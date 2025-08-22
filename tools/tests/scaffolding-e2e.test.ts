@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
 import * as fsp from "node:fs/promises";
-import { rsyncRepoTo, mktemp } from "#tests/lib/test-helpers";
+import { rsyncRepoTo, mktemp } from "./lib/test-helpers";
 
 async function main() {
   const tmp = await mktemp("scaf-e2e-");

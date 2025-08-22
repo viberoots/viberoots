@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { mktemp, rsyncRepoTo } from "#tests/lib/test-helpers";
+import { mktemp, rsyncRepoTo } from "./lib/test-helpers";
 import * as fsp from "node:fs/promises";
 
 async function main() {
