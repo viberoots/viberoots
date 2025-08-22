@@ -48,10 +48,9 @@
             alias scaf='tools/scaffolding/scaf.ts'
             chmod +x tools/scaffolding/scaf.ts 2>/dev/null || true
           '';
-          buildInputs = [ pkgs.git pkgs.buck2 pkgs.go pkgs.pnpm pkgs.nodejs_22 zx-wrapper pkgs.jq pkgs.rsync ]
-            ++ (if pkgs.stdenv.isLinux then [ pkgs.fuse-overlayfs ] else [])
-            ++ [ (pkgs.python3Packages.copier or pkgs.copier or pkgs.python311Packages.copier) ]
-            ++ [ (pkgs.yq-go or pkgs.yq) ];
+          buildInputs = [
+            pkgs.git pkgs.buck2 pkgs.go pkgs.pnpm pkgs.nodejs_22 zx-wrapper pkgs.jq pkgs.rsync pkgs.copier pkgs.yq
+          ] ++ (if pkgs.stdenv.isLinux then [ pkgs.fuse-overlayfs ] else []);
         };
       }
     );
