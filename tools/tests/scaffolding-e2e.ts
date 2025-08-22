@@ -14,8 +14,8 @@ async function main() {
   try {
     process.chdir(tmp);
     await $`scaf new go lib demo-lib`;
-    const lsJson = (await $`scaf ls --json`).stdout;
-    const arr = JSON.parse(lsJson.trim());
+    const res = await $({ stdio: 'pipe' })`scaf ls --json`;
+    const arr = JSON.parse(res.stdout.trim() || "[]");
     if (!arr.some((r: any) => r.path.endsWith("libs/demo-lib"))) {
       console.error("ls did not include libs/demo-lib");
       process.exit(2);

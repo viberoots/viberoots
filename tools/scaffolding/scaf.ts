@@ -2,7 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import os from "node:os";
-import { copierRecopyOrUpdate, copierUpdate } from "./lib/scaffold-utils";
+import { copierRecopyOrUpdate, copierUpdate } from "./lib/scaffold-utils.ts";
 
 function usage() {
   console.log(`scaf <command> [...]
@@ -57,10 +57,6 @@ function resolveDestination(language: string, template: string, name: string, ov
   return path.join(".tmp", name);
 }
 
-async function writeAnswersFile(dir: string, data: any) {
-  await fs.outputFile(path.join(dir, ".copier-answers.yml"), "# recorded by scaf\n", "utf8");
-}
-
 async function runCopierCopy(templateDir: string, dest: string, data: Record<string, any>) {
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "scaf-"));
   const answersPath = path.join(tmpDir, "answers.json");
@@ -70,6 +66,16 @@ async function runCopierCopy(templateDir: string, dest: string, data: Record<str
   } finally {
     await fs.remove(tmpDir).catch(() => {});
   }
+}
+
+async function writeAnswers(pathDir: string, name: string, language: string, template: string) {
+  const yml = [
+    "# Recorded by scaf for discovery",
+    `name: ${name}`,
+    `language: ${language}`,
+    `template: ${template}`,
+  ].join("\n") + "\n";
+  await fs.outputFile(path.join(pathDir, ".copier-answers.yml"), yml, "utf8");
 }
 
 async function cmdNew(args: string[], flags: Record<string,string>) {
@@ -83,6 +89,7 @@ async function cmdNew(args: string[], flags: Record<string,string>) {
   for (const [k,v] of Object.entries(flags)) if (!["path","json"].includes(k)) data[k] = v;
   await fs.mkdirp(dest);
   await runCopierCopy(root, dest, data);
+  await writeAnswers(dest, name, language, template);
   console.log("created:", dest);
 }
 
@@ -91,11 +98,12 @@ async function discoverScaffolds(root: string = "."): Promise<Array<{path: strin
   for await (const f of walk(root)) {
     if (path.basename(f) === ".copier-answers.yml") {
       const dir = path.dirname(f);
-      // Best-effort: infer from dir name and template hints
       const name = path.basename(dir);
-      // We recorded minimal answers; use dir structure for now
-      const guess = dir.includes("libs/") ? { language: "go", template: "lib" } : { language: "unknown", template: "unknown" };
-      out.push({ path: dir, language: guess.language, template: guess.template, name });
+      // Try parse minimal yaml
+      const txt = await fs.readFile(f, "utf8").catch(() => "");
+      const lang = /language:\s*(\S+)/.exec(txt)?.[1] || (dir.includes("libs/") ? "go" : "unknown");
+      const tmpl = /template:\s*(\S+)/.exec(txt)?.[1] || (dir.includes("libs/") ? "lib" : "unknown");
+      out.push({ path: dir, language: lang, template: tmpl, name });
     }
   }
   return out;
@@ -106,7 +114,7 @@ async function* walk(dir: string): AsyncGenerator<string> {
   for (const e of list) {
     const p = path.join(dir, e.name);
     if (e.isDirectory()) {
-      if ([".git","node_modules","buck-out",".direnv",".gitignore"].includes(e.name)) continue;
+      if ([".git","node_modules","buck-out",".direnv",".gitignore",".tmp"].includes(e.name)) continue;
       yield* walk(p);
     } else {
       yield p;

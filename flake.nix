@@ -45,8 +45,9 @@
           shellHook = ''
             export NIX_CONFIG="extra-experimental-features = nix-command flakes dynamic-derivations recursive-nix"
             echo "[devshell] configured nix experimental features"
-            alias scaf='tools/scaffolding/scaf.ts'
+            export PATH="$PWD/tools/bin:$PATH"
             chmod +x tools/scaffolding/scaf.ts 2>/dev/null || true
+            chmod +x tools/tests/scaffolding-smoke.ts 2>/dev/null || true
           '';
           buildInputs = [
             pkgs.git pkgs.buck2 pkgs.go pkgs.pnpm pkgs.nodejs_22 zx-wrapper pkgs.jq pkgs.rsync pkgs.copier pkgs.yq

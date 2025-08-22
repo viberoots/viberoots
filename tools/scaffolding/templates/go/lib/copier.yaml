@@ -1,10 +1,16 @@
 # Minimal copier template for go/lib
 version: 1
 
-# Variables
-_data:
-  name: ""
-  language: "go"
-  template: "lib"
+_envops:
+  block_start_string: "{%"
+  block_end_string: "%}"
+  variable_start_string: "{{"
+  variable_end_string: "}}"
+  comment_start_string: "{#"
+  comment_end_string: "#}"
+  keep_trailing_newline: true
 
-# Render all files in this directory
+# Top-level variable defaults; scaf supplies values via --data-file
+name: ""
+language: "go"
+template: "lib"
