@@ -18,7 +18,22 @@
               --experimental-strip-types \
               --experimental-top-level-await \
               --disable-warning=ExperimentalWarning \
-              --import ${pkgs.nodePackages.zx}/lib/node_modules/zx/build/globals.js \
+              --import ${pkgs.writeText "zx-init.mjs" ''
+                import "${pkgs.nodePackages.zx}/lib/node_modules/zx/build/globals.js";
+                if (globalThis.$) {
+                  // Default all template-tag calls to stdio: 'inherit'
+                  const $orig = globalThis.$;
+                  const isTemplateCall = (first) => Array.isArray(first) && Object.prototype.hasOwnProperty.call(first, 'raw');
+                  const $patched = (...args) => {
+                    if (isTemplateCall(args[0])) {
+                      return $orig({ stdio: 'inherit' })(...args);
+                    }
+                    return $orig(...args);
+                  };
+                  Object.assign($patched, $orig);
+                  globalThis.$ = $patched;
+                }
+              ''} \
               "$@"
           '');
       in f { inherit pkgs zx-wrapper; }
@@ -30,9 +45,13 @@
           shellHook = ''
             export NIX_CONFIG="extra-experimental-features = nix-command flakes dynamic-derivations ca-derivations recursive-nix"
             echo "[devshell] configured nix experimental features"
+            alias scaf='tools/scaffolding/scaf.ts'
+            chmod +x tools/scaffolding/scaf.ts 2>/dev/null || true
           '';
-          buildInputs = [ pkgs.git pkgs.buck2 pkgs.go pkgs.pnpm pkgs.nodejs_22 zx-wrapper ]
-            ++ (if pkgs.stdenv.isLinux then [ pkgs.fuse-overlayfs ] else []);
+          buildInputs = [ pkgs.git pkgs.buck2 pkgs.go pkgs.pnpm pkgs.nodejs_22 zx-wrapper pkgs.jq pkgs.rsync ]
+            ++ (if pkgs.stdenv.isLinux then [ pkgs.fuse-overlayfs ] else [])
+            ++ [ (pkgs.python3Packages.copier or pkgs.copier or pkgs.python311Packages.copier) ]
+            ++ [ (pkgs.yq-go or pkgs.yq) ];
         };
       }
     );

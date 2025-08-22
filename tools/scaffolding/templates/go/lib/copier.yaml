@@ -1,0 +1,10 @@
+# Minimal copier template for go/lib
+version: 1
+
+# Variables
+_data:
+  name: ""
+  language: "go"
+  template: "lib"
+
+# Render all files in this directory
