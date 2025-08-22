@@ -13,14 +13,6 @@
     "noEmit": true,
     "strict": true
   },
-  "include": [
-     "types/**/*.d.ts",
-     "**/*.ts"
-  ],
-  "exclude": [
-    "**/node_modules/**",
-    "**/dist/**",
-    "**/build/**",
-    "**/buck-out/**"
-  ]
+  "include": ["types/**/*.d.ts", "**/*.ts"],
+  "exclude": ["**/node_modules/**", "**/dist/**", "**/build/**", "**/buck-out/**"]
 }

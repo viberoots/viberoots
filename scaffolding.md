@@ -3,12 +3,14 @@
 This document describes the scaffolding system used in this repository: how templates are organized, how we invoke Copier to materialize a new project from a template (or update an existing scaffold), and how we orchestrate the flow using zx-wrapper scripts and Nix. It is intended as an implementation guide that a junior engineer or an LLM can use to recreate the design from scratch.
 
 ### Goals
+
 - Consistent, repeatable project scaffolds across languages.
 - Idempotent, safe operations (copy new, or update existing) with clear diffs.
 - Deterministic tooling via Nix; no global PATH assumptions.
 - Easy entry points via zx-wrapper scripts and build tool targets.
 
 ### High-level flow
+
 1. Select a template (e.g., a Go microservice, a TS library, etc.).
 2. Compute/collect answers (template variables) and defaults.
 3. Run Copier to either:
@@ -17,9 +19,11 @@ This document describes the scaffolding system used in this repository: how temp
 4. Run post-generation steps (formatting, dependency bootstrapping, metadata updates).
 
 ### CLI UX (intended)
+
 We will expose a single entrypoint `scaf` that provides a consistent, discoverable CLI to operate on templates across languages.
 
 #### Shapes by subcommand
+
 ```text
 scaf new <language> <template> <name> [--path=$DESTINATION_DIR] <template-specific args>
 scaf delete <all|path1 path2 ...>
@@ -28,6 +32,7 @@ scaf update <all|path1 path2 ...>
 ```
 
 Where:
+
 - `<language>`: the language family (e.g., `go`, `ts`, `python`).
 - `<template>`: the template kind within that language (e.g., `lib`, `cli-app`, `service`). Synonyms are supported where brackets indicate optional suffixes (e.g., `lib[rary]`).
 - `<name>`: the logical name of the scaffold (used to derive module/package names and directory names).
@@ -35,6 +40,7 @@ Where:
 - `<template-specific args>`: additional `--key=value` pairs forwarded to Copier as variables.
 
 Examples:
+
 ```bash
 scaf new go lib[rary] greeter-utilities
 scaf new go cli-app greeter-cli
@@ -43,6 +49,7 @@ scaf new go cli-app greeter-cli
 Both examples create the destination under the canonical location for the chosen language/template. The CLI resolves synonyms (e.g., `lib`/`library`) and normalizes names.
 
 #### Subcommands and semantics
+
 - new: Create a new scaffold at the resolved destination using `copier copy`.
   - Refuses to overwrite a non-empty directory unless explicitly confirmed.
   - Writes `.copier-answers.yml` into the destination for future updates.
@@ -64,6 +71,7 @@ Both examples create the destination under the canonical location for the chosen
   - Requires explicit confirmation.
 
 #### Additional commands
+
 - templates: List available templates and their variable schema.
   - Usage:
     - `scaf templates`
@@ -87,26 +95,31 @@ Both examples create the destination under the canonical location for the chosen
     - fish: `scaf completions fish | source`
 
 #### Target selection
+
 - `scaf delete|regen|update <all|path1 path2 ...>`
   - If no names are provided, `all` is the implicit default; the tool discovers all eligible scaffolds in the repo (those with `.copier-answers.yml`).
   - If specific paths are provided, the tool validates they exist; names may also be resolved to paths via canonical rules.
   - The tool prints a table of targets and actions, then prompts `Proceed? [y/N]`.
 
 #### Canonical locations
+
 - The CLI infers destination directories from repository conventions per language/template. For example:
   - `go library` -> libraries root (e.g., `libs/…`).
   - `go application` -> applications root (e.g., `apps/…` or `microservices/…`).
 - These conventions are defined in a small resolver module, not hard-coded paths. The resolver can be configured per repository (e.g., via a JSON/YAML in `tools/scaffolding/`), allowing reuse across repos.
 
 #### Guards and confirmations
+
 - Deletion/update/regen show a summary table of targets and planned operations.
 - Deleting paths without `.copier-answers.yml` is allowed when paths are explicitly provided; a confirmation prompt is still required.
 - On conflicts (update), the tool surfaces Copier’s conflict markers or aborts according to policy (default: inline markers).
 
 #### Exit codes
+
 - 0: success; 1: generic failure; 2: invalid arguments; 3: user aborted.
 
 #### Implementation outline
+
 - The `scaf` CLI is a zx-wrapper script that:
   - Parses the command line into `{subcommand, language, template, name, extras}` (for `new`) or `{subcommand, targets}` (for `delete|regen|update`).
   - Resolves canonical `destination` if `--path` is not provided (for `new`).
@@ -117,6 +130,7 @@ Both examples create the destination under the canonical location for the chosen
   - Runs common post-steps (formatters, generators) via Nix.
 
 ### Directory layout
+
 - `tools/scaffolding/`
   - `templates/<template-name>/`
     - `<language>/` (e.g., `go/`, `typescript/`, etc.)
@@ -128,6 +142,7 @@ Both examples create the destination under the canonical location for the chosen
 You may add additional language subdirectories as needed. Keep each template self-contained.
 
 ### Template anatomy
+
 - Template files are standard Copier/Jinja templates. Anything under the template dir can be rendered with variables defined in `copier.yaml`.
 - Required file: `copier.yaml` with fields such as:
   - `version`: schema version.
@@ -136,16 +151,18 @@ You may add additional language subdirectories as needed. Keep each template sel
   - `prompts`: optional prompts if you want interactive mode (we generally pass all values non-interactively from zx).
   - `tasks` / hooks: `pre-copy`, `post-copy`, `pre-update`, `post-update` to automate steps around Copier actions.
 - Use a `.copier-answers.yml` that gets written into the target scaffold. It records the template source and answers to enable future `copier update`.
- - Reference schema & docs for `copier.yaml` keys: see Copier’s configuration reference at
-   - https://copier.readthedocs.io/en/stable/configuring/
-   - https://copier.readthedocs.io/en/stable/
+- Reference schema & docs for `copier.yaml` keys: see Copier’s configuration reference at
+  - https://copier.readthedocs.io/en/stable/configuring/
+  - https://copier.readthedocs.io/en/stable/
 
 ### Nix integration
+
 - Each template can include Nix expressions (e.g., `flake.nix`, `default.nix`, or a small `env.nix`) that pin the tools required to operate on the scaffold (formatters, generators, language toolchains). This ensures reproducibility.
 - The orchestrator calls tools (Copier, formatters, language CLIs) through Nix to avoid host-specific drift. Example: `nix develop -c copier ...` or `nix shell <pkgs> -c <tool>`.
 - Keep the template’s Nix files template-ized if the scaffold needs its own Nix environment; otherwise, keep Nix only in the scaffolding layer.
 
 ### Orchestration with zx-wrapper
+
 - We use zx-wrapper scripts as the UX layer for scaffolding. Typical steps:
   1. Parse CLI args (e.g., `--name`, `--destination`, optional flags like `--update`).
   2. Derive additional data: normalized names, module paths, computed image/library names, etc.
@@ -156,22 +173,23 @@ You may add additional language subdirectories as needed. Keep each template sel
   5. After Copier finishes, run any post steps: format code, run dependency installers, generate code from IDLs, write convenience files, etc.
 
 Pseudo-structure (TypeScript with zx-wrapper):
+
 ```ts
 #!/usr/bin/env zx-wrapper
 
-import { $ } from 'zx';
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { $ } from "zx";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 
-const templateDir = 'tools/scaffolding/templates/go';
+const templateDir = "tools/scaffolding/templates/go";
 const dest = process.argv[2];
 const answers = {
-  name: 'my-service',
-  module: 'github.com/acme/my-service',
+  name: "my-service",
+  module: "github.com/acme/my-service",
 };
 
 // Decide copy vs update
-const isUpdate = existsSync(join(dest, '.copier-answers.yml'));
+const isUpdate = existsSync(join(dest, ".copier-answers.yml"));
 
 // Run Copier directly (dev shell provides copier on PATH)
 if (!isUpdate) {
@@ -181,7 +199,7 @@ if (!isUpdate) {
   try {
     await $`copier recopy --trust --defaults --force ${dest}`;
   } catch {
-    await $`copier update --trust --defaults --answers-file ${join(dest, '.copier-answers.yml')}`;
+    await $`copier update --trust --defaults --answers-file ${join(dest, ".copier-answers.yml")}`;
   }
 }
 
@@ -190,11 +208,13 @@ await $`bash -lc 'cd ${dest} && npm run format || true'`;
 ```
 
 Notes:
+
 - We prefer non-interactive mode and pass all variables via `--data` to keep pipelines deterministic.
 - Use `--force` when re-running locally; CI may omit `--force` to surface conflicts more clearly.
 - The orchestrator should exit non-zero on errors and surface Copier output directly to the caller.
 
 ### Update strategy (`copier update`)
+
 - The presence of `.copier-answers.yml` in the destination indicates the scaffold is updatable.
 - `copier update`:
   - Reuses recorded template URL/commit (or current template dir if local) and answers file.
@@ -203,33 +223,39 @@ Notes:
 - Policy:
   - If destination exists but no `.copier-answers.yml`, treat it as a copy-only migration (require manual adoption or create a new scaffold and diff).
   - Never “rm -rf” an existing directory. Updates must be explicit.
- - Fallback behavior:
-   - Prefer a full deterministic re-render via `copier recopy` when available, and fall back to `copier update` if `recopy` is unsupported by the installed Copier version/template. This provides resilience across environments while preserving local edits.
+- Fallback behavior:
+  - Prefer a full deterministic re-render via `copier recopy` when available, and fall back to `copier update` if `recopy` is unsupported by the installed Copier version/template. This provides resilience across environments while preserving local edits.
 
 ### Variables, defaults, and naming
+
 - Keep variable names clear and language-agnostic (`name`, `module`, `description`, `owner`, etc.).
 - Normalize names (kebab-case, snake-case, PascalCase) in the orchestrator so templates can render all variants.
 - Provide safe defaults in `copier.yaml`; orchestrator may override based on flags or repo conventions.
 
 ### Hooks and post-processing
+
 - Use Copier hooks for operations tied to template rendering (e.g., renaming, generating lockfiles).
 - Favor zx-wrapper post steps when logic is shared across templates (formatting, linting, bootstrapping language-specific artifacts).
 - Keep hook scripts idempotent and fast.
 
 ### Determinism and safety
+
 - Always run Copier and post steps via Nix to pin tool versions.
 - Avoid mutating outside the destination directory.
 - For updates, prefer Copier’s merge mechanisms over ad-hoc file copying.
 - Consider adding a dry-run mode (`--dry-run` flag in orchestrator) that shells out to Copier with no side effects.
 
 ### Testing the scaffolds
+
 - Golden tests: render a template into a temporary directory with fixed answers, then verify file tree and key file contents.
 - Update path: render with V1 of the template, then update with V2 and confirm expected changes.
 
 #### End-to-end testing without disturbing the source repository
+
 To exercise the full `scaf` flow safely while developing or augmenting scaffolding capabilities, run tests in an ephemeral copy of the repo:
 
 1. Create a temporary working copy of the current repository (exclude heavy/ephemeral dirs for speed), e.g.:
+
 ```bash
 TMPDIR=$(mktemp -d)
 rsync -a --exclude 'buck-out' --exclude 'node_modules' --exclude '.git' ./ "$TMPDIR"/
@@ -238,6 +264,7 @@ rsync -a --exclude 'buck-out' --exclude 'node_modules' --exclude '.git' ./ "$TMP
 2. Optionally, make edits to the repository to set up test preconditions.
 
 3. Run `scaf` commands under test inside the temporary copy (via Nix to pin tools), e.g.:
+
 ```bash
 cd '$TMPDIR'
 direnv allow
@@ -248,25 +275,30 @@ scaf new go cli-app greeter-cli
 4. Verify the resulting temp repo contains the expected changes, compared to the original repo, e.g. using diff, ideally in an automated test script written using zx-wrapper.
 
 5. Ideally, we'd use these as CI-friendly assertions (CI-friendly). For example there could be tests which assert that:
+
 - Expected directories/files exist in `$TMPDIR` under the canonical locations.
 - `.copier-answers.yml` exists for each new scaffold and references the correct template source.
 - Running `scaf update all` in `$TMPDIR` is a no-op (no diff) immediately after `new` (idempotence check).
 
 6. Cleanup when done:
+
 ```bash
 rm -rf "$TMPDIR"
 ```
 
 Notes:
+
 - `scaf` should be defined (or at least added to path) by the flake, so that it can be used immediately without modifying PATH manually, etc.
 - For reproducible comparisons, filter out timestamps or tool caches from the diff (use `--exclude` or a `.diffignore`).
 - When testing `update`, ensure `.copier-answers.yml` is present in the target directories; the CLI uses it to resolve the template source and previously supplied variables.
 
 #### Current scripts behavior (for reference)
+
 - Discovery: maintenance scripts currently locate targets by finding `.copier-answers.yml` (they do not accept arbitrary paths as primary input).
 - Safety flags: they support `--dry-run` to preview and `--yes` to skip interactive confirmations.
 
 ### Implementation checklist
+
 - [ ] Create template directory under `tools/scaffolding/templates/<language>/`.
 - [ ] Author `copier.yaml` with variables, defaults, and hooks.
 - [ ] Add optional Nix files that define the environment and pinned tools.
@@ -278,6 +310,7 @@ Notes:
 - [ ] Add minimal golden tests that render the template under CI and verify success.
 
 ### Implementation plan (from scratch)
+
 1. Establish dev shell and dependencies
    - Ensure `copier`, `yq`, `jq`, `node`, and zx-wrapper are available on PATH via the dev shell.
    - Provide `scaf` entrypoint (zx-wrapper script) in the dev shell so commands work without additional setup.
@@ -323,5 +356,3 @@ Notes:
    - Optionally validate template updates from previous versions using `update`.
 
 This design allows new templates to be added incrementally while keeping scaffolding reproducible, safe to re-run, and easy to evolve through `copier update`.
-
-

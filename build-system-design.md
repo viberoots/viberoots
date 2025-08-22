@@ -1,4 +1,5 @@
 # Nix Dynamic Derivations + Buck2 + Go Patching — Implementation Guide
+
 > **Audience:** Engineers (and future LLM agents) who will be responsible for implementing this design.  
 > **Scope today:** **Go applications & libraries only.** The design deliberately remains **language-agnostic** so other languages (Rust, JVM, Python, Node, etc.) can be added without redesign.
 > **Script policy:** **All scripts MUST be TypeScript zx scripts** using our custom hashbang `#!/usr/bin/env zx-wrapper`. **Do not** write `bash/sh` scripts.
@@ -7,24 +8,24 @@
 
 ## Table of Contents
 
-1. [What You Are Building (Conceptual Overview)](#what-youre-building-conceptual-overview)  
-2. [Design Principles](#design-principles)  
-3. [End-to-End Architecture (Mermaid)](#end-to-end-architecture)  
-4. [Buck2 as Orchestrator: Impact & Inputs](#buck2-as-orchestrator-impact-inputs)  
-5. [Nix with Dynamic Derivations](#nix-with-dynamic-derivations)  
-   - [graph-generator.nix](#graph-generatornix)  
-   - [Planner Dispatch (including optional mapping.nix)](#planner-dispatch-including-optional-mappingnix)  
-   - [Go Templates (goApp / goLib)](#go-templates-goapp-golib)  
-6. [Exporting the Buck Graph (zx)](#exporting-the-buck-graph-zx)  
-7. [Go Patching (outer CLI `patch-pkg` → `patch-go.ts`)](#go-patching-outer-cli-patch-pkg-patch-gots)  
-   - [Directly-Usable Go Patching Workflow (copied & adapted)](#go-patching-workflow)  
-   - [Idempotency Rules](#idempotency-rules)  
-   - [Warnings & CI Fail-Safes](#warnings-ci-fail-safes)  
-8. [Developer Workflow (Mermaid + Commands)](#developer-workflow)  
-9. [CI with Jenkins (Matrix across 3 Architectures)](#ci-with-jenkins)  
-10. [Scaffolding Requirements](#scaffolding-requirements)  
-11. [gomod2nix Integration (called from `tools/install-deps.ts`)](#gomod2nix-integration-called-from-toolsinstall-depsts)  
-12. [Future-Proofing for Other Languages](#future-proofing-for-other-languages)  
+1. [What You Are Building (Conceptual Overview)](#what-youre-building-conceptual-overview)
+2. [Design Principles](#design-principles)
+3. [End-to-End Architecture (Mermaid)](#end-to-end-architecture)
+4. [Buck2 as Orchestrator: Impact & Inputs](#buck2-as-orchestrator-impact-inputs)
+5. [Nix with Dynamic Derivations](#nix-with-dynamic-derivations)
+   - [graph-generator.nix](#graph-generatornix)
+   - [Planner Dispatch (including optional mapping.nix)](#planner-dispatch-including-optional-mappingnix)
+   - [Go Templates (goApp / goLib)](#go-templates-goapp-golib)
+6. [Exporting the Buck Graph (zx)](#exporting-the-buck-graph-zx)
+7. [Go Patching (outer CLI `patch-pkg` → `patch-go.ts`)](#go-patching-outer-cli-patch-pkg-patch-gots)
+   - [Directly-Usable Go Patching Workflow (copied & adapted)](#go-patching-workflow)
+   - [Idempotency Rules](#idempotency-rules)
+   - [Warnings & CI Fail-Safes](#warnings-ci-fail-safes)
+8. [Developer Workflow (Mermaid + Commands)](#developer-workflow)
+9. [CI with Jenkins (Matrix across 3 Architectures)](#ci-with-jenkins)
+10. [Scaffolding Requirements](#scaffolding-requirements)
+11. [gomod2nix Integration (called from `tools/install-deps.ts`)](#gomod2nix-integration-called-from-toolsinstall-depsts)
+12. [Future-Proofing for Other Languages](#future-proofing-for-other-languages)
 13. [Appendix: Reference Snippets](#appendix-reference-snippets)
 
 ---
@@ -33,13 +34,14 @@
 
 **Goal:** Combine **Buck2** (fine-grained graph, change detection, impacted tests) with **Nix** (hermetic toolchains, reproducible builds) and a **Go patching** workflow.
 
-- Buck2 remains the **source of truth** for the dependency graph and test impact analysis.  
-- Each Buck target’s build is implemented **via Nix** using **dynamic derivations**.  
+- Buck2 remains the **source of truth** for the dependency graph and test impact analysis.
+- Each Buck target’s build is implemented **via Nix** using **dynamic derivations**.
 - Patching third-party modules is **ergonomic**, **idempotent**, and **cache-friendly**.
 
 ### Why this design?
-- Buck2 gives us **precise incremental builds and “what to retest”** queries.  
-- Nix gives us **hermeticity** and **deterministic artifacts** (toolchains, dependencies).  
+
+- Buck2 gives us **precise incremental builds and “what to retest”** queries.
+- Nix gives us **hermeticity** and **deterministic artifacts** (toolchains, dependencies).
 - The patching layer makes it safe and **repeatable** to adjust third-party code without vendoring.
 
 ---
@@ -49,40 +51,39 @@
 - **Authoritative exporter enabled (Go).** Labels come from authoritative `go list -deps -json -test=all`, batched by config, after codegen.
 - **Node (optional, experimental): PNPM-only.** Lockfile providers are **importer-scoped**; label format `lockfile:<path>#<importer>` (see “Later / Optional — Node”).
 
- 
-
 ### Nix Features (enable globally)
 
 **Tool versions (pin or newer):** Node ≥ 18.x, PNPM ≥ 8.x, Go ≥ 1.22, Buck2 ≥ 2024-xx, Nix ≥ 2.18.
 
 Set once in **devshell** and **CI** so dynamic derivations and flakes work consistently everywhere:
+
 ```
 extra-experimental-features = nix-command flakes dynamic-derivations ca-derivations recursive-nix
 ```
 
 > Tip: put this in the devshell environment (e.g., `devshell.toml` or `flake`-based shell) **and** ensure CI agents export the same value. Avoid per-job drift.
 
-
 ### Path Invariants (must-follow)
 
 1. All non-Nix patch artifacts live under `patches/<lang>/` (e.g., `patches/go/...`).
 1. **Planner vs exporter homes.** Planner code & language templates live under `tools/nix/...`. Buck graph export tools live under `tools/buck/...`.
-1. **Single outer CLI.** The only user-facing patching entrypoint is `patch-pkg`. Language-specific implementations live under `tools/patch/<lang>/` and are invoked *only* by `patch-pkg`.
+1. **Single outer CLI.** The only user-facing patching entrypoint is `patch-pkg`. Language-specific implementations live under `tools/patch/<lang>/` and are invoked _only_ by `patch-pkg`.
 1. Store patches under a top-level `patches/` directory with **language-specific subdirectories**, e.g. `patches/go/…`. (We explicitly **do not** use `nix/` for non-Nix files.)
-1. **At most one patch per `module@version`** in `patches/<lang>/`; duplicates are forbidden.  
-1. **All automation scripts** are zx TypeScript files with `#!/usr/bin/env zx-wrapper`. The zx-wrapper is **already provided**; it enables TypeScript, `$` shelling, and common imports by default—**do not** re-implement or re-import zx in each script.  
-1. **Flake Integration:** You are working in a repo that already has a `flake.nix`. **Merge** new outputs/attrs with the existing flake **unless** responsibilities overlap; if they do, **this design takes precedence**.  
-1. **Naming:** Use **`graph-generator.nix`** for the outer dynamic-derivation planner entrypoint.  
-1. **Optional `tools/nix/mapping.nix`:** A small, **explicit dispatch table** for mapping **custom Buck rule types** to planner templates. Think of it as a **name-to-template router**. Keep it tiny and example-driven.  
-1. **Examples everywhere.** Prefer short, runnable examples over abstract prose.  
-1. **Dev overrides:** Always print a **warning** when dev package overrides are in effect. In CI (environment flags), builds **must fail** if dev overrides are present. **Setting `NIX_GO_DEV_OVERRIDE_JSON` changes derivation hashes; unset it before sharing cache artifacts. Never allowed in CI.**  
-1. **Patching UX:** One **outer** command: `patch-pkg <subcommand> <language> …` that **delegates** to language-specific scripts (e.g., `patch-go.ts`).  
-1. **Idempotent patches:** Re-applying the **same** patch must **not** cause rebuilds.  
-1. **Scaffolding:** When you add new target types, **update/augment** the existing scaffolding tools in `tools/` (don’t invent new scaffolding).  
+1. **At most one patch per `module@version`** in `patches/<lang>/`; duplicates are forbidden.
+1. **All automation scripts** are zx TypeScript files with `#!/usr/bin/env zx-wrapper`. The zx-wrapper is **already provided**; it enables TypeScript, `$` shelling, and common imports by default—**do not** re-implement or re-import zx in each script.
+1. **Flake Integration:** You are working in a repo that already has a `flake.nix`. **Merge** new outputs/attrs with the existing flake **unless** responsibilities overlap; if they do, **this design takes precedence**.
+1. **Naming:** Use **`graph-generator.nix`** for the outer dynamic-derivation planner entrypoint.
+1. **Optional `tools/nix/mapping.nix`:** A small, **explicit dispatch table** for mapping **custom Buck rule types** to planner templates. Think of it as a **name-to-template router**. Keep it tiny and example-driven.
+1. **Examples everywhere.** Prefer short, runnable examples over abstract prose.
+1. **Dev overrides:** Always print a **warning** when dev package overrides are in effect. In CI (environment flags), builds **must fail** if dev overrides are present. **Setting `NIX_GO_DEV_OVERRIDE_JSON` changes derivation hashes; unset it before sharing cache artifacts. Never allowed in CI.**
+1. **Patching UX:** One **outer** command: `patch-pkg <subcommand> <language> …` that **delegates** to language-specific scripts (e.g., `patch-go.ts`).
+1. **Idempotent patches:** Re-applying the **same** patch must **not** cause rebuilds.
+1. **Scaffolding:** When you add new target types, **update/augment** the existing scaffolding tools in `tools/` (don’t invent new scaffolding).
 1. **Platforms:** Everything must work on at least **aarch64-darwin**, **aarch64-linux**, and **x86_64-linux**.
 1. **Glue scripts run outside Nix.** Generators are plain Node tools; do not wrap them in `nix run`.
 
 ## End-to-End Architecture
+
 ```mermaid
 graph LR
   subgraph Dev
@@ -112,11 +113,11 @@ graph LR
 
 ## Buck2 as Orchestrator: Impact & Inputs
 
-- Buck2 computes a **rule key** from declared inputs: source files, attributes, deps’ outputs, toolchain config, and **any files that influence the derivation**, e.g.:  
-  - `go.mod`, `go.sum`, `gomod2nix.toml`  
+- Buck2 computes a **rule key** from declared inputs: source files, attributes, deps’ outputs, toolchain config, and **any files that influence the derivation**, e.g.:
+  - `go.mod`, `go.sum`, `gomod2nix.toml`
   - `patches/go/<importPath encoded>@<version>.patch` (flat dir; one per module@version)
-- **The planner (`graph-generator.nix`) and the language templates used by it** are also considered inputs.  
-- If any of these change, the rule key changes → that target and its **reverse deps** are dirty → **impacted tests** are directly queryable:  
+- **The planner (`graph-generator.nix`) and the language templates used by it** are also considered inputs.
+- If any of these change, the rule key changes → that target and its **reverse deps** are dirty → **impacted tests** are directly queryable:
   ```bash
   buck2 cquery 'testsof(rdeps(//..., //<target>))'
   ```
@@ -132,6 +133,7 @@ The **outer** dynamic-derivation entrypoint. It reads the exported Buck graph (J
 > **Merge:** Add this to your existing `flake.nix` **without** removing current outputs. If a name or responsibility overlaps (e.g., duplicate `packages.<system>.graph-generator`), **this design’s outputs take precedence**.
 
 **Sketch:**
+
 ```nix
 # graph-generator.nix (outer planner)
 { pkgs, system }:
@@ -187,6 +189,7 @@ in
 **What `mapping.nix` is for:** some repos define **custom Buck rule names** (e.g., `go_service`, `my_go_lib`). The optional `tools/nix/mapping.nix` is a **small registry** that tells the planner which **template** to use and any **attribute name overrides**. Think of it as a **lookup table**—not a second build system.
 
 **Example `tools/nix/mapping.nix`:**
+
 ```nix
 # Optional registry: map custom rule types → template + kind
 {
@@ -205,6 +208,7 @@ in
 ### Go Templates (`goApp` / `goLib`)
 
 Keep language logic localized and easy to read. The Go templates consume the **patch maps** and **dev override** env:
+
 ```nix
 # tools/nix/lang-templates.nix  (Go excerpts)
 { pkgs }:
@@ -280,6 +284,7 @@ in
 > Note: during local development, you may scope exports to language-labeled targets (e.g., only `lang:go`) to keep `graph.json` small. Keep CI unscoped.
 
 We export the **configured** Buck graph as JSON with a short zx script. This script is **not** prescriptive; place it wherever your repo expects tools to live.
+
 ```ts
 #!/usr/bin/env zx-wrapper
 /**
@@ -287,13 +292,24 @@ We export the **configured** Buck graph as JSON with a short zx script. This scr
  * Writes a configured graph to tools/buck/graph.json (or path via --out)
  */
 // We enumerate configured targets with a shallow deps() to avoid dumping the entire graph JSON.
-const query = 'deps(//..., 1, exec_deps())';
+const query = "deps(//..., 1, exec_deps())";
 const out = (argv.out as string) || "tools/buck/graph.json";
 
 const attrs = [
-  'name','rule_type','srcs','deps','labels','args','env','main','main_class',
-  'includes','defines','cflags','ldflags'
-].join(' ');
+  "name",
+  "rule_type",
+  "srcs",
+  "deps",
+  "labels",
+  "args",
+  "env",
+  "main",
+  "main_class",
+  "includes",
+  "defines",
+  "cflags",
+  "ldflags",
+].join(" ");
 
 const { stdout } = await $`buck2 cquery ${query} --json --output-attributes ${attrs}`;
 await fs.outputFile(out, stdout);
@@ -305,58 +321,67 @@ console.log(`wrote ${out}`);
 ## Go Patching (outer CLI `patch-pkg` → `patch-go.ts`)
 
 We standardize on one **outer** CLI:
+
 ```
 patch-pkg <subcommand> <language> [...options]
 ```
 
 The outer CLI `patch-pkg` implements language/subcommand parsing and delegates to the implementation of a common TypeScript interface in language-specific files.
-**Subcommands:**  
-- **`start <module>`**  
-  - Creates a temp writable workspace over the Nix store source of `<module>`:  
-    - **Linux:** `fuse-overlayfs` on top of read-only store path.  
-    - **macOS:** APFS CoW clone (`cp -cR`).  
-  - Writes/updates the `NIX_GO_DEV_OVERRIDE_JSON` entry for `<module>`.  
+**Subcommands:**
+
+- **`start <module>`**
+  - Creates a temp writable workspace over the Nix store source of `<module>`:
+    - **Linux:** `fuse-overlayfs` on top of read-only store path.
+    - **macOS:** APFS CoW clone (`cp -cR`).
+  - Writes/updates the `NIX_GO_DEV_OVERRIDE_JSON` entry for `<module>`.
   - If `$PATCH_EDITOR` is set, launch it with the temp dir.
 
-- **`reset <module>`**  
+- **`reset <module>`**
   - Confirm abandonment, remove override entry, delete temp dir.
 
 - **`apply <module>`**
   - Produce a unified diff and write to the **canonical filename** (flat dir):
+
   ```bash
   diff -ruN "$src" "$tmp" > patches/go/<enc_import>@<exact-module-version>.patch
   # enc_import = import path with '/' -> '__'
   # NOTE: Encoding mirrors PNPM’s patch naming (scoped '@scope__name').
   ```
+
   - Automatically **sync provider rules** and **regenerate the auto-map**:
+
   ```bash
   node tools/buck/sync-providers.ts
   node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl
   ```
+
   - Remove override & delete temp dir; next build applies the patch permanently by filename.
 
-- **`session <module>`**  
-  - Starts like `start` (with Ctrl-C/Ctrl-D instructions) and remains attached:  
-    - **Ctrl-C:** calls `reset`  
-    - **Ctrl-D:** calls `apply`  
+- **`session <module>`**
+  - Starts like `start` (with Ctrl-C/Ctrl-D instructions) and remains attached:
+    - **Ctrl-C:** calls `reset`
+    - **Ctrl-D:** calls `apply`
     - Otherwise: if script exits unexpectedly, user must run `reset` or `apply` later.
-- Delegates to language-specific scripts, e.g. `patch-go.ts` for Go.  
-- Outer command handles **shared logic** (idempotency checks, validation, CI guardrails).  
+- Delegates to language-specific scripts, e.g. `patch-go.ts` for Go.
+- Outer command handles **shared logic** (idempotency checks, validation, CI guardrails).
 - Language script handles **language-specific** details (e.g., module identity, diff generation).
 
 ### Go Patching Workflow
 
 **Components**
 
-1) **gomod2nix**  
-- Lock Go deps in `gomod2nix.toml`.  
+1. **gomod2nix**
+
+- Lock Go deps in `gomod2nix.toml`.
 - Use `buildGoApplication` with `overrides` to add `patches` and `src` overrides per module (fixed-output derivations keep cache keys clean).
 
-2) **Dynamic overrides** (patch map + JSON dev overrides)  
-- **Patch map** (derived from filenames in `patches/go/*.patch`): maps `module@version` → list of patch file paths (under `patches/go/…`).  
+2. **Dynamic overrides** (patch map + JSON dev overrides)
+
+- **Patch map** (derived from filenames in `patches/go/*.patch`): maps `module@version` → list of patch file paths (under `patches/go/…`).
 - `NIX_GO_DEV_OVERRIDE_JSON`: (ephemeral env var) maps `module@version` → absolute local path for dev override.
 
 **Nix usage snippet:**
+
 ```nix
 buildGoApplication {
   pname = "my-app";
@@ -372,18 +397,21 @@ buildGoApplication {
 
 Here `patchesMap` is derived **directly from patch filenames** in `patches/go/*.patch` at evaluation time, and `devOverrides` is read from the `NIX_GO_DEV_OVERRIDE_JSON` environment variable.
 
-3) **`patch-go.ts` (zx) language script** implements subcommands for go.
+3. **`patch-go.ts` (zx) language script** implements subcommands for go.
 
-4) **`PATCH_EDITOR`**  
+4. **`PATCH_EDITOR`**
+
 - If set, executed with the temp dir; can be a GUI IDE or terminal editor.
 
-**Cross-Platform Strategy**  
+**Cross-Platform Strategy**
+
 - Linux: `fuse-overlayfs` writable overlay.
-  - Ensure `fuse-overlayfs` is included in your **Nix developer environment**.  
-- macOS: APFS CoW clones (`cp -cR`).  
+  - Ensure `fuse-overlayfs` is included in your **Nix developer environment**.
+- macOS: APFS CoW clones (`cp -cR`).
 - Both yield a writable dir at `$tmp` with identical UX.
 
 **Developer Example**
+
 ```bash
 # Start editing github.com/foo/bar
 patch-pkg start go github.com/foo/bar
@@ -396,14 +424,15 @@ patch-pkg apply go github.com/foo/bar
 patch-pkg reset go github.com/foo/bar
 ```
 
-**Design Principles**  
-- **No vendoring**: keep repo clean; patches live in `patches/go/*.patch`.  
-- **Per-module**: patches target a single module revision (`module@version`).  
-- **Reproducible**: accepted patches are tracked in VCS and replayed by Nix.  
-- **Fast iteration**: dev overrides let you test changes without committing.  
+**Design Principles**
+
+- **No vendoring**: keep repo clean; patches live in `patches/go/*.patch`.
+- **Per-module**: patches target a single module revision (`module@version`).
+- **Reproducible**: accepted patches are tracked in VCS and replayed by Nix.
+- **Fast iteration**: dev overrides let you test changes without committing.
 - **Cross-platform parity**: same UX on Linux/macOS.
 
-*(Adapted from the internal workflow document.)* fileciteturn5file0
+_(Adapted from the internal workflow document.)_ fileciteturn5file0
 
 ### Idempotency Rules
 
@@ -411,13 +440,14 @@ patch-pkg reset go github.com/foo/bar
 
 ### Warnings & CI Fail-Safes
 
-- The templates (Nix) **emit a warning** whenever `NIX_GO_DEV_OVERRIDE_JSON` is non-empty.  
-- In CI (e.g., `CI=true`), the templates **throw** to **fail the build** if dev overrides are detected.  
+- The templates (Nix) **emit a warning** whenever `NIX_GO_DEV_OVERRIDE_JSON` is non-empty.
+- In CI (e.g., `CI=true`), the templates **throw** to **fail the build** if dev overrides are detected.
 - The outer `patch-pkg` should also print explicit warnings when in session mode.
 
 ---
 
 ## Developer Workflow
+
 ```mermaid
 sequenceDiagram
   participant Dev as Developer
@@ -437,6 +467,7 @@ sequenceDiagram
 ```
 
 **Common commands:**
+
 ```bash
 # Build a Go binary target (example)
 buck2 build //features/payments:service
@@ -452,12 +483,12 @@ patch-pkg apply go golang.org/x/net
 
 ---
 
-
 ## Implementation Plan (bite‑sized, ordered, with verification)
 
 > This plan is designed for a junior engineer or an LLM agent. Each step is **small**, has **clear acceptance criteria**, and includes a **verification** recipe to prevent regressions. Follow in order.
 
 ### Phase 0 — Baseline & Guardrails
+
 - [ ] Create a working branch.
 - [ ] Record current state for later comparison:
   - [ ] Save outputs of `buck2 targets //... | wc -l`, `buck2 test //... --show-output`, and average build time for a representative target (pick 2–3).
@@ -468,6 +499,7 @@ patch-pkg apply go golang.org/x/net
 - Acceptance: Baseline numbers captured in a markdown note under `docs/patching/baseline.md`.
 
 ### Phase 1 — Repo Scaffolding & Invariants
+
 - [ ] Ensure the **path invariants** are present in the repo:
   - [ ] `patches/<lang>/` (e.g., `patches/go/`) exists; **no subdirectories** under `patches/go/`.
   - [ ] `tools/buck/` (exporter + generators) exists.
@@ -482,6 +514,7 @@ patch-pkg apply go golang.org/x/net
 #### Macro Usage Example (attrs that affect configs)
 
 > These attributes (or your macro’s equivalents) must be forwarded by the macro because they impact the **config tuple** used by the authoritative exporter `(GOOS, GOARCH, CGO, build tags, toolchain)`.
+
 ```python
 # TARGETS example
 load("//go:defs.bzl", "nix_go_binary")
@@ -504,7 +537,6 @@ nix_go_binary(
 
 **Acceptance check:** When you change any of these attrs and re‑run the exporter, the target’s `labels` in `tools/buck/graph.json` should update accordingly (different `module:` set if imports change).
 
-
 - [ ] Land `//go/defs.bzl` with the **generic macro** (`nix_go_binary` / `nix_go_library` / `nix_go_test`) that wraps the underlying `go_*` rules and appends provider nodes.
 - [ ] Introduce `//third_party/providers/defs.bzl` with `go_module_patch(...)` (one rule per `module@version`, input = patch file).
 - [ ] Convert **one small target** to the macro (leave the rest untouched).
@@ -513,17 +545,14 @@ nix_go_binary(
   - [ ] No provider nodes are yet required (auto_map can be empty).
 - Acceptance: Macro merged; no behavior change for unpatched builds.
 
-
 ### Phase 3 — Exporter (authoritative, batched `go list`)
 
 **Replace & Pseudo-versions—labeling reference**
 
-| `go.mod` entry | Effective module key | Example label |
-|---|---|---|
-| `replace github.com/foo/bar => ../bar` | `github.com/foo/bar@<pseudo or none>` | `module:github.com/foo/bar@v0.0.0-<pseudo>` |
-| `replace github.com/foo/bar v1.2.3 => github.com/me/bar v1.2.4` | `github.com/me/bar@v1.2.4` | `module:github.com/me/bar@v1.2.4` |
-
-
+| `go.mod` entry                                                  | Effective module key                  | Example label                               |
+| --------------------------------------------------------------- | ------------------------------------- | ------------------------------------------- |
+| `replace github.com/foo/bar => ../bar`                          | `github.com/foo/bar@<pseudo or none>` | `module:github.com/foo/bar@v0.0.0-<pseudo>` |
+| `replace github.com/foo/bar v1.2.3 => github.com/me/bar v1.2.4` | `github.com/me/bar@v1.2.4`            | `module:github.com/me/bar@v1.2.4`           |
 
 - [ ] Implement `tools/buck/export-graph.ts` to run **after codegen** and emit `tools/buck/graph.json` with **authoritative** `module:<path>@<version>` labels using `go list`:
   - Batch targets by **config tuple**: `(toolchain hash, module root, GOOS, GOARCH, CGO_ENABLED, sorted build tags, GOFLAGS)`.
@@ -541,8 +570,8 @@ nix_go_binary(
 - Acceptance: Labels are **exact per target**; changing a module used only in tests affects **test targets** only.
 - [ ] Acceptance: Test-only dependencies appear **only** on their test targets.
 
-
 ### Phase 4 — Provider Sync (Go)
+
 - [ ] Add `tools/buck/sync-providers.ts` that scans `patches/go/*.patch` (flat dir) and rewrites `third_party/providers/TARGETS.auto` (one rule per `module@version`).
 - [ ] Ensure idempotency and sorted order.
 - Verification:
@@ -551,6 +580,7 @@ nix_go_binary(
 - Acceptance: Provider sync merged; no manual provider edits required.
 
 ### Phase 5 — Auto Map (dual‑mode)
+
 - [ ] Add/upgrade `tools/buck/gen-auto-map.ts` to map targets → providers using both:
   - `module:<import>@<version>` → per-module providers (Go)
   - `lockfile:<path>#<importer>` → PNPM importer‑scoped providers (Node), generated via `node_importer_deps(...)`
@@ -562,9 +592,10 @@ nix_go_binary(
 - Acceptance: Changing the dummy patch file triggers a rebuild of only the targets that transitively import that module.
 
 ### Phase 6 — Wire `patch-pkg apply`
+
 - [ ] Extend `patch-pkg apply` (Go) to run, **in order**:
-  1) `node tools/buck/sync-providers.ts`
-  2) `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
+  1. `node tools/buck/sync-providers.ts`
+  2. `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
   - (Re-export graph only when targets/tags change; exporter always runs in CI.)
 - Verification:
   - [ ] `patch-pkg start ...` → edit → `patch-pkg apply ...` creates the canonical patch file and updates providers + auto_map.
@@ -572,18 +603,18 @@ nix_go_binary(
 - Acceptance: No manual steps required after applying a patch.
 
 ### Phase 7 — CI Stages (kept separate for caching)
+
 - [ ] Add stages to Jenkins (exact order):
-  1) **Export Graph** → writes `tools/buck/graph.json`
-  2) **Sync Providers** → updates `TARGETS*.auto`
-  3) **Generate auto_map** → writes `auto_map.bzl`
-  4) **Build & Test** (Buck)
-  5) **Stale Check** → fail if generated files are missing or out-of-date compared to regenerated artifacts (**glue files are not committed**)
+  1. **Export Graph** → writes `tools/buck/graph.json`
+  2. **Sync Providers** → updates `TARGETS*.auto`
+  3. **Generate auto_map** → writes `auto_map.bzl`
+  4. **Build & Test** (Buck)
+  5. **Stale Check** → fail if generated files are missing or out-of-date compared to regenerated artifacts (**glue files are not committed**)
 - [ ] (Optional) Add cache restores keyed by inputs per stage.
 - Verification:
   - [ ] Create a PR that adds a dummy patch; CI updates providers/auto_map and runs the right tests.
   - [ ] Remove the dummy patch; CI drops the provider and passes.
 - Acceptance: CI reproducibly regenerates glue and enforces freshness.
-
 
 ### Phase 8 — Accuracy & Scale Hardening
 
@@ -597,14 +628,14 @@ nix_go_binary(
 - Acceptance: Tag/platform correctness and exporter performance proven on representative samples.
 - [ ] Acceptance: Replace/pseudo-version correctness verified (labels change appropriately when `replace` toggles).
 
-
 ### Phase 9 — Regression Tests & Monitors
+
 - [ ] Add a small **e2e test** script that:
-  1) Creates a temp patch,
-  2) Runs provider sync + auto_map,
-  3) Builds a known target and records the rule key,
-  4) Modifies an **unrelated** patch and confirms the rule key **doesn’t** change,
-  5) Modifies the **related** patch and confirms the rule key **does** change.
+  1. Creates a temp patch,
+  2. Runs provider sync + auto_map,
+  3. Builds a known target and records the rule key,
+  4. Modifies an **unrelated** patch and confirms the rule key **doesn’t** change,
+  5. Modifies the **related** patch and confirms the rule key **does** change.
 - [ ] Add a **lint** that warns on:
   - More than one patch for the same `language/package@version`,
   - Subdirectories under `patches/<lang>/`,
@@ -615,6 +646,7 @@ nix_go_binary(
 - Acceptance: Guardrails prevent regressions in invalidation & naming.
 
 ### Phase 10 — Docs & Operability
+
 - [ ] Update `README` snippets for:
   - Creating a patch (start/apply),
   - Where patches live and naming,
@@ -628,22 +660,26 @@ nix_go_binary(
 ## CI with Jenkins
 
 > **Additional notes:**
+>
 > - Add a **Codegen** stage (if applicable) **before** “Export Graph” to ensure generated Go sources exist.
 > - Add a **Pre-build guard** stage right after “Generate auto_map” that fails fast if `tools/buck/graph.json` or `third_party/providers/auto_map.bzl` are missing, or if no `TARGETS*.auto` files exist when patches/lockfiles are present.
 
 > **Decision (glue generation):** Glue files (`tools/buck/graph.json`, `third_party/providers/TARGETS*.auto`, `third_party/providers/auto_map.bzl`) are **generated by plain Node zx scripts**, invoked directly by `patch-pkg apply` and CI **without** Nix-run wrappers, and are **not committed to VCS**.
 
 > **Why separate stages (not a single `install-deps` in CI)?**
+>
 > - **Cacheability:** cache artifacts per stage (graph export, provider sync, auto-map) with distinct keys.
 > - **Fail-fast diagnostics:** pinpoint exactly which step broke.
 > - **Hermetic control:** CI runs only what’s required.
 
 > **Suggested cache keys:**
+>
 > - **Export Graph:** hash of Buck config & Starlark inputs (e.g., `buck2 --version`, `.buckconfig`, `**/*.bzl`, `**/TARGETS`).
 > - **Sync Providers:** hash of `patches/**` (per-language) and lockfiles (`**/pnpm-lock.yaml`).
 > - **Auto Map:** hash of `tools/buck/graph.json` + generated provider files.
 
 **Example Jenkinsfile (illustrative):**
+
 ```groovy
 pipeline {
   agent none
@@ -701,30 +737,29 @@ pipeline {
 }
 ```
 
-
 > **Note:** Your Jenkins labels must match your builders for each architecture. If you do not have macOS agents, run the Linux-only axes initially.
 
 ---
 
 ## Scaffolding Requirements
 
-When adding **new** Go targets (libs or apps):  
-- **Extend the existing scaffolding tools** in `tools/` to generate:  
-  - the TARGETS stub,  
-  - any minimal Nix/planner hints needed, and  
-  - create `patches/go/` (empty is fine).  
+When adding **new** Go targets (libs or apps):
+
+- **Extend the existing scaffolding tools** in `tools/` to generate:
+  - the TARGETS stub,
+  - any minimal Nix/planner hints needed, and
+  - create `patches/go/` (empty is fine).
 - Do **not** invent a new scaffolding mechanism.
 
 ---
 
 ## gomod2nix Integration (Called from `tools/install-deps.ts`)
 
-- After **dependency changes** (e.g., `go.mod` / `go.sum` updates), you **must** regenerate `gomod2nix.toml`.  
-- **Do not** add a new command; this must be **invoked by the existing** `tools/install-deps.ts` script **without breaking** its current behavior.  
+- After **dependency changes** (e.g., `go.mod` / `go.sum` updates), you **must** regenerate `gomod2nix.toml`.
+- **Do not** add a new command; this must be **invoked by the existing** `tools/install-deps.ts` script **without breaking** its current behavior.
 - Example (conceptual): `nix run nixpkgs#gomod2nix -- --dir .` then stage the updated `gomod2nix.toml`.
 
 ---
-
 
 #### `//third_party/providers/auto_map.bzl` (generated file)
 
@@ -739,6 +774,7 @@ This file is generated by `tools/buck/gen-auto-map.ts` and is loaded by your Buc
   - `module:<import>@<version>` (Go/Rust-style)
   - `lockfile:<path>#<importer>` (Node, PNPM importer-scoped)
 - Emits a dict mapping **target → provider labels**.
+
 ```ts
 #!/usr/bin/env zx-wrapper
 // tools/buck/gen-auto-map.ts
@@ -757,7 +793,7 @@ function nameForLockfileProvider(label: string): string {
 }
 
 const graphPath = (argv.graph as string) || "tools/buck/graph.json";
-const outPath   = (argv.out   as string) || "third_party/providers/auto_map.bzl";
+const outPath = (argv.out as string) || "third_party/providers/auto_map.bzl";
 
 function shortHash(s: string): string {
   return crypto.createHash("sha256").update(s).digest("hex").slice(0, 8);
@@ -778,7 +814,7 @@ function nameForLockfileProvider(label: string): string {
   return `//third_party/providers:lf_${h}_${suffix}`;
 }
 
-type Node = { name: string; rule_type: string; labels?: string[]; };
+type Node = { name: string; rule_type: string; labels?: string[] };
 const nodes: Node[] = JSON.parse(await fs.readFile(graphPath, "utf8"));
 
 function providersFor(node: Node): string[] {
@@ -803,7 +839,7 @@ for (const n of nodes) {
 
 const header = `# //third_party/providers/auto_map.bzl\n# GENERATED FILE — DO NOT EDIT.\n\nMODULE_PROVIDERS = {\n`;
 const body = Object.entries(MODULE_PROVIDERS)
-  .map(([t, arr]) => `    "${t}": [\n${arr.map(a => `        "${a}",`).join("\n")}\n    ],`)
+  .map(([t, arr]) => `    "${t}": [\n${arr.map((a) => `        "${a}",`).join("\n")}\n    ],`)
   .join("\n\n");
 const footer = `\n}\n`;
 
@@ -811,10 +847,10 @@ await fs.outputFile(outPath, header + body + footer);
 console.log(`wrote ${outPath}`);
 ```
 
-
 #### Sync Providers Generator `tools/buck/sync-providers.ts` (zx/TypeScript)
 
 > **Purpose:** Ensure there is exactly **one** Buck provider rule per **patched** `module@version`, derived from the flat `patches/go/*.patch` filenames. This file writes (or rewrites) `third_party/providers/TARGETS.auto` deterministically. **Developers never edit provider rules.**
+
 ```ts
 #!/usr/bin/env zx-wrapper
 // tools/buck/sync-providers.ts
@@ -833,7 +869,7 @@ function nameForLockfileProvider(label: string): string {
 }
 
 const PATCH_DIR = "patches/go";
-const OUT_FILE  = "third_party/providers/TARGETS.auto";
+const OUT_FILE = "third_party/providers/TARGETS.auto";
 
 function decodeModuleKey(file: string): string | null {
   if (!file.endsWith(".patch")) return null;
@@ -872,36 +908,40 @@ if (await fs.pathExists(PATCH_DIR)) {
     if (!key) continue;
     // duplicate guard: only one patch per module@version
     const prior = byModuleKey.get(key);
-    if (prior && prior !== e.name) throw new Error(`Duplicate patch for ${key}: ${prior} vs ${e.name}`);
+    if (prior && prior !== e.name)
+      throw new Error(`Duplicate patch for ${key}: ${prior} vs ${e.name}`);
     byModuleKey.set(key, e.name);
     const name = providerNameForModuleKey(imp, ver);
     const prev = seen.get(name);
-    if (prev && prev !== key) throw new Error(`Provider name collision: ${name}\n${prev} vs ${key}`);
+    if (prev && prev !== key)
+      throw new Error(`Provider name collision: ${name}\n${prev} vs ${key}`);
     seen.set(name, key);
     const patchPath = `${PATCH_DIR}/${e.name}`;
-    entries.push(`go_module_patch(name = "${name}", module_key = "${key}", patch_path = "${patchPath}",)`);
+    entries.push(
+      `go_module_patch(name = "${name}", module_key = "${key}", patch_path = "${patchPath}",)`,
+    );
   }
 }
 
 entries.sort();
 
-const header = `# GENERATED FILE — DO NOT EDIT.\n` +
-               `# Providers derived from filenames in ${PATCH_DIR}.\n\n` +
-               `load("//third_party/providers:defs.bzl", "go_module_patch")\n\n`;
+const header =
+  `# GENERATED FILE — DO NOT EDIT.\n` +
+  `# Providers derived from filenames in ${PATCH_DIR}.\n\n` +
+  `load("//third_party/providers:defs.bzl", "go_module_patch")\n\n`;
 
 const body = entries.join("\n");
 await fs.outputFile(OUT_FILE, header + body + "\n");
 console.log("wrote", OUT_FILE);
 ```
 
-
 **When does it run?**
+
 - **Locally**: automatically when you run `patch-pkg apply` (after writing the canonical patch file).
 - **Dev env setup**: from `tools/install-deps.ts` (after `export-graph.ts`, before `gen-auto-map.ts`).
 - **CI**: as a dedicated stage, before `Generate auto_map`.
 
 ## Future-Proofing for Other Languages
-
 
 ### PNPM Importer‑scoped Providers (Node)
 
@@ -910,15 +950,17 @@ We scope Node to **PNPM only**, and generate **one provider per importer (worksp
 #### Labels & Mapping
 
 - Each Node target gets a label of the form:
-  
+
   ```
   lockfile:<path/to/pnpm-lock.yaml>#<importer>
   ```
-  
+
   Example: `lockfile:apps/web/pnpm-lock.yaml#apps/web`.
+
 - `gen-auto-map.ts` maps this label to the corresponding importer‑scoped provider.
 
 #### Provider Rule (`//third_party/providers/defs_node.bzl`)
+
 ```python
 def node_importer_deps(name, lockfile, importer, patch_paths = []):
     genrule(
@@ -931,6 +973,7 @@ def node_importer_deps(name, lockfile, importer, patch_paths = []):
 ```
 
 #### Generator: `tools/buck/sync-providers-node.ts` (PNPM, Importer‑scoped)
+
 ```ts
 #!/usr/bin/env zx-wrapper
 // tools/buck/sync-providers-node.ts
@@ -1105,10 +1148,10 @@ main().catch(e => { console.error(e); process.exit(1); });
   - [ ] Targets mapped to that importer rebuild; other importers stay untouched.
 - Acceptance: **Importer‑scoped invalidation** works for Node.
 
-
 ## Appendix: Reference Snippets
 
 ### `writeIfChanged()` helper (TypeScript)
+
 ```ts
 // tools/lib/fs-helpers.ts
 import fs from "fs-extra";
@@ -1119,13 +1162,17 @@ export async function writeIfChanged(dst: string, data: string) {
     const cur = await fs.readFile(dst, "utf8");
     const a = crypto.createHash("sha256").update(cur).digest("hex");
     const b = crypto.createHash("sha256").update(data).digest("hex");
-    if (a == b) { console.log(`no-op (already applied): ${dst}`); return; }
+    if (a == b) {
+      console.log(`no-op (already applied): ${dst}`);
+      return;
+    }
   }
   await fs.outputFile(dst, data, "utf8");
 }
 ```
 
 ### `tools/lib/providers.ts` (shared naming/encoding)
+
 ```ts
 // tools/lib/providers.ts — single source of truth used by generators
 import crypto from "node:crypto";
@@ -1154,6 +1201,7 @@ export function providerNameForImporter(lockfilePath: string, importer: string):
 ```
 
 ### `//third_party/providers/defs.bzl`
+
 ```starlark
 # //third_party/providers/defs.bzl — tiny content-addressed stamp for a patch file
 def go_module_patch(name, module_key, patch_path):
@@ -1167,6 +1215,7 @@ def go_module_patch(name, module_key, patch_path):
 ```
 
 ### `//go/defs.bzl` macros (copy‑pasteable)
+
 ```starlark
 # //go/defs.bzl — wrap go_* and attach providers from auto_map.bzl
 load("@prelude//go:def.bzl", "go_binary", "go_library", "go_test")
@@ -1200,6 +1249,7 @@ def nix_go_test(name, **kwargs):
 ```
 
 ### Example TARGETS Entries (Go)
+
 ```starlark
 go_library(
   name = "auth_lib",
@@ -1216,6 +1266,7 @@ go_binary(
 ```
 
 ### Example: Using a specific derivation for an app
+
 ```nix
 # Assuming your flake exposes:
 # packages.<system>.graph-generator
@@ -1227,21 +1278,21 @@ packages.x86_64-linux.graph-generator.goTargets."//features/payments:service"
 
 ### Declaring Buck Inputs (So Impact Works)
 
-- Include: go.mod, go.sum, gomod2nix.toml, and all files matching patches/go/*.patch.
+- Include: go.mod, go.sum, gomod2nix.toml, and all files matching patches/go/\*.patch.
 - Do **not** feed the **value** of `NIX_GO_DEV_OVERRIDE_JSON` into the action key; CI must have it **unset** anyway.
 
 ---
 
 **End of Guide.**  
 This document is intended to be drop-in ready for an LLM and/or engineer to implement the system.  
-Source for the Go patching workflow was incorporated from the attached reference. 
-
+Source for the Go patching workflow was incorporated from the attached reference.
 
 ## Appendix — E2E Provider‑Wiring Test (Ready‑to‑Run Template)
 
 > Goal: verify the **wiring** guarantees that underpin rebuild invalidation — i.e., a target’s transitive deps include the **right** provider(s) and exclude the **wrong** ones. This is a robust regression test that doesn’t depend on output hashes or timing.
 
 ### Script: `tools/tests/e2e-provider-wiring.ts` (zx/TypeScript)
+
 ```ts
 #!/usr/bin/env zx-wrapper
 // tools/tests/e2e-provider-wiring.ts
@@ -1279,7 +1330,7 @@ function lockProviderFrom(lf?: string, importer?: string): string | null {
 async function cqueryDeps(target: string): Promise<string[]> {
   const { stdout } = await $`buck2 cquery "deps(${target})" --json --output-attributes=name`;
   const nodes = JSON.parse(stdout) as Array<{ name: string }>;
-  return nodes.map(n => n.name);
+  return nodes.map((n) => n.name);
 }
 
 function assert(cond: boolean, msg: string) {
@@ -1305,7 +1356,10 @@ async function main() {
   if (unrelated) {
     const p = modProviderFromKey(unrelated);
     console.log("Expect ABSENT:", p);
-    assert(!deps.includes(p), `Expected provider ${p} to be absent in deps(${target}), but it was present.`);
+    assert(
+      !deps.includes(p),
+      `Expected provider ${p} to be absent in deps(${target}), but it was present.`,
+    );
   }
   const lp = lockProviderFrom(lockfile, importer);
   if (lp) {
@@ -1316,11 +1370,14 @@ async function main() {
   console.log("OK — provider wiring looks correct for", target);
 }
 
-main().catch((e) => { console.error(e); process.exit(2); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(2);
+});
 ```
 
-
 **How to run (examples):**
+
 ```bash
 # Go per-module providers
 node tools/tests/e2e-provider-wiring.ts   --target //features/payments:service   --related golang.org/x/net@v0.24.0   --unrelated github.com/sirupsen/logrus@v1.9.0
@@ -1335,6 +1392,7 @@ node tools/tests/e2e-provider-wiring.ts \
 ### Optional Extension — Build Smoke Check
 
 If you also want a minimal build smoke test without relying on output hashes:
+
 ```bash
 # Expect NO rebuild of the target when unrelated patch changes:
 # (touch unrelated patch file with a harmless newline)
@@ -1345,22 +1403,25 @@ buck2 build //features/payments:service  # should report cache hit / no work
 # Revert patch file change afterwards
 git checkout -- patches/go/github.com__sirupsen__logrus@v1.9.0.patch
 ```
+
 > Note: the definitive signal is the **provider wiring** (script above). The smoke check is best‑effort; exact console output can vary with cache settings.
 
-
 ## Appendix — CI Guard & Codegen Stubs
-
 
 ### `tools/dev/startup-check.ts` (zx)
 
 ### `tools/dev/clear-overrides.ts` (zx)
+
 ```ts
 #!/usr/bin/env zx-wrapper
 // Unsets dev overrides and prints the current (empty) value.
-if (process.env.NIX_GO_DEV_OVERRIDE_JSON && process.env.NIX_GO_DEV_OVERRIDE_JSON.trim() !== '') {
+if (process.env.NIX_GO_DEV_OVERRIDE_JSON && process.env.NIX_GO_DEV_OVERRIDE_JSON.trim() !== "") {
   delete process.env.NIX_GO_DEV_OVERRIDE_JSON;
 }
-console.log('NIX_GO_DEV_OVERRIDE_JSON=', JSON.stringify(process.env.NIX_GO_DEV_OVERRIDE_JSON || ''));
+console.log(
+  "NIX_GO_DEV_OVERRIDE_JSON=",
+  JSON.stringify(process.env.NIX_GO_DEV_OVERRIDE_JSON || ""),
+);
 ```
 
 ```ts
@@ -1370,13 +1431,23 @@ import { $ } from "zx";
 import fs from "fs-extra";
 import semver from "semver";
 
-async function which(cmd: string) { try { await $`which ${cmd}`; return true; } catch { return false; } }
+async function which(cmd: string) {
+  try {
+    await $`which ${cmd}`;
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 async function main() {
-  const need = ["pnpm","git","go","buck2","nix"];
+  const need = ["pnpm", "git", "go", "buck2", "nix"];
   const miss: string[] = [];
   for (const b of need) if (!(await which(b))) miss.push(b);
-  if (miss.length) { console.error("Missing tools on PATH:", miss.join(", ")); process.exit(1); }
+  if (miss.length) {
+    console.error("Missing tools on PATH:", miss.join(", "));
+    process.exit(1);
+  }
 
   const pkg = await fs.readJSON("package.json");
   const req = pkg.engines?.node;
@@ -1387,10 +1458,14 @@ async function main() {
 
   try {
     const { stdout } = await $`nix show-config`;
-    const need = ["dynamic-derivations","ca-derivations","recursive-nix"];
-    const ok = need.every(k => new RegExp(`extra-experimental-features\s*=.*\b${k}\b`).test(stdout));
+    const need = ["dynamic-derivations", "ca-derivations", "recursive-nix"];
+    const ok = need.every((k) =>
+      new RegExp(`extra-experimental-features\s*=.*\b${k}\b`).test(stdout),
+    );
     if (!ok) {
-      console.error("[startup-check] nix extra-experimental-features must include: dynamic-derivations ca-derivations recursive-nix");
+      console.error(
+        "[startup-check] nix extra-experimental-features must include: dynamic-derivations ca-derivations recursive-nix",
+      );
       process.exit(1);
     }
   } catch {
@@ -1399,22 +1474,34 @@ async function main() {
   }
 
   if (process.platform === "linux") {
-    if (!(await which("fuse-overlayfs"))) console.info("[startup-check] fuse-overlayfs not found; patch workspaces will fallback to cp -a");
+    if (!(await which("fuse-overlayfs")))
+      console.info(
+        "[startup-check] fuse-overlayfs not found; patch workspaces will fallback to cp -a",
+      );
   } else if (process.platform === "darwin") {
-    console.info("[startup-check] macOS will use APFS CoW (cp -cR) when available; fallback to cp -a");
+    console.info(
+      "[startup-check] macOS will use APFS CoW (cp -cR) when available; fallback to cp -a",
+    );
   }
-  
-  if ((process.env.NIX_GO_DEV_OVERRIDE_JSON || '').trim() !== '') {
-    console.warn("\n[OVERRIDES ACTIVE] NIX_GO_DEV_OVERRIDE_JSON is set — local derivation hashes will differ. Unset before sharing cache artifacts.\n");
+
+  if ((process.env.NIX_GO_DEV_OVERRIDE_JSON || "").trim() !== "") {
+    console.warn(
+      "\n[OVERRIDES ACTIVE] NIX_GO_DEV_OVERRIDE_JSON is set — local derivation hashes will differ. Unset before sharing cache artifacts.\n",
+    );
   }
   console.log("startup-check: OK");
 }
 
-main().catch(e => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
 ```
+
 ### `tools/buck/prebuild-guard.ts` (zx)
 
 > Optional: extend this guard to **fail** if `tools/buck/graph.json` is **older** (mtime) than any `TARGETS` or `*.bzl` file, catching stale graphs early.
+
 ```ts
 #!/usr/bin/env zx-wrapper
 // tools/buck/prebuild-guard.ts
@@ -1422,7 +1509,10 @@ import fs from "fs-extra";
 import { globby } from "globby";
 
 let missing = 0;
-const error = (msg: string) => { console.error(msg); missing = 1; };
+const error = (msg: string) => {
+  console.error(msg);
+  missing = 1;
+};
 
 if (!fs.existsSync("tools/buck/graph.json")) {
   error("ERROR: tools/buck/graph.json missing — run export-graph stage first.");
@@ -1436,7 +1526,8 @@ const matches = await globby(["patches/**/*.patch", "**/pnpm-lock.yaml"], { giti
 const patchesPresent = matches.length > 0;
 if (patchesPresent) {
   const exists = fs.existsSync("third_party/providers");
-  const hasAuto = exists && fs.readdirSync("third_party/providers").some(f => /^TARGETS.*\.auto$/.test(f));
+  const hasAuto =
+    exists && fs.readdirSync("third_party/providers").some((f) => /^TARGETS.*\.auto$/.test(f));
   if (!hasAuto) {
     error("ERROR: provider files (TARGETS*.auto) missing — run sync-providers stages.");
   }
@@ -1445,9 +1536,8 @@ if (patchesPresent) {
 process.exit(missing);
 ```
 
-
-
 ### `tools/codegen.ts` (no-op stub; safe if you don’t generate code)
+
 ```ts
 #!/usr/bin/env zx-wrapper
 // tools/codegen.ts — run protobuf/gqlgen/oapi/ent, etc. If none, exit 0.
@@ -1455,6 +1545,7 @@ process.exit(0);
 ```
 
 ## Misc
+
 ```nix
 # tools/nix/lang-templates.nix (Go)
 { pkgs }:

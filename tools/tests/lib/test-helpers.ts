@@ -13,5 +13,10 @@ export async function mktemp(prefix = "test-") {
 }
 
 export async function exists(p: string) {
-  try { await fsp.access(p); return true; } catch { return false; }
+  try {
+    await fsp.access(p);
+    return true;
+  } catch {
+    return false;
+  }
 }

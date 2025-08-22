@@ -4,7 +4,11 @@ import * as fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
-export async function seedAnswersViaCopier(templateDir: string, targetDir: string, data: Record<string, any>) {
+export async function seedAnswersViaCopier(
+  templateDir: string,
+  targetDir: string,
+  data: Record<string, any>,
+) {
   await $`copier copy --trust --defaults --force --data-file ${await writeTempJson(data)} ${templateDir} ${targetDir}`;
 }
 
@@ -45,8 +49,13 @@ export async function recopyUsingRecordedSource(targetDir: string) {
   }
 }
 
-export async function scaffoldOrUpdate(templateDir: string, targetDir: string, data: Record<string, any>) {
-  if (await exists(path.join(targetDir, ".copier-answers.yml"))) return copierRecopyOrUpdate(targetDir);
+export async function scaffoldOrUpdate(
+  templateDir: string,
+  targetDir: string,
+  data: Record<string, any>,
+) {
+  if (await exists(path.join(targetDir, ".copier-answers.yml")))
+    return copierRecopyOrUpdate(targetDir);
   await seedAnswersViaCopier(templateDir, targetDir, data);
 }
 
@@ -58,5 +67,10 @@ async function writeTempJson(obj: any): Promise<string> {
 }
 
 async function exists(p: string): Promise<boolean> {
-  try { await fsp.access(p); return true; } catch { return false; }
+  try {
+    await fsp.access(p);
+    return true;
+  } catch {
+    return false;
+  }
 }

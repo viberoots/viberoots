@@ -1,0 +1,6 @@
+buck-out/
+node_modules/
+.direnv/
+.tmp/
+result
+**/*.generated.*

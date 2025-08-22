@@ -3,10 +3,14 @@
   "private": true,
   "type": "module",
   "packageManager": "pnpm@9.0.0",
-  "engines": { "node": ">=22.0.0" },
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "dev:check": "tools/dev/startup-check.ts",
-    "dev:clear-overrides": "tools/dev/clear-overrides.ts"
+    "dev:clear-overrides": "tools/dev/clear-overrides.ts",
+    "fmt": "prettier -w .",
+    "fmt:check": "prettier -c ."
   },
   "devDependencies": {
     "zx": "^8.0.0",
@@ -14,6 +18,7 @@
     "semver": "^7.6.0",
     "@types/node": "^22.0.0",
     "@types/fs-extra": "^11.0.4",
-    "@types/semver": "^7.6.0"
+    "@types/semver": "^7.6.0",
+    "prettier": "^3.3.3"
   }
 }
