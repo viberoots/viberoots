@@ -10,13 +10,31 @@
     "dev:check": "tools/dev/startup-check.ts",
     "dev:clear-overrides": "tools/dev/clear-overrides.ts",
     "fmt": "prettier -w .",
-    "fmt:check": "prettier -c ."
+    "fmt:check": "prettier -c .",
+    "lint": "eslint . --ext .ts --max-warnings=0",
+    "lint:fix": "eslint . --ext .ts --fix",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "**/*.{ts,tsx}": [
+      "prettier -w",
+      "eslint --fix"
+    ],
+    "**/*.{js,mjs,cjs,json,md,yaml,yml}": [
+      "prettier -w"
+    ]
   },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^22.0.0",
     "@types/semver": "^7.6.0",
+    "@typescript-eslint/eslint-plugin": "^8.40.0",
+    "@typescript-eslint/parser": "^8.40.0",
+    "eslint": "^9.33.0",
+    "eslint-config-prettier": "^10.1.8",
     "fs-extra": "^11.2.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.5",
     "prettier": "^3.3.3",
     "prettier-plugin-curly": "^0.3.2",
     "semver": "^7.6.0",

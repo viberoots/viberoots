@@ -9,8 +9,6 @@
   "bracketSpacing": true,
   "arrowParens": "always",
   "endOfLine": "lf",
-  "plugins": ["prettier-plugin-curly"],
-  "curly": "all",
   "overrides": [
     {
       "files": ["*.ts", "*.tsx"],
