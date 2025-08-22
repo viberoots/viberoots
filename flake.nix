@@ -43,7 +43,7 @@
       {
         default = pkgs.mkShell {
           shellHook = ''
-            export NIX_CONFIG="extra-experimental-features = nix-command flakes dynamic-derivations ca-derivations recursive-nix"
+            export NIX_CONFIG="extra-experimental-features = nix-command flakes dynamic-derivations recursive-nix"
             echo "[devshell] configured nix experimental features"
             alias scaf='tools/scaffolding/scaf.ts'
             chmod +x tools/scaffolding/scaf.ts 2>/dev/null || true

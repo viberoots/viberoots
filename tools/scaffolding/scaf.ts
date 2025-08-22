@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
 import path from "node:path";
+import os from "node:os";
 
 function usage() {
   console.log(`scaf <command> [...]
@@ -50,7 +51,14 @@ function normalizeTemplateName(name: string): string {
 }
 
 async function runCopierCopy(templateDir: string, dest: string, data: Record<string, any>) {
-  await $`copier copy --trust --defaults --force --data ${JSON.stringify(data)} ${templateDir} ${dest}`;
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "scaf-"));
+  const answersPath = path.join(tmpDir, "answers.json");
+  await fs.outputFile(answersPath, JSON.stringify(data, null, 2), "utf8");
+  try {
+    await $`copier copy --trust --defaults --force --data-file ${answersPath} ${templateDir} ${dest}`;
+  } finally {
+    await fs.remove(tmpDir).catch(() => {});
+  }
 }
 
 async function cmdNew(args: string[], flags: Record<string,string>) {
@@ -72,7 +80,8 @@ async function cmdTemplates(args: string[], flags: Record<string,string>) {
 }
 
 async function main() {
-  const { _, flags } = parseArgs((global as any).argv._);
+  const raw = process.argv.slice(2);
+  const { _, flags } = parseArgs(raw);
   const [cmd, ...rest] = _;
   switch (cmd) {
     case "templates": return cmdTemplates(rest, flags);

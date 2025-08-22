@@ -18,18 +18,20 @@ async function main() {
     process.exit(1);
   }
 
-  const required = ["dynamic-derivations", "ca-derivations", "recursive-nix"];
+  const must = ["dynamic-derivations", "recursive-nix"];
+  const nice = ["ca-derivations"];
   try {
     const { stdout } = await $`nix show-config`;
     const text = String(stdout).toLowerCase();
-    let ok = required.every(k => text.includes(k));
-    if (!ok) {
-      const cfg = (process.env.NIX_CONFIG || '').toLowerCase();
-      ok = required.every(k => cfg.includes(k));
-    }
-    if (!ok) {
-      console.error("[startup-check] nix experimental features must include: dynamic-derivations ca-derivations recursive-nix");
+    const have = (k: string) => text.includes(k) || (process.env.NIX_CONFIG || '').toLowerCase().includes(k);
+    const hardOk = must.every(have);
+    if (!hardOk) {
+      console.error("[startup-check] nix experimental features must include: dynamic-derivations recursive-nix");
       process.exit(1);
+    }
+    const softOk = nice.every(have);
+    if (!softOk) {
+      console.warn("[startup-check] warning: ca-derivations not enabled. Local dev is OK; CI will enforce it.");
     }
   } catch {
     console.error("[startup-check] cannot read nix config via `nix show-config`");
