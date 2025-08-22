@@ -8,6 +8,10 @@ buck-out/
 # Nix
 result
 .nix-*
+.direnv/
+
+# Local temp artifacts
+.tmp/
 
 # macOS
 .DS_Store
