@@ -13,13 +13,25 @@ async function main() {
   const cwd = process.cwd();
   try {
     process.chdir(tmp);
-    const dest = path.join("libs","demo-lib");
-    await $`scaf new go lib demo-lib`;
-    if (!(await fs.pathExists(path.join(dest, "README.md")))) {
-      console.error("README.md missing in scaffold");
+    const name = "demo-lib";
+    const relDest = path.join("libs", name);
+    const absDest = path.resolve(relDest);
+    await $`scaf new go lib ${name}`;
+    const readme = path.join(absDest, "README.md");
+    const exists = await fs.pathExists(readme);
+    if (!exists) {
+      console.error("README.md missing in scaffold; listing dest and parent:");
+      try { await $`ls -la ${absDest}`; } catch {}
+      try { await $`ls -la ${path.dirname(absDest)}`; } catch {}
       process.exit(2);
     }
-    console.log("OK — scaffolding smoke test passed:", dest);
+    const content = await fs.readFile(readme, "utf8");
+    if (!content.includes(`# ${name} (Go library)`)) {
+      console.error("README.md content did not render expected title:");
+      console.error(content);
+      process.exit(2);
+    }
+    console.log("OK — scaffolding smoke test passed:", relDest);
   } finally {
     process.chdir(cwd);
   }

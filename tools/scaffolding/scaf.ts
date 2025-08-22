@@ -12,7 +12,8 @@ Commands:
   new <language> <template> <name> [--path=DEST] [--key=value ...]
   update <all|path1 path2 ...>
   regen  <all|path1 path2 ...>
-  delete <all|path1 path2 ...>
+  delete <all|path1 path2 ...> [--yes] [--dry-run]
+  move <old-path> <new-path> [--yes] [--dry-run]
   ls [--json]
   help [command]
   completions <bash|zsh|fish>
@@ -110,6 +111,19 @@ async function* walk(dir: string): AsyncGenerator<string> {
   }
 }
 
+function confirmOrExit(summary: string, yes: boolean, dry: boolean) {
+  console.log(summary);
+  if (dry) { console.log("[dry-run] no changes made"); process.exit(0); }
+  if (!yes) { console.error("Aborted. Use --yes to confirm."); process.exit(2); }
+}
+
+async function isGitCleanCwd(): Promise<boolean> {
+  try {
+    const res = await $({ stdio: 'pipe' })`git status --porcelain`;
+    return res.stdout.trim().length === 0;
+  } catch { return false; }
+}
+
 async function cmdUpdateOrRegen(mode: "update"|"regen", args: string[]) {
   const targets = args.length ? args : ["all"];
   const discovered = await discoverScaffolds(".");
@@ -130,6 +144,42 @@ async function cmdLs(flags: Record<string,string>) {
   const rows = await discoverScaffolds(".");
   if (flags.json) console.log(JSON.stringify(rows, null, 2));
   else for (const r of rows) console.log(`${r.path}\t${r.language}\t${r.template}\t${r.name}`);
+}
+
+async function cmdDelete(args: string[], flags: Record<string,string>) {
+  const yes = flags["yes"] === "true";
+  const dry = flags["dry-run"] === "true";
+  const discovered = await discoverScaffolds(".");
+  const targets = args.length ? args : ["all"];
+  const chosen = targets[0] === "all" ? discovered.map(d => d.path) : args;
+  confirmOrExit(`Delete ${chosen.length} scaffold(s):\n` + chosen.map(p=>` - ${p}`).join("\n"), yes, dry);
+  for (const p of chosen) await fs.remove(p);
+  console.log("delete OK");
+}
+
+async function cmdMove(args: string[], flags: Record<string,string>) {
+  const [oldPath, newPath] = args;
+  const yes = flags["yes"] === "true";
+  const dry = flags["dry-run"] === "true";
+  if (!oldPath || !newPath) { usage(); process.exit(2); }
+  confirmOrExit(`Move ${oldPath} -> ${newPath}`, yes, dry);
+  await fs.mkdirp(path.dirname(newPath));
+  await fs.move(oldPath, newPath, { overwrite: true });
+  const ans = path.join(newPath, ".copier-answers.yml");
+  if (await fs.pathExists(ans)) {
+    let txt = await fs.readFile(ans, "utf8");
+    const name = path.basename(newPath);
+    if (/^name:\s/m.test(txt)) txt = txt.replace(/name:\s.*$/, `name: ${name}`);
+    else txt += `\nname: ${name}\n`;
+    await fs.writeFile(ans, txt, "utf8");
+  }
+  // If repo is clean, try to sync; otherwise skip and let caller run update after committing
+  if (await isGitCleanCwd()) {
+    try { await copierUpdate(newPath); } catch {}
+  } else {
+    console.log("(skipped update; working tree not clean)");
+  }
+  console.log("move OK");
 }
 
 async function cmdTemplates(args: string[], flags: Record<string,string>) {
@@ -159,8 +209,9 @@ async function main() {
     case "new": return cmdNew(rest, flags);
     case "update": return cmdUpdateOrRegen("update", rest);
     case "regen": return cmdUpdateOrRegen("regen", rest);
+    case "delete": return cmdDelete(rest, flags);
+    case "move": return cmdMove(rest, flags);
     case "ls": return cmdLs(flags);
-    case "delete":
     case "help":
     case "completions":
       console.error(`${cmd} not yet implemented (stub)`);

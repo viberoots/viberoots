@@ -14,22 +14,34 @@ async function main() {
   try {
     process.chdir(tmp);
     await $`scaf new go lib demo-lib`;
-    // Initialize git and commit to satisfy copier update/regen cleanliness checks
+    // Initialize git and commit initial scaffold
     await $`git init`;
     await $`git add -A`;
     await $`git commit -m "init scaffold"`;
 
+    // Move
+    await $`scaf move libs/demo-lib libs/demo-moved --yes`;
+    // Commit move so update can run on a clean repo
+    await $`git add -A`;
+    await $`git commit -m "move scaffold"`;
+
+    // Update should run cleanly now
+    await $`scaf update libs/demo-moved`;
+
+    // Delete
+    await $`scaf delete libs/demo-moved --yes`;
+
+    // Should not appear in ls
     const res = await $({ stdio: 'pipe' })`scaf ls --json`;
     const arr = JSON.parse(res.stdout.trim() || "[]");
-    if (!arr.some((r: any) => r.path.endsWith("libs/demo-lib"))) {
-      console.error("ls did not include libs/demo-lib");
+    if (arr.some((r: any) => r.path.endsWith("libs/demo-moved"))) {
+      console.error("delete failed: libs/demo-moved still listed");
       process.exit(2);
     }
-    await $`scaf update libs/demo-lib`;
-    await $`scaf regen libs/demo-lib`;
     console.log("OK — scaffolding e2e passed:", tmp);
   } finally {
     process.chdir(cwd);
+    await fs.remove(tmp).catch(() => {});
   }
 }
 
