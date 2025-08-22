@@ -4,7 +4,7 @@ import path from "node:path";
 import * as fsp from "node:fs/promises";
 
 async function rsyncRepoTo(tmp: string) {
-  await $`bash -lc 'rsync -a --exclude "buck-out" --exclude "node_modules" --exclude ".git" ./ ${tmp}/'`;
+  await $`bash -lc 'rsync -a --exclude "buck-out" --exclude ".git" ./ ${tmp}/'`;
 }
 
 async function runValidator(tmp: string, expectPass: boolean) {

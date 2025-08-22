@@ -1,2 +1,18 @@
-# Buck2 build targets will be defined here using TARGETS going forward.
-# This file intentionally left minimal in this PR.
+# Buck2 targets
+
+load("//tools/buck:zx_test.bzl", "zx_test")
+
+zx_test(
+    name = "scaffolding_smoke",
+    script = "tools/tests/scaffolding-smoke.test.ts",
+)
+
+zx_test(
+    name = "scaffolding_e2e",
+    script = "tools/tests/scaffolding-e2e.test.ts",
+)
+
+zx_test(
+    name = "templates_validate",
+    script = "tools/tests/templates-validate.spec.ts",
+)
