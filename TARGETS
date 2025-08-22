@@ -1,11 +1,13 @@
 # Buck2 targets
 
-load("@prelude//genrule:genrule.bzl", "genrule")
+load("//tools/buck:zx_test.bzl", "zx_test")
 
-genrule(
+zx_test(
     name = "scaffolding",
-    srcs = ["tools/tests/scaffolding.test.ts"],
-    out = "scaffolding.stamp",
-    cmd = "node --experimental-strip-types --test tools/tests/scaffolding.test.ts && echo ok > $OUT",
-    type = "test",
+    script = "tools/tests/scaffolding.test.ts",
+)
+
+zx_test(
+    name = "linting",
+    script = "tools/tests/linting.test.ts",
 )

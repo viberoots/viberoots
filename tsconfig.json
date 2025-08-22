@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2023",
-    "module": "NodeNext",
+    "module": "ESNext",
     "moduleResolution": "Bundler",
     "lib": ["ES2023"],
     "types": ["node"],

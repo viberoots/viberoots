@@ -1,10 +1,10 @@
 #!/usr/bin/env zx-wrapper
-import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import path from "node:path";
 import * as fsp from "node:fs/promises";
-import { rsyncRepoTo, mktemp, exists } from "./lib/test-helpers";
+import path from "node:path";
+import { describe, test } from "node:test";
 import { $ } from "zx";
+import { exists, mktemp, rsyncRepoTo } from "./lib/test-helpers";
 
 async function runInTemp<T>(name: string, fn: (tmp: string) => Promise<T>): Promise<T> {
   const tmp = await mktemp(name + "-");

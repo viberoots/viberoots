@@ -1,18 +1,26 @@
 def _zx_test_impl(ctx):
     script = ctx.attrs.script
-    out = ctx.actions.declare_output(ctx.label.name + ".stamp")
     cmd = [
-        "bash",
-        "-lc",
-        "zx-wrapper node --test {} && echo ok > {}".format(script.short_path, out.as_output()),
+        "node",
+        "--experimental-strip-types",
+        "--import",
+        "./tools/dev/zx-init.mjs",
+        "--test",
+        script.short_path,
     ]
-    ctx.actions.run(
-        cmd_args(cmd),
-        category = "test",
-        identifier = ctx.label.name,
-        local_only = True,
-    )
-    return [DefaultInfo(default_output = out)]
+    # Declare a tiny output to satisfy Buck's expectation of outputs
+    stamp = ctx.actions.declare_output(ctx.label.name + ".stamp")
+    ctx.actions.write(stamp, "zx_test\n")
+    return [
+        DefaultInfo(default_output = stamp),
+        ExternalRunnerTestInfo(
+            type = "custom",
+            command = cmd,
+            env = {},
+            labels = [],
+            contacts = [],
+        ),
+    ]
 
 zx_test = rule(
     impl = _zx_test_impl,

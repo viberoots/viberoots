@@ -61,13 +61,9 @@ async function main() {
     const hasFuse = await which("fuse-overlayfs");
     if (!hasFuse) {
       console.info(
-        "[startup-check] fuse-overlayfs not found; patch workspaces will fallback to cp -a",
+        "[startup-check] warning:fuse-overlayfs not found; patch workspaces will fallback to cp -a",
       );
     }
-  } else if (process.platform === "darwin") {
-    console.info(
-      "[startup-check] macOS will use APFS CoW (cp -cR) when available; fallback to cp -a",
-    );
   }
 
   if ((process.env.NIX_GO_DEV_OVERRIDE_JSON || "").trim() !== "") {

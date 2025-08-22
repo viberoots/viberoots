@@ -1,7 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
-import path from "node:path";
 import os from "node:os";
+import path from "node:path";
+
 import { $ } from "zx";
 
 export async function rsyncRepoTo(tmp: string) {
@@ -18,5 +19,19 @@ export async function exists(p: string) {
     return true;
   } catch {
     return false;
+  }
+}
+
+export async function runInTemp<T>(
+  name: string,
+  fn: (tmp: string, $: any) => Promise<T>,
+): Promise<T> {
+  const tmp = await mktemp(name + "-");
+  await rsyncRepoTo(tmp);
+  const _$ = $({ cwd: tmp });
+  try {
+    return await fn(tmp, _$);
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true }).catch(() => {});
   }
 }
