@@ -17,6 +17,7 @@ Commands:
   move <old-path> <new-path> [--yes] [--dry-run]
   ls [--json]
   help <language> <template>
+  template <language> <template>
   completions <bash|zsh|fish>
 `);
 }
@@ -237,6 +238,19 @@ async function cmdTemplates(args: string[], flags: Record<string,string>) {
   await listTemplates(args[0], Boolean(flags.json));
 }
 
+async function cmdTemplate(args: string[]) {
+  const [language, tmpl] = args;
+  if (!language || !tmpl) { usage(); process.exit(2); }
+  const dir = path.join("tools","scaffolding","templates", language, tmpl);
+  if (await exists(dir)) { console.error("template already exists"); process.exit(2); }
+  await fsp.mkdir(dir, { recursive: true });
+  await fsp.writeFile(path.join(dir, "meta.json"), JSON.stringify({ language, template: tmpl, description: `${language} ${tmpl}` }, null, 2) + "\n", "utf8");
+  const help = `# Summary\nA minimal ${language} ${tmpl} template.\n\n# Usage\nscaf new ${language} ${tmpl} <name> [--path=DEST]\n\n# Variables\n- name: scaffold name\n- language: fixed to "${language}"\n- template: fixed to "${tmpl}"\n\n# Generated\n- README.md\n\n# Post-steps\n- None\n\n# Examples\n- scaf new ${language} ${tmpl} demo\n`;
+  await fsp.writeFile(path.join(dir, "help.md"), help, "utf8");
+  await fsp.writeFile(path.join(dir, "README.md.jinja"), `# {{ name }} (${language} ${tmpl})\n`, "utf8");
+  console.log("created template:", dir);
+}
+
 async function cmdNew(args: string[], flags: Record<string,string>) {
   const [language, templateRaw, name] = args;
   if (!language || !templateRaw || !name) { usage(); process.exit(2); }
@@ -264,6 +278,7 @@ async function main() {
     case "move": return cmdMove(rest, flags);
     case "ls": return cmdLs(flags);
     case "help": return cmdHelp(rest);
+    case "template": return cmdTemplate(rest);
     case "completions": return cmdCompletions(rest);
     default:
       usage();

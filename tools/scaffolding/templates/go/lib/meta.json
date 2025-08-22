@@ -1,17 +1,6 @@
 {
   "language": "go",
   "template": "lib",
-  "description": "Go library skeleton with README",
-  "help": {
-    "usage": "scaf new go lib <name> [--path=DEST]",
-    "notes": [
-      "Creates libs/<name> by default.",
-      "Update/regenerate uses recorded scaf_src_path."
-    ],
-    "examples": [
-      "scaf new go lib auth-utils",
-      "scaf regen libs/auth-utils"
-    ]
-  }
+  "description": "Go library skeleton with README"
 }
 

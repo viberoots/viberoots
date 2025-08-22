@@ -18,6 +18,7 @@ async function main() {
       for (const key of ["language","template"]) if (!meta[key]) { console.error(`meta.json missing ${key}: ${l}/${t}`); process.exit(2); }
       if (meta.language !== l || meta.template !== t) { console.error(`meta.json language/template mismatch: ${l}/${t}`); process.exit(2); }
       if (typeof meta.description !== "string") { console.error(`meta.json description must be string: ${l}/${t}`); process.exit(2); }
+      if (meta.help) { console.error(`meta.json must not contain 'help' (use help.md): ${l}/${t}`); process.exit(2); }
       const helpMd = path.join(tdir, "help.md");
       if (!(await exists(helpMd))) { console.error(`missing help.md: ${l}/${t}`); process.exit(2); }
       const md = await fsp.readFile(helpMd, "utf8");
