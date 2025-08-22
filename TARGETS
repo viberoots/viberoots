@@ -1,0 +1,2 @@
+# Buck2 build targets will be defined here using TARGETS going forward.
+# This file intentionally left minimal in this PR.
