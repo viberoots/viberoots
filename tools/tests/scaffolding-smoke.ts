@@ -4,7 +4,7 @@ import path from "node:path";
 import fs from "fs-extra";
 
 async function rsyncRepoTo(tmp: string) {
-  await $`bash -lc 'rsync -a --exclude "buck-out" --exclude "node_modules" --exclude ".git" ./ ${tmp}/'`;
+  await $`bash -lc 'rsync -a --exclude "buck-out" --exclude "node_modules" --exclude ".git" --exclude "libs" --exclude ".tmp" ./ ${tmp}/'`;
 }
 
 async function main() {
@@ -34,6 +34,7 @@ async function main() {
     console.log("OK — scaffolding smoke test passed:", relDest);
   } finally {
     process.chdir(cwd);
+    await fs.remove(tmp).catch(() => {});
   }
 }
 
