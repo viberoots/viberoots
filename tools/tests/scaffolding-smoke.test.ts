@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import os from "node:os";
 import path from "node:path";
-import fs from "fs-extra";
+import fs from "node:fs/promises";
 
 async function rsyncRepoTo(tmp: string) {
   await $`bash -lc 'rsync -a --exclude "buck-out" --exclude "node_modules" --exclude ".git" --exclude "libs" --exclude ".tmp" ./ ${tmp}/'`;
@@ -15,7 +15,7 @@ async function main() {
     const absDest = path.join(tmp, "libs", name);
     await $({ cwd: tmp })`scaf new go lib ${name}`;
     const readme = path.join(absDest, "README.md");
-    const exists = await fs.pathExists(readme);
+    const exists = await fs.access(readme).then(()=>true).catch(()=>false);
     if (!exists) {
       console.error("README.md missing in scaffold; listing dest and parent:");
       try { await $`ls -la ${absDest}`; } catch {}
@@ -30,7 +30,7 @@ async function main() {
     }
     console.log("OK — scaffolding smoke test passed:", path.relative(tmp, absDest));
   } finally {
-    await fs.remove(tmp).catch(() => {});
+    await fs.rm(tmp, { recursive: true, force: true }).catch(() => {});
   }
 }
 

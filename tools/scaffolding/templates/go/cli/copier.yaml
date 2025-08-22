@@ -1,0 +1,6 @@
+# copier config for go/cli
+override: true
+
+_exclude:
+  - meta.json
+  - help.md
