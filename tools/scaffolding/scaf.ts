@@ -16,7 +16,7 @@ Commands:
   delete <all|path1 path2 ...> [--yes] [--dry-run]
   move <old-path> <new-path> [--yes] [--dry-run]
   ls [--json]
-  help [command]
+  help <language> <template>
   completions <bash|zsh|fish>
 `);
 }
@@ -33,19 +33,36 @@ function parseArgs(argv: string[]): { _: string[]; flags: Record<string,string> 
   return { _: out, flags };
 }
 
-async function listTemplates(language?: string, json = false) {
+async function exists(p: string): Promise<boolean> { try { await fsp.access(p); return true; } catch { return false; } }
+
+async function readTemplateMeta(language?: string) {
   const root = path.join("tools","scaffolding","templates");
   const langs = language ? [language] : (await exists(root) ? await fsp.readdir(root) : []);
-  const data: any[] = [];
+  const out: any[] = [];
   for (const l of langs) {
-    const p = path.join(root, l);
-    if (!(await exists(p))) continue;
-    const entries = await fsp.readdir(p, { withFileTypes: true });
-    const kinds = entries.filter(e => e.isDirectory()).map(e => e.name);
-    for (const k of kinds) data.push({ language: l, template: k });
+    const langDir = path.join(root, l);
+    if (!(await exists(langDir))) continue;
+    const entries = await fsp.readdir(langDir, { withFileTypes: true });
+    for (const e of entries) {
+      if (!e.isDirectory()) continue;
+      const tmpl = e.name;
+      const metaPath = path.join(langDir, tmpl, "meta.json");
+      let meta: any = { language: l, template: tmpl };
+      if (await exists(metaPath)) {
+        try { meta = JSON.parse(await fsp.readFile(metaPath, "utf8")); } catch {}
+      } else {
+        meta.description = `${l} ${tmpl}`;
+      }
+      out.push({ language: l, template: tmpl, description: meta.description || "", help: meta.help || {} });
+    }
   }
-  if (json) console.log(JSON.stringify(data, null, 2));
-  else for (const t of data) console.log(`${t.language}\t${t.template}`);
+  return out;
+}
+
+async function listTemplates(language?: string, json = false) {
+  const metas = await readTemplateMeta(language);
+  if (json) console.log(JSON.stringify(metas, null, 2));
+  else metas.forEach(m => console.log(`${m.language}\t${m.template}\t${m.description}`));
 }
 
 function normalizeTemplateName(name: string): string {
@@ -92,8 +109,8 @@ async function discoverScaffolds(root: string = "."): Promise<Array<{path: strin
       const dir = path.dirname(f);
       const name = path.basename(dir);
       const txt = await fsp.readFile(f, "utf8").catch(() => "");
-      const lang = /language:\s*(\S+)/.exec(txt)?.[1] || (dir.includes("libs/") ? "go" : "unknown");
-      const tmpl = /template:\s*(\S+)/.exec(txt)?.[1] || (dir.includes("libs/") ? "lib" : "unknown");
+      const lang = /language:\s*(\S+)/m.exec(txt)?.[1] || (dir.includes("libs/") ? "go" : "unknown");
+      const tmpl = /template:\s*(\S+)/m.exec(txt)?.[1] || (dir.includes("libs/") ? "lib" : "unknown");
       out.push({ path: dir, language: lang, template: tmpl, name });
     }
   }
@@ -183,8 +200,37 @@ async function cmdMove(args: string[], flags: Record<string,string>) {
   console.log("move OK");
 }
 
-async function exists(p: string): Promise<boolean> {
-  try { await fsp.access(p); return true; } catch { return false; }
+async function cmdCompletions(args: string[]) {
+  const [shell] = args;
+  const script = shell === "bash"
+    ? "complete -W 'templates new update regen delete move ls help' scaf"
+    : shell === "zsh"
+    ? "# zsh users can alias scaf and use compctl if desired"
+    : "# fish completion is minimal; extend as needed";
+  console.log(script);
+}
+
+async function cmdHelp(args: string[]) {
+  const [language, template] = args;
+  if (!language || !template) {
+    usage();
+    console.log("\nAvailable templates:");
+    const metas = await readTemplateMeta();
+    metas.forEach(m => console.log(`  ${m.language} ${m.template}\t${m.description}`));
+    return; // exit 0
+  }
+  const tmplDir = path.join("tools","scaffolding","templates", language, template);
+  const helpPath = path.join(tmplDir, "help.md");
+  if (await exists(helpPath)) {
+    const md = await fsp.readFile(helpPath, "utf8");
+    console.log(md.trim());
+    return;
+  }
+  const metas = await readTemplateMeta(language);
+  const meta = metas.find(m => m.template === template);
+  if (!meta) { console.error("template not found for help"); process.exit(1); }
+  const h = meta.help || {};
+  console.log([h.usage || `scaf new ${language} ${template} <name>`, "", ...(h.notes || []), "", "Examples:", ...((h.examples || []).map((e:string)=>`  ${e}`))].join("\n"));
 }
 
 async function cmdTemplates(args: string[], flags: Record<string,string>) {
@@ -217,10 +263,8 @@ async function main() {
     case "delete": return cmdDelete(rest, flags);
     case "move": return cmdMove(rest, flags);
     case "ls": return cmdLs(flags);
-    case "help":
-    case "completions":
-      console.error(`${cmd} not yet implemented (stub)`);
-      return process.exit(2);
+    case "help": return cmdHelp(rest);
+    case "completions": return cmdCompletions(rest);
     default:
       usage();
       return process.exit(cmd ? 2 : 0);
