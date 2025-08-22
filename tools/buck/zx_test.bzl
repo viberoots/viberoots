@@ -19,5 +19,5 @@ zx_test = rule(
     attrs = {
         "script": attrs.source(),
     },
-    test = True,
+    is_test = True,
 )

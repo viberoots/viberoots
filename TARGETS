@@ -14,5 +14,5 @@ zx_test(
 
 zx_test(
     name = "templates_validate",
-    script = "tools/tests/templates-validate.spec.ts",
+    script = "tools/tests/templates-validate.test.ts",
 )
