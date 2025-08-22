@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import fs from "fs-extra";
+import * as fsp from "node:fs/promises";
+import * as fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { copierRecopyOrUpdate, copierUpdate, recopyUsingRecordedSource } from "./lib/scaffold-utils.ts";
@@ -34,12 +35,13 @@ function parseArgs(argv: string[]): { _: string[]; flags: Record<string,string> 
 
 async function listTemplates(language?: string, json = false) {
   const root = path.join("tools","scaffolding","templates");
-  const langs = language ? [language] : (await fs.pathExists(root) ? await fs.readdir(root) : []);
+  const langs = language ? [language] : (await exists(root) ? await fsp.readdir(root) : []);
   const data: any[] = [];
   for (const l of langs) {
     const p = path.join(root, l);
-    if (!(await fs.pathExists(p))) continue;
-    const kinds = (await fs.readdir(p)).filter(x => (fs.statSync(path.join(p,x))).isDirectory());
+    if (!(await exists(p))) continue;
+    const entries = await fsp.readdir(p, { withFileTypes: true });
+    const kinds = entries.filter(e => e.isDirectory()).map(e => e.name);
     for (const k of kinds) data.push({ language: l, template: k });
   }
   if (json) console.log(JSON.stringify(data, null, 2));
@@ -59,16 +61,16 @@ function resolveDestination(language: string, template: string, name: string, ov
 }
 
 async function runCopierCopy(templateDir: string, dest: string, data: Record<string, any>) {
-  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "scaf-"));
+  const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), "scaf-"));
   const answersPath = path.join(tmpDir, "answers.json");
-  await fs.outputFile(answersPath, JSON.stringify(data, null, 2), "utf8");
+  await fsp.writeFile(answersPath, JSON.stringify(data, null, 2), "utf8");
   try {
     const absTemplate = path.resolve(templateDir);
     const absDest = path.resolve(dest);
-    await fs.mkdirp(absDest);
+    await fsp.mkdir(absDest, { recursive: true });
     await $`copier copy --trust --defaults --force --data-file ${answersPath} ${absTemplate} ${absDest}`;
   } finally {
-    await fs.remove(tmpDir).catch(() => {});
+    await fsp.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   }
 }
 
@@ -77,9 +79,9 @@ async function recordSource(dest: string, language: string, template: string) {
   const relSrc = path.join("tools","scaffolding","templates", language, template);
   const line = `scaf_src_path: ${relSrc}`;
   let cur = "";
-  try { cur = await fs.readFile(answers, "utf8"); } catch {}
+  try { cur = await fsp.readFile(answers, "utf8"); } catch {}
   if (!cur.includes("scaf_src_path:")) {
-    await fs.appendFile(answers, (cur.endsWith("\n") ? "" : "\n") + line + "\n", "utf8");
+    await fsp.appendFile(answers, (cur.endsWith("\n") ? "" : "\n") + line + "\n", "utf8");
   }
 }
 
@@ -89,7 +91,7 @@ async function discoverScaffolds(root: string = "."): Promise<Array<{path: strin
     if (path.basename(f) === ".copier-answers.yml") {
       const dir = path.dirname(f);
       const name = path.basename(dir);
-      const txt = await fs.readFile(f, "utf8").catch(() => "");
+      const txt = await fsp.readFile(f, "utf8").catch(() => "");
       const lang = /language:\s*(\S+)/.exec(txt)?.[1] || (dir.includes("libs/") ? "go" : "unknown");
       const tmpl = /template:\s*(\S+)/.exec(txt)?.[1] || (dir.includes("libs/") ? "lib" : "unknown");
       out.push({ path: dir, language: lang, template: tmpl, name });
@@ -99,8 +101,8 @@ async function discoverScaffolds(root: string = "."): Promise<Array<{path: strin
 }
 
 async function* walk(dir: string): AsyncGenerator<string> {
-  const list = await fs.readdir(dir, { withFileTypes: true }).catch(() => [] as fs.Dirent[]);
-  for (const e of list) {
+  const entries = await fsp.readdir(dir, { withFileTypes: true }).catch(() => [] as fs.Dirent[]);
+  for (const e of entries) {
     const p = path.join(dir, e.name);
     if (e.isDirectory()) {
       if ([".git","node_modules","buck-out",".direnv",".gitignore",".tmp"].includes(e.name)) continue;
@@ -153,7 +155,7 @@ async function cmdDelete(args: string[], flags: Record<string,string>) {
   const targets = args.length ? args : ["all"];
   const chosen = targets[0] === "all" ? discovered.map(d => d.path) : args;
   confirmOrExit(`Delete ${chosen.length} scaffold(s):\n` + chosen.map(p=>` - ${p}`).join("\n"), yes, dry);
-  for (const p of chosen) await fs.remove(p);
+  for (const p of chosen) await fsp.rm(p, { recursive: true, force: true });
   console.log("delete OK");
 }
 
@@ -163,23 +165,26 @@ async function cmdMove(args: string[], flags: Record<string,string>) {
   const dry = flags["dry-run"] === "true";
   if (!oldPath || !newPath) { usage(); process.exit(2); }
   confirmOrExit(`Move ${oldPath} -> ${newPath}`, yes, dry);
-  await fs.mkdirp(path.dirname(newPath));
-  await fs.move(oldPath, newPath, { overwrite: true });
+  await fsp.mkdir(path.dirname(newPath), { recursive: true });
+  await fsp.rename(oldPath, newPath);
   const ans = path.join(newPath, ".copier-answers.yml");
-  if (await fs.pathExists(ans)) {
-    let txt = await fs.readFile(ans, "utf8");
+  if (await exists(ans)) {
+    let txt = await fsp.readFile(ans, "utf8");
     const name = path.basename(newPath);
     if (/^name:\s/m.test(txt)) txt = txt.replace(/name:\s.*$/, `name: ${name}`);
     else txt += `\nname: ${name}\n`;
-    await fs.writeFile(ans, txt, "utf8");
+    await fsp.writeFile(ans, txt, "utf8");
   }
-  // If repo is clean, try to sync; otherwise skip and let caller run update after committing
   if (await isGitCleanCwd()) {
     try { await copierUpdate(newPath); } catch {}
   } else {
     console.log("(skipped update; working tree not clean)");
   }
   console.log("move OK");
+}
+
+async function exists(p: string): Promise<boolean> {
+  try { await fsp.access(p); return true; } catch { return false; }
 }
 
 async function cmdTemplates(args: string[], flags: Record<string,string>) {
@@ -191,7 +196,7 @@ async function cmdNew(args: string[], flags: Record<string,string>) {
   if (!language || !templateRaw || !name) { usage(); process.exit(2); }
   const template = normalizeTemplateName(templateRaw);
   const root = path.join("tools","scaffolding","templates", language, template);
-  if (!(await fs.pathExists(root))) { console.error(`template not found: ${language}/${template}`); process.exit(1); }
+  if (!(await exists(root))) { console.error(`template not found: ${language}/${template}`); process.exit(1); }
   const dest = resolveDestination(language, template, name, flags.path);
   const data: Record<string, any> = { name, language, template };
   for (const [k,v] of Object.entries(flags)) if (!["path","json"].includes(k)) data[k] = v;

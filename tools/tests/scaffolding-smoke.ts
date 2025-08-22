@@ -10,13 +10,10 @@ async function rsyncRepoTo(tmp: string) {
 async function main() {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "scaf-smoke-"));
   await rsyncRepoTo(tmp);
-  const cwd = process.cwd();
   try {
-    process.chdir(tmp);
     const name = "demo-lib";
-    const relDest = path.join("libs", name);
-    const absDest = path.resolve(relDest);
-    await $`scaf new go lib ${name}`;
+    const absDest = path.join(tmp, "libs", name);
+    await $({ cwd: tmp })`scaf new go lib ${name}`;
     const readme = path.join(absDest, "README.md");
     const exists = await fs.pathExists(readme);
     if (!exists) {
@@ -31,9 +28,8 @@ async function main() {
       console.error(content);
       process.exit(2);
     }
-    console.log("OK — scaffolding smoke test passed:", relDest);
+    console.log("OK — scaffolding smoke test passed:", path.relative(tmp, absDest));
   } finally {
-    process.chdir(cwd);
     await fs.remove(tmp).catch(() => {});
   }
 }

@@ -10,29 +10,27 @@ async function rsyncRepoTo(tmp: string) {
 async function main() {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "scaf-e2e-"));
   await rsyncRepoTo(tmp);
-  const cwd = process.cwd();
   try {
-    process.chdir(tmp);
-    await $`scaf new go lib demo-lib`;
+    await $({ cwd: tmp })`scaf new go lib demo-lib`;
     // Initialize git and commit initial scaffold
-    await $`git init`;
-    await $`git add -A`;
-    await $`git commit -m "init scaffold"`;
+    await $({ cwd: tmp })`git init`;
+    await $({ cwd: tmp })`git add -A`;
+    await $({ cwd: tmp })`git commit -m "init scaffold"`;
 
     // Move
-    await $`scaf move libs/demo-lib libs/demo-moved --yes`;
+    await $({ cwd: tmp })`scaf move libs/demo-lib libs/demo-moved --yes`;
     // Commit move so update can run on a clean repo
-    await $`git add -A`;
-    await $`git commit -m "move scaffold"`;
+    await $({ cwd: tmp })`git add -A`;
+    await $({ cwd: tmp })`git commit -m "move scaffold"`;
 
     // Update should run cleanly now
-    await $`scaf update libs/demo-moved`;
+    await $({ cwd: tmp })`scaf update libs/demo-moved`;
 
     // Delete
-    await $`scaf delete libs/demo-moved --yes`;
+    await $({ cwd: tmp })`scaf delete libs/demo-moved --yes`;
 
     // Should not appear in ls
-    const res = await $({ stdio: 'pipe' })`scaf ls --json`;
+    const res = await $({ stdio: 'pipe', cwd: tmp })`scaf ls --json`;
     const arr = JSON.parse(res.stdout.trim() || "[]");
     if (arr.some((r: any) => r.path.endsWith("libs/demo-moved"))) {
       console.error("delete failed: libs/demo-moved still listed");
@@ -40,7 +38,6 @@ async function main() {
     }
     console.log("OK — scaffolding e2e passed:", tmp);
   } finally {
-    process.chdir(cwd);
     await fs.remove(tmp).catch(() => {});
   }
 }
