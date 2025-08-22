@@ -1,0 +1,5 @@
+* text=auto eol=lf
+*.ts diff=ts
+*.tsx diff=ts
+*.bzl linguist-language=Starlark
+*.md diff=markdown

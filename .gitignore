@@ -1,0 +1,23 @@
+# Node
+node_modules/
+
+# Buck2
+buck-out/
+.buckd/
+
+# Nix
+result
+.nix-*
+
+# macOS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+
+# Generated glue (not committed per design)
+third_party/providers/TARGETS.auto
+third_party/providers/TARGETS.node.auto
+third_party/providers/auto_map.bzl
+tools/buck/graph.json

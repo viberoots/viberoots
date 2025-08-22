@@ -1,0 +1,19 @@
+{
+  "name": "bucknix-fresh",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.0.0",
+  "engines": { "node": ">=22.0.0" },
+  "scripts": {
+    "dev:check": "tools/dev/startup-check.ts",
+    "dev:clear-overrides": "tools/dev/clear-overrides.ts"
+  },
+  "devDependencies": {
+    "zx": "^8.0.0",
+    "fs-extra": "^11.2.0",
+    "semver": "^7.6.0",
+    "@types/node": "^22.0.0",
+    "@types/fs-extra": "^11.0.4",
+    "@types/semver": "^7.6.0"
+  }
+}
