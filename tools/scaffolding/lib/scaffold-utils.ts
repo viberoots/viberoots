@@ -31,10 +31,14 @@ export async function copierRecopyOrUpdate(targetDir: string) {
 
 export async function recopyUsingRecordedSource(targetDir: string) {
   const answersFile = path.join(targetDir, ".copier-answers.yml");
-  if (!(await exists(answersFile))) throw new Error("answers file missing");
+  if (!(await exists(answersFile))) {
+    throw new Error("answers file missing");
+  }
   const txt = await fsp.readFile(answersFile, "utf8");
   const src = /^scaf_src_path:\s*(\S+)/m.exec(txt)?.[1]?.trim();
-  if (!src) throw new Error("scaf_src_path not recorded in answers");
+  if (!src) {
+    throw new Error("scaf_src_path not recorded in answers");
+  }
   const name = /^name:\s*(\S+)/m.exec(txt)?.[1]?.trim() || path.basename(targetDir);
   const language = /^language:\s*(\S+)/m.exec(txt)?.[1]?.trim() || "";
   const template = /^template:\s*(\S+)/m.exec(txt)?.[1]?.trim() || "";
@@ -54,8 +58,9 @@ export async function scaffoldOrUpdate(
   targetDir: string,
   data: Record<string, any>,
 ) {
-  if (await exists(path.join(targetDir, ".copier-answers.yml")))
+  if (await exists(path.join(targetDir, ".copier-answers.yml"))) {
     return copierRecopyOrUpdate(targetDir);
+  }
   await seedAnswersViaCopier(templateDir, targetDir, data);
 }
 

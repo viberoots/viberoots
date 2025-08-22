@@ -16,14 +16,18 @@ export async function validateTemplates(targets: string[], quiet: boolean = fals
   if (targets.length === 0 || targets[0] === "all") {
     roots.push(path.join("tools", "scaffolding", "templates"));
   } else {
-    for (const t of targets) roots.push(t);
+    for (const t of targets) {
+      roots.push(t);
+    }
   }
 
   const templateDirs: string[] = [];
   for (const root of roots) {
     const st = await fsp.stat(root).catch(() => null as any);
     if (!st) {
-      if (!quiet) console.error(`path not found: ${root}`);
+      if (!quiet) {
+        console.error(`path not found: ${root}`);
+      }
       process.exit(2);
     }
     if (st.isDirectory()) {
@@ -38,13 +42,17 @@ export async function validateTemplates(targets: string[], quiet: boolean = fals
           const tdirs = (await fsp.readdir(ldir, { withFileTypes: true }))
             .filter((e) => e.isDirectory())
             .map((e) => e.name);
-          for (const t of tdirs) templateDirs.push(path.join(ldir, t));
+          for (const t of tdirs) {
+            templateDirs.push(path.join(ldir, t));
+          }
         }
       } else {
         templateDirs.push(root);
       }
     } else {
-      if (!quiet) console.error(`not a directory: ${root}`);
+      if (!quiet) {
+        console.error(`not a directory: ${root}`);
+      }
       process.exit(2);
     }
   }
@@ -54,31 +62,43 @@ export async function validateTemplates(targets: string[], quiet: boolean = fals
     const template = path.basename(tdir);
     const metaPath = path.join(tdir, "meta.json");
     if (!(await exists(metaPath))) {
-      if (!quiet) console.error(`missing meta.json: ${language}/${template}`);
+      if (!quiet) {
+        console.error(`missing meta.json: ${language}/${template}`);
+      }
       process.exit(2);
     }
     const meta = JSON.parse(await fsp.readFile(metaPath, "utf8"));
-    for (const key of ["language", "template"])
+    for (const key of ["language", "template"]) {
       if (!meta[key]) {
-        if (!quiet) console.error(`meta.json missing ${key}: ${language}/${template}`);
+        if (!quiet) {
+          console.error(`meta.json missing ${key}: ${language}/${template}`);
+        }
         process.exit(2);
       }
+    }
     if (meta.language !== language || meta.template !== template) {
-      if (!quiet) console.error(`meta.json language/template mismatch: ${language}/${template}`);
+      if (!quiet) {
+        console.error(`meta.json language/template mismatch: ${language}/${template}`);
+      }
       process.exit(2);
     }
     if (typeof meta.description !== "string") {
-      if (!quiet) console.error(`meta.json description must be string: ${language}/${template}`);
+      if (!quiet) {
+        console.error(`meta.json description must be string: ${language}/${template}`);
+      }
       process.exit(2);
     }
     if (meta.help) {
-      if (!quiet)
+      if (!quiet) {
         console.error(`meta.json must not contain 'help' (use help.md): ${language}/${template}`);
+      }
       process.exit(2);
     }
     const helpMd = path.join(tdir, "help.md");
     if (!(await exists(helpMd))) {
-      if (!quiet) console.error(`missing help.md: ${language}/${template}`);
+      if (!quiet) {
+        console.error(`missing help.md: ${language}/${template}`);
+      }
       process.exit(2);
     }
     const md = await fsp.readFile(helpMd, "utf8");
@@ -90,13 +110,18 @@ export async function validateTemplates(targets: string[], quiet: boolean = fals
       "# Post-steps",
       "# Examples",
     ];
-    for (const h of required)
+    for (const h of required) {
       if (!md.includes(h)) {
-        if (!quiet) console.error(`help.md missing section ${h}: ${language}/${template}`);
+        if (!quiet) {
+          console.error(`help.md missing section ${h}: ${language}/${template}`);
+        }
         process.exit(2);
       }
+    }
   }
-  if (!quiet) console.log("OK — template meta/help validated");
+  if (!quiet) {
+    console.log("OK \u2014 template meta/help validated");
+  }
 }
 
 async function main() {

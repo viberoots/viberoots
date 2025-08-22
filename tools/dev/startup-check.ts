@@ -15,7 +15,11 @@ async function which(cmd: string) {
 async function main() {
   const need = ["pnpm", "git", "go", "buck2", "nix"];
   const miss: string[] = [];
-  for (const b of need) if (!(await which(b))) miss.push(b);
+  for (const b of need) {
+    if (!(await which(b))) {
+      miss.push(b);
+    }
+  }
   if (miss.length) {
     console.error("Missing tools on PATH:", miss.join(", "));
     process.exit(1);
@@ -55,10 +59,11 @@ async function main() {
 
   if (process.platform === "linux") {
     const hasFuse = await which("fuse-overlayfs");
-    if (!hasFuse)
+    if (!hasFuse) {
       console.info(
         "[startup-check] fuse-overlayfs not found; patch workspaces will fallback to cp -a",
       );
+    }
   } else if (process.platform === "darwin") {
     console.info(
       "[startup-check] macOS will use APFS CoW (cp -cR) when available; fallback to cp -a",

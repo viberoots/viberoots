@@ -834,7 +834,9 @@ function providersFor(node: Node): string[] {
 const MODULE_PROVIDERS: Record<string, string[]> = {};
 for (const n of nodes) {
   const provs = providersFor(n);
-  if (provs.length) MODULE_PROVIDERS[n.name] = provs;
+  if (provs.length) {
+    MODULE_PROVIDERS[n.name] = provs;
+  }
 }
 
 const header = `# //third_party/providers/auto_map.bzl\n# GENERATED FILE — DO NOT EDIT.\n\nMODULE_PROVIDERS = {\n`;
@@ -872,14 +874,20 @@ const PATCH_DIR = "patches/go";
 const OUT_FILE = "third_party/providers/TARGETS.auto";
 
 function decodeModuleKey(file: string): string | null {
-  if (!file.endsWith(".patch")) return null;
+  if (!file.endsWith(".patch")) {
+    return null;
+  }
   const base = file.slice(0, -".patch".length);
   const at = base.lastIndexOf("@");
-  if (at < 0) return null;
+  if (at < 0) {
+    return null;
+  }
   const enc = base.slice(0, at);
   const ver = base.slice(at + 1);
   const importPath = enc.replace(/__/g, "/");
-  if (!importPath || !ver) return null;
+  if (!importPath || !ver) {
+    return null;
+  }
   return `${importPath}@${ver}`.toLowerCase();
 }
 
@@ -905,16 +913,20 @@ if (await fs.pathExists(PATCH_DIR)) {
       continue;
     }
     const key = decodeModuleKey(e.name);
-    if (!key) continue;
+    if (!key) {
+      continue;
+    }
     // duplicate guard: only one patch per module@version
     const prior = byModuleKey.get(key);
-    if (prior && prior !== e.name)
+    if (prior && prior !== e.name) {
       throw new Error(`Duplicate patch for ${key}: ${prior} vs ${e.name}`);
+    }
     byModuleKey.set(key, e.name);
     const name = providerNameForModuleKey(imp, ver);
     const prev = seen.get(name);
-    if (prev && prev !== key)
+    if (prev && prev !== key) {
       throw new Error(`Provider name collision: ${name}\n${prev} vs ${key}`);
+    }
     seen.set(name, key);
     const patchPath = `${PATCH_DIR}/${e.name}`;
     entries.push(
@@ -1321,7 +1333,9 @@ function modProviderFromKey(key: string): string {
 }
 
 function lockProviderFrom(lf?: string, importer?: string): string | null {
-  if (!lf || !importer) return null;
+  if (!lf || !importer) {
+    return null;
+  }
   const h = shortHash(`${lf}#${importer}`);
   const suffix = `${importer.replace(/[^\w]+/g, "_")}__${lf.replace(/[^\w]+/g, "_")}`.toLowerCase();
   return `//third_party/providers:lf_${h}_${suffix}`;
@@ -1443,7 +1457,11 @@ async function which(cmd: string) {
 async function main() {
   const need = ["pnpm", "git", "go", "buck2", "nix"];
   const miss: string[] = [];
-  for (const b of need) if (!(await which(b))) miss.push(b);
+  for (const b of need) {
+    if (!(await which(b))) {
+      miss.push(b);
+    }
+  }
   if (miss.length) {
     console.error("Missing tools on PATH:", miss.join(", "));
     process.exit(1);
@@ -1474,10 +1492,11 @@ async function main() {
   }
 
   if (process.platform === "linux") {
-    if (!(await which("fuse-overlayfs")))
+    if (!(await which("fuse-overlayfs"))) {
       console.info(
         "[startup-check] fuse-overlayfs not found; patch workspaces will fallback to cp -a",
       );
+    }
   } else if (process.platform === "darwin") {
     console.info(
       "[startup-check] macOS will use APFS CoW (cp -cR) when available; fallback to cp -a",

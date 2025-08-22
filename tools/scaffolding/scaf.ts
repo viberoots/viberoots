@@ -35,7 +35,9 @@ function parseArgs(argv: string[]): { _: string[]; flags: Record<string, string>
     if (a.startsWith("--")) {
       const [k, v = "true"] = a.slice(2).split("=");
       flags[k] = v;
-    } else out.push(a);
+    } else {
+      out.push(a);
+    }
   }
   return { _: out, flags };
 }
@@ -55,10 +57,14 @@ async function readTemplateMeta(language?: string) {
   const out: any[] = [];
   for (const l of langs) {
     const langDir = path.join(root, l);
-    if (!(await exists(langDir))) continue;
+    if (!(await exists(langDir))) {
+      continue;
+    }
     const entries = await fsp.readdir(langDir, { withFileTypes: true });
     for (const e of entries) {
-      if (!e.isDirectory()) continue;
+      if (!e.isDirectory()) {
+        continue;
+      }
       const tmpl = e.name;
       const metaPath = path.join(langDir, tmpl, "meta.json");
       let meta: any = { language: l, template: tmpl };
@@ -82,13 +88,20 @@ async function readTemplateMeta(language?: string) {
 
 async function listTemplates(language?: string, json = false) {
   const metas = await readTemplateMeta(language);
-  if (json) console.log(JSON.stringify(metas, null, 2));
-  else metas.forEach((m) => console.log(`${m.language}\t${m.template}\t${m.description}`));
+  if (json) {
+    console.log(JSON.stringify(metas, null, 2));
+  } else {
+    metas.forEach((m) => console.log(`${m.language}\t${m.template}\t${m.description}`));
+  }
 }
 
 function normalizeTemplateName(name: string): string {
-  if (name === "lib" || name === "library") return "lib";
-  if (name === "cli-app" || name === "cli" || name === "app") return "cli-app";
+  if (name === "lib" || name === "library") {
+    return "lib";
+  }
+  if (name === "cli-app" || name === "cli" || name === "app") {
+    return "cli-app";
+  }
   return name;
 }
 
@@ -98,8 +111,12 @@ function resolveDestination(
   name: string,
   override?: string,
 ): string {
-  if (override) return override;
-  if (language === "go" && template === "lib") return path.join("libs", name);
+  if (override) {
+    return override;
+  }
+  if (language === "go" && template === "lib") {
+    return path.join("libs", name);
+  }
   return path.join(".tmp", name);
 }
 
@@ -154,8 +171,9 @@ async function* walk(dir: string): AsyncGenerator<string> {
   for (const e of entries) {
     const p = path.join(dir, e.name);
     if (e.isDirectory()) {
-      if ([".git", "node_modules", "buck-out", ".direnv", ".gitignore", ".tmp"].includes(e.name))
+      if ([".git", "node_modules", "buck-out", ".direnv", ".gitignore", ".tmp"].includes(e.name)) {
         continue;
+      }
       yield* walk(p);
     } else {
       yield p;
@@ -208,8 +226,13 @@ async function cmdUpdateOrRegen(mode: "update" | "regen", args: string[]) {
 
 async function cmdLs(flags: Record<string, string>) {
   const rows = await discoverScaffolds(".");
-  if (flags.json) console.log(JSON.stringify(rows, null, 2));
-  else for (const r of rows) console.log(`${r.path}\t${r.language}\t${r.template}\t${r.name}`);
+  if (flags.json) {
+    console.log(JSON.stringify(rows, null, 2));
+  } else {
+    for (const r of rows) {
+      console.log(`${r.path}\t${r.language}\t${r.template}\t${r.name}`);
+    }
+  }
 }
 
 async function cmdDelete(args: string[], flags: Record<string, string>) {
@@ -223,7 +246,9 @@ async function cmdDelete(args: string[], flags: Record<string, string>) {
     yes,
     dry,
   );
-  for (const p of chosen) await fsp.rm(p, { recursive: true, force: true });
+  for (const p of chosen) {
+    await fsp.rm(p, { recursive: true, force: true });
+  }
   console.log("delete OK");
 }
 
@@ -242,8 +267,11 @@ async function cmdMove(args: string[], flags: Record<string, string>) {
   if (await exists(ans)) {
     let txt = await fsp.readFile(ans, "utf8");
     const name = path.basename(newPath);
-    if (/^name:\s/m.test(txt)) txt = txt.replace(/name:\s.*$/, `name: ${name}`);
-    else txt += `\nname: ${name}\n`;
+    if (/^name:\s/m.test(txt)) {
+      txt = txt.replace(/name:\s.*$/, `name: ${name}`);
+    } else {
+      txt += `\nname: ${name}\n`;
+    }
     await fsp.writeFile(ans, txt, "utf8");
   }
   if (await isGitCleanCwd()) {
@@ -348,7 +376,11 @@ async function cmdNew(args: string[], flags: Record<string, string>) {
   }
   const dest = resolveDestination(language, template, name, flags.path);
   const data: Record<string, any> = { name, language, template };
-  for (const [k, v] of Object.entries(flags)) if (!["path", "json"].includes(k)) data[k] = v;
+  for (const [k, v] of Object.entries(flags)) {
+    if (!["path", "json"].includes(k)) {
+      data[k] = v;
+    }
+  }
   await runCopierCopy(root, dest, data);
   await recordSource(dest, language, template);
   console.log("created:", dest);
