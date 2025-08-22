@@ -2,7 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import os from "node:os";
-import { copierRecopyOrUpdate, copierUpdate } from "./lib/scaffold-utils.ts";
+import { copierRecopyOrUpdate, copierUpdate, recopyUsingRecordedSource } from "./lib/scaffold-utils.ts";
 
 function usage() {
   console.log(`scaf <command> [...]
@@ -62,35 +62,24 @@ async function runCopierCopy(templateDir: string, dest: string, data: Record<str
   const answersPath = path.join(tmpDir, "answers.json");
   await fs.outputFile(answersPath, JSON.stringify(data, null, 2), "utf8");
   try {
-    await $`copier copy --trust --defaults --force --data-file ${answersPath} ${templateDir} ${dest}`;
+    const absTemplate = path.resolve(templateDir);
+    const absDest = path.resolve(dest);
+    await fs.mkdirp(absDest);
+    await $`copier copy --trust --defaults --force --data-file ${answersPath} ${absTemplate} ${absDest}`;
   } finally {
     await fs.remove(tmpDir).catch(() => {});
   }
 }
 
-async function writeAnswers(pathDir: string, name: string, language: string, template: string) {
-  const yml = [
-    "# Recorded by scaf for discovery",
-    `name: ${name}`,
-    `language: ${language}`,
-    `template: ${template}`,
-  ].join("\n") + "\n";
-  await fs.outputFile(path.join(pathDir, ".copier-answers.yml"), yml, "utf8");
-}
-
-async function cmdNew(args: string[], flags: Record<string,string>) {
-  const [language, templateRaw, name] = args;
-  if (!language || !templateRaw || !name) { usage(); process.exit(2); }
-  const template = normalizeTemplateName(templateRaw);
-  const root = path.join("tools","scaffolding","templates", language, template);
-  if (!(await fs.pathExists(root))) { console.error(`template not found: ${language}/${template}`); process.exit(1); }
-  const dest = resolveDestination(language, template, name, flags.path);
-  const data: Record<string, any> = { name, language, template };
-  for (const [k,v] of Object.entries(flags)) if (!["path","json"].includes(k)) data[k] = v;
-  await fs.mkdirp(dest);
-  await runCopierCopy(root, dest, data);
-  await writeAnswers(dest, name, language, template);
-  console.log("created:", dest);
+async function recordSource(dest: string, language: string, template: string) {
+  const answers = path.join(dest, ".copier-answers.yml");
+  const relSrc = path.join("tools","scaffolding","templates", language, template);
+  const line = `scaf_src_path: ${relSrc}`;
+  let cur = "";
+  try { cur = await fs.readFile(answers, "utf8"); } catch {}
+  if (!cur.includes("scaf_src_path:")) {
+    await fs.appendFile(answers, (cur.endsWith("\n") ? "" : "\n") + line + "\n", "utf8");
+  }
 }
 
 async function discoverScaffolds(root: string = "."): Promise<Array<{path: string, language: string, template: string, name: string}>> {
@@ -99,7 +88,6 @@ async function discoverScaffolds(root: string = "."): Promise<Array<{path: strin
     if (path.basename(f) === ".copier-answers.yml") {
       const dir = path.dirname(f);
       const name = path.basename(dir);
-      // Try parse minimal yaml
       const txt = await fs.readFile(f, "utf8").catch(() => "");
       const lang = /language:\s*(\S+)/.exec(txt)?.[1] || (dir.includes("libs/") ? "go" : "unknown");
       const tmpl = /template:\s*(\S+)/.exec(txt)?.[1] || (dir.includes("libs/") ? "lib" : "unknown");
@@ -127,8 +115,13 @@ async function cmdUpdateOrRegen(mode: "update"|"regen", args: string[]) {
   const discovered = await discoverScaffolds(".");
   const chosen = targets[0] === "all" ? discovered.map(d => d.path) : targets;
   for (const t of chosen) {
-    if (mode === "regen") await copierRecopyOrUpdate(t);
-    else await copierUpdate(t);
+    if (mode === "regen") {
+      try { await recopyUsingRecordedSource(t); }
+      catch { await copierRecopyOrUpdate(t); }
+    } else {
+      try { await recopyUsingRecordedSource(t); }
+      catch { await copierUpdate(t); }
+    }
     console.log(`${mode} OK:`, t);
   }
 }
@@ -141,6 +134,20 @@ async function cmdLs(flags: Record<string,string>) {
 
 async function cmdTemplates(args: string[], flags: Record<string,string>) {
   await listTemplates(args[0], Boolean(flags.json));
+}
+
+async function cmdNew(args: string[], flags: Record<string,string>) {
+  const [language, templateRaw, name] = args;
+  if (!language || !templateRaw || !name) { usage(); process.exit(2); }
+  const template = normalizeTemplateName(templateRaw);
+  const root = path.join("tools","scaffolding","templates", language, template);
+  if (!(await fs.pathExists(root))) { console.error(`template not found: ${language}/${template}`); process.exit(1); }
+  const dest = resolveDestination(language, template, name, flags.path);
+  const data: Record<string, any> = { name, language, template };
+  for (const [k,v] of Object.entries(flags)) if (!["path","json"].includes(k)) data[k] = v;
+  await runCopierCopy(root, dest, data);
+  await recordSource(dest, language, template);
+  console.log("created:", dest);
 }
 
 async function main() {

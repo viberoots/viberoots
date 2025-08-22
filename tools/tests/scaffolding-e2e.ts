@@ -14,6 +14,11 @@ async function main() {
   try {
     process.chdir(tmp);
     await $`scaf new go lib demo-lib`;
+    // Initialize git and commit to satisfy copier update/regen cleanliness checks
+    await $`git init`;
+    await $`git add -A`;
+    await $`git commit -m "init scaffold"`;
+
     const res = await $({ stdio: 'pipe' })`scaf ls --json`;
     const arr = JSON.parse(res.stdout.trim() || "[]");
     if (!arr.some((r: any) => r.path.endsWith("libs/demo-lib"))) {
