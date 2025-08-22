@@ -1,10 +1,10 @@
 def _zx_test_impl(ctx):
     script = ctx.attrs.script
-    # Run the TypeScript test using local tsx from node_modules
     cmd = [
         "bash",
         "-lc",
-        "./node_modules/.bin/tsx {}".format(script.short_path),
+        # Use node directly; zx-wrapper shebang on the script handles the flags
+        "node {}".format(script.short_path),
     ]
     ctx.actions.run(
         cmd_args(cmd),
@@ -19,5 +19,4 @@ zx_test = rule(
     attrs = {
         "script": attrs.source(),
     },
-    is_test = True,
 )

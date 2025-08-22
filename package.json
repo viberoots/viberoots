@@ -4,6 +4,9 @@
   "type": "module",
   "packageManager": "pnpm@9.0.0",
   "engines": { "node": ">=22.0.0" },
+  "imports": {
+    "#tests/lib/test-helpers": "./tools/tests/lib/test-helpers.ts"
+  },
   "scripts": {
     "dev:check": "tools/dev/startup-check.ts",
     "dev:clear-overrides": "tools/dev/clear-overrides.ts"
