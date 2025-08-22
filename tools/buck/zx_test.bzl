@@ -1,6 +1,13 @@
 def _zx_test_impl(ctx):
     script = ctx.attrs.script
     cmd = [
+        "./node_modules/.bin/c8",
+        "--reporter=lcov",
+        "--reporter=text-summary",
+        "--report-dir",
+        "./coverage/" + ctx.label.name,
+        "--all",
+        "--src=tools",
         "node",
         "--experimental-strip-types",
         "--import",

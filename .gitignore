@@ -25,3 +25,16 @@ third_party/providers/TARGETS.auto
 third_party/providers/TARGETS.node.auto
 third_party/providers/auto_map.bzl
 tools/buck/graph.json
+
+# Test coverage and reports
+coverage/
+.nyc_output/
+
+# Husky/lint-staged temp patches
+.git/lint-staged_unstaged.patch
+
+# Test temp repos or files if created
+/tools/tests/**/tmp/
+
+# zx / misc temp
+*.log
