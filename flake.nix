@@ -33,6 +33,14 @@
                   Object.assign($patched, $orig);
                   globalThis.$ = $patched;
                 }
+                // Register a tiny ESM loader to resolve extensionless relative imports to .ts
+                try {
+                  const { register } = await import('node:module');
+                  const { pathToFileURL } = await import('node:url');
+                  const tsLoaderCode = `export async function resolve(specifier, context, nextResolve) { try { const isRel = specifier.startsWith('./') || specifier.startsWith('../') || specifier.startsWith('/'); const base = context.parentURL || 'file:///'; if (isRel) { const last = new URL(specifier, base).pathname.split('/').pop() || ''; if (!/\\.[a-zA-Z0-9]+$/.test(last)) { const withTs = new URL(specifier + '.ts', base).href; return await nextResolve(withTs, context); } } } catch {} return nextResolve(specifier, context); }`;
+                  const dataUrl = 'data:text/javascript,' + encodeURIComponent(tsLoaderCode);
+                  register(dataUrl, pathToFileURL(process.cwd() + '/'));
+                } catch {}
               ''} \
               "$@"
           '');

@@ -18,3 +18,7 @@ scaf new go lib <name> [--path=DEST]
 # Examples
 - scaf new go lib auth-utils
 - scaf regen libs/auth-utils
+
+# Validation
+Use `scaf validate all` to validate all templates, or target specific ones:
+- `scaf validate tools/scaffolding/templates/go/lib`
