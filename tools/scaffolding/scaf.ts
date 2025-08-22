@@ -2,6 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import os from "node:os";
+import { copierRecopyOrUpdate, copierUpdate } from "./lib/scaffold-utils";
 
 function usage() {
   console.log(`scaf <command> [...]
@@ -50,6 +51,16 @@ function normalizeTemplateName(name: string): string {
   return name;
 }
 
+function resolveDestination(language: string, template: string, name: string, override?: string): string {
+  if (override) return override;
+  if (language === "go" && template === "lib") return path.join("libs", name);
+  return path.join(".tmp", name);
+}
+
+async function writeAnswersFile(dir: string, data: any) {
+  await fs.outputFile(path.join(dir, ".copier-answers.yml"), "# recorded by scaf\n", "utf8");
+}
+
 async function runCopierCopy(templateDir: string, dest: string, data: Record<string, any>) {
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "scaf-"));
   const answersPath = path.join(tmpDir, "answers.json");
@@ -67,12 +78,57 @@ async function cmdNew(args: string[], flags: Record<string,string>) {
   const template = normalizeTemplateName(templateRaw);
   const root = path.join("tools","scaffolding","templates", language, template);
   if (!(await fs.pathExists(root))) { console.error(`template not found: ${language}/${template}`); process.exit(1); }
-  const dest = flags.path || path.join(".tmp", name);
+  const dest = resolveDestination(language, template, name, flags.path);
   const data: Record<string, any> = { name, language, template };
   for (const [k,v] of Object.entries(flags)) if (!["path","json"].includes(k)) data[k] = v;
   await fs.mkdirp(dest);
   await runCopierCopy(root, dest, data);
   console.log("created:", dest);
+}
+
+async function discoverScaffolds(root: string = "."): Promise<Array<{path: string, language: string, template: string, name: string}>> {
+  const out: Array<{path: string, language: string, template: string, name: string}> = [];
+  for await (const f of walk(root)) {
+    if (path.basename(f) === ".copier-answers.yml") {
+      const dir = path.dirname(f);
+      // Best-effort: infer from dir name and template hints
+      const name = path.basename(dir);
+      // We recorded minimal answers; use dir structure for now
+      const guess = dir.includes("libs/") ? { language: "go", template: "lib" } : { language: "unknown", template: "unknown" };
+      out.push({ path: dir, language: guess.language, template: guess.template, name });
+    }
+  }
+  return out;
+}
+
+async function* walk(dir: string): AsyncGenerator<string> {
+  const list = await fs.readdir(dir, { withFileTypes: true }).catch(() => [] as fs.Dirent[]);
+  for (const e of list) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) {
+      if ([".git","node_modules","buck-out",".direnv",".gitignore"].includes(e.name)) continue;
+      yield* walk(p);
+    } else {
+      yield p;
+    }
+  }
+}
+
+async function cmdUpdateOrRegen(mode: "update"|"regen", args: string[]) {
+  const targets = args.length ? args : ["all"];
+  const discovered = await discoverScaffolds(".");
+  const chosen = targets[0] === "all" ? discovered.map(d => d.path) : targets;
+  for (const t of chosen) {
+    if (mode === "regen") await copierRecopyOrUpdate(t);
+    else await copierUpdate(t);
+    console.log(`${mode} OK:`, t);
+  }
+}
+
+async function cmdLs(flags: Record<string,string>) {
+  const rows = await discoverScaffolds(".");
+  if (flags.json) console.log(JSON.stringify(rows, null, 2));
+  else for (const r of rows) console.log(`${r.path}\t${r.language}\t${r.template}\t${r.name}`);
 }
 
 async function cmdTemplates(args: string[], flags: Record<string,string>) {
@@ -86,10 +142,10 @@ async function main() {
   switch (cmd) {
     case "templates": return cmdTemplates(rest, flags);
     case "new": return cmdNew(rest, flags);
-    case "update":
-    case "regen":
+    case "update": return cmdUpdateOrRegen("update", rest);
+    case "regen": return cmdUpdateOrRegen("regen", rest);
+    case "ls": return cmdLs(flags);
     case "delete":
-    case "ls":
     case "help":
     case "completions":
       console.error(`${cmd} not yet implemented (stub)`);
