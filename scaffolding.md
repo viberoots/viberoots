@@ -204,7 +204,7 @@ if (!isUpdate) {
 }
 
 // Post steps (example): formatting & install
-await $`bash -lc 'cd ${dest} && npm run format || true'`;
+await $`bash -c 'cd ${dest} && npm run format || true'`;
 ```
 
 Notes:

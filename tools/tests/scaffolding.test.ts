@@ -1,83 +1,101 @@
 #!/usr/bin/env zx-wrapper
-import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { describe, test } from "node:test";
-import { $ } from "zx";
-import { exists, mktemp, rsyncRepoTo } from "./lib/test-helpers";
 
-async function runInTemp<T>(name: string, fn: (tmp: string) => Promise<T>): Promise<T> {
-  const tmp = await mktemp(name + "-");
-  await rsyncRepoTo(tmp);
-  try {
-    return await fn(tmp);
-  } finally {
-    await fsp.rm(tmp, { recursive: true, force: true }).catch(() => {});
-  }
-}
+import { runInTemp } from "./lib/test-helpers";
 
 describe("scaffolding", () => {
   test("buck2 config uses TARGETS buildfile", async () => {
-    await runInTemp("buck2-targets", async (tmp) => {
+    await runInTemp("buck2-targets", async (tmp, _$) => {
       const cfg = await fsp.readFile(path.join(tmp, ".buckconfig"), "utf8");
-      assert.match(cfg, /\[buildfile\][\s\S]*?name\s*=\s*TARGETS/m);
+      if (!/\[buildfile\][\s\S]*?name\s*=\s*TARGETS/m.test(cfg)) {
+        console.error("Expected .buckconfig to include buildfile.name = TARGETS");
+        process.exit(2);
+      }
     });
   });
 
   test("scaf new go lib <name> renders README", async () => {
-    await runInTemp("scaf-smoke", async (tmp) => {
+    await runInTemp("scaf-smoke", async (tmp, _$) => {
+      const $ = _$({ stdio: "ignore" });
+      const pipe$ = _$({ stdio: "pipe" });
+
       const name = "demo-lib";
       const dest = path.join(tmp, "libs", name);
-      await $({ cwd: tmp, stdio: "ignore" })`scaf new go lib ${name}`;
+      try {
+        await pipe$`scaf new go lib ${name}`;
+      } catch (e: any) {
+        const out = e?.stdout || "";
+        const err = e?.stderr || "";
+        console.error("scaf new failed:\n" + (err || out));
+        process.exit(2);
+      }
       const readme = path.join(dest, "README.md");
-      assert.ok(await exists(readme), "README.md should exist");
+      const existsReadme = await fsp
+        .access(readme)
+        .then(() => true)
+        .catch(() => false);
+      if (!existsReadme) {
+        console.error("README.md missing in scaffold");
+        process.exit(2);
+      }
       const content = await fsp.readFile(readme, "utf8");
-      assert.ok(content.startsWith(`# ${name} (Go library)`), "README header should match");
+      if (!content.startsWith(`# ${name} (Go library)`)) {
+        console.error("README header mismatch");
+        process.exit(2);
+      }
     });
   });
 
   test("move, update, delete and ls reflects state", async () => {
-    await runInTemp("scaf-e2e", async (tmp) => {
-      await $({ cwd: tmp, stdio: "ignore" })`scaf new go lib demo-lib`;
-      await $({ cwd: tmp, stdio: "ignore" })`git init`;
-      await $({ cwd: tmp, stdio: "ignore" })`git add -A`;
-      await $({ cwd: tmp, stdio: "ignore" })`git commit -m "init scaffold"`;
-      await $({ cwd: tmp, stdio: "ignore" })`scaf move libs/demo-lib libs/demo-moved --yes`;
-      await $({ cwd: tmp, stdio: "ignore" })`git add -A`;
-      await $({ cwd: tmp, stdio: "ignore" })`git commit -m "move scaffold"`;
-      await $({ cwd: tmp, stdio: "ignore" })`scaf update libs/demo-moved`;
-      await $({ cwd: tmp, stdio: "ignore" })`scaf delete libs/demo-moved --yes`;
-      const res = await $({ stdio: "pipe", cwd: tmp })`scaf ls --json`;
+    await runInTemp("scaf-e2e", async (_tmp, _$) => {
+      const $ = _$({ stdio: "ignore" });
+      const pipe$ = _$({ stdio: "pipe" });
+
+      await $`scaf new go lib demo-lib`;
+      await $`git init`;
+      await $`git add -A`;
+      await $`git commit -m "init scaffold"`;
+      await $`scaf move libs/demo-lib libs/demo-moved --yes`;
+      await $`git add -A`;
+      await $`git commit -m "move scaffold"`;
+      await $`scaf update libs/demo-moved`;
+      await $`scaf delete libs/demo-moved --yes`;
+      const res = await pipe$`scaf ls --json`;
       const arr = JSON.parse(res.stdout.trim() || "[]");
-      assert.equal(
-        arr.some((r: any) => String(r.path || "").endsWith("libs/demo-moved")),
-        false,
-      );
+      if (arr.some((r: any) => String(r.path || "").endsWith("libs/demo-moved"))) {
+        console.error("delete failed: libs/demo-moved still listed");
+        process.exit(2);
+      }
     });
   });
 
   test("meta.json and help.md validation pass/fail scenarios", async () => {
     // pass
-    await runInTemp("tmpl-validate-pass", async (tmp) => {
-      await $({ cwd: tmp, stdio: "ignore" })`scaf validate all --quiet`;
+    await runInTemp("tmpl-validate-pass", async (_tmp, _$) => {
+      const $ = _$({ stdio: "ignore" });
+      await $`scaf validate all --quiet`;
     });
     // fail missing help.md
-    await runInTemp("tmpl-validate-fail1", async (tmp) => {
+    await runInTemp("tmpl-validate-fail1", async (tmp, _$) => {
+      const $ = _$({ stdio: "ignore" });
       const bad = path.join(tmp, "tools", "scaffolding", "templates", "go", "lib", "help.md");
       await fsp.rm(bad, { force: true });
       let failed = false;
       try {
-        await $({
-          cwd: tmp,
-          stdio: "ignore",
-        })`scaf validate tools/scaffolding/templates/go/lib --quiet`;
+        await $`scaf validate tools/scaffolding/templates/go/lib --quiet`;
       } catch {
         failed = true;
       }
-      assert.ok(failed, "validator should fail when help.md is missing");
+      if (!failed) {
+        console.error("validator unexpectedly passed");
+        process.exit(2);
+      }
     });
     // fail meta.help present
-    await runInTemp("tmpl-validate-fail2", async (tmp) => {
+    await runInTemp("tmpl-validate-fail2", async (tmp, _$) => {
+      const $ = _$({ stdio: "ignore" });
       const metaPath = path.join(
         tmp,
         "tools",
@@ -88,18 +106,18 @@ describe("scaffolding", () => {
         "meta.json",
       );
       const meta = JSON.parse(await fsp.readFile(metaPath, "utf8"));
-      meta.help = { usage: "bogus" };
+      (meta as any).help = { usage: "bogus" };
       await fsp.writeFile(metaPath, JSON.stringify(meta, null, 2) + "\n", "utf8");
       let failed = false;
       try {
-        await $({
-          cwd: tmp,
-          stdio: "ignore",
-        })`scaf validate tools/scaffolding/templates/go/lib --quiet`;
+        await $`scaf validate tools/scaffolding/templates/go/lib --quiet`;
       } catch {
         failed = true;
       }
-      assert.ok(failed, "validator should fail when meta.help exists");
+      if (!failed) {
+        console.error("validator unexpectedly passed");
+        process.exit(2);
+      }
     });
   });
 });

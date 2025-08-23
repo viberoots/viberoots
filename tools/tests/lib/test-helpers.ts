@@ -6,7 +6,7 @@ import path from "node:path";
 import { $ } from "zx";
 
 export async function rsyncRepoTo(tmp: string) {
-  await $`bash -lc 'rsync -a --exclude "buck-out" --exclude ".git" --exclude "libs" --exclude ".tmp" ./ ${tmp}/'`;
+  await $`rsync -a --exclude "buck-out" --exclude ".git" --exclude "libs" --exclude ".tmp" ./ ${tmp}/`;
 }
 
 export async function mktemp(prefix = "test-") {

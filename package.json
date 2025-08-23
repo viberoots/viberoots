@@ -14,7 +14,7 @@
     "lint": "eslint . --ext .ts --max-warnings=0",
     "lint:fix": "eslint . --ext .ts --fix",
     "prepare": "husky",
-    "coverage:summary": "node -e \"try{console.log(require('fs').readFileSync('coverage/lcov.info','utf8').split('\n').slice(-200).join('\n'))}catch(e){console.error('No coverage yet')}\""
+    "coverage:summary": "tools/dev/coverage-summary.ts"
   },
   "lint-staged": {
     "**/*.{ts,tsx}": [

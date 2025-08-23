@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import * as fsp from "node:fs/promises";
 import * as fs from "node:fs";
-import path from "node:path";
+import * as fsp from "node:fs/promises";
 import os from "node:os";
+import path from "node:path";
 import {
   copierRecopyOrUpdate,
   copierUpdate,
@@ -286,13 +286,11 @@ async function cmdMove(args: string[], flags: Record<string, string>) {
 
 async function cmdCompletions(args: string[]) {
   const [shell] = args;
-  const script =
-    shell === "bash"
-      ? "complete -W 'templates new update regen delete move ls help template validate' scaf"
-      : shell === "zsh"
-        ? "# zsh users can alias scaf and use compctl if desired"
-        : "# fish completion is minimal; extend as needed";
-  console.log(script);
+  if (shell === "bash" || shell === "zsh") {
+    console.log(
+      "complete -W 'templates new update regen delete move ls help template validate' scaf",
+    );
+  }
 }
 
 async function cmdHelp(args: string[]) {
