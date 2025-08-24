@@ -4,7 +4,7 @@
   "description": "Go command-line application",
   "help": {
     "usage": "scaf new go cli <name> [--path=DEST]",
-    "notes": ["A minimal go cli template.", "Generated: README.md"],
+    "notes": ["A minimal Go CLI template.", "Generated: README.md"],
     "examples": ["scaf new go cli demo"]
   }
 }

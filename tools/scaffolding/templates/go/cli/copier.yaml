@@ -1,6 +1,20 @@
-# copier config for go/cli
-override: true
+# Minimal copier template for go/cli
+version: 1
+
+_envops:
+  block_start_string: "{%"
+  block_end_string: "%}"
+  variable_start_string: "{{"
+  variable_end_string: "}}"
+  comment_start_string: "{#"
+  comment_end_string: "#}"
+  keep_trailing_newline: true
 
 _exclude:
   - meta.json
   - help.md
+
+# scaf supplies values via --data-file
+name: ""
+language: "go"
+template: "cli"

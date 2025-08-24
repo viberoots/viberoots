@@ -48,6 +48,62 @@ describe("scaffolding", () => {
     });
   });
 
+  test("scaf new go cli <name> renders README", async () => {
+    await runInTemp("scaf-cli-smoke", async (tmp, _$) => {
+      const $ = _$({ stdio: "ignore" });
+      const pipe$ = _$({ stdio: "pipe" });
+
+      const name = "demo-cli";
+      const dest = path.join(tmp, ".tmp", name);
+      try {
+        await pipe$`scaf new go cli ${name}`;
+      } catch (e: any) {
+        const out = e?.stdout || "";
+        const err = e?.stderr || "";
+        console.error("scaf new (cli) failed:\n" + (err || out));
+        process.exit(2);
+      }
+      const readme = path.join(dest, "README.md");
+      const existsReadme = await fsp
+        .access(readme)
+        .then(() => true)
+        .catch(() => false);
+      if (!existsReadme) {
+        console.error("README.md missing in CLI scaffold");
+        process.exit(2);
+      }
+      const content = await fsp.readFile(readme, "utf8");
+      if (!content.startsWith(`# ${name} (Go CLI)`)) {
+        console.error("CLI README header mismatch");
+        process.exit(2);
+      }
+    });
+  });
+
+  test("new overwrite guard requires --yes or supports --dry-run", async () => {
+    await runInTemp("scaf-overwrite-guard", async (_tmp, _$) => {
+      const $ = _$({ stdio: "ignore" });
+      const pipe$ = _$({ stdio: "pipe" });
+      // first creation
+      await $`scaf new go lib demo-lib`;
+      // attempt to create again should prompt and exit 2
+      let prompted = false;
+      try {
+        await $`scaf new go lib demo-lib`;
+      } catch {
+        prompted = true;
+      }
+      if (!prompted) {
+        console.error("expected new without --yes to abort on non-empty dir");
+        process.exit(2);
+      }
+      // dry-run should exit 0
+      await $`scaf new go lib demo-lib --dry-run`;
+      // with --yes should proceed
+      await $`scaf new go lib demo-lib --yes`;
+    });
+  });
+
   test("move, update, delete and ls reflects state", async () => {
     await runInTemp("scaf-e2e", async (_tmp, _$) => {
       const $ = _$({ stdio: "ignore" });

@@ -23,8 +23,7 @@ def _zx_test_impl(ctx):
     ctx.actions.write(stamp, "zx_test\n")
     return [
         DefaultInfo(
-            default_outputs = [stamp],
-            other_outputs = [stamp],
+            default_output = stamp,
         ),
         ExternalRunnerTestInfo(
             type = "custom",

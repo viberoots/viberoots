@@ -106,8 +106,8 @@ function normalizeTemplateName(name: string): string {
   if (name === "lib" || name === "library") {
     return "lib";
   }
-  if (name === "cli-app" || name === "cli" || name === "app") {
-    return "cli-app";
+  if (name === "cli-app" || name === "cli") {
+    return "cli";
   }
   return name;
 }
@@ -284,7 +284,7 @@ async function cmdDelete(args: string[], flags: Record<string, string>) {
   const discovered = await discoverScaffolds(".");
   const targets = args.length ? args : ["all"];
   const chosen = targets[0] === "all" ? discovered.map((d) => d.path) : args;
-  confirmOrExit(
+  await confirmOrExit(
     `Delete ${chosen.length} scaffold(s):\n` + chosen.map((p) => ` - ${p}`).join("\n"),
     yes,
     dry,
@@ -453,6 +453,21 @@ async function cmdNew(args: string[], flags: Record<string, string>) {
       data[k] = v;
     }
   }
+  // Overwrite guard + dry-run support
+  const yes = flags["yes"] === "true";
+  const dry = flags["dry-run"] === "true";
+  const destExists = await exists(dest);
+  const isNonEmpty = destExists
+    ? (await fsp.readdir(dest).catch(() => [] as string[])).length > 0
+    : false;
+  if (isNonEmpty && !yes) {
+    await confirmOrExit(`Directory not empty: ${dest}\nOverwrite via copier?`, false, dry);
+  }
+  if (dry) {
+    console.log(`[dry-run] would create/update scaffold at: ${dest}`);
+    return;
+  }
+
   await runCopierCopy(root, dest, data);
   await recordSource(dest, language, template);
   console.log("created:", dest);
