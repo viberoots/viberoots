@@ -157,6 +157,22 @@ async function recordSource(dest: string, language: string, template: string) {
   }
 }
 
+async function readRegenInfo(targetDir: string): Promise<{
+  src?: string;
+  data: Record<string, any>;
+}> {
+  const answersFile = path.join(targetDir, ".copier-answers.yml");
+  const txt = await fsp.readFile(answersFile, "utf8").catch(() => "");
+  const src = /^scaf_src_path:\s*(\S+)/m.exec(txt)?.[1]?.trim();
+  const name = /^name:\s*(\S+)/m.exec(txt)?.[1]?.trim() || path.basename(targetDir);
+  const language = /^language:\s*(\S+)/m.exec(txt)?.[1]?.trim() || undefined;
+  const template = /^template:\s*(\S+)/m.exec(txt)?.[1]?.trim() || undefined;
+  const data: Record<string, any> = { name };
+  if (language) data.language = language;
+  if (template) data.template = template;
+  return { src, data };
+}
+
 async function discoverScaffolds(
   root: string = ".",
 ): Promise<
@@ -250,10 +266,31 @@ async function cmdUpdateOrRegen(
   );
   for (const t of chosen) {
     if (mode === "regen") {
-      try {
-        await recopyUsingRecordedSource(t);
-      } catch {
-        await copierRecopyOrUpdate(t);
+      // Staged regen when we have a recorded source; otherwise fall back.
+      const { src, data } = await readRegenInfo(t);
+      if (src) {
+        const parent = path.dirname(t);
+        const base = path.basename(t);
+        const staged = path.join(parent, `${base}.scaf-stage-${Date.now()}`);
+        // Move current scaffold out of the way
+        await fsp.rename(t, staged);
+        try {
+          await runCopierCopy(src, t, data);
+          // success: remove staged backup
+          await fsp.rm(staged, { recursive: true, force: true });
+        } catch (err) {
+          // failure: restore original and surface error
+          await fsp.rm(t, { recursive: true, force: true }).catch(() => {});
+          await fsp.rename(staged, t).catch(() => {});
+          throw err;
+        }
+      } else {
+        // No recorded source; use non-staged fallback
+        try {
+          await recopyUsingRecordedSource(t);
+        } catch {
+          await copierRecopyOrUpdate(t);
+        }
       }
     } else {
       try {

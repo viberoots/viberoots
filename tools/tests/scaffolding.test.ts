@@ -104,6 +104,44 @@ describe("scaffolding", () => {
     });
   });
 
+  test("regen staging restores original on failure", async () => {
+    await runInTemp("scaf-regen-stage", async (tmp, _$) => {
+      const $ = _$({ stdio: "ignore" });
+      const pipe$ = _$({ stdio: "pipe" });
+      // create scaffold
+      await $`scaf new go lib demo-lib`;
+      // corrupt recorded source so staged regen tries and fails
+      const answers = path.join(tmp, "libs", "demo-lib", ".copier-answers.yml");
+      let txt = await fsp.readFile(answers, "utf8").catch(() => "");
+      txt = txt.replace(
+        /^scaf_src_path:.*/m,
+        "scaf_src_path: tools/scaffolding/templates/does/not/exist",
+      );
+      await fsp.writeFile(answers, txt, "utf8");
+      // Modify a file in the scaffold to detect restoration
+      const readme = path.join(tmp, "libs", "demo-lib", "README.md");
+      const marker = "RESTORE_ME";
+      await fsp.appendFile(readme, `\n${marker}\n`, "utf8");
+      // Run regen, expecting failure
+      let failed = false;
+      try {
+        await pipe$`scaf regen libs/demo-lib --yes`;
+      } catch {
+        failed = true;
+      }
+      if (!failed) {
+        console.error("expected regen to fail with bad source");
+        process.exit(2);
+      }
+      // Ensure staged restore retained our marker
+      const content = await fsp.readFile(readme, "utf8");
+      if (!content.includes(marker)) {
+        console.error("regen did not restore original content from staging");
+        process.exit(2);
+      }
+    });
+  });
+
   test("move, update, delete and ls reflects state", async () => {
     await runInTemp("scaf-e2e", async (_tmp, _$) => {
       const $ = _$({ stdio: "ignore" });
