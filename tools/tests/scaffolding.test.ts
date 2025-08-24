@@ -54,9 +54,9 @@ describe("scaffolding", () => {
       const pipe$ = _$({ stdio: "pipe" });
 
       const name = "demo-cli";
-      const dest = path.join(tmp, ".tmp", name);
+      const dest = path.join(tmp, name);
       try {
-        await pipe$`scaf new go cli ${name}`;
+        await pipe$`scaf new go cli ${name} --yes`;
       } catch (e: any) {
         const out = e?.stdout || "";
         const err = e?.stderr || "";
@@ -166,6 +166,13 @@ describe("scaffolding", () => {
       await $`scaf move libs/demo-lib libs/demo-moved --yes`;
       await $`git add -A`;
       await $`git commit -m "move scaffold"`;
+      // verify .copier-answers.yml name updated
+      const ans = path.join(_tmp, "libs", "demo-moved", ".copier-answers.yml");
+      const txt = await fsp.readFile(ans, "utf8");
+      if (!/^name:\s*demo-moved/m.test(txt)) {
+        console.error("move did not update name in .copier-answers.yml");
+        process.exit(2);
+      }
       // dry-run should not change state and should exit 0
       await $`scaf update libs/demo-moved --dry-run`;
       // without --yes, update should prompt and exit 2
