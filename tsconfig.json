@@ -11,7 +11,8 @@
     "allowJs": false,
     "checkJs": false,
     "noEmit": true,
-    "strict": true
+    "strict": true,
+    "allowImportingTsExtensions": true
   },
   "include": ["types/**/*.d.ts", "**/*.ts"],
   "exclude": ["**/node_modules/**", "**/dist/**", "**/build/**", "**/buck-out/**"]

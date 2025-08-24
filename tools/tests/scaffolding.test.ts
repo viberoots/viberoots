@@ -60,7 +60,22 @@ describe("scaffolding", () => {
       await $`scaf move libs/demo-lib libs/demo-moved --yes`;
       await $`git add -A`;
       await $`git commit -m "move scaffold"`;
-      await $`scaf update libs/demo-moved`;
+      // dry-run should not change state and should exit 0
+      await $`scaf update libs/demo-moved --dry-run`;
+      // without --yes, update should prompt and exit 2
+      let prompted = false;
+      try {
+        await $`scaf update libs/demo-moved`;
+      } catch {
+        prompted = true;
+      }
+      if (!prompted) {
+        console.error("expected update without --yes to abort");
+        process.exit(2);
+      }
+      await $`scaf update libs/demo-moved --yes`;
+      // dry-run delete
+      await $`scaf delete libs/demo-moved --dry-run`;
       await $`scaf delete libs/demo-moved --yes`;
       const res = await pipe$`scaf ls --json`;
       const arr = JSON.parse(res.stdout.trim() || "[]");

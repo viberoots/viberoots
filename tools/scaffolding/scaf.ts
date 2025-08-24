@@ -3,6 +3,8 @@ import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { stdin as input, stdout as output } from "node:process";
+import readline from "node:readline/promises";
 import "zx/globals";
 import {
   copierRecopyOrUpdate,
@@ -157,8 +159,16 @@ async function recordSource(dest: string, language: string, template: string) {
 
 async function discoverScaffolds(
   root: string = ".",
-): Promise<Array<{ path: string; language: string; template: string; name: string }>> {
-  const out: Array<{ path: string; language: string; template: string; name: string }> = [];
+): Promise<
+  Array<{ path: string; language: string; template: string; name: string; templateRef?: string }>
+> {
+  const out: Array<{
+    path: string;
+    language: string;
+    template: string;
+    name: string;
+    templateRef?: string;
+  }> = [];
   for await (const f of walk(root)) {
     if (path.basename(f) === ".copier-answers.yml") {
       const dir = path.dirname(f);
@@ -168,7 +178,8 @@ async function discoverScaffolds(
         /language:\s*(\S+)/m.exec(txt)?.[1] || (dir.includes("libs/") ? "go" : "unknown");
       const tmpl =
         /template:\s*(\S+)/m.exec(txt)?.[1] || (dir.includes("libs/") ? "lib" : "unknown");
-      out.push({ path: dir, language: lang, template: tmpl, name });
+      const templateRef = /^scaf_src_path:\s*(\S+)/m.exec(txt)?.[1]?.trim();
+      out.push({ path: dir, language: lang, template: tmpl, name, templateRef });
     }
   }
   return out;
@@ -189,13 +200,23 @@ async function* walk(dir: string): AsyncGenerator<string> {
   }
 }
 
-function confirmOrExit(summary: string, yes: boolean, dry: boolean) {
+async function confirmOrExit(summary: string, yes: boolean, dry: boolean) {
   console.log(summary);
   if (dry) {
     console.log("[dry-run] no changes made");
     process.exit(0);
   }
   if (!yes) {
+    if (process.stdin.isTTY) {
+      const rl = readline.createInterface({ input, output });
+      const answer = (await rl.question("Proceed? [y/N] ")).trim().toLowerCase();
+      rl.close();
+      if (answer !== "y" && answer !== "yes") {
+        console.error("Aborted. Use --yes to confirm.");
+        process.exit(2);
+      }
+      return;
+    }
     console.error("Aborted. Use --yes to confirm.");
     process.exit(2);
   }
@@ -212,10 +233,21 @@ async function isGitCleanCwd(): Promise<boolean> {
   }
 }
 
-async function cmdUpdateOrRegen(mode: "update" | "regen", args: string[]) {
+async function cmdUpdateOrRegen(
+  mode: "update" | "regen",
+  args: string[],
+  flags: Record<string, string>,
+) {
+  const yes = flags["yes"] === "true";
+  const dry = flags["dry-run"] === "true";
   const targets = args.length ? args : ["all"];
   const discovered = await discoverScaffolds(".");
   const chosen = targets[0] === "all" ? discovered.map((d) => d.path) : targets;
+  await confirmOrExit(
+    `${mode} ${chosen.length} scaffold(s):\n` + chosen.map((p) => ` - ${p}`).join("\n"),
+    yes,
+    dry,
+  );
   for (const t of chosen) {
     if (mode === "regen") {
       try {
@@ -240,7 +272,8 @@ async function cmdLs(flags: Record<string, string>) {
     console.log(JSON.stringify(rows, null, 2));
   } else {
     for (const r of rows) {
-      console.log(`${r.path}\t${r.language}\t${r.template}\t${r.name}`);
+      const ref = r.templateRef ? `\t${r.templateRef}` : "";
+      console.log(`${r.path}\t${r.language}\t${r.template}\t${r.name}${ref}`);
     }
   }
 }
@@ -435,9 +468,9 @@ async function main() {
     case "new":
       return cmdNew(rest, flags);
     case "update":
-      return cmdUpdateOrRegen("update", rest);
+      return cmdUpdateOrRegen("update", rest, flags);
     case "regen":
-      return cmdUpdateOrRegen("regen", rest);
+      return cmdUpdateOrRegen("regen", rest, flags);
     case "delete":
       return cmdDelete(rest, flags);
     case "move":
