@@ -80,6 +80,18 @@ describe("scaffolding", () => {
     });
   });
 
+  test("help --json includes variables from copier.yaml", async () => {
+    await runInTemp("scaf-help-json", async (_tmp, _$) => {
+      const pipe$ = _$({ stdio: "pipe" });
+      const res = await pipe$`scaf help go lib --json`;
+      const obj = JSON.parse(res.stdout.trim());
+      if (!Array.isArray(obj.variables) || !obj.variables.includes("name")) {
+        console.error("expected help --json to include variables");
+        process.exit(2);
+      }
+    });
+  });
+
   test("new overwrite guard requires --yes or supports --dry-run", async () => {
     await runInTemp("scaf-overwrite-guard", async (_tmp, _$) => {
       const $ = _$({ stdio: "ignore" });

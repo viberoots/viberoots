@@ -93,6 +93,25 @@ async function readTemplateMeta(language?: string) {
   return out;
 }
 
+async function readCopierVariables(templateDir: string): Promise<string[]> {
+  const cfgs = ["copier.yaml", "copier.yml", ".copier-answers.yml"];
+  for (const c of cfgs) {
+    const p = path.join(templateDir, c);
+    if (await exists(p)) {
+      const txt = await fsp.readFile(p, "utf8").catch(() => "");
+      const vars: string[] = [];
+      for (const m of txt.matchAll(/^([a-zA-Z_][a-zA-Z0-9_-]*):\s*(?:"[^"]*"|\S*)\s*$/gm)) {
+        const key = m[1];
+        if (!key.startsWith("_")) {
+          vars.push(key);
+        }
+      }
+      return Array.from(new Set(vars));
+    }
+  }
+  return [];
+}
+
 async function listTemplates(language?: string, json = false) {
   const metas = await readTemplateMeta(language);
   if (json) {
@@ -138,6 +157,18 @@ async function runCopierCopy(templateDir: string, dest: string, data: Record<str
     await $`copier copy --trust --defaults --force --data-file ${answersPath} ${absTemplate} ${absDest}`;
   } finally {
     await fsp.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+async function runPostSteps(dest: string) {
+  // Lightweight, idempotent post-steps; skip when not applicable
+  const goMod = path.join(dest, "go.mod");
+  if (await exists(goMod)) {
+    try {
+      await $`bash -lc 'cd ${dest} && go fmt ./... || true && go mod tidy || true'`;
+    } catch {
+      // Non-fatal; post-steps are best-effort
+    }
   }
 }
 
@@ -276,6 +307,7 @@ async function cmdUpdateOrRegen(
         await fsp.rename(t, staged);
         try {
           await runCopierCopy(src, t, data);
+          await runPostSteps(t);
           // success: remove staged backup
           await fsp.rm(staged, { recursive: true, force: true });
         } catch (err) {
@@ -291,6 +323,7 @@ async function cmdUpdateOrRegen(
         } catch {
           await copierRecopyOrUpdate(t);
         }
+        await runPostSteps(t);
       }
     } else {
       try {
@@ -298,6 +331,7 @@ async function cmdUpdateOrRegen(
       } catch {
         await copierUpdate(t);
       }
+      await runPostSteps(t);
     }
     console.log(`${mode} OK:`, t);
   }
@@ -394,6 +428,8 @@ async function cmdHelp(args: string[], flags: Record<string, string>) {
   }
   const h = meta.help || {};
   if (flags.json === "true") {
+    const tmplDirPath = path.join("tools", "scaffolding", "templates", language, template);
+    const variables = await readCopierVariables(tmplDirPath).catch(() => [] as string[]);
     console.log(
       JSON.stringify(
         {
@@ -401,6 +437,7 @@ async function cmdHelp(args: string[], flags: Record<string, string>) {
           template,
           description: meta.description || "",
           help: h,
+          variables,
         },
         null,
         2,
@@ -507,6 +544,7 @@ async function cmdNew(args: string[], flags: Record<string, string>) {
 
   await runCopierCopy(root, dest, data);
   await recordSource(dest, language, template);
+  await runPostSteps(dest);
   console.log("created:", dest);
 }
 
