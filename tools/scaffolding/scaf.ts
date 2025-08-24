@@ -136,14 +136,31 @@ function resolveDestination(
   template: string,
   name: string,
   override?: string,
-): string {
+): { path: string; needsConfirm: boolean } {
   if (override) {
-    return override;
+    return { path: override, needsConfirm: false };
   }
-  if (language === "go" && template === "lib") {
-    return path.join("libs", name);
+  // Configurable resolver
+  const cfgPath = path.join("tools", "scaffolding", "resolver.json");
+  try {
+    const raw = fs.readFileSync(cfgPath, "utf8");
+    const cfg = JSON.parse(raw || "{}");
+    const langCfg = (cfg && typeof cfg === "object" ? cfg[language] : undefined) || {};
+    let pattern = (langCfg && typeof langCfg === "object" ? langCfg[template] : undefined) as
+      | string
+      | undefined;
+    if (!pattern) {
+      const def = (cfg && typeof cfg === "object" ? cfg["default"] : undefined) || {};
+      pattern = (def && typeof def === "object" ? def[template] : undefined) as string | undefined;
+    }
+    if (pattern && typeof pattern === "string") {
+      return { path: pattern.replaceAll("{name}", name), needsConfirm: false };
+    }
+  } catch {
+    // ignore; fall back to defaults
   }
-  return path.join(".tmp", name);
+  // No mapping: default to ./{name}, but require confirmation
+  return { path: path.join(".", name), needsConfirm: true };
 }
 
 async function runCopierCopy(templateDir: string, dest: string, data: Record<string, any>) {
@@ -176,16 +193,29 @@ async function recordSource(dest: string, language: string, template: string) {
   const answers = path.join(dest, ".copier-answers.yml");
   const relSrc = path.join("tools", "scaffolding", "templates", language, template);
   const line = `scaf_src_path: ${relSrc}`;
-  let cur = "";
-  try {
-    cur = await fsp.readFile(answers, "utf8");
-  } catch (err) {
-    // Missing answers file is OK; we'll create/append below.
-    console.warn(`info: no existing answers file at ${answers}; will create`, err);
+  const existsAns = await exists(answers);
+  if (!existsAns) {
+    const name = path.basename(dest);
+    const base = `name: ${name}\nlanguage: ${language}\ntemplate: ${template}\n${line}\n`;
+    await fsp.writeFile(answers, base, "utf8");
+    return;
   }
+  let cur = await fsp.readFile(answers, "utf8").catch(() => "");
+  // Ensure base keys exist via simple replace-or-append
+  const ensureLine = (key: string, value: string) => {
+    if (new RegExp(`^${key}:\\s`, "m").test(cur)) {
+      cur = cur.replace(new RegExp(`^${key}:.*$`, "m"), `${key}: ${value}`);
+    } else {
+      cur += (cur.endsWith("\n") ? "" : "\n") + `${key}: ${value}\n`;
+    }
+  };
+  ensureLine("name", path.basename(dest));
+  ensureLine("language", language);
+  ensureLine("template", template);
   if (!cur.includes("scaf_src_path:")) {
-    await fsp.appendFile(answers, (cur.endsWith("\n") ? "" : "\n") + line + "\n", "utf8");
+    cur += (cur.endsWith("\n") ? "" : "\n") + line + "\n";
   }
+  await fsp.writeFile(answers, cur, "utf8");
 }
 
 async function readRegenInfo(targetDir: string): Promise<{
@@ -378,26 +408,29 @@ async function cmdMove(args: string[], flags: Record<string, string>) {
   await fsp.mkdir(path.dirname(newPath), { recursive: true });
   await fsp.rename(oldPath, newPath);
   const ans = path.join(newPath, ".copier-answers.yml");
-  if (await exists(ans)) {
+  const name = path.basename(newPath);
+  if (!(await exists(ans))) {
+    await fsp.writeFile(ans, `name: ${name}\n`, "utf8");
+  } else {
     let txt = await fsp.readFile(ans, "utf8");
-    const name = path.basename(newPath);
     if (/^name:\s/m.test(txt)) {
-      txt = txt.replace(/name:\s.*$/, `name: ${name}`);
+      txt = txt.replace(/^name:\s.*$/m, `name: ${name}`);
     } else {
       txt += `\nname: ${name}\n`;
     }
+    // Update simple module path if it resembles github.com/org/old-name
+    if (/^module:\s/m.test(txt)) {
+      const m = /^module:\s*(\S+)/m.exec(txt)?.[1] || "";
+      const parts = m.split("/");
+      if (parts.length >= 3) {
+        parts[parts.length - 1] = name;
+        const newModule = parts.join("/");
+        txt = txt.replace(/^module:\s.*$/m, `module: ${newModule}`);
+      }
+    }
     await fsp.writeFile(ans, txt, "utf8");
   }
-  if (await isGitCleanCwd()) {
-    try {
-      await copierUpdate(newPath);
-    } catch (err) {
-      // Non-fatal: move succeeded; copier update may fail if template state is inconsistent.
-      console.warn("warning: copier update after move failed; continuing", err);
-    }
-  } else {
-    console.log("(skipped update; working tree not clean)");
-  }
+  // Do not auto-run update on move; user can invoke `scaf update` explicitly.
   console.log("move OK");
 }
 
@@ -520,7 +553,8 @@ async function cmdNew(args: string[], flags: Record<string, string>) {
     console.error(`template not found: ${language}/${template}`);
     process.exit(1);
   }
-  const dest = resolveDestination(language, template, name, flags.path);
+  const destInfo = resolveDestination(language, template, name, flags.path);
+  const dest = destInfo.path;
   const data: Record<string, any> = { name, language, template };
   for (const [k, v] of Object.entries(flags)) {
     if (!["path", "json"].includes(k)) {
@@ -530,6 +564,9 @@ async function cmdNew(args: string[], flags: Record<string, string>) {
   // Overwrite guard + dry-run support
   const yes = flags["yes"] === "true";
   const dry = flags["dry-run"] === "true";
+  if (destInfo.needsConfirm) {
+    await confirmOrExit(`No resolver mapping found. Create at ${dest}?`, yes, dry);
+  }
   const destExists = await exists(dest);
   const isNonEmpty = destExists
     ? (await fsp.readdir(dest).catch(() => [] as string[])).length > 0
