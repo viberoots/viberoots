@@ -69,7 +69,8 @@ async function readTemplateMeta(language?: string) {
         continue;
       }
       const tmpl = e.name;
-      const metaPath = path.join(langDir, tmpl, "meta.json");
+      const tmplDir = path.join(langDir, tmpl);
+      const metaPath = path.join(tmplDir, "meta.json");
       let meta: any = { language: l, template: tmpl };
       if (await exists(metaPath)) {
         try {
@@ -82,11 +83,14 @@ async function readTemplateMeta(language?: string) {
       } else {
         meta.description = `${l} ${tmpl}`;
       }
+      // Try to read copier variables
+      const variables = await readCopierVariables(tmplDir).catch(() => [] as string[]);
       out.push({
         language: l,
         template: tmpl,
         description: meta.description || "",
         help: meta.help || {},
+        variables,
       });
     }
   }
@@ -117,7 +121,13 @@ async function listTemplates(language?: string, json = false) {
   if (json) {
     console.log(JSON.stringify(metas, null, 2));
   } else {
-    metas.forEach((m) => console.log(`${m.language}\t${m.template}\t${m.description}`));
+    metas.forEach((m) => {
+      const vars =
+        Array.isArray((m as any).variables) && (m as any).variables.length
+          ? (m as any).variables.join(",")
+          : "-";
+      console.log(`${m.language}\t${m.template}\t${m.description}\t${vars}`);
+    });
   }
 }
 
