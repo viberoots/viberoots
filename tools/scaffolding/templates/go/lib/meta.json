@@ -1,5 +1,10 @@
 {
   "language": "go",
   "template": "lib",
-  "description": "Go library skeleton with README"
+  "description": "Go library skeleton with README",
+  "help": {
+    "usage": "scaf new go lib <name> [--path=DEST]",
+    "notes": ["A minimal Go library skeleton with a README.", "Generated: README.md"],
+    "examples": ["scaf new go lib auth-utils", "scaf regen libs/auth-utils"]
+  }
 }

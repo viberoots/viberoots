@@ -1,5 +1,10 @@
 {
   "language": "go",
   "template": "cli",
-  "description": "go cli"
+  "description": "Go command-line application",
+  "help": {
+    "usage": "scaf new go cli <name> [--path=DEST]",
+    "notes": ["A minimal go cli template.", "Generated: README.md"],
+    "examples": ["scaf new go cli demo"]
+  }
 }

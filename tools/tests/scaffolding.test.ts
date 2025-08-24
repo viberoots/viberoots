@@ -71,17 +71,27 @@ describe("scaffolding", () => {
     });
   });
 
-  test("meta.json and help.md validation pass/fail scenarios", async () => {
+  test("meta.json help validation pass/fail scenarios", async () => {
     // pass
     await runInTemp("tmpl-validate-pass", async (_tmp, _$) => {
       const $ = _$({ stdio: "ignore" });
       await $`scaf validate all --quiet`;
     });
-    // fail missing help.md
+    // fail missing help object in meta.json
     await runInTemp("tmpl-validate-fail1", async (tmp, _$) => {
       const $ = _$({ stdio: "ignore" });
-      const bad = path.join(tmp, "tools", "scaffolding", "templates", "go", "lib", "help.md");
-      await fsp.rm(bad, { force: true });
+      const metaPath = path.join(
+        tmp,
+        "tools",
+        "scaffolding",
+        "templates",
+        "go",
+        "lib",
+        "meta.json",
+      );
+      const meta = JSON.parse(await fsp.readFile(metaPath, "utf8"));
+      delete (meta as any).help;
+      await fsp.writeFile(metaPath, JSON.stringify(meta, null, 2) + "\n", "utf8");
       let failed = false;
       try {
         await $`scaf validate tools/scaffolding/templates/go/lib --quiet`;
@@ -93,7 +103,7 @@ describe("scaffolding", () => {
         process.exit(2);
       }
     });
-    // fail meta.help present
+    // fail wrong type in meta.help
     await runInTemp("tmpl-validate-fail2", async (tmp, _$) => {
       const $ = _$({ stdio: "ignore" });
       const metaPath = path.join(
@@ -106,7 +116,7 @@ describe("scaffolding", () => {
         "meta.json",
       );
       const meta = JSON.parse(await fsp.readFile(metaPath, "utf8"));
-      (meta as any).help = { usage: "bogus" };
+      (meta as any).help = { usage: "" };
       await fsp.writeFile(metaPath, JSON.stringify(meta, null, 2) + "\n", "utf8");
       let failed = false;
       try {

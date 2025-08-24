@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import "zx/globals";
 import {
   copierRecopyOrUpdate,
   copierUpdate,
@@ -21,7 +22,7 @@ Commands:
   delete <all|path1 path2 ...> [--yes] [--dry-run]
   move <old-path> <new-path> [--yes] [--dry-run]
   ls [--json]
-  help <language> <template>
+  help <language> <template> [--json]
   template <language> <template>
   validate <all|path1 path2 ...> [--quiet]
   completions <bash|zsh|fish>
@@ -71,7 +72,11 @@ async function readTemplateMeta(language?: string) {
       if (await exists(metaPath)) {
         try {
           meta = JSON.parse(await fsp.readFile(metaPath, "utf8"));
-        } catch {}
+        } catch (err) {
+          // Intentionally continue with default meta when JSON is invalid.
+          // Justification: listing templates should not crash due to a bad file; validation will catch it.
+          console.warn(`warning: failed to parse ${metaPath}:`, err);
+        }
       } else {
         meta.description = `${l} ${tmpl}`;
       }
@@ -141,7 +146,10 @@ async function recordSource(dest: string, language: string, template: string) {
   let cur = "";
   try {
     cur = await fsp.readFile(answers, "utf8");
-  } catch {}
+  } catch (err) {
+    // Missing answers file is OK; we'll create/append below.
+    console.warn(`info: no existing answers file at ${answers}; will create`, err);
+  }
   if (!cur.includes("scaf_src_path:")) {
     await fsp.appendFile(answers, (cur.endsWith("\n") ? "" : "\n") + line + "\n", "utf8");
   }
@@ -197,7 +205,9 @@ async function isGitCleanCwd(): Promise<boolean> {
   try {
     const res = await $({ stdio: "pipe" })`git status --porcelain`;
     return res.stdout.trim().length === 0;
-  } catch {
+  } catch (err) {
+    // If git is unavailable in context, treat as dirty to avoid destructive ops.
+    console.warn("info: git status failed; assuming dirty working tree", err);
     return false;
   }
 }
@@ -277,7 +287,10 @@ async function cmdMove(args: string[], flags: Record<string, string>) {
   if (await isGitCleanCwd()) {
     try {
       await copierUpdate(newPath);
-    } catch {}
+    } catch (err) {
+      // Non-fatal: move succeeded; copier update may fail if template state is inconsistent.
+      console.warn("warning: copier update after move failed; continuing", err);
+    }
   } else {
     console.log("(skipped update; working tree not clean)");
   }
@@ -293,7 +306,7 @@ async function cmdCompletions(args: string[]) {
   }
 }
 
-async function cmdHelp(args: string[]) {
+async function cmdHelp(args: string[], flags: Record<string, string>) {
   const [language, template] = args;
   if (!language || !template) {
     usage();
@@ -303,12 +316,6 @@ async function cmdHelp(args: string[]) {
     return; // exit 0
   }
   const tmplDir = path.join("tools", "scaffolding", "templates", language, template);
-  const helpPath = path.join(tmplDir, "help.md");
-  if (await exists(helpPath)) {
-    const md = await fsp.readFile(helpPath, "utf8");
-    console.log(md.trim());
-    return;
-  }
   const metas = await readTemplateMeta(language);
   const meta = metas.find((m) => m.template === template);
   if (!meta) {
@@ -316,16 +323,37 @@ async function cmdHelp(args: string[]) {
     process.exit(1);
   }
   const h = meta.help || {};
-  console.log(
-    [
-      h.usage || `scaf new ${language} ${template} <name>`,
-      "",
-      ...(h.notes || []),
-      "",
-      "Examples:",
-      ...(h.examples || []).map((e: string) => `  ${e}`),
-    ].join("\n"),
-  );
+  if (flags.json === "true") {
+    console.log(
+      JSON.stringify(
+        {
+          language,
+          template,
+          description: meta.description || "",
+          help: h,
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+  const lines: string[] = [];
+  if (meta.description) {
+    lines.push(`# ${meta.description}`);
+    lines.push("");
+  }
+  lines.push(h.usage || `scaf new ${language} ${template} <name>`);
+  if (h.notes && Array.isArray(h.notes) && h.notes.length) {
+    lines.push("");
+    lines.push(...h.notes);
+  }
+  if (h.examples && Array.isArray(h.examples) && h.examples.length) {
+    lines.push("");
+    lines.push("Examples:");
+    lines.push(...h.examples.map((e: string) => `  ${e}`));
+  }
+  console.log(lines.join("\n"));
 }
 
 async function cmdTemplates(args: string[], flags: Record<string, string>) {
@@ -346,12 +374,25 @@ async function cmdTemplate(args: string[]) {
   await fsp.mkdir(dir, { recursive: true });
   await fsp.writeFile(
     path.join(dir, "meta.json"),
-    JSON.stringify({ language, template: tmpl, description: `${language} ${tmpl}` }, null, 2) +
-      "\n",
+    JSON.stringify(
+      {
+        language,
+        template: tmpl,
+        description: `${language} ${tmpl}`,
+        help: {
+          usage: `scaf new ${language} ${tmpl} <name> [--path=DEST]`,
+          notes: [
+            `A minimal ${language} ${tmpl} template.`,
+            "Variables: name (scaffold name), language, template",
+          ],
+          examples: [`scaf new ${language} ${tmpl} demo`],
+        },
+      },
+      null,
+      2,
+    ) + "\n",
     "utf8",
   );
-  const help = `# Summary\nA minimal ${language} ${tmpl} template.\n\n# Usage\nscaf new ${language} ${tmpl} <name> [--path=DEST]\n\n# Variables\n- name: scaffold name\n- language: fixed to "${language}"\n- template: fixed to "${tmpl}"\n\n# Generated\n- README.md\n\n# Post-steps\n- None\n\n# Examples\n- scaf new ${language} ${tmpl} demo\n`;
-  await fsp.writeFile(path.join(dir, "help.md"), help, "utf8");
   await fsp.writeFile(
     path.join(dir, "README.md.jinja"),
     `# {{ name }} (${language} ${tmpl})\n`,
@@ -404,7 +445,7 @@ async function main() {
     case "ls":
       return cmdLs(flags);
     case "help":
-      return cmdHelp(rest);
+      return cmdHelp(rest, flags);
     case "template":
       return cmdTemplate(rest);
     case "validate":

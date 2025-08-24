@@ -32,6 +32,9 @@ export async function runInTemp<T>(
   try {
     return await fn(tmp, _$);
   } finally {
-    await fsp.rm(tmp, { recursive: true, force: true }).catch(() => {});
+    await fsp.rm(tmp, { recursive: true, force: true }).catch((err) => {
+      // Non-fatal: cleanup of temp dir may fail on CI; ignore but log for visibility.
+      console.warn("warning: failed to remove temp test dir:", err);
+    });
   }
 }

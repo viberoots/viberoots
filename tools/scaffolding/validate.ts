@@ -88,35 +88,37 @@ export async function validateTemplates(targets: string[], quiet: boolean = fals
       }
       process.exit(2);
     }
-    if (meta.help) {
+    // New rules: help content must be in meta.json.help, and help.md is not allowed
+    if (!meta.help || typeof meta.help !== "object") {
       if (!quiet) {
-        console.error(`meta.json must not contain 'help' (use help.md): ${language}/${template}`);
+        console.error(`meta.json missing help object: ${language}/${template}`);
+      }
+      process.exit(2);
+    }
+    if (typeof meta.help.usage !== "string" || !meta.help.usage.trim()) {
+      if (!quiet) {
+        console.error(`meta.json help.usage must be non-empty string: ${language}/${template}`);
+      }
+      process.exit(2);
+    }
+    if (meta.help.notes && !Array.isArray(meta.help.notes)) {
+      if (!quiet) {
+        console.error(`meta.json help.notes must be array of strings: ${language}/${template}`);
+      }
+      process.exit(2);
+    }
+    if (meta.help.examples && !Array.isArray(meta.help.examples)) {
+      if (!quiet) {
+        console.error(`meta.json help.examples must be array of strings: ${language}/${template}`);
       }
       process.exit(2);
     }
     const helpMd = path.join(tdir, "help.md");
-    if (!(await exists(helpMd))) {
+    if (await exists(helpMd)) {
       if (!quiet) {
-        console.error(`missing help.md: ${language}/${template}`);
+        console.error(`help.md must be removed (use meta.json.help): ${language}/${template}`);
       }
       process.exit(2);
-    }
-    const md = await fsp.readFile(helpMd, "utf8");
-    const required = [
-      "# Summary",
-      "# Usage",
-      "# Variables",
-      "# Generated",
-      "# Post-steps",
-      "# Examples",
-    ];
-    for (const h of required) {
-      if (!md.includes(h)) {
-        if (!quiet) {
-          console.error(`help.md missing section ${h}: ${language}/${template}`);
-        }
-        process.exit(2);
-      }
     }
   }
   if (!quiet) {

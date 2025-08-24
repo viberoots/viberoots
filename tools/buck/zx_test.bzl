@@ -19,14 +19,16 @@ def _zx_test_impl(ctx):
         script.short_path,
     ]
     # Declare a tiny output to satisfy Buck's expectation of outputs
-    stamp = ctx.actions.declare_output(ctx.label.name + ".stamp")
+    stamp = ctx.actions.declare_output(ctx.attrs.out)
     ctx.actions.write(stamp, "zx_test\n")
     return [
-        DefaultInfo(default_output = stamp),
+        DefaultInfo(
+            default_outputs = [stamp],
+            other_outputs = [stamp],
+        ),
         ExternalRunnerTestInfo(
             type = "custom",
             command = cmd,
-            env = {},
             labels = [],
             contacts = [],
         ),
@@ -36,5 +38,6 @@ zx_test = rule(
     impl = _zx_test_impl,
     attrs = {
         "script": attrs.source(),
+        "out": attrs.string(),
     },
 )

@@ -1,8 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
-import * as fs from "node:fs";
-import path from "node:path";
 import os from "node:os";
+import path from "node:path";
 
 export async function seedAnswersViaCopier(
   templateDir: string,
@@ -49,7 +48,14 @@ export async function recopyUsingRecordedSource(targetDir: string) {
     await fsp.writeFile(answersJson, JSON.stringify(data, null, 2), "utf8");
     await $`copier copy --trust --defaults --force --data-file ${answersJson} ${src} ${targetDir}`;
   } finally {
-    await fsp.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+    await fsp.rm(tmpDir, { recursive: true, force: true }).catch((err) => {
+      // Non-fatal: temp dir cleanup best-effort; log and continue.
+      console.warn("warning: failed to remove temp dir:", err);
+    });
+    await fsp.rm(tmpDir, { recursive: true, force: true }).catch((err) => {
+      // Non-fatal: temp dir cleanup best-effort; log and continue.
+      console.warn("warning: failed to remove temp dir:", err);
+    });
   }
 }
 

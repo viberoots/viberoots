@@ -5,9 +5,11 @@ load("//tools/buck:zx_test.bzl", "zx_test")
 zx_test(
     name = "scaffolding",
     script = "tools/tests/scaffolding.test.ts",
+    out = "scaffolding.stamp",
 )
 
 zx_test(
     name = "linting",
     script = "tools/tests/linting.test.ts",
+    out = "linting.stamp",
 )
