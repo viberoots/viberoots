@@ -446,10 +446,73 @@ async function cmdMove(args: string[], flags: Record<string, string>) {
 
 async function cmdCompletions(args: string[]) {
   const [shell] = args;
-  if (shell === "bash" || shell === "zsh") {
+  const subcommands =
+    "templates new update regen delete move ls help validate template completions";
+  if (shell === "bash") {
     console.log(
-      "complete -W 'templates new update regen delete move ls help template validate' scaf",
+      [
+        "_scaf_complete() {",
+        "  local cur prev;",
+        "  COMPREPLY=();",
+        '  cur="${COMP_WORDS[COMP_CWORD]}"',
+        '  prev="${COMP_WORDS[COMP_CWORD-1]}"',
+        `  local subs="${subcommands}"`,
+        "  if [[ ${COMP_CWORD} -eq 1 ]]; then",
+        '    COMPREPLY=( $(compgen -W "$subs" -- "$cur") ); return;',
+        "  fi",
+        '  case "${COMP_WORDS[1]}" in',
+        "    new)",
+        "      if [[ ${COMP_CWORD} -eq 2 ]]; then",
+        "        local langs=$(scaf templates --json 2>/dev/null | jq -r '.[].language' | sort -u);",
+        '        COMPREPLY=( $(compgen -W "$langs" -- "$cur") ); return;',
+        "      elif [[ ${COMP_CWORD} -eq 3 ]]; then",
+        "        local tmpls=$(scaf templates --json 2>/dev/null | jq -r '.[].template' | sort -u);",
+        '        COMPREPLY=( $(compgen -W "$tmpls" -- "$cur") ); return;',
+        "      fi",
+        "      ;;",
+        "    update|regen|delete|ls|validate)",
+        "      local targets=\"all $(scaf ls --json 2>/dev/null | jq -r '.[].path')\";",
+        '      COMPREPLY=( $(compgen -W "$targets" -- "$cur") ); return;',
+        "      ;;",
+        "  esac",
+        "}",
+        "complete -F _scaf_complete scaf",
+      ].join("\n"),
     );
+    return;
+  }
+  if (shell === "zsh") {
+    console.log(
+      [
+        "#compdef scaf",
+        "_scaf_complete() {",
+        `  local -a subs; subs=( ${subcommands} )`,
+        "  if (( CURRENT == 2 )); then",
+        "    _describe -t commands 'scaf subcommands' subs; return",
+        "  fi",
+        "}",
+        "compdef _scaf_complete scaf",
+      ].join("\n"),
+    );
+    return;
+  }
+  if (shell === "fish") {
+    console.log(
+      [
+        "complete -c scaf -n '__fish_use_subcommand' -a 'templates'",
+        "complete -c scaf -n '__fish_use_subcommand' -a 'new'",
+        "complete -c scaf -n '__fish_use_subcommand' -a 'update'",
+        "complete -c scaf -n '__fish_use_subcommand' -a 'regen'",
+        "complete -c scaf -n '__fish_use_subcommand' -a 'delete'",
+        "complete -c scaf -n '__fish_use_subcommand' -a 'move'",
+        "complete -c scaf -n '__fish_use_subcommand' -a 'ls'",
+        "complete -c scaf -n '__fish_use_subcommand' -a 'help'",
+        "complete -c scaf -n '__fish_use_subcommand' -a 'validate'",
+        "complete -c scaf -n '__fish_use_subcommand' -a 'template'",
+        "complete -c scaf -n '__fish_use_subcommand' -a 'completions'",
+      ].join("\n"),
+    );
+    return;
   }
 }
 
