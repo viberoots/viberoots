@@ -41,6 +41,12 @@ if [[ -o interactive ]]; then
 fi
 EOF
             export ZDOTDIR="$PWD/.nix-zsh"
+            # Also create a .zshrc for shells that ignore .zshenv for completions
+            cat > .nix-zsh/.zshrc <<'EOF'
+autoload -Uz compinit
+compinit -i
+eval "$(scaf completions zsh)"
+EOF
 
             if [ -n "$BASH_VERSION" ]; then
               eval "$(scaf completions bash)"
