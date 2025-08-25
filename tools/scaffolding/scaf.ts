@@ -414,7 +414,7 @@ async function cmdMove(args: string[], flags: Record<string, string>) {
     usage();
     process.exit(2);
   }
-  confirmOrExit(`Move ${oldPath} -> ${newPath}`, yes, dry);
+  await confirmOrExit(`Move ${oldPath} -> ${newPath}`, yes, dry);
   await fsp.mkdir(path.dirname(newPath), { recursive: true });
   await fsp.rename(oldPath, newPath);
   const ans = path.join(newPath, ".copier-answers.yml");
