@@ -11,7 +11,7 @@
     "dev:clear-overrides": "tools/dev/clear-overrides.ts",
     "fmt": "prettier -w .",
     "fmt:check": "prettier -c .",
-    "lint": "eslint . --ext .ts --max-warnings=0",
+    "lint": "eslint . --ext .ts --max-warnings=0 --ignore-pattern .tmp --ignore-pattern coverage --ignore-pattern .clinic",
     "lint:fix": "eslint . --ext .ts --fix",
     "prepare": "husky",
     "coverage:summary": "tools/dev/coverage-summary.ts"

@@ -12,25 +12,111 @@
     forAllSystems = f: nixpkgs.lib.genAttrs systems (system:
       let
         pkgs = import nixpkgs { inherit system; };
-        zx-wrapper = (
-          pkgs.writeShellScriptBin "zx-wrapper" ''
-            exec ${pkgs.nodejs_22}/bin/node \
-              --experimental-strip-types \
-              --experimental-top-level-await \
-              --disable-warning=ExperimentalWarning \
-              --import "$PWD/tools/dev/zx-init.mjs" \
-              "$@"
-          '');
-      in f { inherit pkgs zx-wrapper; }
+        zx-wrapper = pkgs.writeShellScriptBin "zx-wrapper" ''
+          exec ${pkgs.nodejs_22}/bin/node \
+            --experimental-strip-types \
+            --experimental-top-level-await \
+            --disable-warning=ExperimentalWarning \
+            --eval 'import "${pkgs.nodePackages.zx}/lib/node_modules/zx/build/globals.js";' \
+            "$@"
+        '';
+
+
+        node = pkgs.nodejs_22;
+        pnpm = pkgs.pnpm;
+
+        # Exclude local node_modules to keep builds reproducible
+        src = pkgs.lib.cleanSourceWith {
+          src = ./.;
+          filter = path: type: (builtins.match ".*/node_modules(/.*)?" path == null);
+        };
+
+        pnpm-store = pkgs.stdenvNoCC.mkDerivation (let certs = pkgs.cacert; in {
+          pname = "pnpm-store";
+          version = "lock-${builtins.hashFile "sha256" ./pnpm-lock.yaml}";
+          inherit src;
+          nativeBuildInputs = [ pkgs.nodejs_22 pkgs.pnpm ];
+          outputHashMode = "recursive";
+          outputHash     = "sha256-GvPMWKsyAMsICZ5CW/vbcs32VqeTVMNu00F6mIOUhWU=";
+          dontPatchShebangs = true;
+          unpackPhase = ''
+            runHook preUnpack
+            cp -r ${src} source
+            chmod -R u+rwX source
+            cd source
+            runHook postUnpack
+          '';
+          buildPhase = ''
+            runHook preBuild
+            export SSL_CERT_FILE=${certs}/etc/ssl/certs/ca-bundle.crt
+            export NIX_SSL_CERT_FILE=${certs}/etc/ssl/certs/ca-bundle.crt
+            export NODE_EXTRA_CA_CERTS=${certs}/etc/ssl/certs/ca-bundle.crt
+            export HOME=$(pwd)/.home
+            mkdir -p "$HOME"
+            pnpm config set store-dir "$out/store"
+            pnpm fetch --frozen-lockfile
+            runHook postBuild
+          '';
+        });
+
+        node-modules = pkgs.stdenvNoCC.mkDerivation (let certs = pkgs.cacert; in {
+          pname = "node-modules";
+          version = "lock-${builtins.hashFile "sha256" ./pnpm-lock.yaml}";
+          inherit src;
+          nativeBuildInputs = [ node pnpm ];
+          unpackPhase = ''
+            runHook preUnpack
+            cp -r ${src} source
+            chmod -R u+rwX source
+            cd source
+            runHook postUnpack
+          '';
+          buildPhase = ''
+            runHook preBuild
+            export SSL_CERT_FILE=${certs}/etc/ssl/certs/ca-bundle.crt
+            export NIX_SSL_CERT_FILE=${certs}/etc/ssl/certs/ca-bundle.crt
+            export NODE_EXTRA_CA_CERTS=${certs}/etc/ssl/certs/ca-bundle.crt
+            export HOME=$(pwd)/.home
+            mkdir -p "$HOME"
+            pnpm config set store-dir "${pnpm-store}/store"
+            pnpm install --offline --frozen-lockfile
+            runHook postBuild
+          '';
+          installPhase = ''
+            runHook preInstall
+            mkdir -p $out
+            if [ -d node_modules ]; then
+              cp -R node_modules $out/
+            fi
+            if [ -d .pnpm ]; then
+              cp -R .pnpm $out/
+            fi
+            runHook postInstall
+          '';
+          passthru.lockHash = builtins.hashFile "sha256" ./pnpm-lock.yaml;
+        });
+      in f { inherit pkgs zx-wrapper node pnpm src pnpm-store node-modules; }
     );
   in {
-    devShells = forAllSystems ({ pkgs, zx-wrapper }:
+    devShells = forAllSystems ({ pkgs, zx-wrapper, node-modules, ... }:
       {
         default = pkgs.mkShell {
           shellHook = ''
-            export NIX_CONFIG="extra-experimental-features = nix-command flakes dynamic-derivations recursive-nix"
-            export PATH="$PWD/tools/bin:$PWD/node_modules/.bin:$PATH"
-            # Always prepare zsh completions for any zsh spawned later
+            # link Nix-built node_modules for IDEs/CLIs (read-only)
+            if [ -e node_modules ] && [ ! -L node_modules ]; then
+              echo "(devShell) existing non-symlink node_modules detected; not overwriting" >&2 || true
+            else
+              out_path=$(nix build .#node-modules --no-link --accept-flake-config --print-out-paths 2>/dev/null || true)
+              if [ -n "$out_path" ]; then
+                ln -sfn "$out_path/node_modules" node_modules || true
+                if [ -d "$out_path/node_modules/.bin" ]; then
+                  export PATH="$out_path/node_modules/.bin:$PATH"
+                fi
+              fi
+            fi
+
+            export PATH="$PWD/tools/bin:$PATH"
+            # Always prepare zsh completions for any zsh spawned later (guarded until node_modules exists)
             mkdir -p .nix-zsh
             cat > .nix-zsh/.zshenv <<'EOF'
 if [[ -o interactive ]]; then
@@ -38,7 +124,9 @@ if [[ -o interactive ]]; then
   PROMPT='%F{green}[nix-shell]%f %m:%~$ '
   autoload -Uz compinit
   compinit -i
-  eval "$(scaf completions zsh)"
+  if [ -d "node_modules/zx" ]; then
+    eval "$(scaf completions zsh)"
+  fi
 fi
 EOF
             export ZDOTDIR="$PWD/.nix-zsh"
@@ -47,13 +135,17 @@ EOF
 PROMPT='%F{green}[nix-shell]%f %m:%~$ '
 autoload -Uz compinit
 compinit -i
-eval "$(scaf completions zsh)"
+if [ -d "node_modules/zx" ]; then
+  eval "$(scaf completions zsh)"
+fi
 EOF
 
             if [ -n "$BASH_VERSION" ]; then
               # Prompt for bash
               export PS1="\n\033[32m[nix-shell]\033[0m \h:\w$ "
-              eval "$(scaf completions bash)"
+              if [ -d "node_modules/zx" ]; then
+                eval "$(scaf completions bash)"
+              fi
             fi
           '';
           buildInputs = [
@@ -63,8 +155,15 @@ EOF
       }
     );
 
-    packages = forAllSystems ({ zx-wrapper, pkgs }: {
+    packages = forAllSystems ({ zx-wrapper, pkgs, pnpm-store, node-modules, ... }: {
       zx-wrapper = zx-wrapper;
+      pnpm-store = pnpm-store;
+      node-modules = node-modules;
+      default = node-modules;
+    });
+
+    checks = forAllSystems ({ node-modules, ... }: {
+      default = node-modules;
     });
   };
 }

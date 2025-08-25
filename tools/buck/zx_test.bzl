@@ -1,21 +1,10 @@
 def _zx_test_impl(ctx):
     script = ctx.attrs.script
     cmd = [
-        "./node_modules/.bin/c8",
-        "--reporter=lcov",
-        "--reporter=json-summary",
-        "--report-dir",
-        "./coverage",
-        "--temp-directory",
-        "./coverage/tmp",
-        "--clean=false",
-        "--all",
-        "--src=tools",
-        "node",
-        "--experimental-strip-types",
-        "--import",
-        "./tools/dev/zx-init.mjs",
-        "--test",
+        "nix",
+        "develop",
+        "-c",
+        "zx-wrapper",
         script.short_path,
     ]
     # Declare a tiny output to satisfy Buck's expectation of outputs

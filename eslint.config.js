@@ -10,6 +10,8 @@ export default [
       "**/buck-out/**",
       "**/.direnv/**",
       "**/.tmp/**",
+      "**/coverage/**",
+      "**/.clinic/**",
       "tools/scaffolding/templates/**",
     ],
     languageOptions: {
