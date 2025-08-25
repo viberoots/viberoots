@@ -490,6 +490,19 @@ async function cmdCompletions(args: string[]) {
         "  if (( CURRENT == 2 )); then",
         "    _describe -t commands 'scaf subcommands' subs; return",
         "  fi",
+        "  case $words[2] in",
+        "    new)",
+        "      if (( CURRENT == 3 )); then",
+        "        compadd -- $(scaf __complete languages); return",
+        "      elif (( CURRENT == 4 )); then",
+        "        local lang=$words[3]",
+        "        compadd -- $(scaf __complete templates $lang); return",
+        "      fi",
+        "      ;;",
+        "    update|regen|delete|ls|validate)",
+        "      compadd -- $(scaf __complete targets); return",
+        "      ;;",
+        "  esac",
         "}",
         "compdef _scaf_complete scaf",
       ].join("\n"),
@@ -510,6 +523,11 @@ async function cmdCompletions(args: string[]) {
         "complete -c scaf -n '__fish_use_subcommand' -a 'validate'",
         "complete -c scaf -n '__fish_use_subcommand' -a 'template'",
         "complete -c scaf -n '__fish_use_subcommand' -a 'completions'",
+        "# dynamic for 'new'",
+        "complete -c scaf -n '__fish_seen_subcommand_from new; and test (count (commandline -opc)) -eq 2' -a '(scaf __complete languages)'",
+        "complete -c scaf -n '__fish_seen_subcommand_from new; and test (count (commandline -opc)) -eq 3' -a '(set -l lang (commandline -opc | sed -n 2p); scaf __complete templates $lang)'",
+        "# dynamic for targets",
+        "complete -c scaf -n '__fish_seen_subcommand_from update regen delete ls validate' -a '(scaf __complete targets)'",
       ].join("\n"),
     );
     return;
@@ -658,6 +676,24 @@ async function cmdNew(args: string[], flags: Record<string, string>) {
   console.log("created:", dest);
 }
 
+async function completeLanguages(): Promise<void> {
+  const metas = await readTemplateMeta();
+  const langs = Array.from(new Set(metas.map((m) => m.language))).sort();
+  console.log(langs.join("\n"));
+}
+
+async function completeTemplatesFor(lang: string): Promise<void> {
+  const metas = await readTemplateMeta(lang);
+  const tmpls = metas.filter((m) => m.language === lang).map((m) => m.template);
+  console.log(Array.from(new Set(tmpls)).sort().join("\n"));
+}
+
+async function completeTargets(): Promise<void> {
+  const rows = await discoverScaffolds(".");
+  const lines = ["all", ...rows.map((r) => r.path)];
+  console.log(lines.join("\n"));
+}
+
 async function main() {
   const raw = process.argv.slice(2);
   const { _, flags } = parseArgs(raw);
@@ -685,6 +721,11 @@ async function main() {
       return validateTemplates(rest, flags.quiet === "true");
     case "completions":
       return cmdCompletions(rest);
+    case "__complete":
+      if (rest[0] === "languages") return completeLanguages();
+      if (rest[0] === "templates") return completeTemplatesFor(rest[1] || "");
+      if (rest[0] === "targets") return completeTargets();
+      return process.exit(2);
     default:
       usage();
       return process.exit(cmd ? 2 : 0);
