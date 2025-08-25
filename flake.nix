@@ -31,16 +31,18 @@
             export NIX_CONFIG="extra-experimental-features = nix-command flakes dynamic-derivations recursive-nix"
             export PATH="$PWD/tools/bin:$PATH"
             export PS1="\n\033[32m[nix-shell]\033[0m \h:\w$ "
-            if [ -n "$ZSH_VERSION" ]; then
-              mkdir -p .nix-zsh
-              cat > .nix-zsh/.zshenv <<'EOF'
+            # Always prepare zsh completions for any zsh spawned later
+            mkdir -p .nix-zsh
+            cat > .nix-zsh/.zshenv <<'EOF'
 if [[ -o interactive ]]; then
-  autoload -U compinit && compinit
+  autoload -Uz compinit
+  compinit -i
   eval "$(scaf completions zsh)"
 fi
 EOF
-              export ZDOTDIR="$PWD/.nix-zsh"
-            elif [ -n "$BASH_VERSION" ]; then
+            export ZDOTDIR="$PWD/.nix-zsh"
+
+            if [ -n "$BASH_VERSION" ]; then
               eval "$(scaf completions bash)"
             fi
           '';
