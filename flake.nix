@@ -29,7 +29,7 @@
         default = pkgs.mkShell {
           shellHook = ''
             export NIX_CONFIG="extra-experimental-features = nix-command flakes dynamic-derivations recursive-nix"
-            export PATH="$PWD/tools/bin:$PATH"
+            export PATH="$PWD/tools/bin:$PWD/node_modules/.bin:$PATH"
             # Always prepare zsh completions for any zsh spawned later
             mkdir -p .nix-zsh
             cat > .nix-zsh/.zshenv <<'EOF'
