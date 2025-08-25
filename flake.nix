@@ -34,6 +34,8 @@
             mkdir -p .nix-zsh
             cat > .nix-zsh/.zshenv <<'EOF'
 if [[ -o interactive ]]; then
+  # Prompt for zsh
+  PROMPT='%F{green}[nix-shell]%f %m:%~$ '
   autoload -Uz compinit
   compinit -i
   eval "$(scaf completions zsh)"
@@ -42,12 +44,15 @@ EOF
             export ZDOTDIR="$PWD/.nix-zsh"
             # Also create a .zshrc for shells that ignore .zshenv for completions
             cat > .nix-zsh/.zshrc <<'EOF'
+PROMPT='%F{green}[nix-shell]%f %m:%~$ '
 autoload -Uz compinit
 compinit -i
 eval "$(scaf completions zsh)"
 EOF
 
             if [ -n "$BASH_VERSION" ]; then
+              # Prompt for bash
+              export PS1="\n\033[32m[nix-shell]\033[0m \h:\w$ "
               eval "$(scaf completions bash)"
             fi
           '';
