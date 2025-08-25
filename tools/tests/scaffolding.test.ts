@@ -135,6 +135,68 @@ describe("scaffolding", () => {
     });
   });
 
+  test("help new/update/regen/delete shows synopsis", async () => {
+    await runInTemp("scaf-help-cmds", async (_tmp, _$) => {
+      const pipe$ = _$({ stdio: "pipe" });
+      const hn = await pipe$`scaf help new`;
+      if (!/Usage: scaf new/.test(hn.stdout)) {
+        console.error("help new missing usage");
+        process.exit(2);
+      }
+      const hu = await pipe$`scaf help update`;
+      if (!/Usage: scaf update/.test(hu.stdout)) {
+        console.error("help update missing usage");
+        process.exit(2);
+      }
+      const hr = await pipe$`scaf help regen`;
+      if (!/Usage: scaf regen/.test(hr.stdout)) {
+        console.error("help regen missing usage");
+        process.exit(2);
+      }
+      const hd = await pipe$`scaf help delete`;
+      if (!/Usage: scaf delete/.test(hd.stdout)) {
+        console.error("help delete missing usage");
+        process.exit(2);
+      }
+    });
+  });
+
+  test("help new <lang> <template> shows variables preview", async () => {
+    await runInTemp("scaf-help-new-vars", async (_tmp, _$) => {
+      const pipe$ = _$({ stdio: "pipe" });
+      const res = await pipe$`scaf help new go lib`;
+      const out = res.stdout;
+      if (!/Usage: scaf new/.test(out)) {
+        console.error("help new <lang> <tmpl> missing usage");
+        process.exit(2);
+      }
+      if (!/Variables:\n/.test(out) && !/Variables:/.test(out)) {
+        console.error("help new <lang> <tmpl> missing variables header");
+        process.exit(2);
+      }
+      if (!/- name/.test(out)) {
+        console.error("expected 'name' in variables list");
+        process.exit(2);
+      }
+    });
+  });
+
+  test("help new <lang> lists templates for that language", async () => {
+    await runInTemp("scaf-help-new-list", async (_tmp, _$) => {
+      const pipe$ = _$({ stdio: "pipe" });
+      const res = await pipe$`scaf help new go`;
+      const out = res.stdout;
+      if (!/# Available go templates/.test(out)) {
+        console.error("help new <lang> missing header");
+        process.exit(2);
+      }
+      if (!/- lib: /.test(out)) {
+        console.error("expected lib template listed for go");
+        process.exit(2);
+      }
+    });
+  });
+
   test("new overwrite guard requires --yes or supports --dry-run", async () => {
     await runInTemp("scaf-overwrite-guard", async (_tmp, _$) => {
       const $ = _$({ stdio: "ignore" });

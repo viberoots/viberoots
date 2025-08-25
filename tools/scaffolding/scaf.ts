@@ -535,6 +535,143 @@ async function cmdCompletions(args: string[]) {
 }
 
 async function cmdHelp(args: string[], flags: Record<string, string>) {
+  const [a1, a2, a3] = args;
+  const commands = new Set(["new", "update", "regen", "delete"]);
+  if (a1 && commands.has(a1) && !a2) {
+    const cmd = a1;
+    const lines: string[] = [];
+    switch (cmd) {
+      case "new": {
+        lines.push("Usage: scaf new <language> <template> <name> [--path=DEST] [--key=value ...]");
+        lines.push("");
+        lines.push("Examples:");
+        lines.push("  scaf new go lib greeter-utilities");
+        lines.push("  scaf new go cli greeter-cli");
+        lines.push("");
+        if (flags.json === "true") {
+          console.log(
+            JSON.stringify({ command: cmd, usage: lines[0], examples: lines.slice(2) }, null, 2),
+          );
+          return;
+        }
+        console.log(lines.join("\n"));
+        return;
+      }
+      case "update": {
+        lines.push("Usage: scaf update <all|path1 path2 ...> [--yes] [--dry-run]");
+        lines.push("");
+        lines.push("Examples:");
+        lines.push("  scaf update all --dry-run");
+        lines.push("  scaf update libs/demo-lib --yes");
+        if (flags.json === "true") {
+          console.log(
+            JSON.stringify({ command: cmd, usage: lines[0], examples: lines.slice(2) }, null, 2),
+          );
+          return;
+        }
+        console.log(lines.join("\n"));
+        return;
+      }
+      case "regen": {
+        lines.push("Usage: scaf regen <all|path1 path2 ...> [--yes] [--dry-run]");
+        lines.push("");
+        lines.push("Examples:");
+        lines.push("  scaf regen all --dry-run");
+        lines.push("  scaf regen libs/demo-lib --yes");
+        if (flags.json === "true") {
+          console.log(
+            JSON.stringify({ command: cmd, usage: lines[0], examples: lines.slice(2) }, null, 2),
+          );
+          return;
+        }
+        console.log(lines.join("\n"));
+        return;
+      }
+      case "delete": {
+        lines.push("Usage: scaf delete <all|path1 path2 ...> [--yes] [--dry-run]");
+        lines.push("");
+        lines.push("Examples:");
+        lines.push("  scaf delete all --dry-run");
+        lines.push("  scaf delete libs/demo-lib --yes");
+        if (flags.json === "true") {
+          console.log(
+            JSON.stringify({ command: cmd, usage: lines[0], examples: lines.slice(2) }, null, 2),
+          );
+          return;
+        }
+        console.log(lines.join("\n"));
+        return;
+      }
+    }
+  }
+  // Command-level: scaf help new <language> <template> → usage + live variables preview
+  if (a1 === "new" && a2 && a3) {
+    const language = a2;
+    const template = normalizeTemplateName(a3);
+    const tmplDirPath = path.join("tools", "scaffolding", "templates", language, template);
+    const variables = await readCopierVariables(tmplDirPath).catch(() => [] as string[]);
+    if (flags.json === "true") {
+      console.log(
+        JSON.stringify(
+          {
+            command: "new",
+            usage: "scaf new <language> <template> <name> [--path=DEST] [--key=value ...]",
+            language,
+            template,
+            variables,
+          },
+          null,
+          2,
+        ),
+      );
+      return;
+    }
+    const lines: string[] = [];
+    lines.push("Usage: scaf new <language> <template> <name> [--path=DEST] [--key=value ...]");
+    lines.push("");
+    lines.push("Variables:");
+    if (variables.length) {
+      for (const v of variables) {
+        lines.push(`  - ${v}`);
+      }
+    } else {
+      lines.push("  - (none detected)");
+    }
+    lines.push("");
+    lines.push("Examples:");
+    lines.push("  scaf new go lib greeter-utilities");
+    lines.push("  scaf new go cli greeter-cli");
+    console.log(lines.join("\n"));
+    return;
+  }
+  // Command-level: scaf help new <language> → list templates for that language
+  if (a1 === "new" && a2 && !a3) {
+    const language = a2;
+    const metas = await readTemplateMeta(language);
+    if (flags.json === "true") {
+      console.log(
+        JSON.stringify(
+          metas.map((m) => ({
+            language: m.language,
+            template: m.template,
+            description: m.description || "",
+            variables: (m as any).variables || [],
+          })),
+          null,
+          2,
+        ),
+      );
+      return;
+    }
+    const lines: string[] = [];
+    lines.push(`# Available ${language} templates:`);
+    lines.push("");
+    for (const m of metas) {
+      lines.push(`- ${m.template}: ${m.description || ""}`);
+    }
+    console.log(lines.join("\n"));
+    return;
+  }
   const [language, template] = args;
   if (!language || !template) {
     usage();
