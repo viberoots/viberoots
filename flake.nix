@@ -31,7 +31,12 @@
             export NIX_CONFIG="extra-experimental-features = nix-command flakes dynamic-derivations recursive-nix"
             export PATH="$PWD/tools/bin:$PATH"
             export PS1="\n\033[32m[nix-shell]\033[0m \h:\w$ "
-            eval "$(scaf completions bash)"
+            if [ -n "$ZSH_VERSION" ]; then
+              autoload -U compinit && compinit
+              eval "$(scaf completions zsh)"
+            elif [ -n "$BASH_VERSION" ]; then
+              eval "$(scaf completions bash)"
+            fi
           '';
           buildInputs = [
             pkgs.git pkgs.buck2 pkgs.go pkgs.pnpm pkgs.nodejs_22 zx-wrapper pkgs.jq pkgs.rsync pkgs.copier pkgs.yq
