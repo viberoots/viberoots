@@ -33,10 +33,11 @@
             export PS1="\n\033[32m[nix-shell]\033[0m \h:\w$ "
             if [ -n "$ZSH_VERSION" ]; then
               mkdir -p .nix-zsh
-              cat > .nix-zsh/.zshrc <<'EOF'
-[ -f ~/.zshrc ] && source ~/.zshrc
-autoload -U compinit && compinit
-eval "$(scaf completions zsh)"
+              cat > .nix-zsh/.zshenv <<'EOF'
+if [[ -o interactive ]]; then
+  autoload -U compinit && compinit
+  eval "$(scaf completions zsh)"
+fi
 EOF
               export ZDOTDIR="$PWD/.nix-zsh"
             elif [ -n "$BASH_VERSION" ]; then
