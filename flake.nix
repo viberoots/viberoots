@@ -30,7 +30,6 @@
           shellHook = ''
             export NIX_CONFIG="extra-experimental-features = nix-command flakes dynamic-derivations recursive-nix"
             export PATH="$PWD/tools/bin:$PATH"
-            export PS1="\n\033[32m[nix-shell]\033[0m \h:\w$ "
             # Always prepare zsh completions for any zsh spawned later
             mkdir -p .nix-zsh
             cat > .nix-zsh/.zshenv <<'EOF'
