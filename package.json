@@ -41,6 +41,7 @@
     "fs-extra": "^11.2.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.1.5",
+    "fast-glob": "^3.3.2",
     "prettier": "^3.3.3",
     "prettier-plugin-curly": "^0.3.2",
     "semver": "^7.6.0",

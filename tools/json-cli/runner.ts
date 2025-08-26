@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import readline from "node:readline";
+import fg from "fast-glob";
 
 type CliOpts = {
   help: boolean;
@@ -323,48 +324,36 @@ async function buildIndex(rootDir: string, cfg: RootConfig): Promise<Map<string,
   const includeGlobs = cfg.globs && cfg.globs.length > 0 ? cfg.globs : ["**/*.tool.json"];
   const excludeGlobs = cfg.excludeGlobs || [];
 
-  const includeRes = includeGlobs.map(globToRegExp);
-  const excludeRes = excludeGlobs.map(globToRegExp);
+  const entries = await fg(includeGlobs, {
+    cwd: rootDir,
+    ignore: [
+      ...Array.from(ignoreDirs).map((d) => (d.endsWith("/") ? d + "**" : d)),
+      ...excludeGlobs,
+    ],
+    dot: false,
+    onlyFiles: true,
+    unique: true,
+    markDirectories: false,
+    followSymbolicLinks: true,
+  });
 
-  async function walk(dir: string) {
-    const ents = await fsp.readdir(dir, { withFileTypes: true }).catch(() => [] as any);
-    for (const ent of ents) {
-      const p = path.join(dir, ent.name);
-      if (ent.isDirectory()) {
-        const rel = path.relative(rootDir, p).replace(/\\/g, "/") + "/";
-        let skip = false;
-        for (const pref of ignoreDirs) {
-          if (rel.startsWith(pref)) {
-            skip = true;
-            break;
-          }
-        }
-        if (!skip) await walk(p);
-      } else if (ent.isFile() && ent.name.endsWith(".tool.json")) {
-        const relFile = path.relative(rootDir, p).replace(/\\/g, "/");
-        const included = includeRes.some((re) => re.test(relFile));
-        const excluded = excludeRes.some((re) => re.test(relFile));
-        if (!included || excluded) continue;
-        const spec = await readSpec(p);
-        const fq =
-          spec && spec.command?.package && spec.tool?.name
-            ? `${spec.command.package}.${spec.tool.name}`
-            : null;
-        if (fq) {
-          if (idx.has(fq)) {
-            throw new Error(
-              `json-cli: config error — duplicate tool FQName '${fq}' found in:\n  - ${idx.get(
-                fq,
-              )}\n  - ${p}`,
-            );
-          }
-          idx.set(fq, p);
-        }
+  for (const rel of entries) {
+    const p = path.join(rootDir, rel);
+    const spec = await readSpec(p);
+    const fq =
+      spec && spec.command?.package && spec.tool?.name
+        ? `${spec.command.package}.${spec.tool.name}`
+        : null;
+    if (fq) {
+      if (idx.has(fq)) {
+        throw new Error(
+          `json-cli: config error — duplicate tool FQName '${fq}' found in:\n  - ${idx.get(fq)}\n  - ${p}`,
+        );
       }
+      idx.set(fq, p);
     }
   }
 
-  await walk(rootDir);
   return idx;
 }
 
