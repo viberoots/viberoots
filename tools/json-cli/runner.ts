@@ -103,17 +103,39 @@ export async function main(argv: string[]): Promise<number | void> {
 
   const requiresInput = usesPathParams(spec);
   let invObj: any = {};
-  if (requiresInput) {
-    if (!opts.inFile) {
+  if (requiresInput || opts.inFile) {
+    if (!opts.inFile && requiresInput) {
       console.error("json-cli: --in is required when parameters use path");
       return 78;
     }
-    try {
-      const txt = await fsp.readFile(path.resolve(opts.inFile), "utf8");
-      invObj = JSON.parse(txt);
-    } catch (e: any) {
-      if (e && e.code === "ENOENT") return 66;
-      return 65;
+    if (opts.inFile) {
+      try {
+        const txt = await fsp.readFile(path.resolve(opts.inFile), "utf8");
+        invObj = JSON.parse(txt);
+      } catch (e: any) {
+        if (e && e.code === "ENOENT") return 66;
+        return 65;
+      }
+    }
+  }
+
+  // Validate invocation JSON against tool.inputSchema when provided
+  if (spec.tool?.outputSchema || spec.tool?.inputSchema) {
+    // Ajv instance created below for output too; create local here for input
+    const ajvIn = new Ajv({ allErrors: false, strict: false });
+    const inSchema: any = (spec as any).tool?.inputSchema;
+    if (inSchema) {
+      try {
+        const validateIn = ajvIn.compile(inSchema);
+        const ok = validateIn(invObj);
+        if (!ok) {
+          console.error(`json-cli: invalid input: ${JSON.stringify(validateIn.errors?.[0] || {})}`);
+          return 1;
+        }
+      } catch (e: any) {
+        console.error("json-cli: input validation failed");
+        return 1;
+      }
     }
   }
 
@@ -131,7 +153,7 @@ export async function main(argv: string[]): Promise<number | void> {
     return 0;
   }
 
-  const code = await runWithStdoutTransform(rootDir, specPath, spec, argvBuilt, rootCfg);
+  const code = await runWithTransforms(rootDir, specPath, spec, argvBuilt, rootCfg);
   return code;
 }
 
@@ -471,7 +493,7 @@ function mergeEnv(rootCfg: RootConfig, spec: ToolSpec): Record<string, string> {
   return env;
 }
 
-async function runWithStdoutTransform(
+async function runWithTransforms(
   rootDir: string,
   specPath: string,
   spec: ToolSpec,
@@ -481,16 +503,29 @@ async function runWithStdoutTransform(
   const cwd = resolveWorkingDir(rootDir, specPath, spec);
   const env = mergeEnv(rootCfg, spec);
 
+  // Optional stdinTransform
+  const stIn = spec.command?.stdinTransform;
+  const p1 =
+    stIn && stIn.shell
+      ? spawn("/bin/sh", ["-c", `set -euo pipefail; ${stIn.shell}`], {
+          cwd,
+          env,
+          stdio: ["pipe", "pipe", "pipe"],
+          detached: false,
+        })
+      : null;
+
   const cmd = spawn(spec.command!.exec as string, argv, {
     cwd,
     env,
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: ["pipe", "pipe", "pipe"],
     detached: false,
   });
 
   const st = spec.command?.stdoutTransform;
   if (!st || !st.shell || !st.format) {
     console.error("json-cli: stdoutTransform with shell and format is required");
+    if (p1) p1.kill("SIGTERM");
     cmd.kill("SIGTERM");
     return 78;
   }
@@ -503,11 +538,55 @@ async function runWithStdoutTransform(
   });
 
   // Wire stderr passthrough
+  if (p1) p1.stderr.pipe(process.stderr, { end: false });
   cmd.stderr.pipe(process.stderr, { end: false });
   p2.stderr.pipe(process.stderr, { end: false });
 
   // Pipe cmd stdout into transform stdin
   cmd.stdout.pipe(p2.stdin);
+
+  // Feed stdin → p1? → cmd.stdin with format enforcement
+  if (!p1) {
+    // No transform; wire stdin directly
+    process.stdin.pipe(cmd.stdin);
+  } else {
+    // process.stdin -> p1.stdin
+    process.stdin.pipe(p1.stdin);
+    // enforce format on p1.stdout and forward into cmd.stdin
+    const format = stIn!.format;
+    if (format === "ndjson") {
+      const rlIn = readline.createInterface({ input: p1.stdout });
+      (async () => {
+        for await (const line of rlIn) {
+          const s = String(line);
+          if (s.trim() === "") continue;
+          try {
+            JSON.parse(s);
+            cmd.stdin.write(s + "\n");
+          } catch {
+            process.stderr.write("json-cli: stdinTransform emitted non-JSON line\n");
+          }
+        }
+        cmd.stdin.end();
+      })().catch(() => cmd.stdin.end());
+    } else if (format === "json") {
+      (async () => {
+        const chunks: Buffer[] = [];
+        for await (const chunk of p1.stdout) chunks.push(Buffer.from(chunk));
+        const buf = Buffer.concat(chunks).toString("utf8");
+        try {
+          JSON.parse(buf);
+          cmd.stdin.write(buf);
+        } catch {
+          process.stderr.write("json-cli: stdinTransform did not emit valid JSON\n");
+        }
+        cmd.stdin.end();
+      })().catch(() => cmd.stdin.end());
+    } else {
+      process.stderr.write("json-cli: unknown stdinTransform.format\n");
+      p1.stdout.pipe(cmd.stdin);
+    }
+  }
 
   // Output validation
   const ajv = new Ajv({ allErrors: false, strict: false });
@@ -558,11 +637,13 @@ async function runWithStdoutTransform(
   }
 
   // Await processes end
-  const [cCode, p2Code] = await Promise.all([
+  const [p1Code, cCode, p2Code] = await Promise.all([
+    p1 ? new Promise<number>((res) => p1.on("exit", (code) => res(code ?? 0))) : Promise.resolve(0),
     new Promise<number>((res) => cmd.on("exit", (code) => res(code ?? 0))),
     new Promise<number>((res) => p2.on("exit", (code) => res(code ?? 0))),
   ]);
 
+  if (p1Code !== 0) exitCode = exitCode || p1Code;
   if (cCode !== 0) exitCode = exitCode || cCode;
   if (p2Code !== 0) exitCode = exitCode || p2Code;
   return exitCode || 0;

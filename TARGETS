@@ -43,3 +43,9 @@ zx_test(
     script = "tools/tests/json-cli.stdout.test.ts",
     out = "json_cli_stdout.stamp",
 )
+
+zx_test(
+    name = "json_cli_stdin",
+    script = "tools/tests/json-cli.stdin.test.ts",
+    out = "json_cli_stdin.stamp",
+)
