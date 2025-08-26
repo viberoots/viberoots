@@ -611,6 +611,8 @@ async function runWithTransforms(
   // Feed stdin → p1? → cmd.stdin with format enforcement
   let stdinParseFailed = false;
   let stdinConfigError = false;
+  const waitDrain = async (w: NodeJS.WritableStream) =>
+    new Promise<void>((res) => (w.writableNeedDrain ? w.once("drain", res) : res()));
   if (!p1) {
     // No transform; wire stdin directly
     process.stdin.pipe(cmd.stdin);
@@ -632,7 +634,7 @@ async function runWithTransforms(
           }
           try {
             JSON.parse(s);
-            cmd.stdin.write(s + "\n");
+            if (!cmd.stdin.write(s + "\n")) await waitDrain(cmd.stdin);
           } catch {
             process.stderr.write("json-cli: stdinTransform emitted non-JSON line\n");
             if (sink)
@@ -654,7 +656,7 @@ async function runWithTransforms(
         if (buf.charCodeAt(0) === 0xfeff) buf = buf.slice(1);
         try {
           JSON.parse(buf);
-          cmd.stdin.write(buf);
+          if (!cmd.stdin.write(buf)) await waitDrain(cmd.stdin);
         } catch {
           process.stderr.write("json-cli: stdinTransform did not emit valid JSON\n");
           if (sink)
@@ -701,7 +703,7 @@ async function runWithTransforms(
           // Continue streaming; drop invalid item
           continue;
         }
-        process.stdout.write(s + "\n");
+        if (!process.stdout.write(s + "\n")) await waitDrain(process.stdout);
       } catch {
         process.stderr.write("json-cli: invalid NDJSON line (not JSON)\n");
         if (sink)
@@ -726,7 +728,7 @@ async function runWithTransforms(
         if (sink) await sink.write({ reason: "output", object: obj, message: msg });
         exitCode = exitCode || 1;
       }
-      process.stdout.write(buf);
+      if (!process.stdout.write(buf)) await waitDrain(process.stdout);
     } catch {
       process.stderr.write("json-cli: stdoutTransform did not emit valid JSON\n");
       if (sink)
