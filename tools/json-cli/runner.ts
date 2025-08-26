@@ -617,6 +617,22 @@ function evaluateJsonPath(root: any, expr: string): any {
             for (const idx of parts) if (idx >= 0 && idx < v.length) next.push(v[idx]);
           }
         }
+      } else if (/^(['"]).*\1(\s*,\s*(['"]).*\3)*$/.test(s)) {
+        // Property-name union: $['a','b'] or $["a","b"]
+        const re = /(['"])([^'"\\]*(?:\\.[^'"\\]*)*)\1/g;
+        const props: string[] = [];
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(s)) !== null) {
+          const raw = m[2].replace(/\\(['"])/g, "$1");
+          props.push(raw);
+        }
+        for (const v of current) {
+          if (v && typeof v === "object" && !Array.isArray(v)) {
+            for (const key of props) {
+              if (key in v) next.push((v as any)[key]);
+            }
+          }
+        }
       } else {
         // unsupported subset (scripts/functions/unions of properties)
         throw new Error(`json-cli: unsupported JSONPath segment: [${s}]`);
