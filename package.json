@@ -15,6 +15,7 @@
     "lint:fix": "eslint . --ext .ts --fix",
     "prepare": "husky",
     "coverage:summary": "tools/dev/coverage-summary.ts",
+    "coverage:open": "pnpm coverage:summary --open-browser || open coverage/lcov-report/index.html",
     "test:cov": "buck2 test //... && c8 report --clean=false --temp-directory coverage/raw --reports-dir coverage --reporter=json-summary --reporter=lcov --reporter=html --extension .ts --allowExternal --all --src . --src .tmp"
   },
   "lint-staged": {

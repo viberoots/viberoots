@@ -39,3 +39,29 @@ Notes:
 - Coverage uses raw V8 output from test processes and aggregates via `c8`.
 - Reports land in `coverage/` and are Git-ignored.
 - For CI, prefer enabling coverage in specific jobs rather than always-on.
+
+## Running subsets and multiple targets
+
+- Run a single Buck target:
+
+```
+buck2 test //:scaffolding_smoke
+```
+
+- Run several specific targets:
+
+```
+buck2 test //:scaffolding_smoke //:scaffolding_help
+```
+
+- Filter at the shell level (only scaffolding targets):
+
+```
+buck2 test $(buck2 targets //:scaffolding_* | tr '\n' ' ')
+```
+
+- Enable coverage for those runs as needed:
+
+```
+COVERAGE=1 buck2 test //:scaffolding_help
+```

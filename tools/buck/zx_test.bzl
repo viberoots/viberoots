@@ -6,7 +6,8 @@ def _zx_test_impl(ctx):
         + "export WORKSPACE_ROOT=$(pwd); "
         + "export NODE_BIN=\"$(command -v node)\"; "
         + "export PATH=\"$(pwd)/tools/bin:$(pwd)/node_modules/.bin:$PATH\"; "
-        + "if [ -n \"$NODE_V8_COVERAGE\" ]; then mkdir -p \"$NODE_V8_COVERAGE\"; fi; "
+        + "if [ -n \"$NODE_V8_COVERAGE\" ]; then mkdir -p \"$NODE_V8_COVERAGE\"; "
+        + "ls -1t \"$NODE_V8_COVERAGE\"/coverage-*.json 2>/dev/null | tail -n +201 | xargs -r rm -f || true; fi; "
         + "zx-wrapper %s; STATUS=$?; " % script.short_path
         + "if [ \"$COVERAGE\" = \"1\" ]; then "
         + "node ./node_modules/c8/bin/c8.js report "
