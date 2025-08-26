@@ -49,3 +49,9 @@ zx_test(
     script = "tools/tests/json-cli.stdin.test.ts",
     out = "json_cli_stdin.stamp",
 )
+
+zx_test(
+    name = "json_cli_failure",
+    script = "tools/tests/json-cli.failure.test.ts",
+    out = "json_cli_failure.stamp",
+)

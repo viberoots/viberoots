@@ -33,6 +33,7 @@ type ToolSpec = {
     parameters?: Record<string, ParameterSpec>;
     stdinTransform?: { shell?: string; format?: "json" | "ndjson" };
     stdoutTransform?: { shell?: string; format?: "json" | "ndjson" };
+    onValidationFailure?: { shell?: string };
   };
 };
 
@@ -120,7 +121,7 @@ export async function main(argv: string[]): Promise<number | void> {
   }
 
   // Validate invocation JSON against tool.inputSchema when provided
-  if (spec.tool?.outputSchema || spec.tool?.inputSchema) {
+  if (spec.tool?.outputSchema || (spec as any).tool?.inputSchema) {
     // Ajv instance created below for output too; create local here for input
     const ajvIn = new Ajv({ allErrors: false, strict: false });
     const inSchema: any = (spec as any).tool?.inputSchema;
@@ -129,7 +130,11 @@ export async function main(argv: string[]): Promise<number | void> {
         const validateIn = ajvIn.compile(inSchema);
         const ok = validateIn(invObj);
         if (!ok) {
-          console.error(`json-cli: invalid input: ${JSON.stringify(validateIn.errors?.[0] || {})}`);
+          const sink = openFailureSink(rootDir, specPath, spec, rootCfg);
+          const msg = JSON.stringify(validateIn.errors?.[0] || {});
+          if (sink) await sink.write({ reason: "input", object: invObj, message: msg });
+          console.error(`json-cli: invalid input: ${msg}`);
+          if (sink) await sink.close();
           return 1;
         }
       } catch (e: any) {
@@ -153,7 +158,7 @@ export async function main(argv: string[]): Promise<number | void> {
     return 0;
   }
 
-  const code = await runWithTransforms(rootDir, specPath, spec, argvBuilt, rootCfg);
+  const code = await runWithTransforms(rootDir, specPath, spec, argvBuilt, rootCfg, invObj);
   return code;
 }
 
@@ -499,9 +504,11 @@ async function runWithTransforms(
   spec: ToolSpec,
   argv: string[],
   rootCfg: RootConfig,
+  invObj: any,
 ): Promise<number> {
   const cwd = resolveWorkingDir(rootDir, specPath, spec);
   const env = mergeEnv(rootCfg, spec);
+  const sink = openFailureSink(rootDir, specPath, spec, rootCfg);
 
   // Optional stdinTransform
   const stIn = spec.command?.stdinTransform;
@@ -565,6 +572,12 @@ async function runWithTransforms(
             cmd.stdin.write(s + "\n");
           } catch {
             process.stderr.write("json-cli: stdinTransform emitted non-JSON line\n");
+            if (sink)
+              await sink.write({
+                reason: "stdin",
+                object: s.slice(0, 200),
+                message: "invalid JSON line",
+              });
           }
         }
         cmd.stdin.end();
@@ -579,6 +592,12 @@ async function runWithTransforms(
           cmd.stdin.write(buf);
         } catch {
           process.stderr.write("json-cli: stdinTransform did not emit valid JSON\n");
+          if (sink)
+            await sink.write({
+              reason: "stdin",
+              object: buf.slice(0, 200),
+              message: "invalid JSON document",
+            });
         }
         cmd.stdin.end();
       })().catch(() => cmd.stdin.end());
@@ -602,15 +621,21 @@ async function runWithTransforms(
       try {
         const obj = JSON.parse(s);
         if (validate && !validate(obj)) {
-          process.stderr.write(
-            `json-cli: invalid output item: ${JSON.stringify(validate.errors?.[0] || {})}\n`,
-          );
+          const msg = JSON.stringify(validate.errors?.[0] || {});
+          process.stderr.write(`json-cli: invalid output item: ${msg}\n`);
+          if (sink) await sink.write({ reason: "output", object: obj, message: msg });
           // Continue streaming; drop invalid item
           continue;
         }
         process.stdout.write(s + "\n");
       } catch {
         process.stderr.write("json-cli: invalid NDJSON line (not JSON)\n");
+        if (sink)
+          await sink.write({
+            reason: "stdout",
+            object: s.slice(0, 200),
+            message: "invalid NDJSON",
+          });
         exitCode = exitCode || 65;
       }
     }
@@ -621,14 +646,16 @@ async function runWithTransforms(
     try {
       const obj = JSON.parse(buf);
       if (validate && !validate(obj)) {
-        process.stderr.write(
-          `json-cli: invalid output: ${JSON.stringify(validate.errors?.[0] || {})}\n`,
-        );
+        const msg = JSON.stringify(validate.errors?.[0] || {});
+        process.stderr.write(`json-cli: invalid output: ${msg}\n`);
+        if (sink) await sink.write({ reason: "output", object: obj, message: msg });
         exitCode = exitCode || 1;
       }
       process.stdout.write(buf);
     } catch {
       process.stderr.write("json-cli: stdoutTransform did not emit valid JSON\n");
+      if (sink)
+        await sink.write({ reason: "stdout", object: buf.slice(0, 200), message: "invalid JSON" });
       exitCode = exitCode || 65;
     }
   } else {
@@ -643,10 +670,42 @@ async function runWithTransforms(
     new Promise<number>((res) => p2.on("exit", (code) => res(code ?? 0))),
   ]);
 
+  if (sink) await sink.close();
   if (p1Code !== 0) exitCode = exitCode || p1Code;
   if (cCode !== 0) exitCode = exitCode || cCode;
   if (p2Code !== 0) exitCode = exitCode || p2Code;
   return exitCode || 0;
+}
+
+function openFailureSink(
+  rootDir: string,
+  specPath: string,
+  spec: ToolSpec,
+  rootCfg: RootConfig,
+): { write: (obj: any) => Promise<void>; close: () => Promise<void> } | null {
+  const of = spec.command?.onValidationFailure;
+  if (!of || !of.shell) return null;
+  const cwd = resolveWorkingDir(rootDir, specPath, spec);
+  const env = mergeEnv(rootCfg, spec);
+  const p = spawn("/bin/sh", ["-c", `set -euo pipefail; ${of.shell}`], {
+    cwd,
+    env,
+    stdio: ["pipe", "ignore", "pipe"],
+    detached: false,
+  });
+  p.stderr.pipe(process.stderr, { end: false });
+  const write = async (obj: any) => {
+    try {
+      p.stdin.write(JSON.stringify(obj) + "\n");
+    } catch {}
+  };
+  const close = async () => {
+    try {
+      p.stdin.end();
+    } catch {}
+    await new Promise<void>((res) => p.on("exit", () => res())).catch(() => undefined);
+  };
+  return { write, close };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
