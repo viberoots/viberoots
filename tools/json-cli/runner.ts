@@ -21,7 +21,30 @@ type RootConfig = {
 
 type ToolSpec = {
   tool?: { name?: string };
-  command?: { package?: string };
+  command?: {
+    package?: string;
+    exec?: string;
+    workingDir?: string;
+    env?: Record<string, string>;
+    defaultBooleanStyle?: "presence" | "equals";
+    parameters?: Record<string, ParameterSpec>;
+    stdinTransform?: { shell?: string; format?: "json" | "ndjson" };
+    stdoutTransform?: { shell?: string; format?: "json" | "ndjson" };
+  };
+};
+
+type ParameterSpec = {
+  path?: string;
+  value?: string;
+  type: "string" | "number" | "boolean" | "array" | "object";
+  required?: boolean;
+  default?: any;
+  position?: number;
+  flag?: boolean;
+  flagName?: string;
+  booleanStyle?: "presence" | "equals";
+  collectionStyle?: "repeatArg" | "repeatFlag" | "csv" | "kv" | "separate";
+  csvSeparator?: string;
 };
 
 export async function main(argv: string[]): Promise<number | void> {
@@ -62,9 +85,50 @@ export async function main(argv: string[]): Promise<number | void> {
     printHelp("missing <toolRef>");
     return 2;
   }
+  const index = await buildIndex(rootDir, rootCfg);
+  const fqTool = resolveToolRef(opts.toolRef, rootCfg);
+  const specPath = index.get(fqTool);
+  if (!specPath) {
+    console.error(`json-cli: tool not found: ${fqTool}`);
+    return 78;
+  }
+  const spec = await readSpec(specPath);
+  if (!spec || !spec.command?.exec) {
+    console.error("json-cli: invalid spec (missing command.exec)");
+    return 78;
+  }
 
-  // Execution and dry-run are not implemented in PR1.
-  console.error("json-cli: execution not implemented yet (PR1 skeleton)");
+  const requiresInput = usesPathParams(spec);
+  let invObj: any = {};
+  if (requiresInput) {
+    if (!opts.inFile) {
+      console.error("json-cli: --in is required when parameters use path");
+      return 78;
+    }
+    try {
+      const txt = await fsp.readFile(path.resolve(opts.inFile), "utf8");
+      invObj = JSON.parse(txt);
+    } catch (e: any) {
+      if (e && e.code === "ENOENT") return 66;
+      return 65;
+    }
+  }
+
+  let argvBuilt: string[];
+  try {
+    argvBuilt = buildArgv(spec, invObj);
+  } catch (e: any) {
+    console.error(String(e?.message || e || "json-cli: argv build failed"));
+    return 78;
+  }
+
+  if (opts.dryRun) {
+    const plan = buildDryRunPlan(rootDir, specPath, spec, argvBuilt, rootCfg);
+    console.log(JSON.stringify(plan));
+    return 0;
+  }
+
+  console.error("json-cli: execution not implemented yet");
   return 78;
 }
 
@@ -146,6 +210,13 @@ async function readRootConfig(rootDir: string): Promise<RootConfig> {
       if (typeof obj.defaultPackage === "string") cfg.defaultPackage = obj.defaultPackage;
       if (Array.isArray(obj.ignore))
         cfg.ignore = obj.ignore.filter((x: any) => typeof x === "string");
+      if (obj.env && typeof obj.env === "object") {
+        const env: Record<string, string> = {};
+        for (const [k, v] of Object.entries(obj.env)) {
+          if (typeof v === "string") env[k] = v;
+        }
+        cfg.env = env;
+      }
     }
     return cfg;
   } catch {
@@ -210,10 +281,197 @@ async function readSpec(p: string): Promise<ToolSpec | null> {
   }
 }
 
+function usesPathParams(spec: ToolSpec): boolean {
+  const params = spec.command?.parameters || {};
+  for (const p of Object.values(params)) {
+    if (p && typeof p === "object" && (p as any).path) return true;
+  }
+  return false;
+}
+
+function buildArgv(spec: ToolSpec, invObj: any): string[] {
+  const params = spec.command?.parameters || {};
+  const positionals: Array<{ pos: number; token: string }> = [];
+  const flags: Array<{ name: string; tokens: string[] }> = [];
+
+  const seenPositions = new Set<number>();
+  const defaultBooleanStyle: "presence" | "equals" =
+    spec.command?.defaultBooleanStyle === "equals" ? "equals" : "presence";
+
+  for (const [paramName, psRaw] of Object.entries(params)) {
+    const ps = psRaw as ParameterSpec;
+    const value = resolveParamValue(ps, invObj);
+    const required = !!ps.required;
+    const type = ps.type;
+    const flag = !!ps.flag;
+    const flagName = ps.flagName;
+
+    const isEmptyArray = type === "array" && Array.isArray(value) && value.length === 0;
+    const isEmptyObject =
+      type === "object" && value && typeof value === "object" && Object.keys(value).length === 0;
+    if (value === undefined || value === null || isEmptyArray || isEmptyObject) {
+      if (required) throw new Error(`missing required parameter: ${paramName}`);
+      continue;
+    }
+
+    if (!flag) {
+      const pos = ps.position;
+      if (!pos || pos <= 0 || !Number.isInteger(pos))
+        throw new Error(`invalid or missing position for parameter: ${paramName}`);
+      if (seenPositions.has(pos)) throw new Error(`duplicate positional index: ${pos}`);
+      seenPositions.add(pos);
+      const tokens = renderValueTokens(type, ps, value, undefined);
+      if (tokens.length !== 1)
+        throw new Error(`positional parameter must render to exactly one token: ${paramName}`);
+      positionals.push({ pos, token: tokens[0] });
+      continue;
+    }
+
+    if (!flagName) throw new Error(`flag parameter missing flagName: ${paramName}`);
+    const booleanStyle = ps.booleanStyle || defaultBooleanStyle;
+    const rendered = renderValueTokens(type, ps, value, flagName, booleanStyle);
+    if (rendered.length > 0) flags.push({ name: flagName, tokens: rendered });
+  }
+
+  positionals.sort((a, b) => a.pos - b.pos);
+  flags.sort((a, b) => a.name.localeCompare(b.name));
+
+  const argv: string[] = [];
+  for (const p of positionals) argv.push(p.token);
+  for (const f of flags) argv.push(...f.tokens);
+  return argv;
+}
+
+function resolveParamValue(ps: ParameterSpec, invObj: any): any {
+  if (ps.path && ps.value) throw new Error("parameter cannot have both path and value");
+  let v: any = undefined;
+  if (ps.path) {
+    v = extractBySimpleJsonPath(invObj, ps.path);
+  } else if (ps.value !== undefined) {
+    v = ps.value;
+  }
+  if ((v === undefined || v === null) && ps.default !== undefined) return ps.default;
+  return v;
+}
+
+function extractBySimpleJsonPath(obj: any, pathExpr: string): any {
+  if (!pathExpr.startsWith("$")) return undefined;
+  let cur: any = obj;
+  const trimmed = pathExpr.replace(/^\$[.]/, "");
+  if (trimmed === "" || trimmed === "$") return cur;
+  const parts = trimmed.split(".");
+  for (const part of parts) {
+    if (part === "") continue;
+    const m = part.match(/^(\w+)(\[(\d+)\])?$/);
+    if (!m) return undefined;
+    const key = m[1];
+    if (cur == null || typeof cur !== "object" || !(key in cur)) return undefined;
+    cur = (cur as any)[key];
+    if (m[3] !== undefined) {
+      const idx = Number(m[3]);
+      if (!Array.isArray(cur) || idx < 0 || idx >= cur.length) return undefined;
+      cur = cur[idx];
+    }
+  }
+  return cur;
+}
+
+function renderValueTokens(
+  type: ParameterSpec["type"],
+  ps: ParameterSpec,
+  value: any,
+  flagName?: string,
+  booleanStyle: "presence" | "equals" = "presence",
+): string[] {
+  switch (type) {
+    case "string":
+    case "number": {
+      const str = String(value);
+      if (!flagName) return [str];
+      if (ps.collectionStyle === "separate") return [flagName, str];
+      return [`${flagName}=${str}`];
+    }
+    case "boolean": {
+      const b = !!value;
+      if (!flagName) return [String(b)];
+      if (booleanStyle === "equals") return [`${flagName}=${b ? "true" : "false"}`];
+      return b ? [flagName] : [];
+    }
+    case "array": {
+      if (!Array.isArray(value)) return [];
+      const style = ps.collectionStyle;
+      if (!style) throw new Error("array parameter requires collectionStyle");
+      if (style === "repeatArg") return value.map((v) => String(v));
+      if (style === "csv") {
+        const sep = ps.csvSeparator || ",";
+        const joined = value.map((v) => String(v)).join(sep);
+        if (!flagName) return [joined];
+        if (ps.collectionStyle === "separate") return [flagName, joined];
+        return [`${flagName}=${joined}`];
+      }
+      if (style === "repeatFlag") {
+        if (!flagName) throw new Error("repeatFlag requires flagName");
+        return value.map((v) => `${flagName}=${String(v)}`);
+      }
+      if (style === "separate") {
+        if (!flagName) throw new Error("separate requires flagName");
+        return [flagName, String(value.join(ps.csvSeparator || ","))];
+      }
+      throw new Error(`unsupported array collectionStyle: ${style}`);
+    }
+    case "object": {
+      if (!value || typeof value !== "object") return [];
+      const style = ps.collectionStyle;
+      if (style !== "kv") throw new Error("object parameter requires collectionStyle=kv");
+      const keys = Object.keys(value).sort();
+      if (!flagName) return keys.map((k) => `${k}=${String((value as any)[k])}`);
+      return keys.map((k) => `--${k}=${String((value as any)[k])}`);
+    }
+    default:
+      return [];
+  }
+}
+
+function buildDryRunPlan(
+  rootDir: string,
+  specPath: string,
+  spec: ToolSpec,
+  argv: string[],
+  rootCfg: RootConfig,
+) {
+  const cwd = resolveWorkingDir(rootDir, specPath, spec);
+  const env = mergeEnv(rootCfg, spec);
+  return {
+    exec: spec.command?.exec,
+    argv,
+    cwd,
+    envKeys: Object.keys(env).sort(),
+    stdoutTransform: spec.command?.stdoutTransform?.shell,
+    stdinTransform: spec.command?.stdinTransform?.shell,
+  };
+}
+
+function resolveWorkingDir(_rootDir: string, specPath: string, spec: ToolSpec): string {
+  const wd = spec.command?.workingDir;
+  if (!wd) return path.dirname(specPath);
+  if (path.isAbsolute(wd)) return wd;
+  return path.resolve(path.dirname(specPath), wd);
+}
+
+function mergeEnv(rootCfg: RootConfig, spec: ToolSpec): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const [k, v] of Object.entries(process.env)) {
+    if (typeof v === "string") env[k] = v;
+  }
+  for (const [k, v] of Object.entries(rootCfg.env || {})) env[k] = v;
+  for (const [k, v] of Object.entries(spec.command?.env || {})) env[k] = v;
+  return env;
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   // If run directly (unlikely in this repo), execute main.
   // Buck/zx wrapper calls into this module from tools/bin/json-cli.
-   
+
   main(process.argv.slice(2)).then((code) => {
     if (typeof code === "number") process.exit(code);
   });
