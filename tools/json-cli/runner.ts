@@ -609,6 +609,8 @@ async function runWithTransforms(
   cmd.stdout.pipe(p2.stdin);
 
   // Feed stdin → p1? → cmd.stdin with format enforcement
+  let stdinParseFailed = false;
+  let stdinConfigError = false;
   if (!p1) {
     // No transform; wire stdin directly
     process.stdin.pipe(cmd.stdin);
@@ -634,6 +636,7 @@ async function runWithTransforms(
                 object: s.slice(0, 200),
                 message: "invalid JSON line",
               });
+            stdinParseFailed = true;
           }
         }
         cmd.stdin.end();
@@ -654,12 +657,14 @@ async function runWithTransforms(
               object: buf.slice(0, 200),
               message: "invalid JSON document",
             });
+          stdinParseFailed = true;
         }
         cmd.stdin.end();
       })().catch(() => cmd.stdin.end());
     } else {
       process.stderr.write("json-cli: unknown stdinTransform.format\n");
       p1.stdout.pipe(cmd.stdin);
+      stdinConfigError = true;
     }
   }
 
@@ -669,6 +674,8 @@ async function runWithTransforms(
   const validate = schema ? ajv.compile(schema) : null;
 
   let exitCode = 0;
+  let stdoutParseFailed = false;
+  let stdoutConfigError = false;
   if (st.format === "ndjson") {
     const rl = readline.createInterface({ input: p2.stdout });
     for await (const line of rl) {
@@ -692,7 +699,7 @@ async function runWithTransforms(
             object: s.slice(0, 200),
             message: "invalid NDJSON",
           });
-        exitCode = exitCode || 65;
+        stdoutParseFailed = true;
       }
     }
   } else if (st.format === "json") {
@@ -712,11 +719,11 @@ async function runWithTransforms(
       process.stderr.write("json-cli: stdoutTransform did not emit valid JSON\n");
       if (sink)
         await sink.write({ reason: "stdout", object: buf.slice(0, 200), message: "invalid JSON" });
-      exitCode = exitCode || 65;
+      stdoutParseFailed = true;
     }
   } else {
     process.stderr.write("json-cli: unknown stdoutTransform.format\n");
-    exitCode = 78;
+    stdoutConfigError = true;
   }
 
   // Await processes end
@@ -736,10 +743,23 @@ async function runWithTransforms(
 
   if (killer) clearTimeout(killer);
   if (sink) await sink.close();
-  if (p1Code !== 0) exitCode = exitCode || p1Code;
-  if (cCode !== 0) exitCode = exitCode || cCode;
-  if (p2Code !== 0) exitCode = exitCode || p2Code;
-  return exitCode || 0;
+
+  // Exit precedence: stdinTransform → exec → stdoutTransform
+  if (stdinConfigError || stdinParseFailed || p1Code !== 0) {
+    const code = stdinConfigError ? 78 : p1Code !== 0 ? p1Code : 65;
+    process.stderr.write(`json-cli: stage failed: stdinTransform code=${code}\n`);
+    return code;
+  }
+  if (cCode !== 0) {
+    process.stderr.write(`json-cli: stage failed: exec code=${cCode}\n`);
+    return cCode;
+  }
+  if (stdoutConfigError || stdoutParseFailed || p2Code !== 0) {
+    const code = stdoutConfigError ? 78 : p2Code !== 0 ? p2Code : 65;
+    process.stderr.write(`json-cli: stage failed: stdoutTransform code=${code}\n`);
+    return code;
+  }
+  return 0;
 }
 
 function openFailureSink(

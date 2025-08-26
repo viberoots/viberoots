@@ -67,3 +67,9 @@ zx_test(
     script = "tools/tests/json-cli.discovery.test.ts",
     out = "json_cli_discovery.stamp",
 )
+
+zx_test(
+    name = "json_cli_exit_precedence",
+    script = "tools/tests/json-cli.exit-precedence.test.ts",
+    out = "json_cli_exit_precedence.stamp",
+)
