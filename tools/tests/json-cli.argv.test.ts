@@ -15,9 +15,6 @@ describe("json-cli PR2 argv mapping + dry-run", () => {
       );
       const specPath = path.join(tmp, "demo.tool.json");
       const spec = defineToolSpec({
-        specVersion: "1.0.0",
-        jsonPathDialect: "jsonpath-plus@8",
-        schemaDialect: "https://json-schema.org/draft/2020-12/schema",
         tool: { name: "flags" },
         command: {
           package: "io.example",
@@ -80,9 +77,6 @@ describe("json-cli PR2 argv mapping + dry-run", () => {
       );
       const specPath = path.join(tmp, "arr.tool.json");
       const spec = defineToolSpec({
-        specVersion: "1.0.0",
-        jsonPathDialect: "jsonpath-plus@8",
-        schemaDialect: "https://json-schema.org/draft/2020-12/schema",
         tool: { name: "arr" },
         command: {
           package: "io.example",

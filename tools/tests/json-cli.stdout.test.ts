@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import { describe, test } from "node:test";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { runInTemp } from "./lib/test-helpers";
+import { describe, test } from "node:test";
 import { defineToolSpec } from "../json-cli/spec";
+import { runInTemp } from "./lib/test-helpers";
 
 describe("json-cli PR3 stdoutTransform + validation", () => {
   test("ndjson output validated and streamed", async () => {
@@ -30,9 +30,6 @@ console.log('{"ok":2}');
 
       const specPath = path.join(tmp, "echo.tool.json");
       const spec = defineToolSpec({
-        specVersion: "1.0.0",
-        jsonPathDialect: "jsonpath-plus@8",
-        schemaDialect: "https://json-schema.org/draft/2020-12/schema",
         tool: {
           name: "echo",
           outputSchema: {
@@ -80,9 +77,6 @@ console.log('{"notOk":true}');
 
       const specPath = path.join(tmp, "echo1.tool.json");
       const spec = defineToolSpec({
-        specVersion: "1.0.0",
-        jsonPathDialect: "jsonpath-plus@8",
-        schemaDialect: "https://json-schema.org/draft/2020-12/schema",
         tool: {
           name: "echo1",
           outputSchema: {
