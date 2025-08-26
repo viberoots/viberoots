@@ -518,7 +518,7 @@ async function runWithTransforms(
           cwd,
           env,
           stdio: ["pipe", "pipe", "pipe"],
-          detached: false,
+          detached: true,
         })
       : null;
 
@@ -526,7 +526,7 @@ async function runWithTransforms(
     cwd,
     env,
     stdio: ["pipe", "pipe", "pipe"],
-    detached: false,
+    detached: true,
   });
 
   const st = spec.command?.stdoutTransform;
@@ -541,7 +541,7 @@ async function runWithTransforms(
     cwd,
     env,
     stdio: ["pipe", "pipe", "pipe"],
-    detached: false,
+    detached: true,
   });
 
   // Wire stderr passthrough
@@ -664,12 +664,21 @@ async function runWithTransforms(
   }
 
   // Await processes end
+  // Timeout handling (optional)
+  const procs = [p1, cmd, p2, sink && (sink as any).proc].filter(Boolean) as any[];
+  let killer: NodeJS.Timeout | null = null;
+  const timeoutMs = spec.command?.timeoutMs;
+  if (timeoutMs && timeoutMs > 0) {
+    killer = setTimeout(() => terminateGroup(procs), timeoutMs);
+  }
+
   const [p1Code, cCode, p2Code] = await Promise.all([
     p1 ? new Promise<number>((res) => p1.on("exit", (code) => res(code ?? 0))) : Promise.resolve(0),
     new Promise<number>((res) => cmd.on("exit", (code) => res(code ?? 0))),
     new Promise<number>((res) => p2.on("exit", (code) => res(code ?? 0))),
   ]);
 
+  if (killer) clearTimeout(killer);
   if (sink) await sink.close();
   if (p1Code !== 0) exitCode = exitCode || p1Code;
   if (cCode !== 0) exitCode = exitCode || cCode;
@@ -706,6 +715,26 @@ function openFailureSink(
     await new Promise<void>((res) => p.on("exit", () => res())).catch(() => undefined);
   };
   return { write, close };
+}
+
+function terminateGroup(procs: any[]) {
+  // Phase 1: SIGTERM to process groups
+  for (const p of procs) {
+    try {
+      if (p && p.pid) process.kill(-p.pid, "SIGTERM");
+    } catch {}
+  }
+  process.stderr.write(
+    "json-cli: timeout — sent SIGTERM to process groups; will SIGKILL after 5s\n",
+  );
+  // Phase 2 after 5s: SIGKILL
+  setTimeout(() => {
+    for (const p of procs) {
+      try {
+        if (p && p.pid) process.kill(-p.pid, "SIGKILL");
+      } catch {}
+    }
+  }, 5000);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

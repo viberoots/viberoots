@@ -55,3 +55,9 @@ zx_test(
     script = "tools/tests/json-cli.failure.test.ts",
     out = "json_cli_failure.stamp",
 )
+
+zx_test(
+    name = "json_cli_timeout",
+    script = "tools/tests/json-cli.timeout.test.ts",
+    out = "json_cli_timeout.stamp",
+)
