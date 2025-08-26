@@ -339,7 +339,12 @@ async function buildIndex(rootDir: string, cfg: RootConfig): Promise<Map<string,
 
   for (const rel of entries) {
     const p = path.join(rootDir, rel);
-    const spec = await readSpec(p);
+    const { spec, warning } = await readSpec(p);
+    if (warning) {
+      try {
+        process.stderr.write(warning + "\n");
+      } catch {}
+    }
     const fq =
       spec && spec.command?.package && spec.tool?.name
         ? `${spec.command.package}.${spec.tool.name}`
@@ -460,18 +465,21 @@ function ensureFormalValidator() {
   }
 }
 
-async function readSpec(p: string): Promise<ToolSpec | null> {
+async function readSpec(p: string): Promise<{ spec: ToolSpec | null; warning: string | null }> {
   try {
     const txt = await fsp.readFile(p, "utf8");
     const obj = JSON.parse(txt);
     ensureFormalValidator();
     if (validateFormal && !validateFormal(obj)) {
       const msg = JSON.stringify((validateFormal as any).errors?.[0] || {});
-      throw new Error(`json-cli: invalid spec at ${p}: ${msg}`);
+      return { spec: null, warning: `json-cli: invalid spec skipped: ${p}: ${msg}` };
     }
-    return obj as ToolSpec;
-  } catch {
-    return null;
+    return { spec: obj as ToolSpec, warning: null };
+  } catch (e: any) {
+    return {
+      spec: null,
+      warning: `json-cli: unreadable spec skipped: ${p}: ${String(e?.message || e)}`,
+    };
   }
 }
 
@@ -658,6 +666,14 @@ function renderValueTokens(
   switch (type) {
     case "string":
     case "number": {
+      if (type === "number") {
+        const n = Number(value);
+        if (Number.isFinite(n) && Math.abs(n) > Math.pow(2, 53) - 1) {
+          try {
+            process.stderr.write("json-cli: warning: number may lose precision (>2^53-1)\n");
+          } catch {}
+        }
+      }
       const str = String(value);
       if (!flagName) return [str];
       if (ps.collectionStyle === "separate") return [flagName, str];

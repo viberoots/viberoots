@@ -115,3 +115,15 @@ zx_test(
     script = "tools/tests/json-cli.jsonpath-union.test.ts",
     out = "json_cli_jsonpath_union.stamp",
 )
+
+zx_test(
+    name = "json_cli_invalid_spec_skip",
+    script = "tools/tests/json-cli.invalid-spec-skip.test.ts",
+    out = "json_cli_invalid_spec_skip.stamp",
+)
+
+zx_test(
+    name = "json_cli_number_warning",
+    script = "tools/tests/json-cli.number-warning.test.ts",
+    out = "json_cli_number_warning.stamp",
+)
