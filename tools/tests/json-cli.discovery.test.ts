@@ -5,7 +5,7 @@ import path from "node:path";
 import { runInTemp } from "./lib/test-helpers";
 import { defineToolSpec } from "../json-cli/spec";
 
-describe("json-cli PR7 discovery globs/excludes and duplicates", () => {
+describe("json-cli discovery globs/excludes and duplicates", () => {
   test("globs include and exclude control discovery", async () => {
     await runInTemp("json-cli-globs", async (tmp, $) => {
       const cfg = {

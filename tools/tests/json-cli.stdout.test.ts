@@ -5,7 +5,7 @@ import { describe, test } from "node:test";
 import { defineToolSpec } from "../json-cli/spec";
 import { runInTemp } from "./lib/test-helpers";
 
-describe("json-cli PR3 stdoutTransform + validation", () => {
+describe("json-cli stdoutTransform + validation", () => {
   test("ndjson output validated and streamed", async () => {
     await runInTemp("json-cli-stdout-ndjson", async (tmp, $) => {
       await fsp.writeFile(

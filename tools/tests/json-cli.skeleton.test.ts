@@ -4,7 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runInTemp } from "./lib/test-helpers";
 
-describe("json-cli PR1 skeleton", () => {
+describe("json-cli skeleton", () => {
   test("shows help and version", async () => {
     await runInTemp("json-cli-help", async (_tmp, $) => {
       const help = await $({ stdio: "pipe" })`json-cli --help`;

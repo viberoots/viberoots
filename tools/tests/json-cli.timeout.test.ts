@@ -5,7 +5,7 @@ import path from "node:path";
 import { runInTemp } from "./lib/test-helpers";
 import { defineToolSpec } from "../json-cli/spec";
 
-describe("json-cli PR6 timeout and two-phase shutdown", () => {
+describe("json-cli timeout and two-phase shutdown", () => {
   test("times out long-running command and prints timeout note", async () => {
     await runInTemp("json-cli-timeout", async (tmp, $) => {
       await fsp.writeFile(

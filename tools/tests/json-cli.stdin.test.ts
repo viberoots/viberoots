@@ -5,7 +5,7 @@ import path from "node:path";
 import { runInTemp } from "./lib/test-helpers";
 import { defineToolSpec } from "../json-cli/spec";
 
-describe("json-cli PR4 stdinTransform + input validation", () => {
+describe("json-cli stdinTransform + input validation", () => {
   test("fails fast when invocation JSON violates inputSchema", async () => {
     await runInTemp("json-cli-stdin-invalid", async (tmp, $) => {
       await fsp.writeFile(

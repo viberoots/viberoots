@@ -5,7 +5,7 @@ import path from "node:path";
 import { runInTemp } from "./lib/test-helpers";
 import { defineToolSpec } from "../json-cli/spec";
 
-describe("json-cli PR8A exit precedence and standardized codes", () => {
+describe("json-cli exit precedence and standardized codes", () => {
   test("stdinTransform parse error takes precedence over exec/stdout", async () => {
     await runInTemp("json-cli-exit-stdin", async (tmp, $) => {
       await fsp.writeFile(

@@ -5,7 +5,7 @@ import path from "node:path";
 import { runInTemp } from "./lib/test-helpers";
 import { defineToolSpec } from "../json-cli/spec";
 
-describe("json-cli PR5 onValidationFailure routing", () => {
+describe("json-cli onValidationFailure routing", () => {
   test("routes invalid output items to handler as NDJSON", async () => {
     await runInTemp("json-cli-fail-output", async (tmp, $) => {
       await fsp.writeFile(

@@ -5,7 +5,7 @@ import path from "node:path";
 import { runInTemp } from "./lib/test-helpers";
 import { defineToolSpec } from "../json-cli/spec";
 
-describe("json-cli PR2 argv mapping + dry-run", () => {
+describe("json-cli argv mapping + dry-run", () => {
   test("positional + boolean presence + equals", async () => {
     await runInTemp("json-cli-argv1", async (tmp, $) => {
       await fsp.writeFile(
