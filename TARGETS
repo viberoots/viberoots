@@ -91,3 +91,9 @@ zx_test(
     script = "tools/tests/json-cli.backpressure.test.ts",
     out = "json_cli_backpressure.stamp",
 )
+
+zx_test(
+    name = "json_cli_list_ux",
+    script = "tools/tests/json-cli.list-ux.test.ts",
+    out = "json_cli_list_ux.stamp",
+)

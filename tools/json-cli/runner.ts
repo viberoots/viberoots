@@ -73,7 +73,11 @@ export async function main(argv: string[]): Promise<number | void> {
       console.error(String(e?.message || e));
       return 78;
     }
-    for (const [fq, p] of idx) {
+    if (rootCfg.defaultPackage) {
+      console.log(`defaultPackage: ${rootCfg.defaultPackage}`);
+    }
+    const entries = Array.from(idx.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+    for (const [fq, p] of entries) {
       console.log(`${fq}\t${p}`);
     }
     return 0;
@@ -95,6 +99,14 @@ export async function main(argv: string[]): Promise<number | void> {
     const hit = idx.get(fq);
     if (!hit) {
       console.error(`json-cli: tool not found: ${fq}`);
+      if (
+        (rootCfg.globs && rootCfg.globs.length) ||
+        (rootCfg.excludeGlobs && rootCfg.excludeGlobs.length)
+      ) {
+        console.error(
+          "hint: tool may be excluded by globs/excludeGlobs; run 'json-cli --list' to inspect discovered tools",
+        );
+      }
       return 78;
     }
     console.log(hit);
@@ -120,6 +132,14 @@ export async function main(argv: string[]): Promise<number | void> {
   const specPath = index.get(fqTool);
   if (!specPath) {
     console.error(`json-cli: tool not found: ${fqTool}`);
+    if (
+      (rootCfg.globs && rootCfg.globs.length) ||
+      (rootCfg.excludeGlobs && rootCfg.excludeGlobs.length)
+    ) {
+      console.error(
+        "hint: tool may be excluded by globs/excludeGlobs; run 'json-cli --list' to inspect discovered tools",
+      );
+    }
     return 78;
   }
   const spec = await readSpec(specPath);
