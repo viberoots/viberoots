@@ -7,6 +7,7 @@
     "node": ">=22.0.0"
   },
   "scripts": {
+    "json-cli:lint": "tools/json-cli/lint-specs.ts",
     "dev:check": "tools/dev/startup-check.ts",
     "dev:clear-overrides": "tools/dev/clear-overrides.ts",
     "fmt": "prettier -w .",
