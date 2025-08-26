@@ -3,6 +3,7 @@ import { describe, test } from "node:test";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runInTemp } from "./lib/test-helpers";
+import { defineToolSpec } from "../json-cli/spec";
 
 describe("json-cli PR2 argv mapping + dry-run", () => {
   test("positional + boolean presence + equals", async () => {
@@ -13,39 +14,35 @@ describe("json-cli PR2 argv mapping + dry-run", () => {
         "utf8",
       );
       const specPath = path.join(tmp, "demo.tool.json");
-      await fsp.writeFile(
-        specPath,
-        JSON.stringify(
-          {
-            tool: { name: "flags" },
-            command: {
-              package: "io.example",
-              exec: "tool",
-              defaultBooleanStyle: "presence",
-              parameters: {
-                sub: { type: "string", value: "run", position: 1 },
-                dryRun: {
-                  path: "$.dryRun",
-                  type: "boolean",
-                  flag: true,
-                  flagName: "--dry-run",
-                  booleanStyle: "equals",
-                },
-                verbose: {
-                  path: "$.verbose",
-                  type: "boolean",
-                  flag: true,
-                  flagName: "--verbose",
-                },
-              },
-              stdoutTransform: { shell: "jq -c .", format: "ndjson" },
+      const spec = defineToolSpec({
+        specVersion: "1.0.0",
+        jsonPathDialect: "jsonpath-plus@8",
+        schemaDialect: "https://json-schema.org/draft/2020-12/schema",
+        tool: { name: "flags" },
+        command: {
+          package: "io.example",
+          exec: "tool",
+          defaultBooleanStyle: "presence",
+          parameters: {
+            sub: { type: "string", value: "run", position: 1 },
+            dryRun: {
+              path: "$.dryRun",
+              type: "boolean",
+              flag: true,
+              flagName: "--dry-run",
+              booleanStyle: "equals",
+            },
+            verbose: {
+              path: "$.verbose",
+              type: "boolean",
+              flag: true,
+              flagName: "--verbose",
             },
           },
-          null,
-          2,
-        ),
-        "utf8",
-      );
+          stdoutTransform: { shell: "jq -c .", format: "ndjson" },
+        },
+      });
+      await fsp.writeFile(specPath, JSON.stringify(spec, null, 2), "utf8");
       const inv = path.join(tmp, "inv.json");
       await fsp.writeFile(inv, JSON.stringify({ dryRun: true, verbose: false }), "utf8");
       const out = await $({ stdio: "pipe" })`json-cli io.example.flags --in ${inv} --dry-run`;
@@ -82,41 +79,37 @@ describe("json-cli PR2 argv mapping + dry-run", () => {
         "utf8",
       );
       const specPath = path.join(tmp, "arr.tool.json");
-      await fsp.writeFile(
-        specPath,
-        JSON.stringify(
-          {
-            tool: { name: "arr" },
-            command: {
-              package: "io.example",
-              exec: "tool",
-              parameters: {
-                ids: { path: "$.ids", type: "array", position: 1, collectionStyle: "repeatArg" },
-                tag: {
-                  path: "$.tags",
-                  type: "array",
-                  flag: true,
-                  flagName: "--tag",
-                  collectionStyle: "repeatFlag",
-                },
-                labels: {
-                  path: "$.labels",
-                  type: "array",
-                  flag: true,
-                  flagName: "--labels",
-                  collectionStyle: "csv",
-                  csvSeparator: ";",
-                },
-                opts: { path: "$.opts", type: "object", flag: true, collectionStyle: "kv" },
-              },
-              stdoutTransform: { shell: "jq -c .", format: "ndjson" },
+      const spec = defineToolSpec({
+        specVersion: "1.0.0",
+        jsonPathDialect: "jsonpath-plus@8",
+        schemaDialect: "https://json-schema.org/draft/2020-12/schema",
+        tool: { name: "arr" },
+        command: {
+          package: "io.example",
+          exec: "tool",
+          parameters: {
+            ids: { path: "$.ids", type: "array", position: 1, collectionStyle: "repeatArg" },
+            tag: {
+              path: "$.tags",
+              type: "array",
+              flag: true,
+              flagName: "--tag",
+              collectionStyle: "repeatFlag",
             },
+            labels: {
+              path: "$.labels",
+              type: "array",
+              flag: true,
+              flagName: "--labels",
+              collectionStyle: "csv",
+              csvSeparator: ";",
+            },
+            opts: { path: "$.opts", type: "object", flag: true, collectionStyle: "kv" },
           },
-          null,
-          2,
-        ),
-        "utf8",
-      );
+          stdoutTransform: { shell: "jq -c .", format: "ndjson" },
+        },
+      });
+      await fsp.writeFile(specPath, JSON.stringify(spec, null, 2), "utf8");
       const inv = path.join(tmp, "inv.json");
       await fsp.writeFile(
         inv,

@@ -3,6 +3,7 @@ import { describe, test } from "node:test";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runInTemp } from "./lib/test-helpers";
+import { defineToolSpec } from "../json-cli/spec";
 
 describe("json-cli PR3 stdoutTransform + validation", () => {
   test("ndjson output validated and streamed", async () => {
@@ -28,30 +29,26 @@ console.log('{"ok":2}');
       await $`chmod +x ${toolPath}`;
 
       const specPath = path.join(tmp, "echo.tool.json");
-      await fsp.writeFile(
-        specPath,
-        JSON.stringify(
-          {
-            tool: {
-              name: "echo",
-              outputSchema: {
-                type: "object",
-                properties: { ok: { type: "number" } },
-                required: ["ok"],
-              },
-            },
-            command: {
-              package: "io.example",
-              exec: toolPath,
-              parameters: {},
-              stdoutTransform: { shell: "jq -c .", format: "ndjson" },
-            },
+      const spec = defineToolSpec({
+        specVersion: "1.0.0",
+        jsonPathDialect: "jsonpath-plus@8",
+        schemaDialect: "https://json-schema.org/draft/2020-12/schema",
+        tool: {
+          name: "echo",
+          outputSchema: {
+            type: "object",
+            properties: { ok: { type: "number" } },
+            required: ["ok"],
           },
-          null,
-          2,
-        ),
-        "utf8",
-      );
+        },
+        command: {
+          package: "io.example",
+          exec: toolPath,
+          parameters: {},
+          stdoutTransform: { shell: "jq -c .", format: "ndjson" },
+        },
+      });
+      await fsp.writeFile(specPath, JSON.stringify(spec, null, 2), "utf8");
 
       const out = await $({ stdio: "pipe" })`json-cli io.example.echo`;
       const lines = String(out.stdout).trim().split(/\n+/);
@@ -82,30 +79,26 @@ console.log('{"notOk":true}');
       await $`chmod +x ${toolPath}`;
 
       const specPath = path.join(tmp, "echo1.tool.json");
-      await fsp.writeFile(
-        specPath,
-        JSON.stringify(
-          {
-            tool: {
-              name: "echo1",
-              outputSchema: {
-                type: "object",
-                properties: { ok: { type: "number" } },
-                required: ["ok"],
-              },
-            },
-            command: {
-              package: "io.example",
-              exec: toolPath,
-              parameters: {},
-              stdoutTransform: { shell: "jq -c .", format: "json" },
-            },
+      const spec = defineToolSpec({
+        specVersion: "1.0.0",
+        jsonPathDialect: "jsonpath-plus@8",
+        schemaDialect: "https://json-schema.org/draft/2020-12/schema",
+        tool: {
+          name: "echo1",
+          outputSchema: {
+            type: "object",
+            properties: { ok: { type: "number" } },
+            required: ["ok"],
           },
-          null,
-          2,
-        ),
-        "utf8",
-      );
+        },
+        command: {
+          package: "io.example",
+          exec: toolPath,
+          parameters: {},
+          stdoutTransform: { shell: "jq -c .", format: "json" },
+        },
+      });
+      await fsp.writeFile(specPath, JSON.stringify(spec, null, 2), "utf8");
 
       let failed = false;
       try {
