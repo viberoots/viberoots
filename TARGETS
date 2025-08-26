@@ -25,3 +25,9 @@ zx_test(
     script = "tools/tests/linting.test.ts",
     out = "linting.stamp",
 )
+
+zx_test(
+    name = "json_cli_skeleton",
+    script = "tools/tests/json-cli.skeleton.test.ts",
+    out = "json_cli_skeleton.stamp",
+)
