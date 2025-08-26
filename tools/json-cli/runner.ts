@@ -1,5 +1,8 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { spawn } from "node:child_process";
+import readline from "node:readline";
+import Ajv from "ajv";
 
 type CliOpts = {
   help: boolean;
@@ -20,7 +23,7 @@ type RootConfig = {
 };
 
 type ToolSpec = {
-  tool?: { name?: string };
+  tool?: { name?: string; outputSchema?: any };
   command?: {
     package?: string;
     exec?: string;
@@ -128,8 +131,8 @@ export async function main(argv: string[]): Promise<number | void> {
     return 0;
   }
 
-  console.error("json-cli: execution not implemented yet");
-  return 78;
+  const code = await runWithStdoutTransform(rootDir, specPath, spec, argvBuilt, rootCfg);
+  return code;
 }
 
 function parseArgs(argv: string[]): CliOpts {
@@ -466,6 +469,103 @@ function mergeEnv(rootCfg: RootConfig, spec: ToolSpec): Record<string, string> {
   for (const [k, v] of Object.entries(rootCfg.env || {})) env[k] = v;
   for (const [k, v] of Object.entries(spec.command?.env || {})) env[k] = v;
   return env;
+}
+
+async function runWithStdoutTransform(
+  rootDir: string,
+  specPath: string,
+  spec: ToolSpec,
+  argv: string[],
+  rootCfg: RootConfig,
+): Promise<number> {
+  const cwd = resolveWorkingDir(rootDir, specPath, spec);
+  const env = mergeEnv(rootCfg, spec);
+
+  const cmd = spawn(spec.command!.exec as string, argv, {
+    cwd,
+    env,
+    stdio: ["ignore", "pipe", "pipe"],
+    detached: false,
+  });
+
+  const st = spec.command?.stdoutTransform;
+  if (!st || !st.shell || !st.format) {
+    console.error("json-cli: stdoutTransform with shell and format is required");
+    cmd.kill("SIGTERM");
+    return 78;
+  }
+
+  const p2 = spawn("/bin/sh", ["-c", `set -euo pipefail; ${st.shell}`], {
+    cwd,
+    env,
+    stdio: ["pipe", "pipe", "pipe"],
+    detached: false,
+  });
+
+  // Wire stderr passthrough
+  cmd.stderr.pipe(process.stderr, { end: false });
+  p2.stderr.pipe(process.stderr, { end: false });
+
+  // Pipe cmd stdout into transform stdin
+  cmd.stdout.pipe(p2.stdin);
+
+  // Output validation
+  const ajv = new Ajv({ allErrors: false, strict: false });
+  const schema = spec.tool?.outputSchema;
+  const validate = schema ? ajv.compile(schema) : null;
+
+  let exitCode = 0;
+  if (st.format === "ndjson") {
+    const rl = readline.createInterface({ input: p2.stdout });
+    for await (const line of rl) {
+      const s = String(line);
+      if (s.trim() === "") continue;
+      try {
+        const obj = JSON.parse(s);
+        if (validate && !validate(obj)) {
+          process.stderr.write(
+            `json-cli: invalid output item: ${JSON.stringify(validate.errors?.[0] || {})}\n`,
+          );
+          // Continue streaming; drop invalid item
+          continue;
+        }
+        process.stdout.write(s + "\n");
+      } catch {
+        process.stderr.write("json-cli: invalid NDJSON line (not JSON)\n");
+        exitCode = exitCode || 65;
+      }
+    }
+  } else if (st.format === "json") {
+    const chunks: Buffer[] = [];
+    for await (const chunk of p2.stdout) chunks.push(Buffer.from(chunk));
+    const buf = Buffer.concat(chunks).toString("utf8");
+    try {
+      const obj = JSON.parse(buf);
+      if (validate && !validate(obj)) {
+        process.stderr.write(
+          `json-cli: invalid output: ${JSON.stringify(validate.errors?.[0] || {})}\n`,
+        );
+        exitCode = exitCode || 1;
+      }
+      process.stdout.write(buf);
+    } catch {
+      process.stderr.write("json-cli: stdoutTransform did not emit valid JSON\n");
+      exitCode = exitCode || 65;
+    }
+  } else {
+    process.stderr.write("json-cli: unknown stdoutTransform.format\n");
+    exitCode = 78;
+  }
+
+  // Await processes end
+  const [cCode, p2Code] = await Promise.all([
+    new Promise<number>((res) => cmd.on("exit", (code) => res(code ?? 0))),
+    new Promise<number>((res) => p2.on("exit", (code) => res(code ?? 0))),
+  ]);
+
+  if (cCode !== 0) exitCode = exitCode || cCode;
+  if (p2Code !== 0) exitCode = exitCode || p2Code;
+  return exitCode || 0;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
