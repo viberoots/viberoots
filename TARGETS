@@ -3,9 +3,21 @@
 load("//tools/buck:zx_test.bzl", "zx_test")
 
 zx_test(
-    name = "scaffolding",
-    script = "tools/tests/scaffolding.test.ts",
-    out = "scaffolding.stamp",
+    name = "scaffolding_smoke",
+    script = "tools/tests/scaffolding.smoke.test.ts",
+    out = "scaffolding_smoke.stamp",
+)
+
+zx_test(
+    name = "scaffolding_help",
+    script = "tools/tests/scaffolding.help.test.ts",
+    out = "scaffolding_help.stamp",
+)
+
+zx_test(
+    name = "scaffolding_e2e",
+    script = "tools/tests/scaffolding.e2e.test.ts",
+    out = "scaffolding_e2e.stamp",
 )
 
 zx_test(
