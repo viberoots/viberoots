@@ -621,10 +621,15 @@ async function runWithTransforms(
     const format = stIn!.format;
     if (format === "ndjson") {
       const rlIn = readline.createInterface({ input: p1.stdout });
+      let firstLineSeen = false;
       (async () => {
         for await (const line of rlIn) {
-          const s = String(line);
+          let s = String(line);
           if (s.trim() === "") continue;
+          if (!firstLineSeen) {
+            firstLineSeen = true;
+            if (s.charCodeAt(0) === 0xfeff) s = s.slice(1);
+          }
           try {
             JSON.parse(s);
             cmd.stdin.write(s + "\n");
@@ -645,7 +650,8 @@ async function runWithTransforms(
       (async () => {
         const chunks: Buffer[] = [];
         for await (const chunk of p1.stdout) chunks.push(Buffer.from(chunk));
-        const buf = Buffer.concat(chunks).toString("utf8");
+        let buf = Buffer.concat(chunks).toString("utf8");
+        if (buf.charCodeAt(0) === 0xfeff) buf = buf.slice(1);
         try {
           JSON.parse(buf);
           cmd.stdin.write(buf);
@@ -678,9 +684,14 @@ async function runWithTransforms(
   let stdoutConfigError = false;
   if (st.format === "ndjson") {
     const rl = readline.createInterface({ input: p2.stdout });
+    let firstLineSeen = false;
     for await (const line of rl) {
-      const s = String(line);
+      let s = String(line);
       if (s.trim() === "") continue;
+      if (!firstLineSeen) {
+        firstLineSeen = true;
+        if (s.charCodeAt(0) === 0xfeff) s = s.slice(1);
+      }
       try {
         const obj = JSON.parse(s);
         if (validate && !validate(obj)) {
@@ -705,7 +716,8 @@ async function runWithTransforms(
   } else if (st.format === "json") {
     const chunks: Buffer[] = [];
     for await (const chunk of p2.stdout) chunks.push(Buffer.from(chunk));
-    const buf = Buffer.concat(chunks).toString("utf8");
+    let buf = Buffer.concat(chunks).toString("utf8");
+    if (buf.charCodeAt(0) === 0xfeff) buf = buf.slice(1);
     try {
       const obj = JSON.parse(buf);
       if (validate && !validate(obj)) {

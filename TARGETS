@@ -73,3 +73,9 @@ zx_test(
     script = "tools/tests/json-cli.exit-precedence.test.ts",
     out = "json_cli_exit_precedence.stamp",
 )
+
+zx_test(
+    name = "json_cli_tolerance",
+    script = "tools/tests/json-cli.tolerance.test.ts",
+    out = "json_cli_tolerance.stamp",
+)
