@@ -97,3 +97,9 @@ zx_test(
     script = "tools/tests/json-cli.list-ux.test.ts",
     out = "json_cli_list_ux.stamp",
 )
+
+zx_test(
+    name = "json_cli_schema_jsonpath",
+    script = "tools/tests/json-cli.schema-jsonpath.test.ts",
+    out = "json_cli_schema_jsonpath.stamp",
+)

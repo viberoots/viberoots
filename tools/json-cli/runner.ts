@@ -368,10 +368,118 @@ async function buildIndex(rootDir: string, cfg: RootConfig): Promise<Map<string,
   return idx;
 }
 
+// Formal schema (from json-cli.md §12)
+const FORMAL_SCHEMA: any = {
+  type: "object",
+  required: ["specVersion", "tool", "command"],
+  properties: {
+    tool: {
+      type: "object",
+      required: ["name"],
+      properties: {
+        name: { type: "string" },
+        title: { type: "string" },
+        description: { type: "string" },
+        inputSchema: { type: "object" },
+        outputSchema: { type: "object" },
+      },
+      additionalProperties: false,
+    },
+    command: {
+      type: "object",
+      required: ["package", "exec", "parameters", "stdoutTransform"],
+      properties: {
+        package: { type: "string" },
+        exec: { type: "string" },
+        workingDir: { type: "string" },
+        env: { type: "object", additionalProperties: { type: "string" } },
+        defaultBooleanStyle: { type: "string", enum: ["presence", "equals"], default: "presence" },
+        timeoutMs: { type: "integer", minimum: 1 },
+        parameters: {
+          type: "object",
+          additionalProperties: {
+            allOf: [
+              {
+                type: "object",
+                properties: {
+                  path: { type: "string" },
+                  value: { type: "string" },
+                  type: {
+                    type: "string",
+                    enum: ["string", "number", "boolean", "array", "object"],
+                  },
+                  required: { type: "boolean" },
+                  default: {},
+                  position: { type: "integer", minimum: 1 },
+                  flag: { type: "boolean" },
+                  flagName: { type: "string" },
+                  booleanStyle: { type: "string", enum: ["presence", "equals"] },
+                  collectionStyle: {
+                    type: "string",
+                    enum: ["repeatArg", "repeatFlag", "csv", "kv", "separate"],
+                  },
+                  csvSeparator: { type: "string", maxLength: 1 },
+                },
+                oneOf: [{ required: ["path", "type"] }, { required: ["value", "type"] }],
+              },
+              {
+                if: { properties: { flag: { const: true } } },
+                then: { required: ["flagName"] },
+              },
+            ],
+          },
+        },
+        stdinTransform: {
+          type: "object",
+          properties: {
+            shell: { type: "string" },
+            format: { type: "string", enum: ["ndjson", "json"] },
+          },
+          additionalProperties: false,
+        },
+        stdoutTransform: {
+          type: "object",
+          required: ["shell", "format"],
+          properties: {
+            shell: { type: "string" },
+            format: { type: "string", enum: ["ndjson", "json"] },
+          },
+          additionalProperties: false,
+        },
+        onValidationFailure: {
+          type: "object",
+          properties: { shell: { type: "string" } },
+          required: ["shell"],
+          additionalProperties: false,
+        },
+      },
+      additionalProperties: false,
+    },
+    specVersion: { type: "string", const: "1.0.0" },
+    jsonPathDialect: { type: "string", const: "jsonpath-plus@8" },
+    schemaDialect: { type: "string", const: "https://json-schema.org/draft/2020-12/schema" },
+  },
+  additionalProperties: false,
+};
+
+let ajvFormal: Ajv | null = null;
+let validateFormal: ((data: any) => boolean) | null = null;
+function ensureFormalValidator() {
+  if (!ajvFormal) {
+    ajvFormal = new Ajv({ allErrors: false, strict: false });
+    validateFormal = ajvFormal.compile(FORMAL_SCHEMA);
+  }
+}
+
 async function readSpec(p: string): Promise<ToolSpec | null> {
   try {
     const txt = await fsp.readFile(p, "utf8");
     const obj = JSON.parse(txt);
+    ensureFormalValidator();
+    if (validateFormal && !validateFormal(obj)) {
+      const msg = JSON.stringify((validateFormal as any).errors?.[0] || {});
+      throw new Error(`json-cli: invalid spec at ${p}: ${msg}`);
+    }
     return obj as ToolSpec;
   } catch {
     return null;
@@ -443,7 +551,7 @@ function resolveParamValue(ps: ParameterSpec, invObj: any): any {
   if (ps.path && ps.value) throw new Error("parameter cannot have both path and value");
   let v: any = undefined;
   if (ps.path) {
-    v = extractBySimpleJsonPath(invObj, ps.path);
+    v = evaluateJsonPath(invObj, ps.path);
   } else if (ps.value !== undefined) {
     v = ps.value;
   }
@@ -451,26 +559,88 @@ function resolveParamValue(ps: ParameterSpec, invObj: any): any {
   return v;
 }
 
-function extractBySimpleJsonPath(obj: any, pathExpr: string): any {
-  if (!pathExpr.startsWith("$")) return undefined;
-  let cur: any = obj;
-  const trimmed = pathExpr.replace(/^\$[.]/, "");
-  if (trimmed === "" || trimmed === "$") return cur;
-  const parts = trimmed.split(".");
-  for (const part of parts) {
-    if (part === "") continue;
-    const m = part.match(/^(\w+)(\[(\d+)\])?$/);
-    if (!m) return undefined;
-    const key = m[1];
-    if (cur == null || typeof cur !== "object" || !(key in cur)) return undefined;
-    cur = (cur as any)[key];
-    if (m[3] !== undefined) {
-      const idx = Number(m[3]);
-      if (!Array.isArray(cur) || idx < 0 || idx >= cur.length) return undefined;
-      cur = cur[idx];
+// Minimal JSONPath evaluator supporting: $.a.b, .*, [index], [*], [i,j], [start:end]
+function evaluateJsonPath(root: any, expr: string): any {
+  if (!expr || expr[0] !== "$") return undefined;
+  let i = 1; // after $
+  let current: any[] = [root];
+
+  function takeDotSegment(): string | null {
+    if (expr[i] !== ".") return null;
+    i++;
+    if (expr[i] === "*") {
+      i++;
+      return "*";
     }
+    let start = i;
+    while (i < expr.length && /[A-Za-z0-9_]/.test(expr[i])) i++;
+    return expr.slice(start, i) || null;
   }
-  return cur;
+  function takeBracket(): string | null {
+    if (expr[i] !== "[") return null;
+    let start = i;
+    while (i < expr.length && expr[i] !== "]") i++;
+    if (expr[i] !== "]") return null;
+    i++; // include ]
+    return expr.slice(start + 1, i - 1);
+  }
+
+  while (i < expr.length) {
+    const dot = takeDotSegment();
+    if (dot !== null) {
+      const next: any[] = [];
+      if (dot === "*") {
+        for (const v of current) {
+          if (v && typeof v === "object" && !Array.isArray(v)) next.push(...Object.values(v));
+        }
+      } else {
+        for (const v of current) {
+          if (v && typeof v === "object" && dot in v) next.push((v as any)[dot]);
+        }
+      }
+      current = next;
+      continue;
+    }
+    const br = takeBracket();
+    if (br !== null) {
+      const next: any[] = [];
+      const s = br.trim();
+      if (s === "*") {
+        for (const v of current) {
+          if (Array.isArray(v)) next.push(...v);
+        }
+      } else if (/^-?\d+$/.test(s)) {
+        const idx = Number(s);
+        for (const v of current) {
+          if (Array.isArray(v) && idx >= 0 && idx < v.length) next.push(v[idx]);
+        }
+      } else if (/^-?\d+\s*:\s*-?\d*$/.test(s)) {
+        const [a, b] = s.split(":");
+        const start = Number(a);
+        const end = b === "" ? undefined : Number(b);
+        for (const v of current) {
+          if (Array.isArray(v)) next.push(...v.slice(start, end));
+        }
+      } else if (/^-?\d+(\s*,\s*-?\d+)+$/.test(s)) {
+        const parts = s.split(",").map((x) => Number(x.trim()));
+        for (const v of current) {
+          if (Array.isArray(v)) {
+            for (const idx of parts) if (idx >= 0 && idx < v.length) next.push(v[idx]);
+          }
+        }
+      } else {
+        // unsupported subset (scripts/functions/unions of properties)
+        throw new Error(`json-cli: unsupported JSONPath segment: [${s}]`);
+      }
+      current = next;
+      continue;
+    }
+    // unsupported token
+    break;
+  }
+  if (current.length === 0) return undefined;
+  if (current.length === 1) return current[0];
+  return current;
 }
 
 function renderValueTokens(
