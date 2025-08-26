@@ -59,10 +59,18 @@
           '';
         });
 
+        # Limit inputs so node-modules changes only when dependency metadata changes
+        minimalSrc = pkgs.lib.cleanSourceWith {
+          src = ./.;
+          filter = path: type:
+            let base = pkgs.lib.baseNameOf path; in
+            base == "pnpm-lock.yaml" || base == "package.json" || base == "pnpm-workspace.yaml" || base == ".npmrc";
+        };
+
         node-modules = pkgs.stdenvNoCC.mkDerivation (let certs = pkgs.cacert; in {
           pname = "node-modules";
           version = "lock-${builtins.hashFile "sha256" ./pnpm-lock.yaml}";
-          inherit src;
+          src = minimalSrc;
           nativeBuildInputs = [ node pnpm ];
           unpackPhase = ''
             runHook preUnpack
