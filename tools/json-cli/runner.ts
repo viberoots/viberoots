@@ -1,8 +1,8 @@
+import Ajv from "ajv";
+import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { spawn } from "node:child_process";
 import readline from "node:readline";
-import Ajv from "ajv";
 
 type CliOpts = {
   help: boolean;
@@ -747,10 +747,48 @@ async function runWithTransforms(
     killer = setTimeout(() => terminateGroup(procs), timeoutMs);
   }
 
+  function waitProcess(
+    p: any,
+    stage: "stdinTransform" | "exec" | "stdoutTransform",
+  ): Promise<number> {
+    return new Promise<number>((res) => {
+      const onExit = (code: number | null) => {
+        cleanup();
+        res(code ?? 0);
+      };
+      const onError = (err: any) => {
+        // Map spawn failure to 69 and print diagnostics
+        try {
+          process.stderr.write(
+            `json-cli: failed to spawn ${stage}: ${String(err?.message || err)} (code=${err?.code || "ERR"})\n`,
+          );
+        } catch {}
+        try {
+          p.stdout?.destroy();
+        } catch {}
+        try {
+          p.stderr?.destroy();
+        } catch {}
+        cleanup();
+        res(69);
+      };
+      const cleanup = () => {
+        try {
+          p.off("exit", onExit);
+        } catch {}
+        try {
+          p.off("error", onError);
+        } catch {}
+      };
+      p.on("exit", onExit);
+      p.on("error", onError);
+    });
+  }
+
   const [p1Code, cCode, p2Code] = await Promise.all([
-    p1 ? new Promise<number>((res) => p1.on("exit", (code) => res(code ?? 0))) : Promise.resolve(0),
-    new Promise<number>((res) => cmd.on("exit", (code) => res(code ?? 0))),
-    new Promise<number>((res) => p2.on("exit", (code) => res(code ?? 0))),
+    p1 ? waitProcess(p1, "stdinTransform") : Promise.resolve(0),
+    waitProcess(cmd, "exec"),
+    waitProcess(p2, "stdoutTransform"),
   ]);
 
   if (killer) clearTimeout(killer);

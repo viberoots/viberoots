@@ -79,3 +79,9 @@ zx_test(
     script = "tools/tests/json-cli.tolerance.test.ts",
     out = "json_cli_tolerance.stamp",
 )
+
+zx_test(
+    name = "json_cli_spawn_failure",
+    script = "tools/tests/json-cli.spawn-failure.test.ts",
+    out = "json_cli_spawn_failure.stamp",
+)
