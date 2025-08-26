@@ -192,7 +192,7 @@ async function runPostSteps(dest: string) {
   const goMod = path.join(dest, "go.mod");
   if (await exists(goMod)) {
     try {
-      await $`bash -lc 'cd ${dest} && go fmt ./... || true && go mod tidy || true'`;
+      await $`bash -c 'cd ${dest} && go fmt ./... || true && go mod tidy || true'`;
     } catch {
       // Non-fatal; post-steps are best-effort
     }

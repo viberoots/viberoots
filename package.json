@@ -14,7 +14,8 @@
     "lint": "eslint . --ext .ts --max-warnings=0 --ignore-pattern .tmp --ignore-pattern coverage --ignore-pattern .clinic",
     "lint:fix": "eslint . --ext .ts --fix",
     "prepare": "husky",
-    "coverage:summary": "tools/dev/coverage-summary.ts"
+    "coverage:summary": "tools/dev/coverage-summary.ts",
+    "test:cov": "buck2 test //... && c8 report --clean=false --temp-directory coverage/raw --reports-dir coverage --reporter=json-summary --reporter=lcov --reporter=html --extension .ts --allowExternal --all --src . --src .tmp"
   },
   "lint-staged": {
     "**/*.{ts,tsx}": [

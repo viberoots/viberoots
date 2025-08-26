@@ -1,6 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-TARGET="${SCRIPT_DIR}/../scaffolding/scaf.ts"
+REPO_ROOT="${SCRIPT_DIR}/../.."
+# Prefer running the source from the original workspace root if provided (when executed from a temp copy)
+LIVE_ROOT="${WORKSPACE_ROOT:-$REPO_ROOT}"
+TARGET="${LIVE_ROOT}/tools/scaffolding/scaf.ts"
 
-exec "$TARGET" "$@"
+if [[ -z "${NODE_V8_COVERAGE:-}" ]]; then
+  export NODE_V8_COVERAGE="${REPO_ROOT}/coverage/raw"
+fi
+mkdir -p "${NODE_V8_COVERAGE}"
+
+exec "${NODE_BIN:-node}" \
+  --experimental-top-level-await \
+  --disable-warning=ExperimentalWarning \
+  --import tsx/esm \
+  --import "${LIVE_ROOT}/tools/dev/zx-init.mjs" \
+  "$TARGET" "$@"
