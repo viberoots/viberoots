@@ -103,3 +103,9 @@ zx_test(
     script = "tools/tests/json-cli.schema-jsonpath.test.ts",
     out = "json_cli_schema_jsonpath.stamp",
 )
+
+zx_test(
+    name = "json_cli_handler_timeout",
+    script = "tools/tests/json-cli.handler-timeout.test.ts",
+    out = "json_cli_handler_timeout.stamp",
+)

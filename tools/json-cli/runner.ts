@@ -925,7 +925,12 @@ async function runWithTransforms(
   let killer: NodeJS.Timeout | null = null;
   const timeoutMs = spec.command?.timeoutMs;
   if (timeoutMs && timeoutMs > 0) {
-    killer = setTimeout(() => terminateGroup(procs), timeoutMs);
+    killer = setTimeout(() => {
+      try {
+        (sink as any)?.endInput?.();
+      } catch {}
+      terminateGroup(procs);
+    }, timeoutMs);
   }
 
   function waitProcess(
@@ -998,7 +1003,12 @@ function openFailureSink(
   specPath: string,
   spec: ToolSpec,
   rootCfg: RootConfig,
-): { write: (obj: any) => Promise<void>; close: () => Promise<void> } | null {
+): {
+  write: (obj: any) => Promise<void>;
+  close: () => Promise<void>;
+  proc: any;
+  endInput: () => void;
+} | null {
   const of = spec.command?.onValidationFailure;
   if (!of || !of.shell) return null;
   const cwd = resolveWorkingDir(rootDir, specPath, spec);
@@ -1007,7 +1017,7 @@ function openFailureSink(
     cwd,
     env,
     stdio: ["pipe", "ignore", "pipe"],
-    detached: false,
+    detached: true,
   });
   p.stderr.pipe(process.stderr, { end: false });
   const write = async (obj: any) => {
@@ -1015,13 +1025,16 @@ function openFailureSink(
       p.stdin.write(JSON.stringify(obj) + "\n");
     } catch {}
   };
-  const close = async () => {
+  const endInput = () => {
     try {
       p.stdin.end();
     } catch {}
+  };
+  const close = async () => {
+    endInput();
     await new Promise<void>((res) => p.on("exit", () => res())).catch(() => undefined);
   };
-  return { write, close };
+  return { write, close, proc: p, endInput };
 }
 
 function terminateGroup(procs: any[]) {
