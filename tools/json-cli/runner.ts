@@ -66,7 +66,13 @@ export async function main(argv: string[]): Promise<number | void> {
   const rootCfg = await readRootConfig(rootDir);
 
   if (opts.list) {
-    const idx = await buildIndex(rootDir, rootCfg);
+    let idx: Map<string, string>;
+    try {
+      idx = await buildIndex(rootDir, rootCfg);
+    } catch (e: any) {
+      console.error(String(e?.message || e));
+      return 78;
+    }
     for (const [fq, p] of idx) {
       console.log(`${fq}\t${p}`);
     }
@@ -74,7 +80,17 @@ export async function main(argv: string[]): Promise<number | void> {
   }
 
   if (opts.where) {
-    const idx = await buildIndex(rootDir, rootCfg);
+    let idx: Map<string, string>;
+    try {
+      idx = await buildIndex(rootDir, rootCfg);
+    } catch (e: any) {
+      console.error(String(e?.message || e));
+      return 78;
+    }
+    if (!opts.where.includes(".") && !rootCfg.defaultPackage) {
+      console.error("json-cli: config error — bare name requires .json-cli.defaultPackage");
+      return 78;
+    }
     const fq = resolveToolRef(opts.where, rootCfg);
     const hit = idx.get(fq);
     if (!hit) {
@@ -89,7 +105,17 @@ export async function main(argv: string[]): Promise<number | void> {
     printHelp("missing <toolRef>");
     return 2;
   }
-  const index = await buildIndex(rootDir, rootCfg);
+  if (!opts.toolRef.includes(".") && !rootCfg.defaultPackage) {
+    console.error("json-cli: config error — bare name requires .json-cli.defaultPackage");
+    return 78;
+  }
+  let index: Map<string, string>;
+  try {
+    index = await buildIndex(rootDir, rootCfg);
+  } catch (e: any) {
+    console.error(String(e?.message || e));
+    return 78;
+  }
   const fqTool = resolveToolRef(opts.toolRef, rootCfg);
   const specPath = index.get(fqTool);
   if (!specPath) {
@@ -240,6 +266,9 @@ async function readRootConfig(rootDir: string): Promise<RootConfig> {
       if (typeof obj.defaultPackage === "string") cfg.defaultPackage = obj.defaultPackage;
       if (Array.isArray(obj.ignore))
         cfg.ignore = obj.ignore.filter((x: any) => typeof x === "string");
+      if (Array.isArray(obj.globs)) cfg.globs = obj.globs.filter((x: any) => typeof x === "string");
+      if (Array.isArray(obj.excludeGlobs))
+        cfg.excludeGlobs = obj.excludeGlobs.filter((x: any) => typeof x === "string");
       if (obj.env && typeof obj.env === "object") {
         const env: Record<string, string> = {};
         for (const [k, v] of Object.entries(obj.env)) {
@@ -271,6 +300,11 @@ async function buildIndex(rootDir: string, cfg: RootConfig): Promise<Map<string,
     "dist/",
     ...(cfg.ignore ?? []),
   ]);
+  const includeGlobs = cfg.globs && cfg.globs.length > 0 ? cfg.globs : ["**/*.tool.json"];
+  const excludeGlobs = cfg.excludeGlobs || [];
+
+  const includeRes = includeGlobs.map(globToRegExp);
+  const excludeRes = excludeGlobs.map(globToRegExp);
 
   async function walk(dir: string) {
     const ents = await fsp.readdir(dir, { withFileTypes: true }).catch(() => [] as any);
@@ -287,12 +321,25 @@ async function buildIndex(rootDir: string, cfg: RootConfig): Promise<Map<string,
         }
         if (!skip) await walk(p);
       } else if (ent.isFile() && ent.name.endsWith(".tool.json")) {
+        const relFile = path.relative(rootDir, p).replace(/\\/g, "/");
+        const included = includeRes.some((re) => re.test(relFile));
+        const excluded = excludeRes.some((re) => re.test(relFile));
+        if (!included || excluded) continue;
         const spec = await readSpec(p);
         const fq =
           spec && spec.command?.package && spec.tool?.name
             ? `${spec.command.package}.${spec.tool.name}`
             : null;
-        if (fq && !idx.has(fq)) idx.set(fq, p);
+        if (fq) {
+          if (idx.has(fq)) {
+            throw new Error(
+              `json-cli: config error — duplicate tool FQName '${fq}' found in:\n  - ${idx.get(
+                fq,
+              )}\n  - ${p}`,
+            );
+          }
+          idx.set(fq, p);
+        }
       }
     }
   }
@@ -496,6 +543,15 @@ function mergeEnv(rootCfg: RootConfig, spec: ToolSpec): Record<string, string> {
   for (const [k, v] of Object.entries(rootCfg.env || {})) env[k] = v;
   for (const [k, v] of Object.entries(spec.command?.env || {})) env[k] = v;
   return env;
+}
+
+function globToRegExp(glob: string): RegExp {
+  // very small glob: **, *, and literal dots/slashes
+  let g = glob.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+  g = g.replace(/\\\\/g, "/");
+  g = g.replace(/\*\*/g, ".*?");
+  g = g.replace(/\*/g, "[^/]*?");
+  return new RegExp("^" + g + "$");
 }
 
 async function runWithTransforms(
