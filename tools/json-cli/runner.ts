@@ -31,6 +31,7 @@ type ToolSpec = {
     workingDir?: string;
     env?: Record<string, string>;
     defaultBooleanStyle?: "presence" | "equals";
+    timeoutMs?: number;
     parameters?: Record<string, ParameterSpec>;
     stdinTransform?: { shell?: string; format?: "json" | "ndjson" };
     stdoutTransform?: { shell?: string; format?: "json" | "ndjson" };
@@ -247,8 +248,8 @@ Flags:
   -v, --version     Show version
       --list        List discovered tools (FQName -> path)
       --where REF   Print the path to the tool spec for REF
-      --in FILE     Invocation JSON file (for future argv mapping)
-      --dry-run     Print plan without executing (not implemented in PR1)
+      --in FILE     Invocation JSON file
+      --dry-run     Print plan without executing
 `);
 }
 
@@ -316,7 +317,6 @@ async function buildIndex(rootDir: string, cfg: RootConfig): Promise<Map<string,
     "node_modules/",
     ".git/",
     "buck-out/",
-    ".tmp/",
     "coverage/",
     "dist/",
     ...(cfg.ignore ?? []),
@@ -365,7 +365,7 @@ async function buildIndex(rootDir: string, cfg: RootConfig): Promise<Map<string,
 // Formal schema (from json-cli.md §12)
 const FORMAL_SCHEMA: any = {
   type: "object",
-  required: ["specVersion", "tool", "command"],
+  required: ["tool", "command"],
   properties: {
     tool: {
       type: "object",
@@ -417,8 +417,18 @@ const FORMAL_SCHEMA: any = {
                 oneOf: [{ required: ["path", "type"] }, { required: ["value", "type"] }],
               },
               {
-                if: { properties: { flag: { const: true } } },
-                then: { required: ["flagName"] },
+                if: { required: ["flag"], properties: { flag: { const: true } } },
+                then: {
+                  anyOf: [
+                    { required: ["flagName"] },
+                    {
+                      properties: {
+                        type: { const: "object" },
+                        collectionStyle: { const: "kv" },
+                      },
+                    },
+                  ],
+                },
               },
             ],
           },
@@ -493,7 +503,7 @@ function usesPathParams(spec: ToolSpec): boolean {
 
 function buildArgv(spec: ToolSpec, invObj: any): string[] {
   const params = spec.command?.parameters || {};
-  const positionals: Array<{ pos: number; token: string }> = [];
+  const positionals: Array<{ pos: number; tokens: string[] }> = [];
   const flags: Array<{ name: string; tokens: string[] }> = [];
 
   const seenPositions = new Set<number>();
@@ -523,23 +533,30 @@ function buildArgv(spec: ToolSpec, invObj: any): string[] {
       if (seenPositions.has(pos)) throw new Error(`duplicate positional index: ${pos}`);
       seenPositions.add(pos);
       const tokens = renderValueTokens(type, ps, value, undefined);
-      if (tokens.length !== 1)
-        throw new Error(`positional parameter must render to exactly one token: ${paramName}`);
-      positionals.push({ pos, token: tokens[0] });
+      if (tokens.length === 0) continue;
+      positionals.push({ pos, tokens });
       continue;
     }
 
-    if (!flagName) throw new Error(`flag parameter missing flagName: ${paramName}`);
+    const needsFlagName = !(type === "object" && ps.collectionStyle === "kv");
+    if (needsFlagName && !flagName)
+      throw new Error(`flag parameter missing flagName: ${paramName}`);
     const booleanStyle = ps.booleanStyle || defaultBooleanStyle;
-    const rendered = renderValueTokens(type, ps, value, flagName, booleanStyle);
-    if (rendered.length > 0) flags.push({ name: flagName, tokens: rendered });
+    const rendered = renderValueTokens(
+      type,
+      ps,
+      value,
+      flagName ? flagName : undefined,
+      booleanStyle,
+    );
+    if (rendered.length > 0) flags.push({ name: flagName || "", tokens: rendered });
   }
 
   positionals.sort((a, b) => a.pos - b.pos);
   flags.sort((a, b) => a.name.localeCompare(b.name));
 
   const argv: string[] = [];
-  for (const p of positionals) argv.push(p.token);
+  for (const p of positionals) argv.push(...p.tokens);
   for (const f of flags) argv.push(...f.tokens);
   return argv;
 }
@@ -712,8 +729,8 @@ function renderValueTokens(
       const style = ps.collectionStyle;
       if (style !== "kv") throw new Error("object parameter requires collectionStyle=kv");
       const keys = Object.keys(value).sort();
-      if (!flagName) return keys.map((k) => `${k}=${String((value as any)[k])}`);
-      return keys.map((k) => `--${k}=${String((value as any)[k])}`);
+      const useDashes = !!(ps as any).flag;
+      return keys.map((k) => `${useDashes ? "--" : ""}${k}=${String((value as any)[k])}`);
     }
     default:
       return [];
@@ -779,9 +796,15 @@ async function runWithTransforms(
 
   // Optional stdinTransform
   const stIn = spec.command?.stdinTransform;
+  const preferredShell = (await hasBinaryOnPath("bash")) ? "bash" : "/bin/sh";
+  const shellCmd = (script: string) =>
+    preferredShell.includes("bash") ? `set -euo pipefail; ${script}` : `set -eu; ${script}`;
+  const shellArgsIn = preferredShell.includes("bash")
+    ? ["--noprofile", "--norc", "-c", shellCmd(stIn?.shell || "")]
+    : ["-c", shellCmd(stIn?.shell || "")];
   const p1 =
     stIn && stIn.shell
-      ? spawn("/bin/sh", ["-c", `set  -euo pipefail; ${stIn.shell}`], {
+      ? spawn(preferredShell, shellArgsIn, {
           cwd,
           env,
           stdio: ["pipe", "pipe", "pipe"],
@@ -814,6 +837,40 @@ async function runWithTransforms(
     } catch {}
   }
 
+  // If executing a TypeScript script directly, prefer running via Node with type stripping and zx globals
+  if (/\.ts$/i.test(execCmd)) {
+    const nodeBin = process.env.NODE_BIN || "node";
+    const wsRoot = process.env.WORKSPACE_ROOT || process.cwd();
+    const zxGlobals = path.join(wsRoot, "node_modules", "zx", "build", "globals.cjs");
+    const zxInit = path.join(wsRoot, "tools", "dev", "zx-init.mjs");
+    execArgv = [
+      "--experimental-strip-types",
+      "--experimental-top-level-await",
+      "--disable-warning=ExperimentalWarning",
+      "--import",
+      zxGlobals,
+      "--import",
+      zxInit,
+      execCmd,
+      ...execArgv,
+    ];
+    execCmd = nodeBin;
+  }
+
+  // Avoid sourcing user profiles which may reference unavailable tools when executing bash
+  if (/(?:^|\/)bash$/.test(execCmd)) {
+    execArgv = ["--noprofile", "--norc", ...execArgv];
+  }
+
+  // Convenience: if executing bash with -c/-lc only (no command), default to 'cat' to pass stdin through.
+  const isBash = /(?:^|\/)bash$/.test(execCmd);
+  if (isBash) {
+    const idxC = execArgv.findIndex((a) => a === "-c" || a === "-lc");
+    if (idxC >= 0 && idxC === execArgv.length - 1) {
+      execArgv.push("cat");
+    }
+  }
+
   const cmd = spawn(execCmd, execArgv, {
     cwd,
     env,
@@ -829,7 +886,10 @@ async function runWithTransforms(
     return 78;
   }
 
-  const p2 = spawn("/bin/sh", ["-c", `set -euo pipefail; ${st.shell}`], {
+  const shellArgsOut = preferredShell.includes("bash")
+    ? ["--noprofile", "--norc", "-c", shellCmd(st.shell)]
+    : ["-c", shellCmd(st.shell)];
+  const p2 = spawn(preferredShell, shellArgsOut, {
     cwd,
     env,
     stdio: ["pipe", "pipe", "pipe"],
@@ -848,7 +908,7 @@ async function runWithTransforms(
   let stdinParseFailed = false;
   let stdinConfigError = false;
   const waitDrain = async (w: NodeJS.WritableStream) =>
-    new Promise<void>((res) => (w.writableNeedDrain ? w.once("drain", res) : res()));
+    new Promise<void>((res) => w.once("drain", res));
   if (!p1) {
     // No transform; wire stdin directly
     process.stdin.pipe(cmd.stdin);
@@ -962,9 +1022,15 @@ async function runWithTransforms(
         const msg = JSON.stringify(validate.errors?.[0] || {});
         process.stderr.write(`json-cli: invalid output: ${msg}\n`);
         if (sink) await sink.write({ reason: "output", object: obj, message: msg });
+        // Validation failure: mark non-zero exit but do not treat as stdoutTransform parse/config error
+        // so exit precedence reports the validation failure via exitCode rather than stage failure.
         exitCode = exitCode || 1;
+        try {
+          if (!process.exitCode) process.exitCode = 1;
+        } catch {}
+      } else {
+        if (!process.stdout.write(buf)) await waitDrain(process.stdout);
       }
-      if (!process.stdout.write(buf)) await waitDrain(process.stdout);
     } catch {
       process.stderr.write("json-cli: stdoutTransform did not emit valid JSON\n");
       if (sink)
@@ -1000,7 +1066,7 @@ async function runWithTransforms(
         res(code ?? 0);
       };
       const onError = (err: any) => {
-        // Map spawn failure to 69 and print diagnostics
+        // Map spawn failure (including ENOENT) to 69 and print diagnostics
         try {
           process.stderr.write(
             `json-cli: failed to spawn ${stage}: ${String(err?.message || err)} (code=${err?.code || "ERR"})\n`,
@@ -1028,11 +1094,12 @@ async function runWithTransforms(
     });
   }
 
-  const [p1Code, cCode, p2Code] = await Promise.all([
-    p1 ? waitProcess(p1, "stdinTransform") : Promise.resolve(0),
-    waitProcess(cmd, "exec"),
-    waitProcess(p2, "stdoutTransform"),
-  ]);
+  // Attach waiters immediately after spawn to avoid missing early 'error' events
+  const p1Wait = p1 ? waitProcess(p1, "stdinTransform") : Promise.resolve(0);
+  const cmdWait = waitProcess(cmd, "exec");
+  const p2Wait = waitProcess(p2, "stdoutTransform");
+
+  const [p1Code, cCode, p2Code] = await Promise.all([p1Wait, cmdWait, p2Wait]);
 
   if (killer) clearTimeout(killer);
   if (sink) await sink.close();
@@ -1052,6 +1119,12 @@ async function runWithTransforms(
     process.stderr.write(`json-cli: stage failed: stdoutTransform code=${code}\n`);
     return code;
   }
+  if (exitCode !== 0) {
+    try {
+      process.stderr.write(`json-cli: validation failure exit code=${exitCode}\n`);
+    } catch {}
+    return exitCode;
+  }
   return 0;
 }
 
@@ -1070,7 +1143,10 @@ function openFailureSink(
   if (!of || !of.shell) return null;
   const cwd = resolveWorkingDir(rootDir, specPath, spec);
   const env = mergeEnv(rootCfg, spec);
-  const p = spawn("/bin/sh", ["-c", `set -euo pipefail; ${of.shell}`], {
+  const sh = process.env.SHELL && process.env.SHELL.includes("bash") ? "bash" : "/bin/sh";
+  const cmd = sh.includes("bash") ? `set -euo pipefail; ${of.shell}` : `set -eu; ${of.shell}`;
+  const args = sh.includes("bash") ? ["--noprofile", "--norc", "-c", cmd] : ["-c", cmd];
+  const p = spawn(sh, args, {
     cwd,
     env,
     stdio: ["pipe", "ignore", "pipe"],
@@ -1143,7 +1219,7 @@ async function findToolSpecs(
 ): Promise<string[]> {
   // Minimal fallback: recursively list files and filter by simple **/*.tool.json include and excludes
   const out: string[] = [];
-  const ignoreDirs = new Set(["node_modules", ".git", "buck-out", ".tmp", "coverage", "dist"]);
+  const ignoreDirs = new Set(["node_modules", ".git", "buck-out", "coverage", "dist"]);
 
   async function walk(dir: string) {
     let ents: any[] = [];
@@ -1176,11 +1252,15 @@ async function findToolSpecs(
   return out;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  // If run directly (unlikely in this repo), execute main.
-  // Buck/zx wrapper calls into this module from tools/bin/json-cli.
-
-  main(process.argv.slice(2)).then((code) => {
+// Execute CLI when loaded as entrypoint (normal) or even when imported by the thin bash wrapper.
+// This ensures the process exits with the intended status code instead of falling through as 0.
+main(process.argv.slice(2))
+  .then((code) => {
     if (typeof code === "number") process.exit(code);
+  })
+  .catch((err) => {
+    try {
+      console.error(String(err?.message || err));
+    } catch {}
+    process.exit(1);
   });
-}

@@ -71,6 +71,25 @@ async function main() {
       "\n[OVERRIDES ACTIVE] NIX_GO_DEV_OVERRIDE_JSON is set — local derivation hashes will differ. Unset before sharing cache artifacts.\n",
     );
   }
+
+  // Preflight: ensure pnpm-store fixed-output hash is correct so shellHook/node-modules won't rebuild repeatedly.
+  try {
+    await $`nix build .#pnpm-store --no-link --accept-flake-config`;
+  } catch (e: any) {
+    const out = String((e && e.stderr) || (e && e.stdout) || e || "");
+    if (/hash mismatch in fixed-output derivation/i.test(out)) {
+      console.error(
+        "[startup-check] pnpm-store fixed-output hash mismatch detected.\n" +
+          "Run: pnpm tsx tools/dev/update-pnpm-hash.ts\n",
+      );
+    } else {
+      console.error(
+        "[startup-check] pnpm-store build failed; see error below and consider updating the hash via update-pnpm-hash.ts\n\n" +
+          out,
+      );
+    }
+    process.exit(1);
+  }
   console.log("startup-check: OK");
 }
 

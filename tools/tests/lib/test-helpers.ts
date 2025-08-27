@@ -1,6 +1,42 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
+import { performance } from "node:perf_hooks";
+
+const ENABLE_TIMING = process.env.TEST_TIMING === "1";
+function logTiming(label: string, ms: number) {
+  if (!ENABLE_TIMING) return;
+  try {
+    console.error(`[timing] ${label}: ${ms.toFixed(1)}ms`);
+  } catch {}
+}
+async function timeAsync<T>(label: string, fn: () => Promise<T>): Promise<T> {
+  const t0 = performance.now();
+  try {
+    return await fn();
+  } finally {
+    logTiming(label, performance.now() - t0);
+  }
+}
+
+let preflightDone = false;
+async function ensurePnpmStoreHashValid() {
+  if (preflightDone) return;
+  preflightDone = true;
+  try {
+    await $`nix build .#pnpm-store --no-link --accept-flake-config`;
+  } catch (e: any) {
+    const out = String((e && e.stderr) || (e && e.stdout) || e || "");
+    const hint = "Run: pnpm tsx tools/dev/update-pnpm-hash.ts";
+    if (/hash mismatch in fixed-output derivation/i.test(out)) {
+      console.error(`test preflight: pnpm-store hash mismatch. ${hint}`);
+    } else {
+      console.error(`test preflight: pnpm-store build failed. ${hint}`);
+    }
+    process.exit(1);
+  }
+}
 
 async function rewriteCoverageUrls(tmpRoot: string) {
   try {
@@ -59,12 +95,13 @@ async function rewriteCoverageUrls(tmpRoot: string) {
 }
 
 export async function rsyncRepoTo(tmp: string) {
-  await $`rsync -a --exclude "buck-out" --exclude ".git" --exclude "libs" --exclude ".tmp" --exclude "node_modules" --exclude "coverage" --exclude ".clinic" ./ ${tmp}/`;
+  await timeAsync(`rsyncRepoTo(${path.basename(tmp)})`, async () => {
+    await $`rsync -a --exclude "buck-out" --exclude ".git" --exclude "libs" --exclude "node_modules" --exclude "coverage" --exclude ".clinic" ./ ${tmp}/`;
+  });
 }
 
 export async function mktemp(prefix = "test-") {
-  const base = path.join(process.cwd(), ".tmp");
-  await fsp.mkdir(base, { recursive: true });
+  const base = os.tmpdir();
   return await fsp.mkdtemp(path.join(base, prefix));
 }
 
@@ -81,19 +118,28 @@ export async function runInTemp<T>(
   name: string,
   fn: (tmp: string, $: any) => Promise<T>,
 ): Promise<T> {
+  const overallStart = performance.now();
   const tmp = await mktemp(name + "-");
   await rsyncRepoTo(tmp);
+  await ensurePnpmStoreHashValid();
   // Load direnv environment for the temp dir so devShell linking/PATH are active when available.
-  // If direnv is not present, skip altering the environment to preserve the parent devShell PATH.
-  const envOut = await $({
-    cwd: tmp,
-    stdio: "pipe",
-  })`bash -c 'if command -v direnv >/dev/null 2>&1; then direnv allow . >/dev/null 2>&1 || true; eval "$(direnv export bash)"; env -0; else printf ""; fi'`;
+  // If already in a nix dev shell, skip direnv to avoid redundant flake eval and shellHook.
+  const shouldUseDirenv = !process.env.IN_NIX_SHELL;
+  const envOut = shouldUseDirenv
+    ? await timeAsync(
+        `direnvExport(${path.basename(tmp)})`,
+        async () =>
+          $({
+            cwd: tmp,
+            stdio: "pipe",
+          })`bash -c 'if command -v direnv >/dev/null 2>&1; then direnv allow . >/dev/null 2>&1 || true; eval "$(direnv export bash)"; env -0; else printf ""; fi'`,
+      )
+    : ({ stdout: "" } as any);
   const exportEnv: Record<string, string> = {};
   for (const [k, v] of Object.entries(process.env)) {
     if (typeof v === "string") exportEnv[k] = v;
   }
-  const injected = String(envOut.stdout || "");
+  const injected = String((envOut as any).stdout || "");
   for (const entry of injected ? injected.split("\0") : []) {
     if (!entry) continue;
     const idx = entry.indexOf("=");
@@ -103,15 +149,30 @@ export async function runInTemp<T>(
       exportEnv[k] = v;
     }
   }
+  // Ensure module resolution inside temp can find repo's node_modules (for eslint plugins, etc.)
+  exportEnv.NODE_PATH = [path.join(process.cwd(), "node_modules"), exportEnv.NODE_PATH || ""]
+    .filter(Boolean)
+    .join(path.delimiter);
+  // Ensure node child processes pick up zx-init resolver and type stripping
+  const nodeOpts = [
+    "--experimental-strip-types",
+    `--import ${path.join(process.cwd(), "tools", "dev", "zx-init.mjs")}`,
+  ];
+  exportEnv.NODE_OPTIONS = [nodeOpts.join(" "), exportEnv.NODE_OPTIONS || ""]
+    .filter(Boolean)
+    .join(" ");
   const _$ = $({ cwd: tmp, env: exportEnv });
   try {
     return await fn(tmp, _$);
   } finally {
     // Rewrite any raw coverage URLs that point to the soon-to-be-deleted tmp to the repo root
-    await rewriteCoverageUrls(tmp).catch(() => {});
+    await timeAsync(`rewriteCoverageUrls(${path.basename(tmp)})`, async () =>
+      rewriteCoverageUrls(tmp).catch(() => {}),
+    );
     await fsp.rm(tmp, { recursive: true, force: true }).catch((err) => {
       // Non-fatal: cleanup of temp dir may fail on CI; ignore but log for visibility.
       console.warn("warning: failed to remove temp test dir:", err);
     });
+    logTiming(`runInTemp(${name})`, performance.now() - overallStart);
   }
 }
