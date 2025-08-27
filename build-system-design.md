@@ -1441,7 +1441,6 @@ console.log(
 ```ts
 #!/usr/bin/env zx-wrapper
 // tools/dev/startup-check.ts — verifies required tools and Nix features; prints fallbacks
-import { $ } from "zx";
 import fs from "fs-extra";
 import semver from "semver";
 

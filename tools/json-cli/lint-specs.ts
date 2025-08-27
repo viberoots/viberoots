@@ -1,9 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import { $ } from "zx";
+import Ajv from "ajv";
+import fg from "fast-glob";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import fg from "fast-glob";
-import Ajv from "ajv";
 
 const FORMAL_SCHEMA: any = {
   type: "object",

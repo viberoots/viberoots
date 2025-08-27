@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { $ } from "zx";
 
+console.log("Installing dependencies...");
 function parseFlags(argv: string[]): { force: boolean } {
   let force = false;
   for (const a of argv) {
@@ -44,9 +44,10 @@ async function relinkNodeModules(force: boolean) {
 
 async function main() {
   const { force } = parseFlags(process.argv.slice(2));
-  await $`pnpm install --lockfile-only`;
-  await $`tools/dev/update-pnpm-hash.ts`;
-  await $`nix build .#node-modules --accept-flake-config`;
+  await fsp.rm("node_modules", { force: true });
+  await $({ stdio: "inherit" })`pnpm install --lockfile-only`;
+  await $({ stdio: "inherit" })`tools/dev/update-pnpm-hash.ts`;
+  await $({ stdio: "inherit" })`nix build .#node-modules --accept-flake-config`;
   await relinkNodeModules(force);
   console.log("Dependencies installed and node_modules linked.");
 }

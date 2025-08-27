@@ -1,9 +1,9 @@
 import Ajv from "ajv";
+import fg from "fast-glob";
 import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import readline from "node:readline";
-import fg from "fast-glob";
 
 type CliOpts = {
   help: boolean;
@@ -143,7 +143,8 @@ export async function main(argv: string[]): Promise<number | void> {
     }
     return 78;
   }
-  const spec = await readSpec(specPath);
+  const specRead = await readSpec(specPath);
+  const spec = specRead.spec;
   if (!spec || !spec.command?.exec) {
     console.error("json-cli: invalid spec (missing command.exec)");
     return 78;
@@ -169,7 +170,6 @@ export async function main(argv: string[]): Promise<number | void> {
 
   // Validate invocation JSON against tool.inputSchema when provided
   if (spec.tool?.outputSchema || (spec as any).tool?.inputSchema) {
-    // Ajv instance created below for output too; create local here for input
     const ajvIn = new Ajv({ allErrors: false, strict: false });
     const inSchema: any = (spec as any).tool?.inputSchema;
     if (inSchema) {
@@ -781,7 +781,7 @@ async function runWithTransforms(
   const stIn = spec.command?.stdinTransform;
   const p1 =
     stIn && stIn.shell
-      ? spawn("/bin/sh", ["-c", `set -euo pipefail; ${stIn.shell}`], {
+      ? spawn("/bin/sh", ["-c", `set  -euo pipefail; ${stIn.shell}`], {
           cwd,
           env,
           stdio: ["pipe", "pipe", "pipe"],
@@ -789,7 +789,32 @@ async function runWithTransforms(
         })
       : null;
 
-  const cmd = spawn(spec.command!.exec as string, argv, {
+  // Determine exec command; auto-wrap with secretspec if available and enabled
+  let execCmd = spec.command!.exec as string;
+  let execArgv = argv.slice();
+  const secretsDisabled = process.env.JSON_CLI_SECRETS_DISABLE === "1";
+  const secretsForced = process.env.JSON_CLI_SECRETS === "1";
+  const secretspecToml = path.join(rootDir, "secretspec.toml");
+  const shouldTrySecrets =
+    !secretsDisabled && (secretsForced || (await pathExists(secretspecToml)));
+  if (shouldTrySecrets && (await hasBinaryOnPath("secretspec"))) {
+    const provider = process.env.JSON_CLI_SECRETS_PROVIDER;
+    const profile = process.env.JSON_CLI_SECRETS_PROFILE;
+    const args: string[] = ["run"];
+    if (profile) args.push("--profile", profile);
+    if (provider) args.push("--provider", provider);
+    args.push("--", execCmd, ...execArgv);
+    execCmd = "secretspec";
+    execArgv = args;
+  } else if (shouldTrySecrets) {
+    try {
+      process.stderr.write(
+        "json-cli: warning: secretspec not found on PATH; running without secrets wrap\n",
+      );
+    } catch {}
+  }
+
+  const cmd = spawn(execCmd, execArgv, {
     cwd,
     env,
     stdio: ["pipe", "pipe", "pipe"],
@@ -1087,6 +1112,68 @@ function terminateGroup(procs: any[]) {
       } catch {}
     }
   }, 5000);
+}
+
+async function pathExists(p: string): Promise<boolean> {
+  try {
+    await fsp.access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function hasBinaryOnPath(bin: string): Promise<boolean> {
+  const envPath = process.env.PATH || "";
+  for (const dir of envPath.split(":")) {
+    if (!dir) continue;
+    const p = path.join(dir, bin);
+    try {
+      await fsp.access(p);
+      return true;
+    } catch {}
+  }
+  return false;
+}
+
+async function findToolSpecs(
+  rootDir: string,
+  includeGlobs: string[],
+  excludeGlobs: string[],
+): Promise<string[]> {
+  // Minimal fallback: recursively list files and filter by simple **/*.tool.json include and excludes
+  const out: string[] = [];
+  const ignoreDirs = new Set(["node_modules", ".git", "buck-out", ".tmp", "coverage", "dist"]);
+
+  async function walk(dir: string) {
+    let ents: any[] = [];
+    try {
+      ents = await fsp.readdir(dir, { withFileTypes: true } as any);
+    } catch {
+      return;
+    }
+    for (const e of ents) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) {
+        if (ignoreDirs.has(e.name)) continue;
+        await walk(p);
+        continue;
+      }
+      if (!e.isFile()) continue;
+      const rel = path.relative(rootDir, p);
+      // include: **/*.tool.json
+      const inc =
+        includeGlobs.length === 0 ||
+        includeGlobs.some((g) => (g === "**/*.tool.json" ? rel.endsWith(".tool.json") : true));
+      if (!inc) continue;
+      // exclude: naive match
+      const exc = excludeGlobs.some((g) => rel.includes(g.replace(/\*\*/g, "").replace(/\*/g, "")));
+      if (exc) continue;
+      out.push(rel);
+    }
+  }
+  await walk(rootDir);
+  return out;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

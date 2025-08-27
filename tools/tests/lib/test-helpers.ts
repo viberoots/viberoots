@@ -2,8 +2,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 
-import { $ } from "zx";
-
 async function rewriteCoverageUrls(tmpRoot: string) {
   try {
     const repoRoot = process.cwd();

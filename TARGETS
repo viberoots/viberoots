@@ -127,3 +127,9 @@ zx_test(
     script = "tools/tests/json-cli.number-warning.test.ts",
     out = "json_cli_number_warning.stamp",
 )
+
+zx_test(
+    name = "json_cli_secretspec_integration",
+    script = "tools/tests/json-cli.secretspec.integration.test.ts",
+    out = "json_cli_secretspec_integration.stamp",
+)

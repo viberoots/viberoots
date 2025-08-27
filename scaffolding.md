@@ -177,7 +177,6 @@ Pseudo-structure (TypeScript with zx-wrapper):
 ```ts
 #!/usr/bin/env zx-wrapper
 
-import { $ } from "zx";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 

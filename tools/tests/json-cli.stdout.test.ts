@@ -20,7 +20,6 @@ describe("json-cli stdoutTransform + validation", () => {
       await fsp.writeFile(
         toolPath,
         `#!/usr/bin/env zx-wrapper
-import { $ } from 'zx';
 console.log('{"ok":1}');
 console.log('{"ok":2}');
 `,

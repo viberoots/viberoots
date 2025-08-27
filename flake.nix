@@ -37,7 +37,7 @@
           inherit src;
           nativeBuildInputs = [ pkgs.nodejs_22 pkgs.pnpm ];
           outputHashMode = "recursive";
-          outputHash     = "sha256-GvPMWKsyAMsICZ5CW/vbcs32VqeTVMNu00F6mIOUhWU=";
+          outputHash     = "sha256-0jyrurOG18mdCcEpZZ5d//6PKnaeG43L449fIor3rF8=";
           dontPatchShebangs = true;
           unpackPhase = ''
             runHook preUnpack
@@ -63,7 +63,7 @@
         minimalSrc = pkgs.lib.cleanSourceWith {
           src = ./.;
           filter = path: type:
-            let base = pkgs.lib.baseNameOf path; in
+            let base = builtins.baseNameOf path; in
             base == "pnpm-lock.yaml" || base == "package.json" || base == "pnpm-workspace.yaml" || base == ".npmrc";
         };
 
@@ -158,6 +158,7 @@ EOF
           '';
           buildInputs = [
             pkgs.git pkgs.buck2 pkgs.go pkgs.pnpm pkgs.nodejs_22 zx-wrapper pkgs.jq pkgs.rsync pkgs.copier pkgs.yq
+            pkgs.secretspec
           ] ++ (if pkgs.stdenv.isLinux then [ pkgs.fuse-overlayfs pkgs.xdg-utils ] else []);
         };
       }

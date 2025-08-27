@@ -1,7 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { $ } from "zx";
 
 async function buildStore(): Promise<{ ok: boolean; output: string }> {
   try {
