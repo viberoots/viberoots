@@ -4,9 +4,9 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 
 function mapTmpToRepo(sf, repoRoot) {
-  // If path contains /.tmp/<tmpdir>/, rewrite to repoRoot by stripping tmp prefix
+  // If path contains any temp prefix before /tools/, rewrite to repoRoot by stripping prefix
   const idx = sf.indexOf(`${path.sep}tools${path.sep}`);
-  if (sf.includes(`${path.sep}.tmp${path.sep}`) && idx > -1) {
+  if (idx > -1) {
     const suffix = sf.slice(idx + 1); // drop leading slash for join behavior
     return path.join(repoRoot, suffix);
   }

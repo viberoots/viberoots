@@ -100,7 +100,7 @@ const FORMAL_SCHEMA: any = {
 async function main() {
   const root = process.cwd();
   const patterns = ["**/*.tool.json"];
-  const ignore = ["node_modules/**", ".git/**", "buck-out/**", ".tmp/**", "coverage/**", "dist/**"];
+  const ignore = ["node_modules/**", ".git/**", "buck-out/**", "coverage/**", "dist/**"];
   const files = await fg(patterns, { cwd: root, ignore, onlyFiles: true, dot: false });
   const ajv = new Ajv({ allErrors: true, strict: false });
   const validate = ajv.compile(FORMAL_SCHEMA);

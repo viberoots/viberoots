@@ -9,7 +9,6 @@ export default [
       "**/node_modules/**",
       "**/buck-out/**",
       "**/.direnv/**",
-      "**/.tmp/**",
       "**/coverage/**",
       "**/.clinic/**",
       "tools/scaffolding/templates/**",

@@ -13,7 +13,7 @@ mkdir -p "${NODE_V8_COVERAGE}"
 exec "${NODE_BIN:-node}" \
   --experimental-top-level-await \
   --disable-warning=ExperimentalWarning \
-  --import tsx/esm \
+  --experimental-strip-types \
   --import "${LIVE_ROOT}/tools/dev/zx-init.mjs" \
   "$TARGET" "$@"
 
