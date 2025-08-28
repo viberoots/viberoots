@@ -632,6 +632,27 @@ function buildArgv(spec: ToolSpec, invObj: any): string[] {
     const flag = !!ps.flag;
     const flagName = ps.flagName;
 
+    // Enforce kv keys subset of inputSchema.properties when applicable
+    if (
+      type === "object" &&
+      (ps as any).collectionStyle === "kv" &&
+      value &&
+      typeof value === "object"
+    ) {
+      const inSchema: any = (spec as any).tool?.inputSchema;
+      if (inSchema && (ps as any).path && typeof (ps as any).path === "string") {
+        const schemaAt = getSchemaAtPath(inSchema, (ps as any).path as string);
+        if (schemaAt && schemaAt.properties && typeof schemaAt.properties === "object") {
+          const allowed = new Set<string>(Object.keys(schemaAt.properties));
+          const keysAll = Object.keys(value as any);
+          const bad = keysAll.filter((k) => !allowed.has(k));
+          if (bad.length > 0) {
+            throw new Error(`kv keys not allowed for ${(ps as any).path}: ${bad.join(", ")}`);
+          }
+        }
+      }
+    }
+
     const isEmptyArray = type === "array" && Array.isArray(value) && value.length === 0;
     const isEmptyObject =
       type === "object" && value && typeof value === "object" && Object.keys(value).length === 0;
@@ -787,6 +808,53 @@ function evaluateJsonPath(root: any, expr: string): any {
   if (current.length === 0) return undefined;
   if (current.length === 1) return current[0];
   return current;
+}
+
+// Navigate a JSON Schema object along a simple JSONPath like $.a.b
+function getSchemaAtPath(schema: any, jsonPath: string): any | null {
+  if (!schema || typeof schema !== "object") return null;
+  if (!jsonPath || jsonPath[0] !== "$") return null;
+  const parts: string[] = [];
+  let i = 1;
+  while (i < jsonPath.length) {
+    if (jsonPath[i] === ".") {
+      i++;
+      let start = i;
+      while (i < jsonPath.length && /[A-Za-z0-9_]/.test(jsonPath[i])) i++;
+      const seg = jsonPath.slice(start, i);
+      if (seg) parts.push(seg);
+    } else if (jsonPath[i] === "[") {
+      // Only support ['prop'] form; ignore other forms
+      let start = i;
+      while (i < jsonPath.length && jsonPath[i] !== "]") i++;
+      if (jsonPath[i] !== "]") break;
+      const inner = jsonPath.slice(start + 1, i);
+      i++;
+      const m = inner.match(/^['"]([^'\\"]+)['"]$/);
+      if (m) parts.push(m[1]);
+    } else {
+      break;
+    }
+  }
+  let cur = schema;
+  for (const seg of parts) {
+    if (!cur || typeof cur !== "object") return null;
+    if (cur.type === "object" && cur.properties && cur.properties[seg]) {
+      cur = cur.properties[seg];
+      continue;
+    }
+    // array step
+    if (cur.type === "array" && cur.items) {
+      cur = cur.items;
+      // reprocess seg at this level if array of objects
+      if (cur && cur.type === "object" && cur.properties && cur.properties[seg]) {
+        cur = cur.properties[seg];
+        continue;
+      }
+    }
+    return null;
+  }
+  return cur;
 }
 
 function renderValueTokens(
@@ -1014,6 +1082,14 @@ async function runWithTransforms(
           detached: true,
         })
       : null;
+  // Swallow pipe errors from transform during teardown
+  if (p1) {
+    try {
+      p1.stdin?.on("error", () => {});
+      p1.stdout?.on("error", () => {});
+      p1.stderr?.on("error", () => {});
+    } catch {}
+  }
   const p1StdoutEnd: Promise<void> = p1
     ? new Promise<void>((res) => {
         try {
@@ -1088,6 +1164,12 @@ async function runWithTransforms(
     // Make exec the leader of its own process group so we can signal the whole tree reliably
     detached: true,
   });
+  // Swallow pipe errors from main exec during teardown (e.g., EPIPE after SIGTERM)
+  try {
+    cmd.stdin?.on("error", () => {});
+    cmd.stdout?.on("error", () => {});
+    cmd.stderr?.on("error", () => {});
+  } catch {}
 
   const st = spec.command?.stdoutTransform;
 
@@ -1103,6 +1185,11 @@ async function runWithTransforms(
             stdio: ["pipe", "pipe", "pipe"],
             detached: true,
           });
+          try {
+            proc.stdin?.on("error", () => {});
+            proc.stdout?.on("error", () => {});
+            proc.stderr?.on("error", () => {});
+          } catch {}
           return proc;
         })()
       : null;
@@ -1130,7 +1217,8 @@ async function runWithTransforms(
       : p2BaseWaitEarly;
 
   // Local timeout guard
-  const procs = [p1, cmd, p2, sink && (sink as any).proc].filter(Boolean) as any[];
+  // Exclude failure sink from termination group to allow it to flush after endInput()
+  const procs = [p1, cmd, p2].filter(Boolean) as any[];
   const timeoutMs = runtime.timeoutMsOverride || spec.command?.timeoutMs;
   let localTimedOut = false;
   let localKiller: NodeJS.Timeout | null = null;
@@ -1144,6 +1232,12 @@ async function runWithTransforms(
             terminateGroup(procs);
             try {
               (p2 as any)?.stdout?.destroy();
+            } catch {}
+            try {
+              (p2 as any)?.stdin?.destroy?.();
+            } catch {}
+            try {
+              cmd.stdin?.destroy?.();
             } catch {}
             localTimedOut = true;
             res("TIMEOUT");
@@ -1193,6 +1287,7 @@ async function runWithTransforms(
 
   // Feed stdin → p1? → cmd.stdin with format enforcement
   let stdinParseFailed = false;
+  let stdinLimitExceeded = false;
   let stdinConfigError = false;
   let stdinForwardDone: Promise<void> | null = null;
   const waitDrain = async (w: NodeJS.WritableStream) =>
@@ -1215,6 +1310,7 @@ async function runWithTransforms(
           try {
             cmd.stdin.end();
           } catch {}
+          stdinLimitExceeded = true;
         }
       });
       process.stdin.pipe(limiter).pipe(cmd.stdin);
@@ -1246,6 +1342,7 @@ async function runWithTransforms(
         try {
           p1.stdin.end();
         } catch {}
+        stdinLimitExceeded = true;
       }
     });
     process.stdin.pipe(limiter).pipe(p1.stdin);
@@ -1527,6 +1624,7 @@ async function runWithTransforms(
     );
     return 69;
   }
+  if (stdinLimitExceeded) return 78;
   if (stdinConfigError || stdoutConfigError) return 78;
   if (runtime.collect && typeof runtime.collectLimit === "number" && runtime.collectLimit >= 0) {
     // If limit exceeded flag set earlier
@@ -1549,6 +1647,38 @@ async function runWithTransforms(
     } catch {}
     return 65;
   }
+  // Finalize failure sink with bounded grace period for flush
+  await (async () => {
+    if (!sink) return;
+    try {
+      (sink as any).endInput?.();
+    } catch {}
+    const proc: any = (sink as any).proc;
+    if (!proc || !proc.pid) return;
+    const exited = new Promise<void>((res) => {
+      try {
+        proc.once?.("exit", () => res());
+      } catch {
+        res();
+      }
+    });
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const grace1 = 800;
+    const grace2 = 800;
+    let done = false;
+    await Promise.race([exited.then(() => (done = true)), sleep(grace1)]);
+    if (!done) {
+      try {
+        process.kill(proc.pid, "SIGTERM");
+      } catch {}
+      await Promise.race([exited.then(() => (done = true)), sleep(grace2)]);
+      if (!done) {
+        try {
+          process.kill(proc.pid, "SIGKILL");
+        } catch {}
+      }
+    }
+  })();
   return exitCode || cCode || p1Code || p2Code;
 }
 

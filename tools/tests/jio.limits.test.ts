@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import { describe, test } from "node:test";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { runInTemp } from "./lib/test-helpers";
+import { describe, test } from "node:test";
 import { defineToolSpec } from "../jio/spec";
+import { runInTemp } from "./lib/test-helpers";
 
 describe("jio limits and clean env", () => {
   test("argv tokens cap triggers exit 78", async () => {
@@ -35,7 +35,11 @@ describe("jio limits and clean env", () => {
           stdoutTransform: { shell: "cat", format: "ndjson" },
         },
       });
-      await fsp.writeFile(path.join(dir, "argvcap.tool.json"), JSON.stringify(spec, null, 2), "utf8");
+      await fsp.writeFile(
+        path.join(dir, "argvcap.tool.json"),
+        JSON.stringify(spec, null, 2),
+        "utf8",
+      );
       const inPath = path.join(tmp, "in.json");
       await fsp.writeFile(inPath, JSON.stringify({ many: [1, 2, 3, 4, 5] }), "utf8");
       let failed = false;
@@ -70,7 +74,10 @@ describe("jio limits and clean env", () => {
         command: {
           package: "io.example",
           exec: "bash",
-          parameters: { sub: { type: "string", value: "-lc", position: 1 }, cmd: { type: "string", value: "cat >/dev/null", position: 2 } },
+          parameters: {
+            sub: { type: "string", value: "-lc", position: 1 },
+            cmd: { type: "string", value: "cat >/dev/null", position: 2 },
+          },
           stdoutTransform: { shell: "cat", format: "ndjson" },
         },
       });
@@ -78,7 +85,9 @@ describe("jio limits and clean env", () => {
       const big = "A".repeat(2000);
       let failed = false;
       try {
-        await $({ stdio: "pipe" })`bash --noprofile --norc -lc ${`printf %s ${big} | jio io.example.sink --max-stdin-bytes 100`}`;
+        await $({
+          stdio: "pipe",
+        })`bash --noprofile --norc -lc ${`printf %s ${big} | jio io.example.sink --max-stdin-bytes 100`}`;
       } catch (e: any) {
         const err = String(e?.stderr || e);
         if (!/stdin bytes limit exceeded/i.test(err)) {
@@ -116,7 +125,11 @@ describe("jio limits and clean env", () => {
           stdoutTransform: { shell: "cat", format: "json" },
         },
       });
-      await fsp.writeFile(path.join(dir, "bigjson.tool.json"), JSON.stringify(spec, null, 2), "utf8");
+      await fsp.writeFile(
+        path.join(dir, "bigjson.tool.json"),
+        JSON.stringify(spec, null, 2),
+        "utf8",
+      );
       let failed = false;
       try {
         await $({ stdio: "pipe" })`jio io.example.bigjson --max-stdout-json-bytes 100`;
@@ -157,7 +170,11 @@ describe("jio limits and clean env", () => {
           stdoutTransform: { shell: "cat", format: "ndjson" },
         },
       });
-      await fsp.writeFile(path.join(dir, "bigline.tool.json"), JSON.stringify(spec, null, 2), "utf8");
+      await fsp.writeFile(
+        path.join(dir, "bigline.tool.json"),
+        JSON.stringify(spec, null, 2),
+        "utf8",
+      );
       let failed = false;
       try {
         await $({ stdio: "pipe" })`jio io.example.bigline --max-ndjson-line-bytes 100`;
@@ -197,17 +214,25 @@ describe("jio limits and clean env", () => {
           stdoutTransform: { shell: "cat", format: "json" },
         },
       });
-      await fsp.writeFile(path.join(dir, "printenv.tool.json"), JSON.stringify(spec, null, 2), "utf8");
+      await fsp.writeFile(
+        path.join(dir, "printenv.tool.json"),
+        JSON.stringify(spec, null, 2),
+        "utf8",
+      );
 
       // FOO set in caller, but not passed by default
-      const out1 = await $({ stdio: "pipe" })`bash --noprofile --norc -lc ${`FOO=BAR jio io.example.printenv`}`;
+      const out1 = await $({
+        stdio: "pipe",
+      })`bash --noprofile --norc -lc ${`FOO=BAR jio io.example.printenv`}`;
       const obj1 = JSON.parse(String(out1.stdout || "{}"));
       if (obj1.foo !== "") {
         console.error("expected empty foo without pass-env");
         process.exit(2);
       }
 
-      const out2 = await $({ stdio: "pipe" })`bash --noprofile --norc -lc ${`FOO=BAR jio io.example.printenv --pass-env FOO`}`;
+      const out2 = await $({
+        stdio: "pipe",
+      })`bash --noprofile --norc -lc ${`FOO=BAR jio io.example.printenv --pass-env FOO`}`;
       const obj2 = JSON.parse(String(out2.stdout || "{}"));
       if (obj2.foo !== "BAR") {
         console.error("expected foo=BAR with pass-env");
@@ -216,5 +241,3 @@ describe("jio limits and clean env", () => {
     });
   });
 });
-
-

@@ -163,3 +163,9 @@ zx_test(
     script = "tools/tests/jio.limits.test.ts",
     out = "json_cli_limits.stamp",
 )
+
+zx_test(
+    name = "json_cli_kv_keys",
+    script = "tools/tests/jio.kv-keys.test.ts",
+    out = "json_cli_kv_keys.stamp",
+)
