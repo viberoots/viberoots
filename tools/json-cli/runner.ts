@@ -155,7 +155,7 @@ export async function main(argv: string[]): Promise<number | void> {
   let invObj: any = {};
   if (requiresInput || opts.inFile) {
     if (!opts.inFile && requiresInput) {
-      console.error("json-cli: --in is required when parameters use path");
+      console.error("json-cli: --in is required when required parameters use path");
       return 78;
     }
     if (opts.inFile) {
@@ -495,7 +495,12 @@ async function readSpec(p: string): Promise<{ spec: ToolSpec | null; warning: st
 function usesPathParams(spec: ToolSpec): boolean {
   const params = spec.command?.parameters || {};
   for (const p of Object.values(params)) {
-    if (p && typeof p === "object" && (p as any).path) return true;
+    if (!p || typeof p !== "object") continue;
+    const ps = p as any;
+    const hasPath: boolean = !!ps.path;
+    const isRequired: boolean = !!ps.required;
+    const hasDefault: boolean = Object.prototype.hasOwnProperty.call(ps, "default");
+    if (hasPath && isRequired && !hasDefault) return true;
   }
   return false;
 }

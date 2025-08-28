@@ -30,10 +30,28 @@
     "package": "io.example.examples",
     "exec": "ls",
     "parameters": {
-      "path": { "path": "$.path", "type": "string", "position": 1 },
-      "all": { "path": "$.all", "type": "boolean", "flag": true, "flagName": "-a" },
-      "long": { "path": "$.long", "type": "boolean", "flag": true, "flagName": "-l" },
-      "human": { "path": "$.human", "type": "boolean", "flag": true, "flagName": "-h" }
+      "path": { "path": "$.path", "type": "string", "position": 1, "required": false },
+      "all": {
+        "path": "$.all",
+        "type": "boolean",
+        "flag": true,
+        "flagName": "-a",
+        "required": false
+      },
+      "long": {
+        "path": "$.long",
+        "type": "boolean",
+        "flag": true,
+        "flagName": "-l",
+        "required": false
+      },
+      "human": {
+        "path": "$.human",
+        "type": "boolean",
+        "flag": true,
+        "flagName": "-h",
+        "required": false
+      }
     },
     "stdoutTransform": {
       "shell": "jq -R -c '. as $l | {line: $l}'",

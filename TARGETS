@@ -133,3 +133,9 @@ zx_test(
     script = "tools/tests/json-cli.secretspec.integration.test.ts",
     out = "json_cli_secretspec_integration.stamp",
 )
+
+zx_test(
+    name = "json_cli_optional_params",
+    script = "tools/tests/json-cli.optional-params.test.ts",
+    out = "json_cli_optional_params.stamp",
+)
