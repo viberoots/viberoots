@@ -45,7 +45,7 @@ graph LR
 ```
 
 - **Single process invocation**: The command is started **once**.
-- **Streaming**: NDJSON flows through `stdinTransform` → command stdin; command stdout flows into `stdoutTransform` and back out as JSON/NDJSON.
+- **Streaming**: NDJSON flows through `stdinTransform` → command stdin; command stdout flows into `stdoutTransform` (if present) and back out as JSON/NDJSON. If `stdoutTransform` is omitted, command stdout is passed through unmodified.
 - **Validation failures** (input or output) can be routed to `onValidationFailure` as **NDJSON** items.
 
 ---
@@ -125,9 +125,7 @@ The spec has two siblings: **`tool`** and **`command`**.
 - `stdoutTransform` (required) — shell pipeline that converts stdout into **JSON/NDJSON**.
   - `shell`: e.g., `"jq -c ."`
   - `format`: `"json"` | `"ndjson"` describing what it emits.
--
-
-**Shell robustness example (recommended)**
+- **Shell robustness example (recommended)**
 
 ```sh
 # stdinTransform example
@@ -330,7 +328,7 @@ Input:
 3. **Acquire data stream** from `process.stdin` (or `/dev/null` if not used).
 4. **stdinTransform** (optional): pipe the data stream into `/bin/sh -c "<stdinTransform.shell>"`. The runner **MUST** enforce `stdinTransform.format` on the transform's **output** before it is connected to the command.
 5. **Run the command** (`exec + argv`) with merged env and `workingDir`.
-6. **stdoutTransform** (required): pipe command stdout into `/bin/sh -c "<stdoutTransform.shell>"`; the runner **MUST** enforce its declared `format`.
+6. **stdoutTransform** (optional): if present, pipe command stdout into `/bin/sh -c "<stdoutTransform.shell>"`; the runner **MUST** enforce its declared `format`. If omitted, command stdout is passed through unmodified.
 7. **Emit output** from the stdout transform as `"ndjson"` or `"json"`.
 8. **stderr**: all stage stderrs pass through to the parent stderr.
 9. **Timeout**: if `timeoutMs` is set, the runner applies a **two‑phase shutdown**: send **SIGTERM to the process group**, wait a grace period (default **5s**), then **SIGKILL** (see pseudocode below).
@@ -340,6 +338,7 @@ Input:
 - Use OS pipes and native stream backpressure; **do not buffer entire streams in memory**.
 - Treat lines as UTF-8; tolerate CRLF; ignore a UTF-8 BOM if present.
 - When parsing NDJSON, silently skip blank lines (or warn).
+- Note: `pipefail` is enabled when the runner executes `bash`. For `/bin/sh` fallback, the runner uses `set -eu`. If your transform requires `pipefail`, invoke `bash` explicitly in the transform.
 
 **Simple Node (TypeScript) pseudocode for the three pipelines with backpressure**
 
@@ -499,6 +498,7 @@ json-cli <toolRef> [--in file.json] [--dry-run] [--list] [--where <toolRef>]
   - `66` input file missing
   - `69` spawn failure
   - `78` config error (invalid spec, duplicate FQNames, unreadable `.json-cli`)
+  - `124` timeout (runner-enforced wall-clock exceeded)
 
 ---
 
@@ -757,7 +757,7 @@ tool a b --tag=x --tag=y --labels=red;blue --a=1 --b=2
     },
     "command": {
       "type": "object",
-      "required": ["package", "exec", "parameters", "stdoutTransform"],
+      "required": ["package", "exec", "parameters"],
       "properties": {
         "package": {
           "type": "string"
