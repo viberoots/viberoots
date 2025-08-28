@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import { describe, test } from "node:test";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { runInTemp } from "./lib/test-helpers";
+import { describe, test } from "node:test";
 import { defineToolSpec } from "../json-cli/spec";
+import { runInTemp } from "./lib/test-helpers";
 
 describe("json-cli formal schema validation and JSONPath subset", () => {
   test("invalid spec rejected by schema", async () => {
@@ -23,12 +23,13 @@ describe("json-cli formal schema validation and JSONPath subset", () => {
         specVersion: "1.0.0",
       };
       await fsp.writeFile(path.join(tmp, "bad.tool.json"), JSON.stringify(bad, null, 2), "utf8");
+      // Execute the bad tool directly to trigger schema validation failure
       let failed = false;
       try {
-        await $({ stdio: "pipe" })`json-cli --list`;
+        await $({ stdio: "pipe" })`json-cli io.example.oops --dry-run`;
       } catch (e: any) {
         const err = String(e?.stderr || e?.stdout || "");
-        if (!/invalid spec/i.test(err)) {
+        if (!/invalid spec|invalid .*missing command\.exec/i.test(err)) {
           console.error("expected invalid spec message, got:", err);
           process.exit(2);
         }

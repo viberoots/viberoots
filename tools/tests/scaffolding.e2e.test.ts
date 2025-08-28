@@ -7,6 +7,7 @@ import { runInTemp } from "./lib/test-helpers";
 
 test("new overwrite guard requires --yes or supports --dry-run", async () => {
   await runInTemp("scaf-overwrite-guard", async (_tmp, _$) => {
+    process.env.JSON_CLI_SKIP_DIRENV = "1";
     const $ = _$({ stdio: "ignore" });
     const pipe$ = _$({ stdio: "pipe" });
     await $`scaf new go lib demo-lib`;
@@ -27,6 +28,7 @@ test("new overwrite guard requires --yes or supports --dry-run", async () => {
 
 test("regen staging restores original on failure", async () => {
   await runInTemp("scaf-regen-stage", async (tmp, _$) => {
+    process.env.JSON_CLI_SKIP_DIRENV = "1";
     const $ = _$({ stdio: "ignore" });
     const pipe$ = _$({ stdio: "pipe" });
     await $`scaf new go lib demo-lib`;
@@ -60,6 +62,7 @@ test("regen staging restores original on failure", async () => {
 
 test("move, update, delete and ls reflects state", async () => {
   await runInTemp("scaf-e2e", async (_tmp, _$) => {
+    process.env.JSON_CLI_SKIP_DIRENV = "1";
     const $ = _$({ stdio: "ignore" });
     const pipe$ = _$({ stdio: "pipe" });
     await $`scaf new go lib demo-lib`;
@@ -100,6 +103,7 @@ test("move, update, delete and ls reflects state", async () => {
 
 test("move requires confirmation unless --yes", async () => {
   await runInTemp("scaf-move-confirm", async (_tmp, _$) => {
+    process.env.JSON_CLI_SKIP_DIRENV = "1";
     const $ = _$({ stdio: "ignore" });
     const pipe$ = _$({ stdio: "pipe" });
     await $`scaf new go lib demo-lib`;
@@ -119,10 +123,12 @@ test("move requires confirmation unless --yes", async () => {
 
 test("meta.json help validation pass/fail scenarios", async () => {
   await runInTemp("tmpl-validate-pass", async (_tmp, _$) => {
+    process.env.JSON_CLI_SKIP_DIRENV = "1";
     const $ = _$({ stdio: "ignore" });
     await $`scaf validate all --quiet`;
   });
   await runInTemp("tmpl-validate-fail1", async (tmp, _$) => {
+    process.env.JSON_CLI_SKIP_DIRENV = "1";
     const $ = _$({ stdio: "ignore" });
     const metaPath = path.join(tmp, "tools", "scaffolding", "templates", "go", "lib", "meta.json");
     const meta = JSON.parse(await fsp.readFile(metaPath, "utf8"));
@@ -140,6 +146,7 @@ test("meta.json help validation pass/fail scenarios", async () => {
     }
   });
   await runInTemp("tmpl-validate-fail2", async (tmp, _$) => {
+    process.env.JSON_CLI_SKIP_DIRENV = "1";
     const $ = _$({ stdio: "ignore" });
     const metaPath = path.join(tmp, "tools", "scaffolding", "templates", "go", "lib", "meta.json");
     const meta = JSON.parse(await fsp.readFile(metaPath, "utf8"));

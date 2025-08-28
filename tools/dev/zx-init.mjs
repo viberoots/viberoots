@@ -1,12 +1,26 @@
-import "zx/globals";
+// Ensure zx globals are available even when running from a temp dir without node_modules
+// Compute workspace root from this file's location (repo/tools/dev/zx-init.mjs)
+const urlMod = await import("node:url");
+const pathMod = await import("node:path");
+const here = urlMod.fileURLToPath(import.meta.url);
+const WORKSPACE_ROOT_FIXED = pathMod.dirname(pathMod.dirname(pathMod.dirname(here)));
+
+try {
+  const zxPath = pathMod.resolve(WORKSPACE_ROOT_FIXED, "node_modules/zx/build/globals.cjs");
+  await import(urlMod.pathToFileURL(zxPath).href);
+} catch {
+  // Fallback: let default/bare resolution try via NODE_PATH or local node_modules
+  try {
+    await import("zx/globals");
+  } catch {}
+}
 
 const { register } = await import("node:module");
 const { pathToFileURL } = await import("node:url");
 
 // Minimal resolver:
 // 1) Append .ts to relative/absolute specifiers lacking an extension.
-// 2) Fall back to resolving bare imports from WORKSPACE_ROOT/node_modules when default resolution fails.
-const root = process.env.WORKSPACE_ROOT || process.cwd();
+// 2) Fall back to resolving bare imports by searching NODE_PATH entries, then repo node_modules.
 const src = `export async function resolve(specifier, context, nextResolve) {
   const base = new URL(context.parentURL || 'file:///');
   try {
@@ -21,14 +35,20 @@ const src = `export async function resolve(specifier, context, nextResolve) {
     // Try default resolution first
     return await nextResolve(specifier, context);
   } catch (e) {
-    // Fallback: treat bare specifiers as coming from workspace node_modules
+    // Fallback: treat bare specifiers as coming from NODE_PATH or workspace node_modules
     try {
-      const root = '${root}'.endsWith('/') ? '${root}' : '${root}/';
-      const baseUrl = new URL(root, base);
+      const envPath = (process.env.NODE_PATH || '').split('${process.platform === "win32" ? ";" : ":"}').filter(Boolean);
+      for (const entry of envPath) {
+        const baseUrl = new URL(entry.endsWith('/') ? entry : entry + '/', base);
+        const candidate = new URL(specifier, baseUrl).href;
+        try { return await nextResolve(candidate, context); } catch {}
+        const candidateDir = new URL(specifier + '/index.js', baseUrl).href;
+        try { return await nextResolve(candidateDir, context); } catch {}
+      }
+      const ws = '${WORKSPACE_ROOT_FIXED}'.endsWith('/') ? '${WORKSPACE_ROOT_FIXED}' : '${WORKSPACE_ROOT_FIXED}/';
+      const baseUrl = new URL(ws, base);
       const candidateDir = new URL('node_modules/' + specifier, baseUrl).href;
-      try {
-        return await nextResolve(candidateDir, context);
-      } catch {}
+      try { return await nextResolve(candidateDir, context); } catch {}
       // Try common index.js locations
       const candidates = [
         'node_modules/' + specifier + '/index.js',
@@ -46,4 +66,9 @@ const src = `export async function resolve(specifier, context, nextResolve) {
   return nextResolve(specifier, context);
 }`;
 const dataUrl = "data:text/javascript," + encodeURIComponent(src);
-register(dataUrl, pathToFileURL(root.endsWith("/") ? root : root + "/"));
+register(
+  dataUrl,
+  pathToFileURL(
+    WORKSPACE_ROOT_FIXED.endsWith("/") ? WORKSPACE_ROOT_FIXED : WORKSPACE_ROOT_FIXED + "/",
+  ),
+);

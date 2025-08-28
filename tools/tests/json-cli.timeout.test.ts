@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import { describe, test } from "node:test";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { runInTemp } from "./lib/test-helpers";
+import { describe, test } from "node:test";
 import { defineToolSpec } from "../json-cli/spec";
+import { runInTemp } from "./lib/test-helpers";
 
 describe("json-cli timeout and two-phase shutdown", () => {
   test("times out long-running command and prints timeout note", async () => {
@@ -19,7 +19,10 @@ describe("json-cli timeout and two-phase shutdown", () => {
         command: {
           package: "io.example",
           exec: "bash",
-          parameters: { sub: { type: "string", value: "-lc", position: 1 } },
+          parameters: {
+            sub: { type: "string", value: "-lc", position: 1 },
+            cmd: { type: "string", value: "sleep 30", position: 2 },
+          },
           stdoutTransform: { shell: "cat", format: "ndjson" },
           timeoutMs: 500,
         },
@@ -28,6 +31,7 @@ describe("json-cli timeout and two-phase shutdown", () => {
 
       let failed = false;
       try {
+        // Run the tool; it embeds a long sleep via spec parameters
         await $({ stdio: "pipe" })`json-cli io.example.sleep`;
       } catch (e: any) {
         const err = String(e?.stderr || e?.stdout || "");

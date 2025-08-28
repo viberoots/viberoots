@@ -37,7 +37,11 @@ process.stdin.pipe(process.stdout);
       await fsp.writeFile(specPath, JSON.stringify(spec, null, 2), "utf8");
 
       const input = '{"a":1}\r\n\n{"b":2}\n';
-      const out = await $({ stdin: input, stdio: "pipe" })`json-cli io.example.tol1`;
+      const inFile = path.join(tmp, "tol1.input.ndjson");
+      await fsp.writeFile(inFile, input, "utf8");
+      const out = await $({
+        stdio: "pipe",
+      })`bash --noprofile --norc -c ${`cat '${inFile}' | json-cli io.example.tol1`}`;
       const lines = String(out.stdout).trim().split(/\n+/);
       if (!(lines.includes('{"a":1}') && lines.includes('{"b":2}'))) {
         console.error("did not tolerate CRLF/blank lines:", lines);
@@ -82,7 +86,11 @@ process.stdin.pipe(process.stdout);
       );
       const bom = "\ufeff";
       const inputNd = bom + '{"x":1}\n{"y":2}\n';
-      const outNd = await $({ stdin: inputNd, stdio: "pipe" })`json-cli io.example.tol2`;
+      const inNd = path.join(tmp, "tol2.input.ndjson");
+      await fsp.writeFile(inNd, inputNd, "utf8");
+      const outNd = await $({
+        stdio: "pipe",
+      })`bash --noprofile --norc -c ${`cat '${inNd}' | json-cli io.example.tol2`}`;
       const linesNd = String(outNd.stdout).trim().split(/\n+/);
       if (!(linesNd[0] === '{"x":1}' && linesNd.includes('{"y":2}'))) {
         console.error("BOM not ignored on first NDJSON line:", linesNd);
@@ -105,7 +113,11 @@ process.stdin.pipe(process.stdout);
         "utf8",
       );
       const inputJson = bom + '{"ok":true}';
-      const outJs = await $({ stdin: inputJson, stdio: "pipe" })`json-cli io.example.tol3`;
+      const inJson = path.join(tmp, "tol3.input.json");
+      await fsp.writeFile(inJson, inputJson, "utf8");
+      const outJs = await $({
+        stdio: "pipe",
+      })`bash --noprofile --norc -c ${`cat '${inJson}' | json-cli io.example.tol3`}`;
       if (String(outJs.stdout).trim() !== '{"ok":true}') {
         console.error("BOM not ignored for JSON doc:", String(outJs.stdout));
         process.exit(2);

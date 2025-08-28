@@ -13,11 +13,12 @@
       let
         pkgs = import nixpkgs { inherit system; };
         zx-wrapper = pkgs.writeShellScriptBin "zx-wrapper" ''
+          set -euo pipefail
           exec ${pkgs.nodejs_22}/bin/node \
             --experimental-strip-types \
             --experimental-top-level-await \
             --disable-warning=ExperimentalWarning \
-            --eval 'import "${pkgs.nodePackages.zx}/lib/node_modules/zx/build/globals.js";' \
+            --import="${pkgs.nodePackages.zx}/lib/node_modules/zx/build/globals.js" \
             "$@"
         '';
 
@@ -37,7 +38,7 @@
           inherit src;
           nativeBuildInputs = [ pkgs.nodejs_22 pkgs.pnpm ];
           outputHashMode = "recursive";
-          outputHash     = "sha256-qMkNVI2011qrRBwzqACHuebavuh9jA5U3fPtzZobwKE=";
+          outputHash     = "sha256-kFH1riRtmzOhJLvqOMOEo0+gz1jfWWt0/1bAc1VFcoQ=";
           dontPatchShebangs = true;
           unpackPhase = ''
             runHook preUnpack

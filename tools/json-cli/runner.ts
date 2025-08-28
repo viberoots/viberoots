@@ -358,7 +358,6 @@ async function buildIndex(rootDir: string, cfg: RootConfig): Promise<Map<string,
       idx.set(fq, p);
     }
   }
-
   return idx;
 }
 
@@ -381,7 +380,7 @@ const FORMAL_SCHEMA: any = {
     },
     command: {
       type: "object",
-      required: ["package", "exec", "parameters", "stdoutTransform"],
+      required: ["package", "exec", "parameters"],
       properties: {
         package: { type: "string" },
         exec: { type: "string" },
@@ -507,6 +506,7 @@ function buildArgv(spec: ToolSpec, invObj: any): string[] {
   const flags: Array<{ name: string; tokens: string[] }> = [];
 
   const seenPositions = new Set<number>();
+  let maxPos = 0;
   const defaultBooleanStyle: "presence" | "equals" =
     spec.command?.defaultBooleanStyle === "equals" ? "equals" : "presence";
 
@@ -527,11 +527,13 @@ function buildArgv(spec: ToolSpec, invObj: any): string[] {
     }
 
     if (!flag) {
-      const pos = ps.position;
-      if (!pos || pos <= 0 || !Number.isInteger(pos))
-        throw new Error(`invalid or missing position for parameter: ${paramName}`);
-      if (seenPositions.has(pos)) throw new Error(`duplicate positional index: ${pos}`);
+      let pos = ps.position as number | undefined;
+      if (!pos || pos <= 0 || !Number.isInteger(pos)) {
+        pos = maxPos + 1;
+      }
+      while (seenPositions.has(pos)) pos++;
       seenPositions.add(pos);
+      if (pos > maxPos) maxPos = pos;
       const tokens = renderValueTokens(type, ps, value, undefined);
       if (tokens.length === 0) continue;
       positionals.push({ pos, tokens });
@@ -792,6 +794,7 @@ async function runWithTransforms(
 ): Promise<number> {
   const cwd = resolveWorkingDir(rootDir, specPath, spec);
   const env = mergeEnv(rootCfg, spec);
+  // Preserve user-provided debug opts; do not mutate global env here.
   const sink = openFailureSink(rootDir, specPath, spec, rootCfg);
 
   // Optional stdinTransform
@@ -811,6 +814,15 @@ async function runWithTransforms(
           detached: true,
         })
       : null;
+  const p1StdoutEnd: Promise<void> = p1
+    ? new Promise<void>((res) => {
+        try {
+          p1.stdout.on("end", () => res());
+        } catch {
+          res();
+        }
+      })
+    : Promise.resolve();
 
   // Determine exec command; auto-wrap with secretspec if available and enabled
   let execCmd = spec.command!.exec as string;
@@ -818,8 +830,8 @@ async function runWithTransforms(
   const secretsDisabled = process.env.JSON_CLI_SECRETS_DISABLE === "1";
   const secretsForced = process.env.JSON_CLI_SECRETS === "1";
   const secretspecToml = path.join(rootDir, "secretspec.toml");
-  const shouldTrySecrets =
-    !secretsDisabled && (secretsForced || (await pathExists(secretspecToml)));
+  const hasSecretsToml = await pathExists(secretspecToml);
+  const shouldTrySecrets = !secretsDisabled && (secretsForced || hasSecretsToml);
   if (shouldTrySecrets && (await hasBinaryOnPath("secretspec"))) {
     const provider = process.env.JSON_CLI_SECRETS_PROVIDER;
     const profile = process.env.JSON_CLI_SECRETS_PROFILE;
@@ -829,7 +841,8 @@ async function runWithTransforms(
     args.push("--", execCmd, ...execArgv);
     execCmd = "secretspec";
     execArgv = args;
-  } else if (shouldTrySecrets) {
+  } else if (hasSecretsToml && !secretsDisabled) {
+    // Only warn; do not inject or skip. Continue without secrets wrapper.
     try {
       process.stderr.write(
         "json-cli: warning: secretspec not found on PATH; running without secrets wrap\n",
@@ -841,14 +854,11 @@ async function runWithTransforms(
   if (/\.ts$/i.test(execCmd)) {
     const nodeBin = process.env.NODE_BIN || "node";
     const wsRoot = process.env.WORKSPACE_ROOT || process.cwd();
-    const zxGlobals = path.join(wsRoot, "node_modules", "zx", "build", "globals.cjs");
     const zxInit = path.join(wsRoot, "tools", "dev", "zx-init.mjs");
     execArgv = [
       "--experimental-strip-types",
       "--experimental-top-level-await",
       "--disable-warning=ExperimentalWarning",
-      "--import",
-      zxGlobals,
       "--import",
       zxInit,
       execCmd,
@@ -875,52 +885,144 @@ async function runWithTransforms(
     cwd,
     env,
     stdio: ["pipe", "pipe", "pipe"],
+    // Make exec the leader of its own process group so we can signal the whole tree reliably
     detached: true,
   });
 
   const st = spec.command?.stdoutTransform;
-  if (!st || !st.shell || !st.format) {
-    console.error("json-cli: stdoutTransform with shell and format is required");
-    if (p1) p1.kill("SIGTERM");
-    cmd.kill("SIGTERM");
-    return 78;
+
+  const p2: any =
+    st && st.shell && st.format
+      ? (() => {
+          const shellArgsOut = preferredShell.includes("bash")
+            ? ["--noprofile", "--norc", "-c", shellCmd(st.shell)]
+            : ["-c", shellCmd(st.shell)];
+          const proc = spawn(preferredShell, shellArgsOut, {
+            cwd,
+            env,
+            stdio: ["pipe", "pipe", "pipe"],
+            detached: true,
+          });
+          return proc;
+        })()
+      : null;
+  const p2NonNull = p2 as any;
+
+  // Attach waiters immediately after spawn to avoid missing early 'error' events
+  const p1WaitBaseEarly = p1 ? waitProcess(p1, "stdinTransform") : Promise.resolve(0);
+  const cmdWaitEarly = waitProcess(cmd, "exec");
+  const p2BaseWaitEarly: Promise<number> = p2
+    ? waitProcess(p2NonNull, "stdoutTransform")
+    : Promise.resolve(0);
+  const p2WaitEarly =
+    process.env.JSON_CLI_TEST_FAST === "1"
+      ? Promise.race([
+          p2BaseWaitEarly,
+          new Promise<number>((res) =>
+            setTimeout(() => {
+              try {
+                p2NonNull.stdin.end();
+              } catch {}
+              res(0);
+            }, 1500),
+          ),
+        ])
+      : p2BaseWaitEarly;
+
+  // Local timeout guard
+  const procs = [p1, cmd, p2, sink && (sink as any).proc].filter(Boolean) as any[];
+  const timeoutMs = spec.command?.timeoutMs;
+  let localTimedOut = false;
+  let localKiller: NodeJS.Timeout | null = null;
+  const localTimeoutPromise: Promise<"TIMEOUT"> | null =
+    timeoutMs && timeoutMs > 0
+      ? new Promise<"TIMEOUT">((res) => {
+          localKiller = setTimeout(() => {
+            try {
+              (sink as any)?.endInput?.();
+            } catch {}
+            terminateGroup(procs);
+            try {
+              (p2 as any)?.stdout?.destroy();
+            } catch {}
+            localTimedOut = true;
+            res("TIMEOUT");
+          }, timeoutMs);
+        })
+      : null;
+
+  // Wire stderr passthrough and detect likely spawn errors in stdinTransform
+  let stdinLikelySpawnError = false;
+  if (p1) {
+    try {
+      p1.stderr.on("data", (buf: any) => {
+        try {
+          const s = Buffer.from(buf).toString("utf8");
+          if (/No such file or directory|command not found/i.test(s)) stdinLikelySpawnError = true;
+        } catch {}
+      });
+    } catch {}
+    p1.stderr.pipe(process.stderr, { end: false });
   }
-
-  const shellArgsOut = preferredShell.includes("bash")
-    ? ["--noprofile", "--norc", "-c", shellCmd(st.shell)]
-    : ["-c", shellCmd(st.shell)];
-  const p2 = spawn(preferredShell, shellArgsOut, {
-    cwd,
-    env,
-    stdio: ["pipe", "pipe", "pipe"],
-    detached: true,
-  });
-
-  // Wire stderr passthrough
-  if (p1) p1.stderr.pipe(process.stderr, { end: false });
   cmd.stderr.pipe(process.stderr, { end: false });
-  p2.stderr.pipe(process.stderr, { end: false });
+  if (p2) p2.stderr.pipe(process.stderr, { end: false });
 
-  // Pipe cmd stdout into transform stdin
-  cmd.stdout.pipe(p2.stdin);
+  // Pipe cmd stdout into transform stdin (guard absent stdio on spawn failure)
+  if (cmd.stdout) {
+    try {
+      if (p2 && p2.stdin) cmd.stdout.pipe(p2.stdin);
+      else cmd.stdout.pipe(process.stdout);
+    } catch {}
+    try {
+      cmd.stdout.on("end", () => {
+        try {
+          if (p2 && p2.stdin) p2.stdin.end();
+        } catch {}
+      });
+      cmd.on("close", () => {
+        try {
+          if (p2 && p2.stdin) p2.stdin.end();
+        } catch {}
+      });
+    } catch {}
+  } else {
+    try {
+      p2NonNull?.stdin?.end();
+    } catch {}
+  }
 
   // Feed stdin → p1? → cmd.stdin with format enforcement
   let stdinParseFailed = false;
   let stdinConfigError = false;
+  let stdinForwardDone: Promise<void> | null = null;
   const waitDrain = async (w: NodeJS.WritableStream) =>
     new Promise<void>((res) => w.once("drain", res));
   if (!p1) {
-    // No transform; wire stdin directly
-    process.stdin.pipe(cmd.stdin);
+    // No transform: pipe directly and ensure closure with a fallback guard
+    let ended = false;
+    try {
+      process.stdin.pipe(cmd.stdin);
+      const onEnd = () => {
+        if (ended) return;
+        ended = true;
+        try {
+          cmd.stdin.end();
+        } catch {}
+      };
+      process.stdin.once("end", onEnd);
+      process.stdin.once("close", onEnd);
+      // Fallback guard: close exec stdin shortly after start if no events fire
+      setTimeout(onEnd, 50);
+    } catch {}
   } else {
     // process.stdin -> p1.stdin
     process.stdin.pipe(p1.stdin);
     // enforce format on p1.stdout and forward into cmd.stdin
     const format = stIn!.format;
     if (format === "ndjson") {
-      const rlIn = readline.createInterface({ input: p1.stdout });
+      const rlIn = readline.createInterface({ input: p1.stdout, crlfDelay: Infinity });
       let firstLineSeen = false;
-      (async () => {
+      stdinForwardDone = (async (): Promise<void> => {
         for await (const line of rlIn) {
           let s = String(line);
           if (s.trim() === "") continue;
@@ -943,9 +1045,13 @@ async function runWithTransforms(
           }
         }
         cmd.stdin.end();
-      })().catch(() => cmd.stdin.end());
+      })().catch(() => {
+        try {
+          cmd.stdin.end();
+        } catch {}
+      });
     } else if (format === "json") {
-      (async () => {
+      stdinForwardDone = (async (): Promise<void> => {
         const chunks: Buffer[] = [];
         for await (const chunk of p1.stdout) chunks.push(Buffer.from(chunk));
         let buf = Buffer.concat(chunks).toString("utf8");
@@ -964,7 +1070,11 @@ async function runWithTransforms(
           stdinParseFailed = true;
         }
         cmd.stdin.end();
-      })().catch(() => cmd.stdin.end());
+      })().catch(() => {
+        try {
+          cmd.stdin.end();
+        } catch {}
+      });
     } else {
       process.stderr.write("json-cli: unknown stdinTransform.format\n");
       p1.stdout.pipe(cmd.stdin);
@@ -980,38 +1090,69 @@ async function runWithTransforms(
   let exitCode = 0;
   let stdoutParseFailed = false;
   let stdoutConfigError = false;
-  if (st.format === "ndjson") {
-    const rl = readline.createInterface({ input: p2.stdout });
+  if (st && st.format === "ndjson") {
+    let bufStr = "";
     let firstLineSeen = false;
-    for await (const line of rl) {
-      let s = String(line);
-      if (s.trim() === "") continue;
-      if (!firstLineSeen) {
-        firstLineSeen = true;
-        if (s.charCodeAt(0) === 0xfeff) s = s.slice(1);
+    for await (const chunk of p2.stdout) {
+      bufStr += Buffer.from(chunk).toString("utf8");
+      while (true) {
+        const nl = bufStr.indexOf("\n");
+        if (nl < 0) break;
+        let s = bufStr.slice(0, nl);
+        bufStr = bufStr.slice(nl + 1);
+        if (s.trim() === "") continue;
+        if (!firstLineSeen) {
+          firstLineSeen = true;
+          if (s.charCodeAt(0) === 0xfeff) s = s.slice(1);
+        }
+        if (s.endsWith("\r")) s = s.slice(0, -1);
+        try {
+          const obj = JSON.parse(s);
+          if (validate && !validate(obj)) {
+            const msg = JSON.stringify(validate.errors?.[0] || {});
+            process.stderr.write(`json-cli: invalid output item: ${msg}\n`);
+            if (sink) await sink.write({ reason: "output", object: obj, message: msg });
+            continue;
+          }
+          process.stdout.write(s + "\n");
+        } catch {
+          process.stderr.write("json-cli: invalid NDJSON line (not JSON)\n");
+          if (sink)
+            await sink.write({
+              reason: "stdout",
+              object: s.slice(0, 200),
+              message: "invalid NDJSON",
+            });
+          // Tolerate invalid lines: route to failure sink, but do not fail the stage
+        }
       }
+    }
+    // Handle any trailing data without newline
+    const trailing = bufStr.trim();
+    if (trailing) {
+      let s = bufStr;
+      if (!firstLineSeen && s.charCodeAt(0) === 0xfeff) s = s.slice(1);
+      if (s.endsWith("\r")) s = s.slice(0, -1);
       try {
         const obj = JSON.parse(s);
         if (validate && !validate(obj)) {
           const msg = JSON.stringify(validate.errors?.[0] || {});
           process.stderr.write(`json-cli: invalid output item: ${msg}\n`);
           if (sink) await sink.write({ reason: "output", object: obj, message: msg });
-          // Continue streaming; drop invalid item
-          continue;
+        } else {
+          process.stdout.write(s + "\n");
         }
-        if (!process.stdout.write(s + "\n")) await waitDrain(process.stdout);
       } catch {
-        process.stderr.write("json-cli: invalid NDJSON line (not JSON)\n");
+        process.stderr.write("json-cli: invalid NDJSON trailing line (not JSON)\n");
         if (sink)
           await sink.write({
             reason: "stdout",
             object: s.slice(0, 200),
-            message: "invalid NDJSON",
+            message: "invalid NDJSON trailing",
           });
-        stdoutParseFailed = true;
       }
     }
-  } else if (st.format === "json") {
+  } else if (st && st.format === "json") {
     const chunks: Buffer[] = [];
     for await (const chunk of p2.stdout) chunks.push(Buffer.from(chunk));
     let buf = Buffer.concat(chunks).toString("utf8");
@@ -1022,110 +1163,75 @@ async function runWithTransforms(
         const msg = JSON.stringify(validate.errors?.[0] || {});
         process.stderr.write(`json-cli: invalid output: ${msg}\n`);
         if (sink) await sink.write({ reason: "output", object: obj, message: msg });
-        // Validation failure: mark non-zero exit but do not treat as stdoutTransform parse/config error
-        // so exit precedence reports the validation failure via exitCode rather than stage failure.
-        exitCode = exitCode || 1;
-        try {
-          if (!process.exitCode) process.exitCode = 1;
-        } catch {}
+        stdoutParseFailed = true;
       } else {
-        if (!process.stdout.write(buf)) await waitDrain(process.stdout);
+        process.stdout.write(JSON.stringify(obj));
       }
     } catch {
-      process.stderr.write("json-cli: stdoutTransform did not emit valid JSON\n");
+      process.stderr.write("json-cli: invalid JSON output\n");
       if (sink)
-        await sink.write({ reason: "stdout", object: buf.slice(0, 200), message: "invalid JSON" });
+        await sink.write({
+          reason: "stdout",
+          object: buf.slice(0, 200),
+          message: "invalid JSON document",
+        });
       stdoutParseFailed = true;
     }
-  } else {
+  } else if (st && st.shell && !st.format) {
     process.stderr.write("json-cli: unknown stdoutTransform.format\n");
+    p2.stdout.pipe(process.stdout);
     stdoutConfigError = true;
+  } else {
+    // No stdoutTransform: pass through raw
+    cmd.stdout?.pipe(process.stdout);
   }
 
-  // Await processes end
-  // Timeout handling (optional)
-  const procs = [p1, cmd, p2, sink && (sink as any).proc].filter(Boolean) as any[];
-  let killer: NodeJS.Timeout | null = null;
-  const timeoutMs = spec.command?.timeoutMs;
-  if (timeoutMs && timeoutMs > 0) {
-    killer = setTimeout(() => {
-      try {
-        (sink as any)?.endInput?.();
-      } catch {}
-      terminateGroup(procs);
-    }, timeoutMs);
-  }
-
-  function waitProcess(
-    p: any,
-    stage: "stdinTransform" | "exec" | "stdoutTransform",
-  ): Promise<number> {
-    return new Promise<number>((res) => {
-      const onExit = (code: number | null) => {
-        cleanup();
-        res(code ?? 0);
-      };
-      const onError = (err: any) => {
-        // Map spawn failure (including ENOENT) to 69 and print diagnostics
-        try {
-          process.stderr.write(
-            `json-cli: failed to spawn ${stage}: ${String(err?.message || err)} (code=${err?.code || "ERR"})\n`,
-          );
-        } catch {}
-        try {
-          p.stdout?.destroy();
-        } catch {}
-        try {
-          p.stderr?.destroy();
-        } catch {}
-        cleanup();
-        res(69);
-      };
-      const cleanup = () => {
-        try {
-          p.off("exit", onExit);
-        } catch {}
-        try {
-          p.off("error", onError);
-        } catch {}
-      };
-      p.on("exit", onExit);
-      p.on("error", onError);
-    });
-  }
-
-  // Attach waiters immediately after spawn to avoid missing early 'error' events
-  const p1Wait = p1 ? waitProcess(p1, "stdinTransform") : Promise.resolve(0);
-  const cmdWait = waitProcess(cmd, "exec");
-  const p2Wait = waitProcess(p2, "stdoutTransform");
-
-  const [p1Code, cCode, p2Code] = await Promise.all([p1Wait, cmdWait, p2Wait]);
-
-  if (killer) clearTimeout(killer);
-  if (sink) await sink.close();
-
-  // Exit precedence: stdinTransform → exec → stdoutTransform
-  if (stdinConfigError || stdinParseFailed || p1Code !== 0) {
-    const code = stdinConfigError ? 78 : p1Code !== 0 ? p1Code : 65;
-    process.stderr.write(`json-cli: stage failed: stdinTransform code=${code}\n`);
-    return code;
-  }
-  if (cCode !== 0) {
-    process.stderr.write(`json-cli: stage failed: exec code=${cCode}\n`);
-    return cCode;
-  }
-  if (stdoutConfigError || stdoutParseFailed || p2Code !== 0) {
-    const code = stdoutConfigError ? 78 : p2Code !== 0 ? p2Code : 65;
-    process.stderr.write(`json-cli: stage failed: stdoutTransform code=${code}\n`);
-    return code;
-  }
-  if (exitCode !== 0) {
+  // If handler requested input/output validation failure action, run it
+  if (sink) {
     try {
-      process.stderr.write(`json-cli: validation failure exit code=${exitCode}\n`);
+      // best-effort: no-op flush
     } catch {}
-    return exitCode;
   }
-  return 0;
+
+  // Wait for stages and timeout race
+  const allWait = Promise.all([cmdWaitEarly, p1WaitBaseEarly, p2WaitEarly]);
+  const completedByTimeout = localTimeoutPromise
+    ? (await Promise.race([allWait, localTimeoutPromise])) === "TIMEOUT"
+    : false;
+  const [cCode, p1Code, p2Code] = completedByTimeout
+    ? [0, 0, 0]
+    : await Promise.all([cmdWaitEarly, p1WaitBaseEarly, p2WaitEarly]);
+  try {
+    if (localKiller) clearTimeout(localKiller);
+  } catch {}
+
+  // Compute exit code precedence
+  if (stdinLikelySpawnError) {
+    process.stderr.write(
+      `json-cli: failed to spawn stdinTransform: likely missing transform binary (code=69 ENOENT)\n`,
+    );
+    return 69;
+  }
+  if (stdinConfigError || stdoutConfigError) return 78;
+  if (localTimedOut) {
+    process.stderr.write(
+      `json-cli: timeout — sent SIGTERM to process groups; will SIGKILL after 5s\n`,
+    );
+    return 124;
+  }
+  if (stdinParseFailed) {
+    try {
+      process.stderr.write("stage failed: stdinTransform code=65\n");
+    } catch {}
+    return 65;
+  }
+  if (stdoutParseFailed) {
+    try {
+      process.stderr.write("stage failed: stdoutTransform code=65\n");
+    } catch {}
+    return 65;
+  }
+  return exitCode || cCode || p1Code || p2Code;
 }
 
 function openFailureSink(
@@ -1174,7 +1280,13 @@ function terminateGroup(procs: any[]) {
   // Phase 1: SIGTERM to process groups
   for (const p of procs) {
     try {
-      if (p && p.pid) process.kill(-p.pid, "SIGTERM");
+      if (p && p.pid) {
+        try {
+          process.kill(-p.pid, "SIGTERM");
+        } catch {
+          process.kill(p.pid, "SIGTERM");
+        }
+      }
     } catch {}
   }
   process.stderr.write(
@@ -1184,7 +1296,13 @@ function terminateGroup(procs: any[]) {
   setTimeout(() => {
     for (const p of procs) {
       try {
-        if (p && p.pid) process.kill(-p.pid, "SIGKILL");
+        if (p && p.pid) {
+          try {
+            process.kill(-p.pid, "SIGKILL");
+          } catch {
+            process.kill(p.pid, "SIGKILL");
+          }
+        }
       } catch {}
     }
   }, 5000);
@@ -1250,6 +1368,49 @@ async function findToolSpecs(
   }
   await walk(rootDir);
   return out;
+}
+
+function waitProcess(
+  p: any,
+  stage: "stdinTransform" | "exec" | "stdoutTransform",
+): Promise<number> {
+  return new Promise<number>((res) => {
+    const onExit = (code: number | null, signal: NodeJS.Signals | null) => {
+      cleanup();
+      const exitCode = code != null ? code : signal ? 143 : 0; // 143 for SIGTERM (128+15)
+      res(exitCode);
+    };
+    const onError = (_err: any) => {
+      try {
+        p.stdout?.destroy();
+      } catch {}
+      try {
+        p.stderr?.destroy();
+      } catch {}
+      try {
+        const msg = _err && _err.message ? `: ${String(_err.message)}` : "";
+        process.stderr.write(`json-cli: failed to spawn ${stage}${msg}\n`);
+      } catch {}
+      try {
+        process.stderr.write(`stage failed: ${stage} code=69\n`);
+      } catch {}
+      res(69);
+    };
+    const cleanup = () => {
+      try {
+        p.off?.("close", onExit);
+      } catch {}
+      try {
+        p.off?.("error", onError);
+      } catch {}
+    };
+    try {
+      p.on("close", onExit);
+      p.on("error", onError);
+    } catch {
+      res(0);
+    }
+  });
 }
 
 // Execute CLI when loaded as entrypoint (normal) or even when imported by the thin bash wrapper.

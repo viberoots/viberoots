@@ -96,7 +96,7 @@ async function rewriteCoverageUrls(tmpRoot: string) {
 
 export async function rsyncRepoTo(tmp: string) {
   await timeAsync(`rsyncRepoTo(${path.basename(tmp)})`, async () => {
-    await $`rsync -a --exclude "buck-out" --exclude ".git" --exclude "libs" --exclude "node_modules" --exclude "coverage" --exclude ".clinic" ./ ${tmp}/`;
+    await $`rsync -a --exclude "buck-out" --exclude ".git" --exclude "libs" --exclude "node_modules" --exclude "coverage" --exclude ".clinic" --exclude ".direnv" --exclude "result" ./ ${tmp}/`;
   });
 }
 
@@ -124,7 +124,22 @@ export async function runInTemp<T>(
   await ensurePnpmStoreHashValid();
   // Load direnv environment for the temp dir so devShell linking/PATH are active when available.
   // If already in a nix dev shell, skip direnv to avoid redundant flake eval and shellHook.
-  const shouldUseDirenv = !process.env.IN_NIX_SHELL;
+  // Additionally, if the required tools are already available on PATH (e.g., secretspec), skip direnv.
+  async function isOnPath(bin: string): Promise<boolean> {
+    try {
+      await $({ stdio: "pipe" })`bash --noprofile --norc -c ${`command -v ${bin} >/dev/null 2>&1`}`;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  const skipDirenv = process.env.JSON_CLI_SKIP_DIRENV === "1";
+  let shouldUseDirenv = !process.env.IN_NIX_SHELL && !skipDirenv;
+  try {
+    if (await isOnPath("secretspec")) {
+      shouldUseDirenv = false;
+    }
+  } catch {}
   const envOut = shouldUseDirenv
     ? await timeAsync(
         `direnvExport(${path.basename(tmp)})`,
@@ -132,7 +147,7 @@ export async function runInTemp<T>(
           $({
             cwd: tmp,
             stdio: "pipe",
-          })`bash -c 'if command -v direnv >/dev/null 2>&1; then direnv allow . >/dev/null 2>&1 || true; eval "$(direnv export bash)"; env -0; else printf ""; fi'`,
+          })`bash --noprofile --norc -c 'if command -v direnv >/dev/null 2>&1; then direnv allow . >/dev/null 2>&1 || true; eval "$(direnv export bash)"; env -0; else printf ""; fi'`,
       )
     : ({ stdout: "" } as any);
   const exportEnv: Record<string, string> = {};
@@ -163,16 +178,35 @@ export async function runInTemp<T>(
     .join(" ");
   const _$ = $({ cwd: tmp, env: exportEnv });
   try {
+    if (process.env.TEST_KEEP_TMP === "1") {
+      // Enable runner debug to a file inside the tmp to survive stdout suppression
+      exportEnv.JSON_CLI_DEBUG = "1";
+      exportEnv.JSON_CLI_DEBUG_FILE = path.join(tmp, "jc.runner.log");
+      try {
+        console.error(`KEEP_TMP ${tmp}`);
+        await fsp
+          .appendFile(path.join(process.cwd(), "test-tmp-paths.log"), tmp + "\n", "utf8")
+          .catch(() => {});
+      } catch {}
+    }
     return await fn(tmp, _$);
   } finally {
     // Rewrite any raw coverage URLs that point to the soon-to-be-deleted tmp to the repo root
     await timeAsync(`rewriteCoverageUrls(${path.basename(tmp)})`, async () =>
       rewriteCoverageUrls(tmp).catch(() => {}),
     );
-    await fsp.rm(tmp, { recursive: true, force: true }).catch((err) => {
-      // Non-fatal: cleanup of temp dir may fail on CI; ignore but log for visibility.
-      console.warn("warning: failed to remove temp test dir:", err);
-    });
+    if (process.env.TEST_KEEP_TMP === "1") {
+      try {
+        console.error(`KEEP_TMP ${tmp}`);
+        const logFile = path.join(process.cwd(), "test-tmp-paths.log");
+        await fsp.appendFile(logFile, tmp + "\n", "utf8").catch(() => {});
+      } catch {}
+    } else {
+      await fsp.rm(tmp, { recursive: true, force: true }).catch((err) => {
+        // Non-fatal: cleanup of temp dir may fail on CI; ignore but log for visibility.
+        console.warn("warning: failed to remove temp test dir:", err);
+      });
+    }
     logTiming(`runInTemp(${name})`, performance.now() - overallStart);
   }
 }

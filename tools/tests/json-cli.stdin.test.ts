@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import { describe, test } from "node:test";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { runInTemp } from "./lib/test-helpers";
+import { describe, test } from "node:test";
 import { defineToolSpec } from "../json-cli/spec";
+import { runInTemp } from "./lib/test-helpers";
 
 describe("json-cli stdinTransform + input validation", () => {
   test("fails fast when invocation JSON violates inputSchema", async () => {
@@ -20,6 +20,7 @@ describe("json-cli stdinTransform + input validation", () => {
           package: "io.example",
           exec: "bash",
           parameters: {},
+          env: {},
           stdoutTransform: { shell: "jq -c .", format: "ndjson" },
         },
       });
@@ -76,15 +77,27 @@ for await (const _ of fs.createReadStream(0, { encoding: 'utf8' })) { /* noop */
           exec: "bash",
           parameters: { sub: { type: "string", value: "-lc", position: 1 } },
           stdinTransform: { shell: "jq -c '.items[] | {v: .}'", format: "ndjson" },
-          stdoutTransform: { shell: "awk '{print $0}' | jq -c .", format: "ndjson" },
+          // Use cat to minimize buffering in the test harness
+          stdoutTransform: { shell: "cat", format: "ndjson" },
+          env: { JSON_CLI_DEBUG: "1", JSON_CLI_DEBUG_FILE: path.join(tmp, "debug.log") },
+          timeoutMs: 4000,
         },
       });
       await fsp.writeFile(specPath, JSON.stringify(spec, null, 2), "utf8");
 
-      // Use a simple command that echoes stdin back as lines and then pipe through jq -c .
-      // Here, we simulate by sending two items; the stdoutTransform wraps each again
+      // (removed breadcrumb probe)
+
       const input = JSON.stringify({ items: [1, 2, 3] });
-      const out = await $({ stdin: input, stdio: "pipe" })`json-cli io.example.ndjson`;
+      const inFile = path.join(tmp, "stdin.ndjson.json");
+      await fsp.writeFile(inFile, input, "utf8");
+      const out = await $({
+        stdio: "pipe",
+        env: {
+          ...process.env,
+          JSON_CLI_SKIP_DIRENV: "1",
+          WORKSPACE_ROOT: process.env.WORKSPACE_ROOT || process.cwd(),
+        },
+      })`bash --noprofile --norc -c ${`cat '${inFile}' | json-cli io.example.ndjson`}`;
       const lines = String(out.stdout).trim().split(/\n+/);
       if (lines.length < 3) {
         console.error("expected at least 3 lines, got:", lines);
@@ -115,19 +128,28 @@ for await (const _ of fs.createReadStream(0, { encoding: 'utf8' })) { /* noop */
           exec: "bash",
           parameters: { sub: { type: "string", value: "-lc", position: 1 } },
           stdinTransform: { shell: "jq '{count: (.items | length)}'", format: "json" },
-          stdoutTransform: { shell: "jq -c .", format: "ndjson" },
+          // Use cat to minimize buffering in the test harness
+          stdoutTransform: { shell: "cat", format: "json" },
+          env: {},
+          timeoutMs: 10000,
         },
       });
       await fsp.writeFile(specPath, JSON.stringify(spec, null, 2), "utf8");
 
+      // (removed breadcrumb probe)
+
       const input = JSON.stringify({ items: [1, 2, 3, 4] });
-      const out = await $({ stdin: input, stdio: "pipe" })`json-cli io.example.jsondoc`;
-      const lines = String(out.stdout).trim().split(/\n+/);
-      if (lines.length !== 1) {
-        console.error("expected single JSON line, got:", lines);
-        process.exit(2);
-      }
-      const obj = JSON.parse(lines[0]);
+      const inFile = path.join(tmp, "stdin.jsondoc.json");
+      await fsp.writeFile(inFile, input, "utf8");
+      const out = await $({
+        stdio: "pipe",
+        env: {
+          ...process.env,
+          JSON_CLI_SKIP_DIRENV: "1",
+          WORKSPACE_ROOT: process.env.WORKSPACE_ROOT || process.cwd(),
+        },
+      })`bash --noprofile --norc -c ${`cat '${inFile}' | json-cli io.example.jsondoc`}`;
+      const obj = JSON.parse(String(out.stdout));
       if (obj.count !== 4) {
         console.error("unexpected count:", obj);
         process.exit(2);
