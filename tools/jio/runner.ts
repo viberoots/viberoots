@@ -1165,6 +1165,13 @@ async function runWithTransforms(
           }
           if (runtime.collect) {
             if (suppressFurther) continue;
+            if (typeof runtime.collectLimit === "number" && runtime.collectLimit >= 0) {
+              if (itemsEmitted >= runtime.collectLimit) {
+                collectLimitExceeded = true;
+                suppressFurther = true;
+                continue;
+              }
+            }
             if (!arrayStarted) {
               process.stdout.write("[");
               arrayStarted = true;
@@ -1173,12 +1180,6 @@ async function runWithTransforms(
             }
             process.stdout.write(JSON.stringify(obj));
             itemsEmitted++;
-            if (typeof runtime.collectLimit === "number" && runtime.collectLimit >= 0) {
-              if (itemsEmitted > runtime.collectLimit) {
-                collectLimitExceeded = true;
-                suppressFurther = true;
-              }
-            }
           } else {
             process.stdout.write(s + "\n");
           }
@@ -1209,19 +1210,29 @@ async function runWithTransforms(
         } else {
           if (runtime.collect) {
             if (!suppressFurther) {
-              if (!arrayStarted) {
-                process.stdout.write("[");
-                arrayStarted = true;
-              } else {
-                process.stdout.write(",");
-              }
-              process.stdout.write(JSON.stringify(obj));
-              itemsEmitted++;
               if (typeof runtime.collectLimit === "number" && runtime.collectLimit >= 0) {
-                if (itemsEmitted > runtime.collectLimit) {
+                if (itemsEmitted >= runtime.collectLimit) {
                   collectLimitExceeded = true;
                   suppressFurther = true;
+                } else {
+                  if (!arrayStarted) {
+                    process.stdout.write("[");
+                    arrayStarted = true;
+                  } else {
+                    process.stdout.write(",");
+                  }
+                  process.stdout.write(JSON.stringify(obj));
+                  itemsEmitted++;
                 }
+              } else {
+                if (!arrayStarted) {
+                  process.stdout.write("[");
+                  arrayStarted = true;
+                } else {
+                  process.stdout.write(",");
+                }
+                process.stdout.write(JSON.stringify(obj));
+                itemsEmitted++;
               }
             }
           } else {

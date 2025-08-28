@@ -134,9 +134,20 @@ describe("jio --collect mode", () => {
       try {
         await $({ stdio: "pipe" })`jio io.example.many --collect --collect-limit 3`;
       } catch (e: any) {
-        const err = String(e?.stderr || e?.stdout || e);
-        if (!/collect-limit/i.test(err)) {
-          console.error("expected collect-limit error, got:\n" + err);
+        const stderrTxt = String(e?.stderr || "");
+        const stdoutTxt = String(e?.stdout || "");
+        if (!/collect-limit/i.test(stderrTxt)) {
+          console.error("expected collect-limit error, got:\n" + stderrTxt);
+          process.exit(2);
+        }
+        try {
+          const arr = JSON.parse(stdoutTxt.trim());
+          if (!Array.isArray(arr) || arr.length !== 3) {
+            console.error("expected output array of length 3, got: " + stdoutTxt);
+            process.exit(2);
+          }
+        } catch {
+          console.error("expected valid JSON array on stdout, got:\n" + stdoutTxt);
           process.exit(2);
         }
         failed = true;
@@ -150,9 +161,20 @@ describe("jio --collect mode", () => {
       try {
         await $({ stdio: "pipe" })`jio io.example.many --collect --collect-limit=2`;
       } catch (e: any) {
-        const err = String(e?.stderr || e?.stdout || e);
-        if (!/collect-limit/i.test(err)) {
-          console.error("expected collect-limit error (eq form), got:\n" + err);
+        const stderrTxt = String(e?.stderr || "");
+        const stdoutTxt = String(e?.stdout || "");
+        if (!/collect-limit/i.test(stderrTxt)) {
+          console.error("expected collect-limit error (eq form), got:\n" + stderrTxt);
+          process.exit(2);
+        }
+        try {
+          const arr = JSON.parse(stdoutTxt.trim());
+          if (!Array.isArray(arr) || arr.length !== 2) {
+            console.error("expected output array of length 2, got: " + stdoutTxt);
+            process.exit(2);
+          }
+        } catch {
+          console.error("expected valid JSON array on stdout (eq form), got:\n" + stdoutTxt);
           process.exit(2);
         }
         failedEq = true;
