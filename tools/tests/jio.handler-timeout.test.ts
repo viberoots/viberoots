@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import { describe, test } from "node:test";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { runInTemp } from "./lib/test-helpers";
+import { describe, test } from "node:test";
 import { defineToolSpec } from "../jio/spec";
+import { runInTemp } from "./lib/test-helpers";
 
 describe("jio handler participates in timeout kill group", () => {
   test("timeout closes handler stdin then kills group", async () => {
@@ -24,7 +24,10 @@ let i=0; setInterval(() => console.log('not-json-'+(i++)), 1);
       );
       await $`chmod +x ${toolPath}`;
 
-      const sinkPath = path.join(tmp, "errors.ndjson");
+      const sinkPath = path.join(
+        tmp,
+        `errors-${Date.now()}-${Math.random().toString(36).slice(2)}.ndjson`,
+      );
       const spec = defineToolSpec({
         tool: { name: "ht" },
         command: {
@@ -38,6 +41,7 @@ let i=0; setInterval(() => console.log('not-json-'+(i++)), 1);
       });
       await fsp.writeFile(path.join(tmp, "ht.tool.json"), JSON.stringify(spec, null, 2), "utf8");
 
+      process.env.JIO_SECRETS_DISABLE = "1";
       let failed = false;
       try {
         await $({ stdio: "pipe" })`jio io.example.ht`;

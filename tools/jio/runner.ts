@@ -1419,6 +1419,38 @@ async function runWithTransforms(
   let exitCode = 0;
   let stdoutParseFailed = false;
   let stdoutConfigError = false;
+  // Helper to gracefully finalize the failure sink with a bounded grace period
+  const finalizeFailureSink = async () => {
+    if (!sink) return;
+    try {
+      (sink as any).endInput?.();
+    } catch {}
+    const proc: any = (sink as any).proc;
+    if (!proc || !proc.pid) return;
+    const exited = new Promise<void>((res) => {
+      try {
+        proc.once?.("exit", () => res());
+      } catch {
+        res();
+      }
+    });
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const grace1 = 800;
+    const grace2 = 800;
+    let done = false;
+    await Promise.race([exited.then(() => (done = true)), sleep(grace1)]);
+    if (!done) {
+      try {
+        process.kill(proc.pid, "SIGTERM");
+      } catch {}
+      await Promise.race([exited.then(() => (done = true)), sleep(grace2)]);
+      if (!done) {
+        try {
+          process.kill(proc.pid, "SIGKILL");
+        } catch {}
+      }
+    }
+  };
   if (st && st.format === "ndjson") {
     let bufStr = "";
     let firstLineSeen = false;
@@ -1633,6 +1665,8 @@ async function runWithTransforms(
   }
   if (localTimedOut) {
     process.stderr.write(`jio: timeout — sent SIGTERM to process groups; will SIGKILL after 5s\n`);
+    // Ensure failure sink has a chance to flush before we exit
+    await finalizeFailureSink();
     return 124;
   }
   if (stdinParseFailed) {
@@ -1647,38 +1681,7 @@ async function runWithTransforms(
     } catch {}
     return 65;
   }
-  // Finalize failure sink with bounded grace period for flush
-  await (async () => {
-    if (!sink) return;
-    try {
-      (sink as any).endInput?.();
-    } catch {}
-    const proc: any = (sink as any).proc;
-    if (!proc || !proc.pid) return;
-    const exited = new Promise<void>((res) => {
-      try {
-        proc.once?.("exit", () => res());
-      } catch {
-        res();
-      }
-    });
-    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-    const grace1 = 800;
-    const grace2 = 800;
-    let done = false;
-    await Promise.race([exited.then(() => (done = true)), sleep(grace1)]);
-    if (!done) {
-      try {
-        process.kill(proc.pid, "SIGTERM");
-      } catch {}
-      await Promise.race([exited.then(() => (done = true)), sleep(grace2)]);
-      if (!done) {
-        try {
-          process.kill(proc.pid, "SIGKILL");
-        } catch {}
-      }
-    }
-  })();
+  await finalizeFailureSink();
   return exitCode || cCode || p1Code || p2Code;
 }
 
