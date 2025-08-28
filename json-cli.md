@@ -115,7 +115,10 @@ The spec has two siblings: **`tool`** and **`command`**.
 
 - `package` — reverse-DNS-like namespace (used in FQName).
 - `exec` — the binary to run (e.g., `"scaf"`).
-- `workingDir` (optional) — directory to spawn the process in. **Normative rule**: resolve relative paths **relative to the directory containing the `*.tool.json` file**, unless an absolute path is provided.
+- `workingDir` (optional) — directory to spawn the process in.
+  - Default resolution: relative paths are resolved **relative to the directory containing the `*.tool.json` file**, unless an absolute path is provided.
+  - If `inheritCallerCwd: true`, relative paths (or an omitted `workingDir`) resolve relative to the caller’s current working directory.
+  - Absolute paths are used as-is regardless of `inheritCallerCwd`.
 - `env` (optional) — per-tool environment (merged over process env and `.json-cli.env`). **Precedence**: `process.env` < root `.json-cli.env` < per-tool `command.env`. In `--dry-run`, print env **keys only** and redact values matching `*_TOKEN`, `*_SECRET`, `*PASSWORD*`, etc. **Secrets** SHOULD be provided via [SecretSpec](https://github.com/cachix/secretspec) files and referenced by the runner rather than embedded directly.
 - `defaultBooleanStyle` (optional) — `"presence"` (default) or `"equals"`.
 - `parameters` — **explicit mapping** from JSON → argv (see §4).
@@ -318,7 +321,7 @@ Input:
 
 **Two channels (explicit):**
 
-- **Invocation JSON (args channel):** Loaded **only** from `--in <file.json>`. This object is used to build `argv` via `parameters`. If any parameter uses `path`, `--in` is **required**. If `--in` is omitted, only `value`-based parameters may be used; otherwise fail with **config error (78)**.
+- **Invocation JSON (args channel):** Loaded **only** from `--in <file.json>`. This object is used to build `argv` via `parameters`. `--in` is **required** if there exists at least one parameter that (a) uses `path`, (b) is `required:true`, and (c) does not provide a `default`. Otherwise, `--in` is optional and any path‑mapped parameters without values are skipped or use their `default`.
 - **Data stream (stdin channel):** Read from **stdin** and fed to `stdinTransform` (if present). This stream is independent of the invocation JSON and can be NDJSON or JSON as required by the transform.
 
 **Execution steps**
@@ -779,6 +782,10 @@ tool a b --tag=x --tag=y --labels=red;blue --a=1 --b=2
           "enum": ["presence", "equals"],
           "default": "presence"
         },
+        "inheritCallerCwd": {
+          "type": "boolean",
+          "default": false
+        },
         "timeoutMs": {
           "type": "integer",
           "minimum": 1
@@ -828,12 +835,9 @@ tool a b --tag=x --tag=y --labels=red;blue --a=1 --b=2
                   }
                 },
                 "oneOf": [
-                  {
-                    "required": ["path", "type"]
-                  },
-                  {
-                    "required": ["value", "type"]
-                  }
+                  { "required": ["path", "type"] },
+                  { "required": ["value", "type"] },
+                  { "required": ["default", "type"] }
                 ]
               },
               {

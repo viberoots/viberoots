@@ -29,6 +29,7 @@ type ToolSpec = {
     package?: string;
     exec?: string;
     workingDir?: string;
+    inheritCallerCwd?: boolean;
     env?: Record<string, string>;
     defaultBooleanStyle?: "presence" | "equals";
     timeoutMs?: number;
@@ -387,6 +388,7 @@ const FORMAL_SCHEMA: any = {
         workingDir: { type: "string" },
         env: { type: "object", additionalProperties: { type: "string" } },
         defaultBooleanStyle: { type: "string", enum: ["presence", "equals"], default: "presence" },
+        inheritCallerCwd: { type: "boolean", default: false },
         timeoutMs: { type: "integer", minimum: 1 },
         parameters: {
           type: "object",
@@ -413,7 +415,11 @@ const FORMAL_SCHEMA: any = {
                   },
                   csvSeparator: { type: "string", maxLength: 1 },
                 },
-                oneOf: [{ required: ["path", "type"] }, { required: ["value", "type"] }],
+                anyOf: [
+                  { required: ["path", "type"] },
+                  { required: ["value", "type"] },
+                  { required: ["default", "type"] },
+                ],
               },
               {
                 if: { required: ["flag"], properties: { flag: { const: true } } },
@@ -765,6 +771,12 @@ function buildDryRunPlan(
 
 function resolveWorkingDir(_rootDir: string, specPath: string, spec: ToolSpec): string {
   const wd = spec.command?.workingDir;
+  const inherit = !!spec.command?.inheritCallerCwd;
+  if (inherit) {
+    if (!wd) return process.cwd();
+    if (path.isAbsolute(wd)) return wd;
+    return path.resolve(process.cwd(), wd);
+  }
   if (!wd) return path.dirname(specPath);
   if (path.isAbsolute(wd)) return wd;
   return path.resolve(path.dirname(specPath), wd);

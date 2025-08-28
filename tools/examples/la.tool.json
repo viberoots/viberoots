@@ -1,0 +1,32 @@
+{
+  "specVersion": "1.0.0",
+  "jsonPathDialect": "jsonpath-plus@8",
+  "schemaDialect": "https://json-schema.org/draft/2020-12/schema",
+
+  "tool": {
+    "name": "la",
+    "title": "List all (long)",
+    "description": "ls that returns all stats for each file",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": { "file": { "type": "string" } },
+      "required": ["file"]
+    }
+  },
+
+  "command": {
+    "package": "io.example.examples",
+    "exec": "ls",
+    "parameters": {
+      "path": { "path": "$.path", "type": "string", "position": 1, "required": false }
+    },
+    "stdoutTransform": {
+      "shell": "xargs stat | jc --stat | jq -c '.[0]'",
+      "format": "ndjson"
+    }
+  }
+}

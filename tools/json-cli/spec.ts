@@ -18,6 +18,7 @@ export type CommandSection = {
   package: string;
   exec: string;
   workingDir?: string;
+  inheritCallerCwd?: boolean;
   env?: Record<string, string>;
   defaultBooleanStyle?: "presence" | "equals";
   timeoutMs?: number;
@@ -29,7 +30,8 @@ export type CommandSection = {
 
 export type ParameterSpec =
   | ({ value: string; type: BaseTypes } & BaseParam)
-  | ({ path: string; type: BaseTypes } & BaseParam);
+  | ({ path: string; type: BaseTypes } & BaseParam)
+  | ({ default: any; type: BaseTypes } & BaseParam);
 
 type BaseTypes = "string" | "number" | "boolean" | "array" | "object";
 
