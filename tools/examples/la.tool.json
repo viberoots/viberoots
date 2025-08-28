@@ -21,11 +21,12 @@
   "command": {
     "package": "io.example.examples",
     "exec": "ls",
+    "inheritCallerCwd": true,
     "parameters": {
       "path": { "path": "$.path", "type": "string", "position": 1, "required": false }
     },
     "stdoutTransform": {
-      "shell": "xargs stat | jc --stat | jq -c '.[0]'",
+      "shell": "xargs stat | jc --stat | jq -c '.[]'",
       "format": "ndjson"
     }
   }

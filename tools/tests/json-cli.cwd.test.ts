@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import { describe, test } from "node:test";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { runInTemp } from "./lib/test-helpers";
+import { describe, test } from "node:test";
 import { defineToolSpec } from "../json-cli/spec";
+import { runInTemp } from "./lib/test-helpers";
 
 describe("json-cli working directory resolution", () => {
   test("defaults to spec directory when inheritCallerCwd is false", async () => {
