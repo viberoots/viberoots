@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import readline from "node:readline";
+import { PassThrough } from "node:stream";
 
 type CliOpts = {
   help: boolean;
@@ -15,6 +16,17 @@ type CliOpts = {
   toolRef: string | null;
   collect: boolean;
   collectLimit?: number;
+  // Limits (CLI overrides)
+  maxArgvTokens?: number;
+  maxArgvBytes?: number;
+  maxStdinBytes?: number;
+  maxStdoutJsonBytes?: number;
+  maxNdjsonLineBytes?: number;
+  timeoutMsOverride?: number;
+  // Env handling
+  cleanEnv: boolean;
+  passEnv: string[];
+  setEnv: Record<string, string>;
 };
 
 type RootConfig = {
@@ -33,8 +45,16 @@ type ToolSpec = {
     workingDir?: string;
     inheritCallerCwd?: boolean;
     env?: Record<string, string>;
+    envPassthrough?: string[];
     defaultBooleanStyle?: "presence" | "equals";
     timeoutMs?: number;
+    limits?: {
+      maxArgvTokens?: number;
+      maxArgvBytes?: number;
+      maxStdinBytes?: number;
+      maxStdoutJsonBytes?: number;
+      maxNdjsonLineBytes?: number;
+    };
     parameters?: Record<string, ParameterSpec>;
     stdinTransform?: { shell?: string; format?: "json" | "ndjson" };
     stdoutTransform?: { shell?: string; format?: "json" | "ndjson" };
@@ -212,6 +232,17 @@ export async function main(argv: string[]): Promise<number | void> {
   const code = await runWithTransforms(rootDir, specPath, spec, argvBuilt, rootCfg, invObj, {
     collect: !!opts.collect,
     collectLimit: opts.collectLimit,
+    limits: {
+      maxArgvTokens: opts.maxArgvTokens,
+      maxArgvBytes: opts.maxArgvBytes,
+      maxStdinBytes: opts.maxStdinBytes,
+      maxStdoutJsonBytes: opts.maxStdoutJsonBytes,
+      maxNdjsonLineBytes: opts.maxNdjsonLineBytes,
+    },
+    timeoutMsOverride: opts.timeoutMsOverride,
+    cleanEnv: opts.cleanEnv,
+    passEnv: opts.passEnv,
+    setEnv: opts.setEnv,
   });
   return code;
 }
@@ -240,6 +271,9 @@ function parseArgs(argv: string[]): CliOpts {
     dryRun: false,
     toolRef: null,
     collect: false,
+    cleanEnv: true,
+    passEnv: [],
+    setEnv: {},
   };
   const rest: string[] = [];
   const tokens = normalizeEquals(argv);
@@ -255,6 +289,39 @@ function parseArgs(argv: string[]): CliOpts {
     else if (a === "--collect-limit") {
       const n = Number(tokens[++i] ?? "");
       if (Number.isFinite(n) && n >= 0) out.collectLimit = Math.floor(n);
+    } else if (a === "--max-argv-tokens") {
+      const n = Number(tokens[++i] ?? "");
+      if (Number.isFinite(n) && n >= 0) out.maxArgvTokens = Math.floor(n);
+    } else if (a === "--max-argv-bytes") {
+      const n = Number(tokens[++i] ?? "");
+      if (Number.isFinite(n) && n >= 0) out.maxArgvBytes = Math.floor(n);
+    } else if (a === "--max-stdin-bytes") {
+      const n = Number(tokens[++i] ?? "");
+      if (Number.isFinite(n) && n >= 0) out.maxStdinBytes = Math.floor(n);
+    } else if (a === "--max-stdout-json-bytes") {
+      const n = Number(tokens[++i] ?? "");
+      if (Number.isFinite(n) && n >= 0) out.maxStdoutJsonBytes = Math.floor(n);
+    } else if (a === "--max-ndjson-line-bytes") {
+      const n = Number(tokens[++i] ?? "");
+      if (Number.isFinite(n) && n >= 0) out.maxNdjsonLineBytes = Math.floor(n);
+    } else if (a === "--timeout-ms") {
+      const n = Number(tokens[++i] ?? "");
+      if (Number.isFinite(n) && n >= 0) out.timeoutMsOverride = Math.floor(n);
+    } else if (a === "--no-clean-env") {
+      out.cleanEnv = false;
+    } else if (a === "--clean-env") {
+      out.cleanEnv = true;
+    } else if (a === "--pass-env") {
+      const name = String(tokens[++i] ?? "").trim();
+      if (name) out.passEnv.push(name);
+    } else if (a === "--env") {
+      const kv = String(tokens[++i] ?? "");
+      const eq = kv.indexOf("=");
+      if (eq > 0) {
+        const k = kv.slice(0, eq);
+        const v = kv.slice(eq + 1);
+        out.setEnv[k] = v;
+      }
     } else if (a.startsWith("-")) {
       // unknown flag; keep for future but ignore
     } else {
@@ -278,6 +345,15 @@ Flags:
       --dry-run     Print plan without executing
       --collect     For ndjson output, return a single JSON array instead of lines
       --collect-limit N  Max number of items to collect before failing (default: unlimited)
+      --timeout-ms N      Override spec timeout (ms)
+      --max-argv-tokens N  Cap number of argv tokens
+      --max-argv-bytes N   Cap total argv bytes
+      --max-stdin-bytes N  Cap bytes read from stdin
+      --max-stdout-json-bytes N  Cap size of JSON output
+      --max-ndjson-line-bytes N  Cap per-line NDJSON bytes
+      --clean-env | --no-clean-env  Use minimal env by default; disable to passthrough all
+      --pass-env NAME      Pass specific env var from parent (repeatable)
+      --env NAME=VALUE     Set explicit env var for child (repeatable)
 `);
 }
 
@@ -819,6 +895,46 @@ function mergeEnv(rootCfg: RootConfig, spec: ToolSpec): Record<string, string> {
   return env;
 }
 
+function buildChildEnv(
+  rootCfg: RootConfig,
+  spec: ToolSpec,
+  runtime: { cleanEnv: boolean; passEnv: string[]; setEnv: Record<string, string> },
+): Record<string, string> {
+  const base: Record<string, string> = {};
+  const mustKeep = new Set<string>([
+    "PATH",
+    "WORKSPACE_ROOT",
+    "NODE_BIN",
+    "NODE_OPTIONS",
+    "NODE_PATH",
+    "HOME",
+    "TMPDIR",
+    "TEMP",
+    "TMP",
+  ]);
+  if (!runtime.cleanEnv) {
+    for (const [k, v] of Object.entries(process.env)) if (typeof v === "string") base[k] = v;
+  } else {
+    for (const k of mustKeep) {
+      const v = process.env[k];
+      if (typeof v === "string") base[k] = v;
+    }
+    for (const name of spec.command?.envPassthrough || []) {
+      const v = process.env[name];
+      if (typeof v === "string") base[name] = v;
+    }
+    for (const name of runtime.passEnv || []) {
+      const v = process.env[name];
+      if (typeof v === "string") base[name] = v;
+    }
+  }
+  // Root config/env and spec.env overlay
+  for (const [k, v] of Object.entries(rootCfg.env || {})) base[k] = v;
+  for (const [k, v] of Object.entries(spec.command?.env || {})) base[k] = v;
+  for (const [k, v] of Object.entries(runtime.setEnv || {})) base[k] = v;
+  return base;
+}
+
 function globToRegExp(glob: string): RegExp {
   // very small glob: **, *, and literal dots/slashes
   let g = glob.replace(/[.+^${}()|[\]\\]/g, "\\$&");
@@ -835,12 +951,51 @@ async function runWithTransforms(
   argv: string[],
   rootCfg: RootConfig,
   invObj: any,
-  runtime: { collect: boolean; collectLimit?: number },
+  runtime: {
+    collect: boolean;
+    collectLimit?: number;
+    limits?: {
+      maxArgvTokens?: number;
+      maxArgvBytes?: number;
+      maxStdinBytes?: number;
+      maxStdoutJsonBytes?: number;
+      maxNdjsonLineBytes?: number;
+    };
+    timeoutMsOverride?: number;
+    cleanEnv: boolean;
+    passEnv: string[];
+    setEnv: Record<string, string>;
+  },
 ): Promise<number> {
+  const DEFAULT_LIMITS = {
+    maxArgvTokens: 4096,
+    maxArgvBytes: 262144,
+    maxStdinBytes: 16 * 1024 * 1024,
+    maxStdoutJsonBytes: 32 * 1024 * 1024,
+    maxNdjsonLineBytes: 1 * 1024 * 1024,
+  };
+  const limits = {
+    ...DEFAULT_LIMITS,
+    ...(spec.command?.limits || {}),
+    ...(runtime.limits || {}),
+  } as Required<typeof DEFAULT_LIMITS>;
   const cwd = resolveWorkingDir(rootDir, specPath, spec);
-  const env = mergeEnv(rootCfg, spec);
+  const env = buildChildEnv(rootCfg, spec, runtime);
   // Preserve user-provided debug opts; do not mutate global env here.
   const sink = openFailureSink(rootDir, specPath, spec, rootCfg);
+
+  // Enforce argv caps before spawn
+  const argvTokenCount = argv.length;
+  let argvBytes = 0;
+  for (const t of argv) argvBytes += Buffer.byteLength(String(t)) + 1;
+  if (argvTokenCount > limits.maxArgvTokens) {
+    process.stderr.write("jio: argv tokens limit exceeded\n");
+    return 78;
+  }
+  if (argvBytes > limits.maxArgvBytes) {
+    process.stderr.write("jio: argv bytes limit exceeded\n");
+    return 78;
+  }
 
   // Optional stdinTransform
   const stIn = spec.command?.stdinTransform;
@@ -976,7 +1131,7 @@ async function runWithTransforms(
 
   // Local timeout guard
   const procs = [p1, cmd, p2, sink && (sink as any).proc].filter(Boolean) as any[];
-  const timeoutMs = spec.command?.timeoutMs;
+  const timeoutMs = runtime.timeoutMsOverride || spec.command?.timeoutMs;
   let localTimedOut = false;
   let localKiller: NodeJS.Timeout | null = null;
   const localTimeoutPromise: Promise<"TIMEOUT"> | null =
@@ -1046,7 +1201,23 @@ async function runWithTransforms(
     // No transform: pipe directly and ensure closure with a fallback guard
     let ended = false;
     try {
-      process.stdin.pipe(cmd.stdin);
+      const limiter = new PassThrough();
+      let stdinCount = 0;
+      limiter.on("data", (chunk) => {
+        stdinCount += (chunk as Buffer).length;
+        if (stdinCount > limits.maxStdinBytes) {
+          try {
+            process.stderr.write("jio: stdin bytes limit exceeded\n");
+          } catch {}
+          try {
+            limiter.destroy();
+          } catch {}
+          try {
+            cmd.stdin.end();
+          } catch {}
+        }
+      });
+      process.stdin.pipe(limiter).pipe(cmd.stdin);
       const onEnd = () => {
         if (ended) return;
         ended = true;
@@ -1061,7 +1232,23 @@ async function runWithTransforms(
     } catch {}
   } else {
     // process.stdin -> p1.stdin
-    process.stdin.pipe(p1.stdin);
+    const limiter = new PassThrough();
+    let stdinCount = 0;
+    limiter.on("data", (chunk) => {
+      stdinCount += (chunk as Buffer).length;
+      if (stdinCount > limits.maxStdinBytes) {
+        try {
+          process.stderr.write("jio: stdin bytes limit exceeded\n");
+        } catch {}
+        try {
+          limiter.destroy();
+        } catch {}
+        try {
+          p1.stdin.end();
+        } catch {}
+      }
+    });
+    process.stdin.pipe(limiter).pipe(p1.stdin);
     // enforce format on p1.stdout and forward into cmd.stdin
     const format = stIn!.format;
     if (format === "ndjson") {
@@ -1144,11 +1331,22 @@ async function runWithTransforms(
     let suppressFurther = false;
     for await (const chunk of p2.stdout) {
       bufStr += Buffer.from(chunk).toString("utf8");
+      if (bufStr.indexOf("\n") < 0 && Buffer.byteLength(bufStr) > limits.maxNdjsonLineBytes) {
+        process.stderr.write("jio: ndjson line bytes limit exceeded (stream)\n");
+        return 78;
+      }
       while (true) {
         const nl = bufStr.indexOf("\n");
         if (nl < 0) break;
         let s = bufStr.slice(0, nl);
         bufStr = bufStr.slice(nl + 1);
+        // line-size cap (after cut at newline)
+        if (Buffer.byteLength(s) > limits.maxNdjsonLineBytes) {
+          process.stderr.write("jio: ndjson line bytes limit exceeded\n");
+          stdoutParseFailed = false;
+          stdoutConfigError = false;
+          return 78;
+        }
         if (s.trim() === "") continue;
         if (!firstLineSeen) {
           firstLineSeen = true;
@@ -1198,6 +1396,10 @@ async function runWithTransforms(
     // Handle any trailing data without newline
     const trailing = bufStr.trim();
     if (trailing) {
+      if (Buffer.byteLength(trailing) > limits.maxNdjsonLineBytes) {
+        process.stderr.write("jio: ndjson line bytes limit exceeded (trailing)\n");
+        return 78;
+      }
       let s = bufStr;
       if (!firstLineSeen && s.charCodeAt(0) === 0xfeff) s = s.slice(1);
       if (s.endsWith("\r")) s = s.slice(0, -1);
@@ -1258,7 +1460,16 @@ async function runWithTransforms(
     }
   } else if (st && st.format === "json") {
     const chunks: Buffer[] = [];
-    for await (const chunk of p2.stdout) chunks.push(Buffer.from(chunk));
+    let total = 0;
+    for await (const chunk of p2.stdout) {
+      const c = Buffer.from(chunk);
+      total += c.length;
+      if (total > limits.maxStdoutJsonBytes) {
+        process.stderr.write("jio: stdout JSON bytes limit exceeded\n");
+        return 78;
+      }
+      chunks.push(c);
+    }
     let buf = Buffer.concat(chunks).toString("utf8");
     if (buf.charCodeAt(0) === 0xfeff) buf = buf.slice(1);
     try {
