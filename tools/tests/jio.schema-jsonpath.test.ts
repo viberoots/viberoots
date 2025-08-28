@@ -2,14 +2,14 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { describe, test } from "node:test";
-import { defineToolSpec } from "../json-cli/spec";
+import { defineToolSpec } from "../jio/spec";
 import { runInTemp } from "./lib/test-helpers";
 
-describe("json-cli formal schema validation and JSONPath subset", () => {
+describe("jio formal schema validation and JSONPath subset", () => {
   test("invalid spec rejected by schema", async () => {
-    await runInTemp("json-cli-schema", async (tmp, $) => {
+    await runInTemp("jio-schema", async (tmp, $) => {
       await fsp.writeFile(
-        path.join(tmp, ".json-cli"),
+        path.join(tmp, ".jio"),
         JSON.stringify({ defaultPackage: "io.example" }),
         "utf8",
       );
@@ -26,7 +26,7 @@ describe("json-cli formal schema validation and JSONPath subset", () => {
       // Execute the bad tool directly to trigger schema validation failure
       let failed = false;
       try {
-        await $({ stdio: "pipe" })`json-cli io.example.oops --dry-run`;
+        await $({ stdio: "pipe" })`jio io.example.oops --dry-run`;
       } catch (e: any) {
         const err = String(e?.stderr || e?.stdout || "");
         if (!/invalid spec|invalid .*missing command\.exec/i.test(err)) {
@@ -43,9 +43,9 @@ describe("json-cli formal schema validation and JSONPath subset", () => {
   });
 
   test("JSONPath subset: arrays and wildcards", async () => {
-    await runInTemp("json-cli-jsonpath", async (tmp, $) => {
+    await runInTemp("jio-jsonpath", async (tmp, $) => {
       await fsp.writeFile(
-        path.join(tmp, ".json-cli"),
+        path.join(tmp, ".jio"),
         JSON.stringify({ defaultPackage: "io.example" }),
         "utf8",
       );
@@ -76,7 +76,7 @@ describe("json-cli formal schema validation and JSONPath subset", () => {
         JSON.stringify({ ids: ["a", "b", "c", "d"], tags: ["x", "y"] }),
         "utf8",
       );
-      const out = await $({ stdio: "pipe" })`json-cli io.example.jp --in ${inv} --dry-run`;
+      const out = await $({ stdio: "pipe" })`jio io.example.jp --in ${inv} --dry-run`;
       const plan = JSON.parse(String(out.stdout));
       const argv: string[] = plan.argv;
       // Expect positionals: -lc a b c ; flags: --tag=x --tag=y

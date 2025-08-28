@@ -3,13 +3,13 @@ import { describe, test } from "node:test";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runInTemp } from "./lib/test-helpers";
-import { defineToolSpec } from "../json-cli/spec";
+import { defineToolSpec } from "../jio/spec";
 
-describe("json-cli warns on >2^53-1 numbers", () => {
+describe("jio warns on >2^53-1 numbers", () => {
   test("rendering large number triggers stderr warning", async () => {
-    await runInTemp("json-cli-num-warn", async (tmp, $) => {
+    await runInTemp("jio-num-warn", async (tmp, $) => {
       await fsp.writeFile(
-        path.join(tmp, ".json-cli"),
+        path.join(tmp, ".jio"),
         JSON.stringify({ defaultPackage: "io.example" }),
         "utf8",
       );
@@ -31,7 +31,7 @@ describe("json-cli warns on >2^53-1 numbers", () => {
       await fsp.writeFile(inv, JSON.stringify({ big: 9007199254740992 }), "utf8");
       let warned = false;
       try {
-        await $({ stdio: "pipe" })`json-cli io.example.large --in ${inv} --dry-run`;
+        await $({ stdio: "pipe" })`jio io.example.large --in ${inv} --dry-run`;
       } catch (e: any) {
         const err = String(e?.stderr || e?.stdout || "");
         warned = /warning: number may lose precision/i.test(err);
@@ -39,7 +39,7 @@ describe("json-cli warns on >2^53-1 numbers", () => {
       }
       if (!warned) {
         // If no exception path, run again and check captured stderr via spawn output
-        const out = await $({ stdio: "pipe" })`json-cli io.example.large --in ${inv} --dry-run`; // should be 0
+        const out = await $({ stdio: "pipe" })`jio io.example.large --in ${inv} --dry-run`; // should be 0
         const err = String(out.stderr || "");
         if (!/warning: number may lose precision/i.test(err)) {
           console.error("expected precision warning in stderr, got:\n" + err);

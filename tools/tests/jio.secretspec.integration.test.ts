@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { describe, test } from "node:test";
-import { defineToolSpec } from "../json-cli/spec";
+import { defineToolSpec } from "../jio/spec";
 import { runInTemp } from "./lib/test-helpers";
 
 async function execJsonCli(
@@ -17,7 +17,7 @@ async function execJsonCli(
       if (typeof v === "string") mergedEnv[k] = v;
     }
     for (const [k, v] of Object.entries(env)) mergedEnv[k] = v;
-    const proc = spawn("json-cli", args, {
+    const proc = spawn("jio", args, {
       stdio: ["ignore", "pipe", "inherit"],
       env: mergedEnv,
       cwd,
@@ -29,18 +29,18 @@ async function execJsonCli(
     proc.on("error", (err) => reject(err));
     proc.on("close", (code) => {
       if (code === 0) resolve(out);
-      else reject(new Error(`json-cli exited with code ${code}`));
+      else reject(new Error(`jio exited with code ${code}`));
     });
   });
 }
 
-describe("json-cli auto-wrap with SecretSpec when secretspec.toml exists", () => {
+describe("jio auto-wrap with SecretSpec when secretspec.toml exists", () => {
   test(
     "dotenv provider injects FAKE secrets without calling secretspec run explicitly",
     { timeout: 120_000 },
     async () => {
-      process.env.JSON_CLI_SKIP_DIRENV = "1";
-      await runInTemp("json-cli-secrets-auto", async (tmp, $) => {
+      process.env.JIO_SKIP_DIRENV = "1";
+      await runInTemp("jio-secrets-auto", async (tmp, $) => {
         // Make a very obviously fake secret value
         const fakeEnv = path.join(tmp, ".fake-secrets.env");
         await fsp.writeFile(fakeEnv, "API_TOKEN=FAKE_SECRET_TOKEN\n", "utf8");
@@ -52,9 +52,9 @@ describe("json-cli auto-wrap with SecretSpec when secretspec.toml exists", () =>
           "utf8",
         );
 
-        // .json-cli with defaultPackage
+        // .jio with defaultPackage
         await fsp.writeFile(
-          path.join(tmp, ".json-cli"),
+          path.join(tmp, ".jio"),
           JSON.stringify({ defaultPackage: "io.example" }),
           "utf8",
         );
@@ -81,13 +81,13 @@ describe("json-cli auto-wrap with SecretSpec when secretspec.toml exists", () =>
         });
         await fsp.writeFile(path.join(tmp, "tok.tool.json"), JSON.stringify(spec, null, 2), "utf8");
 
-        // Run json-cli normally, relying on auto-wrap. Provide provider via env.
+        // Run jio normally, relying on auto-wrap. Provide provider via env.
         const out = await execJsonCli(
           ["io.example.tok"],
           {
-            JSON_CLI_SKIP_DIRENV: "1",
-            JSON_CLI_SECRETS_PROFILE: "default",
-            JSON_CLI_SECRETS_PROVIDER: `dotenv:${fakeEnv}`,
+            JIO_SKIP_DIRENV: "1",
+            JIO_SECRETS_PROFILE: "default",
+            JIO_SECRETS_PROVIDER: `dotenv:${fakeEnv}`,
           },
           tmp,
         );
@@ -102,10 +102,10 @@ describe("json-cli auto-wrap with SecretSpec when secretspec.toml exists", () =>
         const out2 = await execJsonCli(
           ["io.example.tok"],
           {
-            JSON_CLI_SKIP_DIRENV: "1",
-            JSON_CLI_SECRETS_DISABLE: "1",
-            JSON_CLI_SECRETS_PROFILE: "default",
-            JSON_CLI_SECRETS_PROVIDER: `dotenv:${fakeEnv}`,
+            JIO_SKIP_DIRENV: "1",
+            JIO_SECRETS_DISABLE: "1",
+            JIO_SECRETS_PROFILE: "default",
+            JIO_SECRETS_PROVIDER: `dotenv:${fakeEnv}`,
           },
           tmp,
         );

@@ -2,14 +2,14 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { describe, test } from "node:test";
-import { defineToolSpec } from "../json-cli/spec";
+import { defineToolSpec } from "../jio/spec";
 import { runInTemp } from "./lib/test-helpers";
 
-describe("json-cli streaming and backpressure", () => {
+describe("jio streaming and backpressure", () => {
   test("high-volume NDJSON passes through without buffering", async () => {
-    await runInTemp("json-cli-backpressure", async (tmp, $) => {
+    await runInTemp("jio-backpressure", async (tmp, $) => {
       await fsp.writeFile(
-        path.join(tmp, ".json-cli"),
+        path.join(tmp, ".jio"),
         JSON.stringify({ defaultPackage: "io.example" }),
         "utf8",
       );
@@ -41,7 +41,7 @@ for (let i = 0; i < N; i++) {
       });
       await fsp.writeFile(specPath, JSON.stringify(spec, null, 2), "utf8");
 
-      const out = await $({ stdio: "pipe" })`json-cli io.example.bp`;
+      const out = await $({ stdio: "pipe" })`jio io.example.bp`;
       const lines = String(out.stdout).trim().split(/\n+/);
       if (lines.length < 50000) {
         console.error("missing lines:", lines.length);

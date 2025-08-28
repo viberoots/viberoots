@@ -2,14 +2,14 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { describe, test } from "node:test";
-import { defineToolSpec } from "../json-cli/spec";
+import { defineToolSpec } from "../jio/spec";
 import { runInTemp } from "./lib/test-helpers";
 
-describe("json-cli spawn failure diagnostics", () => {
+describe("jio spawn failure diagnostics", () => {
   test("exec ENOENT produces exit 69 and message", async () => {
-    await runInTemp("json-cli-spawn-exec-enoent", async (tmp, $) => {
+    await runInTemp("jio-spawn-exec-enoent", async (tmp, $) => {
       await fsp.writeFile(
-        path.join(tmp, ".json-cli"),
+        path.join(tmp, ".jio"),
         JSON.stringify({ defaultPackage: "io.example" }),
         "utf8",
       );
@@ -29,7 +29,7 @@ describe("json-cli spawn failure diagnostics", () => {
       );
       let failed = false;
       try {
-        await $({ stdio: "pipe" })`json-cli io.example.enoent`;
+        await $({ stdio: "pipe" })`jio io.example.enoent`;
       } catch (e: any) {
         const err = String(e?.stderr || e?.stdout || "");
         if (!/failed to spawn exec/i.test(err) || !/69/.test(err)) {
@@ -46,9 +46,9 @@ describe("json-cli spawn failure diagnostics", () => {
   });
 
   test("stdinTransform spawn failure produces exit 69", async () => {
-    await runInTemp("json-cli-spawn-stdin", async (tmp, $) => {
+    await runInTemp("jio-spawn-stdin", async (tmp, $) => {
       await fsp.writeFile(
-        path.join(tmp, ".json-cli"),
+        path.join(tmp, ".jio"),
         JSON.stringify({ defaultPackage: "io.example" }),
         "utf8",
       );
@@ -70,7 +70,7 @@ describe("json-cli spawn failure diagnostics", () => {
       );
       let failed = false;
       try {
-        await $({ stdio: "pipe" })`json-cli io.example.badstdinspawn`;
+        await $({ stdio: "pipe" })`jio io.example.badstdinspawn`;
       } catch (e: any) {
         const err = String(e?.stderr || e?.stdout || "");
         if (!/failed to spawn stdinTransform/i.test(err) || !/69/.test(err)) {

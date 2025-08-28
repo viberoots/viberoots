@@ -2,14 +2,14 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { describe, test } from "node:test";
-import { defineToolSpec } from "../json-cli/spec";
+import { defineToolSpec } from "../jio/spec";
 import { runInTemp } from "./lib/test-helpers";
 
-describe("json-cli exit precedence and standardized codes", () => {
+describe("jio exit precedence and standardized codes", () => {
   test("stdinTransform parse error takes precedence over exec/stdout", async () => {
-    await runInTemp("json-cli-exit-stdin", async (tmp, $) => {
+    await runInTemp("jio-exit-stdin", async (tmp, $) => {
       await fsp.writeFile(
-        path.join(tmp, ".json-cli"),
+        path.join(tmp, ".jio"),
         JSON.stringify({ defaultPackage: "io.example" }),
         "utf8",
       );
@@ -28,7 +28,7 @@ describe("json-cli exit precedence and standardized codes", () => {
       await fsp.writeFile(specPath, JSON.stringify(spec, null, 2), "utf8");
       let failed = false;
       try {
-        await $({ stdin: "", stdio: "pipe" })`json-cli io.example.badstdin`;
+        await $({ stdin: "", stdio: "pipe" })`jio io.example.badstdin`;
       } catch (e: any) {
         const err = String(e?.stderr || e?.stdout || "");
         if (!/stage failed: stdinTransform code=65/.test(err)) {
@@ -45,9 +45,9 @@ describe("json-cli exit precedence and standardized codes", () => {
   });
 
   test("stdoutTransform parse error wins over zero-exit exec", async () => {
-    await runInTemp("json-cli-exit-stdout", async (tmp, $) => {
+    await runInTemp("jio-exit-stdout", async (tmp, $) => {
       await fsp.writeFile(
-        path.join(tmp, ".json-cli"),
+        path.join(tmp, ".jio"),
         JSON.stringify({ defaultPackage: "io.example" }),
         "utf8",
       );
@@ -74,7 +74,7 @@ console.log('not-json');
       await fsp.writeFile(specPath, JSON.stringify(spec, null, 2), "utf8");
       let failed = false;
       try {
-        await $({ stdio: "pipe" })`json-cli io.example.badstdout`;
+        await $({ stdio: "pipe" })`jio io.example.badstdout`;
       } catch (e: any) {
         const err = String(e?.stderr || e?.stdout || "");
         if (!/stage failed: stdoutTransform code=65/.test(err)) {

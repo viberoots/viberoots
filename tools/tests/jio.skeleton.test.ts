@@ -4,15 +4,15 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runInTemp } from "./lib/test-helpers";
 
-describe("json-cli skeleton", () => {
+describe("jio skeleton", () => {
   test("shows help and version", async () => {
-    await runInTemp("json-cli-help", async (_tmp, $) => {
-      const help = await $({ stdio: "pipe" })`json-cli --help`;
-      if (!String(help.stdout).includes("Usage: json-cli")) {
+    await runInTemp("jio-help", async (_tmp, $) => {
+      const help = await $({ stdio: "pipe" })`jio --help`;
+      if (!String(help.stdout).includes("Usage: jio")) {
         console.error("missing Usage in help");
         process.exit(2);
       }
-      const ver = await $({ stdio: "pipe" })`json-cli --version`;
+      const ver = await $({ stdio: "pipe" })`jio --version`;
       if (!/^\d+\.\d+\.\d+/.test(String(ver.stdout).trim())) {
         console.error("version not semver-like");
         process.exit(2);
@@ -20,9 +20,9 @@ describe("json-cli skeleton", () => {
     });
   });
 
-  test("resolves root via .json-cli and lists tools", async () => {
-    await runInTemp("json-cli-list", async (tmp, $) => {
-      const cfgPath = path.join(tmp, ".json-cli");
+  test("resolves root via .jio and lists tools", async () => {
+    await runInTemp("jio-list", async (tmp, $) => {
+      const cfgPath = path.join(tmp, ".jio");
       await fsp.writeFile(cfgPath, JSON.stringify({ defaultPackage: "io.example" }), "utf8");
       const toolDir = path.join(tmp, "toolspecs");
       await fsp.mkdir(toolDir, { recursive: true });
@@ -41,14 +41,14 @@ describe("json-cli skeleton", () => {
         "utf8",
       );
 
-      const out = await $({ stdio: "pipe" })`json-cli --list`;
+      const out = await $({ stdio: "pipe" })`jio --list`;
       const s = String(out.stdout);
       if (!s.includes("io.example.demo") || !s.includes("demo.tool.json")) {
         console.error("list output missing fqname or path");
         process.exit(2);
       }
 
-      const where = await $({ stdio: "pipe" })`json-cli --where io.example.demo`;
+      const where = await $({ stdio: "pipe" })`jio --where io.example.demo`;
       const p = String(where.stdout).trim();
       if (!p.endsWith("demo.tool.json")) {
         console.error("where did not resolve to demo.tool.json");

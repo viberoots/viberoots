@@ -4,11 +4,11 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runInTemp } from "./lib/test-helpers";
 
-describe("json-cli skips invalid specs with warning", () => {
+describe("jio skips invalid specs with warning", () => {
   test("--list prints warning and continues", async () => {
-    await runInTemp("json-cli-invalid-skip", async (tmp, $) => {
+    await runInTemp("jio-invalid-skip", async (tmp, $) => {
       await fsp.writeFile(
-        path.join(tmp, ".json-cli"),
+        path.join(tmp, ".jio"),
         JSON.stringify({ defaultPackage: "io.example" }),
         "utf8",
       );
@@ -33,7 +33,7 @@ describe("json-cli skips invalid specs with warning", () => {
       };
       await fsp.writeFile(path.join(tmp, "good.tool.json"), JSON.stringify(good, null, 2), "utf8");
       await fsp.writeFile(path.join(tmp, "bad.tool.json"), JSON.stringify(bad, null, 2), "utf8");
-      const out = await $({ stdio: "pipe" })`json-cli --list`;
+      const out = await $({ stdio: "pipe" })`jio --list`;
       const stdout = String(out.stdout);
       const stderr = String(out.stderr);
       if (!/io\.example\.ok/.test(stdout)) {

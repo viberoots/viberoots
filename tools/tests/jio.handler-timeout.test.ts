@@ -3,13 +3,13 @@ import { describe, test } from "node:test";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runInTemp } from "./lib/test-helpers";
-import { defineToolSpec } from "../json-cli/spec";
+import { defineToolSpec } from "../jio/spec";
 
-describe("json-cli handler participates in timeout kill group", () => {
+describe("jio handler participates in timeout kill group", () => {
   test("timeout closes handler stdin then kills group", async () => {
-    await runInTemp("json-cli-handler-timeout", async (tmp, $) => {
+    await runInTemp("jio-handler-timeout", async (tmp, $) => {
       await fsp.writeFile(
-        path.join(tmp, ".json-cli"),
+        path.join(tmp, ".jio"),
         JSON.stringify({ defaultPackage: "io.example" }),
         "utf8",
       );
@@ -40,7 +40,7 @@ let i=0; setInterval(() => console.log('not-json-'+(i++)), 1);
 
       let failed = false;
       try {
-        await $({ stdio: "pipe" })`json-cli io.example.ht`;
+        await $({ stdio: "pipe" })`jio io.example.ht`;
       } catch (e: any) {
         const err = String(e?.stderr || e?.stdout || "");
         if (!/timeout — sent SIGTERM/i.test(err)) {

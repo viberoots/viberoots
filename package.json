@@ -7,7 +7,6 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "json-cli:lint": "tools/json-cli/lint-specs.ts",
     "dev:check": "tools/dev/startup-check.ts",
     "dev:clear-overrides": "tools/dev/clear-overrides.ts",
     "fmt": "prettier -w .",
@@ -17,7 +16,8 @@
     "prepare": "husky",
     "coverage:summary": "tools/dev/coverage-summary.ts",
     "coverage:open": "pnpm coverage:summary --open-browser || open coverage/lcov-report/index.html",
-    "test:cov": "buck2 test //... && c8 report --clean=false --temp-directory coverage/raw --reports-dir coverage --reporter=json-summary --reporter=lcov --reporter=html --extension .ts --allowExternal --all --src ."
+    "test:cov": "buck2 test //... && c8 report --clean=false --temp-directory coverage/raw --reports-dir coverage --reporter=json-summary --reporter=lcov --reporter=html --extension .ts --allowExternal --all --src .",
+    "jio:lint": "tools/jio/lint-specs.ts"
   },
   "lint-staged": {
     "**/*.{ts,tsx}": [

@@ -2,14 +2,14 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { describe, test } from "node:test";
-import { defineToolSpec } from "../json-cli/spec";
+import { defineToolSpec } from "../jio/spec";
 import { runInTemp } from "./lib/test-helpers";
 
-describe("json-cli working directory resolution", () => {
+describe("jio working directory resolution", () => {
   test("defaults to spec directory when inheritCallerCwd is false", async () => {
-    await runInTemp("json-cli-cwd-spec", async (tmp, $) => {
+    await runInTemp("jio-cwd-spec", async (tmp, $) => {
       await fsp.writeFile(
-        path.join(tmp, ".json-cli"),
+        path.join(tmp, ".jio"),
         JSON.stringify({ defaultPackage: "io.example" }),
         "utf8",
       );
@@ -34,9 +34,9 @@ describe("json-cli working directory resolution", () => {
         JSON.stringify(spec, null, 2),
         "utf8",
       );
-      await $({ cwd: tmp })`json-cli io.example.touch --dry-run`;
+      await $({ cwd: tmp })`jio io.example.touch --dry-run`;
       // Dry run doesn't execute. Now run real and verify file placement.
-      await $({ cwd: tmp })`json-cli io.example.touch`;
+      await $({ cwd: tmp })`jio io.example.touch`;
       const exists = await fsp
         .stat(path.join(subDir, "here.txt"))
         .then(() => true)
@@ -49,9 +49,9 @@ describe("json-cli working directory resolution", () => {
   });
 
   test("inherits caller CWD when inheritCallerCwd is true", async () => {
-    await runInTemp("json-cli-cwd-inherit", async (tmp, $) => {
+    await runInTemp("jio-cwd-inherit", async (tmp, $) => {
       await fsp.writeFile(
-        path.join(tmp, ".json-cli"),
+        path.join(tmp, ".jio"),
         JSON.stringify({ defaultPackage: "io.example" }),
         "utf8",
       );
@@ -72,7 +72,7 @@ describe("json-cli working directory resolution", () => {
         JSON.stringify(spec, null, 2),
         "utf8",
       );
-      const out = await $({ stdio: "pipe", cwd: tmp })`json-cli io.example.pwd`;
+      const out = await $({ stdio: "pipe", cwd: tmp })`jio io.example.pwd`;
       const s = String(out.stdout).trim();
       const obj = JSON.parse(s);
       const realTmp = await fsp.realpath(tmp);

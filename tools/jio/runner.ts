@@ -95,19 +95,19 @@ export async function main(argv: string[]): Promise<number | void> {
       return 78;
     }
     if (!opts.where.includes(".") && !rootCfg.defaultPackage) {
-      console.error("json-cli: config error — bare name requires .json-cli.defaultPackage");
+      console.error("jio: config error — bare name requires .jio.defaultPackage");
       return 78;
     }
     const fq = resolveToolRef(opts.where, rootCfg);
     const hit = idx.get(fq);
     if (!hit) {
-      console.error(`json-cli: tool not found: ${fq}`);
+      console.error(`jio: tool not found: ${fq}`);
       if (
         (rootCfg.globs && rootCfg.globs.length) ||
         (rootCfg.excludeGlobs && rootCfg.excludeGlobs.length)
       ) {
         console.error(
-          "hint: tool may be excluded by globs/excludeGlobs; run 'json-cli --list' to inspect discovered tools",
+          "hint: tool may be excluded by globs/excludeGlobs; run 'jio --list' to inspect discovered tools",
         );
       }
       return 78;
@@ -121,7 +121,7 @@ export async function main(argv: string[]): Promise<number | void> {
     return 2;
   }
   if (!opts.toolRef.includes(".") && !rootCfg.defaultPackage) {
-    console.error("json-cli: config error — bare name requires .json-cli.defaultPackage");
+    console.error("jio: config error — bare name requires .jio.defaultPackage");
     return 78;
   }
   let index: Map<string, string>;
@@ -134,13 +134,13 @@ export async function main(argv: string[]): Promise<number | void> {
   const fqTool = resolveToolRef(opts.toolRef, rootCfg);
   const specPath = index.get(fqTool);
   if (!specPath) {
-    console.error(`json-cli: tool not found: ${fqTool}`);
+    console.error(`jio: tool not found: ${fqTool}`);
     if (
       (rootCfg.globs && rootCfg.globs.length) ||
       (rootCfg.excludeGlobs && rootCfg.excludeGlobs.length)
     ) {
       console.error(
-        "hint: tool may be excluded by globs/excludeGlobs; run 'json-cli --list' to inspect discovered tools",
+        "hint: tool may be excluded by globs/excludeGlobs; run 'jio --list' to inspect discovered tools",
       );
     }
     return 78;
@@ -148,7 +148,7 @@ export async function main(argv: string[]): Promise<number | void> {
   const specRead = await readSpec(specPath);
   const spec = specRead.spec;
   if (!spec || !spec.command?.exec) {
-    console.error("json-cli: invalid spec (missing command.exec)");
+    console.error("jio: invalid spec (missing command.exec)");
     return 78;
   }
 
@@ -156,7 +156,7 @@ export async function main(argv: string[]): Promise<number | void> {
   let invObj: any = {};
   if (requiresInput || opts.inFile) {
     if (!opts.inFile && requiresInput) {
-      console.error("json-cli: --in is required when required parameters use path");
+      console.error("jio: --in is required when required parameters use path");
       return 78;
     }
     if (opts.inFile) {
@@ -182,12 +182,12 @@ export async function main(argv: string[]): Promise<number | void> {
           const sink = openFailureSink(rootDir, specPath, spec, rootCfg);
           const msg = JSON.stringify(validateIn.errors?.[0] || {});
           if (sink) await sink.write({ reason: "input", object: invObj, message: msg });
-          console.error(`json-cli: invalid input: ${msg}`);
+          console.error(`jio: invalid input: ${msg}`);
           if (sink) await sink.close();
           return 1;
         }
       } catch (e: any) {
-        console.error("json-cli: input validation failed");
+        console.error("jio: input validation failed");
         return 1;
       }
     }
@@ -197,7 +197,7 @@ export async function main(argv: string[]): Promise<number | void> {
   try {
     argvBuilt = buildArgv(spec, invObj);
   } catch (e: any) {
-    console.error(String(e?.message || e || "json-cli: argv build failed"));
+    console.error(String(e?.message || e || "jio: argv build failed"));
     return 78;
   }
 
@@ -241,8 +241,8 @@ function parseArgs(argv: string[]): CliOpts {
 }
 
 function printHelp(error?: string) {
-  if (error) console.error(`json-cli: ${error}`);
-  console.log(`Usage: json-cli <toolRef> [--in file.json] [--dry-run] [--list] [--where <toolRef>]
+  if (error) console.error(`jio: ${error}`);
+  console.log(`Usage: jio <toolRef> [--in file.json] [--dry-run] [--list] [--where <toolRef>]
 
 Flags:
   -h, --help        Show help
@@ -265,10 +265,10 @@ async function readVersion(): Promise<string> {
 }
 
 async function resolveRoot(): Promise<string> {
-  if (process.env.JSON_CLI_ROOT) return path.resolve(process.env.JSON_CLI_ROOT);
+  if (process.env.JIO_ROOT) return path.resolve(process.env.JIO_ROOT);
   let dir = process.cwd();
   while (true) {
-    const probe = path.join(dir, ".json-cli");
+    const probe = path.join(dir, ".jio");
     try {
       const st = await fsp.stat(probe);
       if (st.isFile()) return dir;
@@ -282,7 +282,7 @@ async function resolveRoot(): Promise<string> {
 
 async function readRootConfig(rootDir: string): Promise<RootConfig> {
   try {
-    const txt = await fsp.readFile(path.join(rootDir, ".json-cli"), "utf8");
+    const txt = await fsp.readFile(path.join(rootDir, ".jio"), "utf8");
     const obj = JSON.parse(txt);
     const cfg: RootConfig = {};
     if (obj && typeof obj === "object") {
@@ -353,7 +353,7 @@ async function buildIndex(rootDir: string, cfg: RootConfig): Promise<Map<string,
     if (fq) {
       if (idx.has(fq)) {
         throw new Error(
-          `json-cli: config error — duplicate tool FQName '${fq}' found in:\n  - ${idx.get(fq)}\n  - ${p}`,
+          `jio: config error — duplicate tool FQName '${fq}' found in:\n  - ${idx.get(fq)}\n  - ${p}`,
         );
       }
       idx.set(fq, p);
@@ -362,7 +362,7 @@ async function buildIndex(rootDir: string, cfg: RootConfig): Promise<Map<string,
   return idx;
 }
 
-// Formal schema (from json-cli.md §12)
+// Formal schema (from jio.md §12)
 const FORMAL_SCHEMA: any = {
   type: "object",
   required: ["tool", "command"],
@@ -487,13 +487,13 @@ async function readSpec(p: string): Promise<{ spec: ToolSpec | null; warning: st
     ensureFormalValidator();
     if (validateFormal && !validateFormal(obj)) {
       const msg = JSON.stringify((validateFormal as any).errors?.[0] || {});
-      return { spec: null, warning: `json-cli: invalid spec skipped: ${p}: ${msg}` };
+      return { spec: null, warning: `jio: invalid spec skipped: ${p}: ${msg}` };
     }
     return { spec: obj as ToolSpec, warning: null };
   } catch (e: any) {
     return {
       spec: null,
-      warning: `json-cli: unreadable spec skipped: ${p}: ${String(e?.message || e)}`,
+      warning: `jio: unreadable spec skipped: ${p}: ${String(e?.message || e)}`,
     };
   }
 }
@@ -673,7 +673,7 @@ function evaluateJsonPath(root: any, expr: string): any {
         }
       } else {
         // unsupported subset (scripts/functions/unions of properties)
-        throw new Error(`json-cli: unsupported JSONPath segment: [${s}]`);
+        throw new Error(`jio: unsupported JSONPath segment: [${s}]`);
       }
       current = next;
       continue;
@@ -700,7 +700,7 @@ function renderValueTokens(
         const n = Number(value);
         if (Number.isFinite(n) && Math.abs(n) > Math.pow(2, 53) - 1) {
           try {
-            process.stderr.write("json-cli: warning: number may lose precision (>2^53-1)\n");
+            process.stderr.write("jio: warning: number may lose precision (>2^53-1)\n");
           } catch {}
         }
       }
@@ -844,14 +844,14 @@ async function runWithTransforms(
   // Determine exec command; auto-wrap with secretspec if available and enabled
   let execCmd = spec.command!.exec as string;
   let execArgv = argv.slice();
-  const secretsDisabled = process.env.JSON_CLI_SECRETS_DISABLE === "1";
-  const secretsForced = process.env.JSON_CLI_SECRETS === "1";
+  const secretsDisabled = process.env.JIO_SECRETS_DISABLE === "1";
+  const secretsForced = process.env.JIO_SECRETS === "1";
   const secretspecToml = path.join(rootDir, "secretspec.toml");
   const hasSecretsToml = await pathExists(secretspecToml);
   const shouldTrySecrets = !secretsDisabled && (secretsForced || hasSecretsToml);
   if (shouldTrySecrets && (await hasBinaryOnPath("secretspec"))) {
-    const provider = process.env.JSON_CLI_SECRETS_PROVIDER;
-    const profile = process.env.JSON_CLI_SECRETS_PROFILE;
+    const provider = process.env.JIO_SECRETS_PROVIDER;
+    const profile = process.env.JIO_SECRETS_PROFILE;
     const args: string[] = ["run"];
     if (profile) args.push("--profile", profile);
     if (provider) args.push("--provider", provider);
@@ -862,7 +862,7 @@ async function runWithTransforms(
     // Only warn; do not inject or skip. Continue without secrets wrapper.
     try {
       process.stderr.write(
-        "json-cli: warning: secretspec not found on PATH; running without secrets wrap\n",
+        "jio: warning: secretspec not found on PATH; running without secrets wrap\n",
       );
     } catch {}
   }
@@ -932,7 +932,7 @@ async function runWithTransforms(
     ? waitProcess(p2NonNull, "stdoutTransform")
     : Promise.resolve(0);
   const p2WaitEarly =
-    process.env.JSON_CLI_TEST_FAST === "1"
+    process.env.JIO_TEST_FAST === "1"
       ? Promise.race([
           p2BaseWaitEarly,
           new Promise<number>((res) =>
@@ -1051,7 +1051,7 @@ async function runWithTransforms(
             JSON.parse(s);
             if (!cmd.stdin.write(s + "\n")) await waitDrain(cmd.stdin);
           } catch {
-            process.stderr.write("json-cli: stdinTransform emitted non-JSON line\n");
+            process.stderr.write("jio: stdinTransform emitted non-JSON line\n");
             if (sink)
               await sink.write({
                 reason: "stdin",
@@ -1077,7 +1077,7 @@ async function runWithTransforms(
           JSON.parse(buf);
           if (!cmd.stdin.write(buf)) await waitDrain(cmd.stdin);
         } catch {
-          process.stderr.write("json-cli: stdinTransform did not emit valid JSON\n");
+          process.stderr.write("jio: stdinTransform did not emit valid JSON\n");
           if (sink)
             await sink.write({
               reason: "stdin",
@@ -1093,7 +1093,7 @@ async function runWithTransforms(
         } catch {}
       });
     } else {
-      process.stderr.write("json-cli: unknown stdinTransform.format\n");
+      process.stderr.write("jio: unknown stdinTransform.format\n");
       p1.stdout.pipe(cmd.stdin);
       stdinConfigError = true;
     }
@@ -1127,13 +1127,13 @@ async function runWithTransforms(
           const obj = JSON.parse(s);
           if (validate && !validate(obj)) {
             const msg = JSON.stringify(validate.errors?.[0] || {});
-            process.stderr.write(`json-cli: invalid output item: ${msg}\n`);
+            process.stderr.write(`jio: invalid output item: ${msg}\n`);
             if (sink) await sink.write({ reason: "output", object: obj, message: msg });
             continue;
           }
           process.stdout.write(s + "\n");
         } catch {
-          process.stderr.write("json-cli: invalid NDJSON line (not JSON)\n");
+          process.stderr.write("jio: invalid NDJSON line (not JSON)\n");
           if (sink)
             await sink.write({
               reason: "stdout",
@@ -1154,13 +1154,13 @@ async function runWithTransforms(
         const obj = JSON.parse(s);
         if (validate && !validate(obj)) {
           const msg = JSON.stringify(validate.errors?.[0] || {});
-          process.stderr.write(`json-cli: invalid output item: ${msg}\n`);
+          process.stderr.write(`jio: invalid output item: ${msg}\n`);
           if (sink) await sink.write({ reason: "output", object: obj, message: msg });
         } else {
           process.stdout.write(s + "\n");
         }
       } catch {
-        process.stderr.write("json-cli: invalid NDJSON trailing line (not JSON)\n");
+        process.stderr.write("jio: invalid NDJSON trailing line (not JSON)\n");
         if (sink)
           await sink.write({
             reason: "stdout",
@@ -1178,14 +1178,14 @@ async function runWithTransforms(
       const obj = JSON.parse(buf);
       if (validate && !validate(obj)) {
         const msg = JSON.stringify(validate.errors?.[0] || {});
-        process.stderr.write(`json-cli: invalid output: ${msg}\n`);
+        process.stderr.write(`jio: invalid output: ${msg}\n`);
         if (sink) await sink.write({ reason: "output", object: obj, message: msg });
         stdoutParseFailed = true;
       } else {
         process.stdout.write(JSON.stringify(obj));
       }
     } catch {
-      process.stderr.write("json-cli: invalid JSON output\n");
+      process.stderr.write("jio: invalid JSON output\n");
       if (sink)
         await sink.write({
           reason: "stdout",
@@ -1195,7 +1195,7 @@ async function runWithTransforms(
       stdoutParseFailed = true;
     }
   } else if (st && st.shell && !st.format) {
-    process.stderr.write("json-cli: unknown stdoutTransform.format\n");
+    process.stderr.write("jio: unknown stdoutTransform.format\n");
     p2.stdout.pipe(process.stdout);
     stdoutConfigError = true;
   } else {
@@ -1225,15 +1225,13 @@ async function runWithTransforms(
   // Compute exit code precedence
   if (stdinLikelySpawnError) {
     process.stderr.write(
-      `json-cli: failed to spawn stdinTransform: likely missing transform binary (code=69 ENOENT)\n`,
+      `jio: failed to spawn stdinTransform: likely missing transform binary (code=69 ENOENT)\n`,
     );
     return 69;
   }
   if (stdinConfigError || stdoutConfigError) return 78;
   if (localTimedOut) {
-    process.stderr.write(
-      `json-cli: timeout — sent SIGTERM to process groups; will SIGKILL after 5s\n`,
-    );
+    process.stderr.write(`jio: timeout — sent SIGTERM to process groups; will SIGKILL after 5s\n`);
     return 124;
   }
   if (stdinParseFailed) {
@@ -1306,9 +1304,7 @@ function terminateGroup(procs: any[]) {
       }
     } catch {}
   }
-  process.stderr.write(
-    "json-cli: timeout — sent SIGTERM to process groups; will SIGKILL after 5s\n",
-  );
+  process.stderr.write("jio: timeout — sent SIGTERM to process groups; will SIGKILL after 5s\n");
   // Phase 2 after 5s: SIGKILL
   setTimeout(() => {
     for (const p of procs) {
@@ -1406,7 +1402,7 @@ function waitProcess(
       } catch {}
       try {
         const msg = _err && _err.message ? `: ${String(_err.message)}` : "";
-        process.stderr.write(`json-cli: failed to spawn ${stage}${msg}\n`);
+        process.stderr.write(`jio: failed to spawn ${stage}${msg}\n`);
       } catch {}
       try {
         process.stderr.write(`stage failed: ${stage} code=69\n`);

@@ -3,13 +3,13 @@ import { describe, test } from "node:test";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runInTemp } from "./lib/test-helpers";
-import { defineToolSpec } from "../json-cli/spec";
+import { defineToolSpec } from "../jio/spec";
 
-describe("json-cli list sorting and not-found hints", () => {
+describe("jio list sorting and not-found hints", () => {
   test("--list prints header and sorts FQNames", async () => {
-    await runInTemp("json-cli-list-sort", async (tmp, $) => {
+    await runInTemp("jio-list-sort", async (tmp, $) => {
       await fsp.writeFile(
-        path.join(tmp, ".json-cli"),
+        path.join(tmp, ".jio"),
         JSON.stringify({ defaultPackage: "io.example" }),
         "utf8",
       );
@@ -36,7 +36,7 @@ describe("json-cli list sorting and not-found hints", () => {
       await fsp.writeFile(path.join(dir, "b.tool.json"), JSON.stringify(a, null, 2), "utf8");
       await fsp.writeFile(path.join(dir, "a.tool.json"), JSON.stringify(b, null, 2), "utf8");
 
-      const out = await $({ stdio: "pipe" })`json-cli --list`;
+      const out = await $({ stdio: "pipe" })`jio --list`;
       const s = String(out.stdout).trim().split(/\n+/);
       if (!s[0].startsWith("defaultPackage:")) {
         console.error("expected defaultPackage header");
@@ -53,9 +53,9 @@ describe("json-cli list sorting and not-found hints", () => {
   });
 
   test("not-found hint when globs/excludes are set", async () => {
-    await runInTemp("json-cli-notfound-hint", async (tmp, $) => {
+    await runInTemp("jio-notfound-hint", async (tmp, $) => {
       await fsp.writeFile(
-        path.join(tmp, ".json-cli"),
+        path.join(tmp, ".jio"),
         JSON.stringify({
           defaultPackage: "io.example",
           globs: ["sub/*.tool.json"],
@@ -77,7 +77,7 @@ describe("json-cli list sorting and not-found hints", () => {
       await fsp.writeFile(path.join(dir, "x.tool.json"), JSON.stringify(spec, null, 2), "utf8");
       let failed = false;
       try {
-        await $({ stdio: "pipe" })`json-cli io.example.x --where`;
+        await $({ stdio: "pipe" })`jio io.example.x --where`;
       } catch (e: any) {
         const err = String(e?.stderr || e?.stdout || "");
         if (!/tool not found/i.test(err) || !/globs\/excludeGlobs/i.test(err)) {

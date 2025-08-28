@@ -2,14 +2,14 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { describe, test } from "node:test";
-import { defineToolSpec } from "../json-cli/spec";
+import { defineToolSpec } from "../jio/spec";
 import { runInTemp } from "./lib/test-helpers";
 
-describe("json-cli stdinTransform + input validation", () => {
+describe("jio stdinTransform + input validation", () => {
   test("fails fast when invocation JSON violates inputSchema", async () => {
-    await runInTemp("json-cli-stdin-invalid", async (tmp, $) => {
+    await runInTemp("jio-stdin-invalid", async (tmp, $) => {
       await fsp.writeFile(
-        path.join(tmp, ".json-cli"),
+        path.join(tmp, ".jio"),
         JSON.stringify({ defaultPackage: "io.example" }),
         "utf8",
       );
@@ -29,7 +29,7 @@ describe("json-cli stdinTransform + input validation", () => {
       await fsp.writeFile(inv, JSON.stringify({}), "utf8");
       let failed = false;
       try {
-        await $({ stdio: "pipe" })`json-cli io.example.bad --in ${inv}`;
+        await $({ stdio: "pipe" })`jio io.example.bad --in ${inv}`;
       } catch (e: any) {
         const err = String(e?.stderr || e?.stdout || "");
         if (!/invalid input/i.test(err)) {
@@ -46,9 +46,9 @@ describe("json-cli stdinTransform + input validation", () => {
   });
 
   test("stdinTransform ndjson: array to lines, command receives items", async () => {
-    await runInTemp("json-cli-stdin-ndjson", async (tmp, $) => {
+    await runInTemp("jio-stdin-ndjson", async (tmp, $) => {
       await fsp.writeFile(
-        path.join(tmp, ".json-cli"),
+        path.join(tmp, ".jio"),
         JSON.stringify({ defaultPackage: "io.example" }),
         "utf8",
       );
@@ -79,7 +79,7 @@ for await (const _ of fs.createReadStream(0, { encoding: 'utf8' })) { /* noop */
           stdinTransform: { shell: "jq -c '.items[] | {v: .}'", format: "ndjson" },
           // Use cat to minimize buffering in the test harness
           stdoutTransform: { shell: "cat", format: "ndjson" },
-          env: { JSON_CLI_DEBUG: "1", JSON_CLI_DEBUG_FILE: path.join(tmp, "debug.log") },
+          env: { JIO_DEBUG: "1", JIO_DEBUG_FILE: path.join(tmp, "debug.log") },
           timeoutMs: 4000,
         },
       });
@@ -94,10 +94,10 @@ for await (const _ of fs.createReadStream(0, { encoding: 'utf8' })) { /* noop */
         stdio: "pipe",
         env: {
           ...process.env,
-          JSON_CLI_SKIP_DIRENV: "1",
+          JIO_SKIP_DIRENV: "1",
           WORKSPACE_ROOT: process.env.WORKSPACE_ROOT || process.cwd(),
         },
-      })`bash --noprofile --norc -c ${`cat '${inFile}' | json-cli io.example.ndjson`}`;
+      })`bash --noprofile --norc -c ${`cat '${inFile}' | jio io.example.ndjson`}`;
       const lines = String(out.stdout).trim().split(/\n+/);
       if (lines.length < 3) {
         console.error("expected at least 3 lines, got:", lines);
@@ -113,9 +113,9 @@ for await (const _ of fs.createReadStream(0, { encoding: 'utf8' })) { /* noop */
   });
 
   test("stdinTransform json: enforce single JSON document", async () => {
-    await runInTemp("json-cli-stdin-json", async (tmp, $) => {
+    await runInTemp("jio-stdin-json", async (tmp, $) => {
       await fsp.writeFile(
-        path.join(tmp, ".json-cli"),
+        path.join(tmp, ".jio"),
         JSON.stringify({ defaultPackage: "io.example" }),
         "utf8",
       );
@@ -145,10 +145,10 @@ for await (const _ of fs.createReadStream(0, { encoding: 'utf8' })) { /* noop */
         stdio: "pipe",
         env: {
           ...process.env,
-          JSON_CLI_SKIP_DIRENV: "1",
+          JIO_SKIP_DIRENV: "1",
           WORKSPACE_ROOT: process.env.WORKSPACE_ROOT || process.cwd(),
         },
-      })`bash --noprofile --norc -c ${`cat '${inFile}' | json-cli io.example.jsondoc`}`;
+      })`bash --noprofile --norc -c ${`cat '${inFile}' | jio io.example.jsondoc`}`;
       const obj = JSON.parse(String(out.stdout));
       if (obj.count !== 4) {
         console.error("unexpected count:", obj);

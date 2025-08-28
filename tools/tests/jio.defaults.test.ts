@@ -2,14 +2,14 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { describe, test } from "node:test";
-import { defineToolSpec } from "../json-cli/spec";
+import { defineToolSpec } from "../jio/spec";
 import { runInTemp } from "./lib/test-helpers";
 
-describe("json-cli parameter defaults", () => {
+describe("jio parameter defaults", () => {
   test("boolean presence defaults render flags when no --in provided", async () => {
-    await runInTemp("json-cli-defaults-presence", async (tmp, $) => {
+    await runInTemp("jio-defaults-presence", async (tmp, $) => {
       await fsp.writeFile(
-        path.join(tmp, ".json-cli"),
+        path.join(tmp, ".jio"),
         JSON.stringify({ defaultPackage: "io.example" }),
         "utf8",
       );
@@ -28,7 +28,7 @@ describe("json-cli parameter defaults", () => {
         },
       });
       await fsp.writeFile(path.join(dir, "def.tool.json"), JSON.stringify(spec, null, 2), "utf8");
-      const out = await $({ stdio: "pipe" })`json-cli io.example.def --dry-run`;
+      const out = await $({ stdio: "pipe" })`jio io.example.def --dry-run`;
       const s = String(out.stdout);
       if (!/"argv"\s*:\s*\["-a","-l"\]/.test(s) && !/\["-l","-a"\]/.test(s)) {
         console.error("expected default flags present in argv, got:\n" + s);
@@ -38,9 +38,9 @@ describe("json-cli parameter defaults", () => {
   });
 
   test("provided values override defaults", async () => {
-    await runInTemp("json-cli-defaults-override", async (tmp, $) => {
+    await runInTemp("jio-defaults-override", async (tmp, $) => {
       await fsp.writeFile(
-        path.join(tmp, ".json-cli"),
+        path.join(tmp, ".jio"),
         JSON.stringify({ defaultPackage: "io.example" }),
         "utf8",
       );
@@ -61,7 +61,7 @@ describe("json-cli parameter defaults", () => {
       await fsp.writeFile(path.join(dir, "over.tool.json"), JSON.stringify(spec, null, 2), "utf8");
       const inputPath = path.join(tmp, "in.json");
       await fsp.writeFile(inputPath, JSON.stringify({ all: false, long: true }), "utf8");
-      const out = await $({ stdio: "pipe" })`json-cli io.example.over --dry-run --in ${inputPath}`;
+      const out = await $({ stdio: "pipe" })`jio io.example.over --dry-run --in ${inputPath}`;
       const s = String(out.stdout);
       // Expect only -l present, -a suppressed by provided false
       if (!/"argv"\s*:\s*\["-l"\]/.test(s)) {

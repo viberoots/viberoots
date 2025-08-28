@@ -2,14 +2,14 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { describe, test } from "node:test";
-import { defineToolSpec } from "../json-cli/spec";
+import { defineToolSpec } from "../jio/spec";
 import { runInTemp } from "./lib/test-helpers";
 
-describe("json-cli stdoutTransform + validation", () => {
+describe("jio stdoutTransform + validation", () => {
   test("ndjson output validated and streamed", async () => {
-    await runInTemp("json-cli-stdout-ndjson", async (tmp, $) => {
+    await runInTemp("jio-stdout-ndjson", async (tmp, $) => {
       await fsp.writeFile(
-        path.join(tmp, ".json-cli"),
+        path.join(tmp, ".jio"),
         JSON.stringify({ defaultPackage: "io.example" }),
         "utf8",
       );
@@ -46,7 +46,7 @@ console.log('{"ok":2}');
       });
       await fsp.writeFile(specPath, JSON.stringify(spec, null, 2), "utf8");
 
-      const out = await $({ stdio: "pipe" })`json-cli io.example.echo`;
+      const out = await $({ stdio: "pipe" })`jio io.example.echo`;
       const lines = String(out.stdout).trim().split(/\n+/);
       if (!(lines.includes('{"ok":1}') && lines.includes('{"ok":2}'))) {
         console.error("missing echoed lines:", lines);
@@ -56,9 +56,9 @@ console.log('{"ok":2}');
   });
 
   test("json output validation error reported", async () => {
-    await runInTemp("json-cli-stdout-json", async (tmp, $) => {
+    await runInTemp("jio-stdout-json", async (tmp, $) => {
       await fsp.writeFile(
-        path.join(tmp, ".json-cli"),
+        path.join(tmp, ".jio"),
         JSON.stringify({ defaultPackage: "io.example" }),
         "utf8",
       );
@@ -95,7 +95,7 @@ console.log('{"notOk":true}');
 
       let failed = false;
       try {
-        await $({ stdio: "pipe" })`json-cli io.example.echo1`;
+        await $({ stdio: "pipe" })`jio io.example.echo1`;
       } catch (e: any) {
         const err = String(e?.stderr || e?.stdout || "");
         if (!/invalid output/i.test(err)) {

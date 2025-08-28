@@ -2,14 +2,14 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { describe, test } from "node:test";
-import { defineToolSpec } from "../json-cli/spec";
+import { defineToolSpec } from "../jio/spec";
 import { runInTemp } from "./lib/test-helpers";
 
-describe("json-cli JSON/NDJSON tolerance (CRLF, blank lines, BOM)", () => {
+describe("jio JSON/NDJSON tolerance (CRLF, blank lines, BOM)", () => {
   test("NDJSON: mixed CRLF/LF and blank lines", async () => {
-    await runInTemp("json-cli-tol-ndjson", async (tmp, $) => {
+    await runInTemp("jio-tol-ndjson", async (tmp, $) => {
       await fsp.writeFile(
-        path.join(tmp, ".json-cli"),
+        path.join(tmp, ".jio"),
         JSON.stringify({ defaultPackage: "io.example" }),
         "utf8",
       );
@@ -41,7 +41,7 @@ process.stdin.pipe(process.stdout);
       await fsp.writeFile(inFile, input, "utf8");
       const out = await $({
         stdio: "pipe",
-      })`bash --noprofile --norc -c ${`cat '${inFile}' | json-cli io.example.tol1`}`;
+      })`bash --noprofile --norc -c ${`cat '${inFile}' | jio io.example.tol1`}`;
       const lines = String(out.stdout).trim().split(/\n+/);
       if (!(lines.includes('{"a":1}') && lines.includes('{"b":2}'))) {
         console.error("did not tolerate CRLF/blank lines:", lines);
@@ -51,9 +51,9 @@ process.stdin.pipe(process.stdout);
   });
 
   test("BOM is ignored for NDJSON first line and JSON document", async () => {
-    await runInTemp("json-cli-tol-bom", async (tmp, $) => {
+    await runInTemp("jio-tol-bom", async (tmp, $) => {
       await fsp.writeFile(
-        path.join(tmp, ".json-cli"),
+        path.join(tmp, ".jio"),
         JSON.stringify({ defaultPackage: "io.example" }),
         "utf8",
       );
@@ -90,7 +90,7 @@ process.stdin.pipe(process.stdout);
       await fsp.writeFile(inNd, inputNd, "utf8");
       const outNd = await $({
         stdio: "pipe",
-      })`bash --noprofile --norc -c ${`cat '${inNd}' | json-cli io.example.tol2`}`;
+      })`bash --noprofile --norc -c ${`cat '${inNd}' | jio io.example.tol2`}`;
       const linesNd = String(outNd.stdout).trim().split(/\n+/);
       if (!(linesNd[0] === '{"x":1}' && linesNd.includes('{"y":2}'))) {
         console.error("BOM not ignored on first NDJSON line:", linesNd);
@@ -117,7 +117,7 @@ process.stdin.pipe(process.stdout);
       await fsp.writeFile(inJson, inputJson, "utf8");
       const outJs = await $({
         stdio: "pipe",
-      })`bash --noprofile --norc -c ${`cat '${inJson}' | json-cli io.example.tol3`}`;
+      })`bash --noprofile --norc -c ${`cat '${inJson}' | jio io.example.tol3`}`;
       if (String(outJs.stdout).trim() !== '{"ok":true}') {
         console.error("BOM not ignored for JSON doc:", String(outJs.stdout));
         process.exit(2);

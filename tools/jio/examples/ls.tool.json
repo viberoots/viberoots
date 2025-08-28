@@ -19,16 +19,15 @@
     },
     "outputSchema": {
       "type": "object",
-      "properties": {
-        "line": { "type": "string" }
-      },
-      "required": ["line"]
+      "properties": { "file": { "type": "string" } },
+      "required": ["file"]
     }
   },
 
   "command": {
     "package": "io.example.examples",
     "exec": "ls",
+    "inheritCallerCwd": true,
     "parameters": {
       "path": { "path": "$.path", "type": "string", "position": 1, "required": false },
       "all": {
@@ -54,7 +53,7 @@
       }
     },
     "stdoutTransform": {
-      "shell": "jq -R -c '. as $l | {line: $l}'",
+      "shell": "jq -R -c '. as $l | {file: $l}'",
       "format": "ndjson"
     }
   }

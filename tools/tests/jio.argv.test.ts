@@ -3,13 +3,13 @@ import { describe, test } from "node:test";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runInTemp } from "./lib/test-helpers";
-import { defineToolSpec } from "../json-cli/spec";
+import { defineToolSpec } from "../jio/spec";
 
-describe("json-cli argv mapping + dry-run", () => {
+describe("jio argv mapping + dry-run", () => {
   test("positional + boolean presence + equals", async () => {
-    await runInTemp("json-cli-argv1", async (tmp, $) => {
+    await runInTemp("jio-argv1", async (tmp, $) => {
       await fsp.writeFile(
-        path.join(tmp, ".json-cli"),
+        path.join(tmp, ".jio"),
         JSON.stringify({ defaultPackage: "io.example", env: { GLOBAL_ENV: "1" } }),
         "utf8",
       );
@@ -42,7 +42,7 @@ describe("json-cli argv mapping + dry-run", () => {
       await fsp.writeFile(specPath, JSON.stringify(spec, null, 2), "utf8");
       const inv = path.join(tmp, "inv.json");
       await fsp.writeFile(inv, JSON.stringify({ dryRun: true, verbose: false }), "utf8");
-      const out = await $({ stdio: "pipe" })`json-cli io.example.flags --in ${inv} --dry-run`;
+      const out = await $({ stdio: "pipe" })`jio io.example.flags --in ${inv} --dry-run`;
       const plan = JSON.parse(String(out.stdout));
       if (plan.exec !== "tool") {
         console.error("unexpected exec");
@@ -69,9 +69,9 @@ describe("json-cli argv mapping + dry-run", () => {
   });
 
   test("arrays: repeatArg / repeatFlag / csv; object kv", async () => {
-    await runInTemp("json-cli-argv2", async (tmp, $) => {
+    await runInTemp("jio-argv2", async (tmp, $) => {
       await fsp.writeFile(
-        path.join(tmp, ".json-cli"),
+        path.join(tmp, ".jio"),
         JSON.stringify({ defaultPackage: "io.example" }),
         "utf8",
       );
@@ -115,7 +115,7 @@ describe("json-cli argv mapping + dry-run", () => {
         }),
         "utf8",
       );
-      const out = await $({ stdio: "pipe" })`json-cli io.example.arr --in ${inv} --dry-run`;
+      const out = await $({ stdio: "pipe" })`jio io.example.arr --in ${inv} --dry-run`;
       const plan = JSON.parse(String(out.stdout));
       const argv: string[] = plan.argv;
       // Expect: a b --labels=red;blue --tag=x --tag=y --a=1 --b=2 (sorted flags)

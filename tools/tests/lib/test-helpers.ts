@@ -133,7 +133,7 @@ export async function runInTemp<T>(
       return false;
     }
   }
-  const skipDirenv = process.env.JSON_CLI_SKIP_DIRENV === "1";
+  const skipDirenv = process.env.JIO_SKIP_DIRENV === "1";
   let shouldUseDirenv = !process.env.IN_NIX_SHELL && !skipDirenv;
   try {
     if (await isOnPath("secretspec")) {
@@ -180,8 +180,8 @@ export async function runInTemp<T>(
   try {
     if (process.env.TEST_KEEP_TMP === "1") {
       // Enable runner debug to a file inside the tmp to survive stdout suppression
-      exportEnv.JSON_CLI_DEBUG = "1";
-      exportEnv.JSON_CLI_DEBUG_FILE = path.join(tmp, "jc.runner.log");
+      exportEnv.JIO_DEBUG = "1";
+      exportEnv.JIO_DEBUG_FILE = path.join(tmp, "jio.runner.log");
       try {
         console.error(`KEEP_TMP ${tmp}`);
         await fsp

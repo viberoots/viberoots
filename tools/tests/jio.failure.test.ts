@@ -3,13 +3,13 @@ import { describe, test } from "node:test";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runInTemp } from "./lib/test-helpers";
-import { defineToolSpec } from "../json-cli/spec";
+import { defineToolSpec } from "../jio/spec";
 
-describe("json-cli onValidationFailure routing", () => {
+describe("jio onValidationFailure routing", () => {
   test("routes invalid output items to handler as NDJSON", async () => {
-    await runInTemp("json-cli-fail-output", async (tmp, $) => {
+    await runInTemp("jio-fail-output", async (tmp, $) => {
       await fsp.writeFile(
-        path.join(tmp, ".json-cli"),
+        path.join(tmp, ".jio"),
         JSON.stringify({ defaultPackage: "io.example" }),
         "utf8",
       );
@@ -50,7 +50,7 @@ console.log('{"bad":true}');
       });
       await fsp.writeFile(specPath, JSON.stringify(spec, null, 2), "utf8");
 
-      const out = await $({ stdio: "pipe" })`json-cli io.example.mixed`;
+      const out = await $({ stdio: "pipe" })`jio io.example.mixed`;
       const lines = String(out.stdout).trim().split(/\n+/);
       if (!lines.includes('{"ok":1}')) {
         console.error("valid line not passed through");

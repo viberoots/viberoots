@@ -3,17 +3,17 @@ import { describe, test } from "node:test";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runInTemp } from "./lib/test-helpers";
-import { defineToolSpec } from "../json-cli/spec";
+import { defineToolSpec } from "../jio/spec";
 
-describe("json-cli discovery globs/excludes and duplicates", () => {
+describe("jio discovery globs/excludes and duplicates", () => {
   test("globs include and exclude control discovery", async () => {
-    await runInTemp("json-cli-globs", async (tmp, $) => {
+    await runInTemp("jio-globs", async (tmp, $) => {
       const cfg = {
         defaultPackage: "io.example",
         globs: ["toolspecs/a/*.tool.json"],
         excludeGlobs: ["**/skip-*.tool.json"],
       };
-      await fsp.writeFile(path.join(tmp, ".json-cli"), JSON.stringify(cfg, null, 2), "utf8");
+      await fsp.writeFile(path.join(tmp, ".jio"), JSON.stringify(cfg, null, 2), "utf8");
 
       const dirA = path.join(tmp, "toolspecs", "a");
       const dirB = path.join(tmp, "toolspecs", "b");
@@ -64,7 +64,7 @@ describe("json-cli discovery globs/excludes and duplicates", () => {
         "utf8",
       );
 
-      const out = await $({ stdio: "pipe" })`json-cli --list`;
+      const out = await $({ stdio: "pipe" })`jio --list`;
       const s = String(out.stdout);
       if (!s.includes("io.example.one") || s.includes("io.example.two") || s.includes("skip-two")) {
         console.error("glob include/exclude not respected. list=\n" + s);
@@ -74,9 +74,9 @@ describe("json-cli discovery globs/excludes and duplicates", () => {
   });
 
   test("duplicate FQName errors", async () => {
-    await runInTemp("json-cli-dup", async (tmp, $) => {
+    await runInTemp("jio-dup", async (tmp, $) => {
       await fsp.writeFile(
-        path.join(tmp, ".json-cli"),
+        path.join(tmp, ".jio"),
         JSON.stringify({ defaultPackage: "io.example" }),
         "utf8",
       );
@@ -104,7 +104,7 @@ describe("json-cli discovery globs/excludes and duplicates", () => {
       await fsp.writeFile(path.join(dir, "b.tool.json"), JSON.stringify(b, null, 2), "utf8");
       let failed = false;
       try {
-        await $({ stdio: "pipe" })`json-cli --list`;
+        await $({ stdio: "pipe" })`jio --list`;
       } catch (e: any) {
         const err = String(e?.stderr || e?.stdout || "");
         if (!/duplicate tool FQName/i.test(err)) {
@@ -121,9 +121,9 @@ describe("json-cli discovery globs/excludes and duplicates", () => {
   });
 
   test("bare name without defaultPackage errors", async () => {
-    await runInTemp("json-cli-bare", async (tmp, $) => {
-      // no defaultPackage in .json-cli
-      await fsp.writeFile(path.join(tmp, ".json-cli"), JSON.stringify({}), "utf8");
+    await runInTemp("jio-bare", async (tmp, $) => {
+      // no defaultPackage in .jio
+      await fsp.writeFile(path.join(tmp, ".jio"), JSON.stringify({}), "utf8");
       const dir = path.join(tmp, "x");
       await fsp.mkdir(dir, { recursive: true });
       const a = defineToolSpec({
@@ -138,7 +138,7 @@ describe("json-cli discovery globs/excludes and duplicates", () => {
       await fsp.writeFile(path.join(dir, "a.tool.json"), JSON.stringify(a, null, 2), "utf8");
       let failed = false;
       try {
-        await $({ stdio: "pipe" })`json-cli tool --dry-run`;
+        await $({ stdio: "pipe" })`jio tool --dry-run`;
       } catch (e: any) {
         const err = String(e?.stderr || e?.stdout || "");
         if (!/bare name requires .*defaultPackage/i.test(err)) {

@@ -1,6 +1,6 @@
-# JSON-CLI Specification
+# JIO Specification (formerly JSON-CLI)
 
-> **Scope**: This document specifies the **json-cli** tool and the structure of `*.tool.json` files.
+> **Scope**: This document specifies the **jio** tool (formerly jio) and the structure of `*.tool.json` files.
 
 ### Top-level metadata (required/recommended)
 
@@ -14,9 +14,9 @@ Runners MUST reject specs whose `specVersion` major is unsupported.
 
 ---
 
-## Why json-cli exists
+## Why jio exists
 
-Many CLI tools don’t speak JSON. **json-cli** is a thin, declarative wrapper that makes them behave like JSON-first APIs:
+Many CLI tools don’t speak JSON. **jio** is a thin, declarative wrapper that makes them behave like JSON-first APIs:
 
 1. Accept **JSON** or **NDJSON** input.
 2. Map JSON fields to **argv** (positional and/or flags).
@@ -56,11 +56,11 @@ graph LR
 
 Resolve the root directory in this order:
 
-1. If `$JSON_CLI_ROOT` is set → use it.
-2. Else, walk upward from the current working directory until a file named **`.json-cli`** is found; use its directory.
+1. If `$JIO_ROOT` is set → use it.
+2. Else, walk upward from the current working directory until a file named **`.jio`** is found; use its directory.
 3. Else, use the current working directory.
 
-### Root file: `.json-cli` (optional)
+### Root file: `.jio` (optional)
 
 ```json
 {
@@ -90,11 +90,11 @@ Resolve the root directory in this order:
 CLI form:
 
 ```
-json-cli <toolRef> [--in file.json] [--dry-run] [--list] [--where <toolRef>]
+jio <toolRef> [--in file.json] [--dry-run] [--list] [--where <toolRef>]
 ```
 
 - `<toolRef>` is either `{package}.{name}` or a **bare `name`**.
-- Bare `name` resolves via `.json-cli.defaultPackage` → FQName `{defaultPackage}.{name}`.
+- Bare `name` resolves via `.jio.defaultPackage` → FQName `{defaultPackage}.{name}`.
 - Input can be provided with `--in file.json` or via stdin. If both are present, `--in` wins.
 
 ---
@@ -119,7 +119,7 @@ The spec has two siblings: **`tool`** and **`command`**.
   - Default resolution: relative paths are resolved **relative to the directory containing the `*.tool.json` file**, unless an absolute path is provided.
   - If `inheritCallerCwd: true`, relative paths (or an omitted `workingDir`) resolve relative to the caller’s current working directory.
   - Absolute paths are used as-is regardless of `inheritCallerCwd`.
-- `env` (optional) — per-tool environment (merged over process env and `.json-cli.env`). **Precedence**: `process.env` < root `.json-cli.env` < per-tool `command.env`. In `--dry-run`, print env **keys only** and redact values matching `*_TOKEN`, `*_SECRET`, `*PASSWORD*`, etc. **Secrets** SHOULD be provided via [SecretSpec](https://github.com/cachix/secretspec) files and referenced by the runner rather than embedded directly.
+- `env` (optional) — per-tool environment (merged over process env and `.jio.env`). **Precedence**: `process.env` < root `.jio.env` < per-tool `command.env`. In `--dry-run`, print env **keys only** and redact values matching `*_TOKEN`, `*_SECRET`, `*PASSWORD*`, etc. **Secrets** SHOULD be provided via [SecretSpec](https://github.com/cachix/secretspec) files and referenced by the runner rather than embedded directly.
 - `defaultBooleanStyle` (optional) — `"presence"` (default) or `"equals"`.
 - `parameters` — **explicit mapping** from JSON → argv (see §4).
 - `stdinTransform` (optional) — shell pipeline that converts input JSON/NDJSON into **stdin** bytes for the command.
@@ -225,7 +225,7 @@ bash -euo pipefail -c 'jq -c . | grep -v "^#"'
 **Invocation example**
 
 ```bash
-echo '{"template":"cli","exampleArg":123,"exampleFlag":true}' | json-cli scaf.new
+echo '{"template":"cli","exampleArg":123,"exampleFlag":true}' | jio scaf.new
 # Resolves to FQName io.example.scaf.new
 # Final argv: scaf new cli --example-arg=123 --example-flag
 ```
@@ -403,7 +403,7 @@ export async function run(spec, invObj, dataIn, out, err, abortSignal) {
   const failure = await firstFailingStage(procs);
   if (failure) {
     const { name, code, signal } = failure;
-    err.write(`json-cli: stage failed: ${name} code=${code} signal=${signal}\n`);
+    err.write(`jio: stage failed: ${name} code=${code} signal=${signal}\n`);
     process.exitCode = code || 1;
   }
 }
@@ -421,7 +421,7 @@ function terminateGroup(procs: Stage[], err: NodeJS.WritableStream) {
       } catch {}
     }
   }, 5000);
-  err.write("json-cli: timeout — sent SIGTERM to process groups; will SIGKILL after 5s\n");
+  err.write("jio: timeout — sent SIGTERM to process groups; will SIGKILL after 5s\n");
 }
 
 async function firstFailingStage(procs: Stage[]) {
@@ -486,10 +486,10 @@ All routed failures are sent as **NDJSON** to `onValidationFailure.shell`:
 ## 7) CLI
 
 ```
-json-cli <toolRef> [--in file.json] [--dry-run] [--list] [--where <toolRef>]
+jio <toolRef> [--in file.json] [--dry-run] [--list] [--where <toolRef>]
 ```
 
-- `<toolRef>`: `{package}.{name}` or bare `name` (resolved via `.json-cli.defaultPackage`).
+- `<toolRef>`: `{package}.{name}` or bare `name` (resolved via `.jio.defaultPackage`).
 - `--in <file.json>`: **required** when any parameter uses `path`; the invocation JSON for argv mapping is read **only** from this file. Stdin is reserved for the data stream to `stdinTransform`.
 - `--dry-run`: print resolved argv and transform shells; do not execute (env values redacted).
 - `--list`: list discovered tools (FQName → file path).
@@ -500,7 +500,7 @@ json-cli <toolRef> [--in file.json] [--dry-run] [--list] [--where <toolRef>]
   - `65` JSON parse error
   - `66` input file missing
   - `69` spawn failure
-  - `78` config error (invalid spec, duplicate FQNames, unreadable `.json-cli`)
+  - `78` config error (invalid spec, duplicate FQNames, unreadable `.jio`)
   - `124` timeout (runner-enforced wall-clock exceeded)
 
 ---
@@ -633,7 +633,7 @@ tool a b --tag=x --tag=y --labels=red;blue --a=1 --b=2
 ## 9) Example Implementation plan (for a Node/TypeScript/zx-wrapper runner)
 
 1. **Parse CLI args** (`yargs` or minimal custom): `toolRef`, `--in`, `--dry-run`, `--list`, `--where`.
-2. **Resolve root** (env → `.json-cli` → cwd). Load `.json-cli` JSON if present.
+2. **Resolve root** (env → `.jio` → cwd). Load `.jio` JSON if present.
 3. **Scan for specs** using `fast-glob` honoring `ignore`, `globs`, `excludeGlobs`.
 4. **Load + validate specs** using `ajv` (Draft-07 or 2020-12). Build index `{ FQName → spec }`.
 5. **Resolve tool** by `toolRef` (prepend defaultPackage for bare `name`). Confirm file path.

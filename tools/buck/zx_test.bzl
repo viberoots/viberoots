@@ -11,7 +11,7 @@ def _zx_test_impl(ctx):
             # so tools like secretspec/copier are on PATH without per-temp flake eval
             + "if ! command -v secretspec >/dev/null 2>&1 || ! command -v copier >/dev/null 2>&1; then if command -v direnv >/dev/null 2>&1; then eval \"$(direnv export bash)\"; fi; fi; "
             # Skip direnv in temp repos by default; specific tests can override
-            + "export JSON_CLI_SKIP_DIRENV=\"${JSON_CLI_SKIP_DIRENV:-1}\"; "
+            + "export JIO_SKIP_DIRENV=\"${JIO_SKIP_DIRENV:-1}\"; "
             + "unset IN_NIX_SHELL; "
             # Provide a sane default per-test timeout for debugging runs unless overridden
             + "if [ -z \"$TEST_NODE_OPTIONS\" ]; then export TEST_NODE_OPTIONS=\"--test-timeout=120000\"; fi; "

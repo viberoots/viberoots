@@ -3,13 +3,13 @@ import { describe, test } from "node:test";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runInTemp } from "./lib/test-helpers";
-import { defineToolSpec } from "../json-cli/spec";
+import { defineToolSpec } from "../jio/spec";
 
-describe("json-cli JSONPath property-name unions", () => {
+describe("jio JSONPath property-name unions", () => {
   test("gh repo clone style OWNER/REPO via union + CSV", async () => {
-    await runInTemp("json-cli-union-csv", async (tmp, $) => {
+    await runInTemp("jio-union-csv", async (tmp, $) => {
       await fsp.writeFile(
-        path.join(tmp, ".json-cli"),
+        path.join(tmp, ".jio"),
         JSON.stringify({ defaultPackage: "io.example" }),
         "utf8",
       );
@@ -35,7 +35,7 @@ describe("json-cli JSONPath property-name unions", () => {
       await fsp.writeFile(p, JSON.stringify(spec, null, 2), "utf8");
       const inv = path.join(tmp, "inv.json");
       await fsp.writeFile(inv, JSON.stringify({ owner: "kubernetes", repo: "kubectl" }), "utf8");
-      const out = await $({ stdio: "pipe" })`json-cli io.example.clone --in ${inv} --dry-run`;
+      const out = await $({ stdio: "pipe" })`jio io.example.clone --in ${inv} --dry-run`;
       const plan = JSON.parse(String(out.stdout));
       const argv: string[] = plan.argv;
       if (!(argv.includes("-lc") && argv.includes("kubernetes/kubectl"))) {
@@ -46,9 +46,9 @@ describe("json-cli JSONPath property-name unions", () => {
   });
 
   test("repeatFlag over union of properties", async () => {
-    await runInTemp("json-cli-union-flags", async (tmp, $) => {
+    await runInTemp("jio-union-flags", async (tmp, $) => {
       await fsp.writeFile(
-        path.join(tmp, ".json-cli"),
+        path.join(tmp, ".jio"),
         JSON.stringify({ defaultPackage: "io.example" }),
         "utf8",
       );
@@ -74,7 +74,7 @@ describe("json-cli JSONPath property-name unions", () => {
       await fsp.writeFile(p, JSON.stringify(spec, null, 2), "utf8");
       const inv = path.join(tmp, "inv.json");
       await fsp.writeFile(inv, JSON.stringify({ owner: "cli", repo: "cli" }), "utf8");
-      const out = await $({ stdio: "pipe" })`json-cli io.example.flags --in ${inv} --dry-run`;
+      const out = await $({ stdio: "pipe" })`jio io.example.flags --in ${inv} --dry-run`;
       const plan = JSON.parse(String(out.stdout));
       const argv: string[] = plan.argv;
       if (

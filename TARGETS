@@ -28,126 +28,126 @@ zx_test(
 
 zx_test(
     name = "json_cli_skeleton",
-    script = "tools/tests/json-cli.skeleton.test.ts",
+    script = "tools/tests/jio.skeleton.test.ts",
     out = "json_cli_skeleton.stamp",
 )
 
 zx_test(
     name = "json_cli_argv",
-    script = "tools/tests/json-cli.argv.test.ts",
+    script = "tools/tests/jio.argv.test.ts",
     out = "json_cli_argv.stamp",
 )
 
 zx_test(
     name = "json_cli_stdout",
-    script = "tools/tests/json-cli.stdout.test.ts",
+    script = "tools/tests/jio.stdout.test.ts",
     out = "json_cli_stdout.stamp",
 )
 
 zx_test(
     name = "json_cli_stdin",
-    script = "tools/tests/json-cli.stdin.test.ts",
+    script = "tools/tests/jio.stdin.test.ts",
     out = "json_cli_stdin.stamp",
 )
 
 zx_test(
     name = "json_cli_failure",
-    script = "tools/tests/json-cli.failure.test.ts",
+    script = "tools/tests/jio.failure.test.ts",
     out = "json_cli_failure.stamp",
 )
 
 zx_test(
     name = "json_cli_timeout",
-    script = "tools/tests/json-cli.timeout.test.ts",
+    script = "tools/tests/jio.timeout.test.ts",
     out = "json_cli_timeout.stamp",
 )
 
 zx_test(
     name = "json_cli_discovery",
-    script = "tools/tests/json-cli.discovery.test.ts",
+    script = "tools/tests/jio.discovery.test.ts",
     out = "json_cli_discovery.stamp",
 )
 
 zx_test(
     name = "json_cli_exit_precedence",
-    script = "tools/tests/json-cli.exit-precedence.test.ts",
+    script = "tools/tests/jio.exit-precedence.test.ts",
     out = "json_cli_exit_precedence.stamp",
 )
 
 zx_test(
     name = "json_cli_tolerance",
-    script = "tools/tests/json-cli.tolerance.test.ts",
+    script = "tools/tests/jio.tolerance.test.ts",
     out = "json_cli_tolerance.stamp",
 )
 
 zx_test(
     name = "json_cli_spawn_failure",
-    script = "tools/tests/json-cli.spawn-failure.test.ts",
+    script = "tools/tests/jio.spawn-failure.test.ts",
     out = "json_cli_spawn_failure.stamp",
 )
 
 zx_test(
     name = "json_cli_backpressure",
-    script = "tools/tests/json-cli.backpressure.test.ts",
+    script = "tools/tests/jio.backpressure.test.ts",
     out = "json_cli_backpressure.stamp",
 )
 
 zx_test(
     name = "json_cli_list_ux",
-    script = "tools/tests/json-cli.list-ux.test.ts",
+    script = "tools/tests/jio.list-ux.test.ts",
     out = "json_cli_list_ux.stamp",
 )
 
 zx_test(
     name = "json_cli_schema_jsonpath",
-    script = "tools/tests/json-cli.schema-jsonpath.test.ts",
+    script = "tools/tests/jio.schema-jsonpath.test.ts",
     out = "json_cli_schema_jsonpath.stamp",
 )
 
 zx_test(
     name = "json_cli_handler_timeout",
-    script = "tools/tests/json-cli.handler-timeout.test.ts",
+    script = "tools/tests/jio.handler-timeout.test.ts",
     out = "json_cli_handler_timeout.stamp",
 )
 
 zx_test(
     name = "json_cli_jsonpath_union",
-    script = "tools/tests/json-cli.jsonpath-union.test.ts",
+    script = "tools/tests/jio.jsonpath-union.test.ts",
     out = "json_cli_jsonpath_union.stamp",
 )
 
 zx_test(
     name = "json_cli_invalid_spec_skip",
-    script = "tools/tests/json-cli.invalid-spec-skip.test.ts",
+    script = "tools/tests/jio.invalid-spec-skip.test.ts",
     out = "json_cli_invalid_spec_skip.stamp",
 )
 
 zx_test(
     name = "json_cli_number_warning",
-    script = "tools/tests/json-cli.number-warning.test.ts",
+    script = "tools/tests/jio.number-warning.test.ts",
     out = "json_cli_number_warning.stamp",
 )
 
 zx_test(
     name = "json_cli_secretspec_integration",
-    script = "tools/tests/json-cli.secretspec.integration.test.ts",
+    script = "tools/tests/jio.secretspec.integration.test.ts",
     out = "json_cli_secretspec_integration.stamp",
 )
 
 zx_test(
     name = "json_cli_optional_params",
-    script = "tools/tests/json-cli.optional-params.test.ts",
+    script = "tools/tests/jio.optional-params.test.ts",
     out = "json_cli_optional_params.stamp",
 )
 
 zx_test(
     name = "json_cli_defaults",
-    script = "tools/tests/json-cli.defaults.test.ts",
+    script = "tools/tests/jio.defaults.test.ts",
     out = "json_cli_defaults.stamp",
 )
 
 zx_test(
     name = "json_cli_cwd",
-    script = "tools/tests/json-cli.cwd.test.ts",
+    script = "tools/tests/jio.cwd.test.ts",
     out = "json_cli_cwd.stamp",
 )

@@ -122,10 +122,10 @@ async function main() {
     }
   }
   if (bad > 0) {
-    console.error(`json-cli: spec lint failed: ${bad} invalid/unreadable spec(s)`);
+    console.error(`jio: spec lint failed: ${bad} invalid/unreadable spec(s)`);
     process.exit(78);
   } else {
-    console.log("json-cli: all specs valid");
+    console.log("jio: all specs valid");
   }
 }
 
