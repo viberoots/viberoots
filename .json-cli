@@ -1,0 +1,15 @@
+{
+  "defaultPackage": "io.example.examples",
+  "ignore": [
+    "node_modules/",
+    ".git/",
+    "buck-out/",
+    "coverage/",
+    "dist/"
+  ],
+  "globs": ["**/*.tool.json"],
+  "excludeGlobs": [],
+  "env": {}
+}
+
+
