@@ -3,3 +3,6 @@ root = .
 
 [buildfile]
 name = TARGETS
+
+[build]
+threads = 30

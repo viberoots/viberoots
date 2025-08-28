@@ -13,6 +13,8 @@ type CliOpts = {
   inFile: string | null;
   dryRun: boolean;
   toolRef: string | null;
+  collect: boolean;
+  collectLimit?: number;
 };
 
 type RootConfig = {
@@ -207,11 +209,28 @@ export async function main(argv: string[]): Promise<number | void> {
     return 0;
   }
 
-  const code = await runWithTransforms(rootDir, specPath, spec, argvBuilt, rootCfg, invObj);
+  const code = await runWithTransforms(rootDir, specPath, spec, argvBuilt, rootCfg, invObj, {
+    collect: !!opts.collect,
+    collectLimit: opts.collectLimit,
+  });
   return code;
 }
 
 function parseArgs(argv: string[]): CliOpts {
+  function normalizeEquals(args: string[]): string[] {
+    const out: string[] = [];
+    for (const a of args) {
+      if (a.startsWith("--") && a.includes("=")) {
+        const idx = a.indexOf("=");
+        const name = a.slice(0, idx);
+        const value = a.slice(idx + 1);
+        out.push(name, value);
+      } else {
+        out.push(a);
+      }
+    }
+    return out;
+  }
   const out: CliOpts = {
     help: false,
     version: false,
@@ -220,17 +239,23 @@ function parseArgs(argv: string[]): CliOpts {
     inFile: null,
     dryRun: false,
     toolRef: null,
+    collect: false,
   };
   const rest: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
+  const tokens = normalizeEquals(argv);
+  for (let i = 0; i < tokens.length; i++) {
+    const a = tokens[i];
     if (a === "--help" || a === "-h") out.help = true;
     else if (a === "--version" || a === "-v") out.version = true;
     else if (a === "--list") out.list = true;
     else if (a === "--dry-run") out.dryRun = true;
-    else if (a === "--in") out.inFile = argv[++i] ?? null;
-    else if (a === "--where") out.where = argv[++i] ?? null;
-    else if (a.startsWith("-")) {
+    else if (a === "--in") out.inFile = tokens[++i] ?? null;
+    else if (a === "--where") out.where = tokens[++i] ?? null;
+    else if (a === "--collect" || a === "--collect-ndjson") out.collect = true;
+    else if (a === "--collect-limit") {
+      const n = Number(tokens[++i] ?? "");
+      if (Number.isFinite(n) && n >= 0) out.collectLimit = Math.floor(n);
+    } else if (a.startsWith("-")) {
       // unknown flag; keep for future but ignore
     } else {
       rest.push(a);
@@ -251,6 +276,8 @@ Flags:
       --where REF   Print the path to the tool spec for REF
       --in FILE     Invocation JSON file
       --dry-run     Print plan without executing
+      --collect     For ndjson output, return a single JSON array instead of lines
+      --collect-limit N  Max number of items to collect before failing (default: unlimited)
 `);
 }
 
@@ -808,6 +835,7 @@ async function runWithTransforms(
   argv: string[],
   rootCfg: RootConfig,
   invObj: any,
+  runtime: { collect: boolean; collectLimit?: number },
 ): Promise<number> {
   const cwd = resolveWorkingDir(rootDir, specPath, spec);
   const env = mergeEnv(rootCfg, spec);
@@ -1110,6 +1138,10 @@ async function runWithTransforms(
   if (st && st.format === "ndjson") {
     let bufStr = "";
     let firstLineSeen = false;
+    let arrayStarted = false;
+    let itemsEmitted = 0;
+    let collectLimitExceeded = false;
+    let suppressFurther = false;
     for await (const chunk of p2.stdout) {
       bufStr += Buffer.from(chunk).toString("utf8");
       while (true) {
@@ -1131,7 +1163,25 @@ async function runWithTransforms(
             if (sink) await sink.write({ reason: "output", object: obj, message: msg });
             continue;
           }
-          process.stdout.write(s + "\n");
+          if (runtime.collect) {
+            if (suppressFurther) continue;
+            if (!arrayStarted) {
+              process.stdout.write("[");
+              arrayStarted = true;
+            } else {
+              process.stdout.write(",");
+            }
+            process.stdout.write(JSON.stringify(obj));
+            itemsEmitted++;
+            if (typeof runtime.collectLimit === "number" && runtime.collectLimit >= 0) {
+              if (itemsEmitted > runtime.collectLimit) {
+                collectLimitExceeded = true;
+                suppressFurther = true;
+              }
+            }
+          } else {
+            process.stdout.write(s + "\n");
+          }
         } catch {
           process.stderr.write("jio: invalid NDJSON line (not JSON)\n");
           if (sink)
@@ -1157,7 +1207,26 @@ async function runWithTransforms(
           process.stderr.write(`jio: invalid output item: ${msg}\n`);
           if (sink) await sink.write({ reason: "output", object: obj, message: msg });
         } else {
-          process.stdout.write(s + "\n");
+          if (runtime.collect) {
+            if (!suppressFurther) {
+              if (!arrayStarted) {
+                process.stdout.write("[");
+                arrayStarted = true;
+              } else {
+                process.stdout.write(",");
+              }
+              process.stdout.write(JSON.stringify(obj));
+              itemsEmitted++;
+              if (typeof runtime.collectLimit === "number" && runtime.collectLimit >= 0) {
+                if (itemsEmitted > runtime.collectLimit) {
+                  collectLimitExceeded = true;
+                  suppressFurther = true;
+                }
+              }
+            }
+          } else {
+            process.stdout.write(s + "\n");
+          }
         }
       } catch {
         process.stderr.write("jio: invalid NDJSON trailing line (not JSON)\n");
@@ -1168,6 +1237,13 @@ async function runWithTransforms(
             message: "invalid NDJSON trailing",
           });
       }
+    }
+    if (runtime.collect && arrayStarted) {
+      process.stdout.write("]\n");
+    }
+    if (runtime.collect && collectLimitExceeded) {
+      process.stderr.write(`jio: --collect-limit exceeded (${String(runtime.collectLimit)})\n`);
+      return 78;
     }
   } else if (st && st.format === "json") {
     const chunks: Buffer[] = [];
@@ -1230,6 +1306,11 @@ async function runWithTransforms(
     return 69;
   }
   if (stdinConfigError || stdoutConfigError) return 78;
+  if (runtime.collect && typeof runtime.collectLimit === "number" && runtime.collectLimit >= 0) {
+    // If limit exceeded flag set earlier
+    // Use a weak signal: check stderr wrote message is optional; return 78 to indicate config error
+    // (limitExceeded variable is scoped above; redeclare here to satisfy TS)
+  }
   if (localTimedOut) {
     process.stderr.write(`jio: timeout — sent SIGTERM to process groups; will SIGKILL after 5s\n`);
     return 124;

@@ -151,3 +151,9 @@ zx_test(
     script = "tools/tests/jio.cwd.test.ts",
     out = "json_cli_cwd.stamp",
 )
+
+zx_test(
+    name = "json_cli_collect",
+    script = "tools/tests/jio.collect.test.ts",
+    out = "json_cli_collect.stamp",
+)
