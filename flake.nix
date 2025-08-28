@@ -159,7 +159,7 @@ EOF
           '';
           buildInputs = [
             pkgs.git pkgs.buck2 pkgs.go pkgs.pnpm pkgs.nodejs_22 zx-wrapper pkgs.jq pkgs.rsync pkgs.copier pkgs.yq
-            pkgs.secretspec
+            pkgs.secretspec pkgs.jc
           ] ++ (if pkgs.stdenv.isLinux then [ pkgs.fuse-overlayfs pkgs.xdg-utils ] else []);
         };
       }
