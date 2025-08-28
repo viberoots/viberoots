@@ -1,0 +1,43 @@
+{
+  "specVersion": "1.0.0",
+  "jsonPathDialect": "jsonpath-plus@8",
+  "schemaDialect": "https://json-schema.org/draft/2020-12/schema",
+
+  "tool": {
+    "name": "ls",
+    "title": "List files",
+    "description": "Wraps `ls` and emits NDJSON lines.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string" },
+        "all": { "type": "boolean" },
+        "long": { "type": "boolean" },
+        "human": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "line": { "type": "string" }
+      },
+      "required": ["line"]
+    }
+  },
+
+  "command": {
+    "package": "io.example.examples",
+    "exec": "ls",
+    "parameters": {
+      "path": { "path": "$.path", "type": "string", "position": 1 },
+      "all": { "path": "$.all", "type": "boolean", "flag": true, "flagName": "-a" },
+      "long": { "path": "$.long", "type": "boolean", "flag": true, "flagName": "-l" },
+      "human": { "path": "$.human", "type": "boolean", "flag": true, "flagName": "-h" }
+    },
+    "stdoutTransform": {
+      "shell": "jq -R -c '. as $l | {line: $l}'",
+      "format": "ndjson"
+    }
+  }
+}
