@@ -205,3 +205,21 @@ zx_test(
     script = "tools/tests/jio.stdout.sink-on-validation-error.test.ts",
     out = "json_cli_stdout_sink_on_validation_error.stamp",
 )
+
+zx_test(
+    name = "json_cli_limits_ndjson_trailing",
+    script = "tools/tests/jio.limits.ndjson-trailing.test.ts",
+    out = "json_cli_limits_ndjson_trailing.stamp",
+)
+
+zx_test(
+    name = "json_cli_exit_precedence_with_sink",
+    script = "tools/tests/jio.exit-precedence.with-sink.test.ts",
+    out = "json_cli_exit_precedence_with_sink.stamp",
+)
+
+zx_test(
+    name = "json_cli_failure_hook_cwd_caller",
+    script = "tools/tests/jio.failure-hook.cwd-caller.test.ts",
+    out = "json_cli_failure_hook_cwd_caller.stamp",
+)
