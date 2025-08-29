@@ -169,3 +169,15 @@ zx_test(
     script = "tools/tests/jio.kv-keys.test.ts",
     out = "json_cli_kv_keys.stamp",
 )
+
+zx_test(
+    name = "json_cli_on_validation_failure_ndjson",
+    script = "tools/tests/jio.on-validation-failure.ndjson.test.ts",
+    out = "json_cli_on_validation_failure_ndjson.stamp",
+)
+
+zx_test(
+    name = "json_cli_limits_ndjson_line_bytes",
+    script = "tools/tests/jio.limits.ndjson-line-bytes.test.ts",
+    out = "json_cli_limits_ndjson_line_bytes.stamp",
+)
