@@ -26,23 +26,25 @@
         node = pkgs.nodejs_22;
         pnpm = pkgs.pnpm;
 
-        # Exclude local node_modules to keep builds reproducible
-        src = pkgs.lib.cleanSourceWith {
+        # Inputs for pnpm fetch (FOD): lockfile + .npmrc only (minimize churn)
+        storeSrc = pkgs.lib.cleanSourceWith {
           src = ./.;
-          filter = path: type: (builtins.match ".*/node_modules(/.*)?" path == null);
+          filter = path: type:
+            (builtins.match ".*/pnpm-lock\\.yaml" path != null)
+            || (builtins.match ".*/\\.npmrc" path != null);
         };
 
         pnpm-store = pkgs.stdenvNoCC.mkDerivation (let certs = pkgs.cacert; in {
           pname = "pnpm-store";
           version = "lock-${builtins.hashFile "sha256" ./pnpm-lock.yaml}";
-          inherit src;
+          src = storeSrc;
           nativeBuildInputs = [ pkgs.nodejs_22 pkgs.pnpm ];
           outputHashMode = "recursive";
-          outputHash     = "sha256-jwWcH8swDG9CNq/8FoLDI06HpaGirzj26WXC5BCUvss=";
+          outputHash     = "sha256-hPpj1ruPAI6ph/mEQNJw2uURUYNqswoI4vbEbCxTXKc=";
           dontPatchShebangs = true;
           unpackPhase = ''
             runHook preUnpack
-            cp -r ${src} source
+            cp -r $src source
             chmod -R u+rwX source
             cd source
             runHook postUnpack
@@ -58,14 +60,18 @@
             pnpm fetch --frozen-lockfile
             runHook postBuild
           '';
+          passthru.lockHash = builtins.hashFile "sha256" ./pnpm-lock.yaml;
         });
 
         # Limit inputs so node-modules changes only when dependency metadata changes
         minimalSrc = pkgs.lib.cleanSourceWith {
           src = ./.;
           filter = path: type:
-            let base = builtins.baseNameOf path; in
-            base == "pnpm-lock.yaml" || base == "package.json" || base == "pnpm-workspace.yaml" || base == ".npmrc";
+            (builtins.match ".*/pnpm-lock\\.yaml" path != null)
+            || (builtins.match ".*/package\\.json" path != null)
+            || (builtins.match ".*/pnpm-workspace\\.yaml" path != null)
+            || (builtins.match ".*/\\.npmrc" path != null)
+            || (builtins.match ".*/patches/pnpm(/.*)?" path != null);
         };
 
         node-modules = pkgs.stdenvNoCC.mkDerivation (let certs = pkgs.cacert; in {
@@ -75,7 +81,7 @@
           nativeBuildInputs = [ node pnpm ];
           unpackPhase = ''
             runHook preUnpack
-            cp -r ${src} source
+            cp -r $src source
             chmod -R u+rwX source
             cd source
             runHook postUnpack
@@ -104,7 +110,7 @@
           '';
           passthru.lockHash = builtins.hashFile "sha256" ./pnpm-lock.yaml;
         });
-      in f { inherit pkgs zx-wrapper node pnpm src pnpm-store node-modules; }
+      in f { inherit pkgs zx-wrapper node pnpm pnpm-store node-modules; }
     );
   in {
     devShells = forAllSystems ({ pkgs, zx-wrapper, node-modules, ... }:

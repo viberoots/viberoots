@@ -80,7 +80,7 @@ async function main() {
     if (/hash mismatch in fixed-output derivation/i.test(out)) {
       console.error(
         "[startup-check] pnpm-store fixed-output hash mismatch detected.\n" +
-          "Run: pnpm tsx tools/dev/update-pnpm-hash.ts\n",
+          "Run: tools/dev/update-pnpm-hash.ts\n",
       );
     } else {
       console.error(
