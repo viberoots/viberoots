@@ -59,18 +59,25 @@ export async function jioCall<TInput = unknown, TOut = unknown>(
     if (opts.output === "json") {
       return JSON.parse(stdout) as TOut;
     }
-    // ndjson: collect into array (one JSON per line)
-    const out: TOut[] = [] as any;
-    for (const line of stdout.split(/\r?\n/)) {
-      const s = line.trim();
-      if (!s) continue;
-      try {
-        out.push(JSON.parse(s));
-      } catch {
-        // tolerate non-JSON lines in NDJSON stream (should be rare)
+    // ndjson
+    if (opts.collect) {
+      // When --collect is passed, jio emits a single JSON array
+      const arr = JSON.parse(stdout);
+      return arr as any;
+    } else {
+      // Collect line-by-line
+      const out: TOut[] = [] as any;
+      for (const line of stdout.split(/\r?\n/)) {
+        const s = line.trim();
+        if (!s) continue;
+        try {
+          out.push(JSON.parse(s));
+        } catch {
+          // tolerate non-JSON lines in NDJSON stream (should be rare)
+        }
       }
+      return out;
     }
-    return out;
   } catch (e: any) {
     // Surface stderr for easier debugging
     const errOut = String(e?.stderr || e?.stdout || e || "");

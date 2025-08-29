@@ -229,3 +229,9 @@ zx_test(
     script = "tools/tests/jio.limits.argv-bytes.test.ts",
     out = "json_cli_limits_argv_bytes.stamp",
 )
+
+zx_test(
+    name = "jio_call_helper",
+    script = "tools/tests/jio.jio-call.test.ts",
+    out = "jio_call_helper.stamp",
+)
