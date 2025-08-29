@@ -193,3 +193,15 @@ zx_test(
     script = "tools/tests/jio.timeout.sink-finalize.test.ts",
     out = "json_cli_timeout_sink_finalize.stamp",
 )
+
+zx_test(
+    name = "json_cli_failure_hook_cwd",
+    script = "tools/tests/jio.failure-hook.cwd.test.ts",
+    out = "json_cli_failure_hook_cwd.stamp",
+)
+
+zx_test(
+    name = "json_cli_stdout_sink_on_validation_error",
+    script = "tools/tests/jio.stdout.sink-on-validation-error.test.ts",
+    out = "json_cli_stdout_sink_on_validation_error.stamp",
+)
