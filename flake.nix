@@ -38,7 +38,7 @@
           inherit src;
           nativeBuildInputs = [ pkgs.nodejs_22 pkgs.pnpm ];
           outputHashMode = "recursive";
-          outputHash     = "sha256-p1dJ3IepIozEI0XJOWse6NuihiGAHgWaJGEkMM5Rnyk=";
+          outputHash     = "sha256-Yk7jlFc6SnMz3V6nZ1A3prD0PACRU9u3KGB0LvCprBo=";
           dontPatchShebangs = true;
           unpackPhase = ''
             runHook preUnpack
