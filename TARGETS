@@ -181,3 +181,15 @@ zx_test(
     script = "tools/tests/jio.limits.ndjson-line-bytes.test.ts",
     out = "json_cli_limits_ndjson_line_bytes.stamp",
 )
+
+zx_test(
+    name = "json_cli_limits_stdout_json_chunked",
+    script = "tools/tests/jio.limits.stdout-json-chunked.test.ts",
+    out = "json_cli_limits_stdout_json_chunked.stamp",
+)
+
+zx_test(
+    name = "json_cli_timeout_sink_finalize",
+    script = "tools/tests/jio.timeout.sink-finalize.test.ts",
+    out = "json_cli_timeout_sink_finalize.stamp",
+)
