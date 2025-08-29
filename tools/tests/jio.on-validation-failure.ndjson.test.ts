@@ -62,11 +62,22 @@ console.log('{"ok":2}');
         process.exit(2);
       }
       const sinkLines = sinkTxt.trim().split(/\n+/);
+      let parsed: any;
       try {
-        // Ensure lines are JSON parseable describing the failure
-        JSON.parse(sinkLines[0]);
+        parsed = JSON.parse(sinkLines[0]);
       } catch {
         console.error("failure sink line is not JSON:", sinkLines[0]);
+        process.exit(2);
+      }
+      // Verify expected diagnostic shape from runner
+      if (
+        !(
+          parsed &&
+          (parsed.reason === "output" || parsed.reason === "stdout") &&
+          typeof parsed.message === "string"
+        )
+      ) {
+        console.error("unexpected sink object shape:", parsed);
         process.exit(2);
       }
     });

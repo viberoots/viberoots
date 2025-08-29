@@ -223,3 +223,9 @@ zx_test(
     script = "tools/tests/jio.failure-hook.cwd-caller.test.ts",
     out = "json_cli_failure_hook_cwd_caller.stamp",
 )
+
+zx_test(
+    name = "json_cli_limits_argv_bytes",
+    script = "tools/tests/jio.limits.argv-bytes.test.ts",
+    out = "json_cli_limits_argv_bytes.stamp",
+)
