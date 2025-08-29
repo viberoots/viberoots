@@ -7,6 +7,28 @@ import readline from "node:readline";
 import { PassThrough } from "node:stream";
 import { createAjvValidator, generateInputSchemaFromParameters } from "./schema/index.ts";
 
+// Parent stdio EPIPE handling: exit(0) on broken pipe like Unix CLIs
+try {
+  process.stdout.on("error", (e: any) => {
+    if (e && (e as any).code === "EPIPE") {
+      try {
+        // minimal cleanup only; let process exit immediately
+      } finally {
+        process.exit(0);
+      }
+    }
+  });
+  process.stderr.on("error", (e: any) => {
+    if (e && (e as any).code === "EPIPE") {
+      try {
+        // minimal cleanup only; let process exit immediately
+      } finally {
+        process.exit(0);
+      }
+    }
+  });
+} catch {}
+
 type CliOpts = {
   help: boolean;
   version: boolean;
@@ -1144,6 +1166,16 @@ async function runWithTransforms(
   // Local timeout guard
   // Exclude failure sink from termination group to allow it to flush after endInput()
   const procs = [p1, cmd, p2].filter(Boolean) as any[];
+  // If stdin parsing fails, proactively terminate the running group to honor precedence and avoid hangs
+  let abortSent = false;
+  const abortTimer = setInterval(() => {
+    if (stdinParseFailed && !abortSent) {
+      abortSent = true;
+      try {
+        terminateGroup(procs);
+      } catch {}
+    }
+  }, 10);
   const timeoutMs = runtime.timeoutMsOverride || spec.command?.timeoutMs;
   let localTimedOut = false;
   let localKiller: NodeJS.Timeout | null = null;
@@ -1156,13 +1188,20 @@ async function runWithTransforms(
             } catch {}
             terminateGroup(procs);
             try {
+              // Proactively break any readers waiting on stdout/stdin streams to avoid hangs
               (p2 as any)?.stdout?.destroy();
             } catch {}
             try {
               (p2 as any)?.stdin?.destroy?.();
             } catch {}
             try {
+              cmd.stdout?.destroy?.();
+            } catch {}
+            try {
               cmd.stdin?.destroy?.();
+            } catch {}
+            try {
+              (p1 as any)?.stdout?.destroy?.();
             } catch {}
             localTimedOut = true;
             res("TIMEOUT");
@@ -1218,10 +1257,10 @@ async function runWithTransforms(
   const waitDrain = async (w: NodeJS.WritableStream) =>
     new Promise<void>((res) => w.once("drain", res));
   if (!p1) {
-    // No transform: pipe directly and ensure closure with a fallback guard
-    let ended = false;
+    // No transform: pipe stdin directly with backpressure and limits
     try {
-      const limiter = new PassThrough();
+      // Use highWaterMark tuned for large inputs to avoid tiny chunking overheads
+      const limiter = new PassThrough({ highWaterMark: 256 * 1024 });
       let stdinCount = 0;
       limiter.on("data", (chunk) => {
         stdinCount += (chunk as Buffer).length;
@@ -1238,19 +1277,18 @@ async function runWithTransforms(
           stdinLimitExceeded = true;
         }
       });
+      // Stream piping honors backpressure internally; do not block the main flow
       process.stdin.pipe(limiter).pipe(cmd.stdin);
-      try {
-        process.stdin.on("error", () => {});
-      } catch {}
-      const onEnd = () => {
-        if (ended) return;
-        ended = true;
+      // If shell pipeline upstream ends early (e.g., `cat file | head -n1 | jio ...`),
+      // end our stdin too so the child can complete and emit output
+      limiter.once("end", () => {
         try {
           cmd.stdin.end();
         } catch {}
-      };
-      process.stdin.once("end", onEnd);
-      process.stdin.once("close", onEnd);
+      });
+      try {
+        process.stdin.on("error", () => {});
+      } catch {}
     } catch {}
   } else {
     // process.stdin -> p1.stdin
@@ -1345,36 +1383,18 @@ async function runWithTransforms(
   let exitCode = 0;
   let stdoutParseFailed = false;
   let stdoutConfigError = false;
-  // Helper to gracefully finalize the failure sink with a bounded grace period
+  // Helper to gracefully finalize the failure sink with a bounded, idempotent shutdown
+  let sinkFinalized = false;
   const finalizeFailureSink = async () => {
+    if (sinkFinalized) return;
+    sinkFinalized = true;
     if (!sink) return;
     try {
       (sink as any).endInput?.();
     } catch {}
-    const proc: any = (sink as any).proc;
-    if (!proc || !proc.pid) return;
-    const exited = new Promise<void>((res) => {
-      try {
-        proc.once?.("exit", () => res());
-      } catch {
-        res();
-      }
-    });
-    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-    const grace1 = 800;
-    const grace2 = 800;
-    let done = false;
-    await Promise.race([exited.then(() => (done = true)), sleep(grace1)]);
-    if (!done) {
-      try {
-        process.kill(proc.pid, "SIGTERM");
-      } catch {}
-      await Promise.race([exited.then(() => (done = true)), sleep(grace2)]);
-      if (!done) {
-        try {
-          process.kill(proc.pid, "SIGKILL");
-        } catch {}
-      }
+    const closePromise = (sink as any).close?.() as Promise<void> | undefined;
+    if (closePromise && typeof closePromise.then === "function") {
+      await Promise.race([closePromise, new Promise<void>((res) => setTimeout(res, 1000))]);
     }
   };
   if (st && st.format === "ndjson") {
@@ -1385,16 +1405,10 @@ async function runWithTransforms(
     let collectLimitExceeded = false;
     let suppressFurther = false;
     for await (const chunk of p2.stdout) {
-      if (localTimedOut) {
-        try {
-          (p2 as any)?.stdout?.destroy?.();
-        } catch {}
-        await finalizeFailureSink();
-        return 124;
-      }
       bufStr += Buffer.from(chunk).toString("utf8");
       if (bufStr.indexOf("\n") < 0 && Buffer.byteLength(bufStr) > limits.maxNdjsonLineBytes) {
         process.stderr.write("jio: ndjson line bytes limit exceeded (stream)\n");
+        await finalizeFailureSink();
         return 78;
       }
       while (true) {
@@ -1402,15 +1416,12 @@ async function runWithTransforms(
         if (nl < 0) break;
         let s = bufStr.slice(0, nl);
         bufStr = bufStr.slice(nl + 1);
-        if (localTimedOut) {
-          await finalizeFailureSink();
-          return 124;
-        }
         // line-size cap (after cut at newline)
         if (Buffer.byteLength(s) > limits.maxNdjsonLineBytes) {
           process.stderr.write("jio: ndjson line bytes limit exceeded\n");
           stdoutParseFailed = false;
           stdoutConfigError = false;
+          await finalizeFailureSink();
           return 78;
         }
         if (s.trim() === "") continue;
@@ -1458,6 +1469,10 @@ async function runWithTransforms(
           // Tolerate invalid lines: route to failure sink, but do not fail the stage
         }
       }
+      if (localTimedOut) {
+        await finalizeFailureSink();
+        return 124;
+      }
     }
     // Handle any trailing data without newline
     if (localTimedOut) {
@@ -1468,6 +1483,7 @@ async function runWithTransforms(
     if (trailing) {
       if (Buffer.byteLength(trailing) > limits.maxNdjsonLineBytes) {
         process.stderr.write("jio: ndjson line bytes limit exceeded (trailing)\n");
+        await finalizeFailureSink();
         return 78;
       }
       let s = bufStr;
@@ -1543,6 +1559,7 @@ async function runWithTransforms(
       total += c.length;
       if (total > limits.maxStdoutJsonBytes) {
         process.stderr.write("jio: stdout JSON bytes limit exceeded\n");
+        await finalizeFailureSink();
         return 78;
       }
       chunks.push(c);
@@ -1585,6 +1602,36 @@ async function runWithTransforms(
     } catch {}
   }
 
+  // If we already know we must fail due to parse/config errors, stop early
+  if (stdinParseFailed) {
+    terminateGroup([p1, cmd, p2].filter(Boolean) as any[]);
+    try {
+      clearInterval(abortTimer);
+    } catch {}
+    await finalizeFailureSink();
+    try {
+      if (localKiller) clearTimeout(localKiller);
+    } catch {}
+    try {
+      process.stderr.write("stage failed: stdinTransform code=65\n");
+    } catch {}
+    return 65;
+  }
+  if (stdoutParseFailed) {
+    terminateGroup([p1, cmd, p2].filter(Boolean) as any[]);
+    try {
+      clearInterval(abortTimer);
+    } catch {}
+    await finalizeFailureSink();
+    try {
+      if (localKiller) clearTimeout(localKiller);
+    } catch {}
+    try {
+      process.stderr.write("stage failed: stdoutTransform code=65\n");
+    } catch {}
+    return 65;
+  }
+
   // Wait for stages and timeout race
   const allWait = Promise.all([cmdWaitEarly, p1WaitBaseEarly, p2WaitEarly]);
   const completedByTimeout = localTimeoutPromise
@@ -1593,17 +1640,16 @@ async function runWithTransforms(
   const [cCode, p1Code, p2Code] = completedByTimeout
     ? [0, 0, 0]
     : await Promise.all([cmdWaitEarly, p1WaitBaseEarly, p2WaitEarly]);
-  // If we timed out and have a failure sink, wait for it to finish cleanly (bounded)
+  // If we timed out and have a failure sink, request close but do not block here;
+  // we'll perform bounded finalize during exit code computation.
   if (completedByTimeout && sink) {
     try {
-      const closePromise = (sink as any).close?.() as Promise<void> | undefined;
-      if (closePromise && typeof closePromise.then === "function") {
-        await Promise.race([closePromise, new Promise<void>((res) => setTimeout(res, 1000))]);
-      }
+      (sink as any).endInput?.();
     } catch {}
   }
   try {
     if (localKiller) clearTimeout(localKiller);
+    clearInterval(abortTimer);
   } catch {}
 
   // Compute exit code precedence
@@ -1611,10 +1657,17 @@ async function runWithTransforms(
     process.stderr.write(
       `jio: failed to spawn stdinTransform: likely missing transform binary (code=69 ENOENT)\n`,
     );
+    await finalizeFailureSink();
     return 69;
   }
-  if (stdinLimitExceeded) return 78;
-  if (stdinConfigError || stdoutConfigError) return 78;
+  if (stdinLimitExceeded) {
+    await finalizeFailureSink();
+    return 78;
+  }
+  if (stdinConfigError || stdoutConfigError) {
+    await finalizeFailureSink();
+    return 78;
+  }
   if (runtime.collect && typeof runtime.collectLimit === "number" && runtime.collectLimit >= 0) {
     // If limit exceeded flag set earlier
     // Use a weak signal: check stderr wrote message is optional; return 78 to indicate config error
@@ -1626,18 +1679,7 @@ async function runWithTransforms(
     await finalizeFailureSink();
     return 124;
   }
-  if (stdinParseFailed) {
-    try {
-      process.stderr.write("stage failed: stdinTransform code=65\n");
-    } catch {}
-    return 65;
-  }
-  if (stdoutParseFailed) {
-    try {
-      process.stderr.write("stage failed: stdoutTransform code=65\n");
-    } catch {}
-    return 65;
-  }
+  // (Parse failures are handled above with early return)
   await finalizeFailureSink();
   return exitCode || cCode || p1Code || p2Code;
 }
@@ -1667,10 +1709,28 @@ function openFailureSink(
     detached: true,
   });
   p.stderr.pipe(process.stderr, { end: false });
+  try {
+    p.stdin.on("error", () => {});
+  } catch {}
+  let writeChain: Promise<void> = Promise.resolve();
   const write = async (obj: any) => {
-    try {
-      p.stdin.write(JSON.stringify(obj) + "\n");
-    } catch {}
+    writeChain = writeChain.then(async () => {
+      try {
+        const line = JSON.stringify(obj) + "\n";
+        const ok = p.stdin.write(line);
+        if (!ok) {
+          await Promise.race([
+            new Promise<void>((res) => p.stdin.once("drain", res)),
+            new Promise<void>((res) => p.stdin.once("close", res)),
+            new Promise<void>((res) => p.stdin.once("finish", res)),
+            new Promise<void>((res) => p.stdin.once("end", res)),
+            new Promise<void>((res) => p.stdin.once("error", () => res())),
+            new Promise<void>((res) => setTimeout(res, 500)),
+          ]);
+        }
+      } catch {}
+    });
+    await writeChain.catch(() => undefined);
   };
   const endInput = () => {
     try {
@@ -1678,6 +1738,9 @@ function openFailureSink(
     } catch {}
   };
   const close = async () => {
+    try {
+      await writeChain.catch(() => undefined);
+    } catch {}
     endInput();
     await new Promise<void>((res) => p.on("exit", () => res())).catch(() => undefined);
   };

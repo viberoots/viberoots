@@ -237,6 +237,24 @@ zx_test(
 )
 
 zx_test(
+    name = "json_cli_epipe",
+    script = "tools/tests/jio.epipe.test.ts",
+    out = "json_cli_epipe.stamp",
+)
+
+zx_test(
+    name = "json_cli_stdin_backpressure",
+    script = "tools/tests/jio.stdin-backpressure.test.ts",
+    out = "json_cli_stdin_backpressure.stamp",
+)
+
+zx_test(
+    name = "json_cli_stdin_error",
+    script = "tools/tests/jio.stdin-error.test.ts",
+    out = "json_cli_stdin_error.stamp",
+)
+
+zx_test(
     name = "json_cli_schema_parity",
     script = "tools/tests/jio.schema-parity.test.ts",
     out = "json_cli_schema_parity.stamp",
