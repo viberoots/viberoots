@@ -22,6 +22,7 @@ async function timeAsync<T>(label: string, fn: () => Promise<T>): Promise<T> {
 
 let preflightDone = false;
 async function ensurePnpmStoreHashValid() {
+  if (process.env.JIO_SKIP_PNPM_STORE_CHECK === "1") return;
   if (preflightDone) return;
   preflightDone = true;
   try {
