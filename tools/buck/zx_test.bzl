@@ -15,7 +15,6 @@ def _zx_test_impl(ctx):
             # Skip direnv in temp repos by default; specific tests can override
             + "export JIO_SKIP_DIRENV=\"${JIO_SKIP_DIRENV:-1}\"; "
             + "unset IN_NIX_SHELL; "
-            + "export JIO_SKIP_PNPM_STORE_CHECK=1; "
             # Provide a sane default per-test timeout for debugging runs unless overridden
             + "if [ -z \"$TEST_NODE_OPTIONS\" ]; then export TEST_NODE_OPTIONS=\"--test-timeout=300000\"; fi; "
             + "if [ -n \"$NODE_V8_COVERAGE\" ]; then mkdir -p \"$NODE_V8_COVERAGE\"; "
