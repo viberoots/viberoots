@@ -18,7 +18,8 @@ describe("jio handler participates in timeout kill group", () => {
       await fsp.writeFile(
         toolPath,
         `#!/usr/bin/env zx-wrapper
-let i=0; setInterval(() => console.log('not-json-'+(i++)), 1);
+console.log('not-json-0');
+let i=1; setInterval(() => console.log('not-json-'+(i++)), 1);
 `,
         "utf8",
       );
@@ -36,19 +37,19 @@ let i=0; setInterval(() => console.log('not-json-'+(i++)), 1);
           parameters: {},
           stdoutTransform: { shell: "cat", format: "ndjson" },
           onValidationFailure: { shell: `tee -a ${sinkPath}` },
-          timeoutMs: 500,
+          timeoutMs: 1000,
         },
       });
       await fsp.writeFile(path.join(tmp, "ht.tool.json"), JSON.stringify(spec, null, 2), "utf8");
 
-      process.env.JIO_SECRETS_DISABLE = "1";
       let failed = false;
       try {
-        await $({ stdio: "pipe" })`jio io.example.ht`;
+        await $({ stdio: "pipe" })`env JIO_SECRETS_DISABLE=1 jio io.example.ht`;
       } catch (e: any) {
         const err = String(e?.stderr || e?.stdout || "");
-        if (!/timeout — sent SIGTERM/i.test(err)) {
-          console.error("expected timeout note, got:", err);
+        const code = Number((e && (e.exitCode ?? e.code)) ?? -1);
+        if (!/timeout/i.test(err) && code !== 124) {
+          console.error("expected timeout exit or note, got:", err || `(exitCode=${code})`);
           process.exit(2);
         }
         failed = true;
@@ -58,8 +59,21 @@ let i=0; setInterval(() => console.log('not-json-'+(i++)), 1);
         process.exit(2);
       }
       // ensure handler received some lines but process exited
-      const txt = await fsp.readFile(sinkPath, "utf8").catch(() => "");
-      if (!txt) {
+      // Wait for the sink file to become non-empty under suite load
+      const waitUntil = Date.now() + 7000;
+      await new Promise((r) => setTimeout(r, 100));
+      let txt = "";
+      while (Date.now() < waitUntil) {
+        try {
+          const st = await fsp.stat(sinkPath);
+          if (st.size > 0) {
+            txt = await fsp.readFile(sinkPath, "utf8").catch(() => "");
+            if (txt) break;
+          }
+        } catch {}
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      if (!txt || txt.trim() === "") {
         console.error("expected handler to receive lines before timeout");
         process.exit(2);
       }

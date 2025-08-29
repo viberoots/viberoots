@@ -17,6 +17,8 @@ try {
 
 const { register } = await import("node:module");
 const { pathToFileURL } = await import("node:url");
+const fsp = await import("node:fs/promises");
+const pathMod2 = await import("node:path");
 
 // Minimal resolver:
 // 1) Append .ts to relative/absolute specifiers lacking an extension.
@@ -72,3 +74,45 @@ register(
     WORKSPACE_ROOT_FIXED.endsWith("/") ? WORKSPACE_ROOT_FIXED : WORKSPACE_ROOT_FIXED + "/",
   ),
 );
+
+// Tee zx child process outputs to files for debugging when TEST_LOG_DIR is set
+try {
+  if (globalThis.$ && process.env.TEST_LOG_DIR && process.env.TEST_CAPTURE_LOGS === "1") {
+    const origDollar = globalThis.$;
+    const baseDir = process.env.TEST_LOG_DIR;
+    const target = process.env.BUCK_TEST_TARGET || process.env.TEST_TARGET || "unknown-test";
+    const safe = target
+      .replace(/^.*?:/, "")
+      .replace(/[^a-zA-Z0-9._-]+/g, "_")
+      .slice(0, 200);
+    const dir = pathMod2.default.join(baseDir, safe, "children");
+    try {
+      await fsp.mkdir(dir, { recursive: true });
+    } catch {}
+
+    globalThis.$ = function wrappedDollar(...args) {
+      const startedAt = Date.now();
+      const rand = Math.random().toString(36).slice(2, 8);
+      const base = `${startedAt}-${rand}`;
+      const outPath = pathMod2.default.join(dir, `${base}.stdout.log`);
+      const errPath = pathMod2.default.join(dir, `${base}.stderr.log`);
+      const p = origDollar.apply(this, args);
+      const writeLogs = async (stdout, stderr) => {
+        try {
+          if (stdout) await fsp.appendFile(outPath, String(stdout));
+        } catch {}
+        try {
+          if (stderr) await fsp.appendFile(errPath, String(stderr));
+        } catch {}
+      };
+      // best-effort: attach then/catch without altering return value
+      try {
+        p.then(
+          (res) => writeLogs(res?.stdout, res?.stderr),
+          (e) => writeLogs(e?.stdout, e?.stderr),
+        );
+      } catch {}
+      return p;
+    };
+  }
+} catch {}

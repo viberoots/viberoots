@@ -1459,6 +1459,13 @@ async function runWithTransforms(
     let collectLimitExceeded = false;
     let suppressFurther = false;
     for await (const chunk of p2.stdout) {
+      if (localTimedOut) {
+        try {
+          (p2 as any)?.stdout?.destroy?.();
+        } catch {}
+        await finalizeFailureSink();
+        return 124;
+      }
       bufStr += Buffer.from(chunk).toString("utf8");
       if (bufStr.indexOf("\n") < 0 && Buffer.byteLength(bufStr) > limits.maxNdjsonLineBytes) {
         process.stderr.write("jio: ndjson line bytes limit exceeded (stream)\n");
@@ -1469,6 +1476,10 @@ async function runWithTransforms(
         if (nl < 0) break;
         let s = bufStr.slice(0, nl);
         bufStr = bufStr.slice(nl + 1);
+        if (localTimedOut) {
+          await finalizeFailureSink();
+          return 124;
+        }
         // line-size cap (after cut at newline)
         if (Buffer.byteLength(s) > limits.maxNdjsonLineBytes) {
           process.stderr.write("jio: ndjson line bytes limit exceeded\n");
@@ -1523,6 +1534,10 @@ async function runWithTransforms(
       }
     }
     // Handle any trailing data without newline
+    if (localTimedOut) {
+      await finalizeFailureSink();
+      return 124;
+    }
     const trailing = bufStr.trim();
     if (trailing) {
       if (Buffer.byteLength(trailing) > limits.maxNdjsonLineBytes) {
@@ -1591,6 +1606,13 @@ async function runWithTransforms(
     const chunks: Buffer[] = [];
     let total = 0;
     for await (const chunk of p2.stdout) {
+      if (localTimedOut) {
+        try {
+          (p2 as any)?.stdout?.destroy?.();
+        } catch {}
+        await finalizeFailureSink();
+        return 124;
+      }
       const c = Buffer.from(chunk);
       total += c.length;
       if (total > limits.maxStdoutJsonBytes) {
