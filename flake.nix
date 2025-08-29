@@ -26,12 +26,15 @@
         node = pkgs.nodejs_22;
         pnpm = pkgs.pnpm;
 
-        # Inputs for pnpm fetch (FOD): lockfile + .npmrc only (minimize churn)
+        # Inputs for pnpm fetch (FOD): include resolution inputs to avoid missing tarballs
         storeSrc = pkgs.lib.cleanSourceWith {
           src = ./.;
           filter = path: type:
             (builtins.match ".*/pnpm-lock\\.yaml" path != null)
-            || (builtins.match ".*/\\.npmrc" path != null);
+            || (builtins.match ".*/package\\.json" path != null)
+            || (builtins.match ".*/pnpm-workspace\\.yaml" path != null)
+            || (builtins.match ".*/\\.npmrc" path != null)
+            || (builtins.match ".*/patches/pnpm(/.*)?" path != null);
         };
 
         pnpm-store = pkgs.stdenvNoCC.mkDerivation (let certs = pkgs.cacert; in {
@@ -40,7 +43,8 @@
           src = storeSrc;
           nativeBuildInputs = [ pkgs.nodejs_22 pkgs.pnpm ];
           outputHashMode = "recursive";
-          outputHash     = "sha256-hPpj1ruPAI6ph/mEQNJw2uURUYNqswoI4vbEbCxTXKc=";
+          # Temporary placeholder; updated by tools/dev/update-pnpm-hash.ts after first build attempt
+          outputHash     = "sha256-bWUv7OOmQ1yOXynmWhYTYK2+RcaHpuzpk64aIetCBLY=";
           dontPatchShebangs = true;
           unpackPhase = ''
             runHook preUnpack
@@ -56,10 +60,12 @@
             export NODE_EXTRA_CA_CERTS=${certs}/etc/ssl/certs/ca-bundle.crt
             export HOME=$(pwd)/.home
             mkdir -p "$HOME"
+            # Write store only under $out to keep FOD pure and content-addressed
             pnpm config set store-dir "$out/store"
             pnpm fetch --frozen-lockfile
             runHook postBuild
           '';
+          # No installPhase needed; store already at $out/store
           passthru.lockHash = builtins.hashFile "sha256" ./pnpm-lock.yaml;
         });
 
@@ -93,6 +99,7 @@
             export NODE_EXTRA_CA_CERTS=${certs}/etc/ssl/certs/ca-bundle.crt
             export HOME=$(pwd)/.home
             mkdir -p "$HOME"
+            # Read from the fixed-output store; PNPM writes only to working dirs
             pnpm config set store-dir "${pnpm-store}/store"
             pnpm install --offline --frozen-lockfile
             runHook postBuild

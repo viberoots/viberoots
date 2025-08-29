@@ -5,6 +5,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import readline from "node:readline";
 import { PassThrough } from "node:stream";
+import { createAjvValidator, generateInputSchemaFromParameters } from "./schema/index.ts";
 
 type CliOpts = {
   help: boolean;
@@ -38,7 +39,7 @@ type RootConfig = {
 };
 
 type ToolSpec = {
-  tool?: { name?: string; outputSchema?: any };
+  tool?: { name?: string; inputSchema?: any; outputSchema?: any };
   command?: {
     package?: string;
     exec?: string;
@@ -172,6 +173,38 @@ export async function main(argv: string[]): Promise<number | void> {
   if (!spec || !spec.command?.exec) {
     console.error("jio: invalid spec (missing command.exec)");
     return 78;
+  }
+
+  // Schema printing mode
+  if (argv.includes("--input-schema") || argv.includes("--output-schema")) {
+    const wantIn = argv.includes("--input-schema");
+    const wantOut = argv.includes("--output-schema");
+    if (wantIn && wantOut) {
+      if (!spec.tool?.outputSchema) {
+        return 65;
+      }
+      const effIn = spec.tool?.inputSchema || generateInputSchemaFromParameters(spec);
+      try {
+        process.stdout.write(
+          JSON.stringify({ inputSchema: effIn, outputSchema: spec.tool.outputSchema }),
+        );
+      } catch {}
+      return 0;
+    }
+    if (wantIn) {
+      const effIn = spec.tool?.inputSchema || generateInputSchemaFromParameters(spec);
+      try {
+        process.stdout.write(JSON.stringify(effIn));
+      } catch {}
+      return 0;
+    }
+    if (wantOut) {
+      if (!spec.tool?.outputSchema) return 65;
+      try {
+        process.stdout.write(JSON.stringify(spec.tool.outputSchema));
+      } catch {}
+      return 0;
+    }
   }
 
   const requiresInput = usesPathParams(spec);
@@ -354,6 +387,8 @@ Flags:
       --clean-env | --no-clean-env  Use minimal env by default; disable to passthrough all
       --pass-env NAME      Pass specific env var from parent (repeatable)
       --env NAME=VALUE     Set explicit env var for child (repeatable)
+      --input-schema       Print effective input schema (explicit or inferred)
+      --output-schema      Print output schema; if absent, prints nothing and exits non-zero
 `);
 }
 
@@ -465,121 +500,11 @@ async function buildIndex(rootDir: string, cfg: RootConfig): Promise<Map<string,
   return idx;
 }
 
-// Formal schema (from jio.md §12)
-const FORMAL_SCHEMA: any = {
-  type: "object",
-  required: ["tool", "command"],
-  properties: {
-    tool: {
-      type: "object",
-      required: ["name"],
-      properties: {
-        name: { type: "string" },
-        title: { type: "string" },
-        description: { type: "string" },
-        inputSchema: { type: "object" },
-        outputSchema: { type: "object" },
-      },
-      additionalProperties: false,
-    },
-    command: {
-      type: "object",
-      required: ["package", "exec", "parameters"],
-      properties: {
-        package: { type: "string" },
-        exec: { type: "string" },
-        workingDir: { type: "string" },
-        env: { type: "object", additionalProperties: { type: "string" } },
-        defaultBooleanStyle: { type: "string", enum: ["presence", "equals"], default: "presence" },
-        inheritCallerCwd: { type: "boolean", default: false },
-        timeoutMs: { type: "integer", minimum: 1 },
-        parameters: {
-          type: "object",
-          additionalProperties: {
-            allOf: [
-              {
-                type: "object",
-                properties: {
-                  path: { type: "string" },
-                  value: { type: "string" },
-                  type: {
-                    type: "string",
-                    enum: ["string", "number", "boolean", "array", "object"],
-                  },
-                  required: { type: "boolean" },
-                  default: {},
-                  position: { type: "integer", minimum: 1 },
-                  flag: { type: "boolean" },
-                  flagName: { type: "string" },
-                  booleanStyle: { type: "string", enum: ["presence", "equals"] },
-                  collectionStyle: {
-                    type: "string",
-                    enum: ["repeatArg", "repeatFlag", "csv", "kv", "separate"],
-                  },
-                  csvSeparator: { type: "string", maxLength: 1 },
-                },
-                anyOf: [
-                  { required: ["path", "type"] },
-                  { required: ["value", "type"] },
-                  { required: ["default", "type"] },
-                ],
-              },
-              {
-                if: { required: ["flag"], properties: { flag: { const: true } } },
-                then: {
-                  anyOf: [
-                    { required: ["flagName"] },
-                    {
-                      properties: {
-                        type: { const: "object" },
-                        collectionStyle: { const: "kv" },
-                      },
-                    },
-                  ],
-                },
-              },
-            ],
-          },
-        },
-        stdinTransform: {
-          type: "object",
-          properties: {
-            shell: { type: "string" },
-            format: { type: "string", enum: ["ndjson", "json"] },
-          },
-          additionalProperties: false,
-        },
-        stdoutTransform: {
-          type: "object",
-          required: ["shell", "format"],
-          properties: {
-            shell: { type: "string" },
-            format: { type: "string", enum: ["ndjson", "json"] },
-          },
-          additionalProperties: false,
-        },
-        onValidationFailure: {
-          type: "object",
-          properties: { shell: { type: "string" } },
-          required: ["shell"],
-          additionalProperties: false,
-        },
-      },
-      additionalProperties: false,
-    },
-    specVersion: { type: "string", const: "1.0.0" },
-    jsonPathDialect: { type: "string", const: "jsonpath-plus@8" },
-    schemaDialect: { type: "string", const: "https://json-schema.org/draft/2020-12/schema" },
-  },
-  additionalProperties: false,
-};
-
-let ajvFormal: Ajv | null = null;
 let validateFormal: ((data: any) => boolean) | null = null;
 function ensureFormalValidator() {
-  if (!ajvFormal) {
-    ajvFormal = new Ajv({ allErrors: false, strict: false });
-    validateFormal = ajvFormal.compile(FORMAL_SCHEMA);
+  if (!validateFormal) {
+    const { validate } = createAjvValidator();
+    validateFormal = validate;
   }
 }
 
@@ -1314,6 +1239,9 @@ async function runWithTransforms(
         }
       });
       process.stdin.pipe(limiter).pipe(cmd.stdin);
+      try {
+        process.stdin.on("error", () => {});
+      } catch {}
       const onEnd = () => {
         if (ended) return;
         ended = true;
@@ -1323,8 +1251,6 @@ async function runWithTransforms(
       };
       process.stdin.once("end", onEnd);
       process.stdin.once("close", onEnd);
-      // Fallback guard: close exec stdin shortly after start if no events fire
-      setTimeout(onEnd, 50);
     } catch {}
   } else {
     // process.stdin -> p1.stdin
@@ -1667,6 +1593,15 @@ async function runWithTransforms(
   const [cCode, p1Code, p2Code] = completedByTimeout
     ? [0, 0, 0]
     : await Promise.all([cmdWaitEarly, p1WaitBaseEarly, p2WaitEarly]);
+  // If we timed out and have a failure sink, wait for it to finish cleanly (bounded)
+  if (completedByTimeout && sink) {
+    try {
+      const closePromise = (sink as any).close?.() as Promise<void> | undefined;
+      if (closePromise && typeof closePromise.then === "function") {
+        await Promise.race([closePromise, new Promise<void>((res) => setTimeout(res, 1000))]);
+      }
+    } catch {}
+  }
   try {
     if (localKiller) clearTimeout(localKiller);
   } catch {}

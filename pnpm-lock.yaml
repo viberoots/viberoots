@@ -7,6 +7,9 @@ settings:
 importers:
   .:
     devDependencies:
+      "@sinclair/typebox":
+        specifier: ^0.32.35
+        version: 0.32.35
       "@types/fs-extra":
         specifier: ^11.0.4
         version: 11.0.4
@@ -545,6 +548,12 @@ packages:
     resolution:
       {
         integrity: sha512-zt6OdqaDoOnJ1ZYsCYGt9YmWzDXl4vQdKTyJev62gFhRGKdx7mcT54V9KIjg+d2wi9EXsPvAPKe7i7WjfVWB8g==,
+      }
+
+  "@sinclair/typebox@0.32.35":
+    resolution:
+      {
+        integrity: sha512-Ul3YyOTU++to8cgNkttakC0dWvpERr6RYoHO2W47DLbFvrwBDJUY31B1sImH6JZSYc4Kt4PyHtoPNu+vL2r2dA==,
       }
 
   "@types/estree@1.0.8":
@@ -2938,6 +2947,8 @@ snapshots:
     optional: true
 
   "@rtsao/scc@1.1.0": {}
+
+  "@sinclair/typebox@0.32.35": {}
 
   "@types/estree@1.0.8": {}
 

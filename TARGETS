@@ -235,3 +235,15 @@ zx_test(
     script = "tools/tests/jio.jio-call.test.ts",
     out = "jio_call_helper.stamp",
 )
+
+zx_test(
+    name = "json_cli_schema_parity",
+    script = "tools/tests/jio.schema-parity.test.ts",
+    out = "json_cli_schema_parity.stamp",
+)
+
+zx_test(
+    name = "json_cli_cli_schema_flags",
+    script = "tools/tests/jio.cli-schema-flags.test.ts",
+    out = "json_cli_cli_schema_flags.stamp",
+)

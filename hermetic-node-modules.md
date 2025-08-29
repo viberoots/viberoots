@@ -30,17 +30,22 @@ This document captures the exact approach we use to make `node_modules` immutabl
 
 ## Key Nix snippets (what we actually use)
 
-Clean source and pin toolchain:
+Clean source and pin toolchain (minimal, resolution-only inputs):
 
 ```nix
 let
   pkgs = import nixpkgs { inherit system; config.allowUnfree = true; };
   node = pkgs.nodejs_22;
   pnpm = pkgs.pnpm;
+  # Include only files that affect dependency resolution and patches
   src = pkgs.lib.cleanSourceWith {
     src = ./.;
-    # Include everything except node_modules (see Churn section for a more minimal src)
-    filter = path: type: (builtins.match ".*/node_modules(/.*)?" path == null);
+    filter = path: type:
+      (builtins.match ".*/pnpm-lock.yaml" path != null)
+      || (builtins.match ".*/package.json" path != null)
+      || (builtins.match ".*/pnpm-workspace.yaml" path != null)
+      || (builtins.match ".*/\\.npmrc" path != null)
+      || (builtins.match ".*/patches/pnpm(/.*)?" path != null);
   };
 in
 ```
@@ -72,6 +77,7 @@ pnpm-store = pkgs.stdenvNoCC.mkDerivation {
     mkdir -p "$HOME"
     # Critical: keep store only under $out so FOD output does not reference other store paths
     pnpm config set store-dir "$out/store"
+    # Fetch exactly from the lockfile (no extra flags, no recursion/filters)
     pnpm fetch --frozen-lockfile
     runHook postBuild
   '';
@@ -114,6 +120,11 @@ node-modules = pkgs.stdenvNoCC.mkDerivation {
   passthru.lockHash = builtins.hashFile "sha256" ./pnpm-lock.yaml;
 };
 ```
+
+Notes:
+
+- Do not copy or clone the fixed-output store into a local directory in `node-modules`. Point `store-dir` directly to `${pnpm-store}/store`; PNPM will read from it and only write to working dirs (`node_modules`, `.pnpm`).
+- Run `pnpm fetch` from the repository/workspace root. Avoid `--recursive`, `--filter`, or `--prod/--dev/--optional` in the FOD; these can exclude importers and cause missing tarballs.
 
 Dev shell: best‑effort link only, no installation:
 
@@ -184,10 +195,12 @@ Even small deltas in `pnpm-lock.yaml` change its hash. We employ several techniq
   src = pkgs.lib.cleanSourceWith {
     src = ./.;
     filter = path: type:
-      # include only lockfile, root package.json, and patches/**
+      # include only lockfile, root package.json, workspace + npmrc, and patches/pnpm/**
       (builtins.match ".*/pnpm-lock.yaml" path != null)
       || (builtins.match ".*/package.json" path != null)
-      || (builtins.match ".*/patches(/.*)?" path != null);
+      || (builtins.match ".*/pnpm-workspace.yaml" path != null)
+      || (builtins.match ".*/\\.npmrc" path != null)
+      || (builtins.match ".*/patches/pnpm(/.*)?" path != null);
   };
   ```
 
@@ -202,6 +215,21 @@ Even small deltas in `pnpm-lock.yaml` change its hash. We employ several techniq
   - If you have many workspaces, consider generating importer‑scoped providers or even separate `node-modules` per importer keyed to its effective subset. This keeps changes in one workspace from invalidating all consumers.
 
 With the above, rebuilds happen only when the effective dependency graph changes. Minor text‑only edits to files outside the resolution set won’t affect derivation hashes; and even when the lockfile changes, dev shells won’t “rebuild on activation” unless there’s genuinely new content to realize.
+
+---
+
+## Hardening checklist
+
+- CA certificates and HOME inside builds
+  - Set `SSL_CERT_FILE`, `NIX_SSL_CERT_FILE`, `NODE_EXTRA_CA_CERTS` to `${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt`.
+  - Set `HOME=$(pwd)/.home` and `mkdir -p "$HOME"` in both derivations.
+- Pin toolchain
+  - Use PNPM and Node from Nix (`pkgs.pnpm`, `pkgs.nodejs_22`). Prefer matching the lockfile generator version (same major/minor).
+  - If formats drift, regenerate `pnpm-lock.yaml` inside `nix develop`.
+- `.npmrc` stability
+  - If you customize `node-linker`, `virtual-store-dir`, scopes/registries, or auth, keep `.npmrc` under version control and include it in the FOD `src` (as shown above).
+- Dev shell PATH
+  - After linking, prepend `node_modules/.bin` to `PATH` so scripts resolve without any install steps.
 
 ---
 
