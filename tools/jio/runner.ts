@@ -1,5 +1,6 @@
 import fg from "fast-glob";
 import { spawn } from "node:child_process";
+import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import readline from "node:readline";
@@ -1522,7 +1523,8 @@ async function runWithTransforms(
       stdinCount += (chunk as Buffer).length;
       if (stdinCount > limits.maxStdinBytes) {
         try {
-          process.stderr.write("jio: stdin bytes limit exceeded\n");
+          const tag = stIn!.format === "json" ? " (json)" : "";
+          process.stderr.write("jio: stdin bytes limit exceeded" + tag + "\n");
         } catch {}
         try {
           limiter.destroy();
@@ -2167,10 +2169,7 @@ async function hasBinaryOnPath(bin: string): Promise<boolean> {
     try {
       const st = await fsp.stat(candidate);
       if (!st.isFile()) continue;
-      await fsp.access(
-        candidate,
-        (fs as any).constants?.X_OK ?? (fs as any).promises?.constants?.X_OK ?? 1,
-      );
+      await fsp.access(candidate, (fs as any).constants?.X_OK ?? 1);
       return true;
     } catch {}
   }

@@ -254,6 +254,12 @@ zx_test(
 )
 
 zx_test(
+    name = "json_cli_secretspec_path_detection",
+    script = "tools/tests/jio.secretspec.path-detection.test.ts",
+    out = "json_cli_secretspec_path_detection.stamp",
+)
+
+zx_test(
     name = "json_cli_optional_params",
     script = "tools/tests/jio.optional-params.test.ts",
     out = "json_cli_optional_params.stamp",
