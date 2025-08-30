@@ -39,6 +39,7 @@ type CliOpts = {
   toolRef: string | null;
   collect: boolean;
   collectLimit?: number;
+  collectBytes?: number;
   // Limits (CLI overrides)
   maxArgvTokens?: number;
   maxArgvBytes?: number;
@@ -77,6 +78,14 @@ type ToolSpec = {
       maxStdinBytes?: number;
       maxStdoutJsonBytes?: number;
       maxNdjsonLineBytes?: number;
+      collectItems?: number;
+      collectBytes?: number;
+      // Failure sink reliability caps
+      sinkMaxBytes?: number;
+      sinkMaxItems?: number;
+      sinkMaxRatePerSec?: number;
+      sinkWriteTimeoutMs?: number;
+      sinkCloseTimeoutMs?: number;
     };
     parameters?: Record<string, ParameterSpec>;
     stdinTransform?: { shell?: string; format?: "json" | "ndjson" };
@@ -293,6 +302,8 @@ export async function main(argv: string[]): Promise<number | void> {
       maxStdinBytes: opts.maxStdinBytes,
       maxStdoutJsonBytes: opts.maxStdoutJsonBytes,
       maxNdjsonLineBytes: opts.maxNdjsonLineBytes,
+      collectItems: opts.collectLimit,
+      collectBytes: opts.collectBytes,
     },
     timeoutMsOverride: opts.timeoutMsOverride,
     cleanEnv: opts.cleanEnv,
@@ -326,6 +337,7 @@ function parseArgs(argv: string[]): CliOpts {
     dryRun: false,
     toolRef: null,
     collect: false,
+    collectBytes: undefined,
     cleanEnv: true,
     passEnv: [],
     setEnv: {},
@@ -344,6 +356,9 @@ function parseArgs(argv: string[]): CliOpts {
     else if (a === "--collect-limit") {
       const n = Number(tokens[++i] ?? "");
       if (Number.isFinite(n) && n >= 0) out.collectLimit = Math.floor(n);
+    } else if (a === "--collect-bytes") {
+      const n = Number(tokens[++i] ?? "");
+      if (Number.isFinite(n) && n >= 0) out.collectBytes = Math.floor(n);
     } else if (a === "--max-argv-tokens") {
       const n = Number(tokens[++i] ?? "");
       if (Number.isFinite(n) && n >= 0) out.maxArgvTokens = Math.floor(n);
@@ -400,6 +415,7 @@ Flags:
       --dry-run     Print plan without executing
       --collect     For ndjson output, return a single JSON array instead of lines
       --collect-limit N  Max number of items to collect before failing (default: unlimited)
+      --collect-bytes N  Max total bytes of collected items before failing (default: unlimited)
       --timeout-ms N      Override spec timeout (ms)
       --max-argv-tokens N  Cap number of argv tokens
       --max-argv-bytes N   Cap total argv bytes
@@ -411,6 +427,13 @@ Flags:
       --env NAME=VALUE     Set explicit env var for child (repeatable)
       --input-schema       Print effective input schema (explicit or inferred)
       --output-schema      Print output schema; if absent, prints nothing and exits non-zero
+
+Environment:
+  JIO_SINK_DEBUG=1  Emit a one-line summary of failure sink drops/limits at shutdown
+
+Spec limits (command.limits):
+  sinkMaxBytes (default 1MiB), sinkMaxItems (1000), sinkMaxRatePerSec (100/s)
+  sinkWriteTimeoutMs (500), sinkCloseTimeoutMs (1000)
 `);
 }
 
@@ -975,6 +998,8 @@ async function runWithTransforms(
       maxStdinBytes?: number;
       maxStdoutJsonBytes?: number;
       maxNdjsonLineBytes?: number;
+      collectItems?: number;
+      collectBytes?: number;
     };
     timeoutMsOverride?: number;
     cleanEnv: boolean;
@@ -988,6 +1013,13 @@ async function runWithTransforms(
     maxStdinBytes: 16 * 1024 * 1024,
     maxStdoutJsonBytes: 32 * 1024 * 1024,
     maxNdjsonLineBytes: 1 * 1024 * 1024,
+    collectItems: Number.POSITIVE_INFINITY as number,
+    collectBytes: Number.POSITIVE_INFINITY as number,
+    sinkMaxBytes: 1 * 1024 * 1024,
+    sinkMaxItems: 1000,
+    sinkMaxRatePerSec: 100,
+    sinkWriteTimeoutMs: 500,
+    sinkCloseTimeoutMs: 1000,
   };
   const limits = {
     ...DEFAULT_LIMITS,
@@ -1402,6 +1434,7 @@ async function runWithTransforms(
     let firstLineSeen = false;
     let arrayStarted = false;
     let itemsEmitted = 0;
+    let bytesCollected = 0;
     let collectLimitExceeded = false;
     let suppressFurther = false;
     for await (const chunk of p2.stdout) {
@@ -1441,7 +1474,19 @@ async function runWithTransforms(
           if (runtime.collect) {
             if (suppressFurther) continue;
             if (typeof runtime.collectLimit === "number" && runtime.collectLimit >= 0) {
-              if (itemsEmitted >= runtime.collectLimit) {
+              if (
+                itemsEmitted >= runtime.collectLimit ||
+                (limits.collectItems as number) <= itemsEmitted
+              ) {
+                collectLimitExceeded = true;
+                suppressFurther = true;
+                continue;
+              }
+            }
+            const itemStr = JSON.stringify(obj);
+            const itemBytes = Buffer.byteLength(itemStr);
+            if (Number.isFinite(limits.collectBytes as number)) {
+              if (bytesCollected + itemBytes > (limits.collectBytes as number)) {
                 collectLimitExceeded = true;
                 suppressFurther = true;
                 continue;
@@ -1453,8 +1498,9 @@ async function runWithTransforms(
             } else {
               process.stdout.write(",");
             }
-            process.stdout.write(JSON.stringify(obj));
+            process.stdout.write(itemStr);
             itemsEmitted++;
+            bytesCollected += itemBytes;
           } else {
             process.stdout.write(s + "\n");
           }
@@ -1499,28 +1545,51 @@ async function runWithTransforms(
           if (runtime.collect) {
             if (!suppressFurther) {
               if (typeof runtime.collectLimit === "number" && runtime.collectLimit >= 0) {
-                if (itemsEmitted >= runtime.collectLimit) {
+                if (
+                  itemsEmitted >= runtime.collectLimit ||
+                  (limits.collectItems as number) <= itemsEmitted
+                ) {
                   collectLimitExceeded = true;
                   suppressFurther = true;
                 } else {
-                  if (!arrayStarted) {
+                  const itemStr = JSON.stringify(obj);
+                  const itemBytes = Buffer.byteLength(itemStr);
+                  if (
+                    Number.isFinite(limits.collectBytes as number) &&
+                    bytesCollected + itemBytes > (limits.collectBytes as number)
+                  ) {
+                    collectLimitExceeded = true;
+                    suppressFurther = true;
+                  } else if (!arrayStarted) {
                     process.stdout.write("[");
                     arrayStarted = true;
                   } else {
                     process.stdout.write(",");
                   }
-                  process.stdout.write(JSON.stringify(obj));
+                  process.stdout.write(itemStr);
                   itemsEmitted++;
+                  bytesCollected += itemBytes;
                 }
               } else {
-                if (!arrayStarted) {
+                const itemStr = JSON.stringify(obj);
+                const itemBytes = Buffer.byteLength(itemStr);
+                if (
+                  Number.isFinite(limits.collectBytes as number) &&
+                  bytesCollected + itemBytes > (limits.collectBytes as number)
+                ) {
+                  collectLimitExceeded = true;
+                  suppressFurther = true;
+                } else if (!arrayStarted) {
                   process.stdout.write("[");
                   arrayStarted = true;
                 } else {
                   process.stdout.write(",");
                 }
-                process.stdout.write(JSON.stringify(obj));
-                itemsEmitted++;
+                if (!suppressFurther) {
+                  process.stdout.write(itemStr);
+                  itemsEmitted++;
+                  bytesCollected += itemBytes;
+                }
               }
             }
           } else {
@@ -1541,7 +1610,14 @@ async function runWithTransforms(
       process.stdout.write("]\n");
     }
     if (runtime.collect && collectLimitExceeded) {
-      process.stderr.write(`jio: --collect-limit exceeded (${String(runtime.collectLimit)})\n`);
+      const hintItems =
+        typeof runtime.collectLimit === "number" && runtime.collectLimit >= 0
+          ? ` --collect-limit=${String(runtime.collectLimit)}`
+          : " (set --collect-limit to increase)";
+      const hintBytes = Number.isFinite(limits.collectBytes as number)
+        ? ` --collect-bytes=${String(limits.collectBytes)}`
+        : " (set --collect-bytes to increase)";
+      process.stderr.write(`jio: collect limit exceeded.${hintItems}${hintBytes}\n`);
       return 78;
     }
   } else if (st && st.format === "json") {
@@ -1710,13 +1786,87 @@ function openFailureSink(
   });
   p.stderr.pipe(process.stderr, { end: false });
   try {
-    p.stdin.on("error", () => {});
+    p.stdin.on("error", (e: any) => {
+      if (e && e.code === "EPIPE") {
+        // treat as closed; subsequent writes will be no-ops
+      }
+    });
   } catch {}
   let writeChain: Promise<void> = Promise.resolve();
+  // Caps and rate limiting
+  const limits = spec.command?.limits || {};
+  const sinkMaxBytes = Number.isFinite(limits.sinkMaxBytes as number)
+    ? (limits.sinkMaxBytes as number)
+    : 1 * 1024 * 1024;
+  const sinkMaxItems = Number.isFinite(limits.sinkMaxItems as number)
+    ? (limits.sinkMaxItems as number)
+    : 1000;
+  const sinkMaxRatePerSec = Number.isFinite(limits.sinkMaxRatePerSec as number)
+    ? (limits.sinkMaxRatePerSec as number)
+    : 100;
+  const sinkWriteTimeoutMs = Number.isFinite(limits.sinkWriteTimeoutMs as number)
+    ? (limits.sinkWriteTimeoutMs as number)
+    : 500;
+  const sinkCloseTimeoutMs = Number.isFinite(limits.sinkCloseTimeoutMs as number)
+    ? (limits.sinkCloseTimeoutMs as number)
+    : 1000;
+  let bytesWritten = 0;
+  let itemsWritten = 0;
+  let rateWindowStart = Date.now();
+  let rateCount = 0;
+  let sentLimitMsg = false;
+  let sentRateMsg = false;
+  let droppedForRate = 0;
+  let droppedForCaps = 0;
   const write = async (obj: any) => {
     writeChain = writeChain.then(async () => {
       try {
-        const line = JSON.stringify(obj) + "\n";
+        // Enforce size caps
+        let payload = obj;
+        try {
+          if (typeof obj === "object" && obj) {
+            const s = JSON.stringify(obj);
+            if (Buffer.byteLength(s) > 8 * 1024) {
+              payload = {
+                ...obj,
+                message: String(obj.message || "").slice(0, 7900) + "…(truncated)",
+              };
+            }
+          }
+        } catch {}
+        const line = JSON.stringify(payload) + "\n";
+        const now = Date.now();
+        if (now - rateWindowStart >= 1000) {
+          rateWindowStart = now;
+          rateCount = 0;
+        }
+        if (rateCount >= sinkMaxRatePerSec) {
+          droppedForRate++;
+          if (!sentRateMsg) {
+            try {
+              process.stderr.write(
+                "jio: sink limits reached (hint: command.limits.sinkMax* / sinkMaxRatePerSec)\n",
+              );
+            } catch {}
+            sentRateMsg = true;
+          }
+          return; // drop due to rate
+        }
+        if (itemsWritten >= sinkMaxItems || bytesWritten + Buffer.byteLength(line) > sinkMaxBytes) {
+          droppedForCaps++;
+          if (!sentLimitMsg) {
+            try {
+              process.stderr.write(
+                "jio: sink limits reached (hint: command.limits.sinkMax* / sinkMaxRatePerSec)\n",
+              );
+            } catch {}
+            sentLimitMsg = true;
+          }
+          return; // drop due to caps
+        }
+        rateCount++;
+        itemsWritten++;
+        bytesWritten += Buffer.byteLength(line);
         const ok = p.stdin.write(line);
         if (!ok) {
           await Promise.race([
@@ -1725,7 +1875,7 @@ function openFailureSink(
             new Promise<void>((res) => p.stdin.once("finish", res)),
             new Promise<void>((res) => p.stdin.once("end", res)),
             new Promise<void>((res) => p.stdin.once("error", () => res())),
-            new Promise<void>((res) => setTimeout(res, 500)),
+            new Promise<void>((res) => setTimeout(res, sinkWriteTimeoutMs)),
           ]);
         }
       } catch {}
@@ -1742,7 +1892,17 @@ function openFailureSink(
       await writeChain.catch(() => undefined);
     } catch {}
     endInput();
-    await new Promise<void>((res) => p.on("exit", () => res())).catch(() => undefined);
+    await Promise.race([
+      new Promise<void>((res) => p.on("exit", () => res())),
+      new Promise<void>((res) => setTimeout(res, sinkCloseTimeoutMs)),
+    ]).catch(() => undefined);
+    if (process.env.JIO_SINK_DEBUG === "1") {
+      try {
+        process.stderr.write(
+          `jio: sink summary drops: rate=${droppedForRate} caps=${droppedForCaps} written_items=${itemsWritten} written_bytes=${bytesWritten}\n`,
+        );
+      } catch {}
+    }
   };
   return { write, close, proc: p, endInput };
 }
