@@ -3,21 +3,99 @@
 load("//tools/buck:zx_test.bzl", "zx_test")
 
 zx_test(
-    name = "scaffolding_smoke",
-    script = "tools/tests/scaffolding.smoke.test.ts",
-    out = "scaffolding_smoke.stamp",
+    name = "scaffolding_smoke_targets_buildfile",
+    script = "tools/tests/scaffolding.smoke.targets-buildfile.test.ts",
+    out = "scaffolding_smoke_targets_buildfile.stamp",
 )
 
 zx_test(
-    name = "scaffolding_help",
-    script = "tools/tests/scaffolding.help.test.ts",
-    out = "scaffolding_help.stamp",
+    name = "scaffolding_smoke_lib_readme",
+    script = "tools/tests/scaffolding.smoke.lib-readme.test.ts",
+    out = "scaffolding_smoke_lib_readme.stamp",
 )
 
 zx_test(
-    name = "scaffolding_e2e",
-    script = "tools/tests/scaffolding.e2e.test.ts",
-    out = "scaffolding_e2e.stamp",
+    name = "scaffolding_smoke_cli_readme",
+    script = "tools/tests/scaffolding.smoke.cli-readme.test.ts",
+    out = "scaffolding_smoke_cli_readme.stamp",
+)
+
+zx_test(
+    name = "scaffolding_e2e_overwrite_guard",
+    script = "tools/tests/scaffolding.e2e.overwrite-guard.test.ts",
+    out = "scaffolding_e2e_overwrite_guard.stamp",
+)
+
+zx_test(
+    name = "scaffolding_e2e_regen_stage",
+    script = "tools/tests/scaffolding.e2e.regen-stage.test.ts",
+    out = "scaffolding_e2e_regen_stage.stamp",
+)
+
+zx_test(
+    name = "scaffolding_e2e_move_update_delete",
+    script = "tools/tests/scaffolding.e2e.move-update-delete.test.ts",
+    out = "scaffolding_e2e_move_update_delete.stamp",
+)
+
+zx_test(
+    name = "scaffolding_e2e_move_confirm",
+    script = "tools/tests/scaffolding.e2e.move-confirm.test.ts",
+    out = "scaffolding_e2e_move_confirm.stamp",
+)
+
+zx_test(
+    name = "scaffolding_e2e_validate_pass",
+    script = "tools/tests/scaffolding.e2e.validate-pass.test.ts",
+    out = "scaffolding_e2e_validate_pass.stamp",
+)
+
+zx_test(
+    name = "scaffolding_e2e_validate_fail1",
+    script = "tools/tests/scaffolding.e2e.validate-fail1.test.ts",
+    out = "scaffolding_e2e_validate_fail1.stamp",
+)
+
+zx_test(
+    name = "scaffolding_e2e_validate_fail2",
+    script = "tools/tests/scaffolding.e2e.validate-fail2.test.ts",
+    out = "scaffolding_e2e_validate_fail2.stamp",
+)
+
+zx_test(
+    name = "scaffolding_help_json_vars",
+    script = "tools/tests/scaffolding.help.json-vars.test.ts",
+    out = "scaffolding_help_json_vars.stamp",
+)
+
+zx_test(
+    name = "scaffolding_help_templates_json",
+    script = "tools/tests/scaffolding.help.templates-json.test.ts",
+    out = "scaffolding_help_templates_json.stamp",
+)
+
+zx_test(
+    name = "scaffolding_help_completions",
+    script = "tools/tests/scaffolding.help.completions.test.ts",
+    out = "scaffolding_help_completions.stamp",
+)
+
+zx_test(
+    name = "scaffolding_help_synopses",
+    script = "tools/tests/scaffolding.help.synopses.test.ts",
+    out = "scaffolding_help_synopses.stamp",
+)
+
+zx_test(
+    name = "scaffolding_help_new_vars",
+    script = "tools/tests/scaffolding.help.new-vars.test.ts",
+    out = "scaffolding_help_new_vars.stamp",
+)
+
+zx_test(
+    name = "scaffolding_help_new_list",
+    script = "tools/tests/scaffolding.help.new-list.test.ts",
+    out = "scaffolding_help_new_list.stamp",
 )
 
 zx_test(
@@ -33,21 +111,42 @@ zx_test(
 )
 
 zx_test(
-    name = "json_cli_argv",
-    script = "tools/tests/jio.argv.test.ts",
-    out = "json_cli_argv.stamp",
+    name = "json_cli_argv_positional_and_booleans",
+    script = "tools/tests/jio.argv.positional-and-booleans.test.ts",
+    out = "json_cli_argv_positional_and_booleans.stamp",
+)
+zx_test(
+    name = "json_cli_argv_arrays_and_kv",
+    script = "tools/tests/jio.argv.arrays-and-kv.test.ts",
+    out = "json_cli_argv_arrays_and_kv.stamp",
 )
 
 zx_test(
-    name = "json_cli_stdout",
-    script = "tools/tests/jio.stdout.test.ts",
-    out = "json_cli_stdout.stamp",
+    name = "json_cli_stdout_ndjson",
+    script = "tools/tests/jio.stdout.ndjson.test.ts",
+    out = "json_cli_stdout_ndjson.stamp",
+)
+zx_test(
+    name = "json_cli_stdout_validation_error",
+    script = "tools/tests/jio.stdout.validation-error.test.ts",
+    out = "json_cli_stdout_validation_error.stamp",
 )
 
 zx_test(
-    name = "json_cli_stdin",
-    script = "tools/tests/jio.stdin.test.ts",
-    out = "json_cli_stdin.stamp",
+    name = "json_cli_stdin_invalid_input",
+    script = "tools/tests/jio.stdin.invalid-input.test.ts",
+    out = "json_cli_stdin_invalid_input.stamp",
+)
+zx_test(
+    name = "json_cli_stdin_ndjson",
+    script = "tools/tests/jio.stdin.ndjson.test.ts",
+    out = "json_cli_stdin_ndjson.stamp",
+)
+
+zx_test(
+    name = "json_cli_stdin_jsondoc",
+    script = "tools/tests/jio.stdin.jsondoc.test.ts",
+    out = "json_cli_stdin_jsondoc.stamp",
 )
 
 zx_test(
@@ -63,15 +162,30 @@ zx_test(
 )
 
 zx_test(
-    name = "json_cli_discovery",
-    script = "tools/tests/jio.discovery.test.ts",
-    out = "json_cli_discovery.stamp",
+    name = "json_cli_discovery_globs",
+    script = "tools/tests/jio.discovery.globs.test.ts",
+    out = "json_cli_discovery_globs.stamp",
+)
+zx_test(
+    name = "json_cli_discovery_duplicate",
+    script = "tools/tests/jio.discovery.duplicate.test.ts",
+    out = "json_cli_discovery_duplicate.stamp",
+)
+zx_test(
+    name = "json_cli_discovery_bare_name",
+    script = "tools/tests/jio.discovery.bare-name.test.ts",
+    out = "json_cli_discovery_bare_name.stamp",
 )
 
 zx_test(
-    name = "json_cli_exit_precedence",
-    script = "tools/tests/jio.exit-precedence.test.ts",
-    out = "json_cli_exit_precedence.stamp",
+    name = "json_cli_exit_precedence_stdin",
+    script = "tools/tests/jio.exit-precedence.stdin.test.ts",
+    out = "json_cli_exit_precedence_stdin.stamp",
+)
+zx_test(
+    name = "json_cli_exit_precedence_stdout",
+    script = "tools/tests/jio.exit-precedence.stdout.test.ts",
+    out = "json_cli_exit_precedence_stdout.stamp",
 )
 
 zx_test(
@@ -99,9 +213,14 @@ zx_test(
 )
 
 zx_test(
-    name = "json_cli_schema_jsonpath",
-    script = "tools/tests/jio.schema-jsonpath.test.ts",
-    out = "json_cli_schema_jsonpath.stamp",
+    name = "json_cli_schema_invalid_spec",
+    script = "tools/tests/jio.schema-jsonpath.invalid-spec.test.ts",
+    out = "json_cli_schema_invalid_spec.stamp",
+)
+zx_test(
+    name = "json_cli_schema_jsonpath_subset",
+    script = "tools/tests/jio.schema-jsonpath.subset.test.ts",
+    out = "json_cli_schema_jsonpath_subset.stamp",
 )
 
 zx_test(
@@ -141,9 +260,14 @@ zx_test(
 )
 
 zx_test(
-    name = "json_cli_defaults",
-    script = "tools/tests/jio.defaults.test.ts",
-    out = "json_cli_defaults.stamp",
+    name = "json_cli_defaults_presence",
+    script = "tools/tests/jio.defaults.presence.test.ts",
+    out = "json_cli_defaults_presence.stamp",
+)
+zx_test(
+    name = "json_cli_defaults_override",
+    script = "tools/tests/jio.defaults.override.test.ts",
+    out = "json_cli_defaults_override.stamp",
 )
 
 zx_test(
@@ -153,15 +277,15 @@ zx_test(
 )
 
 zx_test(
-    name = "json_cli_collect",
-    script = "tools/tests/jio.collect.test.ts",
-    out = "json_cli_collect.stamp",
+    name = "json_cli_collect_in_equals",
+    script = "tools/tests/jio.collect.in-equals.test.ts",
+    out = "json_cli_collect_in_equals.stamp",
 )
 
 zx_test(
-    name = "json_cli_limits",
-    script = "tools/tests/jio.limits.test.ts",
-    out = "json_cli_limits.stamp",
+    name = "json_cli_collect_where_equals",
+    script = "tools/tests/jio.collect.where-equals.test.ts",
+    out = "json_cli_collect_where_equals.stamp",
 )
 
 zx_test(
@@ -171,15 +295,15 @@ zx_test(
 )
 
 zx_test(
-    name = "json_cli_on_validation_failure_ndjson",
-    script = "tools/tests/jio.on-validation-failure.ndjson.test.ts",
-    out = "json_cli_on_validation_failure_ndjson.stamp",
+    name = "json_cli_collect_gathers",
+    script = "tools/tests/jio.collect.gathers.test.ts",
+    out = "json_cli_collect_gathers.stamp",
 )
 
 zx_test(
-    name = "json_cli_limits_ndjson_line_bytes",
-    script = "tools/tests/jio.limits.ndjson-line-bytes.test.ts",
-    out = "json_cli_limits_ndjson_line_bytes.stamp",
+    name = "json_cli_collect_limit",
+    script = "tools/tests/jio.collect.limit.test.ts",
+    out = "json_cli_collect_limit.stamp",
 )
 
 zx_test(
@@ -231,9 +355,27 @@ zx_test(
 )
 
 zx_test(
-    name = "jio_call_helper",
-    script = "tools/tests/jio.jio-call.test.ts",
-    out = "jio_call_helper.stamp",
+    name = "jio_call_helper_json",
+    script = "tools/tests/jio.jio-call.json.test.ts",
+    out = "jio_call_helper_json.stamp",
+)
+
+zx_test(
+    name = "jio_call_helper_ndjson",
+    script = "tools/tests/jio.jio-call.ndjson.test.ts",
+    out = "jio_call_helper_ndjson.stamp",
+)
+
+zx_test(
+    name = "jio_call_helper_passenv",
+    script = "tools/tests/jio.jio-call.passenv.test.ts",
+    out = "jio_call_helper_passenv.stamp",
+)
+
+zx_test(
+    name = "jio_call_helper_error",
+    script = "tools/tests/jio.jio-call.error.test.ts",
+    out = "jio_call_helper_error.stamp",
 )
 
 zx_test(
@@ -261,9 +403,21 @@ zx_test(
 )
 
 zx_test(
-    name = "json_cli_cli_schema_flags",
-    script = "tools/tests/jio.cli-schema-flags.test.ts",
-    out = "json_cli_cli_schema_flags.stamp",
+    name = "json_cli_cli_schema_flags_input",
+    script = "tools/tests/jio.cli-schema-flags.input.test.ts",
+    out = "json_cli_cli_schema_flags_input.stamp",
+)
+
+zx_test(
+    name = "json_cli_cli_schema_flags_output",
+    script = "tools/tests/jio.cli-schema-flags.output.test.ts",
+    out = "json_cli_cli_schema_flags_output.stamp",
+)
+
+zx_test(
+    name = "json_cli_cli_schema_flags_both",
+    script = "tools/tests/jio.cli-schema-flags.both.test.ts",
+    out = "json_cli_cli_schema_flags_both.stamp",
 )
 
 zx_test(
