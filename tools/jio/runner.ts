@@ -1853,6 +1853,10 @@ async function runWithTransforms(
   }
 
   // If we already know we must fail due to parse/config errors, stop early
+  // Ensure stdin forwarding finished so parse-failure flag is up-to-date before deciding
+  try {
+    if (stdinForwardDone) await stdinForwardDone;
+  } catch {}
   if (stdinParseFailed) {
     terminateProcs([p1, cmd, p2].filter(Boolean) as any[]);
     try {
