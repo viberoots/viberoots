@@ -1541,6 +1541,9 @@ async function runWithTransforms(
                 message: "invalid JSON line",
               });
             stdinParseFailed = true;
+            try {
+              process.stderr.write("stage failed: stdinTransform code=65\n");
+            } catch {}
           }
         }
         cmd.stdin.end();
@@ -1567,6 +1570,9 @@ async function runWithTransforms(
               message: "invalid JSON document",
             });
           stdinParseFailed = true;
+          try {
+            process.stderr.write("stage failed: stdinTransform code=65\n");
+          } catch {}
         }
         cmd.stdin.end();
       })().catch(() => {
@@ -1903,6 +1909,21 @@ async function runWithTransforms(
   } catch {}
 
   // Compute exit code precedence
+  // Final guard: ensure transform parse failures win even if detected late due to scheduling
+  if (stdinParseFailed) {
+    try {
+      process.stderr.write("stage failed: stdinTransform code=65\n");
+    } catch {}
+    await finalizeFailureSink();
+    return 65;
+  }
+  if (stdoutParseFailed) {
+    try {
+      process.stderr.write("stage failed: stdoutTransform code=65\n");
+    } catch {}
+    await finalizeFailureSink();
+    return 65;
+  }
   if (stdinLikelySpawnError) {
     process.stderr.write(
       `jio: failed to spawn stdinTransform: likely missing transform binary (code=69 ENOENT)\n`,
