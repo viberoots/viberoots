@@ -48,3 +48,42 @@ describe("jio stdinTransform + input validation — json doc", () => {
     });
   });
 });
+
+describe("jio stdinTransform json document size cap", () => {
+  test("json doc over maxStdinBytes fails with exit 78", async () => {
+    await runInTemp("jio-stdin-json-cap", async (tmp, $) => {
+      await fsp.writeFile(
+        path.join(tmp, ".jio"),
+        JSON.stringify({ defaultPackage: "io.example" }),
+        "utf8",
+      );
+      const specPath = path.join(tmp, "cap.tool.json");
+      const spec = defineToolSpec({
+        tool: { name: "cap" },
+        command: {
+          package: "io.example",
+          exec: "bash",
+          parameters: {
+            sub: { type: "string", value: "-lc", position: 1 },
+            cmd: { type: "string", value: "cat", position: 2 },
+          },
+          stdinTransform: { shell: "cat", format: "json" },
+          stdoutTransform: { shell: "cat", format: "json" },
+        },
+      });
+      await fsp.writeFile(specPath, JSON.stringify(spec, null, 2), "utf8");
+
+      // Build a big JSON document exceeding 64KiB
+      const big = JSON.stringify({ s: "x".repeat(80 * 1024) });
+      const err = await $({
+        stdio: "pipe",
+        input: big,
+      })`jio io.example.cap --max-stdin-bytes 65536`.catch((e: any) => e);
+      const stderrTxt = String(err?.stderr || "");
+      if (!/stdin bytes limit exceeded \(json\)/i.test(stderrTxt)) {
+        console.error("expected stdin bytes cap error (json), got:", stderrTxt);
+        process.exit(2);
+      }
+    });
+  });
+});

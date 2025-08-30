@@ -638,7 +638,6 @@ function buildArgv(spec: ToolSpec, invObj: any): string[] {
   const flags: Array<{ name: string; tokens: string[] }> = [];
 
   const seenPositions = new Set<number>();
-  let maxPos = 0;
   const defaultBooleanStyle: "presence" | "equals" =
     spec.command?.defaultBooleanStyle === "equals" ? "equals" : "presence";
 
@@ -649,6 +648,13 @@ function buildArgv(spec: ToolSpec, invObj: any): string[] {
     const type = ps.type;
     const flag = !!ps.flag;
     const flagName = ps.flagName;
+
+    // If JSONPath yields an array for a non-array typed parameter, fail fast.
+    if (type !== "array" && Array.isArray(value)) {
+      throw new Error(
+        `parameter ${paramName} expects type ${type} but JSONPath returned an array; use type=array with collectionStyle or adjust your path`,
+      );
+    }
 
     // Enforce kv keys subset of inputSchema.properties when applicable
     if (
@@ -680,13 +686,17 @@ function buildArgv(spec: ToolSpec, invObj: any): string[] {
     }
 
     if (!flag) {
-      let pos = ps.position as number | undefined;
-      if (!pos || pos <= 0 || !Number.isInteger(pos)) {
-        pos = maxPos + 1;
+      const pos = ps.position as number | undefined;
+      // Enforce explicit, positive, unique position for positionals
+      if (!pos || !Number.isInteger(pos) || pos <= 0) {
+        throw new Error(
+          `positional parameter '${paramName}' must declare a positive integer position`,
+        );
       }
-      while (seenPositions.has(pos)) pos++;
+      if (seenPositions.has(pos)) {
+        throw new Error(`duplicate positional index ${pos} for parameter '${paramName}'`);
+      }
       seenPositions.add(pos);
-      if (pos > maxPos) maxPos = pos;
       const tokens = renderValueTokens(type, ps, value, undefined);
       if (tokens.length === 0) continue;
       positionals.push({ pos, tokens });
@@ -922,7 +932,11 @@ function renderValueTokens(
       }
       if (style === "separate") {
         if (!flagName) throw new Error("separate requires flagName");
-        return [flagName, String(value.join(ps.csvSeparator || ","))];
+        const out: string[] = [];
+        for (const v of value) {
+          out.push(flagName, String(v));
+        }
+        return out;
       }
       throw new Error(`unsupported array collectionStyle: ${style}`);
     }
@@ -1146,7 +1160,7 @@ async function runWithTransforms(
         },
         true,
       );
-      setTimeout(() => {
+      setTimeout(async () => {
         try {
           if (useFallback) {
             for (const p of procs) {
@@ -1161,6 +1175,10 @@ async function runWithTransforms(
               } catch {}
             }
           } else {
+            // Second descendant scan before SIGKILL
+            try {
+              targets = await listDescendantPids(roots);
+            } catch {}
             for (const pid of targets) {
               try {
                 process.kill(pid, "SIGKILL");
@@ -1552,7 +1570,25 @@ async function runWithTransforms(
     } else if (format === "json") {
       stdinForwardDone = (async (): Promise<void> => {
         const chunks: Buffer[] = [];
-        for await (const chunk of p1.stdout) chunks.push(Buffer.from(chunk));
+        let total = 0;
+        for await (const chunk of p1.stdout) {
+          const c = Buffer.from(chunk);
+          total += c.length;
+          if (total > limits.maxStdinBytes) {
+            try {
+              process.stderr.write("jio: stdin bytes limit exceeded (json)\n");
+            } catch {}
+            try {
+              (p1 as any)?.stdout?.destroy?.();
+            } catch {}
+            try {
+              cmd.stdin.end();
+            } catch {}
+            stdinLimitExceeded = true;
+            return;
+          }
+          chunks.push(c);
+        }
         let buf = Buffer.concat(chunks).toString("utf8");
         if (buf.charCodeAt(0) === 0xfeff) buf = buf.slice(1);
         try {
