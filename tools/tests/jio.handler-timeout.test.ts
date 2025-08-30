@@ -36,7 +36,10 @@ let i=1; setInterval(() => console.log('not-json-'+(i++)), 1);
           exec: toolPath,
           parameters: {},
           stdoutTransform: { shell: "cat", format: "ndjson" },
-          onValidationFailure: { shell: `tee -a ${sinkPath}` },
+          // Ensure the sink writes at least one line even if stdin closes immediately
+          onValidationFailure: {
+            shell: `awk '{ print; has=1 } END { if (!has) print "closed" }' >> '${sinkPath}'`,
+          },
           timeoutMs: 1000,
         },
       });

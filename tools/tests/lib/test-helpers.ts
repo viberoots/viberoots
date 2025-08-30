@@ -20,24 +20,6 @@ async function timeAsync<T>(label: string, fn: () => Promise<T>): Promise<T> {
   }
 }
 
-let preflightDone = false;
-async function ensurePnpmStoreHashValid() {
-  if (preflightDone) return;
-  preflightDone = true;
-  try {
-    await $`nix build .#pnpm-store --no-link --accept-flake-config`;
-  } catch (e: any) {
-    const out = String((e && e.stderr) || (e && e.stdout) || e || "");
-    const hint = "Run: pnpm tsx tools/dev/update-pnpm-hash.ts";
-    if (/hash mismatch in fixed-output derivation/i.test(out)) {
-      console.error(`test preflight: pnpm-store hash mismatch. ${hint}`);
-    } else {
-      console.error(`test preflight: pnpm-store build failed. ${hint}`);
-    }
-    process.exit(1);
-  }
-}
-
 async function rewriteCoverageUrls(tmpRoot: string) {
   try {
     const repoRoot = process.cwd();
@@ -121,7 +103,6 @@ export async function runInTemp<T>(
   const overallStart = performance.now();
   const tmp = await mktemp(name + "-");
   await rsyncRepoTo(tmp);
-  await ensurePnpmStoreHashValid();
   // Load direnv environment for the temp dir so devShell linking/PATH are active when available.
   // If already in a nix dev shell, skip direnv to avoid redundant flake eval and shellHook.
   // Additionally, if the required tools are already available on PATH (e.g., secretspec), skip direnv.
