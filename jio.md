@@ -12,6 +12,8 @@ At the top-level of each `*.tool.json` file, include the following metadata:
 
 Runners MUST reject specs whose `specVersion` major is unsupported.
 
+// Deprecated: the runner now enforces an RFC 9535 JSONPath subset via a jsonpath-plus adapter (see §4).
+
 ---
 
 ## Why jio exists
@@ -64,6 +66,7 @@ Resolve the root directory in this order:
 
 ```json
 {
+  "configVersion": "1",
   "defaultPackage": "io.example",
   "ignore": ["node_modules/", ".git/", "dist/"],
   "globs": ["**/*.tool.json"],
@@ -72,6 +75,7 @@ Resolve the root directory in this order:
 }
 ```
 
+- `configVersion`: when present, the runner validates `.jio` against `https://static.kilty.io/jio/config.schema.json`.
 - `defaultPackage`: used when a tool is invoked by a bare `name` (no dot).
 - `ignore`: directory prefixes to skip during scanning.
 - `globs` / `excludeGlobs`: control which `*.tool.json` files are loaded.
@@ -128,107 +132,6 @@ The spec has two siblings: **`tool`** and **`command`**.
 - `stdoutTransform` (required) — shell pipeline that converts stdout into **JSON/NDJSON**.
   - `shell`: e.g., `"jq -c ."`
   - `format`: `"json"` | `"ndjson"` describing what it emits.
-- **Shell robustness example (recommended)**
-
-```sh
-# stdinTransform example
-set -euo pipefail
-jq -c '.[]' | sed 's/foo/bar/g'
-
-# Or explicitly call bash with pipefail enabled:
-bash -euo pipefail -c 'jq -c . | grep -v "^#"'
-```
-
-`onValidationFailure` (optional) — shell pipeline to receive **NDJSON** wrappers for validation failures:
-
-- Each line is a JSON object:
-  ```json
-  { "reason": "input|stdin|stdout|output", "object": <offending>, "message": "details if any" }
-  ```
-- Implementations SHOULD keep streaming even when failures occur (except fatal cases like unreadable top-level input).
-- `timeoutMs` (optional) — wall-clock deadline for the entire run.
-
-> **Trust note**: Tool specs and transform shell strings are **trusted configurations**. Treat them like code (they run via `/bin/sh -c`).
-
----
-
-## 3) Complete example
-
-```json
-{
-  "tool": {
-    "name": "new",
-    "title": "Scaffold: create project",
-    "description": "Wraps `scaf new` to scaffold a project using JSON input.",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "template": { "type": "string" },
-        "exampleArg": { "type": "number" },
-        "exampleFlag": { "type": "boolean" }
-      },
-      "required": ["template"]
-    },
-    "outputSchema": {
-      "type": "object",
-      "properties": {
-        "level": { "type": "string" },
-        "msg": { "type": "string" },
-        "ts": { "type": "string" }
-      },
-      "required": ["level", "msg", "ts"]
-    }
-  },
-
-  "command": {
-    "package": "io.example.scaf",
-    "exec": "scaf",
-    "workingDir": "./",
-    "env": { "SCHEMA": "enabled" },
-    "defaultBooleanStyle": "presence",
-    "timeoutMs": 60000,
-
-    "parameters": {
-      "subcommand": { "type": "string", "value": "new", "position": 1 },
-      "template": { "path": "$.template", "type": "string", "required": true, "position": 2 },
-      "exampleArg": {
-        "path": "$.exampleArg",
-        "type": "number",
-        "flag": true,
-        "flagName": "--example-arg"
-      },
-      "exampleFlag": {
-        "path": "$.exampleFlag",
-        "type": "boolean",
-        "flag": true,
-        "flagName": "--example-flag"
-      }
-    },
-
-    "stdinTransform": {
-      "shell": "jq -c .",
-      "format": "ndjson"
-    },
-
-    "stdoutTransform": {
-      "shell": "jq -c '.events[] | {level, msg, ts}'",
-      "format": "ndjson"
-    },
-
-    "onValidationFailure": {
-      "shell": "jq -c . >> errors.ndjson"
-    }
-  }
-}
-```
-
-**Invocation example**
-
-```bash
-echo '{"template":"cli","exampleArg":123,"exampleFlag":true}' | jio scaf.new
-# Resolves to FQName io.example.scaf.new
-# Final argv: scaf new cli --example-arg=123 --example-flag
-```
 
 ---
 
@@ -238,7 +141,10 @@ There is **no argv template**. You explicitly define how to build argv.
 
 ### Field reference
 
-- `path` — JSONPath expression into the **invocation JSON** (not streaming stdin). **Dialect**: `jsonpath-plus@8`. Allowed subset for portability: property/array selectors, wildcards `*`, unions, and slices. **Disallowed**: script expressions and function extensions. See grammar: https://github.com/JSONPath-Plus/JSONPath#readme
+- `path` — JSONPath expression into the **invocation JSON** (not streaming stdin).
+  - Enforced subset (RFC 9535‑compatible): dot/property selectors, bracketed string keys, wildcards `*`, array indexes, slices, and unions of property names like `$['a','b']`.
+  - Disallowed: script expressions/filters (e.g., `?(expr)`), functions, and `@` current node — such expressions are rejected.
+  - Returns: a single value, an array of values, or `undefined`.
 - `value` — static literal string (mutually exclusive with `path`).
 - `type` — `"string" | "number" | "boolean" | "array" | "object"`.
 - `required` — missing value is an error (unless `default` is present).
@@ -247,14 +153,8 @@ There is **no argv template**. You explicitly define how to build argv.
 - `flag` — if `true`, render as a named flag (`--flagName...`).
 - `flagName` — required when `flag=true` (e.g., `"--example-arg"`).
 - `booleanStyle` — `"presence"` (default) vs `"equals"`.
-- `collectionStyle` — controls arrays/objects expansion (replaces older `repeatRule`):
-  - `"repeatArg"` — each array element becomes its own positional arg.
-  - `"repeatFlag"` — each array element becomes a repeated flag like `--tag=value`.
-  - `"csv"` — join array with a separator into **one** arg; set `csvSeparator` (default: `","`).
-  - `"kv"` — expand object/map into `--key=value` pairs (order of keys is implementation-defined; recommend lexical by key).
-  - `"separate"` — render value as a separate arg: `--flag value` instead of `--flag=value`.
-
-> **No implicit case conversion**: Field names and flag names are **not** auto-converted. Be explicit with `flagName` and `path`.
+- `collectionStyle` — controls arrays/objects expansion: `"repeatArg" | "repeatFlag" | "csv" | "kv" | "separate"`.
+- `csvSeparator` — used when `collectionStyle: "csv"` (default: `","`).
 
 ### Rendering rules & coercion
 

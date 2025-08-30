@@ -1,6 +1,5 @@
 export type JsonCliSpec = {
   specVersion: "1.0.0";
-  jsonPathDialect?: "jsonpath-plus@8";
   schemaDialect?: "https://json-schema.org/draft/2020-12/schema";
   tool: ToolSection;
   command: CommandSection;
@@ -46,16 +45,12 @@ type BaseParam = {
   csvSeparator?: string;
 };
 
-export type JsonCliSpecInput = Omit<
-  JsonCliSpec,
-  "specVersion" | "jsonPathDialect" | "schemaDialect"
-> &
-  Partial<Pick<JsonCliSpec, "specVersion" | "jsonPathDialect" | "schemaDialect">>;
+export type JsonCliSpecInput = Omit<JsonCliSpec, "specVersion" | "schemaDialect"> &
+  Partial<Pick<JsonCliSpec, "specVersion" | "schemaDialect">>;
 
 export function defineToolSpec(spec: JsonCliSpecInput): JsonCliSpec {
   return {
     specVersion: spec.specVersion ?? "1.0.0",
-    jsonPathDialect: spec.jsonPathDialect ?? "jsonpath-plus@8",
     schemaDialect: spec.schemaDialect ?? "https://json-schema.org/draft/2020-12/schema",
     tool: spec.tool,
     command: spec.command,

@@ -1,6 +1,5 @@
 {
   "specVersion": "1.0.0",
-  "jsonPathDialect": "jsonpath-plus@8",
   "schemaDialect": "https://json-schema.org/draft/2020-12/schema",
 
   "tool": {

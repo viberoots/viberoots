@@ -1,7 +1,10 @@
 import Ajv from "ajv";
+import { compileJsonPath } from "../jsonpath/index.ts";
+import { createAjv } from "../validation/ajv.ts";
 
 // Canonical JSON Schema (single source of truth) matching runner.ts behavior today
 const JioSpecSchema: any = {
+  $id: "https://static.kilty.io/jio/spec.schema.json",
   type: "object",
   required: ["tool", "command"],
   properties: {
@@ -35,7 +38,7 @@ const JioSpecSchema: any = {
               {
                 type: "object",
                 properties: {
-                  path: { type: "string" },
+                  path: { type: "string", format: "jsonpath" },
                   value: { type: "string" },
                   type: {
                     type: "string",
@@ -54,17 +57,32 @@ const JioSpecSchema: any = {
                   csvSeparator: { type: "string", maxLength: 1 },
                 },
                 anyOf: [
-                  { required: ["path", "type"] },
-                  { required: ["value", "type"] },
-                  { required: ["default", "type"] },
+                  {
+                    type: "object",
+                    properties: { path: {}, type: {} },
+                    required: ["path", "type"],
+                  },
+                  {
+                    type: "object",
+                    properties: { value: {}, type: {} },
+                    required: ["value", "type"],
+                  },
+                  {
+                    type: "object",
+                    properties: { default: {}, type: {} },
+                    required: ["default", "type"],
+                  },
                 ],
               },
               {
-                if: { required: ["flag"], properties: { flag: { const: true } } },
+                if: { type: "object", required: ["flag"], properties: { flag: { const: true } } },
                 then: {
                   anyOf: [
-                    { required: ["flagName"] },
-                    { properties: { type: { const: "object" }, collectionStyle: { const: "kv" } } },
+                    { type: "object", properties: { flagName: {} }, required: ["flagName"] },
+                    {
+                      type: "object",
+                      properties: { type: { const: "object" }, collectionStyle: { const: "kv" } },
+                    },
                   ],
                 },
               },
@@ -99,7 +117,6 @@ const JioSpecSchema: any = {
       additionalProperties: false,
     },
     specVersion: { type: "string", const: "1.0.0" },
-    jsonPathDialect: { type: "string", const: "jsonpath-plus@8" },
     schemaDialect: { type: "string", const: "https://json-schema.org/draft/2020-12/schema" },
   },
   additionalProperties: false,
@@ -116,7 +133,7 @@ let cachedAjv: Ajv | null = null;
 let cachedValidate: ((d: any) => boolean) | null = null;
 export function createAjvValidator(): { ajv: Ajv; validate: (d: any) => boolean } {
   if (!cachedAjv) {
-    cachedAjv = new Ajv({ allErrors: false, strict: false });
+    cachedAjv = createAjv();
     cachedValidate = cachedAjv.compile(toJsonSchema());
   }
   return { ajv: cachedAjv, validate: cachedValidate! };
@@ -202,6 +219,12 @@ export function generateInputSchemaFromParameters(spec: any): any {
 
     try {
       const expr = p.path as string;
+      // Validate JSONPath early in RFC mode
+      try {
+        compileJsonPath(expr);
+      } catch {
+        /* ignore; schema validation will catch */
+      }
       let i = 1; // after $
       while (i < expr.length) {
         if (expr[i] === ".") {

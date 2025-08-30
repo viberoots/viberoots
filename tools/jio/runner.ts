@@ -1,11 +1,12 @@
-import Ajv from "ajv";
 import fg from "fast-glob";
 import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import readline from "node:readline";
 import { PassThrough } from "node:stream";
+import { evaluateJsonPathString as evaluateJsonPathRfc } from "./jsonpath/index.ts";
 import { createAjvValidator, generateInputSchemaFromParameters } from "./schema/index.ts";
+import { createAjv } from "./validation/ajv.ts";
 
 // Parent stdio EPIPE handling: exit(0) on broken pipe like Unix CLIs
 try {
@@ -258,7 +259,7 @@ export async function main(argv: string[]): Promise<number | void> {
 
   // Validate invocation JSON against tool.inputSchema when provided
   if (spec.tool?.outputSchema || (spec as any).tool?.inputSchema) {
-    const ajvIn = new Ajv({ allErrors: false, strict: false });
+    const ajvIn = createAjv();
     const inSchema: any = (spec as any).tool?.inputSchema;
     if (inSchema) {
       try {
@@ -273,7 +274,21 @@ export async function main(argv: string[]): Promise<number | void> {
           return 1;
         }
       } catch (e: any) {
-        console.error("jio: input validation failed");
+        const sink = openFailureSink(rootDir, specPath, spec, rootCfg);
+        try {
+          if (sink)
+            await sink.write({
+              reason: "input",
+              object: invObj,
+              message: "input validation failed",
+            });
+        } catch {}
+        try {
+          console.error("jio: invalid input");
+        } catch {}
+        try {
+          if (sink) await sink.close();
+        } catch {}
         return 1;
       }
     }
@@ -467,6 +482,39 @@ async function readRootConfig(rootDir: string): Promise<RootConfig> {
   try {
     const txt = await fsp.readFile(path.join(rootDir, ".jio"), "utf8");
     const obj = JSON.parse(txt);
+    try {
+      // Validate .jio config shape minimally when configVersion is declared
+      if (
+        obj &&
+        typeof obj === "object" &&
+        Object.prototype.hasOwnProperty.call(obj, "configVersion")
+      ) {
+        const ajv = createAjv();
+        const schema = {
+          $id: "https://static.kilty.io/jio/config.schema.json",
+          $schema: "https://json-schema.org/draft/2020-12/schema",
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            configVersion: { type: "string", enum: ["1"] },
+            defaultPackage: { type: "string" },
+            ignore: { type: "array", items: { type: "string" } },
+            globs: { type: "array", items: { type: "string" } },
+            excludeGlobs: { type: "array", items: { type: "string" } },
+            env: { type: "object", additionalProperties: { type: "string" } },
+          },
+          required: ["configVersion"],
+        } as const;
+        const validate = ajv.compile(schema as any);
+        const ok = validate(obj);
+        if (!ok) {
+          const msg = JSON.stringify((validate as any).errors?.[0] || {});
+          try {
+            process.stderr.write("jio: invalid .jio config: " + msg + "\n");
+          } catch {}
+        }
+      }
+    } catch {}
     const cfg: RootConfig = {};
     if (obj && typeof obj === "object") {
       if (typeof obj.defaultPackage === "string") cfg.defaultPackage = obj.defaultPackage;
@@ -672,7 +720,7 @@ function resolveParamValue(ps: ParameterSpec, invObj: any): any {
   if (ps.path && ps.value) throw new Error("parameter cannot have both path and value");
   let v: any = undefined;
   if (ps.path) {
-    v = evaluateJsonPath(invObj, ps.path);
+    v = evaluateJsonPathRfc(ps.path as string, invObj);
   } else if (ps.value !== undefined) {
     v = ps.value;
   }
@@ -982,6 +1030,24 @@ function globToRegExp(glob: string): RegExp {
   return new RegExp("^" + g + "$");
 }
 
+type RunnerRuntimeOptions = {
+  collect: boolean;
+  collectLimit?: number;
+  limits?: {
+    maxArgvTokens?: number;
+    maxArgvBytes?: number;
+    maxStdinBytes?: number;
+    maxStdoutJsonBytes?: number;
+    maxNdjsonLineBytes?: number;
+    collectItems?: number;
+    collectBytes?: number;
+  };
+  timeoutMsOverride?: number;
+  cleanEnv: boolean;
+  passEnv: string[];
+  setEnv: Record<string, string>;
+};
+
 async function runWithTransforms(
   rootDir: string,
   specPath: string,
@@ -989,23 +1055,7 @@ async function runWithTransforms(
   argv: string[],
   rootCfg: RootConfig,
   invObj: any,
-  runtime: {
-    collect: boolean;
-    collectLimit?: number;
-    limits?: {
-      maxArgvTokens?: number;
-      maxArgvBytes?: number;
-      maxStdinBytes?: number;
-      maxStdoutJsonBytes?: number;
-      maxNdjsonLineBytes?: number;
-      collectItems?: number;
-      collectBytes?: number;
-    };
-    timeoutMsOverride?: number;
-    cleanEnv: boolean;
-    passEnv: string[];
-    setEnv: Record<string, string>;
-  },
+  runtime: RunnerRuntimeOptions,
 ): Promise<number> {
   // Structured diagnostics (JSON lines to stderr)
   const logEvent = (evt: any, force = false) => {
@@ -1532,7 +1582,7 @@ async function runWithTransforms(
   }
 
   // Output validation
-  const ajv = new Ajv({ allErrors: false, strict: false });
+  const ajv = createAjv();
   const schema = spec.tool?.outputSchema;
   const validate = schema ? ajv.compile(schema) : null;
 
@@ -2073,9 +2123,14 @@ async function hasBinaryOnPath(bin: string): Promise<boolean> {
   const envPath = process.env.PATH || "";
   for (const dir of envPath.split(":")) {
     if (!dir) continue;
-    const p = path.join(dir, bin);
+    const candidate = path.join(dir, bin);
     try {
-      await fsp.access(p);
+      const st = await fsp.stat(candidate);
+      if (!st.isFile()) continue;
+      await fsp.access(
+        candidate,
+        (fs as any).constants?.X_OK ?? (fs as any).promises?.constants?.X_OK ?? 1,
+      );
       return true;
     } catch {}
   }

@@ -5,4 +5,4 @@ root = .
 name = TARGETS
 
 [build]
-threads = 50
+threads = 25
