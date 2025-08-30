@@ -265,3 +265,15 @@ zx_test(
     script = "tools/tests/jio.cli-schema-flags.test.ts",
     out = "json_cli_cli_schema_flags.stamp",
 )
+
+zx_test(
+    name = "json_cli_terminate_descendants",
+    script = "tools/tests/jio.terminate-descendants.test.ts",
+    out = "json_cli_terminate_descendants.stamp",
+)
+
+zx_test(
+    name = "json_cli_structured_diagnostics",
+    script = "tools/tests/jio.structured-diagnostics.test.ts",
+    out = "json_cli_structured_diagnostics.stamp",
+)

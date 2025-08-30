@@ -1007,6 +1007,121 @@ async function runWithTransforms(
     setEnv: Record<string, string>;
   },
 ): Promise<number> {
+  // Structured diagnostics (JSON lines to stderr)
+  const logEvent = (evt: any, force = false) => {
+    try {
+      if (force || process.env.JIO_DEBUG === "1") {
+        const obj = { ts: Date.now(), ...evt };
+        process.stderr.write(JSON.stringify(obj) + "\n");
+      }
+    } catch {}
+  };
+  let didLogSigterm = false;
+
+  // Descendant-only termination with platform ps fallback
+  async function listDescendantPids(rootPids: number[]): Promise<Set<number>> {
+    try {
+      const args = process.platform === "darwin" ? ["-Ao", "pid,ppid"] : ["-eo", "pid,ppid"];
+      const ps = spawn("ps", args, { stdio: ["ignore", "pipe", "pipe"] });
+      let out = "";
+      ps.stdout.on("data", (b: any) => (out += Buffer.from(b).toString("utf8")));
+      await new Promise<void>((res) => ps.on("close", () => res()));
+      const edges = new Map<number, number[]>();
+      for (const line of out.split(/\r?\n/)) {
+        const m = line.trim().match(/^(\d+)\s+(\d+)$/);
+        if (!m) continue;
+        const pid = Number(m[1]);
+        const ppid = Number(m[2]);
+        if (!edges.has(ppid)) edges.set(ppid, []);
+        (edges.get(ppid) as number[]).push(pid);
+      }
+      const roots = new Set<number>(rootPids.filter((n) => Number.isFinite(n) && n > 0));
+      const visited = new Set<number>();
+      const queue: number[] = Array.from(roots);
+      while (queue.length) {
+        const cur = queue.shift() as number;
+        if (visited.has(cur)) continue;
+        visited.add(cur);
+        const kids = edges.get(cur) || [];
+        for (const k of kids) queue.push(k);
+      }
+      return visited;
+    } catch {
+      return new Set<number>();
+    }
+  }
+
+  function terminateProcs(procs: any[]) {
+    (async () => {
+      const roots = (procs || [])
+        .map((p: any) => (p && p.pid ? Number(p.pid) : 0))
+        .filter((n: number) => n > 0);
+      let targets = await listDescendantPids(roots);
+      const useFallback = targets.size === 0;
+      if (useFallback) {
+        // Fallback to group kill behavior per original implementation
+        for (const p of procs) {
+          try {
+            if (p && p.pid) {
+              try {
+                process.kill(-p.pid, "SIGTERM");
+              } catch {
+                process.kill(p.pid, "SIGTERM");
+              }
+            }
+          } catch {}
+        }
+      } else {
+        // Target descendants only
+        for (const pid of targets) {
+          try {
+            process.kill(pid, "SIGTERM");
+          } catch {}
+        }
+      }
+      if (!didLogSigterm) {
+        try {
+          process.stderr.write(
+            "jio: timeout — sent SIGTERM to process groups; will SIGKILL after 5s\n",
+          );
+        } catch {}
+        didLogSigterm = true;
+      }
+      logEvent(
+        {
+          event: "terminate",
+          reason: "timeout",
+          strategy: useFallback ? "group" : "descendants",
+          pids: useFallback ? roots : Array.from(targets),
+        },
+        true,
+      );
+      setTimeout(() => {
+        try {
+          if (useFallback) {
+            for (const p of procs) {
+              try {
+                if (p && p.pid) {
+                  try {
+                    process.kill(-p.pid, "SIGKILL");
+                  } catch {
+                    process.kill(p.pid, "SIGKILL");
+                  }
+                }
+              } catch {}
+            }
+          } else {
+            for (const pid of targets) {
+              try {
+                process.kill(pid, "SIGKILL");
+              } catch {}
+            }
+          }
+          logEvent({ event: "terminated", signal: "SIGKILL" }, true);
+        } catch {}
+      }, 5000);
+    })().catch(() => undefined);
+  }
   const DEFAULT_LIMITS = {
     maxArgvTokens: 4096,
     maxArgvBytes: 262144,
@@ -1218,7 +1333,16 @@ async function runWithTransforms(
             try {
               (sink as any)?.endInput?.();
             } catch {}
-            terminateGroup(procs);
+            terminateProcs(procs);
+            // Human-readable timeout note once
+            if (!didLogSigterm) {
+              try {
+                process.stderr.write(
+                  "jio: timeout — sent SIGTERM to process groups; will SIGKILL after 5s\n",
+                );
+              } catch {}
+              didLogSigterm = true;
+            }
             try {
               // Proactively break any readers waiting on stdout/stdin streams to avoid hangs
               (p2 as any)?.stdout?.destroy();
@@ -1680,7 +1804,7 @@ async function runWithTransforms(
 
   // If we already know we must fail due to parse/config errors, stop early
   if (stdinParseFailed) {
-    terminateGroup([p1, cmd, p2].filter(Boolean) as any[]);
+    terminateProcs([p1, cmd, p2].filter(Boolean) as any[]);
     try {
       clearInterval(abortTimer);
     } catch {}
@@ -1694,7 +1818,7 @@ async function runWithTransforms(
     return 65;
   }
   if (stdoutParseFailed) {
-    terminateGroup([p1, cmd, p2].filter(Boolean) as any[]);
+    terminateProcs([p1, cmd, p2].filter(Boolean) as any[]);
     try {
       clearInterval(abortTimer);
     } catch {}
@@ -1750,7 +1874,6 @@ async function runWithTransforms(
     // (limitExceeded variable is scoped above; redeclare here to satisfy TS)
   }
   if (localTimedOut) {
-    process.stderr.write(`jio: timeout — sent SIGTERM to process groups; will SIGKILL after 5s\n`);
     // Ensure failure sink has a chance to flush before we exit
     await finalizeFailureSink();
     return 124;
