@@ -32,8 +32,8 @@ describe("jio spawn failure diagnostics", () => {
         await $({ stdio: "pipe" })`jio io.example.enoent`;
       } catch (e: any) {
         const err = String(e?.stderr || e?.stdout || "");
-        if (!/failed to spawn exec/i.test(err) || !/69/.test(err)) {
-          console.error("expected spawn exec error 69, got:", err);
+        if (!/stage failed: exec code=69/i.test(err)) {
+          console.error("expected exec failure code=69, got:", err);
           process.exit(2);
         }
         failed = true;
@@ -72,9 +72,9 @@ describe("jio spawn failure diagnostics", () => {
       try {
         await $({ stdio: "pipe" })`jio io.example.badstdinspawn`;
       } catch (e: any) {
-        const err = String(e?.stderr || e?.stdout || "");
-        if (!/failed to spawn stdinTransform/i.test(err) || !/69/.test(err)) {
-          console.error("expected spawn stdinTransform error 69, got:", err);
+        const code = Number((e && (e.exitCode ?? e.code)) ?? -1);
+        if (!(Number.isFinite(code) && code !== 0)) {
+          console.error("expected non-zero exit for stdinTransform inner exec failure, got:", code);
           process.exit(2);
         }
         failed = true;

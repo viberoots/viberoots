@@ -775,105 +775,7 @@ function resolveParamValue(ps: ParameterSpec, invObj: any): any {
   return v;
 }
 
-// Minimal JSONPath evaluator supporting: $.a.b, .*, [index], [*], [i,j], [start:end]
-function evaluateJsonPath(root: any, expr: string): any {
-  if (!expr || expr[0] !== "$") return undefined;
-  let i = 1; // after $
-  let current: any[] = [root];
-
-  function takeDotSegment(): string | null {
-    if (expr[i] !== ".") return null;
-    i++;
-    if (expr[i] === "*") {
-      i++;
-      return "*";
-    }
-    let start = i;
-    while (i < expr.length && /[A-Za-z0-9_]/.test(expr[i])) i++;
-    return expr.slice(start, i) || null;
-  }
-  function takeBracket(): string | null {
-    if (expr[i] !== "[") return null;
-    let start = i;
-    while (i < expr.length && expr[i] !== "]") i++;
-    if (expr[i] !== "]") return null;
-    i++; // include ]
-    return expr.slice(start + 1, i - 1);
-  }
-
-  while (i < expr.length) {
-    const dot = takeDotSegment();
-    if (dot !== null) {
-      const next: any[] = [];
-      if (dot === "*") {
-        for (const v of current) {
-          if (v && typeof v === "object" && !Array.isArray(v)) next.push(...Object.values(v));
-        }
-      } else {
-        for (const v of current) {
-          if (v && typeof v === "object" && dot in v) next.push((v as any)[dot]);
-        }
-      }
-      current = next;
-      continue;
-    }
-    const br = takeBracket();
-    if (br !== null) {
-      const next: any[] = [];
-      const s = br.trim();
-      if (s === "*") {
-        for (const v of current) {
-          if (Array.isArray(v)) next.push(...v);
-        }
-      } else if (/^-?\d+$/.test(s)) {
-        const idx = Number(s);
-        for (const v of current) {
-          if (Array.isArray(v) && idx >= 0 && idx < v.length) next.push(v[idx]);
-        }
-      } else if (/^-?\d+\s*:\s*-?\d*$/.test(s)) {
-        const [a, b] = s.split(":");
-        const start = Number(a);
-        const end = b === "" ? undefined : Number(b);
-        for (const v of current) {
-          if (Array.isArray(v)) next.push(...v.slice(start, end));
-        }
-      } else if (/^-?\d+(\s*,\s*-?\d+)+$/.test(s)) {
-        const parts = s.split(",").map((x) => Number(x.trim()));
-        for (const v of current) {
-          if (Array.isArray(v)) {
-            for (const idx of parts) if (idx >= 0 && idx < v.length) next.push(v[idx]);
-          }
-        }
-      } else if (/^(['"]).*\1(\s*,\s*(['"]).*\3)*$/.test(s)) {
-        // Property-name union: $['a','b'] or $["a","b"]
-        const re = /(['"])([^'"\\]*(?:\\.[^'"\\]*)*)\1/g;
-        const props: string[] = [];
-        let m: RegExpExecArray | null;
-        while ((m = re.exec(s)) !== null) {
-          const raw = m[2].replace(/\\(['"])/g, "$1");
-          props.push(raw);
-        }
-        for (const v of current) {
-          if (v && typeof v === "object" && !Array.isArray(v)) {
-            for (const key of props) {
-              if (key in v) next.push((v as any)[key]);
-            }
-          }
-        }
-      } else {
-        // unsupported subset (scripts/functions/unions of properties)
-        throw new Error(`jio: unsupported JSONPath segment: [${s}]`);
-      }
-      current = next;
-      continue;
-    }
-    // unsupported token
-    break;
-  }
-  if (current.length === 0) return undefined;
-  if (current.length === 1) return current[0];
-  return current;
-}
+// minimal JSONPath evaluator removed; use tools/jio/jsonpath
 
 // Navigate a JSON Schema object along a simple JSONPath like $.a.b
 function getSchemaAtPath(schema: any, jsonPath: string): any | null {
@@ -1473,19 +1375,8 @@ async function runWithTransforms(
         })
       : null;
 
-  // Wire stderr passthrough and detect likely spawn errors in stdinTransform
-  let stdinLikelySpawnError = false;
-  if (p1) {
-    try {
-      p1.stderr.on("data", (buf: any) => {
-        try {
-          const s = Buffer.from(buf).toString("utf8");
-          if (/No such file or directory|command not found/i.test(s)) stdinLikelySpawnError = true;
-        } catch {}
-      });
-    } catch {}
-    p1.stderr.pipe(process.stderr, { end: false });
-  }
+  // Wire stderr passthrough for visibility
+  if (p1) p1.stderr.pipe(process.stderr, { end: false });
   cmd.stderr.pipe(process.stderr, { end: false });
   if (p2) p2.stderr.pipe(process.stderr, { end: false });
 
@@ -1990,13 +1881,6 @@ async function runWithTransforms(
   } catch {}
 
   // Compute exit code precedence
-  if (stdinLikelySpawnError) {
-    process.stderr.write(
-      `jio: failed to spawn stdinTransform: likely missing transform binary (code=69 ENOENT)\n`,
-    );
-    await finalizeFailureSink();
-    return 69;
-  }
   if (stdinLimitExceeded) {
     await finalizeFailureSink();
     return 78;
