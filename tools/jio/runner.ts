@@ -267,7 +267,13 @@ export async function main(argv: string[]): Promise<number | void> {
         const validateIn = ajvIn.compile(inSchema);
         const ok = validateIn(invObj);
         if (!ok) {
-          const sink = openFailureSink(rootDir, specPath, spec, rootCfg);
+          const sink = openFailureSink(rootDir, specPath, spec, rootCfg, {
+            cleanEnv: opts.cleanEnv,
+            passEnv: opts.passEnv,
+            setEnv: opts.setEnv,
+            collect: false,
+            timeoutMsOverride: undefined,
+          } as any);
           const msg = JSON.stringify(validateIn.errors?.[0] || {});
           if (sink) await sink.write({ reason: "input", object: invObj, message: msg });
           console.error(`jio: invalid input: ${msg}`);
@@ -275,7 +281,13 @@ export async function main(argv: string[]): Promise<number | void> {
           return 1;
         }
       } catch (e: any) {
-        const sink = openFailureSink(rootDir, specPath, spec, rootCfg);
+        const sink = openFailureSink(rootDir, specPath, spec, rootCfg, {
+          cleanEnv: opts.cleanEnv,
+          passEnv: opts.passEnv,
+          setEnv: opts.setEnv,
+          collect: false,
+          timeoutMsOverride: undefined,
+        } as any);
         try {
           if (sink)
             await sink.write({
@@ -1213,7 +1225,7 @@ async function runWithTransforms(
   const cwd = resolveWorkingDir(rootDir, specPath, spec);
   const env = buildChildEnv(rootCfg, spec, runtime);
   // Preserve user-provided debug opts; do not mutate global env here.
-  const sink = openFailureSink(rootDir, specPath, spec, rootCfg);
+  const sink = openFailureSink(rootDir, specPath, spec, rootCfg, runtime);
 
   // Enforce argv caps before spawn
   const argvTokenCount = argv.length;
@@ -1980,6 +1992,7 @@ function openFailureSink(
   specPath: string,
   spec: ToolSpec,
   rootCfg: RootConfig,
+  runtime?: RunnerRuntimeOptions,
 ): {
   write: (obj: any) => Promise<void>;
   close: () => Promise<void>;
@@ -1989,7 +2002,13 @@ function openFailureSink(
   const of = spec.command?.onValidationFailure;
   if (!of || !of.shell) return null;
   const cwd = resolveWorkingDir(rootDir, specPath, spec);
-  const env = mergeEnv(rootCfg, spec);
+  const env = runtime
+    ? buildChildEnv(rootCfg, spec, {
+        cleanEnv: !!runtime.cleanEnv,
+        passEnv: runtime.passEnv || [],
+        setEnv: runtime.setEnv || {},
+      })
+    : mergeEnv(rootCfg, spec);
   const sh = process.env.SHELL && process.env.SHELL.includes("bash") ? "bash" : "/bin/sh";
   const cmd = sh.includes("bash") ? `set -euo pipefail; ${of.shell}` : `set -eu; ${of.shell}`;
   const args = sh.includes("bash") ? ["--noprofile", "--norc", "-c", cmd] : ["-c", cmd];

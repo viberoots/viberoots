@@ -260,6 +260,12 @@ zx_test(
 )
 
 zx_test(
+    name = "json_cli_failure_sink_env_sanitized",
+    script = "tools/tests/jio.failure-sink.env-sanitized.test.ts",
+    out = "json_cli_failure_sink_env_sanitized.stamp",
+)
+
+zx_test(
     name = "json_cli_optional_params",
     script = "tools/tests/jio.optional-params.test.ts",
     out = "json_cli_optional_params.stamp",
