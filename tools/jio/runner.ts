@@ -10,11 +10,30 @@ import { createAjvValidator, generateInputSchemaFromParameters } from "./schema/
 import { createAjv } from "./validation/ajv.ts";
 
 // Parent stdio EPIPE handling: exit(0) on broken pipe like Unix CLIs
+let ACTIVE_PROCS: any[] = [];
+let ACTIVE_SINK: any = null;
+function setActiveRunContext(procs: any[], sink: any) {
+  try {
+    ACTIVE_PROCS = procs || [];
+    ACTIVE_SINK = sink || null;
+  } catch {}
+}
+function clearActiveRunContext() {
+  try {
+    ACTIVE_PROCS = [];
+    ACTIVE_SINK = null;
+  } catch {}
+}
 try {
   process.stdout.on("error", (e: any) => {
     if (e && (e as any).code === "EPIPE") {
       try {
-        // minimal cleanup only; let process exit immediately
+        try {
+          (ACTIVE_SINK as any)?.endInput?.();
+        } catch {}
+        try {
+          terminateGroup(ACTIVE_PROCS);
+        } catch {}
       } finally {
         process.exit(0);
       }
@@ -23,7 +42,12 @@ try {
   process.stderr.on("error", (e: any) => {
     if (e && (e as any).code === "EPIPE") {
       try {
-        // minimal cleanup only; let process exit immediately
+        try {
+          (ACTIVE_SINK as any)?.endInput?.();
+        } catch {}
+        try {
+          terminateGroup(ACTIVE_PROCS);
+        } catch {}
       } finally {
         process.exit(0);
       }
@@ -1394,6 +1418,9 @@ async function runWithTransforms(
   // Local timeout guard
   // Exclude failure sink from termination group to allow it to flush after endInput()
   const procs = [p1, cmd, p2].filter(Boolean) as any[];
+  try {
+    setActiveRunContext(procs, sink);
+  } catch {}
   // If stdin parsing fails, proactively terminate the running group to honor precedence and avoid hangs
   let abortSent = false;
   const abortTimer = setInterval(() => {
@@ -1919,6 +1946,9 @@ async function runWithTransforms(
     try {
       process.stderr.write("stage failed: stdinTransform code=65\n");
     } catch {}
+    try {
+      clearActiveRunContext();
+    } catch {}
     return 65;
   }
   if (stdoutParseFailed) {
@@ -1932,6 +1962,9 @@ async function runWithTransforms(
     } catch {}
     try {
       process.stderr.write("stage failed: stdoutTransform code=65\n");
+    } catch {}
+    try {
+      clearActiveRunContext();
     } catch {}
     return 65;
   }
@@ -1984,6 +2017,9 @@ async function runWithTransforms(
   }
   // (Parse failures are handled above with early return)
   await finalizeFailureSink();
+  try {
+    clearActiveRunContext();
+  } catch {}
   return exitCode || cCode || p1Code || p2Code;
 }
 
