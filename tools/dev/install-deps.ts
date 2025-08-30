@@ -47,7 +47,7 @@ async function main() {
   await fsp.rm("node_modules", { force: true });
   await $({ stdio: "inherit" })`pnpm install --lockfile-only`;
   await $({ stdio: "inherit" })`tools/dev/update-pnpm-hash.ts`;
-  await $({ stdio: "inherit" })`nix build .#node-modules --accept-flake-config`;
+  await $({ stdio: "inherit" })`nix build .#node-modules --no-link --accept-flake-config`;
   await relinkNodeModules(force);
   console.log("Dependencies installed and node_modules linked.");
 }
