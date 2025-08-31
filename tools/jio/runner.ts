@@ -157,52 +157,16 @@ export async function main(argv: string[]): Promise<number | void> {
   const rootDir = await resolveRoot();
   const rootCfg = await readRootConfig(rootDir);
 
-  if (opts.list) {
-    let idx: Map<string, string>;
-    try {
-      idx = await buildIndex(rootDir, rootCfg);
-    } catch (e: any) {
-      console.error(String(e?.message || e));
-      return 78;
-    }
-    if (rootCfg.defaultPackage) {
-      console.log(`defaultPackage: ${rootCfg.defaultPackage}`);
-    }
-    const entries = Array.from(idx.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-    for (const [fq, p] of entries) {
-      console.log(`${fq}\t${p}`);
-    }
-    return 0;
+  // List mode
+  {
+    const listCode = await maybeHandleListMode(opts, rootDir, rootCfg);
+    if (listCode !== null) return listCode;
   }
 
-  if (opts.where) {
-    let idx: Map<string, string>;
-    try {
-      idx = await buildIndex(rootDir, rootCfg);
-    } catch (e: any) {
-      console.error(String(e?.message || e));
-      return 78;
-    }
-    if (!opts.where.includes(".") && !rootCfg.defaultPackage) {
-      console.error("jio: config error — bare name requires .jio.defaultPackage");
-      return 78;
-    }
-    const fq = resolveToolRef(opts.where, rootCfg);
-    const hit = idx.get(fq);
-    if (!hit) {
-      console.error(`jio: tool not found: ${fq}`);
-      if (
-        (rootCfg.globs && rootCfg.globs.length) ||
-        (rootCfg.excludeGlobs && rootCfg.excludeGlobs.length)
-      ) {
-        console.error(
-          "hint: tool may be excluded by globs/excludeGlobs; run 'jio --list' to inspect discovered tools",
-        );
-      }
-      return 78;
-    }
-    console.log(hit);
-    return 0;
+  // Where mode
+  {
+    const whereCode = await maybeHandleWhereMode(opts, rootCfg, rootDir);
+    if (whereCode !== null) return whereCode;
   }
 
   if (!opts.toolRef) {
@@ -213,28 +177,14 @@ export async function main(argv: string[]): Promise<number | void> {
     console.error("jio: config error — bare name requires .jio.defaultPackage");
     return 78;
   }
-  let index: Map<string, string>;
-  try {
-    index = await buildIndex(rootDir, rootCfg);
-  } catch (e: any) {
-    console.error(String(e?.message || e));
-    return 78;
-  }
-  const fqTool = resolveToolRef(opts.toolRef, rootCfg);
-  const specPath = index.get(fqTool);
-  if (!specPath) {
-    console.error(`jio: tool not found: ${fqTool}`);
-    if (
-      (rootCfg.globs && rootCfg.globs.length) ||
-      (rootCfg.excludeGlobs && rootCfg.excludeGlobs.length)
-    ) {
-      console.error(
-        "hint: tool may be excluded by globs/excludeGlobs; run 'jio --list' to inspect discovered tools",
-      );
-    }
-    return 78;
-  }
-  const specRead = await readSpec(specPath);
+  const {
+    index,
+    specPath,
+    code: specResolveCode,
+  } = await resolveSpecPathOrExit(opts.toolRef as string, rootCfg, rootDir);
+  if (specResolveCode !== null) return specResolveCode;
+  const specPathStr = specPath as string;
+  const specRead = await readSpec(specPathStr);
   const spec = specRead.spec;
   if (!spec || !spec.command?.exec) {
     console.error("jio: invalid spec (missing command.exec)");
@@ -242,54 +192,13 @@ export async function main(argv: string[]): Promise<number | void> {
   }
 
   // Schema printing mode
-  if (argv.includes("--input-schema") || argv.includes("--output-schema")) {
-    const wantIn = argv.includes("--input-schema");
-    const wantOut = argv.includes("--output-schema");
-    if (wantIn && wantOut) {
-      if (!spec.tool?.outputSchema) {
-        return 65;
-      }
-      const effIn = spec.tool?.inputSchema || generateInputSchemaFromParameters(spec);
-      try {
-        process.stdout.write(
-          JSON.stringify({ inputSchema: effIn, outputSchema: spec.tool.outputSchema }),
-        );
-      } catch {}
-      return 0;
-    }
-    if (wantIn) {
-      const effIn = spec.tool?.inputSchema || generateInputSchemaFromParameters(spec);
-      try {
-        process.stdout.write(JSON.stringify(effIn));
-      } catch {}
-      return 0;
-    }
-    if (wantOut) {
-      if (!spec.tool?.outputSchema) return 65;
-      try {
-        process.stdout.write(JSON.stringify(spec.tool.outputSchema));
-      } catch {}
-      return 0;
-    }
-  }
+  const schemaExit = handleSchemaPrinting(spec, argv);
+  if (schemaExit !== null) return schemaExit;
 
-  const requiresInput = usesPathParams(spec);
-  let invObj: any = {};
-  if (requiresInput || opts.inFile) {
-    if (!opts.inFile && requiresInput) {
-      console.error("jio: --in is required when required parameters use path");
-      return 78;
-    }
-    if (opts.inFile) {
-      try {
-        const txt = await fsp.readFile(path.resolve(opts.inFile), "utf8");
-        invObj = JSON.parse(txt);
-      } catch (e: any) {
-        if (e && e.code === "ENOENT") return 66;
-        return 65;
-      }
-    }
-  }
+  // Input resolution
+  const invState = await resolveInvocationObject(spec, opts);
+  if (typeof invState.code === "number") return invState.code;
+  const invObj = invState.invObj as any;
 
   // Validate invocation JSON against tool.inputSchema when provided
   if (spec.tool?.outputSchema || (spec as any).tool?.inputSchema) {
@@ -300,7 +209,7 @@ export async function main(argv: string[]): Promise<number | void> {
         const validateIn = ajvIn.compile(inSchema);
         const ok = validateIn(invObj);
         if (!ok) {
-          const sink = openFailureSink(rootDir, specPath, spec, rootCfg, {
+          const sink = openFailureSink(rootDir, specPathStr, spec, rootCfg, {
             cleanEnv: opts.cleanEnv,
             passEnv: opts.passEnv,
             setEnv: opts.setEnv,
@@ -314,7 +223,7 @@ export async function main(argv: string[]): Promise<number | void> {
           return 1;
         }
       } catch (e: any) {
-        const sink = openFailureSink(rootDir, specPath, spec, rootCfg, {
+        const sink = openFailureSink(rootDir, specPathStr, spec, rootCfg, {
           cleanEnv: opts.cleanEnv,
           passEnv: opts.passEnv,
           setEnv: opts.setEnv,
@@ -349,12 +258,12 @@ export async function main(argv: string[]): Promise<number | void> {
   }
 
   if (opts.dryRun) {
-    const plan = buildDryRunPlan(rootDir, specPath, spec, argvBuilt, rootCfg);
+    const plan = buildDryRunPlan(rootDir, specPathStr, spec, argvBuilt, rootCfg);
     console.log(JSON.stringify(plan));
     return 0;
   }
 
-  const code = await runWithTransforms(rootDir, specPath, spec, argvBuilt, rootCfg, invObj, {
+  const code = await runWithTransforms(rootDir, specPathStr, spec, argvBuilt, rootCfg, invObj, {
     collect: !!opts.collect,
     collectLimit: opts.collectLimit,
     limits: {
@@ -498,6 +407,88 @@ Spec limits (command.limits):
 `);
 }
 
+async function maybeHandleListMode(
+  opts: CliOpts,
+  rootDir: string,
+  rootCfg: RootConfig,
+): Promise<number | null> {
+  if (!opts.list) return null;
+  try {
+    const idx = await buildIndex(rootDir, rootCfg);
+    if (rootCfg.defaultPackage) console.log(`defaultPackage: ${rootCfg.defaultPackage}`);
+    const entries = Array.from(idx.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+    for (const [fq, p] of entries) console.log(`${fq}\t${p}`);
+    return 0;
+  } catch (e: any) {
+    console.error(String(e?.message || e));
+    return 78;
+  }
+}
+
+async function maybeHandleWhereMode(
+  opts: CliOpts,
+  rootCfg: RootConfig,
+  rootDir: string,
+): Promise<number | null> {
+  if (!opts.where) return null;
+  const whereRef = opts.where as string;
+  let idx: Map<string, string>;
+  try {
+    idx = await buildIndex(rootDir, rootCfg);
+  } catch (e: any) {
+    console.error(String(e?.message || e));
+    return 78;
+  }
+  if (!whereRef.includes(".") && !rootCfg.defaultPackage) {
+    console.error("jio: config error — bare name requires .jio.defaultPackage");
+    return 78;
+  }
+  const fq = resolveToolRef(whereRef, rootCfg);
+  const hit = idx.get(fq);
+  if (!hit) {
+    console.error(`jio: tool not found: ${fq}`);
+    if (
+      (rootCfg.globs && rootCfg.globs.length) ||
+      (rootCfg.excludeGlobs && rootCfg.excludeGlobs.length)
+    ) {
+      console.error(
+        "hint: tool may be excluded by globs/excludeGlobs; run 'jio --list' to inspect discovered tools",
+      );
+    }
+    return 78;
+  }
+  console.log(hit);
+  return 0;
+}
+
+async function resolveSpecPathOrExit(
+  toolRef: string,
+  rootCfg: RootConfig,
+  rootDir: string,
+): Promise<{ index?: Map<string, string>; specPath?: string; code: number | null }> {
+  try {
+    const index = await buildIndex(rootDir, rootCfg);
+    const fqTool = resolveToolRef(toolRef, rootCfg);
+    const specPath = index.get(fqTool);
+    if (!specPath) {
+      console.error(`jio: tool not found: ${fqTool}`);
+      if (
+        (rootCfg.globs && rootCfg.globs.length) ||
+        (rootCfg.excludeGlobs && rootCfg.excludeGlobs.length)
+      ) {
+        console.error(
+          "hint: tool may be excluded by globs/excludeGlobs; run 'jio --list' to inspect discovered tools",
+        );
+      }
+      return { code: 78 };
+    }
+    return { index, specPath, code: null };
+  } catch (e: any) {
+    console.error(String(e?.message || e));
+    return { code: 78 };
+  }
+}
+
 async function readVersion(): Promise<string> {
   try {
     const pkgPath = path.resolve(process.cwd(), "package.json");
@@ -506,6 +497,139 @@ async function readVersion(): Promise<string> {
     if (pkg && typeof pkg.version === "string") return pkg.version as string;
   } catch {}
   return "0.0.0";
+}
+
+// Shared default limits for execution and sinks
+const DEFAULT_LIMITS = {
+  maxArgvTokens: 4096,
+  maxArgvBytes: 262144,
+  maxStdinBytes: 16 * 1024 * 1024,
+  maxStdoutJsonBytes: 32 * 1024 * 1024,
+  maxNdjsonLineBytes: 1 * 1024 * 1024,
+  collectItems: Number.POSITIVE_INFINITY as number,
+  collectBytes: Number.POSITIVE_INFINITY as number,
+  sinkMaxBytes: 1 * 1024 * 1024,
+  sinkMaxItems: 1000,
+  sinkMaxRatePerSec: 100,
+  sinkWriteTimeoutMs: 500,
+  sinkCloseTimeoutMs: 1000,
+} as const;
+
+type ValidateFn = ((data: any) => boolean) & { errors?: any };
+
+function getEffectiveLimits(
+  spec: ToolSpec,
+  runtime: RunnerRuntimeOptions,
+): Required<typeof DEFAULT_LIMITS> {
+  return {
+    ...DEFAULT_LIMITS,
+    ...(spec.command?.limits || {}),
+    ...(runtime.limits || {}),
+  } as Required<typeof DEFAULT_LIMITS>;
+}
+
+async function resolvePreferredShell(): Promise<string> {
+  return (await hasBinaryOnPath("bash")) ? "bash" : "/bin/sh";
+}
+
+function makeShellSetFlags(preferredShell: string): string {
+  return preferredShell.includes("bash") ? "set -euo pipefail; " : "set -eu; ";
+}
+
+function buildShellArgsWithScript(preferredShell: string, script: string): string[] {
+  const cmd = makeShellSetFlags(preferredShell) + (script || "");
+  return preferredShell.includes("bash") ? ["--noprofile", "--norc", "-c", cmd] : ["-c", cmd];
+}
+
+function attachPipeErrorNoops(proc: any) {
+  try {
+    proc.stdin?.on("error", () => {});
+  } catch {}
+  try {
+    proc.stdout?.on("error", () => {});
+  } catch {}
+  try {
+    proc.stderr?.on("error", () => {});
+  } catch {}
+}
+
+function enforceArgvCaps(argv: string[], limits: Required<typeof DEFAULT_LIMITS>): number | null {
+  const argvTokenCount = argv.length;
+  let argvBytes = 0;
+  for (const t of argv) argvBytes += Buffer.byteLength(String(t)) + 1;
+  if (argvTokenCount > limits.maxArgvTokens) {
+    try {
+      process.stderr.write("jio: argv tokens limit exceeded\n");
+    } catch {}
+    return 78;
+  }
+  if (argvBytes > limits.maxArgvBytes) {
+    try {
+      process.stderr.write("jio: argv bytes limit exceeded\n");
+    } catch {}
+    return 78;
+  }
+  return null;
+}
+
+async function computeExecCommand(
+  initialExecCmd: string,
+  initialExecArgv: string[],
+  rootDir: string,
+): Promise<{ execCmd: string; execArgv: string[] }> {
+  let execCmd = initialExecCmd;
+  let execArgv = initialExecArgv.slice();
+
+  // Optional secretspec wrapper
+  const secretsDisabled = process.env.JIO_SECRETS_DISABLE === "1";
+  const secretsForced = process.env.JIO_SECRETS === "1";
+  const secretspecToml = path.join(rootDir, "secretspec.toml");
+  const hasSecretsToml = await pathExists(secretspecToml);
+  const shouldTrySecrets = !secretsDisabled && (secretsForced || hasSecretsToml);
+  if (shouldTrySecrets && (await hasBinaryOnPath("secretspec"))) {
+    const provider = process.env.JIO_SECRETS_PROVIDER;
+    const profile = process.env.JIO_SECRETS_PROFILE;
+    const args: string[] = ["run"];
+    if (profile) args.push("--profile", profile);
+    if (provider) args.push("--provider", provider);
+    args.push("--", execCmd, ...execArgv);
+    execCmd = "secretspec";
+    execArgv = args;
+  } else if (hasSecretsToml && !secretsDisabled) {
+    try {
+      process.stderr.write(
+        "jio: warning: secretspec not found on PATH; running without secrets wrap\n",
+      );
+    } catch {}
+  }
+
+  // If executing a TS file directly, run via node with zx-init and type stripping
+  if (/\.ts$/i.test(execCmd)) {
+    const nodeBin = process.env.NODE_BIN || "node";
+    const wsRoot = process.env.WORKSPACE_ROOT || process.cwd();
+    const zxInit = path.join(wsRoot, "tools", "dev", "zx-init.mjs");
+    execArgv = [
+      "--experimental-strip-types",
+      "--experimental-top-level-await",
+      "--disable-warning=ExperimentalWarning",
+      "--import",
+      zxInit,
+      execCmd,
+      ...execArgv,
+    ];
+    execCmd = nodeBin;
+  }
+
+  // Avoid sourcing profiles when executing bash
+  if (/(?:^|\/)bash$/.test(execCmd)) {
+    execArgv = ["--noprofile", "--norc", ...execArgv];
+    const idxC = execArgv.findIndex((a) => a === "-c" || a === "-lc");
+    if (idxC >= 0 && idxC === execArgv.length - 1) {
+      execArgv.push("cat");
+    }
+  }
+
+  return { execCmd, execArgv };
 }
 
 async function resolveRoot(): Promise<string> {
@@ -903,6 +1027,37 @@ function renderValueTokens(
   }
 }
 
+function handleSchemaPrinting(spec: ToolSpec, argv: string[]): number | null {
+  const wantIn = argv.includes("--input-schema");
+  const wantOut = argv.includes("--output-schema");
+  if (!wantIn && !wantOut) return null;
+  if (wantIn && wantOut) {
+    if (!spec.tool?.outputSchema) return 65;
+    const effIn = spec.tool?.inputSchema || generateInputSchemaFromParameters(spec);
+    try {
+      process.stdout.write(
+        JSON.stringify({ inputSchema: effIn, outputSchema: spec.tool.outputSchema }),
+      );
+    } catch {}
+    return 0;
+  }
+  if (wantIn) {
+    const effIn = spec.tool?.inputSchema || generateInputSchemaFromParameters(spec);
+    try {
+      process.stdout.write(JSON.stringify(effIn));
+    } catch {}
+    return 0;
+  }
+  if (wantOut) {
+    if (!spec.tool?.outputSchema) return 65;
+    try {
+      process.stdout.write(JSON.stringify(spec.tool.outputSchema));
+    } catch {}
+    return 0;
+  }
+  return null;
+}
+
 function buildDryRunPlan(
   rootDir: string,
   specPath: string,
@@ -920,6 +1075,30 @@ function buildDryRunPlan(
     stdoutTransform: spec.command?.stdoutTransform?.shell,
     stdinTransform: spec.command?.stdinTransform?.shell,
   };
+}
+
+async function resolveInvocationObject(
+  spec: ToolSpec,
+  opts: CliOpts,
+): Promise<{ invObj?: any; code?: number }> {
+  const requiresInput = usesPathParams(spec);
+  let invObj: any = {};
+  if (requiresInput || opts.inFile) {
+    if (!opts.inFile && requiresInput) {
+      console.error("jio: --in is required when required parameters use path");
+      return { code: 78 };
+    }
+    if (opts.inFile) {
+      try {
+        const txt = await fsp.readFile(path.resolve(opts.inFile), "utf8");
+        invObj = JSON.parse(txt);
+      } catch (e: any) {
+        if (e && e.code === "ENOENT") return { code: 66 };
+        return { code: 65 };
+      }
+    }
+  }
+  return { invObj };
 }
 
 function resolveWorkingDir(_rootDir: string, specPath: string, spec: ToolSpec): string {
@@ -1175,51 +1354,22 @@ async function runWithTransforms(
       }, 5000);
     })().catch(() => undefined);
   }
-  const DEFAULT_LIMITS = {
-    maxArgvTokens: 4096,
-    maxArgvBytes: 262144,
-    maxStdinBytes: 16 * 1024 * 1024,
-    maxStdoutJsonBytes: 32 * 1024 * 1024,
-    maxNdjsonLineBytes: 1 * 1024 * 1024,
-    collectItems: Number.POSITIVE_INFINITY as number,
-    collectBytes: Number.POSITIVE_INFINITY as number,
-    sinkMaxBytes: 1 * 1024 * 1024,
-    sinkMaxItems: 1000,
-    sinkMaxRatePerSec: 100,
-    sinkWriteTimeoutMs: 500,
-    sinkCloseTimeoutMs: 1000,
-  };
-  const limits = {
-    ...DEFAULT_LIMITS,
-    ...(spec.command?.limits || {}),
-    ...(runtime.limits || {}),
-  } as Required<typeof DEFAULT_LIMITS>;
+  const limits = getEffectiveLimits(spec, runtime);
   const cwd = resolveWorkingDir(rootDir, specPath, spec);
   const env = buildChildEnv(rootCfg, spec, runtime);
   // Preserve user-provided debug opts; do not mutate global env here.
   const sink = openFailureSink(rootDir, specPath, spec, rootCfg, runtime);
 
   // Enforce argv caps before spawn
-  const argvTokenCount = argv.length;
-  let argvBytes = 0;
-  for (const t of argv) argvBytes += Buffer.byteLength(String(t)) + 1;
-  if (argvTokenCount > limits.maxArgvTokens) {
-    process.stderr.write("jio: argv tokens limit exceeded\n");
-    return 78;
-  }
-  if (argvBytes > limits.maxArgvBytes) {
-    process.stderr.write("jio: argv bytes limit exceeded\n");
-    return 78;
+  {
+    const capCode = enforceArgvCaps(argv, limits);
+    if (capCode !== null) return capCode;
   }
 
   // Optional stdinTransform
   const stIn = spec.command?.stdinTransform;
-  const preferredShell = (await hasBinaryOnPath("bash")) ? "bash" : "/bin/sh";
-  const shellCmd = (script: string) =>
-    preferredShell.includes("bash") ? `set -euo pipefail; ${script}` : `set -eu; ${script}`;
-  const shellArgsIn = preferredShell.includes("bash")
-    ? ["--noprofile", "--norc", "-c", shellCmd(stIn?.shell || "")]
-    : ["-c", shellCmd(stIn?.shell || "")];
+  const preferredShell = await resolvePreferredShell();
+  const shellArgsIn = buildShellArgsWithScript(preferredShell, stIn?.shell || "");
   const p1 =
     stIn && stIn.shell
       ? spawn(preferredShell, shellArgsIn, {
@@ -1230,13 +1380,7 @@ async function runWithTransforms(
         })
       : null;
   // Swallow pipe errors from transform during teardown
-  if (p1) {
-    try {
-      p1.stdin?.on("error", () => {});
-      p1.stdout?.on("error", () => {});
-      p1.stderr?.on("error", () => {});
-    } catch {}
-  }
+  if (p1) attachPipeErrorNoops(p1);
   const p1StdoutEnd: Promise<void> = p1
     ? new Promise<void>((res) => {
         try {
@@ -1247,62 +1391,12 @@ async function runWithTransforms(
       })
     : Promise.resolve();
 
-  // Determine exec command; auto-wrap with secretspec if available and enabled
-  let execCmd = spec.command!.exec as string;
-  let execArgv = argv.slice();
-  const secretsDisabled = process.env.JIO_SECRETS_DISABLE === "1";
-  const secretsForced = process.env.JIO_SECRETS === "1";
-  const secretspecToml = path.join(rootDir, "secretspec.toml");
-  const hasSecretsToml = await pathExists(secretspecToml);
-  const shouldTrySecrets = !secretsDisabled && (secretsForced || hasSecretsToml);
-  if (shouldTrySecrets && (await hasBinaryOnPath("secretspec"))) {
-    const provider = process.env.JIO_SECRETS_PROVIDER;
-    const profile = process.env.JIO_SECRETS_PROFILE;
-    const args: string[] = ["run"];
-    if (profile) args.push("--profile", profile);
-    if (provider) args.push("--provider", provider);
-    args.push("--", execCmd, ...execArgv);
-    execCmd = "secretspec";
-    execArgv = args;
-  } else if (hasSecretsToml && !secretsDisabled) {
-    // Only warn; do not inject or skip. Continue without secrets wrapper.
-    try {
-      process.stderr.write(
-        "jio: warning: secretspec not found on PATH; running without secrets wrap\n",
-      );
-    } catch {}
-  }
-
-  // If executing a TypeScript script directly, prefer running via Node with type stripping and zx globals
-  if (/\.ts$/i.test(execCmd)) {
-    const nodeBin = process.env.NODE_BIN || "node";
-    const wsRoot = process.env.WORKSPACE_ROOT || process.cwd();
-    const zxInit = path.join(wsRoot, "tools", "dev", "zx-init.mjs");
-    execArgv = [
-      "--experimental-strip-types",
-      "--experimental-top-level-await",
-      "--disable-warning=ExperimentalWarning",
-      "--import",
-      zxInit,
-      execCmd,
-      ...execArgv,
-    ];
-    execCmd = nodeBin;
-  }
-
-  // Avoid sourcing user profiles which may reference unavailable tools when executing bash
-  if (/(?:^|\/)bash$/.test(execCmd)) {
-    execArgv = ["--noprofile", "--norc", ...execArgv];
-  }
-
-  // Convenience: if executing bash with -c/-lc only (no command), default to 'cat' to pass stdin through.
-  const isBash = /(?:^|\/)bash$/.test(execCmd);
-  if (isBash) {
-    const idxC = execArgv.findIndex((a) => a === "-c" || a === "-lc");
-    if (idxC >= 0 && idxC === execArgv.length - 1) {
-      execArgv.push("cat");
-    }
-  }
+  // Determine exec command; auto-wrap and normalize argv
+  const { execCmd, execArgv } = await computeExecCommand(
+    spec.command!.exec as string,
+    argv,
+    rootDir,
+  );
 
   const cmd = spawn(execCmd, execArgv, {
     cwd,
@@ -1312,31 +1406,21 @@ async function runWithTransforms(
     detached: true,
   });
   // Swallow pipe errors from main exec during teardown (e.g., EPIPE after SIGTERM)
-  try {
-    cmd.stdin?.on("error", () => {});
-    cmd.stdout?.on("error", () => {});
-    cmd.stderr?.on("error", () => {});
-  } catch {}
+  attachPipeErrorNoops(cmd);
 
   const st = spec.command?.stdoutTransform;
 
   const p2: any =
     st && st.shell && st.format
       ? (() => {
-          const shellArgsOut = preferredShell.includes("bash")
-            ? ["--noprofile", "--norc", "-c", shellCmd(st.shell)]
-            : ["-c", shellCmd(st.shell)];
+          const shellArgsOut = buildShellArgsWithScript(preferredShell, st.shell);
           const proc = spawn(preferredShell, shellArgsOut, {
             cwd,
             env,
             stdio: ["pipe", "pipe", "pipe"],
             detached: true,
           });
-          try {
-            proc.stdin?.on("error", () => {});
-            proc.stdout?.on("error", () => {});
-            proc.stderr?.on("error", () => {});
-          } catch {}
+          attachPipeErrorNoops(proc);
           return proc;
         })()
       : null;
@@ -1599,7 +1683,7 @@ async function runWithTransforms(
   // Output validation
   const ajv = createAjv();
   const schema = spec.tool?.outputSchema;
-  const validate = schema ? ajv.compile(schema) : null;
+  const validate: ValidateFn | null = schema ? (ajv.compile(schema) as any) : null;
 
   let exitCode = 0;
   let stdoutParseFailed = false;
@@ -1619,238 +1703,29 @@ async function runWithTransforms(
     }
   };
   if (st && st.format === "ndjson") {
-    let bufStr = "";
-    let firstLineSeen = false;
-    let arrayStarted = false;
-    let itemsEmitted = 0;
-    let bytesCollected = 0;
-    let collectLimitExceeded = false;
-    let suppressFurther = false;
-    for await (const chunk of p2.stdout) {
-      bufStr += Buffer.from(chunk).toString("utf8");
-      if (bufStr.indexOf("\n") < 0 && Buffer.byteLength(bufStr) > limits.maxNdjsonLineBytes) {
-        process.stderr.write("jio: ndjson line bytes limit exceeded (stream)\n");
-        await finalizeFailureSink();
-        return 78;
-      }
-      while (true) {
-        const nl = bufStr.indexOf("\n");
-        if (nl < 0) break;
-        let s = bufStr.slice(0, nl);
-        bufStr = bufStr.slice(nl + 1);
-        // line-size cap (after cut at newline)
-        if (Buffer.byteLength(s) > limits.maxNdjsonLineBytes) {
-          process.stderr.write("jio: ndjson line bytes limit exceeded\n");
-          stdoutParseFailed = false;
-          stdoutConfigError = false;
-          await finalizeFailureSink();
-          return 78;
-        }
-        if (s.trim() === "") continue;
-        if (!firstLineSeen) {
-          firstLineSeen = true;
-          if (s.charCodeAt(0) === 0xfeff) s = s.slice(1);
-        }
-        if (s.endsWith("\r")) s = s.slice(0, -1);
-        try {
-          const obj = JSON.parse(s);
-          if (validate && !validate(obj)) {
-            const msg = JSON.stringify(validate.errors?.[0] || {});
-            process.stderr.write(`jio: invalid output item: ${msg}\n`);
-            if (sink) await sink.write({ reason: "output", object: obj, message: msg });
-            continue;
-          }
-          if (runtime.collect) {
-            if (suppressFurther) continue;
-            if (typeof runtime.collectLimit === "number" && runtime.collectLimit >= 0) {
-              if (
-                itemsEmitted >= runtime.collectLimit ||
-                (limits.collectItems as number) <= itemsEmitted
-              ) {
-                collectLimitExceeded = true;
-                suppressFurther = true;
-                continue;
-              }
-            }
-            const itemStr = JSON.stringify(obj);
-            const itemBytes = Buffer.byteLength(itemStr);
-            if (Number.isFinite(limits.collectBytes as number)) {
-              if (bytesCollected + itemBytes > (limits.collectBytes as number)) {
-                collectLimitExceeded = true;
-                suppressFurther = true;
-                continue;
-              }
-            }
-            if (!arrayStarted) {
-              process.stdout.write("[");
-              arrayStarted = true;
-            } else {
-              process.stdout.write(",");
-            }
-            process.stdout.write(itemStr);
-            itemsEmitted++;
-            bytesCollected += itemBytes;
-          } else {
-            process.stdout.write(s + "\n");
-          }
-        } catch {
-          process.stderr.write("jio: invalid NDJSON line (not JSON)\n");
-          if (sink)
-            await sink.write({
-              reason: "stdout",
-              object: s.slice(0, 200),
-              message: "invalid NDJSON",
-            });
-          // Tolerate invalid lines: route to failure sink, but do not fail the stage
-        }
-      }
-      if (localTimedOut) {
-        await finalizeFailureSink();
-        return 124;
-      }
-    }
-    // Handle any trailing data without newline
-    if (localTimedOut) {
-      await finalizeFailureSink();
-      return 124;
-    }
-    const trailing = bufStr.trim();
-    if (trailing) {
-      if (Buffer.byteLength(trailing) > limits.maxNdjsonLineBytes) {
-        process.stderr.write("jio: ndjson line bytes limit exceeded (trailing)\n");
-        await finalizeFailureSink();
-        return 78;
-      }
-      let s = bufStr;
-      if (!firstLineSeen && s.charCodeAt(0) === 0xfeff) s = s.slice(1);
-      if (s.endsWith("\r")) s = s.slice(0, -1);
-      try {
-        const obj = JSON.parse(s);
-        if (validate && !validate(obj)) {
-          const msg = JSON.stringify(validate.errors?.[0] || {});
-          process.stderr.write(`jio: invalid output item: ${msg}\n`);
-          if (sink) await sink.write({ reason: "output", object: obj, message: msg });
-        } else {
-          if (runtime.collect) {
-            if (!suppressFurther) {
-              if (typeof runtime.collectLimit === "number" && runtime.collectLimit >= 0) {
-                if (
-                  itemsEmitted >= runtime.collectLimit ||
-                  (limits.collectItems as number) <= itemsEmitted
-                ) {
-                  collectLimitExceeded = true;
-                  suppressFurther = true;
-                } else {
-                  const itemStr = JSON.stringify(obj);
-                  const itemBytes = Buffer.byteLength(itemStr);
-                  if (
-                    Number.isFinite(limits.collectBytes as number) &&
-                    bytesCollected + itemBytes > (limits.collectBytes as number)
-                  ) {
-                    collectLimitExceeded = true;
-                    suppressFurther = true;
-                  } else if (!arrayStarted) {
-                    process.stdout.write("[");
-                    arrayStarted = true;
-                  } else {
-                    process.stdout.write(",");
-                  }
-                  process.stdout.write(itemStr);
-                  itemsEmitted++;
-                  bytesCollected += itemBytes;
-                }
-              } else {
-                const itemStr = JSON.stringify(obj);
-                const itemBytes = Buffer.byteLength(itemStr);
-                if (
-                  Number.isFinite(limits.collectBytes as number) &&
-                  bytesCollected + itemBytes > (limits.collectBytes as number)
-                ) {
-                  collectLimitExceeded = true;
-                  suppressFurther = true;
-                } else if (!arrayStarted) {
-                  process.stdout.write("[");
-                  arrayStarted = true;
-                } else {
-                  process.stdout.write(",");
-                }
-                if (!suppressFurther) {
-                  process.stdout.write(itemStr);
-                  itemsEmitted++;
-                  bytesCollected += itemBytes;
-                }
-              }
-            }
-          } else {
-            process.stdout.write(s + "\n");
-          }
-        }
-      } catch {
-        process.stderr.write("jio: invalid NDJSON trailing line (not JSON)\n");
-        if (sink)
-          await sink.write({
-            reason: "stdout",
-            object: s.slice(0, 200),
-            message: "invalid NDJSON trailing",
-          });
-      }
-    }
-    if (runtime.collect && arrayStarted) {
-      process.stdout.write("]\n");
-    }
-    if (runtime.collect && collectLimitExceeded) {
-      const hintItems =
-        typeof runtime.collectLimit === "number" && runtime.collectLimit >= 0
-          ? ` --collect-limit=${String(runtime.collectLimit)}`
-          : " (set --collect-limit to increase)";
-      const hintBytes = Number.isFinite(limits.collectBytes as number)
-        ? ` --collect-bytes=${String(limits.collectBytes)}`
-        : " (set --collect-bytes to increase)";
-      process.stderr.write(`jio: collect limit exceeded.${hintItems}${hintBytes}\n`);
-      return 78;
-    }
+    const result = await handleStdoutNdjson({
+      p2,
+      limits,
+      validate,
+      runtime,
+      sink,
+      finalizeFailureSink,
+      localTimedOut,
+    });
+    if (typeof result === "number") return result;
   } else if (st && st.format === "json") {
-    const chunks: Buffer[] = [];
-    let total = 0;
-    for await (const chunk of p2.stdout) {
-      if (localTimedOut) {
-        try {
-          (p2 as any)?.stdout?.destroy?.();
-        } catch {}
-        await finalizeFailureSink();
-        return 124;
-      }
-      const c = Buffer.from(chunk);
-      total += c.length;
-      if (total > limits.maxStdoutJsonBytes) {
-        process.stderr.write("jio: stdout JSON bytes limit exceeded\n");
-        await finalizeFailureSink();
-        return 78;
-      }
-      chunks.push(c);
-    }
-    let buf = Buffer.concat(chunks).toString("utf8");
-    if (buf.charCodeAt(0) === 0xfeff) buf = buf.slice(1);
-    try {
-      const obj = JSON.parse(buf);
-      if (validate && !validate(obj)) {
-        const msg = JSON.stringify(validate.errors?.[0] || {});
-        process.stderr.write(`jio: invalid output: ${msg}\n`);
-        if (sink) await sink.write({ reason: "output", object: obj, message: msg });
+    const result = await handleStdoutJson({
+      p2,
+      limits,
+      validate,
+      sink,
+      finalizeFailureSink,
+      localTimedOut,
+      markStdoutParseFailed: () => {
         stdoutParseFailed = true;
-      } else {
-        process.stdout.write(JSON.stringify(obj));
-      }
-    } catch {
-      process.stderr.write("jio: invalid JSON output\n");
-      if (sink)
-        await sink.write({
-          reason: "stdout",
-          object: buf.slice(0, 200),
-          message: "invalid JSON document",
-        });
-      stdoutParseFailed = true;
-    }
+      },
+    });
+    if (typeof result === "number") return result;
   } else if (st && st.shell && !st.format) {
     process.stderr.write("jio: unknown stdoutTransform.format\n");
     p2.stdout.pipe(process.stdout);
@@ -1948,6 +1823,299 @@ async function runWithTransforms(
     setCurrentManager(null);
   } catch {}
   return exitCode || cCode || p1Code || p2Code;
+}
+
+type HandleNdjsonArgs = {
+  p2: any;
+  limits: Required<typeof DEFAULT_LIMITS>;
+  validate: ValidateFn | null;
+  runtime: RunnerRuntimeOptions;
+  sink: any;
+  finalizeFailureSink: () => Promise<void>;
+  localTimedOut: boolean;
+};
+
+async function handleStdoutNdjson(args: HandleNdjsonArgs): Promise<number | void> {
+  const { p2, limits, validate, runtime, sink, finalizeFailureSink, localTimedOut } = args;
+  let buffer = "";
+  let sawFirstLine = false;
+  let arrayStarted = false;
+  let itemsEmitted = 0;
+  let bytesCollected = 0;
+  let collectLimitExceeded = false;
+  let suppressFurther = false;
+
+  for await (const chunk of p2.stdout) {
+    buffer += Buffer.from(chunk).toString("utf8");
+    if (buffer.indexOf("\n") < 0 && Buffer.byteLength(buffer) > limits.maxNdjsonLineBytes) {
+      process.stderr.write("jio: ndjson line bytes limit exceeded (stream)\n");
+      await finalizeFailureSink();
+      return 78;
+    }
+    while (true) {
+      const nl = buffer.indexOf("\n");
+      if (nl < 0) break;
+      let line = buffer.slice(0, nl);
+      buffer = buffer.slice(nl + 1);
+      const cap = enforceNdjsonLineCap(line, limits.maxNdjsonLineBytes);
+      if (cap !== null) {
+        await finalizeFailureSink();
+        return cap;
+      }
+      if (
+        !emitNdjsonLine({
+          line,
+          sawFirstLineRef: () => sawFirstLine,
+          setSawFirstLine: () => (sawFirstLine = true),
+          validate,
+          runtime,
+          collectState: {
+            arrayStartedRef: () => arrayStarted,
+            startArray: () => {
+              process.stdout.write("[");
+              arrayStarted = true;
+            },
+            itemsEmittedRef: () => itemsEmitted,
+            incrementItems: (n) => (itemsEmitted += n),
+            bytesCollectedRef: () => bytesCollected,
+            addCollectedBytes: (n) => (bytesCollected += n),
+            suppressFurtherRef: () => suppressFurther,
+            suppressFurther: () => (suppressFurther = true),
+            setCollectLimitExceeded: () => (collectLimitExceeded = true),
+            limits,
+          },
+          sink,
+        })
+      ) {
+        // tolerated invalid line
+      }
+    }
+    if (localTimedOut) {
+      await finalizeFailureSink();
+      return 124;
+    }
+  }
+  if (localTimedOut) {
+    await finalizeFailureSink();
+    return 124;
+  }
+  const trailing = buffer.trim();
+  if (trailing) {
+    if (Buffer.byteLength(trailing) > limits.maxNdjsonLineBytes) {
+      process.stderr.write("jio: ndjson line bytes limit exceeded (trailing)\n");
+      await finalizeFailureSink();
+      return 78;
+    }
+    let s = buffer;
+    if (!sawFirstLine && s.charCodeAt(0) === 0xfeff) s = s.slice(1);
+    if (s.endsWith("\r")) s = s.slice(0, -1);
+    try {
+      const obj = JSON.parse(s);
+      if (validate && !validate(obj)) {
+        const msg = JSON.stringify(validate.errors?.[0] || {});
+        process.stderr.write(`jio: invalid output item: ${msg}\n`);
+        if (sink) await sink.write({ reason: "output", object: obj, message: msg });
+      } else {
+        if (runtime.collect) {
+          if (!suppressFurther) {
+            const res = tryCollectItem({
+              obj,
+              collectState: {
+                arrayStartedRef: () => arrayStarted,
+                startArray: () => {
+                  process.stdout.write("[");
+                  arrayStarted = true;
+                },
+                itemsEmittedRef: () => itemsEmitted,
+                incrementItems: (n) => (itemsEmitted += n),
+                bytesCollectedRef: () => bytesCollected,
+                addCollectedBytes: (n) => (bytesCollected += n),
+                suppressFurtherRef: () => suppressFurther,
+                suppressFurther: () => (suppressFurther = true),
+                setCollectLimitExceeded: () => (collectLimitExceeded = true),
+                limits,
+              },
+            });
+            if (!res) {
+              // limits exceeded inside tryCollectItem
+            }
+          }
+        } else {
+          process.stdout.write(s + "\n");
+        }
+      }
+    } catch {
+      process.stderr.write("jio: invalid NDJSON trailing line (not JSON)\n");
+      if (sink)
+        await sink.write({
+          reason: "stdout",
+          object: s.slice(0, 200),
+          message: "invalid NDJSON trailing",
+        });
+    }
+  }
+  if (runtime.collect && arrayStarted) {
+    process.stdout.write("]\n");
+  }
+  if (runtime.collect && collectLimitExceeded) {
+    const hintItems =
+      typeof runtime.collectLimit === "number" && runtime.collectLimit >= 0
+        ? ` --collect-limit=${String(runtime.collectLimit)}`
+        : " (set --collect-limit to increase)";
+    const hintBytes = Number.isFinite(limits.collectBytes as number)
+      ? ` --collect-bytes=${String(limits.collectBytes)}`
+      : " (set --collect-bytes to increase)";
+    process.stderr.write(`jio: collect limit exceeded.${hintItems}${hintBytes}\n`);
+    return 78;
+  }
+}
+
+function enforceNdjsonLineCap(line: string, maxBytes: number): number | null {
+  if (Buffer.byteLength(line) > maxBytes) {
+    process.stderr.write("jio: ndjson line bytes limit exceeded\n");
+    return 78;
+  }
+  return null;
+}
+
+type CollectState = {
+  arrayStartedRef: () => boolean;
+  startArray: () => void;
+  itemsEmittedRef: () => number;
+  incrementItems: (n: number) => void;
+  bytesCollectedRef: () => number;
+  addCollectedBytes: (n: number) => void;
+  suppressFurtherRef: () => boolean;
+  suppressFurther: () => void;
+  setCollectLimitExceeded: () => void;
+  limits: Required<typeof DEFAULT_LIMITS>;
+};
+
+function tryCollectItem(args: { obj: any; collectState: CollectState }): boolean {
+  const { obj, collectState: s } = args;
+  const itemStr = JSON.stringify(obj);
+  const itemBytes = Buffer.byteLength(itemStr);
+  const haveByteCap = Number.isFinite(s.limits.collectBytes as number);
+  if (haveByteCap && s.bytesCollectedRef() + itemBytes > (s.limits.collectBytes as number)) {
+    s.setCollectLimitExceeded();
+    s.suppressFurther();
+    return false;
+  }
+  if (!s.arrayStartedRef()) s.startArray();
+  else process.stdout.write(",");
+  process.stdout.write(itemStr);
+  s.incrementItems(1);
+  s.addCollectedBytes(itemBytes);
+  return true;
+}
+
+function emitNdjsonLine(args: {
+  line: string;
+  sawFirstLineRef: () => boolean;
+  setSawFirstLine: () => void;
+  validate: ValidateFn | null;
+  runtime: RunnerRuntimeOptions;
+  collectState: CollectState;
+  sink: any;
+}): boolean {
+  let s = String(args.line);
+  if (s.trim() === "") return true;
+  if (!args.sawFirstLineRef()) {
+    args.setSawFirstLine();
+    if (s.charCodeAt(0) === 0xfeff) s = s.slice(1);
+  }
+  if (s.endsWith("\r")) s = s.slice(0, -1);
+  try {
+    const obj = JSON.parse(s);
+    if (args.validate && !args.validate(obj)) {
+      const msg = JSON.stringify(args.validate.errors?.[0] || {});
+      process.stderr.write(`jio: invalid output item: ${msg}\n`);
+      if (args.sink) args.sink.write({ reason: "output", object: obj, message: msg });
+      return true;
+    }
+    if (args.runtime.collect) {
+      if (args.collectState.suppressFurtherRef()) return true;
+      if (
+        typeof args.runtime.collectLimit === "number" &&
+        args.runtime.collectLimit >= 0 &&
+        (args.collectState.itemsEmittedRef() >= args.runtime.collectLimit ||
+          (args.collectState.limits.collectItems as number) <= args.collectState.itemsEmittedRef())
+      ) {
+        args.collectState.setCollectLimitExceeded();
+        args.collectState.suppressFurther();
+        return true;
+      }
+      tryCollectItem({ obj, collectState: args.collectState });
+      return true;
+    }
+    process.stdout.write(s + "\n");
+    return true;
+  } catch {
+    process.stderr.write("jio: invalid NDJSON line (not JSON)\n");
+    if (args.sink)
+      args.sink.write({
+        reason: "stdout",
+        object: s.slice(0, 200),
+        message: "invalid NDJSON",
+      });
+    return false;
+  }
+}
+
+async function handleStdoutJson(args: {
+  p2: any;
+  limits: Required<typeof DEFAULT_LIMITS>;
+  validate: ValidateFn | null;
+  sink: any;
+  finalizeFailureSink: () => Promise<void>;
+  localTimedOut: boolean;
+  markStdoutParseFailed: () => void;
+}): Promise<number | void> {
+  const { p2, limits, validate, sink, finalizeFailureSink, localTimedOut, markStdoutParseFailed } =
+    args;
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for await (const chunk of p2.stdout) {
+    if (localTimedOut) {
+      try {
+        (p2 as any)?.stdout?.destroy?.();
+      } catch {}
+
+      await finalizeFailureSink();
+      return 124;
+    }
+    const c = Buffer.from(chunk);
+    total += c.length;
+    if (total > limits.maxStdoutJsonBytes) {
+      process.stderr.write("jio: stdout JSON bytes limit exceeded\n");
+      await finalizeFailureSink();
+      return 78;
+    }
+    chunks.push(c);
+  }
+  let buf = Buffer.concat(chunks).toString("utf8");
+  if (buf.charCodeAt(0) === 0xfeff) buf = buf.slice(1);
+  try {
+    const obj = JSON.parse(buf);
+    if (validate && !validate(obj)) {
+      const msg = JSON.stringify(validate.errors?.[0] || {});
+      process.stderr.write(`jio: invalid output: ${msg}\n`);
+      if (sink) await sink.write({ reason: "output", object: obj, message: msg });
+      markStdoutParseFailed();
+      return; // allow precedence handler to return 65 later
+    }
+    process.stdout.write(JSON.stringify(obj));
+  } catch {
+    process.stderr.write("jio: invalid JSON output\n");
+    if (sink)
+      await sink.write({
+        reason: "stdout",
+        object: buf.slice(0, 200),
+        message: "invalid JSON document",
+      });
+    markStdoutParseFailed();
+    return; // allow precedence handler to return 65 later
+  }
 }
 
 function openFailureSink(

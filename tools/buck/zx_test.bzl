@@ -29,6 +29,7 @@ def _zx_test_impl(ctx):
             + "{ \"$NODE_BIN\" $TEST_NODE_OPTIONS --test --experimental-strip-types --import \"$WORKSPACE_ROOT/tools/dev/zx-init.mjs\" %s; } > >(tee -a \"$LOGDIR/test.stdout.log\") 2> >(tee -a \"$LOGDIR/test.stderr.log\" >&2); STATUS=$?; "
             + "else \"$NODE_BIN\" $TEST_NODE_OPTIONS --test --experimental-strip-types --import \"$WORKSPACE_ROOT/tools/dev/zx-init.mjs\" %s; STATUS=$?; fi; "
             + "if [ \"$COVERAGE\" = \"1\" ]; then "
+            + "\"$NODE_BIN\" \"$WORKSPACE_ROOT/tools/dev/coverage-raw-normalize.mjs\" || true; "
             + "\"$NODE_BIN\" \"$WORKSPACE_ROOT/node_modules/c8/bin/c8.js\" report "
             + "--clean=false --temp-directory \"$WORKSPACE_ROOT/coverage/raw\" "
             + "--reports-dir \"$WORKSPACE_ROOT/coverage\" --reporter=json-summary --reporter=lcov --reporter=html "

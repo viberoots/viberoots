@@ -43,7 +43,7 @@ async function normalizeLcov(repoRoot) {
     const das = new Map();
     const fns = new Map(); // name -> line
     const fndas = new Map(); // name -> hits
-    const brdas = new Map(); // key -> count
+    const brdas = new Map(); // tripleKey "line,block,branch" -> taken count
     let brf = 0,
       brh = 0;
     for (const l of lines) {
@@ -66,12 +66,13 @@ async function normalizeLcov(repoRoot) {
           if (hits > prev) fndas.set(name, hits);
         }
       } else if (l.startsWith("BRDA:")) {
-        const key = l.slice(5);
-        const parts = key.split(",");
+        const payload = l.slice(5);
+        const parts = payload.split(",");
+        const triple = parts.slice(0, 3).join(",");
         const cntStr = parts[3] || "-";
         const cnt = cntStr === "-" ? 0 : parseInt(cntStr, 10) || 0;
-        const prev = brdas.get(key) || 0;
-        if (cnt > prev) brdas.set(key, cnt);
+        const prev = brdas.get(triple) || 0;
+        if (cnt > prev) brdas.set(triple, cnt);
       } else if (l.startsWith("BRF:")) {
         brf = Math.max(brf, parseInt(l.slice(4), 10) || 0);
       } else if (l.startsWith("BRH:")) {
@@ -102,8 +103,8 @@ async function normalizeLcov(repoRoot) {
     for (const [name, ln] of entry.fns) out += `FN:${ln},${name}\n`;
     for (const [name, hits] of entry.fndas) out += `FNDA:${hits},${name}\n`;
     for (const [ln, n] of entry.das) out += `DA:${ln},${n}\n`;
-    for (const [k, c] of entry.brdas) {
-      out += `BRDA:${k}\n`;
+    for (const [triple, taken] of entry.brdas) {
+      out += `BRDA:${triple},${taken > 0 ? taken : "-"}\n`;
     }
     if (entry.brf) out += `BRF:${entry.brf}\n`;
     if (entry.brh) out += `BRH:${entry.brh}\n`;
