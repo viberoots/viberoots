@@ -282,7 +282,7 @@ graph LR
   P --> ARGV["argv (positionals + flags)"]
   ARGV --> EXEC["exec (e.g., bash)"]
   EXEC --> OUT["stdout passthrough (no transform)"]
-  EXEC -.-> ERR["stderr passthrough"]
+  EXEC --> ERR["stderr passthrough"]
 ```
 
 Spec (excerpt):
@@ -317,10 +317,10 @@ Invocation JSON (`--in inv.json`):
 Resulting argv (conceptual):
 
 ```text
--lc curl https://example.com -H Accept: application/json
+curl https://example.com -H Accept: application/json
 ```
 
-The actual spawned process is `exec: bash` with the argv list above.
+The actual spawned process is `exec: curl` with the argv list above.
 
 ### B) NDJSON streaming with collect
 
@@ -333,8 +333,8 @@ graph LR
   INV["Invocation JSON (--in)"] --> MAP["parameters mapping"]
   MAP --> RUN["exec + argv"]
   RUN --> STOUT["stdoutTransform shell (ndjson)"]
-  STOUT --> OUT["NDJSON items → optionally --collect → JSON array"]
-  RUN -.-> ERR["stderr passthrough"]
+  STOUT --> OUT["NDJSON items -> optionally --collect -> JSON array"]
+  RUN --> ERR["stderr passthrough"]
 ```
 
 Spec (excerpt):
@@ -363,7 +363,7 @@ Invocation JSON (`--in inv.json`):
 Usage:
 
 ```bash
-jio io.example.emit --in inv.json --collect
+jio io.example.emit_items --in inv.json --collect
 ```
 
 Output (one JSON array due to `--collect`):
@@ -381,16 +381,16 @@ This example validates input and output and routes validation failures to a sink
 ```mermaid
 graph LR
   INV["Invocation JSON (--in)"] --> VIN["validate against tool.inputSchema"]
-  VIN --> MAP["parameters mapping → argv"]
+  VIN --> MAP["parameters mapping -> argv"]
   STDIN["process.stdin (JSON)"] --> STIN["stdinTransform shell (json)"]
   STIN --> CMDIN["command stdin (json)"]
   EXEC["exec + argv"]
   EXEC --> STOUT["stdoutTransform shell (json)"]
   STOUT --> VOUT["validate against tool.outputSchema"]
   VOUT --> OUT["final JSON"]
-  VOUT -.-> SINK["onValidationFailure shell (NDJSON)"]
-  VIN -.-> SINK
-  EXEC -.-> ERR["stderr passthrough"]
+  VOUT --> SINK["onValidationFailure shell (NDJSON)"]
+  VIN --> SINK
+  EXEC --> ERR["stderr passthrough"]
 ```
 
 Spec (excerpt):
