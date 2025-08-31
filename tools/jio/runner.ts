@@ -10,29 +10,41 @@ import { createAjvValidator, generateInputSchemaFromParameters } from "./schema/
 import { createAjv } from "./validation/ajv.ts";
 
 // Parent stdio EPIPE handling: exit(0) on broken pipe like Unix CLIs
-let ACTIVE_PROCS: any[] = [];
-let ACTIVE_SINK: any = null;
-function setActiveRunContext(procs: any[], sink: any) {
-  try {
-    ACTIVE_PROCS = procs || [];
-    ACTIVE_SINK = sink || null;
-  } catch {}
+class ProcessGroupManager {
+  private processes: any[] = [];
+  private sink: any = null;
+  private terminated: boolean = false;
+  register(processes: any[], sink: any) {
+    this.processes = processes || [];
+    this.sink = sink || null;
+    this.terminated = false;
+  }
+  terminateOnce(_reason: string) {
+    if (this.terminated) return;
+    this.terminated = true;
+    try {
+      (this.sink as any)?.endInput?.();
+    } catch {}
+    try {
+      terminateGroup(this.processes);
+    } catch {}
+  }
+  clear() {
+    this.processes = [];
+    this.sink = null;
+    this.terminated = false;
+  }
 }
-function clearActiveRunContext() {
-  try {
-    ACTIVE_PROCS = [];
-    ACTIVE_SINK = null;
-  } catch {}
+let CURRENT_MANAGER: ProcessGroupManager | null = null;
+function setCurrentManager(m: ProcessGroupManager | null) {
+  CURRENT_MANAGER = m;
 }
 try {
   process.stdout.on("error", (e: any) => {
     if (e && (e as any).code === "EPIPE") {
       try {
         try {
-          (ACTIVE_SINK as any)?.endInput?.();
-        } catch {}
-        try {
-          terminateGroup(ACTIVE_PROCS);
+          CURRENT_MANAGER?.terminateOnce("epipe-stdout");
         } catch {}
       } finally {
         process.exit(0);
@@ -43,10 +55,7 @@ try {
     if (e && (e as any).code === "EPIPE") {
       try {
         try {
-          (ACTIVE_SINK as any)?.endInput?.();
-        } catch {}
-        try {
-          terminateGroup(ACTIVE_PROCS);
+          CURRENT_MANAGER?.terminateOnce("epipe-stderr");
         } catch {}
       } finally {
         process.exit(0);
@@ -1013,7 +1022,7 @@ async function runWithTransforms(
   // Structured diagnostics (JSON lines to stderr)
   const logEvent = (evt: any, force = false) => {
     try {
-      if (force || process.env.JIO_DEBUG === "1") {
+      if (force || process.env.JIO_DEBUG === "1" || process.env.TEST_CAPTURE_LOGS === "1") {
         const obj = { ts: Date.now(), ...evt };
         process.stderr.write(JSON.stringify(obj) + "\n");
       }
@@ -1320,9 +1329,9 @@ async function runWithTransforms(
   // Local timeout guard
   // Exclude failure sink from termination group to allow it to flush after endInput()
   const procs = [p1, cmd, p2].filter(Boolean) as any[];
-  try {
-    setActiveRunContext(procs, sink);
-  } catch {}
+  const mgr = new ProcessGroupManager();
+  mgr.register(procs, sink);
+  setCurrentManager(mgr);
   // If stdin parsing fails, terminate once without polling
   let abortSent = false;
   const abortOnce = () => {
@@ -1828,8 +1837,6 @@ async function runWithTransforms(
   } catch {}
   if (stdinParseFailed) {
     terminateProcs([p1, cmd, p2].filter(Boolean) as any[]);
-    try {
-    } catch {}
     await finalizeFailureSink();
     try {
       if (localKiller) clearTimeout(localKiller);
@@ -1838,14 +1845,13 @@ async function runWithTransforms(
       process.stderr.write("stage failed: stdinTransform code=65\n");
     } catch {}
     try {
-      clearActiveRunContext();
+      mgr.clear();
+      setCurrentManager(null);
     } catch {}
     return 65;
   }
   if (stdoutParseFailed) {
     terminateProcs([p1, cmd, p2].filter(Boolean) as any[]);
-    try {
-    } catch {}
     await finalizeFailureSink();
     try {
       if (localKiller) clearTimeout(localKiller);
@@ -1854,7 +1860,8 @@ async function runWithTransforms(
       process.stderr.write("stage failed: stdoutTransform code=65\n");
     } catch {}
     try {
-      clearActiveRunContext();
+      mgr.clear();
+      setCurrentManager(null);
     } catch {}
     return 65;
   }
@@ -1900,7 +1907,8 @@ async function runWithTransforms(
   // (Parse failures are handled above with early return)
   await finalizeFailureSink();
   try {
-    clearActiveRunContext();
+    mgr.clear();
+    setCurrentManager(null);
   } catch {}
   return exitCode || cCode || p1Code || p2Code;
 }

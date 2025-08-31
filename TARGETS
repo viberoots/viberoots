@@ -446,6 +446,12 @@ zx_test(
 )
 
 zx_test(
+    name = "json_cli_child_timeout_termination",
+    script = "tools/tests/jio.child-timeout.termination.test.ts",
+    out = "json_cli_child_timeout_termination.stamp",
+)
+
+zx_test(
     name = "json_cli_structured_diagnostics",
     script = "tools/tests/jio.structured-diagnostics.test.ts",
     out = "json_cli_structured_diagnostics.stamp",
