@@ -248,3 +248,67 @@ async function main() {
 ---
 
 This design leverages the MCP TypeScript SDK’s primitives for server and transports, while reusing jio’s solid core (discovery, argv building, transforms, validation, limits, and termination) to provide a schema‑first, streaming‑capable tool surface to MCP clients.
+
+### Proposed PR scopes
+
+To land this feature with minimal risk and clear review boundaries, we will split the work into focused PRs. Each PR will include tests (unit and/or integration) and will keep behavior stable for existing `jio` CLI usage unless explicitly noted.
+
+The implementation will be split into focused PRs to ensure clear review boundaries and maintain stability for existing `jio` CLI usage. Each PR will include comprehensive tests and preserve backward compatibility unless explicitly noted.
+
+**PR 1: Core refactor for reuse (no behavior change)**
+
+- Extract and export internal APIs from the runner so the server can reuse them without invoking the CLI: `buildIndex` (discovery), `readSpec`, `generateInputSchemaFromParameters`, `buildArgv`, `buildChildEnv`, `runWithTransforms`.
+- Light module splits if needed (e.g., `tools/jio/core/{discovery,argv,env,run}.ts`) while preserving public CLI behavior.
+- Tests: unit coverage for discovery, argv rendering edge cases, env passthrough globbing; keep existing tests green.
+
+**PR 2: MCP server skeleton + stdio transport (JSON and collected NDJSON only)**
+
+- Add `tools/jio/mcp/server.ts` implementing minimal server using `@modelcontextprotocol/sdk` with stdio transport.
+- Add `jio --mcp-server` CLI flag wiring to start the server; reuse discovery to register tools with inferred or explicit input schemas.
+- Handler path: validate args with Ajv, build argv/env, call `runWithTransforms` with `collect=true` for NDJSON, return JSON/array to MCP client. Map exit codes to MCP error taxonomy.
+- Tests: unit for registration and error mapping; integration test invoking a simple JSON and NDJSON tool via stdio transport.
+
+**PR 3: HTTP transport with progressive NDJSON streaming and cancellation**
+
+- Add optional HTTP transport (`--transport=http --http-port/--http-host`) using SDK's streamable HTTP server; stream NDJSON items progressively, collect JSON documents.
+- Implement request-scoped abort → SIGTERM → SIGKILL after 5s.
+- Tests: integration for streaming, backpressure tolerance, and mid-stream cancellation.
+
+**PR 4: Server-level limits, caps, and concurrency controls**
+
+- Expose server flags for limits and precedence over spec defaults: `--max-stdin-bytes`, `--max-stdout-json-bytes`, `--max-ndjson-line-bytes`, `--max-argv-*`, `--max-items-per-call`, `--timeout-ms`, `--max-concurrent-calls` (queue excess).
+- Thread these into `runWithTransforms` runtime options; enforce per-call caps and fair queuing.
+- Tests: unit for precedence and cap breaches; integration for concurrent requests and queue behavior.
+
+**PR 5: Elicitation support (optional)**
+
+- When Ajv reports invalid/missing args and elicitation is enabled, send an elicitation request (message + focused schema) and accept updated args; otherwise return InvalidInput.
+- Tests: unit for elicitation decisioning; integration covering accept/decline flows.
+
+**PR 6: Resources and prompts (optional)**
+
+- Register read-only resources for spec files; implement helper prompts `list-tools` and `explain-tool {name}`.
+- Tests: unit for resource resolution; integration for prompts returning expected summaries.
+
+**PR 7: Safe mode and policy hardening**
+
+- `--safe-mode` disallows shell transforms at runtime; only pass through stdout and enforce formats. Validate configuration at startup and per-call.
+- Tighten name collision handling and logging controls (`--log-level`).
+- Tests: unit for safe-mode enforcement; integration ensuring transforms are blocked while passthrough still works.
+
+**PR 8: Env policy surface for server**
+
+- Add server `--clean-env|--no-clean-env`, `--pass-env NAME|GLOB`, and `--env NAME=VALUE` overlays; reuse `buildChildEnv` with precedence: process → `.jio.env` → `command.env` → server flags.
+- Tests: unit for exact and glob passthrough; integration for precedence and sanitization.
+
+**PR 9: Robustness and diagnostics**
+
+- Improve structured diagnostics for spawn/terminate/sink summaries; propagate sink diagnostics in server logs at `--log-level=debug`.
+- Harden edge cases (BOM stripping, CRLF, trailing NDJSON without newline) in server return paths as needed.
+- Tests: targeted cases for diagnostics and tricky stream edges.
+
+**PR 10: Documentation and examples**
+
+- Update `jio-user-manual.md` with "Using jio as an MCP server" section, including stdio and HTTP usage, limits, env policy, and streaming behaviors.
+- Add small example specs and a smoke script to demonstrate MCP client calls against the server.
+- Tests: lightweight e2e example in CI invoking the server in stdio mode.
