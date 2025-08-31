@@ -10,36 +10,7 @@
     "ignore": { "type": "array", "items": { "type": "string" } },
     "globs": { "type": "array", "items": { "type": "string" } },
     "excludeGlobs": { "type": "array", "items": { "type": "string" } },
-    "env": { "type": "object", "additionalProperties": { "type": "string" } },
-    "limits": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "argvBytesMax": { "type": "integer", "minimum": 1 },
-        "ndjsonLineBytesMax": { "type": "integer", "minimum": 1 },
-        "stdoutChunkBytesMax": { "type": "integer", "minimum": 1 }
-      }
-    },
-    "discovery": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "rootDirs": { "type": "array", "items": { "type": "string" } },
-        "include": { "type": "array", "items": { "type": "string" } },
-        "exclude": { "type": "array", "items": { "type": "string" } }
-      }
-    },
-    "logging": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "level": {
-          "type": "string",
-          "enum": ["silent", "error", "warn", "info", "debug"],
-          "default": "warn"
-        }
-      }
-    }
+    "env": { "type": "object", "additionalProperties": { "type": "string" } }
   },
   "required": ["configVersion"]
 }

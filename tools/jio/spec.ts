@@ -1,52 +1,14 @@
-export type JsonCliSpec = {
-  specVersion: "1.0.0";
-  schemaDialect?: "https://json-schema.org/draft/2020-12/schema";
-  tool: ToolSection;
-  command: CommandSection;
-};
+import type {
+  JsonCliSpec as CanonJsonCliSpec,
+  JsonCliSpecInput as CanonJsonCliSpecInput,
+  ParameterSpec,
+} from "./schema/types";
 
-export type ToolSection = {
-  name: string;
-  title?: string;
-  description?: string;
-  inputSchema?: any;
-  outputSchema?: any;
-};
+export type JsonCliSpec = CanonJsonCliSpec;
 
-export type CommandSection = {
-  package: string;
-  exec: string;
-  workingDir?: string;
-  inheritCallerCwd?: boolean;
-  env?: Record<string, string>;
-  defaultBooleanStyle?: "presence" | "equals";
-  timeoutMs?: number;
-  parameters: Record<string, ParameterSpec>;
-  stdinTransform?: { shell: string; format: "ndjson" | "json" };
-  stdoutTransform: { shell: string; format: "ndjson" | "json" };
-  onValidationFailure?: { shell: string };
-};
+export type ParameterSpec = ParameterSpec;
 
-export type ParameterSpec =
-  | ({ value: string; type: BaseTypes } & BaseParam)
-  | ({ path: string; type: BaseTypes } & BaseParam)
-  | ({ default: any; type: BaseTypes } & BaseParam);
-
-type BaseTypes = "string" | "number" | "boolean" | "array" | "object";
-
-type BaseParam = {
-  required?: boolean;
-  default?: any;
-  position?: number; // for positionals
-  flag?: boolean; // for flags
-  flagName?: string; // required when flag=true
-  booleanStyle?: "presence" | "equals";
-  collectionStyle?: "repeatArg" | "repeatFlag" | "csv" | "kv" | "separate";
-  csvSeparator?: string;
-};
-
-export type JsonCliSpecInput = Omit<JsonCliSpec, "specVersion" | "schemaDialect"> &
-  Partial<Pick<JsonCliSpec, "specVersion" | "schemaDialect">>;
+export type JsonCliSpecInput = CanonJsonCliSpecInput;
 
 export function defineToolSpec(spec: JsonCliSpecInput): JsonCliSpec {
   return {

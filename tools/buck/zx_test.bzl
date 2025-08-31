@@ -21,6 +21,8 @@ def _zx_test_impl(ctx):
             + "ls -1t \"$NODE_V8_COVERAGE\"/coverage-*.json 2>/dev/null | tail -n +201 | xargs -r rm -f || true; fi; "
             # Keep NODE_OPTIONS untouched; pass test flags on CLI instead
             + "export NODE_OPTIONS=\"$NODE_OPTIONS\"; "
+            # Generate TS types from schema before running tests (write into workspace, gitignored)
+            + "\"$NODE_BIN\" --experimental-strip-types --import \"$WORKSPACE_ROOT/tools/dev/zx-init.mjs\" \"$WORKSPACE_ROOT/tools/jio/schema/gen-types.ts\" \"$WORKSPACE_ROOT/tools/jio/schema/types.ts\" >/dev/null 2>&1 || true; "
             + "SAFE=$(printf %%s \"$BUCK_TEST_TARGET\" | sed -E 's|^.*/:||; s/[^A-Za-z0-9._-]+/_/g' | cut -c1-200); "
             + "LOGDIR=\"$TEST_LOG_DIR/$SAFE\"; mkdir -p \"$LOGDIR\"; "
             + "if [ \"$TEST_CAPTURE_LOGS\" = \"1\" ]; then "

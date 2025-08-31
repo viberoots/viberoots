@@ -124,15 +124,6 @@ The spec has two siblings: **`tool`** and **`command`**.
   - If `inheritCallerCwd: true`, relative paths (or an omitted `workingDir`) resolve relative to the caller’s current working directory.
   - Absolute paths are used as-is regardless of `inheritCallerCwd`.
 - `env` (optional) — per-tool environment (merged over process env and `.jio.env`). **Precedence**: `process.env` < root `.jio.env` < per-tool `command.env`. In `--dry-run`, print env **keys only** and redact values matching `*_TOKEN`, `*_SECRET`, `*PASSWORD*`, etc. **Secrets** SHOULD be provided via SecretSpec files and referenced by the runner rather than embedded directly.
-- `defaultBooleanStyle` (optional) — `"presence"` (default) or `"equals"`.
-- `parameters` — **explicit mapping** from JSON → argv (see §4).
-- `stdinTransform` (optional) — shell pipeline that converts input JSON/NDJSON into **stdin** bytes for the command.
-  - `shell`: executed with `/bin/sh -c "<shell>"`.
-  - `format`: `"json"` | `"ndjson"` — **MUST be enforced**.
-- `stdoutTransform` (optional) — shell pipeline that converts stdout into **JSON/NDJSON**.
-  - `shell`: e.g., `"jq -c ."`
-  - `format`: `"json"` | `"ndjson"` describing what it emits.
-  - If omitted, command stdout is passed through unmodified.
 
 ---
 

@@ -1,6 +1,12 @@
 # Buck2 targets
 
 load("//tools/buck:zx_test.bzl", "zx_test")
+zx_test(
+    name = "gen_jio_schema_types",
+    script = "tools/jio/schema/gen-types.ts",
+    out = "gen_jio_schema_types.stamp",
+)
+load("//tools/buck:zx_test.bzl", "zx_test")
 
 zx_test(
     name = "scaffolding_smoke_targets_buildfile",
