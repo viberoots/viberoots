@@ -402,6 +402,76 @@ zx_test(
     out = "json_cli_epipe.stamp",
 )
 
+zx_test(
+    name = "json_cli_sink_limits",
+    script = "tools/tests/jio.sink-limits.test.ts",
+    out = "json_cli_sink_limits.stamp",
+)
+
+zx_test(
+    name = "json_cli_sigkill_after_5s",
+    script = "tools/tests/jio.sigkill-after-5s.test.ts",
+    out = "json_cli_sigkill_after_5s.stamp",
+)
+
+## removed: json_cli_trailing_ndjson_collect_limits (redundant with ndjson-trailing test)
+
+zx_test(
+    name = "json_cli_collect_limit_hints",
+    script = "tools/tests/jio.collect.limit.hints.test.ts",
+    out = "json_cli_collect_limit_hints.stamp",
+)
+
+zx_test(
+    name = "json_cli_sink_write_nonjson",
+    script = "tools/tests/jio.sink-write.nonjson.test.ts",
+    out = "json_cli_sink_write_nonjson.stamp",
+)
+
+zx_test(
+    name = "json_cli_env_glob_passthrough",
+    script = "tools/tests/jio.env.glob-passthrough.test.ts",
+    out = "json_cli_env_glob_passthrough.stamp",
+)
+
+## removed: json_cli_print_schemas (covered by cli-schema-flags tests)
+
+zx_test(
+    name = "json_cli_skip_unreadable_specs",
+    script = "tools/tests/jio.skip-unreadable-specs.test.ts",
+    out = "json_cli_skip_unreadable_specs.stamp",
+)
+
+zx_test(
+    name = "json_cli_cli_flags_collect_bytes",
+    script = "tools/tests/jio.cli-flags.collect-bytes.test.ts",
+    out = "json_cli_cli_flags_collect_bytes.stamp",
+)
+
+zx_test(
+    name = "json_cli_cli_flags_timeout_ms",
+    script = "tools/tests/jio.cli-flags.timeout-ms.test.ts",
+    out = "json_cli_cli_flags_timeout_ms.stamp",
+)
+
+zx_test(
+    name = "json_cli_cli_flags_env",
+    script = "tools/tests/jio.cli-flags.env.test.ts",
+    out = "json_cli_cli_flags_env.stamp",
+)
+
+zx_test(
+    name = "json_cli_invalid_invocation_object",
+    script = "tools/tests/jio.invalid-invocation-object.test.ts",
+    out = "json_cli_invalid_invocation_object.stamp",
+)
+
+zx_test(
+    name = "json_cli_config_validation_warning",
+    script = "tools/tests/jio.config.validation-warning.test.ts",
+    out = "json_cli_config_validation_warning.stamp",
+)
+
 
 zx_test(
     name = "json_cli_stdin_backpressure",
@@ -456,3 +526,17 @@ zx_test(
     script = "tools/tests/jio.structured-diagnostics.test.ts",
     out = "json_cli_structured_diagnostics.stamp",
 )
+
+zx_test(
+    name = "json_cli_render_kv_object",
+    script = "tools/tests/jio.render.kv-object.test.ts",
+    out = "json_cli_render_kv_object.stamp",
+)
+
+zx_test(
+    name = "json_cli_jsonpath_bracket_notation",
+    script = "tools/tests/jio.jsonpath.bracket-notation.test.ts",
+    out = "json_cli_jsonpath_bracket_notation.stamp",
+)
+
+## removed: json_cli_parent_stdio_epipe (redundant with jio.epipe.test.ts)

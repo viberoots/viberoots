@@ -3,8 +3,8 @@ def _zx_test_impl(ctx):
     # Export NODE_V8_COVERAGE so child Node processes also write coverage data, but only when COVERAGE=1.
     run_and_report = (
         (
-            "if [ \"$COVERAGE\" = \"1\" ]; then export NODE_V8_COVERAGE=$(pwd)/coverage/raw; else unset NODE_V8_COVERAGE; fi; "
-            + "export WORKSPACE_ROOT=\"${WORKSPACE_ROOT:-$(pwd)}\"; "
+            "export WORKSPACE_ROOT=\"${WORKSPACE_ROOT:-$(pwd)}\"; "
+            + "if [ \"$COVERAGE\" = \"1\" ]; then export NODE_V8_COVERAGE=\"$WORKSPACE_ROOT/coverage/raw\"; else unset NODE_V8_COVERAGE; fi; "
             + "export BUCK_TEST_TARGET=\"%s\"; "
             + "export TEST_LOG_DIR=\"${TEST_LOG_DIR:-$(pwd)/buck-out/test-logs}\"; "
             + "export NODE_BIN=\"$(command -v node)\"; "
@@ -29,10 +29,13 @@ def _zx_test_impl(ctx):
             + "{ \"$NODE_BIN\" $TEST_NODE_OPTIONS --test --experimental-strip-types --import \"$WORKSPACE_ROOT/tools/dev/zx-init.mjs\" %s; } > >(tee -a \"$LOGDIR/test.stdout.log\") 2> >(tee -a \"$LOGDIR/test.stderr.log\" >&2); STATUS=$?; "
             + "else \"$NODE_BIN\" $TEST_NODE_OPTIONS --test --experimental-strip-types --import \"$WORKSPACE_ROOT/tools/dev/zx-init.mjs\" %s; STATUS=$?; fi; "
             + "if [ \"$COVERAGE\" = \"1\" ]; then "
-            + "\"$NODE_BIN\" ./node_modules/c8/bin/c8.js report "
-            + "--clean=false --temp-directory \"$NODE_V8_COVERAGE\" "
-            + "--reports-dir coverage --reporter=json-summary --reporter=lcov --reporter=html "
-            + "--extension .ts --allowExternal --all --src . || true; "
+            + "\"$NODE_BIN\" \"$WORKSPACE_ROOT/node_modules/c8/bin/c8.js\" report "
+            + "--clean=false --temp-directory \"$WORKSPACE_ROOT/coverage/raw\" "
+            + "--reports-dir \"$WORKSPACE_ROOT/coverage\" --reporter=json-summary --reporter=lcov --reporter=html "
+            + "--extension .ts --allowExternal --src \"$WORKSPACE_ROOT\" "
+            + "--include \"**/*.ts\" "
+            + "--exclude \"node_modules/**\" --exclude \"buck-out/**\" --exclude \".clinic/**\" --exclude \"**/*.d.ts\" "
+            + "|| true; "
             + "\"$NODE_BIN\" ./tools/dev/coverage-normalize.mjs || true; "
             + "fi; exit \"$STATUS\""
         )
