@@ -1323,16 +1323,15 @@ async function runWithTransforms(
   try {
     setActiveRunContext(procs, sink);
   } catch {}
-  // If stdin parsing fails, proactively terminate the running group to honor precedence and avoid hangs
+  // If stdin parsing fails, terminate once without polling
   let abortSent = false;
-  const abortTimer = setInterval(() => {
-    if (stdinParseFailed && !abortSent) {
-      abortSent = true;
-      try {
-        terminateGroup(procs);
-      } catch {}
-    }
-  }, 10);
+  const abortOnce = () => {
+    if (abortSent) return;
+    abortSent = true;
+    try {
+      terminateGroup(procs);
+    } catch {}
+  };
   const timeoutMs = runtime.timeoutMsOverride || spec.command?.timeoutMs;
   let localTimedOut = false;
   let localKiller: NodeJS.Timeout | null = null;
@@ -1491,6 +1490,7 @@ async function runWithTransforms(
                 message: "invalid JSON line",
               });
             stdinParseFailed = true;
+            abortOnce();
           }
         }
         cmd.stdin.end();
@@ -1535,6 +1535,7 @@ async function runWithTransforms(
               message: "invalid JSON document",
             });
           stdinParseFailed = true;
+          abortOnce();
         }
         cmd.stdin.end();
       })().catch(() => {
@@ -1828,7 +1829,6 @@ async function runWithTransforms(
   if (stdinParseFailed) {
     terminateProcs([p1, cmd, p2].filter(Boolean) as any[]);
     try {
-      clearInterval(abortTimer);
     } catch {}
     await finalizeFailureSink();
     try {
@@ -1845,7 +1845,6 @@ async function runWithTransforms(
   if (stdoutParseFailed) {
     terminateProcs([p1, cmd, p2].filter(Boolean) as any[]);
     try {
-      clearInterval(abortTimer);
     } catch {}
     await finalizeFailureSink();
     try {
@@ -1877,7 +1876,6 @@ async function runWithTransforms(
   }
   try {
     if (localKiller) clearTimeout(localKiller);
-    clearInterval(abortTimer);
   } catch {}
 
   // Compute exit code precedence
