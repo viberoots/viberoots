@@ -853,7 +853,8 @@ function renderValueTokens(
       }
       const str = String(value);
       if (!flagName) return [str];
-      if (ps.collectionStyle === "separate") return [flagName, str];
+      const valueStyle = (ps as any).flagValueStyle === "separate" ? "separate" : "equals";
+      if (valueStyle === "separate") return [flagName, str];
       return [`${flagName}=${str}`];
     }
     case "boolean": {
@@ -871,7 +872,8 @@ function renderValueTokens(
         const sep = ps.csvSeparator || ",";
         const joined = value.map((v) => String(v)).join(sep);
         if (!flagName) return [joined];
-        if (ps.collectionStyle === "separate") return [flagName, joined];
+        const valueStyle = (ps as any).flagValueStyle === "separate" ? "separate" : "equals";
+        if (valueStyle === "separate") return [flagName, joined];
         return [`${flagName}=${joined}`];
       }
       if (style === "repeatFlag") {
@@ -959,6 +961,13 @@ function buildChildEnv(
     "TMPDIR",
     "TEMP",
     "TMP",
+    // Common locale and tooling defaults often required by child processes
+    "LANG",
+    "LC_ALL",
+    // Common SSL and SSH tooling
+    "SSL_CERT_FILE",
+    "GIT_SSH_COMMAND",
+    "SSH_AUTH_SOCK",
   ]);
   if (!runtime.cleanEnv) {
     for (const [k, v] of Object.entries(process.env)) if (typeof v === "string") base[k] = v;
@@ -971,9 +980,37 @@ function buildChildEnv(
       const v = process.env[name];
       if (typeof v === "string") base[name] = v;
     }
-    for (const name of runtime.passEnv || []) {
-      const v = process.env[name];
-      if (typeof v === "string") base[name] = v;
+    // Support exact and glob-style passEnv entries (e.g., AWS_*, GCP_*)
+    const patterns = Array.isArray(runtime.passEnv) ? runtime.passEnv : [];
+    const envKeys = Object.keys(process.env);
+    for (const pat of patterns) {
+      const hasWildcard = /[\*\?]/.test(pat);
+      if (!hasWildcard) {
+        const v = process.env[pat];
+        if (typeof v === "string") base[pat] = v;
+        continue;
+      }
+      // Convert simple glob to RegExp: * -> .* and ? -> .
+      const reSrc =
+        "^" +
+        pat
+          .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+          .replace(/\\\*/g, ".*")
+          .replace(/\\\?/g, ".") +
+        "$";
+      let re: RegExp | null = null;
+      try {
+        re = new RegExp(reSrc);
+      } catch {
+        re = null;
+      }
+      if (!re) continue;
+      for (const k of envKeys) {
+        if (re.test(k)) {
+          const v = process.env[k];
+          if (typeof v === "string") base[k] = v;
+        }
+      }
     }
   }
   // Root config/env and spec.env overlay

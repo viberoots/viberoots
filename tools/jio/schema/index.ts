@@ -49,6 +49,7 @@ const JioSpecSchema: any = {
                   position: { type: "integer", minimum: 1 },
                   flag: { type: "boolean" },
                   flagName: { type: "string" },
+                  flagValueStyle: { type: "string", enum: ["equals", "separate"] },
                   booleanStyle: { type: "string", enum: ["presence", "equals"] },
                   collectionStyle: {
                     type: "string",
