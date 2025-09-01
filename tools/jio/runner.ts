@@ -154,6 +154,26 @@ export async function main(argv: string[]): Promise<number | void> {
     return 0;
   }
 
+  // PR2: MCP server entrypoint (stdio only)
+  if ((argv || []).includes("--mcp-server")) {
+    try {
+      const { startMcpServer } = await import("./mcp/server.ts");
+      await startMcpServer({
+        transport: "stdio",
+        timeoutMs: getNumericFlag(argv, "--timeout-ms"),
+        collectLimit: getNumericFlag(argv, "--collect-limit"),
+        collectBytes: getNumericFlag(argv, "--collect-bytes"),
+        cleanEnv: !argv.includes("--no-clean-env"),
+        passEnv: getRepeatedFlags(argv, "--pass-env"),
+        setEnv: Object.fromEntries(getKvFlags(argv, "--env")),
+      });
+      return 0;
+    } catch (e: any) {
+      console.error(String(e?.message || e));
+      return 78;
+    }
+  }
+
   const rootDir = await resolveRoot();
   const rootCfg = await readRootConfig(rootDir);
 
@@ -281,6 +301,40 @@ export async function main(argv: string[]): Promise<number | void> {
     setEnv: opts.setEnv,
   });
   return code;
+}
+
+function getNumericFlag(argv: string[], name: string): number | undefined {
+  const i = argv.indexOf(name);
+  if (i >= 0) {
+    const n = Number(argv[i + 1] || "");
+    if (Number.isFinite(n) && n >= 0) return Math.floor(n);
+  }
+  return undefined;
+}
+
+function getRepeatedFlags(argv: string[], name: string): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === name) {
+      const v = String(argv[i + 1] || "").trim();
+      if (v) out.push(v);
+      i++;
+    }
+  }
+  return out;
+}
+
+function getKvFlags(argv: string[], name: string): Array<[string, string]> {
+  const out: Array<[string, string]> = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === name) {
+      const v = String(argv[i + 1] || "");
+      const idx = v.indexOf("=");
+      if (idx > 0) out.push([v.slice(0, idx), v.slice(idx + 1)]);
+      i++;
+    }
+  }
+  return out;
 }
 
 function parseArgs(argv: string[]): CliOpts {

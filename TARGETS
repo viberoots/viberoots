@@ -111,6 +111,30 @@ zx_test(
 )
 
 zx_test(
+    name = "jio_mcp_register",
+    script = "tools/tests/jio.mcp.register.test.ts",
+    out = "jio_mcp_register.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_error_mapping",
+    script = "tools/tests/jio.mcp.error-mapping.test.ts",
+    out = "jio_mcp_error_mapping.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_stdio_json",
+    script = "tools/tests/jio.mcp.stdio.json.test.ts",
+    out = "jio_mcp_stdio_json.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_stdio_ndjson_collect",
+    script = "tools/tests/jio.mcp.stdio.ndjson-collect.test.ts",
+    out = "jio_mcp_stdio_ndjson_collect.stamp",
+)
+
+zx_test(
     name = "jio_core_build_argv_basic",
     script = "tools/tests/jio.core.build-argv.basic.test.ts",
     out = "jio_core_build_argv_basic.stamp",
