@@ -11,20 +11,49 @@ describe("jio mcp — http SSE POST behavior", () => {
     try {
       delete (process.env as any).JIO_MCP_HTTP_JSON_RESPONSE;
       const srv = await startMcpServer({ transport: "http", httpHost: host, httpPort: port });
+      await new Promise((r) => setTimeout(r, 200));
+      // Preflight GET to create session and get cookie
+      const pre = await new Promise<{ status: number; headers: any }>((resolve) => {
+        const req = http.request(
+          { method: "GET", host, port, path: "/mcp", headers: { accept: "text/event-stream" } },
+          (res) => {
+            const headers = res.headers;
+            res.resume();
+            resolve({ status: res.statusCode || 0, headers });
+            res.destroy();
+          },
+        );
+        req.on("error", () => resolve({ status: 0, headers: {} }));
+        req.end();
+      });
+      const cookie = pre.headers["set-cookie"]?.[0] || "";
       const { status, headers } = await postInit(host, port);
       if (status !== 200) {
         console.error("init failed", status);
         await srv?.close?.();
         process.exit(2);
       }
-      const { status: status2, headers: headers2 } = await postListTools(host, port);
+      const cookie2 = headers["set-cookie"]?.[0] || cookie || "";
+      // Extract session id from response headers or cookie (case-insensitive)
+      let sessionId =
+        (pre.headers as any)["mcp-session-id"] || (headers as any)["mcp-session-id"] || "";
+      if (Array.isArray(sessionId)) sessionId = sessionId[0] || "";
+      if (!sessionId && cookie2) {
+        const m = /mcp-session-id=([^;]+)/i.exec(cookie2);
+        if (m && m[1]) sessionId = m[1];
+      }
+      const {
+        status: status2,
+        headers: headers2,
+        body: body2,
+      } = await postListTools(host, port, cookie2, sessionId);
       if (status2 !== 200) {
-        console.error("listTools failed", status2);
+        console.error("listTools failed", status2, body2);
         await srv?.close?.();
         process.exit(2);
       }
       const ct = headers2["content-type"] || headers["content-type"];
-      // We expect SSE by default (text/event-stream)
+      // Expect SSE when client accepts SSE
       if (!ct || !String(ct).includes("text/event-stream")) {
         console.error("expected text/event-stream, got", ct);
         await srv?.close?.();
@@ -46,7 +75,10 @@ async function postInit(host: string, port: number) {
         host,
         port,
         path: "/mcp",
-        headers: { "content-type": "application/json", accept: "text/event-stream" },
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+        },
       },
       (res) => {
         res.resume();
@@ -69,19 +101,28 @@ async function postInit(host: string, port: number) {
   });
 }
 
-async function postListTools(host: string, port: number) {
-  return await new Promise<{ status: number; headers: any }>((resolve, reject) => {
+async function postListTools(host: string, port: number, cookie?: string, sessionId?: string) {
+  return await new Promise<{ status: number; headers: any; body: string }>((resolve, reject) => {
     const req = http.request(
       {
         method: "POST",
         host,
         port,
         path: "/mcp",
-        headers: { "content-type": "application/json", accept: "text/event-stream" },
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+          ...(cookie ? { cookie } : {}),
+          ...(sessionId ? { "Mcp-Session-Id": sessionId } : {}),
+        },
       },
       (res) => {
-        res.resume();
-        resolve({ status: res.statusCode || 0, headers: res.headers });
+        let data = "";
+        res.setEncoding("utf8");
+        res.on("data", (c) => (data += c));
+        res.on("end", () =>
+          resolve({ status: res.statusCode || 0, headers: res.headers, body: data }),
+        );
       },
     );
     req.on("error", reject);

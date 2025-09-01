@@ -29,22 +29,18 @@ describe("jio mcp — http cancel", () => {
       arguments: {},
       _meta: { progressToken: "p2" },
     } as any);
-    // send cancellation via POST (mimic notification)
-    // Use the explicit id from our pending request (the SDK assigns monotonically)
-    const cancelId = 3;
+    // send cancellation via POST (mimic notification). The SDK uses numeric ids starting at 1
+    const cancelId = 1;
     await postJson(host, port, {
       jsonrpc: "2.0",
       method: "notifications/cancelled",
       params: { requestId: cancelId },
     });
-    let failed = false;
-    try {
-      await req;
-    } catch {
-      failed = true;
-    }
-    if (!failed) {
-      console.error("expected cancellation error");
+    const result = await req.catch((e) => e);
+    const isError =
+      (result && result.isError) || result?.type === "error" || !!result?.error || !!result?.code;
+    if (!isError) {
+      console.error("expected cancellation error/result");
       await client.close().catch(() => {});
       await srv?.close?.();
       process.exit(2);

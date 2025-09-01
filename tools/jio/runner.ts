@@ -169,6 +169,17 @@ export async function main(argv: string[]): Promise<number | void> {
         cleanEnv: !argv.includes("--no-clean-env"),
         passEnv: getRepeatedFlags(argv, "--pass-env"),
         setEnv: Object.fromEntries(getKvFlags(argv, "--env")),
+        // PR4: server-level limits and concurrency
+        maxArgvTokens: getNumericFlag(argv, "--max-argv-tokens"),
+        maxArgvBytes: getNumericFlag(argv, "--max-argv-bytes"),
+        maxStdinBytes: getNumericFlag(argv, "--max-stdin-bytes"),
+        maxStdoutJsonBytes: getNumericFlag(argv, "--max-stdout-json-bytes"),
+        maxNdjsonLineBytes: getNumericFlag(argv, "--max-ndjson-line-bytes"),
+        maxItemsPerCall: getNumericFlag(argv, "--max-items-per-call"),
+        maxCollectBytes: getNumericFlag(argv, "--collect-bytes"),
+        maxConcurrentCalls: getNumericFlag(argv, "--max-concurrent-calls"),
+        queueSize: getNumericFlag(argv, "--queue-size"),
+        queueTimeoutMs: getNumericFlag(argv, "--queue-timeout-ms"),
       });
       return; // keep process alive for server
     } catch (e: any) {

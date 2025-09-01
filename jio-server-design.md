@@ -76,7 +76,8 @@ jio --mcp-server [--transport=stdio|http] [--http-port=3000] [--http-host=127.0.
                  [--timeout-ms N]
                  [--max-stdin-bytes N] [--max-stdout-json-bytes N]
                  [--max-ndjson-line-bytes N] [--max-argv-tokens N] [--max-argv-bytes N]
-                 [--max-concurrent-calls N] [--max-items-per-call N]
+                 [--max-concurrent-calls N] [--queue-size N] [--queue-timeout-ms N]
+                 [--max-items-per-call N] [--collect-bytes N]
                  [--default-collect] [--strict-ndjson] [--safe-mode]
                  [--log-level=info|debug]
 ```
@@ -176,6 +177,28 @@ When Ajv reports missing/invalid fields, the server can send an elicitation requ
 
 - `JIO_MCP_HTTP_JSON_RESPONSE`: when set to `1`, the HTTP MCP transport responds with JSON bodies instead of SSE streams. Useful for debugging and simple clients.
 - `JIO_MCP_PROGRESS`: when set to `0`, progress notifications are disabled even when clients provide a `_meta.progressToken`.
+
+## Server limits and concurrency
+
+Server-level knobs can override per-spec limits and control throughput:
+
+- Limits (precedence: server flag > spec default):
+  - `--max-stdin-bytes N`
+  - `--max-stdout-json-bytes N`
+  - `--max-ndjson-line-bytes N`
+  - `--max-argv-tokens N`
+  - `--max-argv-bytes N`
+  - `--max-items-per-call N` (collectItems)
+  - `--collect-bytes N` (collectBytes)
+- Concurrency:
+  - `--max-concurrent-calls N` (default: unlimited)
+  - `--queue-size N` (default: 0 → immediate rejection when full)
+  - `--queue-timeout-ms N` (default: 0)
+
+Behavior:
+
+- When the server is busy and queue is full, requests are rejected (HTTP 503/SSE error; stdio: MCP error).
+- With a non-zero queue, waiting requests are admitted FIFO up to `queue-size`; if not admitted before `queue-timeout-ms`, they are rejected.
 
 ## Configuration Precedence
 

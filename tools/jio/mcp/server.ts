@@ -18,6 +18,17 @@ export type McpServerOpts = {
   cleanEnv?: boolean;
   passEnv?: string[];
   setEnv?: Record<string, string>;
+  // PR4: server-level limits and concurrency
+  maxArgvTokens?: number;
+  maxArgvBytes?: number;
+  maxStdinBytes?: number;
+  maxStdoutJsonBytes?: number;
+  maxNdjsonLineBytes?: number;
+  maxItemsPerCall?: number;
+  maxCollectBytes?: number;
+  maxConcurrentCalls?: number;
+  queueSize?: number;
+  queueTimeoutMs?: number;
 };
 
 async function readVersion(): Promise<string> {
@@ -54,6 +65,51 @@ export async function startMcpServer(
       (mcp as any).server?.registerCapabilities?.({ tools: { listChanged: true } });
     } catch {}
     const ajv = new Ajv({ strict: true, allErrors: true });
+    // PR4: simple fair semaphore for concurrency control
+    const maxConcurrent = Number.isFinite(opts.maxConcurrentCalls as number)
+      ? Math.max(0, opts.maxConcurrentCalls as number)
+      : 0; // 0 = unlimited
+    const queueSize = Number.isFinite(opts.queueSize as number)
+      ? Math.max(0, opts.queueSize as number)
+      : 0;
+    const queueTimeoutMs = Number.isFinite(opts.queueTimeoutMs as number)
+      ? Math.max(0, opts.queueTimeoutMs as number)
+      : 0;
+    let inFlight = 0;
+    const waitQueue: Array<{
+      res: (v: () => void) => void;
+      rej: (e: any) => void;
+      t?: NodeJS.Timeout;
+    }> = [];
+    const release = () => {
+      inFlight = Math.max(0, inFlight - 1);
+      const next = waitQueue.shift();
+      if (next) {
+        clearTimeout(next.t as any);
+        inFlight++;
+        next.res(() => release());
+      }
+    };
+    const acquire = async (): Promise<() => void> => {
+      if (!maxConcurrent || inFlight < maxConcurrent) {
+        inFlight++;
+        return () => release();
+      }
+      if (waitQueue.length >= queueSize) {
+        throw Object.assign(new Error("Server busy"), { code: "ServerBusy" });
+      }
+      return await new Promise<() => void>((res, rej) => {
+        const entry: any = { res, rej };
+        if (queueTimeoutMs > 0) {
+          entry.t = setTimeout(() => {
+            const idx = waitQueue.indexOf(entry);
+            if (idx >= 0) waitQueue.splice(idx, 1);
+            rej(Object.assign(new Error("Queue timeout"), { code: "QueueTimeout" }));
+          }, queueTimeoutMs);
+        }
+        waitQueue.push(entry);
+      });
+    };
     const inflight = new Map<string, { cancelled: boolean }>();
     const keyForId = (id: any): string => (typeof id === "string" ? id : String(id));
     try {
@@ -98,6 +154,16 @@ export async function startMcpServer(
       };
 
       registerWith(async (args: any, extra: any) => {
+        // Concurrency gate
+        let done: (() => void) | null = null;
+        try {
+          if (maxConcurrent) done = await acquire();
+        } catch (e: any) {
+          return {
+            type: "error",
+            error: { type: "Error", message: String(e?.message || "Server busy") },
+          } as any;
+        }
         try {
           const explicitId = extra?.request?.id as any;
           const reqId =
@@ -107,6 +173,11 @@ export async function startMcpServer(
           if (k !== undefined && inflight.get(k)?.cancelled) {
             return { isError: true, content: [{ type: "text", text: "cancelled" }] } as any;
           }
+          // Hold permit briefly for concurrency testing if configured
+          try {
+            const d = Number(process.env.JIO_MCP_TEST_DELAY_MS || "0");
+            if (Number.isFinite(d) && d > 0) await new Promise((r) => setTimeout(r, d));
+          } catch {}
           if (validateIn && !validateIn(args)) {
             const err = (validateIn.errors && validateIn.errors[0]) || { message: "invalid" };
             return {
@@ -146,7 +217,15 @@ export async function startMcpServer(
             {
               collect: true,
               collectLimit: opts.collectLimit,
-              limits: { collectItems: opts.collectLimit, collectBytes: opts.collectBytes },
+              limits: {
+                collectItems: (opts.maxItemsPerCall as any) ?? opts.collectLimit,
+                collectBytes: (opts.maxCollectBytes as any) ?? opts.collectBytes,
+                maxArgvTokens: opts.maxArgvTokens as any,
+                maxArgvBytes: opts.maxArgvBytes as any,
+                maxStdinBytes: opts.maxStdinBytes as any,
+                maxStdoutJsonBytes: opts.maxStdoutJsonBytes as any,
+                maxNdjsonLineBytes: opts.maxNdjsonLineBytes as any,
+              },
               timeoutMsOverride: opts.timeoutMs,
               cleanEnv: opts.cleanEnv !== false,
               passEnv: opts.passEnv || [],
@@ -232,6 +311,9 @@ export async function startMcpServer(
           } as any;
         } finally {
           try {
+            if (done) done();
+          } catch {}
+          try {
             const explicitId = extra?.request?.id as any;
             const reqId =
               explicitId ?? (extra && (extra.relatedRequestId ?? extra.id ?? extra.requestId));
@@ -263,7 +345,8 @@ export async function startMcpServer(
       enableDnsRebindingProtection: true,
       allowedHosts: allowedHosts.length ? allowedHosts : defaultAllowedHosts,
       allowedOrigins: allowedOrigins.length ? allowedOrigins : undefined,
-    });
+      enableCookies: true,
+    } as any);
     await mcp.connect(transport as any);
 
     const httpServer = createServer(async (req, res) => {
@@ -312,6 +395,22 @@ export async function startMcpServer(
     (server as any).server?.registerCapabilities?.({ tools: {} });
   } catch {}
   const ajv = new Ajv({ strict: true, allErrors: true });
+  // PR4: apply same limits and optional concurrency gate for stdio
+  const maxConcurrent = Number.isFinite(opts.maxConcurrentCalls as number)
+    ? Math.max(0, opts.maxConcurrentCalls as number)
+    : 0;
+  let inFlight = 0;
+  const tryAcquire = (): boolean => {
+    if (!maxConcurrent) return true;
+    if (inFlight < maxConcurrent) {
+      inFlight++;
+      return true;
+    }
+    return false;
+  };
+  const release = () => {
+    if (maxConcurrent) inFlight = Math.max(0, inFlight - 1);
+  };
 
   for (const [fq, spec] of specs) {
     const inputSchema = spec.tool?.inputSchema || generateInputSchemaFromParameters(spec);
@@ -373,6 +472,9 @@ export async function startMcpServer(
 
     registerWith(async (args: any) => {
       try {
+        if (!tryAcquire()) {
+          return { type: "error", error: { type: "Error", message: "Server busy" } } as any;
+        }
         if (validateIn && !validateIn(args)) {
           const err = (validateIn.errors && validateIn.errors[0]) || { message: "invalid" };
           return {
@@ -411,8 +513,13 @@ export async function startMcpServer(
           collect: !!isNdjson,
           collectLimit: opts.collectLimit,
           limits: {
-            collectItems: opts.collectLimit,
-            collectBytes: opts.collectBytes,
+            collectItems: (opts.maxItemsPerCall as any) ?? opts.collectLimit,
+            collectBytes: (opts.maxCollectBytes as any) ?? opts.collectBytes,
+            maxArgvTokens: opts.maxArgvTokens as any,
+            maxArgvBytes: opts.maxArgvBytes as any,
+            maxStdinBytes: opts.maxStdinBytes as any,
+            maxStdoutJsonBytes: opts.maxStdoutJsonBytes as any,
+            maxNdjsonLineBytes: opts.maxNdjsonLineBytes as any,
           },
           timeoutMsOverride: opts.timeoutMs,
           cleanEnv: opts.cleanEnv !== false,
@@ -444,6 +551,10 @@ export async function startMcpServer(
         }
       } catch (e: any) {
         return { isError: true, content: [{ type: "text", text: String(e?.message || e) }] } as any;
+      } finally {
+        try {
+          release();
+        } catch {}
       }
     });
   }

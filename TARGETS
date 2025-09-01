@@ -600,3 +600,52 @@ zx_test(
 )
 
 ## removed: json_cli_parent_stdio_epipe (redundant with jio.epipe.test.ts)
+
+# PR3/PR4 MCP HTTP/stdio additional tests
+zx_test(
+    name = "jio_mcp_http_sse_behavior",
+    script = "tools/tests/jio.mcp.http.sse.behavior.test.ts",
+    out = "jio_mcp_http_sse_behavior.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_http_sse_post",
+    script = "tools/tests/jio.mcp.http.sse.post.test.ts",
+    out = "jio_mcp_http_sse_post.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_http_cancel",
+    script = "tools/tests/jio.mcp.http.cancel.test.ts",
+    out = "jio_mcp_http_cancel.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_http_progress",
+    script = "tools/tests/jio.mcp.http.progress.test.ts",
+    out = "jio_mcp_http_progress.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_http_concurrency",
+    script = "tools/tests/jio.mcp.http.concurrency.test.ts",
+    out = "jio_mcp_http_concurrency.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_stdio_concurrency",
+    script = "tools/tests/jio.mcp.stdio.concurrency.test.ts",
+    out = "jio_mcp_stdio_concurrency.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_http_queue_timeout",
+    script = "tools/tests/jio.mcp.http.queue-timeout.test.ts",
+    out = "jio_mcp_http_queue_timeout.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_http_limits_precedence",
+    script = "tools/tests/jio.mcp.http.limits-precedence.test.ts",
+    out = "jio_mcp_http_limits_precedence.stamp",
+)
