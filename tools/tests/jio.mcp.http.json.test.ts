@@ -38,8 +38,8 @@ describe("jio mcp — http json (non-streaming)", () => {
       } catch {}
       process.exit(2);
     }
-    const url = `http://${host}:${port}/mcp`;
-    const transport = new StreamableHTTPClientTransport(url, {} as any);
+    const url = new URL(`http://${host}:${port}/mcp`);
+    const transport = new StreamableHTTPClientTransport(url as any, {} as any);
     const client = new Client({ name: "test", version: "0.0.0" });
     console.error("connecting...");
     await client.connect(transport as any);
@@ -60,7 +60,8 @@ describe("jio mcp — http json (non-streaming)", () => {
     const result = await client.callTool({
       name: ls?.name || "io.example.examples.ls",
       arguments: {},
-    });
+      _meta: { progressToken: "t1" } as any,
+    } as any);
     console.error("callTool done");
     if (!result || (result.structuredContent == null && result.content == null)) {
       console.error("callTool unexpected", result);

@@ -148,6 +148,11 @@ sequenceDiagram
 
 Cancellation: client closes the stream → Server aborts with SIGTERM → after 5s, SIGKILL.
 
+### Cancellation result semantics
+
+- When a request is cancelled via `notifications/cancelled { requestId }`, the server attempts to terminate the underlying process group (stdin close, SIGTERM, then SIGKILL after 5s).
+- The call resolves with an error result (non‑zero exit mapped to MCP error), and no final `notifications/progress` “done” message is emitted.
+
 ## Elicitation (Optional)
 
 When Ajv reports missing/invalid fields, the server can send an elicitation request (message + focused schema) allowing the client to complete or correct arguments. This follows the SDK’s elicitation pattern (see examples in the SDK repo: https://github.com/modelcontextprotocol/typescript-sdk). If the client declines, the server returns a structured InvalidInput error.
@@ -166,6 +171,11 @@ When Ajv reports missing/invalid fields, the server can send an elicitation requ
 - Logging: `--log-level=debug` enables structured JSON logs for spawn/terminate/exit and sink summaries.
 - HTTP transport is localhost-only by default (`--http-host=127.0.0.1`). To bind externally, specify `--http-host` explicitly.
 - Strict streaming caps: NDJSON/streaming responses enforce hard limits by default (per-call item cap via `--max-items-per-call`, byte caps via `--max-stdout-json-bytes`/`--max-ndjson-line-bytes`). On cap breach, the server terminates the call with a structured error and summary.
+
+## Environment knobs
+
+- `JIO_MCP_HTTP_JSON_RESPONSE`: when set to `1`, the HTTP MCP transport responds with JSON bodies instead of SSE streams. Useful for debugging and simple clients.
+- `JIO_MCP_PROGRESS`: when set to `0`, progress notifications are disabled even when clients provide a `_meta.progressToken`.
 
 ## Configuration Precedence
 

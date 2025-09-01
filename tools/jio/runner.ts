@@ -1298,6 +1298,14 @@ type RunnerRuntimeOptions = {
   stdoutTarget?: NodeJS.WritableStream;
   stderrTarget?: NodeJS.WritableStream;
   inputSource?: NodeJS.ReadableStream;
+  // PR3.2: optional cancellation and progress hooks
+  isCancelled?: () => boolean;
+  onProgress?: (info: {
+    items?: number;
+    bytes?: number;
+    message?: string;
+    progress?: number;
+  }) => void;
 };
 
 export async function runWithTransforms(
@@ -1539,6 +1547,22 @@ export async function runWithTransforms(
   const timeoutMs = runtime.timeoutMsOverride || spec.command?.timeoutMs;
   let localTimedOut = false;
   let localKiller: NodeJS.Timeout | null = null;
+  // PR3.2: external cancellation support
+  let localCancelled = false;
+  let cancelPoll: NodeJS.Timeout | null = null;
+  if (typeof (runtime as any).isCancelled === "function") {
+    cancelPoll = setInterval(() => {
+      try {
+        if (!localCancelled && (runtime as any).isCancelled && (runtime as any).isCancelled()) {
+          localCancelled = true;
+          try {
+            (sink as any)?.endInput?.();
+          } catch {}
+          terminateProcs(procs);
+        }
+      } catch {}
+    }, 50);
+  }
   const localTimeoutPromise: Promise<"TIMEOUT"> | null =
     timeoutMs && timeoutMs > 0
       ? new Promise<"TIMEOUT">((res) => {
@@ -1785,6 +1809,8 @@ export async function runWithTransforms(
       sink,
       finalizeFailureSink,
       localTimedOut,
+      isCancelled: () =>
+        localCancelled || ((runtime as any).isCancelled ? !!(runtime as any).isCancelled() : false),
     });
     if (typeof result === "number") return result;
   } else if (st && st.format === "json") {
@@ -1796,6 +1822,8 @@ export async function runWithTransforms(
       sink,
       finalizeFailureSink,
       localTimedOut,
+      isCancelled: () =>
+        localCancelled || ((runtime as any).isCancelled ? !!(runtime as any).isCancelled() : false),
       markStdoutParseFailed: () => {
         stdoutParseFailed = true;
       },
@@ -1897,6 +1925,9 @@ export async function runWithTransforms(
     mgr.clear();
     setCurrentManager(null);
   } catch {}
+  try {
+    if (cancelPoll) clearInterval(cancelPoll);
+  } catch {}
   return exitCode || cCode || p1Code || p2Code;
 }
 
@@ -1908,10 +1939,12 @@ type HandleNdjsonArgs = {
   sink: any;
   finalizeFailureSink: () => Promise<void>;
   localTimedOut: boolean;
+  isCancelled: () => boolean;
 };
 
 async function handleStdoutNdjson(args: HandleNdjsonArgs): Promise<number | void> {
-  const { p2, limits, validate, runtime, sink, finalizeFailureSink, localTimedOut } = args;
+  const { p2, limits, validate, runtime, sink, finalizeFailureSink, localTimedOut, isCancelled } =
+    args;
   let buffer = "";
   let sawFirstLine = false;
   let arrayStarted = false;
@@ -1926,6 +1959,10 @@ async function handleStdoutNdjson(args: HandleNdjsonArgs): Promise<number | void
       process.stderr.write("jio: ndjson line bytes limit exceeded (stream)\n");
       await finalizeFailureSink();
       return 78;
+    }
+    if (isCancelled()) {
+      await finalizeFailureSink();
+      return 124;
     }
     while (true) {
       const nl = buffer.indexOf("\n");
@@ -1964,6 +2001,18 @@ async function handleStdoutNdjson(args: HandleNdjsonArgs): Promise<number | void
       ) {
         // tolerated invalid line
       }
+      try {
+        if ((runtime as any).onProgress)
+          (runtime as any).onProgress({
+            items: itemsEmitted,
+            bytes: bytesCollected,
+            message: "processing",
+          });
+      } catch {}
+      if (isCancelled()) {
+        await finalizeFailureSink();
+        return 124;
+      }
     }
     if (localTimedOut) {
       await finalizeFailureSink();
@@ -1971,6 +2020,10 @@ async function handleStdoutNdjson(args: HandleNdjsonArgs): Promise<number | void
     }
   }
   if (localTimedOut) {
+    await finalizeFailureSink();
+    return 124;
+  }
+  if (isCancelled()) {
     await finalizeFailureSink();
     return 124;
   }
@@ -2154,6 +2207,7 @@ async function handleStdoutJson(args: {
   sink: any;
   finalizeFailureSink: () => Promise<void>;
   localTimedOut: boolean;
+  isCancelled: () => boolean;
   markStdoutParseFailed: () => void;
 }): Promise<number | void> {
   const {
@@ -2164,11 +2218,19 @@ async function handleStdoutJson(args: {
     sink,
     finalizeFailureSink,
     localTimedOut,
+    isCancelled,
     markStdoutParseFailed,
   } = args;
   const chunks: Buffer[] = [];
   let total = 0;
   for await (const chunk of p2.stdout) {
+    if (isCancelled()) {
+      try {
+        (p2 as any)?.stdout?.destroy?.();
+      } catch {}
+      await finalizeFailureSink();
+      return 124;
+    }
     if (localTimedOut) {
       try {
         (p2 as any)?.stdout?.destroy?.();

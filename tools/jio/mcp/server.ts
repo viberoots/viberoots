@@ -46,11 +46,25 @@ export async function startMcpServer(
     // Build MCP server and register tools
     const { dir, cfg, specs, index } = await discoverJioTools();
     const Mcp = (await import("@modelcontextprotocol/sdk/server/mcp.js")).McpServer;
+    const { CancelledNotificationSchema, ProgressNotificationSchema } = await import(
+      "@modelcontextprotocol/sdk/types.js"
+    );
     const mcp = new Mcp({ name: "jio-mcp", version: await readVersion() });
     try {
       (mcp as any).server?.registerCapabilities?.({ tools: { listChanged: true } });
     } catch {}
     const ajv = new Ajv({ strict: true, allErrors: true });
+    const inflight = new Map<string, { cancelled: boolean }>();
+    const keyForId = (id: any): string => (typeof id === "string" ? id : String(id));
+    try {
+      (mcp as any).server?.setNotificationHandler?.(
+        CancelledNotificationSchema,
+        async (notification: any) => {
+          const id = notification?.params?.requestId;
+          if (id !== undefined && id !== null) inflight.set(keyForId(id), { cancelled: true });
+        },
+      );
+    } catch {}
 
     for (const [fq, spec] of specs) {
       const inputSchema = spec.tool?.inputSchema || generateInputSchemaFromParameters(spec);
@@ -83,8 +97,16 @@ export async function startMcpServer(
         return (mcp as any).tool(fq, description, cb);
       };
 
-      registerWith(async (args: any) => {
+      registerWith(async (args: any, extra: any) => {
         try {
+          const explicitId = extra?.request?.id as any;
+          const reqId =
+            explicitId ?? (extra && (extra.relatedRequestId ?? extra.id ?? extra.requestId));
+          const k = reqId !== undefined ? keyForId(reqId) : undefined;
+          if (k !== undefined && !inflight.has(k)) inflight.set(k, { cancelled: false });
+          if (k !== undefined && inflight.get(k)?.cancelled) {
+            return { isError: true, content: [{ type: "text", text: "cancelled" }] } as any;
+          }
           if (validateIn && !validateIn(args)) {
             const err = (validateIn.errors && validateIn.errors[0]) || { message: "invalid" };
             return {
@@ -113,6 +135,7 @@ export async function startMcpServer(
           let err = "";
           outStream.on("data", (b) => (out += Buffer.from(b as any).toString("utf8")));
           errStream.on("data", (b) => (err += Buffer.from(b as any).toString("utf8")));
+          const progressToken = args?._meta?.progressToken;
           const code = await runWithTransforms(
             dir,
             specPath,
@@ -131,9 +154,53 @@ export async function startMcpServer(
               stdoutTarget: outStream as any,
               stderrTarget: errStream as any,
               inputSource: inStream as any,
+              isCancelled: () => (k !== undefined && inflight.get(k)?.cancelled) || false,
+              onProgress:
+                progressToken && process.env.JIO_MCP_PROGRESS !== "0"
+                  ? (info: {
+                      items?: number;
+                      bytes?: number;
+                      message?: string;
+                      progress?: number;
+                    }) => {
+                      try {
+                        if ((mcp as any).server?.notification) {
+                          (mcp as any).server.notification({
+                            method: "notifications/progress",
+                            params: {
+                              progress: info.progress ?? undefined,
+                              message: info.message || undefined,
+                              progressToken,
+                            },
+                          });
+                        }
+                      } catch {}
+                    }
+                  : undefined,
             } as any,
           );
           if (code && code !== 0) return mapExit(code);
+          // optional progress completion notice if client requested
+          try {
+            if (process.env.JIO_MCP_PROGRESS !== "0") {
+              const token = args?._meta?.progressToken;
+              if (token && (mcp as any).server?.notification) {
+                try {
+                  await (mcp as any).server.notification(
+                    ProgressNotificationSchema.parse({
+                      method: "notifications/progress",
+                      params: { progress: 1, message: "done", progressToken: token },
+                    }),
+                  );
+                } catch {
+                  await (mcp as any).server.notification({
+                    method: "notifications/progress",
+                    params: { progress: 1, message: "done", progressToken: token },
+                  });
+                }
+              }
+            }
+          } catch {}
           try {
             const obj = out ? JSON.parse(out) : null;
             if (validateOut && obj != null) {
@@ -148,6 +215,9 @@ export async function startMcpServer(
                 } as any;
               }
             }
+            if (k !== undefined && inflight.get(k)?.cancelled) {
+              return { isError: true, content: [{ type: "text", text: "cancelled" }] } as any;
+            }
             return { structuredContent: obj } as any;
           } catch {
             return {
@@ -160,6 +230,13 @@ export async function startMcpServer(
             isError: true,
             content: [{ type: "text", text: String(e?.message || e) }],
           } as any;
+        } finally {
+          try {
+            const explicitId = extra?.request?.id as any;
+            const reqId =
+              explicitId ?? (extra && (extra.relatedRequestId ?? extra.id ?? extra.requestId));
+            if (reqId !== undefined) inflight.delete(keyForId(reqId));
+          } catch {}
         }
       });
     }
@@ -179,9 +256,10 @@ export async function startMcpServer(
       .map((s) => s.trim())
       .filter(Boolean);
 
+    const forceJson = process.env.JIO_MCP_HTTP_JSON_RESPONSE === "1";
     const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined, // stateless for PR3.1
-      enableJsonResponse: true,
+      sessionIdGenerator: () => `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      enableJsonResponse: !!forceJson,
       enableDnsRebindingProtection: true,
       allowedHosts: allowedHosts.length ? allowedHosts : defaultAllowedHosts,
       allowedOrigins: allowedOrigins.length ? allowedOrigins : undefined,
