@@ -1,21 +1,37 @@
 #!/usr/bin/env zx-wrapper
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { spawn } from "node:child_process";
 
 describe("jio mcp — stdio ndjson collect", () => {
-  test("starts stdio server", async () => {
-    const p = spawn("jio", ["--mcp-server"], { stdio: ["ignore", "pipe", "pipe"] });
-    let ok = false;
-    p.on("spawn", () => {
-      ok = true;
-      try {
-        p.kill("SIGTERM");
-      } catch {}
+  test("invoke NDJSON tool and get collected array", async () => {
+    const transport = new StdioClientTransport({
+      command: "jio",
+      args: ["--mcp-server"],
+      stderr: "pipe",
+      env: {
+        ...(process.env as any),
+        JIO_ROOT: (process.env.WORKSPACE_ROOT as string) || process.cwd(),
+      },
     });
-    await new Promise<void>((res) => p.on("close", () => res()));
-    if (!ok) {
-      console.error("failed to start stdio server");
+    const client = new Client({ name: "test", version: "0.0.0" });
+    await client.connect(transport);
+    const tools = await client.listTools({});
+    const ndTool = tools.tools.find((t: any) => t.name === "io.example.examples.ls");
+    if (!ndTool) {
+      console.error("no ndjson tools registered");
+      await transport.close();
       process.exit(2);
     }
+    const res = await client.callTool({ name: ndTool.name, arguments: {} });
+    if (!res || (res.structuredContent == null && !Array.isArray((res as any).content))) {
+      console.error("expected collected content", res);
+      await transport.close();
+      process.exit(2);
+    }
+    // If collected array, ensure it is an array
+    if ((res as any).content != null) assert.ok(Array.isArray((res as any).content));
+    await transport.close();
   });
 });

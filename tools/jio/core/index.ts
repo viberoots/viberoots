@@ -1,20 +1,21 @@
+export { getEffectiveLimits } from "../runner.ts";
+export { buildArgv, enforceArgvCaps } from "./argv.ts";
 export {
-  buildArgv,
-  buildChildEnv,
   buildIndex,
-  buildShellArgsWithScript,
-  computeExecCommand,
-  enforceArgvCaps,
   findToolSpecs,
-  getEffectiveLimits,
-  makeShellSetFlags,
   readRootConfig,
   readSpec,
-  resolvePreferredShell,
   resolveRoot,
-  runWithTransforms,
-  waitProcess,
-} from "../runner.ts";
+  resolveToolRef,
+} from "./discovery.ts";
+export {
+  buildChildEnv,
+  buildShellArgsWithScript,
+  computeExecCommand,
+  makeShellSetFlags,
+  resolvePreferredShell,
+} from "./env.ts";
+export { openFailureSink, runWithTransforms, waitProcess } from "./run.ts";
 
 export type { ParameterSpec, RootConfig, ToolSpec } from "../runner.ts";
 
@@ -25,8 +26,8 @@ export {
 } from "../schema/index.ts";
 
 export async function discoverJioTools(rootDir?: string) {
-  const dir = rootDir || (await (await import("../runner.ts")).resolveRoot());
-  const { readRootConfig, buildIndex, readSpec } = await import("../runner.ts");
+  const { resolveRoot, readRootConfig, buildIndex, readSpec } = await import("./discovery.ts");
+  const dir = rootDir || (await resolveRoot());
   const cfg = await readRootConfig(dir);
   const index = await buildIndex(dir, cfg);
   const specs = new Map<string, any>();

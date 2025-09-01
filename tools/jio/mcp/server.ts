@@ -1,12 +1,12 @@
 import Ajv from "ajv";
+import { PassThrough } from "node:stream";
 import {
   buildArgv,
   discoverJioTools,
   generateInputSchemaFromParameters,
   runWithTransforms,
-  type RootConfig,
-  type ToolSpec,
 } from "../core/index.ts";
+import { emitZodWarning, getZodRawShape, jsonSchemaToZodSafe } from "./schema.ts";
 
 export type McpServerOpts = {
   transport?: "stdio";
@@ -20,10 +20,22 @@ export type McpServerOpts = {
   setEnv?: Record<string, string>;
 };
 
+async function readVersion(): Promise<string> {
+  try {
+    const { readFile } = await import("node:fs/promises");
+    const { resolve } = await import("node:path");
+    const pkgPath = resolve(process.cwd(), "package.json");
+    const txt = await readFile(pkgPath, "utf8");
+    const pkg = JSON.parse(txt);
+    if (pkg && typeof pkg.version === "string") return pkg.version as string;
+  } catch {}
+  return "0.0.0";
+}
+
 export async function startMcpServer(
   opts: McpServerOpts = {},
-): Promise<{ close?: () => Promise<void> }> {
-  if (opts.transport === "http") {
+): Promise<{ close?: () => Promise<void> } | void> {
+  if ((opts as any).transport === "http") {
     const { createServer } = await import("node:http");
     const host = opts.httpHost || "127.0.0.1";
     const port = Number.isFinite(opts.httpPort as number) ? (opts.httpPort as number) : 3000;
@@ -74,82 +86,152 @@ export async function startMcpServer(
   // default to stdio using MCP SDK
   const { McpServer } = await import("@modelcontextprotocol/sdk/server/mcp.js");
   const { StdioServerTransport } = await import("@modelcontextprotocol/sdk/server/stdio.js");
-  const { dir, cfg, specs } = await discoverJioTools();
-  const server = new McpServer({ name: "jio-mcp", version: "0.1.0" });
+  const { dir, cfg, specs, index } = await discoverJioTools();
+  const server = new McpServer({ name: "jio-mcp", version: await readVersion() });
+  try {
+    (server as any).server?.registerCapabilities?.({ tools: {} });
+  } catch {}
   const ajv = new Ajv({ strict: true, allErrors: true });
 
   for (const [fq, spec] of specs) {
     const inputSchema = spec.tool?.inputSchema || generateInputSchemaFromParameters(spec);
     const description = spec.tool?.description || fq;
     const validateIn = inputSchema ? ajv.compile(inputSchema) : null;
+    const outputSchema = spec.tool?.outputSchema || null;
+    const validateOut = outputSchema ? ajv.compile(outputSchema) : null;
 
-    server.tool({
-      name: fq,
-      description,
-      schema: inputSchema || { type: "object" },
-      handler: async ({ args }) => {
+    let maybeParams: any | undefined = undefined;
+    let maybeOutput: any | undefined = undefined;
+    if (inputSchema && process.env.JIO_MCP_ZOD !== "0") {
+      const conv = await jsonSchemaToZodSafe(inputSchema);
+      if (conv.zod) {
+        // Convert Zod object to the SDK's expected raw shape (ZodRawShape)
+        // The SDK wraps with z.object() internally.
+        const shape = getZodRawShape(conv.zod);
+        if (shape && typeof shape === "object") {
+          maybeParams = shape;
+        }
+      } else if (conv.reasons && conv.reasons.length) {
+        emitZodWarning({ tool: fq, reasons: conv.reasons, schema: inputSchema, kind: "input" });
+      }
+    }
+
+    if (outputSchema && process.env.JIO_MCP_ZOD !== "0") {
+      const conv = await jsonSchemaToZodSafe(outputSchema);
+      if (conv.zod) {
+        const shape = getZodRawShape(conv.zod);
+        if (shape && typeof shape === "object") {
+          maybeOutput = shape;
+        } else {
+          emitZodWarning({
+            tool: fq,
+            reasons: [{ keyword: "rootType", pointer: "", note: "non-object" }],
+            schema: outputSchema,
+            kind: "output",
+          });
+        }
+      } else if (conv.reasons && conv.reasons.length) {
+        emitZodWarning({ tool: fq, reasons: conv.reasons, schema: outputSchema, kind: "output" });
+      }
+    }
+
+    const registerWith = (cb: any) => {
+      if (maybeParams || maybeOutput) {
+        // Prefer config-style API when we have any schema to pass explicitly
+        return (server as any).registerTool(
+          fq,
+          {
+            description,
+            inputSchema: maybeParams,
+            outputSchema: maybeOutput,
+          },
+          cb,
+        );
+      }
+      return (server as any).tool(fq, description, cb);
+    };
+
+    registerWith(async (args: any) => {
+      try {
+        if (validateIn && !validateIn(args)) {
+          const err = (validateIn.errors && validateIn.errors[0]) || { message: "invalid" };
+          return {
+            type: "error",
+            error: {
+              type: "InvalidInput",
+              message: JSON.stringify(err),
+            },
+          } as any;
+        }
+
+        // Use core to build argv and run with transforms, capturing output to avoid polluting MCP stdio.
+        const specPath = (index as Map<string, string>).get(fq);
+        if (!specPath) {
+          return { type: "error", error: { type: "NotFound", message: "spec not found" } } as any;
+        }
+        const invObj = args ?? {};
+        let argv: string[];
         try {
-          if (validateIn && !validateIn(args)) {
-            const err = (validateIn.errors && validateIn.errors[0]) || { message: "invalid" };
-            return {
-              type: "error",
-              error: {
-                type: "InvalidInput",
-                message: JSON.stringify(err),
-              },
-            } as any;
-          }
-
-          // Execute via jio CLI in a child process so MCP stdio remains clean.
-          const { spawn } = await import("node:child_process");
-          const { tmpdir } = await import("node:os");
-          const { writeFile, mkdtemp } = await import("node:fs/promises");
-          const { join } = await import("node:path");
-          const tmp = await mkdtemp(join(tmpdir(), "jio-mcp-"));
-          const inPath = join(tmp, "invocation.json");
-          await writeFile(inPath, JSON.stringify(args ?? {}), "utf8");
-          const isNdjson = spec.command?.stdoutTransform?.format === "ndjson";
-          const cliArgs: string[] = [fq, "--in", inPath];
-          if (isNdjson) cliArgs.push("--collect");
-          if (typeof opts.timeoutMs === "number")
-            cliArgs.push("--timeout-ms", String(opts.timeoutMs));
-          if (typeof opts.collectLimit === "number")
-            cliArgs.push("--collect-limit", String(opts.collectLimit));
-          if (typeof opts.collectBytes === "number")
-            cliArgs.push("--collect-bytes", String(opts.collectBytes));
-          if (opts.cleanEnv === false) cliArgs.push("--no-clean-env");
-          for (const name of opts.passEnv || []) cliArgs.push("--pass-env", name);
-          for (const [k, v] of Object.entries(opts.setEnv || {}))
-            cliArgs.push("--env", `${k}=${v}`);
-          const p = spawn("jio", cliArgs, { stdio: ["ignore", "pipe", "pipe"] });
-          let out = "";
-          let err = "";
-          p.stdout.on("data", (b: any) => (out += Buffer.from(b).toString("utf8")));
-          p.stderr.on("data", (b: any) => (err += Buffer.from(b).toString("utf8")));
-          const code: number = await new Promise((res) => p.on("close", (c) => res(c ?? 0)));
-          if (code && code !== 0) return mapExit(code);
-          try {
-            const obj = out ? JSON.parse(out) : null;
-            return { type: "json", content: obj } as any;
-          } catch {
-            // If output wasn't JSON, return an error with captured stderr snippet
-            return {
-              type: "error",
-              error: { type: "OutputParseError", message: err || "invalid JSON output" },
-            } as any;
-          }
+          argv = buildArgv(spec as any, invObj);
         } catch (e: any) {
           return {
             type: "error",
-            error: { type: "TransformError", message: String(e?.message || e) },
+            error: { type: "ConfigError", message: String(e?.message || e) },
           } as any;
         }
-      },
+        const isNdjson = spec.command?.stdoutTransform?.format === "ndjson";
+        const outStream = new PassThrough();
+        const errStream = new PassThrough();
+        const inStream = new PassThrough();
+        let out = "";
+        let err = "";
+        outStream.on("data", (b) => (out += Buffer.from(b as any).toString("utf8")));
+        errStream.on("data", (b) => (err += Buffer.from(b as any).toString("utf8")));
+        const code = await runWithTransforms(dir, specPath, spec as any, argv, cfg as any, invObj, {
+          collect: !!isNdjson,
+          collectLimit: opts.collectLimit,
+          limits: {
+            collectItems: opts.collectLimit,
+            collectBytes: opts.collectBytes,
+          },
+          timeoutMsOverride: opts.timeoutMs,
+          cleanEnv: opts.cleanEnv !== false,
+          passEnv: opts.passEnv || [],
+          setEnv: opts.setEnv || {},
+          stdoutTarget: outStream as any,
+          stderrTarget: errStream as any,
+          inputSource: inStream as any,
+        } as any);
+        if (code && code !== 0) return mapExit(code);
+        try {
+          const obj = out ? JSON.parse(out) : null;
+          if (validateOut && obj != null) {
+            const ok = validateOut(obj);
+            if (!ok) {
+              const err = (validateOut.errors && validateOut.errors[0]) || { message: "invalid" };
+              return {
+                isError: true,
+                content: [{ type: "text", text: JSON.stringify(err) }],
+              } as any;
+            }
+          }
+          return { structuredContent: obj } as any;
+        } catch {
+          return {
+            isError: true,
+            content: [{ type: "text", text: err || "invalid JSON output" }],
+          } as any;
+        }
+      } catch (e: any) {
+        return { isError: true, content: [{ type: "text", text: String(e?.message || e) }] } as any;
+      }
     });
   }
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
+  // Keep process alive while using stdio transport; caller can terminate the process
+  await new Promise<void>(() => {});
 }
 
 export function mapExit(code: number) {

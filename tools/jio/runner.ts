@@ -158,7 +158,7 @@ export async function main(argv: string[]): Promise<number | void> {
   if ((argv || []).includes("--mcp-server")) {
     try {
       const { startMcpServer } = await import("./mcp/server.ts");
-      const transport = (getStringFlag(argv, "--transport") as any) === "http" ? "http" : "stdio";
+      const transport = (getStringFlag(argv, "--transport") as "stdio" | undefined) || "stdio";
       await startMcpServer({
         transport,
         httpHost: getStringFlag(argv, "--http-host"),
@@ -1295,6 +1295,9 @@ type RunnerRuntimeOptions = {
   cleanEnv: boolean;
   passEnv: string[];
   setEnv: Record<string, string>;
+  stdoutTarget?: NodeJS.WritableStream;
+  stderrTarget?: NodeJS.WritableStream;
+  inputSource?: NodeJS.ReadableStream;
 };
 
 export async function runWithTransforms(
@@ -1311,7 +1314,7 @@ export async function runWithTransforms(
     try {
       if (force || process.env.JIO_DEBUG === "1" || process.env.TEST_CAPTURE_LOGS === "1") {
         const obj = { ts: Date.now(), ...evt };
-        process.stderr.write(JSON.stringify(obj) + "\n");
+        ((runtime as any).stderrTarget || process.stderr).write(JSON.stringify(obj) + "\n");
       }
     } catch {}
   };
@@ -1380,7 +1383,7 @@ export async function runWithTransforms(
       }
       if (!didLogSigterm) {
         try {
-          process.stderr.write(
+          ((runtime as any).stderrTarget || process.stderr).write(
             "jio: timeout — sent SIGTERM to process groups; will SIGKILL after 5s\n",
           );
         } catch {}
@@ -1547,7 +1550,7 @@ export async function runWithTransforms(
             // Human-readable timeout note once
             if (!didLogSigterm) {
               try {
-                process.stderr.write(
+                ((runtime as any).stderrTarget || process.stderr).write(
                   "jio: timeout — sent SIGTERM to process groups; will SIGKILL after 5s\n",
                 );
               } catch {}
@@ -1633,7 +1636,7 @@ export async function runWithTransforms(
         }
       });
       // Stream piping honors backpressure internally; do not block the main flow
-      process.stdin.pipe(limiter).pipe(cmd.stdin);
+      (runtime.inputSource || process.stdin).pipe(limiter).pipe(cmd.stdin);
       // If shell pipeline upstream ends early (e.g., `cat file | head -n1 | jio ...`),
       // end our stdin too so the child can complete and emit output
       limiter.once("end", () => {
@@ -1665,7 +1668,7 @@ export async function runWithTransforms(
         stdinLimitExceeded = true;
       }
     });
-    process.stdin.pipe(limiter).pipe(p1.stdin);
+    (runtime.inputSource || process.stdin).pipe(limiter).pipe(p1.stdin);
     // enforce format on p1.stdout and forward into cmd.stdin
     const format = stIn!.format;
     if (format === "ndjson") {
@@ -1789,6 +1792,7 @@ export async function runWithTransforms(
       p2,
       limits,
       validate,
+      runtime,
       sink,
       finalizeFailureSink,
       localTimedOut,
@@ -1943,7 +1947,7 @@ async function handleStdoutNdjson(args: HandleNdjsonArgs): Promise<number | void
           collectState: {
             arrayStartedRef: () => arrayStarted,
             startArray: () => {
-              process.stdout.write("[");
+              ((runtime as any).stdoutTarget || process.stdout).write("[");
               arrayStarted = true;
             },
             itemsEmittedRef: () => itemsEmitted,
@@ -1994,7 +1998,7 @@ async function handleStdoutNdjson(args: HandleNdjsonArgs): Promise<number | void
               collectState: {
                 arrayStartedRef: () => arrayStarted,
                 startArray: () => {
-                  process.stdout.write("[");
+                  ((runtime as any).stdoutTarget || process.stdout).write("[");
                   arrayStarted = true;
                 },
                 itemsEmittedRef: () => itemsEmitted,
@@ -2006,13 +2010,14 @@ async function handleStdoutNdjson(args: HandleNdjsonArgs): Promise<number | void
                 setCollectLimitExceeded: () => (collectLimitExceeded = true),
                 limits,
               },
+              write: (t: string) => ((runtime as any).stdoutTarget || process.stdout).write(t),
             });
             if (!res) {
               // limits exceeded inside tryCollectItem
             }
           }
         } else {
-          process.stdout.write(s + "\n");
+          ((runtime as any).stdoutTarget || process.stdout).write(s + "\n");
         }
       }
     } catch {
@@ -2026,7 +2031,7 @@ async function handleStdoutNdjson(args: HandleNdjsonArgs): Promise<number | void
     }
   }
   if (runtime.collect && arrayStarted) {
-    process.stdout.write("]\n");
+    ((runtime as any).stdoutTarget || process.stdout).write("]\n");
   }
   if (runtime.collect && collectLimitExceeded) {
     const hintItems =
@@ -2062,8 +2067,12 @@ type CollectState = {
   limits: Required<typeof DEFAULT_LIMITS>;
 };
 
-function tryCollectItem(args: { obj: any; collectState: CollectState }): boolean {
-  const { obj, collectState: s } = args;
+function tryCollectItem(args: {
+  obj: any;
+  collectState: CollectState;
+  write: (s: string) => void;
+}): boolean {
+  const { obj, collectState: s, write } = args;
   const itemStr = JSON.stringify(obj);
   const itemBytes = Buffer.byteLength(itemStr);
   const haveByteCap = Number.isFinite(s.limits.collectBytes as number);
@@ -2073,8 +2082,8 @@ function tryCollectItem(args: { obj: any; collectState: CollectState }): boolean
     return false;
   }
   if (!s.arrayStartedRef()) s.startArray();
-  else process.stdout.write(",");
-  process.stdout.write(itemStr);
+  else write(",");
+  write(itemStr);
   s.incrementItems(1);
   s.addCollectedBytes(itemBytes);
   return true;
@@ -2116,10 +2125,14 @@ function emitNdjsonLine(args: {
         args.collectState.suppressFurther();
         return true;
       }
-      tryCollectItem({ obj, collectState: args.collectState });
+      tryCollectItem({
+        obj,
+        collectState: args.collectState,
+        write: (t: string) => ((args.runtime as any).stdoutTarget || process.stdout).write(t),
+      });
       return true;
     }
-    process.stdout.write(s + "\n");
+    ((args.runtime as any).stdoutTarget || process.stdout).write(s + "\n");
     return true;
   } catch {
     process.stderr.write("jio: invalid NDJSON line (not JSON)\n");
@@ -2137,13 +2150,22 @@ async function handleStdoutJson(args: {
   p2: any;
   limits: Required<typeof DEFAULT_LIMITS>;
   validate: ValidateFn | null;
+  runtime?: RunnerRuntimeOptions;
   sink: any;
   finalizeFailureSink: () => Promise<void>;
   localTimedOut: boolean;
   markStdoutParseFailed: () => void;
 }): Promise<number | void> {
-  const { p2, limits, validate, sink, finalizeFailureSink, localTimedOut, markStdoutParseFailed } =
-    args;
+  const {
+    p2,
+    limits,
+    validate,
+    runtime,
+    sink,
+    finalizeFailureSink,
+    localTimedOut,
+    markStdoutParseFailed,
+  } = args;
   const chunks: Buffer[] = [];
   let total = 0;
   for await (const chunk of p2.stdout) {
@@ -2175,7 +2197,7 @@ async function handleStdoutJson(args: {
       markStdoutParseFailed();
       return; // allow precedence handler to return 65 later
     }
-    process.stdout.write(JSON.stringify(obj));
+    ((args.runtime as any).stdoutTarget || process.stdout).write(JSON.stringify(obj));
   } catch {
     process.stderr.write("jio: invalid JSON output\n");
     if (sink)
