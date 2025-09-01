@@ -1,6 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import { describe, test } from "node:test";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import http from "node:http";
+import { describe, test } from "node:test";
 import { startMcpServer } from "../jio/mcp/server.ts";
 
 async function waitForHealth(host: string, port: number, ms = 10000) {
@@ -24,7 +26,7 @@ async function waitForHealth(host: string, port: number, ms = 10000) {
 }
 
 describe("jio mcp — http json (non-streaming)", () => {
-  test("/call returns a single JSON document", async () => {
+  test("/mcp initialize + listTools + callTool (collected)", async () => {
     const host = "127.0.0.1";
     const port = 33001 + Math.floor(Math.random() * 1000);
     const srv = await startMcpServer({ transport: "http", httpHost: host, httpPort: port });
@@ -32,37 +34,72 @@ describe("jio mcp — http json (non-streaming)", () => {
     if (!healthy) {
       console.error("server did not become healthy");
       try {
-        p.kill("SIGTERM");
+        await srv?.close?.();
       } catch {}
       process.exit(2);
     }
-    const body = await new Promise<string>((resolve, reject) => {
-      const req = http.request({ method: "POST", host, port, path: "/call" }, (res) => {
+    const url = `http://${host}:${port}/mcp`;
+    const transport = new StreamableHTTPClientTransport(url, {} as any);
+    const client = new Client({ name: "test", version: "0.0.0" });
+    console.error("connecting...");
+    await client.connect(transport as any);
+    console.error("connected");
+    const tools = await client.listTools({});
+    console.error(
+      "listed tools",
+      Array.isArray((tools as any)?.tools) ? (tools as any).tools.length : -1,
+    );
+    if (!tools || !tools.tools || !Array.isArray(tools.tools)) {
+      console.error("listTools failed", tools);
+      try {
+        await srv?.close?.();
+      } catch {}
+      process.exit(2);
+    }
+    const ls = tools.tools.find((t: any) => t.name === "io.example.examples.ls");
+    const result = await client.callTool({
+      name: ls?.name || "io.example.examples.ls",
+      arguments: {},
+    });
+    console.error("callTool done");
+    if (!result || (result.structuredContent == null && result.content == null)) {
+      console.error("callTool unexpected", result);
+      try {
+        await srv?.close?.();
+      } catch {}
+      process.exit(2);
+    }
+    await client.close().catch(() => {});
+    if (srv && srv.close) await srv.close();
+  });
+});
+
+async function httpPostJson(host: string, port: number, path: string, body: any): Promise<any> {
+  const raw = await new Promise<string>((resolve, reject) => {
+    const req = http.request(
+      {
+        method: "POST",
+        host,
+        port,
+        path,
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+        },
+      },
+      (res) => {
         let data = "";
         res.setEncoding("utf8");
         res.on("data", (c) => (data += c));
         res.on("end", () => resolve(data));
-      });
-      req.on("error", reject);
-      req.end("{}\n");
-    });
-    let json: any;
-    try {
-      json = JSON.parse(body);
-    } catch {
-      console.error("not json", body);
-      try {
-        p.kill("SIGTERM");
-      } catch {}
-      process.exit(2);
-    }
-    if (!json || json.ok !== true) {
-      console.error("unexpected json", json);
-      try {
-        p.kill("SIGTERM");
-      } catch {}
-      process.exit(2);
-    }
-    if (srv && srv.close) await srv.close();
+      },
+    );
+    req.on("error", reject);
+    req.end(JSON.stringify(body));
   });
-});
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
