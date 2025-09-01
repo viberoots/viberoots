@@ -111,6 +111,24 @@ zx_test(
 )
 
 zx_test(
+    name = "jio_core_build_argv_basic",
+    script = "tools/tests/jio.core.build-argv.basic.test.ts",
+    out = "jio_core_build_argv_basic.stamp",
+)
+
+zx_test(
+    name = "jio_core_env_policy",
+    script = "tools/tests/jio.core.env.policy.test.ts",
+    out = "jio_core_env_policy.stamp",
+)
+
+zx_test(
+    name = "jio_core_discovery_index",
+    script = "tools/tests/jio.core.discovery.index.test.ts",
+    out = "jio_core_discovery_index.stamp",
+)
+
+zx_test(
     name = "json_cli_skeleton",
     script = "tools/tests/jio.skeleton.test.ts",
     out = "json_cli_skeleton.stamp",

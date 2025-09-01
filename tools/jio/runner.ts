@@ -88,7 +88,7 @@ type CliOpts = {
   setEnv: Record<string, string>;
 };
 
-type RootConfig = {
+export type RootConfig = {
   defaultPackage?: string;
   ignore?: string[];
   globs?: string[];
@@ -96,7 +96,7 @@ type RootConfig = {
   env?: Record<string, string>;
 };
 
-type ToolSpec = {
+export type ToolSpec = {
   tool?: { name?: string; inputSchema?: any; outputSchema?: any };
   command?: {
     package?: string;
@@ -129,7 +129,7 @@ type ToolSpec = {
   };
 };
 
-type ParameterSpec = {
+export type ParameterSpec = {
   path?: string;
   value?: string;
   type: "string" | "number" | "boolean" | "array" | "object";
@@ -517,7 +517,7 @@ const DEFAULT_LIMITS = {
 
 type ValidateFn = ((data: any) => boolean) & { errors?: any };
 
-function getEffectiveLimits(
+export function getEffectiveLimits(
   spec: ToolSpec,
   runtime: RunnerRuntimeOptions,
 ): Required<typeof DEFAULT_LIMITS> {
@@ -528,20 +528,20 @@ function getEffectiveLimits(
   } as Required<typeof DEFAULT_LIMITS>;
 }
 
-async function resolvePreferredShell(): Promise<string> {
+export async function resolvePreferredShell(): Promise<string> {
   return (await hasBinaryOnPath("bash")) ? "bash" : "/bin/sh";
 }
 
-function makeShellSetFlags(preferredShell: string): string {
+export function makeShellSetFlags(preferredShell: string): string {
   return preferredShell.includes("bash") ? "set -euo pipefail; " : "set -eu; ";
 }
 
-function buildShellArgsWithScript(preferredShell: string, script: string): string[] {
+export function buildShellArgsWithScript(preferredShell: string, script: string): string[] {
   const cmd = makeShellSetFlags(preferredShell) + (script || "");
   return preferredShell.includes("bash") ? ["--noprofile", "--norc", "-c", cmd] : ["-c", cmd];
 }
 
-function attachPipeErrorNoops(proc: any) {
+export function attachPipeErrorNoops(proc: any) {
   try {
     proc.stdin?.on("error", () => {});
   } catch {}
@@ -553,7 +553,10 @@ function attachPipeErrorNoops(proc: any) {
   } catch {}
 }
 
-function enforceArgvCaps(argv: string[], limits: Required<typeof DEFAULT_LIMITS>): number | null {
+export function enforceArgvCaps(
+  argv: string[],
+  limits: Required<typeof DEFAULT_LIMITS>,
+): number | null {
   const argvTokenCount = argv.length;
   let argvBytes = 0;
   for (const t of argv) argvBytes += Buffer.byteLength(String(t)) + 1;
@@ -572,7 +575,7 @@ function enforceArgvCaps(argv: string[], limits: Required<typeof DEFAULT_LIMITS>
   return null;
 }
 
-async function computeExecCommand(
+export async function computeExecCommand(
   initialExecCmd: string,
   initialExecArgv: string[],
   rootDir: string,
@@ -632,7 +635,7 @@ async function computeExecCommand(
   return { execCmd, execArgv };
 }
 
-async function resolveRoot(): Promise<string> {
+export async function resolveRoot(): Promise<string> {
   if (process.env.JIO_ROOT) return path.resolve(process.env.JIO_ROOT);
   let dir = process.cwd();
   while (true) {
@@ -648,7 +651,7 @@ async function resolveRoot(): Promise<string> {
   return process.cwd();
 }
 
-async function readRootConfig(rootDir: string): Promise<RootConfig> {
+export async function readRootConfig(rootDir: string): Promise<RootConfig> {
   try {
     const txt = await fsp.readFile(path.join(rootDir, ".jio"), "utf8");
     const obj = JSON.parse(txt);
@@ -707,13 +710,13 @@ async function readRootConfig(rootDir: string): Promise<RootConfig> {
   }
 }
 
-function resolveToolRef(ref: string, cfg: RootConfig): string {
+export function resolveToolRef(ref: string, cfg: RootConfig): string {
   if (ref.includes(".")) return ref;
   if (!cfg.defaultPackage) return ref; // bare name; no default package known
   return `${cfg.defaultPackage}.${ref}`;
 }
 
-async function buildIndex(rootDir: string, cfg: RootConfig): Promise<Map<string, string>> {
+export async function buildIndex(rootDir: string, cfg: RootConfig): Promise<Map<string, string>> {
   const idx = new Map<string, string>();
   const ignoreDirs = new Set<string>([
     "node_modules/",
@@ -771,7 +774,9 @@ function ensureFormalValidator() {
   }
 }
 
-async function readSpec(p: string): Promise<{ spec: ToolSpec | null; warning: string | null }> {
+export async function readSpec(
+  p: string,
+): Promise<{ spec: ToolSpec | null; warning: string | null }> {
   try {
     const txt = await fsp.readFile(p, "utf8");
     const obj = JSON.parse(txt);
@@ -802,7 +807,7 @@ function usesPathParams(spec: ToolSpec): boolean {
   return false;
 }
 
-function buildArgv(spec: ToolSpec, invObj: any): string[] {
+export function buildArgv(spec: ToolSpec, invObj: any): string[] {
   const params = spec.command?.parameters || {};
   const positionals: Array<{ pos: number; tokens: string[] }> = [];
   const flags: Array<{ name: string; tokens: string[] }> = [];
@@ -1058,7 +1063,7 @@ function handleSchemaPrinting(spec: ToolSpec, argv: string[]): number | null {
   return null;
 }
 
-function buildDryRunPlan(
+export function buildDryRunPlan(
   rootDir: string,
   specPath: string,
   spec: ToolSpec,
@@ -1124,7 +1129,7 @@ function mergeEnv(rootCfg: RootConfig, spec: ToolSpec): Record<string, string> {
   return env;
 }
 
-function buildChildEnv(
+export function buildChildEnv(
   rootCfg: RootConfig,
   spec: ToolSpec,
   runtime: { cleanEnv: boolean; passEnv: string[]; setEnv: Record<string, string> },
@@ -1226,7 +1231,7 @@ type RunnerRuntimeOptions = {
   setEnv: Record<string, string>;
 };
 
-async function runWithTransforms(
+export async function runWithTransforms(
   rootDir: string,
   specPath: string,
   spec: ToolSpec,
@@ -2118,7 +2123,7 @@ async function handleStdoutJson(args: {
   }
 }
 
-function openFailureSink(
+export function openFailureSink(
   rootDir: string,
   specPath: string,
   spec: ToolSpec,
@@ -2326,7 +2331,7 @@ async function hasBinaryOnPath(bin: string): Promise<boolean> {
   return false;
 }
 
-async function findToolSpecs(
+export async function findToolSpecs(
   rootDir: string,
   includeGlobs: string[],
   excludeGlobs: string[],
@@ -2366,7 +2371,7 @@ async function findToolSpecs(
   return out;
 }
 
-function waitProcess(
+export function waitProcess(
   p: any,
   stage: "stdinTransform" | "exec" | "stdoutTransform",
 ): Promise<number> {
@@ -2411,13 +2416,24 @@ function waitProcess(
 
 // Execute CLI when loaded as entrypoint (normal) or even when imported by the thin bash wrapper.
 // This ensures the process exits with the intended status code instead of falling through as 0.
-main(process.argv.slice(2))
-  .then((code) => {
-    if (typeof code === "number") process.exit(code);
-  })
-  .catch((err) => {
-    try {
-      console.error(String(err?.message || err));
-    } catch {}
-    process.exit(1);
-  });
+// Run CLI only when this module is the entrypoint (not when imported)
+(() => {
+  try {
+    const candidate = "file://" + path.resolve(process.argv[1] || "");
+    const isEntrypoint =
+      typeof (import.meta as any).url === "string" && (import.meta as any).url === candidate;
+    if (!isEntrypoint) return;
+    main(process.argv.slice(2))
+      .then((code) => {
+        if (typeof code === "number") process.exit(code);
+      })
+      .catch((err) => {
+        try {
+          console.error(String(err?.message || err));
+        } catch {}
+        process.exit(1);
+      });
+  } catch {
+    // If detection fails, do nothing (module likely imported)
+  }
+})();
