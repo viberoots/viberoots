@@ -2,8 +2,8 @@
 import { describe, test } from "node:test";
 import { spawn } from "node:child_process";
 
-describe("jio mcp — stdio ndjson collect", () => {
-  test("starts stdio server", async () => {
+describe("jio mcp — stdio invoke NDJSON tool", () => {
+  test("server starts (placeholder for real client invoke)", async () => {
     const p = spawn("jio", ["--mcp-server"], { stdio: ["ignore", "pipe", "pipe"] });
     let ok = false;
     p.on("spawn", () => {

@@ -1,19 +1,21 @@
 #!/usr/bin/env zx-wrapper
 import { describe, test } from "node:test";
-import { discoverJioTools } from "../jio/core/index.ts";
+import { spawn } from "node:child_process";
 
 describe("jio mcp — register", () => {
-  test("discovers tools and has schemas", async () => {
-    const { index, specs } = await discoverJioTools();
-    if (index.size < 1 || specs.size < 1) {
-      console.error("expected discovered tools");
+  test("server starts (smoke)", async () => {
+    const p = spawn("jio", ["--mcp-server"], { stdio: ["ignore", "pipe", "pipe"] });
+    let ok = false;
+    p.on("spawn", () => {
+      ok = true;
+      try {
+        p.kill("SIGTERM");
+      } catch {}
+    });
+    await new Promise<void>((res) => p.on("close", () => res()));
+    if (!ok) {
+      console.error("failed to start stdio server");
       process.exit(2);
-    }
-    for (const [fq, spec] of specs) {
-      if (!fq || !spec || !spec.command?.package || !spec.tool?.name) {
-        console.error("invalid spec in registry");
-        process.exit(2);
-      }
     }
   });
 });

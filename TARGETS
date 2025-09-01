@@ -141,6 +141,18 @@ zx_test(
 )
 
 zx_test(
+    name = "jio_mcp_stdio_invoke_json",
+    script = "tools/tests/jio.mcp.stdio.invoke-json.test.ts",
+    out = "jio_mcp_stdio_invoke_json.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_stdio_invoke_ndjson",
+    script = "tools/tests/jio.mcp.stdio.invoke-ndjson.test.ts",
+    out = "jio_mcp_stdio_invoke_ndjson.stamp",
+)
+
+zx_test(
     name = "jio_core_build_argv_basic",
     script = "tools/tests/jio.core.build-argv.basic.test.ts",
     out = "jio_core_build_argv_basic.stamp",

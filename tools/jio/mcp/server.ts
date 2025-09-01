@@ -71,8 +71,7 @@ export async function startMcpServer(
         }),
     };
   }
-  // default to stdio
-  return {};
+  // default to stdio using MCP SDK
   const { McpServer } = await import("@modelcontextprotocol/sdk/server/mcp.js");
   const { StdioServerTransport } = await import("@modelcontextprotocol/sdk/server/stdio.js");
   const { dir, cfg, specs } = await discoverJioTools();
@@ -101,31 +100,44 @@ export async function startMcpServer(
             } as any;
           }
 
-          const argv = buildArgv(spec as ToolSpec, args);
-          const code = await runWithTransforms(
-            dir,
-            "",
-            spec as ToolSpec,
-            argv,
-            cfg as RootConfig,
-            args,
-            {
-              collect: spec.command?.stdoutTransform?.format === "ndjson",
-              collectLimit: opts.collectLimit,
-              limits: {
-                collectItems: opts.collectLimit,
-                collectBytes: opts.collectBytes,
-              },
-              timeoutMsOverride: opts.timeoutMs,
-              cleanEnv: opts.cleanEnv !== false,
-              passEnv: opts.passEnv || [],
-              setEnv: opts.setEnv || {},
-            },
-          );
+          // Execute via jio CLI in a child process so MCP stdio remains clean.
+          const { spawn } = await import("node:child_process");
+          const { tmpdir } = await import("node:os");
+          const { writeFile, mkdtemp } = await import("node:fs/promises");
+          const { join } = await import("node:path");
+          const tmp = await mkdtemp(join(tmpdir(), "jio-mcp-"));
+          const inPath = join(tmp, "invocation.json");
+          await writeFile(inPath, JSON.stringify(args ?? {}), "utf8");
+          const isNdjson = spec.command?.stdoutTransform?.format === "ndjson";
+          const cliArgs: string[] = [fq, "--in", inPath];
+          if (isNdjson) cliArgs.push("--collect");
+          if (typeof opts.timeoutMs === "number")
+            cliArgs.push("--timeout-ms", String(opts.timeoutMs));
+          if (typeof opts.collectLimit === "number")
+            cliArgs.push("--collect-limit", String(opts.collectLimit));
+          if (typeof opts.collectBytes === "number")
+            cliArgs.push("--collect-bytes", String(opts.collectBytes));
+          if (opts.cleanEnv === false) cliArgs.push("--no-clean-env");
+          for (const name of opts.passEnv || []) cliArgs.push("--pass-env", name);
+          for (const [k, v] of Object.entries(opts.setEnv || {}))
+            cliArgs.push("--env", `${k}=${v}`);
+          const p = spawn("jio", cliArgs, { stdio: ["ignore", "pipe", "pipe"] });
+          let out = "";
+          let err = "";
+          p.stdout.on("data", (b: any) => (out += Buffer.from(b).toString("utf8")));
+          p.stderr.on("data", (b: any) => (err += Buffer.from(b).toString("utf8")));
+          const code: number = await new Promise((res) => p.on("close", (c) => res(c ?? 0)));
           if (code && code !== 0) return mapExit(code);
-          // For JSON, the runner wrote the JSON document to stdout; for collected NDJSON, it wrote an array.
-          // We cannot capture directly here without refactoring runWithTransforms; rely on caller capture.
-          return { type: "json", content: null } as any;
+          try {
+            const obj = out ? JSON.parse(out) : null;
+            return { type: "json", content: obj } as any;
+          } catch {
+            // If output wasn't JSON, return an error with captured stderr snippet
+            return {
+              type: "error",
+              error: { type: "OutputParseError", message: err || "invalid JSON output" },
+            } as any;
+          }
         } catch (e: any) {
           return {
             type: "error",
@@ -140,7 +152,7 @@ export async function startMcpServer(
   await server.connect(transport);
 }
 
-function mapExit(code: number) {
+export function mapExit(code: number) {
   const type =
     code === 1
       ? "InvalidInput"
