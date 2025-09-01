@@ -135,6 +135,12 @@ zx_test(
 )
 
 zx_test(
+    name = "jio_mcp_http_json",
+    script = "tools/tests/jio.mcp.http.json.test.ts",
+    out = "jio_mcp_http_json.stamp",
+)
+
+zx_test(
     name = "jio_core_build_argv_basic",
     script = "tools/tests/jio.core.build-argv.basic.test.ts",
     out = "jio_core_build_argv_basic.stamp",

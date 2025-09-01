@@ -10,6 +10,8 @@ import {
 
 export type McpServerOpts = {
   transport?: "stdio";
+  httpHost?: string;
+  httpPort?: number;
   timeoutMs?: number;
   collectLimit?: number;
   collectBytes?: number;
@@ -18,7 +20,59 @@ export type McpServerOpts = {
   setEnv?: Record<string, string>;
 };
 
-export async function startMcpServer(opts: McpServerOpts = {}) {
+export async function startMcpServer(
+  opts: McpServerOpts = {},
+): Promise<{ close?: () => Promise<void> }> {
+  if (opts.transport === "http") {
+    const { createServer } = await import("node:http");
+    const host = opts.httpHost || "127.0.0.1";
+    const port = Number.isFinite(opts.httpPort as number) ? (opts.httpPort as number) : 3000;
+    const server = createServer(async (req, res) => {
+      try {
+        if (req.method === "GET" && req.url === "/health") {
+          const body = JSON.stringify({ ok: true });
+          res.writeHead(200, { "content-type": "application/json" });
+          res.end(body);
+          return;
+        }
+        // Placeholder endpoint: non-streaming JSON case
+        if (req.method === "POST" && req.url === "/call") {
+          const chunks: Buffer[] = [];
+          for await (const c of req) chunks.push(Buffer.from(c as any));
+          // We don't execute tools in PR3 skeleton; return minimal json
+          res.writeHead(200, { "content-type": "application/json" });
+          res.end(JSON.stringify({ ok: true }));
+          return;
+        }
+        res.statusCode = 404;
+        res.end();
+      } catch {
+        try {
+          res.statusCode = 500;
+          res.end();
+        } catch {}
+      }
+    });
+    await new Promise<void>((res) => server.listen(port, host, () => res()));
+    // In background, warm up discovery for future endpoints (non-blocking)
+    void (async () => {
+      try {
+        await discoverJioTools();
+      } catch {}
+    })();
+    return {
+      close: async () =>
+        new Promise<void>((res, rej) => {
+          try {
+            server.close((err: any) => (err ? rej(err) : res()));
+          } catch (e) {
+            res();
+          }
+        }),
+    };
+  }
+  // default to stdio
+  return {};
   const { McpServer } = await import("@modelcontextprotocol/sdk/server/mcp.js");
   const { StdioServerTransport } = await import("@modelcontextprotocol/sdk/server/stdio.js");
   const { dir, cfg, specs } = await discoverJioTools();

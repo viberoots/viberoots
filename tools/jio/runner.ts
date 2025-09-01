@@ -158,8 +158,11 @@ export async function main(argv: string[]): Promise<number | void> {
   if ((argv || []).includes("--mcp-server")) {
     try {
       const { startMcpServer } = await import("./mcp/server.ts");
+      const transport = (getStringFlag(argv, "--transport") as any) === "http" ? "http" : "stdio";
       await startMcpServer({
-        transport: "stdio",
+        transport,
+        httpHost: getStringFlag(argv, "--http-host"),
+        httpPort: getNumericFlag(argv, "--http-port"),
         timeoutMs: getNumericFlag(argv, "--timeout-ms"),
         collectLimit: getNumericFlag(argv, "--collect-limit"),
         collectBytes: getNumericFlag(argv, "--collect-bytes"),
@@ -167,7 +170,7 @@ export async function main(argv: string[]): Promise<number | void> {
         passEnv: getRepeatedFlags(argv, "--pass-env"),
         setEnv: Object.fromEntries(getKvFlags(argv, "--env")),
       });
-      return 0;
+      return; // keep process alive for server
     } catch (e: any) {
       console.error(String(e?.message || e));
       return 78;
@@ -308,6 +311,15 @@ function getNumericFlag(argv: string[], name: string): number | undefined {
   if (i >= 0) {
     const n = Number(argv[i + 1] || "");
     if (Number.isFinite(n) && n >= 0) return Math.floor(n);
+  }
+  return undefined;
+}
+
+function getStringFlag(argv: string[], name: string): string | undefined {
+  const i = argv.indexOf(name);
+  if (i >= 0) {
+    const v = String(argv[i + 1] || "").trim();
+    if (v) return v;
   }
   return undefined;
 }
