@@ -25,46 +25,37 @@ async function waitForHealth(host: string, port: number, ms = 10000) {
   return false;
 }
 
-describe("jio mcp — http limits precedence", () => {
-  test("server flags override spec defaults (items and bytes)", async () => {
+describe("jio mcp — http control ignore via _meta", () => {
+  test("_meta.ignoreControlMessages passes control lines as output", async () => {
     const host = "127.0.0.1";
-    const port = 37250 + Math.floor(Math.random() * 500);
-    const srv = await startMcpServer({
-      transport: "http",
-      httpHost: host,
-      httpPort: port,
-      // Force small caps so override effect is observable
-      maxItemsPerCall: 2,
-      maxCollectBytes: 50,
-      maxStdoutJsonBytes: 64,
-      maxNdjsonLineBytes: 64,
-    });
+    const port = 37050 + Math.floor(Math.random() * 500);
+    const srv = await startMcpServer({ transport: "http", httpHost: host, httpPort: port });
     const ok = await waitForHealth(host, port, 3000);
     if (!ok) {
       console.error("server not healthy");
       await srv?.close?.();
       process.exit(2);
     }
-    const url = new URL(`http://${host}:${port}/mcp`);
-    const t = new StreamableHTTPClientTransport(url as any, {} as any);
+    const t = new StreamableHTTPClientTransport(
+      new URL(`http://${host}:${port}/mcp`) as any,
+      {} as any,
+    );
     const c = new Client({ name: "test", version: "0" });
     await c.connect(t as any);
     const tools = await c.listTools({});
-    const ls = tools.tools.find((x: any) => x.name === "io.example.examples.ls");
-    if (!ls) {
-      console.error("ls tool not found");
+    const tool = tools.tools.find((x: any) => x.name === "io.example.examples.ctlndjson");
+    const res = await c.callTool({
+      name: tool.name,
+      arguments: {},
+      _meta: { ignoreControlMessages: true },
+    } as any);
+    const sc = (res as any)?.structuredContent;
+    const items = Array.isArray(sc) ? sc : Array.isArray(sc?.items) ? sc.items : [];
+    const hasCtl = items.some((o: any) => o && o["$jio.ctl"] === true);
+    if (!hasCtl) {
+      console.error("expected raw control object in output array", res);
       await c.close().catch(() => {});
-      await srv?.close?.();
-      process.exit(2);
-    }
-    // This tool emits a small, predictable set. With maxItemsPerCall=2, one of these calls should fail when collecting
-    const res = await c.callTool({ name: ls.name, arguments: {} } as any);
-    // We expect either an explicit error or a collected array capped by server limits.
-    const isError = (res as any)?.error || (res as any)?.isError;
-    const isArray = Array.isArray((res as any)?.structuredContent);
-    if (!isError && !isArray) {
-      console.error("expected error or array result", res);
-      await c.close().catch(() => {});
+      await (t as any).close?.().catch(() => {});
       await srv?.close?.();
       process.exit(2);
     }

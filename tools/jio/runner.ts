@@ -1823,7 +1823,12 @@ export async function runWithTransforms(
       isCancelled: () =>
         localCancelled || ((runtime as any).isCancelled ? !!(runtime as any).isCancelled() : false),
     });
-    if (typeof result === "number") return result;
+    if (typeof result === "number") {
+      try {
+        if (cancelPoll) clearInterval(cancelPoll);
+      } catch {}
+      return result;
+    }
   } else if (st && st.format === "json") {
     const result = await handleStdoutJson({
       p2,
@@ -1839,7 +1844,12 @@ export async function runWithTransforms(
         stdoutParseFailed = true;
       },
     });
-    if (typeof result === "number") return result;
+    if (typeof result === "number") {
+      try {
+        if (cancelPoll) clearInterval(cancelPoll);
+      } catch {}
+      return result;
+    }
   } else if (st && st.shell && !st.format) {
     process.stderr.write("jio: unknown stdoutTransform.format\n");
     p2.stdout.pipe(process.stdout);
@@ -1868,6 +1878,9 @@ export async function runWithTransforms(
       if (localKiller) clearTimeout(localKiller);
     } catch {}
     try {
+      if (cancelPoll) clearInterval(cancelPoll);
+    } catch {}
+    try {
       process.stderr.write("stage failed: stdinTransform code=65\n");
     } catch {}
     try {
@@ -1881,6 +1894,9 @@ export async function runWithTransforms(
     await finalizeFailureSink();
     try {
       if (localKiller) clearTimeout(localKiller);
+    } catch {}
+    try {
+      if (cancelPoll) clearInterval(cancelPoll);
     } catch {}
     try {
       process.stderr.write("stage failed: stdoutTransform code=65\n");

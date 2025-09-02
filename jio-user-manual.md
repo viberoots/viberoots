@@ -553,10 +553,19 @@ NDJSON specifics
 - `--collect` or `--collect-ndjson` converts the NDJSON stream into a single JSON array on stdout
 - You can cap collection with `--collect-limit N` and `--collect-bytes N` (or via spec `limits`)
 - jio enforces per‑line limits: `maxNdjsonLineBytes`
+- MCP server mode (PR5): collected NDJSON is wrapped in an object `{ items: [...] }` so `structuredContent` is always an object for SDK parsing. CLI output remains an array.
 
 JSON document specifics
 
 - jio enforces `maxStdoutJsonBytes` while buffering the JSON document
+
+### MCP control messages and elicitation (server mode)
+
+Tools can signal control actions by emitting special JSON with `"$jio.ctl": true` and optional `"$jio.ctl.elicit": { ... }`.
+
+- JSON mode: server returns `result.control.elicit` instead of normal output when control is present.
+- NDJSON mode: server stops on the first control line and returns `result.control.elicit` in the final JSON‑RPC frame; previously streamed items remain delivered.
+- To pass control objects through as normal output, set `command.ignoreControlMessages: true` (spec) or `_meta.ignoreControlMessages: true` (per‑call).
 
 ## Environment handling
 

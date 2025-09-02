@@ -1,0 +1,25 @@
+{
+  "specVersion": "1.0.0",
+  "schemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "tool": {
+    "name": "ctlndjson_ignore",
+    "title": "Emit NDJSON with a control line (ignored)",
+    "description": "Emits one data item then a $jio.ctl elicit control message; server should pass through.",
+    "inputSchema": { "type": "object", "additionalProperties": false },
+    "outputSchema": { "type": "array", "items": { "type": "object" } }
+  },
+  "command": {
+    "package": "io.example.examples",
+    "exec": "bash",
+    "ignoreControlMessages": true,
+    "parameters": {
+      "script": { "type": "string", "position": 1, "value": "-lc" },
+      "body": {
+        "type": "string",
+        "position": 2,
+        "value": "printf '%s\n' '{\"file\":\"a.txt\"}' '{\"$jio.ctl\":true,\"$jio.ctl.elicit\":{\"message\":\"confirm?\",\"confirmProperty\":\"confirm\"}}'"
+      }
+    },
+    "stdoutTransform": { "shell": "cat", "format": "ndjson" }
+  }
+}

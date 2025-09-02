@@ -128,6 +128,16 @@ export async function startMcpServer(
       const validateIn = inputSchema ? ajv.compile(inputSchema) : null;
       const outputSchema = spec.tool?.outputSchema || null;
       const validateOut = outputSchema ? ajv.compile(outputSchema) : null;
+      let allowedKeys: Set<string> | null = null;
+      if (inputSchema && (inputSchema as any).type === "object") {
+        const hasProps = !!(inputSchema as any).properties;
+        const addl = (inputSchema as any).additionalProperties;
+        if (addl === false) {
+          allowedKeys = new Set(Object.keys((inputSchema as any).properties || {}));
+        } else if (hasProps) {
+          allowedKeys = new Set(Object.keys((inputSchema as any).properties));
+        }
+      }
 
       let maybeParams: any | undefined = undefined;
       let maybeOutput: any | undefined = undefined;
@@ -146,7 +156,11 @@ export async function startMcpServer(
         if (maybeParams || maybeOutput) {
           return (mcp as any).registerTool(
             fq,
-            { description, inputSchema: maybeParams, outputSchema: maybeOutput },
+            {
+              description,
+              inputSchema: maybeParams,
+              outputSchema: maybeOutput,
+            },
             cb,
           );
         }
@@ -178,11 +192,50 @@ export async function startMcpServer(
             const d = Number(process.env.JIO_MCP_TEST_DELAY_MS || "0");
             if (Number.isFinite(d) && d > 0) await new Promise((r) => setTimeout(r, d));
           } catch {}
-          if (validateIn && !validateIn(args)) {
+          // Strip non-schema meta keys before validation
+          const argsForValidation = args && typeof args === "object" ? { ...args } : args;
+          if (argsForValidation && typeof argsForValidation === "object") {
+            delete (argsForValidation as any)._meta;
+            delete (argsForValidation as any).signal;
+            delete (argsForValidation as any).sessionId;
+            delete (argsForValidation as any).sendNotification;
+            delete (argsForValidation as any).sendRequest;
+            delete (argsForValidation as any).progressToken;
+            if (allowedKeys) {
+              for (const k of Object.keys(argsForValidation)) {
+                if (!allowedKeys.has(k)) delete (argsForValidation as any)[k];
+              }
+            }
+          }
+          if (validateIn && !validateIn(argsForValidation)) {
             const err = (validateIn.errors && validateIn.errors[0]) || { message: "invalid" };
+            if (process.env.JIO_MCP_ELICIT === "1") {
+              const missing = (err as any)?.params?.missingProperty;
+              const payload = {
+                ajvError: err,
+                elicit: {
+                  message: "Input validation failed; provide missing/invalid fields and retry.",
+                  missingProperty: missing,
+                  instancePath: (err as any)?.instancePath || "",
+                  schemaPath: (err as any)?.schemaPath || "",
+                },
+              };
+              return {
+                type: "error",
+                error: { type: "InvalidInput", message: JSON.stringify(payload) },
+              } as any;
+            }
             return {
               type: "error",
               error: { type: "InvalidInput", message: JSON.stringify(err) },
+            } as any;
+          }
+          // Request-time control: allow clients to ask for elicitation explicitly
+          if (args?._meta?.elicit === true) {
+            return {
+              control: {
+                elicit: { message: "confirmation requested", confirmProperty: "confirm" },
+              },
             } as any;
           }
           const specPath = (index as Map<string, string>).get(fq);
@@ -207,10 +260,16 @@ export async function startMcpServer(
           outStream.on("data", (b) => (out += Buffer.from(b as any).toString("utf8")));
           errStream.on("data", (b) => (err += Buffer.from(b as any).toString("utf8")));
           const progressToken = args?._meta?.progressToken;
+          const ignoreCtl =
+            spec.command?.ignoreControlMessages === true ||
+            args?._meta?.ignoreControlMessages === true;
+          const specForRun = ignoreCtl
+            ? { ...spec, tool: { ...(spec.tool || {}), outputSchema: undefined } }
+            : spec;
           const code = await runWithTransforms(
             dir,
             specPath,
-            spec as any,
+            specForRun as any,
             argv,
             cfg as any,
             invObj,
@@ -259,30 +318,43 @@ export async function startMcpServer(
             } as any,
           );
           if (code && code !== 0) return mapExit(code);
-          // optional progress completion notice if client requested
           try {
-            if (process.env.JIO_MCP_PROGRESS !== "0") {
-              const token = args?._meta?.progressToken;
-              if (token && (mcp as any).server?.notification) {
-                try {
-                  await (mcp as any).server.notification(
-                    ProgressNotificationSchema.parse({
-                      method: "notifications/progress",
-                      params: { progress: 1, message: "done", progressToken: token },
-                    }),
-                  );
-                } catch {
-                  await (mcp as any).server.notification({
-                    method: "notifications/progress",
-                    params: { progress: 1, message: "done", progressToken: token },
-                  });
+            const ignoreCtl =
+              spec.command?.ignoreControlMessages === true ||
+              args?._meta?.ignoreControlMessages === true;
+            let obj: any = null;
+            if (out) {
+              try {
+                obj = JSON.parse(out);
+              } catch {
+                if (ignoreCtl) {
+                  const items: any[] = [];
+                  for (const line of out.split(/\r?\n/)) {
+                    const s = line.trim();
+                    if (!s) continue;
+                    try {
+                      items.push(JSON.parse(s));
+                    } catch {}
+                  }
+                  obj = { items };
+                } else {
+                  throw new Error("parse");
                 }
               }
             }
-          } catch {}
-          try {
-            const obj = out ? JSON.parse(out) : null;
-            if (validateOut && obj != null) {
+            if (!ignoreCtl && obj != null) {
+              // Control detection: NDJSON (array) or JSON (object)
+              const isCtlObj = (o: any) => o && typeof o === "object" && o["$jio.ctl"] === true;
+              if (Array.isArray(obj)) {
+                const ctl = obj.find((o) => isCtlObj(o));
+                if (ctl && ctl["$jio.ctl.elicit"]) {
+                  return { control: { elicit: ctl["$jio.ctl.elicit"] } } as any;
+                }
+              } else if (isCtlObj(obj) && obj["$jio.ctl.elicit"]) {
+                return { control: { elicit: obj["$jio.ctl.elicit"] } } as any;
+              }
+            }
+            if (!ignoreCtl && validateOut && obj != null) {
               const ok = validateOut(obj);
               if (!ok) {
                 const verr = (validateOut.errors && validateOut.errors[0]) || {
@@ -297,7 +369,29 @@ export async function startMcpServer(
             if (k !== undefined && inflight.get(k)?.cancelled) {
               return { isError: true, content: [{ type: "text", text: "cancelled" }] } as any;
             }
-            return { structuredContent: obj } as any;
+            // optional progress completion notice if client requested and no control
+            try {
+              if (process.env.JIO_MCP_PROGRESS !== "0") {
+                const token = args?._meta?.progressToken;
+                if (token && (mcp as any).server?.notification) {
+                  try {
+                    await (mcp as any).server.notification(
+                      ProgressNotificationSchema.parse({
+                        method: "notifications/progress",
+                        params: { progress: 1, message: "done", progressToken: token },
+                      }),
+                    );
+                  } catch {
+                    await (mcp as any).server.notification({
+                      method: "notifications/progress",
+                      params: { progress: 1, message: "done", progressToken: token },
+                    });
+                  }
+                }
+              }
+            } catch {}
+            const payload = Array.isArray(obj) ? { items: obj } : obj;
+            return { structuredContent: payload } as any;
           } catch {
             return {
               isError: true,
@@ -456,7 +550,6 @@ export async function startMcpServer(
 
     const registerWith = (cb: any) => {
       if (maybeParams || maybeOutput) {
-        // Prefer config-style API when we have any schema to pass explicitly
         return (server as any).registerTool(
           fq,
           {
@@ -475,14 +568,56 @@ export async function startMcpServer(
         if (!tryAcquire()) {
           return { type: "error", error: { type: "Error", message: "Server busy" } } as any;
         }
-        if (validateIn && !validateIn(args)) {
+        const argsForValidation = args && typeof args === "object" ? { ...args } : args;
+        if (argsForValidation && typeof argsForValidation === "object") {
+          delete (argsForValidation as any)._meta;
+          delete (argsForValidation as any).signal;
+          delete (argsForValidation as any).sessionId;
+          delete (argsForValidation as any).sendNotification;
+          delete (argsForValidation as any).sendRequest;
+          delete (argsForValidation as any).progressToken;
+          if (allowedKeys) {
+            for (const k of Object.keys(argsForValidation)) {
+              if (!allowedKeys.has(k)) delete (argsForValidation as any)[k];
+            }
+          }
+        }
+        if (validateIn && !validateIn(argsForValidation)) {
           const err = (validateIn.errors && validateIn.errors[0]) || { message: "invalid" };
+          if (process.env.JIO_MCP_ELICIT === "1") {
+            const missing = (err as any)?.params?.missingProperty;
+            const payload = {
+              ajvError: err,
+              elicit: {
+                message: "Input validation failed; provide missing/invalid fields and retry.",
+                missingProperty: missing,
+                instancePath: (err as any)?.instancePath || "",
+                schemaPath: (err as any)?.schemaPath || "",
+              },
+            };
+            return {
+              type: "error",
+              error: { type: "InvalidInput", message: JSON.stringify(payload) },
+            } as any;
+          }
           return {
             type: "error",
             error: {
               type: "InvalidInput",
               message: JSON.stringify(err),
             },
+          } as any;
+        }
+        if (process.env.JIO_MCP_ELICIT === "1") {
+          const payload = {
+            elicit: {
+              message: "Please confirm you want to proceed",
+              confirmProperty: "confirm",
+            },
+          };
+          return {
+            type: "error",
+            error: { type: "InvalidInput", message: JSON.stringify(payload) },
           } as any;
         }
 
@@ -531,8 +666,46 @@ export async function startMcpServer(
         } as any);
         if (code && code !== 0) return mapExit(code);
         try {
-          const obj = out ? JSON.parse(out) : null;
-          if (validateOut && obj != null) {
+          let obj: any = null;
+          if (out) {
+            try {
+              obj = JSON.parse(out);
+            } catch {
+              // Fallback: if ignoring control and NDJSON, parse line-by-line
+              if (ignoreCtl && isNdjson) {
+                const items: any[] = [];
+                for (const line of out.split(/\r?\n/)) {
+                  const s = line.trim();
+                  if (!s) continue;
+                  try {
+                    items.push(JSON.parse(s));
+                  } catch {}
+                }
+                obj = { items };
+              } else {
+                throw new Error("parse");
+              }
+            }
+          }
+          // ignoreCtl computed above
+          if (!ignoreCtl && obj != null) {
+            const isCtlObj = (o: any) => o && typeof o === "object" && o["$jio.ctl"] === true;
+            if (Array.isArray(obj)) {
+              const ctl = obj.find((o) => isCtlObj(o));
+              if (ctl && ctl["$jio.ctl.elicit"]) {
+                return {
+                  structuredContent: undefined,
+                  control: { elicit: ctl["$jio.ctl.elicit"] },
+                } as any;
+              }
+            } else if (isCtlObj(obj) && obj["$jio.ctl.elicit"]) {
+              return {
+                structuredContent: undefined,
+                control: { elicit: obj["$jio.ctl.elicit"] },
+              } as any;
+            }
+          }
+          if (!ignoreCtl && validateOut && obj != null) {
             const ok = validateOut(obj);
             if (!ok) {
               const err = (validateOut.errors && validateOut.errors[0]) || { message: "invalid" };
@@ -542,7 +715,9 @@ export async function startMcpServer(
               } as any;
             }
           }
-          return { structuredContent: obj } as any;
+          // For NDJSON tools, wrap collected array in an object for MCP structuredContent
+          const payload = isNdjson && Array.isArray(obj) ? { items: obj } : obj;
+          return { structuredContent: payload } as any;
         } catch {
           return {
             isError: true,

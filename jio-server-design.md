@@ -149,6 +149,16 @@ sequenceDiagram
 
 Cancellation: client closes the stream → Server aborts with SIGTERM → after 5s, SIGKILL.
 
+### Control messages and elicitation (PR5)
+
+- Tools may emit special control objects via stdout:
+  - NDJSON line or final JSON document containing `"$jio.ctl": true` and optionally `"$jio.ctl.elicit": { ... }`.
+- Server behavior:
+  - JSON mode (non‑streaming): if the final document is a control message, the server returns a success‑shaped response with `result.control.elicit` instead of `structuredContent`.
+  - NDJSON mode (streaming/SSE): previously streamed items may already be delivered; on the first control line, the server stops the tool and returns `result.control.elicit` in the final JSON‑RPC frame.
+  - ignoreControlMessages: when `command.ignoreControlMessages=true` (or per‑call `_meta.ignoreControlMessages=true`), the server does not interpret control messages and passes them through as normal output.
+  - NDJSON wrapping: collected NDJSON responses are wrapped as an object `{ items: [...] }`, so `structuredContent` is always an object for MCP SDK parsing.
+
 ### Cancellation result semantics
 
 - When a request is cancelled via `notifications/cancelled { requestId }`, the server attempts to terminate the underlying process group (stdin close, SIGTERM, then SIGKILL after 5s).

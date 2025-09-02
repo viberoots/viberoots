@@ -1,0 +1,24 @@
+{
+  "specVersion": "1.0.0",
+  "schemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "tool": {
+    "name": "ctljson",
+    "title": "Emit single JSON control message",
+    "description": "Emits a JSON document with $jio.ctl and $jio.ctl.elicit",
+    "inputSchema": { "type": "object", "additionalProperties": false },
+    "outputSchema": { "type": "object" }
+  },
+  "command": {
+    "package": "io.example.examples",
+    "exec": "bash",
+    "parameters": {
+      "script": { "type": "string", "position": 1, "value": "-lc" },
+      "body": {
+        "type": "string",
+        "position": 2,
+        "value": "printf '%s' '{\"$jio.ctl\":true,\"$jio.ctl.elicit\":{\"message\":\"confirm?\",\"confirmProperty\":\"confirm\"}}'"
+      }
+    },
+    "stdoutTransform": { "shell": "cat", "format": "json" }
+  }
+}

@@ -28,6 +28,7 @@ const JioSpecSchema: any = {
         exec: { type: "string" },
         workingDir: { type: "string" },
         inheritCallerCwd: { type: "boolean", default: false },
+        ignoreControlMessages: { type: "boolean", default: false },
         env: { type: "object", additionalProperties: { type: "string" } },
         defaultBooleanStyle: { type: "string", enum: ["presence", "equals"], default: "presence" },
         timeoutMs: { type: "integer", minimum: 1 },

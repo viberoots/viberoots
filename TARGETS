@@ -649,3 +649,39 @@ zx_test(
     script = "tools/tests/jio.mcp.http.limits-precedence.test.ts",
     out = "jio_mcp_http_limits_precedence.stamp",
 )
+
+zx_test(
+    name = "jio_mcp_http_elicit",
+    script = "tools/tests/jio.mcp.http.elicit.test.ts",
+    out = "jio_mcp_http_elicit.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_http_control_json",
+    script = "tools/tests/jio.mcp.http.control-json.test.ts",
+    out = "jio_mcp_http_control_json.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_http_control_ndjson",
+    script = "tools/tests/jio.mcp.http.control-ndjson.test.ts",
+    out = "jio_mcp_http_control_ndjson.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_http_control_ignore",
+    script = "tools/tests/jio.mcp.http.control-ignore.test.ts",
+    out = "jio_mcp_http_control_ignore.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_http_control_json_tool_driven",
+    script = "tools/tests/jio.mcp.http.control-json-tool-driven.test.ts",
+    out = "jio_mcp_http_control_json_tool_driven.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_http_control_ignore_meta",
+    script = "tools/tests/jio.mcp.http.control-ignore-meta.test.ts",
+    out = "jio_mcp_http_control_ignore_meta.stamp",
+)
