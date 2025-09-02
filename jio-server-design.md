@@ -333,6 +333,53 @@ The implementation will be split into focused PRs to ensure clear review boundar
 - Register read-only resources for spec files; implement helper prompts `list-tools` and `explain-tool {name}`.
 - Tests: unit for resource resolution; integration for prompts returning expected summaries.
 
+  [PR6.1] Resource spec format and discovery (relative paths)
+  - Add a new discovery glob `**/*.resource.json` alongside tools.
+  - Define a minimal schema for resource specs:
+    - `id` (string, unique)
+    - `name` (string)
+    - `description?` (string)
+    - `file` (string) — path to the underlying artifact, RESOLVED RELATIVE TO THE DIRECTORY CONTAINING THE `.resource.json` FILE (not the repo root).
+    - `mimeType?` (string) — optional; server may sniff a safe subset if omitted
+    - `etag?` (string | "auto")
+    - `cacheControl?` (string)
+  - Add schema validation and clear diagnostics; reject duplicates on `id`.
+
+  [PR6.2] Resource index and core API
+  - Build and cache an index: `resourceId → { meta, absPath }` with paths normalized using the spec file’s directory as the base.
+  - Export core helpers from `tools/jio/core` for server reuse (e.g., `discoverResources`, `readResourceSpec`).
+
+  [PR6.3] HTTP resource serving
+  - Add `GET /jio/resources/:id` route to serve static files by `id`.
+  - Headers: `Content-Type` (declared or safe-sniffed), `ETag` (auto or provided), `Cache-Control` (from spec or default), `Content-Length`.
+  - Limits and safety: path normalization within repo root, deny traversal, cap max response bytes, 404 on unknown id.
+
+  [PR6.4] MCP resources surface (list/read)
+  - Register resources in MCP: `listResources` returns entries `{ id, name, description, mimeType, uri }` where `uri` is `http(s)://<host>/jio/resources/<id>` when HTTP is enabled, or a virtual URI otherwise.
+  - Implement `readResource(id)` for stdio transport by reading the mapped file and returning bytes + `mimeType`.
+  - Ensure `listResources/readResource` reflect the relative-path resolution rule.
+
+  [PR6.5] Configuration & policy
+  - Server flags:
+    - `--resources=on|off` (default on)
+    - `--resource-max-bytes N` (cap per-response)
+    - `--resource-allow-file-uris=on|off` (default off; prefer server URL)
+  - MIME sniffing limited to a safe list; otherwise require explicit `mimeType`.
+
+  [PR6.6] Test coverage (unit + integration)
+  - Discovery: duplicate-id rejection; invalid spec errors; relative path resolution (nested directories).
+  - HTTP: `GET /jio/resources/:id` returns expected headers/body; enforces size caps; 404 on unknown id; denies traversal.
+  - MCP stdio: `listResources` shape; `readResource(id)` returns bytes and `mimeType`.
+  - End-to-end: adding/removing a `.resource.json` updates the exposed set; concurrency does not block resource serving.
+
+  [PR6.7] Documentation
+  - Update the user manual with the new `*.resource.json` format, relative path semantics, configuration flags, and examples.
+  - Add a small example resource in `tools/examples/` and reference it in tests.
+
+  [PR6.8] Security hardening (optional)
+  - Allowlist for `mimeType` and optional denylist for file extensions.
+  - Optional signature or checksum support (`sha256?`) for integrity hints in specs.
+
 **PR 7: Safe mode and policy hardening**
 
 - `--safe-mode` disallows shell transforms at runtime; only pass through stdout and enforce formats. Validate configuration at startup and per-call.

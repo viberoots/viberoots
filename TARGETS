@@ -1,6 +1,10 @@
 # Buck2 targets
-
 load("//tools/buck:zx_test.bzl", "zx_test")
+zx_test(
+    name = "jio_resources_discovery",
+    script = "tools/tests/jio.resources.discovery.test.ts",
+    out = "jio_resources_discovery.stamp",
+)
 zx_test(
     name = "gen_jio_schema_types",
     script = "tools/jio/schema/gen-types.ts",
