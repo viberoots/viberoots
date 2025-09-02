@@ -5,6 +5,12 @@ zx_test(
     script = "tools/tests/jio.resources.discovery.test.ts",
     out = "jio_resources_discovery.stamp",
 )
+
+zx_test(
+    name = "jio_resources_registry",
+    script = "tools/tests/jio.resources.registry.test.ts",
+    out = "jio_resources_registry.stamp",
+)
 zx_test(
     name = "gen_jio_schema_types",
     script = "tools/jio/schema/gen-types.ts",
