@@ -594,21 +594,50 @@ export async function startMcpServer(
     (server as any).server?.registerCapabilities?.({ tools: {} });
   } catch {}
   const ajv = new Ajv({ strict: true, allErrors: true });
-  // PR4: apply same limits and optional concurrency gate for stdio
+  // PR4: full queue semantics for stdio as well
   const maxConcurrent = Number.isFinite(opts.maxConcurrentCalls as number)
     ? Math.max(0, opts.maxConcurrentCalls as number)
+    : 0; // 0 = unlimited
+  const queueSize = Number.isFinite(opts.queueSize as number)
+    ? Math.max(0, opts.queueSize as number)
+    : 0;
+  const queueTimeoutMs = Number.isFinite(opts.queueTimeoutMs as number)
+    ? Math.max(0, opts.queueTimeoutMs as number)
     : 0;
   let inFlight = 0;
-  const tryAcquire = (): boolean => {
-    if (!maxConcurrent) return true;
-    if (inFlight < maxConcurrent) {
-      inFlight++;
-      return true;
-    }
-    return false;
-  };
+  const waitQueue: Array<{
+    res: (v: () => void) => void;
+    rej: (e: any) => void;
+    t?: NodeJS.Timeout;
+  }> = [];
   const release = () => {
-    if (maxConcurrent) inFlight = Math.max(0, inFlight - 1);
+    inFlight = Math.max(0, inFlight - 1);
+    const next = waitQueue.shift();
+    if (next) {
+      clearTimeout(next.t as any);
+      inFlight++;
+      next.res(() => release());
+    }
+  };
+  const acquire = async (): Promise<() => void> => {
+    if (!maxConcurrent || inFlight < maxConcurrent) {
+      inFlight++;
+      return () => release();
+    }
+    if (waitQueue.length >= queueSize) {
+      throw Object.assign(new Error("Server busy"), { code: "ServerBusy" });
+    }
+    return await new Promise<() => void>((res, rej) => {
+      const entry: any = { res, rej };
+      if (queueTimeoutMs > 0) {
+        entry.t = setTimeout(() => {
+          const idx = waitQueue.indexOf(entry);
+          if (idx >= 0) waitQueue.splice(idx, 1);
+          rej(Object.assign(new Error("Queue timeout"), { code: "QueueTimeout" }));
+        }, queueTimeoutMs);
+      }
+      waitQueue.push(entry);
+    });
   };
 
   for (const [fq, spec] of specs) {
@@ -669,10 +698,9 @@ export async function startMcpServer(
     };
 
     registerWith(async (args: any) => {
+      let done: (() => void) | null = null;
       try {
-        if (!tryAcquire()) {
-          return { type: "error", error: { type: "Error", message: "Server busy" } } as any;
-        }
+        if (maxConcurrent) done = await acquire();
         const argsForValidation = args && typeof args === "object" ? { ...args } : args;
         let allowedKeys: Set<string> | null = null;
         if (inputSchema && (inputSchema as any).type === "object") {
@@ -845,7 +873,7 @@ export async function startMcpServer(
         return { isError: true, content: [{ type: "text", text: String(e?.message || e) }] } as any;
       } finally {
         try {
-          release();
+          if (done) done();
         } catch {}
       }
     });

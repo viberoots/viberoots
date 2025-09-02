@@ -645,6 +645,12 @@ zx_test(
 )
 
 zx_test(
+    name = "jio_mcp_stdio_queue_semantics",
+    script = "tools/tests/jio.mcp.stdio.queue-semantics.test.ts",
+    out = "jio_mcp_stdio_queue_semantics.stamp",
+)
+
+zx_test(
     name = "jio_mcp_http_queue_timeout",
     script = "tools/tests/jio.mcp.http.queue-timeout.test.ts",
     out = "jio_mcp_http_queue_timeout.stamp",
