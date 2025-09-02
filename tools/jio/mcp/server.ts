@@ -1,5 +1,5 @@
 import Ajv from "ajv";
-import { PassThrough } from "node:stream";
+import { PassThrough, Writable } from "node:stream";
 import {
   buildArgv,
   discoverJioTools,
@@ -251,13 +251,99 @@ export async function startMcpServer(
               error: { type: "ConfigError", message: String(e?.message || e) },
             } as any;
           }
-          // PR3.1: collect outputs to return a single JSON document over HTTP
+          // Progressive NDJSON streaming over HTTP: when stdout is NDJSON and JSON fallback is not forced,
+          // stream each item as an MCP notification and also accumulate items for the final structuredContent.
+          const forceJsonResp = process.env.JIO_MCP_HTTP_JSON_RESPONSE === "1";
+          const isNdjson = spec.command?.stdoutTransform?.format === "ndjson";
+          const shouldStreamNdjson = isNdjson && !forceJsonResp;
           const outStream = new PassThrough();
           const errStream = new PassThrough();
           const inStream = new PassThrough();
           let out = "";
           let err = "";
-          outStream.on("data", (b) => (out += Buffer.from(b as any).toString("utf8")));
+          // When streaming, parse lines and emit item notifications as they arrive.
+          let lineBuf = "";
+          const streamedItems: any[] = [];
+          let sawCtl = false as boolean;
+          let ctlPayload: any = null;
+          const notifyItem = (obj: any) => {
+            try {
+              if ((mcp as any).server?.notification) {
+                (mcp as any).server.notification({
+                  method: "notifications/item",
+                  params: { item: obj },
+                });
+              }
+            } catch {}
+          };
+          if (!shouldStreamNdjson) {
+            outStream.on("data", (b) => (out += Buffer.from(b as any).toString("utf8")));
+          }
+          // Custom sink to ensure all writes are observed before returning
+          const ndjsonSink: Writable | null = shouldStreamNdjson
+            ? new Writable({
+                write(chunk, _enc, cb) {
+                  try {
+                    const part = Buffer.from(chunk as any).toString("utf8");
+                    lineBuf += part;
+                    while (true) {
+                      const nl = lineBuf.indexOf("\n");
+                      if (nl < 0) break;
+                      let line = lineBuf.slice(0, nl);
+                      lineBuf = lineBuf.slice(nl + 1);
+                      const s = line.trim();
+                      if (!s) continue;
+                      try {
+                        const obj = JSON.parse(s);
+                        if (
+                          !ignoreCtl &&
+                          obj &&
+                          typeof obj === "object" &&
+                          obj["$jio.ctl"] === true
+                        ) {
+                          if (obj["$jio.ctl.elicit"]) {
+                            ctlPayload = obj["$jio.ctl.elicit"];
+                            sawCtl = true;
+                            if (k !== undefined) inflight.set(k, { cancelled: true });
+                            continue;
+                          }
+                        }
+                        streamedItems.push(obj);
+                        notifyItem(obj);
+                      } catch {}
+                    }
+                  } finally {
+                    cb();
+                  }
+                },
+                final(cb) {
+                  try {
+                    const trailing = lineBuf.trim();
+                    if (trailing) {
+                      try {
+                        const obj = JSON.parse(trailing);
+                        if (
+                          !ignoreCtl &&
+                          obj &&
+                          typeof obj === "object" &&
+                          obj["$jio.ctl"] === true
+                        ) {
+                          if (obj["$jio.ctl.elicit"]) {
+                            ctlPayload = obj["$jio.ctl.elicit"];
+                            sawCtl = true;
+                          }
+                        } else {
+                          streamedItems.push(obj);
+                          notifyItem(obj);
+                        }
+                      } catch {}
+                    }
+                  } finally {
+                    cb();
+                  }
+                },
+              })
+            : null;
           errStream.on("data", (b) => (err += Buffer.from(b as any).toString("utf8")));
           const progressToken = args?._meta?.progressToken;
           const ignoreCtl =
@@ -274,7 +360,7 @@ export async function startMcpServer(
             cfg as any,
             invObj,
             {
-              collect: true,
+              collect: !shouldStreamNdjson,
               collectLimit: opts.collectLimit,
               limits: {
                 collectItems: (opts.maxItemsPerCall as any) ?? opts.collectLimit,
@@ -289,7 +375,7 @@ export async function startMcpServer(
               cleanEnv: opts.cleanEnv !== false,
               passEnv: opts.passEnv || [],
               setEnv: opts.setEnv || {},
-              stdoutTarget: outStream as any,
+              stdoutTarget: (ndjsonSink as any) || (outStream as any),
               stderrTarget: errStream as any,
               inputSource: inStream as any,
               isCancelled: () => (k !== undefined && inflight.get(k)?.cancelled) || false,
@@ -317,13 +403,32 @@ export async function startMcpServer(
                   : undefined,
             } as any,
           );
+          if (shouldStreamNdjson && !ignoreCtl && sawCtl && ctlPayload) {
+            return { control: { elicit: ctlPayload } } as any;
+          }
           if (code && code !== 0) return mapExit(code);
           try {
             const ignoreCtl =
               spec.command?.ignoreControlMessages === true ||
               args?._meta?.ignoreControlMessages === true;
             let obj: any = null;
-            if (out) {
+            if (shouldStreamNdjson) {
+              // If control was observed, return control result.
+              if (!ignoreCtl && sawCtl && ctlPayload) {
+                return { control: { elicit: ctlPayload } } as any;
+              }
+              // Flush trailing line if any
+              const trailing = lineBuf.trim();
+              if (trailing) {
+                try {
+                  const o = JSON.parse(trailing);
+                  streamedItems.push(o);
+                  notifyItem(o);
+                } catch {}
+              }
+              // For streaming mode, still provide a final structuredContent for convenience.
+              obj = streamedItems.slice();
+            } else if (out) {
               try {
                 obj = JSON.parse(out);
               } catch {
@@ -569,6 +674,16 @@ export async function startMcpServer(
           return { type: "error", error: { type: "Error", message: "Server busy" } } as any;
         }
         const argsForValidation = args && typeof args === "object" ? { ...args } : args;
+        let allowedKeys: Set<string> | null = null;
+        if (inputSchema && (inputSchema as any).type === "object") {
+          const hasProps = !!(inputSchema as any).properties;
+          const addl = (inputSchema as any).additionalProperties;
+          if (addl === false) {
+            allowedKeys = new Set(Object.keys((inputSchema as any).properties || {}));
+          } else if (hasProps) {
+            allowedKeys = new Set(Object.keys((inputSchema as any).properties));
+          }
+        }
         if (argsForValidation && typeof argsForValidation === "object") {
           delete (argsForValidation as any)._meta;
           delete (argsForValidation as any).signal;
@@ -667,6 +782,9 @@ export async function startMcpServer(
         if (code && code !== 0) return mapExit(code);
         try {
           let obj: any = null;
+          const ignoreCtl =
+            spec.command?.ignoreControlMessages === true ||
+            args?._meta?.ignoreControlMessages === true;
           if (out) {
             try {
               obj = JSON.parse(out);
@@ -687,7 +805,6 @@ export async function startMcpServer(
               }
             }
           }
-          // ignoreCtl computed above
           if (!ignoreCtl && obj != null) {
             const isCtlObj = (o: any) => o && typeof o === "object" && o["$jio.ctl"] === true;
             if (Array.isArray(obj)) {

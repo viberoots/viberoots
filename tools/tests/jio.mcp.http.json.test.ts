@@ -57,6 +57,8 @@ describe("jio mcp — http json (non-streaming)", () => {
       process.exit(2);
     }
     const ls = tools.tools.find((t: any) => t.name === "io.example.examples.ls");
+    // Enable JSON fallback to validate non-streaming mode remains working
+    process.env.JIO_MCP_HTTP_JSON_RESPONSE = "1";
     const result = await client.callTool({
       name: ls?.name || "io.example.examples.ls",
       arguments: {},
@@ -70,6 +72,7 @@ describe("jio mcp — http json (non-streaming)", () => {
       } catch {}
       process.exit(2);
     }
+    delete (process.env as any).JIO_MCP_HTTP_JSON_RESPONSE;
     await client.close().catch(() => {});
     if (srv && srv.close) await srv.close();
   });
