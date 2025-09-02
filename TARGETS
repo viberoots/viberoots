@@ -521,6 +521,12 @@ zx_test(
 )
 
 zx_test(
+    name = "json_cli_cli_flags_env_dry_run",
+    script = "tools/tests/jio.cli-flags.env-dry-run.test.ts",
+    out = "json_cli_cli_flags_env_dry_run.stamp",
+)
+
+zx_test(
     name = "json_cli_invalid_invocation_object",
     script = "tools/tests/jio.invalid-invocation-object.test.ts",
     out = "json_cli_invalid_invocation_object.stamp",

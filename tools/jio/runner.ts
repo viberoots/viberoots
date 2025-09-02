@@ -292,7 +292,11 @@ export async function main(argv: string[]): Promise<number | void> {
   }
 
   if (opts.dryRun) {
-    const plan = buildDryRunPlan(rootDir, specPathStr, spec, argvBuilt, rootCfg);
+    const plan = buildDryRunPlan(rootDir, specPathStr, spec, argvBuilt, rootCfg, {
+      cleanEnv: opts.cleanEnv,
+      passEnv: opts.passEnv,
+      setEnv: opts.setEnv,
+    });
     console.log(JSON.stringify(plan));
     return 0;
   }
@@ -1146,9 +1150,10 @@ export function buildDryRunPlan(
   spec: ToolSpec,
   argv: string[],
   rootCfg: RootConfig,
+  runtime: { cleanEnv: boolean; passEnv: string[]; setEnv: Record<string, string> },
 ) {
   const cwd = resolveWorkingDir(rootDir, specPath, spec);
-  const env = mergeEnv(rootCfg, spec);
+  const env = buildChildEnv(rootCfg, spec, runtime);
   return {
     exec: spec.command?.exec,
     argv,
