@@ -237,9 +237,6 @@ export async function startMcpServer(
                 try {
                   return await (cb as any)(...handlerArgs);
                 } catch (e: any) {
-                  try {
-                    process.stderr.write(`[TMPDBG] RESP_ERR fq=${fq} ${String(e?.message || e)}\n`);
-                  } catch {}
                   throw e;
                 }
               },
@@ -1316,7 +1313,6 @@ export async function startMcpServer(
                         message: foundCtl?.message,
                         requestedSchema: foundCtl?.requestedSchema,
                       }).catch(() => null);
-                      tmpDbg(`ELICIT_RESP action=${(elicitRes as any)?.action}`); // TMPDBG
                       if (elicitRes && elicitRes.action === "accept") {
                         const invObj2 = {
                           ...(args ?? {}),
@@ -1361,7 +1357,6 @@ export async function startMcpServer(
                             isCancelled: () => false,
                           } as any,
                         );
-                        tmpDbg(`SECOND_RUN_CODE_JSON=${String(code2 || 0)}`); // TMPDBG
                         if (code2 && code2 !== 0) return mapExit(code2);
                         try {
                           const items2: any[] = [];
@@ -1427,7 +1422,6 @@ export async function startMcpServer(
                 const ctl = obj.find((o) => isCtlObj(o));
                 if (ctl && ctl["$jio.ctl.elicit"]) {
                   try {
-                    tmpDbg("ARRAY_CONTROL_DETECTED"); // TMPDBG
                     if (forcedElicit && forcedElicit.action === "accept") {
                       const invObj2 = {
                         ...(args ?? {}),
@@ -1485,7 +1479,6 @@ export async function startMcpServer(
                     }
                     const req = extra?.sendRequest;
                     if (typeof req === "function") {
-                      tmpDbg("ELICIT_REQ_SEND_SECOND_RUN"); // TMPDBG
                       const { ElicitResultSchema } = await import(
                         "@modelcontextprotocol/sdk/types.js"
                       );
@@ -1501,8 +1494,7 @@ export async function startMcpServer(
                                 },
                               } as any,
                               ElicitResultSchema as any,
-                            );
-                      //
+                            ).catch(() => null);
                       if (elicitRes && elicitRes.action === "accept") {
                         const invObj2 = {
                           ...(args ?? {}),
@@ -1547,7 +1539,6 @@ export async function startMcpServer(
                             isCancelled: () => false,
                           } as any,
                         );
-                        //
                         if (code2 && code2 !== 0) return mapExit(code2);
                         try {
                           const obj2 = outTxt ? JSON.parse(outTxt) : null;
@@ -1572,10 +1563,8 @@ export async function startMcpServer(
                 }
               } else if (isCtlObj(obj) && obj["$jio.ctl.elicit"]) {
                 try {
-                  //
                   const req = extra?.sendRequest;
                   if (typeof req === "function") {
-                    //
                     const { ElicitResultSchema } = await import(
                       "@modelcontextprotocol/sdk/types.js"
                     );
@@ -1592,7 +1581,6 @@ export async function startMcpServer(
                             } as any,
                             ElicitResultSchema as any,
                           ).catch(() => null);
-                    //
                     if (elicitRes && elicitRes.action === "accept") {
                       const invObj2 = {
                         ...(args ?? {}),
@@ -1637,7 +1625,6 @@ export async function startMcpServer(
                           isCancelled: () => false,
                         } as any,
                       );
-                      //
                       if (code2 && code2 !== 0) return mapExit(code2);
                       try {
                         const obj2 = outTxt ? JSON.parse(outTxt) : null;
@@ -2059,7 +2046,7 @@ export async function startMcpServer(
         const oparse = ot === "zod" && typeof (maybeOutput as any).parse === "function";
         const ik = it === "object" ? Object.keys(maybeParams || {}).length : 0;
         const ok = ot === "object" ? Object.keys(maybeOutput || {}).length : 0;
-        const msg = `[TMPDBG] REG_STDIO in=${String(it)}(${String(ik)}) parse=${String(iparse)} out=${String(ot)}(${String(ok)}) parse=${String(oparse)} fq=${fq}`;
+        const msg = ``;
         process.stderr.write(msg + "\n");
       } catch {}
       if (maybeParams || maybeOutput) {
