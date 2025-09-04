@@ -221,20 +221,11 @@ export async function startMcpServer(
           const oparse = ot === "zod" && typeof (maybeOutput as any).parse === "function";
           const ik = it === "object" ? Object.keys(maybeParams || {}).length : 0;
           const ok = ot === "object" ? Object.keys(maybeOutput || {}).length : 0;
-          const msg = `[TMPDBG] REG_HTTP in=${String(it)}(${String(ik)}) parse=${String(iparse)} out=${String(ot)}(${String(ok)}) parse=${String(oparse)} fq=${fq}`;
-          process.stderr.write(msg + "\n");
-          try {
-            const p = process.env.JIO_TMPDBG_FILE || "/tmp/jio_tmpdbg.log";
-            fss.appendFile(p, msg + "\n", () => {});
-          } catch {}
+          // debug removed
         } catch {}
         if (maybeParams || maybeOutput) {
           try {
-            process.stderr.write(`[TMPDBG] REG_HTTP_CALL fq=${fq}\n`);
-            try {
-              const p = process.env.JIO_TMPDBG_FILE || "/tmp/jio_tmpdbg.log";
-              fss.appendFile(p, `[TMPDBG] REG_HTTP_CALL fq=${fq}\n`, () => {});
-            } catch {}
+            // debug removed
             const res = (mcp as any).registerTool(
               fq,
               {
@@ -253,24 +244,10 @@ export async function startMcpServer(
                 }
               },
             );
-            process.stderr.write(`[TMPDBG] REG_HTTP_OK fq=${fq}\n`);
-            try {
-              const p = process.env.JIO_TMPDBG_FILE || "/tmp/jio_tmpdbg.log";
-              fss.appendFile(p, `[TMPDBG] REG_HTTP_OK fq=${fq}\n`, () => {});
-            } catch {}
+            // debug removed
             return res;
           } catch (e: any) {
-            try {
-              process.stderr.write(`[TMPDBG] REG_HTTP_ERR fq=${fq} ${String(e?.message || e)}\n`);
-            } catch {}
-            try {
-              const p = process.env.JIO_TMPDBG_FILE || "/tmp/jio_tmpdbg.log";
-              fss.appendFile(
-                p,
-                `[TMPDBG] REG_HTTP_ERR fq=${fq} ${String(e?.message || e)}\n`,
-                () => {},
-              );
-            } catch {}
+            // debug removed
             throw e;
           }
         }
@@ -278,17 +255,7 @@ export async function startMcpServer(
       };
 
       registerWith(async (args: any, extra: any) => {
-        // TMPDBG: helper to emit temporary debug traces
-        const tmpDbg = (tag: string) => {
-          try {
-            const line = `[TMPDBG] ${String(tag)}\n`;
-            process.stderr.write(line);
-            const p = process.env.JIO_TMPDBG_FILE || "/tmp/jio_tmpdbg.log";
-            try {
-              fss.appendFile(p, line, () => {});
-            } catch {}
-          } catch {}
-        };
+        const tmpDbg = (_tag: string) => {};
         // Concurrency gate
         let done: (() => void) | null = null;
         try {
@@ -458,7 +425,7 @@ export async function startMcpServer(
             } catch {}
           };
           if (!shouldStreamNdjson) {
-            tmpDbg("HANDLER_ENTER_JSON"); // TMPDBG
+            //
             outStream.on("data", (b) => (out += Buffer.from(b as any).toString("utf8")));
           }
           // Disable outputSchema on the first run to allow control messages; preserve original stdoutTransform
@@ -737,7 +704,7 @@ export async function startMcpServer(
             `FIRST_RUN_START_JSON argv=${JSON.stringify(argv)} fmt=${String(
               (specForRun as any)?.command?.stdoutTransform?.format,
             )}`,
-          ); // TMPDBG
+          );
           const code = await runWithTransforms(
             dir,
             specPath as string,
@@ -793,11 +760,11 @@ export async function startMcpServer(
           );
           tmpDbg(
             `FIRST_RUN_DONE_JSON code=${String(code || 0)} outLen=${String(out.length)} errLen=${String(err.length)}`,
-          ); // TMPDBG
+          );
           if (err) tmpDbg(`FIRST_RUN_ERR ${err.slice(0, 500)}`);
           tmpDbg(
             `FIRST_RUN_FLAGS sawCtl=${String(sawCtl)} items=${String(streamedItems.length)} hasCtlPayload=${String(!!ctlPayload)}`,
-          ); // TMPDBG
+          );
           // Allow brief time for stderr to flush debug lines from runner, then try fallback parse
           if (!ignoreCtl && !sawCtl) {
             try {
@@ -813,9 +780,9 @@ export async function startMcpServer(
           // Fallback: if runner reported preview lines in stderr, try to parse them for control
           if (!ignoreCtl && !sawCtl && err) {
             try {
-              const MARK = "[TMPDBG] RUNNER_NDJSON_INVALID_LINE ";
-              const MARK2 = "[TMPDBG] RUNNER_NDJSON_LINE ";
-              const MARK_JSON = "[TMPDBG] RUNNER_JSON_INVALID_PREVIEW ";
+              const MARK = "RUNNER_NDJSON_INVALID_LINE_NOT_USED ";
+              const MARK2 = "RUNNER_NDJSON_LINE_NOT_USED ";
+              const MARK_JSON = "RUNNER_JSON_INVALID_PREVIEW_NOT_USED ";
               const lines = err.split(/\r?\n/);
               for (let i = 0; i < lines.length; i++) {
                 const ln = lines[i];
@@ -913,7 +880,7 @@ export async function startMcpServer(
             try {
               const req = extra?.sendRequest;
               if (typeof req === "function") {
-                tmpDbg("ELICIT_REQ_SEND_STREAMED"); // TMPDBG
+                //
                 const { ElicitResultSchema } = await import("@modelcontextprotocol/sdk/types.js");
                 const elicitRes = await req(
                   {
@@ -925,9 +892,9 @@ export async function startMcpServer(
                   } as any,
                   ElicitResultSchema as any,
                 ).catch(() => null);
-                tmpDbg(`ELICIT_RESP action=${(elicitRes as any)?.action}`); // TMPDBG
+                //
                 if (elicitRes && elicitRes.action === "accept") {
-                  tmpDbg("SECOND_RUN_BUILD_SPEC");
+                  //
                   const invObj2 = {
                     ...(args ?? {}),
                     ["$jio.ctl.elicit.response"]: {
@@ -943,7 +910,7 @@ export async function startMcpServer(
                   let errTxt2 = "";
                   out2.on("data", (b) => (outTxt2 += Buffer.from(b as any).toString("utf8")));
                   err2.on("data", (b) => (errTxt2 += Buffer.from(b as any).toString("utf8")));
-                  tmpDbg("SECOND_RUN_START_STREAMED"); // TMPDBG
+                  //
                   const code2 = await runWithTransforms(
                     dir,
                     specPath as string,
@@ -973,7 +940,7 @@ export async function startMcpServer(
                       isCancelled: () => false,
                     } as any,
                   );
-                  tmpDbg(`SECOND_RUN_CODE_STREAMED=${String(code2 || 0)}`); // TMPDBG
+                  //
                   if (code2 && code2 !== 0) return mapExit(code2);
                   try {
                     const fmt = (spec?.command as any)?.stdoutTransform?.format;
@@ -1005,9 +972,7 @@ export async function startMcpServer(
                       }
                     } catch (e: any) {
                       try {
-                        process.stderr.write(
-                          `[TMPDBG] SECOND_RUN_VALIDATE_JSON_ERR ${String(e?.message || e)}\n`,
-                        );
+                        //
                       } catch {}
                     }
                     if (fmt !== "ndjson") {
@@ -1176,12 +1141,12 @@ export async function startMcpServer(
               }
               const req = extra?.sendRequest;
               if (typeof req === "function") {
-                tmpDbg("ELICIT_REQ_SEND_SECOND_RUN"); // TMPDBG
+                //
                 const elicitRes = await req("elicitation/create", {
                   message: ctlPayload?.message,
                   requestedSchema: ctlPayload?.requestedSchema,
                 }).catch(() => null);
-                tmpDbg(`ELICIT_RESP action=${(elicitRes as any)?.action}`); // TMPDBG
+                //
                 if (elicitRes && elicitRes.action === "accept") {
                   const invObj2 = {
                     ...(args ?? {}),
@@ -1226,7 +1191,7 @@ export async function startMcpServer(
                       isCancelled: () => false,
                     } as any,
                   );
-                  tmpDbg(`SECOND_RUN_CODE_ARRAY=${String(code2 || 0)}`); // TMPDBG
+                  //
                   if (code2 && code2 !== 0) return mapExit(code2);
                   try {
                     const obj2 = outTxt ? JSON.parse(outTxt) : null;
@@ -1346,7 +1311,7 @@ export async function startMcpServer(
                   try {
                     const req = extra?.sendRequest;
                     if (typeof req === "function") {
-                      tmpDbg("ELICIT_REQ_SEND_SECOND_RUN"); // TMPDBG
+                      //
                       const elicitRes = await req("elicitation/create", {
                         message: foundCtl?.message,
                         requestedSchema: foundCtl?.requestedSchema,
@@ -1537,8 +1502,7 @@ export async function startMcpServer(
                               } as any,
                               ElicitResultSchema as any,
                             );
-                      tmpDbg(`ELICIT_RESP action=${(elicitRes as any)?.action}`); // TMPDBG
-                      tmpDbg(`ELICIT_RESP action=${(elicitRes as any)?.action}`); // TMPDBG
+                      //
                       if (elicitRes && elicitRes.action === "accept") {
                         const invObj2 = {
                           ...(args ?? {}),
@@ -1583,7 +1547,7 @@ export async function startMcpServer(
                             isCancelled: () => false,
                           } as any,
                         );
-                        tmpDbg(`SECOND_RUN_CODE_JSON=${String(code2 || 0)}`); // TMPDBG
+                        //
                         if (code2 && code2 !== 0) return mapExit(code2);
                         try {
                           const obj2 = outTxt ? JSON.parse(outTxt) : null;
@@ -1608,10 +1572,10 @@ export async function startMcpServer(
                 }
               } else if (isCtlObj(obj) && obj["$jio.ctl.elicit"]) {
                 try {
-                  tmpDbg("JSON_CONTROL_DETECTED"); // TMPDBG
+                  //
                   const req = extra?.sendRequest;
                   if (typeof req === "function") {
-                    tmpDbg("ELICIT_REQ_SEND_JSON"); // TMPDBG
+                    //
                     const { ElicitResultSchema } = await import(
                       "@modelcontextprotocol/sdk/types.js"
                     );
@@ -1628,7 +1592,7 @@ export async function startMcpServer(
                             } as any,
                             ElicitResultSchema as any,
                           ).catch(() => null);
-                    tmpDbg(`ELICIT_RESP action=${(elicitRes as any)?.action}`); // TMPDBG
+                    //
                     if (elicitRes && elicitRes.action === "accept") {
                       const invObj2 = {
                         ...(args ?? {}),
@@ -1673,7 +1637,7 @@ export async function startMcpServer(
                           isCancelled: () => false,
                         } as any,
                       );
-                      tmpDbg(`SECOND_RUN_CODE_JSON=${String(code2 || 0)}`); // TMPDBG
+                      //
                       if (code2 && code2 !== 0) return mapExit(code2);
                       try {
                         const obj2 = outTxt ? JSON.parse(outTxt) : null;
@@ -1783,7 +1747,7 @@ export async function startMcpServer(
       allowedOrigins: allowedOrigins.length ? allowedOrigins : undefined,
       enableCookies: true,
     } as any);
-    // TMPDBG: wrap transport send and error to trace message flow
+    // wrap transport send and error to trace message flow
     try {
       const origSend = (transport as any).send?.bind(transport);
       (transport as any).send = async (message: any, options: any) => {
@@ -1805,7 +1769,7 @@ export async function startMcpServer(
             errorCode: message?.error?.code,
             errorMessage: message?.error?.message,
           };
-          process.stderr.write(`[TMPDBG] TRANS_SEND ${JSON.stringify(meta)}\n`);
+          //
         } catch {}
         try {
           const kind = message?.result
@@ -1825,19 +1789,17 @@ export async function startMcpServer(
             errorCode: message?.error?.code,
             errorMessage: message?.error?.message,
           };
-          const p = process.env.JIO_TMPDBG_FILE || "/tmp/jio_tmpdbg.log";
-          fss.appendFile(p, `[TMPDBG] TRANS_SEND ${JSON.stringify(meta)}\n`, () => {});
+          //
         } catch {}
         return await origSend(message, options);
       };
       const origOnError = (transport as any).onerror?.bind(transport);
       (transport as any).onerror = (err: any) => {
         try {
-          process.stderr.write(`[TMPDBG] TRANS_ERR ${String(err?.message || err)}\n`);
+          //
         } catch {}
         try {
-          const p = process.env.JIO_TMPDBG_FILE || "/tmp/jio_tmpdbg.log";
-          fss.appendFile(p, `[TMPDBG] TRANS_ERR ${String(err?.message || err)}\n`, () => {});
+          //
         } catch {}
         try {
           origOnError?.(err);

@@ -1557,9 +1557,7 @@ export async function runWithTransforms(
     rootDir,
   );
   try {
-    ((runtime as any).stderrTarget || process.stderr).write(
-      `[TMPDBG] RUNNER_EXEC cmd=${String(execCmd)} argv=${JSON.stringify(execArgv)}\n`,
-    );
+    //
   } catch {}
 
   const cmd = spawn(execCmd, execArgv, {
@@ -1586,7 +1584,7 @@ export async function runWithTransforms(
           });
           attachPipeErrorNoops(proc);
           try {
-            ((runtime as any).stderrTarget || process.stderr).write("[TMPDBG] RUNNER_P2_SPAWN\n");
+            //
           } catch {}
           return proc;
         })()
@@ -1697,9 +1695,7 @@ export async function runWithTransforms(
     try {
       if (p2 && p2.stdin) {
         try {
-          ((runtime as any).stderrTarget || process.stderr).write(
-            "[TMPDBG] RUNNER_PIPE_CMD_TO_P2\n",
-          );
+          //
         } catch {}
         cmd.stdout.pipe(p2.stdin);
       } else {
@@ -2063,14 +2059,12 @@ async function handleStdoutNdjson(args: HandleNdjsonArgs): Promise<number | void
   let suppressFurther = false;
 
   try {
-    ((runtime as any).stderrTarget || process.stderr).write(
-      "[TMPDBG] RUNNER_HANDLE_NDJSON_ENTER\n",
-    );
+    //
   } catch {}
 
   for await (const chunk of p2.stdout) {
     try {
-      ((runtime as any).stderrTarget || process.stderr).write("[TMPDBG] RUNNER_NDJSON_CHUNK\n");
+      //
     } catch {}
     buffer += Buffer.from(chunk).toString("utf8");
     if (buffer.indexOf("\n") < 0 && Buffer.byteLength(buffer) > limits.maxNdjsonLineBytes) {
@@ -2314,9 +2308,7 @@ function emitNdjsonLine(args: {
   try {
     try {
       // Reveal escapes and any hidden chars
-      ((args.runtime as any).stderrTarget || process.stderr).write(
-        `[TMPDBG] RUNNER_NDJSON_LINE ${JSON.stringify(s)}\n`,
-      );
+      //
     } catch {}
     // Debug tap: mirror raw line to stdoutTarget before parsing when enabled
     try {
@@ -2324,9 +2316,7 @@ function emitNdjsonLine(args: {
         const out = (args.runtime as any).stdoutTarget || process.stdout;
         const ok = out.write(s + "\n");
         try {
-          ((args.runtime as any).stderrTarget || process.stderr).write(
-            `[TMPDBG] RUNNER_TAP_WRITE ok=${String(!!ok)} toStdout=${String(!(args.runtime as any).stdoutTarget)}\n`,
-          );
+          //
         } catch {}
       }
     } catch {}
@@ -2368,16 +2358,7 @@ function emitNdjsonLine(args: {
   } catch (e: any) {
     process.stderr.write("jio: invalid NDJSON line (not JSON)\n");
     try {
-      ((args.runtime as any).stderrTarget || process.stderr).write(
-        "[TMPDBG] RUNNER_NDJSON_INVALID\n",
-      );
-      ((args.runtime as any).stderrTarget || process.stderr).write(
-        `[TMPDBG] RUNNER_NDJSON_PARSE_ERR ${String(e?.message || e)}\n`,
-      );
-      const preview = s.length > 200 ? s.slice(0, 200) + "…" : s;
-      ((args.runtime as any).stderrTarget || process.stderr).write(
-        `[TMPDBG] RUNNER_NDJSON_INVALID_LINE ${preview}\n`,
-      );
+      //
     } catch {}
     // Fallback: try to salvage a JSON object substring if present
     try {
@@ -2394,9 +2375,7 @@ function emitNdjsonLine(args: {
           } catch {}
         }
         try {
-          ((args.runtime as any).stderrTarget || process.stderr).write(
-            "[TMPDBG] RUNNER_NDJSON_SALVAGED_OBJECT\n",
-          );
+          //
         } catch {}
         if (args.validate && !args.validate(obj)) {
           const msg = JSON.stringify(args.validate.errors?.[0] || {});
@@ -2432,11 +2411,10 @@ function emitNdjsonLine(args: {
     // Emit codepoint diagnostics once to stderr for debugging
     try {
       const cps = Array.from(s)
-        .map((ch) => ch.codePointAt(0)?.toString(16))
+        .slice(0, 8)
+        .map((ch) => ch.codePointAt(0)!)
         .join(",");
-      ((args.runtime as any).stderrTarget || process.stderr).write(
-        `[TMPDBG] RUNNER_NDJSON_CODEPOINTS ${cps}\n`,
-      );
+      //
     } catch {}
     if (args.sink)
       args.sink.write({
@@ -2512,16 +2490,7 @@ async function handleStdoutJson(args: {
   } catch {
     process.stderr.write("jio: invalid JSON output\n");
     try {
-      ((args.runtime as any).stderrTarget || process.stderr).write(
-        `[TMPDBG] RUNNER_JSON_INVALID_PREVIEW ${buf.slice(0, 200)}\n`,
-      );
-      const cps = Array.from(buf)
-        .map((ch: any) => (typeof ch === "string" ? ch : String.fromCharCode(ch)))
-        .map((ch: any) => ch.codePointAt(0)?.toString(16))
-        .join(",");
-      ((args.runtime as any).stderrTarget || process.stderr).write(
-        `[TMPDBG] RUNNER_JSON_CODEPOINTS ${cps}\n`,
-      );
+      //
     } catch {}
     if (sink)
       await sink.write({
