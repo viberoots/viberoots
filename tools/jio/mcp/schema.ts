@@ -66,16 +66,96 @@ export async function jsonSchemaToZodSafe(schema: any): Promise<{ zod?: any; rea
     if (reasons.length) return { reasons };
     const key = sha256(schema);
     if (convCache.has(key)) return { zod: convCache.get(key) };
-    const { jsonSchemaToZod } = await import("json-schema-to-zod");
     const { z } = await import("zod");
-    const zod = jsonSchemaToZod(schema, { module: "esm" }).schema;
-    // Round-trip sanity via Zod 4 native conversion
-    const round = (z as any).toJSONSchema(zod, { target: "draft-2020-12" });
-    const diverged = !shallowComparableEqual(schema, round);
-    if (diverged)
-      return { reasons: [{ keyword: "roundTrip", pointer: "", note: "material divergence" }] };
-    convCache.set(key, zod);
-    return { zod };
+    const build = (s: any): any => {
+      if (!s || typeof s !== "object") return (z as any).any();
+      if (s.const !== undefined) return (z as any).literal(s.const);
+      if (Array.isArray(s.enum)) {
+        const vals = s.enum;
+        if (vals.every((v: any) => typeof v === "string")) return (z as any).enum(vals);
+        return (z as any).union(vals.map((v: any) => (z as any).literal(v)));
+      }
+      const t = s.type;
+      if (Array.isArray(t)) {
+        const nonNull = t.filter((x: any) => x !== "null");
+        if (nonNull.length === 1 && t.includes("null"))
+          return build({ ...s, type: nonNull[0] }).nullable();
+        return (z as any).union(t.map((x: any) => build({ ...s, type: x })));
+      }
+      switch (t) {
+        case "string": {
+          let zz: any = (z as any).string();
+          if (typeof s.minLength === "number") zz = zz.min(s.minLength);
+          if (typeof s.maxLength === "number") zz = zz.max(s.maxLength);
+          if (typeof s.pattern === "string") {
+            try {
+              zz = zz.regex(new RegExp(s.pattern));
+            } catch {}
+          }
+          if (typeof s.format === "string") {
+            if (s.format === "email") zz = zz.email?.() || zz;
+            if (s.format === "uuid") zz = zz.uuid?.() || zz;
+            if (s.format === "url") zz = zz.url?.() || zz;
+            if (s.format === "date-time") zz = zz.datetime?.() || zz;
+          }
+          return zz;
+        }
+        case "number": {
+          let zz: any = (z as any).number();
+          if (typeof s.minimum === "number") zz = zz.min(s.minimum);
+          if (typeof s.maximum === "number") zz = zz.max(s.maximum);
+          return zz;
+        }
+        case "integer": {
+          let zz: any = (z as any).number().int();
+          if (typeof s.minimum === "number") zz = zz.min(s.minimum);
+          if (typeof s.maximum === "number") zz = zz.max(s.maximum);
+          return zz;
+        }
+        case "boolean":
+          return (z as any).boolean();
+        case "null":
+          return (z as any).null();
+        case "array": {
+          const item = build(s.items || {});
+          let zz: any = (z as any).array(item);
+          if (typeof s.minItems === "number") zz = zz.min(s.minItems);
+          if (typeof s.maxItems === "number") zz = zz.max(s.maxItems);
+          return zz;
+        }
+        case "object": {
+          const props = s.properties && typeof s.properties === "object" ? s.properties : {};
+          const required = Array.isArray(s.required) ? new Set(s.required) : new Set<string>();
+          const shapeEntries = Object.entries(props).map(([k, v]: any) => {
+            const base = build(v);
+            const node = required.has(k) ? base : base.optional();
+            return [k, node];
+          });
+          let obj: any = (z as any).object(Object.fromEntries(shapeEntries));
+          // Model JSON Schema additionalProperties semantics:
+          // - false => reject unknown keys (strict)
+          // - schema => validate unknown keys against that schema (catchall)
+          // - true/undefined => allow unknown keys (passthrough)
+          if (s.additionalProperties === false) {
+            obj = obj.strict?.() || obj;
+          } else if (s.additionalProperties && typeof s.additionalProperties === "object") {
+            try {
+              const extra = build(s.additionalProperties);
+              obj = obj.catchall?.(extra) || obj;
+            } catch {
+              obj = obj.passthrough?.() || obj;
+            }
+          } else {
+            obj = obj.passthrough?.() || obj;
+          }
+          return obj;
+        }
+      }
+      return (z as any).any();
+    };
+    const zodInstance = build(schema);
+    convCache.set(key, zodInstance);
+    return { zod: zodInstance };
   } catch (e) {
     return {
       reasons: [{ keyword: "exception", pointer: "", note: String((e as any)?.message || e) }],

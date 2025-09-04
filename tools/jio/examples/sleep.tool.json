@@ -1,0 +1,28 @@
+{
+  "specVersion": "1.0.0",
+  "schemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "tool": {
+    "name": "sleep",
+    "title": "Sleep then output",
+    "description": "Sleeps for several seconds before emitting JSON.",
+    "inputSchema": { "type": "object", "additionalProperties": false },
+    "outputSchema": {
+      "type": "object",
+      "properties": { "ok": { "type": "boolean" } },
+      "required": ["ok"]
+    }
+  },
+  "command": {
+    "package": "io.example.examples",
+    "exec": "bash",
+    "parameters": {
+      "script": { "type": "string", "position": 1, "value": "-lc" },
+      "body": {
+        "type": "string",
+        "position": 2,
+        "value": "sleep 5; printf '%s' '{\"ok\":true}'"
+      }
+    },
+    "stdoutTransform": { "shell": "cat", "format": "json" }
+  }
+}

@@ -40,13 +40,20 @@ describe("jio mcp — http control (NDJSON)", () => {
       new URL(`http://${host}:${port}/mcp`) as any,
       {} as any,
     );
-    const c = new Client({ name: "test", version: "0" });
+    const c = new Client({ name: "test", version: "0" }, {
+      capabilities: { elicitation: {} },
+    } as any);
     await c.connect(t as any);
     const tools = await c.listTools({});
     const tool = tools.tools.find((x: any) => x.name === "io.example.examples.ctlndjson");
+    // Accept elicitations with empty content
+    (c as any).setRequestHandler?.(
+      (await import("@modelcontextprotocol/sdk/types.js")).ElicitRequestSchema,
+      async () => ({ action: "accept", content: {} }),
+    );
     const res = await c.callTool({ name: tool.name, arguments: {} } as any);
-    if (!(res as any)?.control?.elicit) {
-      console.error("expected control elicit result", res);
+    if ((res as any)?.isError || (res as any)?.error) {
+      console.error("expected success result after elicitation", res);
       await c.close().catch(() => {});
       await (t as any).close?.().catch(() => {});
       await srv?.close?.();

@@ -9,6 +9,8 @@ describe("jio mcp — http cancel", () => {
   test("cancel a slow call", async () => {
     const host = "127.0.0.1";
     const port = 36501 + Math.floor(Math.random() * 500);
+    const prevDelay = process.env.JIO_MCP_TEST_DELAY_MS;
+    process.env.JIO_MCP_TEST_DELAY_MS = "2000";
     const srv = await startMcpServer({ transport: "http", httpHost: host, httpPort: port });
     await waitForHealth(host, port, 4000);
     const transport = new StreamableHTTPClientTransport(
@@ -20,25 +22,57 @@ describe("jio mcp — http cancel", () => {
     (transport as any).onmessage = (msg: any) => {
       seen.push(msg);
     };
+    // Intercept outgoing client requests to capture the JSON-RPC id for tools/call
+    let currentRequestId: number | string | undefined = undefined;
+    const origSend = (transport as any).send?.bind(transport);
+    (transport as any).send = async (message: any, options: any) => {
+      try {
+        if (message && message.method === "tools/call" && typeof message.id !== "undefined") {
+          currentRequestId = message.id;
+        }
+      } catch {}
+      return await origSend(message, options);
+    };
     await client.connect(transport as any);
     const tools = await client.listTools({});
-    const ls = tools.tools.find((t: any) => t.name === "io.example.examples.ls");
+    const ls = tools.tools.find((t: any) => t.name === "io.example.examples.sleep");
     // fire request
     const req = client.callTool({
-      name: ls?.name || "io.example.examples.ls",
+      name: ls?.name || "io.example.examples.sleep",
       arguments: {},
-      _meta: { progressToken: "p2" },
     } as any);
-    // send cancellation via POST (mimic notification). The SDK uses numeric ids starting at 1
-    const cancelId = 1;
-    await postJson(host, port, {
-      jsonrpc: "2.0",
-      method: "notifications/cancelled",
-      params: { requestId: cancelId },
-    });
+    // send cancellation via POST (mimic notification) with session/protocol headers and requestId
+    let cancelId: any = 1;
+    const startWait = Date.now();
+    while (Date.now() - startWait < 1000) {
+      if (typeof currentRequestId !== "undefined") {
+        cancelId = currentRequestId;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    const sessionId = (transport as any).sessionId as string | undefined;
+    const protoVersion = (transport as any).protocolVersion as string | undefined;
+    await postJson(
+      host,
+      port,
+      {
+        jsonrpc: "2.0",
+        method: "notifications/cancelled",
+        params: { requestId: cancelId },
+      },
+      {
+        ...(sessionId ? { "mcp-session-id": String(sessionId) } : {}),
+        ...(protoVersion ? { "mcp-protocol-version": String(protoVersion) } : {}),
+      },
+    );
     const result = await req.catch((e) => e);
     const isError =
-      (result && result.isError) || result?.type === "error" || !!result?.error || !!result?.code;
+      result instanceof Error ||
+      (result && result.isError) ||
+      result?.type === "error" ||
+      !!result?.error ||
+      !!result?.code;
     if (!isError) {
       console.error("expected cancellation error/result");
       await client.close().catch(() => {});
@@ -58,6 +92,8 @@ describe("jio mcp — http cancel", () => {
     }
     await client.close().catch(() => {});
     await srv?.close?.();
+    if (prevDelay === undefined) delete (process.env as any).JIO_MCP_TEST_DELAY_MS;
+    else process.env.JIO_MCP_TEST_DELAY_MS = prevDelay;
   });
 });
 
@@ -85,6 +121,7 @@ async function postJson(
   host: string,
   port: number,
   body: any,
+  extraHeaders?: Record<string, string>,
 ): Promise<{ status: number; body: string }> {
   return await new Promise((resolve, reject) => {
     const req = http.request(
@@ -96,6 +133,7 @@ async function postJson(
         headers: {
           "content-type": "application/json",
           accept: "application/json, text/event-stream",
+          ...(extraHeaders || {}),
         },
       },
       (res) => {

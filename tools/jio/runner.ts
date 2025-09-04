@@ -5,6 +5,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import readline from "node:readline";
 import { PassThrough } from "node:stream";
+import { ResourceRegistry } from "./core/resources.ts";
 import { evaluateJsonPathString as evaluateJsonPathRfc } from "./jsonpath/index.ts";
 import { createAjvValidator, generateInputSchemaFromParameters } from "./schema/index.ts";
 import { createAjv } from "./validation/ajv.ts";
@@ -69,6 +70,8 @@ type CliOpts = {
   version: boolean;
   list: boolean;
   where: string | null;
+  listResources: boolean;
+  whereResource: string | null;
   inFile: string | null;
   dryRun: boolean;
   toolRef: string | null;
@@ -195,6 +198,14 @@ export async function main(argv: string[]): Promise<number | void> {
   {
     const listCode = await maybeHandleListMode(opts, rootDir, rootCfg);
     if (listCode !== null) return listCode;
+  }
+
+  // Resource list/where modes
+  {
+    const resListCode = await maybeHandleResourceListMode(opts, rootDir);
+    if (resListCode !== null) return resListCode;
+    const resWhereCode = await maybeHandleResourceWhereMode(opts, rootDir);
+    if (resWhereCode !== null) return resWhereCode;
   }
 
   // Where mode
@@ -384,6 +395,8 @@ function parseArgs(argv: string[]): CliOpts {
     version: false,
     list: false,
     where: null,
+    listResources: false,
+    whereResource: null,
     inFile: null,
     dryRun: false,
     toolRef: null,
@@ -400,9 +413,11 @@ function parseArgs(argv: string[]): CliOpts {
     if (a === "--help" || a === "-h") out.help = true;
     else if (a === "--version" || a === "-v") out.version = true;
     else if (a === "--list") out.list = true;
+    else if (a === "--list-resources") out.listResources = true;
     else if (a === "--dry-run") out.dryRun = true;
     else if (a === "--in") out.inFile = tokens[++i] ?? null;
     else if (a === "--where") out.where = tokens[++i] ?? null;
+    else if (a === "--where-resource") out.whereResource = tokens[++i] ?? null;
     else if (a === "--collect" || a === "--collect-ndjson") out.collect = true;
     else if (a === "--collect-limit") {
       const n = Number(tokens[++i] ?? "");
@@ -462,6 +477,8 @@ Flags:
   -v, --version     Show version
       --list        List discovered tools (FQName -> path)
       --where REF   Print the path to the tool spec for REF
+      --list-resources        List discovered resources (id -> absFilePath)
+      --where-resource ID     Print the abs path to the resource file for ID
       --in FILE     Invocation JSON file
       --dry-run     Print plan without executing
       --collect     For ndjson output, return a single JSON array instead of lines
@@ -499,6 +516,41 @@ async function maybeHandleListMode(
     if (rootCfg.defaultPackage) console.log(`defaultPackage: ${rootCfg.defaultPackage}`);
     const entries = Array.from(idx.entries()).sort((a, b) => a[0].localeCompare(b[0]));
     for (const [fq, p] of entries) console.log(`${fq}\t${p}`);
+    return 0;
+  } catch (e: any) {
+    console.error(String(e?.message || e));
+    return 78;
+  }
+}
+
+async function maybeHandleResourceListMode(opts: CliOpts, rootDir: string): Promise<number | null> {
+  if (!opts.listResources) return null;
+  try {
+    const reg = new ResourceRegistry(rootDir);
+    await reg.refresh();
+    const rows = reg.list();
+    for (const r of rows) console.log(`${r.id}\t${r.absFilePath}`);
+    return 0;
+  } catch (e: any) {
+    console.error(String(e?.message || e));
+    return 78;
+  }
+}
+
+async function maybeHandleResourceWhereMode(
+  opts: CliOpts,
+  rootDir: string,
+): Promise<number | null> {
+  if (!opts.whereResource) return null;
+  try {
+    const reg = new ResourceRegistry(rootDir);
+    await reg.refresh();
+    const hit = reg.get(opts.whereResource);
+    if (!hit) {
+      console.error(`jio: resource not found: ${opts.whereResource}`);
+      return 78;
+    }
+    console.log(hit.absFilePath);
     return 0;
   } catch (e: any) {
     console.error(String(e?.message || e));
@@ -710,6 +762,15 @@ export async function computeExecCommand(
     const idxC = execArgv.findIndex((a) => a === "-c" || a === "-lc");
     if (idxC >= 0 && idxC === execArgv.length - 1) {
       execArgv.push("cat");
+    }
+    // Ensure a $0 placeholder after the command string so that subsequent arguments
+    // are available to the script as $1, $2, ... per bash -c semantics.
+    if (idxC >= 0 && idxC + 2 <= execArgv.length - 1) {
+      // There is at least one extra argument after the command string.
+      // Insert a placeholder so that bash assigns subsequent args to $1, $2, ...
+      if (execArgv[idxC + 2] !== "jio-bash") {
+        execArgv.splice(idxC + 2, 0, "jio-bash");
+      }
     }
   }
 
@@ -1495,6 +1556,11 @@ export async function runWithTransforms(
     argv,
     rootDir,
   );
+  try {
+    ((runtime as any).stderrTarget || process.stderr).write(
+      `[TMPDBG] RUNNER_EXEC cmd=${String(execCmd)} argv=${JSON.stringify(execArgv)}\n`,
+    );
+  } catch {}
 
   const cmd = spawn(execCmd, execArgv, {
     cwd,
@@ -1519,6 +1585,9 @@ export async function runWithTransforms(
             detached: true,
           });
           attachPipeErrorNoops(proc);
+          try {
+            ((runtime as any).stderrTarget || process.stderr).write("[TMPDBG] RUNNER_P2_SPAWN\n");
+          } catch {}
           return proc;
         })()
       : null;
@@ -1626,8 +1695,16 @@ export async function runWithTransforms(
   // Pipe cmd stdout into transform stdin (guard absent stdio on spawn failure)
   if (cmd.stdout) {
     try {
-      if (p2 && p2.stdin) cmd.stdout.pipe(p2.stdin);
-      else cmd.stdout.pipe(process.stdout);
+      if (p2 && p2.stdin) {
+        try {
+          ((runtime as any).stderrTarget || process.stderr).write(
+            "[TMPDBG] RUNNER_PIPE_CMD_TO_P2\n",
+          );
+        } catch {}
+        cmd.stdout.pipe(p2.stdin);
+      } else {
+        cmd.stdout.pipe(process.stdout);
+      }
     } catch {}
     try {
       cmd.stdout.on("end", () => {
@@ -1985,7 +2062,16 @@ async function handleStdoutNdjson(args: HandleNdjsonArgs): Promise<number | void
   let collectLimitExceeded = false;
   let suppressFurther = false;
 
+  try {
+    ((runtime as any).stderrTarget || process.stderr).write(
+      "[TMPDBG] RUNNER_HANDLE_NDJSON_ENTER\n",
+    );
+  } catch {}
+
   for await (const chunk of p2.stdout) {
+    try {
+      ((runtime as any).stderrTarget || process.stderr).write("[TMPDBG] RUNNER_NDJSON_CHUNK\n");
+    } catch {}
     buffer += Buffer.from(chunk).toString("utf8");
     if (buffer.indexOf("\n") < 0 && Buffer.byteLength(buffer) > limits.maxNdjsonLineBytes) {
       process.stderr.write("jio: ndjson line bytes limit exceeded (stream)\n");
@@ -2069,6 +2155,8 @@ async function handleStdoutNdjson(args: HandleNdjsonArgs): Promise<number | void
     let s = buffer;
     if (!sawFirstLine && s.charCodeAt(0) === 0xfeff) s = s.slice(1);
     if (s.endsWith("\r")) s = s.slice(0, -1);
+    // Sanitize trailing line to strip hidden control characters before parsing/writing
+    s = sanitizeNdjsonLine(s);
     try {
       const obj = JSON.parse(s);
       if (validate && !validate(obj)) {
@@ -2152,6 +2240,29 @@ type CollectState = {
   limits: Required<typeof DEFAULT_LIMITS>;
 };
 
+// Sanitize NDJSON lines by removing non-printable control characters that can break JSON.parse.
+// Keep regular whitespace (space, tab, CR, LF) but strip BOM, DEL, and zero-width format chars.
+function sanitizeNdjsonLine(input: string): string {
+  let out = String(input);
+  // Strip BOM at start if present
+  if (out.charCodeAt(0) === 0xfeff) out = out.slice(1);
+  // Remove ASCII control chars except tab (\t), newline (\n), and carriage return (\r), plus DEL
+  out = out.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
+  // Remove C1 control range as well
+  out = out.replace(/[\u0080-\u009F]/g, "");
+  // Remove common zero-width and formatting characters (ZWSP, ZWJ, ZWNJ, WJ, BOM)
+  out = out.replace(/[\u200B-\u200D\u2060\uFEFF]/g, "");
+  // Remove Unicode line/paragraph separators which are not JSON whitespace
+  out = out.replace(/[\u2028\u2029]/g, "");
+  // Remove non-breaking and special spaces not allowed by JSON grammar (keep ASCII space 0x20)
+  out = out.replace(/[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]/g, "");
+  // Best-effort: strip any remaining format characters using Unicode property escapes if supported
+  try {
+    out = out.replace(/\p{Cf}+/gu, "");
+  } catch {}
+  return out;
+}
+
 function tryCollectItem(args: {
   obj: any;
   collectState: CollectState;
@@ -2190,8 +2301,43 @@ function emitNdjsonLine(args: {
     if (s.charCodeAt(0) === 0xfeff) s = s.slice(1);
   }
   if (s.endsWith("\r")) s = s.slice(0, -1);
+  // Sanitize line to remove hidden control characters that can break JSON.parse
+  s = sanitizeNdjsonLine(s);
+  // In non-collect mode, proactively write the sanitized line so downstream tees can observe it
+  let wrotePre = false;
   try {
-    const obj = JSON.parse(s);
+    if (!args.runtime.collect) {
+      ((args.runtime as any).stdoutTarget || process.stdout).write(s + "\n");
+      wrotePre = true;
+    }
+  } catch {}
+  try {
+    try {
+      // Reveal escapes and any hidden chars
+      ((args.runtime as any).stderrTarget || process.stderr).write(
+        `[TMPDBG] RUNNER_NDJSON_LINE ${JSON.stringify(s)}\n`,
+      );
+    } catch {}
+    // Debug tap: mirror raw line to stdoutTarget before parsing when enabled
+    try {
+      if (process.env.JIO_TMPDBG_TAP === "1") {
+        const out = (args.runtime as any).stdoutTarget || process.stdout;
+        const ok = out.write(s + "\n");
+        try {
+          ((args.runtime as any).stderrTarget || process.stderr).write(
+            `[TMPDBG] RUNNER_TAP_WRITE ok=${String(!!ok)} toStdout=${String(!(args.runtime as any).stdoutTarget)}\n`,
+          );
+        } catch {}
+      }
+    } catch {}
+    let obj: any = JSON.parse(s);
+    if (typeof obj === "string") {
+      const innerSanitized = sanitizeNdjsonLine(obj);
+      try {
+        const parsedInner = JSON.parse(innerSanitized);
+        obj = parsedInner;
+      } catch {}
+    }
     if (args.validate && !args.validate(obj)) {
       const msg = JSON.stringify(args.validate.errors?.[0] || {});
       process.stderr.write(`jio: invalid output item: ${msg}\n`);
@@ -2217,10 +2363,81 @@ function emitNdjsonLine(args: {
       });
       return true;
     }
-    ((args.runtime as any).stdoutTarget || process.stdout).write(s + "\n");
+    // Already wrote sanitized line above in non-collect mode
     return true;
-  } catch {
+  } catch (e: any) {
     process.stderr.write("jio: invalid NDJSON line (not JSON)\n");
+    try {
+      ((args.runtime as any).stderrTarget || process.stderr).write(
+        "[TMPDBG] RUNNER_NDJSON_INVALID\n",
+      );
+      ((args.runtime as any).stderrTarget || process.stderr).write(
+        `[TMPDBG] RUNNER_NDJSON_PARSE_ERR ${String(e?.message || e)}\n`,
+      );
+      const preview = s.length > 200 ? s.slice(0, 200) + "…" : s;
+      ((args.runtime as any).stderrTarget || process.stderr).write(
+        `[TMPDBG] RUNNER_NDJSON_INVALID_LINE ${preview}\n`,
+      );
+    } catch {}
+    // Fallback: try to salvage a JSON object substring if present
+    try {
+      const i0 = s.indexOf("{");
+      const i1 = s.lastIndexOf("}");
+      if (i0 >= 0 && i1 > i0) {
+        const inner = s.slice(i0, i1 + 1);
+        let obj: any = JSON.parse(inner);
+        if (typeof obj === "string") {
+          const innerSanitized2 = sanitizeNdjsonLine(obj);
+          try {
+            const parsedInner2 = JSON.parse(innerSanitized2);
+            obj = parsedInner2;
+          } catch {}
+        }
+        try {
+          ((args.runtime as any).stderrTarget || process.stderr).write(
+            "[TMPDBG] RUNNER_NDJSON_SALVAGED_OBJECT\n",
+          );
+        } catch {}
+        if (args.validate && !args.validate(obj)) {
+          const msg = JSON.stringify(args.validate.errors?.[0] || {});
+          process.stderr.write(`jio: invalid output item: ${msg}\n`);
+          if (args.sink) args.sink.write({ reason: "output", object: obj, message: msg });
+          return true;
+        }
+        if (args.runtime.collect) {
+          if (args.collectState.suppressFurtherRef()) return true;
+          if (
+            typeof args.runtime.collectLimit === "number" &&
+            args.runtime.collectLimit >= 0 &&
+            (args.collectState.itemsEmittedRef() >= args.runtime.collectLimit ||
+              (args.collectState.limits.collectItems as number) <=
+                args.collectState.itemsEmittedRef())
+          ) {
+            args.collectState.setCollectLimitExceeded();
+            args.collectState.suppressFurther();
+            return true;
+          }
+          tryCollectItem({
+            obj,
+            collectState: args.collectState,
+            write: (t: string) => ((args.runtime as any).stdoutTarget || process.stdout).write(t),
+          });
+          return true;
+        }
+        const outStr = JSON.stringify(obj);
+        ((args.runtime as any).stdoutTarget || process.stdout).write(outStr + "\n");
+        return true;
+      }
+    } catch {}
+    // Emit codepoint diagnostics once to stderr for debugging
+    try {
+      const cps = Array.from(s)
+        .map((ch) => ch.codePointAt(0)?.toString(16))
+        .join(",");
+      ((args.runtime as any).stderrTarget || process.stderr).write(
+        `[TMPDBG] RUNNER_NDJSON_CODEPOINTS ${cps}\n`,
+      );
+    } catch {}
     if (args.sink)
       args.sink.write({
         reason: "stdout",
@@ -2294,6 +2511,18 @@ async function handleStdoutJson(args: {
     ((args.runtime as any).stdoutTarget || process.stdout).write(JSON.stringify(obj));
   } catch {
     process.stderr.write("jio: invalid JSON output\n");
+    try {
+      ((args.runtime as any).stderrTarget || process.stderr).write(
+        `[TMPDBG] RUNNER_JSON_INVALID_PREVIEW ${buf.slice(0, 200)}\n`,
+      );
+      const cps = Array.from(buf)
+        .map((ch: any) => (typeof ch === "string" ? ch : String.fromCharCode(ch)))
+        .map((ch: any) => ch.codePointAt(0)?.toString(16))
+        .join(",");
+      ((args.runtime as any).stderrTarget || process.stderr).write(
+        `[TMPDBG] RUNNER_JSON_CODEPOINTS ${cps}\n`,
+      );
+    } catch {}
     if (sink)
       await sink.write({
         reason: "stdout",

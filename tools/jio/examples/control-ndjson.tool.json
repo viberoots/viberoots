@@ -20,7 +20,7 @@
       "body": {
         "type": "string",
         "position": 2,
-        "value": "printf '%s\n' '{\"file\":\"a.txt\"}' '{\"$jio.ctl\":true,\"$jio.ctl.elicit\":{\"message\":\"confirm?\",\"confirmProperty\":\"confirm\"}}'"
+        "value": "printf '%s\n' '{\"file\":\"a.txt\"}' '{\"$jio.ctl\":true,\"$jio.ctl.elicit\":{\"message\":\"confirm?\",\"requestedSchema\":{\"type\":\"object\",\"properties\":{\"confirm\":{\"type\":\"boolean\"}},\"required\":[\"confirm\"],\"additionalProperties\":false}}'"
       }
     },
     "stdoutTransform": { "shell": "cat", "format": "ndjson" }

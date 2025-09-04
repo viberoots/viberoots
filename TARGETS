@@ -11,6 +11,24 @@ zx_test(
     script = "tools/tests/jio.resources.registry.test.ts",
     out = "jio_resources_registry.stamp",
 )
+
+zx_test(
+    name = "jio_resources_http_get",
+    script = "tools/tests/jio.resources.http.get.test.ts",
+    out = "jio_resources_http_get.stamp",
+)
+
+zx_test(
+    name = "jio_resources_http_mime_index",
+    script = "tools/tests/jio.resources.http.mime-index.test.ts",
+    out = "jio_resources_http_mime_index.stamp",
+)
+
+zx_test(
+    name = "jio_resources_cli",
+    script = "tools/tests/jio.resources.cli.test.ts",
+    out = "jio_resources_cli.stamp",
+)
 zx_test(
     name = "gen_jio_schema_types",
     script = "tools/jio/schema/gen-types.ts",
@@ -703,9 +721,9 @@ zx_test(
 )
 
 zx_test(
-    name = "jio_mcp_http_control_ignore_meta",
-    script = "tools/tests/jio.mcp.http.control-ignore-meta.test.ts",
-    out = "jio_mcp_http_control_ignore_meta.stamp",
+    name = "jio_mcp_http_control_ignore_spec",
+    script = "tools/tests/jio.mcp.http.control-ignore-spec.test.ts",
+    out = "jio_mcp_http_control_ignore_spec.stamp",
 )
 
 zx_test(

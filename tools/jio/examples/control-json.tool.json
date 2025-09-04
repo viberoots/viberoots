@@ -16,7 +16,13 @@
       "body": {
         "type": "string",
         "position": 2,
-        "value": "printf '%s' '{\"$jio.ctl\":true,\"$jio.ctl.elicit\":{\"message\":\"confirm?\",\"confirmProperty\":\"confirm\"}}'"
+        "value": "if [ \"$1\" = \"accept\" ]; then printf '%s' '{\"ok\":true}'; else printf '%s\n' '{\"$jio.ctl\":true,\"$jio.ctl.elicit\":{\"message\":\"confirm?\",\"requestedSchema\":{\"type\":\"object\",\"properties\":{\"confirm\":{\"type\":\"boolean\"}},\"required\":[\"confirm\"],\"additionalProperties\":false}}'; fi"
+      },
+      "action": {
+        "type": "string",
+        "position": 3,
+        "required": false,
+        "path": "$['$jio.ctl.elicit.response'].action"
       }
     },
     "stdoutTransform": { "shell": "cat", "format": "json" }

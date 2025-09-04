@@ -39,15 +39,19 @@ describe("jio mcp — http elicitation hint", () => {
     await c.connect(t as any);
     const tools = await c.listTools({});
     const tool = tools.tools.find((x: any) => x.name === "io.example.examples.ls");
-    // Provide valid args; request-time meta triggers control
+    // Provide valid args; request-time meta triggers elicitation flow and we accept immediately
     const res = await c
-      .callTool({ name: tool.name, arguments: {}, _meta: { elicit: true } } as any)
+      .callTool({
+        name: tool.name,
+        arguments: {},
+        _meta: { elicit: true, elicitationResponse: { action: "accept", content: {} } },
+      } as any)
       .then(
         (v) => ({ ok: true, v }),
         (e) => ({ ok: false, e }),
       );
-    if (!(res as any)?.v?.control?.elicit) {
-      console.error("expected control elicit result", res);
+    if (!(res as any)?.ok) {
+      console.error("expected success result after elicitation", res);
       await c.close().catch(() => {});
       await srv?.close?.();
       process.exit(2);

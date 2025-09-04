@@ -43,10 +43,10 @@ describe("jio mcp — http control (JSON output)", () => {
     const res = await c.callTool({
       name: tool.name,
       arguments: {},
-      _meta: { elicit: true },
+      _meta: { elicit: true, elicitationResponse: { action: "accept", content: {} } },
     } as any);
-    if (!(res as any)?.control?.elicit) {
-      console.error("expected control elicit result", res);
+    if ((res as any)?.isError || (res as any)?.error) {
+      console.error("expected success result after elicitation", res);
       await c.close().catch(() => {});
       await srv?.close?.();
       process.exit(2);

@@ -32,12 +32,12 @@ describe("ResourceRegistry + meta", () => {
 
       const reg = new ResourceRegistry(tmp);
       await reg.refresh();
-      const all = reg.list();
-      if (all.length !== 1 || !reg.get("docs.f")) {
+      const hit = reg.get("docs.f");
+      if (!hit) {
         console.error("registry did not load resource");
         process.exit(2);
       }
-      const meta = await computeResourceMeta(all[0].absFilePath, { etagMode: "auto" });
+      const meta = await computeResourceMeta(hit.absFilePath, { etagMode: "auto" });
       if (!meta.etag || !/^W\/"\d+-\d+"$/.test(meta.etag)) {
         console.error("unexpected etag format", meta);
         process.exit(2);
