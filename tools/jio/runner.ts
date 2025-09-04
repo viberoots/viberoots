@@ -2306,20 +2306,6 @@ function emitNdjsonLine(args: {
     }
   } catch {}
   try {
-    try {
-      // Reveal escapes and any hidden chars
-      //
-    } catch {}
-    // Debug tap: mirror raw line to stdoutTarget before parsing when enabled
-    try {
-      if (process.env.JIO_TMPDBG_TAP === "1") {
-        const out = (args.runtime as any).stdoutTarget || process.stdout;
-        const ok = out.write(s + "\n");
-        try {
-          //
-        } catch {}
-      }
-    } catch {}
     let obj: any = JSON.parse(s);
     if (typeof obj === "string") {
       const innerSanitized = sanitizeNdjsonLine(obj);

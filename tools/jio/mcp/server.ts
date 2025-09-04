@@ -252,7 +252,6 @@ export async function startMcpServer(
       };
 
       registerWith(async (args: any, extra: any) => {
-        const tmpDbg = (_tag: string) => {};
         // Concurrency gate
         let done: (() => void) | null = null;
         try {
@@ -448,13 +447,11 @@ export async function startMcpServer(
               return false;
             }
           })();
-          tmpDbg(`TEE_SETUP firstRunNdjson=${String(firstRunNdjson)}`);
           const teeTarget: Writable | null = firstRunNdjson
             ? new Writable({
                 write(chunk, _enc, cb) {
                   try {
                     const part = Buffer.from(chunk as any).toString("utf8");
-                    tmpDbg(`TEE_WRITE bytes=${String(part.length)}`);
                     out += part;
                     lineBuf += part;
                     while (true) {
@@ -570,7 +567,6 @@ export async function startMcpServer(
                 },
                 final(cb) {
                   try {
-                    tmpDbg("TEE_FINAL");
                     const trailing = lineBuf.trim();
                     if (trailing) {
                       try {
@@ -697,11 +693,6 @@ export async function startMcpServer(
             : null;
           errStream.on("data", (b) => (err += Buffer.from(b as any).toString("utf8")));
           const progressToken = undefined as any;
-          tmpDbg(
-            `FIRST_RUN_START_JSON argv=${JSON.stringify(argv)} fmt=${String(
-              (specForRun as any)?.command?.stdoutTransform?.format,
-            )}`,
-          );
           const code = await runWithTransforms(
             dir,
             specPath as string,
@@ -754,13 +745,6 @@ export async function startMcpServer(
                     }
                   : undefined,
             } as any,
-          );
-          tmpDbg(
-            `FIRST_RUN_DONE_JSON code=${String(code || 0)} outLen=${String(out.length)} errLen=${String(err.length)}`,
-          );
-          if (err) tmpDbg(`FIRST_RUN_ERR ${err.slice(0, 500)}`);
-          tmpDbg(
-            `FIRST_RUN_FLAGS sawCtl=${String(sawCtl)} items=${String(streamedItems.length)} hasCtlPayload=${String(!!ctlPayload)}`,
           );
           // Allow brief time for stderr to flush debug lines from runner, then try fallback parse
           if (!ignoreCtl && !sawCtl) {
@@ -825,7 +809,6 @@ export async function startMcpServer(
                         ctlPayload = obj["$jio.ctl.elicit"];
                         ctlState = obj["$jio.ctl.elicit"]?.state;
                         sawCtl = true;
-                        tmpDbg("FALLBACK_ERR_CONTROL_DETECTED");
                         break;
                       }
                     }
@@ -900,7 +883,6 @@ export async function startMcpServer(
                       state: ctlState,
                     },
                   };
-                  tmpDbg("SECOND_RUN_EXECUTE_JSON");
                   const out2 = new PassThrough();
                   const err2 = new PassThrough();
                   let outTxt2 = "";
@@ -942,7 +924,6 @@ export async function startMcpServer(
                   try {
                     const fmt = (spec?.command as any)?.stdoutTransform?.format;
                     let obj2: any = null;
-                    tmpDbg("SECOND_RUN_PARSE_JSON");
                     if (fmt === "ndjson") {
                       const items: any[] = [];
                       for (const line of String(outTxt2 || "").split(/\r?\n/)) {
@@ -958,14 +939,12 @@ export async function startMcpServer(
                     } else {
                       obj2 = outTxt2 ? JSON.parse(outTxt2) : null;
                     }
-                    tmpDbg("SECOND_RUN_VALIDATE_JSON");
                     try {
                       if (
                         zodOutForValidation &&
                         typeof (zodOutForValidation as any).parse === "function"
                       ) {
                         (zodOutForValidation as any).parse(obj2);
-                        tmpDbg("SECOND_RUN_VALIDATE_JSON_OK");
                       }
                     } catch (e: any) {
                       try {
