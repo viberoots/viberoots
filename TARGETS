@@ -755,3 +755,53 @@ zx_test(
     script = "tools/tests/jio.mcp.http.streaming-high-volume.test.ts",
     out = "jio_mcp_http_streaming_high_volume.stamp",
 )
+
+# PR3/PR4 additions
+zx_test(
+    name = "jio_mcp_http_ndjson_output_schema_registration",
+    script = "tools/tests/jio.mcp.http.ndjson-output-schema-registration.test.ts",
+    out = "jio_mcp_http_ndjson_output_schema_registration.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_stdio_ndjson_output_schema_registration",
+    script = "tools/tests/jio.mcp.stdio.ndjson-output-schema-registration.test.ts",
+    out = "jio_mcp_stdio_ndjson_output_schema_registration.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_http_zod_guard_root_non_object",
+    script = "tools/tests/jio.mcp.http.zod-guard.root-non-object.test.ts",
+    out = "jio_mcp_http_zod_guard_root_non_object.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_schema_guard_valid_shape",
+    script = "tools/tests/jio.mcp.schema.guard.valid-shape.test.ts",
+    out = "jio_mcp_schema_guard_valid_shape.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_schema_guard_member_invalid",
+    script = "tools/tests/jio.mcp.schema.guard.member-invalid.test.ts",
+    out = "jio_mcp_schema_guard_member_invalid.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_schema_guard_root_non_object",
+    script = "tools/tests/jio.mcp.schema.guard.root-non-object.test.ts",
+    out = "jio_mcp_schema_guard_root_non_object.stamp",
+)
+
+# PR5 additions
+zx_test(
+    name = "jio_mcp_http_elicit_requestedSchema_invalid",
+    script = "tools/tests/jio.mcp.http.elicit-requestedSchema-invalid.test.ts",
+    out = "jio_mcp_http_elicit_requestedSchema_invalid.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_stdio_elicit_requestedSchema_invalid",
+    script = "tools/tests/jio.mcp.stdio.elicit-requestedSchema-invalid.test.ts",
+    out = "jio_mcp_stdio_elicit_requestedSchema_invalid.stamp",
+)

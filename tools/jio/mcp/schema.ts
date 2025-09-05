@@ -219,7 +219,7 @@ export function emitZodWarning(args: {
   tool: string;
   reasons: Reason[];
   schema: any;
-  kind?: "input" | "output";
+  kind?: "input" | "output" | "requested";
 }) {
   try {
     if (process.env.JIO_MCP_ZOD_WARN === "0") return;

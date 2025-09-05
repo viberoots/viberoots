@@ -63,6 +63,104 @@ export type McpServerOpts = {
   streamingFinalAggregate?: boolean;
 };
 
+function validateRequestedSchemaBestEffort(
+  schema: any,
+): { keyword: string; pointer: string; note?: string }[] {
+  const reasons: { keyword: string; pointer: string; note?: string }[] = [];
+  try {
+    if (!schema || typeof schema !== "object")
+      return [{ keyword: "rootType(non-object)", pointer: "" }];
+    const t = (schema as any).type;
+    if (t !== "object") reasons.push({ keyword: "rootType(non-object)", pointer: "" });
+    const props = (schema as any).properties;
+    if (props && typeof props === "object") {
+      for (const key of Object.keys(props)) {
+        const ps: any = (props as any)[key];
+        const ptr = `/properties/${key}`;
+        if (!ps || typeof ps !== "object") {
+          reasons.push({ keyword: "unsupportedKeyword", pointer: ptr, note: "non-object member" });
+          continue;
+        }
+        if (ps.properties || ps.items) {
+          reasons.push({ keyword: "unsupportedKeyword", pointer: ptr, note: "nested structure" });
+          continue;
+        }
+        if (
+          ps.anyOf ||
+          ps.oneOf ||
+          ps.allOf ||
+          ps.not ||
+          ps.$ref ||
+          ps.$defs ||
+          ps.patternProperties ||
+          ps.dependentSchemas ||
+          ps.contains ||
+          ps.unevaluatedProperties ||
+          ps.propertyNames
+        ) {
+          reasons.push({
+            keyword: "unsupportedKeyword",
+            pointer: ptr,
+            note: "combinators/advanced",
+          });
+        }
+        if (ps.enum) {
+          const ok =
+            Array.isArray(ps.enum) &&
+            (ps.enum as any[]).every(
+              (v) => ["string", "number", "boolean"].includes(typeof v) || v === null,
+            );
+          if (!ok)
+            reasons.push({
+              keyword: "unsupportedKeyword",
+              pointer: `${ptr}/enum`,
+              note: "non-primitive enum",
+            });
+        }
+        if (ps.const !== undefined) {
+          const vt = typeof ps.const;
+          if (!["string", "number", "boolean"].includes(vt) && ps.const !== null)
+            reasons.push({
+              keyword: "unsupportedKeyword",
+              pointer: `${ptr}/const`,
+              note: "non-primitive const",
+            });
+        }
+        const typ = Array.isArray(ps.type) ? ps.type.filter((x: any) => x !== "null")[0] : ps.type;
+        switch (typ) {
+          case "string": {
+            const fmt = ps.format;
+            if (fmt && !["email", "uuid", "url", "date-time"].includes(String(fmt))) {
+              reasons.push({
+                keyword: "unsupportedKeyword",
+                pointer: `${ptr}/format`,
+                note: String(fmt),
+              });
+            }
+            break;
+          }
+          case "number":
+          case "integer":
+          case "boolean":
+          case "null":
+            break;
+          default:
+            if (typ !== undefined)
+              reasons.push({
+                keyword: "unsupportedKeyword",
+                pointer: `${ptr}/type`,
+                note: String(typ),
+              });
+            break;
+        }
+      }
+    }
+  } catch (e: any) {
+    reasons.push({ keyword: "exception", pointer: "", note: String(e?.message || e) });
+  }
+  return reasons;
+}
+
 async function readVersion(): Promise<string> {
   try {
     const { readFile } = await import("node:fs/promises");
@@ -284,30 +382,30 @@ export async function startMcpServer(
         const isNdjson = (spec as any)?.command?.stdoutTransform?.format === "ndjson";
         if (isNdjson) {
           if (opts.streamingFinalAggregate) {
-            // Wrap the item Zod as an array under { items }
+            // Register a wrapper { items: <ZodArray> } using the full Zod instance when available
             try {
-              // maybeOutput currently holds the Zod raw shape for an object root produced by converter.
-              // For NDJSON, the declared outputSchema corresponds to a single item. We attempt to
-              // reconstruct an item Zod from the raw shape by creating z.object(shape) at runtime.
-              // Since we don't have the full Zod instance here, fall back to raw shape array guard.
               const { z } = await import("zod");
-              if (maybeOutput && typeof maybeOutput === "object" && !Array.isArray(maybeOutput)) {
-                const itemObj = (z as any).object?.(maybeOutput);
-                const wrapper = { items: (z as any).array?.(itemObj) };
-                if (wrapper.items && typeof wrapper.items === "object") {
-                  if (isZodRawShapeValid({ items: wrapper.items })) {
-                    // Replace maybeOutput with raw shape for wrapper
-                    // SDK expects raw shape; for wrapper we pass { items: ZodType }
-                    maybeOutput = { items: wrapper.items } as any;
+              const itemZod = zodOutForValidation;
+              if (itemZod && typeof itemZod === "object") {
+                const arrayZod =
+                  itemZod._def?.typeName === "ZodArray"
+                    ? itemZod
+                    : (z as any).array?.(itemZod) || null;
+                if (
+                  arrayZod &&
+                  (typeof (arrayZod as any).parse === "function" ||
+                    typeof (arrayZod as any)._parse === "function")
+                ) {
+                  const wrapper = { items: arrayZod } as any;
+                  if (isZodRawShapeValid(wrapper)) {
+                    maybeOutput = wrapper;
                   } else {
-                    // If wrapper invalid, skip registering output
                     maybeOutput = undefined;
                   }
                 } else {
                   maybeOutput = undefined;
                 }
               } else {
-                // Cannot infer item shape; skip
                 maybeOutput = undefined;
               }
             } catch {
@@ -1517,7 +1615,15 @@ export async function startMcpServer(
                       method: "elicitation/create",
                       params: {
                         message: ctlPayload?.message,
-                        requestedSchema: ctlPayload?.requestedSchema,
+                        requestedSchema: (() => {
+                          try {
+                            const rs = ctlPayload?.requestedSchema;
+                            const reasons = validateRequestedSchemaBestEffort(rs);
+                            if (reasons.length)
+                              emitZodWarning({ tool: fq, reasons, schema: rs, kind: "requested" });
+                          } catch {}
+                          return ctlPayload?.requestedSchema;
+                        })(),
                       },
                     } as any,
                     (await import("@modelcontextprotocol/sdk/types.js")).ElicitResultSchema as any,
@@ -1955,6 +2061,12 @@ export async function startMcpServer(
                 const ctl = obj.find((o) => isCtlObj(o));
                 if (ctl && ctl["$jio.ctl.elicit"]) {
                   try {
+                    try {
+                      const rs = ctl["$jio.ctl.elicit"]?.requestedSchema;
+                      const reasons = validateRequestedSchemaBestEffort(rs);
+                      if (reasons.length)
+                        emitZodWarning({ tool: fq, reasons, schema: rs, kind: "requested" });
+                    } catch {}
                     if (forcedElicit && forcedElicit.action === "accept") {
                       const invObj2 = {
                         ...(args ?? {}),
@@ -2033,7 +2145,20 @@ export async function startMcpServer(
                             method: "elicitation/create",
                             params: {
                               message: ctl["$jio.ctl.elicit"]?.message,
-                              requestedSchema: ctl["$jio.ctl.elicit"]?.requestedSchema,
+                              requestedSchema: (() => {
+                                try {
+                                  const rs = ctl["$jio.ctl.elicit"]?.requestedSchema;
+                                  const reasons = validateRequestedSchemaBestEffort(rs);
+                                  if (reasons.length)
+                                    emitZodWarning({
+                                      tool: fq,
+                                      reasons,
+                                      schema: rs,
+                                      kind: "requested",
+                                    });
+                                } catch {}
+                                return ctl["$jio.ctl.elicit"]?.requestedSchema;
+                              })(),
                             },
                           } as any,
                           ElicitResultSchema as any,
@@ -2176,7 +2301,20 @@ export async function startMcpServer(
                             method: "elicitation/create",
                             params: {
                               message: obj["$jio.ctl.elicit"]?.message,
-                              requestedSchema: obj["$jio.ctl.elicit"]?.requestedSchema,
+                              requestedSchema: (() => {
+                                try {
+                                  const rs = obj["$jio.ctl.elicit"]?.requestedSchema;
+                                  const reasons = validateRequestedSchemaBestEffort(rs);
+                                  if (reasons.length)
+                                    emitZodWarning({
+                                      tool: fq,
+                                      reasons,
+                                      schema: rs,
+                                      kind: "requested",
+                                    });
+                                } catch {}
+                                return obj["$jio.ctl.elicit"]?.requestedSchema;
+                              })(),
                             },
                           } as any,
                           ElicitResultSchema as any,
@@ -2604,7 +2742,15 @@ export async function startMcpServer(
   const { dir, cfg, specs, index } = await discoverJioTools();
   const server = new McpServer({ name: "jio-mcp", version: await readVersion() });
   try {
-    (server as any).server?.registerCapabilities?.({ tools: {} });
+    (server as any).server?.registerCapabilities?.({ tools: { listChanged: true } });
+  } catch {}
+  try {
+    // After the client sends Initialized, notify that the tools list is ready
+    (server as any).oninitialized = () => {
+      try {
+        (server as any).notification?.({ method: "tools/list_changed", params: {} });
+      } catch {}
+    };
   } catch {}
   const ajv = new Ajv({ strict: true, allErrors: true });
   // PR4: full queue semantics for stdio as well
@@ -2727,6 +2873,8 @@ export async function startMcpServer(
             kind: "output",
           });
         }
+        // Keep full Zod instance for wrapper construction and runtime validation
+        zodOutForValidation = conv.zod;
       } else if (conv.reasons && conv.reasons.length) {
         emitZodWarning({ tool: fq, reasons: conv.reasons, schema: outputSchema, kind: "output" });
       }
@@ -2739,30 +2887,30 @@ export async function startMcpServer(
       const isNdjson = (spec as any)?.command?.stdoutTransform?.format === "ndjson";
       if (isNdjson) {
         if (opts.streamingFinalAggregate) {
-          // Wrap the item Zod as an array under { items }
+          // Register a wrapper { items: <ZodArray> } using the full Zod instance when available
           try {
-            // maybeOutput currently holds the Zod raw shape for an object root produced by converter.
-            // For NDJSON, the declared outputSchema corresponds to a single item. We attempt to
-            // reconstruct an item Zod from the raw shape by creating z.object(shape) at runtime.
-            // Since we don't have the full Zod instance here, fall back to raw shape array guard.
             const { z } = await import("zod");
-            if (maybeOutput && typeof maybeOutput === "object" && !Array.isArray(maybeOutput)) {
-              const itemObj = (z as any).object?.(maybeOutput);
-              const wrapper = { items: (z as any).array?.(itemObj) };
-              if (wrapper.items && typeof wrapper.items === "object") {
-                if (isZodRawShapeValid({ items: wrapper.items })) {
-                  // Replace maybeOutput with raw shape for wrapper
-                  // SDK expects raw shape; for wrapper we pass { items: ZodType }
-                  maybeOutput = { items: wrapper.items } as any;
+            const itemZod = zodOutForValidation;
+            if (itemZod && typeof itemZod === "object") {
+              const arrayZod =
+                itemZod._def?.typeName === "ZodArray"
+                  ? itemZod
+                  : (z as any).array?.(itemZod) || null;
+              if (
+                arrayZod &&
+                (typeof (arrayZod as any).parse === "function" ||
+                  typeof (arrayZod as any)._parse === "function")
+              ) {
+                const wrapper = { items: arrayZod } as any;
+                if (isZodRawShapeValid(wrapper)) {
+                  maybeOutput = wrapper;
                 } else {
-                  // If wrapper invalid, skip registering output
                   maybeOutput = undefined;
                 }
               } else {
                 maybeOutput = undefined;
               }
             } else {
-              // Cannot infer item shape; skip
               maybeOutput = undefined;
             }
           } catch {
@@ -2786,7 +2934,7 @@ export async function startMcpServer(
         process.stderr.write(msg + "\n");
       } catch {}
       if (maybeParams || maybeOutput) {
-        return (server as any).registerTool(
+        const res = (server as any).registerTool(
           fq,
           {
             description,
@@ -2795,6 +2943,7 @@ export async function startMcpServer(
           },
           cb,
         );
+        return res;
       }
       return (server as any).tool(fq, description, cb);
     };

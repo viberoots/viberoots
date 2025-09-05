@@ -10,9 +10,13 @@ describe("jio mcp — stdio ndjson output schema registration", () => {
       command: "jio",
       args: ["--mcp-server"],
       stderr: "pipe",
+      env: { ...(process.env as any), TEST_CAPTURE_LOGS: "1" },
     } as any);
     const c1 = new Client({ name: "test", version: "0" }, {} as any);
     await c1.connect(t1 as any);
+    // Wait for initial progress notification (server signals readiness)
+    // Wait briefly; server emits initial readiness progress but tools/list_changed is not guaranteed
+    await new Promise((r) => setTimeout(r, 100));
     const tools1 = await c1.listTools({});
     const nd1 = tools1.tools.find((x: any) => x.name === "io.example.examples.ctlndjson_ignore");
     const js1 = tools1.tools.find((x: any) => x.name === "io.example.examples.ctljson");
@@ -35,9 +39,11 @@ describe("jio mcp — stdio ndjson output schema registration", () => {
       command: "jio",
       args: ["--mcp-server", "--streaming-final-aggregate"],
       stderr: "pipe",
+      env: { ...(process.env as any), TEST_CAPTURE_LOGS: "1" },
     } as any);
     const c2 = new Client({ name: "test", version: "0" }, {} as any);
     await c2.connect(t2 as any);
+    await new Promise((r) => setTimeout(r, 100));
     const tools2 = await c2.listTools({});
     const nd2 = tools2.tools.find((x: any) => x.name === "io.example.examples.ctlndjson_ignore");
     if (!nd2) {

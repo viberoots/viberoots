@@ -183,6 +183,8 @@ export async function main(argv: string[]): Promise<number | void> {
         maxConcurrentCalls: getNumericFlag(argv, "--max-concurrent-calls"),
         queueSize: getNumericFlag(argv, "--queue-size"),
         queueTimeoutMs: getNumericFlag(argv, "--queue-timeout-ms"),
+        // PR4: allow opting into final aggregate and corresponding schema registration for NDJSON
+        streamingFinalAggregate: argv.includes("--streaming-final-aggregate"),
       });
       return; // keep process alive for server
     } catch (e: any) {
