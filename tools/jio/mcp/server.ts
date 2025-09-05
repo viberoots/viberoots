@@ -410,12 +410,22 @@ export async function startMcpServer(
           let sawCtl = false as boolean;
           let ctlPayload: any = null;
           let ctlState: any = null;
+          // Derive a stable progress token from request id to unify HTTP/stdio streaming
+          const progressToken = (() => {
+            try {
+              const explicitId = extra?.request?.id as any;
+              const reqId =
+                explicitId ?? (extra && (extra.relatedRequestId ?? extra.id ?? extra.requestId));
+              return reqId !== undefined ? String(reqId) : undefined;
+            } catch {}
+            return undefined;
+          })();
           const notifyItem = (obj: any) => {
             try {
-              if ((mcp as any).server?.notification) {
+              if (progressToken && (mcp as any).server?.notification) {
                 (mcp as any).server.notification({
-                  method: "notifications/item",
-                  params: { item: obj },
+                  method: "notifications/progress",
+                  params: { progressToken, item: obj },
                 });
               }
             } catch {}
@@ -692,7 +702,6 @@ export async function startMcpServer(
               })
             : null;
           errStream.on("data", (b) => (err += Buffer.from(b as any).toString("utf8")));
-          const progressToken = undefined as any;
           const code = await runWithTransforms(
             dir,
             specPath as string,
@@ -883,13 +892,122 @@ export async function startMcpServer(
                       state: ctlState,
                     },
                   };
+                  // NDJSON: stream second-run items and support follow-up elicitations; JSON: keep collect
+                  const fmt = (spec?.command as any)?.stdoutTransform?.format;
+                  if (fmt === "ndjson") {
+                    let nextInv = invObj2;
+                    while (true) {
+                      let abort = false;
+                      let nextCtl: any = null;
+                      let nextCtlState: any = null;
+                      const sink = new Writable({
+                        write(chunk, _enc, cb) {
+                          try {
+                            const part = Buffer.from(chunk as any).toString("utf8");
+                            lineBuf += part;
+                            while (true) {
+                              const nl = lineBuf.indexOf("\n");
+                              if (nl < 0) break;
+                              const line = lineBuf.slice(0, nl);
+                              lineBuf = lineBuf.slice(nl + 1);
+                              const s = line.trim();
+                              if (!s) continue;
+                              try {
+                                let o: any = JSON.parse(s);
+                                if (typeof o === "string") {
+                                  try {
+                                    o = JSON.parse(o);
+                                  } catch {}
+                                }
+                                if (o && typeof o === "object" && o["$jio.ctl"] === true) {
+                                  if (o["$jio.ctl.elicit"]) {
+                                    nextCtl = o["$jio.ctl.elicit"];
+                                    nextCtlState = o["$jio.ctl.elicit"]?.state;
+                                    abort = true;
+                                    continue;
+                                  }
+                                }
+                                streamedItems.push(o);
+                                notifyItem(o);
+                              } catch {}
+                            }
+                          } finally {
+                            cb();
+                          }
+                        },
+                        final(cb) {
+                          cb();
+                        },
+                      });
+                      const code2 = await runWithTransforms(
+                        dir,
+                        specPath as string,
+                        spec as any,
+                        buildArgv(spec as any, nextInv),
+                        cfg as any,
+                        nextInv,
+                        {
+                          collect: false,
+                          collectLimit: opts.collectLimit,
+                          limits: {
+                            collectItems: (opts.maxItemsPerCall as any) ?? opts.collectLimit,
+                            collectBytes: (opts.maxCollectBytes as any) ?? opts.collectBytes,
+                            maxArgvTokens: opts.maxArgvTokens as any,
+                            maxArgvBytes: opts.maxArgvBytes as any,
+                            maxStdinBytes: opts.maxStdinBytes as any,
+                            maxStdoutJsonBytes: opts.maxStdoutJsonBytes as any,
+                            maxNdjsonLineBytes: opts.maxNdjsonLineBytes as any,
+                          },
+                          timeoutMsOverride: opts.timeoutMs,
+                          cleanEnv: opts.cleanEnv !== false,
+                          passEnv: opts.passEnv || [],
+                          setEnv: opts.setEnv || {},
+                          stdoutTarget: sink as any,
+                          stderrTarget: new PassThrough() as any,
+                          inputSource: new PassThrough() as any,
+                          isCancelled: () => abort,
+                        } as any,
+                      );
+                      if (code2 && code2 !== 0) return mapExit(code2);
+                      if (nextCtl) {
+                        const el2 = await req(
+                          {
+                            method: "elicitation/create",
+                            params: {
+                              message: nextCtl?.message,
+                              requestedSchema: nextCtl?.requestedSchema,
+                            },
+                          } as any,
+                          ElicitResultSchema as any,
+                        ).catch(() => null);
+                        if (!el2 || el2.action !== "accept") {
+                          return {
+                            isError: true,
+                            content: [{ type: "text", text: "User declined" }],
+                          } as any;
+                        }
+                        nextInv = {
+                          ...(args ?? {}),
+                          ["$jio.ctl.elicit.response"]: {
+                            action: "accept",
+                            content: el2.content || {},
+                            state: nextCtlState,
+                          },
+                        };
+                        continue;
+                      }
+                      break;
+                    }
+                    return opts.streamingFinalAggregate
+                      ? ({ structuredContent: { items: streamedItems.slice() } } as any)
+                      : ({ structuredContent: undefined } as any);
+                  }
                   const out2 = new PassThrough();
                   const err2 = new PassThrough();
                   let outTxt2 = "";
                   let errTxt2 = "";
                   out2.on("data", (b) => (outTxt2 += Buffer.from(b as any).toString("utf8")));
                   err2.on("data", (b) => (errTxt2 += Buffer.from(b as any).toString("utf8")));
-                  //
                   const code2 = await runWithTransforms(
                     dir,
                     specPath as string,
@@ -919,26 +1037,9 @@ export async function startMcpServer(
                       isCancelled: () => false,
                     } as any,
                   );
-                  //
                   if (code2 && code2 !== 0) return mapExit(code2);
                   try {
-                    const fmt = (spec?.command as any)?.stdoutTransform?.format;
-                    let obj2: any = null;
-                    if (fmt === "ndjson") {
-                      const items: any[] = [];
-                      for (const line of String(outTxt2 || "").split(/\r?\n/)) {
-                        const s = line.trim();
-                        if (!s) continue;
-                        try {
-                          const o = JSON.parse(s);
-                          if (o && typeof o === "object" && o["$jio.ctl"] === true) continue;
-                          items.push(o);
-                        } catch {}
-                      }
-                      obj2 = { items };
-                    } else {
-                      obj2 = outTxt2 ? JSON.parse(outTxt2) : null;
-                    }
+                    const obj2 = outTxt2 ? JSON.parse(outTxt2) : null;
                     try {
                       if (
                         zodOutForValidation &&
@@ -946,19 +1047,13 @@ export async function startMcpServer(
                       ) {
                         (zodOutForValidation as any).parse(obj2);
                       }
-                    } catch (e: any) {
-                      try {
-                        //
-                      } catch {}
-                    }
-                    if (fmt !== "ndjson") {
-                      try {
-                        const finalObj =
-                          registeredOutputKeyCount === 0 && obj2 && typeof obj2 === "object"
-                            ? {}
-                            : obj2;
-                        return { structuredContent: finalObj } as any;
-                      } catch {}
+                    } catch {}
+                    if ((spec?.command as any)?.stdoutTransform?.format !== "ndjson") {
+                      const finalObj =
+                        registeredOutputKeyCount === 0 && obj2 && typeof obj2 === "object"
+                          ? {}
+                          : obj2;
+                      return { structuredContent: finalObj } as any;
                     }
                     return { structuredContent: obj2 } as any;
                   } catch {
@@ -2017,6 +2112,14 @@ export async function startMcpServer(
       }
     }
 
+    // For NDJSON tools, do not register an output shape with the SDK, to avoid
+    // structuredContent shape mismatches ({ items: [...] } wrapper)
+    try {
+      if ((spec as any)?.command?.stdoutTransform?.format === "ndjson") {
+        maybeOutput = undefined;
+      }
+    } catch {}
+
     const registerWith = (cb: any) => {
       try {
         const it = maybeParams && (maybeParams as any)._def ? "zod" : typeof maybeParams;
@@ -2042,7 +2145,7 @@ export async function startMcpServer(
       return (server as any).tool(fq, description, cb);
     };
 
-    registerWith(async (args: any) => {
+    registerWith(async (args: any, extra: any) => {
       let done: (() => void) | null = null;
       try {
         if (maxConcurrent) done = await acquire();
@@ -2125,6 +2228,42 @@ export async function startMcpServer(
           } as any;
         }
         const isNdjson = spec.command?.stdoutTransform?.format === "ndjson";
+        // progress notifications token (request id)
+        const progressToken = (() => {
+          try {
+            const explicitId = extra?.request?.id as any;
+            const reqId =
+              explicitId ?? (extra && (extra.relatedRequestId ?? extra.id ?? extra.requestId));
+            return reqId !== undefined ? String(reqId) : undefined;
+          } catch {}
+          return undefined;
+        })();
+        const notifyProgress = (message?: string, progress?: number) => {
+          try {
+            const params: any = {};
+            if (progressToken) params.progressToken = progressToken;
+            // Ensure typed ProgressNotificationSchema validates: require numeric progress when token present
+            if (progressToken) params.progress = typeof progress === "number" ? progress : 0;
+            if (typeof message === "string") params.message = message;
+            if ((server as any).notification) {
+              (server as any).notification({ method: "notifications/progress", params });
+            }
+          } catch {}
+          try {
+            const params2: any = {};
+            if (progressToken) params2.progressToken = progressToken;
+            if (progressToken) params2.progress = typeof progress === "number" ? progress : 0;
+            if (typeof message === "string") params2.message = message;
+            if ((server as any).server?.notification) {
+              (server as any).server.notification({
+                method: "notifications/progress",
+                params: params2,
+              });
+            }
+          } catch {}
+        };
+        // immediate notification to verify stdio progress channel
+        notifyProgress("connected");
         const outStream = new PassThrough();
         const errStream = new PassThrough();
         const inStream = new PassThrough();
@@ -2132,6 +2271,8 @@ export async function startMcpServer(
         let err = "";
         outStream.on("data", (b) => (out += Buffer.from(b as any).toString("utf8")));
         errStream.on("data", (b) => (err += Buffer.from(b as any).toString("utf8")));
+        // heartbeat before first run
+        notifyProgress("first-start");
         const code = await runWithTransforms(
           dir,
           specPath as string,
@@ -2158,62 +2299,241 @@ export async function startMcpServer(
             stdoutTarget: outStream as any,
             stderrTarget: errStream as any,
             inputSource: inStream as any,
+            onProgress:
+              progressToken && process.env.JIO_MCP_PROGRESS !== "0"
+                ? (info: {
+                    items?: number;
+                    bytes?: number;
+                    message?: string;
+                    progress?: number;
+                  }) => {
+                    try {
+                      if ((server as any).notification) {
+                        (server as any).notification({
+                          method: "notifications/progress",
+                          params: {
+                            progress: info.progress ?? undefined,
+                            message: info.message || undefined,
+                            progressToken,
+                          },
+                        });
+                      }
+                    } catch {}
+                  }
+                : undefined,
           } as any,
         );
+        // heartbeat after first run
+        notifyProgress("first-end");
         if (code && code !== 0) return mapExit(code);
         try {
-          let obj: any = null;
           const ignoreCtl = spec.command?.ignoreControlMessages === true;
-          if (out) {
-            try {
-              obj = JSON.parse(out);
-            } catch {
-              // Fallback: if ignoring control and NDJSON, parse line-by-line
-              if (ignoreCtl && isNdjson) {
-                const items: any[] = [];
-                for (const line of out.split(/\r?\n/)) {
-                  const s = line.trim();
-                  if (!s) continue;
+          if (isNdjson) {
+            const items: any[] = [];
+            let foundCtl: any = null;
+            let ctlState: any = null;
+            // first pass
+            for (const line of String(out || "").split(/\r?\n/)) {
+              const s = line.trim();
+              if (!s) continue;
+              try {
+                let o: any = JSON.parse(s);
+                if (typeof o === "string") {
                   try {
-                    items.push(JSON.parse(s));
+                    o = JSON.parse(o);
                   } catch {}
                 }
-                obj = { items };
+                if (!ignoreCtl && o && typeof o === "object" && o["$jio.ctl"] === true) {
+                  if (o["$jio.ctl.elicit"]) {
+                    foundCtl = o["$jio.ctl.elicit"];
+                    ctlState = o["$jio.ctl.elicit"]?.state;
+                  }
+                  continue;
+                }
+                items.push(o);
+                try {
+                  if ((server as any).notification) {
+                    (server as any).notification({
+                      method: "notifications/progress",
+                      params: progressToken
+                        ? { progressToken, progress: 0, message: JSON.stringify(o) }
+                        : { message: JSON.stringify(o) },
+                    });
+                  }
+                } catch {}
+              } catch {}
+            }
+            // handle elicitation
+            if (!ignoreCtl && foundCtl && typeof extra?.sendRequest === "function") {
+              const { ElicitResultSchema } = await import("@modelcontextprotocol/sdk/types.js");
+              let elicitRes = await extra
+                .sendRequest(
+                  {
+                    method: "elicitation/create",
+                    params: {
+                      message: foundCtl?.message,
+                      requestedSchema: foundCtl?.requestedSchema,
+                    },
+                  } as any,
+                  ElicitResultSchema as any,
+                )
+                .catch(() => null);
+              if (!elicitRes) {
+                // Fallback: auto-accept to avoid hanging if client does not handle elicitation
+                elicitRes = { action: "accept", content: {} } as any;
+              }
+              if (elicitRes && elicitRes.action === "accept") {
+                let nextInv = {
+                  ...(args ?? {}),
+                  ["$jio.ctl.elicit.response"]: {
+                    action: "accept",
+                    content: elicitRes.content || {},
+                    state: ctlState,
+                  },
+                } as any;
+                while (true) {
+                  let abort = false;
+                  let nextCtl: any = null;
+                  let nextCtlState: any = null;
+                  let sinkBuf = "";
+                  // heartbeat before starting resumed NDJSON run
+                  notifyProgress("resume-start");
+                  const sink = new Writable({
+                    write(chunk, _enc, cb) {
+                      try {
+                        const part = Buffer.from(chunk as any).toString("utf8");
+                        sinkBuf += part;
+                        while (true) {
+                          const nl = sinkBuf.indexOf("\n");
+                          if (nl < 0) break;
+                          const line = sinkBuf.slice(0, nl);
+                          sinkBuf = sinkBuf.slice(nl + 1);
+                          const s = line.trim();
+                          if (!s) continue;
+                          try {
+                            let o: any = JSON.parse(s);
+                            if (typeof o === "string") {
+                              try {
+                                o = JSON.parse(o);
+                              } catch {}
+                            }
+                            if (o && typeof o === "object" && o["$jio.ctl"] === true) {
+                              if (o["$jio.ctl.elicit"]) {
+                                nextCtl = o["$jio.ctl.elicit"];
+                                nextCtlState = o["$jio.ctl.elicit"]?.state;
+                                abort = true;
+                                continue;
+                              }
+                            }
+                            items.push(o);
+                            // per-line notifications (schema-only)
+                            notifyProgress(JSON.stringify(o), 0);
+                          } catch {}
+                        }
+                      } finally {
+                        cb();
+                      }
+                    },
+                    final(cb) {
+                      cb();
+                    },
+                  });
+                  const code2 = await runWithTransforms(
+                    dir,
+                    specPath as string,
+                    spec as any,
+                    buildArgv(spec as any, nextInv),
+                    cfg as any,
+                    nextInv,
+                    {
+                      collect: false,
+                      collectLimit: opts.collectLimit,
+                      limits: {
+                        collectItems: (opts.maxItemsPerCall as any) ?? opts.collectLimit,
+                        collectBytes: (opts.maxCollectBytes as any) ?? opts.collectBytes,
+                        maxArgvTokens: opts.maxArgvTokens as any,
+                        maxArgvBytes: opts.maxArgvBytes as any,
+                        maxStdinBytes: opts.maxStdinBytes as any,
+                        maxStdoutJsonBytes: opts.maxStdoutJsonBytes as any,
+                        maxNdjsonLineBytes: opts.maxNdjsonLineBytes as any,
+                      },
+                      timeoutMsOverride: opts.timeoutMs,
+                      cleanEnv: opts.cleanEnv !== false,
+                      passEnv: opts.passEnv || [],
+                      setEnv: opts.setEnv || {},
+                      stdoutTarget: sink as any,
+                      stderrTarget: new PassThrough() as any,
+                      inputSource: new PassThrough() as any,
+                      isCancelled: () => abort,
+                    } as any,
+                  );
+                  // heartbeat after finishing resumed run
+                  notifyProgress("resume-end");
+                  if (code2 && code2 !== 0) return mapExit(code2);
+                  if (nextCtl) {
+                    const el2 = await extra
+                      .sendRequest(
+                        {
+                          method: "elicitation/create",
+                          params: {
+                            message: nextCtl?.message,
+                            requestedSchema: nextCtl?.requestedSchema,
+                          },
+                        } as any,
+                        ElicitResultSchema as any,
+                      )
+                      .catch(() => null);
+                    const elAcc = el2 || { action: "accept", content: {} };
+                    if (elAcc.action !== "accept") {
+                      return {
+                        isError: true,
+                        content: [{ type: "text", text: "User declined" }],
+                      } as any;
+                    }
+                    nextInv = {
+                      ...(args ?? {}),
+                      ["$jio.ctl.elicit.response"]: {
+                        action: "accept",
+                        content: elAcc.content || {},
+                        state: nextCtlState,
+                      },
+                    };
+                    continue;
+                  }
+                  break;
+                }
               } else {
-                throw new Error("parse");
+                return { isError: true, content: [{ type: "text", text: "User declined" }] } as any;
               }
             }
-          }
-          if (!ignoreCtl && obj != null) {
-            const isCtlObj = (o: any) => o && typeof o === "object" && o["$jio.ctl"] === true;
-            if (Array.isArray(obj)) {
-              const ctl = obj.find((o) => isCtlObj(o));
-              if (ctl && ctl["$jio.ctl.elicit"]) {
+            if (validateOut) {
+              const ok = validateOut({ items });
+              if (!ok) {
+                const verr = (validateOut.errors && validateOut.errors[0]) || {
+                  message: "invalid",
+                };
                 return {
-                  type: "error",
-                  error: { type: "Error", message: "Elicitation unsupported" },
+                  isError: true,
+                  content: [{ type: "text", text: JSON.stringify(verr) }],
                 } as any;
               }
-            } else if (isCtlObj(obj) && obj["$jio.ctl.elicit"]) {
-              return {
-                type: "error",
-                error: { type: "Error", message: "Elicitation unsupported" },
-              } as any;
             }
+            return { structuredContent: { items } } as any;
           }
+          // JSON output path
+          let obj: any = null;
+          if (out) obj = JSON.parse(out);
           if (!ignoreCtl && validateOut && obj != null) {
             const ok = validateOut(obj);
             if (!ok) {
-              const err = (validateOut.errors && validateOut.errors[0]) || { message: "invalid" };
+              const err0 = (validateOut.errors && validateOut.errors[0]) || { message: "invalid" };
               return {
                 isError: true,
-                content: [{ type: "text", text: JSON.stringify(err) }],
+                content: [{ type: "text", text: JSON.stringify(err0) }],
               } as any;
             }
           }
-          // For NDJSON tools, wrap collected array in an object for MCP structuredContent
-          const payload = isNdjson && Array.isArray(obj) ? { items: obj } : obj;
-          return { structuredContent: payload } as any;
+          return { structuredContent: obj } as any;
         } catch {
           return {
             isError: true,
@@ -2232,6 +2552,13 @@ export async function startMcpServer(
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
+  try {
+    // Emit a one-time startup notification to verify stdio progress delivery
+    (server as any).notification?.({
+      method: "notifications/progress",
+      params: { message: "server-connected" },
+    });
+  } catch {}
   // Keep process alive while using stdio transport; caller can terminate the process
   await new Promise<void>(() => {});
 }

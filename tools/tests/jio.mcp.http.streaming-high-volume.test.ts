@@ -88,7 +88,7 @@ for (let i = 0; i < N; i++) {
       const c = new Client({ name: "test", version: "0" });
       let itemCount = 0;
       (t as any).onmessage = (msg: any) => {
-        if (msg && msg.method === "notifications/item") itemCount++;
+        if (msg && msg.method === "notifications/progress" && msg.params?.item) itemCount++;
       };
       await c.connect(t as any);
       // give SSE channel a brief moment to settle

@@ -46,7 +46,7 @@ describe("jio mcp — http ndjson streaming", () => {
     const c = new Client({ name: "test", version: "0" });
     let itemCount = 0;
     (t as any).onmessage = (msg: any) => {
-      if (msg && msg.method === "notifications/item") itemCount++;
+      if (msg && msg.method === "notifications/progress" && msg.params?.item) itemCount++;
     };
     await c.connect(t as any);
     const tools = await c.listTools({});
