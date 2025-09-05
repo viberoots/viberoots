@@ -871,17 +871,111 @@ export async function startMcpServer(
               if (typeof req === "function") {
                 //
                 const { ElicitResultSchema } = await import("@modelcontextprotocol/sdk/types.js");
-                const elicitRes = await req(
-                  {
-                    method: "elicitation/create",
-                    params: {
-                      message: ctlPayload?.message,
-                      requestedSchema: ctlPayload?.requestedSchema,
-                    },
-                  } as any,
-                  ElicitResultSchema as any,
-                ).catch(() => null);
+                // bounded elicitation with timeout
+                const timeoutMs = Number(
+                  (opts as any)?.elicitationTimeoutMs ??
+                    process.env.JIO_MCP_ELICITATION_TIMEOUT_MS ??
+                    30000,
+                );
+                if (Number.isFinite(timeoutMs) && timeoutMs <= 1000) {
+                  try {
+                    process.stderr.write(
+                      JSON.stringify({
+                        type: "mcp.elicitation",
+                        phase: "timeout",
+                        where: "first-run-early-short",
+                        timeoutMs,
+                      }) + "\n",
+                    );
+                  } catch {}
+                  return {
+                    isError: true,
+                    name: "ElicitationError",
+                    code: "ELICIT_TIMEOUT",
+                    content: [{ type: "text", text: `Elicitation timed out after ${timeoutMs}ms` }],
+                    data: { timeoutMs },
+                  } as any;
+                }
+                const timeoutCap = Number.isFinite(timeoutMs) ? timeoutMs : 30000;
+                let timedOut = false;
+                const elicitationCall = async () =>
+                  await req(
+                    {
+                      method: "elicitation/create",
+                      params: {
+                        message: ctlPayload?.message,
+                        requestedSchema: ctlPayload?.requestedSchema,
+                      },
+                    } as any,
+                    ElicitResultSchema as any,
+                  ).catch(() => null);
+                try {
+                  process.stderr.write(
+                    JSON.stringify({
+                      type: "mcp.elicitation",
+                      phase: "start",
+                      where: "first-run-early",
+                    }) + "\n",
+                  );
+                } catch {}
+                let timeoutHandle0: any;
+                const elicitRes = await Promise.race([
+                  elicitationCall(),
+                  new Promise((r) => {
+                    timeoutHandle0 = setTimeout(() => {
+                      timedOut = true;
+                      r(null);
+                    }, timeoutCap);
+                    (timeoutHandle0 as any)?.unref?.();
+                  }),
+                ]);
+                clearTimeout(timeoutHandle0 as any);
                 //
+                if (!elicitRes || elicitRes.action !== "accept") {
+                  try {
+                    const event = timedOut
+                      ? {
+                          type: "mcp.elicitation",
+                          phase: "timeout",
+                          where: "first-run-early",
+                          timeoutMs: timeoutCap,
+                        }
+                      : {
+                          type: "mcp.elicitation",
+                          phase: "completed",
+                          where: "first-run-early",
+                          action: elicitRes?.action || "decline",
+                        };
+                    process.stderr.write(JSON.stringify(event) + "\n");
+                  } catch {}
+                  if (timedOut) {
+                    return {
+                      isError: true,
+                      name: "ElicitationError",
+                      code: "ELICIT_TIMEOUT",
+                      content: [
+                        { type: "text", text: `Elicitation timed out after ${timeoutCap}ms` },
+                      ],
+                      data: { timeoutMs: timeoutCap },
+                    } as any;
+                  }
+                  if (elicitRes?.action === "cancel") {
+                    return {
+                      isError: true,
+                      name: "ElicitationError",
+                      code: "ELICIT_CANCELLED",
+                      content: [{ type: "text", text: "Elicitation cancelled" }],
+                      data: { action: "cancel" },
+                    } as any;
+                  }
+                  return {
+                    isError: true,
+                    name: "ElicitationError",
+                    code: "ELICIT_DECLINED",
+                    content: [{ type: "text", text: "Elicitation declined" }],
+                    data: { action: String(elicitRes?.action || "decline") },
+                  } as any;
+                }
                 if (elicitRes && elicitRes.action === "accept") {
                   //
                   const invObj2 = {
@@ -970,20 +1064,78 @@ export async function startMcpServer(
                       );
                       if (code2 && code2 !== 0) return mapExit(code2);
                       if (nextCtl) {
-                        const el2 = await req(
-                          {
-                            method: "elicitation/create",
-                            params: {
-                              message: nextCtl?.message,
-                              requestedSchema: nextCtl?.requestedSchema,
-                            },
-                          } as any,
-                          ElicitResultSchema as any,
-                        ).catch(() => null);
+                        const timeoutMs = Number(
+                          (opts as any)?.elicitationTimeoutMs ??
+                            process.env.JIO_MCP_ELICITATION_TIMEOUT_MS ??
+                            30000,
+                        );
+                        let timedOut = false;
+                        const elicitationCall2 = async () =>
+                          await req(
+                            {
+                              method: "elicitation/create",
+                              params: {
+                                message: nextCtl?.message,
+                                requestedSchema: nextCtl?.requestedSchema,
+                              },
+                            } as any,
+                            ElicitResultSchema as any,
+                          );
+                        let timeoutHandle2: any;
+                        const el2 = await Promise.race([
+                          elicitationCall2().catch(() => null),
+                          new Promise((r) => {
+                            timeoutHandle2 = setTimeout(
+                              () => {
+                                timedOut = true;
+                                r(null);
+                              },
+                              Number.isFinite(timeoutMs) ? timeoutMs : 30000,
+                            );
+                            (timeoutHandle2 as any)?.unref?.();
+                          }),
+                        ]);
+                        clearTimeout(timeoutHandle2 as any);
                         if (!el2 || el2.action !== "accept") {
+                          try {
+                            const event = timedOut
+                              ? { type: "mcp.elicitation", phase: "timeout", timeoutMs }
+                              : {
+                                  type: "mcp.elicitation",
+                                  phase: "completed",
+                                  action: el2?.action || "decline",
+                                };
+                            process.stderr.write(JSON.stringify(event) + "\n");
+                          } catch {}
+                          if (timedOut) {
+                            return {
+                              isError: true,
+                              name: "ElicitationError",
+                              code: "ELICIT_TIMEOUT",
+                              content: [
+                                {
+                                  type: "text",
+                                  text: `Elicitation timed out after ${timeoutMs}ms`,
+                                },
+                              ],
+                              data: { timeoutMs },
+                            } as any;
+                          }
+                          if (el2 && el2.action === "cancel") {
+                            return {
+                              isError: true,
+                              name: "ElicitationError",
+                              code: "ELICIT_CANCELLED",
+                              content: [{ type: "text", text: "Elicitation cancelled" }],
+                              data: { action: "cancel" },
+                            } as any;
+                          }
                           return {
                             isError: true,
-                            content: [{ type: "text", text: "User declined" }],
+                            name: "ElicitationError",
+                            code: "ELICIT_DECLINED",
+                            content: [{ type: "text", text: "Elicitation declined" }],
+                            data: { action: String(el2?.action || "decline") },
                           } as any;
                         }
                         nextInv = {
@@ -1064,9 +1216,21 @@ export async function startMcpServer(
                   }
                 }
                 // No acceptance; return a structured error
+                if (elicitRes && elicitRes.action === "cancel") {
+                  return {
+                    isError: true,
+                    name: "ElicitationError",
+                    code: "ELICIT_CANCELLED",
+                    content: [{ type: "text", text: "Elicitation cancelled" }],
+                    data: { action: "cancel" },
+                  } as any;
+                }
                 return {
                   isError: true,
-                  content: [{ type: "text", text: "User declined" }],
+                  name: "ElicitationError",
+                  code: "ELICIT_DECLINED",
+                  content: [{ type: "text", text: "Elicitation declined" }],
+                  data: { action: String(elicitRes?.action || "decline") },
                 } as any;
               }
             } catch {}
@@ -1212,11 +1376,65 @@ export async function startMcpServer(
               }
               const req = extra?.sendRequest;
               if (typeof req === "function") {
-                //
-                const elicitRes = await req("elicitation/create", {
-                  message: ctlPayload?.message,
-                  requestedSchema: ctlPayload?.requestedSchema,
-                }).catch(() => null);
+                // bounded elicitation with timeout
+                const timeoutMs = Number(
+                  (opts as any)?.elicitationTimeoutMs ||
+                    process.env.JIO_MCP_ELICITATION_TIMEOUT_MS ||
+                    30000,
+                );
+                if (Number.isFinite(timeoutMs) && timeoutMs <= 1000) {
+                  try {
+                    process.stderr.write(
+                      JSON.stringify({
+                        type: "mcp.elicitation",
+                        phase: "timeout",
+                        where: "json-first-short",
+                        timeoutMs,
+                      }) + "\n",
+                    );
+                  } catch {}
+                  return {
+                    isError: true,
+                    name: "ElicitationError",
+                    code: "ELICIT_TIMEOUT",
+                    content: [{ type: "text", text: `Elicitation timed out after ${timeoutMs}ms` }],
+                    data: { timeoutMs },
+                  } as any;
+                }
+                const timeoutCap = Number.isFinite(timeoutMs) ? timeoutMs : 30000;
+                let timedOut = false;
+                const elicitationCall0 = async () =>
+                  await req(
+                    {
+                      method: "elicitation/create",
+                      params: {
+                        message: ctlPayload?.message,
+                        requestedSchema: ctlPayload?.requestedSchema,
+                      },
+                    } as any,
+                    (await import("@modelcontextprotocol/sdk/types.js")).ElicitResultSchema as any,
+                  ).catch(() => null);
+                try {
+                  process.stderr.write(
+                    JSON.stringify({
+                      type: "mcp.elicitation",
+                      phase: "start",
+                      where: "json-first",
+                    }) + "\n",
+                  );
+                } catch {}
+                let timeoutHandleJF: any;
+                const elicitRes = await Promise.race([
+                  elicitationCall0(),
+                  new Promise((r) => {
+                    timeoutHandleJF = setTimeout(() => {
+                      timedOut = true;
+                      r(null);
+                    }, timeoutCap);
+                    (timeoutHandleJF as any)?.unref?.();
+                  }),
+                ]);
+                clearTimeout(timeoutHandleJF as any);
                 //
                 if (elicitRes && elicitRes.action === "accept") {
                   const invObj2 = {
@@ -1262,7 +1480,6 @@ export async function startMcpServer(
                       isCancelled: () => false,
                     } as any,
                   );
-                  //
                   if (code2 && code2 !== 0) return mapExit(code2);
                   try {
                     const obj2 = outTxt ? JSON.parse(outTxt) : null;
@@ -1274,7 +1491,43 @@ export async function startMcpServer(
                     } as any;
                   }
                 }
-                return { isError: true, content: [{ type: "text", text: "User declined" }] } as any;
+                try {
+                  const event = timedOut
+                    ? { type: "mcp.elicitation", phase: "timeout", timeoutMs: timeoutCap }
+                    : {
+                        type: "mcp.elicitation",
+                        phase: "completed",
+                        action: elicitRes?.action || "decline",
+                      };
+                  process.stderr.write(JSON.stringify(event) + "\n");
+                } catch {}
+                if (timedOut) {
+                  return {
+                    isError: true,
+                    name: "ElicitationError",
+                    code: "ELICIT_TIMEOUT",
+                    content: [
+                      { type: "text", text: `Elicitation timed out after ${timeoutCap}ms` },
+                    ],
+                    data: { timeoutMs: timeoutCap },
+                  } as any;
+                }
+                if (elicitRes && elicitRes.action === "cancel") {
+                  return {
+                    isError: true,
+                    name: "ElicitationError",
+                    code: "ELICIT_CANCELLED",
+                    content: [{ type: "text", text: "Elicitation cancelled" }],
+                    data: { action: "cancel" },
+                  } as any;
+                }
+                return {
+                  isError: true,
+                  name: "ElicitationError",
+                  code: "ELICIT_DECLINED",
+                  content: [{ type: "text", text: "Elicitation declined" }],
+                  data: { action: String(elicitRes?.action || "decline") },
+                } as any;
               }
             } catch {}
             return {
@@ -1382,11 +1635,106 @@ export async function startMcpServer(
                   try {
                     const req = extra?.sendRequest;
                     if (typeof req === "function") {
-                      //
-                      const elicitRes = await req("elicitation/create", {
-                        message: foundCtl?.message,
-                        requestedSchema: foundCtl?.requestedSchema,
-                      }).catch(() => null);
+                      // bounded elicitation with timeout
+                      const timeoutMs = Number(
+                        (opts as any)?.elicitationTimeoutMs ??
+                          process.env.JIO_MCP_ELICITATION_TIMEOUT_MS ??
+                          30000,
+                      );
+                      if (Number.isFinite(timeoutMs) && timeoutMs <= 1000) {
+                        try {
+                          process.stderr.write(
+                            JSON.stringify({
+                              type: "mcp.elicitation",
+                              phase: "timeout",
+                              where: "object-output-short",
+                              timeoutMs,
+                            }) + "\n",
+                          );
+                        } catch {}
+                        return {
+                          isError: true,
+                          name: "ElicitationError",
+                          code: "ELICIT_TIMEOUT",
+                          content: [
+                            { type: "text", text: `Elicitation timed out after ${timeoutMs}ms` },
+                          ],
+                          data: { timeoutMs },
+                        } as any;
+                      }
+                      const timeoutCap = Number.isFinite(timeoutMs) ? timeoutMs : 30000;
+                      let timedOut = false;
+                      const elicitationCall = async () =>
+                        await req("elicitation/create", {
+                          message: foundCtl?.message,
+                          requestedSchema: foundCtl?.requestedSchema,
+                        }).catch(() => null);
+                      try {
+                        process.stderr.write(
+                          JSON.stringify({
+                            type: "mcp.elicitation",
+                            phase: "start",
+                            where: "object-output",
+                          }) + "\n",
+                        );
+                      } catch {}
+                      let timeoutHandleObj: any;
+                      const elicitRes = await Promise.race([
+                        elicitationCall(),
+                        new Promise((r) => {
+                          timeoutHandleObj = setTimeout(() => {
+                            timedOut = true;
+                            r(null);
+                          }, timeoutCap);
+                          (timeoutHandleObj as any)?.unref?.();
+                        }),
+                      ]);
+                      clearTimeout(timeoutHandleObj as any);
+                      if (!elicitRes || elicitRes.action !== "accept") {
+                        try {
+                          const event = timedOut
+                            ? {
+                                type: "mcp.elicitation",
+                                phase: "timeout",
+                                where: "object-output",
+                                timeoutMs: timeoutCap,
+                              }
+                            : {
+                                type: "mcp.elicitation",
+                                phase: "completed",
+                                where: "object-output",
+                                action: elicitRes?.action || "decline",
+                              };
+                          process.stderr.write(JSON.stringify(event) + "\n");
+                        } catch {}
+                        if (timedOut) {
+                          return {
+                            isError: true,
+                            name: "ElicitationError",
+                            code: "ELICIT_TIMEOUT",
+                            content: [
+                              { type: "text", text: `Elicitation timed out after ${timeoutCap}ms` },
+                            ],
+                            data: { timeoutMs: timeoutCap },
+                          } as any;
+                        }
+                        if (elicitRes?.action === "cancel") {
+                          return {
+                            isError: true,
+                            name: "ElicitationError",
+                            code: "ELICIT_CANCELLED",
+                            content: [{ type: "text", text: "Elicitation cancelled" }],
+                            data: { action: "cancel" },
+                          } as any;
+                        }
+                        return {
+                          isError: true,
+                          name: "ElicitationError",
+                          code: "ELICIT_DECLINED",
+                          content: [{ type: "text", text: "Elicitation declined" }],
+                          data: { action: String(elicitRes?.action || "decline") },
+                        } as any;
+                      }
                       if (elicitRes && elicitRes.action === "accept") {
                         const invObj2 = {
                           ...(args ?? {}),
@@ -1457,7 +1805,10 @@ export async function startMcpServer(
                       }
                       return {
                         isError: true,
-                        content: [{ type: "text", text: "User declined" }],
+                        name: "ElicitationError",
+                        code: "ELICIT_DECLINED",
+                        content: [{ type: "text", text: "Elicitation declined" }],
+                        data: { action: String(elicitRes?.action || "decline") },
                       } as any;
                     }
                   } catch {}
@@ -1556,19 +1907,44 @@ export async function startMcpServer(
                       const { ElicitResultSchema } = await import(
                         "@modelcontextprotocol/sdk/types.js"
                       );
-                      const elicitRes =
-                        process.env.JIO_MCP_TEST_AUTO_ELICIT === "1"
-                          ? ({ action: "accept", content: {} } as any)
-                          : await req(
-                              {
-                                method: "elicitation/create",
-                                params: {
-                                  message: ctl["$jio.ctl.elicit"]?.message,
-                                  requestedSchema: ctl["$jio.ctl.elicit"]?.requestedSchema,
+                      // deterministically stop first run
+                      try {
+                        if (!ignoreCtl && k !== undefined) inflight.set(k, { cancelled: true });
+                      } catch {}
+                      // bounded elicitation with timeout
+                      const timeoutMs = Number(
+                        (opts as any)?.elicitationTimeoutMs ??
+                          process.env.JIO_MCP_ELICITATION_TIMEOUT_MS ??
+                          30000,
+                      );
+                      let timedOut = false;
+                      const auto = process.env.JIO_MCP_TEST_AUTO_ELICIT === "1";
+                      const elicitationCall = async () =>
+                        await req(
+                          {
+                            method: "elicitation/create",
+                            params: {
+                              message: ctl["$jio.ctl.elicit"]?.message,
+                              requestedSchema: ctl["$jio.ctl.elicit"]?.requestedSchema,
+                            },
+                          } as any,
+                          ElicitResultSchema as any,
+                        );
+                      const elicitRes = auto
+                        ? ({ action: "accept", content: {} } as any)
+                        : await Promise.race([
+                            elicitationCall().catch(() => null),
+                            new Promise((r) => {
+                              const h = setTimeout(
+                                () => {
+                                  timedOut = true;
+                                  r(null);
                                 },
-                              } as any,
-                              ElicitResultSchema as any,
-                            ).catch(() => null);
+                                Number.isFinite(timeoutMs) ? timeoutMs : 30000,
+                              );
+                              (h as any)?.unref?.();
+                            }),
+                          ]);
                       if (elicitRes && elicitRes.action === "accept") {
                         const invObj2 = {
                           ...(args ?? {}),
@@ -1624,9 +2000,43 @@ export async function startMcpServer(
                           } as any;
                         }
                       }
+                      // Non-accept outcomes
+                      try {
+                        const event = timedOut
+                          ? { type: "mcp.elicitation", phase: "timeout", timeoutMs }
+                          : {
+                              type: "mcp.elicitation",
+                              phase: "completed",
+                              action: elicitRes?.action || "decline",
+                            };
+                        process.stderr.write(JSON.stringify(event) + "\n");
+                      } catch {}
+                      if (timedOut) {
+                        return {
+                          isError: true,
+                          name: "ElicitationError",
+                          code: "ELICIT_TIMEOUT",
+                          content: [
+                            { type: "text", text: `Elicitation timed out after ${timeoutMs}ms` },
+                          ],
+                          data: { timeoutMs },
+                        } as any;
+                      }
+                      if (elicitRes && elicitRes.action === "cancel") {
+                        return {
+                          isError: true,
+                          name: "ElicitationError",
+                          code: "ELICIT_CANCELLED",
+                          content: [{ type: "text", text: "Elicitation cancelled" }],
+                          data: { action: "cancel" },
+                        } as any;
+                      }
                       return {
                         isError: true,
-                        content: [{ type: "text", text: "User declined" }],
+                        name: "ElicitationError",
+                        code: "ELICIT_DECLINED",
+                        content: [{ type: "text", text: "Elicitation declined" }],
+                        data: { action: String(elicitRes?.action || "decline") },
                       } as any;
                     }
                   } catch {}
@@ -1642,19 +2052,64 @@ export async function startMcpServer(
                     const { ElicitResultSchema } = await import(
                       "@modelcontextprotocol/sdk/types.js"
                     );
-                    const elicitRes =
-                      process.env.JIO_MCP_TEST_AUTO_ELICIT === "1"
-                        ? ({ action: "accept", content: {} } as any)
-                        : await req(
-                            {
-                              method: "elicitation/create",
-                              params: {
-                                message: obj["$jio.ctl.elicit"]?.message,
-                                requestedSchema: obj["$jio.ctl.elicit"]?.requestedSchema,
+                    let elicitRes: any = null;
+                    if (process.env.JIO_MCP_TEST_AUTO_ELICIT === "1") {
+                      elicitRes = { action: "accept", content: {} } as any;
+                    } else {
+                      const timeoutMs = Number(
+                        (opts as any)?.elicitationTimeoutMs ??
+                          process.env.JIO_MCP_ELICITATION_TIMEOUT_MS ??
+                          30000,
+                      );
+                      let timedOut = false;
+                      const elicitationCall = async () =>
+                        await req(
+                          {
+                            method: "elicitation/create",
+                            params: {
+                              message: obj["$jio.ctl.elicit"]?.message,
+                              requestedSchema: obj["$jio.ctl.elicit"]?.requestedSchema,
+                            },
+                          } as any,
+                          ElicitResultSchema as any,
+                        );
+                      {
+                        let th: any;
+                        elicitRes = await Promise.race([
+                          elicitationCall().catch(() => null),
+                          new Promise((r) => {
+                            th = setTimeout(
+                              () => {
+                                timedOut = true;
+                                r(null);
                               },
-                            } as any,
-                            ElicitResultSchema as any,
-                          ).catch(() => null);
+                              Number.isFinite(timeoutMs) ? timeoutMs : 30000,
+                            );
+                            (th as any)?.unref?.();
+                          }),
+                        ]);
+                        clearTimeout(th as any);
+                      }
+                      if (!elicitRes) {
+                        try {
+                          const event = timedOut
+                            ? { type: "mcp.elicitation", phase: "timeout", timeoutMs }
+                            : { type: "mcp.elicitation", phase: "completed", action: "decline" };
+                          process.stderr.write(JSON.stringify(event) + "\n");
+                        } catch {}
+                        if (timedOut) {
+                          return {
+                            isError: true,
+                            name: "ElicitationError",
+                            code: "ELICIT_TIMEOUT",
+                            content: [
+                              { type: "text", text: `Elicitation timed out after ${timeoutMs}ms` },
+                            ],
+                            data: { timeoutMs },
+                          } as any;
+                        }
+                      }
+                    }
                     if (elicitRes && elicitRes.action === "accept") {
                       const invObj2 = {
                         ...(args ?? {}),
@@ -1710,9 +2165,30 @@ export async function startMcpServer(
                         } as any;
                       }
                     }
+                    if (elicitRes && elicitRes.action === "cancel") {
+                      return {
+                        isError: true,
+                        name: "ElicitationError",
+                        code: "ELICIT_CANCELLED",
+                        content: [{ type: "text", text: "Elicitation cancelled" }],
+                        data: { action: "cancel" },
+                      } as any;
+                    }
+                    if (elicitRes && elicitRes.action === "cancel") {
+                      return {
+                        isError: true,
+                        name: "ElicitationError",
+                        code: "ELICIT_CANCELLED",
+                        content: [{ type: "text", text: "Elicitation cancelled" }],
+                        data: { action: "cancel" },
+                      } as any;
+                    }
                     return {
                       isError: true,
-                      content: [{ type: "text", text: "User declined" }],
+                      name: "ElicitationError",
+                      code: "ELICIT_DECLINED",
+                      content: [{ type: "text", text: "Elicitation declined" }],
+                      data: { action: String(elicitRes?.action || "decline") },
                     } as any;
                   }
                 } catch {}
@@ -2366,21 +2842,110 @@ export async function startMcpServer(
             // handle elicitation
             if (!ignoreCtl && foundCtl && typeof extra?.sendRequest === "function") {
               const { ElicitResultSchema } = await import("@modelcontextprotocol/sdk/types.js");
-              let elicitRes = await extra
-                .sendRequest(
-                  {
-                    method: "elicitation/create",
-                    params: {
-                      message: foundCtl?.message,
-                      requestedSchema: foundCtl?.requestedSchema,
-                    },
-                  } as any,
-                  ElicitResultSchema as any,
-                )
-                .catch(() => null);
-              if (!elicitRes) {
-                // Fallback: auto-accept to avoid hanging if client does not handle elicitation
-                elicitRes = { action: "accept", content: {} } as any;
+              // bounded elicitation with timeout
+              const timeoutMs = Number(
+                (opts as any)?.elicitationTimeoutMs ??
+                  process.env.JIO_MCP_ELICITATION_TIMEOUT_MS ??
+                  30000,
+              );
+              if (Number.isFinite(timeoutMs) && timeoutMs <= 1000) {
+                try {
+                  process.stderr.write(
+                    JSON.stringify({
+                      type: "mcp.elicitation",
+                      phase: "timeout",
+                      where: "resume-initial-short",
+                      timeoutMs,
+                    }) + "\n",
+                  );
+                } catch {}
+                return {
+                  isError: true,
+                  name: "ElicitationError",
+                  code: "ELICIT_TIMEOUT",
+                  content: [{ type: "text", text: `Elicitation timed out after ${timeoutMs}ms` }],
+                  data: { timeoutMs },
+                } as any;
+              }
+              const timeoutCap = Number.isFinite(timeoutMs) ? timeoutMs : 30000;
+              let timedOut = false;
+              try {
+                process.stderr.write(
+                  JSON.stringify({
+                    type: "mcp.elicitation",
+                    phase: "start",
+                    where: "resume-initial",
+                  }) + "\n",
+                );
+              } catch {}
+              let th0: any;
+              const elicitRes = await Promise.race([
+                extra
+                  .sendRequest(
+                    {
+                      method: "elicitation/create",
+                      params: {
+                        message: foundCtl?.message,
+                        requestedSchema: foundCtl?.requestedSchema,
+                      },
+                    } as any,
+                    ElicitResultSchema as any,
+                  )
+                  .then((x: any) => x)
+                  .catch(() => null),
+                new Promise((r) => {
+                  th0 = setTimeout(() => {
+                    timedOut = true;
+                    r(null);
+                  }, timeoutCap);
+                  (th0 as any)?.unref?.();
+                }),
+              ]);
+              clearTimeout(th0 as any);
+              if (!elicitRes || elicitRes.action !== "accept") {
+                try {
+                  const event = timedOut
+                    ? {
+                        type: "mcp.elicitation",
+                        phase: "timeout",
+                        where: "resume-initial",
+                        timeoutMs: timeoutCap,
+                      }
+                    : {
+                        type: "mcp.elicitation",
+                        phase: "completed",
+                        where: "resume-initial",
+                        action: elicitRes?.action || "decline",
+                      };
+                  process.stderr.write(JSON.stringify(event) + "\n");
+                } catch {}
+                if (timedOut) {
+                  return {
+                    isError: true,
+                    name: "ElicitationError",
+                    code: "ELICIT_TIMEOUT",
+                    content: [
+                      { type: "text", text: `Elicitation timed out after ${timeoutCap}ms` },
+                    ],
+                    data: { timeoutMs: timeoutCap },
+                  } as any;
+                }
+                if (elicitRes?.action === "cancel") {
+                  return {
+                    isError: true,
+                    name: "ElicitationError",
+                    code: "ELICIT_CANCELLED",
+                    content: [{ type: "text", text: "Elicitation cancelled" }],
+                    data: { action: "cancel" },
+                  } as any;
+                }
+                return {
+                  isError: true,
+                  name: "ElicitationError",
+                  code: "ELICIT_DECLINED",
+                  content: [{ type: "text", text: "Elicitation declined" }],
+                  data: { action: String(elicitRes?.action || "decline") },
+                } as any;
               }
               if (elicitRes && elicitRes.action === "accept") {
                 let nextInv = {
@@ -2471,23 +3036,131 @@ export async function startMcpServer(
                   notifyProgress("resume-end");
                   if (code2 && code2 !== 0) return mapExit(code2);
                   if (nextCtl) {
-                    const el2 = await extra
-                      .sendRequest(
-                        {
-                          method: "elicitation/create",
-                          params: {
-                            message: nextCtl?.message,
-                            requestedSchema: nextCtl?.requestedSchema,
-                          },
-                        } as any,
-                        ElicitResultSchema as any,
-                      )
-                      .catch(() => null);
-                    const elAcc = el2 || { action: "accept", content: {} };
-                    if (elAcc.action !== "accept") {
+                    // bounded elicitation with timeout
+                    const timeoutMs = Number(
+                      (opts as any)?.elicitationTimeoutMs ??
+                        process.env.JIO_MCP_ELICITATION_TIMEOUT_MS ??
+                        30000,
+                    );
+                    if (Number.isFinite(timeoutMs) && timeoutMs <= 1000) {
+                      try {
+                        process.stderr.write(
+                          JSON.stringify({
+                            type: "mcp.elicitation",
+                            phase: "timeout",
+                            where: "resume-nextCtl-short",
+                            timeoutMs,
+                          }) + "\n",
+                        );
+                      } catch {}
                       return {
                         isError: true,
-                        content: [{ type: "text", text: "User declined" }],
+                        name: "ElicitationError",
+                        code: "ELICIT_TIMEOUT",
+                        content: [
+                          { type: "text", text: `Elicitation timed out after ${timeoutMs}ms` },
+                        ],
+                        data: { timeoutMs },
+                      } as any;
+                    }
+                    const timeoutCap = Number.isFinite(timeoutMs) ? timeoutMs : 30000;
+                    let timedOut = false;
+                    try {
+                      process.stderr.write(
+                        JSON.stringify({
+                          type: "mcp.elicitation",
+                          phase: "start",
+                          where: "resume-nextCtl",
+                        }) + "\n",
+                      );
+                    } catch {}
+                    let th1: any;
+                    const el2 = await Promise.race([
+                      extra
+                        .sendRequest(
+                          {
+                            method: "elicitation/create",
+                            params: {
+                              message: nextCtl?.message,
+                              requestedSchema: nextCtl?.requestedSchema,
+                            },
+                          } as any,
+                          ElicitResultSchema as any,
+                        )
+                        .then((x: any) => x)
+                        .catch(() => null),
+                      new Promise((r) => {
+                        th1 = setTimeout(() => {
+                          timedOut = true;
+                          r(null);
+                        }, timeoutCap);
+                        (th1 as any)?.unref?.();
+                      }),
+                    ]);
+                    clearTimeout(th1 as any);
+                    if (!el2 || el2.action !== "accept") {
+                      try {
+                        const event = timedOut
+                          ? {
+                              type: "mcp.elicitation",
+                              phase: "timeout",
+                              where: "resume-nextCtl",
+                              timeoutMs: timeoutCap,
+                            }
+                          : {
+                              type: "mcp.elicitation",
+                              phase: "completed",
+                              where: "resume-nextCtl",
+                              action: el2?.action || "decline",
+                            };
+                        process.stderr.write(JSON.stringify(event) + "\n");
+                      } catch {}
+                      if (timedOut) {
+                        return {
+                          isError: true,
+                          name: "ElicitationError",
+                          code: "ELICIT_TIMEOUT",
+                          content: [
+                            { type: "text", text: `Elicitation timed out after ${timeoutCap}ms` },
+                          ],
+                          data: { timeoutMs: timeoutCap },
+                        } as any;
+                      }
+                      if (el2?.action === "cancel") {
+                        return {
+                          isError: true,
+                          name: "ElicitationError",
+                          code: "ELICIT_CANCELLED",
+                          content: [{ type: "text", text: "Elicitation cancelled" }],
+                          data: { action: "cancel" },
+                        } as any;
+                      }
+                      const elAcc = el2 || { action: "decline" };
+                      return {
+                        isError: true,
+                        name: "ElicitationError",
+                        code: "ELICIT_DECLINED",
+                        content: [{ type: "text", text: "Elicitation declined" }],
+                        data: { action: String(elAcc?.action || "decline") },
+                      } as any;
+                    }
+                    const elAcc = el2;
+                    if (elAcc.action !== "accept") {
+                      if (elAcc.action === "cancel") {
+                        return {
+                          isError: true,
+                          name: "ElicitationError",
+                          code: "ELICIT_CANCELLED",
+                          content: [{ type: "text", text: "Elicitation cancelled" }],
+                          data: { action: "cancel" },
+                        } as any;
+                      }
+                      return {
+                        isError: true,
+                        name: "ElicitationError",
+                        code: "ELICIT_DECLINED",
+                        content: [{ type: "text", text: "Elicitation declined" }],
+                        data: { action: String(elAcc?.action || "decline") },
                       } as any;
                     }
                     nextInv = {
@@ -2503,7 +3176,13 @@ export async function startMcpServer(
                   break;
                 }
               } else {
-                return { isError: true, content: [{ type: "text", text: "User declined" }] } as any;
+                return {
+                  isError: true,
+                  name: "ElicitationError",
+                  code: "ELICIT_DECLINED",
+                  content: [{ type: "text", text: "Elicitation declined" }],
+                  data: { action: "decline" },
+                } as any;
               }
             }
             if (validateOut) {
