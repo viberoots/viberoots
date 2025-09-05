@@ -9,6 +9,7 @@ import {
   runWithTransforms,
 } from "../core/index.ts";
 import { emitZodWarning } from "./schema.ts";
+import { runInvocation } from "./invocation.ts";
 import {
   buildSdkSchemas,
   isZodRawShapeValid as isZodRawShapeValidHelper,
@@ -422,6 +423,186 @@ export async function startMcpServer(
           const invObj = args ?? {};
           const forcedElicit = undefined as any;
           const ignoreCtl = spec.command?.ignoreControlMessages === true;
+
+          // Unified invocation using runInvocation; forwards events via HTTP transport notifications
+          try {
+            const isNdjson = spec.command?.stdoutTransform?.format === "ndjson";
+            const forceJsonResp = process.env.JIO_MCP_HTTP_JSON_RESPONSE === "1";
+            const progressToken = (() => {
+              try {
+                const explicitId = extra?.request?.id as any;
+                const reqId =
+                  explicitId ?? (extra && (extra.relatedRequestId ?? extra.id ?? extra.requestId));
+                return reqId !== undefined ? String(reqId) : undefined;
+              } catch {}
+              return undefined;
+            })();
+            const notifyProgress = (message?: string, progress?: number) => {
+              try {
+                if (progressToken && (mcp as any).server?.notification) {
+                  (mcp as any).server.notification({
+                    method: "notifications/progress",
+                    params: { progressToken, message, progress },
+                  });
+                }
+              } catch {}
+            };
+            const notifyItem = (obj: any) => {
+              try {
+                if (progressToken && (mcp as any).server?.notification) {
+                  (mcp as any).server.notification({
+                    method: "notifications/progress",
+                    params: { progressToken, item: obj },
+                  });
+                }
+              } catch {}
+            };
+            const limits = {
+              collectItems: (opts.maxItemsPerCall as any) ?? opts.collectLimit,
+              collectBytes: (opts.maxCollectBytes as any) ?? opts.collectBytes,
+              maxArgvTokens: opts.maxArgvTokens as any,
+              maxArgvBytes: opts.maxArgvBytes as any,
+              maxStdinBytes: opts.maxStdinBytes as any,
+              maxStdoutJsonBytes: opts.maxStdoutJsonBytes as any,
+              maxNdjsonLineBytes: opts.maxNdjsonLineBytes as any,
+            } as any;
+            const ctx2 = { dir, specPath: specPath as string, spec, cfg } as any;
+            const evs = runInvocation(ctx2, {
+              args: invObj,
+              isNdjson,
+              streamingFinalAggregate: !!opts.streamingFinalAggregate,
+              ignoreControlMessages: ignoreCtl,
+              limits,
+              timeoutMsOverride: opts.timeoutMs,
+              env: {
+                cleanEnv: opts.cleanEnv !== false,
+                passEnv: opts.passEnv || [],
+                setEnv: opts.setEnv || {},
+              },
+              isCancelled: () =>
+                cancelAll || (k !== undefined && inflight.get(k)?.cancelled) || false,
+              onProgress: (info) => notifyProgress(info.message, info.progress),
+              onItem: (obj) => notifyItem(obj),
+            });
+            let finalResult: any = undefined;
+            let currentArgs: any = invObj;
+            // Elicitation loop: run, if control -> ask client, then rerun with response
+            while (true) {
+              let controlPayload: any = null;
+              for await (const ev of runInvocation(ctx2, {
+                args: currentArgs,
+                isNdjson,
+                streamingFinalAggregate: !!opts.streamingFinalAggregate,
+                ignoreControlMessages: ignoreCtl,
+                limits,
+                timeoutMsOverride: opts.timeoutMs,
+                env: {
+                  cleanEnv: opts.cleanEnv !== false,
+                  passEnv: opts.passEnv || [],
+                  setEnv: opts.setEnv || {},
+                },
+                isCancelled: () =>
+                  cancelAll || (k !== undefined && inflight.get(k)?.cancelled) || false,
+                onProgress: (info) => notifyProgress(info.message, info.progress),
+                onItem: (obj) => notifyItem(obj),
+              }) as any) {
+                if (!ev || typeof ev !== "object") continue;
+                if (ev.type === "progress") notifyProgress(ev.message, ev.progress);
+                else if (ev.type === "data") notifyItem(ev.item);
+                else if (ev.type === "error")
+                  return { isError: true, type: "error", error: ev.error } as any;
+                else if (ev.type === "control") controlPayload = ev.elicit;
+                else if (ev.type === "final") finalResult = ev.result;
+              }
+              if (!controlPayload) break;
+              // solicit response from client
+              try {
+                const { ElicitResultSchema } = await import("@modelcontextprotocol/sdk/types.js");
+                const timeoutMs = Number(
+                  (opts as any)?.elicitationTimeoutMs ??
+                    process.env.JIO_MCP_ELICITATION_TIMEOUT_MS ??
+                    30000,
+                );
+                const cap = Number.isFinite(timeoutMs) ? timeoutMs : 30000;
+                let timedOut = false;
+                let th: any;
+                const res = await Promise.race([
+                  extra
+                    ?.sendRequest?.(
+                      {
+                        method: "elicitation/create",
+                        params: {
+                          message: controlPayload?.message,
+                          requestedSchema: controlPayload?.requestedSchema,
+                        },
+                      } as any,
+                      ElicitResultSchema as any,
+                    )
+                    .then((x: any) => x)
+                    .catch(() => null),
+                  new Promise((r) => {
+                    th = setTimeout(() => {
+                      timedOut = true;
+                      r(null);
+                    }, cap);
+                    (th as any)?.unref?.();
+                  }),
+                ]);
+                clearTimeout(th as any);
+                if (!res || res.action !== "accept") {
+                  if (timedOut) {
+                    return {
+                      isError: true,
+                      name: "ElicitationError",
+                      code: "ELICIT_TIMEOUT",
+                      content: [{ type: "text", text: `Elicitation timed out after ${cap}ms` }],
+                      data: { timeoutMs: cap },
+                    } as any;
+                  }
+                  if (res?.action === "cancel") {
+                    return {
+                      isError: true,
+                      name: "ElicitationError",
+                      code: "ELICIT_CANCELLED",
+                      content: [{ type: "text", text: "Elicitation cancelled" }],
+                      data: { action: "cancel" },
+                    } as any;
+                  }
+                  return {
+                    isError: true,
+                    name: "ElicitationError",
+                    code: "ELICIT_DECLINED",
+                    content: [{ type: "text", text: "Elicitation declined" }],
+                    data: { action: String(res?.action || "decline") },
+                  } as any;
+                }
+                // augment args and continue loop
+                currentArgs = {
+                  ...(currentArgs || {}),
+                  ["$jio.ctl.elicit.response"]: {
+                    action: "accept",
+                    content: res.content || {},
+                    state: controlPayload?.state,
+                  },
+                } as any;
+              } catch (e: any) {
+                return {
+                  isError: true,
+                  type: "error",
+                  error: { type: "Error", message: String(e?.message || e) },
+                } as any;
+              }
+            }
+            // finalize
+            if (!isNdjson) {
+              const finalObj =
+                registeredOutputKeyCount === 0 && finalResult && typeof finalResult === "object"
+                  ? {}
+                  : finalResult;
+              return { structuredContent: finalObj } as any;
+            }
+            return { structuredContent: finalResult } as any;
+          } catch {}
           // If client provided an elicitation response up front, skip the initial run and go straight
           // to the second run with augmented invocation.
           if (false && !ignoreCtl) {
