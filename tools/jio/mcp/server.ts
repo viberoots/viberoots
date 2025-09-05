@@ -277,10 +277,45 @@ export async function startMcpServer(
           emitZodWarning({ tool: fq, reasons: conv.reasons, schema: outputSchema, kind: "output" });
         }
       }
-      // Do not register output schema for NDJSON tools to avoid SDK structuredContent mismatch
+      // NDJSON output schema registration policy:
+      // - When streamingFinalAggregate is true, register a wrapper { items: [...] } if possible
+      // - Otherwise, skip registering outputSchema to avoid mismatch with streamed notifications
       try {
-        if ((spec as any)?.command?.stdoutTransform?.format === "ndjson") {
-          maybeOutput = undefined;
+        const isNdjson = (spec as any)?.command?.stdoutTransform?.format === "ndjson";
+        if (isNdjson) {
+          if (opts.streamingFinalAggregate) {
+            // Wrap the item Zod as an array under { items }
+            try {
+              // maybeOutput currently holds the Zod raw shape for an object root produced by converter.
+              // For NDJSON, the declared outputSchema corresponds to a single item. We attempt to
+              // reconstruct an item Zod from the raw shape by creating z.object(shape) at runtime.
+              // Since we don't have the full Zod instance here, fall back to raw shape array guard.
+              const { z } = await import("zod");
+              if (maybeOutput && typeof maybeOutput === "object" && !Array.isArray(maybeOutput)) {
+                const itemObj = (z as any).object?.(maybeOutput);
+                const wrapper = { items: (z as any).array?.(itemObj) };
+                if (wrapper.items && typeof wrapper.items === "object") {
+                  if (isZodRawShapeValid({ items: wrapper.items })) {
+                    // Replace maybeOutput with raw shape for wrapper
+                    // SDK expects raw shape; for wrapper we pass { items: ZodType }
+                    maybeOutput = { items: wrapper.items } as any;
+                  } else {
+                    // If wrapper invalid, skip registering output
+                    maybeOutput = undefined;
+                  }
+                } else {
+                  maybeOutput = undefined;
+                }
+              } else {
+                // Cannot infer item shape; skip
+                maybeOutput = undefined;
+              }
+            } catch {
+              maybeOutput = undefined;
+            }
+          } else {
+            maybeOutput = undefined;
+          }
         }
       } catch {}
 
@@ -1632,8 +1667,7 @@ export async function startMcpServer(
               return parsed;
             };
             const items = parseItems(out);
-            if (ignoreCtl || opts.streamingFinalAggregate)
-              return { structuredContent: { items } } as any;
+            if (opts.streamingFinalAggregate) return { structuredContent: { items } } as any;
             return { structuredContent: undefined } as any;
           }
           try {
@@ -1641,7 +1675,7 @@ export async function startMcpServer(
             let obj: any = null;
             if (shouldStreamNdjson) {
               if (ignoreCtl) {
-                // When ignoring control messages in streaming mode, just return collected items.
+                // When ignoring control messages in streaming mode, flush trailing line
                 const trailing = lineBuf.trim();
                 if (trailing) {
                   try {
@@ -1650,8 +1684,9 @@ export async function startMcpServer(
                     notifyItem(o);
                   } catch {}
                 }
-                // Always include items when ignoring control lines
-                return { structuredContent: { items: streamedItems.slice() } } as any;
+                if (opts.streamingFinalAggregate)
+                  return { structuredContent: { items: streamedItems.slice() } } as any;
+                return { structuredContent: undefined } as any;
               }
               // If control was observed and we are ignoring control messages, proceed to parse normally.
               // If control was observed and client pre-supplied elicitation, it should have been handled above.
@@ -1891,7 +1926,7 @@ export async function startMcpServer(
                     error: { type: "Error", message: "Elicitation unsupported" },
                   } as any;
                 }
-                // No control or ignoring control: return items
+                // No control (or control ignored): return items only when aggregate requested
                 if (opts.streamingFinalAggregate) return { structuredContent: { items } } as any;
                 return { structuredContent: undefined } as any;
               }
@@ -2697,11 +2732,45 @@ export async function startMcpServer(
       }
     }
 
-    // For NDJSON tools, do not register an output shape with the SDK, to avoid
-    // structuredContent shape mismatches ({ items: [...] } wrapper)
+    // NDJSON output schema registration policy:
+    // - When streamingFinalAggregate is true, register a wrapper { items: [...] } if possible
+    // - Otherwise, skip registering outputSchema to avoid mismatch with streamed notifications
     try {
-      if ((spec as any)?.command?.stdoutTransform?.format === "ndjson") {
-        maybeOutput = undefined;
+      const isNdjson = (spec as any)?.command?.stdoutTransform?.format === "ndjson";
+      if (isNdjson) {
+        if (opts.streamingFinalAggregate) {
+          // Wrap the item Zod as an array under { items }
+          try {
+            // maybeOutput currently holds the Zod raw shape for an object root produced by converter.
+            // For NDJSON, the declared outputSchema corresponds to a single item. We attempt to
+            // reconstruct an item Zod from the raw shape by creating z.object(shape) at runtime.
+            // Since we don't have the full Zod instance here, fall back to raw shape array guard.
+            const { z } = await import("zod");
+            if (maybeOutput && typeof maybeOutput === "object" && !Array.isArray(maybeOutput)) {
+              const itemObj = (z as any).object?.(maybeOutput);
+              const wrapper = { items: (z as any).array?.(itemObj) };
+              if (wrapper.items && typeof wrapper.items === "object") {
+                if (isZodRawShapeValid({ items: wrapper.items })) {
+                  // Replace maybeOutput with raw shape for wrapper
+                  // SDK expects raw shape; for wrapper we pass { items: ZodType }
+                  maybeOutput = { items: wrapper.items } as any;
+                } else {
+                  // If wrapper invalid, skip registering output
+                  maybeOutput = undefined;
+                }
+              } else {
+                maybeOutput = undefined;
+              }
+            } else {
+              // Cannot infer item shape; skip
+              maybeOutput = undefined;
+            }
+          } catch {
+            maybeOutput = undefined;
+          }
+        } else {
+          maybeOutput = undefined;
+        }
       }
     } catch {}
 

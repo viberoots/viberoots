@@ -29,7 +29,12 @@ describe("jio mcp — http control ignore flag", () => {
   test("ignoreControlMessages passes control lines as output", async () => {
     const host = "127.0.0.1";
     const port = 37300 + Math.floor(Math.random() * 500);
-    const srv = await startMcpServer({ transport: "http", httpHost: host, httpPort: port });
+    const srv = await startMcpServer({
+      transport: "http",
+      httpHost: host,
+      httpPort: port,
+      streamingFinalAggregate: true,
+    });
     const ok = await waitForHealth(host, port, 3000);
     if (!ok) {
       console.error("server not healthy");
