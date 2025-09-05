@@ -8,33 +8,17 @@ import {
   generateInputSchemaFromParameters,
   runWithTransforms,
 } from "../core/index.ts";
-import { emitZodWarning, getZodRawShape, jsonSchemaToZodSafe } from "./schema.ts";
+import { emitZodWarning } from "./schema.ts";
+import {
+  buildSdkSchemas,
+  isZodRawShapeValid as isZodRawShapeValidHelper,
+  isZodType as isZodTypeHelper,
+} from "./registration.ts";
 
 // Guard helpers exported for testing
-export function isZodType(value: unknown): boolean {
-  try {
-    return !!(
-      value &&
-      typeof value === "object" &&
-      (typeof (value as any).parse === "function" || typeof (value as any)._parse === "function")
-    );
-  } catch {
-    return false;
-  }
-}
+export const isZodType = isZodTypeHelper;
 
-export function isZodRawShapeValid(shape: unknown): boolean {
-  try {
-    if (!shape || typeof shape !== "object" || Array.isArray(shape)) return false;
-    for (const k of Object.keys(shape as any)) {
-      const v: any = (shape as any)[k];
-      if (!isZodType(v)) return false;
-    }
-    return true;
-  } catch {
-    return false;
-  }
-}
+export const isZodRawShapeValid = isZodRawShapeValidHelper;
 
 export type McpServerOpts = {
   transport?: "stdio" | "http";
@@ -303,119 +287,18 @@ export async function startMcpServer(
       let maybeParams: any | undefined = undefined;
       let maybeOutput: any | undefined = undefined;
       let zodOutForValidation: any | null = null;
-      if (inputSchema) {
-        const conv = await jsonSchemaToZodSafe(inputSchema);
-        if (conv.zod) {
-          // HTTP path: register with Zod raw shape (SDK wraps with z.object(shape))
-          try {
-            const shape = getZodRawShape(conv.zod);
-            if (shape && typeof shape === "object") {
-              if (isZodRawShapeValid(shape)) {
-                maybeParams = shape;
-              } else {
-                try {
-                  const keys = shape && typeof shape === "object" ? Object.keys(shape) : [];
-                  const bad: string[] = [];
-                  for (const k of keys) {
-                    const v: any = (shape as any)[k];
-                    if (!isZodType(v)) bad.push(k);
-                    if (bad.length >= 10) break;
-                  }
-                  emitZodWarning({
-                    tool: fq,
-                    reasons: [{ keyword: "zodShape(memberInvalid)", pointer: "" }],
-                    schema: inputSchema,
-                    kind: "input",
-                  });
-                } catch {}
-              }
-            }
-          } catch {}
-        } else if (conv.reasons && conv.reasons.length) {
-          emitZodWarning({ tool: fq, reasons: conv.reasons, schema: inputSchema, kind: "input" });
-        }
-      }
-      if (outputSchema) {
-        const conv = await jsonSchemaToZodSafe(outputSchema);
-        if (conv.zod) {
-          // HTTP path: register with Zod raw shape; keep full Zod instance for internal validation
-          try {
-            const shape = getZodRawShape(conv.zod);
-            if (shape && typeof shape === "object") {
-              if (isZodRawShapeValid(shape)) {
-                maybeOutput = shape;
-              } else {
-                try {
-                  const keys = shape && typeof shape === "object" ? Object.keys(shape) : [];
-                  const bad: string[] = [];
-                  for (const k of keys) {
-                    const v: any = (shape as any)[k];
-                    if (!isZodType(v)) bad.push(k);
-                    if (bad.length >= 10) break;
-                  }
-                  emitZodWarning({
-                    tool: fq,
-                    reasons: [{ keyword: "zodShape(memberInvalid)", pointer: "" }],
-                    schema: outputSchema,
-                    kind: "output",
-                  });
-                } catch {}
-              }
-            } else {
-              emitZodWarning({
-                tool: fq,
-                reasons: [{ keyword: "rootType(non-object)", pointer: "" }],
-                schema: outputSchema,
-                kind: "output",
-              });
-            }
-          } catch {}
-          zodOutForValidation = conv.zod;
-        } else if (conv.reasons && conv.reasons.length) {
-          emitZodWarning({ tool: fq, reasons: conv.reasons, schema: outputSchema, kind: "output" });
-        }
-      }
-      // NDJSON output schema registration policy:
-      // - When streamingFinalAggregate is true, register a wrapper { items: [...] } if possible
-      // - Otherwise, skip registering outputSchema to avoid mismatch with streamed notifications
-      try {
-        const isNdjson = (spec as any)?.command?.stdoutTransform?.format === "ndjson";
-        if (isNdjson) {
-          if (opts.streamingFinalAggregate) {
-            // Register a wrapper { items: <ZodArray> } using the full Zod instance when available
-            try {
-              const { z } = await import("zod");
-              const itemZod = zodOutForValidation;
-              if (itemZod && typeof itemZod === "object") {
-                const arrayZod =
-                  itemZod._def?.typeName === "ZodArray"
-                    ? itemZod
-                    : (z as any).array?.(itemZod) || null;
-                if (
-                  arrayZod &&
-                  (typeof (arrayZod as any).parse === "function" ||
-                    typeof (arrayZod as any)._parse === "function")
-                ) {
-                  const wrapper = { items: arrayZod } as any;
-                  if (isZodRawShapeValid(wrapper)) {
-                    maybeOutput = wrapper;
-                  } else {
-                    maybeOutput = undefined;
-                  }
-                } else {
-                  maybeOutput = undefined;
-                }
-              } else {
-                maybeOutput = undefined;
-              }
-            } catch {
-              maybeOutput = undefined;
-            }
-          } else {
-            maybeOutput = undefined;
-          }
-        }
-      } catch {}
+
+      const isNdjson = (spec as any)?.command?.stdoutTransform?.format === "ndjson";
+      const built = await buildSdkSchemas({
+        toolFqName: fq,
+        inputSchema,
+        outputSchema,
+        isNdjson,
+        streamingFinalAggregate: !!opts.streamingFinalAggregate,
+      });
+      maybeParams = built.paramsZodForSdk;
+      maybeOutput = built.outputZodForSdk;
+      zodOutForValidation = built.itemZodForValidation as any;
 
       const registeredOutputKeyCount =
         maybeOutput && typeof maybeOutput === "object" ? Object.keys(maybeOutput).length : -1;
@@ -2809,118 +2692,18 @@ export async function startMcpServer(
     let maybeParams: any | undefined = undefined;
     let maybeOutput: any | undefined = undefined;
     let zodOutForValidation: any | null = null;
-    if (inputSchema) {
-      const conv = await jsonSchemaToZodSafe(inputSchema);
-      if (conv.zod) {
-        // Convert Zod object to the SDK's expected raw shape (ZodRawShape)
-        // The SDK wraps with z.object() internally.
-        const shape = getZodRawShape(conv.zod);
-        if (shape && typeof shape === "object") {
-          if (isZodRawShapeValid(shape)) {
-            maybeParams = shape;
-          } else {
-            try {
-              const keys = shape && typeof shape === "object" ? Object.keys(shape) : [];
-              const bad: string[] = [];
-              for (const k of keys) {
-                const v: any = (shape as any)[k];
-                if (!isZodType(v)) bad.push(k);
-                if (bad.length >= 10) break;
-              }
-              emitZodWarning({
-                tool: fq,
-                reasons: [{ keyword: "zodShape(memberInvalid)", pointer: "" }],
-                schema: inputSchema,
-                kind: "input",
-              });
-            } catch {}
-          }
-        }
-      } else if (conv.reasons && conv.reasons.length) {
-        emitZodWarning({ tool: fq, reasons: conv.reasons, schema: inputSchema, kind: "input" });
-      }
-    }
 
-    if (outputSchema) {
-      const conv = await jsonSchemaToZodSafe(outputSchema);
-      if (conv.zod) {
-        const shape = getZodRawShape(conv.zod);
-        if (shape && typeof shape === "object") {
-          if (isZodRawShapeValid(shape)) {
-            maybeOutput = shape;
-          } else {
-            try {
-              const keys = shape && typeof shape === "object" ? Object.keys(shape) : [];
-              const bad: string[] = [];
-              for (const k of keys) {
-                const v: any = (shape as any)[k];
-                if (!isZodType(v)) bad.push(k);
-                if (bad.length >= 10) break;
-              }
-              emitZodWarning({
-                tool: fq,
-                reasons: [{ keyword: "zodShape(memberInvalid)", pointer: "" }],
-                schema: outputSchema,
-                kind: "output",
-              });
-            } catch {}
-          }
-        } else {
-          emitZodWarning({
-            tool: fq,
-            reasons: [{ keyword: "rootType(non-object)", pointer: "" }],
-            schema: outputSchema,
-            kind: "output",
-          });
-        }
-        // Keep full Zod instance for wrapper construction and runtime validation
-        zodOutForValidation = conv.zod;
-      } else if (conv.reasons && conv.reasons.length) {
-        emitZodWarning({ tool: fq, reasons: conv.reasons, schema: outputSchema, kind: "output" });
-      }
-    }
-
-    // NDJSON output schema registration policy:
-    // - When streamingFinalAggregate is true, register a wrapper { items: [...] } if possible
-    // - Otherwise, skip registering outputSchema to avoid mismatch with streamed notifications
-    try {
-      const isNdjson = (spec as any)?.command?.stdoutTransform?.format === "ndjson";
-      if (isNdjson) {
-        if (opts.streamingFinalAggregate) {
-          // Register a wrapper { items: <ZodArray> } using the full Zod instance when available
-          try {
-            const { z } = await import("zod");
-            const itemZod = zodOutForValidation;
-            if (itemZod && typeof itemZod === "object") {
-              const arrayZod =
-                itemZod._def?.typeName === "ZodArray"
-                  ? itemZod
-                  : (z as any).array?.(itemZod) || null;
-              if (
-                arrayZod &&
-                (typeof (arrayZod as any).parse === "function" ||
-                  typeof (arrayZod as any)._parse === "function")
-              ) {
-                const wrapper = { items: arrayZod } as any;
-                if (isZodRawShapeValid(wrapper)) {
-                  maybeOutput = wrapper;
-                } else {
-                  maybeOutput = undefined;
-                }
-              } else {
-                maybeOutput = undefined;
-              }
-            } else {
-              maybeOutput = undefined;
-            }
-          } catch {
-            maybeOutput = undefined;
-          }
-        } else {
-          maybeOutput = undefined;
-        }
-      }
-    } catch {}
+    const isNdjson = (spec as any)?.command?.stdoutTransform?.format === "ndjson";
+    const built = await buildSdkSchemas({
+      toolFqName: fq,
+      inputSchema,
+      outputSchema,
+      isNdjson,
+      streamingFinalAggregate: !!opts.streamingFinalAggregate,
+    });
+    maybeParams = built.paramsZodForSdk;
+    maybeOutput = built.outputZodForSdk;
+    zodOutForValidation = built.itemZodForValidation as any;
 
     const registerWith = (cb: any) => {
       try {
