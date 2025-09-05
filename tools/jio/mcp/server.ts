@@ -10,6 +10,32 @@ import {
 } from "../core/index.ts";
 import { emitZodWarning, getZodRawShape, jsonSchemaToZodSafe } from "./schema.ts";
 
+// Guard helpers exported for testing
+export function isZodType(value: unknown): boolean {
+  try {
+    return !!(
+      value &&
+      typeof value === "object" &&
+      (typeof (value as any).parse === "function" || typeof (value as any)._parse === "function")
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function isZodRawShapeValid(shape: unknown): boolean {
+  try {
+    if (!shape || typeof shape !== "object" || Array.isArray(shape)) return false;
+    for (const k of Object.keys(shape as any)) {
+      const v: any = (shape as any)[k];
+      if (!isZodType(v)) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export type McpServerOpts = {
   transport?: "stdio" | "http";
   httpHost?: string;
@@ -185,7 +211,27 @@ export async function startMcpServer(
           // HTTP path: register with Zod raw shape (SDK wraps with z.object(shape))
           try {
             const shape = getZodRawShape(conv.zod);
-            if (shape && typeof shape === "object") maybeParams = shape;
+            if (shape && typeof shape === "object") {
+              if (isZodRawShapeValid(shape)) {
+                maybeParams = shape;
+              } else {
+                try {
+                  const keys = shape && typeof shape === "object" ? Object.keys(shape) : [];
+                  const bad: string[] = [];
+                  for (const k of keys) {
+                    const v: any = (shape as any)[k];
+                    if (!isZodType(v)) bad.push(k);
+                    if (bad.length >= 10) break;
+                  }
+                  emitZodWarning({
+                    tool: fq,
+                    reasons: [{ keyword: "zodShape(memberInvalid)", pointer: "" }],
+                    schema: inputSchema,
+                    kind: "input",
+                  });
+                } catch {}
+              }
+            }
           } catch {}
         } else if (conv.reasons && conv.reasons.length) {
           emitZodWarning({ tool: fq, reasons: conv.reasons, schema: inputSchema, kind: "input" });
@@ -197,7 +243,34 @@ export async function startMcpServer(
           // HTTP path: register with Zod raw shape; keep full Zod instance for internal validation
           try {
             const shape = getZodRawShape(conv.zod);
-            if (shape && typeof shape === "object") maybeOutput = shape;
+            if (shape && typeof shape === "object") {
+              if (isZodRawShapeValid(shape)) {
+                maybeOutput = shape;
+              } else {
+                try {
+                  const keys = shape && typeof shape === "object" ? Object.keys(shape) : [];
+                  const bad: string[] = [];
+                  for (const k of keys) {
+                    const v: any = (shape as any)[k];
+                    if (!isZodType(v)) bad.push(k);
+                    if (bad.length >= 10) break;
+                  }
+                  emitZodWarning({
+                    tool: fq,
+                    reasons: [{ keyword: "zodShape(memberInvalid)", pointer: "" }],
+                    schema: outputSchema,
+                    kind: "output",
+                  });
+                } catch {}
+              }
+            } else {
+              emitZodWarning({
+                tool: fq,
+                reasons: [{ keyword: "rootType(non-object)", pointer: "" }],
+                schema: outputSchema,
+                kind: "output",
+              });
+            }
           } catch {}
           zodOutForValidation = conv.zod;
         } else if (conv.reasons && conv.reasons.length) {
@@ -2562,7 +2635,25 @@ export async function startMcpServer(
         // The SDK wraps with z.object() internally.
         const shape = getZodRawShape(conv.zod);
         if (shape && typeof shape === "object") {
-          maybeParams = shape;
+          if (isZodRawShapeValid(shape)) {
+            maybeParams = shape;
+          } else {
+            try {
+              const keys = shape && typeof shape === "object" ? Object.keys(shape) : [];
+              const bad: string[] = [];
+              for (const k of keys) {
+                const v: any = (shape as any)[k];
+                if (!isZodType(v)) bad.push(k);
+                if (bad.length >= 10) break;
+              }
+              emitZodWarning({
+                tool: fq,
+                reasons: [{ keyword: "zodShape(memberInvalid)", pointer: "" }],
+                schema: inputSchema,
+                kind: "input",
+              });
+            } catch {}
+          }
         }
       } else if (conv.reasons && conv.reasons.length) {
         emitZodWarning({ tool: fq, reasons: conv.reasons, schema: inputSchema, kind: "input" });
@@ -2574,11 +2665,29 @@ export async function startMcpServer(
       if (conv.zod) {
         const shape = getZodRawShape(conv.zod);
         if (shape && typeof shape === "object") {
-          maybeOutput = shape;
+          if (isZodRawShapeValid(shape)) {
+            maybeOutput = shape;
+          } else {
+            try {
+              const keys = shape && typeof shape === "object" ? Object.keys(shape) : [];
+              const bad: string[] = [];
+              for (const k of keys) {
+                const v: any = (shape as any)[k];
+                if (!isZodType(v)) bad.push(k);
+                if (bad.length >= 10) break;
+              }
+              emitZodWarning({
+                tool: fq,
+                reasons: [{ keyword: "zodShape(memberInvalid)", pointer: "" }],
+                schema: outputSchema,
+                kind: "output",
+              });
+            } catch {}
+          }
         } else {
           emitZodWarning({
             tool: fq,
-            reasons: [{ keyword: "rootType", pointer: "", note: "non-object" }],
+            reasons: [{ keyword: "rootType(non-object)", pointer: "" }],
             schema: outputSchema,
             kind: "output",
           });
