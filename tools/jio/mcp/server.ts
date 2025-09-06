@@ -8,6 +8,8 @@ import {
   generateInputSchemaFromParameters,
   runWithTransforms,
 } from "../core/index.ts";
+import { computeCapabilities, serializeCapabilities } from "./capabilities.ts";
+import { createReadinessMachine } from "./readiness.ts";
 import { validateRequestedSchemaBestEffort as validateRequestedSchemaBestEffortCentral } from "./elicitation.ts";
 import { runInvocation } from "./invocation.ts";
 import {
@@ -2811,6 +2813,32 @@ export async function startMcpServer(
           res.end(body);
           return;
         }
+        if (req.method === "GET" && req.url === "/capabilities") {
+          try {
+            const caps = computeCapabilities({
+              specs,
+              transport: "http",
+              limits: {
+                maxStdoutBytes: opts.maxStdoutJsonBytes as any,
+                maxStdinBytes: opts.maxStdinBytes as any,
+                maxNdjsonLineBytes: opts.maxNdjsonLineBytes as any,
+              },
+              streamingFinalAggregate: !!opts.streamingFinalAggregate,
+            });
+            const body = JSON.stringify(serializeCapabilities(caps));
+            const hdrs: any = { "content-type": "application/json" };
+            if (opts.noKeepAlive || process.env.JIO_HTTP_NO_KEEPALIVE === "1")
+              hdrs["Connection"] = "close";
+            res.writeHead(200, hdrs);
+            res.end(body);
+          } catch {
+            try {
+              if (!res.headersSent) res.writeHead(500);
+              res.end();
+            } catch {}
+          }
+          return;
+        }
         if (req.method === "POST" && req.url === "/call") {
           // Minimal OK endpoint for CLI smoke test
           try {
@@ -3023,6 +3051,34 @@ export async function startMcpServer(
       });
     } catch {}
     await new Promise<void>((res) => httpServer.listen(port, host, () => res()));
+    try {
+      const machine = createReadinessMachine({
+        onComputeCaps: async () => {
+          const caps = computeCapabilities({
+            specs,
+            transport: "http",
+            limits: {
+              maxStdoutBytes: opts.maxStdoutJsonBytes as any,
+              maxStdinBytes: opts.maxStdinBytes as any,
+              maxNdjsonLineBytes: opts.maxNdjsonLineBytes as any,
+            },
+            streamingFinalAggregate: !!opts.streamingFinalAggregate,
+          });
+          try {
+            process.stderr.write(
+              JSON.stringify({ type: "MCP_READY_CAPS", transport: "http", caps }) + "\n",
+            );
+          } catch {}
+        },
+        onBindTransport: async () => {},
+      });
+      machine.on("ready", () => {
+        try {
+          process.stderr.write(`jio-mcp: listening on http://${host}:${port}\n`);
+        } catch {}
+      });
+      await machine.start();
+    } catch {}
     // Do not unref the HTTP server; keep default Node semantics
     try {
       if (opts.noKeepAlive || process.env.JIO_HTTP_NO_KEEPALIVE === "1") {
@@ -3786,6 +3842,35 @@ export async function startMcpServer(
       }
     });
   }
+  try {
+    const machine = createReadinessMachine({
+      onComputeCaps: async () => {
+        const caps = computeCapabilities({
+          specs,
+          transport: "stdio",
+          limits: {
+            maxStdoutBytes: opts.maxStdoutJsonBytes as any,
+            maxStdinBytes: opts.maxStdinBytes as any,
+            maxNdjsonLineBytes: opts.maxNdjsonLineBytes as any,
+          },
+          streamingFinalAggregate: !!opts.streamingFinalAggregate,
+        });
+        try {
+          process.stderr.write(
+            JSON.stringify({ type: "MCP_READY_CAPS", transport: "stdio", caps }) + "\n",
+          );
+        } catch {}
+      },
+      onBindTransport: async () => {},
+    });
+    machine.on("ready", () => {
+      try {
+        const ctl = { "$jio.ctl": true, "$jio.ctl.ready": { ts: Date.now() } };
+        process.stderr.write(JSON.stringify(ctl) + "\n");
+      } catch {}
+    });
+    await machine.start();
+  } catch {}
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

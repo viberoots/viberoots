@@ -171,6 +171,18 @@ zx_test(
 )
 
 zx_test(
+    name = "jio_mcp_capabilities_parity",
+    script = "tools/tests/jio.mcp.capabilities.parity.test.ts",
+    out = "jio_mcp_capabilities_parity.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_readiness_http",
+    script = "tools/tests/jio.mcp.readiness.http.test.ts",
+    out = "jio_mcp_readiness_http.stamp",
+)
+
+zx_test(
     name = "jio_mcp_elicitation_schema",
     script = "tools/tests/jio.mcp.elicitation.schema.test.ts",
     out = "jio_mcp_elicitation_schema.stamp",
@@ -180,6 +192,12 @@ zx_test(
     name = "jio_mcp_stdio_invoke_json",
     script = "tools/tests/jio.mcp.stdio.invoke-json.test.ts",
     out = "jio_mcp_stdio_invoke_json.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_readiness_stdio",
+    script = "tools/tests/jio.mcp.readiness.stdio.test.ts",
+    out = "jio_mcp_readiness_stdio.stamp",
 )
 
 zx_test(
