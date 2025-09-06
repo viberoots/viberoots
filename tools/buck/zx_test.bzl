@@ -7,7 +7,7 @@ def _zx_test_impl(ctx):
             + "if [ \"$COVERAGE\" = \"1\" ]; then export NODE_V8_COVERAGE=\"$WORKSPACE_ROOT/coverage/raw\"; else unset NODE_V8_COVERAGE; fi; "
             + "export BUCK_TEST_TARGET=\"%s\"; "
             + "export TEST_LOG_DIR=\"${TEST_LOG_DIR:-$(pwd)/buck-out/test-logs}\"; "
-            + "export NODE_BIN=\"$(command -v node)\"; "
+            + "if [ -z \"$NODE_BIN\" ]; then export NODE_BIN=\"$(command -v node)\"; fi; "
             + "export PATH=\"$(pwd)/tools/bin:$(pwd)/node_modules/.bin:$PATH\"; "
             # Load dev shell environment at repo root via direnv if needed (fast),
             # so tools like secretspec/copier are on PATH without per-temp flake eval
@@ -25,9 +25,8 @@ def _zx_test_impl(ctx):
             + "\"$NODE_BIN\" --experimental-strip-types --import \"$WORKSPACE_ROOT/tools/dev/zx-init.mjs\" \"$WORKSPACE_ROOT/tools/jio/schema/gen-types.ts\" \"$WORKSPACE_ROOT/tools/jio/schema/types.ts\" >/dev/null 2>&1 || true; "
             + "SAFE=$(printf %%s \"$BUCK_TEST_TARGET\" | sed -E 's|^.*/:||; s/[^A-Za-z0-9._-]+/_/g' | cut -c1-200); "
             + "LOGDIR=\"$TEST_LOG_DIR/$SAFE\"; mkdir -p \"$LOGDIR\"; "
-            + "if [ \"$TEST_CAPTURE_LOGS\" = \"1\" ]; then "
+            + "rm -f \"$LOGDIR/test.stdout.log\" \"$LOGDIR/test.stderr.log\" 2>/dev/null || true; "
             + "{ \"$NODE_BIN\" $TEST_NODE_OPTIONS --test --experimental-strip-types --import \"$WORKSPACE_ROOT/tools/dev/zx-init.mjs\" %s; } > >(tee -a \"$LOGDIR/test.stdout.log\") 2> >(tee -a \"$LOGDIR/test.stderr.log\" >&2); STATUS=$?; "
-            + "else \"$NODE_BIN\" $TEST_NODE_OPTIONS --test --experimental-strip-types --import \"$WORKSPACE_ROOT/tools/dev/zx-init.mjs\" %s; STATUS=$?; fi; "
             + "if [ \"$COVERAGE\" = \"1\" ]; then "
             + "\"$NODE_BIN\" \"$WORKSPACE_ROOT/tools/dev/coverage-raw-normalize.mjs\" || true; "
             + "\"$NODE_BIN\" \"$WORKSPACE_ROOT/node_modules/c8/bin/c8.js\" report "
@@ -40,7 +39,7 @@ def _zx_test_impl(ctx):
             + "\"$NODE_BIN\" ./tools/dev/coverage-normalize.mjs || true; "
             + "fi; exit \"$STATUS\""
         )
-        % (ctx.label, script.short_path, script.short_path,)
+        % (ctx.label, script.short_path,)
     )
     cmd = [
         "bash",

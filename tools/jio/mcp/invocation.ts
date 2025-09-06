@@ -68,11 +68,14 @@ export async function* runInvocation(
   const streamedItems: any[] = [];
   let sawCtl = false;
   let ctlPayload: any = null;
+  // Raw capture of first run output for JSON fallback when forcing NDJSON
+  let outRawFirstRun = "";
 
   const ndjsonSink: Writable | null = new Writable({
     write(chunk, _enc, cb) {
       try {
         const part = Buffer.from(chunk as any).toString("utf8");
+        outRawFirstRun += part;
         lineBuf += part;
         while (true) {
           const nl = lineBuf.indexOf("\n");
@@ -104,7 +107,36 @@ export async function* runInvocation(
             try {
               opts.onItem?.(obj);
             } catch {}
-          } catch {}
+          } catch {
+            // Salvage: try to parse JSON object substring
+            try {
+              const i0 = s2.indexOf("{");
+              const i1 = s2.lastIndexOf("}");
+              if (i0 >= 0 && i1 > i0) {
+                let obj: any = JSON.parse(s2.slice(i0, i1 + 1));
+                if (typeof obj === "string") {
+                  try {
+                    obj = JSON.parse(obj);
+                  } catch {}
+                }
+                if (
+                  !ignoreCtl &&
+                  obj &&
+                  typeof obj === "object" &&
+                  (obj as any)["$jio.ctl"] === true &&
+                  (obj as any)["$jio.ctl.elicit"]
+                ) {
+                  ctlPayload = (obj as any)["$jio.ctl.elicit"];
+                  sawCtl = true;
+                  continue;
+                }
+                streamedItems.push(obj);
+                try {
+                  opts.onItem?.(obj);
+                } catch {}
+              }
+            } catch {}
+          }
         }
       } finally {
         cb();
@@ -133,7 +165,36 @@ export async function* runInvocation(
                 opts.onItem?.(obj);
               } catch {}
             }
-          } catch {}
+          } catch {
+            // Salvage trailing JSON object
+            try {
+              const i0 = s2.indexOf("{");
+              const i1 = s2.lastIndexOf("}");
+              if (i0 >= 0 && i1 > i0) {
+                let obj: any = JSON.parse(s2.slice(i0, i1 + 1));
+                if (typeof obj === "string") {
+                  try {
+                    obj = JSON.parse(obj);
+                  } catch {}
+                }
+                if (
+                  !ignoreCtl &&
+                  obj &&
+                  typeof obj === "object" &&
+                  (obj as any)["$jio.ctl"] === true &&
+                  (obj as any)["$jio.ctl.elicit"]
+                ) {
+                  ctlPayload = (obj as any)["$jio.ctl.elicit"];
+                  sawCtl = true;
+                } else {
+                  streamedItems.push(obj);
+                  try {
+                    opts.onItem?.(obj);
+                  } catch {}
+                }
+              }
+            } catch {}
+          }
         }
       } finally {
         cb();
@@ -150,11 +211,25 @@ export async function* runInvocation(
   })();
   const firstRunNdjson = (() => {
     try {
-      return opts.isNdjson || (origFmt === "json" && !ignoreCtl);
+      const hasElicitResp = !!(opts.args && (opts.args as any)["$jio.ctl.elicit.response"]);
+      return opts.isNdjson || (origFmt === "json" && !ignoreCtl && !hasElicitResp);
     } catch {
       return opts.isNdjson;
     }
   })();
+
+  try {
+    process.stderr.write(
+      JSON.stringify({
+        type: "INV_DEBUG_PRE",
+        where: "pre",
+        origFmt: String(origFmt || ""),
+        firstRunNdjson,
+        hasResp: !!(opts.args && (opts.args as any)["$jio.ctl.elicit.response"]),
+        ignoreCtl,
+      }) + "\n",
+    );
+  } catch {}
 
   const specForRun = (() => {
     try {
@@ -164,7 +239,9 @@ export async function* runInvocation(
         command: {
           ...(spec.command || {}),
           stdoutTransform:
-            origFmt === "json" && !ignoreCtl
+            origFmt === "json" &&
+            !ignoreCtl &&
+            !(opts.args && (opts.args as any)["$jio.ctl.elicit.response"])
               ? ({ shell: "cat", format: "ndjson" } as any)
               : ((spec.command as any)?.stdoutTransform as any) ||
                 ({ shell: "cat", format: "ndjson" } as any),
@@ -213,9 +290,18 @@ export async function* runInvocation(
     } as any,
   );
 
-  if (code && code !== 0) {
-    return yield { type: "error", error: { type: "Error", message: `exit ${code}` } };
-  }
+  try {
+    process.stderr.write(
+      JSON.stringify({
+        type: "INV_DEBUG_POST",
+        where: "post",
+        code,
+        sawCtl,
+        hasCtl: !!ctlPayload,
+        firstRunNdjson,
+      }) + "\n",
+    );
+  } catch {}
 
   // If we saw control, emit control and return
   if (!ignoreCtl && sawCtl && ctlPayload) {
@@ -226,6 +312,150 @@ export async function* runInvocation(
     // If the original tool format was JSON (we forced NDJSON to detect control),
     // perform a second run with the original spec to produce the final JSON result.
     if (origFmt === "json" && !opts.isNdjson) {
+      // First: try buffered fallback for control immediately; if found, yield control and return
+      if (!sawCtl && outRawFirstRun) {
+        try {
+          const sample = outRawFirstRun.slice(0, 400);
+          process.stderr.write(
+            JSON.stringify({
+              type: "INV_DEBUG_RAW",
+              where: "rawFirst",
+              len: outRawFirstRun.length,
+              sample,
+            }) + "\n",
+          );
+        } catch (e: any) {
+          try {
+            let bufSan = sanitizeControlLine(outRawFirstRun);
+            bufSan = bufSan.replace(/^\s+|\s+$/g, "");
+            bufSan = bufSan.replace(/[\r\n]+$/g, "");
+            process.stderr.write(
+              JSON.stringify({
+                type: "INV_DEBUG_RAW",
+                where: "rawFirst.parseError",
+                message: String(e?.message || e),
+                tail: bufSan.slice(-60),
+                len: bufSan.length,
+              }) + "\n",
+            );
+          } catch {}
+        }
+        // Heuristic: detect control without full JSON parse, then extract elicit payload
+        try {
+          const s2h = sanitizeControlLine(outRawFirstRun).trim();
+          if (s2h.includes('"$jio.ctl"') && s2h.includes('"$jio.ctl.elicit"')) {
+            const key = '"$jio.ctl.elicit"';
+            const kpos = s2h.indexOf(key);
+            if (kpos >= 0) {
+              const colon = s2h.indexOf(":", kpos + key.length);
+              if (colon > 0) {
+                let i = colon + 1;
+                while (i < s2h.length && s2h[i] !== "{") i++;
+                if (i < s2h.length) {
+                  let depth = 0;
+                  let j = i;
+                  for (; j < s2h.length; j++) {
+                    const ch = s2h[j];
+                    if (ch === "{") depth++;
+                    else if (ch === "}") {
+                      depth--;
+                      if (depth === 0) {
+                        j++;
+                        break;
+                      }
+                    }
+                  }
+                  if (j > i) {
+                    const payloadStr = s2h.slice(i, j);
+                    try {
+                      const payload = JSON.parse(payloadStr);
+                      try {
+                        process.stderr.write(
+                          JSON.stringify({
+                            type: "inv.debug",
+                            where: "rawFirst.heuristic.control",
+                          }) + "\n",
+                        );
+                      } catch {}
+                      return yield { type: "control", elicit: payload };
+                    } catch {}
+                  }
+                }
+              }
+            }
+          }
+        } catch {}
+        try {
+          let bufSan = sanitizeControlLine(outRawFirstRun);
+          bufSan = bufSan.replace(/^\s+|\s+$/g, "");
+          bufSan = bufSan.replace(/[\r\n]+$/g, "");
+          let obj: any = JSON.parse(bufSan);
+          if (typeof obj === "string") {
+            try {
+              obj = JSON.parse(obj);
+            } catch {}
+          }
+          try {
+            const info = {
+              type: typeof obj,
+              keys: obj && typeof obj === "object" ? Object.keys(obj).slice(0, 5) : [],
+              hasCtl: !!(obj && typeof obj === "object" && (obj as any)["$jio.ctl"] === true),
+              hasElicit: !!(
+                obj &&
+                typeof obj === "object" &&
+                (obj as any)["$jio.ctl.elicit"] !== undefined
+              ),
+            };
+            process.stderr.write(
+              JSON.stringify({ type: "INV_DEBUG_RAW", where: "rawFirst.parsed", info }) + "\n",
+            );
+          } catch {}
+          if (
+            !ignoreCtl &&
+            obj &&
+            typeof obj === "object" &&
+            (obj as any)["$jio.ctl"] === true &&
+            (obj as any)["$jio.ctl.elicit"]
+          ) {
+            try {
+              process.stderr.write(
+                JSON.stringify({ type: "inv.debug", where: "rawFirst.controlDetected" }) + "\n",
+              );
+            } catch {}
+            return yield { type: "control", elicit: (obj as any)["$jio.ctl.elicit"] };
+          }
+        } catch {
+          // Salvage: try to parse JSON object substring from buffered first run
+          try {
+            let bufSan = sanitizeControlLine(outRawFirstRun);
+            bufSan = bufSan.replace(/^[\s\u0000-\u001F]+|[\s\u0000-\u001F]+$/g, "");
+            const i0 = bufSan.indexOf("{");
+            const i1 = bufSan.lastIndexOf("}");
+            if (i0 >= 0 && i1 > i0) {
+              let obj: any = JSON.parse(bufSan.slice(i0, i1 + 1));
+              if (typeof obj === "string") {
+                try {
+                  obj = JSON.parse(obj);
+                } catch {}
+              }
+              if (
+                !ignoreCtl &&
+                obj &&
+                typeof obj === "object" &&
+                (obj as any)["$jio.ctl"] === true &&
+                (obj as any)["$jio.ctl.elicit"]
+              ) {
+                try {
+                  process.stderr.write(
+                    JSON.stringify({ type: "inv.debug", where: "rawFirst.salvage.control" }) + "\n",
+                  );
+                } catch {}
+                return yield { type: "control", elicit: (obj as any)["$jio.ctl.elicit"] };
+              }
+            }
+          } catch {}
+        }
+      }
       // Emit any seen items as data events for symmetry
       for (const it of streamedItems) {
         yield { type: "data", item: it };
@@ -268,6 +498,15 @@ export async function* runInvocation(
         if (code2 && code2 !== 0)
           return yield { type: "error", error: { type: "Error", message: `exit ${code2}` } };
         const obj2 = outTxt2 ? JSON.parse(outTxt2) : null;
+        if (
+          !ignoreCtl &&
+          obj2 &&
+          typeof obj2 === "object" &&
+          (obj2 as any)["$jio.ctl"] === true &&
+          (obj2 as any)["$jio.ctl.elicit"]
+        ) {
+          return yield { type: "control", elicit: (obj2 as any)["$jio.ctl.elicit"] };
+        }
         yield { type: "final", result: obj2 };
       } catch {
         yield { type: "error", error: { type: "InvalidJSON", message: "invalid JSON output" } };
@@ -275,6 +514,12 @@ export async function* runInvocation(
       return;
     }
     // True NDJSON tool: emit items and optional aggregate
+    if (code && code !== 0) {
+      return yield {
+        type: "error",
+        error: { type: "Error", message: errTxt || `exit ${code}` },
+      };
+    }
     for (const it of streamedItems) {
       yield { type: "data", item: it };
     }
@@ -293,6 +538,15 @@ export async function* runInvocation(
   } catch {}
   try {
     const obj = outTxt ? JSON.parse(outTxt) : null;
+    if (
+      !ignoreCtl &&
+      obj &&
+      typeof obj === "object" &&
+      (obj as any)["$jio.ctl"] === true &&
+      (obj as any)["$jio.ctl.elicit"]
+    ) {
+      return yield { type: "control", elicit: (obj as any)["$jio.ctl.elicit"] };
+    }
     yield { type: "final", result: obj };
   } catch {
     yield {

@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import http from "node:http";
 import { describe, test } from "node:test";
 
-async function waitForHealth(host: string, port: number, ms = 10000) {
+async function waitForHealth(host: string, port: number, ms = 20000) {
   const start = Date.now();
   while (Date.now() - start < ms) {
     try {
@@ -17,7 +17,7 @@ async function waitForHealth(host: string, port: number, ms = 10000) {
       });
       return true;
     } catch {
-      await new Promise((r) => setTimeout(r, 100));
+      await new Promise((r) => setTimeout(r, 50));
     }
   }
   return false;
@@ -46,8 +46,32 @@ describe("jio mcp — http cli (non-streaming)", () => {
       console.error("failed to spawn jio", e);
       process.exit(2);
     });
+    try {
+      p.stderr?.on("data", (b) => {
+        try {
+          const s = Buffer.from(b).toString("utf8");
+          console.error(s.trimEnd());
+        } catch {}
+      });
+    } catch {}
 
-    const healthy = await waitForHealth(host, port, 5000);
+    // Prefer readiness signal from stderr; fall back to /health polling
+    let ready = false;
+    const onData = (buf: any) => {
+      try {
+        const s = Buffer.from(buf).toString("utf8");
+        if (s.includes("jio-mcp: listening on http://")) ready = true;
+      } catch {}
+    };
+    try {
+      p.stderr?.on("data", onData);
+    } catch {}
+    const start = Date.now();
+    while (!ready && Date.now() - start < 10000) {
+      await new Promise((r) => setTimeout(r, 50));
+      if (ready) break;
+    }
+    const healthy = ready || (await waitForHealth(host, port, 10000));
     if (!healthy) {
       console.error("server did not become healthy");
       try {

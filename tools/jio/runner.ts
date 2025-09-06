@@ -335,19 +335,32 @@ export async function main(argv: string[]): Promise<number | void> {
 }
 
 function getNumericFlag(argv: string[], name: string): number | undefined {
-  const i = argv.indexOf(name);
-  if (i >= 0) {
-    const n = Number(argv[i + 1] || "");
-    if (Number.isFinite(n) && n >= 0) return Math.floor(n);
+  // Support both "--name value" and "--name=value"
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i] || "";
+    if (a === name) {
+      const n = Number(argv[i + 1] || "");
+      if (Number.isFinite(n) && n >= 0) return Math.floor(n);
+    } else if (a.startsWith(name + "=")) {
+      const v = a.slice(name.length + 1);
+      const n = Number(v);
+      if (Number.isFinite(n) && n >= 0) return Math.floor(n);
+    }
   }
   return undefined;
 }
 
 function getStringFlag(argv: string[], name: string): string | undefined {
-  const i = argv.indexOf(name);
-  if (i >= 0) {
-    const v = String(argv[i + 1] || "").trim();
-    if (v) return v;
+  // Support both "--name value" and "--name=value"
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i] || "";
+    if (a === name) {
+      const v = String(argv[i + 1] || "").trim();
+      if (v) return v;
+    } else if (a.startsWith(name + "=")) {
+      const v = a.slice(name.length + 1).trim();
+      if (v) return v;
+    }
   }
   return undefined;
 }
@@ -1324,8 +1337,8 @@ export function buildChildEnv(
         "^" +
         pat
           .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-          .replace(/\\\*/g, ".*")
-          .replace(/\\\?/g, ".") +
+          .replace(/\*/g, ".*")
+          .replace(/\?/g, ".") +
         "$";
       let re: RegExp | null = null;
       try {
@@ -2059,6 +2072,26 @@ async function handleStdoutNdjson(args: HandleNdjsonArgs): Promise<number | void
   let bytesCollected = 0;
   let collectLimitExceeded = false;
   let suppressFurther = false;
+  const endTargetAndLog = async (reason: string) => {
+    try {
+      const tgt: any = (runtime as any).stdoutTarget;
+      if (tgt && typeof tgt.end === "function") tgt.end();
+    } catch {}
+    try {
+      process.stderr.write(
+        JSON.stringify({
+          type: "RUNNER_NDJSON_DONE",
+          reason,
+          itemsEmitted,
+          bytesCollected,
+          collectLimitExceeded,
+        }) + "\n",
+      );
+    } catch {}
+    try {
+      CURRENT_MANAGER?.terminateOnce?.(reason);
+    } catch {}
+  };
 
   try {
     //
@@ -2072,6 +2105,7 @@ async function handleStdoutNdjson(args: HandleNdjsonArgs): Promise<number | void
     if (buffer.indexOf("\n") < 0 && Buffer.byteLength(buffer) > limits.maxNdjsonLineBytes) {
       process.stderr.write("jio: ndjson line bytes limit exceeded (stream)\n");
       await finalizeFailureSink();
+      await endTargetAndLog("line-bytes-cap");
       return 78;
     }
     if (isCancelled()) {
@@ -2130,15 +2164,18 @@ async function handleStdoutNdjson(args: HandleNdjsonArgs): Promise<number | void
     }
     if (localTimedOut) {
       await finalizeFailureSink();
+      await endTargetAndLog("local-timeout");
       return 124;
     }
   }
   if (localTimedOut) {
     await finalizeFailureSink();
+    await endTargetAndLog("local-timeout-post");
     return 124;
   }
   if (isCancelled()) {
     await finalizeFailureSink();
+    await endTargetAndLog("cancelled");
     return 124;
   }
   const trailing = buffer.trim();
@@ -2211,8 +2248,10 @@ async function handleStdoutNdjson(args: HandleNdjsonArgs): Promise<number | void
       ? ` --collect-bytes=${String(limits.collectBytes)}`
       : " (set --collect-bytes to increase)";
     process.stderr.write(`jio: collect limit exceeded.${hintItems}${hintBytes}\n`);
+    await endTargetAndLog("collect-cap");
     return 78;
   }
+  await endTargetAndLog("ndjson-complete");
 }
 
 function enforceNdjsonLineCap(line: string, maxBytes: number): number | null {
@@ -2342,9 +2381,17 @@ function emitNdjsonLine(args: {
       return true;
     }
     // Already wrote sanitized line above in non-collect mode
+    try {
+      // Flush write pipeline to ensure upstream tees see the line
+      ((args.runtime as any).stdoutTarget || process.stdout).emit?.("drain");
+    } catch {}
     return true;
   } catch (e: any) {
     process.stderr.write("jio: invalid NDJSON line (not JSON)\n");
+    try {
+      // Emit raw line for higher-level fallback parsing
+      process.stderr.write("RUNNER_NDJSON_LINE_NOT_USED " + JSON.stringify(s) + "\n");
+    } catch {}
     try {
       //
     } catch {}
@@ -2364,6 +2411,10 @@ function emitNdjsonLine(args: {
         }
         try {
           //
+        } catch {}
+        try {
+          // Emit the original raw line to aid fallback parsing
+          process.stderr.write("RUNNER_NDJSON_INVALID_LINE_NOT_USED " + JSON.stringify(s) + "\n");
         } catch {}
         if (args.validate && !args.validate(obj)) {
           const msg = JSON.stringify(args.validate.errors?.[0] || {});
@@ -2474,9 +2525,19 @@ async function handleStdoutJson(args: {
       markStdoutParseFailed();
       return; // allow precedence handler to return 65 later
     }
-    ((args.runtime as any).stdoutTarget || process.stdout).write(JSON.stringify(obj));
+    const tgt: any = (args.runtime as any).stdoutTarget || process.stdout;
+    tgt.write(JSON.stringify(obj));
+    try {
+      if ((args.runtime as any).stdoutTarget && typeof tgt.end === "function") tgt.end();
+    } catch {}
   } catch {
     process.stderr.write("jio: invalid JSON output\n");
+    try {
+      // Emit preview buffer for higher-level fallback parsing
+      process.stderr.write(
+        "RUNNER_JSON_INVALID_PREVIEW_NOT_USED " + JSON.stringify(buf.slice(0, 400)) + "\n",
+      );
+    } catch {}
     try {
       //
     } catch {}

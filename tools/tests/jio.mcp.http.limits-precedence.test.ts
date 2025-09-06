@@ -59,14 +59,24 @@ describe("jio mcp — http limits precedence", () => {
     }
     // This tool emits a small, predictable set. With maxItemsPerCall=2, one of these calls should fail when collecting
     const res = await c.callTool({ name: ls.name, arguments: {} } as any);
-    // We expect either an explicit error or a collected array capped by server limits.
+    // We expect either an explicit error, or a collected array, or an aggregate {items: [...]} capped by limits.
     const isError = (res as any)?.error || (res as any)?.isError;
-    const isArray = Array.isArray((res as any)?.structuredContent);
-    if (!isError && !isArray) {
-      console.error("expected error or array result", res);
+    const sc: any = (res as any)?.structuredContent;
+    const isArray = Array.isArray(sc);
+    const isItemsObj = sc && typeof sc === "object" && Array.isArray(sc.items);
+    if (!isError && !isArray && !isItemsObj) {
+      console.error("expected error or array or {items} result", res);
       await c.close().catch(() => {});
       await srv?.close?.();
       process.exit(2);
+    }
+    if (isItemsObj) {
+      if (!Array.isArray(sc.items) || sc.items.length > 2) {
+        console.error("expected {items} length <= server cap", sc);
+        await c.close().catch(() => {});
+        await srv?.close?.();
+        process.exit(2);
+      }
     }
     await c.close().catch(() => {});
     try {

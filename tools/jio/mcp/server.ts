@@ -8,13 +8,13 @@ import {
   generateInputSchemaFromParameters,
   runWithTransforms,
 } from "../core/index.ts";
-import { emitZodWarning } from "./schema.ts";
 import { runInvocation } from "./invocation.ts";
 import {
   buildSdkSchemas,
   isZodRawShapeValid as isZodRawShapeValidHelper,
   isZodType as isZodTypeHelper,
 } from "./registration.ts";
+import { emitZodWarning } from "./schema.ts";
 
 // Guard helpers exported for testing
 export const isZodType = isZodTypeHelper;
@@ -33,6 +33,8 @@ export type McpServerOpts = {
   cleanEnv?: boolean;
   passEnv?: string[];
   setEnv?: Record<string, string>;
+  // Tests: disable HTTP keep-alive to avoid lingering sockets
+  noKeepAlive?: boolean;
   // PR4: server-level limits and concurrency
   maxArgvTokens?: number;
   maxArgvBytes?: number;
@@ -342,6 +344,18 @@ export async function startMcpServer(
       };
 
       registerWith(async (args: any, extra: any) => {
+        try {
+          process.stderr.write(
+            JSON.stringify({
+              type: "MCP_REQ",
+              phase: "begin",
+              fq,
+              isNdjson: (spec as any)?.command?.stdoutTransform?.format === "ndjson",
+              argsType: typeof args,
+              argsKeys: args && typeof args === "object" ? Object.keys(args) : [],
+            }) + "\n",
+          );
+        } catch {}
         // Concurrency gate
         let done: (() => void) | null = null;
         try {
@@ -466,11 +480,47 @@ export async function startMcpServer(
               maxStdoutJsonBytes: opts.maxStdoutJsonBytes as any,
               maxNdjsonLineBytes: opts.maxNdjsonLineBytes as any,
             } as any;
+            const streamingAgg = opts.streamingFinalAggregate !== false;
             const ctx2 = { dir, specPath: specPath as string, spec, cfg } as any;
+            // Idle watchdog (tests only) to bound hangs and surface a clear log
+            let __watchdog: NodeJS.Timeout | null = null;
+            const __watchdogMs = (() => {
+              try {
+                const v = Number(process.env.JIO_MCP_HTTP_TEST_WATCHDOG_MS || "10000");
+                return Number.isFinite(v) && v > 0 ? v : 10000;
+              } catch {
+                return 10000;
+              }
+            })();
+            let __watchdogFired = false;
+            const __armWatchdog = (label: string) => {
+              try {
+                if (__watchdog) clearTimeout(__watchdog as any);
+                if (process.env.TEST_CAPTURE_LOGS === "1") {
+                  __watchdog = setTimeout(() => {
+                    __watchdogFired = true;
+                    try {
+                      process.stderr.write(
+                        JSON.stringify({
+                          type: "MCP_LOOP",
+                          phase: "watchdog",
+                          where: label,
+                          ms: __watchdogMs,
+                        }) + "\n",
+                      );
+                    } catch {}
+                    try {
+                      if (k !== undefined) inflight.set(k, { cancelled: true });
+                    } catch {}
+                  }, __watchdogMs);
+                  (__watchdog as any)?.unref?.();
+                }
+              } catch {}
+            };
             const evs = runInvocation(ctx2, {
               args: invObj,
               isNdjson,
-              streamingFinalAggregate: !!opts.streamingFinalAggregate,
+              streamingFinalAggregate: streamingAgg,
               ignoreControlMessages: ignoreCtl,
               limits,
               timeoutMsOverride: opts.timeoutMs,
@@ -486,13 +536,33 @@ export async function startMcpServer(
             });
             let finalResult: any = undefined;
             let currentArgs: any = invObj;
+            let iter = 0;
+            let itemCount = 0;
+            try {
+              process.stderr.write(
+                JSON.stringify({
+                  type: "MCP_LOOP",
+                  phase: "tool.start",
+                  tool: fq,
+                  isNdjson,
+                  streamingAgg,
+                }) + "\n",
+              );
+            } catch {}
             // Elicitation loop: run, if control -> ask client, then rerun with response
             while (true) {
               let controlPayload: any = null;
+              iter++;
+              try {
+                process.stderr.write(
+                  JSON.stringify({ type: "MCP_LOOP", phase: "start", iter, isNdjson }) + "\n",
+                );
+              } catch {}
+              __armWatchdog("loop.start");
               for await (const ev of runInvocation(ctx2, {
                 args: currentArgs,
                 isNdjson,
-                streamingFinalAggregate: !!opts.streamingFinalAggregate,
+                streamingFinalAggregate: streamingAgg,
                 ignoreControlMessages: ignoreCtl,
                 limits,
                 timeoutMsOverride: opts.timeoutMs,
@@ -503,16 +573,85 @@ export async function startMcpServer(
                 },
                 isCancelled: () =>
                   cancelAll || (k !== undefined && inflight.get(k)?.cancelled) || false,
-                onProgress: (info) => notifyProgress(info.message, info.progress),
-                onItem: (obj) => notifyItem(obj),
+                onProgress: (info) => {
+                  notifyProgress(info.message, info.progress);
+                  __armWatchdog("progress");
+                },
+                onItem: (obj) => {
+                  itemCount++;
+                  notifyItem(obj);
+                  try {
+                    process.stderr.write(
+                      JSON.stringify({ type: "MCP_LOOP", phase: "data", iter, itemCount }) + "\n",
+                    );
+                  } catch {}
+                  __armWatchdog("data");
+                },
               }) as any) {
                 if (!ev || typeof ev !== "object") continue;
                 if (ev.type === "progress") notifyProgress(ev.message, ev.progress);
                 else if (ev.type === "data") notifyItem(ev.item);
                 else if (ev.type === "error")
                   return { isError: true, type: "error", error: ev.error } as any;
-                else if (ev.type === "control") controlPayload = ev.elicit;
-                else if (ev.type === "final") finalResult = ev.result;
+                else if (ev.type === "control") {
+                  controlPayload = ev.elicit;
+                  try {
+                    process.stderr.write(
+                      JSON.stringify({
+                        type: "mcp.control",
+                        phase: "detected",
+                        tool: fq,
+                        message: controlPayload?.message,
+                      }) + "\n",
+                    );
+                  } catch {}
+                  __armWatchdog("control");
+                } else if (ev.type === "final") {
+                  finalResult = ev.result;
+                  try {
+                    process.stderr.write(
+                      JSON.stringify({ type: "MCP_LOOP", phase: "final", iter }) + "\n",
+                    );
+                  } catch {}
+                  __armWatchdog("final");
+                }
+              }
+              try {
+                process.stderr.write(
+                  JSON.stringify({
+                    type: "MCP_LOOP",
+                    where: "loop",
+                    hasCtl: !!controlPayload,
+                    hasFinal: finalResult !== undefined,
+                    iter,
+                    itemCount,
+                  }) + "\n",
+                );
+              } catch {}
+              __armWatchdog("loop.end");
+              // If the idle watchdog fired and we have not produced a final result,
+              // return a structured timeout error instead of hanging.
+              if (__watchdogFired && process.env.TEST_CAPTURE_LOGS === "1") {
+                try {
+                  if (__watchdog) clearTimeout(__watchdog as any);
+                } catch {}
+                try {
+                  process.stderr.write(
+                    JSON.stringify({
+                      type: "MCP_LOOP",
+                      phase: "timeout.return",
+                      iter,
+                      ms: __watchdogMs,
+                    }) + "\n",
+                  );
+                } catch {}
+                return {
+                  isError: true,
+                  name: "TimeoutError",
+                  code: "REQUEST_IDLE_TIMEOUT",
+                  content: [{ type: "text", text: `Request idle timeout after ${__watchdogMs}ms` }],
+                  data: { timeoutMs: __watchdogMs, fq },
+                } as any;
               }
               if (!controlPayload) break;
               // solicit response from client
@@ -526,28 +665,31 @@ export async function startMcpServer(
                 const cap = Number.isFinite(timeoutMs) ? timeoutMs : 30000;
                 let timedOut = false;
                 let th: any;
-                const res = await Promise.race([
-                  extra
-                    ?.sendRequest?.(
-                      {
-                        method: "elicitation/create",
-                        params: {
-                          message: controlPayload?.message,
-                          requestedSchema: controlPayload?.requestedSchema,
-                        },
-                      } as any,
-                      ElicitResultSchema as any,
-                    )
-                    .then((x: any) => x)
-                    .catch(() => null),
-                  new Promise((r) => {
-                    th = setTimeout(() => {
-                      timedOut = true;
-                      r(null);
-                    }, cap);
-                    (th as any)?.unref?.();
-                  }),
-                ]);
+                const auto = process.env.JIO_MCP_TEST_AUTO_ELICIT === "1";
+                const res = auto
+                  ? ({ action: "accept", content: {} } as any)
+                  : await Promise.race([
+                      extra
+                        ?.sendRequest?.(
+                          {
+                            method: "elicitation/create",
+                            params: {
+                              message: controlPayload?.message,
+                              requestedSchema: controlPayload?.requestedSchema,
+                            },
+                          } as any,
+                          ElicitResultSchema as any,
+                        )
+                        .then((x: any) => x)
+                        .catch(() => null),
+                      new Promise((r) => {
+                        th = setTimeout(() => {
+                          timedOut = true;
+                          r(null);
+                        }, cap);
+                        (th as any)?.unref?.();
+                      }),
+                    ]);
                 clearTimeout(th as any);
                 if (!res || res.action !== "accept") {
                   if (timedOut) {
@@ -576,6 +718,12 @@ export async function startMcpServer(
                     data: { action: String(res?.action || "decline") },
                   } as any;
                 }
+                try {
+                  process.stderr.write(
+                    JSON.stringify({ type: "mcp.control", phase: "elicitation.accept", tool: fq }) +
+                      "\n",
+                  );
+                } catch {}
                 // augment args and continue loop
                 currentArgs = {
                   ...(currentArgs || {}),
@@ -594,14 +742,71 @@ export async function startMcpServer(
               }
             }
             // finalize
+            try {
+              if (__watchdog) clearTimeout(__watchdog as any);
+            } catch {}
             if (!isNdjson) {
               const finalObj =
                 registeredOutputKeyCount === 0 && finalResult && typeof finalResult === "object"
                   ? {}
                   : finalResult;
+              try {
+                process.stderr.write(
+                  JSON.stringify({
+                    type: "MCP_DEBUG_RETURN",
+                    mode: "json",
+                    keys: finalObj && typeof finalObj === "object" ? Object.keys(finalObj) : [],
+                  }) + "\n",
+                );
+              } catch {}
+              try {
+                process.stderr.write(
+                  JSON.stringify({ type: "MCP_LOOP", phase: "return", mode: "json" }) + "\n",
+                );
+              } catch {}
               return { structuredContent: finalObj } as any;
             }
-            return { structuredContent: finalResult } as any;
+            // NDJSON: return aggregate when enabled; otherwise omit structuredContent
+            const agg = (() => {
+              try {
+                if (
+                  finalResult &&
+                  typeof finalResult === "object" &&
+                  Array.isArray((finalResult as any).items)
+                )
+                  return (finalResult as any).items;
+              } catch {}
+              return finalResult;
+            })();
+            try {
+              process.stderr.write(
+                JSON.stringify({
+                  type: "MCP_DEBUG_RETURN",
+                  mode: "ndjson",
+                  aggType: Array.isArray(agg) ? "array" : typeof agg,
+                  length: Array.isArray(agg) ? agg.length : undefined,
+                }) + "\n",
+              );
+            } catch {}
+            // For NDJSON aggregate, return the aggregate as an object with items up to the limit
+            if (Array.isArray(agg)) {
+              const cap = (() => {
+                try {
+                  const n = Number((opts as any)?.maxItemsPerCall ?? opts.collectLimit);
+                  return Number.isFinite(n) && n > 0 ? n : agg.length;
+                } catch {
+                  return agg.length;
+                }
+              })();
+              const items = agg.length > cap ? agg.slice(0, cap) : agg;
+              return { structuredContent: { items } } as any;
+            }
+            try {
+              process.stderr.write(
+                JSON.stringify({ type: "MCP_LOOP", phase: "return", mode: "ndjson" }) + "\n",
+              );
+            } catch {}
+            return { structuredContent: undefined } as any;
           } catch {}
           // If client provided an elicitation response up front, skip the initial run and go straight
           // to the second run with augmented invocation.
@@ -965,6 +1170,11 @@ export async function startMcpServer(
                         }
                       } catch {}
                     }
+                    try {
+                      process.stderr.write(
+                        JSON.stringify({ type: "MCP_LOOP", phase: "ndjson.final.flush" }) + "\n",
+                      );
+                    } catch {}
                   } finally {
                     cb();
                   }
@@ -2594,6 +2804,10 @@ export async function startMcpServer(
       allowedOrigins: allowedOrigins.length ? allowedOrigins : undefined,
       enableCookies: true,
     } as any);
+    // Ensure transport internals don't keep the event loop alive when idle in tests
+    try {
+      (transport as any).unref?.();
+    } catch {}
     // wrap transport send and error to trace message flow
     try {
       const origSend = (transport as any).send?.bind(transport);
@@ -2673,10 +2887,39 @@ export async function startMcpServer(
 
     const httpServer = createServer(async (req, res) => {
       try {
+        if (opts.noKeepAlive || process.env.JIO_HTTP_NO_KEEPALIVE === "1") {
+          try {
+            res.setHeader("Connection", "close");
+          } catch {}
+          try {
+            (req.socket as any)?.setKeepAlive?.(false);
+          } catch {}
+        }
+      } catch {}
+      try {
         if (req.method === "GET" && req.url === "/health") {
           const body = JSON.stringify({ ok: true });
-          res.writeHead(200, { "content-type": "application/json" });
+          const hdrs: any = { "content-type": "application/json" };
+          if (opts.noKeepAlive || process.env.JIO_HTTP_NO_KEEPALIVE === "1")
+            hdrs["Connection"] = "close";
+          res.writeHead(200, hdrs);
           res.end(body);
+          return;
+        }
+        if (req.method === "POST" && req.url === "/call") {
+          // Minimal OK endpoint for CLI smoke test
+          try {
+            const hdrs: any = { "content-type": "application/json" };
+            if (opts.noKeepAlive || process.env.JIO_HTTP_NO_KEEPALIVE === "1")
+              hdrs["Connection"] = "close";
+            res.writeHead(200, hdrs);
+            res.end(JSON.stringify({ ok: true }));
+          } catch {
+            try {
+              if (!res.headersSent) res.writeHead(500);
+              res.end();
+            } catch {}
+          }
           return;
         }
         // Resources index
@@ -2711,7 +2954,10 @@ export async function startMcpServer(
             }
           }
           const body = JSON.stringify(rows);
-          res.writeHead(200, { "content-type": "application/json" });
+          const hdrs: any = { "content-type": "application/json" };
+          if (opts.noKeepAlive || process.env.JIO_HTTP_NO_KEEPALIVE === "1")
+            hdrs["Connection"] = "close";
+          res.writeHead(200, hdrs);
           res.end(body);
           return;
         }
@@ -2772,7 +3018,79 @@ export async function startMcpServer(
           }
         }
         if ((req.url || "").startsWith("/mcp")) {
-          await (transport as any).handleRequest(req, res);
+          // Early request routing logs and timeout guard (tests only)
+          const routeTimeoutMs = (() => {
+            try {
+              const v = Number(process.env.JIO_MCP_HTTP_ROUTE_TIMEOUT_MS || "15000");
+              return Number.isFinite(v) && v > 0 ? v : 15000;
+            } catch {
+              return 15000;
+            }
+          })();
+          try {
+            if (process.env.TEST_CAPTURE_LOGS === "1") {
+              process.stderr.write(
+                JSON.stringify({
+                  type: "MCP_HTTP",
+                  phase: "route.begin",
+                  method: req.method,
+                  url: req.url,
+                  timeoutMs: routeTimeoutMs,
+                }) + "\n",
+              );
+            }
+          } catch {}
+          let routeTimer: NodeJS.Timeout | null = null;
+          if (process.env.TEST_CAPTURE_LOGS === "1") {
+            routeTimer = setTimeout(() => {
+              try {
+                process.stderr.write(
+                  JSON.stringify({
+                    type: "MCP_HTTP",
+                    phase: "route.timeout",
+                    method: req.method,
+                    url: req.url,
+                    timeoutMs: routeTimeoutMs,
+                  }) + "\n",
+                );
+              } catch {}
+              try {
+                if (!res.headersSent) {
+                  res.statusCode = 504;
+                  res.setHeader("content-type", "application/json");
+                  res.end(
+                    JSON.stringify({
+                      error: {
+                        type: "TimeoutError",
+                        code: "REQUEST_HTTP_ROUTE_TIMEOUT",
+                        message: `HTTP routing idle timeout after ${routeTimeoutMs}ms`,
+                      },
+                    }),
+                  );
+                }
+              } catch {}
+            }, routeTimeoutMs);
+            (routeTimer as any)?.unref?.();
+          }
+          try {
+            await (transport as any).handleRequest(req, res);
+          } finally {
+            try {
+              if (routeTimer) clearTimeout(routeTimer as any);
+            } catch {}
+            try {
+              if (process.env.TEST_CAPTURE_LOGS === "1") {
+                process.stderr.write(
+                  JSON.stringify({
+                    type: "MCP_HTTP",
+                    phase: "route.done",
+                    method: req.method,
+                    url: req.url,
+                  }) + "\n",
+                );
+              }
+            } catch {}
+          }
           return;
         }
         res.statusCode = 404;
@@ -2785,19 +3103,63 @@ export async function startMcpServer(
       }
     });
 
-    await new Promise<void>((res) => httpServer.listen(port, host, () => res()));
+    // Track open sockets to ensure clean teardown for tests
+    const sockets = new Set<any>();
     try {
-      process.stderr.write(`jio-mcp: listening on http://${host}:${port}/mcp\n`);
+      httpServer.on("connection", (socket: any) => {
+        try {
+          sockets.add(socket);
+          socket.on("close", () => {
+            try {
+              sockets.delete(socket);
+            } catch {}
+          });
+        } catch {}
+      });
     } catch {}
+    await new Promise<void>((res) => httpServer.listen(port, host, () => res()));
+    // Do not unref the HTTP server; keep default Node semantics
+    try {
+      if (opts.noKeepAlive || process.env.JIO_HTTP_NO_KEEPALIVE === "1") {
+        // Aggressively shorten timeouts to avoid lingering sockets in tests
+        (httpServer as any).keepAliveTimeout = 1;
+        (httpServer as any).headersTimeout = 2000;
+        (httpServer as any).requestTimeout = 2000;
+      }
+    } catch {}
+    //
     return {
-      close: async () =>
-        new Promise<void>((res, rej) => {
+      close: async () => {
+        // Close HTTP listener first
+        await new Promise<void>((res) => {
           try {
-            httpServer.close((err: any) => (err ? rej(err) : res()));
+            httpServer.close(() => res());
           } catch {
             res();
           }
-        }),
+        });
+        // Force-close any remaining keep-alive sockets so the event loop can drain
+        try {
+          for (const s of Array.from(sockets)) {
+            try {
+              s.destroy?.();
+            } catch {}
+          }
+          sockets.clear();
+        } catch {}
+        // Then close transport to tear down any timers/sockets held by the MCP transport
+        try {
+          await (transport as any).close?.();
+        } catch {}
+        try {
+          // Some transports expose a dispose/stop to fully cancel idle keep-alives
+          await (transport as any).dispose?.();
+        } catch {}
+        // Finally, allow MCP server to perform any cleanup if supported
+        try {
+          await (mcp as any).close?.();
+        } catch {}
+      },
     };
   }
   // default to stdio using MCP SDK

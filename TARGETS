@@ -29,11 +29,7 @@ zx_test(
     script = "tools/tests/jio.resources.cli.test.ts",
     out = "jio_resources_cli.stamp",
 )
-zx_test(
-    name = "gen_jio_schema_types",
-    script = "tools/jio/schema/gen-types.ts",
-    out = "gen_jio_schema_types.stamp",
-)
+## removed: gen_jio_schema_types (not a test target)
 load("//tools/buck:zx_test.bzl", "zx_test")
 
 zx_test(
@@ -651,6 +647,49 @@ zx_test(
     out = "json_cli_jsonpath_bracket_notation.stamp",
 )
 
+# Additional json-cli tests wired
+zx_test(
+    name = "json_cli_argv_csv_flag",
+    script = "tools/tests/jio.argv.csv-flag.test.ts",
+    out = "json_cli_argv_csv_flag.stamp",
+)
+
+zx_test(
+    name = "json_cli_argv_csv_separate_flag",
+    script = "tools/tests/jio.argv.csv-separate-flag.test.ts",
+    out = "json_cli_argv_csv_separate_flag.stamp",
+)
+
+zx_test(
+    name = "json_cli_children_termination",
+    script = "tools/tests/jio.children-termination.test.ts",
+    out = "json_cli_children_termination.stamp",
+)
+
+zx_test(
+    name = "json_cli_env_defaults_glob_pass",
+    script = "tools/tests/jio.env.defaults.glob-pass.test.ts",
+    out = "json_cli_env_defaults_glob_pass.stamp",
+)
+
+zx_test(
+    name = "json_cli_limits_ndjson_line_bytes",
+    script = "tools/tests/jio.limits.ndjson-line-bytes.test.ts",
+    out = "json_cli_limits_ndjson_line_bytes.stamp",
+)
+
+zx_test(
+    name = "json_cli_limits",
+    script = "tools/tests/jio.limits.test.ts",
+    out = "json_cli_limits.stamp",
+)
+
+zx_test(
+    name = "json_cli_on_validation_failure_ndjson",
+    script = "tools/tests/jio.on-validation-failure.ndjson.test.ts",
+    out = "json_cli_on_validation_failure_ndjson.stamp",
+)
+
 ## removed: json_cli_parent_stdio_epipe (redundant with jio.epipe.test.ts)
 
 # PR3/PR4 MCP HTTP/stdio additional tests
@@ -676,6 +715,18 @@ zx_test(
     name = "jio_mcp_http_progress",
     script = "tools/tests/jio.mcp.http.progress.test.ts",
     out = "jio_mcp_http_progress.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_http_cli",
+    script = "tools/tests/jio.mcp.http.cli.test.ts",
+    out = "jio_mcp_http_cli.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_http_headers",
+    script = "tools/tests/jio.mcp.http.headers.test.ts",
+    out = "jio_mcp_http_headers.stamp",
 )
 
 zx_test(
@@ -732,10 +783,47 @@ zx_test(
     out = "jio_mcp_http_control_ignore.stamp",
 )
 
+
 zx_test(
-    name = "jio_mcp_http_control_json_tool_driven",
-    script = "tools/tests/jio.mcp.http.control-json-tool-driven.test.ts",
-    out = "jio_mcp_http_control_json_tool_driven.stamp",
+    name = "jio_mcp_http_control_json_tool_driven_decline",
+    script = "tools/tests/jio.mcp.http.control-json-tool-driven.decline.test.ts",
+    out = "jio_mcp_http_control_json_tool_driven_decline.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_http_control_json_tool_driven_cancel",
+    script = "tools/tests/jio.mcp.http.control-json-tool-driven.cancel.test.ts",
+    out = "jio_mcp_http_control_json_tool_driven_cancel.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_http_control_json_tool_driven_timeout",
+    script = "tools/tests/jio.mcp.http.control-json-tool-driven.timeout.test.ts",
+    out = "jio_mcp_http_control_json_tool_driven_timeout.stamp",
+)
+
+zx_test(
+    name = "stdio_idle_quick_exit",
+    script = "tools/tests/stdio.idle.test.ts",
+    out = "stdio_idle_quick_exit.stamp",
+)
+
+zx_test(
+    name = "node_test_idle_minimal",
+    script = "tools/tests/node.test.idle.minimal.test.ts",
+    out = "node_test_idle_minimal.stamp",
+)
+
+zx_test(
+    name = "node_test_idle_minimal_http",
+    script = "tools/tests/node.test.idle.minimal.http.test.ts",
+    out = "node_test_idle_minimal_http.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_http_control_json_tool_driven_accept",
+    script = "tools/tests/jio.mcp.http.control-json-tool-driven.accept.test.ts",
+    out = "jio_mcp_http_control_json_tool_driven_accept.stamp",
 )
 
 zx_test(
@@ -791,6 +879,12 @@ zx_test(
     name = "jio_mcp_schema_guard_root_non_object",
     script = "tools/tests/jio.mcp.schema.guard.root-non-object.test.ts",
     out = "jio_mcp_schema_guard_root_non_object.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_schema_convert",
+    script = "tools/tests/jio.mcp.schema.convert.test.ts",
+    out = "jio_mcp_schema_convert.stamp",
 )
 
 # PR5 additions
