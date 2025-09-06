@@ -1,5 +1,6 @@
 import { PassThrough, Writable } from "node:stream";
 import { buildArgv, runWithTransforms } from "../core/index.ts";
+import { ELICIT_KEY, isControl, isElicit, sanitizeControlString } from "./elicitation.ts";
 
 export type InvocationEvent =
   | { type: "progress"; message?: string; progress?: number }
@@ -36,20 +37,11 @@ export interface InvocationOptions {
   isCancelled?: () => boolean;
   onProgress?: (info: { message?: string; progress?: number }) => void;
   onItem?: (item: any) => void;
+  input?: NodeJS.ReadableStream;
 }
 
-function sanitizeControlLine(s: string): string {
-  let t = s;
-  try {
-    if (t.charCodeAt(0) === 0xfeff) t = t.slice(1);
-  } catch {}
-  t = t.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
-  t = t.replace(/[\u0080-\u009F]/g, "");
-  t = t.replace(/[\u200B-\u200D\u2060\uFEFF]/g, "");
-  t = t.replace(/[\u2028\u2029]/g, "");
-  t = t.replace(/[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]/g, "");
-  return t;
-}
+// sanitizeControlLine now delegates to the centralized function
+const sanitizeControlLine = sanitizeControlString;
 
 export async function* runInvocation(
   ctx: InvocationContext,
@@ -62,6 +54,13 @@ export async function* runInvocation(
   const inStream = new PassThrough();
   let errTxt = "";
   errStream.on("data", (b) => (errTxt += Buffer.from(b as any).toString("utf8")));
+  // If caller provided an input stream (e.g., CLI process.stdin), forward into inStream
+  try {
+    if (opts.input) {
+      opts.input.on("error", () => void 0);
+      opts.input.pipe(inStream);
+    }
+  } catch {}
 
   // Streaming parsing buffers
   let lineBuf = "";
@@ -92,14 +91,8 @@ export async function* runInvocation(
                 obj = JSON.parse(obj);
               } catch {}
             }
-            if (
-              !ignoreCtl &&
-              obj &&
-              typeof obj === "object" &&
-              obj["$jio.ctl"] === true &&
-              obj["$jio.ctl.elicit"]
-            ) {
-              ctlPayload = obj["$jio.ctl.elicit"];
+            if (!ignoreCtl && obj && typeof obj === "object" && isElicit(obj)) {
+              ctlPayload = (obj as any)[ELICIT_KEY];
               sawCtl = true;
               continue;
             }
@@ -119,14 +112,8 @@ export async function* runInvocation(
                     obj = JSON.parse(obj);
                   } catch {}
                 }
-                if (
-                  !ignoreCtl &&
-                  obj &&
-                  typeof obj === "object" &&
-                  (obj as any)["$jio.ctl"] === true &&
-                  (obj as any)["$jio.ctl.elicit"]
-                ) {
-                  ctlPayload = (obj as any)["$jio.ctl.elicit"];
+                if (!ignoreCtl && obj && typeof obj === "object" && isElicit(obj)) {
+                  ctlPayload = (obj as any)[ELICIT_KEY];
                   sawCtl = true;
                   continue;
                 }
@@ -154,9 +141,9 @@ export async function* runInvocation(
                 obj = JSON.parse(obj);
               } catch {}
             }
-            if (!ignoreCtl && obj && typeof obj === "object" && obj["$jio.ctl"] === true) {
-              if (obj["$jio.ctl.elicit"]) {
-                ctlPayload = obj["$jio.ctl.elicit"];
+            if (!ignoreCtl && obj && typeof obj === "object" && isControl(obj)) {
+              if ((obj as any)[ELICIT_KEY]) {
+                ctlPayload = (obj as any)[ELICIT_KEY];
                 sawCtl = true;
               }
             } else {
@@ -177,14 +164,8 @@ export async function* runInvocation(
                     obj = JSON.parse(obj);
                   } catch {}
                 }
-                if (
-                  !ignoreCtl &&
-                  obj &&
-                  typeof obj === "object" &&
-                  (obj as any)["$jio.ctl"] === true &&
-                  (obj as any)["$jio.ctl.elicit"]
-                ) {
-                  ctlPayload = (obj as any)["$jio.ctl.elicit"];
+                if (!ignoreCtl && obj && typeof obj === "object" && isElicit(obj)) {
+                  ctlPayload = (obj as any)[ELICIT_KEY];
                   sawCtl = true;
                 } else {
                   streamedItems.push(obj);
@@ -410,19 +391,13 @@ export async function* runInvocation(
               JSON.stringify({ type: "INV_DEBUG_RAW", where: "rawFirst.parsed", info }) + "\n",
             );
           } catch {}
-          if (
-            !ignoreCtl &&
-            obj &&
-            typeof obj === "object" &&
-            (obj as any)["$jio.ctl"] === true &&
-            (obj as any)["$jio.ctl.elicit"]
-          ) {
+          if (!ignoreCtl && obj && typeof obj === "object" && isElicit(obj)) {
             try {
               process.stderr.write(
                 JSON.stringify({ type: "inv.debug", where: "rawFirst.controlDetected" }) + "\n",
               );
             } catch {}
-            return yield { type: "control", elicit: (obj as any)["$jio.ctl.elicit"] };
+            return yield { type: "control", elicit: (obj as any)[ELICIT_KEY] };
           }
         } catch {
           // Salvage: try to parse JSON object substring from buffered first run
@@ -438,19 +413,13 @@ export async function* runInvocation(
                   obj = JSON.parse(obj);
                 } catch {}
               }
-              if (
-                !ignoreCtl &&
-                obj &&
-                typeof obj === "object" &&
-                (obj as any)["$jio.ctl"] === true &&
-                (obj as any)["$jio.ctl.elicit"]
-              ) {
+              if (!ignoreCtl && obj && typeof obj === "object" && isElicit(obj)) {
                 try {
                   process.stderr.write(
                     JSON.stringify({ type: "inv.debug", where: "rawFirst.salvage.control" }) + "\n",
                   );
                 } catch {}
-                return yield { type: "control", elicit: (obj as any)["$jio.ctl.elicit"] };
+                return yield { type: "control", elicit: (obj as any)[ELICIT_KEY] };
               }
             }
           } catch {}
@@ -498,14 +467,8 @@ export async function* runInvocation(
         if (code2 && code2 !== 0)
           return yield { type: "error", error: { type: "Error", message: `exit ${code2}` } };
         const obj2 = outTxt2 ? JSON.parse(outTxt2) : null;
-        if (
-          !ignoreCtl &&
-          obj2 &&
-          typeof obj2 === "object" &&
-          (obj2 as any)["$jio.ctl"] === true &&
-          (obj2 as any)["$jio.ctl.elicit"]
-        ) {
-          return yield { type: "control", elicit: (obj2 as any)["$jio.ctl.elicit"] };
+        if (!ignoreCtl && obj2 && typeof obj2 === "object" && isElicit(obj2)) {
+          return yield { type: "control", elicit: (obj2 as any)[ELICIT_KEY] };
         }
         yield { type: "final", result: obj2 };
       } catch {
@@ -538,14 +501,8 @@ export async function* runInvocation(
   } catch {}
   try {
     const obj = outTxt ? JSON.parse(outTxt) : null;
-    if (
-      !ignoreCtl &&
-      obj &&
-      typeof obj === "object" &&
-      (obj as any)["$jio.ctl"] === true &&
-      (obj as any)["$jio.ctl.elicit"]
-    ) {
-      return yield { type: "control", elicit: (obj as any)["$jio.ctl.elicit"] };
+    if (!ignoreCtl && obj && typeof obj === "object" && isElicit(obj)) {
+      return yield { type: "control", elicit: (obj as any)[ELICIT_KEY] };
     }
     yield { type: "final", result: obj };
   } catch {

@@ -238,6 +238,7 @@ export async function main(argv: string[]): Promise<number | void> {
     console.error("jio: invalid spec (missing command.exec)");
     return 78;
   }
+  const specNN = spec as ToolSpec;
 
   // Schema printing mode
   const schemaExit = handleSchemaPrinting(spec, argv);
@@ -263,16 +264,19 @@ export async function main(argv: string[]): Promise<number | void> {
     });
   } catch {}
 
+  // Note: CLI path continues to use the local runWithTransforms implementation
+  // to preserve legacy semantics for stdin/stdout transforms and limits.
+
   // Validate invocation JSON against tool.inputSchema when provided
-  if (spec.tool?.outputSchema || (spec as any).tool?.inputSchema) {
+  if (specNN.tool?.outputSchema || (specNN as any).tool?.inputSchema) {
     const ajvIn = createAjv();
-    const inSchema: any = (spec as any).tool?.inputSchema;
+    const inSchema: any = (specNN as any).tool?.inputSchema;
     if (inSchema) {
       try {
         const validateIn = ajvIn.compile(inSchema);
         const ok = validateIn(invObj);
         if (!ok) {
-          const sink = openFailureSink(rootDir, specPathStr, spec, rootCfg, {
+          const sink = openFailureSink(rootDir, specPathStr, specNN, rootCfg, {
             cleanEnv: opts.cleanEnv,
             passEnv: opts.passEnv,
             setEnv: opts.setEnv,
@@ -280,13 +284,18 @@ export async function main(argv: string[]): Promise<number | void> {
             timeoutMsOverride: undefined,
           } as any);
           const msg = JSON.stringify(validateIn.errors?.[0] || {});
-          if (sink) await sink.write({ reason: "input", object: invObj, message: msg });
+          if (sink)
+            await (sink as NonNullable<typeof sink>).write({
+              reason: "input",
+              object: invObj,
+              message: msg,
+            });
           console.error(`jio: invalid input: ${msg}`);
-          if (sink) await sink.close();
+          if (sink) await (sink as NonNullable<typeof sink>).close();
           return 1;
         }
       } catch (e: any) {
-        const sink = openFailureSink(rootDir, specPathStr, spec, rootCfg, {
+        const sink = openFailureSink(rootDir, specPathStr, specNN, rootCfg, {
           cleanEnv: opts.cleanEnv,
           passEnv: opts.passEnv,
           setEnv: opts.setEnv,
@@ -295,7 +304,7 @@ export async function main(argv: string[]): Promise<number | void> {
         } as any);
         try {
           if (sink)
-            await sink.write({
+            await (sink as NonNullable<typeof sink>).write({
               reason: "input",
               object: invObj,
               message: "input validation failed",
@@ -305,7 +314,7 @@ export async function main(argv: string[]): Promise<number | void> {
           console.error("jio: invalid input");
         } catch {}
         try {
-          if (sink) await sink.close();
+          if (sink) await (sink as NonNullable<typeof sink>).close();
         } catch {}
         return 1;
       }
@@ -314,14 +323,14 @@ export async function main(argv: string[]): Promise<number | void> {
 
   let argvBuilt: string[];
   try {
-    argvBuilt = buildArgv(spec, invObj);
+    argvBuilt = buildArgv(specNN, invObj);
   } catch (e: any) {
     console.error(String(e?.message || e || "jio: argv build failed"));
     return 78;
   }
 
   if (opts.dryRun) {
-    const plan = buildDryRunPlan(rootDir, specPathStr, spec, argvBuilt, rootCfg, {
+    const plan = buildDryRunPlan(rootDir, specPathStr, specNN, argvBuilt, rootCfg, {
       cleanEnv: opts.cleanEnv,
       passEnv: opts.passEnv,
       setEnv: opts.setEnv,
@@ -330,7 +339,7 @@ export async function main(argv: string[]): Promise<number | void> {
     return 0;
   }
 
-  const code = await runWithTransforms(rootDir, specPathStr, spec, argvBuilt, rootCfg, invObj, {
+  const code = await runWithTransforms(rootDir, specPathStr, specNN, argvBuilt, rootCfg, invObj, {
     collect: !!opts.collect,
     collectLimit: opts.collectLimit,
     limits: {

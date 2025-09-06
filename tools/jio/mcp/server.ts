@@ -8,6 +8,7 @@ import {
   generateInputSchemaFromParameters,
   runWithTransforms,
 } from "../core/index.ts";
+import { validateRequestedSchemaBestEffort as validateRequestedSchemaBestEffortCentral } from "./elicitation.ts";
 import { runInvocation } from "./invocation.ts";
 import {
   buildSdkSchemas,
@@ -50,103 +51,7 @@ export type McpServerOpts = {
   streamingFinalAggregate?: boolean;
 };
 
-function validateRequestedSchemaBestEffort(
-  schema: any,
-): { keyword: string; pointer: string; note?: string }[] {
-  const reasons: { keyword: string; pointer: string; note?: string }[] = [];
-  try {
-    if (!schema || typeof schema !== "object")
-      return [{ keyword: "rootType(non-object)", pointer: "" }];
-    const t = (schema as any).type;
-    if (t !== "object") reasons.push({ keyword: "rootType(non-object)", pointer: "" });
-    const props = (schema as any).properties;
-    if (props && typeof props === "object") {
-      for (const key of Object.keys(props)) {
-        const ps: any = (props as any)[key];
-        const ptr = `/properties/${key}`;
-        if (!ps || typeof ps !== "object") {
-          reasons.push({ keyword: "unsupportedKeyword", pointer: ptr, note: "non-object member" });
-          continue;
-        }
-        if (ps.properties || ps.items) {
-          reasons.push({ keyword: "unsupportedKeyword", pointer: ptr, note: "nested structure" });
-          continue;
-        }
-        if (
-          ps.anyOf ||
-          ps.oneOf ||
-          ps.allOf ||
-          ps.not ||
-          ps.$ref ||
-          ps.$defs ||
-          ps.patternProperties ||
-          ps.dependentSchemas ||
-          ps.contains ||
-          ps.unevaluatedProperties ||
-          ps.propertyNames
-        ) {
-          reasons.push({
-            keyword: "unsupportedKeyword",
-            pointer: ptr,
-            note: "combinators/advanced",
-          });
-        }
-        if (ps.enum) {
-          const ok =
-            Array.isArray(ps.enum) &&
-            (ps.enum as any[]).every(
-              (v) => ["string", "number", "boolean"].includes(typeof v) || v === null,
-            );
-          if (!ok)
-            reasons.push({
-              keyword: "unsupportedKeyword",
-              pointer: `${ptr}/enum`,
-              note: "non-primitive enum",
-            });
-        }
-        if (ps.const !== undefined) {
-          const vt = typeof ps.const;
-          if (!["string", "number", "boolean"].includes(vt) && ps.const !== null)
-            reasons.push({
-              keyword: "unsupportedKeyword",
-              pointer: `${ptr}/const`,
-              note: "non-primitive const",
-            });
-        }
-        const typ = Array.isArray(ps.type) ? ps.type.filter((x: any) => x !== "null")[0] : ps.type;
-        switch (typ) {
-          case "string": {
-            const fmt = ps.format;
-            if (fmt && !["email", "uuid", "url", "date-time"].includes(String(fmt))) {
-              reasons.push({
-                keyword: "unsupportedKeyword",
-                pointer: `${ptr}/format`,
-                note: String(fmt),
-              });
-            }
-            break;
-          }
-          case "number":
-          case "integer":
-          case "boolean":
-          case "null":
-            break;
-          default:
-            if (typ !== undefined)
-              reasons.push({
-                keyword: "unsupportedKeyword",
-                pointer: `${ptr}/type`,
-                note: String(typ),
-              });
-            break;
-        }
-      }
-    }
-  } catch (e: any) {
-    reasons.push({ keyword: "exception", pointer: "", note: String(e?.message || e) });
-  }
-  return reasons;
-}
+const validateRequestedSchemaBestEffort = validateRequestedSchemaBestEffortCentral;
 
 async function readVersion(): Promise<string> {
   try {

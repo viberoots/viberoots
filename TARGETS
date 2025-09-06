@@ -171,6 +171,12 @@ zx_test(
 )
 
 zx_test(
+    name = "jio_mcp_elicitation_schema",
+    script = "tools/tests/jio.mcp.elicitation.schema.test.ts",
+    out = "jio_mcp_elicitation_schema.stamp",
+)
+
+zx_test(
     name = "jio_mcp_stdio_invoke_json",
     script = "tools/tests/jio.mcp.stdio.invoke-json.test.ts",
     out = "jio_mcp_stdio_invoke_json.stamp",
