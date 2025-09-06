@@ -7,6 +7,7 @@ import readline from "node:readline";
 import { PassThrough } from "node:stream";
 import { ResourceRegistry } from "./core/resources.ts";
 import { evaluateJsonPathString as evaluateJsonPathRfc } from "./jsonpath/index.ts";
+import { buildSdkSchemas } from "./mcp/registration.ts";
 import { createAjvValidator, generateInputSchemaFromParameters } from "./schema/index.ts";
 import { createAjv } from "./validation/ajv.ts";
 
@@ -246,6 +247,21 @@ export async function main(argv: string[]): Promise<number | void> {
   const invState = await resolveInvocationObject(spec, opts);
   if (typeof invState.code === "number") return invState.code;
   const invObj = invState.invObj as any;
+
+  // Build SDK schemas (Zod-based) to centralize NDJSON wrapper and guard logic used across transports
+  // This emits warnings for unsupported shapes consistently with the HTTP path.
+  try {
+    const fqTool = resolveToolRef(opts.toolRef as string, rootCfg);
+    const isNdjson = (spec as any)?.command?.stdoutTransform?.format === "ndjson";
+    await buildSdkSchemas({
+      toolFqName: fqTool,
+      inputSchema: (spec as any)?.tool?.inputSchema,
+      outputSchema: (spec as any)?.tool?.outputSchema,
+      isNdjson,
+      // For CLI, aggregate behavior corresponds to --collect for NDJSON tools
+      streamingFinalAggregate: !!opts.collect,
+    });
+  } catch {}
 
   // Validate invocation JSON against tool.inputSchema when provided
   if (spec.tool?.outputSchema || (spec as any).tool?.inputSchema) {
@@ -1196,10 +1212,21 @@ function handleSchemaPrinting(spec: ToolSpec, argv: string[]): number | null {
   if (wantIn && wantOut) {
     if (!spec.tool?.outputSchema) return 65;
     const effIn = spec.tool?.inputSchema || generateInputSchemaFromParameters(spec);
+    const isNdjson = (spec.command as any)?.stdoutTransform?.format === "ndjson";
+    const collectWanted = argv.includes("--collect") || argv.includes("--collect-ndjson");
+    const effOut =
+      isNdjson && collectWanted
+        ? {
+            type: "object",
+            additionalProperties: false,
+            required: ["items"],
+            properties: {
+              items: { type: "array", items: spec.tool.outputSchema },
+            },
+          }
+        : spec.tool.outputSchema;
     try {
-      process.stdout.write(
-        JSON.stringify({ inputSchema: effIn, outputSchema: spec.tool.outputSchema }),
-      );
+      process.stdout.write(JSON.stringify({ inputSchema: effIn, outputSchema: effOut }));
     } catch {}
     return 0;
   }
@@ -1212,8 +1239,21 @@ function handleSchemaPrinting(spec: ToolSpec, argv: string[]): number | null {
   }
   if (wantOut) {
     if (!spec.tool?.outputSchema) return 65;
+    const isNdjson = (spec.command as any)?.stdoutTransform?.format === "ndjson";
+    const collectWanted = argv.includes("--collect") || argv.includes("--collect-ndjson");
+    const effOut =
+      isNdjson && collectWanted
+        ? {
+            type: "object",
+            additionalProperties: false,
+            required: ["items"],
+            properties: {
+              items: { type: "array", items: spec.tool.outputSchema },
+            },
+          }
+        : spec.tool.outputSchema;
     try {
-      process.stdout.write(JSON.stringify(spec.tool.outputSchema));
+      process.stdout.write(JSON.stringify(effOut));
     } catch {}
     return 0;
   }
