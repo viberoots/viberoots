@@ -69,6 +69,19 @@ export async function* runInvocation(
   let ctlPayload: any = null;
   // Raw capture of first run output for JSON fallback when forcing NDJSON
   let outRawFirstRun = "";
+  // NDJSON collect/limit state (unified policy)
+  const maxLineBytes = Number.isFinite(opts.limits?.maxNdjsonLineBytes as number)
+    ? (opts.limits?.maxNdjsonLineBytes as number)
+    : undefined;
+  const maxCollectItems = Number.isFinite(opts.limits?.collectItems as number)
+    ? (opts.limits?.collectItems as number)
+    : undefined;
+  const maxCollectBytes = Number.isFinite(opts.limits?.collectBytes as number)
+    ? (opts.limits?.collectBytes as number)
+    : undefined;
+  let itemsCollected = 0;
+  let bytesCollected = 0;
+  let suppressFurther = false;
 
   const ndjsonSink: Writable | null = new Writable({
     write(chunk, _enc, cb) {
@@ -83,6 +96,10 @@ export async function* runInvocation(
           lineBuf = lineBuf.slice(nl + 1);
           const s = line.trim();
           if (!s) continue;
+          if (maxLineBytes && Buffer.byteLength(s) > maxLineBytes) {
+            // drop overlong line, continue
+            continue;
+          }
           try {
             const s2 = sanitizeControlLine(s);
             let obj: any = JSON.parse(s2);
@@ -96,10 +113,35 @@ export async function* runInvocation(
               sawCtl = true;
               continue;
             }
-            streamedItems.push(obj);
-            try {
-              opts.onItem?.(obj);
-            } catch {}
+            if (opts.streamingFinalAggregate) {
+              if (!suppressFurther) {
+                const str = (() => {
+                  try {
+                    return JSON.stringify(obj);
+                  } catch {
+                    return "";
+                  }
+                })();
+                const b = Buffer.byteLength(str);
+                if (maxCollectBytes && bytesCollected + b > maxCollectBytes) {
+                  suppressFurther = true;
+                } else if (maxCollectItems && itemsCollected >= maxCollectItems) {
+                  suppressFurther = true;
+                } else {
+                  streamedItems.push(obj);
+                  itemsCollected++;
+                  bytesCollected += b;
+                  try {
+                    opts.onItem?.(obj);
+                  } catch {}
+                }
+              }
+            } else {
+              streamedItems.push(obj);
+              try {
+                opts.onItem?.(obj);
+              } catch {}
+            }
           } catch {
             // Salvage: try to parse JSON object substring
             try {
@@ -117,10 +159,35 @@ export async function* runInvocation(
                   sawCtl = true;
                   continue;
                 }
-                streamedItems.push(obj);
-                try {
-                  opts.onItem?.(obj);
-                } catch {}
+                if (opts.streamingFinalAggregate) {
+                  if (!suppressFurther) {
+                    const str = (() => {
+                      try {
+                        return JSON.stringify(obj);
+                      } catch {
+                        return "";
+                      }
+                    })();
+                    const b = Buffer.byteLength(str);
+                    if (maxCollectBytes && bytesCollected + b > maxCollectBytes) {
+                      suppressFurther = true;
+                    } else if (maxCollectItems && itemsCollected >= maxCollectItems) {
+                      suppressFurther = true;
+                    } else {
+                      streamedItems.push(obj);
+                      itemsCollected++;
+                      bytesCollected += b;
+                      try {
+                        opts.onItem?.(obj);
+                      } catch {}
+                    }
+                  }
+                } else {
+                  streamedItems.push(obj);
+                  try {
+                    opts.onItem?.(obj);
+                  } catch {}
+                }
               }
             } catch {}
           }
@@ -133,6 +200,10 @@ export async function* runInvocation(
       try {
         const trailing = lineBuf.trim();
         if (trailing) {
+          if (maxLineBytes && Buffer.byteLength(trailing) > maxLineBytes) {
+            // drop overlong trailing line
+            return cb();
+          }
           try {
             const s2 = sanitizeControlLine(trailing);
             let obj: any = JSON.parse(s2);
@@ -147,10 +218,35 @@ export async function* runInvocation(
                 sawCtl = true;
               }
             } else {
-              streamedItems.push(obj);
-              try {
-                opts.onItem?.(obj);
-              } catch {}
+              if (opts.streamingFinalAggregate) {
+                if (!suppressFurther) {
+                  const str = (() => {
+                    try {
+                      return JSON.stringify(obj);
+                    } catch {
+                      return "";
+                    }
+                  })();
+                  const b = Buffer.byteLength(str);
+                  if (maxCollectBytes && bytesCollected + b > maxCollectBytes) {
+                    suppressFurther = true;
+                  } else if (maxCollectItems && itemsCollected >= maxCollectItems) {
+                    suppressFurther = true;
+                  } else {
+                    streamedItems.push(obj);
+                    itemsCollected++;
+                    bytesCollected += b;
+                    try {
+                      opts.onItem?.(obj);
+                    } catch {}
+                  }
+                }
+              } else {
+                streamedItems.push(obj);
+                try {
+                  opts.onItem?.(obj);
+                } catch {}
+              }
             }
           } catch {
             // Salvage trailing JSON object
@@ -168,10 +264,35 @@ export async function* runInvocation(
                   ctlPayload = (obj as any)[ELICIT_KEY];
                   sawCtl = true;
                 } else {
-                  streamedItems.push(obj);
-                  try {
-                    opts.onItem?.(obj);
-                  } catch {}
+                  if (opts.streamingFinalAggregate) {
+                    if (!suppressFurther) {
+                      const str = (() => {
+                        try {
+                          return JSON.stringify(obj);
+                        } catch {
+                          return "";
+                        }
+                      })();
+                      const b = Buffer.byteLength(str);
+                      if (maxCollectBytes && bytesCollected + b > maxCollectBytes) {
+                        suppressFurther = true;
+                      } else if (maxCollectItems && itemsCollected >= maxCollectItems) {
+                        suppressFurther = true;
+                      } else {
+                        streamedItems.push(obj);
+                        itemsCollected++;
+                        bytesCollected += b;
+                        try {
+                          opts.onItem?.(obj);
+                        } catch {}
+                      }
+                    }
+                  } else {
+                    streamedItems.push(obj);
+                    try {
+                      opts.onItem?.(obj);
+                    } catch {}
+                  }
                 }
               }
             } catch {}

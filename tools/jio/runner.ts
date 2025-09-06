@@ -7,6 +7,7 @@ import readline from "node:readline";
 import { PassThrough } from "node:stream";
 import { ResourceRegistry } from "./core/resources.ts";
 import { evaluateJsonPathString as evaluateJsonPathRfc } from "./jsonpath/index.ts";
+import { runInvocation } from "./mcp/invocation.ts";
 import { buildSdkSchemas } from "./mcp/registration.ts";
 import { createAjvValidator, generateInputSchemaFromParameters } from "./schema/index.ts";
 import { createAjv } from "./validation/ajv.ts";
@@ -339,24 +340,64 @@ export async function main(argv: string[]): Promise<number | void> {
     return 0;
   }
 
-  const code = await runWithTransforms(rootDir, specPathStr, specNN, argvBuilt, rootCfg, invObj, {
-    collect: !!opts.collect,
-    collectLimit: opts.collectLimit,
-    limits: {
-      maxArgvTokens: opts.maxArgvTokens,
-      maxArgvBytes: opts.maxArgvBytes,
-      maxStdinBytes: opts.maxStdinBytes,
-      maxStdoutJsonBytes: opts.maxStdoutJsonBytes,
-      maxNdjsonLineBytes: opts.maxNdjsonLineBytes,
-      collectItems: opts.collectLimit,
-      collectBytes: opts.collectBytes,
-    },
-    timeoutMsOverride: opts.timeoutMsOverride,
-    cleanEnv: opts.cleanEnv,
-    passEnv: opts.passEnv,
-    setEnv: opts.setEnv,
-  });
-  return code;
+  if (process.env.JIO_CLI_INVOCATION === "ndjson") {
+    const isNdjson = (specNN as any)?.command?.stdoutTransform?.format === "ndjson";
+    const streamingAgg = !!opts.collect;
+    const ctx = { dir: rootDir, specPath: specPathStr, spec: specNN, cfg: rootCfg } as any;
+    let exitViaError: number | null = null;
+    for await (const ev of runInvocation(ctx, {
+      args: invObj,
+      isNdjson,
+      streamingFinalAggregate: streamingAgg,
+      ignoreControlMessages: true,
+      input: process.stdin,
+      limits: {
+        maxArgvTokens: opts.maxArgvTokens,
+        maxArgvBytes: opts.maxArgvBytes,
+        maxStdinBytes: opts.maxStdinBytes,
+        maxStdoutJsonBytes: opts.maxStdoutJsonBytes,
+        maxNdjsonLineBytes: opts.maxNdjsonLineBytes,
+        collectItems: opts.collectLimit,
+        collectBytes: opts.collectBytes,
+      },
+      timeoutMsOverride: opts.timeoutMsOverride,
+      env: { cleanEnv: opts.cleanEnv, passEnv: opts.passEnv, setEnv: opts.setEnv },
+    })) {
+      if (ev.type === "data") {
+        try {
+          (process.stdout as any).write(JSON.stringify(ev.item) + "\n");
+        } catch {}
+      } else if (ev.type === "final") {
+        if (streamingAgg) {
+          try {
+            (process.stdout as any).write(JSON.stringify(ev.result) + "\n");
+          } catch {}
+        }
+      } else if (ev.type === "error") {
+        exitViaError = 1;
+      }
+    }
+    return exitViaError ?? 0;
+  } else {
+    const code = await runWithTransforms(rootDir, specPathStr, specNN, argvBuilt, rootCfg, invObj, {
+      collect: !!opts.collect,
+      collectLimit: opts.collectLimit,
+      limits: {
+        maxArgvTokens: opts.maxArgvTokens,
+        maxArgvBytes: opts.maxArgvBytes,
+        maxStdinBytes: opts.maxStdinBytes,
+        maxStdoutJsonBytes: opts.maxStdoutJsonBytes,
+        maxNdjsonLineBytes: opts.maxNdjsonLineBytes,
+        collectItems: opts.collectLimit,
+        collectBytes: opts.collectBytes,
+      },
+      timeoutMsOverride: opts.timeoutMsOverride,
+      cleanEnv: opts.cleanEnv,
+      passEnv: opts.passEnv,
+      setEnv: opts.setEnv,
+    });
+    return code;
+  }
 }
 
 function getNumericFlag(argv: string[], name: string): number | undefined {
