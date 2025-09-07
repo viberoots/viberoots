@@ -1,6 +1,8 @@
 import { PassThrough, Writable } from "node:stream";
 import { buildArgv, runWithTransforms } from "../core/index.ts";
 import { ELICIT_KEY, isControl, isElicit, sanitizeControlString } from "./elicitation.ts";
+import { createSpecFailureSink } from "./sink.ts";
+import type { FailureSink, FailureSinkFactory } from "./sink.ts";
 
 export type InvocationEvent =
   | { type: "progress"; message?: string; progress?: number }
@@ -39,6 +41,8 @@ export interface InvocationOptions {
   onItem?: (item: any) => void;
   input?: NodeJS.ReadableStream;
   stdinTransform?: "json" | "ndjson";
+  sink?: FailureSink;
+  sinkFactory?: FailureSinkFactory;
 }
 
 // sanitizeControlLine now delegates to the centralized function
@@ -264,6 +268,13 @@ export async function* runInvocation(
               } catch {}
             }
           } catch {
+            // Record invalid NDJSON line to failure sink, then try to salvage JSON object substring
+            try {
+              const preview = (typeof s2 === "string" ? s2 : String(s)).slice(0, 200);
+              (sink as any)
+                ?.write?.({ reason: "stdout", object: preview, message: "invalid NDJSON" })
+                ?.catch?.(() => undefined);
+            } catch {}
             // Salvage: try to parse JSON object substring
             try {
               const i0 = s2.indexOf("{");
@@ -477,6 +488,27 @@ export async function* runInvocation(
     }
   })();
 
+  // Build failure sink (spec-based by default)
+  const sink = (() => {
+    if (opts.sink) return opts.sink;
+    const fac = opts.sinkFactory || createSpecFailureSink;
+    try {
+      return fac({
+        rootDir: dir,
+        specPath,
+        spec,
+        rootCfg: cfg,
+        runtime: {
+          cleanEnv: opts.env?.cleanEnv !== false,
+          passEnv: opts.env?.passEnv || [],
+          setEnv: opts.env?.setEnv || {},
+        },
+      });
+    } catch {
+      return null;
+    }
+  })();
+
   const code = await runWithTransforms(
     dir,
     ctx.specPath,
@@ -541,6 +573,9 @@ export async function* runInvocation(
     return yield { type: "error", error: { type: "Error", message: "stdin bytes limit exceeded" } };
   }
   if (stdinParseFailed) {
+    try {
+      await sink?.write?.({ reason: "stdin", object: "", message: "invalid JSON document" });
+    } catch {}
     return yield { type: "error", error: { type: "InvalidInput", message: "invalid stdin" } };
   }
 

@@ -219,6 +219,12 @@ zx_test(
 )
 
 zx_test(
+    name = "jio_mcp_cli_sink_gated_behavior",
+    script = "tools/tests/jio.mcp.cli.sink-gated.behavior.test.ts",
+    out = "jio_mcp_cli_sink_gated_behavior.stamp",
+)
+
+zx_test(
     name = "jio_mcp_stdio_invoke_ndjson",
     script = "tools/tests/jio.mcp.stdio.invoke-ndjson.test.ts",
     out = "jio_mcp_stdio_invoke_ndjson.stamp",
