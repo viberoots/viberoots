@@ -754,7 +754,21 @@ export async function startMcpServer(
                 isCancelled: () => false,
               } as any,
             );
-            if (code2 && code2 !== 0) return mapExit(code2);
+            if (code2 && code2 !== 0) {
+              // Map invalid JSON to 422 for HTTP clients and include a vendor-specific kind in error data
+              const kind = getErrorTypeFromExitCode(code2);
+              if (kind === "TransformError") {
+                try {
+                  res.statusCode = 422;
+                } catch {}
+                return {
+                  isError: true,
+                  error: { type: "TransformError", message: errTxt || "invalid JSON output" },
+                  data: { kind: "InvalidJson" },
+                } as any;
+              }
+              return mapExit(code2);
+            }
             try {
               const obj2 = outTxt ? JSON.parse(outTxt) : null;
               return { structuredContent: obj2 } as any;

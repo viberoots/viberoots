@@ -7,6 +7,7 @@ import readline from "node:readline";
 import { PassThrough } from "node:stream";
 import { ResourceRegistry } from "./core/resources.ts";
 import { evaluateJsonPathString as evaluateJsonPathRfc } from "./jsonpath/index.ts";
+import { toExitCodeFromAny } from "./mcp/errors.ts";
 import { runInvocation } from "./mcp/invocation.ts";
 import { buildSdkSchemas } from "./mcp/registration.ts";
 import { createAjvValidator, generateInputSchemaFromParameters } from "./schema/index.ts";
@@ -360,7 +361,11 @@ export async function main(argv: string[]): Promise<number | void> {
         collectItems: opts.collectLimit,
         collectBytes: opts.collectBytes,
       },
-      timeoutMsOverride: opts.timeoutMsOverride,
+      timeoutMsOverride: (() => {
+        if (Number.isFinite(opts.timeoutMsOverride as any)) return opts.timeoutMsOverride as any;
+        const v = Number(process.env.JIO_TIMEOUT_MS || "");
+        return Number.isFinite(v) && v > 0 ? Math.floor(v) : undefined;
+      })(),
       env: { cleanEnv: opts.cleanEnv, passEnv: opts.passEnv, setEnv: opts.setEnv },
     })) {
       if (ev.type === "data") {
@@ -374,7 +379,7 @@ export async function main(argv: string[]): Promise<number | void> {
           } catch {}
         }
       } else if (ev.type === "error") {
-        exitViaError = 1;
+        exitViaError = toExitCodeFromAny((ev as any).error);
       }
     }
     return exitViaError ?? 0;
@@ -400,7 +405,11 @@ export async function main(argv: string[]): Promise<number | void> {
           collectItems: opts.collectLimit,
           collectBytes: opts.collectBytes,
         },
-        timeoutMsOverride: opts.timeoutMsOverride,
+        timeoutMsOverride: (() => {
+          if (Number.isFinite(opts.timeoutMsOverride as any)) return opts.timeoutMsOverride as any;
+          const v = Number(process.env.JIO_TIMEOUT_MS || "");
+          return Number.isFinite(v) && v > 0 ? Math.floor(v) : undefined;
+        })(),
         env: { cleanEnv: opts.cleanEnv, passEnv: opts.passEnv, setEnv: opts.setEnv },
       })) {
         if (ev.type === "final") {
@@ -408,7 +417,7 @@ export async function main(argv: string[]): Promise<number | void> {
             (process.stdout as any).write(JSON.stringify(ev.result));
           } catch {}
         } else if (ev.type === "error") {
-          exitViaError = 1;
+          exitViaError = toExitCodeFromAny((ev as any).error);
         }
       }
       return exitViaError ?? 0;
@@ -454,7 +463,11 @@ export async function main(argv: string[]): Promise<number | void> {
         collectItems: opts.collectLimit,
         collectBytes: opts.collectBytes,
       },
-      timeoutMsOverride: opts.timeoutMsOverride,
+      timeoutMsOverride: (() => {
+        if (Number.isFinite(opts.timeoutMsOverride as any)) return opts.timeoutMsOverride as any;
+        const v = Number(process.env.JIO_TIMEOUT_MS || "");
+        return Number.isFinite(v) && v > 0 ? Math.floor(v) : undefined;
+      })(),
       env: { cleanEnv: opts.cleanEnv, passEnv: opts.passEnv, setEnv: opts.setEnv },
     })) {
       if (ev.type === "data") {
@@ -472,7 +485,7 @@ export async function main(argv: string[]): Promise<number | void> {
           } catch {}
         }
       } else if (ev.type === "error") {
-        exitViaError = 1;
+        exitViaError = toExitCodeFromAny((ev as any).error);
       }
     }
     return exitViaError ?? 0;

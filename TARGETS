@@ -225,6 +225,36 @@ zx_test(
 )
 
 zx_test(
+    name = "jio_mcp_cli_error_precedence",
+    script = "tools/tests/jio.mcp.cli.error-precedence.test.ts",
+    out = "jio_mcp_cli_error_precedence.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_cli_invalid_json_maps_65",
+    script = "tools/tests/jio.mcp.cli.invalid-json-maps-65.test.ts",
+    out = "jio_mcp_cli_invalid_json_maps_65.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_cli_timeout_maps_124",
+    script = "tools/tests/jio.mcp.cli.timeout-maps-124.test.ts",
+    out = "jio_mcp_cli_timeout_maps_124.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_cli_config_maps_78",
+    script = "tools/tests/jio.mcp.cli.config-maps-78.test.ts",
+    out = "jio_mcp_cli_config_maps_78.stamp",
+)
+
+zx_test(
+    name = "jio_mcp_parity_error_mapping",
+    script = "tools/tests/jio.mcp.parity.error-mapping.test.ts",
+    out = "jio_mcp_parity_error_mapping.stamp",
+)
+
+zx_test(
     name = "jio_mcp_stdio_invoke_ndjson",
     script = "tools/tests/jio.mcp.stdio.invoke-ndjson.test.ts",
     out = "jio_mcp_stdio_invoke_ndjson.stamp",

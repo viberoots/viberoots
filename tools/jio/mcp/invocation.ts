@@ -1,15 +1,16 @@
 import { PassThrough, Writable } from "node:stream";
 import { buildArgv, runWithTransforms } from "../core/index.ts";
 import { ELICIT_KEY, isControl, isElicit, sanitizeControlString } from "./elicitation.ts";
-import { createSpecFailureSink } from "./sink.ts";
+import { classifyError, type TaxonomyError } from "./errors.ts";
 import type { FailureSink, FailureSinkFactory } from "./sink.ts";
+import { createSpecFailureSink } from "./sink.ts";
 
 export type InvocationEvent =
   | { type: "progress"; message?: string; progress?: number }
   | { type: "data"; item: any }
   | { type: "control"; elicit: any }
   | { type: "final"; result: any }
-  | { type: "error"; error: { type: string; message: string; data?: any } };
+  | { type: "error"; error: TaxonomyError };
 
 export interface InvocationContext {
   dir: string;
@@ -58,7 +59,12 @@ export async function* runInvocation(
   const errStream = new PassThrough();
   const inStream = new PassThrough();
   let errTxt = "";
-  errStream.on("data", (b) => (errTxt += Buffer.from(b as any).toString("utf8")));
+  let sawTimeout = false;
+  errStream.on("data", (b) => {
+    const t = Buffer.from(b as any).toString("utf8");
+    errTxt += t;
+    if (/timeout/i.test(t) || /premature close/i.test(t)) sawTimeout = true;
+  });
   // Prepare stdin enforcement (optional)
   let stdinParseFailed = false;
   let stdinLimitExceeded = false;
@@ -509,43 +515,48 @@ export async function* runInvocation(
     }
   })();
 
-  const code = await runWithTransforms(
-    dir,
-    ctx.specPath,
-    specForRun,
-    buildArgv(spec as any, opts.args ?? {}),
-    cfg as any,
-    opts.args ?? {},
-    {
-      collect: !firstRunNdjson,
-      collectLimit: opts.limits?.collectItems,
-      limits: {
-        collectItems: opts.limits?.collectItems,
-        collectBytes: opts.limits?.collectBytes,
-        maxArgvTokens: opts.limits?.maxArgvTokens,
-        maxArgvBytes: opts.limits?.maxArgvBytes,
-        maxStdinBytes: opts.limits?.maxStdinBytes,
-        maxStdoutJsonBytes: opts.limits?.maxStdoutJsonBytes,
-        maxNdjsonLineBytes: opts.limits?.maxNdjsonLineBytes,
-      },
-      timeoutMsOverride: opts.timeoutMsOverride,
-      cleanEnv: opts.env?.cleanEnv !== false,
-      passEnv: opts.env?.passEnv || [],
-      setEnv: opts.env?.setEnv || {},
-      stdoutTarget: firstRunNdjson ? (ndjsonSink as any) : (outStream as any),
-      stderrTarget: errStream as any,
-      inputSource: inStream as any,
-      isCancelled: () => (opts.isCancelled ? !!opts.isCancelled() : false),
-      onProgress:
-        opts.onProgress && process.env.JIO_MCP_PROGRESS !== "0"
-          ? (info: { items?: number; bytes?: number; message?: string; progress?: number }) => {
-              try {
-                opts.onProgress?.({ message: info.message, progress: info.progress });
-              } catch {}
-            }
-          : undefined,
-    } as any,
-  );
+  let code: number | undefined;
+  try {
+    code = await runWithTransforms(
+      dir,
+      ctx.specPath,
+      specForRun,
+      buildArgv(spec as any, opts.args ?? {}),
+      cfg as any,
+      opts.args ?? {},
+      {
+        collect: !firstRunNdjson,
+        collectLimit: opts.limits?.collectItems,
+        limits: {
+          collectItems: opts.limits?.collectItems,
+          collectBytes: opts.limits?.collectBytes,
+          maxArgvTokens: opts.limits?.maxArgvTokens,
+          maxArgvBytes: opts.limits?.maxArgvBytes,
+          maxStdinBytes: opts.limits?.maxStdinBytes,
+          maxStdoutJsonBytes: opts.limits?.maxStdoutJsonBytes,
+          maxNdjsonLineBytes: opts.limits?.maxNdjsonLineBytes,
+        },
+        timeoutMsOverride: opts.timeoutMsOverride,
+        cleanEnv: opts.env?.cleanEnv !== false,
+        passEnv: opts.env?.passEnv || [],
+        setEnv: opts.env?.setEnv || {},
+        stdoutTarget: firstRunNdjson ? (ndjsonSink as any) : (outStream as any),
+        stderrTarget: errStream as any,
+        inputSource: inStream as any,
+        isCancelled: () => (opts.isCancelled ? !!opts.isCancelled() : false),
+        onProgress:
+          opts.onProgress && process.env.JIO_MCP_PROGRESS !== "0"
+            ? (info: { items?: number; bytes?: number; message?: string; progress?: number }) => {
+                try {
+                  opts.onProgress?.({ message: info.message, progress: info.progress });
+                } catch {}
+              }
+            : undefined,
+      } as any,
+    );
+  } catch (e: any) {
+    return yield { type: "error", error: classifyError(e?.message || e) };
+  }
 
   try {
     process.stderr.write(
@@ -570,13 +581,13 @@ export async function* runInvocation(
     if (stdinEnforceDone) await stdinEnforceDone;
   } catch {}
   if (stdinLimitExceeded) {
-    return yield { type: "error", error: { type: "Error", message: "stdin bytes limit exceeded" } };
+    return yield { type: "error", error: classifyError("stdin bytes limit exceeded") };
   }
   if (stdinParseFailed) {
     try {
       await sink?.write?.({ reason: "stdin", object: "", message: "invalid JSON document" });
     } catch {}
-    return yield { type: "error", error: { type: "InvalidInput", message: "invalid stdin" } };
+    return yield { type: "error", error: classifyError("invalid stdin") };
   }
 
   if (firstRunNdjson) {
@@ -715,6 +726,13 @@ export async function* runInvocation(
           } catch {}
         }
       }
+      // If the first run indicated a timeout, surface it rather than attempting a second run
+      try {
+        const et = (errTxt || "").toLowerCase();
+        if (et.includes("timeout")) {
+          return yield { type: "error", error: classifyError("timeout") };
+        }
+      } catch {}
       // Emit any seen items as data events for symmetry
       for (const it of streamedItems) {
         yield { type: "data", item: it };
@@ -723,7 +741,8 @@ export async function* runInvocation(
         const out2 = new PassThrough();
         const err2 = new PassThrough();
         let outTxt2 = "";
-        err2.on("data", () => void 0);
+        let errTxt2 = "";
+        err2.on("data", (b) => (errTxt2 += Buffer.from(b as any).toString("utf8")));
         out2.on("data", (b) => (outTxt2 += Buffer.from(b as any).toString("utf8")));
         const code2 = await runWithTransforms(
           dir,
@@ -754,24 +773,54 @@ export async function* runInvocation(
             isCancelled: () => (opts.isCancelled ? !!opts.isCancelled() : false),
           } as any,
         );
-        if (code2 && code2 !== 0)
-          return yield { type: "error", error: { type: "Error", message: `exit ${code2}` } };
+        if (code2 && code2 !== 0) {
+          if (code2 === 65)
+            return yield {
+              type: "error",
+              error: {
+                kind: "InvalidJson",
+                message: errTxt2 || `exit ${code2}`,
+                data: { exitCode: code2 },
+              },
+            } as any;
+          if (code2 === 78)
+            return yield {
+              type: "error",
+              error: {
+                kind: "ConfigError",
+                message: errTxt2 || `exit ${code2}`,
+                data: { exitCode: code2 },
+              },
+            } as any;
+          if (code2 === 124)
+            return yield {
+              type: "error",
+              error: {
+                kind: "Timeout",
+                message: errTxt2 || `exit ${code2}`,
+                data: { exitCode: code2 },
+              },
+            } as any;
+          return yield { type: "error", error: classifyError(errTxt2 || `exit ${code2}`) };
+        }
         const obj2 = outTxt2 ? JSON.parse(outTxt2) : null;
         if (!ignoreCtl && obj2 && typeof obj2 === "object" && isElicit(obj2)) {
           return yield { type: "control", elicit: (obj2 as any)[ELICIT_KEY] };
         }
+        if (sawTimeout)
+          return yield {
+            type: "error",
+            error: { kind: "Timeout", message: errTxt || "timeout" },
+          } as any;
         yield { type: "final", result: obj2 };
       } catch {
-        yield { type: "error", error: { type: "InvalidJSON", message: "invalid JSON output" } };
+        yield { type: "error", error: classifyError("invalid JSON output") };
       }
       return;
     }
     // True NDJSON tool: emit items and optional aggregate
     if (code && code !== 0) {
-      return yield {
-        type: "error",
-        error: { type: "Error", message: errTxt || `exit ${code}` },
-      };
+      return yield { type: "error", error: classifyError(errTxt || `exit ${code}`) };
     }
     for (const it of streamedItems) {
       yield { type: "data", item: it };
@@ -792,19 +841,18 @@ export async function* runInvocation(
   try {
     const obj = outTxt ? JSON.parse(outTxt) : null;
     if (code && code !== 0) {
-      return yield {
-        type: "error",
-        error: { type: "Error", message: errTxt || `exit ${code}` },
-      };
+      return yield { type: "error", error: classifyError(errTxt || `exit ${code}`) };
     }
     if (!ignoreCtl && obj && typeof obj === "object" && isElicit(obj)) {
       return yield { type: "control", elicit: (obj as any)[ELICIT_KEY] };
     }
     yield { type: "final", result: obj };
   } catch {
-    yield {
-      type: "error",
-      error: { type: "InvalidJSON", message: errTxt || "invalid JSON output" },
-    };
+    const et = (errTxt || "").toLowerCase();
+    if (sawTimeout || et.includes("timeout")) {
+      yield { type: "error", error: classifyError("timeout") };
+    } else {
+      yield { type: "error", error: classifyError(errTxt || "invalid JSON output") };
+    }
   }
 }

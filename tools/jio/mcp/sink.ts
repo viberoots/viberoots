@@ -1,6 +1,5 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
-import * as fsp from "node:fs/promises";
 import { buildChildEnv } from "../runner.ts";
 
 export interface FailureSink {
