@@ -614,7 +614,7 @@ export async function* runInvocation(
     return;
   }
 
-  // JSON: parse once from outStream buffer
+  // JSON: parse once from outStream buffer with exit-code precedence
   let outTxt = "";
   try {
     outStream.on("data", (b) => (outTxt += Buffer.from(b as any).toString("utf8")));
@@ -622,6 +622,12 @@ export async function* runInvocation(
   } catch {}
   try {
     const obj = outTxt ? JSON.parse(outTxt) : null;
+    if (code && code !== 0) {
+      return yield {
+        type: "error",
+        error: { type: "Error", message: errTxt || `exit ${code}` },
+      };
+    }
     if (!ignoreCtl && obj && typeof obj === "object" && isElicit(obj)) {
       return yield { type: "control", elicit: (obj as any)[ELICIT_KEY] };
     }

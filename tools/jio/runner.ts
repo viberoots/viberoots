@@ -378,6 +378,60 @@ export async function main(argv: string[]): Promise<number | void> {
       }
     }
     return exitViaError ?? 0;
+  } else if (process.env.JIO_CLI_INVOCATION === "json") {
+    const fmt = (specNN as any)?.command?.stdoutTransform?.format;
+    const isJson = fmt === "json";
+    if (isJson) {
+      const ctx = { dir: rootDir, specPath: specPathStr, spec: specNN, cfg: rootCfg } as any;
+      let exitViaError: number | null = null;
+      for await (const ev of runInvocation(ctx, {
+        args: invObj,
+        isNdjson: false,
+        streamingFinalAggregate: false,
+        // Allow control detection for JSON tools (single control envelope before data)
+        ignoreControlMessages: false,
+        input: process.stdin,
+        limits: {
+          maxArgvTokens: opts.maxArgvTokens,
+          maxArgvBytes: opts.maxArgvBytes,
+          maxStdinBytes: opts.maxStdinBytes,
+          maxStdoutJsonBytes: opts.maxStdoutJsonBytes,
+          maxNdjsonLineBytes: opts.maxNdjsonLineBytes,
+          collectItems: opts.collectLimit,
+          collectBytes: opts.collectBytes,
+        },
+        timeoutMsOverride: opts.timeoutMsOverride,
+        env: { cleanEnv: opts.cleanEnv, passEnv: opts.passEnv, setEnv: opts.setEnv },
+      })) {
+        if (ev.type === "final") {
+          try {
+            (process.stdout as any).write(JSON.stringify(ev.result));
+          } catch {}
+        } else if (ev.type === "error") {
+          exitViaError = 1;
+        }
+      }
+      return exitViaError ?? 0;
+    }
+    // Non-JSON tools: fall back to legacy path
+    const code = await runWithTransforms(rootDir, specPathStr, specNN, argvBuilt, rootCfg, invObj, {
+      collect: !!opts.collect,
+      collectLimit: opts.collectLimit,
+      limits: {
+        maxArgvTokens: opts.maxArgvTokens,
+        maxArgvBytes: opts.maxArgvBytes,
+        maxStdinBytes: opts.maxStdinBytes,
+        maxStdoutJsonBytes: opts.maxStdoutJsonBytes,
+        maxNdjsonLineBytes: opts.maxNdjsonLineBytes,
+        collectItems: opts.collectLimit,
+        collectBytes: opts.collectBytes,
+      },
+      timeoutMsOverride: opts.timeoutMsOverride,
+      cleanEnv: opts.cleanEnv,
+      passEnv: opts.passEnv,
+      setEnv: opts.setEnv,
+    });
+    return code;
   } else {
     const code = await runWithTransforms(rootDir, specPathStr, specNN, argvBuilt, rootCfg, invObj, {
       collect: !!opts.collect,
