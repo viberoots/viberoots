@@ -38,6 +38,7 @@ export interface InvocationOptions {
   onProgress?: (info: { message?: string; progress?: number }) => void;
   onItem?: (item: any) => void;
   input?: NodeJS.ReadableStream;
+  stdinTransform?: "json" | "ndjson";
 }
 
 // sanitizeControlLine now delegates to the centralized function
@@ -54,11 +55,131 @@ export async function* runInvocation(
   const inStream = new PassThrough();
   let errTxt = "";
   errStream.on("data", (b) => (errTxt += Buffer.from(b as any).toString("utf8")));
-  // If caller provided an input stream (e.g., CLI process.stdin), forward into inStream
+  // Prepare stdin enforcement (optional)
+  let stdinParseFailed = false;
+  let stdinLimitExceeded = false;
+  const effectiveStdinFmt: "json" | "ndjson" | undefined = (() => {
+    try {
+      return (
+        (opts.stdinTransform as any) || ((spec?.command as any)?.stdinTransform?.format as any)
+      );
+    } catch {
+      return opts.stdinTransform as any;
+    }
+  })();
+  const stdinSource: NodeJS.ReadableStream = opts.input || (process.stdin as any);
+  let stdinEnforceDone: Promise<void> | null = null;
+  const writeWithDrain = async (w: NodeJS.WritableStream, data: string | Buffer) => {
+    const ok = w.write(data);
+    if (!ok) await new Promise<void>((res) => w.once("drain", res));
+  };
+  const startEnforceNdjson = () => {
+    stdinEnforceDone = (async () => {
+      let total = 0;
+      let sawFirst = false;
+      let buf = "";
+      for await (const chunk of stdinSource as any) {
+        const part = Buffer.from(chunk as any).toString("utf8");
+        total += Buffer.byteLength(part);
+        if (opts.limits?.maxStdinBytes && total > (opts.limits.maxStdinBytes as number)) {
+          try {
+            process.stderr.write("jio: stdin bytes limit exceeded\n");
+          } catch {}
+          stdinLimitExceeded = true;
+          break;
+        }
+        buf += part;
+        while (true) {
+          const nl = buf.indexOf("\n");
+          if (nl < 0) break;
+          let line = buf.slice(0, nl);
+          buf = buf.slice(nl + 1);
+          let s = String(line);
+          if (s.trim() === "") continue;
+          if (!sawFirst) {
+            sawFirst = true;
+            if (s.charCodeAt(0) === 0xfeff) s = s.slice(1);
+          }
+          if (s.endsWith("\r")) s = s.slice(0, -1);
+          try {
+            JSON.parse(s);
+          } catch {
+            try {
+              process.stderr.write("jio: stdinTransform emitted non-JSON line\n");
+            } catch {}
+            stdinParseFailed = true;
+            buf = ""; // drop remaining
+            break;
+          }
+          await writeWithDrain(inStream, s + "\n");
+        }
+        if (stdinParseFailed || stdinLimitExceeded) break;
+      }
+      // drain trailing
+      const trailing = buf.trim();
+      if (!stdinParseFailed && !stdinLimitExceeded && trailing) {
+        let s = trailing;
+        if (!sawFirst && s.charCodeAt(0) === 0xfeff) s = s.slice(1);
+        if (s.endsWith("\r")) s = s.slice(0, -1);
+        try {
+          JSON.parse(s);
+          await writeWithDrain(inStream, s + "\n");
+        } catch {
+          try {
+            process.stderr.write("jio: stdinTransform emitted non-JSON line\n");
+          } catch {}
+          stdinParseFailed = true;
+        }
+      }
+      try {
+        inStream.end();
+      } catch {}
+    })();
+  };
+  const startEnforceJson = () => {
+    stdinEnforceDone = (async () => {
+      const chunks: Buffer[] = [];
+      let total = 0;
+      for await (const chunk of stdinSource as any) {
+        const c = Buffer.from(chunk as any);
+        total += c.length;
+        if (opts.limits?.maxStdinBytes && total > (opts.limits.maxStdinBytes as number)) {
+          try {
+            process.stderr.write("jio: stdin bytes limit exceeded (json)\n");
+          } catch {}
+          stdinLimitExceeded = true;
+          break;
+        }
+        chunks.push(c);
+      }
+      if (!stdinLimitExceeded) {
+        let buf = Buffer.concat(chunks).toString("utf8");
+        if (buf && buf.charCodeAt(0) === 0xfeff) buf = buf.slice(1);
+        const trimmed = buf.replace(/^\s+|\s+$/g, "");
+        try {
+          if (trimmed) JSON.parse(trimmed);
+          await writeWithDrain(inStream, trimmed);
+        } catch {
+          try {
+            process.stderr.write("jio: stdinTransform did not emit valid JSON\n");
+          } catch {}
+          stdinParseFailed = true;
+        }
+      }
+      try {
+        inStream.end();
+      } catch {}
+    })();
+  };
   try {
-    if (opts.input) {
-      opts.input.on("error", () => void 0);
-      opts.input.pipe(inStream);
+    if (effectiveStdinFmt === "ndjson") startEnforceNdjson();
+    else if (effectiveStdinFmt === "json") startEnforceJson();
+    else {
+      // No transform: direct pipe
+      if (opts.input) {
+        opts.input.on("error", () => void 0);
+        opts.input.pipe(inStream);
+      }
     }
   } catch {}
 
@@ -340,6 +461,8 @@ export async function* runInvocation(
         tool: { ...(spec.tool || {}), outputSchema: undefined },
         command: {
           ...(spec.command || {}),
+          // Remove stdinTransform when enforcing at this layer
+          stdinTransform: effectiveStdinFmt ? undefined : (spec as any)?.command?.stdinTransform,
           stdoutTransform:
             origFmt === "json" &&
             !ignoreCtl &&
@@ -408,6 +531,17 @@ export async function* runInvocation(
   // If we saw control, emit control and return
   if (!ignoreCtl && sawCtl && ctlPayload) {
     return yield { type: "control", elicit: ctlPayload };
+  }
+
+  // Check stdin enforcement results (if any)
+  try {
+    if (stdinEnforceDone) await stdinEnforceDone;
+  } catch {}
+  if (stdinLimitExceeded) {
+    return yield { type: "error", error: { type: "Error", message: "stdin bytes limit exceeded" } };
+  }
+  if (stdinParseFailed) {
+    return yield { type: "error", error: { type: "InvalidInput", message: "invalid stdin" } };
   }
 
   if (firstRunNdjson) {

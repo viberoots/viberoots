@@ -432,6 +432,50 @@ export async function main(argv: string[]): Promise<number | void> {
       setEnv: opts.setEnv,
     });
     return code;
+  } else if (process.env.JIO_CLI_INVOCATION === "stdin") {
+    const isNdjson = (specNN as any)?.command?.stdoutTransform?.format === "ndjson";
+    const streamingAgg = !!opts.collect;
+    const ctx = { dir: rootDir, specPath: specPathStr, spec: specNN, cfg: rootCfg } as any;
+    const stdinFmt = ((specNN as any)?.command?.stdinTransform?.format as any) || undefined;
+    let exitViaError: number | null = null;
+    for await (const ev of runInvocation(ctx, {
+      args: invObj,
+      isNdjson,
+      streamingFinalAggregate: streamingAgg,
+      ignoreControlMessages: true,
+      input: process.stdin,
+      stdinTransform: stdinFmt,
+      limits: {
+        maxArgvTokens: opts.maxArgvTokens,
+        maxArgvBytes: opts.maxArgvBytes,
+        maxStdinBytes: opts.maxStdinBytes,
+        maxStdoutJsonBytes: opts.maxStdoutJsonBytes,
+        maxNdjsonLineBytes: opts.maxNdjsonLineBytes,
+        collectItems: opts.collectLimit,
+        collectBytes: opts.collectBytes,
+      },
+      timeoutMsOverride: opts.timeoutMsOverride,
+      env: { cleanEnv: opts.cleanEnv, passEnv: opts.passEnv, setEnv: opts.setEnv },
+    })) {
+      if (ev.type === "data") {
+        try {
+          (process.stdout as any).write(JSON.stringify(ev.item) + "\n");
+        } catch {}
+      } else if (ev.type === "final") {
+        if (isNdjson && streamingAgg) {
+          try {
+            (process.stdout as any).write(JSON.stringify(ev.result) + "\n");
+          } catch {}
+        } else if (!isNdjson) {
+          try {
+            (process.stdout as any).write(JSON.stringify(ev.result));
+          } catch {}
+        }
+      } else if (ev.type === "error") {
+        exitViaError = 1;
+      }
+    }
+    return exitViaError ?? 0;
   } else {
     const code = await runWithTransforms(rootDir, specPathStr, specNN, argvBuilt, rootCfg, invObj, {
       collect: !!opts.collect,
