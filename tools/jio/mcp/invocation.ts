@@ -36,6 +36,8 @@ export interface InvocationOptions {
   ignoreControlMessages?: boolean;
   limits?: InvocationLimits;
   timeoutMsOverride?: number;
+  idleTimeoutMs?: number;
+  cancelGraceMs?: number;
   env?: { cleanEnv?: boolean; passEnv?: string[]; setEnv?: Record<string, string> };
   isCancelled?: () => boolean;
   onProgress?: (info: { message?: string; progress?: number }) => void;
@@ -60,10 +62,33 @@ export async function* runInvocation(
   const inStream = new PassThrough();
   let errTxt = "";
   let sawTimeout = false;
+  // Idle watchdog (PR10)
+  let __idleTimer: NodeJS.Timeout | null = null;
+  let __idleFired = false;
+  const __armIdle = (where: string) => {
+    try {
+      if (__idleTimer) clearTimeout(__idleTimer as any);
+      const raw = opts.idleTimeoutMs ?? Number(process.env.JIO_IDLE_TIMEOUT_MS || "");
+      const ms =
+        Number.isFinite(raw as number) && (raw as number) > 0 ? Math.floor(raw as number) : 0;
+      if (ms > 0) {
+        __idleTimer = setTimeout(() => {
+          __idleFired = true;
+          try {
+            if (process.env.TEST_CAPTURE_LOGS === "1")
+              process.stderr.write(JSON.stringify({ type: "INV_IDLE", where, ms }) + "\n");
+          } catch {}
+        }, ms);
+        (__idleTimer as any)?.unref?.();
+      }
+    } catch {}
+  };
+  __armIdle("start");
   errStream.on("data", (b) => {
     const t = Buffer.from(b as any).toString("utf8");
     errTxt += t;
     if (/timeout/i.test(t) || /premature close/i.test(t)) sawTimeout = true;
+    __armIdle("stderr");
   });
   // Prepare stdin enforcement (optional)
   let stdinParseFailed = false;
@@ -220,6 +245,7 @@ export async function* runInvocation(
         const part = Buffer.from(chunk as any).toString("utf8");
         outRawFirstRun += part;
         lineBuf += part;
+        __armIdle("stdout");
         while (true) {
           const nl = lineBuf.indexOf("\n");
           if (nl < 0) break;
@@ -543,13 +569,14 @@ export async function* runInvocation(
         stdoutTarget: firstRunNdjson ? (ndjsonSink as any) : (outStream as any),
         stderrTarget: errStream as any,
         inputSource: inStream as any,
-        isCancelled: () => (opts.isCancelled ? !!opts.isCancelled() : false),
+        isCancelled: () => __idleFired || (opts.isCancelled ? !!opts.isCancelled() : false),
         onProgress:
           opts.onProgress && process.env.JIO_MCP_PROGRESS !== "0"
             ? (info: { items?: number; bytes?: number; message?: string; progress?: number }) => {
                 try {
                   opts.onProgress?.({ message: info.message, progress: info.progress });
                 } catch {}
+                __armIdle("progress");
               }
             : undefined,
       } as any,
@@ -557,6 +584,11 @@ export async function* runInvocation(
   } catch (e: any) {
     return yield { type: "error", error: classifyError(e?.message || e) };
   }
+
+  // Stop idle timer after primary run returns control
+  try {
+    if (__idleTimer) clearTimeout(__idleTimer as any);
+  } catch {}
 
   try {
     process.stderr.write(
@@ -570,6 +602,11 @@ export async function* runInvocation(
       }) + "\n",
     );
   } catch {}
+
+  // If idle watchdog fired, surface timeout uniformly
+  if (__idleFired) {
+    return yield { type: "error", error: classifyError("timeout") };
+  }
 
   // If we saw control, emit control and return
   if (!ignoreCtl && sawCtl && ctlPayload) {
@@ -820,6 +857,29 @@ export async function* runInvocation(
     }
     // True NDJSON tool: emit items and optional aggregate
     if (code && code !== 0) {
+      if (code === 65)
+        return yield {
+          type: "error",
+          error: {
+            kind: "InvalidJson",
+            message: errTxt || `exit ${code}`,
+            data: { exitCode: code },
+          },
+        } as any;
+      if (code === 78)
+        return yield {
+          type: "error",
+          error: {
+            kind: "ConfigError",
+            message: errTxt || `exit ${code}`,
+            data: { exitCode: code },
+          },
+        } as any;
+      if (code === 124)
+        return yield {
+          type: "error",
+          error: { kind: "Timeout", message: errTxt || `exit ${code}`, data: { exitCode: code } },
+        } as any;
       return yield { type: "error", error: classifyError(errTxt || `exit ${code}`) };
     }
     for (const it of streamedItems) {

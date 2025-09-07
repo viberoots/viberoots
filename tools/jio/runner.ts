@@ -366,7 +366,24 @@ export async function main(argv: string[]): Promise<number | void> {
         const v = Number(process.env.JIO_TIMEOUT_MS || "");
         return Number.isFinite(v) && v > 0 ? Math.floor(v) : undefined;
       })(),
+      idleTimeoutMs: (() => {
+        const v = Number(process.env.JIO_IDLE_TIMEOUT_MS || "");
+        return Number.isFinite(v) && v > 0 ? Math.floor(v) : undefined;
+      })(),
       env: { cleanEnv: opts.cleanEnv, passEnv: opts.passEnv, setEnv: opts.setEnv },
+      onProgress:
+        process.env.JIO_CLI_PROGRESS === "1"
+          ? (info: { message?: string; progress?: number }) => {
+              try {
+                const msg = info.message ? ` ${info.message}` : "";
+                const pct =
+                  typeof info.progress === "number" && Number.isFinite(info.progress)
+                    ? ` ${(Math.max(0, Math.min(1, info.progress)) * 100).toFixed(0)}%`
+                    : "";
+                (process.stderr as any).write(`jio: progress${pct}${msg}\n`);
+              } catch {}
+            }
+          : undefined,
     })) {
       if (ev.type === "data") {
         try {
@@ -410,7 +427,24 @@ export async function main(argv: string[]): Promise<number | void> {
           const v = Number(process.env.JIO_TIMEOUT_MS || "");
           return Number.isFinite(v) && v > 0 ? Math.floor(v) : undefined;
         })(),
+        idleTimeoutMs: (() => {
+          const v = Number(process.env.JIO_IDLE_TIMEOUT_MS || "");
+          return Number.isFinite(v) && v > 0 ? Math.floor(v) : undefined;
+        })(),
         env: { cleanEnv: opts.cleanEnv, passEnv: opts.passEnv, setEnv: opts.setEnv },
+        onProgress:
+          process.env.JIO_CLI_PROGRESS === "1"
+            ? (info: { message?: string; progress?: number }) => {
+                try {
+                  const msg = info.message ? ` ${info.message}` : "";
+                  const pct =
+                    typeof info.progress === "number" && Number.isFinite(info.progress)
+                      ? ` ${(Math.max(0, Math.min(1, info.progress)) * 100).toFixed(0)}%`
+                      : "";
+                  (process.stderr as any).write(`jio: progress${pct}${msg}\n`);
+                } catch {}
+              }
+            : undefined,
       })) {
         if (ev.type === "final") {
           try {
@@ -468,7 +502,24 @@ export async function main(argv: string[]): Promise<number | void> {
         const v = Number(process.env.JIO_TIMEOUT_MS || "");
         return Number.isFinite(v) && v > 0 ? Math.floor(v) : undefined;
       })(),
+      idleTimeoutMs: (() => {
+        const v = Number(process.env.JIO_IDLE_TIMEOUT_MS || "");
+        return Number.isFinite(v) && v > 0 ? Math.floor(v) : undefined;
+      })(),
       env: { cleanEnv: opts.cleanEnv, passEnv: opts.passEnv, setEnv: opts.setEnv },
+      onProgress:
+        process.env.JIO_CLI_PROGRESS === "1"
+          ? (info: { message?: string; progress?: number }) => {
+              try {
+                const msg = info.message ? ` ${info.message}` : "";
+                const pct =
+                  typeof info.progress === "number" && Number.isFinite(info.progress)
+                    ? ` ${(Math.max(0, Math.min(1, info.progress)) * 100).toFixed(0)}%`
+                    : "";
+                (process.stderr as any).write(`jio: progress${pct}${msg}\n`);
+              } catch {}
+            }
+          : undefined,
     })) {
       if (ev.type === "data") {
         try {

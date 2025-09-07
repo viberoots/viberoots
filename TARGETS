@@ -977,3 +977,9 @@ zx_test(
     script = "tools/tests/jio.mcp.stdio.elicit-requestedSchema-invalid.test.ts",
     out = "jio_mcp_stdio_elicit_requestedSchema_invalid.stamp",
 )
+
+zx_test(
+    name = "jio_mcp_cli_progress_and_cancel_behavior",
+    script = "tools/tests/jio.mcp.cli.progress-and-cancel.behavior.test.ts",
+    out = "jio_mcp_cli_progress_and_cancel_behavior.stamp",
+)
