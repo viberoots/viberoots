@@ -25,7 +25,6 @@ third_party/providers/TARGETS.auto
 third_party/providers/TARGETS.node.auto
 third_party/providers/auto_map.bzl
 tools/buck/graph.json
-tools/jio/schema/types.ts
 
 # Test coverage and reports
 coverage/

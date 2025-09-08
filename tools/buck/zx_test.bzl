@@ -13,16 +13,12 @@ def _zx_test_impl(ctx):
             # so tools like secretspec/copier are on PATH without per-temp flake eval
             + "if ! command -v secretspec >/dev/null 2>&1 || ! command -v copier >/dev/null 2>&1; then if command -v direnv >/dev/null 2>&1; then eval \"$(direnv export bash)\"; fi; fi; "
             # Skip direnv in temp repos by default; specific tests can override
-            + "export JIO_SKIP_DIRENV=\"${JIO_SKIP_DIRENV:-1}\"; "
-            + "unset IN_NIX_SHELL; "
             # Provide a sane default per-test timeout for debugging runs unless overridden
-            + "if [ -z \"$TEST_NODE_OPTIONS\" ]; then export TEST_NODE_OPTIONS=\"--test-timeout=300000\"; fi; "
+            + "if [ -z \"$TEST_NODE_OPTIONS\" ]; then export TEST_NODE_OPTIONS=\"--test-timeout=120000\"; fi; "
             + "if [ -n \"$NODE_V8_COVERAGE\" ]; then mkdir -p \"$NODE_V8_COVERAGE\"; "
             + "ls -1t \"$NODE_V8_COVERAGE\"/coverage-*.json 2>/dev/null | tail -n +201 | xargs -r rm -f || true; fi; "
             # Keep NODE_OPTIONS untouched; pass test flags on CLI instead
             + "export NODE_OPTIONS=\"$NODE_OPTIONS\"; "
-            # Generate TS types from schema before running tests (write into workspace, gitignored)
-            + "\"$NODE_BIN\" --experimental-strip-types --import \"$WORKSPACE_ROOT/tools/dev/zx-init.mjs\" \"$WORKSPACE_ROOT/tools/jio/schema/gen-types.ts\" \"$WORKSPACE_ROOT/tools/jio/schema/types.ts\" >/dev/null 2>&1 || true; "
             + "SAFE=$(printf %%s \"$BUCK_TEST_TARGET\" | sed -E 's|^.*/:||; s/[^A-Za-z0-9._-]+/_/g' | cut -c1-200); "
             + "LOGDIR=\"$TEST_LOG_DIR/$SAFE\"; mkdir -p \"$LOGDIR\"; "
             + "rm -f \"$LOGDIR/test.stdout.log\" \"$LOGDIR/test.stderr.log\" 2>/dev/null || true; "

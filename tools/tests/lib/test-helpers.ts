@@ -114,10 +114,12 @@ export async function runInTemp<T>(
       return false;
     }
   }
-  const skipDirenv = process.env.JIO_SKIP_DIRENV === "1";
-  let shouldUseDirenv = !process.env.IN_NIX_SHELL && !skipDirenv;
+  let shouldUseDirenv = true;
   try {
-    if (await isOnPath("secretspec")) {
+    // if direnv is already loaded, skip direnv
+    const direnvStatus = await $({ stdio: "pipe" })`direnv status --json`;
+    const direnvStatusJson = JSON.parse(direnvStatus.stdout);
+    if (direnvStatusJson.config.loadadRC != null) {
       shouldUseDirenv = false;
     }
   } catch {}
@@ -160,9 +162,6 @@ export async function runInTemp<T>(
   const _$ = $({ cwd: tmp, env: exportEnv });
   try {
     if (process.env.TEST_KEEP_TMP === "1") {
-      // Enable runner debug to a file inside the tmp to survive stdout suppression
-      exportEnv.JIO_DEBUG = "1";
-      exportEnv.JIO_DEBUG_FILE = path.join(tmp, "jio.runner.log");
       try {
         console.error(`KEEP_TMP ${tmp}`);
         await fsp

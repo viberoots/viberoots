@@ -6,7 +6,6 @@ import { runInTemp } from "./lib/test-helpers";
 
 test("meta: empty usage fails", async () => {
   await runInTemp("tmpl-validate-fail2", async (tmp, _$) => {
-    process.env.JSON_CLI_SKIP_DIRENV = "1";
     const $ = _$({ stdio: "ignore" });
     const metaPath = path.join(tmp, "tools", "scaffolding", "templates", "go", "lib", "meta.json");
     const meta = JSON.parse(await fsp.readFile(metaPath, "utf8"));

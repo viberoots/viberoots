@@ -1,9 +1,0 @@
-{
-  "id": "io.example.examples.sample-text",
-  "name": "Sample text resource",
-  "description": "A simple example resource served by the JIO MCP server",
-  "file": "./sample-resource.md",
-  "mimeType": "text/markdown",
-  "etag": "auto",
-  "cacheControl": "no-cache"
-}

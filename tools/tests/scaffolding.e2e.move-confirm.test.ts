@@ -4,7 +4,6 @@ import { runInTemp } from "./lib/test-helpers";
 
 test("move requires confirmation unless --yes", async () => {
   await runInTemp("scaf-move-confirm", async (_tmp, _$) => {
-    process.env.JSON_CLI_SKIP_DIRENV = "1";
     const $ = _$({ stdio: "ignore" });
     const pipe$ = _$({ stdio: "pipe" });
     await $`scaf new go lib demo-lib`;

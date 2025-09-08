@@ -6,7 +6,6 @@ import { runInTemp } from "./lib/test-helpers";
 
 test("move, update, delete and ls reflects state", async () => {
   await runInTemp("scaf-e2e", async (_tmp, _$) => {
-    process.env.JSON_CLI_SKIP_DIRENV = "1";
     const $ = _$({ stdio: "ignore" });
     const pipe$ = _$({ stdio: "pipe" });
     await $`scaf new go lib demo-lib`;

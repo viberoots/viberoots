@@ -4,7 +4,6 @@ import { runInTemp } from "./lib/test-helpers";
 
 test("new overwrite guard requires --yes or supports --dry-run", async () => {
   await runInTemp("scaf-overwrite-guard", async (_tmp, _$) => {
-    process.env.JSON_CLI_SKIP_DIRENV = "1";
     const $ = _$({ stdio: "ignore" });
     const pipe$ = _$({ stdio: "pipe" });
     await $`scaf new go lib demo-lib`;
