@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
-import { runInTemp } from "./lib/test-helpers";
+import { runInTemp } from "../lib/test-helpers";
 
 test("templates --json includes variables per template", async () => {
   await runInTemp("scaf-templates-json", async (_tmp, _$) => {

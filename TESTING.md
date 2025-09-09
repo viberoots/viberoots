@@ -12,12 +12,12 @@ buck2 test //...
 
 ## Runs with coverage
 
-Enable coverage explicitly using `COVERAGE=1`.
+Enable coverage explicitly by passing `COVERAGE=1` through Buck2's test executor arguments.
 
 - Run all tests with coverage and generate reports in `coverage/`:
 
 ```
-COVERAGE=1 buck2 test //...
+buck2 test //... -- --env COVERAGE=1
 ```
 
 - Print a summary to the console (after a covered run):
@@ -63,5 +63,5 @@ buck2 test $(buck2 targets //:scaffolding_* | tr '\n' ' ')
 - Enable coverage for those runs as needed:
 
 ```
-COVERAGE=1 buck2 test //:scaffolding_help
+buck2 test //:scaffolding_help -- --env COVERAGE=1
 ```

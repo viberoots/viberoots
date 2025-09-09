@@ -1,98 +1,106 @@
 # Buck2 targets
 load("//tools/buck:zx_test.bzl", "zx_test");
 
+# Linting tests
+zx_test(
+    name = "linting",
+    script = "tools/tests/linting/linting.test.ts",
+    out = "linting.stamp",
+)
+
+# Scaffolding tests
 zx_test(
     name = "scaffolding_smoke_targets_buildfile",
-    script = "tools/tests/scaffolding.smoke.targets-buildfile.test.ts",
+    script = "tools/tests/scaffolding/smoke.targets-buildfile.test.ts",
     out = "scaffolding_smoke_targets_buildfile.stamp",
 )
 
 zx_test(
     name = "scaffolding_smoke_lib_readme",
-    script = "tools/tests/scaffolding.smoke.lib-readme.test.ts",
+    script = "tools/tests/scaffolding/smoke.lib-readme.test.ts",
     out = "scaffolding_smoke_lib_readme.stamp",
 )
 
 zx_test(
     name = "scaffolding_smoke_cli_readme",
-    script = "tools/tests/scaffolding.smoke.cli-readme.test.ts",
+    script = "tools/tests/scaffolding/smoke.cli-readme.test.ts",
     out = "scaffolding_smoke_cli_readme.stamp",
 )
 
 zx_test(
     name = "scaffolding_e2e_overwrite_guard",
-    script = "tools/tests/scaffolding.e2e.overwrite-guard.test.ts",
+    script = "tools/tests/scaffolding/e2e.overwrite-guard.test.ts",
     out = "scaffolding_e2e_overwrite_guard.stamp",
 )
 
 zx_test(
     name = "scaffolding_e2e_regen_stage",
-    script = "tools/tests/scaffolding.e2e.regen-stage.test.ts",
+    script = "tools/tests/scaffolding/e2e.regen-stage.test.ts",
     out = "scaffolding_e2e_regen_stage.stamp",
 )
 
 zx_test(
     name = "scaffolding_e2e_move_update_delete",
-    script = "tools/tests/scaffolding.e2e.move-update-delete.test.ts",
+    script = "tools/tests/scaffolding/e2e.move-update-delete.test.ts",
     out = "scaffolding_e2e_move_update_delete.stamp",
 )
 
 zx_test(
     name = "scaffolding_e2e_move_confirm",
-    script = "tools/tests/scaffolding.e2e.move-confirm.test.ts",
+    script = "tools/tests/scaffolding/e2e.move-confirm.test.ts",
     out = "scaffolding_e2e_move_confirm.stamp",
 )
 
 zx_test(
     name = "scaffolding_e2e_validate_pass",
-    script = "tools/tests/scaffolding.e2e.validate-pass.test.ts",
+    script = "tools/tests/scaffolding/e2e.validate-pass.test.ts",
     out = "scaffolding_e2e_validate_pass.stamp",
 )
 
 zx_test(
     name = "scaffolding_e2e_validate_fail1",
-    script = "tools/tests/scaffolding.e2e.validate-fail1.test.ts",
+    script = "tools/tests/scaffolding/e2e.validate-fail1.test.ts",
     out = "scaffolding_e2e_validate_fail1.stamp",
 )
 
 zx_test(
     name = "scaffolding_e2e_validate_fail2",
-    script = "tools/tests/scaffolding.e2e.validate-fail2.test.ts",
+    script = "tools/tests/scaffolding/e2e.validate-fail2.test.ts",
     out = "scaffolding_e2e_validate_fail2.stamp",
 )
 
 zx_test(
     name = "scaffolding_help_json_vars",
-    script = "tools/tests/scaffolding.help.json-vars.test.ts",
+    script = "tools/tests/scaffolding/help.json-vars.test.ts",
     out = "scaffolding_help_json_vars.stamp",
 )
 
 zx_test(
     name = "scaffolding_help_templates_json",
-    script = "tools/tests/scaffolding.help.templates-json.test.ts",
+    script = "tools/tests/scaffolding/help.templates-json.test.ts",
     out = "scaffolding_help_templates_json.stamp",
 )
 
 zx_test(
     name = "scaffolding_help_completions",
-    script = "tools/tests/scaffolding.help.completions.test.ts",
+    script = "tools/tests/scaffolding/help.completions.test.ts",
     out = "scaffolding_help_completions.stamp",
 )
 
 zx_test(
     name = "scaffolding_help_synopses",
-    script = "tools/tests/scaffolding.help.synopses.test.ts",
+    script = "tools/tests/scaffolding/help.synopses.test.ts",
     out = "scaffolding_help_synopses.stamp",
 )
 
 zx_test(
     name = "scaffolding_help_new_vars",
-    script = "tools/tests/scaffolding.help.new-vars.test.ts",
+    script = "tools/tests/scaffolding/help.new-vars.test.ts",
     out = "scaffolding_help_new_vars.stamp",
 )
 
 zx_test(
     name = "scaffolding_help_new_list",
-    script = "tools/tests/scaffolding.help.new-list.test.ts",
+    script = "tools/tests/scaffolding/help.new-list.test.ts",
     out = "scaffolding_help_new_list.stamp",
 )

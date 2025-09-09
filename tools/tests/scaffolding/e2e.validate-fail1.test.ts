@@ -2,7 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "./lib/test-helpers";
+import { runInTemp } from "../lib/test-helpers";
 
 test("meta: missing help fails", async () => {
   await runInTemp("tmpl-validate-fail1", async (tmp, _$) => {

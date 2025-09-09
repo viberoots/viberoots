@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
-import { runInTemp } from "./lib/test-helpers";
+import { runInTemp } from "../lib/test-helpers";
 
 test("move requires confirmation unless --yes", async () => {
   await runInTemp("scaf-move-confirm", async (_tmp, _$) => {

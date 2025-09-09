@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
-import { runInTemp } from "./lib/test-helpers";
+import { runInTemp } from "../lib/test-helpers";
 
 test("help --json includes variables from copier.yaml", async () => {
   await runInTemp("scaf-help-json", async (_tmp, _$) => {

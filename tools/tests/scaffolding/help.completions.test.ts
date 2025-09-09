@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
-import { runInTemp } from "./lib/test-helpers";
+import { runInTemp } from "../lib/test-helpers";
 
 test("completions emit scripts with dynamic listings", async () => {
   await runInTemp("scaf-completions", async (_tmp, _$) => {

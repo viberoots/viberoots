@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
-import { runInTemp } from "./lib/test-helpers";
+import { runInTemp } from "../lib/test-helpers";
 
 test("help new/update/regen/delete shows synopsis", async () => {
   await runInTemp("scaf-help-cmds", async (_tmp, _$) => {

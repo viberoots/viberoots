@@ -2,7 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "./lib/test-helpers";
+import { runInTemp } from "../lib/test-helpers";
 
 test("buck2 config uses TARGETS buildfile", async () => {
   await runInTemp("buck2-targets", async (tmp, _$) => {

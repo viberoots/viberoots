@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
-import { runInTemp } from "./lib/test-helpers";
+import { runInTemp } from "../lib/test-helpers";
 
 test("help new <lang> lists templates for that language", async () => {
   await runInTemp("scaf-help-new-list", async (_tmp, _$) => {

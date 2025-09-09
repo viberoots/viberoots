@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
-import { runInTemp } from "./lib/test-helpers";
+import { runInTemp } from "../lib/test-helpers";
 
 test("new overwrite guard requires --yes or supports --dry-run", async () => {
   await runInTemp("scaf-overwrite-guard", async (_tmp, _$) => {

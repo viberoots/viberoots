@@ -2,7 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "./lib/test-helpers";
+import { runInTemp } from "../lib/test-helpers";
 
 test("move, update, delete and ls reflects state", async () => {
   await runInTemp("scaf-e2e", async (_tmp, _$) => {

@@ -2,7 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { describe, test } from "node:test";
-import { runInTemp } from "./lib/test-helpers";
+import { runInTemp } from "../lib/test-helpers";
 
 describe("pre-commit hook (lint-staged with Prettier + ESLint)", () => {
   test("blocks commit on lint/format errors and allows commit when fixed", async () => {
