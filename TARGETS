@@ -124,6 +124,19 @@ zx_test(
     out = "scaffolding_export_graph_noop.stamp",
 )
 
+# Phase 3 exporter attachment tests
+zx_test(
+    name = "scaffolding_export_graph_attach_modules_test_only",
+    script = "tools/tests/scaffolding/export-graph.attach-modules.test-only.test.ts",
+    out = "scaffolding_export_graph_attach_modules_test_only.stamp",
+)
+
+zx_test(
+    name = "scaffolding_export_graph_attach_modules_local_replace",
+    script = "tools/tests/scaffolding/export-graph.attach-modules.local-replace.test.ts",
+    out = "scaffolding_export_graph_attach_modules_local_replace.stamp",
+)
+
 # Phase 4 sync-providers tests
 zx_test(
     name = "scaffolding_sync_providers_empty",
