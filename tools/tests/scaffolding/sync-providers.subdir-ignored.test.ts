@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
-import { test } from "node:test";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
 test("sync-providers: subdirectory under patches/go is ignored (non-strict)", async () => {

@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import { test } from "node:test";
 import * as fsp from "node:fs/promises";
+import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
 test("sync-providers: empty patches generates minimal TARGETS.auto", async () => {

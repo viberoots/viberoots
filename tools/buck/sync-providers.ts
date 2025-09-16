@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
-import path from "node:path";
 import crypto from "node:crypto";
-import { providerNameForModuleKey, decodeFromPatchFilename } from "../lib/providers";
+import path from "node:path";
+import { decodeFromPatchFilename, providerNameForModuleKey } from "../lib/providers";
 
 const PATCH_DIR = "patches/go";
 const OUT_FILE = (argv.out as string) || "third_party/providers/TARGETS.auto";

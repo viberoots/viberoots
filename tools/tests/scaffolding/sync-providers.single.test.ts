@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import { test } from "node:test";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { runInTemp } from "../lib/test-helpers";
+import { test } from "node:test";
 import { providerNameForModuleKey } from "../../lib/providers";
+import { runInTemp } from "../lib/test-helpers";
 
 test("sync-providers: single patch emits one go_module_patch with stable provider name", async () => {
   await runInTemp("sync-single", async (tmp, $) => {
