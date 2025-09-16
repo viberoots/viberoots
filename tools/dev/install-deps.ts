@@ -49,6 +49,10 @@ async function main() {
   await $({ stdio: "inherit" })`tools/dev/update-pnpm-hash.ts`;
   await $({ stdio: "inherit" })`nix build .#node-modules --no-link --accept-flake-config`;
   await relinkNodeModules(force);
+  // Advisory lint (non-strict): enforce patch path invariants without blocking setup
+  try {
+    await $({ stdio: "inherit" })`node tools/dev/patches-lint.ts`;
+  } catch {}
   console.log("Dependencies installed and node_modules linked.");
 }
 

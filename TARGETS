@@ -104,3 +104,28 @@ zx_test(
     script = "tools/tests/scaffolding/help.new-list.test.ts",
     out = "scaffolding_help_new_list.stamp",
 )
+
+# Phase 1 patches-lint tests
+zx_test(
+    name = "scaffolding_patches_lint_clean",
+    script = "tools/tests/scaffolding/patches-lint.clean.test.ts",
+    out = "scaffolding_patches_lint_clean.stamp",
+)
+
+zx_test(
+    name = "scaffolding_patches_lint_subdir_warning",
+    script = "tools/tests/scaffolding/patches-lint.subdir-warning.test.ts",
+    out = "scaffolding_patches_lint_subdir_warning.stamp",
+)
+
+zx_test(
+    name = "scaffolding_patches_lint_duplicate_detect",
+    script = "tools/tests/scaffolding/patches-lint.duplicate-detect.test.ts",
+    out = "scaffolding_patches_lint_duplicate_detect.stamp",
+)
+
+zx_test(
+    name = "scaffolding_patches_lint_filename_shape",
+    script = "tools/tests/scaffolding/patches-lint.filename-shape.test.ts",
+    out = "scaffolding_patches_lint_filename_shape.stamp",
+)
