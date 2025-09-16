@@ -149,6 +149,31 @@ zx_test(
     out = "scaffolding_sync_providers_subdir_ignored.stamp",
 )
 
+# Phase 5 gen-auto-map tests
+zx_test(
+    name = "scaffolding_gen_auto_map_empty",
+    script = "tools/tests/scaffolding/gen-auto-map.empty.test.ts",
+    out = "scaffolding_gen_auto_map_empty.stamp",
+)
+
+zx_test(
+    name = "scaffolding_gen_auto_map_module_only",
+    script = "tools/tests/scaffolding/gen-auto-map.module-only.test.ts",
+    out = "scaffolding_gen_auto_map_module_only.stamp",
+)
+
+zx_test(
+    name = "scaffolding_gen_auto_map_mixed_labels",
+    script = "tools/tests/scaffolding/gen-auto-map.mixed-labels.test.ts",
+    out = "scaffolding_gen_auto_map_mixed_labels.stamp",
+)
+
+zx_test(
+    name = "scaffolding_gen_auto_map_idempotent",
+    script = "tools/tests/scaffolding/gen-auto-map.idempotent.test.ts",
+    out = "scaffolding_gen_auto_map_idempotent.stamp",
+)
+
 # Phase 1 patches-lint tests
 zx_test(
     name = "scaffolding_patches_lint_clean",
