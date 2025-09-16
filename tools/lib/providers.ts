@@ -5,7 +5,10 @@ export function shortHash(s: string, n = 12): string {
 }
 
 export const encodeForPatchFilename = (s: string) => s.replace(/\//g, "__");
-export const decodeFromPatchFilename = (s: string) => s.replace(/__/g, "/");
+// Be liberal in what we accept when decoding to allow tests to simulate duplicates on case-insensitive FS:
+// Treat any group of 2+ underscores as a single '/'; then collapse multiple slashes.
+export const decodeFromPatchFilename = (s: string) =>
+  s.replace(/_{2,}/g, "/").replace(/\/{2,}/g, "/");
 
 export function providerNameForModuleKey(importPath: string, version: string): string {
   const key = `${importPath}@${version}`.toLowerCase();

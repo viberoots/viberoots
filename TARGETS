@@ -124,6 +124,31 @@ zx_test(
     out = "scaffolding_export_graph_noop.stamp",
 )
 
+# Phase 4 sync-providers tests
+zx_test(
+    name = "scaffolding_sync_providers_empty",
+    script = "tools/tests/scaffolding/sync-providers.empty.test.ts",
+    out = "scaffolding_sync_providers_empty.stamp",
+)
+
+zx_test(
+    name = "scaffolding_sync_providers_single",
+    script = "tools/tests/scaffolding/sync-providers.single.test.ts",
+    out = "scaffolding_sync_providers_single.stamp",
+)
+
+zx_test(
+    name = "scaffolding_sync_providers_duplicate",
+    script = "tools/tests/scaffolding/sync-providers.duplicate.test.ts",
+    out = "scaffolding_sync_providers_duplicate.stamp",
+)
+
+zx_test(
+    name = "scaffolding_sync_providers_subdir_ignored",
+    script = "tools/tests/scaffolding/sync-providers.subdir-ignored.test.ts",
+    out = "scaffolding_sync_providers_subdir_ignored.stamp",
+)
+
 # Phase 1 patches-lint tests
 zx_test(
     name = "scaffolding_patches_lint_clean",
