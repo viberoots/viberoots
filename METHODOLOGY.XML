@@ -1,0 +1,308 @@
+<!-- Based on below, with a few deletions / additions / edits
+Disciplined AI Software Development Methodology © 2025 by Jay Baleine is licensed under CC BY-SA
+4.0 
+https://creativecommons.org/licenses/by-sa/4.0/
+
+Attribution Requirements:
+- When sharing content publicly (repositories, documentation, articles): Include the full
+attribution above
+- When working with AI systems (ChatGPT, Claude, etc.): Attribution not required during
+collaboration sessions
+- When distributing or modifying the methodology: Full CC BY-SA 4.0 compliance required
+-->
+<Methodology>
+    <Title>Project Documentation Methodology</Title>
+
+    <CoreArchitecturalPrinciples>
+        <FoundationalPhilosophy>
+            <principle>Architectural Minimalism with Deterministic Reliability: Every line of code
+                must earn its place through measurable value. Build systems that work predictably in
+                production, not demonstrations of sophistication.</principle>
+        </FoundationalPhilosophy>
+
+        <CodeArchitecturePrinciples>
+            <SeparationOfConcerns>
+                <rule>Each module has single, well-defined responsibility</rule>
+                <rule>Strict modular boundaries with clear interfaces</rule>
+                <rule>Recognize when separation would harm rather than help architecture</rule>
+                <rule>Centralized main entry points with modular project layout</rule>
+            </SeparationOfConcerns>
+
+            <DeterministicOperations>
+                <rule>Synchronous, predictable behavior over async complexity</rule>
+                <rule>Long-runtime stability over cutting-edge patterns</rule>
+                <rule>Production stability over development convenience</rule>
+                <rule>Cross-platform considerations in design decisions</rule>
+            </DeterministicOperations>
+
+            <PerformanceDrivenDecisions>
+                <rule>Choose based on workload requirements, not popular trends</rule>
+                <rule>Apply optimizations only to proven bottlenecks with measurable impact</rule>
+                <rule>Avoid premature optimization that clutters codebase</rule>
+                <rule>Maintain performance baselines and regression detection</rule>
+            </PerformanceDrivenDecisions>
+
+            <CodeQualityStandards>
+                <rule>Files never exceed 250 lines (split into separate modules if needed)</rule>
+                <rule>Self-explanatory code without comments</rule>
+                <rule>Preserve readability and maintainability as primary concerns</rule>
+                <rule>KISS and DRY principles expertly applied</rule>
+                <rule>Reuse existing functions before creating new ones</rule>
+            </CodeQualityStandards>
+
+            <ErrorHandlingPhilosophy>
+                <rule>Robust without over-engineering</rule>
+                <rule>Implement what's necessary for production reliability</rule>
+                <rule>Avoid handling every possible edge case</rule>
+                <rule>Graceful failure modes and resource cleanup</rule>
+            </ErrorHandlingPhilosophy>
+
+            <FeatureControl>
+                <rule>Resist feature bloat and complexity creep</rule>
+                <rule>Every addition must serve core project purpose</rule>
+                <rule>Surgical approach: target exact problem with minimal code</rule>
+                <rule>Multi-language use only when justified by measurable gains</rule>
+            </FeatureControl>
+        </CodeArchitecturePrinciples>
+    </CoreArchitecturalPrinciples>
+
+    <Phase0Requirements>
+        <title>Basic Must-Haves (Phase 0 - Always First)</title>
+        <description>Every project, regardless of size, must establish these foundational systems
+            before any feature development</description>
+
+        <CoreArchitecture>
+            <requirement>Centralized Entry Points: Single main module that orchestrates everything</requirement>
+            <requirement>Configuration Management: Externalized settings with validation</requirement>
+            <requirement>Centralized Logging: Error handling and diagnostic output with JSON
+                integration</requirement>
+            <requirement>Dependency Injection: Clean separation and testable components</requirement>
+        </CoreArchitecture>
+
+        <TestingInfrastructure>
+            <requirement>Test Suite: Unit and integration tests for all components</requirement>
+            <requirement>Stress Testing: Load and boundary condition validation</requirement>
+            <requirement>Test Data Management: Reproducible test scenarios and cleanup</requirement>
+            <requirement>Coverage Tracking: Ensure adequate test coverage before releases</requirement>
+        </TestingInfrastructure>
+    </Phase0Requirements>
+
+    <DocumentationBuildingProcess>
+        <Step1>
+            <name>Project Decomposition</name>
+            <questions>
+                <question>What does "finished" look like?</question>
+                <question>What are the major pieces that need to exist?</question>
+                <question>What depends on what?</question>
+                <question>Where are the natural stopping points?</question>
+            </questions>
+            <approach>Create sections based on dependencies: Major Piece A → Major Piece B → Major
+                Piece C with corresponding sub-tasks</approach>
+        </Step1>
+
+        <Step2>
+            <name>Phase Creation</name>
+            <mandatoryPhase0>
+                <item>Test suite for regression detection</item>
+                <item>Test infrastructure (unit + stress testing)</item>
+                <item>Centralized architecture setup</item>
+            </mandatoryPhase0>
+            <groupingCriteria>
+                <criterion>Dependency chains: Things that must happen in sequence</criterion>
+                <criterion>Logical groupings: Related functionality that makes sense together</criterion>
+                <criterion>Natural checkpoints: Places where you can validate progress</criterion>
+            </groupingCriteria>
+        </Step2>
+
+        <Step3>
+            <name>Task Breakdown</name>
+            <requirements>
+                <requirement>Specific action: What exactly needs to be done</requirement>
+                <requirement>Output: What will exist when complete</requirement>
+                <requirement>Success criteria: How to verify completion</requirement>
+                <requirement>Integration points: How it connects to other work</requirement>
+            </requirements>
+        </Step3>
+
+        <Step4>
+            <name>Progress Tracking System</name>
+            <statusIndicators>
+                <indicator status="COMPLETED">Done and validated</indicator>
+                <indicator status="BLOCKED">Cannot proceed due to dependency</indicator>
+                <indicator status="READY">Dependencies met, can start</indicator>
+                <indicator status="UNCERTAIN">Need clarification or decision</indicator>
+            </statusIndicators>
+        </Step4>
+
+        <Step5>
+            <name>Quality Gates</name>
+            <criteria>
+                <criterion>Does the output match what was specified?</criterion>
+                <criterion>Can the next phase actually use this output?</criterion>
+                <criterion>Is there enough documentation for future reference?</criterion>
+                <criterion>Are there any obvious issues that need fixing?</criterion>
+            </criteria>
+        </Step5>
+    </DocumentationBuildingProcess>
+
+    <SystematicEnforcementFramework>
+        <MandatoryCheckpoints>
+            <ArchitecturalCompliance>
+                <checkpoint>SoC VALIDATION: Each module single responsibility, clear boundaries</checkpoint>
+                <checkpoint>DETERMINISTIC BEHAVIOR: Synchronous operations, predictable outcomes</checkpoint>
+                <checkpoint>FILE SIZE COMPLIANCE: All files ≤250 lines or properly modularized</checkpoint>
+                <checkpoint>DRY ENFORCEMENT: No duplicate code, existing functions reused</checkpoint>
+                <checkpoint>KISS VALIDATION: Minimal complexity, surgical implementations</checkpoint>
+                <checkpoint>CONFIG CENTRALIZATION: No hardcoded values outside constants</checkpoint>
+                <checkpoint>PERFORMANCE INTEGRATION: Benchmarks operational, gates passing</checkpoint>
+                <checkpoint>PRODUCTION READINESS: Error handling, resource cleanup, cross-platform</checkpoint>
+            </ArchitecturalCompliance>
+
+            <CodeQualityGates>
+                <gate>Self-explanatory naming, no comments needed</gate>
+                <gate>Performance characteristics match workload requirements</gate>
+                <gate>Every addition serves core project purpose</gate>
+                <gate>Regression testing prevents performance degradation</gate>
+            </CodeQualityGates>
+
+            <progressionBlocker>Any failed checkpoint blocks phase advancement</progressionBlocker>
+        </MandatoryCheckpoints>
+
+        <MidPhaseValidation>
+            <DuringDevelopment>
+                <validation>INCREMENTAL COMPLIANCE: Check after each significant change</validation>
+                <validation>BENCHMARK INTEGRATION: New components measured immediately</validation>
+                <validation>DEPENDENCY ALIGNMENT: Imports match architectural boundaries</validation>
+                <validation>EDGE CASE HANDLING: Document but don't implement without plan</validation>
+                <validation>FEATURE CREEP CHECK: Question necessity of each addition</validation>
+            </DuringDevelopment>
+
+            <BeforePhaseCompletion>
+                <validation>FULL ARCHITECTURE AUDIT: All principles systematically verified</validation>
+                <validation>INTEGRATION VALIDATION: Components work within system boundaries</validation>
+                <validation>PRODUCTION SIMULATION: Test under realistic deployment constraints</validation>
+            </BeforePhaseCompletion>
+        </MidPhaseValidation>
+
+        <EnforcementAutomation>
+            <ValidatePhaseScript>
+                <function>Check file sizes (fail if >250 lines)</function>
+                <function>Scan for hardcoded values outside config</function>
+                <function>Validate import dependencies match architecture</function>
+                <function>Run benchmark suite and check gates</function>
+                <function>Generate compliance report</function>
+            </ValidatePhaseScript>
+
+            <DryAuditScript>
+                <function>Detect duplicate function implementations</function>
+                <function>Find unused imports and functions</function>
+                <function>Identify constants that should be centralized</function>
+                <function>Flag potential separation of concerns violations</function>
+            </DryAuditScript>
+
+            <WorkflowIntegration>
+                <function>Run validation before every commit</function>
+                <function>Block commits that fail compliance checks</function>
+            </WorkflowIntegration>
+        </EnforcementAutomation>
+    </SystematicEnforcementFramework>
+
+    <PrincipleIntegration>
+        <ImplementationEnforcement>
+            <FileAndModuleConstraints>
+                <constraint>Each file ≤ 250 lines or properly split</constraint>
+                <constraint>Module serves single, clear purpose</constraint>
+                <constraint>No redundant code between modules</constraint>
+                <constraint>Existing functions reused before creating new ones</constraint>
+                <constraint>Naming conventions consistent across codebase</constraint>
+            </FileAndModuleConstraints>
+
+            <ArchitectureValidation>
+                <constraint>Centralized configuration used throughout</constraint>
+                <constraint>Constants referenced, no magic numbers</constraint>
+                <constraint>Modular separation maintained with clear boundaries</constraint>
+                <constraint>Dependencies align with separation of concerns</constraint>
+                <constraint>Synchronous operations preferred over async complexity</constraint>
+            </ArchitectureValidation>
+
+            <PerformanceIntegration>
+                <constraint>Test suite integrated with all modules</constraint>
+            </PerformanceIntegration>
+
+            <ProductionReadiness>
+                <constraint>Real-world constraints addressed</constraint>
+                <constraint>Resource cleanup on shutdown</constraint>
+                <constraint>Deterministic behavior under load</constraint>
+                <constraint>Error handling appropriate for production</constraint>
+            </ProductionReadiness>
+        </ImplementationEnforcement>
+
+        <ScalingAdaptationGuidelines>
+            <SingleFileScripts>
+                <guideline>Apply SoC within functions (input, processing, output)</guideline>
+                <guideline>Benchmark core operation even if simple</guideline>
+                <guideline>Validate against 250-line limit</guideline>
+                <guideline>Self-explanatory function and variable names</guideline>
+            </SingleFileScripts>
+
+            <SmallApplications>
+                <guideline>Strict modular boundaries with clear interfaces</guideline>
+                <guideline>Centralized configuration and constants</guideline>
+                <guideline>Synchronous operations with predictable flow</guideline>
+                <guideline>Performance baseline establishment</guideline>
+            </SmallApplications>
+
+            <ProductionSystems>
+                <guideline>Full architectural compliance with all principles</guideline>
+                <guideline>Comprehensive testing</guideline>
+                <guideline>Production-grade error handling and resource management</guideline>
+            </ProductionSystems>
+
+            <MultiLanguageProjects>
+                <guideline>Maintain architectural principles across language boundaries</guideline>
+                <guideline>Unified test system for all components</guideline>
+                <guideline>Consistent error handling patterns across languages</guideline>
+            </MultiLanguageProjects>
+        </ScalingAdaptationGuidelines>
+    </PrincipleIntegration>
+
+    <SuccessMetrics>
+        <TechnicalIndicators>
+            <indicator>All architectural principles consistently applied across codebase</indicator>
+            <indicator>Testing maintained throughout development lifecycle</indicator>
+            <indicator>Zero production incidents related to architectural violations</indicator>
+            <indicator>File size constraints adhered to without compromising functionality</indicator>
+        </TechnicalIndicators>
+
+        <OperationalIndicators>
+            <indicator>System uptime and reliability under production load</indicator>
+            <indicator>Predictable resource utilization patterns</indicator>
+            <indicator>Graceful degradation under stress conditions</indicator>
+            <indicator>Maintainability preserved as codebase grows</indicator>
+        </OperationalIndicators>
+
+        <DevelopmentIndicators>
+            <indicator>Enforcement checkpoints prevent architectural drift</indicator>
+            <indicator>Performance regression detection catches optimizations and degradations</indicator>
+            <indicator>Code review efficiency improved through systematic validation</indicator>
+            <indicator>Technical debt accumulation prevented through continuous compliance</indicator>
+        </DevelopmentIndicators>
+
+        <DocumentationQuality>
+            <indicator>Enforcement checkpoints prevent architectural drift</indicator>
+            <indicator>Quality gates block progression with incomplete work</indicator>
+            <indicator>Automated validation catches compliance violations</indicator>
+            <indicator>Performance baselines maintained throughout development</indicator>
+        </DocumentationQuality>
+
+        <ProjectExecution>
+            <indicator>Systematic validation prevents technical debt accumulation</indicator>
+            <indicator>Architectural principles consistently applied across codebase</indicator>
+            <indicator>Production readiness verified at each phase</indicator>
+        </ProjectExecution>
+    </SuccessMetrics>
+
+    <conclusion>This methodology enforces discipline through automated checking and explicit
+        validation points, preventing the gradual erosion of architectural principles during
+        development.</conclusion>
+</Methodology>
