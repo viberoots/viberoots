@@ -1,8 +1,5 @@
 #!/usr/bin/env sh
 . "$(dirname "$0")/_/husky.sh"
 
-# Run formatters/linters on staged files, and ensure any auto-fixes are staged
+# Run formatters/linters on staged files; lint-staged will re-stage any modified files
 pnpm exec lint-staged || exit 1
-
-# In case any tool modified files not originally staged, add them so the commit includes fixes
-git add -A
