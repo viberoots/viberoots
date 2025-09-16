@@ -105,6 +105,19 @@ zx_test(
     out = "scaffolding_help_new_list.stamp",
 )
 
+# Phase 2 macro/provider presence tests
+zx_test(
+    name = "scaffolding_macros_exports_present",
+    script = "tools/tests/scaffolding/macros.exports-present.test.ts",
+    out = "scaffolding_macros_exports_present.stamp",
+)
+
+zx_test(
+    name = "scaffolding_providers_defs_present",
+    script = "tools/tests/scaffolding/providers.defs-present.test.ts",
+    out = "scaffolding_providers_defs_present.stamp",
+)
+
 # Phase 1 patches-lint tests
 zx_test(
     name = "scaffolding_patches_lint_clean",
