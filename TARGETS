@@ -244,6 +244,13 @@ zx_test(
     out = "exporter_replace_directive.stamp",
 )
 
+# Phase 10 docs tests
+zx_test(
+    name = "docs_readme_links",
+    script = "tools/tests/docs/readme-links.test.ts",
+    out = "docs_readme_links.stamp",
+)
+
 # Phase 9 regression tests
 zx_test(
     name = "regression_provider_wiring_e2e",
