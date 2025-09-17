@@ -1,38 +1,211 @@
 #!/usr/bin/env zx-wrapper
 // tools/buck/prebuild-guard.ts
 import fs from "fs-extra";
+import path from "node:path";
 
-let missing = 0;
-const error = (msg: string) => {
-  console.error(msg);
-  missing = 1;
-};
+type Mode = "ci" | "local";
+const mode: Mode = process.env.CI === "true" ? "ci" : "local";
+const skewMs = Number(process.env.PREBUILD_GUARD_SKEW_MS || "2000");
+const noFix = process.env.PREBUILD_GUARD_NO_FIX === "1";
+const verbose = process.env.PREBUILD_GUARD_VERBOSE === "1";
 
-if (!fs.existsSync("tools/buck/graph.json")) {
-  error("ERROR: tools/buck/graph.json missing — run export-graph stage first.");
+function mtimeSafe(p: string): number | null {
+  try {
+    return fs.statSync(p).mtimeMs;
+  } catch {
+    return null;
+  }
 }
-if (!fs.existsSync("third_party/providers/auto_map.bzl")) {
-  error("ERROR: third_party/providers/auto_map.bzl missing — run gen-auto-map stage.");
+
+async function listInputs(): Promise<string[]> {
+  // Prefer git for speed and determinism
+  try {
+    const { stdout } = await $`git ls-files -z`;
+    const raw = String(stdout || "");
+    const files = raw.split("\0").filter(Boolean);
+    return files.filter(
+      (f) =>
+        f === "TARGETS" ||
+        f.endsWith("/TARGETS") ||
+        f.endsWith(".bzl") ||
+        (f.startsWith("patches/") && f.endsWith(".patch")) ||
+        f.endsWith("pnpm-lock.yaml"),
+    );
+  } catch {
+    // Fallback: manual crawl without external deps (globby not guaranteed available in temp repo)
+    const result: string[] = [];
+    const root = process.cwd();
+    const ignoreDirs = new Set([
+      ".git",
+      "buck-out",
+      "node_modules",
+      "coverage",
+      ".clinic",
+      ".direnv",
+      "result",
+    ]);
+    async function walk(dir: string) {
+      let entries: fs.Dirent[] = [];
+      try {
+        entries = await fs.readdir(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const e of entries) {
+        const rel = path.relative(root, path.join(dir, e.name));
+        if (e.isDirectory()) {
+          if (ignoreDirs.has(e.name)) continue;
+          await walk(path.join(dir, e.name));
+        } else {
+          if (
+            e.name === "TARGETS" ||
+            e.name.endsWith(".bzl") ||
+            (rel.startsWith("patches/") && e.name.endsWith(".patch")) ||
+            e.name === "pnpm-lock.yaml"
+          ) {
+            result.push(rel);
+          }
+        }
+      }
+    }
+    await walk(root);
+    return result;
+  }
 }
 
-// Detect if repo has any patches or pnpm lockfiles using git ls-files
-try {
-  const { stdout } = await $`git ls-files`;
-  const files = String(stdout || "")
-    .split(/\r?\n/)
-    .filter(Boolean);
-  const hasPatches = files.some((f) => f.startsWith("patches/") && f.endsWith(".patch"));
-  const hasPnpmLocks = files.some((f) => f.endsWith("pnpm-lock.yaml"));
-  if (hasPatches || hasPnpmLocks) {
-    const exists = fs.existsSync("third_party/providers");
-    const hasAuto =
-      exists && fs.readdirSync("third_party/providers").some((f) => /^TARGETS.*\.auto$/.test(f));
-    if (!hasAuto) {
-      error("ERROR: provider files (TARGETS*.auto) missing — run sync-providers stages.");
+function listOutputs(): string[] {
+  const outs = ["tools/buck/graph.json", "third_party/providers/auto_map.bzl"];
+  // Include all provider auto files
+  try {
+    const dir = "third_party/providers";
+    for (const f of fs.existsSync(dir) ? fs.readdirSync(dir) : []) {
+      if (/^TARGETS.*\.auto$/.test(f)) outs.push(path.join(dir, f));
+    }
+  } catch {}
+  return outs;
+}
+
+function hasPatchesOrLocks(inputs: string[]): boolean {
+  return (
+    inputs.some((f) => f.startsWith("patches/") && f.endsWith(".patch")) ||
+    inputs.some((f) => f.endsWith("pnpm-lock.yaml"))
+  );
+}
+
+function missingProviderAutos(): boolean {
+  try {
+    const dir = "third_party/providers";
+    if (!fs.existsSync(dir)) return true;
+    return !fs.readdirSync(dir).some((f) => /^TARGETS.*\.auto$/.test(f));
+  } catch {
+    return true;
+  }
+}
+
+async function runFixSteps() {
+  await $({ stdio: "inherit" })`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
+  await $({ stdio: "inherit" })`node tools/buck/sync-providers.ts`;
+  await $({
+    stdio: "inherit",
+  })`node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
+}
+
+function logList(name: string, files: string[], limit = 5) {
+  if (!verbose) return;
+  const top = files.slice(0, limit);
+  for (const f of top) {
+    const t = mtimeSafe(f);
+    console.error(`${name}: ${t != null ? new Date(t).toISOString() : "(missing)"} ${f}`);
+  }
+}
+
+async function main() {
+  const inputs = await listInputs();
+  const outputs = listOutputs();
+
+  let hasError = false;
+  const outPresence: string[] = [];
+  for (const o of outputs) {
+    if (!fs.existsSync(o)) outPresence.push(o);
+  }
+
+  // If patch/lockfiles exist, at least one provider auto must exist
+  if (hasPatchesOrLocks(inputs) && missingProviderAutos()) {
+    outPresence.push("third_party/providers/TARGETS*.auto");
+  }
+
+  const needFixPresence = outPresence.length > 0;
+
+  // Freshness check only if some outputs exist
+  const presentOutputs = outputs.filter((o) => fs.existsSync(o));
+  let needFixFreshness = false;
+  if (presentOutputs.length > 0) {
+    const newestInput = Math.max(
+      0,
+      ...inputs.map((f) => mtimeSafe(f)).filter((n): n is number => n != null),
+    );
+    const oldestOutput = Math.min(
+      ...presentOutputs.map((f) => mtimeSafe(f)).filter((n): n is number => n != null),
+    );
+    if (Number.isFinite(newestInput) && Number.isFinite(oldestOutput)) {
+      if (newestInput > oldestOutput + skewMs) {
+        needFixFreshness = true;
+        if (mode === "ci") {
+          console.error(
+            `ERROR: glue is stale. Newest input is newer than outputs by ${Math.round(
+              (newestInput - oldestOutput) / 1000,
+            )}s`,
+          );
+          // Show top offenders
+          const sortedInputs = [...inputs].sort((a, b) => mtimeSafe(b)! - mtimeSafe(a)!);
+          const sortedOutputs = [...presentOutputs].sort((a, b) => mtimeSafe(a)! - mtimeSafe(b)!);
+          logList("newer input", sortedInputs, Number(process.env.PREBUILD_GUARD_LIST_LIMIT || 5));
+          logList(
+            "older output",
+            sortedOutputs,
+            Number(process.env.PREBUILD_GUARD_LIST_LIMIT || 5),
+          );
+        }
+      }
     }
   }
-} catch {
-  // If git is unavailable, be conservative and do not block
+
+  const needFix = needFixPresence || needFixFreshness;
+
+  if (needFix) {
+    if (mode === "ci") {
+      // In CI, fail fast with presence/freshness details
+      for (const o of outPresence) {
+        console.error(
+          `ERROR: ${o} missing — run export-graph, sync-providers and gen-auto-map stages`,
+        );
+      }
+      process.exit(1);
+    }
+    if (!noFix) {
+      const t0 = Date.now();
+      try {
+        await runFixSteps();
+        console.error(`auto-fixed glue in ${Date.now() - t0}ms`);
+      } catch (e) {
+        console.error("ERROR: auto-fix failed:", e);
+        process.exit(1);
+      }
+    } else {
+      // Local warn-only
+      for (const o of outPresence) {
+        console.error(`WARN: ${o} missing`);
+      }
+      if (needFixFreshness) {
+        console.error("WARN: glue is stale");
+      }
+    }
+  }
+
+  process.exit(0);
 }
 
-process.exit(missing);
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

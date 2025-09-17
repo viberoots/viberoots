@@ -1,6 +1,5 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
-import fs from "fs";
 import os from "node:os";
 import path from "node:path";
 

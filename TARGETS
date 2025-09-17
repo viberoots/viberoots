@@ -283,6 +283,30 @@ zx_test(
     out = "regression_minimal_invalidation_related_change.stamp",
 )
 
+# PR3 prebuild-guard tests
+zx_test(
+    name = "prebuild_guard_present_clean",
+    script = "tools/tests/prebuild/guard.present.clean.test.ts",
+    out = "prebuild_guard_present_clean.stamp",
+)
+
+zx_test(
+    name = "prebuild_guard_presence_missing_outputs",
+    script = "tools/tests/prebuild/guard.presence.missing-outputs.test.ts",
+    out = "prebuild_guard_presence_missing_outputs.stamp",
+)
+
+zx_test(
+    name = "prebuild_guard_freshness_local_warn",
+    script = "tools/tests/prebuild/guard.freshness.local-warn.test.ts",
+    out = "prebuild_guard_freshness_local_warn.stamp",
+)
+
+zx_test(
+    name = "prebuild_guard_freshness_ci_fail",
+    script = "tools/tests/prebuild/guard.freshness.ci-fail.test.ts",
+    out = "prebuild_guard_freshness_ci_fail.stamp",
+)
 # PR2 install-deps gomod2nix tests
 zx_test(
     name = "dev_install_deps_gomod2nix_dry_run",
