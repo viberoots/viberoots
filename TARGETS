@@ -211,3 +211,22 @@ zx_test(
     script = "tools/tests/scaffolding/patches-lint.filename-shape.test.ts",
     out = "scaffolding_patches_lint_filename_shape.stamp",
 )
+
+# Phase 6 patch-go tests
+zx_test(
+    name = "patch_go_start",
+    script = "tools/tests/patching/patch-go.start.test.ts",
+    out = "patch_go_start.stamp",
+)
+
+zx_test(
+    name = "patch_go_apply_noop",
+    script = "tools/tests/patching/patch-go.apply.noop.test.ts",
+    out = "patch_go_apply_noop.stamp",
+)
+
+zx_test(
+    name = "patch_go_apply_creates_patch",
+    script = "tools/tests/patching/patch-go.apply.creates-patch.test.ts",
+    out = "patch_go_apply_creates_patch.stamp",
+)

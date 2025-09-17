@@ -38,3 +38,4 @@ coverage/
 
 # zx / misc temp
 *.log
+.patch-sessions.json
