@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
-import crypto from "node:crypto";
+import { writeIfChanged } from "../lib/fs-helpers";
 import { providerNameForImporter, providerNameForModuleKey } from "../lib/providers";
 
 type Node = {
@@ -12,21 +12,7 @@ type Node = {
 const graphPath = (argv.graph as string) || "tools/buck/graph.json";
 const outPath = (argv.out as string) || "third_party/providers/auto_map.bzl";
 
-function writeIfChanged(dst: string, data: string) {
-  return (async () => {
-    if (await fs.pathExists(dst)) {
-      const cur = await fs.readFile(dst, "utf8");
-      const a = crypto.createHash("sha256").update(cur).digest("hex");
-      const b = crypto.createHash("sha256").update(data).digest("hex");
-      if (a === b) {
-        console.log(`no-op (already applied): ${dst}`);
-        return;
-      }
-    }
-    await fs.outputFile(dst, data, "utf8");
-    console.log("wrote", dst);
-  })();
-}
+// writeIfChanged now imported from ../lib/fs-helpers
 
 function fqProviderLabel(name: string): string {
   return `//third_party/providers:${name}`;

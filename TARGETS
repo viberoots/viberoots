@@ -302,6 +302,13 @@ zx_test(
     out = "exporter_tuple_cache_key_shifts_on_goflags.stamp",
 )
 
+# PR C fs-helpers tests
+zx_test(
+    name = "lib_fs_helpers_write_if_changed",
+    script = "tools/tests/lib/fs-helpers.write-if-changed.test.ts",
+    out = "lib_fs_helpers_write_if_changed.stamp",
+)
+
 # PR B per-target tuple/labels tests
 zx_test(
     name = "exporter_per_target_tags_affect_labels",
