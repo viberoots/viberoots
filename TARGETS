@@ -243,3 +243,22 @@ zx_test(
     script = "tools/tests/exporter/replace-directive.test.ts",
     out = "exporter_replace_directive.stamp",
 )
+
+# Phase 9 regression tests
+zx_test(
+    name = "regression_provider_wiring_e2e",
+    script = "tools/tests/regression/provider-wiring.e2e.test.ts",
+    out = "regression_provider_wiring_e2e.stamp",
+)
+
+zx_test(
+    name = "regression_minimal_invalidation_unrelated_noop",
+    script = "tools/tests/regression/minimal-invalidation.unrelated-noop.test.ts",
+    out = "regression_minimal_invalidation_unrelated_noop.stamp",
+)
+
+zx_test(
+    name = "regression_minimal_invalidation_related_change",
+    script = "tools/tests/regression/minimal-invalidation.related-change.test.ts",
+    out = "regression_minimal_invalidation_related_change.stamp",
+)
