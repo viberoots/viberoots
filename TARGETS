@@ -307,6 +307,13 @@ zx_test(
     script = "tools/tests/prebuild/guard.freshness.ci-fail.test.ts",
     out = "prebuild_guard_freshness_ci_fail.stamp",
 )
+
+# PR4 codegen tests
+zx_test(
+    name = "ci_codegen_noop",
+    script = "tools/tests/ci/codegen.noop.test.ts",
+    out = "ci_codegen_noop.stamp",
+)
 # PR2 install-deps gomod2nix tests
 zx_test(
     name = "dev_install_deps_gomod2nix_dry_run",
