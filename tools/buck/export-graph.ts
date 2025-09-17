@@ -148,6 +148,24 @@ function parseTagsFromGOFLAGS(envGOFLAGS: string | undefined): string[] {
   return Array.from(out).sort();
 }
 
+function parseGoEnvFromLabels(labels: string[] | undefined): {
+  goos?: string;
+  goarch?: string;
+  cgo?: string;
+} {
+  const out: { goos?: string; goarch?: string; cgo?: string } = {};
+  for (const l of labels || []) {
+    if (l.startsWith("goenv:")) {
+      const kv = l.slice("goenv:".length);
+      const [k, v] = kv.split("=");
+      if (k === "GOOS" && v) out.goos = v.toLowerCase();
+      else if (k === "GOARCH" && v) out.goarch = v.toLowerCase();
+      else if (k === "CGO_ENABLED" && v) out.cgo = v === "1" ? "1" : "0";
+    }
+  }
+  return out;
+}
+
 function normalizeGOFLAGS(s: string | undefined): string {
   const v = (s || "").trim();
   if (!v) return "";
@@ -196,13 +214,17 @@ async function gatherToolchainIdentity(): Promise<string> {
 }
 
 async function deriveTupleForNode(n: Node): Promise<Tuple> {
+  const envFromLabels = parseGoEnvFromLabels(n.labels);
   const goos = (
-    process.env.GOOS || (os.platform() === "darwin" ? "darwin" : os.platform())
+    envFromLabels.goos ||
+    process.env.GOOS ||
+    (os.platform() === "darwin" ? "darwin" : os.platform())
   ).toString();
   const goarch =
+    envFromLabels.goarch ||
     process.env.GOARCH ||
     (process.arch === "arm64" ? "arm64" : process.arch === "x64" ? "amd64" : process.arch);
-  const cgo = process.env.CGO_ENABLED || "1";
+  const cgo = envFromLabels.cgo || process.env.CGO_ENABLED || "1";
   const tagsFromLabels = parseTagsFromLabels(n.labels);
   const tagsFromFlags = parseTagsFromGOFLAGS(process.env.GOFLAGS);
   const mergedTags = Array.from(new Set([...tagsFromLabels, ...tagsFromFlags])).sort();

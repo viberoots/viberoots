@@ -301,6 +301,25 @@ zx_test(
     script = "tools/tests/exporter/exporter.tuple.cache-key-shifts-on-goflags.test.ts",
     out = "exporter_tuple_cache_key_shifts_on_goflags.stamp",
 )
+
+# PR B per-target tuple/labels tests
+zx_test(
+    name = "exporter_per_target_tags_affect_labels",
+    script = "tools/tests/exporter/exporter.per-target.tags-affect-labels.test.ts",
+    out = "exporter_per_target_tags_affect_labels.stamp",
+)
+
+zx_test(
+    name = "exporter_per_target_platform_splits_batches",
+    script = "tools/tests/exporter/exporter.per-target.platform-splits-batches.test.ts",
+    out = "exporter_per_target_platform_splits_batches.stamp",
+)
+
+zx_test(
+    name = "exporter_per_target_cgo_flip",
+    script = "tools/tests/exporter/exporter.per-target.cgo-flip.test.ts",
+    out = "exporter_per_target_cgo_flip.stamp",
+)
 # PR3 prebuild-guard tests
 zx_test(
     name = "prebuild_guard_present_clean",
