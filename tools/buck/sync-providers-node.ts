@@ -1,9 +1,8 @@
 #!/usr/bin/env zx-wrapper
 // tools/buck/sync-providers-node.ts — optional Node importer-scoped providers
 import fs from "fs-extra";
-import { globby } from "globby";
-import YAML from "yaml";
 import crypto from "node:crypto";
+import YAML from "yaml";
 
 const PATCH_DIR = "patches/node";
 const OUT_FILE = "third_party/providers/TARGETS.node.auto";
@@ -95,7 +94,16 @@ function effectiveSetForImporter(doc: PNPMDoc, importer: string): Set<string> {
 
 async function main() {
   const entries: string[] = [];
-  const lockfiles = await globby(["**/pnpm-lock.yaml"], { gitignore: true });
+  let lockfiles: string[] = [];
+  try {
+    const { stdout } = await $`git ls-files '**/pnpm-lock.yaml'`;
+    lockfiles = String(stdout || "")
+      .split(/\r?\n/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  } catch {
+    lockfiles = [];
+  }
   const nodePatches = (await fs.pathExists(PATCH_DIR))
     ? (await fs.readdir(PATCH_DIR)).filter((f) => f.endsWith(".patch"))
     : [];
