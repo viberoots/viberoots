@@ -48,9 +48,16 @@ type Metrics = {
   cacheHits: number;
   cacheMisses: number;
   durationMs: number;
+  tupleKeys: string[];
 };
 
-let gMetrics: Metrics = { totalBatches: 0, cacheHits: 0, cacheMisses: 0, durationMs: 0 };
+let gMetrics: Metrics = {
+  totalBatches: 0,
+  cacheHits: 0,
+  cacheMisses: 0,
+  durationMs: 0,
+  tupleKeys: [],
+};
 
 async function exportConfiguredGraph(): Promise<Node[]> {
   let nodes: Node[];
@@ -101,21 +108,107 @@ type Tuple = {
   goarch: string;
   cgo: string;
   tagsKey: string; // sorted, joined
-  toolchain: string; // placeholder for future
+  goflagsKey: string; // normalized GOFLAGS
+  toolchain: string; // short hash or "unknown"
 };
 
 function tupleKey(t: Tuple): string {
-  return [t.goos, t.goarch, t.cgo, t.tagsKey, t.toolchain].join("|");
+  return [t.goos, t.goarch, t.cgo, t.tagsKey, t.goflagsKey, t.toolchain].join("|");
 }
 
-function defaultTuple(): Tuple {
+function parseTagsFromLabels(labels: string[] | undefined): string[] {
+  const out = new Set<string>();
+  for (const l of labels || []) {
+    if (l.startsWith("gotags:")) {
+      const rest = l.slice("gotags:".length);
+      for (const t of rest.split(",")) {
+        const v = t.trim().toLowerCase();
+        if (v) out.add(v);
+      }
+    }
+  }
+  return Array.from(out).sort();
+}
+
+function parseTagsFromGOFLAGS(envGOFLAGS: string | undefined): string[] {
+  const s = envGOFLAGS || "";
+  if (!s) return [];
+  const out = new Set<string>();
+  // Accept forms: -tags=a,b -tags=\"a b\" etc.
+  // Simple extraction: split by spaces, find -tags=*
+  for (const part of s.split(/\s+/)) {
+    if (part.startsWith("-tags=")) {
+      const val = part.slice("-tags=".length).replace(/^\"|\"$/g, "");
+      for (const tok of val.split(/[ ,]+/)) {
+        const v = tok.trim().toLowerCase();
+        if (v) out.add(v);
+      }
+    }
+  }
+  return Array.from(out).sort();
+}
+
+function normalizeGOFLAGS(s: string | undefined): string {
+  const v = (s || "").trim();
+  if (!v) return "";
+  // Collapse multiple spaces; sort repeated -tags values internally
+  const parts = v.split(/\s+/);
+  const norm: string[] = [];
+  for (const p of parts) {
+    if (p.startsWith("-tags=")) {
+      const val = p.slice("-tags=".length).replace(/^\"|\"$/g, "");
+      const tags = val
+        .split(/[ ,]+/)
+        .map((x) => x.trim().toLowerCase())
+        .filter(Boolean)
+        .sort();
+      norm.push(`-tags=${tags.join(",")}`);
+    } else {
+      norm.push(p);
+    }
+  }
+  return norm.join(" ");
+}
+
+async function gatherToolchainIdentity(): Promise<string> {
+  try {
+    const { stdout: gorootOut } = await $({ stdio: "pipe" })`go env GOROOT`;
+    const { stdout: goversionOut } = await $({ stdio: "pipe" })`go version`;
+    const goroot = String(gorootOut || "").trim();
+    const goversion = String(goversionOut || "").trim();
+    const obj = {
+      goroot,
+      goversion,
+      goos: process.env.GOOS || (os.platform() === "darwin" ? "darwin" : os.platform()),
+      goarch:
+        process.env.GOARCH ||
+        (process.arch === "arm64" ? "arm64" : process.arch === "x64" ? "amd64" : process.arch),
+      cgo: process.env.CGO_ENABLED || "1",
+    } as const;
+    return require("node:crypto")
+      .createHash("sha256")
+      .update(JSON.stringify(obj))
+      .digest("hex")
+      .slice(0, 12);
+  } catch {
+    return "unknown";
+  }
+}
+
+async function deriveTupleForNode(n: Node): Promise<Tuple> {
   const goos = (
-    process.env.GOOS || os.platform() === "darwin" ? "darwin" : os.platform()
+    process.env.GOOS || (os.platform() === "darwin" ? "darwin" : os.platform())
   ).toString();
   const goarch =
-    process.arch === "arm64" ? "arm64" : process.arch === "x64" ? "amd64" : process.arch;
+    process.env.GOARCH ||
+    (process.arch === "arm64" ? "arm64" : process.arch === "x64" ? "amd64" : process.arch);
   const cgo = process.env.CGO_ENABLED || "1";
-  return { goos, goarch, cgo, tagsKey: "", toolchain: "default" };
+  const tagsFromLabels = parseTagsFromLabels(n.labels);
+  const tagsFromFlags = parseTagsFromGOFLAGS(process.env.GOFLAGS);
+  const mergedTags = Array.from(new Set([...tagsFromLabels, ...tagsFromFlags])).sort();
+  const goflagsKey = normalizeGOFLAGS(process.env.GOFLAGS);
+  const toolchain = await gatherToolchainIdentity();
+  return { goos, goarch, cgo, tagsKey: mergedTags.join(","), goflagsKey, toolchain };
 }
 
 function packageDirFromTargetName(name: string): string {
@@ -159,7 +252,7 @@ async function buildBatches(
   >();
   for (const n of nodes) {
     if (!isGoNode(n)) continue;
-    const t = defaultTuple();
+    const t = await deriveTupleForNode(n);
     const dirs = dirsForTarget(n);
     const modRoot = await findModuleRootForDirs(dirs);
     if (!modRoot) continue; // skip if we can't find a module
@@ -174,12 +267,15 @@ async function buildBatches(
     for (const d of dirs) entry.roots.add(d);
     groups.set(key, entry);
   }
-  return Array.from(groups.values()).map((g) => ({
+  const list = Array.from(groups.values()).map((g) => ({
     tuple: g.tuple,
     members: g.members,
     roots: Array.from(g.roots),
     cwd: g.cwd,
   }));
+  // record tuple keys for metrics
+  gMetrics.tupleKeys = Array.from(new Set(list.map((x) => tupleKey(x.tuple)))).sort();
+  return list;
 }
 
 function toHashInput(tuple: Tuple, roots: string[], modRootAbs: string): any {
@@ -424,6 +520,13 @@ async function attachGoModuleLabels(nodes: Node[]): Promise<Node[]> {
       }
       outNodes.push({ ...n, labels: [...keep, ...Array.from(moduleKeys)] });
     }
+    // Record tupleKeys for metrics even in simulate mode
+    try {
+      const tuples = await Promise.all(
+        outNodes.filter((n) => isGoNode(n)).map((n) => deriveTupleForNode(n)),
+      );
+      gMetrics.tupleKeys = Array.from(new Set(tuples.map((t) => tupleKey(t)))).sort();
+    } catch {}
     return outNodes;
   }
 

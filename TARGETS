@@ -283,6 +283,24 @@ zx_test(
     out = "regression_minimal_invalidation_related_change.stamp",
 )
 
+# PR A exporter tuple tests
+zx_test(
+    name = "exporter_tuple_includes_goflags",
+    script = "tools/tests/exporter/exporter.tuple.includes-goflags.test.ts",
+    out = "exporter_tuple_includes_goflags.stamp",
+)
+
+zx_test(
+    name = "exporter_tuple_includes_toolchain",
+    script = "tools/tests/exporter/exporter.tuple.includes-toolchain.test.ts",
+    out = "exporter_tuple_includes_toolchain.stamp",
+)
+
+zx_test(
+    name = "exporter_tuple_cache_key_shifts_on_goflags",
+    script = "tools/tests/exporter/exporter.tuple.cache-key-shifts-on-goflags.test.ts",
+    out = "exporter_tuple_cache_key_shifts_on_goflags.stamp",
+)
 # PR3 prebuild-guard tests
 zx_test(
     name = "prebuild_guard_present_clean",
