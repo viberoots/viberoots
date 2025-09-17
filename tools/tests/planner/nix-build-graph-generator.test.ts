@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
-import { test } from "node:test";
 import fs from "fs-extra";
 import path from "node:path";
+import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
 test("nix builds graph-generator", async () => {

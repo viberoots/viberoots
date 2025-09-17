@@ -13,6 +13,11 @@ This repo uses Buck2 for orchestration, Nix for hermetic builds, and zx TypeScri
   - `tools/ci/run-stage.ts --stage gen-auto-map`
   - `tools/ci/run-stage.ts --stage prebuild-guard`
 
+## Go dependencies (gomod2nix)
+
+- After editing `go.mod` or `go.sum`, run `node tools/dev/install-deps.ts` to regenerate `gomod2nix.toml`.
+- Use `--dry-run` to preview the command without changes.
+
 ## Patching (Go)
 
 - Start: `tools/bin/patch-pkg start go <importPath>`

@@ -15,3 +15,10 @@
 
 - Full: `timeout -k 10s 180s buck2 test //...`
 - Specific: `buck2 test //<target>`
+ 
+## Go dependencies (gomod2nix)
+
+- After editing `go.mod` or `go.sum`, run:
+  - `node tools/dev/install-deps.ts` (regenerates `gomod2nix.toml` deterministically)
+- Preview without changes:
+  - `node tools/dev/install-deps.ts --dry-run`

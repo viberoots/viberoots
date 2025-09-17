@@ -282,3 +282,22 @@ zx_test(
     script = "tools/tests/regression/minimal-invalidation.related-change.test.ts",
     out = "regression_minimal_invalidation_related_change.stamp",
 )
+
+# PR2 install-deps gomod2nix tests
+zx_test(
+    name = "dev_install_deps_gomod2nix_dry_run",
+    script = "tools/tests/dev/install-deps.gomod2nix.dry-run.test.ts",
+    out = "dev_install_deps_gomod2nix_dry_run.stamp",
+)
+
+zx_test(
+    name = "dev_install_deps_gomod2nix_skip_when_missing",
+    script = "tools/tests/dev/install-deps.gomod2nix.skip-when-missing.test.ts",
+    out = "dev_install_deps_gomod2nix_skip_when_missing.stamp",
+)
+
+zx_test(
+    name = "dev_install_deps_gomod2nix_integration",
+    script = "tools/tests/dev/install-deps.gomod2nix.integration.test.ts",
+    out = "dev_install_deps_gomod2nix_integration.stamp",
+)
