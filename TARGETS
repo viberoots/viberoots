@@ -251,6 +251,19 @@ zx_test(
     out = "docs_readme_links.stamp",
 )
 
+# PR1 Nix planner tests
+zx_test(
+    name = "planner_nix_build_graph_generator",
+    script = "tools/tests/planner/nix-build-graph-generator.test.ts",
+    out = "planner_nix_build_graph_generator.stamp",
+)
+
+zx_test(
+    name = "planner_go_targets_read",
+    script = "tools/tests/planner/planner-go-targets-read.test.ts",
+    out = "planner_go_targets_read.stamp",
+)
+
 # Phase 9 regression tests
 zx_test(
     name = "regression_provider_wiring_e2e",

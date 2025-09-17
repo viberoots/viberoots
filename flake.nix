@@ -183,6 +183,7 @@ EOF
       pnpm-store = pnpm-store;
       node-modules = node-modules;
       default = node-modules;
+      graph-generator = (pkgs.callPackage ./tools/nix/graph-generator.nix { inherit pkgs; }).all;
     });
 
     checks = forAllSystems ({ node-modules, ... }: {
