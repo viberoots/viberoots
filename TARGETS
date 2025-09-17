@@ -230,3 +230,16 @@ zx_test(
     script = "tools/tests/patching/patch-go.apply.creates-patch.test.ts",
     out = "patch_go_apply_creates_patch.stamp",
 )
+
+# Phase 8 exporter tests
+zx_test(
+    name = "exporter_cache_hit_noop",
+    script = "tools/tests/exporter/cache-hit-noop.test.ts",
+    out = "exporter_cache_hit_noop.stamp",
+)
+
+zx_test(
+    name = "exporter_replace_directive",
+    script = "tools/tests/exporter/replace-directive.test.ts",
+    out = "exporter_replace_directive.stamp",
+)

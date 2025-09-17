@@ -18,6 +18,8 @@ const out = (argv.out as string) || "tools/buck/graph.json";
 const scope = (argv.scope as string) || ""; // e.g., "label:go" to limit local runs
 const simulate = (argv.simulate as string) || ""; // path to simulated nodes JSON (tests)
 const maxParallel = Number(argv["max-parallel"] || 4);
+const cacheDir = (argv["cache-dir"] as string) || "tools/buck/.export-cache";
+const metricsOut = (argv["metrics-out"] as string) || "";
 
 const attrList = [
   "name",
@@ -40,6 +42,15 @@ function isGoNode(n: Node): boolean {
   const labs = n.labels || [];
   return labs.includes("lang:go");
 }
+
+type Metrics = {
+  totalBatches: number;
+  cacheHits: number;
+  cacheMisses: number;
+  durationMs: number;
+};
+
+let gMetrics: Metrics = { totalBatches: 0, cacheHits: 0, cacheMisses: 0, durationMs: 0 };
 
 async function exportConfiguredGraph(): Promise<Node[]> {
   let nodes: Node[];
@@ -171,6 +182,27 @@ async function buildBatches(
   }));
 }
 
+function toHashInput(tuple: Tuple, roots: string[], modRootAbs: string): any {
+  return {
+    tuple,
+    modRoot: modRootAbs,
+    roots: Array.from(new Set(roots)).sort(),
+  };
+}
+
+async function sha256OfFile(p: string): Promise<string> {
+  try {
+    const buf = await fs.readFile(p);
+    return require("node:crypto").createHash("sha256").update(buf).digest("hex");
+  } catch {
+    return "";
+  }
+}
+
+async function ensureDir(p: string) {
+  await fs.mkdirp(p);
+}
+
 async function runGoList(tuple: Tuple, roots: string[], cwd: string): Promise<GoPkg[]> {
   if (!roots.length) return [];
   const env = {
@@ -184,8 +216,31 @@ async function runGoList(tuple: Tuple, roots: string[], cwd: string): Promise<Go
     rel === "" ? "." : rel.startsWith(".") ? rel : `./${rel}`,
   );
   const args = ["list", "-deps", "-json", "-test", ...norm];
+  // Caching
+  const modRootAbs = path.resolve(cwd);
+  const gomod = path.join(modRootAbs, "go.mod");
+  const gosum = path.join(modRootAbs, "go.sum");
+  const gomod2nix = path.resolve("gomod2nix.toml");
+  const input = toHashInput(tuple, roots, modRootAbs);
+  const lockHash =
+    (await sha256OfFile(gomod2nix)) || (await sha256OfFile(gomod)) + (await sha256OfFile(gosum));
+  const keyObj = { input, lockHash };
+  const key = require("node:crypto")
+    .createHash("sha256")
+    .update(JSON.stringify(keyObj))
+    .digest("hex");
+  const cachePath = path.join(cacheDir, `${key}.json`);
+  await ensureDir(cacheDir);
+  if (await fs.pathExists(cachePath)) {
+    gMetrics.cacheHits++;
+    const txt = await fs.readFile(cachePath, "utf8");
+    return parseGoListStream(txt);
+  }
+  gMetrics.cacheMisses++;
   const { stdout } = await $({ env, stdio: "pipe", cwd })`go ${args}`;
-  return parseGoListStream(String(stdout));
+  const raw = String(stdout);
+  await fs.outputFile(cachePath, raw, "utf8");
+  return parseGoListStream(raw);
 }
 
 function parseGoListStream(s: string): GoPkg[] {
@@ -269,7 +324,8 @@ async function attachGoModuleLabels(nodes: Node[]): Promise<Node[]> {
   if (!anyGo) return nodes.map((n) => ({ ...n, labels: Array.from(new Set(n.labels || [])) }));
 
   // Simulated mode: derive labels without network access via simple import/require parsing
-  if (simulate) {
+  const forceAuth = String(process.env.FORCE_AUTHORITATIVE || "") === "1";
+  if (simulate && !forceAuth) {
     function parseImportsFromFile(absPath: string): string[] {
       try {
         const txt = fs.readFileSync(absPath, "utf8");
@@ -313,20 +369,28 @@ async function attachGoModuleLabels(nodes: Node[]): Promise<Node[]> {
       if (!goModPath) return "unknown";
       try {
         const txt = fs.readFileSync(goModPath, "utf8");
-        const reqLine = new RegExp(
-          `^\\s*require\\s+${modPath.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}\\s+([^\\s)]+)`,
+        const esc = modPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        // Prefer replace directive's right-hand version when present
+        // Forms:
+        //   replace <mod> => <mod2> vX.Y.Z
+        //   replace <mod> vA.B.C => <mod2> vX.Y.Z
+        const rep = new RegExp(
+          `^\\s*replace\\s+${esc}(?:\\s+[^\\s]+)?\\s*=>\\s+[^\\s]+\\s+([^\\s]+)`,
           "m",
         );
+        const mr = rep.exec(txt);
+        if (mr && mr[1]) return mr[1];
+
+        // Direct require line
+        const reqLine = new RegExp(`^\\s*require\\s+${esc}\\s+([^\\s)]+)`, "m");
         const m = reqLine.exec(txt);
         if (m && m[1]) return m[1];
+
         // handle require ( ... ) blocks
         const block = /require\s*\(([^)]+)\)/ms.exec(txt);
         if (block) {
           const inner = block[1];
-          const re = new RegExp(
-            `^\\s*${modPath.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}\\s+([^\\s]+)`,
-            "m",
-          );
+          const re = new RegExp(`^\\s*${esc}\\s+([^\\s]+)`, "m");
           const m2 = re.exec(inner);
           if (m2 && m2[1]) return m2[1];
         }
@@ -365,10 +429,12 @@ async function attachGoModuleLabels(nodes: Node[]): Promise<Node[]> {
 
   // Authoritative mode via go list
   const batches = await buildBatches(nodes);
+  gMetrics.totalBatches = batches.length;
   const results: Array<{ members: Node[]; labelsByTarget: Map<string, Set<string>> }> = [];
 
   // Simple parallel limiter
   let i = 0;
+  const startedAt = Date.now();
   const work = new Array(Math.max(1, Math.min(maxParallel, batches.length)))
     .fill(0)
     .map(async () => {
@@ -410,6 +476,7 @@ async function attachGoModuleLabels(nodes: Node[]): Promise<Node[]> {
       }
     });
   await Promise.all(work);
+  gMetrics.durationMs = Date.now() - startedAt;
 
   const labelsLookup = new Map<string, Set<string>>();
   for (const r of results) {
@@ -432,6 +499,12 @@ async function main() {
   const nodes = await exportConfiguredGraph();
   await writeAtomicJSON(out, nodes);
   console.log(`wrote ${out}`);
+  if (metricsOut) {
+    try {
+      await fs.outputFile(metricsOut, JSON.stringify(gMetrics, null, 2) + "\n", "utf8");
+      console.log(`wrote metrics ${metricsOut}`);
+    } catch {}
+  }
 }
 
 main().catch((e) => {
