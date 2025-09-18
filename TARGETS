@@ -333,6 +333,13 @@ zx_test(
     out = "exporter_tuple_cache_key_shifts_on_goflags.stamp",
 )
 
+# PR8 exporter metrics flag
+zx_test(
+    name = "exporter_metrics_out",
+    script = "tools/tests/exporter/exporter.metrics-out.test.ts",
+    out = "exporter_metrics_out.stamp",
+)
+
 # PR C fs-helpers tests
 zx_test(
     name = "lib_fs_helpers_write_if_changed",

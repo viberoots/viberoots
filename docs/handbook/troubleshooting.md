@@ -78,3 +78,9 @@ Validate patch filenames and directory shape to prevent cache/key churn and misa
 - Some zx tests probe `@prelude` availability using `buck2 cquery`.
 - If unavailable, the test prints a SKIP message and exits early; enter the dev shell and re-run.
 - See Testing handbook for external timeouts and coverage.
+
+### Exporter metrics (optional)
+
+- You can ask the exporter to write a small JSON metrics file for observability.
+- Usage: `node tools/buck/export-graph.ts --out tools/buck/graph.json --metrics-out tools/buck/export-metrics.json`
+- The metrics write is best-effort and does not change export behavior.

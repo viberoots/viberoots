@@ -5,7 +5,7 @@
 - One test per file.
 - External timeouts: 40s per test, 180s for full suite.
 - Use zx `#!/usr/bin/env zx-wrapper` for tests.
- - Do not modify PATH inside tests; rely on the dev shell to supply tools.
+- Do not modify PATH inside tests; rely on the dev shell to supply tools.
 
 ## Coverage
 
@@ -16,7 +16,7 @@
 
 - Full: `timeout -k 10s 180s buck2 test //...`
 - Specific: `buck2 test //<target>`
- - Single-test external timeout (preferred): `gtimeout -k 5s 40s buck2 test //<target>` (or `timeout` on Linux)
+- Single-test external timeout (preferred): `gtimeout -k 5s 40s buck2 test //<target>` (or `timeout` on Linux)
 
 ## zx tests overview
 

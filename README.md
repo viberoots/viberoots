@@ -17,6 +17,8 @@ This repo uses Buck2 for orchestration, Nix for hermetic builds, and zx TypeScri
     - `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
     - Or run `node tools/dev/install-deps.ts` (dev shell) to chain them
 
+- Optional: write exporter metrics with `--metrics-out tools/buck/export-metrics.json` (see handbook).
+
 ## Go dependencies (gomod2nix)
 
 - After editing `go.mod` or `go.sum`, run `node tools/dev/install-deps.ts` to regenerate `gomod2nix.toml`.
