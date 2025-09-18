@@ -5,18 +5,33 @@ import path from "node:path";
 type Args = {
   strict?: string | boolean;
   lang?: string;
+  format?: string;
 };
 
 const argv = (global as any).argv as Args;
 const STRICT = String(argv.strict || "").toLowerCase() === "true" || argv.strict === true;
 const LANG = (argv.lang as string) || ""; // optional: scope to one language
+const FORMAT = ((argv.format as string) || "text").toLowerCase();
 
-type Violation = { level: "warn" | "error"; message: string };
+type Violation = {
+  level: "warn" | "error";
+  message: string;
+  code: string;
+  lang: string;
+  file?: string;
+  moduleKey?: string;
+};
 
-function log(v: Violation) {
-  const out = `${v.level === "error" ? "ERROR" : "warning"}: ${v.message}`;
-  if (v.level === "error") console.error(out);
-  else console.warn(out);
+function printHuman(vs: Violation[]) {
+  for (const v of vs) {
+    const out = `${v.level === "error" ? "ERROR" : "warning"}: ${v.message}`;
+    if (v.level === "error") console.error(out);
+    else console.warn(out);
+  }
+}
+
+function printJson(vs: Violation[]) {
+  console.log(JSON.stringify(vs, null, 2));
 }
 
 function isPatchFile(file: string): boolean {
@@ -32,6 +47,9 @@ function validateGoPatchFilename(file: string, violations: Violation[]) {
   if (!isPatchFile(file)) {
     violations.push({
       level: STRICT ? "error" : "warn",
+      code: "nonpatch",
+      lang: "go",
+      file,
       message: `[go] non-patch file in patches/go: ${file}`,
     });
     return;
@@ -41,6 +59,9 @@ function validateGoPatchFilename(file: string, violations: Violation[]) {
   if (at < 0) {
     violations.push({
       level: STRICT ? "error" : "warn",
+      code: "filename_shape",
+      lang: "go",
+      file,
       message: `[go] invalid filename (missing @): ${file}`,
     });
     return;
@@ -50,6 +71,9 @@ function validateGoPatchFilename(file: string, violations: Violation[]) {
   if (!enc || !ver) {
     violations.push({
       level: STRICT ? "error" : "warn",
+      code: "filename_shape",
+      lang: "go",
+      file,
       message: `[go] invalid filename (empty import/version): ${file}`,
     });
     return;
@@ -57,6 +81,9 @@ function validateGoPatchFilename(file: string, violations: Violation[]) {
   if (enc.includes("/")) {
     violations.push({
       level: STRICT ? "error" : "warn",
+      code: "filename_shape",
+      lang: "go",
+      file,
       message: `[go] import path must be encoded ('/' -> '__'): ${file}`,
     });
   }
@@ -70,10 +97,13 @@ async function lintGo(): Promise<number> {
   const byKey = new Map<string, string>(); // lowercased "import@version" -> filename
 
   const entries = await fs.readdir(dir, { withFileTypes: true });
-  for (const e of entries) {
+  for (const e of entries.sort((a, b) => a.name.localeCompare(b.name))) {
     if (e.isDirectory()) {
       violations.push({
         level: STRICT ? "error" : "warn",
+        code: "subdir",
+        lang: "go",
+        file: path.join("patches/go", e.name),
         message: `[go] ignoring subdirectory ${e.name}`,
       });
       continue;
@@ -91,6 +121,10 @@ async function lintGo(): Promise<number> {
     if (prior && prior !== e.name) {
       violations.push({
         level: "error",
+        code: "duplicate",
+        lang: "go",
+        moduleKey: key,
+        file: e.name,
         message: `[go] duplicate patch for ${key}: ${prior} vs ${e.name}`,
       });
     } else {
@@ -98,10 +132,18 @@ async function lintGo(): Promise<number> {
     }
   }
 
-  for (const v of violations) {
-    log(v);
-    if (v.level === "error") problems++;
-  }
+  // Deterministic output: sort by file then code then message
+  violations.sort(
+    (a, b) =>
+      (a.file || "").localeCompare(b.file || "") ||
+      a.code.localeCompare(b.code) ||
+      a.message.localeCompare(b.message),
+  );
+
+  if (FORMAT === "json") printJson(violations);
+  else printHuman(violations);
+
+  for (const v of violations) if (v.level === "error") problems++;
   return problems;
 }
 

@@ -43,3 +43,23 @@ The prebuild guard verifies that generated glue files exist and are fresh relati
 - Typical commands
   - Local auto-fix: `node tools/buck/prebuild-guard.ts`
   - CI sequencing: run the three glue steps explicitly before building or testing.
+
+### Patches lint
+
+Validate patch filenames and directory shape to prevent cache/key churn and misapplied patches.
+
+- Rules (Go)
+  - Files must be flat under `patches/go/` (no subdirectories).
+  - Filenames must be `<importPath-encoded>@<version>.patch` with `/` encoded as `__`.
+  - Exactly one patch per `module@version` (case-insensitive).
+  - Non-`.patch` files under `patches/go/` are violations (e.g., `.gitkeep`).
+
+- Usage
+  - Advisory (default): `node tools/dev/patches-lint.ts`
+  - Strict (CI/hooks): `node tools/dev/patches-lint.ts --strict`
+  - JSON output: `node tools/dev/patches-lint.ts --format json`
+  - Scope language: `node tools/dev/patches-lint.ts --lang go`
+
+- Exit policy
+  - Advisory: prints diagnostics and exits 0.
+  - Strict: exits 1 if any violations.

@@ -50,3 +50,11 @@ Jenkins runs zx-backed stages: export-graph → sync-providers → gen-auto-map 
 ## Further reading
 
 See `docs/handbook/` for patching, CI, adding languages, testing, troubleshooting, and conventions.
+
+## Patches lint
+
+Use patches lint to validate patch filenames and detect duplicates.
+
+- Run advisory: `node tools/dev/patches-lint.ts`
+- Run strict: `node tools/dev/patches-lint.ts --strict`
+- See `docs/handbook/troubleshooting.md` for rules and JSON output mode.
