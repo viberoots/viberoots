@@ -4,9 +4,10 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    buck2.url = "github:facebook/buck2";
   };
 
-  outputs = { self, nixpkgs }:
+  outputs = { self, nixpkgs, buck2 }:
   let
     systems = [ "aarch64-darwin" "aarch64-linux" "x86_64-linux" ];
     forAllSystems = f: nixpkgs.lib.genAttrs systems (system:
@@ -167,6 +168,23 @@ EOF
               export PS1="\n\033[32m[nix-shell]\033[0m \h:\w$ "
               if [ -d "node_modules/zx" ]; then
                 eval "$(scaf completions bash)"
+              fi
+            fi
+
+            # Pin Buck2 prelude via Nix flake input and map cell alias locally
+            PRELUDE_PATH="${buck2}/prelude"
+            if [ ! -f .buckconfig ]; then
+              cat > .buckconfig <<EOF
+[repositories]
+prelude = ${buck2}/prelude
+EOF
+            else
+              # Ensure [repositories] section exists and alias is present
+              if ! grep -q "^\[repositories\]" .buckconfig; then
+                printf "\n[repositories]\n" >> .buckconfig
+              fi
+              if ! grep -q "^prelude\s*=\s*" .buckconfig; then
+                printf "prelude = %s\n" "$PRELUDE_PATH" >> .buckconfig
               fi
             fi
           '';
