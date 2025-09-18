@@ -34,4 +34,4 @@ This guide outlines how to introduce a new language without changing the core ar
 
 - Keep implementation language-agnostic in the planner (`tools/nix/lang-templates.nix`) and add only what’s necessary.
 - Node importer-scoped providers are optional/future; do not rely on them here.
-  - If you explore Node later: mirror the same flow with a `sync-providers-node` generator and have `gen-auto-map.ts` translate `lockfile:<path>#<importer>` labels via `providerNameForImporter`. Keep it deterministic and idempotent.
+  - If you explore Node later: mirror the same flow with a `sync-providers-node` generator and have `gen-auto-map.ts` translate `lockfile:<path>#<importer>` labels via `providerNameForImporter` (see `tools/lib/providers.ts`). Keep it deterministic and idempotent.

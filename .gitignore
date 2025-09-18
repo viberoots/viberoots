@@ -23,8 +23,10 @@ result
 # Generated glue (not committed per design)
 third_party/providers/TARGETS.auto
 third_party/providers/TARGETS.node.auto
+third_party/providers/TARGETS.*.auto
 third_party/providers/auto_map.bzl
 tools/buck/graph.json
+tools/buck/export-metrics.json
 
 # Test coverage and reports
 coverage/
