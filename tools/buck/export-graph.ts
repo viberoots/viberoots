@@ -6,6 +6,7 @@
 import fs from "fs-extra";
 import os from "node:os";
 import path from "node:path";
+import crypto from "node:crypto";
 
 type Node = {
   name: string;
@@ -203,7 +204,7 @@ async function gatherToolchainIdentity(): Promise<string> {
         (process.arch === "arm64" ? "arm64" : process.arch === "x64" ? "amd64" : process.arch),
       cgo: process.env.CGO_ENABLED || "1",
     } as const;
-    return require("node:crypto")
+    return crypto
       .createHash("sha256")
       .update(JSON.stringify(obj))
       .digest("hex")
@@ -301,9 +302,13 @@ async function buildBatches(
 }
 
 function toHashInput(tuple: Tuple, roots: string[], modRootAbs: string): any {
+  // Normalize macOS /private/var path variant so cache keys remain stable across runs
+  const modNorm = modRootAbs.startsWith("/private/var/")
+    ? modRootAbs.slice("/private".length)
+    : modRootAbs;
   return {
     tuple,
-    modRoot: modRootAbs,
+    modRoot: modNorm,
     roots: Array.from(new Set(roots)).sort(),
   };
 }
@@ -343,7 +348,7 @@ async function runGoList(tuple: Tuple, roots: string[], cwd: string): Promise<Go
   const lockHash =
     (await sha256OfFile(gomod2nix)) || (await sha256OfFile(gomod)) + (await sha256OfFile(gosum));
   const keyObj = { input, lockHash };
-  const key = require("node:crypto")
+  const key = crypto
     .createHash("sha256")
     .update(JSON.stringify(keyObj))
     .digest("hex");
