@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="${SCRIPT_DIR}/../.."
+LIVE_ROOT="${WORKSPACE_ROOT:-$REPO_ROOT}"
+
+TIMEOUT_CMD=(timeout -k 10s 180s)
+if [[ "${CI:-}" == "true" ]]; then
+  TIMEOUT_CMD=()
+fi
+
+: "${COVERAGE:=1}"
+
+RUN=("${TIMEOUT_CMD[@]}" buck2 test //... -- --env COVERAGE="${COVERAGE}" "$@")
+
+if [[ -z "${IN_NIX_SHELL:-}" ]]; then
+  if ! command -v direnv >/dev/null 2>&1; then
+    echo "error: direnv not found on PATH; run inside the dev shell" 1>&2
+    exit 127
+  fi
+  exec direnv exec "${LIVE_ROOT}" "${RUN[@]}"
+else
+  exec "${RUN[@]}"
+fi

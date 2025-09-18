@@ -11,9 +11,19 @@ if [[ -z "${NODE_V8_COVERAGE:-}" ]]; then
 fi
 mkdir -p "${NODE_V8_COVERAGE}"
 
-exec "${NODE_BIN:-node}" \
+RUN=("${NODE_BIN:-node}" \
   --experimental-top-level-await \
   --disable-warning=ExperimentalWarning \
   --experimental-strip-types \
   --import "${LIVE_ROOT}/tools/dev/zx-init.mjs" \
-  "$TARGET" "$@"
+  "$TARGET" "$@")
+
+if [[ -z "${IN_NIX_SHELL:-}" ]]; then
+  if ! command -v direnv >/dev/null 2>&1; then
+    echo "error: direnv not found on PATH; run inside the dev shell" 1>&2
+    exit 127
+  fi
+  exec direnv exec "${LIVE_ROOT}" "${RUN[@]}"
+else
+  exec "${RUN[@]}"
+fi
