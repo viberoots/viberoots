@@ -35,3 +35,8 @@
   - `node tools/dev/install-deps.ts` (regenerates `gomod2nix.toml` deterministically)
 - Preview without changes:
   - `node tools/dev/install-deps.ts --dry-run`
+
+## Buck prelude alias
+
+- Entering the dev shell (`nix develop`) writes `.buckconfig` with `[repositories] prelude = <nix-store>/prelude`, so loads like `@prelude//go:def.bzl` resolve automatically.
+- If you run Buck outside the dev shell, ensure the alias exists (use the committed `.buckconfig` or configure the alias yourself).

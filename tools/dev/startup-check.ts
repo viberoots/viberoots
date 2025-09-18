@@ -72,6 +72,21 @@ async function main() {
     );
   }
 
+  // Ensure Buck prelude alias exists so @prelude loads work even outside dev shell
+  try {
+    const buckconfig = await fs.readFile(".buckconfig", "utf8");
+    const hasPrelude = /\[repositories\][\s\S]*?^\s*prelude\s*=\s*/m.test(buckconfig);
+    if (!hasPrelude) {
+      console.warn(
+        "[startup-check] .buckconfig missing [repositories] prelude mapping; run 'nix develop' or add the alias so @prelude//go:def.bzl resolves.",
+      );
+    }
+  } catch {
+    console.warn(
+      "[startup-check] .buckconfig not found; run 'nix develop' to generate it or ensure prelude alias exists.",
+    );
+  }
+
   // Preflight: ensure pnpm-store fixed-output hash is correct so shellHook/node-modules won't rebuild repeatedly.
   try {
     await $`nix build .#pnpm-store --no-link --accept-flake-config`;

@@ -4,6 +4,9 @@ This repo uses Buck2 for orchestration, Nix for hermetic builds, and zx TypeScri
 
 ## Quick start
 
+- Enter dev shell (recommended)
+  - `nix develop`
+  - Note: the dev shell writes `.buckconfig` with `[repositories] prelude = <nix-store>/prelude`, enabling loads like `@prelude//go:def.bzl`. If you run Buck outside the dev shell, ensure this alias exists (use the committed `.buckconfig` or set the alias yourself).
 - Run tests
   - Full: `timeout -k 10s 180s buck2 test //...`
   - Targeted: `buck2 test //<target>`
@@ -30,7 +33,7 @@ Dev overrides warn locally and fail in CI.
 
 ## CI
 
-Jenkins runs zx-backed stages: export-graph → sync-providers → gen-auto-map → prebuild-guard → build & test → stale check. See `tools/ci/run-stage.ts`.
+Jenkins runs zx-backed stages: export-graph → sync-providers → gen-auto-map → prebuild-guard → build & test. See `tools/ci/run-stage.ts`.
 
 ## Further reading
 
