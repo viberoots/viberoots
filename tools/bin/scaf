@@ -1,29 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="${SCRIPT_DIR}/../.."
-# Prefer running the source from the original workspace root if provided (when executed from a temp copy)
-LIVE_ROOT="${WORKSPACE_ROOT:-$REPO_ROOT}"
+# shell helpers
+# shellcheck source=/dev/null
+. "$(cd "$(dirname "$0")" && pwd)/_env.sh"
+
+env_init_paths "$0"
 TARGET="${LIVE_ROOT}/tools/scaffolding/scaf.ts"
 
-if [[ -z "${NODE_V8_COVERAGE:-}" ]]; then
-  export NODE_V8_COVERAGE="${REPO_ROOT}/coverage/raw"
-fi
-mkdir -p "${NODE_V8_COVERAGE}"
+ensure_coverage_dir "${REPO_ROOT}"
 
-RUN=("${NODE_BIN:-node}" \
-  --experimental-top-level-await \
-  --disable-warning=ExperimentalWarning \
-  --experimental-strip-types \
-  --import "${LIVE_ROOT}/tools/dev/zx-init.mjs" \
-  "$TARGET" "$@")
-
-if [[ -z "${IN_NIX_SHELL:-}" ]]; then
-  if ! command -v direnv >/dev/null 2>&1; then
-    echo "error: direnv not found on PATH; run inside the dev shell" 1>&2
-    exit 127
-  fi
-  exec direnv exec "${LIVE_ROOT}" "${RUN[@]}"
-else
-  exec "${RUN[@]}"
-fi
+node_ts "${LIVE_ROOT}" "${TARGET}" "$@"
