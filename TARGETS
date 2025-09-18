@@ -296,6 +296,19 @@ zx_test(
     out = "exporter_tuple_includes_toolchain.stamp",
 )
 
+# E2E provider wiring and exporter test-only labels
+zx_test(
+    name = "e2e_provider_wiring",
+    script = "tools/tests/e2e-provider-wiring.ts",
+    out = "e2e_provider_wiring.stamp",
+)
+
+zx_test(
+    name = "exporter_test_only_deps_only_on_tests",
+    script = "tools/tests/exporter/exporter.test-only-deps-only-on-tests.test.ts",
+    out = "exporter_test_only_deps_only_on_tests.stamp",
+)
+
 zx_test(
     name = "exporter_tuple_cache_key_shifts_on_goflags",
     script = "tools/tests/exporter/exporter.tuple.cache-key-shifts-on-goflags.test.ts",

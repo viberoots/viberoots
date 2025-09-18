@@ -1,4 +1,4 @@
-load("prelude//go:def.bzl", "go_binary", "go_library", "go_test")
+load("@prelude//go:def.bzl", "go_binary", "go_library", "go_test")
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
 
 def _providers_for(name):

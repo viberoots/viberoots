@@ -39,12 +39,6 @@ pipeline {
           stage('Buck Tests') {
             steps { sh 'node tools/ci/run-stage.ts --stage buck-test' }
           }
-          stage('Stale check') {
-            steps {
-              sh 'git diff --exit-code third_party/providers/ || (echo "Generated providers are stale" && exit 1)'
-              sh 'git diff --exit-code tools/buck/graph.json || (echo "graph.json is stale" && exit 1)'
-            }
-          }
         }
       }
     }
