@@ -4,19 +4,27 @@ import os from "node:os";
 import path from "node:path";
 
 console.log("Installing dependencies...");
-type Flags = { force: boolean; dryRun: boolean; verbose: boolean; skipGlue: boolean };
+type Flags = {
+  force: boolean;
+  dryRun: boolean;
+  verbose: boolean;
+  skipGlue: boolean;
+  glueOnly: boolean;
+};
 function parseFlags(argv: string[]): Flags {
   let force = false;
   let dryRun = process.env.INSTALL_DEPS_DRY_RUN === "1";
   let verbose = false;
   let skipGlue = false;
+  let glueOnly = false;
   for (const a of argv) {
     if (a === "--force") force = true;
     if (a === "--dry-run") dryRun = true;
     if (a === "--verbose" || a === "-v") verbose = true;
     if (a === "--skip-glue") skipGlue = true;
+    if (a === "--glue-only") glueOnly = true;
   }
-  return { force, dryRun, verbose, skipGlue };
+  return { force, dryRun, verbose, skipGlue, glueOnly };
 }
 
 function logv(enabled: boolean, msg: string) {
@@ -92,28 +100,24 @@ async function runGomod2nixGenerate(dryRun: boolean, verbose: boolean) {
       await $({ cwd: tmp, stdio: "inherit" })`bash -c ${cmd}`;
       ran = true;
     } catch (e1) {
-      // Fallback 1: some nixpkgs revisions do not expose gomod2nix as an app
       const fallback1 = `nix shell nixpkgs#gomod2nix -c gomod2nix --dir .`;
       console.warn(`[gomod2nix] primary failed; trying fallback: ${fallback1}`);
       try {
         await $({ cwd: tmp, stdio: "inherit" })`bash -c ${fallback1}`;
         ran = true;
       } catch (e2) {
-        // Fallback 2: upstream flake reference (nix-community)
         const fallback2 = `nix run github:nix-community/gomod2nix -- --dir .`;
         console.warn(`[gomod2nix] nixpkgs missing app; trying upstream: ${fallback2}`);
         try {
           await $({ cwd: tmp, stdio: "inherit" })`bash -c ${fallback2}`;
           ran = true;
         } catch (e3) {
-          // Fallback 3: shell upstream (nix-community) and invoke binary explicitly
           const fallback3 = `nix shell github:nix-community/gomod2nix -c gomod2nix --dir .`;
           console.warn(`[gomod2nix] upstream run failed; trying shell: ${fallback3}`);
           try {
             await $({ cwd: tmp, stdio: "inherit" })`bash -c ${fallback3}`;
             ran = true;
           } catch (e4) {
-            // Fallback 4: use gomod2nix from PATH if available in dev shell
             try {
               await $({
                 cwd: tmp,
@@ -193,7 +197,7 @@ async function runGlue(dryRun: boolean, verbose: boolean) {
           return false;
         }
         try {
-          await $({ stdio: "pipe" })`bash -lc ${`${nodeBin} -e \"require.resolve('yaml')\"`}`;
+          await $({ stdio: "pipe" })`bash -lc ${`${nodeBin} -e "require.resolve('yaml')"`}`;
           return true;
         } catch {
           console.warn("[install-deps] yaml package missing; skipping node providers stage");
@@ -229,7 +233,13 @@ async function runGlue(dryRun: boolean, verbose: boolean) {
 }
 
 async function main() {
-  const { force, dryRun, verbose, skipGlue } = parseFlags(process.argv.slice(2));
+  const { force, dryRun, verbose, skipGlue, glueOnly } = parseFlags(process.argv.slice(2));
+  if (glueOnly) {
+    if (verbose) console.log("[install-deps] glue-only mode");
+    await runGlue(dryRun, verbose);
+    console.log("Glue refreshed.");
+    return;
+  }
   await fsp.rm("node_modules", { force: true });
   await $({ stdio: "inherit" })`pnpm install --lockfile-only`;
   await $({ stdio: "inherit" })`tools/dev/update-pnpm-hash.ts`;
