@@ -732,9 +732,7 @@ pipeline {
               '''
             }
           }
-          stage('Stale Check') {
-            steps { sh 'git diff --exit-code third_party/providers/ && git diff --exit-code tools/buck/graph.json || (echo "Generated files are stale"; exit 1)' }
-          }
+          // Stale check: rely on prebuild-guard for freshness of glue files (they are not committed)
         }
       }
     }
@@ -1235,16 +1233,15 @@ def go_module_patch(name, module_key, patch_path):
 
 ```starlark
 # //go/defs.bzl — wrap go_* and attach providers from auto_map.bzl
+# Note: Some repos don’t define the `prelude` cell alias. If so, adjust the load
+# to your local alias or expose go rules via a repo-local forwarding bzl.
 load("@prelude//go:def.bzl", "go_binary", "go_library", "go_test")
 
 def _providers_for(name):
-    # Load generated mapping; fail with an actionable message if missing.
-    fail_msg = "Missing provider map. Run: `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`."
-    MODULE_PROVIDERS = None
-    try:
-        load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
-    except Exception as e:
-        fail(fail_msg + "\nDetails: %s" % e)
+    # Mapping is generated; guard its presence via prebuild-guard in CI/local.
+    # Macro-level loads cannot easily provide friendly errors without try/except.
+    MODULE_PROVIDERS = {}
+    load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
     pkg = native.package_name()
     key = "//%s:%s" % (pkg, name)
     return MODULE_PROVIDERS.get(key, [])
@@ -1264,6 +1261,8 @@ def nix_go_test(name, **kwargs):
     deps = deps + _providers_for(name)
     go_test(name = name, deps = deps, **kwargs)
 ```
+
+> Macro error UX: We intentionally rely on `tools/buck/prebuild-guard.ts` to emit actionable messages when glue is missing/stale, because Starlark macro loads cannot portably catch and reword load errors. If your repo can’t use the `@prelude` alias, set the alias in Buck config or change the `load("@prelude//go:def.bzl", ...)` to a repo-local forwarding bzl that re-exports `go_*`.
 
 ### Example TARGETS Entries (Go)
 
