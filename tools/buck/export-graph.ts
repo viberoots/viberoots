@@ -2,6 +2,11 @@
 /**
  * tools/buck/export-graph.ts — Configured Buck graph exporter with Go module labels
  * Generated file is not committed. See build-system-design.md (Exporting the Buck Graph (ZX)).
+ *
+ * Usage examples:
+ *   node tools/buck/export-graph.ts --out tools/buck/graph.json
+ *   node tools/buck/export-graph.ts --out tools/buck/graph.json \
+ *     --metrics-out tools/buck/export-metrics.json
  */
 import fs from "fs-extra";
 import crypto from "node:crypto";

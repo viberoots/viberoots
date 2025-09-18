@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
+import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
 test("exporter writes metrics when --metrics-out is provided", async () => {
@@ -22,7 +22,9 @@ test("exporter writes metrics when --metrics-out is provided", async () => {
     await fs.outputFile(sim, JSON.stringify(nodes) + "\n");
 
     // Run in simulate mode so it doesn’t query buck
-    await $({ cwd: tmp })`node tools/buck/export-graph.ts --simulate ${sim} --out ${out} --metrics-out ${metrics}`;
+    await $({
+      cwd: tmp,
+    })`node tools/buck/export-graph.ts --simulate ${sim} --out ${out} --metrics-out ${metrics}`;
 
     assert.ok(await fs.pathExists(out), "graph.json should exist");
     assert.ok(await fs.pathExists(metrics), "metrics file should exist");
@@ -31,5 +33,3 @@ test("exporter writes metrics when --metrics-out is provided", async () => {
     assert.ok(Array.isArray(m.tupleKeys));
   });
 });
-
-
