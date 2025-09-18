@@ -5,6 +5,7 @@
 - One test per file.
 - External timeouts: 40s per test, 180s for full suite.
 - Use zx `#!/usr/bin/env zx-wrapper` for tests.
+ - Do not modify PATH inside tests; rely on the dev shell to supply tools.
 
 ## Coverage
 
@@ -15,6 +16,7 @@
 
 - Full: `timeout -k 10s 180s buck2 test //...`
 - Specific: `buck2 test //<target>`
+ - Single-test external timeout (preferred): `gtimeout -k 5s 40s buck2 test //<target>` (or `timeout` on Linux)
 
 ## zx tests overview
 
@@ -40,3 +42,8 @@
 
 - Entering the dev shell (`nix develop`) writes `.buckconfig` with `[repositories] prelude = <nix-store>/prelude`, so loads like `@prelude//go:def.bzl` resolve automatically.
 - If you run Buck outside the dev shell, ensure the alias exists (use the committed `.buckconfig` or configure the alias yourself).
+
+## Prelude-gated tests
+
+- Some integration/unit zx tests probe prelude availability with a `buck2 cquery` call.
+- If the probe fails, they `SKIP` with a message instructing you to run in the dev shell.

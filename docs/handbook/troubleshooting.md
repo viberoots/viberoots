@@ -63,3 +63,18 @@ Validate patch filenames and directory shape to prevent cache/key churn and misa
 - Exit policy
   - Advisory: prints diagnostics and exits 0.
   - Strict: exits 1 if any violations.
+
+### Glue regeneration (quick reference)
+
+- Local sequence (not committed): export-graph → sync-providers → gen-auto-map.
+  - Run `node tools/buck/export-graph.ts --out tools/buck/graph.json`
+  - Run `node tools/buck/sync-providers.ts`
+  - Run `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
+  - Or run `node tools/dev/install-deps.ts` (dev shell) which chains them for you.
+- CI sequence: the same steps as separate stages before build/test.
+
+### Prelude-gated tests (dev shell)
+
+- Some zx tests probe `@prelude` availability using `buck2 cquery`.
+- If unavailable, the test prints a SKIP message and exits early; enter the dev shell and re-run.
+- See Testing handbook for external timeouts and coverage.

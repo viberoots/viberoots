@@ -11,10 +11,11 @@ This repo uses Buck2 for orchestration, Nix for hermetic builds, and zx TypeScri
   - Full: `timeout -k 10s 180s buck2 test //...`
   - Targeted: `buck2 test //<target>`
 - Regenerate glue locally
-  - `tools/ci/run-stage.ts --stage export-graph`
-  - `tools/ci/run-stage.ts --stage sync-providers-go`
-  - `tools/ci/run-stage.ts --stage gen-auto-map`
-  - `tools/ci/run-stage.ts --stage prebuild-guard`
+  - Local sequence (not committed): export-graph → sync-providers → gen-auto-map
+    - `node tools/buck/export-graph.ts --out tools/buck/graph.json`
+    - `node tools/buck/sync-providers.ts`
+    - `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
+    - Or run `node tools/dev/install-deps.ts` (dev shell) to chain them
 
 ## Go dependencies (gomod2nix)
 
@@ -30,6 +31,7 @@ This repo uses Buck2 for orchestration, Nix for hermetic builds, and zx TypeScri
 Patches live at `patches/go/<encodedImport>@<version>.patch` (flat). One patch per `module@version`.
 
 Dev overrides warn locally and fail in CI.
+See the Patching and Troubleshooting handbooks for details.
 
 ## Prebuild guard
 
