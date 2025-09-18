@@ -25,6 +25,65 @@ Scope: Implement remaining items from build-system-design.md excluding Node impo
   - Running `node tools/dev/install-deps.ts` on a repo with patches produces `tools/buck/graph.json`, `third_party/providers/TARGETS.auto`, and `third_party/providers/auto_map.bzl` without errors.
   - Idempotent: re-running does not change files if inputs are unchanged.
 
+### PR 2 — Detailed Design: Glue regeneration in install-deps
+
+Overview:
+
+- Ensure a developer who runs `tools/dev/install-deps.ts` ends up with current glue files locally, without manual steps. Glue is not committed; this only prepares the workspace.
+
+Invocation sequence (added near the end of install-deps):
+
+1. `node tools/buck/export-graph.ts --out tools/buck/graph.json`
+2. `node tools/buck/sync-providers.ts` (Go)
+3. (Optional) `node tools/buck/sync-providers-node.ts` when PNPM lockfiles exist and the `yaml` package is resolvable
+4. `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
+
+Placement in `tools/dev/install-deps.ts`:
+
+- After existing steps (pnpm lockfile handling, node-modules link, advisory `patches-lint`, and `gomod2nix` generation). This ensures the exporter sees any newly generated Go deps and that Go/Nix inputs are in place.
+
+Gating and behavior:
+
+- If `--dry-run` is passed (or `INSTALL_DEPS_DRY_RUN=1`), echo the four commands with no changes.
+- If `buck2` is not available on PATH, print a warning and skip steps (1) and (4) that depend on the exported graph; still run `sync-providers.ts` to keep provider files aligned with patches.
+- Node provider sync is best-effort: if no `**/pnpm-lock.yaml` files are present or `require('yaml')` fails, skip silently with a concise warning (consistent with tools/ci/run-stage.ts).
+
+Idempotency:
+
+- `sync-providers.ts` and `gen-auto-map.ts` already write deterministically and use a write-if-changed strategy; repeated execution should yield no diffs.
+- `export-graph.ts` writes normalized, deterministic JSON. Re-running with unchanged inputs should produce identical file content (mtime may change, which is acceptable locally).
+
+Flags and env:
+
+- Reuse existing flags parser; add an optional `--skip-glue` that bypasses glue steps entirely (defaults to false). Honor `--dry-run`.
+- `--verbose` (existing) should print the exact commands when glue steps run.
+
+Errors and exit policy:
+
+- Any non-dry-run glue sub-step failure should fail the script with a non-zero exit code.
+- When `buck2` is missing, the script does not fail; it warns and skips exporter/auto-map. This keeps install-deps usable outside the dev shell while nudging devs to enter it.
+
+Minimal edits (≤250 LOC budget across touched files):
+
+- `tools/dev/install-deps.ts`
+  - Add small helpers: `have(cmd: string): Promise<boolean>` and `runGlue(dryRun: boolean, verbose: boolean)`.
+  - Append invocation near the end, gated by flags.
+
+Testing plan:
+
+- Add a zx test that runs `tools/dev/install-deps.ts --dry-run` in a temp copy and asserts the echoed glue commands appear in order.
+- Add a zx test that creates a dummy Go patch file in `patches/go/…` and runs the glue section (with buck2 available in dev shell), then asserts:
+  - `third_party/providers/TARGETS.auto` contains one provider rule for the dummy patch.
+  - `third_party/providers/auto_map.bzl` is present and non-empty.
+- Re-run to confirm no content changes (idempotency) when inputs are unchanged.
+
+Acceptance criteria (expanded):
+
+- Running `tools/dev/install-deps.ts` in a dev shell with Buck available produces fresh `graph.json` and `auto_map.bzl` and regenerates provider files based on patches.
+- Running with `--dry-run` prints planned glue commands without performing changes.
+- Running on a machine without `buck2` prints a single warning and completes without throwing, but still syncs provider files for Go patches.
+- Repeating the command when repo inputs are unchanged leads to no content diffs in glue files.
+
 ### PR 3: Nix templates warn on dev overrides (non-CI)
 
 - Goals:

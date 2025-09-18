@@ -4,9 +4,10 @@
  * Generated file is not committed. See build-system-design.md (Exporting the Buck Graph (ZX)).
  */
 import fs from "fs-extra";
+import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
-import crypto from "node:crypto";
+import { writeIfChanged } from "../lib/fs-helpers.ts";
 
 type Node = {
   name: string;
@@ -82,11 +83,9 @@ async function exportConfiguredGraph(): Promise<Node[]> {
   return normalized.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-async function writeAtomicJSON(file: string, data: any) {
-  const txt = JSON.stringify(data, null, 2);
-  const tmp = file + ".tmp";
-  await fs.outputFile(tmp, txt, "utf8");
-  await fs.move(tmp, file, { overwrite: true });
+async function writeIfChangedJSON(file: string, data: any) {
+  const txt = JSON.stringify(data, null, 2) + "\n";
+  await writeIfChanged(file, txt);
 }
 
 // -------------------- Phase 3 core: authoritative module labeler --------------------
@@ -204,11 +203,7 @@ async function gatherToolchainIdentity(): Promise<string> {
         (process.arch === "arm64" ? "arm64" : process.arch === "x64" ? "amd64" : process.arch),
       cgo: process.env.CGO_ENABLED || "1",
     } as const;
-    return crypto
-      .createHash("sha256")
-      .update(JSON.stringify(obj))
-      .digest("hex")
-      .slice(0, 12);
+    return crypto.createHash("sha256").update(JSON.stringify(obj)).digest("hex").slice(0, 12);
   } catch {
     return "unknown";
   }
@@ -348,10 +343,7 @@ async function runGoList(tuple: Tuple, roots: string[], cwd: string): Promise<Go
   const lockHash =
     (await sha256OfFile(gomod2nix)) || (await sha256OfFile(gomod)) + (await sha256OfFile(gosum));
   const keyObj = { input, lockHash };
-  const key = crypto
-    .createHash("sha256")
-    .update(JSON.stringify(keyObj))
-    .digest("hex");
+  const key = crypto.createHash("sha256").update(JSON.stringify(keyObj)).digest("hex");
   const cachePath = path.join(cacheDir, `${key}.json`);
   await ensureDir(cacheDir);
   if (await fs.pathExists(cachePath)) {
@@ -627,7 +619,7 @@ async function attachGoModuleLabels(nodes: Node[]): Promise<Node[]> {
 
 async function main() {
   const nodes = await exportConfiguredGraph();
-  await writeAtomicJSON(out, nodes);
+  await writeIfChangedJSON(out, nodes);
   console.log(`wrote ${out}`);
   if (metricsOut) {
     try {

@@ -4,17 +4,19 @@ import os from "node:os";
 import path from "node:path";
 
 console.log("Installing dependencies...");
-type Flags = { force: boolean; dryRun: boolean; verbose: boolean };
+type Flags = { force: boolean; dryRun: boolean; verbose: boolean; skipGlue: boolean };
 function parseFlags(argv: string[]): Flags {
   let force = false;
   let dryRun = process.env.INSTALL_DEPS_DRY_RUN === "1";
   let verbose = false;
+  let skipGlue = false;
   for (const a of argv) {
     if (a === "--force") force = true;
     if (a === "--dry-run") dryRun = true;
     if (a === "--verbose" || a === "-v") verbose = true;
+    if (a === "--skip-glue") skipGlue = true;
   }
-  return { force, dryRun, verbose };
+  return { force, dryRun, verbose, skipGlue };
 }
 
 function logv(enabled: boolean, msg: string) {
@@ -151,8 +153,69 @@ async function runGomod2nixGenerate(dryRun: boolean, verbose: boolean) {
   logv(verbose, `[gomod2nix] hash ${beforeHash || "(none)"} -> ${afterHash || "(none)"}`);
 }
 
+async function have(cmd: string): Promise<boolean> {
+  try {
+    await $({ stdio: "pipe" })`bash -lc 'command -v ${cmd} >/dev/null 2>&1'`;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function zxNodeBase(): string {
+  const zxInit = path.resolve("tools/dev/zx-init.mjs");
+  return [
+    "--experimental-top-level-await",
+    "--experimental-strip-types",
+    "--disable-warning=ExperimentalWarning",
+    "--import",
+    zxInit,
+  ].join(" ");
+}
+
+async function runGlue(dryRun: boolean, verbose: boolean) {
+  const nodeBase = zxNodeBase();
+  const nodeBin = process.execPath || "node";
+  const cmds: Array<{ label: string; cmd: string; gated?: () => Promise<boolean> } > = [
+    { label: "export-graph", cmd: `${nodeBin} ${nodeBase} tools/buck/export-graph.ts --out tools/buck/graph.json`, gated: async () => await have("buck2") },
+    { label: "sync-providers-go", cmd: `${nodeBin} ${nodeBase} tools/buck/sync-providers.ts` },
+    { label: "sync-providers-node", cmd: `${nodeBin} ${nodeBase} tools/buck/sync-providers-node.ts`, gated: async () => {
+      try {
+        await $({ stdio: "pipe" })`git ls-files '**/pnpm-lock.yaml'`;
+      } catch { return false; }
+      try {
+        await $({ stdio: "pipe" })`bash -lc ${`${nodeBin} -e \"require.resolve('yaml')\"`}`;
+        return true;
+      } catch {
+        console.warn("[install-deps] yaml package missing; skipping node providers stage");
+        return false;
+      }
+    } },
+    { label: "gen-auto-map", cmd: `${nodeBin} ${nodeBase} tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`, gated: async () => await have("buck2") },
+  ];
+
+  const buckPresent = await have("buck2");
+  for (const c of cmds) {
+    if (c.gated) {
+      const ok = await c.gated();
+      if (!ok) {
+        if ((c.label === "export-graph" || c.label === "gen-auto-map") && !buckPresent) {
+          console.warn(`[install-deps] buck2 not found; skipping ${c.label}`);
+        }
+        continue;
+      }
+    }
+    if (dryRun) {
+      console.log(`[dry-run] ${c.cmd}`);
+    } else {
+      if (verbose) console.log(`[run] ${c.cmd}`);
+      await $({ stdio: "inherit" })`bash -lc ${c.cmd}`;
+    }
+  }
+}
+
 async function main() {
-  const { force, dryRun, verbose } = parseFlags(process.argv.slice(2));
+  const { force, dryRun, verbose, skipGlue } = parseFlags(process.argv.slice(2));
   await fsp.rm("node_modules", { force: true });
   await $({ stdio: "inherit" })`pnpm install --lockfile-only`;
   await $({ stdio: "inherit" })`tools/dev/update-pnpm-hash.ts`;
@@ -160,9 +223,15 @@ async function main() {
   await relinkNodeModules(force);
   // Advisory lint (non-strict): enforce patch path invariants without blocking setup
   try {
-    await $({ stdio: "inherit" })`node tools/dev/patches-lint.ts`;
+    const nodeBase = zxNodeBase();
+    await $({ stdio: "inherit" })`bash -lc ${`node ${nodeBase} tools/dev/patches-lint.ts`}`;
   } catch {}
   await runGomod2nixGenerate(dryRun, verbose);
+  if (!skipGlue) {
+    await runGlue(dryRun, verbose);
+  } else if (verbose) {
+    console.log("[skip] glue regeneration");
+  }
   console.log("Dependencies installed and node_modules linked.");
 }
 
