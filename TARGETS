@@ -310,6 +310,12 @@ zx_test(
 )
 
 zx_test(
+    name = "exporter_cache_content_reuse",
+    script = "tools/tests/exporter/exporter.cache-content-reuse.test.ts",
+    out = "exporter_cache_content_reuse.stamp",
+)
+
+zx_test(
     name = "exporter_tuple_cache_key_shifts_on_goflags",
     script = "tools/tests/exporter/exporter.tuple.cache-key-shifts-on-goflags.test.ts",
     out = "exporter_tuple_cache_key_shifts_on_goflags.stamp",

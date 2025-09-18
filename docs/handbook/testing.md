@@ -16,6 +16,19 @@
 - Full: `timeout -k 10s 180s buck2 test //...`
 - Specific: `buck2 test //<target>`
  
+## zx tests overview
+
+- Exporter tuple and cache:
+  - `//:exporter_tuple_includes_goflags` — GOFLAGS become part of the tuple.
+  - `//:exporter_tuple_includes_toolchain` — toolchain identity is included.
+  - `//:exporter_tuple_cache_key_shifts_on_goflags` — cache key varies with GOFLAGS.
+  - `//:exporter_cache_content_reuse` — identical batches reuse the cached go-list JSON without rewriting.
+
+- Per-target configuration and wiring:
+  - `//:exporter_per_target_platform_splits_batches` — GOOS/GOARCH split batches.
+  - `//:exporter_test_only_deps_only_on_tests` — test-only deps label only test targets.
+  - `//:e2e_provider_wiring` — provider mapping places module providers only on affected targets.
+
 ## Go dependencies (gomod2nix)
 
 - After editing `go.mod` or `go.sum`, run:

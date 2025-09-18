@@ -641,6 +641,11 @@ nix_go_binary(
   - Subdirectories under `patches/<lang>/`,
   - Missing provider entries (shouldn’t happen with generators).
 - [ ] Add a **pre-commit** hook to run provider sync (fast) and fail on diffs.
+- Concrete tests implemented:
+  - `tools/tests/exporter/exporter.test-only-deps-only-on-tests.test.ts` — verifies test-only deps only label test targets.
+  - `tools/tests/e2e-provider-wiring.ts` — ensures provider wiring maps module labels only to affected targets.
+  - `tools/tests/exporter/exporter.cache-content-reuse.test.ts` — proves exporter reuses cached go-list JSON for identical batches.
+
 - Verification:
   - [ ] All three checks green locally and in CI.
 - Acceptance: Guardrails prevent regressions in invalidation & naming.
