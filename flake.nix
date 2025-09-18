@@ -158,6 +158,10 @@ EOF
 PROMPT='%F{green}[nix-shell]%f %m:%~$ '
 autoload -Uz compinit
 compinit -i
+# Aliases for convenience
+alias b=build
+alias v=verify
+alias t=verify
 if [ -d "node_modules/zx" ]; then
   eval "$(scaf completions zsh)"
 fi
