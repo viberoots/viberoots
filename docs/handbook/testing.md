@@ -15,7 +15,7 @@
 
 - Full: `timeout -k 10s 180s buck2 test //...`
 - Specific: `buck2 test //<target>`
- 
+
 ## zx tests overview
 
 - Exporter tuple and cache:

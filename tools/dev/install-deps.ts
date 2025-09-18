@@ -176,22 +176,36 @@ function zxNodeBase(): string {
 async function runGlue(dryRun: boolean, verbose: boolean) {
   const nodeBase = zxNodeBase();
   const nodeBin = process.execPath || "node";
-  const cmds: Array<{ label: string; cmd: string; gated?: () => Promise<boolean> } > = [
-    { label: "export-graph", cmd: `${nodeBin} ${nodeBase} tools/buck/export-graph.ts --out tools/buck/graph.json`, gated: async () => await have("buck2") },
+  const cmds: Array<{ label: string; cmd: string; gated?: () => Promise<boolean> }> = [
+    {
+      label: "export-graph",
+      cmd: `${nodeBin} ${nodeBase} tools/buck/export-graph.ts --out tools/buck/graph.json`,
+      gated: async () => await have("buck2"),
+    },
     { label: "sync-providers-go", cmd: `${nodeBin} ${nodeBase} tools/buck/sync-providers.ts` },
-    { label: "sync-providers-node", cmd: `${nodeBin} ${nodeBase} tools/buck/sync-providers-node.ts`, gated: async () => {
-      try {
-        await $({ stdio: "pipe" })`git ls-files '**/pnpm-lock.yaml'`;
-      } catch { return false; }
-      try {
-        await $({ stdio: "pipe" })`bash -lc ${`${nodeBin} -e \"require.resolve('yaml')\"`}`;
-        return true;
-      } catch {
-        console.warn("[install-deps] yaml package missing; skipping node providers stage");
-        return false;
-      }
-    } },
-    { label: "gen-auto-map", cmd: `${nodeBin} ${nodeBase} tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`, gated: async () => await have("buck2") },
+    {
+      label: "sync-providers-node",
+      cmd: `${nodeBin} ${nodeBase} tools/buck/sync-providers-node.ts`,
+      gated: async () => {
+        try {
+          await $({ stdio: "pipe" })`git ls-files '**/pnpm-lock.yaml'`;
+        } catch {
+          return false;
+        }
+        try {
+          await $({ stdio: "pipe" })`bash -lc ${`${nodeBin} -e \"require.resolve('yaml')\"`}`;
+          return true;
+        } catch {
+          console.warn("[install-deps] yaml package missing; skipping node providers stage");
+          return false;
+        }
+      },
+    },
+    {
+      label: "gen-auto-map",
+      cmd: `${nodeBin} ${nodeBase} tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`,
+      gated: async () => await have("buck2"),
+    },
   ];
 
   const buckPresent = await have("buck2");
