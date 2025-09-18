@@ -169,6 +169,16 @@ EOF
               if [ -d "node_modules/zx" ]; then
                 eval "$(scaf completions bash)"
               fi
+              alias b=build
+              alias v=verify
+              alias t=verify
+            fi
+
+            # Also add aliases for zsh sessions
+            if [ -n "$ZSH_VERSION" ]; then
+              alias b=build
+              alias v=verify
+              alias t=verify
             fi
 
             # Pin Buck2 prelude via Nix flake input and map cell alias locally
