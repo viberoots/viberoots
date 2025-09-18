@@ -12,9 +12,15 @@ export async function makeWorkspace(originPath: string, moduleKey: string): Prom
   const dst = path.join(base, `${safeKey}-${stamp}`);
   await fs.mkdirp(base);
 
-  // On macOS, some environments may lack `cp -c` support; fall back immediately to cp -a.
-  // On Linux, we intentionally skip overlay mounts in automated tests to avoid permissions prompts.
-  // Fallback: plain recursive copy
+  // macOS: prefer APFS CoW clone (cp -cR) when available; otherwise fall back to cp -a.
+  if (process.platform === "darwin") {
+    try {
+      await $`cp -cR ${originPath}/. ${dst}/`;
+      return dst;
+    } catch {
+      // fall through to cp -a
+    }
+  }
   await $`cp -a ${originPath}/. ${dst}/`;
   return dst;
 }

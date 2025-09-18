@@ -57,14 +57,7 @@ async function main() {
     process.exit(1);
   }
 
-  if (process.platform === "linux") {
-    const hasFuse = await which("fuse-overlayfs");
-    if (!hasFuse) {
-      console.info(
-        "[startup-check] warning:fuse-overlayfs not found; patch workspaces will fallback to cp -a",
-      );
-    }
-  }
+  // No overlayfs requirement: patch workspaces use cp -cR on macOS when available, else cp -a.
 
   if ((process.env.NIX_GO_DEV_OVERRIDE_JSON || "").trim() !== "") {
     console.warn(

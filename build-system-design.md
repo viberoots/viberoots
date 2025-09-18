@@ -331,8 +331,8 @@ The outer CLI `patch-pkg` implements language/subcommand parsing and delegates t
 
 - **`start <module>`**
   - Creates a temp writable workspace over the Nix store source of `<module>`:
-    - **Linux:** `fuse-overlayfs` on top of read-only store path.
-    - **macOS:** APFS CoW clone (`cp -cR`).
+    - **macOS:** APFS CoW clone (`cp -cR`) when available; otherwise `cp -a`.
+    - **Other platforms:** `cp -a`.
   - Writes/updates the `NIX_GO_DEV_OVERRIDE_JSON` entry for `<module>`.
   - If `$PATCH_EDITOR` is set, launch it with the temp dir.
 
@@ -405,10 +405,8 @@ Here `patchesMap` is derived **directly from patch filenames** in `patches/go/*.
 
 **Cross-Platform Strategy**
 
-- Linux: `fuse-overlayfs` writable overlay.
-  - Ensure `fuse-overlayfs` is included in your **Nix developer environment**.
-- macOS: APFS CoW clones (`cp -cR`).
-- Both yield a writable dir at `$tmp` with identical UX.
+- macOS: APFS CoW clones (`cp -cR`) when available; fallback to `cp -a`.
+- Others: `cp -a`.
 
 **Developer Example**
 
