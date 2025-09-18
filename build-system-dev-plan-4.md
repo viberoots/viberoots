@@ -166,6 +166,59 @@ Acceptance criteria (expanded):
   - Default behavior unchanged.
   - When `extra_module_providers=["//third_party/providers:example"]` is provided, the macro includes them in deps in addition to auto_map providers.
 
+### PR 4 — Detailed Design: Macros `extra_module_providers` escape hatch
+
+Overview:
+
+- Add an opt-in macro kwarg `extra_module_providers` to `nix_go_library`, `nix_go_binary`, and `nix_go_test`. When present, these labels are appended to the macro’s deps in addition to the auto providers derived from `auto_map.bzl`. Defaults to empty to keep behavior unchanged.
+
+Exact macro changes (go/defs.bzl):
+
+- Signatures:
+  - `def nix_go_library(name, deps = [], extra_module_providers = [], **kwargs): ...`
+  - `def nix_go_binary(name, deps = [], extra_module_providers = [], **kwargs): ...`
+  - `def nix_go_test(name, deps = [], extra_module_providers = [], **kwargs): ...`
+- Implementation details:
+  - Keep `_providers_for(name)` as-is to read generated `MODULE_PROVIDERS`.
+  - Add a small helper `_normalize_labels(pkg, labels)` that:
+    - Accepts a list of strings; raises a readable error if a non-string is provided.
+    - Converts relative labels like `":foo"` to absolute `"//{pkg}:foo"` using `native.package_name()`.
+    - Returns the normalized list as given (no re-sorting).
+  - Merge order for final deps is:
+    1. user `deps` (preserve order)
+    2. auto providers from `_providers_for(name)` (preserve order from mapping)
+    3. normalized `extra_module_providers` (preserve order)
+  - Deduplicate with first-wins semantics across the concatenated sequence so that if the user duplicates a label, only the first instance remains.
+  - Apply the merged list to the wrapped `go_*` rule.
+
+Validation and UX:
+
+- If `extra_module_providers` contains any non-string, raise `fail("extra_module_providers must be a list of string labels")`.
+- Do not attempt to verify target existence at macro time (keeps macros fast and avoids cross-package coupling). Buck will surface missing labels normally.
+- No change to how `MODULE_PROVIDERS` is loaded; prebuild guard continues to handle missing glue cases.
+
+Non-goals:
+
+- No environment or global toggle; purely per-macro explicit escape hatch.
+- No implicit provider injection besides those already in `auto_map.bzl`.
+
+Testing plan:
+
+- Add zx tests under `tools/tests/scaffolding/` (or a new small group if preferred) that:
+  1. Create a temporary package with a `TARGETS` using `nix_go_library` and set `extra_module_providers = ["//third_party/providers:mod_dummy"]`.
+     - Assert via `buck2 cquery "deps(//tmp:lib)"` that `//third_party/providers:mod_dummy` is present.
+  2. Ensure auto providers remain: seed a minimal `MODULE_PROVIDERS` mapping for the same target, then assert both the auto provider AND the extra are present.
+  3. Relative label normalization: use `extra_module_providers = [":localprov"]` in a local package and assert it resolves to `//tmp:localprov` in deps.
+  4. Deduplication: include the same label via `deps` and `extra_module_providers`; assert only one instance is present in deps.
+- Wire these tests in root `TARGETS` similarly to existing zx tests.
+
+Acceptance criteria (expanded):
+
+- Default invocation of macros behaves identically to before (no `extra_module_providers`).
+- Providing one or more labels in `extra_module_providers` appends them to deps alongside auto providers, with stable ordering and deduplication.
+- Relative labels are normalized to absolute using the package name.
+- New tests pass under Buck2 with the project’s external timeouts.
+
 ### PR 5: Prebuild guard env & auto-fix documentation alignment (no code change required)
 
 - Goals:

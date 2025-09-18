@@ -177,7 +177,7 @@ async function main() {
       // In CI, fail fast with presence/freshness details
       for (const o of outPresence) {
         console.error(
-          `ERROR: ${o} missing — run export-graph, sync-providers and gen-auto-map stages`,
+          `ERROR: ${o} missing — run glue generation in this order: export-graph → sync-providers → gen-auto-map`,
         );
       }
       process.exit(1);
@@ -199,6 +199,7 @@ async function main() {
       if (needFixFreshness) {
         console.error("WARN: glue is stale");
       }
+      console.error("HINT: unset PREBUILD_GUARD_NO_FIX to auto-fix locally.");
     }
   }
 

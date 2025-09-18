@@ -119,6 +119,18 @@ zx_test(
 )
 
 zx_test(
+    name = "scaffolding_macros_extra_module_providers",
+    script = "tools/tests/scaffolding/macros.extra-module-providers.test.ts",
+    out = "scaffolding_macros_extra_module_providers.stamp",
+)
+
+zx_test(
+    name = "scaffolding_macros_extra_module_providers_integration",
+    script = "tools/tests/scaffolding/macros.extra-module-providers.integration.test.ts",
+    out = "scaffolding_macros_extra_module_providers_integration.stamp",
+)
+
+zx_test(
     name = "scaffolding_export_graph_noop",
     script = "tools/tests/scaffolding/export-graph.noop.test.ts",
     out = "scaffolding_export_graph_noop.stamp",

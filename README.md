@@ -31,6 +31,18 @@ Patches live at `patches/go/<encodedImport>@<version>.patch` (flat). One patch p
 
 Dev overrides warn locally and fail in CI.
 
+## Prebuild guard
+
+Before Buck builds, the prebuild guard ensures required glue exists and is fresh. Locally it auto-fixes by default; in CI it fails fast if glue is missing or stale.
+
+- Local: run `node tools/buck/prebuild-guard.ts` to generate glue in order: export-graph → sync-providers → gen-auto-map.
+- Env toggles:
+  - `PREBUILD_GUARD_NO_FIX=1` to warn without auto-fixing locally.
+  - `PREBUILD_GUARD_VERBOSE=1` to print top newer inputs and older outputs.
+  - `PREBUILD_GUARD_SKEW_MS` and `PREBUILD_GUARD_LIST_LIMIT` to adjust freshness sensitivity and listing size.
+
+For details, see `docs/handbook/troubleshooting.md`.
+
 ## CI
 
 Jenkins runs zx-backed stages: export-graph → sync-providers → gen-auto-map → prebuild-guard → build & test. See `tools/ci/run-stage.ts`.
