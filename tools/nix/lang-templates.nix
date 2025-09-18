@@ -18,12 +18,20 @@ let
             val = (acc.${key} or []) ++ [ "${patchDir}/${name}" ];
         in acc // { "${key}" = val; };
     in builtins.foldl' step {} (lib.filter isPatch names);
+
+  # Emit a concise warning locally when dev overrides are set; in CI we still hard-fail below.
+  readDevOverrides = envName: let
+    v = builtins.getEnv envName;
+    dev = if v == "" then {} else builtins.fromJSON v;
+  in if (builtins.getEnv "CI") != "true" && dev != {}
+     then builtins.trace "[NIX_GO_DEV_OVERRIDE_JSON active] Local derivation hashes will differ; unset before sharing cache artifacts." dev
+     else dev;
 in
 {
   goApp = { name, modulesToml, devOverrideEnv ? "NIX_GO_DEV_OVERRIDE_JSON", subdir ? ".", patchDir ? ../../patches/go }:
     let
       patchesMap = patchesMapFromDir patchDir;
-      devOverrides = let v = builtins.getEnv devOverrideEnv; in if v == "" then {} else builtins.fromJSON v;
+      devOverrides = readDevOverrides devOverrideEnv;
       _ = if (builtins.getEnv "CI") == "true" && (builtins.getEnv devOverrideEnv) != "" then
             builtins.throw "Dev overrides are forbidden in CI" else null;
     in pkgs.buildGoApplication {
@@ -41,7 +49,7 @@ in
   goLib = { name, modulesToml, devOverrideEnv ? "NIX_GO_DEV_OVERRIDE_JSON", subdir ? ".", patchDir ? ../../patches/go }:
     let
       patchesMap = patchesMapFromDir patchDir;
-      devOverrides = let v = builtins.getEnv devOverrideEnv; in if v == "" then {} else builtins.fromJSON v;
+      devOverrides = readDevOverrides devOverrideEnv;
       _ = if (builtins.getEnv "CI") == "true" && (builtins.getEnv devOverrideEnv) != "" then
             builtins.throw "Dev overrides are forbidden in CI" else null;
     in pkgs.buildGoApplication {

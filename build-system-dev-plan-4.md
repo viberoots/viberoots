@@ -94,6 +94,67 @@ Acceptance criteria (expanded):
   - Local eval/build prints a single-line warning when overrides set.
   - In CI (`CI=true`), same code path throws as before.
 
+### PR 3 — Detailed Design: Nix templates warn on dev overrides
+
+Overview:
+
+- Align implementation with the design doc: when `NIX_GO_DEV_OVERRIDE_JSON` is set locally, print a concise, single-line warning during Nix evaluation; in CI (`CI=true`) hard-fail remains intact.
+
+Exact changes (tools/nix/lang-templates.nix):
+
+- Introduce a helper function to read overrides and emit a warning only when appropriate:
+
+  ```nix
+  # At top-level inside the file's `let` or adjacent scope used by templates
+  readDevOverrides = envName: let
+    v = builtins.getEnv envName;
+    dev = if v == "" then {} else builtins.fromJSON v;
+  in if (builtins.getEnv "CI") != "true" && dev != {}
+     then builtins.trace "[NIX_GO_DEV_OVERRIDE_JSON active] Local derivation hashes will differ; unset before sharing cache artifacts." dev
+     else dev;
+  ```
+
+- In both `goApp` and `goLib` templates, replace the direct `devOverrides` binding with:
+
+  ```nix
+  devOverrides = readDevOverrides devOverrideEnv;
+  ```
+
+- Preserve the CI guard exactly as-is (hard fail) immediately after `devOverrides`:
+
+  ```nix
+  _ = if (builtins.getEnv "CI") == "true" && (builtins.getEnv devOverrideEnv) != ""
+        then builtins.throw "Dev overrides are forbidden in CI"
+        else null;
+  ```
+
+Notes:
+
+- `builtins.trace` prints once per template instantiation when overrides are present; the message is a single concise line to minimize noise while remaining visible.
+- No change to derivation structure or hashes beyond the intended effect of the overrides.
+
+Testing plan:
+
+- Add a zx test `tools/tests/dev/nix-dev-overrides-warning.test.ts` that:
+  - Runs under the dev shell with `NIX_GO_DEV_OVERRIDE_JSON='{"example@v1.0.0":"/tmp/src"}'` and `CI=` (unset).
+  - Executes a lightweight evaluation that forces the templates to evaluate, capturing stderr to assert the warning appears exactly once:
+    - For example, run:
+      ```bash
+      nix-instantiate --eval -E '
+        let pkgs = import <nixpkgs> {}; T = import ./tools/nix/lang-templates.nix { inherit pkgs; };
+        (T.goLib { name = "dummy"; modulesToml = ./gomod2nix.toml; }).pname or "ok"
+      '
+      ```
+    - Assert stderr contains `[NIX_GO_DEV_OVERRIDE_JSON active]` and exit code is 0.
+  - Repeat with `CI=true` and assert that evaluation fails with the CI error message.
+- Wire the test via existing zx test rule so it participates in `buck2 test`.
+
+Acceptance criteria (expanded):
+
+- With overrides set and `CI` unset, Nix evaluation logs exactly one concise warning line per template evaluation site and proceeds.
+- With `CI=true`, evaluation/build throws with the existing message, unchanged.
+- No other behavior changes; full test suite remains green.
+
 ### PR 4: Buck macros manual override escape hatch
 
 - Goals:
