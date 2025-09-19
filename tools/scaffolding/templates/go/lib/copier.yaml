@@ -19,3 +19,10 @@ _exclude:
 name: ""
 language: "go"
 template: "lib"
+
+# Required variables for Phase 1
+module: "github.com/example/{{ name }}"
+description: "{{ name }} library"
+go_min: "1.22"
+license: "MIT"
+enable_ci: false

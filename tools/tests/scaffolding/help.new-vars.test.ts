@@ -19,5 +19,12 @@ test("help new <lang> <template> shows variables preview", async () => {
       console.error("expected 'name' in variables list");
       process.exit(2);
     }
+    // Phase 1 variables
+    for (const v of ["module", "description", "go_min", "license", "enable_ci"]) {
+      if (!new RegExp(`- ${v}(\\s|$)`).test(out)) {
+        console.error(`expected '${v}' in variables list`);
+        process.exit(2);
+      }
+    }
   });
 });
