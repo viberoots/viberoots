@@ -8,3 +8,6 @@ Build after glue generation:
 build
 verify
 ```
+
+Providers: nix_go_* macros attach providers automatically via `third_party/providers/auto_map.bzl`.
+Glue is generated locally by the build wrappers (and in CI via stages).

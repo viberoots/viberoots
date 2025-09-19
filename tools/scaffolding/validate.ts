@@ -148,9 +148,25 @@ export async function validateTemplates(targets: string[], quiet: boolean = fals
         process.exit(2);
       }
     }
+
+    // Phase 3: ensure TARGETS uses nix_go_* macros, not raw go_* rules
+    const targetsPath = path.join(tdir, "TARGETS");
+    if (await exists(targetsPath)) {
+      const txt = await fsp.readFile(targetsPath, "utf8");
+      const usesNix = /\bnix_go_(library|binary|test)\s*\(/.test(txt);
+      const usesRaw = /\bgo_(library|binary|test)\s*\(/.test(txt);
+      if (!usesNix || usesRaw) {
+        if (!quiet) {
+          console.error(
+            `TARGETS must use nix_go_* macros and not raw go_*: ${language}/${template}`,
+          );
+        }
+        process.exit(2);
+      }
+    }
   }
   if (!quiet) {
-    console.log("OK \u2014 template meta/help validated");
+    console.log("OK — template meta/help validated");
   }
 }
 
