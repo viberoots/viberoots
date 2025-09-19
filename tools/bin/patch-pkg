@@ -1,12 +1,6 @@
 #!/usr/bin/env bash
-set -euo pipefail
 # shell helpers
 # shellcheck source=/dev/null
 . "$(cd "$(dirname "$0")" && pwd)/_env.sh"
 
-env_init_paths "$0"
-TARGET_TS="${LIVE_ROOT}/tools/patch/patch-pkg.ts"
-
-ensure_coverage_dir "${REPO_ROOT}"
-
-node_ts "${LIVE_ROOT}" "${TARGET_TS}" "$@"
+run_ts "../patch/patch-pkg.ts" "$@"

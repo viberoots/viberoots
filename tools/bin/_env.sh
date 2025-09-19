@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Directory of this helper script (tools/bin)
+export ENV_SH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 env_init_paths() {
   local script_path="$1"
   export SCRIPT_DIR="$(cd "$(dirname "$script_path")" && pwd)"
@@ -43,3 +46,21 @@ node_ts() {
     --import "${live_root}/tools/dev/zx-init.mjs" \
     "$target_ts" "$@"
 }
+
+run_ts() {
+  # Usage: run_ts "../dev/dev-build.ts" [args...]
+  local rel_path="$1"; shift || true
+  local target_ts="${ENV_SH_DIR}/${rel_path}"
+  node_ts "${LIVE_ROOT}" "${target_ts}" "$@"
+}
+
+# Auto-initialize paths on source if not already set, then ensure coverage dir when enabled
+if [[ -z "${SCRIPT_DIR:-}" || -z "${REPO_ROOT:-}" || -z "${LIVE_ROOT:-}" ]]; then
+  __ENV_INIT_CALLER="${BASH_SOURCE[1]:-$0}"
+  env_init_paths "${__ENV_INIT_CALLER}"
+  unset __ENV_INIT_CALLER
+fi
+
+if [[ "${COVERAGE:-}" == "1" ]]; then
+  ensure_coverage_dir "${REPO_ROOT}"
+fi

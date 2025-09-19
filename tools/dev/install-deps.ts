@@ -197,7 +197,7 @@ async function runGlue(dryRun: boolean, verbose: boolean) {
           return false;
         }
         try {
-          await $({ stdio: "pipe" })`bash -lc ${`${nodeBin} -e "require.resolve('yaml')"`}`;
+          await import("yaml");
           return true;
         } catch {
           console.warn("[install-deps] yaml package missing; skipping node providers stage");
