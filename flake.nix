@@ -45,7 +45,7 @@
           nativeBuildInputs = [ pkgs.nodejs_22 pkgs.pnpm ];
           outputHashMode = "recursive";
           # Temporary placeholder; updated by tools/dev/update-pnpm-hash.ts after first build attempt
-          outputHash     = "sha256-BXt5+VM8x26BNYNel/U2U8k/gIyk+XDamVYykZmXWlY=";
+          outputHash     = "sha256-nSySfpEzhcuYkYb9q2wFWFWbU1Zvr0yuGgg4OpEu6cc=";
           dontPatchShebangs = true;
           unpackPhase = ''
             runHook preUnpack
