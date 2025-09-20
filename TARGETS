@@ -372,6 +372,13 @@ zx_test(
     out = "scaffolding_go_cli_scaffold_and_build.stamp",
 )
 
+# Phase 7 partial-clone discovery/build test
+zx_test(
+    name = "scaffolding_partial_clone_discover_and_build",
+    script = "tools/tests/scaffolding/partial-clone.discover-and-build.test.ts",
+    out = "scaffolding_partial_clone_discover_and_build.stamp",
+)
+
 # PR C fs-helpers tests
 zx_test(
     name = "lib_fs_helpers_write_if_changed",
