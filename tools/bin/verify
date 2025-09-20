@@ -3,17 +3,89 @@
 # shellcheck source=/dev/null
 . "$(cd "$(dirname "$0")" && pwd)/_env.sh"
 
-TIMEOUT_CMD=(timeout -k 10s 180s)
+# Determine external timeout command
+if command -v timeout >/dev/null 2>&1; then
+  TIMEOUT_CMD=(timeout -k 10s 180s)
+elif command -v gtimeout >/dev/null 2>&1; then
+  TIMEOUT_CMD=(gtimeout -k 10s 180s)
+else
+  TIMEOUT_CMD=()
+fi
 if [[ "${CI:-}" == "true" ]]; then
   TIMEOUT_CMD=()
 fi
 
 : "${COVERAGE:=1}"
 
+# Use PATH for buck2; shellHook ensures upstream buck2 is first
+BUCK_BIN="buck2"
+
+# Resolve prelude strictly from this flake's buck2-prelude (built from upstream input)
+if ! command -v nix >/dev/null 2>&1; then
+  echo "error: nix not found; cannot resolve buck2 prelude" 1>&2
+  exit 127
+fi
+PRE_OUT=$(nix build .#buck2-prelude --no-link --accept-flake-config --print-out-paths 2>/dev/null | tail -1)
+if [[ -z "$PRE_OUT" || ! -d "$PRE_OUT/prelude" ]]; then
+  echo "error: failed to resolve flake .#buck2-prelude" 1>&2
+  exit 1
+fi
+BUCK_PRELUDE="$PRE_OUT/prelude"
+
+export BUCK_ROOT="${WORKSPACE_ROOT:-$PWD}"
+
+# Write deterministic Buck config mapping, symlinking prelude into repo for stable alias
+: > .buckroot
+rm -rf prelude && ln -s "$BUCK_PRELUDE" prelude
+cat > .buckconfig <<EOF
+[buildfile]
+name = TARGETS
+
+[repositories]
+root = .
+prelude = ./prelude
+toolchains = ./toolchains
+repo_toolchains = ./toolchains
+fbsource = ./prelude/third-party/fbsource_stub
+fbcode = ./prelude/third-party/fbcode_stub
+config = ./prelude
+
+[cells]
+root = .
+prelude = ./prelude
+toolchains = ./toolchains
+repo_toolchains = ./toolchains
+fbsource = ./prelude/third-party/fbsource_stub
+fbcode = ./prelude/third-party/fbcode_stub
+config = ./prelude
+
+[build]
+prelude = prelude
+user_platform = prelude//platforms:default
+target_platforms = prelude//platforms:default
+EOF
+
+# Ensure toolchains/ has its own .buckconfig so Buck uses TARGETS there too
+mkdir -p toolchains
+cat > toolchains/.buckconfig <<EOF
+[buildfile]
+name = TARGETS
+EOF
+
+build_run_array() {
+  local PLATFORM_FLAGS=(--target-platforms prelude//platforms:default)
+  local args=("$BUCK_BIN" test "${PLATFORM_FLAGS[@]}" "$@" -- --env COVERAGE="${COVERAGE}")
+  if [[ ${#TIMEOUT_CMD[@]} -gt 0 ]]; then
+    RUN=("${TIMEOUT_CMD[@]}" "${args[@]}")
+  else
+    RUN=("${args[@]}")
+  fi
+}
+
 if [[ $# -eq 0 ]]; then
-  RUN=("${TIMEOUT_CMD[@]}" buck2 test //... -- --env COVERAGE="${COVERAGE}")
+  build_run_array //...
 else
-  RUN=("${TIMEOUT_CMD[@]}" buck2 test "$@" -- --env COVERAGE="${COVERAGE}")
+  build_run_array "$@"
 fi
 
 exec_in_dev_shell "${LIVE_ROOT}" "${RUN[@]}"

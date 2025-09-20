@@ -32,25 +32,48 @@ async function main() {
     process.exit(1);
   }
 
-  const must = ["dynamic-derivations", "recursive-nix"];
-  const nice = ["ca-derivations"];
   try {
     const { stdout } = await $`nix show-config`;
-    const text = String(stdout).toLowerCase();
-    const have = (k: string) =>
-      text.includes(k) || (process.env.NIX_CONFIG || "").toLowerCase().includes(k);
-    const hardOk = must.every(have);
-    if (!hardOk) {
-      console.error(
-        "[startup-check] nix experimental features must include: dynamic-derivations recursive-nix",
-      );
+    const configText = String(stdout).toLowerCase();
+    const envText = (process.env.NIX_CONFIG || "").toLowerCase();
+    const expLine =
+      configText.split(/\n/).find((l) => l.trim().startsWith("experimental-features =")) || "";
+    const merged = [expLine.split("=").slice(1).join("=") || "", envText].join(" ").trim();
+    const features = new Set(
+      merged
+        .split(/[\s,]+/)
+        .map((s) => s.trim())
+        .filter(Boolean),
+    );
+
+    if (!features.has("nix-command")) {
+      console.error("[startup-check] missing nix experimental feature: nix-command");
       process.exit(1);
     }
-    const softOk = nice.every(have);
-    if (!softOk) {
-      console.warn(
-        "[startup-check] warning: ca-derivations not enabled. Local dev is OK; CI will enforce it.",
-      );
+    if (!features.has("flakes")) {
+      console.error("[startup-check] missing nix experimental feature: flakes");
+      process.exit(1);
+    }
+    if (!features.has("dynamic-derivations")) {
+      console.error("[startup-check] missing nix experimental feature: dynamic-derivations");
+      process.exit(1);
+    }
+    if (!features.has("recursive-nix")) {
+      console.error("[startup-check] missing nix experimental feature: recursive-nix");
+      process.exit(1);
+    }
+
+    if (!features.has("ca-derivations")) {
+      if ((process.env.CI || "").toLowerCase() === "true") {
+        console.error(
+          "[startup-check] missing nix experimental feature: ca-derivations (required in CI)",
+        );
+        process.exit(1);
+      } else {
+        console.warn(
+          "[startup-check] warning: ca-derivations not enabled. Local dev is OK; CI will enforce it.",
+        );
+      }
     }
   } catch {
     console.error("[startup-check] cannot read nix config via `nix show-config`");

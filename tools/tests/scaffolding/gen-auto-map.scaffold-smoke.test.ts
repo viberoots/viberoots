@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
-import { test } from "node:test";
-import { runInTemp, exists } from "../lib/test-helpers";
 import * as path from "node:path";
+import { test } from "node:test";
+import { exists, runInTemp } from "../lib/test-helpers";
 
 test("auto_map generated for scaffolded repo (may be empty)", async () => {
   await runInTemp("scaf-automap-smoke", async (_tmp, _$) => {

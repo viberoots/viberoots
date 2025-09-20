@@ -27,6 +27,79 @@ const simulate = (argv.simulate as string) || ""; // path to simulated nodes JSO
 const maxParallel = Number(argv["max-parallel"] || 4);
 const cacheDir = (argv["cache-dir"] as string) || "tools/buck/.export-cache";
 const metricsOut = (argv["metrics-out"] as string) || "";
+async function ensurePreludeBuckConfig() {
+  try {
+    // If config already points to prelude cell, skip
+    const cfg = path.join(process.cwd(), ".buckconfig");
+    const has = await fs.pathExists(cfg);
+    if (has) {
+      const txt = await fs.readFile(cfg, "utf8").catch(() => "");
+      if (/^\[build\][\s\S]*?^prelude\s*=\s*prelude/m.test(txt)) return;
+    }
+    // Try build package first
+    let out = "";
+    try {
+      const { stdout } = await $({
+        stdio: "pipe",
+      })`nix build .#buck2-prelude --no-link --accept-flake-config --print-out-paths`;
+      out =
+        String(stdout || "")
+          .trim()
+          .split("\n")
+          .filter(Boolean)
+          .pop() || "";
+    } catch {}
+    if (!out) {
+      try {
+        const { stdout } = await $({ stdio: "pipe" })`nix eval --raw .#inputs.buck2.outPath`;
+        out = String(stdout || "").trim();
+      } catch {}
+    }
+    if (!out) return;
+    const preludeDir = path.join(out, "prelude");
+    await fs.writeFile(path.join(process.cwd(), ".buckroot"), "");
+    await fs.remove("prelude").catch(() => {});
+    await fs.symlink(preludeDir, "prelude").catch(async () => {
+      // On some systems, symlink might exist; ensure it points correctly
+      try {
+        const cur = await fs.readlink("prelude");
+        if (path.resolve(cur) !== path.resolve(preludeDir)) {
+          await fs.unlink("prelude");
+          await fs.symlink(preludeDir, "prelude");
+        }
+      } catch {}
+    });
+    const cfgTxt = [
+      "[buildfile]",
+      "name = TARGETS",
+      "",
+      "[repositories]",
+      "root = .",
+      "prelude = ./prelude",
+      "toolchains = ./toolchains",
+      "repo_toolchains = ./toolchains",
+      "fbsource = ./prelude/third-party/fbsource_stub",
+      "fbcode = ./prelude/third-party/fbcode_stub",
+      "config = ./prelude",
+      "",
+      "[cells]",
+      "root = .",
+      "prelude = ./prelude",
+      "toolchains = ./toolchains",
+      "repo_toolchains = ./toolchains",
+      "fbsource = ./prelude/third-party/fbsource_stub",
+      "fbcode = ./prelude/third-party/fbcode_stub",
+      "config = ./prelude",
+      "",
+      "[build]",
+      "prelude = prelude",
+      "",
+    ].join("\n");
+    await fs.writeFile(cfg, cfgTxt, "utf8");
+  } catch {
+    // best-effort only
+  }
+}
 
 const attrList = [
   "name",
@@ -67,6 +140,7 @@ let gMetrics: Metrics = {
 };
 
 async function exportConfiguredGraph(): Promise<Node[]> {
+  await ensurePreludeBuckConfig();
   let nodes: Node[];
   if (simulate) {
     const txt = await fs.readFile(simulate, "utf8");
@@ -76,7 +150,8 @@ async function exportConfiguredGraph(): Promise<Node[]> {
       ? `attrfilter(labels, ${scope}, deps(//..., 1, exec_deps()))`
       : `deps(//..., 1, exec_deps())`;
     const flags = attrList.flatMap((a) => ["--output-attribute", a]);
-    const { stdout } = await $`buck2 cquery ${query} --json ${flags}`;
+    const platformFlags = ["--target-platforms", "prelude//platforms:default"];
+    const { stdout } = await $`buck2 cquery ${platformFlags} ${query} --json ${flags}`;
     const obj = JSON.parse(String(stdout)) as Record<string, any>;
     nodes = Object.values(obj) as any[];
   }

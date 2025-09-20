@@ -4,7 +4,8 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    buck2.url = "github:facebook/buck2";
+    # Pin buck2 to match the upstream binary version on PATH (201beb86106f...)
+    buck2.url = "github:facebook/buck2/201beb86106fecdc84e30260b0f1abb5bf576988";
   };
 
   outputs = { self, nixpkgs, buck2 }:
@@ -118,10 +119,10 @@
           '';
           passthru.lockHash = builtins.hashFile "sha256" ./pnpm-lock.yaml;
         });
-      in f { inherit pkgs zx-wrapper node pnpm pnpm-store node-modules; }
+      in f { inherit pkgs zx-wrapper node pnpm pnpm-store node-modules system; buck2Input = buck2; }
     );
   in {
-    devShells = forAllSystems ({ pkgs, zx-wrapper, node-modules, ... }:
+    devShells = forAllSystems ({ pkgs, zx-wrapper, node-modules, buck2Input, system, ... }:
       {
         default = pkgs.mkShell {
           shellHook = ''
@@ -139,6 +140,17 @@
             fi
 
             export PATH="$PWD/tools/bin:$PATH"
+            # Prefer upstream buck2 binary on PATH (fallback to flake buck2)
+            buck_out=$(nix build github:facebook/buck2#buck2 --no-link --print-out-paths 2>/dev/null || true)
+            if [ -n "$buck_out" ] && [ -x "$buck_out/bin/buck2" ]; then
+              export PATH="$buck_out/bin:$PATH"
+            else
+              buck_out_local=$(nix build .#buck2 --no-link --accept-flake-config --print-out-paths 2>/dev/null || true)
+              if [ -n "$buck_out_local" ] && [ -x "$buck_out_local/bin/buck2" ]; then
+                export PATH="$buck_out_local/bin:$PATH"
+              fi
+            fi
+
             # Always prepare zsh completions for any zsh spawned later (guarded until node_modules exists)
             mkdir -p .nix-zsh
             cat > .nix-zsh/.zshenv <<'EOF'
@@ -185,32 +197,230 @@ EOF
               alias t=verify
             fi
 
-            # Pin Buck2 prelude via Nix flake input and map cell alias locally
-            PRELUDE_PATH="${buck2}/prelude"
-            if [ ! -f .buckconfig ]; then
-              cat > .buckconfig <<EOF
-[repositories]
-prelude = ${buck2}/prelude
-EOF
+            # Ensure Buck2 config uses a prelude that matches upstream buck2, unless locked
+            if [ "''${BUCK_CONFIG_LOCK:-0}" = "1" ]; then
+              : # Skip buck config mutation; locked by caller
             else
-              # Ensure [repositories] section exists and alias is present
-              if ! grep -q "^\[repositories\]" .buckconfig; then
-                printf "\n[repositories]\n" >> .buckconfig
+              pre_out=$(nix build .#buck2-prelude --no-link --accept-flake-config --print-out-paths 2>/dev/null || true)
+              if [ -n "$pre_out" ]; then
+                PRELUDE_PATH="$pre_out/prelude"
+              else
+                PRELUDE_PATH="$(${pkgs.nix}/bin/nix eval --raw .#inputs.buck2.outPath 2>/dev/null)/prelude"
               fi
-              if ! grep -q "^prelude\s*=\s*" .buckconfig; then
-                printf "prelude = %s\n" "$PRELUDE_PATH" >> .buckconfig
+              # Guarantee buck root marker
+              : > .buckroot
+            # Ensure a buildfile section exists
+            if ! grep -q "^\[buildfile\]" .buckconfig 2>/dev/null; then
+              printf "[buildfile]\nname = TARGETS\n\n" >> .buckconfig
+            elif ! grep -q "^name\s*=\s*TARGETS" .buckconfig; then
+              # Replace or append name in [buildfile]
+              if command -v gsed >/dev/null 2>&1; then SED=gsed; else SED=sed; fi
+              "$SED" -i.bak -e '/^\[buildfile\]/{:a;n;/^\[/q; s/^name\s*=.*/name = TARGETS/; ta}' .buckconfig || true
+              rm -f .buckconfig.bak
+            fi
+
+            # Ensure [repositories] with prelude alias exists and points to PRELUDE_PATH
+            if ! grep -q "^\[repositories\]" .buckconfig 2>/dev/null; then
+              printf "[repositories]\nroot = .\nprelude = %s\ntoolchains = %s/toolchains\nfbsource = %s/third-party/fbsource_stub\nfbcode = %s/third-party/fbcode_stub\n\n" "$PRELUDE_PATH" "$PRELUDE_PATH" "$PRELUDE_PATH" "$PRELUDE_PATH" >> .buckconfig
+            else
+              if command -v gsed >/dev/null 2>&1; then SED=gsed; else SED=sed; fi
+              if grep -q "^prelude\s*=\s*" .buckconfig; then
+                "$SED" -i.bak -E "s|^prelude\s*=.*$|prelude = ''${PRELUDE_PATH}|" .buckconfig || true
+              else
+                # Append into the repositories section
+                awk -v repl="prelude = ''${PRELUDE_PATH}" '
+                  BEGIN{printed=0}
+                  {print}
+                  /^\[repositories\]$/ {section=1; next}
+                  section && /^(\[|$)/ {
+                    if (!printed) {print repl"\n"; printed=1}
+                    section=0
+                  }
+                  END{if (section && !printed) print repl}
+                ' .buckconfig > .buckconfig.tmp && mv .buckconfig.tmp .buckconfig || true
               fi
+              # Ensure toolchains mapping
+              if grep -q "^toolchains\s*=\s*" .buckconfig; then
+                "$SED" -i.bak -E "s|^toolchains\s*=.*$|toolchains = ''${PRELUDE_PATH}/toolchains|" .buckconfig || true
+              else
+                awk -v repl="toolchains = ''${PRELUDE_PATH}/toolchains" '
+                  BEGIN{printed=0}
+                  {print}
+                  /^\[repositories\]$/ {section=1; next}
+                  section && /^(\[|$)/ {
+                    if (!printed) {print repl"\n"; printed=1}
+                    section=0
+                  }
+                  END{if (section && !printed) print repl}
+                ' .buckconfig > .buckconfig.tmp && mv .buckconfig.tmp .buckconfig || true
+              fi
+              # Ensure fbsource mapping
+              if grep -q "^fbsource\s*=\s*" .buckconfig; then
+                "$SED" -i.bak -E "s|^fbsource\s*=.*$|fbsource = ''${PRELUDE_PATH}/third-party/fbsource_stub|" .buckconfig || true
+              else
+                awk -v repl="fbsource = ''${PRELUDE_PATH}/third-party/fbsource_stub" '
+                  BEGIN{printed=0}
+                  {print}
+                  /^\[repositories\]$/ {section=1; next}
+                  section && /^(\[|$)/ {
+                    if (!printed) {print repl"\n"; printed=1}
+                    section=0
+                  }
+                  END{if (section && !printed) print repl}
+                ' .buckconfig > .buckconfig.tmp && mv .buckconfig.tmp .buckconfig || true
+              fi
+              # Ensure fbcode mapping
+              if grep -q "^fbcode\s*=\s*" .buckconfig; then
+                "$SED" -i.bak -E "s|^fbcode\s*=.*$|fbcode = ''${PRELUDE_PATH}/third-party/fbcode_stub|" .buckconfig || true
+              else
+                awk -v repl="fbcode = ''${PRELUDE_PATH}/third-party/fbcode_stub" '
+                  BEGIN{printed=0}
+                  {print}
+                  /^\[repositories\]$/ {section=1; next}
+                  section && /^(\[|$)/ {
+                    if (!printed) {print repl"\n"; printed=1}
+                    section=0
+                  }
+                  END{if (section && !printed) print repl}
+                ' .buckconfig > .buckconfig.tmp && mv .buckconfig.tmp .buckconfig || true
+              fi
+              # Ensure root = . exists in [repositories]
+              if ! grep -q "^root\s*=\s*\.\s*$" .buckconfig; then
+                awk -v repl="root = ." '
+                  BEGIN{printed=0}
+                  {print}
+                  /^\[repositories\]$/ {section=1; next}
+                  section && /^(\[|$)/ {
+                    if (!printed) {print repl"\n"; printed=1}
+                    section=0
+                  }
+                  END{if (section && !printed) print repl}
+                ' .buckconfig > .buckconfig.tmp && mv .buckconfig.tmp .buckconfig || true
+              fi
+              rm -f .buckconfig.bak
+            fi
+
+            # Ensure [cells] maps prelude
+            if ! grep -q "^\[cells\]" .buckconfig 2>/dev/null; then
+              printf "[cells]\nroot = .\nprelude = %s\ntoolchains = %s/toolchains\nfbsource = %s/third-party/fbsource_stub\nfbcode = %s/third-party/fbcode_stub\n\n" "$PRELUDE_PATH" "$PRELUDE_PATH" "$PRELUDE_PATH" "$PRELUDE_PATH" >> .buckconfig
+            else
+              if command -v gsed >/dev/null 2>&1; then SED=gsed; else SED=sed; fi
+              if grep -q "^prelude\s*=\s*" .buckconfig; then
+                "$SED" -i.bak -E "0,/^\[cells\]$/{0,/^prelude\s*=.*/s||prelude = ''${PRELUDE_PATH}|}" .buckconfig || true
+              else
+                awk -v repl="prelude = ''${PRELUDE_PATH}" '
+                  BEGIN{printed=0}
+                  {print}
+                  /^\[cells\]$/ {section=1; next}
+                  section && /^(\[|$)/ {
+                    if (!printed) {print repl"\n"; printed=1}
+                    section=0
+                  }
+                  END{if (section && !printed) print repl}
+                ' .buckconfig > .buckconfig.tmp && mv .buckconfig.tmp .buckconfig || true
+              fi
+              # Ensure toolchains cell mapping
+              if grep -q "^toolchains\s*=\s*" .buckconfig; then
+                "$SED" -i.bak -E "0,/^\[cells\]$/{0,/^toolchains\s*=.*/s||toolchains = ''${PRELUDE_PATH}/toolchains|}" .buckconfig || true
+              else
+                awk -v repl="toolchains = ''${PRELUDE_PATH}/toolchains" '
+                  BEGIN{printed=0}
+                  {print}
+                  /^\[cells\]$/ {section=1; next}
+                  section && /^(\[|$)/ {
+                    if (!printed) {print repl"\n"; printed=1}
+                    section=0
+                  }
+                  END{if (section && !printed) print repl}
+                ' .buckconfig > .buckconfig.tmp && mv .buckconfig.tmp .buckconfig || true
+              fi
+              # Ensure fbsource cell mapping
+              if grep -q "^fbsource\s*=\s*" .buckconfig; then
+                "$SED" -i.bak -E "0,/^\[cells\]$/{0,/^fbsource\s*=.*/s||fbsource = ''${PRELUDE_PATH}/third-party/fbsource_stub|}" .buckconfig || true
+              else
+                awk -v repl="fbsource = ''${PRELUDE_PATH}/third-party/fbsource_stub" '
+                  BEGIN{printed=0}
+                  {print}
+                  /^\[cells\]$/ {section=1; next}
+                  section && /^(\[|$)/ {
+                    if (!printed) {print repl"\n"; printed=1}
+                    section=0
+                  }
+                  END{if (section && !printed) print repl}
+                ' .buckconfig > .buckconfig.tmp && mv .buckconfig.tmp .buckconfig || true
+              fi
+              # Ensure fbcode cell mapping
+              if grep -q "^fbcode\s*=\s*" .buckconfig; then
+                "$SED" -i.bak -E "0,/^\[cells\]$/{0,/^fbcode\s*=.*/s||fbcode = ''${PRELUDE_PATH}/third-party/fbcode_stub|}" .buckconfig || true
+              else
+                awk -v repl="fbcode = ''${PRELUDE_PATH}/third-party/fbcode_stub" '
+                  BEGIN{printed=0}
+                  {print}
+                  /^\[cells\]$/ {section=1; next}
+                  section && /^(\[|$)/ {
+                    if (!printed) {print repl"\n"; printed=1}
+                    section=0
+                  }
+                  END{if (section && !printed) print repl}
+                ' .buckconfig > .buckconfig.tmp && mv .buckconfig.tmp .buckconfig || true
+              fi
+              # Ensure root = . exists within the [cells] section specifically
+              awk '
+                BEGIN { insec=0; have_root=0 }
+                /^\[cells\]$/ { insec=1; print; next }
+                insec && /^root\s*=\s*\.$/ { have_root=1 }
+                { print }
+                insec && /^\[/ { if (!have_root) print "root = ."; insec=0 }
+                END { if (insec && !have_root) print "root = ." }
+              ' .buckconfig > .buckconfig.tmp && mv .buckconfig.tmp .buckconfig || true
+              rm -f .buckconfig.bak
+            fi
+
+            # Ensure [build] prelude refers to the prelude cell alias (not a path)
+            if ! grep -q "^\[build\]" .buckconfig 2>/dev/null; then
+              printf "[build]\nprelude = prelude\n\n" >> .buckconfig
+            else
+              if command -v gsed >/dev/null 2>&1; then SED=gsed; else SED=sed; fi
+              if grep -q "^prelude\s*=\s*" .buckconfig; then
+                "$SED" -i.bak -E "0,/^\[build\]$/{0,/^prelude\s*=.*/s||prelude = prelude|}" .buckconfig || true
+              else
+                awk -v repl="prelude = prelude" '
+                  BEGIN{printed=0}
+                  {print}
+                  /^\[build\]$/ {section=1; next}
+                  section && /^(\[|$)/ {
+                    if (!printed) {print repl"\n"; printed=1}
+                    section=0
+                  }
+                  END{if (section && !printed) print repl}
+                ' .buckconfig > .buckconfig.tmp && mv .buckconfig.tmp .buckconfig || true
+              fi
+              rm -f .buckconfig.bak
+            fi
             fi
           '';
           buildInputs = [
             pkgs.git pkgs.buck2 pkgs.go pkgs.pnpm pkgs.nodejs_22 zx-wrapper pkgs.jq pkgs.rsync pkgs.copier pkgs.yq
-            pkgs.secretspec pkgs.jc
+            pkgs.secretspec pkgs.jc pkgs.coreutils
           ] ++ (if pkgs.stdenv.isLinux then [ pkgs.fuse-overlayfs pkgs.xdg-utils ] else []);
         };
       }
     );
 
-    packages = forAllSystems ({ zx-wrapper, pkgs, pnpm-store, node-modules, ... }: {
+    packages = forAllSystems ({ zx-wrapper, pkgs, pnpm-store, node-modules, buck2Input, system, ... }: {
+      # Expose only a prelude package derived from the upstream buck2 input
+      buck2-prelude = pkgs.stdenvNoCC.mkDerivation {
+        pname = "buck2-prelude";
+        version = (pkgs.buck2.version or "unstable");
+        src = buck2Input;
+        dontUnpack = true;
+        installPhase = ''
+          runHook preInstall
+          mkdir -p "$out"
+          cp -r "$src/prelude" "$out/prelude"
+          runHook postInstall
+        '';
+      };
       zx-wrapper = zx-wrapper;
       pnpm-store = pnpm-store;
       node-modules = node-modules;

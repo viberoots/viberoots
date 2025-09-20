@@ -1,4 +1,4 @@
-load("@prelude//go:def.bzl", "go_binary", "go_library", "go_test")
+load("@prelude//:rules.bzl", "go_binary", "go_library", "go_test")
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
 
 def _providers_for(name):
@@ -65,6 +65,10 @@ def nix_go_library(name, **kwargs):
     deps = kwargs.pop("deps", [])
     extra = _normalize_labels(pkg, kwargs.pop("extra_module_providers", []))
     merged = _dedupe_preserve(deps + _providers_for(name) + extra)
+    if "_go_toolchain" not in kwargs:
+        kwargs["_go_toolchain"] = "@repo_toolchains//:go"
+    if "_cxx_toolchain" not in kwargs:
+        kwargs["_cxx_toolchain"] = "@repo_toolchains//:cxx"
     go_library(name = name, deps = merged, **kwargs)
 
 def nix_go_binary(name, **kwargs):
@@ -77,6 +81,10 @@ def nix_go_binary(name, **kwargs):
     deps = kwargs.pop("deps", [])
     extra = _normalize_labels(pkg, kwargs.pop("extra_module_providers", []))
     merged = _dedupe_preserve(deps + _providers_for(name) + extra)
+    if "_go_toolchain" not in kwargs:
+        kwargs["_go_toolchain"] = "@repo_toolchains//:go"
+    if "_cxx_toolchain" not in kwargs:
+        kwargs["_cxx_toolchain"] = "@repo_toolchains//:cxx"
     go_binary(name = name, deps = merged, **kwargs)
 
 def nix_go_test(name, **kwargs):
@@ -89,6 +97,19 @@ def nix_go_test(name, **kwargs):
     deps = kwargs.pop("deps", [])
     extra = _normalize_labels(pkg, kwargs.pop("extra_module_providers", []))
     merged = _dedupe_preserve(deps + _providers_for(name) + extra)
+
+    # If a library is provided, ensure we don't pass the same target in deps.
+    lib = kwargs.get("library")
+    if isinstance(lib, str) and lib:
+        abs_lib = lib
+        if lib.startswith(":"):
+            abs_lib = "//%s:%s" % (pkg, lib[1:])
+        merged = [d for d in merged if d not in (lib, abs_lib)]
+
+    if "_go_toolchain" not in kwargs:
+        kwargs["_go_toolchain"] = "@repo_toolchains//:go"
+    if "_cxx_toolchain" not in kwargs:
+        kwargs["_cxx_toolchain"] = "@repo_toolchains//:cxx"
     go_test(name = name, deps = merged, **kwargs)
 
 

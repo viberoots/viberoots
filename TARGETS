@@ -199,6 +199,25 @@ zx_test(
     out = "scaffolding_gen_auto_map_idempotent.stamp",
 )
 
+# Phase 3 scaffold-based smoke/integration tests
+zx_test(
+    name = "scaffolding_gen_auto_map_scaffold_smoke",
+    script = "tools/tests/scaffolding/gen-auto-map.scaffold-smoke.test.ts",
+    out = "scaffolding_gen_auto_map_scaffold_smoke.stamp",
+)
+
+zx_test(
+    name = "scaffolding_provider_wiring_scaffold_patch",
+    script = "tools/tests/scaffolding/provider-wiring.scaffold-patch.test.ts",
+    out = "scaffolding_provider_wiring_scaffold_patch.stamp",
+)
+
+zx_test(
+    name = "scaffolding_prebuild_guard_scaffold",
+    script = "tools/tests/scaffolding/prebuild-guard.scaffold.test.ts",
+    out = "scaffolding_prebuild_guard_scaffold.stamp",
+)
+
 # Phase 1 patches-lint tests
 zx_test(
     name = "scaffolding_patches_lint_clean",
@@ -338,6 +357,19 @@ zx_test(
     name = "exporter_metrics_out",
     script = "tools/tests/exporter/exporter.metrics-out.test.ts",
     out = "exporter_metrics_out.stamp",
+)
+
+# Phase 2 scaffold-and-build tests
+zx_test(
+    name = "scaffolding_go_lib_scaffold_and_build",
+    script = "tools/tests/scaffolding/go-lib.scaffold-and-build.test.ts",
+    out = "scaffolding_go_lib_scaffold_and_build.stamp",
+)
+
+zx_test(
+    name = "scaffolding_go_cli_scaffold_and_build",
+    script = "tools/tests/scaffolding/go-cli.scaffold-and-build.test.ts",
+    out = "scaffolding_go_cli_scaffold_and_build.stamp",
 )
 
 # PR C fs-helpers tests

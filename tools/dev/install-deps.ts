@@ -159,7 +159,7 @@ async function runGomod2nixGenerate(dryRun: boolean, verbose: boolean) {
 
 async function have(cmd: string): Promise<boolean> {
   try {
-    await $({ stdio: "pipe" })`bash -lc 'command -v ${cmd} >/dev/null 2>&1'`;
+    await $({ stdio: "pipe" })`bash --noprofile --norc -c 'command -v ${cmd} >/dev/null 2>&1'`;
     return true;
   } catch {
     return false;
@@ -227,7 +227,7 @@ async function runGlue(dryRun: boolean, verbose: boolean) {
       console.log(`[dry-run] ${c.cmd}`);
     } else {
       if (verbose) console.log(`[run] ${c.cmd}`);
-      await $({ stdio: "inherit" })`bash -lc ${c.cmd}`;
+      await $({ stdio: "inherit" })`bash --noprofile --norc -c ${c.cmd}`;
     }
   }
 }
@@ -248,7 +248,9 @@ async function main() {
   // Advisory lint (non-strict): enforce patch path invariants without blocking setup
   try {
     const nodeBase = zxNodeBase();
-    await $({ stdio: "inherit" })`bash -lc ${`node ${nodeBase} tools/dev/patches-lint.ts`}`;
+    await $({
+      stdio: "inherit",
+    })`bash --noprofile --norc -c ${`node ${nodeBase} tools/dev/patches-lint.ts`}`;
   } catch {}
   await runGomod2nixGenerate(dryRun, verbose);
   if (!skipGlue) {

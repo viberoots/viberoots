@@ -78,7 +78,10 @@ async function rewriteCoverageUrls(tmpRoot: string) {
 
 export async function rsyncRepoTo(tmp: string) {
   await timeAsync(`rsyncRepoTo(${path.basename(tmp)})`, async () => {
-    await $`rsync -a --exclude "buck-out" --exclude ".git" --exclude "libs" --exclude "node_modules" --exclude "coverage" --exclude ".clinic" --exclude ".direnv" --exclude "result" ./ ${tmp}/`;
+    // Anchor excludes to repository root so we don't accidentally exclude
+    // nested directories with the same names inside templates (e.g.,
+    // tools/scaffolding/templates/**/libs/**).
+    await $`rsync -a --exclude "/buck-out" --exclude "/.git" --exclude "/libs" --exclude "/node_modules" --exclude "/coverage" --exclude "/.clinic" --exclude "/.direnv" --exclude "/result" ./ ${tmp}/`;
   });
 }
 
@@ -103,20 +106,63 @@ export async function runInTemp<T>(
   const overallStart = performance.now();
   const tmp = await mktemp(name + "-");
   await rsyncRepoTo(tmp);
-  // Load direnv environment for the temp dir so devShell linking/PATH are active when available.
-  // If already in a nix dev shell, skip direnv to avoid redundant flake eval and shellHook.
-  // Additionally, if the required tools are already available on PATH (e.g., secretspec), skip direnv.
-  async function isOnPath(bin: string): Promise<boolean> {
-    try {
-      await $({ stdio: "pipe" })`bash --noprofile --norc -c ${`command -v ${bin} >/dev/null 2>&1`}`;
-      return true;
-    } catch {
-      return false;
+  // Ensure Buck prelude and config exist inside the temp repo so @prelude loads work
+  try {
+    const pre = await $({
+      cwd: tmp,
+      stdio: "pipe",
+    })`nix build .#buck2-prelude --no-link --accept-flake-config --print-out-paths`;
+    let out = String(pre.stdout || "")
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .pop();
+    if (!out) {
+      const ev = await $({ cwd: tmp, stdio: "pipe" })`nix eval --raw .#inputs.buck2.outPath`.catch(
+        () => ({ stdout: "" }) as any,
+      );
+      const p = String((ev as any).stdout || "").trim();
+      if (p) out = p;
     }
-  }
+    if (out) {
+      const preludePath = path.join(out, "prelude").replaceAll("\\", "/");
+      await $({ cwd: tmp })`bash -lc ${`set -euo pipefail
+        : > .buckroot
+        rm -f prelude && ln -s "${preludePath}" prelude
+        cat > .buckconfig <<'EOF'
+[buildfile]
+name = TARGETS
+
+[repositories]
+root = .
+prelude = ./prelude
+toolchains = ./toolchains
+repo_toolchains = ./toolchains
+fbsource = ./prelude/third-party/fbsource_stub
+fbcode = ./prelude/third-party/fbcode_stub
+config = ./prelude
+
+[cells]
+root = .
+prelude = ./prelude
+toolchains = ./toolchains
+repo_toolchains = ./toolchains
+fbsource = ./prelude/third-party/fbsource_stub
+fbcode = ./prelude/third-party/fbcode_stub
+config = ./prelude
+
+[build]
+prelude = prelude
+user_platform = prelude//platforms:default
+target_platforms = prelude//platforms:default
+EOF
+        mkdir -p toolchains
+        printf '[buildfile]\nname = TARGETS\n' > toolchains/.buckconfig
+      `}`;
+    }
+  } catch {}
   let shouldUseDirenv = true;
   try {
-    // if direnv is already loaded, skip direnv
     const direnvStatus = await $({ stdio: "pipe" })`direnv status --json`;
     const direnvStatusJson = JSON.parse(direnvStatus.stdout);
     if (direnvStatusJson.config.loadadRC != null) {
@@ -147,11 +193,55 @@ export async function runInTemp<T>(
       exportEnv[k] = v;
     }
   }
-  // Ensure module resolution inside temp can find repo's node_modules (for eslint plugins, etc.)
+  // Ensure repo-aware bin helpers (e.g., tools/bin/build, verify) operate on the temp copy
+  exportEnv.WORKSPACE_ROOT = tmp;
   exportEnv.NODE_PATH = [path.join(process.cwd(), "node_modules"), exportEnv.NODE_PATH || ""]
     .filter(Boolean)
     .join(path.delimiter);
-  // Ensure node child processes pick up zx-init resolver and type stripping
+  // Prefer upstream buck2 on PATH inside temp test env
+  try {
+    const built = await $({
+      stdio: "pipe",
+    })`nix build github:facebook/buck2#buck2 --no-link --print-out-paths`;
+    const p = String(built.stdout || "")
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .pop();
+    if (p) {
+      exportEnv.PATH = [
+        path.join(p, "bin"),
+        path.join(tmp, "tools", "bin"),
+        path.join(tmp, "node_modules", ".bin"),
+        exportEnv.PATH || process.env.PATH || "",
+      ]
+        .filter(Boolean)
+        .join(path.delimiter);
+    }
+  } catch {
+    // Fallback to local flake buck2 if available
+    try {
+      const built2 = await $({
+        cwd: tmp,
+        stdio: "pipe",
+      })`nix build .#buck2 --no-link --accept-flake-config --print-out-paths`;
+      const p2 = String(built2.stdout || "")
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .pop();
+      if (p2) {
+        exportEnv.PATH = [
+          path.join(p2, "bin"),
+          path.join(tmp, "tools", "bin"),
+          path.join(tmp, "node_modules", ".bin"),
+          exportEnv.PATH || process.env.PATH || "",
+        ]
+          .filter(Boolean)
+          .join(path.delimiter);
+      }
+    } catch {}
+  }
   const nodeOpts = [
     "--experimental-strip-types",
     `--import ${path.join(process.cwd(), "tools", "dev", "zx-init.mjs")}`,
@@ -171,7 +261,6 @@ export async function runInTemp<T>(
     }
     return await fn(tmp, _$);
   } finally {
-    // Rewrite any raw coverage URLs that point to the soon-to-be-deleted tmp to the repo root
     await timeAsync(`rewriteCoverageUrls(${path.basename(tmp)})`, async () =>
       rewriteCoverageUrls(tmp).catch(() => {}),
     );
@@ -183,10 +272,9 @@ export async function runInTemp<T>(
       } catch {}
     } else {
       await fsp.rm(tmp, { recursive: true, force: true }).catch((err) => {
-        // Non-fatal: cleanup of temp dir may fail on CI; ignore but log for visibility.
         console.warn("warning: failed to remove temp test dir:", err);
       });
     }
-    logTiming(`runInTemp(${name})`, performance.now() - overallStart);
+    console.error(`[timing] runInTemp(${name}) done`);
   }
 }

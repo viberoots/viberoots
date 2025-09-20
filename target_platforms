@@ -1,0 +1,10 @@
+load("@prelude//toolchains:go.bzl", "system_go_toolchain")
+
+oncall("build_infra")
+
+system_go_toolchain(
+    name = "go",
+    visibility = ["PUBLIC"],
+)
+
+

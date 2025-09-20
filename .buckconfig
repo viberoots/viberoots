@@ -1,9 +1,25 @@
-[repositories]
-root = .
-
 [buildfile]
 name = TARGETS
 
+[repositories]
+root = .
+prelude = ./prelude
+toolchains = ./toolchains
+repo_toolchains = ./toolchains
+fbsource = ./prelude/third-party/fbsource_stub
+fbcode = ./prelude/third-party/fbcode_stub
+config = ./prelude
+
+[cells]
+root = .
+prelude = ./prelude
+toolchains = ./toolchains
+repo_toolchains = ./toolchains
+fbsource = ./prelude/third-party/fbsource_stub
+fbcode = ./prelude/third-party/fbcode_stub
+config = ./prelude
+
 [build]
-threads = 25
-prelude = /nix/store/7ln24zspjgy2jz130q75g63m9vlkrvzc-source/prelude
+prelude = prelude
+user_platform = prelude//platforms:default
+target_platforms = prelude//platforms:default
