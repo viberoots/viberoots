@@ -5,9 +5,9 @@
 
 # Determine external timeout command
 if command -v timeout >/dev/null 2>&1; then
-  TIMEOUT_CMD=(timeout -k 10s 180s)
+  TIMEOUT_CMD=(timeout -k 10s 300s)
 elif command -v gtimeout >/dev/null 2>&1; then
-  TIMEOUT_CMD=(gtimeout -k 10s 180s)
+  TIMEOUT_CMD=(gtimeout -k 10s 300s)
 else
   TIMEOUT_CMD=()
 fi

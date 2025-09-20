@@ -52,15 +52,15 @@ Create production-ready Copier templates in `tools/scaffolding/templates/go/*` t
 
 - `go/lib` template layout:
   - `libs/{{ name }}/`
-    - `go.mod` (module = `{{ module }}`), `go.sum` (empty allowed), `gomod2nix.toml` placeholder.
+    - `go.mod` (module = `{{ module }}`), `go.sum` (empty allowed).
     - `TARGETS` with `nix_go_library` and `nix_go_test` using our macros.
     - `pkg/{{ name }}/{{ name }}.go` minimal API.
     - `pkg/{{ name }}/{{ name }}_test.go` minimal single-test file.
     - `README.md` from `README.md.jinja`.
 - `go/cli` template layout:
   - `apps/{{ name }}/`
-    - `go.mod` (module = `{{ module }}`), `gomod2nix.toml` placeholder.
-    - `TARGETS` with `nix_go_binary` and example dep on a local lib via comment.
+    - `go.mod` (module = `{{ module }}`).
+    - `TARGETS` with `nix_go_binary`.
     - `cmd/{{ name }}/main.go` hello-world using a function shape that mirrors lib usage.
     - `README.md`.
 - Acceptance:

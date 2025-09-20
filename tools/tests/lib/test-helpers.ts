@@ -198,50 +198,7 @@ EOF
   exportEnv.NODE_PATH = [path.join(process.cwd(), "node_modules"), exportEnv.NODE_PATH || ""]
     .filter(Boolean)
     .join(path.delimiter);
-  // Prefer upstream buck2 on PATH inside temp test env
-  try {
-    const built = await $({
-      stdio: "pipe",
-    })`nix build github:facebook/buck2#buck2 --no-link --print-out-paths`;
-    const p = String(built.stdout || "")
-      .trim()
-      .split("\n")
-      .filter(Boolean)
-      .pop();
-    if (p) {
-      exportEnv.PATH = [
-        path.join(p, "bin"),
-        path.join(tmp, "tools", "bin"),
-        path.join(tmp, "node_modules", ".bin"),
-        exportEnv.PATH || process.env.PATH || "",
-      ]
-        .filter(Boolean)
-        .join(path.delimiter);
-    }
-  } catch {
-    // Fallback to local flake buck2 if available
-    try {
-      const built2 = await $({
-        cwd: tmp,
-        stdio: "pipe",
-      })`nix build .#buck2 --no-link --accept-flake-config --print-out-paths`;
-      const p2 = String(built2.stdout || "")
-        .trim()
-        .split("\n")
-        .filter(Boolean)
-        .pop();
-      if (p2) {
-        exportEnv.PATH = [
-          path.join(p2, "bin"),
-          path.join(tmp, "tools", "bin"),
-          path.join(tmp, "node_modules", ".bin"),
-          exportEnv.PATH || process.env.PATH || "",
-        ]
-          .filter(Boolean)
-          .join(path.delimiter);
-      }
-    } catch {}
-  }
+  // Do not mutate PATH; rely on direnv-provided environment from the dev shell.
   const nodeOpts = [
     "--experimental-strip-types",
     `--import ${path.join(process.cwd(), "tools", "dev", "zx-init.mjs")}`,

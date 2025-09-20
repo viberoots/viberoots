@@ -8,12 +8,7 @@ def _zx_test_impl(ctx):
             + "export BUCK_TEST_TARGET=\"%s\"; "
             + "export TEST_LOG_DIR=\"${TEST_LOG_DIR:-$(pwd)/buck-out/test-logs}\"; "
             + "if [ -z \"$NODE_BIN\" ]; then export NODE_BIN=\"$(command -v node)\"; fi; "
-            + "export PATH=\"$(pwd)/tools/bin:$(pwd)/node_modules/.bin:$PATH\"; "
-            # Prefer upstream buck2 on PATH inside sandbox for tests that directly invoke buck2
-            + "BUILT=$(nix build github:facebook/buck2#buck2 --no-link --print-out-paths 2>/dev/null | tail -1); "
-            + "if [ -n \"$BUILT\" ] && [ -x \"$BUILT/bin/buck2\" ]; then export PATH=\"$BUILT/bin:$PATH\"; else "
-            + "  BUILT2=$(nix build .#buck2 --no-link --accept-flake-config --print-out-paths 2>/dev/null | tail -1); "
-            + "  if [ -n \"$BUILT2\" ] && [ -x \"$BUILT2/bin/buck2\" ]; then export PATH=\"$BUILT2/bin:$PATH\"; fi; fi; "
+            
             # Ensure Buck prelude/config present in test sandbox
             + "if [ ! -e .buckconfig ] || ! grep -q '^prelude = prelude' .buckconfig 2>/dev/null; then "
             + "  PRE_OUT=$(nix build .#buck2-prelude --no-link --accept-flake-config --print-out-paths 2>/dev/null | tail -1); "
