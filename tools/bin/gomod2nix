@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Uniform gomod2nix entrypoint for dev and CI.
+# Prefer a flake app, then shell, then a bare binary on PATH.
+
+ARGS=("$@")
+
+try_run() {
+  local cmd=(bash -lc "$1")
+  if "${cmd[@]}"; then
+    exit 0
+  fi
+}
+
+# 1) nix run from nixpkgs
+try_run "nix run nixpkgs#gomod2nix -- ${ARGS[*]}" || true
+
+# 2) nix shell from nixpkgs
+try_run "nix shell nixpkgs#gomod2nix -c gomod2nix ${ARGS[*]}" || true
+
+# 3) nix run from upstream flake
+try_run "nix run github:nix-community/gomod2nix -- ${ARGS[*]}" || true
+
+# 4) nix shell from upstream flake
+try_run "nix shell github:nix-community/gomod2nix -c gomod2nix ${ARGS[*]}" || true
+
+# 5) fallback to PATH
+if command -v gomod2nix >/dev/null 2>&1; then
+  exec gomod2nix "${ARGS[@]}"
+fi
+
+echo "error: gomod2nix is not available via nix or PATH" >&2
+exit 127
+
+

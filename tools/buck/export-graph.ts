@@ -27,6 +27,7 @@ const simulate = (argv.simulate as string) || ""; // path to simulated nodes JSO
 const maxParallel = Number(argv["max-parallel"] || 4);
 const cacheDir = (argv["cache-dir"] as string) || "tools/buck/.export-cache";
 const metricsOut = (argv["metrics-out"] as string) || "";
+// Ensure we build the graph so gen-auto-map and sync-go-mods have data in glue-only mode
 async function ensurePreludeBuckConfig() {
   try {
     // If config already points to prelude cell, skip
@@ -146,9 +147,7 @@ async function exportConfiguredGraph(): Promise<Node[]> {
     const txt = await fs.readFile(simulate, "utf8");
     nodes = JSON.parse(txt) as Node[];
   } else {
-    const query = scope
-      ? `attrfilter(labels, ${scope}, deps(//..., 1, exec_deps()))`
-      : `deps(//..., 1, exec_deps())`;
+    const query = scope ? `attrfilter(labels, ${scope}, //...)` : `//...`;
     const flags = attrList.flatMap((a) => ["--output-attribute", a]);
     const platformFlags = ["--target-platforms", "prelude//platforms:default"];
     const { stdout } = await $`buck2 cquery ${platformFlags} ${query} --json ${flags}`;

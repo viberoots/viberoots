@@ -1,0 +1,2 @@
+load("@prelude//:rules.bzl", "go_library")
+

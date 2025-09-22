@@ -1,0 +1,2 @@
+load("//go:defs.bzl", "nix_go_third_party_library")
+

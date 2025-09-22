@@ -6,14 +6,19 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     # Pin buck2 to match the upstream binary version on PATH (201beb86106f...)
     buck2.url = "github:facebook/buck2/201beb86106fecdc84e30260b0f1abb5bf576988";
+    gomod2nix.url = "github:nix-community/gomod2nix";
+    gomod2nix.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, nixpkgs, buck2 }:
+  outputs = { self, nixpkgs, buck2, gomod2nix }:
   let
     systems = [ "aarch64-darwin" "aarch64-linux" "x86_64-linux" ];
     forAllSystems = f: nixpkgs.lib.genAttrs systems (system:
       let
-        pkgs = import nixpkgs { inherit system; };
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [ gomod2nix.overlays.default ];
+        };
         zx-wrapper = pkgs.writeShellScriptBin "zx-wrapper" ''
           set -euo pipefail
           exec ${pkgs.nodejs_22}/bin/node \
@@ -425,7 +430,13 @@ EOF
       pnpm-store = pnpm-store;
       node-modules = node-modules;
       default = node-modules;
-      graph-generator = (pkgs.callPackage ./tools/nix/graph-generator.nix { inherit pkgs; }).all;
+      graph-generator = (
+        let wr = builtins.getEnv "WORKSPACE_ROOT"; in
+        pkgs.callPackage ./tools/nix/graph-generator.nix {
+          inherit pkgs;
+          src = if (wr != "") then builtins.toPath wr else ./.;
+        }
+      ).all;
     });
 
     checks = forAllSystems ({ node-modules, ... }: {

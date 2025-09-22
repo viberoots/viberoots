@@ -379,6 +379,13 @@ zx_test(
     out = "scaffolding_partial_clone_discover_and_build.stamp",
 )
 
+# Third-party runtime wiring test
+zx_test(
+    name = "scaffolding_go_cli_thirdparty_runtime",
+    script = "tools/tests/scaffolding/go-cli.thirdparty-runtime.test.ts",
+    out = "scaffolding_go_cli_thirdparty_runtime.stamp",
+)
+
 # PR C fs-helpers tests
 zx_test(
     name = "lib_fs_helpers_write_if_changed",

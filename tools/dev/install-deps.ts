@@ -82,8 +82,9 @@ async function runGomod2nixGenerate(dryRun: boolean, verbose: boolean) {
     return;
   }
 
-  const binOverride = process.env.INSTALL_DEPS_GOMOD2NIX_BIN || "";
-  const cmd = binOverride ? `${binOverride} --dir .` : `nix run nixpkgs#gomod2nix -- --dir .`;
+  const binOverride =
+    process.env.INSTALL_DEPS_GOMOD2NIX_BIN || path.join(process.cwd(), "tools", "bin", "gomod2nix");
+  const cmd = `${binOverride} --dir .`;
   if (dryRun) {
     console.log(`[gomod2nix] dry-run: ${cmd}`);
     return;
@@ -209,6 +210,10 @@ async function runGlue(dryRun: boolean, verbose: boolean) {
       label: "gen-auto-map",
       cmd: `${nodeBin} ${nodeBase} tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`,
       gated: async () => await have("buck2"),
+    },
+    {
+      label: "sync-go-mods",
+      cmd: `${nodeBin} ${nodeBase} tools/buck/sync-go-mods.ts`,
     },
   ];
 
