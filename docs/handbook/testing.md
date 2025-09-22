@@ -12,6 +12,16 @@
 - Enable: `COVERAGE=1` via Buck test executor `-- --env COVERAGE=1`.
 - Open report: `pnpm coverage:open` after full run.
 
+### Verify helper
+
+- Full suite without coverage:
+  - `tools/bin/verify`
+- Full suite with coverage (single merged report):
+  - `tools/bin/verify --coverage`
+- Focused target(s):
+  - `tools/bin/verify //<target>` (40s external timeout per focused run)
+  - `tools/bin/verify --coverage //<target>`
+
 ## Running
 
 - Full: `timeout -k 10s 300s buck2 test //...`

@@ -12,6 +12,7 @@
 - Ensure `NIX_GO_DEV_OVERRIDE_JSON` is unset. Locally, use `tools/dev/clear-overrides.ts`.
 
 ## Duplicate/malformed patches
+
 ## Go import lookup errors (vendor mode)
 
 - Symptom: `import lookup disabled by -mod=vendor` or `go.mod not found`.
@@ -32,7 +33,6 @@
 
 - Symptom: CI test `linting_no_vendored_go` fails with `.go` files under `third_party/go`.
 - Fix: remove vendored files; do not copy from `GOMODCACHE`. Third‑party is resolved by Nix and `gomod2nix.toml`.
-
 
 - Ensure one patch per `module@version`; file name must be `<encodedImport>@<version>.patch`.
 

@@ -39,6 +39,13 @@ pipeline {
           stage('Buck Tests') {
             steps { sh 'node tools/ci/run-stage.ts --stage buck-test' }
           }
+          stage('Coverage (merged)') {
+            steps {
+              sh 'COVERAGE=1 node tools/ci/run-stage.ts --stage buck-test'
+              sh 'pnpm coverage:build'
+              archiveArtifacts artifacts: 'coverage/**', fingerprint: true, allowEmptyArchive: true
+            }
+          }
         }
       }
     }

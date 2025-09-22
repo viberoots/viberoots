@@ -15,7 +15,24 @@ if [[ "${CI:-}" == "true" ]]; then
   TIMEOUT_CMD=()
 fi
 
-: "${COVERAGE:=1}"
+# Flags
+COVERAGE=0
+ARGS=()
+for a in "$@"; do
+  case "$a" in
+    --coverage)
+      COVERAGE=1
+      ;;
+    --)
+      shift
+      ARGS+=("$@")
+      break
+      ;;
+    *)
+      ARGS+=("$a")
+      ;;
+  esac
+done
 
 # Use PATH for buck2; shellHook ensures upstream buck2 is first
 BUCK_BIN="buck2"
@@ -75,17 +92,29 @@ EOF
 build_run_array() {
   local PLATFORM_FLAGS=(--target-platforms prelude//platforms:default)
   local args=("$BUCK_BIN" test "${PLATFORM_FLAGS[@]}" "$@" -- --env COVERAGE="${COVERAGE}")
+  # External timeout policy: 300s full suite; 40s for a single focused test
+  local RUN_TIMEOUT=("${TIMEOUT_CMD[@]}")
   if [[ ${#TIMEOUT_CMD[@]} -gt 0 ]]; then
-    RUN=("${TIMEOUT_CMD[@]}" "${args[@]}")
+    if [[ $# -eq 1 && "$1" == //:* || ( $# -eq 1 && "$1" == //*) ]]; then
+      # Focused single target → shorter timeout
+      if command -v timeout >/dev/null 2>&1; then
+        RUN_TIMEOUT=(timeout -k 10s 40s)
+      elif command -v gtimeout >/dev/null 2>&1; then
+        RUN_TIMEOUT=(gtimeout -k 10s 40s)
+      fi
+    fi
+  fi
+  if [[ ${#RUN_TIMEOUT[@]} -gt 0 ]]; then
+    RUN=("${RUN_TIMEOUT[@]}" "${args[@]}")
   else
     RUN=("${args[@]}")
   fi
 }
 
-if [[ $# -eq 0 ]]; then
+if [[ ${#ARGS[@]} -eq 0 ]]; then
   build_run_array //...
 else
-  build_run_array "$@"
+  build_run_array "${ARGS[@]}"
 fi
 
 exec_in_dev_shell "${LIVE_ROOT}" "${RUN[@]}"
