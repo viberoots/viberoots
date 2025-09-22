@@ -3,23 +3,23 @@ name = TARGETS
 
 [repositories]
 root = .
-prelude = prelude
-toolchains = /nix/store/qj2121pvsk0bm562hifmw9zdb8giziaq-buck2-prelude-unstable-2025-05-06/prelude/toolchains
+prelude = ./prelude
+toolchains = ./toolchains
 repo_toolchains = ./toolchains
-fbsource = /nix/store/qj2121pvsk0bm562hifmw9zdb8giziaq-buck2-prelude-unstable-2025-05-06/prelude/third-party/fbsource_stub
-fbcode = /nix/store/qj2121pvsk0bm562hifmw9zdb8giziaq-buck2-prelude-unstable-2025-05-06/prelude/third-party/fbcode_stub
+fbsource = ./prelude/third-party/fbsource_stub
+fbcode = ./prelude/third-party/fbcode_stub
 config = ./prelude
 
 [cells]
 root = .
-prelude = /nix/store/qj2121pvsk0bm562hifmw9zdb8giziaq-buck2-prelude-unstable-2025-05-06/prelude
-toolchains = /nix/store/qj2121pvsk0bm562hifmw9zdb8giziaq-buck2-prelude-unstable-2025-05-06/prelude/toolchains
+prelude = ./prelude
+toolchains = ./toolchains
 repo_toolchains = ./toolchains
-fbsource = /nix/store/qj2121pvsk0bm562hifmw9zdb8giziaq-buck2-prelude-unstable-2025-05-06/prelude/third-party/fbsource_stub
-fbcode = /nix/store/qj2121pvsk0bm562hifmw9zdb8giziaq-buck2-prelude-unstable-2025-05-06/prelude/third-party/fbcode_stub
+fbsource = ./prelude/third-party/fbsource_stub
+fbcode = ./prelude/third-party/fbcode_stub
 config = ./prelude
 
 [build]
-prelude = /nix/store/qj2121pvsk0bm562hifmw9zdb8giziaq-buck2-prelude-unstable-2025-05-06/prelude
+prelude = prelude
 user_platform = prelude//platforms:default
 target_platforms = prelude//platforms:default

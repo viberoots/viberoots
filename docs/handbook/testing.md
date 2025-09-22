@@ -38,6 +38,12 @@
 - Preview without changes:
   - `node tools/dev/install-deps.ts --dry-run`
 
+## Nix-first runtime validation (Go)
+
+- Build Go apps/libs via `nix build .#graph-generator --impure`.
+- Locate binaries via `buck-go/manifest.json` (preferred) or `$out/bin` symlinks.
+- Tests should prefer manifest-based discovery instead of Buck-only `go_library` resolution for third-party deps.
+
 ## Buck prelude alias
 
 - Entering the dev shell (`nix develop`) writes `.buckconfig` with `[repositories] prelude = <nix-store>/prelude`, so loads like `@prelude//go:def.bzl` resolve automatically.

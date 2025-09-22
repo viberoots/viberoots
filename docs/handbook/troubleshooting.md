@@ -12,6 +12,27 @@
 - Ensure `NIX_GO_DEV_OVERRIDE_JSON` is unset. Locally, use `tools/dev/clear-overrides.ts`.
 
 ## Duplicate/malformed patches
+## Go import lookup errors (vendor mode)
+
+- Symptom: `import lookup disabled by -mod=vendor` or `go.mod not found`.
+- Cause: builder working directory not at module root, or vendor mode assumptions.
+- Fix:
+  - Ensure `tools/nix/lang-templates.nix` sets `pwd`/`modRoot` to the module root and `subPackages` as documented (apps: `cmd/<name>`, libs: `.`).
+  - Regenerate glue and rebuild via Nix (`nix build .#graph-generator --impure`).
+
+## Manifest missing or empty
+
+- Symptom: tests cannot find binaries or `manifest.json` is empty.
+- Fix:
+  - Run glue: `node tools/buck/export-graph.ts` → `node tools/buck/sync-providers.ts` → `node tools/buck/gen-auto-map.ts`.
+  - Ensure `gomod2nix.toml` exists at repo root (copy from the authoritative module lock).
+  - Inspect `$out/build.log` for target keys and bin discovery.
+
+## No vendoring guard fails
+
+- Symptom: CI test `linting_no_vendored_go` fails with `.go` files under `third_party/go`.
+- Fix: remove vendored files; do not copy from `GOMODCACHE`. Third‑party is resolved by Nix and `gomod2nix.toml`.
+
 
 - Ensure one patch per `module@version`; file name must be `<encodedImport>@<version>.patch`.
 
