@@ -211,10 +211,7 @@ async function runGlue(dryRun: boolean, verbose: boolean) {
       cmd: `${nodeBin} ${nodeBase} tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`,
       gated: async () => await have("buck2"),
     },
-    {
-      label: "sync-go-mods",
-      cmd: `${nodeBin} ${nodeBase} tools/buck/sync-go-mods.ts`,
-    },
+    // PR3: No vendoring. sync-go-mods is deprecated and now a no-op. Intentionally omitted.
   ];
 
   const buckPresent = await have("buck2");

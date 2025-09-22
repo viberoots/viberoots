@@ -8,6 +8,13 @@ zx_test(
     out = "linting.stamp",
 )
 
+# PR3: No vendoring guard
+zx_test(
+    name = "linting_no_vendored_go",
+    script = "tools/tests/linting/no-vendored-go.test.ts",
+    out = "linting_no_vendored_go.stamp",
+)
+
 # Scaffolding tests
 zx_test(
     name = "scaffolding_smoke_targets_buildfile",
