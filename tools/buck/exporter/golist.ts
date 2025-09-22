@@ -2,7 +2,7 @@
 import fs from "fs-extra";
 import crypto from "node:crypto";
 import path from "node:path";
-import { GoPkg, Tuple } from "./types";
+import type { GoPkg, Tuple } from "./types";
 
 export let cacheHits = 0;
 export let cacheMisses = 0;
