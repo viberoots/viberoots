@@ -11,6 +11,7 @@ type Stage =
   | "gen-auto-map"
   | "prebuild-guard"
   | "patches-lint"
+  | "file-size-lint"
   | "nix-build-graph-generator"
   | "buck-test";
 
@@ -78,6 +79,11 @@ async function main() {
       const target = path.resolve("tools/dev/patches-lint.ts");
       // Strict mode in CI; scope language to go
       await $`node ${nodeBase} ${target} --strict --lang go`;
+      break;
+    }
+    case "file-size-lint": {
+      const target = path.resolve("tools/dev/file-size-lint.ts");
+      await $`node ${nodeBase} ${target} --changed-only`;
       break;
     }
     case "nix-build-graph-generator":

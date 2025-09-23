@@ -33,6 +33,9 @@ pipeline {
           stage('Pre-build guard') {
             steps { sh 'node tools/ci/run-stage.ts --stage prebuild-guard' }
           }
+          stage('File size lint (warn)') {
+            steps { sh 'node tools/ci/run-stage.ts --stage file-size-lint' }
+          }
           stage('Patches Lint (strict)') {
             steps { sh 'node tools/ci/run-stage.ts --stage patches-lint' }
           }

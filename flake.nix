@@ -1,4 +1,4 @@
-# flake.nix — PR 1 devshell and zx-wrapper
+# flake.nix — devshell and zx-wrapper
 {
   description = "bucknix-fresh devshell and scaffolding";
 

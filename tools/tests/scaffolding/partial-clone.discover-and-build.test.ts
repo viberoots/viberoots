@@ -3,8 +3,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-// Phase 7 — E2E partial-clone discovery & build
-// Proves decentralized registration: a sparse repo with minimal shared files + one scaffolded package builds after glue generation.
+// E2E: partial-clone discovery & build in a sparse workspace.
 
 test("partial clone: discover and build scaffolded lib via //...", async () => {
   await runInTemp("partial-clone-discover-build", async (_tmp, _$) => {
