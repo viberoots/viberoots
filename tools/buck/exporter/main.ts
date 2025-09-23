@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import { buildBatches, isGoNode } from "./batch";
-import { cacheHits, cacheMisses, runGoList } from "./golist";
-import { attrList, cqueryNodes, parseArgs, readSimulatedNodes, writeIfChangedJSON } from "./io";
-import { attachGoModuleLabels } from "./labeler";
-import type { Batch, Metrics, Node } from "./types";
+import { buildBatches, isGoNode } from "./batch.ts";
+import { cacheHits, cacheMisses, runGoList } from "./golist.ts";
+import { attrList, cqueryNodes, parseArgs, readSimulatedNodes, writeIfChangedJSON } from "./io.ts";
+import { attachGoModuleLabels } from "./labeler.ts";
+import type { Batch, Metrics, Node } from "./types.ts";
 
 function sortAndDedupeLabels(nodes: Node[]): Node[] {
   return nodes
@@ -89,11 +89,4 @@ type GoPkgPerBatch = { batch: Batch; pkgs: any[] };
 
 async function emitMetrics(path: string, m: Metrics) {
   await (await import("fs-extra")).outputFile(path, JSON.stringify(m, null, 2) + "\n", "utf8");
-}
-
-if (require.main === module) {
-  run().catch((e) => {
-    console.error(e);
-    process.exit(1);
-  });
 }

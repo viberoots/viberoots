@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import crypto from "node:crypto";
 import os from "node:os";
-import type { Node, Tuple } from "./types";
+import type { Node, Tuple } from "./types.ts";
 
 export function parseTagsFromLabels(labels: string[] | undefined): string[] {
   const out = new Set<string>();

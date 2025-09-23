@@ -2,7 +2,7 @@
 import fs from "fs-extra";
 import crypto from "node:crypto";
 import path from "node:path";
-import type { GoPkg, Tuple } from "./types";
+import type { GoPkg, Tuple } from "./types.ts";
 
 export let cacheHits = 0;
 export let cacheMisses = 0;
@@ -43,7 +43,7 @@ export async function runGoList(
   const norm = Array.from(new Set(roots.map((r) => path.relative(cwd, r)))).map((rel) =>
     rel === "" ? "." : rel.startsWith(".") ? rel : `./${rel}`,
   );
-  const args = ["list", "-deps", "-json", "-test", ...norm];
+  const args = ["list", "-deps", "-json", "-test", "-mod=mod", ...norm];
   const modRootAbs = path.resolve(cwd);
   const gomod = path.join(modRootAbs, "go.mod");
   const gosum = path.join(modRootAbs, "go.sum");
@@ -61,6 +61,12 @@ export async function runGoList(
     return parseGoListStream(txt);
   }
   cacheMisses++;
+  // Ensure module dependencies (including test-only) are available and go.sum is populated
+  try {
+    await $({ env, stdio: "pipe", cwd: modRootAbs })`go mod download all`;
+  } catch {
+    // best-effort; continue to go list which will report errors if unresolved
+  }
   const { stdout } = await $({ env, stdio: "pipe", cwd })`go ${args}`;
   const raw = String(stdout);
   await fs.outputFile(cachePath, raw, "utf8");
@@ -95,13 +101,27 @@ export function buildPkgIndexes(pkgs: GoPkg[]) {
     if (d.startsWith("/private/var/")) return d.slice("/private".length);
     return d;
   }
+  const baseCwd = normalizeDir(process.cwd());
   for (const p of pkgs) {
     if (p.ImportPath) byImport.set(p.ImportPath, p);
     if (p.Dir) {
       const dir = normalizeDir(p.Dir);
-      const rel = path.relative(process.cwd(), dir);
-      byDir.set(rel, p);
-      if ((p.ImportPath || "").endsWith(".test") || (p.ForTest && p.ForTest !== "")) {
+      const rel = path.relative(baseCwd, dir);
+      const isTestPkg = (p.ImportPath || "").endsWith(".test") || (!!p.ForTest && p.ForTest !== "");
+      const existing = byDir.get(rel);
+      // Prefer non-test package for root mapping; only fall back to test pkg if none exists
+      if (
+        !existing ||
+        (!isTestPkg &&
+          existing &&
+          ((existing.ImportPath || "").endsWith(".test") ||
+            (existing.ForTest && existing.ForTest !== "")))
+      ) {
+        if (!isTestPkg || !byDir.has(rel)) {
+          byDir.set(rel, p);
+        }
+      }
+      if (isTestPkg) {
         const arr = testByDir.get(rel) || [];
         arr.push(p);
         testByDir.set(rel, arr);

@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
-import { Node } from "./types";
+import type { Node } from "./types.ts";
 
 export const attrList = [
   "name",
