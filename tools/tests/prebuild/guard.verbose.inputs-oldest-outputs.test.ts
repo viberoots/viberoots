@@ -47,7 +47,11 @@ EOF
       "# gen\nMODULE_PROVIDERS = {}\n",
       "utf8",
     );
-    await fsp.writeFile(path.join(tmp, "third_party", "providers", "TARGETS.auto"), "# gen\n", "utf8");
+    await fsp.writeFile(
+      path.join(tmp, "third_party", "providers", "TARGETS.auto"),
+      "# gen\n",
+      "utf8",
+    );
     // Inputs (multiple) to populate top-N lists
     await fsp.writeFile(path.join(tmp, "TARGETS"), "# t1\n", "utf8");
     await fsp.mkdir(path.join(tmp, "patches", "go"), { recursive: true });
@@ -63,11 +67,13 @@ EOF
       env: { ...process.env, PREBUILD_GUARD_VERBOSE: "1", PREBUILD_GUARD_LIST_LIMIT: "2" },
     })`node --experimental-strip-types --import ./tools/dev/zx-init.mjs tools/buck/prebuild-guard.ts --verbose --verbose-limit 2`;
     const out = String(stdout || "") + String(stderr || "");
-    if (!out.includes("newer input:") && !out.includes("older output:") && !out.includes("missing output:")) {
+    if (
+      !out.includes("newer input:") &&
+      !out.includes("older output:") &&
+      !out.includes("missing output:")
+    ) {
       console.error(out);
       throw new Error("expected verbose listings");
     }
   });
 });
-
-

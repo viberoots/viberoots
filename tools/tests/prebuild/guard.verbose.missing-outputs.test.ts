@@ -52,11 +52,15 @@ EOF
       const entries = await fsp.readdir(providersDir);
       for (const name of entries) {
         if (/^TARGETS.*\.auto$/.test(name) || name === "auto_map.bzl") {
-          try { await fsp.rm(path.join(providersDir, name)); } catch {}
+          try {
+            await fsp.rm(path.join(providersDir, name));
+          } catch {}
         }
       }
     } catch {}
-    try { await fsp.rm(path.join(tmp, "tools", "buck", "graph.json")); } catch {}
+    try {
+      await fsp.rm(path.join(tmp, "tools", "buck", "graph.json"));
+    } catch {}
     const { stdout, stderr } = await $({
       cwd: tmp,
       stdio: "pipe",
@@ -69,5 +73,3 @@ EOF
     }
   });
 });
-
-

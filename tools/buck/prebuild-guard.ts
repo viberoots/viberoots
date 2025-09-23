@@ -194,14 +194,14 @@ async function runFixSteps() {
       }
     }
   } catch {}
-  const nodeBase = [
-    "--experimental-strip-types",
-    "--import",
-    "./tools/dev/zx-init.mjs",
-  ];
-  await $({ stdio: "inherit" })`node ${nodeBase} tools/buck/export-graph.ts --out tools/buck/graph.json`;
+  const nodeBase = ["--experimental-strip-types", "--import", "./tools/dev/zx-init.mjs"];
+  await $({
+    stdio: "inherit",
+  })`node ${nodeBase} tools/buck/export-graph.ts --out tools/buck/graph.json`;
   await $({ stdio: "inherit" })`node ${nodeBase} tools/buck/sync-providers.ts`;
-  await $({ stdio: "inherit" })`node ${nodeBase} tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
+  await $({
+    stdio: "inherit",
+  })`node ${nodeBase} tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
 }
 
 function logList(name: string, files: string[], limit = 5) {
@@ -216,7 +216,9 @@ function logList(name: string, files: string[], limit = 5) {
 function collectDiagnostics(inputs: string[], presentOutputs: string[], missingOutputs: string[]) {
   const now = Date.now();
   const inputsSorted = [...inputs].sort((a, b) => (mtimeSafe(b) || 0) - (mtimeSafe(a) || 0));
-  const outputsSorted = [...presentOutputs].sort((a, b) => (mtimeSafe(a) || 0) - (mtimeSafe(b) || 0));
+  const outputsSorted = [...presentOutputs].sort(
+    (a, b) => (mtimeSafe(a) || 0) - (mtimeSafe(b) || 0),
+  );
   const inputsNewest = inputsSorted.slice(0, verboseLimit).map((p) => ({
     path: p,
     mtime: mtimeSafe(p) || 0,
@@ -227,13 +229,17 @@ function collectDiagnostics(inputs: string[], presentOutputs: string[], missingO
     mtime: mtimeSafe(p) || 0,
     ageMs: Math.max(0, now - (mtimeSafe(p) || now)),
   }));
-  const newestInput = Math.max(0, ...inputs.map((f) => mtimeSafe(f)).filter((n): n is number => n != null));
+  const newestInput = Math.max(
+    0,
+    ...inputs.map((f) => mtimeSafe(f)).filter((n): n is number => n != null),
+  );
   const oldestOutput = Math.min(
     ...presentOutputs.map((f) => mtimeSafe(f)).filter((n): n is number => n != null),
   );
-  const ageDeltaMs = Number.isFinite(newestInput) && Number.isFinite(oldestOutput)
-    ? Math.max(0, newestInput - oldestOutput)
-    : 0;
+  const ageDeltaMs =
+    Number.isFinite(newestInput) && Number.isFinite(oldestOutput)
+      ? Math.max(0, newestInput - oldestOutput)
+      : 0;
   return {
     inputsNewest,
     outputsOldest,
@@ -302,21 +308,22 @@ async function main() {
 
   const needFix = needFixPresence || needFixFreshness;
 
-  // Optional diagnostics (verbose or JSON) — no behavior change
-  if (flagVerbose || jsonOut) {
+  // Optional diagnostics (verbose or JSON)
+  if (flagVerbose) {
     const sortedInputs = [...inputs].sort((a, b) => (mtimeSafe(b) || 0) - (mtimeSafe(a) || 0));
-    const sortedOutputs = [...presentOutputs].sort((a, b) => (mtimeSafe(a) || 0) - (mtimeSafe(b) || 0));
+    const sortedOutputs = [...presentOutputs].sort(
+      (a, b) => (mtimeSafe(a) || 0) - (mtimeSafe(b) || 0),
+    );
     logList("newer input", sortedInputs, verboseLimit);
     logList("older output", sortedOutputs, verboseLimit);
     for (const o of outPresence.slice(0, verboseLimit)) {
       console.error(`missing output: ${o}`);
     }
-    if (jsonOut) {
-      const diag = collectDiagnostics(inputs, presentOutputs, outPresence);
-      try {
-        console.log(JSON.stringify(diag));
-      } catch {}
-    }
+  }
+  if (jsonOut) {
+    const diag = collectDiagnostics(inputs, presentOutputs, outPresence);
+    console.log(JSON.stringify(diag));
+    return process.exit(0);
   }
 
   if (needFix) {

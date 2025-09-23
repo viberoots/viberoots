@@ -47,11 +47,18 @@ EOF
       "# gen\nMODULE_PROVIDERS = {}\n",
       "utf8",
     );
-    await fsp.writeFile(path.join(tmp, "third_party", "providers", "TARGETS.auto"), "# gen\n", "utf8");
+    await fsp.writeFile(
+      path.join(tmp, "third_party", "providers", "TARGETS.auto"),
+      "# gen\n",
+      "utf8",
+    );
     // One input
     await fsp.writeFile(path.join(tmp, "TARGETS"), "# t1\n", "utf8");
     // Capture JSON
-    const { stdout } = await $({ cwd: tmp, stdio: "pipe" })`node --experimental-strip-types --import ./tools/dev/zx-init.mjs tools/buck/prebuild-guard.ts --json --verbose-limit 1`;
+    const { stdout } = await $({
+      cwd: tmp,
+      stdio: "pipe",
+    })`node --experimental-strip-types --import ./tools/dev/zx-init.mjs tools/buck/prebuild-guard.ts --json --verbose-limit 1`;
     const txt = String(stdout || "");
     const first = txt.indexOf("{");
     const last = txt.lastIndexOf("}");
@@ -63,5 +70,3 @@ EOF
     if (!obj.summary || typeof obj.summary !== "object") throw new Error("summary missing");
   });
 });
-
-
