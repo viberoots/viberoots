@@ -46,3 +46,21 @@ Running `node tools/dev/install-deps.ts` in the dev shell runs the full sequence
 ## CI guardrails
 
 Local builds warn when `NIX_GO_DEV_OVERRIDE_JSON` is set; CI fails if it is set.
+
+In addition, CI enforces patch directory invariants for Go:
+
+- Flat `patches/go` directory (no subdirectories)
+- Files must be `.patch` only
+- Exactly one patch per `module@version`
+
+Locally, run advisory mode:
+
+```
+node tools/dev/patches-lint.ts --lang go
+```
+
+In CI, strict mode runs and exits nonzero on violations:
+
+```
+node tools/ci/run-stage.ts --stage patches-lint
+```

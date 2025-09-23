@@ -33,6 +33,9 @@ pipeline {
           stage('Pre-build guard') {
             steps { sh 'node tools/ci/run-stage.ts --stage prebuild-guard' }
           }
+          stage('Patches Lint (strict)') {
+            steps { sh 'node tools/ci/run-stage.ts --stage patches-lint' }
+          }
           stage('Build graph-generator (Nix)') {
             steps { sh 'node tools/ci/run-stage.ts --stage nix-build-graph-generator' }
           }
