@@ -6,6 +6,38 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("install-deps gomod2nix integration writes deterministic gomod2nix.toml", async () => {
   await runInTemp("install-deps-integration", async (tmp, $) => {
+    await $`bash -lc ${`set -euo pipefail
+      : > .buckroot
+      cat > .buckconfig <<'EOF'
+[buildfile]
+name = TARGETS
+
+[repositories]
+root = .
+prelude = ./prelude
+toolchains = ./toolchains
+repo_toolchains = ./toolchains
+fbsource = ./prelude/third-party/fbsource_stub
+fbcode = ./prelude/third-party/fbcode_stub
+config = ./prelude
+
+[cells]
+root = .
+prelude = ./prelude
+toolchains = ./toolchains
+repo_toolchains = ./toolchains
+fbsource = ./prelude/third-party/fbsource_stub
+fbcode = ./prelude/third-party/fbcode_stub
+config = ./prelude
+
+[build]
+prelude = prelude
+user_platform = prelude//platforms:default
+target_platforms = prelude//platforms:default
+EOF
+      mkdir -p toolchains
+      printf '[buildfile]\nname = TARGETS\n' > toolchains/.buckconfig
+    `}`;
     const goMod = ["module example.com/demo", "\ngo 1.22"].join("\n");
     await fsp.writeFile(path.join(tmp, "go.mod"), goMod, "utf8");
     // Run install-deps which invokes gomod2nix regeneration

@@ -88,19 +88,22 @@ async function main() {
     );
   }
 
-  // Ensure Buck prelude alias exists so @prelude loads work even outside dev shell
+  // Verify Buck prelude/cell mapping exists (diagnostic only; do not write files)
   try {
     const buckconfig = await fs.readFile(".buckconfig", "utf8");
     const hasPrelude = /\[repositories\][\s\S]*?^\s*prelude\s*=\s*/m.test(buckconfig);
-    if (!hasPrelude) {
-      console.warn(
-        "[startup-check] .buckconfig missing [repositories] prelude mapping; run 'nix develop' or add the alias so @prelude//go:def.bzl resolves.",
+    const hasCellsPrelude = /\[cells\][\s\S]*?^\s*prelude\s*=\s*/m.test(buckconfig);
+    if (!hasPrelude || !hasCellsPrelude) {
+      console.error(
+        "[startup-check] invalid .buckconfig: missing prelude mapping in [repositories] or [cells]. Run 'nix develop' to provision or fix the mapping.",
       );
+      process.exit(1);
     }
   } catch {
-    console.warn(
-      "[startup-check] .buckconfig not found; run 'nix develop' to generate it or ensure prelude alias exists.",
+    console.error(
+      "[startup-check] .buckconfig not found; run 'nix develop' to generate it. Exporter will fail without a valid prelude mapping.",
     );
+    process.exit(1);
   }
 
   // Preflight: ensure pnpm-store fixed-output hash is correct so shellHook/node-modules won't rebuild repeatedly.

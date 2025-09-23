@@ -11,10 +11,12 @@ def _zx_test_impl(ctx):
             
             # Ensure Buck prelude/config present in test sandbox
             + "if [ ! -e .buckconfig ] || ! grep -q '^prelude = prelude' .buckconfig 2>/dev/null; then "
-            + "  PRE_OUT=$(nix build .#buck2-prelude --no-link --accept-flake-config --print-out-paths 2>/dev/null | tail -1); "
-            + "  if [ -n \"$PRE_OUT\" ]; then PRELUDE_PATH=\"$PRE_OUT/prelude\"; fi; "
-            + "  if [ -n \"$PRELUDE_PATH\" ]; then : > .buckroot; rm -f prelude && ln -s \"$PRELUDE_PATH\" prelude; fi; "
-            + "  cat > .buckconfig <<'EOF'\n"
+            + "  if [ -d \"$WORKSPACE_ROOT/prelude\" ] || [ -L \"$WORKSPACE_ROOT/prelude\" ]; then PRELUDE_PATH=\"$WORKSPACE_ROOT/prelude\"; fi; "
+            + "  if [ -z \"$PRELUDE_PATH\" ]; then PRE_OUT=$(nix build .#buck2-prelude --no-link --accept-flake-config --print-out-paths 2>/dev/null | tail -1); fi; "
+            + "  if [ -z \"$PRELUDE_PATH\" ] && [ -n \"$PRE_OUT\" ]; then PRELUDE_PATH=\"$PRE_OUT/prelude\"; fi; "
+            + "  : > \"$WORKSPACE_ROOT/.buckroot\"; "
+            + "  if [ -n \"$PRELUDE_PATH\" ] && [ ! -e \"$WORKSPACE_ROOT/prelude\" ]; then ln -s \"$PRELUDE_PATH\" \"$WORKSPACE_ROOT/prelude\"; fi; "
+            + "  cat > \"$WORKSPACE_ROOT/.buckconfig\" <<'EOF'\n"
             + "[buildfile]\n"
             + "name = TARGETS\n\n"
             + "[repositories]\n"
@@ -38,7 +40,7 @@ def _zx_test_impl(ctx):
             + "user_platform = prelude//platforms:default\n"
             + "target_platforms = prelude//platforms:default\n"
             + "EOF\n"
-            + "  mkdir -p toolchains && printf '[buildfile]\nname = TARGETS\n' > toolchains/.buckconfig; "
+            + "  mkdir -p \"$WORKSPACE_ROOT/toolchains\" && printf '[buildfile]\nname = TARGETS\n' > \"$WORKSPACE_ROOT/toolchains/.buckconfig\"; "
             + "            fi; "
             # Load dev shell environment at repo root via direnv if needed (fast),
             # so tools like secretspec/copier are on PATH without per-temp flake eval
@@ -53,7 +55,7 @@ def _zx_test_impl(ctx):
             + "SAFE=$(printf %%s \"$BUCK_TEST_TARGET\" | sed -E 's|^.*/:||; s/[^A-Za-z0-9._-]+/_/g' | cut -c1-200); "
             + "LOGDIR=\"$TEST_LOG_DIR/$SAFE\"; mkdir -p \"$LOGDIR\"; "
             + "rm -f \"$LOGDIR/test.stdout.log\" \"$LOGDIR/test.stderr.log\" 2>/dev/null || true; "
-            + "{ \"$NODE_BIN\" $TEST_NODE_OPTIONS --test --experimental-strip-types --import \"$WORKSPACE_ROOT/tools/dev/zx-init.mjs\" %s; } > >(tee -a \"$LOGDIR/test.stdout.log\") 2> >(tee -a \"$LOGDIR/test.stderr.log\" >&2); STATUS=$?; "
+            + "cd \"$WORKSPACE_ROOT\"; { \"$NODE_BIN\" $TEST_NODE_OPTIONS --test --experimental-strip-types --import \"$WORKSPACE_ROOT/tools/dev/zx-init.mjs\" %s; } > >(tee -a \"$LOGDIR/test.stdout.log\") 2> >(tee -a \"$LOGDIR/test.stderr.log\" >&2); STATUS=$?; "
             + "if [ \"$COVERAGE\" = \"1\" ]; then "
             + "\"$NODE_BIN\" \"$WORKSPACE_ROOT/tools/dev/coverage-raw-normalize.mjs\" || true; "
             + "\"$NODE_BIN\" \"$WORKSPACE_ROOT/node_modules/c8/bin/c8.js\" report "

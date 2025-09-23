@@ -107,28 +107,40 @@ export async function runInTemp<T>(
   const tmp = await mktemp(name + "-");
   await rsyncRepoTo(tmp);
   // Ensure Buck prelude and config exist inside the temp repo so @prelude loads work
-  try {
-    const pre = await $({
-      cwd: tmp,
-      stdio: "pipe",
-    })`nix build .#buck2-prelude --no-link --accept-flake-config --print-out-paths`;
-    let out = String(pre.stdout || "")
-      .trim()
-      .split("\n")
-      .filter(Boolean)
-      .pop();
-    if (!out) {
-      const ev = await $({ cwd: tmp, stdio: "pipe" })`nix eval --raw .#inputs.buck2.outPath`.catch(
-        () => ({ stdout: "" }) as any,
-      );
-      const p = String((ev as any).stdout || "").trim();
-      if (p) out = p;
+  {
+    let preludePath = "";
+    // Prefer the checked-in prelude from the workspace copy
+    const localPrelude = path.join(tmp, "prelude");
+    try {
+      const fs = await import("fs-extra");
+      if (await fs.pathExists(localPrelude)) preludePath = localPrelude;
+    } catch {}
+    // If not available, best-effort: obtain nix prelude path (non-fatal if it fails)
+    if (!preludePath) {
+      try {
+        const pre = await $({
+          cwd: tmp,
+          stdio: "pipe",
+        })`nix build .#buck2-prelude --no-link --accept-flake-config --print-out-paths`;
+        const out = String(pre.stdout || "")
+          .trim()
+          .split("\n")
+          .filter(Boolean)
+          .pop();
+        if (out) preludePath = path.join(out, "prelude").replaceAll("\\", "/");
+      } catch {}
+      if (!preludePath) {
+        try {
+          const ev = await $({ cwd: tmp, stdio: "pipe" })`nix eval --raw .#inputs.buck2.outPath`;
+          const p = String(ev.stdout || "").trim();
+          if (p) preludePath = path.join(p, "prelude").replaceAll("\\", "/");
+        } catch {}
+      }
     }
-    if (out) {
-      const preludePath = path.join(out, "prelude").replaceAll("\\", "/");
+    if (preludePath) {
       await $({ cwd: tmp })`bash -lc ${`set -euo pipefail
         : > .buckroot
-        rm -f prelude && ln -s "${preludePath}" prelude
+        [ -e prelude ] || ln -s "${preludePath}" prelude
         cat > .buckconfig <<'EOF'
 [buildfile]
 name = TARGETS
@@ -160,7 +172,7 @@ EOF
         printf '[buildfile]\nname = TARGETS\n' > toolchains/.buckconfig
       `}`;
     }
-  } catch {}
+  }
   let shouldUseDirenv = true;
   try {
     const direnvStatus = await $({ stdio: "pipe" })`direnv status --json`;

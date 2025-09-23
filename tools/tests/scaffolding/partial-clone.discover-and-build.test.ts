@@ -9,6 +9,38 @@ import { runInTemp } from "../lib/test-helpers";
 test("partial clone: discover and build scaffolded lib via //...", async () => {
   await runInTemp("partial-clone-discover-build", async (_tmp, _$) => {
     const $ = _$({ stdio: "pipe" });
+    await $`bash -lc ${`set -euo pipefail
+      : > .buckroot
+      cat > .buckconfig <<'EOF'
+[buildfile]
+name = TARGETS
+
+[repositories]
+root = .
+prelude = ./prelude
+toolchains = ./toolchains
+repo_toolchains = ./toolchains
+fbsource = ./prelude/third-party/fbsource_stub
+fbcode = ./prelude/third-party/fbcode_stub
+config = ./prelude
+
+[cells]
+root = .
+prelude = ./prelude
+toolchains = ./toolchains
+repo_toolchains = ./toolchains
+fbsource = ./prelude/third-party/fbsource_stub
+fbcode = ./prelude/third-party/fbcode_stub
+config = ./prelude
+
+[build]
+prelude = prelude
+user_platform = prelude//platforms:default
+target_platforms = prelude//platforms:default
+EOF
+      mkdir -p toolchains
+      printf '[buildfile]\nname = TARGETS\n' > toolchains/.buckconfig
+    `}`;
 
     // The test harness already rsyncs a minimal repo (excludes libs), writes .buckconfig and prelude.
     // We only need to ensure shared glue scripts exist (copied from repo root if missing) and scaffold a package.

@@ -472,3 +472,9 @@ zx_test(
     script = "tools/tests/dev/nix-dev-overrides-warning.test.ts",
     out = "dev_nix_dev_overrides_warning.stamp",
 )
+
+zx_test(
+    name = "dev_startup_check_buck_prelude",
+    script = "tools/tests/dev/startup-check.buck-prelude.test.ts",
+    out = "dev_startup_check_buck_prelude.stamp",
+)

@@ -103,6 +103,84 @@ function missingProviderAutos(): boolean {
 }
 
 async function runFixSteps() {
+  // Ensure Buck prelude is mapped locally so exporter can query Buck graph in temp workspaces
+  try {
+    const cfgPath = path.join(process.cwd(), ".buckconfig");
+    const cfgTxt = [
+      "[buildfile]",
+      "name = TARGETS",
+      "",
+      "[repositories]",
+      "root = .",
+      "prelude = ./prelude",
+      "toolchains = ./toolchains",
+      "repo_toolchains = ./toolchains",
+      "fbsource = ./prelude/third-party/fbsource_stub",
+      "fbcode = ./prelude/third-party/fbcode_stub",
+      "config = ./prelude",
+      "",
+      "[cells]",
+      "root = .",
+      "prelude = ./prelude",
+      "toolchains = ./toolchains",
+      "repo_toolchains = ./toolchains",
+      "fbsource = ./prelude/third-party/fbsource_stub",
+      "fbcode = ./prelude/third-party/fbcode_stub",
+      "config = ./prelude",
+      "",
+      "[build]",
+      "prelude = prelude",
+      "",
+    ].join("\n");
+    let hasMapping = false;
+    try {
+      const txt = await fs.readFile(cfgPath, "utf8");
+      const hasRepo = /\[repositories\][\s\S]*?^\s*prelude\s*=\s*/m.test(txt);
+      const hasCells = /\[cells\][\s\S]*?^\s*prelude\s*=\s*/m.test(txt);
+      hasMapping = hasRepo && hasCells;
+    } catch {}
+    const preludeLocal = fs.existsSync(path.join(process.cwd(), "prelude"));
+    if (!hasMapping && preludeLocal) {
+      try {
+        await fs.writeFile(path.join(process.cwd(), ".buckroot"), "");
+      } catch {}
+      await fs.outputFile(cfgPath, cfgTxt, "utf8");
+    }
+    // If still not mapped, best-effort Nix prelude
+    if (!preludeLocal) {
+      let out = "";
+      try {
+        const { stdout } = await $({
+          stdio: "pipe",
+        })`nix build .#buck2-prelude --no-link --accept-flake-config --print-out-paths`;
+        out =
+          String(stdout || "")
+            .trim()
+            .split("\n")
+            .filter(Boolean)
+            .pop() || "";
+      } catch {}
+      if (!out) {
+        try {
+          const { stdout } = await $({ stdio: "pipe" })`nix eval --raw .#inputs.buck2.outPath`;
+          out = String(stdout || "").trim();
+        } catch {}
+      }
+      if (out) {
+        const preludeDir = path.join(out, "prelude");
+        try {
+          await fs.writeFile(path.join(process.cwd(), ".buckroot"), "");
+        } catch {}
+        try {
+          await fs.remove("prelude");
+        } catch {}
+        try {
+          await fs.symlink(preludeDir, "prelude");
+        } catch {}
+        await fs.outputFile(cfgPath, cfgTxt, "utf8");
+      }
+    }
+  } catch {}
   await $({ stdio: "inherit" })`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
   await $({ stdio: "inherit" })`node tools/buck/sync-providers.ts`;
   await $({
