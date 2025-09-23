@@ -83,7 +83,8 @@ async function main() {
     }
     case "file-size-lint": {
       const target = path.resolve("tools/dev/file-size-lint.ts");
-      await $`node ${nodeBase} ${target} --changed-only`;
+      const failFlag = process.env.CI === "true" ? "--fail=true" : "";
+      await $`node ${nodeBase} ${target} --changed-only ${failFlag}`;
       break;
     }
     case "nix-build-graph-generator":

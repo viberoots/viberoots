@@ -1,2 +1,2 @@
-load("//go:defs.bzl", "nix_go_third_party_library")
+## No third-party Go vendoring. This file intentionally left minimal.
 

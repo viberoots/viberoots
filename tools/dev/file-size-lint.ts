@@ -5,12 +5,14 @@ import path from "node:path";
 type Options = {
   changedOnly: boolean;
   threshold: number;
+  failOnOffenders: boolean;
 };
 
 function parseArgs(argv: any): Options {
   const changedOnly = argv["changed-only"] === true || argv.changedOnly === true;
   const threshold = Number(argv.threshold || 250);
-  return { changedOnly, threshold };
+  const failOnOffenders = argv.fail === true || String(argv.fail || "").toLowerCase() === "true";
+  return { changedOnly, threshold, failOnOffenders };
 }
 
 async function listTrackedFiles(): Promise<string[]> {
@@ -77,7 +79,7 @@ async function countLines(file: string): Promise<number> {
 }
 
 async function main() {
-  const { changedOnly, threshold } = parseArgs((global as any).argv);
+  const { changedOnly, threshold, failOnOffenders } = parseArgs((global as any).argv);
   const files = changedOnly ? await listChangedFiles() : await listTrackedFiles();
   const warnExts = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs", ".bzl", ".nix"]);
   const offenders: Array<{ file: string; lines: number }> = [];
@@ -87,12 +89,20 @@ async function main() {
     const lines = await countLines(f);
     if (lines > threshold) offenders.push({ file: f, lines });
   }
-  if (offenders.length > 0) {
-    console.warn(`file-size-lint: ${offenders.length} file(s) exceed ${threshold} LOC (warn-only)`);
+  if (offenders.length === 0) return;
+  const header = `file-size-lint: ${offenders.length} file(s) exceed ${threshold} LOC`;
+  if (!failOnOffenders) {
+    console.warn(header + " (warn-only)");
     for (const { file, lines } of offenders.sort((a, b) => b.lines - a.lines)) {
       console.warn(`  ${file}: ${lines} lines`);
     }
+    return;
   }
+  console.error(header + " (fail)");
+  for (const { file, lines } of offenders.sort((a, b) => b.lines - a.lines)) {
+    console.error(`  ${file}: ${lines} lines`);
+  }
+  process.exit(2);
 }
 
 main().catch((e) => {

@@ -129,24 +129,3 @@ def nix_go_test(name, **kwargs):
 # Third-party shim: expose vendor-provided sources as a go_library while
 # allowing an explicit import path via package map flags
 
-def nix_go_third_party_library(name, import_path, srcs = [], visibility = None, **kwargs):
-    labels = kwargs.pop("labels", [])
-    # Annotate with module: label for mapping
-    if isinstance(import_path, str) and import_path:
-        labels = labels + ["module:%s@unknown" % import_path]
-    # Standard go_library does not accept importpath; rely on source layout matching import path
-    # Expect srcs to be laid out under third_party/go/<import_path>/**.go
-    if len(srcs) == 0:
-        srcs = ["%s/**/*.go" % import_path]
-    # Map import_path last segment to package_name
-    pkgname = import_path.split("/")[-1].replace("-", "_")
-    go_library(
-        name = name,
-        srcs = native.glob(srcs, exclude = ["%s/**/*_test.go" % import_path]),
-        visibility = visibility,
-        labels = labels,
-        package_name = pkgname,
-        **kwargs
-    )
-
-
