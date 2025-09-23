@@ -207,7 +207,11 @@ EOF
   }
   // Ensure repo-aware bin helpers (e.g., tools/bin/build, verify) operate on the temp copy
   exportEnv.WORKSPACE_ROOT = tmp;
-  exportEnv.NODE_PATH = [path.join(process.cwd(), "node_modules"), exportEnv.NODE_PATH || ""]
+  exportEnv.NODE_PATH = [
+    path.join(tmp, "node_modules"),
+    path.join(process.cwd(), "node_modules"),
+    exportEnv.NODE_PATH || "",
+  ]
     .filter(Boolean)
     .join(path.delimiter);
   // Do not mutate PATH; rely on direnv-provided environment from the dev shell.

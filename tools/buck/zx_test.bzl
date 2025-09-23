@@ -41,6 +41,11 @@ def _zx_test_impl(ctx):
             + "target_platforms = prelude//platforms:default\n"
             + "EOF\n"
             + "  mkdir -p \"$WORKSPACE_ROOT/toolchains\" && printf '[buildfile]\nname = TARGETS\n' > \"$WORKSPACE_ROOT/toolchains/.buckconfig\"; "
+            # Ensure node_modules available in sandbox by linking from flake output
+            + "  if [ ! -e \"$WORKSPACE_ROOT/node_modules\" ]; then "
+            + "    NM_OUT=$(nix build \"$WORKSPACE_ROOT\"#node-modules --no-link --accept-flake-config --print-out-paths 2>/dev/null | tail -1); "
+            + "    if [ -n \"$NM_OUT\" ] && [ -d \"$NM_OUT/node_modules\" ]; then ln -s \"$NM_OUT/node_modules\" \"$WORKSPACE_ROOT/node_modules\"; fi; "
+            + "  fi; "
             + "            fi; "
             # Load dev shell environment at repo root via direnv if needed (fast),
             # so tools like secretspec/copier are on PATH without per-temp flake eval

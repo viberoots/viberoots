@@ -41,6 +41,13 @@ const src = `export async function resolve(specifier, context, nextResolve) {
   } catch (e) {
     // Fallback: treat bare specifiers as coming from NODE_PATH or workspace node_modules
     try {
+      // Special-case zx bare import; prefer the flake-provided globals file
+      if (specifier === 'zx' || specifier === 'zx/globals' || specifier === 'zx/globals.cjs') {
+        const ws = '${WORKSPACE_ROOT_FIXED}'.endsWith('/') ? '${WORKSPACE_ROOT_FIXED}' : '${WORKSPACE_ROOT_FIXED}/';
+        const baseUrl = new URL(ws, base);
+        const zxGlobals = new URL('node_modules/zx/build/globals.cjs', baseUrl).href;
+        return await nextResolve(zxGlobals, context);
+      }
       const envPath = (process.env.NODE_PATH || '').split('${process.platform === "win32" ? ";" : ":"}').filter(Boolean);
       for (const entry of envPath) {
         const baseUrl = new URL(entry.endsWith('/') ? entry : entry + '/', base);
