@@ -7,7 +7,20 @@ type Mode = "ci" | "local";
 const mode: Mode = process.env.CI === "true" ? "ci" : "local";
 const skewMs = Number(process.env.PREBUILD_GUARD_SKEW_MS || "2000");
 const noFix = process.env.PREBUILD_GUARD_NO_FIX === "1";
-const verbose = process.env.PREBUILD_GUARD_VERBOSE === "1";
+// CLI flags
+const argv = process.argv.slice(2);
+const flagVerbose = argv.includes("--verbose") || process.env.PREBUILD_GUARD_VERBOSE === "1";
+const jsonOut = argv.includes("--json");
+function getVerboseLimit(): number {
+  const idx = argv.indexOf("--verbose-limit");
+  if (idx >= 0 && argv[idx + 1]) {
+    const n = Number(argv[idx + 1]);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  const envN = Number(process.env.PREBUILD_GUARD_LIST_LIMIT || "10");
+  return Number.isFinite(envN) && envN > 0 ? envN : 10;
+}
+const verboseLimit = getVerboseLimit();
 
 function mtimeSafe(p: string): number | null {
   try {
@@ -181,20 +194,59 @@ async function runFixSteps() {
       }
     }
   } catch {}
-  await $({ stdio: "inherit" })`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
-  await $({ stdio: "inherit" })`node tools/buck/sync-providers.ts`;
-  await $({
-    stdio: "inherit",
-  })`node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
+  const nodeBase = [
+    "--experimental-strip-types",
+    "--import",
+    "./tools/dev/zx-init.mjs",
+  ];
+  await $({ stdio: "inherit" })`node ${nodeBase} tools/buck/export-graph.ts --out tools/buck/graph.json`;
+  await $({ stdio: "inherit" })`node ${nodeBase} tools/buck/sync-providers.ts`;
+  await $({ stdio: "inherit" })`node ${nodeBase} tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
 }
 
 function logList(name: string, files: string[], limit = 5) {
-  if (!verbose) return;
+  if (!flagVerbose) return;
   const top = files.slice(0, limit);
   for (const f of top) {
     const t = mtimeSafe(f);
     console.error(`${name}: ${t != null ? new Date(t).toISOString() : "(missing)"} ${f}`);
   }
+}
+
+function collectDiagnostics(inputs: string[], presentOutputs: string[], missingOutputs: string[]) {
+  const now = Date.now();
+  const inputsSorted = [...inputs].sort((a, b) => (mtimeSafe(b) || 0) - (mtimeSafe(a) || 0));
+  const outputsSorted = [...presentOutputs].sort((a, b) => (mtimeSafe(a) || 0) - (mtimeSafe(b) || 0));
+  const inputsNewest = inputsSorted.slice(0, verboseLimit).map((p) => ({
+    path: p,
+    mtime: mtimeSafe(p) || 0,
+    ageMs: Math.max(0, now - (mtimeSafe(p) || now)),
+  }));
+  const outputsOldest = outputsSorted.slice(0, verboseLimit).map((p) => ({
+    path: p,
+    mtime: mtimeSafe(p) || 0,
+    ageMs: Math.max(0, now - (mtimeSafe(p) || now)),
+  }));
+  const newestInput = Math.max(0, ...inputs.map((f) => mtimeSafe(f)).filter((n): n is number => n != null));
+  const oldestOutput = Math.min(
+    ...presentOutputs.map((f) => mtimeSafe(f)).filter((n): n is number => n != null),
+  );
+  const ageDeltaMs = Number.isFinite(newestInput) && Number.isFinite(oldestOutput)
+    ? Math.max(0, newestInput - oldestOutput)
+    : 0;
+  return {
+    inputsNewest,
+    outputsOldest,
+    missingOutputs,
+    summary: {
+      inputCount: inputs.length,
+      presentOutputCount: presentOutputs.length,
+      missingOutputCount: missingOutputs.length,
+      maxInputAgeMs: Math.max(0, ...inputsNewest.map((x) => x.ageMs)),
+      minOutputAgeMs: outputsOldest.length > 0 ? Math.min(...outputsOldest.map((x) => x.ageMs)) : 0,
+      ageDeltaMs,
+    },
+  };
 }
 
 async function main() {
@@ -249,6 +301,23 @@ async function main() {
   }
 
   const needFix = needFixPresence || needFixFreshness;
+
+  // Optional diagnostics (verbose or JSON) — no behavior change
+  if (flagVerbose || jsonOut) {
+    const sortedInputs = [...inputs].sort((a, b) => (mtimeSafe(b) || 0) - (mtimeSafe(a) || 0));
+    const sortedOutputs = [...presentOutputs].sort((a, b) => (mtimeSafe(a) || 0) - (mtimeSafe(b) || 0));
+    logList("newer input", sortedInputs, verboseLimit);
+    logList("older output", sortedOutputs, verboseLimit);
+    for (const o of outPresence.slice(0, verboseLimit)) {
+      console.error(`missing output: ${o}`);
+    }
+    if (jsonOut) {
+      const diag = collectDiagnostics(inputs, presentOutputs, outPresence);
+      try {
+        console.log(JSON.stringify(diag));
+      } catch {}
+    }
+  }
 
   if (needFix) {
     if (mode === "ci") {

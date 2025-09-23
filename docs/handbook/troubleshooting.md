@@ -57,9 +57,13 @@ The prebuild guard verifies that generated glue files exist and are fresh relati
 
 - Environment variables
   - `PREBUILD_GUARD_NO_FIX=1`: disable local auto-fix; print WARN lines instead (CI always fails).
-  - `PREBUILD_GUARD_VERBOSE=1`: print top offenders for freshness (newer inputs and older outputs).
+  - `PREBUILD_GUARD_VERBOSE=1`: print top offenders for freshness (newer inputs and older outputs). Equivalent to `--verbose`.
   - `PREBUILD_GUARD_SKEW_MS=2000`: allowed mtime skew in milliseconds before glue is considered stale.
-  - `PREBUILD_GUARD_LIST_LIMIT=5`: number of files listed when verbose.
+  - `PREBUILD_GUARD_LIST_LIMIT=5`: number of files listed when verbose; can be overridden by `--verbose-limit`.
+
+- CLI diagnostics
+  - Verbose: `node tools/buck/prebuild-guard.ts --verbose --verbose-limit 10`
+  - JSON: `node tools/buck/prebuild-guard.ts --json > guard.json`
 
 - Typical commands
   - Local auto-fix: `node tools/buck/prebuild-guard.ts`
