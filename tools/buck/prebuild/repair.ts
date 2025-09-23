@@ -85,9 +85,6 @@ async function ensureLocalPreludeMapping() {
 }
 
 export async function autoFixGlue() {
-  try {
-    await ensureLocalPreludeMapping();
-  } catch {}
   const nodeBase = ["--experimental-strip-types", "--import", "./tools/dev/zx-init.mjs"];
   await $`node ${nodeBase} tools/buck/export-graph.ts --out tools/buck/graph.json`;
   await $`node ${nodeBase} tools/buck/sync-providers.ts`;

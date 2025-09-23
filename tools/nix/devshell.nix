@@ -78,34 +78,15 @@ EOF
         alias t=verify
       fi
 
-      # Ensure Buck2 config uses a prelude that matches upstream buck2, unless locked
-      if [ "''${BUCK_CONFIG_LOCK:-0}" = "1" ]; then
-        :
-      else
+      # Symlink prelude from flake output for local dev if missing; do not edit .buckconfig here
+      if [ ! -e prelude ]; then
         pre_out=$(nix build .#buck2-prelude --no-link --accept-flake-config --print-out-paths 2>/dev/null || true)
-        if [ -n "$pre_out" ]; then
-          PRELUDE_PATH="$pre_out/prelude"
-        else
-          PRELUDE_PATH="$(${pkgs.nix}/bin/nix eval --raw .#inputs.buck2.outPath 2>/dev/null)/prelude"
+        if [ -z "$pre_out" ]; then
+          pre_out="$(${pkgs.nix}/bin/nix eval --raw .#inputs.buck2.outPath 2>/dev/null || true)"
         fi
-        : > .buckroot
-        if ! grep -q "^\[buildfile\]" .buckconfig 2>/dev/null; then
-          printf "[buildfile]\nname = TARGETS\n\n" >> .buckconfig
-        elif ! grep -q "^name\s*=\s*TARGETS" .buckconfig; then
-          if command -v gsed >/dev/null 2>&1; then SED=gsed; else SED=sed; fi
-          "$SED" -i.bak -e '/^\[buildfile\]/{:a;n;/^\[/q; s/^name\s*=.*/name = TARGETS/; ta}' .buckconfig || true
-          rm -f .buckconfig.bak
+        if [ -n "$pre_out" ] && [ -d "$pre_out/prelude" ]; then
+          ln -s "$pre_out/prelude" prelude 2>/dev/null || true
         fi
-        if ! grep -q "^\[repositories\]" .buckconfig 2>/dev/null; then
-          printf "[repositories]\nroot = .\nprelude = %s\ntoolchains = %s/toolchains\nfbsource = %s/third-party/fbsource_stub\nfbcode = %s/third-party/fbcode_stub\n\n" "$PRELUDE_PATH" "$PRELUDE_PATH" "$PRELUDE_PATH" "$PRELUDE_PATH" >> .buckconfig
-        fi
-        if ! grep -q "^\[cells\]" .buckconfig 2>/dev/null; then
-          printf "[cells]\nroot = .\nprelude = %s\ntoolchains = %s/toolchains\nfbsource = %s/third-party/fbsource_stub\nfbcode = %s/third-party/fbcode_stub\n\n" "$PRELUDE_PATH" "$PRELUDE_PATH" "$PRELUDE_PATH" "$PRELUDE_PATH" >> .buckconfig
-        fi
-        if ! grep -q "^\[build\]" .buckconfig 2>/dev/null; then
-          printf "[build]\nprelude = prelude\n\n" >> .buckconfig
-        fi
-        mkdir -p toolchains && printf '[buildfile]\nname = TARGETS\n' > toolchains/.buckconfig
       fi
     '';
     buildInputs = [
