@@ -1,9 +1,8 @@
 { pkgs, src ? ../../. }:
 let
   lib = pkgs.lib;
-  # Prefer a live workspace path when WORKSPACE_ROOT is provided (requires --impure)
-  # Falls back to the flake src snapshot when not set.
-  repoRootStr = let wr = builtins.getEnv "WORKSPACE_ROOT"; in if (wr != "") then wr else builtins.toString src;
+  # Always use the provided flake src snapshot; avoid reading from env for purity
+  repoRootStr = builtins.toString src;
   repoRoot = builtins.toPath repoRootStr;
   # Filtered source that includes both apps/* and libs/* so local replaces resolve
   appsLibsSrc = lib.cleanSourceWith {
@@ -17,7 +16,7 @@ let
       p == rootP || lib.hasPrefix "apps/" rel || lib.hasPrefix "libs/" rel;
   };
 
-  # Helper to read module path from a go.mod file under the live repo root (impure)
+  # Helper to read module path from a go.mod file under the repo root (pure with src)
   readModulePathLive = rel:
     let p = builtins.toPath (repoRootStr + "/" + rel); in
       if builtins.pathExists p then (
@@ -143,7 +142,6 @@ let
       mkdir -p $out/bin
       : > $out/manifest.json
       : > $out/build.log
-      echo "WORKSPACE_ROOT=${builtins.getEnv "WORKSPACE_ROOT"}" >> $out/build.log
       echo "repoRootStr=${repoRootStr}" >> $out/build.log
       echo "appsDir=${builtins.toString (builtins.toPath (repoRootStr + "/apps"))}" >> $out/build.log
       echo "libsDir=${builtins.toString (builtins.toPath (repoRootStr + "/libs"))}" >> $out/build.log

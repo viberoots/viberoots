@@ -50,7 +50,7 @@
 
 ## Nix-first runtime validation (Go)
 
-- Build Go apps/libs via `nix build .#graph-generator --impure`.
+- Build Go apps/libs via `nix build .#graph-generator`.
 - Locate binaries via `buck-go/manifest.json` (preferred) or `$out/bin` symlinks.
 - Tests should prefer manifest-based discovery instead of Buck-only `go_library` resolution for third-party deps.
 

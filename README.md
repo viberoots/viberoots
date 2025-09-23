@@ -27,7 +27,7 @@ node tools/dev/install-deps.ts --glue-only
 4. Build via Nix and run from manifest
 
 ```
-nix build .#graph-generator --impure
+nix build .#graph-generator
 jq -r '.[] | select(.label=="//apps/demo-cli:demo-cli") | .bins[0]' buck-go/manifest.json
 ```
 

@@ -58,8 +58,7 @@ EOF
     await $({
       cwd: _tmp,
       stdio: "inherit",
-      env: { WORKSPACE_ROOT: _tmp },
-    })`nix build .#graph-generator --out-link ${outLinkName} --impure`;
+    })`nix build .#graph-generator --out-link ${outLinkName}`;
     const manifestPath = path.join(_tmp, outLinkName, "manifest.json");
     await fsp.access(manifestPath);
   });

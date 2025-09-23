@@ -431,10 +431,9 @@ EOF
       node-modules = node-modules;
       default = node-modules;
       graph-generator = (
-        let wr = builtins.getEnv "WORKSPACE_ROOT"; in
         pkgs.callPackage ./tools/nix/graph-generator.nix {
           inherit pkgs;
-          src = if (wr != "") then builtins.toPath wr else ./.;
+          src = ./.;
         }
       ).all;
     });

@@ -19,7 +19,7 @@
 - Cause: builder working directory not at module root, or vendor mode assumptions.
 - Fix:
   - Ensure `tools/nix/lang-templates.nix` sets `pwd`/`modRoot` to the module root and `subPackages` as documented (apps: `cmd/<name>`, libs: `.`).
-  - Regenerate glue and rebuild via Nix (`nix build .#graph-generator --impure`).
+  - Regenerate glue and rebuild via Nix (`nix build .#graph-generator`).
 
 ## Manifest missing or empty
 

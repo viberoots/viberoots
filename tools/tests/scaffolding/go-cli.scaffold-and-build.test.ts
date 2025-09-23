@@ -58,8 +58,7 @@ EOF
     await $({
       cwd: _tmp,
       stdio: "inherit",
-      env: { WORKSPACE_ROOT: _tmp },
-    })`nix build .#graph-generator --out-link ${outLinkName} --impure`;
+    })`nix build .#graph-generator --out-link ${outLinkName}`;
     // Verify manifest contains the CLI bin entry
     const manifestPath = path.join(_tmp, outLinkName, "manifest.json");
     const txt = await fsp.readFile(manifestPath, "utf8");
