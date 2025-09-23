@@ -1,5 +1,4 @@
 #!/usr/bin/env zx-wrapper
-import * as fsp from "node:fs/promises";
 import path from "node:path";
 
 export function zxNodeBase(): string {
@@ -11,6 +10,28 @@ export function zxNodeBase(): string {
     "--import",
     zxInit,
   ].join(" ");
+}
+
+async function ensurePreludeSymlinkIfMissing() {
+  try {
+    const check = await $({ stdio: "pipe" })`bash --noprofile --norc -c 'test -e prelude'`;
+    if (check.exitCode === 0) return;
+  } catch {}
+  let out = "";
+  try {
+    const res = await $({ stdio: "pipe" })`nix build .#buck2-prelude --no-link --accept-flake-config --print-out-paths`;
+    out = String(res.stdout || "").trim().split("\n").filter(Boolean).pop() || "";
+  } catch {}
+  if (!out) {
+    try {
+      const ev = await $({ stdio: "pipe" })`nix eval --raw .#inputs.buck2.outPath`;
+      out = String(ev.stdout || "").trim();
+    } catch {}
+  }
+  if (!out) return;
+  try {
+    await $`ln -s ${out + "/prelude"} prelude`;
+  } catch {}
 }
 
 export async function runGlue(dryRun: boolean, verbose: boolean) {
@@ -31,6 +52,7 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
       cmd: `${nodeBin} ${nodeBase} tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`,
     },
   ];
+  await ensurePreludeSymlinkIfMissing();
   for (const c of cmds) {
     if (dryRun) {
       console.log(`[dry-run] ${c.cmd}`);
