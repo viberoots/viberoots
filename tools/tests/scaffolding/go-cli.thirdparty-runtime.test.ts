@@ -230,7 +230,9 @@ EOF
 
     // Generate glue
     await $`tools/dev/install-deps.ts --glue-only`;
-    try { await $({ cwd: _tmp, stdio: "pipe" })`direnv allow .`; } catch {}
+    try {
+      await $({ cwd: _tmp, stdio: "pipe" })`direnv allow .`;
+    } catch {}
 
     // 5) Build via Nix (graph-generator) and run the resulting CLI binary
     const outLinkName = `buck-go-${Date.now()}`;

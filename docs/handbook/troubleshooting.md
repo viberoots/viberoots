@@ -2,7 +2,13 @@
 
 ## Missing auto_map or graph
 
-- Run:
+- The planner has no fallback discovery; you must regenerate glue locally or in CI.
+- Run locally:
+  - `node tools/buck/export-graph.ts --out tools/buck/graph.json`
+  - `node tools/buck/sync-providers.ts && node tools/buck/sync-providers-node.ts`
+  - `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
+  - Or: `node tools/dev/install-deps.ts --glue-only`
+- In CI, run dedicated stages before build/test:
   - `tools/ci/run-stage.ts --stage export-graph`
   - `tools/ci/run-stage.ts --stage gen-auto-map`
   - `tools/ci/run-stage.ts --stage prebuild-guard`

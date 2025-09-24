@@ -127,9 +127,11 @@ async function main() {
   }
   const buckBin = await findBuckBin();
   const platformFlags = ["--target-platforms", "prelude//platforms:default"];
-  const cmd = `${buckBin} ${subcmd} ${platformFlags.join(" ")} ${restArgs.join(" ")}`;
   process.env.BUCK_ROOT = process.cwd();
-  const proc = await $({ stdio: "inherit" })`bash --noprofile --norc -c ${cmd}`.catch((e) => e);
+  // Invoke buck directly with structured args to avoid shell-quoting issues
+  const proc = await $({
+    stdio: "inherit",
+  })`${buckBin} ${subcmd} ${platformFlags} ${restArgs}`.catch((e) => e);
   const code = typeof proc?.exitCode === "number" ? proc.exitCode : 1;
   process.exit(code);
 }
