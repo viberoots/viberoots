@@ -39,7 +39,7 @@ in
       _ = if (builtins.getEnv "CI") == "true" && (builtins.getEnv devOverrideEnv) != "" then
             builtins.throw "Dev overrides are forbidden in CI" else null;
       devOverrides = (devOverridesMap // devOverridesEnv);
-      targetName = lib.elemAt (lib.splitString ":" name) 1;
+      targetName = let parts = lib.splitString ":" name; in if (builtins.length parts) > 1 then lib.elemAt parts 1 else (let left = lib.elemAt parts 0; segs = lib.splitString "/" left; in if (builtins.length segs) > 0 then lib.elemAt segs ((builtins.length segs) - 1) else left);
       srcAbs = lib.cleanSource srcRoot;
       baseArgs = {
         pname = "go-${lib.replaceStrings ["//" ":" "/"] ["" "-" "-"] name}";
@@ -48,6 +48,8 @@ in
         modules = modulesToml;
         # Build entrypoint within module root
         subPackages = [ "cmd/${targetName}" ];
+        # Avoid vendor mode; gomod2nix provides modules
+        GOFLAGS = "-mod=mod";
       };
       args = baseArgs // ({
         # Module root is subdir with /cmd/<name> stripped
@@ -74,7 +76,10 @@ in
         src = srcAbs;
         modules = modulesToml;
         # Build the module root
+        # For libraries, build subPackages '.' plus any cmd/<name> bins if present
         subPackages = [ "." ];
+        # Avoid vendor mode; gomod2nix provides modules
+        GOFLAGS = "-mod=mod";
       };
       args = baseArgs // ({
         # Change to the library module root

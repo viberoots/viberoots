@@ -42,11 +42,12 @@ function writeDevOverrides(map: Record<string, string>) {
 
 async function ensureGraph(): Promise<void> {
   if (await fs.pathExists("tools/buck/graph.json")) return;
-  // Try exporter, otherwise write a minimal empty array for local tests without buck2
   try {
     await $`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
-  } catch {
-    await fs.outputFile("tools/buck/graph.json", "[]\n", "utf8");
+  } catch (e) {
+    throw new Error(
+      "tools/buck/graph.json is missing and exporter failed. Ensure buck2 is available in the dev shell and run: node tools/buck/export-graph.ts",
+    );
   }
 }
 

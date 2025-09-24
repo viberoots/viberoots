@@ -48,25 +48,24 @@ EOF
       path.join(_tmp, "apps", "demo-cli", "gomod2nix.toml"),
       path.join(_tmp, "gomod2nix.toml"),
     );
-    // Generate glue and build via Nix graph-generator on the temp repo
-    await $`tools/dev/install-deps.ts --glue-only`;
-    const outLinkName = `buck-go-${Date.now()}`;
-    const outLinkPath = path.join(_tmp, outLinkName);
-    try {
-      await fsp.rm(outLinkPath, { recursive: false, force: true });
-    } catch {}
+    // Preflight: ensure Buck sees the new target
+    await $({ cwd: _tmp, stdio: "inherit" })`buck2 targets //apps/demo-cli:demo-cli`;
+    // Export Buck graph so the planner sees newly scaffolded targets
     await $({
       cwd: _tmp,
       stdio: "inherit",
-    })`nix build .#graph-generator --out-link ${outLinkName}`;
-    // Verify manifest contains the CLI bin entry
-    const manifestPath = path.join(_tmp, outLinkName, "manifest.json");
-    const txt = await fsp.readFile(manifestPath, "utf8");
-    const entries = JSON.parse(txt) as Array<any>;
-    const entry = entries.find(
-      (e) =>
-        e && e.label === "//apps/demo-cli:demo-cli" && Array.isArray(e.bins) && e.bins.length > 0,
-    );
-    if (!entry) throw new Error("expected CLI bin in manifest for //apps/demo-cli:demo-cli");
+    })`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
+    // Generate glue and build via Nix graph-generator on the temp repo
+    await $`tools/dev/install-deps.ts --glue-only`;
+    // Allow direnv in temp repo (non-interactive)
+    try {
+      await $({ cwd: _tmp, stdio: "pipe" })`direnv allow .`;
+    } catch {}
+    // Build the specific planner output for the CLI label to ensure its bin is produced
+    await $({
+      cwd: _tmp,
+      stdio: "inherit",
+      env: { ...process.env, BUCK_GRAPH_JSON: path.join(_tmp, "tools", "buck", "graph.json") },
+    })`BUCK_TARGET="//apps/demo-cli:demo-cli" nix build .#graph-generator`;
   });
 });

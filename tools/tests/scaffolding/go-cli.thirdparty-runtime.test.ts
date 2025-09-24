@@ -220,7 +220,7 @@ EOF
     // Ensure CLI resolves transitive deps from the replaced local lib
     await $({ cwd: path.join(_tmp, "apps", "demo-cli"), stdio: "inherit" })`go mod tidy`;
 
-    // Generate gomod2nix.toml for lib (for completeness) and from CLI (authoritative)
+    // Generate gomod2nix.toml for lib and CLI; copy root from CLI (authoritative)
     await runGomod2nix($, _tmp, "libs/demo-lib");
     await runGomod2nix($, _tmp, "apps/demo-cli");
     await fsp.copyFile(
@@ -230,6 +230,7 @@ EOF
 
     // Generate glue
     await $`tools/dev/install-deps.ts --glue-only`;
+    try { await $({ cwd: _tmp, stdio: "pipe" })`direnv allow .`; } catch {}
 
     // 5) Build via Nix (graph-generator) and run the resulting CLI binary
     const outLinkName = `buck-go-${Date.now()}`;

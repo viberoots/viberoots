@@ -38,19 +38,24 @@
       { default = (import ./tools/nix/devshell.nix { inherit pkgs; buck2Input = buck2Input; }).default; }
     );
 
-    packages = forAllSystems ({ zx-wrapper, pkgs, nodeMods, prelude, buck2Input, system, ... }: {
+    packages = forAllSystems ({ zx-wrapper, pkgs, nodeMods, prelude, buck2Input, system, ... }:
+      let
+        gg = pkgs.callPackage ./tools/nix/graph-generator.nix {
+          inherit pkgs;
+          src = ./.;
+        };
+        gt = gg.goTargets;
+        sanitize = s: pkgs.lib.replaceStrings ["//" ":" "/" " "] ["" "-" "-" "-"] s;
+        gtSan = pkgs.lib.mapAttrs' (n: v: { name = sanitize n; value = v; }) gt;
+        goTargetPkgs = pkgs.lib.mapAttrs' (n: v: { name = "goTarget-" + n; value = v; }) gtSan;
+      in {
       buck2-prelude = prelude.buck2-prelude;
       zx-wrapper = zx-wrapper;
       pnpm-store = nodeMods.pnpm-store;
       node-modules = nodeMods.node-modules;
       default = nodeMods.node-modules;
-      graph-generator = (
-        pkgs.callPackage ./tools/nix/graph-generator.nix {
-          inherit pkgs;
-          src = ./.;
-        }
-      ).all;
-    });
+      graph-generator = gg.all;
+    } // goTargetPkgs);
 
     checks = forAllSystems ({ nodeMods, ... }: {
       default = nodeMods.node-modules;

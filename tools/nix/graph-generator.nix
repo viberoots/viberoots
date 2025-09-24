@@ -26,27 +26,85 @@ let
       ) else "";
 
   # Vendor staging removed — rely on gomod2nix and overrides only
-  graphPath = builtins.toPath (repoRootStr + "/tools/buck/graph.json");
+  # Allow overriding graph location via environment for impure local builds/tests
+  graphPathEnv = builtins.getEnv "BUCK_GRAPH_JSON";
+  graphPath = if graphPathEnv != "" then builtins.toPath graphPathEnv else builtins.toPath (repoRootStr + "/tools/buck/graph.json");
   nodes = if builtins.pathExists graphPath then builtins.fromJSON (builtins.readFile graphPath) else [];
+  nodesList =
+    let t = builtins.typeOf nodes; in
+      if t == "list" then nodes
+      else if t == "set" then (
+        let ks = builtins.attrNames nodes; in
+          map (k:
+            let v = nodes.${k}; vt = builtins.typeOf v; in
+              if vt == "set" then (if (v ? name) then v else (v // { name = k; }))
+              else { name = k; }
+          ) ks
+      ) else [];
   T = import ./lang-templates.nix { inherit pkgs; };
   M = if builtins.pathExists ./mapping.nix then import ./mapping.nix else {};
   D = M.dispatch or {};
 
   get = attrs: k: attrs.${k} or null;
+  nameOf = n:
+    let t = builtins.typeOf n; in
+      if t == "set" then (
+        if builtins.hasAttr "name" n && builtins.typeOf n.name == "string" && n.name != ""
+        then n.name else ""
+      ) else "";
+
+  # Reconstruct full label if exporter provided only short name
+  ensureFullLabel = n:
+    let nm = nameOf n; in
+      if (nm == "") then nm else if (lib.hasPrefix "//" nm) || lib.hasInfix ":" nm then nm else (
+        let srcs = get n "srcs"; in
+          if (srcs != null) && (builtins.length srcs > 0) then (
+            let s = builtins.head srcs;
+                dparts = lib.splitString "/" s;
+                ddir = lib.concatStringsSep "/" (lib.init dparts);
+                base = lib.removeSuffix ("/cmd/" + nm) ddir;
+            in "//" + base + ":" + nm
+          ) else nm
+      );
+
+  isGoCandidate = n:
+    let rt = get n "rule_type";
+        lbs = get n "labels";
+        hasGoRT = (rt != null) && lib.hasPrefix "go_" rt;
+        hasGoLabel = (lbs != null) && builtins.elem "lang:go" lbs;
+    in hasGoRT || hasGoLabel;
 
   pick = n:
-    let rt = get n "rule_type"; in
-      if builtins.hasAttr rt D then D.${rt}
-      else if lib.hasPrefix "go_" rt then {
+    let
+      rt = get n "rule_type";
+      lbs = get n "labels";
+      isGoLabel = lbs != null && builtins.elem "lang:go" lbs;
+      isBinLabel = lbs != null && builtins.elem "kind:bin" lbs;
+      hasDispatch = (rt != null) && builtins.hasAttr rt D;
+      hasGoPrefix = (rt != null) && lib.hasPrefix "go_" rt;
+    in
+      if hasDispatch then D.${rt}
+      else if hasGoPrefix then {
         template = "go";
         kind = if lib.hasSuffix "_binary" rt then "bin" else "lib";
+      } else if isGoLabel then {
+        template = "go";
+        kind = if isBinLabel then "bin" else "lib";
       } else null;
 
   modulesTomlDefault = builtins.toPath (repoRootStr + "/gomod2nix.toml");
   haveModulesDefault = builtins.pathExists modulesTomlDefault;
-  # repoRoot provided via 'src'
+  # Prefer per-package gomod2nix.toml when present; fall back to repo root
+  modulesTomlFor = name:
+    let pkgRel = pkgPathOf name; in
+      let perPkg = builtins.toPath (repoRootStr + "/" + pkgRel + "/gomod2nix.toml"); in
+        if builtins.pathExists perPkg then perPkg else modulesTomlDefault;
 
-  modulesTomlFor = name: modulesTomlDefault;
+  # Minimal local libs listing (not used for target discovery) to build a map of
+  # module import path -> live source for local libs (for replaces)
+  safeReadDir = p: if builtins.pathExists p then builtins.readDir p else {};
+  libsDir = builtins.toPath (repoRootStr + "/libs");
+  libNames = builtins.attrNames (safeReadDir libsDir);
 
   # Build a map of module import path -> live source for local libs (for replaces)
   localModuleOverrides =
@@ -60,25 +118,32 @@ let
 
   sanitize = s: lib.replaceStrings ["//" ":" "/" " "] ["" "-" "-" "-"] s;
 
+  baseNameOf = p:
+    let parts = lib.splitString "/" p; in
+      if (builtins.length parts) > 0 then lib.elemAt parts ((builtins.length parts) - 1) else p;
+
   pkgPathOf = name:
     let left = lib.elemAt (lib.splitString ":" name) 0;
-        rel = lib.removePrefix "//" left;
+        parts = lib.splitString "//" left;
+        rel = if (builtins.length parts) > 1 then lib.elemAt parts ((builtins.length parts) - 1) else lib.removePrefix "//" left;
     in if rel == "" then "." else rel;
 
-  targetNameOf = name: lib.elemAt (lib.splitString ":" name) 1;
+  targetNameOf = name:
+    let parts = lib.splitString ":" name; in
+      if (builtins.length parts) > 1 then lib.elemAt parts 1 else baseNameOf (pkgPathOf name);
 
   mkGo = name: kind:
-    if haveModulesDefault then (
+    let mt = modulesTomlFor name; in
+    if builtins.pathExists mt then (
       if kind == "bin" then T.goApp {
-        inherit name; modulesToml = modulesTomlFor name;
-        # Build from repo root; module root subdir is apps/<name>
+        inherit name;
+        modulesToml = mt;
         srcRoot = repoRoot;
         devOverridesMap = localModuleOverrides;
-        # Pass module root for pwd/modRoot
         subdir = (pkgPathOf name);
       } else T.goLib {
-        inherit name; modulesToml = modulesTomlFor name;
-        # Build from repo root; package dir is libs/<name>
+        inherit name;
+        modulesToml = mt;
         srcRoot = repoRoot;
         subdir = (pkgPathOf name);
       }
@@ -87,50 +152,47 @@ let
       echo stub > $out/.stub
     '';
 
-  goTargetsFromGraph = lib.listToAttrs (map (n:
-    let name = get n "name"; k = pick n; in {
-      inherit name;
-      value = if k == null then pkgs.runCommand "noop-${lib.replaceStrings ["//" ":" "/"] ["" "-" "-"] name}" {} "mkdir -p $out; touch $out/.noop"
-              else mkGo name k.kind;
-    }
-  ) (builtins.filter (n:
-        let nm = get n "name"; rt = get n "rule_type"; in
-        nm != null && rt != null && lib.hasPrefix "go_" rt
-     ) nodes));
+  safeNodes = builtins.filter (n:
+    let nm = ensureFullLabel n; in (builtins.typeOf nm == "string") && nm != "" && isGoCandidate n && (pick n) != null
+  ) nodesList;
 
-  # Fallback discovery when Buck graph is unavailable: scan apps/* and libs/*
-  safeReadDir = p: if builtins.pathExists p then builtins.readDir p else {};
-  appsDir = builtins.toPath (repoRootStr + "/apps");
-  libsDir = builtins.toPath (repoRootStr + "/libs");
-  appNames = builtins.attrNames (safeReadDir appsDir);
-  libNames = builtins.attrNames (safeReadDir libsDir);
+  goTargetsFromGraph = builtins.foldl' (acc: n:
+    let nm = ensureFullLabel n; k = pick n; tnm = builtins.typeOf nm; in
+      if (tnm != "string") || (nm == "") || (k == null)
+      then acc
+      else (acc // { "${nm}" = mkGo nm k.kind; })
+  ) {} safeNodes;
 
-  discoveredApps = lib.listToAttrs (map (nm: let
-      label = "//apps/" + nm + ":" + nm;
-      appDir = builtins.toPath (repoRootStr + "/apps/" + nm);
-      cmdDir = builtins.toPath (repoRootStr + "/apps/" + nm + "/cmd/" + nm);
-    in {
-      name = label;
-      value = if builtins.pathExists cmdDir then T.goApp {
-        name = label; modulesToml = modulesTomlFor label;
-        srcRoot = repoRoot; devOverridesMap = localModuleOverrides; subdir = "apps/" + nm;
-      } else pkgs.runCommand "noop-${lib.replaceStrings ["//" ":" "/"] ["" "-" "-"] label}" {} "mkdir -p $out; touch $out/.noop";
-    }) appNames);
-
-  discoveredLibs = lib.listToAttrs (map (nm: let
-      label = "//libs/" + nm + ":" + nm;
-      modRoot = builtins.toPath (repoRootStr + "/libs/" + nm);
-      goMod = builtins.toPath (repoRootStr + "/libs/" + nm + "/go.mod");
-    in {
-      name = label;
-      value = if builtins.pathExists goMod then T.goLib {
-        name = label; modulesToml = modulesTomlFor label;
-        srcRoot = repoRoot; subdir = "libs/" + nm;
-      } else pkgs.runCommand "noop-${lib.replaceStrings ["//" ":" "/"] ["" "-" "-"] label}" {} "mkdir -p $out; touch $out/.noop";
-    }) libNames);
-
-  goTargets = goTargetsFromGraph // discoveredApps // discoveredLibs;
+  # Strict mode: require Buck graph; only build app binaries in graph-outputs
+  goTargets =
+    let names = builtins.attrNames goTargetsFromGraph;
+        entries = builtins.filter (e: e != null) (map (nm:
+          let matches = builtins.filter (x: ensureFullLabel x == nm) safeNodes;
+              n = if matches == [] then null else builtins.head matches;
+              k = if n == null then null else pick n;
+          in if k != null && k.kind == "bin" then { name = nm; value = goTargetsFromGraph.${nm}; } else null
+        ) names);
+    in builtins.listToAttrs entries;
   goOutPaths = lib.mapAttrs (n: p: builtins.toString p) goTargets;
+
+  # Optional: select a single target by BUCK_TARGET for impure local builds/tests
+  selectedTargetName = builtins.getEnv "BUCK_TARGET";
+  selected = if selectedTargetName != "" then (
+    let matches = builtins.filter (n: ensureFullLabel n == selectedTargetName) safeNodes;
+    in if matches == [] then pkgs.runCommand "missing-target-${sanitize selectedTargetName}" {} ''
+      echo "missing target: ${selectedTargetName}" >&2
+      exit 1
+    '' else (
+      let n = builtins.head matches; k = pick n; in
+        if k == null then pkgs.runCommand "missing-kind-${sanitize selectedTargetName}" {} ''
+          echo "missing kind for: ${selectedTargetName}" >&2
+          exit 1
+        '' else mkGo selectedTargetName k.kind
+    )
+  ) else pkgs.runCommand "no-target-specified" {} ''
+    mkdir -p $out
+    echo no-target > $out/.noop
+  '';
 
   all = pkgs.stdenv.mkDerivation {
     name = "graph-outputs";
@@ -146,8 +208,7 @@ let
       echo "appsDir=${builtins.toString (builtins.toPath (repoRootStr + "/apps"))}" >> $out/build.log
       echo "libsDir=${builtins.toString (builtins.toPath (repoRootStr + "/libs"))}" >> $out/build.log
       echo "goTargets keys: ${lib.concatStringsSep "," (builtins.attrNames goOutPaths)}" >> $out/build.log
-      echo "apps discovered: ${lib.concatStringsSep "," appNames}" >> $out/build.log
-      echo "libs discovered: ${lib.concatStringsSep "," libNames}" >> $out/build.log
+      # discovery removed; no appNames/libNames logged
       echo '[' > $out/manifest.json
       first=1
       ${lib.concatStringsSep "\n" (lib.mapAttrsToList (n: p:
@@ -155,6 +216,7 @@ let
           ln -s "${p}" "$out/" || true
           echo "== target: ${n} ==" >> $out/build.log
           echo "path: ${p}" >> $out/build.log
+          echo "modulesToml: ${builtins.toString (modulesTomlFor n)}" >> $out/build.log
           echo "pkgPath: ${pkgPathOf n}" >> $out/build.log
           echo "targetName: ${targetNameOf n}" >> $out/build.log
           echo "expected subdir(bin): ${pkgPathOf n}/cmd/${targetNameOf n}" >> $out/build.log
@@ -186,6 +248,6 @@ let
     '';
   };
 in
-{ inherit goTargets all; }
+{ inherit goTargets all selected; }
 
 
