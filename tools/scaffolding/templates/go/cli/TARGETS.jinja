@@ -2,7 +2,7 @@ load("//go:defs.bzl", "nix_go_binary")
 
 nix_go_binary(
     name = "{{ name }}",
-    srcs = glob(["apps/{{ name }}/cmd/{{ name }}/**/*.go"]),
+    srcs = glob(["cmd/{{ name }}/**/*.go"]),
     labels = ["lang:go", "kind:bin"],
 )
 
