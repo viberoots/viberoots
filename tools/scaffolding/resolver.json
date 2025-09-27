@@ -1,10 +1,10 @@
 {
   "default": {
     "lib": "libs/{name}",
-    "cli": "{name}"
+    "cli": "apps/{name}"
   },
   "go": {
     "lib": "libs/{name}",
-    "cli": "{name}"
+    "cli": "apps/{name}"
   }
 }
