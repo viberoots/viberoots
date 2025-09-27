@@ -1,5 +1,10 @@
 {
   "default": {
-    "lib": "libs/{name}"
+    "lib": "libs/{name}",
+    "cli": "{name}"
+  },
+  "go": {
+    "lib": "libs/{name}",
+    "cli": "{name}"
   }
 }
