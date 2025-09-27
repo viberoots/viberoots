@@ -92,15 +92,17 @@ EOF
 build_run_array() {
   local PLATFORM_FLAGS=(--target-platforms prelude//platforms:default)
   local args=("$BUCK_BIN" test "${PLATFORM_FLAGS[@]}" "$@" -- --env COVERAGE="${COVERAGE}")
-  # External timeout policy: 300s full suite; 180s for a single focused test
+  # External timeout policy: 300s full suite; 40s for a single focused test
   local RUN_TIMEOUT=("${TIMEOUT_CMD[@]}")
   if [[ ${#TIMEOUT_CMD[@]} -gt 0 ]]; then
-    if [[ $# -eq 1 && "$1" == //:* || ( $# -eq 1 && "$1" == //*) ]]; then
-      # Focused single target → shorter timeout
+    # Consider it a single focused target only if exactly one arg is provided
+    # AND it references a concrete target label containing a ':' (not //... or //path/...)
+    if [[ $# -eq 1 && "$1" == *:* ]]; then
+      # Focused single target → shorter timeout per project policy
       if command -v timeout >/dev/null 2>&1; then
-        RUN_TIMEOUT=(timeout -k 10s 180s)
+        RUN_TIMEOUT=(timeout -k 10s 40s)
       elif command -v gtimeout >/dev/null 2>&1; then
-        RUN_TIMEOUT=(gtimeout -k 10s 180s)
+        RUN_TIMEOUT=(gtimeout -k 10s 40s)
       fi
     fi
   fi
