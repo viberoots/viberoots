@@ -2,9 +2,8 @@ load("//go:defs.bzl", "nix_go_binary")
 
 nix_go_binary(
     name = "{{ name }}",
-    labels = [
-        # Tuple key can be extended by users via extra labels if needed
-    ],
+    srcs = glob(["cmd/{{ name }}/**/*.go"]),
+    labels = ["lang:go", "kind:bin"],
 )
 
 

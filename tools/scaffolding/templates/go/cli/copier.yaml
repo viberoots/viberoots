@@ -27,4 +27,5 @@ license: "MIT"
 enable_ci: false
 
 _tasks:
+  # Ensure destination subdir exists (apps/{{ name }}) since files below are nested in apps/{{ name }}/...
   - mkdir -p apps/{{ name }}/cmd/{{ name }}

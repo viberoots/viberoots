@@ -810,41 +810,7 @@ async function cmdNew(args: string[], flags: Record<string, string>) {
   }
 
   await runCopierCopy(root, effectiveDest, data);
-  // Post-fix double-nesting for templates that include apps/{{name}} or libs/{{name}}
-  try {
-    const normalizedDest = effectiveDest.replace(/\/+$/, "");
-    if (language === "go" && template === "cli" && normalizedDest === `apps/${name}`) {
-      const nested = path.join(effectiveDest, "apps", name);
-      try {
-        const st = await fsp.stat(nested);
-        if (st.isDirectory()) {
-          const entries = await fsp.readdir(nested);
-          for (const entry of entries) {
-            await fsp.rename(path.join(nested, entry), path.join(effectiveDest, entry));
-          }
-          // remove empty nested dir and its parent 'apps' if empty
-          await fsp.rm(nested, { recursive: true, force: true }).catch(() => {});
-          const parentApps = path.join(effectiveDest, "apps");
-          await fsp.rmdir(parentApps).catch(() => {});
-        }
-      } catch {}
-    }
-    if (language === "go" && template === "lib" && normalizedDest === `libs/${name}`) {
-      const nested = path.join(effectiveDest, "libs", name);
-      try {
-        const st = await fsp.stat(nested);
-        if (st.isDirectory()) {
-          const entries = await fsp.readdir(nested);
-          for (const entry of entries) {
-            await fsp.rename(path.join(nested, entry), path.join(effectiveDest, entry));
-          }
-          await fsp.rm(nested, { recursive: true, force: true }).catch(() => {});
-          const parentLibs = path.join(effectiveDest, "libs");
-          await fsp.rmdir(parentLibs).catch(() => {});
-        }
-      } catch {}
-    }
-  } catch {}
+  // No de-nesting workaround; templates must render into the resolved destination
   await recordSource(dest, language, template);
   await runPostSteps(dest);
   console.log("created:", dest);
