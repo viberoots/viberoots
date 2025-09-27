@@ -783,17 +783,8 @@ async function cmdNew(args: string[], flags: Record<string, string>) {
   }
   const destInfo = resolveDestination(language, template, name, flags.path);
   const dest = destInfo.path;
-  // If resolved destination equals apps/{name} or libs/{name} and the template
-  // itself nests under apps/{{name}} or libs/{{name}}, write into repo root to
-  // avoid double-nesting like apps/<name>/apps/<name>.
+  // Always copy into the resolved destination
   let effectiveDest = dest;
-  const normalizedDest = dest.replace(/\/+$/, "");
-  if (language === "go" && template === "cli" && normalizedDest === `apps/${name}`) {
-    effectiveDest = ".";
-  }
-  if (language === "go" && template === "lib" && normalizedDest === `libs/${name}`) {
-    effectiveDest = ".";
-  }
   const data: Record<string, any> = { name, language, template };
   for (const [k, v] of Object.entries(flags)) {
     if (!["path", "json"].includes(k)) {
@@ -819,6 +810,41 @@ async function cmdNew(args: string[], flags: Record<string, string>) {
   }
 
   await runCopierCopy(root, effectiveDest, data);
+  // Post-fix double-nesting for templates that include apps/{{name}} or libs/{{name}}
+  try {
+    const normalizedDest = effectiveDest.replace(/\/+$/, "");
+    if (language === "go" && template === "cli" && normalizedDest === `apps/${name}`) {
+      const nested = path.join(effectiveDest, "apps", name);
+      try {
+        const st = await fsp.stat(nested);
+        if (st.isDirectory()) {
+          const entries = await fsp.readdir(nested);
+          for (const entry of entries) {
+            await fsp.rename(path.join(nested, entry), path.join(effectiveDest, entry));
+          }
+          // remove empty nested dir and its parent 'apps' if empty
+          await fsp.rm(nested, { recursive: true, force: true }).catch(() => {});
+          const parentApps = path.join(effectiveDest, "apps");
+          await fsp.rmdir(parentApps).catch(() => {});
+        }
+      } catch {}
+    }
+    if (language === "go" && template === "lib" && normalizedDest === `libs/${name}`) {
+      const nested = path.join(effectiveDest, "libs", name);
+      try {
+        const st = await fsp.stat(nested);
+        if (st.isDirectory()) {
+          const entries = await fsp.readdir(nested);
+          for (const entry of entries) {
+            await fsp.rename(path.join(nested, entry), path.join(effectiveDest, entry));
+          }
+          await fsp.rm(nested, { recursive: true, force: true }).catch(() => {});
+          const parentLibs = path.join(effectiveDest, "libs");
+          await fsp.rmdir(parentLibs).catch(() => {});
+        }
+      } catch {}
+    }
+  } catch {}
   await recordSource(dest, language, template);
   await runPostSteps(dest);
   console.log("created:", dest);
