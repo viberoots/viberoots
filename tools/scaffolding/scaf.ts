@@ -783,18 +783,16 @@ async function cmdNew(args: string[], flags: Record<string, string>) {
   }
   const destInfo = resolveDestination(language, template, name, flags.path);
   const dest = destInfo.path;
-  // When a concrete destination is provided that already encodes the standard
-  // go layout (apps/<name> or libs/<name>), and the template itself also
-  // writes into apps/{{name}} or libs/{{name}}, copy into the workspace root
-  // to avoid nested paths like apps/<name>/apps/<name>.
+  // If resolved destination equals apps/{name} or libs/{name} and the template
+  // itself nests under apps/{{name}} or libs/{{name}}, write into repo root to
+  // avoid double-nesting like apps/<name>/apps/<name>.
   let effectiveDest = dest;
-  if (flags.path) {
-    if (language === "go" && template === "cli" && dest.replace(/\/+$/, "") === `apps/${name}`) {
-      effectiveDest = ".";
-    }
-    if (language === "go" && template === "lib" && dest.replace(/\/+$/, "") === `libs/${name}`) {
-      effectiveDest = ".";
-    }
+  const normalizedDest = dest.replace(/\/+$/, "");
+  if (language === "go" && template === "cli" && normalizedDest === `apps/${name}`) {
+    effectiveDest = ".";
+  }
+  if (language === "go" && template === "lib" && normalizedDest === `libs/${name}`) {
+    effectiveDest = ".";
   }
   const data: Record<string, any> = { name, language, template };
   for (const [k, v] of Object.entries(flags)) {
