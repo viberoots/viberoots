@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
+import os from "node:os";
 import path from "node:path";
 import { encodeForPatchFilename } from "../lib/providers";
 import { makeWorkspace } from "./cross-platform";
@@ -42,19 +43,42 @@ function writeDevOverrides(map: Record<string, string>) {
 
 async function ensureGraph(): Promise<void> {
   if (await fs.pathExists("tools/buck/graph.json")) return;
+  const nodeBin = process.execPath;
+  const repoRoot = process.cwd();
+  const zxInit = path.join(repoRoot, "tools/dev/zx-init.mjs");
+  const exportScript = path.join(repoRoot, "tools/buck/export-graph.ts");
+  const zxArgs = [
+    "--experimental-top-level-await",
+    "--disable-warning=ExperimentalWarning",
+    "--experimental-strip-types",
+    "--import",
+    zxInit,
+  ];
   try {
-    await $`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
+    await $`${nodeBin} ${zxArgs} ${exportScript} --out tools/buck/graph.json`;
   } catch (e) {
     throw new Error(
-      "tools/buck/graph.json is missing and exporter failed. Ensure buck2 is available in the dev shell and run: node tools/buck/export-graph.ts",
+      "tools/buck/graph.json is missing and exporter failed. Ensure buck2 is available in the dev shell and run: tools/buck/export-graph.ts",
     );
   }
 }
 
 async function runGlue(): Promise<void> {
   await ensureGraph();
-  await $`node tools/buck/sync-providers.ts`;
-  await $`node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
+  const nodeBin = process.execPath;
+  const repoRoot = process.cwd();
+  const zxInit = path.join(repoRoot, "tools/dev/zx-init.mjs");
+  const syncScript = path.join(repoRoot, "tools/buck/sync-providers.ts");
+  const autoMapScript = path.join(repoRoot, "tools/buck/gen-auto-map.ts");
+  const zxArgs = [
+    "--experimental-top-level-await",
+    "--disable-warning=ExperimentalWarning",
+    "--experimental-strip-types",
+    "--import",
+    zxInit,
+  ];
+  await $`${nodeBin} ${zxArgs} ${syncScript}`;
+  await $`${nodeBin} ${zxArgs} ${autoMapScript} --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
 }
 
 async function doStart(args: string[]) {
@@ -113,13 +137,27 @@ async function doApply(args: string[]) {
   }
   if (write) await fs.outputFile(dst, diff, "utf8");
 
+  // Strict apply verification: ensure patch applies cleanly against origin
+  const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "bucknix-patch-verify-"));
+  const tmpCopy = path.join(tmpRoot, path.basename(sess.originPath));
+  await fs.copy(sess.originPath, tmpCopy, { recursive: true, overwrite: true });
+  try {
+    await $({ cwd: tmpCopy, stdio: "inherit" })`patch -p1 --dry-run -i ${path.resolve(dst)}`;
+  } catch (e) {
+    throw new Error(
+      `Patch verification failed: the generated diff did not apply cleanly with -p1 to the origin module.\n` +
+        `Module: ${importPath}@${version}\n` +
+        `Origin: ${sess.originPath}\n` +
+        `Patch: ${dst}`,
+    );
+  }
+
   const dev = readDevOverrides();
   delete dev[key];
   writeDevOverrides(dev);
   await deleteSession("go", key);
-  try {
-    await fs.rm(sess.workspacePath, { recursive: true, force: true });
-  } catch {}
+  // Keep the temporary workspace on disk to allow downstream builds to
+  // point NIX_GO_DEV_OVERRIDE_JSON at it for verification.
 
   await runGlue();
   console.log(dst);

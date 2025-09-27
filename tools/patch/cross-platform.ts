@@ -16,11 +16,15 @@ export async function makeWorkspace(originPath: string, moduleKey: string): Prom
   if (process.platform === "darwin") {
     try {
       await $`cp -cR ${originPath}/. ${dst}/`;
+      // Ensure workspace is writable even if source tree had read-only bits
+      await $`chmod -R u+w ${dst}`;
       return dst;
     } catch {
       // fall through to cp -a
     }
   }
   await $`cp -a ${originPath}/. ${dst}/`;
+  // Ensure workspace is writable even if source tree had read-only bits
+  await $`chmod -R u+w ${dst}`;
   return dst;
 }

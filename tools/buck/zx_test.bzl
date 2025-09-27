@@ -8,6 +8,8 @@ def _zx_test_impl(ctx):
             + "export BUCK_TEST_TARGET=\"%s\"; "
             + "export TEST_LOG_DIR=\"${TEST_LOG_DIR:-$(pwd)/buck-out/test-logs}\"; "
             + "if [ -z \"$NODE_BIN\" ]; then export NODE_BIN=\"$(command -v node)\"; fi; "
+            # Ensure a valid TMPDIR inside the sandbox to avoid stale host TMPDIR paths
+            + "export TMPDIR=\"${TMPDIR:-$WORKSPACE_ROOT/buck-out/tmp}\"; mkdir -p \"$TMPDIR\"; "
             
             # Ensure Buck prelude/config present in test sandbox
             + "if [ ! -e .buckconfig ] || ! grep -q '^prelude = prelude' .buckconfig 2>/dev/null; then "

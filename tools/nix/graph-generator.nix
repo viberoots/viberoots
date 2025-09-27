@@ -44,6 +44,7 @@ let
   T = import ./lang-templates.nix { inherit pkgs; };
   M = if builtins.pathExists ./mapping.nix then import ./mapping.nix else {};
   D = M.dispatch or {};
+  devOverrideJSON = builtins.getEnv "NIX_GO_DEV_OVERRIDE_JSON";
 
   get = attrs: k: attrs.${k} or null;
   nameOf = n:
@@ -207,6 +208,7 @@ let
       echo "repoRootStr=${repoRootStr}" >> $out/build.log
       echo "appsDir=${builtins.toString (builtins.toPath (repoRootStr + "/apps"))}" >> $out/build.log
       echo "libsDir=${builtins.toString (builtins.toPath (repoRootStr + "/libs"))}" >> $out/build.log
+      echo "devOverrideJSON=${builtins.toJSON devOverrideJSON}" >> $out/build.log
       echo "goTargets keys: ${lib.concatStringsSep "," (builtins.attrNames goOutPaths)}" >> $out/build.log
       # discovery removed; no appNames/libNames logged
       echo '[' > $out/manifest.json
@@ -216,6 +218,7 @@ let
           ln -s "${p}" "$out/" || true
           echo "== target: ${n} ==" >> $out/build.log
           echo "path: ${p}" >> $out/build.log
+          echo "deriver: $(nix-store -q --deriver "${p}" 2>/dev/null || true)" >> $out/build.log
           echo "modulesToml: ${builtins.toString (modulesTomlFor n)}" >> $out/build.log
           echo "pkgPath: ${pkgPathOf n}" >> $out/build.log
           echo "targetName: ${targetNameOf n}" >> $out/build.log

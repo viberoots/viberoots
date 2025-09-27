@@ -1,0 +1,451 @@
+#!/usr/bin/env zx-wrapper
+import * as fsp from "node:fs/promises";
+import path from "node:path";
+import process from "node:process";
+import { test } from "node:test";
+import { runInTemp } from "../lib/test-helpers";
+// Ensure Node is on PATH inside zx_test sandboxes that may not have dev shell
+process.env.PATH = `${path.dirname(process.execPath)}:${process.env.PATH || ""}`;
+
+async function writeFileAbs(p: string, content: string) {
+  await fsp.mkdir(path.dirname(p), { recursive: true });
+  await fsp.writeFile(p, content, "utf8");
+}
+
+async function writeBuckConfig($: any) {
+  await $`bash -lc ${`set -euo pipefail
+    : > .buckroot
+    cat > .buckconfig <<'EOF'
+[buildfile]
+name = TARGETS
+
+[repositories]
+root = .
+prelude = ./prelude
+toolchains = ./toolchains
+repo_toolchains = ./toolchains
+fbsource = ./prelude/third-party/fbsource_stub
+fbcode = ./prelude/third-party/fbcode_stub
+config = ./prelude
+
+[cells]
+root = .
+prelude = ./prelude
+toolchains = ./toolchains
+repo_toolchains = ./toolchains
+fbsource = ./prelude/third-party/fbsource_stub
+fbcode = ./prelude/third-party/fbcode_stub
+config = ./prelude
+
+[build]
+prelude = prelude
+user_platform = prelude//platforms:default
+target_platforms = prelude//platforms:default
+EOF
+    mkdir -p toolchains
+    printf '[buildfile]\nname = TARGETS\n' > toolchains/.buckconfig
+  `}`;
+}
+
+async function ensureNodeOnPath(tmp: string): Promise<string> {
+  const localBin = path.join(tmp, "local-bin");
+  await fsp.mkdir(localBin, { recursive: true });
+  const nodeLink = path.join(localBin, "node");
+  try {
+    await fsp.unlink(nodeLink);
+  } catch {}
+  await fsp.symlink(process.execPath, nodeLink);
+  return localBin;
+}
+
+async function startPatchPkgSession($: any, tmp: string): Promise<{ origin: string; ws: string }> {
+  const { stdout: gomodcacheOut } = await $({ cwd: tmp, stdio: "pipe" })`go env GOMODCACHE`;
+  const gomodcache = String(gomodcacheOut || "").trim();
+  if (!gomodcache) throw new Error("GOMODCACHE not found");
+  const origin = path.join(gomodcache, "github.com/google/uuid@v1.6.0");
+  const resolveMap = JSON.stringify({
+    "github.com/google/uuid": { version: "v1.6.0", originPath: origin },
+  });
+  const localBin = await ensureNodeOnPath(tmp);
+  const startRes = await $({
+    cwd: tmp,
+    stdio: "pipe",
+    env: {
+      NO_DEV_SHELL: "1",
+      NODE_BIN: process.execPath,
+      PATH: `${path.dirname(process.execPath)}:${localBin}:${process.env.PATH || ""}`,
+      NIX_GO_TEST_RESOLVE_JSON: resolveMap,
+    },
+  })`tools/bin/patch-pkg start go github.com/google/uuid`;
+  const ws =
+    String(startRes.stdout || startRes.stderr || "")
+      .split(/\r?\n/)
+      .find((l: string) => l.trim().startsWith("/"))
+      ?.trim() || "";
+  if (!ws) throw new Error("patch-pkg did not return a workspace path");
+  return { origin, ws };
+}
+
+async function applyPatchPkg($: any, tmp: string, resolveOrigin: string) {
+  const localBin = await ensureNodeOnPath(tmp);
+  const resolveMap = JSON.stringify({
+    "github.com/google/uuid": { version: "v1.6.0", originPath: resolveOrigin },
+  });
+  await $({
+    cwd: tmp,
+    stdio: "inherit",
+    env: {
+      NO_DEV_SHELL: "1",
+      NODE_BIN: process.execPath,
+      PATH: `${path.dirname(process.execPath)}:${localBin}:${process.env.PATH || ""}`,
+      NIX_GO_TEST_RESOLVE_JSON: resolveMap,
+    },
+  })`tools/bin/patch-pkg apply go github.com/google/uuid --force`;
+}
+
+async function scaffoldLibrary($: any, tmp: string) {
+  await $`scaf new go lib demo-lib --yes --path=libs/demo-lib`;
+  await $({
+    cwd: path.join(tmp, "libs", "demo-lib"),
+    stdio: "inherit",
+  })`go get github.com/google/uuid@v1.6.0`;
+  await $({ cwd: path.join(tmp, "libs", "demo-lib"), stdio: "inherit" })`go mod tidy`;
+  await writeFileAbs(
+    path.join(tmp, "libs", "demo-lib", "pkg", "demo-lib", "demo-lib.go"),
+    [
+      "package demolib",
+      "",
+      "import (",
+      '  "fmt"',
+      '  "github.com/google/uuid"',
+      ")",
+      "",
+      "func Greeting(name string) string {",
+      '  return fmt.Sprintf("Hello, %s %s", name, uuid.NewString())',
+      "}",
+      "",
+    ].join("\n"),
+  );
+}
+
+async function scaffoldCli($: any, tmp: string) {
+  await $`scaf new go cli demo-cli --yes --path=apps/demo-cli`;
+
+  const cliGoModPath = path.join(tmp, "apps", "demo-cli", "go.mod");
+  let cliGoMod = await fsp.readFile(cliGoModPath, "utf8");
+  if (!/\nrequire\s/.test(cliGoMod)) {
+    cliGoMod = cliGoMod.replace(
+      /^(go\s+\d+\.\d+\s*)$/m,
+      `$1\nrequire github.com/example/demo-lib v0.0.0\n`,
+    );
+  }
+  if (
+    !/\nreplace\s+github\.com\/example\/demo-lib\s+=>\s+\.\.\/\.\.\/libs\/demo-lib\s*$/.test(
+      cliGoMod,
+    )
+  ) {
+    cliGoMod =
+      cliGoMod.trimEnd() + "\nreplace github.com/example/demo-lib => ../../libs/demo-lib\n";
+  }
+  await fsp.writeFile(cliGoModPath, cliGoMod, "utf8");
+
+  const libTargetsPath = path.join(tmp, "libs", "demo-lib", "TARGETS");
+  let libTargets = await fsp.readFile(libTargetsPath, "utf8");
+  if (!/visibility\s*=\s*\[\s*"PUBLIC"\s*\]/.test(libTargets)) {
+    libTargets = libTargets.replace(/nix_go_library\(([^)]*)\)/ms, (m: string, body: string) => {
+      const withVis = body.includes("visibility = ")
+        ? body
+        : body.replace(
+            /labels\s*=\s*\[[^\]]*\],?/m,
+            (lm: string) => `${lm}\n    visibility = ["PUBLIC"],`,
+          );
+      return `nix_go_library(${withVis})`;
+    });
+    await fsp.writeFile(libTargetsPath, libTargets, "utf8");
+  }
+
+  const cliTargetsPath = path.join(tmp, "apps", "demo-cli", "TARGETS");
+  let cliTargets = await fsp.readFile(cliTargetsPath, "utf8");
+  if (!/deps\s*=\s*\[\s*"\/\/libs\/demo-lib:demo-lib"\s*\]/.test(cliTargets)) {
+    cliTargets = cliTargets.replace(/nix_go_binary\(([^)]*)\)/ms, (m: string, body: string) => {
+      const withDeps = body.includes("deps = ")
+        ? body.replace(
+            /deps\s*=\s*\[([^\]]*)\]/m,
+            (mm: string, inner: string) => `deps = [${inner}, "//libs/demo-lib:demo-lib"]`,
+          )
+        : body.replace(
+            /labels\s*=\s*\[[^\]]*\],?/m,
+            (lm: string) => `${lm}\n    deps = ["//libs/demo-lib:demo-lib"],`,
+          );
+      return `nix_go_binary(${withDeps})`;
+    });
+    await fsp.writeFile(cliTargetsPath, cliTargets, "utf8");
+  }
+
+  await writeFileAbs(
+    path.join(tmp, "apps", "demo-cli", "cmd", "demo-cli", "main.go"),
+    [
+      "package main",
+      "",
+      "import (",
+      '  "fmt"',
+      '  demolib "github.com/example/demo-lib/pkg/demo-lib"',
+      '  "os"',
+      ")",
+      "",
+      "func main() {",
+      '  name := "World"',
+      '  if len(os.Args) > 2 && os.Args[1] == "--name" {',
+      "    name = os.Args[2]",
+      "  }",
+      "  fmt.Println(demolib.Greeting(name))",
+      "}",
+      "",
+    ].join("\n"),
+  );
+}
+
+async function generateGomod2nixForLibAndCli($: any, tmp: string) {
+  await runGomod2nix($, tmp, "libs/demo-lib");
+  await runGomod2nix($, tmp, "apps/demo-cli");
+  await fsp.copyFile(
+    path.join(tmp, "apps", "demo-cli", "gomod2nix.toml"),
+    path.join(tmp, "gomod2nix.toml"),
+  );
+}
+
+async function exportGlue($: any) {
+  await $`tools/dev/install-deps.ts --glue-only`;
+}
+
+async function createUuidWorkspace($: any, tmp: string): Promise<{ origin: string; ws: string }> {
+  const { origin, ws } = await startPatchPkgSession($, tmp);
+  await patchUuidWorkspace(ws);
+  return { origin, ws };
+}
+
+async function enforceCliReplaceToWorkspace($: any, tmp: string, ws: string) {
+  const cliGoModPath = path.join(tmp, "apps", "demo-cli", "go.mod");
+  let cliGoMod = await fsp.readFile(cliGoModPath, "utf8");
+  if (
+    !/\nreplace\s+github\.com\/google\/uuid\s+=>\s+\.\.\/\.\.\/uuid-workspace\s*$/.test(cliGoMod)
+  ) {
+    cliGoMod = cliGoMod.trimEnd() + "\nreplace github.com/google/uuid => ../../uuid-workspace\n";
+    await fsp.writeFile(cliGoModPath, cliGoMod, "utf8");
+  }
+  await runGomod2nix($, tmp, "apps/demo-cli");
+  await fsp.copyFile(
+    path.join(tmp, "apps", "demo-cli", "gomod2nix.toml"),
+    path.join(tmp, "gomod2nix.toml"),
+  );
+}
+
+async function enforceLibReplaceToWorkspace($: any, tmp: string, ws: string) {
+  const libGoModPath = path.join(tmp, "libs", "demo-lib", "go.mod");
+  let libGoMod = await fsp.readFile(libGoModPath, "utf8");
+  if (
+    !/\nreplace\s+github\.com\/google\/uuid\s+=>\s+\.\.\/\.\.\/uuid-workspace\s*$/.test(libGoMod)
+  ) {
+    libGoMod = libGoMod.trimEnd() + "\nreplace github.com/google/uuid => ../../uuid-workspace\n";
+    await fsp.writeFile(libGoModPath, libGoMod, "utf8");
+  }
+  await runGomod2nix($, tmp, "libs/demo-lib");
+}
+
+async function regenerateProviders($: any) {
+  await $`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
+  await $`node tools/buck/sync-providers.ts`;
+  await $`node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
+}
+
+function normalizeCellLabel(s: string) {
+  return s.replace(/^\/\/[^/]+\/+/, "//");
+}
+
+async function buildGraphAndFindBin($: any, tmp: string, label: string): Promise<string> {
+  const outLinkName = `buck-go-${Date.now()}`;
+  const outLinkPath = path.join(tmp, outLinkName);
+  try {
+    await fsp.rm(outLinkPath, { recursive: false, force: true });
+  } catch {}
+  await $({
+    cwd: tmp,
+    stdio: "inherit",
+    env: {},
+  })`nix build .#graph-generator --out-link ${outLinkName}`;
+
+  const manifestPath = path.join(tmp, outLinkName, "manifest.json");
+  const manifestTxt = await fsp.readFile(manifestPath, "utf8").catch(() => "");
+  let binPath = "";
+  if (manifestTxt) {
+    const entries = JSON.parse(manifestTxt) as Array<any>;
+    const labelEntry = entries.find((e) => {
+      const lab = String(e?.label || "");
+      return (
+        lab === label || normalizeCellLabel(lab) === label || lab.includes("apps/demo-cli:demo-cli")
+      );
+    });
+    if (!labelEntry) throw new Error(`manifest.json missing expected label: ${label}`);
+    if (Array.isArray(labelEntry?.bins) && labelEntry.bins.length > 0) {
+      binPath = String(labelEntry.bins[0] || "");
+    }
+  }
+  if (!binPath) {
+    throw new Error("CLI executable not found in graph outputs");
+  }
+  return binPath;
+}
+
+async function findExecutableRecursively(rootDir: string): Promise<string> {
+  const stack: string[] = [rootDir];
+  while (stack.length) {
+    const cur = stack.pop()!;
+    let names: string[] = [];
+    try {
+      names = await fsp.readdir(cur);
+    } catch {
+      continue;
+    }
+    for (const name of names) {
+      const p = path.join(cur, name);
+      try {
+        const st = await fsp.stat(p);
+        if (st.isDirectory()) stack.push(p);
+        else if (st.isFile()) {
+          try {
+            await fsp.access(p, 0o111);
+            return p;
+          } catch {}
+        }
+      } catch {}
+    }
+  }
+  return "";
+}
+
+async function runGomod2nix($: any, repoRoot: string, moduleRelDir: string) {
+  await $({ cwd: repoRoot, stdio: "inherit" })`tools/bin/gomod2nix --dir ${moduleRelDir}`;
+}
+
+async function listGoFilesRecursive(rootDir: string): Promise<string[]> {
+  const out: string[] = [];
+  const stack: string[] = [rootDir];
+  while (stack.length) {
+    const cur = stack.pop()!;
+    let names: string[] = [];
+    try {
+      names = await fsp.readdir(cur);
+    } catch {
+      continue;
+    }
+    for (const name of names) {
+      const p = path.join(cur, name);
+      try {
+        const st = await fsp.stat(p);
+        if (st.isDirectory()) stack.push(p);
+        else if (st.isFile() && name.endsWith(".go")) out.push(p);
+      } catch {}
+    }
+  }
+  return out;
+}
+
+async function patchUuidWorkspace(workspacePath: string): Promise<void> {
+  const files = await listGoFilesRecursive(workspacePath);
+  let changed = 0;
+  for (const file of files) {
+    let txt = "";
+    try {
+      txt = await fsp.readFile(file, "utf8");
+    } catch {
+      continue;
+    }
+    if (!/package\s+uuid\b/.test(txt)) continue;
+    let out = txt;
+    // Patch NewString() to return zero UUID string
+    out = out.replace(
+      /func\s+NewString\s*\(\s*\)\s*string\s*\{[\s\S]*?\}/m,
+      'func NewString() string {\n\treturn "00000000-0000-0000-0000-000000000000"\n}',
+    );
+    // Do not alter New(), NewRandom(), or NewRandomFromReader(); keep minimal surface to avoid hunk drift
+    // Patch String() method to always return zero UUID string
+    out = out.replace(
+      /func\s*\(\s*\w+\s+UUID\s*\)\s*String\s*\(\s*\)\s*string\s*\{[\s\S]*?\}/m,
+      'func (u UUID) String() string {\n\treturn "00000000-0000-0000-0000-000000000000"\n}',
+    );
+    if (out !== txt) {
+      await fsp.writeFile(file, out, "utf8");
+      changed++;
+    }
+  }
+  if (changed === 0)
+    throw new Error("could not locate uuid.NewString()/New()/NewRandom() to patch");
+}
+
+test("go cli with local lib + third-party patched uuid runtime", async () => {
+  await runInTemp("go-cli-thirdparty-runtime-patched-uuid", async (_tmp, _$) => {
+    const $ = _$({ stdio: "pipe" });
+    await writeBuckConfig($);
+
+    await scaffoldLibrary($, _tmp);
+    await scaffoldCli($, _tmp);
+    await $({ cwd: path.join(_tmp, "apps", "demo-cli"), stdio: "inherit" })`go mod tidy`;
+    await generateGomod2nixForLibAndCli($, _tmp);
+    //
+    await exportGlue($);
+
+    // 4) Create a patch for github.com/google/uuid to zero the UUID (manual path)
+    const { origin, ws } = await createUuidWorkspace($, _tmp);
+    //
+    await applyPatchPkg($, _tmp, origin);
+    // Remove any accidental local replace directives; rely on Nix-layer patches only
+    // Ensure clean gomod2nix after stripping replaces
+    try {
+      const cliGoModPath = path.join(_tmp, "apps", "demo-cli", "go.mod");
+      const cliTxt = await fsp.readFile(cliGoModPath, "utf8");
+      const cleanedCli = cliTxt.replace(/\nreplace\s+github\.com\/google\/uuid\s+=>.*$/gm, "");
+      if (cleanedCli !== cliTxt) await fsp.writeFile(cliGoModPath, cleanedCli, "utf8");
+    } catch {}
+    try {
+      const libGoModPath = path.join(_tmp, "libs", "demo-lib", "go.mod");
+      const libTxt = await fsp.readFile(libGoModPath, "utf8");
+      const cleanedLib = libTxt.replace(/\nreplace\s+github\.com\/google\/uuid\s+=>.*$/gm, "");
+      if (cleanedLib !== libTxt) await fsp.writeFile(libGoModPath, cleanedLib, "utf8");
+    } catch {}
+    // Note: skip git-based verification in sandbox to avoid requiring git
+
+    // Ensure CLI go.mod forces uuid to our patched workspace via replace
+    // Do not set go.mod replace for uuid when using patch-pkg; rely on patches/go
+    // Re-export graph, then regenerate providers and auto_map after writing patch
+    await regenerateProviders($);
+
+    // 5) Assert provider + auto_map wiring instead of executing the binary
+    const patchFile = path.join(_tmp, "patches", "go", "github.com__google__uuid@v1.6.0.patch");
+    if (!(await fsp.stat(patchFile).catch(() => null))) {
+      throw new Error("expected uuid patch file not found");
+    }
+    const providersTargets = await fsp.readFile(
+      path.join(_tmp, "third_party", "providers", "TARGETS.auto"),
+      "utf8",
+    );
+    const provName = "mod_"; // minimal check: presence of a go_module_patch entry is sufficient
+    if (!/go_module_patch\(name\s*=\s*\"mod_/.test(providersTargets)) {
+      throw new Error("expected a go_module_patch provider entry in TARGETS.auto");
+    }
+    const autoMapPath = path.join(_tmp, "third_party", "providers", "auto_map.bzl");
+    if (!(await fsp.stat(autoMapPath).catch(() => null))) {
+      throw new Error("expected auto_map.bzl to be generated");
+    }
+
+    // 6) Build via Nix (graph-generator) and run the resulting CLI binary; expect zero UUID
+    const label = "//apps/demo-cli:demo-cli";
+    const binPath = await buildGraphAndFindBin($, _tmp, label);
+    let outStr = "";
+    const run = await $({ stdio: "pipe" })`${binPath} --name Bob`;
+    outStr = String(run.stdout || "").trim();
+    if (!/^Hello, Bob 00000000-0000-0000-0000-000000000000$/.test(outStr)) {
+      console.error("stdout:", outStr);
+      throw new Error("unexpected output; expected zero UUID appended");
+    }
+  });
+});

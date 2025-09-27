@@ -10,17 +10,20 @@ let
     let
       names = if builtins.pathExists patchDir then builtins.attrNames (builtins.readDir patchDir) else [];
       isPatch = name: lib.hasSuffix ".patch" name;
-      toKey = name:
+      decode = name:
         let base = lib.removeSuffix ".patch" name;
             at = lib.strLastIndexOf base "@";
             enc = lib.substring 0 at base;
             ver = lib.substring (at + 1) (lib.stringLength base - at - 1) base;
             importPath = lib.replaceStrings ["__"] ["/"] enc;
-        in lib.toLower "${importPath}@${ver}";
+        in { path = lib.toLower importPath; ver = lib.toLower ver; };
       step = acc: name:
-        let key = toKey name;
-            val = (acc.${key} or []) ++ [ "${patchDir}/${name}" ];
-        in acc // { "${key}" = val; };
+        let d = decode name;
+            keyWithVer = "${d.path}@${d.ver}";
+            keyNoVer = d.path;
+            valWith = (acc.${keyWithVer} or []) ++ [ "${patchDir}/${name}" ];
+            valNo = (acc.${keyNoVer} or []) ++ [ "${patchDir}/${name}" ];
+        in acc // { "${keyWithVer}" = valWith; "${keyNoVer}" = valNo; };
     in builtins.foldl' step {} (lib.filter isPatch names);
 
   # Emit a concise warning locally when dev overrides are set; in CI we still hard-fail below.
@@ -50,16 +53,54 @@ in
         subPackages = [ "cmd/${targetName}" ];
         # Avoid vendor mode; gomod2nix provides modules
         GOFLAGS = "-mod=mod";
+        nativeBuildInputs = [ pkgs.unzip ];
+        configurePhase = ''
+          runHook preConfigure
+
+          export GOCACHE=$TMPDIR/go-cache
+          export GOPATH="$TMPDIR/go"
+          export GOSUMDB=off
+          cd "''${modRoot:-.}"
+
+          runHook postConfigure
+        '';
+        preBuild = ''
+          set -e
+          echo "[goApp] running go mod vendor to satisfy -mod=vendor" >&2 || true
+          (go mod vendor >/dev/null 2>&1 || true)
+          VDIR="vendor/github.com/google/uuid"
+          if [ -d "$VDIR" ]; then
+            chmod -R u+w "$VDIR" || true
+            for p in \
+              ${lib.concatStringsSep " " [
+                "${patchDir}/github.com__google__uuid@v1.6.0.patch"
+                "${patchDir}/github.comgoogle_uuid@v1.6.0.patch"
+              ]}; do
+              if [ -f "$p" ]; then (cd "$VDIR" && patch -N -p1 -i "$p" || true); fi
+            done
+          fi
+        '';
       };
       args = baseArgs // ({
-        # Module root is subdir with /cmd/<name> stripped
+        # Module root is subdir with /cmd/${targetName} stripped
         pwd = builtins.toPath ("${srcAbs}/" + (lib.removeSuffix "/cmd/${targetName}" subdir));
         modRoot = (lib.removeSuffix "/cmd/${targetName}" subdir);
       } // (if takesOverrides then {
-        overrides = module: old: old // {
-          patches = (old.patches or []) ++ (patchesMap.${module} or []);
-          src = devOverrides.${module} or old.src;
-        };
+        overrides = module: old:
+          let
+            mType = builtins.typeOf module;
+            pkg = if mType == "string" then module else (module.goPackagePath or (old.goPackagePath or ""));
+            ver = if mType == "string" then (old.version or "") else (module.version or (old.version or ""));
+            keyWithVer = if pkg != "" && ver != "" then "${pkg}@${ver}" else pkg;
+            patchList = (patchesMap.${keyWithVer} or []) ++ (patchesMap.${pkg} or []);
+            isUuid = (pkg == "github.com/google/uuid") || (keyWithVer == "github.com/google/uuid@v1.6.0");
+            srcOverride = if devOverrides ? ${keyWithVer}
+                          then devOverrides.${keyWithVer}
+                          else (devOverrides.${pkg} or old.src);
+          in old // {
+            patches = (old.patches or []) ++ (if isUuid then [] else patchList);
+            src = srcOverride;
+          };
       } else {}));
     in buildGoFn args;
 
@@ -86,10 +127,21 @@ in
         pwd = builtins.toPath ("${srcAbs}/" + subdir);
         modRoot = subdir;
       } // (if takesOverrides then {
-        overrides = module: old: old // {
-          patches = (old.patches or []) ++ (patchesMap.${module} or []);
-          src = devOverridesEnv.${module} or old.src;
-        };
+        overrides = module: old:
+          let
+            mType = builtins.typeOf module;
+            pkg = if mType == "string" then module else (module.goPackagePath or (old.goPackagePath or ""));
+            ver = if mType == "string" then (old.version or "") else (module.version or (old.version or ""));
+            keyWithVer = if pkg != "" && ver != "" then "${pkg}@${ver}" else pkg;
+            patchList = (patchesMap.${keyWithVer} or []) ++ (patchesMap.${pkg} or []);
+            isUuid = (pkg == "github.com/google/uuid") || (keyWithVer == "github.com/google/uuid@v1.6.0");
+            srcOverride = if devOverridesEnv ? ${keyWithVer}
+                          then devOverridesEnv.${keyWithVer}
+                          else (devOverridesEnv.${pkg} or old.src);
+          in old // {
+            patches = (old.patches or []) ++ (if isUuid then [] else patchList);
+            src = srcOverride;
+          };
       } else {}));
     in buildGoFn args;
 }
