@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import { runGlue, zxNodeBase } from "./glue.ts";
-import { runGomod2nixGenerate } from "./gomod2nix.ts";
+import { runGomod2nixGenerate, runGomod2nixScanAll } from "./gomod2nix.ts";
 import { relinkNodeModules } from "./link-node.ts";
 
 type Flags = {
@@ -57,7 +57,9 @@ export async function main() {
       stdio: "inherit",
     })`bash --noprofile --norc -c ${`node ${nodeBase} tools/dev/patches-lint.ts`}`;
   } catch {}
+  // Generate gomod2nix.toml at repo root (if present) and per-app/lib (apps/*, libs/*)
   await runGomod2nixGenerate(dryRun, verbose);
+  await runGomod2nixScanAll(dryRun, verbose);
   if (!skipGlue) {
     await runGlue(dryRun, verbose);
   } else if (verbose) {

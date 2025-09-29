@@ -1,4 +1,4 @@
-{ pkgs, src ? ../../. }:
+{ pkgs, src ? ../../., graphJsonPath ? null }:
 let
   lib = pkgs.lib;
   # Always use the provided flake src snapshot; avoid reading from env for purity
@@ -26,10 +26,13 @@ let
       ) else "";
 
   # Vendor staging removed — rely on gomod2nix and overrides only
-  # Allow overriding graph location via environment for impure local builds/tests
-  graphPathEnv = builtins.getEnv "BUCK_GRAPH_JSON";
-  graphPath = if graphPathEnv != "" then builtins.toPath graphPathEnv else builtins.toPath (repoRootStr + "/tools/buck/graph.json");
-  nodes = if builtins.pathExists graphPath then builtins.fromJSON (builtins.readFile graphPath) else [];
+  # Prefer explicit graphJsonPath (pure) if provided; else fall back to src path
+  graphPath = if graphJsonPath != null
+    then builtins.toPath graphJsonPath
+    else builtins.toPath (repoRootStr + "/tools/buck/graph.json");
+  nodes = if builtins.pathExists graphPath
+    then builtins.fromJSON (builtins.readFile graphPath)
+    else builtins.throw "tools/buck/graph.json missing — run tools/buck/export-graph.ts before building.";
   nodesList =
     let t = builtins.typeOf nodes; in
       if t == "list" then nodes
@@ -47,11 +50,18 @@ let
   devOverrideJSON = builtins.getEnv "NIX_GO_DEV_OVERRIDE_JSON";
 
   get = attrs: k: attrs.${k} or null;
+  # Buck map keys can include a config suffix like
+  #   "root//apps/test-cli:test-cli (config//platforms:default#...)"
+  # Strip the optional trailing " (config//...)" part using a simple split.
+  cleanLabel = s:
+    let parts = lib.splitString " (config//" s; in
+      if (builtins.length parts) > 1 then (builtins.elemAt parts 0) else s;
+
   nameOf = n:
     let t = builtins.typeOf n; in
       if t == "set" then (
         if builtins.hasAttr "name" n && builtins.typeOf n.name == "string" && n.name != ""
-        then n.name else ""
+        then cleanLabel n.name else ""
       ) else "";
 
   # Reconstruct full label if exporter provided only short name
@@ -97,9 +107,17 @@ let
   haveModulesDefault = builtins.pathExists modulesTomlDefault;
   # Prefer per-package gomod2nix.toml when present; fall back to repo root
   modulesTomlFor = name:
-    let pkgRel = pkgPathOf name; in
-      let perPkg = builtins.toPath (repoRootStr + "/" + pkgRel + "/gomod2nix.toml"); in
-        if builtins.pathExists perPkg then perPkg else modulesTomlDefault;
+    let
+      pkgRel = pkgPathOf name;
+      # Resolve gomod2nix.toml from the live repo snapshot to ensure presence
+      perPkg = builtins.toPath (repoRootStr + "/" + pkgRel + "/gomod2nix.toml");
+    in if builtins.pathExists perPkg then perPkg
+       else if haveModulesDefault then modulesTomlDefault
+       else (pkgs.writeText "gomod2nix.toml" ''
+schema = 3
+
+[mod]
+'');
 
   # Minimal local libs listing (not used for target discovery) to build a map of
   # module import path -> live source for local libs (for replaces)
@@ -135,10 +153,10 @@ let
 
   mkGo = name: kind:
     let mt = modulesTomlFor name; in
-    if builtins.pathExists mt then (
       if kind == "bin" then T.goApp {
         inherit name;
         modulesToml = mt;
+        # Use full repo snapshot to ensure the package path exists at build time
         srcRoot = repoRoot;
         devOverridesMap = localModuleOverrides;
         subdir = (pkgPathOf name);
@@ -147,11 +165,7 @@ let
         modulesToml = mt;
         srcRoot = repoRoot;
         subdir = (pkgPathOf name);
-      }
-    ) else pkgs.runCommand "stub-${lib.replaceStrings ["//" ":" "/"] ["" "-" "-"] name}" {} ''
-      mkdir -p $out
-      echo stub > $out/.stub
-    '';
+      };
 
   safeNodes = builtins.filter (n:
     let nm = ensureFullLabel n; in (builtins.typeOf nm == "string") && nm != "" && isGoCandidate n && (pick n) != null
@@ -171,7 +185,7 @@ let
           let matches = builtins.filter (x: ensureFullLabel x == nm) safeNodes;
               n = if matches == [] then null else builtins.head matches;
               k = if n == null then null else pick n;
-          in if k != null && k.kind == "bin" then { name = nm; value = goTargetsFromGraph.${nm}; } else null
+          in if k != null && (k.kind == "bin" || k.kind == "lib") then { name = nm; value = goTargetsFromGraph.${nm}; } else null
         ) names);
     in builtins.listToAttrs entries;
   goOutPaths = lib.mapAttrs (n: p: builtins.toString p) goTargets;
@@ -210,7 +224,6 @@ let
       echo "libsDir=${builtins.toString (builtins.toPath (repoRootStr + "/libs"))}" >> $out/build.log
       echo "devOverrideJSON=${builtins.toJSON devOverrideJSON}" >> $out/build.log
       echo "goTargets keys: ${lib.concatStringsSep "," (builtins.attrNames goOutPaths)}" >> $out/build.log
-      # discovery removed; no appNames/libNames logged
       echo '[' > $out/manifest.json
       first=1
       ${lib.concatStringsSep "\n" (lib.mapAttrsToList (n: p:

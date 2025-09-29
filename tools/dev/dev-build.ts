@@ -1,6 +1,8 @@
 #!/usr/bin/env zx-wrapper
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import "zx/globals";
+import { runGomod2nixGenerate, runGomod2nixScanAll } from "./install/gomod2nix.ts";
 
 function shouldInstallDeps(): boolean {
   // Placeholder for future heuristics (node_modules symlink, gomod2nix freshness, etc.)
@@ -92,6 +94,8 @@ async function main() {
   ]);
   let subcmd = "build";
   let restArgs = argsIn;
+  // Global opt-out for materialization
+  let materialize = true;
   if (argsIn.length === 0) {
     restArgs = ["//..."];
   } else if (known.has(argsIn[0])) {
@@ -107,11 +111,25 @@ async function main() {
     restArgs = argsIn;
   }
 
+  // Recognize opt-out flag anywhere after subcmd
+  const filtered: string[] = [];
+  for (const a of restArgs) {
+    if (a === "--no-materialize") {
+      materialize = false;
+      continue;
+    }
+    filtered.push(a);
+  }
+  restArgs = filtered;
+
   // Environment guard: ensure required tools and Nix features are present
   await $({ stdio: "inherit" })`tools/dev/startup-check.ts`;
 
   // Ensure Buck prelude and config are aligned to flake buck2-prelude
   await ensureBuckPreludeConfig();
+
+  // Clean any stray buck-go-* dirs at repo root from previous runs
+  await $({ stdio: "ignore" })`bash -lc 'rm -rf buck-go-*'`.nothrow();
 
   if (!isCI && shouldInstallDeps()) {
     const nodeBase = zxNodeBase();
@@ -119,21 +137,91 @@ async function main() {
     await $({
       stdio: "inherit",
     })`bash --noprofile --norc -c ${`${nodeBin} ${nodeBase} tools/dev/install-deps.ts --glue-only`}`;
+    // Ensure gomod2nix.toml exists for Go modules (repo root and per app/lib) without running full install
+    try {
+      await runGomod2nixGenerate(false, false);
+      await runGomod2nixScanAll(false, false);
+    } catch (e) {
+      console.warn("[dev-build] gomod2nix generation skipped:", e);
+    }
+    // Refresh Buck graph so graph-generator sees newest targets
+    await $({
+      stdio: "inherit",
+    })`bash --noprofile --norc -c ${`${nodeBin} ${nodeBase} tools/buck/export-graph.ts --out tools/buck/graph.json`}`;
+    // Force-stage graph.json so the flake's Git snapshot includes it (without committing)
+    await $({ stdio: "ignore" })`git add -f -- tools/buck/graph.json`.nothrow();
+    // Ensure gomod2nix.toml files are visible to the flake snapshot
+    await $({
+      stdio: "ignore",
+    })`bash -lc 'git add -f -- gomod2nix.toml apps/**/gomod2nix.toml 2>/dev/null || true'`.nothrow();
   }
 
+  // Materialize Nix-built graph BEFORE Buck build to ensure attribute exists
+  if (!isCI && materialize) {
+    const linkDir = path.resolve("buck-out", "tmp");
+    await fsp.mkdir(linkDir, { recursive: true });
+    const linkName = path.join(linkDir, `buck-go-${Date.now()}`);
+    try {
+      await $({ stdio: "inherit" })`nix build .#graph-generator --out-link ${linkName}`;
+      // Print discovered bins for convenience (match requested labels if provided)
+      try {
+        const manifestPath = path.resolve(linkName, "manifest.json");
+        const txt = await fsp.readFile(manifestPath, "utf8").catch(() => "");
+        const targets = restArgs.length ? restArgs : [];
+        if (txt) {
+          const entries = JSON.parse(txt) as Array<any>;
+          const specific = targets.filter(
+            (t) => (t.includes(":") || t.startsWith("//")) && !t.includes("..."),
+          );
+          const match = (lab: string) => {
+            if (specific.length === 0) return true;
+            return specific.some((t) => {
+              const norm = t.replace(/^root\//, "").replace(/^\/+/, "");
+              return lab.includes(norm) || lab.endsWith(norm);
+            });
+          };
+          const bins: Array<{ label: string; bin: string }> = [];
+          for (const e of entries) {
+            const lab = String(e?.label || "");
+            if (!lab || !match(lab)) continue;
+            const list: string[] = Array.isArray(e?.bins) ? e.bins : [];
+            for (const b of list) bins.push({ label: lab, bin: String(b) });
+          }
+          if (bins.length) {
+            console.log("Materialized binaries:");
+            for (const b of bins) console.log(` - ${b.label}: ${b.bin}`);
+          } else {
+            console.log(
+              "Materialized graph; no binaries matched the requested labels. See",
+              path.join(linkName, "manifest.json"),
+            );
+          }
+        }
+      } catch {}
+    } finally {
+      // Unstage graph.json after materialization to avoid polluting the index
+      await $({ stdio: "ignore" })`git reset -q -- tools/buck/graph.json`.nothrow();
+      // Unstage gomod2nix.toml files
+      await $({
+        stdio: "ignore",
+      })`bash -lc 'git reset -q -- gomod2nix.toml apps/**/gomod2nix.toml 2>/dev/null || true'`.nothrow();
+    }
+  }
+
+  // Now run Buck
   async function findBuckBin(): Promise<string> {
-    // Use PATH (shellHook ensures upstream buck2 is first on PATH)
     return "buck2";
   }
   const buckBin = await findBuckBin();
   const platformFlags = ["--target-platforms", "prelude//platforms:default"];
   process.env.BUCK_ROOT = process.cwd();
-  // Invoke buck directly with structured args to avoid shell-quoting issues
   const proc = await $({
     stdio: "inherit",
   })`${buckBin} ${subcmd} ${platformFlags} ${restArgs}`.catch((e) => e);
   const code = typeof proc?.exitCode === "number" ? proc.exitCode : 1;
-  process.exit(code);
+  if (code !== 0) process.exit(code);
+
+  process.exit(0);
 }
 
 main().catch((e) => {

@@ -25,10 +25,14 @@ async function sha256File(file: string): Promise<string> {
 }
 
 export async function runGomod2nixGenerate(dryRun: boolean, verbose: boolean) {
-  const hasGoMod = await exists("go.mod");
-  const hasGoSum = await exists("go.sum");
+  await runGomod2nixGenerateIn(process.cwd(), dryRun, verbose);
+}
+
+export async function runGomod2nixGenerateIn(dir: string, dryRun: boolean, verbose: boolean) {
+  const hasGoMod = await exists(path.join(dir, "go.mod"));
+  const hasGoSum = await exists(path.join(dir, "go.sum"));
   if (!hasGoMod && !hasGoSum) {
-    console.log("[gomod2nix] skip: no go.mod or go.sum present");
+    if (verbose) console.log(`[gomod2nix] skip: no go.mod or go.sum in ${dir}`);
     return;
   }
 
@@ -36,16 +40,16 @@ export async function runGomod2nixGenerate(dryRun: boolean, verbose: boolean) {
     process.env.INSTALL_DEPS_GOMOD2NIX_BIN || path.join(process.cwd(), "tools", "bin", "gomod2nix");
   const cmd = `${binOverride} --dir .`;
   if (dryRun) {
-    console.log(`[gomod2nix] dry-run: ${cmd}`);
+    console.log(`[gomod2nix] dry-run (${dir}): ${cmd}`);
     return;
   }
 
-  const beforeHash = await sha256File("gomod2nix.toml");
+  const beforeHash = await sha256File(path.join(dir, "gomod2nix.toml"));
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "gomod2nix-"));
   try {
-    if (hasGoMod) await fsp.copyFile("go.mod", path.join(tmp, "go.mod"));
-    if (hasGoSum) await fsp.copyFile("go.sum", path.join(tmp, "go.sum"));
-    if (verbose) console.log(`[gomod2nix] running in ${tmp}: ${cmd}`);
+    if (hasGoMod) await fsp.copyFile(path.join(dir, "go.mod"), path.join(tmp, "go.mod"));
+    if (hasGoSum) await fsp.copyFile(path.join(dir, "go.sum"), path.join(tmp, "go.sum"));
+    if (verbose) console.log(`[gomod2nix] running in ${tmp} for ${dir}: ${cmd}`);
     try {
       await $({ cwd: tmp, stdio: "inherit" })`bash -c ${cmd}`;
     } catch (e1) {
@@ -84,21 +88,42 @@ export async function runGomod2nixGenerate(dryRun: boolean, verbose: boolean) {
       process.exit(3);
     }
     const next = await fsp.readFile(tmpOut, "utf8");
-    const cur = (await exists("gomod2nix.toml"))
-      ? await fsp.readFile("gomod2nix.toml", "utf8")
-      : "";
+    const dst = path.join(dir, "gomod2nix.toml");
+    const cur = (await exists(dst)) ? await fsp.readFile(dst, "utf8") : "";
     if (cur !== next) {
-      await fsp.writeFile("gomod2nix.toml", next, "utf8");
-      console.log("[gomod2nix] updated gomod2nix.toml");
+      await fsp.writeFile(dst, next, "utf8");
+      console.log(`[gomod2nix] updated ${path.relative(process.cwd(), dst)}`);
     } else if (verbose) {
-      console.log("[gomod2nix] no changes to gomod2nix.toml");
+      console.log(`[gomod2nix] no changes: ${path.relative(process.cwd(), dst)}`);
     }
   } finally {
     try {
       await fsp.rm(tmp, { recursive: true, force: true });
     } catch {}
   }
-  const afterHash = await sha256File("gomod2nix.toml");
+  const afterHash = await sha256File(path.join(dir, "gomod2nix.toml"));
   if (verbose)
-    console.log(`[gomod2nix] hash ${beforeHash || "(none)"} -> ${afterHash || "(none)"}`);
+    console.log(
+      `[gomod2nix] hash (${path.relative(process.cwd(), dir)}): ${afterHash || "(none)"}`,
+    );
+}
+
+export async function runGomod2nixScanAll(dryRun: boolean, verbose: boolean) {
+  // Scan for go.mod under apps/* and libs/* and generate per-module gomod2nix.toml
+  const roots = [path.join(process.cwd(), "apps"), path.join(process.cwd(), "libs")];
+  const dirs: string[] = [];
+  for (const r of roots) {
+    try {
+      const entries = await fsp.readdir(r, { withFileTypes: true });
+      for (const e of entries) {
+        if (e.isDirectory()) {
+          const d = path.join(r, e.name);
+          if (await exists(path.join(d, "go.mod"))) dirs.push(d);
+        }
+      }
+    } catch {}
+  }
+  for (const d of dirs) {
+    await runGomod2nixGenerateIn(d, dryRun, verbose);
+  }
 }

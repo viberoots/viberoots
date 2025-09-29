@@ -49,8 +49,8 @@ in
         version = "0.1.0";
         src = srcAbs;
         modules = modulesToml;
-        # Build entrypoint within module root
-        subPackages = [ "cmd/${targetName}" ];
+        # Build entrypoint within module root; include "." to ensure module is realized even if no cmd/*
+        subPackages = [ "." "cmd/${targetName}" ];
         # Avoid vendor mode; gomod2nix provides modules
         GOFLAGS = "-mod=mod";
         nativeBuildInputs = [ pkgs.unzip ];

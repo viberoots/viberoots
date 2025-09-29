@@ -98,6 +98,10 @@ export async function run(): Promise<void> {
     process.exit(1);
   }
 
+  if (process.env.PREBUILD_GUARD_NO_FIX === "1") {
+    // In no-fix mode, exit 0 locally after printing diagnostics
+    return;
+  }
   try {
     await autoFixGlue();
   } catch (e) {

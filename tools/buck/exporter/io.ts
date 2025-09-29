@@ -19,12 +19,55 @@ export const attrList = [
 ];
 
 export async function cqueryNodes(scope: string, attrs: string[]): Promise<Node[]> {
-  const query = scope ? `attrfilter(labels, ${scope}, //...)` : `//...`;
+  const base = `deps(//..., 1, exec_deps())`;
+  const query = scope ? `attrfilter(labels, ${scope}, ${base})` : base;
   const flags = attrs.flatMap((a) => ["--output-attribute", a]);
   const platformFlags = ["--target-platforms", "prelude//platforms:default"];
   const { stdout } = await $`buck2 cquery ${platformFlags} ${query} --json ${flags}`;
   const obj = JSON.parse(String(stdout)) as Record<string, any>;
-  return Object.values(obj) as any[];
+  const nodes: Node[] = [];
+  for (const [label, raw] of Object.entries(obj)) {
+    const a = (raw || {}) as Record<string, any>;
+    // Normalize possible buck.* keys to canonical names expected downstream
+    const ruleType: string | undefined =
+      typeof a["rule_type"] === "string"
+        ? (a["rule_type"] as string)
+        : (a["buck.type"] as string | undefined);
+    const deps: string[] | undefined = Array.isArray(a["deps"])
+      ? (a["deps"] as string[])
+      : Array.isArray(a["buck.deps"])
+        ? (a["buck.deps"] as string[])
+        : undefined;
+    const labelsArr: string[] | undefined = Array.isArray(a["labels"])
+      ? (a["labels"] as string[])
+      : Array.isArray(a["buck.labels"])
+        ? (a["buck.labels"] as string[])
+        : undefined;
+    const srcsArr: string[] | undefined = Array.isArray(a["srcs"])
+      ? (a["srcs"] as string[])
+      : Array.isArray(a["buck.srcs"])
+        ? (a["buck.srcs"] as string[])
+        : undefined;
+
+    // Heuristics to help classification when Buck omits rule_type/labels
+    const labs = new Set<string>(labelsArr || []);
+    const looksGo =
+      (ruleType && ruleType.startsWith("go_")) || (srcsArr || []).some((s) => s.endsWith(".go"));
+    if (looksGo) labs.add("lang:go");
+    const isBinHeuristic = (srcsArr || []).some((s) => /\bcmd\/.+\/main\.go$/.test(s));
+    if (isBinHeuristic) labs.add("kind:bin");
+
+    const n: any = {
+      ...a,
+      name: label,
+      rule_type: ruleType || a["rule_type"] || "",
+      deps: deps || a["deps"],
+      labels: Array.from(labs),
+      srcs: srcsArr || a["srcs"],
+    };
+    nodes.push(n as Node);
+  }
+  return nodes;
 }
 
 export async function readSimulatedNodes(path: string): Promise<Node[]> {
