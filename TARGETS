@@ -314,6 +314,12 @@ zx_test(
     out = "planner_go_binary_filtered_src.stamp",
 )
 
+zx_test(
+    name = "planner_bins_only_manifest",
+    script = "tools/tests/planner/planner-bins-only.manifest.test.ts",
+    out = "planner_bins_only_manifest.stamp",
+)
+
 # Phase 9 regression tests
 zx_test(
     name = "regression_provider_wiring_e2e",

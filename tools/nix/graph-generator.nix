@@ -190,6 +190,14 @@ let
       else (acc // { "${nm}" = mkGo nm k.kind; })
   ) {} safeNodes;
 
+  # Names of targets that are binaries (used to restrict graph-outputs per PR5)
+  binTargetNames = builtins.filter (nm:
+    let matches = builtins.filter (x: ensureFullLabel x == nm) safeNodes;
+        n = if matches == [] then null else builtins.head matches;
+        k = if n == null then null else pick n;
+    in k != null && k.kind == "bin"
+  ) (builtins.attrNames goTargetsFromGraph);
+
   # Strict mode: require Buck graph; only build app binaries in graph-outputs
   goTargets =
     let names = builtins.attrNames goTargetsFromGraph;
@@ -200,7 +208,9 @@ let
           in if k != null && (k.kind == "bin" || k.kind == "lib") then { name = nm; value = goTargetsFromGraph.${nm}; } else null
         ) names);
     in builtins.listToAttrs entries;
-  goOutPaths = lib.mapAttrs (n: p: builtins.toString p) goTargets;
+  # Only binaries participate in graph-outputs/manifest (PR5)
+  goTargetsBins = builtins.listToAttrs (map (nm: { name = nm; value = goTargetsFromGraph.${nm}; }) binTargetNames);
+  goOutPaths = lib.mapAttrs (n: p: builtins.toString p) goTargetsBins;
 
   # Optional: select a single target by BUCK_TARGET for impure local builds/tests
   selectedTargetName = builtins.getEnv "BUCK_TARGET";
