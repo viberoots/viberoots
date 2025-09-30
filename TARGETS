@@ -277,6 +277,12 @@ zx_test(
 )
 
 zx_test(
+    name = "exporter_negative_missing_rule_type_and_labels",
+    script = "tools/tests/exporter/exporter.negative.missing-rule_type-and-labels.test.ts",
+    out = "exporter_negative_missing_rule_type_and_labels.stamp",
+)
+
+zx_test(
     name = "exporter_replace_directive",
     script = "tools/tests/exporter/replace-directive.test.ts",
     out = "exporter_replace_directive.stamp",

@@ -49,13 +49,8 @@ export async function cqueryNodes(scope: string, attrs: string[]): Promise<Node[
         ? (a["buck.srcs"] as string[])
         : undefined;
 
-    // Heuristics to help classification when Buck omits rule_type/labels
+    // Do not add heuristic labels; rely only on authoritative rule_type or macro-stamped labels
     const labs = new Set<string>(labelsArr || []);
-    const looksGo =
-      (ruleType && ruleType.startsWith("go_")) || (srcsArr || []).some((s) => s.endsWith(".go"));
-    if (looksGo) labs.add("lang:go");
-    const isBinHeuristic = (srcsArr || []).some((s) => /\bcmd\/.+\/main\.go$/.test(s));
-    if (isBinHeuristic) labs.add("kind:bin");
 
     const n: any = {
       ...a,

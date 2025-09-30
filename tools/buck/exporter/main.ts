@@ -22,6 +22,39 @@ export async function run() {
   if (simulate) nodes = await readSimulatedNodes(simulate);
   else nodes = await cqueryNodes(scope, attrList);
 
+  // Drop internal Buck/config cells that are not part of the repo's targets
+  nodes = nodes.filter((n) => {
+    const nm = n.name || "";
+    return !(nm.startsWith("config//") || nm.startsWith("prelude//"));
+  });
+
+  // Early-fail validation for PR 2: ensure authoritative classification for Go
+  // If a node appears Go-like via srcs but lacks both rule_type starting with go_ and a lang:go label, fail.
+  const bad: string[] = [];
+  for (const n of nodes) {
+    const srcs = Array.isArray((n as any).srcs) ? ((n as any).srcs as string[]) : [];
+    const looksGo = srcs.some((s) => s.endsWith(".go"));
+    const hasGoRT = (n.rule_type || "").startsWith("go_");
+    const hasLangGo = (n.labels || []).includes("lang:go");
+    if (looksGo && !hasGoRT && !hasLangGo) {
+      bad.push(n.name);
+    }
+  }
+  if (bad.length) {
+    const sample = bad.slice(0, 10).join("\n  - ");
+    throw new Error(
+      [
+        "Authoritative exporter requires rule_type or macro-stamped labels for Go targets.",
+        "These targets include .go sources but lack both rule_type starting with 'go_' and 'lang:go' label:",
+        `  - ${sample}`,
+        bad.length > 10 ? `  ... and ${bad.length - 10} more` : "",
+        "Fix: ensure your Buck macros stamp 'lang:go' (and 'kind:bin' for binaries) or Buck emits rule_type.",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    );
+  }
+
   // Fast path if no go nodes
   if (!nodes.some((n) => isGoNode(n))) {
     const normalized = nodes.map((n) => ({ ...n, labels: Array.from(new Set(n.labels || [])) }));
