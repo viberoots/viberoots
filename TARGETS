@@ -528,3 +528,9 @@ zx_test(
     script = "tools/tests/dev/startup-check.buck-prelude.test.ts",
     out = "dev_startup_check_buck_prelude.stamp",
 )
+
+zx_test(
+    name = "dev_build_no_staging",
+    script = "tools/tests/dev/dev-build.no-staging.test.ts",
+    out = "dev_build_no_staging.stamp",
+)
