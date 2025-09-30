@@ -32,7 +32,8 @@ export async function runGomod2nixGenerateIn(dir: string, dryRun: boolean, verbo
   const hasGoMod = await exists(path.join(dir, "go.mod"));
   const hasGoSum = await exists(path.join(dir, "go.sum"));
   if (!hasGoMod && !hasGoSum) {
-    if (verbose) console.log(`[gomod2nix] skip: no go.mod or go.sum in ${dir}`);
+    // Always emit a clear skip message (tests depend on exact phrasing)
+    console.log(`[gomod2nix] skip: no go.mod or go.sum present`);
     return;
   }
 
@@ -40,7 +41,8 @@ export async function runGomod2nixGenerateIn(dir: string, dryRun: boolean, verbo
     process.env.INSTALL_DEPS_GOMOD2NIX_BIN || path.join(process.cwd(), "tools", "bin", "gomod2nix");
   const cmd = `${binOverride} --dir .`;
   if (dryRun) {
-    console.log(`[gomod2nix] dry-run (${dir}): ${cmd}`);
+    // Always emit a concise dry-run command line (tests depend on exact prefix)
+    console.log(`[gomod2nix] dry-run: ${cmd}`);
     return;
   }
 

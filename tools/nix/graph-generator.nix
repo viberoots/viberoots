@@ -1,8 +1,9 @@
 { pkgs, src ? ../../., graphJsonPath ? null }:
 let
   lib = pkgs.lib;
-  # Always use the provided flake src snapshot; avoid reading from env for purity
-  repoRootStr = builtins.toString src;
+  # Allow tests to override the repo root via BUCK_TEST_SRC; default to provided flake src
+  buckTestSrcEnv = builtins.getEnv "BUCK_TEST_SRC";
+  repoRootStr = if buckTestSrcEnv != "" then buckTestSrcEnv else builtins.toString src;
   repoRoot = builtins.toPath repoRootStr;
   # Filtered source that includes both apps/* and libs/* so local replaces resolve
   appsLibsSrc = lib.cleanSourceWith {
@@ -12,8 +13,8 @@ let
           rootP = builtins.toString repoRoot;
           rel = lib.removePrefix (rootP + "/") p;
       in
-      # keep the root and anything under apps/ or libs/
-      p == rootP || lib.hasPrefix "apps/" rel || lib.hasPrefix "libs/" rel;
+      # keep the root, the top-level apps/libs directories, and anything under them
+      p == rootP || rel == "apps" || rel == "libs" || lib.hasPrefix "apps/" rel || lib.hasPrefix "libs/" rel;
   };
 
   # Helper to read module path from a go.mod file under the repo root (pure with src)
@@ -156,19 +157,24 @@ schema = 3
       if kind == "bin" then T.goApp {
         inherit name;
         modulesToml = mt;
-        # Use full repo snapshot to ensure the package path exists at build time
-        srcRoot = repoRoot;
+        # Use filtered apps/libs snapshot per PR1 to minimize closure and avoid root dependencies
+        srcRoot = appsLibsSrc;
         devOverridesMap = localModuleOverrides;
         subdir = (pkgPathOf name);
       } else T.goLib {
         inherit name;
         modulesToml = mt;
-        srcRoot = repoRoot;
+        # Use filtered apps/libs snapshot per PR1
+        srcRoot = appsLibsSrc;
         subdir = (pkgPathOf name);
       };
 
   safeNodes = builtins.filter (n:
-    let nm = ensureFullLabel n; in (builtins.typeOf nm == "string") && nm != "" && isGoCandidate n && (pick n) != null
+    let nm = ensureFullLabel n;
+        okName = (builtins.typeOf nm == "string") && nm != "";
+        rel = if okName then (pkgPathOf nm) else "";
+        inAppsLibs = lib.hasPrefix "apps/" rel || lib.hasPrefix "libs/" rel;
+    in okName && inAppsLibs && isGoCandidate n && (pick n) != null
   ) nodesList;
 
   goTargetsFromGraph = builtins.foldl' (acc: n:

@@ -302,6 +302,12 @@ zx_test(
     out = "planner_go_targets_read.stamp",
 )
 
+zx_test(
+    name = "planner_go_binary_filtered_src",
+    script = "tools/tests/planner/planner-go-binary.filtered-src.test.ts",
+    out = "planner_go_binary_filtered_src.stamp",
+)
+
 # Phase 9 regression tests
 zx_test(
     name = "regression_provider_wiring_e2e",
