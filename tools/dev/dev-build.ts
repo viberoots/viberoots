@@ -42,8 +42,8 @@ name = TARGETS
 [repositories]
 root = .
 prelude = ./prelude
- toolchains = ./toolchains
- repo_toolchains = ./toolchains
+toolchains = ./toolchains
+repo_toolchains = ./toolchains
 fbsource = ./prelude/third-party/fbsource_stub
 fbcode = ./prelude/third-party/fbcode_stub
 config = ./prelude
@@ -51,8 +51,8 @@ config = ./prelude
 [cells]
 root = .
 prelude = ./prelude
- toolchains = ./toolchains
- repo_toolchains = ./toolchains
+toolchains = ./toolchains
+repo_toolchains = ./toolchains
 fbsource = ./prelude/third-party/fbsource_stub
 fbcode = ./prelude/third-party/fbcode_stub
 config = ./prelude
