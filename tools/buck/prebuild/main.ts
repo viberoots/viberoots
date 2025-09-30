@@ -87,6 +87,29 @@ export async function run(): Promise<void> {
     return;
   }
 
+  // Additional presence guard (PR 3): ensure gomod2nix.toml exists when go.mod present
+  // We only warn locally; CI will fail on missing outputs anyway once glue runs.
+  const missingGomod: string[] = [];
+  for (const base of ["apps", "libs"]) {
+    try {
+      for (const d of fs.readdirSync(base, { withFileTypes: true })) {
+        if (!d.isDirectory()) continue;
+        const dir = require("node:path").join(base, d.name);
+        const gm = require("fs").existsSync(require("node:path").join(dir, "go.mod"));
+        const gt = require("fs").existsSync(require("node:path").join(dir, "gomod2nix.toml"));
+        if (gm && !gt) missingGomod.push(require("node:path").join(dir, "gomod2nix.toml"));
+      }
+    } catch {}
+  }
+  if (missingGomod.length && mode === "ci") {
+    for (const m of missingGomod) {
+      console.error(
+        `ERROR: missing ${m} — run tools/dev/install-deps.ts to generate gomod2nix.toml`,
+      );
+    }
+    process.exit(1);
+  }
+
   if (!needFix) return;
 
   if (mode === "ci") {

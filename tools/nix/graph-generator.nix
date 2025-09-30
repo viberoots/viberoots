@@ -106,19 +106,25 @@ let
 
   modulesTomlDefault = builtins.toPath (repoRootStr + "/gomod2nix.toml");
   haveModulesDefault = builtins.pathExists modulesTomlDefault;
-  # Prefer per-package gomod2nix.toml when present; fall back to repo root
+  # Prefer nearest ancestor gomod2nix.toml starting from the target package directory; otherwise require repo-root file; no inline fallback
   modulesTomlFor = name:
     let
       pkgRel = pkgPathOf name;
-      # Resolve gomod2nix.toml from the live repo snapshot to ensure presence
-      perPkg = builtins.toPath (repoRootStr + "/" + pkgRel + "/gomod2nix.toml");
-    in if builtins.pathExists perPkg then perPkg
+      # walk up from pkgRel to repo root looking for gomod2nix.toml
+      split = lib.splitString "/" pkgRel;
+      segments = if (builtins.length split) == 0 then [] else split;
+      descend = idx:
+        if idx < 0 then null else
+        let rel = lib.concatStringsSep "/" (lib.take (idx + 1) segments);
+            cand = builtins.toPath (repoRootStr + "/" + rel + "/gomod2nix.toml");
+        in if builtins.pathExists cand then cand else descend (idx - 1);
+      nearest = if (builtins.length segments) > 0 then descend ((builtins.length segments) - 1) else null;
+    in if nearest != null then nearest
        else if haveModulesDefault then modulesTomlDefault
-       else (pkgs.writeText "gomod2nix.toml" ''
-schema = 3
-
-[mod]
-'');
+       else builtins.throw ("gomod2nix.toml missing for target " + name +
+         "; expected a gomod2nix.toml in an ancestor of " + (repoRootStr + "/" + pkgRel) +
+         " or repo-root " + (builtins.toString modulesTomlDefault) +
+         ". Run tools/dev/install-deps.ts to generate it.");
 
   # Minimal local libs listing (not used for target discovery) to build a map of
   # module import path -> live source for local libs (for replaces)

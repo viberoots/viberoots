@@ -469,6 +469,12 @@ zx_test(
     out = "prebuild_guard_freshness_ci_fail.stamp",
 )
 
+zx_test(
+    name = "prebuild_guard_gomod2nix_present_ci_fail",
+    script = "tools/tests/prebuild/guard.gomod2nix.present.test.ts",
+    out = "prebuild_guard_gomod2nix_present_ci_fail.stamp",
+)
+
 # PR7 verbose/json diagnostics tests
 zx_test(
     name = "prebuild_guard_verbose_inputs_oldest_outputs",
