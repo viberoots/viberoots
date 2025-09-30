@@ -148,12 +148,6 @@ async function main() {
     await $({
       stdio: "inherit",
     })`bash --noprofile --norc -c ${`${nodeBin} ${nodeBase} tools/buck/export-graph.ts --out tools/buck/graph.json`}`;
-    // Force-stage graph.json so the flake's Git snapshot includes it (without committing)
-    await $({ stdio: "ignore" })`git add -f -- tools/buck/graph.json`.nothrow();
-    // Ensure gomod2nix.toml files are visible to the flake snapshot
-    await $({
-      stdio: "ignore",
-    })`bash -lc 'git add -f -- gomod2nix.toml apps/**/gomod2nix.toml 2>/dev/null || true'`.nothrow();
   }
 
   // Materialize Nix-built graph BEFORE Buck build to ensure attribute exists
@@ -199,12 +193,6 @@ async function main() {
         }
       } catch {}
     } finally {
-      // Unstage graph.json after materialization to avoid polluting the index
-      await $({ stdio: "ignore" })`git reset -q -- tools/buck/graph.json`.nothrow();
-      // Unstage gomod2nix.toml files
-      await $({
-        stdio: "ignore",
-      })`bash -lc 'git reset -q -- gomod2nix.toml apps/**/gomod2nix.toml 2>/dev/null || true'`.nothrow();
     }
   }
 

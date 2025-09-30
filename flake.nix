@@ -42,8 +42,10 @@
       let
         graphGen = pkgs.callPackage ./tools/nix/graph-generator.nix {
           inherit pkgs;
+          # Use a stable working-tree snapshot of the entire repo
           src = builtins.path { path = ./.; name = "repo"; };
-          graphJsonPath = ./tools/buck/graph.json;
+          # Explicitly include graph.json from working tree (no staging required)
+          graphJsonPath = builtins.path { path = ./tools/buck/graph.json; name = "graph.json"; };
         };
       in {
         buck2-prelude = prelude.buck2-prelude;
