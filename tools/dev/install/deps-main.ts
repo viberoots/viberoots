@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
+import path from "node:path";
 import { runGlue, zxNodeBase } from "./glue.ts";
 import { runGomod2nixGenerate, runGomod2nixScanAll } from "./gomod2nix.ts";
 import { relinkNodeModules } from "./link-node.ts";
@@ -38,6 +39,12 @@ async function have(cmd: string): Promise<boolean> {
 }
 
 export async function main() {
+  // Normalize CWD to repo root so this script works from any directory
+  try {
+    const here = path.dirname(new URL(import.meta.url).pathname);
+    const root = path.resolve(here, "..", "..");
+    process.chdir(root);
+  } catch {}
   console.log("Installing dependencies...");
   const { force, dryRun, verbose, skipGlue, glueOnly } = parseFlags(process.argv.slice(2));
   if (glueOnly) {

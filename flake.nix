@@ -50,6 +50,9 @@
           src = builtins.path { path = ./.; name = "repo"; };
           # Explicitly include graph.json: prefer env override, else working tree file
           graphJsonPath = builtins.path { path = graphPath; name = "graph.json"; };
+          # Allow tests to override repo-root gomod2nix.toml via env
+          rootModulesTomlPath = let envRootToml = builtins.getEnv "ROOT_GOMOD2NIX_TOML"; in
+            if envRootToml != "" then envRootToml else ./gomod2nix.toml;
         };
       in {
         buck2-prelude = prelude.buck2-prelude;

@@ -1,4 +1,4 @@
-{ pkgs, src ? ../../., graphJsonPath ? null }:
+{ pkgs, src ? ../../., graphJsonPath ? null, rootModulesTomlPath ? null }:
 let
   lib = pkgs.lib;
   # Allow tests to override the repo root via BUCK_TEST_SRC; default to provided flake src
@@ -108,7 +108,9 @@ let
         kind = if isBinLabel then "bin" else "lib";
       } else null;
 
-  modulesTomlDefault = builtins.toPath (repoRootStr + "/gomod2nix.toml");
+  modulesTomlDefault = if rootModulesTomlPath != null
+    then builtins.toPath rootModulesTomlPath
+    else builtins.toPath (repoRootStr + "/gomod2nix.toml");
   haveModulesDefault = builtins.pathExists modulesTomlDefault;
   # Prefer nearest ancestor gomod2nix.toml starting from the target package directory; otherwise require repo-root file; no inline fallback
   modulesTomlFor = name:
@@ -167,15 +169,15 @@ let
       if kind == "bin" then T.goApp {
         inherit name;
         modulesToml = mt;
-        # Use filtered apps/libs snapshot per PR1 to minimize closure and avoid root dependencies
-        srcRoot = appsLibsSrc;
+        # Use full repo root to ensure dynamic scaffolds like apps/* are present
+        srcRoot = repoRoot;
         devOverridesMap = localModuleOverrides;
         subdir = (pkgPathOf name);
       } else T.goLib {
         inherit name;
         modulesToml = mt;
-        # Use filtered apps/libs snapshot per PR1
-        srcRoot = appsLibsSrc;
+        # Use full repo root to ensure library module roots are visible
+        srcRoot = repoRoot;
         subdir = (pkgPathOf name);
       };
 

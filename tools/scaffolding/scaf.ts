@@ -872,6 +872,12 @@ async function completeTargets(): Promise<void> {
 }
 
 async function main() {
+  // Normalize CWD to repo root for consistent relative paths
+  try {
+    const here = path.dirname(new URL(import.meta.url).pathname);
+    const root = path.resolve(here, "..", "..");
+    process.chdir(root);
+  } catch {}
   const raw = process.argv.slice(2);
   const { _, flags } = parseArgs(raw);
   const [cmd, ...rest] = _;

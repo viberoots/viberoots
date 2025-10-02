@@ -43,7 +43,9 @@ in
             builtins.throw "Dev overrides are forbidden in CI" else null;
       devOverrides = (devOverridesMap // devOverridesEnv);
       targetName = let parts = lib.splitString ":" name; in if (builtins.length parts) > 1 then lib.elemAt parts 1 else (let left = lib.elemAt parts 0; segs = lib.splitString "/" left; in if (builtins.length segs) > 0 then lib.elemAt segs ((builtins.length segs) - 1) else left);
-      srcAbs = lib.cleanSource srcRoot;
+      # Narrow src to module root (strip cmd/<targetName>) so go sees go.mod at '.'
+      moduleRootRel = lib.removeSuffix "/cmd/${targetName}" subdir;
+      srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + moduleRootRel));
       baseArgs = {
         pname = "go-${lib.replaceStrings ["//" ":" "/"] ["" "-" "-"] name}";
         version = "0.1.0";
@@ -67,9 +69,9 @@ in
         '';
       };
       args = baseArgs // ({
-        # Module root is subdir with /cmd/${targetName} stripped
-        pwd = builtins.toPath ("${srcAbs}/" + (lib.removeSuffix "/cmd/${targetName}" subdir));
-        modRoot = (lib.removeSuffix "/cmd/${targetName}" subdir);
+        # Work from module root
+        pwd = srcAbs;
+        modRoot = ".";
       } // (if takesOverrides then {
         overrides = module: old:
           let
@@ -94,7 +96,9 @@ in
       devOverridesEnv = readDevOverrides devOverrideEnv;
       _ = if (builtins.getEnv "CI") == "true" && (builtins.getEnv devOverrideEnv) != "" then
             builtins.throw "Dev overrides are forbidden in CI" else null;
-      srcAbs = lib.cleanSource srcRoot;
+      # Narrow src to library module root
+      moduleRootRel = subdir;
+      srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + moduleRootRel));
       baseArgs = {
         pname = "golib-${lib.replaceStrings ["//" ":" "/"] ["" "-" "-"] name}";
         version = "0.1.0";
@@ -118,9 +122,9 @@ in
         '';
       };
       args = baseArgs // ({
-        # Change to the library module root
-        pwd = builtins.toPath ("${srcAbs}/" + subdir);
-        modRoot = subdir;
+        # Work from library module root
+        pwd = srcAbs;
+        modRoot = ".";
       } // (if takesOverrides then {
         overrides = module: old:
           let

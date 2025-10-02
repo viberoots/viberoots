@@ -49,7 +49,13 @@ if [[ -z "$PRE_OUT" || ! -d "$PRE_OUT/prelude" ]]; then
 fi
 BUCK_PRELUDE="$PRE_OUT/prelude"
 
-export BUCK_ROOT="${WORKSPACE_ROOT:-$PWD}"
+export BUCK_ROOT="${WORKSPACE_ROOT:-$LIVE_ROOT}"
+
+# Always operate from repo root so this script can be called from any directory
+ROOT_DIR="$(cd "$(dirname "$0")"/../.. && pwd)"
+ORIG_CWD="$PWD"
+cd "$ROOT_DIR"
+export BUCK_ROOT="$ROOT_DIR"
 
 # Write deterministic Buck config mapping, symlinking prelude into repo for stable alias
 : > .buckroot
@@ -93,8 +99,11 @@ build_run_array() {
   local PLATFORM_FLAGS=(--target-platforms prelude//platforms:default)
   local args=("$BUCK_BIN" test "${PLATFORM_FLAGS[@]}" "$@" -- --env COVERAGE="${COVERAGE}")
   # External timeout policy: 300s for both full suite and single focused tests
-  local RUN_TIMEOUT=("${TIMEOUT_CMD[@]}")
-  if [[ ${#TIMEOUT_CMD[@]} -gt 0 ]]; then
+  local RUN_TIMEOUT=()
+  if [[ ${#TIMEOUT_CMD[@]:-0} -gt 0 ]]; then
+    RUN_TIMEOUT=("${TIMEOUT_CMD[@]}")
+  fi
+  if [[ ${#TIMEOUT_CMD[@]:-0} -gt 0 ]]; then
     # Keep single-target timeout aligned with full suite (300s)
     if [[ $# -eq 1 && "$1" == *:* ]]; then
       if command -v timeout >/dev/null 2>&1; then
@@ -104,7 +113,7 @@ build_run_array() {
       fi
     fi
   fi
-  if [[ ${#RUN_TIMEOUT[@]} -gt 0 ]]; then
+  if [[ ${#RUN_TIMEOUT[@]:-0} -gt 0 ]]; then
     RUN=("${RUN_TIMEOUT[@]}" "${args[@]}")
   else
     RUN=("${args[@]}")

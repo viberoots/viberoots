@@ -33,7 +33,10 @@ async function main() {
     return usage(`unsupported language: ${lang}`);
   }
 
-  const go = await import(path.join(process.cwd(), "tools/patch/patch-go.ts"));
+  // Resolve repo root to import the language handler robustly from any CWD
+  const here = path.dirname(new URL(import.meta.url).pathname);
+  const root = path.resolve(here, "..", "..");
+  const go = await import(path.join(root, "tools/patch/patch-go.ts"));
   const handler = go.default as {
     start(args: string[]): Promise<void>;
     apply(args: string[]): Promise<void>;
