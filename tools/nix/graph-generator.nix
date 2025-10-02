@@ -27,13 +27,13 @@ let
       ) else "";
 
   # Vendor staging removed — rely on gomod2nix and overrides only
-  # Prefer explicit graphJsonPath (pure) if provided; else fall back to src path
+  # Require explicit graphJsonPath because flake self source excludes untracked files
   graphPath = if graphJsonPath != null
     then builtins.toPath graphJsonPath
-    else builtins.toPath (repoRootStr + "/tools/buck/graph.json");
+    else builtins.throw "graphJsonPath is required; pass tools/buck/graph.json via flake to include untracked glue.";
   nodes = if builtins.pathExists graphPath
     then builtins.fromJSON (builtins.readFile graphPath)
-    else builtins.throw "tools/buck/graph.json missing — run tools/buck/export-graph.ts before building.";
+    else builtins.throw "graphJsonPath does not exist — run tools/buck/export-graph.ts before building.";
   nodesList =
     let t = builtins.typeOf nodes; in
       if t == "list" then nodes
