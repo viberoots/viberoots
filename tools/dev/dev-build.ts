@@ -156,7 +156,10 @@ async function main() {
     await fsp.mkdir(linkDir, { recursive: true });
     const linkName = path.join(linkDir, `buck-go-${Date.now()}`);
     try {
-      await $({ stdio: "inherit" })`nix build .#graph-generator --out-link ${linkName}`;
+      // Ensure Nix sees the live graph.json via BUCK_GRAPH_JSON; fallback is flake literal
+      const absGraph = path.resolve("tools/buck/graph.json");
+      const env = { ...process.env, BUCK_GRAPH_JSON: absGraph };
+      await $({ stdio: "inherit", env })`nix build .#graph-generator --out-link ${linkName}`;
       // Print discovered bins for convenience (match requested labels if provided)
       try {
         const manifestPath = path.resolve(linkName, "manifest.json");

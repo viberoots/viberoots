@@ -40,12 +40,16 @@
 
     packages = forAllSystems ({ zx-wrapper, pkgs, nodeMods, prelude, buck2Input, system, ... }:
       let
-        graphGen = pkgs.callPackage ./tools/nix/graph-generator.nix {
+        # Allow BUCK_GRAPH_JSON to override the graph path when running via dev shell
+        graphGen = let
+          envGraph = builtins.getEnv "BUCK_GRAPH_JSON";
+          graphPath = if envGraph != "" then envGraph else ./tools/buck/graph.json;
+        in pkgs.callPackage ./tools/nix/graph-generator.nix {
           inherit pkgs;
           # Use a stable working-tree snapshot of the entire repo
           src = builtins.path { path = ./.; name = "repo"; };
-          # Explicitly include graph.json from working tree (no staging required)
-          graphJsonPath = builtins.path { path = ./tools/buck/graph.json; name = "graph.json"; };
+          # Explicitly include graph.json: prefer env override, else working tree file
+          graphJsonPath = builtins.path { path = graphPath; name = "graph.json"; };
         };
       in {
         buck2-prelude = prelude.buck2-prelude;
