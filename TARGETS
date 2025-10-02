@@ -332,6 +332,13 @@ zx_test(
     out = "planner_closure_excludes_root_files.stamp",
 )
 
+# Dispatch mapping tests
+zx_test(
+    name = "planner_dispatch_mapping_present",
+    script = "tools/tests/planner/planner-dispatch.mapping-present.test.ts",
+    out = "planner_dispatch_mapping_present.stamp",
+)
+
 # Phase 9 regression tests
 zx_test(
     name = "regression_provider_wiring_e2e",

@@ -46,7 +46,11 @@ let
           ) ks
       ) else [];
   T = import ./lang-templates.nix { inherit pkgs; };
-  M = if builtins.pathExists ./mapping.nix then import ./mapping.nix else {};
+  M = if builtins.pathExists ./mapping.nix then (
+        let raw = import ./mapping.nix;
+            attempt = builtins.tryEval (raw {});
+        in if attempt.success then attempt.value else raw
+      ) else {};
   D = M.dispatch or {};
   devOverrideJSON = builtins.getEnv "NIX_GO_DEV_OVERRIDE_JSON";
 
