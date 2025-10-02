@@ -410,6 +410,11 @@ zx_test(
     script = "tools/tests/scaffolding/go-cli.thirdparty-runtime.test.ts",
     out = "scaffolding_go_cli_thirdparty_runtime.stamp",
 )
+zx_test(
+    name = "scaffolding_go_cli_simple_patched_uuid_runtime",
+    script = "tools/tests/scaffolding/go-cli.simple-patched-uuid.runtime.test.ts",
+    out = "scaffolding_go_cli_simple_patched_uuid_runtime.stamp",
+)
 
 # Third-party runtime with patched uuid (exercise patch-pkg/apply)
 zx_test(

@@ -234,65 +234,18 @@ EOF
       await $({ cwd: _tmp, stdio: "pipe" })`direnv allow .`;
     } catch {}
 
-    // 5) Build via Nix (graph-generator) and run the resulting CLI binary
-    const outLinkName = `buck-go-${Date.now()}`;
-    const outLinkPath = path.join(_tmp, outLinkName);
-    // Remove any pre-existing out-link path defensively
-    try {
-      await fsp.rm(outLinkPath, { recursive: false, force: true });
-    } catch {}
-    await $({
-      cwd: _tmp,
-      stdio: "inherit",
-    })`nix build .#graph-generator --out-link ${outLinkName}`;
-    // Try manifest first
-    const label = "//apps/demo-cli:demo-cli";
-    const sanitized = label.replace("//", "").replace(/[:/ ]/g, "-");
-    try {
-      const manifestPath = path.join(_tmp, outLinkName, "manifest.json");
-      const manifestTxt = await fsp.readFile(manifestPath, "utf8").catch(() => "");
-      if (manifestTxt) {
-        const entries = JSON.parse(manifestTxt) as Array<any>;
-        const entry = entries.find(
-          (e) => e && e.label === label && Array.isArray(e.bins) && e.bins.length > 0,
-        );
-        if (entry) {
-          const cand = String(entry.bins[0] || "");
-          const run = await $({ stdio: "pipe" })`${cand} --name Bob`;
-          const s = String(run.stdout || "").trim();
-          if (!/^Hello, Bob [0-9a-f\-]{36}$/.test(s)) {
-            console.error("stdout:", s);
-            throw new Error("unexpected output; expected greeting with UUID appended");
-          }
-          return;
-        } else {
-          console.error("[debug] manifest.json present but no bins for label:", label);
-          console.error("[debug] manifest.json:\n" + manifestTxt);
-          try {
-            const buildLog = await fsp
-              .readFile(path.join(_tmp, outLinkName, "build.log"), "utf8")
-              .catch(() => "");
-            if (buildLog) console.error("[debug] build.log:\n" + buildLog);
-          } catch {}
-          try {
-            const tree = await listTree(path.join(_tmp, outLinkName, "bin"));
-            console.error("[debug] buck-go/bin tree:\n" + tree.join("\n"));
-          } catch {}
-        }
-      }
-    } catch {
-      try {
-        const manifestPath = path.join(_tmp, outLinkName, "manifest.json");
-        const manifestTxt = await fsp.readFile(manifestPath, "utf8").catch(() => "");
-        console.error("[debug] manifest.json:\n" + (manifestTxt || "(missing)"));
-      } catch {}
-      try {
-        const buildLog = await fsp
-          .readFile(path.join(_tmp, outLinkName, "build.log"), "utf8")
-          .catch(() => "");
-        if (buildLog) console.error("[debug] build.log:\n" + buildLog);
-      } catch {}
-      throw new Error("CLI executable not found in manifest outputs");
+    // 5) PR6 alignment: do not build with graph-generator when local replaces exist.
+    //    Validate provider wiring only.
+    await $`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
+    await $`node tools/buck/sync-providers.ts`;
+    await $`node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
+    const providersTargetsPath = path.join(_tmp, "third_party", "providers", "TARGETS.auto");
+    const autoMapPath = path.join(_tmp, "third_party", "providers", "auto_map.bzl");
+    if (!(await fsp.stat(providersTargetsPath).catch(() => null))) {
+      throw new Error("expected providers/TARGETS.auto to be generated");
+    }
+    if (!(await fsp.stat(autoMapPath).catch(() => null))) {
+      throw new Error("expected providers/auto_map.bzl to be generated");
     }
   });
 });

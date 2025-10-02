@@ -51,8 +51,9 @@ in
         modules = modulesToml;
         # Build entrypoint within module root; include "." to ensure module is realized even if no cmd/*
         subPackages = [ "." "cmd/${targetName}" ];
-        # Avoid vendor mode; gomod2nix provides modules
-        GOFLAGS = "-mod=mod";
+        # Allow reference to go toolchain when GOFLAGS may be in env for tests
+        disallowedReferences = [];
+        # Avoid vendor mode; gomod2nix provides modules (exported in configurePhase)
         nativeBuildInputs = [ pkgs.unzip ];
         configurePhase = ''
           runHook preConfigure
@@ -63,22 +64,6 @@ in
           cd "''${modRoot:-.}"
 
           runHook postConfigure
-        '';
-        preBuild = ''
-          set -e
-          echo "[goApp] running go mod vendor to satisfy -mod=vendor" >&2 || true
-          (go mod vendor >/dev/null 2>&1 || true)
-          VDIR="vendor/github.com/google/uuid"
-          if [ -d "$VDIR" ]; then
-            chmod -R u+w "$VDIR" || true
-            for p in \
-              ${lib.concatStringsSep " " [
-                "${patchDir}/github.com__google__uuid@v1.6.0.patch"
-                "${patchDir}/github.comgoogle_uuid@v1.6.0.patch"
-              ]}; do
-              if [ -f "$p" ]; then (cd "$VDIR" && patch -N -p1 -i "$p" || true); fi
-            done
-          fi
         '';
       };
       args = baseArgs // ({
@@ -93,12 +78,11 @@ in
             ver = if mType == "string" then (old.version or "") else (module.version or (old.version or ""));
             keyWithVer = if pkg != "" && ver != "" then "${pkg}@${ver}" else pkg;
             patchList = (patchesMap.${keyWithVer} or []) ++ (patchesMap.${pkg} or []);
-            isUuid = (pkg == "github.com/google/uuid") || (keyWithVer == "github.com/google/uuid@v1.6.0");
             srcOverride = if devOverrides ? ${keyWithVer}
                           then devOverrides.${keyWithVer}
                           else (devOverrides.${pkg} or old.src);
           in old // {
-            patches = (old.patches or []) ++ (if isUuid then [] else patchList);
+            patches = (old.patches or []) ++ patchList;
             src = srcOverride;
           };
       } else {}));
@@ -119,8 +103,19 @@ in
         # Build the module root
         # For libraries, build subPackages '.' plus any cmd/<name> bins if present
         subPackages = [ "." ];
-        # Avoid vendor mode; gomod2nix provides modules
-        GOFLAGS = "-mod=mod";
+        # Avoid vendor mode; gomod2nix provides modules (exported in configurePhase)
+        disallowedReferences = [];
+        configurePhase = ''
+          runHook preConfigure
+
+          export GOCACHE=$TMPDIR/go-cache
+          export GOPATH="$TMPDIR/go"
+          export GOSUMDB=off
+          export GOFLAGS="-mod=mod"
+          cd "''${modRoot:-.}"
+
+          runHook postConfigure
+        '';
       };
       args = baseArgs // ({
         # Change to the library module root
@@ -134,12 +129,11 @@ in
             ver = if mType == "string" then (old.version or "") else (module.version or (old.version or ""));
             keyWithVer = if pkg != "" && ver != "" then "${pkg}@${ver}" else pkg;
             patchList = (patchesMap.${keyWithVer} or []) ++ (patchesMap.${pkg} or []);
-            isUuid = (pkg == "github.com/google/uuid") || (keyWithVer == "github.com/google/uuid@v1.6.0");
             srcOverride = if devOverridesEnv ? ${keyWithVer}
                           then devOverridesEnv.${keyWithVer}
                           else (devOverridesEnv.${pkg} or old.src);
           in old // {
-            patches = (old.patches or []) ++ (if isUuid then [] else patchList);
+            patches = (old.patches or []) ++ patchList;
             src = srcOverride;
           };
       } else {}));
