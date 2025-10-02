@@ -13,6 +13,8 @@ _envops:
 _exclude:
   - meta.json
   - help.md
+  # Prevent accidental nested apps/ inside destination (dest is already apps/<name>)
+  - apps/**
 
 # scaf supplies values via --data-file
 name: ""
@@ -26,6 +28,4 @@ go_min: "1.22"
 license: "MIT"
 enable_ci: false
 
-_tasks:
-  # Ensure destination subdir exists (apps/{{ name }}) since files below are nested in apps/{{ name }}/...
-  - mkdir -p apps/{{ name }}/cmd/{{ name }}
+_tasks: []
