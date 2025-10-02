@@ -28,6 +28,7 @@ Commands:
   template <language> <template>
   validate <all|path1 path2 ...> [--quiet]
   completions <bash|zsh|fish>
+  go test <name_of_test> [--path=DEST] [--yes] [--dry-run]
 `);
 }
 
@@ -447,7 +448,7 @@ async function cmdMove(args: string[], flags: Record<string, string>) {
 async function cmdCompletions(args: string[]) {
   const [shell] = args;
   const subcommands =
-    "templates new update regen delete move ls help validate template completions";
+    "templates new update regen delete move ls help validate template completions go";
   if (shell === "bash") {
     console.log(
       [
@@ -473,6 +474,11 @@ async function cmdCompletions(args: string[]) {
         "    update|regen|delete|ls|validate)",
         "      local targets=\"all $(scaf ls --json 2>/dev/null | jq -r '.[].path')\";",
         '      COMPREPLY=( $(compgen -W "$targets" -- "$cur") ); return;',
+        "      ;;",
+        "    go)",
+        "      if [[ ${COMP_CWORD} -eq 3 ]]; then",
+        '        COMPREPLY=( $(compgen -W "test" -- "$cur") ); return;',
+        "      fi",
         "      ;;",
         "  esac",
         "}",
@@ -502,6 +508,11 @@ async function cmdCompletions(args: string[]) {
         "    update|regen|delete|ls|validate)",
         "      compadd -- $(scaf __complete targets); return",
         "      ;;",
+        "    go)",
+        "      if (( CURRENT == 3 )); then",
+        "        compadd -- test; return",
+        "      fi",
+        "      ;;",
         "  esac",
         "}",
         "compdef _scaf_complete scaf",
@@ -523,11 +534,14 @@ async function cmdCompletions(args: string[]) {
         "complete -c scaf -n '__fish_use_subcommand' -a 'validate'",
         "complete -c scaf -n '__fish_use_subcommand' -a 'template'",
         "complete -c scaf -n '__fish_use_subcommand' -a 'completions'",
+        "complete -c scaf -n '__fish_use_subcommand' -a 'go'",
         "# dynamic for 'new'",
         "complete -c scaf -n '__fish_seen_subcommand_from new; and test (count (commandline -opc)) -eq 2' -a '(scaf __complete languages)'",
         "complete -c scaf -n '__fish_seen_subcommand_from new; and test (count (commandline -opc)) -eq 3' -a '(set -l lang (commandline -opc | sed -n 2p); scaf __complete templates $lang)'",
         "# dynamic for targets",
         "complete -c scaf -n '__fish_seen_subcommand_from update regen delete ls validate' -a '(scaf __complete targets)'",
+        "# 'go' subcommands",
+        "complete -c scaf -n '__fish_seen_subcommand_from go; and test (count (commandline -opc)) -eq 2' -a 'test'",
       ].join("\n"),
     );
     return;
@@ -603,6 +617,29 @@ async function cmdHelp(args: string[], flags: Record<string, string>) {
         return;
       }
     }
+  }
+  // Command-level: scaf help go test
+  if (a1 === "go" && a2 === "test") {
+    const usageLine = "Usage: scaf go test <name_of_test> [--path=DEST] [--yes] [--dry-run]";
+    const notes = [
+      "- Place tests under libs/<lib>/pkg/<pkg>/ for libs, apps/<app>/cmd/<app>/ for apps.",
+      "- The file name will be suffixed with _test.go if missing.",
+      "- Package is inferred from existing *.go, or 'main' under /cmd/, else directory name.",
+    ];
+    const examples = [
+      "scaf go test handlers --path=libs/demo-lib/pkg/demo-lib/handlers_test.go",
+      "scaf go test main_case --path=apps/demo-cli/cmd/demo-cli/main_case_test.go",
+    ];
+    if (flags.json === "true") {
+      console.log(
+        JSON.stringify({ command: "go test", usage: usageLine, notes, examples }, null, 2),
+      );
+      return;
+    }
+    console.log(
+      [usageLine, "", ...notes, "", "Examples:", ...examples.map((e) => `  ${e}`)].join("\n"),
+    );
+    return;
   }
   // Command-level: scaf help new <language> <template> → usage + live variables preview
   if (a1 === "new" && a2 && a3) {
@@ -839,6 +876,19 @@ async function main() {
   const { _, flags } = parseArgs(raw);
   const [cmd, ...rest] = _;
   switch (cmd) {
+    case "go": {
+      const sub = rest[0];
+      if (sub === "test") {
+        const name = rest[1];
+        if (!name) {
+          console.error("Usage: scaf go test <name_of_test> [--path=DEST] [--yes] [--dry-run]");
+          process.exit(2);
+        }
+        return cmdGoTest(name, flags);
+      }
+      usage();
+      return process.exit(2);
+    }
     case "templates":
       return cmdTemplates(rest, flags);
     case "new":
@@ -876,3 +926,81 @@ main().catch((e) => {
   console.error(e);
   process.exit(1);
 });
+
+// ---------------
+// go test command
+// ---------------
+
+function ensureSuffix(name: string, suffix: string): string {
+  return name.endsWith(suffix) ? name : name + suffix;
+}
+
+function toPascalCase(s: string): string {
+  const parts = s
+    .replace(/[^a-zA-Z0-9]+/g, " ")
+    .trim()
+    .split(/\s+/);
+  return parts.map((p) => (p ? p[0].toUpperCase() + p.slice(1) : "")).join("");
+}
+
+function sanitizePkgName(s: string): string {
+  let t = s
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, "_");
+  if (!/^[a-z_]/.test(t)) t = "_" + t;
+  return t || "pkg";
+}
+
+async function inferPackageName(dir: string, destPath: string): Promise<string> {
+  try {
+    const entries = await fsp.readdir(dir);
+    for (const e of entries) {
+      if (!e.endsWith(".go")) continue;
+      const txt = await fsp.readFile(path.join(dir, e), "utf8").catch(() => "");
+      const m = /^\s*package\s+([a-zA-Z_][a-zA-Z0-9_]*)/m.exec(txt);
+      if (m && m[1]) return m[1];
+    }
+  } catch {}
+  if (destPath.includes(`${path.sep}cmd${path.sep}`)) return "main";
+  return sanitizePkgName(path.basename(dir));
+}
+
+async function cmdGoTest(name: string, flags: Record<string, string>) {
+  const yes = flags["yes"] === "true";
+  const dry = flags["dry-run"] === "true";
+  const provided = flags["path"];
+  const filename = ensureSuffix(name, "_test.go");
+  const dest = provided ? provided : path.join(process.cwd(), filename);
+  const dir = path.dirname(dest);
+
+  const summary = `Create Go test: ${dest}`;
+  if (!yes && !dry && (await exists(dest))) {
+    console.error(`${summary}\nRefusing to overwrite without --yes`);
+    process.exit(2);
+  }
+  if (dry) {
+    const pkg = await inferPackageName(dir, dest);
+    console.log(`[dry-run] would write ${dest} (package ${pkg})`);
+    return;
+  }
+  await fsp.mkdir(dir, { recursive: true });
+  const pkg = await inferPackageName(dir, dest);
+  const funcName = toPascalCase(name);
+  const contents = `package ${pkg}\n\nimport \"testing\"\n\nfunc Test${funcName}(t *testing.T) {\n}\n`;
+  await fsp.writeFile(dest, contents, "utf8");
+  try {
+    await $`bash -lc ${`set -euo pipefail; go fmt ${dest} >/dev/null 2>&1 || true`}`;
+  } catch {}
+  // Hint about auto-wiring roots
+  const hintLib =
+    dest.includes(`${path.sep}libs${path.sep}`) && dest.includes(`${path.sep}pkg${path.sep}`);
+  const hintApp =
+    dest.includes(`${path.sep}apps${path.sep}`) && dest.includes(`${path.sep}cmd${path.sep}`);
+  if (!hintLib && !hintApp) {
+    console.warn(
+      "note: for auto-wiring, place tests under libs/<lib>/pkg/<pkg>/ (lib) or apps/<app>/cmd/<app>/ (app)",
+    );
+  }
+  console.log("created:", dest);
+}

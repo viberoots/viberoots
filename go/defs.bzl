@@ -88,9 +88,10 @@ def nix_go_library(name, **kwargs):
     # We mirror the scaffolded pattern: tests live under pkg/** for libs.
     tests = native.glob(["pkg/**/*_test.go"]) or []
     if len(tests) > 0:
-        # Do not set `library` for binaries; Buck's go_test expects a go_library.
+        # Bind tests to the library to include sources in compilation.
         nix_go_test(
             name = name + "_test",
+            library = ":%s" % name,
             srcs = tests,
             labels = ["lang:go", "kind:test"],
         )
@@ -115,9 +116,6 @@ def nix_go_binary(name, **kwargs):
     # Auto-wire a go_test target for binaries if *_test.go exists under cmd/<name>/**
     # This allows CLI packages to have local tests with no TARGETS edits.
     tests = native.glob(["cmd/%s/**/*_test.go" % name]) or []
-    if len(tests) == 0:
-        # Fallback: any test files under cmd/** (useful for multi-package CLIs)
-        tests = native.glob(["cmd/**/*_test.go"]) or []
     if len(tests) > 0:
         # Synthesize a package library for tests; binaries don't expose GoTestInfo
         pkg_srcs = native.glob(["cmd/%s/**/*.go" % name], exclude=["**/*_test.go"]) or []
