@@ -1,17 +1,10 @@
-load("//go:defs.bzl", "nix_go_library", "nix_go_test")
+load("//go:defs.bzl", "nix_go_library")
 
 nix_go_library(
     name = "{{ name }}",
     srcs = glob(["pkg/**/*.go"], exclude=["**/*_test.go"]),
     labels = ["lang:go", "kind:lib"],
     visibility = ["PUBLIC"],
-)
-
-nix_go_test(
-    name = "{{ name }}_test",
-    srcs = glob(["pkg/**/*_test.go"]),
-    library = ":{{ name }}",
-    labels = ["lang:go", "kind:test"],
 )
 
 

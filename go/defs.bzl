@@ -83,6 +83,18 @@ def nix_go_library(name, **kwargs):
         kwargs["_cxx_toolchain"] = "@repo_toolchains//:cxx"
     go_library(name = name, deps = merged, **kwargs)
 
+    # Auto-wire a go_test target if *_test.go files exist alongside the library.
+    # This keeps scaffolds simple: adding a test file is enough; no TARGETS edits.
+    # We mirror the scaffolded pattern: tests live under pkg/** for libs.
+    tests = native.glob(["pkg/**/*_test.go"]) or []
+    if len(tests) > 0:
+        nix_go_test(
+            name = name + "_test",
+            library = ":%s" % name,
+            srcs = tests,
+            labels = ["lang:go", "kind:test"],
+        )
+
 
 def nix_go_binary(name, **kwargs):
     build_tags = kwargs.pop("build_tags", [])
