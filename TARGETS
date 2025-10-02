@@ -320,6 +320,18 @@ zx_test(
     out = "planner_bins_only_manifest.stamp",
 )
 
+zx_test(
+    name = "planner_invalidation_root_touch_cache_hit",
+    script = "tools/tests/planner/planner-invalidation.root-touch.cache-hit.test.ts",
+    out = "planner_invalidation_root_touch_cache_hit.stamp",
+)
+
+zx_test(
+    name = "planner_closure_excludes_root_files",
+    script = "tools/tests/planner/planner-closure.excludes-root-files.test.ts",
+    out = "planner_closure_excludes_root_files.stamp",
+)
+
 # Phase 9 regression tests
 zx_test(
     name = "regression_provider_wiring_e2e",
