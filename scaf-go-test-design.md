@@ -184,3 +184,5 @@ Note: TARGETS is already using `auto_zx_tests`, so these new tests auto‑regist
 - Acceptance criteria
   - `scaf help go test` output matches the docs and this design.
   - Links or references from `scaffolding.md` to the design or `help` are correct.
+
+Implementation status: Implemented (PRs 1–3 merged)

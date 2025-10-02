@@ -94,6 +94,15 @@ Both examples create the destination under the canonical location for the chosen
     - zsh: `autoload -U compinit && compinit; eval "$(scaf completions zsh)"`
     - fish: `scaf completions fish | source`
 
+- go test: Generate a minimal Go test file that is auto‑wired by macros.
+  - Usage: `scaf go test <name_of_test> [--path=DEST] [--yes] [--dry-run]`
+  - Defaults:
+    - Destination defaults to `./<name_of_test>_test.go` if `--path` is omitted.
+    - Package is inferred from existing files; under `/cmd/` it defaults to `main`.
+  - Auto‑wiring (no TARGETS edits):
+    - Libs: tests under `libs/<lib>/pkg/<pkg>/**/_test.go` bind to `//libs/<lib>:<lib>_test`.
+    - Apps: tests under `apps/<app>/cmd/<app>/**/_test.go` bind to `//apps/<app>:<app>_test`.
+
 #### Target selection
 
 - `scaf delete|regen|update <all|path1 path2 ...>`
