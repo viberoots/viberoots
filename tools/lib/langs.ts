@@ -8,12 +8,11 @@ const KNOWN: ScaffoldingLanguage[] = [
     id: "go",
     displayName: "Go",
     requiredPaths: ["tools/nix/templates/go.nix", "go/defs.bzl", "tools/scaffolding/templates/go"],
+    optionalPaths: [],
     kinds: ["cli", "lib", "test"],
     templatesDir: "tools/scaffolding/templates/go",
   },
-];
-
-type LangsCfg = { enabled?: string[] };
+] as any;
 
 export async function detectEnabledLanguages(cwd = process.cwd()): Promise<ScaffoldingLanguage[]> {
   const cfgPath = path.join(cwd, "tools/nix/langs.json");
