@@ -83,38 +83,25 @@ let
           ) else nm
       );
 
-  # Language registry (pluggable). Each language exposes a tiny adapter surface.
-  LANGS = {
-    go = {
-      isTarget = n:
-        let rt = get n "rule_type";
-            lbs = get n "labels";
-            hasGoRT = (rt != null) && lib.hasPrefix "go_" rt;
-            hasGoLabel = (lbs != null) && builtins.elem "lang:go" lbs;
-        in hasGoRT || hasGoLabel;
-      kindOf = n:
-        let rt = get n "rule_type";
-            lbs = get n "labels";
-            isBinLabel = lbs != null && builtins.elem "kind:bin" lbs;
-        in if (rt != null) && lib.hasPrefix "go_" rt
-             then (if lib.hasSuffix "_binary" rt then "bin" else "lib")
-             else if isBinLabel then "bin" else "lib";
-      modulesFileFor = name: modulesTomlFor name;
-      mkApp = name: T.goApp {
-        inherit name;
-        modulesToml = LANGS.go.modulesFileFor name;
-        srcRoot = repoRoot;
-        devOverridesMap = localModuleOverrides;
-        subdir = (pkgPathOf name);
-      };
-      mkLib = name: T.goLib {
-        inherit name;
-        modulesToml = LANGS.go.modulesFileFor name;
-        srcRoot = repoRoot;
-        subdir = (pkgPathOf name);
+  # Build planner context and import language plugins if present
+  ctx = {
+    inherit lib T repoRoot localModuleOverrides pkgPathOf;
+    inherit (pkgs) lib;
+    get = get;
+    modulesTomlFor = modulesTomlFor;
+  };
+  LANGS =
+    let goPluginPath = ./planner/go.nix;
+    in {
+      go = if builtins.pathExists goPluginPath then (import goPluginPath { inherit lib; } ctx) else {
+        # Fallback minimal no-op adapter if plugin missing
+        isTarget = n: false;
+        kindOf = n: null;
+        modulesFileFor = name: modulesTomlFor name;
+        mkApp = name: T.goApp { inherit name; modulesToml = modulesTomlFor name; repoRoot = repoRoot; subdir = (pkgPathOf name); };
+        mkLib = name: T.goLib { inherit name; modulesToml = modulesTomlFor name; repoRoot = repoRoot; subdir = (pkgPathOf name); };
       };
     };
-  };
 
   pick = n:
     let
