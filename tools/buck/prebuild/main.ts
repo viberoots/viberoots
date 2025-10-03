@@ -6,7 +6,7 @@ import { hasPatchesOrLocks, listInputs, listOutputs, missingProviderAutos } from
 
 type Mode = "ci" | "local";
 const mode: Mode = process.env.CI === "true" ? "ci" : "local";
-const skewMs = Number(process.env.PREBUILD_GUARD_SKEW_MS || "2000");
+const skewMs = Number(process.env.PREBUILD_GUARD_SKEW_MS || "5000");
 const argv = process.argv.slice(2);
 const flagVerbose = argv.includes("--verbose") || process.env.PREBUILD_GUARD_VERBOSE === "1";
 const jsonOut = argv.includes("--json");

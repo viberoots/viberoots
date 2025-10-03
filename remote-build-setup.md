@@ -250,3 +250,5 @@ cachix push <your-cache-name> $(nix path-info .#graph-generator)
 
 - **Will dev overrides poison the cache?**
   - They change derivation hashes. CI forbids them; unset `NIX_GO_DEV_OVERRIDE_JSON` before pushing builds to the shared cache.
+
+
