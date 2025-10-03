@@ -1,12 +1,21 @@
 #!/usr/bin/env zx-wrapper
 import { syncGoProviders } from "./go";
+import type { LanguageProviderSync } from "../../lib/lang-contracts";
 
 export type SyncOptions = {
   outFile?: string;
   strict?: boolean;
+  patchDir?: string;
+  lang?: string; // optional narrow
 };
 
+const handlers: LanguageProviderSync[] = [{ lang: "go", sync: syncGoProviders }];
+
 export async function syncAllProviders(opts?: SyncOptions) {
-  // Go providers (always supported in current repo)
-  await syncGoProviders({ outFile: opts?.outFile, strict: opts?.strict });
+  const targetLang = opts?.lang;
+  for (const h of handlers) {
+    if (!targetLang || targetLang === h.lang) {
+      await h.sync({ outFile: opts?.outFile, patchDir: opts?.patchDir, strict: opts?.strict });
+    }
+  }
 }

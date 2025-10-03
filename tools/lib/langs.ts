@@ -1,18 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
 import path from "node:path";
+import type { ScaffoldingLanguage, LangId } from "./lang-contracts";
 
-export type LangId = string;
-export type LangSpec = {
-  id: LangId;
-  displayName: string;
-  requiredPaths: string[];
-  optionalPaths?: string[];
-  kinds: string[];
-  templatesDir: string;
-};
-
-const KNOWN: LangSpec[] = [
+const KNOWN: ScaffoldingLanguage[] = [
   {
     id: "go",
     displayName: "Go",
@@ -24,7 +15,7 @@ const KNOWN: LangSpec[] = [
 
 type LangsCfg = { enabled?: string[] };
 
-export async function detectEnabledLanguages(cwd = process.cwd()): Promise<LangSpec[]> {
+export async function detectEnabledLanguages(cwd = process.cwd()): Promise<ScaffoldingLanguage[]> {
   const cfgPath = path.join(cwd, "tools/nix/langs.json");
   let preferred: string[] = [];
   try {
@@ -32,7 +23,7 @@ export async function detectEnabledLanguages(cwd = process.cwd()): Promise<LangS
     preferred = (JSON.parse(txt)?.enabled || []) as string[];
   } catch {}
   const exists = async (p: string) => fs.pathExists(path.join(cwd, p));
-  const out: LangSpec[] = [];
+  const out: ScaffoldingLanguage[] = [];
   for (const s of KNOWN) {
     if (preferred.length && !preferred.includes(s.id)) continue;
     let ok = true;
@@ -47,6 +38,6 @@ export async function detectEnabledLanguages(cwd = process.cwd()): Promise<LangS
   return out;
 }
 
-export function knownLanguages(): LangSpec[] {
+export function knownLanguages(): ScaffoldingLanguage[] {
   return [...KNOWN];
 }
