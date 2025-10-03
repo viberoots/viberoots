@@ -83,29 +83,52 @@ let
           ) else nm
       );
 
-  isGoCandidate = n:
-    let rt = get n "rule_type";
-        lbs = get n "labels";
-        hasGoRT = (rt != null) && lib.hasPrefix "go_" rt;
-        hasGoLabel = (lbs != null) && builtins.elem "lang:go" lbs;
-    in hasGoRT || hasGoLabel;
+  # Language registry (pluggable). Each language exposes a tiny adapter surface.
+  LANGS = {
+    go = {
+      isTarget = n:
+        let rt = get n "rule_type";
+            lbs = get n "labels";
+            hasGoRT = (rt != null) && lib.hasPrefix "go_" rt;
+            hasGoLabel = (lbs != null) && builtins.elem "lang:go" lbs;
+        in hasGoRT || hasGoLabel;
+      kindOf = n:
+        let rt = get n "rule_type";
+            lbs = get n "labels";
+            isBinLabel = lbs != null && builtins.elem "kind:bin" lbs;
+        in if (rt != null) && lib.hasPrefix "go_" rt
+             then (if lib.hasSuffix "_binary" rt then "bin" else "lib")
+             else if isBinLabel then "bin" else "lib";
+      modulesFileFor = name: modulesTomlFor name;
+      mkApp = name: T.goApp {
+        inherit name;
+        modulesToml = LANGS.go.modulesFileFor name;
+        srcRoot = repoRoot;
+        devOverridesMap = localModuleOverrides;
+        subdir = (pkgPathOf name);
+      };
+      mkLib = name: T.goLib {
+        inherit name;
+        modulesToml = LANGS.go.modulesFileFor name;
+        srcRoot = repoRoot;
+        subdir = (pkgPathOf name);
+      };
+    };
+  };
 
   pick = n:
     let
       rt = get n "rule_type";
-      lbs = get n "labels";
-      isGoLabel = lbs != null && builtins.elem "lang:go" lbs;
-      isBinLabel = lbs != null && builtins.elem "kind:bin" lbs;
       hasDispatch = (rt != null) && builtins.hasAttr rt D;
-      hasGoPrefix = (rt != null) && lib.hasPrefix "go_" rt;
+      langKeys = builtins.attrNames LANGS;
+      firstMatch =
+        let matches = builtins.filter (k: (LANGS.${k}.isTarget n)) langKeys; in
+          if matches == [] then null else builtins.head matches;
     in
       if hasDispatch then D.${rt}
-      else if hasGoPrefix then {
-        template = "go";
-        kind = if lib.hasSuffix "_binary" rt then "bin" else "lib";
-      } else if isGoLabel then {
-        template = "go";
-        kind = if isBinLabel then "bin" else "lib";
+      else if firstMatch != null then {
+        template = firstMatch;
+        kind = LANGS.${firstMatch}.kindOf n;
       } else null;
 
   modulesTomlDefault = if rootModulesTomlPath != null
@@ -165,28 +188,14 @@ let
       if (builtins.length parts) > 1 then lib.elemAt parts 1 else baseNameOf (pkgPathOf name);
 
   mkGo = name: kind:
-    let mt = modulesTomlFor name; in
-      if kind == "bin" then T.goApp {
-        inherit name;
-        modulesToml = mt;
-        # Use full repo root to ensure dynamic scaffolds like apps/* are present
-        srcRoot = repoRoot;
-        devOverridesMap = localModuleOverrides;
-        subdir = (pkgPathOf name);
-      } else T.goLib {
-        inherit name;
-        modulesToml = mt;
-        # Use full repo root to ensure library module roots are visible
-        srcRoot = repoRoot;
-        subdir = (pkgPathOf name);
-      };
+    if kind == "bin" then LANGS.go.mkApp name else LANGS.go.mkLib name;
 
   safeNodes = builtins.filter (n:
     let nm = ensureFullLabel n;
         okName = (builtins.typeOf nm == "string") && nm != "";
         rel = if okName then (pkgPathOf nm) else "";
         inAppsLibs = lib.hasPrefix "apps/" rel || lib.hasPrefix "libs/" rel;
-    in okName && inAppsLibs && isGoCandidate n && (pick n) != null
+    in okName && inAppsLibs && ((LANGS.go.isTarget n) || (pick n) != null) && (pick n) != null
   ) nodesList;
 
   goTargetsFromGraph = builtins.foldl' (acc: n:
