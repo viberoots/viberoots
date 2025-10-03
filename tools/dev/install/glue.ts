@@ -55,30 +55,62 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
   const nodeBase = zxNodeBase();
   const nodeBin = process.execPath || "node";
   const zxImport = path.join(repoRoot(), "tools/dev/zx-init.mjs");
-  const cmds: Array<{ label: string; cmd: string; withZx?: boolean }> = [
+  // Detect enabled languages via templates or optional langs.json
+  type LangConfig = { enabled?: string[] };
+  let enabledLangs: Set<string> = new Set();
+  const langsJson = path.join(repoRoot(), "tools/nix/langs.json");
+  try {
+    const { stdout } = await $({
+      stdio: "pipe",
+    })`bash --noprofile --norc -c ${`test -f ${langsJson} && cat ${langsJson}`}`;
+    const cfg = JSON.parse(String(stdout || "{}")) as LangConfig;
+    for (const l of cfg.enabled || []) enabledLangs.add(l);
+  } catch {}
+  // Fall back to presence of templates directory entries
+  if (enabledLangs.size === 0) {
+    const tplDir = path.join(repoRoot(), "tools/nix/templates");
+    try {
+      const { stdout } = await $({
+        stdio: "pipe",
+      })`bash --noprofile --norc -c ${`test -d ${tplDir} && ls -1 ${tplDir}`}`;
+      for (const n of String(stdout || "").split(/\r?\n/)) {
+        const base = n.trim().replace(/\.nix$/, "");
+        if (base) enabledLangs.add(base);
+      }
+    } catch {}
+  }
+  const haveGo = enabledLangs.has("go");
+  const haveNode = enabledLangs.has("node");
+
+  const cmds: Array<{ label: string; cmd: string; withZx?: boolean; when?: boolean }> = [
     {
       label: "export-graph",
       cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/export-graph.ts")} --out ${path.join(repoRoot(), "tools/buck/graph.json")}`,
       withZx: true,
+      when: true,
     },
     {
       label: "sync-providers-go",
       cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/sync-providers.ts")}`,
       withZx: true,
+      when: haveGo,
     },
     {
       label: "sync-providers-node",
       cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/sync-providers-node.ts")}`,
       withZx: true,
+      when: haveNode,
     },
     {
       label: "gen-auto-map",
       cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/gen-auto-map.ts")} --graph ${path.join(repoRoot(), "tools/buck/graph.json")} --out ${path.join(repoRoot(), "third_party/providers/auto_map.bzl")}`,
       withZx: true,
+      when: true,
     },
   ];
   await ensurePreludeSymlinkIfMissing();
   for (const c of cmds) {
+    if (c.when === false) continue;
     if (dryRun) {
       console.log(`[dry-run] ${c.cmd}`);
       continue;
