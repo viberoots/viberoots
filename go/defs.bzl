@@ -24,6 +24,9 @@ def nix_go_library(name, **kwargs):
     goarch = kwargs.pop("goarch", None)
     cgo_enabled = kwargs.pop("cgo_enabled", None)
     _append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled)
+    # PR3: Stamp primary target labels for language/kind
+    labels = kwargs.get("labels", []) or []
+    kwargs["labels"] = dedupe_preserve(labels + ["lang:go", "kind:lib"])
     pkg = native.package_name()
     deps = kwargs.pop("deps", [])
     extra = normalize_labels(pkg, kwargs.pop("extra_module_providers", []))
@@ -55,6 +58,9 @@ def nix_go_binary(name, **kwargs):
     goarch = kwargs.pop("goarch", None)
     cgo_enabled = kwargs.pop("cgo_enabled", None)
     _append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled)
+    # PR3: Stamp primary target labels for language/kind
+    labels = kwargs.get("labels", []) or []
+    kwargs["labels"] = dedupe_preserve(labels + ["lang:go", "kind:bin"]) 
     pkg = native.package_name()
     deps = kwargs.pop("deps", [])
     extra = normalize_labels(pkg, kwargs.pop("extra_module_providers", []))
