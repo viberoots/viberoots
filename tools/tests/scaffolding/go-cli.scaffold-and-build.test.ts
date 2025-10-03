@@ -1,9 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
 import { scaffoldApp } from "../lib/lang-fixtures";
+import { runInTemp } from "../lib/test-helpers";
 
 test("go cli: scaffold and build", async () => {
   await runInTemp("go-cli-scaffold-and-build", async (_tmp, _$) => {

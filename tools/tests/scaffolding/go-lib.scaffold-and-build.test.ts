@@ -2,8 +2,8 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
 import { scaffoldLib } from "../lib/lang-fixtures";
+import { runInTemp } from "../lib/test-helpers";
 
 test("go lib: scaffold and build+test", async () => {
   await runInTemp("go-lib-scaffold-and-build", async (_tmp, _$) => {
