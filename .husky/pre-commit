@@ -1,4 +1,8 @@
 #!/usr/bin/env sh
 . "$(dirname "$0")/_/husky.sh"
 
-pnpm exec lint-staged || exit 1
+if command -v direnv >/dev/null 2>&1; then
+  direnv exec "$PWD" pnpm exec lint-staged || exit 1
+else
+  pnpm exec lint-staged || exit 1
+fi
