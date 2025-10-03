@@ -95,7 +95,7 @@ Both examples create the destination under the canonical location for the chosen
     - fish: `scaf completions fish | source`
 
 - go test: Generate a minimal Go test file that is auto‑wired by macros.
-  - Usage: `scaf go test <name_of_test> [--path=DEST] [--yes] [--dry-run]`
+  - Usage: `scaf new go test <name_of_test> [--path=DEST] [--yes] [--dry-run]`
   - Defaults:
     - Destination defaults to `./<name_of_test>_test.go` if `--path` is omitted.
     - Package is inferred from existing files; under `/cmd/` it defaults to `main`.

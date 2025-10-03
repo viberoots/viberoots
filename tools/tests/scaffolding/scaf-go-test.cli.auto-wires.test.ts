@@ -19,7 +19,7 @@ test("scaf go test: app auto-wires *_test.go under cmd/<app>/**", async () => {
 
     // Use scaf to create a new test under cmd/<app>/**
     const testPath = path.join(tmp, "apps/demo-cli/cmd/demo-cli/extra_case_test.go");
-    await $`scaf go test extra_case --path=${testPath}`;
+    await $`scaf new go test extra_case --path=${testPath}`;
 
     // Glue and test
     await $`tools/dev/install-deps.ts --glue-only`;

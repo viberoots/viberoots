@@ -54,8 +54,8 @@ Notes
 - Generate a minimal, passing test with the scaffolding CLI:
 
 ```
-scaf go test handlers --path=libs/demo-lib/pkg/demo-lib/handlers_test.go
-scaf go test main_case --path=apps/demo-cli/cmd/demo-cli/main_case_test.go
+scaf new go test handlers --path=libs/demo-lib/pkg/demo-lib/handlers_test.go
+scaf new go test main_case --path=apps/demo-cli/cmd/demo-cli/main_case_test.go
 ```
 
 - Auto‑wiring rules (no TARGETS edits):

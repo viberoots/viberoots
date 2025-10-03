@@ -42,7 +42,7 @@ export async function main() {
   // Normalize CWD to repo root so this script works from any directory
   try {
     const here = path.dirname(new URL(import.meta.url).pathname);
-    const root = path.resolve(here, "..", "..");
+    const root = path.resolve(here, "..", "..", "..");
     process.chdir(root);
   } catch {}
   console.log("Installing dependencies...");

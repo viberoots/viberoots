@@ -19,7 +19,7 @@ test("scaf go test: lib auto-wires *_test.go under pkg/**", async () => {
 
     // Use scaf to create a new test under pkg/**
     const testPath = path.join(tmp, "libs/demo-lib/pkg/demo-lib/extra_case_test.go");
-    await $`scaf go test extra_case --path=${testPath}`;
+    await $`scaf new go test extra_case --path=${testPath}`;
 
     // Glue and test
     await $`tools/dev/install-deps.ts --glue-only`;

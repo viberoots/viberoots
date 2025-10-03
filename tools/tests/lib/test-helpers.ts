@@ -206,7 +206,10 @@ EOF
     }
   }
   // Ensure repo-aware bin helpers (e.g., tools/bin/build, verify) operate on the temp copy
+  // Keep WORKSPACE_ROOT as the temp repo for file operations
   exportEnv.WORKSPACE_ROOT = tmp;
+  // Ensure zx init import always points to the real workspace, not the temp copy
+  exportEnv.ZX_INIT = path.join(process.cwd(), "tools", "dev", "zx-init.mjs");
   exportEnv.NODE_PATH = [
     path.join(tmp, "node_modules"),
     path.join(process.cwd(), "node_modules"),
@@ -215,10 +218,7 @@ EOF
     .filter(Boolean)
     .join(path.delimiter);
   // Do not mutate PATH; rely on direnv-provided environment from the dev shell.
-  const nodeOpts = [
-    "--experimental-strip-types",
-    `--import ${path.join(process.cwd(), "tools", "dev", "zx-init.mjs")}`,
-  ];
+  const nodeOpts = ["--experimental-strip-types", `--import ${exportEnv.ZX_INIT}`];
   exportEnv.NODE_OPTIONS = [nodeOpts.join(" "), exportEnv.NODE_OPTIONS || ""]
     .filter(Boolean)
     .join(" ");

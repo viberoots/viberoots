@@ -13,6 +13,9 @@ import {
 } from "./lib/scaffold-utils.ts";
 import { validateTemplates } from "./validate.ts";
 
+// Capture the user's original working directory before we normalize to repo root.
+const ORIGINAL_CWD = process.cwd();
+
 function usage() {
   console.log(`scaf <command> [...]
 
@@ -28,7 +31,7 @@ Commands:
   template <language> <template>
   validate <all|path1 path2 ...> [--quiet]
   completions <bash|zsh|fish>
-  go test <name_of_test> [--path=DEST] [--yes] [--dry-run]
+  new go test <name_of_test> [--path=DEST] [--yes] [--dry-run]
 `);
 }
 
@@ -448,7 +451,7 @@ async function cmdMove(args: string[], flags: Record<string, string>) {
 async function cmdCompletions(args: string[]) {
   const [shell] = args;
   const subcommands =
-    "templates new update regen delete move ls help validate template completions go";
+    "templates new update regen delete move ls help validate template completions";
   if (shell === "bash") {
     console.log(
       [
@@ -475,11 +478,7 @@ async function cmdCompletions(args: string[]) {
         "      local targets=\"all $(scaf ls --json 2>/dev/null | jq -r '.[].path')\";",
         '      COMPREPLY=( $(compgen -W "$targets" -- "$cur") ); return;',
         "      ;;",
-        "    go)",
-        "      if [[ ${COMP_CWORD} -eq 3 ]]; then",
-        '        COMPREPLY=( $(compgen -W "test" -- "$cur") ); return;',
-        "      fi",
-        "      ;;",
+
         "  esac",
         "}",
         "complete -F _scaf_complete scaf",
@@ -508,11 +507,7 @@ async function cmdCompletions(args: string[]) {
         "    update|regen|delete|ls|validate)",
         "      compadd -- $(scaf __complete targets); return",
         "      ;;",
-        "    go)",
-        "      if (( CURRENT == 3 )); then",
-        "        compadd -- test; return",
-        "      fi",
-        "      ;;",
+
         "  esac",
         "}",
         "compdef _scaf_complete scaf",
@@ -534,14 +529,12 @@ async function cmdCompletions(args: string[]) {
         "complete -c scaf -n '__fish_use_subcommand' -a 'validate'",
         "complete -c scaf -n '__fish_use_subcommand' -a 'template'",
         "complete -c scaf -n '__fish_use_subcommand' -a 'completions'",
-        "complete -c scaf -n '__fish_use_subcommand' -a 'go'",
         "# dynamic for 'new'",
         "complete -c scaf -n '__fish_seen_subcommand_from new; and test (count (commandline -opc)) -eq 2' -a '(scaf __complete languages)'",
         "complete -c scaf -n '__fish_seen_subcommand_from new; and test (count (commandline -opc)) -eq 3' -a '(set -l lang (commandline -opc | sed -n 2p); scaf __complete templates $lang)'",
         "# dynamic for targets",
         "complete -c scaf -n '__fish_seen_subcommand_from update regen delete ls validate' -a '(scaf __complete targets)'",
-        "# 'go' subcommands",
-        "complete -c scaf -n '__fish_seen_subcommand_from go; and test (count (commandline -opc)) -eq 2' -a 'test'",
+        "# nothing special beyond new/templates completions",
       ].join("\n"),
     );
     return;
@@ -618,21 +611,25 @@ async function cmdHelp(args: string[], flags: Record<string, string>) {
       }
     }
   }
-  // Command-level: scaf help go test
-  if (a1 === "go" && a2 === "test") {
-    const usageLine = "Usage: scaf go test <name_of_test> [--path=DEST] [--yes] [--dry-run]";
+  // Command-level: scaf help new go test
+  if (a1 === "new" && a2 === "go" && a3 === "test") {
+    const usageLine = "Usage: scaf new go test <name_of_test> [--path=DEST] [--yes] [--dry-run]";
     const notes = [
       "- Place tests under libs/<lib>/pkg/<pkg>/ for libs, apps/<app>/cmd/<app>/ for apps.",
       "- The file name will be suffixed with _test.go if missing.",
       "- Package is inferred from existing *.go, or 'main' under /cmd/, else directory name.",
+      "- Default DEST is resolved from current directory:",
+      "  • apps/<app> → apps/<app>/cmd/<app>/<name>_test.go",
+      "  • libs/<lib> → libs/<lib>/pkg/<lib>/<name>_test.go",
+      "  • inside those trees, writes into the current directory",
     ];
     const examples = [
-      "scaf go test handlers --path=libs/demo-lib/pkg/demo-lib/handlers_test.go",
-      "scaf go test main_case --path=apps/demo-cli/cmd/demo-cli/main_case_test.go",
+      "scaf new go test handlers --path=libs/demo-lib/pkg/demo-lib/handlers_test.go",
+      "scaf new go test main_case --path=apps/demo-cli/cmd/demo-cli/main_case_test.go",
     ];
     if (flags.json === "true") {
       console.log(
-        JSON.stringify({ command: "go test", usage: usageLine, notes, examples }, null, 2),
+        JSON.stringify({ command: "new go test", usage: usageLine, notes, examples }, null, 2),
       );
       return;
     }
@@ -882,22 +879,18 @@ async function main() {
   const { _, flags } = parseArgs(raw);
   const [cmd, ...rest] = _;
   switch (cmd) {
-    case "go": {
-      const sub = rest[0];
-      if (sub === "test") {
-        const name = rest[1];
+    case "templates":
+      return cmdTemplates(rest, flags);
+    case "new":
+      // `scaf new go test <name>` generates a Go *_test.go file
+      if (rest[0] === "go" && rest[1] === "test") {
+        const name = rest[2];
         if (!name) {
-          console.error("Usage: scaf go test <name_of_test> [--path=DEST] [--yes] [--dry-run]");
+          console.error("Usage: scaf new go test <name_of_test> [--path=DEST] [--yes] [--dry-run]");
           process.exit(2);
         }
         return cmdGoTest(name, flags);
       }
-      usage();
-      return process.exit(2);
-    }
-    case "templates":
-      return cmdTemplates(rest, flags);
-    case "new":
       return cmdNew(rest, flags);
     case "update":
       return cmdUpdateOrRegen("update", rest, flags);
@@ -977,7 +970,33 @@ async function cmdGoTest(name: string, flags: Record<string, string>) {
   const dry = flags["dry-run"] === "true";
   const provided = flags["path"];
   const filename = ensureSuffix(name, "_test.go");
-  const dest = provided ? provided : path.join(process.cwd(), filename);
+  function repoRoot(): string {
+    return path.resolve(path.dirname(new URL(import.meta.url).pathname), "..", "..");
+  }
+  function defaultDestFromCwd(file: string): string {
+    const root = repoRoot();
+    const rel = path.relative(root, ORIGINAL_CWD);
+    const parts = rel.split(path.sep).filter(Boolean);
+    // apps/<app>
+    if (parts[0] === "apps" && parts[1]) {
+      const app = parts[1];
+      if (parts[2] === "cmd" && parts[3] === app) {
+        return path.join(ORIGINAL_CWD, file);
+      }
+      return path.join(root, "apps", app, "cmd", app, file);
+    }
+    // libs/<lib>
+    if (parts[0] === "libs" && parts[1]) {
+      const lib = parts[1];
+      if (parts[2] === "pkg" && parts[3]) {
+        return path.join(ORIGINAL_CWD, file);
+      }
+      return path.join(root, "libs", lib, "pkg", lib, file);
+    }
+    // Fallback: write in the caller's cwd (not repo root)
+    return path.join(ORIGINAL_CWD, file);
+  }
+  const dest = provided ? provided : defaultDestFromCwd(filename);
   const dir = path.dirname(dest);
 
   const summary = `Create Go test: ${dest}`;

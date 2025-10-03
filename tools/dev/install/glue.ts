@@ -1,8 +1,14 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
 
+function repoRoot(): string {
+  const here = path.dirname(new URL(import.meta.url).pathname);
+  // File lives at tools/dev/install/glue.ts → repo root is three levels up
+  return path.resolve(here, "..", "..", "..");
+}
+
 export function zxNodeBase(): string {
-  const zxInit = path.resolve("tools/dev/zx-init.mjs");
+  const zxInit = path.resolve(repoRoot(), "tools/dev/zx-init.mjs");
   return [
     "--experimental-top-level-await",
     "--experimental-strip-types",
@@ -14,13 +20,24 @@ export function zxNodeBase(): string {
 
 async function ensurePreludeSymlinkIfMissing() {
   try {
-    const check = await $({ stdio: "pipe" })`bash --noprofile --norc -c 'test -e prelude'`;
+    const check = await $({
+      stdio: "pipe",
+      cwd: repoRoot(),
+    })`bash --noprofile --norc -c 'test -e prelude'`;
     if (check.exitCode === 0) return;
   } catch {}
   let out = "";
   try {
-    const res = await $({ stdio: "pipe" })`nix build .#buck2-prelude --no-link --accept-flake-config --print-out-paths`;
-    out = String(res.stdout || "").trim().split("\n").filter(Boolean).pop() || "";
+    const res = await $({
+      stdio: "pipe",
+      cwd: repoRoot(),
+    })`nix build .#buck2-prelude --no-link --accept-flake-config --print-out-paths`;
+    out =
+      String(res.stdout || "")
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .pop() || "";
   } catch {}
   if (!out) {
     try {
@@ -30,26 +47,34 @@ async function ensurePreludeSymlinkIfMissing() {
   }
   if (!out) return;
   try {
-    await $`ln -s ${out + "/prelude"} prelude`;
+    await $({ cwd: repoRoot() })`ln -s ${out + "/prelude"} prelude`;
   } catch {}
 }
 
 export async function runGlue(dryRun: boolean, verbose: boolean) {
   const nodeBase = zxNodeBase();
   const nodeBin = process.execPath || "node";
-  const cmds: Array<{ label: string; cmd: string }> = [
+  const zxImport = path.join(repoRoot(), "tools/dev/zx-init.mjs");
+  const cmds: Array<{ label: string; cmd: string; withZx?: boolean }> = [
     {
       label: "export-graph",
-      cmd: `${nodeBin} ${nodeBase} tools/buck/export-graph.ts --out tools/buck/graph.json`,
+      cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/export-graph.ts")} --out ${path.join(repoRoot(), "tools/buck/graph.json")}`,
+      withZx: true,
     },
-    { label: "sync-providers-go", cmd: `${nodeBin} ${nodeBase} tools/buck/sync-providers.ts` },
+    {
+      label: "sync-providers-go",
+      cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/sync-providers.ts")}`,
+      withZx: true,
+    },
     {
       label: "sync-providers-node",
-      cmd: `${nodeBin} ${nodeBase} tools/buck/sync-providers-node.ts`,
+      cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/sync-providers-node.ts")}`,
+      withZx: true,
     },
     {
       label: "gen-auto-map",
-      cmd: `${nodeBin} ${nodeBase} tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`,
+      cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/gen-auto-map.ts")} --graph ${path.join(repoRoot(), "tools/buck/graph.json")} --out ${path.join(repoRoot(), "third_party/providers/auto_map.bzl")}`,
+      withZx: true,
     },
   ];
   await ensurePreludeSymlinkIfMissing();
@@ -59,6 +84,14 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
       continue;
     }
     if (verbose) console.log(`[run] ${c.cmd}`);
-    await $({ stdio: "inherit" })`bash --noprofile --norc -c ${c.cmd}`;
+    const env = c.withZx
+      ? {
+          ...process.env,
+          NODE_OPTIONS: [`--import ${zxImport}`, process.env.NODE_OPTIONS || ""]
+            .filter(Boolean)
+            .join(" "),
+        }
+      : process.env;
+    await $({ stdio: "inherit", cwd: repoRoot(), env })`bash --noprofile --norc -c ${c.cmd}`;
   }
 }

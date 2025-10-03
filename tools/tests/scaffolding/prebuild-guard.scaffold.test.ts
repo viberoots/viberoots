@@ -39,9 +39,9 @@ EOF
     `}`;
     await $`scaf new go lib demo-lib --yes`;
     // Guard should auto-fix glue if stale and succeed
-    await $`node tools/buck/prebuild-guard.ts`;
+    await $`env PREBUILD_GUARD_SKEW_MS=5000 node tools/buck/prebuild-guard.ts`;
     // Build also succeeds and guard remains satisfied
     await $`build`;
-    await $`node tools/buck/prebuild-guard.ts`;
+    await $`env PREBUILD_GUARD_SKEW_MS=5000 node tools/buck/prebuild-guard.ts`;
   });
 });

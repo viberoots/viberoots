@@ -51,8 +51,11 @@ in
         version = "0.1.0";
         src = srcAbs;
         modules = modulesToml;
-        # Build entrypoint within module root; include "." to ensure module is realized even if no cmd/*
-        subPackages = [ "." "cmd/${targetName}" ];
+        # Build only the binary entrypoint under cmd/<targetName>. Some modules have no go files at root.
+        subPackages = [ "cmd/${targetName}" ];
+        # Do not run `go test` during Nix builds; tests are executed via Buck2.
+        doCheck = false;
+        doInstallCheck = false;
         # Allow reference to go toolchain when GOFLAGS may be in env for tests
         disallowedReferences = [];
         # Avoid vendor mode; gomod2nix provides modules (exported in configurePhase)
@@ -107,6 +110,9 @@ in
         # Build the module root
         # For libraries, build subPackages '.' plus any cmd/<name> bins if present
         subPackages = [ "." ];
+        # Do not run `go test` during Nix builds; tests are executed via Buck2.
+        doCheck = false;
+        doInstallCheck = false;
         # Avoid vendor mode; gomod2nix provides modules (exported in configurePhase)
         disallowedReferences = [];
         configurePhase = ''

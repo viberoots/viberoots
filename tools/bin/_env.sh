@@ -40,12 +40,14 @@ node_ts() {
 	local live_root="$1"; shift
 	local target_ts="$1"; shift
 	local node_bin="${NODE_BIN:-node}"
+	# Prefer explicit ZX_INIT if provided (e.g., tests), else live_root-based path
+	local zx_init_path="${ZX_INIT:-${live_root}/tools/dev/zx-init.mjs}"
 	exec_in_dev_shell "$live_root" \
 		"$node_bin" \
 		--experimental-top-level-await \
 		--disable-warning=ExperimentalWarning \
 		--experimental-strip-types \
-		--import "${live_root}/tools/dev/zx-init.mjs" \
+		--import "${zx_init_path}" \
 		"$target_ts" "$@"
 }
 
