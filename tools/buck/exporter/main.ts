@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import { cacheHits, cacheMisses, runGoList } from "./golist.ts";
 import { attrList, cqueryNodes, parseArgs, readSimulatedNodes, writeIfChangedJSON } from "./io.ts";
+import { loadPresentAdapters } from "./lang/contract.ts";
 import type { Adapter, Batch, Metrics, Node } from "./types.ts";
-import { goAdapter } from "./lang/go.ts";
 
 function sortAndDedupeLabels(nodes: Node[]): Node[] {
   return nodes
@@ -54,7 +54,7 @@ export async function run() {
     );
   }
 
-  const adapters: Adapter[] = [goAdapter];
+  const adapters: Adapter[] = await loadPresentAdapters();
   const active = adapters.filter((a) => nodes.some((n) => a.isNode(n)));
 
   // Fast path if no known-language nodes
