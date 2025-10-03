@@ -1,9 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import { buildBatches, isGoNode } from "./batch.ts";
 import { cacheHits, cacheMisses, runGoList } from "./golist.ts";
 import { attrList, cqueryNodes, parseArgs, readSimulatedNodes, writeIfChangedJSON } from "./io.ts";
-import { attachGoModuleLabels } from "./labeler.ts";
-import type { Batch, Metrics, Node } from "./types.ts";
+import type { Adapter, Batch, Metrics, Node } from "./types.ts";
+import { goAdapter } from "./lang/go.ts";
 
 function sortAndDedupeLabels(nodes: Node[]): Node[] {
   return nodes
@@ -55,8 +54,11 @@ export async function run() {
     );
   }
 
-  // Fast path if no go nodes
-  if (!nodes.some((n) => isGoNode(n))) {
+  const adapters: Adapter[] = [goAdapter];
+  const active = adapters.filter((a) => nodes.some((n) => a.isNode(n)));
+
+  // Fast path if no known-language nodes
+  if (active.length === 0) {
     const normalized = nodes.map((n) => ({ ...n, labels: Array.from(new Set(n.labels || [])) }));
     await writeIfChangedJSON(out, normalized);
     if (metricsOut)
@@ -70,7 +72,9 @@ export async function run() {
     return;
   }
 
-  const batches = await buildBatches(nodes);
+  // For now, only one language type is expected per node set; merge batches if multiple adapters are active later.
+  const adapter = active[0];
+  const batches = await adapter.buildBatches(nodes);
   const gMetrics: Metrics = {
     totalBatches: batches.length,
     cacheHits: 0,
@@ -100,7 +104,7 @@ export async function run() {
   for (const r of goListResults) cache.set(r.batch, r.pkgs);
   (global as any).__GO_LIST_CACHE = { get: (b: Batch) => cache.get(b) };
 
-  const enriched = await attachGoModuleLabels(nodes, batches, cacheDir);
+  const enriched = await adapter.attachLabels(nodes, batches, cacheDir);
   const normalized = sortAndDedupeLabels(enriched);
   gMetrics.durationMs = Date.now() - startedAt;
   gMetrics.cacheHits = cacheHits;

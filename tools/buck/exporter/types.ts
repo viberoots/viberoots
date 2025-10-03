@@ -42,3 +42,10 @@ export interface Metrics {
   durationMs: number;
   tupleKeys: string[];
 }
+
+export interface Adapter {
+  name: string;
+  isNode(n: Node): boolean;
+  buildBatches(nodes: Node[]): Promise<Batch[]>;
+  attachLabels(nodes: Node[], batches: Batch[], cacheDir: string): Promise<Node[]>;
+}
