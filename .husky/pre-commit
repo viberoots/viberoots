@@ -3,3 +3,6 @@ if command -v direnv >/dev/null 2>&1; then
 else
   pnpm exec lint-staged || exit 1
 fi
+
+# Guard: fail if anything changed after lint-staged (prevents stray diffs)
+git diff --quiet || { echo "Working tree dirty after lint-staged. Stage changes and re-commit."; exit 1; }

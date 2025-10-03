@@ -1,8 +1,7 @@
 #!/usr/bin/env zx-wrapper
-import path from "node:path";
-import { decodeFromPatchFilename, providerNameForModuleKey } from "../../lib/providers";
 import { writeIfChanged } from "../../lib/fs-helpers";
 import { scanFlatPatchDir } from "../../lib/provider-sync";
+import { decodeFromPatchFilename, providerNameForModuleKey } from "../../lib/providers";
 
 export type GoEntry = { provider: string; moduleKey: string; patchPath: string };
 

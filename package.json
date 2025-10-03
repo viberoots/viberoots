@@ -21,8 +21,8 @@
   },
   "lint-staged": {
     "**/*.{ts,tsx}": [
-      "prettier -w",
-      "eslint --fix"
+      "eslint --fix",
+      "prettier -w"
     ],
     "**/*.{js,mjs,cjs,md,json,yml,yaml}": [
       "prettier -w"
