@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import { syncGoProviders } from "./go";
 import type { LanguageProviderSync } from "../../lib/lang-contracts";
+import { syncGoProviders } from "./go";
 
 export type SyncOptions = {
   outFile?: string;

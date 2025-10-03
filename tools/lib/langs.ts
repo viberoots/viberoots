@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
 import path from "node:path";
-import type { ScaffoldingLanguage, LangId } from "./lang-contracts";
+import type { ScaffoldingLanguage } from "./lang-contracts";
 
 const KNOWN: ScaffoldingLanguage[] = [
   {

@@ -20,47 +20,55 @@ This guide explains how to add a new language to the build without touching core
 
 ## Step-by-step
 
-1) Nix template
+1. Nix template
+
 - Create `tools/nix/templates/<lang>.nix` implementing two functions analogous to Go’s `goApp`/`goLib` (names are up to you):
   - Inputs: `name`, lockfile path (or equivalent), `patchDir`, and optional `devOverrideEnv`.
   - Apply patches deterministically by scanning `patchDir` at evaluation time.
   - Honor `NIX_*_DEV_OVERRIDE_JSON` if you support dev overrides; warn locally and fail in CI.
 
-2) Register in planner
+2. Register in planner
+
 - In the planner’s registry (see `graph-generator.nix`/`LANGS`), add:
   - `isTarget(n) -> bool` to detect language targets (via `rule_type` or `labels`)
   - `kindOf(n) -> "bin"|"lib"|null`
   - `modulesFileFor(name) -> path` to locate your lockfile
   - `mkApp(name)`, `mkLib(name)` that call your Nix template via `tools/nix/lang-templates.nix`.
 
-3) Exporter labels
+3. Exporter labels
+
 - Ensure the exporter marks your targets with deterministic labels that identify invalidation inputs. Examples:
   - Per-module style: `module:<import>@<version>`
   - Lockfile style: `lockfile:<path>#<importer>`
 - Keep label strings stable; `gen-auto-map.ts` will map these to provider names.
 
-4) Provider sync (optional/when patches exist)
+4. Provider sync (optional/when patches exist)
+
 - Add a zx script `tools/buck/sync-providers-<lang>.ts` which:
   - Scans `patches/<lang>/*.patch` (flat), validates shapes, and writes `third_party/providers/TARGETS.<lang>.auto` deterministically
   - Uses helpers from `tools/lib/providers.ts` for naming (stable, hashed suffix)
   - Enforces one-patch-per-key and no subdirectories (warn in non-strict, fail in strict)
 
-5) Auto-map integration
+5. Auto-map integration
+
 - Extend `tools/buck/gen-auto-map.ts` (if needed) to translate your labels to provider names using `tools/lib/providers.ts` helpers.
 - Ensure per-target providers are sorted and deduplicated.
 
-6) Macros
+6. Macros
+
 - Add `<lang>/defs.bzl` using `lang/defs_common.bzl` helpers to:
   - Stamp labels (`lang:<id>`, `kind:<bin|lib|test>`) on primary targets
   - Auto-wire tests per your language conventions
   - Append providers from `//third_party/providers:auto_map.bzl`
 
-7) Scaffolding
+7. Scaffolding
+
 - Add templates under `tools/scaffolding/templates/<lang>`.
 - Register the language in `tools/lib/langs.ts` (id, display name, requiredPaths, kinds, templatesDir).
 - `scaf` will discover your language automatically and expose `scaf new <lang> <kind>`.
 
-8) Tests
+8. Tests
+
 - Use `tools/tests/lib/lang-fixtures.ts` to scaffold a minimal repo, generate glue, and build/test.
 - Add targeted zx tests that prove:
   - Provider sync determinism and duplicate detection

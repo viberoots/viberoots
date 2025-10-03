@@ -24,7 +24,7 @@
       "prettier -w",
       "eslint --fix"
     ],
-    "**/*.{js,mjs,cjs}": [
+    "**/*.{js,mjs,cjs,md,json,yml,yaml}": [
       "prettier -w"
     ]
   },

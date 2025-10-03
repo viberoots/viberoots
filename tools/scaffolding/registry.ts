@@ -1,6 +1,5 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import fs from "fs-extra";
 import { detectEnabledLanguages, type LangSpec } from "../lib/langs";
 
 export type EnabledRegistry = {
