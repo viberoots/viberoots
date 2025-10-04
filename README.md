@@ -48,6 +48,7 @@ Notes
 - Dev overrides: use `NIX_GO_DEV_OVERRIDE_JSON` locally; CI forbids it.
 - Planner has no discovery fallback; it consumes `tools/buck/graph.json` only.
 - Testing and coverage: see `docs/handbook/testing.md`.
+- Adding a new language: read `docs/handbook/new-language-walkthrough.md` for a fast, capability‑gated path using the lang‑kit template.
 
 ### Adding a Go test file (auto‑wired)
 
