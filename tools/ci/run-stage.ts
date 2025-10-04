@@ -63,6 +63,11 @@ async function main() {
       } catch {}
       break;
     }
+    case "langs-validate": {
+      const target = path.resolve("tools/dev/validate-langs.ts");
+      await $`node ${nodeBase} ${target}`;
+      break;
+    }
     case "export-graph": {
       const target = path.resolve("tools/buck/export-graph.ts");
       await $`node ${nodeBase} ${target} --out tools/buck/graph.json`;
