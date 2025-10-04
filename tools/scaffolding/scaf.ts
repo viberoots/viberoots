@@ -12,6 +12,7 @@ import {
   recopyUsingRecordedSource,
 } from "./lib/scaffold-utils.ts";
 import { validateTemplates } from "./validate.ts";
+import { printSkip } from "../lib/errors";
 
 // Capture the user's original working directory before we normalize to repo root.
 const ORIGINAL_CWD = process.cwd();
@@ -778,7 +779,12 @@ async function cmdHelp(args: string[], flags: Record<string, string>) {
 }
 
 async function cmdTemplates(args: string[], flags: Record<string, string>) {
-  await listTemplates(args[0], Boolean(flags.json));
+  const lang = args[0];
+  if (lang && !(await isLanguageEnabled(lang))) {
+    printSkip("missing-language", `${lang}`);
+    return;
+  }
+  await listTemplates(lang, Boolean(flags.json));
 }
 
 async function cmdTemplate(args: string[]) {
@@ -827,6 +833,10 @@ async function cmdNew(args: string[], flags: Record<string, string>) {
   if (!language || !templateRaw || !name) {
     usage();
     process.exit(2);
+  }
+  if (language !== "lang-kit" && !(await isLanguageEnabled(language))) {
+    printSkip("missing-language", `${language}`);
+    return; // exit 0 for disabled language in sparse checkout
   }
   const template = normalizeTemplateName(templateRaw);
   const root = path.join("tools", "scaffolding", "templates", language, template);
