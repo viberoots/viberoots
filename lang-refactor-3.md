@@ -50,7 +50,6 @@ Changes
 
 - Add `tools/dev/validate-langs.ts` using JSON Schema (bundled) to validate:
   - required fields: `id`, `displayName`, `requiredPaths`, `kinds`, `templatesDir`
-  - optional `capabilities` object (see PR 22)
   - that all `requiredPaths` are strings and not empty
 - Wire a CI stage `langs-validate` (optional locally) in `tools/ci/run-stage.ts`.
 
@@ -69,78 +68,6 @@ If not implemented
 
 ---
 
-## PR 22: Stronger capability taxonomy and typed accessors
-
-Intent/Impact
-
-- Make CI and glue fully data‑driven; remove language‑specific branches.
-
-Changes
-
-- Extend capability keys in `tools/nix/langs.json`:
-  - `exporterLabels` (boolean) — exporter can emit authoritative labels for this language
-  - `providerSyncMode` ("patchdir" | "lockfile" | "lockfile+override" | "buildsystem-resolved" | "none")
-    - patchdir: providers derived from flat `patches/<lang>/*.patch`
-    - lockfile: providers derived from dependency lockfiles (e.g., `pnpm-lock.yaml`, `Cargo.lock`, `poetry.lock`)
-    - lockfile+override: lockfile plus language‑native override mechanism (e.g., Cargo `[patch]`)
-    - buildsystem-resolved: providers inferred from declared deps in build rules/macros (e.g., C++ `cxx_*` deps)
-  - `plannerPlugin` (boolean) — planner has a `tools/nix/planner/<lang>.nix` plugin
-  - `macroStamping` (boolean) — macros stamp `lang:<id>` and `kind:*` labels
-  - `lockfileKinds` (string[]) — known lockfile families for this language (e.g., ["cargo", "poetry", "pdm", "pip-tools", "gradle", "maven", "nuget", "mix", "rebar", "conan", "vcpkg"])
-  - `labelStrategy` ("rule-type" | "macro-stamp" | "lockfile" | "hybrid") — primary signal exporter uses to detect/classify nodes
-  - `buildSystem` ("buck" | "bazel" | "gradle" | "maven" | "make" | "other") — optional hint for diagnostics/lints
-- Update `tools/dev/codegen.ts` to emit typed accessors in `tools/lib/langs.ts`:
-  - `getCapabilities(langId): { ... }`
-  - `isEnabled(langId): boolean` (considers `enabled` and presence of `requiredPaths`)
-- Refactor `tools/ci/run-stage.ts` and glue to use accessors.
-
-Acceptance criteria
-
-- CI stages for sync and auto‑map are gated purely by capabilities; adding a language with `providerSyncMode: "patchdir"` triggers Go‑style sync without code changes; `buildsystem-resolved` skips lockfile scanning automatically.
-- Unit tests cover accessor behavior and stage gating.
-
-Risks
-
-- Capability semantics must remain stable to keep pipeline rules predictable.
-
-If not implemented
-
-- CI and glue continue to require per‑language conditionals, increasing maintenance.
-
----
-
-## PR 23: Unified provider‑sync plugin contract
-
-Intent/Impact
-
-- Reduce per‑language code by providing a generic sync engine for common modes.
-
-Changes
-
-- Add `tools/buck/providers/contract.ts` exposing:
-  - `syncProviders({ mode, decodeKey?, nameForKey?, listLockfiles?, lockfileKinds? }): Promise<void>`
-  - Built‑in modes:
-    - `patchdir`: scan flat patch dir using `tools/lib/provider-sync.ts`
-    - `lockfile`: read lockfiles (`lockfileKinds`) and map to patches/providers
-    - `lockfile+override`: lockfile plus language‑native override layer (e.g., Cargo `[patch]`)
-    - `buildsystem-resolved`: use declared deps from build rules/macros to synthesize providers
-- Refactor Go/Node providers to thin wrappers passing mode and hooks.
-
-Acceptance criteria
-
-- Behavior identical to current Go/Node sync; deterministic output; duplicate and collision checks preserved.
-- Adding a new language with `mode: patchdir` requires only file placement and a tiny shim; `lockfile` modes accept `lockfileKinds` and built‑in parsers; `buildsystem-resolved` consumes Buck rule deps where applicable.
-
-Risks
-
-- Over‑generalization could obscure edge cases; keep hooks explicit.
-
-If not implemented
-
-- New languages must re‑implement scanning/wiring logic, increasing defects.
-
----
-
 ## PR 24: Exporter adapter ergonomics (detect/label helpers)
 
 Intent/Impact
@@ -155,14 +82,11 @@ Changes
 - Provide utilities in `tools/buck/exporter/lang/helpers.ts`:
   - `hasLabel(node, "lang:<id>")`, `isRuleType(node, /^go_/)`
   - `sortedUniqueLabels(nodes)` and batch roots helpers
-  - `detectByBuildSystem(node, { rulePrefixes: string[], labels?: string[] })`
-  - `lockfileLabeler({ kinds, resolvers })` to attach labels using known lockfile families
 
 Acceptance criteria
 
 - Go adapter remains unchanged functionally and gains readability from helpers.
 - Example new adapter (toy) shows detect/label scaffolding with <50 LoC.
-  - Cookbook snippet demonstrates: C++ (`buildsystem-resolved`), Python (`lockfile`), Rust (`lockfile+override`), Kotlin (`lockfile`), C# (`lockfile`), Erlang (`lockfile`).
 
 Risks
 
@@ -392,41 +316,11 @@ If not implemented
 
 ---
 
-### Appendix: Capability taxonomy mapping per language (reference)
+### Appendix: Notes per language (reference)
 
-- C++
-  - `providerSyncMode`: "buildsystem-resolved"
-  - `labelStrategy`: "rule-type" (e.g., `cxx_*`) with macro stamping fallback
-  - `lockfileKinds`: ["conan", "vcpkg"] (optional if used)
-  - `exporterLabels`: true | false (repo‑dependent)
-  - Notes: providers come from declared deps; patchdir possible for vendored flows but uncommon
-
-- Python
-  - `providerSyncMode`: "lockfile"
-  - `lockfileKinds`: ["poetry", "pdm", "pip-tools"]
-  - `labelStrategy`: "lockfile" | "macro-stamp"
-  - `exporterLabels`: true (if adapter adds) | false
-
-- Kotlin/Java
-  - `providerSyncMode`: "lockfile"
-  - `lockfileKinds`: ["gradle", "maven"]
-  - `labelStrategy`: "lockfile" | "macro-stamp" | "rule-type"
-  - `exporterLabels`: true | false
-
-- Rust
-  - `providerSyncMode`: "lockfile+override"
-  - `lockfileKinds`: ["cargo"]
-  - `labelStrategy`: "lockfile" | "macro-stamp"
-  - `exporterLabels`: true
-
-- C# (.NET)
-  - `providerSyncMode`: "lockfile"
-  - `lockfileKinds`: ["nuget"]
-  - `labelStrategy`: "lockfile" | "macro-stamp"
-  - `exporterLabels`: true | false
-
-- Erlang/Elixir
-  - `providerSyncMode`: "lockfile"
-  - `lockfileKinds`: ["rebar", "mix"]
-  - `labelStrategy`: "lockfile" | "macro-stamp"
-  - `exporterLabels`: true | false
+- C++: Primarily buildrule/macros driven; patchdir is possible for vendored flows but uncommon.
+- Python: Lockfile‑driven ecosystems (poetry/pdm/pip‑tools) are common; exporter helpers remain useful.
+- Kotlin/Java: Lockfile or build tool metadata (Gradle/Maven) guide labeling; macro stamping recommended.
+- Rust: Cargo lockfile with optional `[patch]` overrides; macro stamping recommended.
+- C# (.NET): NuGet lockfile ecosystems; macro stamping recommended.
+- Erlang/Elixir: rebar/mix lockfiles; macro stamping recommended.
