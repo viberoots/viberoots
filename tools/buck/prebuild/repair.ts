@@ -92,5 +92,12 @@ export async function autoFixGlue() {
   const nodeBase = ["--experimental-strip-types", "--import", "./tools/dev/zx-init.mjs"];
   await $`node ${nodeBase} tools/buck/export-graph.ts --out tools/buck/graph.json`;
   await $`node ${nodeBase} tools/buck/sync-providers.ts`;
+  // Capability-gated: run Node provider sync only if a pnpm-lock.yaml exists
+  try {
+    const { stdout } = await $`git ls-files '**/pnpm-lock.yaml'`;
+    if (String(stdout || "").trim().length > 0) {
+      await $`node ${nodeBase} tools/buck/sync-providers-node.ts`;
+    }
+  } catch {}
   await $`node ${nodeBase} tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
 }

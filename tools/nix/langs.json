@@ -1,17 +1,26 @@
-{
-  "enabled": [],
-  "languages": [
-    {
-      "id": "go",
-      "displayName": "Go",
-      "requiredPaths": [
-        "tools/nix/templates/go.nix",
-        "go/defs.bzl",
-        "tools/scaffolding/templates/go"
-      ],
-      "optionalPaths": [],
-      "kinds": ["cli", "lib", "test"],
-      "templatesDir": "tools/scaffolding/templates/go"
-    }
-  ]
-}
+[
+  {
+    "id": "go",
+    "displayName": "Go",
+    "requiredPaths": ["tools/nix/templates/go.nix", "go/defs.bzl"],
+    "optionalPaths": [],
+    "capabilities": {
+      "patching": true,
+      "lockfileLabels": false,
+      "testAutoWire": true
+    },
+    "templatesDir": "tools/scaffolding/templates/go"
+  },
+  {
+    "id": "node",
+    "displayName": "Node",
+    "requiredPaths": ["**/pnpm-lock.yaml"],
+    "optionalPaths": ["patches/node"],
+    "capabilities": {
+      "patching": true,
+      "lockfileLabels": true,
+      "testAutoWire": false
+    },
+    "templatesDir": "tools/scaffolding/templates/node"
+  }
+]
