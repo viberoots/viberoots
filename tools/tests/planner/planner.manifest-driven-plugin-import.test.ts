@@ -1,0 +1,62 @@
+#!/usr/bin/env zx-wrapper
+import fs from "fs-extra";
+import path from "node:path";
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { runInTemp } from "../lib/test-helpers";
+
+test("planner imports plugins listed in langs.json when present", async () => {
+  await runInTemp("planner-manifest-plugin", async (tmp, $) => {
+    // Write minimal langs.json with a toy language plus go for compatibility
+    const langs = {
+      enabled: ["go", "toy"],
+      languages: [
+        {
+          id: "go",
+          displayName: "Go",
+          requiredPaths: ["tools/nix/templates/go.nix", "go/defs.bzl"],
+          kinds: ["cli", "lib", "test"],
+          templatesDir: "tools/scaffolding/templates/go",
+        },
+        {
+          id: "toy",
+          displayName: "Toy",
+          requiredPaths: ["tools/nix/planner/toy.nix"],
+          kinds: ["lib"],
+          templatesDir: "tools/scaffolding/templates/toy",
+        },
+      ],
+    } as any;
+    await fs.outputFile(
+      path.join(tmp, "tools/nix/langs.json"),
+      JSON.stringify(langs, null, 2) + "\n",
+    );
+
+    // Provide a minimal planner plugin for toy that won't be exercised
+    const toyPlugin = [
+      "{ lib }:",
+      "ctx:",
+      "let",
+      "  T = ctx.T;",
+      "  get = ctx.get;",
+      "in {",
+      "  isTarget = n: false;",
+      "  kindOf = n: null;",
+      "  modulesFileFor = name: ctx.modulesTomlFor name;",
+      "  mkApp = name: T.goApp { inherit name; modulesToml = ctx.modulesTomlFor name; repoRoot = ctx.repoRoot; subdir = (ctx.pkgPathOf name); };",
+      "  mkLib = name: T.goLib { inherit name; modulesToml = ctx.modulesTomlFor name; repoRoot = ctx.repoRoot; subdir = (ctx.pkgPathOf name); };",
+      "}",
+      "",
+    ].join("\n");
+    await fs.outputFile(path.join(tmp, "tools/nix/planner/toy.nix"), toyPlugin);
+
+    // Minimal graph.json (empty) so planner evaluates without needing Buck
+    await fs.outputFile(path.join(tmp, "tools/buck/graph.json"), "[]\n");
+
+    // Nix build should succeed and produce graph-generator output
+    const outLink = `buck-go-${Date.now()}`;
+    await $({ cwd: tmp })`nix build .#graph-generator --out-link ${outLink}`;
+    const manifestPath = path.join(tmp, outLink, "manifest.json");
+    assert.ok(await fs.pathExists(manifestPath), "manifest.json should exist");
+  });
+});

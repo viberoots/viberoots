@@ -89,18 +89,32 @@ let
     get = get;
     modulesTomlFor = modulesTomlFor;
   };
-  LANGS =
-    let goPluginPath = ./planner/go.nix;
-    in {
-      go = if builtins.pathExists goPluginPath then (import goPluginPath { inherit lib; } ctx) else {
-        # Fallback minimal no-op adapter if plugin missing
+  # Build language adapters map by enumerating known ids from langs.json when present,
+  # otherwise fall back to on-disk existence. Keep partial-clone safe behavior.
+  readLangIds = let
+    langsPath = ./langs.json;
+  in if builtins.pathExists langsPath then
+    let raw = builtins.fromJSON (builtins.readFile langsPath);
+        arr = if (builtins.isList raw) then raw else (raw.languages or []);
+    in builtins.map (l: (l.id or "")) (builtins.filter (l: (builtins.isAttrs l) && (l ? id)) arr)
+  else [];
+
+  ensureAdapter = langId:
+    let p = ./. + ("/planner/" + langId + ".nix"); in
+      if builtins.pathExists p then (import p { inherit lib; } ctx) else {
         isTarget = n: false;
         kindOf = n: null;
         modulesFileFor = name: modulesTomlFor name;
         mkApp = name: T.goApp { inherit name; modulesToml = modulesTomlFor name; repoRoot = repoRoot; subdir = (pkgPathOf name); };
         mkLib = name: T.goLib { inherit name; modulesToml = modulesTomlFor name; repoRoot = repoRoot; subdir = (pkgPathOf name); };
       };
-    };
+
+  # Always include go for backward compatibility; merge any ids from manifest
+  langIds = let ids = readLangIds; in
+    if builtins.elem "go" ids then ids else ids ++ [ "go" ];
+
+  LANGS =
+    builtins.listToAttrs (map (id: { name = id; value = ensureAdapter id; }) langIds);
 
   pick = n:
     let
