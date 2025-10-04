@@ -1,0 +1,19 @@
+{ lib }:
+# tools/nix/planner/{{ lang_id }}.nix — planner plug-in (import-if-exists friendly)
+ctx:
+{
+  isTarget = n:
+    let rt = ctx.get n "rule_type"; lbs = ctx.get n "labels"; in
+      (rt != null) && lib.hasPrefix "{{ lang_id }}_" rt
+      || (lbs != null) && builtins.elem "lang:{{ lang_id }}" lbs;
+
+  kindOf = n:
+    let rt = ctx.get n "rule_type"; in
+      if (rt != null) && lib.hasSuffix "_binary" rt then "bin"
+      else if (rt != null) && lib.hasSuffix "_library" rt then "lib" else null;
+
+  modulesFileFor = _: null; # adjust for non-Go languages if needed
+
+  mkApp = name: (ctx.T.{{ lang_id }}App { inherit name; srcRoot = ctx.repoRoot; });
+  mkLib = name: (ctx.T.{{ lang_id }}Lib { inherit name; srcRoot = ctx.repoRoot; });
+}

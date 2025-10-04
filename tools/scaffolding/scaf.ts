@@ -58,9 +58,28 @@ async function exists(p: string): Promise<boolean> {
   }
 }
 
+async function isLanguageEnabled(language: string): Promise<boolean> {
+  // Heuristic gating to support partial clones: language is enabled only if its
+  // required planner/template surface exists in this checkout.
+  if (language === "go") {
+    const goTpl = path.join("tools", "nix", "templates", "go.nix");
+    const goDefs = path.join("go", "defs.bzl");
+    return (await exists(goTpl)) && (await exists(goDefs));
+  }
+  // Generic rule: require tools/nix/templates/<lang>.nix for other languages
+  const tplPath = path.join("tools", "nix", "templates", `${language}.nix`);
+  return await exists(tplPath);
+}
+
 async function readTemplateMeta(language?: string) {
   const root = path.join("tools", "scaffolding", "templates");
-  const langs = language ? [language] : (await exists(root)) ? await fsp.readdir(root) : [];
+  let langs = language ? [language] : (await exists(root)) ? await fsp.readdir(root) : [];
+  // Filter languages by enablement to support sparse checkouts
+  const filtered: string[] = [];
+  for (const l of langs) {
+    if (await isLanguageEnabled(l)) filtered.push(l);
+  }
+  langs = filtered;
   const out: any[] = [];
   for (const l of langs) {
     const langDir = path.join(root, l);
@@ -816,7 +835,8 @@ async function cmdNew(args: string[], flags: Record<string, string>) {
     process.exit(1);
   }
   const destInfo = resolveDestination(language, template, name, flags.path);
-  const dest = destInfo.path;
+  // Special-case: lang-kit scaffolds into the repo root by default
+  const dest = language === "lang-kit" && template === "kit" ? "." : destInfo.path;
   // Always copy into the resolved destination
   let effectiveDest = dest;
   const data: Record<string, any> = { name, language, template };
@@ -825,10 +845,18 @@ async function cmdNew(args: string[], flags: Record<string, string>) {
       data[k] = v;
     }
   }
+  // Special-case: lang-kit/kit uses <name> as the language id unless overridden
+  if (language === "lang-kit" && template === "kit") {
+    if (!data["lang_id"]) data["lang_id"] = name;
+    if (!data["display_name"]) {
+      const cap = name.charAt(0).toUpperCase() + name.slice(1);
+      data["display_name"] = cap;
+    }
+  }
   // Overwrite guard + dry-run support
   const yes = flags["yes"] === "true";
   const dry = flags["dry-run"] === "true";
-  if (destInfo.needsConfirm) {
+  if (destInfo.needsConfirm && !(language === "lang-kit" && template === "kit")) {
     await confirmOrExit(`No resolver mapping found. Create at ${dest}?`, yes, dry);
   }
   const destExists = await exists(dest);

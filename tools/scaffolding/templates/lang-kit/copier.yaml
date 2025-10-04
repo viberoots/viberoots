@@ -1,0 +1,11 @@
+_subdirectory: "."
+_templates_suffix: ".jinja"
+_answers_file: ".copier-answers.yml"
+
+lang_id:
+  type: str
+  help: New language id (e.g., rust)
+
+display_name:
+  type: str
+  help: Display name (e.g., Rust)

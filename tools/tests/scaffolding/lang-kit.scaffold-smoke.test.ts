@@ -1,0 +1,24 @@
+#!/usr/bin/env zx-wrapper
+import path from "node:path";
+import { test } from "node:test";
+import { exists, runInTemp } from "../lib/test-helpers";
+
+test("lang-kit: scaffold skeleton files", async () => {
+  await runInTemp("lang-kit-smoke", async (tmp, $) => {
+    const name = "rust";
+    await $`scaf new lang-kit kit ${name} --yes --display_name=Rust`;
+    const expectPaths = [
+      path.join(tmp, `tools/nix/templates/${name}.nix`),
+      path.join(tmp, `tools/nix/planner/${name}.nix`),
+      path.join(tmp, `${name}/defs.bzl`),
+      path.join(tmp, `tools/buck/providers/${name}.ts`),
+      path.join(tmp, `patches/${name}/.gitkeep`),
+    ];
+    for (const p of expectPaths) {
+      if (!(await exists(p))) {
+        console.error("missing:", p);
+        process.exit(2);
+      }
+    }
+  });
+});

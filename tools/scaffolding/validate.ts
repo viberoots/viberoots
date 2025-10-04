@@ -121,7 +121,7 @@ export async function validateTemplates(targets: string[], quiet: boolean = fals
       process.exit(2);
     }
 
-    // Phase 1: enforce copier.yaml contains required variables with sane defaults
+    // Require copier.yaml to exist for all templates
     const copierPath = path.join(tdir, "copier.yaml");
     if (!(await exists(copierPath))) {
       if (!quiet) {
@@ -130,38 +130,42 @@ export async function validateTemplates(targets: string[], quiet: boolean = fals
       process.exit(2);
     }
     const copierTxt = await fsp.readFile(copierPath, "utf8");
-    const needVars: Array<{ key: string; pattern: RegExp }> = [
-      { key: "name", pattern: /^name:\s*("[^"]*"|''|)\s*$/m },
-      { key: "language", pattern: /^language:\s*["']?go["']?\s*$/m },
-      { key: "template", pattern: new RegExp(`^template:\\s*["']?${template}["']?\\s*$`, "m") },
-      { key: "module", pattern: /^(module:)\s*.*\{\{\s*name\s*\}\}.*$/m },
-      { key: "description", pattern: /^description:\s*.+$/m },
-      { key: "go_min", pattern: /^go_min:\s*["']?1\.22["']?\s*$/m },
-      { key: "license", pattern: /^license:\s*["']?[A-Za-z0-9_.+\-]+["']?\s*$/m },
-      { key: "enable_ci", pattern: /^enable_ci:\s*(true|false)\s*$/m },
-    ];
-    for (const nv of needVars) {
-      if (!nv.pattern.test(copierTxt)) {
-        if (!quiet) {
-          console.error(`copier.yaml missing or invalid ${nv.key}: ${language}/${template}`);
-        }
-        process.exit(2);
-      }
-    }
 
-    // Phase 3: ensure TARGETS uses nix_go_* macros, not raw go_* rules
-    const targetsPath = path.join(tdir, "TARGETS");
-    if (await exists(targetsPath)) {
-      const txt = await fsp.readFile(targetsPath, "utf8");
-      const usesNix = /\bnix_go_(library|binary|test)\s*\(/.test(txt);
-      const usesRaw = /\bgo_(library|binary|test)\s*\(/.test(txt);
-      if (!usesNix || usesRaw) {
-        if (!quiet) {
-          console.error(
-            `TARGETS must use nix_go_* macros and not raw go_*: ${language}/${template}`,
-          );
+    // Go-specific validations (do not apply to other languages)
+    if (language === "go") {
+      const needVars: Array<{ key: string; pattern: RegExp }> = [
+        { key: "name", pattern: /^name:\s*("[^"]*"|''|)\s*$/m },
+        { key: "language", pattern: /^language:\s*["']?go["']?\s*$/m },
+        { key: "template", pattern: new RegExp(`^template:\\s*["']?${template}["']?\\s*$`, "m") },
+        { key: "module", pattern: /^(module:)\s*.*\{\{\s*name\s*\}\}.*$/m },
+        { key: "description", pattern: /^description:\s*.+$/m },
+        { key: "go_min", pattern: /^go_min:\s*["']?1\.22["']?\s*$/m },
+        { key: "license", pattern: /^license:\s*["']?[A-Za-z0-9_.+\-]+["']?\s*$/m },
+        { key: "enable_ci", pattern: /^enable_ci:\s*(true|false)\s*$/m },
+      ];
+      for (const nv of needVars) {
+        if (!nv.pattern.test(copierTxt)) {
+          if (!quiet) {
+            console.error(`copier.yaml missing or invalid ${nv.key}: ${language}/${template}`);
+          }
+          process.exit(2);
         }
-        process.exit(2);
+      }
+
+      // Ensure TARGETS uses nix_go_* macros, not raw go_* rules
+      const targetsPath = path.join(tdir, "TARGETS");
+      if (await exists(targetsPath)) {
+        const txt = await fsp.readFile(targetsPath, "utf8");
+        const usesNix = /\bnix_go_(library|binary|test)\s*\(/.test(txt);
+        const usesRaw = /\bgo_(library|binary|test)\s*\(/.test(txt);
+        if (!usesNix || usesRaw) {
+          if (!quiet) {
+            console.error(
+              `TARGETS must use nix_go_* macros and not raw go_*: ${language}/${template}`,
+            );
+          }
+          process.exit(2);
+        }
       }
     }
   }
