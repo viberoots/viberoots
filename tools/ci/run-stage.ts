@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 // tools/ci/run-stage.ts — small runner to invoke named CI stages locally or in CI
+import fs from "fs-extra";
 import assert from "node:assert";
 import path from "node:path";
 
@@ -27,6 +28,32 @@ const nodeBase = [
 ];
 
 async function main() {
+  // Load capability/enablement manifest (best-effort; skip if missing)
+  type LangCfg = { id: string; capabilities?: Record<string, boolean> };
+  type Manifest = { enabled?: string[]; languages?: LangCfg[] } | LangCfg[];
+  function normalize(raw: any): {
+    enabled: Set<string>;
+    caps: Map<string, Record<string, boolean>>;
+  } {
+    const enabled = new Set<string>();
+    const caps = new Map<string, Record<string, boolean>>();
+    if (Array.isArray(raw)) {
+      for (const l of raw as any[]) caps.set(String(l.id), (l.capabilities || {}) as any);
+    } else if (raw && Array.isArray(raw.languages)) {
+      for (const l of raw.languages as any[]) caps.set(String(l.id), (l.capabilities || {}) as any);
+      for (const e of raw.enabled || []) enabled.add(String(e));
+    }
+    return { enabled, caps };
+  }
+  let enabled = new Set<string>();
+  let caps = new Map<string, Record<string, boolean>>();
+  try {
+    const txt = await fs.readFile(path.resolve("tools/nix/langs.json"), "utf8");
+    const norm = normalize(JSON.parse(txt) as Manifest);
+    enabled = norm.enabled;
+    caps = norm.caps;
+  } catch {}
+
   switch (stage as Stage) {
     case "codegen": {
       const target = path.resolve("tools/codegen.ts");
@@ -42,11 +69,13 @@ async function main() {
       break;
     }
     case "sync-providers-go": {
+      if (enabled.size && !enabled.has("go")) break;
       const target = path.resolve("tools/buck/sync-providers.ts");
       await $`node ${nodeBase} ${target}`;
       break;
     }
     case "sync-providers-node": {
+      if (enabled.size && !enabled.has("node")) break;
       try {
         await $`git ls-files '**/pnpm-lock.yaml' >/dev/null 2>&1`;
       } catch {
@@ -66,6 +95,7 @@ async function main() {
       break;
     }
     case "gen-auto-map": {
+      // Always generate; internal mapping dedup is language-agnostic
       const target = path.resolve("tools/buck/gen-auto-map.ts");
       await $`node ${nodeBase} ${target} --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
       break;

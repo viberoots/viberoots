@@ -7,10 +7,28 @@ const KNOWN: ScaffoldingLanguage[] = [
   {
     id: "go",
     displayName: "Go",
-    requiredPaths: ["tools/nix/templates/go.nix", "go/defs.bzl", "tools/scaffolding/templates/go"],
+    requiredPaths: ["tools/nix/templates/go.nix", "go/defs.bzl"],
     optionalPaths: [],
     kinds: ["cli", "lib", "test"],
+    capabilities: {
+      patching: true,
+      lockfileLabels: false,
+      testAutoWire: true,
+    },
     templatesDir: "tools/scaffolding/templates/go",
+  },
+  {
+    id: "node",
+    displayName: "Node",
+    requiredPaths: ["**/pnpm-lock.yaml"],
+    optionalPaths: ["patches/node"],
+    kinds: ["app", "lib", "workspace"],
+    capabilities: {
+      patching: true,
+      lockfileLabels: true,
+      testAutoWire: false,
+    },
+    templatesDir: "tools/scaffolding/templates/node",
   },
 ] as any;
 

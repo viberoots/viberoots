@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
+import { printSkip } from "../../lib/errors";
 import { autoFixGlue } from "./repair.ts";
 import { collectDiagnostics, logList, mtimeSafe } from "./report.ts";
 import { hasPatchesOrLocks, listInputs, listOutputs, missingProviderAutos } from "./scan.ts";
@@ -123,6 +124,9 @@ export async function run(): Promise<void> {
 
   if (process.env.PREBUILD_GUARD_NO_FIX === "1") {
     // In no-fix mode, exit 0 locally after printing diagnostics
+    if (outPresence.length) {
+      printSkip("stale-glue", outPresence.join(", "));
+    }
     return;
   }
   try {
