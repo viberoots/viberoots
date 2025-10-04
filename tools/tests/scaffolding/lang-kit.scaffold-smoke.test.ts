@@ -6,7 +6,7 @@ import { exists, runInTemp } from "../lib/test-helpers";
 test("lang-kit: scaffold skeleton files", async () => {
   await runInTemp("lang-kit-smoke", async (tmp, $) => {
     const name = "rust";
-    await $`scaf new lang-kit kit ${name} --yes --display_name=Rust`;
+    await $`scaf language new ${name} --yes --display_name=Rust`;
     const expectPaths = [
       path.join(tmp, `tools/nix/templates/${name}.nix`),
       path.join(tmp, `tools/nix/planner/${name}.nix`),

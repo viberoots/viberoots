@@ -133,7 +133,7 @@ Intent/Impact
 Changes
 
 - Add `tools/dev/planner-gen.ts` that converts a tiny TS config (predicates + kindOf) into a Nix file, using a stable template.
-- Integrate with `lang-kit` so `scaf new lang-kit kit <id>` can optionally emit a generated planner file from TS config.
+- Integrate with `scaf language new <id>` so it can optionally emit a generated planner file from TS config (same behavior, cleaner UX).
 
 Acceptance criteria
 
@@ -149,7 +149,7 @@ If not implemented
 
 ---
 
-## PR 27: Lang‑kit emits contract tests by default
+## PR 27: Language scaffolding emits contract tests by default
 
 Intent/Impact
 
@@ -157,7 +157,7 @@ Intent/Impact
 
 Changes
 
-- Extend `tools/scaffolding/templates/lang-kit/kit` to generate:
+- Extend `tools/scaffolding/templates/language/kit` to generate:
   - `tools/tests/<lang>/contract/*` with minimal fixtures and TARGETS
   - CI wiring based on capabilities
 
@@ -234,7 +234,7 @@ Intent/Impact
 
 Changes
 
-- Extend `scaf new lang-kit kit <id>` to optionally:
+- Extend `scaf language new <id>` to optionally:
   - append entry to `tools/nix/langs.json`
   - run `node tools/dev/codegen.ts`
   - create planner/provider/exporter stubs
@@ -295,7 +295,7 @@ Changes
 
 Acceptance criteria
 
-- A teammate can add labels/providers/planner/macro for a toy language in <60 minutes using the cookbooks + lang‑kit.
+- A teammate can add labels/providers/planner/macro for a toy language in <60 minutes using the cookbooks + language scaffolding.
 
 Risks
 

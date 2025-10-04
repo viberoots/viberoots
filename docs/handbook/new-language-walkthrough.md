@@ -6,8 +6,8 @@ Prereqs: Buck2, Nix, PNPM, Node, Go (per build-system-design), zx wrapper availa
 
 Steps
 
-- **Scaffold the kit**
-  - Run: `scaf new lang-kit kit rust --yes --display_name=Rust`
+- **Create a new language**
+  - Run: `scaf new language kit rust --yes --display_name=Rust`
   - Generated files:
     - `tools/nix/templates/rust.nix`
     - `tools/nix/planner/rust.nix`

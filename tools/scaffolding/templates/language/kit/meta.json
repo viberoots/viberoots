@@ -1,10 +1,10 @@
 {
-  "language": "lang-kit",
+  "language": "language",
   "template": "kit",
   "description": "Scaffold a new language integration skeleton (planner + providers + macros)",
   "help": {
-    "usage": "scaf new lang-kit kit <lang_id> [--display_name=Name]",
+    "usage": "scaf new language kit <lang_id> [--display_name=Name]",
     "notes": ["Generates the skeleton files using import-if-exists patterns for sparse checkouts."],
-    "examples": ["scaf new lang-kit kit rust --display_name=Rust"]
+    "examples": ["scaf new language kit rust --display_name=Rust"]
   }
 }

@@ -6,13 +6,13 @@ import path from "node:path";
 import { stdin as input, stdout as output } from "node:process";
 import readline from "node:readline/promises";
 import "zx/globals";
+import { printSkip } from "../lib/errors";
 import {
   copierRecopyOrUpdate,
   copierUpdate,
   recopyUsingRecordedSource,
 } from "./lib/scaffold-utils.ts";
 import { validateTemplates } from "./validate.ts";
-import { printSkip } from "../lib/errors";
 
 // Capture the user's original working directory before we normalize to repo root.
 const ORIGINAL_CWD = process.cwd();
@@ -23,6 +23,7 @@ function usage() {
 Commands:
   templates [<language>] [--json]
   new <language> <template> <name> [--path=DEST] [--key=value ...]
+  language <new|plan|doctor|remove> [...]
   update <all|path1 path2 ...>
   regen  <all|path1 path2 ...>
   delete <all|path1 path2 ...> [--yes] [--dry-run]
@@ -834,7 +835,7 @@ async function cmdNew(args: string[], flags: Record<string, string>) {
     usage();
     process.exit(2);
   }
-  if (language !== "lang-kit" && !(await isLanguageEnabled(language))) {
+  if (language !== "language" && !(await isLanguageEnabled(language))) {
     printSkip("missing-language", `${language}`);
     return; // exit 0 for disabled language in sparse checkout
   }
@@ -845,8 +846,8 @@ async function cmdNew(args: string[], flags: Record<string, string>) {
     process.exit(1);
   }
   const destInfo = resolveDestination(language, template, name, flags.path);
-  // Special-case: lang-kit scaffolds into the repo root by default
-  const dest = language === "lang-kit" && template === "kit" ? "." : destInfo.path;
+  // Special-case: language/kit scaffolds into the repo root by default
+  const dest = language === "language" && template === "kit" ? "." : destInfo.path;
   // Always copy into the resolved destination
   let effectiveDest = dest;
   const data: Record<string, any> = { name, language, template };
@@ -855,8 +856,8 @@ async function cmdNew(args: string[], flags: Record<string, string>) {
       data[k] = v;
     }
   }
-  // Special-case: lang-kit/kit uses <name> as the language id unless overridden
-  if (language === "lang-kit" && template === "kit") {
+  // Special-case: language/kit uses <name> as the language id unless overridden
+  if (language === "language" && template === "kit") {
     if (!data["lang_id"]) data["lang_id"] = name;
     if (!data["display_name"]) {
       const cap = name.charAt(0).toUpperCase() + name.slice(1);
@@ -866,7 +867,7 @@ async function cmdNew(args: string[], flags: Record<string, string>) {
   // Overwrite guard + dry-run support
   const yes = flags["yes"] === "true";
   const dry = flags["dry-run"] === "true";
-  if (destInfo.needsConfirm && !(language === "lang-kit" && template === "kit")) {
+  if (destInfo.needsConfirm && !(language === "language" && template === "kit")) {
     await confirmOrExit(`No resolver mapping found. Create at ${dest}?`, yes, dry);
   }
   const destExists = await exists(dest);
@@ -906,6 +907,94 @@ async function cmdNew(args: string[], flags: Record<string, string>) {
     }
   }
   console.log("created:", dest);
+}
+
+// -----------------------
+// language subcommands UX
+// -----------------------
+
+async function cmdLanguage(args: string[], flags: Record<string, string>) {
+  const [sub, id] = args;
+  if (!sub || (sub !== "doctor" && !id)) {
+    console.error(
+      "Usage: scaf language <new|plan|doctor|remove> <id> [flags]\n" +
+        "Examples:\n" +
+        "  scaf language new rust --display-name=Rust --kinds=bin,lib --manifest=write\n" +
+        "  scaf language plan python --with-exporter --manifest=print\n" +
+        "  scaf language doctor\n" +
+        "  scaf language remove kotlin --yes",
+    );
+    process.exit(2);
+  }
+  if (sub === "doctor") {
+    // Stub for PR 28; print minimal structure for now
+    const json = flags["json"] === "true";
+    const payload = {
+      languages: [],
+      note: "diagnostics stub; implement in PR 28",
+    } as const;
+    console.log(json ? JSON.stringify(payload, null, 2) : payload.note);
+    return;
+  }
+  if (sub === "plan") {
+    const display = flags["display-name"] || id.charAt(0).toUpperCase() + id.slice(1);
+    const kinds = (flags["kinds"] || "bin,lib").split(",").map((s) => s.trim());
+    const withPlanner = (flags["with-planner"] ?? "true").toString();
+    const withProvider = (flags["with-provider"] ?? "true").toString();
+    const withExporter = (flags["with-exporter"] ?? "true").toString();
+    const manifest = (flags["manifest"] || "write").toString();
+    const willCreate = [
+      `tools/nix/planner/${id}.nix`,
+      `tools/buck/providers/${id}.ts`,
+      `tools/buck/exporter/lang/${id}.ts`,
+      `tools/scaffolding/templates/${id}/...`,
+      `patches/${id}/.gitkeep`,
+      `docs/handbook/${id}-notes.md`,
+      `tools/tests/${id}/contract/...`,
+    ];
+    console.log(
+      JSON.stringify(
+        {
+          id,
+          displayName: display,
+          kinds,
+          withPlanner,
+          withProvider,
+          withExporter,
+          manifest,
+          willCreate,
+          manifestFragment: { id, displayName: display },
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+  if (sub === "new") {
+    const flagsArr: string[] = [];
+    for (const [k, v] of Object.entries(flags)) flagsArr.push(`--${k}=${v}`);
+    // Reuse template flow for now
+    await cmdNew(["language", "kit", id], flags);
+    return;
+  }
+  if (sub === "remove") {
+    const yes = flags["yes"] === "true";
+    const dry = flags["dry-run"] === "true";
+    const summary = `Remove language ${id}: templates/providers/exporter/planner (non-destructive for user code)`;
+    await confirmOrExit(summary, yes, dry);
+    const rm = async (p: string) => fsp.rm(p, { recursive: true, force: true }).catch(() => {});
+    await rm(path.join("tools/nix/planner", `${id}.nix`));
+    await rm(path.join("tools/buck/providers", `${id}.ts`));
+    await rm(path.join("tools/buck/exporter/lang", `${id}.ts`));
+    await rm(path.join("tools/scaffolding/templates", id));
+    await rm(path.join("patches", id));
+    // Manifest handling omitted (to be completed with PR 21/30 integration)
+    console.log("remove OK");
+    return;
+  }
+  console.error("Unknown subcommand for language");
+  process.exit(2);
 }
 
 async function completeLanguages(): Promise<void> {
@@ -950,6 +1039,8 @@ async function main() {
         return cmdGoTest(name, flags);
       }
       return cmdNew(rest, flags);
+    case "language":
+      return cmdLanguage(rest, flags);
     case "update":
       return cmdUpdateOrRegen("update", rest, flags);
     case "regen":
