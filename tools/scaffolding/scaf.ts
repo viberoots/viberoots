@@ -885,6 +885,26 @@ async function cmdNew(args: string[], flags: Record<string, string>) {
   // No de-nesting workaround; templates must render into the resolved destination
   await recordSource(dest, language, template);
   await runPostSteps(dest);
+  // Optional: for lang-kit/kit, generate a starter planner plugin from TS config
+  if (language === "lang-kit" && template === "kit") {
+    const withPlanner = ["true", "1", "yes"].includes((flags["with-planner"] || "").toLowerCase());
+    if (withPlanner) {
+      const langId = (data["lang_id"] as string) || name;
+      const cfgDir = path.join("tools", "nix", "planner");
+      const cfgPath = path.join(cfgDir, `${langId}.config.ts`);
+      await fsp.mkdir(cfgDir, { recursive: true });
+      if (!(await exists(cfgPath))) {
+        const cfg = `export default {\n  id: ${JSON.stringify(langId)},\n  detect: { requireAnyLabels: [${JSON.stringify(`lang:${langId}`)}] },\n  kindRules: [\n    { ifHasAnyLabel: [\"kind:bin\"], thenKind: \"bin\" },\n    { ifHasAnyLabel: [\"kind:lib\"], thenKind: \"lib\" }\n  ],\n  modulesFile: { inheritFromGo: true },\n};\n`;
+        await fsp.writeFile(cfgPath, cfg, "utf8");
+      }
+      try {
+        await $`node tools/dev/planner-gen.ts --lang ${langId}`;
+        console.log(`planner generated: tools/nix/planner/${langId}.nix`);
+      } catch (e) {
+        console.warn("warning: planner-gen failed:", e);
+      }
+    }
+  }
   console.log("created:", dest);
 }
 

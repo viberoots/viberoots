@@ -1,0 +1,83 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["id"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "detect": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ruleTypePrefixes": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "requireAnyLabels": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "fileGlobsAny": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "kindRules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["thenKind"],
+        "properties": {
+          "ifRuleTypePrefix": { "type": "string", "minLength": 1 },
+          "ifHasAnyLabel": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "ifPathMatchesAny": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "thenKind": { "enum": ["bin", "lib", "test"] }
+        }
+      }
+    },
+    "modulesFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pattern": { "type": "string" },
+        "inheritFromGo": { "type": "boolean" }
+      }
+    },
+    "builders": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mkApp": {
+          "type": "object",
+          "required": ["expr", "args"],
+          "properties": {
+            "expr": { "type": "string", "minLength": 1 },
+            "args": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "mkLib": {
+          "type": "object",
+          "required": ["expr", "args"],
+          "properties": {
+            "expr": { "type": "string", "minLength": 1 },
+            "args": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    }
+  }
+}

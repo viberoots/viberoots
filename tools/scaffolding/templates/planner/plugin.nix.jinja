@@ -1,0 +1,25 @@
+{ lib }: ctx:
+let
+  inherit (ctx) T repoRoot modulesTomlFor pkgPathOf;
+  hasAnyLabel = labels: patterns: lib.any (p: lib.elem p labels) patterns;
+  hasPrefix = s: p: lib.hasPrefix p (s or "");
+in {
+  isTarget = n: {{ isTargetExpr }};
+
+  kindOf = n:
+    {% if hasKindBin %}if hasAnyLabel (n.labels or []) [ "kind:bin" ] then "bin"
+    {% else %}if false then null
+    {% endif %}
+    {% if hasKindLib %}else if hasAnyLabel (n.labels or []) [ "kind:lib" ] then "lib"
+    {% endif %}
+    {% for line in kindLines %}{{ line }}
+    {% endfor %}
+    else null;
+
+  modulesFileFor = name: {{ modulesExpr }};
+
+  mkApp = name: {{ mkAppExpr }};
+  mkLib = name: {{ mkLibExpr }};
+}
+
+
