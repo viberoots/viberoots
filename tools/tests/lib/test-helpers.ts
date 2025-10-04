@@ -181,7 +181,7 @@ EOF
       shouldUseDirenv = false;
     }
   } catch {}
-  const envOut = shouldUseDirenv
+  let envOut = shouldUseDirenv
     ? await timeAsync(
         `direnvExport(${path.basename(tmp)})`,
         async () =>
@@ -191,6 +191,22 @@ EOF
           })`bash --noprofile --norc -c 'if command -v direnv >/dev/null 2>&1; then direnv allow . >/dev/null 2>&1 || true; eval "$(direnv export bash)"; env -0; else printf ""; fi'`,
       )
     : ({ stdout: "" } as any);
+  // Fallback: if direnv is unavailable (common in CI or minimal shells), attempt to
+  // capture a dev-shell environment via Nix so tools like pnpm are on PATH.
+  if (!String((envOut as any).stdout || "")) {
+    try {
+      envOut = await timeAsync(
+        `nixDevelopExport(${path.basename(tmp)})`,
+        async () =>
+          $({
+            cwd: tmp,
+            stdio: "pipe",
+          })`bash --noprofile --norc -c 'if command -v nix >/dev/null 2>&1; then nix develop --accept-flake-config -c env -0; else printf ""; fi'`,
+      );
+    } catch {
+      // ignore; proceed with current environment
+    }
+  }
   const exportEnv: Record<string, string> = {};
   for (const [k, v] of Object.entries(process.env)) {
     if (typeof v === "string") exportEnv[k] = v;

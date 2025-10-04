@@ -31,14 +31,17 @@ in {
   modulesFileFor = name: modulesTomlFor name;
 
   mkApp = name: T.goApp {
-    inherit name repoRoot localModuleOverrides;
+    inherit name;
     modulesToml = modulesTomlFor name;
+    devOverridesMap = localModuleOverrides;
+    srcRoot = repoRoot;
     subdir = (pkgPathOf name);
   };
 
   mkLib = name: T.goLib {
-    inherit name repoRoot;
+    inherit name;
     modulesToml = modulesTomlFor name;
+    srcRoot = repoRoot;
     subdir = (pkgPathOf name);
   };
 }

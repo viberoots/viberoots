@@ -86,7 +86,6 @@ let
   # Build planner context and import language plugins if present
   ctx = {
     inherit lib T repoRoot localModuleOverrides pkgPathOf;
-    inherit (pkgs) lib;
     get = get;
     modulesTomlFor = modulesTomlFor;
   };
