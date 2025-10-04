@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
+import { printSkip } from "../../lib/errors";
 
 function repoRoot(): string {
   const here = path.dirname(new URL(import.meta.url).pathname);
@@ -56,8 +57,12 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
   const nodeBin = process.execPath || "node";
   const zxImport = path.join(repoRoot(), "tools/dev/zx-init.mjs");
   // Detect enabled languages via templates or optional langs.json
-  type LangConfig = { enabled?: string[] };
+  type LangConfig = {
+    enabled?: string[];
+    languages?: Array<{ id: string; capabilities?: Record<string, boolean> }>;
+  };
   let enabledLangs: Set<string> = new Set();
+  const caps = new Map<string, Record<string, boolean>>();
   const langsJson = path.join(repoRoot(), "tools/nix/langs.json");
   try {
     const { stdout } = await $({
@@ -65,6 +70,8 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
     })`bash --noprofile --norc -c ${`test -f ${langsJson} && cat ${langsJson}`}`;
     const cfg = JSON.parse(String(stdout || "{}")) as LangConfig;
     for (const l of cfg.enabled || []) enabledLangs.add(l);
+    for (const l of cfg.languages || [])
+      caps.set(String(l.id), (l.capabilities || {}) as Record<string, boolean>);
   } catch {}
   // Fall back to presence of templates directory entries
   if (enabledLangs.size === 0) {
@@ -81,8 +88,16 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
   }
   const haveGo = enabledLangs.has("go");
   const haveNode = enabledLangs.has("node");
+  const goCaps = caps.get("go") || {};
+  const nodeCaps = caps.get("node") || {};
 
-  const cmds: Array<{ label: string; cmd: string; withZx?: boolean; when?: boolean }> = [
+  const cmds: Array<{
+    label: string;
+    cmd: string;
+    withZx?: boolean;
+    when?: boolean;
+    skipReason?: string;
+  }> = [
     {
       label: "export-graph",
       cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/export-graph.ts")} --out ${path.join(repoRoot(), "tools/buck/graph.json")}`,
@@ -93,24 +108,47 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
       label: "sync-providers-go",
       cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/sync-providers.ts")}`,
       withZx: true,
-      when: haveGo,
+      when: haveGo && goCaps.patching !== false,
+      skipReason: haveGo
+        ? goCaps.patching === false
+          ? "not-applicable"
+          : undefined
+        : "missing-language",
     },
     {
       label: "sync-providers-node",
       cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/sync-providers-node.ts")}`,
       withZx: true,
-      when: haveNode,
+      when: haveNode && nodeCaps.patching !== false,
+      skipReason: haveNode
+        ? nodeCaps.patching === false
+          ? "not-applicable"
+          : undefined
+        : "missing-language",
     },
     {
       label: "gen-auto-map",
       cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/gen-auto-map.ts")} --graph ${path.join(repoRoot(), "tools/buck/graph.json")} --out ${path.join(repoRoot(), "third_party/providers/auto_map.bzl")}`,
       withZx: true,
-      when: true,
+      // Generate when any enabled language claims either patching or lockfile labeling capability; otherwise skip
+      when: (() => {
+        for (const id of enabledLangs) {
+          const c = caps.get(id) || {};
+          if (c.patching || c.lockfileLabels) return true;
+        }
+        return enabledLangs.size === 0; // default to run if no explicit enabled set
+      })(),
+      skipReason: "not-applicable",
     },
   ];
   await ensurePreludeSymlinkIfMissing();
   for (const c of cmds) {
-    if (c.when === false) continue;
+    if (c.when === false) {
+      if (c.skipReason) {
+        printSkip(c.skipReason as any, c.label);
+      }
+      continue;
+    }
     if (dryRun) {
       console.log(`[dry-run] ${c.cmd}`);
       continue;

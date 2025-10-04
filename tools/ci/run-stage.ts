@@ -70,12 +70,16 @@ async function main() {
     }
     case "sync-providers-go": {
       if (enabled.size && !enabled.has("go")) break;
+      const c = caps.get("go") || {};
+      if (c.patching === false) break;
       const target = path.resolve("tools/buck/sync-providers.ts");
       await $`node ${nodeBase} ${target}`;
       break;
     }
     case "sync-providers-node": {
       if (enabled.size && !enabled.has("node")) break;
+      const c = caps.get("node") || {};
+      if (c.patching === false) break;
       try {
         await $`git ls-files '**/pnpm-lock.yaml' >/dev/null 2>&1`;
       } catch {
@@ -95,7 +99,18 @@ async function main() {
       break;
     }
     case "gen-auto-map": {
-      // Always generate; internal mapping dedup is language-agnostic
+      // Generate only if any enabled language has patching or lockfileLabels capability
+      if (enabled.size) {
+        let any = false;
+        for (const id of enabled) {
+          const c = caps.get(id) || {};
+          if (c.patching || c.lockfileLabels) {
+            any = true;
+            break;
+          }
+        }
+        if (!any) break;
+      }
       const target = path.resolve("tools/buck/gen-auto-map.ts");
       await $`node ${nodeBase} ${target} --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
       break;
