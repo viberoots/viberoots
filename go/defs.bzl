@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "go_binary", "go_library", "go_test")
-load("//lang:defs_common.bzl", "append_tuple_labels", "dedupe_preserve", "normalize_labels")
+load("//lang:defs_common.bzl", "append_tuple_labels", "dedupe_preserve", "normalize_labels", "stamp_labels")
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
 
 def _providers_for(name):
@@ -24,9 +24,8 @@ def nix_go_library(name, **kwargs):
     goarch = kwargs.pop("goarch", None)
     cgo_enabled = kwargs.pop("cgo_enabled", None)
     _append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled)
-    # PR3: Stamp primary target labels for language/kind
-    labels = kwargs.get("labels", []) or []
-    kwargs["labels"] = dedupe_preserve(labels + ["lang:go", "kind:lib"])
+    # PR3/PR25: Stamp primary target labels for language/kind via helper
+    stamp_labels(kwargs, "go", "lib")
     pkg = native.package_name()
     deps = kwargs.pop("deps", [])
     extra = normalize_labels(pkg, kwargs.pop("extra_module_providers", []))
@@ -58,9 +57,8 @@ def nix_go_binary(name, **kwargs):
     goarch = kwargs.pop("goarch", None)
     cgo_enabled = kwargs.pop("cgo_enabled", None)
     _append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled)
-    # PR3: Stamp primary target labels for language/kind
-    labels = kwargs.get("labels", []) or []
-    kwargs["labels"] = dedupe_preserve(labels + ["lang:go", "kind:bin"]) 
+    # PR3/PR25: Stamp primary target labels for language/kind via helper
+    stamp_labels(kwargs, "go", "bin")
     pkg = native.package_name()
     deps = kwargs.pop("deps", [])
     extra = normalize_labels(pkg, kwargs.pop("extra_module_providers", []))

@@ -49,3 +49,16 @@ def append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled):
     kwargs["labels"] = labels + extra
 
 
+
+def stamp_labels(kwargs, lang, kind=None):
+    """
+    Ensure kwargs["labels"] contains the language stamp (e.g., "lang:go")
+    and optional kind stamp (e.g., "kind:bin"|"kind:lib"|"kind:test").
+    Labels are deduped while preserving order.
+    """
+    labels = kwargs.get("labels", []) or []
+    stamps = ["lang:%s" % lang]
+    if kind != None and isinstance(kind, str) and kind != "":
+        stamps.append("kind:%s" % kind)
+    kwargs["labels"] = dedupe_preserve(labels + stamps)
+
