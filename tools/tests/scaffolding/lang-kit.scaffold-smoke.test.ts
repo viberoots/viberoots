@@ -13,6 +13,7 @@ test("lang-kit: scaffold skeleton files", async () => {
       path.join(tmp, `${name}/defs.bzl`),
       path.join(tmp, `tools/buck/providers/${name}.ts`),
       path.join(tmp, `patches/${name}/.gitkeep`),
+      path.join(tmp, `tools/tests/${name}/contract/basic.test.ts`),
     ];
     for (const p of expectPaths) {
       if (!(await exists(p))) {

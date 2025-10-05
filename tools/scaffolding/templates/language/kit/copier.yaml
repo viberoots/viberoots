@@ -10,3 +10,7 @@ display_name:
   type: str
   help: Display name (e.g., Rust)
   default: "{{ lang_id | capitalize }}"
+
+_tasks:
+  - mkdir -p tools/tests/{{ lang_id }}/contract
+  - cp -n tools/scaffolding/templates/language/kit/tools/tests/_contract.basic.test.ts.jinja tools/tests/{{ lang_id }}/contract/basic.test.ts
