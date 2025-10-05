@@ -18,7 +18,32 @@ def _append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled):
     append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled)
 
 
+def _nixpkg_provider_for(attr):
+    # Deterministic provider target name for nixpkgs attribute paths, e.g., pkgs.zlib
+    # Keep simple to ensure readability: lowercase, non-word -> underscore
+    if not isinstance(attr, str) or attr == "":
+        fail("nix_cgo_deps entries must be non-empty strings like 'pkgs.zlib'")
+    tail = "".join([c if (c.isalnum() or c == "_") else "_" for c in attr.lower()])
+    return "//third_party/providers:nx_%s" % tail
+
+
+def _apply_cgo_labels(kwargs, nix_cgo_deps):
+    if len(nix_cgo_deps) > 0:
+        labels = kwargs.get("labels", []) or []
+        extra = ["cgo:enabled"] + ["nixpkg:%s" % a for a in nix_cgo_deps]
+        kwargs["labels"] = dedupe_preserve(labels + extra)
+
+
+def _merge_cgo_providers(deps, nix_cgo_deps):
+    if len(nix_cgo_deps) == 0:
+        return deps
+    provs = [_nixpkg_provider_for(a) for a in nix_cgo_deps]
+    return dedupe_preserve(deps + provs)
+
+
 def nix_go_library(name, **kwargs):
+    nix_cgo_deps = kwargs.pop("nix_cgo_deps", [])
+    nix_cgo_pkgconfig = kwargs.pop("nix_cgo_pkgconfig", {})
     build_tags = kwargs.pop("build_tags", [])
     goos = kwargs.pop("goos", None)
     goarch = kwargs.pop("goarch", None)
@@ -28,8 +53,9 @@ def nix_go_library(name, **kwargs):
     stamp_labels(kwargs, "go", "lib")
     pkg = native.package_name()
     deps = kwargs.pop("deps", [])
+    _apply_cgo_labels(kwargs, nix_cgo_deps)
     extra = normalize_labels(pkg, kwargs.pop("extra_module_providers", []))
-    merged = dedupe_preserve(deps + _providers_for(name) + extra)
+    merged = dedupe_preserve(_merge_cgo_providers(deps, nix_cgo_deps) + _providers_for(name) + extra)
     # Forward importpath to underlying rule if present; Buck's go_library understands it
     if "_go_toolchain" not in kwargs:
         kwargs["_go_toolchain"] = "@repo_toolchains//:go"
@@ -52,6 +78,8 @@ def nix_go_library(name, **kwargs):
 
 
 def nix_go_binary(name, **kwargs):
+    nix_cgo_deps = kwargs.pop("nix_cgo_deps", [])
+    nix_cgo_pkgconfig = kwargs.pop("nix_cgo_pkgconfig", {})
     build_tags = kwargs.pop("build_tags", [])
     goos = kwargs.pop("goos", None)
     goarch = kwargs.pop("goarch", None)
@@ -61,8 +89,9 @@ def nix_go_binary(name, **kwargs):
     stamp_labels(kwargs, "go", "bin")
     pkg = native.package_name()
     deps = kwargs.pop("deps", [])
+    _apply_cgo_labels(kwargs, nix_cgo_deps)
     extra = normalize_labels(pkg, kwargs.pop("extra_module_providers", []))
-    merged = dedupe_preserve(deps + _providers_for(name) + extra)
+    merged = dedupe_preserve(_merge_cgo_providers(deps, nix_cgo_deps) + _providers_for(name) + extra)
     if "_go_toolchain" not in kwargs:
         kwargs["_go_toolchain"] = "@repo_toolchains//:go"
     if "_cxx_toolchain" not in kwargs:
@@ -94,6 +123,8 @@ def nix_go_binary(name, **kwargs):
 
 
 def nix_go_test(name, **kwargs):
+    nix_cgo_deps = kwargs.pop("nix_cgo_deps", [])
+    nix_cgo_pkgconfig = kwargs.pop("nix_cgo_pkgconfig", {})
     build_tags = kwargs.pop("build_tags", [])
     goos = kwargs.pop("goos", None)
     goarch = kwargs.pop("goarch", None)
@@ -102,7 +133,8 @@ def nix_go_test(name, **kwargs):
     pkg = native.package_name()
     deps = kwargs.pop("deps", [])
     extra = normalize_labels(pkg, kwargs.pop("extra_module_providers", []))
-    merged = dedupe_preserve(deps + _providers_for(name) + extra)
+    _apply_cgo_labels(kwargs, nix_cgo_deps)
+    merged = dedupe_preserve(_merge_cgo_providers(deps, nix_cgo_deps) + _providers_for(name) + extra)
 
     # If a library is provided, ensure we don't pass the same target in deps.
     lib = kwargs.get("library")

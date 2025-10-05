@@ -23,3 +23,12 @@ export function providerNameForImporter(lockfilePath: string, importer: string):
   const tail = `${importer.replace(/[^\w]+/g, "_")}__${lockfilePath.replace(/[^\w]+/g, "_")}`;
   return `lf_${h}_${tail}`;
 }
+
+// Deterministic provider name for a nixpkgs attribute path (e.g., "pkgs.zlib").
+// Keep simple and readable for now: no hash, sanitize to word chars and underscores.
+export function providerNameForNixpkgAttr(attrPath: string): string {
+  const tail = String(attrPath)
+    .toLowerCase()
+    .replace(/[^\w]+/g, "_");
+  return `nx_${tail}`;
+}

@@ -16,6 +16,8 @@ in {
     subdir ? ".",
     srcRoot ? ../../..,
     patchDir ? ../../patches/go,
+    nixCgoPkgs ? [],
+    pkgConfigNames ? {},
   }:
     let
       patchesMap = H.patchesMapFromDir patchDir;
@@ -31,6 +33,10 @@ in {
         );
       moduleRootRel = lib.removeSuffix "/cmd/${targetName}" subdir;
       srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + moduleRootRel));
+      haveCgo = (builtins.length nixCgoPkgs) > 0;
+      pkgCfgPaths = lib.concatStringsSep ":" (map (p: "${p}/lib/pkgconfig") nixCgoPkgs);
+      synthCFlags = lib.concatStringsSep " " (map (p: "-I${p}/include") nixCgoPkgs);
+      synthLdFlags = lib.concatStringsSep " " (map (p: "-L${p}/lib") nixCgoPkgs);
       baseArgs = {
         pname = "go-${H.sanitizeName name}";
         version = "0.1.0";
@@ -40,13 +46,21 @@ in {
         doCheck = false;
         doInstallCheck = false;
         disallowedReferences = [];
-        nativeBuildInputs = [ pkgs.unzip ];
+        nativeBuildInputs = ([ pkgs.unzip ] ++ (if haveCgo then (nixCgoPkgs ++ [ pkgs.pkg-config ]) else []));
         configurePhase = ''
           runHook preConfigure
 
           export GOCACHE=$TMPDIR/go-cache
           export GOPATH="$TMPDIR/go"
           export GOSUMDB=off
+          ${if haveCgo then ''
+            export CGO_ENABLED=1
+            export PKG_CONFIG_PATH=${pkgCfgPaths}
+            if [ -z "$PKG_CONFIG_PATH" ]; then
+              export CGO_CFLAGS="${synthCFlags} $CGO_CFLAGS"
+              export CGO_LDFLAGS="${synthLdFlags} $CGO_LDFLAGS"
+            fi
+          '' else ""}
           cd "''${modRoot:-.}"
 
           runHook postConfigure
@@ -80,6 +94,8 @@ in {
     subdir ? ".",
     srcRoot ? ../../..,
     patchDir ? ../../patches/go,
+    nixCgoPkgs ? [],
+    pkgConfigNames ? {},
   }:
     let
       patchesMap = H.patchesMapFromDir patchDir;
@@ -87,6 +103,10 @@ in {
       _ = if (builtins.getEnv "CI") == "true" && (builtins.getEnv devOverrideEnv) != "" then
             builtins.throw "Dev overrides are forbidden in CI" else null;
       srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + subdir));
+      haveCgo = (builtins.length nixCgoPkgs) > 0;
+      pkgCfgPaths = lib.concatStringsSep ":" (map (p: "${p}/lib/pkgconfig") nixCgoPkgs);
+      synthCFlags = lib.concatStringsSep " " (map (p: "-I${p}/include") nixCgoPkgs);
+      synthLdFlags = lib.concatStringsSep " " (map (p: "-L${p}/lib") nixCgoPkgs);
       baseArgs = {
         pname = "golib-${H.sanitizeName name}";
         version = "0.1.0";
@@ -96,6 +116,7 @@ in {
         doCheck = false;
         doInstallCheck = false;
         disallowedReferences = [];
+        nativeBuildInputs = (if haveCgo then (nixCgoPkgs ++ [ pkgs.pkg-config ]) else []);
         configurePhase = ''
           runHook preConfigure
 
@@ -103,6 +124,14 @@ in {
           export GOPATH="$TMPDIR/go"
           export GOSUMDB=off
           export GOFLAGS="-mod=mod"
+          ${if haveCgo then ''
+            export CGO_ENABLED=1
+            export PKG_CONFIG_PATH=${pkgCfgPaths}
+            if [ -z "$PKG_CONFIG_PATH" ]; then
+              export CGO_CFLAGS="${synthCFlags} $CGO_CFLAGS"
+              export CGO_LDFLAGS="${synthLdFlags} $CGO_LDFLAGS"
+            fi
+          '' else ""}
           cd "''${modRoot:-.}"
 
           runHook postConfigure
