@@ -245,7 +245,6 @@ async function main() {
   else printHuman(out, filterId);
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+// PR 29: Wrap main() with error policy that treats known skips as exit 0
+import { runMain } from "../lib/cli-wrap";
+runMain(main);
