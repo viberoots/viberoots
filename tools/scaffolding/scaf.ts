@@ -874,7 +874,8 @@ async function cmdNew(args: string[], flags: Record<string, string>) {
   const isNonEmpty = destExists
     ? (await fsp.readdir(dest).catch(() => [] as string[])).length > 0
     : false;
-  if (isNonEmpty && !yes) {
+  const isLangKit = language === "language" && template === "kit";
+  if (isNonEmpty && !yes && !isLangKit) {
     await confirmOrExit(`Directory not empty: ${dest}\nOverwrite via copier?`, false, dry);
   }
   if (dry) {
