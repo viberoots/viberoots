@@ -1,5 +1,5 @@
 {
-  "enabled": ["go", "node"],
+  "enabled": ["go", "node", "cpp"],
   "languages": [
     {
       "id": "go",
@@ -26,6 +26,17 @@
         "testAutoWire": false
       },
       "templatesDir": "tools/scaffolding/templates/node"
+    },
+    {
+      "id": "cpp",
+      "displayName": "C++",
+      "requiredPaths": ["cpp/defs.bzl", "tools/nix/templates/cpp.nix"],
+      "optionalPaths": [],
+      "kinds": ["bin", "lib", "test"],
+      "capabilities": {
+        "patching": false
+      },
+      "templatesDir": "tools/scaffolding/templates/cpp"
     }
   ]
 }
