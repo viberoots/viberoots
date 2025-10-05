@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { writeGoModule } from "../lib/fixtures/go";
 
 test("exporter writes metrics when --metrics-out is provided", async () => {
   await runInTemp("exporter-metrics", async (tmp, $) => {
@@ -13,10 +14,12 @@ test("exporter writes metrics when --metrics-out is provided", async () => {
     await fs.mkdirp(path.dirname(out));
     await fs.mkdirp(path.dirname(metrics));
 
-    // Simulate a minimal graph to avoid requiring buck2 for this unit test
+    // Use fixture writer to create a tiny module and derive nodes
+    const modDir = await writeGoModule(tmp, { modulePath: "m" });
+    void modDir;
     const nodes = [
-      { name: "//app:bin", rule_type: "go_binary", labels: ["lang:go"] },
-      { name: "//lib:pkg", rule_type: "go_library", labels: ["lang:go"] },
+      { name: "//m:bin", rule_type: "go_binary", labels: ["lang:go"] },
+      { name: "//m:pkg", rule_type: "go_library", labels: ["lang:go"] },
     ];
     const sim = path.join(tmp, "tools/buck/simulated.json");
     await fs.outputFile(sim, JSON.stringify(nodes) + "\n");
