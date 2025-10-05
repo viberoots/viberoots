@@ -887,7 +887,7 @@ async function cmdNew(args: string[], flags: Record<string, string>) {
   await recordSource(dest, language, template);
   await runPostSteps(dest);
   // Optional: for lang-kit/kit, generate a starter planner plugin from TS config
-  if (language === "lang-kit" && template === "kit") {
+  if (language === "language" && template === "kit") {
     const withPlanner = ["true", "1", "yes"].includes((flags["with-planner"] || "").toLowerCase());
     if (withPlanner) {
       const langId = (data["lang_id"] as string) || name;
@@ -972,10 +972,95 @@ async function cmdLanguage(args: string[], flags: Record<string, string>) {
     return;
   }
   if (sub === "new") {
-    const flagsArr: string[] = [];
-    for (const [k, v] of Object.entries(flags)) flagsArr.push(`--${k}=${v}`);
-    // Reuse template flow for now
+    // Step 1: scaffold language kit into repo
     await cmdNew(["language", "kit", id], flags);
+
+    // Step 2: optionally update tools/nix/langs.json
+    const noManifest = flags["no-manifest"] === "true";
+    const manifestMode = (flags["manifest"] || (noManifest ? "skip" : "write")).toString();
+    const display = flags["display-name"] || id.charAt(0).toUpperCase() + id.slice(1);
+    const kinds = (flags["kinds"] || "bin,lib")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const fragment = {
+      id,
+      displayName: display,
+      requiredPaths: [
+        `tools/nix/planner/${id}.nix`,
+        `tools/buck/exporter/lang/${id}.ts`,
+        `tools/buck/providers/${id}.ts`,
+      ],
+      kinds,
+      templatesDir: `tools/scaffolding/templates/${id}`,
+    } as const;
+
+    async function writeManifestEntry(): Promise<void> {
+      const p = path.join("tools", "nix", "langs.json");
+      const existsFile = await exists(p);
+      if (!existsFile) {
+        const doc = { enabled: [id], languages: [fragment] } as any;
+        await fsp.mkdir(path.dirname(p), { recursive: true });
+        await fsp.writeFile(p, JSON.stringify(doc, null, 2) + "\n", "utf8");
+        return;
+      }
+      let raw: string = await fsp.readFile(p, "utf8").catch(() => "");
+      if (!raw.trim()) raw = "{}";
+      let json: any;
+      try {
+        json = JSON.parse(raw);
+      } catch {
+        json = {};
+      }
+      if (Array.isArray(json)) {
+        // legacy array form
+        const arr = json as any[];
+        if (!arr.find((e) => e && e.id === id)) arr.push(fragment);
+        await fsp.writeFile(p, JSON.stringify(arr, null, 2) + "\n", "utf8");
+      } else if (json && typeof json === "object") {
+        const langs = Array.isArray(json.languages) ? json.languages : [];
+        if (!langs.find((e: any) => e && e.id === id)) langs.push(fragment);
+        const enabled = new Set<string>(Array.isArray(json.enabled) ? json.enabled : []);
+        enabled.add(id);
+        json.languages = langs;
+        json.enabled = Array.from(enabled).sort();
+        await fsp.writeFile(p, JSON.stringify(json, null, 2) + "\n", "utf8");
+      } else {
+        const doc = { enabled: [id], languages: [fragment] } as any;
+        await fsp.writeFile(p, JSON.stringify(doc, null, 2) + "\n", "utf8");
+      }
+      // Best-effort validate
+      try {
+        await $`node tools/dev/validate-langs.ts`;
+      } catch {}
+    }
+
+    if (manifestMode === "write") await writeManifestEntry();
+    else if (manifestMode === "print") {
+      console.log(JSON.stringify({ manifestFragment: fragment }, null, 2));
+    }
+
+    // Step 3: optionally run codegen
+    const doCodegen = flags["no-codegen"] === "true" ? false : true;
+    if (doCodegen) {
+      try {
+        await $`node tools/dev/codegen.ts`;
+      } catch (e) {
+        console.warn("warning: codegen failed:", e);
+      }
+    }
+
+    // Step 4: print follow-ups
+    console.log(
+      [
+        "\nNext steps:",
+        `- Edit tools/buck/exporter/lang/${id}.ts to implement detection/labels`,
+        `- Edit tools/buck/providers/${id}.ts to add provider wiring`,
+        `- Edit tools/nix/planner/${id}.nix to route build kinds (bin/lib)`,
+        `- Add tests under tools/tests/${id}/contract/ if desired`,
+        `- Run: tools/dev/langs-diagnose.ts --lang ${id} to verify status`,
+      ].join("\n"),
+    );
     return;
   }
   if (sub === "remove") {
