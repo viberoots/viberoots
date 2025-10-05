@@ -3,8 +3,8 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { providerNameForModuleKey } from "../../lib/providers";
-import { runInTemp } from "../lib/test-helpers";
 import { ensurePatch } from "../lib/fixtures/go";
+import { runInTemp } from "../lib/test-helpers";
 
 test("sync-providers: single patch emits one go_module_patch with stable provider name", async () => {
   await runInTemp("sync-single", async (tmp, $) => {
