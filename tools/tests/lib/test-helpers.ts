@@ -81,7 +81,17 @@ export async function rsyncRepoTo(tmp: string) {
     // Anchor excludes to repository root so we don't accidentally exclude
     // nested directories with the same names inside templates (e.g.,
     // tools/scaffolding/templates/**/libs/**).
-    await $`rsync -a --exclude "/buck-out" --exclude "/.git" --exclude "/libs" --exclude "/node_modules" --exclude "/coverage" --exclude "/.clinic" --exclude "/.direnv" --exclude "/result" ./ ${tmp}/`;
+    await $`rsync -a \
+      --exclude "/buck-out" \
+      --exclude "/.git" \
+      --exclude "/libs" \
+      --exclude "/node_modules" \
+      --exclude "/coverage" \
+      --exclude "/.clinic" \
+      --exclude "/.direnv" \
+      --exclude "/result" \
+      --exclude "/tools/nix/templates/cpp.nix" \
+      ./ ${tmp}/`;
   });
 }
 
