@@ -254,6 +254,48 @@ If not implemented
 
 ---
 
+### PR 8.1: Multi-adapter orchestration in exporter
+
+Intent/Impact
+
+- Allow the exporter to handle mixed-language graphs (e.g., Go + C++) in a single run, orchestrating all present language adapters and merging their label enrichments deterministically.
+
+Design
+
+- Adapter discovery: reuse `tools/buck/exporter/lang/contract.ts` to load all present adapters.
+- Active set: compute `active = adapters.filter((a) => nodes.some((n) => a.isNode(n)))`.
+- Per-adapter batching/enrichment:
+  - For each active adapter `a`:
+    - Compute `nodesA = nodes.filter(a.isNode)`.
+    - Run `batchesA = await a.buildBatches(nodesA)`.
+    - Allow per-adapter optional preprocessing (e.g., Go’s `go list`) to happen inside `a.attachLabels` or via adapter-internal helpers; exporter remains language-agnostic.
+    - Get `enrichedA = await a.attachLabels(nodes, batchesA, cacheDir)`.
+- Deterministic merge:
+  - Start from original `nodes` and fold `enrichedA` for each adapter by `name`:
+    - Merge labels as a set, then output sorted labels.
+    - Non-overlapping fields remain unchanged (C++ adapter only touches labels).
+- Keep attr reads unchanged (`attrList`), maintain sparse-checkout grace (adapters absent → simply not active).
+- Preserve current single-adapter fast path when only one adapter is active.
+
+Acceptance criteria
+
+- With a simulated graph containing both Go and C++ targets, resulting JSON has:
+  - Go nodes: `lang:go` plus existing module/kind labels as today.
+  - C++ nodes: `lang:cpp` plus `kind:bin|lib|test` where derivable.
+- No label loss or duplication; labels are deduped and lexicographically sorted.
+- Existing language-specific tests remain green; new mixed-language test passes.
+
+Risks
+
+- Complexity increase in `exporter/main.ts`. Mitigation: minimal, well-named helpers and keep language-specific logic inside adapters.
+- Parallel execution complexity. Mitigation: bound concurrency per adapter (reuse existing Go batching) and keep deterministic ordering in merges.
+
+If not implemented
+
+- Exporter will enrich only the first active language adapter; mixed-language graphs won’t have complete labeling for the non-selected language.
+
+---
+
 ### PR 9: Macros (`//cpp/defs.bzl`) and stamping lint
 
 Intent/Impact
