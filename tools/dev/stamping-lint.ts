@@ -16,11 +16,13 @@ async function main() {
     }
     for (const n of arr) {
       const labs = Array.isArray(n.labels) ? n.labels : [];
-      const hasLangGo = labs.includes("lang:go");
+      // Go
       const looksGo = (n.rule_type || "").startsWith("go_");
-      if (looksGo && !hasLangGo) {
-        problems.push(`${n.name} missing label lang:go`);
-      }
+      if (looksGo && !labs.includes("lang:go")) problems.push(`${n.name} missing label lang:go`);
+      // C++
+      const looksCpp = (n.rule_type || "").startsWith("cxx_");
+      if (looksCpp && !labs.includes("lang:cpp")) problems.push(`${n.name} missing label lang:cpp`);
+      // kind label normalized
       if (labs.some((l) => l.startsWith("kind:"))) {
         const k = labs.find((l) => l.startsWith("kind:")) || "";
         if (!/^kind:(bin|lib|test)$/.test(k))
@@ -49,6 +51,9 @@ async function main() {
       const hasGoRule = /\b(go_library|go_binary|go_test)\s*\(/.test(content);
       const hasLangGo = content.includes("lang:go");
       if (hasGoRule && !hasLangGo) problems.push(`${f} missing label lang:go`);
+      const hasCppRule = /\b(cxx_library|cxx_binary|cxx_test)\s*\(/.test(content);
+      const hasLangCpp = content.includes("lang:cpp");
+      if (hasCppRule && !hasLangCpp) problems.push(`${f} missing label lang:cpp`);
     }
   }
   if (problems.length) {

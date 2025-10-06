@@ -396,26 +396,99 @@ Intent/Impact
 
 Design
 
-- `load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve", "normalize_labels")`
-- For each macro:
-  - `stamp_labels(kwargs, "cpp", "lib|bin|test")`
-  - forward user attrs (`srcs`, `deps`, `includes`, `defines`, `cflags`, `ldflags`)
-  - append auto providers (currently none)
-- Ensure `tools/dev/stamping-lint.ts` checks C++ targets: C++ rules with sources must include `lang:cpp` through macros.
+- Starlark file: `cpp/defs.bzl` (≤ 250 lines; one responsibility: thin macros)
+  - Loads:
+    ```starlark
+    load("@prelude//cxx:cxx.bzl", "cxx_library", "cxx_binary", "cxx_test")
+    load("//lang:defs_common.bzl", "stamp_labels", "merge_labels")
+    ```
+  - Each macro is a simple wrapper that:
+    - Accepts the same kwargs as its underlying `cxx_*` rule plus optional pass-throughs (`includes`, `defines`, `cflags`, `ldflags`).
+    - Computes the intended kind: `"lib" | "bin" | "test"`.
+    - Ensures labels contain `lang:cpp` and `kind:<kind>` using `stamp_labels` (dedupe+sort).
+    - Appends auto providers from `MODULE_PROVIDERS` when present (noop v1). We keep the provider plumbing consistent across languages.
+  - Sketch:
+
+    ```starlark
+    # cpp/defs.bzl
+    load("@prelude//cxx:cxx.bzl", "cxx_library", "cxx_binary", "cxx_test")
+    load("//lang:defs_common.bzl", "stamp_labels")
+
+    def _providers_for(name):
+        MODULE_PROVIDERS = {}
+        # Optional: only load if file exists; otherwise default to empty
+        # Buck Starlark lacks try/except portable pattern, so rely on prebuild-guard for presence in CI
+        load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
+        pkg = native.package_name()
+        key = "//%s:%s" % (pkg, name)
+        return MODULE_PROVIDERS.get(key, [])
+
+    def nix_cpp_library(name, **kwargs):
+        deps = kwargs.pop("deps", [])
+        labels = kwargs.pop("labels", [])
+        labels = stamp_labels(labels, lang = "cpp", kind = "lib")
+        deps = deps + _providers_for(name)
+        cxx_library(name = name, labels = labels, deps = deps, **kwargs)
+
+    def nix_cpp_binary(name, **kwargs):
+        deps = kwargs.pop("deps", [])
+        labels = kwargs.pop("labels", [])
+        labels = stamp_labels(labels, lang = "cpp", kind = "bin")
+        deps = deps + _providers_for(name)
+        cxx_binary(name = name, labels = labels, deps = deps, **kwargs)
+
+    def nix_cpp_test(name, **kwargs):
+        deps = kwargs.pop("deps", [])
+        labels = kwargs.pop("labels", [])
+        labels = stamp_labels(labels, lang = "cpp", kind = "test")
+        deps = deps + _providers_for(name)
+        cxx_test(name = name, labels = labels, deps = deps, **kwargs)
+    ```
+
+- Stamping lint: extend `tools/dev/stamping-lint.ts` to include C++
+  - Policy: any `cxx_*` rule (or `nix_cpp_*` macro) with C/C++ sources must include `lang:cpp` and the appropriate `kind:*` label.
+  - Implementation: reuse existing lint framework; add a C++ predicate and emit actionable messages with target names.
+  - The lint runs in CI and locally via `tools/dev/install-deps.ts` or dedicated lint target; it is non-destructive (reports errors/warnings; does not write files).
+
+- Exporter interplay
+  - Exporter already detects `cxx_*` and/or `lang:cpp`. Macros guarantee presence of the label even when `rule_type` is opaque or repo-specific.
+  - No additional exporter changes are required for PR 9.
+
+- Providers interplay (forward-looking but harmless today)
+  - `_providers_for(name)` loads `MODULE_PROVIDERS` (generated) and appends any matching provider deps.
+  - In v1 (no C++ providers), this resolves to an empty list; prebuild-guard ensures the generated file is present when providers exist.
 
 Acceptance criteria
 
 - Converting a sample `cxx_*` target to `nix_cpp_*` preserves behavior and stamps labels.
+- Lint flags missing labels on raw `cxx_*` usage with sources; using `nix_cpp_*` fixes the lint.
+- Exporter sees `lang:cpp` + `kind:*` for the macro-managed targets.
 
 Risks
 
 - Mis-stamping edge cases; tests cover detection.
+- Macro error UX: Starlark cannot easily provide friendly messaging for missing generated files; rely on prebuild-guard for actionable diagnostics.
 
 If not implemented
 
 - Exporter may warn on missing labels; ergonomics remain inconsistent.
 
 ---
+
+Verification & Tests
+
+- Macro stamping tests (`tools/tests/cpp/`):
+  - `cpp.macros.stamp.labels.lib.test.ts`: creates a temporary repo with a small `nix_cpp_library` and verifies labels contain `lang:cpp` and `kind:lib` after export.
+  - `cpp.macros.stamp.labels.bin.test.ts`: same for `nix_cpp_binary`, expecting `kind:bin`.
+  - `cpp.macros.stamp.labels.test.test.ts`: same for `nix_cpp_test`, expecting `kind:test`.
+- Stamping lint tests (`tools/tests/dev/`):
+  - `stamping-lint.cpp.missing-labels.test.ts`: introduces a raw `cxx_library` with sources but without labels and asserts the lint reports a violation; adding `nix_cpp_library` resolves it.
+
+Determinism & Sparse Checkout
+
+- Macros are pure Starlark wrappers around `cxx_*` with label stamping only; no file scanning or IO.
+- If `third_party/providers/auto_map.bzl` is missing, `_providers_for` effectively yields no deps; prebuild-guard in CI ensures generated glue presence only when needed.
+- If `cpp/defs.bzl` is missing in a sparse checkout, teams can continue using raw `cxx_*` rules; exporter still recognizes C++ via `rule_type` and tests for other languages continue to work.
 
 ### PR 10: Scaffolding templates (cpp/lib and cpp/bin)
 
