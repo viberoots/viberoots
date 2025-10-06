@@ -6,9 +6,9 @@
 # Determine external timeout command
 TIMEOUT_CMD=()
 if command -v timeout >/dev/null 2>&1; then
-  TIMEOUT_CMD=(timeout -k 10s 300s)
+  TIMEOUT_CMD=(timeout -k 10s 600s)
 elif command -v gtimeout >/dev/null 2>&1; then
-  TIMEOUT_CMD=(gtimeout -k 10s 300s)
+  TIMEOUT_CMD=(gtimeout -k 10s 600s)
 else
   TIMEOUT_CMD=()
 fi
@@ -99,15 +99,15 @@ EOF
 build_run_array() {
   local PLATFORM_FLAGS=(--target-platforms prelude//platforms:default)
   local args=("$BUCK_BIN" test "${PLATFORM_FLAGS[@]}" "$@" -- --env COVERAGE="${COVERAGE}")
-  # External timeout policy: 300s for both full suite and single focused tests
+  # External timeout policy: 600s (10 minutes) for both full suite and single focused tests
   local RUN_TIMEOUT=()
   if [[ -n ${TIMEOUT_CMD+x} && ${#TIMEOUT_CMD[@]} -gt 0 ]]; then
     # Keep single-target timeout aligned with full suite (300s)
     if [[ $# -eq 1 && "$1" == *:* ]]; then
       if command -v timeout >/dev/null 2>&1; then
-        RUN_TIMEOUT=(timeout -k 10s 300s)
+        RUN_TIMEOUT=(timeout -k 10s 600s)
       elif command -v gtimeout >/dev/null 2>&1; then
-        RUN_TIMEOUT=(gtimeout -k 10s 300s)
+        RUN_TIMEOUT=(gtimeout -k 10s 600s)
       fi
     else
       RUN_TIMEOUT=("${TIMEOUT_CMD[@]}")

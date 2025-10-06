@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { printSkip } from "../../lib/errors";
+import { printSkip } from "../../lib/errors.ts";
 
 function repoRoot(): string {
   const here = path.dirname(new URL(import.meta.url).pathname);

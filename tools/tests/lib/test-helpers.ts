@@ -84,6 +84,7 @@ export async function rsyncRepoTo(tmp: string) {
     await $`rsync -a \
       --exclude "/buck-out" \
       --exclude "/.git" \
+      --exclude "/apps" \
       --exclude "/libs" \
       --exclude "/node_modules" \
       --exclude "/coverage" \
