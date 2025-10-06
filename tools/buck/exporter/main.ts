@@ -55,7 +55,9 @@ export async function run() {
   }
 
   const adapters: Adapter[] = await loadPresentAdapters();
-  const active = adapters.filter((a) => nodes.some((n) => a.isNode(n)));
+  const active = adapters
+    .filter((a) => nodes.some((n) => a.isNode(n)))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   // Fast path if no known-language nodes
   if (active.length === 0) {
@@ -72,11 +74,8 @@ export async function run() {
     return;
   }
 
-  // For now, only one language type is expected per node set; merge batches if multiple adapters are active later.
-  const adapter = active[0];
-  const batches = await adapter.buildBatches(nodes);
   const gMetrics: Metrics = {
-    totalBatches: batches.length,
+    totalBatches: 0,
     cacheHits: 0,
     cacheMisses: 0,
     durationMs: 0,
@@ -84,40 +83,73 @@ export async function run() {
   };
   const startedAt = Date.now();
 
-  // Execute go list per batch with limited concurrency
-  const goListResults: GoPkgPerBatch[] = [];
-  let i = 0;
-  const workers = new Array(Math.max(1, Math.min(maxParallel, batches.length)))
-    .fill(0)
-    .map(async () => {
-      while (i < batches.length) {
-        const idx = i++;
-        const b = batches[idx];
-        const pkgs = await runGoList(b.tuple, b.roots, b.cwd, cacheDir);
-        goListResults.push({ batch: b, pkgs });
-      }
-    });
-  await Promise.all(workers);
+  // Start with original nodes; maintain a name→node map to merge labels per adapter
+  const byName = new Map<string, Node>(
+    nodes
+      .map((n) => ({ ...n, labels: Array.from(new Set(n.labels || [])).sort() }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((n) => [n.name, n] as const),
+  );
 
-  // Provide pkgs to labeler via a simple shared map on global to avoid coupling
-  const cache = new Map<Batch, any>();
-  for (const r of goListResults) cache.set(r.batch, r.pkgs);
-  (global as any).__GO_LIST_CACHE = { get: (b: Batch) => cache.get(b) };
+  for (const adapter of active) {
+    const nodesA = nodes
+      .filter((n) => adapter.isNode(n))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const batchesA = await adapter.buildBatches(nodesA);
 
-  const enriched = await adapter.attachLabels(nodes, batches, cacheDir);
-  const normalized = sortAndDedupeLabels(enriched);
+    // If batches carry Go tuples, execute go list to warm cache for labeler
+    if (batchesA.length > 0 && (batchesA[0] as any).tuple) {
+      const goListResults: Array<{ batch: Batch; pkgs: any[] }> = [];
+      let i = 0;
+      const workers = new Array(Math.max(1, Math.min(maxParallel, batchesA.length)))
+        .fill(0)
+        .map(async () => {
+          while (i < batchesA.length) {
+            const idx = i++;
+            const b = batchesA[idx];
+            const pkgs = await runGoList(
+              (b as any).tuple,
+              (b as any).roots,
+              (b as any).cwd,
+              cacheDir,
+            );
+            goListResults.push({ batch: b, pkgs });
+          }
+        });
+      await Promise.all(workers);
+      const cache = new Map<Batch, any>();
+      for (const r of goListResults) cache.set(r.batch, r.pkgs);
+      (global as any).__GO_LIST_CACHE = { get: (b: Batch) => cache.get(b) };
+
+      // Update metrics
+      gMetrics.totalBatches += batchesA.length;
+      gMetrics.tupleKeys = Array.from(
+        new Set([
+          ...gMetrics.tupleKeys,
+          ...batchesA.map(
+            (b: any) =>
+              `${b.tuple.goos}|${b.tuple.goarch}|${b.tuple.cgo}|${b.tuple.tagsKey}|${b.tuple.goflagsKey}|${b.tuple.toolchain}`,
+          ),
+        ]),
+      ).sort();
+    }
+
+    const enriched = await adapter.attachLabels(
+      Array.from(byName.values()),
+      batchesA as any,
+      cacheDir,
+    );
+    for (const n of enriched) {
+      const cur = byName.get(n.name) || n;
+      const labs = new Set([...(cur.labels || []), ...((n.labels as any) || [])]);
+      byName.set(n.name, { ...cur, labels: Array.from(labs).sort() });
+    }
+  }
+
+  const normalized = Array.from(byName.values()).sort((a, b) => a.name.localeCompare(b.name));
   gMetrics.durationMs = Date.now() - startedAt;
   gMetrics.cacheHits = cacheHits;
   gMetrics.cacheMisses = cacheMisses;
-  gMetrics.tupleKeys = Array.from(
-    new Set(
-      batches.map(
-        (b) =>
-          `${b.tuple.goos}|${b.tuple.goarch}|${b.tuple.cgo}|${b.tuple.tagsKey}|${b.tuple.goflagsKey}|${b.tuple.toolchain}`,
-      ),
-    ),
-  ).sort();
-
   await writeIfChangedJSON(out, normalized);
   if (metricsOut) await emitMetrics(metricsOut, gMetrics);
 }

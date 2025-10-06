@@ -258,41 +258,133 @@ If not implemented
 
 Intent/Impact
 
-- Allow the exporter to handle mixed-language graphs (e.g., Go + C++) in a single run, orchestrating all present language adapters and merging their label enrichments deterministically.
+- Enable mixed-language exports (e.g., Go + C++) in a single run by orchestrating all present adapters and deterministically merging their enrichments.
+- Keep the exporter language-agnostic; all language-specific logic remains inside adapters.
 
-Design
+Adapter contract (no breaking changes)
 
-- Adapter discovery: reuse `tools/buck/exporter/lang/contract.ts` to load all present adapters.
-- Active set: compute `active = adapters.filter((a) => nodes.some((n) => a.isNode(n)))`.
-- Per-adapter batching/enrichment:
-  - For each active adapter `a`:
-    - Compute `nodesA = nodes.filter(a.isNode)`.
-    - Run `batchesA = await a.buildBatches(nodesA)`.
-    - Allow per-adapter optional preprocessing (e.g., Go’s `go list`) to happen inside `a.attachLabels` or via adapter-internal helpers; exporter remains language-agnostic.
-    - Get `enrichedA = await a.attachLabels(nodes, batchesA, cacheDir)`.
-- Deterministic merge:
-  - Start from original `nodes` and fold `enrichedA` for each adapter by `name`:
-    - Merge labels as a set, then output sorted labels.
-    - Non-overlapping fields remain unchanged (C++ adapter only touches labels).
-- Keep attr reads unchanged (`attrList`), maintain sparse-checkout grace (adapters absent → simply not active).
-- Preserve current single-adapter fast path when only one adapter is active.
+- File: `tools/buck/exporter/lang/contract.ts`
+- Types (reference):
+  ```ts
+  export type Node = {
+    name: string;
+    rule_type?: string;
+    labels?: string[];
+    srcs?: string[];
+    [k: string]: any;
+  };
+  export type Batch = {
+    key: string;
+    nodes: string[];
+    env?: Record<string, string>;
+    args?: string[];
+  };
+  export interface Adapter {
+    name: string; // e.g., "go", "cpp"
+    isNode(n: Node): boolean; // adapter claims a node
+    buildBatches(nodes: Node[]): Promise<Batch[]>; // optional heavy preprocessing per config tuple
+    attachLabels(nodes: Node[], batches?: Batch[], cacheDir?: string): Promise<Node[]>; // return new/updated nodes
+  }
+  ```
+- Backward compatible: Adapters may ignore `batches` and `cacheDir` (e.g., `cpp`).
+
+Dispatcher/orchestration (exporter main)
+
+- Discovery: Glob-load present adapters from `tools/buck/exporter/lang/*.ts` (already implemented for single adapter).
+- Active set: `active = adapters.filter(a => nodes.some(n => a.isNode(n)))`.
+- Batching:
+  - For each `a ∈ active`: `nodesA = nodes.filter(a.isNode)`; `batchesA = await a.buildBatches(nodesA)`.
+  - Cache directory: `${cacheRoot}/adapters/${a.name}` where `cacheRoot` defaults to `tools/buck/.cache` (created if missing). Stable path → deterministic keys.
+- Deterministic execution order:
+  - Sort `active` by `a.name` ascending.
+  - Execute adapters sequentially by default to simplify determinism and IO (can parallelize later with bounded concurrency if needed).
+- Merge algorithm (per adapter):
+  - `enrichedA = await a.attachLabels(nodes, batchesA, cacheDirA)`.
+  - Fold by `node.name`:
+    - Fields touched by adapters today: only `labels`.
+    - Merge rule for labels: `labels' = sort(unique((labels || []) ∪ (labelsA || [])))`.
+    - Never delete labels; adapters only add.
+    - For future adapter fields, additions must be monotonic and merged via set-union or last-writer by adapter-name order; keep the merge central and trivial.
+
+Determinism & stability
+
+- Inputs: Original `nodes` array, adapter presence, adapter source code, and any adapter cache contents keyed by batch `key`.
+- Ordering: Sort adapters by `name`; within each adapter, sort batches by `key`; sort node merges by `node.name`.
+- Output: `nodesOut` with labels lexicographically sorted; metrics (optional) include adapter names and batch keys in sorted order.
+
+Caching
+
+- Provide `cacheDirA` to adapters; content and eviction policy are adapter-owned.
+- Go adapter may reuse its existing batch cache keyed by `(toolchain, GOOS/GOARCH/CGO, tags, go.mod/sum hash)`; `cpp` adapter typically no-ops.
+
+Metrics & diagnostics (optional but recommended)
+
+- Extend `--metrics-out` JSON with:
+  - `adaptersActive: string[]` (sorted)
+  - `adapterBatches: Record<string,string[]>` mapping adapter → sorted batch keys
+  - `labelsAddedByAdapter: Record<string, number>` (counts)
+
+Sparse-checkout grace
+
+- If an adapter file is absent, it is simply not discovered → not active.
+- If an adapter is present but no nodes match `isNode`, it is not active.
+- No cross-language hard requirements: exporter runs with any subset of adapters.
+
+Error handling
+
+- Adapter failure should fail the run with a concise message prefixed with `[adapter:<name>]`.
+- For batch-level failures, include `batch.key` in the error to aid debugging.
+- Do not partially apply labels; fail-fast preserves determinism.
+
+Pseudocode (sketch)
+
+```ts
+const adapters = loadPresentAdapters(); // discovered from lang/*.ts
+const active = adapters
+  .filter((a) => nodes.some(a.isNode))
+  .sort((a, b) => a.name.localeCompare(b.name));
+const byName = new Map(nodes.map((n) => [n.name, { ...n, labels: [...(n.labels || [])].sort() }]));
+for (const a of active) {
+  const nodesA = nodes.filter(a.isNode).sort((x, y) => x.name.localeCompare(y.name));
+  const batchesA = await a.buildBatches(nodesA);
+  const cacheDirA = path.join(cacheRoot, "adapters", a.name);
+  const enriched = await a.attachLabels(nodes, batchesA, cacheDirA);
+  for (const n of enriched) {
+    const cur = byName.get(n.name) || n;
+    const labs = new Set([...(cur.labels || []), ...(n.labels || [])]);
+    byName.set(n.name, { ...cur, labels: Array.from(labs).sort() });
+  }
+}
+const out = Array.from(byName.values()).sort((x, y) => x.name.localeCompare(y.name));
+```
+
+Tests (add to `tools/tests/exporter/`)
+
+- `exporter.mixed-lang.labels.merge.test.ts`:
+  - Simulated nodes: 1 Go lib/test and 1 C++ bin.
+  - Expect: Go targets keep `lang:go` + module labels; C++ target gets `lang:cpp` + `kind:bin`.
+  - Labels are deduped and lexicographically sorted per node.
+- `exporter.adapters.inactive.skip.test.ts`:
+  - Remove `tools/buck/exporter/lang/cpp.ts` from temp repo; ensure run still succeeds and Go labels present.
+- `exporter.metrics.adapters.batches.test.ts` (if metrics enabled):
+  - Verify `adaptersActive` and `adapterBatches` include `go` and `cpp` appropriately.
 
 Acceptance criteria
 
-- With a simulated graph containing both Go and C++ targets, resulting JSON has:
-  - Go nodes: `lang:go` plus existing module/kind labels as today.
-  - C++ nodes: `lang:cpp` plus `kind:bin|lib|test` where derivable.
-- No label loss or duplication; labels are deduped and lexicographically sorted.
-- Existing language-specific tests remain green; new mixed-language test passes.
+- Mixed-language graph export yields correct per-language labels with no loss/duplication; ordering of labels is deterministic.
+- Existing single-language tests remain green; new mixed-language tests pass.
+- Exporter remains sparse-checkout friendly: missing adapters simply reduce the active set.
 
 Risks
 
-- Complexity increase in `exporter/main.ts`. Mitigation: minimal, well-named helpers and keep language-specific logic inside adapters.
-- Parallel execution complexity. Mitigation: bound concurrency per adapter (reuse existing Go batching) and keep deterministic ordering in merges.
+- Orchestration adds control flow to `exporter/main.ts`.
+  - Mitigation: keep logic in 3 small, well-named helpers (`computeActive`, `runAdapter`, `mergeNodes`) with ≤10 cyclomatic complexity each.
+- Potential hidden coupling via shared fields in the future.
+  - Mitigation: enforce “adapters only add, never delete” policy; centralize merge for touched fields.
 
 If not implemented
 
-- Exporter will enrich only the first active language adapter; mixed-language graphs won’t have complete labeling for the non-selected language.
+- Mixed-language graphs may lack labels for the non-selected language, reducing diagnostics and downstream provider wiring quality.
 
 ---
 
