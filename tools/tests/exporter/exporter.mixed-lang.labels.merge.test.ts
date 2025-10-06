@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import assert from "node:assert/strict";
 import fs from "fs-extra";
+import assert from "node:assert/strict";
 import path from "node:path";
 import { runInTemp } from "../lib/test-helpers";
 
