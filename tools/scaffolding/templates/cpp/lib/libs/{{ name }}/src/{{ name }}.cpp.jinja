@@ -1,0 +1,8 @@
+#include "{{ name }}.h"
+#include <string>
+
+std::string {{ name | replace("-", "_") }}_greet(const std::string& who) {
+    return "hello " + who;
+}
+
+

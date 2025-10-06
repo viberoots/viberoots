@@ -1,0 +1,10 @@
+load("//cpp:defs.bzl", "nix_cpp_binary")
+
+nix_cpp_binary(
+    name = "{{ name }}",
+    srcs = ["apps/{{ name }}/src/main.cpp"],
+    labels = ["lang:cpp", "kind:bin"],
+    visibility = ["PUBLIC"],
+)
+
+

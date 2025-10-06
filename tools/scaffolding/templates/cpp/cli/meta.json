@@ -1,0 +1,13 @@
+{
+  "language": "cpp",
+  "template": "cli",
+  "description": "C++ CLI (hello world)",
+  "help": {
+    "usage": "scaf new cpp cli <name> [--path=DEST]",
+    "notes": [
+      "Generates a minimal C++ binary using nix_cpp_binary.",
+      "No third-party deps; prints a hello message."
+    ],
+    "examples": ["scaf new cpp cli demo-cli --path=apps/demo-cli"]
+  }
+}

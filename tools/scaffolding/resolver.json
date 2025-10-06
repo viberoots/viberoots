@@ -6,5 +6,9 @@
   "go": {
     "lib": "libs/{name}",
     "cli": "apps/{name}"
+  },
+  "cpp": {
+    "lib": "libs/{name}",
+    "cli": "apps/{name}"
   }
 }

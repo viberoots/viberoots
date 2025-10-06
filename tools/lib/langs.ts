@@ -18,6 +18,19 @@ const KNOWN: ScaffoldingLanguage[] = [
     templatesDir: "tools/scaffolding/templates/go",
   },
   {
+    id: "cpp",
+    displayName: "C++",
+    requiredPaths: ["tools/nix/templates/cpp.nix", "cpp/defs.bzl"],
+    optionalPaths: [],
+    kinds: ["cli", "lib", "test"],
+    capabilities: {
+      patching: false,
+      lockfileLabels: false,
+      testAutoWire: false,
+    },
+    templatesDir: "tools/scaffolding/templates/cpp",
+  },
+  {
     id: "node",
     displayName: "Node",
     requiredPaths: ["**/pnpm-lock.yaml"],

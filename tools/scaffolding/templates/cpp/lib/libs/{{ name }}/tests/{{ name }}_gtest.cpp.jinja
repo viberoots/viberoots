@@ -1,0 +1,8 @@
+#include <gtest/gtest.h>
+#include "{{ name }}.h"
+
+TEST({{ name | replace("-", "_") | capitalize }}Greet, ReturnsHelloWorld) {
+    EXPECT_EQ({{ name | replace("-", "_") }}_greet("world"), "hello world");
+}
+
+

@@ -1,0 +1,22 @@
+load("//cpp:defs.bzl", "nix_cpp_library", "nix_cpp_test")
+
+nix_cpp_library(
+    name = "{{ name }}",
+    srcs = glob(["src/**/*.cpp"]),
+    headers = glob(["include/**/*.h"]),
+    labels = ["lang:cpp", "kind:lib"],
+    visibility = ["PUBLIC"],
+)
+
+nix_cpp_test(
+    name = "{{ name }}_gtest",
+    srcs = ["tests/{{ name }}_gtest.cpp"],
+    deps = [
+        ":{{ name }}",
+        "//third_party/cpp:gtest_main",
+        "//third_party/cpp:gtest",
+    ],
+    labels = ["lang:cpp", "kind:test"],
+)
+
+

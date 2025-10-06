@@ -1,0 +1,13 @@
+{
+  "language": "cpp",
+  "template": "lib",
+  "description": "C++ library with GoogleTest",
+  "help": {
+    "usage": "scaf new cpp lib <name> [--path=DEST]",
+    "notes": [
+      "Generates a minimal C++ static library and a GoogleTest-based test.",
+      "Targets use nix_cpp_* macros; tests depend on //third_party/cpp:gtest_main and gtest."
+    ],
+    "examples": ["scaf new cpp lib demo-lib --path=libs/demo-lib"]
+  }
+}

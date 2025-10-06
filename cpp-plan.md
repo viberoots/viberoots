@@ -4,7 +4,7 @@ This document proposes adding C++ as a first-class language to the repo with min
 
 ### Scope
 
-- Templates: `cpp/lib`, `cpp/bin`
+- Templates: `cpp/lib`, `cpp/cli`
 - Planner templates and mapping
 - Exporter adapter and labels
 - Macros (`//cpp/defs.bzl`) stamping `lang:cpp` + `kind:*`
@@ -490,26 +490,41 @@ Determinism & Sparse Checkout
 - If `third_party/providers/auto_map.bzl` is missing, `_providers_for` effectively yields no deps; prebuild-guard in CI ensures generated glue presence only when needed.
 - If `cpp/defs.bzl` is missing in a sparse checkout, teams can continue using raw `cxx_*` rules; exporter still recognizes C++ via `rule_type` and tests for other languages continue to work.
 
-### PR 10: Scaffolding templates (cpp/lib and cpp/bin)
+### PR 10: Scaffolding templates (cpp/lib and cpp/cli)
 
 Intent/Impact
 
-- Add copier templates for `cpp/lib` and `cpp/bin` producing runnable examples and `TARGETS` using `nix_cpp_*` macros.
+- Add copier templates for `cpp/lib` and `cpp/cli` producing runnable examples and `TARGETS` using `nix_cpp_*` macros.
 
 Design
 
 - `tools/scaffolding/templates/cpp/lib`:
   - `libs/{{ name }}/`
-  - `TARGETS` with `nix_cpp_library(name = "{{ name }}", srcs = glob(["src/**/*.cpp"]))`
-  - minimal `src/{{ name }}.cpp` and a single `*_test.cpp` (one test per file convention)
-- `tools/scaffolding/templates/cpp/bin`:
+  - `TARGETS`:
+    - `nix_cpp_library(name = "{{ name }}", srcs = glob(["src/**/*.cpp"]))`
+    - `nix_cpp_test(name = "{{ name }}_gtest", srcs = ["tests/{{ name }}_gtest.cpp"], deps = [":{{ name }}", "//third_party/cpp:gtest_main", "//third_party/cpp:gtest"])`
+      - Depends on nixpkgs `pkgs.gtest` via the C++ provider from PR 1 (expected aliases: `//third_party/cpp:gtest` and `//third_party/cpp:gtest_main`).
+  - minimal `include/{{ name }}.h` and `src/{{ name }}.cpp`
+  - a single GoogleTest file `tests/{{ name }}_gtest.cpp` (one test per file convention)
+  - Example test template (no custom `main`; provided by `gtest_main`):
+
+    ```cpp
+    #include <gtest/gtest.h>
+    #include "{{ name }}.h"
+
+    TEST({{ name | replace("-", "_") | capitalize }}Greet, ReturnsHelloWorld) {
+        EXPECT_EQ({{ name | replace("-", "_") }}_greet("world"), "hello world");
+    }
+    ```
+
+- `tools/scaffolding/templates/cpp/cli`:
   - `apps/{{ name }}/`
   - `TARGETS` with `nix_cpp_binary(name = "{{ name }}", srcs = ["src/main.cpp"], deps = [])`
   - `src/main.cpp` hello world
 
 Acceptance criteria
 
-- `scaf new cpp lib demo-lib` and `scaf new cpp bin demo-cli` both build and the test passes.
+- `scaf new cpp lib demo-lib` and `scaf new cpp cli demo-cli` both build and the lib test passes under GoogleTest.
 
 Risks
 
@@ -521,7 +536,7 @@ If not implemented
 
 ---
 
-### PR 11: Tests — e2e scaffold-and-build (lib/bin)
+### PR 11: Tests — e2e scaffold-and-build (lib/cli)
 
 Intent/Impact
 
@@ -531,7 +546,7 @@ Intent/Impact
 
 - Tests under `tools/tests/cpp/`:
   - `cpp.scaffold-and-build.lib.test.ts`
-  - `cpp.scaffold-and-build.bin.test.ts`
+  - `cpp.scaffold-and-build.cli.test.ts`
   - Validate labels include `lang:cpp` and `kind:*`
   - Validate planner builds derivations and outputs exist
 

@@ -1,0 +1,24 @@
+# Minimal copier template for cpp/lib
+version: 1
+
+_envops:
+  block_start_string: "{%"
+  block_end_string: "%}"
+  variable_start_string: "{{"
+  variable_end_string: "}}"
+  comment_start_string: "{#"
+  comment_end_string: "#}"
+  keep_trailing_newline: true
+
+_exclude:
+  - meta.json
+  - help.md
+
+name: ""
+language: "cpp"
+template: "lib"
+
+_tasks:
+  - mkdir -p libs/{{ name }}/include
+  - mkdir -p libs/{{ name }}/src
+  - mkdir -p libs/{{ name }}/tests
