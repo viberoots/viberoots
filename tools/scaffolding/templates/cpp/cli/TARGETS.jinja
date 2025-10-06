@@ -1,10 +1,20 @@
-load("//cpp:defs.bzl", "nix_cpp_binary")
+load("//cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_test")
 
 nix_cpp_binary(
     name = "{{ name }}",
     srcs = ["src/main.cpp"],
     labels = ["lang:cpp", "kind:bin"],
     visibility = ["PUBLIC"],
+)
+
+nix_cpp_test(
+    name = "{{ name }}_gtest",
+    srcs = ["tests/{{ name }}_gtest.cpp"],
+    deps = [
+        "//third_party/cpp:gtest_main",
+        "//third_party/cpp:gtest",
+    ],
+    labels = ["lang:cpp", "kind:test"],
 )
 
 

@@ -20,3 +20,5 @@ template: "cli"
 
 _tasks:
   - mkdir -p src
+  - mkdir -p include
+  - mkdir -p tests
