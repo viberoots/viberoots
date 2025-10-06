@@ -19,4 +19,4 @@ language: "cpp"
 template: "cli"
 
 _tasks:
-  - mkdir -p apps/{{ name }}/src
+  - mkdir -p src

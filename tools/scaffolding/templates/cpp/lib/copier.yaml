@@ -19,6 +19,6 @@ language: "cpp"
 template: "lib"
 
 _tasks:
-  - mkdir -p libs/{{ name }}/include
-  - mkdir -p libs/{{ name }}/src
-  - mkdir -p libs/{{ name }}/tests
+  - mkdir -p include
+  - mkdir -p src
+  - mkdir -p tests
