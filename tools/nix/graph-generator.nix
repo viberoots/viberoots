@@ -190,12 +190,15 @@ let
   mkGo = name: kind:
     if kind == "bin" then LANGS.go.mkApp name else LANGS.go.mkLib name;
 
+  # Limit to Go targets only for graph-outputs; other languages are handled in their own PRs/tests.
+  # This avoids requiring gomod2nix overlay when non-Go targets are present and prevents
+  # accidentally dispatching non-Go nodes through Go templates.
   safeNodes = builtins.filter (n:
     let nm = ensureFullLabel n;
         okName = (builtins.typeOf nm == "string") && nm != "";
         rel = if okName then (pkgPathOf nm) else "";
         inAppsLibs = lib.hasPrefix "apps/" rel || lib.hasPrefix "libs/" rel;
-    in okName && inAppsLibs && ((LANGS.go.isTarget n) || (pick n) != null) && (pick n) != null
+    in okName && inAppsLibs && (LANGS.go.isTarget n)
   ) nodesList;
 
   goTargetsFromGraph = builtins.foldl' (acc: n:
