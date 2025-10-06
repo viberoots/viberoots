@@ -8,6 +8,70 @@ let
   # Stable sort helper for lists of strings
   sorted = xs: lib.sort (a: b: a < b) xs;
 in {
+  cppApp = {
+    name,
+    srcRoot ? ../../..,
+    subdir ? ".",
+    includes ? [],
+    defines ? [],
+    cflags ? [],
+    ldflags ? [],
+    std ? "c++17",
+  }:
+  let
+    pname = "cppapp-${H.sanitizeName name}";
+    srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + subdir));
+    incFlags = lib.concatStringsSep " " (map (p: "-I${p}") (sorted includes));
+    defFlags = lib.concatStringsSep " " (map (d: "-D${d}") (sorted defines));
+    extraC   = lib.concatStringsSep " " (sorted (cflags ++ [ "-ffunction-sections" "-fdata-sections" ]));
+    extraLD  = lib.concatStringsSep " " (sorted ldflags);
+    platLD   = if pkgs.stdenv.isDarwin then "-Wl,-dead_strip" else "-Wl,--gc-sections";
+  in pkgs.stdenv.mkDerivation {
+    inherit pname;
+    version = "0.1.0";
+    src = srcAbs;
+    nativeBuildInputs = [ pkgs.llvmPackages.clang pkgs.llvmPackages.llvm ];
+    dontConfigure = true;
+    dontInstallCheck = true;
+    doCheck = false;
+    installPhase = ''
+      set -eu
+      mkdir -p "$out/bin" "$out/include"
+      tmp="$TMPDIR/obj"; mkdir -p "$tmp"
+
+      mapfile -t SRCS < <(find . -type f \( -name '*.cpp' -o -name '*.cc' -o -name '*.cxx' \) | sort)
+      mapfile -t HDRS < <(find . -type f \( -name '*.h' -o -name '*.hpp' -o -name '*.hh' -o -name '*.hxx' \) | sort)
+
+      cflags_common="-std=${std} -fno-record-gcc-switches -ffile-prefix-map=$PWD=. -g0 -O2 -pipe"
+      for s in "''${SRCS[@]}"; do
+        rel="''${s#./}"
+        obj="$tmp/''${rel%.*}.o"
+        mkdir -p "$(dirname "$obj")"
+        ${clangxx} $cflags_common ${incFlags} ${defFlags} ${extraC} -c "$s" -o "$obj"
+      done
+
+      mapfile -t OBJS < <(find "$tmp" -type f -name '*.o' | sort)
+      outbin="$out/bin/${H.sanitizeName name}"
+      ${clangxx} ${platLD} ${extraLD} "''${OBJS[@]}" -o "$outbin"
+
+      for h in "''${HDRS[@]}"; do
+        install -Dm644 "$h" "$out/include/''${h#./}"
+      done
+
+      {
+        echo "name=${name}"
+        echo "std=${std}"
+        echo "includes=${incFlags}"
+        echo "defines=${defFlags}"
+        echo "cflags=${extraC}"
+        echo "ldflags=${extraLD} ${platLD}"
+        echo "sources=${#SRCS[@]}"
+        echo "objects=${#OBJS[@]}"
+        echo "outbin=$outbin"
+      } > "$out/build.log"
+    '';
+  };
+
   # Build a static C++ library from sources under subdir of srcRoot.
   # Determinism: stable file ordering, stable flag ordering, reproducible flags.
   cppLib = {
