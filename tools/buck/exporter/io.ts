@@ -5,9 +5,14 @@ import type { Node } from "./types.ts";
 export const attrList = [
   "name",
   "rule_type",
+  "buck.type",
   "srcs",
+  "buck.srcs",
+  "nix_srcs",
   "deps",
+  "buck.deps",
   "labels",
+  "buck.labels",
   "args",
   "env",
   "main",
@@ -19,16 +24,41 @@ export const attrList = [
 ];
 
 export async function cqueryNodes(scope: string, attrs: string[]): Promise<Node[]> {
-  const base = `deps(//..., 1, exec_deps())`;
-  const query = scope ? `attrfilter(labels, ${scope}, ${base})` : base;
   const flags = attrs.flatMap((a) => ["--output-attribute", a]);
   const platformFlags = ["--target-platforms", "prelude//platforms:default"];
-  const { stdout } = await $`buck2 cquery ${platformFlags} ${query} --json ${flags}`;
-  const obj = JSON.parse(String(stdout)) as Record<string, any>;
+  // Buck disallows recursive invocations unless an isolation dir NAME is set.
+  // It must be a simple directory name, not a path.
+  const iso = process.env.BUCK_ISOLATION_DIR || `exporter-${process.pid}-${Date.now()}`;
+
+  async function runQuery(q: string): Promise<Record<string, any>> {
+    const query = scope ? `attrfilter(labels, ${scope}, ${q})` : q;
+    const { stdout } =
+      await $`buck2 --isolation-dir ${iso} cquery ${platformFlags} ${query} --json ${flags}`;
+    return JSON.parse(String(stdout)) as Record<string, any>;
+  }
+
+  async function runQuerySafe(q: string): Promise<Record<string, any>> {
+    try {
+      return await runQuery(q);
+    } catch {
+      return {} as Record<string, any>;
+    }
+  }
+
+  // Query regular deps and tests separately, then merge to ensure test nodes are present
+  const base = `deps(//..., 1, exec_deps())`;
+  const kindCxxTest = `kind("cxx_test", //...)`;
+  const attrCxxTest = `attrfilter(rule_type, "cxx_test", //...)`;
+  const [obj1, obj2, obj3] = await Promise.all([
+    runQuerySafe(base),
+    runQuerySafe(kindCxxTest),
+    runQuerySafe(attrCxxTest),
+  ]);
+  const merged: Record<string, any> = { ...obj1, ...obj2, ...obj3 };
+
   const nodes: Node[] = [];
-  for (const [label, raw] of Object.entries(obj)) {
+  for (const [label, raw] of Object.entries(merged)) {
     const a = (raw || {}) as Record<string, any>;
-    // Normalize possible buck.* keys to canonical names expected downstream
     const ruleType: string | undefined =
       typeof a["rule_type"] === "string"
         ? (a["rule_type"] as string)
@@ -49,9 +79,7 @@ export async function cqueryNodes(scope: string, attrs: string[]): Promise<Node[
         ? (a["buck.srcs"] as string[])
         : undefined;
 
-    // Do not add heuristic labels; rely only on authoritative rule_type or macro-stamped labels
     const labs = new Set<string>(labelsArr || []);
-
     const n: any = {
       ...a,
       name: label,

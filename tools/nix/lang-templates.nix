@@ -4,7 +4,7 @@ let
   Cpp = import ./templates/cpp.nix { inherit pkgs; };
 in {
   inherit (Go)  goApp goLib;
-  inherit (Cpp) cppApp cppLib;
+  inherit (Cpp) cppApp cppLib cppTest;
 }
 
 

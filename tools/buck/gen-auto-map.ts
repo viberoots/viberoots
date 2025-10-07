@@ -33,6 +33,12 @@ function providersForLabels(labels: string[] | undefined): string[] {
       const [path, importer = ""] = rest.split("#");
       if (!path || !importer) continue;
       out.add(fqProviderLabel(providerNameForImporter(path, importer)));
+    } else if (l.startsWith("nixpkg:")) {
+      let attr = l.slice("nixpkg:".length);
+      // Normalize common alias: pkgs.gtest -> pkgs.googletest
+      if (attr === "pkgs.gtest") attr = "pkgs.googletest";
+      const tail = attr.toLowerCase().replace(/[^a-z0-9_]+/g, "_");
+      out.add(fqProviderLabel(`nix_pkgs_${tail}`));
     }
   }
   return Array.from(out).sort();

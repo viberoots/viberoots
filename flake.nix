@@ -2,6 +2,16 @@
 {
   description = "bucknix-fresh devshell and scaffolding";
 
+  nixConfig = {
+    allowed-impure-env-vars = [
+      "BUCK_GRAPH_JSON"
+      "ROOT_GOMOD2NIX_TOML"
+      "BUCK_TEST_SRC"
+      "BUCK_TARGET"
+      "NIX_GO_DEV_OVERRIDE_JSON"
+    ];
+  };
+
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     # Pin buck2 to match the upstream binary version on PATH (201beb86106f...)
@@ -40,16 +50,17 @@
 
     packages = forAllSystems ({ zx-wrapper, pkgs, nodeMods, prelude, buck2Input, system, ... }:
       let
-        # Allow BUCK_GRAPH_JSON to override the graph path when running via dev shell
+        # Allow BUCK_GRAPH_JSON to override the graph path; only pass when path exists
         graphGen = let
           envGraph = builtins.getEnv "BUCK_GRAPH_JSON";
           graphPath = if envGraph != "" then envGraph else ./tools/buck/graph.json;
+          graphArg = if (builtins.pathExists graphPath) then (builtins.path { path = graphPath; name = "graph.json"; }) else null;
         in pkgs.callPackage ./tools/nix/graph-generator.nix {
           inherit pkgs;
           # Use a stable working-tree snapshot of the entire repo
           src = builtins.path { path = ./.; name = "repo"; };
           # Explicitly include graph.json: prefer env override, else working tree file
-          graphJsonPath = builtins.path { path = graphPath; name = "graph.json"; };
+          graphJsonPath = graphArg;
           # Allow tests to override repo-root gomod2nix.toml via env
           rootModulesTomlPath = let envRootToml = builtins.getEnv "ROOT_GOMOD2NIX_TOML"; in
             if envRootToml != "" then envRootToml else ./gomod2nix.toml;
@@ -61,6 +72,8 @@
         node-modules = nodeMods.node-modules;
         default = nodeMods.node-modules;
         graph-generator = graphGen.all;
+        graph-generator-cppTargets = graphGen.cppTargetsFlat;
+        graph-generator-selected = graphGen.selected;
       }
     );
 

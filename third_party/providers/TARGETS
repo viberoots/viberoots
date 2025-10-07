@@ -1,0 +1,7 @@
+load("//third_party/providers:defs_cpp.bzl", "nix_cxx_library")
+
+# Minimal C++ providers (nixpkgs-backed) for test scaffolds
+nix_cxx_library(name = "nix_pkgs_gtest", attr = "pkgs.googletest")
+nix_cxx_library(name = "nix_pkgs_gtest_main", attr = "pkgs.googletest")
+
+

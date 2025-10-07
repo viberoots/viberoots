@@ -1,0 +1,27 @@
+load("//tools/buck:zx_test.bzl", "zx_test")
+
+zx_test(
+    name = "include-from-nixpkg.providers.test.ts",
+    script = "include-from-nixpkg.providers.test.ts",
+    out = "include-from-nixpkg.providers.test.stamp",
+)
+
+zx_test(
+    name = "cpp.macros.stamp.labels.lib.test.ts",
+    script = "cpp.macros.stamp.labels.lib.test.ts",
+    out = "cpp.macros.stamp.labels.lib.test.stamp",
+)
+
+zx_test(
+    name = "cpp.macros.stamp.labels.bin.test.ts",
+    script = "cpp.macros.stamp.labels.bin.test.ts",
+    out = "cpp.macros.stamp.labels.bin.test.stamp",
+)
+
+zx_test(
+    name = "cpp.macros.stamp.labels.test.test.ts",
+    script = "cpp.macros.stamp.labels.test.test.ts",
+    out = "cpp.macros.stamp.labels.test.test.stamp",
+)
+
+

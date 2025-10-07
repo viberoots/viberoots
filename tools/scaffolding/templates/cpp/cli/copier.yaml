@@ -17,7 +17,6 @@ _exclude:
 name: ""
 language: "cpp"
 template: "cli"
-with_gtest: false
 
 _tasks:
   - mkdir -p src

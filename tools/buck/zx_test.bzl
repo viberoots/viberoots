@@ -62,7 +62,11 @@ def _zx_test_impl(ctx):
             + "SAFE=$(printf %%s \"$BUCK_TEST_TARGET\" | sed -E 's|^.*/:||; s/[^A-Za-z0-9._-]+/_/g' | cut -c1-200); "
             + "LOGDIR=\"$TEST_LOG_DIR/$SAFE\"; mkdir -p \"$LOGDIR\"; "
             + "rm -f \"$LOGDIR/test.stdout.log\" \"$LOGDIR/test.stderr.log\" 2>/dev/null || true; "
-            + "cd \"$WORKSPACE_ROOT\"; { \"$NODE_BIN\" $TEST_NODE_OPTIONS --test --experimental-strip-types --import \"$WORKSPACE_ROOT/tools/dev/zx-init.mjs\" %s; } > >(tee -a \"$LOGDIR/test.stdout.log\") 2> >(tee -a \"$LOGDIR/test.stderr.log\" >&2); STATUS=$?; "
+            + "cd \"$WORKSPACE_ROOT\"; "
+            + "PKG=$(printf %%s \"$BUCK_TEST_TARGET\" | sed -E 's#^.*//([^:]+):.*$#\\1#'); "
+            + "CAND1=\"$WORKSPACE_ROOT/%s\"; CAND2=\"$WORKSPACE_ROOT/$PKG/%s\"; "
+            + "SCRIPT_PATH=\"$CAND1\"; if [ ! -f \"$SCRIPT_PATH\" ]; then SCRIPT_PATH=\"$CAND2\"; fi; "
+            + "{ \"$NODE_BIN\" $TEST_NODE_OPTIONS --test --experimental-strip-types --import \"$WORKSPACE_ROOT/tools/dev/zx-init.mjs\" \"$SCRIPT_PATH\"; } > >(tee -a \"$LOGDIR/test.stdout.log\") 2> >(tee -a \"$LOGDIR/test.stderr.log\" >&2); STATUS=$?; "
             + "if [ \"$COVERAGE\" = \"1\" ]; then "
             + "\"$NODE_BIN\" \"$WORKSPACE_ROOT/tools/dev/coverage-raw-normalize.mjs\" || true; "
             + "\"$NODE_BIN\" \"$WORKSPACE_ROOT/node_modules/c8/bin/c8.js\" report "
@@ -75,7 +79,7 @@ def _zx_test_impl(ctx):
             + "\"$NODE_BIN\" ./tools/dev/coverage-normalize.mjs || true; "
             + "fi; exit \"$STATUS\""
         )
-        % (ctx.label, script.short_path,)
+        % (ctx.label, script.short_path, script.short_path)
     )
     cmd = [
         "bash",

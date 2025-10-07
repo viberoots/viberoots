@@ -26,11 +26,12 @@ let
         in if parts == [] then "" else lib.removePrefix "module " (lib.head parts)
       ) else "";
 
-  # Vendor staging removed — rely on gomod2nix and overrides only
-  # Require explicit graphJsonPath because flake self source excludes untracked files
-  graphPath = if graphJsonPath != null
-    then builtins.toPath graphJsonPath
-    else builtins.throw "graphJsonPath is required; pass tools/buck/graph.json via flake to include untracked glue.";
+  # Prefer explicit graphJsonPath; otherwise fall back to BUCK_TEST_SRC/tools/buck/graph.json
+  # so test sandboxes can provide a live graph without requiring flake to import it.
+  graphPath = if graphJsonPath != null then builtins.toPath graphJsonPath else (
+    let cand = builtins.toPath (repoRootStr + "/tools/buck/graph.json"); in
+      if builtins.pathExists cand then cand else builtins.throw "graphJsonPath not provided and repoRoot/tools/buck/graph.json missing — run tools/buck/export-graph.ts first." 
+  );
   nodes = if builtins.pathExists graphPath
     then builtins.fromJSON (builtins.readFile graphPath)
     else builtins.throw "graphJsonPath does not exist — run tools/buck/export-graph.ts before building.";
@@ -45,7 +46,14 @@ let
               else { name = k; }
           ) ks
       ) else [];
-  T = import ./lang-templates.nix { inherit pkgs; };
+  # Prefer language manifests and planner plugins from the TEST repo (BUCK_TEST_SRC)
+  # so zx tests that rsync a temp repo can provide cpp enablement without requiring
+  # the main flake workspace to also include those files.
+  manifestBase =
+    let candidate = builtins.toPath (repoRootStr + "/tools/nix"); in
+      if builtins.pathExists candidate then candidate else ./.;
+  # Load language templates from the chosen manifest base (temp repo when set)
+  T = import (manifestBase + "/lang-templates.nix") { inherit pkgs; };
   M = if builtins.pathExists ./mapping.nix then (
         let raw = import ./mapping.nix;
             attempt = builtins.tryEval (raw {});
@@ -86,13 +94,15 @@ let
   # Build planner context and import language plugins if present
   ctx = {
     inherit lib T repoRoot localModuleOverrides pkgPathOf;
+    # Provide full nodes list so language plugins (e.g., C++) can walk deps
+    nodes = nodesList;
     get = get;
     modulesTomlFor = modulesTomlFor;
   };
   # Build language adapters map by enumerating known ids from langs.json when present,
   # otherwise fall back to on-disk existence. Keep partial-clone safe behavior.
   readLangIds = let
-    langsPath = ./langs.json;
+    langsPath = manifestBase + "/langs.json";
   in if builtins.pathExists langsPath then
     let raw = builtins.fromJSON (builtins.readFile langsPath);
         arr = if (builtins.isList raw) then raw else (raw.languages or []);
@@ -100,7 +110,7 @@ let
   else [];
 
   ensureAdapter = langId:
-    let p = ./. + ("/planner/" + langId + ".nix"); in
+    let p = manifestBase + ("/planner/" + langId + ".nix"); in
       if builtins.pathExists p then (import p { inherit lib; } ctx) else {
         isTarget = n: false;
         kindOf = n: null;
@@ -190,10 +200,15 @@ let
   mkGo = name: kind:
     if kind == "bin" then LANGS.go.mkApp name else LANGS.go.mkLib name;
 
-  # Limit to Go targets only for graph-outputs; other languages are handled in their own PRs/tests.
-  # This avoids requiring gomod2nix overlay when non-Go targets are present and prevents
-  # accidentally dispatching non-Go nodes through Go templates.
-  safeNodes = builtins.filter (n:
+  mkCpp = name: kind:
+    if kind == "bin" then LANGS.cpp.mkApp name
+    else if kind == "lib" then LANGS.cpp.mkLib name
+    else if kind == "test" then LANGS.cpp.mkTest name
+    else LANGS.cpp.mkApp name;
+
+  # Limit to Go targets only for graph-outputs historically; now include C++ in addition.
+  # We still restrict to apps/* and libs/* for partial-clone safety.
+  safeGoNodes = builtins.filter (n:
     let nm = ensureFullLabel n;
         okName = (builtins.typeOf nm == "string") && nm != "";
         rel = if okName then (pkgPathOf nm) else "";
@@ -201,16 +216,24 @@ let
     in okName && inAppsLibs && (LANGS.go.isTarget n)
   ) nodesList;
 
+  safeCppNodes = builtins.filter (n:
+    let nm = ensureFullLabel n;
+        okName = (builtins.typeOf nm == "string") && nm != "";
+        rel = if okName then (pkgPathOf nm) else "";
+        inAppsLibs = lib.hasPrefix "apps/" rel || lib.hasPrefix "libs/" rel;
+    in okName && inAppsLibs && (LANGS ? cpp) && (LANGS.cpp.isTarget n)
+  ) nodesList;
+
   goTargetsFromGraph = builtins.foldl' (acc: n:
     let nm = ensureFullLabel n; k = pick n; tnm = builtins.typeOf nm; in
       if (tnm != "string") || (nm == "") || (k == null)
       then acc
       else (acc // { "${nm}" = mkGo nm k.kind; })
-  ) {} safeNodes;
+  ) {} safeGoNodes;
 
   # Names of targets that are binaries (used to restrict graph-outputs per PR5)
   binTargetNames = builtins.filter (nm:
-    let matches = builtins.filter (x: ensureFullLabel x == nm) safeNodes;
+    let matches = builtins.filter (x: ensureFullLabel x == nm) safeGoNodes;
         n = if matches == [] then null else builtins.head matches;
         k = if n == null then null else pick n;
     in k != null && k.kind == "bin"
@@ -220,7 +243,7 @@ let
   goTargets =
     let names = builtins.attrNames goTargetsFromGraph;
         entries = builtins.filter (e: e != null) (map (nm:
-          let matches = builtins.filter (x: ensureFullLabel x == nm) safeNodes;
+          let matches = builtins.filter (x: ensureFullLabel x == nm) safeGoNodes;
               n = if matches == [] then null else builtins.head matches;
               k = if n == null then null else pick n;
           in if k != null && (k.kind == "bin" || k.kind == "lib") then { name = nm; value = goTargetsFromGraph.${nm}; } else null
@@ -230,10 +253,55 @@ let
   goTargetsBins = builtins.listToAttrs (map (nm: { name = nm; value = goTargetsFromGraph.${nm}; }) binTargetNames);
   goOutPaths = lib.mapAttrs (n: p: builtins.toString p) goTargetsBins;
 
+  # C++ targets collected similarly; include bin/lib/test in attrset, but only link bins in all.out/bin
+  cppTargetsFromGraph = builtins.foldl' (acc: n:
+    let nm = ensureFullLabel n; k = pick n; tnm = builtins.typeOf nm; in
+      if (tnm != "string") || (nm == "") || (k == null)
+      then acc
+      else if (k.kind == null) then acc else (acc // { "${nm}" = mkCpp nm k.kind; })
+  ) {} safeCppNodes;
+
+  cppBinNames = builtins.filter (nm:
+    let matches = builtins.filter (x: ensureFullLabel x == nm) safeCppNodes;
+        n = if matches == [] then null else builtins.head matches;
+        k = if n == null then null else pick n;
+    in k != null && k.kind == "bin"
+  ) (builtins.attrNames cppTargetsFromGraph);
+
+  cppTargets = cppTargetsFromGraph;
+  cppTargetsBins = builtins.listToAttrs (map (nm: { name = nm; value = cppTargetsFromGraph.${nm}; }) cppBinNames);
+  cppOutPaths = lib.mapAttrs (n: p: builtins.toString p) cppTargetsBins;
+
+  # Provide a flake-friendly flat attrset whose keys are safe identifiers: t + [a-z0-9_]+
+  sanitizeAttr = s:
+    let
+      chars = lib.stringToCharacters (lib.toLower s);
+      allowed = lib.stringToCharacters "abcdefghijklmnopqrstuvwxyz0123456789_";
+      mapChar = c: if builtins.elem c allowed then c else "_";
+    in "t" + (lib.concatStrings (map mapChar chars));
+
+  cppTargetsFlat = builtins.listToAttrs (
+    let
+      dropCell = lbl:
+        let parts = lib.splitString "//" lbl; in
+          if (builtins.length parts) > 1 && !(lib.hasPrefix "//" lbl)
+          then "//" + (lib.elemAt parts 1)
+          else lbl;
+    in map (nm:
+      { name = sanitizeAttr (dropCell nm); value = cppTargetsFromGraph.${nm}; }
+    ) (builtins.attrNames cppTargetsFromGraph)
+  );
+
   # Optional: select a single target by BUCK_TARGET for impure local builds/tests
   selectedTargetName = builtins.getEnv "BUCK_TARGET";
+  dropCell = lbl:
+    let base = ensureFullLabel { name = lbl; };
+        # If label starts with a cell like "root//...", convert to "//..."
+        hasCell = lib.hasInfix "//" base && !(lib.hasPrefix "//" base);
+    in if hasCell then ("//" + (lib.elemAt (lib.splitString "//" base) 1)) else base;
   selected = if selectedTargetName != "" then (
-    let matches = builtins.filter (n: ensureFullLabel n == selectedTargetName) safeNodes;
+    let normSel = dropCell selectedTargetName;
+        matches = builtins.filter (n: (dropCell (ensureFullLabel n)) == normSel) (safeGoNodes ++ safeCppNodes);
     in if matches == [] then pkgs.runCommand "missing-target-${sanitize selectedTargetName}" {} ''
       echo "missing target: ${selectedTargetName}" >&2
       exit 1
@@ -242,7 +310,7 @@ let
         if k == null then pkgs.runCommand "missing-kind-${sanitize selectedTargetName}" {} ''
           echo "missing kind for: ${selectedTargetName}" >&2
           exit 1
-        '' else mkGo selectedTargetName k.kind
+        '' else (if k.kind == "bin" || k.kind == "lib" then mkGo selectedTargetName k.kind else mkCpp selectedTargetName k.kind)
     )
   ) else pkgs.runCommand "no-target-specified" {} ''
     mkdir -p $out
@@ -300,10 +368,34 @@ let
           fi
         ''
       ) goOutPaths)}
+      ${lib.concatStringsSep "\n" (lib.mapAttrsToList (n: p:
+        ''
+          ln -s "${p}" "$out/" || true
+          echo "== cpp target: ${n} ==" >> $out/build.log
+          echo "path: ${p}" >> $out/build.log
+          (cd "${p}" && { ls -la || true; echo "-- bin --"; ls -la bin 2>/dev/null || true; }) >> $out/build.log || true
+          bins=""
+          if [ -d "${p}/bin" ]; then
+            for f in "${p}/bin"/*; do
+              if [ -f "$f" ] && [ -x "$f" ]; then
+                if [ -z "$bins" ]; then bins="\"$f\""; else bins="$bins, \"$f\""; fi
+                ln -s "$f" "$out/bin/$(basename "$f")" || true
+              fi
+            done
+          fi
+          if [ -n "$bins" ]; then
+            if [ "$first" -eq 0 ]; then echo "," >> $out/manifest.json; fi
+            echo "{ \"label\": \"${n}\", \"kind\": \"bin\", \"bins\": [ $bins ], \"aux\": [] }" >> $out/manifest.json
+            first=0
+          fi
+        ''
+      ) cppOutPaths)}
       echo ']' >> $out/manifest.json
     '';
   };
 in
-{ inherit goTargets all selected; }
+{
+  inherit goTargets cppTargets cppTargetsFlat all selected;
+}
 
 
