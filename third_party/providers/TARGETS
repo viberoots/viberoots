@@ -4,4 +4,8 @@ load("//third_party/providers:defs_cpp.bzl", "nix_cxx_library")
 nix_cxx_library(name = "nix_pkgs_gtest", attr = "pkgs.googletest")
 nix_cxx_library(name = "nix_pkgs_gtest_main", attr = "pkgs.googletest")
 
+# Curated nixpkgs providers used by C++ tests and examples
+nix_cxx_library(name = "nix_pkgs_zlib", attr = "pkgs.zlib")
+nix_cxx_library(name = "nix_pkgs_openssl", attr = "pkgs.openssl")
+
 

@@ -95,15 +95,27 @@ let
       uniq = xs: builtins.attrNames (builtins.listToAttrs (map (a: { name = a; value = true; }) xs));
     in builtins.sort (a: b: a < b) (uniq init.labels);
 
+  # Collect nixpkg labels stamped directly on the node itself (no DFS)
+  nixAttrsFromSelf = name:
+    let n = if builtins.hasAttr name byName then byName.${name} else null; in
+      if n == null then [] else (map attrFrom (builtins.filter isNixLabel (labelsOf n)));
+
   # Fallback: some Buck cquery configurations may omit deps edges on planner stubs.
   # In that case, detect common provider nodes directly and seed attrs accordingly.
   providerAttrsFallback = let
     names = builtins.map (n: let nm = get n "name"; in if nm == null then "" else cleanLabel nm) nodes;
-    has = s: builtins.any (x: (x != null && x != "") && lib.hasSuffix s x) names;
-    acc = []
-      ++ (if has "//third_party/providers:nix_pkgs_gtest" then [ "pkgs.googletest" ] else [])
-      ++ (if has "//third_party/providers:nix_pkgs_gtest_main" then [ "pkgs.googletest" ] else []);
-  in builtins.sort (a: b: a < b) (builtins.attrNames (builtins.listToAttrs (map (a: { name = a; value = true; }) acc)));
+    # Extract provider attr from a full label when it matches our providers pattern
+    toAttr = full:
+      let marker = "//third_party/providers:nix_pkgs_";
+          parts = lib.splitString marker full;
+      in if (builtins.length parts) < 2 then null else
+      let tail = builtins.elemAt parts ((builtins.length parts) - 1);
+          # Map gtest/gtest_main to pkgs.googletest; otherwise use pkgs.<tail with '_' -> '.'>
+          isGTest = lib.hasPrefix "gtest" tail;
+      in if isGTest then "pkgs.googletest" else ("pkgs." + (lib.replaceStrings ["_"] ["."] tail));
+    acc = builtins.filter (a: a != null) (builtins.map toAttr names);
+    uniq = xs: builtins.attrNames (builtins.listToAttrs (map (a: { name = a; value = true; }) xs));
+  in builtins.sort (a: b: a < b) (uniq acc);
 
   mkApp = name:
     T.cppApp {
@@ -128,7 +140,14 @@ let
       inherit name;
       srcRoot = ctx.repoRoot;
       subdir = pkgPathOf name;
-      nixCxxAttrs = let collected = collectNixAttrsFor name; in if collected == [] then providerAttrsFallback else collected;
+      nixCxxAttrs =
+        let
+          fromDeps = collectNixAttrsFor name;
+          fromSelf = nixAttrsFromSelf name;
+          merged = fromDeps ++ fromSelf;
+          uniq = xs: builtins.attrNames (builtins.listToAttrs (map (a: { name = a; value = true; }) xs));
+          all = builtins.sort (a: b: a < b) (uniq merged);
+        in if all == [] then providerAttrsFallback else all;
       srcList = normSrcsOf name;
     };
 in {

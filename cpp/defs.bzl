@@ -31,11 +31,18 @@ def nix_cpp_test(name, **kwargs):
     # Planner-visible: stamps labels and wires providers so exporter->planner can generate the Nix derivation
     _planner_kwargs = dict(kwargs)
     stamp_labels(_planner_kwargs, "cpp", "test")
-    # Derive nixpkg:* labels from explicit provider deps to aid planner collection
+    # Derive nixpkg:* labels from explicit provider deps to aid planner collection.
+    # Generic rule: any dep ending with :nix_pkgs_<attr> → nixpkg:pkgs.<attr> ("_" → ".").
+    # Keep gtest special-case to preserve canonical googletest label.
     extra_nixpkg_labels = []
     for d in deps:
+        if ":nix_pkgs_" in d:
+            tail = d.split(":nix_pkgs_")[-1]
+            # Map underscores to dots for attr path (e.g., openssl → pkgs.openssl; zlib → pkgs.zlib).
+            attr = tail.replace("_", ".")
+            extra_nixpkg_labels.append("nixpkg:pkgs.%s" % attr)
         if d.endswith(":nix_pkgs_gtest") or d.endswith(":nix_pkgs_gtest_main"):
-            # Stamp both historical and canonical googletest labels
+            # Add both gtest and googletest labels for compatibility across Nixpkgs variants.
             extra_nixpkg_labels.append("nixpkg:pkgs.gtest")
             extra_nixpkg_labels.append("nixpkg:pkgs.googletest")
     _planner_labels = _planner_kwargs.get("labels", []) + extra_nixpkg_labels

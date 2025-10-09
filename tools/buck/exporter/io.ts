@@ -51,14 +51,16 @@ export async function cqueryNodes(scope: string, attrs: string[]): Promise<Node[
   const attrCxxTest = `attrfilter(rule_type, "cxx_test", //...)`;
   const kindCxxBin = `kind("cxx_binary", //...)`;
   const attrCxxBin = `attrfilter(rule_type, "cxx_binary", //...)`;
-  const [obj1, obj2, obj3, obj4, obj5] = await Promise.all([
+  const cxxPlanner = `filter("__planner$", kind("cxx_library", //...))`;
+  const [obj1, obj2, obj3, obj4, obj5, obj6] = await Promise.all([
     runQuerySafe(base),
     runQuerySafe(kindCxxTest),
     runQuerySafe(attrCxxTest),
     runQuerySafe(kindCxxBin),
     runQuerySafe(attrCxxBin),
+    runQuerySafe(cxxPlanner),
   ]);
-  const merged: Record<string, any> = { ...obj1, ...obj2, ...obj3, ...obj4, ...obj5 };
+  const merged: Record<string, any> = { ...obj1, ...obj2, ...obj3, ...obj4, ...obj5, ...obj6 };
 
   const nodes: Node[] = [];
   for (const [label, raw] of Object.entries(merged)) {
