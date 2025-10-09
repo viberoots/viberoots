@@ -13,8 +13,8 @@ nix_cpp_test(
     srcs = ["tests/{{ name }}_gtest.cpp"],
     deps = [
         ":{{ name }}",
-        "//third_party/cpp:gtest_main",
-        "//third_party/cpp:gtest",
+        "//third_party/providers:nix_pkgs_gtest_main",
+        "//third_party/providers:nix_pkgs_gtest",
     ],
     labels = ["lang:cpp", "kind:test"],
 )

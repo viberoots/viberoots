@@ -24,10 +24,16 @@ test("cpp lib scaffold: files render and TARGETS wires gtest deps", async () => 
     const targetsPath = path.join(tmp, "libs/demo-lib", "TARGETS");
     assert(await fs.pathExists(targetsPath), "missing libs/demo-lib/TARGETS");
 
-    // Verify TARGETS content references gtest targets
+    // Verify TARGETS content references provider-backed gtest targets
     const txt = await fs.readFile(targetsPath, "utf8");
     assert(txt.includes("nix_cpp_test("), "expected nix_cpp_test present");
-    assert(txt.includes("//third_party/cpp:gtest"), "expected gtest dep present");
-    assert(txt.includes("//third_party/cpp:gtest_main"), "expected gtest_main dep present");
+    assert(
+      txt.includes("//third_party/providers:nix_pkgs_gtest"),
+      "expected provider gtest dep present",
+    );
+    assert(
+      txt.includes("//third_party/providers:nix_pkgs_gtest_main"),
+      "expected provider gtest_main dep present",
+    );
   });
 });

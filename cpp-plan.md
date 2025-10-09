@@ -502,8 +502,8 @@ Design
   - `libs/{{ name }}/`
   - `TARGETS`:
     - `nix_cpp_library(name = "{{ name }}", srcs = glob(["src/**/*.cpp"]))`
-    - `nix_cpp_test(name = "{{ name }}_gtest", srcs = ["tests/{{ name }}_gtest.cpp"], deps = [":{{ name }}", "//third_party/cpp:gtest_main", "//third_party/cpp:gtest"])`
-      - Depends on nixpkgs `pkgs.gtest` via the C++ provider from PR 1 (expected aliases: `//third_party/cpp:gtest` and `//third_party/cpp:gtest_main`).
+    - `nix_cpp_test(name = "{{ name }}_gtest", srcs = ["tests/{{ name }}_gtest.cpp"], deps = [":{{ name }}", "//third_party/providers:nix_pkgs_gtest_main", "//third_party/providers:nix_pkgs_gtest"])`
+      - Depends on nixpkgs `pkgs.googletest` via provider-backed shims (`//third_party/providers:nix_pkgs_gtest(_main)`), not a local header shim.
   - minimal `include/{{ name }}.h` and `src/{{ name }}.cpp`
   - a single GoogleTest file `tests/{{ name }}_gtest.cpp` (one test per file convention)
   - Example test template (no custom `main`; provided by `gtest_main`):
