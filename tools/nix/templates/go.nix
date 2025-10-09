@@ -17,6 +17,7 @@ in {
     srcRoot ? ../../..,
     patchDir ? ../../patches/go,
     nixCgoPkgs ? [],
+    nixCgoAttrs ? [],
     pkgConfigNames ? {},
   }:
     let
@@ -33,10 +34,25 @@ in {
         );
       moduleRootRel = lib.removeSuffix "/cmd/${targetName}" subdir;
       srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + moduleRootRel));
-      haveCgo = (builtins.length nixCgoPkgs) > 0;
-      pkgCfgPaths = lib.concatStringsSep ":" (map (p: "${p}/lib/pkgconfig") nixCgoPkgs);
-      synthCFlags = lib.concatStringsSep " " (map (p: "-I${p}/include") nixCgoPkgs);
-      synthLdFlags = lib.concatStringsSep " " (map (p: "-L${p}/lib") nixCgoPkgs);
+      # Resolve nixCgoAttrs like "pkgs.openssl" into concrete package values
+      segs = s: let xs = lib.splitString "." s; in if xs == [] then [] else xs;
+      getAtPath = attrs: parts:
+        if parts == [] then attrs else (
+          let k = lib.head parts; rest = lib.tail parts; in
+            if (builtins.isAttrs attrs) && (builtins.hasAttr k attrs)
+            then getAtPath (builtins.getAttr k attrs) rest
+            else null
+        );
+      resolveAttr = s:
+        let parts0 = segs s;
+            parts = if parts0 != [] && (lib.head parts0) == "pkgs" then lib.tail parts0 else parts0;
+        in getAtPath pkgs parts;
+      resolvedCgo = builtins.filter (v: v != null) (map resolveAttr nixCgoAttrs);
+      cgoPkgs = nixCgoPkgs ++ resolvedCgo;
+      haveCgo = (builtins.length cgoPkgs) > 0;
+      pkgCfgPaths = lib.concatStringsSep ":" (map (p: "${p}/lib/pkgconfig") cgoPkgs);
+      synthCFlags = lib.concatStringsSep " " (map (p: "-I${p}/include") cgoPkgs);
+      synthLdFlags = lib.concatStringsSep " " (map (p: "-L${p}/lib") cgoPkgs);
       baseArgs = {
         pname = "go-${H.sanitizeName name}";
         version = "0.1.0";
@@ -46,7 +62,7 @@ in {
         doCheck = false;
         doInstallCheck = false;
         disallowedReferences = [];
-        nativeBuildInputs = ([ pkgs.unzip ] ++ (if haveCgo then (nixCgoPkgs ++ [ pkgs.pkg-config ]) else []));
+        nativeBuildInputs = ([ pkgs.unzip ] ++ (if haveCgo then (cgoPkgs ++ [ pkgs.pkg-config ]) else []));
         configurePhase = ''
           runHook preConfigure
 
@@ -95,6 +111,7 @@ in {
     srcRoot ? ../../..,
     patchDir ? ../../patches/go,
     nixCgoPkgs ? [],
+    nixCgoAttrs ? [],
     pkgConfigNames ? {},
   }:
     let
@@ -103,10 +120,24 @@ in {
       _ = if (builtins.getEnv "CI") == "true" && (builtins.getEnv devOverrideEnv) != "" then
             builtins.throw "Dev overrides are forbidden in CI" else null;
       srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + subdir));
-      haveCgo = (builtins.length nixCgoPkgs) > 0;
-      pkgCfgPaths = lib.concatStringsSep ":" (map (p: "${p}/lib/pkgconfig") nixCgoPkgs);
-      synthCFlags = lib.concatStringsSep " " (map (p: "-I${p}/include") nixCgoPkgs);
-      synthLdFlags = lib.concatStringsSep " " (map (p: "-L${p}/lib") nixCgoPkgs);
+      segs = s: let xs = lib.splitString "." s; in if xs == [] then [] else xs;
+      getAtPath = attrs: parts:
+        if parts == [] then attrs else (
+          let k = lib.head parts; rest = lib.tail parts; in
+            if (builtins.isAttrs attrs) && (builtins.hasAttr k attrs)
+            then getAtPath (builtins.getAttr k attrs) rest
+            else null
+        );
+      resolveAttr = s:
+        let parts0 = segs s;
+            parts = if parts0 != [] && (lib.head parts0) == "pkgs" then lib.tail parts0 else parts0;
+        in getAtPath pkgs parts;
+      resolvedCgo = builtins.filter (v: v != null) (map resolveAttr nixCgoAttrs);
+      cgoPkgs = nixCgoPkgs ++ resolvedCgo;
+      haveCgo = (builtins.length cgoPkgs) > 0;
+      pkgCfgPaths = lib.concatStringsSep ":" (map (p: "${p}/lib/pkgconfig") cgoPkgs);
+      synthCFlags = lib.concatStringsSep " " (map (p: "-I${p}/include") cgoPkgs);
+      synthLdFlags = lib.concatStringsSep " " (map (p: "-L${p}/lib") cgoPkgs);
       baseArgs = {
         pname = "golib-${H.sanitizeName name}";
         version = "0.1.0";
@@ -116,7 +147,7 @@ in {
         doCheck = false;
         doInstallCheck = false;
         disallowedReferences = [];
-        nativeBuildInputs = (if haveCgo then (nixCgoPkgs ++ [ pkgs.pkg-config ]) else []);
+        nativeBuildInputs = (if haveCgo then (cgoPkgs ++ [ pkgs.pkg-config ]) else []);
         configurePhase = ''
           runHook preConfigure
 

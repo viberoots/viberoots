@@ -8,7 +8,7 @@ test("nix_go_library stamps cgo:enabled and nixpkg labels when nix_cgo_deps set"
       cwd: tmp,
     })`bash -lc 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<'\''EOF'\''
 load("//third_party/providers:defs_cpp.bzl", "nix_cxx_library")
-nix_cxx_library(name="nx_pkgs_zlib", attr="pkgs.zlib")
+nix_cxx_library(name="nix_pkgs_zlib", attr="pkgs.zlib")
 EOF'`;
 
     await $({ cwd: tmp })`bash -lc 'mkdir -p tmp && cat > tmp/TARGETS <<'\''EOF'\''

@@ -19,12 +19,16 @@ def _append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled):
 
 
 def _nixpkg_provider_for(attr):
-    # Deterministic provider target name for nixpkgs attribute paths, e.g., pkgs.zlib
-    # Keep simple to ensure readability: lowercase, non-word -> underscore
+    # Deterministic provider target name for nixpkgs attribute paths, e.g., pkgs.zlib -> //third_party/providers:nix_pkgs_zlib
+    # Policy: drop an initial "pkgs." prefix from the attribute path when forming the provider name.
     if not isinstance(attr, str) or attr == "":
         fail("nix_cgo_deps entries must be non-empty strings like 'pkgs.zlib'")
-    tail = "".join([c if (c.isalnum() or c == "_") else "_" for c in attr.lower()])
-    return "//third_party/providers:nx_%s" % tail
+    raw = attr.lower()
+    if raw.startswith("pkgs."):
+        raw = raw[len("pkgs."):]
+    # Normalize any remaining separators to underscores for a stable provider name
+    tail = "".join([c if (c.isalnum() or c == "_") else "_" for c in raw])
+    return "//third_party/providers:nix_pkgs_%s" % tail
 
 
 def _apply_cgo_labels(kwargs, nix_cgo_deps):
