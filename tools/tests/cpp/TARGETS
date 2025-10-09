@@ -36,4 +36,16 @@ zx_test(
     out = "cpp.macros.stamp.labels.test.test.stamp",
 )
 
+zx_test(
+    name = "cpp.scaffold-and-build.lib.test.ts",
+    script = "cpp.scaffold-and-build.lib.test.ts",
+    out = "cpp.scaffold-and-build.lib.test.stamp",
+)
+
+zx_test(
+    name = "cpp.scaffold-and-build.cli.test.ts",
+    script = "cpp.scaffold-and-build.cli.test.ts",
+    out = "cpp.scaffold-and-build.cli.test.stamp",
+)
+
 
