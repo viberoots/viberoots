@@ -15,7 +15,7 @@ test("prebuild-guard: verbose shows missing outputs", async () => {
     );
     // Buck mapping
     await $({ cwd: tmp })`bash -lc ${`set -euo pipefail
-      : > .buckroot
+      printf '.\n' > .buckroot
       cat > .buckconfig <<'EOF'
 [buildfile]
 name = TARGETS

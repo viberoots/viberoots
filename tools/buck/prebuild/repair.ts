@@ -46,7 +46,7 @@ async function ensureLocalPreludeMapping() {
     const preludeLocal = fs.existsSync(path.join(process.cwd(), "prelude"));
     if (preludeLocal) {
       try {
-        await fs.writeFile(path.join(process.cwd(), ".buckroot"), "");
+        await fs.writeFile(path.join(process.cwd(), ".buckroot"), ".\n");
       } catch {}
       await fs.outputFile(cfgPath, cfgTxt, "utf8");
       return;
@@ -72,7 +72,7 @@ async function ensureLocalPreludeMapping() {
     if (!out) return;
     const preludeDir = path.join(out, "prelude");
     try {
-      await fs.writeFile(path.join(process.cwd(), ".buckroot"), "");
+      await fs.writeFile(path.join(process.cwd(), ".buckroot"), ".\n");
     } catch {}
     try {
       await fs.remove("prelude");

@@ -4,15 +4,21 @@ import path from "node:path";
 import "zx/globals";
 import { runGomod2nixGenerate, runGomod2nixScanAll } from "./install/gomod2nix.ts";
 
-function shouldInstallDeps(): boolean {
-  // Placeholder for future heuristics (node_modules symlink, gomod2nix freshness, etc.)
-  return true;
+function shouldInstallDeps(materialize: boolean): boolean {
+  // Only install or refresh glue when materializing; otherwise avoid mutating the workspace
+  return materialize;
 }
 
 function repoRoot(): string {
-  // Resolve repo root based on this script path (URL) to be callable from any CWD
-  const here = path.dirname(new URL(import.meta.url).pathname);
-  return path.resolve(here, "..", "..");
+  // Prefer the current working directory so tests running in a temp repo
+  // operate on that sandbox rather than the original workspace.
+  // Fall back to script-relative resolution if CWD is unavailable.
+  try {
+    return process.cwd();
+  } catch {
+    const here = path.dirname(new URL(import.meta.url).pathname);
+    return path.resolve(here, "..", "..");
+  }
 }
 
 function zxNodeBase(): string {
@@ -40,7 +46,7 @@ async function ensureBuckPreludeConfig(): Promise<void> {
     if (!out) throw new Error("unable to build .#buck2-prelude");
     const preludePath = `${out}/prelude`;
     await $({ cwd: repoRoot() })`bash -lc ${`set -euo pipefail
-      : > .buckroot
+      printf '.\n' > .buckroot
       rm -f prelude && ln -s "${preludePath}" prelude
       cat > .buckconfig <<'EOF'
 [buildfile]
@@ -87,7 +93,7 @@ EOF
 
 async function main() {
   const isCI = process.env.CI === "true";
-  // Ensure process.cwd() is the repo root so helpers using it behave consistently
+  // Ensure process.cwd() is the repo root; repoRoot() already prefers CWD
   try {
     process.chdir(repoRoot());
   } catch {}
@@ -107,6 +113,7 @@ async function main() {
   let restArgs = argsIn;
   // Global opt-out for materialization
   let materialize = true;
+  let impure = false;
   if (argsIn.length === 0) {
     restArgs = ["//..."];
   } else if (known.has(argsIn[0])) {
@@ -122,27 +129,66 @@ async function main() {
     restArgs = argsIn;
   }
 
-  // Recognize opt-out flag anywhere after subcmd
+  // Recognize opt-out flag anywhere after subcmd and --impure fast path
   const filtered: string[] = [];
   for (const a of restArgs) {
     if (a === "--no-materialize") {
       materialize = false;
       continue;
     }
+    if (a === "--impure") {
+      impure = true;
+      continue;
+    }
     filtered.push(a);
   }
   restArgs = filtered;
 
+  // Auto-switch to impure on dev builds when there are untracked files in the working tree.
+  // CI remains pure. Only applies when user didn't explicitly request pure/impure.
+  if (!isCI && !impure) {
+    try {
+      const { stdout } = await $({
+        stdio: "pipe",
+        cwd: repoRoot(),
+      })`git ls-files --others --exclude-standard`;
+      const untracked = String(stdout || "")
+        .trim()
+        .split("\n")
+        .filter(Boolean);
+      if (untracked.length > 0) {
+        impure = true;
+        console.warn("[dev-build] Falling back to --impure due to untracked files:");
+        for (const f of untracked.slice(0, 50)) console.warn(` - ${f}`);
+        if (untracked.length > 50) console.warn(` ... and ${untracked.length - 50} more`);
+      }
+    } catch {}
+  }
+
+  // Allow command after flags: if first remaining arg is a known subcmd, adopt it
+  if (restArgs.length > 0 && known.has(restArgs[0])) {
+    subcmd = restArgs[0];
+    restArgs = restArgs.slice(1);
+  }
+
+  // If no explicit targets remain (e.g., only flags like --impure were provided),
+  // default to building the entire repo to avoid empty target errors.
+  if (subcmd === "build" && restArgs.length === 0) {
+    restArgs = ["//..."];
+  }
+
   // Environment guard: ensure required tools and Nix features are present
   await $({ stdio: "inherit", cwd: repoRoot() })`tools/dev/startup-check.ts`;
 
-  // Ensure Buck prelude and config are aligned to flake buck2-prelude
-  await ensureBuckPreludeConfig();
+  // Ensure Buck prelude/config only when materializing; avoid mutating workspace when --no-materialize
+  if (materialize) {
+    await ensureBuckPreludeConfig();
+  }
 
   // Clean any stray buck-go-* dirs at repo root from previous runs
   await $({ stdio: "ignore", cwd: repoRoot() })`bash -lc 'rm -rf buck-go-*'`.nothrow();
 
-  if (!isCI && shouldInstallDeps()) {
+  if (!isCI && shouldInstallDeps(materialize)) {
     const nodeBase = zxNodeBase();
     const nodeBin = process.execPath || "node";
     await $({
@@ -156,7 +202,7 @@ async function main() {
     } catch (e) {
       console.warn("[dev-build] gomod2nix generation skipped:", e);
     }
-    // Refresh Buck graph so graph-generator sees newest targets
+    // Refresh Buck graph so graph-generator sees newest targets (only when materializing)
     await $({
       stdio: "inherit",
       cwd: repoRoot(),
@@ -164,89 +210,108 @@ async function main() {
   }
 
   // Materialize Nix-built graph BEFORE Buck build to ensure attribute exists
-  if (!isCI && materialize) {
+  if (!isCI && materialize && !impure) {
     const linkDir = path.resolve(repoRoot(), "buck-out", "tmp");
     await fsp.mkdir(linkDir, { recursive: true });
     const linkName = path.join(linkDir, `buck-go-${Date.now()}`);
     try {
-      // Ensure Nix sees the live graph.json via BUCK_GRAPH_JSON; fallback is flake literal
-      const absGraph = path.resolve(repoRoot(), "tools/buck/graph.json");
-      // Provide a repo-root gomod2nix.toml fallback via ROOT_GOMOD2NIX_TOML when missing
-      let rootToml = path.resolve("gomod2nix.toml");
-      try {
-        const stat = await fsp.stat(rootToml).catch(() => null);
-        if (!stat) {
-          // Scan for a module-level gomod2nix.toml under apps/ or libs/
-          const roots = [path.resolve("apps"), path.resolve("libs")];
-          let found = "";
-          for (const r of roots) {
-            try {
-              const ents = await fsp.readdir(r, { withFileTypes: true });
-              for (const e of ents) {
-                if (!e.isDirectory()) continue;
-                const p = path.join(r, e.name, "gomod2nix.toml");
-                try {
-                  const st = await fsp.stat(p);
-                  if (st && st.isFile()) {
-                    found = p;
-                    break;
-                  }
-                } catch {}
-              }
-            } catch {}
-            if (found) break;
-          }
-          if (found) rootToml = found;
-        }
-      } catch {}
-      const env = {
-        ...process.env,
-        BUCK_GRAPH_JSON: absGraph,
-        ROOT_GOMOD2NIX_TOML: rootToml,
-        BUCK_TEST_SRC: process.cwd(),
-      };
-      await $({
-        stdio: "inherit",
-        env,
+      // Pure path: build the store-pinned buck-graph; optionally materialize selected-only
+      const { stdout: graphOut } = await $({
+        stdio: "pipe",
         cwd: repoRoot(),
-      })`nix build --impure .#graph-generator --out-link ${linkName}`;
-      // Print discovered bins for convenience (match requested labels if provided)
-      try {
-        const manifestPath = path.resolve(linkName, "manifest.json");
-        const txt = await fsp.readFile(manifestPath, "utf8").catch(() => "");
-        const targets = restArgs.length ? restArgs : [];
-        if (txt) {
-          const entries = JSON.parse(txt) as Array<any>;
-          const specific = targets.filter(
-            (t) => (t.includes(":") || t.startsWith("//")) && !t.includes("..."),
-          );
-          const match = (lab: string) => {
-            if (specific.length === 0) return true;
-            return specific.some((t) => {
-              const norm = t.replace(/^root\//, "").replace(/^\/+/, "");
-              return lab.includes(norm) || lab.endsWith(norm);
-            });
-          };
-          const bins: Array<{ label: string; bin: string }> = [];
-          for (const e of entries) {
-            const lab = String(e?.label || "");
-            if (!lab || !match(lab)) continue;
-            const list: string[] = Array.isArray(e?.bins) ? e.bins : [];
-            for (const b of list) bins.push({ label: lab, bin: String(b) });
-          }
-          if (bins.length) {
-            console.log("Materialized binaries:");
-            for (const b of bins) console.log(` - ${b.label}: ${b.bin}`);
-          } else {
-            console.log(
-              "Materialized graph; no binaries matched the requested labels. See",
-              path.join(linkName, "manifest.json"),
-            );
+      })`nix build .#buck-graph --no-link --accept-flake-config --print-out-paths`;
+      const graphStore = String(graphOut || "")
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .pop();
+      if (!graphStore) throw new Error("failed to build .#buck-graph");
+      const targets = restArgs.length ? restArgs : [];
+      const specific = targets.filter(
+        (t) => (t.includes(":") || t.startsWith("//")) && !t.includes("..."),
+      );
+      if (specific.length > 0) {
+        console.log("Materializing selected targets (pure):");
+        for (const sel of specific) {
+          try {
+            const { stdout: selOut } = await $({
+              stdio: "pipe",
+              cwd: repoRoot(),
+            })`BUCK_TARGET=${sel} nix build --impure .#graph-generator-pure-selected --accept-flake-config --print-out-paths`;
+            const outPath =
+              String(selOut || "")
+                .trim()
+                .split("\n")
+                .filter(Boolean)
+                .pop() || "";
+            if (!outPath) {
+              console.log(` - ${sel}: (no out path)`);
+              continue;
+            }
+            try {
+              const binDir = path.join(outPath, "bin");
+              const files = await fsp.readdir(binDir).catch(() => [] as string[]);
+              if (files.length) {
+                for (const f of files) console.log(` - ${sel}: ${path.join(binDir, f)}`);
+              } else {
+                console.log(` - ${sel}: (no bin artifacts in ${binDir})`);
+              }
+            } catch {
+              console.log(` - ${sel}: (no bin artifacts)`);
+            }
+          } catch (e) {
+            console.log(` - ${sel}: (failed to materialize)`, e);
           }
         }
-      } catch {}
+      } else {
+        // Evaluate full graph outputs (pure) for convenience
+        await $({
+          stdio: "inherit",
+          cwd: repoRoot(),
+        })`nix build .#graph-generator-pure --accept-flake-config --out-link ${linkName}`;
+        try {
+          const manifestPath = path.resolve(linkName, "manifest.json");
+          const txt = await fsp.readFile(manifestPath, "utf8").catch(() => "");
+          if (txt) {
+            const entries = JSON.parse(txt) as Array<any>;
+            const bins: Array<{ label: string; bin: string }> = [];
+            for (const e of entries) {
+              const lab = String(e?.label || "");
+              if (!lab) continue;
+              const list: string[] = Array.isArray(e?.bins) ? e.bins : [];
+              for (const b of list) bins.push({ label: lab, bin: String(b) });
+            }
+            if (bins.length) {
+              console.log("Materialized binaries:");
+              for (const b of bins) console.log(` - ${b.label}: ${b.bin}`);
+            } else {
+              const labels = entries.map((e: any) => String(e?.label || "")).filter(Boolean);
+              if (labels.length) {
+                console.log("Materialized graph; no bins produced. Available labels:");
+                for (const l of labels) console.log(` - ${l}`);
+                console.log("See", path.join(linkName, "manifest.json"));
+              } else {
+                console.log(
+                  "Materialized graph; no bins found in manifest. See",
+                  path.join(linkName, "manifest.json"),
+                );
+              }
+            }
+          }
+        } catch {}
+      }
     } finally {
     }
+  }
+
+  // Impure fast path: ensure live graph and build selected targets via impure evaluation (CI should not use this)
+  if (impure) {
+    const nodeBase = zxNodeBase();
+    const nodeBin = process.execPath || "node";
+    await $({
+      stdio: "inherit",
+      cwd: repoRoot(),
+    })`bash --noprofile --norc -c ${`${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/export-graph.ts")} --out ${path.join(repoRoot(), "tools/buck/graph.json")}`}`;
   }
 
   // Now run Buck
@@ -254,14 +319,110 @@ async function main() {
     return "buck2";
   }
   const buckBin = await findBuckBin();
-  const platformFlags = ["--target-platforms", "prelude//platforms:default"];
+  // Always bind target platforms explicitly for reliability in sandboxes.
+  // This is harmless when defaults are already set in .buckconfig.
   process.env.BUCK_ROOT = repoRoot();
+  const platformFlags = ["--target-platforms", "prelude//platforms:default"];
   const proc = await $({
     stdio: "inherit",
     cwd: repoRoot(),
   })`${buckBin} ${subcmd} ${platformFlags} ${restArgs}`.catch((e) => e);
   const code = typeof proc?.exitCode === "number" ? proc.exitCode : 1;
   if (code !== 0) process.exit(code);
+
+  // After successful Buck build, if running in impure mode with specific targets,
+  // also materialize and print impure selected Nix outputs' bin paths for convenience.
+  if (impure) {
+    const targets = restArgs.length ? restArgs : [];
+    const specific = targets.filter(
+      (t) => (t.includes(":") || t.startsWith("//")) && !t.includes("..."),
+    );
+    if (specific.length > 0) {
+      const graphPath = path.join(repoRoot(), "tools/buck/graph.json");
+      console.log("Impure selected binaries:");
+      for (const sel of specific) {
+        try {
+          const { stdout } = await $({
+            stdio: "pipe",
+            cwd: repoRoot(),
+            env: {
+              ...process.env,
+              BUCK_TEST_SRC: repoRoot(),
+              BUCK_GRAPH_JSON: graphPath,
+              BUCK_TARGET: sel,
+            },
+          })`nix build --impure .#graph-generator-selected --accept-flake-config --print-out-paths`;
+          const outPath =
+            String(stdout || "")
+              .trim()
+              .split("\n")
+              .filter(Boolean)
+              .pop() || "";
+          if (!outPath) {
+            console.log(` - ${sel}: (no out path)`);
+            continue;
+          }
+          try {
+            const binDir = path.join(outPath, "bin");
+            const files = await fsp.readdir(binDir).catch(() => [] as string[]);
+            if (files.length) {
+              for (const f of files) console.log(` - ${sel}: ${path.join(binDir, f)}`);
+            } else {
+              console.log(` - ${sel}: (no bin artifacts in ${binDir})`);
+            }
+          } catch {
+            console.log(` - ${sel}: (no bin artifacts)`);
+          }
+        } catch (e) {
+          console.log(` - ${sel}: (failed to materialize impure selected)`, e);
+        }
+      }
+    } else {
+      // No specific targets: materialize full impure graph outputs and list any bins
+      try {
+        const linkDir = path.resolve(repoRoot(), "buck-out", "tmp");
+        await fsp.mkdir(linkDir, { recursive: true });
+        const linkNameImp = path.join(linkDir, `buck-impure-${Date.now()}`);
+        const env = {
+          ...process.env,
+          BUCK_TEST_SRC: repoRoot(),
+          BUCK_GRAPH_JSON: path.join(repoRoot(), "tools/buck/graph.json"),
+        } as any;
+        await $({
+          stdio: "inherit",
+          cwd: repoRoot(),
+          env,
+        })`nix build --impure .#graph-generator --accept-flake-config --out-link ${linkNameImp}`;
+        const manifestPath = path.resolve(linkNameImp, "manifest.json");
+        const txt = await fsp.readFile(manifestPath, "utf8").catch(() => "");
+        if (txt) {
+          const entries = JSON.parse(txt) as Array<any>;
+          const bins: Array<{ label: string; bin: string }> = [];
+          for (const e of entries) {
+            const lab = String(e?.label || "");
+            const list: string[] = Array.isArray(e?.bins) ? e.bins : [];
+            for (const b of list) bins.push({ label: lab, bin: String(b) });
+          }
+          if (bins.length) {
+            console.log("Impure materialized binaries:");
+            for (const b of bins) console.log(` - ${b.label}: ${b.bin}`);
+          } else {
+            const labels = entries.map((e: any) => String(e?.label || "")).filter(Boolean);
+            if (labels.length) {
+              console.log("Impure materialized graph; no bins produced. Available labels:");
+              for (const l of labels) console.log(` - ${l}`);
+              console.log("See", manifestPath);
+            } else {
+              console.log(
+                "Impure materialized graph; no bins found in manifest. See",
+                manifestPath,
+              );
+            }
+          }
+        }
+      } catch {}
+    }
+  }
 
   process.exit(0);
 }

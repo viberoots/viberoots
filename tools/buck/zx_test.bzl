@@ -16,7 +16,7 @@ def _zx_test_impl(ctx):
             + "  if [ -d \"$WORKSPACE_ROOT/prelude\" ] || [ -L \"$WORKSPACE_ROOT/prelude\" ]; then PRELUDE_PATH=\"$WORKSPACE_ROOT/prelude\"; fi; "
             + "  if [ -z \"$PRELUDE_PATH\" ]; then PRE_OUT=$(nix build .#buck2-prelude --no-link --accept-flake-config --print-out-paths 2>/dev/null | tail -1); fi; "
             + "  if [ -z \"$PRELUDE_PATH\" ] && [ -n \"$PRE_OUT\" ]; then PRELUDE_PATH=\"$PRE_OUT/prelude\"; fi; "
-            + "  : > \"$WORKSPACE_ROOT/.buckroot\"; "
+            + "  printf '.\\n' > \"$WORKSPACE_ROOT/.buckroot\"; "
             + "  if [ -n \"$PRELUDE_PATH\" ] && [ ! -e \"$WORKSPACE_ROOT/prelude\" ]; then ln -s \"$PRELUDE_PATH\" \"$WORKSPACE_ROOT/prelude\"; fi; "
             + "  cat > \"$WORKSPACE_ROOT/.buckconfig\" <<'EOF'\n"
             + "[buildfile]\n"
@@ -63,7 +63,9 @@ def _zx_test_impl(ctx):
             + "LOGDIR=\"$TEST_LOG_DIR/$SAFE\"; mkdir -p \"$LOGDIR\"; "
             + "rm -f \"$LOGDIR/test.stdout.log\" \"$LOGDIR/test.stderr.log\" 2>/dev/null || true; "
             + "cd \"$WORKSPACE_ROOT\"; "
-            + "PKG=$(printf %%s \"$BUCK_TEST_TARGET\" | sed -E 's#^.*//([^:]+):.*$#\\1#'); "
+            # Prefer package from Starlark context; fall back to parsing label, stripping any config suffix
+            + "PKG=\"%s\"; "
+            + "if [ -z \"$PKG\" ]; then PKG=$(printf %%s \"$BUCK_TEST_TARGET\" | sed -E 's/ \\([^)]*\\)$//; s#^.*//([^:]+):.*$#\\1#'); fi; "
             + "CAND1=\"$WORKSPACE_ROOT/%s\"; CAND2=\"$WORKSPACE_ROOT/$PKG/%s\"; "
             + "SCRIPT_PATH=\"$CAND1\"; if [ ! -f \"$SCRIPT_PATH\" ]; then SCRIPT_PATH=\"$CAND2\"; fi; "
             + "{ \"$NODE_BIN\" $TEST_NODE_OPTIONS --test --experimental-strip-types --import \"$WORKSPACE_ROOT/tools/dev/zx-init.mjs\" \"$SCRIPT_PATH\"; } > >(tee -a \"$LOGDIR/test.stdout.log\") 2> >(tee -a \"$LOGDIR/test.stderr.log\" >&2); STATUS=$?; "
@@ -79,7 +81,7 @@ def _zx_test_impl(ctx):
             + "\"$NODE_BIN\" ./tools/dev/coverage-normalize.mjs || true; "
             + "fi; exit \"$STATUS\""
         )
-        % (ctx.label, script.short_path, script.short_path)
+        % (ctx.label, ctx.label.package, script.short_path, script.short_path)
     )
     cmd = [
         "bash",

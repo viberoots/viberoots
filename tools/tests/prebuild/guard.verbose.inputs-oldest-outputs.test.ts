@@ -8,7 +8,7 @@ test("prebuild-guard: verbose lists newest inputs and oldest outputs (capped)", 
   await runInTemp("prebuild-verbose-io", async (tmp, $) => {
     // Buck mapping
     await $({ cwd: tmp })`bash -lc ${`set -euo pipefail
-      : > .buckroot
+      printf '.\n' > .buckroot
       cat > .buckconfig <<'EOF'
 [buildfile]
 name = TARGETS

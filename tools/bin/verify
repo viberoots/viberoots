@@ -59,7 +59,7 @@ cd "$ROOT_DIR"
 export BUCK_ROOT="$ROOT_DIR"
 
 # Write deterministic Buck config mapping, symlinking prelude into repo for stable alias
-: > .buckroot
+printf '.\n' > .buckroot
 rm -rf prelude && ln -s "$BUCK_PRELUDE" prelude
 cat > .buckconfig <<EOF
 [buildfile]

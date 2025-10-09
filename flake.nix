@@ -65,6 +65,20 @@
           rootModulesTomlPath = let envRootToml = builtins.getEnv "ROOT_GOMOD2NIX_TOML"; in
             if envRootToml != "" then envRootToml else ./gomod2nix.toml;
         };
+        # Ensure buck-graph.nix is included even when untracked by wrapping with builtins.path
+        buckGraphFile = builtins.path { path = ./tools/nix/buck-graph.nix; name = "buck-graph.nix"; };
+        buckGraph = pkgs.callPackage buckGraphFile {
+          inherit pkgs buck2Input;
+          preludeOut = prelude.buck2-prelude;
+          src = ./.;
+        };
+        graphGenPure = pkgs.callPackage ./tools/nix/graph-generator.nix {
+          inherit pkgs;
+          src = builtins.path { path = ./.; name = "repo"; };
+          graphJsonPath = buckGraph + "/graph.json";
+          rootModulesTomlPath = let envRootToml = builtins.getEnv "ROOT_GOMOD2NIX_TOML"; in
+            if envRootToml != "" then envRootToml else ./gomod2nix.toml;
+        };
       in {
         buck2-prelude = prelude.buck2-prelude;
         zx-wrapper = zx-wrapper;
@@ -74,6 +88,9 @@
         graph-generator = graphGen.all;
         graph-generator-cppTargets = graphGen.cppTargetsFlat;
         graph-generator-selected = graphGen.selected;
+        buck-graph = buckGraph;
+        graph-generator-pure = graphGenPure.all;
+        graph-generator-pure-selected = graphGenPure.selected;
       }
     );
 

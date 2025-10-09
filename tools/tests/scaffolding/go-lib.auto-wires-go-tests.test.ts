@@ -9,7 +9,7 @@ test("go lib: adding *_test.go auto-wires nix_go_test and runs", async () => {
     const $ = _$({ stdio: "inherit" });
     // minimal Buck config
     await $`bash -lc ${`set -euo pipefail
-      : > .buckroot
+      printf '.\n' > .buckroot
       cat > .buckconfig <<'EOF'
 [buildfile]
 name = TARGETS

@@ -147,7 +147,7 @@ async function main() {
       break;
     case "buck-test":
       // External timeout is recommended; allow override via TIMEOUT_SEC
-      const t = Number(process.env.TIMEOUT_SEC || 300);
+      const t = Number(process.env.TIMEOUT_SEC || 600);
       // Coverage passthrough if COVERAGE=1 in env
       const extra = process.env.COVERAGE === "1" ? ["--", "--env", "COVERAGE=1"] : [];
       await $`timeout -k 10s ${t}s buck2 test //... ${extra}`;

@@ -64,4 +64,16 @@ buck2 test $(buck2 targets //:scaffolding_* | tr '\n' ' ')
 
 ```
 buck2 test //:scaffolding_help -- --env COVERAGE=1
+
+## Dev Build Modes (Pure vs Impure)
+
+- Pure (CI-equivalent, default):
+  - Uses a store-pinned Buck graph built via Nix (`nix build .#buck-graph`).
+  - Example: `tools/dev/dev-build.ts build //...`
+
+- Impure (fast local loop):
+  - Regenerates `tools/buck/graph.json` from the live workspace and evaluates with `--impure`.
+  - Example: `tools/dev/dev-build.ts --impure build //...`
+
+CI should always use the pure path. Local development can opt into `--impure` for fast iteration.
 ```

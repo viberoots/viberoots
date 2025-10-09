@@ -53,7 +53,8 @@ in rec {
     srcsCmd = if srcList != [] then (
       "printf '%s\\n' " + (lib.concatStringsSep " " (map (s: "'" + s + "'") (sorted srcList))) + " | sort"
     ) else (
-      "find . -type f \\( -name '*.cpp' -o -name '*.cc' -o -name '*.cxx' \\) | sort"
+      # Fallback: restrict to conventional source dir to avoid picking up tests/** by accident
+      "find ./src -type f \\( -name '*.cpp' -o -name '*.cc' -o -name '*.cxx' \\) 2>/dev/null | sed 's#^./##' | sort"
     );
   in pkgs.stdenv.mkDerivation {
     inherit pname;

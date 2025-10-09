@@ -6,7 +6,7 @@ test("prebuild-guard auto-fixes when stale and passes thereafter", async () => {
   await runInTemp("scaf-prebuild-guard", async (_tmp, _$) => {
     const $ = _$({ stdio: "pipe" });
     await $`bash -lc ${`set -euo pipefail
-      : > .buckroot
+      printf '.\n' > .buckroot
       cat > .buckconfig <<'EOF'
 [buildfile]
 name = TARGETS

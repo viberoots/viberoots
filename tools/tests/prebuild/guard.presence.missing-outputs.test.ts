@@ -15,7 +15,7 @@ test("prebuild-guard: missing outputs warns locally and fails in CI", async () =
     );
     // Ensure Buck mapping exists in temp repo
     await $({ cwd: tmp })`bash -lc ${`set -euo pipefail
-      : > .buckroot
+      printf '.\n' > .buckroot
       cat > .buckconfig <<'EOF'
 [buildfile]
 name = TARGETS
@@ -47,10 +47,11 @@ EOF
       printf '[buildfile]\nname = TARGETS\n' > toolchains/.buckconfig
     `}`;
     // No outputs created
-    // Local should not exit non-zero
+    // Local should not exit non-zero. Disable auto-fix to keep outputs missing for the CI run below.
     await $({
       cwd: tmp,
       stdio: "inherit",
+      env: { ...process.env, PREBUILD_GUARD_NO_FIX: "1" },
     })`node --experimental-strip-types --import ./tools/dev/zx-init.mjs tools/buck/prebuild-guard.ts`;
     // CI should fail
     let failed = false;

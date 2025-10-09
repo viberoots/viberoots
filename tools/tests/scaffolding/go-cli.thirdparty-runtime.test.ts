@@ -75,7 +75,7 @@ test("go cli with local lib + third-party runtime", async () => {
   await runInTemp("go-cli-thirdparty-runtime", async (_tmp, _$) => {
     const $ = _$({ stdio: "pipe" });
     await $`bash -lc ${`set -euo pipefail
-      : > .buckroot
+      printf '.\n' > .buckroot
       cat > .buckconfig <<'EOF'
 [buildfile]
 name = TARGETS

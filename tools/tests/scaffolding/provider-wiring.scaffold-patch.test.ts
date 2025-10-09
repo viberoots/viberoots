@@ -8,7 +8,7 @@ test("provider wiring present only on affected target after patch", async () => 
   await runInTemp("scaf-prov-wiring", async (_tmp, _$) => {
     const $ = _$({ stdio: "pipe" });
     await $`bash -lc ${`set -euo pipefail
-      : > .buckroot
+      printf '.\n' > .buckroot
       cat > .buckconfig <<'EOF'
 [buildfile]
 name = TARGETS

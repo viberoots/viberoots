@@ -20,7 +20,7 @@ test("prebuild-guard: clean present outputs passes locally", async () => {
     );
     // Ensure Buck mapping exists in temp repo
     await $({ cwd: tmp })`bash -lc ${`set -euo pipefail
-      : > .buckroot
+      printf '.\n' > .buckroot
       cat > .buckconfig <<'EOF'
 [buildfile]
 name = TARGETS

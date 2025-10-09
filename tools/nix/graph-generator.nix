@@ -295,13 +295,21 @@ let
   # Optional: select a single target by BUCK_TARGET for impure local builds/tests
   selectedTargetName = builtins.getEnv "BUCK_TARGET";
   dropCell = lbl:
-    let base = ensureFullLabel { name = lbl; };
+    let base0 = ensureFullLabel { name = lbl; };
+        # Strip optional trailing config suffix: " (config//platforms:...)"
+        base = (lib.elemAt (lib.splitString " (config//" base0) 0);
         # If label starts with a cell like "root//...", convert to "//..."
         hasCell = lib.hasInfix "//" base && !(lib.hasPrefix "//" base);
     in if hasCell then ("//" + (lib.elemAt (lib.splitString "//" base) 1)) else base;
+  canon = s:
+    let d = dropCell s;
+    in if lib.hasPrefix "//" d then (lib.removePrefix "//" d) else d;
   selected = if selectedTargetName != "" then (
-    let normSel = dropCell selectedTargetName;
-        matches = builtins.filter (n: (dropCell (ensureFullLabel n)) == normSel) (safeGoNodes ++ safeCppNodes);
+    let want = canon selectedTargetName;
+        matches = builtins.filter (n:
+          let nm = canon (ensureFullLabel n);
+          in nm == want
+        ) (safeGoNodes ++ safeCppNodes);
     in if matches == [] then pkgs.runCommand "missing-target-${sanitize selectedTargetName}" {} ''
       echo "missing target: ${selectedTargetName}" >&2
       exit 1
@@ -310,7 +318,14 @@ let
         if k == null then pkgs.runCommand "missing-kind-${sanitize selectedTargetName}" {} ''
           echo "missing kind for: ${selectedTargetName}" >&2
           exit 1
-        '' else (if k.kind == "bin" || k.kind == "lib" then mkGo selectedTargetName k.kind else mkCpp selectedTargetName k.kind)
+        '' else (
+          if k.template == "go" then (
+            if (k.kind == "bin" || k.kind == "lib") then mkGo selectedTargetName k.kind else mkGo selectedTargetName "bin"
+          ) else (
+            # default to cpp when not go
+            if (k.kind == "bin" || k.kind == "lib" || k.kind == "test") then mkCpp selectedTargetName k.kind else mkCpp selectedTargetName "bin"
+          )
+        )
     )
   ) else pkgs.runCommand "no-target-specified" {} ''
     mkdir -p $out

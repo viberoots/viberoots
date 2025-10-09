@@ -9,7 +9,7 @@ test("partial clone: discover and build scaffolded lib via //...", async () => {
   await runInTemp("partial-clone-discover-build", async (_tmp, _$) => {
     const $ = _$({ stdio: "pipe" });
     await $`bash -lc ${`set -euo pipefail
-      : > .buckroot
+      printf '.\n' > .buckroot
       cat > .buckconfig <<'EOF'
 [buildfile]
 name = TARGETS

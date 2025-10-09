@@ -15,7 +15,7 @@ async function writeFileAbs(p: string, content: string) {
 
 async function writeBuckConfig($: any) {
   await $`bash -lc ${`set -euo pipefail
-    : > .buckroot
+    printf '.\n' > .buckroot
     cat > .buckconfig <<'EOF'
 [buildfile]
 name = TARGETS
