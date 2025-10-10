@@ -97,8 +97,8 @@ in rec {
         if [ -d "$d" ]; then
           while IFS= read -r f; do
             b=$(basename "$f")
-            n="${b#lib}"
-            n="${n%.a}"
+            n="''${b#lib}"
+            n="''${n%.a}"
             LIBFLAGS+=("-l$n")
           done < <(find "$d" -maxdepth 1 -type f -name 'lib*.a' 2>/dev/null)
         fi
@@ -297,8 +297,8 @@ in rec {
         if [ -d "$d" ]; then
           while IFS= read -r f; do
             b=$(basename "$f")
-            n="${b#lib}"
-            n="${n%.a}"
+            n="''${b#lib}"
+            n="''${n%.a}"
             LIBFLAGS+=("-l$n")
           done < <(find "$d" -maxdepth 1 -type f -name 'lib*.a' 2>/dev/null)
         fi
