@@ -1,0 +1,56 @@
+#!/usr/bin/env zx-wrapper
+import { test } from "node:test";
+import { runInTemp } from "../lib/test-helpers";
+
+// This test scaffolds a minimal Go c-archive and a C++ caller in a temp repo,
+// exports the graph, and builds the selected target via graph-generator-selected.
+// It mirrors the repo_cgo_deps pattern used for Go->C but exercises C->Go.
+
+test("cpp calls go c-archive (temp repo)", async () => {
+  await runInTemp("cpp-carchive-caller", async (tmp, $) => {
+    // Create a Go c-archive lib
+    await $({ cwd: tmp })`bash -lc 'mkdir -p libs/greetgo'`;
+    await $({
+      cwd: tmp,
+    })`bash -lc 'cat > libs/greetgo/export.go <<"EOF"\npackage greetgo\n\n// #include <stdint.h>\nimport "C"\n\n//export GoGreet\nfunc GoGreet() *C.char {\n    return C.CString("hello from go")\n}\nEOF'`;
+    await $({
+      cwd: tmp,
+    })`bash -lc 'cat > libs/greetgo/TARGETS <<"EOF"\nload("//go:defs.bzl", "nix_go_carchive")\n\nnix_go_carchive(\n    name = "greetgo",\n    srcs = [\n        "export.go",\n    ],\n    labels = ["lang:go", "kind:carchive"],\n    visibility = ["PUBLIC"],\n)\nEOF'`;
+
+    // Create a C++ caller that uses the exported Go symbol
+    await $({ cwd: tmp })`bash -lc 'mkdir -p apps/caller/src apps/caller/tests'`;
+    await $({
+      cwd: tmp,
+    })`bash -lc 'cat > apps/caller/src/main.cpp <<"EOF"\n#include <iostream>\nextern "C" char* GoGreet();\nint main() {\n  char* s = GoGreet();\n  if (s) std::cout << s << "\\n";\n  return 0;\n}\nEOF'`;
+    await $({
+      cwd: tmp,
+    })`bash -lc 'cat > apps/caller/tests/caller_gtest.cpp <<"EOF"\n#include <gtest/gtest.h>\nextern "C" char* GoGreet();\nTEST(CGoCaller, CallsGo) {\n  char* s = GoGreet();\n  ASSERT_NE(s, nullptr);\n}\nEOF'`;
+    await $({
+      cwd: tmp,
+    })`bash -lc 'cat > apps/caller/TARGETS <<"EOF"\nload("//cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_test")\n\nnix_cpp_binary(\n    name = "caller",\n    srcs = ["src/main.cpp"],\n    deps = ["//libs/greetgo:greetgo"],\n    labels = ["lang:cpp", "kind:bin"],\n    visibility = ["PUBLIC"],\n)\n\nnix_cpp_test(\n    name = "caller_gtest",\n    srcs = ["tests/caller_gtest.cpp"],\n    deps = [\n        ":caller",\n        "//libs/greetgo:greetgo",\n        "//third_party/providers:nix_pkgs_gtest_main",\n        "//third_party/providers:nix_pkgs_gtest",\n    ],\n    labels = ["lang:cpp", "kind:test"],\n)\nEOF'`;
+
+    // Verify Buck graph is available, then export graph and build selected target
+    const probe = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+    })`buck2 cquery "deps(//apps/caller:caller)" --json --output-attributes name`;
+    if (probe.exitCode !== 0) {
+      // Skip if prelude/toolchain not available in the environment
+      return;
+    }
+
+    await $({ cwd: tmp })`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
+    const build = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+    })`bash -lc 'BUCK_TARGET="//apps/caller:caller" nix build --impure -L .#graph-generator-selected --accept-flake-config --print-out-paths'`;
+    if (build.exitCode !== 0) {
+      console.error(build.stdout + "\n" + build.stderr);
+      throw new Error("nix build failed");
+    }
+  });
+});
