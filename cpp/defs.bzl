@@ -2,6 +2,20 @@ load("@prelude//:rules.bzl", "cxx_library", "cxx_binary", "cxx_test")
 load("//lang:defs_common.bzl", "stamp_labels")
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
 
+def _replace_all(hay, needle, repl):
+    if needle == "":
+        return hay
+    return repl.join(hay.split(needle))
+
+def _sanitize_to_bin_name(s):
+    # Mirror tools/nix/templates-common.nix sanitizeName exactly:
+    # replaceStrings ["//" ":" "/" " "] ["" "-" "-" "-"] s
+    s1 = _replace_all(s, "//", "")
+    s2 = _replace_all(s1, ":", "-")
+    s3 = _replace_all(s2, "/", "-")
+    s4 = _replace_all(s3, " ", "-")
+    return s4
+
 def _providers_for(name):
     pkg = native.package_name()
     key = "//%s:%s" % (pkg, name)
@@ -46,12 +60,12 @@ def nix_cpp_test(name, **kwargs):
             extra_nixpkg_labels.append("nixpkg:pkgs.gtest")
             extra_nixpkg_labels.append("nixpkg:pkgs.googletest")
     _planner_labels = _planner_kwargs.get("labels", []) + extra_nixpkg_labels
-    # Planner-visible stub: use cxx_library with headers only to avoid compilation; stamp test labels
+    # Planner-visible stub: expose test sources in `srcs` so planner can pass only test files
     cxx_library(
         name = planner_name,
-        headers = srcs,
+        headers = [],
         exported_headers = [],
-        srcs = [],
+        srcs = srcs,
         deps = deps + _providers_for(name) + _providers_for(planner_name),
         labels = _planner_labels,
     )
@@ -70,6 +84,8 @@ def _cpp_nix_test_impl(ctx):
     # Build per-target attr exposed by flake: packages.<system>.graph-generator-cppTargets.<sanitized>
     # Sanitize label to match cppTargetsFlat in graph-generator.nix
     raw = ctx.attrs.planner_label
+    # Compute expected test binary name deterministically
+    expected_bin = _sanitize_to_bin_name(raw)
     def _sanitize(s):
         # Map to [a-z0-9_] only, lowercased; others become '_', then prefix with 't'
         s = s.lower()
@@ -110,8 +126,8 @@ def _cpp_nix_test_impl(ctx):
         + ("set +e; OUT_PATH=$(BUCK_TEST_SRC=\"$PWD\" BUCK_TARGET=\"%s\" nix build --impure -L \"$FLK_ROOT\"#graph-generator-selected --accept-flake-config --print-out-paths 2>&1 | tee /tmp/cpp_nix_test_build.log | tail -1); NIX_STATUS=$?; set -e; echo \"[cpp_nix_test] OUT_PATH=$OUT_PATH\" >&2; if [ \"$NIX_STATUS\" -ne 0 ]; then echo '[cpp_nix_test] nix build failed' >&2; cat /tmp/cpp_nix_test_build.log >&2 || true; exit $NIX_STATUS; fi; " % raw)
         + "test -n \"$OUT_PATH\" || { echo '[cpp_nix_test] nix build returned no out path' >&2; cat /tmp/cpp_nix_test_build.log >&2 || true; exit 2; }; "
         + "if [ ! -d \"$OUT_PATH/bin\" ]; then echo 'no test binary produced' >&2; exit 2; fi; "
-        + "BIN=$(ls -1 \"$OUT_PATH/bin\" 2>/dev/null | head -1); "
-        + "test -n \"$BIN\" || { echo '[cpp_nix_test] no test binary found under out path' >&2; ls -la \"$OUT_PATH\" >&2 || true; ls -la \"$OUT_PATH/bin\" >&2 || true; exit 2; }; "
+        + ("BIN='%s'; " % expected_bin)
+        + "if [ ! -x \"$OUT_PATH/bin/$BIN\" ]; then echo '[cpp_nix_test] expected bin not found: ' \"$OUT_PATH/bin/$BIN\" >&2; ls -la \"$OUT_PATH/bin\" >&2 || true; exit 2; fi; "
         + "\"$OUT_PATH/bin/$BIN\""
     )
     stamp = ctx.actions.declare_output(ctx.attrs.out)

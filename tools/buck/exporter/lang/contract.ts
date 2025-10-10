@@ -54,5 +54,16 @@ export async function loadPresentAdapters(): Promise<Adapter[]> {
     }
   }
 
+  // Optional filter for tests/diagnostics: limit active adapters via env
+  const allow = (process.env.EXPORTER_ADAPTERS || "").trim();
+  if (allow) {
+    const set = new Set(
+      allow
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    );
+    return adapters.filter((a) => set.has(a.name));
+  }
   return adapters;
 }

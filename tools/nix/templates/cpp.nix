@@ -254,7 +254,8 @@ in rec {
       echo "[cpp.nix:test] nixInc=${nixInc}" >&2
       echo "[cpp.nix:test] gtestInc=${gtestInc}" >&2
 
-      mapfile -t SRCS < <(find . -type f \( -name '*.cpp' -o -name '*.cc' -o -name '*.cxx' \) | sort)
+      # Discover sources deterministically from working directory
+      mapfile -t SRCS < <(find . -type f \( -name '*.cpp' -o -name '*.cc' -o -name '*.cxx' \) | sed 's#^\./##' | sort)
       mapfile -t HDRS < <(find . -type f \( -name '*.h' -o -name '*.hpp' -o -name '*.hh' -o -name '*.hxx' \) | sort)
 
       cflags_common="-std=${std} -fno-record-gcc-switches -ffile-prefix-map=$PWD=. -g0 -O2 -pipe ${nixInc} ${gtestInc}"

@@ -227,9 +227,23 @@ async function main() {
         .pop();
       if (!graphStore) throw new Error("failed to build .#buck-graph");
       const targets = restArgs.length ? restArgs : [];
-      const specific = targets.filter(
-        (t) => (t.includes(":") || t.startsWith("//")) && !t.includes("..."),
-      );
+      // Extract only real Buck targets; ignore flags and their values (like --target-platforms <val>)
+      const specific: string[] = [];
+      let skipNext = false;
+      for (let i = 0; i < targets.length; i++) {
+        const tok = targets[i];
+        if (skipNext) {
+          skipNext = false;
+          continue;
+        }
+        if (tok === "--") break;
+        if (tok === "--target-platforms" || tok === "--user-platform" || tok.startsWith("-")) {
+          // Skip the flag and consume its value if present (for known 2-arg flags)
+          if (tok === "--target-platforms" || tok === "--user-platform") skipNext = true;
+          continue;
+        }
+        if ((tok.startsWith("//") || tok.includes(":")) && !tok.includes("...")) specific.push(tok);
+      }
       if (specific.length > 0) {
         console.log("Materializing selected targets (pure):");
         for (const sel of specific) {
@@ -319,10 +333,11 @@ async function main() {
     return "buck2";
   }
   const buckBin = await findBuckBin();
-  // Always bind target platforms explicitly for reliability in sandboxes.
-  // This is harmless when defaults are already set in .buckconfig.
+  // Always bind target platforms explicitly for reliability in sandboxes unless caller already supplied one.
   process.env.BUCK_ROOT = repoRoot();
-  const platformFlags = ["--target-platforms", "prelude//platforms:default"];
+  const hasUserPlatform =
+    restArgs.includes("--target-platforms") || restArgs.includes("--user-platform");
+  const platformFlags = hasUserPlatform ? [] : ["--target-platforms", "prelude//platforms:default"];
   const proc = await $({
     stdio: "inherit",
     cwd: repoRoot(),
