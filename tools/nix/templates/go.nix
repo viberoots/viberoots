@@ -19,6 +19,7 @@ in {
     nixCgoPkgs ? [],
     nixCgoAttrs ? [],
     pkgConfigNames ? {},
+    repoCgoPkgs ? [],
   }:
     let
       patchesMap = H.patchesMapFromDir patchDir;
@@ -48,11 +49,14 @@ in {
             parts = if parts0 != [] && (lib.head parts0) == "pkgs" then lib.tail parts0 else parts0;
         in getAtPath pkgs parts;
       resolvedCgo = builtins.filter (v: v != null) (map resolveAttr nixCgoAttrs);
-      cgoPkgs = nixCgoPkgs ++ resolvedCgo;
+      # Merge nix-provided C/C++ packages with repo-provided derivations
+      cgoPkgs = nixCgoPkgs ++ resolvedCgo ++ repoCgoPkgs;
       haveCgo = (builtins.length cgoPkgs) > 0;
       pkgCfgPaths = lib.concatStringsSep ":" (map (p: "${p}/lib/pkgconfig") cgoPkgs);
       synthCFlags = lib.concatStringsSep " " (map (p: "-I${p}/include") cgoPkgs);
       synthLdFlags = lib.concatStringsSep " " (map (p: "-L${p}/lib") cgoPkgs);
+      # Link any static libs exported by repo C++ libs if present
+      repoStaticLibs = lib.concatStringsSep " " (map (p: let a = "${p}/lib"; in ''$(ls -1 "$a" 2>/dev/null | sed -n 's/^lib\(.*\)\.a$/-l\1/p' | tr '\n' ' ')'') repoCgoPkgs);
       baseArgs = {
         pname = "go-${H.sanitizeName name}";
         version = "0.1.0";
@@ -74,7 +78,7 @@ in {
             export PKG_CONFIG_PATH=${pkgCfgPaths}
             if [ -z "$PKG_CONFIG_PATH" ]; then
               export CGO_CFLAGS="${synthCFlags} $CGO_CFLAGS"
-              export CGO_LDFLAGS="${synthLdFlags} $CGO_LDFLAGS"
+              export CGO_LDFLAGS="${synthLdFlags} ${repoStaticLibs} $CGO_LDFLAGS"
             fi
           '' else ""}
           cd "''${modRoot:-.}"
@@ -113,6 +117,7 @@ in {
     nixCgoPkgs ? [],
     nixCgoAttrs ? [],
     pkgConfigNames ? {},
+    repoCgoPkgs ? [],
   }:
     let
       patchesMap = H.patchesMapFromDir patchDir;
@@ -133,11 +138,12 @@ in {
             parts = if parts0 != [] && (lib.head parts0) == "pkgs" then lib.tail parts0 else parts0;
         in getAtPath pkgs parts;
       resolvedCgo = builtins.filter (v: v != null) (map resolveAttr nixCgoAttrs);
-      cgoPkgs = nixCgoPkgs ++ resolvedCgo;
+      cgoPkgs = nixCgoPkgs ++ resolvedCgo ++ repoCgoPkgs;
       haveCgo = (builtins.length cgoPkgs) > 0;
       pkgCfgPaths = lib.concatStringsSep ":" (map (p: "${p}/lib/pkgconfig") cgoPkgs);
       synthCFlags = lib.concatStringsSep " " (map (p: "-I${p}/include") cgoPkgs);
       synthLdFlags = lib.concatStringsSep " " (map (p: "-L${p}/lib") cgoPkgs);
+      repoStaticLibs = lib.concatStringsSep " " (map (p: let a = "${p}/lib"; in ''$(ls -1 "$a" 2>/dev/null | sed -n 's/^lib\(.*\)\.a$/-l\1/p' | tr '\n' ' ')'') repoCgoPkgs);
       baseArgs = {
         pname = "golib-${H.sanitizeName name}";
         version = "0.1.0";
@@ -160,7 +166,7 @@ in {
             export PKG_CONFIG_PATH=${pkgCfgPaths}
             if [ -z "$PKG_CONFIG_PATH" ]; then
               export CGO_CFLAGS="${synthCFlags} $CGO_CFLAGS"
-              export CGO_LDFLAGS="${synthLdFlags} $CGO_LDFLAGS"
+              export CGO_LDFLAGS="${synthLdFlags} ${repoStaticLibs} $CGO_LDFLAGS"
             fi
           '' else ""}
           cd "''${modRoot:-.}"

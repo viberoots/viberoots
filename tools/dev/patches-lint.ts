@@ -8,8 +8,14 @@ type Args = {
   format?: string;
 };
 
-const argv = (global as any).argv as Args;
-const STRICT = String(argv.strict || "").toLowerCase() === "true" || argv.strict === true;
+const argv = (global as any).argv as Args & Record<string, any>;
+// Treat presence of --strict (with or without value) as true, unless explicitly false/0/no
+function isExplicitFalse(v: any): boolean {
+  const s = String(v).toLowerCase();
+  return v === false || s === "false" || s === "0" || s === "no";
+}
+const HAS_STRICT = Object.prototype.hasOwnProperty.call(argv, "strict");
+const STRICT = HAS_STRICT ? !isExplicitFalse((argv as any).strict) : false;
 const LANG = (argv.lang as string) || ""; // optional: scope to one language
 const FORMAT = ((argv.format as string) || "text").toLowerCase();
 

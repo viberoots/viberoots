@@ -30,63 +30,105 @@ in {
 
   modulesFileFor = name: modulesTomlFor name;
 
-  mkApp = name: T.goApp {
-    inherit name;
-    modulesToml = modulesTomlFor name;
-    devOverridesMap = localModuleOverrides;
-    srcRoot = repoRoot;
-    subdir = (pkgPathOf name);
-    # Derive nixCgoAttrs from any nixpkg:* labels stamped on deps/self for this node.
-    # We pass attrs literally (e.g., "pkgs.zlib") so templates can resolve them against pkgs.
-    nixCgoAttrs = let
-      # Scan nodes for this label's transitive deps to collect nixpkg labels
+  mkApp = name:
+    let
       nodesAll = ctx.nodes or [];
-      get = ctx.get;
-      labelsOf = n: let labs = (get n "labels"); in if labs == null then [] else (if builtins.isList labs then labs else []);
-      isNixLabel = l: lib.hasPrefix "nixpkg:" l;
-      attrFrom = l: lib.removePrefix "nixpkg:" l;
+      getA = ctx.get;
       cleanLabel = s: let parts = lib.splitString " (config//" s; in if (builtins.length parts) > 1 then (builtins.elemAt parts 0) else s;
-      byName = builtins.listToAttrs (map (n: { name = cleanLabel (get n "name"); value = n; }) (builtins.filter (n: (get n "name") != null) nodesAll));
-      depsOf = n: let ds = (get n "deps"); in if ds == null then [] else (if builtins.isList ds then (map cleanLabel ds) else []);
-      start = if builtins.hasAttr name byName then byName.${name} else null;
-      step = state: dn:
-        if builtins.hasAttr dn state.seen then state else
-        let n = if builtins.hasAttr dn byName then byName.${dn} else null; in
-        if n == null then state else
-        let here = map attrFrom (builtins.filter isNixLabel (labelsOf n));
-            nexts = depsOf n;
-        in builtins.foldl' step { seen = state.seen // { "${dn}" = true; }; out = state.out ++ here; } nexts;
-      init = if start == null then { seen = {}; out = []; } else step { seen = {}; out = []; } name;
-      uniq = xs: builtins.attrNames (builtins.listToAttrs (map (a: { name = a; value = true; }) xs));
-    in builtins.sort (a: b: a < b) (uniq init.out);
-  };
+      byName = builtins.listToAttrs (map (n: { name = cleanLabel (getA n "name"); value = n; }) (builtins.filter (n: (getA n "name") != null) nodesAll));
+      depsOfName = nm: let n = if builtins.hasAttr nm byName then byName.${nm} else null; in if n == null then [] else (
+        let ds = (getA n "deps"); in if ds == null then [] else (if builtins.isList ds then (map cleanLabel ds) else [])
+      );
+      labelsOfName = nm: let n = if builtins.hasAttr nm byName then byName.${nm} else null; in if n == null then [] else (
+        let labs = (getA n "labels"); in if labs == null then [] else (if builtins.isList labs then labs else [])
+      );
+      isCppNode = nm:
+        let n = if builtins.hasAttr nm byName then byName.${nm} else null;
+            rt0 = if n == null then null else (getA n "rule_type");
+            rt = if rt0 == null then "" else rt0;
+            labs = labelsOfName nm;
+        in (rt != null && (lib.hasPrefix "cxx_" rt || lib.hasInfix "cpp_nix_build" rt)) || (labs != null && builtins.elem "lang:cpp" labs);
+      isCppLib = nm:
+        let n = if builtins.hasAttr nm byName then byName.${nm} else null;
+            rt0 = if n == null then null else (getA n "rule_type");
+            rt = if rt0 == null then "" else rt0;
+            labs = labelsOfName nm;
+        in (labs != null && builtins.elem "kind:lib" labs) || (rt == "cxx_library");
+      directDeps = depsOfName name;
+      cppLibDeps = builtins.filter (dn: isCppNode dn && isCppLib dn) directDeps;
+      repoCgoPkgs = map (dn: T.cppLib { name = dn; srcRoot = repoRoot; subdir = (pkgPathOf dn); }) cppLibDeps;
+      # Derive nixCgoAttrs (nixpkgs attrs) from transitive deps
+      nixCgoAttrs = let
+        isNixLabel = l: lib.hasPrefix "nixpkg:" l;
+        attrFrom = l: lib.removePrefix "nixpkg:" l;
+        step = state: dn:
+          if builtins.hasAttr dn state.seen then state else
+          let n = if builtins.hasAttr dn byName then byName.${dn} else null; in
+          if n == null then state else
+          let here = map attrFrom (builtins.filter isNixLabel (labelsOfName dn));
+              nexts = depsOfName dn;
+          in builtins.foldl' step { seen = state.seen // { "${dn}" = true; }; out = state.out ++ here; } nexts;
+        init = if builtins.hasAttr name byName then step { seen = {}; out = []; } name else { seen = {}; out = []; };
+        uniq = xs: builtins.attrNames (builtins.listToAttrs (map (a: { name = a; value = true; }) xs));
+      in builtins.sort (a: b: a < b) (uniq init.out);
+    in T.goApp {
+      inherit name;
+      modulesToml = modulesTomlFor name;
+      devOverridesMap = localModuleOverrides;
+      srcRoot = repoRoot;
+      subdir = (pkgPathOf name);
+      nixCgoAttrs = nixCgoAttrs;
+      nixCgoPkgs  = repoCgoPkgs;
+    };
 
-  mkLib = name: T.goLib {
-    inherit name;
-    modulesToml = modulesTomlFor name;
-    srcRoot = repoRoot;
-    subdir = (pkgPathOf name);
-    nixCgoAttrs = let
+  mkLib = name:
+    let
       nodesAll = ctx.nodes or [];
-      get = ctx.get;
-      labelsOf = n: let labs = (get n "labels"); in if labs == null then [] else (if builtins.isList labs then labs else []);
-      isNixLabel = l: lib.hasPrefix "nixpkg:" l;
-      attrFrom = l: lib.removePrefix "nixpkg:" l;
+      getA = ctx.get;
       cleanLabel = s: let parts = lib.splitString " (config//" s; in if (builtins.length parts) > 1 then (builtins.elemAt parts 0) else s;
-      byName = builtins.listToAttrs (map (n: { name = cleanLabel (get n "name"); value = n; }) (builtins.filter (n: (get n "name") != null) nodesAll));
-      depsOf = n: let ds = (get n "deps"); in if ds == null then [] else (if builtins.isList ds then (map cleanLabel ds) else []);
-      start = if builtins.hasAttr name byName then byName.${name} else null;
-      step = state: dn:
-        if builtins.hasAttr dn state.seen then state else
-        let n = if builtins.hasAttr dn byName then byName.${dn} else null; in
-        if n == null then state else
-        let here = map attrFrom (builtins.filter isNixLabel (labelsOf n));
-            nexts = depsOf n;
-        in builtins.foldl' step { seen = state.seen // { "${dn}" = true; }; out = state.out ++ here; } nexts;
-      init = if start == null then { seen = {}; out = []; } else step { seen = {}; out = []; } name;
-      uniq = xs: builtins.attrNames (builtins.listToAttrs (map (a: { name = a; value = true; }) xs));
-    in builtins.sort (a: b: a < b) (uniq init.out);
-  };
+      byName = builtins.listToAttrs (map (n: { name = cleanLabel (getA n "name"); value = n; }) (builtins.filter (n: (getA n "name") != null) nodesAll));
+      depsOfName = nm: let n = if builtins.hasAttr nm byName then byName.${nm} else null; in if n == null then [] else (
+        let ds = (getA n "deps"); in if ds == null then [] else (if builtins.isList ds then (map cleanLabel ds) else [])
+      );
+      labelsOfName = nm: let n = if builtins.hasAttr nm byName then byName.${nm} else null; in if n == null then [] else (
+        let labs = (getA n "labels"); in if labs == null then [] else (if builtins.isList labs then labs else [])
+      );
+      isCppNode = nm:
+        let n = if builtins.hasAttr nm byName then byName.${nm} else null;
+            rt0 = if n == null then null else (getA n "rule_type");
+            rt = if rt0 == null then "" else rt0;
+            labs = labelsOfName nm;
+        in (rt != null && (lib.hasPrefix "cxx_" rt || lib.hasInfix "cpp_nix_build" rt)) || (labs != null && builtins.elem "lang:cpp" labs);
+      isCppLib = nm:
+        let n = if builtins.hasAttr nm byName then byName.${nm} else null;
+            rt0 = if n == null then null else (getA n "rule_type");
+            rt = if rt0 == null then "" else rt0;
+            labs = labelsOfName nm;
+        in (labs != null && builtins.elem "kind:lib" labs) || (rt == "cxx_library");
+      directDeps = depsOfName name;
+      cppLibDeps = builtins.filter (dn: isCppNode dn && isCppLib dn) directDeps;
+      repoCgoPkgs = map (dn: T.cppLib { name = dn; srcRoot = repoRoot; subdir = (pkgPathOf dn); }) cppLibDeps;
+      nixCgoAttrs = let
+        isNixLabel = l: lib.hasPrefix "nixpkg:" l;
+        attrFrom = l: lib.removePrefix "nixpkg:" l;
+        step = state: dn:
+          if builtins.hasAttr dn state.seen then state else
+          let n = if builtins.hasAttr dn byName then byName.${dn} else null; in
+          if n == null then state else
+          let here = map attrFrom (builtins.filter isNixLabel (labelsOfName dn));
+              nexts = depsOfName dn;
+          in builtins.foldl' step { seen = state.seen // { "${dn}" = true; }; out = state.out ++ here; } nexts;
+        init = if builtins.hasAttr name byName then step { seen = {}; out = []; } name else { seen = {}; out = []; };
+        uniq = xs: builtins.attrNames (builtins.listToAttrs (map (a: { name = a; value = true; }) xs));
+      in builtins.sort (a: b: a < b) (uniq init.out);
+    in T.goLib {
+      inherit name;
+      modulesToml = modulesTomlFor name;
+      srcRoot = repoRoot;
+      subdir = (pkgPathOf name);
+      nixCgoAttrs = nixCgoAttrs;
+      nixCgoPkgs  = repoCgoPkgs;
+    };
 }
 
 
