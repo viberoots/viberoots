@@ -95,12 +95,12 @@ in rec {
       declare -a LIBFLAGS
       for d in "''${PKG_LIB_DIRS[@]}"; do
         if [ -d "$d" ]; then
-          while IFS= read -r -d '' f; do
+          while IFS= read -r f; do
             b=$(basename "$f")
             n="${b#lib}"
             n="${n%.a}"
             LIBFLAGS+=("-l$n")
-          done < <(find "$d" -maxdepth 1 -type f -name 'lib*.a' -print0 2>/dev/null)
+          done < <(find "$d" -maxdepth 1 -type f -name 'lib*.a' 2>/dev/null)
         fi
       done
       # Link resolved nix libraries first so -l flags can resolve
@@ -295,12 +295,12 @@ in rec {
       declare -a LIBFLAGS
       for d in "''${PKG_LIB_DIRS[@]}"; do
         if [ -d "$d" ]; then
-          while IFS= read -r -d '' f; do
+          while IFS= read -r f; do
             b=$(basename "$f")
             n="${b#lib}"
             n="${n%.a}"
             LIBFLAGS+=("-l$n")
-          done < <(find "$d" -maxdepth 1 -type f -name 'lib*.a' -print0 2>/dev/null)
+          done < <(find "$d" -maxdepth 1 -type f -name 'lib*.a' 2>/dev/null)
         fi
       done
       ${clangxx} ${platLD} ${nixLib} ${gtestLibPath} ${extraLD} "''${OBJS[@]}" ${gtestLibs} ${threadLib} "''${LIBFLAGS[@]}" -o "$outbin"
