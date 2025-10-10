@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import type { LanguageProviderSync } from "../../lib/lang-contracts";
+import { syncCppProviders } from "./cpp";
 import { syncGoProviders } from "./go";
 
 export type SyncOptions = {
@@ -9,7 +10,13 @@ export type SyncOptions = {
   lang?: string; // optional narrow
 };
 
-const handlers: LanguageProviderSync[] = [{ lang: "go", sync: syncGoProviders }];
+const handlers: LanguageProviderSync[] = [
+  { lang: "go", sync: syncGoProviders },
+  {
+    lang: "cpp",
+    sync: async (_opts) => syncCppProviders({ outFile: "third_party/providers/TARGETS.cpp.auto" }),
+  },
+];
 
 export async function syncAllProviders(opts?: SyncOptions) {
   const targetLang = opts?.lang;

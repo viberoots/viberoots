@@ -23,7 +23,9 @@ export async function listInputs(): Promise<string[]> {
         (f.startsWith("patches/") && f.endsWith(".patch")) ||
         f.endsWith("pnpm-lock.yaml") ||
         f.endsWith("/go.mod") ||
-        f.endsWith("/go.sum"),
+        f.endsWith("/go.sum") ||
+        f === "flake.lock" ||
+        f.startsWith("tools/nix/overlays/"),
     );
   } catch {
     const result: string[] = [];
@@ -56,7 +58,9 @@ export async function listInputs(): Promise<string[]> {
             (rel.startsWith("patches/") && e.name.endsWith(".patch")) ||
             e.name === "pnpm-lock.yaml" ||
             e.name === "go.mod" ||
-            e.name === "go.sum"
+            e.name === "go.sum" ||
+            e.name === "flake.lock" ||
+            rel.startsWith("tools/nix/overlays/")
           ) {
             result.push(rel);
           }
@@ -82,7 +86,9 @@ export function listOutputs(): string[] {
 export function hasPatchesOrLocks(inputs: string[]): boolean {
   return (
     inputs.some((f) => f.startsWith("patches/") && f.endsWith(".patch")) ||
-    inputs.some((f) => f.endsWith("pnpm-lock.yaml"))
+    inputs.some((f) => f.endsWith("pnpm-lock.yaml")) ||
+    inputs.includes("flake.lock") ||
+    inputs.some((f) => f.startsWith("tools/nix/overlays/"))
   );
 }
 

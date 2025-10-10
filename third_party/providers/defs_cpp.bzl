@@ -17,6 +17,7 @@ def nix_cxx_library(name, attr, headers_subdir = None, static = True, shared = F
         visibility = ["PUBLIC"],
     )
 
+
 def nix_cxx_gtest_providers():
     # Convenience macro to declare gtest providers when needed locally
     nix_cxx_library(name = "nx_pkgs_gtest", attr = "pkgs.googletest")

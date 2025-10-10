@@ -27,7 +27,11 @@
       let
         pkgs = import nixpkgs {
           inherit system;
-          overlays = [ gomod2nix.overlays.default ];
+          overlays = let
+            haveCppOverlay = builtins.pathExists ./tools/nix/overlays/cpp-patches.nix;
+          in [
+            gomod2nix.overlays.default
+          ] ++ (if haveCppOverlay then [ (import ./tools/nix/overlays/cpp-patches.nix) ] else []);
         };
         zx-wrapper = pkgs.writeShellScriptBin "zx-wrapper" ''
           set -euo pipefail

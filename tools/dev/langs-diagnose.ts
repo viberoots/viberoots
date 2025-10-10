@@ -221,6 +221,25 @@ function printHuman(out: DiagnoseOutput, filterId: string) {
   sep();
   console.log("CI stages (would run):");
   for (const s of out.stages) console.log("  -", s);
+
+  // Extra note for C++: list patched attrs if present
+  if (!filterId || filterId === "cpp") {
+    try {
+      const autoMap = path.resolve("third_party/providers/auto_map.bzl");
+      if (fs.existsSync(autoMap)) {
+        const txt = fs.readFileSync(autoMap, "utf8");
+        const re = new RegExp('"//third_party/providers:nix_pkgs_([a-z0-9_]+)"', "gi");
+        const set = new Set<string>();
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(txt))) set.add(m[1]);
+        if (set.size) {
+          sep();
+          console.log("Patched C++ nixpkgs providers detected:");
+          console.log("  ", Array.from(set).sort().join(", "));
+        }
+      }
+    } catch {}
+  }
 }
 
 async function main() {
