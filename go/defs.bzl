@@ -1,4 +1,4 @@
-load("@prelude//:rules.bzl", "go_binary", "go_library", "go_test")
+load("@prelude//:rules.bzl", "go_binary", "go_library", "go_test", "genrule")
 load("//lang:defs_common.bzl", "append_tuple_labels", "dedupe_preserve", "normalize_labels", "stamp_labels")
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
 
@@ -162,4 +162,30 @@ def nix_go_test(name, **kwargs):
 
 # Third-party shim: expose vendor-provided sources as a go_library while
 # allowing an explicit import path via package map flags
+
+
+def nix_go_carchive(name, **kwargs):
+    """
+    Declare a planner-visible Go target that builds as a C archive via Nix.
+
+    This macro stamps labels so the exporter/planner can route the target to
+    the goCArchive Nix template. It creates a small genrule to appear in the
+    Buck graph; the actual archive is produced by the Nix planner build when
+    a consumer (e.g., a C++ binary) is built.
+    """
+    # Stamp language/kind labels for planner detection
+    labels = kwargs.get("labels", []) or []
+    labels = dedupe_preserve(labels + ["lang:go", "kind:carchive"])
+    deps = kwargs.pop("deps", [])
+    # Keep a minimal graph node with srcs so planner can find package dir
+    srcs = kwargs.get("srcs", []) or []
+    genrule(
+        name = name,
+        srcs = srcs,
+        out = name + ".stamp",
+        cmd = "echo go_carchive > $OUT",
+        labels = labels,
+        deps = deps + _providers_for(name),
+        visibility = kwargs.get("visibility", []),
+    )
 

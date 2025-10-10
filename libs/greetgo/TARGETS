@@ -1,0 +1,12 @@
+load("//go:defs.bzl", "nix_go_carchive")
+
+nix_go_carchive(
+    name = "greetgo",
+    srcs = [
+        "export.go",
+    ],
+    labels = ["lang:go", "kind:carchive"],
+    visibility = ["PUBLIC"],
+)
+
+

@@ -24,7 +24,8 @@ in {
     let rt = get n "rule_type";
         lbs = get n "labels";
         isBinLabel = lbs != null && builtins.elem "kind:bin" lbs;
-    in if (rt != null) && lib.hasPrefix "go_" rt
+    in if (lbs != null && builtins.elem "kind:carchive" lbs) then "lib"
+       else if (rt != null) && lib.hasPrefix "go_" rt
          then (if lib.hasSuffix "_binary" rt then "bin" else "lib")
          else if isBinLabel then "bin" else "lib";
 

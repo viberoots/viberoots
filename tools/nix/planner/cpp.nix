@@ -95,6 +95,24 @@ let
       uniq = xs: builtins.attrNames (builtins.listToAttrs (map (a: { name = a; value = true; }) xs));
     in builtins.sort (a: b: a < b) (uniq init.labels);
 
+  # Identify direct deps that are Go c-archives (labeled kind:carchive) and
+  # build them as repo-provided C packages to link against from C++.
+  # We return a list of derivations produced via T.goCArchive with subdir/pkgPath.
+  repoGoCArchivesFor = name:
+    let
+      start = if builtins.hasAttr name byName then byName.${name} else null;
+      direct = if start == null then [] else depsOf start;
+      isCArchive = nm:
+        let n = if builtins.hasAttr nm byName then byName.${nm} else null; in
+          if n == null then false else builtins.elem "kind:carchive" (labelsOf n);
+      asDerivation = nm: T.goCArchive {
+        name = nm;
+        modulesToml = ctx.modulesTomlFor nm;
+        srcRoot = ctx.repoRoot;
+        subdir = pkgPathOf nm;
+      };
+    in builtins.map asDerivation (builtins.filter isCArchive direct);
+
   # Collect nixpkg labels stamped directly on the node itself (no DFS)
   nixAttrsFromSelf = name:
     let n = if builtins.hasAttr name byName then byName.${name} else null; in
@@ -123,6 +141,7 @@ let
       srcRoot = ctx.repoRoot;
       subdir = pkgPathOf name;
       nixCxxAttrs = collectNixAttrsFor name;
+      nixCxxPkgs = repoGoCArchivesFor name;
       srcList = normSrcsOf name;
     };
 
@@ -148,6 +167,7 @@ let
           uniq = xs: builtins.attrNames (builtins.listToAttrs (map (a: { name = a; value = true; }) xs));
           all = builtins.sort (a: b: a < b) (uniq merged);
         in if all == [] then providerAttrsFallback else all;
+      nixCxxPkgs = repoGoCArchivesFor name;
       srcList = normSrcsOf name;
     };
 in {

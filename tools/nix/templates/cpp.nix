@@ -45,6 +45,7 @@ in rec {
       in (nixCxxPkgs ++ (builtins.filter (v: v != null) (map getAt nixCxxAttrs)));
     # include flags from explicit includes and resolved nixCxx packages
     nixInc = lib.concatStringsSep " " (map (p: "-isystem ${toIncludeBase p}/include") resolvedPkgs);
+    nixLib = lib.concatStringsSep " " (map (p: "-L${toLibBase p}/lib") resolvedPkgs);
     incFlags = lib.concatStringsSep " " (map (p: "-I${p}") (sorted includes));
     defFlags = lib.concatStringsSep " " (map (d: "-D${d}") (sorted defines));
     extraC   = lib.concatStringsSep " " (sorted (cflags ++ [ "-ffunction-sections" "-fdata-sections" ]));
@@ -86,7 +87,24 @@ in rec {
 
       mapfile -t OBJS < <(find "$tmp" -type f -name '*.o' | sort)
       outbin="$out/bin/${H.sanitizeName name}"
-      ${clangxx} ${platLD} ${extraLD} "''${OBJS[@]}" -o "$outbin"
+      # Auto-discover static libraries from nix pkgs to link with -l<name>
+      declare -a PKG_LIB_DIRS
+      PKG_LIB_DIRS=(
+        ${lib.concatStringsSep " " (map (p: ("${toLibBase p}/lib")) resolvedPkgs)}
+      )
+      declare -a LIBFLAGS
+      for d in "''${PKG_LIB_DIRS[@]}"; do
+        if [ -d "$d" ]; then
+          while IFS= read -r -d '' f; do
+            b=$(basename "$f")
+            n="${b#lib}"
+            n="${n%.a}"
+            LIBFLAGS+=("-l$n")
+          done < <(find "$d" -maxdepth 1 -type f -name 'lib*.a' -print0 2>/dev/null)
+        fi
+      done
+      # Link resolved nix libraries first so -l flags can resolve
+      ${clangxx} ${platLD} ${nixLib} ${extraLD} "''${OBJS[@]}" "''${LIBFLAGS[@]}" -o "$outbin"
 
       for h in "''${HDRS[@]}"; do
         install -Dm644 "$h" "$out/include/''${h#./}"
@@ -269,7 +287,23 @@ in rec {
 
       mapfile -t OBJS < <(find "$tmp" -type f -name '*.o' | sort)
       outbin="$out/bin/${H.sanitizeName name}"
-      ${clangxx} ${platLD} ${nixLib} ${gtestLibPath} ${extraLD} "''${OBJS[@]}" ${gtestLibs} ${threadLib} -o "$outbin"
+      # Auto-discover static libraries from nix pkgs to link with -l<name>
+      declare -a PKG_LIB_DIRS
+      PKG_LIB_DIRS=(
+        ${lib.concatStringsSep " " (map (p: ("${toLibBase p}/lib")) resolvedPkgs)}
+      )
+      declare -a LIBFLAGS
+      for d in "''${PKG_LIB_DIRS[@]}"; do
+        if [ -d "$d" ]; then
+          while IFS= read -r -d '' f; do
+            b=$(basename "$f")
+            n="${b#lib}"
+            n="${n%.a}"
+            LIBFLAGS+=("-l$n")
+          done < <(find "$d" -maxdepth 1 -type f -name 'lib*.a' -print0 2>/dev/null)
+        fi
+      done
+      ${clangxx} ${platLD} ${nixLib} ${gtestLibPath} ${extraLD} "''${OBJS[@]}" ${gtestLibs} ${threadLib} "''${LIBFLAGS[@]}" -o "$outbin"
 
       for h in "''${HDRS[@]}"; do
         install -Dm644 "$h" "$out/include/''${h#./}"

@@ -194,6 +194,105 @@ in {
           };
       } else {}));
     in buildGoFn args;
+
+  # Build a Go package as a C archive (.a) with an accompanying header via buildmode=c-archive
+  goCArchive = {
+    name,
+    modulesToml,
+    devOverrideEnv ? "NIX_GO_DEV_OVERRIDE_JSON",
+    subdir ? ".",
+    srcRoot ? ../../..,
+    patchDir ? ../../patches/go,
+    nixCgoPkgs ? [],
+    nixCgoAttrs ? [],
+    repoCgoPkgs ? [],
+  }:
+    let
+      patchesMap = H.patchesMapFromDir patchDir;
+      devOverridesEnv = H.readDevOverrides devOverrideEnv;
+      _ = if (builtins.getEnv "CI") == "true" && (builtins.getEnv devOverrideEnv) != "" then
+            builtins.throw "Dev overrides are forbidden in CI" else null;
+      srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + subdir));
+      segs = s: let xs = lib.splitString "." s; in if xs == [] then [] else xs;
+      getAtPath = attrs: parts:
+        if parts == [] then attrs else (
+          let k = lib.head parts; rest = lib.tail parts; in
+            if (builtins.isAttrs attrs) && (builtins.hasAttr k attrs)
+            then getAtPath (builtins.getAttr k attrs) rest
+            else null
+        );
+      resolveAttr = s:
+        let parts0 = segs s;
+            parts = if parts0 != [] && (lib.head parts0) == "pkgs" then lib.tail parts0 else parts0;
+        in getAtPath pkgs parts;
+      cgoPkgs = nixCgoPkgs ++ (builtins.filter (v: v != null) (map resolveAttr nixCgoAttrs)) ++ repoCgoPkgs;
+      pkgCfgPaths = lib.concatStringsSep ":" (map (p: "${p}/lib/pkgconfig") cgoPkgs);
+      synthCFlags = lib.concatStringsSep " " (map (p: "-I${p}/include") cgoPkgs);
+      synthLdFlags = lib.concatStringsSep " " (map (p: "-L${p}/lib") cgoPkgs);
+    in buildGoFn ({
+      pname = "gocarchive-${H.sanitizeName name}";
+      version = "0.1.0";
+      src = srcAbs;
+      modules = modulesToml;
+      subPackages = [ "." ];
+      doCheck = false;
+      doInstallCheck = false;
+      nativeBuildInputs = cgoPkgs ++ [ pkgs.unzip pkgs.pkg-config ];
+      configurePhase = ''
+        runHook preConfigure
+        export GOCACHE=$TMPDIR/go-cache
+        export GOPATH="$TMPDIR/go"
+        export GOSUMDB=off
+        export CGO_ENABLED=1
+        export PKG_CONFIG_PATH=${pkgCfgPaths}
+        if [ -z "$PKG_CONFIG_PATH" ]; then
+          export CGO_CFLAGS="${synthCFlags} $CGO_CFLAGS"
+          export CGO_LDFLAGS="${synthLdFlags} $CGO_LDFLAGS"
+        fi
+        runHook postConfigure
+      '';
+      buildPhase = ''
+        runHook preBuild
+        mkdir -p $out/lib $out/include
+        # Build the c-archive for the package at subdir (".")
+        # The output is a .a and a header named after the module/package
+        pkgName=$(basename "$PWD")
+        outA="$out/lib/lib${pkgName}.a"
+        outH="$out/include/${pkgName}.h"
+        go env -w GOFLAGS=-mod=mod >/dev/null 2>&1 || true
+        go build -buildmode=c-archive -o "$outA" .
+        # Locate the generated header (go writes a .h next to the .a)
+        genH=$(dirname "$outA")/$(basename "$outA" .a).h
+        if [ -f "$genH" ]; then
+          cp -f "$genH" "$outH"
+        else
+          # Fallback: copy any generated header in build dir
+          find . -maxdepth 1 -type f -name '*.h' -print -quit | xargs -I{} cp -f {} "$outH" 2>/dev/null || true
+        fi
+        runHook postBuild
+      '';
+      installPhase = ''
+        runHook preInstall
+        # Artifacts already copied to $out in buildPhase
+        :
+        runHook postInstall
+      '';
+    } // (if takesOverrides then {
+      overrides = module: old:
+        let
+          mType = builtins.typeOf module;
+          pkg = if mType == "string" then module else (module.goPackagePath or (old.goPackagePath or ""));
+          ver = if mType == "string" then (old.version or "") else (module.version or (old.version or ""));
+          keyWithVer = if pkg != "" && ver != "" then "${pkg}@${ver}" else pkg;
+          patchList = (patchesMap.${keyWithVer} or []) ++ (patchesMap.${pkg} or []);
+          srcOverride = if builtins.hasAttr keyWithVer devOverridesEnv
+                        then devOverridesEnv.${keyWithVer}
+                        else (devOverridesEnv.${pkg} or old.src);
+        in old // {
+          patches = (old.patches or []) ++ patchList;
+          src = srcOverride;
+        };
+    } else {}));
 }
 
 
