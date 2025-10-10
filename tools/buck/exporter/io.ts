@@ -27,13 +27,14 @@ export async function cqueryNodes(scope: string, attrs: string[]): Promise<Node[
   const flags = attrs.flatMap((a) => ["--output-attribute", a]);
   const platformFlags = ["--target-platforms", "prelude//platforms:default"];
   // Buck disallows recursive invocations unless an isolation dir NAME is set.
-  // It must be a simple directory name, not a path.
+  // It must be a simple directory name, not a path. Allow disabling in pure sandbox.
   const iso = process.env.BUCK_ISOLATION_DIR || `exporter-${process.pid}-${Date.now()}`;
+  const isolationFlags = process.env.BUCK_NO_ISOLATION === "1" ? [] : ["--isolation-dir", iso];
 
   async function runQuery(q: string): Promise<Record<string, any>> {
     const query = scope ? `attrfilter(labels, ${scope}, ${q})` : q;
     const { stdout } =
-      await $`buck2 --isolation-dir ${iso} cquery ${platformFlags} ${query} --json ${flags}`;
+      await $`buck2 ${isolationFlags} cquery ${platformFlags} ${query} --json ${flags}`;
     return JSON.parse(String(stdout)) as Record<string, any>;
   }
 
@@ -47,20 +48,36 @@ export async function cqueryNodes(scope: string, attrs: string[]): Promise<Node[
 
   // Query regular deps and tests separately, then merge to ensure test nodes are present
   const base = `deps(//..., 1, exec_deps())`;
+  // Enumerate all configured targets in case deps(...) misses standalone nodes
+  const allKind = `kind(".*", //...)`;
   const kindCxxTest = `kind("cxx_test", //...)`;
   const attrCxxTest = `attrfilter(rule_type, "cxx_test", //...)`;
   const kindCxxBin = `kind("cxx_binary", //...)`;
   const attrCxxBin = `attrfilter(rule_type, "cxx_binary", //...)`;
   const cxxPlanner = `filter("__planner$", kind("cxx_library", //...))`;
-  const [obj1, obj2, obj3, obj4, obj5, obj6] = await Promise.all([
+  // Explicitly include any targets stamped with lang:cpp to catch repo-local
+  // macros (e.g., nix_cpp_*) that don't use cxx_* rule_types.
+  const labeledCpp = `attrfilter(labels, "lang:cpp", //...)`;
+  const [obj0, obj1, obj2, obj3, obj4, obj5, obj6, obj7] = await Promise.all([
+    runQuerySafe(allKind),
     runQuerySafe(base),
     runQuerySafe(kindCxxTest),
     runQuerySafe(attrCxxTest),
     runQuerySafe(kindCxxBin),
     runQuerySafe(attrCxxBin),
     runQuerySafe(cxxPlanner),
+    runQuerySafe(labeledCpp),
   ]);
-  const merged: Record<string, any> = { ...obj1, ...obj2, ...obj3, ...obj4, ...obj5, ...obj6 };
+  const merged: Record<string, any> = {
+    ...obj0,
+    ...obj1,
+    ...obj2,
+    ...obj3,
+    ...obj4,
+    ...obj5,
+    ...obj6,
+    ...obj7,
+  };
 
   const nodes: Node[] = [];
   for (const [label, raw] of Object.entries(merged)) {

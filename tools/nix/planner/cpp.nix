@@ -14,7 +14,7 @@ let
   # Basic predicates
   isCxx = n:
     let rt = get n "rule_type"; in
-    (rt != null) && lib.hasPrefix "cxx_" rt;
+    (rt != null) && (lib.hasPrefix "cxx_" rt || lib.hasInfix "cpp_nix_build" rt);
 
   hasLangCpp = n:
     let ls = (get n "labels"); in

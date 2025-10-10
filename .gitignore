@@ -28,6 +28,11 @@ third_party/providers/auto_map.bzl
 tools/buck/graph.json
 tools/buck/export-metrics.json
 
+# Local out-links created during ad-hoc nix builds (not part of normal flow)
+buck-graph-result
+graph-all
+graph-pure-out
+
 # Test coverage and reports
 coverage/
 .nyc_output/
@@ -41,3 +46,4 @@ coverage/
 # zx / misc temp
 *.log
 .patch-sessions.json
+graph-gen-pure

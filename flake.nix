@@ -68,14 +68,17 @@
         # Ensure buck-graph.nix is included even when untracked by wrapping with builtins.path
         buckGraphFile = builtins.path { path = ./tools/nix/buck-graph.nix; name = "buck-graph.nix"; };
         buckGraph = pkgs.callPackage buckGraphFile {
-          inherit pkgs buck2Input;
-          preludeOut = prelude.buck2-prelude;
-          src = ./.;
+          inherit pkgs;
+          graphJsonPath = let envGraph = builtins.getEnv "BUCK_GRAPH_JSON"; in
+            if envGraph != ""
+            then (builtins.path { path = (builtins.toPath envGraph); name = "graph.json"; })
+            else throw "BUCK_GRAPH_JSON not set; export the graph and pass it explicitly";
         };
         graphGenPure = pkgs.callPackage ./tools/nix/graph-generator.nix {
           inherit pkgs;
           src = builtins.path { path = ./.; name = "repo"; };
-          graphJsonPath = buckGraph + "/graph.json";
+          graphJsonPath = let envGraph = builtins.getEnv "BUCK_GRAPH_JSON"; in
+            if envGraph != "" then envGraph else (buckGraph + "/graph.json");
           rootModulesTomlPath = let envRootToml = builtins.getEnv "ROOT_GOMOD2NIX_TOML"; in
             if envRootToml != "" then envRootToml else ./gomod2nix.toml;
         };

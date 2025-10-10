@@ -165,6 +165,9 @@ async function main() {
     } catch {}
   }
 
+  // Keep mode selection strict: impure only when explicitly requested or when
+  // the working tree has untracked files (handled above). Otherwise, stay pure.
+
   // Allow command after flags: if first remaining arg is a known subcmd, adopt it
   if (restArgs.length > 0 && known.has(restArgs[0])) {
     subcmd = restArgs[0];
@@ -207,6 +210,20 @@ async function main() {
       stdio: "inherit",
       cwd: repoRoot(),
     })`bash --noprofile --norc -c ${`${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/export-graph.ts")} --out ${path.join(repoRoot(), "tools/buck/graph.json")}`}`;
+    // Validate non-empty graph before pure Nix stage
+    const { stdout: glen } = await $({
+      stdio: "pipe",
+      cwd: repoRoot(),
+    })`jq -r 'length' tools/buck/graph.json`;
+    const graphLen = Number(String(glen || "0").trim() || "0");
+    if (!Number.isFinite(graphLen) || graphLen <= 0) {
+      console.error(
+        "[dev-build] ERROR: tools/buck/graph.json is empty. Export failed or found no nodes.",
+      );
+      process.exit(2);
+    }
+    // Make the graph path visible for downstream pure Nix builds
+    process.env.BUCK_GRAPH_JSON = path.join(repoRoot(), "tools/buck/graph.json");
   }
 
   // Materialize Nix-built graph BEFORE Buck build to ensure attribute exists
@@ -215,11 +232,16 @@ async function main() {
     await fsp.mkdir(linkDir, { recursive: true });
     const linkName = path.join(linkDir, `buck-go-${Date.now()}`);
     try {
-      // Pure path: build the store-pinned buck-graph; optionally materialize selected-only
+      // Pure path: build the store-pinned buck-graph from workspace graph.json
+      const envPure = {
+        ...process.env,
+        BUCK_GRAPH_JSON: path.join(repoRoot(), "tools/buck/graph.json"),
+      } as any;
       const { stdout: graphOut } = await $({
         stdio: "pipe",
         cwd: repoRoot(),
-      })`nix build .#buck-graph --no-link --accept-flake-config --print-out-paths`;
+        env: envPure,
+      })`nix build --impure .#buck-graph --no-link --accept-flake-config --print-out-paths`;
       const graphStore = String(graphOut || "")
         .trim()
         .split("\n")
@@ -248,10 +270,16 @@ async function main() {
         console.log("Materializing selected targets (pure):");
         for (const sel of specific) {
           try {
+            const envSel = {
+              ...process.env,
+              BUCK_TARGET: sel,
+              BUCK_GRAPH_JSON: path.join(repoRoot(), "tools/buck/graph.json"),
+            } as any;
             const { stdout: selOut } = await $({
               stdio: "pipe",
               cwd: repoRoot(),
-            })`BUCK_TARGET=${sel} nix build --impure .#graph-generator-pure-selected --accept-flake-config --print-out-paths`;
+              env: envSel,
+            })`nix build .#graph-generator-pure-selected --accept-flake-config --print-out-paths`;
             const outPath =
               String(selOut || "")
                 .trim()
@@ -278,11 +306,29 @@ async function main() {
           }
         }
       } else {
-        // Evaluate full graph outputs (pure) for convenience
-        await $({
-          stdio: "inherit",
+        // Evaluate full graph outputs (pure) strictly; print a helpful warning if empty
+        const envFull = {
+          ...process.env,
+          BUCK_GRAPH_JSON: path.join(repoRoot(), "tools/buck/graph.json"),
+        } as any;
+        const { stdout: pureOut } = await $({
+          stdio: "pipe",
           cwd: repoRoot(),
-        })`nix build .#graph-generator-pure --accept-flake-config --out-link ${linkName}`;
+          env: envFull,
+        })`nix build --impure .#graph-generator-pure --accept-flake-config --print-out-paths`;
+        const purePath =
+          String(pureOut || "")
+            .trim()
+            .split("\n")
+            .filter(Boolean)
+            .pop() || "";
+        if (!purePath) {
+          console.warn(
+            "[dev-build] WARNING: pure graph evaluation returned no out path. If your manifest is empty, ensure buck graph export succeeded and glue exists (third_party/providers/auto_map.bzl, TARGETS.auto).",
+          );
+        } else {
+          await $({ stdio: "inherit", cwd: repoRoot() })`ln -sfn ${purePath} ${linkName}`;
+        }
         try {
           const manifestPath = path.resolve(linkName, "manifest.json");
           const txt = await fsp.readFile(manifestPath, "utf8").catch(() => "");

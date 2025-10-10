@@ -119,9 +119,14 @@ let
         mkLib = name: T.goLib { inherit name; modulesToml = modulesTomlFor name; repoRoot = repoRoot; subdir = (pkgPathOf name); };
       };
 
-  # Always include go for backward compatibility; merge any ids from manifest
-  langIds = let ids = readLangIds; in
-    if builtins.elem "go" ids then ids else ids ++ [ "go" ];
+  # Always include go for backward compatibility; and include cpp if planner/cpp.nix exists.
+  langIds = let
+    ids0 = readLangIds;
+    withGo = if builtins.elem "go" ids0 then ids0 else (ids0 ++ [ "go" ]);
+    cppPlanner = manifestBase + "/planner/cpp.nix";
+    withCpp = if builtins.pathExists cppPlanner && !(builtins.elem "cpp" withGo)
+      then (withGo ++ [ "cpp" ]) else withGo;
+  in withCpp;
 
   LANGS =
     builtins.listToAttrs (map (id: { name = id; value = ensureAdapter id; }) langIds);
@@ -251,7 +256,10 @@ let
     in builtins.listToAttrs entries;
   # Only binaries participate in graph-outputs/manifest (PR5)
   goTargetsBins = builtins.listToAttrs (map (nm: { name = nm; value = goTargetsFromGraph.${nm}; }) binTargetNames);
-  goOutPaths = lib.mapAttrs (n: p: builtins.toString p) goTargetsBins;
+  # IMPORTANT: keep values as derivations here (do NOT toString) so Nix realizes them
+  # when referenced in the runCommand below. Stringifying would drop inputDerivations
+  # and prevent materialization, leading to missing /bin during manifest creation.
+  goOutPaths = goTargetsBins;
 
   # C++ targets collected similarly; include bin/lib/test in attrset, but only link bins in all.out/bin
   cppTargetsFromGraph = builtins.foldl' (acc: n:
@@ -269,8 +277,11 @@ let
   ) (builtins.attrNames cppTargetsFromGraph);
 
   cppTargets = cppTargetsFromGraph;
-  cppTargetsBins = builtins.listToAttrs (map (nm: { name = nm; value = cppTargetsFromGraph.${nm}; }) cppBinNames);
-  cppOutPaths = lib.mapAttrs (n: p: builtins.toString p) cppTargetsBins;
+  # Only include C++ binary targets when building the manifest/bin links.
+  # Tests and planner stubs are excluded from bin output.
+  cppOutPaths = builtins.listToAttrs (
+    map (nm: { name = nm; value = cppTargetsFromGraph.${nm}; }) cppBinNames
+  );
 
   # Provide a flake-friendly flat attrset whose keys are safe identifiers: t + [a-z0-9_]+
   sanitizeAttr = s:
@@ -332,11 +343,10 @@ let
     echo no-target > $out/.noop
   '';
 
-  all = pkgs.stdenv.mkDerivation {
-    name = "graph-outputs";
-    outputs = [ "out" ];
-    phases = [ "installPhase" ];
-    installPhase = ''
+  # Ensure C++ and Go target derivations are realized by declaring them as inputs.
+  allDeps = (lib.attrValues goOutPaths) ++ (lib.attrValues cppOutPaths);
+
+  all = pkgs.runCommand "graph-outputs" { inherit allDeps; } ''
       set -eu
       mkdir -p $out
       mkdir -p $out/bin
@@ -347,6 +357,7 @@ let
       echo "libsDir=${builtins.toString (builtins.toPath (repoRootStr + "/libs"))}" >> $out/build.log
       echo "devOverrideJSON=${builtins.toJSON devOverrideJSON}" >> $out/build.log
       echo "goTargets keys: ${lib.concatStringsSep "," (builtins.attrNames goOutPaths)}" >> $out/build.log
+      echo "cppTargets bin keys: ${lib.concatStringsSep "," (builtins.attrNames cppOutPaths)}" >> $out/build.log
       echo '[' > $out/manifest.json
       first=1
       ${lib.concatStringsSep "\n" (lib.mapAttrsToList (n: p:
@@ -395,6 +406,8 @@ let
               if [ -f "$f" ] && [ -x "$f" ]; then
                 if [ -z "$bins" ]; then bins="\"$f\""; else bins="$bins, \"$f\""; fi
                 ln -s "$f" "$out/bin/$(basename "$f")" || true
+                ln -s "$f" "$out/bin/${sanitize n}" || true
+                ln -s "$f" "$out/bin/cpp-${sanitize n}" || true
               fi
             done
           fi
@@ -407,7 +420,6 @@ let
       ) cppOutPaths)}
       echo ']' >> $out/manifest.json
     '';
-  };
 in
 {
   inherit goTargets cppTargets cppTargetsFlat all selected;

@@ -23,18 +23,31 @@ def _providers_for(name):
 
 
 def nix_cpp_library(name, **kwargs):
+    # Build via Nix, not Buck's C++ toolchain
     deps = kwargs.pop("deps", [])
-    # Stamp language/kind onto kwargs["labels"] while preserving any existing labels
     stamp_labels(kwargs, "cpp", "lib")
-    deps = deps + _providers_for(name)
-    cxx_library(name = name, deps = deps, **kwargs)
+    _cpp_nix_build(
+        name = name,
+        out = _sanitize_to_bin_name("//%s:%s" % (native.package_name(), name)) + ".a",
+        kind = "lib",
+        self_label = "//%s:%s" % (native.package_name(), name),
+        deps = deps + _providers_for(name),
+        labels = kwargs.get("labels", []),
+    )
 
 
 def nix_cpp_binary(name, **kwargs):
+    # Build via Nix, not Buck's C++ toolchain
     deps = kwargs.pop("deps", [])
     stamp_labels(kwargs, "cpp", "bin")
-    deps = deps + _providers_for(name)
-    cxx_binary(name = name, deps = deps, **kwargs)
+    _cpp_nix_build(
+        name = name,
+        out = _sanitize_to_bin_name("//%s:%s" % (native.package_name(), name)),
+        kind = "bin",
+        self_label = "//%s:%s" % (native.package_name(), name),
+        deps = deps + _providers_for(name),
+        labels = kwargs.get("labels", []),
+    )
 
 
 def nix_cpp_test(name, **kwargs):
@@ -60,12 +73,12 @@ def nix_cpp_test(name, **kwargs):
             extra_nixpkg_labels.append("nixpkg:pkgs.gtest")
             extra_nixpkg_labels.append("nixpkg:pkgs.googletest")
     _planner_labels = _planner_kwargs.get("labels", []) + extra_nixpkg_labels
-    # Planner-visible stub: expose test sources in `srcs` so planner can pass only test files
+    # Planner-visible stub: declare a cxx_library without compiling test sources; Nix will build the test.
     cxx_library(
         name = planner_name,
         headers = [],
         exported_headers = [],
-        srcs = srcs,
+        srcs = [],
         deps = deps + _providers_for(name) + _providers_for(planner_name),
         labels = _planner_labels,
     )
@@ -153,4 +166,42 @@ _cpp_nix_test = rule(
     },
 )
 
+
+def _cpp_nix_build_impl(ctx):
+    # Build a C++ bin/lib via Nix graph-generator-selected and export the artifact as this rule's output
+    raw = ctx.attrs.self_label
+    kind = ctx.attrs.kind
+    # Expected artifact names mirror tools/nix/templates/cpp.nix sanitize logic
+    sanitized = _sanitize_to_bin_name(raw)
+    expected = ("bin/%s" % sanitized) if kind == "bin" else ("lib/lib%s.a" % sanitized)
+    run_and_copy = (
+        "set -euo pipefail; "
+        + "export WORKSPACE_ROOT=\"${WORKSPACE_ROOT:-$(pwd)}\"; cd \"$WORKSPACE_ROOT\"; "
+        + "FLK_ROOT=\"$WORKSPACE_ROOT\"; if [ ! -f \"$FLK_ROOT/flake.nix\" ]; then FLK_ROOT=\"$(git -C \"$WORKSPACE_ROOT\" rev-parse --show-toplevel 2>/dev/null || echo \"$WORKSPACE_ROOT\")\"; fi; "
+        + "test -f \"$FLK_ROOT/flake.nix\"; "
+        + "mkdir -p tools/buck; rm -f tools/buck/graph.json; nix run \"$FLK_ROOT\"#zx-wrapper -- \"$FLK_ROOT/tools/buck/export-graph.ts\" --out tools/buck/graph.json; "
+        + "export BUCK_GRAPH_JSON=\"$PWD/tools/buck/graph.json\"; export BUCK_TEST_SRC=\"$PWD\"; "
+        + ("SYS=$(nix eval --raw --impure --expr builtins.currentSystem); ")
+        + ("OUT_PATH=$(BUCK_TARGET=\"%s\" nix build --impure -L \"$FLK_ROOT\"#graph-generator-selected --accept-flake-config --print-out-paths | tail -1); " % raw)
+        + "test -n \"$OUT_PATH\"; "
+        + ("if [ ! -e \"$OUT_PATH/%s\" ]; then echo 'expected artifact not found: %s' >&2; (ls -la \"$OUT_PATH\"; ls -la \"$OUT_PATH/bin\" 2>/dev/null || true; ls -la \"$OUT_PATH/lib\" 2>/dev/null || true) >&2; exit 2; fi; " % (expected, expected))
+        + "DEST=\"$0\"; cp -f \"$OUT_PATH/%s\" \"$DEST\"; " % expected
+    )
+    out = ctx.actions.declare_output(ctx.attrs.out)
+    # For bash -c, $0 is set to the first argument after the script string
+    cmd = cmd_args(["bash", "-c", run_and_copy, out.as_output()])
+    ctx.actions.run(cmd, category = "cpp_nix_build")
+    return [DefaultInfo(default_output = out)]
+
+
+_cpp_nix_build = rule(
+    impl = _cpp_nix_build_impl,
+    attrs = {
+        "self_label": attrs.string(),
+        "kind": attrs.string(),  # "bin" | "lib"
+        "out": attrs.string(),
+        "deps": attrs.list(attrs.dep(), default = []),  # graph edge for provider discovery
+        "labels": attrs.list(attrs.string(), default = []),
+    },
+)
 
