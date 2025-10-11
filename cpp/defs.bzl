@@ -136,7 +136,15 @@ def _cpp_nix_test_impl(ctx):
         + ("echo '[cpp_nix_test] listing cppTargets keys'; nix eval --impure --json \"$FLK_ROOT\"#packages.$SYS.graph-generator-cppTargets --accept-flake-config | jq -r 'keys[]' 2>/dev/null | sed 's/^/[cpp_nix_test] key /' >&2; ")
         + ("echo '[cpp_nix_test] expecting attr %s' >&2; " % attr)
         # Build selected target via flake attr, passing BUCK_TARGET (avoids attr-key mismatch)
-        + ("set +e; OUT_PATH=$(BUCK_TEST_SRC=\"$PWD\" BUCK_TARGET=\"%s\" nix build --impure -L \"$FLK_ROOT\"#graph-generator-selected --accept-flake-config --print-out-paths 2>&1 | tee /tmp/cpp_nix_test_build.log | tail -1); NIX_STATUS=$?; set -e; echo \"[cpp_nix_test] OUT_PATH=$OUT_PATH\" >&2; if [ \"$NIX_STATUS\" -ne 0 ]; then echo '[cpp_nix_test] nix build failed' >&2; cat /tmp/cpp_nix_test_build.log >&2 || true; exit $NIX_STATUS; fi; " % raw)
+        + (
+            "set +e; "
+            + ("OUT_RAW=$(BUCK_TEST_SRC=\"$PWD\" BUCK_TARGET=\"%s\" nix build --impure \"$FLK_ROOT\"#graph-generator-selected --accept-flake-config --print-out-paths 2>&1 | tee /tmp/cpp_nix_test_build.log | tail -1); " % raw)
+            + "NIX_STATUS=$?; "
+            + "OUT_PATH=$(printf %s \"$OUT_RAW\" | sed -E 's/\\x1B\\[[0-9;]*[A-Za-z]//g'); "
+            + "set -e; "
+            + "echo \"[cpp_nix_test] OUT_PATH=$OUT_PATH\" >&2; "
+            + "if [ \"$NIX_STATUS\" -ne 0 ]; then echo '[cpp_nix_test] nix build failed' >&2; cat /tmp/cpp_nix_test_build.log >&2 || true; exit $NIX_STATUS; fi; "
+        )
         + "test -n \"$OUT_PATH\" || { echo '[cpp_nix_test] nix build returned no out path' >&2; cat /tmp/cpp_nix_test_build.log >&2 || true; exit 2; }; "
         + "if [ ! -d \"$OUT_PATH/bin\" ]; then echo 'no test binary produced' >&2; exit 2; fi; "
         + ("BIN='%s'; " % expected_bin)
