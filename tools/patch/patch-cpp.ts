@@ -17,8 +17,10 @@ function normalizeAttr(attr: string): string {
   return `pkgs.${s}`;
 }
 
-function sanitizeForFilename(s: string): string {
-  return s.toLowerCase().replace(/[^\w]+/g, "_");
+function encodeAttrForFilename(attrNorm: string): string {
+  // pkgs.openssl -> pkgs/openssl -> pkgs__openssl
+  const slash = attrNorm.replaceAll(".", "/");
+  return slash.replaceAll("/", "__");
 }
 
 async function nixEvalRaw(expr: string): Promise<string> {
@@ -108,7 +110,7 @@ async function ensureOriginAndWorkspace(attr: string): Promise<{
     .toISOString()
     .replace(/[-:TZ.]/g, "")
     .slice(0, 14);
-  const safeKey = sanitizeForFilename(key);
+  const safeKey = encodeAttrForFilename(key);
   const base = path.join(os.tmpdir(), "bucknix-patch-cpp");
   const originRoot = path.join(base, `origin-${safeKey}-${stamp}`);
   const wsRoot = path.join(base, `ws-${safeKey}-${stamp}`);
@@ -164,7 +166,7 @@ async function doApply(args: string[]) {
   }
 
   await fs.mkdirp("patches/cpp");
-  const fileKey = sanitizeForFilename(attrNorm);
+  const fileKey = encodeAttrForFilename(attrNorm);
   const dst = path.join("patches", "cpp", `${fileKey}@${sess.version}.patch`);
 
   let write = true;
@@ -198,20 +200,11 @@ async function doApply(args: string[]) {
   // End session; keep workspace for manual inspection if desired
   await deleteSession("cpp", key);
 
-  // Print an overlay snippet to help wire the patch
-  const tail = attrNorm.replace(/^pkgs\./, "");
-  const rel = "../../../" + path.posix.join("patches", "cpp", path.basename(dst));
-  const snippet = [
-    "# tools/nix/overlays/cpp-patches.nix",
-    "final: prev: let",
-    `  patchedSrc = final.applyPatches { name = "cpp-patched-${tail}"; src = prev.${tail}.src; patches = [ ${rel} ]; };`,
-    "in {",
-    `  ${tail} = prev.${tail}.overrideAttrs (old: { src = patchedSrc; });`,
-    "}",
-  ].join("\n");
+  // Message: auto-discovery notice (no snippet required)
   console.log(dst);
   console.log(
-    "\nOverlay snippet (add to tools/nix/overlays/cpp-patches.nix):\n\n" + snippet + "\n",
+    "\nC++ overlay auto-discovers patches by filename; no manual snippet required.\n" +
+      "Ensure tools/nix/overlays/cpp-patches.nix exists (it is included by flake.nix).\n",
   );
 }
 

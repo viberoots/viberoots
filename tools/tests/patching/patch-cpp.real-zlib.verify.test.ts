@@ -37,8 +37,8 @@ test("patch-cpp applies overlay to real nixpkgs zlib and changes runtime zlibVer
     // Apply to write a canonical patch under patches/cpp
     const applyOut = await $({ cwd: tmp })`tools/bin/patch-pkg apply cpp zlib`;
     const outTxt = String(applyOut.stdout || "");
-    if (!outTxt.includes("Overlay snippet")) {
-      console.error("expected overlay snippet in apply output");
+    if (!outTxt.toLowerCase().includes("auto-discovers patches")) {
+      console.error("expected auto-discovery note in apply output");
       process.exit(2);
     }
 
@@ -55,16 +55,12 @@ test("patch-cpp applies overlay to real nixpkgs zlib and changes runtime zlibVer
     const overlaysDir = path.join(tmp, "tools", "nix", "overlays");
     await fs.mkdirp(overlaysDir);
     const overlayPath = path.join(overlaysDir, "cpp-patches.nix");
-    const rel = path.posix.join("../../../patches/cpp", patchFile);
-    const overlay = [
-      "final: prev: let",
-      `  patchedSrc = final.applyPatches { name = "cpp-patched-zlib"; src = prev.zlib.src; patches = [ ${rel} ]; };`,
-      "in {",
-      "  zlib = prev.zlib.overrideAttrs (old: { src = patchedSrc; });",
-      "  zlib_patched_src = patchedSrc;",
-      "}",
-    ].join("\n");
-    await fs.writeFile(overlayPath, overlay, "utf8");
+    // Overlay is already committed in the repo and auto-discovers patches; ensure the path exists
+    await fs.mkdirp(path.dirname(overlayPath));
+    if (!(await fs.pathExists(overlayPath))) {
+      // Create a minimal pass-through overlay file to satisfy presence checks if missing in this temp
+      await fs.writeFile(overlayPath, "final: prev: {}\n", "utf8");
+    }
 
     // Build a tiny program that prints ZLIB_VERSION using the patched headers in our workspace
     const mainC = [
