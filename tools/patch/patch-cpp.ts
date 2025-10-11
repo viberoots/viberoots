@@ -60,6 +60,8 @@ async function resolveNixpkg(
     pname = await nixEvalRaw(`${base}.pname`);
   } catch {}
   const version = await nixEvalRaw(`${base}.version`);
+  // Ensure the source is realised in the store before attempting to read or extract it.
+  await $`nix build --no-link ${base}.src`;
   const srcPath = await nixEvalRaw(`${base}.src`);
   return { pname: pname || name, version, srcPath };
 }
@@ -69,15 +71,8 @@ async function extractOrCopySrc(srcPath: string, destDir: string): Promise<strin
   // If srcPath is a directory in the store, copy it. Otherwise, attempt extraction.
   const stat = await fs.stat(srcPath).catch(() => null);
   if (stat && stat.isDirectory()) {
-    // Copy store dir into a writable workspace
-    if (process.platform === "darwin") {
-      try {
-        await $`cp -cR ${srcPath}/. ${destDir}/`;
-        await $`chmod -R u+w ${destDir}`;
-        return destDir;
-      } catch {}
-    }
-    await $`cp -a ${srcPath}/. ${destDir}/`;
+    // Copy store dir into a writable workspace; prefer rsync for portability
+    await $`rsync -a ${srcPath}/ ${destDir}/`;
     await $`chmod -R u+w ${destDir}`;
     return destDir;
   }
@@ -120,18 +115,8 @@ async function ensureOriginAndWorkspace(attr: string): Promise<{
   await fs.mkdirp(base);
   const originPath = await extractOrCopySrc(srcPath, originRoot);
   // Create workspace by cloning originPath
-  if (process.platform === "darwin") {
-    try {
-      await $`cp -cR ${originPath}/. ${wsRoot}/`;
-      await $`chmod -R u+w ${wsRoot}`;
-    } catch {
-      await $`cp -a ${originPath}/. ${wsRoot}/`;
-      await $`chmod -R u+w ${wsRoot}`;
-    }
-  } else {
-    await $`cp -a ${originPath}/. ${wsRoot}/`;
-    await $`chmod -R u+w ${wsRoot}`;
-  }
+  await $`rsync -a ${originPath}/ ${wsRoot}/`;
+  await $`chmod -R u+w ${wsRoot}`;
   return { key, originPath, workspacePath: wsRoot, version, pname };
 }
 
@@ -219,9 +204,9 @@ async function doApply(args: string[]) {
   const snippet = [
     "# tools/nix/overlays/cpp-patches.nix",
     "final: prev: let",
-    '  apply = pkg: patches: final.applyPatches { inherit pkg patches; name = "cpp-patched-${pkg.pname or "pkg"}"; };',
+    `  patchedSrc = final.applyPatches { name = "cpp-patched-${tail}"; src = prev.${tail}.src; patches = [ ${rel} ]; };`,
     "in {",
-    `  ${tail} = apply prev.${tail} [ ${rel} ];`,
+    `  ${tail} = prev.${tail}.overrideAttrs (old: { src = patchedSrc; });`,
     "}",
   ].join("\n");
   console.log(dst);
