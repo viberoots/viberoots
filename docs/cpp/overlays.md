@@ -66,6 +66,35 @@ node tools/buck/sync-providers.ts --lang=cpp
 
 This emits `third_party/providers/TARGETS.cpp.auto` with a generated header. No manual edits are required.
 
+### 3.5) Creating patches with patch-pkg (recommended)
+
+For a guided workflow, use the patch helper to create canonical unified diffs for nixpkgs C/C++ packages. The tool maintains sessions and workspaces for you.
+
+Commands:
+
+```bash
+# Start a session for a nixpkgs attribute (both forms accepted)
+tools/bin/patch-pkg start cpp pkgs.zlib
+# or
+tools/bin/patch-pkg start cpp zlib
+
+# Make edits under the printed workspace path, then:
+tools/bin/patch-pkg apply cpp zlib
+
+# If you want to discard the session/workspace:
+tools/bin/patch-pkg reset cpp zlib
+
+# Interactive session: Ctrl-D applies, Ctrl-C resets
+tools/bin/patch-pkg session cpp zlib
+```
+
+What it does:
+
+- Creates a writable workspace cloned from the nix store source for the package.
+- Generates a canonical unified diff into `patches/cpp/<attr>@<version>.patch`.
+- Verifies the patch applies cleanly with `patch -p1 --dry-run`.
+- Prints an overlay snippet you can paste into `tools/nix/overlays/cpp-patches.nix`.
+
 ### 4) Validate and test
 
 - Run language diagnostics to confirm C++ is enabled and visibility is intact:

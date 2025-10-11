@@ -16,7 +16,7 @@ function usage(msg?: string) {
       "  session <lang> <module>  Start and attach; Ctrl-D=apply, Ctrl-C=reset",
       "",
       "languages:",
-      "  go",
+      "  go | cpp",
     ].join("\n"),
   );
   process.exit(2);
@@ -29,15 +29,14 @@ async function main() {
   if (!sub || sub === "help") return usage();
   if (!lang) return usage("missing <language>");
 
-  if (lang !== "go") {
-    return usage(`unsupported language: ${lang}`);
-  }
+  if (lang !== "go" && lang !== "cpp") return usage(`unsupported language: ${lang}`);
 
   // Resolve repo root to import the language handler robustly from any CWD
   const here = path.dirname(new URL(import.meta.url).pathname);
   const root = path.resolve(here, "..", "..");
-  const go = await import(path.join(root, "tools/patch/patch-go.ts"));
-  const handler = go.default as {
+  const go = lang === "go" ? await import(path.join(root, "tools/patch/patch-go.ts")) : null;
+  const cpp = lang === "cpp" ? await import(path.join(root, "tools/patch/patch-cpp.ts")) : null;
+  const handler = (go ? go.default : cpp!.default) as {
     start(args: string[]): Promise<void>;
     apply(args: string[]): Promise<void>;
     reset(args: string[]): Promise<void>;
