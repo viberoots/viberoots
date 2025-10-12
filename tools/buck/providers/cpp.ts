@@ -1,22 +1,13 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
 import path from "node:path";
+import { normalizeNixAttr, providerNameForNixAttr } from "../../lib/providers";
 
 type Node = { name: string; labels?: string[] };
 
-function normalizeAttr(attr: string): string {
-  const s = String(attr || "").trim();
-  if (!s) return s;
-  let a = s.toLowerCase();
-  if (!a.startsWith("pkgs.")) a = `pkgs.${a}`;
-  if (a === "pkgs.gtest") a = "pkgs.googletest";
-  return a;
-}
-
-function nameForAttr(attr: string): string {
-  // pkgs.openssl -> pkgs_openssl, pkgs.gnome.glib -> pkgs_gnome_glib
-  return `nix_pkgs_${attr.replace(/[^a-z0-9]+/g, "_")}`;
-}
+// Normalization and naming are shared across generators.
+const normalizeAttr = normalizeNixAttr;
+const nameForAttr = providerNameForNixAttr;
 
 function encodeForPatchPrefix(attr: string): string {
   // pkgs.openssl -> pkgs/openssl -> pkgs__openssl

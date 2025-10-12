@@ -24,11 +24,25 @@ export function providerNameForImporter(lockfilePath: string, importer: string):
   return `lf_${h}_${tail}`;
 }
 
-// Deterministic provider name for a nixpkgs attribute path (e.g., "pkgs.zlib").
-// Keep simple and readable for now: no hash, sanitize to word chars and underscores.
-export function providerNameForNixpkgAttr(attrPath: string): string {
-  const tail = String(attrPath)
-    .toLowerCase()
-    .replace(/[^\w]+/g, "_");
-  return `nx_${tail}`;
+// Normalize a nixpkgs attribute path for provider naming and labeling.
+// - Trims
+// - Lower-cases
+// - Ensures "pkgs." prefix
+// - Maps historical alias pkgs.gtest -> pkgs.googletest
+export function normalizeNixAttr(attr: string): string {
+  const s = String(attr || "")
+    .trim()
+    .toLowerCase();
+  if (!s) return s;
+  let a = s.startsWith("pkgs.") ? s : `pkgs.${s}`;
+  if (a === "pkgs.gtest") a = "pkgs.googletest";
+  return a;
+}
+
+// Deterministic provider name for a nixpkgs attribute path.
+// Example: pkgs.zlib -> nix_pkgs_pkgs_zlib, pkgs.gnome.glib -> nix_pkgs_pkgs_gnome_glib
+export function providerNameForNixAttr(attr: string): string {
+  const norm = normalizeNixAttr(attr);
+  const tail = norm.replace(/[^a-z0-9]+/g, "_");
+  return `nix_pkgs_${tail}`;
 }

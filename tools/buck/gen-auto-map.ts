@@ -1,7 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
 import { writeIfChanged } from "../lib/fs-helpers";
-import { providerNameForImporter, providerNameForModuleKey } from "../lib/providers";
+import {
+  providerNameForImporter,
+  providerNameForModuleKey,
+  normalizeNixAttr,
+  providerNameForNixAttr,
+} from "../lib/providers";
 
 type Node = {
   name: string;
@@ -34,11 +39,8 @@ function providersForLabels(labels: string[] | undefined): string[] {
       if (!path || !importer) continue;
       out.add(fqProviderLabel(providerNameForImporter(path, importer)));
     } else if (l.startsWith("nixpkg:")) {
-      let attr = l.slice("nixpkg:".length);
-      // Normalize common alias: pkgs.gtest -> pkgs.googletest
-      if (attr === "pkgs.gtest") attr = "pkgs.googletest";
-      const tail = attr.toLowerCase().replace(/[^a-z0-9_]+/g, "_");
-      out.add(fqProviderLabel(`nix_pkgs_${tail}`));
+      const attr = normalizeNixAttr(l.slice("nixpkg:".length));
+      out.add(fqProviderLabel(providerNameForNixAttr(attr)));
     }
   }
   return Array.from(out).sort();
