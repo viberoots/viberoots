@@ -40,3 +40,25 @@ in {
 - `guardNoDevOverridesInCI ENV`: throws in CI when overrides are present.
 
 These helpers keep behavior consistent across languages and reduce boilerplate in each template.
+
+### Deterministic IO and stamps for provider sync
+
+Leverage the shared utilities in `tools/lib/fs-helpers.ts` to keep outputs stable:
+
+- `writeIfChanged(path, content)` writes only when content differs (prevents churn).
+- `writeStamp(file, inputs)` writes a deterministic stamp capturing ordered inputs and their contents.
+- `stableUnique(items, keyFn)` deduplicates while preserving first-appearance order.
+
+Example usage in a generator:
+
+```ts
+import { writeIfChanged, writeStamp, stableUnique } from "../lib/fs-helpers";
+
+// … compute entries: string[] deterministically …
+await writeIfChanged("third_party/providers/TARGETS.auto", header + entries.join("\n") + "\n");
+
+await writeStamp("third_party/providers/TARGETS.auto.stamp", [
+  { path: "patches/go/example@v1.2.3.patch" },
+  { path: "third_party/providers/TARGETS.auto", content: header },
+]);
+```

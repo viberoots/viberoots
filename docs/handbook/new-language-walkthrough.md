@@ -19,6 +19,14 @@ Steps
   - Ensure `tools/nix/planner/rust.nix` exports: `isTarget`, `kindOf`, `mkApp`, `mkLib`.
   - `graph-generator.nix` auto-imports `planner/<lang>.nix` when present.
 
+- **Exporter adapter validation (new)**
+  - Implement `validate(nodes)` on your language adapter; it runs during export.
+  - Purpose: enforce language-specific invariants early with actionable errors.
+  - Example policies:
+    - Targets with language sources must carry a stamped `lang:<id>` label (or use your macros that add it automatically).
+    - Custom rule aliases must map to your language template via `tools/nix/mapping.nix`.
+  - Keep the function small and deterministic; fail fast if invariants are violated.
+
 - **Provider sync**
   - Implement `tools/buck/providers/rust.ts` using the existing provider-sync helpers pattern. If no patches exist, generator writes a minimal `TARGETS.<lang>.auto` deterministically.
 
@@ -33,7 +41,7 @@ Steps
 
 - **Tests**
   - Copy the Go contract tests as a model and adjust for your language’s providers and labels. Keep tests one-per-file and wire via `TARGETS`.
-  - Implement the adapter `validate(nodes)` hook to enforce language-specific invariants early (e.g., require a macro-stamped `lang:<id>` label when sources indicate the language). Validation runs per active adapter during export and should throw with actionable messages when misconfigurations are detected.
+  - Include a small test that proves your adapter’s `validate(nodes)` rejects a misconfigured sample with a clear message.
 
 - **Run glue**
   - Local: `node tools/buck/export-graph.ts`, `node tools/buck/sync-providers.ts`, `node tools/buck/gen-auto-map.ts` or simply `node tools/buck/prebuild-guard.ts` (auto-fix in local mode).
