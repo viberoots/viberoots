@@ -19,6 +19,48 @@ in rec {
         else null
     );
 
+  # Dev override support (parity with Go):
+  # - Read NIX_CPP_DEV_OVERRIDE_JSON as a JSON map of attr -> absolute path
+  #   e.g. { "pkgs.openssl": "/abs/path/to/workspace" }
+  # - If set locally, emit a warning via builtins.trace; in CI, throw.
+  # - When an override path exists for an attr, use overrideAttrs to replace src.
+  devOverrideEnv = builtins.getEnv "NIX_CPP_DEV_OVERRIDE_JSON";
+  devOverrides =
+    let v = devOverrideEnv; in
+      if v == "" then {}
+      else (
+        let parsed = builtins.fromJSON v; in
+          if builtins.isAttrs parsed then parsed else {}
+      );
+  _warn =
+    if devOverrideEnv != "" && (builtins.getEnv "CI") != "true"
+    then builtins.trace "[OVERRIDES ACTIVE] NIX_CPP_DEV_OVERRIDE_JSON is set — local derivation hashes will differ. Unset before sharing cache artifacts." null
+    else null;
+  _ci_guard =
+    if (builtins.getEnv "CI") == "true" && devOverrideEnv != ""
+    then builtins.throw "Dev overrides are forbidden in CI"
+    else null;
+
+  normalizeAttr = s:
+    let s0 = lib.toLower (lib.trim s);
+        withPkgs = if lib.hasPrefix "pkgs." s0 then s0 else ("pkgs." + s0);
+    in if withPkgs == "pkgs.gtest" then "pkgs.googletest" else withPkgs;
+
+  overridePkgIfAny = attr: pkg:
+    let key = normalizeAttr attr;
+        # Accept keys both with and without pkgs. prefix
+        keyAlt = lib.removePrefix "pkgs." key;
+        has = builtins.hasAttr key devOverrides || builtins.hasAttr keyAlt devOverrides;
+        path = if builtins.hasAttr key devOverrides then devOverrides.${key}
+               else (devOverrides.${keyAlt} or null);
+    in if has && path != null && path != ""
+       then (pkg.overrideAttrs (old: {
+         src = builtins.path path;
+         pname = (old.pname or "pkg") + "-dev";
+         version = "0.0.0-dev";
+       }))
+       else pkg;
+
   cppApp = {
     name,
     srcRoot ? ../../..,
@@ -42,7 +84,10 @@ in rec {
             let parts0 = segs s;
                 parts = if parts0 != [] && (lib.head parts0) == "pkgs" then lib.tail parts0 else parts0;
             in if parts == [ "gtest" ] then getAtPath pkgs [ "googletest" ] else getAtPath pkgs parts;
-      in (nixCxxPkgs ++ (builtins.filter (v: v != null) (map getAt nixCxxAttrs)));
+          fromAttrs = builtins.filter (v: v != null) (map (a:
+            let base = getAt a; in if base == null then null else overridePkgIfAny a base
+          ) nixCxxAttrs);
+      in nixCxxPkgs ++ fromAttrs;
     # include flags from explicit includes and resolved nixCxx packages
     nixInc = lib.concatStringsSep " " (map (p: "-isystem ${toIncludeBase p}/include") resolvedPkgs);
     nixLib = lib.concatStringsSep " " (map (p: "-L${toLibBase p}/lib") resolvedPkgs);
@@ -146,7 +191,10 @@ in rec {
             let parts0 = segs s;
                 parts = if parts0 != [] && (lib.head parts0) == "pkgs" then lib.tail parts0 else parts0;
             in if parts == [ "gtest" ] then getAtPath pkgs [ "googletest" ] else getAtPath pkgs parts;
-      in (nixCxxPkgs ++ (builtins.filter (v: v != null) (map getAt nixCxxAttrs)));
+          fromAttrs = builtins.filter (v: v != null) (map (a:
+            let base = getAt a; in if base == null then null else overridePkgIfAny a base
+          ) nixCxxAttrs);
+      in nixCxxPkgs ++ fromAttrs;
     nixInc = lib.concatStringsSep " " (map (p: "-isystem ${toIncludeBase p}/include") resolvedPkgs);
     incFlags = lib.concatStringsSep " " (map (p: "-I${p}") (sorted includes));
     defFlags = lib.concatStringsSep " " (map (d: "-D${d}") (sorted defines));
@@ -225,8 +273,12 @@ in rec {
           parts = if parts0 != [] && (lib.head parts0) == "pkgs" then lib.tail parts0 else parts0;
       in if parts == [ "gtest" ] then getAtPath pkgs [ "googletest" ] else getAtPath pkgs parts;
     resolvedPkgs =
-      let base = (nixCxxPkgs ++ (builtins.filter (v: v != null) (map getAt nixCxxAttrs)));
-      in base ++ (if hasGTest then gtestPkgsAll else []);
+      let base0 = nixCxxPkgs;
+          attrsOver = builtins.filter (v: v != null) (map (a:
+            let base = getAt a; in if base == null then null else overridePkgIfAny a base
+          ) nixCxxAttrs);
+          base1 = base0 ++ attrsOver;
+      in base1 ++ (if hasGTest then gtestPkgsAll else []);
     nixInc = lib.concatStringsSep " " (map (p: "-isystem ${toIncludeBase p}/include") resolvedPkgs);
     nixLib = lib.concatStringsSep " " (map (p: "-L${toLibBase p}/lib") resolvedPkgs);
     incFlags = lib.concatStringsSep " " (map (p: "-I${p}") (sorted includes));

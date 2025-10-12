@@ -14,6 +14,22 @@ Use `tools/bin/patch-pkg` as the canonical way to create and manage C++ (nixpkgs
 
 Directly hand-writing patch files is possible but discouraged; prefer `patch-pkg` for consistency and correctness.
 
+### Dev override (local-only, parity with Go)
+
+For rapid iteration without committing patches, you can point a nixpkgs attr at a local workspace using a temporary environment variable:
+
+```
+export NIX_CPP_DEV_OVERRIDE_JSON='{"pkgs.openssl":"/abs/path/to/workspace"}'
+```
+
+Notes:
+
+- Local warning is emitted when this variable is set.
+- In CI (`CI=true`), dev overrides are forbidden and evaluation will fail.
+- Do not commit with this set; it changes derivation hashes locally and is not part of Buck inputs.
+
+Use `tools/dev/clear-overrides-cpp.ts` to unset quickly.
+
 ### What you get
 
 - **Conditional overlay wiring**: If `tools/nix/overlays/cpp-patches.nix` exists, it is automatically included by `flake.nix`.

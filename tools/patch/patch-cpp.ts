@@ -145,6 +145,13 @@ async function doStart(args: string[]) {
   };
   await setSession("cpp", key, rec);
   console.log(workspacePath);
+  // Suggest a dev override snippet for local iteration parity (unset before CI)
+  const snippet = `export NIX_CPP_DEV_OVERRIDE_JSON='${JSON.stringify({ [attrNorm]: workspacePath })}'`;
+  console.error(
+    "\nTo build using this workspace as a dev override (local only), run:\n" +
+      snippet +
+      "\n\nUnset before CI: unset NIX_CPP_DEV_OVERRIDE_JSON\n",
+  );
   if (process.env.PATCH_EDITOR && process.env.PATCH_EDITOR.trim() !== "") {
     const ed = process.env.PATCH_EDITOR;
     await $({ cwd: workspacePath })`${ed}`.nothrow();
@@ -226,6 +233,21 @@ async function doSession(args: string[]) {
   const attrInput = attrArg(args);
   await doStart([attrInput]);
   console.log("Attached. Ctrl-D to apply, Ctrl-C to reset.");
+  // In session mode, also export a process-local dev override suggestion to help quick rebuilds
+  try {
+    const attrNorm = normalizeAttr(attrInput);
+    const { version } = await resolveNixpkg(attrNorm);
+    const key = `${attrNorm}@${version}`.toLowerCase();
+    const sess = await getSession("cpp", key);
+    if (sess?.workspacePath) {
+      const json = JSON.stringify({ [attrNorm]: sess.workspacePath });
+      console.error(
+        "\n[session] You can dev-override locally (do not use in CI):\nexport NIX_CPP_DEV_OVERRIDE_JSON='" +
+          json +
+          "'\n",
+      );
+    }
+  } catch {}
   await new Promise<void>((resolve, reject) => {
     process.stdin.setRawMode?.(true);
     process.stdin.resume();
