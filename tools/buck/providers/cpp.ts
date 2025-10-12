@@ -38,6 +38,25 @@ async function listCppPatchesFor(attr: string): Promise<string[]> {
   return out;
 }
 
+async function readCuratedProviders(): Promise<Array<{ name: string; attr: string }>> {
+  const TARGETS = path.resolve("third_party/providers/TARGETS");
+  try {
+    const txt = await fs.readFile(TARGETS, "utf8");
+    const out: Array<{ name: string; attr: string }> = [];
+    // Match nix_cxx_library(name = "...", attr = "...") allowing whitespace
+    const re = /nix_cxx_library\(\s*name\s*=\s*"([^"]+)",\s*attr\s*=\s*"([^"]+)"/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(txt)) !== null) {
+      const name = m[1];
+      const rawAttr = m[2];
+      out.push({ name, attr: normalizeAttr(rawAttr) });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 export async function syncCppProviders(opts?: { outFile?: string }) {
   const OUT = opts?.outFile || "third_party/providers/TARGETS.cpp.auto";
   const graphPath = "tools/buck/graph.json";
@@ -71,6 +90,19 @@ export async function syncCppProviders(opts?: { outFile?: string }) {
   }
   const attrList = Array.from(attrs).sort();
 
+  // Also include curated providers declared in third_party/providers/TARGETS
+  const curated = await readCuratedProviders();
+  const curatedAttrSet = new Set<string>(curated.map((c) => c.attr));
+  for (const a of curatedAttrSet) if (a) attrList.push(a);
+  // Stable unique
+  const seenAttrs = new Set<string>();
+  const attrListUniq: string[] = [];
+  for (const a of attrList.sort()) {
+    if (seenAttrs.has(a)) continue;
+    seenAttrs.add(a);
+    attrListUniq.push(a);
+  }
+
   const overlayPaths = (await fs.pathExists(overlay)) ? [overlay] : [];
   const hasLock = await fs.pathExists(lockfile).catch(() => false);
 
@@ -78,7 +110,7 @@ export async function syncCppProviders(opts?: { outFile?: string }) {
   const stampsDir = path.resolve("third_party/providers/stamps");
   await fs.mkdirp(stampsDir);
 
-  for (const attr of attrList) {
+  for (const attr of attrListUniq) {
     const name = nameForAttr(attr);
     const patch_paths = await listCppPatchesFor(attr);
     const inputs: string[] = [];
@@ -105,6 +137,28 @@ export async function syncCppProviders(opts?: { outFile?: string }) {
     lines.push(`    attr = \"${attr}\",`);
     lines.push(")\n");
     providerLines.push(lines.join("\n"));
+  }
+
+  // Write stamps for curated providers using curated names (which may differ
+  // from the auto-generated nameForAttr mapping, e.g., gtest vs googletest)
+  for (const { name, attr } of curated) {
+    const patch_paths = await listCppPatchesFor(attr);
+    const inputs: string[] = [];
+    for (const p of overlayPaths) inputs.push(p);
+    for (const p of patch_paths) inputs.push(p);
+    if (hasLock) inputs.push(lockfile);
+    const chunks: string[] = [];
+    for (const p of inputs) {
+      try {
+        const txt = await fs.readFile(p, "utf8");
+        chunks.push(`# path=${p}`);
+        chunks.push(txt);
+      } catch {
+        chunks.push(`# missing=${p}`);
+      }
+    }
+    const data = chunks.join("\n");
+    await fs.outputFile(path.join(stampsDir, `${name}.stamp`), data, "utf8");
   }
 
   const data = header + providerLines.join("\n");
