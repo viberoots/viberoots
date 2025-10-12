@@ -71,3 +71,8 @@
 
 - Some integration/unit zx tests probe prelude availability with a `buck2 cquery` call.
 - If the probe fails, they `SKIP` with a message instructing you to run in the dev shell.
+
+## On-demand vs prebuild (what to do locally vs CI)
+
+- **Local**: Buck already builds on-demand. Run `buck2 test` or `buck2 build` and it will invoke Nix derivations as needed. You can skip the separate Nix stage if you prefer.
+- **CI**: We keep a separate Nix build stage to warm caches and isolate template/patch errors. Later Buck stages mostly hit cache and provide clean graph-level diagnostics.

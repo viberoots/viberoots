@@ -67,3 +67,28 @@ scaf new go test main_case --path=apps/demo-cli/cmd/demo-cli/main_case_test.go
 Further reading: `build-system-design.md`, `docs/handbook/`.
 
 CI stage runner reference: `tools/ci/run-stage.ts`.
+
+## Key concepts (fast)
+
+### Stamping (what it is and why)
+
+- Stamping = macros attach standardized labels to each target, e.g., `lang:go`, `kind:bin|lib|test`.
+- Purpose: help the exporter and provider mapping identify language/kind deterministically.
+- Benefit: clearer graphs, tighter invalidation, and actionable linting/errors when labels are missing.
+- See: `docs/handbook/macro-stamping-cookbook.md`.
+
+### Pipeline stages (human summary)
+
+- Export Graph: freeze the configured Buck graph to `tools/buck/graph.json`.
+- Sync Providers: generate provider rules from patches/lockfiles with stable names.
+- Auto Map: map targets → the exact providers they need (tight invalidation only where needed).
+- Prebuild Guard: verify glue exists and is fresh; local auto‑fix, CI fails fast.
+- Nix Build (graph‑generator): build the artifacts hermetically using shared templates.
+- Buck Build/Test: orchestrate what’s dirty, build on demand, and run exactly the right tests.
+
+### Nix vs Buck (why both)
+
+- Nix build answers “can the recipe produce the artifact, hermetically?” and warms cache.
+- Buck decides “what needs building or testing right now?” across the whole repo graph.
+- Locally, you can use Buck alone; CI splits stages for better cache reuse and clearer diagnostics.
+- See: `docs/handbook/ci.md` for per‑stage responsibilities.
