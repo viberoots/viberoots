@@ -74,32 +74,35 @@ export async function syncCppProviders(opts?: { outFile?: string }) {
   const overlayPaths = (await fs.pathExists(overlay)) ? [overlay] : [];
   const hasLock = await fs.pathExists(lockfile).catch(() => false);
 
+  // Prepare stamps directory and write one stamp per attr capturing input hashes
+  const stampsDir = path.resolve("third_party/providers/stamps");
+  await fs.mkdirp(stampsDir);
+
   for (const attr of attrList) {
     const name = nameForAttr(attr);
     const patch_paths = await listCppPatchesFor(attr);
+    const inputs: string[] = [];
+    for (const p of overlayPaths) inputs.push(p);
+    for (const p of patch_paths) inputs.push(p);
+    if (hasLock) inputs.push(lockfile);
+    // Compute a stable content hash over all inputs' contents and paths
+    const chunks: string[] = [];
+    for (const p of inputs) {
+      try {
+        const txt = await fs.readFile(p, "utf8");
+        chunks.push(`# path=${p}`);
+        chunks.push(txt);
+      } catch {
+        chunks.push(`# missing=${p}`);
+      }
+    }
+    const data = chunks.join("\n");
+    await fs.outputFile(path.join(stampsDir, `${name}.stamp`), data, "utf8");
+
     const lines: string[] = [];
     lines.push("nix_cxx_provider(");
     lines.push(`    name = \"${name}\",`);
     lines.push(`    attr = \"${attr}\",`);
-    if (overlayPaths.length) {
-      lines.push(
-        `    overlay_paths = [${overlayPaths.map((p) => `\"${p}\"`).join(", \n        ")}],`,
-      );
-    } else {
-      lines.push("    overlay_paths = [],");
-    }
-    if (patch_paths.length) {
-      lines.push(
-        `    patch_paths = [\n${patch_paths.map((p) => `        \"${p}\",`).join("\n")}\n    ],`,
-      );
-    } else {
-      lines.push("    patch_paths = [],");
-    }
-    if (hasLock) {
-      lines.push(`    lockfile = \"${lockfile}\",`);
-    } else {
-      lines.push('    lockfile = "",');
-    }
     lines.push(")\n");
     providerLines.push(lines.join("\n"));
   }
