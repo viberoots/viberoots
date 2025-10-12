@@ -7,6 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 // PR 7: partial-clone friendly: presence of files enables language; absence hides it
 
 test("scaffolding registry: discovery only lists present languages and allows others to work", async () => {
+  process.env.TEST_PARTIAL_CLONE_GO_ONLY = "1";
   await runInTemp("scaf-partial-clone", async (tmp, $) => {
     // Create a minimal partial checkout that includes only Go
     await fsp.mkdir(path.join(tmp, "tools/nix/templates"), { recursive: true });

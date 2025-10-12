@@ -78,23 +78,27 @@ async function rewriteCoverageUrls(tmpRoot: string) {
 
 export async function rsyncRepoTo(tmp: string) {
   await timeAsync(`rsyncRepoTo(${path.basename(tmp)})`, async () => {
-    // Anchor excludes to repository root so we don't accidentally exclude
-    // nested directories with the same names inside templates (e.g.,
-    // tools/scaffolding/templates/**/libs/**).
-    await $`rsync -a \
-      --exclude "/buck-out" \
-      --exclude "/.git" \
-      --exclude "/apps" \
-      --exclude "/libs" \
-      --exclude "/node_modules" \
-      --exclude "/coverage" \
-      --exclude "/.clinic" \
-      --exclude "/.direnv" \
-      --exclude "/result" \
-      --exclude "/tools/buck/graph.json" \
-      --exclude "/cpp/defs.bzl" \
-      --exclude "/tools/nix/templates/cpp.nix" \
-      ./ ${tmp}/`;
+    const goOnly = process.env.TEST_PARTIAL_CLONE_GO_ONLY === "1";
+    const excludes = [
+      "/buck-out",
+      "/.git",
+      "/apps",
+      "/libs",
+      "/node_modules",
+      "/coverage",
+      "/.clinic",
+      "/.direnv",
+      "/result",
+      "/tools/buck/graph.json",
+    ];
+    if (goOnly) {
+      excludes.push("/cpp", "/tools/nix/templates/cpp.nix", "/tools/scaffolding/templates/cpp");
+    }
+    if (process.env.TEST_EXCLUDE_CPP_REQS === "1") {
+      excludes.push("/cpp/defs.bzl", "/tools/nix/templates/cpp.nix");
+    }
+    const args = excludes.map((e) => ["--exclude", e]).flat();
+    await $`rsync -a ${args} ./ ${tmp}/`;
   });
 }
 

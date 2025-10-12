@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
 test("cpp missing: diagnose reports disabled with missing paths", async () => {
+  process.env.TEST_EXCLUDE_CPP_REQS = "1";
   await runInTemp("cpp-missing", async (tmp, $) => {
     const manifest = {
       enabled: ["go", "cpp"],

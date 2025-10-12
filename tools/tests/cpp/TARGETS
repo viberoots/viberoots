@@ -75,3 +75,10 @@ zx_test(
 )
 
 
+zx_test(
+    name = "sanitize-name.parity.test.ts",
+    script = "sanitize-name.parity.test.ts",
+    out = "sanitize-name.parity.test.stamp",
+)
+
+
