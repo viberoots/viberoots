@@ -85,14 +85,9 @@ export async function syncCppProviders(opts?: { outFile?: string }) {
   const curated = await readCuratedProviders();
   const curatedAttrSet = new Set<string>(curated.map((c) => c.attr));
   for (const a of curatedAttrSet) if (a) attrList.push(a);
-  // Stable unique
-  const seenAttrs = new Set<string>();
-  const attrListUniq: string[] = [];
-  for (const a of attrList.sort()) {
-    if (seenAttrs.has(a)) continue;
-    seenAttrs.add(a);
-    attrListUniq.push(a);
-  }
+  // Stable unique using shared helper
+  const { stableUnique } = await import("../../lib/fs-helpers");
+  const attrListUniq: string[] = stableUnique(attrList.sort(), (a) => a);
 
   const overlayPaths = (await fs.pathExists(overlay)) ? [overlay] : [];
   const hasLock = await fs.pathExists(lockfile).catch(() => false);
@@ -104,23 +99,13 @@ export async function syncCppProviders(opts?: { outFile?: string }) {
   for (const attr of attrListUniq) {
     const name = nameForAttr(attr);
     const patch_paths = await listCppPatchesFor(attr);
-    const inputs: string[] = [];
-    for (const p of overlayPaths) inputs.push(p);
-    for (const p of patch_paths) inputs.push(p);
-    if (hasLock) inputs.push(lockfile);
-    // Compute a stable content hash over all inputs' contents and paths
-    const chunks: string[] = [];
-    for (const p of inputs) {
-      try {
-        const txt = await fs.readFile(p, "utf8");
-        chunks.push(`# path=${p}`);
-        chunks.push(txt);
-      } catch {
-        chunks.push(`# missing=${p}`);
-      }
-    }
-    const data = chunks.join("\n");
-    await fs.outputFile(path.join(stampsDir, `${name}.stamp`), data, "utf8");
+    const inputs = [
+      ...overlayPaths.map((p) => ({ path: p })),
+      ...patch_paths.map((p) => ({ path: p })),
+      ...(hasLock ? [{ path: lockfile }] : []),
+    ];
+    const { writeStamp } = await import("../../lib/fs-helpers");
+    await writeStamp(path.join(stampsDir, `${name}.stamp`), inputs);
 
     const lines: string[] = [];
     lines.push("nix_cxx_provider(");
@@ -134,24 +119,16 @@ export async function syncCppProviders(opts?: { outFile?: string }) {
   // from the auto-generated nameForAttr mapping, e.g., gtest vs googletest)
   for (const { name, attr } of curated) {
     const patch_paths = await listCppPatchesFor(attr);
-    const inputs: string[] = [];
-    for (const p of overlayPaths) inputs.push(p);
-    for (const p of patch_paths) inputs.push(p);
-    if (hasLock) inputs.push(lockfile);
-    const chunks: string[] = [];
-    for (const p of inputs) {
-      try {
-        const txt = await fs.readFile(p, "utf8");
-        chunks.push(`# path=${p}`);
-        chunks.push(txt);
-      } catch {
-        chunks.push(`# missing=${p}`);
-      }
-    }
-    const data = chunks.join("\n");
-    await fs.outputFile(path.join(stampsDir, `${name}.stamp`), data, "utf8");
+    const inputs = [
+      ...overlayPaths.map((p) => ({ path: p })),
+      ...patch_paths.map((p) => ({ path: p })),
+      ...(hasLock ? [{ path: lockfile }] : []),
+    ];
+    const { writeStamp } = await import("../../lib/fs-helpers");
+    await writeStamp(path.join(stampsDir, `${name}.stamp`), inputs);
   }
 
   const data = header + providerLines.join("\n");
-  await fs.outputFile(OUT, data, "utf8");
+  const { writeIfChanged } = await import("../../lib/fs-helpers");
+  await writeIfChanged(OUT, data);
 }
