@@ -1,8 +1,15 @@
-if command -v direnv >/dev/null 2>&1; then
-  direnv exec "$PWD" pnpm exec lint-staged || exit 1
-else
-  pnpm exec lint-staged || exit 1
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+
+if ! command -v nix >/dev/null 2>&1; then
+  echo "error: Nix is required for pre-commit. Install Nix and try again." 1>&2
+  exit 127
 fi
+
+# Run lint-staged inside the repo's Nix dev shell so pnpm and tools are on PATH
+BUCK_CONFIG_LOCK=1 nix develop "${ROOT_DIR}" --accept-flake-config -c pnpm exec lint-staged
 
 # Guard: fail if anything changed after lint-staged (prevents stray diffs)
 git diff --quiet || { echo "Working tree dirty after lint-staged. Stage changes and re-commit."; exit 1; }

@@ -34,7 +34,7 @@
       "optionalPaths": [],
       "kinds": ["bin", "lib", "test"],
       "capabilities": {
-        "patching": false
+        "patching": true
       },
       "templatesDir": "tools/scaffolding/templates/cpp"
     }

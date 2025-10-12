@@ -150,7 +150,7 @@ def _cpp_nix_test_impl(ctx):
             "set +e; "
             + ("OUT_RAW=$(BUCK_TEST_SRC=\"$PWD\" BUCK_TARGET=\"%s\" nix build --impure \"$FLK_ROOT\"#graph-generator-selected --accept-flake-config --print-out-paths 2>&1 | tee /tmp/cpp_nix_test_build.log | tail -1); " % raw)
             + "NIX_STATUS=$?; "
-            + "OUT_PATH=$(printf %s \"$OUT_RAW\" | sed -E 's/\\x1B\\[[0-9;]*[A-Za-z]//g'); "
+            + "OUT_PATH=$(printf %s \"$OUT_RAW\" | sed -E 's/\\x1B\\[[0-9;]*[A-Za-z]//g' | tr -d '\r'); "
             + "set -e; "
             + "echo \"[cpp_nix_test] OUT_PATH=$OUT_PATH\" >&2; "
             + "if [ \"$NIX_STATUS\" -ne 0 ]; then echo '[cpp_nix_test] nix build failed' >&2; cat /tmp/cpp_nix_test_build.log >&2 || true; exit $NIX_STATUS; fi; "
