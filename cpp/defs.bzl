@@ -79,7 +79,9 @@ def nix_cpp_test(name, **kwargs):
         headers = [],
         exported_headers = [],
         srcs = [],
-        deps = deps + _providers_for(name) + _providers_for(planner_name),
+        # Do not wire providers on the planner stub to avoid visibility issues during graph export.
+        # Nix templates read nixpkg attrs from labels stamped below.
+        deps = deps,
         labels = _planner_labels,
     )
     # Executed: external runner builds the corresponding flake attr for planner_name and runs it
