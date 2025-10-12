@@ -1,23 +1,11 @@
 #!/usr/bin/env zx-wrapper
 // tools/buck/sync-providers-node.ts — optional Node importer-scoped providers
 import fs from "fs-extra";
-import crypto from "node:crypto";
 import YAML from "yaml";
+import { providerNameForImporter } from "../lib/providers";
 
 const PATCH_DIR = "patches/node";
 const OUT_FILE = "third_party/providers/TARGETS.node.auto";
-
-function shortHash(s: string): string {
-  return crypto.createHash("sha256").update(s).digest("hex").slice(0, 8);
-}
-
-function nameForImporterProvider(lockfilePath: string, importer: string): string {
-  const key = `${lockfilePath}#${importer}`;
-  const h = shortHash(key);
-  const suffix =
-    `${importer.replace(/[^\w]+/g, "_")}__${lockfilePath.replace(/[^\w]+/g, "_")}`.toLowerCase();
-  return `lf_${h}_${suffix}`;
-}
 
 function pkgKeyFromPatch(filename: string): string | null {
   if (!filename.endsWith(".patch")) return null;
