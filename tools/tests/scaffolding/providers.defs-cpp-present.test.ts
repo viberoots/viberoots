@@ -3,15 +3,15 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("third_party/providers/defs_cpp.bzl defines nix_cxx_library stamp", async () => {
+test("third_party/providers/defs_cpp.bzl defines nix_cxx_library and nix_cxx_provider", async () => {
   await runInTemp("providers-defs-cpp", async (tmp, $) => {
     const txt = await fsp.readFile("third_party/providers/defs_cpp.bzl", "utf8");
     if (!txt.includes("def nix_cxx_library(")) {
       console.error("missing nix_cxx_library definition");
       process.exit(2);
     }
-    if (!txt.includes("genrule(")) {
-      console.error("missing genrule in cpp provider def");
+    if (!txt.includes("def nix_cxx_provider(")) {
+      console.error("missing nix_cxx_provider in cpp provider defs");
       process.exit(2);
     }
   });
