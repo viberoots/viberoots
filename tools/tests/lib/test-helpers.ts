@@ -91,6 +91,7 @@ export async function rsyncRepoTo(tmp: string) {
       --exclude "/.clinic" \
       --exclude "/.direnv" \
       --exclude "/result" \
+      --exclude "/tools/buck/graph.json" \
       --exclude "/cpp/defs.bzl" \
       --exclude "/tools/nix/templates/cpp.nix" \
       ./ ${tmp}/`;

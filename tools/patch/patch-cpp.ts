@@ -208,6 +208,12 @@ async function doApply(args: string[]) {
   await deleteSession("cpp", key);
 
   // Regenerate C++ providers and auto_map deterministically
+  await fs.mkdirp("tools/buck");
+  try {
+    await fs.access("tools/buck/graph.json");
+  } catch {
+    await $`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
+  }
   await $`node tools/buck/sync-providers.ts --lang=cpp`;
   await $`node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
 
