@@ -200,12 +200,12 @@ async function doApply(args: string[]) {
   // End session; keep workspace for manual inspection if desired
   await deleteSession("cpp", key);
 
-  // Message: auto-discovery notice (no snippet required)
+  // Regenerate C++ providers and auto_map deterministically
+  await $`node tools/buck/sync-providers.ts --lang=cpp`;
+  await $`node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
+
+  // Message: confirmation and path of patch file
   console.log(dst);
-  console.log(
-    "\nC++ overlay auto-discovers patches by filename; no manual snippet required.\n" +
-      "Ensure tools/nix/overlays/cpp-patches.nix exists (it is included by flake.nix).\n",
-  );
 }
 
 async function doReset(args: string[]) {

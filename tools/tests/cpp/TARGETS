@@ -48,4 +48,10 @@ zx_test(
     out = "cpp.scaffold-and-build.cli.test.stamp",
 )
 
+zx_test(
+    name = "cpp.sync-providers.emits-stamp.for.attrs.test.ts",
+    script = "cpp.sync-providers.emits-stamp.for.attrs.test.ts",
+    out = "cpp.sync-providers.emits-stamp.for.attrs.test.stamp",
+)
+
 
