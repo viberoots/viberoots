@@ -92,6 +92,7 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
   }
   const haveGo = enabledLangs.has("go");
   const haveNode = enabledLangs.has("node");
+  const haveCpp = enabledLangs.has("cpp");
   const goCaps = caps.get("go") || {};
   const nodeCaps = caps.get("node") || {};
 
@@ -118,6 +119,17 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
           ? "not-applicable"
           : undefined
         : "missing-language",
+    },
+    {
+      label: "sync-providers-cpp",
+      cmd: `${nodeBin} ${nodeBase} ${path.join(
+        repoRoot(),
+        "tools/buck/sync-providers.ts",
+      )} --lang=cpp`,
+      withZx: true,
+      // Always run when C++ is enabled; overlay/lockfile stamps are required even if patching is false
+      when: haveCpp,
+      skipReason: haveCpp ? undefined : "missing-language",
     },
     {
       label: "sync-providers-node",
