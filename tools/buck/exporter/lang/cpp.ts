@@ -19,6 +19,9 @@ export const adapter: Adapter = {
   isNode(n) {
     return isCppNode(n);
   },
+  // For C++, validation is intentionally minimal/no-op for now.
+  // Keep hook present for parity and future checks.
+  validate(_nodes: Node[]) {},
   async buildBatches(_nodes: Node[]): Promise<Batch[]> {
     return [];
   },

@@ -48,4 +48,8 @@ export interface Adapter {
   isNode(n: Node): boolean;
   buildBatches(nodes: Node[]): Promise<Batch[]>;
   attachLabels(nodes: Node[], batches: Batch[], cacheDir: string): Promise<Node[]>;
+  // Optional adapter-specific validation hook (PR 1):
+  // Called before label attachment to enforce language-specific invariants.
+  // Should throw with an actionable message to fail fast when invariants are violated.
+  validate?(nodes: Node[]): Promise<void> | void;
 }

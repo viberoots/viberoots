@@ -33,6 +33,7 @@ Steps
 
 - **Tests**
   - Copy the Go contract tests as a model and adjust for your language’s providers and labels. Keep tests one-per-file and wire via `TARGETS`.
+  - Implement the adapter `validate(nodes)` hook to enforce language-specific invariants early (e.g., require a macro-stamped `lang:<id>` label when sources indicate the language). Validation runs per active adapter during export and should throw with actionable messages when misconfigurations are detected.
 
 - **Run glue**
   - Local: `node tools/buck/export-graph.ts`, `node tools/buck/sync-providers.ts`, `node tools/buck/gen-auto-map.ts` or simply `node tools/buck/prebuild-guard.ts` (auto-fix in local mode).

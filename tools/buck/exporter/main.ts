@@ -27,37 +27,21 @@ export async function run() {
     return !(nm.startsWith("config//") || nm.startsWith("prelude//"));
   });
 
-  // Early-fail validation for PR 2: ensure authoritative classification for Go
-  // If a node appears Go-like via srcs but lacks both rule_type starting with go_ and a lang:go label, fail.
-  const bad: string[] = [];
-  for (const n of nodes) {
-    const srcs = Array.isArray((n as any).srcs) ? ((n as any).srcs as string[]) : [];
-    const looksGo = srcs.some((s) => s.endsWith(".go"));
-    const hasGoRT = (n.rule_type || "").startsWith("go_");
-    const hasLangGo = (n.labels || []).includes("lang:go");
-    if (looksGo && !hasGoRT && !hasLangGo) {
-      bad.push(n.name);
+  // Adapter-level validation hook (PR 1) will run per active adapter below.
+
+  const adapters: Adapter[] = (await loadPresentAdapters()).sort((a, b) =>
+    a.name.localeCompare(b.name),
+  );
+
+  // Run adapter-level validation for all discovered adapters to catch
+  // misclassified nodes (e.g., .go sources missing rule_type/labels).
+  for (const a of adapters) {
+    if (typeof a.validate === "function") {
+      await a.validate(nodes);
     }
   }
-  if (bad.length) {
-    const sample = bad.slice(0, 10).join("\n  - ");
-    throw new Error(
-      [
-        "Authoritative exporter requires rule_type or macro-stamped labels for Go targets.",
-        "These targets include .go sources but lack both rule_type starting with 'go_' and 'lang:go' label:",
-        `  - ${sample}`,
-        bad.length > 10 ? `  ... and ${bad.length - 10} more` : "",
-        "Fix: ensure your Buck macros stamp 'lang:go' (and 'kind:bin' for binaries) or Buck emits rule_type.",
-      ]
-        .filter(Boolean)
-        .join("\n"),
-    );
-  }
 
-  const adapters: Adapter[] = await loadPresentAdapters();
-  const active = adapters
-    .filter((a) => nodes.some((n) => a.isNode(n)))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const active = adapters.filter((a) => nodes.some((n) => a.isNode(n)));
 
   // Fast path if no known-language nodes
   if (active.length === 0) {
@@ -92,6 +76,11 @@ export async function run() {
   );
 
   for (const adapter of active) {
+    if (typeof adapter.validate === "function") {
+      // Adapter-level validation receives the full node set so it can detect
+      // misclassified nodes (e.g., .go sources missing labels/rule_type).
+      await adapter.validate(nodes);
+    }
     const nodesA = nodes
       .filter((n) => adapter.isNode(n))
       .sort((a, b) => a.name.localeCompare(b.name));
