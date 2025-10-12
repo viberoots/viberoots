@@ -4,12 +4,16 @@ let
   get = ctx.get;
   pkgPathOf = ctx.pkgPathOf;
   T = ctx.T;
+  L = import ./lib.nix {
+    inherit lib;
+    get = ctx.get;
+    nodes = (if builtins.hasAttr "nodes" ctx then ctx.nodes else []);
+    pkgPathOf = ctx.pkgPathOf;
+  };
   # Buck labels may contain a trailing config suffix like
   #   "//apps/demo:demo_gtest__planner (config//platforms:default#hash)"
   # Normalize by stripping the suffix for stable lookups.
-  cleanLabel = s:
-    let parts = lib.splitString " (config//" s; in
-      if (builtins.length parts) > 1 then (builtins.elemAt parts 0) else s;
+  cleanLabel = L.cleanLabel;
 
   # Basic predicates
   isCxx = n:
@@ -37,42 +41,18 @@ let
 
   # Index nodes by name for quick lookup
   nodes = if builtins.hasAttr "nodes" ctx then ctx.nodes else [];
-  byName = builtins.listToAttrs (
-    map (n:
-      let nm = get n "name"; raw = if nm == null then "" else nm; name = cleanLabel raw; in
-      { inherit name; value = n; }
-    ) (builtins.filter (n:
-      let nm = get n "name"; raw = if nm == null then "" else nm; name = cleanLabel raw; in name != ""
-    ) nodes)
-  );
+  byName = L.byName;
 
-  labelsOf = n:
-    let labs = (get n "labels"); in
-      if labs == null then [] else (if builtins.isList labs then labs else []);
+  labelsOf = L.labelsOf;
 
-  nameOf = n:
-    let nm = get n "name"; in if nm == null then "" else cleanLabel nm;
+  nameOf = L.nameOf;
 
-  depsOf = n:
-    let ds = (get n "deps"); in
-      if ds == null then [] else (
-        if builtins.isList ds then (map cleanLabel ds) else []
-      );
+  depsOf = L.depsOf;
 
-  srcsOf = name:
-    let n = if builtins.hasAttr name byName then byName.${name} else null;
-    in if n == null then [] else (
-      let s = get n "srcs"; in if s == null then [] else (if builtins.isList s then s else [])
-    );
+  srcsOf = name: L.srcsOf name;
 
   # Normalize Buck-provided src paths to be relative to the package subdir.
-  normSrcsOf = name:
-    let
-      pkg = pkgPathOf name;
-      dropCell = s: if lib.hasPrefix "root//" s then lib.removePrefix "root//" s else s;
-      dropPkg = s:
-        if lib.hasPrefix (pkg + "/") s then lib.removePrefix (pkg + "/") s else s;
-    in map (s: dropPkg (dropCell s)) (srcsOf name);
+  normSrcsOf = name: srcsOf name;
 
   isNixLabel = l: lib.hasPrefix "nixpkg:" l;
   attrFrom = l: lib.removePrefix "nixpkg:" l;
@@ -83,11 +63,11 @@ let
       start = if builtins.hasAttr name byName then byName.${name} else null;
       step = state: dn:
         if builtins.hasAttr dn state.seen then state else
-        let key = cleanLabel dn;
+        let key = L.cleanLabel dn;
             n = if builtins.hasAttr key byName then byName.${key} else null;
         in if n == null then state else
-          let here = map attrFrom (builtins.filter isNixLabel (labelsOf n));
-              nexts = depsOf n;
+          let here = map attrFrom (builtins.filter isNixLabel (L.labelsOf n));
+              nexts = L.depsOf n;
               seen' = state.seen // { "${dn}" = true; };
               labels' = state.labels ++ here;
           in builtins.foldl' step { seen = seen'; labels = labels'; } nexts;
@@ -101,10 +81,10 @@ let
   repoGoCArchivesFor = name:
     let
       start = if builtins.hasAttr name byName then byName.${name} else null;
-      direct = if start == null then [] else depsOf start;
+      direct = if start == null then [] else L.depsOf start;
       isCArchive = nm:
         let n = if builtins.hasAttr nm byName then byName.${nm} else null; in
-          if n == null then false else builtins.elem "kind:carchive" (labelsOf n);
+          if n == null then false else builtins.elem "kind:carchive" (L.labelsOf n);
       asDerivation = nm: T.goCArchive {
         name = nm;
         modulesToml = ctx.modulesTomlFor nm;
@@ -116,12 +96,12 @@ let
   # Collect nixpkg labels stamped directly on the node itself (no DFS)
   nixAttrsFromSelf = name:
     let n = if builtins.hasAttr name byName then byName.${name} else null; in
-      if n == null then [] else (map attrFrom (builtins.filter isNixLabel (labelsOf n)));
+      if n == null then [] else (map attrFrom (builtins.filter isNixLabel (L.labelsOf n)));
 
   # Fallback: some Buck cquery configurations may omit deps edges on planner stubs.
   # In that case, detect common provider nodes directly and seed attrs accordingly.
   providerAttrsFallback = let
-    names = builtins.map (n: let nm = get n "name"; in if nm == null then "" else cleanLabel nm) nodes;
+    names = builtins.map (n: let nm = get n "name"; in if nm == null then "" else L.cleanLabel nm) nodes;
     # Extract provider attr from a full label when it matches our providers pattern
     toAttr = full:
       let marker = "//third_party/providers:nix_pkgs_";

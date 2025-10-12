@@ -68,3 +68,10 @@ zx_test(
 )
 
 
+zx_test(
+    name = "planner.lib-helpers.integration.test.ts",
+    script = "planner.lib-helpers.integration.test.ts",
+    out = "planner.lib-helpers.integration.test.stamp",
+)
+
+

@@ -1189,6 +1189,39 @@ export async function writeIfChanged(dst: string, data: string) {
 }
 ```
 
+### `tools/nix/planner/lib.nix` (shared helpers)
+
+```nix
+# tools/nix/planner/lib.nix — tiny, pure utilities reused by planners
+{ lib, get ? (attrs: k: attrs.${k} or null), nodes ? [], pkgPathOf ? (name: ".") }:
+let
+  cleanLabel = s:
+    let parts = lib.splitString " (config//" s; in
+      if (builtins.length parts) > 1 then (builtins.elemAt parts 0) else s;
+  labelsOf = n:
+    let labs = (get n "labels"); in if labs == null then [] else (if builtins.isList labs then labs else []);
+  nameOf = n:
+    let nm = get n "name"; in if nm == null then "" else cleanLabel nm;
+  depsRaw = n:
+    let ds = (get n "deps"); in if ds == null then [] else (if builtins.isList ds then ds else []);
+  depsOf = n: map cleanLabel (depsRaw n);
+  byName = builtins.listToAttrs (
+    map (n: { name = nameOf n; value = n; }) (builtins.filter (n: (get n "name") != null && (nameOf n) != "") nodes)
+  );
+  srcsOf = name:
+    let
+      n = if builtins.hasAttr name byName then byName.${name} else null;
+      s = if n == null then [] else (get n "srcs");
+      list = if s == null then [] else (if builtins.isList s then s else []);
+      pkg = pkgPathOf name;
+      dropCell = p: if lib.hasPrefix "root//" p then lib.removePrefix "root//" p else p;
+      dropPkg = p: if lib.hasPrefix (pkg + "/") p then lib.removePrefix (pkg + "/") p else p;
+    in map (p: dropPkg (dropCell p)) list;
+in {
+  inherit get cleanLabel labelsOf nameOf depsOf srcsOf byName;
+}
+```
+
 ### `tools/lib/providers.ts` (shared naming/encoding)
 
 ```ts
