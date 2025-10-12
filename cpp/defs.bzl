@@ -74,14 +74,22 @@ def nix_cpp_test(name, **kwargs):
             extra_nixpkg_labels.append("nixpkg:pkgs.googletest")
     _planner_labels = _planner_kwargs.get("labels", []) + extra_nixpkg_labels
     # Planner-visible stub: declare a cxx_library without compiling test sources; Nix will build the test.
+    # Filter provider deps from planner to avoid visibility / graph-edge to providers
+    _planner_deps = []
+    for d in deps:
+        if not isinstance(d, str):
+            continue
+        if d.startswith("//third_party/providers:"):
+            continue
+        _planner_deps.append(d)
+
     cxx_library(
         name = planner_name,
         headers = [],
         exported_headers = [],
         srcs = [],
-        # Do not wire providers on the planner stub to avoid visibility issues during graph export.
-        # Nix templates read nixpkg attrs from labels stamped below.
-        deps = deps,
+        # No provider deps on planner; labels carry nixpkg attrs for the planner.
+        deps = _planner_deps,
         labels = _planner_labels,
     )
     # Executed: external runner builds the corresponding flake attr for planner_name and runs it
