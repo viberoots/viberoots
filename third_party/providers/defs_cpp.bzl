@@ -1,6 +1,6 @@
 load("@prelude//:rules.bzl", "genrule")
 
-def nix_cxx_provider(name, attr, overlay_paths = [], patch_paths = [], lockfile = "flake.lock"):
+def nix_cxx_provider(name, attr, overlay_paths = [], patch_paths = [], lockfile = ""):
     """
     Content-addressed stamp for nixpkgs attribute providers.
     Inputs drive Buck invalidation; compilation happens in Nix templates.

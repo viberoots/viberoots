@@ -72,7 +72,7 @@ export async function syncCppProviders(opts?: { outFile?: string }) {
   const attrList = Array.from(attrs).sort();
 
   const overlayPaths = (await fs.pathExists(overlay)) ? [overlay] : [];
-  const hasLock = await fs.pathExists(lockfile);
+  const hasLock = await fs.pathExists(lockfile).catch(() => false);
 
   for (const attr of attrList) {
     const name = nameForAttr(attr);
