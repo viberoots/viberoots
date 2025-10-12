@@ -206,6 +206,7 @@ async function doApply(args: string[]) {
 
   // Message: confirmation and path of patch file
   console.log(dst);
+  console.log("\nC++ overlay auto-discovers patches by filename; no manual snippet required.\n");
 }
 
 async function doReset(args: string[]) {
