@@ -2,9 +2,9 @@
 import fs from "fs-extra";
 import { writeIfChanged } from "../lib/fs-helpers";
 import {
+  normalizeNixAttr,
   providerNameForImporter,
   providerNameForModuleKey,
-  normalizeNixAttr,
   providerNameForNixAttr,
 } from "../lib/providers";
 

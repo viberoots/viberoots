@@ -11,6 +11,9 @@ Useful helpers:
 
 - `providerNameForModuleKey("github.com/stretchr/testify", "v1.9.0")` to compute labels.
 - `tools/tests/lib/fixtures/go.ts: ensurePatch()` to create a patch with correct filename.
+- For nixpkgs providers, use the shared helpers in `tools/lib/providers.ts`:
+  - `normalizeNixAttr(attr)` ensures a canonical `pkgs.`-prefixed, lowercased attr (maps `pkgs.gtest` → `pkgs.googletest`).
+  - `providerNameForNixAttr(attr)` derives the deterministic provider name (e.g., `pkgs.zlib` → `nix_pkgs_pkgs_zlib`).
 
 ### Shared Nix helpers (templates-common)
 
