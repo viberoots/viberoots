@@ -28,6 +28,14 @@
 - Specific: `buck2 test //<target>`
 - Single-test external timeout (preferred): `gtimeout -k 10s 300s buck2 test //<target>` (or `timeout` on Linux)
 
+## External runner helper (C++)
+
+- For C++ tests and binaries built via the Nix planner, use the centralized helper:
+  - `node tools/dev/build-selected.ts` (or `nix run .#zx-wrapper -- tools/dev/build-selected.ts`)
+- It ensures `tools/buck/graph.json` exists for the current workspace and runs:
+  - `nix build .#graph-generator-selected` with `BUCK_TARGET` and `--accept-flake-config`
+- Output: prints only the Nix out path on stdout; logs go to stderr. Buck macros call this helper under the hood.
+
 ## zx tests overview
 
 - Exporter tuple and cache:
