@@ -19,7 +19,7 @@ Scope
 High-Level Architecture
 
 - Exporter (`tools/buck/exporter/main.ts` + `lang/cpp.ts`) attaches `nixpkg:<attr>` labels to C++ nodes via macros and rule_type.
-- Generator (`tools/buck/sync-providers-cpp.ts`) scans the exported graph, collects all `nixpkg:<attr>` labels, discovers related overlay/patch/lockfile inputs, and emits one stamped provider per attr.
+- Generator (`tools/buck/providers/cpp.ts`, invoked via `tools/buck/sync-providers.ts --lang=cpp`) scans the exported graph, collects all `nixpkg:<attr>` labels, discovers related overlay/patch/lockfile inputs, and emits one stamped provider per attr.
 - Auto-map (`tools/buck/gen-auto-map.ts`) translates `nixpkg:<attr>` labels to concrete provider labels `//third_party/providers:nix_pkgs_<attr_underscored>`.
 - Macros (`cpp/defs.bzl`) append providers from `MODULE_PROVIDERS` to all `nix_cpp_*` targets, so per-attr changes invalidate only affected targets.
 
@@ -29,17 +29,15 @@ Provider Rule Definition (Stamp-Only)
 
 ```starlark
 # //third_party/providers/defs_cpp.bzl
-def nix_cxx_provider(name, attr, overlay_paths = [], patch_paths = [], lockfile = "flake.lock"):
+def nix_cxx_provider(name, attr):
     """
     Content-addressed stamp for nixpkgs attribute providers.
-    Inputs drive Buck invalidation; compilation happens in Nix templates.
+    The actual stamp file is generated under third_party/providers/stamps/<name>.stamp
+    by the TypeScript glue and surfaced via a filegroup.
     """
-    srcs = overlay_paths + patch_paths + ([lockfile] if lockfile else [])
-    genrule(
+    filegroup(
         name = name,
-        srcs = srcs,
-        out = name + ".stamp",
-        cmd = "if command -v sha256sum >/dev/null; then cat $SRCS | sha256sum > $OUT; else cat $SRCS | shasum -a 256 > $OUT; fi",
+        srcs = glob(["stamps/%s.stamp" % name]),
         labels = ["lang:cpp", "nixpkg:%s" % attr],
         visibility = ["//visibility:public"],
     )
@@ -48,7 +46,7 @@ def nix_cxx_provider(name, attr, overlay_paths = [], patch_paths = [], lockfile 
 - Naming: `name = "nix_pkgs_<attr_underscored>"` where `<attr_underscored>` is `pkgs.openssl` → `pkgs_openssl`, `pkgs.gnome.glib` → `pkgs_gnome_glib`.
 - Labels: include `nixpkg:<attr>` for auto-map; include `lang:cpp` for diagnostics.
 
-Generator: tools/buck/sync-providers-cpp.ts
+Generator: tools/buck/providers/cpp.ts (invoked by sync CLI)
 
 - Inputs
   - Graph: `tools/buck/graph.json` (must exist).
@@ -64,12 +62,9 @@ Generator: tools/buck/sync-providers-cpp.ts
   3. For each attr:
      - Resolve encoded patch filename prefix: `attr.replace('.', '/')` then `/` → `__` (e.g., `pkgs.openssl` → `pkgs__openssl`).
      - Gather all `patches/cpp/<enc>@<ver>.patch` matching the attr; sort deterministically.
-     - Build provider entry using `nix_cxx_provider` with:
-       - `overlay_paths = ["tools/nix/overlays/cpp-patches.nix"]` if present
-       - `patch_paths = [ ... gathered patches ... ]`
-       - `lockfile = "flake.lock"` if present
-  4. Emit `third_party/providers/TARGETS.cpp.auto` with a stable header and sorted providers.
-  5. Idempotent write (skip if unchanged).
+     - Write a content-addressed stamp file to `third_party/providers/stamps/<providerName>.stamp` that records overlay/patch/lockfile inputs.
+     - Emit a minimal `nix_cxx_provider(name = <providerName>, attr = <attr>)` entry into `third_party/providers/TARGETS.cpp.auto`.
+  4. Idempotent writes (skip if unchanged).
 
 - Output example
 
@@ -80,11 +75,6 @@ load("//third_party/providers:defs_cpp.bzl", "nix_cxx_provider")
 nix_cxx_provider(
     name = "nix_pkgs_pkgs_openssl",
     attr = "pkgs.openssl",
-    overlay_paths = ["tools/nix/overlays/cpp-patches.nix"],
-    patch_paths = [
-        "patches/cpp/pkgs__openssl@3.3.1.patch",
-    ],
-    lockfile = "flake.lock",
 )
 ```
 
@@ -95,18 +85,18 @@ Auto-map and Macros
 
 Removal of Unused Paths (no backwards compatibility)
 
-- Replace the old C++ provider sync stub and curated manual entries with the new auto-generated file:
-  - Remove or stop relying on `tools/buck/providers/cpp.ts` no-op writer.
-  - Deprecate curated entries in `third_party/providers/TARGETS` for attrs covered by auto generation.
+- Replace curated/manual C++ provider entries with the new auto-generated file:
+  - Providers are emitted to `third_party/providers/TARGETS.cpp.auto` and backed by on-disk stamps in `third_party/providers/stamps/`.
+  - Curated entries in `third_party/providers/TARGETS` for covered attrs should be removed.
 
 CI and Local Workflow
 
 - Local (developer):
-  - `patch-pkg apply cpp pkgs.<attr>` → writes patch file → run `sync-providers-cpp` → run `gen-auto-map` → build
+  - `patch-pkg apply cpp pkgs.<attr>` → writes patch file → `node tools/buck/sync-providers.ts --lang=cpp` → `node tools/buck/gen-auto-map.ts` → build
 - CI stages (ordered):
   1. Export Graph → `tools/buck/graph.json`
-  2. Sync C++ Providers → `tools/buck/sync-providers-cpp.ts`
-  3. Generate auto_map → `tools/buck/gen-auto-map.ts`
+  2. Sync C++ Providers → `node tools/buck/sync-providers.ts --lang=cpp`
+  3. Generate auto_map → `node tools/buck/gen-auto-map.ts`
   4. Prebuild guard → verify files exist
   5. Build & Test
 
@@ -144,7 +134,7 @@ What We Lose If We Do Not Implement
 Implementation Checklist
 
 1. Add `nix_cxx_provider` to `third_party/providers/defs_cpp.bzl` and remove unused/old C++ provider shims.
-2. Create `tools/buck/sync-providers-cpp.ts` implementing the steps above.
+2. Create `tools/buck/providers/cpp.ts` implementing the steps above.
 3. Update `tools/buck/providers/index.ts` to call the new C++ sync.
 4. Wire into `patch-pkg apply cpp` and CI stages.
 5. Add unit + e2e tests under `tools/tests/cpp/` and `tools/tests/dev/`.

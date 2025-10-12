@@ -156,10 +156,10 @@ def _cpp_nix_test_impl(ctx):
             + "if [ \"$NIX_STATUS\" -ne 0 ]; then echo '[cpp_nix_test] nix build failed' >&2; cat /tmp/cpp_nix_test_build.log >&2 || true; exit $NIX_STATUS; fi; "
         )
         + "test -n \"$OUT_PATH\" || { echo '[cpp_nix_test] nix build returned no out path' >&2; cat /tmp/cpp_nix_test_build.log >&2 || true; exit 2; }; "
-        + "if [ ! -d \"$OUT_PATH/bin\" ]; then echo 'no test binary produced' >&2; exit 2; fi; "
         + ("BIN='%s'; " % expected_bin)
-        + "if [ ! -x \"$OUT_PATH/bin/$BIN\" ]; then echo '[cpp_nix_test] expected bin not found: ' \"$OUT_PATH/bin/$BIN\" >&2; ls -la \"$OUT_PATH/bin\" >&2 || true; exit 2; fi; "
-        + "\"$OUT_PATH/bin/$BIN\""
+        + "CAND=\"$OUT_PATH/bin/$BIN\"; "
+        + "if [ ! -x \"$CAND\" ]; then echo '[cpp_nix_test] expected bin not found: ' \"$CAND\" >&2; ls -la \"$OUT_PATH\" >&2 || true; ls -la \"$OUT_PATH/bin\" >&2 || true; exit 2; fi; "
+        + "\"$CAND\""
     )
     stamp = ctx.actions.declare_output(ctx.attrs.out)
     ctx.actions.write(stamp, "cpp_nix_test\n")
