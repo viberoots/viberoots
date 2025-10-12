@@ -2,6 +2,7 @@
 let
   lib = pkgs.lib;
   H = import ../lib/lang-helpers.nix { inherit pkgs; };
+  Dev = import ../dev-overrides.nix { inherit pkgs; };
 
   buildGoFn = if pkgs ? buildGoApplication then pkgs.buildGoApplication
               else builtins.throw "gomod2nix overlay (buildGoApplication) is required; no vendoring fallback";
@@ -23,10 +24,9 @@ in {
   }:
     let
       patchesMap = H.patchesMapFromDir patchDir;
-      devOverridesEnv = H.readDevOverrides devOverrideEnv;
-      _ = if (builtins.getEnv "CI") == "true" && (builtins.getEnv devOverrideEnv) != "" then
-            builtins.throw "Dev overrides are forbidden in CI" else null;
-      devOverrides = (devOverridesMap // devOverridesEnv);
+      dev = Dev.readJsonOverride { envName = devOverrideEnv; ciForbidden = true; };
+      _warn = dev.warnEffect; _guard = dev.ciGuard;
+      devOverrides = (devOverridesMap // dev.map);
       targetName = let parts = lib.splitString ":" name; in
         if (builtins.length parts) > 1 then lib.elemAt parts 1
         else (
@@ -121,9 +121,8 @@ in {
   }:
     let
       patchesMap = H.patchesMapFromDir patchDir;
-      devOverridesEnv = H.readDevOverrides devOverrideEnv;
-      _ = if (builtins.getEnv "CI") == "true" && (builtins.getEnv devOverrideEnv) != "" then
-            builtins.throw "Dev overrides are forbidden in CI" else null;
+      dev = Dev.readJsonOverride { envName = devOverrideEnv; ciForbidden = true; };
+      _warn = dev.warnEffect; _guard = dev.ciGuard;
       srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + subdir));
       segs = s: let xs = lib.splitString "." s; in if xs == [] then [] else xs;
       getAtPath = attrs: parts:
@@ -185,9 +184,9 @@ in {
             ver = if mType == "string" then (old.version or "") else (module.version or (old.version or ""));
             keyWithVer = if pkg != "" && ver != "" then "${pkg}@${ver}" else pkg;
             patchList = (patchesMap.${keyWithVer} or []) ++ (patchesMap.${pkg} or []);
-            srcOverride = if builtins.hasAttr keyWithVer devOverridesEnv
-                          then devOverridesEnv.${keyWithVer}
-                          else (devOverridesEnv.${pkg} or old.src);
+            srcOverride = if builtins.hasAttr keyWithVer dev.map
+                          then dev.map.${keyWithVer}
+                          else (dev.map.${pkg} or old.src);
           in old // {
             patches = (old.patches or []) ++ patchList;
             src = srcOverride;
@@ -209,9 +208,8 @@ in {
   }:
     let
       patchesMap = H.patchesMapFromDir patchDir;
-      devOverridesEnv = H.readDevOverrides devOverrideEnv;
-      _ = if (builtins.getEnv "CI") == "true" && (builtins.getEnv devOverrideEnv) != "" then
-            builtins.throw "Dev overrides are forbidden in CI" else null;
+      dev = Dev.readJsonOverride { envName = devOverrideEnv; ciForbidden = true; };
+      _warn = dev.warnEffect; _guard = dev.ciGuard;
       srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + subdir));
       segs = s: let xs = lib.splitString "." s; in if xs == [] then [] else xs;
       getAtPath = attrs: parts:
@@ -285,9 +283,9 @@ in {
           ver = if mType == "string" then (old.version or "") else (module.version or (old.version or ""));
           keyWithVer = if pkg != "" && ver != "" then "${pkg}@${ver}" else pkg;
           patchList = (patchesMap.${keyWithVer} or []) ++ (patchesMap.${pkg} or []);
-          srcOverride = if builtins.hasAttr keyWithVer devOverridesEnv
-                        then devOverridesEnv.${keyWithVer}
-                        else (devOverridesEnv.${pkg} or old.src);
+          srcOverride = if builtins.hasAttr keyWithVer dev.map
+                        then dev.map.${keyWithVer}
+                        else (dev.map.${pkg} or old.src);
         in old // {
           patches = (old.patches or []) ++ patchList;
           src = srcOverride;

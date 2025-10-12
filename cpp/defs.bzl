@@ -83,13 +83,12 @@ def nix_cpp_test(name, **kwargs):
             continue
         _planner_deps.append(d)
 
-    cxx_library(
+    _cpp_planner_stub(
         name = planner_name,
-        headers = [],
-        exported_headers = [],
-        srcs = [],
-        # No provider deps on planner; labels carry nixpkg attrs for the planner.
+        out = planner_name + ".stamp",
+        # Graph edges for planner discovery
         deps = _planner_deps,
+        # labels carry nixpkg attrs for the planner in the exported graph
         labels = _planner_labels,
     )
     # Executed: external runner builds the corresponding flake attr for planner_name and runs it
@@ -99,6 +98,23 @@ def nix_cpp_test(name, **kwargs):
         planner_label = "//%s:%s" % (native.package_name(), planner_name),
         planner = ":%s" % planner_name,
     )
+
+
+def _cpp_planner_stub_impl(ctx):
+    # Minimal planner-visible node: writes a stamp file and exposes edges via deps
+    out = ctx.actions.declare_output(ctx.attrs.out)
+    ctx.actions.write(out, "planner\n")
+    return [DefaultInfo(default_output = out)]
+
+
+_cpp_planner_stub = rule(
+    impl = _cpp_planner_stub_impl,
+    attrs = {
+        "out": attrs.string(),
+        "deps": attrs.list(attrs.dep(), default = []),
+        "labels": attrs.list(attrs.string(), default = []),
+    },
+)
 
 
 def _cpp_nix_test_impl(ctx):

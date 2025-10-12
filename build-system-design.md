@@ -378,7 +378,7 @@ The outer CLI `patch-pkg` implements language/subcommand parsing and delegates t
 2. **Dynamic overrides** (patch map + JSON dev overrides)
 
 - **Patch map** (derived from filenames in `patches/go/*.patch`): maps `module@version` → list of patch file paths (under `patches/go/…`).
-- `NIX_GO_DEV_OVERRIDE_JSON`: (ephemeral env var) maps `module@version` → absolute local path for dev override.
+  - `NIX_GO_DEV_OVERRIDE_JSON`: (ephemeral env var) maps `module@version` → absolute local path for dev override. This is handled uniformly via `tools/nix/dev-overrides.nix`.
 
 **Nix usage snippet:**
 
@@ -438,8 +438,8 @@ _(Adapted from the internal workflow document.)_ fileciteturn5file0
 
 ### Warnings & CI Fail-Safes
 
-- The templates (Nix) **emit a warning** whenever `NIX_GO_DEV_OVERRIDE_JSON` is non-empty.
-- In CI (e.g., `CI=true`), the templates **throw** to **fail the build** if dev overrides are detected.
+- The templates (Nix) use the shared helper `tools/nix/dev-overrides.nix` to **emit a warning** locally whenever dev overrides are set (e.g., `NIX_GO_DEV_OVERRIDE_JSON`, `NIX_CPP_DEV_OVERRIDE_JSON`).
+- In CI (e.g., `CI=true`), the shared helper **throws** to **fail the build** if dev overrides are detected.
 - The outer `patch-pkg` should also print explicit warnings when in session mode.
 
 ---

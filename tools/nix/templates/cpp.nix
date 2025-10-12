@@ -2,6 +2,7 @@
 let
   lib = pkgs.lib;
   H = import ../lib/lang-helpers.nix { inherit pkgs; };
+  Dev = import ../dev-overrides.nix { inherit pkgs; };
   clangxx = "${pkgs.llvmPackages.clang}/bin/clang++";
   llvmAr  = "${pkgs.llvmPackages.llvm}/bin/llvm-ar";
 
@@ -19,27 +20,9 @@ in rec {
         else null
     );
 
-  # Dev override support (parity with Go):
-  # - Read NIX_CPP_DEV_OVERRIDE_JSON as a JSON map of attr -> absolute path
-  #   e.g. { "pkgs.openssl": "/abs/path/to/workspace" }
-  # - If set locally, emit a warning via builtins.trace; in CI, throw.
-  # - When an override path exists for an attr, use overrideAttrs to replace src.
-  devOverrideEnv = builtins.getEnv "NIX_CPP_DEV_OVERRIDE_JSON";
-  devOverrides =
-    let v = devOverrideEnv; in
-      if v == "" then {}
-      else (
-        let parsed = builtins.fromJSON v; in
-          if builtins.isAttrs parsed then parsed else {}
-      );
-  _warn =
-    if devOverrideEnv != "" && (builtins.getEnv "CI") != "true"
-    then builtins.trace "[OVERRIDES ACTIVE] NIX_CPP_DEV_OVERRIDE_JSON is set — local derivation hashes will differ. Unset before sharing cache artifacts." null
-    else null;
-  _ci_guard =
-    if (builtins.getEnv "CI") == "true" && devOverrideEnv != ""
-    then builtins.throw "Dev overrides are forbidden in CI"
-    else null;
+  # Standardized dev override handling (shared helper)
+  dev = Dev.readJsonOverride { envName = "NIX_CPP_DEV_OVERRIDE_JSON"; ciForbidden = true; };
+  _warn = dev.warnEffect; _ci_guard = dev.ciGuard;
 
   normalizeAttr = s:
     let s0 = lib.toLower (lib.trim s);
@@ -50,9 +33,9 @@ in rec {
     let key = normalizeAttr attr;
         # Accept keys both with and without pkgs. prefix
         keyAlt = lib.removePrefix "pkgs." key;
-        has = builtins.hasAttr key devOverrides || builtins.hasAttr keyAlt devOverrides;
-        path = if builtins.hasAttr key devOverrides then devOverrides.${key}
-               else (devOverrides.${keyAlt} or null);
+        has = builtins.hasAttr key dev.map || builtins.hasAttr keyAlt dev.map;
+        path = if builtins.hasAttr key dev.map then dev.map.${key}
+               else (dev.map.${keyAlt} or null);
     in if has && path != null && path != ""
        then (pkg.overrideAttrs (old: {
          src = builtins.path path;
