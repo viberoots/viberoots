@@ -24,6 +24,22 @@ export function providerNameForImporter(lockfilePath: string, importer: string):
   return `lf_${h}_${tail}`;
 }
 
+// Encode a nixpkgs attribute path for C++ patch filenames.
+// Example: pkgs.openssl -> pkgs/openssl -> pkgs__openssl
+export function encodeNixAttrForPatchPrefix(attr: string): string {
+  return String(attr || "")
+    .replace(/\./g, "/")
+    .replace(/\//g, "__");
+}
+
+// Decode a C++ patch filename prefix back into a canonical nixpkgs attribute path.
+// Example: pkgs__openssl -> pkgs/openssl -> pkgs.openssl (normalized)
+export function decodeNixAttrFromPatchPrefix(prefix: string): string {
+  const withSlashes = String(prefix || "").replace(/__+/g, "/");
+  const dotted = withSlashes.replace(/\//g, ".");
+  return normalizeNixAttr(dotted);
+}
+
 // Normalize a nixpkgs attribute path for provider naming and labeling.
 // - Trims
 // - Lower-cases

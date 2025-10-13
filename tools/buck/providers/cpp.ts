@@ -1,7 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
 import path from "node:path";
-import { normalizeNixAttr, providerNameForNixAttr } from "../../lib/providers";
+import {
+  normalizeNixAttr,
+  providerNameForNixAttr,
+  encodeNixAttrForPatchPrefix,
+} from "../../lib/providers";
 
 type Node = { name: string; labels?: string[] };
 
@@ -9,16 +13,11 @@ type Node = { name: string; labels?: string[] };
 const normalizeAttr = normalizeNixAttr;
 const nameForAttr = providerNameForNixAttr;
 
-function encodeForPatchPrefix(attr: string): string {
-  // pkgs.openssl -> pkgs/openssl -> pkgs__openssl
-  return attr.replace(/\./g, "/").replace(/\//g, "__");
-}
-
 async function listCppPatchesFor(attr: string): Promise<string[]> {
   const dir = "patches/cpp";
   const out: string[] = [];
   if (!(await fs.pathExists(dir))) return out;
-  const enc = encodeForPatchPrefix(attr);
+  const enc = encodeNixAttrForPatchPrefix(attr);
   const files = await fs.readdir(dir).catch(() => [] as string[]);
   for (const f of files) {
     if (!f.endsWith(".patch")) continue;

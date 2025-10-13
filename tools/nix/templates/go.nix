@@ -8,6 +8,24 @@ let
               else builtins.throw "gomod2nix overlay (buildGoApplication) is required; no vendoring fallback";
   takesOverrides = (builtins.hasAttr "overrides" (builtins.functionArgs (pkgs.buildGoApplication)));
 
+  # Shared override composition for Go module patches and dev src overrides.
+  mkOverrides = { patchesMap, devMap }:
+    (module: old:
+      let
+        mType = builtins.typeOf module;
+        pkg = if mType == "string" then module else (module.goPackagePath or (old.goPackagePath or ""));
+        ver = if mType == "string" then (old.version or "") else (module.version or (old.version or ""));
+        keyWithVer = if pkg != "" && ver != "" then "${pkg}@${ver}" else pkg;
+        patchList = (patchesMap.${keyWithVer} or []) ++ (patchesMap.${pkg} or []);
+        srcOverride = if builtins.hasAttr keyWithVer devMap
+                      then devMap.${keyWithVer}
+                      else (devMap.${pkg} or old.src);
+      in old // {
+        patches = (old.patches or []) ++ patchList;
+        src = srcOverride;
+      }
+    );
+
 in {
   goApp = {
     name,
@@ -90,20 +108,7 @@ in {
         pwd = srcAbs;
         modRoot = ".";
       } // (if takesOverrides then {
-        overrides = module: old:
-          let
-            mType = builtins.typeOf module;
-            pkg = if mType == "string" then module else (module.goPackagePath or (old.goPackagePath or ""));
-            ver = if mType == "string" then (old.version or "") else (module.version or (old.version or ""));
-            keyWithVer = if pkg != "" && ver != "" then "${pkg}@${ver}" else pkg;
-            patchList = (patchesMap.${keyWithVer} or []) ++ (patchesMap.${pkg} or []);
-            srcOverride = if builtins.hasAttr keyWithVer devOverrides
-                          then devOverrides.${keyWithVer}
-                          else (devOverrides.${pkg} or old.src);
-          in old // {
-            patches = (old.patches or []) ++ patchList;
-            src = srcOverride;
-          };
+        overrides = mkOverrides { patchesMap = patchesMap; devMap = devOverrides; };
       } else {}));
     in buildGoFn args;
 
@@ -177,20 +182,7 @@ in {
         pwd = srcAbs;
         modRoot = ".";
       } // (if takesOverrides then {
-        overrides = module: old:
-          let
-            mType = builtins.typeOf module;
-            pkg = if mType == "string" then module else (module.goPackagePath or (old.goPackagePath or ""));
-            ver = if mType == "string" then (old.version or "") else (module.version or (old.version or ""));
-            keyWithVer = if pkg != "" && ver != "" then "${pkg}@${ver}" else pkg;
-            patchList = (patchesMap.${keyWithVer} or []) ++ (patchesMap.${pkg} or []);
-            srcOverride = if builtins.hasAttr keyWithVer dev.map
-                          then dev.map.${keyWithVer}
-                          else (dev.map.${pkg} or old.src);
-          in old // {
-            patches = (old.patches or []) ++ patchList;
-            src = srcOverride;
-          };
+        overrides = mkOverrides { patchesMap = patchesMap; devMap = dev.map; };
       } else {}));
     in buildGoFn args;
 
@@ -276,20 +268,7 @@ in {
         runHook postInstall
       '';
     } // (if takesOverrides then {
-      overrides = module: old:
-        let
-          mType = builtins.typeOf module;
-          pkg = if mType == "string" then module else (module.goPackagePath or (old.goPackagePath or ""));
-          ver = if mType == "string" then (old.version or "") else (module.version or (old.version or ""));
-          keyWithVer = if pkg != "" && ver != "" then "${pkg}@${ver}" else pkg;
-          patchList = (patchesMap.${keyWithVer} or []) ++ (patchesMap.${pkg} or []);
-          srcOverride = if builtins.hasAttr keyWithVer dev.map
-                        then dev.map.${keyWithVer}
-                        else (dev.map.${pkg} or old.src);
-        in old // {
-          patches = (old.patches or []) ++ patchList;
-          src = srcOverride;
-        };
+      overrides = mkOverrides { patchesMap = patchesMap; devMap = dev.map; };
     } else {}));
 }
 
