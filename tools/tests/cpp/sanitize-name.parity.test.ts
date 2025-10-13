@@ -13,14 +13,25 @@ function nixSanitize(s: string): string {
 }
 
 async function starlarkProbeOutput(target: string, label: string): Promise<string> {
-  const iso = `parity_${Date.now()}`;
-  await $`buck2 --isolation-dir ${iso} build ${target}`;
-  const { stdout } = await $`buck2 --isolation-dir ${iso} targets --show-output ${target}`;
-  const out = stdout.trim().split(/\s+/).pop() || "";
-  const outName = out.split("/").pop() || "";
-  // The file content is the sanitized value; derive expected content from Nix sanitizer
-  if (!outName) throw new Error("no output path for " + target);
-  return outName.replace(/\.txt$/, "");
+  const inherited = process.env.BUCK_ISOLATION_DIR;
+  const iso = inherited && inherited.trim() ? inherited : `parity_${process.pid}`;
+  const createdOwnIso = !inherited;
+  try {
+    await $`buck2 --isolation-dir ${iso} build ${target}`;
+    const { stdout } = await $`buck2 --isolation-dir ${iso} targets --show-output ${target}`;
+    const out = stdout.trim().split(/\s+/).pop() || "";
+    const outName = out.split("/").pop() || "";
+    // The file content is the sanitized value; derive expected content from Nix sanitizer
+    if (!outName) throw new Error("no output path for " + target);
+    return outName.replace(/\.txt$/, "");
+  } finally {
+    // If we created a custom isolation for this script, kill only that daemon.
+    if (createdOwnIso) {
+      try {
+        await $`buck2 --isolation-dir ${iso} kill`;
+      } catch {}
+    }
+  }
 }
 
 for (const c of cases) {

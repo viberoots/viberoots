@@ -64,7 +64,9 @@ function filterIsolations(
 async function confirm(question: string): Promise<boolean> {
   process.stdout.write(question + " [y/N] ");
   try {
-    const { stdout } = await $({ stdio: "pipe" })`bash -lc 'read -r a; printf "%s" "$a"'`;
+    const { stdout } = await $({
+      stdio: "pipe",
+    })`bash --noprofile --norc -c 'read -r a; printf "%s" "$a"'`;
     const ans = String(stdout || "")
       .trim()
       .toLowerCase();

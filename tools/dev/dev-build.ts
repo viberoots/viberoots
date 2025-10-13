@@ -45,7 +45,7 @@ async function ensureBuckPreludeConfig(): Promise<void> {
       .pop();
     if (!out) throw new Error("unable to build .#buck2-prelude");
     const preludePath = `${out}/prelude`;
-    await $({ cwd: repoRoot() })`bash -lc ${`set -euo pipefail
+    await $({ cwd: repoRoot() })`bash --noprofile --norc -c ${`set -euo pipefail
       printf '.\n' > .buckroot
       rm -f prelude && ln -s "${preludePath}" prelude
       cat > .buckconfig <<'EOF'
@@ -78,7 +78,7 @@ EOF
     `}`;
 
     // Ensure toolchains/ has its own .buckconfig so Buck uses TARGETS there too
-    await $({ cwd: repoRoot() })`bash -lc ${`set -euo pipefail
+    await $({ cwd: repoRoot() })`bash --noprofile --norc -c ${`set -euo pipefail
       mkdir -p toolchains
       cat > toolchains/.buckconfig <<'EOF'
 [buildfile]
@@ -93,6 +93,98 @@ EOF
 
 async function main() {
   const isCI = process.env.CI === "true";
+  // Prepare a scoped Buck isolation for this process; respect an inherited isolation when provided.
+  const inheritedIso = (process.env.BUCK_ISOLATION_DIR || "").trim();
+  const buckIsolation = inheritedIso ? inheritedIso : `devbuild-${process.pid}`;
+  const createdOwnIsolation = !inheritedIso && process.env.BUCK_NO_ISOLATION !== "1";
+  const isolationFlags: string[] =
+    process.env.BUCK_NO_ISOLATION === "1" ? [] : ["--isolation-dir", buckIsolation];
+  async function killIsolationIfOwned() {
+    if (createdOwnIsolation) {
+      try {
+        await $`buck2 --isolation-dir ${buckIsolation} kill`;
+      } catch {}
+      // Best-effort: also reap any per-test/exporter daemons left from child processes
+      try {
+        const { stdout } = await $({ stdio: "pipe" })`/bin/ps -A -o pid=,comm=`;
+        const lines = String(stdout || "").split("\n");
+        for (const ln of lines) {
+          const m = ln.match(/buck2d\[([^\]]+)\]/);
+          if (m && /^(zxtest-|exporter-)/.test(m[1])) {
+            try {
+              await $`buck2 --isolation-dir ${m[1]} kill`;
+            } catch {}
+          }
+        }
+      } catch {}
+    }
+  }
+  // Ensure we tear down the daemon if the process is interrupted or exits.
+  for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+    try {
+      process.on(sig as any, async () => {
+        // Best-effort: terminate our entire process group so spawned tools exit promptly
+        try {
+          // Negative PID sends signal to the process group on POSIX systems
+          process.kill(-process.pid, sig as any);
+        } catch {}
+        // Kill our isolation and any exporter- children we may have spawned
+        try {
+          await $`buck2 --isolation-dir ${buckIsolation} kill`;
+        } catch {}
+        try {
+          const { stdout } = await $({ stdio: "pipe" })`/bin/ps -A -o pid=,command=`;
+          const lines = String(stdout || "").split("\n");
+          for (const ln of lines) {
+            const m = ln.match(/--isolation-dir\s+(exporter-[^\s]+)/);
+            if (m) {
+              try {
+                await $`buck2 --isolation-dir ${m[1]} kill`;
+              } catch {}
+            }
+          }
+        } catch {}
+        process.exit(130);
+      });
+    } catch {}
+  }
+  // Detached watchdog: if this process disappears, kill the associated buck2d isolation
+  // and sweep any orphaned exporter-/zxtest-/devbuild- daemons.
+  try {
+    const parentPid = String(process.pid);
+    const nodeBase = zxNodeBase();
+    const nodeBin = process.execPath || "node";
+    await $({
+      stdio: "ignore",
+    })`bash --noprofile --norc -c ${`${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/dev/buck-watchdog.ts")} --parent ${parentPid} --iso ${buckIsolation} --patterns zxtest-,exporter-,devbuild- & disown`}`.nothrow();
+  } catch {}
+  process.once("exit", () => {
+    // Fire and forget; cannot await on exit
+    (async () => {
+      try {
+        await $`buck2 --isolation-dir ${buckIsolation} kill`;
+      } catch {}
+      try {
+        const { stdout } = await $({ stdio: "pipe" })`/bin/ps -A -o pid=,command=`;
+        const lines = String(stdout || "").split("\n");
+        for (const ln of lines) {
+          const m = ln.match(/--isolation-dir\s+(exporter-[^\s]+)/);
+          if (m) {
+            try {
+              await $`buck2 --isolation-dir ${m[1]} kill`;
+            } catch {}
+          }
+        }
+      } catch {}
+    })();
+  });
+  process.once("uncaughtException", async (err) => {
+    try {
+      await killIsolationIfOwned();
+    } catch {}
+    console.error(err);
+    process.exit(1);
+  });
   // Ensure process.cwd() is the repo root; repoRoot() already prefers CWD
   try {
     process.chdir(repoRoot());
@@ -189,7 +281,10 @@ async function main() {
   }
 
   // Clean any stray buck-go-* dirs at repo root from previous runs
-  await $({ stdio: "ignore", cwd: repoRoot() })`bash -lc 'rm -rf buck-go-*'`.nothrow();
+  await $({
+    stdio: "ignore",
+    cwd: repoRoot(),
+  })`bash --noprofile --norc -c 'rm -rf buck-go-*'`.nothrow();
 
   if (!isCI && shouldInstallDeps(materialize)) {
     const nodeBase = zxNodeBase();
@@ -387,7 +482,9 @@ async function main() {
   const proc = await $({
     stdio: "inherit",
     cwd: repoRoot(),
-  })`${buckBin} ${subcmd} ${platformFlags} ${restArgs}`.catch((e) => e);
+  })`bash --noprofile --norc -c ${`${buckBin} ${isolationFlags.join(" ")} ${subcmd} ${platformFlags.join(" ")} ${restArgs.join(" ")} 2> >(grep -Ev 'buck2_client_ctx::file_tailers::tailer: Failed to read from .*/buckd\\.(stderr|stdout): task [0-9]+ was cancelled|buck2_event_log::writer: Failed to flush log file .*: Broken pipe \\([^)]+\\)' >&2)`}`.catch(
+    (e) => e,
+  );
   const code = typeof proc?.exitCode === "number" ? proc.exitCode : 1;
   if (code !== 0) process.exit(code);
 

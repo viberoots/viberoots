@@ -7,7 +7,7 @@ set -euo pipefail
 ARGS=("$@")
 
 try_run() {
-  local cmd=(bash -lc "$1")
+  local cmd=(bash --noprofile --norc -c "$1")
   if "${cmd[@]}"; then
     exit 0
   fi
@@ -17,11 +17,11 @@ try_run() {
 try_run "nix run github:nix-community/gomod2nix -- ${ARGS[*]}" || true
 
 # Fallback to upstream shell
-try_run "nix shell github:nix-community/gomod2nix -c bash -lc 'gomod2nix ${ARGS[*]}'" || true
+try_run "nix shell github:nix-community/gomod2nix -c bash --noprofile --norc -c 'gomod2nix ${ARGS[*]}'" || true
 
 # Then try nixpkgs app and shell
 try_run "nix run nixpkgs#gomod2nix -- ${ARGS[*]}" || true
-try_run "nix shell nixpkgs#gomod2nix -c bash -lc 'gomod2nix ${ARGS[*]}'" || true
+try_run "nix shell nixpkgs#gomod2nix -c bash --noprofile --norc -c 'gomod2nix ${ARGS[*]}'" || true
 
 # 5) fallback to PATH
 if command -v gomod2nix >/dev/null 2>&1; then

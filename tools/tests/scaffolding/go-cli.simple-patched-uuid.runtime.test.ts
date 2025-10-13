@@ -14,7 +14,7 @@ async function writeFileAbs(p: string, content: string) {
 }
 
 async function writeBuckConfig($: any) {
-  await $`bash -lc ${`set -euo pipefail
+  await $`bash --noprofile --norc -c ${`set -euo pipefail
     printf '.\n' > .buckroot
     cat > .buckconfig <<'EOF'
 [buildfile]
@@ -189,7 +189,7 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
       "google",
       "uuid",
     );
-    await $({ stdio: "inherit" })`bash -lc ${`set -euo pipefail
+    await $({ stdio: "inherit" })`bash --noprofile --norc -c ${`set -euo pipefail
       rm -rf ${vendUuidDir}
       mkdir -p ${vendUuidDir}
       cp -R ${ws}/. ${vendUuidDir}/

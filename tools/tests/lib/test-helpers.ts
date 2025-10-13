@@ -155,7 +155,7 @@ export async function runInTemp<T>(
       }
     }
     if (preludePath) {
-      await $({ cwd: tmp })`bash -lc ${`set -euo pipefail
+      await $({ cwd: tmp })`bash --noprofile --norc -c ${`set -euo pipefail
         printf '.\n' > .buckroot
         [ -e prelude ] || ln -s "${preludePath}" prelude
         cat > .buckconfig <<'EOF'

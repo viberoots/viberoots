@@ -1,0 +1,66 @@
+#!/usr/bin/env zx-wrapper
+import "zx/globals";
+
+function parseArg(name: string, def: string = ""): string {
+  const idx = process.argv.indexOf(`--${name}`);
+  if (idx >= 0 && idx + 1 < process.argv.length) return process.argv[idx + 1];
+  return def;
+}
+
+function isPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function sweepOrphans(patterns: RegExp) {
+  try {
+    const { stdout } = await $({ stdio: "pipe" })`/bin/ps -A -o pid=,command=`;
+    const lines = String(stdout || "").split("\n");
+    for (const ln of lines) {
+      // Extract isolation from a running buck2d command line
+      const m = ln.match(/--isolation-dir\s+([^\s]+)/);
+      if (!m) continue;
+      const iso = m[1];
+      if (!patterns.test(iso)) continue;
+      const pidMatch = iso.match(/(\d+)$/);
+      const suffixPid = pidMatch ? Number(pidMatch[1]) : NaN;
+      if (!Number.isFinite(suffixPid) || isPidAlive(suffixPid)) continue;
+      try {
+        await $`buck2 --isolation-dir ${iso} kill`;
+      } catch {}
+    }
+  } catch {}
+}
+
+async function main() {
+  const parentPid = Number(parseArg("parent", "0"));
+  const iso = parseArg("iso", "");
+  const patternsRaw = parseArg("patterns", "zxtest-,exporter-,devbuild-");
+  const pat = new RegExp(
+    `^(?:${patternsRaw
+      .split(",")
+      .map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .join("|")})`,
+  );
+
+  if (!Number.isFinite(parentPid) || parentPid <= 1) return;
+
+  while (isPidAlive(parentPid)) {
+    await sweepOrphans(pat);
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+
+  // Parent exited: kill the main isolation and sweep once more
+  if (iso) {
+    try {
+      await $`buck2 --isolation-dir ${iso} kill`;
+    } catch {}
+  }
+  await sweepOrphans(pat);
+}
+
+main().catch(() => process.exit(0));

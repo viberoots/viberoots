@@ -7,7 +7,7 @@ export type TestCtx = { tmp: string; $: any };
 export async function scaffoldLib(lang: string, name: string, ctx: TestCtx): Promise<void> {
   if (lang !== "go") throw new Error(`unsupported lang: ${lang}`);
   const { tmp: t, $ } = ctx;
-  await $`bash -lc ${`set -euo pipefail
+  await $`bash --noprofile --norc -c ${`set -euo pipefail
       printf '.\n' > .buckroot
       cat > .buckconfig <<'EOF'
 [buildfile]
@@ -49,7 +49,7 @@ EOF
 export async function scaffoldApp(lang: string, name: string, ctx: TestCtx): Promise<void> {
   if (lang !== "go") throw new Error(`unsupported lang: ${lang}`);
   const { tmp: t, $ } = ctx;
-  await $`bash -lc ${`set -euo pipefail
+  await $`bash --noprofile --norc -c ${`set -euo pipefail
       printf '.\n' > .buckroot
       cat > .buckconfig <<'EOF'
 [buildfile]

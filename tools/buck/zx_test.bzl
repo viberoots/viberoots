@@ -64,6 +64,9 @@ def _zx_test_impl(ctx):
             # Use a deterministic buck2 isolation name per test to avoid accumulating daemons,
             # and kill the daemon at the end of the test regardless of status.
             + "export BUCK_ISOLATION_DIR=\"zxtest-$SAFE-$$\"; "
+            # If exporter spawns with its own isolation, nest it under the test isolation so cleanup is single-sourced
+            + "export BUCK_ISOLATION_DIR_EXPORTER=\"$BUCK_ISOLATION_DIR\"; "
+            + "cleanup() { buck2 --isolation-dir \"$BUCK_ISOLATION_DIR\" kill >/dev/null 2>&1 || true; }; trap cleanup EXIT INT TERM HUP; "
             + "rm -f \"$LOGDIR/test.stdout.log\" \"$LOGDIR/test.stderr.log\" 2>/dev/null || true; "
             + "cd \"$WORKSPACE_ROOT\"; "
             # Prefer package from Starlark context; fall back to parsing label, stripping any config suffix
@@ -71,7 +74,7 @@ def _zx_test_impl(ctx):
             + "if [ -z \"$PKG\" ]; then PKG=$(printf %%s \"$BUCK_TEST_TARGET\" | sed -E 's/ \\([^)]*\\)$//; s#^.*//([^:]+):.*$#\\1#'); fi; "
             + "CAND1=\"$WORKSPACE_ROOT/%s\"; CAND2=\"$WORKSPACE_ROOT/$PKG/%s\"; "
             + "SCRIPT_PATH=\"$CAND1\"; if [ ! -f \"$SCRIPT_PATH\" ]; then SCRIPT_PATH=\"$CAND2\"; fi; "
-            + "{ \"$NODE_BIN\" $TEST_NODE_OPTIONS --test --experimental-strip-types --import \"$WORKSPACE_ROOT/tools/dev/zx-init.mjs\" \"$SCRIPT_PATH\"; } > >(tee -a \"$LOGDIR/test.stdout.log\") 2> >(tee -a \"$LOGDIR/test.stderr.log\" >&2); STATUS=$?; "
+            + "{ \"$NODE_BIN\" $TEST_NODE_OPTIONS --test --experimental-strip-types --import \"$WORKSPACE_ROOT/tools/dev/zx-init.mjs\" \"$SCRIPT_PATH\"; } > >(tee -a \"$LOGDIR/test.stdout.log\") 2> >(grep -Ev 'buck2_client_ctx::file_tailers::tailer: Failed to read from .*buckd\\.(stderr|stdout).*: task [0-9]+ was cancelled' | tee -a \"$LOGDIR/test.stderr.log\" >&2); STATUS=$?; "
             + "if [ \"$COVERAGE\" = \"1\" ]; then "
             + "\"$NODE_BIN\" \"$WORKSPACE_ROOT/tools/dev/coverage-raw-normalize.mjs\" || true; "
             + "\"$NODE_BIN\" \"$WORKSPACE_ROOT/node_modules/c8/bin/c8.js\" report "
