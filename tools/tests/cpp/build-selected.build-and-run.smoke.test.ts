@@ -31,6 +31,16 @@ async function main() {
     console.error("build-selected failed", stderr);
     process.exit(exitCode || 1);
   }
+  // Assert helper log messages on stderr for single-source verification
+  const err = String(stderr || "");
+  if (!/\[build-selected\] BUCK_TARGET=\/\/apps\/foo:foo/.test(err)) {
+    console.error("missing BUCK_TARGET log in stderr", err);
+    process.exit(2);
+  }
+  if (!/\[build-selected\] (exporting graph to|using existing graph:)/.test(err)) {
+    console.error("missing graph export/usage log in stderr", err);
+    process.exit(2);
+  }
   const outPath = String(stdout || "").trim();
   if (!outPath || !(await fs.pathExists(outPath))) {
     console.error("out path missing:", outPath);
