@@ -1,0 +1,9 @@
+load("//tools/buck:zx_test.bzl", "zx_test")
+
+zx_test(
+    name = "exporter.adapters.inactive.skip.test.ts",
+    script = "exporter.adapters.inactive.skip.test.ts",
+    out = "exporter.adapters.inactive.skip.test.stamp",
+)
+
+

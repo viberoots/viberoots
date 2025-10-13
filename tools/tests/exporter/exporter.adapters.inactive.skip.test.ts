@@ -21,8 +21,7 @@ await runInTemp("exporter-adapters-inactive", async (tmp, $) => {
   // Run exporter in simulate mode from the temp repo
   await $({
     cwd: tmp,
-    env: { EXPORTER_ADAPTERS: "go" },
-  })`tools/buck/export-graph.ts --simulate ${graph} --out ${graph}`;
+  })`EXPORTER_ADAPTERS=go node tools/buck/export-graph.ts --simulate ${graph} --out ${graph}`;
 
   const out = JSON.parse(await fs.readFile(graph, "utf8")) as any[];
   const by = new Map(out.map((n) => [n.name, n]));
