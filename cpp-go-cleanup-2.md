@@ -288,3 +288,4 @@ Consequence if not implemented
 - Starlark↔Nix name sanitization parity is tested and enforced.
 - Dev overrides are handled centrally in Nix across languages.
 - One command refreshes all provider glue; CI enforces freshness and presence of mapping.
+

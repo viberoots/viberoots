@@ -47,3 +47,4 @@ coverage/
 *.log
 .patch-sessions.json
 graph-gen-pure
+buck-test.*
