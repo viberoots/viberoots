@@ -13,17 +13,17 @@ Scope
 
 Detailed Design
 
-- Current behavior (Starlark): `_nixpkg_provider_for("pkgs.zlib") -> //third_party/providers:nix_pkgs_zlib` (drops `pkgs.`).
-- Canonical behavior (TS): `providerNameForNixAttr("pkgs.zlib") -> nix_pkgs_pkgs_zlib`.
+- Current behavior (Starlark): `_nixpkg_provider_for("pkgs.zlib") -> //third_party/providers:nix_pkgs_pkgs_zlib` (duplicated `pkgs_`).
+- Canonical behavior (TS): `providerNameForNixAttr("pkgs.zlib") -> nix_pkgs_zlib`.
 - Change Starlark logic to:
   - Preserve `pkgs.` prefix when forming the tail.
   - Normalize to lowercase and replace non‑alnum with `_`.
-  - Final format: `//third_party/providers:nix_pkgs_<tail>` where `<tail>` corresponds to `normalizeNixAttr(attr).replace(/[^a-z0-9]+/g, "_")`.
+  - Final format: `//third_party/providers:nix_<tail>` where `<tail>` corresponds to `normalizeNixAttr(attr).replace(/[^a-z0-9]+/g, "_")`.
 - Do not alter the labels‑only path; this PR is naming parity only.
 
 Acceptance Criteria
 
-- For a matrix of attrs (`pkgs.zlib`, `pkgs.openssl`, `pkgs.gnome.glib`, alias `pkgs.gtest` → `pkgs.googletest`), Go macro emits provider names exactly matching TS helper output.
+- For a matrix of attrs (`pkgs.zlib`, `pkgs.openssl`, `pkgs.gnome.glib`), Go macro emits provider names exactly matching TS helper output.
 - No duplicate stamps appear in `third_party/providers/stamps/` for the matrix (i.e., no both `nix_pkgs_zlib.stamp` and `nix_pkgs_pkgs_zlib.stamp`).
 - Builds and tests pass unchanged.
 
