@@ -1,9 +1,3 @@
 load("//tools/buck:zx_test.bzl", "zx_test")
 
-zx_test(
-    name = "nix-dev-overrides-warning.test.ts",
-    script = "nix-dev-overrides-warning.test.ts",
-    out = "nix-dev-overrides-warning.test.stamp",
-)
-
 

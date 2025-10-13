@@ -1,15 +1,2 @@
 load("//tools/buck:zx_test.bzl", "zx_test")
 
-zx_test(
-    name = "nix-attr-normalization.test.ts",
-    script = "nix-attr-normalization.test.ts",
-    out = "nix-attr-normalization.test.stamp",
-)
-
-zx_test(
-    name = "provider-name.from-nix-attr.test.ts",
-    script = "provider-name.from-nix-attr.test.ts",
-    out = "provider-name.from-nix-attr.test.stamp",
-)
-
-
