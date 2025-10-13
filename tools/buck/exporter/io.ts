@@ -28,13 +28,14 @@ export async function cqueryNodes(scope: string, attrs: string[]): Promise<Node[
   const platformFlags = ["--target-platforms", "prelude//platforms:default"];
   // Buck disallows recursive invocations unless an isolation dir NAME is set.
   // It must be a simple directory name, not a path. Allow disabling in pure sandbox.
-  const iso = process.env.BUCK_ISOLATION_DIR || `exporter-${process.pid}-${Date.now()}`;
+  // Use a deterministic isolation dir per process (name only) to avoid piling up buck2d instances.
+  const iso = `exporter-${process.pid}`;
   const isolationFlags = process.env.BUCK_NO_ISOLATION === "1" ? [] : ["--isolation-dir", iso];
 
   async function runQuery(q: string): Promise<Record<string, any>> {
     const query = scope ? `attrfilter(labels, ${scope}, ${q})` : q;
     const { stdout } =
-      await $`buck2 ${isolationFlags} cquery ${platformFlags} ${query} --json ${flags}`;
+      await $`buck2 --isolation-dir ${iso} cquery ${platformFlags} ${query} --json ${flags}`;
     return JSON.parse(String(stdout)) as Record<string, any>;
   }
 

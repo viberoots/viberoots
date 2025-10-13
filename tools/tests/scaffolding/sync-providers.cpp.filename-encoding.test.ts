@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
 import path from "node:path";
-import { runInTemp } from "../lib/test-helpers";
 import { providerNameForNixAttr } from "../../lib/providers";
+import { runInTemp } from "../lib/test-helpers";
 
 await runInTemp("cpp-encoding", async (tmp, $) => {
   await fs.mkdirp(path.join(tmp, "patches/cpp"));

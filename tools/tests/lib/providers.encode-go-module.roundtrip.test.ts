@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
-import { encodeForPatchFilename, decodeFromPatchFilename } from "../../lib/providers";
+import { decodeFromPatchFilename, encodeForPatchFilename } from "../../lib/providers";
 
 test("go module path encode/decode roundtrip", async () => {
   const cases = ["golang.org/x/net", "github.com/sirupsen/logrus", "github.com/stretchr/testify"];

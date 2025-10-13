@@ -267,6 +267,10 @@ EOF
     }
     return await fn(tmp, _$);
   } finally {
+    // Best-effort: stop any buck2 daemon for this temp repo to prevent buckd accumulation.
+    try {
+      await _$`buck2 kill`;
+    } catch {}
     await timeAsync(`rewriteCoverageUrls(${path.basename(tmp)})`, async () =>
       rewriteCoverageUrls(tmp).catch(() => {}),
     );

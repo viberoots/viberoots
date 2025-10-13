@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import { test } from "node:test";
 import path from "node:path";
+import { test } from "node:test";
 
 test("startup-check warns for C++ overrides locally", async () => {
   const here = new URL(import.meta.url).pathname;

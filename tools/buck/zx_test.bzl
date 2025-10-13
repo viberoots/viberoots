@@ -61,6 +61,9 @@ def _zx_test_impl(ctx):
             + "export NODE_OPTIONS=\"$NODE_OPTIONS\"; "
             + "SAFE=$(printf %%s \"$BUCK_TEST_TARGET\" | sed -E 's|^.*/:||; s/[^A-Za-z0-9._-]+/_/g' | cut -c1-200); "
             + "LOGDIR=\"$TEST_LOG_DIR/$SAFE\"; mkdir -p \"$LOGDIR\"; "
+            # Use a deterministic buck2 isolation name per test to avoid accumulating daemons,
+            # and kill the daemon at the end of the test regardless of status.
+            + "export BUCK_ISOLATION_DIR=\"zxtest-$SAFE-$$\"; "
             + "rm -f \"$LOGDIR/test.stdout.log\" \"$LOGDIR/test.stderr.log\" 2>/dev/null || true; "
             + "cd \"$WORKSPACE_ROOT\"; "
             # Prefer package from Starlark context; fall back to parsing label, stripping any config suffix
@@ -79,7 +82,9 @@ def _zx_test_impl(ctx):
             + "--exclude \"node_modules/**\" --exclude \"buck-out/**\" --exclude \".clinic/**\" --exclude \"**/*.d.ts\" "
             + "|| true; "
             + "\"$NODE_BIN\" ./tools/dev/coverage-normalize.mjs || true; "
-            + "fi; exit \"$STATUS\""
+            + "fi; "
+            + "buck2 --isolation-dir \"$BUCK_ISOLATION_DIR\" kill >/dev/null 2>&1 || true; "
+            + "exit \"$STATUS\""
         )
         % (ctx.label, ctx.label.package, script.short_path, script.short_path)
     )

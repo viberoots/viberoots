@@ -2,9 +2,9 @@
 import fs from "fs-extra";
 import path from "node:path";
 import {
+  encodeNixAttrForPatchPrefix,
   normalizeNixAttr,
   providerNameForNixAttr,
-  encodeNixAttrForPatchPrefix,
 } from "../../lib/providers";
 
 type Node = { name: string; labels?: string[] };

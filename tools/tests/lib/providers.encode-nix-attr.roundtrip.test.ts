@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
-import { encodeNixAttrForPatchPrefix, decodeNixAttrFromPatchPrefix } from "../../lib/providers";
+import { decodeNixAttrFromPatchPrefix, encodeNixAttrForPatchPrefix } from "../../lib/providers";
 
 test("nix attr encode/decode roundtrip", async () => {
   const cases = ["pkgs.zlib", "pkgs.openssl", "pkgs.gnome.glib"];
