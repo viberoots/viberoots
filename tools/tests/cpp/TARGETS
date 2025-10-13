@@ -1,2 +1,0 @@
-load("//tools/buck:zx_test.bzl", "zx_test")
-

@@ -18,12 +18,14 @@ async function main() {
 
   // Export graph and build via helper
   const env = { ...process.env, BUCK_TARGET: "//apps/foo:foo", BUCK_TEST_SRC: tmp } as any;
+  // Invoke via node with ZX_INIT to ensure zx globals and TS loader in temp env
+  const zxInit = path.join(repo, "tools/dev/zx-init.mjs");
   const cmd = $({
     cwd: tmp,
     env,
     reject: false,
     nothrow: true,
-  })`nix run .#zx-wrapper -- tools/dev/build-selected.ts`;
+  })`node --experimental-strip-types --import ${zxInit} tools/dev/build-selected.ts`;
   const { stdout, stderr, exitCode } = await cmd;
   if (exitCode !== 0) {
     console.error("build-selected failed", stderr);
