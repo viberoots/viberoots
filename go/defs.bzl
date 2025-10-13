@@ -18,16 +18,28 @@ def _append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled):
     append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled)
 
 
-def _nixpkg_provider_for(attr):
-    # Deterministic provider target name for nixpkgs attribute paths, e.g., pkgs.zlib -> //third_party/providers:nix_pkgs_zlib
-    # Policy: drop an initial "pkgs." prefix from the attribute path when forming the provider name.
-    if not isinstance(attr, str) or attr == "":
+def _normalize_nix_attr(attr):
+    # Canonical normalization for nixpkgs attribute paths to mirror tools/lib/providers.ts
+    # - trim, lower-case
+    # - ensure "pkgs." prefix
+    # - map historical alias pkgs.gtest -> pkgs.googletest
+    if not isinstance(attr, str):
         fail("nix_cgo_deps entries must be non-empty strings like 'pkgs.zlib'")
-    raw = attr.lower()
-    if raw.startswith("pkgs."):
-        raw = raw[len("pkgs."):]
-    # Normalize any remaining separators to underscores for a stable provider name
-    tail = "".join([c if (c.isalnum() or c == "_") else "_" for c in raw])
+    s = attr.strip().lower()
+    if s == "":
+        fail("nix_cgo_deps entries must be non-empty strings like 'pkgs.zlib'")
+    if not s.startswith("pkgs."):
+        s = "pkgs." + s
+    if s == "pkgs.gtest":
+        s = "pkgs.googletest"
+    return s
+
+
+def _nixpkg_provider_for(attr):
+    # Deterministic provider target name for nixpkgs attribute paths, aligned with TS helper
+    norm = _normalize_nix_attr(attr)
+    # Replace any non-alphanumeric character with underscore for a stable provider name
+    tail = "".join([c if (c.isalnum() or c == "_") else "_" for c in norm])
     return "//third_party/providers:nix_pkgs_%s" % tail
 
 
