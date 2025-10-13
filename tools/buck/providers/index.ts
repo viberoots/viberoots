@@ -2,6 +2,7 @@
 import type { LanguageProviderSync } from "../../lib/lang-contracts";
 import { syncCppProviders } from "./cpp";
 import { syncGoProviders } from "./go";
+import { syncNodeProviders } from "./node";
 
 export type SyncOptions = {
   outFile?: string;
@@ -15,6 +16,14 @@ const handlers: LanguageProviderSync[] = [
   {
     lang: "cpp",
     sync: async (_opts) => syncCppProviders({ outFile: "third_party/providers/TARGETS.cpp.auto" }),
+  },
+  {
+    lang: "node",
+    sync: async (opts) =>
+      syncNodeProviders({
+        outFile: "third_party/providers/TARGETS.node.auto",
+        patchDir: opts?.patchDir,
+      }),
   },
 ];
 

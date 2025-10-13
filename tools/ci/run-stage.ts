@@ -7,8 +7,7 @@ import path from "node:path";
 type Stage =
   | "codegen"
   | "export-graph"
-  | "sync-providers-go"
-  | "sync-providers-node"
+  | "sync-providers"
   | "gen-auto-map"
   | "prebuild-guard"
   | "patches-lint"
@@ -73,34 +72,10 @@ async function main() {
       await $`node ${nodeBase} ${target} --out tools/buck/graph.json`;
       break;
     }
-    case "sync-providers-go": {
-      if (enabled.size && !enabled.has("go")) break;
-      const c = caps.get("go") || {};
-      if (c.patching === false) break;
+    case "sync-providers": {
+      // Unified orchestrator: always run for enabled languages; drivers are no-ops if inactive
       const target = path.resolve("tools/buck/sync-providers.ts");
       await $`node ${nodeBase} ${target}`;
-      break;
-    }
-    case "sync-providers-node": {
-      if (enabled.size && !enabled.has("node")) break;
-      const c = caps.get("node") || {};
-      if (c.patching === false) break;
-      try {
-        await $`git ls-files '**/pnpm-lock.yaml' >/dev/null 2>&1`;
-      } catch {
-        break; // no lockfiles; no-op
-      }
-      // Ensure 'yaml' package is available; otherwise skip gracefully
-      try {
-        await $`node -e "require.resolve('yaml')"`;
-      } catch {
-        console.warn("yaml package missing; skipping node providers stage");
-        break;
-      }
-      {
-        const target = path.resolve("tools/buck/sync-providers-node.ts");
-        await $`node ${nodeBase} ${target}`;
-      }
       break;
     }
     case "gen-auto-map": {

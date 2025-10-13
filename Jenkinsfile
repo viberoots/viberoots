@@ -21,11 +21,8 @@ pipeline {
           stage('Export Graph') {
             steps { sh 'node tools/ci/run-stage.ts --stage export-graph' }
           }
-          stage('Sync Providers (Go)') {
-            steps { sh 'node tools/ci/run-stage.ts --stage sync-providers-go' }
-          }
-          stage('Sync Providers (Node, optional)') {
-            steps { sh 'node tools/ci/run-stage.ts --stage sync-providers-node' }
+          stage('Sync Providers') {
+            steps { sh 'node tools/ci/run-stage.ts --stage sync-providers' }
           }
           stage('Generate auto_map') {
             steps { sh 'node tools/ci/run-stage.ts --stage gen-auto-map' }
