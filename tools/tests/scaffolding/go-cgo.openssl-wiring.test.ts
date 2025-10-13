@@ -8,7 +8,7 @@ test("nix_cgo_deps wires provider dep for openssl", async () => {
       cwd: tmp,
     })`bash -lc 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<'\''EOF'\''
 load("//third_party/providers:defs_cpp.bzl", "nix_cxx_library")
-nix_cxx_library(name="nix_pkgs_pkgs_openssl", attr="pkgs.openssl")
+nix_cxx_library(name="nix_pkgs_openssl", attr="pkgs.openssl")
 EOF'`;
 
     await $({
@@ -42,7 +42,7 @@ EOF'`;
     if (probe.exitCode !== 0) return; // skip if prelude not available
     const nodes = JSON.parse(String(probe.stdout || "")) as Array<{ name: string }>;
     const names = new Set(nodes.map((n) => n.name));
-    if (!names.has("//third_party/providers:nix_pkgs_pkgs_openssl")) {
+    if (!names.has("//third_party/providers:nix_pkgs_openssl")) {
       console.error("expected openssl provider dep present");
       process.exit(2);
     }

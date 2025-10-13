@@ -40,7 +40,8 @@ def _nixpkg_provider_for(attr):
     norm = _normalize_nix_attr(attr)
     # Replace any non-alphanumeric character with underscore for a stable provider name
     tail = "".join([c if (c.isalnum() or c == "_") else "_" for c in norm])
-    return "//third_party/providers:nix_pkgs_%s" % tail
+    # Family is "nix_" and the package tail is the entire normalized attribute (may start with pkgs_)
+    return "//third_party/providers:nix_%s" % tail
 
 
 def _apply_cgo_labels(kwargs, nix_cgo_deps, repo_cgo_deps):

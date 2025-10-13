@@ -13,8 +13,7 @@ nix_cpp_test(
     srcs = ["tests/{{ name }}_gtest.cpp"],
     deps = [
         ":{{ name }}",
-        "//third_party/providers:nix_pkgs_gtest_main",
-        "//third_party/providers:nix_pkgs_gtest",
+        "//third_party/providers:nix_pkgs_googletest",
     ],
     labels = ["lang:cpp", "kind:test"],
 )
@@ -35,8 +34,7 @@ nix_cpp_test(
     srcs = ["tests/{{ name }}_gtest.cpp"],
     deps = [
         ":{{ name }}",
-        "//third_party/providers:nix_pkgs_gtest_main",
-        "//third_party/providers:nix_pkgs_gtest",
+        "//third_party/providers:nix_pkgs_googletest",
     ],
     labels = ["lang:cpp", "kind:test"],
 )

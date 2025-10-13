@@ -73,7 +73,7 @@ Generator: tools/buck/providers/cpp.ts (invoked by sync CLI)
 load("//third_party/providers:defs_cpp.bzl", "nix_cxx_provider")
 
 nix_cxx_provider(
-    name = "nix_pkgs_pkgs_openssl",
+    name = "nix_pkgs_openssl",
     attr = "pkgs.openssl",
 )
 ```

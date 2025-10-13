@@ -27,11 +27,11 @@ test("sync-providers-cpp emits provider stamps for nixpkg attrs in graph", async
 
     const out = path.join(tmp, "third_party/providers/TARGETS.cpp.auto");
     const txt = await fs.readFile(out, "utf8");
-    if (!/nix_cxx_provider\(\s*name\s*=\s*"nix_pkgs_pkgs_zlib"/m.test(txt)) {
+    if (!/nix_cxx_provider\(\s*name\s*=\s*"nix_pkgs_zlib"/m.test(txt)) {
       console.error("expected provider for pkgs.zlib");
       process.exit(2);
     }
-    if (!/nix_cxx_provider\(\s*name\s*=\s*"nix_pkgs_pkgs_googletest"/m.test(txt)) {
+    if (!/nix_cxx_provider\(\s*name\s*=\s*"nix_pkgs_googletest"/m.test(txt)) {
       console.error("expected provider for pkgs.gtest normalized → pkgs.googletest");
       process.exit(2);
     }

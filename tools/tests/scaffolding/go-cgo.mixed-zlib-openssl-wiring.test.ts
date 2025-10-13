@@ -8,8 +8,8 @@ test("nix_cgo_deps wires both zlib and openssl providers", async () => {
       cwd: tmp,
     })`bash -lc 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<'\''EOF'\''
 load("//third_party/providers:defs_cpp.bzl", "nix_cxx_library")
-nix_cxx_library(name="nix_pkgs_pkgs_zlib", attr="pkgs.zlib")
-nix_cxx_library(name="nix_pkgs_pkgs_openssl", attr="pkgs.openssl")
+nix_cxx_library(name="nix_pkgs_zlib", attr="pkgs.zlib")
+nix_cxx_library(name="nix_pkgs_openssl", attr="pkgs.openssl")
 EOF'`;
 
     await $({
@@ -45,8 +45,8 @@ EOF'`;
     const nodes = JSON.parse(String(probe.stdout || "")) as Array<{ name: string }>;
     const names = new Set(nodes.map((n) => n.name));
     const expect = [
-      "//third_party/providers:nix_pkgs_pkgs_zlib",
-      "//third_party/providers:nix_pkgs_pkgs_openssl",
+      "//third_party/providers:nix_pkgs_zlib",
+      "//third_party/providers:nix_pkgs_openssl",
     ];
     for (const p of expect) {
       if (!names.has(p)) {

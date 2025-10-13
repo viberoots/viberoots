@@ -8,7 +8,7 @@ test("nix_cgo_deps wires provider dep; build stays planner-scoped", async () => 
       cwd: tmp,
     })`bash -lc 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<'\''EOF'\''
 load("//third_party/providers:defs_cpp.bzl", "nix_cxx_library")
-nix_cxx_library(name="nix_pkgs_pkgs_zlib", attr="pkgs.zlib")
+nix_cxx_library(name="nix_pkgs_zlib", attr="pkgs.zlib")
 EOF'`;
 
     await $({
@@ -48,7 +48,7 @@ EOF'`;
     if (probe.exitCode !== 0) return; // skip if prelude not available
     const nodes = JSON.parse(String(probe.stdout || "")) as Array<{ name: string }>;
     const names = new Set(nodes.map((n) => n.name));
-    if (!names.has("//third_party/providers:nix_pkgs_pkgs_zlib")) {
+    if (!names.has("//third_party/providers:nix_pkgs_zlib")) {
       console.error("expected provider dep present");
       process.exit(2);
     }

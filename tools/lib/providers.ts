@@ -56,9 +56,10 @@ export function normalizeNixAttr(attr: string): string {
 }
 
 // Deterministic provider name for a nixpkgs attribute path.
-// Example: pkgs.zlib -> nix_pkgs_pkgs_zlib, pkgs.gnome.glib -> nix_pkgs_pkgs_gnome_glib
+// Example: pkgs.zlib -> nix_pkgs_zlib, pkgs.gnome.glib -> nix_pkgs_gnome_glib
 export function providerNameForNixAttr(attr: string): string {
   const norm = normalizeNixAttr(attr);
   const tail = norm.replace(/[^a-z0-9]+/g, "_");
-  return `nix_pkgs_${tail}`;
+  // Family is "nix_"; package tail is the normalized attribute with separators underscored
+  return `nix_${tail}`;
 }

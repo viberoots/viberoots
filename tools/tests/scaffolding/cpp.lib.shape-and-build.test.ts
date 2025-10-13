@@ -28,11 +28,11 @@ test("cpp lib scaffold: files render and TARGETS wires gtest deps", async () => 
     const txt = await fs.readFile(targetsPath, "utf8");
     assert(txt.includes("nix_cpp_test("), "expected nix_cpp_test present");
     assert(
-      txt.includes("//third_party/providers:nix_pkgs_gtest"),
+      txt.includes("//third_party/providers:nix_pkgs_googletest"),
       "expected provider gtest dep present",
     );
     assert(
-      txt.includes("//third_party/providers:nix_pkgs_gtest_main"),
+      !txt.includes("//third_party/providers:nix_pkgs_gtest_main"),
       "expected provider gtest_main dep present",
     );
   });

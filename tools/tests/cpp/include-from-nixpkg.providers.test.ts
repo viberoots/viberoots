@@ -67,7 +67,7 @@ nix_cpp_test(
     name = "demo_gtest",
     srcs = ["tests/demo_gtest.cpp"],
     deps = [
-        "//third_party/providers:nix_pkgs_pkgs_googletest",
+        "//third_party/providers:nix_pkgs_googletest",
     ],
 )
 `;

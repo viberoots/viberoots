@@ -66,8 +66,8 @@ nix_cpp_test(
     name = "demo_zlib_gtest",
     srcs = ["tests/demo_zlib_gtest.cpp"],
     deps = [
-        "//third_party/providers:nix_pkgs_pkgs_googletest",
-        "//third_party/providers:nix_pkgs_pkgs_zlib",
+        "//third_party/providers:nix_pkgs_googletest",
+        "//third_party/providers:nix_pkgs_zlib",
     ],
 )
 `;

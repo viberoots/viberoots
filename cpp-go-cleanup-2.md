@@ -68,10 +68,10 @@ Scope
 
 Detailed Design
 
-- Extend the existing provider sync orchestrator to compute, for each generated nixpkgs provider (e.g., `//third_party/providers:nix_pkgs_pkgs_zlib`), the corresponding normalized attr (e.g., `nixpkg:pkgs.zlib`).
+- Extend the existing provider sync orchestrator to compute, for each generated nixpkgs provider (e.g., `//third_party/providers:nix_pkgs_zlib`), the corresponding normalized attr (e.g., `nixpkg:pkgs.zlib`).
 - Write a deterministic Starlark file:
-  - `NIX_ATTR_MAP = { "//third_party/providers:nix_pkgs_pkgs_zlib": "nixpkg:pkgs.zlib", ... }`
-  - Sorted keys, newline‑terminated, generated idempotently.
+- `NIX_ATTR_MAP = { "//third_party/providers:nix_pkgs_zlib": "nixpkg:pkgs.zlib", ... }`
+- Sorted keys, newline‑terminated, generated idempotently.
 - In `cpp/defs.bzl`, replace heuristic derivation of `nixpkg:` labels with a mapping lookup:
   - For each provider dep under `//third_party/providers:*`, if present in `NIX_ATTR_MAP`, append the associated `nixpkg:` label to the planner labels.
 - Keep existing provider nodes (`third_party/providers/defs_cpp.bzl`) unchanged; they already carry `nixpkg:` labels for visibility.
@@ -288,4 +288,3 @@ Consequence if not implemented
 - Starlark↔Nix name sanitization parity is tested and enforced.
 - Dev overrides are handled centrally in Nix across languages.
 - One command refreshes all provider glue; CI enforces freshness and presence of mapping.
-
