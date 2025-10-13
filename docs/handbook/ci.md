@@ -5,19 +5,18 @@ CI runs zx-backed stages and does not commit generated glue.
 ## Stages (via tools/ci/run-stage.ts)
 
 1. `export-graph`
-2. `sync-providers-go`
-3. `sync-providers-node` (optional)
-4. `gen-auto-map`
-5. `prebuild-guard`
-6. `nix-build-graph-generator` (optional)
-7. `buck-test`
+2. `sync-providers` (unified orchestrator; per-language drivers run conditionally)
+3. `gen-auto-map`
+4. `prebuild-guard`
+5. `nix-build-graph-generator` (optional)
+6. `buck-test`
 
 Run locally with `CI=true tools/ci/run-stage.ts --stage <name>`.
 
 ## What each stage does (simple)
 
 - **export-graph**: Freeze the configured Buck graph to `tools/buck/graph.json` so other steps read a stable view.
-- **sync-providers-\***: Generate provider rules from patches (Go) or `pnpm-lock.yaml` (Node). Names are stable and deduped.
+- **sync-providers**: Unified orchestrator regenerates language providers and `third_party/providers/nix_attr_map.bzl` deterministically (Node is skipped when no PNPM lockfiles are present).
 - **gen-auto-map**: Map targets → providers based on labels in the exported graph; keeps invalidation tight.
 - **prebuild-guard**: Ensure glue exists and is fresh. Locally it can auto‑fix; CI fails fast with clear errors.
 - **nix-build-graph-generator**: Build artifacts via Nix templates, warming the Nix store for the matrix.

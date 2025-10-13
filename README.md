@@ -18,10 +18,10 @@ tools/bin/gomod2nix --dir apps/demo-cli
 cp apps/demo-cli/gomod2nix.toml gomod2nix.toml
 ```
 
-3. Glue (strict: export graph → providers → auto_map)
+3. Glue (strict: export graph → unified sync-providers → auto_map)
 
 - Glue is not committed and has no planner fallback. Always regenerate before Nix builds.
-- Use the helper to run all steps in order:
+- Use the helper to run all steps in order (export-graph → sync-providers orchestrator → gen-auto-map):
 
 ```
 node tools/dev/install-deps.ts --glue-only

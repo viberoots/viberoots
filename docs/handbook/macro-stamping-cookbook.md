@@ -12,5 +12,5 @@ Stamping ensures exporter preconditions via consistent labels applied in macros.
 Ensure artifact/name sanitization in Starlark matches the canonical implementation used by Nix planners.
 
 - Canonical helper: `tools/nix/lib/lang-helpers.nix: sanitizeName`.
-- Macro parity: update any macro-side helper (e.g., `_sanitize_to_bin_name` in `cpp/defs.bzl`) to mirror the same rules for `//`, `:`, `/`, spaces, case, and non‑alnum characters.
-- Add a table‑driven test that exercises representative labels and asserts equality across both implementations.
+- Macro parity: keep the macro-side helper (e.g., `_sanitize_to_bin_name` via `cpp/private/sanitize.bzl`) in strict parity with the Nix helper for `//`, `:`, `/`, spaces, case, and non‑alnum characters.
+- Tests: `tools/tests/cpp/sanitize-name.parity.test.ts` runs a parity matrix through the `cpp_sanitize_probe` rule and compares to the Nix helper. Update either side if parity breaks.

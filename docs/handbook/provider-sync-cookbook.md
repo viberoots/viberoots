@@ -3,7 +3,10 @@
 Provider sync maps patch files under `patches/<lang>` to Buck providers used in builds. Keep it deterministic and idempotent.
 
 - **Patch filenames**: `<module path with / → __>@<version>.patch` (dots are preserved).
-- **Sync command**: `node tools/buck/sync-providers.ts --out third_party/providers/TARGETS.auto`.
+- **Unified sync command (orchestrator)**: `node tools/buck/sync-providers.ts` writes all language-specific provider files deterministically:
+  - Go: `third_party/providers/TARGETS.auto`
+  - Node (PNPM): `third_party/providers/TARGETS.node.auto` (when lockfiles present)
+  - Mapping file: `third_party/providers/nix_attr_map.bzl` (canonical nixpkgs attr map)
 - **Idempotency**: re-running should not change output when inputs are unchanged.
 - **Tests**: create a single patch using fixtures and assert stable provider name and paths.
 
@@ -11,9 +14,7 @@ Useful helpers:
 
 - `providerNameForModuleKey("github.com/stretchr/testify", "v1.9.0")` to compute labels.
 - `tools/tests/lib/fixtures/go.ts: ensurePatch()` to create a patch with correct filename.
-- For nixpkgs providers, use the shared helpers in `tools/lib/providers.ts`:
-  - `normalizeNixAttr(attr)` ensures a canonical `pkgs.`-prefixed, lowercased attr (maps `pkgs.gtest` → `pkgs.googletest`).
-  - `providerNameForNixAttr(attr)` derives the deterministic provider name (e.g., `pkgs.zlib` → `nix_pkgs_pkgs_zlib`).
+- For nixpkgs providers, the canonical source of truth is the generated `nix_attr_map.bzl` created by the orchestrator. Starlark macros should consume this mapping instead of deriving attrs heuristically. Shared naming helpers still live in `tools/lib/providers.ts` for scripts that need them.
 
 ### Shared Nix helpers (templates-common)
 
