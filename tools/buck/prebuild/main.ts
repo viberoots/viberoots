@@ -35,6 +35,15 @@ export async function run(): Promise<void> {
   if (hasPatchesOrLocks(inputs) && missingProviderAutos()) {
     outPresence.push("third_party/providers/TARGETS*.auto");
   }
+  // PR 10: If any provider autos exist, require nix_attr_map.bzl to be present
+  try {
+    const provDir = "third_party/providers";
+    const hasProvAutos =
+      fs.existsSync(provDir) && fs.readdirSync(provDir).some((f) => /^TARGETS.*\.auto$/.test(f));
+    if (hasProvAutos && !fs.existsSync("third_party/providers/nix_attr_map.bzl")) {
+      outPresence.push("third_party/providers/nix_attr_map.bzl");
+    }
+  } catch {}
   const needFixPresence = outPresence.length > 0;
 
   const presentOutputs = outputs.filter((o) => fs.existsSync(o));
