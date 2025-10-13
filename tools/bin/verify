@@ -162,9 +162,9 @@ if command -v nohup >/dev/null 2>&1; then
   ) || true
 fi
 # Run tests; pass through any target patterns as arguments. Preserve TTY for Buck superconsole.
-# Suppress benign tailer/event-log warnings via client/daemon log filters without piping (keeps superconsole visible).
-export RUST_LOG="${RUST_LOG:-info},buck2_client_ctx::file_tailers::tailer=off,buck2_event_log::writer=off"
-export BUCK_LOG="${BUCK_LOG:-info},buck2_client_ctx::file_tailers::tailer=off,buck2_event_log::writer=off"
+# Suppress benign tailer/event-log and post-run INFO spam; keep superconsole visible.
+export RUST_LOG="${RUST_LOG:-warn},buck2_client_ctx::file_tailers::tailer=off,buck2_event_log::writer=off"
+export BUCK_LOG="${BUCK_LOG:-warn},buck2_client_ctx::file_tailers::tailer=off,buck2_event_log::writer=off"
 CMD="buck2 --isolation-dir \"$ISO\" test --console super --target-platforms prelude//platforms:default \"$@\" -- --env COVERAGE=\"${COVERAGE:-0}\""
 if command -v script >/dev/null 2>&1; then
   # Use a PTY so Buck detects an interactive console; avoid login/profile shells

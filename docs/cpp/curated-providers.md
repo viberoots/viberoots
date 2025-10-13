@@ -17,9 +17,8 @@ nix_cpp_test(
     name = "demo_zlib_gtest",
     srcs = ["tests/demo_zlib_gtest.cpp"],
     deps = [
-        "//third_party/providers:nix_pkgs_gtest_main",
-        "//third_party/providers:nix_pkgs_gtest",
-        "//third_party/providers:nix_pkgs_zlib",
+        "//third_party/providers:nix_pkgs_pkgs_googletest",
+        "//third_party/providers:nix_pkgs_pkgs_zlib",
     ],
 )
 ```
@@ -49,9 +48,8 @@ nix_cpp_test(
     name = "demo_openssl_gtest",
     srcs = ["tests/demo_openssl_gtest.cpp"],
     deps = [
-        "//third_party/providers:nix_pkgs_gtest_main",
-        "//third_party/providers:nix_pkgs_gtest",
-        "//third_party/providers:nix_pkgs_openssl",
+        "//third_party/providers:nix_pkgs_pkgs_googletest",
+        "//third_party/providers:nix_pkgs_pkgs_openssl",
     ],
 )
 ```
@@ -68,6 +66,6 @@ TEST(Demo, OpenSSLSmoke) {
 
 ### Notes
 
-- Naming: `//third_party/providers:nix_pkgs_<attr>` where `<attr>` is the nixpkgs attribute path with dots replaced by underscores (e.g., `pkgs.openssl` → `nix_pkgs_openssl`).
+- Naming: `//third_party/providers:nix_pkgs_<attr>` where `<attr>` is the nixpkgs attribute path normalized and with non‑alnum to `_` (e.g., `pkgs.openssl` → `nix_pkgs_pkgs_openssl`).
 - Determinism: the planner collects `nixpkg:*` labels from deps and passes them to `tools/nix/templates/cpp.nix`, which resolves include and library paths from nixpkgs; no paths are hard-coded in Starlark.
 - Linking: GoogleTest linking is auto-detected by the template when `pkgs.googletest` is present; other libraries only need to be listed as provider deps.

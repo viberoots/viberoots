@@ -63,9 +63,8 @@ nix_cpp_test(
     name = "demo_openssl_gtest",
     srcs = ["tests/demo_openssl_gtest.cpp"],
     deps = [
-        "//third_party/providers:nix_pkgs_gtest_main",
-        "//third_party/providers:nix_pkgs_gtest",
-        "//third_party/providers:nix_pkgs_openssl",
+        "//third_party/providers:nix_pkgs_pkgs_googletest",
+        "//third_party/providers:nix_pkgs_pkgs_openssl",
     ],
 )
 `;
