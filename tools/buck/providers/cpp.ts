@@ -131,4 +131,36 @@ export async function syncCppProviders(opts?: { outFile?: string }) {
   const data = header + providerLines.join("\n");
   const { writeIfChanged } = await import("../../lib/fs-helpers");
   await writeIfChanged(OUT, data);
+
+  // Also emit a deterministic mapping from provider targets to canonical nixpkg labels.
+  // This enables C++ macros to consume attrs without brittle string heuristics.
+  type MapEntry = { key: string; val: string };
+  const mapEntries: MapEntry[] = [];
+  // From auto-generated providers
+  for (const attr of attrListUniq) {
+    const name = nameForAttr(attr);
+    mapEntries.push({
+      key: `//third_party/providers:${name}`,
+      val: `nixpkg:${attr}`,
+    });
+  }
+  // From curated providers
+  for (const { name, attr } of curated) {
+    mapEntries.push({ key: `//third_party/providers:${name}`, val: `nixpkg:${attr}` });
+  }
+  // Stable unique by key, then sort by key
+  const seenKeys = new Set<string>();
+  const uniqSorted = mapEntries
+    .filter((e) => {
+      if (seenKeys.has(e.key)) return false;
+      seenKeys.add(e.key);
+      return true;
+    })
+    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+
+  const mapHeader = ["# GENERATED FILE — DO NOT EDIT.", "", "NIX_ATTR_MAP = {"].join("\n");
+  const mapBody = uniqSorted.map((e) => `    \"${e.key}\": \"${e.val}\",`).join("\n");
+  const mapFooter = "\n}\n";
+  const mapText = mapHeader + (mapBody ? "\n" + mapBody : "") + mapFooter;
+  await writeIfChanged("third_party/providers/nix_attr_map.bzl", mapText);
 }

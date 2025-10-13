@@ -24,6 +24,13 @@ test("cpp zlib include via nixpkg providers only (no local shim)", async () => {
       path.join(process.cwd(), "tools/nix/planner/cpp.nix"),
       path.join(tmp, "tools/nix/planner/cpp.nix"),
     );
+    // Provide empty nix_attr_map for macro load; provider sync will overwrite when run
+    await fs.mkdirp(path.join(tmp, "third_party/providers"));
+    await fs.outputFile(
+      path.join(tmp, "third_party/providers/nix_attr_map.bzl"),
+      "NIX_ATTR_MAP = {}\n",
+      "utf8",
+    );
 
     // Minimal manifest enabling cpp
     const langs = {
