@@ -2,6 +2,7 @@
 import fs from "fs-extra";
 import YAML from "yaml";
 import { writeIfChanged } from "../../lib/fs-helpers";
+import { scanFlatPatchDir } from "../../lib/provider-sync";
 import { providerNameForImporter } from "../../lib/providers";
 
 type PNPMDoc = {
@@ -112,9 +113,12 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
     return;
   }
 
-  const nodePatches = (await fs.pathExists(PATCH_DIR))
-    ? (await fs.readdir(PATCH_DIR)).filter((f) => f.endsWith(".patch"))
-    : [];
+  const scanned = await scanFlatPatchDir({
+    patchDir: PATCH_DIR,
+    decodeKey: pkgKeyFromPatch,
+  });
+  const keyToPatchPath = new Map<string, string>();
+  for (const e of scanned) keyToPatchPath.set(e.key, e.patchPath);
 
   const seenNames = new Map<string, string>();
   const entries: string[] = [];
@@ -123,9 +127,9 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
     const doc = parsePnpmLock(lf);
     for (const importer of Object.keys(doc.importers || {})) {
       const eff = effectiveSetForImporter(doc, importer);
-      const usedPatches = nodePatches
-        .filter((p) => eff.has(pkgKeyFromPatch(p) || ""))
-        .map((p) => `${PATCH_DIR}/${p}`)
+      const usedPatches = Array.from(eff)
+        .map((k) => keyToPatchPath.get(k) || "")
+        .filter(Boolean)
         .sort();
       const name = providerNameForImporter(lf, importer);
       const key = `${lf}#${importer}`;

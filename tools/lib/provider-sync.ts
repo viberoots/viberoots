@@ -6,7 +6,8 @@ export type ScanOpts = {
   patchDir: string; // e.g., patches/go
   strict?: boolean;
   decodeKey: (filename: string) => string | null; // derive module key from filename
-  nameForKey: (key: string) => string; // stable provider name for dedupe
+  nameForKey?: (key: string) => string; // stable provider name for dedupe (optional)
+  preDecodeFilter?: (filename: string) => boolean; // optional coarse filter before decode
 };
 
 export type ProviderEntry = { provider: string; key: string; patchPath: string };
@@ -25,6 +26,10 @@ export async function scanFlatPatchDir(opts: ScanOpts): Promise<ProviderEntry[]>
       console.warn(`warning: ${msg}`);
       continue;
     }
+    if (opts.preDecodeFilter && !opts.preDecodeFilter(e.name)) {
+      // Skip early when not relevant to the caller’s selection strategy
+      continue;
+    }
     const key = opts.decodeKey(e.name);
     if (!key) {
       const msg = `invalid or non-patch file in ${patchDir}: ${e.name}`;
@@ -37,14 +42,31 @@ export async function scanFlatPatchDir(opts: ScanOpts): Promise<ProviderEntry[]>
       throw new Error(`Duplicate patch for ${key}: ${prev} vs ${e.name}`);
     }
     byKey.set(key, e.name);
-    const provider = opts.nameForKey(key);
-    const priorForProvider = seenProvider.get(provider);
-    if (priorForProvider && priorForProvider !== key) {
-      throw new Error(`Provider name collision: ${provider}\n${priorForProvider} vs ${key}`);
+    const provider = opts.nameForKey ? opts.nameForKey(key) : "";
+    if (opts.nameForKey) {
+      const priorForProvider = seenProvider.get(provider);
+      if (priorForProvider && priorForProvider !== key) {
+        throw new Error(`Provider name collision: ${provider}\n${priorForProvider} vs ${key}`);
+      }
+      seenProvider.set(provider, key);
     }
-    seenProvider.set(provider, key);
     entries.push({ provider, key, patchPath: path.join(patchDir, e.name) });
   }
   entries.sort((a, b) => a.provider.localeCompare(b.provider));
   return entries;
+}
+
+// Lightweight validation that a patch directory is flat (no subdirectories).
+// Used by languages that implement their own selection (e.g., C++) but want
+// consistent warnings/errors about directory structure.
+export async function validateFlatDir(patchDir: string, strict?: boolean) {
+  if (!(await fs.pathExists(patchDir))) return;
+  const list = await fs.readdir(patchDir, { withFileTypes: true });
+  for (const e of list) {
+    if (e.isDirectory()) {
+      const msg = `ignoring subdirectory ${e.name}`;
+      if (strict) throw new Error(msg);
+      console.warn(`warning: ${msg}`);
+    }
+  }
 }

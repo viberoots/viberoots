@@ -7,6 +7,7 @@ import {
   normalizeNixAttr,
   providerNameForNixAttr,
 } from "../../lib/providers";
+import { validateFlatDir } from "../../lib/provider-sync";
 
 type Node = { name: string; labels?: string[] };
 
@@ -18,6 +19,8 @@ async function listCppPatchesFor(attr: string): Promise<string[]> {
   const dir = "patches/cpp";
   const out: string[] = [];
   if (!(await fs.pathExists(dir))) return out;
+  // Validate directory flatness once per call site; warn by default
+  await validateFlatDir(dir, false).catch(() => {});
   const enc = encodeNixAttrForPatchPrefix(attr);
   const files = await fs.readdir(dir).catch(() => [] as string[]);
   for (const f of files) {
