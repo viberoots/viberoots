@@ -46,6 +46,25 @@ let
     in map (p: dropPkg (dropCell p)) list;
 in {
   inherit get cleanLabel labelsOf nameOf depsOf srcsOf byName;
+  # Generic DFS label collector. Starting from `name`, walk transitive deps
+  # and collect unique labels that start with `prefix`. Returns a sorted list
+  # of full labels (including the prefix).
+  collectLabelsWithPrefix = name: prefix:
+    let
+      start = if builtins.hasAttr name byName then byName.${name} else null;
+      step = state: dn:
+        if builtins.hasAttr dn state.seen then state else
+        let key = cleanLabel dn;
+            n = if builtins.hasAttr key byName then byName.${key} else null;
+        in if n == null then state else
+          let here = builtins.filter (l: lib.hasPrefix prefix l) (labelsOf n);
+              nexts = depsOf n;
+              seen' = state.seen // { "${dn}" = true; };
+              labels' = state.labels ++ here;
+          in builtins.foldl' step { seen = seen'; labels = labels'; } nexts;
+      init = if start == null then { seen = {}; labels = []; } else step { seen = {}; labels = []; } name;
+      uniq = xs: builtins.attrNames (builtins.listToAttrs (map (a: { name = a; value = true; }) xs));
+    in builtins.sort (a: b: a < b) (uniq init.labels);
 }
 
 

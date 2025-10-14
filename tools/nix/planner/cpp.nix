@@ -60,20 +60,10 @@ let
   # DFS over deps to collect nixpkg labels; bounded by nodes present
   collectNixAttrsFor = name:
     let
-      start = if builtins.hasAttr name byName then byName.${name} else null;
-      step = state: dn:
-        if builtins.hasAttr dn state.seen then state else
-        let key = L.cleanLabel dn;
-            n = if builtins.hasAttr key byName then byName.${key} else null;
-        in if n == null then state else
-          let here = map attrFrom (builtins.filter isNixLabel (L.labelsOf n));
-              nexts = L.depsOf n;
-              seen' = state.seen // { "${dn}" = true; };
-              labels' = state.labels ++ here;
-          in builtins.foldl' step { seen = seen'; labels = labels'; } nexts;
-      init = if start == null then { seen = {}; labels = []; } else step { seen = {}; labels = []; } name;
+      labels = L.collectLabelsWithPrefix name "nixpkg:";
+      attrs = map attrFrom labels;
       uniq = xs: builtins.attrNames (builtins.listToAttrs (map (a: { name = a; value = true; }) xs));
-    in builtins.sort (a: b: a < b) (uniq init.labels);
+    in builtins.sort (a: b: a < b) (uniq attrs);
 
   # Identify direct deps that are Go c-archives (labeled kind:carchive) and
   # build them as repo-provided C packages to link against from C++.

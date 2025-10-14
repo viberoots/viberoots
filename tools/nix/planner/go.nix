@@ -12,6 +12,12 @@ let
   repoRoot = ctx.repoRoot;
   localModuleOverrides = ctx.localModuleOverrides;
   pkgPathOf = ctx.pkgPathOf;
+  L = import ./lib.nix {
+    inherit lib;
+    get = ctx.get;
+    nodes = (ctx.nodes or []);
+    pkgPathOf = ctx.pkgPathOf;
+  };
 in {
   isTarget = n:
     let rt = get n "rule_type";
@@ -58,20 +64,13 @@ in {
       directDeps = depsOfName name;
       cppLibDeps = builtins.filter (dn: isCppNode dn && isCppLib dn) directDeps;
       repoCgoPkgs = map (dn: T.cppLib { name = dn; srcRoot = repoRoot; subdir = (pkgPathOf dn); }) cppLibDeps;
-      # Derive nixCgoAttrs (nixpkgs attrs) from transitive deps
+      # Derive nixCgoAttrs (nixpkgs attrs) from transitive deps via shared DFS
       nixCgoAttrs = let
-        isNixLabel = l: lib.hasPrefix "nixpkg:" l;
         attrFrom = l: lib.removePrefix "nixpkg:" l;
-        step = state: dn:
-          if builtins.hasAttr dn state.seen then state else
-          let n = if builtins.hasAttr dn byName then byName.${dn} else null; in
-          if n == null then state else
-          let here = map attrFrom (builtins.filter isNixLabel (labelsOfName dn));
-              nexts = depsOfName dn;
-          in builtins.foldl' step { seen = state.seen // { "${dn}" = true; }; out = state.out ++ here; } nexts;
-        init = if builtins.hasAttr name byName then step { seen = {}; out = []; } name else { seen = {}; out = []; };
+        labels = L.collectLabelsWithPrefix name "nixpkg:";
+        attrs = map attrFrom labels;
         uniq = xs: builtins.attrNames (builtins.listToAttrs (map (a: { name = a; value = true; }) xs));
-      in builtins.sort (a: b: a < b) (uniq init.out);
+      in builtins.sort (a: b: a < b) (uniq attrs);
     in T.goApp {
       inherit name;
       modulesToml = modulesTomlFor name;
@@ -110,18 +109,11 @@ in {
       cppLibDeps = builtins.filter (dn: isCppNode dn && isCppLib dn) directDeps;
       repoCgoPkgs = map (dn: T.cppLib { name = dn; srcRoot = repoRoot; subdir = (pkgPathOf dn); }) cppLibDeps;
       nixCgoAttrs = let
-        isNixLabel = l: lib.hasPrefix "nixpkg:" l;
         attrFrom = l: lib.removePrefix "nixpkg:" l;
-        step = state: dn:
-          if builtins.hasAttr dn state.seen then state else
-          let n = if builtins.hasAttr dn byName then byName.${dn} else null; in
-          if n == null then state else
-          let here = map attrFrom (builtins.filter isNixLabel (labelsOfName dn));
-              nexts = depsOfName dn;
-          in builtins.foldl' step { seen = state.seen // { "${dn}" = true; }; out = state.out ++ here; } nexts;
-        init = if builtins.hasAttr name byName then step { seen = {}; out = []; } name else { seen = {}; out = []; };
+        labels = L.collectLabelsWithPrefix name "nixpkg:";
+        attrs = map attrFrom labels;
         uniq = xs: builtins.attrNames (builtins.listToAttrs (map (a: { name = a; value = true; }) xs));
-      in builtins.sort (a: b: a < b) (uniq init.out);
+      in builtins.sort (a: b: a < b) (uniq attrs);
     in T.goLib {
       inherit name;
       modulesToml = modulesTomlFor name;
