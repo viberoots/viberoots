@@ -7,6 +7,7 @@ import {
   providerNameForModuleKey,
   providerNameForNixAttr,
 } from "../lib/providers";
+import { readGraph } from "../lib/graph";
 
 type Node = {
   name: string;
@@ -47,9 +48,7 @@ function providersForLabels(labels: string[] | undefined): string[] {
 }
 
 async function main() {
-  const txt = await fs.readFile(graphPath, "utf8");
-  const nodes = JSON.parse(txt) as Node[] | Record<string, any>;
-  const list: Node[] = Array.isArray(nodes) ? (nodes as Node[]) : (Object.values(nodes) as Node[]);
+  const list = (await readGraph(graphPath)) as Node[];
   const mapping: Record<string, string[]> = {};
   for (const n of list) {
     const provs = providersForLabels(n.labels);

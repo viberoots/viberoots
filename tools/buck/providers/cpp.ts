@@ -6,6 +6,7 @@ import {
   normalizeNixAttr,
   providerNameForNixAttr,
 } from "../../lib/providers";
+import { readGraph } from "../../lib/graph";
 
 type Node = { name: string; labels?: string[] };
 
@@ -63,9 +64,7 @@ export async function syncCppProviders(opts?: { outFile?: string }) {
   let nodes: Node[] = [];
   if (await fs.pathExists(graphPath)) {
     try {
-      const txt = await fs.readFile(graphPath, "utf8");
-      const data = JSON.parse(txt) as Node[] | Record<string, any>;
-      nodes = Array.isArray(data) ? (data as Node[]) : (Object.values(data) as Node[]);
+      nodes = (await readGraph(graphPath)) as Node[];
     } catch {}
   }
 
