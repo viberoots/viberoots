@@ -1,12 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { writeIfChanged } from "../lib/fs-helpers";
 import { readGraph } from "../lib/graph";
-import {
-  normalizeNixAttr,
-  providerNameForImporter,
-  providerNameForModuleKey,
-  providerNameForNixAttr,
-} from "../lib/providers";
+import { providersForLabels } from "../lib/labels";
 
 type Node = {
   name: string;
@@ -19,32 +14,7 @@ const outPath = (argv.out as string) || "third_party/providers/auto_map.bzl";
 
 // writeIfChanged now imported from ../lib/fs-helpers
 
-function fqProviderLabel(name: string): string {
-  return `//third_party/providers:${name}`;
-}
-
-function providersForLabels(labels: string[] | undefined): string[] {
-  const out = new Set<string>();
-  for (const l of labels || []) {
-    if (l.startsWith("module:")) {
-      const key = l.slice("module:".length).toLowerCase();
-      const at = key.lastIndexOf("@");
-      if (at <= 0) continue;
-      const imp = key.slice(0, at);
-      const ver = key.slice(at + 1);
-      out.add(fqProviderLabel(providerNameForModuleKey(imp, ver)));
-    } else if (l.startsWith("lockfile:")) {
-      const rest = l.slice("lockfile:".length);
-      const [path, importer = ""] = rest.split("#");
-      if (!path || !importer) continue;
-      out.add(fqProviderLabel(providerNameForImporter(path, importer)));
-    } else if (l.startsWith("nixpkg:")) {
-      const attr = normalizeNixAttr(l.slice("nixpkg:".length));
-      out.add(fqProviderLabel(providerNameForNixAttr(attr)));
-    }
-  }
-  return Array.from(out).sort();
-}
+// parsing moved to tools/lib/labels.ts
 
 async function main() {
   const list = (await readGraph(graphPath)) as Node[];
