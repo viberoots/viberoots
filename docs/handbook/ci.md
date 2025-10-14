@@ -17,8 +17,10 @@ Run locally with `CI=true tools/ci/run-stage.ts --stage <name>`.
 
 - **export-graph**: Freeze the configured Buck graph to `tools/buck/graph.json` so other steps read a stable view.
 - **sync-providers**: Unified orchestrator regenerates language providers and `third_party/providers/nix_attr_map.bzl` deterministically (Node is skipped when no PNPM lockfiles are present).
+  - Provider naming is canonical and shared across languages via `tools/lib/providers.ts`. Do not handcraft provider labels in docs or examples; prefer helpers: `providerNameForModuleKey`, `providerNameForImporter`.
 - **gen-auto-map**: Map targets → providers based on labels in the exported graph; keeps invalidation tight.
 - **prebuild-guard**: Ensure glue exists and is fresh. Locally it can auto‑fix; CI fails fast with clear errors.
+  - Reference: `docs/handbook/troubleshooting.md#prebuild-guard-glue-presence--freshness`.
 - **nix-build-graph-generator**: Build artifacts via Nix templates, warming the Nix store for the matrix.
 - **buck-test**: Use Buck to decide what’s dirty, build on demand, and run impacted tests.
 

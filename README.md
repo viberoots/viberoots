@@ -82,7 +82,7 @@ CI stage runner reference: `tools/ci/run-stage.ts`.
 - Export Graph: freeze the configured Buck graph to `tools/buck/graph.json`.
 - Sync Providers: generate provider rules from patches/lockfiles with stable names.
 - Auto Map: map targets → the exact providers they need (tight invalidation only where needed).
-- Prebuild Guard: verify glue exists and is fresh; local auto‑fix, CI fails fast.
+- Prebuild Guard: verify glue exists and is fresh; local auto‑fix, CI fails fast. See `docs/handbook/troubleshooting.md#prebuild-guard-glue-presence--freshness`.
 - Nix Build (graph‑generator): build the artifacts hermetically using shared templates.
 - Buck Build/Test: orchestrate what’s dirty, build on demand, and run exactly the right tests.
 

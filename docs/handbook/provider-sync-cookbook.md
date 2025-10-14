@@ -10,11 +10,12 @@ Provider sync maps patch files under `patches/<lang>` to Buck providers used in 
 - **Idempotency**: re-running should not change output when inputs are unchanged.
 - **Tests**: create a single patch using fixtures and assert stable provider name and paths.
 
-Useful helpers:
+Canonical naming and helpers:
 
-- `providerNameForModuleKey("github.com/stretchr/testify", "v1.9.0")` to compute labels.
-- `tools/tests/lib/fixtures/go.ts: ensurePatch()` to create a patch with correct filename.
-- For nixpkgs providers, the canonical source of truth is the generated `nix_attr_map.bzl` created by the orchestrator. Starlark macros should consume this mapping instead of deriving attrs heuristically. Shared naming helpers still live in `tools/lib/providers.ts` for scripts that need them.
+- **Source of truth (TS helpers)**: `tools/lib/providers.ts` defines provider naming. Use `providerNameForModuleKey(importPath, version)` for Go module providers and `providerNameForImporter(lockfilePath, importer)` for Node importer‑scoped providers.
+- **Go nixpkgs providers (CGO)**: Go macros keep direct provider deps for `nix_cgo_deps` and use the same canonical naming scheme as `tools/lib/providers.ts` (format: `//third_party/providers:nix_<normalized_attr>`; example: `pkgs.openssl` → `nix_pkgs_openssl`). Do not handcraft names.
+- **nixpkgs attr map**: The unified orchestrator generates `third_party/providers/nix_attr_map.bzl` deterministically; Starlark macros should load from this mapping instead of deriving attrs heuristically.
+- **Patch fixtures**: `tools/tests/lib/fixtures/go.ts: ensurePatch()` creates a correctly named patch file for tests.
 
 ### Shared Nix helpers (templates-common)
 

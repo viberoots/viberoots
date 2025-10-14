@@ -65,6 +65,6 @@ TEST(Demo, OpenSSLSmoke) {
 
 ### Notes
 
-- Naming: `//third_party/providers:nix_<attr>` where `<attr>` is the nixpkgs attribute path normalized and with non‑alnum to `_` (e.g., `pkgs.openssl` → `nix_pkgs_openssl`).
+- Naming: `//third_party/providers:nix_<attr>` where `<attr>` is the nixpkgs attribute path normalized and with non‑alnum to `_` (e.g., `pkgs.openssl` → `nix_pkgs_openssl`). Naming is canonical and shared with scripts via `tools/lib/providers.ts`.
 - Determinism: the planner collects `nixpkg:*` labels from deps and passes them to `tools/nix/templates/cpp.nix`, which resolves include and library paths from nixpkgs; no paths are hard-coded in Starlark.
 - Linking: GoogleTest linking is auto-detected by the template when `pkgs.googletest` is present; other libraries only need to be listed as provider deps.
