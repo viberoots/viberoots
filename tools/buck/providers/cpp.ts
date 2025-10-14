@@ -1,13 +1,13 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
 import path from "node:path";
-import { readGraph } from "../../lib/graph";
-import { validateFlatDir } from "../../lib/provider-sync";
+import { readGraph } from "../../lib/graph.ts";
+import { validateFlatDir } from "../../lib/provider-sync.ts";
 import {
   encodeNixAttrForPatchPrefix,
   normalizeNixAttr,
   providerNameForNixAttr,
-} from "../../lib/providers";
+} from "../../lib/providers.ts";
 
 type Node = { name: string; labels?: string[] };
 
@@ -88,7 +88,7 @@ export async function syncCppProviders(opts?: { outFile?: string }) {
   const curatedAttrSet = new Set<string>(curated.map((c) => c.attr));
   for (const a of curatedAttrSet) if (a) attrList.push(a);
   // Stable unique using shared helper
-  const { stableUnique } = await import("../../lib/fs-helpers");
+  const { stableUnique } = await import("../../lib/fs-helpers.ts");
   const attrListUniq: string[] = stableUnique(attrList.sort(), (a) => a);
 
   const overlayPaths = (await fs.pathExists(overlay)) ? [overlay] : [];
@@ -106,7 +106,7 @@ export async function syncCppProviders(opts?: { outFile?: string }) {
       ...patch_paths.map((p) => ({ path: p })),
       ...(hasLock ? [{ path: lockfile }] : []),
     ];
-    const { writeStamp } = await import("../../lib/fs-helpers");
+    const { writeStamp } = await import("../../lib/fs-helpers.ts");
     await writeStamp(path.join(stampsDir, `${name}.stamp`), inputs);
 
     const lines: string[] = [];
@@ -126,11 +126,11 @@ export async function syncCppProviders(opts?: { outFile?: string }) {
       ...patch_paths.map((p) => ({ path: p })),
       ...(hasLock ? [{ path: lockfile }] : []),
     ];
-    const { writeStamp } = await import("../../lib/fs-helpers");
+    const { writeStamp } = await import("../../lib/fs-helpers.ts");
     await writeStamp(path.join(stampsDir, `${name}.stamp`), inputs);
   }
 
-  const { writeIfChanged, renderTargetsFile } = await import("../../lib/fs-helpers");
+  const { writeIfChanged, renderTargetsFile } = await import("../../lib/fs-helpers.ts");
   await writeIfChanged(OUT, renderTargetsFile(header, providerLines));
 
   // Also emit a deterministic mapping from provider targets to canonical nixpkg labels.

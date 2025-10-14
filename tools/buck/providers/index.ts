@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import type { LanguageProviderSync } from "../../lib/lang-contracts";
-import { syncCppProviders } from "./cpp";
-import { syncGoProviders } from "./go";
-import { syncNodeProviders } from "./node";
+import { syncCppProviders } from "./cpp.ts";
+import { syncGoProviders } from "./go.ts";
+import { syncNodeProviders } from "./node.ts";
 
 export type SyncOptions = {
   outFile?: string;

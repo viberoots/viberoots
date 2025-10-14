@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
 import YAML from "yaml";
-import { writeIfChanged, renderTargetsFile } from "../../lib/fs-helpers";
-import { scanFlatPatchDir } from "../../lib/provider-sync";
-import { providerNameForImporter } from "../../lib/providers";
+import { renderTargetsFile, writeIfChanged } from "../../lib/fs-helpers.ts";
+import { scanFlatPatchDir } from "../../lib/provider-sync.ts";
+import { providerNameForImporter } from "../../lib/providers.ts";
 
 type PNPMDoc = {
   importers: Record<string, any>;
@@ -152,4 +152,46 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
     "",
   ].join("\n");
   await writeIfChanged(OUT_FILE, renderTargetsFile(header, entries));
+}
+
+// Minimal surface for provider index generation
+export async function readNodeProviderIndexEntries(): Promise<
+  Array<{ provider: string; key: string }>
+> {
+  const out: Array<{ provider: string; key: string }> = [];
+  let lockfiles: string[] = [];
+  try {
+    const { stdout } = await $`git ls-files '**/pnpm-lock.yaml'`;
+    lockfiles = String(stdout || "")
+      .split(/\r?\n/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  } catch {
+    lockfiles = [];
+  }
+  const haveYaml = (() => {
+    try {
+      require.resolve("yaml");
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  if (!lockfiles.length || !haveYaml) return out;
+
+  // Reuse scan to know which patches exist; only needed to mirror provider naming stability
+  const scanned = await scanFlatPatchDir({ patchDir: "patches/node", decodeKey: pkgKeyFromPatch });
+  const keyToPatchPath = new Map<string, string>();
+  for (const e of scanned) keyToPatchPath.set(e.key, e.patchPath);
+
+  for (const lf of lockfiles) {
+    const doc = parsePnpmLock(lf);
+    for (const importer of Object.keys(doc.importers || {})) {
+      const name = providerNameForImporter(lf, importer);
+      out.push({ provider: name, key: `lockfile:${lf}#${importer}` });
+    }
+  }
+  // Deterministic order
+  out.sort((a, b) => (a.provider < b.provider ? -1 : a.provider > b.provider ? 1 : 0));
+  return out;
 }

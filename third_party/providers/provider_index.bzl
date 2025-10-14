@@ -1,0 +1,8 @@
+# GENERATED FILE — DO NOT EDIT.
+
+PROVIDER_INDEX = {
+
+    "//third_party/providers:nix_pkgs_googletest": { "kind": "cpp", "key": "nixpkg:pkgs.googletest" },
+    "//third_party/providers:nix_pkgs_openssl": { "kind": "cpp", "key": "nixpkg:pkgs.openssl" },
+    "//third_party/providers:nix_pkgs_zlib": { "kind": "cpp", "key": "nixpkg:pkgs.zlib" },
+}

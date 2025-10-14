@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
-import { writeIfChanged, renderTargetsFile } from "../../lib/fs-helpers";
-import { scanFlatPatchDir } from "../../lib/provider-sync";
-import { decodeFromPatchFilename, providerNameForModuleKey } from "../../lib/providers";
+import { renderTargetsFile, writeIfChanged } from "../../lib/fs-helpers.ts";
+import { scanFlatPatchDir } from "../../lib/provider-sync.ts";
+import { decodeFromPatchFilename, providerNameForModuleKey } from "../../lib/providers.ts";
 
 export type GoEntry = { provider: string; moduleKey: string; patchPath: string };
 
