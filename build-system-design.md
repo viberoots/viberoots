@@ -323,6 +323,10 @@ console.log(`wrote ${out}`);
 We standardize on one **outer** CLI:
 
 ```
+
+### C++ adapter validation (warn-only)
+
+- The exporter’s C++ adapter performs a minimal, warn-only validation: if a node lists C++-looking sources (e.g., files ending in `.cc`, `.cpp`, `.cxx`) but lacks both a `cxx_*` rule_type and the `lang:cpp` label, the exporter prints a warning. This does not fail the export; it is advisory to help maintain consistent labeling and easier diagnostics. Keep CI behavior unchanged — warnings are informative only.
 patch-pkg <subcommand> <language> [...options]
 ```
 

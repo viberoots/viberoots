@@ -19,9 +19,34 @@ export const adapter: Adapter = {
   isNode(n) {
     return isCppNode(n);
   },
-  // For C++, validation is intentionally minimal/no-op for now.
-  // Keep hook present for parity and future checks.
-  validate(_nodes: Node[]) {},
+  // Warn-only validation: if a node looks like C++ (has .cc/.cpp/.cxx in srcs)
+  // but lacks both cxx_* rule_type and 'lang:cpp' label, emit an advisory warning.
+  // Do NOT fail the build — this is purely to surface likely misclassification.
+  validate(nodes: Node[]) {
+    const suspects: string[] = [];
+    for (const n of nodes) {
+      const srcs = Array.isArray((n as any).srcs) ? ((n as any).srcs as string[]) : [];
+      const looksCpp = srcs.some((s) => /\.(cc|cpp|cxx)$/i.test(s));
+      const hasCxxRule = (n.rule_type || "").startsWith("cxx_");
+      const hasLangCpp = (n.labels || []).includes("lang:cpp");
+      if (looksCpp && !hasCxxRule && !hasLangCpp) {
+        suspects.push(n.name);
+      }
+    }
+    if (suspects.length) {
+      const sample = suspects.slice(0, 10).join("\n  - ");
+      console.warn(
+        [
+          "[exporter][cpp] warning: targets include C++-looking sources but lack both cxx_* rule_type and 'lang:cpp' label:",
+          `  - ${sample}`,
+          suspects.length > 10 ? `  ... and ${suspects.length - 10} more` : "",
+          "Guidance: stamp 'lang:cpp' in macros or use cxx_* rules to classify C++ targets.",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      );
+    }
+  },
   async buildBatches(_nodes: Node[]): Promise<Batch[]> {
     return [];
   },
