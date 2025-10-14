@@ -2,12 +2,12 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { readGraph } from "../../lib/graph";
+import { validateFlatDir } from "../../lib/provider-sync";
 import {
   encodeNixAttrForPatchPrefix,
   normalizeNixAttr,
   providerNameForNixAttr,
 } from "../../lib/providers";
-import { validateFlatDir } from "../../lib/provider-sync";
 
 type Node = { name: string; labels?: string[] };
 
@@ -61,6 +61,7 @@ export async function syncCppProviders(opts?: { outFile?: string }) {
   const header = [
     "# GENERATED FILE — DO NOT EDIT.",
     'load("//third_party/providers:defs_cpp.bzl", "nix_cxx_provider")',
+    "",
     "",
   ].join("\n");
 
@@ -129,9 +130,8 @@ export async function syncCppProviders(opts?: { outFile?: string }) {
     await writeStamp(path.join(stampsDir, `${name}.stamp`), inputs);
   }
 
-  const data = header + providerLines.join("\n");
-  const { writeIfChanged } = await import("../../lib/fs-helpers");
-  await writeIfChanged(OUT, data);
+  const { writeIfChanged, renderTargetsFile } = await import("../../lib/fs-helpers");
+  await writeIfChanged(OUT, renderTargetsFile(header, providerLines));
 
   // Also emit a deterministic mapping from provider targets to canonical nixpkg labels.
   // This enables C++ macros to consume attrs without brittle string heuristics.

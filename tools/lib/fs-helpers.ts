@@ -59,3 +59,19 @@ export function stableUnique<T>(arr: T[], key: (t: T) => string): T[] {
   }
   return out;
 }
+
+// Render a TARGETS file from a header string and entry strings, ensuring
+// deterministic newlines:
+// - Header always ends with a single trailing newline
+// - If there are entries, the body ends with a single trailing newline
+// - Callers control any additional blank lines by including them in `header`
+export function renderTargetsFile(header: string, entries: string[]): string {
+  if (!entries.length) {
+    // Preserve exact header text for empty-state files to avoid unintended diffs.
+    return header;
+  }
+  const headerText = header.endsWith("\n") ? header : header + "\n";
+  const body = entries.join("\n");
+  const bodyText = body.endsWith("\n") ? body : body + "\n";
+  return headerText + bodyText;
+}

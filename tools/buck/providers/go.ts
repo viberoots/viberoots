@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { writeIfChanged } from "../../lib/fs-helpers";
+import { writeIfChanged, renderTargetsFile } from "../../lib/fs-helpers";
 import { scanFlatPatchDir } from "../../lib/provider-sync";
 import { decodeFromPatchFilename, providerNameForModuleKey } from "../../lib/providers";
 
@@ -45,13 +45,11 @@ export function renderGoTargets(entries: GoEntry[], opts?: { patchDir?: string }
     'load("//third_party/providers:defs.bzl", "go_module_patch")',
     "",
   ].join("\n");
-  const body = entries
-    .map(
-      (e) =>
-        `go_module_patch(name = "${e.provider}", module_key = "${e.moduleKey}", patch_path = "${e.patchPath}",)`,
-    )
-    .join("\n");
-  return header + body + (body ? "\n" : "");
+  const entriesText = entries.map(
+    (e) =>
+      `go_module_patch(name = "${e.provider}", module_key = "${e.moduleKey}", patch_path = "${e.patchPath}",)`,
+  );
+  return renderTargetsFile(header, entriesText);
 }
 
 export async function syncGoProviders(opts?: {

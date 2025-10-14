@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
 import YAML from "yaml";
-import { writeIfChanged } from "../../lib/fs-helpers";
+import { writeIfChanged, renderTargetsFile } from "../../lib/fs-helpers";
 import { scanFlatPatchDir } from "../../lib/provider-sync";
 import { providerNameForImporter } from "../../lib/providers";
 
@@ -103,13 +103,13 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
   })();
 
   if (!lockfiles.length || !haveYaml) {
-    // Nothing to do; write empty deterministic header to avoid stale outputs
     const header = [
       "# GENERATED FILE — DO NOT EDIT.",
       'load("//third_party/providers:defs_node.bzl", "node_importer_deps")',
       "",
+      "",
     ].join("\n");
-    await writeIfChanged(OUT_FILE, header + "\n");
+    await writeIfChanged(OUT_FILE, renderTargetsFile(header, []));
     return;
   }
 
@@ -149,6 +149,7 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
     "# GENERATED FILE — DO NOT EDIT.",
     'load("//third_party/providers:defs_node.bzl", "node_importer_deps")',
     "",
+    "",
   ].join("\n");
-  await writeIfChanged(OUT_FILE, header + "\n" + entries.join("\n") + "\n");
+  await writeIfChanged(OUT_FILE, renderTargetsFile(header, entries));
 }
