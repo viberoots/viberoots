@@ -18,14 +18,15 @@ function extractHash(text: string): string | null {
   return null;
 }
 
-async function rewriteFlakeHash(newHash: string) {
-  const flakePath = path.join(process.cwd(), "flake.nix");
-  const src = await fsp.readFile(flakePath, "utf8");
+async function rewritePnpmStoreHash(newHash: string) {
+  // Update the fixed-output hash in tools/nix/node-modules.nix (pnpm-store derivation)
+  const nmPath = path.join(process.cwd(), "tools", "nix", "node-modules.nix");
+  const src = await fsp.readFile(nmPath, "utf8");
   const next = src.replace(/(outputHash\s*=\s*")sha256-[^"]+(";)/, `$1${newHash}$2`);
   if (next === src) {
-    throw new Error("could not locate outputHash line to update in flake.nix");
+    throw new Error("could not locate outputHash line to update in tools/nix/node-modules.nix");
   }
-  await fsp.writeFile(flakePath, next, "utf8");
+  await fsp.writeFile(nmPath, next, "utf8");
 }
 
 async function main() {
@@ -39,7 +40,7 @@ async function main() {
     console.error("failed to parse suggested sha256 from nix output\n\n" + first.output);
     process.exit(1);
   }
-  await rewriteFlakeHash(suggested);
+  await rewritePnpmStoreHash(suggested);
   const second = await buildStore();
   if (!second.ok) {
     console.error("pnpm-store still failing after hash update\n\n" + second.output);

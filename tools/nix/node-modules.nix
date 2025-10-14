@@ -20,7 +20,7 @@ let
     src = storeSrc;
     nativeBuildInputs = [ node pnpm ];
     outputHashMode = "recursive";
-    outputHash = "sha256-nSySfpEzhcuYkYb9q2wFWFWbU1Zvr0yuGgg4OpEu6cc=";
+    outputHash = "sha256-WRd9oK/vjAegzMsJEruMiNkMR8vN48CeUSyULSmhL8c=";
     dontPatchShebangs = true;
     unpackPhase = ''
       runHook preUnpack
