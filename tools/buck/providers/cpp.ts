@@ -1,12 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
 import path from "node:path";
+import { readGraph } from "../../lib/graph";
 import {
   encodeNixAttrForPatchPrefix,
   normalizeNixAttr,
   providerNameForNixAttr,
 } from "../../lib/providers";
-import { readGraph } from "../../lib/graph";
 
 type Node = { name: string; labels?: string[] };
 

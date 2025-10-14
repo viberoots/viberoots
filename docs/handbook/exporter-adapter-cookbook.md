@@ -32,3 +32,7 @@ Validation check-list:
 - Adapter file present and exports default `Adapter`.
 - Label outputs are stable and sorted where applicable.
 - Tests cover detection and label presence.
+
+Note (C++ adapter): warn-only validation
+
+- The built-in C++ adapter performs a minimal, warn-only validation: if a node lists C++-looking sources (e.g., files ending in `.cc`, `.cpp`, `.cxx`) but lacks both a `cxx_*` rule_type and the `lang:cpp` label, the exporter prints a warning. This does not fail the export; it is advisory to help maintain consistent labeling. Keep CI behavior unchanged — warnings are informative only.

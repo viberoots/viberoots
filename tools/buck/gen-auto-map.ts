@@ -1,13 +1,12 @@
 #!/usr/bin/env zx-wrapper
-import fs from "fs-extra";
 import { writeIfChanged } from "../lib/fs-helpers";
+import { readGraph } from "../lib/graph";
 import {
   normalizeNixAttr,
   providerNameForImporter,
   providerNameForModuleKey,
   providerNameForNixAttr,
 } from "../lib/providers";
-import { readGraph } from "../lib/graph";
 
 type Node = {
   name: string;
