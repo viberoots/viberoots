@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
 import YAML from "yaml";
+import { writeIfChanged } from "../../lib/fs-helpers";
 import { providerNameForImporter } from "../../lib/providers";
 
 type PNPMDoc = {
@@ -107,8 +108,7 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
       'load("//third_party/providers:defs_node.bzl", "node_importer_deps")',
       "",
     ].join("\n");
-    await fs.outputFile(OUT_FILE, header + "\n");
-    console.log("wrote", OUT_FILE);
+    await writeIfChanged(OUT_FILE, header + "\n");
     return;
   }
 
@@ -146,6 +146,5 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
     'load("//third_party/providers:defs_node.bzl", "node_importer_deps")',
     "",
   ].join("\n");
-  await fs.outputFile(OUT_FILE, header + "\n" + entries.join("\n") + "\n");
-  console.log("wrote", OUT_FILE);
+  await writeIfChanged(OUT_FILE, header + "\n" + entries.join("\n") + "\n");
 }
