@@ -3,6 +3,7 @@ import fs from "fs-extra";
 import os from "node:os";
 import path from "node:path";
 import { makeUnifiedDiff } from "./diff";
+import { ensureGraph, runGlue } from "./glue";
 import { deleteSession, getSession, setSession } from "./state";
 import type { LanguageHandler, SessionRecord } from "./types";
 
@@ -207,15 +208,11 @@ async function doApply(args: string[]) {
   // End session; keep workspace for manual inspection if desired
   await deleteSession("cpp", key);
 
-  // Regenerate C++ providers and auto_map deterministically
-  await fs.mkdirp("tools/buck");
-  try {
-    await fs.access("tools/buck/graph.json");
-  } catch {
-    await $`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
-  }
+  // Regenerate providers and auto_map deterministically via shared glue helpers
+  await ensureGraph();
+  // Keep using the C++-scoped provider sync to match prior behavior
   await $`node tools/buck/sync-providers.ts --lang=cpp`;
-  await $`node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
+  await runGlue();
 
   // Message: confirmation and path of patch file
   console.log(dst);
