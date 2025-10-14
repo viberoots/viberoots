@@ -26,6 +26,33 @@ let
       }
     );
 
+  # Factored helpers (no behavior change; used by goApp/goLib/goCArchive)
+  segs = s: let xs = lib.splitString "." s; in if xs == [] then [] else xs;
+  getAtPath = attrs: parts:
+    if parts == [] then attrs else (
+      let k = lib.head parts; rest = lib.tail parts; in
+        if (builtins.isAttrs attrs) && (builtins.hasAttr k attrs)
+        then getAtPath (builtins.getAttr k attrs) rest
+        else null
+    );
+  resolveAttr = s:
+    let parts0 = segs s;
+        parts = if parts0 != [] && (lib.head parts0) == "pkgs" then lib.tail parts0 else parts0;
+    in getAtPath pkgs parts;
+
+  mkCgoEnv = { nixCgoPkgs ? [], nixCgoAttrs ? [], repoCgoPkgs ? [] }:
+    let
+      resolvedCgo = builtins.filter (v: v != null) (map resolveAttr nixCgoAttrs);
+      cgoPkgs = nixCgoPkgs ++ resolvedCgo ++ repoCgoPkgs;
+      haveCgo = (builtins.length cgoPkgs) > 0;
+      pkgCfgPaths = lib.concatStringsSep ":" (map (p: "${p}/lib/pkgconfig") cgoPkgs);
+      synthCFlags = lib.concatStringsSep " " (map (p: "-I${p}/include") cgoPkgs);
+      synthLdFlags = lib.concatStringsSep " " (map (p: "-L${p}/lib") cgoPkgs);
+      repoStaticLibs = lib.concatStringsSep " " (map (p: let a = "${p}/lib"; in ''$(ls -1 "${a}" 2>/dev/null | sed -n 's/^lib\(.*\)\.a$/-l\1/p' | tr '\n' ' ')'') repoCgoPkgs);
+    in {
+      inherit cgoPkgs haveCgo pkgCfgPaths synthCFlags synthLdFlags repoStaticLibs;
+    };
+
 in {
   goApp = {
     name,
@@ -53,28 +80,7 @@ in {
         );
       moduleRootRel = lib.removeSuffix "/cmd/${targetName}" subdir;
       srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + moduleRootRel));
-      # Resolve nixCgoAttrs like "pkgs.openssl" into concrete package values
-      segs = s: let xs = lib.splitString "." s; in if xs == [] then [] else xs;
-      getAtPath = attrs: parts:
-        if parts == [] then attrs else (
-          let k = lib.head parts; rest = lib.tail parts; in
-            if (builtins.isAttrs attrs) && (builtins.hasAttr k attrs)
-            then getAtPath (builtins.getAttr k attrs) rest
-            else null
-        );
-      resolveAttr = s:
-        let parts0 = segs s;
-            parts = if parts0 != [] && (lib.head parts0) == "pkgs" then lib.tail parts0 else parts0;
-        in getAtPath pkgs parts;
-      resolvedCgo = builtins.filter (v: v != null) (map resolveAttr nixCgoAttrs);
-      # Merge nix-provided C/C++ packages with repo-provided derivations
-      cgoPkgs = nixCgoPkgs ++ resolvedCgo ++ repoCgoPkgs;
-      haveCgo = (builtins.length cgoPkgs) > 0;
-      pkgCfgPaths = lib.concatStringsSep ":" (map (p: "${p}/lib/pkgconfig") cgoPkgs);
-      synthCFlags = lib.concatStringsSep " " (map (p: "-I${p}/include") cgoPkgs);
-      synthLdFlags = lib.concatStringsSep " " (map (p: "-L${p}/lib") cgoPkgs);
-      # Link any static libs exported by repo C++ libs if present
-      repoStaticLibs = lib.concatStringsSep " " (map (p: let a = "${p}/lib"; in ''$(ls -1 "$a" 2>/dev/null | sed -n 's/^lib\(.*\)\.a$/-l\1/p' | tr '\n' ' ')'') repoCgoPkgs);
+      cgo = mkCgoEnv { inherit nixCgoPkgs nixCgoAttrs repoCgoPkgs; };
       baseArgs = {
         pname = "go-${H.sanitizeName name}";
         version = "0.1.0";
@@ -84,19 +90,19 @@ in {
         doCheck = false;
         doInstallCheck = false;
         disallowedReferences = [];
-        nativeBuildInputs = ([ pkgs.unzip ] ++ (if haveCgo then (cgoPkgs ++ [ pkgs.pkg-config ]) else []));
+        nativeBuildInputs = ([ pkgs.unzip ] ++ (if cgo.haveCgo then (cgo.cgoPkgs ++ [ pkgs.pkg-config ]) else []));
         configurePhase = ''
           runHook preConfigure
 
           export GOCACHE=$TMPDIR/go-cache
           export GOPATH="$TMPDIR/go"
           export GOSUMDB=off
-          ${if haveCgo then ''
+          ${if cgo.haveCgo then ''
             export CGO_ENABLED=1
-            export PKG_CONFIG_PATH=${pkgCfgPaths}
+            export PKG_CONFIG_PATH=${cgo.pkgCfgPaths}
             if [ -z "$PKG_CONFIG_PATH" ]; then
-              export CGO_CFLAGS="${synthCFlags} $CGO_CFLAGS"
-              export CGO_LDFLAGS="${synthLdFlags} ${repoStaticLibs} $CGO_LDFLAGS"
+              export CGO_CFLAGS="${cgo.synthCFlags} $CGO_CFLAGS"
+              export CGO_LDFLAGS="${cgo.synthLdFlags} ${cgo.repoStaticLibs} $CGO_LDFLAGS"
             fi
           '' else ""}
           cd "''${modRoot:-.}"
@@ -129,25 +135,7 @@ in {
       dev = Dev.readJsonOverride { envName = devOverrideEnv; ciForbidden = true; };
       _warn = dev.warnEffect; _guard = dev.ciGuard;
       srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + subdir));
-      segs = s: let xs = lib.splitString "." s; in if xs == [] then [] else xs;
-      getAtPath = attrs: parts:
-        if parts == [] then attrs else (
-          let k = lib.head parts; rest = lib.tail parts; in
-            if (builtins.isAttrs attrs) && (builtins.hasAttr k attrs)
-            then getAtPath (builtins.getAttr k attrs) rest
-            else null
-        );
-      resolveAttr = s:
-        let parts0 = segs s;
-            parts = if parts0 != [] && (lib.head parts0) == "pkgs" then lib.tail parts0 else parts0;
-        in getAtPath pkgs parts;
-      resolvedCgo = builtins.filter (v: v != null) (map resolveAttr nixCgoAttrs);
-      cgoPkgs = nixCgoPkgs ++ resolvedCgo ++ repoCgoPkgs;
-      haveCgo = (builtins.length cgoPkgs) > 0;
-      pkgCfgPaths = lib.concatStringsSep ":" (map (p: "${p}/lib/pkgconfig") cgoPkgs);
-      synthCFlags = lib.concatStringsSep " " (map (p: "-I${p}/include") cgoPkgs);
-      synthLdFlags = lib.concatStringsSep " " (map (p: "-L${p}/lib") cgoPkgs);
-      repoStaticLibs = lib.concatStringsSep " " (map (p: let a = "${p}/lib"; in ''$(ls -1 "$a" 2>/dev/null | sed -n 's/^lib\(.*\)\.a$/-l\1/p' | tr '\n' ' ')'') repoCgoPkgs);
+      cgo = mkCgoEnv { inherit nixCgoPkgs nixCgoAttrs repoCgoPkgs; };
       baseArgs = {
         pname = "golib-${H.sanitizeName name}";
         version = "0.1.0";
@@ -157,7 +145,7 @@ in {
         doCheck = false;
         doInstallCheck = false;
         disallowedReferences = [];
-        nativeBuildInputs = (if haveCgo then (cgoPkgs ++ [ pkgs.pkg-config ]) else []);
+        nativeBuildInputs = (if cgo.haveCgo then (cgo.cgoPkgs ++ [ pkgs.pkg-config ]) else []);
         configurePhase = ''
           runHook preConfigure
 
@@ -165,12 +153,12 @@ in {
           export GOPATH="$TMPDIR/go"
           export GOSUMDB=off
           export GOFLAGS="-mod=mod"
-          ${if haveCgo then ''
+          ${if cgo.haveCgo then ''
             export CGO_ENABLED=1
-            export PKG_CONFIG_PATH=${pkgCfgPaths}
+            export PKG_CONFIG_PATH=${cgo.pkgCfgPaths}
             if [ -z "$PKG_CONFIG_PATH" ]; then
-              export CGO_CFLAGS="${synthCFlags} $CGO_CFLAGS"
-              export CGO_LDFLAGS="${synthLdFlags} ${repoStaticLibs} $CGO_LDFLAGS"
+              export CGO_CFLAGS="${cgo.synthCFlags} $CGO_CFLAGS"
+              export CGO_LDFLAGS="${cgo.synthLdFlags} ${cgo.repoStaticLibs} $CGO_LDFLAGS"
             fi
           '' else ""}
           cd "''${modRoot:-.}"
@@ -203,22 +191,7 @@ in {
       dev = Dev.readJsonOverride { envName = devOverrideEnv; ciForbidden = true; };
       _warn = dev.warnEffect; _guard = dev.ciGuard;
       srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + subdir));
-      segs = s: let xs = lib.splitString "." s; in if xs == [] then [] else xs;
-      getAtPath = attrs: parts:
-        if parts == [] then attrs else (
-          let k = lib.head parts; rest = lib.tail parts; in
-            if (builtins.isAttrs attrs) && (builtins.hasAttr k attrs)
-            then getAtPath (builtins.getAttr k attrs) rest
-            else null
-        );
-      resolveAttr = s:
-        let parts0 = segs s;
-            parts = if parts0 != [] && (lib.head parts0) == "pkgs" then lib.tail parts0 else parts0;
-        in getAtPath pkgs parts;
-      cgoPkgs = nixCgoPkgs ++ (builtins.filter (v: v != null) (map resolveAttr nixCgoAttrs)) ++ repoCgoPkgs;
-      pkgCfgPaths = lib.concatStringsSep ":" (map (p: "${p}/lib/pkgconfig") cgoPkgs);
-      synthCFlags = lib.concatStringsSep " " (map (p: "-I${p}/include") cgoPkgs);
-      synthLdFlags = lib.concatStringsSep " " (map (p: "-L${p}/lib") cgoPkgs);
+      cgo = mkCgoEnv { inherit nixCgoPkgs nixCgoAttrs repoCgoPkgs; };
     in buildGoFn ({
       pname = "gocarchive-${H.sanitizeName name}";
       version = "0.1.0";
@@ -227,17 +200,17 @@ in {
       subPackages = [ "." ];
       doCheck = false;
       doInstallCheck = false;
-      nativeBuildInputs = cgoPkgs ++ [ pkgs.unzip pkgs.pkg-config ];
+      nativeBuildInputs = cgo.cgoPkgs ++ [ pkgs.unzip pkgs.pkg-config ];
       configurePhase = ''
         runHook preConfigure
         export GOCACHE=$TMPDIR/go-cache
         export GOPATH="$TMPDIR/go"
         export GOSUMDB=off
         export CGO_ENABLED=1
-        export PKG_CONFIG_PATH=${pkgCfgPaths}
+        export PKG_CONFIG_PATH=${cgo.pkgCfgPaths}
         if [ -z "$PKG_CONFIG_PATH" ]; then
-          export CGO_CFLAGS="${synthCFlags} $CGO_CFLAGS"
-          export CGO_LDFLAGS="${synthLdFlags} $CGO_LDFLAGS"
+          export CGO_CFLAGS="${cgo.synthCFlags} $CGO_CFLAGS"
+          export CGO_LDFLAGS="${cgo.synthLdFlags} $CGO_LDFLAGS"
         fi
         runHook postConfigure
       '';

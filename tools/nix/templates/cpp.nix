@@ -8,6 +8,10 @@ let
 
   # Stable sort helper for lists of strings
   sorted = xs: lib.sort (a: b: a < b) xs;
+  # Internal helpers (behavior-preserving; used by app/lib/test)
+  joinInc = paths: lib.concatStringsSep " " (map (p: "-I${p}") (sorted paths));
+  joinDef = defs: lib.concatStringsSep " " (map (d: "-D${d}") (sorted defs));
+  joinExtraC = flags: lib.concatStringsSep " " (sorted flags);
 in rec {
   toIncludeBase = p: if (builtins.isAttrs p && p ? dev) then p.dev else p;
   toLibBase = p: p; # libs typically live under the default output
@@ -60,6 +64,8 @@ in rec {
   let
     pname = "cppapp-${H.sanitizeName name}";
     srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + subdir));
+    nixIncFlags = pkgsList: lib.concatStringsSep " " (map (p: "-isystem ${toIncludeBase p}/include") pkgsList);
+    nixLibFlags = pkgsList: lib.concatStringsSep " " (map (p: "-L${toLibBase p}/lib") pkgsList);
     # Resolve nixCxxAttrs like "pkgs.gtest" into paths if provided at eval-time
     resolvedPkgs =
       let segs = s: let xs = lib.splitString "." s; in if xs == [] then [] else xs;
@@ -72,12 +78,12 @@ in rec {
           ) nixCxxAttrs);
       in nixCxxPkgs ++ fromAttrs;
     # include flags from explicit includes and resolved nixCxx packages
-    nixInc = lib.concatStringsSep " " (map (p: "-isystem ${toIncludeBase p}/include") resolvedPkgs);
-    nixLib = lib.concatStringsSep " " (map (p: "-L${toLibBase p}/lib") resolvedPkgs);
-    incFlags = lib.concatStringsSep " " (map (p: "-I${p}") (sorted includes));
-    defFlags = lib.concatStringsSep " " (map (d: "-D${d}") (sorted defines));
-    extraC   = lib.concatStringsSep " " (sorted (cflags ++ [ "-ffunction-sections" "-fdata-sections" ]));
-    extraLD  = lib.concatStringsSep " " (sorted ldflags);
+    nixInc = nixIncFlags resolvedPkgs;
+    nixLib = nixLibFlags resolvedPkgs;
+    incFlags = joinInc includes;
+    defFlags = joinDef defines;
+    extraC   = joinExtraC (cflags ++ [ "-ffunction-sections" "-fdata-sections" ]);
+    extraLD  = joinExtraC ldflags;
     platLD   = if pkgs.stdenv.isDarwin then "-Wl,-dead_strip" else "-Wl,--gc-sections";
     srcsCmd = if srcList != [] then (
       "printf '%s\\n' " + (lib.concatStringsSep " " (map (s: "'" + s + "'") (sorted srcList))) + " | sort"
@@ -168,6 +174,7 @@ in rec {
   let
     pname = "cpplib-${H.sanitizeName name}";
     srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + subdir));
+    nixIncFlags = pkgsList: lib.concatStringsSep " " (map (p: "-isystem ${toIncludeBase p}/include") pkgsList);
     resolvedPkgs =
       let segs = s: let xs = lib.splitString "." s; in if xs == [] then [] else xs;
           getAt = s:
@@ -178,10 +185,10 @@ in rec {
             let base = getAt a; in if base == null then null else overridePkgIfAny a base
           ) nixCxxAttrs);
       in nixCxxPkgs ++ fromAttrs;
-    nixInc = lib.concatStringsSep " " (map (p: "-isystem ${toIncludeBase p}/include") resolvedPkgs);
-    incFlags = lib.concatStringsSep " " (map (p: "-I${p}") (sorted includes));
-    defFlags = lib.concatStringsSep " " (map (d: "-D${d}") (sorted defines));
-    extraC   = lib.concatStringsSep " " (sorted cflags);
+    nixInc = nixIncFlags resolvedPkgs;
+    incFlags = joinInc includes;
+    defFlags = joinDef defines;
+    extraC   = joinExtraC cflags;
     # Note: ldflags are reserved for future parity with cppApp; unused here.
   in pkgs.stdenv.mkDerivation {
     inherit pname;
@@ -249,6 +256,8 @@ in rec {
   let
     pname = "cpptest-${H.sanitizeName name}";
     srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + subdir));
+    nixIncFlags = pkgsList: lib.concatStringsSep " " (map (p: "-isystem ${toIncludeBase p}/include") pkgsList);
+    nixLibFlags = pkgsList: lib.concatStringsSep " " (map (p: "-L${toLibBase p}/lib") pkgsList);
     # Resolve nixCxxAttrs like "pkgs.gtest" into concrete package values
     segs = s: let xs = lib.splitString "." s; in if xs == [] then [] else xs;
     getAt = s:
@@ -262,12 +271,12 @@ in rec {
           ) nixCxxAttrs);
           base1 = base0 ++ attrsOver;
       in base1 ++ (if hasGTest then gtestPkgsAll else []);
-    nixInc = lib.concatStringsSep " " (map (p: "-isystem ${toIncludeBase p}/include") resolvedPkgs);
-    nixLib = lib.concatStringsSep " " (map (p: "-L${toLibBase p}/lib") resolvedPkgs);
-    incFlags = lib.concatStringsSep " " (map (p: "-I${p}") (sorted includes));
-    defFlags = lib.concatStringsSep " " (map (d: "-D${d}") (sorted defines));
-    extraC   = lib.concatStringsSep " " (sorted (cflags ++ [ "-ffunction-sections" "-fdata-sections" ]));
-    extraLD  = lib.concatStringsSep " " (sorted ldflags);
+    nixInc = nixIncFlags resolvedPkgs;
+    nixLib = nixLibFlags resolvedPkgs;
+    incFlags = joinInc includes;
+    defFlags = joinDef defines;
+    extraC   = joinExtraC (cflags ++ [ "-ffunction-sections" "-fdata-sections" ]);
+    extraLD  = joinExtraC ldflags;
     platLD   = if pkgs.stdenv.isDarwin then "-Wl,-dead_strip" else "-Wl,--gc-sections";
     # Heuristic: if gtest/googletest is among nixCxxAttrs, add -lgtest and -lgtest_main and force include/lib paths
     hasGTest = builtins.any (a: lib.hasInfix "googletest" a || lib.hasInfix "gtest" a) nixCxxAttrs;
