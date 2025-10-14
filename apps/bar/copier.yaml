@@ -1,0 +1,31 @@
+# Minimal copier template for go/cli
+version: 1
+
+_envops:
+  block_start_string: "{%"
+  block_end_string: "%}"
+  variable_start_string: "{{"
+  variable_end_string: "}}"
+  comment_start_string: "{#"
+  comment_end_string: "#}"
+  keep_trailing_newline: true
+
+_exclude:
+  - meta.json
+  - help.md
+  # Prevent accidental nested apps/ inside destination (dest is already apps/<name>)
+  - apps/**
+
+# scaf supplies values via --data-file
+name: ""
+language: "go"
+template: "cli"
+
+# Required variables for Phase 1
+module: "github.com/example/{{ name }}"
+description: "{{ name }} CLI"
+go_min: "1.22"
+license: "MIT"
+enable_ci: false
+
+_tasks: []

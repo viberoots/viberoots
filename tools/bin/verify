@@ -61,6 +61,9 @@ ORIG_CWD="$PWD"
 cd "$ROOT_DIR"
 export BUCK_ROOT="$ROOT_DIR"
 
+# Clean previous coverage artifacts regardless of coverage mode
+rm -rf coverage || true
+
 # Write deterministic Buck config mapping, symlinking prelude into repo for stable alias
 printf '.\n' > .buckroot
 rm -rf prelude && ln -s "$BUCK_PRELUDE" prelude

@@ -1,0 +1,4 @@
+name: bar
+language: go
+template: cli
+scaf_src_path: tools/scaffolding/templates/go/cli
