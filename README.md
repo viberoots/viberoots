@@ -50,6 +50,47 @@ Notes
 - Testing and coverage: see `docs/handbook/testing.md`.
 - Adding a new language: read `docs/handbook/new-language-walkthrough.md` for a fast, capability‑gated path using the lang‑kit template.
 
+### Exporter validation modes (warn | error)
+
+The Buck graph exporter supports a validation severity switch for adapter findings.
+
+- Default behavior: error (non‑zero exit on findings)
+- Local warn mode (exits zero):
+
+```
+node tools/buck/export-graph.ts --validation=warn
+# or
+EXPORTER_VALIDATION=warn node tools/buck/export-graph.ts
+```
+
+- CI override: if `CI=true`, findings are always treated as errors regardless of flags/env.
+
+Typical usage during local iteration is warn; CI remains strict for safety.
+
+### Provider index (optional, for introspection/tools)
+
+For tooling and debugging, you can emit a cross‑language provider index that maps each provider target to its origin key.
+
+- Generate alongside provider sync:
+
+```
+node tools/buck/sync-providers.ts --emit-index
+```
+
+- Or generate directly:
+
+```
+node tools/buck/gen-provider-index.ts --out third_party/providers/provider_index.bzl
+```
+
+The generated `third_party/providers/provider_index.bzl` exposes `PROVIDER_INDEX` where each entry looks like:
+
+```
+"//third_party/providers:<name>": { "kind": "go|node|cpp", "key": "module:<path>@<ver>|lockfile:<path>#<importer>|nixpkg:<attr>" }
+```
+
+This file is not required for builds; it is used by tools/tests for introspection.
+
 ### Adding a Go test file (auto‑wired)
 
 - Generate a minimal, passing test with the scaffolding CLI:

@@ -316,6 +316,16 @@ await fs.outputFile(out, stdout);
 console.log(`wrote ${out}`);
 ```
 
+### Validation modes (warn vs error)
+
+The exporter aggregates adapter findings (e.g., labeling irregularities) and applies a severity mode:
+
+- Default: `error` — findings are printed and the exporter exits non‑zero.
+- Local iteration: set `--validation=warn` or `EXPORTER_VALIDATION=warn` to print warnings and exit zero.
+- CI override: if `CI=true`, severity is forced to `error` regardless of flags/env.
+
+This preserves strictness in CI while enabling smoother local iteration.
+
 ---
 
 ## Go Patching (outer CLI `patch-pkg` → `patch-go.ts`)
@@ -445,6 +455,30 @@ _(Adapted from the internal workflow document.)_ fileciteturn5file0
 - The templates (Nix) use the shared helper `tools/nix/dev-overrides.nix` to **emit a warning** locally whenever dev overrides are set (e.g., `NIX_GO_DEV_OVERRIDE_JSON`, `NIX_CPP_DEV_OVERRIDE_JSON`).
 - In CI (e.g., `CI=true`), the shared helper **throws** to **fail the build** if dev overrides are detected.
 - The outer `patch-pkg` should also print explicit warnings when in session mode.
+
+### Provider index (optional, introspection)
+
+For debugging and tooling, you can generate a cross‑language provider index mapping each provider target to its origin key:
+
+- Generate during provider sync:
+
+```
+node tools/buck/sync-providers.ts --emit-index
+```
+
+- Or generate directly:
+
+```
+node tools/buck/gen-provider-index.ts --out third_party/providers/provider_index.bzl
+```
+
+The index contains entries like:
+
+```
+"//third_party/providers:<name>": { "kind": "go|node|cpp", "key": "module:<path>@<ver>|lockfile:<path>#<importer>|nixpkg:<attr>" }
+```
+
+This file is optional and excluded from builds; it exists for introspection and tests.
 
 ---
 
