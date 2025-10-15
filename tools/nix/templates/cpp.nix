@@ -15,6 +15,9 @@ let
 in rec {
   toIncludeBase = p: if (builtins.isAttrs p && p ? dev) then p.dev else p;
   toLibBase = p: p; # libs typically live under the default output
+  # Common flag joiners for nix pkgs include/lib paths (need access to toIncludeBase/toLibBase)
+  nixIncFlags = pkgsList: lib.concatStringsSep " " (map (p: "-isystem ${toIncludeBase p}/include") pkgsList);
+  nixLibFlags = pkgsList: lib.concatStringsSep " " (map (p: "-L${toLibBase p}/lib") pkgsList);
   # Resolve a dotted attribute path like "pkgs.gtest" against an attribute set
   getAtPath = attrs: parts:
     if parts == [] then attrs else (
@@ -33,6 +36,17 @@ in rec {
         withPkgs = if lib.hasPrefix "pkgs." s0 then s0 else ("pkgs." + s0);
     in if withPkgs == "pkgs.gtest" then "pkgs.googletest" else withPkgs;
 
+  # Split a dotted attribute path (e.g., "pkgs.foobar.baz")
+  segs = s: let xs = lib.splitString "." s; in if xs == [] then [] else xs;
+
+  # Resolve a string attribute against pkgs, handling gtest → googletest alias
+  getAtFromPkgs = s:
+    let parts0 = segs s;
+        parts = if parts0 != [] && (lib.head parts0) == "pkgs" then lib.tail parts0 else parts0;
+    in if parts == [ "gtest" ]
+       then getAtPath pkgs [ "googletest" ]
+       else getAtPath pkgs parts;
+
   overridePkgIfAny = attr: pkg:
     let key = normalizeAttr attr;
         # Accept keys both with and without pkgs. prefix
@@ -47,6 +61,22 @@ in rec {
          version = "0.0.0-dev";
        }))
        else pkg;
+
+  # Map a list of nixCxxAttrs strings to concrete pkgs values (with overrides)
+  resolveAttrsToPkgs = nixCxxAttrs:
+    builtins.filter (v: v != null) (map (a:
+      let base = getAtFromPkgs a; in if base == null then null else overridePkgIfAny a base
+    ) nixCxxAttrs);
+
+  # gtest helpers used by cppTest
+  hasGTestAttr = nixCxxAttrs: builtins.any (a: lib.hasInfix "googletest" a || lib.hasInfix "gtest" a) nixCxxAttrs;
+  gtestPkgsAllFor = nixCxxAttrs:
+    let
+      direct = builtins.filter (p: p != null) [ (getAtFromPkgs "googletest") (getAtFromPkgs "gtest") ];
+      fallback = []
+        ++ (if (builtins.hasAttr "googletest" pkgs) then [ pkgs.googletest ] else [])
+        ++ (if (builtins.hasAttr "gtest" pkgs) then [ pkgs.gtest ] else []);
+    in if direct != [] then direct else fallback;
 
   cppApp = {
     name,
@@ -64,19 +94,8 @@ in rec {
   let
     pname = "cppapp-${H.sanitizeName name}";
     srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + subdir));
-    nixIncFlags = pkgsList: lib.concatStringsSep " " (map (p: "-isystem ${toIncludeBase p}/include") pkgsList);
-    nixLibFlags = pkgsList: lib.concatStringsSep " " (map (p: "-L${toLibBase p}/lib") pkgsList);
     # Resolve nixCxxAttrs like "pkgs.gtest" into paths if provided at eval-time
-    resolvedPkgs =
-      let segs = s: let xs = lib.splitString "." s; in if xs == [] then [] else xs;
-          getAt = s:
-            let parts0 = segs s;
-                parts = if parts0 != [] && (lib.head parts0) == "pkgs" then lib.tail parts0 else parts0;
-            in if parts == [ "gtest" ] then getAtPath pkgs [ "googletest" ] else getAtPath pkgs parts;
-          fromAttrs = builtins.filter (v: v != null) (map (a:
-            let base = getAt a; in if base == null then null else overridePkgIfAny a base
-          ) nixCxxAttrs);
-      in nixCxxPkgs ++ fromAttrs;
+    resolvedPkgs = nixCxxPkgs ++ (resolveAttrsToPkgs nixCxxAttrs);
     # include flags from explicit includes and resolved nixCxx packages
     nixInc = nixIncFlags resolvedPkgs;
     nixLib = nixLibFlags resolvedPkgs;
@@ -174,17 +193,7 @@ in rec {
   let
     pname = "cpplib-${H.sanitizeName name}";
     srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + subdir));
-    nixIncFlags = pkgsList: lib.concatStringsSep " " (map (p: "-isystem ${toIncludeBase p}/include") pkgsList);
-    resolvedPkgs =
-      let segs = s: let xs = lib.splitString "." s; in if xs == [] then [] else xs;
-          getAt = s:
-            let parts0 = segs s;
-                parts = if parts0 != [] && (lib.head parts0) == "pkgs" then lib.tail parts0 else parts0;
-            in if parts == [ "gtest" ] then getAtPath pkgs [ "googletest" ] else getAtPath pkgs parts;
-          fromAttrs = builtins.filter (v: v != null) (map (a:
-            let base = getAt a; in if base == null then null else overridePkgIfAny a base
-          ) nixCxxAttrs);
-      in nixCxxPkgs ++ fromAttrs;
+    resolvedPkgs = nixCxxPkgs ++ (resolveAttrsToPkgs nixCxxAttrs);
     nixInc = nixIncFlags resolvedPkgs;
     incFlags = joinInc includes;
     defFlags = joinDef defines;
@@ -256,21 +265,9 @@ in rec {
   let
     pname = "cpptest-${H.sanitizeName name}";
     srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + subdir));
-    nixIncFlags = pkgsList: lib.concatStringsSep " " (map (p: "-isystem ${toIncludeBase p}/include") pkgsList);
-    nixLibFlags = pkgsList: lib.concatStringsSep " " (map (p: "-L${toLibBase p}/lib") pkgsList);
-    # Resolve nixCxxAttrs like "pkgs.gtest" into concrete package values
-    segs = s: let xs = lib.splitString "." s; in if xs == [] then [] else xs;
-    getAt = s:
-      let parts0 = segs s;
-          parts = if parts0 != [] && (lib.head parts0) == "pkgs" then lib.tail parts0 else parts0;
-      in if parts == [ "gtest" ] then getAtPath pkgs [ "googletest" ] else getAtPath pkgs parts;
     resolvedPkgs =
-      let base0 = nixCxxPkgs;
-          attrsOver = builtins.filter (v: v != null) (map (a:
-            let base = getAt a; in if base == null then null else overridePkgIfAny a base
-          ) nixCxxAttrs);
-          base1 = base0 ++ attrsOver;
-      in base1 ++ (if hasGTest then gtestPkgsAll else []);
+      let base = nixCxxPkgs ++ (resolveAttrsToPkgs nixCxxAttrs);
+      in base ++ (if hasGTest then gtestPkgsAll else []);
     nixInc = nixIncFlags resolvedPkgs;
     nixLib = nixLibFlags resolvedPkgs;
     incFlags = joinInc includes;
@@ -279,17 +276,9 @@ in rec {
     extraLD  = joinExtraC ldflags;
     platLD   = if pkgs.stdenv.isDarwin then "-Wl,-dead_strip" else "-Wl,--gc-sections";
     # Heuristic: if gtest/googletest is among nixCxxAttrs, add -lgtest and -lgtest_main and force include/lib paths
-    hasGTest = builtins.any (a: lib.hasInfix "googletest" a || lib.hasInfix "gtest" a) nixCxxAttrs;
+    hasGTest = hasGTestAttr nixCxxAttrs;
     gtestLibs = if hasGTest then "-lgtest_main -lgtest" else "";
-    # Try to resolve via getAt first; if that fails, fall back to direct pkgs attr references
-    gtestPkg = let a = getAt "googletest"; b = getAt "gtest"; in if a != null then a else b;
-    gtestPkgs = builtins.filter (p: p != null) [ (getAt "googletest") (getAt "gtest") ];
-    fallbackGTestPkgs =
-      let cand = []
-        ++ (if (builtins.hasAttr "googletest" pkgs) then [ pkgs.googletest ] else [])
-        ++ (if (builtins.hasAttr "gtest" pkgs) then [ pkgs.gtest ] else []);
-      in cand;
-    gtestPkgsAll = if gtestPkgs != [] then gtestPkgs else fallbackGTestPkgs;
+    gtestPkgsAll = gtestPkgsAllFor nixCxxAttrs;
     gtestInc = if hasGTest && (gtestPkgsAll != []) then (
       lib.concatStringsSep " " (map (p: "-isystem ${toIncludeBase p}/include") gtestPkgsAll)
     ) else "";
