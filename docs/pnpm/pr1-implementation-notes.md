@@ -5,11 +5,13 @@
 After implementation and debugging, PR 1 scope is complete:
 
 ### Files Added
+
 - `pnpm-workspace.yaml` — Workspace config with `apps/*` and `libs/*` globs
-- `third_party/providers/defs_node.bzl` — Node importer provider stamp rule  
+- `third_party/providers/defs_node.bzl` — Node importer provider stamp rule
 - `patches/node/.gitkeep` — Ensures flat Node patch directory exists in VCS
 
 ### Files Modified
+
 - `.npmrc` — Added `shared-workspace-lockfile=false` to existing isolation settings
   - Prevents pnpm from creating a shared lockfile when apps/libs have no Node projects yet
   - Allows workspace to work cleanly even with Go-only projects in apps/libs
@@ -19,6 +21,7 @@ After implementation and debugging, PR 1 scope is complete:
 - `tools/buck/gen-auto-map.ts` — Already handles `lockfile:<path>#<importer>` labels
 
 ### Critical Fixes Applied (Runaway Process Prevention)
+
 - `tools/nix/devshell.nix`:
   - Added `_BUCKNIX_DEVSHELL_ACTIVE` guard to prevent recursive shellHook invocation
   - Changed node-modules linking to use `nix eval` instead of `node-modules-build.ts` to avoid triggering builds
@@ -45,6 +48,7 @@ The investigation revealed a **recursive shellHook loop**:
 ### Why Adding pnpm-workspace.yaml Made It Worse
 
 When `pnpm-workspace.yaml` exists:
+
 - pnpm treats the repo as a workspace and validates workspace packages
 - `apps/*` and `libs/*` globs match directories, but they contain Go projects
 - pnpm attempts to install/validate them as Node packages
@@ -64,13 +68,14 @@ When `pnpm-workspace.yaml` exists:
 - ✅ `patches/node/.gitkeep` exists
 - ✅ `.npmrc` updated with `shared-workspace-lockfile=false`
 - ✅ Node provider sync runs idempotently (test passes)
-- ✅ No runaway processes when running tests or commits  
+- ✅ No runaway processes when running tests or commits
 - ✅ pnpm list works without errors
 - ✅ All 177 tests pass (full suite verified)
 
 ## For PR 3
 
 When adding the first Node project:
+
 1. Workspace config already exists (✅ done in PR 1)
 2. Create `apps/example` with package.json, pnpm-lock.yaml, etc.
 3. Add lockfile label to TARGETS
@@ -83,4 +88,3 @@ When adding the first Node project:
 - Shellhooks should never trigger builds (use eval/query only)
 - Guard all entry points that might spawn processes
 - The `_BUCKNIX_DEVSHELL_ACTIVE` guard is essential to prevent infinite recursion
-
