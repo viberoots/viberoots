@@ -48,36 +48,47 @@ export async function main() {
   } catch {}
   console.log("Installing dependencies...");
   const { force, dryRun, verbose, skipGlue, glueOnly } = parseFlags(process.argv.slice(2));
+  const inBuckTest = Boolean(
+    process.env.BUCK_TARGET || process.env.BUCK_TEST_SRC || process.env.BUCK_ROOT,
+  );
+  const skipNodeInstall = inBuckTest || process.env.SKIP_NODE_INSTALL === "1";
   if (glueOnly) {
     if (verbose) console.log("[install-deps] glue-only mode");
     await runGlue(dryRun, verbose);
     console.log("Glue refreshed.");
     return;
   }
-  await withExclusiveInstallLock(
-    "node-modules",
-    async () => {
-      await fsp.rm("node_modules", { force: true });
-      // Ensure pnpm uses a writable store for the lockfile-only operation. On some systems
-      // a global pnpm config may point to /nix/store, which is read-only (EACCES after nix gc).
-      const localPnpmStore = path.join(process.cwd(), ".pnpm-store");
-      await fsp.mkdir(localPnpmStore, { recursive: true });
-      const useNixPnpm = await have("nix");
-      const envWithStore = { ...process.env, npm_config_store_dir: localPnpmStore } as Record<
-        string,
-        string
-      >;
-      if (useNixPnpm) {
-        await $({ stdio: "inherit", env: envWithStore })`pnpm install --lockfile-only`;
-      } else {
-        await $({ stdio: "inherit", env: envWithStore })`pnpm install --lockfile-only`;
-      }
-      await $({ stdio: "inherit" })`tools/dev/update-pnpm-hash.ts`;
-      await $({ stdio: "inherit" })`nix build .#node-modules --no-link --accept-flake-config`;
-      await relinkNodeModules(force);
-    },
-    { verbose: String(process.env.INSTALL_LOCK_VERBOSE || "").trim() === "1" },
-  );
+  if (skipNodeInstall) {
+    if (verbose)
+      console.log(
+        "[install-deps] skipping node install/node-modules build in test/CI or when SKIP_NODE_INSTALL=1",
+      );
+  } else {
+    await withExclusiveInstallLock(
+      "node-modules",
+      async () => {
+        await fsp.rm("node_modules", { force: true });
+        // Ensure pnpm uses a writable store for the lockfile-only operation. On some systems
+        // a global pnpm config may point to /nix/store, which is read-only (EACCES after nix gc).
+        const localPnpmStore = path.join(process.cwd(), ".pnpm-store");
+        await fsp.mkdir(localPnpmStore, { recursive: true });
+        const useNixPnpm = await have("nix");
+        const envWithStore = { ...process.env, npm_config_store_dir: localPnpmStore } as Record<
+          string,
+          string
+        >;
+        if (useNixPnpm) {
+          await $({ stdio: "inherit", env: envWithStore })`pnpm install --lockfile-only`;
+        } else {
+          await $({ stdio: "inherit", env: envWithStore })`pnpm install --lockfile-only`;
+        }
+        await $({ stdio: "inherit" })`tools/dev/update-pnpm-hash.ts`;
+        await $({ stdio: "inherit" })`nix build .#node-modules --no-link --accept-flake-config`;
+        await relinkNodeModules(force);
+      },
+      { verbose: String(process.env.INSTALL_LOCK_VERBOSE || "").trim() === "1" },
+    );
+  }
   try {
     const nodeBase = zxNodeBase();
     await $({

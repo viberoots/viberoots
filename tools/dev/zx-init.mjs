@@ -5,14 +5,23 @@ const pathMod = await import("node:path");
 const here = urlMod.fileURLToPath(import.meta.url);
 const WORKSPACE_ROOT_FIXED = pathMod.dirname(pathMod.dirname(pathMod.dirname(here)));
 
-try {
-  const zxPath = pathMod.resolve(WORKSPACE_ROOT_FIXED, "node_modules/zx/build/globals.cjs");
-  await import(urlMod.pathToFileURL(zxPath).href);
-} catch {
-  // Fallback: let default/bare resolution try via NODE_PATH or local node_modules
+const alreadyInit = globalThis.__ZX_INIT_ACTIVE === true;
+if (!alreadyInit) {
   try {
-    await import("zx/globals");
+    Object.defineProperty(globalThis, "__ZX_INIT_ACTIVE", {
+      value: true,
+      configurable: false,
+      writable: false,
+    });
   } catch {}
+  try {
+    const zxPath = pathMod.resolve(WORKSPACE_ROOT_FIXED, "node_modules/zx/build/globals.cjs");
+    await import(urlMod.pathToFileURL(zxPath).href);
+  } catch {
+    try {
+      await import("zx/globals");
+    } catch {}
+  }
 }
 
 const { register } = await import("node:module");

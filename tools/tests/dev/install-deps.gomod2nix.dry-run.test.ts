@@ -11,7 +11,7 @@ test("install-deps gomod2nix dry-run logs command and does not write file", asyn
     const { stdout } = await $({
       cwd: tmp,
       stdio: "pipe",
-      env: { ...process.env },
+      env: { ...process.env, SKIP_NODE_INSTALL: "1" },
     })`node --experimental-strip-types --import ./tools/dev/zx-init.mjs ./tools/dev/install-deps.ts --dry-run`;
     const out = String(stdout);
     if (!out.includes("[gomod2nix] dry-run: ")) {

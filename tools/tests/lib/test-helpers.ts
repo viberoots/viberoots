@@ -221,6 +221,7 @@ EOF
           $({
             cwd: tmp,
             stdio: "pipe",
+            env: { ...process.env, NO_NODE_MODULES_LINK: "1" },
           })`bash --noprofile --norc -c 'if command -v direnv >/dev/null 2>&1; then direnv allow . >/dev/null 2>&1 || true; eval "$(direnv export bash)"; env -0; else printf ""; fi'`,
       )
     : ({ stdout: "" } as any);
@@ -234,7 +235,8 @@ EOF
           $({
             cwd: tmp,
             stdio: "pipe",
-          })`bash --noprofile --norc -c 'if command -v nix >/dev/null 2>&1; then nix develop --accept-flake-config -c env -0; else printf ""; fi'`,
+            env: { ...process.env, NO_NODE_MODULES_LINK: "1" },
+          })`bash --noprofile --norc -c 'if command -v nix >/dev/null 2>&1; then NO_NODE_MODULES_LINK=1 nix develop --accept-flake-config -c env -0; else printf ""; fi'`,
       );
     } catch {
       // ignore; proceed with current environment
@@ -267,6 +269,7 @@ EOF
     .filter(Boolean)
     .join(path.delimiter);
   // Do not mutate PATH; rely on direnv-provided environment from the dev shell.
+  exportEnv.NO_NODE_MODULES_LINK = "1";
   const nodeOpts = ["--experimental-strip-types", `--import ${exportEnv.ZX_INIT}`];
   exportEnv.NODE_OPTIONS = [nodeOpts.join(" "), exportEnv.NODE_OPTIONS || ""]
     .filter(Boolean)
