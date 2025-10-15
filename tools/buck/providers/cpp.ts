@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import fs from "fs-extra";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { readGraph } from "../../lib/graph.ts";
 import { validateFlatDir } from "../../lib/provider-sync.ts";
@@ -18,11 +18,15 @@ const nameForAttr = providerNameForNixAttr;
 async function listCppPatchesFor(attr: string): Promise<string[]> {
   const dir = "patches/cpp";
   const out: string[] = [];
-  if (!(await fs.pathExists(dir))) return out;
+  try {
+    await fsp.access(dir);
+  } catch {
+    return out;
+  }
   // Validate directory flatness once per call site; warn by default
   await validateFlatDir(dir, false).catch(() => {});
   const enc = encodeNixAttrForPatchPrefix(attr);
-  const files = await fs.readdir(dir).catch(() => [] as string[]);
+  const files = await fsp.readdir(dir).catch(() => [] as string[]);
   for (const f of files) {
     if (!f.endsWith(".patch")) continue;
     if (!f.startsWith(`${enc}@`)) continue;
@@ -35,7 +39,7 @@ async function listCppPatchesFor(attr: string): Promise<string[]> {
 async function readCuratedProviders(): Promise<Array<{ name: string; attr: string }>> {
   const TARGETS = path.resolve("third_party/providers/TARGETS");
   try {
-    const txt = await fs.readFile(TARGETS, "utf8");
+    const txt = await fsp.readFile(TARGETS, "utf8");
     const out: Array<{ name: string; attr: string }> = [];
     // Match nix_cxx_library(name = "...", attr = "...") allowing whitespace
     const re = /nix_cxx_library\(\s*name\s*=\s*"([^"]+)",\s*attr\s*=\s*"([^"]+)"/g;
@@ -66,11 +70,12 @@ export async function syncCppProviders(opts?: { outFile?: string }) {
   ].join("\n");
 
   let nodes: Node[] = [];
-  if (await fs.pathExists(graphPath)) {
+  try {
+    await fsp.access(graphPath);
     try {
       nodes = (await readGraph(graphPath)) as Node[];
     } catch {}
-  }
+  } catch {}
 
   const attrs = new Set<string>();
   for (const n of nodes) {
@@ -91,12 +96,20 @@ export async function syncCppProviders(opts?: { outFile?: string }) {
   const { stableUnique } = await import("../../lib/fs-helpers.ts");
   const attrListUniq: string[] = stableUnique(attrList.sort(), (a) => a);
 
-  const overlayPaths = (await fs.pathExists(overlay)) ? [overlay] : [];
-  const hasLock = await fs.pathExists(lockfile).catch(() => false);
+  const overlayPaths = (await fsp
+    .access(overlay)
+    .then(() => true)
+    .catch(() => false))
+    ? [overlay]
+    : [];
+  const hasLock = await fsp
+    .access(lockfile)
+    .then(() => true)
+    .catch(() => false);
 
   // Prepare stamps directory and write one stamp per attr capturing input hashes
   const stampsDir = path.resolve("third_party/providers/stamps");
-  await fs.mkdirp(stampsDir);
+  await fsp.mkdir(stampsDir, { recursive: true });
 
   for (const attr of attrListUniq) {
     const name = nameForAttr(attr);

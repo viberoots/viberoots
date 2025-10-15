@@ -1,10 +1,26 @@
 #!/usr/bin/env zx-wrapper
 import { syncAllProviders } from "./providers/index.ts";
 
-const OUT_FILE = (argv.out as string) || "third_party/providers/TARGETS.auto";
-const STRICT = String(argv.strict || "").toLowerCase() === "true" || argv.strict === true;
-const LANG = (argv.lang as string) || "";
-const EMIT_INDEX = String(argv["emit-index"] || argv.emitIndex || "").toLowerCase() === "true";
+function flagBool(name: string): boolean {
+  const a: any = (global as any).argv || {};
+  if (a && (a[name] === true || String(a[name] || "").toLowerCase() === "true")) return true;
+  const raw = process.argv;
+  return raw.includes(`--${name}`);
+}
+
+function flagStr(name: string, def: string): string {
+  const a: any = (global as any).argv || {};
+  if (a && typeof a[name] === "string" && a[name]) return a[name] as string;
+  const raw = process.argv;
+  const idx = raw.indexOf(`--${name}`);
+  if (idx >= 0 && raw[idx + 1]) return raw[idx + 1];
+  return def;
+}
+
+const OUT_FILE = flagStr("out", "third_party/providers/TARGETS.auto");
+const STRICT = flagBool("strict");
+const LANG = flagStr("lang", "");
+const EMIT_INDEX = flagBool("emit-index") || flagBool("emitIndex");
 
 async function main() {
   await syncAllProviders({ outFile: OUT_FILE, strict: STRICT, lang: LANG });

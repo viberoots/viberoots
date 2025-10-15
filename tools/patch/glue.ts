@@ -1,10 +1,13 @@
 #!/usr/bin/env zx-wrapper
-import fs from "fs-extra";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 
 // ensureGraph: writes tools/buck/graph.json if missing by invoking the exporter
 export async function ensureGraph(): Promise<void> {
-  if (await fs.pathExists("tools/buck/graph.json")) return;
+  try {
+    await fsp.access("tools/buck/graph.json");
+    return;
+  } catch {}
   const nodeBin = process.execPath;
   const repoRoot = process.cwd();
   const zxInit = path.join(repoRoot, "tools/dev/zx-init.mjs");

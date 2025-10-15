@@ -45,7 +45,7 @@ def _zx_test_impl(ctx):
             + "  mkdir -p \"$WORKSPACE_ROOT/toolchains\" && printf '[buildfile]\nname = TARGETS\n' > \"$WORKSPACE_ROOT/toolchains/.buckconfig\"; "
             # Ensure node_modules available in sandbox by linking from flake output
             + "  if [ ! -e \"$WORKSPACE_ROOT/node_modules\" ]; then "
-            + "    NM_OUT=$(nix build \"$WORKSPACE_ROOT\"#node-modules --no-link --accept-flake-config --print-out-paths 2>/dev/null | tail -1); "
+            + "    NM_OUT=$(NODE_BIN=\"$(command -v node)\" \"$NODE_BIN\" --experimental-strip-types --import \"$WORKSPACE_ROOT/tools/dev/zx-init.mjs\" \"$WORKSPACE_ROOT/tools/dev/node-modules-build.ts\" --print-out-paths 2>/dev/null | tail -1); "
             + "    if [ -n \"$NM_OUT\" ] && [ -d \"$NM_OUT/node_modules\" ]; then ln -s \"$NM_OUT/node_modules\" \"$WORKSPACE_ROOT/node_modules\"; fi; "
             + "  fi; "
             + "            fi; "

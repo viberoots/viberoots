@@ -4,6 +4,7 @@ import path from "node:path";
 import { runGlue, zxNodeBase } from "./glue.ts";
 import { runGomod2nixGenerate, runGomod2nixScanAll } from "./gomod2nix.ts";
 import { relinkNodeModules } from "./link-node.ts";
+import { withExclusiveInstallLock } from "./lock.ts";
 
 type Flags = {
   force: boolean;
@@ -53,24 +54,30 @@ export async function main() {
     console.log("Glue refreshed.");
     return;
   }
-  await fsp.rm("node_modules", { force: true });
-  // Ensure pnpm uses a writable store for the lockfile-only operation. On some systems
-  // a global pnpm config may point to /nix/store, which is read-only (EACCES after nix gc).
-  const localPnpmStore = path.join(process.cwd(), ".pnpm-store");
-  await fsp.mkdir(localPnpmStore, { recursive: true });
-  const useNixPnpm = await have("nix");
-  const envWithStore = { ...process.env, npm_config_store_dir: localPnpmStore } as Record<
-    string,
-    string
-  >;
-  if (useNixPnpm) {
-    await $({ stdio: "inherit", env: envWithStore })`pnpm install --lockfile-only`;
-  } else {
-    await $({ stdio: "inherit", env: envWithStore })`pnpm install --lockfile-only`;
-  }
-  await $({ stdio: "inherit" })`tools/dev/update-pnpm-hash.ts`;
-  await $({ stdio: "inherit" })`nix build .#node-modules --no-link --accept-flake-config`;
-  await relinkNodeModules(force);
+  await withExclusiveInstallLock(
+    "node-modules",
+    async () => {
+      await fsp.rm("node_modules", { force: true });
+      // Ensure pnpm uses a writable store for the lockfile-only operation. On some systems
+      // a global pnpm config may point to /nix/store, which is read-only (EACCES after nix gc).
+      const localPnpmStore = path.join(process.cwd(), ".pnpm-store");
+      await fsp.mkdir(localPnpmStore, { recursive: true });
+      const useNixPnpm = await have("nix");
+      const envWithStore = { ...process.env, npm_config_store_dir: localPnpmStore } as Record<
+        string,
+        string
+      >;
+      if (useNixPnpm) {
+        await $({ stdio: "inherit", env: envWithStore })`pnpm install --lockfile-only`;
+      } else {
+        await $({ stdio: "inherit", env: envWithStore })`pnpm install --lockfile-only`;
+      }
+      await $({ stdio: "inherit" })`tools/dev/update-pnpm-hash.ts`;
+      await $({ stdio: "inherit" })`nix build .#node-modules --no-link --accept-flake-config`;
+      await relinkNodeModules(force);
+    },
+    { verbose: String(process.env.INSTALL_LOCK_VERBOSE || "").trim() === "1" },
+  );
   try {
     const nodeBase = zxNodeBase();
     await $({

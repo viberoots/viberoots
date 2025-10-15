@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import fs from "fs-extra";
+import * as fsp from "node:fs/promises";
 import type { Node } from "./types.ts";
 
 export const attrList = [
@@ -149,7 +149,7 @@ export async function cqueryNodes(scope: string, attrs: string[]): Promise<Node[
 }
 
 export async function readSimulatedNodes(path: string): Promise<Node[]> {
-  const txt = await fs.readFile(path, "utf8");
+  const txt = await fsp.readFile(path, "utf8");
   return JSON.parse(txt) as Node[];
 }
 

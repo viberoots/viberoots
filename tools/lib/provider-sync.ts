@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import fs from "fs-extra";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 
 export type ScanOpts = {
@@ -15,10 +15,14 @@ export type ProviderEntry = { provider: string; key: string; patchPath: string }
 export async function scanFlatPatchDir(opts: ScanOpts): Promise<ProviderEntry[]> {
   const { patchDir, strict } = opts;
   const entries: ProviderEntry[] = [];
-  if (!(await fs.pathExists(patchDir))) return entries;
+  try {
+    await fsp.access(patchDir);
+  } catch {
+    return entries;
+  }
   const byKey = new Map<string, string>();
   const seenProvider = new Map<string, string>();
-  const list = await fs.readdir(patchDir, { withFileTypes: true });
+  const list = await fsp.readdir(patchDir, { withFileTypes: true } as any);
   for (const e of list) {
     if (e.isDirectory()) {
       const msg = `ignoring subdirectory ${e.name}`;
@@ -60,8 +64,12 @@ export async function scanFlatPatchDir(opts: ScanOpts): Promise<ProviderEntry[]>
 // Used by languages that implement their own selection (e.g., C++) but want
 // consistent warnings/errors about directory structure.
 export async function validateFlatDir(patchDir: string, strict?: boolean) {
-  if (!(await fs.pathExists(patchDir))) return;
-  const list = await fs.readdir(patchDir, { withFileTypes: true });
+  try {
+    await fsp.access(patchDir);
+  } catch {
+    return;
+  }
+  const list = await fsp.readdir(patchDir, { withFileTypes: true } as any);
   for (const e of list) {
     if (e.isDirectory()) {
       const msg = `ignoring subdirectory ${e.name}`;

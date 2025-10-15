@@ -1,6 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import fs from "fs-extra";
-import YAML from "yaml";
+import * as fsp from "node:fs/promises";
 import { renderTargetsFile, writeIfChanged } from "../../lib/fs-helpers.ts";
 import { scanFlatPatchDir } from "../../lib/provider-sync.ts";
 import { providerNameForImporter } from "../../lib/providers.ts";
@@ -15,8 +14,11 @@ function pkgKeyFromPatch(filename: string): string | null {
   return filename.slice(0, -".patch".length).toLowerCase();
 }
 
-function parsePnpmLock(file: string): PNPMDoc {
-  return YAML.parse(fs.readFileSync(file, "utf8")) as PNPMDoc;
+async function parsePnpmLock(file: string): Promise<PNPMDoc> {
+  const mod = await import("yaml");
+  const YAML: any = (mod as any).default || mod;
+  const txt = await fsp.readFile(file, "utf8");
+  return YAML.parse(txt) as PNPMDoc;
 }
 
 function buildGraph(doc: PNPMDoc) {
@@ -93,16 +95,16 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
     lockfiles = [];
   }
 
-  const haveYaml = (() => {
+  async function haveYaml(): Promise<boolean> {
     try {
-      require.resolve("yaml");
+      await import("yaml");
       return true;
     } catch {
       return false;
     }
-  })();
+  }
 
-  if (!lockfiles.length || !haveYaml) {
+  if (!lockfiles.length || !(await haveYaml())) {
     const header = [
       "# GENERATED FILE — DO NOT EDIT.",
       'load("//third_party/providers:defs_node.bzl", "node_importer_deps")',
@@ -124,7 +126,7 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
   const entries: string[] = [];
 
   for (const lf of lockfiles) {
-    const doc = parsePnpmLock(lf);
+    const doc = await parsePnpmLock(lf);
     for (const importer of Object.keys(doc.importers || {})) {
       const eff = effectiveSetForImporter(doc, importer);
       const usedPatches = Array.from(eff)

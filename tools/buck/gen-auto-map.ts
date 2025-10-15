@@ -9,8 +9,19 @@ type Node = {
   labels?: string[];
 };
 
-const graphPath = (argv.graph as string) || "tools/buck/graph.json";
-const outPath = (argv.out as string) || "third_party/providers/auto_map.bzl";
+function getArg(name: string, def: string): string {
+  try {
+    const a: any = (global as any).argv;
+    if (a && typeof a[name] === "string" && a[name]) return a[name] as string;
+  } catch {}
+  // Fallback: parse process.argv for --name value
+  const idx = process.argv.findIndex((v) => v === `--${name}`);
+  if (idx >= 0 && idx + 1 < process.argv.length) return process.argv[idx + 1] as string;
+  return def;
+}
+
+const graphPath = getArg("graph", "tools/buck/graph.json");
+const outPath = getArg("out", "third_party/providers/auto_map.bzl");
 
 // writeIfChanged now imported from ../lib/fs-helpers
 

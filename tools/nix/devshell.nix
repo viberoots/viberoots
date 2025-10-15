@@ -16,7 +16,7 @@ in {
       if [ -e node_modules ] && [ ! -L node_modules ]; then
         echo "(devShell) existing non-symlink node_modules detected; not overwriting" >&2 || true
       else
-        out_path=$(nix build .#node-modules --no-link --accept-flake-config --print-out-paths 2>/dev/null || true)
+        out_path=$(node --experimental-strip-types --import "$PWD/tools/dev/zx-init.mjs" "$PWD/tools/dev/node-modules-build.ts" --print-out-paths 2>/dev/null || true)
         if [ -n "$out_path" ]; then
           ln -sfn "$out_path/node_modules" node_modules || true
           if [ -d "$out_path/node_modules/.bin" ]; then

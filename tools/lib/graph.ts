@@ -1,4 +1,4 @@
-import fs from "fs-extra";
+import * as fsp from "node:fs/promises";
 
 export type GraphNode = {
   name?: string;
@@ -8,7 +8,7 @@ export type GraphNode = {
 };
 
 export async function readGraph(graphPath: string): Promise<GraphNode[]> {
-  const txt = await fs.readFile(graphPath, "utf8");
+  const txt = await fsp.readFile(graphPath, "utf8");
   const data = JSON.parse(txt);
   if (Array.isArray(data)) return data as GraphNode[];
   if (data && typeof data === "object") return Object.values(data) as GraphNode[];

@@ -1,10 +1,20 @@
 #!/usr/bin/env zx-wrapper
-import fs from "fs-extra";
 import crypto from "node:crypto";
+import * as fsp from "node:fs/promises";
+import path from "node:path";
+
+async function exists(p: string): Promise<boolean> {
+  try {
+    await fsp.access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export async function writeIfChanged(dst: string, data: string) {
-  if (await fs.pathExists(dst)) {
-    const cur = await fs.readFile(dst, "utf8");
+  if (await exists(dst)) {
+    const cur = await fsp.readFile(dst, "utf8");
     const a = crypto.createHash("sha256").update(cur).digest("hex");
     const b = crypto.createHash("sha256").update(data).digest("hex");
     if (a === b) {
@@ -12,7 +22,8 @@ export async function writeIfChanged(dst: string, data: string) {
       return;
     }
   }
-  await fs.outputFile(dst, data, "utf8");
+  await fsp.mkdir(path.dirname(dst), { recursive: true });
+  await fsp.writeFile(dst, data, "utf8");
   console.log("wrote", dst);
 }
 
@@ -37,14 +48,15 @@ export async function writeStamp(file: string, inputs: Array<{ path: string; con
       lines.push(it.content);
     } else {
       try {
-        const txt = await fs.readFile(it.path, "utf8");
+        const txt = await fsp.readFile(it.path, "utf8");
         lines.push(txt);
       } catch {
         lines.push(`# missing=${it.path}`);
       }
     }
   }
-  await fs.outputFile(file, lines.join("\n"), "utf8");
+  await fsp.mkdir(path.dirname(file), { recursive: true });
+  await fsp.writeFile(file, lines.join("\n"), "utf8");
 }
 
 // Stable unique by key while preserving first occurrence order.
