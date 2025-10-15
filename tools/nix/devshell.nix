@@ -12,8 +12,15 @@ let
 in {
   default = pkgs.mkShell {
     shellHook = ''
+      # Guard against recursive shell hook invocation
+      if [ -n "''${_BUCKNIX_DEVSHELL_ACTIVE:-}" ]; then
+        return 0
+      fi
+      export _BUCKNIX_DEVSHELL_ACTIVE=1
+      
       # link Nix-built node_modules for IDEs/CLIs (read-only)
-      if [ -z "''${NO_NODE_MODULES_LINK:-}" ]; then
+      # Link only in interactive shells (TTY) and when not explicitly disabled.
+      if [ -z "''${NO_NODE_MODULES_LINK:-}" ] && [ -t 1 ]; then
         if [ -e node_modules ] && [ ! -L node_modules ]; then
           echo "(devShell) existing non-symlink node_modules detected; not overwriting" >&2 || true
         else

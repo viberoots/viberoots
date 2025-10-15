@@ -8,8 +8,9 @@ if ! command -v nix >/dev/null 2>&1; then
   exit 127
 fi
 
-# Run lint-staged inside the repo's Nix dev shell so pnpm and tools are on PATH
-BUCK_CONFIG_LOCK=1 nix develop "${ROOT_DIR}" --accept-flake-config -c pnpm exec lint-staged
+# Run lint-staged inside the repo's Nix dev shell so pnpm and tools are on PATH.
+# Disable node_modules linking and skip node install to avoid spawning many node processes.
+BUCK_CONFIG_LOCK=1 NO_NODE_MODULES_LINK=1 SKIP_NODE_INSTALL=1 nix develop "${ROOT_DIR}" --accept-flake-config -c pnpm exec lint-staged
 
 # Guard: fail if anything changed after lint-staged (prevents stray diffs)
 git diff --quiet || { echo "Working tree dirty after lint-staged. Stage changes and re-commit."; exit 1; }
