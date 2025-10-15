@@ -4,14 +4,13 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("cpp adapter emit warning for C++-looking srcs missing cxx_* and lang:cpp", async () => {
-  await runInTemp("exp-cpp-warn-mislabeled", async (tmp, $) => {
-    const pkg = path.join(tmp, "cpp", "app");
+test("CI forces error severity regardless of --validation=warn", async () => {
+  await runInTemp("exp-ci-error", async (tmp, $) => {
+    const pkg = path.join(tmp, "go", "app");
     await fs.mkdirp(pkg);
-    await fs.outputFile(path.join(pkg, "main.cpp"), "int main(){return 0;}\n", "utf8");
+    await fs.outputFile(path.join(pkg, "main.go"), "package main\nfunc main(){}\n", "utf8");
 
-    // Node with .cpp srcs but neither cxx_* rule_type nor 'lang:cpp' label
-    const nodes = [{ name: "//cpp/app:bin", srcs: ["cpp/app/main.cpp"], labels: [] }];
+    const nodes = [{ name: "//go/app:bin", srcs: ["go/app/main.go"], labels: [] }];
     const graph = path.join(tmp, "tools/buck/graph.json");
     await fs.mkdirp(path.dirname(graph));
     await fs.outputFile(graph, JSON.stringify(nodes, null, 2));
@@ -22,7 +21,7 @@ test("cpp adapter emit warning for C++-looking srcs missing cxx_* and lang:cpp",
       const res = await $({
         cwd: tmp,
         stdio: "pipe",
-        reject: false,
+        env: { ...process.env, CI: "true" },
       })`tools/buck/export-graph.ts --simulate ${graph} --out ${graph} --validation warn`;
       out = String(res.stdout || "") + String(res.stderr || "");
       code = res.exitCode || 0;
@@ -30,14 +29,12 @@ test("cpp adapter emit warning for C++-looking srcs missing cxx_* and lang:cpp",
       out = String(e?.stdout || "") + String(e?.stderr || "");
       code = typeof e?.exitCode === "number" ? e.exitCode : 1;
     }
-
-    if (code !== 0) {
-      console.error("exporter should succeed (warn-only)", out);
+    if (code === 0) {
+      console.error("expected exporter to fail in CI despite warn mode", out);
       process.exit(2);
     }
-    // Aggregated warnings header and adapter-specific message
-    if (!out.includes("validation warnings") || !out.includes("[exporter][cpp]")) {
-      console.error("expected aggregated validation warnings including cpp adapter message\n", out);
+    if (!out.includes("validation errors") || !out.includes("[exporter][go]")) {
+      console.error("expected aggregated errors including go adapter message", out);
       process.exit(2);
     }
   });

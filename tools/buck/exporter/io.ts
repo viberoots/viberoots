@@ -166,6 +166,7 @@ export function parseArgs(argv: any): {
   maxParallel: number;
   cacheDir: string;
   metricsOut: string;
+  validation: "warn" | "error";
 } {
   return {
     out: (argv.out as string) || "tools/buck/graph.json",
@@ -174,5 +175,10 @@ export function parseArgs(argv: any): {
     maxParallel: Number(argv["max-parallel"] || 4),
     cacheDir: (argv["cache-dir"] as string) || "tools/buck/.export-cache",
     metricsOut: (argv["metrics-out"] as string) || "",
+    validation:
+      ((argv["validation"] as string) || (process.env.EXPORTER_VALIDATION as string) || "error") ===
+      "warn"
+        ? "warn"
+        : "error",
   };
 }

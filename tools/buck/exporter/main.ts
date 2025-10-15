@@ -14,7 +14,7 @@ function sortAndDedupeLabels(nodes: Node[]): Node[] {
 }
 
 export async function run() {
-  const { out, scope, simulate, maxParallel, cacheDir, metricsOut } = parseArgs(
+  const { out, scope, simulate, maxParallel, cacheDir, metricsOut, validation } = parseArgs(
     (global as any).argv,
   );
   let nodes: Node[];
@@ -33,11 +33,31 @@ export async function run() {
     a.name.localeCompare(b.name),
   );
 
-  // Run adapter-level validation for all discovered adapters to catch
-  // misclassified nodes (e.g., .go sources missing rule_type/labels).
+  // Run adapter-level validation for all discovered adapters, collecting findings.
+  const findings: string[] = [];
   for (const a of adapters) {
     if (typeof a.validate === "function") {
-      await a.validate(nodes);
+      try {
+        const res = await a.validate(nodes);
+        if (Array.isArray(res)) findings.push(...res.filter(Boolean));
+      } catch (e: any) {
+        // Adapters should not throw; convert to a finding to avoid losing context
+        findings.push(String(e?.message || e));
+      }
+    }
+  }
+
+  // Determine effective severity (CI forces error)
+  const ci = String(process.env.CI || "").toLowerCase() === "true";
+  const mode: "warn" | "error" = ci ? "error" : validation;
+  if (findings.length) {
+    const hdr = `[exporter] validation ${mode === "warn" ? "warnings" : "errors"} (${findings.length}):`;
+    const body = findings.map((m) => `- ${m}`).join("\n\n");
+    if (mode === "warn") {
+      console.warn(`${hdr}\n\n${body}`);
+    } else {
+      console.error(`${hdr}\n\n${body}`);
+      process.exit(2);
     }
   }
 

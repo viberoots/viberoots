@@ -10,28 +10,30 @@ export const goAdapter: Adapter = {
   },
   validate(nodes: Node[]) {
     // Enforce authoritative classification: .go sources must have either go_* rule_type
-    // or carry a 'lang:go' label stamped by macros.
-    const bad: string[] = [];
+    // or carry a 'lang:go' label stamped by macros. Return findings, do not throw.
+    const findings: string[] = [];
+    const offenders: string[] = [];
     for (const n of nodes) {
       const srcs = Array.isArray((n as any).srcs) ? ((n as any).srcs as string[]) : [];
       const looksGo = srcs.some((s) => s.endsWith(".go"));
       const hasGoRT = (n.rule_type || "").startsWith("go_");
       const hasLangGo = (n.labels || []).includes("lang:go");
-      if (looksGo && !hasGoRT && !hasLangGo) bad.push(n.name);
+      if (looksGo && !hasGoRT && !hasLangGo) offenders.push(n.name);
     }
-    if (bad.length) {
-      const sample = bad.slice(0, 10).join("\n  - ");
-      throw new Error(
+    if (offenders.length) {
+      const sample = offenders.slice(0, 10).join("\n  - ");
+      findings.push(
         [
-          "Go adapter validation failed: targets include .go sources but lack both go_* rule_type and 'lang:go' label:",
+          "[exporter][go] targets include .go sources but lack both go_* rule_type and 'lang:go' label:",
           `  - ${sample}`,
-          bad.length > 10 ? `  ... and ${bad.length - 10} more` : "",
-          "Fix: ensure macros stamp 'lang:go' (and 'kind:bin' for binaries) or Buck emits go_* rule_type.",
+          offenders.length > 10 ? `  ... and ${offenders.length - 10} more` : "",
+          "Fix: ensure macros stamp 'lang:go' (and 'kind:bin') or use go_* rules.",
         ]
           .filter(Boolean)
           .join("\n"),
       );
     }
+    return findings;
   },
   async buildBatches(nodes: Node[]): Promise<Batch[]> {
     return buildBatches(nodes);

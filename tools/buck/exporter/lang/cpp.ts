@@ -19,9 +19,7 @@ export const adapter: Adapter = {
   isNode(n) {
     return isCppNode(n);
   },
-  // Warn-only validation: if a node looks like C++ (has .cc/.cpp/.cxx in srcs)
-  // but lacks both cxx_* rule_type and 'lang:cpp' label, emit an advisory warning.
-  // Do NOT fail the build — this is purely to surface likely misclassification.
+  // Warn-only validation: return advisory messages; main driver decides severity.
   validate(nodes: Node[]) {
     const suspects: string[] = [];
     for (const n of nodes) {
@@ -33,19 +31,18 @@ export const adapter: Adapter = {
         suspects.push(n.name);
       }
     }
-    if (suspects.length) {
-      const sample = suspects.slice(0, 10).join("\n  - ");
-      console.warn(
-        [
-          "[exporter][cpp] warning: targets include C++-looking sources but lack both cxx_* rule_type and 'lang:cpp' label:",
-          `  - ${sample}`,
-          suspects.length > 10 ? `  ... and ${suspects.length - 10} more` : "",
-          "Guidance: stamp 'lang:cpp' in macros or use cxx_* rules to classify C++ targets.",
-        ]
-          .filter(Boolean)
-          .join("\n"),
-      );
-    }
+    if (!suspects.length) return [];
+    const sample = suspects.slice(0, 10).join("\n  - ");
+    return [
+      [
+        "[exporter][cpp] targets include C++-looking sources but lack both cxx_* rule_type and 'lang:cpp' label:",
+        `  - ${sample}`,
+        suspects.length > 10 ? `  ... and ${suspects.length - 10} more` : "",
+        "Guidance: stamp 'lang:cpp' in macros or use cxx_* rules to classify C++ targets.",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    ];
   },
   async buildBatches(_nodes: Node[]): Promise<Batch[]> {
     return [];
