@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import fs from "fs-extra";
 import crypto from "node:crypto";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { GoPkg, Tuple } from "./types.ts";
 
@@ -16,7 +16,7 @@ function toHashInput(tuple: Tuple, roots: string[], modRootAbs: string): any {
 
 async function sha256OfFile(p: string): Promise<string> {
   try {
-    const buf = await fs.readFile(p);
+    const buf = await fsp.readFile(p);
     return crypto.createHash("sha256").update(buf).digest("hex");
   } catch {
     return "";
@@ -24,7 +24,7 @@ async function sha256OfFile(p: string): Promise<string> {
 }
 
 async function ensureDir(p: string) {
-  await fs.mkdirp(p);
+  await fsp.mkdir(p, { recursive: true });
 }
 
 export async function runGoList(
@@ -55,11 +55,12 @@ export async function runGoList(
   const key = crypto.createHash("sha256").update(JSON.stringify(keyObj)).digest("hex");
   const cachePath = path.join(cacheDir, `${key}.json`);
   await ensureDir(cacheDir);
-  if (await fs.pathExists(cachePath)) {
+  try {
+    await fsp.access(cachePath);
     cacheHits++;
-    const txt = await fs.readFile(cachePath, "utf8");
+    const txt = await fsp.readFile(cachePath, "utf8");
     return parseGoListStream(txt);
-  }
+  } catch {}
   cacheMisses++;
   // Ensure module dependencies (including test-only) are available and go.sum is populated
   try {
@@ -69,7 +70,7 @@ export async function runGoList(
   }
   const { stdout } = await $({ env, stdio: "pipe", cwd })`go ${args}`;
   const raw = String(stdout);
-  await fs.outputFile(cachePath, raw, "utf8");
+  await fsp.writeFile(cachePath, raw, "utf8");
   return parseGoListStream(raw);
 }
 

@@ -82,7 +82,11 @@ export async function main() {
         } else {
           await $({ stdio: "inherit", env: envWithStore })`pnpm install --lockfile-only`;
         }
-        await $({ stdio: "inherit" })`tools/dev/update-pnpm-hash.ts`;
+        // Avoid deadlock: update-pnpm-hash runs under the same lock via env flag
+        await $({
+          stdio: "inherit",
+          env: { ...process.env, INSTALL_LOCK_SKIP: "1" },
+        })`tools/dev/update-pnpm-hash.ts`;
         await $({ stdio: "inherit" })`nix build .#node-modules --no-link --accept-flake-config`;
         await relinkNodeModules(force);
       },

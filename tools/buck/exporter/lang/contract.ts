@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import fs from "fs-extra";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { Adapter } from "../types.ts";
 
@@ -20,7 +20,7 @@ export async function loadPresentAdapters(): Promise<Adapter[]> {
   const dir = hereDir();
   let files: string[] = [];
   try {
-    files = (await fs.readdir(dir))
+    files = (await fsp.readdir(dir))
       .filter((f) => f.endsWith(".ts"))
       .filter((f) => f !== "contract.ts")
       .sort();
@@ -32,7 +32,11 @@ export async function loadPresentAdapters(): Promise<Adapter[]> {
     const base = f.replace(/\.ts$/i, "");
     // Require file to exist in repo to support sparse checkouts
     const abs = path.join(dir, f);
-    if (!(await fs.pathExists(abs))) continue;
+    try {
+      await fsp.access(abs);
+    } catch {
+      continue;
+    }
     try {
       const mod = await import(`./${base}.ts`);
       const adapter: Adapter | undefined = (mod &&
@@ -48,10 +52,11 @@ export async function loadPresentAdapters(): Promise<Adapter[]> {
   // Fallback: legacy explicit Go adapter load (kept for clarity and tests)
   if (adapters.length === 0) {
     const goPath = repoPath("tools/buck/exporter/lang/go.ts");
-    if (await fs.pathExists(goPath)) {
+    try {
+      await fsp.access(goPath);
       const { goAdapter } = await import("./go.ts");
       adapters.push(goAdapter);
-    }
+    } catch {}
   }
 
   // Optional filter for tests/diagnostics: limit active adapters via env

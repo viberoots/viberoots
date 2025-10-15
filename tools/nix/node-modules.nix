@@ -20,7 +20,9 @@ let
     src = storeSrc;
     nativeBuildInputs = [ node pnpm ];
     outputHashMode = "recursive";
-    outputHash = "sha256-WRd9oK/vjAegzMsJEruMiNkMR8vN48CeUSyULSmhL8c=";
+    # Intentionally placeholder to force one-time hash refresh via tools/dev/update-pnpm-hash.ts
+    # The update script will rebuild and rewrite this to the correct value.
+    outputHash = "sha256-+xkdTu9e0vP5Lee6vaw2fiPtrMKwuxBPZ6bfTKIBoLc=";
     dontPatchShebangs = true;
     unpackPhase = ''
       runHook preUnpack
@@ -36,6 +38,11 @@ let
       export NODE_EXTRA_CA_CERTS=${certs}/etc/ssl/certs/ca-bundle.crt
       export HOME=$(pwd)/.home
       mkdir -p "$HOME"
+      export COREPACK_ENABLE=0
+      export PNPM_HOME="$HOME/.pnpm-home"
+      mkdir -p "$PNPM_HOME"
+      # Strip packageManager to prevent corepack/pnpm self-bootstrap
+      node -e 'const fs=require("fs"); const p="package.json"; if(fs.existsSync(p)){const j=JSON.parse(fs.readFileSync(p,"utf8")); delete j.packageManager; fs.writeFileSync(p, JSON.stringify(j, null, 2));}'
       pnpm config set store-dir "$out/store"
       pnpm fetch --frozen-lockfile
       runHook postBuild
@@ -61,8 +68,15 @@ let
       export NODE_EXTRA_CA_CERTS=${certs}/etc/ssl/certs/ca-bundle.crt
       export HOME=$(pwd)/.home
       mkdir -p "$HOME"
+      export COREPACK_ENABLE=0
+      export PNPM_HOME="$HOME/.pnpm-home"
+      mkdir -p "$PNPM_HOME"
+      # Strip packageManager to prevent corepack/pnpm self-bootstrap loops inside hermetic builds
+      node -e 'const fs=require("fs"); const p="package.json"; if(fs.existsSync(p)){const j=JSON.parse(fs.readFileSync(p,"utf8")); delete j.packageManager; fs.writeFileSync(p, JSON.stringify(j, null, 2));}'
+      # Use the read-only fixed-output store in the nix store
       pnpm config set store-dir "${pnpm-store}/store"
-      pnpm install --offline --frozen-lockfile
+      # Disable lifecycle scripts to avoid spawning many node processes and ensure hermeticity
+      pnpm install --offline --frozen-lockfile --ignore-scripts
       runHook postBuild
     '';
     installPhase = ''

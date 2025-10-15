@@ -1,6 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+// Use default environment; sanitizer no longer needed
+import { withExclusiveInstallLock } from "./install/lock.ts";
 
 async function buildStore(): Promise<{ ok: boolean; output: string }> {
   try {
@@ -29,7 +31,7 @@ async function rewritePnpmStoreHash(newHash: string) {
   await fsp.writeFile(nmPath, next, "utf8");
 }
 
-async function main() {
+async function inner() {
   const first = await buildStore();
   if (first.ok) {
     console.log("pnpm-store: up to date");
@@ -47,6 +49,16 @@ async function main() {
     process.exit(1);
   }
   console.log("pnpm-store: hash updated and build succeeded");
+}
+
+async function main() {
+  if (String(process.env.INSTALL_LOCK_SKIP || "").trim() === "1") {
+    await inner();
+    return;
+  }
+  await withExclusiveInstallLock("node-modules", inner, {
+    verbose: String(process.env.INSTALL_LOCK_VERBOSE || "").trim() === "1",
+  });
 }
 
 main().catch((e) => {
