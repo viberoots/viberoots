@@ -20,12 +20,14 @@ in {
       
       # link Nix-built node_modules for IDEs/CLIs (read-only)
       # Link only in interactive shells (TTY) and when not explicitly disabled.
+      # Skip if node-modules haven't been built yet to avoid triggering builds in shellHook.
       if [ -z "''${NO_NODE_MODULES_LINK:-}" ] && [ -t 1 ]; then
         if [ -e node_modules ] && [ ! -L node_modules ]; then
           echo "(devShell) existing non-symlink node_modules detected; not overwriting" >&2 || true
         else
-          out_path=$(node --experimental-strip-types --import "$PWD/tools/dev/zx-init.mjs" "$PWD/tools/dev/node-modules-build.ts" --print-out-paths 2>/dev/null || true)
-          if [ -n "$out_path" ]; then
+          # Use nix eval instead of building to avoid recursive nix invocations
+          out_path=$(nix eval --raw .#node-modules.outPath 2>/dev/null || true)
+          if [ -n "$out_path" ] && [ -d "$out_path/node_modules" ]; then
             ln -sfn "$out_path/node_modules" node_modules || true
             if [ -d "$out_path/node_modules/.bin" ]; then
               export PATH="$out_path/node_modules/.bin:$PATH"
