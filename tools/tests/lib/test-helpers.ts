@@ -167,18 +167,18 @@ root = .
 prelude = ./prelude
 toolchains = ./toolchains
 repo_toolchains = ./toolchains
+config = ./prelude
 fbsource = ./prelude/third-party/fbsource_stub
 fbcode = ./prelude/third-party/fbcode_stub
-config = ./prelude
 
 [cells]
 root = .
 prelude = ./prelude
 toolchains = ./toolchains
 repo_toolchains = ./toolchains
+config = ./prelude
 fbsource = ./prelude/third-party/fbsource_stub
 fbcode = ./prelude/third-party/fbcode_stub
-config = ./prelude
 
 [build]
 prelude = prelude
@@ -187,6 +187,22 @@ target_platforms = prelude//platforms:default
 EOF
         mkdir -p toolchains
         printf '[buildfile]\nname = TARGETS\n' > toolchains/.buckconfig
+        cat > toolchains/TARGETS <<'EOF'
+load("@repo_toolchains//:go.bzl", "system_go_bootstrap_toolchain", "system_go_toolchain")
+load("@repo_toolchains//:python.bzl", "system_python_bootstrap_toolchain")
+load("@repo_toolchains//:cxx.bzl", "system_cxx_toolchain")
+load("@prelude//tests:test_toolchain.bzl", "noop_test_toolchain")
+load("@repo_toolchains//:remote_test_execution.bzl", "remote_test_execution_toolchain")
+load("@prelude//toolchains:genrule.bzl", "system_genrule_toolchain")
+
+system_go_toolchain(name = "go", visibility = ["PUBLIC"]) 
+system_go_bootstrap_toolchain(name = "go_bootstrap", visibility = ["PUBLIC"]) 
+system_python_bootstrap_toolchain(name = "python_bootstrap", visibility = ["PUBLIC"]) 
+system_cxx_toolchain(name = "cxx", visibility = ["PUBLIC"]) 
+noop_test_toolchain(name = "test", visibility = ["PUBLIC"]) 
+remote_test_execution_toolchain(name = "remote_test_execution", visibility = ["PUBLIC"]) 
+system_genrule_toolchain(name = "genrule", visibility = ["PUBLIC"]) 
+EOF
       `}`;
     }
   }

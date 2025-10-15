@@ -8,9 +8,9 @@ test("extra_module_providers are appended and normalized", async () => {
     await $({
       cwd: tmp,
     })`bash -lc 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<\'EOF'
-genrule(name="mod_auto", out="mod_auto.stamp", cmd=": > $OUT")
-genrule(name="mod_extra", out="mod_extra.stamp", cmd=": > $OUT")
-genrule(name="dup", out="dup.stamp", cmd=": > $OUT")
+genrule(name="mod_auto", out="mod_auto.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
+genrule(name="mod_extra", out="mod_extra.stamp", cmd=": > $OUT", visibility=["PUBLIC"]) 
+genrule(name="dup", out="dup.stamp", cmd=": > $OUT", visibility=["PUBLIC"]) 
 EOF'`;
     await $({ cwd: tmp })`bash -lc 'cat > third_party/providers/auto_map.bzl <<\'EOF'
 MODULE_PROVIDERS = {
@@ -30,32 +30,28 @@ nix_go_library(
     extra_module_providers = ["//third_party/providers:mod_extra", ":localprov"],
 )
 EOF'`;
-    // Probe Buck with real prelude; skip if prelude alias is unavailable
+    // Probe Buck; now require success instead of skipping
     const probe = await $({
       cwd: tmp,
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery "deps(//tmp:lib)" --json --output-attribute name`;
-    const out = String(probe.stdout || "");
-    const err = String(probe.stderr || "");
+    })`buck2 cquery --target-platforms prelude//platforms:default "deps(//tmp:lib)" --json --output-attribute name`;
     if (probe.exitCode !== 0) {
-      console.log(
-        "SKIP: prelude likely unavailable in this shell; run inside dev shell to enable unit test.",
-      );
-      return;
+      console.error("buck2 cquery failed; prelude or config missing");
+      process.exit(2);
     }
-    const nodes = JSON.parse(out) as Array<{ name: string }>;
-    const names = nodes.map((n) => n.name);
-    if (!names.includes("//third_party/providers:mod_auto")) {
+    const out = String(probe.stdout || "");
+    // Buck2 JSON shape can vary; perform substring checks for robustness
+    if (!out.includes("//third_party/providers:mod_auto")) {
       console.error("expected auto provider present");
       process.exit(2);
     }
-    if (!names.includes("//third_party/providers:mod_extra")) {
+    if (!out.includes("//third_party/providers:mod_extra")) {
       console.error("expected extra provider present");
       process.exit(2);
     }
-    if (!names.includes("//tmp:localprov")) {
+    if (!out.includes("//tmp:localprov")) {
       console.error("expected normalized relative provider present");
       process.exit(2);
     }
@@ -68,7 +64,7 @@ test("dedup keeps first occurrence across deps and extra_module_providers", asyn
     await $({
       cwd: tmp,
     })`bash -lc 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<\'EOF'
-genrule(name="dup", out="dup.stamp", cmd=": > $OUT")
+genrule(name="dup", out="dup.stamp", cmd=": > $OUT", visibility=["PUBLIC"]) 
 EOF'`;
     await $({ cwd: tmp })`bash -lc 'cat > third_party/providers/auto_map.bzl <<\'EOF'
 MODULE_PROVIDERS = {}
@@ -83,24 +79,20 @@ nix_go_library(
     extra_module_providers = ["//third_party/providers:dup"],
 )
 EOF'`;
-    // Probe Buck with real prelude; skip if prelude alias is unavailable
+    // Require success
     const probe = await $({
       cwd: tmp,
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery "deps(//tmp:lib)" --json --output-attribute name`;
-    const out = String(probe.stdout || "");
-    const err = String(probe.stderr || "");
+    })`buck2 cquery --target-platforms prelude//platforms:default "deps(//tmp:lib)" --json --output-attribute name`;
     if (probe.exitCode !== 0) {
-      console.log(
-        "SKIP: prelude likely unavailable in this shell; run inside dev shell to enable unit test.",
-      );
-      return;
+      console.error("buck2 cquery failed; prelude or config missing");
+      process.exit(2);
     }
-    const nodes = JSON.parse(out) as Array<{ name: string }>;
-    const dup = nodes.filter((n) => n.name === "//third_party/providers:dup");
-    if (dup.length !== 1) {
+    const out = String(probe.stdout || "");
+    const count = (out.match(/\/\/third_party\/providers:dup/g) || []).length;
+    if (count !== 1) {
       console.error("expected exactly one instance of duplicate provider, got", dup.length);
       process.exit(2);
     }
