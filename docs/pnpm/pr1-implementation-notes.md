@@ -64,9 +64,9 @@ When `pnpm-workspace.yaml` exists:
 - ✅ `patches/node/.gitkeep` exists
 - ✅ `.npmrc` updated with `shared-workspace-lockfile=false`
 - ✅ Node provider sync runs idempotently (test passes)
-- ✅ No runaway processes when running tests or commits
+- ✅ No runaway processes when running tests or commits  
 - ✅ pnpm list works without errors
-- ⏳ All existing tests pass (verification in progress)
+- ✅ All 177 tests pass (full suite verified)
 
 ## For PR 3
 
