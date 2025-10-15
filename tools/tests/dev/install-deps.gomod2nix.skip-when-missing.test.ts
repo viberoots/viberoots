@@ -7,6 +7,7 @@ test("install-deps gomod2nix skips when go.mod and go.sum missing", async () => 
     const { stdout } = await $({
       cwd: tmp,
       stdio: "pipe",
+      env: { ...process.env, SKIP_NODE_INSTALL: "1" },
     })`node tools/dev/install-deps.ts --dry-run`;
     const out = String(stdout);
     if (!out.includes("[gomod2nix] skip: no go.mod or go.sum present")) {
