@@ -201,6 +201,7 @@ EOS
   fi
 }
 
+export NO_NODE_MODULES_LINK=1
 if [[ ${#ARGS[@]} -eq 0 ]]; then
   build_run_array
 else

@@ -13,14 +13,16 @@ in {
   default = pkgs.mkShell {
     shellHook = ''
       # link Nix-built node_modules for IDEs/CLIs (read-only)
-      if [ -e node_modules ] && [ ! -L node_modules ]; then
-        echo "(devShell) existing non-symlink node_modules detected; not overwriting" >&2 || true
-      else
-        out_path=$(node --experimental-strip-types --import "$PWD/tools/dev/zx-init.mjs" "$PWD/tools/dev/node-modules-build.ts" --print-out-paths 2>/dev/null || true)
-        if [ -n "$out_path" ]; then
-          ln -sfn "$out_path/node_modules" node_modules || true
-          if [ -d "$out_path/node_modules/.bin" ]; then
-            export PATH="$out_path/node_modules/.bin:$PATH"
+      if [ -z "''${NO_NODE_MODULES_LINK:-}" ]; then
+        if [ -e node_modules ] && [ ! -L node_modules ]; then
+          echo "(devShell) existing non-symlink node_modules detected; not overwriting" >&2 || true
+        else
+          out_path=$(node --experimental-strip-types --import "$PWD/tools/dev/zx-init.mjs" "$PWD/tools/dev/node-modules-build.ts" --print-out-paths 2>/dev/null || true)
+          if [ -n "$out_path" ]; then
+            ln -sfn "$out_path/node_modules" node_modules || true
+            if [ -d "$out_path/node_modules/.bin" ]; then
+              export PATH="$out_path/node_modules/.bin:$PATH"
+            fi
           fi
         fi
       fi
