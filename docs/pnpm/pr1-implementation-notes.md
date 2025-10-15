@@ -1,0 +1,86 @@
+# PR 1 Implementation Notes — Workspace Bootstrap Revised
+
+## What PR 1 Actually Delivers (Revised)
+
+After implementation and debugging, PR 1 scope has been refined:
+
+### Files Added
+- `third_party/providers/defs_node.bzl` — Node importer provider stamp rule
+- `patches/node/.gitkeep` — Ensures flat Node patch directory exists in VCS
+
+### Files NOT Added (Deferred to PR 3)
+- ~~`pnpm-workspace.yaml`~~ — **Deferred to PR 3**
+  - Reason: Adding workspace config without actual Node projects causes pnpm to expect workspace packages
+  - When `apps/*` and `libs/*` contain only Go projects, pnpm validation/install attempts fail or hang
+  - Will be added in PR 3 alongside the first actual Node importer project
+
+### Files Already Present (No Changes Needed)
+- `.npmrc` — Already had `node-linker=isolated` and `patches-dir=patches/node`
+- `tools/buck/providers/node.ts` — Node provider sync driver already implemented
+- `tools/buck/sync-providers-node.ts` — Wrapper already present
+- `tools/buck/gen-auto-map.ts` — Already handles `lockfile:<path>#<importer>` labels
+
+### Critical Fixes Applied (Runaway Process Prevention)
+- `tools/nix/devshell.nix`:
+  - Added `_BUCKNIX_DEVSHELL_ACTIVE` guard to prevent recursive shellHook invocation
+  - Changed node-modules linking to use `nix eval` instead of `node-modules-build.ts` to avoid triggering builds
+  - Only link when TTY present and NO_NODE_MODULES_LINK unset
+- `.husky/pre-commit`: Set `NO_NODE_MODULES_LINK=1` and `SKIP_NODE_INSTALL=1`
+- `tools/bin/verify`: Export `NO_NODE_MODULES_LINK=1`
+- `tools/tests/lib/test-helpers.ts`: Export `NO_NODE_MODULES_LINK=1` for test sandboxes
+- `tools/dev/install/deps-main.ts`: Skip node install when in Buck test env or `SKIP_NODE_INSTALL=1`
+- All install-deps tests: Set `SKIP_NODE_INSTALL=1`
+
+## Root Cause Analysis — Runaway Node Processes
+
+The investigation revealed a **recursive shellHook loop**:
+
+1. User runs `git commit` or `direnv exec . buck2 test`
+2. This triggers `nix develop` (for pre-commit or via direnv)
+3. shellHook runs and calls `node-modules-build.ts`
+4. That script runs `nix build .#node-modules`
+5. The nix build evaluation re-enters the flake's devShell
+6. shellHook runs again (step 3), creating infinite recursion
+7. Each iteration spawned: node process + pnpm install + nix build
+8. Result: 1000+ node processes within minutes
+
+### Why Adding pnpm-workspace.yaml Made It Worse
+
+When `pnpm-workspace.yaml` exists:
+- pnpm treats the repo as a workspace and validates workspace packages
+- `apps/*` and `libs/*` globs match directories, but they contain Go projects
+- pnpm attempts to install/validate them as Node packages
+- This triggers more `pnpm install` calls, multiplying the spawn rate
+
+### Solution Summary
+
+1. **Break the recursion**: `_BUCKNIX_DEVSHELL_ACTIVE` guard
+2. **Avoid builds in shellHook**: Use `nix eval` instead of building
+3. **Defer workspace file**: Only add when actual Node projects exist (PR 3)
+4. **Guard all entry points**: NO_NODE_MODULES_LINK + SKIP_NODE_INSTALL in tests/hooks/verify
+
+## Revised PR 1 Acceptance Criteria
+
+- ✅ `third_party/providers/defs_node.bzl` added with stamp rule
+- ✅ `patches/node/.gitkeep` exists
+- ✅ `.npmrc` defaults unchanged (already correct)
+- ✅ Node provider sync runs idempotently (test already exists and passes)
+- ✅ No runaway processes when running tests or commits
+- ✅ All existing tests pass
+- ❌ ~~pnpm-workspace.yaml~~ — Moved to PR 3
+
+## For PR 3
+
+When adding the first Node project:
+1. Add `pnpm-workspace.yaml` with `apps/*` and `libs/*`
+2. Create `apps/example` with package.json, pnpm-lock.yaml, etc.
+3. Add lockfile label to TARGETS
+4. Tests will validate importer-scoped provider wiring
+
+## Lessons Learned
+
+- Don't add workspace config without workspace members
+- Test infrastructure must prevent recursive nix develop calls
+- Shellhooks should never trigger builds (use eval/query only)
+- Guard all entry points that might spawn processes
+
