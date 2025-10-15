@@ -2,20 +2,18 @@
 
 ## What PR 1 Actually Delivers (Revised)
 
-After implementation and debugging, PR 1 scope has been refined:
+After implementation and debugging, PR 1 scope is complete:
 
 ### Files Added
-- `third_party/providers/defs_node.bzl` — Node importer provider stamp rule
+- `pnpm-workspace.yaml` — Workspace config with `apps/*` and `libs/*` globs
+- `third_party/providers/defs_node.bzl` — Node importer provider stamp rule  
 - `patches/node/.gitkeep` — Ensures flat Node patch directory exists in VCS
 
-### Files NOT Added (Deferred to PR 3)
-- ~~`pnpm-workspace.yaml`~~ — **Deferred to PR 3**
-  - Reason: Adding workspace config without actual Node projects causes pnpm to expect workspace packages
-  - When `apps/*` and `libs/*` contain only Go projects, pnpm validation/install attempts fail or hang
-  - Will be added in PR 3 alongside the first actual Node importer project
-
-### Files Already Present (No Changes Needed)
-- `.npmrc` — Already had `node-linker=isolated` and `patches-dir=patches/node`
+### Files Modified
+- `.npmrc` — Added `shared-workspace-lockfile=false` to existing isolation settings
+  - Prevents pnpm from creating a shared lockfile when apps/libs have no Node projects yet
+  - Allows workspace to work cleanly even with Go-only projects in apps/libs
+  - Root package.json remains independent
 - `tools/buck/providers/node.ts` — Node provider sync driver already implemented
 - `tools/buck/sync-providers-node.ts` — Wrapper already present
 - `tools/buck/gen-auto-map.ts` — Already handles `lockfile:<path>#<importer>` labels
@@ -61,26 +59,28 @@ When `pnpm-workspace.yaml` exists:
 
 ## Revised PR 1 Acceptance Criteria
 
+- ✅ `pnpm-workspace.yaml` added with `apps/*` and `libs/*` globs
 - ✅ `third_party/providers/defs_node.bzl` added with stamp rule
 - ✅ `patches/node/.gitkeep` exists
-- ✅ `.npmrc` defaults unchanged (already correct)
-- ✅ Node provider sync runs idempotently (test already exists and passes)
+- ✅ `.npmrc` updated with `shared-workspace-lockfile=false`
+- ✅ Node provider sync runs idempotently (test passes)
 - ✅ No runaway processes when running tests or commits
-- ✅ All existing tests pass
-- ❌ ~~pnpm-workspace.yaml~~ — Moved to PR 3
+- ✅ pnpm list works without errors
+- ⏳ All existing tests pass (verification in progress)
 
 ## For PR 3
 
 When adding the first Node project:
-1. Add `pnpm-workspace.yaml` with `apps/*` and `libs/*`
+1. Workspace config already exists (✅ done in PR 1)
 2. Create `apps/example` with package.json, pnpm-lock.yaml, etc.
 3. Add lockfile label to TARGETS
 4. Tests will validate importer-scoped provider wiring
 
 ## Lessons Learned
 
-- Don't add workspace config without workspace members
+- **Critical**: Use `shared-workspace-lockfile=false` to allow workspace config even without Node projects in apps/libs
 - Test infrastructure must prevent recursive nix develop calls
 - Shellhooks should never trigger builds (use eval/query only)
 - Guard all entry points that might spawn processes
+- The `_BUCKNIX_DEVSHELL_ACTIVE` guard is essential to prevent infinite recursion
 
