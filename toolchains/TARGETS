@@ -3,6 +3,7 @@ load("@repo_toolchains//:python.bzl", "system_python_bootstrap_toolchain")
 load("@repo_toolchains//:cxx.bzl", "system_cxx_toolchain")
 load("@prelude//tests:test_toolchain.bzl", "noop_test_toolchain")
 load("@repo_toolchains//:remote_test_execution.bzl", "remote_test_execution_toolchain")
+load("@prelude//toolchains:genrule.bzl", "system_genrule_toolchain")
 
 oncall("build_infra")
 
@@ -34,6 +35,12 @@ noop_test_toolchain(
 
 remote_test_execution_toolchain(
     name = "remote_test_execution",
+    visibility = ["PUBLIC"],
+)
+
+
+system_genrule_toolchain(
+    name = "genrule",
     visibility = ["PUBLIC"],
 )
 

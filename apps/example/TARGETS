@@ -1,0 +1,28 @@
+# Minimal genrules to stamp provider wiring now; a thin macro will arrive in PR5.
+# Labels must include the importer-scoped lockfile label.
+# Also stamp lang/kind for consistency.
+genrule(
+    name = "provider_stamp",
+    srcs = [],
+    out = "provider.stamp",
+    cmd = "echo provider_ok > $OUT",
+    labels = [
+        "lang:node",
+        "kind:test",
+        "lockfile:apps/example/pnpm-lock.yaml#apps/example",
+    ],
+)
+
+genrule(
+    name = "smoke_test",
+    srcs = [],
+    out = "test.stamp",
+    cmd = "node -e 'console.log(\"ok\")' && echo ok > $OUT",
+    labels = [
+        "lang:node",
+        "kind:test",
+        "lockfile:apps/example/pnpm-lock.yaml#apps/example",
+    ],
+)
+
+
