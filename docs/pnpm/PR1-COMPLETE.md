@@ -6,24 +6,20 @@
 
 - ✅ **`pnpm -w list` shows an empty or minimal workspace without errors**
   - Verified: runs successfully, shows root dev dependencies
-  
 - ✅ **Running `node tools/buck/sync-providers.ts --lang node` creates deterministic `third_party/providers/TARGETS.node.auto`**
   - Verified: creates file with empty header (no lockfiles present yet)
   - Idempotent: running twice produces no diff
-  
 - ✅ **CI prebuild-guard passes (no missing glue after running glue steps)**
   - Verified: existing test `scaffolding_sync_providers_node_idempotent` passes
-  
+
 ### Additional Success Criteria
 
 - ✅ **All 177 tests pass**
   - Full test suite completed in ~4 minutes
   - No hangs, no timeouts, no failures
-  
 - ✅ **No runaway processes**
   - Node process count stable at 4 (Cursor language servers only)
   - Verified after: commits, test runs, pnpm commands
-  
 - ✅ **Isolation guaranteed**
   - `node-linker=isolated` prevents shadow deps
   - `shared-workspace-lockfile=false` enforces per-importer independence
@@ -31,12 +27,14 @@
 ## Files Delivered
 
 ### Core Scope
+
 1. `pnpm-workspace.yaml` — Workspace with `apps/*`, `libs/*`
 2. `.npmrc` — Updated with `shared-workspace-lockfile=false` + comments
 3. `patches/node/.gitkeep` — Flat patch directory
 4. `third_party/providers/defs_node.bzl` — Node importer provider stamp rule
 
 ### Infrastructure (Critical Fixes)
+
 5. `tools/nix/devshell.nix` — Recursion guard + smart node_modules linking
 6. `.husky/pre-commit` — Process leak prevention
 7. `tools/bin/verify` — Test environment guards
@@ -45,13 +43,14 @@
 10. `tools/tests/dev/install-deps.*.test.ts` — Test-specific guards
 
 ### Documentation
+
 11. `docs/pnpm/pr1-implementation-notes.md` — Implementation journey, root cause analysis
 12. `docs/pnpm/shared-workspace-lockfile-analysis.md` — Design alignment analysis
 
 ## Commits (10 total)
 
 1. `chore(node): bootstrap PNPM workspace and Node provider rule`
-2. `fix(dev): prevent runaway node processes during tests` 
+2. `fix(dev): prevent runaway node processes during tests`
 3. `fix(dev): prevent recursive shell hooks and runaway node processes`
 4. `fix(tests): restore zx argv global and add SKIP_NODE_INSTALL to remaining test`
 5. `fix(dev): prevent shellHook from triggering nix builds`
@@ -101,6 +100,7 @@ ps aux | grep -E "node|pnpm" | grep -v grep | wc -l  # ✅ stays at 4
 ## Ready for PR 2
 
 The foundation is stable:
+
 - ✅ Workspace config in place
 - ✅ Provider rule defined
 - ✅ Patch directory exists
@@ -117,4 +117,3 @@ PR 2 can proceed with provider wiring hardening and determinism tests.
 - The 10 commits represent iterative debugging and could be squashed if desired
 - All changes align with METHODOLOGY.XML (files <250 lines, clear separation of concerns, deterministic)
 - All changes align with build-system-design.md (provider strategy, importer-scoped labels)
-

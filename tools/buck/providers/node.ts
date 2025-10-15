@@ -11,7 +11,10 @@ type PNPMDoc = {
 
 function pkgKeyFromPatch(filename: string): string | null {
   if (!filename.endsWith(".patch")) return null;
-  return filename.slice(0, -".patch".length).toLowerCase();
+  const base = filename.slice(0, -".patch".length);
+  // Decode __ to / (PNPM-style encoding for scoped packages)
+  const decoded = base.replace(/__/g, "/");
+  return decoded.toLowerCase();
 }
 
 async function parsePnpmLock(file: string): Promise<PNPMDoc> {
@@ -146,6 +149,9 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
       );
     }
   }
+
+  // Sort entries for deterministic output
+  entries.sort();
 
   const header = [
     "# GENERATED FILE — DO NOT EDIT.",

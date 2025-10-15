@@ -29,6 +29,8 @@ This guide helps a new contributor land any PR in this plan successfully, follow
 - Glue generation (when working on providers/labels mappings):
   - Export graph: `node tools/buck/export-graph.ts`
   - Sync providers: `node tools/buck/sync-providers.ts`
+  - Sync Node providers: `node tools/buck/sync-providers-node.ts`
+  - Sync specific language: `node tools/buck/sync-providers.ts --lang node`
   - Generate auto_map: `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
   - Prebuild guard (freshness/presence): `node tools/buck/prebuild-guard.ts [--verbose|--json]`
 - Nix builds (planner outputs):
