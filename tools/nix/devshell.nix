@@ -19,19 +19,27 @@ in {
       export _BUCKNIX_DEVSHELL_ACTIVE=1
       
       # link Nix-built node_modules for IDEs/CLIs (read-only)
-      # Link only in interactive shells (TTY) and when not explicitly disabled.
-      # Skip if node-modules haven't been built yet to avoid triggering builds in shellHook.
-      if [ -z "''${NO_NODE_MODULES_LINK:-}" ] && [ -t 1 ]; then
-        if [ -e node_modules ] && [ ! -L node_modules ]; then
-          echo "(devShell) existing non-symlink node_modules detected; not overwriting" >&2 || true
-        else
+      # NO_NODE_MODULES_LINK skips expensive nix eval but still tries to link if already built.
+      if [ -e node_modules ] && [ ! -L node_modules ]; then
+        echo "(devShell) existing non-symlink node_modules detected; not overwriting" >&2 || true
+      else
+        out_path=""
+        # Skip expensive nix eval in non-interactive contexts (tests, CI, hooks)
+        if [ -z "''${NO_NODE_MODULES_LINK:-}" ] && [ -t 1 ]; then
           # Use nix eval instead of building to avoid recursive nix invocations
           out_path=$(nix eval --raw .#node-modules.outPath 2>/dev/null || true)
-          if [ -n "$out_path" ] && [ -d "$out_path/node_modules" ]; then
-            ln -sfn "$out_path/node_modules" node_modules || true
-            if [ -d "$out_path/node_modules/.bin" ]; then
-              export PATH="$out_path/node_modules/.bin:$PATH"
-            fi
+        fi
+        # If eval was skipped or failed, check if the parent workspace has node_modules
+        if [ -z "$out_path" ] && [ -n "''${WORKSPACE_ROOT:-}" ] && [ "$PWD" != "''${WORKSPACE_ROOT}" ]; then
+          # Test sandbox: use parent workspace's node_modules if available
+          if [ -L "''${WORKSPACE_ROOT}/node_modules" ]; then
+            out_path=$(readlink "''${WORKSPACE_ROOT}/node_modules" | sed 's|/node_modules$||')
+          fi
+        fi
+        if [ -n "$out_path" ] && [ -d "$out_path/node_modules" ]; then
+          ln -sfn "$out_path/node_modules" node_modules || true
+          if [ -d "$out_path/node_modules/.bin" ]; then
+            export PATH="$out_path/node_modules/.bin:$PATH"
           fi
         fi
       fi
