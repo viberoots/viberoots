@@ -114,8 +114,9 @@ build_run_array() {
     TARGETS=("//...")
   fi
   # Create a small wrapper script to execute tests and always kill the per-run buck2 daemon.
-  local TMP_SCRIPT
-  TMP_SCRIPT=$(mktemp "${TMPDIR:-/tmp}/verify-run-XXXXXX.sh")
+  local TMP_SCRIPT_DIR TMP_SCRIPT
+  TMP_SCRIPT_DIR=$(mktemp -d "${TMPDIR:-/tmp}/verify-run-$$-XXXXXX")
+  TMP_SCRIPT="$TMP_SCRIPT_DIR/run.sh"
   cat >"$TMP_SCRIPT" <<'EOS'
 #!/usr/bin/env bash
 set -euo pipefail
