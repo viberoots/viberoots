@@ -11,10 +11,40 @@ async function exists(p: string): Promise<boolean> {
   }
 }
 
+function findNearestImporterAttr(): string | null {
+  let here = process.cwd();
+  const root = here;
+  while (true) {
+    const lock = path.join(here, "pnpm-lock.yaml");
+    const rel = path.relative(root, here);
+    const looksImporter = rel.startsWith("apps/") || rel.startsWith("libs/");
+    if (looksImporter) {
+      return rel.replace(/[\/ :]+/g, "_");
+    }
+    const next = path.dirname(here);
+    if (next === here) break;
+    here = next;
+  }
+  return null;
+}
+
 export async function relinkNodeModules(force: boolean) {
-  const { stdout } =
-    await $`nix build .#node-modules --no-link --accept-flake-config --print-out-paths`;
-  const outPath = String(stdout).trim();
+  const attr = findNearestImporterAttr();
+  let outPath = "";
+  if (attr) {
+    const { stdout } = await $`nix eval --raw .#node-modules.${attr}.outPath`.nothrow();
+    outPath = String(stdout).trim();
+    if (!outPath) {
+      await $`nix build .#node-modules.${attr} --no-link --accept-flake-config`;
+      const { stdout: s2 } = await $`nix eval --raw .#node-modules.${attr}.outPath`.nothrow();
+      outPath = String(s2).trim();
+    }
+  }
+  if (!outPath) {
+    const { stdout } =
+      await $`nix build .#node-modules --no-link --accept-flake-config --print-out-paths`;
+    outPath = String(stdout).trim();
+  }
   if (!outPath) return;
   const linkTarget = path.join(outPath, "node_modules");
   const nm = path.join(process.cwd(), "node_modules");

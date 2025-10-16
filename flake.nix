@@ -43,7 +43,7 @@
             "$@"
         '';
         devshell = import ./tools/nix/devshell.nix { inherit pkgs; buck2Input = buck2; };
-        nodeMods = import ./tools/nix/node-modules.nix { inherit pkgs; repoRoot = ./.; };
+        nodeMods = import ./tools/nix/node-modules.nix { inherit pkgs; repoRoot = ./.; hashesPath = ./tools/nix/node-modules.hashes.json; };
         prelude = import ./tools/nix/buck-prelude.nix { inherit pkgs; buck2Input = buck2; };
       in f { inherit pkgs zx-wrapper nodeMods prelude system; buck2Input = buck2; }
     );
@@ -86,6 +86,23 @@
           rootModulesTomlPath = let envRootToml = builtins.getEnv "ROOT_GOMOD2NIX_TOML"; in
             if envRootToml != "" then envRootToml else ./gomod2nix.toml;
         };
+
+        # Discover importers under apps/* and libs/* containing a pnpm-lock.yaml
+        appsDirs = if builtins.pathExists ./apps then builtins.attrNames (builtins.readDir ./apps) else [];
+        libsDirs = if builtins.pathExists ./libs then builtins.attrNames (builtins.readDir ./libs) else [];
+        isDir = base: name: ((builtins.readDir base).${name} or null) == "directory";
+        appsWithLock = builtins.filter (d: isDir ./apps d && builtins.pathExists (./apps + ("/" + d) + "/pnpm-lock.yaml")) appsDirs;
+        libsWithLock = builtins.filter (d: isDir ./libs d && builtins.pathExists (./libs + ("/" + d) + "/pnpm-lock.yaml")) libsDirs;
+        importerDirs = (map (d: "apps/" + d) appsWithLock) ++ (map (d: "libs/" + d) libsWithLock);
+
+        perImporter = builtins.listToAttrs (map (imp: {
+          name = (nodeMods.sanitizeName ("node-modules." + imp));
+          value = nodeMods.mkNodeModules { lockfilePath = imp + "/pnpm-lock.yaml"; importerDir = imp; };
+        }) importerDirs);
+        perImporterStore = builtins.listToAttrs (map (imp: {
+          name = (nodeMods.sanitizeName ("pnpm-store." + imp));
+          value = nodeMods.mkPnpmStore { lockfilePath = imp + "/pnpm-lock.yaml"; importerDir = imp; };
+        }) importerDirs);
       in {
         buck2-prelude = prelude.buck2-prelude;
         zx-wrapper = zx-wrapper;
@@ -98,7 +115,7 @@
         buck-graph = buckGraph;
         graph-generator-pure = graphGenPure.all;
         graph-generator-pure-selected = graphGenPure.selected;
-      }
+      } // perImporter // perImporterStore
     );
 
     checks = forAllSystems ({ nodeMods, ... }: {

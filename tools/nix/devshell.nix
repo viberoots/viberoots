@@ -26,8 +26,30 @@ in {
         out_path=""
         # Skip expensive nix eval in non-interactive contexts (tests, CI, hooks)
         if [ -z "''${NO_NODE_MODULES_LINK:-}" ] && [ -t 1 ]; then
-          # Use nix eval instead of building to avoid recursive nix invocations
-          out_path=$(nix eval --raw .#node-modules.outPath 2>/dev/null || true)
+          # Detect importer (nearest directory up containing pnpm-lock.yaml under apps/* or libs/*)
+          imp=""
+          here="$PWD"
+          while [ "$here" != "/" ]; do
+            if [ -f "$here/pnpm-lock.yaml" ]; then
+              rel="''${here#$PWD}" # may be empty when same dir
+              # Prefer relative to repo root when inside apps/* or libs/*
+              case "$here" in
+                *"/apps/"*|*"/libs/"*)
+                  imp="''${here#$PWD/}"
+                  ;;
+              esac
+              break
+            fi
+            here=$(dirname "$here")
+          done
+          if [ -n "$imp" ]; then
+            attr=$(echo "$imp" | sed 's|/|_|g')
+            out_path=$(nix eval --raw .#node-modules.''${attr}.outPath 2>/dev/null || true)
+          fi
+          if [ -z "$out_path" ]; then
+            # Fallback to default attr without building
+            out_path=$(nix eval --raw .#node-modules.outPath 2>/dev/null || true)
+          fi
         fi
         # If eval was skipped or failed, check if the parent workspace has node_modules
         if [ -z "$out_path" ] && [ -n "''${WORKSPACE_ROOT:-}" ] && [ "$PWD" != "''${WORKSPACE_ROOT}" ]; then
@@ -101,7 +123,7 @@ EOF
       if [ ! -e prelude ]; then
         pre_out=$(nix build .#buck2-prelude --no-link --accept-flake-config --print-out-paths 2>/dev/null || true)
         if [ -z "$pre_out" ]; then
-          pre_out="$(${pkgs.nix}/bin/nix eval --raw .#inputs.buck2.outPath 2>/dev/null || true)"
+          pre_out="${pkgs.nix}/bin/nix eval --raw .#inputs.buck2.outPath 2>/dev/null || true"
         fi
         if [ -n "$pre_out" ] && [ -d "$pre_out/prelude" ]; then
           ln -s "$pre_out/prelude" prelude 2>/dev/null || true

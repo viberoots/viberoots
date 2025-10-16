@@ -39,6 +39,32 @@ async function have(cmd: string): Promise<boolean> {
   }
 }
 
+function findNearestImporterLock(): string | null {
+  // Look for apps/*/pnpm-lock.yaml or libs/*/pnpm-lock.yaml under CWD or parents
+  let here = process.cwd();
+  const root = here;
+  while (true) {
+    const cand1 = path.join(here, "pnpm-lock.yaml");
+    const rel = path.relative(root, here);
+    const looksImporter = rel.startsWith("apps/") || rel.startsWith("libs/");
+    if (looksImporter) {
+      try {
+        return path.relative(root, cand1);
+      } catch {}
+    }
+    const next = path.dirname(here);
+    if (next === here) break;
+    here = next;
+  }
+  return null;
+}
+
+function importerAttrFrom(relLock: string | null): string | null {
+  if (!relLock) return null;
+  const importer = path.dirname(relLock);
+  return importer.replace(/[\/ :]+/g, "_");
+}
+
 export async function main() {
   // Normalize CWD to repo root so this script works from any directory
   try {
@@ -82,12 +108,28 @@ export async function main() {
         } else {
           await $({ stdio: "inherit", env: envWithStore })`pnpm install --lockfile-only`;
         }
+        const relLock = findNearestImporterLock();
+        const attr = importerAttrFrom(relLock);
         // Avoid deadlock: update-pnpm-hash runs under the same lock via env flag
-        await $({
-          stdio: "inherit",
-          env: { ...process.env, INSTALL_LOCK_SKIP: "1" },
-        })`tools/dev/update-pnpm-hash.ts`;
-        await $({ stdio: "inherit" })`nix build .#node-modules --no-link --accept-flake-config`;
+        if (relLock) {
+          await $({
+            stdio: "inherit",
+            env: { ...process.env, INSTALL_LOCK_SKIP: "1" },
+          })`tools/dev/update-pnpm-hash.ts --lockfile ${relLock}`;
+          if (attr) {
+            await $({
+              stdio: "inherit",
+            })`nix build .#node-modules.${attr} --no-link --accept-flake-config`;
+          } else {
+            await $({ stdio: "inherit" })`nix build .#node-modules --no-link --accept-flake-config`;
+          }
+        } else {
+          await $({
+            stdio: "inherit",
+            env: { ...process.env, INSTALL_LOCK_SKIP: "1" },
+          })`tools/dev/update-pnpm-hash.ts`;
+          await $({ stdio: "inherit" })`nix build .#node-modules --no-link --accept-flake-config`;
+        }
         await relinkNodeModules(force);
       },
       { verbose: String(process.env.INSTALL_LOCK_VERBOSE || "").trim() === "1" },

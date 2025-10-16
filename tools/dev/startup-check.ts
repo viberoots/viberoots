@@ -112,22 +112,25 @@ async function main() {
   }
 
   // Preflight: ensure pnpm-store fixed-output hash is correct so shellHook/node-modules won't rebuild repeatedly.
-  try {
-    await $`nix build .#pnpm-store --no-link --accept-flake-config`;
-  } catch (e: any) {
-    const out = String((e && e.stderr) || (e && e.stdout) || e || "");
-    if (/hash mismatch in fixed-output derivation/i.test(out)) {
-      console.error(
-        "[startup-check] pnpm-store fixed-output hash mismatch detected.\n" +
-          "Run: tools/dev/update-pnpm-hash.ts\n",
-      );
-    } else {
-      console.error(
-        "[startup-check] pnpm-store build failed; see error below and consider updating the hash via update-pnpm-hash.ts\n\n" +
-          out,
-      );
+  // Only check when a lockfile exists at repo root; temp scaffolds without Node should skip this.
+  if (await fs.pathExists("pnpm-lock.yaml")) {
+    try {
+      await $`nix build .#pnpm-store --no-link --accept-flake-config`;
+    } catch (e: any) {
+      const out = String((e && e.stderr) || (e && e.stdout) || e || "");
+      if (/hash mismatch in fixed-output derivation/i.test(out)) {
+        console.error(
+          "[startup-check] pnpm-store fixed-output hash mismatch detected.\n" +
+            "Run: tools/dev/update-pnpm-hash.ts\n",
+        );
+      } else {
+        console.error(
+          "[startup-check] pnpm-store build failed; see error below and consider updating the hash via update-pnpm-hash.ts\n\n" +
+            out,
+        );
+      }
+      process.exit(1);
     }
-    process.exit(1);
   }
   console.log("startup-check: OK");
 }
