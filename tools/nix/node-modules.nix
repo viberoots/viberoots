@@ -13,6 +13,9 @@ let
     then builtins.fromJSON (builtins.readFile hashesPath)
     else {};
 
+  # Valid base64 placeholder digest (will be replaced by update-pnpm-hash.ts on first real build)
+  placeholderDigest = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+
   # Keep sources minimal and importer-scoped
   cleanSrc = lockfilePath: importerDir: pkgs.lib.cleanSourceWith {
     src = repoRoot;
@@ -28,7 +31,7 @@ let
     let
       relLock = lockfilePath;
       src = cleanSrc relLock importerDir;
-      outHash = hashMap.${relLock} or "sha256-REPLACE_ME_ON_FIRST_BUILD";
+      outHash = hashMap.${relLock} or placeholderDigest;
       certs = pkgs.cacert;
       lockAbs = builtins.toPath "${repoRoot}/${relLock}";
     in pkgs.stdenvNoCC.mkDerivation {
