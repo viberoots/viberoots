@@ -22,7 +22,7 @@ let
     outputHashMode = "recursive";
     # Intentionally placeholder to force one-time hash refresh via tools/dev/update-pnpm-hash.ts
     # The update script will rebuild and rewrite this to the correct value.
-    outputHash = "sha256-BwZfpfxa4bJtlCpe5zXkuVq9rctqLDFqdK13DsXcONE=";
+    outputHash = "sha256-2pniT9SS5dV19DCIdd/fEt7JcClUbUF5QyAFso3JoGY=";
     dontPatchShebangs = true;
     unpackPhase = ''
       runHook preUnpack

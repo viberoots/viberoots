@@ -130,14 +130,74 @@ This plan sequences small, verifiable PRs to implement PNPM workspaces (apps/lib
 - Scope
   - Add `tools/scaffolding/new-pnpm-project.ts` to generate apps/libs templates with TS/ESLint/Prettier/tests, `.npmrc`, labels, and TARGETS using the Node macro.
   - Register templates in scaffolding registry.
+  - Place all Node templates under `tools/scaffolding/templates` (consistent with other languages).
+  - Add a Node CLI template option (apps/\*) that scaffolds a runnable command-line app:
+    - Generates `bin/<name>` with `#!/usr/bin/env node` shebang and a minimal `--help` handler.
+    - Adds `package.json` `bin` mapping (`"bin": { "<name>": "bin/<name>" }`) and scripts (`build`, `test`, `lint`, `format`).
+    - Ensures `.npmrc` includes `node-linker=isolated` and `patches-dir=patches/node`.
+    - Emits `TARGETS` using the Node macro (from PR5) with `labels = ["lockfile:<path>#<importer>", "lang:node", "kind:bin"]` so importer-scoped providers auto-wire.
+    - Includes a one-test-per-file zx test under `tools/tests` that executes the CLI with `--help` and asserts exit code 0 (no zx loader in the app itself; zx is used only for the test harness).
+  - Add a Node lib template option (libs/\*) that scaffolds a reusable library:
+    - Generates `src/index.ts` exporting a function and a matching one-test-per-file unit test in `test/`.
+    - Adds `package.json` `exports`/`types` pointing to built outputs (e.g., `dist/index.js` / `dist/index.d.ts`) and standard scripts (`build`, `test`, `lint`, `format`).
+    - Ensures `.npmrc` includes `node-linker=isolated` and `patches-dir=patches/node`.
+    - Emits `TARGETS` using the Node macro (from PR5) with `labels = ["lockfile:<path>#<importer>", "lang:node", "kind:lib"]` so importer-scoped providers auto-wire.
+    - Avoids runtime dependence on zx; zx is used only for tests.
 - Detailed design
   - Command prompts for name, kind (app/lib), importer id, and creates files accordingly.
+  - For CLI template:
+    - The entry file lives under `bin/` (no TypeScript required for the bin shim); main logic in `src/` (TypeScript), compiled to `dist/`, and the bin shim `require()`s `dist/index.js`.
+    - Buck TARGETS use the Node macro to append provider deps from `//third_party/providers:auto_map.bzl` and carry the importer-scoped lockfile label.
+    - The generator ensures `pnpm-lock.yaml` is created (via `pnpm -w install --lockfile-only` in dev shell) so provider sync has stable inputs.
+  - For lib template:
+    - `tsconfig.json` enables `outDir=dist`, `module=esnext`, `target=es2022`, and `declaration=true` for type output.
+    - `package.json` sets `main`, `module` (optional), and `types` to `dist/*` and defines an explicit `exports` map.
+    - Buck TARGETS use the Node macro to append provider deps and carry the importer-scoped lockfile label; `kind:lib` is stamped.
+    - The generator ensures `pnpm-lock.yaml` exists (lockfile-only) so provider sync has stable inputs.
 - Acceptance criteria
   - Running the command produces a project that installs, builds, tests, and wires providers correctly on first try.
+  - CLI template: `pnpm run build` succeeds; `node bin/<name> --help` exits 0; Buck build/test targets succeed and depend on the correct importer-scoped provider (visible via `buck2 cquery deps(//apps/<name>:<rule>)`).
+  - Lib template: `pnpm run build` emits `dist/`; `node -e "import('<pkg>')"` succeeds (when locally linked); Buck build/test targets succeed and depend on the correct importer-scoped provider (visible via `buck2 cquery deps(//libs/<name>:<rule>)`).
 - Risks
   - Template drift; mitigate with tests using scaffolding fixtures.
 - Consequences of not implementing
   - Manual setup is error‑prone; slower adoption.
+
+### PR8.5 — Vite‑based webapp template (apps/\*)
+
+- Scope
+  - Add a `vite` + TypeScript webapp template under `apps/*` to the `new-pnpm-project` scaffolder.
+  - Generate minimal files: `index.html`, `src/main.ts`, `src/style.css` (optional), `vite.config.ts`.
+  - Create `package.json` with scripts: `dev` (vite), `build` (vite build), `preview` (vite preview), plus `lint`/`format`.
+  - Ensure `.npmrc` includes `node-linker=isolated` and `patches-dir=patches/node`; create importer‑scoped `pnpm-lock.yaml`.
+  - Emit `TARGETS` using the Node macro (from PR5) with `labels = ["lockfile:<path>#<importer>", "lang:node", "kind:app"]` so importer‑scoped providers auto‑wire.
+
+- Detailed design
+  - The scaffold chooses the Vite “vanilla TS” template (framework‑neutral) to minimize dependencies and align with hermeticity goals in `build-system-design.md`.
+  - `vite.config.ts` is minimal and deterministic (no ambient FS reads). Environment values flow via Vite defaults; no Nix wrappers for running Vite.
+  - The generator runs `pnpm -w install --lockfile-only` (in dev shell) to materialize a stable importer lockfile; provider sync then includes the correct importer.
+  - Buck TARGETS use the Node macro to append provider deps from `//third_party/providers:auto_map.bzl` and carry the importer‑scoped lockfile label.
+  - Add a thin Buck macro `node_webapp(...)` (in `//node/defs.bzl`) that builds via Nix, consistent with other templates:
+    - Stamps `lang:node` and `kind:app` using `lang/defs_common.bzl`.
+    - Requires the importer‑scoped lockfile label at call sites and appends providers from `auto_map.bzl`.
+    - Expands to a `genrule` that invokes a zx shim to run `nix build .#node-webapp[${system}].<importer>` and copies its `dist/` to `$OUT` (no network; uses pinned flake inputs). The shim should be minimal and deterministic.
+    - Nix side: expose a flake output `packages.<system>.node-webapp.<importer>` that runs `vite build` with the per‑importer `node-modules` derivation from PR4, producing `dist/` as the derivation output.
+  - Add a zx test under `tools/tests` that:
+    - Refreshes glue (export graph → sync node providers → gen auto_map).
+    - Asserts the webapp targets map to the expected importer provider in `auto_map.bzl`.
+    - Builds the Buck macro target and asserts the artifact contains `index.html` (verifies Nix‑backed build path end‑to‑end).
+
+- Acceptance criteria
+  - Scaffolding produces an `apps/<name>` webapp that builds with `pnpm run build` in the dev shell.
+  - Provider glue steps run cleanly; `auto_map.bzl` lists the importer‑scoped provider for the webapp target.
+  - Buck build/test of the template’s stamp target succeeds; `buck2 cquery deps(//apps/<name>:<rule>)` shows the importer provider.
+
+- Risks
+  - Tooling drift between Vite versions; mitigate with pinned versions and minimal config.
+  - If a future Buck rule is desired for bundling, additional macro work will be required (out of scope here).
+
+- Consequences of not implementing
+  - No standard for webapp scaffolds; duplicated patterns and inconsistent provider wiring.
 
 ### PR9 — Tests and hardening
 
