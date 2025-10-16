@@ -43,7 +43,7 @@ in {
             here=$(dirname "$here")
           done
           if [ -n "$imp" ]; then
-            attr=$(echo "$imp" | sed 's|/|_|g')
+            attr=$(echo "$imp" | sed 's|/|-|g; s| |-|g')
             out_path=$(nix eval --raw .#node-modules.''${attr}.outPath 2>/dev/null || true)
           fi
           if [ -z "$out_path" ]; then
