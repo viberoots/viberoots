@@ -27,9 +27,12 @@ let
       || (builtins.match ".*/patches/pnpm(/.*)?" path != null);
   };
 
+  dirnameOf = p: let parts = lib.splitString "/" p; in lib.concatStringsSep "/" (lib.take (lib.length parts - 1) parts);
+
   mkPnpmStore = { lockfilePath, importerDir, npmrcPath ? null, packageJsonPath ? null }:
     let
       relLock = lockfilePath;
+      relLockDir = dirnameOf relLock;
       src = cleanSrc relLock importerDir;
       outHash = hashMap.${relLock} or placeholderDigest;
       certs = pkgs.cacert;
@@ -59,13 +62,10 @@ let
         export COREPACK_ENABLE=0
         export PNPM_HOME="$HOME/.pnpm-home"
         mkdir -p "$PNPM_HOME"
-        if [ -n "${lib.optionalString (npmrcPath != null) npmrcPath}" ]; then
-          :
-        fi
         # Strip packageManager to prevent corepack/pnpm self-bootstrap
         node -e 'const fs=require("fs"); const p="${importerDir}/package.json"; if(fs.existsSync(p)){const j=JSON.parse(fs.readFileSync(p,"utf8")); delete j.packageManager; fs.writeFileSync(p, JSON.stringify(j, null, 2));}'
         pnpm config set store-dir "$out/store"
-        PNPM_HOME="$PNPM_HOME" pnpm fetch --frozen-lockfile --lockfile-path "${relLock}"
+        PNPM_HOME="$PNPM_HOME" pnpm fetch --frozen-lockfile --lockfile-dir "${relLockDir}" --dir "${importerDir}"
         runHook postBuild
       '';
       passthru.lockHash = builtins.hashFile "sha256" lockAbs;
@@ -74,6 +74,7 @@ let
   mkNodeModules = { lockfilePath, importerDir, npmrcPath ? null, packageJsonPath ? null }:
     let
       relLock = lockfilePath;
+      relLockDir = dirnameOf relLock;
       src = cleanSrc relLock importerDir;
       certs = pkgs.cacert;
       store = mkPnpmStore { inherit lockfilePath importerDir npmrcPath packageJsonPath; };
@@ -103,8 +104,8 @@ let
         # Strip packageManager to prevent corepack/pnpm self-bootstrap loops inside hermetic builds
         node -e 'const fs=require("fs"); const p="${importerDir}/package.json"; if(fs.existsSync(p)){const j=JSON.parse(fs.readFileSync(p,"utf8")); delete j.packageManager; fs.writeFileSync(p, JSON.stringify(j, null, 2));}'
         pnpm config set store-dir "${store}/store"
-        # Install strictly from the fixed-output store
-        PNPM_HOME="$PNPM_HOME" pnpm install --offline --frozen-lockfile --ignore-scripts --lockfile-path "${relLock}"
+        # Install strictly from the fixed-output store for the specific importer
+        PNPM_HOME="$PNPM_HOME" pnpm install --offline --frozen-lockfile --ignore-scripts --lockfile-dir "${relLockDir}" --dir "${importerDir}"
         runHook postBuild
       '';
       installPhase = ''
