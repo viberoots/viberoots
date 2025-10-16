@@ -89,6 +89,12 @@ export async function autoFixGlue() {
   try {
     await $`node --experimental-strip-types --import ./tools/dev/zx-init.mjs tools/dev/install-deps.ts --glue-only`;
   } catch {}
+  // Optional debug: list discovered targets before exporting graph
+  if ((process.env.PREBUILD_GUARD_DEBUG || "").trim() === "1") {
+    try {
+      await $`buck2 targets //...`;
+    } catch {}
+  }
   const nodeBase = ["--experimental-strip-types", "--import", "./tools/dev/zx-init.mjs"];
   await $`node ${nodeBase} tools/buck/export-graph.ts --out tools/buck/graph.json`;
   await $`node ${nodeBase} tools/buck/sync-providers.ts`;

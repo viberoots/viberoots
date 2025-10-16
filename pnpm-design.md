@@ -72,7 +72,13 @@ This document proposes how to add first-class PNPM projects to this monorepo, in
 - **Thin macro over genrules (recommended)**
   - Pros: injects provider deps from `MODULE_PROVIDERS` automatically; enforces presence/shape of lockfile labels; fewer footguns; single place to evolve Node build conventions.
   - Cons: small initial effort to add the macro; still limited by underlying genrule capabilities (which is acceptable for our current needs).
-- **Call:** Start with a minimal `//node/defs.bzl` macro that wraps genrules (build/test/bundle), appends providers via `auto_map.bzl`, and validates required labels. Keep an escape hatch for manual `deps`.
+  - **Call:** Implement `//node/defs.bzl` with:
+    - `nix_node_gen(...)` and `nix_node_test(...)` — thin wrappers over `genrule` that:
+      - enforce exactly one importer‑scoped lockfile label (`lockfile:<path>#<importer>`),
+      - stamp `lang:node` and `kind:*`, and
+      - append providers from `//third_party/providers:auto_map.bzl` using `MODULE_PROVIDERS["//pkg:name"]`.
+    - `nix_node_lib(...)` and `nix_node_bin(...)` — ergonomic aliases that set `kind` to `lib`/`bin` and reuse `nix_node_gen`.
+  - Escape hatch: callers may still pass additional `deps` manually when needed.
 
 ### Patching workflow
 

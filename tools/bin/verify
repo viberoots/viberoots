@@ -61,6 +61,9 @@ ORIG_CWD="$PWD"
 cd "$ROOT_DIR"
 export BUCK_ROOT="$ROOT_DIR"
 
+# Remove any ephemeral repo-root .tmp that may contain test-generated TARGETS
+rm -rf .tmp || true
+
 # Clean previous coverage artifacts regardless of coverage mode
 rm -rf coverage || true
 
@@ -155,11 +158,11 @@ if command -v nohup >/dev/null 2>&1; then
     nohup bash --noprofile --norc -c '
       parent="'"$$"'";
       if command -v node >/dev/null 2>&1; then
-        node --experimental-top-level-await --experimental-strip-types --disable-warning=ExperimentalWarning --import "'"$LIVE_ROOT"'/tools/dev/zx-init.mjs" "'"$LIVE_ROOT"'/tools/dev/buck-watchdog.ts" --parent "$parent" --iso "'"$ISO"'" --patterns zxtest-,exporter-,devbuild-,v-,scaf- & disown
+        node --experimental-top-level-await --experimental-strip-types --disable-warning=ExperimentalWarning --import '"$LIVE_ROOT"'/tools/dev/zx-init.mjs '"$LIVE_ROOT"'/tools/dev/buck-watchdog.ts --parent "$parent" --iso '"$ISO"' --patterns zxtest-,exporter-,devbuild-,v-,scaf- & disown
       else
         # Fallback to simple loop if node unavailable
         while kill -0 "$parent" >/dev/null 2>&1; do sleep 2; done
-        buck2 --isolation-dir "'"$ISO"'" kill >/dev/null 2>&1 || true
+        buck2 --isolation-dir '"$ISO"' kill >/dev/null 2>&1 || true
       fi
     ' >/dev/null 2>&1 &
   ) || true

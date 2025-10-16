@@ -33,6 +33,7 @@ This guide helps a new contributor land any PR in this plan successfully, follow
   - Sync specific language: `node tools/buck/sync-providers.ts --lang node`
   - Generate auto_map: `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
   - Prebuild guard (freshness/presence): `node tools/buck/prebuild-guard.ts [--verbose|--json]`
+  - Node macro usage: load `//node:defs.bzl` and use `nix_node_test(...)`, `nix_node_gen(...)`, or the aliases `nix_node_lib(...)`/`nix_node_bin(...)`.
 - Nix builds (planner outputs):
   - `nix build .#graph-generator`
 - Diagnostics:

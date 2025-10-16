@@ -34,17 +34,55 @@ function zxNodeBase(): string {
 
 async function ensureBuckPreludeConfig(): Promise<void> {
   try {
-    const { stdout } = await $({
-      stdio: "pipe",
-      cwd: repoRoot(),
-    })`nix build .#buck2-prelude --no-link --accept-flake-config --print-out-paths`;
-    const out = String(stdout || "")
-      .trim()
-      .split("\n")
-      .filter(Boolean)
-      .pop();
-    if (!out) throw new Error("unable to build .#buck2-prelude");
-    const preludePath = `${out}/prelude`;
+    // Fast path: if a prelude dir/link and Buck configs already exist, skip Nix work
+    try {
+      const preludeExists = await fsp
+        .lstat(path.join(repoRoot(), "prelude"))
+        .then(() => true)
+        .catch(() => false);
+      const rootCfgExists = await fsp
+        .access(path.join(repoRoot(), ".buckconfig"))
+        .then(() => true)
+        .catch(() => false);
+      const toolCfgExists = await fsp
+        .access(path.join(repoRoot(), "toolchains", ".buckconfig"))
+        .then(() => true)
+        .catch(() => false);
+      if (preludeExists && rootCfgExists && toolCfgExists) {
+        return;
+      }
+    } catch {}
+
+    // First try to build the prelude via the flake output
+    let preludePath = "";
+    try {
+      const { stdout } = await $({
+        stdio: "pipe",
+        cwd: repoRoot(),
+      })`nix build .#buck2-prelude --no-link --accept-flake-config --print-out-paths`;
+      const out = String(stdout || "")
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .pop();
+      if (!out) throw new Error("unable to build .#buck2-prelude");
+      preludePath = `${out}/prelude`;
+    } catch (e) {
+      // Fallback for temp repos where flake build may fail: resolve buck2 input and use its prelude
+      try {
+        const { stdout } = await $({
+          stdio: "pipe",
+          cwd: repoRoot(),
+        })`nix eval --raw .#inputs.buck2.outPath`;
+        const out = String(stdout || "").trim();
+        if (!out) throw new Error("unable to eval .#inputs.buck2.outPath");
+        preludePath = `${out}/prelude`;
+      } catch (e2) {
+        // Last-resort fallback for offline temp repos: link the repo's vendored prelude
+        const vendored = path.join(repoRoot(), "prelude");
+        preludePath = vendored;
+      }
+    }
     await $({ cwd: repoRoot() })`bash --noprofile --norc -c ${`set -euo pipefail
       printf '.\n' > .buckroot
       rm -f prelude && ln -s "${preludePath}" prelude
@@ -285,6 +323,11 @@ async function main() {
     stdio: "ignore",
     cwd: repoRoot(),
   })`bash --noprofile --norc -c 'rm -rf buck-go-*'`.nothrow();
+  // Also remove ephemeral .tmp directories that may contain invalid TARGETS from other tests
+  await $({
+    stdio: "ignore",
+    cwd: repoRoot(),
+  })`bash --noprofile --norc -c 'rm -rf .tmp'`.nothrow();
 
   if (!isCI && shouldInstallDeps(materialize)) {
     const nodeBase = zxNodeBase();
@@ -300,11 +343,45 @@ async function main() {
     } catch (e) {
       console.warn("[dev-build] gomod2nix generation skipped:", e);
     }
+    // Optional debug: list TARGETS and a sample scaffold prior to export
+    if ((process.env.DEVBUILD_DEBUG || "").trim() === "1") {
+      try {
+        console.warn("[dev-build][debug] listing TARGETS files before export:");
+        await $({
+          stdio: "inherit",
+          cwd: repoRoot(),
+        })`bash --noprofile --norc -c 'find . -name TARGETS -type f | sort | sed -e s,^.,ROOT,'`;
+        const demoTargets = path.join(repoRoot(), "libs", "demo-lib", "TARGETS");
+        try {
+          const txt = await fsp.readFile(demoTargets, "utf8").catch(() => "");
+          if (txt) {
+            console.warn("[dev-build][debug] libs/demo-lib/TARGETS contents:\n" + txt);
+          }
+        } catch {}
+        console.warn("[dev-build][debug] running 'buck2 targets //...'");
+        await $({ stdio: "inherit", cwd: repoRoot() })`buck2 targets //...`;
+      } catch {}
+    }
+
     // Refresh Buck graph so graph-generator sees newest targets (only when materializing)
+    const exportArgs: string[] = [
+      `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/export-graph.ts")} --out ${path.join(
+        repoRoot(),
+        "tools/buck/graph.json",
+      )}`,
+    ];
+    if ((process.env.DEVBUILD_SCOPE || "").trim() !== "") {
+      exportArgs[0] += ` --scope ${process.env.DEVBUILD_SCOPE?.trim()}`;
+    }
+    const runEnv = {
+      ...process.env,
+      ...(String(process.env.DEVBUILD_DEBUG || "").trim() === "1" ? { EXPORTER_DEBUG: "1" } : {}),
+    } as any;
     await $({
       stdio: "inherit",
       cwd: repoRoot(),
-    })`bash --noprofile --norc -c ${`${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/export-graph.ts")} --out ${path.join(repoRoot(), "tools/buck/graph.json")}`}`;
+      env: runEnv,
+    })`bash --noprofile --norc -c ${exportArgs[0]}`;
     // Validate non-empty graph before pure Nix stage
     const { stdout: glen } = await $({
       stdio: "pipe",
@@ -312,10 +389,69 @@ async function main() {
     })`jq -r 'length' tools/buck/graph.json`;
     const graphLen = Number(String(glen || "0").trim() || "0");
     if (!Number.isFinite(graphLen) || graphLen <= 0) {
-      console.error(
-        "[dev-build] ERROR: tools/buck/graph.json is empty. Export failed or found no nodes.",
-      );
-      process.exit(2);
+      // Fallback: try scoping to Go nodes only; helpful for bootstrap in temp repos
+      if ((process.env.DEVBUILD_TRIED_FALLBACK || "") !== "1") {
+        try {
+          console.warn(
+            "[dev-build] graph empty; retrying export with --scope lang:go for bootstrap scenarios",
+          );
+          process.env.DEVBUILD_TRIED_FALLBACK = "1";
+          await $({
+            stdio: "inherit",
+            cwd: repoRoot(),
+            env: runEnv,
+          })`bash --noprofile --norc -c ${`${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/export-graph.ts")} --scope lang:go --out ${path.join(repoRoot(), "tools/buck/graph.json")}`}`;
+          const { stdout: glen2 } = await $({
+            stdio: "pipe",
+            cwd: repoRoot(),
+          })`jq -r 'length' tools/buck/graph.json`;
+          const graphLen2 = Number(String(glen2 || "0").trim() || "0");
+          if (Number.isFinite(graphLen2) && graphLen2 > 0) {
+            console.warn("[dev-build] export succeeded with scoped lang:go");
+          } else {
+            // Bootstrap fallback: warm up Buck targets, disable isolation, and re-export once
+            try {
+              console.warn("[dev-build] bootstrap: warming up buck targets and re-exporting");
+              try {
+                await $({ stdio: "inherit", cwd: repoRoot() })`buck2 targets //...`;
+              } catch {}
+              const runEnvNoIso = { ...runEnv, BUCK_NO_ISOLATION: "1", EXPORTER_DEBUG: "1" } as any;
+              await $({
+                stdio: "inherit",
+                cwd: repoRoot(),
+                env: runEnvNoIso,
+              })`bash --noprofile --norc -c ${`${nodeBin} ${nodeBase} ${path.join(
+                repoRoot(),
+                "tools/buck/export-graph.ts",
+              )} --out ${path.join(repoRoot(), "tools/buck/graph.json")}`}`;
+              const { stdout: glen3 } = await $({
+                stdio: "pipe",
+                cwd: repoRoot(),
+              })`jq -r 'length' tools/buck/graph.json`;
+              const graphLen3 = Number(String(glen3 || "0").trim() || "0");
+              if (Number.isFinite(graphLen3) && graphLen3 > 0) {
+                console.warn("[dev-build] export succeeded after bootstrap warmup");
+              } else {
+                console.error(
+                  "[dev-build] ERROR: tools/buck/graph.json is empty even after bootstrap; export failed or found no nodes.",
+                );
+                process.exit(2);
+              }
+            } catch (e3) {
+              console.error("[dev-build] ERROR: bootstrap export failed:", e3);
+              process.exit(2);
+            }
+          }
+        } catch (e) {
+          console.error("[dev-build] ERROR: export-graph retry with --scope lang:go failed:", e);
+          process.exit(2);
+        }
+      } else {
+        console.error(
+          "[dev-build] ERROR: tools/buck/graph.json is empty. Export failed or found no nodes.",
+        );
+        process.exit(2);
+      }
     }
     // Make the graph path visible for downstream pure Nix builds
     process.env.BUCK_GRAPH_JSON = path.join(repoRoot(), "tools/buck/graph.json");
@@ -463,9 +599,14 @@ async function main() {
   if (impure) {
     const nodeBase = zxNodeBase();
     const nodeBin = process.execPath || "node";
+    const runEnvImp = {
+      ...process.env,
+      ...(String(process.env.DEVBUILD_DEBUG || "").trim() === "1" ? { EXPORTER_DEBUG: "1" } : {}),
+    } as any;
     await $({
       stdio: "inherit",
       cwd: repoRoot(),
+      env: runEnvImp,
     })`bash --noprofile --norc -c ${`${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/export-graph.ts")} --out ${path.join(repoRoot(), "tools/buck/graph.json")}`}`;
   }
 
@@ -482,7 +623,7 @@ async function main() {
   const proc = await $({
     stdio: "inherit",
     cwd: repoRoot(),
-  })`bash --noprofile --norc -c ${`${buckBin} ${isolationFlags.join(" ")} ${subcmd} ${platformFlags.join(" ")} ${restArgs.join(" ")} 2> >(grep -Ev 'buck2_client_ctx::file_tailers::tailer: Failed to read from .*/buckd\\.(stderr|stdout): task [0-9]+ was cancelled|buck2_event_log::writer: Failed to flush log file .*: Broken pipe \\([^)]+\\)' >&2)`}`.catch(
+  })`bash --noprofile --norc -c ${`${buckBin} ${isolationFlags.join(" ")} ${subcmd} ${platformFlags.join(" ")} ${restArgs.join(" ")} 2> >(grep -Ev 'buck2_client_ctx::file_tailers::tailer: Failed to read from .*/buckd\.(stderr|stdout): task [0-9]+ was cancelled|buck2_event_log::writer: Failed to flush log file .*: Broken pipe \([^)]+\)' >&2)`}`.catch(
     (e) => e,
   );
   const code = typeof proc?.exitCode === "number" ? proc.exitCode : 1;

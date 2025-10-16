@@ -5,6 +5,8 @@ import { runInTemp } from "../lib/test-helpers";
 test("prebuild-guard auto-fixes when stale and passes thereafter", async () => {
   await runInTemp("scaf-prebuild-guard", async (_tmp, _$) => {
     const $ = _$({ stdio: "pipe" });
+    // Initialize git so git-based checks in dev-build don't error out in temp repos
+    await $`git init`;
     await $`bash -lc ${`set -euo pipefail
       printf '.\n' > .buckroot
       cat > .buckconfig <<'EOF'

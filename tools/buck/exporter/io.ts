@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
+import path from "node:path";
 import type { Node } from "./types.ts";
 
 export const attrList = [
@@ -26,6 +27,24 @@ export const attrList = [
 export async function cqueryNodes(scope: string, attrs: string[]): Promise<Node[]> {
   const flags = attrs.flatMap((a) => ["--output-attribute", a]);
   const platformFlags = ["--target-platforms", "prelude//platforms:default"];
+  // Limit scan roots to avoid parsing ephemeral or intentionally invalid packages (e.g., .tmp)
+  const defaultRoots = ["apps", "libs", "third_party", "go", "cpp"];
+  const rootsEnv = (process.env.BUCK_QUERY_ROOTS || "").trim();
+  const rootsList = rootsEnv ? rootsEnv.split(/[\,\s]+/).filter(Boolean) : defaultRoots;
+  // Filter to existing directories to avoid recursive spec errors in sparse/temp repos
+  const fs = await import("node:fs");
+  const rootsExisting = rootsList.filter((r) => {
+    const dir = r.replace(/^\/+/, "");
+    try {
+      return fs.existsSync(path.join(process.cwd(), dir));
+    } catch {
+      return false;
+    }
+  });
+  const rootsForExpr = rootsExisting.length > 0 ? rootsExisting : ["libs"];
+  const rootsExpr = `set(${rootsForExpr
+    .map((r) => (r.startsWith("//") ? `${r}/...` : `//${r}/...`))
+    .join(" ")})`;
   // Buck disallows recursive invocations unless an isolation dir NAME is set.
   // It must be a simple directory name, not a path. Allow disabling in pure sandbox.
   // Prefer nesting under a parent isolation when provided so parent cleanup can reap child daemons.
@@ -54,7 +73,11 @@ export async function cqueryNodes(scope: string, attrs: string[]): Promise<Node[
   }
 
   async function runQuery(q: string): Promise<Record<string, any>> {
-    const query = scope ? `attrfilter(labels, ${scope}, ${q})` : q;
+    const qScoped = q.replaceAll("//...", rootsExpr);
+    const query = scope ? `attrfilter(labels, ${scope}, ${qScoped})` : qScoped;
+    if ((process.env.EXPORTER_DEBUG || "").trim() === "1") {
+      console.warn(`[exporter][debug] buck2 cquery ${platformFlags.join(" ")} ${query}`);
+    }
     const { stdout } = await $({
       stdio: "pipe",
     })`buck2 ${isolationFlags} cquery ${platformFlags} ${query} --json ${flags}`.quiet();
@@ -62,9 +85,14 @@ export async function cqueryNodes(scope: string, attrs: string[]): Promise<Node[
   }
 
   async function runQuerySafe(q: string): Promise<Record<string, any>> {
+    const dbg = (process.env.EXPORTER_DEBUG || "").trim() === "1";
+    if (dbg) {
+      // In debug mode, surface errors to help diagnose empty graphs
+      return await runQuery(q);
+    }
     try {
       return await runQuery(q);
-    } catch {
+    } catch (e) {
       return {} as Record<string, any>;
     }
   }
@@ -72,17 +100,17 @@ export async function cqueryNodes(scope: string, attrs: string[]): Promise<Node[
   let nodes: Node[] = [];
   try {
     // Query regular deps and tests separately, then merge to ensure test nodes are present
-    const base = `deps(//..., 1, exec_deps())`;
-    // Enumerate all configured targets in case deps(...) misses standalone nodes
-    const allKind = `kind(".*", //...)`;
-    const kindCxxTest = `kind("cxx_test", //...)`;
-    const attrCxxTest = `attrfilter(rule_type, "cxx_test", //...)`;
-    const kindCxxBin = `kind("cxx_binary", //...)`;
-    const attrCxxBin = `attrfilter(rule_type, "cxx_binary", //...)`;
-    const cxxPlanner = `filter("__planner$", kind("cxx_library", //...))`;
+    const base = `deps(${rootsExpr}, 1, exec_deps())`;
+    // Enumerate configured targets in allowed roots in case deps(...) misses standalone nodes
+    const allKind = `kind(".*", ${rootsExpr})`;
+    const kindCxxTest = `kind("cxx_test", ${rootsExpr})`;
+    const attrCxxTest = `attrfilter(rule_type, "cxx_test", ${rootsExpr})`;
+    const kindCxxBin = `kind("cxx_binary", ${rootsExpr})`;
+    const attrCxxBin = `attrfilter(rule_type, "cxx_binary", ${rootsExpr})`;
+    const cxxPlanner = `filter("__planner$", kind("cxx_library", ${rootsExpr}))`;
     // Explicitly include any targets stamped with lang:cpp to catch repo-local
     // macros (e.g., nix_cpp_*) that don't use cxx_* rule_types.
-    const labeledCpp = `attrfilter(labels, "lang:cpp", //...)`;
+    const labeledCpp = `attrfilter(labels, "lang:cpp", ${rootsExpr})`;
     const [obj0, obj1, obj2, obj3, obj4, obj5, obj6, obj7] = await Promise.all([
       runQuerySafe(allKind),
       runQuerySafe(base),
@@ -145,6 +173,14 @@ export async function cqueryNodes(scope: string, attrs: string[]): Promise<Node[
       } catch {}
     }
   }
+  // Exclude ephemeral or test-generated packages (e.g., .tmp/*) that can contain
+  // intentionally invalid TARGETS used by zx tests. These should not participate
+  // in graph export for glue generation.
+  nodes = nodes.filter((n) => {
+    const name = String((n as any)?.name || "");
+    // Match // .tmp / paths across cells (e.g., root//.tmp/foo:bar or //.tmp/foo:bar)
+    return !/\/\/\.tmp\//.test(name);
+  });
   return nodes;
 }
 
