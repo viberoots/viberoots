@@ -329,3 +329,9 @@ test("node provider: <specific behavior>", async () => {
 - Macro stamping: Planned — Node macro should call `stamp_labels(lang="node", kind=...)` and append providers from `//third_party/providers:auto_map.bzl`.
 - Testing: No changes to harness; zx tests and external timeouts remain. Add focused zx tests for Node provider determinism and auto-map wiring when we add the macro.
 - Troubleshooting: Glue sequence, prebuild-guard, and patches lint patterns already documented for Go; Node follows the same flow with importer‑scoped lockfile inputs and `TARGETS.node.auto` presence. Documented in this design and consistent with the handbook.
+
+### Troubleshooting (Node providers and guard)
+
+- The prebuild guard checks importer presence for each `pnpm-lock.yaml` and fails in CI if a corresponding `node_importer_deps(...)` entry is missing in `third_party/providers/TARGETS.node.auto`.
+- Running the guard locally without `PREBUILD_GUARD_NO_FIX=1` will auto-run glue steps to regenerate Node providers and `auto_map.bzl`.
+- `--json` output includes `missingNodeProviders` with objects: `{ lockfile, importer, provider }` to help pinpoint gaps.

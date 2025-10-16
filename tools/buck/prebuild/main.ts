@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
 import { printSkip } from "../../lib/errors";
+import { providerNameForImporter } from "../../lib/providers.ts";
 import { autoFixGlue } from "./repair.ts";
 import { collectDiagnostics, logList, mtimeSafe } from "./report.ts";
 import { hasPatchesOrLocks, listInputs, listOutputs, missingProviderAutos } from "./scan.ts";
@@ -80,6 +81,57 @@ export async function run(): Promise<void> {
 
   const needFix = needFixPresence || needFixFreshness;
 
+  // Node importer presence check: ensure TARGETS.node.auto contains an entry
+  // for every importer present in any pnpm-lock.yaml. This runs after generic
+  // presence/freshness checks so diagnostics can include importer-specific detail.
+  const missingNodeProviders: Array<{ lockfile: string; importer: string; provider: string }> = [];
+  try {
+    // Discover lockfiles tracked in VCS
+    let lockfiles: string[] = [];
+    try {
+      const { stdout } = await $`git ls-files '**/pnpm-lock.yaml'`;
+      lockfiles = String(stdout || "")
+        .split(/\r?\n/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+    } catch {}
+    if (lockfiles.length) {
+      const targetsNodeAuto = "third_party/providers/TARGETS.node.auto";
+      const targetsNodeText = fs.existsSync(targetsNodeAuto)
+        ? await fs.readFile(targetsNodeAuto, "utf8").catch(() => "")
+        : "";
+      // Lazy-load YAML parser only if needed
+      const haveYaml = await (async () => {
+        try {
+          await import("yaml");
+          return true;
+        } catch {
+          return false;
+        }
+      })();
+      for (const lf of lockfiles) {
+        // If YAML is unavailable, we cannot enumerate importers; rely on generic
+        // freshness/presence checks in that case.
+        if (!haveYaml) break;
+        try {
+          const mod = await import("yaml");
+          const YAML: any = (mod as any).default || mod;
+          const doc = YAML.parse(await fs.readFile(lf, "utf8")) as {
+            importers?: Record<string, unknown>;
+          };
+          const importers = Object.keys(doc?.importers || {});
+          for (const imp of importers) {
+            const prov = providerNameForImporter(lf, imp);
+            const needle = `node_importer_deps(name="${prov}", lockfile="${lf}", importer="${imp}"`;
+            if (!targetsNodeText.includes(needle)) {
+              missingNodeProviders.push({ lockfile: lf, importer: imp, provider: prov });
+            }
+          }
+        } catch {}
+      }
+    }
+  } catch {}
+
   if (flagVerbose) {
     const sortedInputs = [...inputs].sort((a, b) => (mtimeSafe(b) || 0) - (mtimeSafe(a) || 0));
     const sortedOutputs = [...presentOutputs].sort(
@@ -93,6 +145,7 @@ export async function run(): Promise<void> {
   }
   if (jsonOut) {
     const diag = collectDiagnostics(inputs, presentOutputs, outPresence, verboseLimit);
+    (diag as any).missingNodeProviders = missingNodeProviders;
     console.log(JSON.stringify(diag));
     return;
   }
@@ -120,7 +173,32 @@ export async function run(): Promise<void> {
     process.exit(1);
   }
 
-  if (!needFix) return;
+  // If importer-specific providers are missing, fail in CI or attempt auto-fix locally
+  if (missingNodeProviders.length) {
+    if (mode === "ci") {
+      for (const m of missingNodeProviders) {
+        console.error(
+          `ERROR: missing Node importer provider: lockfile=${m.lockfile} importer=${m.importer} provider=${m.provider}`,
+        );
+      }
+      process.exit(1);
+    }
+    if (process.env.PREBUILD_GUARD_NO_FIX === "1") {
+      printSkip(
+        "node-importer-providers-missing",
+        missingNodeProviders.map((m) => `${m.provider} for ${m.lockfile}#${m.importer}`).join(", "),
+      );
+      return;
+    }
+    try {
+      await autoFixGlue();
+    } catch (e) {
+      console.error("ERROR: auto-fix (sync providers) failed:", e);
+      process.exit(1);
+    }
+  }
+
+  if (!needFix && !missingNodeProviders.length) return;
 
   if (mode === "ci") {
     for (const o of outPresence) {
