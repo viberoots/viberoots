@@ -68,6 +68,20 @@ async function isLanguageEnabled(language: string): Promise<boolean> {
     const goDefs = path.join("go", "defs.bzl");
     return (await exists(goTpl)) && (await exists(goDefs));
   }
+  if (language === "node") {
+    // Node enablement follows the same rule as tools/lib/langs.ts: require at least one pnpm-lock.yaml
+    try {
+      const { globby } = await import("fast-glob");
+      const locks = await globby(["**/pnpm-lock.yaml"], {
+        gitignore: true,
+        ignore: ["**/buck-out/**", "**/.tmp/**", "**/node_modules/**"],
+      });
+      return Array.isArray(locks) && locks.length > 0;
+    } catch {
+      // If globby is unavailable, fall back to conservative disable to avoid false-positives in partial clones
+      return false;
+    }
+  }
   // Generic rule: require tools/nix/templates/<lang>.nix for other languages
   const tplPath = path.join("tools", "nix", "templates", `${language}.nix`);
   return await exists(tplPath);

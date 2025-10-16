@@ -23,7 +23,7 @@ lockfilePath: "apps/{{ name }}/pnpm-lock.yaml"
 pkgScope: "@apps"
 
 _tasks:
-  - mkdir -p apps/{{ name }}/src
-  - mkdir -p apps/{{ name }}/bin
-  - mkdir -p apps/{{ name }}/test
-  - chmod +x apps/{{ name }}/bin/{{ name }}
+  - mkdir -p src
+  - mkdir -p bin
+  - mkdir -p test
+  - chmod +x bin/{{ name }}
