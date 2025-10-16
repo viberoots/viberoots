@@ -127,15 +127,15 @@ cleanup() {
     # Retry a few times in case buck2d is still winding down
     for _i in 1 2 3; do
       # Collect isolations from active client commands (--isolation-dir) and from running buck2d[iso]
-      mapfile -t _isos_cli < <(/bin/ps -A -o pid=,command= 2>/dev/null \
-        | sed -n "s/.*--isolation-dir \([^ ]*\).*/\1/p" \
+      _isos_cli_str=$(/bin/ps -A -o pid=,command= 2>/dev/null \
+        | sed -n 's/.*--isolation-dir \([^ ]*\).*/\1/p' \
         | grep -E '^(zxtest-|exporter-|devbuild-|v-|scaf-)' \
         | sort -u || true)
-      mapfile -t _isos_d < <(/bin/ps -A -o pid=,comm= 2>/dev/null \
-        | sed -n "s/.*buck2d\[\([^]]*\)\].*/\1/p" \
+      _isos_d_str=$(/bin/ps -A -o pid=,comm= 2>/dev/null \
+        | sed -n 's/.*buck2d\[\([^]]*\)\].*/\1/p' \
         | grep -E '^(zxtest-|exporter-|devbuild-|v-|scaf-)' \
         | sort -u || true)
-      for iso in "${_isos_cli[@]}" "${_isos_d[@]}"; do
+      for iso in $_isos_cli_str $_isos_d_str; do
         [ -n "$iso" ] || continue
         "buck2" --isolation-dir "$iso" kill >/dev/null 2>&1 || true
       done

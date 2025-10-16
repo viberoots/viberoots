@@ -95,12 +95,12 @@
         libsWithLock = builtins.filter (d: isDir ./libs d && builtins.pathExists (./libs + ("/" + d) + "/pnpm-lock.yaml")) libsDirs;
         importerDirs = (map (d: "apps/" + d) appsWithLock) ++ (map (d: "libs/" + d) libsWithLock);
 
-        perImporter = builtins.listToAttrs (map (imp: {
-          name = (nodeMods.sanitizeName ("node-modules." + imp));
+        perImporterNM = builtins.listToAttrs (map (imp: {
+          name = (nodeMods.sanitizeName imp);
           value = nodeMods.mkNodeModules { lockfilePath = imp + "/pnpm-lock.yaml"; importerDir = imp; };
         }) importerDirs);
         perImporterStore = builtins.listToAttrs (map (imp: {
-          name = (nodeMods.sanitizeName ("pnpm-store." + imp));
+          name = (nodeMods.sanitizeName imp);
           value = nodeMods.mkPnpmStore { lockfilePath = imp + "/pnpm-lock.yaml"; importerDir = imp; };
         }) importerDirs);
 
@@ -108,18 +108,17 @@
       in {
         buck2-prelude = prelude.buck2-prelude;
         zx-wrapper = zx-wrapper;
-      } // (if haveRootLock then {
-        pnpm-store = nodeMods.pnpm-store;
-        node-modules = nodeMods.node-modules;
-        default = nodeMods.node-modules;
-      } else {}) // {
+      } // {
+        pnpm-store = ( (if haveRootLock then { default = nodeMods.pnpm-store; } else {}) // perImporterStore );
+        node-modules = ( (if haveRootLock then { default = nodeMods.node-modules; } else {}) // perImporterNM );
+      } // {
         graph-generator = graphGen.all;
         graph-generator-cppTargets = graphGen.cppTargetsFlat;
         graph-generator-selected = graphGen.selected;
         buck-graph = buckGraph;
         graph-generator-pure = graphGenPure.all;
         graph-generator-pure-selected = graphGenPure.selected;
-      } // perImporter // perImporterStore
+      }
     );
 
     checks = forAllSystems ({ nodeMods, ... }: {
