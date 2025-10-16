@@ -103,12 +103,16 @@
           name = (nodeMods.sanitizeName ("pnpm-store." + imp));
           value = nodeMods.mkPnpmStore { lockfilePath = imp + "/pnpm-lock.yaml"; importerDir = imp; };
         }) importerDirs);
+
+        haveRootLock = builtins.pathExists ./pnpm-lock.yaml;
       in {
         buck2-prelude = prelude.buck2-prelude;
         zx-wrapper = zx-wrapper;
+      } // (if haveRootLock then {
         pnpm-store = nodeMods.pnpm-store;
         node-modules = nodeMods.node-modules;
         default = nodeMods.node-modules;
+      } else {}) // {
         graph-generator = graphGen.all;
         graph-generator-cppTargets = graphGen.cppTargetsFlat;
         graph-generator-selected = graphGen.selected;
