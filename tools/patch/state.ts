@@ -1,13 +1,25 @@
 import fs from "fs-extra";
+import path from "node:path";
 import type { SessionRecord, SessionStore } from "./types";
 
-const STORE_PATH = ".patch-sessions.json";
+function storePath(): string {
+  try {
+    const here = path.dirname(new URL(import.meta.url).pathname);
+    const repoRoot =
+      (process.env.WORKSPACE_ROOT && path.resolve(process.env.WORKSPACE_ROOT)) ||
+      path.resolve(here, "..", "..");
+    return path.join(repoRoot, ".patch-sessions.json");
+  } catch {
+    return ".patch-sessions.json";
+  }
+}
 
 async function readStore(): Promise<SessionStore> {
-  if (!(await fs.pathExists(STORE_PATH))) {
+  const p = storePath();
+  if (!(await fs.pathExists(p))) {
     return { version: 1, sessions: {} };
   }
-  const txt = await fs.readFile(STORE_PATH, "utf8");
+  const txt = await fs.readFile(p, "utf8");
   try {
     const obj = JSON.parse(txt) as SessionStore;
     if (!obj || typeof obj !== "object" || typeof obj.version !== "number") {
@@ -21,9 +33,10 @@ async function readStore(): Promise<SessionStore> {
 }
 
 async function writeStore(store: SessionStore): Promise<void> {
-  const tmp = STORE_PATH + ".tmp";
+  const p = storePath();
+  const tmp = p + ".tmp";
   await fs.outputFile(tmp, JSON.stringify(store, null, 2) + "\n", "utf8");
-  await fs.move(tmp, STORE_PATH, { overwrite: true });
+  await fs.move(tmp, p, { overwrite: true });
 }
 
 export async function getSession(lang: string, moduleKey: string): Promise<SessionRecord | null> {
@@ -49,4 +62,16 @@ export async function deleteSession(lang: string, moduleKey: string): Promise<vo
     delete st.sessions[lang]![moduleKey];
   }
   await writeStore(st);
+}
+
+export async function findSessionBy(
+  lang: string,
+  predicate: (moduleKey: string, rec: SessionRecord) => boolean,
+): Promise<{ moduleKey: string; rec: SessionRecord } | null> {
+  const st = await readStore();
+  const byLang = st.sessions[lang] || {};
+  for (const [k, rec] of Object.entries(byLang)) {
+    if (predicate(k, rec as SessionRecord)) return { moduleKey: k, rec: rec as SessionRecord };
+  }
+  return null;
 }
