@@ -849,7 +849,8 @@ async function cmdNew(args: string[], flags: Record<string, string>) {
     usage();
     process.exit(2);
   }
-  if (language !== "language" && !(await isLanguageEnabled(language))) {
+  // Allow Node scaffolds even when not "enabled" (no pnpm-lock yet) so PR8 templates can bootstrap
+  if (language !== "language" && language !== "node" && !(await isLanguageEnabled(language))) {
     printSkip("missing-language", `${language}`);
     return; // exit 0 for disabled language in sparse checkout
   }
