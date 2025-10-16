@@ -1,23 +1,20 @@
 #!/usr/bin/env node
 const argv = process.argv.slice(2);
-if (argv.includes('--help') || argv.includes('-h')) {
+if (argv.includes("--help") || argv.includes("-h")) {
   console.log(`{{ name }}: usage\n  --help  Show help`);
   process.exit(0);
 }
-import('../dist/index.js')
+import("../dist/index.js")
   .then((m) => {
-    const code = m && typeof m.run === 'function' ? m.run(argv) : 0;
-    if (typeof code === 'number') {
+    const code = m && typeof m.run === "function" ? m.run(argv) : 0;
+    if (typeof code === "number") {
       process.exit(code);
       return;
     }
-    if (code && typeof code.then === 'function') {
-      code
-        .then((c) => process.exit(typeof c === 'number' ? c : 0))
-        .catch(() => process.exit(1));
+    if (code && typeof code.then === "function") {
+      code.then((c) => process.exit(typeof c === "number" ? c : 0)).catch(() => process.exit(1));
       return;
     }
     process.exit(0);
   })
   .catch(() => process.exit(1));
-
