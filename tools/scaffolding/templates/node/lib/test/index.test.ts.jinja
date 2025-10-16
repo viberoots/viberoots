@@ -1,0 +1,9 @@
+#!/usr/bin/env zx-wrapper
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { add } from "../dist/index.js";
+
+test("add works", () => {
+  assert.equal(add(1, 2), 3);
+});
+

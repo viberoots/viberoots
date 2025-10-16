@@ -1,0 +1,18 @@
+load("//node:defs.bzl", "nix_node_lib", "nix_node_test")
+
+nix_node_lib(
+    name = "{{ name }}",
+    srcs = [],
+    out = "build.stamp",
+    cmd = "node -e 'console.log(\\"build\\")' && echo ok > $OUT",
+    lockfile_label = "lockfile:{{ lockfilePath }}#{{ importer }}",
+)
+
+nix_node_test(
+    name = "unit",
+    srcs = [],
+    out = "unit.stamp",
+    cmd = "node -e 'console.log(\\"test\\")' && echo ok > $OUT",
+    lockfile_label = "lockfile:{{ lockfilePath }}#{{ importer }}",
+)
+

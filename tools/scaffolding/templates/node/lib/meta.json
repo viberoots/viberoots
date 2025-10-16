@@ -1,0 +1,14 @@
+{
+  "language": "node",
+  "template": "lib",
+  "description": "Node library (PNPM importer-scoped)",
+  "help": {
+    "usage": "scaf new node lib <name> [--path=DEST] [--key=value ...]",
+    "notes": [
+      "Generates libs/<name> with .npmrc, package.json, tsconfig, src, test, TARGETS.",
+      "Pass importer=<id> to override default libs/<name> importer.",
+      "TARGETS uses nix_node_lib and requires exactly one lockfile label."
+    ],
+    "examples": ["scaf new node lib demo-lib", "scaf new node lib demo-lib --importer=libs/util"]
+  }
+}

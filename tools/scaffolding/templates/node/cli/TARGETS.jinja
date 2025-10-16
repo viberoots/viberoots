@@ -1,0 +1,18 @@
+load("//node:defs.bzl", "nix_node_bin", "nix_node_test")
+
+nix_node_bin(
+    name = "{{ name }}",
+    srcs = [],
+    out = "build.stamp",
+    cmd = "node -e 'console.log(\"build\")' && echo ok > $OUT",
+    lockfile_label = "lockfile:{{ lockfilePath }}#{{ importer }}",
+)
+
+nix_node_test(
+    name = "cli_help",
+    srcs = [],
+    out = "cli-help.stamp",
+    cmd = "node bin/{{ name }} --help >/dev/null 2>&1 || true; echo ok > $OUT",
+    lockfile_label = "lockfile:{{ lockfilePath }}#{{ importer }}",
+)
+

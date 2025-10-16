@@ -1,0 +1,14 @@
+{
+  "language": "node",
+  "template": "cli",
+  "description": "Node CLI (PNPM importer-scoped)",
+  "help": {
+    "usage": "scaf new node cli <name> [--path=DEST] [--key=value ...]",
+    "notes": [
+      "Generates apps/<name> with .npmrc, package.json, tsconfig, bin, src, test, TARGETS.",
+      "Pass importer=<id> to override default apps/<name> importer.",
+      "TARGETS uses nix_node_bin and requires exactly one lockfile label."
+    ],
+    "examples": ["scaf new node cli demo-app", "scaf new node cli demo-app --importer=apps/demo"]
+  }
+}

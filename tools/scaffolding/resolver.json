@@ -10,5 +10,9 @@
   "cpp": {
     "lib": "libs/{name}",
     "cli": "apps/{name}"
+  },
+  "node": {
+    "lib": "libs/{name}",
+    "cli": "apps/{name}"
   }
 }
