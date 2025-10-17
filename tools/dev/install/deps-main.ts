@@ -1,6 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import process from "node:process";
+import { findNearestImporterLock, nodeModulesAttr } from "./common.ts";
 import { runGlue, zxNodeBase } from "./glue.ts";
 import { runGomod2nixGenerate, runGomod2nixScanAll } from "./gomod2nix.ts";
 import { relinkNodeModules } from "./link-node.ts";
@@ -39,117 +41,92 @@ async function have(cmd: string): Promise<boolean> {
   }
 }
 
-function findNearestImporterLock(): string | null {
-  // Look for apps/*/pnpm-lock.yaml or libs/*/pnpm-lock.yaml under CWD or parents
-  let here = process.cwd();
-  const root = here;
-  while (true) {
-    const cand1 = path.join(here, "pnpm-lock.yaml");
-    const rel = path.relative(root, here);
-    const looksImporter = rel.startsWith("apps/") || rel.startsWith("libs/");
-    if (looksImporter) {
-      try {
-        return path.relative(root, cand1);
-      } catch {}
-    }
-    const next = path.dirname(here);
-    if (next === here) break;
-    here = next;
-  }
-  return null;
+// Normalize CWD to repo root so this script works from any directory (robust in zx/temp sandboxes)
+try {
+  const here = path.dirname(new URL(import.meta.url).pathname);
+  const root = path.resolve(here, "..", "..", "..");
+  process.chdir(root);
+} catch {}
+console.log("Installing dependencies...");
+const { force, dryRun, verbose, skipGlue, glueOnly } = parseFlags(process.argv.slice(2));
+const inBuckTest = Boolean(
+  process.env.BUCK_TARGET || process.env.BUCK_TEST_SRC || process.env.BUCK_ROOT,
+);
+const skipNodeInstall = inBuckTest || process.env.SKIP_NODE_INSTALL === "1";
+if (glueOnly) {
+  if (verbose) console.log("[install-deps] glue-only mode");
+  await runGlue(dryRun, verbose);
+  console.log("Glue refreshed.");
+  process.exit(0);
 }
-
-function importerAttrFrom(relLock: string | null): string | null {
-  if (!relLock) return null;
-  const importer = path.dirname(relLock);
-  return importer.replace(/[\/ :]+/g, "_");
-}
-
-export async function main() {
-  // Normalize CWD to repo root so this script works from any directory
-  try {
-    const here = path.dirname(new URL(import.meta.url).pathname);
-    const root = path.resolve(here, "..", "..", "..");
-    process.chdir(root);
-  } catch {}
-  console.log("Installing dependencies...");
-  const { force, dryRun, verbose, skipGlue, glueOnly } = parseFlags(process.argv.slice(2));
-  const inBuckTest = Boolean(
-    process.env.BUCK_TARGET || process.env.BUCK_TEST_SRC || process.env.BUCK_ROOT,
-  );
-  const skipNodeInstall = inBuckTest || process.env.SKIP_NODE_INSTALL === "1";
-  if (glueOnly) {
-    if (verbose) console.log("[install-deps] glue-only mode");
-    await runGlue(dryRun, verbose);
-    console.log("Glue refreshed.");
-    return;
-  }
-  if (skipNodeInstall) {
-    if (verbose)
-      console.log(
-        "[install-deps] skipping node install/node-modules build in test/CI or when SKIP_NODE_INSTALL=1",
-      );
-  } else {
-    await withExclusiveInstallLock(
-      "node-modules",
-      async () => {
-        await fsp.rm("node_modules", { force: true });
-        // Ensure pnpm uses a writable store for the lockfile-only operation. On some systems
-        // a global pnpm config may point to /nix/store, which is read-only (EACCES after nix gc).
-        const localPnpmStore = path.join(process.cwd(), ".pnpm-store");
-        await fsp.mkdir(localPnpmStore, { recursive: true });
-        const useNixPnpm = await have("nix");
-        const envWithStore = { ...process.env, npm_config_store_dir: localPnpmStore } as Record<
-          string,
-          string
-        >;
-        if (useNixPnpm) {
-          await $({ stdio: "inherit", env: envWithStore })`pnpm install --lockfile-only`;
-        } else {
-          await $({ stdio: "inherit", env: envWithStore })`pnpm install --lockfile-only`;
-        }
-        const relLock = findNearestImporterLock();
-        const attr = importerAttrFrom(relLock);
-        // Avoid deadlock: update-pnpm-hash runs under the same lock via env flag
-        if (relLock) {
-          await $({
-            stdio: "inherit",
-            env: { ...process.env, INSTALL_LOCK_SKIP: "1" },
-          })`tools/dev/update-pnpm-hash.ts --lockfile ${relLock}`;
-          if (attr) {
-            await $({
-              stdio: "inherit",
-            })`nix build .#node-modules.${attr} --no-link --accept-flake-config`;
-          } else {
-            await $({ stdio: "inherit" })`nix build .#node-modules --no-link --accept-flake-config`;
-          }
-        } else {
-          await $({
-            stdio: "inherit",
-            env: { ...process.env, INSTALL_LOCK_SKIP: "1" },
-          })`tools/dev/update-pnpm-hash.ts`;
-          await $({ stdio: "inherit" })`nix build .#node-modules --no-link --accept-flake-config`;
-        }
-        await relinkNodeModules(force);
-      },
-      { verbose: String(process.env.INSTALL_LOCK_VERBOSE || "").trim() === "1" },
+if (skipNodeInstall) {
+  if (verbose)
+    console.log(
+      "[install-deps] skipping node install/node-modules build in test/CI or when SKIP_NODE_INSTALL=1",
     );
-  }
-  try {
-    const nodeBase = zxNodeBase();
-    await $({
-      stdio: "inherit",
-    })`bash --noprofile --norc -c ${`node ${nodeBase} tools/dev/patches-lint.ts`}`;
-  } catch {}
-  // Generate gomod2nix.toml at repo root (if present) and per-app/lib (apps/*, libs/*)
-  await runGomod2nixGenerate(dryRun, verbose);
-  await runGomod2nixScanAll(dryRun, verbose);
-  if (!skipGlue) {
-    await runGlue(dryRun, verbose);
-  } else if (verbose) {
-    console.log("[skip] glue regeneration");
-  }
-  console.log("Dependencies installed and node_modules linked.");
+} else {
+  await withExclusiveInstallLock(
+    "node-modules",
+    async () => {
+      await fsp.rm("node_modules", { force: true });
+      // Ensure pnpm uses a writable store for the lockfile-only operation. On some systems
+      // a global pnpm config may point to /nix/store, which is read-only (EACCES after nix gc).
+      const localPnpmStore = path.join(process.cwd(), ".pnpm-store");
+      await fsp.mkdir(localPnpmStore, { recursive: true });
+      const useNixPnpm = await have("nix");
+      const envWithStore = { ...process.env, npm_config_store_dir: localPnpmStore } as Record<
+        string,
+        string
+      >;
+      if (useNixPnpm) {
+        await $({ stdio: "inherit", env: envWithStore })`pnpm install --lockfile-only`;
+      } else {
+        await $({ stdio: "inherit", env: envWithStore })`pnpm install --lockfile-only`;
+      }
+      const found = await findNearestImporterLock(process.cwd());
+      const relLock = found?.lockRel || null;
+      const attr = found ? nodeModulesAttr(found.importer).replace(/^node-modules\.?/, "") : null;
+      // Avoid deadlock: update-pnpm-hash runs under the same lock via env flag
+      if (relLock) {
+        await $({
+          stdio: "inherit",
+          env: { ...process.env, INSTALL_LOCK_SKIP: "1" },
+        })`tools/dev/update-pnpm-hash.ts --lockfile ${relLock}`;
+        if (attr) {
+          await $({
+            stdio: "inherit",
+          })`nix build .#node-modules.${attr} --no-link --accept-flake-config`;
+        } else {
+          await $({
+            stdio: "inherit",
+          })`nix build .#node-modules.default --no-link --accept-flake-config`;
+        }
+      } else {
+        await $({
+          stdio: "inherit",
+          env: { ...process.env, INSTALL_LOCK_SKIP: "1" },
+        })`tools/dev/update-pnpm-hash.ts`;
+        await $({
+          stdio: "inherit",
+        })`nix build .#node-modules.default --no-link --accept-flake-config`;
+      }
+      await relinkNodeModules(force);
+    },
+    { verbose: String(process.env.INSTALL_LOCK_VERBOSE || "").trim() === "1" },
+  );
 }
-
-export { have };
+try {
+  const nodeBase = zxNodeBase();
+  await $({
+    stdio: "inherit",
+  })`bash --noprofile --norc -c ${`node ${nodeBase} tools/dev/patches-lint.ts`}`;
+} catch {}
+// Generate gomod2nix.toml at repo root (if present) and per-app/lib (apps/*, libs/*)
+await runGomod2nixGenerate(dryRun, verbose);
+await runGomod2nixScanAll(dryRun, verbose);
+if (!skipGlue) {
+  await runGlue(dryRun, verbose);
+} else if (verbose) {
+  console.log("[skip] glue regeneration");
+}
+console.log("Dependencies installed and node_modules linked.");

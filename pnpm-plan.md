@@ -163,6 +163,72 @@ This plan sequences small, verifiable PRs to implement PNPM workspaces (apps/lib
 - Consequences of not implementing
   - Manual setup is error‑prone; slower adoption.
 
+### PR8.1 — Node CLI binary materialization (apps/\*)
+
+- Scope
+  - Add a minimal Buck macro `nix_node_cli_bin(...)` that materializes a CLI launcher as a Buck output for Node CLI importers.
+  - The macro wraps a `genrule` to copy the source repo’s CLI shim (e.g., `bin/<name>`) to `$OUT` and mark it executable.
+  - Enforce importer‑scoped lockfile labeling, provider auto‑wiring, and stamping (`lang:node`, `kind:bin`) consistently with existing Node macros.
+  - Update the Node CLI scaffold `TARGETS` template to use `nix_node_cli_bin(...)` so new CLIs build an artifact immediately.
+  - Add Nix‑backed Node build rules for TS compilation/bundling to produce a single‑file, shebanged CLI bundle as a Buck materialized artifact.
+
+- Detailed design
+  - Implementation location: `//node/defs.bzl` alongside `nix_node_gen`, `nix_node_bin`, `nix_node_lib`.
+  - Macro signature (conceptual):
+    - `nix_node_cli_bin(name, entry = None, out = None, labels = [], deps = [], lockfile_label = None, bundle = False, **kwargs)`
+    - Defaults:
+      - `entry`: if not provided, defaults to `bin/<name>` within the same package.
+      - `out`: if not provided, defaults to `<name>` (so the produced artifact name matches the CLI name).
+      - `bundle`: off by default (shim copy only); when `True`, build via Nix bundler (see below).
+  - Behavior (shim):
+    - Calls the same internal helper path as `nix_node_gen(...)` to:
+      - enforce exactly one `lockfile:<path>#<importer>` label,
+      - stamp `lang:node` and `kind:bin`,
+      - append provider deps via `MODULE_PROVIDERS["//pkg:name"]`.
+    - Expands to a `genrule` with:
+      - `out = out or name`
+      - `cmd = "cp ${entry} $OUT && chmod +x $OUT"`
+      - `srcs` includes the CLI shim (`entry`) and provider deps to realize edges.
+  - Nix‑backed build (compilation/bundling):
+    - Nix flake output: expose `packages.<system>.node-cli.<importer>` that:
+      - Accepts inputs: importer root path, `pnpm-lock.yaml`, per‑importer `node-modules` derivation from PR4, and a pinned bundler (`esbuild` or `tsup`).
+      - Runs a build script that compiles `src/index.ts` (or the package.json `bin` target’s resolved entry) and bundles to a single JS file with shebang.
+      - Produces `<name>.bundle.js` as the derivation output; set mode 0755 and prepend `#!/usr/bin/env node`.
+    - Bundler settings (deterministic):
+      - Tool: `esbuild` (preferred) with pinned version; fallback: `tsup` pinned.
+      - Entry: `src/index.ts` by default; overrideable via package.json `bin` or macro `entry` param.
+      - Options (esbuild): `{ platform: "node", target: "node22", bundle: true, format: "esm", sourcemap: false, legalComments: "none", banner: { js: "#!/usr/bin/env node" } }`.
+      - Externalization: keep Node built‑ins external; resolve third‑party deps via the importer’s Nix `node-modules` path as needed; prefer inlining only project code by default.
+      - Reproducibility: set `SOURCE_DATE_EPOCH` and disable nondeterministic minification; avoid absolute paths in output.
+    - Buck macro `node_cli_bundle(...)` (or `nix_node_cli_bin(bundle = True)`) will:
+      - stamp labels and append providers as above,
+      - run a zx shim to `nix build .#node-cli[${system}].<importer>` (no network),
+      - copy the resulting single file to `$OUT`.
+  - Hermeticity and scope:
+    - No network or install steps at Buck build time; compilation/bundling runs inside a Nix derivation using pinned inputs and the importer’s lockfile.
+    - Runtime behavior: the bundled artifact is directly executable and does not rely on workspace `dist/` at runtime. When bundling is disabled, the shim behavior remains as in PR8 (loading `dist/`). The `--help` path remains fast.
+  - Template updates:
+    - `tools/scaffolding/templates/node/cli/TARGETS.jinja` will switch from `nix_node_bin(...)` to `nix_node_cli_bin(...)` and optionally enable `bundle = True` to use `node_cli_bundle(...)`, passing the project’s importer‑scoped lockfile label and leaving other fields minimal.
+
+- Acceptance criteria
+  - `buck2 build //apps/<name>:<name>` produces a single file artifact at `buck-out/.../<name>` with the executable bit set (shim mode) OR `<name>.bundle.js` with shebang (bundled mode).
+  - Running the built artifact with `--help` exits 0 and prints usage (in both shim and bundled modes).
+  - `buck2 cquery deps(//apps/<name>:<name>)` shows the importer‑scoped provider dependency from `third_party/providers/auto_map.bzl`.
+
+- Tests
+  - Add a zx test under `tools/tests/scaffolding/` that:
+    - Scaffolds a Node CLI (`apps/demo`), refreshes glue (export graph → sync node providers → gen auto_map),
+    - Builds `//apps/demo:demo` in shim mode and asserts the artifact exists and is executable; executes with `--help` and asserts exit code 0,
+    - Builds `//apps/demo:demo` in bundled mode (via macro `bundle = True`) and asserts the single‑file bundle exists, is executable, and `--help` exits 0.
+
+- Risks
+  - Bundling configuration drift (esbuild/tsup options) can affect hermetic outputs; mitigate by pinning tool versions and keeping configs minimal/deterministic.
+  - If `entry` is customized or missing, builds will fail; defaults and template guard against this.
+
+- Consequences of not implementing
+  - CLIs scaffolded in PR8 have no visible Buck artifact, leading to confusion when trying to locate outputs.
+  - Teams may roll ad‑hoc genrules per project, increasing drift and maintenance cost.
+
 ### PR8.5 — Vite‑based webapp template (apps/\*)
 
 - Scope

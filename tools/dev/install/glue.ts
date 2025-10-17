@@ -3,10 +3,7 @@ import path from "node:path";
 import { printSkip } from "../../lib/errors.ts";
 
 function repoRoot(): string {
-  // Prefer CWD so tests in temp sandboxes operate on their own repo copy
-  try {
-    return process.cwd();
-  } catch {}
+  // Resolve relative to this file to avoid accidental parent cwd resolution
   const here = path.dirname(new URL(import.meta.url).pathname);
   // File lives at tools/dev/install/glue.ts → repo root is three levels up
   return path.resolve(here, "..", "..", "..");

@@ -23,15 +23,18 @@ function importerFromLockfile(relLock: string): string {
   return ".";
 }
 
-function attrFromImporter(imp: string): string {
-  return imp.replace(/\/+|\:+|\s+/g, "_");
+function pnpmStoreAttrFromImporter(importer: string): string {
+  // Flake exposes pnpm-store.<sanitized> or pnpm-store.default for root
+  if (importer === ".") return "pnpm-store.default";
+  const sanitized = importer.replace(/\/+|\:+|\s+/g, "_");
+  return `pnpm-store.${sanitized}`;
 }
 
-async function buildStore(attr: string): Promise<{ ok: boolean; output: string }> {
+async function buildStore(attrPath: string): Promise<{ ok: boolean; output: string }> {
   try {
     const res = await $({
       stdio: "pipe",
-    })`nix build .#${"pnpm-store." + attr} --no-link --accept-flake-config`;
+    })`nix build .#${attrPath} --no-link --accept-flake-config`;
     return { ok: true, output: String(res.stdout || "") + String(res.stderr || "") };
   } catch (e: any) {
     const out = String((e && e.stdout) || "") + String((e && e.stderr) || "");
@@ -60,11 +63,11 @@ async function inner() {
   const repoRoot = process.cwd();
   const relLock = lockfile ? lockfile : "pnpm-lock.yaml";
   const importer = importerFromLockfile(relLock);
-  const attr = attrFromImporter(importer);
+  const storeAttr = pnpmStoreAttrFromImporter(importer);
 
-  const first = await buildStore(attr);
+  const first = await buildStore(storeAttr);
   if (first.ok) {
-    console.log("pnpm-store:", attr, "up to date");
+    console.log("pnpm-store:", storeAttr, "up to date");
     return;
   }
   const suggested = extractHash(first.output || "");
@@ -73,12 +76,12 @@ async function inner() {
     process.exit(1);
   }
   await updateHashesJson(relLock, suggested);
-  const second = await buildStore(attr);
+  const second = await buildStore(storeAttr);
   if (!second.ok) {
     console.error("pnpm-store still failing after hash update\n\n" + second.output);
     process.exit(1);
   }
-  console.log("pnpm-store:", attr, "hash updated and build succeeded");
+  console.log("pnpm-store:", storeAttr, "hash updated and build succeeded");
 }
 
 async function main() {

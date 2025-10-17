@@ -25,7 +25,8 @@ function findNearestImporterAttr(): string | null {
     if (next === here) break;
     here = next;
   }
-  return null;
+  // Fallback to default/root importer when no apps/libs importer is found
+  return "default";
 }
 
 export async function relinkNodeModules(force: boolean) {
@@ -42,7 +43,7 @@ export async function relinkNodeModules(force: boolean) {
   }
   if (!outPath) {
     const { stdout } =
-      await $`nix build .#node-modules --no-link --accept-flake-config --print-out-paths`;
+      await $`nix build .#node-modules.default --no-link --accept-flake-config --print-out-paths`;
     outPath = String(stdout).trim();
   }
   if (!outPath) return;

@@ -204,15 +204,16 @@ export function parseArgs(argv: any): {
   metricsOut: string;
   validation: "warn" | "error";
 } {
+  const a: Record<string, any> = argv && typeof argv === "object" ? argv : {};
   return {
-    out: (argv.out as string) || "tools/buck/graph.json",
-    scope: (argv.scope as string) || "",
-    simulate: (argv.simulate as string) || "",
-    maxParallel: Number(argv["max-parallel"] || 4),
-    cacheDir: (argv["cache-dir"] as string) || "tools/buck/.export-cache",
-    metricsOut: (argv["metrics-out"] as string) || "",
+    out: (a.out as string) || "tools/buck/graph.json",
+    scope: (a.scope as string) || "",
+    simulate: (a.simulate as string) || "",
+    maxParallel: Number(a["max-parallel"] || 4),
+    cacheDir: (a["cache-dir"] as string) || "tools/buck/.export-cache",
+    metricsOut: (a["metrics-out"] as string) || "",
     validation:
-      ((argv["validation"] as string) || (process.env.EXPORTER_VALIDATION as string) || "error") ===
+      ((a["validation"] as string) || (process.env.EXPORTER_VALIDATION as string) || "error") ===
       "warn"
         ? "warn"
         : "error",

@@ -118,7 +118,48 @@
         buck-graph = buckGraph;
         graph-generator-pure = graphGenPure.all;
         graph-generator-pure-selected = graphGenPure.selected;
-      }
+      } // (
+        let
+        # Node CLI single-file bundling per importer.
+        # We expose one attribute per importer with sanitized name.
+        sanitize = (import ./tools/nix/templates-common.nix { inherit pkgs; }).sanitizeName;
+        esbuild = pkgs.esbuild;
+        makeCliBundle = importerDir: let
+          nm = nodeMods.mkNodeModules { lockfilePath = importerDir + "/pnpm-lock.yaml"; inherit importerDir; };
+          entry = importerDir + "/src/index.ts";
+          name = builtins.baseNameOf importerDir;
+        in pkgs.stdenvNoCC.mkDerivation {
+          pname = "node-cli";
+          version = sanitize importerDir;
+          src = builtins.path { path = ./.; name = "repo"; };
+          nativeBuildInputs = [ esbuild pkgs.nodejs_22 ];
+          buildPhase = ''
+            set -euo pipefail
+            cd ${importerDir}
+            export SOURCE_DATE_EPOCH=1
+            export NODE_PATH=${nm}/node_modules
+            outFile="${name}.bundle.js"
+            ${esbuild}/bin/esbuild ${entry} \
+              --platform=node \
+              --target=node22 \
+              --bundle \
+              --format=esm \
+              --sourcemap=false \
+              --legal-comments=none \
+              --banner:js='#!/usr/bin/env node' \
+              --outfile="$outFile"
+          '';
+          installPhase = ''
+            set -euo pipefail
+            mkdir -p $out
+            install -m0755 ${importerDir}/${name}.bundle.js $out/${name}.bundle.js
+          '';
+        };
+        nodeCli = builtins.listToAttrs (map (imp: { name = sanitize imp; value = makeCliBundle imp; }) importerDirs);
+        in {
+          node-cli = nodeCli;
+        }
+      )
     );
 
     checks = forAllSystems ({ nodeMods, ... }: {

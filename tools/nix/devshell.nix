@@ -66,7 +66,8 @@ in {
         fi
       fi
 
-      export PATH="$PWD/tools/bin:$PATH"
+      export PATH="$PWD/tools/bin:$PWD/node_modules/.bin:$PATH"
+      
       # Prefer upstream buck2 binary on PATH (fallback to flake buck2)
       buck_out=$(nix build github:facebook/buck2#buck2 --no-link --print-out-paths 2>/dev/null || true)
       if [ -n "$buck_out" ] && [ -x "$buck_out/bin/buck2" ]; then

@@ -1,0 +1,29 @@
+version: 1
+
+_envops:
+  block_start_string: "{%"
+  block_end_string: "%}"
+  variable_start_string: "{{"
+  variable_end_string: "}}"
+  comment_start_string: "{#"
+  comment_end_string: "#}"
+  keep_trailing_newline: true
+
+_exclude:
+  - meta.json
+
+# Variables populated by scaf
+name: ""
+language: "node"
+template: "cli"
+
+# Derived defaults for Node CLI
+importer: "apps/{{ name }}"
+lockfilePath: "apps/{{ name }}/pnpm-lock.yaml"
+pkgScope: "@apps"
+
+_tasks:
+  - mkdir -p src
+  - mkdir -p bin
+  - mkdir -p test
+  - chmod +x bin/{{ name }}

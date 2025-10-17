@@ -20,8 +20,9 @@ let
   cleanSrc = lockfilePath: importerDir: pkgs.lib.cleanSourceWith {
     src = repoRoot;
     filter = path: type:
+      let pkgRel = if importerDir == "." then "package.json" else (importerDir + "/package.json"); in
       (builtins.match (".*/" + (lib.escapeRegex lockfilePath)) path != null)
-      || (builtins.match (".*/" + (lib.escapeRegex (importerDir + "/package\\.json"))) path != null)
+      || (builtins.match (".*/" + (lib.escapeRegex pkgRel)) path != null)
       || (builtins.match (".*/pnpm-workspace\\.yaml") path != null)
       || (builtins.match (".*/\\.npmrc") path != null)
       || (builtins.match ".*/patches/pnpm(/.*)?" path != null);

@@ -61,3 +61,69 @@ def nix_node_bin(name, **kwargs):
     nix_node_gen(name = name, kind = "bin", **kwargs)
 
 
+
+def nix_node_cli_bin(
+    name,
+    entry = None,
+    out = None,
+    labels = [],
+    deps = [],
+    lockfile_label = None,
+    bundle = False,
+    importer = None,
+    **kwargs
+):
+    """
+    Materialize a Node CLI binary.
+
+    - Shim mode (default): copies `entry` (defaults to bin/<name>) to $OUT and chmod +x.
+    - Bundled mode (bundle = True): builds a single-file shebanged bundle via Nix and copies it to $OUT.
+
+    Notes:
+    - Exactly one importer-scoped lockfile label must be present (lockfile:<path>#<importer>).
+    - When bundle=True, `importer` must be provided (used to select the Nix package attribute).
+    """
+    if entry == None:
+        entry = "bin/%s" % name
+    if out == None:
+        out = name
+
+    if not bundle:
+        nix_node_gen(
+            name = name,
+            srcs = [entry],
+            out = out,
+            cmd = "cp $SRCS $OUT && chmod +x $OUT",
+            deps = deps,
+            labels = labels,
+            lockfile_label = lockfile_label,
+            kind = "bin",
+            **kwargs
+        )
+        return
+
+    # Bundled mode: build a single-file shebanged bundle via Nix-provided esbuild
+    if entry == None or entry == "":
+        entry = "src/index.ts"
+
+    cmd = (
+        "set -euo pipefail; "
+        + "ENTRY=\"$SRCS\"; "
+        + "nix shell --accept-flake-config nixpkgs#esbuild nixpkgs#nodejs_22 -c esbuild \"$ENTRY\" "
+        + "--platform=node --target=node22 --bundle --format=esm --legal-comments=none "
+        + "--banner:js='#!/usr/bin/env node' --outfile=\"$OUT\"; "
+        + "chmod +x $OUT"
+    )
+
+    nix_node_gen(
+        name = name,
+        srcs = [entry],
+        out = out,
+        cmd = cmd,
+        deps = deps,
+        labels = labels,
+        lockfile_label = lockfile_label,
+        kind = "bin",
+        **kwargs
+    )
+

@@ -1,0 +1,4 @@
+name: demo-node
+language: node
+template: cli
+scaf_src_path: tools/scaffolding/templates/node/cli

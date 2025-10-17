@@ -3,6 +3,13 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
+import { pathToFileURL } from "node:url";
+// Ensure zx globals are available in node:test workers by importing workspace zx-init
+try {
+  const zxInit = path.join(process.cwd(), "tools", "dev", "zx-init.mjs");
+  const href = pathToFileURL(zxInit).href;
+  await import(href);
+} catch {}
 
 const ENABLE_TIMING = process.env.TEST_TIMING === "1";
 function logTiming(label: string, ms: number) {
@@ -206,6 +213,13 @@ EOF
       `}`;
     }
   }
+  // Link workspace node_modules into the temp repo to satisfy test imports like fs-extra and c8
+  try {
+    const wsNm = path.join(process.cwd(), "node_modules");
+    await $({
+      cwd: tmp,
+    })`bash --noprofile --norc -c ${`[ -e node_modules ] || ln -s '${wsNm.replace(/'/g, "'\\''")}' node_modules`}`;
+  } catch {}
   let shouldUseDirenv = true;
   try {
     const direnvStatus = await $({ stdio: "pipe" })`direnv status --json`;
@@ -274,6 +288,14 @@ EOF
   exportEnv.NODE_OPTIONS = [nodeOpts.join(" "), exportEnv.NODE_OPTIONS || ""]
     .filter(Boolean)
     .join(" ");
+  // Ensure zx globals are loaded in the temp repo when tests call bare `$` inside runInTemp
+  // by importing the workspace zx-init explicitly once.
+  try {
+    await $({
+      cwd: tmp,
+      env: exportEnv,
+    })`node --experimental-strip-types --import ${exportEnv.ZX_INIT} -e ${"console.log('zx-init-loaded')"}`;
+  } catch {}
   const _$ = $({ cwd: tmp, env: exportEnv });
   try {
     if (process.env.TEST_KEEP_TMP === "1") {

@@ -1,11 +1,10 @@
-load("//node:defs.bzl", "nix_node_bin", "nix_node_test")
+load("//node:defs.bzl", "nix_node_cli_bin", "nix_node_test")
 
-nix_node_bin(
+nix_node_cli_bin(
     name = "{{ name }}",
-    srcs = [],
-    out = "build.stamp",
-    cmd = "node -e 'console.log(\"build\")' && echo ok > $OUT",
     lockfile_label = "lockfile:{{ lockfilePath }}#{{ importer }}",
+    importer = "{{ importer }}",
+    # bundle = True,
 )
 
 nix_node_test(

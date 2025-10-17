@@ -43,12 +43,10 @@ def _zx_test_impl(ctx):
             + "target_platforms = prelude//platforms:default\n"
             + "EOF\n"
             + "  mkdir -p \"$WORKSPACE_ROOT/toolchains\" && printf '[buildfile]\nname = TARGETS\n' > \"$WORKSPACE_ROOT/toolchains/.buckconfig\"; "
-            # Ensure node_modules available in sandbox by linking from flake output
-            + "  if [ ! -e \"$WORKSPACE_ROOT/node_modules\" ]; then "
-            + "    NM_OUT=$(NODE_BIN=\"$(command -v node)\" \"$NODE_BIN\" --experimental-strip-types --import \"$WORKSPACE_ROOT/tools/dev/zx-init.mjs\" \"$WORKSPACE_ROOT/tools/dev/node-modules-build.ts\" --print-out-paths 2>/dev/null | tail -1); "
-            + "    if [ -n \"$NM_OUT\" ] && [ -d \"$NM_OUT/node_modules\" ]; then ln -s \"$NM_OUT/node_modules\" \"$WORKSPACE_ROOT/node_modules\"; fi; "
-            + "  fi; "
             + "            fi; "
+            # Ensure node_modules available in sandbox by linking from flake output (outside prelude guard)
+            + "NM_OUT=$(bash --noprofile --norc -c 'cd \"$WORKSPACE_ROOT\" && NODE_BIN=\"$(command -v node)\" \"$NODE_BIN\" --experimental-strip-types --import \"$WORKSPACE_ROOT/tools/dev/zx-init.mjs\" \"$WORKSPACE_ROOT/tools/dev/node-modules-build.ts\" --print-out-paths 2>/dev/null | tail -1'); "
+            + "if [ -n \"$NM_OUT\" ] && [ -d \"$NM_OUT/node_modules\" ]; then rm -rf \"$WORKSPACE_ROOT/node_modules\"; ln -s \"$NM_OUT/node_modules\" \"$WORKSPACE_ROOT/node_modules\"; fi; "
             # Load dev shell environment at repo root via direnv if needed (fast),
             # so tools like secretspec/copier are on PATH without per-temp flake eval
             + "if ! command -v secretspec >/dev/null 2>&1 || ! command -v copier >/dev/null 2>&1; then if command -v direnv >/dev/null 2>&1; then eval \"$(direnv export bash)\"; fi; fi; "
@@ -57,8 +55,9 @@ def _zx_test_impl(ctx):
             + "if [ -z \"$TEST_NODE_OPTIONS\" ]; then export TEST_NODE_OPTIONS=\"--test-timeout=180000\"; fi; "
             + "if [ -n \"$NODE_V8_COVERAGE\" ]; then mkdir -p \"$NODE_V8_COVERAGE\"; "
             + "ls -1t \"$NODE_V8_COVERAGE\"/coverage-*.json 2>/dev/null | tail -n +201 | xargs -r rm -f || true; fi; "
-            # Keep NODE_OPTIONS untouched; pass test flags on CLI instead
-            + "export NODE_OPTIONS=\"$NODE_OPTIONS\"; "
+            # Ensure zx-init is loaded in all node:test workers via NODE_OPTIONS
+            + "if [ -n \"$NODE_PATH\" ]; then export NODE_PATH=\"$WORKSPACE_ROOT/node_modules:$NODE_PATH\"; else export NODE_PATH=\"$WORKSPACE_ROOT/node_modules\"; fi; "
+            + "export NODE_OPTIONS=\"--import \"$WORKSPACE_ROOT/tools/dev/zx-init.mjs\" $NODE_OPTIONS\"; "
             + "SAFE=$(printf %%s \"$BUCK_TEST_TARGET\" | sed -E 's|^.*/:||; s/[^A-Za-z0-9._-]+/_/g' | cut -c1-200); "
             + "LOGDIR=\"$TEST_LOG_DIR/$SAFE\"; mkdir -p \"$LOGDIR\"; "
             # Use a deterministic buck2 isolation name per test to avoid accumulating daemons,
@@ -77,13 +76,13 @@ def _zx_test_impl(ctx):
             + "{ \"$NODE_BIN\" $TEST_NODE_OPTIONS --test --experimental-strip-types --import \"$WORKSPACE_ROOT/tools/dev/zx-init.mjs\" \"$SCRIPT_PATH\"; } > >(tee -a \"$LOGDIR/test.stdout.log\") 2> >(grep -Ev 'buck2_client_ctx::file_tailers::tailer: Failed to read from .*buckd\\.(stderr|stdout).*: task [0-9]+ was cancelled' | tee -a \"$LOGDIR/test.stderr.log\" >&2); STATUS=$?; "
             + "if [ \"$COVERAGE\" = \"1\" ]; then "
             + "\"$NODE_BIN\" \"$WORKSPACE_ROOT/tools/dev/coverage-raw-normalize.mjs\" || true; "
+            + "test -x \"$WORKSPACE_ROOT/node_modules/c8/bin/c8.js\" || { echo 'c8 missing in workspace node_modules; ensure install-deps linked node_modules' >&2; exit 1; }; "
             + "\"$NODE_BIN\" \"$WORKSPACE_ROOT/node_modules/c8/bin/c8.js\" report "
             + "--clean=false --temp-directory \"$WORKSPACE_ROOT/coverage/raw\" "
             + "--reports-dir \"$WORKSPACE_ROOT/coverage\" --reporter=json-summary --reporter=lcov --reporter=html "
             + "--extension .ts --allowExternal --src \"$WORKSPACE_ROOT\" "
             + "--include \"**/*.ts\" "
-            + "--exclude \"node_modules/**\" --exclude \"buck-out/**\" --exclude \".clinic/**\" --exclude \"**/*.d.ts\" "
-            + "|| true; "
+            + "--exclude \"node_modules/**\" --exclude \"buck-out/**\" --exclude \".clinic/**\" --exclude \"**/*.d.ts\"; "
             + "\"$NODE_BIN\" ./tools/dev/coverage-normalize.mjs || true; "
             + "fi; "
             + "buck2 --isolation-dir \"$BUCK_ISOLATION_DIR\" kill >/dev/null 2>&1 || true; "

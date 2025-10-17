@@ -7,7 +7,7 @@
     "notes": [
       "Generates apps/<name> with .npmrc, package.json, tsconfig, bin, src, test, TARGETS.",
       "Pass importer=<id> to override default apps/<name> importer.",
-      "TARGETS uses nix_node_bin and requires exactly one lockfile label."
+      "TARGETS uses nix_node_cli_bin and requires exactly one lockfile label."
     ],
     "examples": ["scaf new node cli demo-app", "scaf new node cli demo-app --importer=apps/demo"]
   }
