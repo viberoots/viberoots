@@ -20,12 +20,27 @@ let
   cleanSrc = lockfilePath: importerDir: pkgs.lib.cleanSourceWith {
     src = repoRoot;
     filter = path: type:
-      let pkgRel = if importerDir == "." then "package.json" else (importerDir + "/package.json"); in
-      (builtins.match (".*/" + (lib.escapeRegex lockfilePath)) path != null)
-      || (builtins.match (".*/" + (lib.escapeRegex pkgRel)) path != null)
-      || (builtins.match (".*/pnpm-workspace\\.yaml") path != null)
-      || (builtins.match (".*/\\.npmrc") path != null)
-      || (builtins.match ".*/patches/pnpm(/.*)?" path != null);
+      let
+        p = builtins.toString path;
+        rel = lib.removePrefix ((builtins.toString repoRoot) + "/") p;
+        pkgRel = if importerDir == "." then "package.json" else (importerDir + "/package.json");
+        impPrefix = importerDir + "/";
+        lockDir = lib.concatStringsSep "/" (lib.init (lib.splitString "/" lockfilePath));
+        lockPrefix = if lockDir == "" then "" else (lockDir + "/");
+        isPrefix = s: (lib.hasPrefix s rel);
+      in
+      # Always keep top-level aggregator dirs to allow walking into importers
+      (type == "directory" && (rel == "apps" || rel == "libs"))
+      # Keep directories that are prefixes of the importer dir or lockfile dir so children survive
+      || (type == "directory" && ((importerDir != "." && (rel == importerDir || isPrefix impPrefix)) || (lockPrefix != "" && (rel == lockDir || isPrefix lockPrefix))))
+      # Include all files under the importer dir and lockfile dir
+      || ((type != "directory") && (importerDir != "." && isPrefix impPrefix))
+      || ((type != "directory") && (lockPrefix != "" && isPrefix lockPrefix))
+      || (builtins.match ("^" + (lib.escapeRegex lockfilePath) + "$") rel != null)
+      || (builtins.match ("^" + (lib.escapeRegex pkgRel) + "$") rel != null)
+      || (builtins.match "^pnpm-workspace\\.yaml$" rel != null)
+      || (builtins.match "^\\.npmrc$" rel != null)
+      || (builtins.match "^patches/pnpm(/.*)?$" rel != null);
   };
 
   dirnameOf = p: let parts = lib.splitString "/" p; in lib.concatStringsSep "/" (lib.take (lib.length parts - 1) parts);

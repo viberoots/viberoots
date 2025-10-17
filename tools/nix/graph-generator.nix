@@ -283,6 +283,74 @@ let
     map (nm: { name = nm; value = cppTargetsFromGraph.${nm}; }) cppBinNames
   );
 
+  # Node CLI bundles (importer-scoped). We detect Node CLI bin targets by labels
+  # lang:node + kind:bin and extract the importer from the single lockfile label.
+  nodeMods = import ./node-modules.nix { inherit pkgs; repoRoot = repoRoot; };
+
+  labelsOf = n:
+    let labs = (get n "labels"); in if labs == null then [] else (if builtins.isList labs then labs else []);
+
+  isNodeBin = n:
+    let labs = labelsOf n; in (builtins.elem "lang:node" labs) && (builtins.elem "kind:bin" labs);
+
+  importerOf = n:
+    let labs = labelsOf n;
+        locks = builtins.filter (l: lib.hasPrefix "lockfile:" l) labs;
+    in if locks == [] then null else (
+      let rest = lib.removePrefix "lockfile:" (builtins.head locks);
+          parts = lib.splitString "#" rest;
+      in if (builtins.length parts) >= 2 then (builtins.elemAt parts 1) else null
+    );
+
+  safeNodeBinNodes = builtins.filter (n:
+    let nm = ensureFullLabel n;
+        okName = (builtins.typeOf nm == "string") && nm != "";
+        rel = if okName then (pkgPathOf nm) else "";
+        inAppsLibs = lib.hasPrefix "apps/" rel || lib.hasPrefix "libs/" rel;
+    in okName && inAppsLibs && isNodeBin n && (importerOf n != null)
+  ) nodesList;
+
+  mkNodeCli = name: importerDir:
+    let
+      nm = nodeMods.mkNodeModules { lockfilePath = importerDir + "/pnpm-lock.yaml"; inherit importerDir; };
+      entryRel = "src/index.ts";
+      pname = "node-cli-" + sanitize name;
+    in pkgs.stdenvNoCC.mkDerivation {
+      inherit pname;
+      version = sanitize importerDir;
+      src = repoRoot;
+      nativeBuildInputs = [ pkgs.esbuild pkgs.nodejs_22 ];
+      buildPhase = ''
+        set -euo pipefail
+        cd ${importerDir}
+        export SOURCE_DATE_EPOCH=1
+        export NODE_PATH=${nm}/node_modules
+        outFile="${targetNameOf name}"
+        ${pkgs.esbuild}/bin/esbuild ${entryRel} \
+          --platform=node \
+          --target=node22 \
+          --bundle \
+          --format=esm \
+          --legal-comments=none \
+          --banner:js='#!/usr/bin/env node' \
+          --outfile="$outFile"
+      '';
+      installPhase = ''
+        set -euo pipefail
+        mkdir -p $out/bin
+        install -m0755 ${targetNameOf name} $out/bin/${targetNameOf name}
+      '';
+    };
+
+  nodeTargetsFromGraph = builtins.foldl' (acc: n:
+    let nm = ensureFullLabel n; imp = importerOf n; tnm = builtins.typeOf nm; in
+      if (tnm != "string") || (nm == "") || (imp == null)
+      then acc
+      else (acc // { "${nm}" = mkNodeCli nm imp; })
+  ) {} safeNodeBinNodes;
+
+  nodeOutPaths = nodeTargetsFromGraph;
+
   # Provide a flake-friendly flat attrset whose keys are safe identifiers: t + [a-z0-9_]+
   sanitizeAttr = s:
     let
@@ -344,7 +412,7 @@ let
   '';
 
   # Ensure C++ and Go target derivations are realized by declaring them as inputs.
-  allDeps = (lib.attrValues goOutPaths) ++ (lib.attrValues cppOutPaths);
+  allDeps = (lib.attrValues goOutPaths) ++ (lib.attrValues cppOutPaths) ++ (lib.attrValues nodeOutPaths);
 
   all = pkgs.runCommand "graph-outputs" { inherit allDeps; } ''
       set -eu
@@ -418,6 +486,29 @@ let
           fi
         ''
       ) cppOutPaths)}
+      ${lib.concatStringsSep "\n" (lib.mapAttrsToList (n: p:
+        ''
+          ln -s "${p}" "$out/" || true
+          echo "== node target: ${n} ==" >> $out/build.log
+          (cd "${p}" && { ls -la || true; echo "-- bin --"; ls -la bin 2>/dev/null || true; }) >> $out/build.log || true
+          bins=""
+          if [ -d "${p}/bin" ]; then
+            for f in "${p}/bin"/*; do
+              if [ -f "$f" ] && [ -x "$f" ]; then
+                if [ -z "$bins" ]; then bins="\"$f\""; else bins="$bins, \"$f\""; fi
+                ln -s "$f" "$out/bin/$(basename "$f")" || true
+                ln -s "$f" "$out/bin/${sanitize n}" || true
+                ln -s "$f" "$out/bin/node-${sanitize n}" || true
+              fi
+            done
+          fi
+          if [ -n "$bins" ]; then
+            if [ "$first" -eq 0 ]; then echo "," >> $out/manifest.json; fi
+            echo "{ \"label\": \"${n}\", \"kind\": \"bin\", \"bins\": [ $bins ], \"aux\": [] }" >> $out/manifest.json
+            first=0
+          fi
+        ''
+      ) nodeOutPaths)}
       echo ']' >> $out/manifest.json
     '';
 in

@@ -24,9 +24,9 @@ function importerFromLockfile(relLock: string): string {
 }
 
 function pnpmStoreAttrFromImporter(importer: string): string {
-  // Flake exposes pnpm-store.<sanitized> or pnpm-store.default for root
+  // Flake exposes pnpm-store.<sanitized> using node-modules.sanitizeName (slashes -> '-')
   if (importer === ".") return "pnpm-store.default";
-  const sanitized = importer.replace(/\/+|\:+|\s+/g, "_");
+  const sanitized = importer.replace(/\/\/|:|\s+/g, "-").replace(/\//g, "-");
   return `pnpm-store.${sanitized}`;
 }
 
