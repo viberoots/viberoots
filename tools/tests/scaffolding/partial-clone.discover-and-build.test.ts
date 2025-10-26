@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
@@ -6,7 +7,8 @@ import { runInTemp } from "../lib/test-helpers";
 // E2E: partial-clone discovery & build in a sparse workspace.
 
 test("partial clone: discover and build scaffolded lib via //...", async () => {
-  await runInTemp("partial-clone-discover-build", async (_tmp, _$) => {
+  // Avoid dev env export path
+  await runInTemp("partial-clone-discover", async (_tmp, _$) => {
     const $ = _$({ stdio: "pipe" });
     await $`bash -lc ${`set -euo pipefail
       printf '.\n' > .buckroot
@@ -34,6 +36,7 @@ config = ./prelude
 
 [build]
 prelude = prelude
+default_platform = //:no_cgo
 user_platform = prelude//platforms:default
 target_platforms = prelude//platforms:default
 EOF

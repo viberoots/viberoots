@@ -85,12 +85,36 @@ async function rewriteCoverageUrls(tmpRoot: string) {
 
 export async function rsyncRepoTo(tmp: string) {
   await timeAsync(`rsyncRepoTo(${path.basename(tmp)})`, async () => {
+    // Optional: limit sync to specific roots (comma/space-separated), e.g. "apps/demo,cpp,tools"
+    const rootsEnv: string = (process.env.TEST_RSYNC_ROOTS || "").trim();
+    if (rootsEnv) {
+      const roots = rootsEnv
+        .split(/[\,\s]+/)
+        .map((r) => r.trim().replace(/^\/+/, ""))
+        .filter(Boolean);
+      // Always copy flake.nix if present so temp repos can run nix commands
+      try {
+        await $`bash -lc ${`set -euo pipefail
+          if [ -f flake.nix ]; then install -D -m0644 flake.nix "${tmp}/flake.nix"; fi
+        `}`;
+      } catch {}
+      for (const r of roots as string[]) {
+        try {
+          await $`rsync -a --relative ${r} ${tmp}/`;
+        } catch {}
+      }
+      return;
+    }
     const goOnly = process.env.TEST_PARTIAL_CLONE_GO_ONLY === "1";
     const excludes = [
       "/buck-out",
       "/.git",
+      "/.envrc",
+      "/.buck2_shim",
+      // Exclude all product repos; tests must synthesize their own temp content
       "/apps",
       "/libs",
+      "/.pnpm-store",
       "/node_modules",
       "/coverage",
       "/.clinic",
@@ -99,7 +123,12 @@ export async function rsyncRepoTo(tmp: string) {
       "/tools/buck/graph.json",
     ];
     if (goOnly) {
-      excludes.push("/cpp", "/tools/nix/templates/cpp.nix", "/tools/scaffolding/templates/cpp");
+      // In partial-clone GO-only mode, exclude other languages' templates entirely.
+      excludes.push(
+        "/cpp",
+        "/tools/nix/templates", // tests will add minimal go.nix manually
+        "/tools/scaffolding/templates", // tests will create minimal go template stub
+      );
     }
     if (process.env.TEST_EXCLUDE_CPP_REQS === "1") {
       excludes.push("/cpp/defs.bzl", "/tools/nix/templates/cpp.nix");
@@ -110,7 +139,9 @@ export async function rsyncRepoTo(tmp: string) {
 }
 
 export async function mktemp(prefix = "test-") {
-  const base = os.tmpdir();
+  const inRepo = process.env.TEST_TMP_IN_REPO === "1";
+  const base = inRepo ? path.join(process.cwd(), "buck-out", "tmp") : os.tmpdir();
+  if (inRepo) await fsp.mkdir(base, { recursive: true });
   return await fsp.mkdtemp(path.join(base, prefix));
 }
 
@@ -136,8 +167,8 @@ export async function runInTemp<T>(
     // Prefer the checked-in prelude from the workspace copy
     const localPrelude = path.join(tmp, "prelude");
     try {
-      const fs = await import("fs-extra");
-      if (await fs.pathExists(localPrelude)) preludePath = localPrelude;
+      await fsp.access(localPrelude);
+      preludePath = localPrelude;
     } catch {}
     // If not available, best-effort: obtain nix prelude path (non-fatal if it fails)
     if (!preludePath) {
@@ -162,95 +193,101 @@ export async function runInTemp<T>(
       }
     }
     if (preludePath) {
-      await $({ cwd: tmp })`bash --noprofile --norc -c ${`set -euo pipefail
-        printf '.\n' > .buckroot
-        [ -e prelude ] || ln -s "${preludePath}" prelude
-        cat > .buckconfig <<'EOF'
-[buildfile]
-name = TARGETS
-
-[repositories]
-root = .
-prelude = ./prelude
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-config = ./prelude
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbcode_stub
-
-[cells]
-root = .
-prelude = ./prelude
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-config = ./prelude
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbcode_stub
-
-[build]
-prelude = prelude
-user_platform = prelude//platforms:default
-target_platforms = prelude//platforms:default
-EOF
-        mkdir -p toolchains
-        printf '[buildfile]\nname = TARGETS\n' > toolchains/.buckconfig
-        cat > toolchains/TARGETS <<'EOF'
-load("@repo_toolchains//:go.bzl", "system_go_bootstrap_toolchain", "system_go_toolchain")
-load("@repo_toolchains//:python.bzl", "system_python_bootstrap_toolchain")
-load("@repo_toolchains//:cxx.bzl", "system_cxx_toolchain")
-load("@prelude//tests:test_toolchain.bzl", "noop_test_toolchain")
-load("@repo_toolchains//:remote_test_execution.bzl", "remote_test_execution_toolchain")
-load("@prelude//toolchains:genrule.bzl", "system_genrule_toolchain")
-
-system_go_toolchain(name = "go", visibility = ["PUBLIC"]) 
-system_go_bootstrap_toolchain(name = "go_bootstrap", visibility = ["PUBLIC"]) 
-system_python_bootstrap_toolchain(name = "python_bootstrap", visibility = ["PUBLIC"]) 
-system_cxx_toolchain(name = "cxx", visibility = ["PUBLIC"]) 
-noop_test_toolchain(name = "test", visibility = ["PUBLIC"]) 
-remote_test_execution_toolchain(name = "remote_test_execution", visibility = ["PUBLIC"]) 
-system_genrule_toolchain(name = "genrule", visibility = ["PUBLIC"]) 
-EOF
-      `}`;
+      const setupScript = [
+        "set -euo pipefail",
+        "printf '.\\n' > .buckroot",
+        `[ -e prelude ] || ln -s "${preludePath}" prelude`,
+        "cat > .buckconfig <<'EOF'",
+        "[buildfile]",
+        "name = TARGETS",
+        "",
+        "[repositories]",
+        "root = .",
+        "prelude = ./prelude",
+        "toolchains = ./toolchains",
+        "repo_toolchains = ./toolchains",
+        "config = ./prelude",
+        "fbsource = ./prelude/third-party/fbsource_stub",
+        "fbcode = ./prelude/third-party/fbcode_stub",
+        "",
+        "[cells]",
+        "root = .",
+        "prelude = ./prelude",
+        "toolchains = ./toolchains",
+        "repo_toolchains = ./toolchains",
+        "config = ./prelude",
+        "fbsource = ./prelude/third-party/fbsource_stub",
+        "fbcode = ./prelude/third-party/fbcode_stub",
+        "",
+        "[build]",
+        "prelude = prelude",
+        "default_platform = //:no_cgo",
+        "user_platform = //:no_cgo",
+        "target_platforms = //:no_cgo",
+        "action_env = SDKROOT,CPATH,LIBRARY_PATH,CGO_CFLAGS,CGO_CPPFLAGS,CGO_ENABLED",
+        "EOF",
+        "mkdir -p toolchains",
+        "printf '[buildfile]\\nname = TARGETS\\n' > toolchains/.buckconfig",
+        "cat > toolchains/TARGETS <<'EOF'",
+        'load("@repo_toolchains//:go.bzl", "system_go_bootstrap_toolchain", "system_go_toolchain")',
+        'load("@repo_toolchains//:python.bzl", "system_python_bootstrap_toolchain")',
+        'load("@prelude//tests:test_toolchain.bzl", "noop_test_toolchain")',
+        'load("@repo_toolchains//:remote_test_execution.bzl", "remote_test_execution_toolchain")',
+        'load("@prelude//toolchains:genrule.bzl", "system_genrule_toolchain")',
+        'load("@repo_toolchains//:cxx.bzl", "system_cxx_toolchain")',
+        "",
+        'system_go_toolchain(name = "go", visibility = ["PUBLIC"]) ',
+        'system_go_bootstrap_toolchain(name = "go_bootstrap", visibility = ["PUBLIC"]) ',
+        'system_python_bootstrap_toolchain(name = "python_bootstrap", visibility = ["PUBLIC"]) ',
+        'system_cxx_toolchain(name = "cxx", visibility = ["PUBLIC"]) ',
+        'noop_test_toolchain(name = "test", visibility = ["PUBLIC"]) ',
+        'remote_test_execution_toolchain(name = "remote_test_execution", visibility = ["PUBLIC"]) ',
+        'system_genrule_toolchain(name = "genrule", visibility = ["PUBLIC"]) ',
+        "EOF",
+        "# Define a local platform that disables CGO globally for tests in temp repos",
+        "cat > TARGETS <<'EOF'",
+        "platform(",
+        '    name = "no_cgo",',
+        "    constraint_values = [",
+        '        "config//go/constraints:cgo_enabled_false",',
+        '        "config//go/constraints:asan_false",',
+        '        "config//go/constraints:race_false",',
+        "    ],",
+        '    visibility = ["PUBLIC"],',
+        ")",
+        "EOF",
+        "# Ensure ephemeral build directories are ignored by git in temp repos",
+        "cat > .gitignore <<'EOF'",
+        "/.buck/",
+        "/.cache/",
+        "/buck-out/",
+        "/node_modules/",
+        "EOF",
+      ].join("\n");
+      await $({ cwd: tmp })`bash --noprofile --norc -c ${setupScript}`;
+      // Debug: print generated configs for troubleshooting Buck configuration
+      try {
+        await $({
+          cwd: tmp,
+        })`bash -c 'echo ==== .buckconfig ====; sed -n 1,200p .buckconfig || true; echo ==== toolchains/TARGETS ====; sed -n 1,200p toolchains/TARGETS || true'`;
+      } catch {}
     }
   }
-  // Link workspace node_modules into the temp repo to satisfy test imports like fs-extra and c8
-  try {
-    const wsNm = path.join(process.cwd(), "node_modules");
-    await $({
-      cwd: tmp,
-    })`bash --noprofile --norc -c ${`[ -e node_modules ] || ln -s '${wsNm.replace(/'/g, "'\\''")}' node_modules`}`;
-  } catch {}
-  let shouldUseDirenv = true;
-  try {
-    const direnvStatus = await $({ stdio: "pipe" })`direnv status --json`;
-    const direnvStatusJson = JSON.parse(direnvStatus.stdout);
-    if (direnvStatusJson.config.loadadRC != null) {
-      shouldUseDirenv = false;
-    }
-  } catch {}
-  let envOut = shouldUseDirenv
-    ? await timeAsync(
-        `direnvExport(${path.basename(tmp)})`,
-        async () =>
-          $({
-            cwd: tmp,
-            stdio: "pipe",
-            env: { ...process.env, NO_NODE_MODULES_LINK: "1" },
-          })`bash --noprofile --norc -c 'if command -v direnv >/dev/null 2>&1; then direnv allow . >/dev/null 2>&1 || true; eval "$(direnv export bash)"; env -0; else printf ""; fi'`,
-      )
-    : ({ stdout: "" } as any);
-  // Fallback: if direnv is unavailable (common in CI or minimal shells), attempt to
-  // capture a dev-shell environment via Nix so tools like pnpm are on PATH.
-  if (!String((envOut as any).stdout || "")) {
+  // No fallback link to root workspace node_modules — tests must link per-importer via Nix outputs.
+  // Avoid bootstrapping a dev environment in temp repos by default to prevent timeouts.
+  // Opt-in only when TEST_NEED_DEV_ENV=1 is set in the environment.
+  let envOut: any = { stdout: "" };
+  const inferredNeedDev = /(?:^|[-_])go(?:[-_]|$)/i.test(name);
+  if (process.env.TEST_NEED_DEV_ENV === "1" || inferredNeedDev) {
     try {
       envOut = await timeAsync(
-        `nixDevelopExport(${path.basename(tmp)})`,
+        `devEnvExport(${path.basename(tmp)})`,
         async () =>
           $({
             cwd: tmp,
             stdio: "pipe",
-            env: { ...process.env, NO_NODE_MODULES_LINK: "1" },
-          })`bash --noprofile --norc -c 'if command -v nix >/dev/null 2>&1; then NO_NODE_MODULES_LINK=1 nix develop --accept-flake-config -c env -0; else printf ""; fi'`,
+            env: { ...process.env },
+          })`bash --noprofile --norc -c 'if command -v direnv >/dev/null 2>&1; then direnv allow . >/dev/null 2>&1 || true; eval "$(direnv export bash)"; env -0; elif command -v nix >/dev/null 2>&1; then NO_NODE_MODULES_LINK=1 nix develop --accept-flake-config -c env -0; else printf ""; fi'`,
       );
     } catch {
       // ignore; proceed with current environment
@@ -260,6 +297,58 @@ EOF
   for (const [k, v] of Object.entries(process.env)) {
     if (typeof v === "string") exportEnv[k] = v;
   }
+  // In temp repos, prefer disabling CGO to avoid stdlib cgotest header dependencies
+  exportEnv.CGO_ENABLED = "0";
+  // Propagate SDKROOT and basic CGO flags on macOS so Go stdlib cgotest can find headers
+  try {
+    if (process.platform === "darwin") {
+      const { stdout } = await $({ stdio: "pipe" })`xcrun --show-sdk-path`.nothrow();
+      const sdk = String(stdout || "").trim();
+      if (sdk) {
+        exportEnv.SDKROOT = exportEnv.SDKROOT || sdk;
+        const base = `-isysroot ${sdk}`;
+        exportEnv.CGO_CPPFLAGS = [base, exportEnv.CGO_CPPFLAGS || ""].filter(Boolean).join(" ");
+        exportEnv.CGO_CFLAGS = [base, exportEnv.CGO_CFLAGS || ""].filter(Boolean).join(" ");
+        // Help clang/cgo find headers and libs inside the SDK even if flags get reset downstream
+        const inc = `${sdk}/usr/include`;
+        const lib = `${sdk}/usr/lib`;
+        exportEnv.CPATH = [inc, exportEnv.CPATH || ""].filter(Boolean).join(path.delimiter);
+        exportEnv.LIBRARY_PATH = [lib, exportEnv.LIBRARY_PATH || ""]
+          .filter(Boolean)
+          .join(path.delimiter);
+        // Prefer invoking clang via xcrun so it honors SDKROOT reliably
+        exportEnv.CC = exportEnv.CC || "xcrun --sdk macosx clang";
+      }
+    }
+  } catch {}
+  // Enforce that core toolchain binaries come from Nix; set CC/CXX accordingly
+  try {
+    const which = async (cmd: string): Promise<string> => {
+      const out = await $({ stdio: "pipe" })`command -v ${cmd}`.nothrow();
+      return String(out.stdout || "").trim();
+    };
+    const isNix = (p: string) => !!p && p.startsWith("/nix/store/");
+    const clang = await which("clang");
+    const clangxx = (await which("clang++")) || clang;
+    const llvmAr = await which("llvm-ar");
+    const ar = llvmAr || (await which("ar"));
+    // Only enforce/use tools that are present and Nix-provided
+    if (isNix(clang) && isNix(clangxx)) {
+      if (process.platform === "darwin") {
+        const xcrun = await which("xcrun");
+        if (isNix(xcrun)) {
+          exportEnv.CC = `${xcrun} --sdk macosx ${clang}`;
+          exportEnv.CXX = `${xcrun} --sdk macosx ${clangxx}`;
+        }
+      } else {
+        exportEnv.CC = clang;
+        exportEnv.CXX = clangxx;
+      }
+    }
+    if (!isNix(ar)) {
+      // If ar missing or non-Nix, skip; CGO might not need archiver on this path
+    }
+  } catch {}
   const injected = String((envOut as any).stdout || "");
   for (const entry of injected ? injected.split("\0") : []) {
     if (!entry) continue;
@@ -270,20 +359,38 @@ EOF
       exportEnv[k] = v;
     }
   }
+  // Ensure dev deps (fs-extra, c8, yaml, etc.) resolve from the main workspace initially.
+  // When tests install additional deps in the temp repo, local node_modules will take precedence.
+  try {
+    const wsNodeModules = path.join(process.cwd(), "node_modules");
+    exportEnv.NODE_PATH = [wsNodeModules, exportEnv.NODE_PATH || ""]
+      .filter(Boolean)
+      .join(path.delimiter);
+  } catch {}
   // Ensure repo-aware bin helpers (e.g., tools/bin/build, verify) operate on the temp copy
   // Keep WORKSPACE_ROOT as the temp repo for file operations
   exportEnv.WORKSPACE_ROOT = tmp;
+  // Use a stable, per-temp nested buck2 isolation to avoid cross-test interference
+  try {
+    const isoBase = `zxtest-nested-${path.basename(tmp)}-${process.pid}`;
+    exportEnv.BUCK_NESTED_ISO = exportEnv.BUCK_NESTED_ISO || isoBase;
+  } catch {}
+  // Point HOME at the temp repo to avoid loading user login profiles (which may invoke direnv)
+  // when tests run shells like `bash -lc ...`.
+  exportEnv.HOME = tmp;
+  // Prefer Go proxy to avoid GitHub API rate limiting; keep a local module cache under tmp
+  try {
+    exportEnv.GOPROXY = exportEnv.GOPROXY || "https://proxy.golang.org,direct";
+    exportEnv.GOSUMDB = exportEnv.GOSUMDB || "sum.golang.org";
+    exportEnv.GOMODCACHE = exportEnv.GOMODCACHE || path.join(tmp, ".gomodcache");
+  } catch {}
+  // Silence any direnv logging if hooks are present in environment.
+  exportEnv.DIRENV_LOG_FORMAT = "";
   // Ensure zx init import always points to the real workspace, not the temp copy
   exportEnv.ZX_INIT = path.join(process.cwd(), "tools", "dev", "zx-init.mjs");
-  exportEnv.NODE_PATH = [
-    path.join(tmp, "node_modules"),
-    path.join(process.cwd(), "node_modules"),
-    exportEnv.NODE_PATH || "",
-  ]
-    .filter(Boolean)
-    .join(path.delimiter);
+  // Do not force NO_NODE_MODULES_LINK; allow initial symlink and per-temp installs to override.
   // Do not mutate PATH; rely on direnv-provided environment from the dev shell.
-  exportEnv.NO_NODE_MODULES_LINK = "1";
+  // Already set above to disable node_modules linking in zx_test rule
   const nodeOpts = ["--experimental-strip-types", `--import ${exportEnv.ZX_INIT}`];
   exportEnv.NODE_OPTIONS = [nodeOpts.join(" "), exportEnv.NODE_OPTIONS || ""]
     .filter(Boolean)
@@ -298,6 +405,12 @@ EOF
   } catch {}
   const _$ = $({ cwd: tmp, env: exportEnv });
   try {
+    // TEMP-DIAG: print key env that could impact deadlocks
+    try {
+      console.error("[diag] WORKSPACE_ROOT:", process.cwd());
+      console.error("[diag] NODE_OPTIONS:", exportEnv.NODE_OPTIONS || "");
+      console.error("[diag] NO_NODE_MODULES_LINK:", exportEnv.NO_NODE_MODULES_LINK || "");
+    } catch {}
     if (process.env.TEST_KEEP_TMP === "1") {
       try {
         console.error(`KEEP_TMP ${tmp}`);
@@ -310,7 +423,9 @@ EOF
   } finally {
     // Best-effort: stop any buck2 daemon for this temp repo to prevent buckd accumulation.
     try {
-      await _$`buck2 kill`;
+      // Kill only the nested isolation daemon associated with this temp repo
+      const iso = exportEnv.BUCK_NESTED_ISO || `zxtest-nested-${path.basename(tmp)}-${process.pid}`;
+      await _$`buck2 --isolation-dir ${iso} kill`;
     } catch {}
     await timeAsync(`rewriteCoverageUrls(${path.basename(tmp)})`, async () =>
       rewriteCoverageUrls(tmp).catch(() => {}),

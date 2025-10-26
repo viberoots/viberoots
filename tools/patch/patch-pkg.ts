@@ -1,4 +1,18 @@
 #!/usr/bin/env zx-wrapper
+// Ensure zx globals are available even in sandboxes without node_modules by
+// importing the path discovered by zx-init when possible.
+try {
+  const url = process.env.ZX_GLOBALS_URL || "";
+  if (url) {
+    await import(url);
+  } else {
+    await import("zx/globals");
+  }
+} catch {
+  try {
+    await import("zx/globals");
+  } catch {}
+}
 import path from "node:path";
 
 type SubcommandName = "start" | "apply" | "reset" | "session" | "remove" | "help";
@@ -23,7 +37,33 @@ function usage(msg?: string) {
   process.exit(2);
 }
 
-const argvAll = (global as any).argv as any;
+function parseArgs(): { _: string[]; importer?: string; lang?: string; force?: boolean } {
+  const g: any = (global as any).argv;
+  if (g && Array.isArray(g._)) return g;
+  const out: { _: string[]; importer?: string; lang?: string; force?: boolean } = { _: [] };
+  const argv = (process.argv || []).slice(2);
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === "--importer" && i + 1 < argv.length) {
+      out.importer = argv[++i];
+    } else if (a.startsWith("--importer=")) {
+      out.importer = a.split("=", 2)[1] || "";
+    } else if (a === "--lang" && i + 1 < argv.length) {
+      out.lang = argv[++i];
+    } else if (a.startsWith("--lang=")) {
+      out.lang = a.split("=", 2)[1] || "";
+    } else if (a === "--force") {
+      (out as any).force = true;
+    } else if (a.startsWith("--")) {
+      // ignore unknown flag
+    } else {
+      out._.push(a);
+    }
+  }
+  return out;
+}
+
+const argvAll = parseArgs();
 const [_subRaw, _lang, ...positional] = (argvAll._ as string[]) || [];
 const sub = ((_subRaw as string) || "help").toLowerCase() as SubcommandName;
 const lang = (_lang as string) || (argvAll.lang as string);

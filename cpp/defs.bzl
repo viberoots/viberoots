@@ -56,6 +56,19 @@ def nix_cpp_test(name, **kwargs):
             lbl = NIX_ATTR_MAP.get(d)
             if lbl != None and isinstance(lbl, str) and lbl != "":
                 extra_nixpkg_labels.append(lbl)
+            else:
+                # Fallback: derive nixpkg attr from provider naming convention "nix_pkgs_<name>"
+                # Example: //third_party/providers:nix_pkgs_googletest -> nixpkg:pkgs.googletest
+                parts = d.split(":")
+                prov = parts[1] if len(parts) > 1 else ""
+                prefix = "nix_pkgs_"
+                if prov.startswith(prefix):
+                    tail = prov[len(prefix):]
+                    # Special-case common aliases
+                    if tail.startswith("gtest"):
+                        extra_nixpkg_labels.append("nixpkg:pkgs.googletest")
+                    else:
+                        extra_nixpkg_labels.append("nixpkg:pkgs." + tail.replace("_", "."))
     _planner_labels = _planner_kwargs.get("labels", []) + extra_nixpkg_labels
     # Planner-visible stub: declare a cxx_library without compiling test sources; Nix will build the test.
     # Filter provider deps from planner to avoid visibility / graph-edge to providers

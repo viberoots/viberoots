@@ -12,7 +12,7 @@ void (async function main() {
     await $tmp`git add -A && git commit -qm init`;
 
     // Refresh glue and build via the helper
-    await $tmp`tools/dev/dev-build.ts build //:scaffolding_smoke_targets_buildfile --no-materialize`;
+    await $tmp`tools/dev/dev-build.ts build //... --no-materialize`;
 
     // Ensure no index changes occurred
     const { stdout } = await $tmp`git status --porcelain`;

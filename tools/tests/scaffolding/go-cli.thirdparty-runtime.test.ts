@@ -72,40 +72,9 @@ async function listTree(rootDir: string): Promise<string[]> {
 }
 
 test("go cli with local lib + third-party runtime", async () => {
-  await runInTemp("go-cli-thirdparty-runtime", async (_tmp, _$) => {
+  await runInTemp("cli-thirdparty-runtime", async (_tmp, _$) => {
     const $ = _$({ stdio: "pipe" });
-    await $`bash -lc ${`set -euo pipefail
-      printf '.\n' > .buckroot
-      cat > .buckconfig <<'EOF'
-[buildfile]
-name = TARGETS
-
-[repositories]
-root = .
-prelude = ./prelude
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbcode_stub
-config = ./prelude
-
-[cells]
-root = .
-prelude = ./prelude
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbcode_stub
-config = ./prelude
-
-[build]
-prelude = prelude
-user_platform = prelude//platforms:default
-target_platforms = prelude//platforms:default
-EOF
-      mkdir -p toolchains
-      printf '[buildfile]\nname = TARGETS\n' > toolchains/.buckconfig
-    `}`;
+    // use runInTemp-generated buck config
 
     // 1) Scaffold the lib
     await $`scaf new go lib demo-lib --yes --path=libs/demo-lib`;

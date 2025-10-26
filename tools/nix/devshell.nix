@@ -51,8 +51,10 @@ in {
             out_path=$(nix eval --raw .#node-modules.outPath 2>/dev/null || true)
           fi
         fi
-        # If eval was skipped or failed, check if the parent workspace has node_modules
-        if [ -z "$out_path" ] && [ -n "''${WORKSPACE_ROOT:-}" ] && [ "$PWD" != "''${WORKSPACE_ROOT}" ]; then
+        # If eval was skipped or failed, check if the parent workspace has node_modules,
+        # but only when linking is allowed.
+        if [ -z "$out_path" ] && [ -z "''${NO_NODE_MODULES_LINK:-}" ] \
+           && [ -n "''${WORKSPACE_ROOT:-}" ] && [ "$PWD" != "''${WORKSPACE_ROOT}" ]; then
           # Test sandbox: use parent workspace's node_modules if available
           if [ -L "''${WORKSPACE_ROOT}/node_modules" ]; then
             out_path=$(readlink "''${WORKSPACE_ROOT}/node_modules" | sed 's|/node_modules$||')

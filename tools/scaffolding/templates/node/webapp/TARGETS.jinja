@@ -1,0 +1,10 @@
+load("//node:defs.bzl", "node_webapp")
+
+node_webapp(
+    name = "app",
+    labels = [
+        "lockfile:apps/{{ name }}/pnpm-lock.yaml#apps/{{ name }}",
+        "lang:node",
+        "kind:app",
+    ],
+)

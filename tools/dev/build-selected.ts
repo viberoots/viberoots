@@ -61,7 +61,31 @@ async function ensureGraph(repoRoot: string, workDir: string) {
   } else {
     console.error(`[build-selected] exporting graph to ${graphPath}`);
   }
-  await $`nix run ${repoRoot}#zx-wrapper -- ${path.join(repoRoot, "tools/buck/export-graph.ts")} --out ${graphPath}`;
+  // Limit exporter query roots to the target's package to avoid unrelated package errors.
+  const target = (process.env.BUCK_TARGET || "").trim();
+  const dropCellAndConfig = (label: string) => {
+    const noCfg = label.split(" (config//")[0];
+    if (noCfg.includes("//") && !noCfg.startsWith("//")) {
+      const idx = noCfg.indexOf("//");
+      return "//" + noCfg.slice(idx + 2);
+    }
+    return noCfg;
+  };
+  const pkgOf = (label: string) => {
+    const base = dropCellAndConfig(label);
+    const left = base.split(":")[0];
+    return left.startsWith("//") ? left.slice(2) : left;
+  };
+  const pkg = target ? pkgOf(target) : "";
+  const queryRoots = [pkg, "cpp"].filter(Boolean).join(",");
+  await $({
+    env: {
+      ...process.env,
+      BUCK_TEST_SRC: workDir,
+      EXPORTER_DEBUG: "1",
+      BUCK_QUERY_ROOTS: queryRoots,
+    },
+  })`nix run ${repoRoot}#zx-wrapper -- ${path.join(repoRoot, "tools/buck/export-graph.ts")} --out ${graphPath}`;
   return graphPath;
 }
 

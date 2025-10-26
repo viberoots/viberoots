@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { $ } from "zx";
+import "zx/globals";
 
 type Row = { name: string; rule_type: string; labels?: string[] };
 

@@ -93,7 +93,7 @@ EOF'`;
     const out = String(probe.stdout || "");
     const count = (out.match(/\/\/third_party\/providers:dup/g) || []).length;
     if (count !== 1) {
-      console.error("expected exactly one instance of duplicate provider, got", dup.length);
+      console.error("expected exactly one instance of duplicate provider, got", count);
       process.exit(2);
     }
   });

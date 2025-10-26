@@ -1,3 +1,3 @@
-module github.com/example/bar
+module bar
 
 go 1.22

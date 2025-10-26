@@ -2,10 +2,9 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { findNearestImporterLock, nodeModulesAttr } from "./common.ts";
-import { runGlue, zxNodeBase } from "./glue.ts";
+import { sanitizeName } from "./common.ts";
+import { runGlue } from "./glue.ts";
 import { runGomod2nixGenerate, runGomod2nixScanAll } from "./gomod2nix.ts";
-import { relinkNodeModules } from "./link-node.ts";
 import { withExclusiveInstallLock } from "./lock.ts";
 
 type Flags = {
@@ -32,94 +31,93 @@ function parseFlags(argv: string[]): Flags {
   return { force, dryRun, verbose, skipGlue, glueOnly };
 }
 
-async function have(cmd: string): Promise<boolean> {
-  try {
-    await $({ stdio: "pipe" })`bash --noprofile --norc -c 'command -v ${cmd} >/dev/null 2>&1'`;
-    return true;
-  } catch {
-    return false;
+// Resolve absolute workspace root path using ZX_INIT, without changing process CWD.
+function resolveWorkspaceRoot(): string | null {
+  // Prefer explicit temp-repo root when provided by test harness
+  const wr = process.env.WORKSPACE_ROOT || "";
+  if (wr) {
+    try {
+      return path.resolve(wr);
+    } catch {}
   }
+  // Otherwise infer from ZX_INIT path
+  const zx = process.env.ZX_INIT || "";
+  if (zx) {
+    try {
+      const p = path.resolve(zx);
+      return path.resolve(path.dirname(p), "..", "..");
+    } catch {}
+  }
+  return null;
 }
-
-// Normalize CWD to repo root so this script works from any directory (robust in zx/temp sandboxes)
-try {
-  const here = path.dirname(new URL(import.meta.url).pathname);
-  const root = path.resolve(here, "..", "..", "..");
-  process.chdir(root);
-} catch {}
 console.log("Installing dependencies...");
 const { force, dryRun, verbose, skipGlue, glueOnly } = parseFlags(process.argv.slice(2));
-const inBuckTest = Boolean(
-  process.env.BUCK_TARGET || process.env.BUCK_TEST_SRC || process.env.BUCK_ROOT,
-);
-const skipNodeInstall = inBuckTest || process.env.SKIP_NODE_INSTALL === "1";
+const repoRoot = resolveWorkspaceRoot() || process.cwd();
+// Discover importers (apps/*, libs/*) that contain a pnpm-lock.yaml.
+async function discoverImportersWithLock(root: string): Promise<string[]> {
+  const candidates = ["apps", "libs"];
+  const out: string[] = [];
+  for (const base of candidates) {
+    const baseAbs = path.join(root, base);
+    try {
+      const entries = await fsp.readdir(baseAbs).catch(() => [] as string[]);
+      for (const d of entries) {
+        const p = path.join(baseAbs, d);
+        try {
+          const st = await fsp.stat(p);
+          if (st.isDirectory()) {
+            const lock = path.join(p, "pnpm-lock.yaml");
+            try {
+              await fsp.access(lock);
+              // Record as relative path from root
+              out.push(path.relative(root, p) || ".");
+            } catch {}
+          }
+        } catch {}
+      }
+    } catch {}
+  }
+  return out;
+}
+
 if (glueOnly) {
   if (verbose) console.log("[install-deps] glue-only mode");
   await runGlue(dryRun, verbose);
   console.log("Glue refreshed.");
   process.exit(0);
 }
-if (skipNodeInstall) {
-  if (verbose)
-    console.log(
-      "[install-deps] skipping node install/node-modules build in test/CI or when SKIP_NODE_INSTALL=1",
-    );
-} else {
-  await withExclusiveInstallLock(
-    "node-modules",
-    async () => {
-      await fsp.rm("node_modules", { force: true });
-      // Ensure pnpm uses a writable store for the lockfile-only operation. On some systems
-      // a global pnpm config may point to /nix/store, which is read-only (EACCES after nix gc).
-      const localPnpmStore = path.join(process.cwd(), ".pnpm-store");
-      await fsp.mkdir(localPnpmStore, { recursive: true });
-      const useNixPnpm = await have("nix");
-      const envWithStore = { ...process.env, npm_config_store_dir: localPnpmStore } as Record<
-        string,
-        string
-      >;
-      if (useNixPnpm) {
-        await $({ stdio: "inherit", env: envWithStore })`pnpm install --lockfile-only`;
-      } else {
-        await $({ stdio: "inherit", env: envWithStore })`pnpm install --lockfile-only`;
-      }
-      const found = await findNearestImporterLock(process.cwd());
-      const relLock = found?.lockRel || null;
-      const attr = found ? nodeModulesAttr(found.importer).replace(/^node-modules\.?/, "") : null;
-      // Avoid deadlock: update-pnpm-hash runs under the same lock via env flag
-      if (relLock) {
-        await $({
-          stdio: "inherit",
-          env: { ...process.env, INSTALL_LOCK_SKIP: "1" },
-        })`tools/dev/update-pnpm-hash.ts --lockfile ${relLock}`;
-        if (attr) {
-          await $({
-            stdio: "inherit",
-          })`nix build .#node-modules.${attr} --no-link --accept-flake-config`;
-        } else {
-          await $({
-            stdio: "inherit",
-          })`nix build .#node-modules.default --no-link --accept-flake-config`;
-        }
-      } else {
-        await $({
-          stdio: "inherit",
-          env: { ...process.env, INSTALL_LOCK_SKIP: "1" },
-        })`tools/dev/update-pnpm-hash.ts`;
-        await $({
-          stdio: "inherit",
-        })`nix build .#node-modules.default --no-link --accept-flake-config`;
-      }
-      await relinkNodeModules(force);
-    },
-    { verbose: String(process.env.INSTALL_LOCK_VERBOSE || "").trim() === "1" },
-  );
-}
+await withExclusiveInstallLock(
+  "node-modules",
+  async () => {
+    const importers = await discoverImportersWithLock(repoRoot);
+    const absUpdate = path.join(repoRoot, "tools/dev/update-pnpm-hash.ts");
+    if (verbose) console.log("[install-deps] discovered importers:", importers.join(", "));
+    for (const imp of importers) {
+      const relLock = path.join(imp, "pnpm-lock.yaml");
+      // Update the FOD hash for this importer lockfile
+      await $({
+        stdio: "inherit",
+        cwd: repoRoot,
+        env: { ...process.env, INSTALL_LOCK_SKIP: "1" },
+      })`zx-wrapper ${absUpdate} --lockfile ${relLock}`;
+      // Build the importer-scoped node_modules via Nix (pure sandbox)
+      const attr = sanitizeName(imp);
+      await $({
+        stdio: "inherit",
+      })`nix build ${repoRoot}#node-modules.${attr} --no-link --accept-flake-config --print-build-logs`;
+      // Link apps/<name>/node_modules -> Nix output's node_modules (remove stale link first)
+      await $({
+        cwd: path.join(repoRoot, imp),
+        stdio: "inherit",
+      })`zx-wrapper ${path.join(repoRoot, "tools/dev/install/link-node.ts")} ${force ? "--force" : ""}`.nothrow();
+    }
+  },
+  { verbose: String(process.env.INSTALL_LOCK_VERBOSE || "").trim() === "1" },
+);
+// Best-effort patches lint (non-fatal)
 try {
-  const nodeBase = zxNodeBase();
-  await $({
-    stdio: "inherit",
-  })`bash --noprofile --norc -c ${`node ${nodeBase} tools/dev/patches-lint.ts`}`;
+  const patchesLintAbs = path.join(repoRoot, "tools/dev/patches-lint.ts");
+  await $({ stdio: "inherit" })`zx-wrapper ${patchesLintAbs}`.nothrow();
 } catch {}
 // Generate gomod2nix.toml at repo root (if present) and per-app/lib (apps/*, libs/*)
 await runGomod2nixGenerate(dryRun, verbose);

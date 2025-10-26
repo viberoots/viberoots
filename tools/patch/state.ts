@@ -1,4 +1,4 @@
-import fs from "fs-extra";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { SessionRecord, SessionStore } from "./types";
 
@@ -16,10 +16,12 @@ function storePath(): string {
 
 async function readStore(): Promise<SessionStore> {
   const p = storePath();
-  if (!(await fs.pathExists(p))) {
+  try {
+    await fsp.access(p);
+  } catch {
     return { version: 1, sessions: {} };
   }
-  const txt = await fs.readFile(p, "utf8");
+  const txt = await fsp.readFile(p, "utf8");
   try {
     const obj = JSON.parse(txt) as SessionStore;
     if (!obj || typeof obj !== "object" || typeof obj.version !== "number") {
@@ -35,8 +37,17 @@ async function readStore(): Promise<SessionStore> {
 async function writeStore(store: SessionStore): Promise<void> {
   const p = storePath();
   const tmp = p + ".tmp";
-  await fs.outputFile(tmp, JSON.stringify(store, null, 2) + "\n", "utf8");
-  await fs.move(tmp, p, { overwrite: true });
+  await fsp.mkdir(path.dirname(p), { recursive: true }).catch(() => {});
+  await fsp.writeFile(tmp, JSON.stringify(store, null, 2) + "\n", "utf8");
+  try {
+    // Best-effort atomic replace
+    await fsp.rename(tmp, p);
+  } catch {
+    try {
+      await fsp.rm(p, { force: true });
+    } catch {}
+    await fsp.rename(tmp, p);
+  }
 }
 
 export async function getSession(lang: string, moduleKey: string): Promise<SessionRecord | null> {

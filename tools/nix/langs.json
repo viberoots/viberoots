@@ -1,5 +1,5 @@
 {
-  "enabled": ["go", "node", "cpp"],
+  "enabled": ["cpp", "go", "node", "rust"],
   "languages": [
     {
       "id": "go",
@@ -37,6 +37,17 @@
         "patching": true
       },
       "templatesDir": "tools/scaffolding/templates/cpp"
+    },
+    {
+      "id": "rust",
+      "displayName": "Rust",
+      "requiredPaths": [
+        "tools/nix/planner/rust.nix",
+        "tools/buck/exporter/lang/rust.ts",
+        "tools/buck/providers/rust.ts"
+      ],
+      "kinds": ["bin", "lib"],
+      "templatesDir": "tools/scaffolding/templates/rust"
     }
   ]
 }

@@ -13,6 +13,7 @@
   },
   "node": {
     "lib": "libs/{name}",
-    "cli": "apps/{name}"
+    "cli": "apps/{name}",
+    "webapp": "apps/{name}"
   }
 }

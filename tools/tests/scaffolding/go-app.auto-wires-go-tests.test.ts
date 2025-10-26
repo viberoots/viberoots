@@ -5,9 +5,11 @@ import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
 test("go app: adding *_test.go auto-wires nix_go_test and runs", async () => {
-  await runInTemp("go-app-auto-tests", async (tmp, _$) => {
+  // Avoid dev env export (which can trigger GitHub 429 during flake eval) by not including "go" in name
+  await runInTemp("app-auto-tests", async (tmp, _$) => {
     const $ = _$({ stdio: "inherit" });
-    // minimal Buck config prepared by helper
+    // ensure git repo for glue scripts that use git
+    await $`git init`;
 
     // Scaffold a Go CLI app
     await $`scaf new go cli demo-cli --yes --path=apps/demo-cli`;
@@ -31,6 +33,6 @@ test("go app: adding *_test.go auto-wires nix_go_test and runs", async () => {
 
     // Glue and then run the auto-wired test target
     await $`tools/dev/install-deps.ts --glue-only`;
-    await $`buck2 test --target-platforms prelude//platforms:default //apps/demo-cli:demo-cli_test`;
+    await $`buck2 test //apps/demo-cli:demo-cli_test`;
   });
 });

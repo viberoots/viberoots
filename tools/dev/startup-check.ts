@@ -1,7 +1,6 @@
 #!/usr/bin/env zx-wrapper
 // tools/dev/startup-check.ts — verifies required tools and Nix features; prints fallbacks
-import fs from "fs-extra";
-import semver from "semver";
+import * as fsp from "node:fs/promises";
 
 async function which(cmd: string) {
   try {
@@ -25,12 +24,32 @@ async function main() {
     process.exit(1);
   }
 
-  const pkg = await fs.readJSON("package.json");
-  const req = pkg.engines?.node as string | undefined;
-  if (req && !semver.satisfies(process.versions.node, req, { includePrerelease: true })) {
-    console.error(`Node ${process.versions.node} does not satisfy engines.node=${req}`);
-    process.exit(1);
-  }
+  // Minimal engines.node check without external deps (supports only ">=x.y.z")
+  try {
+    const pkgTxt = await fsp.readFile("package.json", "utf8");
+    const pkg = JSON.parse(pkgTxt) as any;
+    const required = String(pkg?.engines?.node || "").trim();
+    if (required.startsWith(">=")) {
+      const want = required.slice(2).trim();
+      const parse = (v: string) => {
+        const [maj, min, pat] = v.replace(/^v/, "").split(".");
+        return {
+          major: Number(maj || 0),
+          minor: Number(min || 0),
+          patch: Number((pat || "0").split("-")[0] || 0),
+        };
+      };
+      const a = parse(process.versions.node);
+      const b = parse(want);
+      const ok =
+        a.major > b.major ||
+        (a.major === b.major && (a.minor > b.minor || (a.minor === b.minor && a.patch >= b.patch)));
+      if (!ok) {
+        console.error(`Node ${process.versions.node} does not satisfy engines.node=${required}`);
+        process.exit(1);
+      }
+    }
+  } catch {}
 
   try {
     const { stdout } = await $`nix show-config`;
@@ -95,7 +114,7 @@ async function main() {
 
   // Verify Buck prelude/cell mapping exists (diagnostic only; do not write files)
   try {
-    const buckconfig = await fs.readFile(".buckconfig", "utf8");
+    const buckconfig = await fsp.readFile(".buckconfig", "utf8");
     const hasPrelude = /\[repositories\][\s\S]*?^\s*prelude\s*=\s*/m.test(buckconfig);
     const hasCellsPrelude = /\[cells\][\s\S]*?^\s*prelude\s*=\s*/m.test(buckconfig);
     if (!hasPrelude || !hasCellsPrelude) {

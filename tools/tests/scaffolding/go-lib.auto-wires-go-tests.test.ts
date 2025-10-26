@@ -5,41 +5,10 @@ import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
 test("go lib: adding *_test.go auto-wires nix_go_test and runs", async () => {
-  await runInTemp("go-lib-auto-tests", async (tmp, _$) => {
+  await runInTemp("lib-auto-tests", async (tmp, _$) => {
     const $ = _$({ stdio: "inherit" });
-    // minimal Buck config
-    await $`bash -lc ${`set -euo pipefail
-      printf '.\n' > .buckroot
-      cat > .buckconfig <<'EOF'
-[buildfile]
-name = TARGETS
-
-[repositories]
-root = .
-prelude = ./prelude
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbcode_stub
-config = ./prelude
-
-[cells]
-root = .
-prelude = ./prelude
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbcode_stub
-config = ./prelude
-
-[build]
-prelude = prelude
-user_platform = prelude//platforms:default
-target_platforms = prelude//platforms:default
-EOF
-      mkdir -p toolchains
-      printf '[buildfile]\nname = TARGETS\n' > toolchains/.buckconfig
-    `}`;
+    // ensure git repo for glue scripts that use git
+    await $`git init`;
 
     // Scaffold a Go library
     await $`scaf new go lib demo-lib --yes --path=libs/demo-lib`;
@@ -63,7 +32,7 @@ EOF
     // Glue and build prerequisites
     await $`tools/dev/install-deps.ts --glue-only`;
 
-    // Run the test via Buck; explicitly set target platforms for determinism
-    await $`buck2 test --target-platforms prelude//platforms:default //libs/demo-lib:demo-lib_test`;
+    // Run the test via Buck; platform is set by runInTemp's .buckconfig
+    await $`buck2 test //libs/demo-lib:demo-lib_test`;
   });
 });

@@ -90,12 +90,57 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
   let lockfiles: string[] = [];
   try {
     const { stdout } = await $`git ls-files '**/pnpm-lock.yaml'`;
-    lockfiles = String(stdout || "")
+    // Only keep lockfiles that actually exist on disk (exclude deleted paths in index)
+    const candidates = String(stdout || "")
       .split(/\r?\n/)
       .map((s) => s.trim())
       .filter(Boolean);
+    const existing: string[] = [];
+    for (const lf of candidates) {
+      try {
+        await fsp.access(lf);
+        existing.push(lf);
+      } catch {}
+    }
+    lockfiles = existing;
   } catch {
     lockfiles = [];
+  }
+  // Fallback for temp repos without .git: scan filesystem
+  if (!lockfiles.length) {
+    try {
+      const rec: string[] = [];
+      async function walk(dir: string) {
+        let entries: string[] = [];
+        try {
+          entries = await fsp.readdir(dir);
+        } catch {
+          return;
+        }
+        for (const e of entries) {
+          const p = `${dir}/${e}`;
+          try {
+            const st = await fsp.lstat(p);
+            if (st.isDirectory()) {
+              if (
+                e === ".git" ||
+                e === "buck-out" ||
+                e === "node_modules" ||
+                e === ".pnpm-store" ||
+                e === ".clinic" ||
+                e === "coverage"
+              )
+                continue;
+              await walk(p);
+            } else if (e === "pnpm-lock.yaml") {
+              rec.push(p);
+            }
+          } catch {}
+        }
+      }
+      await walk(".");
+      lockfiles = rec;
+    } catch {}
   }
 
   async function haveYaml(): Promise<boolean> {
@@ -170,12 +215,56 @@ export async function readNodeProviderIndexEntries(): Promise<
   let lockfiles: string[] = [];
   try {
     const { stdout } = await $`git ls-files '**/pnpm-lock.yaml'`;
-    lockfiles = String(stdout || "")
+    // Exclude deleted/missing lockfiles
+    const candidates = String(stdout || "")
       .split(/\r?\n/)
       .map((s) => s.trim())
       .filter(Boolean);
+    const existing: string[] = [];
+    for (const lf of candidates) {
+      try {
+        await fsp.access(lf);
+        existing.push(lf);
+      } catch {}
+    }
+    lockfiles = existing;
   } catch {
     lockfiles = [];
+  }
+  if (!lockfiles.length) {
+    try {
+      const rec: string[] = [];
+      async function walk(dir: string) {
+        let entries: string[] = [];
+        try {
+          entries = await fsp.readdir(dir);
+        } catch {
+          return;
+        }
+        for (const e of entries) {
+          const p = `${dir}/${e}`;
+          try {
+            const st = await fsp.lstat(p);
+            if (st.isDirectory()) {
+              if (
+                e === ".git" ||
+                e === "buck-out" ||
+                e === "node_modules" ||
+                e === ".pnpm-store" ||
+                e === ".clinic" ||
+                e === "coverage"
+              )
+                continue;
+              await walk(p);
+            } else if (e === "pnpm-lock.yaml") {
+              rec.push(p);
+            }
+          } catch {}
+        }
+      }
+      await walk(".");
+      lockfiles = rec;
+    } catch {}
   }
   const haveYaml = (() => {
     try {
@@ -193,7 +282,7 @@ export async function readNodeProviderIndexEntries(): Promise<
   for (const e of scanned) keyToPatchPath.set(e.key, e.patchPath);
 
   for (const lf of lockfiles) {
-    const doc = parsePnpmLock(lf);
+    const doc = await parsePnpmLock(lf);
     for (const importer of Object.keys(doc.importers || {})) {
       const name = providerNameForImporter(lf, importer);
       out.push({ provider: name, key: `lockfile:${lf}#${importer}` });

@@ -5,8 +5,11 @@ import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
 test("scaf go test: lib auto-wires *_test.go under pkg/**", async () => {
-  await runInTemp("scaf-go-test-lib", async (tmp, _$) => {
+  // Avoid dev env export path
+  await runInTemp("scaf-test-lib", async (tmp, _$) => {
     const $ = _$({ stdio: "inherit" });
+    // ensure git repo for glue scripts that use git
+    await $`git init`;
     // Scaffold a Go library
     await $`scaf new go lib demo-lib --yes --path=libs/demo-lib`;
     // Ensure module tidy and gomod2nix
@@ -23,6 +26,7 @@ test("scaf go test: lib auto-wires *_test.go under pkg/**", async () => {
 
     // Glue and test
     await $`tools/dev/install-deps.ts --glue-only`;
-    await $`buck2 test --target-platforms prelude//platforms:default //libs/demo-lib:demo-lib_test`;
+    // Run tests; platform is set by runInTemp's .buckconfig
+    await $`buck2 test //libs/demo-lib:demo-lib_test`;
   });
 });

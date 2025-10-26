@@ -5,7 +5,14 @@ import os from "node:os";
 import path from "node:path";
 
 function repoIdentity(): string {
-  // Prefer the real workspace root inferred from ZX_INIT (points to real repo, not temp clones)
+  // Prefer explicit temp-repo root if provided by the zx test harness
+  const wr = process.env.WORKSPACE_ROOT || "";
+  if (wr) {
+    try {
+      return path.resolve(wr);
+    } catch {}
+  }
+  // Otherwise, prefer the real workspace root inferred from ZX_INIT
   const zxInit = process.env.ZX_INIT || "";
   if (zxInit) {
     try {

@@ -1,0 +1,64 @@
+direnv: loading ~/Code/bucknix-fresh/.envrc
+direnv: using flake
+warning: Git tree '/Users/kiltyj/Code/bucknix-fresh' is dirty
+Using saved setting for 'allowed-impure-env-vars = BUCK_GRAPH_JSON ROOT_GOMOD2NIX_TOML BUCK_TEST_SRC BUCK_TARGET NIX_GO_DEV_OVERRIDE_JSON' from ~/.local/share/nix/trusted-settings.json.
+(node:17421) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[dev-build] Falling back to --impure due to untracked files:
+ - devbuild.run.ctrl.1760932713.out
+ - devbuild.run.no_fix.1760932592.out
+ - libs/helper-lib/.copier-answers.yml
+ - libs/helper-lib/README.md
+ - libs/helper-lib/TARGETS
+ - libs/helper-lib/copier.yaml
+ - libs/helper-lib/go.mod
+ - libs/helper-lib/gomod2nix.toml
+ - libs/helper-lib/libs/helper-lib/TARGETS
+ - libs/helper-lib/libs/helper-lib/pkg/helper-lib/helper-lib.go
+ - libs/helper-lib/libs/helper-lib/pkg/helper-lib/helper-lib_test.go
+ - patches/rust/.gitkeep
+ - run.control.1760932496.out
+ - run.no_fix.1760932423.out
+ - rust/defs.bzl
+ - tools/buck/providers/rust.ts
+ - tools/nix/planner/rust.nix
+ - tools/nix/templates/rust.nix
+ - tools/tests/rust/contract/basic.test.ts
+warning: Git tree '/Users/kiltyj/Code/bucknix-fresh' is dirty
+startup-check: OK
+Installing dependencies...
+killing buckd server
+Buck2 daemon pid 17549 has exited
+no-op (already applied): /Users/kiltyj/Code/bucknix-fresh/tools/buck/graph.json
+warning: invalid or non-patch file in patches/go: .gitkeep
+no-op (already applied): third_party/providers/TARGETS.auto
+no-op (already applied): third_party/providers/TARGETS.cpp.auto
+no-op (already applied): third_party/providers/nix_attr_map.bzl
+no-op (already applied): third_party/providers/TARGETS.node.auto
+no-op (already applied): third_party/providers/TARGETS.cpp.auto
+no-op (already applied): third_party/providers/nix_attr_map.bzl
+no-op (already applied): third_party/providers/TARGETS.node.auto
+no-op (already applied): /Users/kiltyj/Code/bucknix-fresh/third_party/providers/auto_map.bzl
+Glue refreshed.
+[gomod2nix] skip: no go.mod or go.sum present
+time="2025-10-19T20:58:38-07:00" level=info msg="Parsing go.mod" modPath=go.mod
+time="2025-10-19T20:58:38-07:00" level=info msg="Downloading dependencies"
+time="2025-10-19T20:58:38-07:00" level=info msg="Done downloading dependencies"
+time="2025-10-19T20:58:38-07:00" level=info msg="Wrote: gomod2nix.toml"
+time="2025-10-19T20:58:38-07:00" level=info msg="Parsing go.mod" modPath=go.mod
+time="2025-10-19T20:58:38-07:00" level=info msg="Downloading dependencies"
+time="2025-10-19T20:58:38-07:00" level=info msg="Done downloading dependencies"
+time="2025-10-19T20:58:38-07:00" level=info msg="Wrote: gomod2nix.toml"
+killing buckd server
+Buck2 daemon pid 17674 has exited
+no-op (already applied): /Users/kiltyj/Code/bucknix-fresh/tools/buck/graph.json
+killing buckd server
+Buck2 daemon pid 17729 has exited
+no-op (already applied): /Users/kiltyj/Code/bucknix-fresh/tools/buck/graph.json
+[2025-10-19T20:58:40.021-07:00] Starting new buck2 daemon...
+[2025-10-19T20:58:40.196-07:00] Connected to new buck2 daemon.
+[2025-10-19T20:58:40.197-07:00] Build ID: 4be84f50-3d4c-4058-9283-2959afb692a4
+BUILD FAILED
+package `root//apps/demo:` does not exist
+         ^-------------^
+    dir `root//apps/demo` does not exist

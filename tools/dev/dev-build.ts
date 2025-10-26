@@ -311,7 +311,42 @@ async function main() {
   }
 
   // Environment guard: ensure required tools and Nix features are present
-  await $({ stdio: "inherit", cwd: repoRoot() })`tools/dev/startup-check.ts`;
+  async function resolveRootNodeModulesOut(): Promise<string> {
+    try {
+      const { stdout } = await $({
+        stdio: "pipe",
+        cwd: repoRoot(),
+      })`nix eval --raw .#node-modules.default.outPath --accept-flake-config`;
+      const out = String(stdout || "").trim();
+      if (out) return out;
+    } catch {}
+    try {
+      const { stdout } = await $({
+        stdio: "pipe",
+        cwd: repoRoot(),
+      })`nix build .#node-modules.default --no-link --accept-flake-config --print-out-paths`;
+      const out =
+        String(stdout || "")
+          .trim()
+          .split("\n")
+          .filter(Boolean)
+          .pop() || "";
+      return out;
+    } catch {}
+    return "";
+  }
+  const rootNmOut = await resolveRootNodeModulesOut();
+  const envStartup = {
+    ...process.env,
+    ...(rootNmOut
+      ? {
+          NODE_PATH: [path.join(rootNmOut, "node_modules"), process.env.NODE_PATH || ""]
+            .filter(Boolean)
+            .join(process.platform === "win32" ? ";" : ":"),
+        }
+      : {}),
+  } as any;
+  await $({ stdio: "inherit", cwd: repoRoot(), env: envStartup })`tools/dev/startup-check.ts`;
 
   // Ensure Buck prelude/config only when materializing; avoid mutating workspace when --no-materialize
   if (materialize) {

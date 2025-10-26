@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import fs from "fs-extra";
+import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { encodeForPatchFilename } from "../lib/providers";
@@ -9,6 +9,29 @@ import { runGlue } from "./glue";
 import { resolveModule } from "./go-module-resolve";
 import { deleteSession, getSession, setSession } from "./state";
 import type { LanguageHandler, SessionRecord } from "./types";
+
+async function pathExists(p: string): Promise<boolean> {
+  try {
+    await fsp.access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function mkdirp(dir: string): Promise<void> {
+  await fsp.mkdir(dir, { recursive: true });
+}
+
+async function outputFile(p: string, data: string, enc: BufferEncoding = "utf8"): Promise<void> {
+  await mkdirp(path.dirname(p));
+  await fsp.writeFile(p, data, enc);
+}
+
+async function copyDir(src: string, dst: string): Promise<void> {
+  // Node 16+ provides recursive cp
+  await fsp.cp(src, dst, { recursive: true, force: true });
+}
 
 function moduleArg(args: string[]): string {
   const m = args[0];
@@ -47,7 +70,7 @@ async function doStart(args: string[]) {
   const { version, originPath } = await resolveModule(importPath);
   const key = moduleKey(importPath, version);
   const existing = await getSession("go", key);
-  if (existing && (await fs.pathExists(existing.workspacePath))) {
+  if (existing && (await pathExists(existing.workspacePath))) {
     console.log(existing.workspacePath);
     return;
   }
@@ -66,6 +89,7 @@ async function doStart(args: string[]) {
   dev[key] = ws;
   writeDevOverrides(dev);
   console.log(ws);
+  // Optional: open editor if requested (best-effort)
   if (process.env.PATCH_EDITOR && process.env.PATCH_EDITOR.trim() !== "") {
     const ed = process.env.PATCH_EDITOR;
     await $({ cwd: ws })`${ed}`.nothrow();
@@ -83,25 +107,31 @@ async function doApply(args: string[]) {
     console.log("no changes; no-op");
     return;
   }
-  await fs.mkdirp("patches/go");
+  await mkdirp("patches/go");
   const enc = encodeForPatchFilename(importPath);
-  const dst = path.join("patches", "go", `${enc}@${version}.patch`);
+  const repoRoot = process.env.WORKSPACE_ROOT || process.env.LIVE_ROOT || process.cwd();
+  const patchDir = path.join(repoRoot, "patches", "go");
+  await mkdirp(patchDir);
+  const dst = path.join(patchDir, `${enc}@${version}.patch`);
   let write = true;
-  if (await fs.pathExists(dst)) {
-    const cur = await fs.readFile(dst, "utf8");
+  if (await pathExists(dst)) {
+    const cur = await fsp.readFile(dst, "utf8");
     if (cur === diff) {
       console.log("no-op (already applied)");
       write = false;
-    } else if (!(global as any).argv.force) {
+    } else if (!(global as any).argv?.force) {
       throw new Error(`${dst} exists with different content. Re-run with --force to overwrite.`);
     }
   }
-  if (write) await fs.outputFile(dst, diff, "utf8");
+  if (write) {
+    console.error(`[patch-go] writing patch: ${dst}`);
+    await outputFile(dst, diff, "utf8");
+  }
 
   // Strict apply verification: ensure patch applies cleanly against origin
-  const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "bucknix-patch-verify-"));
+  const tmpRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "bucknix-patch-verify-"));
   const tmpCopy = path.join(tmpRoot, path.basename(sess.originPath));
-  await fs.copy(sess.originPath, tmpCopy, { recursive: true, overwrite: true });
+  await copyDir(sess.originPath, tmpCopy);
   try {
     await $({ cwd: tmpCopy, stdio: "inherit" })`patch -p1 --dry-run -i ${path.resolve(dst)}`;
   } catch (e) {
@@ -135,7 +165,7 @@ async function doReset(args: string[]) {
   writeDevOverrides(dev);
   await deleteSession("go", key);
   try {
-    await fs.rm(sess.workspacePath, { recursive: true, force: true });
+    await fsp.rm(sess.workspacePath, { recursive: true, force: true });
   } catch {}
 }
 

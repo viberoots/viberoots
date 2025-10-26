@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+echo '[diag] buck2 shim invoking:' "$@" >&2
+orig="/nix/store/vdfafkc36147l1q0hfybjf7w5aznfdqd-buck2-unstable-2025-05-06/bin/buck2"
+if [[ -z "${orig}" ]]; then echo "buck2 shim error: embedded buck2 path missing" >&2; exit 127; fi
+# Avoid passing --isolation-dir twice if caller already set it
+for a in "$@"; do if [ "$a" = "--isolation-dir" ]; then exec "$orig" "$@"; fi; done
+iso="${BUCK_NESTED_ISO:-shim-$$}"
+cmd="$1"; shift || true
+# Detect if caller already specified --target-platforms or build.default_platform
+has_tp=0; for a in "$@"; do if [ "$a" = "--target-platforms" ]; then has_tp=1; break; fi; done
+has_defplat=0; for a in "$@"; do if echo "$a" | grep -q 'build.default_platform='; then has_defplat=1; break; fi; done
+if [ "$cmd" = "build" ] || [ "$cmd" = "test" ]; then
+  extra_flags=(); if [ $has_tp -eq 0 ] && [ $has_defplat -eq 0 ]; then extra_flags+=( --config build.default_platform=//:no_cgo --target-platforms //:no_cgo ); fi;
+  exec "$orig" --isolation-dir "$iso" "$cmd" "${extra_flags[@]}" "$@"
+elif [ "$cmd" = "run" ] || [ "$cmd" = "query" ]; then
+  exec "$orig" --isolation-dir "$iso" "$cmd" --config build.default_platform=//:no_cgo "$@"
+else
+  exec "$orig" --isolation-dir "$iso" "$cmd" "$@"
+fi

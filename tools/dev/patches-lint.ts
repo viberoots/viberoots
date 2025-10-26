@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import fs from "fs-extra";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 
 type Args = {
@@ -95,14 +95,23 @@ function validateGoPatchFilename(file: string, violations: Violation[]) {
   }
 }
 
+async function pathExists(p: string): Promise<boolean> {
+  try {
+    await fsp.access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function lintGo(): Promise<number> {
   const dir = path.join("patches", "go");
-  if (!(await fs.pathExists(dir))) return 0;
+  if (!(await pathExists(dir))) return 0;
   let problems = 0;
   const violations: Violation[] = [];
   const byKey = new Map<string, string>(); // lowercased "import@version" -> filename
 
-  const entries = await fs.readdir(dir, { withFileTypes: true });
+  const entries = await fsp.readdir(dir, { withFileTypes: true } as any);
   for (const e of entries.sort((a, b) => a.name.localeCompare(b.name))) {
     if (e.isDirectory()) {
       violations.push({

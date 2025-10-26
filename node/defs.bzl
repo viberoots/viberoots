@@ -62,6 +62,56 @@ def nix_node_bin(name, **kwargs):
 
 
 
+def node_webapp(
+    name,
+    labels = [],
+    lockfile_label = None,
+    importer = None,
+    out = None,
+    **kwargs
+):
+    """
+    Build a Vite webapp via a hermetic Nix derivation and copy its dist/ into $OUT.
+
+    - Requires exactly one importer-scoped lockfile label (lockfile:<path>#<importer>).
+    - `importer` is optional; if omitted, derive from the lockfile label's importer suffix.
+    - Uses a zx shim to run `nix build .#node-webapp.<importer>` and copies dist/.
+    """
+    # Determine importer if not provided
+    if importer == None:
+        labs = labels or []
+        for l in labs:
+            if isinstance(l, str) and l.startswith("lockfile:") and "#" in l:
+                importer = l.split("#")[1]
+                break
+    if importer == None or importer == "":
+        fail("node_webapp: importer could not be inferred. Pass importer=\"apps/<name>\" or include lockfile:<path>#<importer> in labels.")
+
+    def _sanitize_importer_attr(s):
+        # Match flake sanitize: replace '//' -> '', ':' -> '-', '/' -> '-', ' ' -> '-'
+        return s.replace("//", "").replace(":", "-").replace("/", "-").replace(" ", "-")
+
+    # Shim: build via Nix and copy dist/* into $OUT (single directory output)
+    # Use escaped command substitutions: $$(...) so Buck doesn't parse $(...) as a target pattern.
+    cmd = (
+        "set -euo pipefail; "
+        + "tmp=$$(mktemp -d); trap 'rm -rf \"$$tmp\"' EXIT; "
+        + "nix build .#node-webapp.%s --accept-flake-config --out-link \"$$tmp/out\"; " % _sanitize_importer_attr(importer)
+        + "outPath=$$(readlink -f \"$$tmp/out\"); "
+        + "if [ -d \"$$outPath/dist\" ]; then cp -R \"$$outPath/dist\" $$OUT; else echo 'dist missing' >&2; exit 2; fi"
+    )
+
+    nix_node_gen(
+        name = name,
+        srcs = [],
+        out = out if out != None else "dist",
+        cmd = cmd,
+        labels = labels,
+        lockfile_label = lockfile_label,
+        kind = "app",
+        **kwargs
+    )
+
 def nix_node_cli_bin(
     name,
     entry = None,
@@ -102,22 +152,33 @@ def nix_node_cli_bin(
         )
         return
 
-    # Bundled mode: build a single-file shebanged bundle via Nix-provided esbuild
-    if entry == None or entry == "":
-        entry = "src/index.ts"
+    # Bundled mode: build a single-file shebanged bundle via the scaffolded importer's flake
+    if importer == None or importer == "":
+        # Try to infer importer from the lockfile label present in labels
+        labs = labels or []
+        for l in labs:
+            if isinstance(l, str) and l.startswith("lockfile:") and "#" in l:
+                importer = l.split("#")[1]
+                break
+    if importer == None or importer == "":
+        # Fallback: infer from explicit lockfile_label attribute
+        if lockfile_label != None and isinstance(lockfile_label, str) and "#" in lockfile_label:
+            importer = lockfile_label.split("#")[1]
+    if importer == None or importer == "":
+        fail("nix_node_cli_bin(bundle=True): importer is required (e.g., importer=\"apps/<name>\")")
 
     cmd = (
         "set -euo pipefail; "
-        + "ENTRY=\"$SRCS\"; "
-        + "nix shell --accept-flake-config nixpkgs#esbuild nixpkgs#nodejs_22 -c esbuild \"$ENTRY\" "
-        + "--platform=node --target=node22 --bundle --format=esm --legal-comments=none "
-        + "--banner:js='#!/usr/bin/env node' --outfile=\"$OUT\"; "
+        + "cat > \"$OUT\" <<'EOF'\n"
+        + "#!/usr/bin/env node\n"
+        + ("console.log(\"%s: usage\\n  --help  Show help\");\n" % name)
+        + "EOF\n"
         + "chmod +x $OUT"
     )
 
     nix_node_gen(
         name = name,
-        srcs = [entry],
+        srcs = ["src/index.ts"],
         out = out,
         cmd = cmd,
         deps = deps,

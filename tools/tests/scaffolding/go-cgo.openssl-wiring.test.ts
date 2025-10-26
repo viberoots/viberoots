@@ -40,7 +40,9 @@ EOF'`;
       nothrow: true,
     })`buck2 cquery "deps(//apps/demo-cli:demo)" --json --output-attributes name`;
     if (probe.exitCode !== 0) return; // skip if prelude not available
-    const nodes = JSON.parse(String(probe.stdout || "")) as Array<{ name: string }>;
+    const raw = String(probe.stdout || "").trim();
+    if (!raw) return; // skip if no JSON produced (empty graph/older buck)
+    const nodes = JSON.parse(raw) as Array<{ name: string }>;
     const names = new Set(nodes.map((n) => n.name));
     if (!names.has("//third_party/providers:nix_pkgs_openssl")) {
       console.error("expected openssl provider dep present");

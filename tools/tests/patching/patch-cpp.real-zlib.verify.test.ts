@@ -9,6 +9,9 @@ test("patch-cpp applies overlay to real nixpkgs zlib and changes runtime zlibVer
     // Ensure CLI is executable
     await $`chmod +x tools/bin/patch-pkg`;
 
+    // Ensure a fresh session so workspace headers are unmodified
+    await $({ cwd: tmp })`tools/bin/patch-pkg reset cpp zlib`;
+
     // Start session against real nixpkgs attr (no test resolver)
     const wsOut = await $({ cwd: tmp })`tools/bin/patch-pkg start cpp zlib`;
     const ws = String(wsOut.stdout).trim().split(/\s+/).pop() as string;

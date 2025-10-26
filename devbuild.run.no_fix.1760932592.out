@@ -1,0 +1,18 @@
+direnv: loading ~/Code/bucknix-fresh/.envrc
+direnv: using flake
+warning: Git tree '/Users/kiltyj/Code/bucknix-fresh' is dirty
+Using saved setting for 'allowed-impure-env-vars = BUCK_GRAPH_JSON ROOT_GOMOD2NIX_TOML BUCK_TEST_SRC BUCK_TARGET NIX_GO_DEV_OVERRIDE_JSON' from ~/.local/share/nix/trusted-settings.json.
+node:internal/modules/esm/get_format:219
+  throw new ERR_UNKNOWN_FILE_EXTENSION(ext, filepath);
+        ^
+
+TypeError [ERR_UNKNOWN_FILE_EXTENSION]: Unknown file extension ".ts" for /Users/kiltyj/Code/bucknix-fresh/tools/dev/dev-build.ts
+    at Object.getFileProtocolModuleFormat [as file:] (node:internal/modules/esm/get_format:219:9)
+    at defaultGetFormat (node:internal/modules/esm/get_format:245:36)
+    at defaultLoad (node:internal/modules/esm/load:120:22)
+    at async ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:580:32)
+    at async ModuleJob._link (node:internal/modules/esm/module_job:154:19) {
+  code: 'ERR_UNKNOWN_FILE_EXTENSION'
+}
+
+Node.js v22.17.0

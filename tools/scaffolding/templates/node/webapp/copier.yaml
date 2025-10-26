@@ -15,15 +15,14 @@ _exclude:
 # Variables populated by scaf
 name: ""
 language: "node"
-template: "cli"
+template: "webapp"
 
-# Derived defaults for Node CLI
+# Derived defaults for Node webapp
 importer: "apps/{{ name }}"
 lockfilePath: "apps/{{ name }}/pnpm-lock.yaml"
 pkgScope: "@apps"
 
 _tasks:
   - mkdir -p src
-  - mkdir -p bin
-  - mkdir -p test
-  - chmod +x bin/{{ name }}
+_templates_suffix: ".jinja"
+_answers_file: ".copier-answers.yml"

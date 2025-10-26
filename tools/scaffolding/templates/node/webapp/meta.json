@@ -1,0 +1,17 @@
+{
+  "language": "node",
+  "template": "webapp",
+  "description": "Vite + TypeScript webapp (framework‑neutral)",
+  "help": {
+    "usage": "scaf new node webapp <name> [--importer=apps/<name>] [--pkgScope=@apps]",
+    "notes": [
+      "Generates a minimal Vite webapp with importer‑scoped lockfile labeling and Buck/Nix integration.",
+      "Use pnpm dev for HMR. Production builds are hermetic via Nix + Buck.",
+      "Labels include lockfile:apps/<name>/pnpm-lock.yaml#apps/<name> to auto‑wire providers."
+    ],
+    "examples": [
+      "scaf new node webapp demo-web --yes",
+      "scaf new node webapp demo-web --importer=apps/demo-web --pkgScope=@apps"
+    ]
+  }
+}

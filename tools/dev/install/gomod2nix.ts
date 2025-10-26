@@ -52,37 +52,7 @@ export async function runGomod2nixGenerateIn(dir: string, dryRun: boolean, verbo
     if (hasGoMod) await fsp.copyFile(path.join(dir, "go.mod"), path.join(tmp, "go.mod"));
     if (hasGoSum) await fsp.copyFile(path.join(dir, "go.sum"), path.join(tmp, "go.sum"));
     if (verbose) console.log(`[gomod2nix] running in ${tmp} for ${dir}: ${cmd}`);
-    try {
-      await $({ cwd: tmp, stdio: "inherit" })`bash -c ${cmd}`;
-    } catch (e1) {
-      const fallback1 = `nix shell nixpkgs#gomod2nix -c gomod2nix --dir .`;
-      console.warn(`[gomod2nix] primary failed; trying fallback: ${fallback1}`);
-      try {
-        await $({ cwd: tmp, stdio: "inherit" })`bash -c ${fallback1}`;
-      } catch (e2) {
-        const fallback2 = `nix run github:nix-community/gomod2nix -- --dir .`;
-        console.warn(`[gomod2nix] nixpkgs missing app; trying upstream: ${fallback2}`);
-        try {
-          await $({ cwd: tmp, stdio: "inherit" })`bash -c ${fallback2}`;
-        } catch (e3) {
-          const fallback3 = `nix shell github:nix-community/gomod2nix -c gomod2nix --dir .`;
-          console.warn(`[gomod2nix] upstream run failed; trying shell: ${fallback3}`);
-          try {
-            await $({ cwd: tmp, stdio: "inherit" })`bash -c ${fallback3}`;
-          } catch (e4) {
-            try {
-              await $({
-                cwd: tmp,
-                stdio: "inherit",
-              })`bash -c 'command -v gomod2nix >/dev/null 2>&1 && gomod2nix --dir . || exit 127'`;
-            } catch (e5) {
-              console.error("gomod2nix not available via nix or PATH");
-              throw e5;
-            }
-          }
-        }
-      }
-    }
+    await $({ cwd: tmp, stdio: "inherit" })`bash -c ${cmd}`;
     const tmpOut = path.join(tmp, "gomod2nix.toml");
     const tmpExists = await exists(tmpOut);
     if (!tmpExists) {

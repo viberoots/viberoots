@@ -42,13 +42,21 @@ node_ts() {
 	local node_bin="${NODE_BIN:-node}"
 	# Prefer explicit ZX_INIT if provided (e.g., tests), else live_root-based path
 	local zx_init_path="${ZX_INIT:-${live_root}/tools/dev/zx-init.mjs}"
-	exec_in_dev_shell "$live_root" \
-		"$node_bin" \
-		--experimental-top-level-await \
-		--disable-warning=ExperimentalWarning \
-		--experimental-strip-types \
-		--import "${zx_init_path}" \
-		"$target_ts" "$@"
+  # If zx-wrapper is available, prefer it to guarantee zx globals ($) are provided
+  if command -v zx-wrapper >/dev/null 2>&1; then
+    exec_in_dev_shell "$live_root" \
+      zx-wrapper \
+      --import "${zx_init_path}" \
+      "$target_ts" "$@"
+  else
+    exec_in_dev_shell "$live_root" \
+      "$node_bin" \
+      --experimental-top-level-await \
+      --disable-warning=ExperimentalWarning \
+      --experimental-strip-types \
+      --import "${zx_init_path}" \
+      "$target_ts" "$@"
+  fi
 }
 
 run_ts() {

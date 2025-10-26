@@ -1212,18 +1212,25 @@ main().catch(e => { console.error(e); process.exit(1); });
 // tools/lib/fs-helpers.ts
 import fs from "fs-extra";
 import crypto from "node:crypto";
+import path from "node:path";
 
 export async function writeIfChanged(dst: string, data: string) {
   if (await fs.pathExists(dst)) {
     const cur = await fs.readFile(dst, "utf8");
     const a = crypto.createHash("sha256").update(cur).digest("hex");
     const b = crypto.createHash("sha256").update(data).digest("hex");
-    if (a == b) {
+    if (a === b) {
       console.log(`no-op (already applied): ${dst}`);
       return;
     }
   }
-  await fs.outputFile(dst, data, "utf8");
+  // Atomic write: write to a temp file in the same directory, then rename
+  const dir = path.dirname(dst);
+  const base = path.basename(dst);
+  await fs.mkdir(dir, { recursive: true });
+  const tmp = path.join(dir, `.${base}.${process.pid}.${Date.now()}.tmp`);
+  await fs.writeFile(tmp, data, "utf8");
+  await fs.rename(tmp, dst);
 }
 ```
 

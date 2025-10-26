@@ -7,7 +7,7 @@ def _cpp_nix_test_impl(ctx):
     # Build per-target attr exposed by flake: packages.<system>.graph-generator-cppTargets.<sanitized>
     # Sanitize label to match cppTargetsFlat in graph-generator.nix
     raw = ctx.attrs.planner_label
-    # Compute expected test binary name deterministically
+    # Compute expected test binary name deterministically based on the planner label
     expected_bin = sanitize_to_bin_name(raw)
     def _sanitize(s):
         # Map to [a-z0-9_] only, lowercased; others become '_', then prefix with 't'
@@ -34,7 +34,14 @@ def _cpp_nix_test_impl(ctx):
         + "echo \"[cpp_nix_test] OUT_PATH=$OUT_PATH\" >&2; "
         + "if [ \"$NIX_STATUS\" -ne 0 ] || [ -z \"$OUT_PATH\" ]; then echo '[cpp_nix_test] build-selected failed' >&2; cat /tmp/cpp_nix_test_build.log >&2 || true; exit ${NIX_STATUS:-2}; fi; "
         + ("BIN='%s'; " % expected_bin)
-        + "CAND=\"$OUT_PATH/bin/$BIN\"; if [ ! -x \"$CAND\" ]; then echo '[cpp_nix_test] expected bin not found:' \"$CAND\" >&2; ls -la \"$OUT_PATH\" >&2 || true; ls -la \"$OUT_PATH/bin\" >&2 || true; exit 2; fi; "
+        + "CAND=\"$OUT_PATH/bin/$BIN\"; "
+        + "if [ ! -x \"$CAND\" ]; then "
+        + "  echo '[cpp_nix_test] expected bin not found:' \"$CAND\" >&2; "
+        + "  base=\"%s\"; base=${base##*:}; " % raw
+        + "  # Fallback: try to locate the produced test binary by suffixing the target name\n"
+        + "  found=$(ls -1 \"$OUT_PATH/bin\" 2>/dev/null | grep -E \"(^|-)${base}$\" | head -n1 || true); "
+        + "  if [ -n \"$found\" ] && [ -x \"$OUT_PATH/bin/$found\" ]; then CAND=\"$OUT_PATH/bin/$found\"; else ls -la \"$OUT_PATH\" >&2 || true; ls -la \"$OUT_PATH/bin\" >&2 || true; exit 2; fi; "
+        + "fi; "
         + "\"$CAND\""
     )
     stamp = ctx.actions.declare_output(ctx.attrs.out)

@@ -61,7 +61,11 @@ func main() {
 
 Implementation notes
 
-- The Go Nix templates automatically set `CGO_ENABLED=1` when cgo deps are present.
+- Transparent CGO: our Go macros automatically enable CGO when either of these is true:
+  - The target lists any C-family source files in `srcs` (e.g., `.c`, `.cpp`, `.m`, `.mm`, `.s`).
+  - The target declares `nix_cgo_deps` or `repo_cgo_deps`.
+    No TARGETS edits are required when adding/removing C sources.
+- The Go Nix templates set `CGO_ENABLED=1` only for those targets and ensure CC/CXX/AR come from Nix.
 - If `pkg-config` metadata is missing, templates synthesize `CGO_CFLAGS`/`CGO_LDFLAGS` from provided packages.
 - Planner wiring passes nixpkgs attributes and in-repo C/C++ libs so builds are hermetic and deterministic.
 

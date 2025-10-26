@@ -44,7 +44,6 @@ EOF
     const env = {
       ...process.env,
       INSTALL_DEPS_GOMOD2NIX_BIN: "nix run github:nix-community/gomod2nix --",
-      SKIP_NODE_INSTALL: "1",
     } as any;
     await $({
       cwd: tmp,

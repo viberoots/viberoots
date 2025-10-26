@@ -4,6 +4,6 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("patches-lint: clean repo emits no warnings (non-strict)", async () => {
   await runInTemp("patches-lint-clean", async (tmp, $) => {
-    await $`node tools/dev/patches-lint.ts`;
+    await $`zx-wrapper tools/dev/patches-lint.ts`;
   });
 });

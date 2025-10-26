@@ -1,4 +1,5 @@
-import fs from "fs-extra";
+import { execFile } from "node:child_process";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { ResolveResult } from "./types";
 
@@ -6,13 +7,15 @@ type Gomod2Nix = Record<string, { version?: string; src?: { url?: string } } | a
 
 async function readGomod2nix(repoRoot: string): Promise<Gomod2Nix> {
   const tomlPath = path.join(repoRoot, "gomod2nix.toml");
-  if (!(await fs.pathExists(tomlPath))) {
+  try {
+    await fsp.access(tomlPath);
+  } catch {
     throw new Error(
       "gomod2nix.toml not found; run tools/dev/install-deps.ts after updating go.mod",
     );
   }
   // Minimal, forgiving parser: expect sections like ["<importPath>"] and a 'version = "..."' line
-  const txt = await fs.readFile(tomlPath, "utf8");
+  const txt = await fsp.readFile(tomlPath, "utf8");
   const out: Gomod2Nix = {};
   let current: string | null = null;
   for (const raw of txt.split(/\r?\n/)) {
@@ -51,19 +54,23 @@ export async function resolvePristineSource(importPath: string, version: string)
   let gomodcache = envCache.trim();
   if (!gomodcache) {
     try {
-      const { stdout } = await $`go env GOMODCACHE`;
+      const stdout = await new Promise<string>((resolve, reject) => {
+        execFile("go", ["env", "GOMODCACHE"], { encoding: "utf8" }, (err, out) => {
+          if (err) return reject(err);
+          resolve(out);
+        });
+      });
       gomodcache = String(stdout || "").trim();
-    } catch {
-      // no go tool; remain empty
-    }
+    } catch {}
   }
   if (!gomodcache)
     throw new Error("cannot determine GOMODCACHE (set GOMODCACHE or NIX_GO_TEST_GOMODCACHE)");
   // Go's module cache layout uses paths like: $GOMODCACHE/<importPath>@<version>
   const candidate = path.join(gomodcache, importPath + "@" + version);
-  if (await fs.pathExists(candidate)) {
+  try {
+    await fsp.access(candidate);
     return candidate;
-  }
+  } catch {}
   throw new Error(`pristine source not found in GOMODCACHE: ${candidate}`);
 }
 

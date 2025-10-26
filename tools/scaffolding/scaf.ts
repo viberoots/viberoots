@@ -5,7 +5,8 @@ import os from "node:os";
 import path from "node:path";
 import { stdin as input, stdout as output } from "node:process";
 import readline from "node:readline/promises";
-import "zx/globals";
+// zx globals are provided by the zx-wrapper shebang; avoid importing 'zx/globals'
+// directly so this script runs even when workspace node_modules is not present.
 import { printSkip } from "../lib/errors";
 import {
   copierRecopyOrUpdate,
@@ -898,6 +899,10 @@ async function cmdNew(args: string[], flags: Record<string, string>) {
     return;
   }
 
+  // Ensure parent directories exist for common roots like apps/* and libs/*
+  try {
+    await fsp.mkdir(path.dirname(effectiveDest), { recursive: true });
+  } catch {}
   await runCopierCopy(root, effectiveDest, data);
   // No de-nesting workaround; templates must render into the resolved destination
   await recordSource(dest, language, template);
@@ -1117,11 +1122,17 @@ async function completeTargets(): Promise<void> {
 }
 
 async function main() {
-  // Normalize CWD to repo root for consistent relative paths
+  // Normalize CWD. Prefer an explicit workspace root from environment (temp repos in tests)
+  // and fall back to the checked-out repo root when not provided.
   try {
-    const here = path.dirname(new URL(import.meta.url).pathname);
-    const root = path.resolve(here, "..", "..");
-    process.chdir(root);
+    const envRoot = (process.env.WORKSPACE_ROOT || process.env.BUCK_TEST_SRC || "").trim();
+    if (envRoot) {
+      process.chdir(envRoot);
+    } else {
+      const here = path.dirname(new URL(import.meta.url).pathname);
+      const root = path.resolve(here, "..", "..");
+      process.chdir(root);
+    }
   } catch {}
   const raw = process.argv.slice(2);
   const { _, flags } = parseArgs(raw);

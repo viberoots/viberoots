@@ -3,7 +3,7 @@ load("//node:defs.bzl", "nix_node_cli_bin", "nix_node_test")
 nix_node_cli_bin(
     name = "{{ name }}",
     lockfile_label = "lockfile:{{ lockfilePath }}#{{ importer }}",
-    importer = "{{ importer }}",
+    # importer = "{{ importer }}",
     # bundle = True,
 )
 

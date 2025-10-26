@@ -26,11 +26,11 @@ After implementation and debugging, PR 1 scope is complete:
   - Added `_BUCKNIX_DEVSHELL_ACTIVE` guard to prevent recursive shellHook invocation
   - Changed node-modules linking to use `nix eval` instead of `node-modules-build.ts` to avoid triggering builds
   - Only link when TTY present and NO_NODE_MODULES_LINK unset
-- `.husky/pre-commit`: Set `NO_NODE_MODULES_LINK=1` and `SKIP_NODE_INSTALL=1`
+- `.husky/pre-commit`: Set `NO_NODE_MODULES_LINK=1`
 - `tools/bin/verify`: Export `NO_NODE_MODULES_LINK=1`
 - `tools/tests/lib/test-helpers.ts`: Export `NO_NODE_MODULES_LINK=1` for test sandboxes
-- `tools/dev/install/deps-main.ts`: Skip node install when in Buck test env or `SKIP_NODE_INSTALL=1`
-- All install-deps tests: Set `SKIP_NODE_INSTALL=1`
+- `tools/dev/install/deps-main.ts`: Pure Nix path (no `SKIP_NODE_INSTALL` logic); per‑importer builds/link only
+- All install-deps tests: no `SKIP_NODE_INSTALL`; rely on pure Nix builds
 
 ## Root Cause Analysis — Runaway Node Processes
 
@@ -59,7 +59,7 @@ When `pnpm-workspace.yaml` exists:
 1. **Break the recursion**: `_BUCKNIX_DEVSHELL_ACTIVE` guard
 2. **Avoid builds in shellHook**: Use `nix eval` instead of building
 3. **Defer workspace file**: Only add when actual Node projects exist (PR 3)
-4. **Guard all entry points**: NO_NODE_MODULES_LINK + SKIP_NODE_INSTALL in tests/hooks/verify
+4. **Guard all entry points**: Use `NO_NODE_MODULES_LINK` in tests/hooks/verify; do not set `SKIP_NODE_INSTALL`
 
 ## Revised PR 1 Acceptance Criteria
 

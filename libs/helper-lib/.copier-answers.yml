@@ -1,0 +1,14 @@
+name: helper-lib
+language: go
+template: lib
+scaf_src_path: tools/scaffolding/templates/go/lib
+
+module: helper-lib
+
+description: Helper library
+
+go_min: 1.22
+
+license: MIT
+
+enable_ci: true

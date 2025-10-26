@@ -23,7 +23,12 @@ export async function writeIfChanged(dst: string, data: string) {
     }
   }
   await fsp.mkdir(path.dirname(dst), { recursive: true });
-  await fsp.writeFile(dst, data, "utf8");
+  // Atomic write: write to a temp file in the same directory and rename
+  const dir = path.dirname(dst);
+  const base = path.basename(dst);
+  const tmp = path.join(dir, `.tmp-${base}-${crypto.randomBytes(6).toString("hex")}`);
+  await fsp.writeFile(tmp, data, "utf8");
+  await fsp.rename(tmp, dst);
   console.log("wrote", dst);
 }
 
@@ -56,7 +61,12 @@ export async function writeStamp(file: string, inputs: Array<{ path: string; con
     }
   }
   await fsp.mkdir(path.dirname(file), { recursive: true });
-  await fsp.writeFile(file, lines.join("\n"), "utf8");
+  // Atomic write of the stamp file
+  const dir = path.dirname(file);
+  const base = path.basename(file);
+  const tmp = path.join(dir, `.tmp-${base}-${crypto.randomBytes(6).toString("hex")}`);
+  await fsp.writeFile(tmp, lines.join("\n"), "utf8");
+  await fsp.rename(tmp, file);
 }
 
 // Stable unique by key while preserving first occurrence order.

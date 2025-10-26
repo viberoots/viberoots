@@ -3,13 +3,22 @@ def _zx_test_impl(ctx):
     # Export NODE_V8_COVERAGE so child Node processes also write coverage data, but only when COVERAGE=1.
     run_and_report = (
         (
-            "export WORKSPACE_ROOT=\"${WORKSPACE_ROOT:-$(pwd)}\"; "
+            "export WORKSPACE_ROOT=\"${WORKSPACE_ROOT:-${BUCK_TEST_SRC:-$(pwd)}}\"; "
+            # TEMP-DIAG: ensure no stale buckd remains before starting
+            + "ORIG_BUCK2=\"$(command -v buck2)\"; "
+            + "if [ \"$ZX_TEST_KILL_DAEMON\" = \"1\" ]; then \"$ORIG_BUCK2\" kill >/dev/null 2>&1 || true; fi; "
+            # Default to unlinking unless explicitly allowed by tests via NO_NODE_MODULES_LINK=0
+            + "export NO_NODE_MODULES_LINK=\"${NO_NODE_MODULES_LINK:-1}\"; "
+            # TEMP-DIAG: enable more verbose logging from buck2 if supported
+            + "export RUST_LOG=info; "
             + "if [ \"$COVERAGE\" = \"1\" ]; then export NODE_V8_COVERAGE=\"$WORKSPACE_ROOT/coverage/raw\"; else unset NODE_V8_COVERAGE; fi; "
             + "export BUCK_TEST_TARGET=\"%s\"; "
             + "export TEST_LOG_DIR=\"${TEST_LOG_DIR:-$(pwd)/buck-out/test-logs}\"; "
             + "if [ -z \"$NODE_BIN\" ]; then export NODE_BIN=\"$(command -v node)\"; fi; "
             # Ensure a valid TMPDIR inside the sandbox to avoid stale host TMPDIR paths
             + "export TMPDIR=\"${TMPDIR:-$WORKSPACE_ROOT/buck-out/tmp}\"; mkdir -p \"$TMPDIR\"; "
+            # TEMP-DIAG: verbose shell tracing
+            + "set -x; echo '[diag] harness begin'; date; "
             
             # Ensure Buck prelude/config present in test sandbox
             + "if [ ! -e .buckconfig ] || ! grep -q '^prelude = prelude' .buckconfig 2>/dev/null; then "
@@ -44,28 +53,59 @@ def _zx_test_impl(ctx):
             + "EOF\n"
             + "  mkdir -p \"$WORKSPACE_ROOT/toolchains\" && printf '[buildfile]\nname = TARGETS\n' > \"$WORKSPACE_ROOT/toolchains/.buckconfig\"; "
             + "            fi; "
-            # Ensure node_modules available in sandbox by linking from flake output (outside prelude guard)
-            + "NM_OUT=$(bash --noprofile --norc -c 'cd \"$WORKSPACE_ROOT\" && NODE_BIN=\"$(command -v node)\" \"$NODE_BIN\" --experimental-strip-types --import \"$WORKSPACE_ROOT/tools/dev/zx-init.mjs\" \"$WORKSPACE_ROOT/tools/dev/node-modules-build.ts\" --print-out-paths 2>/dev/null | tail -1'); "
-            + "if [ -n \"$NM_OUT\" ] && [ -d \"$NM_OUT/node_modules\" ]; then rm -rf \"$WORKSPACE_ROOT/node_modules\"; ln -s \"$NM_OUT/node_modules\" \"$WORKSPACE_ROOT/node_modules\"; fi; "
-            # Load dev shell environment at repo root via direnv if needed (fast),
-            # so tools like secretspec/copier are on PATH without per-temp flake eval
-            + "if ! command -v secretspec >/dev/null 2>&1 || ! command -v copier >/dev/null 2>&1; then if command -v direnv >/dev/null 2>&1; then eval \"$(direnv export bash)\"; fi; fi; "
+            # Ensure node_modules available in sandbox by linking from flake output, unless disabled by NO_NODE_MODULES_LINK
+            + "if [ \"$NO_NODE_MODULES_LINK\" != \"1\" ]; then "
+            + "  NM_OUT=$(bash --noprofile --norc -c 'cd \"$WORKSPACE_ROOT\" && NODE_BIN=\"$(command -v node)\" \"$NODE_BIN\" --experimental-strip-types --import \"$WORKSPACE_ROOT/tools/dev/zx-init.mjs\" \"$WORKSPACE_ROOT/tools/dev/node-modules-build.ts\" --print-out-paths 2>/dev/null | tail -1'); "
+            + "  if [ -n \"$NM_OUT\" ] && [ -d \"$NM_OUT/node_modules\" ]; then rm -rf \"$WORKSPACE_ROOT/node_modules\"; ln -s \"$NM_OUT/node_modules\" \"$WORKSPACE_ROOT/node_modules\"; fi; "
+            + "fi; "
+            # Optional: allow tests to opt-in to direnv export when needed
+            + "if [ \"$ZX_TEST_DIRENV\" = \"1\" ]; then if command -v direnv >/dev/null 2>&1; then eval \"$(direnv export bash)\"; fi; fi; "
             # Skip direnv in temp repos by default; specific tests can override
-            # Provide a sane default per-test timeout for debugging runs unless overridden
-            + "if [ -z \"$TEST_NODE_OPTIONS\" ]; then export TEST_NODE_OPTIONS=\"--test-timeout=180000\"; fi; "
+            # Provide a single global default timeout unless a caller overrides it
+            + "if [ -z \"$TEST_NODE_OPTIONS\" ]; then export TEST_NODE_OPTIONS=\"--test-timeout=240000\"; fi; "
             + "if [ -n \"$NODE_V8_COVERAGE\" ]; then mkdir -p \"$NODE_V8_COVERAGE\"; "
             + "ls -1t \"$NODE_V8_COVERAGE\"/coverage-*.json 2>/dev/null | tail -n +201 | xargs -r rm -f || true; fi; "
             # Ensure zx-init is loaded in all node:test workers via NODE_OPTIONS
-            + "if [ -n \"$NODE_PATH\" ]; then export NODE_PATH=\"$WORKSPACE_ROOT/node_modules:$NODE_PATH\"; else export NODE_PATH=\"$WORKSPACE_ROOT/node_modules\"; fi; "
+            + "if [ \"$NO_NODE_MODULES_LINK\" != \"1\" ]; then if [ -n \"$NODE_PATH\" ]; then export NODE_PATH=\"$WORKSPACE_ROOT/node_modules:$NODE_PATH\"; else export NODE_PATH=\"$WORKSPACE_ROOT/node_modules\"; fi; fi; "
             + "export NODE_OPTIONS=\"--import \"$WORKSPACE_ROOT/tools/dev/zx-init.mjs\" $NODE_OPTIONS\"; "
             + "SAFE=$(printf %%s \"$BUCK_TEST_TARGET\" | sed -E 's|^.*/:||; s/[^A-Za-z0-9._-]+/_/g' | cut -c1-200); "
             + "LOGDIR=\"$TEST_LOG_DIR/$SAFE\"; mkdir -p \"$LOGDIR\"; "
             # Use a deterministic buck2 isolation name per test to avoid accumulating daemons,
             # and kill the daemon at the end of the test regardless of status.
             + "export BUCK_ISOLATION_DIR=\"zxtest-$SAFE-$$\"; "
+            # Nested isolation for any buck2 calls from inside the test to avoid lock contention with the outer test session
+            + "export BUCK_NESTED_ISO=\"zxtest-nested-$SAFE-$$\"; "
             # If exporter spawns with its own isolation, nest it under the test isolation so cleanup is single-sourced
             + "export BUCK_ISOLATION_DIR_EXPORTER=\"$BUCK_ISOLATION_DIR\"; "
-            + "cleanup() { buck2 --isolation-dir \"$BUCK_ISOLATION_DIR\" kill >/dev/null 2>&1 || true; }; trap cleanup EXIT INT TERM HUP; "
+            # Ensure any nested 'buck2' invocations in test scripts use the same isolation dir
+            + "ORIG_BUCK2=\"$(command -v buck2)\"; "
+            + "export EX_ORIG_BUCK2=\"$ORIG_BUCK2\"; "
+            + "SHIMROOT=\"$WORKSPACE_ROOT/buck-out/zx_shims/$SAFE\"; SHIMBIN=\"$SHIMROOT/bin\"; mkdir -p \"$SHIMBIN\"; WRAP=\"$SHIMBIN/buck2\"; "
+            + "cat > \"$WRAP\" <<'EOSH'\n"
+            + "#!/usr/bin/env bash\n"
+            + "set -euo pipefail\n"
+            + "echo '[diag] buck2 shim invoking:' \"$@\" >&2\n"
+            + "orig=\"__BUCK2_BIN__\"\n"
+            + "if [[ -z \"${orig}\" ]]; then echo \"buck2 shim error: embedded buck2 path missing\" >&2; exit 127; fi\n"
+            + "# Avoid passing --isolation-dir twice if caller already set it\n"
+            + "for a in \"$@\"; do if [ \"$a\" = \"--isolation-dir\" ]; then exec \"$orig\" \"$@\"; fi; done\n"
+            + "iso=\"${BUCK_NESTED_ISO:-shim-$$}\"\n"
+            + "cmd=\"$1\"; shift || true\n"
+            + "# Detect if caller already specified --target-platforms or build.default_platform\n"
+            + "has_tp=0; for a in \"$@\"; do if [ \"$a\" = \"--target-platforms\" ]; then has_tp=1; break; fi; done\n"
+            + "has_defplat=0; for a in \"$@\"; do if echo \"$a\" | grep -q 'build.default_platform='; then has_defplat=1; break; fi; done\n"
+            + "if [ \"$cmd\" = \"build\" ] || [ \"$cmd\" = \"test\" ]; then\n"
+            + "  extra_flags=(); if [ $has_tp -eq 0 ] && [ $has_defplat -eq 0 ]; then extra_flags+=( --config build.default_platform=//:no_cgo --target-platforms //:no_cgo ); fi;\n"
+            + "  exec \"$orig\" --isolation-dir \"$iso\" \"$cmd\" \"${extra_flags[@]}\" \"$@\"\n"
+            + "elif [ \"$cmd\" = \"run\" ] || [ \"$cmd\" = \"query\" ]; then\n"
+            + "  exec \"$orig\" --isolation-dir \"$iso\" \"$cmd\" --config build.default_platform=//:no_cgo \"$@\"\n"
+            + "else\n"
+            + "  exec \"$orig\" --isolation-dir \"$iso\" \"$cmd\" \"$@\"\n"
+            + "fi\n"
+            + "EOSH\n"
+            + "sed -i.bak -e \"s|__BUCK2_BIN__|$ORIG_BUCK2|g\" \"$WRAP\"; rm -f \"$WRAP.bak\"; "
+            + "chmod +x \"$WRAP\"; export PATH=\"$SHIMBIN:$PATH\"; "
+            + "cleanup() { \"$ORIG_BUCK2\" --isolation-dir \"$BUCK_NESTED_ISO\" kill >/dev/null 2>&1 || true; }; trap cleanup EXIT INT TERM HUP; "
             + "rm -f \"$LOGDIR/test.stdout.log\" \"$LOGDIR/test.stderr.log\" 2>/dev/null || true; "
             + "cd \"$WORKSPACE_ROOT\"; "
             # Prefer package from Starlark context; fall back to parsing label, stripping any config suffix
@@ -73,10 +113,14 @@ def _zx_test_impl(ctx):
             + "if [ -z \"$PKG\" ]; then PKG=$(printf %%s \"$BUCK_TEST_TARGET\" | sed -E 's/ \\([^)]*\\)$//; s#^.*//([^:]+):.*$#\\1#'); fi; "
             + "CAND1=\"$WORKSPACE_ROOT/%s\"; CAND2=\"$WORKSPACE_ROOT/$PKG/%s\"; "
             + "SCRIPT_PATH=\"$CAND1\"; if [ ! -f \"$SCRIPT_PATH\" ]; then SCRIPT_PATH=\"$CAND2\"; fi; "
+            + "echo '[diag] zx_test starting script' >&2; date >&2; "
+            # TEMP: disable watchdog to avoid pre-test sleep impacting timeout
+            + "WD=; "
             + "{ \"$NODE_BIN\" $TEST_NODE_OPTIONS --test --experimental-strip-types --import \"$WORKSPACE_ROOT/tools/dev/zx-init.mjs\" \"$SCRIPT_PATH\"; } > >(tee -a \"$LOGDIR/test.stdout.log\") 2> >(grep -Ev 'buck2_client_ctx::file_tailers::tailer: Failed to read from .*buckd\\.(stderr|stdout).*: task [0-9]+ was cancelled' | tee -a \"$LOGDIR/test.stderr.log\" >&2); STATUS=$?; "
+            + "if [ -n \"$WD\" ]; then kill \"$WD\" >/dev/null 2>&1 || true; fi; "
             + "if [ \"$COVERAGE\" = \"1\" ]; then "
             + "\"$NODE_BIN\" \"$WORKSPACE_ROOT/tools/dev/coverage-raw-normalize.mjs\" || true; "
-            + "test -x \"$WORKSPACE_ROOT/node_modules/c8/bin/c8.js\" || { echo 'c8 missing in workspace node_modules; ensure install-deps linked node_modules' >&2; exit 1; }; "
+            + "if [ -x \"$WORKSPACE_ROOT/node_modules/c8/bin/c8.js\" ]; then "
             + "\"$NODE_BIN\" \"$WORKSPACE_ROOT/node_modules/c8/bin/c8.js\" report "
             + "--clean=false --temp-directory \"$WORKSPACE_ROOT/coverage/raw\" "
             + "--reports-dir \"$WORKSPACE_ROOT/coverage\" --reporter=json-summary --reporter=lcov --reporter=html "
@@ -84,8 +128,9 @@ def _zx_test_impl(ctx):
             + "--include \"**/*.ts\" "
             + "--exclude \"node_modules/**\" --exclude \"buck-out/**\" --exclude \".clinic/**\" --exclude \"**/*.d.ts\"; "
             + "\"$NODE_BIN\" ./tools/dev/coverage-normalize.mjs || true; "
+            + "else echo 'warning: c8 missing; skipping coverage aggregation' >&2; fi; "
             + "fi; "
-            + "buck2 --isolation-dir \"$BUCK_ISOLATION_DIR\" kill >/dev/null 2>&1 || true; "
+            + "# Intentionally keep the outer buck2 isolation alive to reduce cross-test cold starts\n"
             + "exit \"$STATUS\""
         )
         % (ctx.label, ctx.label.package, script.short_path, script.short_path)

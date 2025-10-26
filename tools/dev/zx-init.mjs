@@ -4,14 +4,70 @@ const urlMod = await import("node:url");
 const pathMod = await import("node:path");
 const here = urlMod.fileURLToPath(import.meta.url);
 const WORKSPACE_ROOT_FIXED = pathMod.dirname(pathMod.dirname(pathMod.dirname(here)));
+// Ensure zx globals are available as early as possible via bare import using NODE_PATH
+// This covers cases where workspace/node_modules is not present in sandboxes but NODE_PATH points
+// to a host workspace node_modules. Fail silently if not available; other strategies follow.
+try {
+  await import("zx/globals");
+} catch {}
+
+// Best-effort absolute URL to zx globals for resolver to use
+let ZX_GLOBALS_URL = "";
 
 try {
   const zxPath = pathMod.resolve(WORKSPACE_ROOT_FIXED, "node_modules/zx/build/globals.cjs");
-  await import(urlMod.pathToFileURL(zxPath).href);
+  const zxUrl = urlMod.pathToFileURL(zxPath).href;
+  await import(zxUrl);
+  ZX_GLOBALS_URL = zxUrl;
+  try {
+    process.env.ZX_GLOBALS_URL = zxUrl;
+  } catch {}
 } catch {
-  // Fallback: let default/bare resolution try via NODE_PATH or local node_modules
+  // Try to locate zx via the nix-provided zx-wrapper on PATH and import its globals.js
+  try {
+    const fs = await import("node:fs/promises");
+    const pathSep = process.platform === "win32" ? ";" : ":";
+    const parts = String(process.env.PATH || "")
+      .split(pathSep)
+      .filter(Boolean);
+    let zxw = "";
+    for (const p of parts) {
+      const candidate = pathMod.join(
+        p,
+        process.platform === "win32" ? "zx-wrapper.cmd" : "zx-wrapper",
+      );
+      try {
+        await fs.access(candidate);
+        zxw = candidate;
+        break;
+      } catch {}
+    }
+    if (zxw) {
+      const content = await fs.readFile(zxw, "utf8");
+      // Match --import[=| ]'<path>/node_modules/zx/build/globals.(cjs|js)'
+      const re =
+        /--import(?:=|\s+)(['\"]?)([^'\"\s]*\/node_modules\/zx\/build\/globals\.(?:cjs|js))\1/;
+      const m = content.match(re);
+      if (m && m[2]) {
+        const zxGlobalsPath = m[2];
+        try {
+          const zxUrl = urlMod.pathToFileURL(zxGlobalsPath).href;
+          await import(zxUrl);
+          ZX_GLOBALS_URL = zxUrl;
+          try {
+            process.env.ZX_GLOBALS_URL = zxUrl;
+          } catch {}
+        } catch {}
+      }
+    }
+  } catch {}
+  // Final fallback: import zx/globals directly to register globals when available via NODE_PATH
   try {
     await import("zx/globals");
+    ZX_GLOBALS_URL = "";
+    try {
+      process.env.ZX_GLOBALS_URL = "";
+    } catch {}
   } catch {}
 }
 
@@ -43,6 +99,10 @@ const src = `export async function resolve(specifier, context, nextResolve) {
     try {
       // Special-case zx bare import; prefer the flake-provided globals file
       if (specifier === 'zx' || specifier === 'zx/globals' || specifier === 'zx/globals.cjs') {
+        const zxResolved = ${JSON.stringify(ZX_GLOBALS_URL)};
+        if (zxResolved && zxResolved.length > 0) {
+          return await nextResolve(zxResolved, context);
+        }
         const ws = '${WORKSPACE_ROOT_FIXED}'.endsWith('/') ? '${WORKSPACE_ROOT_FIXED}' : '${WORKSPACE_ROOT_FIXED}/';
         const baseUrl = new URL(ws, base);
         const zxGlobals = new URL('node_modules/zx/build/globals.cjs', baseUrl).href;
@@ -72,6 +132,15 @@ const src = `export async function resolve(specifier, context, nextResolve) {
           return await nextResolve(href, context);
         } catch {}
       }
+      // As a last resort, ask Node's CJS resolver to resolve the specifier from the workspace
+      try {
+        const { createRequire } = await import('node:module');
+        const { pathToFileURL } = await import('node:url');
+        const req = createRequire(new URL('package.json', baseUrl));
+        const resolved = req.resolve(specifier);
+        const href = pathToFileURL(resolved).href;
+        return await nextResolve(href, context);
+      } catch {}
     } catch {}
   }
   return nextResolve(specifier, context);

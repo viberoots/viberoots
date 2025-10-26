@@ -1,2 +1,17 @@
 # {{ name }} (Node {{ template }})
 
+{% if template == "webapp" %}
+This is a minimal Vite + TypeScript webapp scaffold wired for importer‑scoped lockfile providers and hermetic production builds via Nix + Buck.
+
+Dev mode with HMR:
+
+```bash
+pnpm dev
+```
+
+Production build via Buck (Nix under the hood):
+
+```bash
+buck2 build //apps/{{ name }}:app
+```
+{% endif %}

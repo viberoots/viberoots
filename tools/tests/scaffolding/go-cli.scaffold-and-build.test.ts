@@ -5,7 +5,8 @@ import { scaffoldApp } from "../lib/lang-fixtures";
 import { runInTemp } from "../lib/test-helpers";
 
 test("go cli: scaffold and build", async () => {
-  await runInTemp("go-cli-scaffold-and-build", async (_tmp, _$) => {
+  // Use a name that avoids triggering dev-shell export in runInTemp (keeps test fast)
+  await runInTemp("cli-scaffold-and-build", async (_tmp, _$) => {
     const $ = _$({ stdio: "pipe" });
     await scaffoldApp("go", "demo-cli", { tmp: _tmp, $ });
     // Preflight: ensure Buck sees the new target
@@ -26,6 +27,6 @@ test("go cli: scaffold and build", async () => {
       cwd: _tmp,
       stdio: "inherit",
       env: { ...process.env, BUCK_GRAPH_JSON: path.join(_tmp, "tools", "buck", "graph.json") },
-    })`BUCK_TARGET="//apps/demo-cli:demo-cli" nix build .#graph-generator`;
+    })`BUCK_TARGET="//apps/demo-cli:demo-cli" nix build .#graph-generator --no-link --accept-flake-config --print-build-logs`;
   });
 });

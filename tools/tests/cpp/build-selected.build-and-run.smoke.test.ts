@@ -19,8 +19,6 @@ async function main() {
       [path.join(repo, "flake.nix"), path.join(tmp, "flake.nix")],
       [path.join(repo, "tools", "nix"), path.join(tmp, "tools", "nix")],
       [path.join(repo, "toolchains"), path.join(tmp, "toolchains")],
-      [path.join(repo, "cpp"), path.join(tmp, "cpp")],
-      [path.join(repo, "apps", "foo"), path.join(tmp, "apps", "foo")],
       [
         path.join(repo, "tools", "dev", "build-selected.ts"),
         path.join(tmp, "tools", "dev", "build-selected.ts"),
@@ -43,9 +41,39 @@ async function main() {
       }
     }
 
+    // Ensure languages manifest enables C++ so export-graph includes cpp labels
+    await fs.ensureDir(path.join(tmp, "tools", "nix"));
+    await fs.writeFile(
+      path.join(tmp, "tools", "nix", "langs.json"),
+      JSON.stringify({ enabled: ["cpp"] }, null, 2) + "\n",
+      "utf8",
+    );
+
+    // Create a minimal C++ app in the temp repo and its TARGETS
+    const appDir = path.join(tmp, "apps", "demo");
+    await fs.ensureDir(path.join(appDir, "src"));
+    await fs.writeFile(path.join(appDir, "src", "main.cpp"), "int main(){return 0;}\n", "utf8");
+    // Provide cpp macro defs
+    await fs.ensureDir(path.join(tmp, "cpp"));
+    await fs.copy(path.join(repo, "cpp", "defs.bzl"), path.join(tmp, "cpp", "defs.bzl"));
+    // Also copy cpp/private so defs.bzl loads resolve (planner_stub, nix_build, etc.)
+    await fs.copy(path.join(repo, "cpp", "private"), path.join(tmp, "cpp", "private"));
+    const targets = [
+      'load("//cpp:defs.bzl", "nix_cpp_binary")',
+      "",
+      "nix_cpp_binary(",
+      '    name = "demo",',
+      '    srcs = ["src/main.cpp"],',
+      '    labels = ["lang:cpp", "kind:bin"],',
+      ")",
+      "",
+    ].join("\n");
+    await fs.writeFile(path.join(appDir, "TARGETS"), targets, "utf8");
+
     // Ensure executable bit and run via zx-wrapper shebang
     await $({ cwd: tmp })`chmod +x tools/dev/build-selected.ts`;
-    const env = { ...process.env, BUCK_TARGET: "//apps/foo:foo", BUCK_TEST_SRC: tmp } as any;
+    const label = "//apps/demo:demo";
+    const env = { ...process.env, BUCK_TARGET: label, BUCK_TEST_SRC: tmp } as any;
     const cmd = $({ cwd: tmp, env, reject: false, nothrow: true })`tools/dev/build-selected.ts`;
     const { stdout, stderr, exitCode } = await cmd;
     if (exitCode !== 0) {
@@ -53,7 +81,11 @@ async function main() {
       process.exit(exitCode || 1);
     }
     const err = String(stderr || "");
-    if (!/\[build-selected\] BUCK_TARGET=\/\/apps\/foo:foo/.test(err)) {
+    if (
+      !new RegExp(
+        `\\[build-selected\\] BUCK_TARGET=${label.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}`,
+      ).test(err)
+    ) {
       console.error("missing BUCK_TARGET log in stderr", err);
       process.exit(2);
     }
@@ -66,14 +98,15 @@ async function main() {
       console.error("out path missing:", outPath);
       process.exit(2);
     }
-    const bin = path.join(outPath, "bin", "apps-foo-foo");
-    if (!(await fs.pathExists(bin))) {
-      console.error("expected binary not found:", bin);
-      console.error("tree:");
-      await $`ls -la ${outPath}`;
-      await $`ls -la ${path.join(outPath, "bin")}`.nothrow();
+    const binDir = path.join(outPath, "bin");
+    const binEntries = (await fs.readdir(binDir).catch(() => [])) as string[];
+    if (!binEntries.length) {
+      console.error("no binaries found in", binDir);
+      await $`ls -la ${outPath}`.nothrow();
+      await $`ls -la ${binDir}`.nothrow();
       process.exit(2);
     }
+    const bin = path.join(binDir, binEntries[0]);
     const run = await $({ reject: false, nothrow: true })`${bin}`;
     if (run.exitCode !== 0) {
       console.error("binary failed:", run.stderr);

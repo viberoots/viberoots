@@ -12,6 +12,8 @@ test("scaffolding registry: discovery only lists present languages and allows ot
     // Create a minimal partial checkout that includes only Go
     await fsp.mkdir(path.join(tmp, "tools/nix/templates"), { recursive: true });
     await fsp.mkdir(path.join(tmp, "tools/scaffolding/templates/go"), { recursive: true });
+    // Provide at least one template directory so `scaf templates` can list Go
+    await fsp.mkdir(path.join(tmp, "tools/scaffolding/templates/go/lib"), { recursive: true });
     await fsp.mkdir(path.join(tmp, "go"), { recursive: true });
 
     // Required files for Go

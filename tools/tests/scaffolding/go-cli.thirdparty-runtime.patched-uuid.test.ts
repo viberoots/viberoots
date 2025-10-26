@@ -12,8 +12,8 @@ async function writeFileAbs(p: string, content: string) {
   await fsp.writeFile(p, content, "utf8");
 }
 
-async function writeBuckConfig($: any) {
-  await $`bash -lc ${`set -euo pipefail
+async function writeBuckConfig(sh: any) {
+  await sh`bash -lc ${`set -euo pipefail
     printf '.\n' > .buckroot
     cat > .buckconfig <<'EOF'
 [buildfile]
@@ -58,8 +58,8 @@ async function ensureNodeOnPath(tmp: string): Promise<string> {
   return localBin;
 }
 
-async function startPatchPkgSession($: any, tmp: string): Promise<{ origin: string; ws: string }> {
-  const { stdout: gomodcacheOut } = await $({ cwd: tmp, stdio: "pipe" })`go env GOMODCACHE`;
+async function startPatchPkgSession(sh: any, tmp: string): Promise<{ origin: string; ws: string }> {
+  const { stdout: gomodcacheOut } = await sh({ cwd: tmp, stdio: "pipe" })`go env GOMODCACHE`;
   const gomodcache = String(gomodcacheOut || "").trim();
   if (!gomodcache) throw new Error("GOMODCACHE not found");
   const origin = path.join(gomodcache, "github.com/google/uuid@v1.6.0");
@@ -67,14 +67,19 @@ async function startPatchPkgSession($: any, tmp: string): Promise<{ origin: stri
     "github.com/google/uuid": { version: "v1.6.0", originPath: origin },
   });
   const localBin = await ensureNodeOnPath(tmp);
-  const startRes = await $({
+  const startRes = await sh({
     cwd: tmp,
     stdio: "pipe",
     env: {
+      NIX_GO_TEST_RESOLVE_JSON: resolveMap,
       NO_DEV_SHELL: "1",
       NODE_BIN: process.execPath,
+      ZX_INIT: path.join(tmp, "tools", "dev", "zx-init.mjs"),
+      WORKSPACE_ROOT: tmp,
+      NODE_PATH: [path.join(process.cwd(), "node_modules"), process.env.NODE_PATH || ""]
+        .filter(Boolean)
+        .join(path.delimiter),
       PATH: `${path.dirname(process.execPath)}:${localBin}:${process.env.PATH || ""}`,
-      NIX_GO_TEST_RESOLVE_JSON: resolveMap,
     },
   })`tools/bin/patch-pkg start go github.com/google/uuid`;
   const ws =
@@ -86,30 +91,35 @@ async function startPatchPkgSession($: any, tmp: string): Promise<{ origin: stri
   return { origin, ws };
 }
 
-async function applyPatchPkg($: any, tmp: string, resolveOrigin: string) {
-  const localBin = await ensureNodeOnPath(tmp);
+async function applyPatchPkg(sh: any, tmp: string, resolveOrigin: string) {
   const resolveMap = JSON.stringify({
     "github.com/google/uuid": { version: "v1.6.0", originPath: resolveOrigin },
   });
-  await $({
+  const localBin = await ensureNodeOnPath(tmp);
+  await sh({
     cwd: tmp,
     stdio: "inherit",
     env: {
+      NIX_GO_TEST_RESOLVE_JSON: resolveMap,
       NO_DEV_SHELL: "1",
       NODE_BIN: process.execPath,
+      ZX_INIT: path.join(tmp, "tools", "dev", "zx-init.mjs"),
+      WORKSPACE_ROOT: tmp,
+      NODE_PATH: [path.join(process.cwd(), "node_modules"), process.env.NODE_PATH || ""]
+        .filter(Boolean)
+        .join(path.delimiter),
       PATH: `${path.dirname(process.execPath)}:${localBin}:${process.env.PATH || ""}`,
-      NIX_GO_TEST_RESOLVE_JSON: resolveMap,
     },
   })`tools/bin/patch-pkg apply go github.com/google/uuid --force`;
 }
 
-async function scaffoldLibrary($: any, tmp: string) {
-  await $`scaf new go lib demo-lib --yes --path=libs/demo-lib`;
-  await $({
+async function scaffoldLibrary(sh: any, tmp: string) {
+  await sh`scaf new go lib demo-lib --yes --path=libs/demo-lib`;
+  await sh({
     cwd: path.join(tmp, "libs", "demo-lib"),
     stdio: "inherit",
   })`go get github.com/google/uuid@v1.6.0`;
-  await $({ cwd: path.join(tmp, "libs", "demo-lib"), stdio: "inherit" })`go mod tidy`;
+  await sh({ cwd: path.join(tmp, "libs", "demo-lib"), stdio: "inherit" })`go mod tidy`;
   await writeFileAbs(
     path.join(tmp, "libs", "demo-lib", "pkg", "demo-lib", "demo-lib.go"),
     [
@@ -128,8 +138,8 @@ async function scaffoldLibrary($: any, tmp: string) {
   );
 }
 
-async function scaffoldCli($: any, tmp: string) {
-  await $`scaf new go cli demo-cli --yes --path=apps/demo-cli`;
+async function scaffoldCli(sh: any, tmp: string) {
+  await sh`scaf new go cli demo-cli --yes --path=apps/demo-cli`;
 
   const cliGoModPath = path.join(tmp, "apps", "demo-cli", "go.mod");
   let cliGoMod = await fsp.readFile(cliGoModPath, "utf8");
@@ -205,26 +215,58 @@ async function scaffoldCli($: any, tmp: string) {
   );
 }
 
-async function generateGomod2nixForLibAndCli($: any, tmp: string) {
-  await runGomod2nix($, tmp, "libs/demo-lib");
-  await runGomod2nix($, tmp, "apps/demo-cli");
-  await fsp.copyFile(
-    path.join(tmp, "apps", "demo-cli", "gomod2nix.toml"),
-    path.join(tmp, "gomod2nix.toml"),
-  );
+async function generateGomod2nixForLibAndCli(sh: any, tmp: string) {
+  await runGomod2nix(sh, tmp, "libs/demo-lib");
+  await runGomod2nix(sh, tmp, "apps/demo-cli");
+  const rootToml = path.join(tmp, "gomod2nix.toml");
+  const cliToml = path.join(tmp, "apps", "demo-cli", "gomod2nix.toml");
+  const libToml = path.join(tmp, "libs", "demo-lib", "gomod2nix.toml");
+  // Start from CLI's toml
+  let rootTxt = await fsp.readFile(cliToml, "utf8").catch(() => "");
+  const seen = new Set<string>();
+  for (const line of rootTxt.split(/\r?\n/)) {
+    const m = line.trim().match(/^\["?([^\]"]+)"?\]$/);
+    if (m) seen.add(m[1]);
+  }
+  // Append missing sections from lib toml
+  const libTxt = await fsp.readFile(libToml, "utf8").catch(() => "");
+  if (libTxt) {
+    const out: string[] = [rootTxt.trimEnd()];
+    let cur: string | null = null;
+    let buf: string[] = [];
+    const flush = () => {
+      if (cur && !seen.has(cur) && buf.length) {
+        out.push("\n" + buf.join("\n"));
+        seen.add(cur);
+      }
+      cur = null;
+      buf = [];
+    };
+    for (const raw of libTxt.split(/\r?\n/)) {
+      const m = raw.trim().match(/^\["?([^\]"]+)"?\]$/);
+      if (m) {
+        flush();
+        cur = m[1];
+      }
+      if (cur) buf.push(raw);
+    }
+    flush();
+    rootTxt = out.filter(Boolean).join("\n");
+  }
+  await fsp.writeFile(rootToml, rootTxt + "\n", "utf8");
 }
 
-async function exportGlue($: any) {
-  await $`tools/dev/install-deps.ts --glue-only`;
+async function exportGlue(sh: any) {
+  await sh`tools/dev/install-deps.ts --glue-only`;
 }
 
-async function createUuidWorkspace($: any, tmp: string): Promise<{ origin: string; ws: string }> {
-  const { origin, ws } = await startPatchPkgSession($, tmp);
+async function createUuidWorkspace(sh: any, tmp: string): Promise<{ origin: string; ws: string }> {
+  const { origin, ws } = await startPatchPkgSession(sh, tmp);
   await patchUuidWorkspace(ws);
   return { origin, ws };
 }
 
-async function enforceCliReplaceToWorkspace($: any, tmp: string, ws: string) {
+async function enforceCliReplaceToWorkspace(sh: any, tmp: string, ws: string) {
   const cliGoModPath = path.join(tmp, "apps", "demo-cli", "go.mod");
   let cliGoMod = await fsp.readFile(cliGoModPath, "utf8");
   if (
@@ -233,14 +275,14 @@ async function enforceCliReplaceToWorkspace($: any, tmp: string, ws: string) {
     cliGoMod = cliGoMod.trimEnd() + "\nreplace github.com/google/uuid => ../../uuid-workspace\n";
     await fsp.writeFile(cliGoModPath, cliGoMod, "utf8");
   }
-  await runGomod2nix($, tmp, "apps/demo-cli");
+  await runGomod2nix(sh, tmp, "apps/demo-cli");
   await fsp.copyFile(
     path.join(tmp, "apps", "demo-cli", "gomod2nix.toml"),
     path.join(tmp, "gomod2nix.toml"),
   );
 }
 
-async function enforceLibReplaceToWorkspace($: any, tmp: string, ws: string) {
+async function enforceLibReplaceToWorkspace(sh: any, tmp: string, ws: string) {
   const libGoModPath = path.join(tmp, "libs", "demo-lib", "go.mod");
   let libGoMod = await fsp.readFile(libGoModPath, "utf8");
   if (
@@ -249,26 +291,26 @@ async function enforceLibReplaceToWorkspace($: any, tmp: string, ws: string) {
     libGoMod = libGoMod.trimEnd() + "\nreplace github.com/google/uuid => ../../uuid-workspace\n";
     await fsp.writeFile(libGoModPath, libGoMod, "utf8");
   }
-  await runGomod2nix($, tmp, "libs/demo-lib");
+  await runGomod2nix(sh, tmp, "libs/demo-lib");
 }
 
-async function regenerateProviders($: any) {
-  await $`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
-  await $`node tools/buck/sync-providers.ts`;
-  await $`node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
+async function regenerateProviders(sh: any) {
+  await sh`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
+  await sh`node tools/buck/sync-providers.ts`;
+  await sh`node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
 }
 
 function normalizeCellLabel(s: string) {
   return s.replace(/^\/\/[^/]+\/+/, "//");
 }
 
-async function buildGraphAndFindBin($: any, tmp: string, label: string): Promise<string> {
+async function buildGraphAndFindBin(sh: any, tmp: string, label: string): Promise<string> {
   const outLinkName = `buck-go-${Date.now()}`;
   const outLinkPath = path.join(tmp, outLinkName);
   try {
     await fsp.rm(outLinkPath, { recursive: false, force: true });
   } catch {}
-  await $({
+  await sh({
     cwd: tmp,
     stdio: "inherit",
     env: {},
@@ -323,8 +365,8 @@ async function findExecutableRecursively(rootDir: string): Promise<string> {
   return "";
 }
 
-async function runGomod2nix($: any, repoRoot: string, moduleRelDir: string) {
-  await $({ cwd: repoRoot, stdio: "inherit" })`tools/bin/gomod2nix --dir ${moduleRelDir}`;
+async function runGomod2nix(sh: any, repoRoot: string, moduleRelDir: string) {
+  await sh({ cwd: repoRoot, stdio: "inherit" })`tools/bin/gomod2nix --dir ${moduleRelDir}`;
 }
 
 async function listGoFilesRecursive(rootDir: string): Promise<string[]> {
@@ -383,8 +425,11 @@ async function patchUuidWorkspace(workspacePath: string): Promise<void> {
 }
 
 test("go cli with local lib + third-party patched uuid runtime", async () => {
-  await runInTemp("go-cli-thirdparty-runtime-patched-uuid", async (_tmp, _$) => {
+  // Avoid name including "go" so runInTemp skips heavy dev env export unless needed
+  await runInTemp("cli-thirdparty-runtime-patched-uuid", async (_tmp, _$) => {
     const $ = _$({ stdio: "pipe" });
+    // Initialize git so patch-pkg can create and apply patches
+    await $`git init`;
     await writeBuckConfig($);
 
     await scaffoldLibrary($, _tmp);

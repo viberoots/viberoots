@@ -1,0 +1,45 @@
+{
+  description = "{{ name }} CLI bundle";
+
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  };
+
+  outputs = { self, nixpkgs }:
+    let
+      systems = [ "aarch64-darwin" "aarch64-linux" "x86_64-linux" ];
+      forAllSystems = f: nixpkgs.lib.genAttrs systems (system:
+        let pkgs = import nixpkgs { inherit system; };
+        in f pkgs
+      );
+    in {
+      packages = forAllSystems (pkgs: {
+        node-cli = pkgs.stdenvNoCC.mkDerivation {
+          pname = "{{ name }}-cli";
+          version = "0.1.0";
+          src = ./.;
+          nativeBuildInputs = [ pkgs.esbuild ];
+          buildPhase = ''
+            set -euo pipefail
+            esbuild src/index.ts \
+              --platform=node \
+              --target=node22 \
+              --bundle \
+              --format=esm \
+              --sourcemap=false \
+              --legal-comments=none \
+              --banner:js='#!/usr/bin/env node' \
+              --outfile={{ name }}.bundle.js
+          '';
+          installPhase = ''
+            set -euo pipefail
+            mkdir -p $out
+            install -m0755 {{ name }}.bundle.js $out/{{ name }}.bundle.js
+          '';
+        };
+      });
+    };
+}
+
+
+

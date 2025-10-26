@@ -61,6 +61,17 @@ def _merge_cgo_deps(deps, nix_cgo_deps, repo_cgo_deps):
     return dedupe_preserve(out)
 
 
+def _srcs_imply_cgo(kwargs):
+    srcs = kwargs.get("srcs", []) or []
+    if not isinstance(srcs, list):
+        return False
+    exts = (".c", ".cc", ".cxx", ".cpp", ".m", ".mm", ".s", ".S")
+    for s in srcs:
+        if isinstance(s, str) and s.endswith(exts):
+            return True
+    return False
+
+
 def nix_go_library(name, **kwargs):
     nix_cgo_deps = kwargs.pop("nix_cgo_deps", [])
     repo_cgo_deps = kwargs.pop("repo_cgo_deps", [])
@@ -82,6 +93,10 @@ def nix_go_library(name, **kwargs):
         kwargs["_go_toolchain"] = "@repo_toolchains//:go"
     if "_cxx_toolchain" not in kwargs:
         kwargs["_cxx_toolchain"] = "@repo_toolchains//:cxx"
+    # Transparent CGO: auto-enable when C-family sources or cgo deps are present
+    if _srcs_imply_cgo(kwargs) or len(nix_cgo_deps) > 0 or len(repo_cgo_deps) > 0:
+        # Prefer override so the target is hermetic regardless of inherited platform
+        kwargs["override_cgo_enabled"] = True
     go_library(name = name, deps = merged, **kwargs)
 
     # Auto-wire a go_test target if *_test.go files exist alongside the library.
@@ -118,6 +133,16 @@ def nix_go_binary(name, **kwargs):
         kwargs["_go_toolchain"] = "@repo_toolchains//:go"
     if "_cxx_toolchain" not in kwargs:
         kwargs["_cxx_toolchain"] = "@repo_toolchains//:cxx"
+    # Ensure stable defaults that don't depend on unspecified platform selects
+    if "asan" not in kwargs:
+        kwargs["asan"] = False
+    if "race" not in kwargs:
+        kwargs["race"] = False
+    if "cgo_enabled" not in kwargs:
+        kwargs["cgo_enabled"] = None
+    # Transparent CGO: auto-enable when C-family sources or cgo deps are present
+    if _srcs_imply_cgo(kwargs) or len(nix_cgo_deps) > 0 or len(repo_cgo_deps) > 0:
+        kwargs["override_cgo_enabled"] = True
     go_binary(name = name, deps = merged, **kwargs)
 
     # Auto-wire a go_test target for binaries if *_test.go exists under cmd/<name>/**
@@ -167,10 +192,20 @@ def nix_go_test(name, **kwargs):
             abs_lib = "//%s:%s" % (pkg, lib[1:])
         merged = [d for d in merged if d not in (lib, abs_lib)]
 
+    if "asan" not in kwargs:
+        kwargs["asan"] = False
+    if "race" not in kwargs:
+        kwargs["race"] = False
+    if "cgo_enabled" not in kwargs:
+        kwargs["cgo_enabled"] = None
     if "_go_toolchain" not in kwargs:
         kwargs["_go_toolchain"] = "@repo_toolchains//:go"
     if "_cxx_toolchain" not in kwargs:
         kwargs["_cxx_toolchain"] = "@repo_toolchains//:cxx"
+    # Transparent CGO: if test itself declares cgo deps or includes C-family sources, enable it.
+    # Note: if testing a cgo library via `library=":lib"`, cgo will be picked up by the library build.
+    if _srcs_imply_cgo(kwargs) or len(nix_cgo_deps) > 0 or len(repo_cgo_deps) > 0:
+        kwargs["override_cgo_enabled"] = True
     go_test(name = name, deps = merged, **kwargs)
 
 # Third-party shim: expose vendor-provided sources as a go_library while

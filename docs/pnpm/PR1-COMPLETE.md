@@ -52,7 +52,7 @@
 1. `chore(node): bootstrap PNPM workspace and Node provider rule`
 2. `fix(dev): prevent runaway node processes during tests`
 3. `fix(dev): prevent recursive shell hooks and runaway node processes`
-4. `fix(tests): restore zx argv global and add SKIP_NODE_INSTALL to remaining test`
+4. `fix(tests): restore zx argv global (remove SKIP_NODE_INSTALL; rely on pure Nix builds)`
 5. `fix(dev): prevent shellHook from triggering nix builds`
 6. `fix(node): defer pnpm-workspace.yaml to PR 3` (investigation)
 7. `feat(node): restore pnpm-workspace with shared-workspace-lockfile=false`
