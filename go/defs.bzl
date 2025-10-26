@@ -225,15 +225,17 @@ def nix_go_carchive(name, **kwargs):
     labels = kwargs.get("labels", []) or []
     labels = dedupe_preserve(labels + ["lang:go", "kind:carchive"])
     deps = kwargs.pop("deps", [])
-    # Keep a minimal graph node with srcs so planner can find package dir
+    # Keep a minimal graph node with srcs so planner can find package dir.
+    # Realize edges to provider nodes by merging them into srcs; genrule does not
+    # accept a `deps` parameter in Buck2.
     srcs = kwargs.get("srcs", []) or []
+    merged_srcs = dedupe_preserve(srcs + deps + _providers_for(name))
     genrule(
         name = name,
-        srcs = srcs,
+        srcs = merged_srcs,
         out = name + ".stamp",
         cmd = "echo go_carchive > $OUT",
         labels = labels,
-        deps = deps + _providers_for(name),
         visibility = kwargs.get("visibility", []),
     )
 

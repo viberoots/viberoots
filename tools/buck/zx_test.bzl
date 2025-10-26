@@ -9,16 +9,13 @@ def _zx_test_impl(ctx):
             + "if [ \"$ZX_TEST_KILL_DAEMON\" = \"1\" ]; then \"$ORIG_BUCK2\" kill >/dev/null 2>&1 || true; fi; "
             # Default to unlinking unless explicitly allowed by tests via NO_NODE_MODULES_LINK=0
             + "export NO_NODE_MODULES_LINK=\"${NO_NODE_MODULES_LINK:-1}\"; "
-            # TEMP-DIAG: enable more verbose logging from buck2 if supported
-            + "export RUST_LOG=info; "
             + "if [ \"$COVERAGE\" = \"1\" ]; then export NODE_V8_COVERAGE=\"$WORKSPACE_ROOT/coverage/raw\"; else unset NODE_V8_COVERAGE; fi; "
             + "export BUCK_TEST_TARGET=\"%s\"; "
             + "export TEST_LOG_DIR=\"${TEST_LOG_DIR:-$(pwd)/buck-out/test-logs}\"; "
             + "if [ -z \"$NODE_BIN\" ]; then export NODE_BIN=\"$(command -v node)\"; fi; "
             # Ensure a valid TMPDIR inside the sandbox to avoid stale host TMPDIR paths
             + "export TMPDIR=\"${TMPDIR:-$WORKSPACE_ROOT/buck-out/tmp}\"; mkdir -p \"$TMPDIR\"; "
-            # TEMP-DIAG: verbose shell tracing
-            + "set -x; echo '[diag] harness begin'; date; "
+            + ""
             
             # Ensure Buck prelude/config present in test sandbox
             + "if [ ! -e .buckconfig ] || ! grep -q '^prelude = prelude' .buckconfig 2>/dev/null; then "
@@ -84,23 +81,24 @@ def _zx_test_impl(ctx):
             + "cat > \"$WRAP\" <<'EOSH'\n"
             + "#!/usr/bin/env bash\n"
             + "set -euo pipefail\n"
-            + "echo '[diag] buck2 shim invoking:' \"$@\" >&2\n"
             + "orig=\"__BUCK2_BIN__\"\n"
             + "if [[ -z \"${orig}\" ]]; then echo \"buck2 shim error: embedded buck2 path missing\" >&2; exit 127; fi\n"
             + "# Avoid passing --isolation-dir twice if caller already set it\n"
             + "for a in \"$@\"; do if [ \"$a\" = \"--isolation-dir\" ]; then exec \"$orig\" \"$@\"; fi; done\n"
             + "iso=\"${BUCK_NESTED_ISO:-shim-$$}\"\n"
             + "cmd=\"$1\"; shift || true\n"
+            + "# Normalize deprecated flags for newer buck2: --output-attributes -> repeated --output-attribute\n"
+            + "norm=(); i=1; while [ $i -le $# ]; do a=\"$1\"; shift || true; i=$((i+1)); if [ \"$a\" = \"--output-attributes\" ]; then if [ $# -ge 1 ]; then v=\"$1\"; shift || true; i=$((i+1)); norm+=( --output-attribute \"$v\" ); else norm+=( --output-attribute ); fi; else norm+=( \"$a\" ); fi; done\n"
             + "# Detect if caller already specified --target-platforms or build.default_platform\n"
-            + "has_tp=0; for a in \"$@\"; do if [ \"$a\" = \"--target-platforms\" ]; then has_tp=1; break; fi; done\n"
-            + "has_defplat=0; for a in \"$@\"; do if echo \"$a\" | grep -q 'build.default_platform='; then has_defplat=1; break; fi; done\n"
+            + "has_tp=0; for a in \"${norm[@]}\"; do if [ \"$a\" = \"--target-platforms\" ]; then has_tp=1; break; fi; done\n"
+            + "has_defplat=0; for a in \"${norm[@]}\"; do if echo \"$a\" | grep -q 'build.default_platform='; then has_defplat=1; break; fi; done\n"
             + "if [ \"$cmd\" = \"build\" ] || [ \"$cmd\" = \"test\" ]; then\n"
             + "  extra_flags=(); if [ $has_tp -eq 0 ] && [ $has_defplat -eq 0 ]; then extra_flags+=( --config build.default_platform=//:no_cgo --target-platforms //:no_cgo ); fi;\n"
-            + "  exec \"$orig\" --isolation-dir \"$iso\" \"$cmd\" \"${extra_flags[@]}\" \"$@\"\n"
+            + "  exec \"$orig\" --isolation-dir \"$iso\" \"$cmd\" \"${extra_flags[@]}\" \"${norm[@]}\"\n"
             + "elif [ \"$cmd\" = \"run\" ] || [ \"$cmd\" = \"query\" ]; then\n"
-            + "  exec \"$orig\" --isolation-dir \"$iso\" \"$cmd\" --config build.default_platform=//:no_cgo \"$@\"\n"
+            + "  exec \"$orig\" --isolation-dir \"$iso\" \"$cmd\" --config build.default_platform=//:no_cgo \"${norm[@]}\"\n"
             + "else\n"
-            + "  exec \"$orig\" --isolation-dir \"$iso\" \"$cmd\" \"$@\"\n"
+            + "  exec \"$orig\" --isolation-dir \"$iso\" \"$cmd\" \"${norm[@]}\"\n"
             + "fi\n"
             + "EOSH\n"
             + "sed -i.bak -e \"s|__BUCK2_BIN__|$ORIG_BUCK2|g\" \"$WRAP\"; rm -f \"$WRAP.bak\"; "
@@ -113,7 +111,6 @@ def _zx_test_impl(ctx):
             + "if [ -z \"$PKG\" ]; then PKG=$(printf %%s \"$BUCK_TEST_TARGET\" | sed -E 's/ \\([^)]*\\)$//; s#^.*//([^:]+):.*$#\\1#'); fi; "
             + "CAND1=\"$WORKSPACE_ROOT/%s\"; CAND2=\"$WORKSPACE_ROOT/$PKG/%s\"; "
             + "SCRIPT_PATH=\"$CAND1\"; if [ ! -f \"$SCRIPT_PATH\" ]; then SCRIPT_PATH=\"$CAND2\"; fi; "
-            + "echo '[diag] zx_test starting script' >&2; date >&2; "
             # TEMP: disable watchdog to avoid pre-test sleep impacting timeout
             + "WD=; "
             + "{ \"$NODE_BIN\" $TEST_NODE_OPTIONS --test --experimental-strip-types --import \"$WORKSPACE_ROOT/tools/dev/zx-init.mjs\" \"$SCRIPT_PATH\"; } > >(tee -a \"$LOGDIR/test.stdout.log\") 2> >(grep -Ev 'buck2_client_ctx::file_tailers::tailer: Failed to read from .*buckd\\.(stderr|stdout).*: task [0-9]+ was cancelled' | tee -a \"$LOGDIR/test.stderr.log\" >&2); STATUS=$?; "
@@ -159,6 +156,7 @@ zx_test = rule(
     impl = _zx_test_impl,
     attrs = {
         "script": attrs.source(),
-        "out": attrs.string(),
+        # Ensure a default output so Buck always recognizes an output artifact
+        "out": attrs.string(default = "zx_test.stamp"),
     },
 )

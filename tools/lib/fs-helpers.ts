@@ -17,10 +17,7 @@ export async function writeIfChanged(dst: string, data: string) {
     const cur = await fsp.readFile(dst, "utf8");
     const a = crypto.createHash("sha256").update(cur).digest("hex");
     const b = crypto.createHash("sha256").update(data).digest("hex");
-    if (a === b) {
-      console.log(`no-op (already applied): ${dst}`);
-      return;
-    }
+    if (a === b) return;
   }
   await fsp.mkdir(path.dirname(dst), { recursive: true });
   // Atomic write: write to a temp file in the same directory and rename
@@ -29,7 +26,7 @@ export async function writeIfChanged(dst: string, data: string) {
   const tmp = path.join(dir, `.tmp-${base}-${crypto.randomBytes(6).toString("hex")}`);
   await fsp.writeFile(tmp, data, "utf8");
   await fsp.rename(tmp, dst);
-  console.log("wrote", dst);
+  // silent
 }
 
 // Write a deterministic stamp file that captures the content of inputs in a
