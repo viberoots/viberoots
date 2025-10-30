@@ -118,21 +118,7 @@ const src = `export async function resolve(specifier, context, nextResolve) {
       }
       const ws = '${WORKSPACE_ROOT_FIXED}'.endsWith('/') ? '${WORKSPACE_ROOT_FIXED}' : '${WORKSPACE_ROOT_FIXED}/';
       const baseUrl = new URL(ws, base);
-      const candidateDir = new URL('node_modules/' + specifier, baseUrl).href;
-      try { return await nextResolve(candidateDir, context); } catch {}
-      // Try common index.js locations
-      const candidates = [
-        'node_modules/' + specifier + '/index.js',
-        'node_modules/' + specifier + '/dist/index.js',
-        'node_modules/' + specifier + '/lib/index.js',
-      ];
-      for (const rel of candidates) {
-        try {
-          const href = new URL(rel, baseUrl).href;
-          return await nextResolve(href, context);
-        } catch {}
-      }
-      // As a last resort, ask Node's CJS resolver to resolve the specifier from the workspace
+      // Prefer Node's CJS resolver first to respect package "exports" fields via createRequire
       try {
         const { createRequire } = await import('node:module');
         const { pathToFileURL } = await import('node:url');
@@ -141,6 +127,21 @@ const src = `export async function resolve(specifier, context, nextResolve) {
         const href = pathToFileURL(resolved).href;
         return await nextResolve(href, context);
       } catch {}
+      const candidateDir = new URL('node_modules/' + specifier, baseUrl).href;
+      try { return await nextResolve(candidateDir, context); } catch {}
+      // Try common index.js locations
+      const candidates = [
+        'node_modules/' + specifier + '/index.js',
+        'node_modules/' + specifier + '/dist/index.js',
+        'node_modules/' + specifier + '/lib/index.js',
+        'node_modules/' + specifier + '/esm/index.js',
+      ];
+      for (const rel of candidates) {
+        try {
+          const href = new URL(rel, baseUrl).href;
+          return await nextResolve(href, context);
+        } catch {}
+      }
     } catch {}
   }
   return nextResolve(specifier, context);

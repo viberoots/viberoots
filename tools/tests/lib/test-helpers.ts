@@ -405,14 +405,10 @@ export async function runInTemp<T>(
   } catch {}
   const _$ = $({ cwd: tmp, env: exportEnv });
   try {
-    // TEMP-DIAG: print key env that could impact deadlocks
-    try {
-      console.error("[diag] WORKSPACE_ROOT:", process.cwd());
-      console.error("[diag] NODE_OPTIONS:", exportEnv.NODE_OPTIONS || "");
-      console.error("[diag] NO_NODE_MODULES_LINK:", exportEnv.NO_NODE_MODULES_LINK || "");
-    } catch {}
+    // quiet: remove temporary diagnostics
     if (process.env.TEST_KEEP_TMP === "1") {
       try {
+        // quiet: keep path logging minimal
         console.error(`KEEP_TMP ${tmp}`);
         await fsp
           .appendFile(path.join(process.cwd(), "test-tmp-paths.log"), tmp + "\n", "utf8")
@@ -432,6 +428,7 @@ export async function runInTemp<T>(
     );
     if (process.env.TEST_KEEP_TMP === "1") {
       try {
+        // quiet: keep path logging minimal
         console.error(`KEEP_TMP ${tmp}`);
         const logFile = path.join(process.cwd(), "test-tmp-paths.log");
         await fsp.appendFile(logFile, tmp + "\n", "utf8").catch(() => {});
@@ -441,6 +438,6 @@ export async function runInTemp<T>(
         console.warn("warning: failed to remove temp test dir:", err);
       });
     }
-    console.error(`[timing] runInTemp(${name}) done`);
+    // quiet: timing footer removed (use TEST_TIMING=1 to enable timings)
   }
 }

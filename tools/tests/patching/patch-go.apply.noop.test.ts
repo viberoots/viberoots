@@ -12,14 +12,16 @@ test("patch-go apply is no-op when no changes", async () => {
     const map = { "golang.org/x/net": { version: "v0.24.0", originPath: origin } };
 
     await $`chmod +x tools/bin/patch-pkg`;
-    await $({ cwd: tmp })`NIX_GO_TEST_RESOLVE_JSON=${JSON.stringify(
+    await $({ cwd: tmp })`WORKSPACE_ROOT=${tmp} NIX_GO_TEST_RESOLVE_JSON=${JSON.stringify(
       map,
     )} NIX_GO_DEV_OVERRIDE_JSON={} GOMODCACHE=${path.join(
       tmp,
       "gomodcache",
     )} tools/bin/patch-pkg start go golang.org/x/net`;
 
-    const out = await $({ cwd: tmp })`NIX_GO_TEST_RESOLVE_JSON=${JSON.stringify(
+    const out = await $({
+      cwd: tmp,
+    })`WORKSPACE_ROOT=${tmp} NIX_GO_TEST_RESOLVE_JSON=${JSON.stringify(
       map,
     )} NIX_GO_DEV_OVERRIDE_JSON={} GOMODCACHE=${path.join(
       tmp,

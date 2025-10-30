@@ -14,7 +14,7 @@ test("go app: adding *_test.go auto-wires nix_go_test and runs", async () => {
     // Scaffold a Go CLI app
     await $`scaf new go cli demo-cli --yes --path=apps/demo-cli`;
 
-    // Ensure module tidy and gomod2nix lock
+    // Ensure module tidy and gomod2nix lock; also surface a clear error if gomod2nix fails
     await $({ cwd: path.join(tmp, "apps", "demo-cli"), stdio: "inherit" })`go mod tidy`;
     await $({ cwd: tmp, stdio: "inherit" })`tools/bin/gomod2nix --dir apps/demo-cli`;
     await fsp.copyFile(
@@ -33,6 +33,14 @@ test("go app: adding *_test.go auto-wires nix_go_test and runs", async () => {
 
     // Glue and then run the auto-wired test target
     await $`tools/dev/install-deps.ts --glue-only`;
-    await $`buck2 test //apps/demo-cli:demo-cli_test`;
+    // Add a short, actionable external timeout message if the test stalls on stdlib
+    try {
+      await $`buck2 test //apps/demo-cli:demo-cli_test`;
+    } catch (e) {
+      console.error(
+        "go app auto-wires: buck2 test stalled or failed — ensure go stdlib toolchain built; rerun test or check Buck logs for go_build_stdlib",
+      );
+      throw e;
+    }
   });
 });

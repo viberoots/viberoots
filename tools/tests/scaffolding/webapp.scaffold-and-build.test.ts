@@ -14,8 +14,7 @@ test("webapp: scaffold, glue, build dist via Buck", { timeout: 240_000 }, async 
       cwd: path.join(tmp, "apps", "demo-web"),
       env: { ...process.env },
     })`zx-wrapper ../../tools/dev/install/deps-main.ts --verbose --glue-only`;
-    // TEMP-DIAG: log installer outputs/env
-    console.error("[diag] after install, running glue");
+    // quiet: remove temporary diagnostics
     // Glue (no buck invocations)
     await $`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
     await $`node tools/buck/sync-providers-node.ts`;
@@ -61,17 +60,17 @@ test("webapp: scaffold, glue, build dist via Buck", { timeout: 240_000 }, async 
       cwd: tmp,
       stdio: "inherit",
       env: { ...envWithPrefetch, INSTALL_LOCK_SKIP: "1" },
-    })`bash --noprofile --norc -c 'nix build "${tmp}#pnpm-store.${sanitized}" --impure --no-substitute --no-link --accept-flake-config --print-build-logs --max-jobs 1 --option cores 1'`;
+    })`bash --noprofile --norc -c 'nix build "${tmp}#pnpm-store.${sanitized}" --impure --no-link --accept-flake-config --print-build-logs --max-jobs 1 --option cores 1'`;
     const nmBuild = await $({
       cwd: tmp,
       stdio: "inherit",
       env: { ...envWithPrefetch, INSTALL_LOCK_SKIP: "1" },
-    })`bash --noprofile --norc -c 'nix build "${tmp}#node-modules.${sanitized}" --impure --no-substitute --no-link --accept-flake-config --print-build-logs --max-jobs 1 --option cores 1'`;
+    })`bash --noprofile --norc -c 'nix build "${tmp}#node-modules.${sanitized}" --impure --no-link --accept-flake-config --print-build-logs --max-jobs 1 --option cores 1'`;
     const nixOut = await $({
       stdio: "pipe",
       cwd: tmp,
       env: envWithPrefetch,
-    })`bash --noprofile --norc -c 'nix build "${tmp}#node-webapp.${sanitized}" --impure --no-substitute --no-link --accept-flake-config --print-build-logs --max-jobs 1 --option cores 1 --print-out-paths'`;
+    })`bash --noprofile --norc -c 'nix build "${tmp}#node-webapp.${sanitized}" --impure --no-link --accept-flake-config --print-build-logs --max-jobs 1 --option cores 1 --print-out-paths'`;
     const outPath =
       String(nixOut.stdout || "")
         .trim()

@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import fs from "fs-extra";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { deriveTupleForNode, tupleKey } from "./env.ts";
 import type { Batch, Node, Tuple } from "./types.ts";
@@ -24,12 +24,35 @@ export function dirsForTarget(n: Node): string[] {
   return Array.from(dirs);
 }
 
+async function pathExists(p: string): Promise<boolean> {
+  try {
+    await fsp.access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function findModuleRootForDirs(dirs: string[]): Promise<string | null> {
-  for (const d of dirs) {
-    const mod = path.join(process.cwd(), d, "go.mod");
-    if (await fs.pathExists(mod)) return d;
-    const parent = path.join(process.cwd(), d, "..", "go.mod");
-    if (await fs.pathExists(parent)) return path.join(d, "..");
+  // Walk up from each dir to the repo root looking for the nearest go.mod to stabilize
+  // module root detection regardless of current working directory nuances.
+  const seen = new Set<string>();
+  for (const d0 of dirs) {
+    let cur = path.resolve(process.cwd(), d0);
+    const root = path.resolve(process.cwd());
+    // Limit ascent to the repo root to avoid scanning outside temp workspace
+    while (cur.startsWith(root)) {
+      const mod = path.join(cur, "go.mod");
+      if (await pathExists(mod)) {
+        // Return path relative to repo root to match previous semantics
+        const rel = path.relative(process.cwd(), cur) || ".";
+        if (!seen.has(rel)) seen.add(rel);
+        return rel;
+      }
+      const next = path.dirname(cur);
+      if (next === cur) break;
+      cur = next;
+    }
   }
   return null;
 }

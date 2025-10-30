@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-echo '[diag] buck2 shim invoking:' "$@" >&2
+# quiet: remove diagnostic echo
 orig="/nix/store/vdfafkc36147l1q0hfybjf7w5aznfdqd-buck2-unstable-2025-05-06/bin/buck2"
 if [[ -z "${orig}" ]]; then echo "buck2 shim error: embedded buck2 path missing" >&2; exit 127; fi
 # Avoid passing --isolation-dir twice if caller already set it

@@ -93,6 +93,56 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
   const goCaps = caps.get("go") || {};
   const nodeCaps = caps.get("node") || {};
 
+  // If Node is enabled, proactively reconcile pnpm fixed-output hashes for any
+  // discovered importers with a pnpm-lock.yaml. This avoids placeholder-digest
+  // mismatches during glue-only runs used by scaffolding tests.
+  if (haveNode) {
+    try {
+      const repo = repoRoot();
+      // Reuse the importer discovery logic from install/deps-main.ts (inline here to keep deps minimal)
+      const importers: string[] = [];
+      for (const base of ["apps", "libs"]) {
+        const baseAbs = path.join(repo, base);
+        try {
+          const { stdout } = await $({
+            stdio: "pipe",
+          })`bash --noprofile --norc -c ${`test -d ${baseAbs} && ls -1 ${baseAbs}`}`;
+          for (const d of String(stdout || "").split(/\r?\n/)) {
+            const name = d.trim();
+            if (!name) continue;
+            const impDir = path.join(repo, base, name);
+            const lock = path.join(impDir, "pnpm-lock.yaml");
+            try {
+              const res = await $({
+                stdio: "pipe",
+              })`bash --noprofile --norc -c ${`test -f ${lock}`}`;
+              if (res.exitCode === 0) {
+                importers.push(path.join(base, name));
+              }
+            } catch {}
+          }
+        } catch {}
+      }
+      if (importers.length) {
+        const updater = path.join(repo, "tools/dev/update-pnpm-hash.ts");
+        for (const imp of importers) {
+          const relLock = path.join(imp, "pnpm-lock.yaml");
+          const cmd = `zx-wrapper ${updater} --lockfile ${relLock}`;
+          if (dryRun) {
+            console.log(`[dry-run] ${cmd}`);
+          } else {
+            if (verbose) console.log(`[run] ${cmd}`);
+            await $({
+              stdio: "inherit",
+              cwd: repo,
+              env: { ...process.env, INSTALL_LOCK_SKIP: "1" },
+            })`bash --noprofile --norc -c ${cmd}`;
+          }
+        }
+      }
+    } catch {}
+  }
+
   const cmds: Array<{
     label: string;
     cmd: string;

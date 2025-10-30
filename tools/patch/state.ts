@@ -86,3 +86,15 @@ export async function findSessionBy(
   }
   return null;
 }
+
+export async function listSessions(
+  lang: string,
+): Promise<Array<{ moduleKey: string; rec: SessionRecord }>> {
+  const st = await readStore();
+  const byLang = st.sessions[lang] || {};
+  const out: Array<{ moduleKey: string; rec: SessionRecord }> = [];
+  for (const [k, rec] of Object.entries(byLang)) {
+    out.push({ moduleKey: k, rec: rec as SessionRecord });
+  }
+  return out;
+}

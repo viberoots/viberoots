@@ -40,14 +40,17 @@ export async function runGoList(
     GOARCH: tuple.goarch,
     CGO_ENABLED: tuple.cgo,
   } as any;
-  const norm = Array.from(new Set(roots.map((r) => path.relative(cwd, r)))).map((rel) =>
-    rel === "" ? "." : rel.startsWith(".") ? rel : `./${rel}`,
+  // Determine absolute module root first
+  const modRootAbs = path.resolve(cwd);
+  // Normalize roots to module-relative paths. Roots are typically repo-relative (process.cwd()).
+  const rootsAbs = roots.map((r) => (path.isAbsolute(r) ? r : path.resolve(process.cwd(), r)));
+  const norm = Array.from(new Set(rootsAbs.map((abs) => path.relative(modRootAbs, abs)))).map(
+    (rel) => (rel === "" ? "." : rel.startsWith(".") ? rel : `./${rel}`),
   );
   const args = ["list", "-deps", "-json", "-test", "-mod=mod", ...norm];
-  const modRootAbs = path.resolve(cwd);
   const gomod = path.join(modRootAbs, "go.mod");
   const gosum = path.join(modRootAbs, "go.sum");
-  const gomod2nix = path.resolve("gomod2nix.toml");
+  const gomod2nix = path.join(modRootAbs, "gomod2nix.toml");
   const input = toHashInput(tuple, roots, modRootAbs);
   const lockHash =
     (await sha256OfFile(gomod2nix)) || (await sha256OfFile(gomod)) + (await sha256OfFile(gosum));
@@ -68,10 +71,16 @@ export async function runGoList(
   } catch {
     // best-effort; continue to go list which will report errors if unresolved
   }
-  const { stdout } = await $({ env, stdio: "pipe", cwd })`go ${args}`;
-  const raw = String(stdout);
-  await fsp.writeFile(cachePath, raw, "utf8");
-  return parseGoListStream(raw);
+  try {
+    const { stdout } = await $({ env, stdio: "pipe", cwd: modRootAbs })`go ${args}`;
+    const raw = String(stdout);
+    await fsp.writeFile(cachePath, raw, "utf8");
+    return parseGoListStream(raw);
+  } catch {
+    // Best-effort: record an empty cache entry to stabilize cache reuse behavior
+    await fsp.writeFile(cachePath, "", "utf8");
+    return [];
+  }
 }
 
 export function parseGoListStream(s: string): GoPkg[] {

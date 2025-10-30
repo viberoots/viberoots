@@ -1,10 +1,16 @@
+load("@prelude//:rules.bzl", "genrule")
+
 def node_importer_deps(name, lockfile, importer, patch_paths = []):
+    # Node importer providers are metadata-only. Buck packages cannot reference
+    # files outside their package as srcs, so we avoid adding lockfiles or patch
+    # paths here. The presence of this target realizes the dependency edge; the
+    # stamp content is deterministic and includes the importer key for debugging.
     genrule(
         name = name,
-        srcs = [lockfile] + patch_paths,
+        srcs = [],
         out = name + ".stamp",
-        cmd = "if command -v sha256sum >/dev/null; then cat $SRCS | sha256sum > $OUT; else cat $SRCS | shasum -a 256 > $OUT; fi",
-        visibility = ["//visibility:public"],
+        cmd = "echo node_importer:${importer} ${lockfile} > $OUT",
+        visibility = ["PUBLIC"],
     )
 
 

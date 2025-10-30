@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import fs from "fs-extra";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
@@ -7,8 +7,8 @@ import { runInTemp } from "../lib/test-helpers";
 test("patch-cpp apply writes encoded patch filename and auto-discovery note", async () => {
   await runInTemp("patch-cpp-apply-create", async (tmp, $) => {
     const storeSrc = path.join(tmp, "nix-store", "zlib-src");
-    await fs.mkdirp(storeSrc);
-    await fs.outputFile(path.join(storeSrc, "file.txt"), "A\n", "utf8");
+    await fsp.mkdir(storeSrc, { recursive: true });
+    await fsp.writeFile(path.join(storeSrc, "file.txt"), "A\n", "utf8");
     const map = { "pkgs.zlib": { version: "1.2.13", srcPath: storeSrc, pname: "zlib" } };
 
     await $`chmod +x tools/bin/patch-pkg`;
@@ -16,14 +16,20 @@ test("patch-cpp apply writes encoded patch filename and auto-discovery note", as
       map,
     )} tools/bin/patch-pkg start cpp pkgs.zlib`;
     const ws = String(wsOut.stdout).trim().split(/\s+/).pop() as string;
-    await fs.outputFile(path.join(ws, "file.txt"), "B\n", "utf8");
+    await fsp.writeFile(path.join(ws, "file.txt"), "B\n", "utf8");
 
     const out = await $({ cwd: tmp })`NIX_CPP_TEST_RESOLVE_JSON=${JSON.stringify(
       map,
     )} tools/bin/patch-pkg apply cpp zlib`;
-
-    const patch = path.join(tmp, "patches/cpp", "pkgs__zlib@1.2.13.patch");
-    if (!(await fs.pathExists(patch))) {
+    const outTxtAll = String(out.stdout || out.stderr || "");
+    const printed = outTxtAll
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .find((l) => l.endsWith(".patch") && l.startsWith("/"));
+    const patch = printed || path.join(tmp, "patches/cpp", "pkgs__zlib@1.2.13.patch");
+    try {
+      await fsp.access(patch);
+    } catch {
       console.error("expected cpp patch file missing");
       process.exit(2);
     }

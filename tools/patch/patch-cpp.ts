@@ -1,10 +1,19 @@
 #!/usr/bin/env zx-wrapper
-import fs from "fs-extra";
+import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { makeUnifiedDiff } from "./diff";
-import { deleteSession, getSession, setSession } from "./state";
+import { deleteSession, getSession, listSessions, setSession } from "./state";
 import type { LanguageHandler, SessionRecord } from "./types";
+
+async function pathExists(p: string): Promise<boolean> {
+  try {
+    await fsp.access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function attrArg(args: string[]): string {
   const a = (args[0] || "").trim();
@@ -24,7 +33,7 @@ function encodeAttrForFilename(attrNorm: string): string {
 }
 
 async function nixEvalRaw(expr: string): Promise<string> {
-  const { stdout } = await $`nix eval --raw ${expr}`;
+  const { stdout } = await $`nix eval --raw --accept-flake-config ${expr}`;
   return String(stdout || "").trim();
 }
 
@@ -58,26 +67,27 @@ async function resolveNixpkg(
   // Support flake-style "nixpkgs#<name>" queries by stripping pkgs.
   const name = attrNorm.replace(/^pkgs\./, "");
   const base = `nixpkgs#${name}`;
-  let pname = "";
-  try {
-    console.error("[patch-cpp] resolve: eval pname", base);
-    pname = await nixEvalRaw(`${base}.pname`);
-  } catch {}
   console.error("[patch-cpp] resolve: eval version", base);
   const version = await nixEvalRaw(`${base}.version`);
-  // Ensure the source is realised in the store before attempting to read or extract it.
+  // Materialize and capture the src path in a single step to avoid a second eval
   console.error("[patch-cpp] resolve: build src", base);
-  await $`nix build --no-link ${base}.src`;
+  const built = await $`nix build --no-link --accept-flake-config ${base}.src --print-out-paths`;
+  const srcPath =
+    String(built.stdout || "")
+      .trim()
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .pop() || "";
+  if (!srcPath) throw new Error(`failed to resolve src path for ${base}`);
   console.error("[patch-cpp] resolve: eval src", base);
-  const srcPath = await nixEvalRaw(`${base}.src`);
-  console.error("[patch-cpp] resolve: done", { pname: pname || name, version, srcPath });
-  return { pname: pname || name, version, srcPath };
+  console.error("[patch-cpp] resolve: done", { pname: name, version, srcPath });
+  return { pname: name, version, srcPath };
 }
 
 async function extractOrCopySrc(srcPath: string, destDir: string): Promise<string> {
-  await fs.mkdirp(destDir);
+  await fsp.mkdir(destDir, { recursive: true });
   // If srcPath is a directory in the store, copy it. Otherwise, attempt extraction.
-  const stat = await fs.stat(srcPath).catch(() => null);
+  const stat = await fsp.stat(srcPath).catch(() => null);
   if (stat && stat.isDirectory()) {
     console.error("[patch-cpp] extract: copy dir", srcPath);
     // Copy store dir into a writable workspace; prefer rsync for portability
@@ -98,17 +108,20 @@ async function extractOrCopySrc(srcPath: string, destDir: string): Promise<strin
     await $`chmod -R u+w ${destDir}`.nothrow();
   }
   // Heuristic: if extraction created a single directory, descend into it for origin path
-  const entries = await fs.readdir(destDir);
+  const entries = await fsp.readdir(destDir);
   if (entries.length === 1) {
     const only = path.join(destDir, entries[0]);
-    const st = await fs.stat(only).catch(() => null);
+    const st = await fsp.stat(only).catch(() => null);
     if (st && st.isDirectory()) return only;
   }
   console.error("[patch-cpp] extract: done");
   return destDir;
 }
 
-async function ensureOriginAndWorkspace(attr: string): Promise<{
+async function ensureOriginAndWorkspace(
+  attr: string,
+  pre?: { pname: string; version: string; srcPath: string },
+): Promise<{
   key: string;
   originPath: string;
   workspacePath: string;
@@ -116,7 +129,7 @@ async function ensureOriginAndWorkspace(attr: string): Promise<{
   pname: string;
 }> {
   const attrNorm = normalizeAttr(attr);
-  const { pname, version, srcPath } = await resolveNixpkg(attrNorm);
+  const { pname, version, srcPath } = pre || (await resolveNixpkg(attrNorm));
   const key = `${attrNorm}@${version}`.toLowerCase();
   const stamp = new Date()
     .toISOString()
@@ -126,7 +139,7 @@ async function ensureOriginAndWorkspace(attr: string): Promise<{
   const base = path.join(os.tmpdir(), "bucknix-patch-cpp");
   const originRoot = path.join(base, `origin-${safeKey}-${stamp}`);
   const wsRoot = path.join(base, `ws-${safeKey}-${stamp}`);
-  await fs.mkdirp(base);
+  await fsp.mkdir(base, { recursive: true });
   const originPath = await extractOrCopySrc(srcPath, originRoot);
   // Create workspace by cloning originPath
   await $`rsync -a ${originPath}/ ${wsRoot}/`;
@@ -143,13 +156,13 @@ async function doStart(args: string[]) {
   const meta = await resolveNixpkg(attrNorm);
   const key = `${attrNorm}@${meta.version}`.toLowerCase();
   const existing = await getSession("cpp", key);
-  if (existing && (await fs.pathExists(existing.workspacePath))) {
+  if (existing && (await pathExists(existing.workspacePath))) {
     console.error("[patch-cpp] start: reuse existing workspace", existing.workspacePath);
     console.log(existing.workspacePath);
     return;
   }
   console.error("[patch-cpp] start: ensure origin and workspace");
-  const { originPath, workspacePath, version } = await ensureOriginAndWorkspace(attrInput);
+  const { originPath, workspacePath, version } = await ensureOriginAndWorkspace(attrInput, meta);
   const now = new Date().toISOString();
   const rec: SessionRecord = {
     importPath: attrNorm,
@@ -179,25 +192,77 @@ async function doApply(args: string[]) {
   console.error("[patch-cpp] apply: begin");
   const attrInput = attrArg(args);
   const attrNorm = normalizeAttr(attrInput);
-  console.error("[patch-cpp] apply: resolve nixpkg", attrNorm);
-  const { version } = await resolveNixpkg(attrNorm);
-  const key = `${attrNorm}@${version}`.toLowerCase();
-  const sess = await getSession("cpp", key);
-  if (!sess) throw new Error(`no active session for ${key}; run: patch-pkg start cpp ${attrInput}`);
+  // Avoid redundant nixpkgs resolutions during apply: reuse an existing session.
+  // Choose the most recent session for this attr whose workspace still exists; fall back to newest.
+  const all = await listSessions("cpp");
+  const matches = all.filter((e) => e.rec.importPath === attrNorm);
+  let sess: SessionRecord | null = null;
+  if (matches.length) {
+    // If multiple sessions exist for this attr, prefer the one matching the currently
+    // resolved version (when available via test mapping), otherwise fall back to recency.
+    let expectedVersion: string | null = null;
+    if (matches.length > 1) {
+      try {
+        const meta = await resolveNixpkg(attrNorm);
+        expectedVersion = meta?.version || null;
+      } catch {}
+    }
+    const filtered = expectedVersion
+      ? matches.filter(
+          (m) => (m.rec.version || "").toLowerCase() === expectedVersion!.toLowerCase(),
+        )
+      : matches;
+    const pickFrom = filtered.length ? filtered : matches;
+    // Prefer sessions whose workspacePath exists, sorted by updatedAt desc
+    const withWs: Array<SessionRecord & { _t: number }> = [];
+    for (const m of pickFrom) {
+      try {
+        if (await pathExists(m.rec.workspacePath)) {
+          const t = Date.parse(m.rec.updatedAt || m.rec.createdAt || "");
+          withWs.push(Object.assign({}, m.rec, { _t: isNaN(t) ? 0 : t }));
+        }
+      } catch {}
+    }
+    if (withWs.length) {
+      withWs.sort((a, b) => b._t - a._t);
+      sess = withWs[0] as SessionRecord;
+    } else {
+      // No existing workspace; fall back to newest by updatedAt
+      const byTime = pickFrom
+        .map((m) => ({ rec: m.rec, t: Date.parse(m.rec.updatedAt || m.rec.createdAt || "") || 0 }))
+        .sort((a, b) => b.t - a.t);
+      sess = byTime[0]?.rec || null;
+    }
+  }
+  if (!sess) {
+    throw new Error(
+      `no active session for ${attrNorm}; run: patch-pkg start cpp ${attrInput} before apply`,
+    );
+  }
   console.error("[patch-cpp] apply: computing diff");
-  const diff = await makeUnifiedDiff(sess.originPath, sess.workspacePath);
+  let diff = "";
+  try {
+    diff = await makeUnifiedDiff(sess.originPath, sess.workspacePath);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(
+      `failed to compute diff between origin and workspace (is the session stale or paths missing?)\n` +
+        `Attr: ${attrNorm}\nVersion: ${sess.version}\nOrigin: ${sess.originPath}\nWorkspace: ${sess.workspacePath}\nError: ${msg}\n` +
+        `Hint: If this persists, run 'tools/bin/patch-pkg reset cpp ${attrInput}' and start a new session.`,
+    );
+  }
   if (!diff || diff.trim() === "") {
     console.log("no changes; no-op");
     return;
   }
 
-  await fs.mkdirp("patches/cpp");
+  await fsp.mkdir("patches/cpp", { recursive: true });
   const fileKey = encodeAttrForFilename(attrNorm);
   const dst = path.join("patches", "cpp", `${fileKey}@${sess.version}.patch`);
 
   let write = true;
-  if (await fs.pathExists(dst)) {
-    const cur = await fs.readFile(dst, "utf8");
+  if (await pathExists(dst)) {
+    const cur = await fsp.readFile(dst, "utf8");
     if (cur === diff) {
       console.log("no-op (already applied)");
       write = false;
@@ -205,12 +270,15 @@ async function doApply(args: string[]) {
       throw new Error(`${dst} exists with different content. Re-run with --force to overwrite.`);
     }
   }
-  if (write) await fs.outputFile(dst, diff, "utf8");
+  if (write) {
+    await fsp.mkdir(path.dirname(dst), { recursive: true });
+    await fsp.writeFile(dst, diff, "utf8");
+  }
   console.error("[patch-cpp] apply: wrote patch", dst);
   // Verify patch applies with -p1 to pristine origin
-  const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "bucknix-patch-verify-cpp-"));
+  const tmpRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "bucknix-patch-verify-cpp-"));
   const tmpCopy = path.join(tmpRoot, path.basename(sess.originPath));
-  await fs.mkdirp(tmpCopy);
+  await fsp.mkdir(tmpCopy, { recursive: true });
   await $`rsync -a ${sess.originPath}/ ${tmpCopy}/`;
   console.error("[patch-cpp] apply: verifying patch");
   try {
@@ -227,7 +295,11 @@ async function doApply(args: string[]) {
   console.error("[patch-cpp] apply: verification ok");
 
   // End session; keep workspace for manual inspection if desired
-  await deleteSession("cpp", key);
+  // Compute the stored key lazily from the session's version
+  try {
+    const key = `${attrNorm}@${sess.version}`.toLowerCase();
+    await deleteSession("cpp", key);
+  } catch {}
   // Message: confirmation and path of patch file
   console.log(dst);
   console.log("\nC++ overlay auto-discovers patches by filename; no manual snippet required.\n");
@@ -242,7 +314,7 @@ async function doReset(args: string[]) {
   if (!sess) return; // no-op
   await deleteSession("cpp", key);
   try {
-    await fs.rm(sess.workspacePath, { recursive: true, force: true });
+    await fsp.rm(sess.workspacePath, { recursive: true, force: true });
   } catch {}
 }
 

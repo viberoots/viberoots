@@ -113,16 +113,7 @@ async function inner() {
   })();
   const importer = importerFromLockfile(relLock);
   const storeAttr = pnpmStoreAttrFromImporter(importer);
-  try {
-    console.error(
-      `[diag] update-pnpm-hash importer=`,
-      importer,
-      ` storeAttr=`,
-      storeAttr,
-      ` lock=`,
-      relLock,
-    );
-  } catch {}
+  // quiet: avoid noisy diagnostics in normal operation
 
   // If forcing, pre-write placeholder digest to bump the FOD derivation and force a rebuild
   if (force) {
@@ -132,9 +123,66 @@ async function inner() {
     await updateHashesJson(key, placeholder);
   }
 
+  // If importer lockfile is missing and generation is allowed, generate it OUTSIDE Nix first
+  const impAbsGen = path.resolve(repoRoot, importer);
+  const impLockGen = path.join(impAbsGen, "pnpm-lock.yaml");
+  if (
+    !fs.existsSync(impLockGen) &&
+    String(process.env.NIX_PNPM_ALLOW_GENERATE || "").trim() === "1"
+  ) {
+    // Generate a lockfile in the importer; keep scripts disabled and include dev deps.
+    // Ensure pnpm uses a writable local store/cache within the importer to avoid /nix/store writes.
+    await $({
+      cwd: impAbsGen,
+      stdio: "inherit",
+    })`bash --noprofile --norc -c 'set -euo pipefail; mkdir -p ./.pnpm-home ./.pnpm-store; export PNPM_HOME="$(pwd)/.pnpm-home"; nix run nixpkgs#pnpm -- config set store-dir "$(pwd)/.pnpm-store"; nix run nixpkgs#pnpm -- install --lockfile-only --prod=false --ignore-scripts'`;
+  }
+
   const first = await buildStore(storeAttr);
   if (first.ok) {
     console.log("pnpm-store:", storeAttr, "up to date");
+    // If generation is allowed and the importer lacks a lockfile, seed it from the store export
+    try {
+      if (String(process.env.NIX_PNPM_ALLOW_GENERATE || "").trim() === "1") {
+        const impAbs = path.resolve(repoRoot, importer);
+        const impLock = path.join(impAbs, "pnpm-lock.yaml");
+        if (!fs.existsSync(impLock)) {
+          const out = await $({
+            stdio: "pipe",
+          })`nix build .#${storeAttr} --no-link --accept-flake-config --print-out-paths`;
+          const outPath =
+            String(out.stdout || "")
+              .trim()
+              .split(/\r?\n/)
+              .filter(Boolean)
+              .pop() || "";
+          if (outPath) {
+            const exp = path.join(outPath, "lockfile", "pnpm-lock.yaml");
+            if (fs.existsSync(exp)) {
+              await fsp.mkdir(path.dirname(impLock), { recursive: true });
+              await fsp.copyFile(exp, impLock);
+              // Reconcile mapping with the new, seeded lockfile content
+              const post = await buildStore(storeAttr);
+              if (!post.ok) {
+                const sug = extractHash(post.output || "");
+                if (sug) {
+                  const k =
+                    importer && importer !== "." ? `${importer}/pnpm-lock.yaml` : "pnpm-lock.yaml";
+                  await updateHashesJson(k, sug);
+                  const final = await buildStore(storeAttr);
+                  if (!final.ok) {
+                    console.error(
+                      "pnpm-store still failing after lockfile seed+hash update\n\n" + final.output,
+                    );
+                    process.exit(1);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch {}
     return;
   }
   const suggested = extractHash(first.output || "");
@@ -143,9 +191,7 @@ async function inner() {
     process.exit(1);
   }
   const key = importer && importer !== "." ? `${importer}/pnpm-lock.yaml` : "pnpm-lock.yaml";
-  try {
-    console.error("[diag] update-pnpm-hash write hash for key=", key, " sha256=", suggested);
-  } catch {}
+  // quiet: avoid noisy diagnostics in normal operation
   await updateHashesJson(key, suggested);
   const second = await buildStore(storeAttr);
   if (!second.ok) {
@@ -153,6 +199,48 @@ async function inner() {
     process.exit(1);
   }
   console.log("pnpm-store:", storeAttr, "hash updated and build succeeded");
+  // After a successful update, if generation is allowed and importer lacks a lockfile, seed it
+  try {
+    if (String(process.env.NIX_PNPM_ALLOW_GENERATE || "").trim() === "1") {
+      const impAbs = path.resolve(repoRoot, importer);
+      const impLock = path.join(impAbs, "pnpm-lock.yaml");
+      if (!fs.existsSync(impLock)) {
+        const out = await $({
+          stdio: "pipe",
+        })`nix build .#${storeAttr} --no-link --accept-flake-config --print-out-paths`;
+        const outPath =
+          String(out.stdout || "")
+            .trim()
+            .split(/\r?\n/)
+            .filter(Boolean)
+            .pop() || "";
+        if (outPath) {
+          const exp = path.join(outPath, "lockfile", "pnpm-lock.yaml");
+          if (fs.existsSync(exp)) {
+            await fsp.mkdir(path.dirname(impLock), { recursive: true });
+            await fsp.copyFile(exp, impLock);
+            // Reconcile mapping with the new, seeded lockfile content
+            const post = await buildStore(storeAttr);
+            if (!post.ok) {
+              const sug = extractHash(post.output || "");
+              if (sug) {
+                const k =
+                  importer && importer !== "." ? `${importer}/pnpm-lock.yaml` : "pnpm-lock.yaml";
+                await updateHashesJson(k, sug);
+                const final = await buildStore(storeAttr);
+                if (!final.ok) {
+                  console.error(
+                    "pnpm-store still failing after lockfile seed+hash update\n\n" + final.output,
+                  );
+                  process.exit(1);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  } catch {}
 }
 
 async function main() {

@@ -121,10 +121,14 @@ export async function run(): Promise<void> {
           };
           const importers = Object.keys(doc?.importers || {});
           for (const imp of importers) {
-            const prov = providerNameForImporter(lf, imp);
-            const needle = `node_importer_deps(name="${prov}", lockfile="${lf}", importer="${imp}"`;
+            // Normalize importer the same way as syncNodeProviders: map '.' to the
+            // directory containing the lockfile. This keeps presence checks and
+            // generated provider names in sync and avoids false-missing reports.
+            const importerLabel = imp === "." ? require("node:path").dirname(lf) || "." : imp;
+            const prov = providerNameForImporter(lf, importerLabel);
+            const needle = `node_importer_deps(name="${prov}", lockfile="${lf}", importer="${importerLabel}"`;
             if (!targetsNodeText.includes(needle)) {
-              missingNodeProviders.push({ lockfile: lf, importer: imp, provider: prov });
+              missingNodeProviders.push({ lockfile: lf, importer: importerLabel, provider: prov });
             }
           }
         } catch {}

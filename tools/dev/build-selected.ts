@@ -76,8 +76,8 @@ async function ensureGraph(repoRoot: string, workDir: string) {
     const left = base.split(":")[0];
     return left.startsWith("//") ? left.slice(2) : left;
   };
-  const pkg = target ? pkgOf(target) : "";
-  const queryRoots = [pkg, "cpp"].filter(Boolean).join(",");
+  // Query broadly to ensure targets exist even when package inference is off; keep cpp for macros
+  const queryRoots = ["apps", "cpp"].join(",");
   await $({
     env: {
       ...process.env,

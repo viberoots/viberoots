@@ -8,3 +8,8 @@ nix_cxx_library(name = "nix_pkgs_zlib", attr = "pkgs.zlib")
 nix_cxx_library(name = "nix_pkgs_openssl", attr = "pkgs.openssl")
 
 
+# BEGIN AUTO_NODE
+load("//third_party/providers:defs_node.bzl", "node_importer_deps")
+
+node_importer_deps(name="lf_a70ec06f5cad_apps_example__apps_example_pnpm_lock_yaml", lockfile="apps/example/pnpm-lock.yaml", importer="apps/example", patch_paths=[])
+# END AUTO_NODE

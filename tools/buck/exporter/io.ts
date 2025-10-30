@@ -155,9 +155,17 @@ export async function cqueryNodes(scope: string, attrs: string[]): Promise<Node[
           : undefined;
 
       const labs = new Set<string>(labelsArr || []);
+      // Normalize label: drop cell prefix and any config suffix to ensure stable keys
+      const dropConfig = (s: string) => s.split(" (config//")[0];
+      const dropCell = (s: string) => {
+        if (s.startsWith("//")) return s;
+        const idx = s.indexOf("//");
+        return idx >= 0 ? "//" + s.slice(idx + 2) : s;
+      };
+      const clean = dropCell(dropConfig(label));
       const n: any = {
         ...a,
-        name: label,
+        name: clean,
         rule_type: ruleType || a["rule_type"] || "",
         deps: deps || a["deps"],
         labels: Array.from(labs),
@@ -192,6 +200,17 @@ export async function readSimulatedNodes(path: string): Promise<Node[]> {
 export async function writeIfChangedJSON(file: string, data: any) {
   const { writeIfChanged } = await import("../../lib/fs-helpers.ts");
   const txt = JSON.stringify(data, null, 2) + "\n";
+  // Avoid stomping a previously non-empty graph with an empty list due to
+  // transient query conditions. If the existing file has non-empty content
+  // and the new content is an empty array, keep the existing graph.
+  try {
+    const cur = await (await import("node:fs/promises")).readFile(file, "utf8");
+    const curTrim = cur.trim();
+    const isCurNonEmpty = curTrim !== "" && curTrim !== "[]";
+    if (Array.isArray(data) && data.length === 0 && isCurNonEmpty) {
+      return;
+    }
+  } catch {}
   await writeIfChanged(file, txt);
 }
 

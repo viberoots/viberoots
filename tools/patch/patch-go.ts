@@ -70,9 +70,18 @@ async function doStart(args: string[]) {
   const { version, originPath } = await resolveModule(importPath);
   const key = moduleKey(importPath, version);
   const existing = await getSession("go", key);
-  if (existing && (await pathExists(existing.workspacePath))) {
-    console.log(existing.workspacePath);
-    return;
+  if (existing) {
+    const workspaceOk = await pathExists(existing.workspacePath);
+    const sameOrigin = existing.originPath === originPath;
+    if (workspaceOk && sameOrigin) {
+      // Reuse only if the workspace still exists AND the origin matches the
+      // currently resolved module origin for this invocation. This avoids
+      // leaking a prior session created against a different origin into new
+      // contexts (e.g., tests with synthetic origins), which would otherwise
+      // cause spurious diffs on apply.
+      console.log(existing.workspacePath);
+      return;
+    }
   }
   const ws = await makeWorkspace(originPath, key);
   const now = new Date().toISOString();
@@ -104,7 +113,13 @@ async function doApply(args: string[]) {
   if (!sess) throw new Error(`no active session for ${key}; run: patch-pkg start go ${importPath}`);
   const diff = await makeUnifiedDiff(sess.originPath, sess.workspacePath);
   if (!diff || diff.trim() === "") {
-    console.log("no changes; no-op");
+    // Even on no-op, ensure we clear any dev overrides and end the session to avoid
+    // leaking state into subsequent builds/tests.
+    const dev = readDevOverrides();
+    delete dev[key];
+    writeDevOverrides(dev);
+    await deleteSession("go", key);
+    console.log("no changes; no-op (cleared dev overrides and ended session)");
     return;
   }
   await mkdirp("patches/go");

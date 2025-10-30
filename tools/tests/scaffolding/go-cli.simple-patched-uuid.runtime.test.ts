@@ -213,7 +213,7 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
             version = "0.1.0";
             src = ./apps/demo-cli;
             subPackages = [ "cmd/demo-cli" ];
-            vendorHash = null;
+                vendorHash = null;
           };
         }
       );

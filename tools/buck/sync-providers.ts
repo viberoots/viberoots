@@ -1,4 +1,6 @@
 #!/usr/bin/env zx-wrapper
+import * as fsp from "node:fs/promises";
+import { writeIfChanged } from "../lib/fs-helpers";
 import { syncAllProviders } from "./providers/index.ts";
 
 function flagBool(name: string): boolean {
@@ -24,6 +26,22 @@ const EMIT_INDEX = flagBool("emit-index") || flagBool("emitIndex");
 
 async function main() {
   await syncAllProviders({ outFile: OUT_FILE, strict: STRICT, lang: LANG });
+  // Guard: ensure the Go providers file exists even when there are no patches.
+  // Some callers (and tests) expect a minimal header-only TARGETS.auto to be
+  // present after a sync. If it doesn't exist yet, write the canonical header.
+  try {
+    await fsp.access(OUT_FILE);
+  } catch {
+    const header = [
+      "# GENERATED FILE — DO NOT EDIT.",
+      `# Providers derived from filenames in patches/go.`,
+      "",
+      'load("//third_party/providers:defs.bzl", "go_module_patch")',
+      "",
+      "",
+    ].join("\n");
+    await writeIfChanged(OUT_FILE, header);
+  }
   if (EMIT_INDEX) {
     const { generateProviderIndex } = await import("./gen-provider-index.ts");
     await generateProviderIndex({ outFile: "third_party/providers/provider_index.bzl" });

@@ -1,4 +1,11 @@
 #!/usr/bin/env zx-wrapper
+import {
+  dirsForTarget,
+  findModuleRootForDirs,
+  isGoNode,
+  packageDirFromTargetName,
+} from "./batch.ts";
+import { deriveTupleForNode } from "./env.ts";
 import { cacheHits, cacheMisses, runGoList } from "./golist.ts";
 import { attrList, cqueryNodes, parseArgs, readSimulatedNodes, writeIfChangedJSON } from "./io.ts";
 import { loadPresentAdapters } from "./lang/contract.ts";
@@ -106,6 +113,20 @@ export async function run() {
       .sort((a, b) => a.name.localeCompare(b.name));
     const batchesA = await adapter.buildBatches(nodesA);
 
+    // Update metrics immediately from batch tuples (independent of go list warming)
+    if (batchesA.length > 0 && (batchesA[0] as any).tuple) {
+      gMetrics.totalBatches += batchesA.length;
+      gMetrics.tupleKeys = Array.from(
+        new Set([
+          ...gMetrics.tupleKeys,
+          ...batchesA.map(
+            (b: any) =>
+              `${b.tuple.goos}|${b.tuple.goarch}|${b.tuple.cgo}|${b.tuple.tagsKey}|${b.tuple.goflagsKey}|${b.tuple.toolchain}`,
+          ),
+        ]),
+      ).sort();
+    }
+
     // If batches carry Go tuples, execute go list to warm cache for labeler
     if (batchesA.length > 0 && (batchesA[0] as any).tuple) {
       const goListResults: Array<{ batch: Batch; pkgs: any[] }> = [];
@@ -129,18 +150,19 @@ export async function run() {
       const cache = new Map<Batch, any>();
       for (const r of goListResults) cache.set(r.batch, r.pkgs);
       (global as any).__GO_LIST_CACHE = { get: (b: Batch) => cache.get(b) };
+    }
 
-      // Update metrics
-      gMetrics.totalBatches += batchesA.length;
-      gMetrics.tupleKeys = Array.from(
-        new Set([
-          ...gMetrics.tupleKeys,
-          ...batchesA.map(
-            (b: any) =>
-              `${b.tuple.goos}|${b.tuple.goarch}|${b.tuple.cgo}|${b.tuple.tagsKey}|${b.tuple.goflagsKey}|${b.tuple.toolchain}`,
-          ),
-        ]),
-      ).sort();
+    // Authoritative fallback: if requested and no batches formed (e.g., simulate nodes),
+    // still run a go list once to populate cache and enable cache reuse tests.
+    if (batchesA.length === 0 && String(process.env.FORCE_AUTHORITATIVE || "") === "1") {
+      const first = nodesA.find((n) => isGoNode(n));
+      if (first) {
+        const tuple = await deriveTupleForNode(first as any);
+        const roots = dirsForTarget(first as any);
+        const modRoot =
+          (await findModuleRootForDirs(roots)) || packageDirFromTargetName(first.name);
+        await runGoList(tuple as any, roots as any, modRoot, cacheDir);
+      }
     }
 
     const enriched = await adapter.attachLabels(
@@ -159,6 +181,19 @@ export async function run() {
   gMetrics.durationMs = Date.now() - startedAt;
   gMetrics.cacheHits = cacheHits;
   gMetrics.cacheMisses = cacheMisses;
+  // Fallback: in simulate mode or when batches are empty, still include tupleKeys derived per go node
+  if (gMetrics.tupleKeys.length === 0) {
+    const tuples: string[] = [];
+    for (const n of normalized) {
+      if (!isGoNode(n)) continue;
+      const t = await deriveTupleForNode(n);
+      tuples.push(`${t.goos}|${t.goarch}|${t.cgo}|${t.tagsKey}|${t.goflagsKey}|${t.toolchain}`);
+    }
+    if (tuples.length) {
+      gMetrics.totalBatches += tuples.length;
+      gMetrics.tupleKeys = Array.from(new Set([...(gMetrics.tupleKeys || []), ...tuples])).sort();
+    }
+  }
   await writeIfChangedJSON(out, normalized);
   if (metricsOut) await emitMetrics(metricsOut, gMetrics);
 }

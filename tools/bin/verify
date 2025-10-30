@@ -121,35 +121,11 @@ build_run_array() {
 #!/usr/bin/env bash
 set -euo pipefail
 ISO="v-$$"
-# Ensure we always teardown our buck2 daemon and terminate our process group on exit/signals
+# Ensure we always teardown only our own buck2 daemon and terminate our process group on exit/signals
 cleanup() {
   # Kill foreground/background children in our process group first (best-effort)
   kill -- -$$ >/dev/null 2>&1 || true
   "buck2" --isolation-dir "$ISO" kill >/dev/null 2>&1 || true
-  # Also clean up any test/exporter-specific daemons left behind from interrupted runs
-  if command -v /bin/ps >/dev/null 2>&1; then
-    # Retry a few times in case buck2d is still winding down
-    for _i in 1 2 3; do
-      # Collect isolations from active client commands (--isolation-dir) and from running buck2d[iso]
-      _isos_cli_str=$(/bin/ps -A -o pid=,command= 2>/dev/null \
-        | sed -n 's/.*--isolation-dir \([^ ]*\).*/\1/p' \
-        | grep -E '^(zxtest-|exporter-|devbuild-|v-|scaf-)' \
-        | sort -u || true)
-      _isos_d_str=$(/bin/ps -A -o pid=,comm= 2>/dev/null \
-        | sed -n 's/.*buck2d\[\([^]]*\)\].*/\1/p' \
-        | grep -E '^(zxtest-|exporter-|devbuild-|v-|scaf-)' \
-        | sort -u || true)
-      for iso in $_isos_cli_str $_isos_d_str; do
-        [ -n "$iso" ] || continue
-        "buck2" --isolation-dir "$iso" kill >/dev/null 2>&1 || true
-      done
-      # If no matching buck2d remain, stop retrying
-      if ! /bin/ps -A -o pid=,comm= 2>/dev/null | grep -E "buck2d\\[(zxtest-|exporter-|devbuild-|v-|scaf-).*\\]" >/dev/null 2>&1; then
-        break
-      fi
-      sleep 0.3
-    done
-  fi
 }
 trap cleanup EXIT INT TERM HUP
 
@@ -159,7 +135,7 @@ if command -v nohup >/dev/null 2>&1; then
     nohup bash --noprofile --norc -c '
       parent="'"$$"'";
       if command -v node >/dev/null 2>&1; then
-        node --experimental-top-level-await --experimental-strip-types --disable-warning=ExperimentalWarning --import '"$LIVE_ROOT"'/tools/dev/zx-init.mjs '"$LIVE_ROOT"'/tools/dev/buck-watchdog.ts --parent "$parent" --iso '"$ISO"' --patterns zxtest-,exporter-,devbuild-,v-,scaf- & disown
+        node --experimental-top-level-await --experimental-strip-types --disable-warning=ExperimentalWarning --import '"$LIVE_ROOT"'/tools/dev/zx-init.mjs '"$LIVE_ROOT"'/tools/dev/buck-watchdog.ts --parent "$parent" --iso '"$ISO"' --patterns v- & disown
       else
         # Fallback to simple loop if node unavailable
         while kill -0 "$parent" >/dev/null 2>&1; do sleep 2; done
@@ -206,6 +182,8 @@ EOS
 }
 
 export NO_NODE_MODULES_LINK=1
+# Prefer linking by default; allow caller override
+export NO_NODE_MODULES_LINK="${NO_NODE_MODULES_LINK:-0}"
 if [[ ${#ARGS[@]} -eq 0 ]]; then
   build_run_array
 else

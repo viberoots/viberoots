@@ -410,6 +410,7 @@ async function main() {
     }
     const runEnv = {
       ...process.env,
+      BUCK_NESTED_ISO: `exporter-${process.pid}`,
       ...(String(process.env.DEVBUILD_DEBUG || "").trim() === "1" ? { EXPORTER_DEBUG: "1" } : {}),
     } as any;
     await $({
@@ -666,7 +667,9 @@ async function main() {
 
   // After successful Buck build, if running in impure mode with specific targets,
   // also materialize and print impure selected Nix outputs' bin paths for convenience.
-  if (impure) {
+  // Skip this for 'test' subcommands: zx test labels are not buildable via graph-generator
+  // and attempting to materialize them causes noisy missing-target errors.
+  if (impure && subcmd !== "test") {
     const targets = restArgs.length ? restArgs : [];
     const specific = targets.filter(
       (t) => (t.includes(":") || t.startsWith("//")) && !t.includes("..."),

@@ -52,16 +52,14 @@ test("node webapp: dev server runs and serves index", { timeout: 240_000 }, asyn
         await fsp.unlink(nmPath);
       }
     } catch {}
-    // Generate lockfile with pnpm (simplifies template maintenance)
-    console.error("[diag] step: pnpm lockfile-only");
-    await _$({ cwd: appAbs, stdio: "inherit" })`nix run nixpkgs#pnpm -- install --lockfile-only`;
+    // Do not perform online pnpm install here. Rely on Nix FOD with
+    // NIX_PNPM_ALLOW_GENERATE=1 to generate or use/export a lockfile hermetically.
     // Hermetic path: use Nix node-modules derivation builder with small timeouts to surface deadlocks
     const sanitized = appDir
       .replace(/\/\//g, "")
       .replace(/:/g, "-")
       .replace(/[\/\s]+/g, "-");
     // Update pnpm store hash and realize node_modules via Nix before running vite
-    console.error("[diag] step: update pnpm hash");
     try {
       await _$({
         cwd: tmp,
@@ -75,16 +73,23 @@ test("node webapp: dev server runs and serves index", { timeout: 240_000 }, asyn
       })`zx-wrapper tools/dev/update-pnpm-hash.ts --lockfile ${path.join(appDir, "pnpm-lock.yaml")}`;
     } catch (e) {
       console.error(
-        "[diag] update-pnpm-hash failed, proceeding:",
-        e instanceof Error ? e.message : String(e),
+        "webapp dev-server: pnpm store hash update failed — run 'zx-wrapper tools/dev/update-pnpm-hash.ts --lockfile apps/demo-web/pnpm-lock.yaml' and re-run the test",
       );
+      throw e;
     }
-    console.error("[diag] step: nix build node-modules");
-    await _$({
-      cwd: tmp,
-      stdio: "inherit",
-      env: { ...process.env, NIX_PNPM_FETCH_TIMEOUT: "240", NIX_PNPM_ALLOW_GENERATE: "1" },
-    })`bash --noprofile --norc -c 'timeout 180s nix build "${tmp}#node-modules.${sanitized}" --no-substitute --no-link --accept-flake-config --print-build-logs --max-jobs 1 --option cores 1'`;
+    // build node-modules derivation
+    try {
+      await _$({
+        cwd: tmp,
+        stdio: "inherit",
+        env: { ...process.env, NIX_PNPM_FETCH_TIMEOUT: "240", NIX_PNPM_ALLOW_GENERATE: "1" },
+      })`bash --noprofile --norc -c 'timeout 180s nix build "${tmp}#node-modules.${sanitized}" --no-link --accept-flake-config --print-build-logs --max-jobs 1 --option cores 1'`;
+    } catch (e) {
+      console.error(
+        "webapp dev-server: node-modules Nix build timed out (180s) or failed — check flake logs; try increasing NIX_PNPM_FETCH_TIMEOUT or re-running with TEST_VERBOSE_LOGS=1",
+      );
+      throw e;
+    }
     const outPathRaw = await _$({
       cwd: appAbs,
       stdio: "pipe",
@@ -126,9 +131,10 @@ test("node webapp: dev server runs and serves index", { timeout: 240_000 }, asyn
         stdio: "pipe",
         env: { ...process.env, NODE_OPTIONS: "", ESBUILD_BINARY_PATH: esbuildBin },
       })`node ./node_modules/vite/bin/vite.js --version`;
-      console.error("[diag] vite version:", String(ver.stdout || "").trim());
+      // quiet
     } catch (e) {
-      console.error("[diag] vite --version failed:", e instanceof Error ? e.message : String(e));
+      // surface concise failure
+      console.error("vite --version failed:", e instanceof Error ? e.message : String(e));
       throw e;
     }
 
@@ -189,19 +195,23 @@ test("node webapp: dev server runs and serves index", { timeout: 240_000 }, asyn
       out += s;
       if (out.length > 200000) out = out.slice(-200000);
       tryExtractPort(s);
-      // Surface logs in real-time to aid debugging on CI timeouts
-      try {
-        console.log("[vite stdout]" + "\n" + s.trimEnd());
-      } catch {}
+      // Surface logs only when verbose to reduce event-loop pressure in suite runs
+      if (process.env.TEST_VERBOSE_LOGS === "1") {
+        try {
+          console.log("[vite stdout]" + "\n" + s.trimEnd());
+        } catch {}
+      }
     });
     server.stderr?.on("data", (d) => {
       const s = String(d);
       err += s;
       if (err.length > 200000) err = err.slice(-200000);
       tryExtractPort(s);
-      try {
-        console.error("[vite stderr]" + "\n" + s.trimEnd());
-      } catch {}
+      if (process.env.TEST_VERBOSE_LOGS === "1") {
+        try {
+          console.error("[vite stderr]" + "\n" + s.trimEnd());
+        } catch {}
+      }
     });
     server.on("exit", (code, signal) => {
       try {
@@ -218,7 +228,8 @@ test("node webapp: dev server runs and serves index", { timeout: 240_000 }, asyn
         });
         try {
           await Promise.race([
-            waitForServer(`http://127.0.0.1:${chosenPort}/`, 60000),
+            // Reduce per-attempt budget to keep total under the 240s test cap
+            waitForServer(`http://127.0.0.1:${chosenPort}/`, 45000),
             exitPromise,
           ]);
           ready = true;
@@ -229,7 +240,12 @@ test("node webapp: dev server runs and serves index", { timeout: 240_000 }, asyn
             server.stderr?.removeAllListeners();
             server.kill("SIGKILL");
           } catch {}
-          if (attempt === 2) throw e;
+          if (attempt === 2) {
+            console.error(
+              "webapp dev-server: Vite did not become ready within the allotted time — rerun with TEST_VERBOSE_LOGS=1 to inspect logs; ensure node-modules was realized and ESBUILD_BINARY_PATH is set",
+            );
+            throw e;
+          }
           // Acquire a new port and restart vite with strictPort
           const srv = net.createServer();
           await new Promise<void>((resolve, reject) => {
@@ -279,18 +295,22 @@ test("node webapp: dev server runs and serves index", { timeout: 240_000 }, asyn
             out += s;
             if (out.length > 200000) out = out.slice(-200000);
             tryExtractPort(s);
-            try {
-              console.log("[vite stdout]" + "\n" + s.trimEnd());
-            } catch {}
+            if (process.env.TEST_VERBOSE_LOGS === "1") {
+              try {
+                console.log("[vite stdout]" + "\n" + s.trimEnd());
+              } catch {}
+            }
           });
           server.stderr?.on("data", (d) => {
             const s = String(d);
             err += s;
             if (err.length > 200000) err = err.slice(-200000);
             tryExtractPort(s);
-            try {
-              console.error("[vite stderr]" + "\n" + s.trimEnd());
-            } catch {}
+            if (process.env.TEST_VERBOSE_LOGS === "1") {
+              try {
+                console.error("[vite stderr]" + "\n" + s.trimEnd());
+              } catch {}
+            }
           });
           server.on("exit", (code, signal) => {
             try {
@@ -312,12 +332,8 @@ test("node webapp: dev server runs and serves index", { timeout: 240_000 }, asyn
       // Minimal sanity: served HTML; template includes "Hello <name>" in index.html
       assert.ok(body.includes("<!doctype html>") || body.includes(`Hello ${name}`));
     } finally {
-      if (out) {
-        console.log("[dev stdout]\n" + out);
-      }
-      if (err) {
-        console.error("[dev stderr]\n" + err);
-      }
+      if (out && process.env.TEST_VERBOSE_LOGS === "1") console.log("[dev stdout]\n" + out);
+      if (err && process.env.TEST_VERBOSE_LOGS === "1") console.error("[dev stderr]\n" + err);
       // Graceful shutdown
       try {
         server.kill("SIGINT");

@@ -100,13 +100,7 @@ let
       '';
       buildPhase = if (prefetchedInput == null) then ''
         runHook preBuild
-        set -x
-        echo "[nix] mkPnpmStore: starting fetch for ${importerDir}"
-        echo "[nix] PATH=$PATH"
-        echo -n "[nix] which node: "; which node || true
-        echo -n "[nix] which pnpm: "; which pnpm || true
-        node -v || true
-        pnpm -v || true
+        # quiet: reduce verbose diagnostics
         export SSL_CERT_FILE=${certs}/etc/ssl/certs/ca-bundle.crt
         export NIX_SSL_CERT_FILE=${certs}/etc/ssl/certs/ca-bundle.crt
         export NODE_EXTRA_CA_CERTS=${certs}/etc/ssl/certs/ca-bundle.crt
@@ -118,14 +112,13 @@ let
         mkdir -p "$PNPM_HOME"
         # Strip packageManager to prevent corepack/pnpm self-bootstrap (relative to importer root)
         node -e 'const fs=require("fs"); const p="package.json"; if(fs.existsSync(p)){const j=JSON.parse(fs.readFileSync(p,"utf8")); delete j.packageManager; fs.writeFileSync(p, JSON.stringify(j, null, 2));}'
-        # Optionally allow generating a lockfile inside the FOD for temp/scaffolded importers
-        if [ "${builtins.getEnv "NIX_PNPM_ALLOW_GENERATE"}" = "1" ] && [ ! -f pnpm-lock.yaml ]; then
-          echo "[nix] mkPnpmStore: generating pnpm-lock.yaml (allow-generate)"
-          PNPM_HOME="$PNPM_HOME" pnpm install --lockfile-only --prod=false --ignore-scripts --lockfile-dir "." --dir "."
+        # Do NOT generate a lockfile inside this fixed-output derivation. This must be seeded
+        # outside the FOD to avoid non-deterministic outputs across runs.
+        if [ ! -f pnpm-lock.yaml ]; then
+          echo "[nix] mkPnpmStore: no lockfile present; seed a lockfile first using tools/dev/update-pnpm-hash.ts --lockfile ${relLock} (set NIX_PNPM_ALLOW_GENERATE=1 for generation)" >&2
+          exit 4
         fi
         pnpm config set store-dir "$out/store"
-        # Persist pnpm cache (metadata/tarball indexes) into the output to enable later offline resolution
-        pnpm config set cache-dir "$out/cache"
         echo "[nix] pnpm install (timeout) --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir ."
         # Allow override via env; increase default to reduce flaky partial stores in CI/temp repos
         FT="''${NIX_PNPM_FETCH_TIMEOUT:-180}"
@@ -139,9 +132,7 @@ let
         runHook postBuild
       '' else ''
         runHook preBuild
-        set -x
-        echo "[nix] mkPnpmStore: using prefetched store at ${prefetchedInput}"
-        echo "[nix] mkPnpmStore: copying prefetched store contents"
+        # quiet: reduce verbose diagnostics
         mkdir -p "$out/store"
         # Copying avoids embedding references to the prefetched store path in a FOD output
         cp -R ${prefetchedInput}/. "$out/store/"
@@ -187,8 +178,7 @@ let
       '';
       buildPhase = ''
         runHook preBuild
-        set -x
-        echo "[nix] mkNodeModules: starting install for ${importerDir}"
+        # quiet: reduce verbose diagnostics
         export SSL_CERT_FILE=${certs}/etc/ssl/certs/ca-bundle.crt
         export NIX_SSL_CERT_FILE=${certs}/etc/ssl/certs/ca-bundle.crt
         export NODE_EXTRA_CA_CERTS=${certs}/etc/ssl/certs/ca-bundle.crt
@@ -209,22 +199,19 @@ let
           cp -R "${store}/store/." "$LOCAL_STORE/" || true
         fi
         pnpm config set store-dir "$LOCAL_STORE"
-        # Restore pnpm cache for offline metadata resolution
-        LOCAL_CACHE="$HOME/Library/Caches/pnpm"
-        mkdir -p "$LOCAL_CACHE"
-        if [ -d "${store}/cache" ]; then
-          cp -R "${store}/cache/." "$LOCAL_CACHE/" || true
-        fi
-        pnpm config set cache-dir "$LOCAL_CACHE"
-        # If allowed and no lockfile exists, prefer using a lockfile exported by mkPnpmStore
-        if [ "${builtins.getEnv "NIX_PNPM_ALLOW_GENERATE"}" = "1" ] && [ ! -f pnpm-lock.yaml ]; then
+        # Do not rely on pnpm cache from the store output; resolve strictly from lockfile + store
+        # Ensure a lockfile is present: prefer using the exported lockfile from pnpm-store
+        if [ ! -f pnpm-lock.yaml ]; then
           if [ -f "${store}/lockfile/pnpm-lock.yaml" ]; then
             echo "[nix] mkNodeModules: using exported lockfile from store"
             cp "${store}/lockfile/pnpm-lock.yaml" pnpm-lock.yaml
             PNPM_HOME="$PNPM_HOME" pnpm install --offline --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
-          else
+          elif [ "${builtins.getEnv "NIX_PNPM_ALLOW_GENERATE"}" = "1" ]; then
             echo "[nix] mkNodeModules: offline install to create lockfile (allow-generate)"
             PNPM_HOME="$PNPM_HOME" pnpm install --offline --no-frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
+          else
+            echo "[nix] mkNodeModules: no lockfile present and generation not allowed; failing"
+            exit 3
           fi
         else
           # Install strictly from the fixed-output store for the specific importer (relative to importer root)

@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
+import path from "node:path";
 import { renderTargetsFile, writeIfChanged } from "../../lib/fs-helpers.ts";
 import { scanFlatPatchDir } from "../../lib/provider-sync.ts";
 import { providerNameForImporter } from "../../lib/providers.ts";
@@ -176,19 +177,21 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
   for (const lf of lockfiles) {
     const doc = await parsePnpmLock(lf);
     for (const importer of Object.keys(doc.importers || {})) {
+      // Normalize importer: map "." to the directory containing the lockfile (repo-relative)
+      const importerLabel = importer === "." ? path.dirname(lf) || "." : importer;
       const eff = effectiveSetForImporter(doc, importer);
       const usedPatches = Array.from(eff)
         .map((k) => keyToPatchPath.get(k) || "")
         .filter(Boolean)
         .sort();
-      const name = providerNameForImporter(lf, importer);
-      const key = `${lf}#${importer}`;
+      const name = providerNameForImporter(lf, importerLabel);
+      const key = `${lf}#${importerLabel}`;
       const prev = seenNames.get(name);
       if (prev && prev !== key)
         throw new Error(`Provider name collision: ${name}\n${prev} vs ${key}`);
       seenNames.set(name, key);
       entries.push(
-        `node_importer_deps(name="${name}", lockfile="${lf}", importer="${importer}", patch_paths=[${usedPatches
+        `node_importer_deps(name="${name}", lockfile="${lf}", importer="${importerLabel}", patch_paths=[${usedPatches
           .map((s) => `"${s}"`)
           .join(", ")}])`,
       );
@@ -205,6 +208,37 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
     "",
   ].join("\n");
   await writeIfChanged(OUT_FILE, renderTargetsFile(header, entries));
+
+  // Also ensure Buck sees these providers in third_party/providers/TARGETS by
+  // synchronizing an auto-managed section. This avoids unknown label errors during
+  // cquery/export when Node targets refer to lf_* providers.
+  try {
+    const targetFile = "third_party/providers/TARGETS";
+    let cur = "";
+    try {
+      cur = await fsp.readFile(targetFile, "utf8");
+    } catch {}
+    const begin = "# BEGIN AUTO_NODE";
+    const end = "# END AUTO_NODE";
+    // Ensure defs_node.bzl load present near top
+    const needLoad = 'load("//third_party/providers:defs_node.bzl", "node_importer_deps")';
+    const hasLoad = cur.includes(needLoad);
+    const autoBody = renderTargetsFile("", entries).trim();
+    const autoSection = [begin, needLoad, "", autoBody, end, ""].join("\n");
+    let next = cur;
+    if (next.includes(begin) && next.includes(end)) {
+      const pre = next.split(begin)[0].replace(/\n?$/, "\n");
+      const post = next.split(end).slice(1).join(end);
+      const postClean = post.replace(/^\n*/, "");
+      next = pre + autoSection + postClean;
+    } else {
+      // Append at end with a separating newline
+      const prefix = next.endsWith("\n") || next === "" ? next : next + "\n";
+      // If missing load, we still place it inside the auto section; keep manual top minimal
+      next = prefix + autoSection;
+    }
+    if (next !== cur) await fsp.writeFile(targetFile, next, "utf8");
+  } catch {}
 }
 
 // Minimal surface for provider index generation
@@ -284,8 +318,9 @@ export async function readNodeProviderIndexEntries(): Promise<
   for (const lf of lockfiles) {
     const doc = await parsePnpmLock(lf);
     for (const importer of Object.keys(doc.importers || {})) {
-      const name = providerNameForImporter(lf, importer);
-      out.push({ provider: name, key: `lockfile:${lf}#${importer}` });
+      const importerLabel = importer === "." ? path.dirname(lf) || "." : importer;
+      const name = providerNameForImporter(lf, importerLabel);
+      out.push({ provider: name, key: `lockfile:${lf}#${importerLabel}` });
     }
   }
   // Deterministic order
