@@ -49,7 +49,12 @@ function effectiveSetForImporter(doc: PNPMDoc, importer: string): Set<string> {
   const imp = (doc.importers as any)?.[importer] || {};
   const roots = new Set<string>();
   const addRoot = (depName: string, depRef: any) => {
-    const key = `/${depName}/${depRef}`;
+    // depRef can be a string (version) or an object like { specifier, version }
+    const ver =
+      typeof depRef === "string"
+        ? depRef
+        : (depRef && (depRef as any).version) || String(depRef || "");
+    const key = `/${depName}/${ver}`;
     if (nodes.has(key)) roots.add(key);
   };
   for (const [depName, depRef] of Object.entries(imp.dependencies || {}))
@@ -300,15 +305,12 @@ export async function readNodeProviderIndexEntries(): Promise<
       lockfiles = rec;
     } catch {}
   }
-  const haveYaml = (() => {
-    try {
-      require.resolve("yaml");
-      return true;
-    } catch {
-      return false;
-    }
-  })();
-  if (!lockfiles.length || !haveYaml) return out;
+  if (!lockfiles.length) return out;
+  try {
+    await import("yaml");
+  } catch {
+    return out;
+  }
 
   // Reuse scan to know which patches exist; only needed to mirror provider naming stability
   const scanned = await scanFlatPatchDir({ patchDir: "patches/node", decodeKey: pkgKeyFromPatch });

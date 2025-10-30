@@ -49,6 +49,11 @@ function decodeGoEnc(enc: string): string {
   return enc.replace(/__/g, "/");
 }
 
+// PNPM-like encoding for Node package names (scoped allowed): '/' -> '__'
+function decodeNodeEnc(enc: string): string {
+  return enc.replace(/__/g, "/");
+}
+
 function validateGoPatchFilename(file: string, violations: Violation[]) {
   if (!isPatchFile(file)) {
     violations.push({
@@ -162,12 +167,116 @@ async function lintGo(): Promise<number> {
   return problems;
 }
 
+function validateNodePatchFilename(file: string, violations: Violation[]) {
+  if (!isPatchFile(file)) {
+    violations.push({
+      level: STRICT ? "error" : "warn",
+      code: "nonpatch",
+      lang: "node",
+      file,
+      message: `[node] non-patch file in patches/node: ${file}`,
+    });
+    return;
+  }
+  const base = file.slice(0, -".patch".length);
+  const at = base.lastIndexOf("@");
+  if (at < 0) {
+    violations.push({
+      level: STRICT ? "error" : "warn",
+      code: "filename_shape",
+      lang: "node",
+      file,
+      message: `[node] invalid filename (missing @): ${file}`,
+    });
+    return;
+  }
+  const enc = base.slice(0, at);
+  const ver = base.slice(at + 1);
+  if (!enc || !ver) {
+    violations.push({
+      level: STRICT ? "error" : "warn",
+      code: "filename_shape",
+      lang: "node",
+      file,
+      message: `[node] invalid filename (empty name/version): ${file}`,
+    });
+    return;
+  }
+  if (enc.includes("/")) {
+    violations.push({
+      level: STRICT ? "error" : "warn",
+      code: "filename_shape",
+      lang: "node",
+      file,
+      message: `[node] package name must be encoded ('/' -> '__'): ${file}`,
+    });
+  }
+}
+
+async function lintNode(): Promise<number> {
+  const dir = path.join("patches", "node");
+  if (!(await pathExists(dir))) return 0;
+  let problems = 0;
+  const violations: Violation[] = [];
+  const byKey = new Map<string, string>(); // lowercased "name@version" -> filename
+
+  const entries = await fsp.readdir(dir, { withFileTypes: true } as any);
+  for (const e of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+    if (e.isDirectory()) {
+      violations.push({
+        level: STRICT ? "error" : "warn",
+        code: "subdir",
+        lang: "node",
+        file: path.join("patches/node", e.name),
+        message: `[node] ignoring subdirectory ${e.name}`,
+      });
+      continue;
+    }
+    validateNodePatchFilename(e.name, violations);
+    if (!isPatchFile(e.name)) continue;
+    const base = e.name.slice(0, -".patch".length);
+    const at = base.lastIndexOf("@");
+    if (at < 0) continue;
+    const enc = base.slice(0, at);
+    const ver = base.slice(at + 1);
+    if (!enc || !ver) continue;
+    const key = `${decodeNodeEnc(enc)}@${ver}`.toLowerCase();
+    const prior = byKey.get(key);
+    if (prior && prior !== e.name) {
+      violations.push({
+        level: "error",
+        code: "duplicate",
+        lang: "node",
+        moduleKey: key,
+        file: e.name,
+        message: `[node] duplicate patch for ${key}: ${prior} vs ${e.name}`,
+      });
+    } else {
+      byKey.set(key, e.name);
+    }
+  }
+
+  violations.sort(
+    (a, b) =>
+      (a.file || "").localeCompare(b.file || "") ||
+      a.code.localeCompare(b.code) ||
+      a.message.localeCompare(b.message),
+  );
+
+  if (FORMAT === "json") printJson(violations);
+  else printHuman(violations);
+
+  for (const v of violations) if (v.level === "error") problems++;
+  return problems;
+}
+
 async function main() {
   let problems = 0;
-  const langs = ["go"]; // extend later (e.g., 'node')
+  const langs = ["go", "node"];
   for (const l of langs) {
     if (LANG && LANG !== l) continue;
     if (l === "go") problems += await lintGo();
+    else if (l === "node") problems += await lintNode();
   }
   if (STRICT && problems > 0) process.exit(2);
 }
