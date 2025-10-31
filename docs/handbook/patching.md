@@ -1,5 +1,7 @@
 # Patching Handbook (Go)
 
+Note: For per-target local patching of Go and C++, see `go-cpp-local-patching.md`. That guide covers placing patches under each target’s package directory (for example, `apps/<app>/patches/go` or `libs/<lib>/patches/cpp`) and how local patch directories integrate with the build. The global `patches/go` flow below remains supported where applicable but local patching is the default developer experience for new scaffolds.
+
 All scripts are zx TypeScript using `#!/usr/bin/env zx-wrapper`.
 
 ## Workflow
