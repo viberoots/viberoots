@@ -37,10 +37,24 @@ function usage(msg?: string) {
   process.exit(2);
 }
 
-function parseArgs(): { _: string[]; importer?: string; lang?: string; force?: boolean } {
+function parseArgs(): {
+  _: string[];
+  importer?: string;
+  lang?: string;
+  force?: boolean;
+  target?: string;
+  patchDir?: string;
+} {
   const g: any = (global as any).argv;
   if (g && Array.isArray(g._)) return g;
-  const out: { _: string[]; importer?: string; lang?: string; force?: boolean } = { _: [] };
+  const out: {
+    _: string[];
+    importer?: string;
+    lang?: string;
+    force?: boolean;
+    target?: string;
+    patchDir?: string;
+  } = { _: [] };
   const argv = (process.argv || []).slice(2);
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -48,6 +62,14 @@ function parseArgs(): { _: string[]; importer?: string; lang?: string; force?: b
       out.importer = argv[++i];
     } else if (a.startsWith("--importer=")) {
       out.importer = a.split("=", 2)[1] || "";
+    } else if (a === "--target" && i + 1 < argv.length) {
+      (out as any).target = argv[++i];
+    } else if (a.startsWith("--target=")) {
+      (out as any).target = a.split("=", 2)[1] || "";
+    } else if (a === "--patch-dir" && i + 1 < argv.length) {
+      (out as any).patchDir = argv[++i];
+    } else if (a.startsWith("--patch-dir=")) {
+      (out as any).patchDir = a.split("=", 2)[1] || "";
     } else if (a === "--lang" && i + 1 < argv.length) {
       out.lang = argv[++i];
     } else if (a.startsWith("--lang=")) {
@@ -71,6 +93,12 @@ const rest: string[] = [...(positional as string[])];
 // Pass-through select flags needed by language handlers (opt-in list to reduce surprises)
 if (typeof argvAll.importer === "string" && argvAll.importer.trim() !== "") {
   rest.push("--importer", String(argvAll.importer));
+}
+if (typeof (argvAll as any).target === "string" && (argvAll as any).target.trim() !== "") {
+  rest.push("--target", String((argvAll as any).target));
+}
+if (typeof (argvAll as any).patchDir === "string" && (argvAll as any).patchDir.trim() !== "") {
+  rest.push("--patch-dir", String((argvAll as any).patchDir));
 }
 
 async function main() {

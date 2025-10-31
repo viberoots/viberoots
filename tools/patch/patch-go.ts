@@ -5,7 +5,6 @@ import path from "node:path";
 import { encodeForPatchFilename } from "../lib/providers";
 import { makeWorkspace } from "./cross-platform";
 import { makeUnifiedDiff } from "./diff";
-import { runGlue } from "./glue";
 import { resolveModule } from "./go-module-resolve";
 import { deleteSession, getSession, setSession } from "./state";
 import type { LanguageHandler, SessionRecord } from "./types";
@@ -106,7 +105,42 @@ async function doStart(args: string[]) {
 }
 
 async function doApply(args: string[]) {
-  const importPath = moduleArg(args);
+  // Parse optional flags first to support local patch-dir targeting
+  let targetPkg = "";
+  let overridePatchDir = "";
+  const rest: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === "--target" && i + 1 < args.length) {
+      const t = String(args[++i] || "").trim();
+      if (t.startsWith("//")) {
+        const noCell = t.slice(2);
+        targetPkg = noCell.split(":")[0] || "";
+      } else {
+        targetPkg = t.split(":")[0] || "";
+      }
+    } else if (a.startsWith("--target=")) {
+      const t = a.split("=", 2)[1] || "";
+      const val = t.trim();
+      if (val.startsWith("//")) {
+        const noCell = val.slice(2);
+        targetPkg = noCell.split(":")[0] || "";
+      } else {
+        targetPkg = val.split(":")[0] || "";
+      }
+    } else if (a === "--patch-dir" && i + 1 < args.length) {
+      overridePatchDir = String(args[++i] || "").trim();
+    } else if (a.startsWith("--patch-dir=")) {
+      overridePatchDir = (a.split("=", 2)[1] || "").trim();
+    } else if (a === "--force") {
+      (global as any).argv = Object.assign({}, (global as any).argv, { force: true });
+    } else if (a.startsWith("--")) {
+      // ignore unknown flags here
+    } else {
+      rest.push(a);
+    }
+  }
+  const importPath = moduleArg(rest);
   const { version, originPath } = await resolveModule(importPath);
   const key = moduleKey(importPath, version);
   const sess = await getSession("go", key);
@@ -122,10 +156,19 @@ async function doApply(args: string[]) {
     console.log("no changes; no-op (cleared dev overrides and ended session)");
     return;
   }
-  await mkdirp("patches/go");
   const enc = encodeForPatchFilename(importPath);
   const repoRoot = process.env.WORKSPACE_ROOT || process.env.LIVE_ROOT || process.cwd();
-  const patchDir = path.join(repoRoot, "patches", "go");
+  let patchDir = "";
+  if (overridePatchDir) {
+    patchDir = path.isAbsolute(overridePatchDir)
+      ? overridePatchDir
+      : path.join(repoRoot, overridePatchDir);
+  } else if (targetPkg) {
+    patchDir = path.join(repoRoot, targetPkg, "patches/go");
+  } else {
+    // Fallback for legacy flows; PR3 prefers local mode via --target
+    patchDir = path.join(repoRoot, "patches", "go");
+  }
   await mkdirp(patchDir);
   const dst = path.join(patchDir, `${enc}@${version}.patch`);
   let write = true;
@@ -165,7 +208,6 @@ async function doApply(args: string[]) {
   // Keep the temporary workspace on disk to allow downstream builds to
   // point NIX_GO_DEV_OVERRIDE_JSON at it for verification.
 
-  await runGlue();
   console.log(dst);
 }
 

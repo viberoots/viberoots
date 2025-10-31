@@ -26,12 +26,12 @@ test("patch-go apply is no-op when no changes", async () => {
     )} NIX_GO_DEV_OVERRIDE_JSON={} GOMODCACHE=${path.join(
       tmp,
       "gomodcache",
-    )} tools/bin/patch-pkg apply go golang.org/x/net`;
+    )} tools/bin/patch-pkg apply go --target //pkg/alpha:lib golang.org/x/net`;
     if (!String(out.stdout).includes("no changes; no-op")) {
       console.error("apply did not report no-op");
       process.exit(2);
     }
-    const patch = path.join(tmp, "patches/go/golang.org__x__net@v0.24.0.patch");
+    const patch = path.join(tmp, "pkg/alpha/patches/go/golang.org__x__net@v0.24.0.patch");
     if (await fs.pathExists(patch)) {
       console.error("unexpected patch file created for no-op apply");
       process.exit(2);

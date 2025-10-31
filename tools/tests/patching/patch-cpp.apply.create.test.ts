@@ -20,13 +20,13 @@ test("patch-cpp apply writes encoded patch filename and auto-discovery note", as
 
     const out = await $({ cwd: tmp })`NIX_CPP_TEST_RESOLVE_JSON=${JSON.stringify(
       map,
-    )} tools/bin/patch-pkg apply cpp zlib`;
+    )} tools/bin/patch-pkg apply cpp --target //libs/core:lib zlib`;
     const outTxtAll = String(out.stdout || out.stderr || "");
     const printed = outTxtAll
       .split(/\r?\n/)
       .map((l) => l.trim())
       .find((l) => l.endsWith(".patch") && l.startsWith("/"));
-    const patch = printed || path.join(tmp, "patches/cpp", "pkgs__zlib@1.2.13.patch");
+    const patch = printed || path.join(tmp, "libs/core/patches/cpp", "pkgs__zlib@1.2.13.patch");
     try {
       await fsp.access(patch);
     } catch {

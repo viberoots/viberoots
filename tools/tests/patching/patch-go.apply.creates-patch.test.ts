@@ -4,7 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("patch-go apply writes canonical patch and runs glue", async () => {
+test("patch-go apply writes canonical patch under target-local dir (no glue)", async () => {
   await runInTemp("patch-go-apply-create", async (tmp, $) => {
     const origin = path.join(tmp, "gomodcache", "golang.org/x/net@v0.24.0");
     await fs.mkdirp(origin);
@@ -25,23 +25,12 @@ test("patch-go apply writes canonical patch and runs glue", async () => {
     )} NIX_GO_DEV_OVERRIDE_JSON={} GOMODCACHE=${path.join(
       tmp,
       "gomodcache",
-    )} tools/bin/patch-pkg apply go golang.org/x/net`;
-    const patch = path.join(tmp, "patches/go/golang.org__x__net@v0.24.0.patch");
+    )} tools/bin/patch-pkg apply go --target //features/auth:service golang.org/x/net`;
+    const patch = path.join(tmp, "features/auth/patches/go/golang.org__x__net@v0.24.0.patch");
     if (!(await fs.pathExists(patch))) {
       console.error("expected patch file missing");
       process.exit(2);
     }
-
-    // Glue generation should run; sync-providers writes third_party/providers/TARGETS.auto
-    const prov = path.join(tmp, "third_party/providers/TARGETS.auto");
-    if (!(await fs.pathExists(prov))) {
-      console.error("expected providers TARGETS.auto missing");
-      process.exit(2);
-    }
-    const autoMap = path.join(tmp, "third_party/providers/auto_map.bzl");
-    if (!(await fs.pathExists(autoMap))) {
-      console.error("expected auto_map.bzl missing");
-      process.exit(2);
-    }
+    // No provider glue assertions for Go in local mode (providers are Node-only)
   });
 });

@@ -190,7 +190,42 @@ async function doStart(args: string[]) {
 
 async function doApply(args: string[]) {
   console.error("[patch-cpp] apply: begin");
-  const attrInput = attrArg(args);
+  // Parse optional flags to support local patch-dir targeting
+  let targetPkg = "";
+  let overridePatchDir = "";
+  const rest: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === "--target" && i + 1 < args.length) {
+      const t = String(args[++i] || "").trim();
+      if (t.startsWith("//")) {
+        const noCell = t.slice(2);
+        targetPkg = noCell.split(":")[0] || "";
+      } else {
+        targetPkg = t.split(":")[0] || "";
+      }
+    } else if (a.startsWith("--target=")) {
+      const t = a.split("=", 2)[1] || "";
+      const val = t.trim();
+      if (val.startsWith("//")) {
+        const noCell = val.slice(2);
+        targetPkg = noCell.split(":")[0] || "";
+      } else {
+        targetPkg = val.split(":")[0] || "";
+      }
+    } else if (a === "--patch-dir" && i + 1 < args.length) {
+      overridePatchDir = String(args[++i] || "").trim();
+    } else if (a.startsWith("--patch-dir=")) {
+      overridePatchDir = (a.split("=", 2)[1] || "").trim();
+    } else if (a === "--force") {
+      (global as any).argv = Object.assign({}, (global as any).argv, { force: true });
+    } else if (a.startsWith("--")) {
+      // ignore unknown flags
+    } else {
+      rest.push(a);
+    }
+  }
+  const attrInput = attrArg(rest);
   const attrNorm = normalizeAttr(attrInput);
   // Avoid redundant nixpkgs resolutions during apply: reuse an existing session.
   // Choose the most recent session for this attr whose workspace still exists; fall back to newest.
@@ -256,9 +291,20 @@ async function doApply(args: string[]) {
     return;
   }
 
-  await fsp.mkdir("patches/cpp", { recursive: true });
   const fileKey = encodeAttrForFilename(attrNorm);
-  const dst = path.join("patches", "cpp", `${fileKey}@${sess.version}.patch`);
+  const repoRoot = process.env.WORKSPACE_ROOT || process.env.LIVE_ROOT || process.cwd();
+  let patchDir = "";
+  if (overridePatchDir) {
+    patchDir = path.isAbsolute(overridePatchDir)
+      ? overridePatchDir
+      : path.join(repoRoot, overridePatchDir);
+  } else if (targetPkg) {
+    patchDir = path.join(repoRoot, targetPkg, "patches/cpp");
+  } else {
+    patchDir = path.join(repoRoot, "patches/cpp");
+  }
+  await fsp.mkdir(patchDir, { recursive: true });
+  const dst = path.join(patchDir, `${fileKey}@${sess.version}.patch`);
 
   let write = true;
   if (await pathExists(dst)) {
