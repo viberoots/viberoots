@@ -85,7 +85,7 @@ async function ensureBuckPreludeConfig(): Promise<void> {
     }
     await $({ cwd: repoRoot() })`bash --noprofile --norc -c ${`set -euo pipefail
       printf '.\n' > .buckroot
-      rm -f prelude && ln -s "${preludePath}" prelude
+      rm -rf prelude && ln -s "${preludePath}" prelude
       cat > .buckconfig <<'EOF'
 [buildfile]
 name = TARGETS

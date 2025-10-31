@@ -1,7 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import type { LanguageProviderSync } from "../../lib/lang-contracts";
 import { syncCppProviders } from "./cpp.ts";
-import { syncGoProviders } from "./go.ts";
 import { syncNodeProviders } from "./node.ts";
 
 export type SyncOptions = {
@@ -12,7 +11,6 @@ export type SyncOptions = {
 };
 
 const handlers: LanguageProviderSync[] = [
-  { lang: "go", sync: syncGoProviders },
   {
     lang: "cpp",
     sync: async (_opts) => syncCppProviders({ outFile: "third_party/providers/TARGETS.cpp.auto" }),
@@ -21,7 +19,7 @@ const handlers: LanguageProviderSync[] = [
     lang: "node",
     sync: async (opts) =>
       syncNodeProviders({
-        outFile: "third_party/providers/TARGETS.node.auto",
+        outFile: opts?.outFile || "third_party/providers/TARGETS.node.auto",
         patchDir: opts?.patchDir,
       }),
   },

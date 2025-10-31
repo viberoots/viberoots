@@ -1,6 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import { writeIfChanged } from "../lib/fs-helpers";
 import { readGraph } from "../lib/graph";
+// PR6 (go-cpp-local-patching): provider mapping is Node-only (lockfile:...) and nixpkg; Go `module:`
+// labels are kept for diagnostics and are intentionally ignored here.
 import { providersForLabels } from "../lib/labels";
 
 type Node = {

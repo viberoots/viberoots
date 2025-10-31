@@ -166,8 +166,9 @@ async function doApply(args: string[]) {
   } else if (targetPkg) {
     patchDir = path.join(repoRoot, targetPkg, "patches/go");
   } else {
-    // Fallback for legacy flows; PR3 prefers local mode via --target
-    patchDir = path.join(repoRoot, "patches", "go");
+    throw new Error(
+      "missing --target //<pkg>:name or --patch-dir for local patch placement (PR6 local mode)",
+    );
   }
   await mkdirp(patchDir);
   const dst = path.join(patchDir, `${enc}@${version}.patch`);

@@ -5,6 +5,9 @@ function fqProviderLabel(name: string): string {
   return `//third_party/providers:${name}`;
 }
 
+// Returns fully qualified provider labels for supported mapping labels.
+// Note: PR6 (go-cpp-local-patching) – `module:` labels are intentionally ignored here; they are
+// kept only for diagnostics and do not map to providers. Node `lockfile:` and C++ `nixpkg:` are supported.
 export function providersForLabels(labels: string[] | undefined): string[] {
   const out = new Set<string>();
   for (const l of labels || []) {

@@ -3,7 +3,7 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("sync-providers: empty patches generates minimal TARGETS.auto", async () => {
+test("sync-providers: empty repo still generates minimal Node providers file when requested", async () => {
   await runInTemp("sync-empty", async (tmp, $) => {
     await $`node tools/buck/sync-providers.ts --out third_party/providers/TARGETS.auto`;
     const txt = await fsp.readFile(`${tmp}/third_party/providers/TARGETS.auto`, "utf8");
@@ -11,8 +11,8 @@ test("sync-providers: empty patches generates minimal TARGETS.auto", async () =>
       console.error("missing header");
       process.exit(2);
     }
-    if (!txt.includes('load("//third_party/providers:defs.bzl", "go_module_patch")')) {
-      console.error("missing load line");
+    if (!txt.includes('load("//third_party/providers:defs_node.bzl", "node_importer_deps")')) {
+      console.error("missing node load line");
       process.exit(2);
     }
   });

@@ -71,8 +71,9 @@ test("patch-cpp applies overlay to real nixpkgs zlib and changes runtime zlibVer
     // Apply to write a canonical patch under patches/cpp
     const applyOut = await $({
       cwd: tmp,
+      stdio: "pipe",
       env: { NO_DEV_SHELL: "1", NIX_CPP_TEST_RESOLVE_JSON: resolveMap },
-    })`tools/bin/patch-pkg apply cpp zlib`;
+    })`tools/bin/patch-pkg apply cpp zlib --patch-dir patches/cpp`;
     const outTxt = String(applyOut.stdout || "");
     if (!outTxt.toLowerCase().includes("auto-discovers patches")) {
       console.error("expected auto-discovery note in apply output");

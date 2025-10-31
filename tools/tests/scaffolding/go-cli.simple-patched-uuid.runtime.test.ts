@@ -101,7 +101,7 @@ async function applyPatchPkg($: any, tmp: string, resolveOrigin: string) {
       PATH: `${path.dirname(process.execPath)}:${localBin}:${process.env.PATH || ""}`,
       NIX_GO_TEST_RESOLVE_JSON: resolveMap,
     },
-  })`tools/bin/patch-pkg apply go github.com/google/uuid --force`;
+  })`tools/bin/patch-pkg apply go github.com/google/uuid --target //apps/demo-cli:demo-cli --force`;
 }
 
 async function patchUuidWorkspaceToZero($: any, ws: string) {

@@ -24,7 +24,6 @@ test("sync-providers without lang flag includes Node providers", async () => {
 
     // All provider files should be created
     const nodeProviderPath = path.join(tmp, "third_party/providers/TARGETS.node.auto");
-    const goProviderPath = path.join(tmp, "third_party/providers/TARGETS.auto");
     const cppProviderPath = path.join(tmp, "third_party/providers/TARGETS.cpp.auto");
 
     // Node provider must exist
@@ -36,12 +35,6 @@ test("sync-providers without lang flag includes Node providers", async () => {
     const nodeContent = await fsp.readFile(nodeProviderPath, "utf8");
     if (!nodeContent.includes("node_importer_deps")) {
       console.error("Expected node_importer_deps in Node provider file");
-      process.exit(2);
-    }
-
-    // Go provider should exist (even if empty)
-    if (!(await exists(goProviderPath))) {
-      console.error("Expected TARGETS.auto (Go) to be created in all-languages sync");
       process.exit(2);
     }
 

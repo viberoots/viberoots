@@ -124,7 +124,7 @@ async function applyPatchPkg(sh: any, tmp: string, resolveOrigin: string) {
         .join(path.delimiter),
       PATH: `${path.dirname(process.execPath)}:${localBin}:${process.env.PATH || ""}`,
     },
-  })`tools/bin/patch-pkg apply go github.com/google/uuid --force`;
+  })`tools/bin/patch-pkg apply go github.com/google/uuid --target //apps/demo-cli:demo-cli --force`;
 }
 
 async function scaffoldLibrary(sh: any, tmp: string) {
@@ -303,11 +303,7 @@ async function enforceLibReplaceToWorkspace(sh: any, tmp: string, ws: string) {
   await runGomod2nix(sh, tmp, "libs/demo-lib");
 }
 
-async function regenerateProviders(sh: any) {
-  await sh`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
-  await sh`node tools/buck/sync-providers.ts`;
-  await sh`node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
-}
+// PR6: Go providers removed; auto_map is Node-only. No provider sync here.
 
 function normalizeCellLabel(s: string) {
   return s.replace(/^\/\/[^/]+\/+/, "//");
@@ -450,7 +446,7 @@ test("go cli with local lib + third-party patched uuid runtime", async () => {
     const { origin, ws } = await createUuidWorkspace($, _tmp);
     //
     await applyPatchPkg($, _tmp, origin);
-    // Remove any accidental local replace directives; rely on Nix-layer patches only
+    // Remove any accidental local replace directives; rely on Nix-layer local patches only
     // Ensure clean gomod2nix after stripping replaces
     try {
       const cliGoModPath = path.join(_tmp, "apps", "demo-cli", "go.mod");
@@ -466,39 +462,18 @@ test("go cli with local lib + third-party patched uuid runtime", async () => {
     } catch {}
     // Note: skip git-based verification in sandbox to avoid requiring git
 
-    // Ensure CLI go.mod forces uuid to our patched workspace via replace
-    // Do not set go.mod replace for uuid when using patch-pkg; rely on patches/go
-    // Re-export graph, then regenerate providers and auto_map after writing patch
-    await regenerateProviders($);
-
-    // 5) Assert provider + auto_map wiring instead of executing the binary
-    const patchFile = path.join(_tmp, "patches", "go", "github.com__google__uuid@v1.6.0.patch");
+    // 5) Assert local patch file under the target's patches/go (PR6 local mode)
+    const patchFile = path.join(
+      _tmp,
+      "apps",
+      "demo-cli",
+      "patches",
+      "go",
+      "github.com__google__uuid@v1.6.0.patch",
+    );
     if (!(await fsp.stat(patchFile).catch(() => null))) {
       throw new Error("expected uuid patch file not found");
     }
-    const providersTargets = await fsp.readFile(
-      path.join(_tmp, "third_party", "providers", "TARGETS.auto"),
-      "utf8",
-    );
-    const provName = "mod_"; // minimal check: presence of a go_module_patch entry is sufficient
-    if (!/go_module_patch\(name\s*=\s*\"mod_/.test(providersTargets)) {
-      throw new Error("expected a go_module_patch provider entry in TARGETS.auto");
-    }
-    const autoMapPath = path.join(_tmp, "third_party", "providers", "auto_map.bzl");
-    if (!(await fsp.stat(autoMapPath).catch(() => null))) {
-      throw new Error("expected auto_map.bzl to be generated");
-    }
-
-    // 6) PR6 alignment: provider-only assertion, no graph-generator build in local-replace scenario
-    await $`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
-    await $`node tools/buck/sync-providers.ts`;
-    await $`node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
-    const providersTxt = await fsp.readFile(
-      path.join(_tmp, "third_party", "providers", "TARGETS.auto"),
-      "utf8",
-    );
-    if (!/go_module_patch\(name\s*=\s*"mod_/.test(providersTxt)) {
-      throw new Error("expected a go_module_patch provider entry in TARGETS.auto");
-    }
+    // 6) Done: local patch is present; no provider wiring required for Go
   });
 });

@@ -2,21 +2,10 @@
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("contract(go): provider sync determinism + auto_map labels present", async () => {
+test("contract(go): auto_map presence (providers not required for Go)", async () => {
   await runInTemp("go-contract", async (_tmp, _$) => {
     const $ = _$({ stdio: "ignore" });
-    // Create a dummy patch and run provider sync twice to assert determinism
-    await $`bash -lc 'mkdir -p patches/go && printf "# dummy\n" > patches/go/golang.org__x__net@v0.24.0.patch'`;
-    await $`node tools/buck/sync-providers.ts`;
-    const a =
-      await $`bash -lc 'sha256sum third_party/providers/TARGETS.auto || shasum -a 256 third_party/providers/TARGETS.auto'`;
-    await $`node tools/buck/sync-providers.ts`;
-    const b =
-      await $`bash -lc 'sha256sum third_party/providers/TARGETS.auto || shasum -a 256 third_party/providers/TARGETS.auto'`;
-    if ((a.stdout || a.stderr) !== (b.stdout || b.stderr)) {
-      console.error("provider sync not deterministic");
-      process.exit(2);
-    }
+    // PR6: Go providers are not required; only ensure auto_map can be generated
 
     // Export a tiny graph and generate auto_map
     await $`node tools/buck/export-graph.ts --out tools/buck/graph.json`;

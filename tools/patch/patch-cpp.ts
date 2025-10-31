@@ -301,7 +301,9 @@ async function doApply(args: string[]) {
   } else if (targetPkg) {
     patchDir = path.join(repoRoot, targetPkg, "patches/cpp");
   } else {
-    patchDir = path.join(repoRoot, "patches/cpp");
+    throw new Error(
+      "missing --target //<pkg>:name or --patch-dir for local patch placement (PR6 local mode)",
+    );
   }
   await fsp.mkdir(patchDir, { recursive: true });
   const dst = path.join(patchDir, `${fileKey}@${sess.version}.patch`);
@@ -321,24 +323,45 @@ async function doApply(args: string[]) {
     await fsp.writeFile(dst, diff, "utf8");
   }
   console.error("[patch-cpp] apply: wrote patch", dst);
+  // Proactively print note so callers capturing stdout see it even if verification chats to tty
+  console.log("C++ overlay auto-discovers patches by filename; no manual snippet required.");
   // Verify patch applies with -p1 to pristine origin
   const tmpRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "bucknix-patch-verify-cpp-"));
   const tmpCopy = path.join(tmpRoot, path.basename(sess.originPath));
   await fsp.mkdir(tmpCopy, { recursive: true });
   await $`rsync -a ${sess.originPath}/ ${tmpCopy}/`;
   console.error("[patch-cpp] apply: verifying patch");
+  let havePatch = false;
   try {
-    await $({ cwd: tmpCopy, stdio: "inherit" })`patch -p1 --dry-run -i ${path.resolve(dst)}`;
-  } catch (e) {
-    throw new Error(
-      `Patch verification failed: the generated diff did not apply cleanly with -p1 to the origin source.\n` +
-        `Attr: ${attrNorm}\n` +
-        `Version: ${sess.version}\n` +
-        `Origin: ${sess.originPath}\n` +
-        `Patch: ${dst}`,
-    );
+    const ver = await $({ stdio: "pipe" })`patch --version`.nothrow();
+    havePatch = String(ver.stdout || ver.stderr || "").trim() !== "";
+  } catch {}
+  if (havePatch) {
+    try {
+      const res = await $({
+        cwd: tmpCopy,
+        stdio: "pipe",
+        env: { ...process.env, LC_ALL: "C" },
+      })`patch -s -p1 --dry-run -i ${path.resolve(dst)}`.nothrow();
+      if ((res.exitCode || 0) !== 0) {
+        const stderr = String(res.stderr || "").trim();
+        throw new Error(stderr || "patch dry-run failed");
+      }
+      console.error("[patch-cpp] apply: verification ok");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(
+        `Patch verification failed: the generated diff did not apply cleanly with -p1 to the origin source.\n` +
+          `Attr: ${attrNorm}\n` +
+          `Version: ${sess.version}\n` +
+          `Origin: ${sess.originPath}\n` +
+          `Patch: ${dst}\n` +
+          `patch: ${msg}`,
+      );
+    }
+  } else {
+    console.error("[patch-cpp] apply: 'patch' tool not found; skipping dry-run verification");
   }
-  console.error("[patch-cpp] apply: verification ok");
 
   // End session; keep workspace for manual inspection if desired
   // Compute the stored key lazily from the session's version
@@ -348,7 +371,6 @@ async function doApply(args: string[]) {
   } catch {}
   // Message: confirmation and path of patch file
   console.log(dst);
-  console.log("\nC++ overlay auto-discovers patches by filename; no manual snippet required.\n");
 }
 
 async function doReset(args: string[]) {

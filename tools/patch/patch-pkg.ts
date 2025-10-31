@@ -94,11 +94,19 @@ const rest: string[] = [...(positional as string[])];
 if (typeof argvAll.importer === "string" && argvAll.importer.trim() !== "") {
   rest.push("--importer", String(argvAll.importer));
 }
-if (typeof (argvAll as any).target === "string" && (argvAll as any).target.trim() !== "") {
+if (
+  typeof (argvAll as any).target === "string" &&
+  ((argvAll as any).target as string).trim() !== ""
+) {
   rest.push("--target", String((argvAll as any).target));
 }
-if (typeof (argvAll as any).patchDir === "string" && (argvAll as any).patchDir.trim() !== "") {
-  rest.push("--patch-dir", String((argvAll as any).patchDir));
+// Support both camelCase and dashed variants from zx/minimist
+const patchDirVal = (argvAll as any).patchDir || (argvAll as any)["patch-dir"] || "";
+if (typeof patchDirVal === "string" && patchDirVal.trim() !== "") {
+  rest.push("--patch-dir", String(patchDirVal));
+}
+if ((argvAll as any).force === true) {
+  rest.push("--force");
 }
 
 async function main() {

@@ -46,15 +46,28 @@ try {
     } catch {}
   }
 } catch {}
-if (!outPath) {
+async function tryBuild(): Promise<string> {
   const built =
-    await $`nix build ${flakeRoot}#${fullAttr} --no-link --accept-flake-config --print-out-paths`;
-  outPath =
-    String(built.stdout || "")
-      .trim()
-      .split("\n")
-      .filter(Boolean)
-      .pop() || "";
+    await $`nix build ${flakeRoot}#${fullAttr} --no-link --accept-flake-config --print-out-paths`.nothrow();
+  const txt = String(built.stdout || "").trim();
+  if (built.exitCode === 0 && txt) {
+    return txt.split("\n").filter(Boolean).pop() || "";
+  }
+  return "";
+}
+
+if (!outPath) {
+  outPath = await tryBuild();
+}
+
+if (!outPath) {
+  // Attempt to reconcile pnpm-store FOD hash for the importer, then retry build once
+  try {
+    const relLock = info!.lockRel;
+    const updater = path.join(flakeRoot, "tools/dev/update-pnpm-hash.ts");
+    await $`zx-wrapper ${updater} --lockfile ${relLock}`.nothrow();
+  } catch {}
+  outPath = await tryBuild();
 }
 if (!outPath) {
   console.error("node-modules-build: nix build produced no output path");

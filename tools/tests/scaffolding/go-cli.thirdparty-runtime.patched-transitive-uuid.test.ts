@@ -111,7 +111,7 @@ async function applyPatchPkg(sh: any, tmp: string, resolveOrigin: string) {
         .join(path.delimiter),
       PATH: `${path.dirname(process.execPath)}:${localBin}:${process.env.PATH || ""}`,
     },
-  })`tools/bin/patch-pkg apply go github.com/google/uuid --force`;
+  })`tools/bin/patch-pkg apply go github.com/google/uuid --target //apps/demo-cli:demo-cli --force`;
 }
 
 async function scaffoldHelperLib(sh: any, tmp: string) {
@@ -343,11 +343,7 @@ async function generateGomod2nixForAll(sh: any, tmp: string) {
   await fsp.writeFile(rootToml, rootTxt + "\n", "utf8");
 }
 
-async function regenerateProviders(sh: any) {
-  await sh`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
-  await sh`node tools/buck/sync-providers.ts`;
-  await sh`node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
-}
+// PR6: Go providers removed; auto_map remains Node-only. No provider sync step here.
 
 function normalizeCellLabel(s: string) {
   return s.replace(/^\/\/[^/]+\/+/, "//");
@@ -484,26 +480,18 @@ test("go cli with transitive third-party patched uuid runtime", async () => {
     const { origin, ws } = await startPatchPkgSession($, _tmp);
     await patchUuidWorkspace(ws);
     await applyPatchPkg($, _tmp, origin);
-    await regenerateProviders($);
-
-    // Validate patch provider presence
-    const patchFile = path.join(_tmp, "patches", "go", "github.com__google__uuid@v1.6.0.patch");
+    // Validate local patch presence under CLI target
+    const patchFile = path.join(
+      _tmp,
+      "apps",
+      "demo-cli",
+      "patches",
+      "go",
+      "github.com__google__uuid@v1.6.0.patch",
+    );
     if (!(await fsp.stat(patchFile).catch(() => null))) {
       throw new Error("expected uuid patch file not found");
     }
-
-    // PR6 alignment: validate provider wiring and manifest only for complex transitive case
-    // Provider-only assertion (skip graph-generator build)
-    await $`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
-    await $`node tools/buck/sync-providers.ts`;
-    await $`node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
-    const providersTargetsPath = path.join(_tmp, "third_party", "providers", "TARGETS.auto");
-    const autoMapPath = path.join(_tmp, "third_party", "providers", "auto_map.bzl");
-    if (!(await fsp.stat(providersTargetsPath).catch(() => null))) {
-      throw new Error("expected providers/TARGETS.auto to be generated");
-    }
-    if (!(await fsp.stat(autoMapPath).catch(() => null))) {
-      throw new Error("expected providers/auto_map.bzl to be generated");
-    }
+    // Done: local patch present is sufficient for PR6
   });
 });

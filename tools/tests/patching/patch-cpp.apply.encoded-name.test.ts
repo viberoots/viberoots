@@ -20,7 +20,7 @@ test("patch-cpp apply uses double-underscore encoding for attr path", async () =
 
     const out = await $({ cwd: tmp })`NIX_CPP_TEST_RESOLVE_JSON=${JSON.stringify(
       map,
-    )} tools/bin/patch-pkg apply cpp openssl`;
+    )} tools/bin/patch-pkg apply cpp openssl --patch-dir patches/cpp`;
 
     const patch = path.join(tmp, "patches/cpp", "pkgs__openssl@3.3.1.patch");
     if (!(await fs.pathExists(patch))) {

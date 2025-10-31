@@ -166,22 +166,21 @@ test("go cli with local lib + third-party patched uuid runtime (prefetched real 
           .join(path.delimiter),
         PATH: `${path.dirname(process.execPath)}:${process.env.PATH || ""}`,
       },
-    })`tools/bin/patch-pkg apply go github.com/google/uuid --force`;
+    })`tools/bin/patch-pkg apply go github.com/google/uuid --target //apps/demo-cli:demo-cli --force`;
 
-    await regenerateProviders($);
-
-    const patchFile = path.join(_tmp, "patches", "go", "github.com__google__uuid@v1.6.0.patch");
+    const patchFile = path.join(
+      _tmp,
+      "apps",
+      "demo-cli",
+      "patches",
+      "go",
+      "github.com__google__uuid@v1.6.0.patch",
+    );
     const ok = await fsp
       .stat(patchFile)
       .then(() => true)
       .catch(() => false);
     if (!ok) throw new Error("expected uuid patch file not found");
-    const providersTargets = await fsp.readFile(
-      path.join(_tmp, "third_party", "providers", "TARGETS.auto"),
-      "utf8",
-    );
-    if (!/go_module_patch\(name\s*=\s*"mod_/.test(providersTargets)) {
-      throw new Error("expected a go_module_patch provider entry in TARGETS.auto");
-    }
+    // No provider assertions (PR6)
   });
 });
