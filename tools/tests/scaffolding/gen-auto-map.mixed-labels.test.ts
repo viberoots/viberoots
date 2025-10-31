@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import { test } from "node:test";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { runInTemp } from "../lib/test-helpers";
+import { test } from "node:test";
 import { providerNameForImporter } from "../../lib/providers";
+import { runInTemp } from "../lib/test-helpers";
 
 test("gen-auto-map: mixed module+lockfile labels map only lockfile provider (Node-only)", async () => {
   await runInTemp("auto-map-mixed", async (tmp, $) => {

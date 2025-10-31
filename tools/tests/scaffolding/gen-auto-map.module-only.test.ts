@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
-import { test } from "node:test";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
 test("gen-auto-map: Go module labels do not map to providers (Node-only)", async () => {

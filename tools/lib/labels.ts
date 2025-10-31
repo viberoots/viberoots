@@ -1,10 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import {
-  normalizeNixAttr,
-  providerNameForImporter,
-  providerNameForModuleKey,
-  providerNameForNixAttr,
-} from "./providers";
+import { normalizeNixAttr, providerNameForImporter, providerNameForNixAttr } from "./providers";
 
 function fqProviderLabel(name: string): string {
   return `//third_party/providers:${name}`;
