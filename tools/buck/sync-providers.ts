@@ -26,17 +26,17 @@ const EMIT_INDEX = flagBool("emit-index") || flagBool("emitIndex");
 
 async function main() {
   await syncAllProviders({ outFile: OUT_FILE, strict: STRICT, lang: LANG });
-  // Guard: ensure the Go providers file exists even when there are no patches.
-  // Some callers (and tests) expect a minimal header-only TARGETS.auto to be
+  // Guard: ensure the Node providers file exists even when there are no lockfiles/patches.
+  // Some callers (and tests) expect a minimal header-only TARGETS.node.auto to be
   // present after a sync. If it doesn't exist yet, write the canonical header.
   try {
     await fsp.access(OUT_FILE);
   } catch {
     const header = [
       "# GENERATED FILE — DO NOT EDIT.",
-      `# Providers derived from filenames in patches/go.`,
+      `# Node importer-scoped providers derived from pnpm-lock.yaml`,
       "",
-      'load("//third_party/providers:defs.bzl", "go_module_patch")',
+      'load("//third_party/providers:defs_node.bzl", "node_importer_deps")',
       "",
       "",
     ].join("\n");

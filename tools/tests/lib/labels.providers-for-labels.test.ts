@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import { providersForLabels } from "../../lib/labels";
 
-test("providersForLabels parses module/lockfile/nixpkg labels", async () => {
+test("providersForLabels parses lockfile/nixpkg labels (module labels ignored)", async () => {
   const labels = [
     "module:github.com/sirupsen/logrus@v1.9.0",
     "module:GOLANG.ORG/X/NET@V0.24.0", // case-insensitive handling
@@ -20,10 +20,6 @@ test("providersForLabels parses module/lockfile/nixpkg labels", async () => {
   }
   // spot-check a few expected patterns (hashes are content-derived; only check prefixes)
   const has = (substr: string) => out.some((p) => p.includes(substr));
-  if (!has(":mod_")) {
-    console.error("expected at least one mod_ provider", out);
-    process.exit(2);
-  }
   if (!has(":lf_")) {
     console.error("expected a lockfile provider", out);
     process.exit(2);

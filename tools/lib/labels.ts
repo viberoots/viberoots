@@ -13,14 +13,7 @@ function fqProviderLabel(name: string): string {
 export function providersForLabels(labels: string[] | undefined): string[] {
   const out = new Set<string>();
   for (const l of labels || []) {
-    if (l.startsWith("module:")) {
-      const key = l.slice("module:".length).toLowerCase();
-      const at = key.lastIndexOf("@");
-      if (at <= 0) continue;
-      const imp = key.slice(0, at);
-      const ver = key.slice(at + 1);
-      out.add(fqProviderLabel(providerNameForModuleKey(imp, ver)));
-    } else if (l.startsWith("lockfile:")) {
+    if (l.startsWith("lockfile:")) {
       const rest = l.slice("lockfile:".length);
       const [path, importer = ""] = rest.split("#");
       if (!path || !importer) continue;

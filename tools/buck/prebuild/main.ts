@@ -4,7 +4,7 @@ import { printSkip } from "../../lib/errors";
 import { providerNameForImporter } from "../../lib/providers.ts";
 import { autoFixGlue } from "./repair.ts";
 import { collectDiagnostics, logList, mtimeSafe } from "./report.ts";
-import { hasPatchesOrLocks, listInputs, listOutputs, missingProviderAutos } from "./scan.ts";
+import { listInputs, listOutputs } from "./scan.ts";
 
 type Mode = "ci" | "local";
 const mode: Mode = process.env.CI === "true" ? "ci" : "local";
@@ -33,9 +33,21 @@ export async function run(): Promise<void> {
   for (const o of outputs) {
     if (!fs.existsSync(o)) outPresence.push(o);
   }
-  if (hasPatchesOrLocks(inputs) && missingProviderAutos()) {
-    outPresence.push("third_party/providers/TARGETS*.auto");
-  }
+  // Node-specific presence: if any pnpm-lock.yaml exists, require TARGETS.node.auto
+  try {
+    let lockfiles: string[] = [];
+    try {
+      const { stdout } = await $`git ls-files '**/pnpm-lock.yaml'`;
+      lockfiles = String(stdout || "")
+        .split(/\r?\n/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+    } catch {}
+    if (lockfiles.length > 0) {
+      const nodeAuto = "third_party/providers/TARGETS.node.auto";
+      if (!fs.existsSync(nodeAuto)) outPresence.push(nodeAuto);
+    }
+  } catch {}
   // PR 10: If any provider autos exist, require nix_attr_map.bzl to be present
   try {
     const provDir = "third_party/providers";

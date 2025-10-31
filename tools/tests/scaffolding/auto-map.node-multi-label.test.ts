@@ -4,7 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("auto-map handles targets with multiple label types (module + lockfile)", async () => {
+test("auto-map maps only lockfile providers when both module + lockfile labels present", async () => {
   await runInTemp("auto-map-multi", async (tmp, $) => {
     // Initialize git so git ls-files works
     await $`git init`;
@@ -54,7 +54,7 @@ test("auto-map handles targets with multiple label types (module + lockfile)", a
       process.exit(2);
     }
 
-    // Should have both module provider and lockfile provider
+    // Should have only lockfile provider (no module provider)
     // Extract the providers for this target
     const targetMatch = autoMapContent.match(/"\/\/apps\/hybrid:service":\s*\[([\s\S]*?)\]/);
     if (!targetMatch) {
@@ -64,9 +64,9 @@ test("auto-map handles targets with multiple label types (module + lockfile)", a
 
     const providersList = targetMatch[1];
 
-    // Should include Go module provider
-    if (!providersList.includes("mod_")) {
-      console.error("Expected Go module provider (mod_) in list");
+    // Should NOT include Go module provider
+    if (providersList.includes("mod_")) {
+      console.error("Did not expect Go module provider (mod_) in list");
       process.exit(2);
     }
 
