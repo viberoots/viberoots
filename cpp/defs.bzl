@@ -14,29 +14,40 @@ def _providers_for(name):
 
 
 def nix_cpp_library(name, **kwargs):
+    local_patch_dirs = kwargs.pop("local_patch_dirs", ["patches/cpp"])  # per-target local patch directories
     # Build via Nix, not Buck's C++ toolchain
     deps = kwargs.pop("deps", [])
     stamp_labels(kwargs, "cpp", "lib")
+    # Include local patch files in rule inputs so Buck invalidates on patch changes
+    srcs = []
+    for d in local_patch_dirs:
+        srcs = srcs + native.glob(["%s/*.patch" % d])
     cpp_nix_build(
         name = name,
         out = sanitize_to_bin_name("//%s:%s" % (native.package_name(), name)) + ".a",
         kind = "lib",
         self_label = "//%s:%s" % (native.package_name(), name),
         deps = deps + _providers_for(name),
+        srcs = srcs,
         labels = kwargs.get("labels", []),
     )
 
 
 def nix_cpp_binary(name, **kwargs):
+    local_patch_dirs = kwargs.pop("local_patch_dirs", ["patches/cpp"])  # per-target local patch directories
     # Build via Nix, not Buck's C++ toolchain
     deps = kwargs.pop("deps", [])
     stamp_labels(kwargs, "cpp", "bin")
+    srcs = []
+    for d in local_patch_dirs:
+        srcs = srcs + native.glob(["%s/*.patch" % d])
     cpp_nix_build(
         name = name,
         out = sanitize_to_bin_name("//%s:%s" % (native.package_name(), name)),
         kind = "bin",
         self_label = "//%s:%s" % (native.package_name(), name),
         deps = deps + _providers_for(name),
+        srcs = srcs,
         labels = kwargs.get("labels", []),
     )
 

@@ -61,14 +61,18 @@ in {
     devOverridesMap ? {},
     subdir ? ".",
     srcRoot ? ../../..,
-    patchDir ? ../../patches/go,
+    patchDirs ? [],
     nixCgoPkgs ? [],
     nixCgoAttrs ? [],
     pkgConfigNames ? {},
     repoCgoPkgs ? [],
   }:
     let
-      patchesMap = H.patchesMapFromDir patchDir;
+      # Merge patches from multiple directories; preserve keys and lists
+      patchesMap = let
+        scan = dir: H.patchesMapFromDir dir;
+        merge = a: b: pkgs.lib.foldlAttrs (acc: k: v: acc // { "${k}" = (acc.${k} or []) ++ v; }) a b;
+      in pkgs.lib.foldl' merge {} (map scan patchDirs);
       dev = Dev.readJsonOverride { envName = devOverrideEnv; ciForbidden = true; };
       _warn = dev.warnEffect; _guard = dev.ciGuard;
       devOverrides = (devOverridesMap // dev.map);
@@ -124,14 +128,17 @@ in {
     devOverrideEnv ? "NIX_GO_DEV_OVERRIDE_JSON",
     subdir ? ".",
     srcRoot ? ../../..,
-    patchDir ? ../../patches/go,
+    patchDirs ? [],
     nixCgoPkgs ? [],
     nixCgoAttrs ? [],
     pkgConfigNames ? {},
     repoCgoPkgs ? [],
   }:
     let
-      patchesMap = H.patchesMapFromDir patchDir;
+      patchesMap = let
+        scan = dir: H.patchesMapFromDir dir;
+        merge = a: b: pkgs.lib.foldlAttrs (acc: k: v: acc // { "${k}" = (acc.${k} or []) ++ v; }) a b;
+      in pkgs.lib.foldl' merge {} (map scan patchDirs);
       dev = Dev.readJsonOverride { envName = devOverrideEnv; ciForbidden = true; };
       _warn = dev.warnEffect; _guard = dev.ciGuard;
       srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + subdir));

@@ -73,6 +73,7 @@ def _srcs_imply_cgo(kwargs):
 
 
 def nix_go_library(name, **kwargs):
+    local_patch_dirs = kwargs.pop("local_patch_dirs", ["patches/go"])  # per-target local patch directories
     nix_cgo_deps = kwargs.pop("nix_cgo_deps", [])
     repo_cgo_deps = kwargs.pop("repo_cgo_deps", [])
     nix_cgo_pkgconfig = kwargs.pop("nix_cgo_pkgconfig", {})
@@ -97,6 +98,12 @@ def nix_go_library(name, **kwargs):
     if _srcs_imply_cgo(kwargs) or len(nix_cgo_deps) > 0 or len(repo_cgo_deps) > 0:
         # Prefer override so the target is hermetic regardless of inherited platform
         kwargs["override_cgo_enabled"] = True
+    # Include local patch files in srcs so Buck invalidates precisely on patch changes
+    srcs = kwargs.get("srcs", []) or []
+    for d in local_patch_dirs:
+        srcs = srcs + native.glob(["%s/*.patch" % d])
+    if len(srcs) > 0:
+        kwargs["srcs"] = srcs
     go_library(name = name, deps = merged, **kwargs)
 
     # Auto-wire a go_test target if *_test.go files exist alongside the library.
@@ -114,6 +121,7 @@ def nix_go_library(name, **kwargs):
 
 
 def nix_go_binary(name, **kwargs):
+    local_patch_dirs = kwargs.pop("local_patch_dirs", ["patches/go"])  # per-target local patch directories
     nix_cgo_deps = kwargs.pop("nix_cgo_deps", [])
     repo_cgo_deps = kwargs.pop("repo_cgo_deps", [])
     nix_cgo_pkgconfig = kwargs.pop("nix_cgo_pkgconfig", {})
@@ -143,6 +151,12 @@ def nix_go_binary(name, **kwargs):
     # Transparent CGO: auto-enable when C-family sources or cgo deps are present
     if _srcs_imply_cgo(kwargs) or len(nix_cgo_deps) > 0 or len(repo_cgo_deps) > 0:
         kwargs["override_cgo_enabled"] = True
+    # Include local patch files in srcs so Buck invalidates precisely on patch changes
+    srcs = kwargs.get("srcs", []) or []
+    for d in local_patch_dirs:
+        srcs = srcs + native.glob(["%s/*.patch" % d])
+    if len(srcs) > 0:
+        kwargs["srcs"] = srcs
     go_binary(name = name, deps = merged, **kwargs)
 
     # Auto-wire a go_test target for binaries if *_test.go exists under cmd/<name>/**

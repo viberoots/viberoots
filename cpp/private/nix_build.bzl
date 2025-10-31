@@ -20,7 +20,12 @@ def _cpp_nix_build_impl(ctx):
     )
     out = ctx.actions.declare_output(ctx.attrs.out)
     # For bash -c, $0 is set to the first argument after the script string
-    cmd = cmd_args(["bash", "-c", run_and_copy, out.as_output()])
+    cmd = cmd_args([
+        "bash",
+        "-c",
+        run_and_copy,
+        out.as_output(),
+    ], hidden = ctx.attrs.srcs)  # ensure local patch files are inputs
     ctx.actions.run(cmd, category = "cpp_nix_build")
     return [DefaultInfo(default_output = out)]
 
@@ -32,6 +37,7 @@ cpp_nix_build = rule(
         "kind": attrs.string(),  # "bin" | "lib"
         "out": attrs.string(),
         "deps": attrs.list(attrs.dep(), default = []),  # graph edge for provider discovery
+        "srcs": attrs.list(attrs.source(), default = []),  # include local patch files as inputs
         "labels": attrs.list(attrs.string(), default = []),
     },
 )

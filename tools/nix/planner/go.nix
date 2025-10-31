@@ -71,12 +71,27 @@ in {
         attrs = map attrFrom labels;
         uniq = xs: builtins.attrNames (builtins.listToAttrs (map (a: { name = a; value = true; }) xs));
       in builtins.sort (a: b: a < b) (uniq attrs);
+      # Compute local patch directories from srcs entries ending with .patch
+      srcs = L.srcsOf name;
+      patchDirsLocalRel = builtins.sort (a: b: a < b) (
+        builtins.attrNames (builtins.listToAttrs (
+          map (p:
+            let parts = lib.splitString "/" p;
+                dir = if (builtins.length parts) > 1 then lib.concatStringsSep "/" (lib.init parts) else ".";
+            in { name = dir; value = true; }
+          ) (builtins.filter (s: lib.hasSuffix ".patch" s) srcs)
+        ))
+      );
+      patchDirsAbs = map (d: builtins.toPath (repoRoot + "/" + (pkgPathOf name) + "/" + d)) patchDirsLocalRel;
+      globalPatchDir = builtins.toPath (repoRoot + "/patches/go");
+      patchDirsAll = patchDirsAbs ++ (if builtins.pathExists globalPatchDir then [ globalPatchDir ] else []);
     in T.goApp {
       inherit name;
       modulesToml = modulesTomlFor name;
       devOverridesMap = localModuleOverrides;
       srcRoot = repoRoot;
       subdir = (pkgPathOf name);
+      patchDirs = patchDirsAll;
       nixCgoAttrs = nixCgoAttrs;
       nixCgoPkgs  = repoCgoPkgs;
     };
@@ -119,6 +134,21 @@ in {
       modulesToml = modulesTomlFor name;
       srcRoot = repoRoot;
       subdir = (pkgPathOf name);
+      patchDirs = (
+        let srcs = L.srcsOf name;
+            patchDirsLocalRel = builtins.sort (a: b: a < b) (
+              builtins.attrNames (builtins.listToAttrs (
+                map (p:
+                  let parts = lib.splitString "/" p;
+                      dir = if (builtins.length parts) > 1 then lib.concatStringsSep "/" (lib.init parts) else ".";
+                  in { name = dir; value = true; }
+                ) (builtins.filter (s: lib.hasSuffix ".patch" s) srcs)
+              ))
+            );
+            patchDirsAbs = map (d: builtins.toPath (repoRoot + "/" + (pkgPathOf name) + "/" + d)) patchDirsLocalRel;
+            globalPatchDir = builtins.toPath (repoRoot + "/patches/go");
+        in patchDirsAbs ++ (if builtins.pathExists globalPatchDir then [ globalPatchDir ] else [])
+      );
       nixCgoAttrs = nixCgoAttrs;
       nixCgoPkgs  = repoCgoPkgs;
     };

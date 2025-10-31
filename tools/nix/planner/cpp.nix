@@ -113,6 +113,10 @@ let
       nixCxxAttrs = collectNixAttrsFor name;
       nixCxxPkgs = repoGoCArchivesFor name;
       srcList = normSrcsOf name;
+      patches = (
+        let rels = builtins.filter (s: lib.hasSuffix ".patch" s) (normSrcsOf name);
+        in map (p: builtins.toPath (ctx.repoRoot + "/" + (pkgPathOf name) + "/" + p)) rels
+      );
     };
 
   mkLib = name:
@@ -122,6 +126,10 @@ let
       subdir = pkgPathOf name;
       nixCxxAttrs = collectNixAttrsFor name;
       srcList = normSrcsOf name;
+      patches = (
+        let rels = builtins.filter (s: lib.hasSuffix ".patch" s) (normSrcsOf name);
+        in map (p: builtins.toPath (ctx.repoRoot + "/" + (pkgPathOf name) + "/" + p)) rels
+      );
     };
   
   mkTest = name:
@@ -139,6 +147,10 @@ let
         in if all == [] then providerAttrsFallback else all;
       nixCxxPkgs = repoGoCArchivesFor name;
       srcList = normSrcsOf name;
+      patches = (
+        let rels = builtins.filter (s: lib.hasSuffix ".patch" s) (normSrcsOf name);
+        in map (p: builtins.toPath (ctx.repoRoot + "/" + (pkgPathOf name) + "/" + p)) rels
+      );
     };
 in {
   isTarget = n: (isCxx n) || (hasLangCpp n);

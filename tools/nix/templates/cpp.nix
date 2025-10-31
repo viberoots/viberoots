@@ -90,6 +90,7 @@ in rec {
     nixCxxPkgs ? [],
     nixCxxAttrs ? [],
     srcList ? [],
+    patches ? [],
   }:
   let
     pname = "cppapp-${H.sanitizeName name}";
@@ -114,6 +115,7 @@ in rec {
     inherit pname;
     version = "0.1.0";
     src = srcAbs;
+    inherit patches;
     nativeBuildInputs = [ pkgs.llvmPackages.clang pkgs.llvmPackages.llvm ];
     dontStrip = true;
     dontConfigure = true;
@@ -189,6 +191,7 @@ in rec {
     std ? "c++17",
     nixCxxPkgs ? [],
     nixCxxAttrs ? [],
+    patches ? [],
   }:
   let
     pname = "cpplib-${H.sanitizeName name}";
@@ -203,6 +206,7 @@ in rec {
     inherit pname;
     version = "0.1.0";
     src = srcAbs;
+    inherit patches;
     nativeBuildInputs = [ pkgs.llvmPackages.clang pkgs.llvmPackages.llvm ];
     dontStrip = true;
     dontConfigure = true;
@@ -261,6 +265,7 @@ in rec {
     nixCxxPkgs ? [],
     nixCxxAttrs ? [],
     srcList ? [],
+    patches ? [],
   }:
   let
     pname = "cpptest-${H.sanitizeName name}";
@@ -290,6 +295,7 @@ in rec {
     inherit pname;
     version = "0.1.0";
     src = srcAbs;
+    inherit patches;
     nativeBuildInputs = [ pkgs.llvmPackages.clang pkgs.llvmPackages.llvm ];
     dontStrip = true;
     dontConfigure = true;
