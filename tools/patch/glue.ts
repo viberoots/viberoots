@@ -44,8 +44,11 @@ export async function runGlue(): Promise<void> {
   const repoRoot = process.cwd();
   const zxInit = path.join(repoRoot, "tools/dev/zx-init.mjs");
   const syncScript = path.join(repoRoot, "tools/buck/sync-providers.ts");
+  const providerIndexScript = path.join(repoRoot, "tools/buck/gen-provider-index.ts");
   const autoMapScript = path.join(repoRoot, "tools/buck/gen-auto-map.ts");
   await runNode(nodeBin, zxInit, syncScript);
+  // Emit provider index for diagnostics and mapping visibility before auto_map
+  await runNode(nodeBin, zxInit, providerIndexScript);
   await runNode(nodeBin, zxInit, autoMapScript, [
     "--graph",
     "tools/buck/graph.json",

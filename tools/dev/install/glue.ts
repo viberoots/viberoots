@@ -190,6 +190,19 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
         : "missing-language",
     },
     {
+      label: "gen-provider-index",
+      cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/gen-provider-index.ts")}`,
+      withZx: true,
+      when: (() => {
+        for (const id of enabledLangs) {
+          const c = caps.get(id) || {};
+          if (c.patching || c.lockfileLabels) return true;
+        }
+        return enabledLangs.size === 0; // default to run if no explicit enabled set
+      })(),
+      skipReason: "not-applicable",
+    },
+    {
       label: "gen-auto-map",
       cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/gen-auto-map.ts")} --graph ${path.join(repoRoot(), "tools/buck/graph.json")} --out ${path.join(repoRoot(), "third_party/providers/auto_map.bzl")}`,
       withZx: true,
