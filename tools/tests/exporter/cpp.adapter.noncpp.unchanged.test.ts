@@ -2,6 +2,7 @@
 import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
+import { readGraph } from "../../lib/graph";
 import { runInTemp } from "../lib/test-helpers";
 
 await runInTemp("exp-cpp-noncpp-unchanged", async (tmp, $) => {
@@ -11,6 +12,6 @@ await runInTemp("exp-cpp-noncpp-unchanged", async (tmp, $) => {
 
   await $({ cwd: tmp })`tools/buck/export-graph.ts --simulate ${out} --out ${out}`;
 
-  const after = JSON.parse(await fs.readFile(out, "utf8")) as any[];
+  const after = (await readGraph(out)) as any[];
   assert.deepEqual(after[0].labels, ["lang:node"]);
 });

@@ -2,6 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
+import { readGraph } from "../../lib/graph";
 import { runInTemp } from "../lib/test-helpers";
 
 test("per-target gotags affect tuple and labels only for tagged target", async () => {
@@ -49,7 +50,7 @@ test("per-target gotags affect tuple and labels only for tagged target", async (
     }
 
     // Ensure only lib_tagged carries the gotags label (we set it)
-    const outNodes = JSON.parse(await fs.readFile(graph, "utf8"));
+    const outNodes = await readGraph(graph);
     const tDefault = outNodes.find((n: any) => n.name.endsWith(":lib_default"));
     const tTagged = outNodes.find((n: any) => n.name.endsWith(":lib_tagged"));
     if ((tDefault?.labels || []).some((l: string) => l.startsWith("gotags:"))) {

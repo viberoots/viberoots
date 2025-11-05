@@ -3,6 +3,7 @@ import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { readGraph } from "../../lib/graph";
 
 test("cpp adapter validate is a no-op and export succeeds", async () => {
   await runInTemp("exp-cpp-validate-noop", async (tmp, $) => {
@@ -31,8 +32,8 @@ test("cpp adapter validate is a no-op and export succeeds", async () => {
     }
 
     // Ensure output wrote normalized nodes
-    const out = await fs.readJSON(graph);
-    if (!Array.isArray(out) || !out.find((n: any) => n.name === "//cpp/app:bin")) {
+    const out = await readGraph(graph);
+    if (!Array.isArray(out) || !out.find((n: any) => (n as any).name === "//cpp/app:bin")) {
       console.error("exporter did not write expected node list");
       process.exit(2);
     }

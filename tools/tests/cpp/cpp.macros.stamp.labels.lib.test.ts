@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "fs-extra";
 import path from "node:path";
 import { runInTemp } from "../lib/test-helpers";
+import { readGraph } from "../../lib/graph";
 
 await runInTemp("cpp-macro-stamp-lib", async (tmp, $) => {
   // Minimal C++ lib under libs/demo
@@ -30,7 +31,7 @@ await runInTemp("cpp-macro-stamp-lib", async (tmp, $) => {
   await fs.outputFile(graph, JSON.stringify(nodesSim) + "\n", "utf8");
   await $({ cwd: tmp })`tools/buck/export-graph.ts --simulate ${graph} --out ${graph}`;
 
-  const after = JSON.parse(await fs.readFile(graph, "utf8")) as any[];
+  const after = (await readGraph(graph)) as any[];
   const node = after.find((n) => n.name === "//libs/demo:demo");
   const labs: string[] = node?.labels || [];
   assert.ok(labs.includes("lang:cpp"));

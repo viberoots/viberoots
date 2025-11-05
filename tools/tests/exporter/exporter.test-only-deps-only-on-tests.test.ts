@@ -2,6 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
+import { readGraph } from "../../lib/graph";
 import { runInTemp } from "../lib/test-helpers";
 
 test("exporter attaches test-only deps only to test targets", async () => {
@@ -30,7 +31,7 @@ test("exporter attaches test-only deps only to test targets", async () => {
     await fs.mkdirp(path.dirname(graphPath));
     await fs.outputFile(nodesPath, JSON.stringify(nodesSim, null, 2), "utf8");
     await $({ cwd: tmp })`tools/buck/export-graph.ts --simulate ${nodesPath} --out ${graphPath}`;
-    const nodes = JSON.parse(await fs.readFile(graphPath, "utf8"));
+    const nodes = await readGraph(graphPath);
     function labelsOf(n: any): string[] {
       return (n.labels || []).filter((x: string) => x.startsWith("module:"));
     }

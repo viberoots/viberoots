@@ -39,9 +39,14 @@ export async function readCompositeGraph(
   const providerIndex = (await readJsonIfExists<Record<string, ProviderIndexEntry>>(
     providerIndexPath,
   )) as Record<string, ProviderIndexEntry>;
-  const nodeLockIndex = (await readJsonIfExists<Record<string, string>>(
-    nodeLockIndexPath,
-  )) as Record<string, string>;
+  const nodeLockRaw = (await readJsonIfExists<Record<string, any>>(nodeLockIndexPath)) as Record<
+    string,
+    any
+  >;
+  const nodeLockIndex =
+    nodeLockRaw && typeof nodeLockRaw === "object" && nodeLockRaw.index
+      ? (nodeLockRaw.index as Record<string, string>)
+      : (nodeLockRaw as unknown as Record<string, string>);
 
   return { nodes, providerIndex, nodeLockIndex };
 }

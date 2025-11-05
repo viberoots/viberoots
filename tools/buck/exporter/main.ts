@@ -194,7 +194,13 @@ export async function run() {
       gMetrics.tupleKeys = Array.from(new Set([...(gMetrics.tupleKeys || []), ...tuples])).sort();
     }
   }
-  await writeIfChangedJSON(out, normalized);
+  const GRAPH_SCHEMA = "https://example.com/schemas/buck-graph.schema.json";
+  const SCHEMA_VERSION = 1;
+  await writeIfChangedJSON(out, {
+    $schema: GRAPH_SCHEMA,
+    version: SCHEMA_VERSION,
+    nodes: normalized,
+  });
 
   // Emit Node sidecar index mapping targets -> importer-scoped lockfile label
   try {
@@ -211,9 +217,21 @@ export async function run() {
     // Deterministic order: materialize object in sorted target order
     const ordered: Record<string, string> = {};
     for (const k of Object.keys(idx).sort((a, b) => a.localeCompare(b))) ordered[k] = idx[k];
-    await writeIfChangedJSON("tools/buck/node-lock-index.json", ordered);
+    const SIDE_SCHEMA = "https://example.com/schemas/node-lock-index.schema.json";
+    await writeIfChangedJSON("tools/buck/node-lock-index.json", {
+      $schema: SIDE_SCHEMA,
+      version: SCHEMA_VERSION,
+      index: ordered,
+    });
   } catch {}
   if (metricsOut) await emitMetrics(metricsOut, gMetrics);
+
+  // Success banner: point consumers to composite API and schema version
+  try {
+    console.log(
+      `[exporter] graph v${SCHEMA_VERSION} ready — use 'node tools/buck/graph-view.ts' for the Composite Graph API`,
+    );
+  } catch {}
 }
 
 type GoPkgPerBatch = { batch: Batch; pkgs: any[] };

@@ -2,6 +2,7 @@
 import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
+import { readGraph } from "../../lib/graph";
 import { runInTemp } from "../lib/test-helpers";
 
 await runInTemp("exporter-adapters-inactive", async (tmp, $) => {
@@ -23,7 +24,7 @@ await runInTemp("exporter-adapters-inactive", async (tmp, $) => {
     cwd: tmp,
   })`EXPORTER_ADAPTERS=go node tools/buck/export-graph.ts --simulate ${graph} --out ${graph}`;
 
-  const out = JSON.parse(await fs.readFile(graph, "utf8")) as any[];
+  const out = (await readGraph(graph)) as any[];
   const by = new Map(out.map((n) => [n.name, n]));
   const goSvc = by.get("//apps/go:svc");
   const cppTool = by.get("//apps/cpp:tool");

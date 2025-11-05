@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
 import path from "node:path";
+import { readGraph } from "../../lib/graph";
 import { runInTemp } from "../lib/test-helpers";
 
 await runInTemp("export-graph-attach-modules-local-replace", async (tmp, $) => {
@@ -80,7 +81,7 @@ await runInTemp("export-graph-attach-modules-local-replace", async (tmp, $) => {
   ];
   await fs.outputFile(path.join(tmp, "sim.json"), JSON.stringify(nodes));
   await $`node tools/buck/export-graph.ts --simulate sim.json --out tools/buck/graph.json`;
-  const graph = JSON.parse(await fs.readFile(path.join(tmp, "tools/buck/graph.json"), "utf8"));
+  const graph = await readGraph(path.join(tmp, "tools/buck/graph.json"));
 
   // Find nodes and assert module labels only on test target
   const find = (name: string) => graph.find((n: any) => n.name.endsWith(name));

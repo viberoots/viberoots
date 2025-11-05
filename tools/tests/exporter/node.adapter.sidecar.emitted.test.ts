@@ -30,7 +30,8 @@ test("exporter emits node-lock-index.json deterministically", async () => {
     assert.ok(await fs.pathExists(out), "graph.json should exist");
     assert.ok(await fs.pathExists(sidecar), "node-lock-index.json should exist");
     const a = await fs.readFile(sidecar, "utf8");
-    const idxA = JSON.parse(a);
+    const parsed = JSON.parse(a);
+    const idxA = parsed && typeof parsed === "object" && parsed.index ? parsed.index : parsed;
     assert.equal(
       idxA["//apps/web:bundle"],
       "lockfile:apps/web/pnpm-lock.yaml#apps/web",

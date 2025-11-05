@@ -2,6 +2,7 @@
 import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
+import { readGraph } from "../../lib/graph";
 import { runInTemp } from "../lib/test-helpers";
 
 await runInTemp("exp-cpp-bin-labels", async (tmp, $) => {
@@ -11,7 +12,7 @@ await runInTemp("exp-cpp-bin-labels", async (tmp, $) => {
 
   await $({ cwd: tmp })`tools/buck/export-graph.ts --simulate ${out} --out ${out}`;
 
-  const after = JSON.parse(await fs.readFile(out, "utf8")) as any[];
+  const after = (await readGraph(out)) as any[];
   assert.equal(after.length, 1);
   const labs: string[] = after[0].labels || [];
   assert.ok(labs.includes("lang:cpp"));

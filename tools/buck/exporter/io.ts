@@ -194,7 +194,12 @@ export async function cqueryNodes(scope: string, attrs: string[]): Promise<Node[
 
 export async function readSimulatedNodes(path: string): Promise<Node[]> {
   const txt = await fsp.readFile(path, "utf8");
-  return JSON.parse(txt) as Node[];
+  const data = JSON.parse(txt);
+  if (Array.isArray(data)) return data as Node[];
+  if (data && typeof data === "object" && Array.isArray((data as any).nodes)) {
+    return (data as any).nodes as Node[];
+  }
+  return [] as Node[];
 }
 
 export async function writeIfChangedJSON(file: string, data: any) {

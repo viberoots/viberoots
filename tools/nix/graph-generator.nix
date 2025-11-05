@@ -32,9 +32,14 @@ let
     let cand = builtins.toPath (repoRootStr + "/tools/buck/graph.json"); in
       if builtins.pathExists cand then cand else builtins.throw "graphJsonPath not provided and repoRoot/tools/buck/graph.json missing — run tools/buck/export-graph.ts first." 
   );
-  nodes = if builtins.pathExists graphPath
+  nodesRaw = if builtins.pathExists graphPath
     then builtins.fromJSON (builtins.readFile graphPath)
     else builtins.throw "graphJsonPath does not exist — run tools/buck/export-graph.ts before building.";
+  nodes =
+    let t = builtins.typeOf nodesRaw; in
+      if t == "set" && (nodesRaw ? nodes) && (builtins.typeOf nodesRaw.nodes) == "list"
+        then nodesRaw.nodes
+        else nodesRaw;
   nodesList =
     let t = builtins.typeOf nodes; in
       if t == "list" then nodes

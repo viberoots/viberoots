@@ -2,6 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
+import { readGraph } from "../../lib/graph";
 import { runInTemp } from "../lib/test-helpers";
 
 test("exporter labels use Module.Replace when present", async () => {
@@ -42,7 +43,7 @@ test("exporter labels use Module.Replace when present", async () => {
 
     // Use simulate mode for hermetic parsing of imports + go.mod replace
     await $({ cwd: tmp })`tools/buck/export-graph.ts --simulate ${graph} --out ${graph}`;
-    const outNodes = JSON.parse(await fs.readFile(graph, "utf8"));
+    const outNodes = await readGraph(graph);
     const target = outNodes.find((n: any) => n.name === "//mod:bin");
     const labels: string[] = target?.labels || [];
     const has = labels.some((l) => l.startsWith("module:golang.org/x/net@v0.25.0"));

@@ -2,6 +2,7 @@
 import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
+import { readGraph } from "../../lib/graph";
 import { runInTemp } from "../lib/test-helpers";
 
 await runInTemp("exporter-mixed-lang-merge", async (tmp, $) => {
@@ -15,7 +16,7 @@ await runInTemp("exporter-mixed-lang-merge", async (tmp, $) => {
 
   await $({ cwd: tmp })`tools/buck/export-graph.ts --simulate ${graph} --out ${graph}`;
 
-  const after = JSON.parse(await fs.readFile(graph, "utf8")) as any[];
+  const after = (await readGraph(graph)) as any[];
   const by = new Map(after.map((n) => [n.name, n]));
   const goLib = by.get("//libs/go:lib");
   const goSvc = by.get("//apps/go:svc");
