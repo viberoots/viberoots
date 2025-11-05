@@ -6,6 +6,7 @@ import { encodeForPatchFilename } from "../lib/providers";
 import { makeWorkspace } from "./cross-platform";
 import { makeUnifiedDiff } from "./diff";
 import { resolveModule } from "./go-module-resolve";
+import { runGlue } from "./glue";
 import { deleteSession, getSession, setSession } from "./state";
 import type { LanguageHandler, SessionRecord } from "./types";
 
@@ -257,6 +258,69 @@ async function doSession(args: string[]) {
   });
 }
 
+async function doRemove(args: string[]) {
+  // Support optional flags similar to apply for local patch placement
+  let targetPkg = "";
+  let overridePatchDir = "";
+  const rest: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === "--target" && i + 1 < args.length) {
+      const t = String(args[++i] || "").trim();
+      if (t.startsWith("//")) {
+        const noCell = t.slice(2);
+        targetPkg = noCell.split(":")[0] || "";
+      } else {
+        targetPkg = t.split(":")[0] || "";
+      }
+    } else if (a.startsWith("--target=")) {
+      const t = a.split("=", 2)[1] || "";
+      const val = t.trim();
+      if (val.startsWith("//")) {
+        const noCell = val.slice(2);
+        targetPkg = noCell.split(":")[0] || "";
+      } else {
+        targetPkg = val.split(":")[0] || "";
+      }
+    } else if (a === "--patch-dir" && i + 1 < args.length) {
+      overridePatchDir = String(args[++i] || "").trim();
+    } else if (a.startsWith("--patch-dir=")) {
+      overridePatchDir = (a.split("=", 2)[1] || "").trim();
+    } else if (a.startsWith("--")) {
+      // ignore unknown flags
+    } else {
+      rest.push(a);
+    }
+  }
+  const importPath = moduleArg(rest);
+  const { version } = await resolveModule(importPath);
+  const enc = encodeForPatchFilename(importPath);
+  const repoRoot = process.env.WORKSPACE_ROOT || process.env.LIVE_ROOT || process.cwd();
+  let patchDir = "";
+  if (overridePatchDir) {
+    patchDir = path.isAbsolute(overridePatchDir)
+      ? overridePatchDir
+      : path.join(repoRoot, overridePatchDir);
+  } else if (targetPkg) {
+    patchDir = path.join(repoRoot, targetPkg, "patches/go");
+  } else {
+    patchDir = path.join(repoRoot, "patches/go");
+  }
+  try {
+    const dst = path.join(patchDir, `${enc}@${version}.patch`);
+    await fsp.rm(dst, { force: true });
+  } catch {}
+  const prev = process.cwd();
+  try {
+    process.chdir(repoRoot);
+    await runGlue();
+  } finally {
+    try {
+      process.chdir(prev);
+    } catch {}
+  }
+}
+
 const handler: LanguageHandler = {
   start: doStart,
   apply: doApply,
@@ -264,4 +328,4 @@ const handler: LanguageHandler = {
   session: doSession,
 };
 
-export default handler;
+export default Object.assign({}, handler, { remove: doRemove });

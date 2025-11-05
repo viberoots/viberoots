@@ -5,6 +5,7 @@ import path from "node:path";
 import { makeUnifiedDiff } from "./diff";
 import { deleteSession, getSession, listSessions, setSession } from "./state";
 import type { LanguageHandler, SessionRecord } from "./types";
+import { runGlue } from "./glue";
 
 async function pathExists(p: string): Promise<boolean> {
   try {
@@ -438,4 +439,69 @@ const handler: LanguageHandler = {
   session: doSession,
 };
 
-export default handler;
+async function doRemove(args: string[]) {
+  // Support optional flags similar to apply for local patch placement
+  let targetPkg = "";
+  let overridePatchDir = "";
+  const rest: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === "--target" && i + 1 < args.length) {
+      const t = String(args[++i] || "").trim();
+      if (t.startsWith("//")) {
+        const noCell = t.slice(2);
+        targetPkg = noCell.split(":")[0] || "";
+      } else {
+        targetPkg = t.split(":")[0] || "";
+      }
+    } else if (a.startsWith("--target=")) {
+      const t = a.split("=", 2)[1] || "";
+      const val = t.trim();
+      if (val.startsWith("//")) {
+        const noCell = val.slice(2);
+        targetPkg = noCell.split(":")[0] || "";
+      } else {
+        targetPkg = val.split(":")[0] || "";
+      }
+    } else if (a === "--patch-dir" && i + 1 < args.length) {
+      overridePatchDir = String(args[++i] || "").trim();
+    } else if (a.startsWith("--patch-dir=")) {
+      overridePatchDir = (a.split("=", 2)[1] || "").trim();
+    } else if (a.startsWith("--")) {
+      // ignore unknown flags
+    } else {
+      rest.push(a);
+    }
+  }
+  const attrInput = attrArg(rest);
+  const attrNorm = normalizeAttr(attrInput);
+  // Resolve version using test-friendly fast path when available
+  const { version } = await resolveNixpkg(attrNorm);
+  const repoRoot = process.env.WORKSPACE_ROOT || process.env.LIVE_ROOT || process.cwd();
+  let patchDir = "";
+  if (overridePatchDir) {
+    patchDir = path.isAbsolute(overridePatchDir)
+      ? overridePatchDir
+      : path.join(repoRoot, overridePatchDir);
+  } else if (targetPkg) {
+    patchDir = path.join(repoRoot, targetPkg, "patches/cpp");
+  } else {
+    patchDir = path.join(repoRoot, "patches/cpp");
+  }
+  const fileKey = encodeAttrForFilename(attrNorm);
+  try {
+    const dst = path.join(patchDir, `${fileKey}@${version}.patch`);
+    await fsp.rm(dst, { force: true });
+  } catch {}
+  const prev = process.cwd();
+  try {
+    process.chdir(repoRoot);
+    await runGlue();
+  } finally {
+    try {
+      process.chdir(prev);
+    } catch {}
+  }
+}
+
+export default Object.assign({}, handler, { remove: doRemove });
