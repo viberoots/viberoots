@@ -212,7 +212,6 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
     await $`node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
 
     // Vendor dependencies and inject patched uuid into vendor tree
-    console.error("[debug] go mod vendor (offline)");
     await $({
       cwd: path.join(_tmp, "apps", "demo-cli"),
       stdio: "inherit",
@@ -261,7 +260,6 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
 }`;
     await fsp.writeFile(flakePath, flakeTemplate(), "utf8");
     // Rebuild with pinned vendorHash (offline GOPROXY)
-    console.error("[debug] nix build second (with vendorHash)");
     await $({
       cwd: _tmp,
       stdio: "inherit",

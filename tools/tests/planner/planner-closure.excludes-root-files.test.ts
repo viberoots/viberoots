@@ -17,7 +17,6 @@ test("planner: root-only files are excluded from materialized outputs", async ()
     await fsp.writeFile(path.join(tmp, "ONLY_AT_REPO_ROOT.txt"), sentinelTxt + "\n", "utf8");
 
     // Scaffold a small CLI app under apps/
-    console.error("[debug] scaffold demo-cli");
     await $`scaf new go cli demo-cli --yes --path=apps/demo-cli`;
     // Provide a local stub gomod2nix to avoid network and nix lookups for this no-deps app
     const stubDir = path.join(tmp, "bin");
@@ -55,7 +54,6 @@ test("planner: root-only files are excluded from materialized outputs", async ()
     // No explicit go.sum creation here; allow glue-only to handle tidy deterministically.
 
     // Full path: glue-only (fail-fast gomod2nix), then export graph
-    console.error("[debug] install-deps --glue-only (GOPROXY=off GOSUMDB=off)");
     await $({
       env: {
         ...process.env,
@@ -63,10 +61,8 @@ test("planner: root-only files are excluded from materialized outputs", async ()
         GOSUMDB: "off",
       },
     })`tools/dev/install-deps.ts --glue-only`;
-    console.error("[debug] export graph");
     await $`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
     const outLink = `buck-go-${Date.now()}`;
-    console.error("[debug] nix build graph-generator-selected (demo-cli)");
     await $({
       cwd: tmp,
       stdio: "inherit",

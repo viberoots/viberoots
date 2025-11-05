@@ -7,7 +7,6 @@ export type TestCtx = { tmp: string; $: any };
 export async function scaffoldLib(lang: string, name: string, ctx: TestCtx): Promise<void> {
   if (lang !== "go") throw new Error(`unsupported lang: ${lang}`);
   const { tmp: t, $ } = ctx;
-  console.error(`[debug] scaffoldLib: setup buck config`);
   await $`bash --noprofile --norc -c ${`set -euo pipefail
       printf '.\n' > .buckroot
       cat > TARGETS <<'EOF'
@@ -52,7 +51,6 @@ EOF
       mkdir -p toolchains
       printf '[buildfile]\nname = TARGETS\n' > toolchains/.buckconfig
     `}`;
-  console.error(`[debug] scaffoldLib: run scaf new go lib ${name}`);
   await $`scaf new go lib ${name} --yes --path=libs/${name}`;
   // Seed gomod2nix deterministically via local stub to avoid network
   const stubDir = path.join(t, "bin");
@@ -87,7 +85,6 @@ EOF
     env: { ...process.env, PATH: `${stubDir}:${process.env.PATH || ""}` },
   })`gomod2nix --dir libs/${name}`;
   await fsp.copyFile(path.join(t, "libs", name, "gomod2nix.toml"), path.join(t, "gomod2nix.toml"));
-  console.error(`[debug] scaffoldLib: seeded gomod2nix.toml via stub`);
 }
 
 export async function scaffoldApp(lang: string, name: string, ctx: TestCtx): Promise<void> {

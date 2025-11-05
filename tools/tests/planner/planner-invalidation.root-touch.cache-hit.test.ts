@@ -54,7 +54,8 @@ test("planner: touching root-only file does not change app bin store path", asyn
       cwd: tmp,
       stdio: "inherit",
     })`bash -lc 'nix build --impure -L .#graph-generator --accept-flake-config --out-link ${outLink1}'`;
-    console.error(`[timing] first nix build: ${((Date.now() - t1) / 1000).toFixed(2)}s`);
+    if (process.env.TEST_TIMING === "1")
+      console.error(`[timing] first nix build: ${((Date.now() - t1) / 1000).toFixed(2)}s`);
 
     // Read manifest and ensure demo-cli entry exists with at least one bin
     const manifest1Path = path.join(tmp, outLink1, "manifest.json");
@@ -80,7 +81,8 @@ test("planner: touching root-only file does not change app bin store path", asyn
       cwd: tmp,
       stdio: "inherit",
     })`bash -lc 'nix build --impure -L .#graph-generator --accept-flake-config --out-link ${outLink2}'`;
-    console.error(`[timing] second nix build: ${((Date.now() - t2) / 1000).toFixed(2)}s`);
+    if (process.env.TEST_TIMING === "1")
+      console.error(`[timing] second nix build: ${((Date.now() - t2) / 1000).toFixed(2)}s`);
     const manifest2Path = path.join(tmp, outLink2, "manifest.json");
     const manifest2Txt = await fsp.readFile(manifest2Path, "utf8");
     const manifest2 = JSON.parse(manifest2Txt) as Array<any>;
