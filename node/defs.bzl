@@ -33,6 +33,17 @@ def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = []
     kwargs["labels"] = labels
     _ensure_lockfile_label(kwargs, lockfile_label)
     stamp_labels(kwargs, "node", kind)
+    # Include importer-local node patches in srcs so Buck invalidates precisely on patch changes
+    # Derive importer from the single required lockfile label
+    _lf = _extract_lockfile_labels(kwargs.get("labels", []))
+    _importer = None
+    if len(_lf) == 1 and isinstance(_lf[0], str):
+        _lab = _lf[0]
+        _importer = _lab[_lab.find("#") + 1:] if ("#" in _lab) else None
+    # Normalize importer '.' (repo root) → patches/node
+    if _importer != None and _importer != "":
+        _patch_dir = "patches/node" if _importer == "." else ("%s/patches/node" % _importer)
+        merged_srcs = merged_srcs + native.glob(["%s/*.patch" % _patch_dir])
     merged_srcs = dedupe_preserve(merged_srcs + deps + _providers_for(name))
     kwargs["srcs"] = merged_srcs
     if out != None:
