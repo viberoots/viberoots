@@ -158,7 +158,7 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
     }
   }
 
-  if (!lockfiles.length || !(await haveYaml())) {
+  if (!lockfiles.length) {
     const header = [
       "# GENERATED FILE — DO NOT EDIT.",
       'load("//third_party/providers:defs_node.bzl", "node_importer_deps")',
@@ -168,6 +168,8 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
     await writeIfChanged(OUT_FILE, renderTargetsFile(header, []));
     return;
   }
+
+  const haveYamlMod = await haveYaml();
 
   const scanned = await scanFlatPatchDir({
     patchDir: PATCH_DIR,
@@ -180,25 +182,51 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
   const entries: string[] = [];
 
   for (const lf of lockfiles) {
-    const doc = await parsePnpmLock(lf);
-    for (const importer of Object.keys(doc.importers || {})) {
-      // Normalize importer: map "." to the directory containing the lockfile (repo-relative)
-      const importerLabel = importer === "." ? path.dirname(lf) || "." : importer;
-      const eff = effectiveSetForImporter(doc, importer);
-      const usedPatches = Array.from(eff)
-        .map((k) => keyToPatchPath.get(k) || "")
-        .filter(Boolean)
-        .sort();
-      const name = providerNameForImporter(lf, importerLabel);
-      const key = `${lf}#${importerLabel}`;
+    const relLf = lf.replace(/^\.\/+/, "");
+    // Only generate providers for app/lib importers; skip repo-root lockfile
+    if (!/^(apps|libs)\//.test(relLf)) continue;
+    if (haveYamlMod) {
+      const doc = await parsePnpmLock(lf);
+      for (const importer of Object.keys(doc.importers || {})) {
+        const importerLabel = importer === "." ? path.dirname(lf) || "." : importer;
+        const eff = effectiveSetForImporter(doc, importer);
+        const usedPatches = Array.from(eff)
+          .map((k) => keyToPatchPath.get(k) || "")
+          .filter(Boolean)
+          .sort();
+        const name = providerNameForImporter(relLf, importerLabel);
+        const key = `${relLf}#${importerLabel}`;
+        const prev = seenNames.get(name);
+        if (prev) {
+          if (prev !== key) {
+            throw new Error(`Provider name collision: ${name}\n${prev} vs ${key}`);
+          } else {
+            continue; // exact duplicate, skip
+          }
+        }
+        seenNames.set(name, key);
+        entries.push(
+          `node_importer_deps(name="${name}", lockfile="${relLf}", importer="${importerLabel}", patch_paths=[${usedPatches
+            .map((s) => `"${s}"`)
+            .join(", ")}])`,
+        );
+      }
+    } else {
+      // No YAML available: still create a provider per lockfile with importer derived from path
+      const importerLabel = path.dirname(relLf) || ".";
+      const name = providerNameForImporter(relLf, importerLabel);
+      const key = `${relLf}#${importerLabel}`;
       const prev = seenNames.get(name);
-      if (prev && prev !== key)
-        throw new Error(`Provider name collision: ${name}\n${prev} vs ${key}`);
+      if (prev) {
+        if (prev !== key) {
+          throw new Error(`Provider name collision: ${name}\n${prev} vs ${key}`);
+        } else {
+          continue;
+        }
+      }
       seenNames.set(name, key);
       entries.push(
-        `node_importer_deps(name="${name}", lockfile="${lf}", importer="${importerLabel}", patch_paths=[${usedPatches
-          .map((s) => `"${s}"`)
-          .join(", ")}])`,
+        `node_importer_deps(name="${name}", lockfile="${relLf}", importer="${importerLabel}", patch_paths=[])`,
       );
     }
   }
@@ -214,36 +242,38 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
   ].join("\n");
   await writeIfChanged(OUT_FILE, renderTargetsFile(header, entries));
 
-  // Also ensure Buck sees these providers in third_party/providers/TARGETS by
-  // synchronizing an auto-managed section. This avoids unknown label errors during
-  // cquery/export when Node targets refer to lf_* providers.
-  try {
-    const targetFile = "third_party/providers/TARGETS";
-    let cur = "";
+  // If OUT_FILE is not the main TARGETS, also synchronize an auto-managed section
+  // inside third_party/providers/TARGETS so Buck can resolve lf_* labels.
+  if (OUT_FILE !== "third_party/providers/TARGETS") {
     try {
-      cur = await fsp.readFile(targetFile, "utf8");
+      const targetFile = "third_party/providers/TARGETS";
+      // Ensure directory exists so writes don't get swallowed
+      try {
+        await fsp.mkdir(path.dirname(targetFile), { recursive: true });
+      } catch {}
+      let cur = "";
+      try {
+        cur = await fsp.readFile(targetFile, "utf8");
+      } catch {}
+      const begin = "# BEGIN AUTO_NODE";
+      const end = "# END AUTO_NODE";
+      // Ensure defs_node.bzl load present near top
+      const needLoad = 'load("//third_party/providers:defs_node.bzl", "node_importer_deps")';
+      const autoBody = renderTargetsFile("", entries).trim();
+      const autoSection = [begin, needLoad, "", autoBody, end, ""].join("\n");
+      let next = cur;
+      if (next.includes(begin) && next.includes(end)) {
+        const pre = next.split(begin)[0].replace(/\n?$/, "\n");
+        const post = next.split(end).slice(1).join(end);
+        const postClean = post.replace(/^\n*/, "");
+        next = pre + autoSection + postClean;
+      } else {
+        const prefix = next.endsWith("\n") || next === "" ? next : next + "\n";
+        next = prefix + autoSection;
+      }
+      if (next !== cur) await fsp.writeFile(targetFile, next, "utf8");
     } catch {}
-    const begin = "# BEGIN AUTO_NODE";
-    const end = "# END AUTO_NODE";
-    // Ensure defs_node.bzl load present near top
-    const needLoad = 'load("//third_party/providers:defs_node.bzl", "node_importer_deps")';
-    const hasLoad = cur.includes(needLoad);
-    const autoBody = renderTargetsFile("", entries).trim();
-    const autoSection = [begin, needLoad, "", autoBody, end, ""].join("\n");
-    let next = cur;
-    if (next.includes(begin) && next.includes(end)) {
-      const pre = next.split(begin)[0].replace(/\n?$/, "\n");
-      const post = next.split(end).slice(1).join(end);
-      const postClean = post.replace(/^\n*/, "");
-      next = pre + autoSection + postClean;
-    } else {
-      // Append at end with a separating newline
-      const prefix = next.endsWith("\n") || next === "" ? next : next + "\n";
-      // If missing load, we still place it inside the auto section; keep manual top minimal
-      next = prefix + autoSection;
-    }
-    if (next !== cur) await fsp.writeFile(targetFile, next, "utf8");
-  } catch {}
+  }
 }
 
 // Minimal surface for provider index generation
@@ -318,6 +348,8 @@ export async function readNodeProviderIndexEntries(): Promise<
   for (const e of scanned) keyToPatchPath.set(e.key, e.patchPath);
 
   for (const lf of lockfiles) {
+    const relLf = lf.replace(/^\.\/+/, "");
+    if (!/^(apps|libs)\//.test(relLf)) continue;
     const doc = await parsePnpmLock(lf);
     for (const importer of Object.keys(doc.importers || {})) {
       const importerLabel = importer === "." ? path.dirname(lf) || "." : importer;

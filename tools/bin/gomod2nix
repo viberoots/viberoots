@@ -7,29 +7,21 @@ set -euo pipefail
 ARGS=("$@")
 
 try_run() {
-  local cmd=(bash --noprofile --norc -c "$1")
+  local cmd=(bash --noprofile --norc -c "exec $1")
   if "${cmd[@]}"; then
     exit 0
   fi
 }
 
-# Prefer a pinned upstream rev from flake.lock to avoid HEAD/429 first
-PINNED_REV=""
-if [ -f flake.lock ] && command -v jq >/dev/null 2>&1; then
-  PINNED_REV=$(jq -r '.nodes.gomod2nix.locked.rev // empty' flake.lock 2>/dev/null || true)
-fi
-if [ -n "$PINNED_REV" ]; then
-  try_run "nix run github:nix-community/gomod2nix/${PINNED_REV} -- ${ARGS[*]}" || true
-  try_run "nix shell github:nix-community/gomod2nix/${PINNED_REV} -c bash --noprofile --norc -c 'gomod2nix ${ARGS[*]}'" || true
-fi
+# If gomod2nix already on PATH (e.g., via dev shell), use it directly
+if command -v gomod2nix >/dev/null 2>&1; then exec gomod2nix "${ARGS[@]}"; fi
 
-# Next: nixpkgs-provided binary (cacheable) — suppress probe errors on platforms that lack the app
+# Prefer repo-pinned app first for determinism across platforms
+try_run "nix run --accept-flake-config .#gomod2nix -- ${ARGS[*]} 2>/dev/null" || true
+
+# Fallback to nixpkgs app/shell if repo app is unavailable on this platform
 try_run "nix run --accept-flake-config nixpkgs#gomod2nix -- ${ARGS[*]} 2>/dev/null" || true
-try_run "nix shell --accept-flake-config nixpkgs#gomod2nix -c bash --noprofile --norc -c 'gomod2nix ${ARGS[*]}' 2>/dev/null" || true
-
-# Last resort: floating upstream (may hit rate limits)
-try_run "nix run github:nix-community/gomod2nix -- ${ARGS[*]}" || true
-try_run "nix shell github:nix-community/gomod2nix -c bash --noprofile --norc -c 'gomod2nix ${ARGS[*]}'" || true
+try_run "nix shell --accept-flake-config nixpkgs#gomod2nix -c bash --noprofile --norc -c 'exec gomod2nix ${ARGS[*]}' 2>/dev/null" || true
 
 echo "error: gomod2nix is not available via nix on this platform (nixpkgs app missing and upstream unreachable). Ensure a pinned gomod2nix input is present in flake.nix or provide a nixpkgs release that includes gomod2nix." >&2
 exit 127

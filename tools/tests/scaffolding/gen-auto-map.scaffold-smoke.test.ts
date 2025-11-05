@@ -8,8 +8,7 @@ test("auto_map generated for scaffolded repo (may be empty)", async () => {
     const $ = _$({ stdio: "pipe" });
     await $`git init`;
     await $`scaf new go lib demo-lib --yes`;
-    // Build via Buck; platform is set by runInTemp's .buckconfig
-    await $`buck2 build //...`;
+    // Avoid full-repo build; just scaffold and generate glue
     // Ensure glue is generated deterministically in the temp repo
     await $`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
     await $`node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;

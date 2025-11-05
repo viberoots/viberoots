@@ -277,7 +277,7 @@ export async function runInTemp<T>(
   // Avoid bootstrapping a dev environment in temp repos by default to prevent timeouts.
   // Opt-in only when TEST_NEED_DEV_ENV=1 is set in the environment.
   let envOut: any = { stdout: "" };
-  const inferredNeedDev = /(?:^|[-_])go(?:[-_]|$)/i.test(name);
+  const inferredNeedDev = false;
   if (process.env.TEST_NEED_DEV_ENV === "1" || inferredNeedDev) {
     try {
       envOut = await timeAsync(
@@ -286,7 +286,7 @@ export async function runInTemp<T>(
           $({
             cwd: tmp,
             stdio: "pipe",
-            env: { ...process.env },
+            env: { ...process.env, TEST_NEED_DEV_ENV: "1" },
           })`bash --noprofile --norc -c 'if command -v direnv >/dev/null 2>&1; then direnv allow . >/dev/null 2>&1 || true; eval "$(direnv export bash)"; env -0; elif command -v nix >/dev/null 2>&1; then NO_NODE_MODULES_LINK=1 nix develop --accept-flake-config -c env -0; else printf ""; fi'`,
       );
     } catch {
@@ -370,11 +370,7 @@ export async function runInTemp<T>(
   // Ensure repo-aware bin helpers (e.g., tools/bin/build, verify) operate on the temp copy
   // Keep WORKSPACE_ROOT as the temp repo for file operations
   exportEnv.WORKSPACE_ROOT = tmp;
-  // Use a stable, per-temp nested buck2 isolation to avoid cross-test interference
-  try {
-    const isoBase = `zxtest-nested-${path.basename(tmp)}-${process.pid}`;
-    exportEnv.BUCK_NESTED_ISO = exportEnv.BUCK_NESTED_ISO || isoBase;
-  } catch {}
+  // Avoid per-temp nested buck2 isolation; reuse a single daemon for all tests to reduce process churn.
   // Point HOME at the temp repo to avoid loading user login profiles (which may invoke direnv)
   // when tests run shells like `bash -lc ...`.
   exportEnv.HOME = tmp;
@@ -418,11 +414,7 @@ export async function runInTemp<T>(
     return await fn(tmp, _$);
   } finally {
     // Best-effort: stop any buck2 daemon for this temp repo to prevent buckd accumulation.
-    try {
-      // Kill only the nested isolation daemon associated with this temp repo
-      const iso = exportEnv.BUCK_NESTED_ISO || `zxtest-nested-${path.basename(tmp)}-${process.pid}`;
-      await _$`buck2 --isolation-dir ${iso} kill`;
-    } catch {}
+    // Do not kill buck2 daemon per test; reuse across tests to avoid fork storms
     await timeAsync(`rewriteCoverageUrls(${path.basename(tmp)})`, async () =>
       rewriteCoverageUrls(tmp).catch(() => {}),
     );

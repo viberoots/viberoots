@@ -46,8 +46,9 @@ async function readNodeIndexEntries(): Promise<Record<string, IndexEntry>> {
   return out;
 }
 
-export async function generateProviderIndex(opts?: { outFile?: string }) {
+export async function generateProviderIndex(opts?: { outFile?: string; jsonOutFile?: string }) {
   const OUT = opts?.outFile || "third_party/providers/provider_index.bzl";
+  const OUT_JSON = opts?.jsonOutFile || "third_party/providers/provider_index.json";
 
   const maps: Record<string, IndexEntry>[] = await Promise.all([
     readGoIndexEntries(),
@@ -70,6 +71,13 @@ export async function generateProviderIndex(opts?: { outFile?: string }) {
   const footer = ["}", ""]; // trailing newline
   const text = [...header, ...(body.length ? ["", ...body] : []), ...footer].join("\n");
   await writeIfChanged(OUT, text);
+
+  // Also emit a JSON sidecar for machine consumption
+  const jsonObj: Record<string, { kind: string; key: string }> = {};
+  for (const [k, v] of entries) {
+    jsonObj[k] = { kind: v.kind, key: v.key };
+  }
+  await writeIfChanged(OUT_JSON, JSON.stringify(jsonObj, null, 2) + "\n");
 }
 
 async function main() {

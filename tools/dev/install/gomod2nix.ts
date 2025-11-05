@@ -37,13 +37,27 @@ export async function runGomod2nixGenerateIn(dir: string, dryRun: boolean, verbo
     return;
   }
 
+  // Respect dry-run before enforcing go.sum presence
   const binOverride =
     process.env.INSTALL_DEPS_GOMOD2NIX_BIN || path.join(process.cwd(), "tools", "bin", "gomod2nix");
   const cmd = `${binOverride} --dir .`;
+  const timeoutSec = Math.max(
+    1,
+    Number.parseInt(String(process.env.INSTALL_DEPS_GOMOD_TIMEOUT || "180"), 10) || 180,
+  );
   if (dryRun) {
     // Always emit a concise dry-run command line (tests depend on exact prefix)
     console.log(`[gomod2nix] dry-run: ${cmd}`);
     return;
+  }
+
+  // If go.mod exists but go.sum is missing, avoid attempting generation which may hang
+  // on network resolution; prefer pre-existing gomod2nix.toml or skip.
+  if (hasGoMod && !hasGoSum) {
+    console.error(
+      `[gomod2nix] error: go.sum missing in ${path.relative(process.cwd(), dir) || "."}; run 'tools/dev/install-deps.ts' (or pass --skip-go-tidy to skip)`,
+    );
+    process.exit(2);
   }
 
   const beforeHash = await sha256File(path.join(dir, "gomod2nix.toml"));
@@ -51,8 +65,31 @@ export async function runGomod2nixGenerateIn(dir: string, dryRun: boolean, verbo
   try {
     if (hasGoMod) await fsp.copyFile(path.join(dir, "go.mod"), path.join(tmp, "go.mod"));
     if (hasGoSum) await fsp.copyFile(path.join(dir, "go.sum"), path.join(tmp, "go.sum"));
-    if (verbose) console.log(`[gomod2nix] running in ${tmp} for ${dir}: ${cmd}`);
-    await $({ cwd: tmp, stdio: "inherit" })`bash -c ${cmd}`;
+    console.log(`[gomod2nix] running in ${tmp} for ${path.relative(process.cwd(), dir) || "."}`);
+    // Log effective env relevant to network behavior
+    try {
+      const gp = process.env.GOPROXY || "";
+      const gs = process.env.GOSUMDB || "";
+      const gc = process.env.GOMODCACHE || "";
+      if (verbose)
+        console.log(
+          `[gomod2nix] env GOPROXY=${gp || "(default)"} GOSUMDB=${
+            gs || "(default)"
+          } GOMODCACHE=${gc || "(default)"}`,
+        );
+    } catch {}
+    // Optional quick preflight: detect obvious connectivity issues without failing the run
+    try {
+      await $({
+        cwd: tmp,
+        stdio: "pipe",
+      })`bash --noprofile --norc -lc ${`if command -v curl >/dev/null 2>&1; then timeout 3 curl -sSfI https://proxy.golang.org/ >/dev/null && echo "[gomod2nix] preflight: proxy.golang.org OK" || echo "[gomod2nix] preflight: proxy.golang.org unreachable"; else echo "[gomod2nix] preflight: curl not found"; fi`}`;
+    } catch {}
+    // Use timeout if present; otherwise run directly to support minimal shells
+    await $({
+      cwd: tmp,
+      stdio: "inherit",
+    })`bash --noprofile --norc -lc ${`if command -v timeout >/dev/null 2>&1; then timeout ${timeoutSec} ${cmd}; else ${cmd}; fi`}`;
     const tmpOut = path.join(tmp, "gomod2nix.toml");
     const tmpExists = await exists(tmpOut);
     if (!tmpExists) {
@@ -81,7 +118,7 @@ export async function runGomod2nixGenerateIn(dir: string, dryRun: boolean, verbo
 }
 
 export async function runGomod2nixScanAll(dryRun: boolean, verbose: boolean) {
-  // Scan for go.mod under apps/* and libs/* and generate per-module gomod2nix.toml
+  // Scan for go.mod+go.sum under apps/* and libs/* and generate per-module gomod2nix.toml
   const roots = [path.join(process.cwd(), "apps"), path.join(process.cwd(), "libs")];
   const dirs: string[] = [];
   for (const r of roots) {
@@ -90,7 +127,9 @@ export async function runGomod2nixScanAll(dryRun: boolean, verbose: boolean) {
       for (const e of entries) {
         if (e.isDirectory()) {
           const d = path.join(r, e.name);
-          if (await exists(path.join(d, "go.mod"))) dirs.push(d);
+          const hasMod = await exists(path.join(d, "go.mod"));
+          const hasSum = await exists(path.join(d, "go.sum"));
+          if (hasMod && hasSum) dirs.push(d);
         }
       }
     } catch {}

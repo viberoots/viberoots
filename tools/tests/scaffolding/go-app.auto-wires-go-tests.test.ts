@@ -14,9 +14,39 @@ test("go app: adding *_test.go auto-wires nix_go_test and runs", async () => {
     // Scaffold a Go CLI app
     await $`scaf new go cli demo-cli --yes --path=apps/demo-cli`;
 
-    // Ensure module tidy and gomod2nix lock; also surface a clear error if gomod2nix fails
-    await $({ cwd: path.join(tmp, "apps", "demo-cli"), stdio: "inherit" })`go mod tidy`;
-    await $({ cwd: tmp, stdio: "inherit" })`tools/bin/gomod2nix --dir apps/demo-cli`;
+    // Seed gomod2nix deterministically via local stub (no network)
+    const stubDir = path.join(tmp, "bin");
+    await fsp.mkdir(stubDir, { recursive: true });
+    const stubPath = path.join(stubDir, "gomod2nix");
+    await fsp.writeFile(
+      stubPath,
+      [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "DIR=.",
+        "while [[ $# -gt 0 ]]; do",
+        '  case "$1" in',
+        "    --dir)",
+        '      DIR="$2"; shift 2;;',
+        "    *) shift;;",
+        "  esac",
+        "done",
+        'mkdir -p "$DIR"',
+        "cat > \"$DIR/gomod2nix.toml\" <<'EOF'",
+        "schema = 3",
+        "mod = {}",
+        "replace = {}",
+        "prune = { go-tests = true, unused-packages = true }",
+        "EOF",
+      ].join("\n"),
+      "utf8",
+    );
+    await $`chmod +x ${stubPath}`;
+    await $({
+      cwd: tmp,
+      stdio: "inherit",
+      env: { ...process.env, PATH: `${stubDir}:${process.env.PATH || ""}` },
+    })`gomod2nix --dir apps/demo-cli`;
     await fsp.copyFile(
       path.join(tmp, "apps", "demo-cli", "gomod2nix.toml"),
       path.join(tmp, "gomod2nix.toml"),
@@ -35,7 +65,7 @@ test("go app: adding *_test.go auto-wires nix_go_test and runs", async () => {
     await $`tools/dev/install-deps.ts --glue-only`;
     // Add a short, actionable external timeout message if the test stalls on stdlib
     try {
-      await $`buck2 test //apps/demo-cli:demo-cli_test`;
+      await $`buck2 test //apps/demo-cli:demo-cli_test --target-platforms //:no_cgo`;
     } catch (e) {
       console.error(
         "go app auto-wires: buck2 test stalled or failed — ensure go stdlib toolchain built; rerun test or check Buck logs for go_build_stdlib",

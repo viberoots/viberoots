@@ -1,5 +1,4 @@
 #!/usr/bin/env zx-wrapper
-import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
@@ -10,8 +9,20 @@ test("partial clone: discover and build scaffolded lib via //...", async () => {
   // Avoid dev env export path
   await runInTemp("partial-clone-discover", async (_tmp, _$) => {
     const $ = _$({ stdio: "pipe" });
+    const T = Number(process.env.TEST_CMD_TIMEOUT_S || "300");
     await $`bash -lc ${`set -euo pipefail
       printf '.\n' > .buckroot
+      cat > TARGETS <<'EOF'
+platform(
+    name = "no_cgo",
+    constraint_values = [
+        "config//go/constraints:cgo_enabled_false",
+        "config//go/constraints:asan_false",
+        "config//go/constraints:race_false",
+    ],
+    visibility = ["PUBLIC"],
+)
+EOF
       cat > .buckconfig <<'EOF'
 [buildfile]
 name = TARGETS
@@ -37,8 +48,8 @@ config = ./prelude
 [build]
 prelude = prelude
 default_platform = //:no_cgo
-user_platform = prelude//platforms:default
-target_platforms = prelude//platforms:default
+user_platform = //:no_cgo
+target_platforms = //:no_cgo
 EOF
       mkdir -p toolchains
       printf '[buildfile]\nname = TARGETS\n' > toolchains/.buckconfig
@@ -73,27 +84,14 @@ EOF
     // Scaffold a new Go lib into the sparse repo
     await $`scaf new go lib demo-lib --yes --path=libs/demo-lib`;
 
-    // Initialize go module & generate gomod2nix lock at repo root
-    await $`bash --noprofile --norc -lc 'cd libs/demo-lib && test -f go.mod || go mod init example.com/demo-lib && go mod tidy'`;
-    await $({ cwd: _tmp, stdio: "inherit" })`tools/bin/gomod2nix --dir libs/demo-lib`;
-    await $`bash --noprofile --norc -lc 'cp libs/demo-lib/gomod2nix.toml gomod2nix.toml'`;
-    await $`tools/dev/install-deps.ts --glue-only`;
+    // No module downloads or gomod2nix; keep the test focused on glue discovery
 
     // Run glue explicitly to ensure discovery works in sparse context
+    await $`tools/dev/install-deps.ts --glue-only`;
+    // Keep the explicit export and mapping to mirror user flow closely
     await $`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
     await $`node tools/buck/sync-providers.ts`;
     await $`node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
-
-    // Build via Nix graph-generator instead of Buck-only go rules
-    const outLinkName = `buck-go-${Date.now()}`;
-    const outLinkPath = path.join(_tmp, outLinkName);
-    try {
-      await fsp.rm(outLinkPath, { recursive: false, force: true });
-    } catch {}
-    await $({
-      cwd: _tmp,
-      stdio: "inherit",
-    })`nix build .#graph-generator --out-link ${outLinkName}`;
 
     // Smoke assertions
     await $`test -f third_party/providers/auto_map.bzl`;

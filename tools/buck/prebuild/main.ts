@@ -59,6 +59,24 @@ export async function run(): Promise<void> {
   } catch {}
   const needFixPresence = outPresence.length > 0;
 
+  // Go-specific presence: if any patches/go/*.patch exists, require TARGETS.go.auto and provider_index files
+  const goPatchesPresent = (() => {
+    try {
+      const dir = "patches/go";
+      return fs.existsSync(dir) && fs.readdirSync(dir).some((f) => f.endsWith(".patch"));
+    } catch {
+      return false;
+    }
+  })();
+  const goTargetsAuto = "third_party/providers/TARGETS.go.auto";
+  const providerIndexBzl = "third_party/providers/provider_index.bzl";
+  const providerIndexJson = "third_party/providers/provider_index.json";
+  if (goPatchesPresent) {
+    if (!fs.existsSync(goTargetsAuto)) outPresence.push(goTargetsAuto);
+    if (!fs.existsSync(providerIndexBzl)) outPresence.push(providerIndexBzl);
+    if (!fs.existsSync(providerIndexJson)) outPresence.push(providerIndexJson);
+  }
+
   const presentOutputs = outputs.filter((o) => fs.existsSync(o));
   let needFixFreshness = false;
   if (presentOutputs.length > 0) {
@@ -92,6 +110,33 @@ export async function run(): Promise<void> {
   }
 
   const needFix = needFixPresence || needFixFreshness;
+
+  // Validate provider_index.json contains entries for patched Go modules
+  const missingGoIndexEntries: string[] = [];
+  if (goPatchesPresent && fs.existsSync(providerIndexJson)) {
+    try {
+      const txt = await fs.readFile(providerIndexJson, "utf8").catch(() => "");
+      const idx = txt ? (JSON.parse(txt) as Record<string, { kind: string; key: string }>) : {};
+      const haveKeys = new Set(
+        Object.values(idx || {})
+          .filter(Boolean)
+          .map((e) => e.key),
+      );
+      const patchDir = "patches/go";
+      for (const f of fs.readdirSync(patchDir)) {
+        if (!f.endsWith(".patch")) continue;
+        const base = f.slice(0, -".patch".length);
+        const at = base.lastIndexOf("@");
+        if (at < 0) continue;
+        const enc = base.slice(0, at);
+        const ver = base.slice(at + 1);
+        if (!enc || !ver) continue;
+        const importPath = enc.replace(/__+/g, "/").replace(/\/{2,}/g, "/");
+        const modKey = `module:${importPath.toLowerCase()}@${ver.toLowerCase()}`;
+        if (!haveKeys.has(modKey)) missingGoIndexEntries.push(modKey);
+      }
+    } catch {}
+  }
 
   // Node importer presence check: ensure TARGETS.node.auto contains an entry
   // for every importer present in any pnpm-lock.yaml. This runs after generic
@@ -162,8 +207,31 @@ export async function run(): Promise<void> {
   if (jsonOut) {
     const diag = collectDiagnostics(inputs, presentOutputs, outPresence, verboseLimit);
     (diag as any).missingNodeProviders = missingNodeProviders;
+    (diag as any).missingGoIndexEntries = missingGoIndexEntries;
     console.log(JSON.stringify(diag));
     return;
+  }
+
+  // Enforce: any importer with go.mod must also have go.sum (fail with guidance)
+  const goMissingSum: string[] = [];
+  for (const base of ["apps", "libs"]) {
+    try {
+      for (const d of fs.readdirSync(base, { withFileTypes: true })) {
+        if (!d.isDirectory()) continue;
+        const dir = require("node:path").join(base, d.name);
+        const gm = fs.existsSync(require("node:path").join(dir, "go.mod"));
+        const gs = fs.existsSync(require("node:path").join(dir, "go.sum"));
+        if (gm && !gs) goMissingSum.push(dir);
+      }
+    } catch {}
+  }
+  if (goMissingSum.length) {
+    for (const imp of goMissingSum) {
+      console.error(
+        `ERROR: ${imp} has go.mod but no go.sum. Run 'tools/dev/install-deps.ts' to auto-tidy or add --skip-go-tidy to bypass`,
+      );
+    }
+    process.exit(1);
   }
 
   // Additional presence guard (PR 3): ensure gomod2nix.toml exists when go.mod present
@@ -210,6 +278,26 @@ export async function run(): Promise<void> {
       await autoFixGlue();
     } catch (e) {
       console.error("ERROR: auto-fix (sync providers) failed:", e);
+      process.exit(1);
+    }
+  }
+
+  // If Go index entries are missing, fail in CI or attempt auto-fix locally
+  if (missingGoIndexEntries.length) {
+    if (mode === "ci") {
+      for (const k of missingGoIndexEntries) {
+        console.error(`ERROR: missing Go provider index entry for ${k}`);
+      }
+      process.exit(1);
+    }
+    if (process.env.PREBUILD_GUARD_NO_FIX === "1") {
+      printSkip("go-provider-index-missing", missingGoIndexEntries.join(", "));
+      return;
+    }
+    try {
+      await autoFixGlue();
+    } catch (e) {
+      console.error("ERROR: auto-fix (sync providers/index) failed:", e);
       process.exit(1);
     }
   }

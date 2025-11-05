@@ -17,7 +17,9 @@ test("go cli: scaffold and build", async () => {
       stdio: "inherit",
     })`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
     // Generate glue and build via Nix graph-generator on the temp repo
-    await $`tools/dev/install-deps.ts --glue-only`;
+    await $({
+      env: { ...process.env, INSTALL_DEPS_SKIP_GO_TIDY: "1" },
+    })`tools/dev/install-deps.ts --glue-only`;
     // Allow direnv in temp repo (non-interactive)
     try {
       await $({ cwd: _tmp, stdio: "pipe" })`direnv allow .`;

@@ -3,6 +3,8 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+// Ensure dev shell tools (gomod2nix, zx deps) are exported into temp repos
+process.env.TEST_NEED_DEV_ENV = "1";
 
 // PR1 closure test: ensure that content written to a root-only file does not
 // appear anywhere under the materialized graph outputs, as a proxy that the
@@ -15,18 +17,60 @@ test("planner: root-only files are excluded from materialized outputs", async ()
     await fsp.writeFile(path.join(tmp, "ONLY_AT_REPO_ROOT.txt"), sentinelTxt + "\n", "utf8");
 
     // Scaffold a small CLI app under apps/
+    console.error("[debug] scaffold demo-cli");
     await $`scaf new go cli demo-cli --yes --path=apps/demo-cli`;
-    await $({ cwd: path.join(tmp, "apps", "demo-cli"), stdio: "inherit" })`go mod tidy`;
-    await $({ cwd: tmp, stdio: "inherit" })`tools/bin/gomod2nix --dir apps/demo-cli`;
-    await fsp.copyFile(
-      path.join(tmp, "apps", "demo-cli", "gomod2nix.toml"),
-      path.join(tmp, "gomod2nix.toml"),
+    // Provide a local stub gomod2nix to avoid network and nix lookups for this no-deps app
+    const stubDir = path.join(tmp, "bin");
+    await fsp.mkdir(stubDir, { recursive: true });
+    const stubPath = path.join(stubDir, "gomod2nix");
+    await fsp.writeFile(
+      stubPath,
+      [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "DIR=.",
+        "while [[ $# -gt 0 ]]; do",
+        '  case "$1" in',
+        "    --dir)",
+        '      DIR="$2"; shift 2;;',
+        "    *) shift;;",
+        "  esac",
+        "done",
+        'mkdir -p "$DIR"',
+        "cat > \"$DIR/gomod2nix.toml\" <<'EOF'",
+        "schema = 3",
+        "mod = {}",
+        "replace = {}",
+        "prune = { go-tests = true, unused-packages = true }",
+        "EOF",
+      ].join("\n"),
+      "utf8",
     );
+    await $`chmod +x ${stubPath}`;
+    await $({
+      cwd: tmp,
+      stdio: "inherit",
+      env: { ...process.env, PATH: `${stubDir}:${process.env.PATH || ""}` },
+    })`gomod2nix --dir apps/demo-cli`;
+    // No explicit go.sum creation here; allow glue-only to handle tidy deterministically.
 
-    // Glue + build
-    await $`tools/dev/install-deps.ts --glue-only`;
+    // Full path: glue-only (fail-fast gomod2nix), then export graph
+    console.error("[debug] install-deps --glue-only (GOPROXY=off GOSUMDB=off)");
+    await $({
+      env: {
+        ...process.env,
+        GOPROXY: "off",
+        GOSUMDB: "off",
+      },
+    })`tools/dev/install-deps.ts --glue-only`;
+    console.error("[debug] export graph");
+    await $`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
     const outLink = `buck-go-${Date.now()}`;
-    await $({ cwd: tmp, stdio: "inherit" })`nix build .#graph-generator --out-link ${outLink}`;
+    console.error("[debug] nix build graph-generator-selected (demo-cli)");
+    await $({
+      cwd: tmp,
+      stdio: "inherit",
+    })`bash -lc 'BUCK_TARGET="//apps/demo-cli:demo-cli" nix build --impure -L .#graph-generator-selected --out-link ${outLink}'`;
 
     // Walk the outLink tree and ensure sentinel is absent from files
     const root = path.join(tmp, outLink);

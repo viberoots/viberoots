@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
-import "zx/globals";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import "zx/globals";
 import { runInTemp } from "../lib/test-helpers";
 
 void (async function main() {
@@ -11,9 +11,38 @@ void (async function main() {
     await $`scaf new go lib demo-lib --yes --path=libs/demo-lib`;
     await $`scaf new go cli demo-cli --yes --path=apps/demo-cli`;
 
-    // Seed gomod2nix from the CLI module to ensure dependencies exist
-    await $({ cwd: path.join(tmp, "apps", "demo-cli") })`go mod tidy`;
-    await $({ cwd: tmp })`tools/bin/gomod2nix --dir apps/demo-cli`;
+    // Seed gomod2nix deterministically via local stub (no network)
+    const stubDir = path.join(tmp, "bin");
+    await fsp.mkdir(stubDir, { recursive: true });
+    const stubPath = path.join(stubDir, "gomod2nix");
+    await fsp.writeFile(
+      stubPath,
+      [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "DIR=.",
+        "while [[ $# -gt 0 ]]; do",
+        '  case "$1" in',
+        "    --dir)",
+        '      DIR="$2"; shift 2;;',
+        "    *) shift;;",
+        "  esac",
+        "done",
+        'mkdir -p "$DIR"',
+        "cat > \"$DIR/gomod2nix.toml\" <<'EOF'",
+        "schema = 3",
+        "mod = {}",
+        "replace = {}",
+        "prune = { go-tests = true, unused-packages = true }",
+        "EOF",
+      ].join("\n"),
+      "utf8",
+    );
+    await $`chmod +x ${stubPath}`;
+    await $({
+      cwd: tmp,
+      env: { ...process.env, PATH: `${stubDir}:${process.env.PATH || ""}` },
+    })`gomod2nix --dir apps/demo-cli`;
     await fsp.copyFile(
       path.join(tmp, "apps", "demo-cli", "gomod2nix.toml"),
       path.join(tmp, "gomod2nix.toml"),

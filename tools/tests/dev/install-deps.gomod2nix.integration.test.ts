@@ -43,6 +43,7 @@ EOF
     // Run install-deps which invokes gomod2nix regeneration
     const env = {
       ...process.env,
+      WORKSPACE_ROOT: tmp,
       INSTALL_DEPS_GOMOD2NIX_BIN: "nix run github:nix-community/gomod2nix --",
     } as any;
     await $({

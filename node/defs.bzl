@@ -139,11 +139,13 @@ def nix_node_cli_bin(
         out = name
 
     if not bundle:
+        # Copy only the CLI entry file to $OUT; provider stamps are included in srcs
+        # for dependency edges but should not be passed to cp as multiple sources.
         nix_node_gen(
             name = name,
             srcs = [entry],
             out = out,
-            cmd = "cp $SRCS $OUT && chmod +x $OUT",
+            cmd = "cp %s $OUT && chmod +x $OUT" % entry,
             deps = deps,
             labels = labels,
             lockfile_label = lockfile_label,

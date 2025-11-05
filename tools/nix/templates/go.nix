@@ -108,7 +108,9 @@ in {
               export CGO_CFLAGS="${cgo.synthCFlags} $CGO_CFLAGS"
               export CGO_LDFLAGS="${cgo.synthLdFlags} ${cgo.repoStaticLibs} $CGO_LDFLAGS"
             fi
-          '' else ""}
+          '' else ''
+            export CGO_ENABLED=0
+          ''}
           cd "''${modRoot:-.}"
 
           runHook postConfigure
@@ -167,7 +169,9 @@ in {
               export CGO_CFLAGS="${cgo.synthCFlags} $CGO_CFLAGS"
               export CGO_LDFLAGS="${cgo.synthLdFlags} ${cgo.repoStaticLibs} $CGO_LDFLAGS"
             fi
-          '' else ""}
+          '' else ''
+            export CGO_ENABLED=0
+          ''}
           cd "''${modRoot:-.}"
 
           runHook postConfigure

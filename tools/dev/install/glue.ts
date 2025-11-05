@@ -180,7 +180,7 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
     },
     {
       label: "sync-providers-node",
-      cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/sync-providers-node.ts")}`,
+      cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/sync-providers.ts")} --lang=node`,
       withZx: true,
       when: haveNode && nodeCaps.patching !== false,
       skipReason: haveNode

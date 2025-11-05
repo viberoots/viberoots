@@ -297,51 +297,7 @@ async function scaffoldCli(sh: any, tmp: string) {
   );
 }
 
-async function runGomod2nix(sh: any, repoRoot: string, moduleRelDir: string) {
-  await sh({ cwd: repoRoot, stdio: "inherit" })`tools/bin/gomod2nix --dir ${moduleRelDir}`;
-}
-
-async function generateGomod2nixForAll(sh: any, tmp: string) {
-  await runGomod2nix(sh, tmp, "libs/helper-lib");
-  await runGomod2nix(sh, tmp, "libs/demo-lib");
-  await runGomod2nix(sh, tmp, "apps/demo-cli");
-  const rootToml = path.join(tmp, "gomod2nix.toml");
-  const cliToml = path.join(tmp, "apps", "demo-cli", "gomod2nix.toml");
-  const helperToml = path.join(tmp, "libs", "helper-lib", "gomod2nix.toml");
-  const demoToml = path.join(tmp, "libs", "demo-lib", "gomod2nix.toml");
-  // Start from CLI's toml
-  let rootTxt = await fsp.readFile(cliToml, "utf8").catch(() => "");
-  const seen = new Set<string>();
-  for (const line of rootTxt.split(/\r?\n/)) {
-    const m = line.trim().match(/^\["?([^\]"]+)"?\]$/);
-    if (m) seen.add(m[1]);
-  }
-  // Append missing sections from helper and demo tomls
-  for (const add of [helperToml, demoToml]) {
-    const txt = await fsp.readFile(add, "utf8").catch(() => "");
-    if (!txt) continue;
-    let cur: string | null = null;
-    let buf: string[] = [];
-    const flush = () => {
-      if (cur && !seen.has(cur) && buf.length) {
-        rootTxt = rootTxt.trimEnd() + "\n\n" + buf.join("\n");
-        seen.add(cur);
-      }
-      cur = null;
-      buf = [];
-    };
-    for (const raw of txt.split(/\r?\n/)) {
-      const m = raw.trim().match(/^\["?([^\]"]+)"?\]$/);
-      if (m) {
-        flush();
-        cur = m[1];
-      }
-      if (cur) buf.push(raw);
-    }
-    flush();
-  }
-  await fsp.writeFile(rootToml, rootTxt + "\n", "utf8");
-}
+// No gomod2nix or glue generation: patch-go uses NIX_GO_TEST_RESOLVE_JSON for speed.
 
 // PR6: Go providers removed; auto_map remains Node-only. No provider sync step here.
 
@@ -473,13 +429,36 @@ test("go cli with transitive third-party patched uuid runtime", async () => {
     await scaffoldDemoLib($, _tmp);
     await scaffoldCli($, _tmp);
     await $({ cwd: path.join(_tmp, "apps", "demo-cli"), stdio: "inherit" })`go mod tidy`;
-    await generateGomod2nixForAll($, _tmp);
-    await $`tools/dev/install-deps.ts --glue-only`;
 
     // Create a uuid patch in a temporary workspace and apply it via patch-pkg
     const { origin, ws } = await startPatchPkgSession($, _tmp);
     await patchUuidWorkspace(ws);
-    await applyPatchPkg($, _tmp, origin);
+    {
+      const T = Number(process.env.TEST_CMD_TIMEOUT_S || "300");
+      const localBin = await ensureNodeOnPath(_tmp);
+      const resolveMap = JSON.stringify({
+        "github.com/google/uuid": { version: "v1.6.0", originPath: origin },
+      });
+      await $({
+        cwd: _tmp,
+        stdio: "inherit",
+        env: {
+          NIX_GO_TEST_RESOLVE_JSON: resolveMap,
+          NO_DEV_SHELL: "1",
+          NODE_BIN: process.execPath,
+          ZX_INIT: path.join(_tmp, "tools", "dev", "zx-init.mjs"),
+          WORKSPACE_ROOT: _tmp,
+          NODE_PATH: [path.join(process.cwd(), "node_modules"), process.env.NODE_PATH || ""]
+            .filter(Boolean)
+            .join(path.delimiter),
+          PATH: `${path.dirname(process.execPath)}:${localBin}:${process.env.PATH || ""}`,
+        },
+      })`tools/bin/patch-pkg apply go github.com/google/uuid --target //apps/demo-cli:demo-cli --force`;
+    }
+    // Exercise full glue path after applying the patch
+    await $`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
+    await $`node tools/buck/sync-providers.ts`;
+    await $`node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
     // Validate local patch presence under CLI target
     const patchFile = path.join(
       _tmp,

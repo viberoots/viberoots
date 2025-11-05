@@ -12,9 +12,39 @@ test("go lib: adding *_test.go auto-wires nix_go_test and runs", async () => {
 
     // Scaffold a Go library
     await $`scaf new go lib demo-lib --yes --path=libs/demo-lib`;
-    // Ensure module tidy and gomod2nix lock to keep planner happy
-    await $({ cwd: path.join(tmp, "libs", "demo-lib"), stdio: "inherit" })`go mod tidy`;
-    await $({ cwd: tmp, stdio: "inherit" })`tools/bin/gomod2nix --dir libs/demo-lib`;
+    // Seed gomod2nix deterministically via local stub (no network)
+    const stubDir = path.join(tmp, "bin");
+    await fsp.mkdir(stubDir, { recursive: true });
+    const stubPath = path.join(stubDir, "gomod2nix");
+    await fsp.writeFile(
+      stubPath,
+      [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "DIR=.",
+        "while [[ $# -gt 0 ]]; do",
+        '  case "$1" in',
+        "    --dir)",
+        '      DIR="$2"; shift 2;;',
+        "    *) shift;;",
+        "  esac",
+        "done",
+        'mkdir -p "$DIR"',
+        "cat > \"$DIR/gomod2nix.toml\" <<'EOF'",
+        "schema = 3",
+        "mod = {}",
+        "replace = {}",
+        "prune = { go-tests = true, unused-packages = true }",
+        "EOF",
+      ].join("\n"),
+      "utf8",
+    );
+    await $`chmod +x ${stubPath}`;
+    await $({
+      cwd: tmp,
+      stdio: "inherit",
+      env: { ...process.env, PATH: `${stubDir}:${process.env.PATH || ""}` },
+    })`gomod2nix --dir libs/demo-lib`;
     await fsp.copyFile(
       path.join(tmp, "libs", "demo-lib", "gomod2nix.toml"),
       path.join(tmp, "gomod2nix.toml"),
@@ -33,6 +63,6 @@ test("go lib: adding *_test.go auto-wires nix_go_test and runs", async () => {
     await $`tools/dev/install-deps.ts --glue-only`;
 
     // Run the test via Buck; platform is set by runInTemp's .buckconfig
-    await $`buck2 test //libs/demo-lib:demo-lib_test`;
+    await $`buck2 test //libs/demo-lib:demo-lib_test --target-platforms //:no_cgo`;
   });
 });

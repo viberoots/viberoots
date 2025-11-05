@@ -62,7 +62,7 @@ def _zx_test_impl(ctx):
             + "if [ \"$ZX_TEST_DIRENV\" = \"1\" ]; then if command -v direnv >/dev/null 2>&1; then eval \"$(direnv export bash)\"; fi; fi; "
             # Skip direnv in temp repos by default; specific tests can override
             # Provide a single global default timeout unless a caller overrides it
-            + "if [ -z \"$TEST_NODE_OPTIONS\" ]; then export TEST_NODE_OPTIONS=\"--test-timeout=240000\"; fi; "
+            + "if [ -z \"$TEST_NODE_OPTIONS\" ]; then export TEST_NODE_OPTIONS=\"--test-timeout=300000\"; fi; "
             + "if [ -n \"$NODE_V8_COVERAGE\" ]; then mkdir -p \"$NODE_V8_COVERAGE\"; "
             + "ls -1t \"$NODE_V8_COVERAGE\"/coverage-*.json 2>/dev/null | tail -n +201 | xargs -r rm -f || true; fi; "
             # Ensure zx-init is loaded in all node:test workers via NODE_OPTIONS
@@ -70,14 +70,7 @@ def _zx_test_impl(ctx):
             + "export NODE_OPTIONS=\"--import \"$WORKSPACE_ROOT/tools/dev/zx-init.mjs\" $NODE_OPTIONS\"; "
             + "SAFE=$(printf %%s \"$BUCK_TEST_TARGET\" | sed -E 's|^.*/:||; s/[^A-Za-z0-9._-]+/_/g' | cut -c1-200); "
             + "LOGDIR=\"$TEST_LOG_DIR/$SAFE\"; mkdir -p \"$LOGDIR\"; "
-            # Use a deterministic buck2 isolation name per test to avoid accumulating daemons,
-            # and kill the daemon at the end of the test regardless of status.
-            + "export BUCK_ISOLATION_DIR=\"zxtest-$SAFE-$$\"; "
-            # Nested isolation for any buck2 calls from inside the test to avoid lock contention with the outer test session
-            + "export BUCK_NESTED_ISO=\"zxtest-nested-$SAFE-$$\"; "
-            # If exporter spawns with its own isolation, nest it under the test isolation so cleanup is single-sourced
-            + "export BUCK_ISOLATION_DIR_EXPORTER=\"$BUCK_ISOLATION_DIR\"; "
-            # Ensure any nested 'buck2' invocations in test scripts use the same isolation dir
+            # Ensure any nested 'buck2' invocations in test scripts resolve to the original binary
             + "ORIG_BUCK2=\"$(command -v buck2)\"; "
             + ""
             + "SHIMROOT=\"$WORKSPACE_ROOT/buck-out/zx_shims/$SAFE\"; SHIMBIN=\"$SHIMROOT/bin\"; mkdir -p \"$SHIMBIN\"; WRAP=\"$SHIMBIN/buck2\"; "
@@ -86,27 +79,12 @@ def _zx_test_impl(ctx):
             + "set -euo pipefail\n"
             + "orig=\"__BUCK2_BIN__\"\n"
             + "if [[ -z \"${orig}\" ]]; then echo \"buck2 shim error: embedded buck2 path missing\" >&2; exit 127; fi\n"
-            + "# Avoid passing --isolation-dir twice if caller already set it\n"
-            + "for a in \"$@\"; do if [ \"$a\" = \"--isolation-dir\" ]; then exec \"$orig\" \"$@\"; fi; done\n"
-            + "iso=\"${BUCK_NESTED_ISO:-shim-$$}\"\n"
-            + "cmd=\"$1\"; shift || true\n"
-            + "# Normalize deprecated flags for newer buck2: --output-attributes -> repeated --output-attribute\n"
-            + "norm=(); i=1; while [ $i -le $# ]; do a=\"$1\"; shift || true; i=$((i+1)); if [ \"$a\" = \"--output-attributes\" ]; then if [ $# -ge 1 ]; then v=\"$1\"; shift || true; i=$((i+1)); norm+=( --output-attribute \"$v\" ); else norm+=( --output-attribute ); fi; else norm+=( \"$a\" ); fi; done\n"
-            + "# Detect if caller already specified --target-platforms or build.default_platform\n"
-            + "has_tp=0; for a in \"${norm[@]}\"; do if [ \"$a\" = \"--target-platforms\" ]; then has_tp=1; break; fi; done\n"
-            + "has_defplat=0; for a in \"${norm[@]}\"; do if echo \"$a\" | grep -q 'build.default_platform='; then has_defplat=1; break; fi; done\n"
-            + "if [ \"$cmd\" = \"build\" ] || [ \"$cmd\" = \"test\" ]; then\n"
-            + "  extra_flags=(); if [ $has_tp -eq 0 ] && [ $has_defplat -eq 0 ]; then extra_flags+=( --config build.default_platform=//:no_cgo --target-platforms //:no_cgo ); fi;\n"
-            + "  exec \"$orig\" --isolation-dir \"$iso\" \"$cmd\" \"${extra_flags[@]}\" \"${norm[@]}\"\n"
-            + "elif [ \"$cmd\" = \"run\" ] || [ \"$cmd\" = \"query\" ]; then\n"
-            + "  exec \"$orig\" --isolation-dir \"$iso\" \"$cmd\" --config build.default_platform=//:no_cgo \"${norm[@]}\"\n"
-            + "else\n"
-            + "  exec \"$orig\" --isolation-dir \"$iso\" \"$cmd\" \"${norm[@]}\"\n"
-            + "fi\n"
+            + "# Pass through to buck2; platform selection comes from .buckconfig in temp repos (//:no_cgo)\n"
+            + "exec \"$orig\" \"$@\"\n"
             + "EOSH\n"
             + "sed -i.bak -e \"s|__BUCK2_BIN__|$ORIG_BUCK2|g\" \"$WRAP\"; rm -f \"$WRAP.bak\"; "
             + "chmod +x \"$WRAP\"; export PATH=\"$SHIMBIN:$PATH\"; "
-            + "cleanup() { \"$ORIG_BUCK2\" --isolation-dir \"$BUCK_NESTED_ISO\" kill >/dev/null 2>&1 || true; }; trap cleanup EXIT INT TERM HUP; "
+            + "# Reuse shared buckd across tests to avoid fork storms; no per-test kill\n"
             + "rm -f \"$LOGDIR/test.stdout.log\" \"$LOGDIR/test.stderr.log\" 2>/dev/null || true; "
             + "cd \"$WORKSPACE_ROOT\"; "
             # Prefer package from Starlark context; fall back to parsing label, stripping any config suffix

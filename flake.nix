@@ -50,6 +50,13 @@
       in f { inherit pkgs zx-wrapper nodeMods prelude system; buck2Input = buck2; }
     );
   in {
+    apps = forAllSystems ({ pkgs, ... }: {
+      gomod2nix = {
+        type = "app";
+        program = "${pkgs.gomod2nix}/bin/gomod2nix";
+      };
+    });
+
     devShells = forAllSystems ({ pkgs, zx-wrapper, nodeMods, prelude, buck2Input, system, ... }:
       { default = (import ./tools/nix/devshell.nix { inherit pkgs; buck2Input = buck2Input; }).default; }
     );

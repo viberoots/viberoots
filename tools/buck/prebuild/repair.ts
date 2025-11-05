@@ -38,6 +38,7 @@ async function ensureLocalPreludeMapping() {
       "",
       "[build]",
       "prelude = prelude",
+      "default_platform = prelude//platforms:default",
       "user_platform = prelude//platforms:default",
       "target_platforms = prelude//platforms:default",
       "",
@@ -85,6 +86,8 @@ async function ensureLocalPreludeMapping() {
 }
 
 export async function autoFixGlue() {
+  // Ensure local .buckconfig/.buckroot and prelude mapping exist so Buck commands use a valid platform
+  await ensureLocalPreludeMapping();
   // Ensure gomod2nix.toml is generated before glue; ignore errors in local mode
   try {
     await $`node --experimental-strip-types --import ./tools/dev/zx-init.mjs tools/dev/install-deps.ts --glue-only`;
@@ -104,6 +107,10 @@ export async function autoFixGlue() {
     if (String(stdout || "").trim().length > 0) {
       await $`node ${nodeBase} tools/buck/sync-providers-node.ts`;
     }
+  } catch {}
+  // Ensure provider index (BZL + JSON) is present before generating auto_map
+  try {
+    await $`node ${nodeBase} tools/buck/gen-provider-index.ts --out third_party/providers/provider_index.bzl`;
   } catch {}
   await $`node ${nodeBase} tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
 }

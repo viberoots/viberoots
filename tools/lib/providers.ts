@@ -18,9 +18,15 @@ export function providerNameForModuleKey(importPath: string, version: string): s
 }
 
 export function providerNameForImporter(lockfilePath: string, importer: string): string {
-  const key = `${lockfilePath}#${importer}`;
+  const normPath = String(lockfilePath || "")
+    .replace(/^\.\/+/, "")
+    .replace(/\/+/, "/");
+  const normImporter = String(importer || "")
+    .replace(/^\.\/+/, "")
+    .replace(/\/+/, "/");
+  const key = `${normPath}#${normImporter}`;
   const h = shortHash(key, 12);
-  const tail = `${importer.replace(/[^\w]+/g, "_")}__${lockfilePath.replace(/[^\w]+/g, "_")}`;
+  const tail = `${normImporter.replace(/[^\w]+/g, "_")}__${normPath.replace(/[^\w]+/g, "_")}`;
   return `lf_${h}_${tail}`;
 }
 

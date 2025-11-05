@@ -35,7 +35,8 @@ const EMIT_INDEX = flagBool("emit-index") || flagBool("emitIndex");
 async function main() {
   // Preserve Node default out path unless user explicitly provided --out
   const maybeOut = flagProvided("out") ? OUT_FILE : undefined;
-  await syncAllProviders({ outFile: maybeOut as any, strict: STRICT, lang: LANG });
+  const targetLang = LANG || (flagProvided("out") ? "node" : "");
+  await syncAllProviders({ outFile: maybeOut as any, strict: STRICT, lang: targetLang });
   if (EMIT_INDEX) {
     const { generateProviderIndex } = await import("./gen-provider-index.ts");
     await generateProviderIndex({ outFile: "third_party/providers/provider_index.bzl" });

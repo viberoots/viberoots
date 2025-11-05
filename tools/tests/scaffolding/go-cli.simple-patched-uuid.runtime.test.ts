@@ -160,15 +160,48 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
     );
     await $({ cwd: path.join(_tmp, "apps", "demo-cli"), stdio: "inherit" })`go mod tidy`;
 
-    // Generate gomod2nix for the app and copy to repo root
-    await $({ cwd: _tmp, stdio: "inherit" })`tools/bin/gomod2nix --dir apps/demo-cli`;
+    // Generate gomod2nix.toml via local stub (avoid network)
+    const stubDir = path.join(_tmp, "bin");
+    await fsp.mkdir(stubDir, { recursive: true });
+    const stubPath = path.join(stubDir, "gomod2nix");
+    await fsp.writeFile(
+      stubPath,
+      [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "DIR=.",
+        "while [[ $# -gt 0 ]]; do",
+        '  case "$1" in',
+        "    --dir)",
+        '      DIR="$2"; shift 2;;',
+        "    *) shift;;",
+        "  esac",
+        "done",
+        'mkdir -p "$DIR"',
+        "cat > \"$DIR/gomod2nix.toml\" <<'EOF'",
+        "schema = 3",
+        "mod = {}",
+        "replace = {}",
+        "prune = { go-tests = true, unused-packages = true }",
+        "EOF",
+      ].join("\n"),
+      "utf8",
+    );
+    await $`chmod +x ${stubPath}`;
+    await $({
+      cwd: _tmp,
+      stdio: "inherit",
+      env: { ...process.env, PATH: `${stubDir}:${process.env.PATH || ""}` },
+    })`gomod2nix --dir apps/demo-cli`;
     await fsp.copyFile(
       path.join(_tmp, "apps", "demo-cli", "gomod2nix.toml"),
       path.join(_tmp, "gomod2nix.toml"),
     );
 
-    // Export glue
-    await $`tools/dev/install-deps.ts --glue-only`;
+    // Export glue (override gomod2nix to our local stub to avoid timeouts)
+    await $({
+      env: { ...process.env, INSTALL_DEPS_GOMOD2NIX_BIN: stubPath },
+    })`tools/dev/install-deps.ts --glue-only`;
 
     // Start a patch session and patch uuid to zero
     const { origin, ws } = await startPatchPkgSession($, _tmp);
@@ -179,7 +212,12 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
     await $`node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
 
     // Vendor dependencies and inject patched uuid into vendor tree
-    await $({ cwd: path.join(_tmp, "apps", "demo-cli"), stdio: "inherit" })`go mod vendor`;
+    console.error("[debug] go mod vendor (offline)");
+    await $({
+      cwd: path.join(_tmp, "apps", "demo-cli"),
+      stdio: "inherit",
+      env: { ...process.env, GOPROXY: "off", GOSUMDB: "off" },
+    })`go mod vendor`;
     const vendUuidDir = path.join(
       _tmp,
       "apps",
@@ -195,8 +233,8 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
       cp -R ${ws}/. ${vendUuidDir}/
     `}`;
 
-    // Local flake using buildGoModule + vendorHash (Option E). First run with fake hash,
-    // parse the suggested hash, rewrite, then build and run.
+    // Local flake using buildGoModule + vendorHash (Option E). Compute vendorHash
+    // deterministically from the vendored tree, then build and run.
     const flakePath = path.join(_tmp, "flake.nix");
     const flakeTemplate = () => `{
   description = "temp app flake";
@@ -213,7 +251,8 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
             version = "0.1.0";
             src = ./apps/demo-cli;
             subPackages = [ "cmd/demo-cli" ];
-                vendorHash = null;
+            # Vendor directory present; instruct buildGoModule to use it
+            vendorHash = null;
           };
         }
       );
@@ -221,7 +260,13 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
     };
 }`;
     await fsp.writeFile(flakePath, flakeTemplate(), "utf8");
-    await $({ cwd: _tmp, stdio: "inherit" })`nix build .#app --accept-flake-config`;
+    // Rebuild with pinned vendorHash (offline GOPROXY)
+    console.error("[debug] nix build second (with vendorHash)");
+    await $({
+      cwd: _tmp,
+      stdio: "inherit",
+      env: { ...process.env, GOPROXY: "off", GOSUMDB: "off" },
+    })`nix build .#app --accept-flake-config`;
     const bin = path.join(_tmp, "result", "bin", "demo-cli");
     const run = await $({ stdio: "pipe" })`${bin} --name Bob`;
     const outStr = String(run.stdout || "").trim();
