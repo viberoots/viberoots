@@ -195,6 +195,24 @@ export async function run() {
     }
   }
   await writeIfChangedJSON(out, normalized);
+
+  // Emit Node sidecar index mapping targets -> importer-scoped lockfile label
+  try {
+    const idx: Record<string, string> = {};
+    const parseLock = (s: string) => /^lockfile:([^#]+)#([^#]+)$/.exec(s);
+    for (const n of normalized) {
+      const labs = Array.isArray((n as any).labels) ? ((n as any).labels as string[]) : [];
+      const locks = labs.filter((l) => l.startsWith("lockfile:"));
+      if (locks.length !== 1) continue;
+      const m = parseLock(locks[0]);
+      if (!m) continue;
+      idx[n.name] = locks[0].toLowerCase();
+    }
+    // Deterministic order: materialize object in sorted target order
+    const ordered: Record<string, string> = {};
+    for (const k of Object.keys(idx).sort((a, b) => a.localeCompare(b))) ordered[k] = idx[k];
+    await writeIfChangedJSON("tools/buck/node-lock-index.json", ordered);
+  } catch {}
   if (metricsOut) await emitMetrics(metricsOut, gMetrics);
 }
 

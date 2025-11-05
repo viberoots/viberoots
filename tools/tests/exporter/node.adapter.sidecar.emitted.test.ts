@@ -1,0 +1,45 @@
+#!/usr/bin/env zx-wrapper
+import fs from "fs-extra";
+import assert from "node:assert/strict";
+import path from "node:path";
+import { test } from "node:test";
+import { runInTemp } from "../lib/test-helpers";
+
+test("exporter emits node-lock-index.json deterministically", async () => {
+  await runInTemp("exp-node-sidecar", async (tmp, $) => {
+    const out = path.join(tmp, "tools/buck/graph.json");
+    const sidecar = path.join(tmp, "tools/buck/node-lock-index.json");
+    await fs.mkdirp(path.dirname(out));
+    const nodes = [
+      {
+        name: "//apps/web:bundle",
+        rule_type: "js_binary",
+        labels: ["lang:node", "lockfile:apps/web/pnpm-lock.yaml#apps/web"],
+      },
+      {
+        name: "//libs/ui:lib",
+        rule_type: "go_library",
+        labels: ["lang:go"],
+      },
+    ];
+    const sim = path.join(tmp, "tools/buck/simulated.json");
+    await fs.outputFile(sim, JSON.stringify(nodes) + "\n");
+
+    // First run
+    await $({ cwd: tmp })`tools/buck/export-graph.ts --simulate ${sim} --out ${out}`;
+    assert.ok(await fs.pathExists(out), "graph.json should exist");
+    assert.ok(await fs.pathExists(sidecar), "node-lock-index.json should exist");
+    const a = await fs.readFile(sidecar, "utf8");
+    const idxA = JSON.parse(a);
+    assert.equal(
+      idxA["//apps/web:bundle"],
+      "lockfile:apps/web/pnpm-lock.yaml#apps/web",
+      "sidecar should map target to importer-scoped lockfile label",
+    );
+
+    // Second run must be a no-op w.r.t. sidecar content
+    await $({ cwd: tmp })`tools/buck/export-graph.ts --simulate ${sim} --out ${out}`;
+    const b = await fs.readFile(sidecar, "utf8");
+    assert.equal(a, b, "sidecar should be deterministic across runs");
+  });
+});
