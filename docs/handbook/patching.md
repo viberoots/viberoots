@@ -1,4 +1,4 @@
-# Patching Handbook (Go)
+# Patching Handbook (Go & Node)
 
 Note: For per-target local patching of Go and C++, see `go-cpp-local-patching.md`. That guide covers placing patches under each target’s package directory (for example, `apps/<app>/patches/go` or `libs/<lib>/patches/cpp`) and how local patch directories integrate with the build. The global `patches/go` flow below remains supported where applicable but local patching is the default developer experience for new scaffolds.
 
@@ -66,3 +66,17 @@ In CI, strict mode runs and exits nonzero on violations:
 ```
 node tools/ci/run-stage.ts --stage patches-lint
 ```
+
+## Node (PNPM) — importer‑local patches and invalidation
+
+- Node targets use importer‑scoped lockfile labels: `lockfile:<path/to/pnpm-lock.yaml>#<importer>`.
+- The Node macros include importer‑local patch files in `srcs` to achieve precise Buck invalidation, mirroring Go:
+  - Patches live under `<importer>/patches/node/*.patch` (e.g., `apps/web/patches/node/...`).
+  - Changing a patch only invalidates Node targets bound to that importer.
+- Provider stamps for Node are importer‑scoped and do not reference patch files as `srcs` (see Provider sync cookbook below); correctness comes from macro‑side `srcs` inclusion.
+
+Quick checks and guidance:
+
+- Ensure exactly one `lockfile:<path>#<importer>` label is present on each Node target (the macros enforce this).
+- Place patches under the importer’s `patches/node/` directory; no cross‑package references.
+- Regenerate glue as needed (export graph → sync providers → gen auto_map). The prebuild guard will auto‑fix locally or fail fast in CI.

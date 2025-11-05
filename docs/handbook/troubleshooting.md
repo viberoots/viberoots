@@ -44,6 +44,13 @@
 
 - Ensure one patch per `module@version`; file name must be `<encodedImport>@<version>.patch`.
 
+## Node patch changes don’t seem to invalidate targets
+
+- Ensure each Node target carries exactly one importer‑scoped lockfile label: `lockfile:<path>#<importer>` (macros enforce this).
+- Place patches under the importer’s directory: `<importer>/patches/node/*.patch` (e.g., `apps/web/patches/node/…`).
+- Remember: Node provider rules do not use patch paths as `srcs`; invalidation is driven by macros including the importer‑local patches in target `srcs`.
+- Run glue regeneration if needed: export graph → sync providers → gen auto_map, or run the prebuild guard locally to auto‑fix.
+
 ## Exporter simulate vs authoritative
 
 - For hermetic tests, use `--simulate`. CI uses authoritative mode.

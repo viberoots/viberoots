@@ -10,6 +10,10 @@ Provider sync maps patch files under `patches/<lang>` to Buck providers used in 
 - **Idempotency**: re-running should not change output when inputs are unchanged.
 - **Tests**: create a single patch using fixtures and assert stable provider name and paths.
 
+Node‑specific note (clarity):
+
+- The Node provider rule accepts `patch_paths` for diagnostics and visibility only. These paths are not used as Buck `srcs` to avoid cross‑package references from `third_party/providers/`. Invalidation for Node patches is achieved by macros adding importer‑local patch files to target `srcs` (see Patching Handbook).
+
 Canonical naming and helpers:
 
 - **Source of truth (TS helpers)**: `tools/lib/providers.ts` defines provider naming. Use `providerNameForModuleKey(importPath, version)` for Go module providers and `providerNameForImporter(lockfilePath, importer)` for Node importer‑scoped providers.

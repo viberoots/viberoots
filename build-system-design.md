@@ -1204,6 +1204,11 @@ main().catch(e => { console.error(e); process.exit(1); });
   - [ ] Targets mapped to that importer rebuild; other importers stay untouched.
 - Acceptance: **Importer‑scoped invalidation** works for Node.
 
+Note on invalidation mechanics (Node):
+
+- Provider stamps in `third_party/providers/` intentionally avoid using importer‑local patch files as `srcs` to respect Buck package boundaries.
+- Instead, Node macros include `<importer>/patches/node/*.patch` in target `srcs`, mirroring Go’s approach. Changing a patch invalidates only the importer’s Node targets.
+
 ## Appendix: Reference Snippets
 
 ### `writeIfChanged()` helper (TypeScript)
