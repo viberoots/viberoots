@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import assert from "node:assert/strict";
 import fs from "fs-extra";
+import assert from "node:assert/strict";
 import path from "node:path";
-import { runInTemp } from "../lib/test-helpers";
 import { readGraph } from "../../lib/graph";
+import { runInTemp } from "../lib/test-helpers";
 
 await runInTemp("cpp-macro-stamp-bin", async (tmp, $) => {
   const app = path.join(tmp, "apps", "demo");

@@ -1,9 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
 import { readGraph } from "../../lib/graph";
+import { runInTemp } from "../lib/test-helpers";
 
 test("export-graph writes tools/buck/graph.json and parses", async () => {
   await runInTemp("export-graph", async (tmp, $) => {

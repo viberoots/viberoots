@@ -25,8 +25,12 @@ third_party/providers/TARGETS.auto
 third_party/providers/TARGETS.node.auto
 third_party/providers/TARGETS.*.auto
 third_party/providers/auto_map.bzl
+third_party/providers/provider_index.bzl
+third_party/providers/provider_index.json
 tools/buck/graph.json
 tools/buck/export-metrics.json
+tools/buck/node-lock-index.json
+tools/buck/.export-cache/
 
 # Local out-links created during ad-hoc nix builds (not part of normal flow)
 buck-graph-result

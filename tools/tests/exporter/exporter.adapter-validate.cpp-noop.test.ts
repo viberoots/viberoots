@@ -2,8 +2,8 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
 import { readGraph } from "../../lib/graph";
+import { runInTemp } from "../lib/test-helpers";
 
 test("cpp adapter validate is a no-op and export succeeds", async () => {
   await runInTemp("exp-cpp-validate-noop", async (tmp, $) => {
