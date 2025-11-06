@@ -24,6 +24,12 @@ export async function run() {
   const { out, scope, simulate, maxParallel, cacheDir, metricsOut, validation } = parseArgs(
     (global as any).argv,
   );
+  const verbose = (() => {
+    const v = String(process.env.EXPORTER_VERBOSE || "")
+      .trim()
+      .toLowerCase();
+    return v === "1" || v === "true";
+  })();
   let nodes: Node[];
   if (simulate) nodes = await readSimulatedNodes(simulate);
   else nodes = await cqueryNodes(scope, attrList);
@@ -42,16 +48,25 @@ export async function run() {
 
   // Run adapter-level validation for all discovered adapters, collecting findings.
   const findings: string[] = [];
+  let nodeValidateMs = 0;
   for (const a of adapters) {
     if (typeof a.validate === "function") {
       try {
+        let t0: number | null = null;
+        if (verbose && a.name === "node") t0 = Date.now();
         const res = await a.validate(nodes);
+        if (t0 !== null) nodeValidateMs += Date.now() - t0;
         if (Array.isArray(res)) findings.push(...res.filter(Boolean));
       } catch (e: any) {
         // Adapters should not throw; convert to a finding to avoid losing context
         findings.push(String(e?.message || e));
       }
     }
+  }
+  if (verbose) {
+    try {
+      console.log(`[exporter][timing] node.validate: ${nodeValidateMs}ms`);
+    } catch {}
   }
 
   // Determine effective severity (CI forces error)
@@ -204,6 +219,7 @@ export async function run() {
 
   // Emit Node sidecar index mapping targets -> importer-scoped lockfile label
   try {
+    const sidecarStart = verbose ? Date.now() : 0;
     const idx: Record<string, string> = {};
     const parseLock = (s: string) => /^lockfile:([^#]+)#([^#]+)$/.exec(s);
     for (const n of normalized) {
@@ -223,6 +239,13 @@ export async function run() {
       version: SCHEMA_VERSION,
       index: ordered,
     });
+    if (verbose) {
+      try {
+        const ms = Date.now() - sidecarStart;
+        const cnt = Object.keys(ordered).length;
+        console.log(`[exporter][timing] node.sidecar: ${ms}ms (${cnt} entries)`);
+      } catch {}
+    }
   } catch {}
   if (metricsOut) await emitMetrics(metricsOut, gMetrics);
 
