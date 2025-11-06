@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import fs from "fs-extra";
+import fs from "node:fs";
 import {
   normalizeNixAttr,
   providerNameForImporter,

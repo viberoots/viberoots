@@ -194,6 +194,21 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
           .map((k) => keyToPatchPath.get(k) || "")
           .filter(Boolean)
           .sort();
+        // Discover importer-local patches for visibility (does not affect invalidation)
+        const importerLocalDir = path.join(importerLabel, "patches", "node");
+        let importerLocalPatches: string[] = [];
+        try {
+          const lst = await fsp.readdir(importerLocalDir);
+          importerLocalPatches = lst
+            .filter((f) => f.endsWith(".patch"))
+            .map((f) => path.join(importerLocalDir, f).replace(/^\.\/+/, ""))
+            .sort();
+        } catch {
+          importerLocalPatches = [];
+        }
+        const patchPaths = Array.from(
+          new Set<string>([...usedPatches, ...importerLocalPatches]),
+        ).sort();
         const name = providerNameForImporter(relLf, importerLabel);
         const key = `${relLf}#${importerLabel}`;
         const prev = seenNames.get(name);
@@ -206,7 +221,7 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
         }
         seenNames.set(name, key);
         entries.push(
-          `node_importer_deps(name="${name}", lockfile="${relLf}", importer="${importerLabel}", patch_paths=[${usedPatches
+          `node_importer_deps(name="${name}", lockfile="${relLf}", importer="${importerLabel}", patch_paths=[${patchPaths
             .map((s) => `"${s}"`)
             .join(", ")}])`,
         );

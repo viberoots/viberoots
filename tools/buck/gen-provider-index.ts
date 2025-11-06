@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import fs from "fs-extra";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { writeIfChanged } from "../lib/fs-helpers.ts";
 import { readGoEntries } from "./providers/go.ts";
@@ -14,8 +14,14 @@ function fq(labelTail: string): string {
 async function readCppIndexEntries(): Promise<Record<string, IndexEntry>> {
   const out: Record<string, IndexEntry> = {};
   const mapFile = path.resolve("third_party/providers/nix_attr_map.bzl");
-  if (!(await fs.pathExists(mapFile))) return out;
-  const txt = await fs.readFile(mapFile, "utf8").catch(() => "");
+  let exists = true;
+  try {
+    await fsp.access(mapFile);
+  } catch {
+    exists = false;
+  }
+  if (!exists) return out;
+  const txt = await fsp.readFile(mapFile, "utf8").catch(() => "");
   if (!txt) return out;
   // Parse lines like: "//third_party/providers:<name>": "nixpkg:<attr>",
   const re = /"(\/\/third_party\/providers:[^"]+)"\s*:\s*"(nixpkg:[^"]+)"/g;

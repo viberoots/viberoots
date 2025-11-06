@@ -50,6 +50,7 @@ This document proposes how to add first-class PNPM projects to this monorepo, in
    - Add `third_party/providers/defs_node.bzl` with a tiny `node_importer_deps(...)` genrule.
    - Continue to use `tools/buck/sync-providers-node.ts` to emit `TARGETS.node.auto` deterministically from all lockfiles and relevant `patches/node/*.patch`.
    - `gen-auto-map.ts` already maps `lockfile:<path>#<importer>` labels to provider deps used by Buck macros.
+   - Note: `patch_paths` in generated `node_importer_deps(...)` include importer‑local patches (e.g., `<importer>/patches/node/*.patch`) for observability only. The provider rule remains metadata‑only (`srcs = []`), and invalidation continues to be driven by macros including importer‑local patches in target `srcs`.
 
 4. **Labels on Node targets**
    - For each Node target, include `labels = ["lockfile:<relative/path/to/pnpm-lock.yaml#<importer>"]`.
