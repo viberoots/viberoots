@@ -316,6 +316,8 @@ await fs.outputFile(out, stdout);
 console.log(`wrote ${out}`);
 ```
 
+> Consumption note: downstream tools should not read `graph.json` directly. Use the Composite Graph API instead — library `tools/lib/graph-view.ts` or CLI `node tools/buck/graph-view.ts`. The exporter also emits a Node sidecar index at `tools/buck/node-lock-index.json` and includes `$schema` and `version` fields in both files.
+
 ### Validation modes (warn vs error)
 
 The exporter aggregates adapter findings (e.g., labeling irregularities) and applies a severity mode:

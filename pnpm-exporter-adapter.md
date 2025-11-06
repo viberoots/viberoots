@@ -68,6 +68,10 @@ Introduce a tiny library and optional CLI so all downstream tools consume a comp
   - Return a normalized structure that includes per‑target provider mapping (Node lockfile providers, nixpkg providers, and gated Go module providers) and the importer lock mapping.
 - CLI: `tools/buck/graph-view.ts` prints the composite view to stdout for scripts/dashboards.
 
+See also:
+
+- Handbook conventions for the Composite Graph API and sidecar expectations: `docs/handbook/conventions.md` (Graph consumption section).
+
 Contract:
 
 - All internal tooling must consume the Composite Graph API; direct reads of `graph.json` are unsupported.

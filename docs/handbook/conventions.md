@@ -40,3 +40,9 @@ This handbook summarizes project-wide conventions that keep behavior determinist
   - Strict flow: the planner has no discovery fallback. Always regenerate glue before Nix builds.
   - Local regeneration order: export-graph → sync-providers → gen-auto-map (see Troubleshooting and README).
   - For Go, third‑party deps are resolved by Nix + gomod2nix; no synthetic Buck targets are created for external modules.
+
+- Graph consumption (Composite Graph API)
+  - Tools must consume the Composite Graph API, not `graph.json` directly.
+  - Library: `tools/lib/graph-view.ts`; CLI: `node tools/buck/graph-view.ts`.
+  - Sidecars: `third_party/providers/provider_index.json` and `tools/buck/node-lock-index.json`.
+  - Schema/version: both `tools/buck/graph.json` and `tools/buck/node-lock-index.json` include `$schema` and `version`; the exporter prints a banner pointing to the Composite Graph API on success.
