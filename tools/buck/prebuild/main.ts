@@ -109,6 +109,24 @@ export async function run(): Promise<void> {
     }
   }
 
+  // PR 4: Enforce Node sidecar freshness relative to graph.json specifically
+  try {
+    const graphPath = "tools/buck/graph.json";
+    const nodeLockIdx = "tools/buck/node-lock-index.json";
+    if (fs.existsSync(graphPath) && fs.existsSync(nodeLockIdx)) {
+      const g = mtimeSafe(graphPath) || 0;
+      const n = mtimeSafe(nodeLockIdx) || 0;
+      if (g > n + skewMs) {
+        needFixFreshness = true;
+        if (mode === "ci") {
+          console.error(
+            `ERROR: ${nodeLockIdx} is stale relative to ${graphPath} — re-run export-graph to regenerate sidecar`,
+          );
+        }
+      }
+    }
+  } catch {}
+
   const needFix = needFixPresence || needFixFreshness;
 
   // Validate provider_index.json contains entries for patched Go modules
