@@ -12,13 +12,15 @@ test("patch-cpp apply writes encoded patch filename and auto-discovery note", as
     const map = { "pkgs.zlib": { version: "1.2.13", srcPath: storeSrc, pname: "zlib" } };
 
     await $`chmod +x tools/bin/patch-pkg`;
-    const wsOut = await $({ cwd: tmp })`NIX_CPP_TEST_RESOLVE_JSON=${JSON.stringify(
+    const wsOut = await $({
+      cwd: tmp,
+    })`PATCH_CPP_DEBUG=1 NIX_CPP_TEST_RESOLVE_JSON=${JSON.stringify(
       map,
     )} tools/bin/patch-pkg start cpp pkgs.zlib`;
     const ws = String(wsOut.stdout).trim().split(/\s+/).pop() as string;
     await fsp.writeFile(path.join(ws, "file.txt"), "B\n", "utf8");
 
-    const out = await $({ cwd: tmp })`NIX_CPP_TEST_RESOLVE_JSON=${JSON.stringify(
+    const out = await $({ cwd: tmp })`PATCH_CPP_DEBUG=1 NIX_CPP_TEST_RESOLVE_JSON=${JSON.stringify(
       map,
     )} tools/bin/patch-pkg apply cpp --target //libs/core:lib zlib`;
     const outTxtAll = String(out.stdout || out.stderr || "");
@@ -31,12 +33,27 @@ test("patch-cpp apply writes encoded patch filename and auto-discovery note", as
       await fsp.access(patch);
     } catch {
       console.error("expected cpp patch file missing");
+      console.error(
+        "--- captured output start ---\n" + outTxtAll + "\n--- captured output end ---",
+      );
+      try {
+        const dir = path.dirname(patch);
+        const ls = await $({ cwd: tmp, stdio: "pipe" })`ls -la ${dir}`.nothrow();
+        console.error(
+          "--- dir listing start ---\n" +
+            String(ls.stdout || ls.stderr || "") +
+            "\n--- dir listing end ---",
+        );
+      } catch {}
       process.exit(2);
     }
 
     const txt = String(out.stdout || "");
     if (!txt.toLowerCase().includes("auto-discovers patches")) {
       console.error("expected auto-discovery note in stdout");
+      console.error(
+        "--- captured output start ---\n" + outTxtAll + "\n--- captured output end ---",
+      );
       process.exit(2);
     }
   });

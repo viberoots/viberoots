@@ -409,13 +409,8 @@ async function patchUuidWorkspace(workspacePath: string): Promise<void> {
     }
     if (!/package\s+uuid\b/.test(txt)) continue;
     let out = txt;
-    // Patch NewString() to return zero UUID string
-    out = out.replace(
-      /func\s+NewString\s*\(\s*\)\s*string\s*\{[\s\S]*?\}/m,
-      'func NewString() string {\n\treturn "00000000-0000-0000-0000-000000000000"\n}',
-    );
-    // Do not alter New(), NewRandom(), or NewRandomFromReader(); keep minimal surface to avoid hunk drift
-    // Patch String() method to always return zero UUID string
+    // Patch only String() method to always return zero UUID string.
+    // Avoid touching NewString() to prevent redeclaration conflicts across files in certain versions.
     out = out.replace(
       /func\s*\(\s*\w+\s+UUID\s*\)\s*String\s*\(\s*\)\s*string\s*\{[\s\S]*?\}/m,
       'func (u UUID) String() string {\n\treturn "00000000-0000-0000-0000-000000000000"\n}',

@@ -2,13 +2,30 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { SessionRecord, SessionStore } from "./types";
 
+function debugEnabled(): boolean {
+  try {
+    return String(process.env.PATCH_CPP_DEBUG || "").trim() === "1";
+  } catch {
+    return false;
+  }
+}
+
+function dbg(...args: any[]) {
+  if (!debugEnabled()) return;
+  try {
+    console.error("[patch-state][debug]", ...args);
+  } catch {}
+}
+
 function storePath(): string {
   try {
     const here = path.dirname(new URL(import.meta.url).pathname);
     const repoRoot =
       (process.env.WORKSPACE_ROOT && path.resolve(process.env.WORKSPACE_ROOT)) ||
       path.resolve(here, "..", "..");
-    return path.join(repoRoot, ".patch-sessions.json");
+    const p = path.join(repoRoot, ".patch-sessions.json");
+    dbg("storePath", { repoRoot, p });
+    return p;
   } catch {
     return ".patch-sessions.json";
   }
@@ -19,6 +36,7 @@ async function readStore(): Promise<SessionStore> {
   try {
     await fsp.access(p);
   } catch {
+    dbg("readStore: new");
     return { version: 1, sessions: {} };
   }
   const txt = await fsp.readFile(p, "utf8");
@@ -28,6 +46,7 @@ async function readStore(): Promise<SessionStore> {
       throw new Error("invalid session store");
     }
     obj.sessions ||= {} as any;
+    dbg("readStore: ok", { keys: Object.keys(obj.sessions || {}) });
     return obj;
   } catch {
     throw new Error("failed to parse .patch-sessions.json");
@@ -42,18 +61,22 @@ async function writeStore(store: SessionStore): Promise<void> {
   try {
     // Best-effort atomic replace
     await fsp.rename(tmp, p);
+    dbg("writeStore: renamed", { p });
   } catch {
     try {
       await fsp.rm(p, { force: true });
     } catch {}
     await fsp.rename(tmp, p);
+    dbg("writeStore: replaced", { p });
   }
 }
 
 export async function getSession(lang: string, moduleKey: string): Promise<SessionRecord | null> {
   const st = await readStore();
   const byLang = st.sessions[lang] || {};
-  return byLang[moduleKey] || null;
+  const out = (byLang as any)[moduleKey] || null;
+  dbg("getSession", { lang, moduleKey, hit: !!out });
+  return out;
 }
 
 export async function setSession(
@@ -65,6 +88,7 @@ export async function setSession(
   st.sessions[lang] ||= {} as any;
   st.sessions[lang]![moduleKey] = rec;
   await writeStore(st);
+  dbg("setSession", { lang, moduleKey });
 }
 
 export async function deleteSession(lang: string, moduleKey: string): Promise<void> {
@@ -73,6 +97,7 @@ export async function deleteSession(lang: string, moduleKey: string): Promise<vo
     delete st.sessions[lang]![moduleKey];
   }
   await writeStore(st);
+  dbg("deleteSession", { lang, moduleKey });
 }
 
 export async function findSessionBy(
@@ -96,5 +121,6 @@ export async function listSessions(
   for (const [k, rec] of Object.entries(byLang)) {
     out.push({ moduleKey: k, rec: rec as SessionRecord });
   }
+  dbg("listSessions", { lang, count: out.length });
   return out;
 }

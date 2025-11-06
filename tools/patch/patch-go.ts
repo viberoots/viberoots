@@ -5,10 +5,28 @@ import path from "node:path";
 import { encodeForPatchFilename } from "../lib/providers";
 import { makeWorkspace } from "./cross-platform";
 import { makeUnifiedDiff } from "./diff";
-import { resolveModule } from "./go-module-resolve";
 import { runGlue } from "./glue";
+import { resolveModule } from "./go-module-resolve";
 import { deleteSession, getSession, setSession } from "./state";
 import type { LanguageHandler, SessionRecord } from "./types";
+
+function debugEnabled(): boolean {
+  try {
+    return (
+      String(process.env["PATCH_GO_DEBUG"]) === "1" ||
+      String(process.env["PATCH_CPP_DEBUG"]) === "1"
+    );
+  } catch {
+    return false;
+  }
+}
+
+function dbg(...args: any[]) {
+  if (!debugEnabled()) return;
+  try {
+    console.error("[patch-go][debug]", ...args);
+  } catch {}
+}
 
 async function pathExists(p: string): Promise<boolean> {
   try {
@@ -54,6 +72,7 @@ function readDevOverrides(): Record<string, string> {
 }
 
 function writeDevOverrides(map: Record<string, string>) {
+  dbg("writeDevOverrides: before", { cur: process.env.NIX_GO_DEV_OVERRIDE_JSON || "" });
   process.env.NIX_GO_DEV_OVERRIDE_JSON = JSON.stringify(map);
   if (process.env.CI === "true" && Object.keys(map).length > 0) {
     throw new Error("Dev overrides are forbidden in CI (NIX_GO_DEV_OVERRIDE_JSON is set)");
@@ -63,9 +82,11 @@ function writeDevOverrides(map: Record<string, string>) {
       "[OVERRIDES ACTIVE] NIX_GO_DEV_OVERRIDE_JSON is set — local derivations will differ.",
     );
   }
+  dbg("writeDevOverrides: after", { next: process.env.NIX_GO_DEV_OVERRIDE_JSON || "" });
 }
 
 async function doStart(args: string[]) {
+  dbg("start: proc", { pid: process.pid, cwd: process.cwd() });
   const importPath = moduleArg(args);
   const { version, originPath } = await resolveModule(importPath);
   const key = moduleKey(importPath, version);
@@ -84,6 +105,7 @@ async function doStart(args: string[]) {
     }
   }
   const ws = await makeWorkspace(originPath, key);
+  dbg("start: resolved", { importPath, version, originPath, ws, key });
   const now = new Date().toISOString();
   const rec: SessionRecord = {
     importPath,
@@ -94,9 +116,11 @@ async function doStart(args: string[]) {
     updatedAt: now,
   };
   await setSession("go", key, rec);
+  dbg("start: setSession", { key, ws });
   const dev = readDevOverrides();
   dev[key] = ws;
   writeDevOverrides(dev);
+  dbg("start: setOverride", { key, ws });
   console.log(ws);
   // Optional: open editor if requested (best-effort)
   if (process.env.PATCH_EDITOR && process.env.PATCH_EDITOR.trim() !== "") {
@@ -142,18 +166,26 @@ async function doApply(args: string[]) {
     }
   }
   const importPath = moduleArg(rest);
+  dbg("apply: flags", { targetPkg, overridePatchDir, importPath });
   const { version, originPath } = await resolveModule(importPath);
   const key = moduleKey(importPath, version);
   const sess = await getSession("go", key);
   if (!sess) throw new Error(`no active session for ${key}; run: patch-pkg start go ${importPath}`);
   const diff = await makeUnifiedDiff(sess.originPath, sess.workspacePath);
+  dbg("apply: diff", {
+    origin: sess.originPath,
+    workspace: sess.workspacePath,
+    length: diff ? diff.length : 0,
+  });
   if (!diff || diff.trim() === "") {
     // Even on no-op, ensure we clear any dev overrides and end the session to avoid
     // leaking state into subsequent builds/tests.
     const dev = readDevOverrides();
+    dbg("apply: no-op clearing override", { key, hadOverride: !!dev[key] });
     delete dev[key];
     writeDevOverrides(dev);
     await deleteSession("go", key);
+    dbg("apply: no-op done", { key });
     console.log("no changes; no-op (cleared dev overrides and ended session)");
     return;
   }
@@ -173,12 +205,14 @@ async function doApply(args: string[]) {
   }
   await mkdirp(patchDir);
   const dst = path.join(patchDir, `${enc}@${version}.patch`);
+  dbg("apply: paths", { repoRoot, patchDir, dst });
   let write = true;
   if (await pathExists(dst)) {
     const cur = await fsp.readFile(dst, "utf8");
     if (cur === diff) {
       console.log("no-op (already applied)");
       write = false;
+      dbg("apply: already-applied", { dst });
     } else if (!(global as any).argv?.force) {
       throw new Error(`${dst} exists with different content. Re-run with --force to overwrite.`);
     }
@@ -186,6 +220,10 @@ async function doApply(args: string[]) {
   if (write) {
     console.error(`[patch-go] writing patch: ${dst}`);
     await outputFile(dst, diff, "utf8");
+    try {
+      const st = await fsp.stat(dst);
+      dbg("apply: wrote", { size: st.size, mtimeMs: st.mtimeMs });
+    } catch {}
   }
 
   // Strict apply verification: ensure patch applies cleanly against origin

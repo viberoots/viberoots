@@ -3,9 +3,9 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { makeUnifiedDiff } from "./diff";
+import { runGlue } from "./glue";
 import { deleteSession, getSession, listSessions, setSession } from "./state";
 import type { LanguageHandler, SessionRecord } from "./types";
-import { runGlue } from "./glue";
 
 async function pathExists(p: string): Promise<boolean> {
   try {
@@ -14,6 +14,21 @@ async function pathExists(p: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+function debugEnabled(): boolean {
+  try {
+    return String(process.env.PATCH_CPP_DEBUG || "").trim() === "1";
+  } catch {
+    return false;
+  }
+}
+
+function dbg(...args: any[]) {
+  if (!debugEnabled()) return;
+  try {
+    console.error("[patch-cpp][debug]", ...args);
+  } catch {}
 }
 
 function attrArg(args: string[]): string {
@@ -145,11 +160,13 @@ async function ensureOriginAndWorkspace(
   // Create workspace by cloning originPath
   await $`rsync -a ${originPath}/ ${wsRoot}/`;
   await $`chmod -R u+w ${wsRoot}`;
+  dbg("ensureOriginAndWorkspace", { attr: attrNorm, originRoot, wsRoot, version, pname });
   return { key, originPath, workspacePath: wsRoot, version, pname };
 }
 
 async function doStart(args: string[]) {
   console.error("[patch-cpp] start: begin");
+  dbg("start: proc", { pid: process.pid, cwd: process.cwd() });
   const attrInput = attrArg(args);
   const attrNorm = normalizeAttr(attrInput);
   // Idempotency: if a session already exists and workspace is present, reuse it.
@@ -159,6 +176,7 @@ async function doStart(args: string[]) {
   const existing = await getSession("cpp", key);
   if (existing && (await pathExists(existing.workspacePath))) {
     console.error("[patch-cpp] start: reuse existing workspace", existing.workspacePath);
+    dbg("start: reuse-session", { key, existing });
     console.log(existing.workspacePath);
     return;
   }
@@ -175,6 +193,7 @@ async function doStart(args: string[]) {
   };
   await setSession("cpp", key, rec);
   console.error("[patch-cpp] start: workspace ready", workspacePath);
+  dbg("start: session-set", { key, rec });
   console.log(workspacePath);
   // Suggest a dev override snippet for local iteration parity (unset before CI)
   const snippet = `export NIX_CPP_DEV_OVERRIDE_JSON='${JSON.stringify({ [attrNorm]: workspacePath })}'`;
@@ -191,6 +210,7 @@ async function doStart(args: string[]) {
 
 async function doApply(args: string[]) {
   console.error("[patch-cpp] apply: begin");
+  dbg("apply: proc", { pid: process.pid, cwd: process.cwd() });
   // Parse optional flags to support local patch-dir targeting
   let targetPkg = "";
   let overridePatchDir = "";
@@ -226,12 +246,14 @@ async function doApply(args: string[]) {
       rest.push(a);
     }
   }
+  dbg("apply: parsed-flags", { targetPkg, overridePatchDir, rest });
   const attrInput = attrArg(rest);
   const attrNorm = normalizeAttr(attrInput);
   // Avoid redundant nixpkgs resolutions during apply: reuse an existing session.
   // Choose the most recent session for this attr whose workspace still exists; fall back to newest.
   const all = await listSessions("cpp");
   const matches = all.filter((e) => e.rec.importPath === attrNorm);
+  dbg("apply: sessions", { total: all.length, matches: matches.length });
   let sess: SessionRecord | null = null;
   if (matches.length) {
     // If multiple sessions exist for this attr, prefer the one matching the currently
@@ -275,6 +297,12 @@ async function doApply(args: string[]) {
       `no active session for ${attrNorm}; run: patch-pkg start cpp ${attrInput} before apply`,
     );
   }
+  dbg("apply: chosen-session", {
+    importPath: sess.importPath,
+    version: sess.version,
+    originPath: sess.originPath,
+    workspacePath: sess.workspacePath,
+  });
   console.error("[patch-cpp] apply: computing diff");
   let diff = "";
   try {
@@ -288,9 +316,15 @@ async function doApply(args: string[]) {
     );
   }
   if (!diff || diff.trim() === "") {
+    dbg("apply: empty-diff", { origin: sess.originPath, workspace: sess.workspacePath });
     console.log("no changes; no-op");
     return;
   }
+  // Emit lightweight debug about the diff (length and first header lines)
+  try {
+    const header = diff.split(/\r?\n/).slice(0, 10);
+    dbg("apply: diff-summary", { length: diff.length, lines: header });
+  } catch {}
 
   const fileKey = encodeAttrForFilename(attrNorm);
   const repoRoot = process.env.WORKSPACE_ROOT || process.env.LIVE_ROOT || process.cwd();
@@ -308,6 +342,7 @@ async function doApply(args: string[]) {
   }
   await fsp.mkdir(patchDir, { recursive: true });
   const dst = path.join(patchDir, `${fileKey}@${sess.version}.patch`);
+  dbg("apply: paths", { repoRoot, patchDir, dst });
 
   let write = true;
   if (await pathExists(dst)) {
@@ -315,6 +350,7 @@ async function doApply(args: string[]) {
     if (cur === diff) {
       console.log("no-op (already applied)");
       write = false;
+      dbg("apply: already-applied", { dst });
     } else if (!(global as any).argv.force) {
       throw new Error(`${dst} exists with different content. Re-run with --force to overwrite.`);
     }
@@ -322,6 +358,11 @@ async function doApply(args: string[]) {
   if (write) {
     await fsp.mkdir(path.dirname(dst), { recursive: true });
     await fsp.writeFile(dst, diff, "utf8");
+    dbg("apply: wrote-patch", { dst, bytes: diff.length });
+    try {
+      const st = await fsp.stat(dst);
+      dbg("apply: patch-stat", { size: st.size, mtimeMs: st.mtimeMs });
+    } catch {}
   }
   console.error("[patch-cpp] apply: wrote patch", dst);
   // Proactively print note so callers capturing stdout see it even if verification chats to tty
@@ -344,6 +385,7 @@ async function doApply(args: string[]) {
         stdio: "pipe",
         env: { ...process.env, LC_ALL: "C" },
       })`patch -s -p1 --dry-run -i ${path.resolve(dst)}`.nothrow();
+      dbg("apply: dry-run", { exitCode: res.exitCode, stderrLen: String(res.stderr || "").length });
       if ((res.exitCode || 0) !== 0) {
         const stderr = String(res.stderr || "").trim();
         throw new Error(stderr || "patch dry-run failed");
@@ -369,8 +411,10 @@ async function doApply(args: string[]) {
   try {
     const key = `${attrNorm}@${sess.version}`.toLowerCase();
     await deleteSession("cpp", key);
+    dbg("apply: session-deleted", { key });
   } catch {}
   // Message: confirmation and path of patch file
+  dbg("apply: stdout-patch-path", { dst });
   console.log(dst);
 }
 

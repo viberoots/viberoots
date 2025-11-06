@@ -1,12 +1,31 @@
+function debugEnabled(): boolean {
+  try {
+    return String(process.env.PATCH_CPP_DEBUG || "").trim() === "1";
+  } catch {
+    return false;
+  }
+}
+
+function dbg(...args: any[]) {
+  if (!debugEnabled()) return;
+  try {
+    console.error("[patch-diff][debug]", ...args);
+  } catch {}
+}
+
 export async function makeUnifiedDiff(srcDir: string, dstDir: string): Promise<string> {
   // Require git --no-index so we get canonical a/ and b/ prefixes; do not fallback.
   const res = await $({
     stdio: "pipe",
   })`git --no-pager diff --no-index -U3 --src-prefix=a/ --dst-prefix=b/ -- ${srcDir} ${dstDir}`.nothrow();
   let s = String(res.stdout || "");
+  try {
+    dbg("git-diff", { exitCode: res.exitCode, stderrLen: String(res.stderr || "").length });
+  } catch {}
   // If there are no changes, stdout will be empty. Treat that as a clean no-op diff
   // and return an empty string so callers can handle it without failing.
   if (!s) {
+    dbg("git-diff-empty", { srcDir, dstDir });
     return "";
   }
   // Normalize absolute path bleed-through by simple prefix replacement on headers

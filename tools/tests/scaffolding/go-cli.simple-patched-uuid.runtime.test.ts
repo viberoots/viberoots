@@ -105,7 +105,7 @@ async function applyPatchPkg($: any, tmp: string, resolveOrigin: string) {
 }
 
 async function patchUuidWorkspaceToZero($: any, ws: string) {
-  // Replace uuid.NewString and UUID.String to return zero
+  // Replace only UUID.String to return zero (leave NewString as-is to avoid redeclarations)
   const walk = async (dir: string) => {
     const names = await fsp.readdir(dir);
     for (const n of names) {
@@ -115,10 +115,6 @@ async function patchUuidWorkspaceToZero($: any, ws: string) {
       else if (p.endsWith(".go")) {
         let txt = await fsp.readFile(p, "utf8");
         let out = txt.replace(
-          /func\s+NewString\s*\(\s*\)\s*string\s*\{[\s\S]*?\}/m,
-          'func NewString() string {\n\treturn "00000000-0000-0000-0000-000000000000"\n}',
-        );
-        out = out.replace(
           /func\s*\(\s*\w+\s+UUID\s*\)\s*String\s*\(\s*\)\s*string\s*\{[\s\S]*?\}/m,
           'func (u UUID) String() string {\n\treturn "00000000-0000-0000-0000-000000000000"\n}',
         );
@@ -127,6 +123,25 @@ async function patchUuidWorkspaceToZero($: any, ws: string) {
     }
   };
   await walk(ws);
+}
+
+async function readPinnedNixpkgsUrl(tmpRepoRoot: string): Promise<string> {
+  // Pin nixpkgs to the repo's flake.lock to avoid nondeterministic Go toolchain/tag selection
+  try {
+    const lockPath = path.join(tmpRepoRoot, "flake.lock");
+    const txt = await fsp.readFile(lockPath, "utf8");
+    const lock = JSON.parse(txt);
+    const node = (lock?.nodes?.nixpkgs || lock?.nodes?.root?.inputs?.nixpkgs) && lock.nodes.nixpkgs;
+    const locked = node?.locked || {};
+    const owner = locked.owner || "NixOS";
+    const repo = locked.repo || "nixpkgs";
+    const rev = locked.rev;
+    if (rev && typeof rev === "string") {
+      return `github:${owner}/${repo}/${rev}`;
+    }
+  } catch {}
+  // Fallback to a moving channel if lock is unavailable in the temp repo (should be rare)
+  return "github:NixOS/nixpkgs/nixos-unstable";
 }
 
 test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () => {
@@ -235,9 +250,10 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
     // Local flake using buildGoModule + vendorHash (Option E). Compute vendorHash
     // deterministically from the vendored tree, then build and run.
     const flakePath = path.join(_tmp, "flake.nix");
+    const pinnedUrl = await readPinnedNixpkgsUrl(_tmp);
     const flakeTemplate = () => `{
   description = "temp app flake";
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  inputs.nixpkgs.url = "${pinnedUrl}";
   outputs = { self, nixpkgs }:
     let
       systems = [ "aarch64-darwin" "aarch64-linux" "x86_64-linux" ];
