@@ -2,6 +2,7 @@
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { makeUnifiedDiff } from "./diff";
 import { runGlue } from "./glue";
 import { deleteSession, getSession, listSessions, setSession } from "./state";
@@ -319,6 +320,42 @@ async function doApply(args: string[]) {
     dbg("apply: empty-diff", { origin: sess.originPath, workspace: sess.workspacePath });
     console.log("no changes; no-op");
     return;
+  }
+  // When debugging, surface concise diagnostics to understand unexpected diffs
+  if (debugEnabled()) {
+    try {
+      const nameStatus = await $({
+        stdio: "pipe",
+      })`git --no-pager diff --no-index --name-status -- ${sess.originPath} ${sess.workspacePath}`.nothrow();
+      console.error(
+        "[patch-cpp][debug] diff-name-status:\n" +
+          String(nameStatus.stdout || nameStatus.stderr || "").trim(),
+      );
+    } catch {}
+    // List a shallow view of both trees to spot stray files or permissions
+    try {
+      const listA = await $({
+        cwd: sess.originPath,
+        stdio: "pipe",
+      })`bash -lc 'find . -maxdepth 2 -type f -ls | sed -n 1,80p'`.nothrow();
+      console.error(
+        "[patch-cpp][debug] origin-list:\n" + String(listA.stdout || listA.stderr || "").trim(),
+      );
+    } catch {}
+    try {
+      const listB = await $({
+        cwd: sess.workspacePath,
+        stdio: "pipe",
+      })`bash -lc 'find . -maxdepth 2 -type f -ls | sed -n 1,80p'`.nothrow();
+      console.error(
+        "[patch-cpp][debug] workspace-list:\n" + String(listB.stdout || listB.stderr || "").trim(),
+      );
+    } catch {}
+    // Emit a short header of the diff to provide context without flooding logs
+    try {
+      const header = diff.split(/\r?\n/).slice(0, 40).join("\n");
+      console.error("[patch-cpp][debug] diff-head:\n" + header);
+    } catch {}
   }
   // Emit lightweight debug about the diff (length and first header lines)
   try {

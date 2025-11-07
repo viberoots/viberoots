@@ -30,6 +30,9 @@ export async function run() {
       .toLowerCase();
     return v === "1" || v === "true";
   })();
+  const argvObj: Record<string, any> = ((global as any).argv || {}) as any;
+  const cliValidation = typeof argvObj?.validation === "string" ? String(argvObj.validation) : "";
+  const envValidation = String(process.env.EXPORTER_VALIDATION || "");
   let nodes: Node[];
   if (simulate) nodes = await readSimulatedNodes(simulate);
   else nodes = await cqueryNodes(scope, attrList);
@@ -72,6 +75,17 @@ export async function run() {
   // Determine effective severity (CI forces error)
   const ci = String(process.env.CI || "").toLowerCase() === "true";
   const mode: "warn" | "error" = ci ? "error" : validation;
+  if (verbose) {
+    try {
+      console.log(
+        `[exporter][mode] validation=${mode} (ci=${ci}, cli=${cliValidation || "-"}, env=${
+          envValidation || "-"
+        })`,
+      );
+      console.log(`[exporter][adapters] present=${adapters.map((a) => a.name).join(",")}`);
+      console.log(`[exporter][findings] count=${findings.length}`);
+    } catch {}
+  }
   if (findings.length) {
     const hdr = `[exporter] validation ${mode === "warn" ? "warnings" : "errors"} (${findings.length}):`;
     const body = findings.map((m) => `- ${m}`).join("\n\n");
@@ -84,6 +98,12 @@ export async function run() {
   }
 
   const active = adapters.filter((a) => nodes.some((n) => a.isNode(n)));
+  if (verbose) {
+    try {
+      console.log(`[exporter][adapters] active=${active.map((a) => a.name).join(",")}`);
+      console.log(`[exporter][nodes] count=${nodes.length}${simulate ? " (simulate)" : ""}`);
+    } catch {}
+  }
 
   // Fast path if no known-language nodes
   if (active.length === 0) {

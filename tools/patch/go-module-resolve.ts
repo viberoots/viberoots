@@ -5,6 +5,23 @@ import type { ResolveResult } from "./types";
 
 type Gomod2Nix = Record<string, { version?: string; src?: { url?: string } } | any>;
 
+function debugEnabled(): boolean {
+  try {
+    return (
+      String(process.env["PATCH_GO_DEBUG"]) === "1" ||
+      String(process.env["PATCH_CPP_DEBUG"]) === "1"
+    );
+  } catch {
+    return false;
+  }
+}
+function dbg(...args: any[]) {
+  if (!debugEnabled()) return;
+  try {
+    console.error("[go-module-resolve][debug]", ...args);
+  } catch {}
+}
+
 async function readGomod2nix(repoRoot: string): Promise<Gomod2Nix> {
   const tomlPath = path.join(repoRoot, "gomod2nix.toml");
   try {
@@ -40,11 +57,13 @@ async function readGomod2nix(repoRoot: string): Promise<Gomod2Nix> {
 export async function resolveModuleVersion(importPath: string): Promise<string> {
   const repoRoot = process.cwd();
   const doc = await readGomod2nix(repoRoot);
+  dbg("resolveModuleVersion: keys", Object.keys(doc).length);
   const key = Object.keys(doc).find((k) => k.toLowerCase() === importPath.toLowerCase());
   if (!key) throw new Error(`module not found in gomod2nix.toml: ${importPath}`);
   const ent = doc[key];
   const v = (ent && (ent.version || ent.rev || ent.ref)) as string | undefined;
   if (!v) throw new Error(`missing version for ${importPath} in gomod2nix.toml`);
+  dbg("resolveModuleVersion: hit", { importPath, version: v });
   return String(v);
 }
 
@@ -52,6 +71,7 @@ export async function resolvePristineSource(importPath: string, version: string)
   // Strategy: prefer explicit env override (tests), then GOMODCACHE env, then `go env GOMODCACHE`.
   const envCache = process.env.GOMODCACHE || process.env.NIX_GO_TEST_GOMODCACHE || "";
   let gomodcache = envCache.trim();
+  dbg("resolvePristineSource: env GOMODCACHE", gomodcache || "<empty>");
   if (!gomodcache) {
     try {
       const stdout = await new Promise<string>((resolve, reject) => {
@@ -63,10 +83,12 @@ export async function resolvePristineSource(importPath: string, version: string)
       gomodcache = String(stdout || "").trim();
     } catch {}
   }
+  dbg("resolvePristineSource: computed GOMODCACHE", gomodcache || "<empty>");
   if (!gomodcache)
     throw new Error("cannot determine GOMODCACHE (set GOMODCACHE or NIX_GO_TEST_GOMODCACHE)");
   // Go's module cache layout uses paths like: $GOMODCACHE/<importPath>@<version>
   const candidate = path.join(gomodcache, importPath + "@" + version);
+  dbg("resolvePristineSource: candidate", candidate);
   try {
     await fsp.access(candidate);
     return candidate;

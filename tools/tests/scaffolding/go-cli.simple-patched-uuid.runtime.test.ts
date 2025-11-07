@@ -4,6 +4,13 @@ import path from "node:path";
 import process from "node:process";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+const DEBUG = String(process.env.GO_SIMPLE_PATCHED_UUID_DEBUG || "") === "1";
+function dbg(...args: any[]) {
+  if (!DEBUG) return;
+  try {
+    console.error("[go-cli.simple-patched-uuid][debug]", ...args);
+  } catch {}
+}
 
 // Ensure Node is on PATH inside zx_test sandboxes that may not have dev shell
 process.env.PATH = `${path.dirname(process.execPath)}:${process.env.PATH || ""}`;
@@ -251,6 +258,7 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
     // deterministically from the vendored tree, then build and run.
     const flakePath = path.join(_tmp, "flake.nix");
     const pinnedUrl = await readPinnedNixpkgsUrl(_tmp);
+    dbg("pinned nixpkgs:", pinnedUrl);
     const flakeTemplate = () => `{
   description = "temp app flake";
   inputs.nixpkgs.url = "${pinnedUrl}";
@@ -276,11 +284,29 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
 }`;
     await fsp.writeFile(flakePath, flakeTemplate(), "utf8");
     // Rebuild with pinned vendorHash (offline GOPROXY)
+    // Optional: preflight diagnostics on vendor dir
+    if (DEBUG) {
+      try {
+        const h1 = await $({ stdio: "pipe" })`nix hash path ${path.join(
+          _tmp,
+          "apps",
+          "demo-cli",
+          "vendor",
+        )}`.nothrow();
+        dbg("vendor tree sha256:", String(h1.stdout || h1.stderr || "").trim());
+        const h2 = await $({ stdio: "pipe" })`nix hash path ${vendUuidDir}`.nothrow();
+        dbg("vendor uuid dir sha256:", String(h2.stdout || h2.stderr || "").trim());
+      } catch {}
+      try {
+        const envOut = await $({ stdio: "pipe" })`go env GOPATH GOMODCACHE GOTOOLDIR`.nothrow();
+        dbg("go env:", String(envOut.stdout || envOut.stderr || "").trim());
+      } catch {}
+    }
     await $({
       cwd: _tmp,
       stdio: "inherit",
       env: { ...process.env, GOPROXY: "off", GOSUMDB: "off" },
-    })`nix build .#app --accept-flake-config`;
+    })`nix build .#app --accept-flake-config --show-trace`;
     const bin = path.join(_tmp, "result", "bin", "demo-cli");
     const run = await $({ stdio: "pipe" })`${bin} --name Bob`;
     const outStr = String(run.stdout || "").trim();
