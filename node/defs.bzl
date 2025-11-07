@@ -1,5 +1,6 @@
 load("@prelude//:rules.bzl", "genrule")
 load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve")
+load("//node/private:nix_test.bzl", "node_nix_test")
 
 # NOTE: Prebuild guard ensures this load is valid before builds/tests run.
 MODULE_PROVIDERS = {}
@@ -52,16 +53,53 @@ def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = []
         kwargs["cmd"] = cmd
     genrule(**kwargs)
 
-def nix_node_test(name, srcs = [], out = None, cmd = None, deps = [], labels = [], lockfile_label = None, kind = "test", **kwargs):
-    nix_node_gen(
+def nix_node_test(
+    name,
+    # Backward-compat args (ignored by runner; 'out' forwarded for stamp name)
+    srcs = [],
+    out = None,
+    cmd = None,
+    # New runner args
+    patterns = None,
+    env = {},
+    timeout_sec = 600,
+    deps = [],
+    labels = [],
+    lockfile_label = None,
+    kind = "test",
+    **kwargs
+):
+    # Prepare kwargs and label stamping
+    kw = { "name": name }
+    kw["labels"] = labels or []
+    _ensure_lockfile_label(kw, lockfile_label)
+    stamp_labels(kw, "node", kind)
+
+    # Derive importer from the single required lockfile label
+    _lf = _extract_lockfile_labels(kw.get("labels", []))
+    _importer = None
+    if len(_lf) == 1 and isinstance(_lf[0], str) and ("#" in _lf[0]):
+        _importer = _lf[0].split("#")[1]
+    if _importer == None or _importer == "":
+        fail("nix_node_test: importer could not be inferred from lockfile label; pass lockfile_label=\"lockfile:<path>#<importer>\"")
+
+    # Include importer-local node patches as inputs so changes invalidate tests precisely
+    merged_srcs = list(srcs)
+    _patch_dir = "patches/node" if _importer == "." else ("%s/patches/node" % _importer)
+    merged_srcs = merged_srcs + native.glob(["%s/*.patch" % _patch_dir])
+    merged_srcs = dedupe_preserve(merged_srcs)
+
+    # Forward to external runner rule; ignore legacy 'cmd'
+    node_nix_test(
         name = name,
-        srcs = srcs,
-        out = out,
-        cmd = cmd,
-        deps = deps,
-        labels = labels,
-        lockfile_label = lockfile_label,
-        kind = kind,
+        importer = _importer,
+        patterns = ([] if patterns == None else patterns),
+        env = (env or {}),
+        timeout_sec = timeout_sec,
+        srcs = merged_srcs,
+        deps = deps + _providers_for(name),
+        labels = kw.get("labels", []),
+        out = (out if out != None else (name + ".stamp")),
         **kwargs
     )
 
