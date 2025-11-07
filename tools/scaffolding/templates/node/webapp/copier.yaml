@@ -21,8 +21,10 @@ template: "webapp"
 importer: "apps/{{ name }}"
 lockfilePath: "apps/{{ name }}/pnpm-lock.yaml"
 pkgScope: "@apps"
+includeNodeTests: false
 
 _tasks:
   - mkdir -p src
+  - mkdir -p test
 _templates_suffix: ".jinja"
 _answers_file: ".copier-answers.yml"

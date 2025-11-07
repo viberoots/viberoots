@@ -1,4 +1,4 @@
-load("//node:defs.bzl", "node_webapp")
+load("//node:defs.bzl", "node_webapp", "nix_node_test")
 
 node_webapp(
     name = "app",
@@ -8,3 +8,10 @@ node_webapp(
         "kind:app",
     ],
 )
+
+{% if includeNodeTests %}
+nix_node_test(
+    name = "unit",
+    lockfile_label = "lockfile:apps/{{ name }}/pnpm-lock.yaml#apps/{{ name }}",
+)
+{% endif %}
