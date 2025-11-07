@@ -19,6 +19,7 @@ template: "lib"
 importer: "libs/{{ name }}"
 lockfilePath: "libs/{{ name }}/pnpm-lock.yaml"
 pkgScope: "@libs"
+includeNodeTests: false
 
 _tasks:
   - mkdir -p libs/{{ name }}/src

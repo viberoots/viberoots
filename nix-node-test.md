@@ -227,6 +227,43 @@ The `node_nix_test` rule’s `ExternalRunnerTestInfo` will:
 - **Risks**
   - Template drift; mitigated by a small zx test validating scaffold and `buck2 test` behavior
 
+### PR3.5 — Update Node templates to use auto‑discovery and auto‑wiring
+
+- **Scope**
+  - Refresh Node scaffolding templates (`tools/scaffolding/templates/node/*`) to rely on the
+    new `nix_node_test` external runner’s default discovery and the repo’s provider auto‑wiring.
+  - Remove legacy `cmd`/`out` shim usage in template `TARGETS` and instead declare a plain
+    `nix_node_test(name="…", lockfile_label=…)` that lets the runner discover tests from the
+    default patterns (`test/**/*.test.(ts|js)`, `__tests__/**/*.test.(ts|js)`, `src/**/*.test.(ts|js)`).
+  - Update template test files to vitest style (import from `vitest`) and place them under
+    `test/` to match runner defaults. Add `vitest` (and `@types/node` as needed) to devDeps.
+  - Ensure template packages preserve importer‑scoped lockfile labels and do not hard‑code
+    providers; rely on generated `auto_map.bzl` instead.
+  - Keep webapp template unchanged for build rule (`node_webapp`) but add an optional
+    `nix_node_test` example target when `test/` exists.
+
+- **Acceptance criteria**
+  - `scaf new node lib …` and `scaf new node cli …` produce projects where:
+    - `buck2 test //<importer>:unit` (or equivalent) passes via the Nix runner without custom
+      `cmd` shims, discovering tests from `test/*.test.ts`.
+    - `COVERAGE=1 buck2 test //<importer>:unit` produces coverage artifacts in the derivation out.
+  - The webapp template can optionally include a sample `nix_node_test` target and passes when a
+    trivial vitest file is added under `test/`.
+  - No explicit provider deps are present in template `TARGETS`; auto‑map wiring is effective.
+
+- **Rationale**
+  - Align templates with the new hermetic test runner and repository conventions: default test
+    discovery, importer‑scoped invalidation, and generated provider mapping.
+
+- **Consequences of not implementing**
+  - New projects continue to rely on shell shims or Node’s built‑in runner; behavior differs from
+    the standardized Nix runner and may fail to collect coverage or match defaults.
+
+- **Risks**
+  - Template consumers without `vitest` tests could see failures if files match patterns but the
+    runner cannot locate vitest. Mitigate by including `vitest` in devDeps and documenting that the
+    runner passes when no tests are present.
+
 ### PR4 — CI wiring and minimal tests
 
 - **Scope**

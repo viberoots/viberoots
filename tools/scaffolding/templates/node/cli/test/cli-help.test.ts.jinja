@@ -1,8 +1,7 @@
-#!/usr/bin/env zx-wrapper
-import { test } from "node:test";
-import { $ } from "zx";
+import { test, expect } from "vitest";
+import { run } from "../src/index.ts";
 
-test("cli --help exits 0", async () => {
-  await $`node bin/{{ name }} --help`;
+test("cli --help returns 0", () => {
+  expect(run(["--help"])) .toBe(0);
 });
 

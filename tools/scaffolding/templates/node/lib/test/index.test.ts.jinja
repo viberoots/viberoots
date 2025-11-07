@@ -1,9 +1,9 @@
-#!/usr/bin/env zx-wrapper
-import { test } from "node:test";
-import assert from "node:assert/strict";
-import { add } from "../dist/index.js";
+import { describe, it, expect } from "vitest";
+import { add } from "../src/index.ts";
 
-test("add works", () => {
-  assert.equal(add(1, 2), 3);
+describe("add", () => {
+  it("adds two numbers", () => {
+    expect(add(1, 2)).toBe(3);
+  });
 });
 

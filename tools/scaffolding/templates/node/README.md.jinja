@@ -15,3 +15,27 @@ Production build via Buck (Nix under the hood):
 buck2 build //apps/{{ name }}:app
 ```
 {% endif %}
+
+## Node tests (nix_node_test)
+
+- This scaffold supports hermetic Node tests powered by a Nix-backed Vitest runner.
+- To include a Buck test target on scaffold, pass `includeNodeTests=true`:
+
+```bash
+scaf new node {{ template }} {{ name }} --yes includeNodeTests=true
+```
+
+- The test target uses default discovery patterns:
+  - `test/**/*.test.(ts|js)`
+  - `__tests__/**/*.test.(ts|js)`
+  - `src/**/*.test.(ts|js)`
+
+### Coverage and timeouts
+
+- Coverage: enable per run with `COVERAGE=1 buck2 test //<pkg>:unit -- --env COVERAGE=1`.
+- Timeout: default 600s per test target; can be adjusted via the macro’s `timeout_sec`.
+
+### Troubleshooting
+
+- If tests match patterns but Vitest isn’t in devDependencies, the runner fails with a clear message. Add `vitest` and re-run.
+- If no tests match, the runner passes (useful while bootstrapping).
