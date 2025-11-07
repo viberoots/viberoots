@@ -4,20 +4,16 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("node adapter warns when multiple lockfile labels are present (warn mode)", async () => {
-  await runInTemp("exp-node-warn-multi-locks", async (tmp, $) => {
+test("node adapter warns when kind:* label is missing (warn mode)", async () => {
+  await runInTemp("exp-node-warn-missing-kind", async (tmp, $) => {
     const out = path.join(tmp, "tools/buck/.tmp.graph.json");
     await fs.mkdirp(path.dirname(out));
     const nodes = [
+      // Detected as Node (js_ rule family) and stamped with importer label but missing kind:*
       {
         name: "//apps/web:bundle",
         rule_type: "js_binary",
-        labels: [
-          "lang:node",
-          "kind:bundle",
-          "lockfile:apps/web/pnpm-lock.yaml#apps/web",
-          "lockfile:libs/ui/pnpm-lock.yaml#libs/ui",
-        ],
+        labels: ["lang:node", "lockfile:apps/web/pnpm-lock.yaml#apps/web"],
       },
     ];
     const sim = path.join(tmp, "tools/buck/simulated.json");
@@ -33,15 +29,12 @@ test("node adapter warns when multiple lockfile labels are present (warn mode)",
       console.error("exporter should succeed in warn mode", txt);
       process.exit(2);
     }
-    if (
-      !txt.includes("[exporter][node]") ||
-      !txt.includes("multiple importer-scoped lockfile labels")
-    ) {
-      console.error("expected node adapter multiple lockfile labels warning", txt);
+    if (!txt.includes("validation warnings") || !txt.includes("[exporter][node]")) {
+      console.error("expected node adapter warning in aggregated output", txt);
       process.exit(2);
     }
-    if (!txt.includes("Fix: keep exactly one importer label")) {
-      console.error("expected remediation for multiple labels", txt);
+    if (!txt.includes("missing kind:* label")) {
+      console.error("expected missing kind:* label guidance", txt);
       process.exit(2);
     }
   });

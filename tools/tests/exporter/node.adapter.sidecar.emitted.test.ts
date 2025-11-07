@@ -7,14 +7,14 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("exporter emits node-lock-index.json deterministically", async () => {
   await runInTemp("exp-node-sidecar", async (tmp, $) => {
-    const out = path.join(tmp, "tools/buck/graph.json");
+    const out = path.join(tmp, "tools/buck/.tmp.graph.json");
     const sidecar = path.join(tmp, "tools/buck/node-lock-index.json");
     await fs.mkdirp(path.dirname(out));
     const nodes = [
       {
         name: "//apps/web:bundle",
         rule_type: "js_binary",
-        labels: ["lang:node", "lockfile:apps/web/pnpm-lock.yaml#apps/web"],
+        labels: ["lang:node", "kind:bundle", "lockfile:apps/web/pnpm-lock.yaml#apps/web"],
       },
       {
         name: "//libs/ui:lib",

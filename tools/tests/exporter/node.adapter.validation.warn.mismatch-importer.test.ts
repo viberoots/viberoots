@@ -4,8 +4,8 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("node adapter warns when multiple lockfile labels are present (warn mode)", async () => {
-  await runInTemp("exp-node-warn-multi-locks", async (tmp, $) => {
+test("node adapter warns on path/importer mismatch (warn mode)", async () => {
+  await runInTemp("exp-node-warn-mismatch", async (tmp, $) => {
     const out = path.join(tmp, "tools/buck/.tmp.graph.json");
     await fs.mkdirp(path.dirname(out));
     const nodes = [
@@ -15,8 +15,8 @@ test("node adapter warns when multiple lockfile labels are present (warn mode)",
         labels: [
           "lang:node",
           "kind:bundle",
-          "lockfile:apps/web/pnpm-lock.yaml#apps/web",
-          "lockfile:libs/ui/pnpm-lock.yaml#libs/ui",
+          // importer 'libs/ui' does not match directory of lockfile 'apps/web'
+          "lockfile:apps/web/pnpm-lock.yaml#libs/ui",
         ],
       },
     ];
@@ -33,15 +33,15 @@ test("node adapter warns when multiple lockfile labels are present (warn mode)",
       console.error("exporter should succeed in warn mode", txt);
       process.exit(2);
     }
-    if (
-      !txt.includes("[exporter][node]") ||
-      !txt.includes("multiple importer-scoped lockfile labels")
-    ) {
-      console.error("expected node adapter multiple lockfile labels warning", txt);
+    if (!txt.includes("[exporter][node]") || !txt.includes("lockfile importer mismatch")) {
+      console.error("expected importer mismatch warning", txt);
       process.exit(2);
     }
-    if (!txt.includes("Fix: keep exactly one importer label")) {
-      console.error("expected remediation for multiple labels", txt);
+    if (
+      !txt.includes("Fix: set importer to '.'") ||
+      !txt.includes("match the lockfile directory")
+    ) {
+      console.error("expected remediation guidance for importer mismatch", txt);
       process.exit(2);
     }
   });

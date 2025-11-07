@@ -4,9 +4,9 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("node adapter warns when lockfile label is malformed (warn mode)", async () => {
+test("node adapter warns on malformed lockfile label (warn mode)", async () => {
   await runInTemp("exp-node-warn-malformed", async (tmp, $) => {
-    const out = path.join(tmp, "tools", "buck", "graph.json");
+    const out = path.join(tmp, "tools/buck/.tmp.graph.json");
     await fs.mkdirp(path.dirname(out));
     const nodes = [
       {
@@ -28,8 +28,12 @@ test("node adapter warns when lockfile label is malformed (warn mode)", async ()
       console.error("exporter should succeed in warn mode", txt);
       process.exit(2);
     }
-    if (!txt.includes("validation warnings") || !txt.includes("malformed lockfile label")) {
-      console.error("expected malformed-label warning from node adapter in aggregated output", txt);
+    if (!txt.includes("[exporter][node]") || !txt.includes("malformed lockfile label")) {
+      console.error("expected malformed lockfile label warning", txt);
+      process.exit(2);
+    }
+    if (!txt.includes("Expected: lockfile:<path>#<importer>")) {
+      console.error("expected remediation for malformed lockfile label", txt);
       process.exit(2);
     }
   });

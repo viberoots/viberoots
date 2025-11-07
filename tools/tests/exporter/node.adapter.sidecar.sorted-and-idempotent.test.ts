@@ -17,12 +17,12 @@ test("exporter emits node-lock-index with sorted keys and no rewrite on second r
       {
         name: "//zz/app:bin",
         rule_type: "js_binary",
-        labels: ["lang:node", "lockfile:apps/zz/pnpm-lock.yaml#apps/zz"],
+        labels: ["lang:node", "kind:bin", "lockfile:apps/zz/pnpm-lock.yaml#apps/zz"],
       },
       {
         name: "//aa/web:bundle",
         rule_type: "js_binary",
-        labels: ["lang:node", "lockfile:apps/aa/pnpm-lock.yaml#apps/aa"],
+        labels: ["lang:node", "kind:bundle", "lockfile:apps/aa/pnpm-lock.yaml#apps/aa"],
       },
     ];
     const sim = path.join(tmp, "tools/buck/simulated.json");

@@ -34,7 +34,10 @@ function validateSingleImporterLabel(n: Node): string[] {
   const locks = lockfileLabels(n);
   if (locks.length === 0) {
     findings.push(
-      `[exporter][node] missing importer-scoped lockfile label on ${n.name}. Expected one label of the form lockfile:<path>#<importer>.`,
+      [
+        `[exporter][node] missing importer-scoped lockfile label on ${n.name}.`,
+        `Fix: stamp exactly one label via macros: lockfile:<path>#<importer> (e.g., lockfile:apps/web/pnpm-lock.yaml#apps/web).`,
+      ].join("\n"),
     );
     return findings;
   }
@@ -43,6 +46,7 @@ function validateSingleImporterLabel(n: Node): string[] {
       [
         `[exporter][node] multiple importer-scoped lockfile labels on ${n.name}:`,
         `  - ${locks.join("\n  - ")}`,
+        `Fix: keep exactly one importer label of the form lockfile:<path>#<importer>.`,
       ].join("\n"),
     );
   }
@@ -51,7 +55,10 @@ function validateSingleImporterLabel(n: Node): string[] {
   const parsed = parseLockLabel(first);
   if (!parsed) {
     findings.push(
-      `[exporter][node] malformed lockfile label on ${n.name}: '${first}'. Expected lockfile:<path>#<importer>.`,
+      [
+        `[exporter][node] malformed lockfile label on ${n.name}: '${first}'.`,
+        `Expected: lockfile:<path>#<importer> (example: lockfile:apps/web/pnpm-lock.yaml#apps/web).`,
+      ].join("\n"),
     );
     return findings;
   }
@@ -59,10 +66,28 @@ function validateSingleImporterLabel(n: Node): string[] {
   const importerOk = parsed.importer === "." || parsed.importer === dir;
   if (!importerOk) {
     findings.push(
-      `[exporter][node] lockfile importer mismatch on ${n.name}: '${first}'. Importer should be '.' or match directory '${dir}'.`,
+      [
+        `[exporter][node] lockfile importer mismatch on ${n.name}: '${first}'.`,
+        `Fix: set importer to '.' (lockfile at repo root) or to '${dir}' to match the lockfile directory.`,
+      ].join("\n"),
     );
   }
   return findings;
+}
+
+function validateKindPresence(n: Node): string[] {
+  if (!isNodeTarget(n)) return [];
+  if (hasKindLabel(n)) return [];
+  // Only enforce kind:* for Node targets that appear to be stamped by our macros
+  // (i.e., carry an importer-scoped lockfile label). This avoids flagging ad-hoc
+  // nodes created in tests or external rules that are not using our macros.
+  if (lockfileLabels(n).length === 0) return [];
+  return [
+    [
+      `[exporter][node] missing kind:* label on ${n.name}.`,
+      "Fix: use macros that stamp a kind label (e.g., 'kind:lib', 'kind:bin', 'kind:test', 'kind:bundle').",
+    ].join("\n"),
+  ];
 }
 
 export const adapter: Adapter = {
@@ -74,6 +99,8 @@ export const adapter: Adapter = {
     const out: string[] = [];
     for (const n of nodes) {
       if (!isNodeTarget(n)) continue;
+      // First, ensure macro-stamped kind label is present for Node targets.
+      out.push(...validateKindPresence(n));
       out.push(...validateSingleImporterLabel(n));
     }
     return out;
