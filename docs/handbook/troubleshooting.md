@@ -14,6 +14,36 @@
   - `tools/ci/run-stage.ts --stage gen-auto-map`
   - `tools/ci/run-stage.ts --stage prebuild-guard`
 
+## Missing importer provider (Node)
+
+- Symptom: prebuild guard or Buck errors referencing a missing `node_importer_deps(...)` for a given `pnpm-lock.yaml#importer`.
+- Fix (local):
+  - `node tools/buck/sync-providers.ts` (unified orchestrator regenerates `third_party/providers/TARGETS.node.auto`)
+  - `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
+  - Ensure the Node target carries a lockfile label like `lockfile:apps/web/pnpm-lock.yaml#apps/web`.
+- Fix (CI): run the dedicated stages before build/test as above.
+
+## No-op sync (Node)
+
+- Symptom: running Node provider sync makes no changes.
+- Expected reasons:
+  - No `pnpm-lock.yaml` files are present under `apps/*` or `libs/*`.
+  - Importers exist but no relevant `patches/node/*.patch` exist for their effective sets (normal — providers still emit without patch paths).
+  - YAML module unavailable; generator falls back to per‑lockfile providers without importer traversal.
+- Fix:
+  - Verify lockfiles exist and contain `importers` entries for your app/lib.
+  - Add or modify patches under `<importer>/patches/node/*.patch` (importer‑local) or `patches/node/*.patch` (global), then re-run sync.
+  - Re-run auto_map after sync.
+
+## Stale sidecar (tools/buck/node-lock-index.json)
+
+- Symptom: graph consumers (Composite Graph API) warn about a missing or stale Node sidecar.
+- Fix:
+  - Regenerate exporter outputs: `node tools/buck/export-graph.ts --out tools/buck/graph.json`
+  - Re-run prebuild guard: `node tools/buck/prebuild-guard.ts`
+- Notes:
+  - Downstream tools MUST use the Composite Graph API (`tools/lib/graph-view.ts` or `tools/buck/graph-view.ts`) rather than reading `graph.json` directly.
+
 ## Overrides in CI
 
 - Ensure `NIX_GO_DEV_OVERRIDE_JSON` and `NIX_CPP_DEV_OVERRIDE_JSON` are unset. Locally, use `tools/dev/clear-overrides.ts`.
