@@ -11,6 +11,8 @@
       "NIX_GO_DEV_OVERRIDE_JSON"
       "NIX_PNPM_ALLOW_GENERATE"
       "NIX_PNPM_FETCH_TIMEOUT"
+      "NIX_NODE_TEST_PATTERNS"
+      "COVERAGE"
     ];
   };
 
@@ -215,9 +217,89 @@
           '';
         };
         nodeWebapp = builtins.listToAttrs (map (imp: { name = sanitize imp; value = makeWebapp imp; }) importerDirs);
+        # Vitest-backed per-importer Node test derivation.
+        # Runs tests hermetically using the importer's node_modules. If vitest is
+        # not present and no files match the patterns, the derivation succeeds
+        # (pass-with-no-tests semantics). If files match but vitest is missing,
+        # the derivation fails with a clear message.
+        makeNodeTest = importerDir: let
+          nm = nodeMods.mkNodeModules { lockfilePath = importerDir + "/pnpm-lock.yaml"; inherit importerDir; };
+          name = builtins.baseNameOf importerDir;
+          sanitize = (import ./tools/nix/templates-common.nix { inherit pkgs; }).sanitizeName;
+          defaultPatterns = ''
+            test/**/*.test.ts
+            test/**/*.test.js
+            __tests__/**/*.test.ts
+            __tests__/**/*.test.js
+            src/**/*.test.ts
+            src/**/*.test.js
+          '';
+          patternsEnv = builtins.getEnv "NIX_NODE_TEST_PATTERNS";
+          patternsValue = if patternsEnv != "" then patternsEnv else (builtins.replaceStrings ["\n\n"] ["\n"] defaultPatterns);
+          coverageEnv = builtins.getEnv "COVERAGE";
+        in pkgs.stdenvNoCC.mkDerivation {
+          pname = "node-test";
+          version = sanitize importerDir;
+          src = builtins.path { path = ./.; name = "repo"; };
+          nativeBuildInputs = [ pkgs.nodejs_22 pkgs.esbuild pkgs.coreutils ];
+          buildPhase = ''
+            set -euo pipefail
+            cd ${importerDir}
+            export SOURCE_DATE_EPOCH=1
+            # Link hermetic node_modules into the working directory
+            ln -s ${nm}/node_modules node_modules
+            # Resolve vitest bin from pnpm virtual store, if present
+            VITEST_BIN=$(ls -d node_modules/.pnpm/vitest@*/node_modules/vitest/vitest.mjs 2>/dev/null | head -n1 || true)
+            if [ -n "$VITEST_BIN" ]; then
+              VITEST_NODE_MODULES=$(dirname "$VITEST_BIN")/..
+              NODE_PATH_SUFFIX=""
+              if [ -n "$NODE_PATH" ]; then NODE_PATH_SUFFIX=":"$NODE_PATH; fi
+              export NODE_PATH="$VITEST_NODE_MODULES$NODE_PATH_SUFFIX"
+            fi
+            # Prepare patterns list (newline separated)
+            PATTERNS_FILE="$TMPDIR/patterns.txt"
+            cat > "$PATTERNS_FILE" <<'EOF_PAT'
+${patternsValue}
+EOF_PAT
+            # Determine whether any files match any default test globs; shell globstar may be unavailable,
+            # so use find(1) for a robust check.
+            FOUND=0
+            if find . -type f \( -name "*.test.ts" -o -name "*.test.js" \) -print -quit | grep -q .; then
+              FOUND=1
+            fi
+            # Coverage flag (evaluated at flake eval time via allowed impure env)
+            COVERAGE_FLAG=""
+            if [ "${coverageEnv}" = "1" ]; then COVERAGE_FLAG="--coverage"; fi
+            mkdir -p report
+            if [ "$FOUND" -eq 0 ]; then
+              echo "[nix] no tests matched; skipping runner and passing." >&2
+            else
+              if [ -n "$VITEST_BIN" ]; then
+                echo "[nix] running vitest..." >&2
+                # Run once with all patterns; passWithNoTests to avoid failure on empty sets
+                ARGS=""
+                while IFS= read -r __p; do
+                  [ -n "$__p" ] || continue
+                  ARGS="$ARGS \"$__p\""
+                done < "$PATTERNS_FILE"
+                eval "node \"$VITEST_BIN\" run --reporter=junit --passWithNoTests $COVERAGE_FLAG $ARGS"
+              else
+                echo "[nix] ERROR: vitest not found under node_modules, but tests matched patterns. Add vitest to devDependencies." >&2
+                exit 3
+              fi
+            fi
+          '';
+          installPhase = ''
+            set -euo pipefail
+            mkdir -p "$out"
+            if [ -d report ]; then cp -R report "$out/"; fi
+          '';
+        };
+        nodeTest = builtins.listToAttrs (map (imp: { name = sanitize imp; value = makeNodeTest imp; }) importerDirs);
         in {
           node-cli = nodeCli;
           node-webapp = nodeWebapp;
+          node-test = nodeTest;
         }
       )
     );
