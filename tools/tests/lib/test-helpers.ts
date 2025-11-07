@@ -273,6 +273,22 @@ export async function runInTemp<T>(
       } catch {}
     }
   }
+  // Strict dev-shell pre-check: when TEST_NEED_DEV_ENV=1, require buck2 prelude to be buildable in temp repo
+  if ((process.env.TEST_NEED_DEV_ENV || "") === "1") {
+    try {
+      const chk = await $({
+        cwd: tmp,
+        stdio: "pipe",
+      })`nix build '.#buck2-prelude' --no-link --accept-flake-config --print-build-logs`.nothrow();
+      if (chk.exitCode !== 0) {
+        throw new Error(
+          "dev-shell check failed: nix build .#buck2-prelude did not succeed in temp repo; ensure direnv/dev shell is active",
+        );
+      }
+    } catch (e) {
+      throw e;
+    }
+  }
   // No fallback link to root workspace node_modules — tests must link per-importer via Nix outputs.
   // Avoid bootstrapping a dev environment in temp repos by default to prevent timeouts.
   // Opt-in only when TEST_NEED_DEV_ENV=1 is set in the environment.

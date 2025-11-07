@@ -1,4 +1,9 @@
-{ pkgs, repoRoot ? ../../., hashesPath ? ../../tools/nix/node-modules.hashes.json, prefetchedStorePathGlobal ? null }:
+{ pkgs, repoRoot ? ../../.,
+  # Live filesystem root of the repo (not snapshotted), used to locate importer lockfiles at eval time
+  repoFsRoot ? ../../.,
+  hashesPath ? ../../tools/nix/node-modules.hashes.json,
+  prefetchedStorePathGlobal ? null
+}:
 let
   lib = pkgs.lib;
   node = pkgs.nodejs_22;
@@ -56,6 +61,8 @@ let
           # Top-level files sometimes consulted by pnpm
           || (builtins.match "^pnpm-workspace\\.yaml$" rel != null)
           || (builtins.match "^\\.npmrc$" rel != null)
+          # Always include root lockfile so builders can fallback when importer lock is missing
+          || (type != "directory" && rel == "pnpm-lock.yaml")
         ) && (!isVendorPath);
     };
 
@@ -68,8 +75,11 @@ let
       src = importerOnlySrc { inherit importerDir; lockfilePath = relLock; };
       outHash = hashMap.${relLock} or placeholderDigest;
       certs = pkgs.cacert;
-      lockAbsStr = "${repoRoot}/${relLock}";
-      hasLock = builtins.pathExists lockAbsStr;
+      lockAbsStrStore = "${repoRoot}/${relLock}";
+      lockAbsStrFs = "${repoFsRoot}/${relLock}";
+      hasLockFs = builtins.pathExists lockAbsStrFs;
+      hasLockStore = builtins.pathExists lockAbsStrStore;
+      lockInput = if hasLockFs then (builtins.path { path = lockAbsStrFs; name = "pnpm-lock.yaml"; }) else (if hasLockStore then (builtins.path { path = lockAbsStrStore; name = "pnpm-lock.yaml"; }) else null);
       # Prefer an explicit mkPnpmStore argument; fall back to the global arg/env.
       chosenPrefetchedPath = if prefetchedStorePath == null || prefetchedStorePath == "" then prefetchedStorePathGlobal else prefetchedStorePath;
       # Only use a prefetched store when explicitly enabled via env. Default is to fetch inside the FOD
@@ -79,7 +89,7 @@ let
       prefetchedInput = if (!preferPrefetch) || (chosenPrefetchedPath == null || chosenPrefetchedPath == "") then null else builtins.path { path = chosenPrefetchedPath; name = "prefetched-store"; };
     in pkgs.stdenvNoCC.mkDerivation {
       pname = "pnpm-store";
-      version = if hasLock then "lock-${builtins.hashFile "sha256" lockAbsStr}" else "lock-missing";
+      version = if (hasLockFs || hasLockStore) then "lock-${builtins.hashFile "sha256" (if hasLockFs then lockAbsStrFs else lockAbsStrStore)}" else "lock-missing";
       inherit src;
       nativeBuildInputs = [ node pnpm pkgs.coreutils ];
       preferLocalBuild = true;
@@ -114,7 +124,21 @@ let
         node -e 'const fs=require("fs"); const p="package.json"; if(fs.existsSync(p)){const j=JSON.parse(fs.readFileSync(p,"utf8")); delete j.packageManager; fs.writeFileSync(p, JSON.stringify(j, null, 2));}'
         # Do NOT generate a lockfile inside this fixed-output derivation. This must be seeded
         # outside the FOD to avoid non-deterministic outputs across runs.
+        LOCK_INPUT_PATH="${if lockInput != null then "${lockInput}" else "/nonexistent"}"
+        echo "[nix] mkPnpmStore: lockInput=${if lockInput != null then "present" else "absent"} path=$LOCK_INPUT_PATH" >&2
+        if [ ! -f pnpm-lock.yaml ] && [ -f "$LOCK_INPUT_PATH" ]; then
+          echo "[nix] mkPnpmStore: injecting importer lockfile input from $LOCK_INPUT_PATH" >&2
+          cp "$LOCK_INPUT_PATH" pnpm-lock.yaml
+        fi
         if [ ! -f pnpm-lock.yaml ]; then
+          if [ "${builtins.getEnv "NIX_PNPM_ALLOW_GENERATE"}" = "1" ]; then
+            echo "[nix] mkPnpmStore: no lockfile present but allow-generate=1; producing empty store and continuing" >&2
+            mkdir -p "$out/store" "$out/lockfile"
+            # Do not attempt any network; leave store empty. Downstream mkNodeModules will generate a lock offline.
+            touch "$out/lockfile/pnpm-lock.yaml" || true
+            runHook postBuild
+            exit 0
+          fi
           echo "[nix] mkPnpmStore: no lockfile present; seed a lockfile first using tools/dev/update-pnpm-hash.ts --lockfile ${relLock} (set NIX_PNPM_ALLOW_GENERATE=1 for generation)" >&2
           exit 4
         fi
@@ -141,7 +165,7 @@ let
         runHook postBuild
       '';
       passthru = {
-        lockHash = if hasLock then builtins.hashFile "sha256" lockAbsStr else "";
+        lockHash = if (hasLockFs || hasLockStore) then builtins.hashFile "sha256" (if hasLockFs then lockAbsStrFs else lockAbsStrStore) else "";
         prefetchUsed = prefetchedInput != null;
         chosenPrefetchedPath = if chosenPrefetchedPath == null then "" else chosenPrefetchedPath;
         prefetchedInputPath = if prefetchedInput == null then "" else prefetchedInput;
@@ -155,11 +179,14 @@ let
       src = importerOnlySrc { inherit importerDir; lockfilePath = relLock; };
       certs = pkgs.cacert;
       store = mkPnpmStore { inherit lockfilePath importerDir npmrcPath packageJsonPath prefetchedStorePath; };
-      lockAbsStr = "${repoRoot}/${relLock}";
-      hasLock = builtins.pathExists lockAbsStr;
+      lockAbsStrStore = "${repoRoot}/${relLock}";
+      lockAbsStrFs = "${repoFsRoot}/${relLock}";
+      hasLockFs = builtins.pathExists lockAbsStrFs;
+      hasLockStore = builtins.pathExists lockAbsStrStore;
+      lockInput = if hasLockFs then (builtins.path { path = lockAbsStrFs; name = "pnpm-lock.yaml"; }) else (if hasLockStore then (builtins.path { path = lockAbsStrStore; name = "pnpm-lock.yaml"; }) else null);
     in pkgs.stdenvNoCC.mkDerivation {
       pname = "node-modules";
-      version = if hasLock then "lock-${builtins.hashFile "sha256" lockAbsStr}" else "lock-missing";
+      version = if (hasLockFs || hasLockStore) then "lock-${builtins.hashFile "sha256" (if hasLockFs then lockAbsStrFs else lockAbsStrStore)}" else "lock-missing";
       inherit src;
       nativeBuildInputs = [ node pnpm ];
       preferLocalBuild = true;
@@ -205,7 +232,9 @@ let
           if [ -f "${store}/lockfile/pnpm-lock.yaml" ]; then
             echo "[nix] mkNodeModules: using exported lockfile from store"
             cp "${store}/lockfile/pnpm-lock.yaml" pnpm-lock.yaml
-            PNPM_HOME="$PNPM_HOME" pnpm install --offline --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
+          elif [ -f ${if lockInput != null then "${lockInput}" else "/nonexistent"} ]; then
+            echo "[nix] mkNodeModules: injecting importer lockfile input"
+            cp ${if lockInput != null then "${lockInput}" else "/nonexistent"} pnpm-lock.yaml
           elif [ "${builtins.getEnv "NIX_PNPM_ALLOW_GENERATE"}" = "1" ]; then
             echo "[nix] mkNodeModules: offline install to create lockfile (allow-generate)"
             PNPM_HOME="$PNPM_HOME" pnpm install --offline --no-frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
@@ -236,7 +265,7 @@ let
         fi
         runHook postInstall
       '';
-      passthru.lockHash = if hasLock then builtins.hashFile "sha256" lockAbsStr else "";
+      passthru.lockHash = if (hasLockFs || hasLockStore) then builtins.hashFile "sha256" (if hasLockFs then lockAbsStrFs else lockAbsStrStore) else "";
     };
 
   # Backward-compat: default to repo root lockfile if present

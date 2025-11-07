@@ -47,7 +47,7 @@
             "$@"
         '';
         devshell = import ./tools/nix/devshell.nix { inherit pkgs; buck2Input = buck2; };
-        nodeMods = import ./tools/nix/node-modules.nix { inherit pkgs; repoRoot = ./.; hashesPath = ./tools/nix/node-modules.hashes.json; prefetchedStorePathGlobal = null; };
+        nodeMods = import ./tools/nix/node-modules.nix { inherit pkgs; repoRoot = ./.; repoFsRoot = ./.; hashesPath = ./tools/nix/node-modules.hashes.json; prefetchedStorePathGlobal = null; };
         prelude = import ./tools/nix/buck-prelude.nix { inherit pkgs; buck2Input = buck2; };
       in f { inherit pkgs zx-wrapper nodeMods prelude system; buck2Input = buck2; }
     );
@@ -110,8 +110,11 @@
         allowGenerate = (builtins.getEnv "NIX_PNPM_ALLOW_GENERATE") == "1";
         appsDirExists = builtins.pathExists ./apps || builtins.pathExists (srcRoot + "/apps");
         libsDirExists = builtins.pathExists ./libs || builtins.pathExists (srcRoot + "/libs");
-        appsListing = if builtins.pathExists ./apps then (builtins.readDir ./apps) else (if builtins.pathExists (srcRoot + "/apps") then (builtins.readDir (srcRoot + "/apps")) else {});
-        libsListing = if builtins.pathExists ./libs then (builtins.readDir ./libs) else (if builtins.pathExists (srcRoot + "/libs") then (builtins.readDir (srcRoot + "/libs")) else {});
+        # Prefer reading from a working-tree snapshot (srcRoot) so newly created importers
+        # in temp repos (untracked by git) are visible during flake evaluation. Fall back to
+        # store-copied ./apps or ./libs when srcRoot paths are absent.
+        appsListing = if builtins.pathExists (srcRoot + "/apps") then (builtins.readDir (srcRoot + "/apps")) else (if builtins.pathExists ./apps then (builtins.readDir ./apps) else {});
+        libsListing = if builtins.pathExists (srcRoot + "/libs") then (builtins.readDir (srcRoot + "/libs")) else (if builtins.pathExists ./libs then (builtins.readDir ./libs) else {});
         appsDirs = if appsDirExists then builtins.attrNames appsListing else [];
         libsDirs = if libsDirExists then builtins.attrNames libsListing else [];
         isDir = base: name: ((builtins.readDir base).${name} or null) == "directory";
@@ -274,7 +277,14 @@ EOF_PAT
             if [ "$FOUND" -eq 0 ]; then
               echo "[nix] no tests matched; skipping runner and passing." >&2
             else
+              # Link hermetic node_modules and resolve vitest only when tests are present
+              ln -s ${nm}/node_modules node_modules
+              VITEST_BIN=$(ls -d node_modules/.pnpm/vitest@*/node_modules/vitest/vitest.mjs 2>/dev/null | head -n1 || true)
               if [ -n "$VITEST_BIN" ]; then
+                VITEST_NODE_MODULES=$(dirname "$VITEST_BIN")/..
+                NODE_PATH_SUFFIX=""
+                if [ -n "$NODE_PATH" ]; then NODE_PATH_SUFFIX=":"$NODE_PATH; fi
+                export NODE_PATH="$VITEST_NODE_MODULES$NODE_PATH_SUFFIX"
                 echo "[nix] running vitest..." >&2
                 # Run once with all patterns; passWithNoTests to avoid failure on empty sets
                 ARGS=""

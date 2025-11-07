@@ -131,11 +131,34 @@ async function inner() {
     String(process.env.NIX_PNPM_ALLOW_GENERATE || "").trim() === "1"
   ) {
     // Generate a lockfile in the importer; keep scripts disabled and include dev deps.
-    // Ensure pnpm uses a writable local store/cache within the importer to avoid /nix/store writes.
+    // Ensure pnpm uses a writable local store/cache. Run from repo root to avoid
+    // pnpm choosing the workspace root implicitly and write lockfile to importer dir.
+    const impWs = path.join(impAbsGen, "pnpm-workspace.yaml");
+    const hadLocalWs = fs.existsSync(impWs);
+    try {
+      if (!hadLocalWs) {
+        await fsp.mkdir(impAbsGen, { recursive: true });
+        await fsp.writeFile(impWs, "packages:\n  - ./\n", "utf8");
+      }
+    } catch {}
     await $({
-      cwd: impAbsGen,
+      cwd: repoRoot,
       stdio: "inherit",
-    })`bash --noprofile --norc -c 'set -euo pipefail; mkdir -p ./.pnpm-home ./.pnpm-store; export PNPM_HOME="$(pwd)/.pnpm-home"; nix run nixpkgs#pnpm -- config set store-dir "$(pwd)/.pnpm-store"; nix run nixpkgs#pnpm -- install --lockfile-only --prod=false --ignore-scripts'`;
+    })`bash --noprofile --norc -c 'set -euo pipefail; mkdir -p "${impAbsGen}/.pnpm-home" "${impAbsGen}/.pnpm-store"; export PNPM_HOME="${impAbsGen}/.pnpm-home"; nix run nixpkgs#pnpm -- config set store-dir "${impAbsGen}/.pnpm-store"; nix run nixpkgs#pnpm -- install --filter "./${importer}" --lockfile-only --prod=false --ignore-scripts --lockfile-dir "./${importer}" --dir "./${importer}"'`;
+    // Fallback: if pnpm still wrote a root lockfile, seed the importer with it
+    try {
+      const rootLock = path.join(repoRoot, "pnpm-lock.yaml");
+      if (!fs.existsSync(impLockGen) && fs.existsSync(rootLock)) {
+        await fsp.mkdir(path.dirname(impLockGen), { recursive: true });
+        await fsp.copyFile(rootLock, impLockGen);
+      }
+    } catch {}
+    // Clean up temporary local workspace marker
+    try {
+      if (!hadLocalWs && fs.existsSync(impWs)) {
+        await fsp.rm(impWs).catch(() => {});
+      }
+    } catch {}
   }
 
   const first = await buildStore(storeAttr);
