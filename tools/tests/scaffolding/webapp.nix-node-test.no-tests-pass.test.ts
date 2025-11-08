@@ -11,7 +11,7 @@ test("node webapp: nix_node_test target passes when no tests present", async () 
   await runInTemp("node-webapp-nix-node-test", async (tmp, _$) => {
     const $ = _$({ cwd: tmp, stdio: "pipe" });
     await $`git init`;
-    // Scaffold with test target enabled
+    // Scaffold with test target enabled by default
     await $`scaf new node webapp demo-web --yes`;
 
     // Proceed; environment is expected to provide Buck prelude via runInTemp setup
@@ -60,16 +60,6 @@ test("node webapp: nix_node_test target passes when no tests present", async () 
       stdio: "inherit",
     })`node tools/dev/update-pnpm-hash.ts --lockfile apps/demo-web/pnpm-lock.yaml`;
     await $({ stdio: "inherit" })`buck2 kill`.nothrow();
-
-    // Append a nix_node_test target (unit) to the importer TARGETS
-    await $`bash -lc 'cat >> apps/demo-web/TARGETS <<'\'EOF'\'
-
-nix_node_test(
-    name = "unit",
-    lockfile_label = "lockfile:apps/demo-web/pnpm-lock.yaml#apps/demo-web",
-)
-
-EOF'`;
 
     // Glue and provider mapping (export graph → providers → auto_map)
     await $`node tools/buck/export-graph.ts --out tools/buck/graph.json`;

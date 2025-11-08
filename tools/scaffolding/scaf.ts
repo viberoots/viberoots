@@ -872,6 +872,15 @@ async function cmdNew(args: string[], flags: Record<string, string>) {
       data[k] = v;
     }
   }
+  // Node PR3.5: default tests on; map --no-tests to includeNodeTests=false
+  if (language === "node") {
+    const noTests = (flags["no-tests"] || "").toString().toLowerCase() === "true";
+    if (noTests) {
+      data["includeNodeTests"] = false;
+    } else if (typeof data["includeNodeTests"] === "undefined") {
+      data["includeNodeTests"] = true;
+    }
+  }
   // Special-case: language/kit uses <name> as the language id unless overridden
   if (language === "language" && template === "kit") {
     if (!data["lang_id"]) data["lang_id"] = name;
@@ -925,6 +934,18 @@ async function cmdNew(args: string[], flags: Record<string, string>) {
       } catch (e) {
         console.warn("warning: planner-gen failed:", e);
       }
+    }
+  }
+  // Remove sample tests when --no-tests opt-out is provided (test target remains present)
+  if (language === "node") {
+    const noTests =
+      (flags["no-tests"] || "").toString().toLowerCase() === "true" ||
+      data["includeNodeTests"] === false;
+    if (noTests) {
+      try {
+        const testDir = path.join(dest, "test");
+        await fsp.rm(testDir, { recursive: true, force: true });
+      } catch {}
     }
   }
   console.log("created:", dest);
@@ -1273,7 +1294,7 @@ async function cmdGoTest(name: string, flags: Record<string, string>) {
   await fsp.mkdir(dir, { recursive: true });
   const pkg = await inferPackageName(dir, dest);
   const funcName = toPascalCase(name);
-  const contents = `package ${pkg}\n\nimport \"testing\"\n\nfunc Test${funcName}(t *testing.T) {\n}\n`;
+  const contents = `package ${pkg}\n\nimport "testing"\n\nfunc Test${funcName}(t *testing.T) {\n}\n`;
   await fsp.writeFile(dest, contents, "utf8");
   try {
     await $`bash -lc ${`set -euo pipefail; go fmt ${dest} >/dev/null 2>&1 || true`}`;

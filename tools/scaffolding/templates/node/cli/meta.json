@@ -6,9 +6,14 @@
     "usage": "scaf new node cli <name> [--path=DEST] [--key=value ...]",
     "notes": [
       "Generates apps/<name> with .npmrc, package.json, tsconfig, bin, src, test, TARGETS.",
+      "Includes a default nix_node_test target (unit) using Vitest; opt out of sample tests with --no-tests.",
       "Pass importer=<id> to override default apps/<name> importer.",
       "TARGETS uses nix_node_cli_bin and requires exactly one lockfile label."
     ],
-    "examples": ["scaf new node cli demo-app", "scaf new node cli demo-app --importer=apps/demo"]
+    "examples": [
+      "scaf new node cli demo-app",
+      "scaf new node cli demo-app --no-tests",
+      "scaf new node cli demo-app --importer=apps/demo"
+    ]
   }
 }

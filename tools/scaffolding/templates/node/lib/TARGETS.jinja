@@ -8,10 +8,8 @@ nix_node_lib(
     lockfile_label = "lockfile:{{ lockfilePath }}#{{ importer }}",
 )
 
-{% if includeNodeTests %}
 nix_node_test(
     name = "unit",
     lockfile_label = "lockfile:{{ lockfilePath }}#{{ importer }}",
 )
-{% endif %}
 

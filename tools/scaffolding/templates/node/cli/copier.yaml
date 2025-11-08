@@ -21,7 +21,7 @@ template: "cli"
 importer: "apps/{{ name }}"
 lockfilePath: "apps/{{ name }}/pnpm-lock.yaml"
 pkgScope: "@apps"
-includeNodeTests: false
+includeNodeTests: true
 
 _tasks:
   - mkdir -p src

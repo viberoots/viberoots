@@ -9,9 +9,7 @@ node_webapp(
     ],
 )
 
-{% if includeNodeTests %}
 nix_node_test(
     name = "unit",
     lockfile_label = "lockfile:apps/{{ name }}/pnpm-lock.yaml#apps/{{ name }}",
 )
-{% endif %}

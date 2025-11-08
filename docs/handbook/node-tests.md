@@ -4,7 +4,7 @@ This repo provides a hermetic Node test runner integrated with Buck2 via a Nix d
 
 ## Usage
 
-- Add a test target in your importer `TARGETS` using the macro:
+- Add a test target in your importer `TARGETS` using the macro (scaffolding generates this by default):
 
 ```starlark
 load("//node:defs.bzl", "nix_node_test")
@@ -19,6 +19,8 @@ nix_node_test(
   - `test/**/*.test.ts`, `test/**/*.test.js`
   - `__tests__/**/*.test.ts`, `__tests__/**/*.test.js`
   - `src/**/*.test.ts`, `src/**/*.test.js`
+
+- Scaffolded projects include this test target and Vitest sample tests by default. Opt out of sample tests and devDependencies with `--no-tests` when running `scaf new node ...` (the test target remains; the runner passes with no tests).
 
 - Run:
 

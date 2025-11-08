@@ -7,10 +7,8 @@ nix_node_cli_bin(
     # bundle = True,
 )
 
-{% if includeNodeTests %}
 nix_node_test(
     name = "unit",
     lockfile_label = "lockfile:{{ lockfilePath }}#{{ importer }}",
 )
-{% endif %}
 

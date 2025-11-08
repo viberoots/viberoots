@@ -10,7 +10,7 @@ let
   modules = import ./node-modules/modules.nix { inherit pkgs repoRoot repoFsRoot hashesPath prefetchedStorePathGlobal; };
 
   inherit (common) sanitizeName;
-  inherit (store) mkPnpmStore;
+  inherit (store) mkPnpmStore mkPnpmStoreUnfixed;
   inherit (modules) mkNodeModules;
 
   # Backward-compat: default to repo root lockfile if present
@@ -24,7 +24,7 @@ let
     importerDir = ".";
   };
 in {
-  inherit mkPnpmStore mkNodeModules sanitizeName;
+  inherit mkPnpmStore mkPnpmStoreUnfixed mkNodeModules sanitizeName;
   # Preserve previous attribute names when root lockfile exists
   pnpm-store = if pnpm-store-default == null then (pkgs.runCommand "pnpm-store-missing" {} "mkdir -p $out; echo no-root-lockfile > $out/info") else pnpm-store-default;
   node-modules = if node-modules-default == null then (pkgs.runCommand "node-modules-missing" {} "mkdir -p $out; echo no-root-lockfile > $out/info") else node-modules-default;

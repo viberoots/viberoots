@@ -44,6 +44,8 @@ in {
       buildPhase = ''
         runHook preBuild
         # quiet: reduce verbose diagnostics
+        export SOURCE_DATE_EPOCH=1
+        export TZ=UTC
         export SSL_CERT_FILE=${certs}/etc/ssl/certs/ca-bundle.crt
         export NIX_SSL_CERT_FILE=${certs}/etc/ssl/certs/ca-bundle.crt
         export NODE_EXTRA_CA_CERTS=${certs}/etc/ssl/certs/ca-bundle.crt
@@ -88,8 +90,9 @@ in {
         echo "[nix] mkNodeModules: install complete"
         echo "[nix] mkNodeModules: listing node_modules/.bin"
         ls -la node_modules/.bin || true
-        echo "[nix] mkNodeModules: listing node_modules/vite"
-        ls -la node_modules/vite || true
+        echo "[nix] mkNodeModules: probing vitest under pnpm virtual store"
+        find node_modules/.pnpm -maxdepth 2 -type d -name "vitest@*" -print || true
+        find node_modules -maxdepth 4 -type f -name "vitest.mjs" -print || true
         runHook postBuild
       '';
       installPhase = ''

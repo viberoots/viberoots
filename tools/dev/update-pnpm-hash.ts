@@ -60,6 +60,13 @@ function pnpmStoreAttrFromImporter(importer: string): string {
   return `pnpm-store.${sanitized}`;
 }
 
+function pnpmStoreUnfixedAttrFromImporter(importer: string): string {
+  const normImp = normalizeImporter(importer);
+  if (!normImp || normImp === ".") return "pnpm-store-unfixed.default";
+  const sanitized = sanitizeName(normImp);
+  return `pnpm-store-unfixed.${sanitized}`;
+}
+
 function normalizeImporter(imp: string): string {
   if (!imp) return ".";
   // If absolute or contains temp prefixes, try to extract apps/* or libs/*
@@ -99,6 +106,36 @@ async function updateHashesJson(lockfileRel: string, newHash: string) {
   await fsp.writeFile(file, JSON.stringify(obj, null, 2) + "\n", "utf8");
 }
 
+async function buildUnfixedAndHash(
+  attrPath: string,
+): Promise<{ ok: boolean; sri?: string; output?: string }> {
+  try {
+    const built = await $({
+      stdio: "pipe",
+    })`nix build .#${attrPath} --impure --no-link --accept-flake-config --print-out-paths`;
+    const outPath =
+      String(built.stdout || "")
+        .trim()
+        .split(/\r?\n/)
+        .filter(Boolean)
+        .pop() || "";
+    if (!outPath) {
+      return { ok: false, output: "nix build returned no out path for " + attrPath };
+    }
+    const hashed = await $({
+      stdio: "pipe",
+    })`nix hash-path --sri ${outPath}`;
+    const sri = String(hashed.stdout || "").trim();
+    if (!/^sha256-[A-Za-z0-9+/=_-]+$/.test(sri)) {
+      return { ok: false, output: "unexpected hash-path output: " + sri };
+    }
+    return { ok: true, sri };
+  } catch (e: any) {
+    const out = String((e && e.stdout) || "") + String((e && e.stderr) || "");
+    return { ok: false, output: out };
+  }
+}
+
 async function inner() {
   const { lockfile, force } = parseArgs(process.argv);
   const repoRoot = process.cwd();
@@ -113,6 +150,7 @@ async function inner() {
   })();
   const importer = importerFromLockfile(relLock);
   const storeAttr = pnpmStoreAttrFromImporter(importer);
+  const unfixedAttr = pnpmStoreUnfixedAttrFromImporter(importer);
   // quiet: avoid noisy diagnostics in normal operation
 
   // If forcing, pre-write placeholder digest to bump the FOD derivation and force a rebuild
@@ -142,9 +180,9 @@ async function inner() {
       }
     } catch {}
     await $({
-      cwd: repoRoot,
+      cwd: impAbsGen,
       stdio: "inherit",
-    })`bash --noprofile --norc -c 'set -euo pipefail; mkdir -p "${impAbsGen}/.pnpm-home" "${impAbsGen}/.pnpm-store"; export PNPM_HOME="${impAbsGen}/.pnpm-home"; nix run nixpkgs#pnpm -- config set store-dir "${impAbsGen}/.pnpm-store"; nix run nixpkgs#pnpm -- install --filter "./${importer}" --lockfile-only --prod=false --ignore-scripts --lockfile-dir "./${importer}" --dir "./${importer}"'`;
+    })`bash --noprofile --norc -c 'set -euo pipefail; mkdir -p ".pnpm-home" ".pnpm-store"; export PNPM_HOME="$(pwd)/.pnpm-home"; nix run ${repoRoot}#pnpm --accept-flake-config -- config set store-dir "$(pwd)/.pnpm-store"; nix run ${repoRoot}#pnpm --accept-flake-config -- install --lockfile-only --prod=false --ignore-scripts --lockfile-dir "." --dir "." --color never'`;
     // Fallback: if pnpm still wrote a root lockfile, seed the importer with it
     try {
       const rootLock = path.join(repoRoot, "pnpm-lock.yaml");
@@ -161,109 +199,29 @@ async function inner() {
     } catch {}
   }
 
-  const first = await buildStore(storeAttr);
-  if (first.ok) {
-    console.log("pnpm-store:", storeAttr, "up to date");
-    // If generation is allowed and the importer lacks a lockfile, seed it from the store export
-    try {
-      if (String(process.env.NIX_PNPM_ALLOW_GENERATE || "").trim() === "1") {
-        const impAbs = path.resolve(repoRoot, importer);
-        const impLock = path.join(impAbs, "pnpm-lock.yaml");
-        if (!fs.existsSync(impLock)) {
-          const out = await $({
-            stdio: "pipe",
-          })`nix build .#${storeAttr} --no-link --accept-flake-config --print-out-paths`;
-          const outPath =
-            String(out.stdout || "")
-              .trim()
-              .split(/\r?\n/)
-              .filter(Boolean)
-              .pop() || "";
-          if (outPath) {
-            const exp = path.join(outPath, "lockfile", "pnpm-lock.yaml");
-            if (fs.existsSync(exp)) {
-              await fsp.mkdir(path.dirname(impLock), { recursive: true });
-              await fsp.copyFile(exp, impLock);
-              // Reconcile mapping with the new, seeded lockfile content
-              const post = await buildStore(storeAttr);
-              if (!post.ok) {
-                const sug = extractHash(post.output || "");
-                if (sug) {
-                  const k =
-                    importer && importer !== "." ? `${importer}/pnpm-lock.yaml` : "pnpm-lock.yaml";
-                  await updateHashesJson(k, sug);
-                  const final = await buildStore(storeAttr);
-                  if (!final.ok) {
-                    console.error(
-                      "pnpm-store still failing after lockfile seed+hash update\n\n" + final.output,
-                    );
-                    process.exit(1);
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    } catch {}
-    return;
-  }
-  const suggested = extractHash(first.output || "");
-  if (!suggested) {
-    console.error("failed to parse suggested sha256 from nix output\n\n" + first.output);
-    process.exit(1);
-  }
+  // Robust path: build unfixed store and compute SRI from its normalized 'store' directory
   const key = importer && importer !== "." ? `${importer}/pnpm-lock.yaml` : "pnpm-lock.yaml";
-  // quiet: avoid noisy diagnostics in normal operation
-  await updateHashesJson(key, suggested);
-  const second = await buildStore(storeAttr);
-  if (!second.ok) {
-    console.error("pnpm-store still failing after hash update\n\n" + second.output);
-    process.exit(1);
+  const pre = await buildUnfixedAndHash(unfixedAttr);
+  if (pre.ok && pre.sri) {
+    await updateHashesJson(key, pre.sri);
+  }
+
+  // Verify fixed-output build; if it still fails, fall back once to parsing suggestion
+  const verify = await buildStore(storeAttr);
+  if (!verify.ok) {
+    const suggested = extractHash(verify.output || "");
+    if (!suggested) {
+      console.error("pnpm-store still failing and no suggested hash found\n\n" + verify.output);
+      process.exit(1);
+    }
+    await updateHashesJson(key, suggested);
+    const final = await buildStore(storeAttr);
+    if (!final.ok) {
+      console.error("pnpm-store still failing after hash update\n\n" + final.output);
+      process.exit(1);
+    }
   }
   console.log("pnpm-store:", storeAttr, "hash updated and build succeeded");
-  // After a successful update, if generation is allowed and importer lacks a lockfile, seed it
-  try {
-    if (String(process.env.NIX_PNPM_ALLOW_GENERATE || "").trim() === "1") {
-      const impAbs = path.resolve(repoRoot, importer);
-      const impLock = path.join(impAbs, "pnpm-lock.yaml");
-      if (!fs.existsSync(impLock)) {
-        const out = await $({
-          stdio: "pipe",
-        })`nix build .#${storeAttr} --no-link --accept-flake-config --print-out-paths`;
-        const outPath =
-          String(out.stdout || "")
-            .trim()
-            .split(/\r?\n/)
-            .filter(Boolean)
-            .pop() || "";
-        if (outPath) {
-          const exp = path.join(outPath, "lockfile", "pnpm-lock.yaml");
-          if (fs.existsSync(exp)) {
-            await fsp.mkdir(path.dirname(impLock), { recursive: true });
-            await fsp.copyFile(exp, impLock);
-            // Reconcile mapping with the new, seeded lockfile content
-            const post = await buildStore(storeAttr);
-            if (!post.ok) {
-              const sug = extractHash(post.output || "");
-              if (sug) {
-                const k =
-                  importer && importer !== "." ? `${importer}/pnpm-lock.yaml` : "pnpm-lock.yaml";
-                await updateHashesJson(k, sug);
-                const final = await buildStore(storeAttr);
-                if (!final.ok) {
-                  console.error(
-                    "pnpm-store still failing after lockfile seed+hash update\n\n" + final.output,
-                  );
-                  process.exit(1);
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  } catch {}
 }
 
 async function main() {

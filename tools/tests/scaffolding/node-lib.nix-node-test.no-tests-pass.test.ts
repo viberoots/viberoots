@@ -11,7 +11,7 @@ test("node lib: nix_node_test target passes when no tests present", async () => 
   await runInTemp("node-lib-nix-node-test", async (tmp, _$) => {
     const $ = _$({ cwd: tmp, stdio: "pipe" });
     await $`git init`;
-    // Scaffold with test target enabled
+    // Scaffold with test target enabled by default
     await $`scaf new node lib demo --yes`;
 
     // Fail fast if buck2 prelude is not available
@@ -52,16 +52,6 @@ test("node lib: nix_node_test target passes when no tests present", async () => 
       stdio: "inherit",
     })`node tools/dev/update-pnpm-hash.ts --lockfile libs/demo/pnpm-lock.yaml`;
     await $({ stdio: "inherit" })`buck2 kill`.nothrow();
-
-    // Append a nix_node_test target (unit) to the importer TARGETS
-    await $`bash -lc 'cat >> libs/demo/TARGETS <<'\'EOF'\'
-
-nix_node_test(
-    name = "unit",
-    lockfile_label = "lockfile:libs/demo/pnpm-lock.yaml#libs/demo",
-)
-
-EOF'`;
 
     // Glue and provider mapping (export graph → providers → auto_map)
     await $`node tools/buck/export-graph.ts --out tools/buck/graph.json`;

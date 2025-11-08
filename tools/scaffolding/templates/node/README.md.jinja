@@ -18,14 +18,14 @@ buck2 build //apps/{{ name }}:app
 
 ## Node tests (nix_node_test)
 
-- This scaffold supports hermetic Node tests powered by a Nix-backed Vitest runner.
-- To include a Buck test target on scaffold, pass `includeNodeTests=true`:
+- This scaffold includes a hermetic Node test target by default (`nix_node_test(name = "unit", ...)`) powered by a Nix‑backed Vitest runner.
+- Opt out of sample tests and devDependencies with `--no-tests` (the test target remains and passes when no tests match):
 
 ```bash
-scaf new node {{ template }} {{ name }} --yes includeNodeTests=true
+scaf new node {{ template }} {{ name }} --yes --no-tests
 ```
 
-- The test target uses default discovery patterns:
+- Default discovery patterns:
   - `test/**/*.test.(ts|js)`
   - `__tests__/**/*.test.(ts|js)`
   - `src/**/*.test.(ts|js)`

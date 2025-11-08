@@ -12,7 +12,8 @@
       "NIX_PNPM_ALLOW_GENERATE"
       "NIX_PNPM_FETCH_TIMEOUT"
       "NIX_NODE_TEST_PATTERNS"
-      "COVERAGE"
+          "COVERAGE"
+          "WORKSPACE_ROOT"
     ];
   };
 
@@ -47,7 +48,16 @@
             "$@"
         '';
         devshell = import ./tools/nix/devshell.nix { inherit pkgs; buck2Input = buck2; };
-        nodeMods = import ./tools/nix/node-modules.nix { inherit pkgs; repoRoot = ./.; repoFsRoot = ./.; hashesPath = ./tools/nix/node-modules.hashes.json; prefetchedStorePathGlobal = null; };
+        # Prefer reading lockfiles/packages from the live workspace (WORKSPACE_ROOT) if provided by the runner.
+        # Fall back to the flake's source snapshot.
+        liveFsRoot = let w = builtins.getEnv "WORKSPACE_ROOT"; in if w != "" then (builtins.toPath w) else ./.;
+        nodeMods = import ./tools/nix/node-modules.nix {
+          inherit pkgs;
+          repoRoot = ./.;
+          repoFsRoot = liveFsRoot;
+          hashesPath = ./tools/nix/node-modules.hashes.json;
+          prefetchedStorePathGlobal = null;
+        };
         prelude = import ./tools/nix/buck-prelude.nix { inherit pkgs; buck2Input = buck2; };
       in f { inherit pkgs zx-wrapper nodeMods prelude system; buck2Input = buck2; }
     );
@@ -56,6 +66,10 @@
       gomod2nix = {
         type = "app";
         program = "${pkgs.gomod2nix}/bin/gomod2nix";
+      };
+      pnpm = {
+        type = "app";
+        program = "${pkgs.pnpm}/bin/pnpm";
       };
     });
 
@@ -67,6 +81,7 @@
       let
         # Optional local override to inject a pre-fetched pnpm store into pnpm-store derivations
         localPnpmStore = let s = builtins.getEnv "LOCAL_PNPM_STORE"; in if s != "" then s else null;
+        # Unfixed pnpm-store builder exposed via nodeMods (tracked file; safe under git snapshots)
         # Allow BUCK_GRAPH_JSON to override the graph path; only pass when path exists
         graphGen = let
           envGraph = builtins.getEnv "BUCK_GRAPH_JSON";
@@ -131,6 +146,10 @@
           name = (nodeMods.sanitizeName imp);
           value = nodeMods.mkPnpmStore { lockfilePath = imp + "/pnpm-lock.yaml"; importerDir = imp; prefetchedStorePath = localPnpmStore; };
         }) importerDirs));
+        perImporterStoreUnfixed = (builtins.listToAttrs (map (imp: {
+          name = (nodeMods.sanitizeName imp);
+          value = nodeMods.mkPnpmStoreUnfixed { lockfilePath = imp + "/pnpm-lock.yaml"; importerDir = imp; };
+        }) importerDirs));
 
         haveRootLock = builtins.pathExists ./pnpm-lock.yaml;
       in {
@@ -138,6 +157,7 @@
         zx-wrapper = zx-wrapper;
       } // {
         pnpm-store = ({} // (if haveRootLock then { default = nodeMods.mkPnpmStore { lockfilePath = "pnpm-lock.yaml"; importerDir = "."; prefetchedStorePath = localPnpmStore; }; } else {}) // perImporterStore);
+        pnpm-store-unfixed = ({} // (if haveRootLock then { default = nodeMods.mkPnpmStoreUnfixed { lockfilePath = "pnpm-lock.yaml"; importerDir = "."; }; } else {}) // perImporterStoreUnfixed);
         node-modules = ({} // (if haveRootLock then { default = nodeMods.node-modules; } else {}) // perImporterNM);
       } // {
         graph-generator = graphGen.all;
@@ -249,16 +269,7 @@
             set -euo pipefail
             cd ${importerDir}
             export SOURCE_DATE_EPOCH=1
-            # Link hermetic node_modules into the working directory
-            ln -s ${nm}/node_modules node_modules
-            # Resolve vitest bin from pnpm virtual store, if present
-            VITEST_BIN=$(ls -d node_modules/.pnpm/vitest@*/node_modules/vitest/vitest.mjs 2>/dev/null | head -n1 || true)
-            if [ -n "$VITEST_BIN" ]; then
-              VITEST_NODE_MODULES=$(dirname "$VITEST_BIN")/..
-              NODE_PATH_SUFFIX=""
-              if [ -n "$NODE_PATH" ]; then NODE_PATH_SUFFIX=":"$NODE_PATH; fi
-              export NODE_PATH="$VITEST_NODE_MODULES$NODE_PATH_SUFFIX"
-            fi
+            # Resolve vitest bin (prefer node_modules/.bin; fallback to pnpm virtual store)
             # Prepare patterns list (newline separated)
             PATTERNS_FILE="$TMPDIR/patterns.txt"
             cat > "$PATTERNS_FILE" <<'EOF_PAT'
@@ -279,12 +290,25 @@ EOF_PAT
             else
               # Link hermetic node_modules and resolve vitest only when tests are present
               ln -s ${nm}/node_modules node_modules
-              VITEST_BIN=$(ls -d node_modules/.pnpm/vitest@*/node_modules/vitest/vitest.mjs 2>/dev/null | head -n1 || true)
-              if [ -n "$VITEST_BIN" ]; then
+              VITEST_BIN=""
+              if [ -x "node_modules/.bin/vitest" ] || [ -f "node_modules/.bin/vitest" ]; then
+                VITEST_BIN="node_modules/.bin/vitest"
+              else
+                VITEST_BIN=$(find node_modules -path "*/node_modules/vitest/*" -type f \( -name "vitest.mjs" -o -name "vitest.js" \) -print -quit 2>/dev/null || true)
+              fi
+              if [ -z "$VITEST_BIN" ] || [ ! -e "$VITEST_BIN" ]; then
+                echo "[nix] DEBUG: vitest binary not found; listing node_modules for diagnostics" >&2
+                (find node_modules -maxdepth 3 -type d -print | sort | head -n 200) || true
+              fi
+            if [ -n "$VITEST_BIN" ]; then
                 VITEST_NODE_MODULES=$(dirname "$VITEST_BIN")/..
                 NODE_PATH_SUFFIX=""
                 if [ -n "$NODE_PATH" ]; then NODE_PATH_SUFFIX=":"$NODE_PATH; fi
                 export NODE_PATH="$VITEST_NODE_MODULES$NODE_PATH_SUFFIX"
+                echo "[nix] DEBUG pwd: $(pwd)" >&2
+                echo "[nix] DEBUG vitest bin: $VITEST_BIN" >&2
+                (ls -la "$VITEST_BIN" || true) >&2
+                (command -v node || true) >&2
                 echo "[nix] running vitest..." >&2
                 # Run once with all patterns; passWithNoTests to avoid failure on empty sets
                 ARGS=""
@@ -292,7 +316,22 @@ EOF_PAT
                   [ -n "$__p" ] || continue
                   ARGS="$ARGS \"$__p\""
                 done < "$PATTERNS_FILE"
-                eval "node \"$VITEST_BIN\" run --reporter=junit --passWithNoTests $COVERAGE_FLAG $ARGS"
+              # Try to produce a junit file under ./report
+              export VITEST_JUNIT_OUTPUT="report/junit.xml"
+                if [ "$(basename "$VITEST_BIN")" = "vitest" ]; then
+                # .bin wrapper (node shebang)
+                CMD="\"$VITEST_BIN\" run --reporter=junit --passWithNoTests $COVERAGE_FLAG $ARGS"
+                  echo "[nix] DEBUG exec: $CMD" >&2
+                  eval "$CMD"
+                else
+                CMD="node \"$VITEST_BIN\" run --reporter=junit --passWithNoTests $COVERAGE_FLAG $ARGS"
+                  echo "[nix] DEBUG exec: $CMD" >&2
+                  eval "$CMD"
+                fi
+              # Fallback: ensure report directory is non-empty for consumers expecting artifacts
+              if [ -d report ] && [ -z "$(ls -A report 2>/dev/null)" ]; then
+                echo "<testsuite name=\"vitest\" tests=\"0\" failures=\"0\" errors=\"0\"></testsuite>" > report/junit.xml || true
+              fi
               else
                 echo "[nix] ERROR: vitest not found under node_modules, but tests matched patterns. Add vitest to devDependencies." >&2
                 exit 3
