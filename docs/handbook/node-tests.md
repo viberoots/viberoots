@@ -1,3 +1,47 @@
+## Node tests (nix_node_test)
+
+This repository standardizes Node tests through a Nix-backed runner that executes Vitest hermetically per importer (app/lib). Buck orchestrates which tests run; Nix ensures how they run with pinned toolchains.
+
+- **Runner**: Vitest (pinned via flake)
+- **Default patterns**: `test/**/*.test.(ts|js)`, `__tests__/**/*.test.(ts|js)`, `src/**/*.test.(ts|js)`
+- **Importer scoping**: Each test target must carry one `lockfile:<path>#<importer>` label.
+
+### Running
+
+- Buck (single target):
+  ```bash
+  direnv exec . buck2 test //<path>:unit
+  ```
+- Buck with coverage:
+  ```bash
+  direnv exec . buck2 test //<path>:unit -- --env COVERAGE=1
+  ```
+
+### Artifacts
+
+When tests pass, the Nix derivation writes artifacts under its output path:
+
+- JUnit report: `$OUT/report/junit.xml`
+- Coverage (when `COVERAGE=1`):
+  - `$OUT/coverage/lcov.info`
+  - `$OUT/coverage/coverage-summary.json`
+  - `$OUT/coverage/html/` (HTML report)
+
+To locate `$OUT`, you can build the derivation and print the path:
+
+```bash
+nix build .#node-test.<importer-sanitized> --no-link --print-out-paths
+```
+
+### Notes
+
+- The runner resolves `vitest` strictly from the importer’s `node_modules` (hermetic, no PATH fallbacks). If files match patterns but `vitest` is not installed, the build fails with a clear error.
+- If no files match patterns, the test passes (pass-with-no-tests semantics).
+- For full-suite coverage, follow the repo convention:
+  ```bash
+  direnv exec . buck2 test //... -- --env COVERAGE=1
+  ```
+
 # Node Testing (nix_node_test)
 
 This repo provides a hermetic Node test runner integrated with Buck2 via a Nix derivation that executes Vitest in a sandbox using per‑importer node_modules and the pinned Node toolchain.

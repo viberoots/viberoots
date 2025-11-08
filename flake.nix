@@ -281,9 +281,13 @@ EOF_PAT
             if find . -type f \( -name "*.test.ts" -o -name "*.test.js" \) -print -quit | grep -q .; then
               FOUND=1
             fi
-            # Coverage flag (evaluated at flake eval time via allowed impure env)
-            COVERAGE_FLAG=""
-            if [ "${coverageEnv}" = "1" ]; then COVERAGE_FLAG="--coverage"; fi
+            # Coverage arguments (evaluated at flake eval time via allowed impure env)
+            COVERAGE_ARGS=""
+            if [ "${coverageEnv}" = "1" ]; then
+              # Also emit raw V8 coverage so we can post-process to lcov if needed
+              export NODE_V8_COVERAGE="coverage/raw"
+              COVERAGE_ARGS="--coverage --coverage.provider=v8 --coverage.reporter=lcov --coverage.reporter=json-summary --coverage.reporter=html --coverage.reportsDirectory=coverage"
+            fi
             mkdir -p report
             if [ "$FOUND" -eq 0 ]; then
               echo "[nix] no tests matched; skipping runner and passing." >&2
@@ -309,7 +313,7 @@ EOF_PAT
                 echo "[nix] DEBUG vitest bin: $VITEST_BIN" >&2
                 (ls -la "$VITEST_BIN" || true) >&2
                 (command -v node || true) >&2
-                echo "[nix] running vitest..." >&2
+                echo "[nix] running vitest (coverage=${coverageEnv:-0})..." >&2
                 # Run once with all patterns; passWithNoTests to avoid failure on empty sets
                 ARGS=""
                 while IFS= read -r __p; do
@@ -320,14 +324,26 @@ EOF_PAT
               export VITEST_JUNIT_OUTPUT="report/junit.xml"
                 if [ "$(basename "$VITEST_BIN")" = "vitest" ]; then
                 # .bin wrapper (node shebang)
-              CMD="\"$VITEST_BIN\" run --reporter=junit --outputFile=report/junit.xml --passWithNoTests $COVERAGE_FLAG $ARGS"
+              CMD="\"$VITEST_BIN\" run --reporter=junit --outputFile=report/junit.xml --passWithNoTests $COVERAGE_ARGS $ARGS"
                   echo "[nix] DEBUG exec: $CMD" >&2
                   eval "$CMD"
                 else
-              CMD="node \"$VITEST_BIN\" run --reporter=junit --outputFile=report/junit.xml --passWithNoTests $COVERAGE_FLAG $ARGS"
+              CMD="node \"$VITEST_BIN\" run --reporter=junit --outputFile=report/junit.xml --passWithNoTests $COVERAGE_ARGS $ARGS"
                   echo "[nix] DEBUG exec: $CMD" >&2
                   eval "$CMD"
                 fi
+              # Ensure report directory has at least a minimal junit file for downstream consumers
+              if [ ! -s report/junit.xml ]; then
+                echo "[nix] junit reporter did not emit a file; writing minimal placeholder" >&2
+                echo "<testsuites/>" > report/junit.xml
+              fi
+              # If reporters didn't produce lcov/summary, synthesize them from raw V8 coverage using c8
+              if [ "${coverageEnv}" = "1" ]; then
+                if [ ! -f coverage/lcov.info ] || [ ! -f coverage/coverage-summary.json ]; then
+                  echo "[nix] coverage: generating lcov/json-summary via c8 report (temp=coverage/raw, out=coverage)" >&2
+                  c8 report --reporter=lcov --reporter=json-summary --reporter=html --report-dir=coverage --temp-directory=coverage/raw || true
+                fi
+              fi
               else
                 echo "[nix] ERROR: vitest not found under node_modules, but tests matched patterns. Add vitest to devDependencies." >&2
                 exit 3
@@ -338,6 +354,10 @@ EOF_PAT
             set -euo pipefail
             mkdir -p "$out"
             if [ -d report ]; then cp -R report "$out/"; fi
+            if [ -d coverage ]; then
+              mkdir -p "$out/coverage"
+              cp -R coverage/* "$out/coverage/" || true
+            fi
           '';
         };
         nodeTest = builtins.listToAttrs (map (imp: { name = sanitize imp; value = makeNodeTest imp; }) importerDirs);
