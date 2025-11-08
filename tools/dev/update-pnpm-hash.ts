@@ -124,7 +124,7 @@ async function buildUnfixedAndHash(
     }
     const hashed = await $({
       stdio: "pipe",
-    })`nix hash-path --sri ${outPath}`;
+    })`nix hash path --sri ${outPath}`;
     const sri = String(hashed.stdout || "").trim();
     if (!/^sha256-[A-Za-z0-9+/=_-]+$/.test(sri)) {
       return { ok: false, output: "unexpected hash-path output: " + sri };

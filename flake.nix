@@ -320,18 +320,14 @@ EOF_PAT
               export VITEST_JUNIT_OUTPUT="report/junit.xml"
                 if [ "$(basename "$VITEST_BIN")" = "vitest" ]; then
                 # .bin wrapper (node shebang)
-                CMD="\"$VITEST_BIN\" run --reporter=junit --passWithNoTests $COVERAGE_FLAG $ARGS"
+              CMD="\"$VITEST_BIN\" run --reporter=junit --outputFile=report/junit.xml --passWithNoTests $COVERAGE_FLAG $ARGS"
                   echo "[nix] DEBUG exec: $CMD" >&2
                   eval "$CMD"
                 else
-                CMD="node \"$VITEST_BIN\" run --reporter=junit --passWithNoTests $COVERAGE_FLAG $ARGS"
+              CMD="node \"$VITEST_BIN\" run --reporter=junit --outputFile=report/junit.xml --passWithNoTests $COVERAGE_FLAG $ARGS"
                   echo "[nix] DEBUG exec: $CMD" >&2
                   eval "$CMD"
                 fi
-              # Fallback: ensure report directory is non-empty for consumers expecting artifacts
-              if [ -d report ] && [ -z "$(ls -A report 2>/dev/null)" ]; then
-                echo "<testsuite name=\"vitest\" tests=\"0\" failures=\"0\" errors=\"0\"></testsuite>" > report/junit.xml || true
-              fi
               else
                 echo "[nix] ERROR: vitest not found under node_modules, but tests matched patterns. Add vitest to devDependencies." >&2
                 exit 3
