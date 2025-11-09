@@ -53,5 +53,24 @@ test("node cli: build bundled single-file and run help", async () => {
       cwd: tmp,
       stdio: "inherit",
     })`buck2 build --target-platforms prelude//platforms:default //apps/demo:demo`;
+    // Run the bundled artifact and assert help works
+    const so = await $({
+      cwd: tmp,
+      stdio: "pipe",
+    })`buck2 targets --target-platforms prelude//platforms:default --show-output //apps/demo:demo`;
+    const line =
+      String(so.stdout || "")
+        .trim()
+        .split(/\r?\n/)
+        .find((l) => l.includes("//apps/demo:demo")) || "";
+    const outPath = line.split(/\s+/)[1] || "";
+    if (!outPath) {
+      console.error("could not determine bundled output path from --show-output");
+      process.exit(2);
+    }
+    await $({
+      cwd: tmp,
+      stdio: "inherit",
+    })`${outPath} --help`;
   });
 });

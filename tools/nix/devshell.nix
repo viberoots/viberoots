@@ -100,6 +100,7 @@ autoload -Uz compinit
 compinit -i
 alias b=build
 alias v=verify
+alias i='bash tools/bin/install-deps'
 alias t=verify
 if [ -d "node_modules/zx" ]; then
   eval "$(scaf completions zsh)"
@@ -113,12 +114,14 @@ EOF
         fi
         alias b=build
         alias v=verify
+        alias i='bash tools/bin/install-deps'
         alias t=verify
       fi
 
       if [ -n "$ZSH_VERSION" ]; then
         alias b=build
         alias v=verify
+        alias i='bash tools/bin/install-deps'
         alias t=verify
       fi
 

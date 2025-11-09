@@ -35,7 +35,15 @@ def _node_nix_test_impl(ctx):
         + ("TOUT=%d; " % (tout if isinstance(tout, int) and tout > 0 else 600))
         + ("echo '[node_nix_test] importer=%s (attr=%s)' >&2; " % (imp, imp_attr))
         + ("if ! (cd \"$WORKSPACE_ROOT/%s\" && (find . -type f -name \"*.test.ts\" -print -quit | grep -q . || find . -type f -name \"*.test.js\" -print -quit | grep -q .)); then echo '[node_nix_test] no tests matched; passing' >&2; exit 0; fi; " % imp)
-        + "timeout \"$TOUT\"s nix build \"path:$FLK_ROOT#node-test.%s\" --impure --accept-flake-config --show-trace --print-build-logs --max-jobs 1 --option cores 1; " % imp_attr
+        + "NIX_MAXJ=\"${NIX_MAX_JOBS:-1}\"; NIX_CORES=\"${NIX_CORES:-1}\"; "
+        + "if command -v timeout >/dev/null 2>&1; then "
+        + "  TIMEOUT=\"timeout -k 2s ${TOUT}s\"; "
+        + "elif command -v gtimeout >/dev/null 2>&1; then "
+        + "  TIMEOUT=\"gtimeout -k 2s ${TOUT}s\"; "
+        + "else "
+        + "  TIMEOUT=\"\"; "
+        + "fi; "
+        + "$TIMEOUT nix build \"path:$FLK_ROOT#node-test.%s\" --impure --accept-flake-config --show-trace --print-build-logs --max-jobs \"$NIX_MAXJ\" --option cores \"$NIX_CORES\"; " % imp_attr
     )
 
     # Declare a tiny deterministic output so builds have an artifact

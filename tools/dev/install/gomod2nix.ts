@@ -86,11 +86,24 @@ export async function runGomod2nixGenerateIn(dir: string, dryRun: boolean, verbo
       })`bash --noprofile --norc -lc ${`if command -v curl >/dev/null 2>&1; then timeout 3 curl -sSfI https://proxy.golang.org/ >/dev/null && echo "[gomod2nix] preflight: proxy.golang.org OK" || echo "[gomod2nix] preflight: proxy.golang.org unreachable"; else echo "[gomod2nix] preflight: curl not found"; fi`}`;
     } catch {}
     // Use timeout if present; otherwise run directly to support minimal shells
-    await $({
-      cwd: tmp,
-      stdio: "inherit",
-    })`bash --noprofile --norc -lc ${`if command -v timeout >/dev/null 2>&1; then timeout ${timeoutSec} ${cmd}; else ${cmd}; fi`}`;
-    const tmpOut = path.join(tmp, "gomod2nix.toml");
+    let ran = false;
+    let tmpOut = path.join(tmp, "gomod2nix.toml");
+    try {
+      await $({
+        cwd: tmp,
+        stdio: "inherit",
+      })`bash --noprofile --norc -lc ${`if command -v timeout >/dev/null 2>&1; then timeout ${timeoutSec} ${cmd}; else ${cmd}; fi`}`;
+      ran = true;
+    } catch {
+      ran = false;
+    }
+    // If override failed to produce an output, fall back to the repo wrapper for determinism
+    if (!(await exists(tmpOut))) {
+      const fallback = `"$PWD"/tools/bin/gomod2nix --dir .`;
+      if (verbose) console.warn(`[gomod2nix] fallback: ${fallback}`);
+      await $({ cwd: tmp, stdio: "inherit" })`bash --noprofile --norc -lc ${fallback}`.nothrow();
+    }
+    tmpOut = path.join(tmp, "gomod2nix.toml");
     const tmpExists = await exists(tmpOut);
     if (!tmpExists) {
       console.error("gomod2nix did not produce gomod2nix.toml");

@@ -45,7 +45,7 @@ let
       || (builtins.match ".*/package.json" path != null)
       || (builtins.match ".*/pnpm-workspace.yaml" path != null)
       || (builtins.match ".*/\\.npmrc" path != null)
-      || (builtins.match ".*/patches/pnpm(/.*)?" path != null);
+      || (builtins.match ".*/patches/node(/.*)?" path != null);
   };
 in
 ```
@@ -200,7 +200,7 @@ Even small deltas in `pnpm-lock.yaml` change its hash. We employ several techniq
       || (builtins.match ".*/package.json" path != null)
       || (builtins.match ".*/pnpm-workspace.yaml" path != null)
       || (builtins.match ".*/\\.npmrc" path != null)
-      || (builtins.match ".*/patches/pnpm(/.*)?" path != null);
+      || (builtins.match ".*/patches/node(/.*)?" path != null);
   };
   ```
 
@@ -245,6 +245,12 @@ With the above, rebuilds happen only when the effective dependency graph changes
 
 - Native addon build failures during install
   - Add compilers/tooling to `nativeBuildInputs` of `node-modules` or prefer packages that ship prebuilt binaries.
+
+---
+
+## Notes on Node patches and importer placement
+
+- Use `patches/node` for Node patches. Place importer‑local patches under `<importer>/patches/node/*.patch` when working in a multi‑importer workspace (e.g., `apps/web/patches/node/…`). The Node provider generator includes only patches relevant to each importer’s effective set, and the Node macros include importer‑local patches in target `srcs` so Buck invalidates precisely.
 
 ---
 

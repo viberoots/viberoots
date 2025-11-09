@@ -10,6 +10,7 @@ def node_importer_deps(name, lockfile, importer, patch_paths = []):
         srcs = [],
         out = name + ".stamp",
         cmd = "echo node_importer:${importer} ${lockfile} > $OUT",
+        labels = ["lang:node"],
         visibility = ["PUBLIC"],
     )
 

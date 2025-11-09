@@ -80,9 +80,11 @@ function normalizeImporter(imp: string): string {
 
 async function buildStore(attrPath: string): Promise<{ ok: boolean; output: string }> {
   try {
+    const maxJobs = String(process.env.NIX_MAX_JOBS || "1").trim();
+    const cores = String(process.env.NIX_CORES || "1").trim();
     const res = await $({
       stdio: "pipe",
-    })`nix build .#${attrPath} --impure --no-link --accept-flake-config`;
+    })`nix build .#${attrPath} --impure --no-link --accept-flake-config --max-jobs ${maxJobs} --option cores ${cores}`;
     return { ok: true, output: String(res.stdout || "") + String(res.stderr || "") };
   } catch (e: any) {
     const out = String((e && e.stdout) || "") + String((e && e.stderr) || "");
@@ -110,9 +112,11 @@ async function buildUnfixedAndHash(
   attrPath: string,
 ): Promise<{ ok: boolean; sri?: string; output?: string }> {
   try {
+    const maxJobs = String(process.env.NIX_MAX_JOBS || "1").trim();
+    const cores = String(process.env.NIX_CORES || "1").trim();
     const built = await $({
       stdio: "pipe",
-    })`nix build .#${attrPath} --impure --no-link --accept-flake-config --print-out-paths`;
+    })`nix build .#${attrPath} --impure --no-link --accept-flake-config --print-out-paths --max-jobs ${maxJobs} --option cores ${cores}`;
     const outPath =
       String(built.stdout || "")
         .trim()

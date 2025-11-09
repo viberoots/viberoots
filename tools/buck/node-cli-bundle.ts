@@ -1,45 +1,83 @@
 #!/usr/bin/env zx-wrapper
-import fs from "fs-extra";
+/**
+ * tools/buck/node-cli-bundle.ts
+ * Build a single-file Node CLI bundle via Nix and copy it to $OUT.
+ *
+ * Args:
+ *   --importer  Importer directory (e.g., apps/demo)
+ *   --name      CLI name (used for output filename when copying)
+ *   --out       Destination path (Buck's $OUT)
+ *   --entry     Optional entry file (unused by the flake today; accepted for future)
+ */
+import path from "node:path";
+import * as fsp from "node:fs/promises";
 
-function getArg(name: string, def = ""): string {
-  const a: any = (global as any).argv || {};
-  if (a && typeof a[name] === "string" && a[name]) return a[name] as string;
-  const raw = process.argv;
-  const idx = raw.indexOf(`--${name}`);
-  if (idx >= 0 && raw[idx + 1]) return raw[idx + 1];
-  return def;
-}
+type Args = {
+  importer?: string;
+  name?: string;
+  out?: string;
+  entry?: string;
+};
 
-const importer = getArg("importer");
-const name = getArg("name");
-const out = getArg("out");
+const args = (global as any).argv as Args;
 
-if (!importer || !name || !out) {
-  console.error("usage: node-cli-bundle --importer <apps/demo> --name <demo> --out <OUT>");
-  process.exit(2);
-}
-
-function sanitize(s: string): string {
+function sanitizeImporterAttr(s: string): string {
+  // Keep in sync with tools/nix/templates-common.nix sanitizeName
   return s.replaceAll("//", "").replaceAll(":", "-").replaceAll("/", "-").replaceAll(" ", "-");
 }
 
-const attr = `node-cli.${sanitize(importer)}`;
+function basenameImporter(s: string): string {
+  // apps/demo -> demo, "." -> "."
+  const b = path.basename(s);
+  return b || s;
+}
 
-const { stdout } = await $`nix build .#${attr} --no-link --accept-flake-config --print-out-paths`;
-const path = String(stdout || "")
-  .trim()
-  .split("\n")
-  .filter(Boolean)
-  .pop();
-if (!path) {
-  console.error("node-cli-bundle: nix build produced no output path");
-  process.exit(3);
+function fail(msg: string): never {
+  console.error(msg);
+  process.exit(2);
 }
-const src = `${path}/${name}.bundle.js`;
-if (!(await fs.pathExists(src))) {
-  console.error(`node-cli-bundle: expected bundle not found: ${src}`);
-  process.exit(4);
+
+async function main() {
+  const importer = String(args.importer || "").trim();
+  const name = String(args.name || "").trim();
+  const out = String(args.out || "").trim();
+  // entry accepted for forward compatibility; unused in current flake pipeline
+  // const entry = (args.entry ?? "").toString().trim();
+
+  if (!importer) fail("node-cli-bundle: --importer is required (e.g., apps/demo)");
+  if (!name) fail("node-cli-bundle: --name is required (e.g., demo)");
+  if (!out) fail("node-cli-bundle: --out is required (Buck's $OUT)");
+
+  const attr = `node-cli.${sanitizeImporterAttr(importer)}`;
+  const { stdout } = await $`nix build .#${attr} --no-link --accept-flake-config --print-out-paths`;
+  const storePath =
+    String(stdout || "")
+      .trim()
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .pop() || "";
+  if (!storePath) fail(`node-cli-bundle: nix build produced no out path for ${attr}`);
+
+  const expected = path.join(storePath, `${basenameImporter(importer)}.bundle.js`);
+  try {
+    await fsp.access(expected);
+  } catch {
+    fail(
+      `node-cli-bundle: expected bundle missing: ${expected}\n` +
+        `Ensure flake packages.<system>.node-cli.<sanitize(importer)> emits <basename(importer)>.bundle.js`,
+    );
+  }
+
+  // Copy to Buck's $OUT and make executable
+  await fsp.mkdir(path.dirname(out), { recursive: true }).catch(() => {});
+  await fsp.copyFile(expected, out);
+  try {
+    await fsp.chmod(out, 0o755);
+  } catch {}
+  console.log(`wrote ${out}`);
 }
-await fs.copy(src, out);
-await fs.chmod(out, 0o755);
-console.log("wrote", out);
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

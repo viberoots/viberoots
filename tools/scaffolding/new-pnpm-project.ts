@@ -30,9 +30,33 @@ function usage(): void {
 
 async function main(): Promise<void> {
   try {
+    // Always respect a sandboxed workspace root when present (tests run in temp repos)
+    const envRoot = (process.env.WORKSPACE_ROOT || process.env.BUCK_TEST_SRC || "").trim();
+    if (envRoot) {
+      process.chdir(path.resolve(envRoot));
+    } else {
+      const here = path.dirname(new URL(import.meta.url).pathname);
+      const root = path.resolve(here, "..", "..");
+      process.chdir(root);
+    }
+  } catch {}
+  // Guard: when invoked under Buck tests, require a sandboxed WORKSPACE_ROOT to avoid mutating live repo
+  try {
     const here = path.dirname(new URL(import.meta.url).pathname);
-    const root = path.resolve(here, "..", "..");
-    process.chdir(root);
+    const realRoot = path.resolve(here, "..", "..");
+    const envRootRaw = (process.env.WORKSPACE_ROOT || process.env.BUCK_TEST_SRC || "").trim();
+    const envRootAbs = envRootRaw ? path.resolve(envRootRaw) : "";
+    const underBuck = Boolean(
+      process.env.BUCK_TEST_TARGET || process.env.BUCK_TARGET || process.env.BUCK_TEST_SRC,
+    );
+    const hasSandboxRoot = Boolean(envRootAbs);
+    const usingLiveRoot = hasSandboxRoot && envRootAbs === realRoot;
+    if (underBuck && (!hasSandboxRoot || usingLiveRoot)) {
+      console.error(
+        "error: refusing to scaffold in the live repo under Buck tests; ensure WORKSPACE_ROOT points to a temp workspace (use runInTemp)",
+      );
+      process.exit(2);
+    }
   } catch {}
 
   const { flags } = parse(process.argv.slice(2));

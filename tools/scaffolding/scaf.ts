@@ -1155,6 +1155,24 @@ async function main() {
       process.chdir(root);
     }
   } catch {}
+  // Guard: under Buck tests, require a sandboxed workspace root to avoid writing to the live repo
+  try {
+    const here = path.dirname(new URL(import.meta.url).pathname);
+    const realRoot = path.resolve(here, "..", "..");
+    const envRoot = (process.env.WORKSPACE_ROOT || process.env.BUCK_TEST_SRC || "").trim();
+    const envRootAbs = envRoot ? path.resolve(envRoot) : "";
+    const underBuck = Boolean(
+      process.env.BUCK_TEST_TARGET || process.env.BUCK_TARGET || process.env.BUCK_TEST_SRC,
+    );
+    const hasSandboxRoot = Boolean(envRootAbs);
+    const usingLiveRoot = hasSandboxRoot && envRootAbs === realRoot;
+    if (underBuck && (!hasSandboxRoot || usingLiveRoot)) {
+      console.error(
+        "error: refusing to scaffold in the live repo under Buck tests; use runInTemp so WORKSPACE_ROOT points to a temp workspace",
+      );
+      process.exit(2);
+    }
+  } catch {}
   const raw = process.argv.slice(2);
   const { _, flags } = parseArgs(raw);
   const [cmd, ...rest] = _;

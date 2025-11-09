@@ -41,6 +41,10 @@ export COVERAGE
 # Use PATH for buck2; shellHook ensures upstream buck2 is first
 BUCK_BIN="buck2"
 
+# Speed up local Nix builds of Node tests while keeping deterministic defaults in CI
+export NIX_MAX_JOBS="${NIX_MAX_JOBS:-2}"
+export NIX_CORES="${NIX_CORES:-2}"
+
 # Resolve prelude strictly from this flake's buck2-prelude (built from upstream input)
 if ! command -v nix >/dev/null 2>&1; then
   echo "error: nix not found; cannot resolve buck2 prelude" 1>&2
@@ -65,7 +69,9 @@ export BUCK_ROOT="$ROOT_DIR"
 rm -rf .tmp || true
 
 # Clean previous coverage artifacts regardless of coverage mode
-rm -rf coverage || true
+# Ensure writable, then remove recursively; ignore errors if already absent
+chmod -R u+w coverage >/dev/null 2>&1 || true
+rm -rf coverage >/dev/null 2>&1 || true
 
 # Write deterministic Buck config mapping, symlinking prelude into repo for stable alias
 printf '.\n' > .buckroot
@@ -144,18 +150,63 @@ if command -v nohup >/dev/null 2>&1; then
     ' >/dev/null 2>&1 &
   ) || true
 fi
-# Run tests; pass through any target patterns as arguments. Preserve TTY for Buck superconsole.
 # Suppress benign tailer/event-log and post-run INFO spam; keep superconsole visible.
 export RUST_LOG="${RUST_LOG:-warn},buck2_client_ctx::file_tailers::tailer=off,buck2_event_log::writer=off"
 export BUCK_LOG="${BUCK_LOG:-warn},buck2_client_ctx::file_tailers::tailer=off,buck2_event_log::writer=off"
-CMD="buck2 --isolation-dir \"$ISO\" test --console super --target-platforms prelude//platforms:default \"$@\" -- --env COVERAGE=\"${COVERAGE:-0}\""
-if command -v script >/dev/null 2>&1; then
-  # Use a PTY so Buck detects an interactive console; avoid login/profile shells
-  script -q /dev/null bash --noprofile --norc -c "$CMD"
+
+run_batch() {
+  local iso="$1"; shift
+  local -a targets=( "$@" )
+  local tsec="${VERIFY_TIMEOUT_SECS:-900}"
+  local prefix=""
+  if command -v timeout >/dev/null 2>&1; then
+    prefix="timeout -k 10s ${tsec}s "
+  elif command -v gtimeout >/dev/null 2>&1; then
+    prefix="gtimeout -k 10s ${tsec}s "
+  fi
+  local cmd="${prefix}buck2 --isolation-dir \"$iso\" test --console super --target-platforms prelude//platforms:default ${targets[*]} -- --env COVERAGE=\"${COVERAGE:-0}\""
+  if command -v script >/dev/null 2>&1; then
+    script -q /dev/null bash --noprofile --norc -c "$cmd"
+  else
+    eval "$cmd"
+  fi
+}
+
+STATUS=0
+if [[ "$#" -gt 0 ]]; then
+  # Direct targets given: single batch
+  run_batch "$ISO" "$@" || STATUS=$?
 else
-  eval "$CMD"
+  # No explicit targets: partition zx tests into a small number of batches to respect the 10m timeout
+  mapfile -t ALL_TESTS < <(buck2 targets --target-platforms prelude//platforms:default //... --json | jq -r '.[] | select(."buck.type"|endswith(":zx_test")) | .name' | sort)
+  if [[ "${#ALL_TESTS[@]}" -eq 0 ]]; then
+    echo "No tests found" 1>&2
+    exit 2
+  fi
+  # Heuristic batch size: ~1/3rd per batch, minimum 1
+  local total="${#ALL_TESTS[@]}"
+  local batches=3
+  local size=$(( (total + batches - 1) / batches ))
+  (( size < 1 )) && size=1
+  local i=0
+  local batch_idx=0
+  while (( i < total )); do
+    batch_idx=$((batch_idx + 1))
+    # Reuse a single buck2 daemon across batches to avoid repeated cold starts
+    local iso_batch="${ISO}"
+    local -a batch=( )
+    local j=0
+    while (( j < size && i < total )); do
+      batch+=( "//:${ALL_TESTS[i]}" )
+      i=$((i + 1))
+      j=$((j + 1))
+    done
+    echo "[verify] Running batch ${batch_idx} with ${#batch[@]} tests..." 1>&2
+    if ! run_batch "$iso_batch" "${batch[@]}"; then
+      STATUS=1
+    fi
+  done
 fi
-STATUS=$?
 # Final best-effort cleanup
 cleanup || true
 exit "$STATUS"

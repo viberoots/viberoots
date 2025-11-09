@@ -1,7 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
+import * as fsp from "node:fs/promises";
 import type { Adapter, Batch, Node } from "../types.ts";
 import { hasLabel, isRuleType } from "./helpers.ts";
+import { packageDirFromTargetName } from "../batch.ts";
 
 function isNodeTarget(n: Node): boolean {
   // Prefer explicit lang stamp; fall back to common js_/node_ rule_type families
@@ -110,8 +112,46 @@ export const adapter: Adapter = {
     return [];
   },
   async attachLabels(nodes: Node[]): Promise<Node[]> {
-    // Validate-only adapter. Returns nodes unchanged (labels are stamped by macros).
-    return nodes;
+    // Env-gated authoritative attach (symmetry-only enhancement). Default off.
+    // Set EXPORTER_NODE_ATTACH=1 to enable stamping missing lockfile labels.
+    const attach = (() => {
+      const v = String(process.env.EXPORTER_NODE_ATTACH || "")
+        .trim()
+        .toLowerCase();
+      return v === "1" || v === "true";
+    })();
+    if (!attach) return nodes;
+
+    const enriched: Node[] = [];
+    for (const n of nodes) {
+      if (!isNodeTarget(n)) {
+        enriched.push(n);
+        continue;
+      }
+      const labs = Array.isArray(n.labels) ? [...n.labels] : [];
+      const hasLock = labs.some((l) => typeof l === "string" && l.startsWith("lockfile:"));
+      // Only attach when a kind:* label is present (macro-like nodes) and no lockfile label exists.
+      const haveKind = hasKindLabel(n);
+      if (hasLock || !haveKind) {
+        enriched.push(n);
+        continue;
+      }
+      // Derive importer candidate from the Buck target name: //pkg:rule → pkg
+      const pkg = packageDirFromTargetName(n.name || "") || ".";
+      const lockRel = pkg === "." ? "pnpm-lock.yaml" : `${pkg}/pnpm-lock.yaml`;
+      try {
+        // If a lockfile exists at the derived path, stamp an importer-scoped label.
+        await fsp.access(path.resolve(process.cwd(), lockRel));
+        const importer = pkg === "." ? "." : pkg;
+        const label = `lockfile:${lockRel}#${importer}`;
+        const next = Array.from(new Set([...(labs as string[]), label])).sort();
+        enriched.push({ ...n, labels: next });
+      } catch {
+        // No lockfile at the derived location; leave node unchanged.
+        enriched.push(n);
+      }
+    }
+    return enriched;
   },
 };
 

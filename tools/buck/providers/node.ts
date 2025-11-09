@@ -93,61 +93,55 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
   const PATCH_DIR = opts?.patchDir || "patches/node";
   const OUT_FILE = opts?.outFile || "third_party/providers/TARGETS.node.auto";
 
-  let lockfiles: string[] = [];
+  // Gather lockfiles from git tracking AND from a filesystem walk, then union them.
+  const fromGit: string[] = [];
   try {
     const { stdout } = await $`git ls-files '**/pnpm-lock.yaml'`;
-    // Only keep lockfiles that actually exist on disk (exclude deleted paths in index)
     const candidates = String(stdout || "")
       .split(/\r?\n/)
       .map((s) => s.trim())
       .filter(Boolean);
-    const existing: string[] = [];
     for (const lf of candidates) {
       try {
         await fsp.access(lf);
-        existing.push(lf);
+        fromGit.push(lf);
       } catch {}
     }
-    lockfiles = existing;
-  } catch {
-    lockfiles = [];
-  }
-  // Fallback for temp repos without .git: scan filesystem
-  if (!lockfiles.length) {
-    try {
-      const rec: string[] = [];
-      async function walk(dir: string) {
-        let entries: string[] = [];
-        try {
-          entries = await fsp.readdir(dir);
-        } catch {
-          return;
-        }
-        for (const e of entries) {
-          const p = `${dir}/${e}`;
-          try {
-            const st = await fsp.lstat(p);
-            if (st.isDirectory()) {
-              if (
-                e === ".git" ||
-                e === "buck-out" ||
-                e === "node_modules" ||
-                e === ".pnpm-store" ||
-                e === ".clinic" ||
-                e === "coverage"
-              )
-                continue;
-              await walk(p);
-            } else if (e === "pnpm-lock.yaml") {
-              rec.push(p);
-            }
-          } catch {}
-        }
+  } catch {}
+  const fromFs: string[] = [];
+  try {
+    async function walk(dir: string) {
+      let entries: string[] = [];
+      try {
+        entries = await fsp.readdir(dir);
+      } catch {
+        return;
       }
-      await walk(".");
-      lockfiles = rec;
-    } catch {}
-  }
+      for (const e of entries) {
+        const p = `${dir}/${e}`;
+        try {
+          const st = await fsp.lstat(p);
+          if (st.isDirectory()) {
+            if (
+              e === ".git" ||
+              e === "buck-out" ||
+              e === "node_modules" ||
+              e === ".pnpm-store" ||
+              e === ".clinic" ||
+              e === "coverage"
+            ) {
+              continue;
+            }
+            await walk(p);
+          } else if (e === "pnpm-lock.yaml") {
+            fromFs.push(p);
+          }
+        } catch {}
+      }
+    }
+    await walk(".");
+  } catch {}
+  const lockfiles = Array.from(new Set<string>([...fromGit, ...fromFs]));
 
   async function haveYaml(): Promise<boolean> {
     try {
@@ -188,7 +182,8 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
     if (haveYamlMod) {
       const doc = await parsePnpmLock(lf);
       for (const importer of Object.keys(doc.importers || {})) {
-        const importerLabel = importer === "." ? path.dirname(lf) || "." : importer;
+        let importerLabel = importer === "." ? path.dirname(lf) || "." : importer;
+        importerLabel = importerLabel.replace(/^\.\/+/, "") || ".";
         const eff = effectiveSetForImporter(doc, importer);
         const usedPatches = Array.from(eff)
           .map((k) => keyToPatchPath.get(k) || "")

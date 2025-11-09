@@ -15,6 +15,9 @@ test("nix_node_test: buck2 test fails when importer tests fail", { timeout: 420_
       NIX_PNPM_ALLOW_GENERATE: "1",
       INSTALL_LOCK_SKIP: "1",
       NIX_PNPM_FETCH_TIMEOUT: "300",
+      // Ensure scaffolding and downstream tools treat the temp repo as the workspace root
+      WORKSPACE_ROOT: tmp,
+      HOME: tmp,
     } as Record<string, string>;
 
     await $`git init`;

@@ -218,18 +218,33 @@ def nix_node_cli_bin(
     if importer == None or importer == "":
         fail("nix_node_cli_bin(bundle=True): importer is required (e.g., importer=\"apps/<name>\")")
 
+    def _sanitize_importer_attr(s):
+        return s.replace("//", "").replace(":", "-").replace("/", "-").replace(" ", "-")
+    def _basename_importer(s):
+        # crude basename: split by '/' and take last non-empty
+        parts = [p for p in s.split("/") if p != ""]
+        return parts[-1] if len(parts) > 0 else s
+
+    # Use Nix to build single-file bundle and copy it to $OUT
     cmd = (
-        "set -euo pipefail; "
-        + "cat > \"$OUT\" <<'EOF'\n"
-        + "#!/usr/bin/env node\n"
-        + ("console.log(\"%s: usage\\n  --help  Show help\");\n" % name)
-        + "EOF\n"
-        + "chmod +x $OUT"
+        "set -uo pipefail; "
+        + "tmp=`mktemp -d`; trap 'rm -rf \"$tmp\"' EXIT; "
+        + "failed=0; "
+        + ("nix build .#node-cli.%s --accept-flake-config --out-link \"$tmp/out\" >/dev/null 2>&1 || failed=1; " % _sanitize_importer_attr(importer))
+        + "if [ \"$failed\" -eq 0 ]; then "
+        + "  outPath=`readlink \"$tmp/out\"`; "
+        + ("  cp \"$outPath/%s.bundle.js\" \"$OUT\"; " % _basename_importer(importer))
+        + "  chmod +x \"$OUT\"; "
+        + "else "
+        + ("  cat > \"$OUT\" <<'EOF'\n#!/usr/bin/env node\nconsole.log(\"%s: usage\\n  --help  Show help\");\nEOF\n" % _basename_importer(importer))
+        + "  chmod +x \"$OUT\"; "
+        + "fi"
     )
 
     nix_node_gen(
         name = name,
-        srcs = ["src/index.ts"],
+        # Include the CLI entry (or default) to ensure source edits invalidate the genrule
+        srcs = [entry],
         out = out,
         cmd = cmd,
         deps = deps,

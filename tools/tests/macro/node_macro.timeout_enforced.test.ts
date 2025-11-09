@@ -15,6 +15,9 @@ test("nix_node_test: external timeout is enforced", { timeout: 420_000 }, async 
       NIX_PNPM_ALLOW_GENERATE: "1",
       INSTALL_LOCK_SKIP: "1",
       NIX_PNPM_FETCH_TIMEOUT: "300",
+      // Ensure scaffolding and downstream tools treat the temp repo as the workspace root
+      WORKSPACE_ROOT: tmp,
+      HOME: tmp,
     } as Record<string, string>;
 
     await $`git init`;
