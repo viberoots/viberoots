@@ -32,6 +32,11 @@ function usage(msg?: string) {
       "",
       "languages:",
       "  go | cpp | node",
+      "",
+      "notes:",
+      "  - Go/C++ default to local mode: apply/remove write/read patches under <pkg>/patches/<lang>.",
+      "    Removing a Go/C++ patch does not regenerate glue; Buck/Nix pick up the change via srcs.",
+      "  - Node remains importer-scoped: apply/remove regenerates providers and auto_map (glue).",
     ].join("\n"),
   );
   process.exit(2);

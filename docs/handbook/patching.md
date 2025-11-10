@@ -45,6 +45,11 @@ Local glue is not committed. Regenerate after apply or on-demand:
 
 Running `node tools/dev/install-deps.ts` in the dev shell runs the full sequence automatically. CI runs the same as separate stages.
 
+Note on remove (Go/C++ vs Node):
+
+- Go/C++: `patch-pkg remove` does not regenerate glue. Local patches live under the target’s `patches/<lang>` directory and are included in the rule’s `srcs`, so removing a patch is picked up directly by Buck/Nix (precise invalidation, no provider/auto_map updates needed).
+- Node: still regenerates providers and `auto_map.bzl` on apply/remove because importer‑scoped providers are generated artifacts derived from the lockfile and the set of applicable patches.
+
 ## CI guardrails
 
 Local builds warn when `NIX_GO_DEV_OVERRIDE_JSON` is set; CI fails if it is set.
