@@ -50,6 +50,12 @@ Notes
 - Testing and coverage: see `docs/handbook/testing.md`.
 - Adding a new language: read `docs/handbook/new-language-walkthrough.md` for a fast, capability‑gated path using the lang‑kit template.
 
+### Go local patching (canonical)
+
+- Place patches under the target’s package directory: `<pkg>/patches/go/`.
+- Filename format: `<importPath with '/' → '__'>@<version>.patch` (e.g., `golang.org__x__net@v0.24.0.patch`).
+- Go patches are local-only; no global Go provider files are generated or required. Buck invalidates precisely via `srcs` on the owning target.
+
 ### Exporter validation modes (warn | error)
 
 The Buck graph exporter supports a validation severity switch for adapter findings.
@@ -86,7 +92,7 @@ node tools/buck/gen-provider-index.ts --out third_party/providers/provider_index
 The generated `third_party/providers/provider_index.bzl` exposes `PROVIDER_INDEX` where each entry looks like:
 
 ```
-"//third_party/providers:<name>": { "kind": "go|node|cpp", "key": "module:<path>@<ver>|lockfile:<path>#<importer>|nixpkg:<attr>" }
+"//third_party/providers:<name>": { "kind": "node|cpp", "key": "lockfile:<path>#<importer>|nixpkg:<attr>" }
 ```
 
 This file is not required for builds; it is used by tools/tests for introspection.

@@ -2,10 +2,9 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { writeIfChanged } from "../lib/fs-helpers.ts";
-import { readGoEntries } from "./providers/go.ts";
 import { readNodeProviderIndexEntries } from "./providers/node.ts";
 
-type IndexEntry = { kind: "go" | "node" | "cpp"; key: string };
+type IndexEntry = { kind: "node" | "cpp"; key: string };
 
 function fq(labelTail: string): string {
   return `//third_party/providers:${labelTail}`;
@@ -34,15 +33,6 @@ async function readCppIndexEntries(): Promise<Record<string, IndexEntry>> {
   return out;
 }
 
-async function readGoIndexEntries(): Promise<Record<string, IndexEntry>> {
-  const out: Record<string, IndexEntry> = {};
-  const entries = await readGoEntries({});
-  for (const e of entries) {
-    out[fq(e.provider)] = { kind: "go", key: `module:${e.moduleKey}` };
-  }
-  return out;
-}
-
 async function readNodeIndexEntries(): Promise<Record<string, IndexEntry>> {
   const out: Record<string, IndexEntry> = {};
   const entries = await readNodeProviderIndexEntries();
@@ -57,7 +47,6 @@ export async function generateProviderIndex(opts?: { outFile?: string; jsonOutFi
   const OUT_JSON = opts?.jsonOutFile || "third_party/providers/provider_index.json";
 
   const maps: Record<string, IndexEntry>[] = await Promise.all([
-    readGoIndexEntries(),
     readNodeIndexEntries(),
     readCppIndexEntries(),
   ]);
