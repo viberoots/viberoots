@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "cxx_library", "cxx_binary", "cxx_test")
-load("//lang:defs_common.bzl", "stamp_labels")
+load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve")
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
 load("//third_party/providers:nix_attr_map.bzl", "NIX_ATTR_MAP")
 load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name", _cpp_sanitize_probe="cpp_sanitize_probe")
@@ -12,9 +12,29 @@ def _providers_for(name):
     key = "//%s:%s" % (pkg, name)
     return MODULE_PROVIDERS.get(key, [])
 
+def _normalize_cxx_attr(a):
+    """
+    Normalize user-provided nix_cxx_attrs to canonical form:
+    - ensure pkgs. prefix
+    - map gtest -> googletest
+    """
+    if a == None:
+        return ""
+    if not isinstance(a, str):
+        return ""
+    s = a.strip()
+    if s == "":
+        return ""
+    if not s.startswith("pkgs."):
+        s = "pkgs.%s" % s
+    if s == "pkgs.gtest":
+        s = "pkgs.googletest"
+    return s
+
 
 def nix_cpp_library(name, **kwargs):
     local_patch_dirs = kwargs.pop("local_patch_dirs", ["patches/cpp"])  # per-target local patch directories
+    nix_cxx_attrs = kwargs.pop("nix_cxx_attrs", [])
     # Build via Nix, not Buck's C++ toolchain
     deps = kwargs.pop("deps", [])
     stamp_labels(kwargs, "cpp", "lib")
@@ -22,6 +42,12 @@ def nix_cpp_library(name, **kwargs):
     srcs = []
     for d in local_patch_dirs:
         srcs = srcs + native.glob(["%s/*.patch" % d])
+    extra_nix_labels = []
+    for a in nix_cxx_attrs or []:
+        na = _normalize_cxx_attr(a)
+        if na != "":
+            extra_nix_labels.append("nixpkg:%s" % na)
+    labels = dedupe_preserve((kwargs.get("labels", []) or []) + extra_nix_labels)
     cpp_nix_build(
         name = name,
         out = sanitize_to_bin_name("//%s:%s" % (native.package_name(), name)) + ".a",
@@ -29,18 +55,25 @@ def nix_cpp_library(name, **kwargs):
         self_label = "//%s:%s" % (native.package_name(), name),
         deps = deps + _providers_for(name),
         srcs = srcs,
-        labels = kwargs.get("labels", []),
+        labels = labels,
     )
 
 
 def nix_cpp_binary(name, **kwargs):
     local_patch_dirs = kwargs.pop("local_patch_dirs", ["patches/cpp"])  # per-target local patch directories
+    nix_cxx_attrs = kwargs.pop("nix_cxx_attrs", [])
     # Build via Nix, not Buck's C++ toolchain
     deps = kwargs.pop("deps", [])
     stamp_labels(kwargs, "cpp", "bin")
     srcs = []
     for d in local_patch_dirs:
         srcs = srcs + native.glob(["%s/*.patch" % d])
+    extra_nix_labels = []
+    for a in nix_cxx_attrs or []:
+        na = _normalize_cxx_attr(a)
+        if na != "":
+            extra_nix_labels.append("nixpkg:%s" % na)
+    labels = dedupe_preserve((kwargs.get("labels", []) or []) + extra_nix_labels)
     cpp_nix_build(
         name = name,
         out = sanitize_to_bin_name("//%s:%s" % (native.package_name(), name)),
@@ -48,13 +81,14 @@ def nix_cpp_binary(name, **kwargs):
         self_label = "//%s:%s" % (native.package_name(), name),
         deps = deps + _providers_for(name),
         srcs = srcs,
-        labels = kwargs.get("labels", []),
+        labels = labels,
     )
 
 
 def nix_cpp_test(name, **kwargs):
     # Define a planner-visible cxx_test (not executed) and an external runner test (executed)
     deps = kwargs.pop("deps", [])
+    nix_cxx_attrs = kwargs.pop("nix_cxx_attrs", [])
     srcs = kwargs.get("srcs", [])
     planner_name = name + "__planner"
     # Planner-visible: stamps labels and wires providers so exporter->planner can generate the Nix derivation
@@ -80,7 +114,12 @@ def nix_cpp_test(name, **kwargs):
                         extra_nixpkg_labels.append("nixpkg:pkgs.googletest")
                     else:
                         extra_nixpkg_labels.append("nixpkg:pkgs." + tail.replace("_", "."))
-    _planner_labels = _planner_kwargs.get("labels", []) + extra_nixpkg_labels
+    # Also add direct call-site attrs as nixpkg labels
+    for a in nix_cxx_attrs or []:
+        na = _normalize_cxx_attr(a)
+        if na != "":
+            extra_nixpkg_labels.append("nixpkg:%s" % na)
+    _planner_labels = dedupe_preserve((_planner_kwargs.get("labels", []) or []) + extra_nixpkg_labels)
     # Planner-visible stub: declare a cxx_library without compiling test sources; Nix will build the test.
     # Filter provider deps from planner to avoid visibility / graph-edge to providers
     _planner_deps = []
