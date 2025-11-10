@@ -574,15 +574,6 @@ async function doRemove(args: string[]) {
     const dst = path.join(patchDir, `${fileKey}@${version}.patch`);
     await fsp.rm(dst, { force: true });
   } catch {}
-  const prev = process.cwd();
-  try {
-    process.chdir(repoRoot);
-    await runGlue();
-  } finally {
-    try {
-      process.chdir(prev);
-    } catch {}
-  }
 }
 
 export default Object.assign({}, handler, { remove: doRemove });

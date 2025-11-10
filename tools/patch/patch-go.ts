@@ -348,15 +348,6 @@ async function doRemove(args: string[]) {
     const dst = path.join(patchDir, `${enc}@${version}.patch`);
     await fsp.rm(dst, { force: true });
   } catch {}
-  const prev = process.cwd();
-  try {
-    process.chdir(repoRoot);
-    await runGlue();
-  } finally {
-    try {
-      process.chdir(prev);
-    } catch {}
-  }
 }
 
 const handler: LanguageHandler = {
