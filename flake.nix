@@ -33,10 +33,12 @@
         pkgs = import nixpkgs {
           inherit system;
           overlays = let
-            haveCppOverlay = builtins.pathExists ./tools/nix/overlays/cpp-patches.nix;
+            haveCppOverlayFile = builtins.pathExists ./tools/nix/overlays/cpp-patches.nix;
+            useCppOverlay = (builtins.getEnv "NIX_CPP_USE_OVERLAY") == "1";
+            cppOverlays = if (haveCppOverlayFile && useCppOverlay) then [ (import ./tools/nix/overlays/cpp-patches.nix) ] else [];
           in [
             gomod2nix.overlays.default
-          ] ++ (if haveCppOverlay then [ (import ./tools/nix/overlays/cpp-patches.nix) ] else []);
+          ] ++ cppOverlays;
         };
         zx-wrapper = pkgs.writeShellScriptBin "zx-wrapper" ''
           set -euo pipefail

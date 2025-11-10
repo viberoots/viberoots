@@ -32,7 +32,7 @@ Use `tools/dev/clear-overrides-cpp.ts` to unset quickly.
 
 ### What you get
 
-- **Conditional overlay wiring**: If `tools/nix/overlays/cpp-patches.nix` exists, it is automatically included by `flake.nix`.
+- **Opt‑in overlay wiring**: If `tools/nix/overlays/cpp-patches.nix` exists and `NIX_CPP_USE_OVERLAY=1` is set in the environment, it is included by `flake.nix`. By default, the overlay is not enabled; local patching remains the canonical path.
 - **Local patch application**: Keep patches under `patches/cpp/*.patch` and apply them to nixpkgs packages via the overlay.
 - **Buck/Nix integration**: Prebuild freshness detection includes `tools/nix/overlays/*.nix` and `flake.lock`, ensuring changes are noticed and tested.
 
@@ -63,8 +63,13 @@ tools/bin/patch-pkg apply cpp zlib
 
 3. Enable the overlay
 
-Ensure `tools/nix/overlays/cpp-patches.nix` exists (it’s already included by `flake.nix` when present).
-No manual edits are required for each patch; the overlay automatically discovers files under `patches/cpp/*.patch` and applies those that match the current nixpkgs version of each attr.
+Ensure `tools/nix/overlays/cpp-patches.nix` exists, and opt‑in when you want to use it:
+
+```bash
+export NIX_CPP_USE_OVERLAY=1
+```
+
+No manual edits are required for each patch; the overlay automatically discovers files under `patches/cpp/*.patch` and applies those that match the current nixpkgs version of each attr when the overlay is enabled.
 
 4. Validate
 
@@ -110,11 +115,11 @@ tools/
       cpp-patches.nix   # overlay entry-point (you write overrides here)
 ```
 
-### 1) Enable the overlay (no-op by default)
+### 1) Enable the overlay (opt‑in)
 
-`flake.nix` conditionally includes the C++ overlay if `tools/nix/overlays/cpp-patches.nix` is present. The file is intentionally minimal by default. Create or edit it to add overrides.
+`flake.nix` conditionally includes the C++ overlay only when `tools/nix/overlays/cpp-patches.nix` is present and `NIX_CPP_USE_OVERLAY=1` is set in the environment. The file is intentionally minimal by default. Create or edit it to add overrides and export the env var to enable the overlay for a given build or shell session.
 
-The committed overlay file at `tools/nix/overlays/cpp-patches.nix` auto-discovers patches; no per-attr snippet is needed.
+The committed overlay file at `tools/nix/overlays/cpp-patches.nix` auto-discovers patches; no per-attr snippet is needed. Remember to set `NIX_CPP_USE_OVERLAY=1` to activate it.
 
 Tips:
 
@@ -208,13 +213,13 @@ direnv exec . timeout 600s buck2 test //... --target-platforms config//platforms
 ### Troubleshooting
 
 - If you see unspecified platform errors during ad-hoc runs, set the default platform explicitly as above with `--target-platforms config//platforms:default`.
-- If changes seem ignored, ensure your overlay file exists at `tools/nix/overlays/cpp-patches.nix` and that patch paths are correct relative to that file.
+- If changes seem ignored, ensure your overlay file exists at `tools/nix/overlays/cpp-patches.nix`, that `NIX_CPP_USE_OVERLAY=1` is set, and that patch paths are correct relative to that file.
 - For CI, these overlays are captured by our hermetic Nix builds and Buck change detection.
 
-Checklist before committing:
+Checklist before committing (overlay is optional; local patches next to targets are canonical):
 
 - Patch lives under `patches/cpp/` with a descriptive name.
-- Overlay entry is added in `tools/nix/overlays/cpp-patches.nix` using overrideAttrs + applyPatches on src.
+- If using overlays: add an entry in `tools/nix/overlays/cpp-patches.nix` using overrideAttrs + applyPatches on src, and enable with `NIX_CPP_USE_OVERLAY=1`.
 - `tools/dev/langs-diagnose.ts` shows C++ providers and any patched entries (optional).
 - Full suite passes: `v` (dev shell) with 600s external timeout and coverage.
 
