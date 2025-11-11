@@ -131,16 +131,17 @@ Tips:
 The recommended path is to use `tools/bin/patch-pkg` to generate patches. It writes to `patches/cpp/` automatically using the convention `<encoded>@<version>.patch`, e.g. `pkgs__zlib@1.2.13.patch`.
 If you must add a patch manually, keep it under `patches/cpp/` and follow the same naming convention.
 
-### 3) Regenerate provider glue (optional)
+### 3) Provider glue (no longer required)
 
-For completeness you can refresh provider glue. The C++ provider sync writes a small generated file:
+As of PR 2 in `drop-cpp-provider.md`, C++ provider sync is a no‑op. There is no C++ provider file to generate and no stamps to maintain. Use label introspection instead:
 
 ```bash
-# From repo root
-node tools/buck/sync-providers.ts --lang=cpp
-```
+# List effective nixpkg attrs for all C++ targets in the exported graph
+node tools/buck/inspect-cpp-attrs.ts --json
 
-This emits `third_party/providers/TARGETS.cpp.auto` with a generated header. No manual edits are required.
+# Or for specific targets
+node tools/buck/inspect-cpp-attrs.ts --target //libs/helper-lib:lib --target //apps/bar:bin
+```
 
 ### 3.5) Creating patches with patch-pkg (recommended, canonical)
 
@@ -220,7 +221,7 @@ Checklist before committing (overlay is optional; local patches next to targets 
 
 - Patch lives under `patches/cpp/` with a descriptive name.
 - If using overlays: add an entry in `tools/nix/overlays/cpp-patches.nix` using overrideAttrs + applyPatches on src, and enable with `NIX_CPP_USE_OVERLAY=1`.
-- `tools/dev/langs-diagnose.ts` shows C++ providers and any patched entries (optional).
+- `tools/buck/inspect-cpp-attrs.ts` shows effective nixpkg attributes per C++ target (labels-based).
 - Full suite passes: `v` (dev shell) with 600s external timeout and coverage.
 
 ### Design alignment

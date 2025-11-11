@@ -8,9 +8,9 @@ test("sync-providers: subdirectory under patches/node is ignored (non-strict)", 
   await runInTemp("sync-subdir", async (tmp, $) => {
     const sub = path.join(tmp, "patches", "node", "foo");
     await fsp.mkdir(sub, { recursive: true });
-    await $`node tools/buck/sync-providers.ts --out third_party/providers/TARGETS.auto`;
+    await $`node tools/buck/sync-providers.ts --lang node`;
     const txt = await fsp
-      .readFile(path.join(tmp, "third_party", "providers", "TARGETS.auto"), "utf8")
+      .readFile(path.join(tmp, "third_party", "providers", "TARGETS.node.auto"), "utf8")
       .catch(() => "");
     if (!txt.includes("GENERATED FILE — DO NOT EDIT.")) {
       console.error("expected generated header even with no patches");

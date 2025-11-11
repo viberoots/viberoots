@@ -17,13 +17,13 @@ test("sync-providers: ignores non-Node patches; generates Node header without er
     await fsp.writeFile(path.join(dir, "github.com__acme__widget@v1.2.3.patch"), "# two\n", "utf8");
     await $({
       stdio: "pipe",
-    })`node tools/buck/sync-providers.ts --out third_party/providers/TARGETS.auto`;
+    })`node tools/buck/sync-providers.ts --lang node`;
     const txt = await fsp.readFile(
-      path.join(tmp, "third_party", "providers", "TARGETS.auto"),
+      path.join(tmp, "third_party", "providers", "TARGETS.node.auto"),
       "utf8",
     );
     if (!txt.includes('load("//third_party/providers:defs_node.bzl", "node_importer_deps")')) {
-      console.error("expected Node provider header in TARGETS.auto");
+      console.error("expected Node provider header in TARGETS.node.auto");
       process.exit(2);
     }
   });

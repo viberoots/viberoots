@@ -38,9 +38,9 @@ test("sync-providers without lang flag includes Node providers", async () => {
       process.exit(2);
     }
 
-    // C++ provider should exist (even if empty)
-    if (!(await exists(cppProviderPath))) {
-      console.error("Expected TARGETS.cpp.auto to be created in all-languages sync");
+    // C++ provider sync is now a no-op in PR 2; file should not be created
+    if (await exists(cppProviderPath)) {
+      console.error("C++ provider sync is a no-op; TARGETS.cpp.auto should not be created");
       process.exit(2);
     }
 

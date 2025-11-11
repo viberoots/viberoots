@@ -133,6 +133,14 @@ export async function rsyncRepoTo(tmp: string) {
     if (process.env.TEST_EXCLUDE_CPP_REQS === "1") {
       excludes.push("/cpp/defs.bzl", "/tools/nix/templates/cpp.nix");
     }
+    // Ensure temp repo starts without any pre-generated provider/graph glue;
+    // tests generate these deterministically when needed.
+    excludes.push(
+      "/third_party/providers/TARGETS.auto",
+      "/third_party/providers/TARGETS.*.auto",
+      // Keep auto_map.bzl available so node macros can parse without running glue
+      "/third_party/providers/nix_attr_map.bzl",
+    );
     const args = excludes.map((e) => ["--exclude", e]).flat();
     await $`rsync -a ${args} ./ ${tmp}/`;
   });

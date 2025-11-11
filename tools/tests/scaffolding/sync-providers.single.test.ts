@@ -15,9 +15,9 @@ test("sync-providers: single Node importer produces a provider entry", async () 
       "utf8",
     );
     await $`git add apps/example/pnpm-lock.yaml`;
-    await $`node tools/buck/sync-providers.ts --out third_party/providers/TARGETS.auto`;
+    await $`node tools/buck/sync-providers.ts --lang node`;
     const txt = await fsp.readFile(
-      path.join(tmp, "third_party", "providers", "TARGETS.auto"),
+      path.join(tmp, "third_party", "providers", "TARGETS.node.auto"),
       "utf8",
     );
     if (!txt.includes("node_importer_deps")) {

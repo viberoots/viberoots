@@ -1,6 +1,5 @@
 #!/usr/bin/env zx-wrapper
 import type { LanguageProviderSync } from "../../lib/lang-contracts";
-import { syncCppProviders } from "./cpp.ts";
 import { syncNodeProviders } from "./node.ts";
 
 export type SyncOptions = {
@@ -13,7 +12,12 @@ export type SyncOptions = {
 const handlers: LanguageProviderSync[] = [
   {
     lang: "cpp",
-    sync: async (_opts) => syncCppProviders({ outFile: "third_party/providers/TARGETS.cpp.auto" }),
+    sync: async (_opts) => {
+      console.info(
+        "[providers] C++ provider sync is now a no-op — see drop-cpp-provider.md (PR 2).",
+      );
+      return;
+    },
   },
   {
     lang: "node",

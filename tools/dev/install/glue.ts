@@ -152,7 +152,12 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
   }> = [
     {
       label: "export-graph",
-      cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/export-graph.ts")} --out ${path.join(repoRoot(), "tools/buck/graph.json")}`,
+      cmd: `${nodeBin} ${nodeBase} ${path.join(
+        repoRoot(),
+        "tools",
+        "buck",
+        "export-graph.ts",
+      )} --out ${path.join(repoRoot(), "tools", "buck", "graph.json")}`,
       withZx: true,
       when: true,
     },
@@ -174,9 +179,9 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
         "tools/buck/sync-providers.ts",
       )} --lang=cpp`,
       withZx: true,
-      // Always run when C++ is enabled; overlay/lockfile stamps are required even if patching is false
-      when: haveCpp,
-      skipReason: haveCpp ? undefined : "missing-language",
+      // PR2: C++ provider sync is a no-op; keep entry for compatibility but skip
+      when: false,
+      skipReason: "no-op",
     },
     {
       label: "sync-providers-node",
@@ -204,7 +209,17 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
     },
     {
       label: "gen-auto-map",
-      cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/gen-auto-map.ts")} --graph ${path.join(repoRoot(), "tools/buck/graph.json")} --out ${path.join(repoRoot(), "third_party/providers/auto_map.bzl")}`,
+      cmd: `${nodeBin} ${nodeBase} ${path.join(
+        repoRoot(),
+        "tools",
+        "buck",
+        "gen-auto-map.ts",
+      )} --graph ${path.join(repoRoot(), "tools", "buck", "graph.json")} --out ${path.join(
+        repoRoot(),
+        "third_party",
+        "providers",
+        "auto_map.bzl",
+      )}`,
       withZx: true,
       // Generate when any enabled language claims either patching or lockfile labeling capability; otherwise skip
       when: (() => {
