@@ -4,7 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("cpp openssl include via nixpkg providers only (no local shim)", async () => {
+test("cpp openssl include via nix_cxx_attrs at call site", async () => {
   await runInTemp("cpp-nixpkg-include-openssl", async (tmp, $) => {
     const appDir = path.join(tmp, "apps/demo");
     await fs.outputFile(path.join(appDir, "src", "main.cpp"), "int main(){return 0;}\n");
@@ -23,14 +23,6 @@ test("cpp openssl include via nixpkg providers only (no local shim)", async () =
       path.join(process.cwd(), "tools/nix/planner/cpp.nix"),
       path.join(tmp, "tools/nix/planner/cpp.nix"),
     );
-    // Provide empty nix_attr_map for macro load; provider sync will overwrite when run
-    await fs.mkdirp(path.join(tmp, "third_party/providers"));
-    await fs.outputFile(
-      path.join(tmp, "third_party/providers/nix_attr_map.bzl"),
-      "NIX_ATTR_MAP = {}\n",
-      "utf8",
-    );
-
     const langs = {
       languages: [
         {
@@ -62,10 +54,7 @@ nix_cpp_binary(
 nix_cpp_test(
     name = "demo_openssl_gtest",
     srcs = ["tests/demo_openssl_gtest.cpp"],
-    deps = [
-        "//third_party/providers:nix_pkgs_googletest",
-        "//third_party/providers:nix_pkgs_openssl",
-    ],
+    nix_cxx_attrs = ["pkgs.googletest", "pkgs.openssl"],
 )
 `;
     await fs.outputFile(path.join(appDir, "TARGETS"), targets);

@@ -1,16 +1,9 @@
 load("@prelude//:rules.bzl", "cxx_library", "cxx_binary", "cxx_test")
 load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve")
-load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
-load("//third_party/providers:nix_attr_map.bzl", "NIX_ATTR_MAP")
 load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name", _cpp_sanitize_probe="cpp_sanitize_probe")
 load("//cpp/private:planner_stub.bzl", "cpp_planner_stub")
 load("//cpp/private:nix_test.bzl", "cpp_nix_test")
 load("//cpp/private:nix_build.bzl", "cpp_nix_build")
-
-def _providers_for(name):
-    pkg = native.package_name()
-    key = "//%s:%s" % (pkg, name)
-    return MODULE_PROVIDERS.get(key, [])
 
 def _normalize_cxx_attr(a):
     """
@@ -53,9 +46,10 @@ def nix_cpp_library(name, **kwargs):
         out = sanitize_to_bin_name("//%s:%s" % (native.package_name(), name)) + ".a",
         kind = "lib",
         self_label = "//%s:%s" % (native.package_name(), name),
-        deps = deps + _providers_for(name),
+        deps = deps,
         srcs = srcs,
         labels = labels,
+        nix_inputs = [],
     )
 
 
@@ -79,9 +73,10 @@ def nix_cpp_binary(name, **kwargs):
         out = sanitize_to_bin_name("//%s:%s" % (native.package_name(), name)),
         kind = "bin",
         self_label = "//%s:%s" % (native.package_name(), name),
-        deps = deps + _providers_for(name),
+        deps = deps,
         srcs = srcs,
         labels = labels,
+        nix_inputs = [],
     )
 
 
@@ -94,27 +89,8 @@ def nix_cpp_test(name, **kwargs):
     # Planner-visible: stamps labels and wires providers so exporter->planner can generate the Nix derivation
     _planner_kwargs = dict(kwargs)
     stamp_labels(_planner_kwargs, "cpp", "test")
-    # Use generated mapping from provider targets → canonical nixpkg: labels (PR 3 Option A)
+    # Add direct call-site attrs as nixpkg labels
     extra_nixpkg_labels = []
-    for d in deps:
-        if isinstance(d, str) and d.startswith("//third_party/providers:"):
-            lbl = NIX_ATTR_MAP.get(d)
-            if lbl != None and isinstance(lbl, str) and lbl != "":
-                extra_nixpkg_labels.append(lbl)
-            else:
-                # Fallback: derive nixpkg attr from provider naming convention "nix_pkgs_<name>"
-                # Example: //third_party/providers:nix_pkgs_googletest -> nixpkg:pkgs.googletest
-                parts = d.split(":")
-                prov = parts[1] if len(parts) > 1 else ""
-                prefix = "nix_pkgs_"
-                if prov.startswith(prefix):
-                    tail = prov[len(prefix):]
-                    # Special-case common aliases
-                    if tail.startswith("gtest"):
-                        extra_nixpkg_labels.append("nixpkg:pkgs.googletest")
-                    else:
-                        extra_nixpkg_labels.append("nixpkg:pkgs." + tail.replace("_", "."))
-    # Also add direct call-site attrs as nixpkg labels
     for a in nix_cxx_attrs or []:
         na = _normalize_cxx_attr(a)
         if na != "":

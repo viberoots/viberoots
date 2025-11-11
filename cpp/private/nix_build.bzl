@@ -25,7 +25,7 @@ def _cpp_nix_build_impl(ctx):
         "-c",
         run_and_copy,
         out.as_output(),
-    ], hidden = ctx.attrs.srcs)  # ensure local patch files are inputs
+    ], hidden = ctx.attrs.srcs + ctx.attrs.nix_inputs)  # include local patches and explicit Nix inputs
     ctx.actions.run(cmd, category = "cpp_nix_build")
     return [DefaultInfo(default_output = out)]
 
@@ -36,8 +36,9 @@ cpp_nix_build = rule(
         "self_label": attrs.string(),
         "kind": attrs.string(),  # "bin" | "lib"
         "out": attrs.string(),
-        "deps": attrs.list(attrs.dep(), default = []),  # graph edge for provider discovery
+        "deps": attrs.list(attrs.dep(), default = []),
         "srcs": attrs.list(attrs.source(), default = []),  # include local patch files as inputs
+        "nix_inputs": attrs.list(attrs.source(), default = []),  # explicit Nix inputs that should affect the rule key
         "labels": attrs.list(attrs.string(), default = []),
     },
 )

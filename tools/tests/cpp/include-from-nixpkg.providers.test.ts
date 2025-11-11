@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("cpp gtest include via nixpkg providers only (no local shim)", async () => {
+test("cpp gtest include via nix_cxx_attrs at call site", async () => {
   await runInTemp("cpp-nixpkg-include", async (tmp, $) => {
     // Write a minimal app with a single gtest
     const appDir = path.join(tmp, "apps/demo");
@@ -26,13 +26,6 @@ test("cpp gtest include via nixpkg providers only (no local shim)", async () => 
     await fs.copy(
       path.join(process.cwd(), "tools/nix/planner/cpp.nix"),
       path.join(tmp, "tools/nix/planner/cpp.nix"),
-    );
-    // Provide empty nix_attr_map for macro load; provider sync will overwrite when run
-    await fs.mkdirp(path.join(tmp, "third_party/providers"));
-    await fs.outputFile(
-      path.join(tmp, "third_party/providers/nix_attr_map.bzl"),
-      "NIX_ATTR_MAP = {}\n",
-      "utf8",
     );
     // Enable cpp via manifest so planner picks it deterministically
     await fs.mkdirp(path.join(tmp, "tools/nix"));
@@ -66,14 +59,12 @@ nix_cpp_binary(
 nix_cpp_test(
     name = "demo_gtest",
     srcs = ["tests/demo_gtest.cpp"],
-    deps = [
-        "//third_party/providers:nix_pkgs_googletest",
-    ],
+    nix_cxx_attrs = ["pkgs.googletest"],
 )
 `;
     await fs.outputFile(path.join(appDir, "TARGETS"), targets);
 
-    // Ensure local shim is not referenced anywhere
+    // Ensure local shim is not referenced anywhere (sanity)
     const rootTargets = await fs.readFile(path.join(tmp, "TARGETS"), "utf8").catch(() => "");
     assert.ok(!rootTargets.includes("third_party/cpp:gtest"));
 

@@ -27,7 +27,30 @@ test("cpp calls go c-archive (temp repo)", async () => {
     })`bash -lc 'cat > apps/caller/tests/caller_gtest.cpp <<"EOF"\n#include <gtest/gtest.h>\nextern "C" char* GoGreet();\nTEST(CGoCaller, CallsGo) {\n  char* s = GoGreet();\n  ASSERT_NE(s, nullptr);\n}\nEOF'`;
     await $({
       cwd: tmp,
-    })`bash -lc 'cat > apps/caller/TARGETS <<"EOF"\nload("//cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_test")\n\nnix_cpp_binary(\n    name = "caller",\n    srcs = ["src/main.cpp"],\n    deps = ["//libs/greetgo:greetgo"],\n    labels = ["lang:cpp", "kind:bin"],\n    visibility = ["PUBLIC"],\n)\n\nnix_cpp_test(\n    name = "caller_gtest",\n    srcs = ["tests/caller_gtest.cpp"],\n    deps = [\n        ":caller",\n        "//libs/greetgo:greetgo",\n        "//third_party/providers:nix_pkgs_googletest",\n    ],\n    labels = ["lang:cpp", "kind:test"],\n)\nEOF'`;
+    })`bash -lc 'cat > apps/caller/TARGETS <<"EOF"
+load("//cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_test")
+
+nix_cpp_binary(
+    name = "caller",
+    srcs = ["src/main.cpp"],
+    deps = ["//libs/greetgo:greetgo"],
+    labels = ["lang:cpp", "kind:bin"],
+    visibility = ["PUBLIC"],
+)
+
+nix_cpp_test(
+    name = "caller_gtest",
+    srcs = ["tests/caller_gtest.cpp"],
+    deps = [
+        ":caller",
+        "//libs/greetgo:greetgo",
+    ],
+    nix_cxx_attrs = [
+        "pkgs.googletest",
+    ],
+    labels = ["lang:cpp", "kind:test"],
+)
+EOF'`;
 
     // Verify Buck graph is available, then export graph and build selected target
     const probe = await $({
