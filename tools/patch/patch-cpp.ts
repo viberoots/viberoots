@@ -7,6 +7,7 @@ import { makeUnifiedDiff } from "./diff";
 import { runGlue } from "./glue";
 import { deleteSession, getSession, listSessions, setSession } from "./state";
 import type { LanguageHandler, SessionRecord } from "./types";
+import { setOverride, clearOverride, formatExportSnippet } from "./dev-overrides";
 
 async function pathExists(p: string): Promise<boolean> {
   try {
@@ -170,6 +171,9 @@ async function doStart(args: string[]) {
   dbg("start: proc", { pid: process.pid, cwd: process.cwd() });
   const attrInput = attrArg(args);
   const attrNorm = normalizeAttr(attrInput);
+  const echoSnippet =
+    process.argv.includes("--echo-snippet") ||
+    String(process.env.PATCH_CPP_ECHO_SNIPPET || "").trim() === "1";
   // Idempotency: if a session already exists and workspace is present, reuse it.
   console.error("[patch-cpp] start: resolve nixpkg", attrNorm);
   const meta = await resolveNixpkg(attrNorm);
@@ -196,13 +200,19 @@ async function doStart(args: string[]) {
   console.error("[patch-cpp] start: workspace ready", workspacePath);
   dbg("start: session-set", { key, rec });
   console.log(workspacePath);
-  // Suggest a dev override snippet for local iteration parity (unset before CI)
-  const snippet = `export NIX_CPP_DEV_OVERRIDE_JSON='${JSON.stringify({ [attrNorm]: workspacePath })}'`;
-  console.error(
-    "\nTo build using this workspace as a dev override (local only), run:\n" +
-      snippet +
-      "\n\nUnset before CI: unset NIX_CPP_DEV_OVERRIDE_JSON\n",
-  );
+  // Default to in-process set; optionally echo a snippet for shells/tools that prefer it
+  if (echoSnippet) {
+    const snippet = formatExportSnippet("NIX_CPP_DEV_OVERRIDE_JSON", {
+      [attrNorm]: workspacePath,
+    });
+    console.error(
+      "\nTo build using this workspace as a dev override (local only), run:\n" +
+        snippet +
+        "\n\nUnset before CI: unset NIX_CPP_DEV_OVERRIDE_JSON\n",
+    );
+  } else {
+    setOverride("NIX_CPP_DEV_OVERRIDE_JSON", attrNorm, workspacePath);
+  }
   if (process.env.PATCH_EDITOR && process.env.PATCH_EDITOR.trim() !== "") {
     const ed = process.env.PATCH_EDITOR;
     await $({ cwd: workspacePath })`${ed}`.nothrow();
@@ -447,6 +457,7 @@ async function doApply(args: string[]) {
   // Compute the stored key lazily from the session's version
   try {
     const key = `${attrNorm}@${sess.version}`.toLowerCase();
+    clearOverride("NIX_CPP_DEV_OVERRIDE_JSON", attrNorm);
     await deleteSession("cpp", key);
     dbg("apply: session-deleted", { key });
   } catch {}
@@ -462,6 +473,8 @@ async function doReset(args: string[]) {
   const key = `${attrNorm}@${version}`.toLowerCase();
   const sess = await getSession("cpp", key);
   if (!sess) return; // no-op
+  // Clear any process-local dev override for parity
+  clearOverride("NIX_CPP_DEV_OVERRIDE_JSON", attrNorm);
   await deleteSession("cpp", key);
   try {
     await fsp.rm(sess.workspacePath, { recursive: true, force: true });

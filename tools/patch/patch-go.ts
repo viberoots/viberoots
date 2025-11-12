@@ -9,6 +9,7 @@ import { runGlue } from "./glue";
 import { resolveModule } from "./go-module-resolve";
 import { deleteSession, getSession, setSession } from "./state";
 import type { LanguageHandler, SessionRecord } from "./types";
+import { readOverrideMap, setOverride, clearOverride } from "./dev-overrides";
 
 function debugEnabled(): boolean {
   try {
@@ -61,30 +62,6 @@ function moduleKey(importPath: string, version: string): string {
   return `${importPath}@${version}`.toLowerCase();
 }
 
-function readDevOverrides(): Record<string, string> {
-  const raw = process.env.NIX_GO_DEV_OVERRIDE_JSON || "";
-  if (!raw.trim()) return {};
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return {};
-  }
-}
-
-function writeDevOverrides(map: Record<string, string>) {
-  dbg("writeDevOverrides: before", { cur: process.env.NIX_GO_DEV_OVERRIDE_JSON || "" });
-  process.env.NIX_GO_DEV_OVERRIDE_JSON = JSON.stringify(map);
-  if (process.env.CI === "true" && Object.keys(map).length > 0) {
-    throw new Error("Dev overrides are forbidden in CI (NIX_GO_DEV_OVERRIDE_JSON is set)");
-  }
-  if (Object.keys(map).length > 0) {
-    console.warn(
-      "[OVERRIDES ACTIVE] NIX_GO_DEV_OVERRIDE_JSON is set — local derivations will differ.",
-    );
-  }
-  dbg("writeDevOverrides: after", { next: process.env.NIX_GO_DEV_OVERRIDE_JSON || "" });
-}
-
 async function doStart(args: string[]) {
   dbg("start: proc", { pid: process.pid, cwd: process.cwd() });
   const importPath = moduleArg(args);
@@ -117,9 +94,7 @@ async function doStart(args: string[]) {
   };
   await setSession("go", key, rec);
   dbg("start: setSession", { key, ws });
-  const dev = readDevOverrides();
-  dev[key] = ws;
-  writeDevOverrides(dev);
+  setOverride("NIX_GO_DEV_OVERRIDE_JSON", key, ws);
   dbg("start: setOverride", { key, ws });
   console.log(ws);
   // Optional: open editor if requested (best-effort)
@@ -180,10 +155,9 @@ async function doApply(args: string[]) {
   if (!diff || diff.trim() === "") {
     // Even on no-op, ensure we clear any dev overrides and end the session to avoid
     // leaking state into subsequent builds/tests.
-    const dev = readDevOverrides();
+    const dev = readOverrideMap("NIX_GO_DEV_OVERRIDE_JSON");
     dbg("apply: no-op clearing override", { key, hadOverride: !!dev[key] });
-    delete dev[key];
-    writeDevOverrides(dev);
+    clearOverride("NIX_GO_DEV_OVERRIDE_JSON", key);
     await deleteSession("go", key);
     dbg("apply: no-op done", { key });
     console.log("no changes; no-op (cleared dev overrides and ended session)");
@@ -241,9 +215,7 @@ async function doApply(args: string[]) {
     );
   }
 
-  const dev = readDevOverrides();
-  delete dev[key];
-  writeDevOverrides(dev);
+  clearOverride("NIX_GO_DEV_OVERRIDE_JSON", key);
   await deleteSession("go", key);
   // Keep the temporary workspace on disk to allow downstream builds to
   // point NIX_GO_DEV_OVERRIDE_JSON at it for verification.
@@ -257,9 +229,7 @@ async function doReset(args: string[]) {
   const key = moduleKey(importPath, version);
   const sess = await getSession("go", key);
   if (!sess) return; // no-op
-  const dev = readDevOverrides();
-  delete dev[key];
-  writeDevOverrides(dev);
+  clearOverride("NIX_GO_DEV_OVERRIDE_JSON", key);
   await deleteSession("go", key);
   try {
     await fsp.rm(sess.workspacePath, { recursive: true, force: true });
