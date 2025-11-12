@@ -81,7 +81,7 @@ extra-experimental-features = nix-command flakes dynamic-derivations ca-derivati
 1. **Scaffolding:** When you add new target types, **update/augment** the existing scaffolding tools in `tools/` (don’t invent new scaffolding).
 1. **Platforms:** Everything must work on at least **aarch64-darwin**, **aarch64-linux**, and **x86_64-linux**.
 1. **Glue scripts run outside Nix.** Generators are plain Node tools; do not wrap them in `nix run`.
-1. **Planner languages vs. macro-only languages:** Go and C++ are “planner languages” (the Nix planner emits derivations for them via templates). Node is handled by Buck macros and importer‑scoped providers; it is built and tested through Nix shims, but not via planner templates.
+1. **Planner languages vs. macro-only languages:** Go and C++ are “planner languages” (the Nix planner emits derivations for them via templates). Node is handled by Buck macros and importer‑scoped providers; it is built and tested through Nix shims. For CLI bundling, a narrowly scoped Node planner plugin (`tools/nix/planner/node.nix`) is used as a shim to invoke bundling without coupling the core planner to Node specifics. This does not change provider/auto_map flows or the Node importer‑scoped provider model.
 
 ## End-to-End Architecture
 

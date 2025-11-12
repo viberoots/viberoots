@@ -98,7 +98,7 @@ let
 
   # Build planner context and import language plugins if present
   ctx = {
-    inherit lib T repoRoot localModuleOverrides pkgPathOf;
+    inherit lib T repoRoot localModuleOverrides pkgPathOf pkgs;
     # Provide full nodes list so language plugins (e.g., C++) can walk deps
     nodes = nodesList;
     get = get;
@@ -288,70 +288,22 @@ let
     map (nm: { name = nm; value = cppTargetsFromGraph.${nm}; }) cppBinNames
   );
 
-  # Node CLI bundles (importer-scoped). We detect Node CLI bin targets by labels
-  # lang:node + kind:bin and extract the importer from the single lockfile label.
-  nodeMods = import ./node-modules.nix { inherit pkgs; repoRoot = repoRoot; };
-
-  labelsOf = n:
-    let labs = (get n "labels"); in if labs == null then [] else (if builtins.isList labs then labs else []);
-
-  isNodeBin = n:
-    let labs = labelsOf n; in (builtins.elem "lang:node" labs) && (builtins.elem "kind:bin" labs);
-
-  importerOf = n:
-    let labs = labelsOf n;
-        locks = builtins.filter (l: lib.hasPrefix "lockfile:" l) labs;
-    in if locks == [] then null else (
-      let rest = lib.removePrefix "lockfile:" (builtins.head locks);
-          parts = lib.splitString "#" rest;
-      in if (builtins.length parts) >= 2 then (builtins.elemAt parts 1) else null
-    );
-
+  # Node CLI bundles (importer-scoped) — pluginized
   safeNodeBinNodes = builtins.filter (n:
     let nm = ensureFullLabel n;
         okName = (builtins.typeOf nm == "string") && nm != "";
         rel = if okName then (pkgPathOf nm) else "";
         inAppsLibs = lib.hasPrefix "apps/" rel || lib.hasPrefix "libs/" rel;
-    in okName && inAppsLibs && isNodeBin n && (importerOf n != null)
+        isNode = (LANGS ? node) && (LANGS.node.isTarget n);
+        kind = if isNode then (LANGS.node.kindOf n) else null;
+    in okName && inAppsLibs && isNode && (kind == "bin")
   ) nodesList;
 
-  mkNodeCli = name: importerDir:
-    let
-      nm = nodeMods.mkNodeModules { lockfilePath = importerDir + "/pnpm-lock.yaml"; inherit importerDir; };
-      entryRel = "src/index.ts";
-      pname = "node-cli-" + sanitize name;
-    in pkgs.stdenvNoCC.mkDerivation {
-      inherit pname;
-      version = sanitize importerDir;
-      src = repoRoot;
-      nativeBuildInputs = [ pkgs.esbuild pkgs.nodejs_22 ];
-      buildPhase = ''
-        set -euo pipefail
-        cd ${importerDir}
-        export SOURCE_DATE_EPOCH=1
-        export NODE_PATH=${nm}/node_modules
-        outFile="${targetNameOf name}"
-        ${pkgs.esbuild}/bin/esbuild ${entryRel} \
-          --platform=node \
-          --target=node22 \
-          --bundle \
-          --format=esm \
-          --legal-comments=none \
-          --banner:js='#!/usr/bin/env node' \
-          --outfile="$outFile"
-      '';
-      installPhase = ''
-        set -euo pipefail
-        mkdir -p $out/bin
-        install -m0755 ${targetNameOf name} $out/bin/${targetNameOf name}
-      '';
-    };
-
   nodeTargetsFromGraph = builtins.foldl' (acc: n:
-    let nm = ensureFullLabel n; imp = importerOf n; tnm = builtins.typeOf nm; in
-      if (tnm != "string") || (nm == "") || (imp == null)
+    let nm = ensureFullLabel n; tnm = builtins.typeOf nm; in
+      if (tnm != "string") || (nm == "")
       then acc
-      else (acc // { "${nm}" = mkNodeCli nm imp; })
+      else (acc // { "${nm}" = LANGS.node.mkApp nm; })
   ) {} safeNodeBinNodes;
 
   nodeOutPaths = nodeTargetsFromGraph;
@@ -405,6 +357,8 @@ let
         '' else (
           if k.template == "go" then (
             if (k.kind == "bin" || k.kind == "lib") then mkGo selectedTargetName k.kind else mkGo selectedTargetName "bin"
+          ) else if k.template == "node" then (
+            if (k.kind == "bin" || k.kind == "lib") then LANGS.node.mkApp selectedTargetName else LANGS.node.mkApp selectedTargetName
           ) else (
             # default to cpp when not go
             if (k.kind == "bin" || k.kind == "lib" || k.kind == "test") then mkCpp selectedTargetName k.kind else mkCpp selectedTargetName "bin"
