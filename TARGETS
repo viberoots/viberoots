@@ -1,5 +1,6 @@
 # Buck2 targets
 load("//tools/tests:defs.bzl", "auto_zx_tests")
+load("@prelude//:rules.bzl", "export_file")
 
 # Auto-generate one zx_test per matching test file.
 auto_zx_tests(
@@ -10,3 +11,8 @@ auto_zx_tests(
     ],
 )
 
+export_file(
+    name = "flake.lock",
+    src = "flake.lock",
+    visibility = ["PUBLIC"],
+)

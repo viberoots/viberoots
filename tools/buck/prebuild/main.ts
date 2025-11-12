@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
+import path from "node:path";
 import { printSkip } from "../../lib/errors";
 import { providerNameForImporter } from "../../lib/providers.ts";
 import { autoFixGlue } from "./repair.ts";
@@ -85,7 +86,23 @@ export async function run(): Promise<void> {
     }
   }
 
-  // Node sidecar freshness is validated via general freshness checks and provider presence
+  // Explicit: ensure node-lock-index.json is not older than graph.json
+  try {
+    const graphPath = path.join("tools", "buck", "graph.json");
+    const sidecarPath = path.join("tools", "buck", "node-lock-index.json");
+    if (fs.existsSync(graphPath) && fs.existsSync(sidecarPath)) {
+      const mg = mtimeSafe(graphPath) || 0;
+      const ms = mtimeSafe(sidecarPath) || 0;
+      if (mg > ms) {
+        needFixFreshness = true;
+        if (mode === "ci") {
+          console.error(
+            `ERROR: node-lock-index.json is stale by ${Math.round((mg - ms) / 1000)}s versus graph.json`,
+          );
+        }
+      }
+    }
+  } catch {}
 
   const needFix = needFixPresence || needFixFreshness;
 
