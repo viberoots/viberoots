@@ -73,12 +73,14 @@ export async function listInputs(): Promise<string[]> {
 }
 
 export function listOutputs(): string[] {
+  const graphOut = path.join("tools", "buck", "graph.json");
+  const nodeLockIdx = path.join("tools", "buck", "node-lock-index.json");
+  const autoMap = path.join("third_party", "providers", "auto_map.bzl");
   const outs = [
-    "tools/buck/graph.json",
-    "tools/buck/node-lock-index.json",
-    "third_party/providers/auto_map.bzl",
-    // PR 3: require provider→attr mapping for C++ planner label collection
-    "third_party/providers/nix_attr_map.bzl",
+    graphOut,
+    nodeLockIdx,
+    autoMap,
+    // C++ no longer requires provider→attr mapping; keep only auto_map for Node.
   ];
   try {
     const dir = "third_party/providers";

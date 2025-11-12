@@ -30,6 +30,10 @@ def nix_cpp_library(name, **kwargs):
     nix_cxx_attrs = kwargs.pop("nix_cxx_attrs", [])
     # Build via Nix, not Buck's C++ toolchain
     deps = kwargs.pop("deps", [])
+    # Explicit Nix-level inputs that should affect the rule key.
+    # We conservatively include repo-level flake.lock and the shared C++ overlay.
+    # These are source file labels at the repo root and tools/nix/overlays package.
+    nix_inputs = ["//:flake.lock", "//tools/nix/overlays:cpp-patches.nix"]
     stamp_labels(kwargs, "cpp", "lib")
     # Include local patch files in rule inputs so Buck invalidates on patch changes
     srcs = []
@@ -49,7 +53,7 @@ def nix_cpp_library(name, **kwargs):
         deps = deps,
         srcs = srcs,
         labels = labels,
-        nix_inputs = [],
+        nix_inputs = nix_inputs,
     )
 
 
@@ -58,6 +62,8 @@ def nix_cpp_binary(name, **kwargs):
     nix_cxx_attrs = kwargs.pop("nix_cxx_attrs", [])
     # Build via Nix, not Buck's C++ toolchain
     deps = kwargs.pop("deps", [])
+    # Explicit Nix-level inputs that should affect the rule key.
+    nix_inputs = ["//:flake.lock", "//tools/nix/overlays:cpp-patches.nix"]
     stamp_labels(kwargs, "cpp", "bin")
     srcs = []
     for d in local_patch_dirs:
@@ -76,7 +82,7 @@ def nix_cpp_binary(name, **kwargs):
         deps = deps,
         srcs = srcs,
         labels = labels,
-        nix_inputs = [],
+        nix_inputs = nix_inputs,
     )
 
 

@@ -48,15 +48,7 @@ export async function run(): Promise<void> {
       if (!fs.existsSync(nodeAuto)) outPresence.push(nodeAuto);
     }
   } catch {}
-  // PR 10: If any provider autos exist, require nix_attr_map.bzl to be present
-  try {
-    const provDir = "third_party/providers";
-    const hasProvAutos =
-      fs.existsSync(provDir) && fs.readdirSync(provDir).some((f) => /^TARGETS.*\.auto$/.test(f));
-    if (hasProvAutos && !fs.existsSync("third_party/providers/nix_attr_map.bzl")) {
-      outPresence.push("third_party/providers/nix_attr_map.bzl");
-    }
-  } catch {}
+  // C++ provider→attr mapping is no longer required; do not require nix_attr_map.bzl.
   const needFixPresence = outPresence.length > 0;
 
   // Go providers/index no longer enforced; local patches are handled via target srcs
