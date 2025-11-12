@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "genrule")
-load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve")
+load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve", "append_patch_srcs")
 load("//node/private:nix_test.bzl", "node_nix_test")
 
 # NOTE: Prebuild guard ensures this load is valid before builds/tests run.
@@ -44,7 +44,9 @@ def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = []
     # Normalize importer '.' (repo root) → patches/node
     if _importer != None and _importer != "":
         _patch_dir = "patches/node" if _importer == "." else ("%s/patches/node" % _importer)
-        merged_srcs = merged_srcs + native.glob(["%s/*.patch" % _patch_dir])
+        _kw = { "srcs": merged_srcs }
+        append_patch_srcs(_kw, [_patch_dir])
+        merged_srcs = _kw.get("srcs", [])
     merged_srcs = dedupe_preserve(merged_srcs + deps + _providers_for(name))
     kwargs["srcs"] = merged_srcs
     if out != None:
@@ -86,8 +88,9 @@ def nix_node_test(
     # Include importer-local node patches as inputs so changes invalidate tests precisely
     merged_srcs = list(srcs)
     _patch_dir = "patches/node" if _importer == "." else ("%s/patches/node" % _importer)
-    merged_srcs = merged_srcs + native.glob(["%s/*.patch" % _patch_dir])
-    merged_srcs = dedupe_preserve(merged_srcs)
+    _kw = { "srcs": merged_srcs }
+    append_patch_srcs(_kw, [_patch_dir])
+    merged_srcs = dedupe_preserve(_kw.get("srcs", []) or [])
 
     # Forward to external runner rule; ignore legacy 'cmd'
     node_nix_test(

@@ -25,6 +25,22 @@ def dedupe_preserve(seq):
     return out
 
 
+def append_patch_srcs(kwargs, dirs):
+    """
+    Append *.patch files from the given directories into kwargs["srcs"].
+    Order is preserved and duplicates are removed.
+    """
+    srcs = kwargs.get("srcs", []) or []
+    for d in dirs or []:
+        if not isinstance(d, str):
+            continue
+        if d == "":
+            continue
+        srcs = srcs + native.glob(["%s/*.patch" % d])
+    if len(srcs) > 0:
+        kwargs["srcs"] = dedupe_preserve(srcs)
+
+
 def normalize_build_tags(tags):
     s = {}
     for t in tags or []:

@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "cxx_library", "cxx_binary", "cxx_test")
-load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve", "normalize_nix_attr")
+load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve", "normalize_nix_attr", "append_patch_srcs")
 load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name", _cpp_sanitize_probe="cpp_sanitize_probe")
 load("//cpp/private:planner_stub.bzl", "cpp_planner_stub")
 load("//cpp/private:nix_test.bzl", "cpp_nix_test")
@@ -16,9 +16,8 @@ def nix_cpp_library(name, **kwargs):
     nix_inputs = ["//:flake.lock", "//tools/nix/overlays:cpp-patches.nix"]
     stamp_labels(kwargs, "cpp", "lib")
     # Include local patch files in rule inputs so Buck invalidates on patch changes
-    srcs = []
-    for d in local_patch_dirs:
-        srcs = srcs + native.glob(["%s/*.patch" % d])
+    append_patch_srcs(kwargs, local_patch_dirs)
+    srcs = kwargs.get("srcs", []) or []
     extra_nix_labels = []
     for a in nix_cxx_attrs or []:
         if not isinstance(a, str):
@@ -49,9 +48,8 @@ def nix_cpp_binary(name, **kwargs):
     # Explicit Nix-level inputs that should affect the rule key.
     nix_inputs = ["//:flake.lock", "//tools/nix/overlays:cpp-patches.nix"]
     stamp_labels(kwargs, "cpp", "bin")
-    srcs = []
-    for d in local_patch_dirs:
-        srcs = srcs + native.glob(["%s/*.patch" % d])
+    append_patch_srcs(kwargs, local_patch_dirs)
+    srcs = kwargs.get("srcs", []) or []
     extra_nix_labels = []
     for a in nix_cxx_attrs or []:
         if not isinstance(a, str):
