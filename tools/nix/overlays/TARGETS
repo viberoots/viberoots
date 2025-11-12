@@ -1,6 +1,8 @@
-#
-# Declares this directory as a Buck package so its source files
-# (e.g., cpp-patches.nix) can be referenced as source labels:
-#   //tools/nix/overlays:cpp-patches.nix
-#
+load("@prelude//:rules.bzl", "export_file")
+
+# Expose overlay source as a Buck target so it can be referenced by label.
+export_file(
+    name = "cpp-patches.nix",
+    src = "cpp-patches.nix",
+)
 
