@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import type { Adapter, Batch, Node } from "../types.ts";
+import { hasLabel, isRuleType, validateLanguageClassification } from "./helpers.ts";
 
 function isCppNode(n: Node): boolean {
   if ((n.rule_type || "").startsWith("cxx_")) return true;
@@ -21,28 +22,23 @@ export const adapter: Adapter = {
   },
   // Warn-only validation: return advisory messages; main driver decides severity.
   validate(nodes: Node[]) {
-    const suspects: string[] = [];
-    for (const n of nodes) {
-      const srcs = Array.isArray((n as any).srcs) ? ((n as any).srcs as string[]) : [];
-      const looksCpp = srcs.some((s) => /\.(cc|cpp|cxx)$/i.test(s));
-      const hasCxxRule = (n.rule_type || "").startsWith("cxx_");
-      const hasLangCpp = (n.labels || []).includes("lang:cpp");
-      if (looksCpp && !hasCxxRule && !hasLangCpp) {
-        suspects.push(n.name);
-      }
-    }
-    if (!suspects.length) return [];
-    const sample = suspects.slice(0, 10).join("\n  - ");
-    return [
-      [
-        "[exporter][cpp] targets include C++-looking sources but lack both cxx_* rule_type and 'lang:cpp' label:",
-        `  - ${sample}`,
-        suspects.length > 10 ? `  ... and ${suspects.length - 10} more` : "",
-        "Guidance: stamp 'lang:cpp' in macros or use cxx_* rules to classify C++ targets.",
-      ]
-        .filter(Boolean)
-        .join("\n"),
-    ];
+    return validateLanguageClassification(nodes, {
+      name: "cpp",
+      looksLike(n: Node) {
+        const srcs = Array.isArray((n as any).srcs) ? ((n as any).srcs as string[]) : [];
+        return srcs.some((s) => /\.(cc|cpp|cxx)$/i.test(s));
+      },
+      hasRuleType(n: Node) {
+        return isRuleType(n, "cxx_");
+      },
+      hasLangLabel(n: Node) {
+        return hasLabel(n, "lang:cpp");
+      },
+      ruleTypePrefix: "cxx_*",
+      langLabel: "lang:cpp",
+      subject: "C++-looking sources",
+      guidance: "Guidance: stamp 'lang:cpp' in macros or use cxx_* rules to classify C++ targets.",
+    });
   },
   async buildBatches(_nodes: Node[]): Promise<Batch[]> {
     return [];

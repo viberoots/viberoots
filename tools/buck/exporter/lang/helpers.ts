@@ -29,3 +29,92 @@ export function sortedUniqueLabels(nodes: Node[]): Node[] {
     .map((n) => ({ ...n, labels: Array.from(new Set(n.labels || [])).sort() }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
+
+/**
+ * DRY validation for language classification across adapters.
+ * Detects nodes whose sources "look like" the language but that are missing
+ * both an appropriate rule_type prefix and the expected lang:<id> label.
+ *
+ * Returns zero or more human-readable findings; caller decides severity.
+ */
+export type LanguageClassificationOptions = {
+  /**
+   * Adapter/language identifier used in the finding prefix, e.g. "go", "cpp".
+   */
+  name: string;
+  /**
+   * Heuristic for whether the node appears to belong to this language
+   * (e.g., has .go sources, or .cpp/.cc/.cxx sources).
+   */
+  looksLike(node: Node): boolean;
+  /**
+   * Whether the node's rule_type indicates this language (e.g., startsWith("go_")).
+   */
+  hasRuleType(node: Node): boolean;
+  /**
+   * Whether the node already carries the appropriate lang label (e.g., "lang:go").
+   */
+  hasLangLabel(node: Node): boolean;
+  /**
+   * Presentation hint used in the message for rule_type, e.g. "go_*" or "cxx_*".
+   */
+  ruleTypePrefix: string;
+  /**
+   * The exact language label expected, e.g., "lang:go".
+   */
+  langLabel: string;
+  /**
+   * Optional descriptive subject for sources in the message. Defaults to
+   * "<name>-looking sources" when omitted (e.g., "go-looking sources").
+   */
+  subject?: string;
+  /**
+   * Optional guidance line appended to the message.
+   */
+  guidance?: string;
+  /**
+   * Limit of offenders listed verbatim in the message (default 10).
+   */
+  sampleLimit?: number;
+};
+
+export function validateLanguageClassification(
+  nodes: Node[],
+  opts: LanguageClassificationOptions,
+): string[] {
+  const {
+    name,
+    looksLike,
+    hasRuleType,
+    hasLangLabel,
+    ruleTypePrefix,
+    langLabel,
+    subject,
+    guidance,
+    sampleLimit = 10,
+  } = opts;
+
+  const offenders: string[] = [];
+  for (const n of nodes) {
+    try {
+      if (looksLike(n) && !hasRuleType(n) && !hasLangLabel(n)) {
+        offenders.push(n.name);
+      }
+    } catch {
+      // Best-effort; skip malformed nodes
+    }
+  }
+  if (offenders.length === 0) return [];
+
+  const shown = offenders.slice(0, sampleLimit).join("\n  - ");
+  const more =
+    offenders.length > sampleLimit ? `  ... and ${offenders.length - sampleLimit} more` : "";
+  const subj = subject || `${name}-looking sources`;
+  const lines = [
+    `[exporter][${name}] targets include ${subj} but lack both ${ruleTypePrefix} rule_type and '${langLabel}' label:`,
+    `  - ${shown}`,
+    more,
+    guidance || "",
+  ].filter(Boolean);
+  return [lines.join("\n")];
+}
