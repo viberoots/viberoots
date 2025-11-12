@@ -3,6 +3,8 @@ import fs from "fs-extra";
 import path from "node:path";
 import { printSkip } from "../../lib/errors";
 import { providerNameForImporter } from "../../lib/providers.ts";
+import { readCompositeGraph } from "../../lib/graph-view.ts";
+import { providersForLabels } from "../../lib/labels.ts";
 import { autoFixGlue } from "./repair.ts";
 import { collectDiagnostics, logList, mtimeSafe } from "./report.ts";
 import { listInputs, listOutputs } from "./scan.ts";
@@ -13,6 +15,7 @@ const skewMs = Number(process.env.PREBUILD_GUARD_SKEW_MS || "5000");
 const argv = process.argv.slice(2);
 const flagVerbose = argv.includes("--verbose") || process.env.PREBUILD_GUARD_VERBOSE === "1";
 const jsonOut = argv.includes("--json");
+const flagStrict = argv.includes("--strict");
 
 function getVerboseLimit(): number {
   const idx = argv.indexOf("--verbose-limit");
@@ -49,7 +52,16 @@ export async function run(): Promise<void> {
       if (!fs.existsSync(nodeAuto)) outPresence.push(nodeAuto);
     }
   } catch {}
-  // C++ provider→attr mapping is no longer required; do not require nix_attr_map.bzl.
+  // If any provider autos exist, require nix_attr_map.bzl to be present (needed for provider index).
+  try {
+    const provDir = "third_party/providers";
+    const autosPresent =
+      fs.existsSync(provDir) && fs.readdirSync(provDir).some((f) => /^TARGETS.*\.auto$/.test(f));
+    const nixMap = path.join(provDir, "nix_attr_map.bzl");
+    if (autosPresent && !fs.existsSync(nixMap)) {
+      outPresence.push(nixMap);
+    }
+  } catch {}
   const needFixPresence = outPresence.length > 0;
 
   // Go providers/index no longer enforced; local patches are handled via target srcs
@@ -161,6 +173,95 @@ export async function run(): Promise<void> {
     }
   } catch {}
 
+  // Provider coverage validation (PR-4):
+  // - For every node with lockfile:/nixpkg: labels, assert a provider exists
+  //   and that MODULE_PROVIDERS maps the node to that provider.
+  type CoverageMiss =
+    | { kind: "provider"; node: string; provider: string }
+    | { kind: "mapping"; node: string; provider: string };
+  const coverageMissing: CoverageMiss[] = [];
+  try {
+    // Parse auto_map.bzl if present
+    const autoMapPath = path.join("third_party", "providers", "auto_map.bzl");
+    let autoMapText = "";
+    try {
+      autoMapText = await fs.readFile(autoMapPath, "utf8");
+    } catch {}
+    function parseModuleProviders(txt: string): Record<string, string[]> {
+      const out: Record<string, string[]> = {};
+      if (!txt) return out;
+      // Very small parser for:
+      // MODULE_PROVIDERS = {
+      //   "//pkg:rule": [
+      //     "//third_party/providers:<name>",
+      //   ],
+      // }
+      const lines = txt.split(/\r?\n/);
+      let curKey: string | null = null;
+      for (const raw of lines) {
+        const line = raw.trim();
+        if (!curKey) {
+          const m = line.match(/^"([^"]+)":\s*\[$/);
+          if (m) {
+            curKey = m[1];
+            if (!out[curKey]) out[curKey] = [];
+          }
+        } else {
+          if (line === "],") {
+            curKey = null;
+            continue;
+          }
+          const m = line.match(/^"([^"]+)",$/);
+          if (m) {
+            out[curKey].push(m[1]);
+          }
+        }
+      }
+      return out;
+    }
+    const moduleProviders = parseModuleProviders(autoMapText);
+
+    // Composite graph provides nodes and optional provider index sidecar
+    const comp = await readCompositeGraph();
+    const providerIndex = comp.providerIndex || {};
+
+    // Helper: cheap existence checks per provider family
+    const targetsNodeAutoPath = path.join("third_party", "providers", "TARGETS.node.auto");
+    const targetsNodeText = fs.existsSync(targetsNodeAutoPath)
+      ? await fs.readFile(targetsNodeAutoPath, "utf8").catch(() => "")
+      : "";
+    function providerExists(fq: string): boolean {
+      if (!fq || !fq.startsWith("//third_party/providers:")) return false;
+      if (providerIndex[fq]) return true;
+      const tail = fq.split(":")[1] || "";
+      if (tail.startsWith("lf_")) {
+        return targetsNodeText.includes(`name="${tail}"`);
+      }
+      if (tail.startsWith("nix_")) {
+        const stamp = path.join("third_party", "providers", "stamps", `${tail}.stamp`);
+        return fs.existsSync(stamp);
+      }
+      return false;
+    }
+
+    for (const n of comp.nodes) {
+      const nodeName = n?.name || "";
+      if (!nodeName) continue;
+      const expected = providersForLabels(n.labels);
+      if (expected.length === 0) continue;
+      for (const prov of expected) {
+        if (!providerExists(prov)) {
+          coverageMissing.push({ kind: "provider", node: nodeName, provider: prov });
+          continue;
+        }
+        const mapped = (moduleProviders[nodeName] || []).includes(prov);
+        if (!mapped) {
+          coverageMissing.push({ kind: "mapping", node: nodeName, provider: prov });
+        }
+      }
+    }
+  } catch {}
+
   if (flagVerbose) {
     const sortedInputs = [...inputs].sort((a, b) => (mtimeSafe(b) || 0) - (mtimeSafe(a) || 0));
     const sortedOutputs = [...presentOutputs].sort(
@@ -175,6 +276,7 @@ export async function run(): Promise<void> {
   if (jsonOut) {
     const diag = collectDiagnostics(inputs, presentOutputs, outPresence, verboseLimit);
     (diag as any).missingNodeProviders = missingNodeProviders;
+    (diag as any).coverageMissing = coverageMissing;
     console.log(JSON.stringify(diag));
     return;
   }
@@ -248,6 +350,29 @@ export async function run(): Promise<void> {
       await autoFixGlue();
     } catch (e) {
       console.error("ERROR: auto-fix (sync providers) failed:", e);
+      process.exit(1);
+    }
+  }
+
+  // Provider coverage failures: CI errors, local warnings unless --strict
+  if (coverageMissing.length > 0) {
+    const header =
+      mode === "ci" || flagStrict
+        ? "ERROR: provider coverage check failed"
+        : "WARN: provider coverage check";
+    console.error(header);
+    for (const miss of coverageMissing) {
+      if (miss.kind === "provider") {
+        console.error(
+          `  missing provider for node=${miss.node} expected=${miss.provider} (run sync/generate providers)`,
+        );
+      } else {
+        console.error(
+          `  missing mapping in MODULE_PROVIDERS for node=${miss.node} provider=${miss.provider} (run gen-auto-map)`,
+        );
+      }
+    }
+    if (mode === "ci" || flagStrict) {
       process.exit(1);
     }
   }
