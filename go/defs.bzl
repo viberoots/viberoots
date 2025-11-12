@@ -36,9 +36,6 @@ def _apply_cgo_labels(kwargs, nix_cgo_deps, repo_cgo_deps):
 
 def _merge_cgo_deps(deps, nix_cgo_deps, repo_cgo_deps):
     out = deps
-    if len(nix_cgo_deps) > 0:
-        provs = [_nixpkg_provider_for(a) for a in nix_cgo_deps]
-        out = out + provs
     if len(repo_cgo_deps) > 0:
         out = out + repo_cgo_deps
     return dedupe_preserve(out)

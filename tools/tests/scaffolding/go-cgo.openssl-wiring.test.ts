@@ -11,6 +11,18 @@ load("//third_party/providers:defs_cpp.bzl", "nix_cxx_library")
 nix_cxx_library(name="nix_pkgs_openssl", attr="pkgs.openssl")
 EOF'`;
 
+    // Map the demo target to the openssl provider via MODULE_PROVIDERS (auto_map)
+    await $({
+      cwd: tmp,
+    })`bash -lc 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
+# GENERATED for test
+MODULE_PROVIDERS = {
+    "//apps/demo-cli:demo": [
+        "//third_party/providers:nix_pkgs_openssl",
+    ],
+}
+EOF'`;
+
     await $({
       cwd: tmp,
     })`bash -lc 'mkdir -p apps/demo-cli/cmd/demo && cat > apps/demo-cli/cmd/demo/main.go <<'\''EOF'\''

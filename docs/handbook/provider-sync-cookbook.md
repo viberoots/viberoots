@@ -17,7 +17,7 @@ Node‑specific note (clarity):
 Canonical naming and helpers:
 
 - **Source of truth (TS helpers)**: `tools/lib/providers.ts` defines provider naming. Use `providerNameForModuleKey(importPath, version)` for Go module providers and `providerNameForImporter(lockfilePath, importer)` for Node importer‑scoped providers.
-- **Go nixpkgs providers (CGO)**: Go macros keep direct provider deps for `nix_cgo_deps` and use the same canonical naming scheme as `tools/lib/providers.ts` (format: `//third_party/providers:nix_<normalized_attr>`; example: `pkgs.openssl` → `nix_pkgs_openssl`). Do not handcraft names.
+- **Go nixpkgs providers (CGO)**: Go macros do not inject direct provider deps for `nix_cgo_deps`. Instead, they attach `nixpkg:<attr>` labels and rely on `MODULE_PROVIDERS` from `third_party/providers/auto_map.bzl` to map targets to providers (format: `//third_party/providers:nix_<normalized_attr>`; example: `pkgs.openssl` → `nix_pkgs_openssl`). Do not handcraft names.
 - **nixpkgs attr map**: The unified orchestrator generates `third_party/providers/nix_attr_map.bzl` deterministically; Starlark macros should load from this mapping instead of deriving attrs heuristically.
 - **Patch fixtures**: `tools/tests/lib/fixtures/go.ts: ensurePatch()` creates a correctly named patch file for tests.
 

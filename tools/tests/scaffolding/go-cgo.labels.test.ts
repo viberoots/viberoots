@@ -11,6 +11,18 @@ load("//third_party/providers:defs_cpp.bzl", "nix_cxx_library")
 nix_cxx_library(name="nix_pkgs_zlib", attr="pkgs.zlib")
 EOF'`;
 
+    // Provide an auto_map with (optional) mapping; labels test does not rely on deps wiring
+    await $({
+      cwd: tmp,
+    })`bash -lc 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
+# GENERATED for test (mapping can be empty for this label-only check)
+MODULE_PROVIDERS = {
+    "//tmp:lib": [
+        "//third_party/providers:nix_pkgs_zlib",
+    ],
+}
+EOF'`;
+
     await $({ cwd: tmp })`bash -lc 'mkdir -p tmp && cat > tmp/TARGETS <<'\''EOF'\''
 load("//go:defs.bzl", "nix_go_library")
 
