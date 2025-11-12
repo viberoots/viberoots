@@ -53,6 +53,10 @@ async function main() {
   const list = nodes as unknown as Node[];
   const mapping: Record<string, string[]> = {};
   for (const n of list) {
+    // PR-1: Skip provider-package nodes to avoid self-mappings in auto_map.
+    if (n.name && n.name.startsWith("//third_party/providers:")) {
+      continue;
+    }
     const provs = providersForLabels(n.labels);
     if (provs.length > 0 && n.name) mapping[n.name] = provs;
   }
