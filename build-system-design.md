@@ -65,11 +65,11 @@ extra-experimental-features = nix-command flakes dynamic-derivations ca-derivati
 
 ### Path Invariants (must-follow)
 
-1. All non-Nix patch artifacts live under `patches/<lang>/` (e.g., `patches/go/...`).
+1. All non-Nix patch artifacts live under language-specific patch directories. For Go and C++, patches are typically stored in a package-local directory (e.g., `<pkg>/patches/go` or `<pkg>/patches/cpp`) and included in that target’s `srcs` so Buck invalidates precisely. For Node, patches are importer‑local (e.g., `<importer>/patches/node`).
 1. **Planner vs exporter homes.** Planner code & language templates live under `tools/nix/...`. Buck graph export tools live under `tools/buck/...`.
 1. **Single outer CLI.** The only user-facing patching entrypoint is `patch-pkg`. Language-specific implementations live under `tools/patch/<lang>/` and are invoked _only_ by `patch-pkg`.
-1. Store patches under a top-level `patches/` directory with **language-specific subdirectories**, e.g. `patches/go/…`. (We explicitly **do not** use `nix/` for non-Nix files.)
-1. **At most one patch per `module@version`** in `patches/<lang>/`; duplicates are forbidden.
+1. You may also use a repo‑level `patches/<lang>/` directory for shared or global patches, but Go/C++ builds source invalidation from package‑local patch files and do not require per‑module provider mapping.
+1. **At most one patch per `module@version`** (enforced by naming convention like `<importPath encoded>@<version>.patch`); duplicates are forbidden.
 1. **All automation scripts** are zx TypeScript files with `#!/usr/bin/env zx-wrapper`. The zx-wrapper is **already provided**; it enables TypeScript, `$` shelling, and common imports by default—**do not** re-implement or re-import zx in each script.
 1. **Flake Integration:** You are working in a repo that already has a `flake.nix`. **Merge** new outputs/attrs with the existing flake **unless** responsibilities overlap; if they do, **this design takes precedence**.
 1. **Naming:** Use **`graph-generator.nix`** for the outer dynamic-derivation planner entrypoint.
@@ -81,6 +81,7 @@ extra-experimental-features = nix-command flakes dynamic-derivations ca-derivati
 1. **Scaffolding:** When you add new target types, **update/augment** the existing scaffolding tools in `tools/` (don’t invent new scaffolding).
 1. **Platforms:** Everything must work on at least **aarch64-darwin**, **aarch64-linux**, and **x86_64-linux**.
 1. **Glue scripts run outside Nix.** Generators are plain Node tools; do not wrap them in `nix run`.
+1. **Planner languages vs. macro-only languages:** Go and C++ are “planner languages” (the Nix planner emits derivations for them via templates). Node is handled by Buck macros and importer‑scoped providers; it is built and tested through Nix shims, but not via planner templates.
 
 ## End-to-End Architecture
 
@@ -97,7 +98,7 @@ graph LR
 
   subgraph Patching
     G["patch-pkg (outer CLI)"] --> H["patch-go.ts"]
-    H --> I["patches live at `patches/go/<importPath encoded>@<version>.patch` (flat dir; one per module@version)"]
+    H --> I["patches live under pkg-local `patches/go/<importPath encoded>@<version>.patch` (one per module@version)"]
     H --> J["NIX_GO_DEV_OVERRIDE_JSON"]
     I --> D
     J --> D
@@ -115,7 +116,8 @@ graph LR
 
 - Buck2 computes a **rule key** from declared inputs: source files, attributes, deps’ outputs, toolchain config, and **any files that influence the derivation**, e.g.:
   - `go.mod`, `go.sum`, `gomod2nix.toml`
-  - `patches/go/<importPath encoded>@<version>.patch` (flat dir; one per module@version)
+  - Go/C++: package‑local patch files (e.g., `<pkg>/patches/{go,cpp}/*.patch`) included in the target’s `srcs`
+  - Node: importer‑local patch files (e.g., `<importer>/patches/node/*.patch`) included in the target’s `srcs`
 - **The planner (`graph-generator.nix`) and the language templates used by it** are also considered inputs.
 - If any of these change, the rule key changes → that target and its **reverse deps** are dirty → **impacted tests** are directly queryable:
   ```bash
@@ -364,13 +366,7 @@ The outer CLI `patch-pkg` implements language/subcommand parsing and delegates t
   # NOTE: Encoding mirrors PNPM’s patch naming (scoped '@scope__name').
   ```
 
-  - Automatically **sync provider rules** and **regenerate the auto-map**:
-
-  ```bash
-  node tools/buck/sync-providers.ts
-  node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl
-  ```
-
+  - No provider sync is required for Go. Patch files live alongside the target (e.g., `<pkg>/patches/go`) and are included in `srcs`; Buck2 invalidates precisely on patch changes.
   - Remove override & delete temp dir; next build applies the patch permanently by filename.
 
 - **`session <module>`**
@@ -445,6 +441,8 @@ patch-pkg reset go github.com/foo/bar
 - **Reproducible**: accepted patches are tracked in VCS and replayed by Nix.
 - **Fast iteration**: dev overrides let you test changes without committing.
 - **Cross-platform parity**: same UX on Linux/macOS.
+
+> Update: In practice we use package‑local patch directories (e.g., `<pkg>/patches/go`) so that patch edits are first‑class inputs of the specific Buck target. This yields tighter invalidation than a single global patch directory and removes the need for Go “per‑module providers.”
 
 _(Adapted from the internal workflow document.)_ fileciteturn5file0
 
@@ -573,15 +571,14 @@ nix_go_binary(
 )
 ```
 
-**Acceptance check:** When you change any of these attrs and re‑run the exporter, the target’s `labels` in `tools/buck/graph.json` should update accordingly (different `module:` set if imports change).
+**Acceptance check:** When you change any of these attrs and re‑run the exporter, the target’s `labels` in `tools/buck/graph.json` should update accordingly (different `module:` set if imports change). Patch edits under `<pkg>/patches/go` should invalidate only the affected targets.
 
-- [ ] Land `//go/defs.bzl` with the **generic macro** (`nix_go_binary` / `nix_go_library` / `nix_go_test`) that wraps the underlying `go_*` rules and appends provider nodes.
-- [ ] Introduce `//third_party/providers/defs.bzl` with `go_module_patch(...)` (one rule per `module@version`, input = patch file).
+- [ ] Land `//go/defs.bzl` with the **generic macro** (`nix_go_binary` / `nix_go_library` / `nix_go_test`) that wraps the underlying `go_*` rules and includes package‑local patch files in `srcs` for precise invalidation.
 - [ ] Convert **one small target** to the macro (leave the rest untouched).
 - Verification:
   - [ ] `buck2 build` for that target succeeds and produces identical binaries compared to pre-macro (hash or size/time check).
-  - [ ] No provider nodes are yet required (auto_map can be empty).
-- Acceptance: Macro merged; no behavior change for unpatched builds.
+  - [ ] No Go provider nodes are required; invalidation is driven by patch files in `srcs`.
+- Acceptance: Macro merged; no behavior change for unpatched builds; patch edits precisely invalidate consumers.
 
 ### Phase 3 — Exporter (authoritative, batched `go list`)
 
@@ -608,36 +605,36 @@ nix_go_binary(
 - Acceptance: Labels are **exact per target**; changing a module used only in tests affects **test targets** only.
 - [ ] Acceptance: Test-only dependencies appear **only** on their test targets.
 
-### Phase 4 — Provider Sync (Go)
+### Phase 4 — Provider Sync (Node)
 
-- [ ] Add `tools/buck/sync-providers.ts` that scans `patches/go/*.patch` (flat dir) and rewrites `third_party/providers/TARGETS.auto` (one rule per `module@version`).
-- [ ] Ensure idempotency and sorted order.
+- [ ] Ensure `tools/buck/sync-providers.ts` orchestrates Node provider generation (importer‑scoped), and C++ sync is a no‑op. Go provider generation is not used.
+- [ ] Ensure idempotency and sorted order for generated Node providers.
 - Verification:
-  - [ ] With **no patches**, running the script produces a minimal `TARGETS.auto` (possibly empty header).
-  - [ ] Add a dummy patch file `patches/go/golang.org__x__net@v0.24.0.patch`; re-run → a provider rule appears and diff is stable if run twice.
-- Acceptance: Provider sync merged; no manual provider edits required.
+  - [ ] With **no pnpm lockfiles**, running the script produces a minimal output (or empties auto sections).
+  - [ ] Add a dummy `apps/web/pnpm-lock.yaml` and an importer‑local patch; re‑run → a Node provider appears; running twice is a no‑op.
+- Acceptance: Node provider sync merged; no manual provider edits required.
 
-### Phase 5 — Auto Map (dual‑mode)
+### Phase 5 — Auto Map (Node lockfile + nixpkg only)
 
-- [ ] Add/upgrade `tools/buck/gen-auto-map.ts` to map targets → providers using both:
-  - `module:<import>@<version>` → per-module providers (Go)
-  - `lockfile:<path>#<importer>` → PNPM importer‑scoped providers (Node), generated via `node_importer_deps(...)`
+- [ ] Ensure `tools/buck/gen-auto-map.ts` maps targets → providers using:
+  - `lockfile:<path>#<importer>` → PNPM importer‑scoped providers (Node)
+  - `nixpkg:<attr>` → nixpkgs providers (for CGO in Go and for C++)
 - [ ] Emit `third_party/providers/auto_map.bzl` (GENERATED).
-- [ ] Make the macro default to **AUTO** (look up providers from `MODULE_PROVIDERS`), with a manual override param preserved for emergencies.
+- [ ] Macros default to **AUTO** (look up providers from `MODULE_PROVIDERS`) with manual override for emergencies.
 - Verification:
-  - [ ] With the dummy patch present and a target that imports `golang.org/x/net`, `auto_map.bzl` lists the matching provider for that target.
-  - [ ] `buck2 build` of that target now **depends** on the provider node (inspect Buck’s target graph or rule key debug output).
-- Acceptance: Changing the dummy patch file triggers a rebuild of only the targets that transitively import that module.
+  - [ ] With a Node importer and a matching lockfile label, `auto_map.bzl` lists the importer provider for that target.
+  - [ ] For targets labeled with `nixpkg:` entries, `auto_map.bzl` lists the corresponding nixpkg providers.
+- Acceptance: Changing importer‑local patches or nixpkg inputs triggers rebuilds of only the affected targets.
 
 ### Phase 6 — Wire `patch-pkg apply`
 
-- [ ] Extend `patch-pkg apply` (Go) to run, **in order**:
+- [ ] Go/C++: `patch-pkg apply` writes the canonical patch file under the package’s `patches/{go,cpp}` directory and clears dev overrides. No glue steps are required; Buck invalidates via `srcs`.
+- [ ] Node: `patch-pkg apply` commits the pnpm patch and triggers:
   1. `node tools/buck/sync-providers.ts`
   2. `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
-  - (Re-export graph only when targets/tags change; exporter always runs in CI.)
 - Verification:
-  - [ ] `patch-pkg start ...` → edit → `patch-pkg apply ...` creates the canonical patch file and updates providers + auto_map.
-  - [ ] Immediate `buck2 build` succeeds without running `install-deps`.
+  - [ ] Go/C++: Immediate `buck2 build` invalidates only the affected targets when patch files change.
+  - [ ] Node: Provider and auto_map refresh completes; dependent targets rebuild.
 - Acceptance: No manual steps required after applying a patch.
 
 ### Phase 7 — CI Stages (kept separate for caching)
@@ -794,7 +791,7 @@ When adding **new** Go targets (libs or apps):
 - **Extend the existing scaffolding tools** in `tools/` to generate:
   - the TARGETS stub,
   - any minimal Nix/planner hints needed, and
-  - create `patches/go/` (empty is fine).
+  - create package‑local `patches/go/` directories where appropriate (empty is fine).
 - Do **not** invent a new scaffolding mechanism.
 
 ---
@@ -816,187 +813,108 @@ This file is generated by `tools/buck/gen-auto-map.ts` and is loaded by your Buc
 #### Generator Script `tools/buck/gen-auto-map.ts` (zx/TypeScript)
 
 - Reads `tools/buck/graph.json` (exported Buck graph).
-- Collects labels from each node:
-  - `module:<import>@<version>` (Go/Rust-style)
+- Collects labels from each node and maps only:
   - `lockfile:<path>#<importer>` (Node, PNPM importer-scoped)
-- Emits a dict mapping **target → provider labels**.
+  - `nixpkg:<attr>` (nixpkgs providers used by Go CGO/C++)
+- Emits a dict mapping **target → provider labels**. Go `module:` labels are diagnostic only and are not mapped.
 
 ```ts
 #!/usr/bin/env zx-wrapper
-// tools/buck/gen-auto-map.ts
-import fs from "fs-extra";
-import { providerNameForModuleKey, providerNameForImporter } from "../lib/providers";
-function nameForModuleProvider(key: string): string {
-  const at = key.lastIndexOf("@");
-  const imp = at >= 0 ? key.slice(0, at) : key;
-  const ver = at >= 0 ? key.slice(at + 1) : "";
-  return providerNameForModuleKey(imp, ver);
-}
-function nameForLockfileProvider(label: string): string {
-  const rest = label.slice("lockfile:".length);
-  const [path, importer] = rest.split("#");
-  return providerNameForImporter(path, importer);
-}
+import { writeIfChanged } from "../lib/fs-helpers";
+// zx is available via shebang; we'll use `$` to interact with git when present.
+import { readCompositeGraph } from "../lib/graph-view.ts";
+// Provider mapping is Node lockfile + nixpkg only; Go `module:` labels are diagnostic.
+import { providersForLabels } from "../lib/labels";
 
-const graphPath = (argv.graph as string) || "tools/buck/graph.json";
-const outPath = (argv.out as string) || "third_party/providers/auto_map.bzl";
+type Node = {
+  name: string;
+  rule_type?: string;
+  labels?: string[];
+};
 
-function shortHash(s: string): string {
-  return crypto.createHash("sha256").update(s).digest("hex").slice(0, 8);
-}
-
-function nameForModuleProvider(key: string): string {
-  const h = shortHash(key);
-  const [imp, ver] = key.split("@");
-  const tail = (imp.split("/").slice(-2).join("_") + "_" + ver.replace(/[.@]/g, "_")).toLowerCase();
-  return `//third_party/providers:mod_${h}_${tail}`;
+function getArg(name: string, def: string): string {
+  try {
+    const a: any = (global as any).argv;
+    if (a && typeof a[name] === "string" && a[name]) return a[name] as string;
+  } catch {}
+  // Fallback: parse process.argv for --name value
+  const idx = process.argv.findIndex((v) => v === `--${name}`);
+  if (idx >= 0 && idx + 1 < process.argv.length) return process.argv[idx + 1] as string;
+  return def;
 }
 
-function nameForLockfileProvider(label: string): string {
-  const li = label.slice("lockfile:".length);
-  const [lf, importer = ""] = li.split("#");
-  const h = shortHash(`${lf}#${importer}`);
-  const suffix = `${importer.replace(/[^\w]+/g, "_")}__${lf.replace(/[^\w]+/g, "_")}`.toLowerCase();
-  return `//third_party/providers:lf_${h}_${suffix}`;
-}
+const graphPath = getArg("graph", "");
+const outPath = getArg("out", "third_party/providers/auto_map.bzl");
 
-type Node = { name: string; rule_type: string; labels?: string[] };
-const nodes: Node[] = JSON.parse(await fs.readFile(graphPath, "utf8"));
-
-function providersFor(node: Node): string[] {
-  const labels = node.labels || [];
-  const list: string[] = [];
-  for (const l of labels) {
-    if (l.startsWith("module:")) {
-      const key = l.slice("module:".length).toLowerCase();
-      list.push(nameForModuleProvider(key));
-    } else if (l.startsWith("lockfile:")) {
-      list.push(nameForLockfileProvider(l));
+async function main() {
+  // Best-effort: mark the output file as 'assume-unchanged' to avoid local noise
+  try {
+    const { stdout, exitCode } = await $({
+      stdio: "pipe",
+    })`git rev-parse --is-inside-work-tree`.nothrow();
+    if (exitCode === 0 && String(stdout || "").trim() === "true") {
+      const check = await $({ stdio: "pipe" })`git ls-files --error-unmatch ${outPath}`.nothrow();
+      if (check.exitCode === 0) {
+        await $({ stdio: "pipe" })`git update-index --assume-unchanged ${outPath}`.nothrow();
+      }
     }
+  } catch {}
+
+  const { nodes } = await readCompositeGraph({ graphPath: graphPath || undefined });
+  const list = nodes as unknown as Node[];
+  const mapping: Record<string, string[]> = {};
+  for (const n of list) {
+    const provs = providersForLabels(n.labels);
+    if (provs.length > 0 && n.name) mapping[n.name] = provs;
   }
-  return Array.from(new Set(list)).sort();
+  const keys = Object.keys(mapping).sort();
+  const body = keys
+    .map((k) => `    "${k}": [\n${mapping[k].map((p) => `        "${p}",`).join("\n")}\n    ],`)
+    .join("\n\n");
+  const header = `# //third_party/providers/auto_map.bzl\n# GENERATED FILE — DO NOT EDIT.\n\nMODULE_PROVIDERS = {\n`;
+  const footer = `\n}\n`;
+  const data = header + body + footer;
+  await writeIfChanged(outPath, data);
 }
 
-const MODULE_PROVIDERS: Record<string, string[]> = {};
-for (const n of nodes) {
-  const provs = providersFor(n);
-  if (provs.length) {
-    MODULE_PROVIDERS[n.name] = provs;
-  }
-}
-
-const header = `# //third_party/providers/auto_map.bzl\n# GENERATED FILE — DO NOT EDIT.\n\nMODULE_PROVIDERS = {\n`;
-const body = Object.entries(MODULE_PROVIDERS)
-  .map(([t, arr]) => `    "${t}": [\n${arr.map((a) => `        "${a}",`).join("\n")}\n    ],`)
-  .join("\n\n");
-const footer = `\n}\n`;
-
-await fs.outputFile(outPath, header + body + footer);
-console.log(`wrote ${outPath}`);
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
 ```
 
 #### Sync Providers Generator `tools/buck/sync-providers.ts` (zx/TypeScript)
 
-> **Purpose:** Ensure there is exactly **one** Buck provider rule per **patched** `module@version`, derived from the flat `patches/go/*.patch` filenames. This file writes (or rewrites) `third_party/providers/TARGETS.auto` deterministically. **Developers never edit provider rules.**
+> **Purpose:** Orchestrate provider generation. Currently:
+>
+> - Node: generate importer‑scoped providers from discovered `pnpm-lock.yaml` files and importer‑local patches.
+> - C++: sync is a no‑op (providers are curated); patches are handled via package‑local `srcs`.
+> - Go: no provider generation; patches are handled via package‑local `srcs`.
 
 ```ts
 #!/usr/bin/env zx-wrapper
-// tools/buck/sync-providers.ts
-import fs from "fs-extra";
-import { providerNameForModuleKey, providerNameForImporter } from "../lib/providers";
-function nameForModuleProvider(key: string): string {
-  const at = key.lastIndexOf("@");
-  const imp = at >= 0 ? key.slice(0, at) : key;
-  const ver = at >= 0 ? key.slice(at + 1) : "";
-  return providerNameForModuleKey(imp, ver);
-}
-function nameForLockfileProvider(label: string): string {
-  const rest = label.slice("lockfile:".length);
-  const [path, importer] = rest.split("#");
-  return providerNameForImporter(path, importer);
+import { syncAllProviders } from "./providers/index.ts";
+
+// By default, generate Node providers. C++ sync is a no‑op; Go has no provider sync.
+// When --lang is passed, narrow to that language.
+function flagStr(name: string, def: string): string {
+  const a: any = (global as any).argv || {};
+  if (a && typeof a[name] === "string" && a[name]) return a[name] as string;
+  const raw = process.argv;
+  const idx = raw.indexOf(`--${name}`);
+  if (idx >= 0 && raw[idx + 1]) return raw[idx + 1];
+  return def;
 }
 
-const PATCH_DIR = "patches/go";
-const OUT_FILE = "third_party/providers/TARGETS.auto";
-
-function decodeModuleKey(file: string): string | null {
-  if (!file.endsWith(".patch")) {
-    return null;
-  }
-  const base = file.slice(0, -".patch".length);
-  const at = base.lastIndexOf("@");
-  if (at < 0) {
-    return null;
-  }
-  const enc = base.slice(0, at);
-  const ver = base.slice(at + 1);
-  const importPath = enc.replace(/__/g, "/");
-  if (!importPath || !ver) {
-    return null;
-  }
-  return `${importPath}@${ver}`.toLowerCase();
-}
-
-function shortHash(s: string): string {
-  return crypto.createHash("sha256").update(s).digest("hex").slice(0, 8);
-}
-
-function nameForModuleProvider(moduleKey: string): string {
-  const h = shortHash(moduleKey);
-  const [imp, ver] = moduleKey.split("@");
-  const tail = (imp.split("/").slice(-2).join("_") + "_" + ver.replace(/[.@]/g, "_")).toLowerCase();
-  return `mod_${h}_${tail}`;
-}
-
-const entries: string[] = [];
-const byModuleKey = new Map<string, string>(); // moduleKey -> filename
-const seen = new Map<string, string>(); // providerName -> moduleKey
-if (await fs.pathExists(PATCH_DIR)) {
-  const list = await fs.readdir(PATCH_DIR, { withFileTypes: true });
-  for (const e of list) {
-    if (e.isDirectory()) {
-      console.warn(`[patches/go] warning: ignoring subdirectory ${e.name}`);
-      continue;
-    }
-    const key = decodeModuleKey(e.name);
-    if (!key) {
-      continue;
-    }
-    // duplicate guard: only one patch per module@version
-    const prior = byModuleKey.get(key);
-    if (prior && prior !== e.name) {
-      throw new Error(`Duplicate patch for ${key}: ${prior} vs ${e.name}`);
-    }
-    byModuleKey.set(key, e.name);
-    const name = providerNameForModuleKey(imp, ver);
-    const prev = seen.get(name);
-    if (prev && prev !== key) {
-      throw new Error(`Provider name collision: ${name}\n${prev} vs ${key}`);
-    }
-    seen.set(name, key);
-    const patchPath = `${PATCH_DIR}/${e.name}`;
-    entries.push(
-      `go_module_patch(name = "${name}", module_key = "${key}", patch_path = "${patchPath}",)`,
-    );
-  }
-}
-
-entries.sort();
-
-const header =
-  `# GENERATED FILE — DO NOT EDIT.\n` +
-  `# Providers derived from filenames in ${PATCH_DIR}.\n\n` +
-  `load("//third_party/providers:defs.bzl", "go_module_patch")\n\n`;
-
-const body = entries.join("\n");
-await fs.outputFile(OUT_FILE, header + body + "\n");
-console.log("wrote", OUT_FILE);
+const LANG = flagStr("lang", "node");
+await syncAllProviders({ lang: LANG });
+console.log("providers sync complete for", LANG);
 ```
 
 **When does it run?**
 
-- **Locally**: automatically when you run `patch-pkg apply` (after writing the canonical patch file).
-- **Dev env setup**: from `tools/install-deps.ts` (after `export-graph.ts`, before `gen-auto-map.ts`).
+- **Locally**: triggered by Node `patch-pkg apply` (after committing the pnpm patch).
+- **Dev env setup**: may run from `tools/install-deps.ts` after `export-graph.ts`, before `gen-auto-map.ts`.
 - **CI**: as a dedicated stage, before `Generate auto_map`.
 
 ## Future-Proofing for Other Languages
@@ -1021,11 +939,13 @@ We scope Node to **PNPM only**, and generate **one provider per importer (worksp
 
 ```python
 def node_importer_deps(name, lockfile, importer, patch_paths = []):
+    # Metadata-only stamp (no cross-package srcs to respect Buck package boundaries)
     genrule(
         name = name,
-        srcs = [lockfile] + patch_paths,
+        srcs = [],
         out = name + ".stamp",
-        cmd = "echo node_deps > $OUT",
+        cmd = "echo node_importer:${importer} ${lockfile} > $OUT",
+        labels = ["lang:node"],
         visibility = ["//visibility:public"],
     )
 ```
@@ -1317,6 +1237,8 @@ def go_module_patch(name, module_key, patch_path):
     )
 ```
 
+> Note: Go provider rules are not used in the current flow; Go invalidation is driven by package‑local patch files included in `srcs`.
+
 ### `//go/defs.bzl` macros (copy‑pasteable)
 
 ```starlark
@@ -1485,9 +1407,6 @@ main().catch((e) => {
 **How to run (examples):**
 
 ```bash
-# Go per-module providers
-node tools/tests/e2e-provider-wiring.ts   --target //features/payments:service   --related golang.org/x/net@v0.24.0   --unrelated github.com/sirupsen/logrus@v1.9.0
-
 # Node importer-scoped providers
 node tools/tests/e2e-provider-wiring.ts \
   --target //apps/web:bundle \

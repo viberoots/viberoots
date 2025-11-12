@@ -27,6 +27,8 @@ Labels for Rust use the existing module form to maximize reuse:
 
 - Format: `module:<crate>@<version>` (crate names have no `/`, so they won’t collide with Go import paths).
 - Auto‑map continues to translate any `module:` label to the provider name using the same helper; no changes required in `gen-auto-map.ts`.
+- Preferred initial wiring: importer‑scoped `lockfile:` labels (e.g., `lockfile:<path/to/Cargo.lock>#<importer>`) so current `gen-auto-map.ts` can map providers without changes. Per‑crate `module:` mapping is optional and would require extending auto‑map to translate `module:` labels for Rust.
+- Invalidation: regardless of provider model, include package‑ or importer‑local patch files in target `srcs` so Buck invalidation remains precise; provider stamps stay metadata‑only.
 
 ---
 

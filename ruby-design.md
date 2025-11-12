@@ -254,3 +254,6 @@ Run tests with repo conventions (external timeouts and coverage env).
 - `patch-pkg ruby` workflow works end‑to‑end and is idempotent.
 - Rails template scaffolds a working example that builds under Buck2.
 - Tests pass locally and in CI, with coverage following repo conventions.
+
+- **Default mapping:** start with importer‑scoped lockfile labels (mirroring Node) so existing auto‑map wiring works out of the box. Per‑gem `module:` mapping can be added later; doing so requires extending `tools/buck/gen-auto-map.ts` to translate Ruby `module:` labels to provider names.
+- **Invalidation:** include importer‑local patch files in target `srcs` (e.g., `<importer>/patches/ruby/*.patch`) so Buck invalidation is precise. Provider stamps remain metadata‑only.

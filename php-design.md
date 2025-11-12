@@ -320,3 +320,6 @@ Acceptance Criteria
 - Templates/macros/providers/patching implemented and documented; PHP provider sync and auto-map wiring verified via zx tests.
 - CI stages integrate PHP sync and guard; builds are reproducible; per-importer invalidation works.
 - Developer docs updated: how to patch, where patches live, how labels/providers work.
+
+- Invalidation model: macros include importer‑local patch files in `srcs` (e.g., `<importer>/patches/php/*.patch`) so Buck invalidation is precise; provider stamps remain metadata‑only.
+- Auto‑map: existing mapping covers `lockfile:` labels. If a per‑package provider model is introduced later, extend `gen-auto-map.ts` accordingly.

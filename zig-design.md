@@ -307,3 +307,9 @@ Idempotency & CI guardrails mirror Go’s.
 ## Summary
 
 This design adds Zig with minimal bespoke logic by reusing our established patterns: `module:` labels, generated providers, auto-map wiring, Nix templates with patch/override maps, zx glue, and thin Buck macros. It keeps invalidation precise, patches reproducible, and behavior deterministic across platforms, while leaving room to refine exporter batching and vendor mechanics as Zig’s ecosystem evolves.
+
+### Mapping and invalidation alignment with current design
+
+- Prefer importer‑scoped lockfile labels for Zig initially (e.g., `lockfile:<path/to/build.zig.zon>#<packageDir>`). Current `gen-auto-map.ts` maps `lockfile:` labels; no changes required.
+- If per‑module `module:<pkgId>@<version>` providers are adopted, extend `tools/buck/gen-auto-map.ts` to translate Zig `module:` labels to provider names; until then, treat `module:` labels as diagnostic.
+- Include package‑ or importer‑local patch files in target `srcs` to ensure precise Buck invalidation; provider stamps remain metadata‑only.

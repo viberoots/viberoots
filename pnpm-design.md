@@ -23,8 +23,8 @@ This document proposes how to add first-class PNPM projects to this monorepo, in
   - The prebuild guard (`tools/buck/prebuild-guard.ts`) enforces freshness/presence of sidecars and `auto_map.bzl` before builds.
 - Missing pieces:
   - No committed `pnpm-workspace.yaml` yet.
-  - No `third_party/providers/defs_node.bzl` (simple genrule macro placeholder is referenced in docs).
-  - No Node Buck macros (we can start with a thin macro over genrules for better DX).
+  - `third_party/providers/defs_node.bzl` exists in this repo (tiny `node_importer_deps` stamp macro).
+  - A thin Node Buck macro exists and should be preferred over raw genrules for better DX; continue evolving it to stamp labels and append providers automatically.
 
 ### Decisions captured
 

@@ -42,6 +42,7 @@
 
 - **Labels**: Erlang targets carry a deterministic lockfile label: `lockfile:<relative/path/to/rebar.lock>#<importer>`. The importer is the Erlang app name (from `rebar.config`/`{project_applications, [...]}` or `{app, Name}`); default to the package directory (e.g., `apps/foo`) if an explicit name isn’t resolvable.
 - **Providers**: A zx generator scans all `rebar.lock` files and `patches/erlang/*.patch`, computes per‑importer effective dep sets, and emits `TARGETS.erlang.auto` with one provider per `(lockfile, importer)`; patch paths included only if relevant to the importer’s effective set.
+- **Invalidation**: Macros also include importer‑local patch files in target `srcs` (mirroring Node) so Buck invalidation is precise. Provider stamps remain metadata‑only.
 - **Auto‑map**: `gen-auto-map.ts` maps `lockfile:...#...` labels to the fully qualified provider target names using shared naming helpers.
 - **Nix**: Templates `erlangApp`/`erlangLib` consume the lockfile path and optional dev overrides (`NIX_ERLANG_DEV_OVERRIDE_JSON`), apply patches deterministically by scanning `patches/erlang/`, and perform the Rebar3 build under `beamPackages`.
 - **Patching UX**: `patch-pkg` gets an Erlang handler mirroring Go/Node flows: `start`, `apply`, `reset`, `session`; canonical patch filenames in `patches/erlang/`.

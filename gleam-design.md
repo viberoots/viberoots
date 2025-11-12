@@ -96,7 +96,8 @@ Patches and Overrides application:
 
 - Provider rule file: `//third_party/providers/defs_gleam.bzl` with a simple `gleam_importer_deps(name, lockfile, importer, patch_paths = [])` genrule that stamps content hash of the lockfile + patch files (mirroring Node’s `node_importer_deps`).
 - Provider sync output: `third_party/providers/TARGETS.gleam.auto` listing `gleam_importer_deps(...)` entries for each detected Gleam importer.
-- Auto‑map: `tools/buck/gen-auto-map.ts` already converts any `lockfile:...#...` label to `providerNameForImporter(...)`; thus Gleam targets will receive the correct provider dependency automatically via macros.
+- Auto‑map: `tools/buck/gen-auto-map.ts` already converts any `lockfile:...#...` label to `providerNameForImporter(...)`; thus Gleam targets will receive the correct provider dependency automatically via macros. Per‑module mapping can be added later by extending auto‑map.
+- Invalidation: Macros include importer‑local patch files in `srcs` to ensure precise Buck invalidation; provider stamps remain metadata‑only (mirrors Node).
 
 ### Labels Summary
 

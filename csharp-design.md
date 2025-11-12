@@ -5,7 +5,7 @@ This document proposes how to add C# (and optionally other .NET languages like F
 ### Goals and non-goals
 
 - **Goal**: Integrate .NET projects (libraries, apps, tests) with Buck2 orchestration and Nix hermetic builds, enabling precise invalidation and reproducible artifacts.
-- **Goal**: Support patching of NuGet package sources with idempotent patches tracked under `patches/csharp/*.patch`.
+- **Goal**: Support patching of NuGet package sources with idempotent patches. Prefer importer‑ or package‑local patch directories (included in target `srcs`) for precise invalidation; a repo‑level `patches/csharp/` remains available for shared cases.
 - **Goal**: Keep design language‑agnostic inside the planner; .NET is a pluggable language like Go/Node.
 - **Non‑goal**: Replace `dotnet` test runner or re‑implement MSBuild. We orchestrate deterministically and call supported Nix builders.
 
@@ -19,15 +19,15 @@ This document proposes how to add C# (and optionally other .NET languages like F
 
 1. Buck targets (C#) are labeled with `lang:dotnet` and `kind:<bin|lib|test>` via `//csharp/defs.bzl`.
 2. Exporter inspects configured C# targets, runs authoritative queries to compute the set of NuGet packages used, tagging targets with `nuget:<id>@<version>` labels.
-3. Provider sync scans `patches/csharp/*.patch`, writes `third_party/providers/TARGETS.csharp.auto` (one provider per `nuget:<id>@<version>`).
-4. Auto‑map reads labels from the Buck graph and maps targets to provider nodes.
+3. Default providers are importer‑scoped (lockfile + importer), mirroring Node; per‑package providers are optional.
+4. Auto‑map maps `lockfile:<path>#<importer>` and `nixpkg:<attr>` labels; mapping `nuget:` per‑package labels would require extending `tools/buck/gen-auto-map.ts`.
 5. Planner templates (`tools/nix/templates/csharp.nix`) build .NET apps/libs with `buildDotnetModule` (or equivalent), applying patches and dev overrides.
 
 ### Labels and naming
 
-- **Per‑module label (authoritative)**: `nuget:<packageId>@<version>` (lowercased). Example: `nuget:newtonsoft.json@13.0.3`.
-- **Optional lockfile label (future)**: `nugetlock:<relative/path/to/packages.lock.json>#<project>` if we later choose importer/lockfile‑scoped providers. Initial design uses per‑module labels for precision.
-- **Provider names**: extend `tools/lib/providers.ts` with `providerNameForNuget(id, version)` → `nu_<hash>_<id>__<version>` and use `//third_party/providers:<name>` fully‑qualified in auto‑map.
+- **Per‑package label (authoritative, diagnostic)**: `nuget:<packageId>@<version>` (lowercased). Example: `nuget:newtonsoft.json@13.0.3`.
+- **Default lockfile label (recommended)**: use generic `lockfile:<relative/path/to/packages.lock.json>#<importer>` so existing auto‑map wiring works out of the box.
+- **Provider names**: importer‑scoped providers reuse `providerNameForImporter(lockfilePath, importer)`. If a per‑package path is adopted later, add `providerNameForNuget(id, version)` and extend auto‑map accordingly.
 
 ### Exporter (authoritative, batched)
 
@@ -49,7 +49,7 @@ This document proposes how to add C# (and optionally other .NET languages like F
 - **Implementation**: Use `pkgs.buildDotnetModule` (from nixpkgs) or a thin wrapper around it:
   - `nugetDeps` points to `nuget-deps.nix` (generated deterministically; see Install‑deps below).
   - Build parameters set from exporter/planner (TFM, RID, SelfContained, Configuration).
-  - Apply patches using a `patchesMapFromDir` analogous to Go: build `{ "<id>@<ver>" = [ /abs/path.patch ... ] }` from filenames in `patches/csharp/*.patch`.
+  - Apply patches using a `patchesMapFromDir` analogous to Go: build `{ "<id>@<ver>" = [ /abs/path.patch ... ] }` from filenames in package‑ or importer‑local patch directories (preferred) or a shared `patches/csharp/*.patch` directory when appropriate.
   - Dev overrides: read JSON from `NIX_CSHARP_DEV_OVERRIDE_JSON` mapping `"<id>@<ver>"` → absolute path of an unpacked package source tree.
   - In CI: throw if dev overrides are set. Locally: print a clear warning (shared helper).
 
@@ -62,13 +62,7 @@ This document proposes how to add C# (and optionally other .NET languages like F
 
 ### Provider sync (C#)
 
-- File: `tools/buck/sync-providers-csharp.ts`.
-- **Behavior**:
-  - Scan `patches/csharp/*.patch` (flat directory). Filenames: `<PackageId>@<version>.patch` (case‑insensitive, stored as lowercased key; keep original case in comments as needed).
-  - Validate: no subdirectories; exactly one patch per `(id@version)`; deterministic sort.
-  - Emit `third_party/providers/TARGETS.csharp.auto` with one provider rule per `(id@version)`:
-    - Rule: `csharp_nuget_patch(name = providerNameForNuget(id, ver), package_id = id, version = ver, patch_path = "patches/csharp/<file>")`
-  - Use `tools/lib/providers.ts` helpers for naming.
+Default path mirrors Node (importer‑scoped): use the existing orchestrator `tools/buck/sync-providers.ts` and, when needed, a C# driver that emits one provider per `(packages.lock.json, importer)` pair. Include only patches relevant to that importer, and prefer importer‑ or package‑local patch files in macro `srcs` for precise invalidation. A per‑package provider mode is optional and would require extending auto‑map alongside a `providerNameForNuget` helper.
 
 #### Provider rule macro
 
@@ -77,10 +71,8 @@ This document proposes how to add C# (and optionally other .NET languages like F
 
 ### Auto‑map integration
 
-- File: `tools/buck/gen-auto-map.ts`.
-- Extend to:
-  - Detect labels starting with `nuget:` and translate each to a provider using `providerNameForNuget(id, ver)`.
-  - Append to `MODULE_PROVIDERS["//pkg:target"]` sorted and deduped.
+- Current `gen-auto-map.ts` supports `lockfile:` and `nixpkg:` labels. Use `lockfile:` for C# initially.
+- If per‑package providers are introduced, extend `gen-auto-map.ts` to translate `nuget:` labels to provider names and append them to `MODULE_PROVIDERS["//pkg:target"].`
 
 ### Buck macros (DX and labels)
 
@@ -94,8 +86,8 @@ This document proposes how to add C# (and optionally other .NET languages like F
 
 - **Command**: `patch-pkg <subcommand> csharp <PackageId>`.
 - **start** `<id>`: materialize the package source for the exact version present in the current project set (using `nuget-deps.nix` mapping); unpack into a temp dir; set `NIX_CSHARP_DEV_OVERRIDE_JSON["id@ver"] = /abs/tmp`; if `$PATCH_EDITOR` is set, open it.
-- **apply** `<id>`: produce a unified diff between the canonical extracted source and the temp dir and write to `patches/csharp/<id>@<ver>.patch`; then run:
-  - `node tools/buck/sync-providers.ts` (which delegates to C# + existing drivers)
+- **apply** `<id>`: produce a unified diff between the canonical extracted source and the temp dir and write to a package‑ or importer‑local patch directory (recommended), or `patches/csharp/<id>@<ver>.patch` when shared. For importer‑scoped flows, then run:
+  - `node tools/buck/sync-providers.ts`
   - `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
   - remove dev override and delete temp dir.
 - **reset** `<id>`: remove override and delete temp dir.
@@ -111,12 +103,12 @@ This document proposes how to add C# (and optionally other .NET languages like F
 
 - Stages (integrated with existing):
   1. Export Graph (includes .NET labels)
-  2. Sync Providers (Go + C# + Node)
+  2. Sync Providers (Node + optional C# driver)
   3. Generate auto_map
   4. Pre‑build guard (fail if glue missing or stale)
   5. Build via Nix `.#graph-generator` (now includes C# outputs)
   6. Buck build/test of selected targets (as today)
-- Prebuild guard: extend to treat presence of `patches/csharp/*.patch` as requiring at least one `TARGETS.csharp.auto` file.
+- Prebuild guard: optionally treat presence of `packages.lock.json` (and C# patches) as requiring a C# provider file when importer‑scoped providers are in use.
 
 ### Tests
 
@@ -146,7 +138,7 @@ This document proposes how to add C# (and optionally other .NET languages like F
 - `buildDotnetModule` in our pinned nixpkgs supports the required features (TFM/RID/self‑contained, offline nuget via `nugetDeps`).
 - We can deterministically derive the transitive package set with `dotnet list … --include-transitive` (or via `project.assets.json`) across SDK versions.
 - `packages.lock.json` can be enabled for all .NET projects (strongly recommended) to stabilize versions.
-- Provider mapping can remain per‑module (`nuget:`); importer/lockfile‑scoped mapping is not needed initially.
+- Prefer importer/lockfile‑scoped mapping initially (works with current auto‑map). Per‑module (`nuget:`) mapping can be added later alongside an auto‑map extension.
 
 ### Risks and mitigations
 
