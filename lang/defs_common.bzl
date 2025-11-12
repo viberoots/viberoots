@@ -62,3 +62,23 @@ def stamp_labels(kwargs, lang, kind=None):
         stamps.append("kind:%s" % kind)
     kwargs["labels"] = dedupe_preserve(labels + stamps)
 
+
+def normalize_nix_attr(attr):
+    """
+    Normalize a nixpkgs attribute path for provider naming and labeling.
+    - Trims
+    - Lower-cases
+    - Ensures "pkgs." prefix
+    - Maps historical alias pkgs.gtest -> pkgs.googletest
+    """
+    if not isinstance(attr, str):
+        return ""
+    s = attr.strip().lower()
+    if s == "":
+        return ""
+    if not s.startswith("pkgs."):
+        s = "pkgs." + s
+    if s == "pkgs.gtest":
+        s = "pkgs.googletest"
+    return s
+

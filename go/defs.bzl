@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "go_binary", "go_library", "go_test", "genrule")
-load("//lang:defs_common.bzl", "append_tuple_labels", "dedupe_preserve", "normalize_labels", "stamp_labels")
+load("//lang:defs_common.bzl", "append_tuple_labels", "dedupe_preserve", "normalize_labels", "stamp_labels", "normalize_nix_attr")
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
 
 def _providers_for(name):
@@ -18,26 +18,9 @@ def _append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled):
     append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled)
 
 
-def _normalize_nix_attr(attr):
-    # Canonical normalization for nixpkgs attribute paths to mirror tools/lib/providers.ts
-    # - trim, lower-case
-    # - ensure "pkgs." prefix
-    # - map historical alias pkgs.gtest -> pkgs.googletest
-    if not isinstance(attr, str):
-        fail("nix_cgo_deps entries must be non-empty strings like 'pkgs.zlib'")
-    s = attr.strip().lower()
-    if s == "":
-        fail("nix_cgo_deps entries must be non-empty strings like 'pkgs.zlib'")
-    if not s.startswith("pkgs."):
-        s = "pkgs." + s
-    if s == "pkgs.gtest":
-        s = "pkgs.googletest"
-    return s
-
-
 def _nixpkg_provider_for(attr):
     # Deterministic provider target name for nixpkgs attribute paths, aligned with TS helper
-    norm = _normalize_nix_attr(attr)
+    norm = normalize_nix_attr(attr)
     # Replace any non-alphanumeric character with underscore for a stable provider name
     tail = "".join([c if (c.isalnum() or c == "_") else "_" for c in norm])
     # Family is "nix_" and the package tail is the entire normalized attribute (may start with pkgs_)
