@@ -1,0 +1,6 @@
+#
+# Declares this directory as a Buck package so its source files
+# (e.g., cpp-patches.nix) can be referenced as source labels:
+#   //tools/nix/overlays:cpp-patches.nix
+#
+
