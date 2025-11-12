@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { writeIfChanged } from "../lib/fs-helpers";
-import { readGraph } from "../lib/graph";
+// zx is available via shebang; we'll use `$` to interact with git when present.
+import { readCompositeGraph } from "../lib/graph-view.ts";
 // PR6 (go-cpp-local-patching): provider mapping is Node-only (lockfile:...) and nixpkg; Go `module:`
 // labels are kept for diagnostics and are intentionally ignored here.
 import { providersForLabels } from "../lib/labels";
@@ -22,7 +23,7 @@ function getArg(name: string, def: string): string {
   return def;
 }
 
-const graphPath = getArg("graph", "tools/buck/graph.json");
+const graphPath = getArg("graph", "");
 const outPath = getArg("out", "third_party/providers/auto_map.bzl");
 
 // writeIfChanged now imported from ../lib/fs-helpers
@@ -30,7 +31,26 @@ const outPath = getArg("out", "third_party/providers/auto_map.bzl");
 // parsing moved to tools/lib/labels.ts
 
 async function main() {
-  const list = (await readGraph(graphPath)) as Node[];
+  // Best-effort: mark the output file as 'assume-unchanged' so that when we
+  // overwrite the tracked stub with generated contents, local working trees
+  // don't show it as modified. This is a local index hint only; it is safe to
+  // ignore errors (e.g., when not in a git work tree or file not tracked).
+  try {
+    const { stdout, exitCode } = await $({
+      stdio: "pipe",
+    })`git rev-parse --is-inside-work-tree`.nothrow();
+    if (exitCode === 0 && String(stdout || "").trim() === "true") {
+      const check = await $({ stdio: "pipe" })`git ls-files --error-unmatch ${outPath}`.nothrow();
+      if (check.exitCode === 0) {
+        await $({ stdio: "pipe" })`git update-index --assume-unchanged ${outPath}`.nothrow();
+      }
+    }
+  } catch {}
+
+  const { nodes } = await readCompositeGraph({
+    graphPath: graphPath || undefined,
+  });
+  const list = nodes as unknown as Node[];
   const mapping: Record<string, string[]> = {};
   for (const n of list) {
     const provs = providersForLabels(n.labels);
