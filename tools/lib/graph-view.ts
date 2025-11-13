@@ -16,6 +16,8 @@ export type ReadCompositeGraphOptions = {
   nodeLockIndexPath?: string;
 };
 
+export const DEFAULT_GRAPH_PATH = path.resolve(path.join("tools", "buck", "graph.json"));
+
 async function readJsonIfExists<T = any>(p: string): Promise<T | {}> {
   try {
     const exists = await fs.pathExists(p);
@@ -29,7 +31,7 @@ async function readJsonIfExists<T = any>(p: string): Promise<T | {}> {
 export async function readCompositeGraph(
   opts: ReadCompositeGraphOptions = {},
 ): Promise<CompositeGraphView> {
-  const graphPath = opts.graphPath || path.resolve("tools/buck/graph.json");
+  const graphPath = opts.graphPath || DEFAULT_GRAPH_PATH;
   const providerIndexPath =
     opts.providerIndexPath || path.resolve("third_party/providers/provider_index.json");
   const nodeLockIndexPath =

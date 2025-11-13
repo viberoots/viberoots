@@ -63,19 +63,6 @@ async function ensureGraph(repoRoot: string, workDir: string) {
   }
   // Limit exporter query roots to the target's package to avoid unrelated package errors.
   const target = (process.env.BUCK_TARGET || "").trim();
-  const dropCellAndConfig = (label: string) => {
-    const noCfg = label.split(" (config//")[0];
-    if (noCfg.includes("//") && !noCfg.startsWith("//")) {
-      const idx = noCfg.indexOf("//");
-      return "//" + noCfg.slice(idx + 2);
-    }
-    return noCfg;
-  };
-  const pkgOf = (label: string) => {
-    const base = dropCellAndConfig(label);
-    const left = base.split(":")[0];
-    return left.startsWith("//") ? left.slice(2) : left;
-  };
   // Query broadly to ensure targets exist even when package inference is off; keep cpp for macros
   const queryRoots = ["apps", "cpp"].join(",");
   await $({
@@ -113,17 +100,16 @@ async function main() {
   console.error(`[build-selected] BUCK_TARGET=${target}`);
   // Planner stubs are represented only in cppTargetsFlat; selected may not include them.
   const isPlanner = target.endsWith("__planner");
-  function dropCellAndConfig(label: string): string {
-    const noCfg = label.split(" (config//")[0];
-    if (noCfg.includes("//") && !noCfg.startsWith("//")) {
-      const idx = noCfg.indexOf("//");
-      return "//" + noCfg.slice(idx + 2);
-    }
-    return noCfg;
-  }
   function sanitizeAttrName(label: string): string {
-    const s = dropCellAndConfig(label).toLowerCase();
-    // Map any non [a-z0-9_] to underscore and prefix with 't'
+    const noCfg = label.split(" (config//")[0];
+    const withCell = (() => {
+      if (noCfg.includes("//") && !noCfg.startsWith("//")) {
+        const idx = noCfg.indexOf("//");
+        return "//" + noCfg.slice(idx + 2);
+      }
+      return noCfg;
+    })();
+    const s = withCell.toLowerCase();
     return "t" + s.replace(/[^a-z0-9_]/g, "_");
   }
 

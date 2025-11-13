@@ -2,6 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { Node } from "./types.ts";
+import { DEFAULT_GRAPH_PATH } from "../../lib/graph-view.ts";
 
 export const attrList = [
   "name",
@@ -156,13 +157,8 @@ export async function cqueryNodes(scope: string, attrs: string[]): Promise<Node[
 
       const labs = new Set<string>(labelsArr || []);
       // Normalize label: drop cell prefix and any config suffix to ensure stable keys
-      const dropConfig = (s: string) => s.split(" (config//")[0];
-      const dropCell = (s: string) => {
-        if (s.startsWith("//")) return s;
-        const idx = s.indexOf("//");
-        return idx >= 0 ? "//" + s.slice(idx + 2) : s;
-      };
-      const clean = dropCell(dropConfig(label));
+      const { normalizeTargetLabel } = await import("../../lib/labels.ts");
+      const clean = normalizeTargetLabel(label);
       const n: any = {
         ...a,
         name: clean,
@@ -230,7 +226,7 @@ export function parseArgs(argv: any): {
 } {
   const a: Record<string, any> = argv && typeof argv === "object" ? argv : {};
   return {
-    out: (a.out as string) || "tools/buck/graph.json",
+    out: (a.out as string) || DEFAULT_GRAPH_PATH,
     scope: (a.scope as string) || "",
     simulate: (a.simulate as string) || "",
     maxParallel: Number(a["max-parallel"] || 4),
