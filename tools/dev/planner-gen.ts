@@ -2,6 +2,7 @@
 import Ajv from "ajv";
 import fs from "fs-extra";
 import path from "node:path";
+import { writeIfChanged as writeIfChangedDeterministic } from "../lib/fs-helpers.ts";
 
 type PlannerConfig = {
   id: string;
@@ -121,7 +122,7 @@ async function validateConfig(cfg: PlannerConfig) {
   }
 }
 
-async function writeIfChanged(
+async function writePlannerOutput(
   outPath: string,
   content: string,
   checkOnly: boolean,
@@ -130,11 +131,12 @@ async function writeIfChanged(
   if (exists) {
     const prev = await fs.readFile(outPath, "utf8");
     if (prev === content) return false;
-    if (checkOnly)
+    if (checkOnly) {
       throw new Error(`planner-gen: ${outPath} would change (run without --check to update)`);
+    }
   }
   await fs.ensureDir(path.dirname(outPath));
-  await fs.writeFile(outPath, content);
+  await writeIfChangedDeterministic(outPath, content);
   return true;
 }
 
@@ -165,7 +167,7 @@ async function main() {
     await validateConfig(cfg);
     const out = generateNix(cfg);
     const outPath = repoPath("tools/nix/planner", `${id}.nix`);
-    const did = await writeIfChanged(outPath, out, check);
+    const did = await writePlannerOutput(outPath, out, check);
     if (did) changed.push(outPath);
   }
   if (changed.length > 0) {
