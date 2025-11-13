@@ -83,8 +83,12 @@ export async function writePatchIfChanged(
     if (!force) {
       throw new Error(`${dst} exists with different content. Re-run with --force to overwrite.`);
     }
-  } catch {
-    // fallthrough to write
+  } catch (e: any) {
+    // Only fall through when the file truly doesn't exist (ENOENT).
+    // If a different error occurred (including our own throw above),
+    // rethrow to avoid accidentally overwriting.
+    const code = (e && (e as any).code) || "";
+    if (code !== "ENOENT") throw e;
   }
   await fsp.writeFile(dst, data, "utf8");
   return "written";

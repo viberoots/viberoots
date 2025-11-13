@@ -11,15 +11,6 @@ import { attrList, cqueryNodes, parseArgs, readSimulatedNodes, writeIfChangedJSO
 import { loadPresentAdapters } from "./lang/contract.ts";
 import type { Adapter, Batch, Metrics, Node } from "./types.ts";
 
-function sortAndDedupeLabels(nodes: Node[]): Node[] {
-  return nodes
-    .map((n) => ({
-      ...n,
-      labels: Array.from(new Set(n.labels || [])).sort(),
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-}
-
 export async function run() {
   const { out, scope, simulate, maxParallel, cacheDir, metricsOut, validation } = parseArgs(
     (global as any).argv,

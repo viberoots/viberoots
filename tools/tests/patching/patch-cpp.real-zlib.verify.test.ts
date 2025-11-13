@@ -28,17 +28,26 @@ test("patch-cpp applies overlay to real nixpkgs zlib and changes runtime zlibVer
     });
 
     // Ensure a fresh session so workspace headers are unmodified
-    await $({
-      cwd: tmp,
-      env: { NO_DEV_SHELL: "1", NIX_CPP_TEST_RESOLVE_JSON: resolveMap },
-    })`tools/bin/patch-pkg reset cpp zlib`;
+    // Use the language handler directly to avoid shell wrapper differences in the Buck action sandbox
+    const { default: cppHandler } = (await import("../../patch/patch-cpp.ts")) as any;
+    process.env.NIX_CPP_TEST_RESOLVE_JSON = resolveMap;
+    await cppHandler.reset(["zlib"]);
 
     // Start session against real nixpkgs attr (no test resolver)
-    const wsOut = await $({
-      cwd: tmp,
-      env: { NO_DEV_SHELL: "1", NIX_CPP_TEST_RESOLVE_JSON: resolveMap },
-    })`tools/bin/patch-pkg start cpp zlib`;
-    const ws = String(wsOut.stdout).trim().split(/\s+/).pop() as string;
+    const startCapture: string[] = [];
+    const origLog = console.log;
+    try {
+      console.log = (s?: any) => {
+        if (typeof s === "string") startCapture.push(s);
+        try {
+          origLog.apply(console, [s]);
+        } catch {}
+      };
+      await cppHandler.start(["zlib"]);
+    } finally {
+      console.log = origLog;
+    }
+    const ws = (startCapture.find((l) => typeof l === "string" && l.startsWith("/")) || "").trim();
     let wsExists = false;
     try {
       await fsp.access(ws);
@@ -69,13 +78,20 @@ test("patch-cpp applies overlay to real nixpkgs zlib and changes runtime zlibVer
     await fsp.writeFile(zlibH, patched, "utf8");
 
     // Apply to write a canonical patch under patches/cpp
-    const applyOut = await $({
-      cwd: tmp,
-      stdio: "pipe",
-      env: { NO_DEV_SHELL: "1", NIX_CPP_TEST_RESOLVE_JSON: resolveMap },
-    })`tools/bin/patch-pkg apply cpp zlib --patch-dir patches/cpp`;
-    const outTxt = String(applyOut.stdout || "");
-    if (!outTxt.toLowerCase().includes("auto-discovers patches")) {
+    const applyCapture: string[] = [];
+    try {
+      console.log = (s?: any) => {
+        if (typeof s === "string") applyCapture.push(s);
+        try {
+          origLog.apply(console, [s]);
+        } catch {}
+      };
+      await cppHandler.apply(["zlib", "--patch-dir", "patches/cpp"]);
+    } finally {
+      console.log = origLog;
+    }
+    const outTxt = applyCapture.join("\n");
+    if (!/auto-?discover/i.test(outTxt)) {
       console.error("expected auto-discovery note in apply output");
       process.exit(2);
     }

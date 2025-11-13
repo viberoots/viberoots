@@ -9,7 +9,7 @@ All scripts are zx TypeScript using `#!/usr/bin/env zx-wrapper`.
 - Start: `tools/bin/patch-pkg start go <importPath>`
   - Creates a writable workspace over the Nix store source for the module.
   - macOS uses APFS CoW (`cp -cR`) when available; otherwise falls back to `cp -a`. Other platforms use `cp -a`.
-  - Writes/updates `NIX_GO_DEV_OVERRIDE_JSON` for the current `module@version` key.
+  - Writes/updates `NIX_GO_DEV_OVERRIDE_JSON` for the current `module@version` key (local-only dev override).
   - If `PATCH_EDITOR` is set, launches it with the workspace.
 
 - Apply: `tools/bin/patch-pkg apply go <importPath> [--target //<pkg>:name | --patch-dir <dir>]`
@@ -41,6 +41,8 @@ Node only (Go/C++ don’t require glue for patch invalidation). Local glue is no
 
 - Export graph: `node tools/buck/export-graph.ts --out tools/buck/graph.json`
 - Sync providers: `node tools/buck/sync-providers.ts`
+- Generate provider index and Node lockfile sidecar: `node tools/buck/gen-provider-index.ts`
+  - Emits `third_party/providers/provider_index.bzl` and `tools/buck/node-lock-index.json`
 - Generate auto_map: `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
 
 Running `node tools/dev/install-deps.ts` in the dev shell runs the full sequence automatically. CI runs the same as separate stages.
@@ -52,7 +54,7 @@ Note on remove (Go/C++ vs Node):
 
 ## CI guardrails
 
-Local builds warn when `NIX_GO_DEV_OVERRIDE_JSON` is set; CI fails if it is set.
+Local builds warn when `NIX_GO_DEV_OVERRIDE_JSON` or `NIX_CPP_DEV_OVERRIDE_JSON` is set; CI fails if either is set. These environment variables change derivation hashes and are never allowed in CI.
 
 In addition, CI enforces patch directory invariants for Go/C++ local patch directories:
 
@@ -194,6 +196,8 @@ This example patches a nixpkgs package (e.g., `pkgs.zlib`) and writes a package�
 ```bash
 tools/bin/patch-pkg start cpp pkgs.zlib
 # prints a writable workspace containing the zlib sources; open and edit
+# By default this sets a process-local NIX_CPP_DEV_OVERRIDE_JSON for the selected attr.
+# Pass --echo-snippet if you prefer to export the override in your shell manually.
 ```
 
 2. Apply the patch into the package‑local directory
