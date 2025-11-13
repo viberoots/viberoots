@@ -2,12 +2,18 @@
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { createHash } from "node:crypto";
 import { makeUnifiedDiff } from "./diff";
-import { runGlue } from "./glue";
+import {
+  parseApplyFlags,
+  repoRoot,
+  resolvePatchDir,
+  verifyPatchDryRun,
+  writePatchIfChanged,
+} from "./lib/apply";
 import { deleteSession, getSession, listSessions, setSession } from "./state";
 import type { LanguageHandler, SessionRecord } from "./types";
 import { setOverride, clearOverride, formatExportSnippet } from "./dev-overrides";
+import { encodeNixAttrForPatchPrefix, normalizeNixAttr } from "../lib/providers";
 
 async function pathExists(p: string): Promise<boolean> {
   try {
@@ -37,17 +43,6 @@ function attrArg(args: string[]): string {
   const a = (args[0] || "").trim();
   if (!a) throw new Error("missing <attr> nixpkgs attribute, e.g. pkgs.zlib or zlib");
   return a;
-}
-
-function normalizeAttr(attr: string): string {
-  const s = attr.replace(/^pkgs\./i, "");
-  return `pkgs.${s}`;
-}
-
-function encodeAttrForFilename(attrNorm: string): string {
-  // pkgs.openssl -> pkgs/openssl -> pkgs__openssl
-  const slash = attrNorm.replaceAll(".", "/");
-  return slash.replaceAll("/", "__");
 }
 
 async function nixEvalRaw(expr: string): Promise<string> {
@@ -146,14 +141,14 @@ async function ensureOriginAndWorkspace(
   version: string;
   pname: string;
 }> {
-  const attrNorm = normalizeAttr(attr);
+  const attrNorm = normalizeNixAttr(attr);
   const { pname, version, srcPath } = pre || (await resolveNixpkg(attrNorm));
   const key = `${attrNorm}@${version}`.toLowerCase();
   const stamp = new Date()
     .toISOString()
     .replace(/[-:TZ.]/g, "")
     .slice(0, 14);
-  const safeKey = encodeAttrForFilename(key);
+  const safeKey = encodeNixAttrForPatchPrefix(key);
   const base = path.join(os.tmpdir(), "bucknix-patch-cpp");
   const originRoot = path.join(base, `origin-${safeKey}-${stamp}`);
   const wsRoot = path.join(base, `ws-${safeKey}-${stamp}`);
@@ -170,7 +165,7 @@ async function doStart(args: string[]) {
   console.error("[patch-cpp] start: begin");
   dbg("start: proc", { pid: process.pid, cwd: process.cwd() });
   const attrInput = attrArg(args);
-  const attrNorm = normalizeAttr(attrInput);
+  const attrNorm = normalizeNixAttr(attrInput);
   const echoSnippet =
     process.argv.includes("--echo-snippet") ||
     String(process.env.PATCH_CPP_ECHO_SNIPPET || "").trim() === "1";
@@ -222,44 +217,17 @@ async function doStart(args: string[]) {
 async function doApply(args: string[]) {
   console.error("[patch-cpp] apply: begin");
   dbg("apply: proc", { pid: process.pid, cwd: process.cwd() });
-  // Parse optional flags to support local patch-dir targeting
-  let targetPkg = "";
-  let overridePatchDir = "";
-  const rest: string[] = [];
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i];
-    if (a === "--target" && i + 1 < args.length) {
-      const t = String(args[++i] || "").trim();
-      if (t.startsWith("//")) {
-        const noCell = t.slice(2);
-        targetPkg = noCell.split(":")[0] || "";
-      } else {
-        targetPkg = t.split(":")[0] || "";
-      }
-    } else if (a.startsWith("--target=")) {
-      const t = a.split("=", 2)[1] || "";
-      const val = t.trim();
-      if (val.startsWith("//")) {
-        const noCell = val.slice(2);
-        targetPkg = noCell.split(":")[0] || "";
-      } else {
-        targetPkg = val.split(":")[0] || "";
-      }
-    } else if (a === "--patch-dir" && i + 1 < args.length) {
-      overridePatchDir = String(args[++i] || "").trim();
-    } else if (a.startsWith("--patch-dir=")) {
-      overridePatchDir = (a.split("=", 2)[1] || "").trim();
-    } else if (a === "--force") {
-      (global as any).argv = Object.assign({}, (global as any).argv, { force: true });
-    } else if (a.startsWith("--")) {
-      // ignore unknown flags
-    } else {
-      rest.push(a);
-    }
+  const flags = parseApplyFlags(args);
+  if (flags.force) {
+    (global as any).argv = Object.assign({}, (global as any).argv, { force: true });
   }
-  dbg("apply: parsed-flags", { targetPkg, overridePatchDir, rest });
-  const attrInput = attrArg(rest);
-  const attrNorm = normalizeAttr(attrInput);
+  dbg("apply: parsed-flags", {
+    targetPkg: flags.targetPkg,
+    overridePatchDir: flags.overridePatchDir,
+    rest: flags.restArgs,
+  });
+  const attrInput = attrArg(flags.restArgs);
+  const attrNorm = normalizeNixAttr(attrInput);
   // Avoid redundant nixpkgs resolutions during apply: reuse an existing session.
   // Choose the most recent session for this attr whose workspace still exists; fall back to newest.
   const all = await listSessions("cpp");
@@ -373,84 +341,33 @@ async function doApply(args: string[]) {
     dbg("apply: diff-summary", { length: diff.length, lines: header });
   } catch {}
 
-  const fileKey = encodeAttrForFilename(attrNorm);
-  const repoRoot = process.env.WORKSPACE_ROOT || process.env.LIVE_ROOT || process.cwd();
-  let patchDir = "";
-  if (overridePatchDir) {
-    patchDir = path.isAbsolute(overridePatchDir)
-      ? overridePatchDir
-      : path.join(repoRoot, overridePatchDir);
-  } else if (targetPkg) {
-    patchDir = path.join(repoRoot, targetPkg, "patches/cpp");
-  } else {
-    throw new Error(
-      "missing --target //<pkg>:name or --patch-dir for local patch placement (PR6 local mode)",
-    );
-  }
-  await fsp.mkdir(patchDir, { recursive: true });
+  const fileKey = encodeNixAttrForPatchPrefix(attrNorm);
+  const root = repoRoot();
+  const patchDir = resolvePatchDir("patches/cpp", flags.targetPkg, flags.overridePatchDir, root);
   const dst = path.join(patchDir, `${fileKey}@${sess.version}.patch`);
-  dbg("apply: paths", { repoRoot, patchDir, dst });
-
-  let write = true;
-  if (await pathExists(dst)) {
-    const cur = await fsp.readFile(dst, "utf8");
-    if (cur === diff) {
-      console.log("no-op (already applied)");
-      write = false;
-      dbg("apply: already-applied", { dst });
-    } else if (!(global as any).argv.force) {
-      throw new Error(`${dst} exists with different content. Re-run with --force to overwrite.`);
-    }
-  }
-  if (write) {
-    await fsp.mkdir(path.dirname(dst), { recursive: true });
-    await fsp.writeFile(dst, diff, "utf8");
+  dbg("apply: paths", { root, patchDir, dst });
+  const wrote = await writePatchIfChanged(dst, diff, !!(global as any).argv.force);
+  if (wrote === "written") {
     dbg("apply: wrote-patch", { dst, bytes: diff.length });
-    try {
-      const st = await fsp.stat(dst);
-      dbg("apply: patch-stat", { size: st.size, mtimeMs: st.mtimeMs });
-    } catch {}
+    console.error("[patch-cpp] apply: wrote patch", dst);
   }
-  console.error("[patch-cpp] apply: wrote patch", dst);
   // Proactively print note so callers capturing stdout see it even if verification chats to tty
   console.log("C++ overlay auto-discovers patches by filename; no manual snippet required.");
   // Verify patch applies with -p1 to pristine origin
-  const tmpRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "bucknix-patch-verify-cpp-"));
-  const tmpCopy = path.join(tmpRoot, path.basename(sess.originPath));
-  await fsp.mkdir(tmpCopy, { recursive: true });
-  await $`rsync -a ${sess.originPath}/ ${tmpCopy}/`;
   console.error("[patch-cpp] apply: verifying patch");
-  let havePatch = false;
   try {
-    const ver = await $({ stdio: "pipe" })`patch --version`.nothrow();
-    havePatch = String(ver.stdout || ver.stderr || "").trim() !== "";
-  } catch {}
-  if (havePatch) {
-    try {
-      const res = await $({
-        cwd: tmpCopy,
-        stdio: "pipe",
-        env: { ...process.env, LC_ALL: "C" },
-      })`patch -s -p1 --dry-run -i ${path.resolve(dst)}`.nothrow();
-      dbg("apply: dry-run", { exitCode: res.exitCode, stderrLen: String(res.stderr || "").length });
-      if ((res.exitCode || 0) !== 0) {
-        const stderr = String(res.stderr || "").trim();
-        throw new Error(stderr || "patch dry-run failed");
-      }
-      console.error("[patch-cpp] apply: verification ok");
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      throw new Error(
-        `Patch verification failed: the generated diff did not apply cleanly with -p1 to the origin source.\n` +
-          `Attr: ${attrNorm}\n` +
-          `Version: ${sess.version}\n` +
-          `Origin: ${sess.originPath}\n` +
-          `Patch: ${dst}\n` +
-          `patch: ${msg}`,
-      );
-    }
-  } else {
-    console.error("[patch-cpp] apply: 'patch' tool not found; skipping dry-run verification");
+    await verifyPatchDryRun(sess.originPath, dst, "cpp");
+    console.error("[patch-cpp] apply: verification ok");
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(
+      `Patch verification failed: the generated diff did not apply cleanly with -p1 to the origin source.\n` +
+        `Attr: ${attrNorm}\n` +
+        `Version: ${sess.version}\n` +
+        `Origin: ${sess.originPath}\n` +
+        `Patch: ${dst}\n` +
+        `patch: ${msg}`,
+    );
   }
 
   // End session; keep workspace for manual inspection if desired
@@ -468,7 +385,7 @@ async function doApply(args: string[]) {
 
 async function doReset(args: string[]) {
   const attrInput = attrArg(args);
-  const attrNorm = normalizeAttr(attrInput);
+  const attrNorm = normalizeNixAttr(attrInput);
   const { version } = await resolveNixpkg(attrNorm);
   const key = `${attrNorm}@${version}`.toLowerCase();
   const sess = await getSession("cpp", key);
@@ -487,7 +404,7 @@ async function doSession(args: string[]) {
   console.log("Attached. Ctrl-D to apply, Ctrl-C to reset.");
   // In session mode, also export a process-local dev override suggestion to help quick rebuilds
   try {
-    const attrNorm = normalizeAttr(attrInput);
+    const attrNorm = normalizeNixAttr(attrInput);
     const { version } = await resolveNixpkg(attrNorm);
     const key = `${attrNorm}@${version}`.toLowerCase();
     const sess = await getSession("cpp", key);
@@ -535,54 +452,17 @@ const handler: LanguageHandler = {
 
 async function doRemove(args: string[]) {
   // Support optional flags similar to apply for local patch placement
-  let targetPkg = "";
-  let overridePatchDir = "";
-  const rest: string[] = [];
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i];
-    if (a === "--target" && i + 1 < args.length) {
-      const t = String(args[++i] || "").trim();
-      if (t.startsWith("//")) {
-        const noCell = t.slice(2);
-        targetPkg = noCell.split(":")[0] || "";
-      } else {
-        targetPkg = t.split(":")[0] || "";
-      }
-    } else if (a.startsWith("--target=")) {
-      const t = a.split("=", 2)[1] || "";
-      const val = t.trim();
-      if (val.startsWith("//")) {
-        const noCell = val.slice(2);
-        targetPkg = noCell.split(":")[0] || "";
-      } else {
-        targetPkg = val.split(":")[0] || "";
-      }
-    } else if (a === "--patch-dir" && i + 1 < args.length) {
-      overridePatchDir = String(args[++i] || "").trim();
-    } else if (a.startsWith("--patch-dir=")) {
-      overridePatchDir = (a.split("=", 2)[1] || "").trim();
-    } else if (a.startsWith("--")) {
-      // ignore unknown flags
-    } else {
-      rest.push(a);
-    }
-  }
-  const attrInput = attrArg(rest);
-  const attrNorm = normalizeAttr(attrInput);
+  const flags = parseApplyFlags(args);
+  const attrInput = attrArg(flags.restArgs);
+  const attrNorm = normalizeNixAttr(attrInput);
   // Resolve version using test-friendly fast path when available
   const { version } = await resolveNixpkg(attrNorm);
-  const repoRoot = process.env.WORKSPACE_ROOT || process.env.LIVE_ROOT || process.cwd();
-  let patchDir = "";
-  if (overridePatchDir) {
-    patchDir = path.isAbsolute(overridePatchDir)
-      ? overridePatchDir
-      : path.join(repoRoot, overridePatchDir);
-  } else if (targetPkg) {
-    patchDir = path.join(repoRoot, targetPkg, "patches/cpp");
-  } else {
-    patchDir = path.join(repoRoot, "patches/cpp");
-  }
-  const fileKey = encodeAttrForFilename(attrNorm);
+  const root = repoRoot();
+  const patchDir =
+    flags.overridePatchDir || flags.targetPkg
+      ? resolvePatchDir("patches/cpp", flags.targetPkg, flags.overridePatchDir, root)
+      : path.join(root, "patches/cpp");
+  const fileKey = encodeNixAttrForPatchPrefix(attrNorm);
   try {
     const dst = path.join(patchDir, `${fileKey}@${version}.patch`);
     await fsp.rm(dst, { force: true });

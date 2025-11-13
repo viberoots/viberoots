@@ -16,7 +16,13 @@ async function generateNodeLockIndex(outFile = "tools/buck/node-lock-index.json"
   const SCHEMA_VERSION = 1;
 
   // Read via Composite Graph API; tolerate missing graph.json by exiting quietly
-  const comp = await readCompositeGraph({});
+  let comp: any = null;
+  try {
+    comp = await readCompositeGraph({});
+  } catch {
+    // Missing graph.json or unreadable graph — skip sidecar emission in this mode
+    return;
+  }
   const nodes = Array.isArray(comp?.nodes) ? comp.nodes : [];
   if (!nodes.length) return;
   const idx: Record<string, string> = {};

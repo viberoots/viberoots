@@ -5,8 +5,14 @@ import path from "node:path";
 import { encodeForPatchFilename } from "../lib/providers";
 import { makeWorkspace } from "./cross-platform";
 import { makeUnifiedDiff } from "./diff";
-import { runGlue } from "./glue";
 import { resolveModule } from "./go-module-resolve";
+import {
+  parseApplyFlags,
+  repoRoot,
+  resolvePatchDir,
+  verifyPatchDryRun,
+  writePatchIfChanged,
+} from "./lib/apply";
 import { deleteSession, getSession, setSession } from "./state";
 import type { LanguageHandler, SessionRecord } from "./types";
 import { readOverrideMap, setOverride, clearOverride } from "./dev-overrides";
@@ -36,20 +42,6 @@ async function pathExists(p: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-async function mkdirp(dir: string): Promise<void> {
-  await fsp.mkdir(dir, { recursive: true });
-}
-
-async function outputFile(p: string, data: string, enc: BufferEncoding = "utf8"): Promise<void> {
-  await mkdirp(path.dirname(p));
-  await fsp.writeFile(p, data, enc);
-}
-
-async function copyDir(src: string, dst: string): Promise<void> {
-  // Node 16+ provides recursive cp
-  await fsp.cp(src, dst, { recursive: true, force: true });
 }
 
 function moduleArg(args: string[]): string {
@@ -105,43 +97,16 @@ async function doStart(args: string[]) {
 }
 
 async function doApply(args: string[]) {
-  // Parse optional flags first to support local patch-dir targeting
-  let targetPkg = "";
-  let overridePatchDir = "";
-  const rest: string[] = [];
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i];
-    if (a === "--target" && i + 1 < args.length) {
-      const t = String(args[++i] || "").trim();
-      if (t.startsWith("//")) {
-        const noCell = t.slice(2);
-        targetPkg = noCell.split(":")[0] || "";
-      } else {
-        targetPkg = t.split(":")[0] || "";
-      }
-    } else if (a.startsWith("--target=")) {
-      const t = a.split("=", 2)[1] || "";
-      const val = t.trim();
-      if (val.startsWith("//")) {
-        const noCell = val.slice(2);
-        targetPkg = noCell.split(":")[0] || "";
-      } else {
-        targetPkg = val.split(":")[0] || "";
-      }
-    } else if (a === "--patch-dir" && i + 1 < args.length) {
-      overridePatchDir = String(args[++i] || "").trim();
-    } else if (a.startsWith("--patch-dir=")) {
-      overridePatchDir = (a.split("=", 2)[1] || "").trim();
-    } else if (a === "--force") {
-      (global as any).argv = Object.assign({}, (global as any).argv, { force: true });
-    } else if (a.startsWith("--")) {
-      // ignore unknown flags here
-    } else {
-      rest.push(a);
-    }
+  const flags = parseApplyFlags(args);
+  if (flags.force) {
+    (global as any).argv = Object.assign({}, (global as any).argv, { force: true });
   }
-  const importPath = moduleArg(rest);
-  dbg("apply: flags", { targetPkg, overridePatchDir, importPath });
+  const importPath = moduleArg(flags.restArgs);
+  dbg("apply: flags", {
+    targetPkg: flags.targetPkg,
+    overridePatchDir: flags.overridePatchDir,
+    importPath,
+  });
   const { version, originPath } = await resolveModule(importPath);
   const key = moduleKey(importPath, version);
   const sess = await getSession("go", key);
@@ -164,48 +129,17 @@ async function doApply(args: string[]) {
     return;
   }
   const enc = encodeForPatchFilename(importPath);
-  const repoRoot = process.env.WORKSPACE_ROOT || process.env.LIVE_ROOT || process.cwd();
-  let patchDir = "";
-  if (overridePatchDir) {
-    patchDir = path.isAbsolute(overridePatchDir)
-      ? overridePatchDir
-      : path.join(repoRoot, overridePatchDir);
-  } else if (targetPkg) {
-    patchDir = path.join(repoRoot, targetPkg, "patches/go");
-  } else {
-    throw new Error(
-      "missing --target //<pkg>:name or --patch-dir for local patch placement (PR6 local mode)",
-    );
-  }
-  await mkdirp(patchDir);
+  const root = repoRoot();
+  const patchDir = resolvePatchDir("patches/go", flags.targetPkg, flags.overridePatchDir, root);
   const dst = path.join(patchDir, `${enc}@${version}.patch`);
-  dbg("apply: paths", { repoRoot, patchDir, dst });
-  let write = true;
-  if (await pathExists(dst)) {
-    const cur = await fsp.readFile(dst, "utf8");
-    if (cur === diff) {
-      console.log("no-op (already applied)");
-      write = false;
-      dbg("apply: already-applied", { dst });
-    } else if (!(global as any).argv?.force) {
-      throw new Error(`${dst} exists with different content. Re-run with --force to overwrite.`);
-    }
-  }
-  if (write) {
+  dbg("apply: paths", { root, patchDir, dst });
+  const wrote = await writePatchIfChanged(dst, diff, !!(global as any).argv?.force);
+  if (wrote === "written") {
     console.error(`[patch-go] writing patch: ${dst}`);
-    await outputFile(dst, diff, "utf8");
-    try {
-      const st = await fsp.stat(dst);
-      dbg("apply: wrote", { size: st.size, mtimeMs: st.mtimeMs });
-    } catch {}
   }
 
-  // Strict apply verification: ensure patch applies cleanly against origin
-  const tmpRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "bucknix-patch-verify-"));
-  const tmpCopy = path.join(tmpRoot, path.basename(sess.originPath));
-  await copyDir(sess.originPath, tmpCopy);
   try {
-    await $({ cwd: tmpCopy, stdio: "inherit" })`patch -p1 --dry-run -i ${path.resolve(dst)}`;
+    await verifyPatchDryRun(sess.originPath, dst, "go");
   } catch (e) {
     throw new Error(
       `Patch verification failed: the generated diff did not apply cleanly with -p1 to the origin module.\n` +

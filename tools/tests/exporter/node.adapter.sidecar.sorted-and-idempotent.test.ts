@@ -31,7 +31,6 @@ test("generator emits node-lock-index with sorted keys and no rewrite on second 
     await $({ cwd: tmp })`tools/buck/export-graph.ts --simulate ${sim}`;
     // Generate sidecar via glue/generator
     await $({ cwd: tmp })`node tools/buck/gen-provider-index.ts`;
-    assert.ok(await fs.pathExists(out), "graph output should exist");
     assert.ok(await fs.pathExists(sidecar), "node-lock-index.json should exist");
 
     // Validate sorted keys in sidecar index

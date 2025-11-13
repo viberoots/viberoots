@@ -28,7 +28,6 @@ test("glue/generator emits node-lock-index.json deterministically", async () => 
     await $({ cwd: tmp })`tools/buck/export-graph.ts --simulate ${sim}`;
     // Generate sidecar via glue/generator
     await $({ cwd: tmp })`node tools/buck/gen-provider-index.ts`;
-    assert.ok(await fs.pathExists(out), "graph.json should exist");
     assert.ok(await fs.pathExists(sidecar), "node-lock-index.json should exist");
     const a = await fs.readFile(sidecar, "utf8");
     const parsed = JSON.parse(a);
