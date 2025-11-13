@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import fs from "fs-extra";
+import fs from "node:fs";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { printSkip } from "../../lib/errors";
 import { providerNameForImporter } from "../../lib/providers.ts";
@@ -135,7 +136,7 @@ export async function run(): Promise<void> {
     if (lockfiles.length) {
       const targetsNodeAuto = "third_party/providers/TARGETS.node.auto";
       const targetsNodeText = fs.existsSync(targetsNodeAuto)
-        ? await fs.readFile(targetsNodeAuto, "utf8").catch(() => "")
+        ? await fsp.readFile(targetsNodeAuto, "utf8").catch(() => "")
         : "";
       // Lazy-load YAML parser only if needed
       const haveYaml = await (async () => {
@@ -153,7 +154,7 @@ export async function run(): Promise<void> {
         try {
           const mod = await import("yaml");
           const YAML: any = (mod as any).default || mod;
-          const doc = YAML.parse(await fs.readFile(lf, "utf8")) as {
+          const doc = YAML.parse(await fsp.readFile(lf, "utf8")) as {
             importers?: Record<string, unknown>;
           };
           const importers = Object.keys(doc?.importers || {});
@@ -185,7 +186,7 @@ export async function run(): Promise<void> {
     const autoMapPath = path.join("third_party", "providers", "auto_map.bzl");
     let autoMapText = "";
     try {
-      autoMapText = await fs.readFile(autoMapPath, "utf8");
+      autoMapText = await fsp.readFile(autoMapPath, "utf8");
     } catch {}
     function parseModuleProviders(txt: string): Record<string, string[]> {
       const out: Record<string, string[]> = {};
@@ -228,7 +229,7 @@ export async function run(): Promise<void> {
     // Helper: cheap existence checks per provider family
     const targetsNodeAutoPath = path.join("third_party", "providers", "TARGETS.node.auto");
     const targetsNodeText = fs.existsSync(targetsNodeAutoPath)
-      ? await fs.readFile(targetsNodeAutoPath, "utf8").catch(() => "")
+      ? await fsp.readFile(targetsNodeAutoPath, "utf8").catch(() => "")
       : "";
     function providerExists(fq: string): boolean {
       if (!fq || !fq.startsWith("//third_party/providers:")) return false;
@@ -311,8 +312,8 @@ export async function run(): Promise<void> {
       for (const d of fs.readdirSync(base, { withFileTypes: true })) {
         if (!d.isDirectory()) continue;
         const dir = require("node:path").join(base, d.name);
-        const gm = require("fs").existsSync(require("node:path").join(dir, "go.mod"));
-        const gt = require("fs").existsSync(require("node:path").join(dir, "gomod2nix.toml"));
+        const gm = require("node:fs").existsSync(require("node:path").join(dir, "go.mod"));
+        const gt = require("node:fs").existsSync(require("node:path").join(dir, "gomod2nix.toml"));
         if (gm && !gt) missingGomod.push(require("node:path").join(dir, "gomod2nix.toml"));
       }
     } catch {}

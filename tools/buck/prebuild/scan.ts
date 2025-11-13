@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import fs from "fs-extra";
+import fs from "node:fs";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 
 export function mtimeSafe(p: string): number | null {
@@ -42,7 +43,7 @@ export async function listInputs(): Promise<string[]> {
     async function walk(dir: string) {
       let entries: fs.Dirent[] = [];
       try {
-        entries = await fs.readdir(dir, { withFileTypes: true });
+        entries = await fsp.readdir(dir, { withFileTypes: true });
       } catch {
         return;
       }

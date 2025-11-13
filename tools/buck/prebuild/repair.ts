@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import fs from "fs-extra";
+import fs from "node:fs";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { ensureGraph } from "../glue-run.ts";
 import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const.ts";
@@ -9,7 +10,7 @@ async function ensureLocalPreludeMapping() {
     const cfgPath = path.join(process.cwd(), ".buckconfig");
     let ok = false;
     try {
-      const txt = await fs.readFile(cfgPath, "utf8");
+      const txt = await fsp.readFile(cfgPath, "utf8");
       const hasRepo = /\[repositories\][\s\S]*?^\s*prelude\s*=\s*/m.test(txt);
       const hasCells = /\[cells\][\s\S]*?^\s*prelude\s*=\s*/m.test(txt);
       ok = hasRepo && hasCells;
@@ -49,9 +50,9 @@ async function ensureLocalPreludeMapping() {
     const preludeLocal = fs.existsSync(path.join(process.cwd(), "prelude"));
     if (preludeLocal) {
       try {
-        await fs.writeFile(path.join(process.cwd(), ".buckroot"), ".\n");
+        await fsp.writeFile(path.join(process.cwd(), ".buckroot"), ".\n");
       } catch {}
-      await fs.outputFile(cfgPath, cfgTxt, "utf8");
+      await fsp.writeFile(cfgPath, cfgTxt, "utf8");
       return;
     }
 
@@ -75,15 +76,15 @@ async function ensureLocalPreludeMapping() {
     if (!out) return;
     const preludeDir = path.join(out, "prelude");
     try {
-      await fs.writeFile(path.join(process.cwd(), ".buckroot"), ".\n");
+      await fsp.writeFile(path.join(process.cwd(), ".buckroot"), ".\n");
     } catch {}
     try {
-      await fs.remove("prelude");
+      await fsp.rm("prelude", { recursive: true, force: true });
     } catch {}
     try {
-      await fs.symlink(preludeDir, "prelude");
+      await fsp.symlink(preludeDir, "prelude");
     } catch {}
-    await fs.outputFile(cfgPath, cfgTxt, "utf8");
+    await fsp.writeFile(cfgPath, cfgTxt, "utf8");
   } catch {}
 }
 

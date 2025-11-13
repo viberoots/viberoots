@@ -1,4 +1,5 @@
-import fs from "fs-extra";
+import fs from "node:fs";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { readGraph, type GraphNode } from "./graph.ts";
 
@@ -20,9 +21,11 @@ export const DEFAULT_GRAPH_PATH = path.resolve(path.join("tools", "buck", "graph
 
 async function readJsonIfExists<T = any>(p: string): Promise<T | {}> {
   try {
-    const exists = await fs.pathExists(p);
-    if (!exists) return {} as T;
-    return (await fs.readJson(p)) as T;
+    await fsp.access(p).catch(() => {
+      throw new Error("ENOENT");
+    });
+    const txt = await fsp.readFile(p, "utf8");
+    return JSON.parse(txt) as T;
   } catch {
     return {} as T;
   }
