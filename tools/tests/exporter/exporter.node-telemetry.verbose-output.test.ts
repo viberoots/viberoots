@@ -30,9 +30,8 @@ test("exporter verbose timing logs for node adapter and sidecar", async () => {
       process.exit(2);
     }
     const hasValidate = /\[exporter\]\[timing\] node\.validate: \d+ms/.test(txt);
-    const hasSidecar = /\[exporter\]\[timing\] node\.sidecar: \d+ms \(\d+ entries\)/.test(txt);
-    if (!hasValidate || !hasSidecar) {
-      console.error("expected verbose timing lines for node.validate and node.sidecar", txt);
+    if (!hasValidate) {
+      console.error("expected verbose timing line for node.validate", txt);
       process.exit(2);
     }
   });

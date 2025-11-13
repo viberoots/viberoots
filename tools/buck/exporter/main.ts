@@ -236,37 +236,6 @@ export async function run() {
     version: SCHEMA_VERSION,
     nodes: normalized,
   });
-
-  // Emit Node sidecar index mapping targets -> importer-scoped lockfile label
-  try {
-    const sidecarStart = verbose ? Date.now() : 0;
-    const idx: Record<string, string> = {};
-    const parseLock = (s: string) => /^lockfile:([^#]+)#([^#]+)$/.exec(s);
-    for (const n of normalized) {
-      const labs = Array.isArray((n as any).labels) ? ((n as any).labels as string[]) : [];
-      const locks = labs.filter((l) => l.startsWith("lockfile:"));
-      if (locks.length !== 1) continue;
-      const m = parseLock(locks[0]);
-      if (!m) continue;
-      idx[n.name] = locks[0].toLowerCase();
-    }
-    // Deterministic order: materialize object in sorted target order
-    const ordered: Record<string, string> = {};
-    for (const k of Object.keys(idx).sort((a, b) => a.localeCompare(b))) ordered[k] = idx[k];
-    const SIDE_SCHEMA = "https://example.com/schemas/node-lock-index.schema.json";
-    await writeIfChangedJSON("tools/buck/node-lock-index.json", {
-      $schema: SIDE_SCHEMA,
-      version: SCHEMA_VERSION,
-      index: ordered,
-    });
-    if (verbose) {
-      try {
-        const ms = Date.now() - sidecarStart;
-        const cnt = Object.keys(ordered).length;
-        console.log(`[exporter][timing] node.sidecar: ${ms}ms (${cnt} entries)`);
-      } catch {}
-    }
-  } catch {}
   if (metricsOut) await emitMetrics(metricsOut, gMetrics);
 
   // Success banner: point consumers to composite API and schema version

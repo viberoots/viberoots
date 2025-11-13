@@ -5,11 +5,10 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("exporter emits node-lock-index with sorted keys and no rewrite on second run", async () => {
+test("generator emits node-lock-index with sorted keys and no rewrite on second run", async () => {
   await runInTemp("exp-node-sidecar-sorted", async (tmp, $) => {
-    const out = path.join(tmp, ".tmp", "graph.json");
     const sidecar = path.join(tmp, "tools/buck/node-lock-index.json");
-    await fs.mkdirp(path.dirname(out));
+    await fs.mkdirp(path.dirname(sidecar));
     await fs.mkdirp(path.dirname(sidecar));
 
     // Simulate two Node targets in reverse order to ensure exporter sorts output keys
@@ -29,7 +28,9 @@ test("exporter emits node-lock-index with sorted keys and no rewrite on second r
     await fs.outputFile(sim, JSON.stringify(nodes) + "\n");
 
     // First run
-    await $({ cwd: tmp })`tools/buck/export-graph.ts --simulate ${sim} --out ${out}`;
+    await $({ cwd: tmp })`tools/buck/export-graph.ts --simulate ${sim}`;
+    // Generate sidecar via glue/generator
+    await $({ cwd: tmp })`node tools/buck/gen-provider-index.ts`;
     assert.ok(await fs.pathExists(out), "graph output should exist");
     assert.ok(await fs.pathExists(sidecar), "node-lock-index.json should exist");
 
@@ -46,7 +47,8 @@ test("exporter emits node-lock-index with sorted keys and no rewrite on second r
     await new Promise((r) => setTimeout(r, 15));
 
     // Second run must be a no-op write (mtime unchanged)
-    await $({ cwd: tmp })`tools/buck/export-graph.ts --simulate ${sim} --out ${out}`;
+    await $({ cwd: tmp })`tools/buck/export-graph.ts --simulate ${sim}`;
+    await $({ cwd: tmp })`node tools/buck/gen-provider-index.ts`;
     const statAfter = await fs.stat(sidecar);
     assert.equal(
       Number(statAfter.mtimeMs),

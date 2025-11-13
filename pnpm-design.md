@@ -18,7 +18,7 @@ This document proposes how to add first-class PNPM projects to this monorepo, in
   - `tools/buck/gen-auto-map.ts`: maps target labels to provider deps, including `lockfile:<path>#<importer>`.
   - `hermetic-node-modules.md`: documents immutable, Nix‑built `node_modules`.
 - Sidecars & Composite Graph API:
-  - The exporter emits a Node sidecar index at `tools/buck/node-lock-index.json` alongside `tools/buck/graph.json`.
+  - Glue emits a Node sidecar index at `tools/buck/node-lock-index.json` (via `tools/buck/gen-provider-index.ts`) alongside `tools/buck/graph.json`.
   - Consumption MUST go through the Composite Graph API (`tools/lib/graph-view.ts` or CLI `tools/buck/graph-view.ts`). Do not read `graph.json` directly.
   - The prebuild guard (`tools/buck/prebuild-guard.ts`) enforces freshness/presence of sidecars and `auto_map.bzl` before builds.
 - Missing pieces:

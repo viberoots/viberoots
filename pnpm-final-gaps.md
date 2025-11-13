@@ -75,6 +75,7 @@ Scope
 
 - Update documentation:
   - `pnpm-design.md`: clarify Node provider `patch_paths` semantics; emphasize importer‑local patch invalidation via macros; call out exporter sidecar (`tools/buck/node-lock-index.json`) and prebuild guard freshness.
+- `pnpm-design.md`: clarify Node provider `patch_paths` semantics; emphasize importer‑local patch invalidation via macros; call out glue‑generated sidecar (`tools/buck/node-lock-index.json`) and prebuild guard freshness.
   - Handbook: troubleshooting entries for “missing importer provider”, “no‑op sync”, and “stale sidecar” with copy‑paste fixes (`node tools/buck/sync-providers.ts`, exporter rerun, etc.).
   - Reference the Composite Graph API and sidecars as the only supported consumption path.
 - Tests: add/extend e2e wiring test to assert that an importer-local Node patch rebuilds only that importer’s targets.

@@ -2,12 +2,46 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { writeIfChanged } from "../lib/fs-helpers.ts";
+import { readCompositeGraph } from "../lib/graph-view.ts";
 import { readNodeProviderIndexEntries } from "./providers/node.ts";
 
 type IndexEntry = { kind: "node" | "cpp"; key: string };
 
 function fq(labelTail: string): string {
   return `//third_party/providers:${labelTail}`;
+}
+
+async function generateNodeLockIndex(outFile = "tools/buck/node-lock-index.json") {
+  const SIDE_SCHEMA = "https://example.com/schemas/node-lock-index.schema.json";
+  const SCHEMA_VERSION = 1;
+
+  // Read via Composite Graph API; tolerate missing graph.json by exiting quietly
+  const comp = await readCompositeGraph({});
+  const nodes = Array.isArray(comp?.nodes) ? comp.nodes : [];
+  if (!nodes.length) return;
+  const idx: Record<string, string> = {};
+  const parseLock = (s: string) => /^lockfile:([^#]+)#([^#]+)$/.exec(s);
+  for (const n of nodes) {
+    const name = String(n?.name || "");
+    if (!name) continue;
+    const labs = Array.isArray(n.labels) ? (n.labels as string[]) : [];
+    const locks = labs.filter((l) => l.startsWith("lockfile:"));
+    if (locks.length !== 1) continue;
+    const m = parseLock(locks[0]);
+    if (!m) continue;
+    idx[name] = locks[0].toLowerCase();
+  }
+  // Deterministic order
+  const ordered: Record<string, string> = {};
+  for (const k of Object.keys(idx).sort((a, b) => a.localeCompare(b))) {
+    ordered[k] = idx[k];
+  }
+  const data = {
+    $schema: SIDE_SCHEMA,
+    version: SCHEMA_VERSION,
+    index: ordered,
+  };
+  await writeIfChanged(outFile, JSON.stringify(data, null, 2) + "\n");
 }
 
 async function readCppIndexEntries(): Promise<Record<string, IndexEntry>> {
@@ -73,6 +107,9 @@ export async function generateProviderIndex(opts?: { outFile?: string; jsonOutFi
     jsonObj[k] = { kind: v.kind, key: v.key };
   }
   await writeIfChanged(OUT_JSON, JSON.stringify(jsonObj, null, 2) + "\n");
+
+  // Emit Node lockfile sidecar from the current graph (kept adapter-agnostic)
+  await generateNodeLockIndex();
 }
 
 async function main() {

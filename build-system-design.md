@@ -318,7 +318,7 @@ await fs.outputFile(out, stdout);
 console.log(`wrote ${out}`);
 ```
 
-> Consumption note: downstream tools should not read `graph.json` directly. Use the Composite Graph API instead — library `tools/lib/graph-view.ts` or CLI `node tools/buck/graph-view.ts`. The exporter also emits a Node sidecar index at `tools/buck/node-lock-index.json` and includes `$schema` and `version` fields in both files.
+> Consumption note: downstream tools should not read `graph.json` directly. Use the Composite Graph API instead — library `tools/lib/graph-view.ts` or CLI `node tools/buck/graph-view.ts`. Glue emits the Node sidecar index at `tools/buck/node-lock-index.json` (via `tools/buck/gen-provider-index.ts`) and both files include `$schema` and `version` fields.
 
 ### Validation modes (warn vs error)
 

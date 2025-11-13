@@ -5,11 +5,10 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("exporter emits node-lock-index.json deterministically", async () => {
+test("glue/generator emits node-lock-index.json deterministically", async () => {
   await runInTemp("exp-node-sidecar", async (tmp, $) => {
-    const out = path.join(tmp, "tools/buck/.tmp.graph.json");
     const sidecar = path.join(tmp, "tools/buck/node-lock-index.json");
-    await fs.mkdirp(path.dirname(out));
+    await fs.mkdirp(path.dirname(sidecar));
     const nodes = [
       {
         name: "//apps/web:bundle",
@@ -26,7 +25,9 @@ test("exporter emits node-lock-index.json deterministically", async () => {
     await fs.outputFile(sim, JSON.stringify(nodes) + "\n");
 
     // First run
-    await $({ cwd: tmp })`tools/buck/export-graph.ts --simulate ${sim} --out ${out}`;
+    await $({ cwd: tmp })`tools/buck/export-graph.ts --simulate ${sim}`;
+    // Generate sidecar via glue/generator
+    await $({ cwd: tmp })`node tools/buck/gen-provider-index.ts`;
     assert.ok(await fs.pathExists(out), "graph.json should exist");
     assert.ok(await fs.pathExists(sidecar), "node-lock-index.json should exist");
     const a = await fs.readFile(sidecar, "utf8");
@@ -39,7 +40,8 @@ test("exporter emits node-lock-index.json deterministically", async () => {
     );
 
     // Second run must be a no-op w.r.t. sidecar content
-    await $({ cwd: tmp })`tools/buck/export-graph.ts --simulate ${sim} --out ${out}`;
+    await $({ cwd: tmp })`tools/buck/export-graph.ts --simulate ${sim}`;
+    await $({ cwd: tmp })`node tools/buck/gen-provider-index.ts`;
     const b = await fs.readFile(sidecar, "utf8");
     assert.equal(a, b, "sidecar should be deterministic across runs");
   });

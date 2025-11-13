@@ -15,7 +15,7 @@ Scope
     - Exactly one importer‑scoped lockfile label present per Node target: `lockfile:<path>#<importer>`.
     - Malformed importer or mismatched path/importer → finding.
   - `attachLabels`: pass‑through (no label synthesis or mutation).
-- Emit `tools/buck/node-lock-index.json` during exporter run:
+- Emit `tools/buck/node-lock-index.json` during glue (`tools/buck/gen-provider-index.ts`):
   - Map `"//pkg:rule" -> "lockfile:<path>#<importer>"` for targets with valid labels.
   - Deterministic: sort by fully‑qualified target label; use `writeIfChanged` to be idempotent.
 
@@ -29,6 +29,7 @@ Verification
 
 - Run:
   - `node tools/buck/export-graph.ts --out tools/buck/graph.json`
+  - `node tools/buck/gen-provider-index.ts`
   - Confirm `tools/buck/node-lock-index.json` is created and stable across two runs.
 - Negative checks:
   - Remove a Node lockfile label from a sample target; rerun export → validation finding appears; CI mode would error.
