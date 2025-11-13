@@ -2,7 +2,6 @@
 let
   lib = pkgs.lib;
   H = import ../lib/lang-helpers.nix { inherit pkgs; };
-  Dev = import ../dev-overrides.nix { inherit pkgs; };
   clangxx = "${pkgs.llvmPackages.clang}/bin/clang++";
   llvmAr  = "${pkgs.llvmPackages.llvm}/bin/llvm-ar";
 
@@ -28,8 +27,8 @@ in rec {
     );
 
   # Standardized dev override handling (shared helper)
-  dev = Dev.readJsonOverride { envName = "NIX_CPP_DEV_OVERRIDE_JSON"; ciForbidden = true; };
-  _warn = dev.warnEffect; _ci_guard = dev.ciGuard;
+  devMap = H.readDevOverrides "NIX_CPP_DEV_OVERRIDE_JSON";
+  _ci_guard = H.guardNoDevOverridesInCI "NIX_CPP_DEV_OVERRIDE_JSON";
 
   normalizeAttr = s:
     let s0 = lib.toLower (lib.trim s);
@@ -51,9 +50,9 @@ in rec {
     let key = normalizeAttr attr;
         # Accept keys both with and without pkgs. prefix
         keyAlt = lib.removePrefix "pkgs." key;
-        has = builtins.hasAttr key dev.map || builtins.hasAttr keyAlt dev.map;
-        path = if builtins.hasAttr key dev.map then dev.map.${key}
-               else (dev.map.${keyAlt} or null);
+        has = builtins.hasAttr key devMap || builtins.hasAttr keyAlt devMap;
+        path = if builtins.hasAttr key devMap then devMap.${key}
+               else (devMap.${keyAlt} or null);
     in if has && path != null && path != ""
        then (pkg.overrideAttrs (old: {
          src = builtins.path path;

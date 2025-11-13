@@ -2,7 +2,6 @@
 let
   lib = pkgs.lib;
   H = import ../lib/lang-helpers.nix { inherit pkgs; };
-  Dev = import ../dev-overrides.nix { inherit pkgs; };
 
   buildGoFn = if pkgs ? buildGoApplication then pkgs.buildGoApplication
               else builtins.throw "gomod2nix overlay (buildGoApplication) is required; no vendoring fallback";
@@ -73,9 +72,9 @@ in {
         scan = dir: H.patchesMapFromDir dir;
         merge = a: b: pkgs.lib.foldlAttrs (acc: k: v: acc // { "${k}" = (acc.${k} or []) ++ v; }) a b;
       in pkgs.lib.foldl' merge {} (map scan patchDirs);
-      dev = Dev.readJsonOverride { envName = devOverrideEnv; ciForbidden = true; };
-      _warn = dev.warnEffect; _guard = dev.ciGuard;
-      devOverrides = (devOverridesMap // dev.map);
+      devOverridesFromEnv = H.readDevOverrides devOverrideEnv;
+      _guard = H.guardNoDevOverridesInCI devOverrideEnv;
+      devOverrides = (devOverridesMap // devOverridesFromEnv);
       targetName = let parts = lib.splitString ":" name; in
         if (builtins.length parts) > 1 then lib.elemAt parts 1
         else (
@@ -141,8 +140,7 @@ in {
         scan = dir: H.patchesMapFromDir dir;
         merge = a: b: pkgs.lib.foldlAttrs (acc: k: v: acc // { "${k}" = (acc.${k} or []) ++ v; }) a b;
       in pkgs.lib.foldl' merge {} (map scan patchDirs);
-      dev = Dev.readJsonOverride { envName = devOverrideEnv; ciForbidden = true; };
-      _warn = dev.warnEffect; _guard = dev.ciGuard;
+      _guard = H.guardNoDevOverridesInCI devOverrideEnv;
       srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + subdir));
       cgo = mkCgoEnv { inherit nixCgoPkgs nixCgoAttrs repoCgoPkgs; };
       baseArgs = {
@@ -181,7 +179,7 @@ in {
         pwd = srcAbs;
         modRoot = ".";
       } // (if takesOverrides then {
-        overrides = mkOverrides { patchesMap = patchesMap; devMap = dev.map; };
+        overrides = mkOverrides { patchesMap = patchesMap; devMap = H.readDevOverrides devOverrideEnv; };
       } else {}));
     in buildGoFn args;
 
@@ -199,8 +197,7 @@ in {
   }:
     let
       patchesMap = H.patchesMapFromDir patchDir;
-      dev = Dev.readJsonOverride { envName = devOverrideEnv; ciForbidden = true; };
-      _warn = dev.warnEffect; _guard = dev.ciGuard;
+      _guard = H.guardNoDevOverridesInCI devOverrideEnv;
       srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + subdir));
       cgo = mkCgoEnv { inherit nixCgoPkgs nixCgoAttrs repoCgoPkgs; };
     in buildGoFn ({
@@ -252,7 +249,7 @@ in {
         runHook postInstall
       '';
     } // (if takesOverrides then {
-      overrides = mkOverrides { patchesMap = patchesMap; devMap = dev.map; };
+      overrides = mkOverrides { patchesMap = patchesMap; devMap = H.readDevOverrides devOverrideEnv; };
     } else {}));
 }
 
