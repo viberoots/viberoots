@@ -3,6 +3,20 @@ import { syncAllProviders } from "./providers/index.ts";
 import { ensureGraph } from "./glue-run.ts";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
 
+function dbgEnabled(): boolean {
+  try {
+    return String(process.env.SYNC_PROVIDERS_DEBUG || "").trim() === "1";
+  } catch {
+    return false;
+  }
+}
+function dbg(...args: any[]) {
+  if (!dbgEnabled()) return;
+  try {
+    console.error("[sync-providers][debug]", ...args);
+  } catch {}
+}
+
 function flagBool(name: string): boolean {
   const a: any = (global as any).argv || {};
   if (a && (a[name] === true || String(a[name] || "").toLowerCase() === "true")) return true;
@@ -38,6 +52,15 @@ async function main() {
   // Preserve Node default out path unless user explicitly provided --out
   const maybeOut = flagProvided("out") ? OUT_FILE : undefined;
   const targetLang = LANG || (flagProvided("out") ? "node" : "");
+  if (targetLang === "cpp") {
+    // Optional debug: show providers dir before running any steps
+    try {
+      const { stdout } = await $({
+        stdio: "pipe",
+      })`bash -lc 'ls -la third_party/providers 2>/dev/null || true'`;
+      dbg("before (third_party/providers):\n" + String(stdout || "").trim());
+    } catch {}
+  }
   await syncAllProviders({ outFile: maybeOut as any, strict: STRICT, lang: targetLang });
   if (targetLgLangRequested(targetLang)) {
     // When a specific language is requested, also ensure downstream glue is present so
@@ -49,6 +72,14 @@ async function main() {
       const { generateProviderIndex } = await import("./gen-provider-index.ts");
       await generateProviderIndex({ outFile: "third_party/providers/provider_index.bzl" });
     } catch {}
+    if (targetLang === "cpp") {
+      try {
+        const { stdout } = await $({
+          stdio: "pipe",
+        })`bash -lc 'ls -la third_party/providers 2>/dev/null || true'`;
+        dbg("after (third_party/providers):\n" + String(stdout || "").trim());
+      } catch {}
+    }
   } else if (EMETIndexRequested()) {
     const { generateProviderIndex } = await import("./gen-provider-index.ts");
     await generateProviderIndex({ outFile: "third_party/providers/provider_index.bzl" });

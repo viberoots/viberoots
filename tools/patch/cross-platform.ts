@@ -1,6 +1,7 @@
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import crypto from "node:crypto";
 
 async function chmodRecursive(root: string): Promise<void> {
   const stack: string[] = [root];
@@ -34,8 +35,10 @@ export async function makeWorkspace(originPath: string, moduleKey: string): Prom
     .toISOString()
     .replace(/[-:TZ.]/g, "")
     .slice(0, 14);
+  const pid = String(process.pid || 0);
+  const rand = crypto.randomBytes(3).toString("hex");
   const safeKey = moduleKey.replace(/[^A-Za-z0-9._@-]+/g, "_");
-  const dst = path.join(base, `${safeKey}-${stamp}`);
+  const dst = path.join(base, `${safeKey}-${stamp}-${pid}-${rand}`);
   await fsp.mkdir(base, { recursive: true });
   // Copy source tree into workspace using Node's recursive cp
   await fsp.cp(originPath, dst, { recursive: true, force: true });

@@ -4,7 +4,9 @@ import type { SessionRecord, SessionStore } from "./types";
 
 function debugEnabled(): boolean {
   try {
-    return String(process.env.PATCH_CPP_DEBUG || "").trim() === "1";
+    const g = String(process.env.PATCH_GO_DEBUG || "").trim() === "1";
+    const c = String(process.env.PATCH_CPP_DEBUG || "").trim() === "1";
+    return g || c;
   } catch {
     return false;
   }
@@ -19,10 +21,9 @@ function dbg(...args: any[]) {
 
 function storePath(): string {
   try {
-    const here = path.dirname(new URL(import.meta.url).pathname);
     const repoRoot =
       (process.env.WORKSPACE_ROOT && path.resolve(process.env.WORKSPACE_ROOT)) ||
-      path.resolve(here, "..", "..");
+      path.resolve(process.cwd());
     const p = path.join(repoRoot, ".patch-sessions.json");
     dbg("storePath", { repoRoot, p });
     return p;

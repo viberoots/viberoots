@@ -14,6 +14,16 @@ test("cpp providers sync is a no-op (no TARGETS.cpp.auto header)", async () => {
     await $`node ${script} --lang=cpp`;
     const exists = await fs.pathExists(out);
     if (exists) {
+      try {
+        console.error("DEBUG third_party/providers listing:");
+        const ls = await $({ cwd: tmp, stdio: "pipe" })`bash -lc 'ls -la third_party/providers'`;
+        console.error(String(ls.stdout || "").trim());
+      } catch {}
+      try {
+        console.error("DEBUG TARGETS.cpp.auto contents:");
+        const txt = await fs.readFile(out, "utf8");
+        console.error((txt || "").slice(0, 2000));
+      } catch {}
       console.error("C++ provider sync should not create TARGETS.cpp.auto");
       process.exit(2);
     }
