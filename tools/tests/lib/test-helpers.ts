@@ -449,9 +449,13 @@ export async function runInTemp<T>(
   } finally {
     // Best-effort: stop any buck2 daemon for this temp repo to prevent buckd accumulation.
     // Do not kill buck2 daemon per test; reuse across tests to avoid fork storms
-    await timeAsync(`rewriteCoverageUrls(${path.basename(tmp)})`, async () =>
-      rewriteCoverageUrls(tmp).catch(() => {}),
-    );
+    // Avoid rewriting shared coverage artifacts concurrently; zx_test already normalizes coverage.
+    // Opt-in via TEST_REWRITE_COVERAGE_TMP=1 if a test explicitly needs this legacy behavior.
+    if ((process.env.TEST_REWRITE_COVERAGE_TMP || "") === "1") {
+      await timeAsync(`rewriteCoverageUrls(${path.basename(tmp)})`, async () =>
+        rewriteCoverageUrls(tmp).catch(() => {}),
+      );
+    }
     if (process.env.TEST_KEEP_TMP === "1") {
       try {
         // quiet: keep path logging minimal
