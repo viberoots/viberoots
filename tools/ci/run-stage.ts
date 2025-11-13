@@ -3,6 +3,8 @@
 import fs from "fs-extra";
 import assert from "node:assert";
 import path from "node:path";
+import { ensureGraph } from "../buck/glue-run.ts";
+import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
 
 type Stage =
   | "codegen"
@@ -68,8 +70,7 @@ async function main() {
       break;
     }
     case "export-graph": {
-      const target = path.resolve("tools/buck/export-graph.ts");
-      await $`node ${nodeBase} ${target} --out tools/buck/graph.json`;
+      await ensureGraph();
       break;
     }
     case "sync-providers": {
@@ -92,7 +93,7 @@ async function main() {
         if (!any) break;
       }
       const target = path.resolve("tools/buck/gen-auto-map.ts");
-      await $`node ${nodeBase} ${target} --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
+      await $`node ${nodeBase} ${target} --graph ${DEFAULT_GRAPH_PATH} --out third_party/providers/auto_map.bzl`;
       break;
     }
     case "prebuild-guard": {

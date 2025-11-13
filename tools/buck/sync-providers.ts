@@ -1,5 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { syncAllProviders } from "./providers/index.ts";
+import { ensureGraph } from "./glue-run.ts";
+import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
 
 function flagBool(name: string): boolean {
   const a: any = (global as any).argv || {};
@@ -41,8 +43,8 @@ async function main() {
     // When a specific language is requested, also ensure downstream glue is present so
     // Buck macros that load //third_party/providers:auto_map.bzl can parse in temp repos.
     // Ensure graph.json exists before generating auto_map and provider index
-    await $`node --experimental-strip-types --import ./tools/dev/zx-init.mjs tools/buck/export-graph.ts --out tools/buck/graph.json`.nothrow();
-    await $`node --experimental-strip-types --import ./tools/dev/zx-init.mjs tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out ./third_party/providers/auto_map.bzl`;
+    await ensureGraph();
+    await $`node --experimental-strip-types --import ./tools/dev/zx-init.mjs tools/buck/gen-auto-map.ts --graph ${DEFAULT_GRAPH_PATH} --out ./third_party/providers/auto_map.bzl`;
     try {
       const { generateProviderIndex } = await import("./gen-provider-index.ts");
       await generateProviderIndex({ outFile: "third_party/providers/provider_index.bzl" });

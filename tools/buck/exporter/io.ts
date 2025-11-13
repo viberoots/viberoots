@@ -2,7 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { Node } from "./types.ts";
-import { DEFAULT_GRAPH_PATH } from "../../lib/graph-view.ts";
+import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const.ts";
 
 export const attrList = [
   "name",
@@ -109,10 +109,12 @@ export async function cqueryNodes(scope: string, attrs: string[]): Promise<Node[
     const kindCxxBin = `kind("cxx_binary", ${rootsExpr})`;
     const attrCxxBin = `attrfilter(rule_type, "cxx_binary", ${rootsExpr})`;
     const cxxPlanner = `filter("__planner$", kind("cxx_library", ${rootsExpr}))`;
+    // Ensure provider/stamp nodes (e.g., nix_cxx_library under third_party/providers) are present for fallback mapping
+    const kindNixCxxLib = `attrfilter(rule_type, "nix_cxx_library", ${rootsExpr})`;
     // Explicitly include any targets stamped with lang:cpp to catch repo-local
     // macros (e.g., nix_cpp_*) that don't use cxx_* rule_types.
     const labeledCpp = `attrfilter(labels, "lang:cpp", ${rootsExpr})`;
-    const [obj0, obj1, obj2, obj3, obj4, obj5, obj6, obj7] = await Promise.all([
+    const [obj0, obj1, obj2, obj3, obj4, obj5, obj6, obj7, obj8] = await Promise.all([
       runQuerySafe(allKind),
       runQuerySafe(base),
       runQuerySafe(kindCxxTest),
@@ -121,6 +123,7 @@ export async function cqueryNodes(scope: string, attrs: string[]): Promise<Node[
       runQuerySafe(attrCxxBin),
       runQuerySafe(cxxPlanner),
       runQuerySafe(labeledCpp),
+      runQuerySafe(kindNixCxxLib),
     ]);
     const merged: Record<string, any> = {
       ...obj0,
@@ -131,6 +134,7 @@ export async function cqueryNodes(scope: string, attrs: string[]): Promise<Node[
       ...obj5,
       ...obj6,
       ...obj7,
+      ...obj8,
     };
 
     for (const [label, raw] of Object.entries(merged)) {

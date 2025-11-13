@@ -2,6 +2,17 @@
 import { execFile } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { findRepoRoot } from "../lib/repo.ts";
+import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
+
+async function buck2Present(): Promise<boolean> {
+  try {
+    const res = await $({ stdio: "pipe" })`buck2 --version`.nothrow();
+    return res.exitCode === 0;
+  } catch {
+    return false;
+  }
+}
 
 async function runNode(nodeBin: string, zxInit: string, script: string, args: string[] = []) {
   const zxArgs = [
@@ -20,20 +31,200 @@ async function runNode(nodeBin: string, zxInit: string, script: string, args: st
 
 // ensureGraph: writes tools/buck/graph.json if missing by invoking the exporter
 export async function ensureGraph(): Promise<void> {
+  const workspaceRoot = (
+    process.env.BUCK_TEST_SRC ||
+    process.env.WORKSPACE_ROOT ||
+    process.cwd()
+  ).trim();
+  const graphPath = path.join(workspaceRoot, "tools", "buck", "graph.json");
   try {
-    await fsp.access("tools/buck/graph.json");
-    return;
+    console.error(`[ensureGraph] workspaceRoot=${workspaceRoot}`);
   } catch {}
+  try {
+    const txt = await fsp.readFile(graphPath, "utf8");
+    const trimmed = String(txt || "").trim();
+    if (trimmed && trimmed !== "[]") {
+      // If a specific target is requested, confirm it is present in the graph; otherwise regenerate.
+      const want = String(process.env.BUCK_TARGET || "").trim();
+      let hasWanted = false;
+      if (want) {
+        try {
+          const data = JSON.parse(trimmed);
+          const arr = Array.isArray(data)
+            ? (data as any[])
+            : Array.isArray((data as any).nodes)
+              ? ((data as any).nodes as any[])
+              : [];
+          const normWant = (await import("../lib/labels.ts")).normalizeTargetLabel(want);
+          for (const n of arr) {
+            const nm = typeof n?.name === "string" ? n.name : "";
+            if (nm && (await import("../lib/labels.ts")).then ? false : false) {
+            }
+          }
+          // dynamic import above can't be awaited inline in loop in TS transpile; do separate import
+        } catch {}
+        try {
+          const mod: any = await import("../lib/labels.ts");
+          const normWant = mod.normalizeTargetLabel(want);
+          const data = JSON.parse(trimmed);
+          const nodes: any[] = Array.isArray(data)
+            ? (data as any[])
+            : Array.isArray((data as any).nodes)
+              ? ((data as any).nodes as any[])
+              : [];
+          hasWanted = nodes.some(
+            (n: any) =>
+              typeof n?.name === "string" && mod.normalizeTargetLabel(n.name) === normWant,
+          );
+        } catch {
+          hasWanted = false;
+        }
+      }
+      if (want && !hasWanted) {
+        try {
+          console.error(`[ensureGraph] target ${want} missing in existing graph — regenerating`);
+        } catch {}
+        // fall through to regenerate
+      } else {
+        try {
+          console.error(`[ensureGraph] graph exists and non-empty: ${graphPath}`);
+        } catch {}
+        return;
+      }
+    }
+    // fall through to regenerate when file is empty or "[]"
+  } catch {
+    // missing or unreadable → regenerate
+  }
   const nodeBin = process.execPath;
-  const repoRoot = process.cwd();
+  const repoRoot = await findRepoRoot(process.cwd());
   const zxInit = path.join(repoRoot, "tools/dev/zx-init.mjs");
   const exportScript = path.join(repoRoot, "tools/buck/export-graph.ts");
+  // Prefer direct Node exporter when buck2 is available; otherwise fallback to nix-run or inline query
+  const haveBuck = await buck2Present();
+  const exporterArgs = ["--out", graphPath];
+  const passEnv = {
+    ...process.env,
+    WORKSPACE_ROOT: workspaceRoot,
+    BUCK_TEST_SRC: workspaceRoot,
+  } as Record<string, string>;
+  if (haveBuck) {
+    try {
+      await runNode(nodeBin, zxInit, exportScript, exporterArgs);
+      return;
+    } catch {}
+  }
+  // Fallback: invoke via nix-run to mirror legacy behavior in temp/nix-driven environments
   try {
-    await runNode(nodeBin, zxInit, exportScript, ["--out", "tools/buck/graph.json"]);
-  } catch (e) {
-    throw new Error(
-      "tools/buck/graph.json is missing and exporter failed. Ensure buck2 is available in the dev shell and run: tools/buck/export-graph.ts",
-    );
+    await $({
+      env: passEnv,
+    })`nix run --accept-flake-config ${repoRoot}#zx-wrapper -- ${exportScript} ${exporterArgs}`;
+    // Verify file now exists; throw if still missing
+    await fsp.access(graphPath);
+    return;
+  } catch {
+    // Final fallback: perform a minimal inline export using buck2 if available
+    if (!(await buck2Present())) {
+      throw new Error(
+        "tools/buck/graph.json is missing and exporter failed. Ensure buck2 is available and try: nix run .#zx-wrapper -- tools/buck/export-graph.ts",
+      );
+    }
+    try {
+      console.error(`[ensureGraph] inline export via buck2 → ${graphPath}`);
+    } catch {}
+    // Build a conservative roots expression (limit to common roots in temp repos)
+    const roots = (process.env.BUCK_QUERY_ROOTS || "apps,libs,go,cpp,third_party")
+      .split(/[,\s]+/)
+      .filter(Boolean)
+      .map((r) => (r.startsWith("//") ? `${r}/...` : `//${r}/...`))
+      .join(" ");
+    const query = `deps(set(${roots}), 1, exec_deps())`;
+    const attrs = [
+      "name",
+      "rule_type",
+      "buck.type",
+      "srcs",
+      "buck.srcs",
+      "deps",
+      "buck.deps",
+      "labels",
+      "buck.labels",
+      "args",
+      "env",
+      "main",
+      "main_class",
+      "includes",
+      "defines",
+      "cflags",
+      "ldflags",
+    ];
+    const flags = attrs.flatMap((a) => ["--output-attribute", a]);
+    await fsp.mkdir(path.dirname(graphPath), { recursive: true }).catch(() => {});
+    // Use an isolated buckd to avoid recursive invocation conflicts inside buck2 tests
+    const parentIso = (
+      process.env.BUCK_ISOLATION_DIR_EXPORTER ||
+      process.env.BUCK_ISOLATION_DIR ||
+      ""
+    ).trim();
+    const iso = parentIso ? `${parentIso}__exporter-${process.pid}` : `exporter-${process.pid}`;
+    const useIso = process.env.BUCK_NO_ISOLATION !== "1";
+    const isoArgs = useIso ? ["--isolation-dir", iso] : ([] as string[]);
+    const res = await $({
+      cwd: workspaceRoot,
+      stdio: "pipe",
+    })`buck2 ${isoArgs} cquery ${query} --json ${flags}`.nothrow();
+    const stdout = String(res.stdout || "");
+    if (res.exitCode !== 0) {
+      try {
+        console.error(`[ensureGraph] buck2 cquery failed (exit ${res.exitCode}). stdout:`, stdout);
+      } catch {}
+    }
+    const obj = (() => {
+      try {
+        return JSON.parse(stdout || "{}") as Record<string, any>;
+      } catch {
+        return {} as Record<string, any>;
+      }
+    })();
+    const merged: any[] = [];
+    for (const [label, raw] of Object.entries(obj)) {
+      const a = (raw || {}) as Record<string, any>;
+      const ruleType: string | undefined =
+        typeof a["rule_type"] === "string" ? (a["rule_type"] as string) : (a["buck.type"] as any);
+      const deps: string[] | undefined = Array.isArray(a["deps"])
+        ? (a["deps"] as string[])
+        : Array.isArray(a["buck.deps"])
+          ? (a["buck.deps"] as string[])
+          : undefined;
+      const labelsArr: string[] | undefined = Array.isArray(a["labels"])
+        ? (a["labels"] as string[])
+        : Array.isArray(a["buck.labels"])
+          ? (a["buck.labels"] as string[])
+          : undefined;
+      const srcsArr: string[] | undefined = Array.isArray(a["srcs"])
+        ? (a["srcs"] as string[])
+        : Array.isArray(a["buck.srcs"])
+          ? (a["buck.srcs"] as string[])
+          : undefined;
+      const name = String(label || a["name"] || "");
+      merged.push({
+        ...a,
+        name,
+        rule_type: ruleType || a["rule_type"] || "",
+        deps: deps || a["deps"] || [],
+        labels: Array.from(new Set(labelsArr || [])),
+        srcs: srcsArr || a["srcs"] || [],
+      });
+    }
+    const data = (merged.length > 0 ? JSON.stringify({ nodes: merged }, null, 2) : "[]") + "\n";
+    await fsp.writeFile(graphPath, data, "utf8");
+    try {
+      console.error(`[ensureGraph] inline export wrote ${merged.length} nodes to ${graphPath}`);
+      if (useIso) {
+        await $({ stdio: "pipe" })`buck2 --isolation-dir ${iso} kill`.nothrow();
+      }
+    } catch {}
+    return;
   }
 }
 
@@ -51,7 +242,7 @@ export async function runGlue(): Promise<void> {
   await runNode(nodeBin, zxInit, providerIndexScript);
   await runNode(nodeBin, zxInit, autoMapScript, [
     "--graph",
-    "tools/buck/graph.json",
+    DEFAULT_GRAPH_PATH,
     "--out",
     "third_party/providers/auto_map.bzl",
   ]);

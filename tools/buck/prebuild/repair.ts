@@ -1,6 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
 import path from "node:path";
+import { ensureGraph } from "../glue-run.ts";
+import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const.ts";
 
 async function ensureLocalPreludeMapping() {
   try {
@@ -98,8 +100,9 @@ export async function autoFixGlue() {
       await $`buck2 targets //...`;
     } catch {}
   }
+  // Ensure graph exists (idempotent)
+  await ensureGraph();
   const nodeBase = ["--experimental-strip-types", "--import", "./tools/dev/zx-init.mjs"];
-  await $`node ${nodeBase} tools/buck/export-graph.ts --out tools/buck/graph.json`;
   await $`node ${nodeBase} tools/buck/sync-providers.ts`;
   // Capability-gated: run Node provider sync only if a pnpm-lock.yaml exists
   try {
@@ -112,5 +115,5 @@ export async function autoFixGlue() {
   try {
     await $`node ${nodeBase} tools/buck/gen-provider-index.ts --out third_party/providers/provider_index.bzl`;
   } catch {}
-  await $`node ${nodeBase} tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
+  await $`node ${nodeBase} tools/buck/gen-auto-map.ts --graph ${DEFAULT_GRAPH_PATH} --out third_party/providers/auto_map.bzl`;
 }
