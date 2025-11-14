@@ -1,60 +1,66 @@
 #!/usr/bin/env zx-wrapper
-import fs from "fs-extra";
+import fsSync from "node:fs";
+import fsp from "node:fs/promises";
 import path from "node:path";
 import type { ScaffoldingLanguage } from "./lang-contracts";
 
-const KNOWN: ScaffoldingLanguage[] = [
-  {
-    id: "go",
-    displayName: "Go",
-    requiredPaths: ["tools/nix/templates/go.nix", "go/defs.bzl"],
-    optionalPaths: [],
-    kinds: ["cli", "lib", "test"],
-    capabilities: {
-      patching: true,
-      lockfileLabels: false,
-      testAutoWire: true,
-    },
-    templatesDir: "tools/scaffolding/templates/go",
-  },
-  {
-    id: "cpp",
-    displayName: "C++",
-    requiredPaths: ["tools/nix/templates/cpp.nix", "cpp/defs.bzl"],
-    optionalPaths: [],
-    kinds: ["cli", "lib", "test"],
-    capabilities: {
-      patching: false,
-      lockfileLabels: false,
-      testAutoWire: false,
-    },
-    templatesDir: "tools/scaffolding/templates/cpp",
-  },
-  {
-    id: "node",
-    displayName: "Node",
-    requiredPaths: ["**/pnpm-lock.yaml"],
-    optionalPaths: ["patches/node"],
-    kinds: ["app", "lib", "workspace"],
-    capabilities: {
-      patching: true,
-      lockfileLabels: true,
-      testAutoWire: false,
-    },
-    templatesDir: "tools/scaffolding/templates/node",
-  },
-] as any;
+type ManifestLang = Partial<ScaffoldingLanguage> & { id: string };
+type ManifestObj =
+  | ManifestLang[]
+  | {
+      enabled?: string[];
+      languages?: ManifestLang[];
+    };
+
+function readManifestSync(cwd: string): { enabled: string[]; languages: ScaffoldingLanguage[] } {
+  const cfgPath = path.join(cwd, "tools/nix/langs.json");
+  try {
+    const raw = fsSync.readFileSync(cfgPath, "utf8");
+    const parsed = JSON.parse(raw) as ManifestObj;
+    const enabled: string[] = Array.isArray(parsed)
+      ? []
+      : Array.isArray(parsed.enabled)
+        ? parsed.enabled!.map(String)
+        : [];
+    const list: ManifestLang[] = Array.isArray(parsed)
+      ? (parsed as ManifestLang[])
+      : Array.isArray(parsed.languages)
+        ? (parsed.languages as ManifestLang[])
+        : [];
+    const languages: ScaffoldingLanguage[] = list
+      .filter((e) => e && typeof e.id === "string")
+      .map((e) => {
+        return {
+          id: String(e.id),
+          displayName: String((e as any).displayName || e.id),
+          requiredPaths: Array.isArray((e as any).requiredPaths)
+            ? ((e as any).requiredPaths as string[])
+            : [],
+          optionalPaths: Array.isArray((e as any).optionalPaths)
+            ? ((e as any).optionalPaths as string[])
+            : [],
+          kinds: Array.isArray((e as any).kinds) ? ((e as any).kinds as string[]) : [],
+          templatesDir: String((e as any).templatesDir || ""),
+        };
+      });
+    return { enabled, languages };
+  } catch {
+    return { enabled: [], languages: [] };
+  }
+}
 
 export async function detectEnabledLanguages(cwd = process.cwd()): Promise<ScaffoldingLanguage[]> {
-  const cfgPath = path.join(cwd, "tools/nix/langs.json");
-  let preferred: string[] = [];
-  try {
-    const txt = await fs.readFile(cfgPath, "utf8");
-    preferred = (JSON.parse(txt)?.enabled || []) as string[];
-  } catch {}
-  const exists = async (p: string) => fs.pathExists(path.join(cwd, p));
+  const { enabled: preferred, languages } = readManifestSync(cwd);
+  const exists = async (p: string) => {
+    try {
+      await fsp.access(path.join(cwd, p));
+      return true;
+    } catch {
+      return false;
+    }
+  };
   const out: ScaffoldingLanguage[] = [];
-  for (const s of KNOWN) {
+  for (const s of languages) {
     if (preferred.length && !preferred.includes(s.id)) continue;
     let ok = true;
     for (const req of s.requiredPaths) {
@@ -69,5 +75,6 @@ export async function detectEnabledLanguages(cwd = process.cwd()): Promise<Scaff
 }
 
 export function knownLanguages(): ScaffoldingLanguage[] {
-  return [...KNOWN];
+  const { languages } = readManifestSync(process.cwd());
+  return [...languages];
 }

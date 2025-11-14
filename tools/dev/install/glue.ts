@@ -151,6 +151,12 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
     skipReason?: string;
   }> = [
     {
+      label: "gen-langs",
+      cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/dev/gen-langs.ts")}`,
+      withZx: true,
+      when: true,
+    },
+    {
       label: "export-graph",
       cmd: `${nodeBin} ${nodeBase} ${path.join(
         repoRoot(),
