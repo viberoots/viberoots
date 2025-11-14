@@ -3,20 +3,12 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { renderTargetsFile, writeIfChanged } from "../../lib/fs-helpers.ts";
 import { scanFlatPatchDir } from "../../lib/provider-sync.ts";
-import { providerNameForImporter } from "../../lib/providers.ts";
+import { providerNameForImporter, decodeNameVersionFromPatch } from "../../lib/providers.ts";
 
 type PNPMDoc = {
   importers: Record<string, any>;
   packages: Record<string, any>;
 };
-
-function pkgKeyFromPatch(filename: string): string | null {
-  if (!filename.endsWith(".patch")) return null;
-  const base = filename.slice(0, -".patch".length);
-  // Decode __ to / (PNPM-style encoding for scoped packages)
-  const decoded = base.replace(/__/g, "/");
-  return decoded.toLowerCase();
-}
 
 async function parsePnpmLock(file: string): Promise<PNPMDoc> {
   const mod = await import("yaml");
@@ -167,7 +159,9 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
 
   const scanned = await scanFlatPatchDir({
     patchDir: PATCH_DIR,
-    decodeKey: pkgKeyFromPatch,
+    decodeKey: decodeNameVersionFromPatch,
+    // Ensure deterministic ordering regardless of filesystem readdir order
+    nameForKey: (k) => k,
   });
   const keyToPatchPath = new Map<string, string>();
   for (const e of scanned) keyToPatchPath.set(e.key, e.patchPath);
@@ -353,7 +347,11 @@ export async function readNodeProviderIndexEntries(): Promise<
   }
 
   // Reuse scan to know which patches exist; only needed to mirror provider naming stability
-  const scanned = await scanFlatPatchDir({ patchDir: "patches/node", decodeKey: pkgKeyFromPatch });
+  const scanned = await scanFlatPatchDir({
+    patchDir: "patches/node",
+    decodeKey: decodeNameVersionFromPatch,
+    nameForKey: (k) => k,
+  });
   const keyToPatchPath = new Map<string, string>();
   for (const e of scanned) keyToPatchPath.set(e.key, e.patchPath);
 

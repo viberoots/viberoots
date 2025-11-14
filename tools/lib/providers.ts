@@ -15,6 +15,21 @@ export const encodeForPatchFilename = (s: string) => s.replace(/\//g, "__");
 export const decodeFromPatchFilename = (s: string) =>
   s.replace(/_{2,}/g, "/").replace(/\/{2,}/g, "/");
 
+// Decode a flat patch filename "<name>@<version>.patch" into a canonical "name@version" key.
+// - Accepts PNPM-style encoding where '/' is written as '__' in the filename
+// - Uses the last '@' as the version separator to support scoped names like '@scope/name'
+// - Returns lowercase "name@version" or null when the filename is not a .patch
+export function decodeNameVersionFromPatch(filename: string): string | null {
+  if (!filename || !filename.endsWith(".patch")) return null;
+  const base = filename.slice(0, -".patch".length);
+  const at = base.lastIndexOf("@");
+  if (at <= 0 || at === base.length - 1) return null;
+  const rawName = base.slice(0, at);
+  const version = base.slice(at + 1);
+  const name = decodeFromPatchFilename(rawName);
+  return `${name}@${version}`.toLowerCase();
+}
+
 export function providerNameForModuleKey(importPath: string, version: string): string {
   const key = `${importPath}@${version}`.toLowerCase();
   const h = shortHash(key, 12);
