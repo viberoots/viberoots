@@ -1,42 +1,12 @@
 #!/usr/bin/env zx-wrapper
-import crypto from "node:crypto";
+import {
+  normalizeNixAttr,
+  providerNameForImporter,
+  providerNameForNixAttr,
+} from "./provider-names.ts";
 
 function fqProviderLabel(name: string): string {
   return `//third_party/providers:${name}`;
-}
-
-// Local, minimal provider helpers to avoid hard dependency on ./providers during sandboxed runs
-function shortHash(s: string, n = 12): string {
-  return crypto.createHash("sha256").update(s).digest("hex").slice(0, n);
-}
-
-function normalizeNixAttrLocal(attr: string): string {
-  const s = String(attr || "")
-    .trim()
-    .toLowerCase();
-  if (!s) return s;
-  let a = s.startsWith("pkgs.") ? s : `pkgs.${s}`;
-  if (a === "pkgs.gtest") a = "pkgs.googletest";
-  return a;
-}
-
-function providerNameForImporterLocal(lockfilePath: string, importer: string): string {
-  const normPath = String(lockfilePath || "")
-    .replace(/^\.\/+/, "")
-    .replace(/\/+/, "/");
-  const normImporter = String(importer || "")
-    .replace(/^\.\/+/, "")
-    .replace(/\/+/, "/");
-  const key = `${normPath}#${normImporter}`;
-  const h = shortHash(key, 12);
-  const tail = `${normImporter.replace(/[^\w]+/g, "_")}__${normPath.replace(/[^\w]+/g, "_")}`;
-  return `lf_${h}_${tail}`;
-}
-
-function providerNameForNixAttrLocal(attr: string): string {
-  const norm = normalizeNixAttrLocal(attr);
-  const tail = norm.replace(/[^a-z0-9]+/g, "_");
-  return `nix_${tail}`;
 }
 
 // Returns fully qualified provider labels for supported mapping labels.
@@ -48,10 +18,10 @@ export function providersForLabels(labels: string[] | undefined): string[] {
       const rest = l.slice("lockfile:".length);
       const [path, importer = ""] = rest.split("#");
       if (!path || !importer) continue;
-      out.add(fqProviderLabel(providerNameForImporterLocal(path, importer)));
+      out.add(fqProviderLabel(providerNameForImporter(path, importer)));
     } else if (l.startsWith("nixpkg:")) {
-      const attr = normalizeNixAttrLocal(l.slice("nixpkg:".length));
-      out.add(fqProviderLabel(providerNameForNixAttrLocal(attr)));
+      const attr = normalizeNixAttr(l.slice("nixpkg:".length));
+      out.add(fqProviderLabel(providerNameForNixAttr(attr)));
     }
   }
   return Array.from(out).sort();

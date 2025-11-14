@@ -1,4 +1,9 @@
 import crypto from "node:crypto";
+import {
+  normalizeNixAttr,
+  providerNameForImporter,
+  providerNameForNixAttr,
+} from "./provider-names.ts";
 
 export function shortHash(s: string, n = 12): string {
   return crypto.createHash("sha256").update(s).digest("hex").slice(0, n);
@@ -17,19 +22,6 @@ export function providerNameForModuleKey(importPath: string, version: string): s
   return `mod_${h}_${tail}`;
 }
 
-export function providerNameForImporter(lockfilePath: string, importer: string): string {
-  const normPath = String(lockfilePath || "")
-    .replace(/^\.\/+/, "")
-    .replace(/\/+/, "/");
-  const normImporter = String(importer || "")
-    .replace(/^\.\/+/, "")
-    .replace(/\/+/, "/");
-  const key = `${normPath}#${normImporter}`;
-  const h = shortHash(key, 12);
-  const tail = `${normImporter.replace(/[^\w]+/g, "_")}__${normPath.replace(/[^\w]+/g, "_")}`;
-  return `lf_${h}_${tail}`;
-}
-
 // Encode a nixpkgs attribute path for C++ patch filenames.
 // Example: pkgs.openssl -> pkgs/openssl -> pkgs__openssl
 export function encodeNixAttrForPatchPrefix(attr: string): string {
@@ -46,26 +38,8 @@ export function decodeNixAttrFromPatchPrefix(prefix: string): string {
   return normalizeNixAttr(dotted);
 }
 
-// Normalize a nixpkgs attribute path for provider naming and labeling.
-// - Trims
-// - Lower-cases
-// - Ensures "pkgs." prefix
-// - Maps historical alias pkgs.gtest -> pkgs.googletest
-export function normalizeNixAttr(attr: string): string {
-  const s = String(attr || "")
-    .trim()
-    .toLowerCase();
-  if (!s) return s;
-  let a = s.startsWith("pkgs.") ? s : `pkgs.${s}`;
-  if (a === "pkgs.gtest") a = "pkgs.googletest";
-  return a;
-}
-
-// Deterministic provider name for a nixpkgs attribute path.
-// Example: pkgs.zlib -> nix_pkgs_zlib, pkgs.gnome.glib -> nix_pkgs_gnome_glib
-export function providerNameForNixAttr(attr: string): string {
-  const norm = normalizeNixAttr(attr);
-  const tail = norm.replace(/[^a-z0-9]+/g, "_");
-  // Family is "nix_"; package tail is the normalized attribute with separators underscored
-  return `nix_${tail}`;
-}
+export {
+  normalizeNixAttr,
+  providerNameForImporter,
+  providerNameForNixAttr,
+} from "./provider-names.ts";
