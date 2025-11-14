@@ -14,6 +14,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { ensureGraph } from "../buck/glue-run.ts";
 import { findRepoRoot, pathExists } from "../lib/repo.ts";
+import { sanitizeAttrNameFromLabel } from "../lib/labels.ts";
 
 function stripAnsi(s: string): string {
   return s.replace(/\x1B\[[0-9;]*[A-Za-z]/g, "").replace(/\r/g, "");
@@ -64,18 +65,6 @@ async function main() {
   console.error(`[build-selected] BUCK_TARGET=${target}`);
   // Planner stubs are represented only in cppTargetsFlat; selected may not include them.
   const isPlanner = target.endsWith("__planner");
-  function sanitizeAttrName(label: string): string {
-    const noCfg = label.split(" (config//")[0];
-    const withCell = (() => {
-      if (noCfg.includes("//") && !noCfg.startsWith("//")) {
-        const idx = noCfg.indexOf("//");
-        return "//" + noCfg.slice(idx + 2);
-      }
-      return noCfg;
-    })();
-    const s = withCell.toLowerCase();
-    return "t" + s.replace(/[^a-z0-9_]/g, "_");
-  }
 
   const { stdout, exitCode } = await $({
     env: { ...process.env, BUCK_TARGET: target },
@@ -85,7 +74,7 @@ async function main() {
   if (exitCode !== 0) {
     if (isPlanner) {
       // Fallback to cppTargetsFlat for planner/test labels
-      const attr = `graph-generator-cppTargets.${sanitizeAttrName(target)}`;
+      const attr = `graph-generator-cppTargets.${sanitizeAttrNameFromLabel(target)}`;
       const res = await $({
         env: { ...process.env },
         reject: false,

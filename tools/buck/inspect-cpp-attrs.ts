@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { readCompositeGraph } from "../lib/graph-view.ts";
+import { normalizeTargetLabel } from "../lib/labels.ts";
 
 type Args = {
   target?: string | string[];
@@ -10,12 +11,6 @@ type Args = {
 function toArray<T>(v: T | T[] | undefined): T[] {
   if (v === undefined) return [];
   return Array.isArray(v) ? v : [v];
-}
-
-function cleanName(name?: string): string {
-  if (!name) return "";
-  const i = name.indexOf(" (config//");
-  return i >= 0 ? name.slice(0, i) : name;
 }
 
 function extractCppAttrs(node: GraphNode): string[] {
@@ -36,12 +31,12 @@ async function main() {
     graphPath: (a.graph as string) || undefined,
   });
 
-  const wanted = new Set<string>(toArray<string>(a.target).map(cleanName));
+  const wanted = new Set<string>(toArray<string>(a.target).map((t) => normalizeTargetLabel(t)));
   const pickAll = wanted.size === 0;
 
   const result: Record<string, string[]> = {};
   for (const n of nodes) {
-    const name = cleanName(n.name);
+    const name = normalizeTargetLabel(n.name);
     if (!name) continue;
     if (!pickAll && !wanted.has(name)) continue;
     const attrs = extractCppAttrs(n);
