@@ -1,17 +1,5 @@
-function debugEnabled(): boolean {
-  try {
-    return String(process.env.PATCH_CPP_DEBUG || "").trim() === "1";
-  } catch {
-    return false;
-  }
-}
-
-function dbg(...args: any[]) {
-  if (!debugEnabled()) return;
-  try {
-    console.error("[patch-diff][debug]", ...args);
-  } catch {}
-}
+import { createDbg } from "./lib/util";
+const dbg = createDbg("patch-diff");
 
 export async function makeUnifiedDiff(srcDir: string, dstDir: string): Promise<string> {
   // Require git --no-index so we get canonical a/ and b/ prefixes; do not fallback.

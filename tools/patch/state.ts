@@ -1,23 +1,9 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { SessionRecord, SessionStore } from "./types";
+import { createDbg } from "./lib/util";
 
-function debugEnabled(): boolean {
-  try {
-    const g = String(process.env.PATCH_GO_DEBUG || "").trim() === "1";
-    const c = String(process.env.PATCH_CPP_DEBUG || "").trim() === "1";
-    return g || c;
-  } catch {
-    return false;
-  }
-}
-
-function dbg(...args: any[]) {
-  if (!debugEnabled()) return;
-  try {
-    console.error("[patch-state][debug]", ...args);
-  } catch {}
-}
+const dbg = createDbg("patch-state");
 
 function storePath(): string {
   try {

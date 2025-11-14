@@ -2,25 +2,11 @@ import { execFile } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { ResolveResult } from "./types";
+import { createDbg } from "./lib/util";
 
 type Gomod2Nix = Record<string, { version?: string; src?: { url?: string } } | any>;
 
-function debugEnabled(): boolean {
-  try {
-    return (
-      String(process.env["PATCH_GO_DEBUG"]) === "1" ||
-      String(process.env["PATCH_CPP_DEBUG"]) === "1"
-    );
-  } catch {
-    return false;
-  }
-}
-function dbg(...args: any[]) {
-  if (!debugEnabled()) return;
-  try {
-    console.error("[go-module-resolve][debug]", ...args);
-  } catch {}
-}
+const dbg = createDbg("go-module-resolve");
 
 async function readGomod2nix(repoRoot: string): Promise<Gomod2Nix> {
   const tomlPath = path.join(repoRoot, "gomod2nix.toml");

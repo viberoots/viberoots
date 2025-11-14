@@ -15,33 +15,10 @@ import {
 import { deleteSession, getSession, setSession } from "./state";
 import type { LanguageHandler, SessionRecord } from "./types";
 import { readOverrideMap, setOverride, clearOverride } from "./dev-overrides";
+import { createDbg, pathExists } from "./lib/util";
+import { runSession } from "./lib/session";
 
-function debugEnabled(): boolean {
-  try {
-    return (
-      String(process.env["PATCH_GO_DEBUG"]) === "1" ||
-      String(process.env["PATCH_CPP_DEBUG"]) === "1"
-    );
-  } catch {
-    return false;
-  }
-}
-
-function dbg(...args: any[]) {
-  if (!debugEnabled()) return;
-  try {
-    console.error("[patch-go][debug]", ...args);
-  } catch {}
-}
-
-async function pathExists(p: string): Promise<boolean> {
-  try {
-    await fsp.access(p);
-    return true;
-  } catch {
-    return false;
-  }
-}
+const dbg = createDbg("patch-go");
 
 function moduleArg(args: string[]): string {
   const m = args[0];
@@ -172,31 +149,14 @@ async function doReset(args: string[]) {
 async function doSession(args: string[]) {
   const importPath = moduleArg(args);
   await doStart([importPath]);
-  console.log("Attached. Ctrl-D to apply, Ctrl-C to reset.");
-  await new Promise<void>((resolve, reject) => {
-    process.stdin.setRawMode?.(true);
-    process.stdin.resume();
-    process.stdin.on("data", async (buf: Buffer) => {
-      const s = buf.toString("utf8");
-      if (s === "\u0004") {
-        // Ctrl-D
-        try {
-          await doApply([importPath]);
-          resolve();
-        } catch (e) {
-          reject(e);
-        }
-      } else if (s === "\u0003") {
-        // Ctrl-C
-        try {
-          await doReset([importPath]);
-          resolve();
-        } catch (e) {
-          reject(e);
-        }
-      }
-    });
-  });
+  await runSession(
+    async () => {
+      await doApply([importPath]);
+    },
+    async () => {
+      await doReset([importPath]);
+    },
+  );
 }
 
 async function doRemove(args: string[]) {

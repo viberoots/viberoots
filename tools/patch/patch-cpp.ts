@@ -14,30 +14,10 @@ import { deleteSession, getSession, listSessions, setSession } from "./state";
 import type { LanguageHandler, SessionRecord } from "./types";
 import { setOverride, clearOverride, formatExportSnippet } from "./dev-overrides";
 import { encodeNixAttrForPatchPrefix, normalizeNixAttr } from "../lib/providers";
+import { createDbg, debugEnabled, pathExists } from "./lib/util";
+import { runSession } from "./lib/session";
 
-async function pathExists(p: string): Promise<boolean> {
-  try {
-    await fsp.access(p);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function debugEnabled(): boolean {
-  try {
-    return String(process.env.PATCH_CPP_DEBUG || "").trim() === "1";
-  } catch {
-    return false;
-  }
-}
-
-function dbg(...args: any[]) {
-  if (!debugEnabled()) return;
-  try {
-    console.error("[patch-cpp][debug]", ...args);
-  } catch {}
-}
+const dbg = createDbg("patch-cpp");
 
 function attrArg(args: string[]): string {
   const a = (args[0] || "").trim();
@@ -401,7 +381,6 @@ async function doReset(args: string[]) {
 async function doSession(args: string[]) {
   const attrInput = attrArg(args);
   await doStart([attrInput]);
-  console.log("Attached. Ctrl-D to apply, Ctrl-C to reset.");
   // In session mode, also export a process-local dev override suggestion to help quick rebuilds
   try {
     const attrNorm = normalizeNixAttr(attrInput);
@@ -417,30 +396,14 @@ async function doSession(args: string[]) {
       );
     }
   } catch {}
-  await new Promise<void>((resolve, reject) => {
-    process.stdin.setRawMode?.(true);
-    process.stdin.resume();
-    process.stdin.on("data", async (buf: Buffer) => {
-      const s = buf.toString("utf8");
-      if (s === "\u0004") {
-        // Ctrl-D
-        try {
-          await doApply([attrInput]);
-          resolve();
-        } catch (e) {
-          reject(e);
-        }
-      } else if (s === "\u0003") {
-        // Ctrl-C
-        try {
-          await doReset([attrInput]);
-          resolve();
-        } catch (e) {
-          reject(e);
-        }
-      }
-    });
-  });
+  await runSession(
+    async () => {
+      await doApply([attrInput]);
+    },
+    async () => {
+      await doReset([attrInput]);
+    },
+  );
 }
 
 const handler: LanguageHandler = {
