@@ -51,6 +51,8 @@ let
               else { name = k; }
           ) ks
       ) else [];
+  # Shared planner helpers (label cleanup, basic lookups)
+  P = import ./planner/lib.nix { inherit lib; get = get; nodes = nodesList; pkgPathOf = pkgPathOf; };
   # Prefer language manifests and planner plugins from the TEST repo (BUCK_TEST_SRC)
   # so zx tests that rsync a temp repo can provide cpp enablement without requiring
   # the main flake workspace to also include those files.
@@ -68,19 +70,9 @@ let
   devOverrideJSON = builtins.getEnv "NIX_GO_DEV_OVERRIDE_JSON";
 
   get = attrs: k: attrs.${k} or null;
-  # Buck map keys can include a config suffix like
-  #   "root//apps/test-cli:test-cli (config//platforms:default#...)"
-  # Strip the optional trailing " (config//...)" part using a simple split.
-  cleanLabel = s:
-    let parts = lib.splitString " (config//" s; in
-      if (builtins.length parts) > 1 then (builtins.elemAt parts 0) else s;
-
-  nameOf = n:
-    let t = builtins.typeOf n; in
-      if t == "set" then (
-        if builtins.hasAttr "name" n && builtins.typeOf n.name == "string" && n.name != ""
-        then cleanLabel n.name else ""
-      ) else "";
+  # Use shared helpers for normalized names
+  cleanLabel = P.cleanLabel;
+  nameOf = P.nameOf;
 
   # Reconstruct full label if exporter provided only short name
   ensureFullLabel = n:
@@ -332,8 +324,8 @@ let
   selectedTargetName = builtins.getEnv "BUCK_TARGET";
   dropCell = lbl:
     let base0 = ensureFullLabel { name = lbl; };
-        # Strip optional trailing config suffix: " (config//platforms:...)"
-        base = (lib.elemAt (lib.splitString " (config//" base0) 0);
+        # Strip optional trailing config suffix using shared helper
+        base = cleanLabel base0;
         # If label starts with a cell like "root//...", convert to "//..."
         hasCell = lib.hasInfix "//" base && !(lib.hasPrefix "//" base);
     in if hasCell then ("//" + (lib.elemAt (lib.splitString "//" base) 1)) else base;
