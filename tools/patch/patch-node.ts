@@ -1,9 +1,18 @@
 #!/usr/bin/env zx-wrapper
-import fs from "fs-extra";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runGlue } from "./glue";
 import { deleteSession, findSessionBy, getSession, setSession } from "./state";
 import type { LanguageHandler, SessionRecord } from "./types";
+
+async function pathExists(p: string): Promise<boolean> {
+  try {
+    await fsp.access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function pkgArg(args: string[]): string {
   const p = args[0];
@@ -28,7 +37,7 @@ async function findImporterDir(args: string[]): Promise<string> {
     repoRootFromScript();
 
   const hasLock = async (dir: string): Promise<boolean> =>
-    await fs.pathExists(path.join(dir, "pnpm-lock.yaml"));
+    await pathExists(path.join(dir, "pnpm-lock.yaml"));
 
   const resolveCandidate = async (cand: string): Promise<string | null> => {
     const abs = path.isAbsolute(cand) ? cand : path.resolve(repoRoot, cand);
@@ -122,7 +131,7 @@ async function doApply(args: string[]) {
     }
   }
   if (!sess) throw new Error(`no active session for ${pkg}; run: patch-pkg start node ${pkg}`);
-  await fs.mkdirp(path.join(importerDir, "patches", "node"));
+  await fsp.mkdir(path.join(importerDir, "patches", "node"), { recursive: true });
   // Ensure patches-dir is respected; prefer configuration via .npmrc
   await $({ cwd: importerDir })`${pnpmBin()} patch-commit ${sess.workspacePath}`;
   await deleteSession("node", key);
@@ -145,7 +154,7 @@ async function doReset(args: string[]) {
   if (!sess) return;
   await deleteSession("node", key);
   try {
-    await fs.rm(sess.workspacePath, { recursive: true, force: true });
+    await fsp.rm(sess.workspacePath, { recursive: true, force: true });
   } catch {}
 }
 
@@ -158,10 +167,11 @@ async function doRemove(args: string[]) {
   } catch {
     const pkgJsonPath = path.join(importerDir, "package.json");
     try {
-      const pkgJson = JSON.parse(await fs.readFile(pkgJsonPath, "utf8"));
+      const pkgJson = JSON.parse(await fsp.readFile(pkgJsonPath, "utf8"));
       if (pkgJson.pnpm && pkgJson.pnpm.patchedDependencies) {
         delete pkgJson.pnpm.patchedDependencies[pkg];
-        await fs.outputFile(pkgJsonPath, JSON.stringify(pkgJson, null, 2) + "\n", "utf8");
+        await fsp.mkdir(path.dirname(pkgJsonPath), { recursive: true }).catch(() => {});
+        await fsp.writeFile(pkgJsonPath, JSON.stringify(pkgJson, null, 2) + "\n", "utf8");
       }
     } catch {}
   }
