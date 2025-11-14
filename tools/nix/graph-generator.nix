@@ -205,14 +205,19 @@ let
     let parts = lib.splitString ":" name; in
       if (builtins.length parts) > 1 then lib.elemAt parts 1 else baseNameOf (pkgPathOf name);
 
+  # Consolidated target constructor: delegates to language adapters
+  mkFor = template: name: kind:
+    let L = builtins.getAttr template LANGS; in
+      if kind == "bin" then L.mkApp name
+      else if kind == "lib" then L.mkLib name
+      else if kind == "test" && (builtins.hasAttr "mkTest" L) then L.mkTest name
+      else L.mkApp name;
+
   mkGo = name: kind:
-    if kind == "bin" then LANGS.go.mkApp name else LANGS.go.mkLib name;
+    mkFor "go" name kind;
 
   mkCpp = name: kind:
-    if kind == "bin" then LANGS.cpp.mkApp name
-    else if kind == "lib" then LANGS.cpp.mkLib name
-    else if kind == "test" then LANGS.cpp.mkTest name
-    else LANGS.cpp.mkApp name;
+    mkFor "cpp" name kind;
 
   # Limit to Go targets only for graph-outputs historically; now include C++ in addition.
   # We still restrict to apps/* and libs/* for partial-clone safety.
