@@ -75,7 +75,7 @@ extra-experimental-features = nix-command flakes dynamic-derivations ca-derivati
 1. **Naming:** Use **`graph-generator.nix`** for the outer dynamic-derivation planner entrypoint.
 1. **Optional `tools/nix/mapping.nix`:** A small, **explicit dispatch table** for mapping **custom Buck rule types** to planner templates. Think of it as a **name-to-template router**. Keep it tiny and example-driven.
 1. **Examples everywhere.** Prefer short, runnable examples over abstract prose.
-1. **Dev overrides:** Always print a **warning** when dev package overrides are in effect. In CI (environment flags), builds **must fail** if dev overrides are present. **Setting `NIX_GO_DEV_OVERRIDE_JSON` changes derivation hashes; unset it before sharing cache artifacts. Never allowed in CI.**
+1. **Dev overrides:** Always print a **warning** when dev package overrides are in effect. In CI (environment flags), builds **must fail** if dev overrides are present. **Setting `NIX_GO_DEV_OVERRIDE_JSON` changes derivation hashes; unset it before sharing cache artifacts. Never allowed in CI.** Additionally, the outer planner logs a neutral one‑liner to `build.log` when dev overrides are present locally (Go and C++); set `PLANNER_NO_DEV_OVERRIDE_LOG=1` to suppress this diagnostic.
 1. **Patching UX:** One **outer** command: `patch-pkg <subcommand> <language> …` that **delegates** to language-specific scripts (e.g., `patch-go.ts`).
 1. **Idempotent patches:** Re-applying the **same** patch must **not** cause rebuilds.
 1. **Scaffolding:** When you add new target types, **update/augment** the existing scaffolding tools in `tools/` (don’t invent new scaffolding).

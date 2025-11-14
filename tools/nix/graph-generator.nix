@@ -68,6 +68,12 @@ let
       ) else {};
   D = M.dispatch or {};
   devOverrideJSON = builtins.getEnv "NIX_GO_DEV_OVERRIDE_JSON";
+  devOverrideCppJSON = builtins.getEnv "NIX_CPP_DEV_OVERRIDE_JSON";
+  # CI detection and optional suppression flag for planner dev-override logs
+  isCI = (builtins.getEnv "CI") == "true";
+  suppressDevOverrideLog = (builtins.getEnv "PLANNER_NO_DEV_OVERRIDE_LOG") != "";
+  hasGoOverride = devOverrideJSON != "";
+  hasCppOverride = devOverrideCppJSON != "";
 
   get = attrs: k: attrs.${k} or null;
   # Use shared helpers for normalized names
@@ -375,6 +381,9 @@ let
       echo "appsDir=${builtins.toString (builtins.toPath (repoRootStr + "/apps"))}" >> $out/build.log
       echo "libsDir=${builtins.toString (builtins.toPath (repoRootStr + "/libs"))}" >> $out/build.log
       echo "devOverrideJSON=${builtins.toJSON devOverrideJSON}" >> $out/build.log
+      ${if (!isCI && !suppressDevOverrideLog && (hasGoOverride || hasCppOverride)) then ''
+        echo "[planner] dev overrides present:${if hasGoOverride then " go" else ""}${if hasCppOverride then " cpp" else ""}" >> $out/build.log
+      '' else ""}
       echo "goTargets keys: ${lib.concatStringsSep "," (builtins.attrNames goOutPaths)}" >> $out/build.log
       echo "cppTargets bin keys: ${lib.concatStringsSep "," (builtins.attrNames cppOutPaths)}" >> $out/build.log
       echo '[' > $out/manifest.json
