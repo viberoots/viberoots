@@ -3,11 +3,12 @@
 import fs from "fs-extra";
 import assert from "node:assert";
 import path from "node:path";
-import { ensureGraph } from "../buck/glue-run.ts";
+import { ensureGraph, runGlue } from "../buck/glue-run.ts";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
 
 type Stage =
   | "codegen"
+  | "glue"
   | "export-graph"
   | "sync-providers"
   | "gen-auto-map"
@@ -71,6 +72,10 @@ async function main() {
     }
     case "export-graph": {
       await ensureGraph();
+      break;
+    }
+    case "glue": {
+      await runGlue();
       break;
     }
     case "sync-providers": {

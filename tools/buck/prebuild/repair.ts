@@ -2,8 +2,7 @@
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { ensureGraph } from "../glue-run.ts";
-import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const.ts";
+import { runGlue } from "../glue-run.ts";
 
 async function ensureLocalPreludeMapping() {
   try {
@@ -95,26 +94,6 @@ export async function autoFixGlue() {
   try {
     await $`node --experimental-strip-types --import ./tools/dev/zx-init.mjs tools/dev/install-deps.ts --glue-only`;
   } catch {}
-  // Optional debug: list discovered targets before exporting graph
-  if ((process.env.PREBUILD_GUARD_DEBUG || "").trim() === "1") {
-    try {
-      await $`buck2 targets //...`;
-    } catch {}
-  }
-  // Ensure graph exists (idempotent)
-  await ensureGraph();
-  const nodeBase = ["--experimental-strip-types", "--import", "./tools/dev/zx-init.mjs"];
-  await $`node ${nodeBase} tools/buck/sync-providers.ts`;
-  // Capability-gated: run Node provider sync only if a pnpm-lock.yaml exists
-  try {
-    const { stdout } = await $`git ls-files '**/pnpm-lock.yaml'`;
-    if (String(stdout || "").trim().length > 0) {
-      await $`node ${nodeBase} tools/buck/sync-providers-node.ts`;
-    }
-  } catch {}
-  // Ensure provider index (BZL + JSON) is present before generating auto_map
-  try {
-    await $`node ${nodeBase} tools/buck/gen-provider-index.ts --out third_party/providers/provider_index.bzl`;
-  } catch {}
-  await $`node ${nodeBase} tools/buck/gen-auto-map.ts --graph ${DEFAULT_GRAPH_PATH} --out third_party/providers/auto_map.bzl`;
+  // Run unified glue orchestration (export graph → provider index → auto-map)
+  await runGlue();
 }
