@@ -1,7 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { decodeNixAttrFromPatchPrefix, normalizeNixAttr } from "../lib/providers.ts";
+import {
+  decodeNixAttrFromPatchPrefix,
+  normalizeNixAttr,
+  decodeNameVersionFromPatch,
+} from "../lib/providers.ts";
 
 type Args = {
   strict?: string | boolean;
@@ -131,13 +135,8 @@ async function lintGo(): Promise<number> {
     }
     validateGoPatchFilename(e.name, violations);
     if (!isPatchFile(e.name)) continue;
-    const base = e.name.slice(0, -".patch".length);
-    const at = base.lastIndexOf("@");
-    if (at < 0) continue;
-    const enc = base.slice(0, at);
-    const ver = base.slice(at + 1);
-    if (!enc || !ver) continue;
-    const key = `${decodeGoEnc(enc)}@${ver}`.toLowerCase();
+    const key = decodeNameVersionFromPatch(e.name);
+    if (!key) continue;
     const prior = byKey.get(key);
     if (prior && prior !== e.name) {
       violations.push({
@@ -235,13 +234,8 @@ async function lintNode(): Promise<number> {
     }
     validateNodePatchFilename(e.name, violations);
     if (!isPatchFile(e.name)) continue;
-    const base = e.name.slice(0, -".patch".length);
-    const at = base.lastIndexOf("@");
-    if (at < 0) continue;
-    const enc = base.slice(0, at);
-    const ver = base.slice(at + 1);
-    if (!enc || !ver) continue;
-    const key = `${decodeNodeEnc(enc)}@${ver}`.toLowerCase();
+    const key = decodeNameVersionFromPatch(e.name);
+    if (!key) continue;
     const prior = byKey.get(key);
     if (prior && prior !== e.name) {
       violations.push({
