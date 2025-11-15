@@ -33,7 +33,7 @@ test("repo_cgo_deps wires local cpp lib and runs", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery "deps(//apps/demo-cli:demo)" --json --output-attributes name`;
+    })`buck2 --isolation-dir cgo_repo_lib cquery "deps(//apps/demo-cli:demo)" --json --output-attribute name`;
     if (probe.exitCode !== 0) {
       // Skip on environments without prelude
       return;

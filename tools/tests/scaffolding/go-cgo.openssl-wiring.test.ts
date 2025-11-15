@@ -50,7 +50,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery "deps(//apps/demo-cli:demo)" --json --output-attributes name`;
+    })`buck2 --isolation-dir cgo_openssl cquery "deps(//apps/demo-cli:demo)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return; // skip if prelude not available
     const raw = String(probe.stdout || "").trim();
     if (!raw) return; // skip if no JSON produced (empty graph/older buck)

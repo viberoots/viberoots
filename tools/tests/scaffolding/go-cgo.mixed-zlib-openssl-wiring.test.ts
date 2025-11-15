@@ -53,7 +53,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery "deps(//apps/demo-cli:demo)" --json --output-attributes name`;
+    })`buck2 --isolation-dir cgo_mixed cquery "deps(//apps/demo-cli:demo)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return; // skip if prelude not available
     const nodes = JSON.parse(String(probe.stdout || "")) as Array<{ name: string }>;
     const names = new Set(nodes.map((n) => n.name));

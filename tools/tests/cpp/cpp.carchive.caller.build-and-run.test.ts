@@ -58,7 +58,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery "deps(//apps/caller:caller)" --json --output-attributes name`;
+    })`buck2 --isolation-dir cpp_carchive cquery "deps(//apps/caller:caller)" --json --output-attribute name`;
     if (probe.exitCode !== 0) {
       // Skip if prelude/toolchain not available in the environment
       return;

@@ -19,7 +19,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery "attr(labels, '.*', //tmp:lib)" --json --output-attributes labels`;
+    })`buck2 --isolation-dir cgo_openssl_labels cquery "attr(labels, '.*', //tmp:lib)" --json --output-attribute labels`;
     if (probe.exitCode !== 0) return; // skip if prelude not available
     const nodes = JSON.parse(String(probe.stdout || "")) as Array<{ labels?: string[] }>;
     const labels = (nodes[0]?.labels || []).sort();
