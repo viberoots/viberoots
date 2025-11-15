@@ -47,6 +47,21 @@ Node only (Go/C++ don’t require glue for patch invalidation). Local glue is no
 
 Running `node tools/dev/install-deps.ts` in the dev shell runs the full sequence automatically. CI runs the same as separate stages.
 
+## Composite Graph API (tools reference)
+
+When building glue or diagnostics, consume the Composite Graph rather than reading `tools/buck/graph.json` directly. This keeps behavior consistent and lets tools benefit from sidecar indexes when present.
+
+- Library: `tools/lib/graph-view.ts` provides `readCompositeGraph({ graphPath?, providerIndexPath?, nodeLockIndexPath? })`.
+- CLI: `node tools/buck/graph-view.ts` prints the composite view as JSON for quick inspection.
+
+Example:
+
+```bash
+node tools/buck/graph-view.ts --graph tools/buck/graph.json
+```
+
+If a sidecar is missing, the Composite Graph API returns an empty object for that index and continues.
+
 Note on remove (Go/C++ vs Node):
 
 - Go/C++: `patch-pkg remove` does not regenerate glue. Local patches live under the target’s `patches/<lang>` directory and are included in the rule’s `srcs`, so removing a patch is picked up directly by Buck/Nix (precise invalidation, no provider/auto_map updates needed).
