@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import fs from "fs-extra";
+import fs from "node:fs";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 
 type Capabilities = Record<string, boolean>;
@@ -37,6 +38,15 @@ function pathToFileUrlLike(p: string): string {
   return pref + abs;
 }
 
+async function pathExists(p: string): Promise<boolean> {
+  try {
+    await fsp.access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function readManifest(): Promise<{
   enabled: Set<string>;
   caps: Map<string, Capabilities>;
@@ -47,7 +57,7 @@ async function readManifest(): Promise<{
   const caps = new Map<string, Capabilities>();
   const langs = new Map<string, LangEntry>();
   try {
-    const txt = await fs.readFile(p, "utf8");
+    const txt = await fsp.readFile(p, "utf8");
     const raw = JSON.parse(txt) as Manifest;
     if (Array.isArray(raw)) {
       for (const l of raw) {
@@ -84,7 +94,7 @@ async function detectEnabledAndMissing(
   const enabled: string[] = [];
   const disabled: Array<{ id: string; missingPaths: string[] }> = [];
   const prefer = (id: string) => (enabledPref.size === 0 ? true : enabledPref.has(id));
-  const existsAbs = async (rel: string) => fs.pathExists(path.resolve(rel));
+  const existsAbs = async (rel: string) => pathExists(path.resolve(rel));
   const ids = Array.from(langs.keys()).sort();
   for (const id of ids) {
     if (filterId && id !== filterId) continue;
@@ -104,7 +114,7 @@ async function detectExporterAdapters(): Promise<string[]> {
   const adapters: string[] = [];
   // Rely on exporter contract loader if available
   const contractPath = path.resolve("tools/buck/exporter/lang/contract.ts");
-  if (await fs.pathExists(contractPath)) {
+  if (await pathExists(contractPath)) {
     try {
       const mod = (await import(pathToFileUrlLike(contractPath))) as any;
       const load = mod.loadPresentAdapters as (() => Promise<any[]>) | undefined;
@@ -126,8 +136,8 @@ async function detectPlannerPlugins(
 ): Promise<string[]> {
   const dir = path.resolve("tools/nix/planner");
   const present: string[] = [];
-  if (await fs.pathExists(dir)) {
-    const files = await fs.readdir(dir).catch(() => [] as string[]);
+  if (await pathExists(dir)) {
+    const files = await fsp.readdir(dir).catch(() => [] as string[]);
     for (const f of files) {
       if (!f.endsWith(".nix")) continue;
       const id = f.replace(/\.nix$/i, "");
@@ -140,7 +150,7 @@ async function detectPlannerPlugins(
   for (const id of manifestLangs.keys()) {
     if (filterId && id !== filterId) continue;
     const p = path.resolve("tools/nix/planner", `${id}.nix`);
-    if (await fs.pathExists(p)) ids.add(id);
+    if (await pathExists(p)) ids.add(id);
   }
   return Array.from(ids).sort();
 }
@@ -174,7 +184,7 @@ async function computeStages(
     try {
       // quick walk to detect any pnpm-lock.yaml under repo
       const walk = async (d: string) => {
-        const entries = await fs.readdir(d, { withFileTypes: true });
+        const entries = await fsp.readdir(d, { withFileTypes: true });
         for (const e of entries) {
           if (
             e.name === "node_modules" ||

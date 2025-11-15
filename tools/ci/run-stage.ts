@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 // tools/ci/run-stage.ts — small runner to invoke named CI stages locally or in CI
-import fs from "fs-extra";
+import * as fsp from "node:fs/promises";
 import assert from "node:assert";
 import path from "node:path";
 import { ensureGraph, runGlue } from "../buck/glue-run.ts";
@@ -51,7 +51,7 @@ async function main() {
   let enabled = new Set<string>();
   let caps = new Map<string, Record<string, boolean>>();
   try {
-    const txt = await fs.readFile(path.resolve("tools/nix/langs.json"), "utf8");
+    const txt = await fsp.readFile(path.resolve("tools/nix/langs.json"), "utf8");
     const norm = normalize(JSON.parse(txt) as Manifest);
     enabled = norm.enabled;
     caps = norm.caps;

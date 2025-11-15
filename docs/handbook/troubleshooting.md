@@ -1,5 +1,10 @@
 # Troubleshooting
 
+## Bootstrap-safe glue
+
+- Glue and CI entrypoints are bootstrap-safe and do not depend on `fs-extra`. They can run before `node_modules` exists.
+- If you see early failures related to missing Node deps, ensure you’re invoking the documented glue stages directly (or `tools/dev/install-deps.ts --glue-only`) in the dev shell. The scripts use only built-in Node `fs` APIs and zx.
+
 ## Missing auto_map or graph
 
 - The planner has no fallback discovery; you must regenerate glue locally or in CI.

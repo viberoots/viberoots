@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import Ajv from "ajv";
-import fs from "fs-extra";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { writeIfChanged as writeIfChangedDeterministic } from "../lib/fs-helpers.ts";
 
@@ -31,14 +31,23 @@ function repoPath(...parts: string[]): string {
   return path.join(process.cwd(), ...parts);
 }
 
+async function pathExists(p: string): Promise<boolean> {
+  try {
+    await fsp.access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function readSchema(): Promise<any> {
   const p = repoPath("tools/dev/planner.config.schema.json");
-  return JSON.parse(await fs.readFile(p, "utf8"));
+  return JSON.parse(await fsp.readFile(p, "utf8"));
 }
 
 async function loadConfig(lang: string): Promise<PlannerConfig> {
   const cfgPath = repoPath("tools/nix/planner", `${lang}.config.ts`);
-  if (!(await fs.pathExists(cfgPath))) {
+  if (!(await pathExists(cfgPath))) {
     throw new Error(`Missing planner config: tools/nix/planner/${lang}.config.ts`);
   }
   const mod = await import(pathToFileUrlLike(cfgPath));
@@ -127,15 +136,15 @@ async function writePlannerOutput(
   content: string,
   checkOnly: boolean,
 ): Promise<boolean> {
-  const exists = await fs.pathExists(outPath);
+  const exists = await pathExists(outPath);
   if (exists) {
-    const prev = await fs.readFile(outPath, "utf8");
+    const prev = await fsp.readFile(outPath, "utf8");
     if (prev === content) return false;
     if (checkOnly) {
       throw new Error(`planner-gen: ${outPath} would change (run without --check to update)`);
     }
   }
-  await fs.ensureDir(path.dirname(outPath));
+  await fsp.mkdir(path.dirname(outPath), { recursive: true });
   await writeIfChangedDeterministic(outPath, content);
   return true;
 }
@@ -151,8 +160,8 @@ async function main() {
   const langs: string[] = [];
   if (all) {
     const dir = repoPath("tools/nix/planner");
-    if (await fs.pathExists(dir)) {
-      for (const e of await fs.readdir(dir)) {
+    if (await pathExists(dir)) {
+      for (const e of await fsp.readdir(dir)) {
         if (e.endsWith(".config.ts")) langs.push(e.slice(0, -".config.ts".length));
       }
     }
