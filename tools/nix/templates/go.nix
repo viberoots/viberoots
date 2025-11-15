@@ -25,23 +25,9 @@ let
       }
     );
 
-  # Factored helpers (no behavior change; used by goApp/goLib/goCArchive)
-  segs = s: let xs = lib.splitString "." s; in if xs == [] then [] else xs;
-  getAtPath = attrs: parts:
-    if parts == [] then attrs else (
-      let k = lib.head parts; rest = lib.tail parts; in
-        if (builtins.isAttrs attrs) && (builtins.hasAttr k attrs)
-        then getAtPath (builtins.getAttr k attrs) rest
-        else null
-    );
-  resolveAttr = s:
-    let parts0 = segs s;
-        parts = if parts0 != [] && (lib.head parts0) == "pkgs" then lib.tail parts0 else parts0;
-    in getAtPath pkgs parts;
-
   mkCgoEnv = { nixCgoPkgs ? [], nixCgoAttrs ? [], repoCgoPkgs ? [] }:
     let
-      resolvedCgo = builtins.filter (v: v != null) (map resolveAttr nixCgoAttrs);
+      resolvedCgo = builtins.filter (v: v != null) (map H.resolveAttrFromPkgs nixCgoAttrs);
       cgoPkgs = nixCgoPkgs ++ resolvedCgo ++ repoCgoPkgs;
       haveCgo = (builtins.length cgoPkgs) > 0;
       pkgCfgPaths = lib.concatStringsSep ":" (map (p: "${p}/lib/pkgconfig") cgoPkgs);

@@ -17,14 +17,6 @@ in rec {
   # Common flag joiners for nix pkgs include/lib paths (need access to toIncludeBase/toLibBase)
   nixIncFlags = pkgsList: lib.concatStringsSep " " (map (p: "-isystem ${toIncludeBase p}/include") pkgsList);
   nixLibFlags = pkgsList: lib.concatStringsSep " " (map (p: "-L${toLibBase p}/lib") pkgsList);
-  # Resolve a dotted attribute path like "pkgs.gtest" against an attribute set
-  getAtPath = attrs: parts:
-    if parts == [] then attrs else (
-      let k = lib.head parts; rest = lib.tail parts; in
-        if (builtins.isAttrs attrs) && (builtins.hasAttr k attrs)
-        then getAtPath (builtins.getAttr k attrs) rest
-        else null
-    );
 
   # Standardized dev override handling (shared helper)
   devMap = H.readDevOverrides "NIX_CPP_DEV_OVERRIDE_JSON";
@@ -35,16 +27,13 @@ in rec {
         withPkgs = if lib.hasPrefix "pkgs." s0 then s0 else ("pkgs." + s0);
     in if withPkgs == "pkgs.gtest" then "pkgs.googletest" else withPkgs;
 
-  # Split a dotted attribute path (e.g., "pkgs.foobar.baz")
-  segs = s: let xs = lib.splitString "." s; in if xs == [] then [] else xs;
-
   # Resolve a string attribute against pkgs, handling gtest → googletest alias
   getAtFromPkgs = s:
-    let parts0 = segs s;
+    let parts0 = H.segs s;
         parts = if parts0 != [] && (lib.head parts0) == "pkgs" then lib.tail parts0 else parts0;
     in if parts == [ "gtest" ]
-       then getAtPath pkgs [ "googletest" ]
-       else getAtPath pkgs parts;
+       then H.getAtPath pkgs [ "googletest" ]
+       else H.getAtPath pkgs parts;
 
   overridePkgIfAny = attr: pkg:
     let key = normalizeAttr attr;
