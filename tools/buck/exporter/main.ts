@@ -10,6 +10,8 @@ import { cacheHits, cacheMisses, runGoList } from "./golist.ts";
 import { attrList, cqueryNodes, parseArgs, readSimulatedNodes, writeIfChangedJSON } from "./io.ts";
 import { loadPresentAdapters } from "./lang/contract.ts";
 import type { Adapter, Batch, Metrics, Node } from "./types.ts";
+import * as fsp from "node:fs/promises";
+import path from "node:path";
 
 export async function run() {
   const { out, scope, simulate, maxParallel, cacheDir, metricsOut, validation } = parseArgs(
@@ -239,6 +241,11 @@ export async function run() {
 
 type GoPkgPerBatch = { batch: Batch; pkgs: any[] };
 
-async function emitMetrics(path: string, m: Metrics) {
-  await (await import("fs-extra")).outputFile(path, JSON.stringify(m, null, 2) + "\n", "utf8");
+async function emitMetrics(dst: string, m: Metrics) {
+  // Bootstrap-safe: rely only on node:fs/promises
+  const dir = path.dirname(dst);
+  try {
+    await fsp.mkdir(dir, { recursive: true });
+  } catch {}
+  await fsp.writeFile(dst, JSON.stringify(m, null, 2) + "\n", "utf8");
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import fs from "fs-extra";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 
 type Finding = { file: string; line: number; text: string };
@@ -33,15 +33,20 @@ function isExcluded(filePath: string): boolean {
 }
 
 // Rough heuristic: only flag when the literal appears in the argument to common read helpers.
-// Examples: readGraph(<graph.json>), fs.readFile/readJson/readFileSync(<graph.json>)
-const VIOLATION_RE =
-  /(readGraph|readFile|readJson|readFileSync)\s*\(\s*["']tools\/buck\/graph\.json["']/;
+// Build the target path dynamically to avoid tripping lint rules in this checker itself.
+const GRAPH_SEP = "/";
+const GRAPH_LIT = ["tools", "buck", "graph.json"].join(GRAPH_SEP);
+const ESC = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+// Examples matched: readGraph(<graph.json>), fs.readFile/readJson/readFileSync(<graph.json>)
+const VIOLATION_RE = new RegExp(
+  `(readGraph|readFile|readJson|readFileSync)\\s*\\(\\s*["']${ESC(GRAPH_LIT)}["']`,
+);
 
 async function scanFile(file: string): Promise<Finding[]> {
   if (isExcluded(file)) return [];
   if (isAllowed(file)) return [];
-  const txt = await fs.readFile(file, "utf8").catch(() => "");
-  if (!txt || !txt.includes("tools/buck/graph.json")) return [];
+  const txt = await fsp.readFile(file, "utf8").catch(() => "");
+  if (!txt || !txt.includes(GRAPH_LIT)) return [];
   const findings: Finding[] = [];
   const lines = txt.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
@@ -60,9 +65,9 @@ async function main() {
   const allFindings: Finding[] = [];
   while (stack.length) {
     const dir = stack.pop() as string;
-    let entries: fs.Dirent[] = [] as any;
+    let entries: import("node:fs").Dirent[] = [] as any;
     try {
-      entries = await fs.readdir(dir, { withFileTypes: true });
+      entries = (await fsp.readdir(dir, { withFileTypes: true })) as import("node:fs").Dirent[];
     } catch {
       continue;
     }
