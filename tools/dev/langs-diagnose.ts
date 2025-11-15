@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { findPnpmLockfiles } from "../lib/lockfiles.ts";
 
 type Capabilities = Record<string, boolean>;
 type LangEntry = {
@@ -180,31 +181,8 @@ async function computeStages(
       cap("node", "patching") ||
       !(caps.get("node") && caps.get("node")!.patching === false));
   if (nodeEligible) {
-    let anyLock = false;
-    try {
-      // quick walk to detect any pnpm-lock.yaml under repo
-      const walk = async (d: string) => {
-        const entries = await fsp.readdir(d, { withFileTypes: true });
-        for (const e of entries) {
-          if (
-            e.name === "node_modules" ||
-            e.name === ".git" ||
-            e.name === "buck-out" ||
-            e.name === ".direnv"
-          )
-            continue;
-          const p = path.join(d, e.name);
-          if (e.isDirectory()) await walk(p);
-          else if (e.isFile() && e.name === "pnpm-lock.yaml") {
-            anyLock = true;
-            return;
-          }
-          if (anyLock) return;
-        }
-      };
-      await walk(process.cwd());
-    } catch {}
-    if (anyLock) stages.push("sync-providers-node");
+    const locks = await findPnpmLockfiles();
+    if (locks.length > 0) stages.push("sync-providers-node");
   }
   // other stages are general; always list common sequence
   stages.push("export-graph", "gen-auto-map", "prebuild-guard", "buck-test");

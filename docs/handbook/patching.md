@@ -88,6 +88,16 @@ Quick checks and guidance:
 - Place patches under the importer’s `patches/node/` directory; no cross‑package references.
 - Regenerate glue as needed (export graph → sync providers → gen auto_map). The prebuild guard will auto‑fix locally or fail fast in CI.
 
+### Lockfile discovery (shared helper)
+
+All glue that scans for PNPM lockfiles uses `tools/lib/lockfiles.ts`:
+
+- `findPnpmLockfiles(opts?: { roots?: string[]; ignore?: string[] }): Promise<string[]>`
+- Ignores (by default): `.git`, `buck-out`, `node_modules`, `.pnpm-store`, `.clinic`, `coverage`
+- Returns a deterministic, sorted list of relative paths (posix separators)
+
+Callers include `tools/buck/providers/node.ts`, `tools/buck/gen-provider-index.ts` (indirect via providers), and `tools/dev/langs-diagnose.ts`. Prefer this helper over bespoke scans to keep behavior consistent.
+
 ## Walkthroughs (step‑by‑step)
 
 ### Go — package‑local patching workflow
