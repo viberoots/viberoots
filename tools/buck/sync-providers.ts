@@ -2,6 +2,7 @@
 import { syncAllProviders } from "./providers/index.ts";
 import { ensureGraph } from "./glue-run.ts";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
+import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli.ts";
 
 function dbgEnabled(): boolean {
   try {
@@ -17,36 +18,13 @@ function dbg(...args: any[]) {
   } catch {}
 }
 
-function flagBool(name: string): boolean {
-  const a: any = (global as any).argv || {};
-  if (a && (a[name] === true || String(a[name] || "").toLowerCase() === "true")) return true;
-  const raw = process.argv;
-  return raw.includes(`--${name}`);
-}
+// Preserve presence detection behavior for defaults that depend on explicit flags
+const flagProvided = hasFlag;
 
-function flagStr(name: string, def: string): string {
-  const a: any = (global as any).argv || {};
-  if (a && typeof a[name] === "string" && a[name]) return a[name] as string;
-  const raw = process.argv;
-  const idx = raw.indexOf(`--${name}`);
-  if (idx >= 0 && raw[idx + 1]) return raw[idx + 1];
-  return def;
-}
-
-function flagProvided(name: string): boolean {
-  const raw: string[] = process.argv || [];
-  const needle = `--${name}`;
-  for (const arg of raw) {
-    if (arg === needle) return true;
-    if (arg.startsWith(needle + "=")) return true;
-  }
-  return false;
-}
-
-const OUT_FILE = flagStr("out", "third_party/providers/TARGETS.auto");
-const STRICT = flagBool("strict");
-const LANG = flagStr("lang", "");
-const EMIT_INDEX = flagBool("emit-index") || flagBool("emitIndex");
+const OUT_FILE = getFlagStr("out", "third_party/providers/TARGETS.auto");
+const STRICT = getFlagBool("strict");
+const LANG = getFlagStr("lang", "");
+const EMIT_INDEX = getFlagBool("emit-index") || getFlagBool("emitIndex");
 
 async function main() {
   // Preserve Node default out path unless user explicitly provided --out

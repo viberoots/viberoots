@@ -3,6 +3,7 @@ import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { printSkip } from "../../lib/errors";
+import { getFlagBool, getFlagStr } from "../../lib/cli.ts";
 import { providerNameForImporter } from "../../lib/providers.ts";
 import { readCompositeGraph } from "../../lib/graph-view.ts";
 import { providersForLabels } from "../../lib/labels.ts";
@@ -13,15 +14,14 @@ import { listInputs, listOutputs } from "./scan.ts";
 type Mode = "ci" | "local";
 const mode: Mode = process.env.CI === "true" ? "ci" : "local";
 const skewMs = Number(process.env.PREBUILD_GUARD_SKEW_MS || "5000");
-const argv = process.argv.slice(2);
-const flagVerbose = argv.includes("--verbose") || process.env.PREBUILD_GUARD_VERBOSE === "1";
-const jsonOut = argv.includes("--json");
-const flagStrict = argv.includes("--strict");
+const flagVerbose = getFlagBool("verbose") || process.env.PREBUILD_GUARD_VERBOSE === "1";
+const jsonOut = getFlagBool("json");
+const flagStrict = getFlagBool("strict");
 
 function getVerboseLimit(): number {
-  const idx = argv.indexOf("--verbose-limit");
-  if (idx >= 0 && argv[idx + 1]) {
-    const n = Number(argv[idx + 1]);
+  const limStr = getFlagStr("verbose-limit", "");
+  if (limStr) {
+    const n = Number(limStr);
     if (Number.isFinite(n) && n > 0) return n;
   }
   const envN = Number(process.env.PREBUILD_GUARD_LIST_LIMIT || "10");

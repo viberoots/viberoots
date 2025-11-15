@@ -20,6 +20,8 @@ This guide helps a new contributor land any PR in this plan successfully, follow
 - Use Conventional Commits and real newlines in commit messages.
 - Keep files small and focused (≤ 250 lines ideally); split modules when needed.
 - Maintain determinism and low cyclomatic complexity; prefer small, well-named functions.
+- Prefer shared CLI helpers when parsing flags in zx scripts:
+  - Use `tools/lib/cli.ts` (`getFlagStr`, `getFlagBool`, `getFlagList`) instead of bespoke parsing.
 
 ### 3. Commands cheat sheet
 

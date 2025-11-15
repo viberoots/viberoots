@@ -5,6 +5,7 @@ import assert from "node:assert";
 import path from "node:path";
 import { ensureGraph, runGlue } from "../buck/glue-run.ts";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
+import { getFlagStr } from "../lib/cli.ts";
 
 type Stage =
   | "codegen"
@@ -18,7 +19,7 @@ type Stage =
   | "nix-build-graph-generator"
   | "buck-test";
 
-const stage = String((argv.stage as string) || "");
+const stage = getFlagStr("stage", "");
 assert(stage, "missing --stage=<name>");
 const zxInit = path.resolve("tools/dev/zx-init.mjs");
 const nodeBase = [

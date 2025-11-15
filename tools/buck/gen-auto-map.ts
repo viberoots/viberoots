@@ -5,6 +5,7 @@ import { readCompositeGraph } from "../lib/graph-view.ts";
 // PR6 (go-cpp-local-patching): provider mapping is Node-only (lockfile:...) and nixpkg; Go `module:`
 // labels are kept for diagnostics and are intentionally ignored here.
 import { providersForLabels } from "../lib/labels";
+import { getFlagStr } from "../lib/cli.ts";
 
 type Node = {
   name: string;
@@ -12,19 +13,8 @@ type Node = {
   labels?: string[];
 };
 
-function getArg(name: string, def: string): string {
-  try {
-    const a: any = (global as any).argv;
-    if (a && typeof a[name] === "string" && a[name]) return a[name] as string;
-  } catch {}
-  // Fallback: parse process.argv for --name value
-  const idx = process.argv.findIndex((v) => v === `--${name}`);
-  if (idx >= 0 && idx + 1 < process.argv.length) return process.argv[idx + 1] as string;
-  return def;
-}
-
-const graphPath = getArg("graph", "");
-const outPath = getArg("out", "third_party/providers/auto_map.bzl");
+const graphPath = getFlagStr("graph", "");
+const outPath = getFlagStr("out", "third_party/providers/auto_map.bzl");
 
 // writeIfChanged now imported from ../lib/fs-helpers
 

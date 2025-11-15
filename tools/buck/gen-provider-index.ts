@@ -4,6 +4,7 @@ import path from "node:path";
 import { writeIfChanged } from "../lib/fs-helpers.ts";
 import { readCompositeGraph } from "../lib/graph-view.ts";
 import { readNodeProviderIndexEntries } from "./providers/node.ts";
+import { getFlagStr } from "../lib/cli.ts";
 
 type IndexEntry = { kind: "node" | "cpp"; key: string };
 
@@ -119,7 +120,7 @@ export async function generateProviderIndex(opts?: { outFile?: string; jsonOutFi
 }
 
 async function main() {
-  const OUT = (argv.out as string) || "third_party/providers/provider_index.bzl";
+  const OUT = getFlagStr("out", "third_party/providers/provider_index.bzl");
   await generateProviderIndex({ outFile: OUT });
 }
 
