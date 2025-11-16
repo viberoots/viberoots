@@ -1,4 +1,5 @@
 load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name")
+load("//lang:nix_shell.bzl", "nix_bootstrap_env")
 
 
 def _cpp_nix_build_impl(ctx):
@@ -9,10 +10,7 @@ def _cpp_nix_build_impl(ctx):
     sanitized = sanitize_to_bin_name(raw)
     expected = ("bin/%s" % sanitized) if kind == "bin" else ("lib/lib%s.a" % sanitized)
     run_and_copy = (
-        "set -euo pipefail; "
-        + "export WORKSPACE_ROOT=\"${WORKSPACE_ROOT:-$(pwd)}\"; cd \"$WORKSPACE_ROOT\"; "
-        + "FLK_ROOT=\"$WORKSPACE_ROOT\"; if [ ! -f \"$FLK_ROOT/flake.nix\" ]; then FLK_ROOT=\"$(git -C \"$WORKSPACE_ROOT\" rev-parse --show-toplevel 2>/dev/null || echo \"$WORKSPACE_ROOT\")\"; fi; "
-        + "test -f \"$FLK_ROOT/flake.nix\"; "
+        nix_bootstrap_env()
         + ("OUT_PATH=$(BUCK_TEST_SRC=\"$PWD\" BUCK_TARGET=\"%s\" nix run \"$FLK_ROOT\"#zx-wrapper -- \"$FLK_ROOT/tools/dev/build-selected.ts\"); " % raw)
         + "test -n \"$OUT_PATH\"; "
         + ("if [ ! -e \"$OUT_PATH/%s\" ]; then echo 'expected artifact not found: %s' >&2; (ls -la \"$OUT_PATH\"; ls -la \"$OUT_PATH/bin\" 2>/dev/null || true; ls -la \"$OUT_PATH/lib\" 2>/dev/null || true) >&2; exit 2; fi; " % (expected, expected))

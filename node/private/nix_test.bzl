@@ -1,4 +1,5 @@
 load("//lang:sanitize.bzl", "sanitize_name")
+load("//lang:nix_shell.bzl", "nix_bootstrap_env", "nix_timeout_wrapper_var")
 
 def _node_nix_test_impl(ctx):
     imp = ctx.attrs.importer
@@ -26,22 +27,12 @@ def _node_nix_test_impl(ctx):
 
     # Compose runner command
     run_cmd = (
-        "set -euo pipefail; "
-        + "export WORKSPACE_ROOT=\"${WORKSPACE_ROOT:-$(pwd)}\"; cd \"$WORKSPACE_ROOT\"; "
-        + "FLK_ROOT=\"$WORKSPACE_ROOT\"; if [ ! -f \"$FLK_ROOT/flake.nix\" ]; then FLK_ROOT=\"$(git -C \"$WORKSPACE_ROOT\" rev-parse --show-toplevel 2>/dev/null || echo \"$WORKSPACE_ROOT\")\"; fi; "
-        + "test -f \"$FLK_ROOT/flake.nix\"; "
+        nix_bootstrap_env()
         + ("".join(env_pairs))
-        + ("TOUT=%d; " % (tout if isinstance(tout, int) and tout > 0 else 600))
+        + nix_timeout_wrapper_var(var_name = "TIMEOUT", default_sec = (tout if isinstance(tout, int) and tout > 0 else 600))
         + ("echo '[node_nix_test] importer=%s (attr=%s)' >&2; " % (imp, imp_attr))
         + ("if ! (cd \"$WORKSPACE_ROOT/%s\" && (find . -type f -name \"*.test.ts\" -print -quit | grep -q . || find . -type f -name \"*.test.js\" -print -quit | grep -q .)); then echo '[node_nix_test] no tests matched; passing' >&2; exit 0; fi; " % imp)
         + "NIX_MAXJ=\"${NIX_MAX_JOBS:-1}\"; NIX_CORES=\"${NIX_CORES:-1}\"; "
-        + "if command -v timeout >/dev/null 2>&1; then "
-        + "  TIMEOUT=\"timeout -k 2s ${TOUT}s\"; "
-        + "elif command -v gtimeout >/dev/null 2>&1; then "
-        + "  TIMEOUT=\"gtimeout -k 2s ${TOUT}s\"; "
-        + "else "
-        + "  TIMEOUT=\"\"; "
-        + "fi; "
         + "$TIMEOUT nix build \"path:$FLK_ROOT#node-test.%s\" --impure --accept-flake-config --show-trace --print-build-logs --max-jobs \"$NIX_MAXJ\" --option cores \"$NIX_CORES\"; " % imp_attr
     )
 
