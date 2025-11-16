@@ -1,13 +1,12 @@
+load("//lang:sanitize.bzl", "sanitize_name")
+
 def _node_nix_test_impl(ctx):
     imp = ctx.attrs.importer
     if imp == None or imp == "":
         fail("node_nix_test: importer is required (derived from lockfile label at macro call)")
 
-    # Sanitize importer to match flake attr naming (see tools/nix/templates-common.nix sanitizeName)
-    def _sanitize_importer_attr(s):
-        return s.replace("//", "").replace(":", "-").replace("/", "-").replace(" ", "-")
-
-    imp_attr = _sanitize_importer_attr(imp)
+    # Sanitize importer using canonical helper (mirrors flake-side sanitizeName)
+    imp_attr = sanitize_name(imp)
     tout = ctx.attrs.timeout_sec
 
     # Prepare environment exports (user env + optional patterns)

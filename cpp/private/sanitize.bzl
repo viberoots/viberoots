@@ -1,17 +1,8 @@
-def _replace_all(hay, needle, repl):
-    if needle == "":
-        return hay
-    return repl.join(hay.split(needle))
-
+load("//lang:sanitize.bzl", "sanitize_name")
 
 def sanitize_to_bin_name(s):
-    # Mirror tools/nix/templates-common.nix sanitizeName exactly:
-    # replaceStrings ["//" ":" "/" " "] ["" "-" "-" "-"] s
-    s1 = _replace_all(s, "//", "")
-    s2 = _replace_all(s1, ":", "-")
-    s3 = _replace_all(s2, "/", "-")
-    s4 = _replace_all(s3, " ", "-")
-    return s4
+    # Delegate to canonical sanitizer in //lang:sanitize.bzl (mirrors flake-side sanitizeName)
+    return sanitize_name(s)
 
 
 def _sanitize_probe_impl(ctx):

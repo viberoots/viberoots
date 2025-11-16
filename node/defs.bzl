@@ -1,10 +1,15 @@
 load("@prelude//:rules.bzl", "genrule")
 load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve", "append_patch_srcs")
+load("//lang:sanitize.bzl", "sanitize_name")
 load("//node/private:nix_test.bzl", "node_nix_test")
 
 # NOTE: Prebuild guard ensures this load is valid before builds/tests run.
 MODULE_PROVIDERS = {}
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
+
+def _sanitize_importer_attr(s):
+    # Use canonical sanitizer from //lang:sanitize.bzl (mirrors flake-side sanitizeName)
+    return sanitize_name(s)
 
 def _providers_for(name):
     pkg = native.package_name()
@@ -139,10 +144,6 @@ def node_webapp(
     if importer == None or importer == "":
         fail("node_webapp: importer could not be inferred. Pass importer=\"apps/<name>\" or include lockfile:<path>#<importer> in labels.")
 
-    def _sanitize_importer_attr(s):
-        # Match flake sanitize: replace '//' -> '', ':' -> '-', '/' -> '-', ' ' -> '-'
-        return s.replace("//", "").replace(":", "-").replace("/", "-").replace(" ", "-")
-
     # Shim: build via Nix and copy dist/* into $OUT (single directory output)
     # Use escaped command substitutions: $$(...) so Buck doesn't parse $(...) as a target pattern.
     cmd = (
@@ -221,8 +222,6 @@ def nix_node_cli_bin(
     if importer == None or importer == "":
         fail("nix_node_cli_bin(bundle=True): importer is required (e.g., importer=\"apps/<name>\")")
 
-    def _sanitize_importer_attr(s):
-        return s.replace("//", "").replace(":", "-").replace("/", "-").replace(" ", "-")
     def _basename_importer(s):
         # crude basename: split by '/' and take last non-empty
         parts = [p for p in s.split("/") if p != ""]
