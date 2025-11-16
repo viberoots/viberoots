@@ -17,6 +17,7 @@ All scripts are zx TypeScript using `#!/usr/bin/env zx-wrapper`.
   - Creates a writable workspace over the Nix store source for the module.
   - macOS uses APFS CoW (`cp -cR`) when available; otherwise falls back to `cp -a`. Other platforms use `cp -a`.
   - Writes/updates `NIX_GO_DEV_OVERRIDE_JSON` for the current `module@version` key (local-only dev override).
+  - Optional: pass `--echo-snippet` to print `export NIX_GO_DEV_OVERRIDE_JSON='{\"<module@version>\":\"<abs/path>\"}'` to stderr (parity with C++), instead of setting the env var in-process.
   - If `PATCH_EDITOR` is set, launches it with the workspace.
 
 - Apply: `tools/bin/patch-pkg apply go <importPath> [--target //<pkg>:name | --patch-dir <dir>]`
