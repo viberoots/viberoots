@@ -23,6 +23,14 @@ Canonical naming and helpers:
 - **Patch fixtures**: `tools/tests/lib/fixtures/go.ts: ensurePatch()` creates a correctly named patch file for tests.
 - **Starlark nixpkgs stamping (canonical)**: use `lang/defs_common.bzl: append_nixpkg_labels(kwargs, attrs)` to append `nixpkg:<normalized>` labels. Normalization trims, lowercases, ensures the `pkgs.` prefix, and maps `pkgs.gtest` → `pkgs.googletest`. Do not re‑implement label loops in language macros.
 
+#### C++ provider edges (optional, graph‑shape uniformity)
+
+- C++ macros (`nix_cpp_library`, `nix_cpp_binary`) may realize provider edges for diagnostics and cquery introspection by merging `providers_for(MODULE_PROVIDERS, name)` into their `deps`.
+- This aligns the exported graph’s shape with Go/Node without changing build artifacts or invalidation semantics.
+- How to read it in `buck2 cquery`:
+  - `deps(//pkg:target)` will include provider nodes like `//third_party/providers:nix_pkgs_openssl` when the target carries matching `nixpkg:<attr>` labels.
+  - These edges are graph‑only; rule keys are unchanged unless provider files themselves change.
+
 ### Shared Nix helpers (lang-helpers)
 
 For Nix templates that need to apply patches or support dev overrides, import the shared helpers from the canonical location:
