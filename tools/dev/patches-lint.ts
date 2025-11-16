@@ -6,6 +6,7 @@ import {
   normalizeNixAttr,
   decodeNameVersionFromPatch,
 } from "../lib/providers.ts";
+import { validateFlatDir } from "../lib/provider-sync.ts";
 
 type Args = {
   strict?: string | boolean;
@@ -20,7 +21,9 @@ function isExplicitFalse(v: any): boolean {
   return v === false || s === "false" || s === "0" || s === "no";
 }
 const HAS_STRICT = Object.prototype.hasOwnProperty.call(argv, "strict");
-const STRICT = HAS_STRICT ? !isExplicitFalse((argv as any).strict) : false;
+// CI enforces strict mode regardless of flags
+const STRICT =
+  process.env.CI === "true" ? true : HAS_STRICT ? !isExplicitFalse((argv as any).strict) : false;
 const LANG = (argv.lang as string) || ""; // optional: scope to one language
 const FORMAT = ((argv.format as string) || "text").toLowerCase();
 
@@ -117,22 +120,18 @@ async function pathExists(p: string): Promise<boolean> {
 async function lintGo(): Promise<number> {
   const dir = path.join("patches", "go");
   if (!(await pathExists(dir))) return 0;
+  // Shared flat-dir validation (warn locally; error in strict/CI)
+  await validateFlatDir(dir, STRICT).catch((e) => {
+    // In strict/CI, validateFlatDir throws; surface error and exit
+    throw e;
+  });
   let problems = 0;
   const violations: Violation[] = [];
   const byKey = new Map<string, string>(); // lowercased "import@version" -> filename
 
   const entries = await fsp.readdir(dir, { withFileTypes: true } as any);
   for (const e of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-    if (e.isDirectory()) {
-      violations.push({
-        level: STRICT ? "error" : "warn",
-        code: "subdir",
-        lang: "go",
-        file: path.join("patches/go", e.name),
-        message: `[go] ignoring subdirectory ${e.name}`,
-      });
-      continue;
-    }
+    if (e.isDirectory()) continue; // subdir already handled by validateFlatDir
     validateGoPatchFilename(e.name, violations);
     if (!isPatchFile(e.name)) continue;
     const key = decodeNameVersionFromPatch(e.name);
@@ -216,22 +215,17 @@ function validateNodePatchFilename(file: string, violations: Violation[]) {
 async function lintNode(): Promise<number> {
   const dir = path.join("patches", "node");
   if (!(await pathExists(dir))) return 0;
+  // Shared flat-dir validation
+  await validateFlatDir(dir, STRICT).catch((e) => {
+    throw e;
+  });
   let problems = 0;
   const violations: Violation[] = [];
   const byKey = new Map<string, string>(); // lowercased "name@version" -> filename
 
   const entries = await fsp.readdir(dir, { withFileTypes: true } as any);
   for (const e of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-    if (e.isDirectory()) {
-      violations.push({
-        level: STRICT ? "error" : "warn",
-        code: "subdir",
-        lang: "node",
-        file: path.join("patches/node", e.name),
-        message: `[node] ignoring subdirectory ${e.name}`,
-      });
-      continue;
-    }
+    if (e.isDirectory()) continue; // handled by validateFlatDir
     validateNodePatchFilename(e.name, violations);
     if (!isPatchFile(e.name)) continue;
     const key = decodeNameVersionFromPatch(e.name);
@@ -326,22 +320,17 @@ function validateCppPatchFilename(file: string, violations: Violation[]) {
 async function lintCpp(): Promise<number> {
   const dir = path.join("patches", "cpp");
   if (!(await pathExists(dir))) return 0;
+  // Shared flat-dir validation
+  await validateFlatDir(dir, STRICT).catch((e) => {
+    throw e;
+  });
   let problems = 0;
   const violations: Violation[] = [];
   const byKey = new Map<string, string>(); // lowercased "nixAttr@version" -> filename
 
   const entries = await fsp.readdir(dir, { withFileTypes: true } as any);
   for (const e of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-    if (e.isDirectory()) {
-      violations.push({
-        level: STRICT ? "error" : "warn",
-        code: "subdir",
-        lang: "cpp",
-        file: path.join("patches/cpp", e.name),
-        message: `[cpp] ignoring subdirectory ${e.name}`,
-      });
-      continue;
-    }
+    if (e.isDirectory()) continue; // handled by validateFlatDir
     validateCppPatchFilename(e.name, violations);
     if (!isPatchFile(e.name)) continue;
     const base = e.name.slice(0, -".patch".length);

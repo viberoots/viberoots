@@ -9,6 +9,7 @@ All scripts are zx TypeScript using `#!/usr/bin/env zx-wrapper`.
 - Patch handlers reuse `tools/patch/lib/apply.ts: repoRoot()` for repo‑root detection.
 - Filesystem existence checks use `tools/patch/lib/util.ts: pathExists()`.
 - Avoid bespoke implementations; this keeps behavior consistent across Go/C++/Node.
+- Flat patch directory checks use `tools/lib/provider-sync.ts: validateFlatDir()`; locally it warns, and in CI (or with `--strict`) it fails.
 
 ## Workflow
 
