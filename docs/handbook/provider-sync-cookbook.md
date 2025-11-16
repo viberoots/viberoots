@@ -20,6 +20,7 @@ Canonical naming and helpers:
 - **Go nixpkgs providers (CGO)**: Go macros do not inject direct provider deps for `nix_cgo_deps`. Instead, they attach `nixpkg:<attr>` labels and rely on `MODULE_PROVIDERS` from `third_party/providers/auto_map.bzl` to map targets to providers (format: `//third_party/providers:nix_<normalized_attr>`; example: `pkgs.openssl` → `nix_pkgs_openssl`). Do not handcraft names.
 - **nixpkgs attr map**: The unified orchestrator generates `third_party/providers/nix_attr_map.bzl` deterministically; Starlark macros should load from this mapping instead of deriving attrs heuristically.
 - **Patch fixtures**: `tools/tests/lib/fixtures/go.ts: ensurePatch()` creates a correctly named patch file for tests.
+- **Starlark nixpkgs stamping (canonical)**: use `lang/defs_common.bzl: append_nixpkg_labels(kwargs, attrs)` to append `nixpkg:<normalized>` labels. Normalization trims, lowercases, ensures the `pkgs.` prefix, and maps `pkgs.gtest` → `pkgs.googletest`. Do not re‑implement label loops in language macros.
 
 ### Shared Nix helpers (lang-helpers)
 

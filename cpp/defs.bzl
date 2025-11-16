@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "cxx_library", "cxx_binary", "cxx_test")
-load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve", "normalize_nix_attr", "append_patch_srcs")
+load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve", "normalize_nix_attr", "append_patch_srcs", "append_nixpkg_labels")
 load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name", _cpp_sanitize_probe="cpp_sanitize_probe")
 load("//cpp/private:planner_stub.bzl", "cpp_planner_stub")
 load("//cpp/private:nix_test.bzl", "cpp_nix_test")

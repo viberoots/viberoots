@@ -112,6 +112,27 @@ def normalize_nix_attr(attr):
     return s
 
 
+def append_nixpkg_labels(kwargs, attrs):
+    """
+    Append normalized nixpkgs labels into kwargs["labels"].
+    - Applies normalize_nix_attr() to each entry in attrs
+    - Appends as "nixpkg:<normalized>"
+    - Dedupes while preserving order
+    - No-ops on non-string / empty values
+    """
+    labels = kwargs.get("labels", []) or []
+    extra = []
+    for a in attrs or []:
+        if not isinstance(a, str):
+            continue
+        na = normalize_nix_attr(a)
+        if na == "":
+            continue
+        extra.append("nixpkg:%s" % na)
+    if len(extra) > 0:
+        kwargs["labels"] = dedupe_preserve(labels + extra)
+
+
 # PR-6: Starlark probe for nix attribute normalization
 def _normalize_nix_attr_probe_impl(ctx):
     val = normalize_nix_attr(ctx.attrs.attr)
