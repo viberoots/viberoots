@@ -36,6 +36,10 @@
   - `nix build .#graph-generator-selected` with `BUCK_TARGET` and `--accept-flake-config`
 - Output: prints only the Nix out path on stdout; logs go to stderr. Buck macros call this helper under the hood.
 
+Parity with Node:
+
+- C++ ExternalRunner tests now reuse the shared nix-shell bootstrap and external timeout wrapper from `//lang:nix_shell.bzl` (default 10 minutes), matching Node test behavior.
+
 ## zx tests overview
 
 - Exporter tuple and cache:

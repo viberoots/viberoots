@@ -1,4 +1,5 @@
 load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name")
+load("//lang:nix_shell.bzl", "nix_bootstrap_env", "nix_timeout_wrapper_var")
 
 
 def _cpp_nix_test_impl(ctx):
@@ -21,10 +22,7 @@ def _cpp_nix_test_impl(ctx):
         return "t" + out
     attr = _sanitize(raw)
     run_and_exec = (
-        "set -euo pipefail; "
-        + "export WORKSPACE_ROOT=\"${WORKSPACE_ROOT:-$(pwd)}\"; cd \"$WORKSPACE_ROOT\"; "
-        + "FLK_ROOT=\"$WORKSPACE_ROOT\"; if [ ! -f \"$FLK_ROOT/flake.nix\" ]; then FLK_ROOT=\"$(git -C \"$WORKSPACE_ROOT\" rev-parse --show-toplevel 2>/dev/null || echo \"$WORKSPACE_ROOT\")\"; fi; "
-        + "test -f \"$FLK_ROOT/flake.nix\"; "
+        nix_bootstrap_env()
         + ("echo '[cpp_nix_test] planner_label=%s' >&2; " % raw)
         + "# Use centralized zx helper to export graph (if needed) and build selected target\n"
         + (
@@ -42,7 +40,8 @@ def _cpp_nix_test_impl(ctx):
         + "  found=$(ls -1 \"$OUT_PATH/bin\" 2>/dev/null | grep -E \"(^|-)${base}$\" | head -n1 || true); "
         + "  if [ -n \"$found\" ] && [ -x \"$OUT_PATH/bin/$found\" ]; then CAND=\"$OUT_PATH/bin/$found\"; else ls -la \"$OUT_PATH\" >&2 || true; ls -la \"$OUT_PATH/bin\" >&2 || true; exit 2; fi; "
         + "fi; "
-        + "\"$CAND\""
+        + nix_timeout_wrapper_var(var_name = "TIMEOUT", default_sec = 600)
+        + "$TIMEOUT \"$CAND\""
     )
     stamp = ctx.actions.declare_output(ctx.attrs.out)
     ctx.actions.write(stamp, "cpp_nix_test\n")
