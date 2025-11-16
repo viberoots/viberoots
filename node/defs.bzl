@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "genrule")
-load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve", "append_patch_srcs")
+load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve", "append_patch_srcs", "providers_for")
 load("//lang:sanitize.bzl", "sanitize_name")
 load("//node/private:nix_test.bzl", "node_nix_test")
 
@@ -10,11 +10,6 @@ load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
 def _sanitize_importer_attr(s):
     # Use canonical sanitizer from //lang:sanitize.bzl (mirrors flake-side sanitizeName)
     return sanitize_name(s)
-
-def _providers_for(name):
-    pkg = native.package_name()
-    key = "//%s:%s" % (pkg, name)
-    return MODULE_PROVIDERS.get(key, [])
 
 def _extract_lockfile_labels(labels):
     out = []
@@ -52,7 +47,7 @@ def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = []
         _kw = { "srcs": merged_srcs }
         append_patch_srcs(_kw, [_patch_dir])
         merged_srcs = _kw.get("srcs", [])
-    merged_srcs = dedupe_preserve(merged_srcs + deps + _providers_for(name))
+    merged_srcs = dedupe_preserve(merged_srcs + deps + providers_for(MODULE_PROVIDERS, name))
     kwargs["srcs"] = merged_srcs
     if out != None:
         kwargs["out"] = out
@@ -105,7 +100,7 @@ def nix_node_test(
         env = (env or {}),
         timeout_sec = timeout_sec,
         srcs = merged_srcs,
-        deps = deps + _providers_for(name),
+        deps = deps + providers_for(MODULE_PROVIDERS, name),
         labels = kw.get("labels", []),
         out = (out if out != None else (name + ".stamp")),
         **kwargs

@@ -98,3 +98,28 @@ def normalize_nix_attr(attr):
         s = "pkgs.googletest"
     return s
 
+
+# PR-2: Centralized provider lookup helpers shared by language macros
+def target_key_for_current_package(name):
+    """
+    Compute the canonical target key for the current package.
+    Example: "//pkg/path:target_name"
+    """
+    pkg = native.package_name()
+    return "//%s:%s" % (pkg, name)
+
+
+def providers_for(MODULE_PROVIDERS, name):
+    """
+    Return provider targets for the given rule name in the current package,
+    looking up entries in the generated MODULE_PROVIDERS mapping.
+    The mapping is expected to come from //third_party/providers:auto_map.bzl.
+    """
+    key = target_key_for_current_package(name)
+    labels = MODULE_PROVIDERS.get(key, [])
+    out = []
+    for l in labels:
+        if isinstance(l, str):
+            out.append(l)
+    return out
+

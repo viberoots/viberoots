@@ -1,18 +1,6 @@
 load("@prelude//:rules.bzl", "go_binary", "go_library", "go_test", "genrule")
-load("//lang:defs_common.bzl", "append_tuple_labels", "dedupe_preserve", "normalize_labels", "stamp_labels", "normalize_nix_attr", "append_patch_srcs")
+load("//lang:defs_common.bzl", "append_tuple_labels", "dedupe_preserve", "normalize_labels", "stamp_labels", "normalize_nix_attr", "append_patch_srcs", "providers_for")
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
-
-def _providers_for(name):
-    pkg = native.package_name()
-    key = "//%s:%s" % (pkg, name)
-    # PR3: Do not translate to third_party/go targets. Providers are used for invalidation only.
-    labels = MODULE_PROVIDERS.get(key, [])
-    out = []
-    for l in labels:
-        if isinstance(l, str):
-            out.append(l)
-    return out
-
 
 def _append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled):
     append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled)
@@ -68,7 +56,7 @@ def nix_go_library(name, **kwargs):
     deps = kwargs.pop("deps", [])
     _apply_cgo_labels(kwargs, nix_cgo_deps, repo_cgo_deps)
     extra = normalize_labels(pkg, kwargs.pop("extra_module_providers", []))
-    merged = dedupe_preserve(_merge_cgo_deps(deps, nix_cgo_deps, repo_cgo_deps) + _providers_for(name) + extra)
+    merged = dedupe_preserve(_merge_cgo_deps(deps, nix_cgo_deps, repo_cgo_deps) + providers_for(MODULE_PROVIDERS, name) + extra)
     # Forward importpath to underlying rule if present; Buck's go_library understands it
     if "_go_toolchain" not in kwargs:
         kwargs["_go_toolchain"] = "@repo_toolchains//:go"
@@ -112,7 +100,7 @@ def nix_go_binary(name, **kwargs):
     deps = kwargs.pop("deps", [])
     _apply_cgo_labels(kwargs, nix_cgo_deps, repo_cgo_deps)
     extra = normalize_labels(pkg, kwargs.pop("extra_module_providers", []))
-    merged = dedupe_preserve(_merge_cgo_deps(deps, nix_cgo_deps, repo_cgo_deps) + _providers_for(name) + extra)
+    merged = dedupe_preserve(_merge_cgo_deps(deps, nix_cgo_deps, repo_cgo_deps) + providers_for(MODULE_PROVIDERS, name) + extra)
     if "_go_toolchain" not in kwargs:
         kwargs["_go_toolchain"] = "@repo_toolchains//:go"
     if "_cxx_toolchain" not in kwargs:
@@ -168,7 +156,7 @@ def nix_go_test(name, **kwargs):
     deps = kwargs.pop("deps", [])
     extra = normalize_labels(pkg, kwargs.pop("extra_module_providers", []))
     _apply_cgo_labels(kwargs, nix_cgo_deps, repo_cgo_deps)
-    merged = dedupe_preserve(_merge_cgo_deps(deps, nix_cgo_deps, repo_cgo_deps) + _providers_for(name) + extra)
+    merged = dedupe_preserve(_merge_cgo_deps(deps, nix_cgo_deps, repo_cgo_deps) + providers_for(MODULE_PROVIDERS, name) + extra)
 
     # If a library is provided, ensure we don't pass the same target in deps.
     lib = kwargs.get("library")
@@ -215,7 +203,7 @@ def nix_go_carchive(name, **kwargs):
     # Realize edges to provider nodes by merging them into srcs; genrule does not
     # accept a `deps` parameter in Buck2.
     srcs = kwargs.get("srcs", []) or []
-    merged_srcs = dedupe_preserve(srcs + deps + _providers_for(name))
+    merged_srcs = dedupe_preserve(srcs + deps + providers_for(MODULE_PROVIDERS, name))
     genrule(
         name = name,
         srcs = merged_srcs,
