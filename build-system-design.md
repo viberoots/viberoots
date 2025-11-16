@@ -209,6 +209,8 @@ in
 
 ### Go Templates (`goApp` / `goLib`)
 
+Canonical patch map helper: `patchesMapFromDir` lives in `tools/nix/lib/lang-helpers.nix`. Templates must import it rather than re‑implementing scanners.
+
 Keep language logic localized and easy to read. The Go templates consume the **patch maps** and **dev override** env:
 
 ```nix
