@@ -2,6 +2,8 @@
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import crypto from "node:crypto";
+import { debugEnabled } from "./util";
 
 export type ApplyFlags = {
   targetPkg: string;
@@ -79,6 +81,15 @@ export async function writePatchIfChanged(
     if (cur === data) {
       console.log("no-op (already applied)");
       return "no-op";
+    }
+    if (debugEnabled()) {
+      try {
+        const curHash = crypto.createHash("sha256").update(cur).digest("hex").slice(0, 12);
+        const newHash = crypto.createHash("sha256").update(data).digest("hex").slice(0, 12);
+        console.error(
+          `[apply][debug] existing patch differs; force=${Boolean(force)} dst=${dst} cur=${curHash} new=${newHash}`,
+        );
+      } catch {}
     }
     if (!force) {
       throw new Error(`${dst} exists with different content. Re-run with --force to overwrite.`);
