@@ -38,6 +38,32 @@ let
       inherit cgoPkgs haveCgo pkgCfgPaths synthCFlags synthLdFlags repoStaticLibs;
     };
 
+  # Tiny composer for shared configure/env steps used by goApp and goLib
+  mkConfigurePhase = { cgo, includeGoFlags ? false }:
+    ''
+      runHook preConfigure
+
+      export GOCACHE=$TMPDIR/go-cache
+      export GOPATH="$TMPDIR/go"
+      export GOSUMDB=off
+      ${if includeGoFlags then ''
+        export GOFLAGS="-mod=mod"
+      '' else ""}
+      ${if cgo.haveCgo then ''
+        export CGO_ENABLED=1
+        export PKG_CONFIG_PATH=${cgo.pkgCfgPaths}
+        if [ -z "$PKG_CONFIG_PATH" ]; then
+          export CGO_CFLAGS="${cgo.synthCFlags} $CGO_CFLAGS"
+          export CGO_LDFLAGS="${cgo.synthLdFlags} ${cgo.repoStaticLibs} $CGO_LDFLAGS"
+        fi
+      '' else ''
+        export CGO_ENABLED=0
+      ''}
+      cd "''${modRoot:-.}"
+
+      runHook postConfigure
+    '';
+
 in {
   goApp = {
     name,
@@ -80,26 +106,7 @@ in {
         doInstallCheck = false;
         disallowedReferences = [];
         nativeBuildInputs = ([ pkgs.unzip ] ++ (if cgo.haveCgo then (cgo.cgoPkgs ++ [ pkgs.pkg-config ]) else []));
-        configurePhase = ''
-          runHook preConfigure
-
-          export GOCACHE=$TMPDIR/go-cache
-          export GOPATH="$TMPDIR/go"
-          export GOSUMDB=off
-          ${if cgo.haveCgo then ''
-            export CGO_ENABLED=1
-            export PKG_CONFIG_PATH=${cgo.pkgCfgPaths}
-            if [ -z "$PKG_CONFIG_PATH" ]; then
-              export CGO_CFLAGS="${cgo.synthCFlags} $CGO_CFLAGS"
-              export CGO_LDFLAGS="${cgo.synthLdFlags} ${cgo.repoStaticLibs} $CGO_LDFLAGS"
-            fi
-          '' else ''
-            export CGO_ENABLED=0
-          ''}
-          cd "''${modRoot:-.}"
-
-          runHook postConfigure
-        '';
+        configurePhase = mkConfigurePhase { inherit cgo; includeGoFlags = false; };
       };
       args = baseArgs // ({
         pwd = srcAbs;
@@ -139,27 +146,7 @@ in {
         doInstallCheck = false;
         disallowedReferences = [];
         nativeBuildInputs = (if cgo.haveCgo then (cgo.cgoPkgs ++ [ pkgs.pkg-config ]) else []);
-        configurePhase = ''
-          runHook preConfigure
-
-          export GOCACHE=$TMPDIR/go-cache
-          export GOPATH="$TMPDIR/go"
-          export GOSUMDB=off
-          export GOFLAGS="-mod=mod"
-          ${if cgo.haveCgo then ''
-            export CGO_ENABLED=1
-            export PKG_CONFIG_PATH=${cgo.pkgCfgPaths}
-            if [ -z "$PKG_CONFIG_PATH" ]; then
-              export CGO_CFLAGS="${cgo.synthCFlags} $CGO_CFLAGS"
-              export CGO_LDFLAGS="${cgo.synthLdFlags} ${cgo.repoStaticLibs} $CGO_LDFLAGS"
-            fi
-          '' else ''
-            export CGO_ENABLED=0
-          ''}
-          cd "''${modRoot:-.}"
-
-          runHook postConfigure
-        '';
+        configurePhase = mkConfigurePhase { inherit cgo; includeGoFlags = true; };
       };
       args = baseArgs // ({
         pwd = srcAbs;
