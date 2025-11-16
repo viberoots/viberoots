@@ -1,5 +1,6 @@
 load("@prelude//:rules.bzl", "go_binary", "go_library", "go_test", "genrule")
 load("//lang:defs_common.bzl", "append_tuple_labels", "dedupe_preserve", "normalize_labels", "stamp_labels", "normalize_nix_attr", "append_patch_srcs", "providers_for")
+load("//lang:defs_common.bzl", "append_nixpkg_labels")
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
 
 def _append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled):
@@ -9,8 +10,9 @@ def _append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled):
 def _apply_cgo_labels(kwargs, nix_cgo_deps, repo_cgo_deps):
     if len(nix_cgo_deps) > 0 or len(repo_cgo_deps) > 0:
         labels = kwargs.get("labels", []) or []
-        extra = ["cgo:enabled"] + ["nixpkg:%s" % a for a in nix_cgo_deps]
-        kwargs["labels"] = dedupe_preserve(labels + extra)
+        kwargs["labels"] = dedupe_preserve(labels + ["cgo:enabled"])
+        # Normalize and append nixpkgs labels using the shared helper
+        append_nixpkg_labels(kwargs, nix_cgo_deps)
 
 
 def _merge_cgo_deps(deps, nix_cgo_deps, repo_cgo_deps):
