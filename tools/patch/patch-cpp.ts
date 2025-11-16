@@ -1,8 +1,5 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
-import { makeUnifiedDiff } from "./diff";
 import {
   parseApplyFlags,
   repoRoot,
@@ -16,6 +13,9 @@ import { setOverride, clearOverride, formatExportSnippet } from "./dev-overrides
 import { encodeNixAttrForPatchPrefix, normalizeNixAttr } from "../lib/providers";
 import { createDbg, debugEnabled, pathExists } from "./lib/util";
 import { runSession } from "./lib/session";
+import { resolveNixpkg } from "./cpp/resolve";
+import { ensureOriginAndWorkspace } from "./cpp/extract";
+import { doApply, doRemove } from "./cpp/apply";
 
 const dbg = createDbg("patch-cpp");
 
@@ -23,122 +23,6 @@ function attrArg(args: string[]): string {
   const a = (args[0] || "").trim();
   if (!a) throw new Error("missing <attr> nixpkgs attribute, e.g. pkgs.zlib or zlib");
   return a;
-}
-
-async function nixEvalRaw(expr: string): Promise<string> {
-  const { stdout } = await $`nix eval --raw --accept-flake-config ${expr}`;
-  return String(stdout || "").trim();
-}
-
-async function resolveNixpkg(
-  attrNorm: string,
-): Promise<{ pname: string; version: string; srcPath: string }> {
-  console.error("[patch-cpp] resolve: begin", attrNorm);
-  // Test-only fast path: allow explicit mapping via NIX_CPP_TEST_RESOLVE_JSON
-  const testJson = process.env.NIX_CPP_TEST_RESOLVE_JSON || "";
-  if (testJson.trim()) {
-    try {
-      const map = JSON.parse(testJson) as Record<
-        string,
-        { version: string; srcPath: string; pname?: string }
-      >;
-      // Accept keys with or without pkgs. prefix
-      const keys = [
-        attrNorm,
-        attrNorm.replace(/^pkgs\./, ""),
-        `pkgs.${attrNorm.replace(/^pkgs\./, "")}`,
-      ];
-      for (const k of keys) {
-        const ent = map[k];
-        if (ent?.version && ent?.srcPath) {
-          const tail = attrNorm.replace(/^pkgs\./, "");
-          return { pname: ent.pname || tail, version: ent.version, srcPath: ent.srcPath };
-        }
-      }
-    } catch {}
-  }
-  // Support flake-style "nixpkgs#<name>" queries by stripping pkgs.
-  const name = attrNorm.replace(/^pkgs\./, "");
-  const base = `nixpkgs#${name}`;
-  console.error("[patch-cpp] resolve: eval version", base);
-  const version = await nixEvalRaw(`${base}.version`);
-  // Materialize and capture the src path in a single step to avoid a second eval
-  console.error("[patch-cpp] resolve: build src", base);
-  const built = await $`nix build --no-link --accept-flake-config ${base}.src --print-out-paths`;
-  const srcPath =
-    String(built.stdout || "")
-      .trim()
-      .split(/\r?\n/)
-      .filter(Boolean)
-      .pop() || "";
-  if (!srcPath) throw new Error(`failed to resolve src path for ${base}`);
-  console.error("[patch-cpp] resolve: eval src", base);
-  console.error("[patch-cpp] resolve: done", { pname: name, version, srcPath });
-  return { pname: name, version, srcPath };
-}
-
-async function extractOrCopySrc(srcPath: string, destDir: string): Promise<string> {
-  await fsp.mkdir(destDir, { recursive: true });
-  // If srcPath is a directory in the store, copy it. Otherwise, attempt extraction.
-  const stat = await fsp.stat(srcPath).catch(() => null);
-  if (stat && stat.isDirectory()) {
-    console.error("[patch-cpp] extract: copy dir", srcPath);
-    // Copy store dir into a writable workspace; prefer rsync for portability
-    await $`rsync -a ${srcPath}/ ${destDir}/`;
-    await $`chmod -R u+w ${destDir}`;
-    console.error("[patch-cpp] extract: copy dir done");
-    return destDir;
-  }
-
-  const lower = srcPath.toLowerCase();
-  if (lower.endsWith(".zip")) {
-    console.error("[patch-cpp] extract: unzip", srcPath);
-    await $({ cwd: destDir })`unzip -qq ${srcPath}`.nothrow();
-  } else {
-    // Extract the full source to ensure expected headers (e.g., zlib.h) are present
-    console.error("[patch-cpp] extract: tar -xf full", srcPath);
-    await $({ cwd: destDir })`tar -xf ${srcPath}`.nothrow();
-    await $`chmod -R u+w ${destDir}`.nothrow();
-  }
-  // Heuristic: if extraction created a single directory, descend into it for origin path
-  const entries = await fsp.readdir(destDir);
-  if (entries.length === 1) {
-    const only = path.join(destDir, entries[0]);
-    const st = await fsp.stat(only).catch(() => null);
-    if (st && st.isDirectory()) return only;
-  }
-  console.error("[patch-cpp] extract: done");
-  return destDir;
-}
-
-async function ensureOriginAndWorkspace(
-  attr: string,
-  pre?: { pname: string; version: string; srcPath: string },
-): Promise<{
-  key: string;
-  originPath: string;
-  workspacePath: string;
-  version: string;
-  pname: string;
-}> {
-  const attrNorm = normalizeNixAttr(attr);
-  const { pname, version, srcPath } = pre || (await resolveNixpkg(attrNorm));
-  const key = `${attrNorm}@${version}`.toLowerCase();
-  const stamp = new Date()
-    .toISOString()
-    .replace(/[-:TZ.]/g, "")
-    .slice(0, 14);
-  const safeKey = encodeNixAttrForPatchPrefix(key);
-  const base = path.join(os.tmpdir(), "bucknix-patch-cpp");
-  const originRoot = path.join(base, `origin-${safeKey}-${stamp}`);
-  const wsRoot = path.join(base, `ws-${safeKey}-${stamp}`);
-  await fsp.mkdir(base, { recursive: true });
-  const originPath = await extractOrCopySrc(srcPath, originRoot);
-  // Create workspace by cloning originPath
-  await $`rsync -a ${originPath}/ ${wsRoot}/`;
-  await $`chmod -R u+w ${wsRoot}`;
-  dbg("ensureOriginAndWorkspace", { attr: attrNorm, originRoot, wsRoot, version, pname });
-  return { key, originPath, workspacePath: wsRoot, version, pname };
 }
 
 async function doStart(args: string[]) {
@@ -194,175 +78,6 @@ async function doStart(args: string[]) {
   }
 }
 
-async function doApply(args: string[]) {
-  console.error("[patch-cpp] apply: begin");
-  dbg("apply: proc", { pid: process.pid, cwd: process.cwd() });
-  const flags = parseApplyFlags(args);
-  if (flags.force) {
-    (global as any).argv = Object.assign({}, (global as any).argv, { force: true });
-  }
-  dbg("apply: parsed-flags", {
-    targetPkg: flags.targetPkg,
-    overridePatchDir: flags.overridePatchDir,
-    rest: flags.restArgs,
-  });
-  const attrInput = attrArg(flags.restArgs);
-  const attrNorm = normalizeNixAttr(attrInput);
-  // Avoid redundant nixpkgs resolutions during apply: reuse an existing session.
-  // Choose the most recent session for this attr whose workspace still exists; fall back to newest.
-  const all = await listSessions("cpp");
-  const matches = all.filter((e) => e.rec.importPath === attrNorm);
-  dbg("apply: sessions", { total: all.length, matches: matches.length });
-  let sess: SessionRecord | null = null;
-  if (matches.length) {
-    // If multiple sessions exist for this attr, prefer the one matching the currently
-    // resolved version (when available via test mapping), otherwise fall back to recency.
-    let expectedVersion: string | null = null;
-    if (matches.length > 1) {
-      try {
-        const meta = await resolveNixpkg(attrNorm);
-        expectedVersion = meta?.version || null;
-      } catch {}
-    }
-    const filtered = expectedVersion
-      ? matches.filter(
-          (m) => (m.rec.version || "").toLowerCase() === expectedVersion!.toLowerCase(),
-        )
-      : matches;
-    const pickFrom = filtered.length ? filtered : matches;
-    // Prefer sessions whose workspacePath exists, sorted by updatedAt desc
-    const withWs: Array<SessionRecord & { _t: number }> = [];
-    for (const m of pickFrom) {
-      try {
-        if (await pathExists(m.rec.workspacePath)) {
-          const t = Date.parse(m.rec.updatedAt || m.rec.createdAt || "");
-          withWs.push(Object.assign({}, m.rec, { _t: isNaN(t) ? 0 : t }));
-        }
-      } catch {}
-    }
-    if (withWs.length) {
-      withWs.sort((a, b) => b._t - a._t);
-      sess = withWs[0] as SessionRecord;
-    } else {
-      // No existing workspace; fall back to newest by updatedAt
-      const byTime = pickFrom
-        .map((m) => ({ rec: m.rec, t: Date.parse(m.rec.updatedAt || m.rec.createdAt || "") || 0 }))
-        .sort((a, b) => b.t - a.t);
-      sess = byTime[0]?.rec || null;
-    }
-  }
-  if (!sess) {
-    throw new Error(
-      `no active session for ${attrNorm}; run: patch-pkg start cpp ${attrInput} before apply`,
-    );
-  }
-  dbg("apply: chosen-session", {
-    importPath: sess.importPath,
-    version: sess.version,
-    originPath: sess.originPath,
-    workspacePath: sess.workspacePath,
-  });
-  console.error("[patch-cpp] apply: computing diff");
-  let diff = "";
-  try {
-    diff = await makeUnifiedDiff(sess.originPath, sess.workspacePath);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    throw new Error(
-      `failed to compute diff between origin and workspace (is the session stale or paths missing?)\n` +
-        `Attr: ${attrNorm}\nVersion: ${sess.version}\nOrigin: ${sess.originPath}\nWorkspace: ${sess.workspacePath}\nError: ${msg}\n` +
-        `Hint: If this persists, run 'tools/bin/patch-pkg reset cpp ${attrInput}' and start a new session.`,
-    );
-  }
-  if (!diff || diff.trim() === "") {
-    dbg("apply: empty-diff", { origin: sess.originPath, workspace: sess.workspacePath });
-    console.log("no changes; no-op");
-    return;
-  }
-  // When debugging, surface concise diagnostics to understand unexpected diffs
-  if (debugEnabled()) {
-    try {
-      const nameStatus = await $({
-        stdio: "pipe",
-      })`git --no-pager diff --no-index --name-status -- ${sess.originPath} ${sess.workspacePath}`.nothrow();
-      console.error(
-        "[patch-cpp][debug] diff-name-status:\n" +
-          String(nameStatus.stdout || nameStatus.stderr || "").trim(),
-      );
-    } catch {}
-    // List a shallow view of both trees to spot stray files or permissions
-    try {
-      const listA = await $({
-        cwd: sess.originPath,
-        stdio: "pipe",
-      })`bash -lc 'find . -maxdepth 2 -type f -ls | sed -n 1,80p'`.nothrow();
-      console.error(
-        "[patch-cpp][debug] origin-list:\n" + String(listA.stdout || listA.stderr || "").trim(),
-      );
-    } catch {}
-    try {
-      const listB = await $({
-        cwd: sess.workspacePath,
-        stdio: "pipe",
-      })`bash -lc 'find . -maxdepth 2 -type f -ls | sed -n 1,80p'`.nothrow();
-      console.error(
-        "[patch-cpp][debug] workspace-list:\n" + String(listB.stdout || listB.stderr || "").trim(),
-      );
-    } catch {}
-    // Emit a short header of the diff to provide context without flooding logs
-    try {
-      const header = diff.split(/\r?\n/).slice(0, 40).join("\n");
-      console.error("[patch-cpp][debug] diff-head:\n" + header);
-    } catch {}
-  }
-  // Emit lightweight debug about the diff (length and first header lines)
-  try {
-    const header = diff.split(/\r?\n/).slice(0, 10);
-    dbg("apply: diff-summary", { length: diff.length, lines: header });
-  } catch {}
-
-  const fileKey = encodeNixAttrForPatchPrefix(attrNorm);
-  const root = repoRoot();
-  const patchDir = resolvePatchDir("patches/cpp", flags.targetPkg, flags.overridePatchDir, root);
-  const dst = path.join(patchDir, `${fileKey}@${sess.version}.patch`);
-  dbg("apply: paths", { root, patchDir, dst });
-  const wrote = await writePatchIfChanged(dst, diff, !!(global as any).argv.force);
-  if (wrote === "written") {
-    dbg("apply: wrote-patch", { dst, bytes: diff.length });
-    console.error("[patch-cpp] apply: wrote patch", dst);
-  }
-  // Proactively print note so callers capturing stdout see it even if verification chats to tty
-  console.log("C++ overlay auto-discovers patches by filename; no manual snippet required.");
-  // Verify patch applies with -p1 to pristine origin
-  console.error("[patch-cpp] apply: verifying patch");
-  try {
-    await verifyPatchDryRun(sess.originPath, dst, "cpp");
-    console.error("[patch-cpp] apply: verification ok");
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    throw new Error(
-      `Patch verification failed: the generated diff did not apply cleanly with -p1 to the origin source.\n` +
-        `Attr: ${attrNorm}\n` +
-        `Version: ${sess.version}\n` +
-        `Origin: ${sess.originPath}\n` +
-        `Patch: ${dst}\n` +
-        `patch: ${msg}`,
-    );
-  }
-
-  // End session; keep workspace for manual inspection if desired
-  // Compute the stored key lazily from the session's version
-  try {
-    const key = `${attrNorm}@${sess.version}`.toLowerCase();
-    clearOverride("NIX_CPP_DEV_OVERRIDE_JSON", attrNorm);
-    await deleteSession("cpp", key);
-    dbg("apply: session-deleted", { key });
-  } catch {}
-  // Message: confirmation and path of patch file
-  dbg("apply: stdout-patch-path", { dst });
-  console.log(dst);
-}
-
 async function doReset(args: string[]) {
   const attrInput = attrArg(args);
   const attrNorm = normalizeNixAttr(attrInput);
@@ -412,24 +127,5 @@ const handler: LanguageHandler = {
   reset: doReset,
   session: doSession,
 };
-
-async function doRemove(args: string[]) {
-  // Support optional flags similar to apply for local patch placement
-  const flags = parseApplyFlags(args);
-  const attrInput = attrArg(flags.restArgs);
-  const attrNorm = normalizeNixAttr(attrInput);
-  // Resolve version using test-friendly fast path when available
-  const { version } = await resolveNixpkg(attrNorm);
-  const root = repoRoot();
-  const patchDir =
-    flags.overridePatchDir || flags.targetPkg
-      ? resolvePatchDir("patches/cpp", flags.targetPkg, flags.overridePatchDir, root)
-      : path.join(root, "patches/cpp");
-  const fileKey = encodeNixAttrForPatchPrefix(attrNorm);
-  try {
-    const dst = path.join(patchDir, `${fileKey}@${version}.patch`);
-    await fsp.rm(dst, { force: true });
-  } catch {}
-}
 
 export default Object.assign({}, handler, { remove: doRemove });

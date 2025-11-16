@@ -102,52 +102,13 @@ let
     get = get;
     modulesTomlFor = modulesTomlFor;
   };
-  # Build language adapters map by enumerating known ids from langs.json when present,
-  # otherwise fall back to on-disk existence. Keep partial-clone safe behavior.
-  readLangIds = let
-    langsPath = manifestBase + "/langs.json";
-  in if builtins.pathExists langsPath then
-    let raw = builtins.fromJSON (builtins.readFile langsPath);
-        arr = if (builtins.isList raw) then raw else (raw.languages or []);
-    in builtins.map (l: (l.id or "")) (builtins.filter (l: (builtins.isAttrs l) && (l ? id)) arr)
-  else [];
-
-  ensureAdapter = langId:
-    let p = manifestBase + ("/planner/" + langId + ".nix"); in
-      if builtins.pathExists p then (import p { inherit lib; } ctx) else {
-        isTarget = n: false;
-        kindOf = n: null;
-        modulesFileFor = name: modulesTomlFor name;
-        mkApp = name: T.goApp { inherit name; modulesToml = modulesTomlFor name; repoRoot = repoRoot; subdir = (pkgPathOf name); };
-        mkLib = name: T.goLib { inherit name; modulesToml = modulesTomlFor name; repoRoot = repoRoot; subdir = (pkgPathOf name); };
-      };
-
-  # Always include go for backward compatibility; and include cpp if planner/cpp.nix exists.
-  langIds = let
-    ids0 = readLangIds;
-    withGo = if builtins.elem "go" ids0 then ids0 else (ids0 ++ [ "go" ]);
-    cppPlanner = manifestBase + "/planner/cpp.nix";
-    withCpp = if builtins.pathExists cppPlanner && !(builtins.elem "cpp" withGo)
-      then (withGo ++ [ "cpp" ]) else withGo;
-  in withCpp;
-
-  LANGS =
-    builtins.listToAttrs (map (id: { name = id; value = ensureAdapter id; }) langIds);
-
-  pick = n:
-    let
-      rt = get n "rule_type";
-      hasDispatch = (rt != null) && builtins.hasAttr rt D;
-      langKeys = builtins.attrNames LANGS;
-      firstMatch =
-        let matches = builtins.filter (k: (LANGS.${k}.isTarget n)) langKeys; in
-          if matches == [] then null else builtins.head matches;
-    in
-      if hasDispatch then D.${rt}
-      else if firstMatch != null then {
-        template = firstMatch;
-        kind = LANGS.${firstMatch}.kindOf n;
-      } else null;
+  # Language adapters and dispatch (extracted module)
+  Langs = import (manifestBase + "/planner/langs.nix") {
+    inherit lib manifestBase nodesList get T M;
+    ctx = ctx;
+  };
+  LANGS = Langs.LANGS;
+  pick = Langs.pick;
 
   modulesTomlDefault = if rootModulesTomlPath != null
     then builtins.toPath rootModulesTomlPath
@@ -219,40 +180,20 @@ let
   mkCpp = name: kind:
     mkFor "cpp" name kind;
 
-  # Limit to Go targets only for graph-outputs historically; now include C++ in addition.
-  # We still restrict to apps/* and libs/* for partial-clone safety.
-  safeGoNodes = builtins.filter (n:
-    let nm = ensureFullLabel n;
-        okName = (builtins.typeOf nm == "string") && nm != "";
-        rel = if okName then (pkgPathOf nm) else "";
-        inAppsLibs = lib.hasPrefix "apps/" rel || lib.hasPrefix "libs/" rel;
-    in okName && inAppsLibs && (LANGS.go.isTarget n)
-  ) nodesList;
+  # Target selection and out paths (extracted module)
+  Targets = import (manifestBase + "/planner/targets.nix") {
+    inherit lib nodesList LANGS pick ensureFullLabel pkgPathOf mkGo mkCpp;
+  };
+  safeGoNodes = Targets.safeGoNodes;
+  safeCppNodes = Targets.safeCppNodes;
+  goTargetsFromGraph = Targets.goTargetsFromGraph;
+  cppTargetsFromGraph = Targets.cppTargetsFromGraph;
+  nodeTargetsFromGraph = Targets.nodeTargetsFromGraph;
+  goOutPaths = Targets.goOutPaths;
+  cppOutPaths = Targets.cppOutPaths;
+  nodeOutPaths = Targets.nodeOutPaths;
 
-  safeCppNodes = builtins.filter (n:
-    let nm = ensureFullLabel n;
-        okName = (builtins.typeOf nm == "string") && nm != "";
-        rel = if okName then (pkgPathOf nm) else "";
-        inAppsLibs = lib.hasPrefix "apps/" rel || lib.hasPrefix "libs/" rel;
-    in okName && inAppsLibs && (LANGS ? cpp) && (LANGS.cpp.isTarget n)
-  ) nodesList;
-
-  goTargetsFromGraph = builtins.foldl' (acc: n:
-    let nm = ensureFullLabel n; k = pick n; tnm = builtins.typeOf nm; in
-      if (tnm != "string") || (nm == "") || (k == null)
-      then acc
-      else (acc // { "${nm}" = mkGo nm k.kind; })
-  ) {} safeGoNodes;
-
-  # Names of targets that are binaries (used to restrict graph-outputs per PR5)
-  binTargetNames = builtins.filter (nm:
-    let matches = builtins.filter (x: ensureFullLabel x == nm) safeGoNodes;
-        n = if matches == [] then null else builtins.head matches;
-        k = if n == null then null else pick n;
-    in k != null && k.kind == "bin"
-  ) (builtins.attrNames goTargetsFromGraph);
-
-  # Strict mode: require Buck graph; only build app binaries in graph-outputs
+  # Strict mode: require Buck graph; only build app binaries/libs in goTargets
   goTargets =
     let names = builtins.attrNames goTargetsFromGraph;
         entries = builtins.filter (e: e != null) (map (nm:
@@ -262,54 +203,7 @@ let
           in if k != null && (k.kind == "bin" || k.kind == "lib") then { name = nm; value = goTargetsFromGraph.${nm}; } else null
         ) names);
     in builtins.listToAttrs entries;
-  # Only binaries participate in graph-outputs/manifest (PR5)
-  goTargetsBins = builtins.listToAttrs (map (nm: { name = nm; value = goTargetsFromGraph.${nm}; }) binTargetNames);
-  # IMPORTANT: keep values as derivations here (do NOT toString) so Nix realizes them
-  # when referenced in the runCommand below. Stringifying would drop inputDerivations
-  # and prevent materialization, leading to missing /bin during manifest creation.
-  goOutPaths = goTargetsBins;
-
-  # C++ targets collected similarly; include bin/lib/test in attrset, but only link bins in all.out/bin
-  cppTargetsFromGraph = builtins.foldl' (acc: n:
-    let nm = ensureFullLabel n; k = pick n; tnm = builtins.typeOf nm; in
-      if (tnm != "string") || (nm == "") || (k == null)
-      then acc
-      else if (k.kind == null) then acc else (acc // { "${nm}" = mkCpp nm k.kind; })
-  ) {} safeCppNodes;
-
-  cppBinNames = builtins.filter (nm:
-    let matches = builtins.filter (x: ensureFullLabel x == nm) safeCppNodes;
-        n = if matches == [] then null else builtins.head matches;
-        k = if n == null then null else pick n;
-    in k != null && k.kind == "bin"
-  ) (builtins.attrNames cppTargetsFromGraph);
-
   cppTargets = cppTargetsFromGraph;
-  # Only include C++ binary targets when building the manifest/bin links.
-  # Tests and planner stubs are excluded from bin output.
-  cppOutPaths = builtins.listToAttrs (
-    map (nm: { name = nm; value = cppTargetsFromGraph.${nm}; }) cppBinNames
-  );
-
-  # Node CLI bundles (importer-scoped) — pluginized
-  safeNodeBinNodes = builtins.filter (n:
-    let nm = ensureFullLabel n;
-        okName = (builtins.typeOf nm == "string") && nm != "";
-        rel = if okName then (pkgPathOf nm) else "";
-        inAppsLibs = lib.hasPrefix "apps/" rel || lib.hasPrefix "libs/" rel;
-        isNode = (LANGS ? node) && (LANGS.node.isTarget n);
-        kind = if isNode then (LANGS.node.kindOf n) else null;
-    in okName && inAppsLibs && isNode && (kind == "bin")
-  ) nodesList;
-
-  nodeTargetsFromGraph = builtins.foldl' (acc: n:
-    let nm = ensureFullLabel n; tnm = builtins.typeOf nm; in
-      if (tnm != "string") || (nm == "")
-      then acc
-      else (acc // { "${nm}" = LANGS.node.mkApp nm; })
-  ) {} safeNodeBinNodes;
-
-  nodeOutPaths = nodeTargetsFromGraph;
 
   # Provide a flake-friendly flat attrset whose keys are safe identifiers: t + [a-z0-9_]+
   sanitizeAttr = s:
@@ -373,109 +267,12 @@ let
     echo no-target > $out/.noop
   '';
 
-  # Ensure C++ and Go target derivations are realized by declaring them as inputs.
-  allDeps = (lib.attrValues goOutPaths) ++ (lib.attrValues cppOutPaths) ++ (lib.attrValues nodeOutPaths);
-
-  all = pkgs.runCommand "graph-outputs" { inherit allDeps; } ''
-      set -eu
-      mkdir -p $out
-      mkdir -p $out/bin
-      : > $out/manifest.json
-      : > $out/build.log
-      echo "repoRootStr=${repoRootStr}" >> $out/build.log
-      echo "appsDir=${builtins.toString (builtins.toPath (repoRootStr + "/apps"))}" >> $out/build.log
-      echo "libsDir=${builtins.toString (builtins.toPath (repoRootStr + "/libs"))}" >> $out/build.log
-      echo "devOverrideJSON=${builtins.toJSON devOverrideJSON}" >> $out/build.log
-      ${if (!isCI && !suppressDevOverrideLog && (hasGoOverride || hasCppOverride)) then ''
-        echo "[planner] dev overrides present:${if hasGoOverride then " go" else ""}${if hasCppOverride then " cpp" else ""}" >> $out/build.log
-      '' else ""}
-      echo "goTargets keys: ${lib.concatStringsSep "," (builtins.attrNames goOutPaths)}" >> $out/build.log
-      echo "cppTargets bin keys: ${lib.concatStringsSep "," (builtins.attrNames cppOutPaths)}" >> $out/build.log
-      echo '[' > $out/manifest.json
-      first=1
-      ${lib.concatStringsSep "\n" (lib.mapAttrsToList (n: p:
-        ''
-          ln -s "${p}" "$out/" || true
-          echo "== target: ${n} ==" >> $out/build.log
-          echo "path: ${p}" >> $out/build.log
-          echo "deriver: $(nix-store -q --deriver "${p}" 2>/dev/null || true)" >> $out/build.log
-          echo "modulesToml: ${builtins.toString (modulesTomlFor n)}" >> $out/build.log
-          echo "pkgPath: ${pkgPathOf n}" >> $out/build.log
-          echo "targetName: ${targetNameOf n}" >> $out/build.log
-          echo "expected subdir(bin): ${pkgPathOf n}/cmd/${targetNameOf n}" >> $out/build.log
-          echo "expected srcRoot: (repo root with apps/libs)" >> $out/build.log
-          echo "tree (depth 2) of out path:" >> $out/build.log
-          (cd "${p}" && { ls -la || true; echo "-- bin --"; ls -la bin 2>/dev/null || true; }) >> $out/build.log || true
-          bins=""
-          if [ -d "${p}/bin" ]; then
-            for f in "${p}/bin"/*; do
-              if [ -f "$f" ] && [ -x "$f" ]; then
-                if [ -z "$bins" ]; then bins="\"$f\""; else bins="$bins, \"$f\""; fi
-                ln -s "$f" "$out/bin/$(basename "$f")" || true
-                ln -s "$f" "$out/bin/${sanitize n}" || true
-                ln -s "$f" "$out/bin/go-${sanitize n}" || true
-              fi
-            done
-          fi
-          if [ -n "$bins" ]; then
-            echo "label=${n} bins=[ $bins ]" >> $out/build.log
-            if [ "$first" -eq 0 ]; then echo "," >> $out/manifest.json; fi
-            echo "{ \"label\": \"${n}\", \"kind\": \"bin\", \"bins\": [ $bins ], \"aux\": [] }" >> $out/manifest.json
-            first=0
-          else
-            echo "label=${n} bins=[]" >> $out/build.log
-          fi
-        ''
-      ) goOutPaths)}
-      ${lib.concatStringsSep "\n" (lib.mapAttrsToList (n: p:
-        ''
-          ln -s "${p}" "$out/" || true
-          echo "== cpp target: ${n} ==" >> $out/build.log
-          echo "path: ${p}" >> $out/build.log
-          (cd "${p}" && { ls -la || true; echo "-- bin --"; ls -la bin 2>/dev/null || true; }) >> $out/build.log || true
-          bins=""
-          if [ -d "${p}/bin" ]; then
-            for f in "${p}/bin"/*; do
-              if [ -f "$f" ] && [ -x "$f" ]; then
-                if [ -z "$bins" ]; then bins="\"$f\""; else bins="$bins, \"$f\""; fi
-                ln -s "$f" "$out/bin/$(basename "$f")" || true
-                ln -s "$f" "$out/bin/${sanitize n}" || true
-                ln -s "$f" "$out/bin/cpp-${sanitize n}" || true
-              fi
-            done
-          fi
-          if [ -n "$bins" ]; then
-            if [ "$first" -eq 0 ]; then echo "," >> $out/manifest.json; fi
-            echo "{ \"label\": \"${n}\", \"kind\": \"bin\", \"bins\": [ $bins ], \"aux\": [] }" >> $out/manifest.json
-            first=0
-          fi
-        ''
-      ) cppOutPaths)}
-      ${lib.concatStringsSep "\n" (lib.mapAttrsToList (n: p:
-        ''
-          ln -s "${p}" "$out/" || true
-          echo "== node target: ${n} ==" >> $out/build.log
-          (cd "${p}" && { ls -la || true; echo "-- bin --"; ls -la bin 2>/dev/null || true; }) >> $out/build.log || true
-          bins=""
-          if [ -d "${p}/bin" ]; then
-            for f in "${p}/bin"/*; do
-              if [ -f "$f" ] && [ -x "$f" ]; then
-                if [ -z "$bins" ]; then bins="\"$f\""; else bins="$bins, \"$f\""; fi
-                ln -s "$f" "$out/bin/$(basename "$f")" || true
-                ln -s "$f" "$out/bin/${sanitize n}" || true
-                ln -s "$f" "$out/bin/node-${sanitize n}" || true
-              fi
-            done
-          fi
-          if [ -n "$bins" ]; then
-            if [ "$first" -eq 0 ]; then echo "," >> $out/manifest.json; fi
-            echo "{ \"label\": \"${n}\", \"kind\": \"bin\", \"bins\": [ $bins ], \"aux\": [] }" >> $out/manifest.json
-            first=0
-          fi
-        ''
-      ) nodeOutPaths)}
-      echo ']' >> $out/manifest.json
-    '';
+  # Build manifest and bin links (extracted module)
+  Manifest = import (manifestBase + "/planner/manifest.nix") {
+    inherit pkgs lib repoRootStr devOverrideJSON devOverrideCppJSON isCI suppressDevOverrideLog
+            goOutPaths cppOutPaths nodeOutPaths modulesTomlFor pkgPathOf targetNameOf sanitize;
+  };
+  all = Manifest.all;
 in
 {
   inherit goTargets cppTargets cppTargetsFlat all selected;

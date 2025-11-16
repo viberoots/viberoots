@@ -1,0 +1,72 @@
+import * as fsp from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { createDbg } from "../lib/util";
+import { encodeNixAttrForPatchPrefix, normalizeNixAttr } from "../../lib/providers";
+import { resolveNixpkg } from "./resolve";
+
+const dbg = createDbg("patch-cpp:extract");
+
+export async function extractOrCopySrc(srcPath: string, destDir: string): Promise<string> {
+  await fsp.mkdir(destDir, { recursive: true });
+  // If srcPath is a directory in the store, copy it. Otherwise, attempt extraction.
+  const stat = await fsp.stat(srcPath).catch(() => null);
+  if (stat && stat.isDirectory()) {
+    console.error("[patch-cpp] extract: copy dir", srcPath);
+    // Copy store dir into a writable workspace; prefer rsync for portability
+    await $`rsync -a ${srcPath}/ ${destDir}/`;
+    await $`chmod -R u+w ${destDir}`;
+    console.error("[patch-cpp] extract: copy dir done");
+    return destDir;
+  }
+
+  const lower = srcPath.toLowerCase();
+  if (lower.endsWith(".zip")) {
+    console.error("[patch-cpp] extract: unzip", srcPath);
+    await $({ cwd: destDir })`unzip -qq ${srcPath}`.nothrow();
+  } else {
+    // Extract the full source to ensure expected headers (e.g., zlib.h) are present
+    console.error("[patch-cpp] extract: tar -xf full", srcPath);
+    await $({ cwd: destDir })`tar -xf ${srcPath}`.nothrow();
+    await $`chmod -R u+w ${destDir}`.nothrow();
+  }
+  // Heuristic: if extraction created a single directory, descend into it for origin path
+  const entries = await fsp.readdir(destDir);
+  if (entries.length === 1) {
+    const only = path.join(destDir, entries[0]);
+    const st = await fsp.stat(only).catch(() => null);
+    if (st && st.isDirectory()) return only;
+  }
+  console.error("[patch-cpp] extract: done");
+  return destDir;
+}
+
+export async function ensureOriginAndWorkspace(
+  attr: string,
+  pre?: { pname: string; version: string; srcPath: string },
+): Promise<{
+  key: string;
+  originPath: string;
+  workspacePath: string;
+  version: string;
+  pname: string;
+}> {
+  const attrNorm = normalizeNixAttr(attr);
+  const { pname, version, srcPath } = pre || (await resolveNixpkg(attrNorm));
+  const key = `${attrNorm}@${version}`.toLowerCase();
+  const stamp = new Date()
+    .toISOString()
+    .replace(/[-:TZ.]/g, "")
+    .slice(0, 14);
+  const safeKey = encodeNixAttrForPatchPrefix(key);
+  const base = path.join(os.tmpdir(), "bucknix-patch-cpp");
+  const originRoot = path.join(base, `origin-${safeKey}-${stamp}`);
+  const wsRoot = path.join(base, `ws-${safeKey}-${stamp}`);
+  await fsp.mkdir(base, { recursive: true });
+  const originPath = await extractOrCopySrc(srcPath, originRoot);
+  // Create workspace by cloning originPath
+  await $`rsync -a ${originPath}/ ${wsRoot}/`;
+  await $`chmod -R u+w ${wsRoot}`;
+  dbg("ensureOriginAndWorkspace", { attr: attrNorm, originRoot, wsRoot, version, pname });
+  return { key, originPath, workspacePath: wsRoot, version, pname };
+}
