@@ -251,3 +251,4 @@ Notes:
 
 - No glue is required for C++; package‑local patch files are included in `srcs` and passed to the Nix C++ derivations.
 - If your C++ targets link against Go C archives, that integration is handled by the planner/templates and requires no special steps in this workflow.
+- C++ macros now use the shared nixpkgs label helper (`append_nixpkg_labels` from `lang/defs_common.bzl`) for stamping `nixpkg:` labels. This change only removes duplication; behavior and exported graphs are unchanged.
