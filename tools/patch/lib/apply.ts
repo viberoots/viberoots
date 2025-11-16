@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import { debugEnabled } from "./util";
+import { getFlagBool, getFlagStr } from "../../lib/cli.ts";
 
 export type ApplyFlags = {
   targetPkg: string;
@@ -13,30 +14,66 @@ export type ApplyFlags = {
 };
 
 export function parseApplyFlags(argv: string[]): ApplyFlags {
-  let targetPkg = "";
-  let overridePatchDir = "";
-  let force = false;
+  // 1) Parse flags from provided argv (programmatic use in tests)
+  let parsedTarget: string | null = null;
+  let parsedPatchDir: string | null = null;
+  let parsedForce = false;
   const rest: string[] = [];
   for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === "--target" && i + 1 < argv.length) {
-      const t = String(argv[++i] || "").trim();
-      targetPkg = normalizeTargetToPkg(t);
-    } else if (a.startsWith("--target=")) {
-      const t = a.split("=", 2)[1] || "";
-      targetPkg = normalizeTargetToPkg(t.trim());
-    } else if (a === "--patch-dir" && i + 1 < argv.length) {
-      overridePatchDir = String(argv[++i] || "").trim();
-    } else if (a.startsWith("--patch-dir=")) {
-      overridePatchDir = (a.split("=", 2)[1] || "").trim();
-    } else if (a === "--force") {
-      force = true;
-    } else if (a.startsWith("--")) {
-      // ignore unknown flags
-    } else {
+    const a = argv[i] || "";
+    if (!a.startsWith("--")) {
       rest.push(a);
+      continue;
     }
+    if (a === "--target") {
+      const nxt = argv[i + 1] || "";
+      if (nxt && !nxt.startsWith("--")) {
+        parsedTarget = nxt.trim();
+        i++;
+      } else {
+        parsedTarget = "";
+      }
+      continue;
+    }
+    if (a.startsWith("--target=")) {
+      parsedTarget = a.slice("--target=".length).trim();
+      continue;
+    }
+    if (a === "--patch-dir" || a === "--patchDir") {
+      const nxt = argv[i + 1] || "";
+      if (nxt && !nxt.startsWith("--")) {
+        parsedPatchDir = nxt.trim();
+        i++;
+      } else {
+        parsedPatchDir = "";
+      }
+      continue;
+    }
+    if (a.startsWith("--patch-dir=")) {
+      parsedPatchDir = a.slice("--patch-dir=".length).trim();
+      continue;
+    }
+    if (a.startsWith("--patchDir=")) {
+      parsedPatchDir = a.slice("--patchDir=".length).trim();
+      continue;
+    }
+    if (a === "--force") {
+      parsedForce = true;
+      continue;
+    }
+    // Unknown flags are ignored (dropped from rest) to preserve prior behavior
   }
+
+  // 2) Merge with standardized helpers (CLI invocation via zx/yargs/process.argv)
+  const cliTarget = getFlagStr("target", "").trim();
+  const cliPatchDir = (getFlagStr("patch-dir", "") || getFlagStr("patchDir", "")).trim();
+  const cliForce = getFlagBool("force");
+
+  const targetRaw = (parsedTarget ?? cliTarget) || "";
+  const overridePatchDir = (parsedPatchDir ?? cliPatchDir) || "";
+  const force = parsedForce || cliForce;
+
+  const targetPkg = normalizeTargetToPkg(targetRaw);
   return { targetPkg, overridePatchDir, restArgs: rest, force };
 }
 

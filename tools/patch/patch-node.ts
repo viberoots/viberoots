@@ -6,6 +6,7 @@ import { deleteSession, findSessionBy, getSession, setSession } from "./state";
 import type { LanguageHandler, SessionRecord } from "./types";
 import { repoRoot } from "./lib/apply";
 import { pathExists } from "./lib/util";
+import { getFlagStr } from "../lib/cli.ts";
 
 function pkgArg(args: string[]): string {
   const p = args[0];
@@ -19,7 +20,6 @@ function pnpmBin(): string {
 }
 
 async function findImporterDir(args: string[]): Promise<string> {
-  const flagIdx = args.findIndex((a) => a === "--importer");
   const repoRootDir = repoRoot();
 
   const hasLock = async (dir: string): Promise<boolean> =>
@@ -30,17 +30,18 @@ async function findImporterDir(args: string[]): Promise<string> {
     return (await hasLock(abs)) ? abs : null;
   };
 
-  if (flagIdx >= 0 && args[flagIdx + 1]) {
-    const ok = await resolveCandidate(args[flagIdx + 1]);
+  // Standardized flag parsing for --importer (global argv → process.argv)
+  const importerFlag = getFlagStr("importer", "").trim();
+  if (importerFlag) {
+    const ok = await resolveCandidate(importerFlag);
     if (ok) return ok;
   }
-  try {
-    const g = (global as any).argv as any;
-    if (g && typeof g.importer === "string" && g.importer.trim() !== "") {
-      const ok = await resolveCandidate(g.importer);
-      if (ok) return ok;
-    }
-  } catch {}
+  // Backward-compatibility: tolerate split-form flag in the passed args (rare)
+  const idx = args.findIndex((a) => a === "--importer");
+  if (idx >= 0 && args[idx + 1]) {
+    const ok = await resolveCandidate(args[idx + 1]);
+    if (ok) return ok;
+  }
 
   // Walk up to detect nearest directory with a pnpm-lock.yaml
   let here = process.cwd();
