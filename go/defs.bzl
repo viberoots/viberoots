@@ -6,15 +6,6 @@ def _append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled):
     append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled)
 
 
-def _nixpkg_provider_for(attr):
-    # Deterministic provider target name for nixpkgs attribute paths, aligned with TS helper
-    norm = normalize_nix_attr(attr)
-    # Replace any non-alphanumeric character with underscore for a stable provider name
-    tail = "".join([c if (c.isalnum() or c == "_") else "_" for c in norm])
-    # Family is "nix_" and the package tail is the entire normalized attribute (may start with pkgs_)
-    return "//third_party/providers:nix_%s" % tail
-
-
 def _apply_cgo_labels(kwargs, nix_cgo_deps, repo_cgo_deps):
     if len(nix_cgo_deps) > 0 or len(repo_cgo_deps) > 0:
         labels = kwargs.get("labels", []) or []
