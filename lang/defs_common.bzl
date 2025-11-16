@@ -41,6 +41,19 @@ def append_patch_srcs(kwargs, dirs):
         kwargs["srcs"] = dedupe_preserve(srcs)
 
 
+def append_node_patches_for_importer(kwargs, importer):
+    """
+    Append importer-local Node patches into kwargs["srcs"].
+    - If importer == ".", use "patches/node"
+    - Else use "<importer>/patches/node"
+    No-op when importer is empty or not a string.
+    """
+    if importer == None or not isinstance(importer, str) or importer == "":
+        return
+    patch_dir = "patches/node" if importer == "." else ("%s/patches/node" % importer)
+    append_patch_srcs(kwargs, [patch_dir])
+
+
 def normalize_build_tags(tags):
     s = {}
     for t in tags or []:
