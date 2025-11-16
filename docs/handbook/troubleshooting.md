@@ -52,7 +52,7 @@
 ## Overrides in CI
 
 - Ensure `NIX_GO_DEV_OVERRIDE_JSON` and `NIX_CPP_DEV_OVERRIDE_JSON` are unset. Locally, use `tools/dev/clear-overrides.ts`.
-- Shared helper: `tools/nix/dev-overrides.nix` centralizes override parsing and CI guard. Templates should import it to emit a local warning (trace) when overrides are set and to throw in CI if overrides are present.
+- Shared helper: `tools/nix/lib/lang-helpers.nix` centralizes override parsing and CI guard (`readDevOverrides`, `guardNoDevOverridesInCI`). Templates import it to emit a local warning (trace) when overrides are set and to throw in CI if overrides are present.
 
 ## Duplicate/malformed patches
 

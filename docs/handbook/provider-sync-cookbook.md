@@ -21,16 +21,16 @@ Canonical naming and helpers:
 - **nixpkgs attr map**: The unified orchestrator generates `third_party/providers/nix_attr_map.bzl` deterministically; Starlark macros should load from this mapping instead of deriving attrs heuristically.
 - **Patch fixtures**: `tools/tests/lib/fixtures/go.ts: ensurePatch()` creates a correctly named patch file for tests.
 
-### Shared Nix helpers (templates-common)
+### Shared Nix helpers (lang-helpers)
 
-For Nix templates that need to apply patches or support dev overrides, import the shared helpers once:
+For Nix templates that need to apply patches or support dev overrides, import the shared helpers from the canonical location:
 
 ```nix
 # tools/nix/templates/<lang>.nix
 { pkgs }:
 let
   lib = pkgs.lib;
-  Common = import ../templates-common.nix { inherit pkgs; };
+  Common = import ../lib/lang-helpers.nix { inherit pkgs; };
 in {
   buildFn = args:
     let
