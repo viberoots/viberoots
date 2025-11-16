@@ -14,6 +14,7 @@ try {
   } catch {}
 }
 import path from "node:path";
+import { getFlagStr, getFlagBool } from "../lib/cli.ts";
 
 type SubcommandName = "start" | "apply" | "reset" | "session" | "remove" | "help";
 
@@ -42,75 +43,41 @@ function usage(msg?: string) {
   process.exit(2);
 }
 
-function parseArgs(): {
-  _: string[];
-  importer?: string;
-  lang?: string;
-  force?: boolean;
-  target?: string;
-  patchDir?: string;
-} {
+function positionalArgs(): string[] {
   const g: any = (global as any).argv;
-  if (g && Array.isArray(g._)) return g;
-  const out: {
-    _: string[];
-    importer?: string;
-    lang?: string;
-    force?: boolean;
-    target?: string;
-    patchDir?: string;
-  } = { _: [] };
-  const argv = (process.argv || []).slice(2);
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === "--importer" && i + 1 < argv.length) {
-      out.importer = argv[++i];
-    } else if (a.startsWith("--importer=")) {
-      out.importer = a.split("=", 2)[1] || "";
-    } else if (a === "--target" && i + 1 < argv.length) {
-      (out as any).target = argv[++i];
-    } else if (a.startsWith("--target=")) {
-      (out as any).target = a.split("=", 2)[1] || "";
-    } else if (a === "--patch-dir" && i + 1 < argv.length) {
-      (out as any).patchDir = argv[++i];
-    } else if (a.startsWith("--patch-dir=")) {
-      (out as any).patchDir = a.split("=", 2)[1] || "";
-    } else if (a === "--lang" && i + 1 < argv.length) {
-      out.lang = argv[++i];
-    } else if (a.startsWith("--lang=")) {
-      out.lang = a.split("=", 2)[1] || "";
-    } else if (a === "--force") {
-      (out as any).force = true;
-    } else if (a.startsWith("--")) {
-      // ignore unknown flag
-    } else {
-      out._.push(a);
-    }
+  if (g && Array.isArray(g._)) return g._ as string[];
+  const raw = (process.argv || []).slice(2);
+  const out: string[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    const a = raw[i] || "";
+    if (a.startsWith("--")) continue; // keep behavior: treat non-flags as positionals
+    out.push(a);
   }
   return out;
 }
 
-const argvAll = parseArgs();
-const [_subRaw, _lang, ...positional] = (argvAll._ as string[]) || [];
+const [_subRaw, _lang, ...positional] = positionalArgs();
 const sub = ((_subRaw as string) || "help").toLowerCase() as SubcommandName;
-const lang = (_lang as string) || (argvAll.lang as string);
+const langFlag = getFlagStr("lang", "");
+const lang = (_lang as string) || langFlag;
 const rest: string[] = [...(positional as string[])];
 // Pass-through select flags needed by language handlers (opt-in list to reduce surprises)
-if (typeof argvAll.importer === "string" && argvAll.importer.trim() !== "") {
-  rest.push("--importer", String(argvAll.importer));
+const importer = getFlagStr("importer", "");
+if (importer.trim() !== "") {
+  rest.push("--importer", importer);
 }
-if (
-  typeof (argvAll as any).target === "string" &&
-  ((argvAll as any).target as string).trim() !== ""
-) {
-  rest.push("--target", String((argvAll as any).target));
+const target = getFlagStr("target", "");
+if (target.trim() !== "") {
+  rest.push("--target", target);
 }
-// Support both camelCase and dashed variants from zx/minimist
-const patchDirVal = (argvAll as any).patchDir || (argvAll as any)["patch-dir"] || "";
-if (typeof patchDirVal === "string" && patchDirVal.trim() !== "") {
-  rest.push("--patch-dir", String(patchDirVal));
+// Support both dashed and camelCase variants commonly present via zx/minimist
+const patchDirDashed = getFlagStr("patch-dir", "");
+const patchDirCamel = getFlagStr("patchDir", "");
+const patchDirVal = patchDirDashed || patchDirCamel;
+if (patchDirVal.trim() !== "") {
+  rest.push("--patch-dir", patchDirVal);
 }
-if ((argvAll as any).force === true) {
+if (getFlagBool("force")) {
   rest.push("--force");
 }
 
