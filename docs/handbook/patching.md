@@ -4,6 +4,12 @@ Note: Go and C++ use per‑target local patching by default. Place patches under
 
 All scripts are zx TypeScript using `#!/usr/bin/env zx-wrapper`.
 
+### Shared helpers (consistency across languages)
+
+- Patch handlers reuse `tools/patch/lib/apply.ts: repoRoot()` for repo‑root detection.
+- Filesystem existence checks use `tools/patch/lib/util.ts: pathExists()`.
+- Avoid bespoke implementations; this keeps behavior consistent across Go/C++/Node.
+
 ## Workflow
 
 - Start: `tools/bin/patch-pkg start go <importPath>`

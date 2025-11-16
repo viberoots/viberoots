@@ -4,15 +4,8 @@ import path from "node:path";
 import { runGlue } from "./glue";
 import { deleteSession, findSessionBy, getSession, setSession } from "./state";
 import type { LanguageHandler, SessionRecord } from "./types";
-
-async function pathExists(p: string): Promise<boolean> {
-  try {
-    await fsp.access(p);
-    return true;
-  } catch {
-    return false;
-  }
-}
+import { repoRoot } from "./lib/apply";
+import { pathExists } from "./lib/util";
 
 function pkgArg(args: string[]): string {
   const p = args[0];
@@ -25,22 +18,15 @@ function pnpmBin(): string {
   return b || "pnpm";
 }
 
-function repoRootFromScript(): string {
-  const scriptDir = path.dirname(new URL(import.meta.url).pathname);
-  return path.resolve(scriptDir, "..", "..");
-}
-
 async function findImporterDir(args: string[]): Promise<string> {
   const flagIdx = args.findIndex((a) => a === "--importer");
-  const repoRoot =
-    (process.env.WORKSPACE_ROOT && path.resolve(process.env.WORKSPACE_ROOT)) ||
-    repoRootFromScript();
+  const repoRootDir = repoRoot();
 
   const hasLock = async (dir: string): Promise<boolean> =>
     await pathExists(path.join(dir, "pnpm-lock.yaml"));
 
   const resolveCandidate = async (cand: string): Promise<string | null> => {
-    const abs = path.isAbsolute(cand) ? cand : path.resolve(repoRoot, cand);
+    const abs = path.isAbsolute(cand) ? cand : path.resolve(repoRootDir, cand);
     return (await hasLock(abs)) ? abs : null;
   };
 
@@ -62,7 +48,7 @@ async function findImporterDir(args: string[]): Promise<string> {
     if (await hasLock(here)) return here;
     const next = path.dirname(here);
     if (next === here) break;
-    const relToRepo = path.relative(repoRoot, next);
+    const relToRepo = path.relative(repoRootDir, next);
     if (relToRepo.startsWith("..")) break;
     here = next;
   }
@@ -72,9 +58,7 @@ async function findImporterDir(args: string[]): Promise<string> {
 }
 
 function sessionKey(importerDir: string, pkgName: string): string {
-  const root =
-    (process.env.WORKSPACE_ROOT && path.resolve(process.env.WORKSPACE_ROOT)) ||
-    repoRootFromScript();
+  const root = repoRoot();
   const rel = path.relative(root, importerDir).replace(/\\/g, "/");
   return `${rel || "."}#${pkgName}`.toLowerCase();
 }
@@ -137,7 +121,7 @@ async function doApply(args: string[]) {
   await deleteSession("node", key);
   const prev = process.cwd();
   try {
-    process.chdir(repoRootFromScript());
+    process.chdir(repoRoot());
     await runGlue();
   } finally {
     try {
@@ -177,7 +161,7 @@ async function doRemove(args: string[]) {
   }
   const prev = process.cwd();
   try {
-    process.chdir(repoRootFromScript());
+    process.chdir(repoRoot());
     await runGlue();
   } finally {
     try {
