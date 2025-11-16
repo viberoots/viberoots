@@ -112,6 +112,32 @@ def normalize_nix_attr(attr):
     return s
 
 
+# PR-6: Starlark probe for nix attribute normalization
+def _normalize_nix_attr_probe_impl(ctx):
+    val = normalize_nix_attr(ctx.attrs.attr)
+    out = ctx.actions.declare_output(ctx.attrs.out)
+    ctx.actions.write(out, val + "\n")
+    return [DefaultInfo(default_output = out)]
+
+_normalize_nix_attr_probe = rule(
+    impl = _normalize_nix_attr_probe_impl,
+    attrs = {
+        "attr": attrs.string(),
+        "out": attrs.string(),
+    },
+)
+
+def normalize_nix_attr_probe(name, attr):
+    """
+    Test-only helper that materializes the normalized nix attr into a declared output.
+    The output file name is the normalized value with a .txt suffix.
+    """
+    _normalize_nix_attr_probe(
+        name = name,
+        attr = attr,
+        out = normalize_nix_attr(attr) + ".txt",
+    )
+
 # PR-2: Centralized provider lookup helpers shared by language macros
 def target_key_for_current_package(name):
     """
