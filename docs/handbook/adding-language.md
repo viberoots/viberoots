@@ -11,6 +11,12 @@ This guide explains how to add a new language to the build without touching core
 - Scaffolding templates: `tools/scaffolding/templates/<lang>/...` + language registry entry
 - Tests: zx tests using `tools/tests/lib/lang-fixtures.ts`
 
+Tip for lockfile-style ecosystems (e.g., Node/PNPM):
+
+- Use the shared helpers from `lang/defs_common.bzl`:
+  - `extract_lockfile_labels(labels)` to find lockfile labels on a rule
+  - `ensure_single_lockfile_label(kwargs, lockfile_label)` to enforce exactly one importer-scoped label (`lockfile:<path>#<importer>`) with stable dedupe and canonical error text
+
 ## Path invariants (must-follow)
 
 - Patches live under `patches/<lang>/` (flat directory).

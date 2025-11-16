@@ -14,6 +14,37 @@ def normalize_labels(pkg, labels):
     return out
 
 
+# PR-2: Shared lockfile label helpers for importer-scoped Node macros
+def extract_lockfile_labels(labels):
+    """
+    Return labels that look like lockfile labels.
+    Matches strings beginning with "lockfile:"; does not validate importer suffix here.
+    """
+    if labels == None:
+        return []
+    out = []
+    for l in labels:
+        if isinstance(l, str) and l.startswith("lockfile:"):
+            out.append(l)
+    return out
+
+
+def ensure_single_lockfile_label(kwargs, lockfile_label):
+    """
+    Ensure kwargs carries exactly one importer-scoped lockfile label.
+    - Optionally merges an explicit lockfile_label arg
+    - Dedupes while preserving order
+    - Error text is precise and stable (relied upon by tests)
+    """
+    labels = kwargs.get("labels", []) or []
+    if lockfile_label != None and isinstance(lockfile_label, str) and lockfile_label != "":
+        labels = labels + [lockfile_label]
+    lf = extract_lockfile_labels(labels)
+    if len(lf) != 1:
+        fail("Exactly one importer-scoped lockfile label is required (lockfile:<path>#<importer>); got: %s" % lf)
+    kwargs["labels"] = dedupe_preserve(labels)
+
+
 def dedupe_preserve(seq):
     seen = {}
     out = []

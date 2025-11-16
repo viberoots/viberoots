@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "genrule")
-load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve", "append_patch_srcs", "providers_for", "append_node_patches_for_importer")
+load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve", "append_patch_srcs", "providers_for", "append_node_patches_for_importer", "extract_lockfile_labels", "ensure_single_lockfile_label")
 load("//lang:sanitize.bzl", "sanitize_name")
 load("//node/private:nix_test.bzl", "node_nix_test")
 
@@ -11,32 +11,16 @@ def _sanitize_importer_attr(s):
     # Use canonical sanitizer from //lang:sanitize.bzl (mirrors flake-side sanitizeName)
     return sanitize_name(s)
 
-def _extract_lockfile_labels(labels):
-    out = []
-    for l in labels or []:
-        if isinstance(l, str) and l.startswith("lockfile:"):
-            out.append(l)
-    return out
-
-def _ensure_lockfile_label(kwargs, lockfile_label):
-    labels = kwargs.get("labels", []) or []
-    if lockfile_label != None and isinstance(lockfile_label, str) and lockfile_label != "":
-        labels = labels + [lockfile_label]
-    lf = _extract_lockfile_labels(labels)
-    if len(lf) != 1:
-        fail("Exactly one importer-scoped lockfile label is required (lockfile:<path>#<importer>); got: %s" % lf)
-    kwargs["labels"] = dedupe_preserve(labels)
-
 def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = [], lockfile_label = None, kind = "gen", **kwargs):
     kwargs["name"] = name
     # Merge explicit deps and provider deps into srcs so edges are realized even if genrule doesn't support `deps`.
     merged_srcs = list(srcs)
     kwargs["labels"] = labels
-    _ensure_lockfile_label(kwargs, lockfile_label)
+    ensure_single_lockfile_label(kwargs, lockfile_label)
     stamp_labels(kwargs, "node", kind)
     # Include importer-local node patches in srcs so Buck invalidates precisely on patch changes
     # Derive importer from the single required lockfile label
-    _lf = _extract_lockfile_labels(kwargs.get("labels", []))
+    _lf = extract_lockfile_labels(kwargs.get("labels", []))
     _importer = None
     if len(_lf) == 1 and isinstance(_lf[0], str):
         _lab = _lf[0]
@@ -72,11 +56,11 @@ def nix_node_test(
     # Prepare kwargs and label stamping
     kw = { "name": name }
     kw["labels"] = labels or []
-    _ensure_lockfile_label(kw, lockfile_label)
+    ensure_single_lockfile_label(kw, lockfile_label)
     stamp_labels(kw, "node", kind)
 
     # Derive importer from the single required lockfile label
-    _lf = _extract_lockfile_labels(kw.get("labels", []))
+    _lf = extract_lockfile_labels(kw.get("labels", []))
     _importer = None
     if len(_lf) == 1 and isinstance(_lf[0], str) and ("#" in _lf[0]):
         _importer = _lf[0].split("#")[1]

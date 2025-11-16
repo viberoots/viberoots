@@ -96,6 +96,7 @@ node tools/ci/run-stage.ts --stage patches-lint
   - Patches live under `<importer>/patches/node/*.patch` (e.g., `apps/web/patches/node/...`).
   - Changing a patch only invalidates Node targets bound to that importer.
 - Provider stamps for Node are importer‑scoped and do not reference patch files as `srcs` (see Provider sync cookbook below); correctness comes from macro‑side `srcs` inclusion.
+- Lockfile label enforcement and parsing are centralized: macros call `ensure_single_lockfile_label(...)` and `extract_lockfile_labels(...)` from `lang/defs_common.bzl`. Error messages and behavior are stable and shared across Node macros.
 
 Quick checks and guidance:
 
