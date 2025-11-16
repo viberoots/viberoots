@@ -29,6 +29,20 @@ export async function writeIfChanged(dst: string, data: string) {
   // silent
 }
 
+export async function maybeAssumeUnchanged(file: string) {
+  try {
+    const { stdout, exitCode } = await $({
+      stdio: "pipe",
+    })`git rev-parse --is-inside-work-tree`.nothrow();
+    if (exitCode === 0 && String(stdout || "").trim() === "true") {
+      const check = await $({ stdio: "pipe" })`git ls-files --error-unmatch ${file}`.nothrow();
+      if (check.exitCode === 0) {
+        await $({ stdio: "pipe" })`git update-index --assume-unchanged ${file}`.nothrow();
+      }
+    }
+  } catch {}
+}
+
 // Write a deterministic stamp file that captures the content of inputs in a
 // stable format. Inputs are de-duplicated by path, sorted by path, and each
 // contributes its path marker and content (or a missing marker) to the stamp.

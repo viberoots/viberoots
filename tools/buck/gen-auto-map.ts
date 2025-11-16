@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { writeIfChanged } from "../lib/fs-helpers";
+import { writeIfChanged, maybeAssumeUnchanged } from "../lib/fs-helpers";
 // zx is available via shebang; we'll use `$` to interact with git when present.
 import { readCompositeGraph } from "../lib/graph-view.ts";
 // PR6 (go-cpp-local-patching): provider mapping is Node-only (lockfile:...) and nixpkg; Go `module:`
@@ -21,21 +21,7 @@ const outPath = getFlagStr("out", "third_party/providers/auto_map.bzl");
 // parsing moved to tools/lib/labels.ts
 
 async function main() {
-  // Best-effort: mark the output file as 'assume-unchanged' so that when we
-  // overwrite the tracked stub with generated contents, local working trees
-  // don't show it as modified. This is a local index hint only; it is safe to
-  // ignore errors (e.g., when not in a git work tree or file not tracked).
-  try {
-    const { stdout, exitCode } = await $({
-      stdio: "pipe",
-    })`git rev-parse --is-inside-work-tree`.nothrow();
-    if (exitCode === 0 && String(stdout || "").trim() === "true") {
-      const check = await $({ stdio: "pipe" })`git ls-files --error-unmatch ${outPath}`.nothrow();
-      if (check.exitCode === 0) {
-        await $({ stdio: "pipe" })`git update-index --assume-unchanged ${outPath}`.nothrow();
-      }
-    }
-  } catch {}
+  await maybeAssumeUnchanged(outPath);
 
   const { nodes } = await readCompositeGraph({
     graphPath: graphPath || undefined,
