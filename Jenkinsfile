@@ -30,6 +30,9 @@ pipeline {
           stage('Pre-build guard') {
             steps { sh 'node tools/ci/run-stage.ts --stage prebuild-guard' }
           }
+          stage('CPP Addon Smoke') {
+            steps { sh 'node tools/ci/run-stage.ts --stage cpp-addon-smoke' }
+          }
           stage('File size lint (warn)') {
             steps { sh 'node tools/ci/run-stage.ts --stage file-size-lint' }
           }

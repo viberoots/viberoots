@@ -17,7 +17,8 @@ type Stage =
   | "patches-lint"
   | "file-size-lint"
   | "nix-build-graph-generator"
-  | "buck-test";
+  | "buck-test"
+  | "cpp-addon-smoke";
 
 const stage = getFlagStr("stage", "");
 assert(stage, "missing --stage=<name>");
@@ -134,6 +135,11 @@ async function main() {
       const extra = process.env.COVERAGE === "1" ? ["--", "--env", "COVERAGE=1"] : [];
       await $`timeout -k 10s ${t}s buck2 test //... ${extra}`;
       break;
+    case "cpp-addon-smoke": {
+      const target = path.resolve("tools/ci/cpp-addon-smoke.ts");
+      await $`node ${nodeBase} ${target}`;
+      break;
+    }
     default:
       throw new Error(`unknown stage: ${stage}`);
   }
