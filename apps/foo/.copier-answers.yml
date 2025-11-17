@@ -1,6 +1,0 @@
-name: foo
-language: cpp
-template: cli
-scaf_src_path: tools/scaffolding/templates/cpp/cli
-
-version: 0.0
