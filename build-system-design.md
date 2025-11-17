@@ -83,6 +83,7 @@ extra-experimental-features = nix-command flakes dynamic-derivations ca-derivati
 1. **Glue scripts run outside Nix.** Generators are plain Node tools; do not wrap them in `nix run`.
 1. **Planner languages vs. macro-only languages:** Go and C++ are “planner languages” (the Nix planner emits derivations for them via templates). Node is handled by Buck macros and importer‑scoped providers; it is built and tested through Nix shims. For CLI bundling, a narrowly scoped Node planner plugin (`tools/nix/planner/node.nix`) is used as a shim to invoke bundling without coupling the core planner to Node specifics. This does not change provider/auto_map flows or the Node importer‑scoped provider model.
    - Note: For discoverability only, `tools/nix/lang-templates.nix` exposes a `Node` symbol bag (forwarded from `tools/nix/templates/node.nix`). The planner’s Node plugin remains authoritative; no consumers rely on this symbol bag.
+   - For a concrete Node→C++ addon scaffold and artifact flow, see `node-call-cpp.md`.
 
 ## End-to-End Architecture
 

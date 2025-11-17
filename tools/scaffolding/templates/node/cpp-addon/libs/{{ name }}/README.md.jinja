@@ -5,6 +5,33 @@ This package exposes a simple TypeScript API backed by a C++ Node-API addon.
 - The native addon is built in `libs/{{ name }}-native` and copied here to `native/{{ addon_name }}.node`.
 - The TypeScript entry loads the addon from a stable relative path using `createRequire(import.meta.url)`.
 
+## Quickstart
+
+Follow these steps to scaffold, build, and test the addon-backed library:
+
+1) Generate the scaffold (already done if you are reading this in a generated repo):
+
+   - `scaf new node cpp-addon {{ name }} --yes`
+
+2) Build the C++ addon via Buck/Nix:
+
+   - `buck2 build //libs/{{ name }}-native:napi_addon`
+
+3) Ensure glue is present (export graph → sync providers (Node, if lockfiles exist) → auto_map):
+
+   - `node tools/buck/export-graph.ts --out tools/buck/graph.json`
+   - `node tools/buck/sync-providers-node.ts` (no-op if no pnpm lockfiles are present)
+   - `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
+
+4) Run the Node unit test (single test file, per project conventions):
+
+   - `buck2 test //libs/{{ name }}:unit`
+
+## Runtime loading behavior
+
+- The compiled addon is made available at a stable path: `native/{{ addon_name }}.node`.
+- The loader respects an override for diagnostics: set `ADDON_PATH=/absolute/path/to/{{ addon_name }}.node` to force a specific binary at runtime (useful for low-friction experiments).
+
 ## Scripts
 
 - `pnpm -C libs/{{ name }} build` — compile TS to `dist/`
@@ -15,5 +42,10 @@ This package exposes a simple TypeScript API backed by a C++ Node-API addon.
 - `//libs/{{ name }}:{{ name }}` — Node library (stamp)
 - `//libs/{{ name }}:copy_addon` — copies the `.node` artifact to `native/{{ addon_name }}.node`
 - `//libs/{{ name }}-native:napi_addon` — C++ addon that produces the `.node` artifact
+
+## Design references
+
+- See `node-call-cpp.md` (repo root) for the end-to-end design, rationale, and alternatives.
+- See `build-system-design.md` for the Buck2 + Nix architecture this scaffold follows.
 
 
