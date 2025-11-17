@@ -5,7 +5,7 @@ let
   Node = import ./templates/node.nix { inherit pkgs; };
 in {
   inherit (Go)  goApp goLib goCArchive;
-  inherit (Cpp) cppApp cppLib cppTest;
+  inherit (Cpp) cppApp cppLib cppTest cppNodeAddon;
   # Expose Node symbol bag for discoverability; planner's Node plugin remains authoritative.
   inherit Node;
 }
