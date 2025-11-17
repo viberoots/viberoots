@@ -42,6 +42,16 @@ async function doStart(args: string[]) {
     console.error("[patch-cpp] start: reuse existing workspace", existing.workspacePath);
     dbg("start: reuse-session", { key, existing });
     console.log(existing.workspacePath);
+    if (echoSnippet) {
+      const snippet = formatExportSnippet("NIX_CPP_DEV_OVERRIDE_JSON", {
+        [attrNorm]: existing.workspacePath,
+      });
+      console.error(
+        "\nTo build using this workspace as a dev override (local only), run:\n" +
+          snippet +
+          "\n\nUnset before CI: unset NIX_CPP_DEV_OVERRIDE_JSON\n",
+      );
+    }
     return;
   }
   console.error("[patch-cpp] start: ensure origin and workspace");

@@ -143,35 +143,49 @@ None.
 
 Implement.
 
-## PR‑5: Lint to prevent ad‑hoc provider naming/hashing
+## PR‑5: Split prebuild guard into focused modules (keep behavior identical)
 
 ### Description
 
-Prevent future re‑implementations of `shortHash`, `providerNameForImporter`, `providerNameForNixAttr` outside `tools/lib/providers.ts`.
+Refactor `tools/buck/prebuild/main.ts` into smaller, purpose‑built modules to comply with file size/clarity guidelines while preserving behavior and all existing test outcomes. No functional changes; orchestration remains in `prebuild-guard.ts`.
 
 ### Scope & Changes
 
-- ESLint config or a lightweight grep‑lint script:
-  - Rule: disallow new definitions matching common naming/hashing shapes; require imports from `tools/lib/providers.ts`.
-- Tests:
-  - Add a guard test that runs the lint task and asserts zero violations on the repo.
+- Create submodules under `tools/buck/prebuild/` and move logic:
+  - `notice.ts`: local dev‑override notice logic (env checks + message composition)
+  - `presence.ts`: glue presence checks (graph.json, auto_map, TARGETS.\*.auto, nix_attr_map.bzl)
+  - `freshness.ts`: input vs output freshness computation and diagnostics
+  - `coverage.ts`: provider coverage analysis (expected providers vs MODULE_PROVIDERS mapping)
+  - Reuse existing helpers (`report.ts`, `scan.ts`, `repair.ts`) without behavior changes
+- Keep `tools/buck/prebuild/main.ts` as a thin orchestrator calling these modules; target file size < 250 lines
+- No changes to CLI surface: `tools/buck/prebuild-guard.ts` import path remains the same
+- Update imports only; do not alter messages, exit codes, or JSON output schema
+- Minor test updates only if import paths are referenced directly; otherwise tests remain unchanged
 
 ### Acceptance Criteria
 
-- The lint passes on the current codebase and fails on intentional examples.
-- No behavior changes to builds or tests.
+- Running `node tools/buck/prebuild-guard.ts` produces identical outputs (stderr/stdout content, JSON mode shape) and exit codes across:
+  - clean repo
+  - missing outputs (presence failures)
+  - stale glue (freshness failures)
+  - missing Node importer providers
+  - provider coverage gaps (both provider missing and mapping missing)
+- File sizes:
+  - `tools/buck/prebuild/main.ts` ≤ 250 lines
+  - Each new module ≤ 250 lines
+- All existing prebuild guard tests pass without logic changes
 
 ### Risks
 
-Low. Incremental guardrail.
+Very low. Pure refactor with orchestration preserved; risk confined to import path mistakes.
 
 ### Consequence of Not Implementing
 
-Future drift/duplication in naming logic across scripts.
+The prebuild guard remains a large file, increasing maintenance burden and violating the methodology’s file size guidance.
 
 ### Downsides for Implementing
 
-Slight contributor friction when introducing new helpers (intended).
+Small amount of churn across imports and file locations.
 
 ### Recommendation
 
@@ -217,7 +231,7 @@ Implement.
 2. PR‑2 (Importer resolution centralization) — refactor; low risk, lands next.
 3. PR‑3 (Prebuild notices) — messaging only; land anytime after 1–2.
 4. PR‑4 (Node template doc) — documentation; independent.
-5. PR‑5 (Lint guard) — add after 1–4 to avoid distracting diffs in parallel.
+5. PR‑5 (Prebuild guard refactor) — land after 1–4; no behavior changes.
 6. PR‑6 (Parsing audit/adoption) — final pass once guard is present.
 
 All PRs are independent and reversible.
@@ -237,8 +251,8 @@ All PRs are independent and reversible.
   - Docs render; no code path changes.
   - Backout: delete comment/doc lines.
 - PR‑5:
-  - Lint passes on repo; fails on seeded violations in a test fixture.
-  - Backout: disable the rule or remove the grep‑lint.
+  - All prebuild guard tests pass unchanged; manual spot‑checks show identical outputs and exit codes.
+  - Backout: revert the module split and restore `tools/buck/prebuild/main.ts` monolith.
 - PR‑6:
   - Re‑run provider sync/gen‑auto‑map; expect identical outputs; all zx tests green.
   - Backout: revert individual adoptions (no schema changes).
@@ -249,4 +263,4 @@ All PRs are independent and reversible.
 - Fewer bespoke importer/patch parsing implementations; simpler maintenance.
 - Improved DX via clear local override notices; zero CI behavior change.
 - Clearer documentation of Node template boundaries.
-- Preventative lint guard to keep future contributions aligned with shared helpers.
+- Maintainable prebuild guard via smaller modules; improved readability and compliance with file‑size guidance.

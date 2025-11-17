@@ -1,0 +1,123 @@
+#!/usr/bin/env zx-wrapper
+import fs from "node:fs";
+import * as fsp from "node:fs/promises";
+import path from "node:path";
+import { providerNameForImporter } from "../../lib/providers.ts";
+
+export async function computeMissingOutputs(outputs: string[]): Promise<string[]> {
+  const outPresence: string[] = [];
+  for (const o of outputs) {
+    if (!fs.existsSync(o)) outPresence.push(o);
+  }
+  // If any pnpm-lock.yaml exists, require TARGETS.node.auto
+  try {
+    let lockfiles: string[] = [];
+    try {
+      const { stdout } = await $`git ls-files '**/pnpm-lock.yaml'`;
+      lockfiles = String(stdout || "")
+        .split(/\r?\n/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+    } catch {}
+    if (lockfiles.length > 0) {
+      const nodeAuto = "third_party/providers/TARGETS.node.auto";
+      if (!fs.existsSync(nodeAuto)) outPresence.push(nodeAuto);
+    }
+  } catch {}
+
+  // If any provider autos exist, require nix_attr_map.bzl (needed for provider index consumers)
+  try {
+    const provDir = "third_party/providers";
+    const autosPresent =
+      fs.existsSync(provDir) && fs.readdirSync(provDir).some((f) => /^TARGETS.*\.auto$/.test(f));
+    const nixMap = path.join(provDir, "nix_attr_map.bzl");
+    if (autosPresent && !fs.existsSync(nixMap)) {
+      outPresence.push(nixMap);
+    }
+  } catch {}
+
+  return outPresence;
+}
+
+export function findGoImporterMissingSum(): string[] {
+  const missing: string[] = [];
+  for (const base of ["apps", "libs"]) {
+    try {
+      for (const d of fs.readdirSync(base, { withFileTypes: true })) {
+        if (!d.isDirectory()) continue;
+        const dir = path.join(base, d.name);
+        const gm = fs.existsSync(path.join(dir, "go.mod"));
+        const gs = fs.existsSync(path.join(dir, "go.sum"));
+        if (gm && !gs) missing.push(dir);
+      }
+    } catch {}
+  }
+  return missing;
+}
+
+export function findMissingGomod2nixToml(): string[] {
+  const missing: string[] = [];
+  for (const base of ["apps", "libs"]) {
+    try {
+      for (const d of fs.readdirSync(base, { withFileTypes: true })) {
+        if (!d.isDirectory()) continue;
+        const dir = path.join(base, d.name);
+        const gm = fs.existsSync(path.join(dir, "go.mod"));
+        const gt = fs.existsSync(path.join(dir, "gomod2nix.toml"));
+        if (gm && !gt) missing.push(path.join(dir, "gomod2nix.toml"));
+      }
+    } catch {}
+  }
+  return missing;
+}
+
+export async function findMissingNodeImporterProviders(): Promise<
+  Array<{ lockfile: string; importer: string; provider: string }>
+> {
+  const missing: Array<{ lockfile: string; importer: string; provider: string }> = [];
+  try {
+    let lockfiles: string[] = [];
+    try {
+      const { stdout } = await $`git ls-files '**/pnpm-lock.yaml'`;
+      lockfiles = String(stdout || "")
+        .split(/\r?\n/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+    } catch {}
+    if (!lockfiles.length) return missing;
+
+    const targetsNodeAuto = "third_party/providers/TARGETS.node.auto";
+    const targetsNodeText = fs.existsSync(targetsNodeAuto)
+      ? await fsp.readFile(targetsNodeAuto, "utf8").catch(() => "")
+      : "";
+
+    const haveYaml = await (async () => {
+      try {
+        await import("yaml");
+        return true;
+      } catch {
+        return false;
+      }
+    })();
+    for (const lf of lockfiles) {
+      if (!haveYaml) break;
+      try {
+        const mod = await import("yaml");
+        const YAML: any = (mod as any).default || mod;
+        const doc = YAML.parse(await fsp.readFile(lf, "utf8")) as {
+          importers?: Record<string, unknown>;
+        };
+        const importers = Object.keys(doc?.importers || {});
+        for (const imp of importers) {
+          const importerLabel = imp === "." ? path.dirname(lf) || "." : imp;
+          const prov = providerNameForImporter(lf, importerLabel);
+          const needle = `node_importer_deps(name="${prov}", lockfile="${lf}", importer="${importerLabel}"`;
+          if (!targetsNodeText.includes(needle)) {
+            missing.push({ lockfile: lf, importer: importerLabel, provider: prov });
+          }
+        }
+      } catch {}
+    }
+  } catch {}
+  return missing;
+}
