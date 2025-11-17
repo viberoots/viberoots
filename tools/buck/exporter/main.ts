@@ -12,6 +12,7 @@ import { loadPresentAdapters } from "./lang/contract.ts";
 import type { Adapter, Batch, Metrics, Node } from "./types.ts";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { collectFindings, determineMode, emitFindings, logValidationMode } from "./validation.ts";
 
 export async function run() {
   const { out, scope, simulate, maxParallel, cacheDir, metricsOut, validation } = parseArgs(
@@ -43,52 +44,12 @@ export async function run() {
   );
 
   // Run adapter-level validation for all discovered adapters, collecting findings.
-  const findings: string[] = [];
-  let nodeValidateMs = 0;
-  for (const a of adapters) {
-    if (typeof a.validate === "function") {
-      try {
-        let t0: number | null = null;
-        if (verbose && a.name === "node") t0 = Date.now();
-        const res = await a.validate(nodes);
-        if (t0 !== null) nodeValidateMs += Date.now() - t0;
-        if (Array.isArray(res)) findings.push(...res.filter(Boolean));
-      } catch (e: any) {
-        // Adapters should not throw; convert to a finding to avoid losing context
-        findings.push(String(e?.message || e));
-      }
-    }
-  }
-  if (verbose) {
-    try {
-      console.log(`[exporter][timing] node.validate: ${nodeValidateMs}ms`);
-    } catch {}
-  }
+  const { findings } = await collectFindings(adapters, nodes, verbose);
 
   // Determine effective severity (CI forces error)
-  const ci = String(process.env.CI || "").toLowerCase() === "true";
-  const mode: "warn" | "error" = ci ? "error" : validation;
-  if (verbose) {
-    try {
-      console.log(
-        `[exporter][mode] validation=${mode} (ci=${ci}, cli=${cliValidation || "-"}, env=${
-          envValidation || "-"
-        })`,
-      );
-      console.log(`[exporter][adapters] present=${adapters.map((a) => a.name).join(",")}`);
-      console.log(`[exporter][findings] count=${findings.length}`);
-    } catch {}
-  }
-  if (findings.length) {
-    const hdr = `[exporter] validation ${mode === "warn" ? "warnings" : "errors"} (${findings.length}):`;
-    const body = findings.map((m) => `- ${m}`).join("\n\n");
-    if (mode === "warn") {
-      console.warn(`${hdr}\n\n${body}`);
-    } else {
-      console.error(`${hdr}\n\n${body}`);
-      process.exit(2);
-    }
-  }
+  const { mode, ci } = determineMode(validation);
+  logValidationMode(mode, ci, cliValidation, envValidation, adapters, findings.length, verbose);
+  emitFindings(findings, mode);
 
   const active = adapters.filter((a) => nodes.some((n) => a.isNode(n)));
   if (verbose) {
