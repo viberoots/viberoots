@@ -253,6 +253,18 @@
           nm = nodeMods.mkNodeModules { lockfilePath = importerDir + "/pnpm-lock.yaml"; inherit importerDir; };
           name = builtins.baseNameOf importerDir;
           sanitize = (import ./tools/nix/templates-common.nix { inherit pkgs; }).sanitizeName;
+          # Optional: if a sibling native addon package exists at libs/<name>-native,
+          # build a Node-API addon derivation and make its artifact available for tests.
+          hasNative = builtins.pathExists (./. + ("/" + importerDir + "-native"));
+          TAddon = import ./tools/nix/templates/cpp-node-addon.nix { inherit pkgs; };
+          addonName = name + "_addon";
+          addonDrv = if hasNative then TAddon.cppNodeAddon {
+            name = sanitize name;
+            addonName = sanitize addonName;
+            srcRoot = ./.;
+            subdir = importerDir + "-native";
+            includes = [ "include" ];
+          } else null;
           defaultPatterns = ''
             test/**/*.test.ts
             test/**/*.test.js
@@ -273,6 +285,12 @@
             set -euo pipefail
             cd ${importerDir}
             export SOURCE_DATE_EPOCH=1
+            # If a sibling C++ addon exists, materialize a stable path for the .node artifact
+            if [ -d "../${name}-native" ]; then
+              mkdir -p native
+              # Copy from the pre-built addon derivation into the location expected by the loader
+              cp -f ${if hasNative then "${addonDrv}/lib/${sanitize addonName}.node" else "/dev/null"} "native/${addonName}.node" 2>/dev/null || true
+            fi
             # Resolve vitest bin (prefer node_modules/.bin; fallback to pnpm virtual store)
             # Prepare patterns list (newline separated)
             PATTERNS_FILE="$TMPDIR/patterns.txt"

@@ -16,13 +16,23 @@ test("node: importer-local patch touch triggers rebuild of target", async () => 
     // tracks it and future patch additions invalidate correctly
     const patchDir = path.join(tmp, "apps/demo/patches/node");
     await fsp.mkdir(patchDir, { recursive: true });
+    // Seed a baseline patch so glob() tracks the file from the start
+    const basePatch = path.join(patchDir, "base@0.0.0.patch");
+    await fsp.writeFile(basePatch, "# baseline\n", "utf8");
 
     // TARGETS with nix_node_gen requiring the importer-scoped lockfile label
     const targets = [
       "",
       'load("@prelude//:rules.bzl", "genrule")',
       // Simulate macro behavior: include importer-local patches in srcs and carry the lockfile label
-      'genrule(name="t", out="out.stamp", cmd="echo ok > $OUT", srcs = glob(["apps/demo/patches/node/*.patch"]), labels=["lockfile:apps/demo/pnpm-lock.yaml#apps/demo"])',
+      // Make output content depend on the sources so we can assert a deterministic change (robust vs mtime)
+      "genrule(",
+      '  name = "t",',
+      '  out = "out.stamp",',
+      "  cmd = \"bash -c 'set -euo pipefail; cat $SRCDIR/apps/demo/patches/node/*.patch | wc -c > $OUT'\",",
+      '  srcs = glob(["apps/demo/patches/node/*.patch"]),',
+      '  labels = ["lockfile:apps/demo/pnpm-lock.yaml#apps/demo"],',
+      ")",
       "",
     ].join("\n");
     // Append to the existing TARGETS created by test harness to preserve platform config
@@ -41,18 +51,19 @@ test("node: importer-local patch touch triggers rebuild of target", async () => 
       console.error("could not determine genrule output path from --show-output");
       process.exit(2);
     }
-    const s1 = await fsp.stat(path.isAbsolute(outPath) ? outPath : path.join(tmp, outPath));
+    const outAbs = path.isAbsolute(outPath) ? outPath : path.join(tmp, outPath);
+    const c1 = await fsp.readFile(outAbs, "utf8").then((s) => s.trim());
 
-    // Add importer-local patch and rebuild
-    await fsp.writeFile(path.join(patchDir, "lodash@4.17.21.patch"), "# noop\n", "utf8");
+    // Modify the existing importer-local patch and rebuild
+    await fsp.appendFile(basePatch, "# change\n", "utf8");
+    // Ensure daemon sees new/changed sources deterministically
+    await $`buck2 kill`.nothrow();
 
     await $`buck2 build --target-platforms //:no_cgo //:t`;
-    const s2 = await fsp.stat(path.isAbsolute(outPath) ? outPath : path.join(tmp, outPath));
-    if (!(s2.mtimeMs > s1.mtimeMs)) {
-      console.error(
-        "expected target to rebuild after importer-local patch change (mtime not increased)",
-      );
-      console.error("before:", s1.mtimeMs, "after:", s2.mtimeMs);
+    const c2 = await fsp.readFile(outAbs, "utf8").then((s) => s.trim());
+    if (c1 === c2) {
+      console.error("expected target output to change after importer-local patch change");
+      console.error("before-content:", JSON.stringify(c1), "after-content:", JSON.stringify(c2));
       process.exit(2);
     }
   });
