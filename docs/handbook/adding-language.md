@@ -2,6 +2,8 @@
 
 This guide explains how to add a new language to the build without touching core planner/exporter logic. The architecture is plugin-style: each language contributes a small set of files and a registry entry. Sparse checkouts are supported — existence of your language files controls enablement.
 
+> Note (Node/PNPM): The Node Nix template at `tools/nix/templates/node.nix` is a discoverability shim only. The authoritative Node planner logic lives in `tools/nix/planner/node.nix`, and Node builds flow through Buck macros plus importer‑scoped providers. Do not implement build logic in `templates/node.nix`; keep logic in the planner plugin and Starlark macros.
+
 ## What you’ll implement
 
 - Templates: `tools/nix/templates/<lang>.nix` consumed by `tools/nix/lang-templates.nix`
