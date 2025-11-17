@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import type { Adapter, Batch, Node } from "../types.ts";
 import { hasLabel, isRuleType, validateLanguageClassification } from "./helpers.ts";
 import { packageDirFromTargetName } from "../batch.ts";
+import { parseLockfileLabel } from "../../../lib/labels.ts";
 
 function isNodeTarget(n: Node): boolean {
   // Prefer explicit lang stamp; fall back to common js_/node_ rule_type families
@@ -18,14 +19,6 @@ function lockfileLabels(n: Node): string[] {
 function hasKindLabel(n: Node): boolean {
   const labs = Array.isArray(n.labels) ? n.labels : [];
   return labs.some((l) => typeof l === "string" && l.startsWith("kind:"));
-}
-
-function parseLockLabel(label: string): { lockfile: string; importer: string } | null {
-  const m = /^lockfile:([^#]+)#([^#]+)$/.exec(label);
-  if (!m) return null;
-  const lockfile = m[1].replace(/^\.\/+/, "");
-  const importer = m[2];
-  return { lockfile, importer };
 }
 
 function validateSingleImporterLabel(n: Node): string[] {
@@ -54,7 +47,7 @@ function validateSingleImporterLabel(n: Node): string[] {
   }
   // Validate format and path/importer consistency for the first label
   const first = locks[0];
-  const parsed = parseLockLabel(first);
+  const parsed = parseLockfileLabel(first);
   if (!parsed) {
     findings.push(
       [

@@ -9,16 +9,36 @@ function fqProviderLabel(name: string): string {
   return `//third_party/providers:${name}`;
 }
 
+// Parse an importer-scoped PNPM lockfile label.
+// Accepts forms like:
+//   - lockfile:apps/web/pnpm-lock.yaml#apps/web
+//   - lockfile:pnpm-lock.yaml#.
+// Normalizes the lockfile path by stripping any leading "./".
+export function parseLockfileLabel(label: string): { lockfile: string; importer: string } | null {
+  const s = String(label || "");
+  if (!s.startsWith("lockfile:")) return null;
+  const rest = s.slice("lockfile:".length);
+  const hashIdx = rest.indexOf("#");
+  if (hashIdx < 0) return null;
+  const pathPart = rest.slice(0, hashIdx).replace(/^\.\/+/, "");
+  const importer = rest.slice(hashIdx + 1);
+  if (!pathPart || !importer) return null;
+  return { lockfile: pathPart, importer };
+}
+
+export function isImporterScopedLockfileLabel(label: string): boolean {
+  return parseLockfileLabel(label) !== null;
+}
+
 // Returns fully qualified provider labels for supported mapping labels.
 
 export function providersForLabels(labels: string[] | undefined): string[] {
   const out = new Set<string>();
   for (const l of labels || []) {
-    if (l.startsWith("lockfile:")) {
-      const rest = l.slice("lockfile:".length);
-      const [path, importer = ""] = rest.split("#");
-      if (!path || !importer) continue;
-      out.add(fqProviderLabel(providerNameForImporter(path, importer)));
+    if (l && l.startsWith("lockfile:")) {
+      const parsed = parseLockfileLabel(l);
+      if (!parsed) continue;
+      out.add(fqProviderLabel(providerNameForImporter(parsed.lockfile, parsed.importer)));
     } else if (l.startsWith("nixpkg:")) {
       const attr = normalizeNixAttr(l.slice("nixpkg:".length));
       out.add(fqProviderLabel(providerNameForNixAttr(attr)));

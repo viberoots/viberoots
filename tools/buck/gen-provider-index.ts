@@ -5,6 +5,7 @@ import { writeIfChanged } from "../lib/fs-helpers.ts";
 import { readCompositeGraph } from "../lib/graph-view.ts";
 import { readNodeProviderIndexEntries } from "./providers/node.ts";
 import { getFlagStr } from "../lib/cli.ts";
+import { parseLockfileLabel } from "../lib/labels.ts";
 
 type IndexEntry = { kind: "node" | "cpp"; key: string };
 
@@ -27,15 +28,13 @@ async function generateNodeLockIndex(outFile = "tools/buck/node-lock-index.json"
   const nodes = Array.isArray(comp?.nodes) ? comp.nodes : [];
   if (!nodes.length) return;
   const idx: Record<string, string> = {};
-  const parseLock = (s: string) => /^lockfile:([^#]+)#([^#]+)$/.exec(s);
   for (const n of nodes) {
     const name = String(n?.name || "");
     if (!name) continue;
     const labs = Array.isArray(n.labels) ? (n.labels as string[]) : [];
     const locks = labs.filter((l) => l.startsWith("lockfile:"));
     if (locks.length !== 1) continue;
-    const m = parseLock(locks[0]);
-    if (!m) continue;
+    if (!parseLockfileLabel(locks[0])) continue;
     idx[name] = locks[0].toLowerCase();
   }
   // Deterministic order
