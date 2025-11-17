@@ -4,7 +4,12 @@ import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import { debugEnabled } from "./util";
-import { getFlagBool, getFlagStr } from "../../lib/cli.ts";
+import {
+  readForceFlag,
+  readPatchDirArg,
+  readTargetArg,
+  normalizeTargetToPkg,
+} from "../../lib/cli.ts";
 
 export type ApplyFlags = {
   targetPkg: string;
@@ -65,9 +70,9 @@ export function parseApplyFlags(argv: string[]): ApplyFlags {
   }
 
   // 2) Merge with standardized helpers (CLI invocation via zx/yargs/process.argv)
-  const cliTarget = getFlagStr("target", "").trim();
-  const cliPatchDir = (getFlagStr("patch-dir", "") || getFlagStr("patchDir", "")).trim();
-  const cliForce = getFlagBool("force");
+  const cliTarget = readTargetArg("");
+  const cliPatchDir = readPatchDirArg("");
+  const cliForce = readForceFlag();
 
   const targetRaw = (parsedTarget ?? cliTarget) || "";
   const overridePatchDir = (parsedPatchDir ?? cliPatchDir) || "";
@@ -75,15 +80,6 @@ export function parseApplyFlags(argv: string[]): ApplyFlags {
 
   const targetPkg = normalizeTargetToPkg(targetRaw);
   return { targetPkg, overridePatchDir, restArgs: rest, force };
-}
-
-function normalizeTargetToPkg(t: string): string {
-  if (!t) return "";
-  if (t.startsWith("//")) {
-    const noCell = t.slice(2);
-    return noCell.split(":")[0] || "";
-  }
-  return t.split(":")[0] || "";
 }
 
 export function repoRoot(): string {

@@ -127,3 +127,47 @@ export function echoSnippetRequested(opts?: { env?: string }): boolean {
   }
   return false;
 }
+
+/**
+ * normalizeTargetToPkg
+ * Accepts a Buck target string and returns the package path portion suitable
+ * for constructing local patch directories.
+ */
+export function normalizeTargetToPkg(t: string): string {
+  if (!t) return "";
+  if (t.startsWith("//")) {
+    const noCell = t.slice(2);
+    return noCell.split(":")[0] || "";
+  }
+  return t.split(":")[0] || "";
+}
+
+/**
+ * readTargetArg — reads --target and returns the normalized package path.
+ */
+export function readTargetArg(def: string = ""): string {
+  const raw = getFlagStr("target", def).trim();
+  return normalizeTargetToPkg(raw);
+}
+
+/**
+ * readPatchDirArg — reads --patch-dir (or legacy --patchDir) value.
+ */
+export function readPatchDirArg(def: string = ""): string {
+  const v = (getFlagStr("patch-dir", "") || getFlagStr("patchDir", "")).trim();
+  return v || def;
+}
+
+/**
+ * readForceFlag — standardized reader for --force.
+ */
+export function readForceFlag(): boolean {
+  return getFlagBool("force");
+}
+
+/**
+ * readImporterArg — standardized reader for Node's --importer flag.
+ */
+export function readImporterArg(def: string = ""): string {
+  return getFlagStr("importer", def).trim();
+}

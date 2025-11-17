@@ -5,7 +5,7 @@ import { runGlue } from "./glue";
 import { deleteSession, findSessionBy, getSession, setSession } from "./state";
 import type { LanguageHandler, SessionRecord } from "./types";
 import { repoRoot } from "./lib/apply";
-import { getFlagStr } from "../lib/cli.ts";
+import { readImporterArg } from "../lib/cli.ts";
 import { resolveImporterDir } from "../lib/lockfiles.ts";
 import { runSession } from "./lib/session";
 
@@ -28,10 +28,7 @@ function sessionKey(importerDir: string, pkgName: string): string {
 
 async function doStart(args: string[]) {
   const pkg = pkgArg(args);
-  const importerRel = await resolveImporterDir(
-    process.cwd(),
-    getFlagStr("importer", "").trim() || undefined,
-  );
+  const importerRel = await resolveImporterDir(process.cwd(), readImporterArg("") || undefined);
   const importerDir = importerRel === "." ? repoRoot() : path.resolve(repoRoot(), importerRel);
   // pnpm prints the temp directory on stdout; capture it
   const res = await $({ cwd: importerDir, stdio: "pipe" })`${pnpmBin()} patch ${pkg}`;
@@ -61,10 +58,7 @@ async function doStart(args: string[]) {
 
 async function doApply(args: string[]) {
   const pkg = pkgArg(args);
-  const importerRel = await resolveImporterDir(
-    process.cwd(),
-    getFlagStr("importer", "").trim() || undefined,
-  );
+  const importerRel = await resolveImporterDir(process.cwd(), readImporterArg("") || undefined);
   const importerDir = importerRel === "." ? repoRoot() : path.resolve(repoRoot(), importerRel);
   const key = sessionKey(importerDir, pkg);
   let sess = await getSession("node", key);
@@ -103,10 +97,7 @@ async function doApply(args: string[]) {
 
 async function doReset(args: string[]) {
   const pkg = pkgArg(args);
-  const importerRel = await resolveImporterDir(
-    process.cwd(),
-    getFlagStr("importer", "").trim() || undefined,
-  );
+  const importerRel = await resolveImporterDir(process.cwd(), readImporterArg("") || undefined);
   const importerDir = importerRel === "." ? repoRoot() : path.resolve(repoRoot(), importerRel);
   const key = sessionKey(importerDir, pkg);
   const sess = await getSession("node", key);
@@ -119,10 +110,7 @@ async function doReset(args: string[]) {
 
 async function doRemove(args: string[]) {
   const pkg = pkgArg(args);
-  const importerRel = await resolveImporterDir(
-    process.cwd(),
-    getFlagStr("importer", "").trim() || undefined,
-  );
+  const importerRel = await resolveImporterDir(process.cwd(), readImporterArg("") || undefined);
   const importerDir = importerRel === "." ? repoRoot() : path.resolve(repoRoot(), importerRel);
   // Try native pnpm removal first; fall back to editing package.json
   try {
