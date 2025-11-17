@@ -2,6 +2,7 @@ import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { readGraph, type GraphNode } from "./graph.ts";
+import { DEFAULT_GRAPH_PATH } from "./graph-const.ts";
 
 export type ProviderIndexEntry = { kind: string; key: string };
 
@@ -16,8 +17,6 @@ export type ReadCompositeGraphOptions = {
   providerIndexPath?: string;
   nodeLockIndexPath?: string;
 };
-
-export const DEFAULT_GRAPH_PATH = path.resolve(path.join("tools", "buck", "graph.json"));
 
 async function readJsonIfExists<T = any>(p: string): Promise<T | {}> {
   try {
