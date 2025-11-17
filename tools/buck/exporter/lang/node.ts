@@ -2,7 +2,7 @@
 import path from "node:path";
 import * as fsp from "node:fs/promises";
 import type { Adapter, Batch, Node } from "../types.ts";
-import { hasLabel, isRuleType } from "./helpers.ts";
+import { hasLabel, isRuleType, validateLanguageClassification } from "./helpers.ts";
 import { packageDirFromTargetName } from "../batch.ts";
 
 function isNodeTarget(n: Node): boolean {
@@ -105,6 +105,26 @@ export const adapter: Adapter = {
       out.push(...validateKindPresence(n));
       out.push(...validateSingleImporterLabel(n));
     }
+    // PR-5: advisory for missing lang:node using shared classification helper.
+    // Narrow scope: only consider nodes that appear macro-stamped (have importer-scoped lockfile label).
+    out.push(
+      ...validateLanguageClassification(nodes, {
+        name: "node",
+        looksLike(n: Node) {
+          return lockfileLabels(n).length > 0;
+        },
+        hasRuleType(n: Node) {
+          return isRuleType(n, /^js_/) || isRuleType(n, /^node_/);
+        },
+        hasLangLabel(n: Node) {
+          return hasLabel(n, "lang:node");
+        },
+        ruleTypePrefix: "js_* or node_*",
+        langLabel: "lang:node",
+        subject: "macro-stamped Node targets",
+        guidance: "Fix: ensure macros stamp 'lang:node' to classify Node targets consistently.",
+      }),
+    );
     return out;
   },
   async buildBatches(_nodes: Node[]): Promise<Batch[]> {
