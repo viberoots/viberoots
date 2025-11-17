@@ -1,14 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import * as fsp from "node:fs/promises";
+import { pathExists as repoPathExists } from "../../lib/repo.ts";
 
-export async function pathExists(filePath: string): Promise<boolean> {
-  try {
-    await fsp.access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
+// Re-export shared helper to avoid duplication across modules
+export const pathExists = repoPathExists;
 
 export function debugEnabled(): boolean {
   try {

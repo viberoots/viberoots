@@ -15,7 +15,7 @@ function warnActive(envName: string, size: number) {
   try {
     // Match wording used across docs/templates for consistency
     console.warn(
-      `[OVERRIDES ACTIVE] ${envName} is set — local derivations will differ. Unset before CI or sharing cache artifacts.`,
+      `[OVERRIDES ACTIVE] ${envName} is set — local derivation hashes will differ. Unset before sharing cache artifacts.`,
     );
   } catch {}
 }

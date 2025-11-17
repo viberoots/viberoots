@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import { debugEnabled } from "./util";
+import { repoRoot as _repoRoot } from "../../lib/repo.ts";
 import {
   readForceFlag,
   readPatchDirArg,
@@ -82,8 +83,9 @@ export function parseApplyFlags(argv: string[]): ApplyFlags {
   return { targetPkg, overridePatchDir, restArgs: rest, force };
 }
 
+// Re-export unified repo root resolver (keeps existing import sites stable)
 export function repoRoot(): string {
-  return process.env.WORKSPACE_ROOT || process.env.LIVE_ROOT || process.cwd();
+  return _repoRoot();
 }
 
 export function resolvePatchDir(
