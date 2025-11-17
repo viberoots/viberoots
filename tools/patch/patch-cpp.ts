@@ -16,6 +16,7 @@ import { runSession } from "./lib/session";
 import { resolveNixpkg } from "./cpp/resolve";
 import { ensureOriginAndWorkspace } from "./cpp/extract";
 import { doApply, doRemove } from "./cpp/apply";
+import { echoSnippetRequested } from "../lib/cli.ts";
 
 const dbg = createDbg("patch-cpp");
 
@@ -30,9 +31,7 @@ async function doStart(args: string[]) {
   dbg("start: proc", { pid: process.pid, cwd: process.cwd() });
   const attrInput = attrArg(args);
   const attrNorm = normalizeNixAttr(attrInput);
-  const echoSnippet =
-    process.argv.includes("--echo-snippet") ||
-    String(process.env.PATCH_CPP_ECHO_SNIPPET || "").trim() === "1";
+  const echoSnippet = echoSnippetRequested({ env: "PATCH_CPP_ECHO_SNIPPET" });
   // Idempotency: if a session already exists and workspace is present, reuse it.
   console.error("[patch-cpp] start: resolve nixpkg", attrNorm);
   const meta = await resolveNixpkg(attrNorm);

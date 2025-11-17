@@ -104,3 +104,26 @@ export function hasFlag(name: string): boolean {
   const p = readFromProcessArgv(name);
   return p.provided;
 }
+
+/**
+ * echoSnippetRequested
+ * Returns true when the caller should print an export snippet instead of
+ * mutating in‑process environment state. Detection is uniform:
+ * - Flag: --echo-snippet (supports zx global argv and process.argv)
+ * - Optional env: pass the env var name to honor (e.g., PATCH_GO_ECHO_SNIPPET)
+ *
+ * Usage:
+ *   echoSnippetRequested({ env: "PATCH_GO_ECHO_SNIPPET" })
+ *   echoSnippetRequested({ env: "PATCH_CPP_ECHO_SNIPPET" })
+ */
+export function echoSnippetRequested(opts?: { env?: string }): boolean {
+  if (getFlagBool("echo-snippet")) return true;
+  const name = (opts?.env || "").trim();
+  if (name && typeof process.env[name] === "string") {
+    const v = String(process.env[name] || "")
+      .trim()
+      .toLowerCase();
+    if (v === "1" || v === "true") return true;
+  }
+  return false;
+}

@@ -17,7 +17,7 @@ import type { LanguageHandler, SessionRecord } from "./types";
 import { readOverrideMap, setOverride, clearOverride, formatExportSnippet } from "./dev-overrides";
 import { createDbg, pathExists } from "./lib/util";
 import { runSession } from "./lib/session";
-import { getFlagBool } from "../lib/cli.ts";
+import { echoSnippetRequested } from "../lib/cli.ts";
 
 const dbg = createDbg("patch-go");
 
@@ -64,8 +64,7 @@ async function doStart(args: string[]) {
   await setSession("go", key, rec);
   dbg("start: setSession", { key, ws });
   // Echo snippet parity with C++ when requested; otherwise set in-process env var
-  const echoSnippet =
-    getFlagBool("echo-snippet") || String(process.env.PATCH_GO_ECHO_SNIPPET || "").trim() === "1";
+  const echoSnippet = echoSnippetRequested({ env: "PATCH_GO_ECHO_SNIPPET" });
   if (echoSnippet) {
     const snippet = formatExportSnippet("NIX_GO_DEV_OVERRIDE_JSON", {
       [key]: ws,
