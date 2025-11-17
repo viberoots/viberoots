@@ -5,8 +5,8 @@ import { runGlue } from "./glue";
 import { deleteSession, findSessionBy, getSession, setSession } from "./state";
 import type { LanguageHandler, SessionRecord } from "./types";
 import { repoRoot } from "./lib/apply";
-import { pathExists } from "./lib/util";
 import { getFlagStr } from "../lib/cli.ts";
+import { resolveImporterDir } from "../lib/lockfiles.ts";
 
 function pkgArg(args: string[]): string {
   const p = args[0];
@@ -19,45 +19,6 @@ function pnpmBin(): string {
   return b || "pnpm";
 }
 
-async function findImporterDir(args: string[]): Promise<string> {
-  const repoRootDir = repoRoot();
-
-  const hasLock = async (dir: string): Promise<boolean> =>
-    await pathExists(path.join(dir, "pnpm-lock.yaml"));
-
-  const resolveCandidate = async (cand: string): Promise<string | null> => {
-    const abs = path.isAbsolute(cand) ? cand : path.resolve(repoRootDir, cand);
-    return (await hasLock(abs)) ? abs : null;
-  };
-
-  // Standardized flag parsing for --importer (global argv → process.argv)
-  const importerFlag = getFlagStr("importer", "").trim();
-  if (importerFlag) {
-    const ok = await resolveCandidate(importerFlag);
-    if (ok) return ok;
-  }
-  // Backward-compatibility: tolerate split-form flag in the passed args (rare)
-  const idx = args.findIndex((a) => a === "--importer");
-  if (idx >= 0 && args[idx + 1]) {
-    const ok = await resolveCandidate(args[idx + 1]);
-    if (ok) return ok;
-  }
-
-  // Walk up to detect nearest directory with a pnpm-lock.yaml
-  let here = process.cwd();
-  while (true) {
-    if (await hasLock(here)) return here;
-    const next = path.dirname(here);
-    if (next === here) break;
-    const relToRepo = path.relative(repoRootDir, next);
-    if (relToRepo.startsWith("..")) break;
-    here = next;
-  }
-  throw new Error(
-    "cannot determine importer directory; run inside an importer or pass --importer <dir>",
-  );
-}
-
 function sessionKey(importerDir: string, pkgName: string): string {
   const root = repoRoot();
   const rel = path.relative(root, importerDir).replace(/\\/g, "/");
@@ -66,7 +27,11 @@ function sessionKey(importerDir: string, pkgName: string): string {
 
 async function doStart(args: string[]) {
   const pkg = pkgArg(args);
-  const importerDir = await findImporterDir(args);
+  const importerRel = await resolveImporterDir(
+    process.cwd(),
+    getFlagStr("importer", "").trim() || undefined,
+  );
+  const importerDir = importerRel === "." ? repoRoot() : path.resolve(repoRoot(), importerRel);
   // pnpm prints the temp directory on stdout; capture it
   const res = await $({ cwd: importerDir, stdio: "pipe" })`${pnpmBin()} patch ${pkg}`;
   const ws =
@@ -95,7 +60,11 @@ async function doStart(args: string[]) {
 
 async function doApply(args: string[]) {
   const pkg = pkgArg(args);
-  const importerDir = await findImporterDir(args);
+  const importerRel = await resolveImporterDir(
+    process.cwd(),
+    getFlagStr("importer", "").trim() || undefined,
+  );
+  const importerDir = importerRel === "." ? repoRoot() : path.resolve(repoRoot(), importerRel);
   const key = sessionKey(importerDir, pkg);
   let sess = await getSession("node", key);
   if (!sess) {
@@ -133,7 +102,11 @@ async function doApply(args: string[]) {
 
 async function doReset(args: string[]) {
   const pkg = pkgArg(args);
-  const importerDir = await findImporterDir(args);
+  const importerRel = await resolveImporterDir(
+    process.cwd(),
+    getFlagStr("importer", "").trim() || undefined,
+  );
+  const importerDir = importerRel === "." ? repoRoot() : path.resolve(repoRoot(), importerRel);
   const key = sessionKey(importerDir, pkg);
   const sess = await getSession("node", key);
   if (!sess) return;
@@ -145,7 +118,11 @@ async function doReset(args: string[]) {
 
 async function doRemove(args: string[]) {
   const pkg = pkgArg(args);
-  const importerDir = await findImporterDir(args);
+  const importerRel = await resolveImporterDir(
+    process.cwd(),
+    getFlagStr("importer", "").trim() || undefined,
+  );
+  const importerDir = importerRel === "." ? repoRoot() : path.resolve(repoRoot(), importerRel);
   // Try native pnpm removal first; fall back to editing package.json
   try {
     await $({ cwd: importerDir })`${pnpmBin()} patch-remove ${pkg}`;
