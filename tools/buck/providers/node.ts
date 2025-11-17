@@ -6,6 +6,7 @@ import { scanFlatPatchDir } from "../../lib/provider-sync.ts";
 import { providerNameForImporter, decodeNameVersionFromPatch } from "../../lib/providers.ts";
 import { findPnpmLockfiles } from "../../lib/lockfiles.ts";
 import { parsePnpmLock, effectiveSetForImporter } from "../../lib/pnpm-lock.ts";
+import { ensureAutoSection } from "../../lib/auto-section.ts";
 
 export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: string }) {
   const PATCH_DIR = opts?.patchDir || "patches/node";
@@ -128,32 +129,13 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
   // inside third_party/providers/TARGETS so Buck can resolve lf_* labels.
   if (OUT_FILE !== "third_party/providers/TARGETS") {
     try {
-      const targetFile = "third_party/providers/TARGETS";
-      // Ensure directory exists so writes don't get swallowed
-      try {
-        await fsp.mkdir(path.dirname(targetFile), { recursive: true });
-      } catch {}
-      let cur = "";
-      try {
-        cur = await fsp.readFile(targetFile, "utf8");
-      } catch {}
-      const begin = "# BEGIN AUTO_NODE";
-      const end = "# END AUTO_NODE";
-      // Ensure defs_node.bzl load present near top
-      const needLoad = 'load("//third_party/providers:defs_node.bzl", "node_importer_deps")';
-      const autoBody = renderTargetsFile("", entries).trim();
-      const autoSection = [begin, needLoad, "", autoBody, end, ""].join("\n");
-      let next = cur;
-      if (next.includes(begin) && next.includes(end)) {
-        const pre = next.split(begin)[0].replace(/\n?$/, "\n");
-        const post = next.split(end).slice(1).join(end);
-        const postClean = post.replace(/^\n*/, "");
-        next = pre + autoSection + postClean;
-      } else {
-        const prefix = next.endsWith("\n") || next === "" ? next : next + "\n";
-        next = prefix + autoSection;
-      }
-      if (next !== cur) await fsp.writeFile(targetFile, next, "utf8");
+      await ensureAutoSection({
+        file: "third_party/providers/TARGETS",
+        begin: "# BEGIN AUTO_NODE",
+        end: "# END AUTO_NODE",
+        header: 'load("//third_party/providers:defs_node.bzl", "node_importer_deps")',
+        body: renderTargetsFile("", entries).trim(),
+      });
     } catch {}
   }
 }
