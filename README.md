@@ -113,6 +113,13 @@ scaf new go test main_case --path=apps/demo-cli/cmd/demo-cli/main_case_test.go
 
 Further reading: `build-system-design.md`, `docs/handbook/`.
 
+Related docs:
+
+- Patching Handbook: `docs/handbook/patching.md`
+- Adding a Language (walkthrough): `docs/handbook/new-language-walkthrough.md`
+- Adding a Language (reference): `docs/handbook/adding-language.md`
+- C++ overlays and patching: `docs/cpp/overlays.md`
+
 CI stage runner reference: `tools/ci/run-stage.ts`.
 
 ## Key concepts (fast)

@@ -1,4 +1,4 @@
-# Patching Handbook (Go & Node)
+# Patching Handbook (Go, C++, and Node)
 
 Note: Go and C++ use per‑target local patching by default. Place patches under each target’s package directory (for example, `apps/<app>/patches/go` or `libs/<lib>/patches/cpp`) so they are included in that target’s `srcs` and Buck invalidation is precise. The global `patches/go` flow remains supported where applicable, but local patching is the default developer experience for new scaffolds. See `build-system-design.md` for details.
 
@@ -30,6 +30,7 @@ All scripts are zx TypeScript using `#!/usr/bin/env zx-wrapper`.
 
 - Session: `tools/bin/patch-pkg session go <importPath>` (Ctrl-D=apply, Ctrl-C=reset)
   - Interactive session that ends by applying or resetting.
+  - Node parity: `tools/bin/patch-pkg session node <pkg>` uses identical Ctrl‑D/Ctrl‑C semantics.
 
 ## Canonical filenames
 
@@ -261,3 +262,4 @@ Notes:
 - No glue is required for C++; package‑local patch files are included in `srcs` and passed to the Nix C++ derivations.
 - If your C++ targets link against Go C archives, that integration is handled by the planner/templates and requires no special steps in this workflow.
 - C++ macros now use the shared nixpkgs label helper (`append_nixpkg_labels` from `lang/defs_common.bzl`) for stamping `nixpkg:` labels. This change only removes duplication; behavior and exported graphs are unchanged.
+- Alternative (overlay, opt‑in): You can also manage C++ patches globally under `patches/cpp/*.patch` via the nix overlay entry‑point; see `docs/cpp/overlays.md` for details. The overlay is disabled by default; local patching remains the canonical workflow.

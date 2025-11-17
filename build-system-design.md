@@ -333,6 +333,8 @@ The exporter aggregates adapter findings (e.g., labeling irregularities) and app
 
 This preserves strictness in CI while enabling smoother local iteration.
 
+> Node adapter note (tests only): for local experiments, you may set `EXPORTER_NODE_ATTACH=1` to let the exporter stamp a missing importer‑scoped lockfile label on macro‑like Node targets that already carry a `kind:*` label. This toggle is off by default and should not be enabled in CI.
+
 ---
 
 ## Go Patching (outer CLI `patch-pkg` → `patch-go.ts`)
@@ -458,6 +460,8 @@ _(Adapted from the internal workflow document.)_ fileciteturn5file0
 - The templates (Nix) use the shared helper `tools/nix/lib/lang-helpers.nix` to **emit a warning** locally whenever dev overrides are set (e.g., `NIX_GO_DEV_OVERRIDE_JSON`, `NIX_CPP_DEV_OVERRIDE_JSON`).
 - In CI (e.g., `CI=true`), the shared helper **throws** to **fail the build** if dev overrides are detected.
 - The outer `patch-pkg` should also print explicit warnings when in session mode.
+
+> C++ parity: C++ templates honor `NIX_CPP_DEV_OVERRIDE_JSON` (see `tools/nix/templates/cpp-common.nix`). As with Go, you’ll see a local warning when set, and evaluation fails in CI.
 
 ### Provider index (optional, introspection)
 
@@ -942,159 +946,16 @@ def node_importer_deps(name, lockfile, importer, patch_paths = []):
     )
 ```
 
-#### Generator: `tools/buck/sync-providers-node.ts` (PNPM, Importer‑scoped)
+#### Node provider generator (canonical)
 
-```ts
-#!/usr/bin/env zx-wrapper
-// tools/buck/sync-providers-node.ts
-import fs from "fs-extra";
-import { globby } from "globby";
-import YAML from "yaml";
-import crypto from "crypto";
+- The canonical Node provider generator lives at `tools/buck/providers/node.ts` (`syncNodeProviders(...)`).
+- The `tools/buck/sync-providers-node.ts` file is a thin wrapper kept for back‑compat; it simply delegates to the canonical generator.
+- Invoke via the orchestrator:
 
-const PATCH_DIR = "patches/node";
-const OUT_FILE  = "third_party/providers/TARGETS.node.auto";
-
-function shortHash(s: string): string {
-  return crypto.createHash("sha256").update(s).digest("hex").slice(0, 8);
-}
-
-function nameForImporterProvider(lockfilePath: string, importer: string): string {
-  const key = `${lockfilePath}#${importer}`;
-  const h = shortHash(key);
-  const suffix = `${importer.replace(/[^\w]+/g, "_")}__${lockfilePath.replace(/[^\w]+/g, "_")}`.toLowerCase();
-  return `lf_${h}_${suffix}`;
-}
-
-function pkgKeyFromPatch(filename: string): string | null {
-  if (!filename.endsWith(".patch")) return null;
-  return filename.slice(0, -".patch".length).toLowerCase(); // e.g., lodash@4.17.21
-}
-
-type PNPMDoc = {
-  importers: Record<string, any>;
-  packages: Record<string, any>; // keys like "/lodash/4.17.21"
-};
-
-function parsePnpmLock(file: string): PNPMDoc {
-  return YAML.parse(fs.readFileSync(file, "utf8")) as PNPMDoc;
-}
-
-function buildGraph(doc: PNPMDoc) {
-  const nodes = new Map<string, { name: string, version: string, deps: Set<string> }>();
-  for (const [k, v] of Object.entries(doc.packages || {})) {
-    const parts = k.split("/").filter(Boolean);
-    if (parts.length >= 2) {
-      const name = parts[0].startsWith("@") ? parts.slice(0,2).join("/") : parts[0];
-      const version = parts[0].startsWith("@") ? parts[2] : parts[1];
-      const deps = new Set<string>();
-      for (const [depName, depRef] of Object.entries(v.dependencies || {})) {
-        const key1 = `/${depName}/${depRef}`;
-        if ((doc.packages || {})[key1]) deps.add(key1);
-      }
-      nodes.set(k, { name, version, deps });
-    }
-  }
-  return nodes;
-}
-
-function effectiveSetForImporter(doc: PNPMDoc, importer: string): Set<string> {
-  const nodes = buildGraph(doc);
-  const out = new Set<string>();
-  const imp = doc.importers?.[importer] || {};
-  const roots = new Set<string>();
-  const addRoot = (depName: string, depRef: any) => {
-    const key = `/${depName}/${depRef}`;
-    if (nodes.has(key)) roots.add(key);
-  };
-  for (const [depName, depRef] of Object.entries(imp.dependencies || {})) addRoot(depName as string, depRef);
-  for (const [depName, depRef] of Object.entries(imp.optionalDependencies || {})) addRoot(depName as string, depRef);
-  for (const [depName, depRef] of Object.entries(imp.peerDependencies || {})) addRoot(depName as string, (imp.dependencies || {})[depName] || depRef);
-
-  const q = [...roots];
-  while (q.length) {
-    const k = q.pop()!;
-    if (out.has(k)) continue;
-    out.add(k);
-    const pkg = nodes.get(k);
-    for (const d of pkg?.deps || []) q.push(d as string);
-    // include peer resolution edges if the package declares peers AND resolved hosts are present in its dependencies
-    const peerDeps = (doc.packages?.[k] as any)?.peerDependencies || {};
-    for (const [pname] of Object.entries(peerDeps)) {
-      const resolved = (doc.packages?.[k] as any)?.dependencies?.[pname];
-      if (resolved) {
-        const peerKey = `/${pname}/${resolved}`;
-        if (nodes.has(peerKey)) q.push(peerKey);
-      }
-    }
-  }
-  const set = new Set<string>();
-  for (const k of out) {
-    const parts = k.split("/").filter(Boolean);
-    const name = parts[0].startsWith("@") ? parts.slice(0,2).join("/") : parts[0];
-    const version = parts[0].startsWith("@") ? parts[2] : parts[1];
-    set.add(`${name}@${version}`.toLowerCase());
-  }
-  return set;
-};
-  const roots = new Set<string>();
-  for (const [depName, depRef] of Object.entries(imp.dependencies || {})) {
-    const key = `/${depName}/${depRef}`;
-    if (nodes.has(key)) roots.add(key);
-  }
-  const q = [...roots];
-  while (q.length) {
-    const k = q.pop()!;
-    if (out.has(k)) continue;
-    out.add(k);
-    for (const d of nodes.get(k)?.deps || []) q.push(d as string);
-  }
-  const set = new Set<string>();
-  for (const k of out) {
-    const parts = k.split("/").filter(Boolean);
-    const name = parts[0].startsWith("@") ? parts.slice(0,2).join("/") : parts[0];
-    const version = parts[0].startsWith("@") ? parts[2] : parts[1];
-    set.add(`${name}@${version}`.toLowerCase());
-  }
-  return set;
-}
-
-async function main() {
-  const entries: string[] = [];
-  const lockfiles = await globby(["**/pnpm-lock.yaml"], { gitignore: true });
-  const nodePatches = (await fs.pathExists(PATCH_DIR))
-    ? (await fs.readdir(PATCH_DIR)).filter(f => f.endsWith(".patch"))
-    : [];
-
-  const seenNames = new Map<string, string>(); // providerName -> key (lf#importer)
-
-  for (const lf of lockfiles) {
-    const doc = parsePnpmLock(lf);
-    for (const importer of Object.keys(doc.importers || {})) {
-      const eff = effectiveSetForImporter(doc, importer);
-      const usedPatches = nodePatches.filter(p => eff.has(pkgKeyFromPatch(p) || ""))
-                                     .map(p => `${PATCH_DIR}/${p}`)
-                                     .sort();
-      const name = nameForImporterProvider(lf, importer);
-      const key = `${lf}#${importer}`;
-      const prev = seenNames.get(name);
-      if (prev && prev !== key) throw new Error(`Provider name collision: ${name}\n${prev} vs ${key}`);
-      seenNames.set(name, key);
-      entries.push(`node_importer_deps(name="${name}", lockfile="${lf}", importer="${importer}", patch_paths=[${usedPatches.map(s=>`"${s}"`).join(", ")}])`);
-    }
-  }
-
-  const header = [
-    "# GENERATED FILE — DO NOT EDIT.",
-    "load(\"//third_party/providers:defs_node.bzl\", \"node_importer_deps\")",
-    "",
-  ].join("\n");
-
-  await fs.outputFile(OUT_FILE, header + "\n" + entries.join("\n") + "\n");
-  console.log("wrote", OUT_FILE);
-}
-
-main().catch(e => { console.error(e); process.exit(1); });
+```bash
+node tools/buck/sync-providers.ts --lang node
+# or directly (wrapper → delegates to providers/node.ts)
+node tools/buck/sync-providers-node.ts
 ```
 
 #### Switching Back to Per‑lockfile (if needed)

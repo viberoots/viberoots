@@ -10,6 +10,10 @@ Provider sync maps patch files under `patches/<lang>` to Buck providers used in 
 - **Idempotency**: re-running should not change output when inputs are unchanged.
 - **Tests**: create a single patch using fixtures and assert stable provider name and paths.
 
+Node generator (canonical):
+
+- The canonical generator implementation is `tools/buck/providers/node.ts` (`syncNodeProviders`). The wrapper `tools/buck/sync-providers-node.ts` delegates to it for back‑compat. Prefer invoking the orchestrator: `node tools/buck/sync-providers.ts --lang node`.
+
 Node‑specific note (clarity):
 
 - The Node provider rule accepts `patch_paths` for diagnostics and visibility only. These paths are not used as Buck `srcs` to avoid cross‑package references from `third_party/providers/`. Invalidation for Node patches is achieved by macros adding importer‑local patch files to target `srcs` (see Patching Handbook).

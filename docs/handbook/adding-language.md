@@ -9,7 +9,7 @@ This guide explains how to add a new language to the build without touching core
 - Templates: `tools/nix/templates/<lang>.nix` consumed by `tools/nix/lang-templates.nix`
 - Planner registry entry: `LANGS.<lang>` inside the planner (dispatch predicates + mkApp/mkLib)
 - Macros: thin Starlark wrappers using `lang/defs_common.bzl` helpers
-- Provider sync (optional): zx script scanning `patches/<lang>` to write `TARGETS.<lang>.auto`
+- Provider sync (optional): implement your generator under `tools/buck/providers/<lang>.ts` (scans `patches/<lang>` and writes `TARGETS.<lang>.auto` deterministically). Optionally expose a thin wrapper `tools/buck/sync-providers-<lang>.ts` that delegates to it (back‑compat/ergonomics).
 - Scaffolding templates: `tools/scaffolding/templates/<lang>/...` + language registry entry
 - Tests: zx tests using `tools/tests/lib/lang-fixtures.ts`
 
@@ -98,6 +98,7 @@ Tip for lockfile-style ecosystems (e.g., Node/PNPM):
   - `tools/nix/templates/go.nix`
   - `go/defs.bzl` and `lang/defs_common.bzl`
   - `tools/buck/providers/go.ts` and `tools/buck/providers/index.ts`
+  - Node provider generator: `tools/buck/providers/node.ts` (invoked by `tools/buck/sync-providers.ts`; wrapper `tools/buck/sync-providers-node.ts` delegates)
   - `tools/buck/gen-auto-map.ts`
   - `tools/lib/langs.ts` and `tools/scaffolding/registry.ts`
   - `tools/tests/**` (scaffolding, provider sync, auto_map, planner, exporter)
