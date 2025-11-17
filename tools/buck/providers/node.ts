@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { renderTargetsFile, writeIfChanged } from "../../lib/fs-helpers.ts";
+import { renderTargetsFile, writeIfChanged, maybeAssumeUnchanged } from "../../lib/fs-helpers.ts";
 import { scanFlatPatchDir } from "../../lib/provider-sync.ts";
 import { providerNameForImporter, decodeNameVersionFromPatch } from "../../lib/providers.ts";
 import { findPnpmLockfiles } from "../../lib/lockfiles.ts";
@@ -124,6 +124,8 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
     "",
   ].join("\n");
   await writeIfChanged(OUT_FILE, renderTargetsFile(header, entries));
+  // Avoid accidental commits: mark generated provider TARGETS file as assume-unchanged if tracked
+  await maybeAssumeUnchanged(OUT_FILE);
 
   // If OUT_FILE is not the main TARGETS, also synchronize an auto-managed section
   // inside third_party/providers/TARGETS so Buck can resolve lf_* labels.
@@ -136,6 +138,8 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
         header: 'load("//third_party/providers:defs_node.bzl", "node_importer_deps")',
         body: renderTargetsFile("", entries).trim(),
       });
+      // Mark the curated TARGETS file assume-unchanged to avoid unintended commits
+      await maybeAssumeUnchanged("third_party/providers/TARGETS");
     } catch {}
   }
 }
