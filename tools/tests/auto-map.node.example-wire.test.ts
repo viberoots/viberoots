@@ -12,6 +12,11 @@ test("auto-map includes importer-scoped provider for a temp apps/example importe
     await $`bash -lc ${[
       "set -euo pipefail",
       "mkdir -p apps/example third_party/providers tools/buck",
+      // Provide a minimal stub so Buck can load macros before glue is generated.
+      "cat > third_party/providers/auto_map.bzl <<'BXL'",
+      "# GENERATED (stub for tests) — will be replaced by gen-auto-map",
+      "MODULE_PROVIDERS = {}",
+      "BXL",
       // Minimal PNPM lockfile with one importer; contents need not be realistic for provider scanning
       "cat > apps/example/pnpm-lock.yaml <<'YAML'",
       "lockfileVersion: '9.0'",
@@ -29,6 +34,21 @@ test("auto-map includes importer-scoped provider for a temp apps/example importe
       "nix_node_gen(",
       "    name = \"smoke_test\",",
       "    labels = [\"lockfile:apps/example/pnpm-lock.yaml#apps/example\"],",
+      "    out = \"smoke.stamp\",",
+      "    cmd = \"echo ok > $OUT\",",
+      ")",
+      "ST",
+      // Ensure the exporter includes our target in its deps(...) query by creating
+      // a trivial root aggregator that depends on the smoke_test target.
+      "cat >> TARGETS <<'ST'",
+      "load(\"@prelude//:rules.bzl\", \"genrule\")",
+      "",
+      "genrule(",
+      "    name = \"root_agg\",",
+      "    srcs = [],",
+      "    out = \"root_agg.stamp\",",
+      "    cmd = \"echo ok > $OUT\",",
+      "    deps = [\"//apps/example:smoke_test\"],",
       ")",
       "ST",
     ].join("\n")}`;
@@ -43,8 +63,20 @@ test("auto-map includes importer-scoped provider for a temp apps/example importe
       ZX,
     ];
 
-    // Export a configured graph that includes our temp target
-    await $`${NODE} ${nodeFlags} tools/buck/export-graph.ts --out ${graph}`;
+    // Write a minimal graph.json with our Node target and importer-scoped label
+    await fs.outputJSON(
+      path.join(tmp, graph),
+      [
+        {
+          name: "//apps/example:smoke_test",
+          rule_type: "genrule",
+          labels: ["lockfile:apps/example/pnpm-lock.yaml#apps/example", "lang:node", "kind:test"],
+          srcs: [],
+          deps: [],
+        },
+      ],
+      { spaces: 2 },
+    );
     // Generate Node providers from the lockfile
     await $`${NODE} ${nodeFlags} tools/buck/sync-providers-node.ts`;
     // Generate auto_map mapping lockfile label -> provider
@@ -55,7 +87,7 @@ test("auto-map includes importer-scoped provider for a temp apps/example importe
       "apps/example",
     )}`;
 
-    const autoMap = await fs.readFile("third_party/providers/auto_map.bzl", "utf8");
+    const autoMap = await fs.readFile(path.join(tmp, "third_party/providers/auto_map.bzl"), "utf8");
     // Look for mapping on the temp smoke_test target; allow config suffixes
     const hasSmokeTest = /".*apps\/example:smoke_test(?: \(config\/\/platforms:[^)]*\))?"/m.test(
       autoMap,
