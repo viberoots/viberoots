@@ -18,6 +18,26 @@ let
     nodes = (ctx.nodes or []);
     pkgPathOf = ctx.pkgPathOf;
   };
+  # Shared, top-level helpers (deduplicated from mkApp/mkLib)
+  byName = L.byName;
+  depsOfName = nm:
+    let n = if builtins.hasAttr nm byName then byName.${nm} else null;
+    in if n == null then [] else L.depsOf n;
+  labelsOfName = nm:
+    let n = if builtins.hasAttr nm byName then byName.${nm} else null;
+    in if n == null then [] else L.labelsOf n;
+  isCppNode = nm:
+    let n = if builtins.hasAttr nm byName then byName.${nm} else null;
+        rt0 = if n == null then null else (get n "rule_type");
+        rt = if rt0 == null then "" else rt0;
+        labs = labelsOfName nm;
+    in (rt != null && (lib.hasPrefix "cxx_" rt || lib.hasInfix "cpp_nix_build" rt)) || (labs != null && builtins.elem "lang:cpp" labs);
+  isCppLib = nm:
+    let n = if builtins.hasAttr nm byName then byName.${nm} else null;
+        rt0 = if n == null then null else (get n "rule_type");
+        rt = if rt0 == null then "" else rt0;
+        labs = labelsOfName nm;
+    in (labs != null && builtins.elem "kind:lib" labs) || (rt == "cxx_library");
   # Helper: compute absolute patch directories from a node's srcs ('.patch' siblings)
   patchDirsAbsFor = name:
     let
@@ -53,28 +73,6 @@ in {
 
   mkApp = name:
     let
-      nodesAll = ctx.nodes or [];
-      getA = ctx.get;
-      cleanLabel = s: let parts = lib.splitString " (config//" s; in if (builtins.length parts) > 1 then (builtins.elemAt parts 0) else s;
-      byName = builtins.listToAttrs (map (n: { name = cleanLabel (getA n "name"); value = n; }) (builtins.filter (n: (getA n "name") != null) nodesAll));
-      depsOfName = nm: let n = if builtins.hasAttr nm byName then byName.${nm} else null; in if n == null then [] else (
-        let ds = (getA n "deps"); in if ds == null then [] else (if builtins.isList ds then (map cleanLabel ds) else [])
-      );
-      labelsOfName = nm: let n = if builtins.hasAttr nm byName then byName.${nm} else null; in if n == null then [] else (
-        let labs = (getA n "labels"); in if labs == null then [] else (if builtins.isList labs then labs else [])
-      );
-      isCppNode = nm:
-        let n = if builtins.hasAttr nm byName then byName.${nm} else null;
-            rt0 = if n == null then null else (getA n "rule_type");
-            rt = if rt0 == null then "" else rt0;
-            labs = labelsOfName nm;
-        in (rt != null && (lib.hasPrefix "cxx_" rt || lib.hasInfix "cpp_nix_build" rt)) || (labs != null && builtins.elem "lang:cpp" labs);
-      isCppLib = nm:
-        let n = if builtins.hasAttr nm byName then byName.${nm} else null;
-            rt0 = if n == null then null else (getA n "rule_type");
-            rt = if rt0 == null then "" else rt0;
-            labs = labelsOfName nm;
-        in (labs != null && builtins.elem "kind:lib" labs) || (rt == "cxx_library");
       directDeps = depsOfName name;
       cppLibDeps = builtins.filter (dn: isCppNode dn && isCppLib dn) directDeps;
       repoCgoPkgs = map (dn: T.cppLib { name = dn; srcRoot = repoRoot; subdir = (pkgPathOf dn); }) cppLibDeps;
@@ -98,28 +96,6 @@ in {
 
   mkLib = name:
     let
-      nodesAll = ctx.nodes or [];
-      getA = ctx.get;
-      cleanLabel = s: let parts = lib.splitString " (config//" s; in if (builtins.length parts) > 1 then (builtins.elemAt parts 0) else s;
-      byName = builtins.listToAttrs (map (n: { name = cleanLabel (getA n "name"); value = n; }) (builtins.filter (n: (getA n "name") != null) nodesAll));
-      depsOfName = nm: let n = if builtins.hasAttr nm byName then byName.${nm} else null; in if n == null then [] else (
-        let ds = (getA n "deps"); in if ds == null then [] else (if builtins.isList ds then (map cleanLabel ds) else [])
-      );
-      labelsOfName = nm: let n = if builtins.hasAttr nm byName then byName.${nm} else null; in if n == null then [] else (
-        let labs = (getA n "labels"); in if labs == null then [] else (if builtins.isList labs then labs else [])
-      );
-      isCppNode = nm:
-        let n = if builtins.hasAttr nm byName then byName.${nm} else null;
-            rt0 = if n == null then null else (getA n "rule_type");
-            rt = if rt0 == null then "" else rt0;
-            labs = labelsOfName nm;
-        in (rt != null && (lib.hasPrefix "cxx_" rt || lib.hasInfix "cpp_nix_build" rt)) || (labs != null && builtins.elem "lang:cpp" labs);
-      isCppLib = nm:
-        let n = if builtins.hasAttr nm byName then byName.${nm} else null;
-            rt0 = if n == null then null else (getA n "rule_type");
-            rt = if rt0 == null then "" else rt0;
-            labs = labelsOfName nm;
-        in (labs != null && builtins.elem "kind:lib" labs) || (rt == "cxx_library");
       directDeps = depsOfName name;
       cppLibDeps = builtins.filter (dn: isCppNode dn && isCppLib dn) directDeps;
       repoCgoPkgs = map (dn: T.cppLib { name = dn; srcRoot = repoRoot; subdir = (pkgPathOf dn); }) cppLibDeps;
