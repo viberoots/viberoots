@@ -1,4 +1,5 @@
 import { shortHash } from "./providers.ts";
+import { NIX_ATTR_ALIASES } from "./nix-attr-aliases.ts";
 
 // Normalize a nixpkgs attribute path for provider naming and labeling.
 // - Trims
@@ -11,7 +12,8 @@ export function normalizeNixAttr(attr: string): string {
     .toLowerCase();
   if (!s) return s;
   let a = s.startsWith("pkgs.") ? s : `pkgs.${s}`;
-  if (a === "pkgs.gtest") a = "pkgs.googletest";
+  const alias = NIX_ATTR_ALIASES[a];
+  if (alias) a = alias;
   return a;
 }
 
