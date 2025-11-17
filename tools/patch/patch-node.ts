@@ -7,6 +7,7 @@ import type { LanguageHandler, SessionRecord } from "./types";
 import { repoRoot } from "./lib/apply";
 import { getFlagStr } from "../lib/cli.ts";
 import { resolveImporterDir } from "../lib/lockfiles.ts";
+import { runSession } from "./lib/session";
 
 function pkgArg(args: string[]): string {
   const p = args[0];
@@ -149,31 +150,15 @@ async function doRemove(args: string[]) {
 }
 
 async function doSession(args: string[]) {
-  const pkg = pkgArg(args);
   await doStart(args);
-  console.log("Attached. Ctrl-D to apply, Ctrl-C to reset.");
-  await new Promise<void>((resolve, reject) => {
-    process.stdin.setRawMode?.(true);
-    process.stdin.resume();
-    process.stdin.on("data", async (buf: Buffer) => {
-      const s = buf.toString("utf8");
-      if (s === "\u0004") {
-        try {
-          await doApply(args);
-          resolve();
-        } catch (e) {
-          reject(e);
-        }
-      } else if (s === "\u0003") {
-        try {
-          await doReset(args);
-          resolve();
-        } catch (e) {
-          reject(e);
-        }
-      }
-    });
-  });
+  await runSession(
+    async () => {
+      await doApply(args);
+    },
+    async () => {
+      await doReset(args);
+    },
+  );
 }
 
 const handler: LanguageHandler = {
