@@ -1,14 +1,16 @@
 #!/usr/bin/env zx-wrapper
-import { normalizeNixAttr } from "../../lib/providers.ts";
+import { normalizeNixAttr, decodeNameVersionFromPatch } from "../../lib/providers.ts";
 
 const cases: Array<{ name: string; attr: string }> = [
   { name: "case1", attr: "gtest" },
   { name: "case2", attr: "pkgs.gtest" },
   { name: "case3", attr: "pkgs.openssl" },
   { name: "case4", attr: "pkgs.gnome.glib" },
+  { name: "case5", attr: "zlib" },
+  { name: "case6", attr: "pkgs.zlib" },
 ];
 
-async function starlarkProbeOutput(target: string): Promise[string] {
+async function starlarkProbeOutput(target: string): Promise<string> {
   const inherited = process.env.BUCK_ISOLATION_DIR;
   const iso = inherited && inherited.trim() ? inherited : `parity_${process.pid}`;
   const createdOwnIso = !inherited;
@@ -28,6 +30,20 @@ async function starlarkProbeOutput(target: string): Promise[string] {
   }
 }
 
+async function nixNormalize(attr: string): Promise<string> {
+  // Evaluate a tiny Nix function inline using nixpkgs lib to trim/lower/prefix/map gtest
+  // Use --argstr to safely pass the attribute string.
+  const expr =
+    "with import <nixpkgs> {}; " +
+    "(let normalize = attr: " +
+    "  let s = lib.toLower (lib.strings.trim attr); " +
+    '      a = if lib.hasPrefix "pkgs." s then s else "pkgs." + s; ' +
+    '  in if a == "pkgs.gtest" then "pkgs.googletest" else a ' +
+    "in normalize a)";
+  const { stdout } = await $`nix eval --impure --raw --expr ${expr} --argstr a ${attr}`;
+  return stdout.trim();
+}
+
 for (const c of cases) {
   const target = `//tools/tests/normalization:${c.name}`;
   const want = normalizeNixAttr(c.attr);
@@ -36,6 +52,33 @@ for (const c of cases) {
     console.error(`normalize_nix_attr mismatch for '${c.attr}': starlark='${got}' ts='${want}'`);
     process.exit(2);
   }
+  // Also compare against Nix evaluation parity
+  const nix = await nixNormalize(c.attr);
+  if (nix !== want) {
+    console.error(`normalize_nix_attr mismatch for '${c.attr}': nix='${nix}' ts='${want}'`);
+    process.exit(2);
+  }
 }
 
 console.log("OK normalization parity");
+
+// Flat patch filename decoding (Go/Node) — ensure decode helper behavior on a small corpus
+const patchCases: Array<{ file: string; expect: string | null }> = [
+  { file: "lodash@4.17.21.patch", expect: "lodash@4.17.21" },
+  { file: "@scope__name@1.2.3.patch", expect: "@scope/name@1.2.3" },
+  { file: "PKGS__OPENSSL@3.2.0.patch", expect: "pkgs/openssl@3.2.0" }, // liberal decoding of "__" and casing
+  { file: "not-a-patch.txt", expect: null },
+  { file: "bad@.patch", expect: null },
+];
+
+for (const t of patchCases) {
+  const got = decodeNameVersionFromPatch(t.file);
+  if (got !== (t.expect && t.expect.toLowerCase())) {
+    console.error(
+      `decodeNameVersionFromPatch mismatch for '${t.file}': got='${got}' want='${t.expect?.toLowerCase() ?? null}'`,
+    );
+    process.exit(2);
+  }
+}
+
+console.log("OK patch filename decoding parity");
