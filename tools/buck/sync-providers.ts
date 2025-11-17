@@ -40,7 +40,7 @@ async function main() {
     } catch {}
   }
   await syncAllProviders({ outFile: maybeOut as any, strict: STRICT, lang: targetLang });
-  if (targetLgLangRequested(targetLang)) {
+  if (targetLangRequested(targetLang)) {
     // When a specific language is requested, also ensure downstream glue is present so
     // Buck macros that load //third_party/providers:auto_map.bzl can parse in temp repos.
     // Ensure graph.json exists before generating auto_map and provider index
@@ -58,17 +58,17 @@ async function main() {
         dbg("after (third_party/providers):\n" + String(stdout || "").trim());
       } catch {}
     }
-  } else if (EMETIndexRequested()) {
+  } else if (emitIndexRequested()) {
     const { generateProviderIndex } = await import("./gen-provider-index.ts");
     await generateProviderIndex({ outFile: "third_party/providers/provider_index.bzl" });
   }
 }
 
-function targetLgLangRequested(lang: string): boolean {
+export function targetLangRequested(lang: string): boolean {
   return typeof lang === "string" && lang.length > 0;
 }
 
-function EMETIndexRequested(): boolean {
+export function emitIndexRequested(): boolean {
   return EMIT_INDEX;
 }
 
