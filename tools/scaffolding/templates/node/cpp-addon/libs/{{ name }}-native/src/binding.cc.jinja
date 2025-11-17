@@ -1,0 +1,32 @@
+#include <node_api.h>
+#include "{{ name }}.h"
+
+static napi_value Sum(napi_env env, napi_callback_info info) {
+  size_t argc = 2;
+  napi_value args[2];
+  napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+  if (argc < 2) {
+    napi_value zero;
+    napi_create_int32(env, 0, &zero);
+    return zero;
+  }
+  int32_t a = 0;
+  int32_t b = 0;
+  napi_get_value_int32(env, args[0], &a);
+  napi_get_value_int32(env, args[1], &b);
+  int32_t r = sum(a, b);
+  napi_value out;
+  napi_create_int32(env, r, &out);
+  return out;
+}
+
+static napi_value Init(napi_env env, napi_value exports) {
+  napi_value fn;
+  napi_create_function(env, "sum", NAPI_AUTO_LENGTH, Sum, nullptr, &fn);
+  napi_set_named_property(env, exports, "sum", fn);
+  return exports;
+}
+
+NAPI_MODULE(NODE_GYP_MODULE_NAME, Init)
+
+

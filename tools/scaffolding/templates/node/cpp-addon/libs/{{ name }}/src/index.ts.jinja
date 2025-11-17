@@ -1,0 +1,21 @@
+import { createRequire } from "node:module";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const require = createRequire(import.meta.url);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+function resolveAddonPath(): string {
+  // Node build outputs dist/index.js; the addon is copied to ../native/{{ addon_name }}.node
+  const override = (process.env.ADDON_PATH || "").trim();
+  if (override) return override;
+  return path.join(__dirname, "..", "native", "{{ addon_name }}.node");
+}
+
+const native = require(resolveAddonPath());
+
+export function sum(a: number, b: number): number {
+  return native.sum(a, b);
+}
+
+

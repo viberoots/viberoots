@@ -1,0 +1,19 @@
+{
+  "language": "node",
+  "template": "cpp-addon",
+  "description": "Node TS library + C++ Node-API addon (two sibling packages)",
+  "help": {
+    "usage": "scaf new node cpp-addon <name> [--path=DEST] [--addon_name=<name>_addon] [--no-tests]",
+    "notes": [
+      "Generates libs/<name> (Node TS) and libs/<name>-native (C++ Node-API addon).",
+      "The Node package loads native/<addon_name>.node via createRequire(import.meta.url).",
+      "TARGETS use nix_cpp_node_addon for the addon and nix_node_gen for copying the .node artifact.",
+      "One test per file. Set --no-tests to skip Node test file generation."
+    ],
+    "examples": [
+      "scaf new node cpp-addon demo",
+      "scaf new node cpp-addon demo --addon_name=myaddon",
+      "scaf new node cpp-addon demo --no-tests"
+    ]
+  }
+}

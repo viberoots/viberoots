@@ -12,6 +12,10 @@ test("node: importer-local patch touch triggers rebuild of target", async () => 
     const lf = path.join(tmp, "apps/demo/pnpm-lock.yaml");
     await fsp.mkdir(path.dirname(lf), { recursive: true });
     await fsp.writeFile(lf, `lockfileVersion: "9.0"\nimporters:\n  apps/demo: {}\n`, "utf8");
+    // Ensure the importer-local patches directory exists before the initial build so glob()
+    // tracks it and future patch additions invalidate correctly
+    const patchDir = path.join(tmp, "apps/demo/patches/node");
+    await fsp.mkdir(patchDir, { recursive: true });
 
     // TARGETS with nix_node_gen requiring the importer-scoped lockfile label
     const targets = [
@@ -40,8 +44,6 @@ test("node: importer-local patch touch triggers rebuild of target", async () => 
     const s1 = await fsp.stat(path.isAbsolute(outPath) ? outPath : path.join(tmp, outPath));
 
     // Add importer-local patch and rebuild
-    const patchDir = path.join(tmp, "apps/demo/patches/node");
-    await fsp.mkdir(patchDir, { recursive: true });
     await fsp.writeFile(path.join(patchDir, "lodash@4.17.21.patch"), "# noop\n", "utf8");
 
     await $`buck2 build --target-platforms //:no_cgo //:t`;

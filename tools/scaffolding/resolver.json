@@ -14,6 +14,7 @@
   "node": {
     "lib": "libs/{name}",
     "cli": "apps/{name}",
-    "webapp": "apps/{name}"
+    "webapp": "apps/{name}",
+    "cpp-addon": "."
   }
 }

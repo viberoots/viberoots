@@ -1,0 +1,30 @@
+load("//node:defs.bzl", "nix_node_lib", "nix_node_test", "nix_node_gen")
+
+# Copy the compiled addon (.node) into a predictable relative path for runtime loading
+nix_node_gen(
+    name = "copy_addon",
+    srcs = [],
+    out = "native/{{ addon_name }}.node",
+    cmd = "cp $(location //libs/{{ name }}-native:napi_addon) $OUT",
+    lockfile_label = "lockfile:{{ lockfilePath }}#{{ importer }}",
+    labels = ["lang:node", "kind:gen"],
+)
+
+# Minimal Node lib target; depends on :copy_addon so the addon is present
+nix_node_lib(
+    name = "{{ name }}",
+    srcs = [],
+    out = "build.stamp",
+    cmd = "echo ok > $OUT",
+    deps = [":copy_addon"],
+    lockfile_label = "lockfile:{{ lockfilePath }}#{{ importer }}",
+)
+
+{% if includeNodeTests -%}
+nix_node_test(
+    name = "unit",
+    lockfile_label = "lockfile:{{ lockfilePath }}#{{ importer }}",
+)
+{%- endif %}
+
+

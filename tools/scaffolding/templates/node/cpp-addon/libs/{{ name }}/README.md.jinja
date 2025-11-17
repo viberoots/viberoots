@@ -1,0 +1,19 @@
+# {{ pkgScope }}/{{ name }}
+
+This package exposes a simple TypeScript API backed by a C++ Node-API addon.
+
+- The native addon is built in `libs/{{ name }}-native` and copied here to `native/{{ addon_name }}.node`.
+- The TypeScript entry loads the addon from a stable relative path using `createRequire(import.meta.url)`.
+
+## Scripts
+
+- `pnpm -C libs/{{ name }} build` — compile TS to `dist/`
+- `pnpm -C libs/{{ name }} test` — run unit tests{% if includeNodeTests %} (Vitest){% endif %}
+
+## Buck targets
+
+- `//libs/{{ name }}:{{ name }}` — Node library (stamp)
+- `//libs/{{ name }}:copy_addon` — copies the `.node` artifact to `native/{{ addon_name }}.node`
+- `//libs/{{ name }}-native:napi_addon` — C++ addon that produces the `.node` artifact
+
+

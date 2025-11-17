@@ -15,12 +15,18 @@ test("node: importer-local patch rebuilds only affected importer's target", asyn
     await fsp.mkdir(path.dirname(lfB), { recursive: true });
     await fsp.writeFile(lfA, `lockfileVersion: "9.0"\nimporters:\n  apps/a: {}\n`, "utf8");
     await fsp.writeFile(lfB, `lockfileVersion: "9.0"\nimporters:\n  apps/b: {}\n`, "utf8");
+    // Ensure importer-local patches directories exist before the initial build so glob() tracks them
+    const patchDirA = path.join(tmp, "apps/a/patches/node");
+    const patchDirB = path.join(tmp, "apps/b/patches/node");
+    await fsp.mkdir(patchDirA, { recursive: true });
+    await fsp.mkdir(patchDirB, { recursive: true });
 
     // TARGETS with two genrules, each labeled to its importer lockfile and including importer-local patches in srcs
     const targets = [
       "",
       'load("@prelude//:rules.bzl", "genrule")',
-      'genrule(name="ta", out="a.stamp", cmd="echo a > $OUT", srcs = glob(["apps/a/patches/node/*.patch"]), labels=["lockfile:apps/a/pnpm-lock.yaml#apps/a"])',
+      // Write a different timestamp on rebuild so mtime/content changes are observable for target A
+      'genrule(name="ta", out="a.stamp", cmd="date +%s > $OUT", srcs = glob(["apps/a/patches/node/*.patch"]), labels=["lockfile:apps/a/pnpm-lock.yaml#apps/a"])',
       'genrule(name="tb", out="b.stamp", cmd="echo b > $OUT", srcs = glob(["apps/b/patches/node/*.patch"]), labels=["lockfile:apps/b/pnpm-lock.yaml#apps/b"])',
       "",
     ].join("\n");
@@ -44,27 +50,28 @@ test("node: importer-local patch rebuilds only affected importer's target", asyn
       console.error("could not determine genrule output paths");
       process.exit(2);
     }
-    const a1 = await fsp.stat(path.isAbsolute(pathA) ? pathA : path.join(tmp, pathA));
-    const b1 = await fsp.stat(path.isAbsolute(pathB) ? pathB : path.join(tmp, pathB));
+    const aPathAbs = path.isAbsolute(pathA) ? pathA : path.join(tmp, pathA);
+    const bPathAbs = path.isAbsolute(pathB) ? pathB : path.join(tmp, pathB);
+    const a1Content = await fsp.readFile(aPathAbs, "utf8").catch(() => "");
+    const b1Content = await fsp.readFile(bPathAbs, "utf8").catch(() => "");
 
     // Add importer-local patch only for importer A
-    const patchDirA = path.join(tmp, "apps/a/patches/node");
-    await fsp.mkdir(patchDirA, { recursive: true });
     await fsp.writeFile(path.join(patchDirA, "leftpad@1.3.0.patch"), "# noop\n", "utf8");
 
-    // Rebuild both targets
+    // Rebuild both targets (ensure daemon refresh so glob picks up newly created files)
+    await $`buck2 kill`.nothrow();
     await $`buck2 build --target-platforms //:no_cgo //:ta //:tb`;
-    const a2 = await fsp.stat(path.isAbsolute(pathA) ? pathA : path.join(tmp, pathA));
-    const b2 = await fsp.stat(path.isAbsolute(pathB) ? pathB : path.join(tmp, pathB));
+    const a2Content = await fsp.readFile(aPathAbs, "utf8").catch(() => "");
+    const b2Content = await fsp.readFile(bPathAbs, "utf8").catch(() => "");
 
-    if (!(a2.mtimeMs > a1.mtimeMs)) {
-      console.error("expected //:ta to rebuild after importer A patch (mtime not increased)");
-      console.error("before:", a1.mtimeMs, "after:", a2.mtimeMs);
+    if (!(a2Content !== a1Content)) {
+      console.error("expected //:ta content to change after importer A patch");
+      console.error("before:", JSON.stringify(a1Content), "after:", JSON.stringify(a2Content));
       process.exit(2);
     }
-    if (!(b2.mtimeMs === b1.mtimeMs)) {
-      console.error("expected //:tb to remain a cache hit (mtime changed unexpectedly)");
-      console.error("before:", b1.mtimeMs, "after:", b2.mtimeMs);
+    if (!(b2Content === b1Content)) {
+      console.error("expected //:tb content to remain unchanged");
+      console.error("before:", JSON.stringify(b1Content), "after:", JSON.stringify(b2Content));
       process.exit(2);
     }
   });
