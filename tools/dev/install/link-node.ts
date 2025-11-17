@@ -2,6 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { sanitizeName } from "./common.ts";
+import { resolveImporterDir } from "../../lib/lockfiles.ts";
 
 async function exists(p: string): Promise<boolean> {
   try {
@@ -12,27 +13,8 @@ async function exists(p: string): Promise<boolean> {
   }
 }
 
-function findNearestImporter(): string {
-  let here = process.cwd();
-  const envRoot = (process.env.WORKSPACE_ROOT || "").trim();
-  const root = envRoot ? path.resolve(envRoot) : here;
-  while (true) {
-    const lock = path.join(here, "pnpm-lock.yaml");
-    const rel = path.relative(root, here) || ".";
-    const looksImporter = rel.startsWith("apps/") || rel.startsWith("libs/");
-    if (looksImporter) {
-      return rel;
-    }
-    const next = path.dirname(here);
-    if (next === here) break;
-    here = next;
-  }
-  // Fallback to default/root importer when no apps/libs importer is found
-  return ".";
-}
-
 export async function relinkNodeModules(force: boolean) {
-  const importer = findNearestImporter();
+  const importer = await resolveImporterDir(process.cwd()).catch(() => "."); // POSIX repo-relative
   const attr = !importer || importer === "." ? "default" : sanitizeName(importer);
   let outPath = "";
   const flakeRoot = (process.env.WORKSPACE_ROOT || process.cwd()).trim();
