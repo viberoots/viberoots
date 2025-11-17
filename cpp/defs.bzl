@@ -101,10 +101,40 @@ def nix_cpp_test(name, **kwargs):
 def cpp_sanitize_probe(name, label):
     _cpp_sanitize_probe(name = name, label = label)
 
+def nix_cpp_node_addon(name, **kwargs):
+    # Node-API addon producing a .node shared library
+    local_patch_dirs = kwargs.pop("local_patch_dirs", ["patches/cpp"])
+    nix_cxx_attrs = kwargs.pop("nix_cxx_attrs", [])
+    deps = kwargs.pop("deps", [])
+    # Optional addon_name hint; for now recorded in labels for planner visibility
+    addon_name = kwargs.pop("addon_name", None)
+    nix_inputs = ["//:flake.lock", "//tools/nix/overlays:cpp-patches.nix"]
+    stamp_labels(kwargs, "cpp", "addon")
+    if addon_name:
+        _labels = (kwargs.get("labels", []) or [])
+        # Encode addon name hint for the planner (non-functional label; reserved prefix)
+        _labels = dedupe_preserve(_labels + ["addon_name:%s" % addon_name])
+        kwargs["labels"] = _labels
+    append_patch_srcs(kwargs, local_patch_dirs)
+    srcs = kwargs.get("srcs", []) or []
+    append_nixpkg_labels(kwargs, nix_cxx_attrs)
+    deps = dedupe_preserve(deps + providers_for(MODULE_PROVIDERS, name))
+    cpp_nix_build(
+        name = name,
+        out = sanitize_to_bin_name("//%s:%s" % (native.package_name(), name)) + ".node",
+        kind = "addon",
+        self_label = "//%s:%s" % (native.package_name(), name),
+        deps = deps,
+        srcs = srcs,
+        labels = kwargs.get("labels", []) or [],
+        nix_inputs = nix_inputs,
+    )
+
 __all__ = [
     "nix_cpp_library",
     "nix_cpp_binary",
     "nix_cpp_test",
+    "nix_cpp_node_addon",
     "cpp_sanitize_probe",
 ]
 

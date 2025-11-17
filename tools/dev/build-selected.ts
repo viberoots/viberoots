@@ -36,7 +36,7 @@ async function main() {
   // Ensure the graph exists via the canonical helper; preserve exporter env behavior
   const graphPath = path.join(workDir, "tools", "buck", "graph.json");
   // Prefer working tree as BUCK_TEST_SRC so exporter operates on the correct repo root
-  const queryRoots = ["apps", "cpp", "third_party"].join(",");
+  const queryRoots = ["apps", "libs", "cpp", "third_party"].join(",");
   process.env.BUCK_TEST_SRC = workDir;
   process.env.EXPORTER_DEBUG = "1";
   // Prefer warn-level validation during local/dev builds to avoid spurious failures in temp repos
@@ -72,32 +72,28 @@ async function main() {
     nothrow: true,
   })`nix build --impure ${repoRoot}#graph-generator-selected --accept-flake-config --print-out-paths`;
   if (exitCode !== 0) {
-    if (isPlanner) {
-      // Fallback to cppTargetsFlat for planner/test labels
-      const attr = `graph-generator-cppTargets.${sanitizeAttrNameFromLabel(target)}`;
-      const res = await $({
-        env: { ...process.env },
-        reject: false,
-        nothrow: true,
-      })`nix build --impure ${repoRoot}#${attr} --accept-flake-config --print-out-paths`;
-      if (res.exitCode !== 0) {
-        console.error("nix build failed (planner fallback)", res.exitCode);
-        process.exit(res.exitCode || 1);
-      }
-      const lines = stripAnsi(String(res.stdout || ""))
-        .split(/\n+/)
-        .map((l) => l.trim())
-        .filter(Boolean);
-      const outPath = lines[lines.length - 1] || "";
-      if (!outPath) {
-        console.error("no out path emitted by nix build (planner fallback)");
-        process.exit(2);
-      }
-      process.stdout.write(outPath + "\n");
-      return;
+    // General fallback: try cppTargetsFlat attribute for any C++-backed target
+    const attr = `graph-generator-cppTargets.${sanitizeAttrNameFromLabel(target)}`;
+    const res = await $({
+      env: { ...process.env },
+      reject: false,
+      nothrow: true,
+    })`nix build --impure ${repoRoot}#${attr} --accept-flake-config --print-out-paths`;
+    if (res.exitCode !== 0) {
+      console.error("nix build failed (fallback)", res.exitCode);
+      process.exit(res.exitCode || 1);
     }
-    console.error("nix build failed with code", exitCode);
-    process.exit(exitCode || 1);
+    const lines = stripAnsi(String(res.stdout || ""))
+      .split(/\n+/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    const outPath = lines[lines.length - 1] || "";
+    if (!outPath) {
+      console.error("no out path emitted by nix build (fallback)");
+      process.exit(2);
+    }
+    process.stdout.write(outPath + "\n");
+    return;
   }
   const lines = stripAnsi(String(stdout || ""))
     .split(/\n+/)

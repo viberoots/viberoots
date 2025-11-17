@@ -34,6 +34,7 @@ let
     in if builtins.elem "kind:test" labs || isPlanner then "test"
       else if builtins.elem "kind:bin" labs then "bin"
       else if builtins.elem "kind:lib" labs then "lib"
+      else if builtins.elem "kind:addon" labs then "addon"
       else if rt == "cxx_test" then "test"
       else if rt == "cxx_binary" then "bin"
       else if rt == "cxx_library" then (if isPlanner then "test" else "lib")
@@ -131,7 +132,7 @@ let
         in map (p: builtins.toPath (ctx.repoRoot + "/" + (pkgPathOf name) + "/" + p)) rels
       );
     };
-  
+
   mkTest = name:
     T.cppTest {
       inherit name;
@@ -152,9 +153,23 @@ let
         in map (p: builtins.toPath (ctx.repoRoot + "/" + (pkgPathOf name) + "/" + p)) rels
       );
     };
+  # Node-API addon builder (produces .node)
+  mkAddon = name:
+    T.cppNodeAddon {
+      inherit name;
+      srcRoot = ctx.repoRoot;
+      subdir = pkgPathOf name;
+      nixCxxAttrs = collectNixAttrsFor name;
+      nixCxxPkgs = repoGoCArchivesFor name;
+      srcList = normSrcsOf name;
+      patches = (
+        let rels = builtins.filter (s: lib.hasSuffix ".patch" s) (normSrcsOf name);
+        in map (p: builtins.toPath (ctx.repoRoot + "/" + (pkgPathOf name) + "/" + p)) rels
+      );
+    };
 in {
   isTarget = n: (isCxx n) || (hasLangCpp n);
-  inherit kindOf mkApp mkLib mkTest;
+  inherit kindOf mkApp mkLib mkTest mkAddon;
   modulesFileFor = name: "";
 }
 
