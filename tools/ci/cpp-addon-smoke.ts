@@ -29,9 +29,47 @@ async function main() {
     await $`buck2 build //libs/demo-native:napi_addon`;
 
     // Optional: print target output for diagnostics
+    let artifactPath = "";
     try {
+      const out = await $({
+        stdio: "pipe",
+      })`buck2 targets --show-output //libs/demo-native:napi_addon`;
+      const line =
+        String(out.stdout || "")
+          .trim()
+          .split(/\r?\n/)
+          .filter(Boolean)
+          .pop() || "";
+      // Expect: //<target> <buck-out-path>
+      const parts = line.split(/\s+/);
+      artifactPath = parts.length >= 2 ? parts[parts.length - 1] : "";
       await $`buck2 targets --show-output //libs/demo-native:napi_addon`;
     } catch {}
+    if (!artifactPath) {
+      throw new Error("Unable to resolve addon artifact path via `buck2 targets --show-output`");
+    }
+    // Linkage sanity check: use otool -L on macOS, ldd on Linux
+    if (process.platform === "darwin") {
+      const out = await $({ stdio: "pipe" })`otool -L ${artifactPath}`;
+      const txt = String(out.stdout || "").trim();
+      if (!txt) {
+        throw new Error("otool -L produced no output for addon artifact");
+      }
+    } else {
+      const out = await $({ stdio: "pipe" })`ldd ${artifactPath}`;
+      const txt = String(out.stdout || "").toLowerCase();
+      if (!txt || /not a dynamic executable/.test(txt)) {
+        throw new Error("ldd linkage check failed or artifact is not dynamically linked");
+      }
+    }
+
+    // Run glue steps and Buck test for the scaffolded unit test
+    await $`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
+    // Node providers sync (no-op if no pnpm lockfiles)
+    await $`node tools/buck/sync-providers.ts --lang node`.nothrow();
+    await $`node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
+    await $`node tools/buck/prebuild-guard.ts`;
+    await $`buck2 test //libs/demo:unit`;
   });
 }
 
