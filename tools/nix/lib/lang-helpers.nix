@@ -33,11 +33,12 @@ let
       names = if builtins.pathExists patchDir then builtins.attrNames (builtins.readDir patchDir) else [];
       isPatch = name: lib.hasSuffix ".patch" name;
       decode = name:
-        let base = lib.removeSuffix ".patch" name;
-            at = lib.strLastIndexOf base "@";
-            enc = lib.substring 0 at base;
-            ver = lib.substring (at + 1) (lib.stringLength base - at - 1) base;
-            importPath = lib.replaceStrings ["__"] ["/"] enc;
+        let
+          base = lib.removeSuffix ".patch" name;
+          parts = lib.splitString "@" base;
+          impEnc = lib.concatStringsSep "@" (lib.take (lib.length parts - 1) parts);
+          ver = lib.last parts;
+          importPath = lib.replaceStrings ["__"] ["/"] impEnc;
         in { path = lib.toLower importPath; ver = lib.toLower ver; };
       step = acc: name:
         let d = decode name;
@@ -45,6 +46,14 @@ let
             val = (acc.${key} or []) ++ [ "${patchDir}/${name}" ];
         in acc // { "${key}" = val; };
     in builtins.foldl' step {} (lib.filter isPatch names);
+
+  # Build a merged patches map from multiple directories, preserving per-dir list order.
+  # Later directories append to earlier ones for identical keys.
+  patchesMapFromDirs = dirs:
+    let
+      scan = dir: patchesMapFromDir dir;
+      merge = a: b: pkgs.lib.foldlAttrs (acc: k: v: acc // { "${k}" = (acc.${k} or []) ++ v; }) a b;
+    in pkgs.lib.foldl' merge {} (map scan dirs);
 
   readDevOverrides = envName:
     let v = builtins.getEnv envName;
@@ -67,5 +76,5 @@ let
       else null;
 
 in {
-  inherit segs getAtPath resolveAttrFromPkgs sanitizeName patchesMapFromDir readDevOverrides guardNoDevOverridesInCI;
+  inherit segs getAtPath resolveAttrFromPkgs sanitizeName patchesMapFromDir patchesMapFromDirs readDevOverrides guardNoDevOverridesInCI;
 }

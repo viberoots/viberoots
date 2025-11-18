@@ -80,10 +80,7 @@ in {
   }:
     let
       # Merge patches from multiple directories; preserve keys and lists
-      patchesMap = let
-        scan = dir: H.patchesMapFromDir dir;
-        merge = a: b: pkgs.lib.foldlAttrs (acc: k: v: acc // { "${k}" = (acc.${k} or []) ++ v; }) a b;
-      in pkgs.lib.foldl' merge {} (map scan patchDirs);
+      patchesMap = H.patchesMapFromDirs patchDirs;
       devOverridesFromEnv = H.readDevOverrides devOverrideEnv;
       _guard = H.guardNoDevOverridesInCI devOverrideEnv;
       devOverrides = (devOverridesMap // devOverridesFromEnv);
@@ -129,10 +126,7 @@ in {
     repoCgoPkgs ? [],
   }:
     let
-      patchesMap = let
-        scan = dir: H.patchesMapFromDir dir;
-        merge = a: b: pkgs.lib.foldlAttrs (acc: k: v: acc // { "${k}" = (acc.${k} or []) ++ v; }) a b;
-      in pkgs.lib.foldl' merge {} (map scan patchDirs);
+      patchesMap = H.patchesMapFromDirs patchDirs;
       _guard = H.guardNoDevOverridesInCI devOverrideEnv;
       srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + subdir));
       cgo = mkCgoEnv { inherit nixCgoPkgs nixCgoAttrs repoCgoPkgs; };
