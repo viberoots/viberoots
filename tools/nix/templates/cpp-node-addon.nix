@@ -36,7 +36,7 @@ in {
     resolvedPkgs = nixCxxPkgs ++ (resolveAttrsToPkgs nixCxxAttrs);
     nixInc = nixIncFlags resolvedPkgs;
     nixLib = nixLibFlags resolvedPkgs;
-    nodeInc = "-isystem ${pkgs.nodejs_22}/include/node";
+    nodeInc = "-isystem ${C.nodeToolchain}/include/node";
     incFlags = joinInc includes;
     # Ensure NODE_GYP_MODULE_NAME and a default NAPI version are defined for compatibility.
     defFlags = joinDef (defines ++ [

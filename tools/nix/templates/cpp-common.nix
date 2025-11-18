@@ -65,11 +65,15 @@ let
         ++ (if (builtins.hasAttr "googletest" pkgs) then [ pkgs.googletest ] else [])
         ++ (if (builtins.hasAttr "gtest" pkgs) then [ pkgs.gtest ] else []);
     in if direct != [] then direct else fallback;
+  # Canonical Node toolchain alias used by C++ Node-API addon template
+  nodeToolchain =
+    if (builtins.hasAttr "nodejs_22" pkgs) then pkgs.nodejs_22
+    else pkgs.nodejs;
 in {
   inherit lib H clangxx llvmAr sorted joinInc joinDef joinExtraC
           toIncludeBase toLibBase nixIncFlags nixLibFlags
           devMap _ci_guard normalizeAttr getAtFromPkgs overridePkgIfAny resolveAttrsToPkgs
-          hasGTestAttr gtestPkgsAllFor;
+          hasGTestAttr gtestPkgsAllFor nodeToolchain;
 }
 
 
