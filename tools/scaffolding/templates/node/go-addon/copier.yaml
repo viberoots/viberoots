@@ -1,0 +1,35 @@
+version: 1
+
+_envops:
+  block_start_string: "{%"
+  block_end_string: "%}"
+  variable_start_string: "{{"
+  variable_end_string: "}}"
+  comment_start_string: "{#"
+  comment_end_string: "#}"
+  keep_trailing_newline: true
+
+_exclude:
+  - meta.json
+
+name: ""
+language: "node"
+template: "go-addon"
+
+# Node importer for the TS package; Go and native live alongside as libs/{{ name }}-go and libs/{{ name }}-native
+importer: "libs/{{ name }}"
+lockfilePath: "libs/{{ name }}/pnpm-lock.yaml"
+pkgScope: "@libs"
+addon_name: "{{ name }}_addon"
+includeNodeTests: true
+
+_tasks:
+  # Ensure all sibling package directories exist
+  - mkdir -p libs/{{ name }}/src
+  - mkdir -p libs/{{ name }}/test
+  - mkdir -p libs/{{ name }}-go/pkg/addon
+  - mkdir -p libs/{{ name }}-go/patches/go
+  - mkdir -p libs/{{ name }}-native/src
+  - mkdir -p libs/{{ name }}-native/include
+  - mkdir -p libs/{{ name }}-native/tests
+  - mkdir -p libs/{{ name }}-native/patches/cpp

@@ -70,59 +70,46 @@ async function main() {
   await ensureGraph();
   process.env.BUCK_GRAPH_JSON = graphPath;
   process.env.BUCK_TEST_SRC = workDir;
+  // Optional debug: surface a snippet of graph.json for diagnostics when requested
+  if ((process.env.EXPORTER_DEBUG || "").trim() === "1") {
+    try {
+      const preview = await fsp.readFile(graphPath, "utf8");
+      const head = preview.slice(0, 200).replace(/\s+/g, " ");
+      console.error(`[build-selected][debug] graph.json head: ${head}`);
+    } catch {}
+  }
 
   console.error(`[build-selected] BUCK_TARGET=${target}`);
-  // Planner stubs are represented only in cppTargetsFlat; selected may not include them.
-  const isPlanner = target.endsWith("__planner");
 
+  // Sanitize impure dev-override env to avoid accidental JSON parse errors in planner
+  const sanitizedEnv = {
+    ...process.env,
+    BUCK_TARGET: target,
+    NIX_GO_DEV_OVERRIDE_JSON: "",
+    NIX_CPP_DEV_OVERRIDE_JSON: "",
+    PLANNER_ONLY_CPP: "1",
+  };
+
+  const nixTrace = (process.env.EXPORTER_DEBUG || "").trim() === "1" ? "--show-trace" : "";
   const { stdout, exitCode } = await $({
-    env: { ...process.env, BUCK_TARGET: target },
+    env: sanitizedEnv,
     reject: false,
     nothrow: true,
-  })`nix build --impure ${repoRoot}#graph-generator-selected --accept-flake-config --print-out-paths`;
+  })`nix build --impure ${repoRoot}#graph-generator-selected --accept-flake-config --print-out-paths ${nixTrace}`;
   if (exitCode !== 0) {
-    // General fallback: try cppTargetsFlat attribute for any C++-backed target
+    // Fallback: try cppTargetsFlat attribute for any C++-backed target (planner path)
     const attr = `graph-generator-cppTargets.${sanitizeAttrNameFromLabel(target)}`;
     const res = await $({
-      env: { ...process.env },
+      env: sanitizedEnv,
       reject: false,
       nothrow: true,
-    })`nix build --impure ${repoRoot}#${attr} --accept-flake-config --print-out-paths`;
+    })`nix build --impure ${repoRoot}#${attr} --accept-flake-config --print-out-paths ${nixTrace}`;
     if (res.exitCode !== 0) {
-      // As a last-resort for minimal temp workspaces where the exported Buck graph is unavailable,
-      // attempt a direct addon build using the cpp-node-addon template (no planner graph required).
-      // This preserves the planner as the primary path while keeping existing tests (that scaffold
-      // only a tiny temp workspace) working without special handling.
-      const subdir = packagePathFromLabel(target);
-      const sanitized = sanitizeName(target);
-      const expr = [
-        "let",
-        "  flk = builtins.getFlake (toString ./.);",
-        "  pkgs = import flk.inputs.nixpkgs { system = builtins.currentSystem; };",
-        "  T = import ./tools/nix/templates/cpp-node-addon.nix { inherit pkgs; };",
-        "in",
-        `  T.cppNodeAddon { name = "${sanitized}"; addonName = "${sanitized}"; srcRoot = ./.; subdir = "${subdir}"; }`,
-      ].join(" ");
-      const direct = await $({
-        env: { ...process.env },
-        reject: false,
-        nothrow: true,
-      })`nix build --impure --accept-flake-config --print-out-paths --expr ${expr}`;
-      if (direct.exitCode !== 0) {
-        console.error("nix build failed (fallback)", res.exitCode);
-        process.exit(res.exitCode || 1);
-      }
-      const lines = stripAnsi(String(direct.stdout || ""))
-        .split(/\n+/)
-        .map((l) => l.trim())
-        .filter(Boolean);
-      const outPath = lines[lines.length - 1] || "";
-      if (!outPath) {
-        console.error("no out path emitted by nix build (direct addon fallback)");
-        process.exit(2);
-      }
-      process.stdout.write(outPath + "\n");
-      return;
+      console.error(
+        "[build-selected] planner build failed for both graph-generator-selected and cppTargetsFlat.\n" +
+          "Ensure tools/buck/graph.json includes the requested target and re-run glue export.",
+      );
+      process.exit(res.exitCode || 1);
     }
     const lines = stripAnsi(String(res.stdout || ""))
       .split(/\n+/)

@@ -2,6 +2,7 @@
 let
   # Optional dispatch mapping from mapping.nix
   D = M.dispatch or {};
+  traceEnabled = (builtins.getEnv "PLANNER_TRACE") != "";
 
   # Read language IDs from langs.json when present; otherwise return []
   readLangIds =
@@ -10,10 +11,22 @@ let
     in
       if builtins.pathExists langsPath then
         let
-          raw = builtins.fromJSON (builtins.readFile langsPath);
-          arr = if (builtins.isList raw) then raw else (raw.languages or []);
+          contents = builtins.readFile langsPath;
+          _t = if traceEnabled then builtins.trace ("[planner][trace] langs.json head: " + (builtins.substring 0 100 contents)) null else null;
+          attempt = builtins.tryEval (builtins.fromJSON contents);
+          raw = if attempt.success then attempt.value else [];
+          # Support either:
+          # - Array of objects with .id
+          # - { languages = [ { id = "cpp"; } ... ] }
+          # - { enabled = [ "cpp", "go" ] }
+          arr0 =
+            if (builtins.isList raw) then raw
+            else if (builtins.isAttrs raw) && (raw ? languages) then raw.languages
+            else if (builtins.isAttrs raw) && (raw ? enabled) then (map (s: { id = s; }) raw.enabled)
+            else [];
+          arr = builtins.filter (l: (builtins.isAttrs l) && (l ? id)) arr0;
         in
-          builtins.map (l: (l.id or "")) (builtins.filter (l: (builtins.isAttrs l) && (l ? id)) arr)
+          builtins.map (l: (l.id or "")) arr
       else
         [];
 
@@ -41,9 +54,10 @@ let
   # Build the list of language ids, always including "go"; include "cpp" when its planner exists
   langIds =
     let
+      onlyCpp = (builtins.getEnv "PLANNER_ONLY_CPP") != "";
       ids0 = readLangIds;
       withGo =
-        if builtins.elem "go" ids0 then ids0 else (ids0 ++ [ "go" ]);
+        if onlyCpp then ids0 else (if builtins.elem "go" ids0 then ids0 else (ids0 ++ [ "go" ]));
       cppPlanner = manifestBase + "/planner/cpp.nix";
       withCpp =
         if builtins.pathExists cppPlanner && !(builtins.elem "cpp" withGo)

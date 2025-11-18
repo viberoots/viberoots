@@ -8,18 +8,22 @@
 , mkCpp
 }:
 let
+  traceEnabled = (builtins.getEnv "PLANNER_TRACE") != "";
+  _trace_nodes_len = if traceEnabled then builtins.trace ("[planner][trace] nodesList.length=" + (toString (builtins.length nodesList))) null else null;
   # Select Go nodes limited to apps/* and libs/*
-  safeGoNodes = builtins.filter (n:
+  safeGoNodes =
+  let xs = builtins.filter (n:
     let
       nm = ensureFullLabel n;
       okName = (builtins.typeOf nm == "string") && nm != "";
       rel = if okName then (pkgPathOf nm) else "";
       inAppsLibs = lib.hasPrefix "apps/" rel || lib.hasPrefix "libs/" rel;
     in okName && inAppsLibs && (LANGS.go.isTarget n)
-  ) nodesList;
+  ) nodesList; in if traceEnabled then builtins.trace ("[planner][trace] safeGoNodes=" + (toString (builtins.length xs))) xs else xs;
 
   # Select C++ nodes limited to apps/* and libs/*
-  safeCppNodes = builtins.filter (n:
+  safeCppNodes =
+  let ys = builtins.filter (n:
     let
       nm = ensureFullLabel n;
       okName = (builtins.typeOf nm == "string") && nm != "";
@@ -27,7 +31,7 @@ let
       inAppsLibs = lib.hasPrefix "apps/" rel || lib.hasPrefix "libs/" rel;
       hasCpp = (LANGS ? cpp);
     in okName && inAppsLibs && hasCpp && (LANGS.cpp.isTarget n)
-  ) nodesList;
+  ) nodesList; in if traceEnabled then builtins.trace ("[planner][trace] safeCppNodes=" + (toString (builtins.length ys))) ys else ys;
 
   # Construct Go targets
   goTargetsFromGraph = builtins.foldl' (acc: n:
@@ -92,12 +96,9 @@ let
   nodeOutPaths = nodeTargetsFromGraph;
 in {
   inherit
-    safeGoNodes
     safeCppNodes
-    goTargetsFromGraph
     cppTargetsFromGraph
     nodeTargetsFromGraph
-    goOutPaths
     cppOutPaths
     nodeOutPaths;
 }

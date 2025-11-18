@@ -1,0 +1,24 @@
+load("//cpp:defs.bzl", "nix_cpp_node_addon", "nix_cpp_test")
+
+nix_cpp_node_addon(
+    name = "napi_addon",
+    srcs = [
+        "src/binding.c",
+    ],
+    headers = glob(["include/**/*.h"]),
+    deps = ["//libs/{{ name }}-go:carchive"],
+    addon_name = "{{ addon_name }}",
+    labels = ["lang:cpp", "kind:addon"],
+    visibility = ["PUBLIC"],
+)
+
+nix_cpp_test(
+    name = "{{ name }}_gtest",
+    srcs = ["tests/{{ name }}_gtest.cpp"],
+    deps = [
+        "//third_party/providers:nix_pkgs_googletest",
+    ],
+    labels = ["lang:cpp", "kind:test"],
+)
+
+

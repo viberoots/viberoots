@@ -5,6 +5,8 @@ let
   buckTestSrcEnv = builtins.getEnv "BUCK_TEST_SRC";
   repoRootStr = if buckTestSrcEnv != "" then buckTestSrcEnv else builtins.toString src;
   repoRoot = builtins.toPath repoRootStr;
+  traceEnabled = (builtins.getEnv "PLANNER_TRACE") != "";
+  onlyCpp = (builtins.getEnv "PLANNER_ONLY_CPP") != "";
   # Filtered source that includes both apps/* and libs/* so local replaces resolve
   appsLibsSrc = lib.cleanSourceWith {
     src = repoRoot;
@@ -33,7 +35,14 @@ let
       if builtins.pathExists cand then cand else builtins.throw "graphJsonPath not provided and repoRoot/tools/buck/graph.json missing — run tools/buck/export-graph.ts first." 
   );
   nodesRaw = if builtins.pathExists graphPath
-    then builtins.fromJSON (builtins.readFile graphPath)
+    then (
+      let
+        contents0 = builtins.readFile graphPath;
+        contents = if traceEnabled
+          then (builtins.trace ("[planner][trace] graph.json head: " + (builtins.substring 0 160 contents0)) contents0)
+          else contents0;
+      in builtins.fromJSON contents
+    )
     else builtins.throw "graphJsonPath does not exist — run tools/buck/export-graph.ts before building.";
   nodes =
     let t = builtins.typeOf nodesRaw; in
@@ -58,7 +67,9 @@ let
   # the main flake workspace to also include those files.
   manifestBase =
     let candidate = builtins.toPath (repoRootStr + "/tools/nix"); in
-      if builtins.pathExists candidate then candidate else ./.;
+      if (builtins.pathExists candidate) && (builtins.pathExists (candidate + "/lang-templates.nix"))
+      then candidate
+      else ./.;
   # Load language templates from the chosen manifest base (temp repo when set)
   T = import (manifestBase + "/lang-templates.nix") { inherit pkgs; };
   M = if builtins.pathExists ./mapping.nix then (
@@ -108,6 +119,7 @@ let
     ctx = ctx;
   };
   LANGS = Langs.LANGS;
+  _trace_langs = if traceEnabled then builtins.trace ("[planner][trace] LANGS keys=" + (builtins.concatStringsSep "," (builtins.attrNames LANGS))) null else null;
   pick = Langs.pick;
 
   modulesTomlDefault = if rootModulesTomlPath != null
@@ -166,43 +178,95 @@ let
     let parts = lib.splitString ":" name; in
       if (builtins.length parts) > 1 then lib.elemAt parts 1 else baseNameOf (pkgPathOf name);
 
-  # Consolidated target constructor: delegates to language adapters
-  mkFor = template: name: kind:
-    let L = builtins.getAttr template LANGS; in
-      if kind == "bin" then L.mkApp name
-      else if kind == "lib" then L.mkLib name
-      else if kind == "test" && (builtins.hasAttr "mkTest" L) then L.mkTest name
-      else L.mkApp name;
-
-  mkGo = name: kind:
-    mkFor "go" name kind;
-
-  mkCpp = name: kind:
-    mkFor "cpp" name kind;
-
-  # Target selection and out paths (extracted module)
-  Targets = import (manifestBase + "/planner/targets.nix") {
-    inherit lib nodesList LANGS pick ensureFullLabel pkgPathOf mkGo mkCpp;
+  # Import C++ planner adapter directly for mk* helpers
+  Cpp = import (manifestBase + "/planner/cpp.nix") { inherit lib; } {
+    inherit T repoRoot;
+    get = get;
+    nodes = nodesList;
+    pkgPathOf = pkgPathOf;
+    modulesTomlFor = modulesTomlFor;
   };
-  safeGoNodes = Targets.safeGoNodes;
-  safeCppNodes = Targets.safeCppNodes;
-  goTargetsFromGraph = Targets.goTargetsFromGraph;
-  cppTargetsFromGraph = Targets.cppTargetsFromGraph;
-  nodeTargetsFromGraph = Targets.nodeTargetsFromGraph;
-  goOutPaths = Targets.goOutPaths;
-  cppOutPaths = Targets.cppOutPaths;
-  nodeOutPaths = Targets.nodeOutPaths;
+  # Direct C++ constructor via planner adapter: avoid LANGS indirection
+  mkCpp = name: kind:
+    if kind == "bin" then Cpp.mkApp name
+    else if kind == "lib" then Cpp.mkLib name
+    else if kind == "test" then Cpp.mkTest name
+    else if kind == "addon" then Cpp.mkAddon name
+    else Cpp.mkApp name;
+
+  # Compute C++ target set locally to avoid evaluating unrelated language paths in temp workspaces
+  safeCppNodes =
+    let hasLabel = n: let ls = get n "labels"; in (ls != null) && (builtins.isList ls) && builtins.elem "lang:cpp" ls;
+        nmOk = n: let nm = ensureFullLabel n; in (builtins.typeOf nm == "string") && (nm != "");
+        inAppsLibs = n:
+          let rel = if nmOk n then (pkgPathOf (ensureFullLabel n)) else ""; in
+            lib.hasPrefix "apps/" rel || lib.hasPrefix "libs/" rel;
+    in builtins.filter (n: nmOk n && inAppsLibs n && hasLabel n) nodesList;
+  # Lightweight C++ kind inference (mirrors planner/cpp.nix:kindOf)
+  cppKindOf = n:
+    let
+      rt0 = get n "rule_type"; rt = if rt0 == null then "" else rt0;
+      labs = get n "labels";
+      nm = ensureFullLabel n;
+      isPlanner = (builtins.typeOf nm == "string") && (nm != "") && lib.hasSuffix "__planner" nm;
+      has = l: (labs != null) && (builtins.isList labs) && builtins.elem l labs;
+    in if has "kind:test" || isPlanner then "test"
+       else if has "kind:bin" then "bin"
+       else if has "kind:lib" then "lib"
+       else if has "kind:addon" then "addon"
+       else if rt == "cxx_test" then "test"
+       else if rt == "cxx_binary" then "bin"
+       else if rt == "cxx_library" then (if isPlanner then "test" else "lib")
+       else null;
+  cppTargetsFromGraph = builtins.foldl' (acc: n:
+    let nm = ensureFullLabel n; tnm = builtins.typeOf nm; k = cppKindOf n; in
+      if (tnm != "string") || (nm == "") || (k == null) then acc
+      else (acc // { "${nm}" = mkCpp nm k; })
+  ) {} safeCppNodes;
+  # Only link C++ binaries in graph outputs
+  cppBinNames = builtins.filter (nm:
+    let
+      matches = builtins.filter (x: ensureFullLabel x == nm) safeCppNodes;
+      n = if matches == [] then null else builtins.head matches;
+      k = if n == null then null else (cppKindOf n);
+    in k != null && k == "bin"
+  ) (builtins.attrNames cppTargetsFromGraph);
+  cppOutPaths = builtins.listToAttrs (map (nm: { name = nm; value = cppTargetsFromGraph.${nm}; }) cppBinNames);
+  # Node targets are not needed for this flow; provide empty set
+  nodeTargetsFromGraph = if onlyCpp then {} else {};
+  nodeOutPaths = if onlyCpp then {} else {};
 
   # Strict mode: require Buck graph; only build app binaries/libs in goTargets
-  goTargets =
-    let names = builtins.attrNames goTargetsFromGraph;
-        entries = builtins.filter (e: e != null) (map (nm:
-          let matches = builtins.filter (x: ensureFullLabel x == nm) safeGoNodes;
-              n = if matches == [] then null else builtins.head matches;
-              k = if n == null then null else pick n;
-          in if k != null && (k.kind == "bin" || k.kind == "lib") then { name = nm; value = goTargetsFromGraph.${nm}; } else null
-        ) names);
-    in builtins.listToAttrs entries;
+  # Defer Go computation entirely to avoid evaluating unrelated paths in C++-only temp workspaces
+  goOutPaths =
+    if onlyCpp then {}
+    else (
+      let
+        # Minimal Go support for full planner runs
+        hasGoLabel = n:
+          let ls = get n "labels"; in (ls != null) && (builtins.isList ls) && builtins.elem "lang:go" ls;
+        inAppsLibs = n:
+          let rel = pkgPathOf (ensureFullLabel n); in lib.hasPrefix "apps/" rel || lib.hasPrefix "libs/" rel;
+        safeGoNodes = builtins.filter (n:
+          let nm = ensureFullLabel n; in
+            (builtins.typeOf nm == "string") && (nm != "") && inAppsLibs n && hasGoLabel n
+        ) nodesList;
+        # Use adapter's kindOf for Go
+        goKindOf = n: LANGS.go.kindOf n;
+        mkGo = name: kind:
+          if (kind == "bin") then LANGS.go.mkApp name else LANGS.go.mkLib name;
+        goTargetsFromGraph = builtins.foldl' (acc: n:
+          let nm = ensureFullLabel n; kind = goKindOf n; in
+            if (kind == null) then acc else (acc // { "${nm}" = mkGo nm kind; })
+        ) {} safeGoNodes;
+        goBinNames = builtins.filter (nm:
+          let nms = builtins.filter (x: ensureFullLabel x == nm) safeGoNodes;
+              n = if nms == [] then null else builtins.head nms;
+              k = if n == null then null else goKindOf n;
+          in k != null && k == "bin"
+        ) (builtins.attrNames goTargetsFromGraph);
+      in builtins.listToAttrs (map (nm: { name = nm; value = goTargetsFromGraph.${nm}; }) goBinNames)
+    );
   cppTargets = cppTargetsFromGraph;
 
   # Provide a flake-friendly flat attrset whose keys are safe identifiers: t + [a-z0-9_]+
@@ -238,30 +302,50 @@ let
     let d = dropCell s;
     in if lib.hasPrefix "//" d then (lib.removePrefix "//" d) else d;
   selected = if selectedTargetName != "" then (
-    let want = canon selectedTargetName;
-        matches = builtins.filter (n:
-          let nm = canon (ensureFullLabel n);
-          in nm == want
-        ) (safeGoNodes ++ safeCppNodes);
-    in if matches == [] then pkgs.runCommand "missing-target-${sanitize selectedTargetName}" {} ''
-      echo "missing target: ${selectedTargetName}" >&2
-      exit 1
-    '' else (
-      let n = builtins.head matches; k = pick n; in
-        if k == null then pkgs.runCommand "missing-kind-${sanitize selectedTargetName}" {} ''
-          echo "missing kind for: ${selectedTargetName}" >&2
+    let want = canon selectedTargetName; in
+      if onlyCpp then (
+        # C++ only mode: limit search to C++ nodes and build with cpp templates
+        let matches = builtins.filter (n:
+              let nm = canon (ensureFullLabel n);
+              in nm == want
+            ) safeCppNodes;
+        in if matches == [] then pkgs.runCommand "missing-target-${sanitize selectedTargetName}" {} ''
+          echo "missing target: ${selectedTargetName}" >&2
           exit 1
         '' else (
-          if k.template == "go" then (
-            if (k.kind == "bin" || k.kind == "lib") then mkGo selectedTargetName k.kind else mkGo selectedTargetName "bin"
-          ) else if k.template == "node" then (
-            if (k.kind == "bin" || k.kind == "lib") then LANGS.node.mkApp selectedTargetName else LANGS.node.mkApp selectedTargetName
-          ) else (
-            # default to cpp when not go
-            if (k.kind == "bin" || k.kind == "lib" || k.kind == "test" || k.kind == "addon") then mkCpp selectedTargetName k.kind else mkCpp selectedTargetName "bin"
-          )
+          let n = builtins.head matches; k = cppKindOf n; in
+            if k == null then pkgs.runCommand "missing-kind-${sanitize selectedTargetName}" {} ''
+              echo "missing kind for: ${selectedTargetName}" >&2
+              exit 1
+            '' else (
+              if (k == "bin" || k == "lib" || k == "test" || k == "addon") then mkCpp selectedTargetName k else mkCpp selectedTargetName "bin"
+            )
         )
-    )
+      ) else (
+        # Full mode: allow any language via adapter pick
+        let matches = builtins.filter (n:
+              let nm = canon (ensureFullLabel n);
+              in nm == want
+            ) nodesList;
+        in if matches == [] then pkgs.runCommand "missing-target-${sanitize selectedTargetName}" {} ''
+          echo "missing target: ${selectedTargetName}" >&2
+          exit 1
+        '' else (
+          let n = builtins.head matches; k = pick n; in
+            if k == null then pkgs.runCommand "missing-kind-${sanitize selectedTargetName}" {} ''
+              echo "missing kind for: ${selectedTargetName}" >&2
+              exit 1
+            '' else (
+              if k.template == "go" then (
+                if (k.kind == "bin" || k.kind == "lib") then LANGS.go.mkApp selectedTargetName else LANGS.go.mkApp selectedTargetName
+              ) else if k.template == "node" then (
+                LANGS.node.mkApp selectedTargetName
+              ) else (
+                if (k.kind == "bin" || k.kind == "lib" || k.kind == "test" || k.kind == "addon") then mkCpp selectedTargetName k.kind else mkCpp selectedTargetName "bin"
+              )
+            )
+        )
+      )
   ) else pkgs.runCommand "no-target-specified" {} ''
     mkdir -p $out
     echo no-target > $out/.noop
@@ -275,7 +359,7 @@ let
   all = Manifest.all;
 in
 {
-  inherit goTargets cppTargets cppTargetsFlat all selected;
+  inherit cppTargets cppTargetsFlat all selected;
 }
 
 

@@ -15,6 +15,7 @@
     "lib": "libs/{name}",
     "cli": "apps/{name}",
     "webapp": "apps/{name}",
-    "cpp-addon": "."
+    "cpp-addon": ".",
+    "go-addon": "."
   }
 }

@@ -1,0 +1,13 @@
+package addon
+
+/*
+#include <stdint.h>
+*/
+import "C"
+
+//export Add
+func Add(a, b C.int) C.int {
+  return a + b
+}
+
+

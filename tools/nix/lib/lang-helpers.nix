@@ -56,18 +56,24 @@ let
     in pkgs.lib.foldl' merge {} (map scan dirs);
 
   readDevOverrides = envName:
-    let v = builtins.getEnv envName;
-        dev = if v == "" then {} else builtins.fromJSON v;
-        # To reduce local Nix eval noise, suppress the default trace unless explicitly enabled.
-        # Preferred local notice lives in the prebuild guard (tools/buck/prebuild/notice.ts).
-        # Set PLANNER_DEV_OVERRIDE_TRACE=1 to re-enable this Nix-level trace during troubleshooting.
-        traceEnabled =
-          (builtins.getEnv "CI") != "true"
-          && dev != {}
-          && (builtins.getEnv "PLANNER_DEV_OVERRIDE_TRACE") != "";
+    let
+      v = builtins.getEnv envName;
+      _t = if (builtins.getEnv "PLANNER_TRACE") != "" then builtins.trace ("[planner][trace] " + envName + " len=" + (toString (builtins.stringLength v))) null else null;
+      parsed =
+        if v == "" then {}
+        else
+          let attempt = builtins.tryEval (builtins.fromJSON v); in
+            if attempt.success then attempt.value else {};
+      # To reduce local Nix eval noise, suppress the default trace unless explicitly enabled.
+      # Preferred local notice lives in the prebuild guard (tools/buck/prebuild/notice.ts).
+      # Set PLANNER_DEV_OVERRIDE_TRACE=1 to re-enable this Nix-level trace during troubleshooting.
+      traceEnabled =
+        (builtins.getEnv "CI") != "true"
+        && parsed != {}
+        && (builtins.getEnv "PLANNER_DEV_OVERRIDE_TRACE") != "";
     in if traceEnabled
-       then builtins.trace "[DEV OVERRIDES ACTIVE] ${envName} set; local derivation hashes will differ." dev
-       else dev;
+       then builtins.trace "[DEV OVERRIDES ACTIVE] ${envName} set; local derivation hashes will differ." parsed
+       else parsed;
 
   guardNoDevOverridesInCI = envName:
     let v = builtins.getEnv envName; in
