@@ -17,34 +17,16 @@ def _cpp_nix_build_impl(ctx):
         expected = "lib/%s.node" % sanitized
     else:
         fail("unknown kind for cpp_nix_build: %s" % kind)
-    if kind == "addon":
-        run_and_copy = (
-            nix_bootstrap_env()
-            + "OUT_PATH=$( "
-            + "  cd \"$FLK_ROOT\"; "
-            + "  nix build --impure --accept-flake-config --print-out-paths "
-            + "    --expr 'let flk = builtins.getFlake (toString ./.); pkgs = import flk.inputs.nixpkgs { system = builtins.currentSystem; }; T = import ./tools/nix/templates/cpp-node-addon.nix { inherit pkgs; }; in T.cppNodeAddon { "
-            + ("      name = \"%s\"; addonName = \"%s\"; srcRoot = ./.; subdir = \"%s\"; " % (sanitized, sanitized, ctx.label.package))
-            + "    }' "
-            + "); "
-            + "test -n \"$OUT_PATH\"; "
-            + (
-                "if [ ! -e \"$OUT_PATH/%s\" ]; then echo 'expected artifact not found: %s' >&2; (ls -la \"$OUT_PATH\"; ls -la \"$OUT_PATH/bin\" 2>/dev/null || true; ls -la \"$OUT_PATH/lib\" 2>/dev/null || true) >&2; exit 2; fi; "
-                % (expected, expected)
-            )
-            + "DEST=\"$0\"; cp -f \"$OUT_PATH/%s\" \"$DEST\"; " % expected
+    run_and_copy = (
+        nix_bootstrap_env()
+        + ("OUT_PATH=$(BUCK_TEST_SRC=\"$PWD\" BUCK_TARGET=\"%s\" nix run \"$FLK_ROOT\"#zx-wrapper -- \"$FLK_ROOT/tools/dev/build-selected.ts\"); " % raw)
+        + "test -n \"$OUT_PATH\"; "
+        + (
+            "if [ ! -e \"$OUT_PATH/%s\" ]; then echo 'expected artifact not found: %s' >&2; (ls -la \"$OUT_PATH\"; ls -la \"$OUT_PATH/bin\" 2>/dev/null || true; ls -la \"$OUT_PATH/lib\" 2>/dev/null || true) >&2; exit 2; fi; "
+            % (expected, expected)
         )
-    else:
-        run_and_copy = (
-            nix_bootstrap_env()
-            + ("OUT_PATH=$(BUCK_TEST_SRC=\"$PWD\" BUCK_TARGET=\"%s\" nix run \"$FLK_ROOT\"#zx-wrapper -- \"$FLK_ROOT/tools/dev/build-selected.ts\"); " % raw)
-            + "test -n \"$OUT_PATH\"; "
-            + (
-                "if [ ! -e \"$OUT_PATH/%s\" ]; then echo 'expected artifact not found: %s' >&2; (ls -la \"$OUT_PATH\"; ls -la \"$OUT_PATH/bin\" 2>/dev/null || true; ls -la \"$OUT_PATH/lib\" 2>/dev/null || true) >&2; exit 2; fi; "
-                % (expected, expected)
-            )
-            + "DEST=\"$0\"; cp -f \"$OUT_PATH/%s\" \"$DEST\"; " % expected
-        )
+        + "DEST=\"$0\"; cp -f \"$OUT_PATH/%s\" \"$DEST\"; " % expected
+    )
     out = ctx.actions.declare_output(ctx.attrs.out)
     # For bash -c, $0 is set to the first argument after the script string
     cmd = cmd_args([

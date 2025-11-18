@@ -258,7 +258,7 @@ let
             if (k.kind == "bin" || k.kind == "lib") then LANGS.node.mkApp selectedTargetName else LANGS.node.mkApp selectedTargetName
           ) else (
             # default to cpp when not go
-            if (k.kind == "bin" || k.kind == "lib" || k.kind == "test") then mkCpp selectedTargetName k.kind else mkCpp selectedTargetName "bin"
+            if (k.kind == "bin" || k.kind == "lib" || k.kind == "test" || k.kind == "addon") then mkCpp selectedTargetName k.kind else mkCpp selectedTargetName "bin"
           )
         )
     )
