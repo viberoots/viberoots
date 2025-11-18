@@ -102,11 +102,21 @@ def cpp_sanitize_probe(name, label):
     _cpp_sanitize_probe(name = name, label = label)
 
 def nix_cpp_node_addon(name, **kwargs):
-    # Node-API addon producing a .node shared library
+    # Node-API addon producing a .node shared library via the Nix planner.
+    #
+    # Contract:
+    # - This macro stamps labels ["lang:cpp", "kind:addon"] and includes local patch dirs
+    #   in srcs so patch edits precisely invalidate reverse deps.
+    # - addon_name (optional) is recorded as a non-functional label "addon_name:<name>"
+    #   to aid planner tooling and documentation. It does not change the build artifact
+    #   filename selected here.
+    # - The build artifact is a single ".node" shared library. Downstream Node packaging
+    #   should copy/rename this artifact to a stable runtime path such as
+    #   "native/<addon_name or sanitized target name>.node" for loading from JS/TS.
     local_patch_dirs = kwargs.pop("local_patch_dirs", ["patches/cpp"])
     nix_cxx_attrs = kwargs.pop("nix_cxx_attrs", [])
     deps = kwargs.pop("deps", [])
-    # Optional addon_name hint; for now recorded in labels for planner visibility
+    # Optional addon_name hint; recorded in labels for planner visibility only
     addon_name = kwargs.pop("addon_name", None)
     nix_inputs = ["//:flake.lock", "//tools/nix/overlays:cpp-patches.nix"]
     stamp_labels(kwargs, "cpp", "addon")

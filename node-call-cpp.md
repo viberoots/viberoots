@@ -126,6 +126,13 @@ Add a small macro in `//cpp:defs.bzl`:
 
 This keeps C++ a planner language and avoids introducing Node‑specific logic into Node macros.
 
+### Naming and load path
+
+- Macro contract: `nix_cpp_node_addon` accepts an optional `addon_name`. The macro records this as a label (`addon_name:<name>`) for planner/tooling visibility; it does not change macro semantics at build time.
+- Build artifact: the Nix build produces a single `.node` shared library. Do not rely on buck‑out paths for runtime loading.
+- Stable runtime path: the Node package should copy the built addon into a deterministic location such as `native/{{ addon_name }}.node` using a small copy rule (e.g., `nix_node_gen`). The TS wrapper loads from that path via `createRequire(import.meta.url)`.
+- Recommendation: set `addon_name` in scaffolds to keep the runtime filename stable and self‑documenting. Changing `addon_name` affects only the copied runtime filename and the planner hint label.
+
 ### Node wrapper code (loading addon)
 
 - Use `createRequire(import.meta.url)` (or CommonJS `require`) to load the `.node` artifact from a predictable relative path (copied by the `:copy_addon` rule).
