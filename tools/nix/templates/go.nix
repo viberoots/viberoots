@@ -156,6 +156,7 @@ in {
     modulesToml,
     devOverrideEnv ? "NIX_GO_DEV_OVERRIDE_JSON",
     subdir ? ".",
+    pkgPath ? ".",
     srcRoot ? ../../..,
     patchDir ? ../../patches/go,
     nixCgoPkgs ? [],
@@ -194,11 +195,15 @@ in {
         mkdir -p $out/lib $out/include
         # Build the c-archive for the package at subdir (".")
         # The output is a .a and a header named after the module/package
-        pkgName=$(basename "$PWD")
+        if [ "${pkgPath}" = "." ]; then
+          pkgName=$(basename "$PWD")
+        else
+          pkgName=$(basename "${pkgPath}")
+        fi
         outA="$out/lib/lib''${pkgName}.a"
         outH="$out/include/''${pkgName}.h"
         go env -w GOFLAGS=-mod=mod >/dev/null 2>&1 || true
-        go build -buildmode=c-archive -o "$outA" .
+        go build -buildmode=c-archive -o "$outA" ${pkgPath}
         # Locate the generated header (go writes a .h next to the .a)
         genH=$(dirname "$outA")/$(basename "$outA" .a).h
         if [ -f "$genH" ]; then

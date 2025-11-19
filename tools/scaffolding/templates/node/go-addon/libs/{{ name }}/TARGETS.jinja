@@ -23,7 +23,7 @@ nix_node_lib(
 {% if includeNodeTests -%}
 nix_node_test(
     name = "unit",
-    deps = ["//libs/{{ name }}-native:napi_addon"],
+    deps = [":copy_addon"],
     lockfile_label = "lockfile:{{ lockfilePath }}#{{ importer }}",
 )
 {%- endif %}

@@ -258,13 +258,30 @@
           # build a Node-API addon derivation and make its artifact available for tests.
           hasNative = builtins.pathExists (./. + ("/" + importerDir + "-native"));
           TAddon = import ./tools/nix/templates/cpp-node-addon.nix { inherit pkgs; };
+          T = import ./tools/nix/lang-templates.nix { inherit pkgs; };
           addonName = name + "_addon";
+          # If a sibling native addon exists, also build the Go c-archive from libs/<name>-go
+          # and link it into the addon via nixCxxPkgs so the header/lib are available hermetically.
+          goPkgDir = "libs/" + name + "-go";
+          modulesTomlPath = ./. + ("/" + goPkgDir + "/gomod2nix.toml");
+          carchive =
+            if hasNative && builtins.pathExists (./. + ("/" + goPkgDir))
+            then T.goCArchive {
+              name = goPkgDir + ":carchive";
+              modulesToml = modulesTomlPath;
+              # Build from the module root; select concrete package path via pkgPath
+              subdir = goPkgDir;
+              pkgPath = "./pkg/addon";
+              srcRoot = ./.;
+            }
+            else null;
           addonDrv = if hasNative then TAddon.cppNodeAddon {
             name = sanitize name;
             addonName = sanitize addonName;
             srcRoot = ./.;
             subdir = importerDir + "-native";
             includes = [ "include" ];
+            nixCxxPkgs = builtins.filter (p: p != null) [ carchive ];
           } else null;
           defaultPatterns = ''
             test/**/*.test.ts
