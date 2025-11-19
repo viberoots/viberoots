@@ -28,7 +28,7 @@ def _cpp_nix_build_impl(ctx):
         )
     run_and_copy = (
         nix_bootstrap_env()
-        + ("OUT_PATH=$(BUCK_TEST_SRC=\"$PWD\" BUCK_TARGET=\"%s\" nix run --accept-flake-config \"$FLK_ROOT\"#zx-wrapper -- \"$FLK_ROOT/tools/dev/build-selected.ts\"); " % (raw))
+        + ("OUT_PATH=$(BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"%s\" nix run --accept-flake-config \"$FLK_ROOT\"#zx-wrapper -- \"$FLK_ROOT/tools/dev/build-selected.ts\"); " % (raw))
         + "test -n \"$OUT_PATH\"; "
         + (
             "if [ ! -e \"$OUT_PATH/%s\" ]; then echo 'cpp_nix_build (%s): expected artifact not found for kind \"%s\": %s' >&2; (ls -la \"$OUT_PATH\"; ls -la \"$OUT_PATH/bin\" 2>/dev/null || true; ls -la \"$OUT_PATH/lib\" 2>/dev/null || true) >&2; exit 2; fi; "

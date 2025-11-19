@@ -232,7 +232,7 @@ export async function runInTemp<T>(
         "default_platform = //:no_cgo",
         "user_platform = //:no_cgo",
         "target_platforms = //:no_cgo",
-        "action_env = SDKROOT,CPATH,LIBRARY_PATH,CGO_CFLAGS,CGO_CPPFLAGS,CGO_ENABLED",
+        "action_env = SDKROOT,CPATH,LIBRARY_PATH,CGO_CFLAGS,CGO_CPPFLAGS,CGO_ENABLED,WORKSPACE_ROOT,REPO_ROOT",
         "EOF",
         "mkdir -p toolchains",
         "printf '[buildfile]\\nname = TARGETS\\n' > toolchains/.buckconfig",
@@ -331,6 +331,10 @@ export async function runInTemp<T>(
   for (const [k, v] of Object.entries(process.env)) {
     if (typeof v === "string") exportEnv[k] = v;
   }
+  // Expose the real workspace root so actions can locate a stable flake root
+  try {
+    exportEnv.REPO_ROOT = process.cwd();
+  } catch {}
   // In temp repos, prefer disabling CGO to avoid stdlib cgotest header dependencies
   exportEnv.CGO_ENABLED = "0";
   // Propagate SDKROOT and basic CGO flags on macOS so Go stdlib cgotest can find headers

@@ -24,6 +24,7 @@ in {
     std ? "c++17",
     nixCxxPkgs ? [],
     nixCxxAttrs ? [],
+    srcList ? [],
     patches ? [],
   }:
   let
@@ -35,6 +36,12 @@ in {
     defFlags = joinDef defines;
     extraC   = joinExtraC cflags;
     # Note: ldflags are reserved for future parity with cppApp; unused here.
+    srcsCmd = if srcList != [] then (
+      "printf '%s\\n' " + (lib.concatStringsSep " " (map (s: "'" + s + "'") (lib.sort (a: b: a < b) srcList))) + " | sort"
+    ) else (
+      # Fallback: restrict to conventional source dir to avoid picking up tests/** by accident
+      "find ./src -type f \\( -name '*.cpp' -o -name '*.cc' -o -name '*.cxx' \\) 2>/dev/null | sed 's#^./##' | sort"
+    );
   in pkgs.stdenv.mkDerivation {
     inherit pname;
     version = "0.1.0";
@@ -53,7 +60,7 @@ in {
       mkdir -p "$tmp"
 
       # Discover and sort sources/headers deterministically
-      mapfile -t SRCS < <(find . -type f \( -name '*.cpp' -o -name '*.cc' -o -name '*.cxx' \) | sort)
+      mapfile -t SRCS < <(${srcsCmd})
       mapfile -t HDRS < <(find . -type f \( -name '*.h' -o -name '*.hpp' -o -name '*.hh' -o -name '*.hxx' \) | sort)
 
       cflags_common="-std=${std} -fno-record-gcc-switches -ffile-prefix-map=$PWD=. -g0 -O2 -pipe ${nixInc}"

@@ -75,15 +75,27 @@ in {
       export SOURCE_DATE_EPOCH=1
       mkdir -p "$out/lib" "$out/include"
       tmp="$TMPDIR/obj"; mkdir -p "$tmp"
+      tmpInc="$TMPDIR/inc"; mkdir -p "$tmpInc"
 
       echo "[cpp.node-addon] nixCxxAttrs=${lib.concatStringsSep "," nixCxxAttrs}" >&2
       echo "[cpp.node-addon] nixInc=${nixInc}" >&2
       echo "[cpp.node-addon] nodeInc=${nodeInc}" >&2
 
+      # Materialize headers from repo-provided packages into a single include dir
+      declare -a PKG_INCLUDE_DIRS
+      PKG_INCLUDE_DIRS=(
+        ${lib.concatStringsSep " " (map (p: ("${toIncludeBase p}/include")) resolvedPkgs)}
+      )
+      for d in "''${PKG_INCLUDE_DIRS[@]}"; do
+        if [ -d "$d" ]; then
+          cp -R "$d"/. "$tmpInc/" 2>/dev/null || true
+        fi
+      done
+
       mapfile -t SRCS < <(${srcsCmd})
       mapfile -t HDRS < <(find . -type f \( -name '*.h' -o -name '*.hpp' -o -name '*.hh' -o -name '*.hxx' \) | sort)
 
-      cflags_common="-std=${std} -fno-record-gcc-switches -ffile-prefix-map=$PWD=. -g0 -O2 -pipe ${nixInc} ${nodeInc}"
+      cflags_common="-std=${std} -fno-record-gcc-switches -ffile-prefix-map=$PWD=. -g0 -O2 -pipe ${nixInc} ${nodeInc} -I \"$tmpInc\""
       for s in "''${SRCS[@]}"; do
         rel="''${s#./}"
         obj="$tmp/''${rel%.*}.o"

@@ -31,6 +31,7 @@ def nix_cpp_library(name, **kwargs):
         srcs = srcs,
         labels = kwargs.get("labels", []) or [],
         nix_inputs = nix_inputs,
+        visibility = kwargs.get("visibility", []),
     )
 
 
@@ -56,6 +57,7 @@ def nix_cpp_binary(name, **kwargs):
         srcs = srcs,
         labels = kwargs.get("labels", []) or [],
         nix_inputs = nix_inputs,
+        visibility = kwargs.get("visibility", []),
     )
 
 
@@ -138,6 +140,7 @@ def nix_cpp_node_addon(name, **kwargs):
         srcs = srcs,
         labels = kwargs.get("labels", []) or [],
         nix_inputs = nix_inputs,
+        visibility = kwargs.get("visibility", []),
     )
 
 __all__ = [

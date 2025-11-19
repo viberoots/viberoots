@@ -6,6 +6,7 @@ nix_node_gen(
     srcs = [],
     out = "native/{{ addon_name }}.node",
     cmd = "cp $(location //libs/{{ name }}-native:napi_addon) $OUT",
+    deps = ["//libs/{{ name }}-native:napi_addon"],
     lockfile_label = "lockfile:{{ lockfilePath }}#{{ importer }}",
     labels = ["lang:node", "kind:gen"],
 )

@@ -25,9 +25,7 @@ def _cpp_nix_test_impl(ctx):
         nix_bootstrap_env()
         + ("echo '[cpp_nix_test] planner_label=%s' >&2; " % raw)
         + "# Use centralized zx helper to export graph (if needed) and build selected target\n"
-        + (
-            "set +e; OUT_RAW=$(BUCK_TEST_SRC=\"$PWD\" BUCK_TARGET=\"%s\" nix run \"$FLK_ROOT\"#zx-wrapper -- \"$FLK_ROOT/tools/dev/build-selected.ts\" 2> /tmp/cpp_nix_test_build.log); " % raw
-        )
+        + ("set +e; OUT_RAW=$(BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"%s\" nix run \"$FLK_ROOT\"#zx-wrapper -- \"$FLK_ROOT/tools/dev/build-selected.ts\" 2> /tmp/cpp_nix_test_build.log); " % raw)
         + "NIX_STATUS=$?; set -e; OUT_PATH=$(printf %s \"$OUT_RAW\" | sed -E 's/\\x1B\\[[0-9;]*[A-Za-z]//g' | tr -d '\r'); "
         + "echo \"[cpp_nix_test] OUT_PATH=$OUT_PATH\" >&2; "
         + "if [ \"$NIX_STATUS\" -ne 0 ] || [ -z \"$OUT_PATH\" ]; then echo '[cpp_nix_test] build-selected failed' >&2; cat /tmp/cpp_nix_test_build.log >&2 || true; exit ${NIX_STATUS:-2}; fi; "

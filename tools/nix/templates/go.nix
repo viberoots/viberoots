@@ -168,6 +168,8 @@ in {
       _guard = H.guardNoDevOverridesInCI devOverrideEnv;
       srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + subdir));
       cgo = mkCgoEnv { inherit nixCgoPkgs nixCgoAttrs repoCgoPkgs; };
+      # Base name of the Go package directory (e.g., "demo-go"); used to expose a stable header alias.
+      subdirBase = builtins.baseNameOf (builtins.toString subdir);
     in buildGoFn ({
       pname = "gocarchive-${H.sanitizeName name}";
       version = "0.1.0";
@@ -211,6 +213,10 @@ in {
         else
           # Fallback: copy any generated header in build dir
           find . -maxdepth 1 -type f -name '*.h' -print -quit | xargs -I{} cp -f {} "$outH" 2>/dev/null || true
+        fi
+        # Compatibility: also expose a header named after the Go package directory (e.g., demo-go.h)
+        if [ -f "$outH" ]; then
+          cp -f "$outH" "$out/include/${subdirBase}.h"
         fi
         runHook postBuild
       '';

@@ -36,7 +36,9 @@ async function main() {
     process.exit(2);
   }
   const workDir = path.resolve(process.env.BUCK_TEST_SRC || process.cwd());
-  const repoRoot = await findRepoRoot(workDir);
+  const repoRoot =
+    (process.env.REPO_ROOT && String(process.env.REPO_ROOT).trim()) ||
+    (await findRepoRoot(workDir));
   if (!(await pathExists(path.join(repoRoot, "flake.nix")))) {
     console.error("flake.nix not found at repo root");
     process.exit(2);
@@ -45,7 +47,9 @@ async function main() {
   // Ensure the graph exists via the canonical helper; preserve exporter env behavior
   const graphPath = path.join(workDir, "tools", "buck", "graph.json");
   // Prefer working tree as BUCK_TEST_SRC so exporter operates on the correct repo root
-  const queryRoots = ["apps", "libs", "cpp", "third_party"].join(",");
+  const queryRoots =
+    (process.env.BUCK_QUERY_ROOTS && String(process.env.BUCK_QUERY_ROOTS).trim()) ||
+    ["apps", "libs", "go", "cpp", "third_party"].join(",");
   process.env.BUCK_TEST_SRC = workDir;
   process.env.EXPORTER_DEBUG = "1";
   // Prefer warn-level validation during local/dev builds to avoid spurious failures in temp repos

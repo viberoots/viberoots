@@ -109,7 +109,8 @@ export async function ensureGraph(): Promise<void> {
     // missing or unreadable → regenerate
   }
   const nodeBin = process.execPath;
-  const repoRoot = await findRepoRoot(process.cwd());
+  const repoRoot =
+    (process.env.REPO_ROOT && process.env.REPO_ROOT.trim()) || (await findRepoRoot(process.cwd()));
   const zxInit = path.join(repoRoot, "tools/dev/zx-init.mjs");
   const exportScript = path.join(repoRoot, "tools/buck/export-graph.ts");
   // Prefer direct Node exporter when buck2 is available; otherwise fallback to nix-run or inline query
@@ -172,10 +173,11 @@ export async function ensureGraph(): Promise<void> {
     const iso = parentIso ? `${parentIso}__exporter-${process.pid}` : `exporter-${process.pid}`;
     const useIso = process.env.BUCK_NO_ISOLATION !== "1";
     const isoArgs = useIso ? ["--isolation-dir", iso] : ([] as string[]);
+    const platformFlags = ["--target-platforms", "prelude//platforms:default"];
     const res = await $({
       cwd: workspaceRoot,
       stdio: "pipe",
-    })`buck2 ${isoArgs} cquery ${query} --json ${flags}`.nothrow();
+    })`buck2 ${isoArgs} cquery ${platformFlags} ${query} --json ${flags}`.nothrow();
     const stdout = String(res.stdout || "");
     const obj = (() => {
       try {
@@ -230,6 +232,7 @@ export async function ensureGraph(): Promise<void> {
     ...process.env,
     WORKSPACE_ROOT: workspaceRoot,
     BUCK_TEST_SRC: workspaceRoot,
+    REPO_ROOT: repoRoot,
   } as Record<string, string>;
   if (haveBuck) {
     try {
@@ -260,13 +263,24 @@ export async function ensureGraph(): Promise<void> {
     try {
       console.error(`[ensureGraph] inline export via buck2 → ${graphPath}`);
     } catch {}
-    // Build a conservative roots expression (limit to common roots in temp repos)
-    const roots = (process.env.BUCK_QUERY_ROOTS || "apps,libs,go,cpp,third_party")
+    // Build a conservative roots expression, filtering to existing directories under the workspace
+    const rawRoots = (process.env.BUCK_QUERY_ROOTS || "apps,libs,go,cpp,third_party")
       .split(/[,\s]+/)
-      .filter(Boolean)
+      .filter(Boolean);
+    const fs = await import("node:fs");
+    const existingRoots = rawRoots.filter((r) => {
+      const dir = r.replace(/^\/+/, "");
+      try {
+        return fs.existsSync(path.join(workspaceRoot, dir));
+      } catch {
+        return false;
+      }
+    });
+    const rootsForExpr = existingRoots.length > 0 ? existingRoots : ["libs"];
+    const rootsExpr = `set(${rootsForExpr
       .map((r) => (r.startsWith("//") ? `${r}/...` : `//${r}/...`))
-      .join(" ");
-    const query = `deps(set(${roots}), 1, exec_deps())`;
+      .join(" ")})`;
+    const query = `deps(${rootsExpr}, 1, exec_deps())`;
     const attrs = [
       "name",
       "rule_type",

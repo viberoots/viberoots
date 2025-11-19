@@ -1,8 +1,20 @@
 def nix_bootstrap_env():
     return (
         "set -euo pipefail; "
-        + "export WORKSPACE_ROOT=\"${WORKSPACE_ROOT:-$(pwd)}\"; cd \"$WORKSPACE_ROOT\"; "
-        + "FLK_ROOT=\"$WORKSPACE_ROOT\"; if [ ! -f \"$FLK_ROOT/flake.nix\" ]; then FLK_ROOT=\"$(git -C \"$WORKSPACE_ROOT\" rev-parse --show-toplevel 2>/dev/null || echo \"$WORKSPACE_ROOT\")\"; fi; "
+        + "export WORKSPACE_ROOT=\"${WORKSPACE_ROOT:-$(pwd)}\"; "
+        # Determine flake root, preferring explicit REPO_ROOT from the parent workspace.
+        + "FLK_ROOT=\"${REPO_ROOT:-$WORKSPACE_ROOT}\"; "
+        + "if [ ! -f \"$FLK_ROOT/flake.nix\" ]; then "
+        + "  SEARCH_FROM=\"${REPO_ROOT:-$(pwd)}\"; "
+        + "  CAND=\"$SEARCH_FROM\"; "
+        + "  while [ \"$CAND\" != \"/\" ] && [ ! -f \"$CAND/flake.nix\" ]; do CAND=\"$(dirname \"$CAND\")\"; done; "
+        + "  FLK_ROOT=\"$CAND\"; "
+        + "fi; "
+        + "if [ ! -f \"$FLK_ROOT/flake.nix\" ]; then "
+        + "  ROOT_GIT=\"$(git -C \"${REPO_ROOT:-$WORKSPACE_ROOT}\" rev-parse --show-toplevel 2>/dev/null || echo \"${REPO_ROOT:-$WORKSPACE_ROOT}\")\"; "
+        + "  FLK_ROOT=\"$ROOT_GIT\"; "
+        + "fi; "
+        + "cd \"$WORKSPACE_ROOT\"; "
         + "test -f \"$FLK_ROOT/flake.nix\"; "
     )
 
