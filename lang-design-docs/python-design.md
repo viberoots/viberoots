@@ -30,6 +30,9 @@ Audience: Engineers and LLM agents implementing Python support end‑to‑end. T
 - Buck macros live under `python/defs.bzl` and use `//third_party/providers:auto_map.bzl`.
 - Provider rules live under `//third_party/providers/**` and are generated, not hand‑edited.
 - Dev overrides via `NIX_PY_DEV_OVERRIDE_JSON` (JSON: `{ "name@ver": "/abs/local/src" }`). CI forbids overrides.
+- Reuse common utilities:
+  - Starlark helpers in `lang/defs_common.bzl` (`stamp_labels`, `ensure_single_lockfile_label`, `append_nixpkg_labels`, `providers_for`, `append_patch_srcs`).
+  - Provider naming and label parsing helpers in `tools/lib/providers.ts` and `tools/lib/labels.ts`.
 
 ---
 
@@ -42,6 +45,7 @@ We adopt the importer‑scoped lockfile labeling model (like Node) to get precis
   - `<importer>` is the project root directory (e.g., `apps/pytool`) to disambiguate multiple importers.
 - `gen-auto-map.ts` already maps generic `lockfile:` labels to providers using `providerNameForImporter(path, importer)`; Python reuses this machinery.
 - Optional per‑distribution labels (future): `pymodule:<dist>@<version>` can be emitted by a Python adapter if we later implement authoritative module discovery. Not required in Phase A.
+- Native dependencies for C-extensions: macros append `nixpkg:<attr>` labels (via `append_nixpkg_labels`) to precisely map nixpkgs inputs through `gen-auto-map.ts`, mirroring Go/C++.
 
 ---
 
@@ -242,6 +246,44 @@ def nix_python_test(name, labels = [], deps = [], **kwargs):
     python_test(name = name, labels = labels, deps = deps, **kwargs)
 ```
 
+Using common helpers (macro outline)
+
+```starlark
+load("@prelude//python:defs.bzl", "python_binary", "python_library", "python_test")
+load("//lang:defs_common.bzl", "stamp_labels", "ensure_single_lockfile_label", "append_nixpkg_labels", "providers_for")
+
+def _providers_for(name):
+    MODULE_PROVIDERS = {}
+    load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
+    return providers_for(MODULE_PROVIDERS, name)
+
+def nix_python_library(name, lockfile_label = None, nix_native_deps = [], deps = [], **kwargs):
+    stamp_labels(kwargs, "python", "lib")
+    ensure_single_lockfile_label(kwargs, lockfile_label)
+    append_nixpkg_labels(kwargs, nix_native_deps)
+    deps = deps + _providers_for(name)
+    python_library(name = name, deps = deps, **kwargs)
+
+def nix_python_binary(name, lockfile_label = None, nix_native_deps = [], deps = [], **kwargs):
+    stamp_labels(kwargs, "python", "bin")
+    ensure_single_lockfile_label(kwargs, lockfile_label)
+    append_nixpkg_labels(kwargs, nix_native_deps)
+    deps = deps + _providers_for(name)
+    python_binary(name = name, deps = deps, **kwargs)
+
+def nix_python_test(name, lockfile_label = None, nix_native_deps = [], deps = [], **kwargs):
+    stamp_labels(kwargs, "python", "test")
+    ensure_single_lockfile_label(kwargs, lockfile_label)
+    append_nixpkg_labels(kwargs, nix_native_deps)
+    deps = deps + _providers_for(name)
+    python_test(name = name, deps = deps, **kwargs)
+```
+
+Notes
+
+- Python macros accept `lockfile_label` explicitly for clarity in scaffolds; callers usually pass `lockfile:"<path>#<importer>"`. The helper dedupes/validates exactly one importer‑scoped label.
+- Use `nix_native_deps = ["pkgs.openssl", ...]` when C‑extensions require toolchain/system libs; labels become `nixpkg:<attr>` and are auto‑mapped to providers just like Go/C++.
+
 ---
 
 ## Patching Workflow: patch-pkg python
@@ -280,6 +322,16 @@ Stages remain unchanged; we extend drivers to include Python:
 Building multiple importers concurrently
 
 - Provider sync scans all `**/uv.lock`; `gen-auto-map.ts` maps each labeled target to its importer‑scoped provider. You can build or test multiple Python targets across different importers in one command; invalidation remains importer‑scoped and cache‑friendly.
+
+Install/lock integration
+
+- Extend `tools/install-deps.ts` to optionally refresh Python lockfiles (uv only) when Python is enabled, mirroring Go’s gomod2nix step:
+  - Detect `**/uv.lock` presence; when dependencies change, run the pinned uv/uv2nix helper to refresh reproducible inputs.
+  - Keep behavior idempotent and silent when no Python importers exist.
+
+Startup guardrails
+
+- Update `tools/dev/startup-check.ts` to warn when `NIX_PY_DEV_OVERRIDE_JSON` is set locally and to throw (via the shared Nix helpers) in CI if overrides are present, matching Go/CPP behavior.
 
 ---
 
@@ -427,3 +479,412 @@ Phase 6 — Tests
 - Patch creation is one command (`patch-pkg start/apply python <dist>`), glue runs automatically, and rebuild invalidation is precise.
 - uv‑only backend realized and tested; optional uv group variants exposed per importer.
 - Tests cover exporter, provider sync, auto‑map wiring, planner dispatch, and patch workflow.
+
+---
+
+## Pull Request Plan — Python Parity with Go/Node/C++
+
+### PR‑1: Python enablement skeleton and path invariants
+
+#### Description
+
+Introduce minimal Python enablement without changing build behavior: path invariants, provider rule, and gating. This primes the repo for subsequent PRs while keeping CI green.
+
+#### Scope & Changes
+
+- Add `patches/python/.gitkeep` (flat dir; no subdirectories).
+- Add `//third_party/providers/defs_python.bzl` with `python_importer_deps(...)` content‑addressed stamp (lockfile + patch paths).
+- Optional gating entry in `tools/nix/langs.json` (if present) to detect Python enablement by required paths (templates, providers).
+- Documentation note in this design that Python glue is presence‑based and partial‑clone friendly.
+
+#### Acceptance Criteria
+
+- Repo builds unchanged; no providers generated without `uv.lock`.
+- `tools/buck/prebuild-guard.ts` continues to pass in repos without Python importers.
+
+#### Risks
+
+Very low. Adds files only; no wiring yet.
+
+#### Consequence of Not Implementing
+
+Later PRs would mix concerns; harder to review and revert cleanly.
+
+#### Downsides for Implementing
+
+None beyond a few files.
+
+#### Recommendation
+
+Implement.
+
+Re-evaluation: After landing this PR, re-evaluate the remaining PR list and adjust scope/ordering as needed.
+
+### PR‑2: Nix templates and planner wiring (pyApp/pyLib)
+
+#### Description
+
+Add Python Nix templates and integrate planner dispatch so Python derivations can be instantiated from the exported graph.
+
+#### Scope & Changes
+
+- Add `tools/nix/templates/python.nix` exposing `pyApp` and `pyLib` using a shared `mkPy` with:
+  - `patchesMap` from `patches/python/*.patch` filenames,
+  - `devOverrides` from `NIX_PY_DEV_OVERRIDE_JSON` (warn locally, throw in CI),
+  - uv backend dispatch (`python/backends/uv.nix`) for lockfile consumption.
+- Extend `graph-generator.nix` dispatch to detect Python targets (by `rule_type` or `lang:python`) and emit derivations via `T.pyApp`/`T.pyLib`.
+
+#### Acceptance Criteria
+
+- A toy Python lib/bin builds via Nix locally when a `uv.lock` is present.
+- Dev overrides print a local warning; CI evaluation fails if overrides are set.
+
+#### Risks
+
+Low. Pure addition; guarded by presence of `uv.lock`.
+
+#### Consequence of Not Implementing
+
+Planner cannot build Python targets; downstream PRs blocked.
+
+#### Downsides for Implementing
+
+Small increase in planner surface; kept minimal per design.
+
+#### Recommendation
+
+Implement.
+
+Re-evaluation: After landing this PR, re-evaluate the remaining PR list and adjust scope/ordering as needed.
+
+### PR‑3: Exporter adapter — importer‑scoped lockfile labels for Python
+
+#### Description
+
+Extend the exporter to attach `lockfile:<path>#<importer>` to Python targets and emit a warn‑only adapter validation when `.py` sources are missing `lang:python` (mirrors C++ warn policy).
+
+#### Scope & Changes
+
+- Update `tools/buck/export-graph.ts`:
+  - Identify Python targets (rule_type or `lang:python`),
+  - Locate nearest `uv.lock`, compute importer id, attach `lockfile:<path>#<importer>` label,
+  - Warn (non‑CI) if `.py` sources lack `lang:python`.
+
+#### Acceptance Criteria
+
+- `tools/buck/graph.json` shows correct lockfile labels on Python targets.
+- Severity obeys repo policy: local warn, CI error (global exporter setting).
+
+#### Risks
+
+Low. Labeling only; no build changes.
+
+#### Consequence of Not Implementing
+
+Auto‑map cannot wire providers; invalidation will be coarse or broken.
+
+#### Downsides for Implementing
+
+None.
+
+#### Recommendation
+
+Implement.
+
+Re-evaluation: After landing this PR, re-evaluate the remaining PR list and adjust scope/ordering as needed.
+
+### PR‑4: Provider sync for Python and orchestrator integration
+
+#### Description
+
+Generate deterministic importer‑scoped Python providers that are sensitive to `uv.lock` and only the patches relevant to that importer.
+
+#### Scope & Changes
+
+- Add `tools/buck/providers/python.ts` (canonical generator) and thin wrapper `tools/buck/sync-providers-python.ts` (optional).
+- Teach `tools/buck/sync-providers.ts` to include Python when `--lang python` or default (all).
+- Emit `third_party/providers/TARGETS.python.auto`:
+  - Stable ordering, one target per importer,
+  - `patch_paths` filtered to dist versions present in the importer’s lockfile,
+  - Duplicate patch detection and flat‑dir validation.
+
+#### Acceptance Criteria
+
+- Running the sync with a sample `uv.lock` produces deterministic `TARGETS.python.auto`.
+- Re‑running with no changes is a no‑op; duplicates and subdirectories raise clear errors/warnings per mode.
+
+#### Risks
+
+Low. Mirrors Node provider generator patterns.
+
+#### Consequence of Not Implementing
+
+Python patches won’t influence builds deterministically.
+
+#### Downsides for Implementing
+
+None beyond a small script.
+
+#### Recommendation
+
+Implement.
+
+Re-evaluation: After landing this PR, re-evaluate the remaining PR list and adjust scope/ordering as needed.
+
+### PR‑5: Auto‑map wiring confirmation (no/low‑code + tests)
+
+#### Description
+
+Confirm `gen-auto-map.ts` maps generic `lockfile:` labels for Python (same as Node). Add tests; avoid code changes unless gaps are found.
+
+#### Scope & Changes
+
+- Add zx tests to assert Python targets (with lockfile labels) receive the correct importer‑scoped provider entries in `MODULE_PROVIDERS`.
+- If needed, minimally adjust `tools/lib/labels.ts` to ensure Python lockfile labels are already handled (expected: no change).
+
+#### Acceptance Criteria
+
+- Mapping present only for Python targets with lockfile labels; unrelated targets unmapped.
+
+#### Risks
+
+Very low. Test‑only unless a gap surfaces.
+
+#### Consequence of Not Implementing
+
+Unnoticed mapping gaps could break invalidation.
+
+#### Downsides for Implementing
+
+None.
+
+#### Recommendation
+
+Implement.
+
+Re-evaluation: After landing this PR, re-evaluate the remaining PR list and adjust scope/ordering as needed.
+
+### PR‑6: Python Buck macros using shared helpers
+
+#### Description
+
+Add `python/defs.bzl` macros that stamp standard labels, validate an importer‑scoped lockfile, optionally attach native nixpkgs deps, and wire providers from `auto_map.bzl`.
+
+#### Scope & Changes
+
+- `python/defs.bzl`:
+  - Use `stamp_labels`, `ensure_single_lockfile_label`, `append_nixpkg_labels`, and `providers_for` from `lang/defs_common.bzl`,
+  - Expose `nix_python_{library,binary,test}` with `lockfile_label` and `nix_native_deps` parameters,
+  - Keep rule args aligned with upstream `python_*` rules.
+
+#### Acceptance Criteria
+
+- Example targets using macros compile identically to raw `python_*` when no providers are mapped.
+- Labels `lang:python` and `kind:*` always present; exactly one `lockfile:` label required.
+
+#### Risks
+
+Low. Thin wrappers; no functional change without providers present.
+
+#### Consequence of Not Implementing
+
+Inconsistent labels and harder provider wiring for users.
+
+#### Downsides for Implementing
+
+None.
+
+#### Recommendation
+
+Implement.
+
+Re-evaluation: After landing this PR, re-evaluate the remaining PR list and adjust scope/ordering as needed.
+
+### PR‑7: Patch workflow — `patch-pkg python`
+
+#### Description
+
+Implement Python language handler for the unified patch workflow: start/reset/apply/session with dev overrides and canonical patch filenames.
+
+#### Scope & Changes
+
+- Add `tools/patch/patch-python.ts`:
+  - `start`: resolve `name@version` from importer lockfile, copy sdist/wheel sources to temp (APFS CoW on macOS), set `NIX_PY_DEV_OVERRIDE_JSON`,
+  - `apply`: produce `patches/python/<name>@<version>.patch`, run provider sync + auto‑map, clear override,
+  - `reset`/`session`: match existing semantics (Ctrl‑D apply, Ctrl‑C reset),
+  - Use shared `decodeNameVersionFromPatch` for canonical keying.
+
+#### Acceptance Criteria
+
+- Applying a change writes the canonical patch, updates providers/auto_map, and clears overrides.
+- Re‑applying identical patches is a no‑op.
+
+#### Risks
+
+Moderate (user‑facing workflow), mitigated by reuse of existing Node/Go patterns.
+
+#### Consequence of Not Implementing
+
+Poor DX; patches require manual steps and are error‑prone.
+
+#### Downsides for Implementing
+
+Small script and tests.
+
+#### Recommendation
+
+Implement.
+
+Re-evaluation: After landing this PR, re-evaluate the remaining PR list and adjust scope/ordering as needed.
+
+### PR‑8: Dev shell/lock integration and guardrails
+
+#### Description
+
+Integrate uv lock refresh into existing install tooling; add override guardrails consistent with Go/C++.
+
+#### Scope & Changes
+
+- `tools/install-deps.ts`: when Python is enabled and `**/uv.lock` present, run pinned uv/uv2nix helper to refresh reproducible inputs; no‑op otherwise.
+- `tools/dev/startup-check.ts`: add local warning for `NIX_PY_DEV_OVERRIDE_JSON`; CI behavior remains enforced in Nix templates.
+- `tools/buck/prebuild-guard.ts`: consider Python providers present when `uv.lock` exists and require at least one `TARGETS.python.auto` (mirrors Node behavior).
+
+#### Acceptance Criteria
+
+- Local install steps refresh Python inputs deterministically when deps change.
+- Guard warns locally about overrides; CI fails if overrides leak into evaluation.
+
+#### Risks
+
+Low. Mirrors existing patterns; guarded by presence.
+
+#### Consequence of Not Implementing
+
+Stale lock integrations and confusing override behavior.
+
+#### Downsides for Implementing
+
+Minor code paths in existing tools.
+
+#### Recommendation
+
+Implement.
+
+Re-evaluation: After landing this PR, re-evaluate the remaining PR list and adjust scope/ordering as needed.
+
+### PR‑9: Tests — exporter, providers, auto‑map, planner, patch workflow
+
+#### Description
+
+Add zx tests (one per file) covering Python integrations end‑to‑end, matching repo conventions.
+
+#### Scope & Changes
+
+- Add tests:
+  - `exporter/python.labels-present.test.ts`
+  - `providers/sync-providers-python.idempotent.test.ts`
+  - `providers/auto-map.python-wiring.test.ts`
+  - `providers/auto-map.python-multi-importers.test.ts`
+  - `patch/patch-python.session.apply.test.ts`
+  - `planner/python-dispatch.test.ts`
+- Use external timeouts and shared fixtures/helpers; keep deterministic ordering and outputs.
+
+#### Acceptance Criteria
+
+- All tests pass locally and in CI; re‑runs are idempotent.
+
+#### Risks
+
+Low. Tests only.
+
+#### Consequence of Not Implementing
+
+Regression risk on label/provider wiring and patch flow.
+
+#### Downsides for Implementing
+
+Slight CI time increase; mitigated by single‑test‑per‑file parallelism.
+
+#### Recommendation
+
+Implement.
+
+Re-evaluation: After landing this PR, re-evaluate the remaining PR list and adjust scope/ordering as needed.
+
+### PR‑10: Docs and scaffolding
+
+#### Description
+
+Add scaffolding templates for Python and update docs for onboarding and operations.
+
+#### Scope & Changes
+
+- Add `tools/scaffolding/templates/python/` (lib/app):
+  - `pyproject.toml`, `uv.lock` generation, `TARGETS` stubs using `nix_python_*` macros, README snippets.
+- Update docs:
+  - `docs/handbook/adding-language.md` — Python notes, path invariants, lockfile labels,
+  - This design doc — finalize examples and references for newcomers.
+
+#### Acceptance Criteria
+
+- `scaf new python <lib|app>` works out of the box and matches repo conventions (one‑test‑per‑file).
+
+#### Risks
+
+Low. Docs/templates only.
+
+#### Consequence of Not Implementing
+
+Higher onboarding friction; inconsistent usage.
+
+#### Downsides for Implementing
+
+None.
+
+#### Recommendation
+
+Implement.
+
+Re-evaluation: After landing this PR, re-evaluate the remaining PR list and adjust scope/ordering as needed.
+
+---
+
+### Rollout & Sequencing
+
+1. PR‑1 (skeleton) — safe foundation, no behavior change.
+2. PR‑2 (templates + planner) — enables derivations behind presence checks.
+3. PR‑3 (exporter labels) — unlocks mapping; strictly additive.
+4. PR‑4 (providers) — deterministic providers for importers with `uv.lock`.
+5. PR‑5 (auto‑map confirmation) — tests prove mapping; minimal/no code.
+6. PR‑6 (macros) — ergonomics; keep behavior identical without providers.
+7. PR‑7 (patch workflow) — DX; integrates glue steps.
+8. PR‑8 (install/guardrails) — stability; aligns with Go/C++.
+9. PR‑9 (tests) — codifies guarantees end‑to‑end.
+10. PR‑10 (docs/scaffolding) — onboarding and consistency.
+
+All PRs are independently reversible.
+
+### Verification & Backout Strategy
+
+- Each PR ships with targeted zx tests; backout is a clean file‑level revert.
+- For exporter/provider/auto‑map PRs, verify by regenerating glue and comparing diffs; expect deterministic/stable outputs for unchanged inputs.
+- For patch workflow, smoke test: start → apply → build; verify provider wiring and no‑op on re‑apply.
+
+### Summary of Expected Impact
+
+- Python achieves parity with Go/Node/C++:
+  - Importer‑scoped lockfile labels, deterministic provider sync, auto‑map integration,
+  - Macros using shared helpers, native nixpkgs deps via `nixpkg:` labels,
+  - Unified patch workflow and CI guardrails.
+- Low risk, staged rollout; strong test coverage and easy backouts.
+
+---
+
+## Parity Checklist (with Go/Node/C++)
+
+- Uses importer‑scoped lockfile labels mapped via `gen-auto-map.ts` (Node parity).
+- Supports dev overrides with local warn/CI fail (`NIX_PY_DEV_OVERRIDE_JSON`) (Go/C++ parity).
+- Provider sync generates deterministic `TARGETS.python.auto` and names via shared helpers (Node parity).
+- Macros stamp `lang:`/`kind:` and wire providers from `auto_map.bzl` using `lang/defs_common.bzl` (Go/Node/C++ parity).
+- Supports `nixpkg:` labels for native deps (Go/C++ parity).
+- Scaffolding generates targets/macros/lockfile label, one‑test‑per‑file (repo conventions).
