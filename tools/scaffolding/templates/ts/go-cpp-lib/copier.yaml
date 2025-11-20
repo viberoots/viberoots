@@ -27,6 +27,8 @@ _tasks:
   # Go c-archive (Node path) directories
   - mkdir -p libs/{{ name }}-go/pkg/addon
   - mkdir -p libs/{{ name }}-go/patches/go
+  # Go API (TinyGo wasm) directories
+  - mkdir -p libs/{{ name }}-api
   # Native addon
   - mkdir -p libs/{{ name }}-native/src
   - mkdir -p libs/{{ name }}-native/tests

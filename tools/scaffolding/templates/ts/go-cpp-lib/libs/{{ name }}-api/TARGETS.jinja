@@ -1,0 +1,13 @@
+load("//go:defs.bzl", "nix_go_tiny_wasm_lib")
+
+# TinyGo WebAssembly build that links (optionally) against the C/C++ wasm static lib
+nix_go_tiny_wasm_lib(
+    name = "wasm",
+    srcs = ["main.go"],
+    # When users extend the C wrapper, they can depend on //libs/{{ name }}-core:core_wasm
+    deps = ["//libs/{{ name }}-core:core_wasm"],
+    labels = ["lang:go", "kind:wasm"],
+    visibility = ["PUBLIC"],
+)
+
+
