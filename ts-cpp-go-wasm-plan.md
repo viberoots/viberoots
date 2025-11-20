@@ -10,10 +10,10 @@ Introduce the C++ core library with a tiny, stable C ABI surface (wrapper) and b
 
 ### Scope & Changes
 
-- Add `libs/math-core`:
+- Scaffold `libs/math-core` in a runInTemp zx test (no live repo changes):
   - `include/core/math.h`, `include/addon.h` (extern "C")
   - `src/core/math.cc`, `src/cwrapper/addon.c`
-  - `TARGETS` with:
+  - `TARGETS` in the temp repo with:
     - native: `nix_cpp_lib`
     - wasm: `nix_cpp_wasm_static_lib` (new macro in a later PR; stub now)
 - Nix templates (scaffold only for now):
@@ -25,9 +25,9 @@ Introduce the C++ core library with a tiny, stable C ABI surface (wrapper) and b
 
 ### Acceptance Criteria
 
-- Native `libcore.a` builds via existing C++ template.
+- In a runInTemp temp repo, native `libcore.a` builds via the existing C++ template.
 - Header `addon.h` is the only public surface (no exceptions/RTTI across ABI).
-- Docs present in `libs/math-core/README.md`; test executes successfully.
+- Docs may live in the temp scaffold or plan notes; test executes successfully.
 - No changes to other targets; CI unaffected.
 
 ### Risks
@@ -56,9 +56,9 @@ Add a Go layer that calls the C ABI (`addon.h`) and a thin Go API facade that wi
 
 ### Scope & Changes
 
-- Add `libs/math-go-core` (cgo wrapper over `addon.h`) and `libs/math-api` (public Go API calling into go‑core).
-- `TARGETS` for both using existing `nix_go_library` macros.
-- Add/lock `gomod2nix.toml` for each Go module; ensure `tools/dev/install-deps.ts` flow updates lockfiles.
+- Scaffold `libs/math-go-core` (cgo wrapper over `addon.h`) and `libs/math-api` (public Go API calling into go‑core) inside a runInTemp zx test (no live repo changes).
+- Use `nix_go_library` macros in the temp repo’s `TARGETS`.
+- Generate `gomod2nix.toml` for each temp Go module within the runInTemp workspace using the existing install-deps flow.
 - Docs:
   - READMEs in `libs/math-go-core` and `libs/math-api` describing the layering, cgo boundary, and how `gomod2nix.toml` is regenerated.
 - Tests:
@@ -66,8 +66,8 @@ Add a Go layer that calls the C ABI (`addon.h`) and a thin Go API facade that wi
 
 ### Acceptance Criteria
 
-- `buck2 build //libs/math-api:lib` succeeds on all supported systems.
-- `go test` basic unit covers one exported function (pure compute path).
+- In a runInTemp temp repo, `buck2 build //libs/math-api:lib` succeeds on all supported systems.
+- In that temp repo, `go test` basic unit covers one exported function (pure compute path).
 - Docs present and accurate (cgo boundary and lockfile regeneration steps).
 
 ### Risks
@@ -96,18 +96,18 @@ Build a Node addon that links the Go API as a `c-archive` and the native C++ cor
 
 ### Scope & Changes
 
-- Add `libs/math-native`:
+- Scaffold `libs/math-native` in a runInTemp zx test (no live repo changes):
   - `src/binding.cc` (N‑API shim calling Go `extern "C"` symbols)
   - `TARGETS` uses `nix_cpp_node_addon` with `nixCxxPkgs=[ //libs/math-api:carchive, //libs/math-core:lib ]`.
-- Add `libs/math-ts/src/node/index.ts` that `require("./native/math_native.node")` and exports functions.
+- Exercise a temp `libs/math-ts/src/node/index.ts` that `require("./native/math_native.node")` and exports functions (live packaging lands in PR‑7).
 - Add a small TS test (`tools/tests/...`) asserting `add(2,3)=5` via the node entrypoint.
 - Docs:
   - `libs/math-native/README.md` documenting symbol exposure, platform notes, and how the TS node entry consumes the addon.
 
 ### Acceptance Criteria
 
-- `buck2 build //libs/math-native:napi_addon` produces a `.node` artifact.
-- TS node entry loads and passes the unit test.
+- In a runInTemp temp repo, `buck2 build //libs/math-native:napi_addon` produces a `.node` artifact.
+- The temp TS node entry loads and passes the unit test.
 - Docs present in `libs/math-native/README.md`.
 
 ### Risks
@@ -140,15 +140,15 @@ Add Nix template/macro to compile the C++ core into a wasm static library (`libc
   - `cppWasmStaticLib` in `tools/nix/templates/cpp.nix` (clang `--target=wasm32-{unknown-unknown|wasi}` → `libcore_wasm.a`)
 - Buck macros:
   - `nix_cpp_wasm_static_lib`
-- Tests:
-  - Build produces `libcore_wasm.a` and headers; add a tiny compile/link smoke target to verify archive usability (no TS yet).
+- Tests (runInTemp):
+  - Build produces `libcore_wasm.a` and headers; add a tiny compile/link smoke target in the temp repo to verify archive usability (no TS yet).
 - Docs:
   - Notes in `libs/math-core/README.md` documenting wasm build flags and constraints (no syscalls).
 
 ### Acceptance Criteria
 
-- `libcore_wasm.a` builds deterministically for supported systems.
-- Minimal smoke link target succeeds.
+- In a runInTemp temp repo, `libcore_wasm.a` builds deterministically for supported systems.
+- A minimal smoke link target succeeds.
 - No provider shape changes; Node path unaffected.
 - Docs updated in `libs/math-core/README.md`.
 
@@ -174,7 +174,7 @@ Link the TinyGo‑compiled Go API with `libcore_wasm.a` to produce `top.wasm` an
 
 ### Acceptance Criteria
 
-- `top.wasm` builds; browser test passes (Node’s `WebAssembly` acceptable for test or headless harness).
+- In a runInTemp temp repo, `top.wasm` builds; browser test passes (Node’s `WebAssembly` acceptable for test or headless harness).
 - No change to Node path; both entries co‑exist in the same TS package.
 - Dev‑override guardrails honored in templates (warn local, fail CI).
 - Docs present in `libs/math-ts/README.md` (browser section).
