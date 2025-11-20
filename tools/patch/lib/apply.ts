@@ -147,7 +147,7 @@ async function cpRecursive(src: string, dst: string): Promise<void> {
 export async function verifyPatchDryRun(
   originPath: string,
   patchPath: string,
-  mode: "go" | "cpp",
+  mode: "go" | "cpp" | "python",
 ): Promise<void> {
   const tmpRoot = await fsp.mkdtemp(path.join(os.tmpdir(), `bucknix-patch-verify-${mode}-`));
   const tmpCopy = path.join(tmpRoot, path.basename(originPath));
@@ -170,6 +170,6 @@ export async function verifyPatchDryRun(
     }
     return;
   }
-  // Go path: inherit stdio; throw on failure
+  // Go/Python path: inherit stdio; throw on failure
   await $({ cwd: tmpCopy, stdio: "inherit" })`patch -p1 --dry-run -i ${path.resolve(patchPath)}`;
 }

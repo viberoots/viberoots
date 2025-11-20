@@ -32,7 +32,7 @@ function usage(msg?: string) {
       "  remove <lang> <module>   Remove a patch and regenerate glue",
       "",
       "languages:",
-      "  go | cpp | node",
+      "  go | cpp | node | python",
       "",
       "notes:",
       "  - Go/C++ default to local mode: apply/remove write/read patches under <pkg>/patches/<lang>.",
@@ -85,7 +85,7 @@ async function main() {
   if (!sub || sub === "help") return usage();
   if (!lang) return usage("missing <language>");
 
-  if (lang !== "go" && lang !== "cpp" && lang !== "node")
+  if (lang !== "go" && lang !== "cpp" && lang !== "node" && lang !== "python")
     return usage(`unsupported language: ${lang}`);
 
   // Resolve repo root to import the language handler robustly from any CWD
@@ -94,7 +94,9 @@ async function main() {
   const go = lang === "go" ? await import(path.join(root, "tools/patch/patch-go.ts")) : null;
   const cpp = lang === "cpp" ? await import(path.join(root, "tools/patch/patch-cpp.ts")) : null;
   const node = lang === "node" ? await import(path.join(root, "tools/patch/patch-node.ts")) : null;
-  const handler = (go ? go.default : node ? node.default : cpp!.default) as {
+  const py =
+    lang === "python" ? await import(path.join(root, "tools/patch/patch-python.ts")) : null;
+  const handler = (go ? go.default : node ? node.default : py ? py.default : cpp!.default) as {
     start(args: string[]): Promise<void>;
     apply(args: string[]): Promise<void>;
     reset(args: string[]): Promise<void>;
