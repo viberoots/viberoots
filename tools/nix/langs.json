@@ -1,5 +1,5 @@
 {
-  "enabled": ["cpp", "go", "node", "rust"],
+  "enabled": ["cpp", "go", "node", "rust", "python"],
   "languages": [
     {
       "id": "go",

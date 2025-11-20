@@ -342,6 +342,9 @@ let
                 else LANGS.go.mkApp selectedTargetName
               ) else if k.template == "node" then (
                 LANGS.node.mkApp selectedTargetName
+              ) else if k.template == "python" then (
+                if (k.kind == "bin" || k.kind == "lib") then LANGS.python.mkApp selectedTargetName
+                else LANGS.python.mkLib selectedTargetName
               ) else (
                 if (k.kind == "bin" || k.kind == "lib" || k.kind == "test" || k.kind == "addon") then mkCpp selectedTargetName k.kind else mkCpp selectedTargetName "bin"
               )

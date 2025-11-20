@@ -63,8 +63,13 @@ let
         if builtins.pathExists cppPlanner && !(builtins.elem "cpp" withGo)
         then (withGo ++ [ "cpp" ])
         else withGo;
+      pyPlanner = manifestBase + "/planner/python.nix";
+      withPy =
+        if builtins.pathExists pyPlanner && !(builtins.elem "python" withCpp)
+        then (withCpp ++ [ "python" ])
+        else withCpp;
     in
-      withCpp;
+      withPy;
 
   LANGS =
     builtins.listToAttrs (map (id: { name = id; value = ensureAdapter id; }) langIds);
