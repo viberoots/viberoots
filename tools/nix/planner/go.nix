@@ -64,9 +64,11 @@ in {
     let rt = get n "rule_type";
         lbs = get n "labels";
         isBinLabel = lbs != null && builtins.elem "kind:bin" lbs;
+        isWasmLabel = lbs != null && builtins.elem "kind:wasm" lbs;
     in if (lbs != null && builtins.elem "kind:carchive" lbs) then "lib"
        else if (rt != null) && lib.hasPrefix "go_" rt
          then (if lib.hasSuffix "_binary" rt then "bin" else "lib")
+         else if isWasmLabel then "tinywasm"
          else if isBinLabel then "bin" else "lib";
 
   modulesFileFor = name: modulesTomlFor name;
@@ -114,6 +116,20 @@ in {
       nixCgoAttrs = nixCgoAttrs;
       nixCgoPkgs  = repoCgoPkgs;
     };
-}
 
+  # Build a TinyGo WebAssembly module that optionally links C/C++ wasm archives
+  mkTinyWasm = name:
+    let
+      directDeps = depsOfName name;
+      cppLibDeps = builtins.filter (dn: isCppNode dn && isCppLib dn) directDeps;
+      # Resolve repo-local wasm static libs for direct C++ deps
+      repoWasmLibs = map (dn: T.cppWasmStaticLib { name = dn; srcRoot = repoRoot; subdir = (pkgPathOf dn); }) cppLibDeps;
+    in T.goTinyWasmLib {
+      inherit name;
+      # TinyGo build uses module sources directly; gomod2nix not required here
+      srcRoot = repoRoot;
+      subdir = (pkgPathOf name);
+      wasmStaticLibs = repoWasmLibs;
+    };
+}
 

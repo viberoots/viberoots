@@ -337,7 +337,9 @@ let
               exit 1
             '' else (
               if k.template == "go" then (
-                if (k.kind == "bin" || k.kind == "lib") then LANGS.go.mkApp selectedTargetName else LANGS.go.mkApp selectedTargetName
+                if (k.kind == "bin" || k.kind == "lib") then LANGS.go.mkApp selectedTargetName
+                else if (k.kind == "tinywasm") then LANGS.go.mkTinyWasm selectedTargetName
+                else LANGS.go.mkApp selectedTargetName
               ) else if k.template == "node" then (
                 LANGS.node.mkApp selectedTargetName
               ) else (
@@ -357,9 +359,26 @@ let
             goOutPaths cppOutPaths nodeOutPaths modulesTomlFor pkgPathOf targetNameOf sanitize;
   };
   all = Manifest.all;
+
+  # Minimal TinyGo wasm selected builder: builds a wasm for BUCK_TARGET without requiring
+  # the node to be present in the exported graph. Intended for tests and simple consumers.
+  selectedWasm =
+    let tgt = builtins.getEnv "BUCK_TARGET";
+    in if tgt != "" then
+      T.goTinyWasmLib {
+        name = tgt;
+        srcRoot = repoRoot;
+        subdir = pkgPathOf tgt;
+        wasmStaticLibs = [];
+      }
+    else pkgs.runCommand "no-target" {} ''
+      mkdir -p $out
+      echo no-target > $out/.noop
+    '';
 in
 {
   inherit cppTargets cppTargetsFlat all selected;
+  inherit selectedWasm;
 }
 
 

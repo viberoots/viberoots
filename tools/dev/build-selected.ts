@@ -86,13 +86,15 @@ async function main() {
   console.error(`[build-selected] BUCK_TARGET=${target}`);
 
   // Sanitize impure dev-override env to avoid accidental JSON parse errors in planner
-  const sanitizedEnv = {
+  const sanitizedEnv: Record<string, string> = {
     ...process.env,
     BUCK_TARGET: target,
     NIX_GO_DEV_OVERRIDE_JSON: "",
     NIX_CPP_DEV_OVERRIDE_JSON: "",
-    PLANNER_ONLY_CPP: "1",
   };
+  if (!process.env.PLANNER_ONLY_CPP) {
+    sanitizedEnv.PLANNER_ONLY_CPP = "1";
+  }
 
   const nixTrace = (process.env.EXPORTER_DEBUG || "").trim() === "1" ? "--show-trace" : "";
   const { stdout, exitCode } = await $({

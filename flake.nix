@@ -168,6 +168,7 @@
         graph-generator = graphGen.all;
         graph-generator-cppTargets = graphGen.cppTargetsFlat;
         graph-generator-selected = graphGen.selected;
+        graph-generator-selected-wasm = graphGen.selectedWasm;
         buck-graph = buckGraph;
         graph-generator-pure = graphGenPure.all;
         graph-generator-pure-selected = graphGenPure.selected;

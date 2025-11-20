@@ -2,6 +2,7 @@
 let
   lib = pkgs.lib;
   H = import ../lib/lang-helpers.nix { inherit pkgs; };
+  Tiny = import ./go-tiny-wasm.nix { inherit pkgs; };
 
   buildGoFn = if pkgs ? buildGoApplication then pkgs.buildGoApplication
               else builtins.throw "gomod2nix overlay (buildGoApplication) is required; no vendoring fallback";
@@ -229,6 +230,7 @@ in {
     } // (if takesOverrides then {
       overrides = mkOverrides { patchesMap = patchesMap; devMap = H.readDevOverrides devOverrideEnv; };
     } else {}));
+  # Re-export TinyGo wasm builder from dedicated template
+  inherit (Tiny) goTinyWasmLib;
 }
-
 

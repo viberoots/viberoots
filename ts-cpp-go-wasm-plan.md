@@ -221,6 +221,66 @@ Implement.
 
 ---
 
+## PR‑6b: Backend Toggle — WASI (opt‑in, single‑artifact)
+
+### Description
+
+Add a third, optional web backend that compiles the C++ core to `wasm32-wasi` and builds the TinyGo top module with `-target wasi`, linking the WASI‑built C static library. This produces a single `top.wasm` that depends on a WASI runtime (e.g., Node’s `node:wasi`, wasmtime/wasmer). It is opt‑in and does not alter the default TinyGo‑bare flow.
+
+### Rationale and fit
+
+- Enables libc‑style APIs and limited syscalls via WASI without Emscripten’s JS glue.
+- Aimed at server/CLI or WASI host environments; not intended for browsers (which currently require a WASI polyfill).
+- Keeps defaults minimal: `tinygo_single` remains default; `emscripten_dual` remains the richer browser‑focused option.
+
+### Scope & Changes
+
+- Nix templates:
+  - Extend `cppWasmStaticLib` to support `wasmTarget = "wasm32-wasi"` and wire a WASI sysroot (e.g., `wasi-libc`/`wasi-sdk`) via `--sysroot`.
+  - Add TinyGo build option `-target wasi` for the WASI backend so the resulting Go object can link with the `wasm32-wasi` C static library.
+- Buck macros:
+  - Extend backend toggle to include WASI:
+    - `webWasmBackend = "tinygo_single" | "wasi_single" | "emscripten_dual"` (default: `tinygo_single`).
+  - When `wasi_single` is selected:
+    - Build `libcore_wasm.a` with `wasm32-wasi` sysroot;
+    - Build TinyGo top with `-target wasi`, link in the archive, emit single `top.wasm`.
+- Tests (runInTemp):
+  - C++ build smoke for `wasm32-wasi` archive (as in PR‑4).
+  - Node WASI smoke: instantiate `top.wasm` using Node’s `node:wasi` module and call `add(2,3)`.
+- Docs:
+  - Update backend matrix to include WASI; document:
+    - Appropriate environments (WASI runtimes).
+    - Browser caveat: WASI polyfill required; not recommended for regular browsers.
+    - How to set `webWasmBackend=wasi_single`; required Nix inputs (WASI sysroot).
+
+### Acceptance Criteria
+
+- `cppWasmStaticLib` deterministically builds `libcore_wasm.a` for `wasm32-wasi` (sysroot pinned).
+- TinyGo top builds with `-target wasi`, linking `libcore_wasm.a`, producing one `top.wasm`.
+- Node WASI smoke test passes in a temp repo (`node:wasi` runner).
+- Default remains `tinygo_single`; no behavior change unless `wasi_single` is selected.
+
+### Risks
+
+- Browser compatibility: WASI is not natively supported in browsers; requires a polyfill.
+- Larger artifacts than bare `wasm32-unknown-unknown` due to WASI libc and initialization.
+- Additional toolchain inputs (WASI sysroot) and configuration; must be pinned for determinism.
+- Cross‑target alignment: both C++ and TinyGo must target WASI to link successfully.
+
+### Consequence of Not Implementing
+
+Teams needing libc‑like behavior under WASI must use Emscripten or maintain bespoke shims.
+
+### Downsides for Implementing
+
+Adds another backend to maintain and a wider test matrix (at least a Node WASI smoke).
+
+### Recommendation
+
+Implement as opt‑in; keep defaults on `tinygo_single`. For browsers, prefer TinyGo bare or Emscripten depending on needs.
+
+---
+
 ## PR‑7: TypeScript Package Packaging — Conditional Exports + Artifacts Staging
 
 ### Description
@@ -345,10 +405,11 @@ Implement (optional).
 2. PR‑2 (Go layer) — cgo + API facade; unlocks both paths.
 3. PR‑3 (Node N‑API) — server entrypoint online.
 4. PR‑4 (C++ wasm static lib) → PR‑5 (TinyGo top.wasm + browser loader).
-5. PR‑6 (Backend toggle) — optional capability; land after stable TinyGo path.
-6. PR‑7 (TS packaging) — conditional exports and staging finalized.
-7. PR‑8 (Scaffolding) — make it easy to replicate the pattern.
-8. PR‑9 (Budgets) — optional polish.
+5. PR‑6 (Backend toggle: Emscripten) — optional capability; land after stable TinyGo path.
+6. PR‑6b (Backend toggle: WASI) — optional capability; WASI single‑artifact path for WASI runtimes.
+7. PR‑7 (TS packaging) — conditional exports and staging finalized.
+8. PR‑8 (Scaffolding) — make it easy to replicate the pattern.
+9. PR‑9 (Budgets) — optional polish.
 
 ## Verification & Backout Strategy
 

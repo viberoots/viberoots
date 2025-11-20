@@ -2,6 +2,7 @@ load("@prelude//:rules.bzl", "go_binary", "go_library", "go_test", "genrule")
 load("//lang:defs_common.bzl", "append_tuple_labels", "dedupe_preserve", "normalize_labels", "stamp_labels", "normalize_nix_attr", "append_patch_srcs", "providers_for")
 load("//lang:defs_common.bzl", "append_nixpkg_labels")
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
+load("//go/private:nix_build_wasm.bzl", "go_nix_build_wasm")
 
 def _append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled):
     append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled)
@@ -202,6 +203,33 @@ def nix_go_carchive(name, **kwargs):
         srcs = merged_srcs,
         out = name + ".stamp",
         cmd = "echo go_carchive > $OUT",
+        labels = labels,
+        visibility = kwargs.get("visibility", []),
+    )
+
+
+def nix_go_tiny_wasm_lib(name, **kwargs):
+    """
+    Declare a planner-visible TinyGo Wasm target that builds a single `top.wasm` via Nix.
+
+    Stamps language/kind labels for adapter detection and uses a thin rule that
+    invokes the planner-selected build, copying `$out/lib/top.wasm` to this rule's output.
+    """
+    # Stamp language/kind labels for planner detection
+    labels = kwargs.get("labels", []) or []
+    labels = dedupe_preserve(labels + ["lang:go", "kind:wasm"])
+    pkg = native.package_name()
+    deps = kwargs.pop("deps", [])
+    srcs = kwargs.get("srcs", []) or []
+    extra = normalize_labels(pkg, kwargs.pop("extra_module_providers", []))
+    merged_srcs = dedupe_preserve(srcs + deps + providers_for(MODULE_PROVIDERS, name) + extra)
+    # Graph-facing shim that copies from the Nix out path produced by planner
+    go_nix_build_wasm(
+        name = name,
+        self_label = "//%s:%s" % (pkg, name),
+        out = name + ".wasm",
+        expected_rel = "lib/top.wasm",
+        srcs = merged_srcs,
         labels = labels,
         visibility = kwargs.get("visibility", []),
     )
