@@ -1,0 +1,21 @@
+load("//cpp:defs.bzl", "nix_cpp_library", "nix_cpp_wasm_static_lib")
+
+# Native C/C++ library (optionally extended by users)
+nix_cpp_library(
+    name = "core",
+    srcs = ["src/cwrapper/addon.c"],
+    headers = ["include/addon.h"],
+    labels = ["lang:cpp", "kind:lib"],
+    visibility = ["PUBLIC"],
+)
+
+# WASM static library for web path
+nix_cpp_wasm_static_lib(
+    name = "core_wasm",
+    srcs = ["src/cwrapper/addon.c"],
+    headers = ["include/addon.h"],
+    labels = ["lang:cpp", "kind:lib"],
+    visibility = ["PUBLIC"],
+)
+
+

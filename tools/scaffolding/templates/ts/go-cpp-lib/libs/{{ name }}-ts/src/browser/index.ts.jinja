@@ -1,0 +1,24 @@
+export async function loadFrom(url: string): Promise<{ add(a: number, b: number): number }> {
+  const toBytes = async (u: string) => {
+    if (u.startsWith("file://")) {
+      const { readFile } = await import("node:fs/promises");
+      return await readFile(new URL(u));
+    }
+    const res = await fetch(u);
+    return await res.arrayBuffer();
+  };
+  const buf = await toBytes(url);
+  let instance: WebAssembly.Instance;
+  try {
+    ({ instance } = await WebAssembly.instantiate(buf, {}));
+  } catch {
+    const { WASI } = await import("node:wasi");
+    const wasi = new WASI({ version: "preview1", args: [], env: {}, preopens: {} });
+    ({ instance } = await WebAssembly.instantiate(buf, { wasi_snapshot_preview1: (wasi as any).wasiImport }));
+    if (typeof (wasi as any).start === "function") (wasi as any).start(instance);
+  }
+  const exp = instance.exports as any;
+  return { add: (a: number, b: number) => (exp.add as (x: number, y: number) => number)(a, b) };
+}
+
+

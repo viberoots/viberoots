@@ -1,0 +1,28 @@
+#include <node_api.h>
+// The Go c-archive export (Add) will be available at link time
+// We declare it here to satisfy the compiler.
+extern int Add(int a, int b);
+
+static napi_value AddWrapped(napi_env env, napi_callback_info info) {
+  size_t argc = 2;
+  napi_value argv[2];
+  napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
+  int32_t a = 0, b = 0;
+  if (argc > 0) napi_get_value_int32(env, argv[0], &a);
+  if (argc > 1) napi_get_value_int32(env, argv[1], &b);
+  int32_t sum = Add(a, b);
+  napi_value out;
+  napi_create_int32(env, sum, &out);
+  return out;
+}
+
+static napi_value Init(napi_env env, napi_value exports) {
+  napi_value fn;
+  napi_create_function(env, "add", NAPI_AUTO_LENGTH, AddWrapped, NULL, &fn);
+  napi_set_named_property(env, exports, "add", fn);
+  return exports;
+}
+
+NAPI_MODULE(NODE_GYP_MODULE_NAME, Init)
+
+

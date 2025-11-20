@@ -83,6 +83,10 @@ async function isLanguageEnabled(language: string): Promise<boolean> {
       return false;
     }
   }
+  // TS scaffolds ride on Node infra; allow TS templates alongside Node even without a ts.nix
+  if (language === "ts") {
+    return true;
+  }
   // Generic rule: require tools/nix/templates/<lang>.nix for other languages
   const tplPath = path.join("tools", "nix", "templates", `${language}.nix`);
   return await exists(tplPath);
@@ -177,6 +181,10 @@ function normalizeTemplateName(name: string): string {
   }
   if (name === "cli-app" || name === "cli") {
     return "cli";
+  }
+  // PR-8 aliases
+  if (name === "ts-go-cpp-lib") {
+    return "go-cpp-lib";
   }
   return name;
 }

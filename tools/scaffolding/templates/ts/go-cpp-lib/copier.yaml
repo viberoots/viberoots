@@ -1,0 +1,40 @@
+version: 1
+
+_envops:
+  block_start_string: "{%"
+  block_end_string: "%}"
+  variable_start_string: "{{"
+  variable_end_string: "}}"
+  comment_start_string: "{#"
+  comment_end_string: "#}"
+  keep_trailing_newline: true
+
+_exclude:
+  - meta.json
+
+# Input variables supplied by scaf
+name: ""
+language: "ts"
+template: "go-cpp-lib"
+pkgScope: "@libs"
+addon_name: "{{ name }}_addon"
+
+_tasks:
+  # Create core directories
+  - mkdir -p libs/{{ name }}-core/include
+  - mkdir -p libs/{{ name }}-core/src/cwrapper
+  - mkdir -p libs/{{ name }}-core/patches/cpp
+  # Go c-archive (Node path) directories
+  - mkdir -p libs/{{ name }}-go/pkg/addon
+  - mkdir -p libs/{{ name }}-go/patches/go
+  # Native addon
+  - mkdir -p libs/{{ name }}-native/src
+  - mkdir -p libs/{{ name }}-native/tests
+  - mkdir -p libs/{{ name }}-native/patches/cpp
+  # TS package
+  - mkdir -p libs/{{ name }}-ts/src/node
+  - mkdir -p libs/{{ name }}-ts/src/browser
+  - mkdir -p libs/{{ name }}-ts/test
+
+_templates_suffix: ".jinja"
+_answers_file: ".copier-answers.yml"

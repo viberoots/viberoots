@@ -1,0 +1,19 @@
+load("//go:defs.bzl", "nix_go_carchive", "nix_go_library")
+
+# Build a tiny Go package as a C archive (Node path)
+nix_go_carchive(
+    name = "carchive",
+    srcs = glob(["pkg/**/*.go"]),
+    labels = ["lang:go", "kind:carchive"],
+    visibility = ["PUBLIC"],
+)
+
+# Optional Go library target (for future use or tests)
+nix_go_library(
+    name = "pkg",
+    srcs = glob(["pkg/**/*.go"]),
+    labels = ["lang:go", "kind:lib"],
+    visibility = ["PUBLIC"],
+)
+
+

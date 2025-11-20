@@ -1,0 +1,16 @@
+{
+  "language": "ts",
+  "template": "go-cpp-lib",
+  "description": "TS package with dual entries (node+browser) plus Go and C++ stubs",
+  "help": {
+    "usage": "scaf new ts go-cpp-lib <name> [--path=DEST]",
+    "notes": [
+      "Generates a minimal multi-target library scaffold:",
+      "- libs/<name>-core (C/C++ core + tiny C wrapper for wasm/static linking)",
+      "- libs/<name>-go (Go c-archive stub for Node addon path)",
+      "- libs/<name>-native (N-API addon using the Go c-archive)",
+      "- libs/<name>-ts (TypeScript package with node and browser entrypoints)"
+    ],
+    "examples": ["scaf new ts go-cpp-lib math", "scaf new ts go-cpp-lib calc --path=./sandbox/calc"]
+  }
+}

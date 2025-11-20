@@ -1,0 +1,10 @@
+// Thin Node entry that loads the compiled N-API addon and re-exports typed functions.
+// The scaffolding keeps paths simple; downstream packaging can relocate artifacts.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const native = require("../native/napi_addon.node");
+
+export function add(a: number, b: number): number {
+  return (native.add as (x: number, y: number) => number)(a, b);
+}
+
+

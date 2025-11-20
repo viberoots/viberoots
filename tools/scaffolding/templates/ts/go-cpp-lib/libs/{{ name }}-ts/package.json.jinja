@@ -1,0 +1,28 @@
+{
+  "name": "{{ pkgScope }}/{{ name }}-ts",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "exports": {
+    ".": {
+      "browser": "./dist/browser/index.js",
+      "node": "./dist/node/index.cjs",
+      "default": "./dist/browser/index.js"
+    }
+  },
+  "types": "dist/types/index.d.ts",
+  "scripts": {
+    "build": "tsc -p .",
+    "test": "vitest run",
+    "lint": "eslint . --ext .ts",
+    "format": "prettier -w ."
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^1.6.0",
+    "esbuild": "^0.21.5",
+    "@types/node": "^22.0.0"
+  }
+}
+
+

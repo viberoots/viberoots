@@ -1,0 +1,17 @@
+# {{ name }} — TS + Go + C++ scaffold
+
+This scaffold sets up:
+
+- libs/{{ name }}-core: C/C++ core with a tiny C wrapper for a stable C ABI
+- libs/{{ name }}-go: Go package compiled as a C archive (Node path)
+- libs/{{ name }}-native: Node N‑API addon that links the Go C archive
+- libs/{{ name }}-ts: TypeScript package with two entrypoints:
+  - node: loads the N‑API addon
+  - browser: ESM loader that instantiates a Wasm module (top.wasm)
+
+Next steps:
+- Add real logic to `libs/{{ name }}-core` and wire the wrapper header.
+- Extend the Go layer to call into the C ABI when needed.
+- Provide a Wasm module (e.g., via TinyGo) for the browser loader.
+
+

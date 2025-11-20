@@ -1,0 +1,12 @@
+load("//cpp:defs.bzl", "nix_cpp_node_addon")
+
+nix_cpp_node_addon(
+    name = "napi_addon",
+    srcs = ["src/binding.c"],
+    deps = ["//libs/{{ name }}-go:carchive"],
+    addon_name = "{{ addon_name }}",
+    labels = ["lang:cpp", "kind:addon"],
+    visibility = ["PUBLIC"],
+)
+
+
