@@ -24,6 +24,8 @@ in {
     # List of derivations produced by cppWasmStaticLib (optional)
     wasmStaticLibs ? [],
     # Build options
+    # TinyGo target: "wasm" (bare) or "wasi" (WASI single-artifact backend)
+    target ? "wasm",
     optimize ? "2",          # TinyGo -opt level (0,1,2 or "z" for size)
     panicMode ? "trap",      # TinyGo -panic mode (trap|print|external)
     scheduler ? "none",      # TinyGo -scheduler (none|tasks)
@@ -70,7 +72,7 @@ in {
       # Note: we do not require symbol references to C/C++ at this stage.
       tinygo build \
         -o "$out/lib/top.wasm" \
-        -target wasm \
+        -target ${target} \
         -no-debug \
         -panic ${panicMode} \
         -scheduler ${scheduler} \
@@ -84,6 +86,7 @@ in {
       echo "name=${name}" >> "$out/build.log"
       echo "subdir=${subdir}" >> "$out/build.log"
       echo "wasmStaticLibs=${toString (builtins.length wasmStaticLibs)}" >> "$out/build.log"
+      echo "target=${target}" >> "$out/build.log"
       echo "opt=${optimize}" >> "$out/build.log"
       echo "panic=${panicMode}" >> "$out/build.log"
       echo "scheduler=${scheduler}" >> "$out/build.log"

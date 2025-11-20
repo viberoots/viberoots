@@ -154,20 +154,30 @@ let
       labs = if n == null then [] else labelsOf n;
       isWasmStatic = builtins.elem "flavor:wasm" labs || builtins.elem "wasm:static" labs;
       isEmscripten = builtins.elem "flavor:emscripten" labs || builtins.elem "wasm:emscripten" labs;
+      wantWasi = builtins.elem "wasm:wasi" labs;
     in
-      (if isEmscripten then T.cppWasmEmscriptenLib else if isWasmStatic then T.cppWasmStaticLib else T.cppLib) {
-        inherit name;
-        srcRoot = ctx.repoRoot;
-        subdir = pkgPathOf name;
-        nixCxxAttrs = collectNixAttrsFor name;
-        srcList = normSrcsOf name;
-        patches = (
-          let
-            rels = builtins.filter (s: lib.hasSuffix ".patch" s) (normSrcsOf name);
-            relsNonPlaceholder = builtins.filter (s: !(lib.hasInfix "placeholder" s)) rels;
-          in map (p: builtins.toPath (ctx.repoRoot + "/" + (pkgPathOf name) + "/" + p)) relsNonPlaceholder
-        );
-      };
+      (
+        let
+          baseAttrs = {
+            inherit name;
+            srcRoot = ctx.repoRoot;
+            subdir = pkgPathOf name;
+            nixCxxAttrs = collectNixAttrsFor name;
+            srcList = normSrcsOf name;
+            patches = (
+              let
+                rels = builtins.filter (s: lib.hasSuffix ".patch" s) (normSrcsOf name);
+                relsNonPlaceholder = builtins.filter (s: !(lib.hasInfix "placeholder" s)) rels;
+              in map (p: builtins.toPath (ctx.repoRoot + "/" + (pkgPathOf name) + "/" + p)) relsNonPlaceholder
+            );
+          };
+          wasmAttrs = if isWasmStatic then { wasmTarget = if wantWasi then "wasm32-wasi" else "wasm32-unknown-unknown"; } else {};
+          attrs = baseAttrs // wasmAttrs;
+        in
+          if isEmscripten then T.cppWasmEmscriptenLib attrs
+          else if isWasmStatic then T.cppWasmStaticLib attrs
+          else T.cppLib attrs
+      );
 
   mkTest = name:
     T.cppTest {

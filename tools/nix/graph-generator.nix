@@ -364,12 +364,17 @@ let
   # the node to be present in the exported graph. Intended for tests and simple consumers.
   selectedWasm =
     let tgt = builtins.getEnv "BUCK_TARGET";
+        backend = builtins.getEnv "WEB_WASM_BACKEND";
+        goTarget =
+          if backend == "wasi_single" then "wasi"
+          else "wasm";
     in if tgt != "" then
       T.goTinyWasmLib {
         name = tgt;
         srcRoot = repoRoot;
         subdir = pkgPathOf tgt;
         wasmStaticLibs = [];
+        target = goTarget;
       }
     else pkgs.runCommand "no-target" {} ''
       mkdir -p $out

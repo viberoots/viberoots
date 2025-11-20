@@ -22,10 +22,27 @@ in {
     srcList ? [],
     patches ? [],
     wasmTarget ? "wasm32-unknown-unknown",
+    # Optional WASI sysroot (used when wasmTarget == "wasm32-wasi")
+    wasiSysroot ? null,
   }:
   let
     pname = "cppwasm-${H.sanitizeName name}";
     srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + subdir));
+    # Compute a sysroot path for WASI if available. Prefer explicit wasiSysroot, then pkgs.wasi-sdk,
+    # then pkgs.wasi-libc (if it exposes a compatible sysroot layout). Otherwise, omit --sysroot.
+    sysrootPath =
+      if wasmTarget == "wasm32-wasi"
+      then (
+        if wasiSysroot != null then wasiSysroot else
+        (if pkgs ? wasi-sdk then "${pkgs.wasi-sdk}/share/wasi-sysroot"
+         else (if pkgs ? wasi-libc then (
+           # Some nixpkgs expose include/lib under wasi-libc; try common layout
+           # Most Clang builds accept a directory with include/lib as sysroot.
+           "${pkgs.wasi-libc}"
+         ) else null))
+      )
+      else null;
+    sysrootArg = if sysrootPath != null then ("--sysroot=" + sysrootPath) else "";
     # Discover sources deterministically; include both C and C++ units.
     srcsCmd = if srcList != [] then (
       "printf '%s\\n' " + (lib.concatStringsSep " " (map (s: "'" + s + "'") (lib.sort (a: b: a < b) srcList))) + " | sort"
@@ -59,8 +76,8 @@ in {
       mapfile -t HDRS < <(find . -type f \( -name '*.h' -o -name '*.hpp' -o -name '*.hh' -o -name '*.hxx' \) | sort)
 
       # Common flags: pure compute, no exceptions/RTTI, no host I/O
-      cxxflags_common="--target=${wasmTarget} -std=${std} -fno-exceptions -fno-rtti -fno-threadsafe-statics -fno-bounds-check -fvisibility=hidden -fno-asynchronous-unwind-tables -fno-unwind-tables -fno-omit-frame-pointer -g0 -O2 -pipe"
-      cflags_common="--target=${wasmTarget} -std=c11 -fvisibility=hidden -g0 -O2 -pipe"
+      cxxflags_common="--target=${wasmTarget} ${sysrootArg} -std=${std} -fno-exceptions -fno-rtti -fno-threadsafe-statics -fno-bounds-check -fvisibility=hidden -fno-asynchronous-unwind-tables -fno-unwind-tables -fno-omit-frame-pointer -g0 -O2 -pipe"
+      cflags_common="--target=${wasmTarget} ${sysrootArg} -std=c11 -fvisibility=hidden -g0 -O2 -pipe"
       incFlags="${lib.concatStringsSep " " (map (p: "-I${p}") includes)}"
       defFlags="${lib.concatStringsSep " " (map (d: "-D${d}") defines)}"
       extraC="${lib.concatStringsSep " " (map (f: f) cflags)}"
@@ -91,6 +108,7 @@ in {
       : > "$out/build.log"
       echo "name=${name}" >> "$out/build.log"
       echo "wasmTarget=${wasmTarget}" >> "$out/build.log"
+      ${if wasmTarget == "wasm32-wasi" then ''echo "sysroot=${sysrootArg}" >> "$out/build.log"'' else ""}
       echo "std=${std}" >> "$out/build.log"
       echo "includes=$incFlags" >> "$out/build.log"
       echo "defines=$defFlags" >> "$out/build.log"
