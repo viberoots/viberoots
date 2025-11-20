@@ -149,19 +149,24 @@ let
     };
 
   mkLib = name:
-    T.cppLib {
-      inherit name;
-      srcRoot = ctx.repoRoot;
-      subdir = pkgPathOf name;
-      nixCxxAttrs = collectNixAttrsFor name;
-      srcList = normSrcsOf name;
-      patches = (
-        let
-          rels = builtins.filter (s: lib.hasSuffix ".patch" s) (normSrcsOf name);
-          relsNonPlaceholder = builtins.filter (s: !(lib.hasInfix "placeholder" s)) rels;
-        in map (p: builtins.toPath (ctx.repoRoot + "/" + (pkgPathOf name) + "/" + p)) relsNonPlaceholder
-      );
-    };
+    let
+      n = if builtins.hasAttr name byName then byName.${name} else null;
+      labs = if n == null then [] else labelsOf n;
+      isWasm = builtins.elem "flavor:wasm" labs || builtins.elem "wasm:static" labs;
+    in
+      (if isWasm then T.cppWasmStaticLib else T.cppLib) {
+        inherit name;
+        srcRoot = ctx.repoRoot;
+        subdir = pkgPathOf name;
+        nixCxxAttrs = collectNixAttrsFor name;
+        srcList = normSrcsOf name;
+        patches = (
+          let
+            rels = builtins.filter (s: lib.hasSuffix ".patch" s) (normSrcsOf name);
+            relsNonPlaceholder = builtins.filter (s: !(lib.hasInfix "placeholder" s)) rels;
+          in map (p: builtins.toPath (ctx.repoRoot + "/" + (pkgPathOf name) + "/" + p)) relsNonPlaceholder
+        );
+      };
 
   mkTest = name:
     T.cppTest {

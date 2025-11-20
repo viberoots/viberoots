@@ -34,6 +34,37 @@ def nix_cpp_library(name, **kwargs):
         visibility = kwargs.get("visibility", []),
     )
 
+def nix_cpp_wasm_static_lib(name, **kwargs):
+    """
+    Build a wasm-targeted static library via the Nix planner (cppWasmStaticLib).
+
+    Stamps:
+      - lang:cpp, kind:lib, flavor:wasm
+    """
+    local_patch_dirs = kwargs.pop("local_patch_dirs", ["patches/cpp"])
+    nix_cxx_attrs = kwargs.pop("nix_cxx_attrs", [])
+    deps = kwargs.pop("deps", [])
+    nix_inputs = ["//:flake.lock", "//tools/nix/overlays:cpp-patches.nix"]
+    stamp_labels(kwargs, "cpp", "lib")
+    # Add a flavor tag so the planner routes to the wasm template
+    _labels = (kwargs.get("labels", []) or []) + ["flavor:wasm"]
+    kwargs["labels"] = dedupe_preserve(_labels)
+    append_patch_srcs(kwargs, local_patch_dirs)
+    srcs = kwargs.get("srcs", []) or []
+    append_nixpkg_labels(kwargs, nix_cxx_attrs)
+    deps = dedupe_preserve(deps + providers_for(MODULE_PROVIDERS, name))
+    cpp_nix_build(
+        name = name,
+        out = sanitize_to_bin_name("//%s:%s" % (native.package_name(), name)) + ".a",
+        kind = "lib",
+        self_label = "//%s:%s" % (native.package_name(), name),
+        deps = deps,
+        srcs = srcs,
+        labels = kwargs.get("labels", []) or [],
+        nix_inputs = nix_inputs,
+        visibility = kwargs.get("visibility", []),
+    )
+
 
 def nix_cpp_binary(name, **kwargs):
     local_patch_dirs = kwargs.pop("local_patch_dirs", ["patches/cpp"])  # per-target local patch directories
@@ -145,6 +176,7 @@ def nix_cpp_node_addon(name, **kwargs):
 
 __all__ = [
     "nix_cpp_library",
+    "nix_cpp_wasm_static_lib",
     "nix_cpp_binary",
     "nix_cpp_test",
     "nix_cpp_node_addon",
