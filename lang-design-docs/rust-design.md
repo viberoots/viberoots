@@ -191,6 +191,22 @@ Provider naming: reuse `providerNameForModuleKey(crate, version)` from `tools/li
 
 ---
 
+## WASM Targets
+
+Now that repository macros and facilities for WASM are available (freestanding and WASI), Rust will ship with WASM options:
+
+- Target triples: `wasm32-unknown-unknown` (freestanding) and `wasm32-wasi` (WASI).
+- Buck macros: extend `rust/defs.bzl` with `nix_rust_wasm_library` and `nix_rust_wasi_binary` (or a `wasm = "freestanding"|"wasi"` attr) that:
+  - Stamp `lang:rust` and `kind:wasm|wasi` labels.
+  - Forward `--target` and features to the builder.
+  - Append providers from `//third_party/providers:auto_map.bzl` as today.
+- Planner/templates: add `rustWasmLib`/`rustWasiBin` functions in `tools/nix/templates/rust.nix`; compile with cargo for the requested target; reuse patch/override maps.
+- Tests: load freestanding `.wasm` via `WebAssembly.instantiate`; run WASI via `node:wasi` and assert exported functions (e.g., `add(2,3)=5`).
+
+Phasing: freestanding first, WASI shortly after; both reuse existing glue, labels, and providers.
+
+---
+
 ## Patching workflow (`patch-pkg rust`)
 
 Add a Rust language handler `tools/patch/patch-rust.ts` behind the existing `patch-pkg` CLI interface with the same subcommands and behavior as Go:

@@ -181,6 +181,18 @@ Notes:
 
 ---
 
+## WASM Targets (Experimental)
+
+With repository WASM/WASI facilities available, Swift can target WASM via the emerging Swift WASI toolchain:
+
+- Planner/templates: add `swiftWasiApp` to `tools/nix/templates/swift.nix` that drives `swift build` for a WASI target when supported; reuse patch/override maps.
+- Buck macros: introduce a `nix_swift_wasm_binary` (or `wasm = "wasi"`) that stamps `kind:wasm` and forwards configuration to the planner.
+- Tests: execute minimal exports under `node:wasi` and assert behavior.
+
+Status: toolchain maturity varies; treat as a later phase without blocking baseline Swift.
+
+---
+
 ## Exporter Labels (tools/buck/export-graph.ts)
 
 Two‑phase labeling strategy:

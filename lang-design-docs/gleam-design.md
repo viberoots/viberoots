@@ -115,6 +115,10 @@ Patches and Overrides application:
 7. Pre‑build guard — extend to fail if Gleam lockfiles exist but `TARGETS.gleam.auto` is missing.
 8. Build & Test — Buck builds Gleam targets; Nix planner instantiates Gleam derivations.
 
+### WASM Targets (Outlook)
+
+With repository WASM facilities, a direct Gleam→WASM path is not currently first‑class. For browser targets, prefer Gleam’s JS backend; for WASI, a future option could embed a BEAM‑in‑WASM runtime. If/when feasible, we can add `gleamWasmApp` templates that reuse patch/override maps and validate under `node:wasi`.
+
 ### Testing Plan
 
 - Add zx tests mirroring existing suites:

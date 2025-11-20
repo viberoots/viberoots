@@ -162,6 +162,19 @@ Integration:
 
 ---
 
+## WASM Targets
+
+With repo-level WASM facilities in place, Zig should support building WASM outputs:
+
+- Targets: `wasm32-wasi` and `wasm32-freestanding` via Zig’s native cross-compilation.
+- Buck macros: add `nix_zig_wasm_library`/`nix_zig_wasm_binary` (or a `wasm = "wasi"|"freestanding"` attribute) that stamp `kind:wasm` and forward the target to the planner.
+- Planner/templates: extend `tools/nix/templates/zig.nix` with `zigWasmLib`/`zigWasmBin` building `.wasm` artifacts; reuse patch/override maps.
+- Tests: freestanding modules loaded with `WebAssembly.instantiate`; WASI with `node:wasi` to validate exports run as expected.
+
+Initial scope: WASI first (best portability), then freestanding where practical.
+
+---
+
 ## Patching Workflow (`patch-pkg zig`)
 
 - `patch-pkg start zig <pkgId>`

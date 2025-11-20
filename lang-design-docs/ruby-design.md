@@ -171,6 +171,16 @@ Integration notes:
   4. Build & Test: Buck builds that pull in Ruby derivations via the planner.
   5. Pre‑build guard: unchanged; it validates glue presence. Optionally extend to detect `Gemfile.lock` → requires `TARGETS.ruby.auto` present.
 
+## WASM Targets (Exploratory)
+
+Given repository WASM facilities, Ruby’s WASM story is interpreter‑based rather than compilation:
+
+- Option: evaluate embedding a Ruby interpreter compiled to WASM (e.g., mruby/mruby‑wasm) for browser/WASI use cases.
+- Planner/macros: add an optional `nix_ruby_wasm_app` template that packages a minimal runtime + app; reuse patch/override maps where applicable.
+- Tests: run under `WebAssembly.instantiate` (freestanding) or `node:wasi` and assert a trivial function.
+
+This remains a later‑phase exploration and is not required for baseline Ruby support.
+
 ## Tests
 
 Add zx tests, one per file, consistent with repo conventions:

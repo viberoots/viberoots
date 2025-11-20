@@ -265,6 +265,16 @@ Phase A — Scaffolding & Guards
 - Add `tools/buck/sync-providers-php.ts` and register in the sync orchestrator.
 - Verify idempotent generation of `TARGETS.php.auto` on an empty repo.
 
+### WASM Targets (Exploratory)
+
+Given repository WASM facilities, PHP can target WASM only via an interpreter compiled to WASM. If we pursue this:
+
+- Add an optional `phpWasmApp` template that packages a minimal PHP runtime + app for WASI.
+- Reuse providers/patch maps; no special provider semantics.
+- Validate execution under `node:wasi` for simple scripts.
+
+This is not part of the initial PHP scope.
+
 Phase B — Templates & Macros
 
 - Implement `tools/nix/templates/php.nix` with `phpApp`/`phpLib`.

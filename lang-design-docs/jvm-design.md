@@ -328,6 +328,19 @@ Notes:
 
 ---
 
+## WASM Targets (Exploratory)
+
+With repository‑level WASM/WASI facilities in place, we plan an optional path for JVM→WASM:
+
+- Tooling candidates: TeaVM, CheerpJ, or similar. Scope is limited to projects compatible with these toolchains.
+- Buck/Planner: add an optional `nix_jvm_wasm_binary` (or `wasm = true`) macro and a `jvmWasmApp` template that drives the selected tool to produce `.wasm` artifacts.
+- Providers/patching: reuse existing lockfile/patch/override maps; no special provider semantics required.
+- Tests: load freestanding artifacts with `WebAssembly.instantiate` or use `node:wasi` if WASI‑compatible.
+
+This is a later‑phase enhancement and does not block the baseline JVM integration.
+
+---
+
 ## Dependency Resolution and Lockfiles
 
 Hermetic classpaths come from a per‑importer lockfile (`jvm.lock`) checked into each `apps/*` or `libs/*` project.

@@ -303,6 +303,18 @@ Building multiple importers concurrently
 
 ---
 
+## WASM Targets (Exploratory)
+
+We have repository support for WASM (freestanding and WASI). For Python, direct compilation to WASM is not generally available; instead:
+
+- Runtime‑in‑WASM: evaluate embedding a Python interpreter compiled to WASM (e.g., Pyodide‑style) for browser/WASI runtimes. Packaging and size constraints apply.
+- Planner/macros: if adopted, add optional `nix_python_wasm_app` that assembles a minimal runtime + app, keeping patch/override maps at the package level.
+- Tests: load under `WebAssembly.instantiate` (freestanding) or `node:wasi` and run a trivial function; keep this out of the minimal Python rollout and gate as later phase.
+
+This remains exploratory and is not required for the initial Python support.
+
+---
+
 ## Scaffolding
 
 Add `tools/scaffolding/templates/python/` and registry entries so `scaf new python <lib|app>` generates:

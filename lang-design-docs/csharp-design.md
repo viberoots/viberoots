@@ -119,6 +119,17 @@ Default path mirrors Node (importer‑scoped): use the existing orchestrator `to
   - `e2e-provider-wiring.csharp.test.ts`: adapts the existing wiring test to a small sample project; confirms only related providers appear in `deps(target)`.
 - Use the project’s external timeout conventions for zx tests.
 
+## WASM Targets (Experimental)
+
+With repo-level WASM/WASI facilities available, .NET targets can optionally produce WASM artifacts:
+
+- Approach: leverage the .NET WASI workload to publish `wasm-wasi` outputs for console‑style apps or libraries.
+- Buck macros: introduce `nix_csharp_wasm_binary` (or a `wasm = "wasi"` knob) that stamps `kind:wasm` and forwards TFM/RID to the planner.
+- Planner/templates: extend `tools/nix/templates/csharp.nix` to a `csharpWasiApp` builder that runs `dotnet publish -r wasm-wasi` hermetically; reuse patch/override maps.
+- Tests: execute under Node using `node:wasi` where applicable, asserting basic exports/behavior.
+
+Status: platform/toolchain dependent; treated as an experimental later phase with no impact on base C# rollout.
+
 ### Phased rollout and acceptance
 
 1. Baseline: ensure no `patches/csharp/**`; exporter and planner compile; CI green.

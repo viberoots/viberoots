@@ -216,6 +216,16 @@ Integrate Lua into existing pipeline without new stages:
 
 ---
 
+## WASM Targets (Exploratory)
+
+With repository WASM support available, Lua can target WASM via an interpreter compiled to WASM (e.g., Wasm3 or a Lua-in-WASM build). If adopted:
+
+- Add optional `luaWasmApp` template packaging a minimal runtime + app for WASI/freestanding.
+- Keep providers/patching unchanged; planner/macros forward a `wasm` knob.
+- Validate under `WebAssembly.instantiate` or `node:wasi` with a trivial script.
+
+This is a later‑phase enhancement and not required for baseline Lua.
+
 ## Tests (zx, one-test-per-file)
 
 - Provider sync determinism and duplicate detection for Lua.

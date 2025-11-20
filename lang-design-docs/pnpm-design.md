@@ -116,6 +116,10 @@ This document proposes how to add first-class PNPM projects to this monorepo, in
 - `TARGETS.node.auto` is generated deterministically and `gen-auto-map.ts` includes Node providers for labeled targets.
 - Scaffolding command can create a new PNPM project with TS/ESLint/Prettier/tests and correct labels and scripts.
 
+### WASM Targets (N/A)
+
+PNPM is a package manager design, not a language. WASM targeting is addressed in the language‑specific design docs (e.g., Node, Go, Rust, etc.). No direct PNPM changes are required for WASM.
+
 ### Wrapping pnpm patching with our patch-pkg interface
 
 pnpm’s native patch flow maps cleanly to our `patch-pkg` subcommands. We standardize on `patches/node/*` for Node patches so provider wiring picks them up.

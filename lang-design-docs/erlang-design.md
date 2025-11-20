@@ -155,6 +155,10 @@
   7. Prebuild Guard
   8. Build & Test
 
+### WASM Targets (Outlook)
+
+Repo‑level WASM support exists, but compiling BEAM code to WASM is not practical today. If a credible interpreter‑in‑WASM path emerges, we can add an optional `erlangWasmApp` template that packages a minimal runtime for WASI. Providers/patching remain unchanged. This is not part of the initial Erlang plan.
+
 ### Testing Plan (zx tests; one‑test‑per‑file)
 
 - Determinism/idempotency: `sync-providers-erlang` writes identical output across runs with unchanged inputs; detects duplicate patch keys; stable ordering.
