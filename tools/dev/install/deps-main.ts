@@ -7,6 +7,7 @@ import { sanitizeName } from "./common.ts";
 import { runGlue } from "./glue.ts";
 import { runGomod2nixGenerate, runGomod2nixScanAll } from "./gomod2nix.ts";
 import { withExclusiveInstallLock } from "./lock.ts";
+import { runUvRefreshAll } from "./uv.ts";
 
 type Flags = {
   force: boolean;
@@ -226,6 +227,8 @@ try {
   await runGomod2nixGenerate(dryRun, verbose);
 } catch {}
 await runGomod2nixScanAll(dryRun, verbose);
+// Best-effort Python lock refresh (uv). No-ops if no uv.lock present.
+await runUvRefreshAll(dryRun, verbose);
 if (!skipGlue) {
   await runGlue(dryRun, verbose);
 } else if (verbose) {

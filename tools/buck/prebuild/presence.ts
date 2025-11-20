@@ -25,6 +25,22 @@ export async function computeMissingOutputs(outputs: string[]): Promise<string[]
     }
   } catch {}
 
+  // If any uv.lock exists, require TARGETS.python.auto
+  try {
+    let uvLocks: string[] = [];
+    try {
+      const { stdout } = await $`git ls-files '**/uv.lock'`;
+      uvLocks = String(stdout || "")
+        .split(/\r?\n/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+    } catch {}
+    if (uvLocks.length > 0) {
+      const pyAuto = "third_party/providers/TARGETS.python.auto";
+      if (!fs.existsSync(pyAuto)) outPresence.push(pyAuto);
+    }
+  } catch {}
+
   // If any provider autos exist, require nix_attr_map.bzl (needed for provider index consumers)
   try {
     const provDir = "third_party/providers";

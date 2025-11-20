@@ -111,6 +111,11 @@ async function main() {
       "\n[OVERRIDES ACTIVE] NIX_CPP_DEV_OVERRIDE_JSON is set — local derivation hashes will differ. Unset before sharing cache artifacts.\n",
     );
   }
+  if ((process.env.NIX_PY_DEV_OVERRIDE_JSON || "").trim() !== "") {
+    console.warn(
+      "\n[OVERRIDES ACTIVE] NIX_PY_DEV_OVERRIDE_JSON is set — local derivation hashes will differ. Unset before sharing cache artifacts.\n",
+    );
+  }
 
   // Verify Buck prelude/cell mapping exists (diagnostic only; do not write files)
   try {
