@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import type { LanguageProviderSync } from "../../lib/lang-contracts";
 import { syncNodeProviders } from "./node.ts";
+import { syncPythonProviders } from "./python.ts";
 
 export type SyncOptions = {
   outFile?: string;
@@ -25,6 +26,15 @@ const handlers: LanguageProviderSync[] = [
       syncNodeProviders({
         outFile: opts?.outFile || "third_party/providers/TARGETS.node.auto",
         patchDir: opts?.patchDir,
+      }),
+  },
+  {
+    lang: "python",
+    sync: async (opts) =>
+      syncPythonProviders({
+        outFile: opts?.outFile || "third_party/providers/TARGETS.python.auto",
+        patchDir: opts?.patchDir || "patches/python",
+        strict: opts?.strict,
       }),
   },
 ];

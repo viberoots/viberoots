@@ -174,3 +174,75 @@ export async function findPnpmLockfiles(opts?: FindLockfilesOptions): Promise<st
 
   return Array.from(found).sort((a, b) => a.localeCompare(b));
 }
+
+// Find uv.lock files under the repository, honoring default ignores and optional roots.
+export async function findUvLockfiles(opts?: FindLockfilesOptions): Promise<string[]> {
+  const ignore = new Set<string>(opts?.ignore || []);
+  for (const d of DEFAULT_IGNORES) ignore.add(d);
+  const baseRoot = path.resolve(process.cwd());
+  const rootsRel = (opts?.roots && opts.roots.length ? opts.roots : ["."])
+    .map((r) => (path.isAbsolute(r) ? r : path.resolve(baseRoot, r)))
+    .map((r) => r.trim())
+    .filter(Boolean);
+
+  const found = new Set<string>();
+
+  // Source 1: git-tracked uv.lock files
+  const useGitStage = !opts?.roots || opts.roots.length === 0;
+  if (useGitStage) {
+    try {
+      const { stdout, exitCode } = await $({
+        stdio: "pipe",
+        cwd: baseRoot,
+      })`git ls-files '**/uv.lock'`.nothrow();
+      if (exitCode === 0) {
+        const candidates = String(stdout || "")
+          .split(/\r?\n/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+        for (const rel of candidates) {
+          const segs = rel.split("/").filter(Boolean);
+          if (segs.some((s) => ignore.has(s))) continue;
+          const abs = path.resolve(baseRoot, rel);
+          if (await pathExists(abs)) found.add(toPosixRelativeFrom(baseRoot, abs));
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // Source 2: filesystem walk
+  async function walkUv(rootDir: string, baseRoot: string, ignore: Set<string>, out: Set<string>) {
+    const stack: string[] = [rootDir];
+    while (stack.length) {
+      const dir = stack.pop()!;
+      let entries: string[] = [];
+      try {
+        entries = await fsp.readdir(dir);
+      } catch {
+        continue;
+      }
+      for (const name of entries) {
+        const full = path.join(dir, name);
+        let st: any;
+        try {
+          st = await fsp.lstat(full);
+        } catch {
+          continue;
+        }
+        if (st.isDirectory()) {
+          if (ignore.has(name)) continue;
+          stack.push(full);
+        } else if (name === "uv.lock") {
+          out.add(toPosixRelativeFrom(baseRoot, full));
+        }
+      }
+    }
+  }
+  for (const r of rootsRel) {
+    const abs = path.resolve(r);
+    await walkUv(abs, baseRoot, ignore, found);
+  }
+  return Array.from(found).sort((a, b) => a.localeCompare(b));
+}
