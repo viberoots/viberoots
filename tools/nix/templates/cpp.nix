@@ -5,10 +5,12 @@ let
   Test = import ./cpp-test.nix { inherit pkgs; };
   Addon = import ./cpp-node-addon.nix { inherit pkgs; };
   Wlib = import ./cpp-wasm-lib.nix { inherit pkgs; };
+  Ems = import ./cpp-emscripten-lib.nix { inherit pkgs; };
 in {
   inherit (App)  cppApp;
   inherit (Lib)  cppLib;
   inherit (Test) cppTest;
   inherit (Addon) cppNodeAddon;
   inherit (Wlib) cppWasmStaticLib;
+  inherit (Ems) cppWasmEmscriptenLib;
 }

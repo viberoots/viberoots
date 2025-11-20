@@ -152,9 +152,10 @@ let
     let
       n = if builtins.hasAttr name byName then byName.${name} else null;
       labs = if n == null then [] else labelsOf n;
-      isWasm = builtins.elem "flavor:wasm" labs || builtins.elem "wasm:static" labs;
+      isWasmStatic = builtins.elem "flavor:wasm" labs || builtins.elem "wasm:static" labs;
+      isEmscripten = builtins.elem "flavor:emscripten" labs || builtins.elem "wasm:emscripten" labs;
     in
-      (if isWasm then T.cppWasmStaticLib else T.cppLib) {
+      (if isEmscripten then T.cppWasmEmscriptenLib else if isWasmStatic then T.cppWasmStaticLib else T.cppLib) {
         inherit name;
         srcRoot = ctx.repoRoot;
         subdir = pkgPathOf name;

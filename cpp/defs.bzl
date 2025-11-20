@@ -66,6 +66,32 @@ def nix_cpp_wasm_static_lib(name, **kwargs):
     )
 
 
+def nix_cpp_wasm_emscripten_lib(name, **kwargs):
+    """
+    Planner-visible stub for an Emscripten C/C++ bundle (JS + WASM) via the Nix planner.
+
+    Stamps:
+      - lang:cpp, kind:lib, wasm:emscripten
+
+    Note:
+      This macro intentionally declares a lightweight planner stub instead of invoking
+      the generic cpp_nix_build rule, because the artifact shape is a dual output
+      (.js + .wasm) rather than a single .a/.node. The actual JS/WASM bundle is
+      produced by the planner template (cppWasmEmscriptenLib) when built via the
+      Nix flake attributes (e.g., graph-generator-selected).
+    """
+    deps = kwargs.pop("deps", [])
+    labels = kwargs.get("labels", []) or []
+    # Stamp language/kind and emscripten flavor for the planner adapter to route
+    labels = dedupe_preserve(labels + ["lang:cpp", "kind:lib", "wasm:emscripten"])
+    # Use a minimal planner stub that exposes graph edges and labels
+    cpp_planner_stub(
+        name = name,
+        out = name + ".stamp",
+        deps = deps,
+        labels = labels,
+    )
+
 def nix_cpp_binary(name, **kwargs):
     local_patch_dirs = kwargs.pop("local_patch_dirs", ["patches/cpp"])  # per-target local patch directories
     nix_cxx_attrs = kwargs.pop("nix_cxx_attrs", [])
@@ -177,6 +203,7 @@ def nix_cpp_node_addon(name, **kwargs):
 __all__ = [
     "nix_cpp_library",
     "nix_cpp_wasm_static_lib",
+    "nix_cpp_wasm_emscripten_lib",
     "nix_cpp_binary",
     "nix_cpp_test",
     "nix_cpp_node_addon",
