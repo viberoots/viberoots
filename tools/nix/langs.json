@@ -48,6 +48,22 @@
       ],
       "kinds": ["bin", "lib"],
       "templatesDir": "tools/scaffolding/templates/rust"
+    },
+    {
+      "id": "python",
+      "displayName": "Python",
+      "requiredPaths": [
+        "tools/nix/templates/python.nix",
+        "python/defs.bzl",
+        "tools/buck/exporter/lang/python.ts",
+        "tools/buck/providers/python.ts"
+      ],
+      "kinds": ["app", "lib"],
+      "capabilities": {
+        "patching": true,
+        "lockfileLabels": true
+      },
+      "templatesDir": "tools/scaffolding/templates/python"
     }
   ]
 }

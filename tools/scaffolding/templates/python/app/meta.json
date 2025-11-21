@@ -1,0 +1,14 @@
+{
+  "language": "python",
+  "template": "app",
+  "description": "Python app scaffold (uv + Buck2 macros)",
+  "help": {
+    "usage": "scaf new python app <name> [--path=DEST]",
+    "notes": [
+      "Creates a Python app under apps/<name> with uv.lock, a library, and a binary entrypoint.",
+      "Lockfile label uses importer-scoped form: lockfile:apps/<name>/uv.lock#apps/<name>.",
+      "Edit pyproject.toml and regenerate uv.lock using uv."
+    ],
+    "examples": ["scaf new python app demo-app --path=apps/demo-app", "scaf regen apps/demo-app"]
+  }
+}

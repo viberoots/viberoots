@@ -13,6 +13,19 @@ This guide explains how to add a new language to the build without touching core
 - Scaffolding templates: `tools/scaffolding/templates/<lang>/...` + language registry entry
 - Tests: zx tests using `tools/tests/lib/lang-fixtures.ts`
 
+### Python notes
+
+- Path invariants:
+  - Patches live under `patches/python/` (flat, no subdirectories).
+  - Lockfile labeling is importer‑scoped: `lockfile:<path>#<importer>`; standard file is `uv.lock`.
+  - Macros: use `nix_python_{library,binary,test}` from `python/defs.bzl` and pass `lockfile_label` explicitly.
+- Scaffolding:
+  - `scaf new python lib <name>` → `libs/<name>` with `pyproject.toml`, `uv.lock`, `TARGETS` using `nix_python_library` and a sample test via `nix_python_test`.
+  - `scaf new python app <name>` → `apps/<name>` with a small library and binary (`nix_python_binary`) and importer‑scoped `lockfile_label`.
+- Glue:
+  - Provider sync reads all `**/uv.lock` and writes `third_party/providers/TARGETS.python.auto` deterministically.
+  - `gen-auto-map.ts` already maps generic `lockfile:` labels to importer providers; no Python‑specific code required.
+
 Tip for lockfile-style ecosystems (e.g., Node/PNPM):
 
 - Use the shared helpers from `lang/defs_common.bzl`:

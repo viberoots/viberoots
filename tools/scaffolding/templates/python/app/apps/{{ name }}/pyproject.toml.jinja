@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "{{ name }}"
+version = "0.1.0"
+description = "Python app {{ name }}"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+{{ name }} = "{{ name }}.__main__:main"
+
+[tool.uv]
+dev-dependencies = []
+groups = []
+
+

@@ -17,5 +17,9 @@
     "webapp": "apps/{name}",
     "cpp-addon": ".",
     "go-addon": "."
+  },
+  "python": {
+    "lib": "libs/{name}",
+    "app": "apps/{name}"
   }
 }

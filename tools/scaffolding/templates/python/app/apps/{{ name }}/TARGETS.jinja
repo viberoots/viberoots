@@ -1,0 +1,19 @@
+load("//python:defs.bzl", "nix_python_library", "nix_python_binary")
+
+nix_python_library(
+    name = "{{ name }}_lib",
+    srcs = glob(["src/**/*.py"]),
+    lockfile_label = "lockfile:apps/{{ name }}/uv.lock#apps/{{ name }}",
+    visibility = ["PUBLIC"],
+)
+
+nix_python_binary(
+    name = "{{ name }}",
+    srcs = ["bin/__main__.py"],
+    deps = [":{{ name }}_lib"],
+    main = "bin/__main__.py",
+    lockfile_label = "lockfile:apps/{{ name }}/uv.lock#apps/{{ name }}",
+    visibility = ["PUBLIC"],
+)
+
+

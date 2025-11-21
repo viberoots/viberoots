@@ -1,0 +1,14 @@
+{
+  "language": "python",
+  "template": "lib",
+  "description": "Python library scaffold (uv + Buck2 macros)",
+  "help": {
+    "usage": "scaf new python lib <name> [--path=DEST]",
+    "notes": [
+      "Creates a Python library under libs/<name> with uv.lock and Buck2 TARGETS wired to nix_python_library.",
+      "Lockfile label uses importer-scoped form: lockfile:libs/<name>/uv.lock#libs/<name>.",
+      "Enable dev/test extras by editing pyproject.toml; regenerate uv.lock with uv."
+    ],
+    "examples": ["scaf new python lib demo-lib --path=libs/demo-lib", "scaf regen libs/demo-lib"]
+  }
+}
