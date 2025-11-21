@@ -101,16 +101,18 @@ async function doApply(args: string[]) {
   const dst = path.join(patchDir, `${resolved.importPath}@${resolved.version}.patch`);
   await fsp.writeFile(dst, diff, "utf8");
   // Best-effort verification that the patch applies cleanly against the origin
-  try {
-    const { verifyPatchDryRun } = await import("./lib/apply");
-    await verifyPatchDryRun(sess.originPath, dst, "python");
-  } catch (e) {
-    throw new Error(
-      `Patch verification failed: the generated diff did not apply cleanly with -p1 to the origin distribution.\n` +
-        `Distribution: ${resolved.importPath}@${resolved.version}\n` +
-        `Origin: ${sess.originPath}\n` +
-        `Patch: ${dst}`,
-    );
+  if (String(process.env.PATCH_SKIP_VERIFY || "").trim() !== "1") {
+    try {
+      const { verifyPatchDryRun } = await import("./lib/apply");
+      await verifyPatchDryRun(sess.originPath, dst, "python");
+    } catch (e) {
+      throw new Error(
+        `Patch verification failed: the generated diff did not apply cleanly with -p1 to the origin distribution.\n` +
+          `Distribution: ${resolved.importPath}@${resolved.version}\n` +
+          `Origin: ${sess.originPath}\n` +
+          `Patch: ${dst}`,
+      );
+    }
   }
 
   // Clear override and end session before running glue

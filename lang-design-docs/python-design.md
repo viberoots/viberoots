@@ -520,6 +520,50 @@ Implement.
 
 Re-evaluation: After landing this PR, re-evaluate the remaining PR list and adjust scope/ordering as needed.
 
+### PR‑11: uv2nix backend realization + runtime e2e
+
+#### Description
+
+Replace the stub uv backend with a real uv2nix-backed builder so Python apps/libs are realized as runnable environments. Add a true end‑to‑end test that patches a dependency and verifies runtime behavior changes.
+
+#### Scope & Changes
+
+- Backend:
+  - Implement `tools/nix/templates/python/backends/uv.nix` to use uv2nix (or a pinned equivalent) to materialize an environment from `uv.lock`.
+  - Integrate `patchesMap` (apply `<dist>@<ver>.patch` overlays at build time) and `devOverrides` (local source override) exactly as today.
+  - Expose an executable/app entry for `pyApp` (and library build realization for `pyLib`) so Buck targets can be executed in tests.
+- Planner/templates:
+  - No interface change to `pyApp`/`pyLib`; they now call the real uv2nix backend.
+  - Keep CI guardrails: fail in CI if `NIX_PY_DEV_OVERRIDE_JSON` is set.
+- True runtime e2e (zx test):
+  - Scaffold a minimal importer with `uv.lock` and a tiny Python app that imports a dependency (e.g., `requests`) and prints an identifiable string/version.
+  - Use `patch-pkg start/apply python requests` (with `NIX_PY_TEST_RESOLVE_JSON` pointing at a fake origin) to introduce a visible code change (e.g., modify a function or the reported `__version__`).
+  - Build the `nix_python_binary` target, execute it, and assert output reflects the patched change.
+  - Re-apply an identical patch and assert a no‑op (idempotency).
+
+#### Acceptance Criteria
+
+- `pyApp` and `pyLib` build via uv2nix on aarch64‑darwin, aarch64‑linux, and x86_64‑linux (subject to available CI builders).
+- The runtime e2e test passes: before/after execution shows changed behavior post‑patch.
+- Re‑applying the same patch is a no‑op in glue and build (idempotent).
+- Provider sync and auto_map remain deterministic; no unintended churn from uv2nix adoption.
+
+#### Risks
+
+- uv2nix availability/version drift across platforms.
+- Larger derivation closures affecting CI time.
+
+Mitigations:
+
+- Pin uv/uv2nix in the flake.
+- Keep outputs minimal for the runtime test (single importer, single dep).
+
+#### Recommendation
+
+Implement.
+
+Re-evaluation: After landing this PR, evaluate whether we should add optional uv group variants to expand runtime coverage.
+
 ### PR‑2: Nix templates and planner wiring (pyApp/pyLib)
 
 #### Description
@@ -861,6 +905,7 @@ Re-evaluation: After landing this PR, re-evaluate the remaining PR list and adju
 8. PR‑8 (install/guardrails) — stability; aligns with Go/C++.
 9. PR‑9 (tests) — codifies guarantees end‑to‑end.
 10. PR‑10 (docs/scaffolding) — onboarding and consistency.
+11. PR‑11 (uv2nix backend + runtime e2e) — realize Python envs and verify patched behavior at runtime.
 
 All PRs are independently reversible.
 
