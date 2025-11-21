@@ -24,6 +24,28 @@ async function main() {
     process.exit(1);
   }
 
+  // Python enablement prerequisites (PR-14): python3 and uv
+  const isCI = (process.env.CI || "").toLowerCase() === "true";
+  const fakeMissing = String(process.env.STARTUP_CHECK_FAKE_MISSING || "")
+    .split(/[,\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const hasPython3 = fakeMissing.includes("python3") ? false : await which("python3");
+  const hasUv = fakeMissing.includes("uv") ? false : await which("uv");
+  if (!hasPython3 || !hasUv) {
+    const missing = [!hasPython3 ? "python3" : "", !hasUv ? "uv" : ""].filter(Boolean);
+    const msg =
+      "[startup-check] missing tools: " +
+      missing.join(", ") +
+      ". Install via dev shell (direnv/nix).";
+    if (isCI) {
+      console.error(msg);
+      process.exit(1);
+    } else {
+      console.warn(msg);
+    }
+  }
+
   // Minimal engines.node check without external deps (supports only ">=x.y.z")
   try {
     const pkgTxt = await fsp.readFile("package.json", "utf8");

@@ -8,6 +8,7 @@ This guide helps a new contributor land any PR in this plan successfully, follow
   - `direnv allow` (once per clone), verify it loads automatically in new shells
 - Quick checks (must succeed):
   - `nix --version`, `buck2 --version`, `go version`, `node --version`, `pnpm --version`
+  - `python3 --version`, `uv --version` ← required for Python enablement
   - `nix show-config` includes experimental features (flakes, dynamic-derivations, recursive-nix)
 - Optional: run our startup check if present (prints clear hints):
   - `node tools/dev/startup-check.ts`
