@@ -4,10 +4,11 @@ import path from "node:path";
 import { writeIfChanged } from "../lib/fs-helpers.ts";
 import { readCompositeGraph } from "../lib/graph-view.ts";
 import { readNodeProviderIndexEntries } from "./providers/node.ts";
+import { readPythonProviderIndexEntries } from "./providers/python.ts";
 import { getFlagStr } from "../lib/cli.ts";
 import { parseLockfileLabel } from "../lib/labels.ts";
 
-type IndexEntry = { kind: "node" | "cpp"; key: string };
+type IndexEntry = { kind: "node" | "cpp" | "python"; key: string };
 
 function fq(labelTail: string): string {
   return `//third_party/providers:${labelTail}`;
@@ -82,6 +83,15 @@ async function readNodeIndexEntries(): Promise<Record<string, IndexEntry>> {
   return out;
 }
 
+async function readPythonIndexEntries(): Promise<Record<string, IndexEntry>> {
+  const out: Record<string, IndexEntry> = {};
+  const entries = await readPythonProviderIndexEntries();
+  for (const e of entries) {
+    out[fq(e.provider)] = { kind: "python", key: e.key };
+  }
+  return out;
+}
+
 export async function generateProviderIndex(opts?: { outFile?: string; jsonOutFile?: string }) {
   const OUT = opts?.outFile || "third_party/providers/provider_index.bzl";
   const OUT_JSON = opts?.jsonOutFile || "third_party/providers/provider_index.json";
@@ -89,6 +99,7 @@ export async function generateProviderIndex(opts?: { outFile?: string; jsonOutFi
   const maps: Record<string, IndexEntry>[] = await Promise.all([
     readNodeIndexEntries(),
     readCppIndexEntries(),
+    readPythonIndexEntries(),
   ]);
 
   const merged = new Map<string, IndexEntry>();

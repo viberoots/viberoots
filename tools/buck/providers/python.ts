@@ -111,3 +111,23 @@ export async function syncPythonProviders(opts?: {
 }
 
 export default syncPythonProviders;
+
+// Minimal surface for provider index generation (PR‑13)
+export async function readPythonProviderIndexEntries(): Promise<
+  Array<{ provider: string; key: string }>
+> {
+  const out: Array<{ provider: string; key: string }> = [];
+  const lockfiles = await findUvLockfiles();
+  if (!lockfiles.length) return out;
+  for (const lf of lockfiles) {
+    const relLf = lf.replace(/^\.\/+/, "");
+    // Only consider importers under apps/* or libs/* per repo convention
+    if (!/^(apps|libs)\//.test(relLf)) continue;
+    const importerLabel = path.dirname(relLf) || ".";
+    const name = providerNameForImporter(relLf, importerLabel);
+    out.push({ provider: name, key: `lockfile:${relLf}#${importerLabel}` });
+  }
+  // Deterministic ordering
+  out.sort((a, b) => (a.provider < b.provider ? -1 : a.provider > b.provider ? 1 : 0));
+  return out;
+}
