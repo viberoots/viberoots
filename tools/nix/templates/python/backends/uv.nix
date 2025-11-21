@@ -38,8 +38,17 @@ pkgs.stdenvNoCC.mkDerivation {
     echo "[uv-backend] tree (top-level):" >&2
     (ls -la . || true) >&2
     if [ ! -f "${lockfile}" ]; then
-      echo "missing lockfile: ${lockfile}" >&2
-      exit 1
+      # Fallback for tests/dev: try live workspace, then original src snapshot
+      if [ -n "${wsRoot:-}" ] && [ -f "${wsRoot}/${subdir}/${lockfile}" ]; then
+        cp "${wsRoot}/${subdir}/${lockfile}" "./${lockfile}"
+      elif [ -f "${src}/${subdir}/${lockfile}" ]; then
+        cp "${src}/${subdir}/${lockfile}" "./${lockfile}"
+      elif [ -f "${src}/uv.lock" ]; then
+        cp "${src}/uv.lock" "./${lockfile}"
+      else
+        echo "missing lockfile: ${lockfile}" >&2
+        exit 1
+      fi
     fi
     mkdir -p "$TMPDIR/site"
     site="$TMPDIR/site"
@@ -187,11 +196,14 @@ pkgs.stdenvNoCC.mkDerivation {
     MAIN="${src}/${subdir}/bin/__main__.py"
     if [ -f "$MAIN" ]; then
       exec "$PY" "$MAIN" "$@"
-    else
-      echo "python app entrypoint not found at $MAIN" >&2
-      echo "PYTHONPATH=$PYTHONPATH" >&2
-      exit 2
     fi
+    # Fallback to live workspace entrypoint during dev/tests
+    if [ -n "''${WORKSPACE_ROOT:-}" ] && [ -f "''${WORKSPACE_ROOT}/${subdir}/bin/__main__.py" ]; then
+      exec "$PY" "''${WORKSPACE_ROOT}/${subdir}/bin/__main__.py" "$@"
+    fi
+    echo "python app entrypoint not found at $MAIN" >&2
+    echo "PYTHONPATH=$PYTHONPATH" >&2
+    exit 2
     SH
     chmod +x "$wrapper"
     # Record minimal metadata for debugging and cache keys

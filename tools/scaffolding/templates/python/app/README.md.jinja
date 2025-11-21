@@ -2,8 +2,11 @@
 
 Minimal Python app scaffold using uv and Buck2 macros (`nix_python_binary`).
 
-Run:
-- Edit `pyproject.toml`, then generate `uv.lock` with `uv`.
+Quickstart:
+- Edit `pyproject.toml` to set metadata and dependencies (PEP 621; hatchling backend).
+- Generate a lockfile with uv:
+  - `uv lock` (base)
+  - Optionally include groups (dev/test) when enabled later: `uv lock --group dev --group test`
 - Build with Buck2 once glue is generated per repo docs.
 
 

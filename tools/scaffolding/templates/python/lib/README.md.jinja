@@ -5,6 +5,9 @@ This is a minimal Python library scaffold using uv for locking and Buck2 macros 
 Notes:
 - Lockfile: `uv.lock` at the importer root (`libs/{{ name }}/uv.lock`)
 - Lockfile label: `lockfile:libs/{{ name }}/uv.lock#libs/{{ name }}`
-- Update dependencies and regenerate the lockfile with `uv` (outside Buck/Nix).
+- Edit `pyproject.toml` to set metadata and dependencies (PEP 621; hatchling backend).
+- Generate/refresh the lockfile with uv (outside Buck/Nix):
+  - `uv lock` (base)
+  - Optionally include groups (e.g. dev/test) when enabled later: `uv lock --group dev --group test`
 
 
