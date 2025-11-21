@@ -13,6 +13,7 @@ let
     srcRoot ? ../../..,
     patchDirs ? [ ../../patches/python ],
     kind ? "app",
+    groups ? [],
   }:
     let
       _guard = H.guardNoDevOverridesInCI devOverrideEnv;
@@ -67,6 +68,7 @@ let
       devOverrides = devOverrides;
       kind = kind;
       wsRoot = wsRoot;
+      groups = groups;
     };
 in {
   pyApp = {
@@ -76,9 +78,10 @@ in {
     subdir ? ".",
     srcRoot ? ../../..,
     patchDirs ? [ ../../patches/python ],
+    groups ? [],
   }:
     mkPy {
-      inherit name lockfile devOverrideEnv subdir srcRoot patchDirs;
+      inherit name lockfile devOverrideEnv subdir srcRoot patchDirs groups;
       kind = "app";
     };
 
@@ -89,9 +92,10 @@ in {
     subdir ? ".",
     srcRoot ? ../../..,
     patchDirs ? [ ../../patches/python ],
+    groups ? [],
   }:
     mkPy {
-      inherit name lockfile devOverrideEnv subdir srcRoot patchDirs;
+      inherit name lockfile devOverrideEnv subdir srcRoot patchDirs groups;
       kind = "lib";
     };
 }

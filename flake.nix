@@ -409,6 +409,42 @@ EOF_PAT
           node-webapp = nodeWebapp;
           node-test = nodeTest;
         }
+      ) // (
+        let
+          # Python per-importer environments (uv.lock-based)
+          T = import ./tools/nix/lang-templates.nix { inherit pkgs; };
+          sanitize = (import ./tools/nix/templates-common.nix { inherit pkgs; }).sanitizeName;
+          srcRoot = builtins.path { path = ./.; name = "repo"; };
+          listDirs = base:
+            if builtins.pathExists base then builtins.attrNames (builtins.readDir base) else [];
+          appsDirs = listDirs ./apps;
+          libsDirs = listDirs ./libs;
+          allImporters = (map (d: "apps/" + d) appsDirs) ++ (map (d: "libs/" + d) libsDirs);
+          hasUvLock = imp:
+            let p = ./. + ("/" + imp + "/uv.lock"); in builtins.pathExists p;
+          pyImporters = builtins.filter hasUvLock allImporters;
+          makePy = importer: groups:
+            T.pyApp {
+              name = importer;
+              lockfile = importer + "/uv.lock";
+              subdir = importer;
+              srcRoot = srcRoot;
+              groups = groups;
+            };
+          pyBase = builtins.listToAttrs (map (imp: {
+            name = "py-" + (sanitize imp);
+            value = makePy imp [];
+          }) pyImporters);
+          pyDev = builtins.listToAttrs (map (imp: {
+            name = "py-" + (sanitize imp) + "-dev";
+            value = makePy imp [ "dev" ];
+          }) pyImporters);
+          pyTest = builtins.listToAttrs (map (imp: {
+            name = "py-" + (sanitize imp) + "-test";
+            value = makePy imp [ "test" ];
+          }) pyImporters);
+        in
+          pyBase // pyDev // pyTest
       )
     );
 

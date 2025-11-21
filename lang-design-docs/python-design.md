@@ -891,6 +891,207 @@ Implement.
 
 Re-evaluation: After landing this PR, re-evaluate the remaining PR list and adjust scope/ordering as needed.
 
+### PR‑12: uv groups in templates and per‑importer flake outputs
+
+#### Description
+
+Expose uv “groups” toggles in the Python templates and surface convenient per‑importer flake outputs (base, dev, test) so variant environments can be realized deterministically and cached separately.
+
+#### Scope & Changes
+
+- `tools/nix/templates/python.nix`:
+  - Add a `groups` parameter (default `[]`) that is forwarded to the backend.
+  - Ensure `groups` participates in cache keys and is reflected in `BUILD-INFO.json`.
+- `tools/nix/templates/python/backends/uv.nix`:
+  - Honor a `groups` argument to materialize extras/variants deterministically (no network; leverage existing `NIX_PY_TEST_RESOLVE_JSON` in tests).
+- `tools/nix/planner/python.nix` and flake manifest:
+  - Add per‑importer exposed outputs `.#py-<importer>`, `.#py-<importer>-dev`, `.#py-<importer>-test` by passing `groups = ["dev"]` / `["test"]`.
+- Tests:
+  - Add zx tests proving base vs dev/test variants create distinct derivations and are idempotent.
+
+#### Acceptance Criteria
+
+- Building `.#py-<importer>` vs `.#py-<importer>-dev` yields distinct outputs with stable keys.
+- Variant derivations work on darwin/linux; re‑builds are no‑ops when inputs unchanged.
+
+#### Risks
+
+Low—pure parameterization; guarded by presence of `uv.lock`. Ensure zero effect when groups are `[]`.
+
+#### Consequence of Not Implementing
+
+Inconsistent handling of dev/test extras; harder to cache and reason about environment variants.
+
+#### Downsides for Implementing
+
+Small increase in template surface area and tests.
+
+#### Recommendation
+
+Implement.
+
+### PR‑13: Provider index coverage for Python importers
+
+#### Description
+
+Extend the provider index to include Python importer‑scoped providers, enabling uniform introspection across Node/CPP/Python.
+
+#### Scope & Changes
+
+- `tools/buck/gen-provider-index.ts`:
+  - Read Python providers from `third_party/providers/TARGETS.python.auto` (or via `findUvLockfiles`) and emit entries with `kind: "python"` and key `lockfile:<path>#<importer>`.
+- Tests:
+  - Add zx tests validating Python entries appear, ordering is deterministic, and JSON/BZL outputs match.
+
+#### Acceptance Criteria
+
+- `third_party/providers/provider_index.bzl/json` contain Python entries with correct keys and stable ordering.
+
+#### Risks
+
+Very low—read‑only index generation.
+
+#### Consequence of Not Implementing
+
+Tooling that relies on the index cannot reason about Python providers uniformly.
+
+#### Downsides for Implementing
+
+Minor maintenance in the index generator.
+
+#### Recommendation
+
+Implement.
+
+### PR‑14: Startup check for Python/uv presence
+
+#### Description
+
+Augment startup diagnostics to verify `python3` and `uv` availability, aligning with Python enablement assumptions.
+
+#### Scope & Changes
+
+- `tools/dev/startup-check.ts`:
+  - Add checks for `python3` and `uv`; keep behavior: fail in CI when missing, friendly error locally.
+- Docs:
+  - Note Python/uv prerequisites in onboarding sections.
+
+#### Acceptance Criteria
+
+- Local runs show clear guidance when Python/uv are missing; CI fails fast with actionable messages.
+
+#### Risks
+
+Low; matches existing style for other tools.
+
+#### Consequence of Not Implementing
+
+Harder to diagnose missing toolchain issues for Python importers.
+
+#### Downsides for Implementing
+
+None beyond a few lines.
+
+#### Recommendation
+
+Implement.
+
+### PR‑15: Scaffolding pyproject.toml for app/lib
+
+#### Description
+
+Complete Python scaffolding by generating `pyproject.toml` (hatchling) alongside `uv.lock` placeholders for both app and lib templates.
+
+#### Scope & Changes
+
+- Add `tools/scaffolding/templates/python/*/pyproject.toml.jinja` with minimal PEP 621 metadata and hatchling backend.
+- Update READMEs to show `uv lock` flow and groups examples.
+- Tests:
+  - Ensure `scaf new python <lib|app>` creates `pyproject.toml` and `uv.lock` placeholder files.
+
+#### Acceptance Criteria
+
+- New scaffolds contain a valid `pyproject.toml`; developer can immediately run `uv lock` and build.
+
+#### Risks
+
+Low; templates only.
+
+#### Consequence of Not Implementing
+
+Incomplete scaffolds increase onboarding friction.
+
+#### Downsides for Implementing
+
+None.
+
+#### Recommendation
+
+Implement.
+
+### PR‑16: Exporter classification warnings test coverage
+
+#### Description
+
+Add explicit tests that `.py` sources lacking `lang:python` (and no `python_*` rule type) trigger warn‑only locally and error in CI (via exporter global severity).
+
+#### Scope & Changes
+
+- Tests under `tools/tests/exporter/`:
+  - Local mode: validate warning text.
+  - Simulated CI: validate non‑zero exit on findings.
+
+#### Acceptance Criteria
+
+- Tests pass; behavior matches policy for Python classification warnings.
+
+#### Risks
+
+Low—tests only.
+
+#### Consequence of Not Implementing
+
+Potential regressions in adapter validation could slip by unnoticed.
+
+#### Downsides for Implementing
+
+Slight CI time increase; mitigated by single‑test‑per‑file parallelism.
+
+#### Recommendation
+
+Implement.
+
+### PR‑17: Documentation alignment — uv‑only initial rollout
+
+#### Description
+
+Clarify that the initial Python rollout is uv‑only; adjust language in “Monorepo‑Friendly Patterns” to avoid implying Poetry/pip‑tools support now.
+
+#### Scope & Changes
+
+- Update this design’s wording to state: uv‑only for the initial phase; Poetry/pip‑tools are out of scope unless/until a future PR adds them.
+- Add a short note in onboarding docs pointing to this decision.
+
+#### Acceptance Criteria
+
+- Docs no longer imply Poetry/pip‑tools support in the current phase; messaging is consistent across guides.
+
+#### Risks
+
+None (docs only).
+
+#### Consequence of Not Implementing
+
+Confusion about supported lockfile ecosystems.
+
+#### Downsides for Implementing
+
+None.
+
+#### Recommendation
+
+Implement.
+
 ---
 
 ### Rollout & Sequencing
@@ -906,6 +1107,12 @@ Re-evaluation: After landing this PR, re-evaluate the remaining PR list and adju
 9. PR‑9 (tests) — codifies guarantees end‑to‑end.
 10. PR‑10 (docs/scaffolding) — onboarding and consistency.
 11. PR‑11 (uv2nix backend + runtime e2e) — realize Python envs and verify patched behavior at runtime.
+12. PR‑12 (uv groups + flake outputs) — parameterize groups; expose per‑importer base/dev/test variants.
+13. PR‑13 (provider index coverage) — include Python providers in provider_index outputs.
+14. PR‑14 (startup checks) — verify python3 and uv availability in startup diagnostics.
+15. PR‑15 (scaffolding pyproject.toml) — generate pyproject for app/lib scaffolds.
+16. PR‑16 (exporter warning tests) — ensure classification warnings covered and CI‑enforced.
+17. PR‑17 (doc alignment) — clarify uv‑only scope; defer Poetry/pip‑tools.
 
 All PRs are independently reversible.
 

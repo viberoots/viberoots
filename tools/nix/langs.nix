@@ -14,6 +14,10 @@
     patching = true;
     testAutoWire = false;
   };
+  python = {
+    lockfileLabels = true;
+    patching = true;
+  };
   rust = {
 
   };

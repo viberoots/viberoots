@@ -11,6 +11,7 @@ let
   devOverrides = args.devOverrides or {};
   kind = args.kind or "app";
   wsRoot = args.wsRoot or null;
+  groups = args.groups or [];
 
   # Testing-only: allow a simple JSON mapping of dist -> {version, originPath}
   # injected at eval time to avoid network fetches. Empty by default.
@@ -198,7 +199,8 @@ pkgs.stdenvNoCC.mkDerivation {
     {
       "kind": "${kind}",
       "lockfile": "${lockfile}",
-      "subdir": "${subdir}"
+      "subdir": "${subdir}",
+      "groups": ${builtins.toJSON groups}
     }
     JSON
   '';
