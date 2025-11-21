@@ -875,6 +875,16 @@ async function cmdNew(args: string[], flags: Record<string, string>) {
   // Always copy into the resolved destination
   let effectiveDest = dest;
   const data: Record<string, any> = { name, language, template };
+  // Normalize Python module name for imports (underscored, lowercase)
+  if (language === "python") {
+    const moduleName = name
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_+|_+$/g, "");
+    data["module_name"] = moduleName || "app";
+  }
   for (const [k, v] of Object.entries(flags)) {
     if (!["path", "json"].includes(k)) {
       data[k] = v;

@@ -1,7 +1,7 @@
-from {{ name }} import greet
+from {{ module_name }} import greet
 
 def main() -> None:
-    print(greet("world"))
+    print(greet())
 
 if __name__ == "__main__":
     main()

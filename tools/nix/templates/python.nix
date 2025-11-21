@@ -16,9 +16,36 @@ let
   }:
     let
       _guard = H.guardNoDevOverridesInCI devOverrideEnv;
-      patchesMap = H.patchesMapFromDirs patchDirs;
+      # Prefer scanning patches from the live workspace root so tests can write to patches/python
+      patchDirAbs =
+        let rootStr = builtins.toString srcRoot; in
+          builtins.toPath ("${rootStr}/patches/python");
+      patchesMap =
+        if builtins.pathExists patchDirAbs then
+          let
+            names = builtins.attrNames (builtins.readDir patchDirAbs);
+            isPatch = name: lib.hasSuffix ".patch" name;
+            toKeyVal = name:
+              let
+                base = lib.removeSuffix ".patch" name;
+                parts = lib.splitString "@" base;
+                impEnc = lib.concatStringsSep "@" (lib.take (lib.length parts - 1) parts);
+                ver = lib.last parts;
+                importPath = lib.replaceStrings ["__"] ["/"] impEnc;
+                key = (lib.toLower importPath) + "@" + (lib.toLower ver);
+                content = builtins.readFile (patchDirAbs + "/" + name);
+                storeFile = pkgs.writeText "py-patch-${key}.patch" content;
+              in { name = key; value = [ (builtins.toString storeFile) ]; };
+          in builtins.listToAttrs (map toKeyVal (lib.filter isPatch names))
+        else {};
       devOverrides = H.readDevOverrides devOverrideEnv;
-      srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + subdir));
+      # Use a stable snapshot of the app/lib subtree, including vendored test fixtures
+      srcAbs = builtins.path { path = builtins.toPath ("${srcRoot}/" + subdir); name = "py-src"; };
+      # Also pass through the live workspace root for test-only origin lookups
+      wsRootEnv = builtins.getEnv "WORKSPACE_ROOT";
+      wsRoot =
+        if wsRootEnv != "" then wsRootEnv
+        else builtins.toString srcRoot;
       # Compute lockfile path relative to srcAbs to keep builds hermetic.
       lockRel =
         let lf = lockfile;
@@ -39,6 +66,7 @@ let
       patchesMap = patchesMap;
       devOverrides = devOverrides;
       kind = kind;
+      wsRoot = wsRoot;
     };
 in {
   pyApp = {
