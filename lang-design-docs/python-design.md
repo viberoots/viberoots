@@ -338,7 +338,7 @@ Startup guardrails
 ## Monorepo‑Friendly Patterns and Isolation
 
 - Per‑importer lockfiles
-  - Python projects live under `apps/*` and `libs/*`, each owning its lockfile (`uv.lock` preferred; `poetry.lock` or `requirements.lock` supported).
+  - Python projects live under `apps/*` and `libs/*`, each owning its lockfile (`uv.lock` only in the initial rollout).
   - Labels use `lockfile:<relative/path>#<importer>` where `<importer>` is the project root (e.g., `apps/pytool`).
 - Isolation and non‑inheritance (no shadow deps)
   - Do not rely on a repo‑wide virtualenv; each importer’s environment is realized by Nix based on its lockfile.
