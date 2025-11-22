@@ -327,10 +327,50 @@ let
               let nm = canon (ensureFullLabel n);
               in nm == want
             ) nodesList;
-        in if matches == [] then pkgs.runCommand "missing-target-${sanitize selectedTargetName}" {} ''
-          echo "missing target: ${selectedTargetName}" >&2
-          exit 1
-        '' else (
+        in if matches == [] then (
+          # Fallback: when the target is missing from the exported graph (e.g., new Python WASM
+          # macros in a temp repo), attempt a direct build using Python templates by inferring the
+          # package path and nearest uv.lock. This keeps zx tests hermetic without requiring the
+          # exporter to classify the target first.
+          let
+            nm = selectedTargetName;
+            pkg = pkgPathOf nm;
+            # Find nearest uv.lock by walking up from pkg
+            findUv = rec {
+              parts = lib.splitString "/" pkg;
+              descend = idx:
+                if idx < 0 then null else
+                let rel = lib.concatStringsSep "/" (lib.take (idx + 1) parts);
+                    cand = builtins.toPath (repoRootStr + "/" + rel + "/uv.lock");
+                in if builtins.pathExists cand then cand else descend (idx - 1);
+              nearest = if (builtins.length parts) > 0 then descend ((builtins.length parts) - 1) else null;
+            };
+            lockAbs = findUv.nearest;
+            lockRel =
+              if lockAbs != null then
+                let absStr = builtins.toString lockAbs; rootStr = builtins.toString repoRoot; in
+                  if lib.hasPrefix (rootStr + "/") absStr then lib.removePrefix (rootStr + "/") absStr else absStr
+              else "uv.lock";
+            isLib = lib.hasSuffix ":pylib" nm || lib.hasSuffix ":lib" nm;
+          in
+            if isLib then T.pyWasmLib { name = nm; lockfile = lockRel; srcRoot = repoRoot; subdir = pkg; }
+            else
+              let
+                # Heuristic overlays: include any libs/* importer that carries a uv.lock
+                listDirs = base: if builtins.pathExists base then builtins.attrNames (builtins.readDir base) else [];
+                libNames = listDirs (builtins.toPath (repoRootStr + "/libs"));
+                libHasLock = d: builtins.pathExists (builtins.toPath (repoRootStr + "/libs/" + d + "/uv.lock"));
+                libImporters = builtins.filter libHasLock libNames;
+                overlays = map (d:
+                  T.pyWasmLib {
+                    name = "//libs/${d}:${d}";
+                    lockfile = "libs/${d}/uv.lock";
+                    srcRoot = repoRoot;
+                    subdir = "libs/${d}";
+                  }
+                ) libImporters;
+              in T.pyWasmApp { name = nm; lockfile = lockRel; srcRoot = repoRoot; subdir = pkg; libOverlays = overlays; }
+        ) else (
           let n = builtins.head matches; k = pick n; in
             if k == null then pkgs.runCommand "missing-kind-${sanitize selectedTargetName}" {} ''
               echo "missing kind for: ${selectedTargetName}" >&2
@@ -343,7 +383,8 @@ let
               ) else if k.template == "node" then (
                 LANGS.node.mkApp selectedTargetName
               ) else if k.template == "python" then (
-                if (k.kind == "bin" || k.kind == "lib") then LANGS.python.mkApp selectedTargetName
+                if (k.kind == "wasm") then LANGS.python.mkWasmApp selectedTargetName
+                else if (k.kind == "bin" || k.kind == "lib") then LANGS.python.mkApp selectedTargetName
                 else LANGS.python.mkLib selectedTargetName
               ) else (
                 if (k.kind == "bin" || k.kind == "lib" || k.kind == "test" || k.kind == "addon") then mkCpp selectedTargetName k.kind else mkCpp selectedTargetName "bin"

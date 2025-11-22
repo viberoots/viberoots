@@ -1,4 +1,4 @@
-load("@prelude//:rules.bzl", "python_binary", "python_library", "python_test")
+load("@prelude//python:defs.bzl", "python_binary", "python_library", "python_test")
 load("//lang:defs_common.bzl", "stamp_labels", "ensure_single_lockfile_label", "append_nixpkg_labels", "providers_for")
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
 
@@ -39,5 +39,47 @@ def nix_python_test(name, lockfile_label = None, nix_native_deps = [], deps = []
     append_nixpkg_labels(kwargs, nix_native_deps)
     deps = deps + _providers_for(name)
     python_test(name = name, deps = deps, **kwargs)
+
+# WASM (WASI) convenience macros — stamp kind:wasm so planner routes to pyWasm* templates
+def nix_python_wasm_app(name, lockfile_label = None, nix_native_deps = [], deps = [], labels = [], **kwargs):
+    """
+    WASI app stamp: uses python_* rules for Buck semantics but marks kind:wasm for the planner.
+    """
+    labels = dedupe_preserve((labels or []) + ["lang:python", "kind:wasm"])
+    kwargs["labels"] = labels
+    ensure_single_lockfile_label(kwargs, lockfile_label)
+    append_nixpkg_labels(kwargs, nix_native_deps)
+    deps = deps + _providers_for(name)
+    # Keep Buck parsing simple: emit a tiny stamp via genrule; planner routes to pyWasmApp.
+    out = name + ".stamp"
+    genrule(
+        name = name,
+        srcs = kwargs.pop("srcs", []),
+        out = out,
+        cmd = "echo py_wasm_app > $OUT",
+        deps = deps,
+        labels = kwargs.pop("labels", []),
+        visibility = kwargs.pop("visibility", ["PUBLIC"]),
+    )
+
+def nix_python_wasm_lib(name, lockfile_label = None, nix_native_deps = [], deps = [], labels = [], **kwargs):
+    """
+    WASI lib stamp: emits a reusable overlay (planner builds via pyWasmLib).
+    """
+    labels = dedupe_preserve((labels or []) + ["lang:python", "kind:wasm"])
+    kwargs["labels"] = labels
+    ensure_single_lockfile_label(kwargs, lockfile_label)
+    append_nixpkg_labels(kwargs, nix_native_deps)
+    deps = deps + _providers_for(name)
+    out = name + ".stamp"
+    genrule(
+        name = name,
+        srcs = kwargs.pop("srcs", []),
+        out = out,
+        cmd = "echo py_wasm_lib > $OUT",
+        deps = deps,
+        labels = kwargs.pop("labels", []),
+        visibility = kwargs.pop("visibility", ["PUBLIC"]),
+    )
 
 

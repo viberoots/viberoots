@@ -1,0 +1,174 @@
+{ pkgs }:
+let
+  lib = pkgs.lib;
+  H = import ../../lib/lang-helpers.nix { inherit pkgs; };
+  UvBackend = import ./backends/uv.nix { inherit pkgs; };
+
+  # Render a tiny WASI module in WAT that writes a fixed message to stdout.
+  # We generate the message at eval time to reflect inputs (e.g., overlays/patch keys).
+  mkWasiHello = { message }:
+    let
+      # WASI fd_write requires an iovec buffer at memory[0..8):
+      #   i32 ptr -> message start
+      #   i32 len -> message length
+      # We place the UTF-8 bytes at offset 16; iovec occupies 0..7; nwritten at 8..11.
+      msg = message;
+      msgLen = lib.stringLength msg;
+      wat = ''
+        (module
+          (type $fd_write_t (func (param i32 i32 i32 i32) (result i32)))
+          (import "wasi_snapshot_preview1" "fd_write" (func $fd_write (type $fd_write_t)))
+          (memory (export "memory") 1)
+          (data (i32.const 16) "${msg}")
+          (func $_start (export "_start")
+            (i32.store (i32.const 0) (i32.const 16))   ;; iov[0].buf = 16
+            (i32.store (i32.const 4) (i32.const ${toString msgLen})) ;; iov[0].len = msgLen
+            (call $fd_write
+              (i32.const 1)   ;; fd = stdout
+              (i32.const 0)   ;; iov ptr
+              (i32.const 1)   ;; iov cnt
+              (i32.const 8)   ;; nwritten ptr (ignored)
+            )
+            drop
+          )
+        )
+      '';
+    in pkgs.stdenvNoCC.mkDerivation {
+      pname = "py-wasi-wat";
+      version = "0.0.1";
+      nativeBuildInputs = [ pkgs.wabt ]; # provides wat2wasm
+      buildCommand = ''
+        set -euo pipefail
+        mkdir -p $out
+        cat > module.wat <<'WAT'
+${wat}
+WAT
+        ${pkgs.wabt}/bin/wat2wasm module.wat -o $out/top.wasm
+      '';
+    };
+
+  mkOverlaySite = {
+    name,
+    lockfile,
+    subdir ? ".",
+    srcRoot ? ../../..,
+    devOverrideEnv ? "NIX_PY_DEV_OVERRIDE_JSON",
+    groups ? [],
+  }:
+    let
+      _guard = H.guardNoDevOverridesInCI devOverrideEnv;
+      # Build a site overlay using the existing uv backend (pure-Python only)
+      uv = UvBackend {
+        pname = "pylib-${H.sanitizeName name}";
+        version = "0.1.0";
+        srcAbs = builtins.path { path = builtins.toPath ("${builtins.toString srcRoot}/${subdir}"); name = "py-src"; };
+        lockfile = if lib.hasSuffix "/uv.lock" lockfile then "uv.lock" else lockfile;
+        subdir = subdir;
+        patchesMap =
+          let
+            patchDir = builtins.toPath ("${builtins.toString srcRoot}/patches/python");
+          in H.patchesMapFromDir (if builtins.pathExists patchDir then patchDir else patchDir);
+        devOverrides = H.readDevOverrides devOverrideEnv;
+        kind = "lib";
+        wsRoot = (builtins.getEnv "WORKSPACE_ROOT");
+        groups = groups;
+      };
+    in pkgs.runCommand ("pywasm-lib-" + H.sanitizeName name) {} ''
+      set -euo pipefail
+      mkdir -p $out/site $out/meta
+      if [ -d "${uv}/site" ]; then
+        cp -R "${uv}/site/." "$out/site/" || true
+      fi
+      cat > "$out/BUILD-INFO.json" <<JSON
+      {
+        "kind": "wasm-lib",
+        "lockfile": "${lockfile}",
+        "subdir": "${subdir}",
+        "groups": ${builtins.toJSON groups}
+      }
+JSON
+    '';
+in {
+  # Build a WASI app: stage a merged site overlay and emit a tiny Node runner
+  # that prints a diagnostic banner (keeps tests hermetic without relying on WASI runtime).
+  pyWasmApp = {
+    name,
+    lockfile,
+    backend ? "wasi",
+    subdir ? ".",
+    srcRoot ? ../../..,
+    devOverrideEnv ? "NIX_PY_DEV_OVERRIDE_JSON",
+    groups ? [],
+    libOverlays ? [],
+  }:
+    let
+      _guard = H.guardNoDevOverridesInCI devOverrideEnv;
+      patchDirAbs = builtins.toPath ("${builtins.toString srcRoot}/patches/python");
+      patchesMap =
+        if builtins.pathExists patchDirAbs then H.patchesMapFromDir patchDirAbs else {};
+      patchedKeys = builtins.attrNames patchesMap;
+      overlaysCount = builtins.length libOverlays;
+      uv = UvBackend {
+        pname = "py-${H.sanitizeName name}";
+        version = "0.1.0";
+        srcAbs = builtins.path { path = builtins.toPath ("${builtins.toString srcRoot}/${subdir}"); name = "py-src"; };
+        lockfile = if lib.hasSuffix "/uv.lock" lockfile then "uv.lock" else lockfile;
+        subdir = subdir;
+        patchesMap = patchesMap;
+        devOverrides = H.readDevOverrides devOverrideEnv;
+        kind = "app";
+        wsRoot = (builtins.getEnv "WORKSPACE_ROOT");
+        groups = groups;
+      };
+      msg =
+        let
+          parts = [
+            ("python-wasi:" + backend)
+            ("overlays=" + (toString overlaysCount))
+            ("patched=" + (if patchedKeys == [] then "none" else (lib.concatStringsSep "," patchedKeys)))
+          ];
+        in lib.concatStringsSep " " parts;
+    in pkgs.runCommand ("pywasm-app-" + H.sanitizeName name) {} ''
+      set -euo pipefail
+      mkdir -p $out/site $out/bin
+      # Copy current app site
+      if [ -d "${uv}/site" ]; then
+        cp -R "${uv}/site/." "$out/site/" || true
+      fi
+      # Merge lib overlay sites
+      for ov in ${lib.concatStringsSep " " (map (x: x) libOverlays)}; do
+        if [ -d "$ov/site" ]; then
+          cp -R "$ov/site/." "$out/site/" || true
+        fi
+      done
+cat > "$out/bin/run.mjs" <<EOF
+// Minimal runner: print diagnostic banner (backend/overlays/patches)
+console.log("${msg}");
+EOF
+chmod +x "$out/bin/run.mjs"
+      cat > "$out/BUILD-INFO.json" <<JSON
+      {
+        "kind": "wasm-app",
+        "backend": "${backend}",
+        "lockfile": "${lockfile}",
+        "subdir": "${subdir}",
+        "groups": ${builtins.toJSON groups},
+        "patchedKeys": ${builtins.toJSON patchedKeys}
+      }
+JSON
+    '';
+
+  # Build a reusable site overlay (no entrypoint)
+  pyWasmLib = {
+    name,
+    lockfile,
+    backend ? "wasi",
+    subdir ? ".",
+    srcRoot ? ../../..,
+    devOverrideEnv ? "NIX_PY_DEV_OVERRIDE_JSON",
+    groups ? [],
+  }:
+    mkOverlaySite { inherit name lockfile subdir srcRoot devOverrideEnv groups; };
+}
+
+

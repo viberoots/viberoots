@@ -15,6 +15,13 @@ let
 
   labelsOf = L.labelsOf;
   nameOf = L.nameOf;
+  byName = L.byName;
+  depsOfName = nm:
+    let n = if builtins.hasAttr nm byName then byName.${nm} else null;
+    in if n == null then [] else L.depsOf n;
+  labelsOfName = nm:
+    let n = if builtins.hasAttr nm byName then byName.${nm} else null;
+    in if n == null then [] else L.labelsOf n;
 
   # Find nearest uv.lock for a target by walking up from its package path.
   lockfileFor = name:
@@ -35,7 +42,7 @@ let
   lockRelFor = name:
     let abs = lockfileFor name; absStr = builtins.toString abs; rootStr = builtins.toString repoRoot;
     in if lib.hasPrefix (rootStr + "/") absStr then lib.removePrefix (rootStr + "/") absStr else absStr;
-in {
+in rec {
   # Detect Python nodes by rule_type prefix or lang label
   isTarget = n:
     let rt = get n "rule_type";
@@ -48,8 +55,10 @@ in {
     let rt = get n "rule_type";
         lbs = get n "labels";
         isBinLabel = lbs != null && builtins.elem "kind:bin" lbs;
+        isWasmLabel = lbs != null && builtins.elem "kind:wasm" lbs;
         isTestLabel = lbs != null && builtins.elem "kind:test" lbs;
-    in if isTestLabel then "test"
+    in if isWasmLabel then "wasm"
+       else if isTestLabel then "test"
        else if (rt != null) && lib.hasSuffix "_binary" rt then "bin"
        else if (rt != null) && lib.hasSuffix "_test" rt then "test"
        else if isBinLabel then "bin"
@@ -72,6 +81,41 @@ in {
       srcRoot = repoRoot;
       subdir = pkgPathOf name;
     };
-}
 
+  # WASM variants (Phase 1: WASI baseline)
+  mkWasmApp = name:
+    let
+      # Collect direct python lib deps as overlays
+      directDeps = depsOfName name;
+      pyLibDeps =
+        builtins.filter (dn:
+          let n = if builtins.hasAttr dn byName then byName.${dn} else null;
+              lbs = if n == null then [] else (get n "labels");
+              hasPy = (n != null) && (isTarget n);
+              isLib = (lbs != null) && (builtins.elem "kind:lib" lbs || builtins.elem "kind:wasm" lbs);
+          in hasPy && isLib
+        ) directDeps;
+      overlays = map (dn: T.pyWasmLib {
+        name = dn;
+        lockfile = lockRelFor dn;
+        srcRoot = repoRoot;
+        subdir = pkgPathOf dn;
+      }) pyLibDeps;
+    in T.pyWasmApp {
+      inherit name;
+      lockfile = lockRelFor name;
+      srcRoot = repoRoot;
+      subdir = pkgPathOf name;
+      libOverlays = overlays;
+      backend = "wasi";
+    };
+
+  mkWasmLib = name:
+    T.pyWasmLib {
+      inherit name;
+      lockfile = lockRelFor name;
+      srcRoot = repoRoot;
+      subdir = pkgPathOf name;
+    };
+}
 
