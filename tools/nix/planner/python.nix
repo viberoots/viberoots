@@ -91,6 +91,12 @@ in rec {
           labs = labelsOfName nm;
           hits = builtins.filter (l: (builtins.typeOf l) == "string" && lib.hasPrefix "backend:" l) (if labs == null then [] else labs);
         in if hits == [] then "wasi" else (lib.removePrefix "backend:" (builtins.head hits));
+      # Determine trim mode from labels; default to "none". Accept labels like "trim:safe" or "trim:aggressive".
+      trimFor = nm:
+        let
+          labs = labelsOfName nm;
+          hits = builtins.filter (l: (builtins.typeOf l) == "string" && lib.hasPrefix "trim:" l) (if labs == null then [] else labs);
+        in if hits == [] then "none" else (lib.removePrefix "trim:" (builtins.head hits));
       # Collect direct python lib deps as overlays
       directDeps = depsOfName name;
       pyLibDeps =
@@ -106,6 +112,7 @@ in rec {
         lockfile = lockRelFor dn;
         srcRoot = repoRoot;
         subdir = pkgPathOf dn;
+        trim = trimFor dn;
       }) pyLibDeps;
     in T.pyWasmApp {
       inherit name;
@@ -114,14 +121,23 @@ in rec {
       subdir = pkgPathOf name;
       libOverlays = overlays;
       backend = backendFor name;
+      trim = trimFor name;
     };
 
   mkWasmLib = name:
-    T.pyWasmLib {
-      inherit name;
-      lockfile = lockRelFor name;
-      srcRoot = repoRoot;
-      subdir = pkgPathOf name;
-    };
+    let
+      trimFor = nm:
+        let
+          labs = labelsOfName nm;
+          hits = builtins.filter (l: (builtins.typeOf l) == "string" && lib.hasPrefix "trim:" l) (if labs == null then [] else labs);
+        in if hits == [] then "none" else (lib.removePrefix "trim:" (builtins.head hits));
+    in
+      T.pyWasmLib {
+        inherit name;
+        lockfile = lockRelFor name;
+        srcRoot = repoRoot;
+        subdir = pkgPathOf name;
+        trim = trimFor name;
+      };
 }
 

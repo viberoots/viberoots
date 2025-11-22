@@ -47,3 +47,27 @@ python-wasi:wasi overlays=0 patched=none
 ```
 
 Patching `hello@1.0.0` under `patches/python/` and rebuilding updates the banner to reflect the applied patch.
+
+### Optional size trimming (opt-in)
+
+You can enable deterministic bundle slimming via labels on your WASM targets:
+
+- `trim:safe` removes `__pycache__`, `*.pyc/*.pyo`, and common test folders (`tests/`, `testing/`, `test/`).
+- `trim:aggressive` applies the safe trims and also removes top-level `*.dist-info/`, `docs/`, and metadata files (`METADATA`, `RECORD`, `INSTALLER`, `WHEEL`) under the `site/` tree.
+
+Example:
+
+```starlark
+load("//python:defs.bzl", "nix_python_wasm_app")
+
+nix_python_wasm_app(
+    name = "pyapp",
+    lockfile_label = "lockfile:apps/pywasm/uv.lock#apps/pywasm",
+    labels = ["trim:safe"],  # or "trim:aggressive"
+)
+```
+
+Notes:
+
+- Trimming affects only the realized `site/` content; planner/cache keys include the trim mode.
+- Trimming is optional and disabled by default (`trim:none`).

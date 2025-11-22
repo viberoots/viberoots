@@ -100,6 +100,7 @@ in {
     devOverrideEnv ? "NIX_PY_DEV_OVERRIDE_JSON",
     groups ? [],
     libOverlays ? [],
+    trim ? "none", # none | safe | aggressive
   }:
     let
       _guard = H.guardNoDevOverridesInCI devOverrideEnv;
@@ -145,6 +146,24 @@ in {
           cp -R "$ov/site/." "$out/site/" || true
         fi
       done
+      # Optional size trimming (deterministic, opt-in)
+      trim_mode='${trim}'
+      if [ "$trim_mode" = "safe" ] || [ "$trim_mode" = "aggressive" ]; then
+        # Remove bytecode caches
+        find "$out/site" -type d -name "__pycache__" -prune -exec rm -rf {} + || true
+        find "$out/site" -type f \( -name "*.pyc" -o -name "*.pyo" \) -delete || true
+        # Remove common test dirs
+        find "$out/site" -type d \( -name "tests" -o -name "testing" -o -name "test" \) -prune -exec rm -rf {} + || true
+      fi
+      if [ "$trim_mode" = "aggressive" ]; then
+        # Remove distribution metadata and docs that aren't needed at runtime
+        find "$out/site" -maxdepth 1 -type d -name "*.dist-info" -prune -exec rm -rf {} + || true
+        find "$out/site" -type d -name "docs" -prune -exec rm -rf {} + || true
+        find "$out/site" -type f -name "METADATA" -delete || true
+        find "$out/site" -type f -name "RECORD" -delete || true
+        find "$out/site" -type f -name "INSTALLER" -delete || true
+        find "$out/site" -type f -name "WHEEL" -delete || true
+      fi
 cat > "$out/bin/run.mjs" <<EOF
 // Minimal runner: print diagnostic banner (backend/overlays/patches)
 console.log("${msg}");
@@ -157,7 +176,8 @@ chmod +x "$out/bin/run.mjs"
         "lockfile": "${lockfile}",
         "subdir": "${subdir}",
         "groups": ${builtins.toJSON groups},
-        "patchedKeys": ${builtins.toJSON patchedKeys}
+        "patchedKeys": ${builtins.toJSON patchedKeys},
+        "trim": "${trim}"
       }
 JSON
     '';
@@ -171,8 +191,46 @@ JSON
     srcRoot ? ../../..,
     devOverrideEnv ? "NIX_PY_DEV_OVERRIDE_JSON",
     groups ? [],
+    trim ? "none", # none | safe | aggressive
   }:
-    mkOverlaySite { inherit name lockfile subdir srcRoot devOverrideEnv groups; };
+    let
+      site = mkOverlaySite { inherit name lockfile subdir srcRoot devOverrideEnv groups; };
+    in pkgs.runCommand ("pywasm-lib-" + H.sanitizeName name + "-trimmed") {} ''
+      set -euo pipefail
+      mkdir -p "$out/site" "$out/meta"
+      if [ -d "${site}/site" ]; then
+        cp -R "${site}/site/." "$out/site/" || true
+      fi
+      # Optional size trimming (deterministic, opt-in)
+      trim_mode='${trim}'
+      if [ "$trim_mode" = "safe" ] || [ "$trim_mode" = "aggressive" ]; then
+        find "$out/site" -type d -name "__pycache__" -prune -exec rm -rf {} + || true
+        find "$out/site" -type f \( -name "*.pyc" -o -name "*.pyo" \) -delete || true
+        find "$out/site" -type d \( -name "tests" -o -name "testing" -o -name "test" \) -prune -exec rm -rf {} + || true
+      fi
+      if [ "$trim_mode" = "aggressive" ]; then
+        find "$out/site" -maxdepth 1 -type d -name "*.dist-info" -prune -exec rm -rf {} + || true
+        find "$out/site" -type d -name "docs" -prune -exec rm -rf {} + || true
+        find "$out/site" -type f -name "METADATA" -delete || true
+        find "$out/site" -type f -name "RECORD" -delete || true
+        find "$out/site" -type f -name "INSTALLER" -delete || true
+        find "$out/site" -type f -name "WHEEL" -delete || true
+      fi
+      # Build info passthrough + trim
+      if [ -f "${site}/BUILD-INFO.json" ]; then
+        jq '. + { "trim": "'${trim}'" }' "${site}/BUILD-INFO.json" > "$out/BUILD-INFO.json" || cp "${site}/BUILD-INFO.json" "$out/BUILD-INFO.json"
+      else
+        cat > "$out/BUILD-INFO.json" <<JSON
+        {
+          "kind": "wasm-lib",
+          "lockfile": "${lockfile}",
+          "subdir": "${subdir}",
+          "groups": ${builtins.toJSON groups},
+          "trim": "${trim}"
+        }
+JSON
+      fi
+    '';
 }
 
 
