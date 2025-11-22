@@ -1,5 +1,6 @@
 load("@prelude//python:defs.bzl", "python_binary", "python_library", "python_test")
-load("//lang:defs_common.bzl", "stamp_labels", "ensure_single_lockfile_label", "append_nixpkg_labels", "providers_for", "append_python_patches_for_importer", "extract_lockfile_labels")
+load("@prelude//:rules.bzl", "genrule")
+load("//lang:defs_common.bzl", "stamp_labels", "ensure_single_lockfile_label", "append_nixpkg_labels", "providers_for", "append_python_patches_for_importer", "extract_lockfile_labels", "dedupe_preserve")
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
 
 def _providers_for(name):
@@ -74,15 +75,17 @@ def nix_python_wasm_app(name, lockfile_label = None, nix_native_deps = [], deps 
         _importer = _lf[0].split("#")[1]
     if _importer != None and _importer != "":
         append_python_patches_for_importer(kwargs, _importer)
-    deps = deps + _providers_for(name)
+    # genrule does not accept a deps parameter in Buck2; realize edges via srcs.
+    provs = _providers_for(name)
+    srcs = kwargs.get("srcs", []) or []
+    merged_srcs = dedupe_preserve(srcs + deps + provs)
     # Keep Buck parsing simple: emit a tiny stamp via genrule; planner routes to pyWasmApp.
     out = name + ".stamp"
     genrule(
         name = name,
-        srcs = kwargs.pop("srcs", []),
+        srcs = merged_srcs,
         out = out,
         cmd = "echo py_wasm_app > $OUT",
-        deps = deps,
         labels = kwargs.pop("labels", []),
         visibility = kwargs.pop("visibility", ["PUBLIC"]),
     )
@@ -101,14 +104,15 @@ def nix_python_wasm_lib(name, lockfile_label = None, nix_native_deps = [], deps 
         _importer = _lf[0].split("#")[1]
     if _importer != None and _importer != "":
         append_python_patches_for_importer(kwargs, _importer)
-    deps = deps + _providers_for(name)
+    provs = _providers_for(name)
+    srcs = kwargs.get("srcs", []) or []
+    merged_srcs = dedupe_preserve(srcs + deps + provs)
     out = name + ".stamp"
     genrule(
         name = name,
-        srcs = kwargs.pop("srcs", []),
+        srcs = merged_srcs,
         out = out,
         cmd = "echo py_wasm_lib > $OUT",
-        deps = deps,
         labels = kwargs.pop("labels", []),
         visibility = kwargs.pop("visibility", ["PUBLIC"]),
     )
