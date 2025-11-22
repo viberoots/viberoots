@@ -3,6 +3,7 @@ import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { providerNameForImporter } from "../../lib/providers.ts";
+import { findUvLockfiles } from "../../lib/lockfiles.ts";
 
 export async function computeMissingOutputs(outputs: string[]): Promise<string[]> {
   const outPresence: string[] = [];
@@ -133,6 +134,33 @@ export async function findMissingNodeImporterProviders(): Promise<
           }
         }
       } catch {}
+    }
+  } catch {}
+  return missing;
+}
+
+export async function findMissingPythonImporterProviders(): Promise<
+  Array<{ lockfile: string; importer: string; provider: string }>
+> {
+  const missing: Array<{ lockfile: string; importer: string; provider: string }> = [];
+  try {
+    const lockfiles = await findUvLockfiles();
+    if (!lockfiles.length) return missing;
+
+    const targetsPyAuto = "third_party/providers/TARGETS.python.auto";
+    const targetsPyText = fs.existsSync(targetsPyAuto)
+      ? await fsp.readFile(targetsPyAuto, "utf8").catch(() => "")
+      : "";
+
+    for (const lfRel of lockfiles) {
+      // Only consider importers under apps/* or libs/* per repo conventions
+      if (!/^(apps|libs)\//.test(lfRel)) continue;
+      const importerLabel = path.dirname(lfRel) || ".";
+      const prov = providerNameForImporter(lfRel, importerLabel);
+      const needle = `python_importer_deps(name="${prov}", lockfile="${lfRel}", importer="${importerLabel}"`;
+      if (!targetsPyText.includes(needle)) {
+        missing.push({ lockfile: lfRel, importer: importerLabel, provider: prov });
+      }
     }
   } catch {}
   return missing;

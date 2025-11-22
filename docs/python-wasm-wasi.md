@@ -83,3 +83,10 @@ Before builds, a prebuild guard ensures generated “glue” is present and fres
   - CI: the guard fails if glue is stale or missing.
 
 This means editing a Python importer’s `uv.lock` will trigger the guard to refresh providers and mappings locally, keeping Python parity with Node’s `pnpm-lock.yaml` handling.
+
+#### Missing provider diagnostics and auto-fix (Python)
+
+When a `uv.lock` exists but `third_party/providers/TARGETS.python.auto` does not contain the importer’s provider rule, the guard:
+
+- CI: fails with a targeted error including the expected provider name (`lf_<hash>_...`) and importer (`<dir>`).
+- Local: auto-fixes by regenerating Python providers, then re-checks and proceeds.

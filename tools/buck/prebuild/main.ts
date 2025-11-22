@@ -12,6 +12,7 @@ import {
   findMissingGomod2nixToml,
   findGoImporterMissingSum,
   findMissingNodeImporterProviders,
+  findMissingPythonImporterProviders,
 } from "./presence.ts";
 import { checkFreshness } from "./freshness.ts";
 import { computeCoverageMissing, type CoverageMiss } from "./coverage.ts";
@@ -51,6 +52,7 @@ export async function run(): Promise<void> {
   const needFix = outPresence.length > 0 || needFixFreshness;
 
   const missingNodeProviders = await findMissingNodeImporterProviders();
+  const missingPythonProviders = await findMissingPythonImporterProviders();
   const coverageMissing: CoverageMiss[] = await computeCoverageMissing();
 
   if (flagVerbose) {
@@ -68,6 +70,7 @@ export async function run(): Promise<void> {
   if (jsonOut) {
     const diag = collectDiagnostics(inputs, presentOutputs, outPresence, verboseLimit);
     (diag as any).missingNodeProviders = missingNodeProviders;
+    (diag as any).missingPythonProviders = missingPythonProviders;
     (diag as any).coverageMissing = coverageMissing;
     console.log(JSON.stringify(diag));
     return;
@@ -137,6 +140,33 @@ export async function run(): Promise<void> {
     }
   }
 
+  if (missingPythonProviders.length) {
+    if (mode === "ci") {
+      for (const m of missingPythonProviders) {
+        console.error(
+          `ERROR: missing Python importer provider: lockfile=${m.lockfile} importer=${m.importer} provider=${m.provider}`,
+        );
+      }
+      process.exit(1);
+    }
+    if (process.env.PREBUILD_GUARD_NO_FIX === "1") {
+      printSkip(
+        "missing-required-files",
+        "python importer providers missing: " +
+          missingPythonProviders
+            .map((m) => `${m.provider} for ${m.lockfile}#${m.importer}`)
+            .join(", "),
+      );
+      return;
+    }
+    try {
+      await autoFixGlue();
+    } catch (e) {
+      console.error("ERROR: auto-fix (sync providers) failed:", e);
+      process.exit(1);
+    }
+  }
+
   if (coverageMissing.length > 0) {
     const header =
       mode === "ci" || flagStrict
@@ -159,7 +189,7 @@ export async function run(): Promise<void> {
     }
   }
 
-  if (!needFix && !missingNodeProviders.length) return;
+  if (!needFix && !missingNodeProviders.length && !missingPythonProviders.length) return;
 
   if (mode === "ci") {
     for (const o of outPresence) {
