@@ -36,16 +36,41 @@ function parseModuleProviders(txt: string): Record<string, string[]> {
   return out;
 }
 
+async function readAllAutoFilesCombined(): Promise<string> {
+  try {
+    const dir = path.join("third_party", "providers");
+    if (!fs.existsSync(dir)) return "";
+    const names = fs.readdirSync(dir);
+    const autoFiles = names.filter((n) => /^TARGETS\..*\.auto$/.test(n));
+    if (!autoFiles.length) return "";
+    const texts: string[] = [];
+    for (const f of autoFiles) {
+      try {
+        const p = path.join(dir, f);
+        const t = await fsp.readFile(p, "utf8").catch(() => "");
+        if (t) texts.push(t);
+      } catch {}
+    }
+    return texts.join("\n\n");
+  } catch {
+    return "";
+  }
+}
+
 function providerExistsFactory(
   providerIndex: Record<string, unknown>,
-  targetsNodeText: string,
+  autosCombinedText: string,
 ): (fq: string) => boolean {
+  const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return (fq: string): boolean => {
     if (!fq || !fq.startsWith("//third_party/providers:")) return false;
     if (providerIndex[fq]) return true;
     const tail = fq.split(":")[1] || "";
     if (tail.startsWith("lf_")) {
-      return targetsNodeText.includes(`name="${tail}"`);
+      // Fallback: scan across all TARGETS.*.auto files (Node, Python, etc.)
+      if (autosCombinedText.includes(`name="${tail}"`)) return true;
+      const re = new RegExp(`\\bname\\s*=\\s*"${escapeRegExp(tail)}"`, "m");
+      return re.test(autosCombinedText);
     }
     if (tail.startsWith("nix_")) {
       const stamp = path.join("third_party", "providers", "stamps", `${tail}.stamp`);
@@ -68,11 +93,8 @@ export async function computeCoverageMissing(): Promise<CoverageMiss[]> {
     const comp = await readCompositeGraph();
     const providerIndex = comp.providerIndex || {};
 
-    const targetsNodeAutoPath = path.join("third_party", "providers", "TARGETS.node.auto");
-    const targetsNodeText = fs.existsSync(targetsNodeAutoPath)
-      ? await fsp.readFile(targetsNodeAutoPath, "utf8").catch(() => "")
-      : "";
-    const providerExists = providerExistsFactory(providerIndex, targetsNodeText);
+    const autosCombinedText = await readAllAutoFilesCombined();
+    const providerExists = providerExistsFactory(providerIndex, autosCombinedText);
 
     for (const n of comp.nodes) {
       const nodeName = (n as any)?.name || "";
