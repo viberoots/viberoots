@@ -1,0 +1,17 @@
+{
+  "language": "python",
+  "template": "wasm-app",
+  "description": "Python WASM app scaffold (WASI default; optional Pyodide)",
+  "help": {
+    "usage": "scaf new python wasm-app <name> [--path=DEST]",
+    "notes": [
+      "Creates apps/<name> with uv.lock and TARGETS using nix_python_wasm_app.",
+      "Default backend is wasi; add label backend:pyodide to switch.",
+      "Lockfile label uses importer-scoped form: lockfile:apps/<name>/uv.lock#apps/<name>."
+    ],
+    "examples": [
+      "scaf new python wasm-app demo-wasm --path=apps/demo-wasm",
+      "scaf regen apps/demo-wasm"
+    ]
+  }
+}

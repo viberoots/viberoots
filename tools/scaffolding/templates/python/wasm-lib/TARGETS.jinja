@@ -1,0 +1,10 @@
+load("//python:defs.bzl", "nix_python_wasm_lib")
+
+nix_python_wasm_lib(
+    name = "{{ name }}",
+    srcs = glob(["**/*.py"]),
+    lockfile_label = "lockfile:libs/{{ name }}/uv.lock#libs/{{ name }}",
+    visibility = ["PUBLIC"],
+)
+
+

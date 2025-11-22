@@ -1,0 +1,17 @@
+{
+  "language": "python",
+  "template": "wasm-lib",
+  "description": "Python WASM lib scaffold (overlay for WASM apps)",
+  "help": {
+    "usage": "scaf new python wasm-lib <name> [--path=DEST]",
+    "notes": [
+      "Creates libs/<name> with uv.lock and TARGETS using nix_python_wasm_lib.",
+      "Lib overlays are automatically merged into apps that depend on this lib.",
+      "Lockfile label uses importer-scoped form: lockfile:libs/<name>/uv.lock#libs/<name>."
+    ],
+    "examples": [
+      "scaf new python wasm-lib demo-wasmlib --path=libs/demo-wasmlib",
+      "scaf regen libs/demo-wasmlib"
+    ]
+  }
+}
