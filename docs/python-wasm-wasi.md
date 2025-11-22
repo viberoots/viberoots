@@ -71,3 +71,15 @@ Notes:
 
 - Trimming affects only the realized `site/` content; planner/cache keys include the trim mode.
 - Trimming is optional and disabled by default (`trim:none`).
+
+### Prebuild guard (glue presence & freshness)
+
+Before builds, a prebuild guard ensures generated “glue” is present and fresh:
+
+- Inputs include `TARGETS`, `*.bzl`, `patches/**/*.patch`, `flake.lock`, `tools/nix/overlays/**`, and importer-scoped lockfiles: `**/pnpm-lock.yaml` for Node and `**/uv.lock` for Python.
+- Freshness compares the newest input against the oldest glue output with a small allowed skew.
+- Behavior:
+  - Local: the guard auto-fixes by running export-graph → sync-providers → gen-auto-map.
+  - CI: the guard fails if glue is stale or missing.
+
+This means editing a Python importer’s `uv.lock` will trigger the guard to refresh providers and mappings locally, keeping Python parity with Node’s `pnpm-lock.yaml` handling.

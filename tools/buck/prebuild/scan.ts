@@ -23,6 +23,7 @@ export async function listInputs(): Promise<string[]> {
         f.endsWith(".bzl") ||
         (f.startsWith("patches/") && f.endsWith(".patch")) ||
         f.endsWith("pnpm-lock.yaml") ||
+        f.endsWith("uv.lock") ||
         f.endsWith("/go.mod") ||
         f.endsWith("/go.sum") ||
         f === "flake.lock" ||
@@ -58,6 +59,7 @@ export async function listInputs(): Promise<string[]> {
             e.name.endsWith(".bzl") ||
             (rel.startsWith("patches/") && e.name.endsWith(".patch")) ||
             e.name === "pnpm-lock.yaml" ||
+            e.name === "uv.lock" ||
             e.name === "go.mod" ||
             e.name === "go.sum" ||
             e.name === "flake.lock" ||
