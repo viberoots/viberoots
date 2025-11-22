@@ -1,10 +1,13 @@
 def python_importer_deps(name, lockfile, importer, patch_paths = []):
+    # Metadata-only stamp (mirrors Node): avoid cross-package srcs to respect Buck package boundaries.
+    # Invalidation for patches is handled by macros that include importer-local patch files in target srcs.
     genrule(
         name = name,
-        srcs = [lockfile] + patch_paths,
+        srcs = [],
         out = name + ".stamp",
-        cmd = "if command -v sha256sum >/dev/null; then cat $SRCS | sha256sum > $OUT; else cat $SRCS | shasum -a 256 > $OUT; fi",
-        visibility = ["//visibility:public"],
+        cmd = "echo python_importer:${importer} ${lockfile} > $OUT",
+        labels = ["lang:python"],
+        visibility = ["PUBLIC"],
     )
 
 

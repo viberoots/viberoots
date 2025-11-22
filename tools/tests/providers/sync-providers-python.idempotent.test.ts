@@ -25,10 +25,13 @@ test("sync-providers-python: deterministic generation and idempotency with patch
     // Global python patches dir
     const pyPatches = path.join(tmp, "patches", "python");
     await fsp.mkdir(pyPatches, { recursive: true });
-    // Matching patch
-    await fsp.writeFile(path.join(pyPatches, "requests@2.32.3.patch"), "# patch\n", "utf8");
+    // Move to importer-local patches directory
+    const importerPatches = path.join(importer, "patches", "python");
+    await fsp.mkdir(importerPatches, { recursive: true });
+    // Matching patch (importer-local)
+    await fsp.writeFile(path.join(importerPatches, "requests@2.32.3.patch"), "# patch\n", "utf8");
     // Unused patch (must not be included in patch_paths)
-    await fsp.writeFile(path.join(pyPatches, "unused@1.0.0.patch"), "# patch\n", "utf8");
+    await fsp.writeFile(path.join(importerPatches, "unused@1.0.0.patch"), "# patch\n", "utf8");
 
     // Run orchestrator for python
     await $`node tools/buck/sync-providers.ts --lang python`;
@@ -49,11 +52,11 @@ test("sync-providers-python: deterministic generation and idempotency with patch
       console.error("lockfile/importer fields incorrect");
       process.exit(2);
     }
-    if (!text1.includes("patches/python/requests@2.32.3.patch")) {
+    if (!text1.includes("apps/pytool/patches/python/requests@2.32.3.patch")) {
       console.error("expected matching patch to be included in patch_paths");
       process.exit(2);
     }
-    if (text1.includes("patches/python/unused@1.0.0.patch")) {
+    if (text1.includes("apps/pytool/patches/python/unused@1.0.0.patch")) {
       console.error("unexpected unused patch included in patch_paths");
       process.exit(2);
     }

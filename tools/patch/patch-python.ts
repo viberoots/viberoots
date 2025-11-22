@@ -92,11 +92,15 @@ async function doApply(args: string[]) {
 
   const root = repoRoot();
   const overridePatchDir = readPatchDirArg("");
+  // Default to importer-local patches directory: <importer>/patches/python
+  const defaultImporterLocal = path.isAbsolute(resolved.importerDir)
+    ? path.join(resolved.importerDir, "patches", "python")
+    : path.join(root, resolved.importerDir, "patches", "python");
   const patchDir = overridePatchDir
     ? path.isAbsolute(overridePatchDir)
       ? overridePatchDir
       : path.join(root, overridePatchDir)
-    : path.join(root, "patches", "python");
+    : defaultImporterLocal;
   await fsp.mkdir(patchDir, { recursive: true });
   const dst = path.join(patchDir, `${resolved.importPath}@${resolved.version}.patch`);
   await fsp.writeFile(dst, diff, "utf8");

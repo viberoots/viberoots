@@ -49,8 +49,8 @@ test("patch-python session applies on Ctrl-D and clears session", async () => {
       },
     })`${process.execPath} --experimental-strip-types --import ${zxInit} tools/patch/patch-pkg.ts apply python requests --importer ${importer}`;
 
-    // Patch file must be created
-    const patch = path.join(tmp, "patches", "python", "requests@2.32.3.patch");
+    // Patch file must be created under the importer-local patches directory
+    const patch = path.join(importer, "patches", "python", "requests@2.32.3.patch");
     if (!(await fs.pathExists(patch))) {
       console.error("expected patch file missing:", patch);
       process.exit(2);

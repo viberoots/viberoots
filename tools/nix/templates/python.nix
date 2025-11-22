@@ -17,10 +17,12 @@ let
   }:
     let
       _guard = H.guardNoDevOverridesInCI devOverrideEnv;
-      # Prefer scanning patches from the live workspace root so tests can write to patches/python
+      # Prefer scanning importer-local patches under <subdir>/patches/python
       patchDirAbs =
-        let rootStr = builtins.toString srcRoot; in
-          builtins.toPath ("${rootStr}/patches/python");
+        let
+          rootStr = builtins.toString srcRoot;
+        in
+          builtins.toPath ("${rootStr}/${subdir}/patches/python");
       patchesMap =
         if builtins.pathExists patchDirAbs then
           let

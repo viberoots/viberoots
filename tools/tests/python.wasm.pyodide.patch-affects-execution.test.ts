@@ -10,7 +10,7 @@ test("python wasm (pyodide): patch affects execution banner", async () => {
     const appDir = path.join(tmp, "apps", "pywasm");
     await fs.mkdir(path.join(appDir, "bin"), { recursive: true });
     await fs.mkdir(path.join(appDir, "src"), { recursive: true });
-    await fs.mkdir(path.join(tmp, "patches", "python"), { recursive: true });
+    await fs.mkdir(path.join(appDir, "patches", "python"), { recursive: true });
     await fs.writeFile(path.join(appDir, "bin", "__main__.py"), 'print("start")\n', "utf8");
     await fs.writeFile(
       path.join(appDir, "uv.lock"),
@@ -59,7 +59,7 @@ nix_python_wasm_app(
     const stdout1 = String(runOut1.stdout || "");
     assert.match(stdout1, /patched=none/);
     // Add a patch that targets hello@1.0.0 (contents don't matter for banner)
-    const patchPath = path.join(tmp, "patches", "python", "hello@1.0.0.patch");
+    const patchPath = path.join(appDir, "patches", "python", "hello@1.0.0.patch");
     await fs.writeFile(
       patchPath,
       [

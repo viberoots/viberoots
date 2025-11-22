@@ -33,14 +33,14 @@ test("patch-python apply writes canonical patch and refreshes glue", async () =>
     // Edit a file to produce a diff
     await fs.writeFile(path.join(ws, "readme.txt"), "B\n", "utf8");
 
-    // Apply patch (global flat directory for Python)
+    // Apply patch (importer-local directory for Python)
     await $({
       cwd: tmp,
     })`NIX_PY_TEST_RESOLVE_JSON=${JSON.stringify({
       requests: { version: "2.32.3", originPath: origin },
     })} NIX_PY_DEV_OVERRIDE_JSON={} tools/bin/patch-pkg apply python requests --importer ${importer}`;
 
-    const patch = path.join(tmp, "patches", "python", "requests@2.32.3.patch");
+    const patch = path.join(importer, "patches", "python", "requests@2.32.3.patch");
     if (!(await fs.pathExists(patch))) {
       console.error("expected patch file missing:", patch);
       process.exit(2);
@@ -56,7 +56,7 @@ test("patch-python apply writes canonical patch and refreshes glue", async () =>
     if (
       !txt.includes('lockfile="apps/pytool/uv.lock"') ||
       !txt.includes('importer="apps/pytool"') ||
-      !txt.includes("requests@2.32.3.patch")
+      !txt.includes("apps/pytool/patches/python/requests@2.32.3.patch")
     ) {
       console.error("providers file missing expected importer or patch entries");
       process.exit(2);

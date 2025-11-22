@@ -143,9 +143,9 @@ test("python runtime e2e: app output changes after patch apply", async () => {
         PATCH_SKIP_VERIFY: "1",
       },
     })`${process.execPath} --experimental-strip-types --import ${zxInit} tools/patch/patch-pkg.ts apply python mydep --importer ${app}`;
-    // Debug: list patches dir
+    // Debug: list importer-local patches dir
     try {
-      const patchesDir = path.join(tmp, "patches", "python");
+      const patchesDir = path.join(app, "patches", "python");
       const entries = await fs.readdir(patchesDir);
       console.log("patches/python:", entries.join(", "));
     } catch {}

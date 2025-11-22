@@ -85,6 +85,19 @@ def append_node_patches_for_importer(kwargs, importer):
     append_patch_srcs(kwargs, [patch_dir])
 
 
+def append_python_patches_for_importer(kwargs, importer):
+    """
+    Append importer-local Python patches into kwargs["srcs"].
+    - If importer == ".", use "patches/python"
+    - Else use "<importer>/patches/python"
+    No-op when importer is empty or not a string.
+    """
+    if importer == None or not isinstance(importer, str) or importer == "":
+        return
+    patch_dir = "patches/python" if importer == "." else ("%s/patches/python" % importer)
+    append_patch_srcs(kwargs, [patch_dir])
+
+
 def normalize_build_tags(tags):
     s = {}
     for t in tags or []:

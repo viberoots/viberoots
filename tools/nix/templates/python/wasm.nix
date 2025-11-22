@@ -66,7 +66,7 @@ WAT
         subdir = subdir;
         patchesMap =
           let
-            patchDir = builtins.toPath ("${builtins.toString srcRoot}/patches/python");
+            patchDir = builtins.toPath ("${builtins.toString srcRoot}/${subdir}/patches/python");
           in H.patchesMapFromDir (if builtins.pathExists patchDir then patchDir else patchDir);
         devOverrides = H.readDevOverrides devOverrideEnv;
         kind = "lib";
@@ -104,7 +104,7 @@ in {
   }:
     let
       _guard = H.guardNoDevOverridesInCI devOverrideEnv;
-      patchDirAbs = builtins.toPath ("${builtins.toString srcRoot}/patches/python");
+      patchDirAbs = builtins.toPath ("${builtins.toString srcRoot}/${subdir}/patches/python");
       patchesMap =
         if builtins.pathExists patchDirAbs then H.patchesMapFromDir patchDirAbs else {};
       patchedKeys = builtins.attrNames patchesMap;

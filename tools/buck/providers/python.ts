@@ -13,7 +13,8 @@ export async function syncPythonProviders(opts?: {
   patchDir?: string;
   strict?: boolean;
 }) {
-  const PATCH_DIR = opts?.patchDir || "patches/python";
+  // Note: Python patches are importer-local: <importer>/patches/python/*.patch
+  // The PATCH_DIR option is ignored for Python to avoid global scanning.
   const OUT_FILE = opts?.outFile || "third_party/providers/TARGETS.python.auto";
   const STRICT = opts?.strict ?? false;
 
@@ -30,16 +31,6 @@ export async function syncPythonProviders(opts?: {
     await writeIfChanged(OUT_FILE, renderTargetsFile(header, []));
     return;
   }
-
-  // Scan the flat global patches directory once and build a lookup
-  const scanned = await scanFlatPatchDir({
-    patchDir: PATCH_DIR,
-    strict: STRICT,
-    decodeKey: decodeNameVersionFromPatch,
-    nameForKey: (k) => k, // stable ordering by canonical key
-  });
-  const keyToPatchPath = new Map<string, string>();
-  for (const e of scanned) keyToPatchPath.set(e.key, e.patchPath);
 
   const seenNames = new Map<string, string>(); // provider name -> unique key lockfile#importer
   const entries: string[] = [];
@@ -59,10 +50,25 @@ export async function syncPythonProviders(opts?: {
       if (STRICT) throw e;
       eff = new Set();
     }
-    const usedPatches = Array.from(eff)
-      .map((k) => keyToPatchPath.get(k) || "")
-      .filter(Boolean)
-      .sort();
+    // Build importer-local patches directory and collect matching patches
+    const importerPatchDir =
+      importerLabel === "."
+        ? path.posix.join("patches", "python")
+        : path.posix.join(importerLabel, "patches", "python");
+    const usedPatches: string[] = [];
+    try {
+      const absDir = path.resolve(importerPatchDir);
+      const names = await fsp.readdir(absDir).catch(() => [] as string[]);
+      for (const name of names) {
+        if (!name.endsWith(".patch")) continue;
+        const key = decodeNameVersionFromPatch(name);
+        if (key && eff.has(key)) {
+          // Keep the path relative (POSIX) for determinism in TARGETS
+          usedPatches.push(path.posix.join(importerPatchDir, name));
+        }
+      }
+      usedPatches.sort();
+    } catch {}
 
     const name = providerNameForImporter(relLf, importerLabel);
     const key = `${relLf}#${importerLabel}`;

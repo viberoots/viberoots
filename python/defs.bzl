@@ -1,5 +1,5 @@
 load("@prelude//python:defs.bzl", "python_binary", "python_library", "python_test")
-load("//lang:defs_common.bzl", "stamp_labels", "ensure_single_lockfile_label", "append_nixpkg_labels", "providers_for")
+load("//lang:defs_common.bzl", "stamp_labels", "ensure_single_lockfile_label", "append_nixpkg_labels", "providers_for", "append_python_patches_for_importer", "extract_lockfile_labels")
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
 
 def _providers_for(name):
@@ -17,6 +17,13 @@ def nix_python_library(name, lockfile_label = None, nix_native_deps = [], deps =
     stamp_labels(kwargs, "python", "lib")
     ensure_single_lockfile_label(kwargs, lockfile_label)
     append_nixpkg_labels(kwargs, nix_native_deps)
+    # Include importer-local patches in srcs so Buck invalidates precisely on patch changes
+    _lf = extract_lockfile_labels(kwargs.get("labels", []))
+    _importer = None
+    if len(_lf) == 1 and isinstance(_lf[0], str) and ("#" in _lf[0]):
+        _importer = _lf[0].split("#")[1]
+    if _importer != None and _importer != "":
+        append_python_patches_for_importer(kwargs, _importer)
     deps = deps + _providers_for(name)
     python_library(name = name, deps = deps, **kwargs)
 
@@ -27,6 +34,12 @@ def nix_python_binary(name, lockfile_label = None, nix_native_deps = [], deps = 
     stamp_labels(kwargs, "python", "bin")
     ensure_single_lockfile_label(kwargs, lockfile_label)
     append_nixpkg_labels(kwargs, nix_native_deps)
+    _lf = extract_lockfile_labels(kwargs.get("labels", []))
+    _importer = None
+    if len(_lf) == 1 and isinstance(_lf[0], str) and ("#" in _lf[0]):
+        _importer = _lf[0].split("#")[1]
+    if _importer != None and _importer != "":
+        append_python_patches_for_importer(kwargs, _importer)
     deps = deps + _providers_for(name)
     python_binary(name = name, deps = deps, **kwargs)
 
@@ -37,6 +50,12 @@ def nix_python_test(name, lockfile_label = None, nix_native_deps = [], deps = []
     stamp_labels(kwargs, "python", "test")
     ensure_single_lockfile_label(kwargs, lockfile_label)
     append_nixpkg_labels(kwargs, nix_native_deps)
+    _lf = extract_lockfile_labels(kwargs.get("labels", []))
+    _importer = None
+    if len(_lf) == 1 and isinstance(_lf[0], str) and ("#" in _lf[0]):
+        _importer = _lf[0].split("#")[1]
+    if _importer != None and _importer != "":
+        append_python_patches_for_importer(kwargs, _importer)
     deps = deps + _providers_for(name)
     python_test(name = name, deps = deps, **kwargs)
 
@@ -49,6 +68,12 @@ def nix_python_wasm_app(name, lockfile_label = None, nix_native_deps = [], deps 
     kwargs["labels"] = labels
     ensure_single_lockfile_label(kwargs, lockfile_label)
     append_nixpkg_labels(kwargs, nix_native_deps)
+    _lf = extract_lockfile_labels(kwargs.get("labels", []))
+    _importer = None
+    if len(_lf) == 1 and isinstance(_lf[0], str) and ("#" in _lf[0]):
+        _importer = _lf[0].split("#")[1]
+    if _importer != None and _importer != "":
+        append_python_patches_for_importer(kwargs, _importer)
     deps = deps + _providers_for(name)
     # Keep Buck parsing simple: emit a tiny stamp via genrule; planner routes to pyWasmApp.
     out = name + ".stamp"
@@ -70,6 +95,12 @@ def nix_python_wasm_lib(name, lockfile_label = None, nix_native_deps = [], deps 
     kwargs["labels"] = labels
     ensure_single_lockfile_label(kwargs, lockfile_label)
     append_nixpkg_labels(kwargs, nix_native_deps)
+    _lf = extract_lockfile_labels(kwargs.get("labels", []))
+    _importer = None
+    if len(_lf) == 1 and isinstance(_lf[0], str) and ("#" in _lf[0]):
+        _importer = _lf[0].split("#")[1]
+    if _importer != None and _importer != "":
+        append_python_patches_for_importer(kwargs, _importer)
     deps = deps + _providers_for(name)
     out = name + ".stamp"
     genrule(

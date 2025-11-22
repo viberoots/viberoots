@@ -25,7 +25,7 @@ Audience: Engineers and LLM agents implementing Python support end‑to‑end. T
 
 ## Path Invariants and Naming
 
-- Patches live in `patches/python/` (flat directory, no subdirectories). Filenames: `<distribution-name>@<version>.patch` (case‑insensitive keys in logic).
+- Patches live in `<importer>/patches/python/` (importer‑local, flat directory, no subdirectories). Filenames: `<distribution-name>@<version>.patch` (case‑insensitive keys in logic).
 - Python Nix templates live in `tools/nix/templates/python.nix`, imported by `tools/nix/lang-templates.nix`.
 - Buck macros live under `python/defs.bzl` and use `//third_party/providers:auto_map.bzl`.
 - Provider rules live under `//third_party/providers/**` and are generated, not hand‑edited.
@@ -55,9 +55,9 @@ Provide two functions mirroring Go’s `goApp`/`goLib` style: `pyApp` and `pyLib
 
 Key responsibilities
 
-- Accept `name`, `lockfile`, `subdir` (optional), `patchDir` (default `../../patches/python`), and `devOverrideEnv` (default `NIX_PY_DEV_OVERRIDE_JSON`).
+- Accept `name`, `lockfile`, `subdir` (optional), and `devOverrideEnv` (default `NIX_PY_DEV_OVERRIDE_JSON`).
 - Build using uv only, with `uv.lock` as the single source of truth (prefer via a `uv2nix` adapter; otherwise a small repo helper to translate `uv.lock` into a reproducible inputs set).
-- Apply patches by matching `name@version` keys from `patches/python/*.patch` to Python distributions during build.
+- Apply patches by matching `name@version` keys from `<importer>/patches/python/*.patch` to Python distributions during build.
 - Apply dev overrides by swapping a distribution’s `src` when `NIX_PY_DEV_OVERRIDE_JSON` is set (warn locally, throw in CI).
 
 Environment variants (uv groups)
@@ -167,8 +167,8 @@ Add a zx generator `tools/buck/sync-providers-python.ts` that:
 
 - Scans all `uv.lock` lockfiles (`**/uv.lock`).
 - For each importer, computes an effective set of distributions (simplest approach: full set from the lockfile; future enhancement may trim unused extras if encoded).
-- Includes only `patches/python/*.patch` whose `<dist>@<ver>` appears in that effective set.
-- Writes `third_party/providers/TARGETS.python.auto` deterministically with entries:
+- Includes only `<importer>/patches/python/*.patch` whose `<dist>@<ver>` appears in that effective set (for introspection only).
+- Writes `third_party/providers/TARGETS.python.auto` deterministically with entries (metadata‑only; patches are not consumed as srcs by the provider rule — macros pull them into target `srcs` for invalidation):
 
 ```starlark
 load("//third_party/providers:defs_python.bzl", "python_importer_deps")
@@ -178,7 +178,7 @@ python_importer_deps(
     lockfile = "apps/pytool/uv.lock",
     importer = "apps/pytool",
     patch_paths = [
-        "patches/python/requests@2.32.3.patch",
+        "apps/pytool/patches/python/requests@2.32.3.patch",
         # ...
     ],
 )
@@ -196,20 +196,20 @@ Note: The orchestrator `tools/buck/sync-providers.ts` already drives per‑langu
 
 ## Provider Rule: //third_party/providers/defs_python.bzl
 
-A minimal, content‑addressed stamp mirroring Node and Go providers:
+A minimal, metadata‑only stamp mirroring Node:
 
 ```starlark
 def python_importer_deps(name, lockfile, importer, patch_paths = []):
     genrule(
         name = name,
-        srcs = [lockfile] + patch_paths,
+        srcs = [],
         out = name + ".stamp",
-        cmd = "if command -v sha256sum >/dev/null; then cat $SRCS | sha256sum > $OUT; else cat $SRCS | shasum -a 256 > $OUT; fi",
+        cmd = "echo python_importer:${importer} ${lockfile} > $OUT",
         visibility = ["//visibility:public"],
     )
 ```
 
-This keeps provider cache keys sensitive to lockfile contents and any referenced patches.
+Patch invalidation is handled by Python macros that include importer‑local patches in target `srcs`.
 
 ---
 
@@ -296,7 +296,7 @@ Add `tools/patch/patch-python.ts` implementing `LanguageHandler`:
   - If `$PATCH_EDITOR` is set, launch it against the temp dir.
 
 - `apply <dist>`
-  - Produce unified diff: `diff -ruN "$src" "$tmp" > patches/python/<name>@<version>.patch`.
+  - Produce unified diff: `diff -ruN "$src" "$tmp" > <importer>/patches/python/<name>@<version>.patch`.
   - Run glue: `node tools/buck/sync-providers.ts` (now includes Python) and `node tools/buck/gen-auto-map.ts`.
   - Clear dev override for that key and delete temp dir.
 
