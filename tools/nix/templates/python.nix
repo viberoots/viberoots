@@ -1,9 +1,9 @@
-{ pkgs }:
+{ pkgs, uv2nixLib ? null }:
 let
   lib = pkgs.lib;
   H = import ../lib/lang-helpers.nix { inherit pkgs; };
 
-  UvBackend = import ./python/backends/uv.nix { inherit pkgs; };
+  UvBackend = import ./python/backends/uv.nix { inherit pkgs; uv2nixLib = uv2nixLib; };
 
   mkPy = {
     name,
@@ -28,18 +28,23 @@ let
           let
             names = builtins.attrNames (builtins.readDir patchDirAbs);
             isPatch = name: lib.hasSuffix ".patch" name;
-            toKeyVal = name:
+            toKey = name:
               let
                 base = lib.removeSuffix ".patch" name;
                 parts = lib.splitString "@" base;
                 impEnc = lib.concatStringsSep "@" (lib.take (lib.length parts - 1) parts);
                 ver = lib.last parts;
                 importPath = lib.replaceStrings ["__"] ["/"] impEnc;
-                key = (lib.toLower importPath) + "@" + (lib.toLower ver);
+              in (lib.toLower importPath) + "@" + (lib.toLower ver);
+            step = acc: name:
+              let
+                key = toKey name;
                 content = builtins.readFile (patchDirAbs + "/" + name);
-                storeFile = pkgs.writeText "py-patch-${key}.patch" content;
-              in { name = key; value = [ (builtins.toString storeFile) ]; };
-          in builtins.listToAttrs (map toKeyVal (lib.filter isPatch names))
+                storeFile = pkgs.writeText "py-patch-${key}-${name}.patch" content;
+                prev = acc.${key} or [];
+              in acc // { "${key}" = prev ++ [ (builtins.toString storeFile) ]; };
+            # Attr names are sorted; fold preserves deterministic order.
+          in builtins.foldl' step {} (lib.filter isPatch names)
         else {};
       devOverrides = H.readDevOverrides devOverrideEnv;
       # Use a stable snapshot of the app/lib subtree, including vendored test fixtures

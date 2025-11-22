@@ -114,7 +114,8 @@
       "inputs": {
         "buck2": "buck2",
         "gomod2nix": "gomod2nix",
-        "nixpkgs": "nixpkgs_2"
+        "nixpkgs": "nixpkgs_2",
+        "uv2nix": "uv2nix"
       }
     },
     "rust-overlay": {
@@ -166,6 +167,18 @@
         "owner": "nix-systems",
         "repo": "default",
         "type": "github"
+      }
+    },
+    "uv2nix": {
+      "locked": {
+        "lastModified": 1,
+        "narHash": "sha256-KLFE3t0Rgz9Pdxig2C/HMo0tdT9znE63HMiA4JAvmwA=",
+        "path": "./third_party/uv2nix",
+        "type": "path"
+      },
+      "original": {
+        "path": "./third_party/uv2nix",
+        "type": "path"
       }
     }
   },

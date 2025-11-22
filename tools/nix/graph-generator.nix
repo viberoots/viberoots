@@ -1,4 +1,4 @@
-{ pkgs, src ? ../../., graphJsonPath ? null, rootModulesTomlPath ? null }:
+{ pkgs, src ? ../../., graphJsonPath ? null, rootModulesTomlPath ? null, uv2nixLib ? null }:
 let
   lib = pkgs.lib;
   # Allow tests to override the repo root via BUCK_TEST_SRC; default to provided flake src
@@ -71,7 +71,7 @@ let
       then candidate
       else ./.;
   # Load language templates from the chosen manifest base (temp repo when set)
-  T = import (manifestBase + "/lang-templates.nix") { inherit pkgs; };
+  T = import (manifestBase + "/lang-templates.nix") { inherit pkgs uv2nixLib; };
   M = if builtins.pathExists ./mapping.nix then (
         let raw = import ./mapping.nix;
             attempt = builtins.tryEval (raw {});

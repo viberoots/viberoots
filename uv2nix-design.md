@@ -137,14 +137,48 @@
   - Preserve `patchesMap` and `devOverrides` behavior and CI guardrails.
   - Optional: `groups` parameter with deterministic effect on outputs and `BUILD-INFO.json`.
   - Ensure `pyApp` emits a runnable wrapper; `pyLib` emits a reusable overlay/site.
+- Pinning and inputs (required):
+  - Add a pinned `uv2nix` input to `flake.nix` (e.g., `inputs.uv2nix.url = "github:<org>/uv2nix/<rev>"`; follow the repo’s pinning conventions).
+  - Route the backend through a tiny adapter module (e.g., `tools/nix/uv2nix-adapter.nix`) that:
+    - Imports `uv2nix` from flake inputs.
+    - Exposes a pure function to realize environments from `uv.lock` without network.
+    - Accepts `groups = []` and makes them part of the derivation key.
+  - Ensure all fetchers (sdists/wheels/index snapshots) are pinned via flake inputs or fixed-output derivations; no implicit network.
+- Backend integration (replacement of the stub):
+  - Replace the current shell-based `uv.nix` realization with an implementation that invokes `uv2nix` to materialize site‑packages.
+  - Apply importer‑local patches during source preparation (sdist or unpacked wheel) in a stable, order‑deterministic manner (sorted by `<dist>@<ver>` → patch filename).
+  - Keep `NIX_PY_DEV_OVERRIDE_JSON` semantics identical:
+    - Local warn (print once per evaluation via shared helper); CI = hard fail.
+    - Overrides participate in the derivation key only when set; never allowed in CI.
+  - Keep the public API of `pyApp`/`pyLib` unchanged (name, lockfile, subdir, groups).
+- Determinism and offline behavior:
+  - Prove “no network access” during evaluation and build by:
+    - Running with `--option restrict-eval true` in CI integration tests (where applicable).
+    - Explicitly pinning any metadata snapshots `uv2nix` requires (e.g., index metadata) as fixed-output inputs.
+  - Output stability:
+    - Emit `BUILD-INFO.json` including `{"lockfile": "<rel>", "groups": [...], "uv2nix": {"rev": "<rev>", "version": "<semver or rev>"}}`.
+    - Wrapper paths for apps remain stable (`bin/py-<sanitized-name>`).
+- Observability and ergonomics:
+  - Log a concise message on evaluation that includes importer, lockfile path, and groups (behind `PLANNER_TRACE` or similar).
+  - When `groups` is non‑empty, ensure the value is visible in derivation names and `BUILD-INFO.json`.
+  - Preserve WASM convenience macros behavior (out of scope for uv2nix; unchanged).
+- Migration/backout:
+  - Keep the legacy shell fallback behind a hidden flag during the transition: `NIX_PY_USE_STUB_BACKEND=1` forces the previous stubbed builder (for quick backouts).
+  - Default is uv2nix; removal of the stub follows after one PR cycle if no regressions are found.
 - Tests (zx, one‑test‑per‑file):
   - “python.runtime.build-and-run.test.ts”: build a tiny importer app; run; assert output.
   - “python.runtime.patch-affects-execution.test.ts”: apply a patch to a locked dist; rebuild; assert output change; re‑apply same patch → no‑op.
   - “python.runtime.groups.variants.test.ts” (if groups): base vs dev/test variants produce distinct derivations and remain idempotent.
+  - “python.runtime.offline-no-network.test.ts”: prove builds succeed with network disabled.
+  - “python.runtime.uv2nix-pinned.test.ts”: assert `BUILD-INFO.json` contains the pinned uv2nix rev/version.
+  - “python.runtime.deterministic-patches-order.test.ts”: multiple patches apply in sorted, deterministic order (derivation key stable across evaluations).
 - Docs:
   - Add a concise uv2nix usage note (how `pyApp`/`pyLib` realize environments; pure/offline guarantees; groups).
 - Acceptance:
   - Deterministic uv2nix builds (Darwin/Linux); wrapper runs pass; patches change behavior; re‑apply is no‑op; tests pass.
+  - `flake.nix` contains a pinned `uv2nix` input and the backend references it (no hidden fetchers).
+  - Offline: CI proves no network access is required for evaluation or build.
+  - Observability: `BUILD-INFO.json` records lockfile, groups, and uv2nix identity.
 
 #### PR‑P3: Scaffolding polish (pyproject + uv.lock + TARGETS) — with tests/docs
 

@@ -1,4 +1,4 @@
-{ pkgs }:
+{ pkgs, uv2nixLib ? null }:
 args:
 let
   lib = pkgs.lib;
@@ -27,8 +27,9 @@ let
 
   sanitize = s: lib.replaceStrings ["//" ":" "/" " "] ["" "-" "-" "-"] s;
   py = pkgs.python3 or pkgs.python311;
-  useStub = stubFlag || (testResolveJSON != "");
-  Uv2nixAdapter = import ../../../uv2nix-adapter.nix { inherit pkgs; };
+  # Stable primary path: uv2nix adapter is mandatory unless explicitly overridden.
+  useStub = stubFlag;
+  Uv2nixAdapter = import ../../../uv2nix-adapter.nix { inherit pkgs; uv2nixLib = uv2nixLib; };
 in
 if (!useStub) then
   # Route through the adapter (uv2nix-backed realization)

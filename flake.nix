@@ -29,9 +29,11 @@
     buck2.url = "github:facebook/buck2/201beb86106fecdc84e30260b0f1abb5bf576988";
     gomod2nix.url = "github:nix-community/gomod2nix";
     gomod2nix.inputs.nixpkgs.follows = "nixpkgs";
+    # uv2nix pinned via a local path flake; provides a stable interface and identity.
+    uv2nix.url = "path:./third_party/uv2nix";
   };
 
-  outputs = { self, nixpkgs, buck2, gomod2nix }:
+  outputs = { self, nixpkgs, buck2, gomod2nix, uv2nix }:
   let
     systems = [ "aarch64-darwin" "aarch64-linux" "x86_64-linux" ];
     forAllSystems = f: nixpkgs.lib.genAttrs systems (system:
@@ -67,7 +69,8 @@
           prefetchedStorePathGlobal = null;
         };
         prelude = import ./tools/nix/buck-prelude.nix { inherit pkgs; buck2Input = buck2; };
-      in f { inherit pkgs zx-wrapper nodeMods prelude system; buck2Input = buck2; }
+        uv2nixLib = (uv2nix.lib or null);
+      in f { inherit pkgs zx-wrapper nodeMods prelude system uv2nixLib; buck2Input = buck2; }
     );
   in {
     apps = forAllSystems ({ pkgs, ... }: {
@@ -85,7 +88,7 @@
       { default = (import ./tools/nix/devshell.nix { inherit pkgs; buck2Input = buck2Input; }).default; }
     );
 
-    packages = forAllSystems ({ zx-wrapper, pkgs, nodeMods, prelude, buck2Input, system, ... }:
+    packages = forAllSystems ({ zx-wrapper, pkgs, nodeMods, prelude, buck2Input, system, uv2nixLib, ... }:
       let
         # Optional local override to inject a pre-fetched pnpm store into pnpm-store derivations
         localPnpmStore = let s = builtins.getEnv "LOCAL_PNPM_STORE"; in if s != "" then s else null;
@@ -104,6 +107,7 @@
           # Allow tests to override repo-root gomod2nix.toml via env
           rootModulesTomlPath = let envRootToml = builtins.getEnv "ROOT_GOMOD2NIX_TOML"; in
             if envRootToml != "" then envRootToml else ./gomod2nix.toml;
+          uv2nixLib = uv2nixLib;
         };
         # Ensure buck-graph.nix is included even when untracked by wrapping with builtins.path
         buckGraphFile = builtins.path { path = ./tools/nix/buck-graph.nix; name = "buck-graph.nix"; };
@@ -121,6 +125,7 @@
             if envGraph != "" then envGraph else (buckGraph + "/graph.json");
           rootModulesTomlPath = let envRootToml = builtins.getEnv "ROOT_GOMOD2NIX_TOML"; in
             if envRootToml != "" then envRootToml else ./gomod2nix.toml;
+          uv2nixLib = uv2nixLib;
         };
 
         # Discover importers under apps/* and libs/* containing a pnpm-lock.yaml.
@@ -262,7 +267,7 @@
           # build a Node-API addon derivation and make its artifact available for tests.
           hasNative = builtins.pathExists (./. + ("/" + importerDir + "-native"));
           TAddon = import ./tools/nix/templates/cpp-node-addon.nix { inherit pkgs; };
-          T = import ./tools/nix/lang-templates.nix { inherit pkgs; };
+          T = import ./tools/nix/lang-templates.nix { inherit pkgs uv2nixLib; };
           addonName = name + "_addon";
           # If a sibling native addon exists, also build the Go c-archive from libs/<name>-go
           # and link it into the addon via nixCxxPkgs so the header/lib are available hermetically.

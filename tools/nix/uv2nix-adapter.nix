@@ -1,4 +1,4 @@
-{ pkgs }:
+{ pkgs, uv2nixLib ? null }:
 # tools/nix/uv2nix-adapter.nix
 # Adapter facade intended to realize Python environments via uv2nix.
 # For now, we implement a conservative, offline-friendly materializer that
@@ -27,7 +27,70 @@ let
     else pkgs.writeText "py-test-resolve.json" "{}";
 
   py = pkgs.python3 or pkgs.python311;
+  stubFlag = (builtins.getEnv "NIX_PY_USE_STUB_BACKEND") == "1";
+  # Require uv2nix when not explicitly in stub mode
+  _ = if (!stubFlag) && (uv2nixLib == null)
+      then builtins.throw "uv2nix adapter requires uv2nixLib; set NIX_PY_USE_STUB_BACKEND=1 to force stub"
+      else null;
 in
+# Primary path: call uv2nixLib to realize the environment (no silent fallbacks).
+if (!stubFlag) then
+  let
+    uvDrv = uv2nixLib.mkEnv {
+      inherit src subdir lockfile patchesMap devOverrides wsRoot;
+      testResolve = (builtins.fromJSON (builtins.readFile testResolveFile));
+    };
+    meta = uv2nixLib.meta or { version = "unknown"; rev = "unknown"; };
+  in
+  pkgs.stdenvNoCC.mkDerivation {
+    inherit pname version src;
+    nativeBuildInputs = [ pkgs.coreutils py ];
+
+    installPhase = ''
+      set -euo pipefail
+      mkdir -p "$out/site" "$out/bin"
+      if [ -d "${uvDrv}/site" ]; then
+        cp -R "${uvDrv}/site/." "$out/site/" || true
+      fi
+      wrapper="$out/bin/${pname}"
+      cat > "$wrapper" <<'SH'
+      #!/usr/bin/env bash
+      set -euo pipefail
+      HERE="$(cd "$(dirname "$0")" && pwd)"
+      PY="$(command -v python3 || true)"
+      if [ -z "$PY" ]; then PY="${py}/bin/python"; fi
+      export PYTHONPATH="$HERE/../site:${src}/${subdir}/src''${PYTHONPATH:+:$PYTHONPATH}"
+      if [ -n "''${WORKSPACE_ROOT:-}" ] && [ -d "''${WORKSPACE_ROOT}/${subdir}/src" ]; then
+        export PYTHONPATH="''${WORKSPACE_ROOT}/${subdir}/src''${PYTHONPATH:+:}''${PYTHONPATH}"
+      fi
+      MAIN="${src}/${subdir}/bin/__main__.py"
+      if [ -f "$MAIN" ]; then
+        exec "$PY" "$MAIN" "$@"
+      fi
+      if [ -n "''${WORKSPACE_ROOT:-}" ] && [ -f "''${WORKSPACE_ROOT}/${subdir}/bin/__main__.py" ]; then
+        exec "$PY" "''${WORKSPACE_ROOT}/${subdir}/bin/__main__.py" "$@"
+      fi
+      echo "python app entrypoint not found at $MAIN" >&2
+      echo "PYTHONPATH=$PYTHONPATH" >&2
+      exit 2
+      SH
+      chmod +x "$wrapper"
+      cat > "$out/BUILD-INFO.json" <<JSON
+      {
+        "kind": "${kind}",
+        "lockfile": "${lockfile}",
+        "subdir": "${subdir}",
+        "groups": ${builtins.toJSON groups},
+        "backend": "uv2nix",
+        "uv2nix": {
+          "version": "${meta.version or "unknown"}",
+          "rev": "${meta.rev or "unknown"}"
+        }
+      }
+      JSON
+    '';
+  }
+else
 pkgs.stdenvNoCC.mkDerivation {
   inherit pname version src;
   nativeBuildInputs = [ pkgs.coreutils pkgs.findutils pkgs.jq pkgs.gnused pkgs.patch py ];

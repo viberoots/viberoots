@@ -1,9 +1,9 @@
-{ pkgs }:
+{ pkgs, uv2nixLib ? null }:
 let
   Go  = import ./templates/go.nix  { inherit pkgs; };
   Cpp = import ./templates/cpp.nix { inherit pkgs; };
   Node = import ./templates/node.nix { inherit pkgs; };
-  Python = import ./templates/python.nix { inherit pkgs; };
+  Python = import ./templates/python.nix { inherit pkgs uv2nixLib; };
   PythonWasm = import ./templates/python/wasm.nix { inherit pkgs; };
 in {
   inherit (Go)  goApp goLib goCArchive goTinyWasmLib;
