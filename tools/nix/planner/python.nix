@@ -85,6 +85,12 @@ in rec {
   # WASM variants (Phase 1: WASI baseline)
   mkWasmApp = name:
     let
+      # Determine backend from labels; default to "wasi". Accept labels like "backend:pyodide".
+      backendFor = nm:
+        let
+          labs = labelsOfName nm;
+          hits = builtins.filter (l: (builtins.typeOf l) == "string" && lib.hasPrefix "backend:" l) (if labs == null then [] else labs);
+        in if hits == [] then "wasi" else (lib.removePrefix "backend:" (builtins.head hits));
       # Collect direct python lib deps as overlays
       directDeps = depsOfName name;
       pyLibDeps =
@@ -107,7 +113,7 @@ in rec {
       srcRoot = repoRoot;
       subdir = pkgPathOf name;
       libOverlays = overlays;
-      backend = "wasi";
+      backend = backendFor name;
     };
 
   mkWasmLib = name:

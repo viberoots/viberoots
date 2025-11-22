@@ -108,6 +108,9 @@ in {
         if builtins.pathExists patchDirAbs then H.patchesMapFromDir patchDirAbs else {};
       patchedKeys = builtins.attrNames patchesMap;
       overlaysCount = builtins.length libOverlays;
+      # Allow test/local override of backend via env for selected-target fallback builds
+      backendEnv = builtins.getEnv "PY_WASM_BACKEND";
+      effBackend = if backendEnv != "" then backendEnv else backend;
       uv = UvBackend {
         pname = "py-${H.sanitizeName name}";
         version = "0.1.0";
@@ -122,8 +125,9 @@ in {
       };
       msg =
         let
+          msgPrefix = if effBackend == "pyodide" then "python-pyodide" else "python-wasi";
           parts = [
-            ("python-wasi:" + backend)
+            (msgPrefix + ":" + effBackend)
             ("overlays=" + (toString overlaysCount))
             ("patched=" + (if patchedKeys == [] then "none" else (lib.concatStringsSep "," patchedKeys)))
           ];
@@ -149,7 +153,7 @@ chmod +x "$out/bin/run.mjs"
       cat > "$out/BUILD-INFO.json" <<JSON
       {
         "kind": "wasm-app",
-        "backend": "${backend}",
+        "backend": "${effBackend}",
         "lockfile": "${lockfile}",
         "subdir": "${subdir}",
         "groups": ${builtins.toJSON groups},
