@@ -18,6 +18,11 @@ let
   kind = args.kind or "app";
   wsRoot = args.wsRoot or null;
   groups = args.groups or [];
+  # Resolve relative origins against BUCK_TEST_SRC or WORKSPACE_ROOT; fallback to flake root
+  flakeRoot = builtins.toString ./.;
+  buckTestSrc = builtins.getEnv "BUCK_TEST_SRC";
+  workspaceEnv = builtins.getEnv "WORKSPACE_ROOT";
+  originRoot = if buckTestSrc != "" then buckTestSrc else if workspaceEnv != "" then workspaceEnv else flakeRoot;
 
   testResolveJSON = builtins.getEnv "NIX_PY_TEST_RESOLVE_JSON";
   patchesMapFile = pkgs.writeText "py-patches.json" (builtins.toJSON patchesMap);
@@ -25,6 +30,25 @@ let
   testResolveFile =
     if testResolveJSON != "" then pkgs.writeText "py-test-resolve.json" testResolveJSON
     else pkgs.writeText "py-test-resolve.json" "{}";
+  # For the uv2nix primary path, embed workspace origins into the store so builds are pure/offline.
+  testResolveObj =
+    let raw = if testResolveJSON != "" then (builtins.fromJSON testResolveJSON) else {};
+        names = builtins.attrNames raw;
+        isRepoAbs = p: lib.hasPrefix "apps/" p || lib.hasPrefix "libs/" p || lib.hasPrefix "/" p;
+        toStore = p: builtins.toString (builtins.path { path = builtins.toPath p; name = "uv-src"; });
+        step = acc: name:
+          let entry = raw.${name};
+              ver = entry.version or null;
+              origin = entry.originPath or null;
+              storeOrigin =
+                if origin == null then null else (
+                  if isRepoAbs origin then toStore (originRoot + "/" + origin) else toStore (builtins.toString src + "/" + origin)
+                );
+              value = if storeOrigin != null then ({ version = ver; originPath = storeOrigin; })
+                      else if origin != null then ({ version = ver; originPath = origin; })
+                      else ({ version = ver; });
+          in acc // { "${name}" = value; };
+    in builtins.foldl' step {} names;
 
   py = pkgs.python3 or pkgs.python311;
   stubFlag = (builtins.getEnv "NIX_PY_USE_STUB_BACKEND") == "1";
@@ -37,14 +61,15 @@ in
 if (!stubFlag) then
   let
     uvDrv = uv2nixLib.mkEnv {
-      inherit src subdir lockfile patchesMap devOverrides wsRoot;
-      testResolve = (builtins.fromJSON (builtins.readFile testResolveFile));
+      inherit src subdir lockfile devOverrides wsRoot;
+      patchesMap = {}; # apply patches in adapter for robustness
+      testResolve = testResolveObj;
     };
     meta = uv2nixLib.meta or { version = "unknown"; rev = "unknown"; };
   in
   pkgs.stdenvNoCC.mkDerivation {
     inherit pname version src;
-    nativeBuildInputs = [ pkgs.coreutils py ];
+    nativeBuildInputs = [ pkgs.coreutils pkgs.jq pkgs.git pkgs.gnused pkgs.patch py ];
 
     installPhase = ''
       set -euo pipefail
@@ -52,48 +77,83 @@ if (!stubFlag) then
       if [ -d "${uvDrv}/site" ]; then
         cp -R "${uvDrv}/site/." "$out/site/" || true
       fi
+      chmod -R u+w "$out/site" || true
+      # Compute minimal patches list (key+file basenames) in deterministic order
+      patchesJson="$(${pkgs.jq}/bin/jq -c 'to_entries | sort_by(.key) | [ .[] | .key as $k | (.value // []) | sort | .[] | {key:$k, file:(. | split(\"/\") | last)} ]' '${patchesMapFile}' 2>/dev/null || echo '[]')"
+      # Apply importer-local patches on top of site (deterministic text replacement)
+      if [ -s '${patchesMapFile}' ]; then
+        keys=$(jq -r 'keys[]' '${patchesMapFile}' 2>/dev/null || true)
+        for k in $keys; do
+          jq -r --arg kk "$k" '.[$kk][]?' '${patchesMapFile}' | while IFS= read -r p; do
+            [ -n "$p" ] || continue
+            tmpPatch="$TMPDIR/$(basename "$p")"
+            cp -f "$p" "$tmpPatch" || true
+            # Normalize CRLF → LF and expand minimal @@ hunks for patch(1)
+            ${pkgs.gnused}/bin/sed -i $'s/\r$//' "$tmpPatch" || true
+            ${pkgs.gnused}/bin/sed -E -i 's/^@@$/@@ -1,999 +1,999 @@/' "$tmpPatch" || true
+            tgt=$(grep -E '^--- a/' "$tmpPatch" | head -n1 | sed -E 's|^--- a/||')
+            if [ -n "$tgt" ] && [ -f "$out/site/$tgt" ]; then
+              oldB="$TMPDIR/old.$$"; newB="$TMPDIR/new.$$"
+              sed -n '1,/^@@/d; /^\-/p' "$tmpPatch" | sed 's/^-//' > "$oldB"
+              sed -n '1,/^@@/d; /^\+/p' "$tmpPatch" | sed 's/^+//' > "$newB"
+              ${py}/bin/python - "$out/site/$tgt" "$oldB" "$newB" <<'PY'
+import sys
+fp, oldf, newf = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(oldf, "r", encoding="utf-8") as f: old = f.read()
+with open(newf, "r", encoding="utf-8") as f: new = f.read()
+with open(fp, "r", encoding="utf-8") as f: data = f.read()
+data = data.replace(old, new)
+with open(fp, "w", encoding="utf-8") as f: f.write(data)
+PY
+            else
+              ${pkgs.gnused}/bin/sed -E -i 's/^@@$/@@ -1,999 +1,999 @@/' "$tmpPatch" || true
+              (cd "$out/site" && ${pkgs.patch}/bin/patch -p1 -t -N -i "$tmpPatch") || true
+            fi
+          done
+        done
+      fi
+      echo "[adapter] site listing at $out/site:" >&2
+      (find "$out/site" -maxdepth 2 -type f -print || true) >&2
       wrapper="$out/bin/${pname}"
-      cat > "$wrapper" <<'SH'
-      #!/usr/bin/env bash
-      set -euo pipefail
-      HERE="$(cd "$(dirname "$0")" && pwd)"
-      PY="$(command -v python3 || true)"
-      if [ -z "$PY" ]; then PY="${py}/bin/python"; fi
-      export PYTHONPATH="$HERE/../site:${src}/${subdir}/src''${PYTHONPATH:+:$PYTHONPATH}"
-      if [ -n "''${WORKSPACE_ROOT:-}" ] && [ -d "''${WORKSPACE_ROOT}/${subdir}/src" ]; then
-        export PYTHONPATH="''${WORKSPACE_ROOT}/${subdir}/src''${PYTHONPATH:+:}''${PYTHONPATH}"
-      fi
-      MAIN="${src}/${subdir}/bin/__main__.py"
-      if [ -f "$MAIN" ]; then
-        exec "$PY" "$MAIN" "$@"
-      fi
-      if [ -n "''${WORKSPACE_ROOT:-}" ] && [ -f "''${WORKSPACE_ROOT}/${subdir}/bin/__main__.py" ]; then
-        exec "$PY" "''${WORKSPACE_ROOT}/${subdir}/bin/__main__.py" "$@"
-      fi
-      echo "python app entrypoint not found at $MAIN" >&2
-      echo "PYTHONPATH=$PYTHONPATH" >&2
-      exit 2
-      SH
-      chmod +x "$wrapper"
-      cat > "$out/BUILD-INFO.json" <<JSON
       {
-        "kind": "${kind}",
-        "lockfile": "${lockfile}",
-        "subdir": "${subdir}",
-        "groups": ${builtins.toJSON groups},
-        "backend": "uv2nix",
-        "uv2nix": {
-          "version": "${meta.version or "unknown"}",
-          "rev": "${meta.rev or "unknown"}"
-        }
-      }
-      JSON
+        echo '#!/usr/bin/env bash'
+        echo 'set -euo pipefail'
+        echo 'HERE="$(cd "$(dirname "$0")" && pwd)"'
+        echo 'PY="$(command -v python3 || true)"'
+        echo 'if [ -z "$PY" ]; then PY="${py}/bin/python"; fi'
+        echo 'export PYTHONPATH="$HERE/../site:${src}/${subdir}/src''${PYTHONPATH:+:$PYTHONPATH}"'
+        echo 'if [ -n "''${WORKSPACE_ROOT:-}" ] && [ -d "''${WORKSPACE_ROOT}/${subdir}/src" ]; then'
+        echo '  export PYTHONPATH="''${WORKSPACE_ROOT}/${subdir}/src''${PYTHONPATH:+:}''${PYTHONPATH}"'
+        echo 'fi'
+        echo 'MAIN="${src}/${subdir}/bin/__main__.py"'
+        echo 'if [ -f "$MAIN" ]; then'
+        echo '  exec "$PY" "$MAIN" "$@"'
+        echo 'fi'
+        echo 'if [ -n "''${WORKSPACE_ROOT:-}" ] && [ -f "''${WORKSPACE_ROOT}/${subdir}/bin/__main__.py" ]; then'
+        echo '  exec "$PY" "''${WORKSPACE_ROOT}/${subdir}/bin/__main__.py" "$@"'
+        echo 'fi'
+        echo 'echo "python app entrypoint not found at $MAIN" >&2'
+        echo 'echo "PYTHONPATH=$PYTHONPATH" >&2'
+        echo 'exit 2'
+      } > "$wrapper"
+      chmod +x "$wrapper"
+      # Write minimal BUILD-INFO.json (avoid heredoc to prevent delimiter pitfalls)
+      {
+        echo '{'
+        echo '  "kind": "'"${kind}"'",'
+        echo '  "lockfile": "'"${lockfile}"'",'
+        echo '  "subdir": "'"${subdir}"'",'
+        printf '%s\n' "  \"groups\": ${builtins.toJSON groups},"
+        echo '  "backend": "uv2nix",'
+        echo '  "uv2nix": { "version": "'"${meta.version or "unknown"}"'", "rev": "'"${meta.rev or "unknown"}"'" }'
+        echo '}'
+      } > "$out/BUILD-INFO.json"
     '';
   }
 else
 pkgs.stdenvNoCC.mkDerivation {
   inherit pname version src;
-  nativeBuildInputs = [ pkgs.coreutils pkgs.findutils pkgs.jq pkgs.gnused pkgs.patch py ];
+  nativeBuildInputs = [ pkgs.coreutils pkgs.findutils pkgs.jq pkgs.gnused pkgs.patch pkgs.git py ];
 
   buildPhase = ''
     set -euo pipefail
@@ -133,14 +193,14 @@ pkgs.stdenvNoCC.mkDerivation {
           cur_ver=""
           ;;
         name\ =\ \"*\" )
-          cur_name="$(printf "%s" "$l" | sed -n 's/^name = "\(.*\)".*$/\1/p' | tr '[:upper:]' '[:lower:]')"
+          cur_name="$(printf "%s" "$l" | sed -n 's/^name = \"\(.*\)\".*$/\1/p' | tr '[:upper:]' '[:lower:]')"
           ;;
         version\ =\ \"*\" )
-          cur_ver="$(printf "%s" "$l" | sed -n 's/^version = "\(.*\)".*$/\1/p' | tr '[:upper:]' '[:lower:]')"
+          cur_ver="$(printf "%s" "$l" | sed -n 's/^version = \"\(.*\)\".*$/\1/p' | tr '[:upper:]' '[:lower:]')"
           ;;
       esac
     done < "${lockfile}"
-    if [ -n "$cur_name" ] && [ -n "$cur_ver" ]; then
+    if [ -n "$cur_name" ] && [ -n "$cur_ver" ] ; then
       printf "%s@%s\n" "$cur_name" "$cur_ver" >> "$keysFile"
     fi
     sort -u "$keysFile" -o "$keysFile"
@@ -200,7 +260,7 @@ pkgs.stdenvNoCC.mkDerivation {
         d="$(find "$work" -mindepth 1 -maxdepth 1 -type d -print | head -n1)"
         cp -a "$d" "$site/"
       else
-        cp -a "$work"/. "$site"/
+        cp -a "$work"/. "$site/"
       fi
     done < "$keysFile"
   '';

@@ -69,7 +69,15 @@
           prefetchedStorePathGlobal = null;
         };
         prelude = import ./tools/nix/buck-prelude.nix { inherit pkgs; buck2Input = buck2; };
-        uv2nixLib = (uv2nix.lib or null);
+        uv2nixLib =
+          let lib = (uv2nix.lib or null);
+          in if lib == null then null else {
+            meta = lib.meta or {};
+            mkEnv = args:
+              if (lib ? mkEnvFor) then (lib.mkEnvFor pkgs) args
+              else if (lib ? mkEnv) then lib.mkEnv args
+              else builtins.throw "uv2nix lib is missing mkEnv/mkEnvFor";
+          };
       in f { inherit pkgs zx-wrapper nodeMods prelude system uv2nixLib; buck2Input = buck2; }
     );
   in {
@@ -418,7 +426,7 @@ EOF_PAT
       ) // (
         let
           # Python per-importer environments (uv.lock-based)
-          T = import ./tools/nix/lang-templates.nix { inherit pkgs; };
+          T = import ./tools/nix/lang-templates.nix { inherit pkgs uv2nixLib; };
           sanitize = (import ./tools/nix/templates-common.nix { inherit pkgs; }).sanitizeName;
           srcRoot = builtins.path { path = ./.; name = "repo"; };
           listDirs = base:
@@ -450,7 +458,26 @@ EOF_PAT
             value = makePy imp [ "test" ];
           }) pyImporters);
         in
-          pyBase // pyDev // pyTest
+          let
+            makeWheelhouse = importer: let
+              envDrv = makePy importer [];
+            in pkgs.stdenvNoCC.mkDerivation {
+              pname = "py-wheelhouse";
+              version = sanitize importer;
+              src = builtins.path { path = ./.; name = "repo"; };
+              installPhase = ''
+                set -euo pipefail
+                mkdir -p "$out/site"
+                if [ -d "${envDrv}/site" ]; then
+                  cp -R "${envDrv}/site/." "$out/site/" || true
+                fi
+              '';
+            };
+            pyWheelhouse = builtins.listToAttrs (map (imp: {
+              name = "py-wheelhouse-" + (sanitize imp);
+              value = makeWheelhouse imp;
+            }) pyImporters);
+          in pyBase // pyDev // pyTest // pyWheelhouse
       )
     );
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import * as fsp from "node:fs/promises";
 import { writeIfChanged, maybeAssumeUnchanged } from "../lib/fs-helpers";
 // zx is available via shebang; we'll use `$` to interact with git when present.
 import { readCompositeGraph } from "../lib/graph-view.ts";
@@ -6,6 +7,7 @@ import { readCompositeGraph } from "../lib/graph-view.ts";
 // labels are kept for diagnostics and are intentionally ignored here.
 import { providersForLabels } from "../lib/labels";
 import { getFlagStr } from "../lib/cli.ts";
+import { ensureGraph } from "./glue-run.ts";
 
 type Node = {
   name: string;
@@ -21,6 +23,16 @@ const outPath = getFlagStr("out", "third_party/providers/auto_map.bzl");
 // parsing moved to tools/lib/labels.ts
 
 async function main() {
+  // Ensure graph exists if caller didn't generate it yet
+  try {
+    if (graphPath && graphPath.length > 0) {
+      await fsp.access(graphPath).catch(async () => {
+        await ensureGraph();
+      });
+    } else {
+      await ensureGraph();
+    }
+  } catch {}
   await maybeAssumeUnchanged(outPath);
 
   const { nodes } = await readCompositeGraph({

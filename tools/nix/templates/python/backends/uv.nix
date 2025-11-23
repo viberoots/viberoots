@@ -14,8 +14,10 @@ let
   groups = args.groups or [];
 
   # Prefer uv2nix-backed realization unless explicitly disabled or a test-only
-  # resolve mapping is provided (which requires the stub materializer).
+  # resolve mapping is provided (which requires the stub materializer). Also
+  # fall back to stub when uv2nixLib is not provided by the caller.
   stubFlag = (builtins.getEnv "NIX_PY_USE_STUB_BACKEND") == "1";
+  hasTestResolve = testResolveJSON != "";
   # Testing-only: allow a simple JSON mapping of dist -> {version, originPath}
   # injected at eval time to avoid network fetches. Empty by default.
   testResolveJSON = builtins.getEnv "NIX_PY_TEST_RESOLVE_JSON";
@@ -27,9 +29,9 @@ let
 
   sanitize = s: lib.replaceStrings ["//" ":" "/" " "] ["" "-" "-" "-"] s;
   py = pkgs.python3 or pkgs.python311;
-  # Stable primary path: uv2nix adapter is mandatory unless explicitly overridden.
-  useStub = stubFlag;
-  Uv2nixAdapter = import ../../../uv2nix-adapter.nix { inherit pkgs; uv2nixLib = uv2nixLib; };
+  # Stable primary path: use stub when requested or when uv2nixLib is absent.
+  useStub = stubFlag || (uv2nixLib == null);
+  Uv2nixAdapter = if useStub then null else import ../../../uv2nix-adapter.nix { inherit pkgs; uv2nixLib = uv2nixLib; };
 in
 if (!useStub) then
   # Route through the adapter (uv2nix-backed realization)
@@ -151,6 +153,10 @@ pkgs.stdenvNoCC.mkDerivation {
           fi
         fi
       fi
+      # Fallback: common vendor layout under the importer root
+      if [ -z "$srcPath" ] && [ -d "vendor/''${dist}-''${wantVer}" ]; then
+        srcPath="vendor/''${dist}-''${wantVer}"
+      fi
       echo "[uv-backend] materialize key=$key dist=$dist wantVer=$wantVer origin=$origin ver=$ver srcPath=$srcPath" >&2
       # If still empty, skip (no available source for this distribution)
       if [ -z "$srcPath" ] || [ ! -e "$srcPath" ]; then
@@ -167,7 +173,34 @@ pkgs.stdenvNoCC.mkDerivation {
         [ -n "$patchFile" ] || continue
         if [ -f "$patchFile" ]; then
           echo "  apply: $patchFile" >&2
-          (cd "$work" && ${pkgs.patch}/bin/patch -p1 -t -N < "$patchFile")
+          tmpPatch="$TMPDIR/$(basename "$patchFile")"
+          cp -f "$patchFile" "$tmpPatch" || true
+          # Normalize CRLF → LF and expand minimal @@ hunks
+          ${pkgs.gnused}/bin/sed -i $'s/\r$//' "$tmpPatch" || true
+          ${pkgs.gnused}/bin/sed -E -i 's/^@@$/@@ -1,999 +1,999 @@/' "$tmpPatch" || true
+          if ! (cd "$work" && ${pkgs.patch}/bin/patch -p1 -t -N -i "$tmpPatch"); then
+            echo "[uv-backend] patch failed; attempting simple replacement fallback" >&2
+            target="$(grep -E '^--- a/' "$tmpPatch" | head -n1 | ${pkgs.gnused}/bin/sed -E 's|^--- a/||')"
+            if [ -n "$target" ] && [ -f "$work/$target" ]; then
+              oldBlock="$TMPDIR/old.$$"
+              newBlock="$TMPDIR/new.$$"
+              ${pkgs.gnused}/bin/sed -n '1,/^@@/d; /^\-/p' "$tmpPatch" | ${pkgs.gnused}/bin/sed 's/^-//' > "$oldBlock"
+              ${pkgs.gnused}/bin/sed -n '1,/^@@/d; /^\+/p' "$tmpPatch" | ${pkgs.gnused}/bin/sed 's/^+//' > "$newBlock"
+              ${py}/bin/python - "$work/$target" "$oldBlock" "$newBlock" <<'PY'
+import sys
+fp, oldf, newf = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(oldf, "r", encoding="utf-8") as f:
+    old = f.read()
+with open(newf, "r", encoding="utf-8") as f:
+    new = f.read()
+with open(fp, "r", encoding="utf-8") as f:
+    data = f.read()
+data = data.replace(old, new)
+with open(fp, "w", encoding="utf-8") as f:
+    f.write(data)
+PY
+            fi
+          fi
         else
           echo "  missing: $patchFile" >&2
         fi

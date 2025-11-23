@@ -33,7 +33,9 @@ let
                 base = lib.removeSuffix ".patch" name;
                 parts = lib.splitString "@" base;
                 impEnc = lib.concatStringsSep "@" (lib.take (lib.length parts - 1) parts);
-                ver = lib.last parts;
+                verRaw = lib.last parts;
+                # Normalize versions like 1.0.0-a -> 1.0.0 for key grouping
+                ver = lib.head (lib.splitString "-" verRaw);
                 importPath = lib.replaceStrings ["__"] ["/"] impEnc;
               in (lib.toLower importPath) + "@" + (lib.toLower ver);
             step = acc: name:

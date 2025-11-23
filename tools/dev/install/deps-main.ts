@@ -64,6 +64,9 @@ console.log("Installing dependencies...");
 const { force, dryRun, verbose, skipGlue, glueOnly, skipGoTidy } = parseFlags(
   process.argv.slice(2),
 );
+// In glue-only mode, default to skipping go mod tidy unless explicitly overridden
+const effSkipGoTidy =
+  skipGoTidy || (glueOnly && String(process.env.INSTALL_DEPS_SKIP_GO_TIDY || "") !== "0");
 const repoRoot = resolveWorkspaceRoot() || process.cwd();
 // Discover importers (apps/*, libs/*) that contain a pnpm-lock.yaml.
 async function discoverImportersWithLock(root: string): Promise<string[]> {
@@ -95,7 +98,7 @@ async function discoverImportersWithLock(root: string): Promise<string[]> {
 if (glueOnly) {
   if (verbose) console.log("[install-deps] glue-only mode");
   // Minimal Go preparation so Nix graph builds are deterministic and fast
-  if (!skipGoTidy) {
+  if (!effSkipGoTidy) {
     await runGoModTidyForMissingSum(repoRoot, dryRun, verbose);
   } else if (verbose) {
     console.log("[skip] go mod tidy for missing go.sum");

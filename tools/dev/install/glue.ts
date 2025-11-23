@@ -1,5 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
+import process from "node:process";
+import * as fsp from "node:fs/promises";
 import { printSkip } from "../../lib/errors.ts";
 
 function repoRoot(): string {
@@ -7,6 +9,12 @@ function repoRoot(): string {
   const here = path.dirname(new URL(import.meta.url).pathname);
   // File lives at tools/dev/install/glue.ts → repo root is three levels up
   return path.resolve(here, "..", "..", "..");
+}
+
+function workspaceRoot(): string {
+  // Prefer explicit WORKSPACE_ROOT (tests set this), else current working directory
+  const wr = String(process.env.WORKSPACE_ROOT || "").trim();
+  return wr ? path.resolve(wr) : process.cwd();
 }
 
 export function zxNodeBase(): string {
@@ -21,42 +29,43 @@ export function zxNodeBase(): string {
 }
 
 async function ensurePreludeSymlinkIfMissing() {
+  const wsRoot = workspaceRoot();
   try {
     const check = await $({
       stdio: "pipe",
-      cwd: repoRoot(),
-    })`bash --noprofile --norc -c 'test -e prelude'`;
+      cwd: wsRoot,
+    })`bash --noprofile --norc -c ${`test -e ${path.join(wsRoot, "prelude")}`}`;
     if (check.exitCode === 0) return;
   } catch {}
-  let out = "";
-  try {
-    const res = await $({
-      stdio: "pipe",
-      cwd: repoRoot(),
-    })`nix build .#buck2-prelude --no-link --accept-flake-config --print-out-paths`;
-    out =
-      String(res.stdout || "")
-        .trim()
-        .split("\n")
-        .filter(Boolean)
-        .pop() || "";
-  } catch {}
-  if (!out) {
-    try {
-      const ev = await $({ stdio: "pipe" })`nix eval --raw .#inputs.buck2.outPath`;
-      out = String(ev.stdout || "").trim();
-    } catch {}
+  // Resolve the Nix-store path of the buck2 prelude and symlink it into the workspace.
+  // Use the host workspace flake (derived from ZX_INIT) to avoid missing inputs in the temp copy.
+  const zxInit = String(process.env.ZX_INIT || "").trim();
+  const flakeRoot =
+    zxInit && zxInit.length > 0 ? path.resolve(path.dirname(zxInit), "..", "..") : repoRoot();
+  const build = await $({
+    stdio: "pipe",
+    cwd: flakeRoot,
+  })`nix build ${flakeRoot}#buck2-prelude --no-link --accept-flake-config --print-out-paths`;
+  const storeOut = String(build.stdout || "")
+    .replace(/\r/g, "")
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .pop();
+  if (!storeOut) {
+    throw new Error("[glue] Failed to resolve buck2-prelude store path");
   }
-  if (!out) return;
-  try {
-    await $({ cwd: repoRoot() })`ln -s ${out + "/prelude"} prelude`;
-  } catch {}
+  const src = path.join(storeOut, "prelude");
+  const dst = path.join(wsRoot, "prelude");
+  await fsp.rm(dst, { recursive: true, force: true }).catch(() => {});
+  await fsp.symlink(src, dst, "dir");
 }
 
 export async function runGlue(dryRun: boolean, verbose: boolean) {
   const nodeBase = zxNodeBase();
   const nodeBin = process.execPath || "node";
   const zxImport = path.join(repoRoot(), "tools/dev/zx-init.mjs");
+  const wsRoot = workspaceRoot();
   // Detect enabled languages via templates or optional langs.json
   type LangConfig = {
     enabled?: string[];
@@ -163,7 +172,7 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
         "tools",
         "buck",
         "export-graph.ts",
-      )} --out ${path.join(repoRoot(), "tools", "buck", "graph.json")}`,
+      )} --out ${path.join(wsRoot, "tools", "buck", "graph.json")}`,
       withZx: true,
       when: true,
     },
@@ -220,8 +229,8 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
         "tools",
         "buck",
         "gen-auto-map.ts",
-      )} --graph ${path.join(repoRoot(), "tools", "buck", "graph.json")} --out ${path.join(
-        repoRoot(),
+      )} --graph ${path.join(wsRoot, "tools", "buck", "graph.json")} --out ${path.join(
+        wsRoot,
         "third_party",
         "providers",
         "auto_map.bzl",
@@ -259,6 +268,7 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
             .join(" "),
         }
       : process.env;
-    await $({ stdio: "inherit", cwd: repoRoot(), env })`bash --noprofile --norc -c ${c.cmd}`;
+    // Execute language/gen tasks in the workspace root to generate files in the temp repo when running tests
+    await $({ stdio: "inherit", cwd: wsRoot, env })`bash --noprofile --norc -c ${c.cmd}`;
   }
 }
