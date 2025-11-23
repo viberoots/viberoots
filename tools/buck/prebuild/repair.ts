@@ -92,7 +92,7 @@ export async function autoFixGlue() {
   await ensureLocalPreludeMapping();
   // Ensure gomod2nix.toml is generated before glue; ignore errors in local mode
   try {
-    await $`node --experimental-strip-types --import ./tools/dev/zx-init.mjs tools/dev/install-deps.ts --glue-only`;
+    await $`node --disable-warning=ExperimentalWarning --experimental-strip-types --import ./tools/dev/zx-init.mjs tools/dev/install-deps.ts --glue-only`;
   } catch {}
   // Run unified glue orchestration (export graph → provider index → auto-map)
   await runGlue();

@@ -8,24 +8,57 @@ import {
 } from "../lib/providers.ts";
 import { validateFlatDir } from "../lib/provider-sync.ts";
 
-type Args = {
-  strict?: string | boolean;
-  lang?: string;
-  format?: string;
-};
+type Args = { strict?: string | boolean; lang?: string; format?: string };
 
-const argv = (global as any).argv as Args & Record<string, any>;
+function parseProcessArgv(): Record<string, any> {
+  const out: Record<string, any> = {};
+  try {
+    const a = (process.argv || []).slice(2);
+    for (let i = 0; i < a.length; i++) {
+      const tok = a[i] || "";
+      if (tok === "--strict") {
+        out.strict = true;
+        continue;
+      }
+      if (tok.startsWith("--strict=")) {
+        out.strict = tok.slice("--strict=".length);
+        continue;
+      }
+      if (tok === "--lang" && i + 1 < a.length) {
+        out.lang = a[i + 1];
+        i++;
+        continue;
+      }
+      if (tok.startsWith("--lang=")) {
+        out.lang = tok.slice("--lang=".length);
+        continue;
+      }
+      if (tok === "--format" && i + 1 < a.length) {
+        out.format = a[i + 1];
+        i++;
+        continue;
+      }
+      if (tok.startsWith("--format=")) {
+        out.format = tok.slice("--format=".length);
+        continue;
+      }
+    }
+  } catch {}
+  return out;
+}
+
+const argv = ((global as any).argv || parseProcessArgv()) as Args & Record<string, any>;
 // Treat presence of --strict (with or without value) as true, unless explicitly false/0/no
 function isExplicitFalse(v: any): boolean {
   const s = String(v).toLowerCase();
   return v === false || s === "false" || s === "0" || s === "no";
 }
-const HAS_STRICT = Object.prototype.hasOwnProperty.call(argv, "strict");
+const HAS_STRICT = argv && Object.prototype.hasOwnProperty.call(argv, "strict");
 // CI enforces strict mode regardless of flags
 const STRICT =
   process.env.CI === "true" ? true : HAS_STRICT ? !isExplicitFalse((argv as any).strict) : false;
-const LANG = (argv.lang as string) || ""; // optional: scope to one language
-const FORMAT = ((argv.format as string) || "text").toLowerCase();
+const LANG = String((argv as any).lang || ""); // optional: scope to one language
+const FORMAT = String((argv as any).format || "text").toLowerCase();
 
 type Violation = {
   level: "warn" | "error";
@@ -63,6 +96,8 @@ function decodeNodeEnc(enc: string): string {
 }
 
 function validateGoPatchFilename(file: string, violations: Violation[]) {
+  // Ignore common keepers/dotfiles silently
+  if (file.startsWith(".") || file === ".gitkeep" || file === ".keep") return;
   if (!isPatchFile(file)) {
     violations.push({
       level: STRICT ? "error" : "warn",
@@ -167,6 +202,8 @@ async function lintGo(): Promise<number> {
 }
 
 function validateNodePatchFilename(file: string, violations: Violation[]) {
+  // Ignore common keepers/dotfiles silently
+  if (file.startsWith(".") || file === ".gitkeep" || file === ".keep") return;
   if (!isPatchFile(file)) {
     violations.push({
       level: STRICT ? "error" : "warn",
@@ -260,6 +297,8 @@ async function lintNode(): Promise<number> {
 }
 
 function validateCppPatchFilename(file: string, violations: Violation[]) {
+  // Ignore common keepers/dotfiles silently
+  if (file.startsWith(".") || file === ".gitkeep" || file === ".keep") return;
   if (!isPatchFile(file)) {
     violations.push({
       level: STRICT ? "error" : "warn",

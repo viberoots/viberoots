@@ -35,8 +35,10 @@ export async function maybeAssumeUnchanged(file: string) {
       stdio: "pipe",
     })`git rev-parse --is-inside-work-tree`.nothrow();
     if (exitCode === 0 && String(stdout || "").trim() === "true") {
-      const check = await $({ stdio: "pipe" })`git ls-files --error-unmatch ${file}`.nothrow();
-      if (check.exitCode === 0) {
+      // Avoid noisy pathspec errors: check tracked status via --cached and stdout presence
+      const check = await $({ stdio: "pipe" })`git ls-files --cached -- ${file}`.nothrow();
+      const tracked = String(check.stdout || "").trim().length > 0;
+      if (tracked) {
         await $({ stdio: "pipe" })`git update-index --assume-unchanged ${file}`.nothrow();
       }
     }

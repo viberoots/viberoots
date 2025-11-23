@@ -11,6 +11,8 @@ try {
   await import("zx/globals");
 } catch {}
 
+// (intentionally no global NIX_CONFIG mutations here; .envrc handles quieting nix)
+
 // Best-effort absolute URL to zx globals for resolver to use
 let ZX_GLOBALS_URL = "";
 

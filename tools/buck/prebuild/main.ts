@@ -80,7 +80,7 @@ export async function run(): Promise<void> {
   if (goMissingSum.length) {
     if (mode === "local") {
       try {
-        await $`node --experimental-strip-types --import ./tools/dev/zx-init.mjs tools/dev/install-deps.ts --glue-only`;
+        await $`node --disable-warning=ExperimentalWarning --experimental-strip-types --import ./tools/dev/zx-init.mjs tools/dev/install-deps.ts --glue-only`;
       } catch {}
       // Re-check after best-effort local tidy
       goMissingSum = findGoImporterMissingSum();

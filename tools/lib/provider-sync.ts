@@ -30,6 +30,12 @@ export async function scanFlatPatchDir(opts: ScanOpts): Promise<ProviderEntry[]>
       console.warn(`warning: ${msg}`);
       continue;
     }
+    // Silently ignore dotfiles and common keepers; these are used to keep VCS directories
+    // and should not trigger noisy warnings or strict failures.
+    // This does not mask other invalid filenames; those continue to warn/fail below.
+    if (e.name.startsWith(".") || e.name === ".gitkeep" || e.name === ".keep") {
+      continue;
+    }
     if (opts.preDecodeFilter && !opts.preDecodeFilter(e.name)) {
       // Skip early when not relevant to the caller’s selection strategy
       continue;
