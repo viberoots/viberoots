@@ -191,7 +191,7 @@
       },
       "locked": {
         "lastModified": 1,
-        "narHash": "sha256-qj6mFqfTMwJ2z9Ss3dtxuQraJjDeyQ1bepnBD7OMmrc=",
+        "narHash": "sha256-vXZrHJkE52D3q4QH6YWbZCpWQVUwenjhV5JKOSA4TyM=",
         "path": "./third_party/uv2nix",
         "type": "path"
       },

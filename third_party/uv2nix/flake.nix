@@ -145,6 +145,11 @@ def normalize_and_validate_patch(patch_file: Path) -> Path:
     content = content.replace("\r\n", "\n").replace("\r", "\n")
     if not content.endswith("\n"):
         content = content + "\n"
+    # PR-6: Guard against binary patch formats (reject by default)
+    # Detect common git binary patch markers and fail fast with an actionable error.
+    if re.search(r'(?m)^(GIT binary patch|literal \d+|delta \d+)\b', content):
+        sys.stderr.write("[uv2nix-lib][strict] binary patches are not supported (reject by default): " + patch_file.name + "\n")
+        raise SystemExit(2)
     # Expand bare '@@' hunks with computed line counts
     lines = content.splitlines()
     out = []
