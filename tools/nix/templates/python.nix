@@ -72,7 +72,7 @@ let
       inherit pname srcAbs;
       version = "0.1.0";
       lockfile = lockRel;
-      subdir = subdir;
+      subdir = ".";
       patchesMap = patchesMap;
       devOverrides = devOverrides;
       kind = kind;

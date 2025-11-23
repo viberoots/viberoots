@@ -29,6 +29,7 @@ let
 
   sanitize = s: lib.replaceStrings ["//" ":" "/" " "] ["" "-" "-" "-"] s;
   py = pkgs.python3 or pkgs.python311;
+  uvMeta = if uv2nixLib != null then (uv2nixLib.meta or { version = "unknown"; rev = "unknown"; }) else { version = "unknown"; rev = "unknown"; };
   # Stable primary path: use stub when requested or when uv2nixLib is absent.
   useStub = stubFlag || (uv2nixLib == null);
   Uv2nixAdapter = if useStub then null else import ../../../uv2nix-adapter.nix { inherit pkgs; uv2nixLib = uv2nixLib; };
@@ -263,7 +264,8 @@ PY
       "lockfile": "${lockfile}",
       "subdir": "${subdir}",
       "groups": ${builtins.toJSON groups},
-      "backend": "stub"
+      "backend": "stub",
+      "uv2nix": ${builtins.toJSON uvMeta}
     }
     JSON
   '';

@@ -66,6 +66,7 @@ test("python runtime: CRLF patch lines are normalized and applied", async () => 
       cwd: tmp,
       env: {
         ...process.env,
+        NIX_PY_USE_STUB_BACKEND: "1",
         BUCK_TARGET: "//apps/demo_pyapp:demo_pyapp",
         BUCK_TEST_SRC: tmp,
         WORKSPACE_ROOT: tmp,

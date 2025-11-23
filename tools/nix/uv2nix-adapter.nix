@@ -62,7 +62,8 @@ if (!stubFlag) then
   let
     uvDrv = uv2nixLib.mkEnv {
       inherit src subdir lockfile devOverrides wsRoot;
-      patchesMap = {}; # apply patches in adapter for robustness
+      # PR-2: delegate patching to uv2nix; pass patchesMap and testResolve as structured inputs.
+      patchesMap = patchesMap;
       testResolve = testResolveObj;
     };
     meta = uv2nixLib.meta or { version = "unknown"; rev = "unknown"; };
@@ -78,42 +79,8 @@ if (!stubFlag) then
         cp -R "${uvDrv}/site/." "$out/site/" || true
       fi
       chmod -R u+w "$out/site" || true
-      # Compute minimal patches list (key+file basenames) in deterministic order
+      # Compute minimal patches list (key+file basenames) in deterministic order (for introspection only)
       patchesJson="$(${pkgs.jq}/bin/jq -c 'to_entries | sort_by(.key) | [ .[] | .key as $k | (.value // []) | sort | .[] | {key:$k, file:(. | split(\"/\") | last)} ]' '${patchesMapFile}' 2>/dev/null || echo '[]')"
-      # Apply importer-local patches on top of site (deterministic text replacement)
-      if [ -s '${patchesMapFile}' ]; then
-        keys=$(jq -r 'keys[]' '${patchesMapFile}' 2>/dev/null || true)
-        for k in $keys; do
-          jq -r --arg kk "$k" '.[$kk][]?' '${patchesMapFile}' | while IFS= read -r p; do
-            [ -n "$p" ] || continue
-            tmpPatch="$TMPDIR/$(basename "$p")"
-            cp -f "$p" "$tmpPatch" || true
-            # Normalize CRLF → LF and expand minimal @@ hunks for patch(1)
-            ${pkgs.gnused}/bin/sed -i $'s/\r$//' "$tmpPatch" || true
-            ${pkgs.gnused}/bin/sed -E -i 's/^@@$/@@ -1,999 +1,999 @@/' "$tmpPatch" || true
-            tgt=$(grep -E '^--- a/' "$tmpPatch" | head -n1 | sed -E 's|^--- a/||')
-            if [ -n "$tgt" ] && [ -f "$out/site/$tgt" ]; then
-              oldB="$TMPDIR/old.$$"; newB="$TMPDIR/new.$$"
-              sed -n '1,/^@@/d; /^\-/p' "$tmpPatch" | sed 's/^-//' > "$oldB"
-              sed -n '1,/^@@/d; /^\+/p' "$tmpPatch" | sed 's/^+//' > "$newB"
-              ${py}/bin/python - "$out/site/$tgt" "$oldB" "$newB" <<'PY'
-import sys
-fp, oldf, newf = sys.argv[1], sys.argv[2], sys.argv[3]
-with open(oldf, "r", encoding="utf-8") as f: old = f.read()
-with open(newf, "r", encoding="utf-8") as f: new = f.read()
-with open(fp, "r", encoding="utf-8") as f: data = f.read()
-data = data.replace(old, new)
-with open(fp, "w", encoding="utf-8") as f: f.write(data)
-PY
-            else
-              ${pkgs.gnused}/bin/sed -E -i 's/^@@$/@@ -1,999 +1,999 @@/' "$tmpPatch" || true
-              (cd "$out/site" && ${pkgs.patch}/bin/patch -p1 -t -N -i "$tmpPatch") || true
-            fi
-          done
-        done
-      fi
-      echo "[adapter] site listing at $out/site:" >&2
-      (find "$out/site" -maxdepth 2 -type f -print || true) >&2
       wrapper="$out/bin/${pname}"
       {
         echo '#!/usr/bin/env bash'

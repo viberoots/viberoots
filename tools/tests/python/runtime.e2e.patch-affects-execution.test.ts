@@ -80,6 +80,7 @@ test("python runtime e2e: app output changes after patch apply", async () => {
           ...process.env,
           BUCK_TARGET: `//apps/${appName}:${appName}`,
           BUCK_TEST_SRC: tmp,
+          NIX_PY_USE_STUB_BACKEND: "1",
           NIX_PY_TEST_RESOLVE_JSON: JSON.stringify({
             mydep: { version: "1.0.0", originPath: originRel },
           }),
