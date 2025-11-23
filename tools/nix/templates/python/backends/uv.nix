@@ -120,6 +120,29 @@ pkgs.stdenvNoCC.mkDerivation {
 
     jqget() { ${pkgs.jq}/bin/jq -r "$1" 2>/dev/null || true; }
 
+    # Strict validation for patch headers and target paths (no traversal, headers required)
+    validate_patch() {
+      local f="$1"
+      # require unified headers
+      if ! grep -Eq '^---[ ]+a/' "$f"; then
+        echo "[uv-backend][strict] malformed patch: missing '--- a/<path>' header in $(basename "$f")" >&2
+        return 2
+      fi
+      if ! grep -Eq '^\+\+\+[ ]+b/' "$f"; then
+        echo "[uv-backend][strict] malformed patch: missing '+++ b/<path>' header in $(basename "$f")" >&2
+        return 2
+      fi
+      # reject traversal in header paths
+      if grep -E '^(---[ ]+a/|\+\+\+[ ]+b/).*(/\.\.)(/|$)' "$f" >/dev/null 2>&1; then
+        echo "[uv-backend][strict] unsafe patch path traversal detected in $(basename "$f")" >&2
+        return 3
+      fi
+    }
+
+    # Accumulate applied patches for provenance in final BUILD-INFO
+    appliedJsonl="$TMPDIR/applied_patches.jsonl"
+    : > "$appliedJsonl"
+
     # For each key, materialize a distribution under site/, preferring devOverrides,
     # then testResolve, then skipping if no source is available. Apply any patches.
     while IFS= read -r key; do
@@ -170,7 +193,7 @@ pkgs.stdenvNoCC.mkDerivation {
       chmod -R u+w "$work" || true
       # Apply patches if present
       echo "[uv-backend] patches for $key:" >&2
-      ${pkgs.jq}/bin/jq -r --arg k "$key" '.[$k][]? // empty' "$patchesMap" | while IFS= read -r patchFile; do
+      ${pkgs.jq}/bin/jq -r --arg k "$key" '(.[$k] // [])[]?' "$patchesMap" | while IFS= read -r patchFile; do
         [ -n "$patchFile" ] || continue
         if [ -f "$patchFile" ]; then
           echo "  apply: $patchFile" >&2
@@ -178,30 +201,52 @@ pkgs.stdenvNoCC.mkDerivation {
           cp -f "$patchFile" "$tmpPatch" || true
           # Normalize CRLF → LF and expand minimal @@ hunks
           ${pkgs.gnused}/bin/sed -i $'s/\r$//' "$tmpPatch" || true
-          ${pkgs.gnused}/bin/sed -E -i 's/^@@$/@@ -1,999 +1,999 @@/' "$tmpPatch" || true
-          if ! (cd "$work" && ${pkgs.patch}/bin/patch -p1 -t -N -i "$tmpPatch"); then
-            echo "[uv-backend] patch failed; attempting simple replacement fallback" >&2
-            target="$(grep -E '^--- a/' "$tmpPatch" | head -n1 | ${pkgs.gnused}/bin/sed -E 's|^--- a/||')"
-            if [ -n "$target" ] && [ -f "$work/$target" ]; then
-              oldBlock="$TMPDIR/old.$$"
-              newBlock="$TMPDIR/new.$$"
-              ${pkgs.gnused}/bin/sed -n '1,/^@@/d; /^\-/p' "$tmpPatch" | ${pkgs.gnused}/bin/sed 's/^-//' > "$oldBlock"
-              ${pkgs.gnused}/bin/sed -n '1,/^@@/d; /^\+/p' "$tmpPatch" | ${pkgs.gnused}/bin/sed 's/^+//' > "$newBlock"
-              ${py}/bin/python - "$work/$target" "$oldBlock" "$newBlock" <<'PY'
-import sys
-fp, oldf, newf = sys.argv[1], sys.argv[2], sys.argv[3]
-with open(oldf, "r", encoding="utf-8") as f:
-    old = f.read()
-with open(newf, "r", encoding="utf-8") as f:
-    new = f.read()
-with open(fp, "r", encoding="utf-8") as f:
-    data = f.read()
-data = data.replace(old, new)
-with open(fp, "w", encoding="utf-8") as f:
-    f.write(data)
+          ${py}/bin/python - "$tmpPatch" > "$tmpPatch.norm" <<'PY'
+import io, sys
+from typing import List
+p = sys.argv[1]
+with io.open(p, "r", encoding="utf-8", newline="\n") as f:
+    lines: List[str] = f.read().splitlines()
+out: List[str] = []
+i = 0
+while i < len(lines):
+    line = lines[i]
+    if line == "@@":
+        # Count +/- lines until next hunk/header/EOF
+        j = i + 1
+        old_cnt = 0
+        new_cnt = 0
+        while j < len(lines):
+            L = lines[j]
+            if L.startswith("@@") or L.startswith("--- ") or L.startswith("+++ "):
+                break
+            if L.startswith("-") and not L.startswith("--- "):
+                old_cnt += 1
+            elif L.startswith("+") and not L.startswith("+++ "):
+                new_cnt += 1
+            j += 1
+        out.append(f"@@ -1,{old_cnt} +1,{new_cnt} @@")
+        i += 1
+        continue
+    out.append(line)
+    i += 1
+sys.stdout.write("\n".join(out) + "\n")
 PY
-            fi
+          mv -f "$tmpPatch.norm" "$tmpPatch"
+          # Strict validation and application (no lenient fallbacks, no fuzz)
+          validate_patch "$tmpPatch"
+          (cd "$work" && ${pkgs.patch}/bin/patch -p1 --fuzz=0 -i "$tmpPatch")
+          # Record provenance entry
+          storeBase="$(basename "$patchFile")"
+          proto="''${storeBase#*-py-patch-}"
+          base="''${proto#''${key}-}"
+          base="''${base%.patch}"
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha="$(sha256sum "$patchFile" | awk '{print $1}')"
+          else
+            sha="$(shasum -a 256 "$patchFile" | awk '{print $1}')"
           fi
+          printf '%s\n' "{\"key\":\"$key\",\"file\":\"$base\",\"sha256\":\"$sha\"}" >> "$appliedJsonl"
         else
           echo "  missing: $patchFile" >&2
         fi
@@ -221,6 +266,9 @@ PY
     cat "$keysFile" >&2
     echo "[uv-backend] site listing:" >&2
     (find "$site" -maxdepth 2 -type f -print || true) >&2
+    # Deterministic patches array to persist across phases
+    patchesJson="[$(paste -sd, "$appliedJsonl")]"
+    echo "$patchesJson" > "$TMPDIR/patches.json"
   '';
 
   installPhase = ''
@@ -264,6 +312,7 @@ PY
       "lockfile": "${lockfile}",
       "subdir": "${subdir}",
       "groups": ${builtins.toJSON groups},
+      "patches": $(cat "$TMPDIR/patches.json" 2>/dev/null || echo "[]"),
       "backend": "stub",
       "uv2nix": ${builtins.toJSON uvMeta}
     }

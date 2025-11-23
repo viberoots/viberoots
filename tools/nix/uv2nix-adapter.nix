@@ -82,8 +82,21 @@ if (!stubFlag) then
         cp -R "${uvDrv}/site/." "$out/site/" || true
       fi
       chmod -R u+w "$out/site" || true
-      # Compute minimal patches list (key+file basenames) in deterministic order (for introspection only)
-      patchesJson="$(${pkgs.jq}/bin/jq -c 'to_entries | sort_by(.key) | [ .[] | .key as $k | (.value // []) | sort | .[] | {key:$k, file:(. | split(\"/\") | last)} ]' '${patchesMapFile}' 2>/dev/null || echo '[]')"
+      # Compute provenance patches list with sha256 in deterministic order
+      tmpPList="$TMPDIR/patches.list"
+      : > "$tmpPList"
+      ${pkgs.jq}/bin/jq -r 'to_entries | sort_by(.key) | .[] | .key as $k | ($k, ((.value // []) | sort | .[]))' '${patchesMapFile}' | while IFS= read -r key; do
+        read -r file || true
+        [ -n "$file" ] || continue
+        base="$(basename "$file")"
+        if command -v sha256sum >/dev/null 2>&1; then
+          sha="$(sha256sum "$file" | awk '{print $1}')"
+        else
+          sha="$(shasum -a 256 "$file" | awk '{print $1}')"
+        fi
+        printf '%s\n' "{\"key\":\"$key\",\"file\":\"$base\",\"sha256\":\"$sha\"}" >> "$tmpPList"
+      done
+      patchesJson="[$(paste -sd, "$tmpPList")]"
       wrapper="$out/bin/${pname}"
       {
         echo '#!/usr/bin/env bash'
