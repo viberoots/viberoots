@@ -141,8 +141,12 @@
   - Add a pinned `uv2nix` input to `flake.nix` (e.g., `inputs.uv2nix.url = "github:<org>/uv2nix/<rev>"`; follow the repo’s pinning conventions).
   - Route the backend through a tiny adapter module (e.g., `tools/nix/uv2nix-adapter.nix`) that:
     - Imports `uv2nix` from flake inputs.
-    - Exposes a pure function to realize environments from `uv.lock` without network.
+    - Exposes a pure function to realize environments from `uv.lock` using only Nix store paths (no network).
     - Accepts `groups = []` and makes them part of the derivation key.
+  - Store-backed realization (pnpm-like):
+    - For each dist in `uv.lock`, generate fixed-output derivations (e.g., fetchurl/fetchgit with sha256) or embed vendored sources via `builtins.path`.
+    - Build a shared “wheelhouse” derivation keyed by `(lockfile + patches + groups)`.
+    - Compose the final `site/` overlay strictly from store paths; no workspace fallbacks.
   - Ensure all fetchers (sdists/wheels/index snapshots) are pinned via flake inputs or fixed-output derivations; no implicit network.
 - Backend integration (replacement of the stub):
   - Replace the current shell-based `uv.nix` realization with an implementation that invokes `uv2nix` to materialize site‑packages.
@@ -153,8 +157,15 @@
   - Keep the public API of `pyApp`/`pyLib` unchanged (name, lockfile, subdir, groups).
 - Determinism and offline behavior:
   - Prove “no network access” during evaluation and build by:
-    - Running with `--option restrict-eval true` in CI integration tests (where applicable).
+    - Running with `--option restrict-eval true` in CI integration tests (where applicable) and `nix build --offline`.
     - Explicitly pinning any metadata snapshots `uv2nix` requires (e.g., index metadata) as fixed-output inputs.
+  - Store hydration and reuse:
+    - Expose a wheelhouse preload attribute (e.g., `.#py-wheelhouse-<importer>`) that realizes all locked dists.
+    - CI publishes the wheelhouse closure to the binary cache; developers can `nix copy` to hydrate locally.
+    - Multiple importers reuse identical store paths when lockfiles match.
+  - No adapter fallbacks:
+    - The uv2nix path is authoritative; the adapter must not synthesize `site/` from workspace state or test-only env.
+    - If realization yields an empty `site/` or required inputs are missing, fail the build loudly.
   - Output stability:
     - Emit `BUILD-INFO.json` including `{"lockfile": "<rel>", "groups": [...], "uv2nix": {"rev": "<rev>", "version": "<semver or rev>"}}`.
     - Wrapper paths for apps remain stable (`bin/py-<sanitized-name>`).
@@ -169,7 +180,7 @@
   - “python.runtime.build-and-run.test.ts”: build a tiny importer app; run; assert output.
   - “python.runtime.patch-affects-execution.test.ts”: apply a patch to a locked dist; rebuild; assert output change; re‑apply same patch → no‑op.
   - “python.runtime.groups.variants.test.ts” (if groups): base vs dev/test variants produce distinct derivations and remain idempotent.
-  - “python.runtime.offline-no-network.test.ts”: prove builds succeed with network disabled.
+  - “python.runtime.offline-no-network.test.ts”: hydrate the wheelhouse; prove builds succeed with `--offline` using only store paths.
   - “python.runtime.uv2nix-pinned.test.ts”: assert `BUILD-INFO.json` contains the pinned uv2nix rev/version.
   - “python.runtime.deterministic-patches-order.test.ts”: multiple patches apply in sorted, deterministic order (derivation key stable across evaluations).
 - Docs:
@@ -177,7 +188,7 @@
 - Acceptance:
   - Deterministic uv2nix builds (Darwin/Linux); wrapper runs pass; patches change behavior; re‑apply is no‑op; tests pass.
   - `flake.nix` contains a pinned `uv2nix` input and the backend references it (no hidden fetchers).
-  - Offline: CI proves no network access is required for evaluation or build.
+  - Offline: CI proves no network access is required for evaluation or build; empty site or missing lock artifacts fails the build (no fallbacks).
   - Observability: `BUILD-INFO.json` records lockfile, groups, and uv2nix identity.
 
 #### PR‑P3: Scaffolding polish (pyproject + uv.lock + TARGETS) — with tests/docs
