@@ -34,7 +34,8 @@ let
   testResolveObj =
     let raw = if testResolveJSON != "" then (builtins.fromJSON testResolveJSON) else {};
         names = builtins.attrNames raw;
-        isRepoAbs = p: lib.hasPrefix "apps/" p || lib.hasPrefix "libs/" p || lib.hasPrefix "/" p;
+        isRepoRel = p: lib.hasPrefix "apps/" p || lib.hasPrefix "libs/" p;
+        isAbs = p: lib.hasPrefix "/" p;
         toStore = p: builtins.toString (builtins.path { path = builtins.toPath p; name = "uv-src"; });
         step = acc: name:
           let entry = raw.${name};
@@ -42,7 +43,9 @@ let
               origin = entry.originPath or null;
               storeOrigin =
                 if origin == null then null else (
-                  if isRepoAbs origin then toStore (originRoot + "/" + origin) else toStore (builtins.toString src + "/" + origin)
+                  if isAbs origin then toStore origin
+                  else if isRepoRel origin then toStore (originRoot + "/" + origin)
+                  else toStore (builtins.toString src + "/" + origin)
                 );
               value = if storeOrigin != null then ({ version = ver; originPath = storeOrigin; })
                       else if origin != null then ({ version = ver; originPath = origin; })

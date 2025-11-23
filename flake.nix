@@ -459,20 +459,13 @@ EOF_PAT
           }) pyImporters);
         in
           let
-            makeWheelhouse = importer: let
-              envDrv = makePy importer [];
-            in pkgs.stdenvNoCC.mkDerivation {
-              pname = "py-wheelhouse";
-              version = sanitize importer;
-              src = builtins.path { path = ./.; name = "repo"; };
-              installPhase = ''
-                set -euo pipefail
-                mkdir -p "$out/site"
-                if [ -d "${envDrv}/site" ]; then
-                  cp -R "${envDrv}/site/." "$out/site/" || true
-                fi
-              '';
-            };
+            makeWheelhouse = importer:
+              T.pyWheelhouse {
+                name = importer;
+                lockfile = importer + "/uv.lock";
+                subdir = importer;
+                srcRoot = srcRoot;
+              };
             pyWheelhouse = builtins.listToAttrs (map (imp: {
               name = "py-wheelhouse-" + (sanitize imp);
               value = makeWheelhouse imp;

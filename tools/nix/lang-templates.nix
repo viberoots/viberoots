@@ -10,7 +10,7 @@ in {
   inherit (Cpp) cppApp cppLib cppTest cppNodeAddon cppWasmStaticLib cppWasmEmscriptenLib;
   # Expose Node symbol bag for discoverability; planner's Node plugin remains authoritative.
   inherit Node;
-  inherit (Python) pyApp pyLib;
+  inherit (Python) pyApp pyLib pyWheelhouse;
   inherit (PythonWasm) pyWasmApp pyWasmLib;
 }
 

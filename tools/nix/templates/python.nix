@@ -107,6 +107,68 @@ in {
       inherit name lockfile devOverrideEnv subdir srcRoot patchDirs groups;
       kind = "lib";
     };
+
+  # Reusable, content-addressed wheelhouse keyed ONLY by lockfile + patches.
+  # Dev overrides are intentionally ignored; groups default to [].
+  # This realizes a minimal src containing just uv.lock to avoid importer-path churn.
+  pyWheelhouse = {
+    name,
+    lockfile,
+    subdir ? ".",
+    srcRoot ? ../../..,
+    patchDirs ? [ ../../patches/python ],
+  }:
+    let
+      # Compute importer-local patch map exactly as mkPy (reuse logic to ensure identical keys).
+      patchDirAbs =
+        let rootStr = builtins.toString srcRoot;
+        in builtins.toPath ("${rootStr}/${subdir}/patches/python");
+      patchesMap =
+        if builtins.pathExists patchDirAbs then
+          let
+            names = builtins.attrNames (builtins.readDir patchDirAbs);
+            isPatch = name: lib.hasSuffix ".patch" name;
+            toKey = name:
+              let
+                base = lib.removeSuffix ".patch" name;
+                parts = lib.splitString "@" base;
+                impEnc = lib.concatStringsSep "@" (lib.take (lib.length parts - 1) parts);
+                verRaw = lib.last parts;
+                ver = lib.head (lib.splitString "-" verRaw);
+                importPath = lib.replaceStrings ["__"] ["/"] impEnc;
+              in (lib.toLower importPath) + "@" + (lib.toLower ver);
+            step = acc: name:
+              let
+                key = toKey name;
+                content = builtins.readFile (patchDirAbs + "/" + name);
+                storeFile = pkgs.writeText "py-patch-${key}-${name}.patch" content;
+                prev = acc.${key} or [];
+              in acc // { "${key}" = prev ++ [ (builtins.toString storeFile) ]; };
+          in builtins.foldl' step {} (lib.filter isPatch names)
+        else {};
+
+      # Build a minimal store directory containing only the lockfile at ./uv.lock
+      # Lockfile path relative to repo root (flake calls pass importer+'/uv.lock')
+      importerLockAbs = builtins.toPath ("${builtins.toString srcRoot}/${lockfile}");
+      lockOnlySrc = pkgs.runCommand "py-lock-only-src" {} ''
+        set -euo pipefail
+        mkdir -p "$out"
+        cp ${builtins.path { path = importerLockAbs; name = "uv.lock"; }} "$out/uv.lock"
+      '';
+      # Use a constant pname so identical inputs across importers yield identical store paths.
+      pname = "py-wheelhouse";
+    in UvBackend {
+      inherit pname;
+      version = "0.1.0";
+      srcAbs = lockOnlySrc;
+      lockfile = "uv.lock";
+      subdir = ".";
+      patchesMap = patchesMap;
+      devOverrides = {};
+      kind = "lib";
+      wsRoot = builtins.toString srcRoot;
+      groups = [];
+    };
 }
 
 
