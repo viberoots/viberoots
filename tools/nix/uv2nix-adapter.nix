@@ -144,6 +144,7 @@ PY
         echo '  "lockfile": "'"${lockfile}"'",'
         echo '  "subdir": "'"${subdir}"'",'
         printf '%s\n' "  \"groups\": ${builtins.toJSON groups},"
+        printf '%s\n' "  \"patches\": ''${patchesJson},"
         echo '  "backend": "uv2nix",'
         echo '  "uv2nix": { "version": "'"${meta.version or "unknown"}"'", "rev": "'"${meta.rev or "unknown"}"'" }'
         echo '}'
