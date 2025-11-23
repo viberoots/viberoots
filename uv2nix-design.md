@@ -173,9 +173,7 @@
   - Log a concise message on evaluation that includes importer, lockfile path, and groups (behind `PLANNER_TRACE` or similar).
   - When `groups` is non‑empty, ensure the value is visible in derivation names and `BUILD-INFO.json`.
   - Preserve WASM convenience macros behavior (out of scope for uv2nix; unchanged).
-- Migration/backout:
-  - Keep the legacy shell fallback behind a hidden flag during the transition: `NIX_PY_USE_STUB_BACKEND=1` forces the previous stubbed builder (for quick backouts).
-  - Default is uv2nix; removal of the stub follows after one PR cycle if no regressions are found.
+  - Stub fallback has been removed; uv2nix is the only supported backend path.
 - Tests (zx, one‑test‑per‑file):
   - “python.runtime.build-and-run.test.ts”: build a tiny importer app; run; assert output.
   - “python.runtime.patch-affects-execution.test.ts”: apply a patch to a locked dist; rebuild; assert output change; re‑apply same patch → no‑op.

@@ -32,8 +32,6 @@ test("python wheelhouse: identical lock+patch → identical store path across im
         stdio: "pipe",
         env: {
           ...process.env,
-          // Use the stub backend to avoid external uv2nix dependency in this test.
-          NIX_PY_USE_STUB_BACKEND: "1",
           NIX_PY_TEST_RESOLVE_JSON: JSON.stringify({
             mydep: {
               version: "1.0.0",
@@ -57,32 +55,22 @@ test("python wheelhouse: identical lock+patch → identical store path across im
       console.error("missing outPath(s):", { outA1, outB1 });
       process.exit(2);
     }
-    // For the stub backend, store paths may differ. Assert content equivalence of the realized site.
-    const siteA = path.join(outA1, "site");
-    const siteB = path.join(outB1, "site");
-    const { exitCode: diffExit } = await $({
-      cwd: tmp,
-      stdio: "inherit",
-      nothrow: true,
-    })`diff -ruN ${siteA} ${siteB}`;
-    if (diffExit !== 0) {
-      console.error("wheelhouse site contents differ between importers", { siteA, siteB });
+    // Under uv2nix, identical lock+patch must yield identical store paths
+    if (outA1 !== outB1) {
+      console.error("expected identical wheelhouse store paths", { outA1, outB1 });
       process.exit(2);
     }
 
     // Re-build to confirm stability
     const outA2 = await nixOut(attrA);
     const outB2 = await nixOut(attrB);
-    // Re-assert site equivalence on rebuild
-    const siteA2 = path.join(outA2, "site");
-    const siteB2 = path.join(outB2, "site");
-    const { exitCode: diffExit2 } = await $({
-      cwd: tmp,
-      stdio: "inherit",
-      nothrow: true,
-    })`diff -ruN ${siteA2} ${siteB2}`;
-    if (diffExit2 !== 0) {
-      console.error("wheelhouse site contents differ after rebuild", { siteA2, siteB2 });
+    if (outA1 !== outA2 || outB1 !== outB2) {
+      console.error("wheelhouse store paths changed across rebuilds", {
+        outA1,
+        outA2,
+        outB1,
+        outB2,
+      });
       process.exit(2);
     }
   });

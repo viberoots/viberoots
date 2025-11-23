@@ -24,7 +24,7 @@ test("python uv groups: base vs dev/test produce distinct, stable derivations", 
       const { stdout } = await $({
         cwd: tmp,
         stdio: "pipe",
-        env: { ...process.env, NIX_PY_USE_STUB_BACKEND: "1" },
+        env: { ...process.env },
       })`nix build --impure --accept-flake-config --no-link --print-out-paths .#${attr}`;
       return String(stdout || "")
         .trim()

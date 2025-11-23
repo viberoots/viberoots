@@ -1,8 +1,8 @@
-{ pkgs }:
+{ pkgs, uv2nixLib ? null }:
 let
   lib = pkgs.lib;
   H = import ../../lib/lang-helpers.nix { inherit pkgs; };
-  UvBackend = import ./backends/uv.nix { inherit pkgs; };
+  UvBackend = import ./backends/uv.nix { inherit pkgs; uv2nixLib = uv2nixLib; };
 
   # Render a tiny WASI module in WAT that writes a fixed message to stdout.
   # We generate the message at eval time to reflect inputs (e.g., overlays/patch keys).
@@ -57,20 +57,37 @@ WAT
   }:
     let
       _guard = H.guardNoDevOverridesInCI devOverrideEnv;
+      buckTestSrc = builtins.getEnv "BUCK_TEST_SRC";
+      workspaceEnv = builtins.getEnv "WORKSPACE_ROOT";
+      wsRoot =
+        if buckTestSrc != "" then buckTestSrc
+        else if workspaceEnv != "" then workspaceEnv
+        else builtins.toString srcRoot;
       # Build a site overlay using the existing uv backend (pure-Python only)
+      toStoreMap = m:
+        builtins.mapAttrs (k: arr:
+          map (p:
+            let
+              content = builtins.readFile p;
+              nameSafe = lib.replaceStrings ["/" "@" ":"] ["_" "_" "_"] k;
+              sf = pkgs.writeText ("py-patch-" + nameSafe) content;
+            in builtins.toString sf
+          ) arr
+        ) m;
       uv = UvBackend {
         pname = "pylib-${H.sanitizeName name}";
         version = "0.1.0";
         srcAbs = builtins.path { path = builtins.toPath ("${builtins.toString srcRoot}/${subdir}"); name = "py-src"; };
         lockfile = if lib.hasSuffix "/uv.lock" lockfile then "uv.lock" else lockfile;
         subdir = subdir;
-        patchesMap =
+        patchesMap = toStoreMap (
           let
             patchDir = builtins.toPath ("${builtins.toString srcRoot}/${subdir}/patches/python");
-          in H.patchesMapFromDir (if builtins.pathExists patchDir then patchDir else patchDir);
+          in H.patchesMapFromDir (if builtins.pathExists patchDir then patchDir else patchDir)
+        );
         devOverrides = H.readDevOverrides devOverrideEnv;
         kind = "lib";
-        wsRoot = (builtins.getEnv "WORKSPACE_ROOT");
+        wsRoot = wsRoot;
         groups = groups;
       };
     in pkgs.runCommand ("pywasm-lib-" + H.sanitizeName name) {} ''
@@ -104,14 +121,32 @@ in {
   }:
     let
       _guard = H.guardNoDevOverridesInCI devOverrideEnv;
+      buckTestSrc = builtins.getEnv "BUCK_TEST_SRC";
+      workspaceEnv = builtins.getEnv "WORKSPACE_ROOT";
+      wsRoot =
+        if buckTestSrc != "" then buckTestSrc
+        else if workspaceEnv != "" then workspaceEnv
+        else builtins.toString srcRoot;
       patchDirAbs = builtins.toPath ("${builtins.toString srcRoot}/${subdir}/patches/python");
+      toStoreMap = m:
+        builtins.mapAttrs (k: arr:
+          map (p:
+            let
+              content = builtins.readFile p;
+              nameSafe = lib.replaceStrings ["/" "@" ":"] ["_" "_" "_"] k;
+              sf = pkgs.writeText ("py-patch-" + nameSafe) content;
+            in builtins.toString sf
+          ) arr
+        ) m;
       patchesMap =
-        if builtins.pathExists patchDirAbs then H.patchesMapFromDir patchDirAbs else {};
+        if builtins.pathExists patchDirAbs then toStoreMap (H.patchesMapFromDir patchDirAbs) else {};
       patchedKeys = builtins.attrNames patchesMap;
       overlaysCount = builtins.length libOverlays;
       # Allow test/local override of backend via env for selected-target fallback builds
       backendEnv = builtins.getEnv "PY_WASM_BACKEND";
       effBackend = if backendEnv != "" then backendEnv else backend;
+      trimEnv = builtins.getEnv "PY_WASM_TRIM";
+      effTrim = if trimEnv != "" then trimEnv else trim;
       uv = UvBackend {
         pname = "py-${H.sanitizeName name}";
         version = "0.1.0";
@@ -121,7 +156,7 @@ in {
         patchesMap = patchesMap;
         devOverrides = H.readDevOverrides devOverrideEnv;
         kind = "app";
-        wsRoot = (builtins.getEnv "WORKSPACE_ROOT");
+        wsRoot = wsRoot;
         groups = groups;
       };
       msg =
@@ -146,8 +181,10 @@ in {
           cp -R "$ov/site/." "$out/site/" || true
         fi
       done
+      # Ensure we can mutate files under $out/site for trimming
+      chmod -R u+w "$out/site" || true
       # Optional size trimming (deterministic, opt-in)
-      trim_mode='${trim}'
+      trim_mode='${effTrim}'
       if [ "$trim_mode" = "safe" ] || [ "$trim_mode" = "aggressive" ]; then
         # Remove bytecode caches
         find "$out/site" -type d -name "__pycache__" -prune -exec rm -rf {} + || true

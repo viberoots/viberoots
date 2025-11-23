@@ -54,7 +54,6 @@ test("python runtime: offline build (no network) succeeds via uv2nix adapter", a
         ...process.env,
         BUCK_TARGET: "//apps/demo_pyapp:demo_pyapp",
         BUCK_TEST_SRC: tmp,
-        NIX_PY_USE_STUB_BACKEND: "1",
         WORKSPACE_ROOT: tmp,
         NIX_PY_TEST_RESOLVE_JSON: JSON.stringify({
           mydep: {

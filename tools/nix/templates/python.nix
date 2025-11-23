@@ -42,7 +42,7 @@ let
               let
                 key = toKey name;
                 content = builtins.readFile (patchDirAbs + "/" + name);
-                storeFile = pkgs.writeText "py-patch-${key}-${name}.patch" content;
+                storeFile = pkgs.writeText "py-patch-${key}-${name}" content;
                 prev = acc.${key} or [];
               in acc // { "${key}" = prev ++ [ (builtins.toString storeFile) ]; };
             # Attr names are sorted; fold preserves deterministic order.
@@ -141,7 +141,7 @@ in {
               let
                 key = toKey name;
                 content = builtins.readFile (patchDirAbs + "/" + name);
-                storeFile = pkgs.writeText "py-patch-${key}-${name}.patch" content;
+                storeFile = pkgs.writeText "py-patch-${key}-${name}" content;
                 prev = acc.${key} or [];
               in acc // { "${key}" = prev ++ [ (builtins.toString storeFile) ]; };
           in builtins.foldl' step {} (lib.filter isPatch names)

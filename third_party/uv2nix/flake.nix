@@ -6,7 +6,7 @@
   outputs = { self, nixpkgs }: {
     lib = rec {
       meta = {
-        version = "0.0.2-local";
+        version = "0.0.3-local";
         rev = "local";
       };
       # mkEnvFor: closure that returns a builder bound to provided pkgs
@@ -19,16 +19,15 @@
           dontPatch = true;
           dontConfigure = true;
           phases = [ "buildPhase" "installPhase" ];
-          nativeBuildInputs = [ pkgs.coreutils pkgs.findutils pkgs.jq pkgs.gnused (pkgs.python3 or pkgs.python311) ];
+          nativeBuildInputs = [ pkgs.coreutils pkgs.findutils pkgs.jq pkgs.gnused pkgs.patch (pkgs.python3 or pkgs.python311) ];
           buildPhase = ''
             set -euo pipefail
-            set -x
             SRC="${src}"
             WORK="$TMPDIR/work-root"
-            mkdir -p "$WORK"
+            SITE="$TMPDIR/site"
+            mkdir -p "$WORK" "$SITE"
             cp -a "${src}/." "$WORK/" || true
             chmod -R u+w "$WORK" || true
-            # srcAbs points directly at the importer subdir snapshot; operate from here.
             cd "$WORK"
             if [ ! -f "${lockfile}" ]; then
               if [ -n "${toString wsRoot}" ] && [ -f "${toString wsRoot}/${subdir}/${lockfile}" ]; then
@@ -42,161 +41,210 @@
                 exit 1
               fi
             fi
-            site="$TMPDIR/site"
-            mkdir -p "$site"
-            patchesFile="$TMPDIR/patches.json"
-            devFile="$TMPDIR/dev.json"
-            testFile="$TMPDIR/test.json"
-            printf '%s' '${builtins.toJSON patchesMap}' > "$patchesFile"
-            printf '%s' '${builtins.toJSON devOverrides}' > "$devFile"
-            printf '%s' '${builtins.toJSON testResolve}' > "$testFile"
-            keysFile="$TMPDIR/keys.txt"
-            : > "$keysFile"
-            ${ (nixpkgs.legacyPackages.${builtins.currentSystem}).python3 or (nixpkgs.legacyPackages.${builtins.currentSystem}).python311 }/bin/python - "${lockfile}" > "$keysFile" <<'PY'
-import sys, re
-lock_path = sys.argv[1]
-try:
-    with open(lock_path, "r", encoding="utf-8") as f:
-        lines = f.readlines()
-except Exception:
-    lines = []
-keys = []
-cur_name = None
-cur_ver = None
-for raw in lines:
-    s = raw.strip()
-    if s.startswith("[[package]]"):
-        if cur_name and cur_ver:
-            keys.append(f"{cur_name.lower()}@{cur_ver.lower()}")
-        cur_name = None
-        cur_ver = None
-    elif s.startswith("name = "):
-        m = re.match(r'^name = "([^"]+)"', s)
-        if m:
-            cur_name = m.group(1)
-    elif s.startswith("version = "):
-        m = re.match(r'^version = "([^"]+)"', s)
-        if m:
-            cur_ver = m.group(1)
-if cur_name and cur_ver:
-    keys.append(f"{cur_name.lower()}@{cur_ver.lower()}")
-for k in sorted(set(keys)):
-    print(k)
-PY
-            keysFromTest="$TMPDIR/keys_test.txt"
-            : > "$keysFromTest"
-            jq -r 'keys[] as $k | "\($k)@\(.[$k].version // \"0.0.0\")"' "$testFile" > "$keysFromTest" 2>/dev/null || true
-            cat "$keysFile" "$keysFromTest" | sort -u > "$TMPDIR/keys_merged.txt" || true
-            mv "$TMPDIR/keys_merged.txt" "$keysFile"
-            echo "[uv2nix-lib] keys (updated):" >&2
-            (cat "$keysFile" || true) >&2
-            for key in $(cat "$keysFile"); do
-              [ -n "$key" ] || continue
-              srcPath="$(jq -r --arg k "$key" '.[$k] // empty' "$devFile")"
-              echo "[uv2nix-lib] processing key=$key srcPath=$srcPath" >&2
-              if [ -z "$srcPath" ] || [ ! -e "$srcPath" ]; then
-                dist="$(printf "%s" "$key" | sed 's/@.*$//')"
-                wantVer="$(printf "%s" "$key" | sed 's/^.*@//')"
-                origin="$(jq -r --arg d "$dist" '.[$d].originPath // empty' "$testFile")"
-                ver="$(jq -r --arg d "$dist" '.[$d].version // empty' "$testFile")"
-                if [ -n "$origin" ]; then
-                  originRel="$origin"
-                  for c in \
-                    "$origin" \
-                    "$originRel" \
-                    "$WORK/$originRel" \
-                    "$WORK/$origin" \
-                    "${toString wsRoot}/$originRel" \
-                    "${toString wsRoot}/$origin" \
-                    "${toString wsRoot}/${subdir}/$originRel" ; do
-                    if [ -n "$c" ] && [ -e "$c" ]; then origin="$c"; break; fi
-                  done
-                fi
-                if [ -n "$origin" ] && [ -e "$origin" ]; then
-                  if [ -z "$ver" ] || [ "$ver" = "$wantVer" ]; then srcPath="$origin"; fi
-                fi
-              fi
-              if [ -z "$srcPath" ] && [ -d "vendor/''${dist}-''${wantVer}" ]; then
-                srcPath="vendor/''${dist}-''${wantVer}"
-              fi
-              [ -n "$srcPath" ] && [ -e "$srcPath" ] || continue
-              workPkg="$TMPDIR/work-$(echo "$key" | tr '@' '_' | tr '/' '_')"
-              mkdir -p "$workPkg"
-              cp -a "$srcPath"/. "$workPkg"/
-              chmod -R u+w "$workPkg" || true
-              echo "[uv2nix-lib] materialize key=$key from=$srcPath" >&2
-              for patchFile in $(jq -r --arg k "$key" '.[$k][]? // empty' "$patchesFile"); do
-                [ -n "$patchFile" ] || continue
-                if [ -f "$patchFile" ]; then
-                  tmpPatch="$TMPDIR/$(basename "$patchFile")"
-                  cp -f "$patchFile" "$tmpPatch" || true
-                  echo "[uv2nix-lib] head $tmpPatch:" >&2
-                  head -n 6 "$tmpPatch" >&2 || true
-                  ${ (nixpkgs.legacyPackages.${builtins.currentSystem}).gnused or (nixpkgs.legacyPackages.${builtins.currentSystem}).sed }/bin/sed -i $'s/\r$//' "$tmpPatch" || true
-                  ${ (nixpkgs.legacyPackages.${builtins.currentSystem}).gnused or (nixpkgs.legacyPackages.${builtins.currentSystem}).sed }/bin/sed -E -i 's/^@@$/@@ -1,999 +1,999 @@/' "$tmpPatch" || true
-                  tgt="$(grep -E '^--- a/|^\+\+\+ b/' "$tmpPatch" | head -n1 | sed -E 's|^--- a/||; s|^\+\+\+ b/||')"
-                  echo "[uv2nix-lib] patch=$tmpPatch target=$tgt" >&2
-                  cand="$workPkg/$tgt"
-                  if [ ! -f "$cand" ] && [ -n "$tgt" ]; then
-                    cand="$(cd "$workPkg" && find . -type f -path "./$tgt" -print -quit || true)"
-                    if [ -n "$cand" ] && [ -f "$workPkg/''${cand#./}" ]; then
-                      cand="$workPkg/''${cand#./}"
-                    else
-                      base="$(basename "$tgt")"
-                      cand="$(cd "$workPkg" && find . -type f -name "$base" -print | head -n1 || true)"
-                      if [ -n "$cand" ] && [ -f "$workPkg/''${cand#./}" ]; then
-                        cand="$workPkg/''${cand#./}"
-                      else
-                        cand=""
-                      fi
-                    fi
-                  fi
-                  if [ -n "$cand" ] && [ -f "$cand" ]; then
-                    oldB="$TMPDIR/old.$$"; newB="$TMPDIR/new.$$"
-                    sed -n '1,/^@@/d; /^\-/p' "$tmpPatch" | sed 's/^-//' > "$oldB"
-                    sed -n '1,/^@@/d; /^\+/p' "$tmpPatch" | sed 's/^+//' > "$newB"
-                    ${ (nixpkgs.legacyPackages.${builtins.currentSystem}).python3 or (nixpkgs.legacyPackages.${builtins.currentSystem}).python311 }/bin/python - "$cand" "$oldB" "$newB" <<'PY'
-import sys
-fp, oldf, newf = sys.argv[1], sys.argv[2], sys.argv[3]
-with open(oldf, "r", encoding="utf-8") as f: old = f.read()
-with open(newf, "r", encoding="utf-8") as f: new = f.read()
-with open(fp, "r", encoding="utf-8") as f: data = f.read()
-# Deterministic textual replacement; raise on missing old block to surface bad hunks
-if old not in data:
-    raise SystemExit("[uv2nix-lib] expected old block not found in {}".format(fp))
-data = data.replace(old, new)
-with open(fp, "w", encoding="utf-8") as f: f.write(data)
-PY
-                  else
-                    oldB="$TMPDIR/old.$$"; newB="$TMPDIR/new.$$"
-                    sed -n '1,/^@@/d; /^\-/p' "$tmpPatch" | sed 's/^-//' > "$oldB"
-                    sed -n '1,/^@@/d; /^\+/p' "$tmpPatch" | sed 's/^+//' > "$newB"
-                    ${ (nixpkgs.legacyPackages.${builtins.currentSystem}).python3 or (nixpkgs.legacyPackages.${builtins.currentSystem}).python311 }/bin/python - "$workPkg" "$oldB" "$newB" <<'PY'
-import sys
+            PATCHES_FILE="$TMPDIR/patches.json"
+            DEV_FILE="$TMPDIR/dev.json"
+            TEST_FILE="$TMPDIR/test.json"
+            export PATCHES_FILE DEV_FILE TEST_FILE
+            printf '%s' '${builtins.toJSON patchesMap}' > "$PATCHES_FILE"
+            printf '%s' '${builtins.toJSON devOverrides}' > "$DEV_FILE"
+            printf '%s' '${builtins.toJSON testResolve}' > "$TEST_FILE"
+            # Export builder context for the Python script
+            export WORK="$WORK"
+            export subdir="${subdir}"
+            export lockfile="${lockfile}"
+            export wsRoot="${toString wsRoot}"
+            ${ (nixpkgs.legacyPackages.${builtins.currentSystem}).python3 or (nixpkgs.legacyPackages.${builtins.currentSystem}).python311 }/bin/python - <<'PY'
+import io, json, os, re, shutil, subprocess, sys
 from pathlib import Path
-root, oldf, newf = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
-old = oldf.read_text(encoding="utf-8")
-new = newf.read_text(encoding="utf-8")
-applied = False
-for p in root.rglob("*"):
-    if p.is_file():
-        try:
-            s = p.read_text(encoding="utf-8")
-        except Exception:
+
+lockfile = Path(os.environ.get("lockfile") or "uv.lock")
+work_root = Path(os.environ.get("WORK") or ".")
+tmpdir = Path(os.environ.get("TMPDIR","/tmp"))
+site_dir = tmpdir / "site"
+patches_path = tmpdir / "patches.json"
+dev_file = tmpdir / "dev.json"
+test_file = tmpdir / "test.json"
+subdir = os.environ.get("subdir","." )
+ws_root = os.environ.get("wsRoot") or ""
+
+def read_json(p: Path):
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+patches_map = read_json(patches_path)
+dev_overrides = read_json(dev_file)
+test_resolve = read_json(test_file)
+
+def parse_keys_from_lock(p: Path):
+    try:
+        lines = p.read_text(encoding="utf-8").splitlines()
+    except Exception:
+        lines = []
+    keys = []
+    cur_name = None
+    cur_ver = None
+    for raw in lines:
+        s = raw.strip()
+        if s.startswith("[[package]]"):
+            if cur_name and cur_ver:
+                keys.append(f"{cur_name.lower()}@{cur_ver.lower()}")
+            cur_name = None
+            cur_ver = None
+        elif s.startswith("name = "):
+            m = re.match(r'^name = "([^"]+)"', s)
+            if m:
+                cur_name = m.group(1)
+        elif s.startswith("version = "):
+            m = re.match(r'^version = "([^"]+)"', s)
+            if m:
+                cur_ver = m.group(1)
+    if cur_name and cur_ver:
+        keys.append(f"{cur_name.lower()}@{cur_ver.lower()}")
+    # merge test_resolve keys
+    for dist, ent in test_resolve.items():
+        ver = (ent or {}).get("version") or "0.0.0"
+        keys.append(f"{dist.lower()}@{str(ver).lower()}")
+    return sorted(set(keys))
+
+def materialize_src_for_key(key: str) -> Path | None:
+    # dev override has precedence (map is key -> path)
+    src = dev_overrides.get(key) or ""
+    if src and Path(src).exists():
+        return Path(src)
+    dist, ver = key.split("@", 1)
+    ent = test_resolve.get(dist, {}) or {}
+    origin = ent.get("originPath") or ""
+    if origin:
+        candidates = [
+            origin,
+            str(work_root / origin),
+            str(work_root / subdir / origin),
+        ]
+        if ws_root:
+            candidates += [
+                str(Path(ws_root) / origin),
+                str(Path(ws_root) / subdir / origin),
+            ]
+        for c in candidates:
+            if c and Path(c).exists():
+                origin = c
+                break
+    if origin and Path(origin).exists():
+        if (not ent.get("version")) or str(ent.get("version")).lower() == ver.lower():
+            return Path(origin)
+    vend = work_root / f"vendor/{dist}-{ver}"
+    if vend.exists():
+        return vend
+    return None
+
+def normalize_and_validate_patch(patch_file: Path) -> Path:
+    content = patch_file.read_text(encoding="utf-8")
+    # Normalize line endings and ensure trailing newline
+    content = content.replace("\r\n", "\n").replace("\r", "\n")
+    if not content.endswith("\n"):
+        content = content + "\n"
+    # Expand bare '@@' hunks with computed line counts
+    lines = content.splitlines()
+    out = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if re.fullmatch(r'@@\s*', line):
+            j = i + 1
+            old_cnt = 0
+            new_cnt = 0
+            while j < len(lines):
+                L = lines[j]
+                if L.startswith('@@') or L.startswith('--- ') or L.startswith('+++ '):
+                    break
+                if L.startswith(' '):
+                    old_cnt += 1
+                    new_cnt += 1
+                elif L.startswith('-') and not L.startswith('--- '):
+                    old_cnt += 1
+                elif L.startswith('+') and not L.startswith('+++ '):
+                    new_cnt += 1
+                j += 1
+            out.append(f'@@ -1,{old_cnt} +1,{new_cnt} @@')
+            i += 1
             continue
-        if old in s:
-            p.write_text(s.replace(old, new), encoding="utf-8")
-            applied = True
-            break
-if not applied:
-    raise SystemExit("[uv2nix-lib] could not find a target file for textual patch fallback")
+        out.append(line)
+        i += 1
+    content = "\n".join(out) + "\n"
+    if not re.search(r'^---\s+a/', content, flags=re.M):
+        sys.stderr.write("[uv2nix-lib][strict] malformed patch: missing '--- a/<path>' header in " + patch_file.name + "\n")
+        raise SystemExit(2)
+    if not re.search(r'^\+\+\+\s+b/', content, flags=re.M):
+        sys.stderr.write("[uv2nix-lib][strict] malformed patch: missing '+++ b/<path>' header in " + patch_file.name + "\n")
+        raise SystemExit(2)
+    headers = re.findall(r'^(---\s+a/|^\+\+\+\s+b/)(.+)$', content, flags=re.M)
+    for _, path in headers:
+        if "/.." in path:
+            sys.stderr.write("[uv2nix-lib][strict] unsafe patch path traversal detected in " + patch_file.name + "\n")
+            raise SystemExit(3)
+    tmp = Path(os.environ.get("TMPDIR","/tmp")) / patch_file.name
+    tmp.write_text(content, encoding="utf-8")
+    return tmp
+
+site_dir.mkdir(parents=True, exist_ok=True)
+keys = parse_keys_from_lock(lockfile)
+for key in keys:
+    if not key:
+        continue
+    src_path = materialize_src_for_key(key)
+    sys.stderr.write("[uv2nix-lib] processing key=%s srcPath=%s\n" % (key, (src_path or "")))
+    if not src_path or not src_path.exists():
+        continue
+    is_dev_override = bool(dev_overrides.get(key))
+    sys.stderr.write("[uv2nix-lib] is_dev_override=%s\n" % ("yes" if is_dev_override else "no"))
+    work_pkg = Path(os.environ.get("TMPDIR","/tmp")) / ("work-" + key.replace("@","_").replace("/","_"))
+    if work_pkg.exists():
+        shutil.rmtree(work_pkg)
+    shutil.copytree(src_path, work_pkg)
+    # ensure work tree is writable
+    for dirpath, dirnames, filenames in os.walk(work_pkg):
+        for dn in dirnames:
+            try:
+                os.chmod(Path(dirpath) / dn, 0o755)
+            except Exception:
+                pass
+        for fn in filenames:
+            try:
+                os.chmod(Path(dirpath) / fn, 0o644)
+            except Exception:
+                pass
+    # apply patches if any (preserve declared order for determinism)
+    # When a dev override is provided for this key, skip applying patches to avoid reversed hunks.
+    if not is_dev_override:
+        for patch in (patches_map.get(key) or []):
+            pf = Path(patch)
+            if not pf.exists():
+                continue
+            tmp_patch = normalize_and_validate_patch(pf)
+            # apply with patch(1)
+            res = subprocess.run(["patch","-p1","--fuzz=0","-i", str(tmp_patch)], cwd=str(work_pkg), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if res.returncode != 0:
+                sys.stderr.write(res.stdout + res.stderr)
+                raise SystemExit(4)
+    # install to site
+    entries = [p for p in work_pkg.iterdir() if p.is_dir()]
+    if len(entries) == 1:
+        dst = site_dir / entries[0].name
+        if dst.exists():
+            shutil.rmtree(dst)
+        shutil.copytree(entries[0], dst)
+    else:
+        for item in work_pkg.iterdir():
+            dst = site_dir / item.name
+            if item.is_dir():
+                if dst.exists():
+                    shutil.rmtree(dst)
+                shutil.copytree(item, dst)
+            else:
+                shutil.copy2(item, dst)
 PY
-                  fi
-                fi
-              done
-                pkgDirs="$(find "$workPkg" -mindepth 1 -maxdepth 1 -type d -print | wc -l | tr -d ' ')"
-                if [ "$pkgDirs" = "1" ]; then d="$(find "$workPkg" -mindepth 1 -maxdepth 1 -type d -print | head -n1)"; cp -a "$d" "$site/"; else cp -a "$workPkg"/. "$site"/; fi
-            done
           '';
           installPhase = ''
             set -euo pipefail

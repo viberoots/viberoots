@@ -45,7 +45,6 @@ test("python lib overlay build smoke: site exists and contains resolved dist", a
       cwd: tmp,
       env: {
         ...process.env,
-        NIX_PY_USE_STUB_BACKEND: "1",
         BUCK_TARGET: `//libs/${name}:${name}`,
         BUCK_TEST_SRC: tmp,
         NIX_PY_TEST_RESOLVE_JSON: JSON.stringify({

@@ -18,15 +18,37 @@ let
   kind = args.kind or "app";
   wsRoot = args.wsRoot or null;
   groups = args.groups or [];
+  # Normalize dev override paths into the Nix store to avoid sandbox permission issues
+  isAbs = p: lib.hasPrefix "/" p;
+  isRepoRel = p: lib.hasPrefix "apps/" p || lib.hasPrefix "libs/" p;
+  isStorePath = p: lib.hasPrefix "/nix/store/" p;
+  toStore = p: builtins.toString (builtins.path { path = builtins.toPath p; name = "uv-dev"; });
+  devOverridesCoerced =
+    let keys = builtins.attrNames devOverrides;
+        step = acc: k:
+          let v = devOverrides.${k};
+              vv =
+                if v == null then null else (
+                  if isStorePath v then v
+                  else if isAbs v then toStore v
+                  else if isRepoRel v then toStore (originRoot + "/" + v)
+                  else toStore (builtins.toString src + "/" + v)
+                );
+          in acc // { "${k}" = vv; };
+    in builtins.foldl' step {} keys;
   # Resolve relative origins against BUCK_TEST_SRC or WORKSPACE_ROOT; fallback to flake root
   flakeRoot = builtins.toString ./.;
   buckTestSrc = builtins.getEnv "BUCK_TEST_SRC";
   workspaceEnv = builtins.getEnv "WORKSPACE_ROOT";
-  originRoot = if buckTestSrc != "" then buckTestSrc else if workspaceEnv != "" then workspaceEnv else flakeRoot;
+  originRoot =
+    if (wsRoot != null && wsRoot != "") then wsRoot
+    else if buckTestSrc != "" then buckTestSrc
+    else if workspaceEnv != "" then workspaceEnv
+    else flakeRoot;
 
   testResolveJSON = builtins.getEnv "NIX_PY_TEST_RESOLVE_JSON";
   patchesMapFile = pkgs.writeText "py-patches.json" (builtins.toJSON patchesMap);
-  devOverridesFile = pkgs.writeText "py-dev-overrides.json" (builtins.toJSON devOverrides);
+  devOverridesFile = pkgs.writeText "py-dev-overrides.json" (builtins.toJSON devOverridesCoerced);
   testResolveFile =
     if testResolveJSON != "" then pkgs.writeText "py-test-resolve.json" testResolveJSON
     else pkgs.writeText "py-test-resolve.json" "{}";
@@ -54,17 +76,17 @@ let
     in builtins.foldl' step {} names;
 
   py = pkgs.python3 or pkgs.python311;
-  stubFlag = (builtins.getEnv "NIX_PY_USE_STUB_BACKEND") == "1";
-  # Require uv2nix when not explicitly in stub mode
-  _ = if (!stubFlag) && (uv2nixLib == null)
-      then builtins.throw "uv2nix adapter requires uv2nixLib; set NIX_PY_USE_STUB_BACKEND=1 to force stub"
+  # Require uv2nix — no stub fallback
+  _ = if (uv2nixLib == null)
+      then builtins.throw "uv2nix adapter requires uv2nixLib"
       else null;
 in
 # Primary path: call uv2nixLib to realize the environment (no silent fallbacks).
-if (!stubFlag) then
+
   let
     uvDrv = uv2nixLib.mkEnv {
-      inherit src subdir lockfile devOverrides wsRoot;
+      inherit src subdir lockfile wsRoot;
+      devOverrides = devOverridesCoerced;
       # PR-2: delegate patching to uv2nix; pass patchesMap and testResolve as structured inputs.
       patchesMap = patchesMap;
       testResolve = testResolveObj;
@@ -85,16 +107,23 @@ if (!stubFlag) then
       # Compute provenance patches list with sha256 in deterministic order
       tmpPList="$TMPDIR/patches.list"
       : > "$tmpPList"
-      ${pkgs.jq}/bin/jq -r 'to_entries | sort_by(.key) | .[] | .key as $k | ($k, ((.value // []) | sort | .[]))' '${patchesMapFile}' | while IFS= read -r key; do
-        read -r file || true
+      ${pkgs.jq}/bin/jq -rc '
+        to_entries
+        | sort_by(.key)
+        | .[]
+        | .key as $k
+        | ((.value // []) | .[] | {key:$k, path:., display:((.|split("/")[-1]) | sub("^.*-py-patch-"; "") | sub("^" + $k + "-"; ""))})
+      ' '${patchesMapFile}' | while IFS= read -r obj; do
+        key="$(${pkgs.jq}/bin/jq -r '.key' <<<"$obj")"
+        file="$(${pkgs.jq}/bin/jq -r '.path' <<<"$obj")"
+        display="$(${pkgs.jq}/bin/jq -r '.display' <<<"$obj")"
         [ -n "$file" ] || continue
-        base="$(basename "$file")"
         if command -v sha256sum >/dev/null 2>&1; then
           sha="$(sha256sum "$file" | awk '{print $1}')"
         else
           sha="$(shasum -a 256 "$file" | awk '{print $1}')"
         fi
-        printf '%s\n' "{\"key\":\"$key\",\"file\":\"$base\",\"sha256\":\"$sha\"}" >> "$tmpPList"
+        printf '%s\n' "{\"key\":\"$key\",\"file\":\"$display\",\"sha256\":\"$sha\"}" >> "$tmpPList"
       done
       patchesJson="[$(paste -sd, "$tmpPList")]"
       wrapper="$out/bin/${pname}"
@@ -134,161 +163,6 @@ if (!stubFlag) then
       } > "$out/BUILD-INFO.json"
     '';
   }
-else
-pkgs.stdenvNoCC.mkDerivation {
-  inherit pname version src;
-  nativeBuildInputs = [ pkgs.coreutils pkgs.findutils pkgs.jq pkgs.gnused pkgs.patch pkgs.git py ];
-
-  buildPhase = ''
-    set -euo pipefail
-    if [ -d "${subdir}" ]; then
-      cd "${subdir}"
-    fi
-    if [ ! -f "${lockfile}" ]; then
-      # Prefer working tree lockfile for dev/test; fall back to src snapshot
-      if [ -n "${wsRoot:-}" ] && [ -f "${wsRoot}/${subdir}/${lockfile}" ]; then
-        cp "${wsRoot}/${subdir}/${lockfile}" "./${lockfile}"
-      elif [ -f "${src}/${subdir}/${lockfile}" ]; then
-        cp "${src}/${subdir}/${lockfile}" "./${lockfile}"
-      elif [ -f "${src}/uv.lock" ]; then
-        cp "${src}/uv.lock" "./${lockfile}"
-      else
-        echo "[uv2nix-adapter] missing lockfile: ${lockfile}" >&2
-        exit 1
-      fi
-    fi
-
-    mkdir -p "$TMPDIR/site"
-    site="$TMPDIR/site"
-
-    # Parse uv.lock minimally (offline)
-    keysFile="$TMPDIR/keys.txt"
-    : > "$keysFile"
-    cur_name=""
-    cur_ver=""
-    while IFS= read -r line; do
-      l="$(printf "%s" "$line" | sed -e 's/^[[:space:]]*//')"
-      case "$l" in
-        "[[package]]"*)
-          if [ -n "$cur_name" ] && [ -n "$cur_ver" ]; then
-            printf "%s@%s\n" "$cur_name" "$cur_ver" >> "$keysFile"
-          fi
-          cur_name=""
-          cur_ver=""
-          ;;
-        name\ =\ \"*\" )
-          cur_name="$(printf "%s" "$l" | sed -n 's/^name = \"\(.*\)\".*$/\1/p' | tr '[:upper:]' '[:lower:]')"
-          ;;
-        version\ =\ \"*\" )
-          cur_ver="$(printf "%s" "$l" | sed -n 's/^version = \"\(.*\)\".*$/\1/p' | tr '[:upper:]' '[:lower:]')"
-          ;;
-      esac
-    done < "${lockfile}"
-    if [ -n "$cur_name" ] && [ -n "$cur_ver" ] ; then
-      printf "%s@%s\n" "$cur_name" "$cur_ver" >> "$keysFile"
-    fi
-    sort -u "$keysFile" -o "$keysFile"
-
-    patchesMap='${patchesMapFile}'
-    devOverrides='${devOverridesFile}'
-    testResolve='${testResolveFile}'
-
-    # Materialize each distribution into site using (in priority order):
-    # devOverrides → testResolve origin → skip
-    while IFS= read -r key; do
-      [ -n "$key" ] || continue
-      srcPath="$(${pkgs.jq}/bin/jq -r --arg k "$key" '.[$k] // empty' "$devOverrides")"
-      if [ -z "$srcPath" ] || [ ! -e "$srcPath" ]; then
-        dist="$(printf "%s" "$key" | sed 's/@.*$//')"
-        wantVer="$(printf "%s" "$key" | sed 's/^.*@//')"
-        origin="$(${pkgs.jq}/bin/jq -r --arg d "$dist" '.[$d].originPath // empty' "$testResolve")"
-        ver="$(${pkgs.jq}/bin/jq -r --arg d "$dist" '.[$d].version // empty' "$testResolve")"
-        if [ -n "$origin" ]; then
-          cand1="$origin"
-          cand2="${src}/$origin"
-          cand3="${src}/${subdir}/$origin"
-          cand4=""
-          if [ -n "${wsRoot:-}" ]; then
-            cand4="${wsRoot}/${subdir}/$origin"
-          fi
-          for c in "$cand1" "$cand2" "$cand3" "$cand4"; do
-            if [ -n "$c" ] && [ -e "$c" ]; then
-              origin="$c"
-              break
-            fi
-          done
-        fi
-        if [ -n "$origin" ] && [ -e "$origin" ]; then
-          if [ -z "$ver" ] || [ "$ver" = "$wantVer" ]; then
-            srcPath="$origin"
-          fi
-        fi
-      fi
-      if [ -z "$srcPath" ] || [ ! -e "$srcPath" ]; then
-        continue
-      fi
-      work="$TMPDIR/work-$(echo "$key" | tr '@' '_' | tr '/' '_')"
-      mkdir -p "$work"
-      cp -a "$srcPath"/. "$work"/
-      chmod -R u+w "$work" || true
-      # Apply patches if present
-      ${pkgs.jq}/bin/jq -r --arg k "$key" '.[$k][]? // empty' "$patchesMap" | while IFS= read -r patchFile; do
-        [ -n "$patchFile" ] || continue
-        if [ -f "$patchFile" ]; then
-          (cd "$work" && ${pkgs.patch}/bin/patch -p1 -t -N < "$patchFile")
-        fi
-      done
-      # Copy layout into site
-      pkgDirs="$(find "$work" -mindepth 1 -maxdepth 1 -type d -print | wc -l | tr -d ' ')"
-      if [ "$pkgDirs" = "1" ]; then
-        d="$(find "$work" -mindepth 1 -maxdepth 1 -type d -print | head -n1)"
-        cp -a "$d" "$site/"
-      else
-        cp -a "$work"/. "$site/"
-      fi
-    done < "$keysFile"
-  '';
-
-  installPhase = ''
-    set -euo pipefail
-    mkdir -p "$out/site" "$out/bin"
-    if [ -d "$TMPDIR/site" ]; then
-      cp -R "$TMPDIR/site/." "$out/site/" || true
-    fi
-    wrapper="$out/bin/${pname}"
-    cat > "$wrapper" <<'SH'
-    #!/usr/bin/env bash
-    set -euo pipefail
-    HERE="$(cd "$(dirname "$0")" && pwd)"
-    PY="$(command -v python3 || true)"
-    if [ -z "$PY" ]; then PY="${py}/bin/python"; fi
-    export PYTHONPATH="$HERE/../site:${src}/${subdir}/src''${PYTHONPATH:+:$PYTHONPATH}"
-    if [ -n "''${WORKSPACE_ROOT:-}" ] && [ -d "''${WORKSPACE_ROOT}/${subdir}/src" ]; then
-      export PYTHONPATH="''${WORKSPACE_ROOT}/${subdir}/src''${PYTHONPATH:+:}''${PYTHONPATH}"
-    fi
-    MAIN="${src}/${subdir}/bin/__main__.py"
-    if [ -f "$MAIN" ]; then
-      exec "$PY" "$MAIN" "$@"
-    fi
-    if [ -n "''${WORKSPACE_ROOT:-}" ] && [ -f "''${WORKSPACE_ROOT}/${subdir}/bin/__main__.py" ]; then
-      exec "$PY" "''${WORKSPACE_ROOT}/${subdir}/bin/__main__.py" "$@"
-    fi
-    echo "python app entrypoint not found at $MAIN" >&2
-    echo "PYTHONPATH=$PYTHONPATH" >&2
-    exit 2
-    SH
-    chmod +x "$wrapper"
-
-    cat > "$out/BUILD-INFO.json" <<JSON
-    {
-      "kind": "${kind}",
-      "lockfile": "${lockfile}",
-      "subdir": "${subdir}",
-      "groups": ${builtins.toJSON groups},
-      "backend": "uv2nix"
-    }
-    JSON
-  '';
-}
+ 
 
 

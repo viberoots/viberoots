@@ -53,6 +53,9 @@ nix_python_wasm_app(
     const env = {
       ...process.env,
       BUCK_TARGET: "//apps/pywasm:pyapp",
+      WORKSPACE_ROOT: tmp,
+      BUCK_TEST_SRC: tmp,
+      PY_WASM_TRIM: "safe",
       NIX_PY_TEST_RESOLVE_JSON: JSON.stringify({
         hello: { version: "1.0.0", originPath: "apps/pywasm/vendor/hello" },
       }),
