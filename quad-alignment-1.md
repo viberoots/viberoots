@@ -226,6 +226,43 @@ None.
 
 Implement.
 
+## PR‑7: Python WASM template consistency — use shared store‑materialized patch map
+
+### Description
+
+Align the Python WASM template with the standard Python template by using the shared `patchesMapFromDirToStore`/`patchesMapFromImporterDirToStore` helper from `tools/nix/lib/lang-helpers.nix`. This replaces the local `toStoreMap` transformation inside `tools/nix/templates/python/wasm.nix`, ensuring one canonical implementation for scanning, key normalization, and store materialization.
+
+### Scope & Changes
+
+- tools/nix/templates/python/wasm.nix:
+  - Replace the manual `toStoreMap (H.patchesMapFromDir ...)` mapping with:
+    - `H.patchesMapFromImporterDirToStore { srcRoot; subdir; lang = "python"; normalizeVersion = (v: lib.head (lib.splitString "-" v)); namePrefix = "py-patch"; }`
+    - or, equivalently, `H.patchesMapFromDirToStore { dir = patchDirAbs; normalizeVersion = (v: lib.head (lib.splitString "-" v)); namePrefix = "py-patch"; }`
+  - Remove the local `toStoreMap` helper in this file.
+  - Preserve existing dev‑override and WASM build logic unmodified.
+
+### Acceptance Criteria
+
+- No diffs in Python WASM build outputs for identical inputs (patches, lockfiles, code).
+- Deterministic patch application order and key normalization match the main Python template.
+- Existing Python WASM tests (Pyodide/WASI) remain green without changes.
+
+### Risks
+
+Very low. This is a consistency refactor; behavior and inputs are unchanged. Store file naming remains stable via `namePrefix = "py-patch"` and canonical keying.
+
+### Consequence of Not Implementing
+
+Minor divergence persists in how patches are materialized for Python WASM vs. standard Python, increasing maintenance surface.
+
+### Downsides for Implementing
+
+None material. Small, localized edit.
+
+### Recommendation
+
+Implement.
+
 ## Rollout & Sequencing
 
 1. PR‑1 (Shared Nix patch‑map helper) — lowest risk, unblocks others.
@@ -234,6 +271,7 @@ Implement.
 4. PR‑3 (Importer-provider utilities) — refactor Node/Python providers.
 5. PR‑5 (Macro helper consolidation) — small Starlark cleanup.
 6. PR‑6 (Docs) — final pass after code is merged.
+7. PR‑7 (Python WASM template consistency) — small refactor, no behavior change.
 
 All PRs are independently reversible.
 
@@ -251,6 +289,8 @@ All PRs are independently reversible.
   - Build/sample targets; confirm identical `srcs` and invalidation behavior. Backout by re-exposing per-language helpers.
 - PR‑6:
   - Docs build/render; no code impact. Backout by reverting doc sections.
+- PR‑7:
+  - Build Python WASM (Pyodide/WASI) samples before/after; expect no diffs in outputs. If differences appear, restore the local mapping or adjust `namePrefix`/normalization to match prior store naming while retaining the shared helper.
 
 ## Summary of Expected Impact
 
@@ -258,3 +298,4 @@ All PRs are independently reversible.
 - Parity in dev-override diagnostics across Go/CPP/Python; clearer local signals.
 - Shared importer utilities decrease drift between Node/Python providers.
 - No functional changes to build artifacts or mappings; safer maintenance long-term.
+- Python WASM template matches standard Python template for patch map handling; lower drift risk.

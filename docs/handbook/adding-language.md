@@ -13,6 +13,17 @@ This guide explains how to add a new language to the build without touching core
 - Scaffolding templates: `tools/scaffolding/templates/<lang>/...` + language registry entry
 - Tests: zx tests using `tools/tests/lib/lang-fixtures.ts`
 
+### Shared helpers (use these instead of rolling your own)
+
+- Nix (`tools/nix/lib/lang-helpers.nix`):
+  - `patchesMapFromDir`, `patchesMapFromDirs` for path‑based scanning
+  - `patchesMapFromDirToStore`, `patchesMapFromImporterDirToStore` for store‑materialized inputs (Python)
+  - `readDevOverrides`, `guardNoDevOverridesInCI` for override parity (Go/C++/Python)
+- TypeScript (`tools/lib/importers.ts`):
+  - `findImporterLockfiles`, `computeImporterLabel`
+  - `defaultImporterPatchDir`, `listImporterPatches`
+  - Keeps importer‑local patch discovery and sorting consistent across Node and Python
+
 ### Python notes
 
 - Path invariants:
@@ -25,6 +36,7 @@ This guide explains how to add a new language to the build without touching core
 - Glue:
   - Provider sync reads all `**/uv.lock` and writes `third_party/providers/TARGETS.python.auto` deterministically.
   - `gen-auto-map.ts` already maps generic `lockfile:` labels to importer providers; no Python‑specific code required.
+  - Reuse `tools/lib/importers.ts` to compute the importer string and list importer‑local patches deterministically.
 
 Tip for lockfile-style ecosystems (e.g., Node/PNPM):
 

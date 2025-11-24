@@ -64,27 +64,19 @@ WAT
         else if workspaceEnv != "" then workspaceEnv
         else builtins.toString srcRoot;
       # Build a site overlay using the existing uv backend (pure-Python only)
-      toStoreMap = m:
-        builtins.mapAttrs (k: arr:
-          map (p:
-            let
-              content = builtins.readFile p;
-              nameSafe = lib.replaceStrings ["/" "@" ":"] ["_" "_" "_"] k;
-              sf = pkgs.writeText ("py-patch-" + nameSafe) content;
-            in builtins.toString sf
-          ) arr
-        ) m;
       uv = UvBackend {
         pname = "pylib-${H.sanitizeName name}";
         version = "0.1.0";
         srcAbs = builtins.path { path = builtins.toPath ("${builtins.toString srcRoot}/${subdir}"); name = "py-src"; };
         lockfile = if lib.hasSuffix "/uv.lock" lockfile then "uv.lock" else lockfile;
         subdir = subdir;
-        patchesMap = toStoreMap (
-          let
-            patchDir = builtins.toPath ("${builtins.toString srcRoot}/${subdir}/patches/python");
-          in H.patchesMapFromDir (if builtins.pathExists patchDir then patchDir else patchDir)
-        );
+        patchesMap = H.patchesMapFromImporterDirToStore {
+          srcRoot = srcRoot;
+          subdir = subdir;
+          lang = "python";
+          normalizeVersion = (v: lib.head (lib.splitString "-" v));
+          namePrefix = "py-patch";
+        };
         devOverrides = H.readDevOverrides devOverrideEnv;
         kind = "lib";
         wsRoot = wsRoot;
@@ -127,19 +119,13 @@ in {
         if buckTestSrc != "" then buckTestSrc
         else if workspaceEnv != "" then workspaceEnv
         else builtins.toString srcRoot;
-      patchDirAbs = builtins.toPath ("${builtins.toString srcRoot}/${subdir}/patches/python");
-      toStoreMap = m:
-        builtins.mapAttrs (k: arr:
-          map (p:
-            let
-              content = builtins.readFile p;
-              nameSafe = lib.replaceStrings ["/" "@" ":"] ["_" "_" "_"] k;
-              sf = pkgs.writeText ("py-patch-" + nameSafe) content;
-            in builtins.toString sf
-          ) arr
-        ) m;
-      patchesMap =
-        if builtins.pathExists patchDirAbs then toStoreMap (H.patchesMapFromDir patchDirAbs) else {};
+      patchesMap = H.patchesMapFromImporterDirToStore {
+        srcRoot = srcRoot;
+        subdir = subdir;
+        lang = "python";
+        normalizeVersion = (v: lib.head (lib.splitString "-" v));
+        namePrefix = "py-patch";
+      };
       patchedKeys = builtins.attrNames patchesMap;
       overlaysCount = builtins.length libOverlays;
       # Allow test/local override of backend via env for selected-target fallback builds

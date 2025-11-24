@@ -75,7 +75,7 @@ extra-experimental-features = nix-command flakes dynamic-derivations ca-derivati
 1. **Naming:** Use **`graph-generator.nix`** for the outer dynamic-derivation planner entrypoint.
 1. **Optional `tools/nix/mapping.nix`:** A small, **explicit dispatch table** for mapping **custom Buck rule types** to planner templates. Think of it as a **name-to-template router**. Keep it tiny and example-driven.
 1. **Examples everywhere.** Prefer short, runnable examples over abstract prose.
-1. **Dev overrides:** Always print a **warning** when dev package overrides are in effect. In CI (environment flags), builds **must fail** if dev overrides are present. **Setting `NIX_GO_DEV_OVERRIDE_JSON` changes derivation hashes; unset it before sharing cache artifacts. Never allowed in CI.** Additionally, the outer planner logs a neutral one‑liner to `build.log` when dev overrides are present locally (Go and C++); set `PLANNER_NO_DEV_OVERRIDE_LOG=1` to suppress this diagnostic.
+1. **Dev overrides:** Always print a **warning** when dev package overrides are in effect. In CI (environment flags), builds **must fail** if dev overrides are present. **Setting `NIX_GO_DEV_OVERRIDE_JSON` changes derivation hashes; unset it before sharing cache artifacts. Never allowed in CI.** Additionally, the outer planner logs a neutral one‑liner to `build.log` when dev overrides are present locally (**Go, C++, and Python**); set `PLANNER_NO_DEV_OVERRIDE_LOG=1` to suppress this diagnostic. Clear all overrides with `node tools/dev/clear-overrides.ts`.
 1. **Patching UX:** One **outer** command: `patch-pkg <subcommand> <language> …` that **delegates** to language-specific scripts (e.g., `patch-go.ts`).
 1. **Idempotent patches:** Re-applying the **same** patch must **not** cause rebuilds.
 1. **Scaffolding:** When you add new target types, **update/augment** the existing scaffolding tools in `tools/` (don’t invent new scaffolding).
@@ -211,7 +211,10 @@ in
 
 ### Go Templates (`goApp` / `goLib`)
 
-Canonical patch map helper: `patchesMapFromDir` lives in `tools/nix/lib/lang-helpers.nix`. Templates must import it rather than re‑implementing scanners.
+Canonical patch map helpers live in `tools/nix/lib/lang-helpers.nix`. Templates must import these rather than re‑implementing scanners:
+
+- `patchesMapFromDir`, `patchesMapFromDirs` — path‑based scanning (Go/C++).
+- `patchesMapFromDirToStore`, `patchesMapFromImporterDirToStore` — store‑materialized inputs (Python), same canonical keying (`__` ↔ `/`, case‑insensitive `importPath@version`).
 
 Keep language logic localized and easy to read. The Go templates consume the **patch maps** and **dev override** env:
 
@@ -915,6 +918,17 @@ console.log("providers sync complete for", LANG);
 - **Locally**: triggered by Node `patch-pkg apply` (after committing the pnpm patch).
 - **Dev env setup**: may run from `tools/install-deps.ts` after `export-graph.ts`, before `gen-auto-map.ts`.
 - **CI**: as a dedicated stage, before `Generate auto_map`.
+
+### Shared importer utilities (Node + Python)
+
+Use `tools/lib/importers.ts` to keep importer logic consistent:
+
+- `findImporterLockfiles(globs: string[])` — discover PNPM (`pnpm-lock.yaml`) and uv (`uv.lock`) lockfiles.
+- `computeImporterLabel(lockfilePath)` — POSIX importer string used in `lockfile:<path>#<importer>`.
+- `defaultImporterPatchDir(importer, lang)` — canonical importer‑local patch directory.
+- `listImporterPatches(importer, lang)` — deterministically sorted `*.patch` list.
+
+These helpers are used by provider generators and tests to avoid path/ordering drift across ecosystems.
 
 ## Future-Proofing for Other Languages
 
