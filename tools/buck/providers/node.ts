@@ -8,6 +8,7 @@ import { findPnpmLockfiles } from "../../lib/lockfiles.ts";
 import { parsePnpmLock, effectiveSetForImporter } from "../../lib/pnpm-lock.ts";
 import { ensureAutoSection } from "../../lib/auto-section.ts";
 import { computeImporterLabel, listImporterPatches } from "../../lib/importers.ts";
+import { writeImporterProviders, type ImporterProvider } from "../../lib/provider-writer.ts";
 
 export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: string }) {
   const PATCH_DIR = opts?.patchDir || "patches/node";
@@ -25,13 +26,17 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
   }
 
   if (!lockfiles.length) {
-    const header = [
-      "# GENERATED FILE — DO NOT EDIT.",
-      'load("//third_party/providers:defs_node.bzl", "node_importer_deps")',
-      "",
-      "",
-    ].join("\n");
-    await writeIfChanged(OUT_FILE, renderTargetsFile(header, []));
+    // Write deterministic, header-only file via shared writer
+    await writeImporterProviders([], {
+      outFile: OUT_FILE,
+      ruleLoad: 'load("//third_party/providers:defs_node.bzl", "node_importer_deps")',
+      ruleName: "node_importer_deps",
+      autoSection: {
+        begin: "# BEGIN AUTO_NODE",
+        end: "# END AUTO_NODE",
+        header: 'load("//third_party/providers:defs_node.bzl", "node_importer_deps")',
+      },
+    });
     return;
   }
 
@@ -46,8 +51,7 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
   const keyToPatchPath = new Map<string, string>();
   for (const e of scanned) keyToPatchPath.set(e.key, e.patchPath);
 
-  const seenNames = new Map<string, string>();
-  const entries: string[] = [];
+  const providers: ImporterProvider[] = [];
 
   for (const lf of lockfiles) {
     const relLf = lf.replace(/^\.\/+/, "");
@@ -68,71 +72,25 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
         const patchPaths = Array.from(
           new Set<string>([...usedPatches, ...importerLocalPatches]),
         ).sort();
-        const name = providerNameForImporter(relLf, importerLabel);
-        const key = `${relLf}#${importerLabel}`;
-        const prev = seenNames.get(name);
-        if (prev) {
-          if (prev !== key) {
-            throw new Error(`Provider name collision: ${name}\n${prev} vs ${key}`);
-          } else {
-            continue; // exact duplicate, skip
-          }
-        }
-        seenNames.set(name, key);
-        entries.push(
-          `node_importer_deps(name="${name}", lockfile="${relLf}", importer="${importerLabel}", patch_paths=[${patchPaths
-            .map((s) => `"${s}"`)
-            .join(", ")}])`,
-        );
+        providers.push({ lockfile: relLf, importer: importerLabel, patchPaths });
       }
     } else {
       // No YAML available: still create a provider per lockfile with importer derived from path
       const importerLabel = path.dirname(relLf) || ".";
-      const name = providerNameForImporter(relLf, importerLabel);
-      const key = `${relLf}#${importerLabel}`;
-      const prev = seenNames.get(name);
-      if (prev) {
-        if (prev !== key) {
-          throw new Error(`Provider name collision: ${name}\n${prev} vs ${key}`);
-        } else {
-          continue;
-        }
-      }
-      seenNames.set(name, key);
-      entries.push(
-        `node_importer_deps(name="${name}", lockfile="${relLf}", importer="${importerLabel}", patch_paths=[])`,
-      );
+      providers.push({ lockfile: relLf, importer: importerLabel, patchPaths: [] });
     }
   }
 
-  // Sort entries for deterministic output
-  entries.sort();
-
-  const header = [
-    "# GENERATED FILE — DO NOT EDIT.",
-    'load("//third_party/providers:defs_node.bzl", "node_importer_deps")',
-    "",
-    "",
-  ].join("\n");
-  await writeIfChanged(OUT_FILE, renderTargetsFile(header, entries));
-  // Avoid accidental commits: mark generated provider TARGETS file as assume-unchanged if tracked
-  await maybeAssumeUnchanged(OUT_FILE);
-
-  // If OUT_FILE is not the main TARGETS, also synchronize an auto-managed section
-  // inside third_party/providers/TARGETS so Buck can resolve lf_* labels.
-  if (OUT_FILE !== "third_party/providers/TARGETS") {
-    try {
-      await ensureAutoSection({
-        file: "third_party/providers/TARGETS",
-        begin: "# BEGIN AUTO_NODE",
-        end: "# END AUTO_NODE",
-        header: 'load("//third_party/providers:defs_node.bzl", "node_importer_deps")',
-        body: renderTargetsFile("", entries).trim(),
-      });
-      // Mark the curated TARGETS file assume-unchanged to avoid unintended commits
-      await maybeAssumeUnchanged("third_party/providers/TARGETS");
-    } catch {}
-  }
+  await writeImporterProviders(providers, {
+    outFile: OUT_FILE,
+    ruleLoad: 'load("//third_party/providers:defs_node.bzl", "node_importer_deps")',
+    ruleName: "node_importer_deps",
+    autoSection: {
+      begin: "# BEGIN AUTO_NODE",
+      end: "# END AUTO_NODE",
+      header: 'load("//third_party/providers:defs_node.bzl", "node_importer_deps")',
+    },
+  });
 }
 
 // Minimal surface for provider index generation

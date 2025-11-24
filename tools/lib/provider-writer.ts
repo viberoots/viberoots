@@ -1,0 +1,103 @@
+#!/usr/bin/env zx-wrapper
+import path from "node:path";
+import { renderTargetsFile, writeIfChanged, maybeAssumeUnchanged } from "./fs-helpers.ts";
+import { ensureAutoSection } from "./auto-section.ts";
+import { providerNameForImporter } from "./providers.ts";
+
+export type ImporterProvider = {
+  lockfile: string; // POSIX relative path, e.g. apps/web/pnpm-lock.yaml
+  importer: string; // POSIX importer label, e.g. apps/web or "."
+  patchPaths: string[]; // POSIX relative paths, deterministically sorted
+};
+
+export type ImporterWriterOptions = {
+  outFile: string;
+  ruleLoad: string; // e.g. 'load("//third_party/providers:defs_node.bzl", "node_importer_deps")'
+  ruleName: string; // e.g. "node_importer_deps"
+  autoSection?: {
+    file?: string; // defaults to third_party/providers/TARGETS
+    begin: string; // e.g. "# BEGIN AUTO_NODE"
+    end: string; // e.g. "# END AUTO_NODE"
+    header?: string; // usually same as ruleLoad
+  };
+};
+
+function headerFrom(ruleLoad: string): string {
+  return ["# GENERATED FILE — DO NOT EDIT.", ruleLoad, "", ""].join("\n");
+}
+
+function makeEntry(
+  ruleName: string,
+  name: string,
+  lockfile: string,
+  importer: string,
+  patchPaths: string[],
+): string {
+  const pp = (patchPaths || [])
+    .slice()
+    .sort()
+    .map((s) => `"${s}"`)
+    .join(", ");
+  return `${ruleName}(name="${name}", lockfile="${lockfile}", importer="${importer}", patch_paths=[${pp}])`;
+}
+
+function resolveInWorkspace(relOrAbs: string): string {
+  if (!relOrAbs) return relOrAbs;
+  if (path.isAbsolute(relOrAbs)) return relOrAbs;
+  const root = (process.env.WORKSPACE_ROOT && process.env.WORKSPACE_ROOT.trim()) || process.cwd();
+  return path.resolve(root, relOrAbs);
+}
+
+/**
+ * Write importer-scoped provider TARGETS deterministically and synchronize an
+ * auto-managed section in the curated providers/TARGETS file.
+ *
+ * Behavior:
+ * - Provider names are derived via providerNameForImporter(lockfile, importer)
+ * - Duplicate provider names for different keys throw (collision detection)
+ * - Entries are sorted by provider name
+ * - Header and auto-section formatting are stable
+ */
+export async function writeImporterProviders(
+  providers: ImporterProvider[],
+  opts: ImporterWriterOptions,
+): Promise<void> {
+  const nameKey = new Map<string, string>(); // provider name -> "lockfile#importer"
+  const items: Array<{ name: string; entry: string }> = [];
+  for (const p of providers) {
+    const lockfile = String(p.lockfile || "").replace(/^\.\/+/, "");
+    const importer = String(p.importer || "") || ".";
+    const patchPaths = (p.patchPaths || []).slice().sort();
+    const name = providerNameForImporter(lockfile, importer);
+    const key = `${lockfile}#${importer}`;
+    const prev = nameKey.get(name);
+    if (prev && prev !== key) {
+      throw new Error(`Provider name collision: ${name}\n${prev} vs ${key}`);
+    }
+    nameKey.set(name, key);
+    items.push({ name, entry: makeEntry(opts.ruleName, name, lockfile, importer, patchPaths) });
+  }
+  // Sort deterministically by provider name
+  items.sort((a, b) => a.name.localeCompare(b.name));
+  const entries = items.map((it) => it.entry);
+
+  const header = headerFrom(opts.ruleLoad);
+  const outPath = resolveInWorkspace(opts.outFile);
+  await writeIfChanged(outPath, renderTargetsFile(header, entries));
+  await maybeAssumeUnchanged(outPath);
+
+  // Synchronize managed section in curated TARGETS
+  if (opts.autoSection) {
+    const file = resolveInWorkspace(opts.autoSection.file || "third_party/providers/TARGETS");
+    await ensureAutoSection({
+      file,
+      begin: opts.autoSection.begin,
+      end: opts.autoSection.end,
+      header: opts.autoSection.header || opts.ruleLoad,
+      body: renderTargetsFile("", entries).trim(),
+    });
+    await maybeAssumeUnchanged(file);
+  }
+}
+
+export default writeImporterProviders;

@@ -12,6 +12,7 @@ import {
   listImporterPatches,
   defaultImporterPatchDir,
 } from "../../lib/importers.ts";
+import { writeImporterProviders, type ImporterProvider } from "../../lib/provider-writer.ts";
 
 export async function syncPythonProviders(opts?: {
   outFile?: string;
@@ -27,18 +28,20 @@ export async function syncPythonProviders(opts?: {
 
   // Empty state: still ensure deterministic, header-only file exists
   if (!lockfiles.length) {
-    const header = [
-      "# GENERATED FILE — DO NOT EDIT.",
-      'load("//third_party/providers:defs_python.bzl", "python_importer_deps")',
-      "",
-      "",
-    ].join("\n");
-    await writeIfChanged(OUT_FILE, renderTargetsFile(header, []));
+    await writeImporterProviders([], {
+      outFile: OUT_FILE,
+      ruleLoad: 'load("//third_party/providers:defs_python.bzl", "python_importer_deps")',
+      ruleName: "python_importer_deps",
+      autoSection: {
+        begin: "# BEGIN AUTO_PYTHON",
+        end: "# END AUTO_PYTHON",
+        header: 'load("//third_party/providers:defs_python.bzl", "python_importer_deps")',
+      },
+    });
     return;
   }
 
-  const seenNames = new Map<string, string>(); // provider name -> unique key lockfile#importer
-  const entries: string[] = [];
+  const providers: ImporterProvider[] = []; // provider entries we will emit
 
   for (const lf of lockfiles) {
     const relLf = lf.replace(/^\.\/+/, "");
@@ -56,7 +59,6 @@ export async function syncPythonProviders(opts?: {
       eff = new Set();
     }
     // Build importer-local patches directory and collect matching patches
-    const importerPatchDir = defaultImporterPatchDir(importerLabel, "python");
     const allImporterPatches = await listImporterPatches(importerLabel, "python");
     const usedPatches = allImporterPatches.filter((p) => {
       const base = path.posix.basename(p);
@@ -65,50 +67,19 @@ export async function syncPythonProviders(opts?: {
     });
     usedPatches.sort();
 
-    const name = providerNameForImporter(relLf, importerLabel);
-    const key = `${relLf}#${importerLabel}`;
-    const prev = seenNames.get(name);
-    if (prev) {
-      if (prev !== key) {
-        throw new Error(`Provider name collision: ${name}\n${prev} vs ${key}`);
-      } else {
-        continue; // exact duplicate, skip
-      }
-    }
-    seenNames.set(name, key);
-    entries.push(
-      `python_importer_deps(name="${name}", lockfile="${relLf}", importer="${importerLabel}", patch_paths=[${usedPatches
-        .map((s) => `"${s}"`)
-        .join(", ")}])`,
-    );
+    providers.push({ lockfile: relLf, importer: importerLabel, patchPaths: usedPatches });
   }
 
-  // Sort entries for deterministic output
-  entries.sort();
-
-  const header = [
-    "# GENERATED FILE — DO NOT EDIT.",
-    'load("//third_party/providers:defs_python.bzl", "python_importer_deps")',
-    "",
-    "",
-  ].join("\n");
-  await writeIfChanged(OUT_FILE, renderTargetsFile(header, entries));
-  // Avoid accidental commits: mark generated provider TARGETS file as assume-unchanged if tracked
-  await maybeAssumeUnchanged(OUT_FILE);
-
-  // Also synchronize an auto-managed section inside third_party/providers/TARGETS for Buck resolution.
-  if (OUT_FILE !== "third_party/providers/TARGETS") {
-    try {
-      await ensureAutoSection({
-        file: "third_party/providers/TARGETS",
-        begin: "# BEGIN AUTO_PYTHON",
-        end: "# END AUTO_PYTHON",
-        header: 'load("//third_party/providers:defs_python.bzl", "python_importer_deps")',
-        body: renderTargetsFile("", entries).trim(),
-      });
-      await maybeAssumeUnchanged("third_party/providers/TARGETS");
-    } catch {}
-  }
+  await writeImporterProviders(providers, {
+    outFile: OUT_FILE,
+    ruleLoad: 'load("//third_party/providers:defs_python.bzl", "python_importer_deps")',
+    ruleName: "python_importer_deps",
+    autoSection: {
+      begin: "# BEGIN AUTO_PYTHON",
+      end: "# END AUTO_PYTHON",
+      header: 'load("//third_party/providers:defs_python.bzl", "python_importer_deps")',
+    },
+  });
 }
 
 export default syncPythonProviders;
