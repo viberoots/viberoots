@@ -9,6 +9,9 @@ if (has(process.env.NIX_GO_DEV_OVERRIDE_JSON)) {
 if (has(process.env.NIX_CPP_DEV_OVERRIDE_JSON)) {
   delete process.env.NIX_CPP_DEV_OVERRIDE_JSON;
 }
+if (has(process.env.NIX_PY_DEV_OVERRIDE_JSON)) {
+  delete process.env.NIX_PY_DEV_OVERRIDE_JSON;
+}
 
 console.log(
   "NIX_GO_DEV_OVERRIDE_JSON=",
@@ -17,4 +20,8 @@ console.log(
 console.log(
   "NIX_CPP_DEV_OVERRIDE_JSON=",
   JSON.stringify(process.env.NIX_CPP_DEV_OVERRIDE_JSON || ""),
+);
+console.log(
+  "NIX_PY_DEV_OVERRIDE_JSON=",
+  JSON.stringify(process.env.NIX_PY_DEV_OVERRIDE_JSON || ""),
 );

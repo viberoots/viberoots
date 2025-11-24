@@ -3,6 +3,7 @@
 , repoRootStr
 , devOverrideJSON
 , devOverrideCppJSON
+, devOverridePyJSON
 , isCI
 , suppressDevOverrideLog
 , goOutPaths
@@ -25,8 +26,8 @@ let
       echo "appsDir=${builtins.toString (builtins.toPath (repoRootStr + "/apps"))}" >> $out/build.log
       echo "libsDir=${builtins.toString (builtins.toPath (repoRootStr + "/libs"))}" >> $out/build.log
       echo "devOverrideJSON=${builtins.toJSON devOverrideJSON}" >> $out/build.log
-      ${if (!isCI && !suppressDevOverrideLog && ((devOverrideJSON != "") || (devOverrideCppJSON != ""))) then ''
-        echo "[planner] dev overrides present:${if devOverrideJSON != "" then " go" else ""}${if devOverrideCppJSON != "" then " cpp" else ""}" >> $out/build.log
+      ${if (!isCI && !suppressDevOverrideLog && ((devOverrideJSON != "") || (devOverrideCppJSON != "") || (devOverridePyJSON != ""))) then ''
+        echo "[planner] dev overrides present:${if devOverrideJSON != "" then " go" else ""}${if devOverrideCppJSON != "" then " cpp" else ""}${if devOverridePyJSON != "" then " py" else ""}" >> $out/build.log
       '' else ""}
       echo "goTargets keys: ${lib.concatStringsSep "," (builtins.attrNames goOutPaths)}" >> $out/build.log
       echo "cppTargets bin keys: ${lib.concatStringsSep "," (builtins.attrNames cppOutPaths)}" >> $out/build.log

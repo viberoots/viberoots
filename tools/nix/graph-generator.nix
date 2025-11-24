@@ -80,6 +80,7 @@ let
   D = M.dispatch or {};
   devOverrideJSON = builtins.getEnv "NIX_GO_DEV_OVERRIDE_JSON";
   devOverrideCppJSON = builtins.getEnv "NIX_CPP_DEV_OVERRIDE_JSON";
+  devOverridePyJSON = builtins.getEnv "NIX_PY_DEV_OVERRIDE_JSON";
   # CI detection and optional suppression flag for planner dev-override logs
   isCI = (builtins.getEnv "CI") == "true";
   suppressDevOverrideLog = (builtins.getEnv "PLANNER_NO_DEV_OVERRIDE_LOG") != "";
@@ -399,7 +400,7 @@ let
 
   # Build manifest and bin links (extracted module)
   Manifest = import (manifestBase + "/planner/manifest.nix") {
-    inherit pkgs lib repoRootStr devOverrideJSON devOverrideCppJSON isCI suppressDevOverrideLog
+    inherit pkgs lib repoRootStr devOverrideJSON devOverrideCppJSON devOverridePyJSON isCI suppressDevOverrideLog
             goOutPaths cppOutPaths nodeOutPaths modulesTomlFor pkgPathOf targetNameOf sanitize;
   };
   all = Manifest.all;
