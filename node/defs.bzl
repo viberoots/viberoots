@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "genrule")
-load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve", "append_patch_srcs", "providers_for", "append_node_patches_for_importer", "extract_lockfile_labels", "ensure_single_lockfile_label")
+load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve", "append_patch_srcs", "providers_for", "append_importer_patches", "extract_lockfile_labels", "ensure_single_lockfile_label")
 load("//lang:sanitize.bzl", "sanitize_name")
 load("//node/private:nix_test.bzl", "node_nix_test")
 
@@ -27,7 +27,7 @@ def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = []
         _importer = _lab[_lab.find("#") + 1:] if ("#" in _lab) else None
     # Use shared helper to append importer-local patch files to srcs
     _kw = { "srcs": merged_srcs }
-    append_node_patches_for_importer(_kw, _importer)
+    append_importer_patches(_kw, _importer, "node")
     merged_srcs = _kw.get("srcs", [])
     merged_srcs = dedupe_preserve(merged_srcs + deps + providers_for(MODULE_PROVIDERS, name))
     kwargs["srcs"] = merged_srcs
@@ -70,7 +70,7 @@ def nix_node_test(
     # Include importer-local node patches as inputs so changes invalidate tests precisely
     merged_srcs = list(srcs)
     _kw = { "srcs": merged_srcs }
-    append_node_patches_for_importer(_kw, _importer)
+    append_importer_patches(_kw, _importer, "node")
     merged_srcs = dedupe_preserve(_kw.get("srcs", []) or [])
 
     # Forward to external runner rule; ignore legacy 'cmd'

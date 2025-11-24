@@ -79,10 +79,8 @@ def append_node_patches_for_importer(kwargs, importer):
     - Else use "<importer>/patches/node"
     No-op when importer is empty or not a string.
     """
-    if importer == None or not isinstance(importer, str) or importer == "":
-        return
-    patch_dir = "patches/node" if importer == "." else ("%s/patches/node" % importer)
-    append_patch_srcs(kwargs, [patch_dir])
+    # Deprecated in PR‑5: prefer append_importer_patches(kwargs, importer, "node")
+    append_importer_patches(kwargs, importer, "node")
 
 
 def append_python_patches_for_importer(kwargs, importer):
@@ -92,9 +90,22 @@ def append_python_patches_for_importer(kwargs, importer):
     - Else use "<importer>/patches/python"
     No-op when importer is empty or not a string.
     """
+    # Deprecated in PR‑5: prefer append_importer_patches(kwargs, importer, "python")
+    append_importer_patches(kwargs, importer, "python")
+
+
+def append_importer_patches(kwargs, importer, lang):
+    """
+    Unified importer-local patches helper (PR‑5).
+    Appends "<importer>/patches/<lang>/*.patch" (or "patches/<lang>" when importer == ".")
+    into kwargs["srcs"] deterministically. No-ops on invalid args.
+    """
     if importer == None or not isinstance(importer, str) or importer == "":
         return
-    patch_dir = "patches/python" if importer == "." else ("%s/patches/python" % importer)
+    if lang == None or not isinstance(lang, str) or lang == "":
+        return
+    base = "patches/%s" % lang
+    patch_dir = base if importer == "." else ("%s/%s" % (importer, base))
     append_patch_srcs(kwargs, [patch_dir])
 
 
