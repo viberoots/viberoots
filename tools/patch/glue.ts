@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { findRepoRoot } from "../lib/repo.ts";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
+import { exportInlineGraph } from "../buck/export-inline.ts";
 
 async function buck2Present(): Promise<boolean> {
   try {
@@ -116,12 +117,9 @@ export async function ensureGraph(): Promise<void> {
   // Prefer direct Node exporter when buck2 is available; otherwise fallback to nix-run or inline query
   const haveBuck = await buck2Present();
   if (forceInline) {
-    // Skip node/nix exporters entirely and go straight to the inline buck2 cquery path
-    // to maximize robustness in minimal temp workspaces.
     try {
       console.error(`[ensureGraph] inline export via buck2 → ${graphPath}`);
     } catch {}
-    // Build a conservative roots expression, filtering to existing directories
     const rawRoots = (process.env.BUCK_QUERY_ROOTS || "apps,libs,go,cpp,third_party")
       .split(/[,\s]+/)
       .filter(Boolean);
@@ -134,97 +132,15 @@ export async function ensureGraph(): Promise<void> {
         return false;
       }
     });
-    const rootsForExpr = existingRoots.length > 0 ? existingRoots : ["libs"];
-    const Labels = await import("../lib/labels.ts");
-    const rootsExpr = `set(${rootsForExpr
-      .map((r) => (r.startsWith("//") ? `${r}/...` : `//${r}/...`))
-      .join(" ")})`;
     const wantTargetRaw = (process.env.BUCK_TARGET || "").trim();
-    const wantTarget = wantTargetRaw ? Labels.normalizeTargetLabel(wantTargetRaw) : "";
-    const query = wantTarget
-      ? `kind(".*", deps(${wantTarget}, 1, exec_deps()))`
-      : `kind(".*", ${rootsExpr})`;
-    const attrs = [
-      "name",
-      "rule_type",
-      "buck.type",
-      "srcs",
-      "buck.srcs",
-      "deps",
-      "buck.deps",
-      "labels",
-      "buck.labels",
-      "args",
-      "env",
-      "main",
-      "main_class",
-      "includes",
-      "defines",
-      "cflags",
-      "ldflags",
-    ];
-    const flags = attrs.flatMap((a) => ["--output-attribute", a]);
-    await fsp.mkdir(path.dirname(graphPath), { recursive: true }).catch(() => {});
-    const parentIso = (
-      process.env.BUCK_ISOLATION_DIR_EXPORTER ||
-      process.env.BUCK_ISOLATION_DIR ||
-      ""
-    ).trim();
-    const iso = parentIso ? `${parentIso}__exporter-${process.pid}` : `exporter-${process.pid}`;
-    const useIso = process.env.BUCK_NO_ISOLATION !== "1";
-    const isoArgs = useIso ? ["--isolation-dir", iso] : ([] as string[]);
-    const platformFlags = ["--target-platforms", "prelude//platforms:default"];
-    const res = await $({
-      cwd: workspaceRoot,
-      stdio: "pipe",
-    })`buck2 ${isoArgs} cquery ${platformFlags} ${query} --json ${flags}`.nothrow();
-    const stdout = String(res.stdout || "");
-    const obj = (() => {
-      try {
-        return JSON.parse(stdout || "{}") as Record<string, any>;
-      } catch {
-        return {} as Record<string, any>;
-      }
-    })();
-    const merged: any[] = [];
-    for (const [label, raw] of Object.entries(obj)) {
-      const a = (raw || {}) as Record<string, any>;
-      const ruleType: string | undefined =
-        typeof a["rule_type"] === "string" ? (a["rule_type"] as string) : (a["buck.type"] as any);
-      const deps: string[] | undefined = Array.isArray(a["deps"])
-        ? (a["deps"] as string[])
-        : Array.isArray(a["buck.deps"])
-          ? (a["buck.deps"] as string[])
-          : undefined;
-      const labelsArr: string[] | undefined = Array.isArray(a["labels"])
-        ? (a["labels"] as string[])
-        : Array.isArray(a["buck.labels"])
-          ? (a["buck.labels"] as string[])
-          : undefined;
-      const srcsArr: string[] | undefined = Array.isArray(a["srcs"])
-        ? (a["srcs"] as string[])
-        : Array.isArray(a["buck.srcs"])
-          ? (a["buck.srcs"] as string[])
-          : undefined;
-      const nameRaw = String(label || a["name"] || "");
-      const name = Labels.normalizeTargetLabel(nameRaw);
-      merged.push({
-        ...a,
-        name,
-        rule_type: ruleType || a["rule_type"] || "",
-        deps: deps || a["deps"] || [],
-        labels: Array.from(new Set(labelsArr || [])),
-        srcs: srcsArr || a["srcs"] || [],
-      });
-    }
-    const data = (merged.length > 0 ? JSON.stringify({ nodes: merged }, null, 2) : "[]") + "\n";
-    const dir = path.dirname(graphPath);
-    const tmp = path.join(dir, `.graph.json.${process.pid}.${Date.now()}.tmp`);
-    await fsp.writeFile(tmp, data, "utf8");
-    await fsp.rename(tmp, graphPath);
-    if (useIso) {
-      await $({ stdio: "pipe" })`buck2 --isolation-dir ${iso} kill`.nothrow();
-    }
+    await exportInlineGraph({
+      workspaceRoot,
+      outPath: graphPath,
+      target: wantTargetRaw,
+      roots: existingRoots.length > 0 ? existingRoots : ["libs"],
+      includeTargetPlatforms: true,
+      normalizeLabels: true,
+    });
     return;
   }
   const exporterArgs = ["--out", graphPath];
@@ -263,7 +179,6 @@ export async function ensureGraph(): Promise<void> {
     try {
       console.error(`[ensureGraph] inline export via buck2 → ${graphPath}`);
     } catch {}
-    // Build a conservative roots expression, filtering to existing directories under the workspace
     const rawRoots = (process.env.BUCK_QUERY_ROOTS || "apps,libs,go,cpp,third_party")
       .split(/[,\s]+/)
       .filter(Boolean);
@@ -276,99 +191,14 @@ export async function ensureGraph(): Promise<void> {
         return false;
       }
     });
-    const rootsForExpr = existingRoots.length > 0 ? existingRoots : ["libs"];
-    const rootsExpr = `set(${rootsForExpr
-      .map((r) => (r.startsWith("//") ? `${r}/...` : `//${r}/...`))
-      .join(" ")})`;
-    const query = `deps(${rootsExpr}, 1, exec_deps())`;
-    const attrs = [
-      "name",
-      "rule_type",
-      "buck.type",
-      "srcs",
-      "buck.srcs",
-      "deps",
-      "buck.deps",
-      "labels",
-      "buck.labels",
-      "args",
-      "env",
-      "main",
-      "main_class",
-      "includes",
-      "defines",
-      "cflags",
-      "ldflags",
-    ];
-    const flags = attrs.flatMap((a) => ["--output-attribute", a]);
-    await fsp.mkdir(path.dirname(graphPath), { recursive: true }).catch(() => {});
-    // Use an isolated buckd to avoid recursive invocation conflicts inside buck2 tests
-    const parentIso = (
-      process.env.BUCK_ISOLATION_DIR_EXPORTER ||
-      process.env.BUCK_ISOLATION_DIR ||
-      ""
-    ).trim();
-    const iso = parentIso ? `${parentIso}__exporter-${process.pid}` : `exporter-${process.pid}`;
-    const useIso = process.env.BUCK_NO_ISOLATION !== "1";
-    const isoArgs = useIso ? ["--isolation-dir", iso] : ([] as string[]);
-    const res = await $({
-      cwd: workspaceRoot,
-      stdio: "pipe",
-    })`buck2 ${isoArgs} cquery ${query} --json ${flags}`.nothrow();
-    const stdout = String(res.stdout || "");
-    if (res.exitCode !== 0) {
-      try {
-        console.error(`[ensureGraph] buck2 cquery failed (exit ${res.exitCode}). stdout:`, stdout);
-      } catch {}
-    }
-    const obj = (() => {
-      try {
-        return JSON.parse(stdout || "{}") as Record<string, any>;
-      } catch {
-        return {} as Record<string, any>;
-      }
-    })();
-    const merged: any[] = [];
-    for (const [label, raw] of Object.entries(obj)) {
-      const a = (raw || {}) as Record<string, any>;
-      const ruleType: string | undefined =
-        typeof a["rule_type"] === "string" ? (a["rule_type"] as string) : (a["buck.type"] as any);
-      const deps: string[] | undefined = Array.isArray(a["deps"])
-        ? (a["deps"] as string[])
-        : Array.isArray(a["buck.deps"])
-          ? (a["buck.deps"] as string[])
-          : undefined;
-      const labelsArr: string[] | undefined = Array.isArray(a["labels"])
-        ? (a["labels"] as string[])
-        : Array.isArray(a["buck.labels"])
-          ? (a["buck.labels"] as string[])
-          : undefined;
-      const srcsArr: string[] | undefined = Array.isArray(a["srcs"])
-        ? (a["srcs"] as string[])
-        : Array.isArray(a["buck.srcs"])
-          ? (a["buck.srcs"] as string[])
-          : undefined;
-      const name = String(label || a["name"] || "");
-      merged.push({
-        ...a,
-        name,
-        rule_type: ruleType || a["rule_type"] || "",
-        deps: deps || a["deps"] || [],
-        labels: Array.from(new Set(labelsArr || [])),
-        srcs: srcsArr || a["srcs"] || [],
-      });
-    }
-    const data = (merged.length > 0 ? JSON.stringify({ nodes: merged }, null, 2) : "[]") + "\n";
-    const dir = path.dirname(graphPath);
-    const tmp = path.join(dir, `.graph.json.${process.pid}.${Date.now()}.tmp`);
-    await fsp.writeFile(tmp, data, "utf8");
-    await fsp.rename(tmp, graphPath);
-    try {
-      console.error(`[ensureGraph] inline export wrote ${merged.length} nodes to ${graphPath}`);
-      if (useIso) {
-        await $({ stdio: "pipe" })`buck2 --isolation-dir ${iso} kill`.nothrow();
-      }
-    } catch {}
+    await exportInlineGraph({
+      workspaceRoot,
+      outPath: graphPath,
+      target: "",
+      roots: existingRoots.length > 0 ? existingRoots : ["libs"],
+      includeTargetPlatforms: false,
+      normalizeLabels: false,
+    });
     return;
   }
 }

@@ -330,6 +330,12 @@ await fs.outputFile(out, stdout);
 console.log(`wrote ${out}`);
 ```
 
+Inline fallback (buck2 cquery):
+
+- For bootstrap and minimal temp workspaces, the inline exporter is encapsulated in `tools/buck/export-inline.ts`.
+- `tools/patch/glue.ts` calls this module from `ensureGraph()` when forced via `EXPORTER_FORCE_INLINE=1` or as the final fallback if the Node exporter and nix-run delegation are unavailable.
+- The module preserves the existing behavior and wiring (roots, optional `--target`, isolation dir, and optional target platform flag).
+
 > Consumption note: downstream tools should not read `graph.json` directly. Use the Composite Graph API instead — library `tools/lib/graph-view.ts` or CLI `node tools/buck/graph-view.ts`. Glue emits the Node sidecar index at `tools/buck/node-lock-index.json` (via `tools/buck/gen-provider-index.ts`) and both files include `$schema` and `version` fields.
 
 ### Validation modes (warn vs error)
