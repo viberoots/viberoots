@@ -17,37 +17,13 @@ let
   }:
     let
       _guard = H.guardNoDevOverridesInCI devOverrideEnv;
-      # Prefer scanning importer-local patches under <subdir>/patches/python
-      patchDirAbs =
-        let
-          rootStr = builtins.toString srcRoot;
-        in
-          builtins.toPath ("${rootStr}/${subdir}/patches/python");
-      patchesMap =
-        if builtins.pathExists patchDirAbs then
-          let
-            names = builtins.attrNames (builtins.readDir patchDirAbs);
-            isPatch = name: lib.hasSuffix ".patch" name;
-            toKey = name:
-              let
-                base = lib.removeSuffix ".patch" name;
-                parts = lib.splitString "@" base;
-                impEnc = lib.concatStringsSep "@" (lib.take (lib.length parts - 1) parts);
-                verRaw = lib.last parts;
-                # Normalize versions like 1.0.0-a -> 1.0.0 for key grouping
-                ver = lib.head (lib.splitString "-" verRaw);
-                importPath = lib.replaceStrings ["__"] ["/"] impEnc;
-              in (lib.toLower importPath) + "@" + (lib.toLower ver);
-            step = acc: name:
-              let
-                key = toKey name;
-                content = builtins.readFile (patchDirAbs + "/" + name);
-                storeFile = pkgs.writeText "py-patch-${key}-${name}" content;
-                prev = acc.${key} or [];
-              in acc // { "${key}" = prev ++ [ (builtins.toString storeFile) ]; };
-            # Attr names are sorted; fold preserves deterministic order.
-          in builtins.foldl' step {} (lib.filter isPatch names)
-        else {};
+      # Prefer scanning importer-local patches under <subdir>/patches/python using shared helper
+      patchesMap = H.patchesMapFromImporterDirToStore {
+        inherit srcRoot subdir;
+        lang = "python";
+        normalizeVersion = (v: lib.head (lib.splitString "-" v));
+        namePrefix = "py-patch";
+      };
       devOverrides = H.readDevOverrides devOverrideEnv;
       # Use a stable snapshot of the app/lib subtree, including vendored test fixtures
       srcAbs = builtins.path { path = builtins.toPath ("${srcRoot}/" + subdir); name = "py-src"; };
@@ -120,32 +96,12 @@ in {
   }:
     let
       # Compute importer-local patch map exactly as mkPy (reuse logic to ensure identical keys).
-      patchDirAbs =
-        let rootStr = builtins.toString srcRoot;
-        in builtins.toPath ("${rootStr}/${subdir}/patches/python");
-      patchesMap =
-        if builtins.pathExists patchDirAbs then
-          let
-            names = builtins.attrNames (builtins.readDir patchDirAbs);
-            isPatch = name: lib.hasSuffix ".patch" name;
-            toKey = name:
-              let
-                base = lib.removeSuffix ".patch" name;
-                parts = lib.splitString "@" base;
-                impEnc = lib.concatStringsSep "@" (lib.take (lib.length parts - 1) parts);
-                verRaw = lib.last parts;
-                ver = lib.head (lib.splitString "-" verRaw);
-                importPath = lib.replaceStrings ["__"] ["/"] impEnc;
-              in (lib.toLower importPath) + "@" + (lib.toLower ver);
-            step = acc: name:
-              let
-                key = toKey name;
-                content = builtins.readFile (patchDirAbs + "/" + name);
-                storeFile = pkgs.writeText "py-patch-${key}-${name}" content;
-                prev = acc.${key} or [];
-              in acc // { "${key}" = prev ++ [ (builtins.toString storeFile) ]; };
-          in builtins.foldl' step {} (lib.filter isPatch names)
-        else {};
+      patchesMap = H.patchesMapFromImporterDirToStore {
+        inherit srcRoot subdir;
+        lang = "python";
+        normalizeVersion = (v: lib.head (lib.splitString "-" v));
+        namePrefix = "py-patch";
+      };
 
       # Build a minimal store directory containing only the lockfile at ./uv.lock
       # Lockfile path relative to repo root (flake calls pass importer+'/uv.lock')

@@ -81,6 +81,61 @@ let
         builtins.throw "Dev overrides are forbidden in CI"
       else null;
 
-in {
+ in rec {
   inherit segs getAtPath resolveAttrFromPkgs sanitizeName patchesMapFromDir patchesMapFromDirs readDevOverrides guardNoDevOverridesInCI;
+
+  /*
+    Build {"importPath@version" = [ /nix/store/...-patch1 /nix/store/...-patch2 ... ]}
+    by scanning a flat patches/<lang>/*.patch directory and materializing each file
+    into the store for stable content-addressed inputs (used by Python).
+
+    Options:
+      - dir: absolute path to the flat directory containing *.patch files
+      - normalizeVersion: function string -> string to normalize version segments
+                          (default = identity; Python strips suffix after "-")
+      - namePrefix: prefix used for pkgs.writeText store file names
+  */
+  patchesMapFromDirToStore = { dir, normalizeVersion ? (v: v), namePrefix ? "patch" }:
+    let
+      names = if builtins.pathExists dir then builtins.attrNames (builtins.readDir dir) else [];
+      isPatch = name: lib.hasSuffix ".patch" name;
+      toKey = name:
+        let
+          base = lib.removeSuffix ".patch" name;
+          parts = lib.splitString "@" base;
+          impEnc = lib.concatStringsSep "@" (lib.take (lib.length parts - 1) parts);
+          verRaw = lib.last parts;
+          ver = normalizeVersion verRaw;
+          importPath = lib.replaceStrings ["__"] ["/"] impEnc;
+        in (lib.toLower importPath) + "@" + (lib.toLower ver);
+      step = acc: name:
+        let
+          key = toKey name;
+          content = builtins.readFile (dir + "/" + name);
+          storeFile = pkgs.writeText "${namePrefix}-${key}-${name}" content;
+          prev = acc.${key} or [];
+        in acc // { "${key}" = prev ++ [ (builtins.toString storeFile) ]; };
+    in builtins.foldl' step {} (lib.filter isPatch names);
+
+  /*
+    Convenience wrapper for importer-local patches living under:
+      <srcRoot>/<subdir>/patches/<lang>
+    Produces the same {"importPath@version" = [ /nix/store/... ]} map as above.
+  */
+  patchesMapFromImporterDirToStore = {
+    srcRoot,
+    subdir ? ".",
+    lang,
+    normalizeVersion ? (v: v),
+    namePrefix ? "${lang}-patch",
+  }:
+    let
+      rootStr = builtins.toString srcRoot;
+      dir = builtins.toPath ("${rootStr}/${subdir}/patches/${lang}");
+    in
+      if builtins.pathExists dir
+      then patchesMapFromDirToStore {
+        inherit dir normalizeVersion namePrefix;
+      }
+      else {};
 }
