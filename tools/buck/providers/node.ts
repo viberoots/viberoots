@@ -7,6 +7,7 @@ import { providerNameForImporter, decodeNameVersionFromPatch } from "../../lib/p
 import { findPnpmLockfiles } from "../../lib/lockfiles.ts";
 import { parsePnpmLock, effectiveSetForImporter } from "../../lib/pnpm-lock.ts";
 import { ensureAutoSection } from "../../lib/auto-section.ts";
+import { computeImporterLabel, listImporterPatches } from "../../lib/importers.ts";
 
 export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: string }) {
   const PATCH_DIR = opts?.patchDir || "patches/node";
@@ -55,25 +56,15 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
     if (haveYamlMod) {
       const doc = await parsePnpmLock(lf);
       for (const importer of Object.keys(doc.importers || {})) {
-        let importerLabel = importer === "." ? path.dirname(lf) || "." : importer;
-        importerLabel = importerLabel.replace(/^\.\/+/, "") || ".";
+        let importerLabel =
+          importer === "." ? computeImporterLabel(lf) : importer.replace(/^\.\/+/, "") || ".";
         const eff = effectiveSetForImporter(doc, importer);
         const usedPatches = Array.from(eff)
           .map((k) => keyToPatchPath.get(k) || "")
           .filter(Boolean)
           .sort();
         // Discover importer-local patches for visibility (does not affect invalidation)
-        const importerLocalDir = path.join(importerLabel, "patches", "node");
-        let importerLocalPatches: string[] = [];
-        try {
-          const lst = await fsp.readdir(importerLocalDir);
-          importerLocalPatches = lst
-            .filter((f) => f.endsWith(".patch"))
-            .map((f) => path.join(importerLocalDir, f).replace(/^\.\/+/, ""))
-            .sort();
-        } catch {
-          importerLocalPatches = [];
-        }
+        const importerLocalPatches = await listImporterPatches(importerLabel, "node");
         const patchPaths = Array.from(
           new Set<string>([...usedPatches, ...importerLocalPatches]),
         ).sort();

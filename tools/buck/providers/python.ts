@@ -7,6 +7,11 @@ import { providerNameForImporter, decodeNameVersionFromPatch } from "../../lib/p
 import { ensureAutoSection } from "../../lib/auto-section.ts";
 import { findUvLockfiles } from "../../lib/lockfiles.ts";
 import { parseUvLockKeys } from "../../lib/uv-lock.ts";
+import {
+  computeImporterLabel,
+  listImporterPatches,
+  defaultImporterPatchDir,
+} from "../../lib/importers.ts";
 
 export async function syncPythonProviders(opts?: {
   outFile?: string;
@@ -39,7 +44,7 @@ export async function syncPythonProviders(opts?: {
     const relLf = lf.replace(/^\.\/+/, "");
     // Only generate providers for known importers under apps/* or libs/*
     if (!/^(apps|libs)\//.test(relLf)) continue;
-    const importerLabel = path.dirname(relLf) || ".";
+    const importerLabel = computeImporterLabel(relLf);
 
     // Parse uv.lock for "<name>@<version>" effective set
     let eff: Set<string> = new Set();
@@ -51,24 +56,14 @@ export async function syncPythonProviders(opts?: {
       eff = new Set();
     }
     // Build importer-local patches directory and collect matching patches
-    const importerPatchDir =
-      importerLabel === "."
-        ? path.posix.join("patches", "python")
-        : path.posix.join(importerLabel, "patches", "python");
-    const usedPatches: string[] = [];
-    try {
-      const absDir = path.resolve(importerPatchDir);
-      const names = await fsp.readdir(absDir).catch(() => [] as string[]);
-      for (const name of names) {
-        if (!name.endsWith(".patch")) continue;
-        const key = decodeNameVersionFromPatch(name);
-        if (key && eff.has(key)) {
-          // Keep the path relative (POSIX) for determinism in TARGETS
-          usedPatches.push(path.posix.join(importerPatchDir, name));
-        }
-      }
-      usedPatches.sort();
-    } catch {}
+    const importerPatchDir = defaultImporterPatchDir(importerLabel, "python");
+    const allImporterPatches = await listImporterPatches(importerLabel, "python");
+    const usedPatches = allImporterPatches.filter((p) => {
+      const base = path.posix.basename(p);
+      const key = decodeNameVersionFromPatch(base);
+      return !!key && eff.has(key);
+    });
+    usedPatches.sort();
 
     const name = providerNameForImporter(relLf, importerLabel);
     const key = `${relLf}#${importerLabel}`;
