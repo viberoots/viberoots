@@ -179,21 +179,8 @@ let
     let parts = lib.splitString ":" name; in
       if (builtins.length parts) > 1 then lib.elemAt parts 1 else baseNameOf (pkgPathOf name);
 
-  # Import C++ planner adapter directly for mk* helpers
-  Cpp = import (manifestBase + "/planner/cpp.nix") { inherit lib; } {
-    inherit T repoRoot;
-    get = get;
-    nodes = nodesList;
-    pkgPathOf = pkgPathOf;
-    modulesTomlFor = modulesTomlFor;
-  };
-  # Direct C++ constructor via planner adapter: avoid LANGS indirection
-  mkCpp = name: kind:
-    if kind == "bin" then Cpp.mkApp name
-    else if kind == "lib" then Cpp.mkLib name
-    else if kind == "test" then Cpp.mkTest name
-    else if kind == "addon" then Cpp.mkAddon name
-    else Cpp.mkApp name;
+  # Registry-first C++: use LANGS.cpp for kind inference and mk* constructors.
+  # Keep PLANNER_ONLY_CPP as a minimal optimization for sliced workspaces.
 
   # Compute C++ target set locally to avoid evaluating unrelated language paths in temp workspaces
   safeCppNodes =
@@ -203,33 +190,26 @@ let
           let rel = if nmOk n then (pkgPathOf (ensureFullLabel n)) else ""; in
             lib.hasPrefix "apps/" rel || lib.hasPrefix "libs/" rel;
     in builtins.filter (n: nmOk n && inAppsLibs n && hasLabel n) nodesList;
-  # Lightweight C++ kind inference (mirrors planner/cpp.nix:kindOf)
-  cppKindOf = n:
-    let
-      rt0 = get n "rule_type"; rt = if rt0 == null then "" else rt0;
-      labs = get n "labels";
-      nm = ensureFullLabel n;
-      isPlanner = (builtins.typeOf nm == "string") && (nm != "") && lib.hasSuffix "__planner" nm;
-      has = l: (labs != null) && (builtins.isList labs) && builtins.elem l labs;
-    in if has "kind:test" || isPlanner then "test"
-       else if has "kind:bin" then "bin"
-       else if has "kind:lib" then "lib"
-       else if has "kind:addon" then "addon"
-       else if rt == "cxx_test" then "test"
-       else if rt == "cxx_binary" then "bin"
-       else if rt == "cxx_library" then (if isPlanner then "test" else "lib")
-       else null;
   cppTargetsFromGraph = builtins.foldl' (acc: n:
-    let nm = ensureFullLabel n; tnm = builtins.typeOf nm; k = cppKindOf n; in
+    let nm = ensureFullLabel n; tnm = builtins.typeOf nm; k = LANGS.cpp.kindOf n; in
       if (tnm != "string") || (nm == "") || (k == null) then acc
-      else (acc // { "${nm}" = mkCpp nm k; })
+      else (
+        acc // {
+          "${nm}" =
+            if k == "bin" then LANGS.cpp.mkApp nm
+            else if k == "lib" then LANGS.cpp.mkLib nm
+            else if k == "test" then LANGS.cpp.mkTest nm
+            else if k == "addon" then LANGS.cpp.mkAddon nm
+            else LANGS.cpp.mkApp nm;
+        }
+      )
   ) {} safeCppNodes;
   # Only link C++ binaries in graph outputs
   cppBinNames = builtins.filter (nm:
     let
       matches = builtins.filter (x: ensureFullLabel x == nm) safeCppNodes;
       n = if matches == [] then null else builtins.head matches;
-      k = if n == null then null else (cppKindOf n);
+      k = if n == null then null else (LANGS.cpp.kindOf n);
     in k != null && k == "bin"
   ) (builtins.attrNames cppTargetsFromGraph);
   cppOutPaths = builtins.listToAttrs (map (nm: { name = nm; value = cppTargetsFromGraph.${nm}; }) cppBinNames);
@@ -314,12 +294,16 @@ let
           echo "missing target: ${selectedTargetName}" >&2
           exit 1
         '' else (
-          let n = builtins.head matches; k = cppKindOf n; in
+          let n = builtins.head matches; k = LANGS.cpp.kindOf n; in
             if k == null then pkgs.runCommand "missing-kind-${sanitize selectedTargetName}" {} ''
               echo "missing kind for: ${selectedTargetName}" >&2
               exit 1
             '' else (
-              if (k == "bin" || k == "lib" || k == "test" || k == "addon") then mkCpp selectedTargetName k else mkCpp selectedTargetName "bin"
+              if k == "bin" then LANGS.cpp.mkApp selectedTargetName
+              else if k == "lib" then LANGS.cpp.mkLib selectedTargetName
+              else if k == "test" then LANGS.cpp.mkTest selectedTargetName
+              else if k == "addon" then LANGS.cpp.mkAddon selectedTargetName
+              else LANGS.cpp.mkApp selectedTargetName
             )
         )
       ) else (
@@ -388,7 +372,11 @@ let
                 else if (k.kind == "bin" || k.kind == "lib") then LANGS.python.mkApp selectedTargetName
                 else LANGS.python.mkLib selectedTargetName
               ) else (
-                if (k.kind == "bin" || k.kind == "lib" || k.kind == "test" || k.kind == "addon") then mkCpp selectedTargetName k.kind else mkCpp selectedTargetName "bin"
+                if k.kind == "bin" then LANGS.cpp.mkApp selectedTargetName
+                else if k.kind == "lib" then LANGS.cpp.mkLib selectedTargetName
+                else if k.kind == "test" then LANGS.cpp.mkTest selectedTargetName
+                else if k.kind == "addon" then LANGS.cpp.mkAddon selectedTargetName
+                else LANGS.cpp.mkApp selectedTargetName
               )
             )
         )

@@ -13,8 +13,23 @@ let
         let
           contents = builtins.readFile langsPath;
           _t = if traceEnabled then builtins.trace ("[planner][trace] langs.json head: " + (builtins.substring 0 100 contents)) null else null;
-          attempt = builtins.tryEval (builtins.fromJSON contents);
-          raw = if attempt.success then attempt.value else [];
+          # Heuristic: only attempt JSON parse when the first non-whitespace char is '{'
+          # and there is at least one double-quote character in the buffer.
+          firstNonWs = s:
+            let
+              chars = lib.stringToCharacters s;
+              isWs = c: c == " " || c == "\t" || c == "\n" || c == "\r";
+              dropWs = cs:
+                if cs == [] then []
+                else if isWs (builtins.head cs) then dropWs (builtins.tail cs) else cs;
+              trimmed = dropWs chars;
+            in if trimmed == [] then "" else (builtins.head trimmed);
+          looksJson = (firstNonWs contents) == "{" && lib.hasInfix "\"" contents;
+          raw =
+            if looksJson then
+              let attempt = builtins.tryEval (builtins.fromJSON contents); in
+                if attempt.success then attempt.value else []
+            else [];
           # Support either:
           # - Array of objects with .id
           # - { languages = [ { id = "cpp"; } ... ] }

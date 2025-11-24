@@ -136,6 +136,11 @@ The **outer** dynamic-derivation entrypoint. It reads the exported Buck graph (J
 
 > **Merge:** Add this to your existing `flake.nix` **without** removing current outputs. If a name or responsibility overlaps (e.g., duplicate `packages.<system>.graph-generator`), **this design’s outputs take precedence**.
 
+Note on C++ planner cohesion:
+
+- By default, C++ construction is routed through the language registry (`LANGS.cpp`) for both kind inference and `mk*` constructors. This reduces bespoke logic in the planner and keeps behavior centralized in the C++ adapter.
+- The `PLANNER_ONLY_CPP=1` fast path is retained as an optional optimization for sliced/workspace tests; it also delegates to `LANGS.cpp` so outputs remain identical.
+
 **Sketch:**
 
 ```nix
