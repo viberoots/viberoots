@@ -10,7 +10,7 @@
         rev = "local";
       };
       # mkEnvFor: closure that returns a builder bound to provided pkgs
-      mkEnvFor = pkgs: { src, subdir ? ".", lockfile ? "uv.lock", patchesMap ? {}, devOverrides ? {}, testResolve ? {}, wsRoot ? null }:
+      mkEnvFor = pkgs: { src, subdir ? ".", lockfile ? "uv.lock", patchesMap ? {}, devOverrides ? {}, testResolve ? {}, wsRoot ? null, groups ? [], kind ? "app" }:
         pkgs.stdenvNoCC.mkDerivation {
           pname = "uv2nix-env";
           version = meta.version;
@@ -25,6 +25,7 @@
             SRC="${src}"
             WORK="$TMPDIR/work-root"
             SITE="$TMPDIR/site"
+            INFO="$TMPDIR/build-info.json"
             mkdir -p "$WORK" "$SITE"
             cp -a "${src}/." "$WORK/" || true
             chmod -R u+w "$WORK" || true
@@ -53,19 +54,32 @@
             export subdir="${subdir}"
             export lockfile="${lockfile}"
             export wsRoot="${toString wsRoot}"
+            export uv2nix_version="${meta.version}"
+            export uv2nix_rev="${meta.rev}"
+            export uv2nix_kind="${kind}"
+            export uv2nix_groups='${builtins.toJSON groups}'
+            export INFO="$INFO"
             ${ (nixpkgs.legacyPackages.${builtins.currentSystem}).python3 or (nixpkgs.legacyPackages.${builtins.currentSystem}).python311 }/bin/python - <<'PY'
-import io, json, os, re, shutil, subprocess, sys
+import io, json, os, re, shutil, subprocess, sys, hashlib
 from pathlib import Path
 
 lockfile = Path(os.environ.get("lockfile") or "uv.lock")
 work_root = Path(os.environ.get("WORK") or ".")
 tmpdir = Path(os.environ.get("TMPDIR","/tmp"))
 site_dir = tmpdir / "site"
+info_file = Path(os.environ.get("INFO") or (tmpdir / "build-info.json"))
 patches_path = tmpdir / "patches.json"
 dev_file = tmpdir / "dev.json"
 test_file = tmpdir / "test.json"
 subdir = os.environ.get("subdir","." )
 ws_root = os.environ.get("wsRoot") or ""
+uv2nix_version = os.environ.get("uv2nix_version") or "unknown"
+uv2nix_rev = os.environ.get("uv2nix_rev") or "unknown"
+uv2nix_kind = os.environ.get("uv2nix_kind") or "app"
+try:
+    uv2nix_groups = json.loads(os.environ.get("uv2nix_groups") or "[]")
+except Exception:
+    uv2nix_groups = []
 
 def read_json(p: Path):
     try:
@@ -195,6 +209,8 @@ def normalize_and_validate_patch(patch_file: Path) -> Path:
 
 site_dir.mkdir(parents=True, exist_ok=True)
 keys = parse_keys_from_lock(lockfile)
+# Provenance patches list
+prov_patches = []
 for key in keys:
     if not key:
         continue
@@ -223,10 +239,33 @@ for key in keys:
     # apply patches if any (preserve declared order for determinism)
     # When a dev override is provided for this key, skip applying patches to avoid reversed hunks.
     if not is_dev_override:
-        for patch in (patches_map.get(key) or []):
+        # Sort patches by basename to enforce lexicographic within key
+        patch_list = sorted((patches_map.get(key) or []), key=lambda p: os.path.basename(p))
+        for patch in patch_list:
             pf = Path(patch)
             if not pf.exists():
                 continue
+            # provenance entry
+            try:
+                h = hashlib.sha256()
+                with open(pf, "rb") as f:
+                    while True:
+                        chunk = f.read(8192)
+                        if not chunk:
+                            break
+                        h.update(chunk)
+                prov_patches.append({
+                    "key": key,
+                    "file": os.path.basename(pf),
+                    "sha256": h.hexdigest(),
+                })
+            except Exception:
+                # best-effort; still attempt to apply the patch
+                prov_patches.append({
+                    "key": key,
+                    "file": os.path.basename(pf),
+                    "sha256": "",
+                })
             tmp_patch = normalize_and_validate_patch(pf)
             # apply with patch(1)
             res = subprocess.run(["patch","-p1","--fuzz=0","-i", str(tmp_patch)], cwd=str(work_pkg), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -249,12 +288,31 @@ for key in keys:
                 shutil.copytree(item, dst)
             else:
                 shutil.copy2(item, dst)
+# Emit BUILD-INFO.json
+try:
+    # Sort provenance by key then file to be deterministic
+    prov_sorted = sorted(prov_patches, key=lambda e: (e.get("key",""), e.get("file","")))
+    info = {
+        "kind": uv2nix_kind,
+        "lockfile": str(lockfile),
+        "subdir": subdir,
+        "groups": uv2nix_groups,
+        "patches": prov_sorted,
+        "backend": "uv2nix",
+        "uv2nix": { "version": uv2nix_version, "rev": uv2nix_rev },
+    }
+    info_file.write_text(json.dumps(info, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+except Exception as e:
+    sys.stderr.write("[uv2nix-lib] failed to write BUILD-INFO.json: %s\n" % (e,))
 PY
           '';
           installPhase = ''
             set -euo pipefail
             mkdir -p "$out/site"
             cp -R "$TMPDIR/site/." "$out/site/" || true
+            if [ -f "$TMPDIR/build-info.json" ]; then
+              cp "$TMPDIR/build-info.json" "$out/BUILD-INFO.json"
+            fi
           '';
         };
     };

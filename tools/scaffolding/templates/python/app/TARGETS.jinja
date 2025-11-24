@@ -1,4 +1,4 @@
-load("//python:defs.bzl", "nix_python_library", "nix_python_binary")
+load("//python:defs.bzl", "nix_python_library", "nix_python_binary", "nix_python_test")
 
 nix_python_library(
     name = "{{ name }}_lib",
@@ -9,9 +9,16 @@ nix_python_library(
 
 nix_python_binary(
     name = "{{ name }}",
-    srcs = ["bin/__main__.py"],
     deps = [":{{ name }}_lib"],
     main = "bin/__main__.py",
+    lockfile_label = "lockfile:apps/{{ name }}/uv.lock#apps/{{ name }}",
+    visibility = ["PUBLIC"],
+)
+
+nix_python_test(
+    name = "{{ name }}_test",
+    srcs = glob(["tests/**/*.py"]),
+    deps = [":{{ name }}_lib"],
     lockfile_label = "lockfile:apps/{{ name }}/uv.lock#apps/{{ name }}",
     visibility = ["PUBLIC"],
 )

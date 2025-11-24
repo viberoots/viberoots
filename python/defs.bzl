@@ -1,5 +1,4 @@
-load("@prelude//python:defs.bzl", "python_binary", "python_library", "python_test")
-load("@prelude//:rules.bzl", "genrule")
+load("@prelude//:rules.bzl", "python_binary", "python_library", "python_test", "genrule")
 load("//lang:defs_common.bzl", "stamp_labels", "ensure_single_lockfile_label", "append_nixpkg_labels", "providers_for", "append_python_patches_for_importer", "extract_lockfile_labels", "dedupe_preserve")
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
 
@@ -35,6 +34,9 @@ def nix_python_binary(name, lockfile_label = None, nix_native_deps = [], deps = 
     stamp_labels(kwargs, "python", "bin")
     ensure_single_lockfile_label(kwargs, lockfile_label)
     append_nixpkg_labels(kwargs, nix_native_deps)
+    # Buck prelude python_binary does not accept `srcs`; callers should use `main`.
+    if "srcs" in kwargs:
+        kwargs.pop("srcs")
     _lf = extract_lockfile_labels(kwargs.get("labels", []))
     _importer = None
     if len(_lf) == 1 and isinstance(_lf[0], str) and ("#" in _lf[0]):
@@ -75,20 +77,12 @@ def nix_python_wasm_app(name, lockfile_label = None, nix_native_deps = [], deps 
         _importer = _lf[0].split("#")[1]
     if _importer != None and _importer != "":
         append_python_patches_for_importer(kwargs, _importer)
-    # genrule does not accept a deps parameter in Buck2; realize edges via srcs.
     provs = _providers_for(name)
     srcs = kwargs.get("srcs", []) or []
-    merged_srcs = dedupe_preserve(srcs + deps + provs)
-    # Keep Buck parsing simple: emit a tiny stamp via genrule; planner routes to pyWasmApp.
-    out = name + ".stamp"
-    genrule(
-        name = name,
-        srcs = merged_srcs,
-        out = out,
-        cmd = "echo py_wasm_app > $OUT",
-        labels = kwargs.pop("labels", []),
-        visibility = kwargs.pop("visibility", ["PUBLIC"]),
-    )
+    # Expose true dependency edges so planner sees overlays via depsOf
+    deps = dedupe_preserve((deps or []) + provs)
+    kwargs["srcs"] = srcs
+    python_library(name = name, deps = deps, **kwargs)
 
 def nix_python_wasm_lib(name, lockfile_label = None, nix_native_deps = [], deps = [], labels = [], **kwargs):
     """
@@ -106,15 +100,8 @@ def nix_python_wasm_lib(name, lockfile_label = None, nix_native_deps = [], deps 
         append_python_patches_for_importer(kwargs, _importer)
     provs = _providers_for(name)
     srcs = kwargs.get("srcs", []) or []
-    merged_srcs = dedupe_preserve(srcs + deps + provs)
-    out = name + ".stamp"
-    genrule(
-        name = name,
-        srcs = merged_srcs,
-        out = out,
-        cmd = "echo py_wasm_lib > $OUT",
-        labels = kwargs.pop("labels", []),
-        visibility = kwargs.pop("visibility", ["PUBLIC"]),
-    )
+    deps = dedupe_preserve((deps or []) + provs)
+    kwargs["srcs"] = srcs
+    python_library(name = name, deps = deps, **kwargs)
 
 

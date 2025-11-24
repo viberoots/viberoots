@@ -16,6 +16,11 @@ function lockfileLabels(n: Node): string[] {
   return labs.filter((l) => typeof l === "string" && l.startsWith("lockfile:"));
 }
 
+function hasPnpmLockfileLabel(n: Node): boolean {
+  const locks = lockfileLabels(n);
+  return locks.some((l) => /lockfile:.*\/?pnpm-lock\.yaml#/.test(l));
+}
+
 function hasKindLabel(n: Node): boolean {
   const labs = Array.isArray(n.labels) ? n.labels : [];
   return labs.some((l) => typeof l === "string" && l.startsWith("kind:"));
@@ -104,7 +109,8 @@ export const adapter: Adapter = {
       ...validateLanguageClassification(nodes, {
         name: "node",
         looksLike(n: Node) {
-          return lockfileLabels(n).length > 0;
+          // Only treat nodes with PNPM importer-scoped lockfile labels as Node-like
+          return hasPnpmLockfileLabel(n);
         },
         hasRuleType(n: Node) {
           return isRuleType(n, /^js_/) || isRuleType(n, /^node_/);

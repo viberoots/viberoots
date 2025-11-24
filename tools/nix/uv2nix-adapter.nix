@@ -90,6 +90,8 @@ in
       # PR-2: delegate patching to uv2nix; pass patchesMap and testResolve as structured inputs.
       patchesMap = patchesMap;
       testResolve = testResolveObj;
+      groups = groups;
+      kind = kind;
     };
     meta = uv2nixLib.meta or { version = "unknown"; rev = "unknown"; };
   in
@@ -104,7 +106,7 @@ in
         cp -R "${uvDrv}/site/." "$out/site/" || true
       fi
       chmod -R u+w "$out/site" || true
-      # Compute provenance patches list with sha256 in deterministic order
+      # Compute provenance patches list with sha256 in deterministic order (adapter-side, stable legacy format)
       tmpPList="$TMPDIR/patches.list"
       : > "$tmpPList"
       ${pkgs.jq}/bin/jq -rc '
@@ -149,7 +151,7 @@ in
         echo 'exit 2'
       } > "$wrapper"
       chmod +x "$wrapper"
-      # Write minimal BUILD-INFO.json (avoid heredoc to prevent delimiter pitfalls)
+      # Write BUILD-INFO.json (authoritative in adapter for now to preserve legacy expectations)
       {
         echo '{'
         echo '  "kind": "'"${kind}"'",'

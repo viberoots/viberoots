@@ -1,5 +1,5 @@
 load("@repo_toolchains//:go.bzl", "system_go_bootstrap_toolchain", "system_go_toolchain")
-load("@repo_toolchains//:python.bzl", "system_python_bootstrap_toolchain")
+load("@repo_toolchains//:python.bzl", "system_python_bootstrap_toolchain", "system_python_toolchain")
 load("@repo_toolchains//:cxx.bzl", "system_cxx_toolchain")
 load("@prelude//tests:test_toolchain.bzl", "noop_test_toolchain")
 load("@repo_toolchains//:remote_test_execution.bzl", "remote_test_execution_toolchain")
@@ -19,6 +19,11 @@ system_go_bootstrap_toolchain(
 
 system_python_bootstrap_toolchain(
     name = "python_bootstrap",
+    visibility = ["PUBLIC"],
+)
+
+system_python_toolchain(
+    name = "python",
     visibility = ["PUBLIC"],
 )
 
