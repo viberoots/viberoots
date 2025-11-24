@@ -146,6 +146,16 @@ nix build .#graph-generator --accept-flake-config
 nix copy --to 'https://<cache-endpoint>' $(nix path-info .#graph-generator)
 ```
 
+- Python wheelhouse (uv2nix) example:
+
+```bash
+# Build and push all wheelhouse outputs for importers with uv.lock
+node tools/ci/run-stage.ts --stage wheelhouse-preload --to 'https://<cache-endpoint>'
+# Equivalent (manual): discover attributes, then copy their closures
+nix build .#py-wheelhouse-apps-foo .#py-wheelhouse-libs-bar --accept-flake-config
+nix copy --to 'https://<cache-endpoint>' $(nix path-info .#py-wheelhouse-apps-foo .#py-wheelhouse-libs-bar)
+```
+
 - Cachix (convenient):
 
 ```bash
@@ -167,6 +177,18 @@ No repository changes are strictly required to use remote builders and caches. H
 
 - Add CI steps to `nix copy`/`cachix push` after successful Nix builds.
 - Document/cache keys and substituters for your organization.
+
+### Developer hydration of wheelhouse (offline local builds)
+
+After CI publishes wheelhouse artifacts, developers can hydrate locally and build offline:
+
+```bash
+# Pull wheelhouse closures locally (example cache URL)
+nix copy --from 'https://<cache-endpoint>' $(nix path-info .#py-wheelhouse-apps-foo)
+
+# Then build Python envs offline (no network)
+nix build .#py-apps-foo --offline --accept-flake-config
+```
 
 ---
 

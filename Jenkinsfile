@@ -42,6 +42,9 @@ pipeline {
           stage('Build graph-generator (Nix)') {
             steps { sh 'node tools/ci/run-stage.ts --stage nix-build-graph-generator' }
           }
+          stage('Wheelhouse Preload (Python)') {
+            steps { sh 'node tools/ci/run-stage.ts --stage wheelhouse-preload' }
+          }
           stage('Buck Tests') {
             steps { sh 'node tools/ci/run-stage.ts --stage buck-test' }
           }

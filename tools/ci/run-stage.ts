@@ -18,7 +18,8 @@ type Stage =
   | "file-size-lint"
   | "nix-build-graph-generator"
   | "buck-test"
-  | "cpp-addon-smoke";
+  | "cpp-addon-smoke"
+  | "wheelhouse-preload";
 
 const stage = getFlagStr("stage", "");
 assert(stage, "missing --stage=<name>");
@@ -138,6 +139,56 @@ async function main() {
     case "cpp-addon-smoke": {
       const target = path.resolve("tools/ci/cpp-addon-smoke.ts");
       await $`node ${nodeBase} ${target}`;
+      break;
+    }
+    case "wheelhouse-preload": {
+      // Discover py-wheelhouse-* attributes for the current system, build them, and optionally push to a binary cache.
+      // Destination can be provided via --to or NIX_CACHE_TO env.
+      const to = getFlagStr("to", process.env.NIX_CACHE_TO || "");
+      // Discover current system as recognized by Nix
+      const sysOut = await $`nix eval --raw --impure --expr builtins.currentSystem`.nothrow();
+      const system = String(sysOut.stdout || "").trim();
+      if (!system) {
+        console.warn("wheelhouse-preload: could not determine current system; skipping");
+        break;
+      }
+      // Enumerate package attributes for this system and pick py-wheelhouse-* keys
+      const evalOut =
+        await $`nix eval --json --impure --accept-flake-config .#packages.${system}`.nothrow();
+      if (evalOut.exitCode !== 0) {
+        console.warn("wheelhouse-preload: packages set not available for system; skipping");
+        break;
+      }
+      let keys: string[] = [];
+      try {
+        const obj = JSON.parse(String(evalOut.stdout || "{}"));
+        keys = Object.keys(obj || {}).filter((k) => k.startsWith("py-wheelhouse-"));
+      } catch {
+        // best-effort parse; treat as empty
+        keys = [];
+      }
+      if (!keys.length) {
+        console.log("wheelhouse-preload: no wheelhouse outputs found; nothing to do");
+        break;
+      }
+      // Build all wheelhouse outputs for this system
+      const attrs = keys.map((k) => `.#${k}`).join(" ");
+      await $`bash -lc ${`set -euo pipefail; nix build --impure --accept-flake-config ${attrs}`}`;
+      // Optionally push to a binary cache if configured
+      if (to && to.trim() !== "") {
+        const pathsOut = await $`bash -lc ${`set -euo pipefail; nix path-info ${attrs}`}`;
+        const paths = String(pathsOut.stdout || "")
+          .trim()
+          .split(/\s+/)
+          .filter(Boolean)
+          .join(" ");
+        if (paths.length > 0) {
+          await $`bash -lc ${`set -euo pipefail; nix copy --to '${to}' ${paths}`}`;
+          console.log(`wheelhouse-preload: pushed ${keys.length} outputs to ${to}`);
+        }
+      } else {
+        console.log("wheelhouse-preload: cache destination not provided; built locally only");
+      }
       break;
     }
     default:
