@@ -14,6 +14,11 @@ export type ImporterWriterOptions = {
   outFile: string;
   ruleLoad: string; // e.g. 'load("//third_party/providers:defs_node.bzl", "node_importer_deps")'
   ruleName: string; // e.g. "node_importer_deps"
+  /**
+   * Optional full file header (banner + load lines). If provided, takes precedence
+   * over ruleLoad-derived header. Must include desired trailing blank lines.
+   */
+  fileHeader?: string;
   autoSection?: {
     file?: string; // defaults to third_party/providers/TARGETS
     begin: string; // e.g. "# BEGIN AUTO_NODE"
@@ -81,7 +86,8 @@ export async function writeImporterProviders(
   items.sort((a, b) => a.name.localeCompare(b.name));
   const entries = items.map((it) => it.entry);
 
-  const header = headerFrom(opts.ruleLoad);
+  const header =
+    opts.fileHeader && opts.fileHeader.length > 0 ? opts.fileHeader : headerFrom(opts.ruleLoad);
   const outPath = resolveInWorkspace(opts.outFile);
   await writeIfChanged(outPath, renderTargetsFile(header, entries));
   await maybeAssumeUnchanged(outPath);

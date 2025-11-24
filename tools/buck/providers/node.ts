@@ -9,10 +9,17 @@ import { parsePnpmLock, effectiveSetForImporter } from "../../lib/pnpm-lock.ts";
 import { ensureAutoSection } from "../../lib/auto-section.ts";
 import { computeImporterLabel, listImporterPatches } from "../../lib/importers.ts";
 import { writeImporterProviders, type ImporterProvider } from "../../lib/provider-writer.ts";
+import { providersHeaderFor, providersLoadFor } from "../../lib/providers-headers.ts";
 
 export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: string }) {
   const PATCH_DIR = opts?.patchDir || "patches/node";
   const OUT_FILE = opts?.outFile || "third_party/providers/TARGETS.node.auto";
+  const LOAD_LINE = providersLoadFor({ lang: "node", rule: "node_importer_deps" });
+  const FILE_HEADER = providersHeaderFor({
+    lang: "node",
+    load: LOAD_LINE,
+    rule: "node_importer_deps",
+  });
 
   const lockfiles = await findPnpmLockfiles();
 
@@ -29,12 +36,13 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
     // Write deterministic, header-only file via shared writer
     await writeImporterProviders([], {
       outFile: OUT_FILE,
-      ruleLoad: 'load("//third_party/providers:defs_node.bzl", "node_importer_deps")',
+      ruleLoad: LOAD_LINE,
       ruleName: "node_importer_deps",
+      fileHeader: FILE_HEADER,
       autoSection: {
         begin: "# BEGIN AUTO_NODE",
         end: "# END AUTO_NODE",
-        header: 'load("//third_party/providers:defs_node.bzl", "node_importer_deps")',
+        header: LOAD_LINE,
       },
     });
     return;
@@ -83,12 +91,13 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
 
   await writeImporterProviders(providers, {
     outFile: OUT_FILE,
-    ruleLoad: 'load("//third_party/providers:defs_node.bzl", "node_importer_deps")',
+    ruleLoad: LOAD_LINE,
     ruleName: "node_importer_deps",
+    fileHeader: FILE_HEADER,
     autoSection: {
       begin: "# BEGIN AUTO_NODE",
       end: "# END AUTO_NODE",
-      header: 'load("//third_party/providers:defs_node.bzl", "node_importer_deps")',
+      header: LOAD_LINE,
     },
   });
 }

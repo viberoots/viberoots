@@ -13,6 +13,7 @@ import {
   defaultImporterPatchDir,
 } from "../../lib/importers.ts";
 import { writeImporterProviders, type ImporterProvider } from "../../lib/provider-writer.ts";
+import { providersHeaderFor, providersLoadFor } from "../../lib/providers-headers.ts";
 
 export async function syncPythonProviders(opts?: {
   outFile?: string;
@@ -23,6 +24,12 @@ export async function syncPythonProviders(opts?: {
   // The PATCH_DIR option is ignored for Python to avoid global scanning.
   const OUT_FILE = opts?.outFile || "third_party/providers/TARGETS.python.auto";
   const STRICT = opts?.strict ?? false;
+  const LOAD_LINE = providersLoadFor({ lang: "python", rule: "python_importer_deps" });
+  const FILE_HEADER = providersHeaderFor({
+    lang: "python",
+    load: LOAD_LINE,
+    rule: "python_importer_deps",
+  });
 
   const lockfiles = await findUvLockfiles();
 
@@ -30,12 +37,13 @@ export async function syncPythonProviders(opts?: {
   if (!lockfiles.length) {
     await writeImporterProviders([], {
       outFile: OUT_FILE,
-      ruleLoad: 'load("//third_party/providers:defs_python.bzl", "python_importer_deps")',
+      ruleLoad: LOAD_LINE,
       ruleName: "python_importer_deps",
+      fileHeader: FILE_HEADER,
       autoSection: {
         begin: "# BEGIN AUTO_PYTHON",
         end: "# END AUTO_PYTHON",
-        header: 'load("//third_party/providers:defs_python.bzl", "python_importer_deps")',
+        header: LOAD_LINE,
       },
     });
     return;
@@ -72,12 +80,13 @@ export async function syncPythonProviders(opts?: {
 
   await writeImporterProviders(providers, {
     outFile: OUT_FILE,
-    ruleLoad: 'load("//third_party/providers:defs_python.bzl", "python_importer_deps")',
+    ruleLoad: LOAD_LINE,
     ruleName: "python_importer_deps",
+    fileHeader: FILE_HEADER,
     autoSection: {
       begin: "# BEGIN AUTO_PYTHON",
       end: "# END AUTO_PYTHON",
-      header: 'load("//third_party/providers:defs_python.bzl", "python_importer_deps")',
+      header: LOAD_LINE,
     },
   });
 }
