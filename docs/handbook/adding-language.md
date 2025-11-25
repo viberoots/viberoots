@@ -13,6 +13,17 @@ This guide explains how to add a new language to the build without touching core
 - Scaffolding templates: `tools/scaffolding/templates/<lang>/...` + language registry entry
 - Tests: zx tests using `tools/tests/lib/lang-fixtures.ts`
 
+### Language contracts and manifest
+
+- The project defines shared TypeScript interfaces in `tools/lib/lang-contracts.ts`:
+  - `ScaffoldingLanguage` describes discovery metadata for `tools/lib/langs.ts`
+  - `LanguageProviderSync` is the provider sync adapter surface used by `tools/buck/sync-providers.ts`
+  - `PlannerLanguage` is used by TS-side helpers that enumerate planner capabilities
+- The language registry is manifest‑driven via `tools/nix/langs.json`. Discovery is partial‑clone safe:
+  - Only languages whose `requiredPaths` exist are considered enabled
+  - Orchestrators dynamically derive their registries from this manifest; missing languages are skipped without errors
+- When adding a new language, update `tools/nix/langs.json` and ensure your `requiredPaths` gate enablement correctly.
+
 ### Shared helpers (use these instead of rolling your own)
 
 - Nix (`tools/nix/lib/lang-helpers.nix`):

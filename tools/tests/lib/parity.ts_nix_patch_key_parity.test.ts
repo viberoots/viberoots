@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import { test } from "node:test";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { test } from "node:test";
 import { scanFlatPatchDir } from "../../lib/provider-sync";
 import { decodeNameVersionFromPatch } from "../../lib/providers";
 
