@@ -41,7 +41,11 @@ async function doStart(args: string[]) {
     }
   }
 
-  const ws = await makeWorkspace(resolved.originPath, key);
+  const ws = await makeWorkspace({
+    lang: "python",
+    originPath: resolved.originPath,
+    moduleKey: key,
+  });
   const now = new Date().toISOString();
   const rec: SessionRecord = {
     importPath: resolved.importPath,

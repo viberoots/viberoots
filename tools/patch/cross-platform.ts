@@ -29,8 +29,13 @@ async function chmodRecursive(root: string): Promise<void> {
   } catch {}
 }
 
-export async function makeWorkspace(originPath: string, moduleKey: string): Promise<string> {
-  const base = path.join(os.tmpdir(), "bucknix-patch-go");
+export async function makeWorkspace(args: {
+  lang: string;
+  originPath: string;
+  moduleKey: string;
+}): Promise<string> {
+  const { lang, originPath, moduleKey } = args;
+  const base = path.join(os.tmpdir(), `bucknix-patch-${lang}`);
   const stamp = new Date()
     .toISOString()
     .replace(/[-:TZ.]/g, "")
@@ -40,8 +45,27 @@ export async function makeWorkspace(originPath: string, moduleKey: string): Prom
   const safeKey = moduleKey.replace(/[^A-Za-z0-9._@-]+/g, "_");
   const dst = path.join(base, `${safeKey}-${stamp}-${pid}-${rand}`);
   await fsp.mkdir(base, { recursive: true });
-  // Copy source tree into workspace using Node's recursive cp
-  await fsp.cp(originPath, dst, { recursive: true, force: true });
+  // macOS optimization: prefer APFS CoW clones when available; fall back to a normal copy.
+  // Other platforms: regular copy.
+  let copied = false;
+  if (process.platform === "darwin") {
+    try {
+      // -c: clone, -R: recursive, -p: preserve mode/ownership/timestamps where possible
+      await $`cp -cRp ${originPath}/ ${dst}/`;
+      copied = true;
+    } catch {
+      try {
+        await $`cp -a ${originPath}/ ${dst}/`;
+        copied = true;
+      } catch {
+        // fall through
+      }
+    }
+  }
+  if (!copied) {
+    // Node's recursive cp as a robust cross-platform fallback
+    await fsp.cp(originPath, dst, { recursive: true, force: true });
+  }
   // Ensure workspace is writable even if source tree had read-only bits
   await chmodRecursive(dst);
   return dst;

@@ -50,7 +50,7 @@ async function doStart(args: string[]) {
       return;
     }
   }
-  const ws = await makeWorkspace(originPath, key);
+  const ws = await makeWorkspace({ lang: "go", originPath, moduleKey: key });
   dbg("start: resolved", { importPath, version, originPath, ws, key });
   const now = new Date().toISOString();
   const rec: SessionRecord = {

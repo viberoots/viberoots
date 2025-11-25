@@ -437,6 +437,7 @@ Here `patchesMap` is derived **directly from patch filenames** in `patches/go/*.
 
 **Cross-Platform Strategy**
 
+- Temporary workspaces live under per-language prefixes in the system temp directory: `$(os.tmpdir)/bucknix-patch-<lang>/...` (e.g., `bucknix-patch-go`, `bucknix-patch-python`, `bucknix-patch-cpp`).
 - macOS: APFS CoW clones (`cp -cR`) when available; fallback to `cp -a`.
 - Others: `cp -a`.
 
