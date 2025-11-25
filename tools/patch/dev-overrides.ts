@@ -57,3 +57,14 @@ export function clearOverride(envName: string, key: string): void {
 export function formatExportSnippet(envName: string, map: OverrideMap): string {
   return `export ${envName}='${JSON.stringify(map)}'`;
 }
+
+export function printOverrideSnippet(envName: string, map: OverrideMap): void {
+  const snippet = formatExportSnippet(envName, map);
+  try {
+    console.error(
+      "\nTo build using this workspace as a dev override (local only), run:\n" +
+        snippet +
+        `\n\nUnset before CI: unset ${envName}\n`,
+    );
+  } catch {}
+}

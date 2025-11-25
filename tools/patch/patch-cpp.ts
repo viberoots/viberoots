@@ -9,7 +9,7 @@ import {
 } from "./lib/apply";
 import { deleteSession, getSession, listSessions, setSession } from "./state";
 import type { LanguageHandler, SessionRecord } from "./types";
-import { setOverride, clearOverride, formatExportSnippet } from "./dev-overrides";
+import { setOverride, clearOverride, printOverrideSnippet } from "./dev-overrides";
 import { encodeNixAttrForPatchPrefix, normalizeNixAttr } from "../lib/providers";
 import { createDbg, debugEnabled, pathExists } from "./lib/util";
 import { runSession } from "./lib/session";
@@ -42,14 +42,7 @@ async function doStart(args: string[]) {
     dbg("start: reuse-session", { key, existing });
     console.log(existing.workspacePath);
     if (echoSnippet) {
-      const snippet = formatExportSnippet("NIX_CPP_DEV_OVERRIDE_JSON", {
-        [attrNorm]: existing.workspacePath,
-      });
-      console.error(
-        "\nTo build using this workspace as a dev override (local only), run:\n" +
-          snippet +
-          "\n\nUnset before CI: unset NIX_CPP_DEV_OVERRIDE_JSON\n",
-      );
+      printOverrideSnippet("NIX_CPP_DEV_OVERRIDE_JSON", { [attrNorm]: existing.workspacePath });
     }
     return;
   }
@@ -70,14 +63,7 @@ async function doStart(args: string[]) {
   console.log(workspacePath);
   // Default to in-process set; optionally echo a snippet for shells/tools that prefer it
   if (echoSnippet) {
-    const snippet = formatExportSnippet("NIX_CPP_DEV_OVERRIDE_JSON", {
-      [attrNorm]: workspacePath,
-    });
-    console.error(
-      "\nTo build using this workspace as a dev override (local only), run:\n" +
-        snippet +
-        "\n\nUnset before CI: unset NIX_CPP_DEV_OVERRIDE_JSON\n",
-    );
+    printOverrideSnippet("NIX_CPP_DEV_OVERRIDE_JSON", { [attrNorm]: workspacePath });
   } else {
     setOverride("NIX_CPP_DEV_OVERRIDE_JSON", attrNorm, workspacePath);
   }

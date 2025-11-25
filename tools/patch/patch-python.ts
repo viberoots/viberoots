@@ -9,7 +9,7 @@ import { runGlue } from "./glue";
 import { readImporterArg, readPatchDirArg } from "../lib/cli.ts";
 import { resolvePythonDist } from "./python-dist-resolve";
 import { echoSnippetRequested } from "../lib/cli.ts";
-import { formatExportSnippet, setOverride, clearOverride, readOverrideMap } from "./dev-overrides";
+import { printOverrideSnippet, setOverride, clearOverride, readOverrideMap } from "./dev-overrides";
 import { getSession, setSession, deleteSession } from "./state";
 
 function distArg(args: string[]): string {
@@ -59,14 +59,7 @@ async function doStart(args: string[]) {
 
   const echoSnippet = echoSnippetRequested({ env: "PATCH_PY_ECHO_SNIPPET" });
   if (echoSnippet) {
-    const snippet = formatExportSnippet("NIX_PY_DEV_OVERRIDE_JSON", { [key]: ws });
-    try {
-      console.error(
-        "\nTo build using this workspace as a dev override (local only), run:\n" +
-          snippet +
-          "\n\nUnset before CI: unset NIX_PY_DEV_OVERRIDE_JSON\n",
-      );
-    } catch {}
+    printOverrideSnippet("NIX_PY_DEV_OVERRIDE_JSON", { [key]: ws });
   } else {
     setOverride("NIX_PY_DEV_OVERRIDE_JSON", key, ws);
   }

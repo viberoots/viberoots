@@ -118,6 +118,7 @@ export function hasFlag(name: string): boolean {
  */
 export function echoSnippetRequested(opts?: { env?: string }): boolean {
   if (getFlagBool("echo-snippet")) return true;
+  // Per-language env toggle (back-compat)
   const name = (opts?.env || "").trim();
   if (name && typeof process.env[name] === "string") {
     const v = String(process.env[name] || "")
@@ -125,6 +126,13 @@ export function echoSnippetRequested(opts?: { env?: string }): boolean {
       .toLowerCase();
     if (v === "1" || v === "true") return true;
   }
+  // Global env toggle
+  try {
+    const g = String(process.env.PATCH_ECHO_SNIPPET || "")
+      .trim()
+      .toLowerCase();
+    if (g === "1" || g === "true") return true;
+  } catch {}
   return false;
 }
 

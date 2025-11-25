@@ -14,7 +14,7 @@ import {
 } from "./lib/apply";
 import { deleteSession, getSession, setSession } from "./state";
 import type { LanguageHandler, SessionRecord } from "./types";
-import { readOverrideMap, setOverride, clearOverride, formatExportSnippet } from "./dev-overrides";
+import { readOverrideMap, setOverride, clearOverride, printOverrideSnippet } from "./dev-overrides";
 import { createDbg, pathExists } from "./lib/util";
 import { runSession } from "./lib/session";
 import { echoSnippetRequested } from "../lib/cli.ts";
@@ -66,16 +66,7 @@ async function doStart(args: string[]) {
   // Echo snippet parity with C++ when requested; otherwise set in-process env var
   const echoSnippet = echoSnippetRequested({ env: "PATCH_GO_ECHO_SNIPPET" });
   if (echoSnippet) {
-    const snippet = formatExportSnippet("NIX_GO_DEV_OVERRIDE_JSON", {
-      [key]: ws,
-    });
-    try {
-      console.error(
-        "\nTo build using this workspace as a dev override (local only), run:\n" +
-          snippet +
-          "\n\nUnset before CI: unset NIX_GO_DEV_OVERRIDE_JSON\n",
-      );
-    } catch {}
+    printOverrideSnippet("NIX_GO_DEV_OVERRIDE_JSON", { [key]: ws });
   } else {
     setOverride("NIX_GO_DEV_OVERRIDE_JSON", key, ws);
     dbg("start: setOverride", { key, ws });
