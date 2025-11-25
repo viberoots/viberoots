@@ -98,6 +98,12 @@ In CI, strict mode runs and exits nonzero on violations:
 node tools/ci/run-stage.ts --stage patches-lint
 ```
 
+Python (uv) importer‑local patches use the same linter. To scope checks locally:
+
+```
+node tools/dev/patches-lint.ts --lang python
+```
+
 ## Node (PNPM) — importer‑local patches and invalidation
 
 - Node targets use importer‑scoped lockfile labels: `lockfile:<path/to/pnpm-lock.yaml>#<importer>`.

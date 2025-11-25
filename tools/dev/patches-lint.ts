@@ -7,6 +7,12 @@ import {
   decodeNameVersionFromPatch,
 } from "../lib/providers.ts";
 import { validateFlatDir } from "../lib/provider-sync.ts";
+import {
+  findImporterLockfiles,
+  computeImporterLabel,
+  defaultImporterPatchDir,
+  listImporterPatches,
+} from "../lib/importers.ts";
 
 type Args = { strict?: string | boolean; lang?: string; format?: string };
 
@@ -410,14 +416,126 @@ async function lintCpp(): Promise<number> {
   return problems;
 }
 
+function validatePythonPatchFilename(file: string, violations: Violation[]) {
+  // Ignore common keepers/dotfiles silently
+  if (file.startsWith(".") || file === ".gitkeep" || file === ".keep") return;
+  if (!isPatchFile(file)) {
+    violations.push({
+      level: STRICT ? "error" : "warn",
+      code: "nonpatch",
+      lang: "python",
+      file,
+      message: `[python] non-patch file in patches/python: ${file}`,
+    });
+    return;
+  }
+  const base = file.slice(0, -".patch".length);
+  const at = base.lastIndexOf("@");
+  if (at < 0) {
+    violations.push({
+      level: STRICT ? "error" : "warn",
+      code: "filename_shape",
+      lang: "python",
+      file,
+      message: `[python] invalid filename (missing @): ${file}`,
+    });
+    return;
+  }
+  const enc = base.slice(0, at);
+  const ver = base.slice(at + 1);
+  if (!enc || !ver) {
+    violations.push({
+      level: STRICT ? "error" : "warn",
+      code: "filename_shape",
+      lang: "python",
+      file,
+      message: `[python] invalid filename (empty name/version): ${file}`,
+    });
+    return;
+  }
+  if (enc.includes("/")) {
+    violations.push({
+      level: STRICT ? "error" : "warn",
+      code: "filename_shape",
+      lang: "python",
+      file,
+      message: `[python] package name must be encoded ('/' -> '__'): ${file}`,
+    });
+  }
+}
+
+async function lintPython(): Promise<number> {
+  // Discover importers via uv.lock
+  const lockfiles = await findImporterLockfiles(["uv.lock"]);
+  if (!lockfiles.length) return 0;
+  let problems = 0;
+  const violations: Violation[] = [];
+  for (const lf of lockfiles) {
+    const importer = computeImporterLabel(lf);
+    const patchDirPosix = defaultImporterPatchDir(importer, "python");
+    const patchDirAbs = path.resolve(patchDirPosix);
+    // Validate flatness per importer directory
+    await validateFlatDir(patchDirAbs, STRICT).catch((e) => {
+      throw e;
+    });
+    // Gather patch files deterministically via shared helper
+    const patchFiles = await listImporterPatches(importer, "python"); // POSIX rel paths
+    const byKey = new Map<string, string>(); // lowercased "name@version" -> filename (per importer)
+
+    // Detect non-patch files (advisory/strict) alongside shape/duplicate detection
+    let names: string[] = [];
+    try {
+      names = await fsp.readdir(patchDirAbs);
+    } catch {
+      names = [];
+    }
+    // Validate every entry we see in the directory, not only *.patch
+    for (const n of names.sort((a, b) => a.localeCompare(b))) {
+      validatePythonPatchFilename(n, violations);
+    }
+    // Now handle duplicate detection using canonical decode on *.patch only
+    for (const rel of patchFiles) {
+      const base = path.posix.basename(rel);
+      const key = decodeNameVersionFromPatch(base);
+      if (!key) continue;
+      const prior = byKey.get(key);
+      if (prior && prior !== base) {
+        violations.push({
+          level: "error",
+          code: "duplicate",
+          lang: "python",
+          moduleKey: key,
+          file: path.posix.join(patchDirPosix, base),
+          message: `[python] duplicate patch for ${key}: ${prior} vs ${base}`,
+        });
+      } else {
+        byKey.set(key, base);
+      }
+    }
+  }
+
+  // Sort and report
+  violations.sort(
+    (a, b) =>
+      (a.file || "").localeCompare(b.file || "") ||
+      a.code.localeCompare(b.code) ||
+      a.message.localeCompare(b.message),
+  );
+  if (FORMAT === "json") printJson(violations);
+  else printHuman(violations);
+  for (const v of violations) if (v.level === "error") problems++;
+  return problems;
+}
+
 async function main() {
   let problems = 0;
-  const langs = ["go", "node", "cpp"];
+  const langs = ["go", "node", "cpp", "python"];
   for (const l of langs) {
     if (LANG && LANG !== l) continue;
     if (l === "go") problems += await lintGo();
     else if (l === "node") problems += await lintNode();
     else if (l === "cpp") problems += await lintCpp();
+    else if (l === "python") problems += await lintPython();
   }
   if (STRICT && problems > 0) process.exit(2);
 }
