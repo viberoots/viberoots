@@ -83,17 +83,6 @@ def append_node_patches_for_importer(kwargs, importer):
     append_importer_patches(kwargs, importer, "node")
 
 
-def append_python_patches_for_importer(kwargs, importer):
-    """
-    Append importer-local Python patches into kwargs["srcs"].
-    - If importer == ".", use "patches/python"
-    - Else use "<importer>/patches/python"
-    No-op when importer is empty or not a string.
-    """
-    # Deprecated in PR‑5: prefer append_importer_patches(kwargs, importer, "python")
-    append_importer_patches(kwargs, importer, "python")
-
-
 def append_importer_patches(kwargs, importer, lang):
     """
     Unified importer-local patches helper (PR‑5).

@@ -97,7 +97,7 @@ def nix_python_wasm_lib(name, lockfile_label = None, nix_native_deps = [], deps 
     if len(_lf) == 1 and isinstance(_lf[0], str) and ("#" in _lf[0]):
         _importer = _lf[0].split("#")[1]
     if _importer != None and _importer != "":
-        append_python_patches_for_importer(kwargs, _importer)
+        append_importer_patches(kwargs, _importer, "python")
     provs = _providers_for(name)
     srcs = kwargs.get("srcs", []) or []
     deps = dedupe_preserve((deps or []) + provs)

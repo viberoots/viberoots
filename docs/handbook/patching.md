@@ -1,4 +1,4 @@
-# Patching Handbook (Go, C++, and Node)
+# Patching Handbook (Go, C++, Node, and Python)
 
 Note: Go and C++ use per‑target local patching by default. Place patches under each target’s package directory (for example, `apps/<app>/patches/go` or `libs/<lib>/patches/cpp`) so they are included in that target’s `srcs` and Buck invalidation is precise. The global `patches/go` flow remains supported where applicable, but local patching is the default developer experience for new scaffolds. See `build-system-design.md` for details.
 
@@ -8,9 +8,10 @@ All scripts are zx TypeScript using `#!/usr/bin/env zx-wrapper`.
 
 - Patch handlers reuse `tools/patch/lib/apply.ts: repoRoot()` for repo‑root detection.
 - Filesystem existence checks use `tools/patch/lib/util.ts: pathExists()`.
-- Avoid bespoke implementations; this keeps behavior consistent across Go/C++/Node.
+- Avoid bespoke implementations; this keeps behavior consistent across Go/C++/Node/Python.
 - Flat patch directory checks use `tools/lib/provider-sync.ts: validateFlatDir()`; locally it warns, and in CI (or with `--strict`) it fails.
 - C++ extraction/workspace setup uses the common permission normalizer `tools/patch/cross-platform.ts: chmodRecursive` to guarantee writable workspaces without affecting diffs.
+- Node and Python macros include importer‑local patch files in `srcs` via the unified helper `//lang:defs_common.bzl: append_importer_patches(kwargs, importer, lang)`. Importer is derived from a single `lockfile:<path>#<importer>` label (enforced by `ensure_single_lockfile_label(...)`).
 
 ## Workflow
 
@@ -104,6 +105,19 @@ Python (uv) importer‑local patches use the same linter. To scope checks locall
 ```
 node tools/dev/patches-lint.ts --lang python
 ```
+
+## Python (uv) — importer‑local patches and invalidation
+
+- Python targets use importer‑scoped lockfile labels: `lockfile:<path/to/uv.lock>#<importer>`.
+- The Python macros include importer‑local patch files in `srcs` (same mechanism as Node) for precise Buck invalidation:
+  - Patches live under `<importer>/patches/python/*.patch` (e.g., `apps/api/patches/python/...`).
+  - Changing a patch only invalidates Python targets bound to that importer.
+- Lockfile label enforcement and parsing are centralized: macros call `ensure_single_lockfile_label(...)` and derive the importer with `extract_lockfile_labels(...)`. Inclusion is delegated to `append_importer_patches(..., "python")`.
+
+Quick checks and guidance:
+
+- Ensure exactly one `lockfile:<path>#<importer>` label is present on each Python target (the macros enforce this).
+- Place patches under the importer’s `patches/python/` directory; no cross‑package references.
 
 ## Node (PNPM) — importer‑local patches and invalidation
 
