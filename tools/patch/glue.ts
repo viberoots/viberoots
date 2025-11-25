@@ -205,20 +205,10 @@ export async function ensureGraph(): Promise<void> {
 
 // runGlue: sync providers (all languages) then generate auto_map deterministically
 export async function runGlue(): Promise<void> {
-  await ensureGraph();
-  const nodeBin = process.execPath;
-  const repoRoot = process.cwd();
-  const zxInit = path.join(repoRoot, "tools/dev/zx-init.mjs");
-  const syncScript = path.join(repoRoot, "tools/buck/sync-providers.ts");
-  const providerIndexScript = path.join(repoRoot, "tools/buck/gen-provider-index.ts");
-  const autoMapScript = path.join(repoRoot, "tools/buck/gen-auto-map.ts");
-  await runNode(nodeBin, zxInit, syncScript);
-  // Emit provider index for diagnostics and mapping visibility before auto_map
-  await runNode(nodeBin, zxInit, providerIndexScript);
-  await runNode(nodeBin, zxInit, autoMapScript, [
-    "--graph",
-    DEFAULT_GRAPH_PATH,
-    "--out",
-    "third_party/providers/auto_map.bzl",
-  ]);
+  // Delegate to the centralized glue pipeline to avoid drift between callsites.
+  const { runGluePipeline } = await import("../buck/glue-pipeline.ts");
+  await runGluePipeline({
+    graphPath: DEFAULT_GRAPH_PATH,
+    outAutoMap: "third_party/providers/auto_map.bzl",
+  });
 }

@@ -177,66 +177,10 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
       when: true,
     },
     {
-      label: "sync-providers-go",
-      cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/sync-providers.ts")}`,
+      label: "glue-pipeline",
+      cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/glue-pipeline.ts")}`,
       withZx: true,
-      when: haveGo && goCaps.patching !== false,
-      skipReason: haveGo
-        ? goCaps.patching === false
-          ? "not-applicable"
-          : undefined
-        : "missing-language",
-    },
-    {
-      label: "sync-providers-cpp",
-      cmd: `${nodeBin} ${nodeBase} ${path.join(
-        repoRoot(),
-        "tools/buck/sync-providers.ts",
-      )} --lang=cpp`,
-      withZx: true,
-      // PR2: C++ provider sync is a no-op; keep entry for compatibility but skip
-      when: false,
-      skipReason: "no-op",
-    },
-    {
-      label: "sync-providers-node",
-      cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/sync-providers.ts")} --lang=node`,
-      withZx: true,
-      when: haveNode && nodeCaps.patching !== false,
-      skipReason: haveNode
-        ? nodeCaps.patching === false
-          ? "not-applicable"
-          : undefined
-        : "missing-language",
-    },
-    {
-      label: "gen-provider-index",
-      cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/gen-provider-index.ts")}`,
-      withZx: true,
-      when: (() => {
-        for (const id of enabledLangs) {
-          const c = caps.get(id) || {};
-          if (c.patching || c.lockfileLabels) return true;
-        }
-        return enabledLangs.size === 0; // default to run if no explicit enabled set
-      })(),
-      skipReason: "not-applicable",
-    },
-    {
-      label: "gen-auto-map",
-      cmd: `${nodeBin} ${nodeBase} ${path.join(
-        repoRoot(),
-        "tools",
-        "buck",
-        "gen-auto-map.ts",
-      )} --graph ${path.join(wsRoot, "tools", "buck", "graph.json")} --out ${path.join(
-        wsRoot,
-        "third_party",
-        "providers",
-        "auto_map.bzl",
-      )}`,
-      withZx: true,
-      // Generate when any enabled language claims either patching or lockfile labeling capability; otherwise skip
+      // Run unified glue only when languages indicate patching or lockfile labeling; otherwise skip
       when: (() => {
         for (const id of enabledLangs) {
           const c = caps.get(id) || {};
