@@ -51,15 +51,15 @@ export async function makeWorkspace(args: {
   if (process.platform === "darwin") {
     try {
       // -c: clone, -R: recursive, -p: preserve mode/ownership/timestamps where possible
-      await $`cp -cRp ${originPath}/ ${dst}/`;
-      copied = true;
-    } catch {
-      try {
-        await $`cp -a ${originPath}/ ${dst}/`;
+      const r1 = await $({ stdio: "pipe" })`cp -cRp ${originPath}/ ${dst}/`.nothrow();
+      if (r1.exitCode === 0) {
         copied = true;
-      } catch {
-        // fall through
+      } else {
+        const r2 = await $({ stdio: "pipe" })`cp -a ${originPath}/ ${dst}/`.nothrow();
+        if (r2.exitCode === 0) copied = true;
       }
+    } catch {
+      // fall through and use the generic fallback
     }
   }
   if (!copied) {
