@@ -4,10 +4,10 @@ import path from "node:path";
 import { renderTargetsFile, writeIfChanged, maybeAssumeUnchanged } from "../../lib/fs-helpers.ts";
 import { scanFlatPatchDir } from "../../lib/provider-sync.ts";
 import { providerNameForImporter, decodeNameVersionFromPatch } from "../../lib/providers.ts";
-import { findPnpmLockfiles } from "../../lib/lockfiles.ts";
+import { findImporterLockfiles, computeImporterLabel } from "../../lib/importers.ts";
 import { parsePnpmLock, effectiveSetForImporter } from "../../lib/pnpm-lock.ts";
 import { ensureAutoSection } from "../../lib/auto-section.ts";
-import { computeImporterLabel, listImporterPatches } from "../../lib/importers.ts";
+import { listImporterPatches } from "../../lib/importers.ts";
 import { writeImporterProviders, type ImporterProvider } from "../../lib/provider-writer.ts";
 import { providersHeaderFor, providersLoadFor } from "../../lib/providers-headers.ts";
 
@@ -21,7 +21,7 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
     rule: "node_importer_deps",
   });
 
-  const lockfiles = await findPnpmLockfiles();
+  const lockfiles = await findImporterLockfiles(["pnpm-lock.yaml"]);
 
   async function haveYaml(): Promise<boolean> {
     try {
@@ -107,7 +107,7 @@ export async function readNodeProviderIndexEntries(): Promise<
   Array<{ provider: string; key: string }>
 > {
   const out: Array<{ provider: string; key: string }> = [];
-  const lockfiles = await findPnpmLockfiles();
+  const lockfiles = await findImporterLockfiles(["pnpm-lock.yaml"]);
   if (!lockfiles.length) return out;
   try {
     await import("yaml");

@@ -111,8 +111,9 @@ async function main() {
     }
     case "patches-lint": {
       const target = path.resolve("tools/dev/patches-lint.ts");
-      // Strict mode in CI; scope language to go
+      // Strict mode in CI; run for Go and Python (importer-local) to enforce parity
       await $`node ${nodeBase} ${target} --strict --lang go`;
+      await $`node ${nodeBase} ${target} --strict --lang python`;
       break;
     }
     case "file-size-lint": {
