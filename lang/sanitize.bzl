@@ -20,8 +20,35 @@ def sanitize_name(s):
     return s4
 
 
+# Test-only probe to surface sanitizer output as a declared artifact
+def _sanitize_probe_impl(ctx):
+    val = sanitize_name(ctx.attrs.value)
+    out = ctx.actions.declare_output(ctx.attrs.out)
+    ctx.actions.write(out, val + "\n")
+    return [DefaultInfo(default_output = out)]
+
+
+_sanitize_probe = rule(
+    impl = _sanitize_probe_impl,
+    attrs = {
+        "value": attrs.string(),
+        "out": attrs.string(),
+    },
+)
+
+
+def sanitize_name_probe(name, value):
+    # Helper used only in tests to materialize the sanitized form as an output filename
+    _sanitize_probe(
+        name = name,
+        value = value,
+        out = sanitize_name(value) + ".txt",
+    )
+
+
 __all__ = [
     "sanitize_name",
+    "sanitize_name_probe",
 ]
 
 

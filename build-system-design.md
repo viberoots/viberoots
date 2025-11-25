@@ -79,6 +79,7 @@ extra-experimental-features = nix-command flakes dynamic-derivations ca-derivati
 1. **Patching UX:** One **outer** command: `patch-pkg <subcommand> <language> …` that **delegates** to language-specific scripts (e.g., `patch-go.ts`).
    - Echo snippet mode: pass `--echo-snippet` or set the global `PATCH_ECHO_SNIPPET=1|true` to print a standardized export snippet (stderr) instead of mutating process-local env. The message format is unified across languages and includes the reminder: “Unset before CI: unset <ENV_NAME>”.
 1. **Idempotent patches:** Re-applying the **same** patch must **not** cause rebuilds.
+1. **Sanitization (names/attrs):** All Starlark macros should use `//lang:sanitize.bzl:sanitize_name` for artifact and attribute names. If a language needs extra semantics, keep a tiny wrapper that delegates to `sanitize_name` for the common portion to avoid drift. The Nix side mirrors this transform.
 1. **Scaffolding:** When you add new target types, **update/augment** the existing scaffolding tools in `tools/` (don’t invent new scaffolding).
 1. **Platforms:** Everything must work on at least **aarch64-darwin**, **aarch64-linux**, and **x86_64-linux**.
 1. **Glue scripts run outside Nix.** Generators are plain Node tools; do not wrap them in `nix run`.

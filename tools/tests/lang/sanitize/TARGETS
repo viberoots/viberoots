@@ -1,0 +1,11 @@
+load("//lang:sanitize.bzl", "sanitize_name_probe")
+
+# One test target per case; zx test will query outputs
+sanitize_name_probe(name = "case1", value = "//apps/foo:bin")
+sanitize_name_probe(name = "case2", value = "//apps/foo/sub:my bin")
+sanitize_name_probe(name = "case3", value = "//third_party/providers:mod_ABC")
+sanitize_name_probe(name = "case4", value = "//a:b/c")
+sanitize_name_probe(name = "case5", value = "//UPPER:Case With Spaces")
+
+
+
