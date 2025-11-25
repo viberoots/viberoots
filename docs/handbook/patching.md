@@ -10,6 +10,7 @@ All scripts are zx TypeScript using `#!/usr/bin/env zx-wrapper`.
 - Filesystem existence checks use `tools/patch/lib/util.ts: pathExists()`.
 - Avoid bespoke implementations; this keeps behavior consistent across Go/C++/Node.
 - Flat patch directory checks use `tools/lib/provider-sync.ts: validateFlatDir()`; locally it warns, and in CI (or with `--strict`) it fails.
+- C++ extraction/workspace setup uses the common permission normalizer `tools/patch/cross-platform.ts: chmodRecursive` to guarantee writable workspaces without affecting diffs.
 
 ## Workflow
 

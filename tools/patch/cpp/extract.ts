@@ -4,6 +4,7 @@ import path from "node:path";
 import { createDbg } from "../lib/util";
 import { encodeNixAttrForPatchPrefix, normalizeNixAttr } from "../../lib/providers";
 import { resolveNixpkg } from "./resolve";
+import { chmodRecursive } from "../cross-platform";
 
 const dbg = createDbg("patch-cpp:extract");
 
@@ -13,9 +14,9 @@ export async function extractOrCopySrc(srcPath: string, destDir: string): Promis
   const stat = await fsp.stat(srcPath).catch(() => null);
   if (stat && stat.isDirectory()) {
     console.error("[patch-cpp] extract: copy dir", srcPath);
-    // Copy store dir into a writable workspace; prefer rsync for portability
-    await $`rsync -a ${srcPath}/ ${destDir}/`;
-    await $`chmod -R u+w ${destDir}`;
+    // Copy store dir into a writable workspace using the shared fallback copy path
+    await fsp.cp(srcPath, destDir, { recursive: true, force: true });
+    await chmodRecursive(destDir);
     console.error("[patch-cpp] extract: copy dir done");
     return destDir;
   }
@@ -28,8 +29,8 @@ export async function extractOrCopySrc(srcPath: string, destDir: string): Promis
     // Extract the full source to ensure expected headers (e.g., zlib.h) are present
     console.error("[patch-cpp] extract: tar -xf full", srcPath);
     await $({ cwd: destDir })`tar -xf ${srcPath}`.nothrow();
-    await $`chmod -R u+w ${destDir}`.nothrow();
   }
+  await chmodRecursive(destDir);
   // Heuristic: if extraction created a single directory, descend into it for origin path
   const entries = await fsp.readdir(destDir);
   if (entries.length === 1) {
@@ -66,7 +67,7 @@ export async function ensureOriginAndWorkspace(
   const originPath = await extractOrCopySrc(srcPath, originRoot);
   // Create workspace by cloning originPath
   await $`rsync -a ${originPath}/ ${wsRoot}/`;
-  await $`chmod -R u+w ${wsRoot}`;
+  await chmodRecursive(wsRoot);
   dbg("ensureOriginAndWorkspace", { attr: attrNorm, originRoot, wsRoot, version, pname });
   return { key, originPath, workspacePath: wsRoot, version, pname };
 }

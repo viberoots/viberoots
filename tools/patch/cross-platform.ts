@@ -1,9 +1,9 @@
+import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import crypto from "node:crypto";
 
-async function chmodRecursive(root: string): Promise<void> {
+export async function chmodRecursive(root: string): Promise<void> {
   const stack: string[] = [root];
   while (stack.length) {
     const cur = stack.pop() as string;
