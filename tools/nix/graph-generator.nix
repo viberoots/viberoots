@@ -78,9 +78,23 @@ let
         in if attempt.success then attempt.value else raw
       ) else {};
   D = M.dispatch or {};
-  devOverrideJSON = builtins.getEnv "NIX_GO_DEV_OVERRIDE_JSON";
-  devOverrideCppJSON = builtins.getEnv "NIX_CPP_DEV_OVERRIDE_JSON";
-  devOverridePyJSON = builtins.getEnv "NIX_PY_DEV_OVERRIDE_JSON";
+  # Planner override env mapping (PR-5): avoid hard-coded names
+  Overrides = import (manifestBase + "/planner/overrides.nix");
+  devOverrideJSON =
+    if builtins.hasAttr "go" Overrides
+    then builtins.getEnv (builtins.getAttr "go" Overrides)
+    else "";
+  devOverrideCppJSON =
+    if builtins.hasAttr "cpp" Overrides
+    then builtins.getEnv (builtins.getAttr "cpp" Overrides)
+    else "";
+  devOverridePyJSON =
+    if builtins.hasAttr "python" Overrides
+    then builtins.getEnv (builtins.getAttr "python" Overrides)
+    else "";
+  overridePresentList =
+    let langs = builtins.attrNames Overrides;
+    in builtins.filter (lang: (builtins.getEnv (builtins.getAttr lang Overrides)) != "") langs;
   # CI detection and optional suppression flag for planner dev-override logs
   isCI = (builtins.getEnv "CI") == "true";
   suppressDevOverrideLog = (builtins.getEnv "PLANNER_NO_DEV_OVERRIDE_LOG") != "";
@@ -390,6 +404,7 @@ let
   Manifest = import (manifestBase + "/planner/manifest.nix") {
     inherit pkgs lib repoRootStr devOverrideJSON devOverrideCppJSON devOverridePyJSON isCI suppressDevOverrideLog
             goOutPaths cppOutPaths nodeOutPaths modulesTomlFor pkgPathOf targetNameOf sanitize;
+    overridePresentList = overridePresentList;
   };
   all = Manifest.all;
 

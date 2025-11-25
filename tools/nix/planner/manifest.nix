@@ -6,6 +6,7 @@
 , devOverridePyJSON
 , isCI
 , suppressDevOverrideLog
+, overridePresentList ? []
 , goOutPaths
 , cppOutPaths
 , nodeOutPaths
@@ -15,6 +16,14 @@
 , sanitize
 }:
 let
+  # Build a short token string like: "go cpp py" in preferred order
+  presentShort =
+    let
+      # Stable, human-friendly order
+      order = [ "go" "cpp" "python" ];
+      presentOrdered = builtins.filter (l: builtins.elem l overridePresentList) order;
+      toShort = l: if l == "python" then "py" else l;
+    in lib.concatStringsSep " " (map toShort presentOrdered);
   allDeps = (lib.attrValues goOutPaths) ++ (lib.attrValues cppOutPaths) ++ (lib.attrValues nodeOutPaths);
   all = pkgs.runCommand "graph-outputs" { inherit allDeps; } ''
       set -eu
@@ -26,8 +35,8 @@ let
       echo "appsDir=${builtins.toString (builtins.toPath (repoRootStr + "/apps"))}" >> $out/build.log
       echo "libsDir=${builtins.toString (builtins.toPath (repoRootStr + "/libs"))}" >> $out/build.log
       echo "devOverrideJSON=${builtins.toJSON devOverrideJSON}" >> $out/build.log
-      ${if (!isCI && !suppressDevOverrideLog && ((devOverrideJSON != "") || (devOverrideCppJSON != "") || (devOverridePyJSON != ""))) then ''
-        echo "[planner] dev overrides present:${if devOverrideJSON != "" then " go" else ""}${if devOverrideCppJSON != "" then " cpp" else ""}${if devOverridePyJSON != "" then " py" else ""}" >> $out/build.log
+      ${if (!isCI && !suppressDevOverrideLog && ((builtins.length overridePresentList) > 0)) then ''
+        echo "[planner] dev overrides present: ${presentShort}" >> $out/build.log
       '' else ""}
       echo "goTargets keys: ${lib.concatStringsSep "," (builtins.attrNames goOutPaths)}" >> $out/build.log
       echo "cppTargets bin keys: ${lib.concatStringsSep "," (builtins.attrNames cppOutPaths)}" >> $out/build.log
