@@ -17,19 +17,17 @@ import { resolveNixpkg } from "./cpp/resolve";
 import { ensureOriginAndWorkspace } from "./cpp/extract";
 import { doApply, doRemove } from "./cpp/apply";
 import { echoSnippetRequested } from "../lib/cli.ts";
+import { requirePositional } from "./lib/args";
 
 const dbg = createDbg("patch-cpp");
-
-function attrArg(args: string[]): string {
-  const a = (args[0] || "").trim();
-  if (!a) throw new Error("missing <attr> nixpkgs attribute, e.g. pkgs.zlib or zlib");
-  return a;
-}
 
 async function doStart(args: string[]) {
   console.error("[patch-cpp] start: begin");
   dbg("start: proc", { pid: process.pid, cwd: process.cwd() });
-  const attrInput = attrArg(args);
+  const attrInput = requirePositional(args, 0, {
+    name: "<attr> nixpkgs attribute",
+    example: "pkgs.zlib or zlib",
+  });
   const attrNorm = normalizeNixAttr(attrInput);
   const echoSnippet = echoSnippetRequested({ env: "PATCH_CPP_ECHO_SNIPPET" });
   // Idempotency: if a session already exists and workspace is present, reuse it.
@@ -74,7 +72,10 @@ async function doStart(args: string[]) {
 }
 
 async function doReset(args: string[]) {
-  const attrInput = attrArg(args);
+  const attrInput = requirePositional(args, 0, {
+    name: "<attr> nixpkgs attribute",
+    example: "pkgs.zlib or zlib",
+  });
   const attrNorm = normalizeNixAttr(attrInput);
   const { version } = await resolveNixpkg(attrNorm);
   const key = `${attrNorm}@${version}`.toLowerCase();
@@ -89,7 +90,10 @@ async function doReset(args: string[]) {
 }
 
 async function doSession(args: string[]) {
-  const attrInput = attrArg(args);
+  const attrInput = requirePositional(args, 0, {
+    name: "<attr> nixpkgs attribute",
+    example: "pkgs.zlib or zlib",
+  });
   await doStart([attrInput]);
   // In session mode, also export a process-local dev override suggestion to help quick rebuilds
   try {

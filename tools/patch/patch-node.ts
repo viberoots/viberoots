@@ -8,12 +8,7 @@ import { repoRoot } from "./lib/apply";
 import { readImporterArg } from "../lib/cli.ts";
 import { resolveImporterDir } from "../lib/lockfiles.ts";
 import { runSession } from "./lib/session";
-
-function pkgArg(args: string[]): string {
-  const p = args[0];
-  if (!p) throw new Error("missing <package> name, e.g. lodash or @scope/pkg");
-  return p.trim();
-}
+import { requirePositional } from "./lib/args";
 
 function pnpmBin(): string {
   const b = (process.env.PNPM_BIN || "").trim();
@@ -27,7 +22,10 @@ function sessionKey(importerDir: string, pkgName: string): string {
 }
 
 async function doStart(args: string[]) {
-  const pkg = pkgArg(args);
+  const pkg = requirePositional(args, 0, {
+    name: "<package> name",
+    example: "lodash or @scope/pkg",
+  });
   const importerRel = await resolveImporterDir(process.cwd(), readImporterArg("") || undefined);
   const importerDir = importerRel === "." ? repoRoot() : path.resolve(repoRoot(), importerRel);
   // pnpm prints the temp directory on stdout; capture it
@@ -57,7 +55,10 @@ async function doStart(args: string[]) {
 }
 
 async function doApply(args: string[]) {
-  const pkg = pkgArg(args);
+  const pkg = requirePositional(args, 0, {
+    name: "<package> name",
+    example: "lodash or @scope/pkg",
+  });
   const importerRel = await resolveImporterDir(process.cwd(), readImporterArg("") || undefined);
   const importerDir = importerRel === "." ? repoRoot() : path.resolve(repoRoot(), importerRel);
   const key = sessionKey(importerDir, pkg);
@@ -96,7 +97,10 @@ async function doApply(args: string[]) {
 }
 
 async function doReset(args: string[]) {
-  const pkg = pkgArg(args);
+  const pkg = requirePositional(args, 0, {
+    name: "<package> name",
+    example: "lodash or @scope/pkg",
+  });
   const importerRel = await resolveImporterDir(process.cwd(), readImporterArg("") || undefined);
   const importerDir = importerRel === "." ? repoRoot() : path.resolve(repoRoot(), importerRel);
   const key = sessionKey(importerDir, pkg);
@@ -109,7 +113,10 @@ async function doReset(args: string[]) {
 }
 
 async function doRemove(args: string[]) {
-  const pkg = pkgArg(args);
+  const pkg = requirePositional(args, 0, {
+    name: "<package> name",
+    example: "lodash or @scope/pkg",
+  });
   const importerRel = await resolveImporterDir(process.cwd(), readImporterArg("") || undefined);
   const importerDir = importerRel === "." ? repoRoot() : path.resolve(repoRoot(), importerRel);
   // Try native pnpm removal first; fall back to editing package.json

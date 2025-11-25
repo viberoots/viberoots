@@ -11,19 +11,18 @@ import { resolvePythonDist } from "./python-dist-resolve";
 import { echoSnippetRequested } from "../lib/cli.ts";
 import { printOverrideSnippet, setOverride, clearOverride, readOverrideMap } from "./dev-overrides";
 import { getSession, setSession, deleteSession } from "./state";
-
-function distArg(args: string[]): string {
-  const d = args[0];
-  if (!d) throw new Error("missing <distribution> name, e.g. requests");
-  return d.trim();
-}
+import { requirePositional } from "./lib/args";
+import { NOOP_CLEARED_MSG } from "./lib/messages";
 
 function keyFor(dist: string, ver: string): string {
   return `${String(dist || "").toLowerCase()}@${String(ver || "").toLowerCase()}`;
 }
 
 async function doStart(args: string[]) {
-  const dist = distArg(args);
+  const dist = requirePositional(args, 0, {
+    name: "<distribution> name",
+    example: "requests",
+  });
   const importerFlag = readImporterArg("");
   const resolved = await resolvePythonDist(dist, importerFlag || undefined);
   const key = keyFor(resolved.importPath, resolved.version);
@@ -71,7 +70,10 @@ async function doStart(args: string[]) {
 }
 
 async function doApply(args: string[]) {
-  const dist = distArg(args);
+  const dist = requirePositional(args, 0, {
+    name: "<distribution> name",
+    example: "requests",
+  });
   const importerFlag = readImporterArg("");
   const resolved = await resolvePythonDist(dist, importerFlag || undefined);
   const key = keyFor(resolved.importPath, resolved.version);
@@ -83,7 +85,7 @@ async function doApply(args: string[]) {
     const dev = readOverrideMap("NIX_PY_DEV_OVERRIDE_JSON");
     if (dev[key]) clearOverride("NIX_PY_DEV_OVERRIDE_JSON", key);
     await deleteSession("python", key);
-    console.log("no changes; no-op (cleared dev overrides and ended session)");
+    console.log(NOOP_CLEARED_MSG);
     return;
   }
 
@@ -134,7 +136,10 @@ async function doApply(args: string[]) {
 }
 
 async function doReset(args: string[]) {
-  const dist = distArg(args);
+  const dist = requirePositional(args, 0, {
+    name: "<distribution> name",
+    example: "requests",
+  });
   const importerFlag = readImporterArg("");
   const resolved = await resolvePythonDist(dist, importerFlag || undefined);
   const key = keyFor(resolved.importPath, resolved.version);
@@ -148,7 +153,10 @@ async function doReset(args: string[]) {
 }
 
 async function doSession(args: string[]) {
-  const dist = distArg(args);
+  const dist = requirePositional(args, 0, {
+    name: "<distribution> name",
+    example: "requests",
+  });
   await doStart([dist]);
   // Reuse generic session runner to support Ctrl-D/Ctrl-C behaviors
   const { runSession } = await import("./lib/session");

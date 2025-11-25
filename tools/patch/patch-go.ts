@@ -18,14 +18,10 @@ import { readOverrideMap, setOverride, clearOverride, printOverrideSnippet } fro
 import { createDbg, pathExists } from "./lib/util";
 import { runSession } from "./lib/session";
 import { echoSnippetRequested } from "../lib/cli.ts";
+import { requirePositional } from "./lib/args";
+import { NOOP_CLEARED_MSG } from "./lib/messages";
 
 const dbg = createDbg("patch-go");
-
-function moduleArg(args: string[]): string {
-  const m = args[0];
-  if (!m) throw new Error("missing <module> import path, e.g. golang.org/x/net");
-  return m.trim();
-}
 
 function moduleKey(importPath: string, version: string): string {
   return `${importPath}@${version}`.toLowerCase();
@@ -33,7 +29,10 @@ function moduleKey(importPath: string, version: string): string {
 
 async function doStart(args: string[]) {
   dbg("start: proc", { pid: process.pid, cwd: process.cwd() });
-  const importPath = moduleArg(args);
+  const importPath = requirePositional(args, 0, {
+    name: "<module> import path",
+    example: "golang.org/x/net",
+  });
   const { version, originPath } = await resolveModule(importPath);
   const key = moduleKey(importPath, version);
   const existing = await getSession("go", key);
@@ -84,7 +83,10 @@ async function doApply(args: string[]) {
   if (flags.force) {
     (global as any).argv = Object.assign({}, (global as any).argv, { force: true });
   }
-  const importPath = moduleArg(flags.restArgs);
+  const importPath = requirePositional(flags.restArgs, 0, {
+    name: "<module> import path",
+    example: "golang.org/x/net",
+  });
   dbg("apply: flags", {
     targetPkg: flags.targetPkg,
     overridePatchDir: flags.overridePatchDir,
@@ -108,7 +110,7 @@ async function doApply(args: string[]) {
     clearOverride("NIX_GO_DEV_OVERRIDE_JSON", key);
     await deleteSession("go", key);
     dbg("apply: no-op done", { key });
-    console.log("no changes; no-op (cleared dev overrides and ended session)");
+    console.log(NOOP_CLEARED_MSG);
     return;
   }
   const enc = encodeForPatchFilename(importPath);
@@ -141,7 +143,10 @@ async function doApply(args: string[]) {
 }
 
 async function doReset(args: string[]) {
-  const importPath = moduleArg(args);
+  const importPath = requirePositional(args, 0, {
+    name: "<module> import path",
+    example: "golang.org/x/net",
+  });
   const { version } = await resolveModule(importPath);
   const key = moduleKey(importPath, version);
   const sess = await getSession("go", key);
@@ -154,7 +159,10 @@ async function doReset(args: string[]) {
 }
 
 async function doSession(args: string[]) {
-  const importPath = moduleArg(args);
+  const importPath = requirePositional(args, 0, {
+    name: "<module> import path",
+    example: "golang.org/x/net",
+  });
   await doStart([importPath]);
   await runSession(
     async () => {
@@ -168,7 +176,10 @@ async function doSession(args: string[]) {
 
 async function doRemove(args: string[]) {
   const flags = parseApplyFlags(args);
-  const importPath = moduleArg(flags.restArgs);
+  const importPath = requirePositional(flags.restArgs, 0, {
+    name: "<module> import path",
+    example: "golang.org/x/net",
+  });
   const { version } = await resolveModule(importPath);
   const enc = encodeForPatchFilename(importPath);
   const repoRoot = process.env.WORKSPACE_ROOT || process.env.LIVE_ROOT || process.cwd();
