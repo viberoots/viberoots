@@ -2,29 +2,12 @@
 let
   lib = pkgs.lib;
   H = import ../lib/lang-helpers.nix { inherit pkgs; };
+  Common = import ../templates-common.nix { inherit pkgs; };
   Tiny = import ./go-tiny-wasm.nix { inherit pkgs; };
 
   buildGoFn = if pkgs ? buildGoApplication then pkgs.buildGoApplication
               else builtins.throw "gomod2nix overlay (buildGoApplication) is required; no vendoring fallback";
   takesOverrides = (builtins.hasAttr "overrides" (builtins.functionArgs (pkgs.buildGoApplication)));
-
-  # Shared override composition for Go module patches and dev src overrides.
-  mkOverrides = { patchesMap, devMap }:
-    (module: old:
-      let
-        mType = builtins.typeOf module;
-        pkg = if mType == "string" then module else (module.goPackagePath or (old.goPackagePath or ""));
-        ver = if mType == "string" then (old.version or "") else (module.version or (old.version or ""));
-        keyWithVer = if pkg != "" && ver != "" then "${pkg}@${ver}" else pkg;
-        patchList = (patchesMap.${keyWithVer} or []) ++ (patchesMap.${pkg} or []);
-        srcOverride = if builtins.hasAttr keyWithVer devMap
-                      then devMap.${keyWithVer}
-                      else (devMap.${pkg} or old.src);
-      in old // {
-        patches = (old.patches or []) ++ patchList;
-        src = srcOverride;
-      }
-    );
 
   mkCgoEnv = { nixCgoPkgs ? [], nixCgoAttrs ? [], repoCgoPkgs ? [] }:
     let
@@ -38,32 +21,6 @@ let
     in {
       inherit cgoPkgs haveCgo pkgCfgPaths synthCFlags synthLdFlags repoStaticLibs;
     };
-
-  # Tiny composer for shared configure/env steps used by goApp and goLib
-  mkConfigurePhase = { cgo, includeGoFlags ? false }:
-    ''
-      runHook preConfigure
-
-      export GOCACHE=$TMPDIR/go-cache
-      export GOPATH="$TMPDIR/go"
-      export GOSUMDB=off
-      ${if includeGoFlags then ''
-        export GOFLAGS="-mod=mod"
-      '' else ""}
-      ${if cgo.haveCgo then ''
-        export CGO_ENABLED=1
-        export PKG_CONFIG_PATH=${cgo.pkgCfgPaths}
-        if [ -z "$PKG_CONFIG_PATH" ]; then
-          export CGO_CFLAGS="${cgo.synthCFlags} $CGO_CFLAGS"
-          export CGO_LDFLAGS="${cgo.synthLdFlags} ${cgo.repoStaticLibs} $CGO_LDFLAGS"
-        fi
-      '' else ''
-        export CGO_ENABLED=0
-      ''}
-      cd "''${modRoot:-.}"
-
-      runHook postConfigure
-    '';
 
 in {
   goApp = {
@@ -104,13 +61,14 @@ in {
         doInstallCheck = false;
         disallowedReferences = [];
         nativeBuildInputs = ([ pkgs.unzip ] ++ (if cgo.haveCgo then (cgo.cgoPkgs ++ [ pkgs.pkg-config ]) else []));
-        configurePhase = mkConfigurePhase { inherit cgo; includeGoFlags = false; };
+        # Shared configure/env phase imported from templates-common.nix
+        configurePhase = Common.mkConfigurePhase { inherit cgo; includeGoFlags = false; };
       };
       args = baseArgs // ({
         pwd = srcAbs;
         modRoot = ".";
       } // (if takesOverrides then {
-        overrides = mkOverrides { patchesMap = patchesMap; devMap = devOverrides; };
+        overrides = Common.mkOverrides { patchesMap = patchesMap; devMap = devOverrides; };
       } else {}));
     in buildGoFn args;
 
@@ -141,13 +99,14 @@ in {
         doInstallCheck = false;
         disallowedReferences = [];
         nativeBuildInputs = (if cgo.haveCgo then (cgo.cgoPkgs ++ [ pkgs.pkg-config ]) else []);
-        configurePhase = mkConfigurePhase { inherit cgo; includeGoFlags = true; };
+        # Shared configure/env phase imported from templates-common.nix
+        configurePhase = Common.mkConfigurePhase { inherit cgo; includeGoFlags = true; };
       };
       args = baseArgs // ({
         pwd = srcAbs;
         modRoot = ".";
       } // (if takesOverrides then {
-        overrides = mkOverrides { patchesMap = patchesMap; devMap = H.readDevOverrides devOverrideEnv; };
+        overrides = Common.mkOverrides { patchesMap = patchesMap; devMap = H.readDevOverrides devOverrideEnv; };
       } else {}));
     in buildGoFn args;
 
@@ -228,7 +187,7 @@ in {
         runHook postInstall
       '';
     } // (if takesOverrides then {
-      overrides = mkOverrides { patchesMap = patchesMap; devMap = H.readDevOverrides devOverrideEnv; };
+      overrides = Common.mkOverrides { patchesMap = patchesMap; devMap = H.readDevOverrides devOverrideEnv; };
     } else {}));
   # Re-export TinyGo wasm builder from dedicated template
   inherit (Tiny) goTinyWasmLib;
