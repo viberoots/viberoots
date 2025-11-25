@@ -12,9 +12,8 @@ def nix_cpp_library(name, **kwargs):
     # Build via Nix, not Buck's C++ toolchain
     deps = kwargs.pop("deps", [])
     # Explicit Nix-level inputs that should affect the rule key.
-    # We conservatively include repo-level flake.lock and the shared C++ overlay.
-    # These are source file labels at the repo root and tools/nix/overlays package.
-    nix_inputs = ["//:flake.lock", "//tools/nix/overlays:cpp-patches.nix"]
+    # We conservatively include repo-level flake.lock only. Overlay coupling removed (PR‑4).
+    nix_inputs = ["//:flake.lock"]
     stamp_labels(kwargs, "cpp", "lib")
     # Include local patch files in rule inputs so Buck invalidates on patch changes
     append_patch_srcs(kwargs, local_patch_dirs)
@@ -44,7 +43,7 @@ def nix_cpp_wasm_static_lib(name, **kwargs):
     local_patch_dirs = kwargs.pop("local_patch_dirs", ["patches/cpp"])
     nix_cxx_attrs = kwargs.pop("nix_cxx_attrs", [])
     deps = kwargs.pop("deps", [])
-    nix_inputs = ["//:flake.lock", "//tools/nix/overlays:cpp-patches.nix"]
+    nix_inputs = ["//:flake.lock"]
     stamp_labels(kwargs, "cpp", "lib")
     # Add a flavor tag so the planner routes to the wasm template
     _labels = (kwargs.get("labels", []) or []) + ["flavor:wasm"]
@@ -98,7 +97,7 @@ def nix_cpp_binary(name, **kwargs):
     # Build via Nix, not Buck's C++ toolchain
     deps = kwargs.pop("deps", [])
     # Explicit Nix-level inputs that should affect the rule key.
-    nix_inputs = ["//:flake.lock", "//tools/nix/overlays:cpp-patches.nix"]
+    nix_inputs = ["//:flake.lock"]
     stamp_labels(kwargs, "cpp", "bin")
     append_patch_srcs(kwargs, local_patch_dirs)
     srcs = kwargs.get("srcs", []) or []
@@ -177,7 +176,7 @@ def nix_cpp_node_addon(name, **kwargs):
     deps = kwargs.pop("deps", [])
     # Optional addon_name hint; recorded in labels for planner visibility only
     addon_name = kwargs.pop("addon_name", None)
-    nix_inputs = ["//:flake.lock", "//tools/nix/overlays:cpp-patches.nix"]
+    nix_inputs = ["//:flake.lock"]
     stamp_labels(kwargs, "cpp", "addon")
     if addon_name:
         _labels = (kwargs.get("labels", []) or [])
