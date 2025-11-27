@@ -5,6 +5,6 @@ import { test } from "node:test";
 
 test("node macros use append_patch_srcs helper for importer-local patches", async () => {
   const txt = await fsp.readFile("node/defs.bzl", "utf8");
-  // After PR‑5, macros delegate to the unified append_importer_patches helper
-  assert.match(txt, /append_importer_patches\(/);
+  // After PR‑6 PR‑1, macros delegate via include_importer_patches_from_labels to the unified importer helper
+  assert.match(txt, /include_importer_patches_from_labels\(/);
 });

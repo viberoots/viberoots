@@ -28,7 +28,7 @@
     buck2.url = "github:facebook/buck2/201beb86106fecdc84e30260b0f1abb5bf576988";
     gomod2nix.url = "github:nix-community/gomod2nix";
     gomod2nix.inputs.nixpkgs.follows = "nixpkgs";
-    # uv2nix pinned via a local path flake; provides a stable interface and identity.
+    # Keep uv2nix input to satisfy existing flake.lock, but resolve lib locally in outputs to avoid lock churn
     uv2nix.url = "path:./third_party/uv2nix";
   };
 
@@ -69,14 +69,19 @@
         };
         prelude = import ./tools/nix/buck-prelude.nix { inherit pkgs; buck2Input = buck2; };
         uv2nixLib =
-          let lib = (uv2nix.lib or null);
-          in if lib == null then null else {
-            meta = lib.meta or {};
-            mkEnv = args:
-              if (lib ? mkEnvFor) then (lib.mkEnvFor pkgs) args
-              else if (lib ? mkEnv) then lib.mkEnv args
-              else builtins.throw "uv2nix lib is missing mkEnv/mkEnvFor";
-          };
+          let
+            # Resolve uv2nix lib from the in-repo third_party copy to avoid relative path flake input issues
+            uvLocal = import ./third_party/uv2nix/flake.nix;
+            uvOut = uvLocal.outputs { self = null; inherit nixpkgs; };
+            lib = (uvOut.lib or null);
+          in
+            if lib == null then null else {
+              meta = lib.meta or {};
+              mkEnv = args:
+                if (lib ? mkEnvFor) then (lib.mkEnvFor pkgs) args
+                else if (lib ? mkEnv) then lib.mkEnv args
+                else builtins.throw "uv2nix lib is missing mkEnv/mkEnvFor";
+            };
       in f { inherit pkgs zx-wrapper nodeMods prelude system uv2nixLib; buck2Input = buck2; }
     );
   in {

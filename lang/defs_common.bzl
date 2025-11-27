@@ -45,6 +45,33 @@ def ensure_single_lockfile_label(kwargs, lockfile_label):
     kwargs["labels"] = dedupe_preserve(labels)
 
 
+def importer_from_labels(kwargs):
+    """
+    Enforce and extract the importer string from the single lockfile label.
+    - Calls ensure_single_lockfile_label(kwargs, None) to validate and dedupe
+    - Returns the importer (text after '#'), or "" if not present
+    """
+    ensure_single_lockfile_label(kwargs, None)
+    labs = extract_lockfile_labels(kwargs.get("labels", []) or [])
+    if len(labs) != 1:
+        # Error text is produced by ensure_single_lockfile_label; this path should not occur.
+        fail("Exactly one importer-scoped lockfile label is required (lockfile:<path>#<importer>); got: %s" % labs)
+    lab = labs[0]
+    return (lab.split("#")[1] if ("#" in lab) else "")
+
+
+def include_importer_patches_from_labels(kwargs, lang):
+    """
+    Convenience helper to include importer-local patches in kwargs['srcs'].
+    - Derives importer from labels via importer_from_labels
+    - Appends "<importer>/patches/<lang>/*.patch" (or "patches/<lang>" when importer == ".")
+    """
+    imp = importer_from_labels(kwargs)
+    if imp == None or imp == "":
+        return
+    append_importer_patches(kwargs, imp, lang)
+
+
 def dedupe_preserve(seq):
     seen = {}
     out = []
@@ -70,17 +97,6 @@ def append_patch_srcs(kwargs, dirs):
         srcs = srcs + native.glob(["%s/*.patch" % d])
     if len(srcs) > 0:
         kwargs["srcs"] = dedupe_preserve(srcs)
-
-
-def append_node_patches_for_importer(kwargs, importer):
-    """
-    Append importer-local Node patches into kwargs["srcs"].
-    - If importer == ".", use "patches/node"
-    - Else use "<importer>/patches/node"
-    No-op when importer is empty or not a string.
-    """
-    # Deprecated in PR‑5: prefer append_importer_patches(kwargs, importer, "node")
-    append_importer_patches(kwargs, importer, "node")
 
 
 def append_importer_patches(kwargs, importer, lang):
@@ -226,4 +242,39 @@ def providers_for(MODULE_PROVIDERS, name):
         if isinstance(l, str):
             out.append(l)
     return out
+
+
+# Test-only: probe importer_from_labels by materializing it into an output file
+def _importer_from_labels_probe_impl(ctx):
+    kw = { "labels": [] }
+    lf = ctx.attrs.lockfile_label
+    if isinstance(lf, str) and lf != "":
+        kw["labels"] = [lf]
+    imp = importer_from_labels(kw)
+    out = ctx.actions.declare_output(ctx.attrs.out)
+    ctx.actions.write(out, imp + "\n")
+    return [DefaultInfo(default_output = out)]
+
+_importer_from_labels_probe = rule(
+    impl = _importer_from_labels_probe_impl,
+    attrs = {
+        "lockfile_label": attrs.string(),
+        "out": attrs.string(),
+    },
+)
+
+def importer_from_labels_probe(name, lockfile_label):
+    """
+    Test-only helper that writes the importer string to a declared output.
+    The output file name is the importer with a .txt suffix ('.' becomes 'dot').
+    """
+    imp = "."
+    if isinstance(lockfile_label, str) and ("#" in lockfile_label):
+        imp = lockfile_label.split("#")[1]
+    out = ((imp if imp != "." else "dot") + ".txt")
+    _importer_from_labels_probe(
+        name = name,
+        lockfile_label = lockfile_label,
+        out = out,
+    )
 

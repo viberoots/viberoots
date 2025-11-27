@@ -112,7 +112,7 @@ node tools/dev/patches-lint.ts --lang python
 - The Python macros include importer‑local patch files in `srcs` (same mechanism as Node) for precise Buck invalidation:
   - Patches live under `<importer>/patches/python/*.patch` (e.g., `apps/api/patches/python/...`).
   - Changing a patch only invalidates Python targets bound to that importer.
-- Lockfile label enforcement and parsing are centralized: macros call `ensure_single_lockfile_label(...)` and derive the importer with `extract_lockfile_labels(...)`. Inclusion is delegated to `append_importer_patches(..., "python")`.
+- Lockfile label enforcement and parsing are centralized in Starlark: call `ensure_single_lockfile_label(...)` and then use `include_importer_patches_from_labels(kwargs, "python")` to both extract the importer and include importer‑local patches deterministically.
 
 Quick checks and guidance:
 
@@ -126,7 +126,7 @@ Quick checks and guidance:
   - Patches live under `<importer>/patches/node/*.patch` (e.g., `apps/web/patches/node/...`).
   - Changing a patch only invalidates Node targets bound to that importer.
 - Provider stamps for Node are importer‑scoped and do not reference patch files as `srcs` (see Provider sync cookbook below); correctness comes from macro‑side `srcs` inclusion.
-- Lockfile label enforcement and parsing are centralized: macros call `ensure_single_lockfile_label(...)` and `extract_lockfile_labels(...)` from `lang/defs_common.bzl`. Error messages and behavior are stable and shared across Node macros.
+- Lockfile label enforcement and parsing are centralized: macros call `ensure_single_lockfile_label(...)` and then `include_importer_patches_from_labels(kwargs, "node")` from `lang/defs_common.bzl`. Error messages and behavior are stable and shared across Node macros.
 
 Quick checks and guidance:
 

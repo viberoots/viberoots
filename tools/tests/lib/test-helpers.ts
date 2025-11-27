@@ -169,6 +169,36 @@ export async function runInTemp<T>(
   const overallStart = performance.now();
   const tmp = await mktemp(name + "-");
   await rsyncRepoTo(tmp);
+  // Normalize flake.lock path inputs that use relative 'path:./...' to absolute paths within the temp repo.
+  // This avoids Nix errors when evaluating from store snapshots where relative path inputs are disallowed.
+  try {
+    const flakeLockPath = path.join(tmp, "flake.lock");
+    const lockTxt = await fsp.readFile(flakeLockPath, "utf8").catch(() => "");
+    if (lockTxt) {
+      const lockJson: any = JSON.parse(lockTxt);
+      const nodes = (lockJson && lockJson.nodes) || {};
+      const uv = nodes["uv2nix"];
+      const locked = uv && uv.locked;
+      const original = uv && uv.original;
+      const isPathType =
+        locked &&
+        locked.type === "path" &&
+        typeof locked.path === "string" &&
+        locked.path.length > 0;
+      if (isPathType) {
+        const rel = locked.path as string;
+        const abs = path.resolve(tmp, rel);
+        // Write back absolute paths; keep type=path
+        lockJson.nodes.uv2nix.locked.path = abs;
+        if (original && typeof original === "object" && original.type === "path") {
+          lockJson.nodes.uv2nix.original.path = abs;
+        }
+        await fsp.writeFile(flakeLockPath, JSON.stringify(lockJson, null, 2) + "\n", "utf8");
+      }
+    }
+  } catch {
+    // best-effort; leave as-is if any failure occurs
+  }
   // Ensure Buck prelude and config exist inside the temp repo so @prelude loads work
   {
     let preludePath = "";

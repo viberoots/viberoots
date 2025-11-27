@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
+import { findImporterLockfiles } from "../../lib/importers.ts";
 import type { LanguageProviderSync } from "../../lib/lang-contracts";
 import { detectEnabledLanguages } from "../../lib/langs";
-import { findImporterLockfiles } from "../../lib/importers.ts";
 
 export type SyncOptions = {
   outFile?: string;

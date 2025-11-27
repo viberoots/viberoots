@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "genrule")
-load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve", "append_patch_srcs", "providers_for", "append_importer_patches", "extract_lockfile_labels", "ensure_single_lockfile_label")
+load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve", "append_patch_srcs", "providers_for", "include_importer_patches_from_labels", "importer_from_labels", "ensure_single_lockfile_label")
 load("//lang:sanitize.bzl", "sanitize_name")
 load("//node/private:nix_test.bzl", "node_nix_test")
 
@@ -19,16 +19,9 @@ def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = []
     ensure_single_lockfile_label(kwargs, lockfile_label)
     stamp_labels(kwargs, "node", kind)
     # Include importer-local node patches in srcs so Buck invalidates precisely on patch changes
-    # Derive importer from the single required lockfile label
-    _lf = extract_lockfile_labels(kwargs.get("labels", []))
-    _importer = None
-    if len(_lf) == 1 and isinstance(_lf[0], str):
-        _lab = _lf[0]
-        _importer = _lab[_lab.find("#") + 1:] if ("#" in _lab) else None
-    # Use shared helper to append importer-local patch files to srcs
-    _kw = { "srcs": merged_srcs }
-    append_importer_patches(_kw, _importer, "node")
-    merged_srcs = _kw.get("srcs", [])
+    kwargs["srcs"] = merged_srcs
+    include_importer_patches_from_labels(kwargs, "node")
+    merged_srcs = kwargs.get("srcs", [])
     merged_srcs = dedupe_preserve(merged_srcs + deps + providers_for(MODULE_PROVIDERS, name))
     kwargs["srcs"] = merged_srcs
     if out != None:
@@ -59,19 +52,14 @@ def nix_node_test(
     ensure_single_lockfile_label(kw, lockfile_label)
     stamp_labels(kw, "node", kind)
 
-    # Derive importer from the single required lockfile label
-    _lf = extract_lockfile_labels(kw.get("labels", []))
-    _importer = None
-    if len(_lf) == 1 and isinstance(_lf[0], str) and ("#" in _lf[0]):
-        _importer = _lf[0].split("#")[1]
-    if _importer == None or _importer == "":
-        fail("nix_node_test: importer could not be inferred from lockfile label; pass lockfile_label=\"lockfile:<path>#<importer>\"")
+    # Derive importer from the single required lockfile label (shared helper)
+    _importer = importer_from_labels(kw)
 
     # Include importer-local node patches as inputs so changes invalidate tests precisely
     merged_srcs = list(srcs)
-    _kw = { "srcs": merged_srcs }
-    append_importer_patches(_kw, _importer, "node")
-    merged_srcs = dedupe_preserve(_kw.get("srcs", []) or [])
+    kw["srcs"] = merged_srcs
+    include_importer_patches_from_labels(kw, "node")
+    merged_srcs = dedupe_preserve(kw.get("srcs", []) or [])
 
     # Forward to external runner rule; ignore legacy 'cmd'
     node_nix_test(

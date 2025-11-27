@@ -3,6 +3,8 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import "zx/globals";
 import { runGomod2nixGenerate, runGomod2nixScanAll } from "./install/gomod2nix.ts";
+import { readCompositeGraph } from "../lib/graph-view.ts";
+import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
 
 function shouldInstallDeps(materialize: boolean): boolean {
   // Only install or refresh glue when materializing; otherwise avoid mutating the workspace
@@ -59,7 +61,7 @@ async function ensureBuckPreludeConfig(): Promise<void> {
       const { stdout } = await $({
         stdio: "pipe",
         cwd: repoRoot(),
-      })`nix build .#buck2-prelude --no-link --accept-flake-config --print-out-paths`;
+      })`nix build .#buck2-prelude --no-link --no-write-lock-file --accept-flake-config --print-out-paths`;
       const out = String(stdout || "")
         .trim()
         .split("\n")
@@ -324,7 +326,7 @@ async function main() {
       const { stdout } = await $({
         stdio: "pipe",
         cwd: repoRoot(),
-      })`nix build .#node-modules.default --no-link --accept-flake-config --print-out-paths`;
+      })`nix build .#node-modules.default --no-link --no-write-lock-file --accept-flake-config --print-out-paths`;
       const out =
         String(stdout || "")
           .trim()
@@ -399,11 +401,12 @@ async function main() {
     }
 
     // Refresh Buck graph so graph-generator sees newest targets (only when materializing)
+    const graphPath = path.join(repoRoot(), DEFAULT_GRAPH_PATH);
     const exportArgs: string[] = [
-      `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/export-graph.ts")} --out ${path.join(
+      `${nodeBin} ${nodeBase} ${path.join(
         repoRoot(),
-        "tools/buck/graph.json",
-      )}`,
+        "tools/buck/export-graph.ts",
+      )} --out ${graphPath}`,
     ];
     if ((process.env.DEVBUILD_SCOPE || "").trim() !== "") {
       exportArgs[0] += ` --scope ${process.env.DEVBUILD_SCOPE?.trim()}`;
@@ -418,12 +421,11 @@ async function main() {
       cwd: repoRoot(),
       env: runEnv,
     })`bash --noprofile --norc -c ${exportArgs[0]}`;
-    // Validate non-empty graph before pure Nix stage
-    const { stdout: glen } = await $({
-      stdio: "pipe",
-      cwd: repoRoot(),
-    })`jq -r 'length' tools/buck/graph.json`;
-    const graphLen = Number(String(glen || "0").trim() || "0");
+    // Validate non-empty graph before pure Nix stage using Composite Graph API
+    const comp = await readCompositeGraph({
+      graphPath: path.resolve(repoRoot(), DEFAULT_GRAPH_PATH),
+    });
+    const graphLen = Array.isArray(comp?.nodes) ? comp.nodes.length : 0;
     if (!Number.isFinite(graphLen) || graphLen <= 0) {
       // Fallback: try scoping to Go nodes only; helpful for bootstrap in temp repos
       if ((process.env.DEVBUILD_TRIED_FALLBACK || "") !== "1") {
@@ -436,12 +438,14 @@ async function main() {
             stdio: "inherit",
             cwd: repoRoot(),
             env: runEnv,
-          })`bash --noprofile --norc -c ${`${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/export-graph.ts")} --scope lang:go --out ${path.join(repoRoot(), "tools/buck/graph.json")}`}`;
-          const { stdout: glen2 } = await $({
-            stdio: "pipe",
-            cwd: repoRoot(),
-          })`jq -r 'length' tools/buck/graph.json`;
-          const graphLen2 = Number(String(glen2 || "0").trim() || "0");
+          })`bash --noprofile --norc -c ${`${nodeBin} ${nodeBase} ${path.join(
+            repoRoot(),
+            "tools/buck/export-graph.ts",
+          )} --scope lang:go --out ${graphPath}`}`;
+          const comp2 = await readCompositeGraph({
+            graphPath: path.resolve(repoRoot(), DEFAULT_GRAPH_PATH),
+          });
+          const graphLen2 = Array.isArray(comp2?.nodes) ? comp2.nodes.length : 0;
           if (Number.isFinite(graphLen2) && graphLen2 > 0) {
             console.warn("[dev-build] export succeeded with scoped lang:go");
           } else {
@@ -459,12 +463,11 @@ async function main() {
               })`bash --noprofile --norc -c ${`${nodeBin} ${nodeBase} ${path.join(
                 repoRoot(),
                 "tools/buck/export-graph.ts",
-              )} --out ${path.join(repoRoot(), "tools/buck/graph.json")}`}`;
-              const { stdout: glen3 } = await $({
-                stdio: "pipe",
-                cwd: repoRoot(),
-              })`jq -r 'length' tools/buck/graph.json`;
-              const graphLen3 = Number(String(glen3 || "0").trim() || "0");
+              )} --out ${graphPath}`}`;
+              const comp3 = await readCompositeGraph({
+                graphPath: path.resolve(repoRoot(), DEFAULT_GRAPH_PATH),
+              });
+              const graphLen3 = Array.isArray(comp3?.nodes) ? comp3.nodes.length : 0;
               if (Number.isFinite(graphLen3) && graphLen3 > 0) {
                 console.warn("[dev-build] export succeeded after bootstrap warmup");
               } else {
@@ -490,7 +493,7 @@ async function main() {
       }
     }
     // Make the graph path visible for downstream pure Nix builds
-    process.env.BUCK_GRAPH_JSON = path.join(repoRoot(), "tools/buck/graph.json");
+    process.env.BUCK_GRAPH_JSON = graphPath;
   }
 
   // Materialize Nix-built graph BEFORE Buck build to ensure attribute exists
@@ -502,13 +505,13 @@ async function main() {
       // Pure path: build the store-pinned buck-graph from workspace graph.json
       const envPure = {
         ...process.env,
-        BUCK_GRAPH_JSON: path.join(repoRoot(), "tools/buck/graph.json"),
+        BUCK_GRAPH_JSON: path.join(repoRoot(), DEFAULT_GRAPH_PATH),
       } as any;
       const { stdout: graphOut } = await $({
         stdio: "pipe",
         cwd: repoRoot(),
         env: envPure,
-      })`nix build --impure .#buck-graph --no-link --accept-flake-config --print-out-paths`;
+      })`nix build --impure --no-write-lock-file .#buck-graph --no-link --accept-flake-config --print-out-paths`;
       const graphStore = String(graphOut || "")
         .trim()
         .split("\n")
@@ -540,13 +543,13 @@ async function main() {
             const envSel = {
               ...process.env,
               BUCK_TARGET: sel,
-              BUCK_GRAPH_JSON: path.join(repoRoot(), "tools/buck/graph.json"),
+              BUCK_GRAPH_JSON: path.join(repoRoot(), DEFAULT_GRAPH_PATH),
             } as any;
             const { stdout: selOut } = await $({
               stdio: "pipe",
               cwd: repoRoot(),
               env: envSel,
-            })`nix build .#graph-generator-pure-selected --accept-flake-config --print-out-paths`;
+            })`nix build --no-write-lock-file .#graph-generator-pure-selected --accept-flake-config --print-out-paths`;
             const outPath =
               String(selOut || "")
                 .trim()
@@ -576,13 +579,13 @@ async function main() {
         // Evaluate full graph outputs (pure) strictly; print a helpful warning if empty
         const envFull = {
           ...process.env,
-          BUCK_GRAPH_JSON: path.join(repoRoot(), "tools/buck/graph.json"),
+          BUCK_GRAPH_JSON: path.join(repoRoot(), DEFAULT_GRAPH_PATH),
         } as any;
         const { stdout: pureOut } = await $({
           stdio: "pipe",
           cwd: repoRoot(),
           env: envFull,
-        })`nix build --impure .#graph-generator-pure --accept-flake-config --print-out-paths`;
+        })`nix build --impure --no-write-lock-file .#graph-generator-pure --accept-flake-config --print-out-paths`;
         const purePath =
           String(pureOut || "")
             .trim()
@@ -643,7 +646,10 @@ async function main() {
       stdio: "inherit",
       cwd: repoRoot(),
       env: runEnvImp,
-    })`bash --noprofile --norc -c ${`${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/export-graph.ts")} --out ${path.join(repoRoot(), "tools/buck/graph.json")}`}`;
+    })`bash --noprofile --norc -c ${`${nodeBin} ${nodeBase} ${path.join(
+      repoRoot(),
+      "tools/buck/export-graph.ts",
+    )} --out ${path.join(repoRoot(), DEFAULT_GRAPH_PATH)}`}`;
   }
 
   // Now run Buck
@@ -675,7 +681,7 @@ async function main() {
       (t) => (t.includes(":") || t.startsWith("//")) && !t.includes("..."),
     );
     if (specific.length > 0) {
-      const graphPath = path.join(repoRoot(), "tools/buck/graph.json");
+      const graphPath = path.join(repoRoot(), DEFAULT_GRAPH_PATH);
       console.log("Impure selected binaries:");
       for (const sel of specific) {
         try {
@@ -723,13 +729,13 @@ async function main() {
         const env = {
           ...process.env,
           BUCK_TEST_SRC: repoRoot(),
-          BUCK_GRAPH_JSON: path.join(repoRoot(), "tools/buck/graph.json"),
+          BUCK_GRAPH_JSON: path.join(repoRoot(), DEFAULT_GRAPH_PATH),
         } as any;
         await $({
           stdio: "inherit",
           cwd: repoRoot(),
           env,
-        })`nix build --impure .#graph-generator --accept-flake-config --out-link ${linkNameImp}`;
+        })`nix build --impure --no-write-lock-file .#graph-generator --accept-flake-config --out-link ${linkNameImp}`;
         const manifestPath = path.resolve(linkNameImp, "manifest.json");
         const txt = await fsp.readFile(manifestPath, "utf8").catch(() => "");
         if (txt) {
@@ -761,6 +767,13 @@ async function main() {
     }
   }
 
+  // Ensure temporary flake.lock updates from Nix invocations don't leave the tree dirty
+  try {
+    await $({
+      stdio: "pipe",
+      cwd: repoRoot(),
+    })`git restore --worktree --staged flake.lock`.nothrow();
+  } catch {}
   process.exit(0);
 }
 
