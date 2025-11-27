@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "go_binary", "go_library", "go_test", "genrule")
-load("//lang:defs_common.bzl", "dedupe_preserve", "normalize_labels", "stamp_labels", "append_patch_srcs", "providers_for")
+load("//lang:defs_common.bzl", "dedupe_preserve", "normalize_labels", "stamp_labels", "append_patch_srcs", "realize_provider_edges")
 load("//lang:defs_common.bzl", "stamp_wasm_variant")
 load("//lang:defs_common.bzl", "append_nixpkg_labels")
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
@@ -52,7 +52,7 @@ def nix_go_library(name, **kwargs):
     deps = kwargs.pop("deps", [])
     _apply_cgo_labels(kwargs, nix_cgo_deps, repo_cgo_deps)
     extra = normalize_labels(pkg, kwargs.pop("extra_module_providers", []))
-    merged = dedupe_preserve(_merge_cgo_deps(deps, nix_cgo_deps, repo_cgo_deps) + providers_for(MODULE_PROVIDERS, name) + extra)
+    merged = realize_provider_edges(MODULE_PROVIDERS, name, base = (_merge_cgo_deps(deps, nix_cgo_deps, repo_cgo_deps) + extra))
     # Forward importpath to underlying rule if present; Buck's go_library understands it
     if "_go_toolchain" not in kwargs:
         kwargs["_go_toolchain"] = "@repo_toolchains//:go"
@@ -96,7 +96,7 @@ def nix_go_binary(name, **kwargs):
     deps = kwargs.pop("deps", [])
     _apply_cgo_labels(kwargs, nix_cgo_deps, repo_cgo_deps)
     extra = normalize_labels(pkg, kwargs.pop("extra_module_providers", []))
-    merged = dedupe_preserve(_merge_cgo_deps(deps, nix_cgo_deps, repo_cgo_deps) + providers_for(MODULE_PROVIDERS, name) + extra)
+    merged = realize_provider_edges(MODULE_PROVIDERS, name, base = (_merge_cgo_deps(deps, nix_cgo_deps, repo_cgo_deps) + extra))
     if "_go_toolchain" not in kwargs:
         kwargs["_go_toolchain"] = "@repo_toolchains//:go"
     if "_cxx_toolchain" not in kwargs:
@@ -152,7 +152,7 @@ def nix_go_test(name, **kwargs):
     deps = kwargs.pop("deps", [])
     extra = normalize_labels(pkg, kwargs.pop("extra_module_providers", []))
     _apply_cgo_labels(kwargs, nix_cgo_deps, repo_cgo_deps)
-    merged = dedupe_preserve(_merge_cgo_deps(deps, nix_cgo_deps, repo_cgo_deps) + providers_for(MODULE_PROVIDERS, name) + extra)
+    merged = realize_provider_edges(MODULE_PROVIDERS, name, base = (_merge_cgo_deps(deps, nix_cgo_deps, repo_cgo_deps) + extra))
 
     # If a library is provided, ensure we don't pass the same target in deps.
     lib = kwargs.get("library")
@@ -199,7 +199,7 @@ def nix_go_carchive(name, **kwargs):
     # Realize edges to provider nodes by merging them into srcs; genrule does not
     # accept a `deps` parameter in Buck2.
     srcs = kwargs.get("srcs", []) or []
-    merged_srcs = dedupe_preserve(srcs + deps + providers_for(MODULE_PROVIDERS, name))
+    merged_srcs = realize_provider_edges(MODULE_PROVIDERS, name, into = "srcs", base = (srcs + deps))
     genrule(
         name = name,
         srcs = merged_srcs,
@@ -224,7 +224,7 @@ def nix_go_tiny_wasm_lib(name, **kwargs):
     deps = kwargs.pop("deps", [])
     srcs = kwargs.get("srcs", []) or []
     extra = normalize_labels(pkg, kwargs.pop("extra_module_providers", []))
-    merged_srcs = dedupe_preserve(srcs + deps + providers_for(MODULE_PROVIDERS, name) + extra)
+    merged_srcs = realize_provider_edges(MODULE_PROVIDERS, name, into = "srcs", base = (srcs + deps + extra))
     # Graph-facing shim that copies from the Nix out path produced by planner
     go_nix_build_wasm(
         name = name,

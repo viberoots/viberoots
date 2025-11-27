@@ -10,12 +10,15 @@ function assert(cond: boolean, msg: string) {
   if (!cond) throw new Error(msg);
 }
 
-test("macros use providers_for() and avoid direct provider labels", async () => {
+test("macros use realize_provider_edges() and avoid direct provider labels", async () => {
   const files = ["go/defs.bzl", "cpp/defs.bzl"];
   for (const f of files) {
     const txt = await read(f);
-    // Must use providers_for() helper
-    assert(txt.includes("providers_for("), `${f} did not call providers_for(...) as expected`);
+    // Must use realize_provider_edges() helper
+    assert(
+      txt.includes("realize_provider_edges("),
+      `${f} did not call realize_provider_edges(...) as expected`,
+    );
     // Should not embed provider FQ labels directly (except allowed load)
     const lines = txt.split(/\r?\n/).filter((l) => l.includes("//third_party/providers:"));
     const offenders = lines.filter(

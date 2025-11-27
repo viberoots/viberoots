@@ -1120,6 +1120,13 @@ export function providerNameForImporter(lockfilePath: string, importer: string):
 
 As of PR‑3 in `quad-alignment-6.md`, the historical `go_module_patch(...)` provider rule has been removed from the repository. Go does not use provider rules; patching is package‑local and driven by `patches/go/*.patch` included in target `srcs`.
 
+### Provider-edge realization helper (PR‑4)
+
+- Use `//lang:defs_common.bzl:realize_provider_edges(MODULE_PROVIDERS, name, into="deps"|"srcs", base)` to append provider edges deterministically.
+- For most macros, merge into `deps`: `deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps)`.
+- For genrule-style shims that don’t accept `deps` (e.g., Node `nix_node_gen`, Go `nix_go_carchive`), merge into `srcs`: `srcs = realize_provider_edges(MODULE_PROVIDERS, name, into = "srcs", base = srcs + deps)`.
+- This replaces ad‑hoc `providers_for(...) + dedupe_preserve(...)` patterns and keeps behavior stable across languages.
+
 ### `//go/defs.bzl` macros (copy‑pasteable)
 
 ```starlark

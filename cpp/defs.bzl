@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "cxx_library", "cxx_binary", "cxx_test")
-load("//lang:defs_common.bzl", "stamp_labels", "append_nixpkg_labels", "append_patch_srcs", "providers_for", "dedupe_preserve", "stamp_wasm_variant")
+load("//lang:defs_common.bzl", "stamp_labels", "append_nixpkg_labels", "append_patch_srcs", "dedupe_preserve", "stamp_wasm_variant", "realize_provider_edges")
 load("//lang:global_inputs.bzl", "global_nix_inputs")
 load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name", _cpp_sanitize_probe="cpp_sanitize_probe")
 load("//cpp/private:planner_stub.bzl", "cpp_planner_stub")
@@ -21,7 +21,7 @@ def nix_cpp_library(name, **kwargs):
     srcs = kwargs.get("srcs", []) or []
     append_nixpkg_labels(kwargs, nix_cxx_attrs)
     # Realize provider edges for diagnostics/introspection (graph-only)
-    deps = dedupe_preserve(deps + providers_for(MODULE_PROVIDERS, name))
+    deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps)
     cpp_nix_build(
         name = name,
         out = sanitize_to_bin_name("//%s:%s" % (native.package_name(), name)) + ".a",
@@ -50,7 +50,7 @@ def nix_cpp_wasm_static_lib(name, **kwargs):
     append_patch_srcs(kwargs, local_patch_dirs)
     srcs = kwargs.get("srcs", []) or []
     append_nixpkg_labels(kwargs, nix_cxx_attrs)
-    deps = dedupe_preserve(deps + providers_for(MODULE_PROVIDERS, name))
+    deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps)
     cpp_nix_build(
         name = name,
         out = sanitize_to_bin_name("//%s:%s" % (native.package_name(), name)) + ".a",
@@ -102,7 +102,7 @@ def nix_cpp_binary(name, **kwargs):
     srcs = kwargs.get("srcs", []) or []
     append_nixpkg_labels(kwargs, nix_cxx_attrs)
     # Realize provider edges for diagnostics/introspection (graph-only)
-    deps = dedupe_preserve(deps + providers_for(MODULE_PROVIDERS, name))
+    deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps)
     cpp_nix_build(
         name = name,
         out = sanitize_to_bin_name("//%s:%s" % (native.package_name(), name)),
@@ -185,7 +185,7 @@ def nix_cpp_node_addon(name, **kwargs):
     append_patch_srcs(kwargs, local_patch_dirs)
     srcs = kwargs.get("srcs", []) or []
     append_nixpkg_labels(kwargs, nix_cxx_attrs)
-    deps = dedupe_preserve(deps + providers_for(MODULE_PROVIDERS, name))
+    deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps)
     cpp_nix_build(
         name = name,
         out = sanitize_to_bin_name("//%s:%s" % (native.package_name(), name)) + ".node",

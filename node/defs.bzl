@@ -1,6 +1,6 @@
 load("@prelude//:rules.bzl", "genrule")
 load("//lang:global_inputs.bzl", "global_nix_inputs")
-load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve", "append_patch_srcs", "providers_for", "include_importer_patches_from_labels", "importer_from_labels", "ensure_single_lockfile_label")
+load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve", "append_patch_srcs", "include_importer_patches_from_labels", "importer_from_labels", "ensure_single_lockfile_label", "realize_provider_edges")
 load("//lang:sanitize.bzl", "sanitize_name")
 load("//node/private:nix_test.bzl", "node_nix_test")
 
@@ -23,7 +23,7 @@ def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = []
     kwargs["srcs"] = merged_srcs
     include_importer_patches_from_labels(kwargs, "node")
     merged_srcs = kwargs.get("srcs", [])
-    merged_srcs = dedupe_preserve(merged_srcs + deps + providers_for(MODULE_PROVIDERS, name))
+    merged_srcs = realize_provider_edges(MODULE_PROVIDERS, name, into = "srcs", base = (merged_srcs + deps))
     kwargs["srcs"] = merged_srcs
     if out != None:
         kwargs["out"] = out
@@ -70,7 +70,7 @@ def nix_node_test(
         env = (env or {}),
         timeout_sec = timeout_sec,
         srcs = merged_srcs,
-        deps = deps + providers_for(MODULE_PROVIDERS, name),
+        deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps),
         labels = kw.get("labels", []),
         out = (out if out != None else (name + ".stamp")),
         **kwargs

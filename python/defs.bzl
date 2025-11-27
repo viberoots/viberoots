@@ -1,10 +1,6 @@
 load("@prelude//:rules.bzl", "python_binary", "python_library", "python_test", "genrule")
-load("//lang:defs_common.bzl", "stamp_labels", "ensure_single_lockfile_label", "append_nixpkg_labels", "providers_for", "include_importer_patches_from_labels", "dedupe_preserve", "stamp_wasm_variant")
+load("//lang:defs_common.bzl", "stamp_labels", "ensure_single_lockfile_label", "append_nixpkg_labels", "include_importer_patches_from_labels", "dedupe_preserve", "stamp_wasm_variant", "realize_provider_edges")
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
-
-def _providers_for(name):
-    # Generated mapping of target -> providers from auto_map.bzl
-    return providers_for(MODULE_PROVIDERS, name)
 
 def nix_python_library(name, lockfile_label = None, nix_native_deps = [], deps = [], **kwargs):
     """
@@ -19,7 +15,7 @@ def nix_python_library(name, lockfile_label = None, nix_native_deps = [], deps =
     append_nixpkg_labels(kwargs, nix_native_deps)
     # Include importer-local patches in srcs so Buck invalidates precisely on patch changes
     include_importer_patches_from_labels(kwargs, "python")
-    deps = deps + _providers_for(name)
+    deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps)
     python_library(name = name, deps = deps, **kwargs)
 
 def nix_python_binary(name, lockfile_label = None, nix_native_deps = [], deps = [], **kwargs):
@@ -33,7 +29,7 @@ def nix_python_binary(name, lockfile_label = None, nix_native_deps = [], deps = 
     if "srcs" in kwargs:
         kwargs.pop("srcs")
     include_importer_patches_from_labels(kwargs, "python")
-    deps = deps + _providers_for(name)
+    deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps)
     python_binary(name = name, deps = deps, **kwargs)
 
 def nix_python_test(name, lockfile_label = None, nix_native_deps = [], deps = [], **kwargs):
@@ -44,7 +40,7 @@ def nix_python_test(name, lockfile_label = None, nix_native_deps = [], deps = []
     ensure_single_lockfile_label(kwargs, lockfile_label)
     append_nixpkg_labels(kwargs, nix_native_deps)
     include_importer_patches_from_labels(kwargs, "python")
-    deps = deps + _providers_for(name)
+    deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps)
     python_test(name = name, deps = deps, **kwargs)
 
 # WASM (WASI) convenience macros — stamp kind:wasm so planner routes to pyWasm* templates
@@ -59,10 +55,9 @@ def nix_python_wasm_app(name, lockfile_label = None, nix_native_deps = [], deps 
     ensure_single_lockfile_label(kwargs, lockfile_label)
     append_nixpkg_labels(kwargs, nix_native_deps)
     include_importer_patches_from_labels(kwargs, "python")
-    provs = _providers_for(name)
     srcs = kwargs.get("srcs", []) or []
     # Expose true dependency edges so planner sees overlays via depsOf
-    deps = dedupe_preserve((deps or []) + provs)
+    deps = realize_provider_edges(MODULE_PROVIDERS, name, base = (deps or []))
     kwargs["srcs"] = srcs
     python_library(name = name, deps = deps, **kwargs)
 
@@ -77,9 +72,8 @@ def nix_python_wasm_lib(name, lockfile_label = None, nix_native_deps = [], deps 
     ensure_single_lockfile_label(kwargs, lockfile_label)
     append_nixpkg_labels(kwargs, nix_native_deps)
     include_importer_patches_from_labels(kwargs, "python")
-    provs = _providers_for(name)
     srcs = kwargs.get("srcs", []) or []
-    deps = dedupe_preserve((deps or []) + provs)
+    deps = realize_provider_edges(MODULE_PROVIDERS, name, base = (deps or []))
     kwargs["srcs"] = srcs
     python_library(name = name, deps = deps, **kwargs)
 

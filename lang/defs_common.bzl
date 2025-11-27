@@ -264,6 +264,18 @@ def providers_for(MODULE_PROVIDERS, name):
     return out
 
 
+# PR-4: Centralized helper to realize provider edges deterministically
+def realize_provider_edges(MODULE_PROVIDERS, name, into = "deps", base = None):
+    """
+    Return a deduped list composed of base (if any) plus provider targets for //pkg:name.
+    - into: "deps" | "srcs" (semantic only; returns a list to assign to that field)
+    - base: existing list to merge with provider edges (defaults to [])
+    """
+    base_list = base if isinstance(base, list) else []
+    provs = providers_for(MODULE_PROVIDERS, name)
+    return dedupe_preserve(base_list + provs)
+
+
 # Test-only: probe importer_from_labels by materializing it into an output file
 def _importer_from_labels_probe_impl(ctx):
     kw = { "labels": [] }
