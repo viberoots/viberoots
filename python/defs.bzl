@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "python_binary", "python_library", "python_test", "genrule")
-load("//lang:defs_common.bzl", "stamp_labels", "ensure_single_lockfile_label", "append_nixpkg_labels", "providers_for", "include_importer_patches_from_labels", "dedupe_preserve")
+load("//lang:defs_common.bzl", "stamp_labels", "ensure_single_lockfile_label", "append_nixpkg_labels", "providers_for", "include_importer_patches_from_labels", "dedupe_preserve", "stamp_wasm_variant")
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
 
 def _providers_for(name):
@@ -52,8 +52,10 @@ def nix_python_wasm_app(name, lockfile_label = None, nix_native_deps = [], deps 
     """
     WASI app stamp: uses python_* rules for Buck semantics but marks kind:wasm for the planner.
     """
-    labels = dedupe_preserve((labels or []) + ["lang:python", "kind:wasm"])
-    kwargs["labels"] = labels
+    # Preserve caller-provided labels then stamp uniform WASM variant (wasi)
+    kwargs["labels"] = dedupe_preserve((labels or []) + (kwargs.get("labels", []) or []))
+    stamp_wasm_variant(kwargs, "python", "wasi")
+    labels = kwargs.get("labels", []) or []
     ensure_single_lockfile_label(kwargs, lockfile_label)
     append_nixpkg_labels(kwargs, nix_native_deps)
     include_importer_patches_from_labels(kwargs, "python")
@@ -68,8 +70,10 @@ def nix_python_wasm_lib(name, lockfile_label = None, nix_native_deps = [], deps 
     """
     WASI lib stamp: emits a reusable overlay (planner builds via pyWasmLib).
     """
-    labels = dedupe_preserve((labels or []) + ["lang:python", "kind:wasm"])
-    kwargs["labels"] = labels
+    # Preserve caller-provided labels then stamp uniform WASM variant (wasi)
+    kwargs["labels"] = dedupe_preserve((labels or []) + (kwargs.get("labels", []) or []))
+    stamp_wasm_variant(kwargs, "python", "wasi")
+    labels = kwargs.get("labels", []) or []
     ensure_single_lockfile_label(kwargs, lockfile_label)
     append_nixpkg_labels(kwargs, nix_native_deps)
     include_importer_patches_from_labels(kwargs, "python")

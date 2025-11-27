@@ -127,6 +127,51 @@ def stamp_labels(kwargs, lang, kind=None):
     kwargs["labels"] = dedupe_preserve(labels + stamps)
 
 
+def stamp_wasm_variant(kwargs, lang, variant):
+    """
+    Append deterministic WASM labels:
+      - lang:<lang>
+      - kind:wasm
+      - wasm:<variant>
+    """
+    if not isinstance(lang, str) or lang == "":
+        return
+    if not isinstance(variant, str) or variant == "":
+        return
+    labels = kwargs.get("labels", []) or []
+    stamps = ["lang:%s" % lang, "kind:wasm", "wasm:%s" % variant]
+    kwargs["labels"] = dedupe_preserve(labels + stamps)
+
+def _labels_file_impl(ctx):
+    out = ctx.actions.declare_output(ctx.attrs.out)
+    # Write one label per line for simple assertions
+    ctx.actions.write(out, "\n".join(ctx.attrs.labels) + "\n")
+    return [DefaultInfo(default_output = out)]
+
+_labels_file = rule(
+    impl = _labels_file_impl,
+    attrs = {
+        "labels": attrs.list(attrs.string(), default = []),
+        "out": attrs.string(),
+    },
+)
+
+def wasm_labels_probe(name, lang, variant, labels = []):
+    """
+    Test-only probe: stamps WASM labels and materializes them into an output file.
+    Usage:
+      wasm_labels_probe(name = "x", lang = "cpp", variant = "emscripten")
+    Produces: x.labels.txt with each label on its own line.
+    """
+    kw = { "labels": (labels or []) }
+    stamp_wasm_variant(kw, lang, variant)
+    _labels_file(
+        name = name,
+        labels = kw.get("labels", []),
+        out = name + ".labels.txt",
+    )
+
+
 def normalize_nix_attr(attr):
     """
     Normalize a nixpkgs attribute path for provider naming and labeling.

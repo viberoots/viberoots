@@ -1,5 +1,6 @@
 load("@prelude//:rules.bzl", "go_binary", "go_library", "go_test", "genrule")
 load("//lang:defs_common.bzl", "dedupe_preserve", "normalize_labels", "stamp_labels", "append_patch_srcs", "providers_for")
+load("//lang:defs_common.bzl", "stamp_wasm_variant")
 load("//lang:defs_common.bzl", "append_nixpkg_labels")
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
 load("//go/private:nix_build_wasm.bzl", "go_nix_build_wasm")
@@ -216,9 +217,9 @@ def nix_go_tiny_wasm_lib(name, **kwargs):
     Stamps language/kind labels for adapter detection and uses a thin rule that
     invokes the planner-selected build, copying `$out/lib/top.wasm` to this rule's output.
     """
-    # Stamp language/kind labels for planner detection
+    # Uniform WASM labeling across languages (variant=tinygo)
+    stamp_wasm_variant(kwargs, "go", "tinygo")
     labels = kwargs.get("labels", []) or []
-    labels = dedupe_preserve(labels + ["lang:go", "kind:wasm"])
     pkg = native.package_name()
     deps = kwargs.pop("deps", [])
     srcs = kwargs.get("srcs", []) or []

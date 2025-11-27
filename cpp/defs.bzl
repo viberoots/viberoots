@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "cxx_library", "cxx_binary", "cxx_test")
-load("//lang:defs_common.bzl", "stamp_labels", "append_nixpkg_labels", "append_patch_srcs", "providers_for", "dedupe_preserve")
+load("//lang:defs_common.bzl", "stamp_labels", "append_nixpkg_labels", "append_patch_srcs", "providers_for", "dedupe_preserve", "stamp_wasm_variant")
 load("//lang:global_inputs.bzl", "global_nix_inputs")
 load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name", _cpp_sanitize_probe="cpp_sanitize_probe")
 load("//cpp/private:planner_stub.bzl", "cpp_planner_stub")
@@ -45,10 +45,8 @@ def nix_cpp_wasm_static_lib(name, **kwargs):
     nix_cxx_attrs = kwargs.pop("nix_cxx_attrs", [])
     deps = kwargs.pop("deps", [])
     nix_inputs = global_nix_inputs()
-    stamp_labels(kwargs, "cpp", "lib")
-    # Add a flavor tag so the planner routes to the wasm template
-    _labels = (kwargs.get("labels", []) or []) + ["flavor:wasm"]
-    kwargs["labels"] = dedupe_preserve(_labels)
+    # Uniform WASM labeling across languages
+    stamp_wasm_variant(kwargs, "cpp", "static")
     append_patch_srcs(kwargs, local_patch_dirs)
     srcs = kwargs.get("srcs", []) or []
     append_nixpkg_labels(kwargs, nix_cxx_attrs)
@@ -81,9 +79,9 @@ def nix_cpp_wasm_emscripten_lib(name, **kwargs):
       Nix flake attributes (e.g., graph-generator-selected).
     """
     deps = kwargs.pop("deps", [])
+    # Stamp language/kind and wasm variant for planner routing
+    stamp_wasm_variant(kwargs, "cpp", "emscripten")
     labels = kwargs.get("labels", []) or []
-    # Stamp language/kind and emscripten flavor for the planner adapter to route
-    labels = dedupe_preserve(labels + ["lang:cpp", "kind:lib", "wasm:emscripten"])
     # Use a minimal planner stub that exposes graph edges and labels
     cpp_planner_stub(
         name = name,

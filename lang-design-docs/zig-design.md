@@ -145,7 +145,8 @@ Behavior:
 ### Starlark macro
 
 - `//third_party/providers/defs_zig.bzl`:
-  - `zig_package_patch(name, module_key, patch_path)` implemented as a content-addressed `genrule` stamp (identical pattern to Go’s `go_module_patch`).
+  - `zig_package_patch(name, module_key, patch_path)` implemented as a content-addressed `genrule` stamp.
+  - Note: Go does not use provider rules; its patching is package‑local and driven via `srcs` (see build-system-design.md). Zig uses provider stamps as described here.
   - Visibility public; output `<name>.stamp`.
 
 ### Generator (zx)
