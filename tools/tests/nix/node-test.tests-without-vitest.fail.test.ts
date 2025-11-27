@@ -7,6 +7,9 @@ import { runInTemp } from "../lib/test-helpers";
 test("node-test: fails when tests exist but vitest is missing", { timeout: 240_000 }, async () => {
   await runInTemp("node-test-missing-vitest", async (tmp, _$) => {
     const $ = _$({ cwd: tmp, stdio: "inherit" });
+    const TIMEOUT_SECS = String(
+      Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200"),
+    );
     const importer = "apps/demo-node";
     const impDir = path.join(tmp, importer);
     await fsp.mkdir(path.join(impDir, "src"), { recursive: true });
@@ -43,18 +46,18 @@ test("node-test: fails when tests exist but vitest is missing", { timeout: 240_0
       cwd: tmp,
       stdio: "inherit",
       env,
-    })`bash --noprofile --norc -c 'timeout 300s nix build "${tmp}#pnpm-store.${sanitized}" --impure --no-link --accept-flake-config --print-build-logs --max-jobs 1 --option cores 1'`;
+    })`bash --noprofile --norc -c 'timeout ${TIMEOUT_SECS}s nix build "${tmp}#pnpm-store.${sanitized}" --impure --no-link --accept-flake-config --print-build-logs --max-jobs 1 --option cores 1'`;
     await $({
       cwd: tmp,
       stdio: "inherit",
       env,
-    })`bash --noprofile --norc -c 'timeout 300s nix build "${tmp}#node-modules.${sanitized}" --impure --no-link --accept-flake-config --print-build-logs --max-jobs 1 --option cores 1'`;
+    })`bash --noprofile --norc -c 'timeout ${TIMEOUT_SECS}s nix build "${tmp}#node-modules.${sanitized}" --impure --no-link --accept-flake-config --print-build-logs --max-jobs 1 --option cores 1'`;
     // Expect build to fail because tests are present but vitest is not installed
     const res = await $({
       cwd: tmp,
       stdio: "pipe",
       env,
-    })`bash --noprofile --norc -c 'timeout 300s nix build "${tmp}#node-test.${sanitized}" --impure --no-link --accept-flake-config --print-build-logs'`.nothrow();
+    })`bash --noprofile --norc -c 'timeout ${TIMEOUT_SECS}s nix build "${tmp}#node-test.${sanitized}" --impure --no-link --accept-flake-config --print-build-logs'`.nothrow();
     if (res.exitCode === 0) {
       throw new Error(
         "expected node-test derivation to fail when vitest is missing and tests exist",

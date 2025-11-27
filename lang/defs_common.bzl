@@ -2,11 +2,11 @@ def normalize_labels(pkg, labels):
     if labels == None:
         return []
     if not isinstance(labels, list):
-        fail("extra_module_providers must be a list of string labels")
+        fail("labels must be a list of string labels")
     out = []
     for l in labels:
         if not isinstance(l, str):
-            fail("extra_module_providers must be a list of string labels")
+            fail("labels must be a list of string labels")
         if l.startswith(":"):
             out.append("//%s:%s" % (pkg, l[1:]))
         else:

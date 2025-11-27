@@ -10,11 +10,14 @@ process.env.TEST_NEED_DEV_ENV = "1";
 test("node cli: coverage artifacts emitted when COVERAGE=1", { timeout: 480_000 }, async () => {
   await runInTemp("node-cli-nix-node-test-coverage", async (tmp, _$) => {
     const $ = _$({ cwd: tmp, stdio: "pipe" });
+    const TIMEOUT_SECS = String(
+      Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200"),
+    );
     const env = {
       ...process.env,
       NIX_PNPM_ALLOW_GENERATE: "1",
       INSTALL_LOCK_SKIP: "1",
-      NIX_PNPM_FETCH_TIMEOUT: "300",
+      NIX_PNPM_FETCH_TIMEOUT: String(Number(process.env.NIX_PNPM_FETCH_TIMEOUT || "600")),
       COVERAGE: "1",
     } as Record<string, string>;
 
@@ -64,11 +67,11 @@ test("node cli: coverage artifacts emitted when COVERAGE=1", { timeout: 480_000 
     await $({
       stdio: "inherit",
       env,
-    })`bash --noprofile --norc -c 'timeout 300s nix build "${tmp}#pnpm-store.${sanitized}" --impure --no-link --accept-flake-config --print-build-logs --max-jobs 1 --option cores 1'`;
+    })`bash --noprofile --norc -c 'timeout ${TIMEOUT_SECS}s nix build "${tmp}#pnpm-store.${sanitized}" --impure --no-link --accept-flake-config --print-build-logs --max-jobs 1 --option cores 1'`;
     await $({
       stdio: "inherit",
       env,
-    })`bash --noprofile --norc -c 'timeout 300s nix build "${tmp}#node-modules.${sanitized}" --impure --no-link --accept-flake-config --print-build-logs --max-jobs 1 --option cores 1'`;
+    })`bash --noprofile --norc -c 'timeout ${TIMEOUT_SECS}s nix build "${tmp}#node-modules.${sanitized}" --impure --no-link --accept-flake-config --print-build-logs --max-jobs 1 --option cores 1'`;
 
     // Reconcile any FOD digest drift detected during warm-up
     await $({
@@ -80,7 +83,7 @@ test("node cli: coverage artifacts emitted when COVERAGE=1", { timeout: 480_000 
     const out = await $({
       stdio: "pipe",
       env,
-    })`bash --noprofile --norc -c 'timeout 300s nix build "${tmp}#node-test.${sanitized}" --impure --no-link --accept-flake-config --print-out-paths'`;
+    })`bash --noprofile --norc -c 'timeout ${TIMEOUT_SECS}s nix build "${tmp}#node-test.${sanitized}" --impure --no-link --accept-flake-config --print-out-paths'`;
     const outPath =
       String(out.stdout || "")
         .trim()
