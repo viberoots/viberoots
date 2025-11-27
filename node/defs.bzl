@@ -147,7 +147,8 @@ def nix_node_cli_bin(
 
     Notes:
     - Exactly one importer-scoped lockfile label must be present (lockfile:<path>#<importer>).
-    - When bundle=True, `importer` must be provided (used to select the Nix package attribute).
+    - When bundle=True, the importer is derived from the single lockfile label via shared helpers
+      (importer_from_labels); no explicit `importer` argument is required.
     """
     if entry == None:
         entry = "bin/%s" % name
