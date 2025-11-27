@@ -99,22 +99,17 @@ def node_webapp(
     - `importer` is optional; if omitted, derive from the lockfile label's importer suffix.
     - Uses a zx shim to run `nix build .#node-webapp.<importer>` and copies dist/.
     """
-    # Determine importer if not provided
-    if importer == None:
-        labs = labels or []
-        for l in labs:
-            if isinstance(l, str) and l.startswith("lockfile:") and "#" in l:
-                importer = l.split("#")[1]
-                break
-    if importer == None or importer == "":
-        fail("node_webapp: importer could not be inferred. Pass importer=\"apps/<name>\" or include lockfile:<path>#<importer> in labels.")
+    # Enforce a single importer-scoped lockfile label and derive the importer via shared helpers
+    kw = { "labels": (labels or []) }
+    ensure_single_lockfile_label(kw, lockfile_label)
+    _importer = importer_from_labels(kw)
 
     # Shim: build via Nix and copy dist/* into $OUT (single directory output)
     # Use escaped command substitutions: $$(...) so Buck doesn't parse $(...) as a target pattern.
     cmd = (
         "set -euo pipefail; "
         + "tmp=$$(mktemp -d); trap 'rm -rf \"$$tmp\"' EXIT; "
-        + "nix build .#node-webapp.%s --accept-flake-config --out-link \"$$tmp/out\"; " % _sanitize_importer_attr(importer)
+        + "nix build .#node-webapp.%s --accept-flake-config --out-link \"$$tmp/out\"; " % _sanitize_importer_attr(_importer)
         + "outPath=$$(readlink -f \"$$tmp/out\"); "
         + "if [ -d \"$$outPath/dist\" ]; then cp -R \"$$outPath/dist\" $$OUT; else echo 'dist missing' >&2; exit 2; fi"
     )
@@ -176,19 +171,10 @@ def nix_node_cli_bin(
         return
 
     # Bundled mode: build a single-file shebanged bundle via the scaffolded importer's flake
-    if importer == None or importer == "":
-        # Try to infer importer from the lockfile label present in labels
-        labs = labels or []
-        for l in labs:
-            if isinstance(l, str) and l.startswith("lockfile:") and "#" in l:
-                importer = l.split("#")[1]
-                break
-    if importer == None or importer == "":
-        # Fallback: infer from explicit lockfile_label attribute
-        if lockfile_label != None and isinstance(lockfile_label, str) and "#" in lockfile_label:
-            importer = lockfile_label.split("#")[1]
-    if importer == None or importer == "":
-        fail("nix_node_cli_bin(bundle=True): importer is required (e.g., importer=\"apps/<name>\")")
+    # Enforce a single importer-scoped lockfile label and derive the importer via shared helpers
+    kw = { "labels": (labels or []) }
+    ensure_single_lockfile_label(kw, lockfile_label)
+    _importer = importer_from_labels(kw)
 
     def _basename_importer(s):
         # crude basename: split by '/' and take last non-empty
@@ -200,13 +186,13 @@ def nix_node_cli_bin(
         "set -uo pipefail; "
         + "tmp=`mktemp -d`; trap 'rm -rf \"$tmp\"' EXIT; "
         + "failed=0; "
-        + ("nix build .#node-cli.%s --accept-flake-config --out-link \"$tmp/out\" >/dev/null 2>&1 || failed=1; " % _sanitize_importer_attr(importer))
+        + ("nix build .#node-cli.%s --accept-flake-config --out-link \"$tmp/out\" >/dev/null 2>&1 || failed=1; " % _sanitize_importer_attr(_importer))
         + "if [ \"$failed\" -eq 0 ]; then "
         + "  outPath=`readlink \"$tmp/out\"`; "
-        + ("  cp \"$outPath/%s.bundle.js\" \"$OUT\"; " % _basename_importer(importer))
+        + ("  cp \"$outPath/%s.bundle.js\" \"$OUT\"; " % _basename_importer(_importer))
         + "  chmod +x \"$OUT\"; "
         + "else "
-        + ("  cat > \"$OUT\" <<'EOF'\n#!/usr/bin/env node\nconsole.log(\"%s: usage\\n  --help  Show help\");\nEOF\n" % _basename_importer(importer))
+        + ("  cat > \"$OUT\" <<'EOF'\n#!/usr/bin/env node\nconsole.log(\"%s: usage\\n  --help  Show help\");\nEOF\n" % _basename_importer(_importer))
         + "  chmod +x \"$OUT\"; "
         + "fi"
     )
