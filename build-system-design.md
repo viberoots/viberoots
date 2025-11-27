@@ -81,6 +81,7 @@ extra-experimental-features = nix-command flakes dynamic-derivations ca-derivati
 1. **Idempotent patches:** Re-applying the **same** patch must **not** cause rebuilds.
 1. **Sanitization (names/attrs):** All Starlark macros should use `//lang:sanitize.bzl:sanitize_name` for artifact and attribute names. If a language needs extra semantics, keep a tiny wrapper that delegates to `sanitize_name` for the common portion to avoid drift. The Nix side mirrors this transform.
 1. **Global inputs policy (PR‑5):** Treat repository‑level global inputs (e.g., `flake.lock`) primarily at the builder/Nix level. Macros must not hardcode `//:flake.lock`; when a macro‑level stamp is justified, use the centralized helper `//lang:global_inputs.bzl:global_nix_inputs()` to avoid per‑language drift.
+   - Node alignment (PR‑2): We stamp `global_nix_inputs()` only in Node macros that directly call Nix (`node_webapp`, `nix_node_cli_bin(bundle=True)`). Non‑Nix macros remain unstamped at the macro level.
 1. **Scaffolding:** When you add new target types, **update/augment** the existing scaffolding tools in `tools/` (don’t invent new scaffolding).
 1. **Platforms:** Everything must work on at least **aarch64-darwin**, **aarch64-linux**, and **x86_64-linux**.
 1. **Glue scripts run outside Nix.** Generators are plain Node tools; do not wrap them in `nix run`.

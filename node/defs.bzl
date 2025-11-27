@@ -1,4 +1,5 @@
 load("@prelude//:rules.bzl", "genrule")
+load("//lang:global_inputs.bzl", "global_nix_inputs")
 load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve", "append_patch_srcs", "providers_for", "include_importer_patches_from_labels", "importer_from_labels", "ensure_single_lockfile_label")
 load("//lang:sanitize.bzl", "sanitize_name")
 load("//node/private:nix_test.bzl", "node_nix_test")
@@ -118,12 +119,15 @@ def node_webapp(
         + "if [ -d \"$$outPath/dist\" ]; then cp -R \"$$outPath/dist\" $$OUT; else echo 'dist missing' >&2; exit 2; fi"
     )
 
+    # Stamp global Nix inputs for macros that call Nix (policy: PR‑5/PR‑2)
+    stamped_labels = dedupe_preserve((labels or []) + global_nix_inputs())
+
     nix_node_gen(
         name = name,
         srcs = [],
         out = out if out != None else "dist",
         cmd = cmd,
-        labels = labels,
+        labels = stamped_labels,
         lockfile_label = lockfile_label,
         kind = "app",
         **kwargs
@@ -207,6 +211,9 @@ def nix_node_cli_bin(
         + "fi"
     )
 
+    # Stamp global Nix inputs when bundling (macro calls Nix)
+    stamped_labels = dedupe_preserve((labels or []) + global_nix_inputs())
+
     nix_node_gen(
         name = name,
         # Include the CLI entry (or default) to ensure source edits invalidate the genrule
@@ -214,7 +221,7 @@ def nix_node_cli_bin(
         out = out,
         cmd = cmd,
         deps = deps,
-        labels = labels,
+        labels = stamped_labels,
         lockfile_label = lockfile_label,
         kind = "bin",
         **kwargs
