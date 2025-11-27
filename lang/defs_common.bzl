@@ -114,31 +114,6 @@ def append_importer_patches(kwargs, importer, lang):
     append_patch_srcs(kwargs, [patch_dir])
 
 
-def normalize_build_tags(tags):
-    s = {}
-    for t in tags or []:
-        if not isinstance(t, str):
-            continue
-        s[t.lower()] = True
-    return sorted(s.keys())
-
-
-def append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled):
-    labels = kwargs.pop("labels", [])
-    extra = []
-    norm_tags = normalize_build_tags(build_tags)
-    if len(norm_tags) > 0:
-        extra.append("gotags:" + ",".join(norm_tags))
-    if isinstance(goos, str) and goos != "":
-        extra.append("goenv:GOOS=" + goos.lower())
-    if isinstance(goarch, str) and goarch != "":
-        extra.append("goenv:GOARCH=" + goarch.lower())
-    if cgo_enabled != None:
-        extra.append("goenv:CGO_ENABLED=" + ("1" if bool(cgo_enabled) else "0"))
-    kwargs["labels"] = labels + extra
-
-
-
 def stamp_labels(kwargs, lang, kind=None):
     """
     Ensure kwargs["labels"] contains the language stamp (e.g., "lang:go")

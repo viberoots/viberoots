@@ -10,8 +10,9 @@ test("go/defs.bzl exports nix_go_* macros and uses shared providers_for", async 
       "def nix_go_library(",
       "def nix_go_binary(",
       "def nix_go_test(",
-      // Ensure we are delegating to the shared helper, not defining a local _providers_for
-      'load("//lang:defs_common.bzl", "append_tuple_labels", "dedupe_preserve", "normalize_labels", "stamp_labels", "normalize_nix_attr", "append_patch_srcs", "providers_for")',
+      // Ensure we are delegating to the shared helpers (providers_for in defs_common, tuple labels in go/private)
+      'load("//lang:defs_common.bzl", "dedupe_preserve", "normalize_labels", "stamp_labels", "append_patch_srcs", "providers_for")',
+      'load("//go/private:labels.bzl", "append_tuple_labels")',
       "providers_for(",
     ];
     for (const needle of need) {

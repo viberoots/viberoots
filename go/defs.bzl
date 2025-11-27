@@ -1,8 +1,9 @@
 load("@prelude//:rules.bzl", "go_binary", "go_library", "go_test", "genrule")
-load("//lang:defs_common.bzl", "append_tuple_labels", "dedupe_preserve", "normalize_labels", "stamp_labels", "normalize_nix_attr", "append_patch_srcs", "providers_for")
+load("//lang:defs_common.bzl", "dedupe_preserve", "normalize_labels", "stamp_labels", "append_patch_srcs", "providers_for")
 load("//lang:defs_common.bzl", "append_nixpkg_labels")
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
 load("//go/private:nix_build_wasm.bzl", "go_nix_build_wasm")
+load("//go/private:labels.bzl", "append_tuple_labels")
 
 def _append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled):
     append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled)
