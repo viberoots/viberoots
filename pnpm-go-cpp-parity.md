@@ -42,13 +42,12 @@ Out of scope: Changing Node to per-package providers or reverting Go to heavy pr
 
 ---
 
-### Design: Minimal, precise Buck invalidation for Go patches
+### Design: Precise Buck invalidation for Go patches (srcs‑driven)
 
-We re-enable Go’s per-module provider mapping only for modules that actually have patches present in `patches/go/*.patch`. This keeps the graph small and precise:
+Update (PR‑3): We do not generate Go providers. Go remains srcs‑driven: package‑local `patches/go/*.patch` are included in target `srcs`, and Buck invalidates precisely based on those inputs. Auto‑mapping remains Node `lockfile:` and C++ `nixpkg:` only.
 
 - Provider generation (Go):
-  - Scan `patches/go/*.patch` and emit one provider `go_module_patch(...)` per `module@version` (deterministic name).
-  - This already exists as an implementation (`tools/buck/providers/go.ts`); we simply wire it back into the orchestrator.
+  - Not used. No Go providers are emitted; Go patching does not rely on provider mapping.
 
 - Provider index (machine-readable):
   - Extend the existing provider index generator to also emit a JSON sidecar with a minimal map (fully qualified provider label → origin key). This allows mapping logic to know which module providers actually exist, avoiding dangling deps.
@@ -57,7 +56,7 @@ We re-enable Go’s per-module provider mapping only for modules that actually h
   - Update mapping to include `module:` → provider only if that module appears in the provider index (i.e., a patch exists). This restores precise invalidation for patched modules and keeps unpatched modules unmapped.
 
 - Prebuild guard:
-  - If any `patches/go/*.patch` exist, require that Go provider autos and the provider index are present and fresh. Keep failure in CI and auto-fix locally.
+  - No Go‑specific provider/index requirements. Guard behavior remains for Node (importers) and C++ (nixpkg) only.
 
 Result: Only targets that carry a `module:<path>@<ver>` label referencing a patched module gain a provider dependency. Unrelated Go targets stay untouched.
 
@@ -81,36 +80,23 @@ This produces consistent day-2 ergonomics across languages.
 
 ### Implementation Plan (ordered, low risk)
 
-Phase 1 — Re-enable Go provider sync and gated mapping
+Phase 1 — No Go provider generation (policy alignment)
 
 1. Orchestrator wiring
-   - Add Go to provider sync orchestration so `sync-providers.ts` regenerates Go providers (in a dedicated auto file or the default auto file). No behavior change when no Go patches exist.
+   - Leave Go out of provider sync. Node and C++ behavior unchanged.
 
-2. Provider index (sidecar JSON)
-   - Extend `gen-provider-index.ts` to emit a JSON sidecar (e.g., `third_party/providers/provider_index.json`) mirroring the BZL mapping for machine use. Include entries for Go (module), Node (lockfile#importer), and C++ (nixpkg attr) where available.
+2. Mapping logic
+   - Do not map `module:` labels to providers. Keep existing Node `lockfile:` and C++ `nixpkg:` handling unchanged.
 
-3. Mapping logic
-   - Update `tools/lib/labels.ts` (or the mapping pipeline) to:
-     - Load the provider index JSON if it exists.
-     - For each `module:<path>@<ver>` label, compute the expected provider label and include it only if the index confirms the provider exists.
-     - Keep existing Node `lockfile:` and C++ `nixpkg:` handling unchanged.
+3. Prebuild guard
+   - No Go‑specific provider/index requirements. CI guard continues to enforce freshness for Node/C++ glue only.
 
-4. Prebuild guard reinforcement
-   - If any Go patches exist, require:
-     - Go provider autos present.
-     - Provider index present and includes entries for those modules.
-   - Continue to fail CI and auto-fix locally by running the glue generation.
-
-5. Tests
-   - Add tests that:
-     - With no Go patches, no module providers are mapped; build succeeds.
-     - With a single Go patch, only targets labeled with that module gain the provider dep.
-     - Unrelated Go targets remain unmapped and stable.
-     - Provider index JSON is produced and used by mapping logic (idempotent, deterministic order).
+4. Tests
+   - Ensure Go builds/tests succeed without any global Go provider artifacts and that patch edits under package‑local `patches/go/` precisely invalidate affected targets.
 
 Acceptance for Phase 1:
 
-- Changing a patched Go module invalidates only impacted Go targets and their test targets.
+- Go targets remain srcs‑driven; changing a Go patch invalidates only impacted targets.
 - No regressions in Node/C++ behaviors.
 
 Phase 2 — Patch UX parity (“remove” for Go/C++)

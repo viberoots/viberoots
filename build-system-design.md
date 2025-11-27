@@ -1112,21 +1112,9 @@ export function providerNameForImporter(lockfilePath: string, importer: string):
 }
 ```
 
-### `//third_party/providers/defs.bzl`
+### Go provider rule removal (PR‑3)
 
-```starlark
-# //third_party/providers/defs.bzl — tiny content-addressed stamp for a patch file
-def go_module_patch(name, module_key, patch_path):
-    genrule(
-        name = name,
-        srcs = [patch_path],
-        out = name + ".stamp",
-        cmd = "if command -v sha256sum >/dev/null; then cat $SRCS | sha256sum > $OUT; else cat $SRCS | shasum -a 256 > $OUT; fi",
-        visibility = ["//visibility:public"],
-    )
-```
-
-> Note: Go provider rules are not used in the current flow; Go invalidation is driven by package‑local patch files included in `srcs`.
+As of PR‑3 in `quad-alignment-6.md`, the historical `go_module_patch(...)` provider rule has been removed from the repository. Go does not use provider rules; patching is package‑local and driven by `patches/go/*.patch` included in target `srcs`.
 
 ### `//go/defs.bzl` macros (copy‑pasteable)
 
