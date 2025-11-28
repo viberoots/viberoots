@@ -114,6 +114,26 @@ def append_importer_patches(kwargs, importer, lang):
     append_patch_srcs(kwargs, [patch_dir])
 
 
+def include_package_local_patches(kwargs, lang, default_dirs = None):
+    """
+    Attach package-local patch directories into kwargs["srcs"] deterministically.
+    - For languages that use package-local patch dirs (e.g., Go/C++).
+    - Delegates to append_patch_srcs(...) and preserves order with deduplication.
+    - If default_dirs is empty or invalid, falls back to ["patches/<lang>"].
+    """
+    if not isinstance(lang, str) or lang == "":
+        return
+    dirs = []
+    if isinstance(default_dirs, list) and len(default_dirs) > 0:
+        # Filter to strings only; ignore invalid entries
+        for d in default_dirs:
+            if isinstance(d, str) and d != "":
+                dirs.append(d)
+    if len(dirs) == 0:
+        dirs = ["patches/%s" % lang]
+    append_patch_srcs(kwargs, dirs)
+
+
 def stamp_labels(kwargs, lang, kind=None):
     """
     Ensure kwargs["labels"] contains the language stamp (e.g., "lang:go")
@@ -308,5 +328,21 @@ def importer_from_labels_probe(name, lockfile_label):
         name = name,
         lockfile_label = lockfile_label,
         out = out,
+    )
+
+
+def package_local_patches_probe(name, lang, dirs = None):
+    """
+    Test-only helper: materialize package-local patch srcs into an output file.
+    Uses include_package_local_patches(...) to populate srcs, then writes each
+    entry on its own line via the labels file rule.
+    Output file name: <name>.srcs.txt
+    """
+    kw = {}
+    include_package_local_patches(kw, lang, dirs)
+    _labels_file(
+        name = name,
+        labels = kw.get("srcs", []) or [],
+        out = name + ".srcs.txt",
     )
 

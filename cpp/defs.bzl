@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "cxx_library", "cxx_binary", "cxx_test")
-load("//lang:defs_common.bzl", "stamp_labels", "append_nixpkg_labels", "append_patch_srcs", "dedupe_preserve", "stamp_wasm_variant", "realize_provider_edges")
+load("//lang:defs_common.bzl", "stamp_labels", "append_nixpkg_labels", "include_package_local_patches", "dedupe_preserve", "stamp_wasm_variant", "realize_provider_edges")
 load("//lang:global_inputs.bzl", "global_nix_inputs")
 load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name", _cpp_sanitize_probe="cpp_sanitize_probe")
 load("//cpp/private:planner_stub.bzl", "cpp_planner_stub")
@@ -17,7 +17,7 @@ def nix_cpp_library(name, **kwargs):
     nix_inputs = global_nix_inputs()
     stamp_labels(kwargs, "cpp", "lib")
     # Include local patch files in rule inputs so Buck invalidates on patch changes
-    append_patch_srcs(kwargs, local_patch_dirs)
+    include_package_local_patches(kwargs, "cpp", local_patch_dirs)
     srcs = kwargs.get("srcs", []) or []
     append_nixpkg_labels(kwargs, nix_cxx_attrs)
     # Realize provider edges for diagnostics/introspection (graph-only)
@@ -47,7 +47,7 @@ def nix_cpp_wasm_static_lib(name, **kwargs):
     nix_inputs = global_nix_inputs()
     # Uniform WASM labeling across languages
     stamp_wasm_variant(kwargs, "cpp", "static")
-    append_patch_srcs(kwargs, local_patch_dirs)
+    include_package_local_patches(kwargs, "cpp", local_patch_dirs)
     srcs = kwargs.get("srcs", []) or []
     append_nixpkg_labels(kwargs, nix_cxx_attrs)
     deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps)
@@ -98,7 +98,7 @@ def nix_cpp_binary(name, **kwargs):
     # Explicit Nix-level inputs that should affect the rule key.
     nix_inputs = global_nix_inputs()
     stamp_labels(kwargs, "cpp", "bin")
-    append_patch_srcs(kwargs, local_patch_dirs)
+    include_package_local_patches(kwargs, "cpp", local_patch_dirs)
     srcs = kwargs.get("srcs", []) or []
     append_nixpkg_labels(kwargs, nix_cxx_attrs)
     # Realize provider edges for diagnostics/introspection (graph-only)
@@ -182,7 +182,7 @@ def nix_cpp_node_addon(name, **kwargs):
         # Encode addon name hint for the planner (non-functional label; reserved prefix)
         _labels = dedupe_preserve(_labels + ["addon_name:%s" % addon_name])
         kwargs["labels"] = _labels
-    append_patch_srcs(kwargs, local_patch_dirs)
+    include_package_local_patches(kwargs, "cpp", local_patch_dirs)
     srcs = kwargs.get("srcs", []) or []
     append_nixpkg_labels(kwargs, nix_cxx_attrs)
     deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps)

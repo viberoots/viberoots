@@ -11,7 +11,7 @@ test("go/defs.bzl exports nix_go_* macros and uses shared realize_provider_edges
       "def nix_go_binary(",
       "def nix_go_test(",
       // Ensure we are delegating to the shared helpers (realize_provider_edges in defs_common, tuple labels in go/private)
-      'load("//lang:defs_common.bzl", "dedupe_preserve", "normalize_labels", "stamp_labels", "append_patch_srcs", "realize_provider_edges")',
+      'load("//lang:defs_common.bzl", "dedupe_preserve", "normalize_labels", "stamp_labels", "include_package_local_patches", "realize_provider_edges")',
       'load("//go/private:labels.bzl", "append_tuple_labels")',
       "realize_provider_edges(",
     ];

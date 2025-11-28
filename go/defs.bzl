@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "go_binary", "go_library", "go_test", "genrule")
-load("//lang:defs_common.bzl", "dedupe_preserve", "normalize_labels", "stamp_labels", "append_patch_srcs", "realize_provider_edges")
+load("//lang:defs_common.bzl", "dedupe_preserve", "normalize_labels", "stamp_labels", "include_package_local_patches", "realize_provider_edges")
 load("//lang:defs_common.bzl", "stamp_wasm_variant")
 load("//lang:defs_common.bzl", "append_nixpkg_labels")
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
@@ -63,7 +63,7 @@ def nix_go_library(name, **kwargs):
         # Prefer override so the target is hermetic regardless of inherited platform
         kwargs["override_cgo_enabled"] = True
     # Include local patch files in srcs so Buck invalidates precisely on patch changes
-    append_patch_srcs(kwargs, local_patch_dirs)
+    include_package_local_patches(kwargs, "go", local_patch_dirs)
     go_library(name = name, deps = merged, **kwargs)
 
     # Auto-wire a go_test target if *_test.go files exist alongside the library.
@@ -112,7 +112,7 @@ def nix_go_binary(name, **kwargs):
     if _srcs_imply_cgo(kwargs) or len(nix_cgo_deps) > 0 or len(repo_cgo_deps) > 0:
         kwargs["override_cgo_enabled"] = True
     # Include local patch files in srcs so Buck invalidates precisely on patch changes
-    append_patch_srcs(kwargs, local_patch_dirs)
+    include_package_local_patches(kwargs, "go", local_patch_dirs)
     go_binary(name = name, deps = merged, **kwargs)
 
     # Auto-wire a go_test target for binaries if *_test.go exists under cmd/<name>/**
