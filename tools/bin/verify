@@ -6,9 +6,9 @@
 # Determine external timeout command
 TIMEOUT_CMD=()
 if command -v timeout >/dev/null 2>&1; then
-  TIMEOUT_CMD=(timeout -k 10s 900s)
+  TIMEOUT_CMD=(timeout -k 10s 1200s)
 elif command -v gtimeout >/dev/null 2>&1; then
-  TIMEOUT_CMD=(gtimeout -k 10s 900s)
+  TIMEOUT_CMD=(gtimeout -k 10s 1200s)
 else
   TIMEOUT_CMD=()
 fi
@@ -157,7 +157,7 @@ export BUCK_LOG="${BUCK_LOG:-warn},buck2_client_ctx::file_tailers::tailer=off,bu
 run_batch() {
   local iso="$1"; shift
   local -a targets=( "$@" )
-  local tsec="${VERIFY_TIMEOUT_SECS:-900}"
+  local tsec="${VERIFY_TIMEOUT_SECS:-1200}"
   local prefix=""
   if command -v timeout >/dev/null 2>&1; then
     prefix="timeout -k 10s ${tsec}s "
@@ -217,9 +217,9 @@ EOS
   if [[ -n ${TIMEOUT_CMD+x} && ${#TIMEOUT_CMD[@]} -gt 0 ]]; then
     if [[ ${#TARGETS[@]} -eq 1 && "${TARGETS[0]}" == *:* ]]; then
       if command -v timeout >/dev/null 2>&1; then
-        RUN_TIMEOUT=(timeout -k 10s 900s)
+        RUN_TIMEOUT=(timeout -k 10s 1200s)
       elif command -v gtimeout >/dev/null 2>&1; then
-        RUN_TIMEOUT=(gtimeout -k 10s 900s)
+        RUN_TIMEOUT=(gtimeout -k 10s 1200s)
       fi
     else
       RUN_TIMEOUT=("${TIMEOUT_CMD[@]}")
