@@ -87,6 +87,9 @@ in {
           exit 4
         fi
         pnpm config set store-dir "$out/store"
+        # Force workspace root to current directory to avoid inheriting repo-root workspace
+        printf '%s\n' "packages:" > pnpm-workspace.yaml
+        printf '%s\n' "  - ./" >> pnpm-workspace.yaml
         echo "[nix] pnpm install (timeout) --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir ."
         # Allow override via env; increase default to reduce flaky partial stores in CI/temp repos
         FT="''${NIX_PNPM_FETCH_TIMEOUT:-180}"
@@ -210,6 +213,9 @@ in {
           exit 4
         fi
         pnpm config set store-dir "$out/store"
+        # Force workspace root to current directory to avoid inheriting repo-root workspace
+        printf '%s\n' "packages:" > pnpm-workspace.yaml
+        printf '%s\n' "  - ./" >> pnpm-workspace.yaml
         echo "[nix] mkPnpmStoreUnfixed: pnpm install --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir ."
         FT="''${NIX_PNPM_FETCH_TIMEOUT:-180}"
         timeout "$FT"s env PNPM_HOME="$PNPM_HOME" pnpm install --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."

@@ -49,9 +49,34 @@ test("python wheelhouse: identical lock+patch → identical store path across im
     const attrA = "py-wheelhouse-apps-alpha";
     const attrB = "py-wheelhouse-apps-bravo";
 
-    const outA1 = await nixOut(attrA);
+    let outA1: string = "";
+    try {
+      outA1 = await nixOut(attrA);
+    } catch (e) {
+      try {
+        const { stdout: sys } = await $({
+          cwd: tmp,
+          stdio: "pipe",
+        })`nix eval --raw --impure --accept-flake-config --expr builtins.currentSystem`;
+        const sysStr = String(sys || "").trim();
+        const { stdout: pkgs } = await $({
+          cwd: tmp,
+          stdio: "pipe",
+        })`nix eval --json --impure --accept-flake-config .#packages.${sysStr} | jq -r 'keys[]' | sort`.nothrow();
+        console.error("diagnostic: packages.%s keys:\n%s", sysStr, String(pkgs || "").trim());
+      } catch {}
+      throw e;
+    }
     const outB1 = await nixOut(attrB);
     if (!outA1 || !outB1) {
+      try {
+        // Diagnostic: list available package attrs to help debug missing wheelhouse attr exposure
+        const { stdout: pkgs } = await $({
+          cwd: tmp,
+          stdio: "pipe",
+        })`bash -lc 'sys=$(nix eval --raw --impure --accept-flake-config --expr builtins.currentSystem); nix eval --json --impure --accept-flake-config .#packages."'"$sys"'" | jq -r "keys[]" | sort'`.nothrow();
+        console.error("diagnostic: packages.<system> keys:\n", String(pkgs || "").trim());
+      } catch {}
       console.error("missing outPath(s):", { outA1, outB1 });
       process.exit(2);
     }

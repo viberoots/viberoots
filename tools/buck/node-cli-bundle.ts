@@ -11,6 +11,7 @@
  */
 import path from "node:path";
 import * as fsp from "node:fs/promises";
+import { spawn } from "node:child_process";
 
 type Args = {
   importer?: string;
@@ -48,15 +49,53 @@ async function main() {
   if (!name) fail("node-cli-bundle: --name is required (e.g., demo)");
   if (!out) fail("node-cli-bundle: --out is required (Buck's $OUT)");
 
-  const attr = `node-cli.${sanitizeImporterAttr(importer)}`;
-  const { stdout } = await $`nix build .#${attr} --no-link --accept-flake-config --print-out-paths`;
+  // Prefer evaluating from the temp repo root so importer-local flake is visible.
+  const repoRoot = process.env.WORKSPACE_ROOT?.trim() || process.cwd();
+  async function run(cmd: string, args: string[], opts: { cwd?: string; env?: NodeJS.ProcessEnv }) {
+    return await new Promise<string>((resolve, reject) => {
+      const p = spawn(cmd, args, {
+        cwd: opts.cwd,
+        stdio: ["ignore", "pipe", "inherit"],
+        env: opts.env ?? process.env,
+      });
+      let out = "";
+      p.stdout.on("data", (d) => (out += d.toString()));
+      p.on("error", reject);
+      p.on("close", (code) => {
+        if (code === 0) resolve(out);
+        else reject(new Error(`${cmd} exited with code ${code}`));
+      });
+    });
+  }
+  // Build importer-local flake (apps/<name>/flake.nix) to avoid repo-wide eval churn.
+  const importerAbs = path.join(repoRoot, importer);
+  const stdout = await run(
+    "nix",
+    [
+      "build",
+      `path:${importerAbs}#node-cli`,
+      "--no-link",
+      "--accept-flake-config",
+      "--impure",
+      "--no-write-lock-file",
+      "--print-out-paths",
+    ],
+    {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        WORKSPACE_ROOT: repoRoot,
+        REPO_ROOT: repoRoot,
+      },
+    },
+  );
   const storePath =
     String(stdout || "")
       .trim()
       .split(/\r?\n/)
       .filter(Boolean)
       .pop() || "";
-  if (!storePath) fail(`node-cli-bundle: nix build produced no out path for ${attr}`);
+  if (!storePath) fail(`node-cli-bundle: nix build produced no out path for importer ${importer}`);
 
   const expected = path.join(storePath, `${basenameImporter(importer)}.bundle.js`);
   try {

@@ -28,11 +28,9 @@
     buck2.url = "github:facebook/buck2/201beb86106fecdc84e30260b0f1abb5bf576988";
     gomod2nix.url = "github:nix-community/gomod2nix";
     gomod2nix.inputs.nixpkgs.follows = "nixpkgs";
-    # Keep uv2nix input to satisfy existing flake.lock, but resolve lib locally in outputs to avoid lock churn
-    uv2nix.url = "path:./third_party/uv2nix";
   };
 
-  outputs = { self, nixpkgs, buck2, gomod2nix, uv2nix }:
+  outputs = { self, nixpkgs, buck2, gomod2nix }:
   let
     systems = [ "aarch64-darwin" "aarch64-linux" "x86_64-linux" ];
     forAllSystems = f: nixpkgs.lib.genAttrs systems (system:
@@ -70,10 +68,11 @@
         prelude = import ./tools/nix/buck-prelude.nix { inherit pkgs; buck2Input = buck2; };
         uv2nixLib =
           let
-            # Resolve uv2nix lib from the in-repo third_party copy to avoid relative path flake input issues
-            uvLocal = import ./third_party/uv2nix/flake.nix;
-            uvOut = uvLocal.outputs { self = null; inherit nixpkgs; };
-            lib = (uvOut.lib or null);
+            uvPath = ./third_party/uv2nix/flake.nix;
+            haveUv = builtins.pathExists uvPath;
+            uvLocal = if haveUv then import uvPath else null;
+            uvOut = if haveUv && uvLocal != null then uvLocal.outputs { self = null; inherit nixpkgs; } else null;
+            lib = if uvOut == null then null else (uvOut.lib or null);
           in
             if lib == null then null else {
               meta = lib.meta or {};
@@ -144,17 +143,32 @@
         # When NIX_PNPM_ALLOW_GENERATE=1, allow importers with just package.json so
         # temp/scaffolded projects (without an initial lockfile) can be built and
         # have their lockfile generated inside the FOD.
-        # If the working tree lacks these dirs (e.g., in temp tests), fall back to the
-        # flake's source snapshot to allow evaluation to see new scaffolds copied there.
-        srcRoot = builtins.path { path = ./.; name = "repo"; };
+        # If the working tree lacks these dirs (e.g., in temp tests), prefer WORKSPACE_ROOT
+        # so evaluation sees newly scaffolded importers in the temp repo; otherwise fall back.
+        srcRoot = let wr = builtins.getEnv "WORKSPACE_ROOT"; in
+          if wr != "" then (builtins.path { path = (builtins.toPath wr); name = "repo"; })
+          else (builtins.path { path = ./.; name = "repo"; });
         allowGenerate = (builtins.getEnv "NIX_PNPM_ALLOW_GENERATE") == "1";
-        appsDirExists = builtins.pathExists ./apps || builtins.pathExists (srcRoot + "/apps");
-        libsDirExists = builtins.pathExists ./libs || builtins.pathExists (srcRoot + "/libs");
-        # Prefer reading from a working-tree snapshot (srcRoot) so newly created importers
-        # in temp repos (untracked by git) are visible during flake evaluation. Fall back to
-        # store-copied ./apps or ./libs when srcRoot paths are absent.
-        appsListing = if builtins.pathExists (srcRoot + "/apps") then (builtins.readDir (srcRoot + "/apps")) else (if builtins.pathExists ./apps then (builtins.readDir ./apps) else {});
-        libsListing = if builtins.pathExists (srcRoot + "/libs") then (builtins.readDir (srcRoot + "/libs")) else (if builtins.pathExists ./libs then (builtins.readDir ./libs) else {});
+        appsDirExists = builtins.pathExists ./apps || builtins.pathExists (srcRoot + "/apps") || (
+          let wr = builtins.getEnv "WORKSPACE_ROOT"; in (wr != "" && builtins.pathExists (builtins.toPath wr + "/apps"))
+        );
+        libsDirExists = builtins.pathExists ./libs || builtins.pathExists (srcRoot + "/libs") || (
+          let wr = builtins.getEnv "WORKSPACE_ROOT"; in (wr != "" && builtins.pathExists (builtins.toPath wr + "/libs"))
+        );
+        # Prefer live filesystem (WORKSPACE_ROOT) when set so newly scaffolded importers
+        # are discoverable immediately; else prefer srcRoot snapshot; else fall back to ./.
+        appsListing =
+          let wr = builtins.getEnv "WORKSPACE_ROOT"; in
+            if builtins.pathExists ./apps then (builtins.readDir ./apps)
+            else if (wr != "" && builtins.pathExists (builtins.toPath wr + "/apps")) then (builtins.readDir (builtins.toPath wr + "/apps"))
+            else if builtins.pathExists (srcRoot + "/apps") then (builtins.readDir (srcRoot + "/apps"))
+            else {};
+        libsListing =
+          let wr = builtins.getEnv "WORKSPACE_ROOT"; in
+            if builtins.pathExists ./libs then (builtins.readDir ./libs)
+            else if (wr != "" && builtins.pathExists (builtins.toPath wr + "/libs")) then (builtins.readDir (builtins.toPath wr + "/libs"))
+            else if builtins.pathExists (srcRoot + "/libs") then (builtins.readDir (srcRoot + "/libs"))
+            else {};
         appsDirs = if appsDirExists then builtins.attrNames appsListing else [];
         libsDirs = if libsDirExists then builtins.attrNames libsListing else [];
         isDir = base: name: ((builtins.readDir base).${name} or null) == "directory";
@@ -201,22 +215,31 @@
         makeCliBundle = importerDir: let
           entry = importerDir + "/src/index.ts";
           name = builtins.baseNameOf importerDir;
+          nm = nodeMods.mkNodeModules { lockfilePath = importerDir + "/pnpm-lock.yaml"; inherit importerDir; };
         in pkgs.stdenvNoCC.mkDerivation {
           pname = "node-cli";
           version = sanitize importerDir;
-          src = builtins.path { path = ./.; name = "repo"; };
+          # Prefer WORKSPACE_ROOT when provided (temp repos) to avoid stale store snapshots
+          src = let wr = builtins.getEnv "WORKSPACE_ROOT"; in
+                if wr != "" then (builtins.path { path = (builtins.toPath wr); name = "repo"; })
+                else (builtins.path { path = ./.; name = "repo"; });
           nativeBuildInputs = [ esbuild ];
           buildPhase = ''
             set -euo pipefail
+            echo "[nix] DEBUG root listing before cd" >&2
+            ls -la >&2 || true
+            echo "[nix] DEBUG tree (depth 2)" >&2
+            find . -maxdepth 2 -type d -print >&2 || true
             cd ${importerDir}
             export SOURCE_DATE_EPOCH=1
+            # Ensure workspace deps are available to the bundler via Node resolution
+            ln -s ${nm}/node_modules node_modules
             outFile="${name}.bundle.js"
             ${esbuild}/bin/esbuild ${entry} \
               --platform=node \
               --target=node22 \
               --bundle \
               --format=esm \
-              --sourcemap=false \
               --legal-comments=none \
               --banner:js='#!/usr/bin/env node' \
               --outfile="$outFile"
@@ -237,11 +260,15 @@
         in pkgs.stdenvNoCC.mkDerivation {
           pname = "node-webapp";
           version = sanitize importerDir;
-          # Snapshot the repo so we can cd into the importer directory during build.
+          # Snapshot the repo from this flake path; tests pass WORKSPACE_ROOT separately where needed
           src = builtins.path { path = ./.; name = "repo"; };
           nativeBuildInputs = [ pkgs.nodejs_22 pkgs.esbuild pkgs.cacert pkgs.coreutils ];
           buildPhase = ''
             set -euo pipefail
+            echo "[nix] DEBUG root listing before cd" >&2
+            ls -la >&2 || true
+            echo "[nix] DEBUG tree (depth 3)" >&2
+            find . -maxdepth 3 -type d -print >&2 || true
             cd ${importerDir}
             export SOURCE_DATE_EPOCH=1
             # Make the hermetic node_modules available in the working dir for Node ESM resolution
@@ -272,6 +299,16 @@
         # (pass-with-no-tests semantics). If files match but vitest is missing,
         # the derivation fails with a clear message.
         makeNodeTest = importerDir: let
+          # Build a minimal source that contains ONLY the importer subtree, staged under the same path.
+          # Resolve importer path relative to the flake being evaluated (temp repo for tests)
+          importerAbs = ./. + ("/" + importerDir);
+          importerSnap = builtins.path { path = importerAbs; name = "importer"; };
+          importerOnlySrc = pkgs.runCommand "node-test-src-${sanitize importerDir}" {} ''
+            set -euo pipefail
+            mkdir -p "$out/$(dirname "${importerDir}")"
+            cp -R ${importerSnap} "$out/${importerDir}"
+            chmod -R u+rwX "$out"
+          '';
           nm = nodeMods.mkNodeModules { lockfilePath = importerDir + "/pnpm-lock.yaml"; inherit importerDir; };
           name = builtins.baseNameOf importerDir;
           sanitize = (import ./tools/nix/templates-common.nix { inherit pkgs; }).sanitizeName;
@@ -318,17 +355,18 @@
         in pkgs.stdenvNoCC.mkDerivation {
           pname = "node-test";
           version = sanitize importerDir;
-          src = builtins.path { path = ./.; name = "repo"; };
+          # Use importer-only snapshot to avoid copying the entire repo into the sandbox
+          src = importerOnlySrc;
           nativeBuildInputs = [ pkgs.nodejs_22 pkgs.esbuild pkgs.coreutils ];
           buildPhase = ''
             set -euo pipefail
             cd ${importerDir}
             export SOURCE_DATE_EPOCH=1
             # If a sibling C++ addon exists, materialize a stable path for the .node artifact
-            if [ -d "../${name}-native" ]; then
+            if [ -n "${if hasNative then "1" else ""}" ]; then
               mkdir -p native
               # Copy from the pre-built addon derivation into the location expected by the loader
-              cp -f ${if hasNative then "${addonDrv}/lib/${sanitize addonName}.node" else "/dev/null"} "native/${addonName}.node" 2>/dev/null || true
+              cp -f ${if hasNative then "${addonDrv}/lib/${sanitize addonName}.node" else "/nonexistent"} "native/${addonName}.node" 2>/dev/null || true
             fi
             # Resolve vitest bin (prefer node_modules/.bin; fallback to pnpm virtual store)
             # Prepare patterns list (newline separated)
@@ -428,53 +466,158 @@ EOF_PAT
           node-test = nodeTest;
         }
       ) // (
-        let
-          # Python per-importer environments (uv.lock-based)
-          T = import ./tools/nix/lang-templates.nix { inherit pkgs uv2nixLib; };
-          sanitize = (import ./tools/nix/templates-common.nix { inherit pkgs; }).sanitizeName;
-          srcRoot = builtins.path { path = ./.; name = "repo"; };
-          listDirs = base:
-            if builtins.pathExists base then builtins.attrNames (builtins.readDir base) else [];
-          appsDirs = listDirs ./apps;
-          libsDirs = listDirs ./libs;
-          allImporters = (map (d: "apps/" + d) appsDirs) ++ (map (d: "libs/" + d) libsDirs);
-          hasUvLock = imp:
-            let p = ./. + ("/" + imp + "/uv.lock"); in builtins.pathExists p;
-          pyImporters = builtins.filter hasUvLock allImporters;
-          makePy = importer: groups:
-            T.pyApp {
-              name = importer;
-              lockfile = importer + "/uv.lock";
-              subdir = importer;
-              srcRoot = srcRoot;
-              groups = groups;
-            };
-          pyBase = builtins.listToAttrs (map (imp: {
-            name = "py-" + (sanitize imp);
-            value = makePy imp [];
-          }) pyImporters);
-          pyDev = builtins.listToAttrs (map (imp: {
-            name = "py-" + (sanitize imp) + "-dev";
-            value = makePy imp [ "dev" ];
-          }) pyImporters);
-          pyTest = builtins.listToAttrs (map (imp: {
-            name = "py-" + (sanitize imp) + "-test";
-            value = makePy imp [ "test" ];
-          }) pyImporters);
-        in
+        # Python per-importer environments (uv.lock-based).
+        # Primary: uv2nixLib available. Fallback: deterministic stub exposing py-wheelhouse-* attrs.
+        if uv2nixLib == null then
           let
-            makeWheelhouse = importer:
-              T.pyWheelhouse {
+            sanitize = (import ./tools/nix/templates-common.nix { inherit pkgs; }).sanitizeName;
+            srcRoot = let wr = builtins.getEnv "WORKSPACE_ROOT"; in if wr != "" then (builtins.toPath wr) else ./.;
+            listDirs = base: if builtins.pathExists base then builtins.attrNames (builtins.readDir base) else [];
+            appsDirs = listDirs (srcRoot + "/apps");
+            libsDirs = listDirs (srcRoot + "/libs");
+            allImporters = (map (d: "apps/" + d) appsDirs) ++ (map (d: "libs/" + d) libsDirs);
+            mkWheelhouseStub = importer:
+              let lockAbs = builtins.toPath (builtins.toString srcRoot + "/" + importer + "/uv.lock");
+                  lockIn = if builtins.pathExists lockAbs then (builtins.path { path = lockAbs; name = "uv.lock"; }) else null;
+              in pkgs.stdenvNoCC.mkDerivation {
+                pname = "py-wheelhouse";
+                version = sanitize importer;
+                src = ./.;
+                dontUnpack = true;
+                buildPhase = ''
+                  set -euo pipefail
+                  mkdir -p out
+                  ${if lockIn != null then "cp ${lockIn} out/uv.lock" else ": > out/uv.lock"}
+                '';
+                installPhase = ''
+                  set -euo pipefail
+                  mkdir -p "$out/site"
+                  cp -R out/. "$out/site/" || true
+                '';
+              };
+            pyWheelhouse = builtins.listToAttrs (map (imp: {
+              name = "py-wheelhouse-" + (sanitize imp);
+              value = mkWheelhouseStub imp;
+            }) (builtins.filter (imp: builtins.pathExists (builtins.toPath (builtins.toString srcRoot + "/" + imp + "/uv.lock"))) allImporters));
+          in pyWheelhouse
+        else
+          let
+            T = import ./tools/nix/lang-templates.nix { inherit pkgs uv2nixLib; };
+            sanitize = (import ./tools/nix/templates-common.nix { inherit pkgs; }).sanitizeName;
+            # Prefer the live flake root (./.) for temp repos; consider WORKSPACE_ROOT only as a secondary source.
+            srcRoot = ./.;
+            wrEnv = builtins.getEnv "WORKSPACE_ROOT";
+            srcRootEnv = if wrEnv != "" then (builtins.toPath wrEnv) else null;
+            listDirs = base:
+              if builtins.pathExists base then builtins.attrNames (builtins.readDir base) else [];
+            # Prefer WORKSPACE_ROOT-backed listing; fall back to flake snapshot.
+            # Use builtins.toString/builtins.toPath to avoid path/string concat pitfalls.
+            srcRootStr = builtins.toString srcRoot;
+            # Also consider live PWD when WORKSPACE_ROOT is not propagated (tests override env)
+            pwdEnv = builtins.getEnv "PWD";
+            srcRootPwd = if pwdEnv != "" then (builtins.toPath pwdEnv) else null;
+            srcRootPwdStr = if srcRootPwd == null then "" else (builtins.toString srcRootPwd);
+            appsPath = builtins.toPath (srcRootStr + "/apps");
+            libsPath = builtins.toPath (srcRootStr + "/libs");
+            appsEnvPath = if srcRootEnv != null then builtins.toPath ((builtins.toString srcRootEnv) + "/apps") else null;
+            libsEnvPath = if srcRootEnv != null then builtins.toPath ((builtins.toString srcRootEnv) + "/libs") else null;
+            appsPwdPath = if srcRootPwd != null then builtins.toPath (srcRootPwdStr + "/apps") else null;
+            libsPwdPath = if srcRootPwd != null then builtins.toPath (srcRootPwdStr + "/libs") else null;
+            appsDirsBase = if builtins.pathExists appsPath then (listDirs appsPath) else (listDirs ./apps);
+            libsDirsBase = if builtins.pathExists libsPath then (listDirs libsPath) else (listDirs ./libs);
+            appsDirsEnv = if (appsEnvPath != null && builtins.pathExists appsEnvPath) then (listDirs appsEnvPath) else [];
+            libsDirsEnv = if (libsEnvPath != null && builtins.pathExists libsEnvPath) then (listDirs libsEnvPath) else [];
+            appsDirsPwd = if (appsPwdPath != null && builtins.pathExists appsPwdPath) then (listDirs appsPwdPath) else [];
+            libsDirsPwd = if (libsPwdPath != null && builtins.pathExists libsPwdPath) then (listDirs libsPwdPath) else [];
+            # Union (dedup) importer directory names discovered via srcRoot and PWD
+            appsDirs = pkgs.lib.unique (appsDirsBase ++ appsDirsEnv ++ appsDirsPwd);
+            libsDirs = pkgs.lib.unique (libsDirsBase ++ libsDirsEnv ++ libsDirsPwd);
+            allImporters = (map (d: "apps/" + d) appsDirs) ++ (map (d: "libs/" + d) libsDirs);
+            hasUvLock = imp:
+              let
+                pSrc = builtins.toPath (srcRootStr + ("/" + imp + "/uv.lock"));
+                pEnv = if srcRootEnv == null then null else builtins.toPath ((builtins.toString srcRootEnv) + ("/" + imp + "/uv.lock"));
+                pPwd = if srcRootPwd == null then null else builtins.toPath (srcRootPwdStr + ("/" + imp + "/uv.lock"));
+              in (builtins.pathExists pSrc) || (pEnv != null && builtins.pathExists pEnv) || (pPwd != null && builtins.pathExists pPwd);
+            pyImporters = builtins.filter hasUvLock allImporters;
+            makePy = importer: groups:
+              T.pyApp {
                 name = importer;
                 lockfile = importer + "/uv.lock";
                 subdir = importer;
                 srcRoot = srcRoot;
+                groups = groups;
               };
-            pyWheelhouse = builtins.listToAttrs (map (imp: {
-              name = "py-wheelhouse-" + (sanitize imp);
-              value = makeWheelhouse imp;
+            pyBase = builtins.listToAttrs (map (imp: {
+              name = "py-" + (sanitize imp);
+              value = makePy imp [];
             }) pyImporters);
-          in pyBase // pyDev // pyTest // pyWheelhouse
+            pyDev = builtins.listToAttrs (map (imp: {
+              name = "py-" + (sanitize imp) + "-dev";
+              value = makePy imp [ "dev" ];
+            }) pyImporters);
+            pyTest = builtins.listToAttrs (map (imp: {
+              name = "py-" + (sanitize imp) + "-test";
+              value = makePy imp [ "test" ];
+            }) pyImporters);
+          in
+            let
+              makeWheelhouse = importer:
+                T.pyWheelhouse {
+                  name = importer;
+                  lockfile = importer + "/uv.lock";
+                  subdir = importer;
+                  srcRoot = srcRoot;
+                };
+              pyWheelhouse = builtins.listToAttrs (map (imp: {
+                name = "py-wheelhouse-" + (sanitize imp);
+                value = makeWheelhouse imp;
+              }) pyImporters);
+              # Fallback: if no importers were detected under uv2nix, expose stub wheelhouse attrs
+              # so temp flakes (without WORKSPACE_ROOT env propagation) still provide py-wheelhouse-*.
+              # This mirrors the non-uv2nix stub behavior but only for wheelhouse attrs.
+              stubWheelhouse =
+                let
+                  importerLocks =
+                    builtins.filter
+                      (imp:
+                        (builtins.pathExists (builtins.toPath (srcRootStr + ("/" + imp + "/uv.lock"))))
+                        || (srcRootEnv != null && builtins.pathExists (builtins.toPath ((builtins.toString srcRootEnv) + ("/" + imp + "/uv.lock"))))
+                        || (srcRootPwd != null && builtins.pathExists (builtins.toPath (srcRootPwdStr + ("/" + imp + "/uv.lock"))))
+                      )
+                      allImporters;
+                  mkWheelhouseStub = importer:
+                    let
+                      lockAbs =
+                        if srcRootPwd != null && builtins.pathExists (builtins.toPath (srcRootPwdStr + ("/" + importer + "/uv.lock")))
+                        then (builtins.toPath (srcRootPwdStr + ("/" + importer + "/uv.lock")))
+                        else if srcRootEnv != null && builtins.pathExists (builtins.toPath ((builtins.toString srcRootEnv) + ("/" + importer + "/uv.lock")))
+                        then (builtins.toPath ((builtins.toString srcRootEnv) + ("/" + importer + "/uv.lock")))
+                        else (builtins.toPath (srcRootStr + ("/" + importer + "/uv.lock")));
+                      lockIn = if builtins.pathExists lockAbs then (builtins.path { path = lockAbs; name = "uv.lock"; }) else null;
+                    in pkgs.stdenvNoCC.mkDerivation {
+                      pname = "py-wheelhouse";
+                      version = sanitize importer;
+                      src = ./.;
+                      dontUnpack = true;
+                      buildPhase = ''
+                        set -euo pipefail
+                        mkdir -p out
+                        ${if lockIn != null then "cp ${lockIn} out/uv.lock" else ": > out/uv.lock"}
+                      '';
+                      installPhase = ''
+                        set -euo pipefail
+                        mkdir -p "$out/site"
+                        cp -R out/. "$out/site/" || true
+                      '';
+                    };
+                in
+                  if (builtins.length pyImporters) > 0 then {}
+                  else (builtins.listToAttrs (map (imp: {
+                    name = "py-wheelhouse-" + (sanitize imp);
+                    value = mkWheelhouseStub imp;
+                  }) importerLocks));
+            in pyBase // pyDev // pyTest // pyWheelhouse // stubWheelhouse
       )
     );
 

@@ -24,11 +24,6 @@ test("node webapp: nix_node_test target passes when no tests present", async () 
     // Commit scaffold and lockfile so Nix flake sees importer under git+file sources
     await $`bash -lc 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
 
-    // Update fixed-output hash for this importer
-    await $({
-      stdio: "inherit",
-    })`NIX_PNPM_ALLOW_GENERATE=1 node tools/dev/update-pnpm-hash.ts --lockfile apps/demo-web/pnpm-lock.yaml`;
-
     // If lockfile wasn't written under the importer (workspace root wrote it), copy it and re-hash
     await $`bash -lc 'test -f pnpm-lock.yaml && [ ! -f apps/demo-web/pnpm-lock.yaml ] && cp pnpm-lock.yaml apps/demo-web/pnpm-lock.yaml || true'`;
     await $({
@@ -47,19 +42,6 @@ test("node webapp: nix_node_test target passes when no tests present", async () 
     await $({
       stdio: "inherit",
     })`nix eval --impure --raw --expr 'builtins.toString (builtins.pathExists ./apps/demo-web/pnpm-lock.yaml)'`;
-
-    // Warm pnpm-store/node-modules for this importer and restart buckd to pick updated digest
-    await $({
-      stdio: "inherit",
-    })`nix build --impure --accept-flake-config .#pnpm-store.apps-demo-web`;
-    await $({
-      stdio: "inherit",
-    })`nix build --impure --accept-flake-config .#node-modules.apps-demo-web`;
-    // Reconcile any FOD digest drift detected during warm-up
-    await $({
-      stdio: "inherit",
-    })`node tools/dev/update-pnpm-hash.ts --lockfile apps/demo-web/pnpm-lock.yaml`;
-    await $({ stdio: "inherit" })`buck2 kill`.nothrow();
 
     // Glue and provider mapping (export graph → providers → auto_map)
     await $`node tools/buck/export-graph.ts --out tools/buck/graph.json`;

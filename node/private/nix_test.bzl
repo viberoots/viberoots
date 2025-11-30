@@ -27,11 +27,25 @@ def _node_nix_test_impl(ctx):
 
     # Compose runner command
     run_cmd = (
-        nix_bootstrap_env()
+        # Skip unified pnpm prewarm at bootstrap; we'll do it only if tests exist
+        "export BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE=1; "
+        + nix_bootstrap_env()
         + ("".join(env_pairs))
         + nix_timeout_wrapper_var(var_name = "TIMEOUT", default_sec = (tout if isinstance(tout, int) and tout > 0 else 600))
         + ("echo '[node_nix_test] importer=%s (attr=%s)' >&2; " % (imp, imp_attr))
         + ("if ! (cd \"$WORKSPACE_ROOT/%s\" && (find . -type f -name \"*.test.ts\" -print -quit | grep -q . || find . -type f -name \"*.test.js\" -print -quit | grep -q .)); then echo '[node_nix_test] no tests matched; passing' >&2; exit 0; fi; " % imp)
+        # Prewarm unified pnpm store only when tests will actually run
+        + "if [ ! -f \"$WORKSPACE_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
+        + "  if command -v node >/dev/null 2>&1; then "
+        + "    (node \"$FLK_ROOT/tools/dev/require-unified-pnpm-store.ts\" >/dev/null 2>&1 || true); "
+        + "  elif command -v nix >/dev/null 2>&1; then "
+        + "    (nix run --accept-flake-config \"$FLK_ROOT\"#zx-wrapper -- \"$FLK_ROOT/tools/dev/require-unified-pnpm-store.ts\" >/dev/null 2>&1 || true); "
+        + "  fi; "
+        + "fi; "
+        + "if [ -f \"$WORKSPACE_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
+        + "  export NIX_USE_PREFETCHED_PNPM_STORE=1; "
+        + "  export LOCAL_PNPM_STORE=\"$(cat \"$WORKSPACE_ROOT/buck-out/.unified-pnpm-store/path\" 2>/dev/null || true)\"; "
+        + "fi; "
         + "NIX_MAXJ=\"${NIX_MAX_JOBS:-1}\"; NIX_CORES=\"${NIX_CORES:-1}\"; "
         + "$TIMEOUT nix build \"path:$FLK_ROOT#node-test.%s\" --impure --accept-flake-config --show-trace --print-build-logs --max-jobs \"$NIX_MAXJ\" --option cores \"$NIX_CORES\"; " % imp_attr
     )

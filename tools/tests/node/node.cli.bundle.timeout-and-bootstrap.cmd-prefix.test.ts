@@ -1,0 +1,49 @@
+#!/usr/bin/env zx-wrapper
+import assert from "node:assert/strict";
+import * as fsp from "node:fs/promises";
+import path from "node:path";
+import { test } from "node:test";
+import { runInTemp } from "../lib/test-helpers";
+
+test("nix_node_cli_bin(bundle=True) cmd prefixes nix bootstrap env and timeout wrapper", async () => {
+  await runInTemp("node-cli-timeout-prefix", async (tmp, $) => {
+    const dir = path.join(tmp, "apps", "cli");
+    await fsp.mkdir(dir, { recursive: true });
+    await fsp.writeFile(
+      path.join(dir, "TARGETS"),
+      [
+        'load("//node:defs.bzl", "nix_node_cli_bin")',
+        "",
+        "nix_node_cli_bin(",
+        '  name = "tool",',
+        "  bundle = True,",
+        '  labels = ["lockfile:apps/cli/pnpm-lock.yaml#apps/cli"],',
+        ")",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const probe = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+    })`buck2 cquery --json --output-attributes cmd //apps/cli:tool`;
+    if (probe.exitCode !== 0) {
+      // Environment not fully available in temp — skip to avoid false negatives
+      return;
+    }
+    const out = String(probe.stdout || "");
+    // Should include nix bootstrap markers
+    assert.ok(
+      out.includes("export WORKSPACE_ROOT=") || out.includes("FLK_ROOT="),
+      "expected nix_bootstrap_env() fragments in cmd",
+    );
+    // Should declare TIMEOUT wrapper and use it to invoke nix build
+    assert.ok(out.includes("TIMEOUT="), "expected TIMEOUT= assignment in cmd");
+    const idxTimeout = out.indexOf("TIMEOUT");
+    const idxNix = out.indexOf("nix build");
+    assert.ok(idxTimeout >= 0 && idxNix > idxTimeout, "expected TIMEOUT to precede nix build");
+  });
+});

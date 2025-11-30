@@ -42,8 +42,10 @@ let
         (
           # Always include parent directories so traversal reaches importerDir/lockDir
           (type == "directory" && (rel == importerDir || relHasPrefix impPrefix || isParentOfImporter || (lockPrefix != "" && (rel == lockDir || relHasPrefix lockPrefix || isParentOfLock))))
-          # Include files under importerDir
-          || ((type != "directory") && (relHasPrefix impPrefix))
+          # Include only the minimal files under importerDir required for pnpm:
+          # - package.json (project manifest)
+          # - optional .npmrc (per-importer config)
+          || ((type != "directory") && (rel == (impPrefix + "package.json") || rel == (impPrefix + ".npmrc")))
           # Special-case root importer: include top-level package.json so pnpm sees a project
           || (importerDir == "." && type != "directory" && rel == "package.json")
           # Include lockfile and files under its dir; special-case root lockfile

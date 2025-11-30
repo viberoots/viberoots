@@ -2,6 +2,7 @@ load("@prelude//:rules.bzl", "genrule")
 load("//lang:global_inputs.bzl", "global_nix_inputs")
 load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve", "append_patch_srcs", "include_importer_patches_from_labels", "importer_from_labels", "ensure_single_lockfile_label", "realize_provider_edges")
 load("//lang:sanitize.bzl", "sanitize_name")
+load("//lang:nix_shell.bzl", "nix_bootstrap_env", "nix_timeout_wrapper_var")
 load("//node/private:nix_test.bzl", "node_nix_test")
 
 # NOTE: Prebuild guard ensures this load is valid before builds/tests run.
@@ -106,12 +107,15 @@ def node_webapp(
 
     # Shim: build via Nix and copy dist/* into $OUT (single directory output)
     # Use escaped command substitutions: $$(...) so Buck doesn't parse $(...) as a target pattern.
+    # Escape only command substitutions `$(...)` to avoid Buck interpreting them;
+    # keep normal `$VAR` expansions intact.
+    _prefix = nix_bootstrap_env().replace("$(", "$$(") + nix_timeout_wrapper_var(default_sec = 240)
     cmd = (
-        "set -euo pipefail; "
-        + "tmp=$$(mktemp -d); trap 'rm -rf \"$$tmp\"' EXIT; "
-        + "nix build .#node-webapp.%s --accept-flake-config --out-link \"$$tmp/out\"; " % _sanitize_importer_attr(_importer)
-        + "outPath=$$(readlink -f \"$$tmp/out\"); "
-        + "if [ -d \"$$outPath/dist\" ]; then cp -R \"$$outPath/dist\" $$OUT; else echo 'dist missing' >&2; exit 2; fi"
+        _prefix
+        + "tmp=$$(mktemp -d); trap 'rm -rf \"$tmp\"' EXIT; "
+        + "$TIMEOUT nix build .#node-webapp.%s --accept-flake-config --out-link \"$tmp/out\"; " % _sanitize_importer_attr(_importer)
+        + "outPath=$$(readlink -f \"$tmp/out\"); "
+        + "if [ -d \"$outPath/dist\" ]; then cp -R \"$outPath/dist\" $OUT; else echo 'dist missing' >&2; exit 2; fi"
     )
 
     # Stamp global Nix inputs for macros that call Nix (policy: PR‑5/PR‑2)
@@ -182,20 +186,15 @@ def nix_node_cli_bin(
         parts = [p for p in s.split("/") if p != ""]
         return parts[-1] if len(parts) > 0 else s
 
-    # Use Nix to build single-file bundle and copy it to $OUT
+    # Use Node shim to build single-file bundle via Nix and copy it to $OUT
+    # Escape only command substitutions `$(...)`; keep `$VAR` expansions.
+    _prefix = nix_bootstrap_env().replace("$(", "$$(") + nix_timeout_wrapper_var(default_sec = 240)
     cmd = (
-        "set -uo pipefail; "
-        + "tmp=`mktemp -d`; trap 'rm -rf \"$tmp\"' EXIT; "
-        + "failed=0; "
-        + ("nix build .#node-cli.%s --accept-flake-config --out-link \"$tmp/out\" >/dev/null 2>&1 || failed=1; " % _sanitize_importer_attr(_importer))
-        + "if [ \"$failed\" -eq 0 ]; then "
-        + "  outPath=`readlink \"$tmp/out\"`; "
-        + ("  cp \"$outPath/%s.bundle.js\" \"$OUT\"; " % _basename_importer(_importer))
-        + "  chmod +x \"$OUT\"; "
-        + "else "
-        + ("  cat > \"$OUT\" <<'EOF'\n#!/usr/bin/env node\nconsole.log(\"%s: usage\\n  --help  Show help\");\nEOF\n" % _basename_importer(_importer))
-        + "  chmod +x \"$OUT\"; "
-        + "fi"
+        "SCRATCH=\"$PWD\"; "
+        + _prefix
+        + "OUT_ABS=\"$SCRATCH/$OUT\"; cd \"$WORKSPACE_ROOT\"; "
+        + "export NIX_PNPM_ALLOW_GENERATE=1; "
+        + ("$TIMEOUT node \"$WORKSPACE_ROOT/tools/buck/node-cli-bundle.ts\" --importer \"%s\" --name \"%s\" --out \"$OUT_ABS\"" % (_importer, _basename_importer(_importer)))
     )
 
     # Stamp global Nix inputs when bundling (macro calls Nix)
@@ -203,7 +202,7 @@ def nix_node_cli_bin(
 
     nix_node_gen(
         name = name,
-        # Include the CLI entry (or default) to ensure source edits invalidate the genrule
+        # Include the CLI entry to ensure source edits invalidate the genrule
         srcs = [entry],
         out = out,
         cmd = cmd,

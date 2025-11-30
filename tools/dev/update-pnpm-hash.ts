@@ -203,9 +203,47 @@ async function inner() {
     } catch {}
   }
 
+  // Helper: ensure importer lockfile exists and is up-to-date by generating it inside importer
+  async function ensureImporterLockUpToDate() {
+    const impAbsGen = path.resolve(repoRoot, importer);
+    const impLockGen = path.join(impAbsGen, "pnpm-lock.yaml");
+    // Generate a lockfile in the importer; keep scripts disabled and include dev deps.
+    const impWs = path.join(impAbsGen, "pnpm-workspace.yaml");
+    const hadLocalWs = fs.existsSync(impWs);
+    try {
+      if (!hadLocalWs) {
+        await fsp.mkdir(impAbsGen, { recursive: true });
+        await fsp.writeFile(impWs, "packages:\n  - ./\n", "utf8");
+      }
+    } catch {}
+    await $({
+      cwd: impAbsGen,
+      stdio: "inherit",
+    })`bash --noprofile --norc -c 'set -euo pipefail; mkdir -p ".pnpm-home" ".pnpm-store"; export PNPM_HOME="$(pwd)/.pnpm-home"; nix run ${repoRoot}#pnpm --accept-flake-config -- config set store-dir "$(pwd)/.pnpm-store"; nix run ${repoRoot}#pnpm --accept-flake-config -- install --lockfile-only --prod=false --ignore-scripts --lockfile-dir "." --dir "." --color never'`;
+    // Fallback: if pnpm still wrote a root lockfile, seed the importer with it
+    try {
+      const rootLock = path.join(repoRoot, "pnpm-lock.yaml");
+      if (!fs.existsSync(impLockGen) && fs.existsSync(rootLock)) {
+        await fsp.mkdir(path.dirname(impLockGen), { recursive: true });
+        await fsp.copyFile(rootLock, impLockGen);
+      }
+    } catch {}
+    // Clean up temporary local workspace marker
+    try {
+      if (!hadLocalWs && fs.existsSync(impWs)) {
+        await fsp.rm(impWs).catch(() => {});
+      }
+    } catch {}
+  }
+
   // Robust path: build unfixed store and compute SRI from its normalized 'store' directory
   const key = importer && importer !== "." ? `${importer}/pnpm-lock.yaml` : "pnpm-lock.yaml";
-  const pre = await buildUnfixedAndHash(unfixedAttr);
+  let pre = await buildUnfixedAndHash(unfixedAttr);
+  if (!pre.ok) {
+    // Attempt to regenerate lock in importer (isolated workspace root), then retry once
+    await ensureImporterLockUpToDate();
+    pre = await buildUnfixedAndHash(unfixedAttr);
+  }
   if (pre.ok && pre.sri) {
     await updateHashesJson(key, pre.sri);
   }

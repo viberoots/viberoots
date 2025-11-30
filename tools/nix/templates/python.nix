@@ -25,13 +25,24 @@ let
         namePrefix = "py-patch";
       };
       devOverrides = H.readDevOverrides devOverrideEnv;
-      # Use a stable snapshot of the app/lib subtree, including vendored test fixtures
-      srcAbs = builtins.path { path = builtins.toPath ("${srcRoot}/" + subdir); name = "py-src"; };
       # Also pass through the live workspace root for test-only origin lookups
       wsRootEnv = builtins.getEnv "WORKSPACE_ROOT";
       wsRoot =
         if wsRootEnv != "" then wsRootEnv
         else builtins.toString srcRoot;
+      # Use a stable snapshot of the app/lib subtree, preferring the live WORKSPACE_ROOT
+      # so temp repos created during tests are visible even if srcRoot was store-snapshotted earlier.
+      srcAbs =
+        let
+          baseWS = wsRoot;
+          baseSrcRoot = builtins.toString srcRoot;
+          baseFlake = builtins.toString ../../..;
+          candidate =
+            if wsRootEnv != "" && builtins.pathExists (builtins.toPath ("${baseWS}/" + subdir)) then baseWS
+            else if builtins.pathExists (builtins.toPath ("${baseSrcRoot}/" + subdir)) then baseSrcRoot
+            else if builtins.pathExists (builtins.toPath ("${baseFlake}/" + subdir)) then baseFlake
+            else baseSrcRoot;
+        in builtins.path { path = builtins.toPath ("${candidate}/" + subdir); name = "py-src"; };
       # Compute lockfile path relative to srcAbs to keep builds hermetic.
       lockRel =
         let lf = lockfile;
