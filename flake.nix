@@ -175,10 +175,8 @@
         hasLockAt = base: d: builtins.pathExists (base + ("/" + d) + "/pnpm-lock.yaml");
         hasPkgJsonAt = base: d: builtins.pathExists (base + ("/" + d) + "/package.json");
         # Include all importer directories; mkNodeModules/mkPnpmStore handle missing locks
-        # Discover importers under apps/* and libs/*, and include a known shared test importer if present.
-        importerDirsBase = (map (d: "apps/" + d) appsDirs) ++ (map (d: "libs/" + d) libsDirs);
-        sharedTestDeps = let p = ./libs/test-deps; in if builtins.pathExists p then [ "libs/test-deps" ] else [];
-        importerDirs = importerDirsBase ++ sharedTestDeps;
+        # Discover importers under apps/* and libs/* (no repo-scoped test importers; tests may scaffold in temp workspaces)
+        importerDirs = (map (d: "apps/" + d) appsDirs) ++ (map (d: "libs/" + d) libsDirs);
 
         perImporterNM = (builtins.listToAttrs (map (imp: {
           name = (nodeMods.sanitizeName imp);

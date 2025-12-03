@@ -92,12 +92,7 @@ async function discoverImportersWithLock(root: string): Promise<string[]> {
       }
     } catch {}
   }
-  // Skip the shared test importer by default to avoid unnecessary FOD updates and noisy output.
-  // Allow opting in explicitly via INSTALL_INCLUDE_SHARED_TEST_IMPORTER=1.
-  const includeShared =
-    String(process.env.INSTALL_INCLUDE_SHARED_TEST_IMPORTER || "").trim() === "1";
-  const filtered = includeShared ? out : out.filter((imp) => imp !== "libs/test-deps");
-  return filtered;
+  return out;
 }
 
 if (glueOnly) {
