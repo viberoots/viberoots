@@ -80,11 +80,20 @@ function normalizeImporter(imp: string): string {
 
 async function buildStore(attrPath: string): Promise<{ ok: boolean; output: string }> {
   try {
-    const maxJobs = String(process.env.NIX_MAX_JOBS || "1").trim();
-    const cores = String(process.env.NIX_CORES || "1").trim();
-    const res = await $({
-      stdio: "pipe",
-    })`nix build .#${attrPath} --impure --no-link --accept-flake-config --max-jobs ${maxJobs} --option cores ${cores}`;
+    const maxJobs = String(process.env.NIX_MAX_JOBS || "").trim();
+    const cores = String(process.env.NIX_CORES || "").trim();
+    const timeoutSec = String(process.env.NIX_PNPM_FETCH_TIMEOUT || "600").trim();
+    const cmd = [
+      "set -euo pipefail;",
+      'MJ="${NIX_MAX_JOBS:-' + (maxJobs || "0") + '}";',
+      'CR="${NIX_CORES:-' + (cores || "0") + '}";',
+      'TS="' + timeoutSec + '";',
+      'TO=""; if command -v timeout >/dev/null 2>&1; then TO="timeout -k 10s ${TS}s "; elif command -v gtimeout >/dev/null 2>&1; then TO="gtimeout -k 10s ${TS}s "; fi;',
+      'JOBS_FLAG=""; if [ -n "$MJ" ] && [ "$MJ" != "0" ]; then JOBS_FLAG="--max-jobs $MJ"; fi;',
+      'CORES_FLAG=""; if [ -n "$CR" ] && [ "$CR" != "0" ]; then CORES_FLAG="--option cores $CR"; fi;',
+      `$TO nix build .#${attrPath} --impure --no-link --accept-flake-config --builders "" $JOBS_FLAG $CORES_FLAG`,
+    ].join(" ");
+    const res = await $({ stdio: "pipe" })`bash --noprofile --norc -c ${cmd}`;
     return { ok: true, output: String(res.stdout || "") + String(res.stderr || "") };
   } catch (e: any) {
     const out = String((e && e.stdout) || "") + String((e && e.stderr) || "");
@@ -112,11 +121,20 @@ async function buildUnfixedAndHash(
   attrPath: string,
 ): Promise<{ ok: boolean; sri?: string; output?: string }> {
   try {
-    const maxJobs = String(process.env.NIX_MAX_JOBS || "1").trim();
-    const cores = String(process.env.NIX_CORES || "1").trim();
-    const built = await $({
-      stdio: "pipe",
-    })`nix build .#${attrPath} --impure --no-link --accept-flake-config --print-out-paths --max-jobs ${maxJobs} --option cores ${cores}`;
+    const maxJobs = String(process.env.NIX_MAX_JOBS || "").trim();
+    const cores = String(process.env.NIX_CORES || "").trim();
+    const timeoutSec = String(process.env.NIX_PNPM_FETCH_TIMEOUT || "600").trim();
+    const cmd = [
+      "set -euo pipefail;",
+      'MJ="${NIX_MAX_JOBS:-' + (maxJobs || "0") + '}";',
+      'CR="${NIX_CORES:-' + (cores || "0") + '}";',
+      'TS="' + timeoutSec + '";',
+      'TO=""; if command -v timeout >/dev/null 2>&1; then TO="timeout -k 10s ${TS}s "; elif command -v gtimeout >/dev/null 2>&1; then TO="gtimeout -k 10s ${TS}s "; fi;',
+      'JOBS_FLAG=""; if [ -n "$MJ" ] && [ "$MJ" != "0" ]; then JOBS_FLAG="--max-jobs $MJ"; fi;',
+      'CORES_FLAG=""; if [ -n "$CR" ] && [ "$CR" != "0" ]; then CORES_FLAG="--option cores $CR"; fi;',
+      `$TO nix build .#${attrPath} --impure --no-link --accept-flake-config --builders "" --print-out-paths $JOBS_FLAG $CORES_FLAG`,
+    ].join(" ");
+    const built = await $({ stdio: "pipe" })`bash --noprofile --norc -c ${cmd}`;
     const outPath =
       String(built.stdout || "")
         .trim()
@@ -140,6 +158,31 @@ async function buildUnfixedAndHash(
   }
 }
 
+async function currentSystem(): Promise<string> {
+  try {
+    const res = await $({ stdio: "pipe" })`nix eval --impure --expr builtins.currentSystem`;
+    return String(res.stdout || "")
+      .trim()
+      .replace(/^"|"$/g, "");
+  } catch {
+    return "";
+  }
+}
+
+async function flakeAttrExists(attrset: string, key: string): Promise<boolean> {
+  try {
+    const sys = await currentSystem();
+    if (!sys) return false;
+    const out = await $({
+      stdio: "pipe",
+    })`bash --noprofile --norc -c ${`nix eval .#packages.${sys}.${attrset} --apply 'builtins.hasAttr "${key}"' --accept-flake-config`}`;
+    const val = String(out.stdout || "").trim();
+    return val === "true";
+  } catch {
+    return false;
+  }
+}
+
 async function inner() {
   const { lockfile, force } = parseArgs(process.argv);
   const repoRoot = process.cwd();
@@ -156,6 +199,15 @@ async function inner() {
   const storeAttr = pnpmStoreAttrFromImporter(importer);
   const unfixedAttr = pnpmStoreUnfixedAttrFromImporter(importer);
   // quiet: avoid noisy diagnostics in normal operation
+  const normImp = normalizeImporter(importer);
+  const isDefault = !normImp || normImp === ".";
+  const sanitized = isDefault ? "default" : sanitizeName(normImp);
+  if (!isDefault) {
+    const hasUnfixed = await flakeAttrExists("pnpm-store-unfixed", sanitized);
+    if (!hasUnfixed) {
+      return;
+    }
+  }
 
   // If forcing, pre-write placeholder digest to bump the FOD derivation and force a rebuild
   if (force) {
@@ -239,10 +291,23 @@ async function inner() {
   // Robust path: build unfixed store and compute SRI from its normalized 'store' directory
   const key = importer && importer !== "." ? `${importer}/pnpm-lock.yaml` : "pnpm-lock.yaml";
   let pre = await buildUnfixedAndHash(unfixedAttr);
+  // If the flake does not expose a per-importer attr for this importer, skip gracefully.
+  if (!pre.ok && /does not provide attribute/.test(String(pre.output || ""))) {
+    console.warn(
+      `[update-pnpm-hash] skip: flake attr missing (${unfixedAttr}); continuing without per-importer store prewarm`,
+    );
+    return;
+  }
   if (!pre.ok) {
     // Attempt to regenerate lock in importer (isolated workspace root), then retry once
     await ensureImporterLockUpToDate();
     pre = await buildUnfixedAndHash(unfixedAttr);
+    if (!pre.ok && /does not provide attribute/.test(String(pre.output || ""))) {
+      console.warn(
+        `[update-pnpm-hash] skip after regen: flake attr still missing (${unfixedAttr})`,
+      );
+      return;
+    }
   }
   if (pre.ok && pre.sri) {
     await updateHashesJson(key, pre.sri);
@@ -251,6 +316,10 @@ async function inner() {
   // Verify fixed-output build; if it still fails, fall back once to parsing suggestion
   const verify = await buildStore(storeAttr);
   if (!verify.ok) {
+    if (/does not provide attribute/.test(String(verify.output || ""))) {
+      console.warn(`[update-pnpm-hash] skip: flake attr missing (${storeAttr}); continuing`);
+      return;
+    }
     const suggested = extractHash(verify.output || "");
     if (!suggested) {
       console.error("pnpm-store still failing and no suggested hash found\n\n" + verify.output);

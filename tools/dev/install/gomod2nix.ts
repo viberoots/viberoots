@@ -43,7 +43,7 @@ export async function runGomod2nixGenerateIn(dir: string, dryRun: boolean, verbo
   const cmd = `${binOverride} --dir .`;
   const timeoutSec = Math.max(
     1,
-    Number.parseInt(String(process.env.INSTALL_DEPS_GOMOD_TIMEOUT || "180"), 10) || 180,
+    Number.parseInt(String(process.env.INSTALL_DEPS_GOMOD_TIMEOUT || "600"), 10) || 600,
   );
   if (dryRun) {
     // Always emit a concise dry-run command line (tests depend on exact prefix)
@@ -97,16 +97,10 @@ export async function runGomod2nixGenerateIn(dir: string, dryRun: boolean, verbo
     } catch {
       ran = false;
     }
-    // If override failed to produce an output, fall back to the repo wrapper for determinism
-    if (!(await exists(tmpOut))) {
-      const fallback = `"$PWD"/tools/bin/gomod2nix --dir .`;
-      if (verbose) console.warn(`[gomod2nix] fallback: ${fallback}`);
-      await $({ cwd: tmp, stdio: "inherit" })`bash --noprofile --norc -lc ${fallback}`.nothrow();
-    }
     tmpOut = path.join(tmp, "gomod2nix.toml");
     const tmpExists = await exists(tmpOut);
     if (!tmpExists) {
-      console.error("gomod2nix did not produce gomod2nix.toml");
+      console.error("[gomod2nix] error: primary path did not produce gomod2nix.toml");
       process.exit(3);
     }
     const next = await fsp.readFile(tmpOut, "utf8");

@@ -43,15 +43,17 @@ test("node lib: nix_node_test target passes when no tests present", async () => 
     })`nix eval --impure --raw --expr 'builtins.toString (builtins.pathExists ./libs/demo/pnpm-lock.yaml)'`;
 
     // Warm pnpm-store/node-modules for this importer and restart buckd to pick updated digest
-    await $({ stdio: "inherit" })`nix build --impure --accept-flake-config .#pnpm-store.libs-demo`;
     await $({
       stdio: "inherit",
-    })`nix build --impure --accept-flake-config .#node-modules.libs-demo`;
+    })`nix build --impure --accept-flake-config --builders "" .#pnpm-store.libs-demo`;
+    await $({
+      stdio: "inherit",
+    })`nix build --impure --accept-flake-config --builders "" .#node-modules.libs-demo`;
     // Reconcile any FOD digest drift detected during warm-up
     await $({
       stdio: "inherit",
     })`node tools/dev/update-pnpm-hash.ts --lockfile libs/demo/pnpm-lock.yaml`;
-    await $({ stdio: "inherit" })`buck2 kill`.nothrow();
+    // Avoid killing the global buckd; zx_test harness reuses a shared daemon across tests.
 
     // Glue and provider mapping (export graph → providers → auto_map)
     await $`node tools/buck/export-graph.ts --out tools/buck/graph.json`;

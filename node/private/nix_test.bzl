@@ -34,20 +34,27 @@ def _node_nix_test_impl(ctx):
         + nix_timeout_wrapper_var(var_name = "TIMEOUT", default_sec = (tout if isinstance(tout, int) and tout > 0 else 600))
         + ("echo '[node_nix_test] importer=%s (attr=%s)' >&2; " % (imp, imp_attr))
         + ("if ! (cd \"$WORKSPACE_ROOT/%s\" && (find . -type f -name \"*.test.ts\" -print -quit | grep -q . || find . -type f -name \"*.test.js\" -print -quit | grep -q .)); then echo '[node_nix_test] no tests matched; passing' >&2; exit 0; fi; " % imp)
+        # If the main repo root already has a unified pnpm store, reuse it in temp workspaces
+        + "if [ -n \"${REPO_ROOT:-}\" ] && [ -f \"$REPO_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
+        + "  export NIX_USE_PREFETCHED_PNPM_STORE=1; "
+        + "  export LOCAL_PNPM_STORE=\"$(cat \"$REPO_ROOT/buck-out/.unified-pnpm-store/path\" 2>/dev/null || true)\"; "
+        + "fi; "
         # Prewarm unified pnpm store only when tests will actually run
-        + "if [ ! -f \"$WORKSPACE_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
+        + "if [ ! -f \"$FLK_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
         + "  if command -v node >/dev/null 2>&1; then "
-        + "    (node \"$FLK_ROOT/tools/dev/require-unified-pnpm-store.ts\" >/dev/null 2>&1 || true); "
+        + "    (cd \"$FLK_ROOT\" && node \"$FLK_ROOT/tools/dev/require-unified-pnpm-store.ts\" >/dev/null 2>&1 || true); "
         + "  elif command -v nix >/dev/null 2>&1; then "
-        + "    (nix run --accept-flake-config \"$FLK_ROOT\"#zx-wrapper -- \"$FLK_ROOT/tools/dev/require-unified-pnpm-store.ts\" >/dev/null 2>&1 || true); "
+        + "    (cd \"$FLK_ROOT\" && nix run --accept-flake-config \"$FLK_ROOT\"#zx-wrapper -- \"$FLK_ROOT/tools/dev/require-unified-pnpm-store.ts\" >/dev/null 2>&1 || true); "
         + "  fi; "
         + "fi; "
-        + "if [ -f \"$WORKSPACE_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
+        + "if [ -f \"$FLK_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
         + "  export NIX_USE_PREFETCHED_PNPM_STORE=1; "
-        + "  export LOCAL_PNPM_STORE=\"$(cat \"$WORKSPACE_ROOT/buck-out/.unified-pnpm-store/path\" 2>/dev/null || true)\"; "
+        + "  export LOCAL_PNPM_STORE=\"$(cat \"$FLK_ROOT/buck-out/.unified-pnpm-store/path\" 2>/dev/null || true)\"; "
         + "fi; "
-        + "NIX_MAXJ=\"${NIX_MAX_JOBS:-1}\"; NIX_CORES=\"${NIX_CORES:-1}\"; "
-        + "$TIMEOUT nix build \"path:$FLK_ROOT#node-test.%s\" --impure --accept-flake-config --show-trace --print-build-logs --max-jobs \"$NIX_MAXJ\" --option cores \"$NIX_CORES\"; " % imp_attr
+        + "NIX_MAXJ=\"${NIX_MAX_JOBS:-0}\"; NIX_CORES=\"${NIX_CORES:-0}\"; "
+        + "JOBS_FLAG=\"\"; if [ -n \"$NIX_MAXJ\" ] && [ \"$NIX_MAXJ\" != \"0\" ]; then JOBS_FLAG=\"--max-jobs $NIX_MAXJ\"; fi; "
+        + "CORES_FLAG=\"\"; if [ -n \"$NIX_CORES\" ] && [ \"$NIX_CORES\" != \"0\" ]; then CORES_FLAG=\"--option cores $NIX_CORES\"; fi; "
+        + "$TIMEOUT nix build \"path:$FLK_ROOT#node-test.%s\" --impure --accept-flake-config --show-trace --print-build-logs --builders \"\" $JOBS_FLAG $CORES_FLAG; " % imp_attr
     )
 
     # Declare a tiny deterministic output so builds have an artifact

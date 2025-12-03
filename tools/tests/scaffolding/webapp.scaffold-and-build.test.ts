@@ -4,8 +4,10 @@ import path from "node:path";
 import { test } from "node:test";
 import { exists, runInTemp } from "../lib/test-helpers";
 
-// Increase internal Node test timeout to stay under the external 120s budget
-test("webapp: scaffold, glue, build dist via Buck", { timeout: 240_000 }, async () => {
+const TEST_TIMEOUT_MS =
+  Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
+// Increase internal Node test timeout to handle slow cold-cache Nix builds in CI
+test("webapp: scaffold, glue, build dist via Buck", { timeout: TEST_TIMEOUT_MS }, async () => {
   await runInTemp("node-webapp-scaffold-build", async (tmp, _$) => {
     const $ = _$({ cwd: tmp, stdio: "inherit" });
     await $`scaf new node webapp demo-web --yes`;
@@ -56,21 +58,64 @@ test("webapp: scaffold, glue, build dist via Buck", { timeout: 240_000 }, async 
       env: { ...envWithPrefetch, INSTALL_LOCK_SKIP: "1" },
     })`zx-wrapper tools/dev/update-pnpm-hash.ts --lockfile ${path.join(importer, "pnpm-lock.yaml")}`;
     // Ensure pnpm-store FOD is built before node-modules
-    await $({
-      cwd: tmp,
-      stdio: "inherit",
-      env: { ...envWithPrefetch, INSTALL_LOCK_SKIP: "1" },
-    })`bash --noprofile --norc -c 'nix build "${tmp}#pnpm-store.${sanitized}" --impure --no-link --accept-flake-config --print-build-logs --max-jobs 1 --option cores 1'`;
-    const nmBuild = await $({
-      cwd: tmp,
-      stdio: "inherit",
-      env: { ...envWithPrefetch, INSTALL_LOCK_SKIP: "1" },
-    })`bash --noprofile --norc -c 'nix build "${tmp}#node-modules.${sanitized}" --impure --no-link --accept-flake-config --print-build-logs --max-jobs 1 --option cores 1'`;
-    const nixOut = await $({
-      stdio: "pipe",
-      cwd: tmp,
-      env: envWithPrefetch,
-    })`bash --noprofile --norc -c 'nix build "${tmp}#node-webapp.${sanitized}" --impure --no-link --accept-flake-config --print-build-logs --max-jobs 1 --option cores 1 --print-out-paths'`;
+    {
+      const mj = String(process.env.NIX_MAX_JOBS || "0");
+      const cr = String(process.env.NIX_CORES || "0");
+      const cmd = [
+        "set -euo pipefail;",
+        "nix build",
+        `"${tmp}#pnpm-store.${sanitized}"`,
+        '--impure --no-link --accept-flake-config --builders "" --print-build-logs',
+        mj && mj !== "0" ? `--max-jobs ${mj}` : "",
+        cr && cr !== "0" ? `--option cores ${cr}` : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+      await $({
+        cwd: tmp,
+        stdio: "inherit",
+        env: { ...envWithPrefetch, INSTALL_LOCK_SKIP: "1" },
+      })`bash --noprofile --norc -c ${cmd}`;
+    }
+    const nmBuild = await (async () => {
+      const mj = String(process.env.NIX_MAX_JOBS || "0");
+      const cr = String(process.env.NIX_CORES || "0");
+      const cmd = [
+        "set -euo pipefail;",
+        "nix build",
+        `"${tmp}#node-modules.${sanitized}"`,
+        '--impure --no-link --accept-flake-config --builders "" --print-build-logs',
+        mj && mj !== "0" ? `--max-jobs ${mj}` : "",
+        cr && cr !== "0" ? `--option cores ${cr}` : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+      return await $({
+        cwd: tmp,
+        stdio: "inherit",
+        env: { ...envWithPrefetch, INSTALL_LOCK_SKIP: "1" },
+      })`bash --noprofile --norc -c ${cmd}`;
+    })();
+    const nixOut = await (async () => {
+      const mj = String(process.env.NIX_MAX_JOBS || "0");
+      const cr = String(process.env.NIX_CORES || "0");
+      const cmd = [
+        "set -euo pipefail;",
+        "nix build",
+        `"${tmp}#node-webapp.${sanitized}"`,
+        '--impure --no-link --accept-flake-config --builders "" --print-build-logs',
+        mj && mj !== "0" ? `--max-jobs ${mj}` : "",
+        cr && cr !== "0" ? `--option cores ${cr}` : "",
+        "--print-out-paths",
+      ]
+        .filter(Boolean)
+        .join(" ");
+      return await $({
+        stdio: "pipe",
+        cwd: tmp,
+        env: envWithPrefetch,
+      })`bash --noprofile --norc -c ${cmd}`;
+    })();
     const outPath =
       String(nixOut.stdout || "")
         .trim()

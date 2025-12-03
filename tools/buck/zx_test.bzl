@@ -62,7 +62,7 @@ def _zx_test_impl(ctx):
             + "if [ \"$ZX_TEST_DIRENV\" = \"1\" ]; then if command -v direnv >/dev/null 2>&1; then eval \"$(direnv export bash)\"; fi; fi; "
             # Skip direnv in temp repos by default; specific tests can override
             # Provide a single global default timeout unless a caller overrides it
-            + "if [ -z \"$TEST_NODE_OPTIONS\" ]; then export TEST_NODE_OPTIONS=\"--test-timeout=300000\"; fi; "
+            + "if [ -z \"$TEST_NODE_OPTIONS\" ]; then TSECS=\"${VERIFY_TIMEOUT_SECS:-1200}\"; if [ -n \"$TEST_NIX_TIMEOUT_SECS\" ]; then TSECS=\"$TEST_NIX_TIMEOUT_SECS\"; fi; export TEST_NODE_OPTIONS=\"--test-timeout=$(( TSECS * 1000 ))\"; fi; "
             + "if [ -n \"$NODE_V8_COVERAGE\" ]; then mkdir -p \"$NODE_V8_COVERAGE\"; "
             + "ls -1t \"$NODE_V8_COVERAGE\"/coverage-*.json 2>/dev/null | tail -n +201 | xargs -r rm -f || true; fi; "
             # Ensure zx-init is loaded in all node:test workers via NODE_OPTIONS

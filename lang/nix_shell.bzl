@@ -19,18 +19,18 @@ def nix_bootstrap_env():
         # Ensure a unified pnpm store exists once per repo state (mutexed) unless explicitly skipped.
         # Cheap no-op when already created; safe under parallel test execution.
         + "if [ \"${BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE:-}\" != \"1\" ]; then "
-        + "  if [ ! -f \"$WORKSPACE_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
+        + "  if [ ! -f \"$FLK_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
         + "    if command -v node >/dev/null 2>&1; then "
-        + "      (node \"$FLK_ROOT/tools/dev/require-unified-pnpm-store.ts\" >/dev/null 2>&1 || true); "
+        + "      (cd \"$FLK_ROOT\" && node \"$FLK_ROOT/tools/dev/require-unified-pnpm-store.ts\" >/dev/null 2>&1 || true); "
         + "    elif command -v nix >/dev/null 2>&1; then "
-        + "      (nix run --accept-flake-config \"$FLK_ROOT\"#zx-wrapper -- \"$FLK_ROOT/tools/dev/require-unified-pnpm-store.ts\" >/dev/null 2>&1 || true); "
+        + "      (cd \"$FLK_ROOT\" && nix run --accept-flake-config \"$FLK_ROOT\"#zx-wrapper -- \"$FLK_ROOT/tools/dev/require-unified-pnpm-store.ts\" >/dev/null 2>&1 || true); "
         + "    fi; "
         + "  fi; "
         + "fi; "
         # If a unified pnpm store path exists (buck-out-scoped), export env for Nix prefetch use.
-        + "if [ -f \"$WORKSPACE_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
+        + "if [ -f \"$FLK_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
         + "  export NIX_USE_PREFETCHED_PNPM_STORE=1; "
-        + "  export LOCAL_PNPM_STORE=\"$(cat \"$WORKSPACE_ROOT/buck-out/.unified-pnpm-store/path\" 2>/dev/null || true)\"; "
+        + "  export LOCAL_PNPM_STORE=\"$(cat \"$FLK_ROOT/buck-out/.unified-pnpm-store/path\" 2>/dev/null || true)\"; "
         + "fi; "
     )
 

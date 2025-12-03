@@ -79,11 +79,23 @@ test("node webapp: dev server runs and serves index", { timeout: 240_000 }, asyn
     }
     // build node-modules derivation
     try {
+      const mj = String(process.env.NIX_MAX_JOBS || "0");
+      const cr = String(process.env.NIX_CORES || "0");
+      const parts = [
+        "set -euo pipefail;",
+        "timeout 180s nix build",
+        `"${tmp}#node-modules.${sanitized}"`,
+        '--no-link --accept-flake-config --builders "" --print-build-logs',
+        mj && mj !== "0" ? `--max-jobs ${mj}` : "",
+        cr && cr !== "0" ? `--option cores ${cr}` : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
       await _$({
         cwd: tmp,
         stdio: "inherit",
         env: { ...process.env, NIX_PNPM_FETCH_TIMEOUT: "240", NIX_PNPM_ALLOW_GENERATE: "1" },
-      })`bash --noprofile --norc -c 'timeout 180s nix build "${tmp}#node-modules.${sanitized}" --no-link --accept-flake-config --print-build-logs --max-jobs 1 --option cores 1'`;
+      })`bash --noprofile --norc -c ${parts}`;
     } catch (e) {
       console.error(
         "webapp dev-server: node-modules Nix build timed out (180s) or failed — check flake logs; try increasing NIX_PNPM_FETCH_TIMEOUT or re-running with TEST_VERBOSE_LOGS=1",

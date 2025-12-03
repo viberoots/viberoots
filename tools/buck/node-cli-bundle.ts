@@ -51,46 +51,95 @@ async function main() {
 
   // Prefer evaluating from the temp repo root so importer-local flake is visible.
   const repoRoot = process.env.WORKSPACE_ROOT?.trim() || process.cwd();
-  async function run(cmd: string, args: string[], opts: { cwd?: string; env?: NodeJS.ProcessEnv }) {
+  async function run(
+    cmd: string,
+    args: string[],
+    opts: { cwd?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number },
+  ) {
     return await new Promise<string>((resolve, reject) => {
       const p = spawn(cmd, args, {
         cwd: opts.cwd,
         stdio: ["ignore", "pipe", "inherit"],
         env: opts.env ?? process.env,
       });
+      let killed = false;
+      const to =
+        typeof opts.timeoutMs === "number" && opts.timeoutMs > 0
+          ? setTimeout(() => {
+              try {
+                killed = true;
+                p.kill("SIGKILL");
+              } catch {}
+            }, opts.timeoutMs)
+          : undefined;
       let out = "";
       p.stdout.on("data", (d) => (out += d.toString()));
-      p.on("error", reject);
+      p.on("error", (e) => {
+        if (to) clearTimeout(to);
+        reject(e);
+      });
       p.on("close", (code) => {
-        if (code === 0) resolve(out);
-        else reject(new Error(`${cmd} exited with code ${code}`));
+        if (to) clearTimeout(to);
+        if (code === 0 && !killed) resolve(out);
+        else reject(new Error(`${cmd} exited with code ${code}${killed ? " (killed)" : ""}`));
       });
     });
   }
   // Build importer-local flake (apps/<name>/flake.nix) to avoid repo-wide eval churn.
   const importerAbs = path.join(repoRoot, importer);
-  const stdout = await run(
-    "nix",
-    [
-      "build",
-      `path:${importerAbs}#node-cli`,
-      "--no-link",
-      "--accept-flake-config",
-      "--impure",
-      "--no-write-lock-file",
-      "--print-out-paths",
-    ],
-    {
-      cwd: repoRoot,
-      env: {
-        ...process.env,
-        WORKSPACE_ROOT: repoRoot,
-        REPO_ROOT: repoRoot,
-      },
+  const mj = String(process.env.NIX_MAX_JOBS || "0").trim();
+  const cr = String(process.env.NIX_CORES || "0").trim();
+  const nixArgs: string[] = [
+    "build",
+    `path:${importerAbs}#node-cli`,
+    "--no-link",
+    "--accept-flake-config",
+    "--impure",
+    "--no-write-lock-file",
+    "--print-out-paths",
+    "--builders",
+    "",
+  ];
+  if (mj && mj !== "0") {
+    nixArgs.push("--max-jobs", mj);
+  }
+  if (cr && cr !== "0") {
+    nixArgs.push("--option", "cores", cr);
+  }
+  const stdout = await run("nix", nixArgs, {
+    cwd: repoRoot,
+    env: {
+      ...process.env,
+      WORKSPACE_ROOT: repoRoot,
+      REPO_ROOT: repoRoot,
     },
-  );
+    // Bound the bundle build to avoid deadlocks; allow override via env if needed
+    timeoutMs: Math.max(1, Number(process.env.NIX_PNPM_FETCH_TIMEOUT || "600")) * 1000,
+  });
+  // Mitigate rare transient ENOENT during flake source import by retrying once.
+  let buildOut = stdout;
+  if (!String(buildOut || "").trim()) {
+    try {
+      // Small backoff before retry
+      await new Promise((r) => setTimeout(r, 300));
+      buildOut = await run("nix", nixArgs, {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          WORKSPACE_ROOT: repoRoot,
+          REPO_ROOT: repoRoot,
+        },
+        timeoutMs: Math.max(1, Number(process.env.NIX_PNPM_FETCH_TIMEOUT || "600")) * 1000,
+      });
+    } catch (e) {
+      // Re-throw with clear context
+      fail(
+        `node-cli-bundle: nix build failed twice for importer ${importer}: ${(e as Error).message || e}`,
+      );
+    }
+  }
   const storePath =
-    String(stdout || "")
+    String(buildOut || "")
       .trim()
       .split(/\r?\n/)
       .filter(Boolean)

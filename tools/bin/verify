@@ -3,12 +3,13 @@
 # shellcheck source=/dev/null
 . "$(cd "$(dirname "$0")" && pwd)/_env.sh"
 
-# Determine external timeout command
+# Determine external timeout command (respect VERIFY_TIMEOUT_SECS)
+TSEC="${VERIFY_TIMEOUT_SECS:-3600}"
 TIMEOUT_CMD=()
 if command -v timeout >/dev/null 2>&1; then
-  TIMEOUT_CMD=(timeout -k 10s 1200s)
+  TIMEOUT_CMD=(timeout -k 10s "${TSEC}s")
 elif command -v gtimeout >/dev/null 2>&1; then
-  TIMEOUT_CMD=(gtimeout -k 10s 1200s)
+  TIMEOUT_CMD=(gtimeout -k 10s "${TSEC}s")
 else
   TIMEOUT_CMD=()
 fi
@@ -41,9 +42,19 @@ export COVERAGE
 # Use PATH for buck2; shellHook ensures upstream buck2 is first
 BUCK_BIN="buck2"
 
-# Speed up local Nix builds of Node tests while keeping deterministic defaults in CI
-export NIX_MAX_JOBS="${NIX_MAX_JOBS:-2}"
-export NIX_CORES="${NIX_CORES:-2}"
+# Speed up local Nix builds by default: detect CPU count unless explicitly overridden
+CPU_COUNT=""
+if command -v sysctl >/dev/null 2>&1; then
+  CPU_COUNT="$(sysctl -n hw.ncpu 2>/dev/null || true)"
+fi
+if [[ -z "${CPU_COUNT:-}" ]] && command -v nproc >/dev/null 2>&1; then
+  CPU_COUNT="$(nproc 2>/dev/null || true)"
+fi
+if [[ -z "${CPU_COUNT:-}" ]]; then
+  CPU_COUNT="4"
+fi
+export NIX_MAX_JOBS="${NIX_MAX_JOBS:-${CPU_COUNT}}"
+export NIX_CORES="${NIX_CORES:-${CPU_COUNT}}"
 
 # Resolve prelude strictly from this flake's buck2-prelude (built from upstream input)
 if ! command -v nix >/dev/null 2>&1; then
@@ -111,6 +122,21 @@ cat > toolchains/.buckconfig <<EOF
 name = TARGETS
 EOF
 
+# Prewarm unified PNPM store once per repo state (best-effort) to avoid per-test prewarm work
+if [[ ! -f "$ROOT_DIR/buck-out/.unified-pnpm-store/path" ]]; then
+  if command -v node >/dev/null 2>&1; then
+    (cd "$ROOT_DIR" && node "$ROOT_DIR/tools/dev/require-unified-pnpm-store.ts" >/dev/null 2>&1 || true)
+  elif command -v nix >/dev/null 2>&1; then
+    (cd "$ROOT_DIR" && nix run --accept-flake-config "$ROOT_DIR"#zx-wrapper -- "$ROOT_DIR/tools/dev/require-unified-pnpm-store.ts" >/dev/null 2>&1 || true)
+  fi
+fi
+
+# Prewarm shared test importer node deps once (best-effort)
+if command -v nix >/dev/null 2>&1; then
+  (cd "$ROOT_DIR" && nix build ".#pnpm-store.libs-test-deps" --no-link --accept-flake-config --builders "" --print-build-logs >/dev/null 2>&1 || true)
+  (cd "$ROOT_DIR" && nix build ".#node-modules.libs-test-deps" --no-link --accept-flake-config --builders "" --print-build-logs >/dev/null 2>&1 || true)
+fi
+
 build_run_array() {
   local PLATFORM_FLAGS=(--target-platforms prelude//platforms:default)
   local TARGETS=()
@@ -157,14 +183,15 @@ export BUCK_LOG="${BUCK_LOG:-warn},buck2_client_ctx::file_tailers::tailer=off,bu
 run_batch() {
   local iso="$1"; shift
   local -a targets=( "$@" )
-  local tsec="${VERIFY_TIMEOUT_SECS:-1200}"
+  local tsec="${VERIFY_TIMEOUT_SECS:-3600}"
+  local tms=$(( tsec * 1000 ))
   local prefix=""
   if command -v timeout >/dev/null 2>&1; then
     prefix="timeout -k 10s ${tsec}s "
   elif command -v gtimeout >/dev/null 2>&1; then
     prefix="gtimeout -k 10s ${tsec}s "
   fi
-  local cmd="${prefix}buck2 --isolation-dir \"$iso\" test --console super --target-platforms prelude//platforms:default ${targets[*]} -- --env COVERAGE=\"${COVERAGE:-0}\""
+  local cmd="${prefix}buck2 --isolation-dir \"$iso\" test --console super --overall-timeout ${tsec}s --target-platforms prelude//platforms:default ${targets[*]} -- --env COVERAGE=\"${COVERAGE:-0}\" --env TEST_NODE_OPTIONS=\"--test-timeout=${tms}\""
   if command -v script >/dev/null 2>&1; then
     script -q /dev/null bash --noprofile --norc -c "$cmd"
   else
@@ -177,35 +204,46 @@ if [[ "$#" -gt 0 ]]; then
   # Direct targets given: single batch
   run_batch "$ISO" "$@" || STATUS=$?
 else
-  # No explicit targets: partition zx tests into a small number of batches to respect the 10m timeout
+  # No explicit targets: enumerate all zx tests
   mapfile -t ALL_TESTS < <(buck2 targets --target-platforms prelude//platforms:default //... --json | jq -r '.[] | select(."buck.type"|endswith(":zx_test")) | .name' | sort)
   if [[ "${#ALL_TESTS[@]}" -eq 0 ]]; then
     echo "No tests found" 1>&2
     exit 2
   fi
-  # Heuristic batch size: ~1/3rd per batch, minimum 1
+  # Default to a single batch for maximal efficiency; allow opting into batching via VERIFY_BATCHES
   local total="${#ALL_TESTS[@]}"
-  local batches=3
-  local size=$(( (total + batches - 1) / batches ))
-  (( size < 1 )) && size=1
-  local i=0
-  local batch_idx=0
-  while (( i < total )); do
-    batch_idx=$((batch_idx + 1))
-    # Reuse a single buck2 daemon across batches to avoid repeated cold starts
-    local iso_batch="${ISO}"
+  local batches="${VERIFY_BATCHES:-1}"
+  if [[ "$batches" -le 1 ]]; then
     local -a batch=( )
-    local j=0
-    while (( j < size && i < total )); do
-      batch+=( "//:${ALL_TESTS[i]}" )
-      i=$((i + 1))
-      j=$((j + 1))
+    for t in "${ALL_TESTS[@]}"; do
+      batch+=( "//:${t}" )
     done
-    echo "[verify] Running batch ${batch_idx} with ${#batch[@]} tests..." 1>&2
-    if ! run_batch "$iso_batch" "${batch[@]}"; then
+    echo "[verify] Running single batch with ${#batch[@]} tests..." 1>&2
+    if ! run_batch "$ISO" "${batch[@]}"; then
       STATUS=1
     fi
-  done
+  else
+    local size=$(( (total + batches - 1) / batches ))
+    (( size < 1 )) && size=1
+    local i=0
+    local batch_idx=0
+    while (( i < total )); do
+      batch_idx=$((batch_idx + 1))
+      # Reuse a single buck2 daemon across batches to avoid repeated cold starts
+      local iso_batch="${ISO}"
+      local -a batch=( )
+      local j=0
+      while (( j < size && i < total )); do
+        batch+=( "//:${ALL_TESTS[i]}" )
+        i=$((i + 1))
+        j=$((j + 1))
+      done
+      echo "[verify] Running batch ${batch_idx} with ${#batch[@]} tests..." 1>&2
+      if ! run_batch "$iso_batch" "${batch[@]}"; then
+        STATUS=1
+      fi
+    done
+  fi
 fi
 # Final best-effort cleanup
 cleanup || true
@@ -216,10 +254,11 @@ EOS
   local RUN_TIMEOUT=()
   if [[ -n ${TIMEOUT_CMD+x} && ${#TIMEOUT_CMD[@]} -gt 0 ]]; then
     if [[ ${#TARGETS[@]} -eq 1 && "${TARGETS[0]}" == *:* ]]; then
+      # For single-target runs, also honor VERIFY_TIMEOUT_SECS
       if command -v timeout >/dev/null 2>&1; then
-        RUN_TIMEOUT=(timeout -k 10s 1200s)
+        RUN_TIMEOUT=(timeout -k 10s "${VERIFY_TIMEOUT_SECS:-1200}s")
       elif command -v gtimeout >/dev/null 2>&1; then
-        RUN_TIMEOUT=(gtimeout -k 10s 1200s)
+        RUN_TIMEOUT=(gtimeout -k 10s "${VERIFY_TIMEOUT_SECS:-1200}s")
       fi
     else
       RUN_TIMEOUT=("${TIMEOUT_CMD[@]}")

@@ -135,6 +135,82 @@ Implement.
 
 ---
 
+## PR‑3.5: Eliminate Nix out‑links and clean `buck-out/tmp` to prevent GC roots/store bloat
+
+### Description
+
+Standardize our Nix invocation patterns to avoid creating persistent GC roots and stale out‑links during builds/tests, and add a lightweight cleanup step for ephemeral Buck temp artifacts. This reduces unbounded growth of the Nix store caused by `--out-link` usage and `buck-out/tmp/buck-impure-*` leftovers.
+
+### Scope & Changes
+
+- `//lang:nix_shell.bzl`:
+  - Guidance: from macro‑assembled shell `cmd`s, use `nix build --no-link --print-out-paths` and capture the output path via a shell variable instead of creating named out‑links with `--out-link`.
+  - Optional follow‑up: provide a tiny helper snippet (as a Starlark string fragment) to capture the last printed out path into a variable, e.g. `OUT_PATH="$($TIMEOUT nix build ... --no-link --print-out-paths | tail -n1)"`.
+
+- `node/defs.bzl` (no output changes):
+  - `node_webapp(...)`:
+    - Replace `--out-link "$tmp/out"; outPath=$(readlink -f "$tmp/out")` with:
+      - `outPath=$($TIMEOUT nix build .#node-webapp.<importer> --accept-flake-config --no-link --print-out-paths | tail -n1)`
+      - Copy `"$outPath/dist"` to `$OUT` as before.
+  - `nix_node_cli_bin(bundle=True)`:
+    - Ensure the bundled artifact path is obtained without out‑links:
+      - Either have the macro capture the printed out path directly (as above), or
+      - Ensure `tools/buck/node-cli-bundle.ts` uses `--no-link --print-out-paths` and prints the path for the macro to consume.
+  - Preserve `global_nix_inputs()` stamping and importer derivation from PR‑3; only out‑link removal is new.
+
+- Node bundler shim:
+  - If `tools/buck/node-cli-bundle.ts` shells to Nix, switch to `--no-link --print-out-paths` and print the absolute path via stdout; avoid creating named out‑links.
+
+- Test scaffolding and examples:
+  - Replace any remaining `nix build ... --out-link <path>` in zx tests with `--no-link --print-out-paths` and local capture.
+  - Add a small zx test that asserts macro‑generated `cmd` strings contain no `--out-link` (via `buck2 cquery --output-attributes cmd`).
+
+- Lightweight cleanup for Buck temp artifacts:
+  - Add `tools/dev/clean-temp-outs.ts`:
+    - Removes stale `buck-out/tmp/buck-impure-*` (older than N minutes, default 30).
+    - Optionally prunes temporary `result` symlinks under known temp roots if any remain from external tooling.
+  - CI (`tools/ci/run-stage.ts`): invoke `clean-temp-outs.ts` after each stage (best‑effort, non‑fatal). Provide a dev command to run it locally.
+
+### Tests (in this PR)
+
+- Node macro command checks:
+  - `node_webapp` and bundled `nix_node_cli_bin` cquery `cmd` payloads do not contain `--out-link`.
+  - Commands still include `nix_bootstrap_env()` and `nix_timeout_wrapper_var()` (from PR‑3).
+- Functional smoke:
+  - Webapp and bundled CLI still build successfully; artifacts are unchanged for identical inputs.
+- Store/GC‑root probes (best‑effort):
+  - Before/after a representative temp run, `nix-store --gc --print-roots | grep -E "nix-shell\\.|buck-impure-"` is reduced/empty after switching to `--no-link` and running the cleanup step.
+
+### Docs (in this PR)
+
+- `build-system-design.md`: add a “No out‑links” note for macros that call Nix; reference the cleanup helper and where it runs (dev + CI).
+
+### Acceptance Criteria
+
+- No `--out-link` appears in macro‑assembled `cmd` strings.
+- Webapp and bundled CLI artifacts remain byte‑identical for unchanged inputs.
+- Running representative builds/tests creates no persistent GC roots from out‑links; `buck-out/tmp` does not accumulate stale `buck-impure-*` across CI runs (post‑stage cleanup active).
+
+### Risks
+
+- Low: shell changes are minimal; incorrect path capture would break copy steps (covered by smoke tests).
+- Very low performance impact; printed paths are as discoverable as out‑links for debugging.
+
+### Consequence of Not Implementing
+
+- Continued Nix store growth due to lingering out‑links and stale Buck temp directories.
+- More frequent manual GC and store optimization needed by developers and CI.
+
+### Downsides for Implementing
+
+- Minor churn to `cmd` assembly in 1‑2 macro paths and a couple of tests.
+
+### Recommendation
+
+Implement.
+
+---
+
 ## PR‑4: Consolidate provider TARGETS boilerplate per‑language
 
 ### Description
@@ -281,6 +357,7 @@ Implement.
 1. PR‑1 (Shared‑layer hygiene): message‑only change; unblocks other refactors with cleaner shared APIs.
 2. PR‑2 (Package‑local patch helper): trivial extraction; reduces duplication in Go/C++ macros.
 3. PR‑3 (Nix bootstrap/timeout standardization): improves reliability of Node macros that call Nix.
+   3.5. PR‑3.5 (Out‑link elimination & tmp cleanup): remove `--out-link` usage and add lightweight cleanup for Buck temp outputs.
 4. PR‑4 (Provider TARGETS boilerplate consolidation): centralize per‑language generation boilerplate.
 5. PR‑5 (Importer provider‑sync driver): factor shared skeleton; adopt in Node/Python.
 6. PR‑6 (Consistency lint): codify guarantees to prevent future drift.
@@ -298,6 +375,9 @@ Implement.
 - PR‑3
   - Verification: Node `webapp`/bundled CLI smoke builds pass; identical artifacts; timeouts applied.
   - Backout: drop bootstrap/timeout fragments from `cmd` assembly.
+- PR‑3.5
+  - Verification: cquery `cmd` shows no `--out-link`; smoke builds succeed; cleanup removes stale `buck-impure-*`; store roots from out‑links do not accumulate across runs.
+  - Backout: revert the `--no-link` changes and skip the cleanup helper.
 - PR‑4
   - Verification: golden provider files unchanged; name collision test still enforced.
   - Backout: restore explicit header/sentinels per file.
@@ -313,6 +393,7 @@ Implement.
 ## Summary of Expected Impact
 
 - **Reliability**: Nix bootstrap/timeout consistency in Node macros that call Nix.
+- **Resource hygiene**: Reduced Nix store bloat by eliminating out‑links and cleaning stale Buck temp outputs.
 - **Consistency**: Centralized provider TARGETS boilerplate and importer‑sync scaffolding.
 - **Maintainability**: Less duplication in Go/C++ patch wiring; unified importer filtering; cleaner shared error messages.
 - **Drift prevention**: A small, fast lint codifies label stamping and provider‑edge realization patterns across languages.

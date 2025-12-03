@@ -91,6 +91,7 @@ extra-experimental-features = nix-command flakes dynamic-derivations ca-derivati
    - WASM stamps: use `//lang:defs_common.bzl:stamp_wasm_variant(kwargs, "<lang>", "<variant>")` to append `lang:<lang>`, `kind:wasm`, and `wasm:<variant>` uniformly across C++/Go/Python macros.
    - Note: For discoverability only, `tools/nix/lang-templates.nix` exposes a `Node` symbol bag (forwarded from `tools/nix/templates/node.nix`). The planner’s Node plugin remains authoritative; no consumers rely on this symbol bag.
    - For a concrete Node→C++ addon scaffold and artifact flow, see `node-call-cpp.md`.
+   - Node macros that call Nix must prepend `nix_bootstrap_env()` and `nix_timeout_wrapper_var()` from `//lang:nix_shell.bzl` to their `cmd` assembly (e.g., `node_webapp`, bundled `nix_node_cli_bin`). This standardizes environment setup and external timeouts across platforms.
 
 ## End-to-End Architecture
 

@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { findNearestImporterLock, nodeModulesAttr } from "./install/common.ts";
+import { resolveImporterDir } from "../lib/lockfiles.ts";
 
 async function findFlakeRoot(start: string): Promise<string> {
   let dir = path.resolve(start);
@@ -19,14 +20,28 @@ async function findFlakeRoot(start: string): Promise<string> {
 }
 
 const cwd = process.cwd();
-const info = await findNearestImporterLock(cwd);
-if (!info) {
-  console.error(
-    "node-modules-build: no pnpm-lock.yaml found near current directory; cannot resolve importer",
-  );
-  process.exit(2);
+// Allow an explicit importer override for tests to reduce redundant per-importer builds.
+// When set, it should be a repo-root-relative directory containing pnpm-lock.yaml, e.g., "libs/test-deps".
+const overrideImporterRaw = (process.env.ZX_TEST_NODE_MODULES_IMPORTER || "").trim();
+let importer = "";
+if (overrideImporterRaw) {
+  try {
+    importer = await resolveImporterDir(cwd, overrideImporterRaw);
+  } catch {
+    // Fall back to nearest importer when override is invalid
+    importer = "";
+  }
 }
-const importer = info!.importer;
+if (!importer) {
+  const info = await findNearestImporterLock(cwd);
+  if (!info) {
+    console.error(
+      "node-modules-build: no pnpm-lock.yaml found near current directory; cannot resolve importer",
+    );
+    process.exit(2);
+  }
+  importer = info!.importer;
+}
 const fullAttr = nodeModulesAttr(importer);
 const flakeRoot = await findFlakeRoot(cwd);
 // Fast path: if output is already realized in the store, prefer path-info
@@ -47,8 +62,17 @@ try {
   }
 } catch {}
 async function tryBuild(): Promise<string> {
-  const built =
-    await $`nix build ${flakeRoot}#${fullAttr} --no-link --accept-flake-config --print-out-paths`.nothrow();
+  const cmd = [
+    "set -euo pipefail;",
+    'MJ="${NIX_MAX_JOBS:-0}";',
+    'CR="${NIX_CORES:-0}";',
+    'TS="${NIX_PNPM_FETCH_TIMEOUT:-900}";',
+    'TO=""; if command -v timeout >/dev/null 2>&1; then TO="timeout -k 10s ${TS}s "; elif command -v gtimeout >/dev/null 2>&1; then TO="gtimeout -k 10s ${TS}s "; fi;',
+    'JOBS_FLAG=""; if [ -n "$MJ" ] && [ "$MJ" != "0" ]; then JOBS_FLAG="--max-jobs $MJ"; fi;',
+    'CORES_FLAG=""; if [ -n "$CR" ] && [ "$CR" != "0" ]; then CORES_FLAG="--option cores $CR"; fi;',
+    `$TO nix build "${flakeRoot}#${fullAttr}" --no-link --accept-flake-config --builders "" --print-out-paths $JOBS_FLAG $CORES_FLAG`,
+  ].join(" ");
+  const built = await $`bash --noprofile --norc -c ${cmd}`.nothrow();
   const txt = String(built.stdout || "").trim();
   if (built.exitCode === 0 && txt) {
     return txt.split("\n").filter(Boolean).pop() || "";

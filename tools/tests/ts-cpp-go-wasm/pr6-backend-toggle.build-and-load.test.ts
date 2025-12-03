@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import fs from "fs-extra";
+import * as fsp from "node:fs/promises";
+import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
@@ -8,7 +9,9 @@ test("pr6: backend toggle tinygo_single and emscripten_dual both return add(2,3)
   await runInTemp("pr6-backend-toggle", async (tmp, $) => {
     // 1) Scaffold minimal C wrapper and header (pure compute) in a temp repo
     const coreDir = path.join(tmp, "libs", "math-core");
-    await fs.outputFile(
+    await fsp.mkdir(path.join(coreDir, "include"), { recursive: true });
+    await fsp.mkdir(path.join(coreDir, "src", "cwrapper"), { recursive: true });
+    await fsp.writeFile(
       path.join(coreDir, "include", "addon.h"),
       `#ifndef MATH_CORE_ADDON_H
 #define MATH_CORE_ADDON_H
@@ -22,13 +25,13 @@ int add(int a, int b);
 #endif
 `,
     );
-    await fs.outputFile(
+    await fsp.writeFile(
       path.join(coreDir, "src", "cwrapper", "addon.c"),
       `#include "../../include/addon.h"
 int add(int a, int b) { return a + b; }
 `,
     );
-    await fs.outputFile(
+    await fsp.writeFile(
       path.join(coreDir, "TARGETS"),
       `load("//cpp:defs.bzl", "nix_cpp_wasm_static_lib", "nix_cpp_wasm_emscripten_lib")
 
@@ -51,15 +54,15 @@ nix_cpp_wasm_emscripten_lib(
 
     // 2) TinyGo package exporting a wasm function `add`
     const apiDir = path.join(tmp, "libs", "math-api");
-    await fs.mkdirp(apiDir);
-    await fs.outputFile(
+    await fsp.mkdir(apiDir, { recursive: true });
+    await fsp.writeFile(
       path.join(apiDir, "go.mod"),
       `module example.com/math/api
 
 go 1.22.0
 `,
     );
-    await fs.outputFile(
+    await fsp.writeFile(
       path.join(apiDir, "main.go"),
       `package main
 
@@ -71,7 +74,7 @@ func add(a int32, b int32) int32 {
 func main() {}
 `,
     );
-    await fs.outputFile(
+    await fsp.writeFile(
       path.join(apiDir, "TARGETS"),
       `load("//go:defs.bzl", "nix_go_tiny_wasm_lib")
 
@@ -86,9 +89,9 @@ nix_go_tiny_wasm_lib(
     );
 
     // 3) Provide C++ defs in the temp repo (planner-visible)
-    await fs.outputFile(
+    await fsp.writeFile(
       path.join(tmp, "cpp", "defs.bzl"),
-      await fs.readFile("cpp/defs.bzl", "utf8"),
+      await fsp.readFile("cpp/defs.bzl", "utf8"),
     );
 
     // 4) Export graph once
@@ -143,7 +146,7 @@ nix_go_tiny_wasm_lib(
     if (!outEmsPath) throw new Error("no out path from build-selected for emscripten bundle");
     // Probe artifact names (lib/<sanitized>.js/.wasm)
     const libDir = path.join(outEmsPath, "lib");
-    const files = await fs.readdir(libDir);
+    const files = await fsp.readdir(libDir);
     const jsFile = files.find((f) => f.endsWith(".js")) || "";
     const wasmFile = files.find((f) => f.endsWith(".wasm")) || "";
     if (!jsFile || !wasmFile) {
@@ -154,9 +157,9 @@ nix_go_tiny_wasm_lib(
 
     // 7) Minimal TS/ESM loader that reads a manifest and returns the API
     const tsDir = path.join(tmp, "libs", "math-ts", "src", "browser");
-    await fs.mkdirp(tsDir);
+    await fsp.mkdir(tsDir, { recursive: true });
     const loaderPath = path.join(tsDir, "index.mjs");
-    await fs.writeFile(
+    await fsp.writeFile(
       loaderPath,
       `
 import { readFile } from 'node:fs/promises';
@@ -234,21 +237,37 @@ export async function loadFromManifest(manifestPath) {
 
     // 8) Manifests for both backends
     const manifestsDir = path.join(tmp, "libs", "math-ts", "dist");
-    await fs.mkdirp(manifestsDir);
+    await fsp.mkdir(manifestsDir, { recursive: true });
     const tinyManifest = path.join(manifestsDir, "manifest.tiny.json");
     const emManifest = path.join(manifestsDir, "manifest.ems.json");
-    await fs.writeJson(tinyManifest, {
-      backend: "tinygo_single",
-      tinygoWasm: "file://" + tinygoWasm,
-    });
-    await fs.writeJson(emManifest, {
-      backend: "emscripten_dual",
-      tinygoWasm: "file://" + tinygoWasm,
-      emscripten: {
-        js: "file://" + emJs,
-        wasm: "file://" + emWasm,
-      },
-    });
+    await fsp.writeFile(
+      tinyManifest,
+      JSON.stringify(
+        {
+          backend: "tinygo_single",
+          tinygoWasm: "file://" + tinygoWasm,
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    await fsp.writeFile(
+      emManifest,
+      JSON.stringify(
+        {
+          backend: "emscripten_dual",
+          tinygoWasm: "file://" + tinygoWasm,
+          emscripten: {
+            js: "file://" + emJs,
+            wasm: "file://" + emWasm,
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
 
     // 9) Import loader and verify both backends
     const fileUrl = "file://" + loaderPath;
