@@ -4,6 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runInTemp } from "../lib/test-helpers";
+import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
 
 test("planner imports plugins listed in langs.json when present", async () => {
   await runInTemp("planner-manifest-plugin", async (tmp, $) => {
@@ -51,12 +52,20 @@ test("planner imports plugins listed in langs.json when present", async () => {
     await fs.outputFile(path.join(tmp, "tools/nix/planner/toy.nix"), toyPlugin);
 
     // Minimal graph.json (empty) so planner evaluates without needing Buck
-    await fs.outputFile(path.join(tmp, "tools/buck/graph.json"), "[]\n");
+    await fs.outputFile(path.join(tmp, DEFAULT_GRAPH_PATH), "[]\n");
 
     // Nix build should succeed and produce graph-generator output
-    const outLink = `buck-go-${Date.now()}`;
-    await $({ cwd: tmp })`nix build .#graph-generator --out-link ${outLink}`;
-    const manifestPath = path.join(tmp, outLink, "manifest.json");
+    const { stdout } = await $({
+      cwd: tmp,
+      stdio: "pipe",
+    })`nix build .#graph-generator --no-link --print-out-paths`;
+    const outPath =
+      String(stdout || "")
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .pop() || "";
+    const manifestPath = path.join(outPath, "manifest.json");
     assert.ok(await fs.pathExists(manifestPath), "manifest.json should exist");
   });
 });

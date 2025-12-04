@@ -47,12 +47,18 @@ test("planner builds go_binary with filtered srcRoot", async () => {
     // Ensure previous link is removed if present
     await fs.remove(path.join(tmp, "buck-go")).catch(() => {});
     // Point flake src at the temp repo so the planner uses the filtered snapshot from tmp
-    await $({
+    const { stdout } = await $({
       cwd: tmp,
-      stdio: "inherit",
+      stdio: "pipe",
       env: { ...process.env, BUCK_TEST_SRC: tmp },
-    })`nix build .#graph-generator --out-link buck-go`;
-    const manifest = path.join(tmp, "buck-go", "manifest.json");
+    })`nix build .#graph-generator --no-link --print-out-paths`;
+    const outPath =
+      String(stdout || "")
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .pop() || "";
+    const manifest = path.join(outPath, "manifest.json");
     const txt = await fs.readFile(manifest, "utf8").catch(() => "");
     if (!txt) {
       console.error("missing manifest.json");

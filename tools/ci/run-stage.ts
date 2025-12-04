@@ -195,6 +195,10 @@ async function main() {
     default:
       throw new Error(`unknown stage: ${stage}`);
   }
+  // Post-stage housekeeping: best-effort cleanup of ephemeral temp outs
+  try {
+    await $`node ${nodeBase} tools/dev/clean-temp-outs.ts`.nothrow();
+  } catch {}
 }
 
 main().catch((e) => {

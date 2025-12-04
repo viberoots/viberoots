@@ -723,20 +723,23 @@ async function main() {
     } else {
       // No specific targets: materialize full impure graph outputs and list any bins
       try {
-        const linkDir = path.resolve(repoRoot(), "buck-out", "tmp");
-        await fsp.mkdir(linkDir, { recursive: true });
-        const linkNameImp = path.join(linkDir, `buck-impure-${Date.now()}`);
         const env = {
           ...process.env,
           BUCK_TEST_SRC: repoRoot(),
           BUCK_GRAPH_JSON: path.join(repoRoot(), DEFAULT_GRAPH_PATH),
         } as any;
-        await $({
-          stdio: "inherit",
+        const { stdout } = await $({
+          stdio: "pipe",
           cwd: repoRoot(),
           env,
-        })`nix build --impure --no-write-lock-file .#graph-generator --accept-flake-config --out-link ${linkNameImp}`;
-        const manifestPath = path.resolve(linkNameImp, "manifest.json");
+        })`nix build --impure --no-write-lock-file .#graph-generator --accept-flake-config --no-link --print-out-paths`;
+        const outPath =
+          String(stdout || "")
+            .trim()
+            .split("\n")
+            .filter(Boolean)
+            .pop() || "";
+        const manifestPath = path.resolve(outPath, "manifest.json");
         const txt = await fsp.readFile(manifestPath, "utf8").catch(() => "");
         if (txt) {
           const entries = JSON.parse(txt) as Array<any>;

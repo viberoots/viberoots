@@ -62,14 +62,19 @@ test("planner: root-only files are excluded from materialized outputs", async ()
       },
     })`tools/dev/install-deps.ts --glue-only`;
     await $`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
-    const outLink = `buck-go-${Date.now()}`;
-    await $({
+    const { stdout } = await $({
       cwd: tmp,
-      stdio: "inherit",
-    })`bash -lc 'BUCK_TARGET="//apps/demo-cli:demo-cli" nix build --impure -L .#graph-generator-selected --out-link ${outLink}'`;
+      stdio: "pipe",
+    })`bash -lc 'BUCK_TARGET="//apps/demo-cli:demo-cli" nix build --impure -L .#graph-generator-selected --no-link --print-out-paths'`;
+    const outPath =
+      String(stdout || "")
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .pop() || "";
 
     // Walk the outLink tree and ensure sentinel is absent from files
-    const root = path.join(tmp, outLink);
+    const root = outPath;
     async function listFilesRec(dir: string): Promise<string[]> {
       const out: string[] = [];
       const stack: string[] = [dir];

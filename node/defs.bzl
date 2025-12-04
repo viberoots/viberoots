@@ -112,9 +112,7 @@ def node_webapp(
     _prefix = nix_bootstrap_env().replace("$(", "$$(") + nix_timeout_wrapper_var(default_sec = 240)
     cmd = (
         _prefix
-        + "tmp=$$(mktemp -d); trap 'rm -rf \"$tmp\"' EXIT; "
-        + "$TIMEOUT nix build .#node-webapp.%s --accept-flake-config --out-link \"$tmp/out\"; " % _sanitize_importer_attr(_importer)
-        + "outPath=$$(readlink -f \"$tmp/out\"); "
+        + "outPath=$$($TIMEOUT nix build .#node-webapp.%s --accept-flake-config --no-link --print-out-paths | tail -n1); " % _sanitize_importer_attr(_importer)
         + "if [ -d \"$outPath/dist\" ]; then cp -R \"$outPath/dist\" $OUT; else echo 'dist missing' >&2; exit 2; fi"
     )
 

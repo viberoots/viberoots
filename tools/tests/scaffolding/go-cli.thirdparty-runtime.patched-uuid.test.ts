@@ -310,18 +310,18 @@ function normalizeCellLabel(s: string) {
 }
 
 async function buildGraphAndFindBin(sh: any, tmp: string, label: string): Promise<string> {
-  const outLinkName = `buck-go-${Date.now()}`;
-  const outLinkPath = path.join(tmp, outLinkName);
-  try {
-    await fsp.rm(outLinkPath, { recursive: false, force: true });
-  } catch {}
-  await sh({
+  const { stdout } = await sh({
     cwd: tmp,
-    stdio: "inherit",
+    stdio: "pipe",
     env: {},
-  })`nix build .#graph-generator --out-link ${outLinkName}`;
-
-  const manifestPath = path.join(tmp, outLinkName, "manifest.json");
+  })`nix build .#graph-generator --no-link --print-out-paths`;
+  const outPath =
+    String(stdout || "")
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .pop() || "";
+  const manifestPath = path.join(outPath, "manifest.json");
   const manifestTxt = await fsp.readFile(manifestPath, "utf8").catch(() => "");
   let binPath = "";
   if (manifestTxt) {

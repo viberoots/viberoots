@@ -52,15 +52,16 @@ test("provider wiring present only on affected target after patch", async () => 
     await $`/usr/bin/env bash --noprofile --norc -lc 'mkdir -p patches/go && touch patches/go/golang.org__x__text@v0.14.0.patch'`;
     // Run glue and build via Nix graph-generator
     await $`tools/dev/install-deps.ts --glue-only`;
-    const outLinkName = `buck-go-${Date.now()}`;
-    const outLinkPath = path.join(_tmp, outLinkName);
-    try {
-      await fsp.rm(outLinkPath, { recursive: false, force: true });
-    } catch {}
-    await $({
+    const { stdout } = await $({
       cwd: _tmp,
-      stdio: "inherit",
-    })`nix build .#graph-generator --out-link ${outLinkName}`;
+      stdio: "pipe",
+    })`nix build .#graph-generator --no-link --print-out-paths`;
+    const outPath =
+      String(stdout || "")
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .pop() || "";
     await $`test -f third_party/providers/auto_map.bzl`;
   });
 });

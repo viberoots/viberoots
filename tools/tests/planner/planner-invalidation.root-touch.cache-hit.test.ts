@@ -48,17 +48,22 @@ test("planner: touching root-only file does not change app bin store path", asyn
 
     // Generate glue, then build graph-generator bundle
     await $`tools/dev/install-deps.ts --glue-only`;
-    const outLink1 = `buck-go-${Date.now()}`;
     const t1 = Date.now();
-    await $({
+    const { stdout: outStd1 } = await $({
       cwd: tmp,
-      stdio: "inherit",
-    })`bash -lc 'nix build --impure -L .#graph-generator --accept-flake-config --out-link ${outLink1}'`;
+      stdio: "pipe",
+    })`bash -lc 'nix build --impure -L .#graph-generator --accept-flake-config --no-link --print-out-paths'`;
+    const outPath1 =
+      String(outStd1 || "")
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .pop() || "";
     if (process.env.TEST_TIMING === "1")
       console.error(`[timing] first nix build: ${((Date.now() - t1) / 1000).toFixed(2)}s`);
 
     // Read manifest and ensure demo-cli entry exists with at least one bin
-    const manifest1Path = path.join(tmp, outLink1, "manifest.json");
+    const manifest1Path = path.join(outPath1, "manifest.json");
     const manifest1Txt = await fsp.readFile(manifest1Path, "utf8");
     const manifest1 = JSON.parse(manifest1Txt) as Array<any>;
     const entry1 = manifest1.find((e) => String(e?.label || "").includes("apps/demo-cli:demo-cli"));
@@ -75,15 +80,20 @@ test("planner: touching root-only file does not change app bin store path", asyn
     await fsp.writeFile(sentinel, "root-only-change\n", "utf8");
 
     // Rebuild and compare the demo-cli bin store path
-    const outLink2 = `buck-go-${Date.now()}`;
     const t2 = Date.now();
-    await $({
+    const { stdout: outStd2 } = await $({
       cwd: tmp,
-      stdio: "inherit",
-    })`bash -lc 'nix build --impure -L .#graph-generator --accept-flake-config --out-link ${outLink2}'`;
+      stdio: "pipe",
+    })`bash -lc 'nix build --impure -L .#graph-generator --accept-flake-config --no-link --print-out-paths'`;
+    const outPath2 =
+      String(outStd2 || "")
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .pop() || "";
     if (process.env.TEST_TIMING === "1")
       console.error(`[timing] second nix build: ${((Date.now() - t2) / 1000).toFixed(2)}s`);
-    const manifest2Path = path.join(tmp, outLink2, "manifest.json");
+    const manifest2Path = path.join(outPath2, "manifest.json");
     const manifest2Txt = await fsp.readFile(manifest2Path, "utf8");
     const manifest2 = JSON.parse(manifest2Txt) as Array<any>;
     const entry2 = manifest2.find((e) => String(e?.label || "").includes("apps/demo-cli:demo-cli"));

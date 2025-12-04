@@ -50,10 +50,17 @@ void (async function main() {
 
     // Glue and build via Nix
     await $`tools/dev/install-deps.ts --glue-only`;
-    const outLink = `buck-go-${Date.now()}`;
-    await $({ cwd: tmp })`nix build .#graph-generator --out-link ${outLink}`;
-
-    const manifestPath = path.join(tmp, outLink, "manifest.json");
+    const { stdout } = await $({
+      cwd: tmp,
+      stdio: "pipe",
+    })`nix build .#graph-generator --no-link --print-out-paths`;
+    const outPath =
+      String(stdout || "")
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .pop() || "";
+    const manifestPath = path.join(outPath, "manifest.json");
     const txt = await fsp.readFile(manifestPath, "utf8");
     const arr = JSON.parse(txt) as Array<any>;
     // Assert only binaries are present (label ends with demo-cli target, not lib)
