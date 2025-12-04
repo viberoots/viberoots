@@ -77,3 +77,23 @@ buck2 test //:scaffolding_help -- --env COVERAGE=1
 
 CI should always use the pure path. Local development can opt into `--impure` for fast iteration.
 ```
+
+## Verify prewarm (toolchains)
+
+`tools/bin/verify` supports an optional, best-effort prewarm step for heavy Nix toolchains to reduce cold-start time. It never affects correctness and is skipped silently if a flake attribute is missing.
+
+- Enabled by default: `VERIFY_PREWARM=1` (set `VERIFY_PREWARM=0` to disable)
+- Prewarms by attempting to build these flake attrs when available:
+  - `.#toolchains.go`
+  - `.#toolchains.cxx`
+  - `.#toolchains.emscripten`
+  - `.#toolchains.tinygo`
+
+Notes:
+
+- Missing attributes are ignored without failing the run.
+- You can customize the attribute list for local experiments by running the script directly:
+
+```
+PREWARM_ATTRS="toolchains.go,toolchains.cxx" node tools/dev/prewarm-toolchains.ts
+```

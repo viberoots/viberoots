@@ -1,13 +1,15 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
-import { writeIfChanged, maybeAssumeUnchanged } from "../lib/fs-helpers";
+import { writeIfChanged, maybeAssumeUnchanged } from "../lib/fs-helpers.ts";
 // zx is available via shebang; we'll use `$` to interact with git when present.
 import { readCompositeGraph } from "../lib/graph-view.ts";
 // PR6 (go-cpp-local-patching): provider mapping is Node-only (lockfile:...) and nixpkg; Go `module:`
 // labels are kept for diagnostics and are intentionally ignored here.
-import { providersForLabels } from "../lib/labels";
+import { providersForLabels, parseLockfileLabel } from "../lib/labels.ts";
+import * as fssync from "node:fs";
 import { getFlagStr } from "../lib/cli.ts";
 import { ensureGraph } from "./glue-run.ts";
+// no path import needed when not checking provider existence
 
 type Node = {
   name: string;
@@ -39,14 +41,33 @@ async function main() {
     graphPath: graphPath || undefined,
   });
   const list = nodes as unknown as Node[];
+
   const mapping: Record<string, string[]> = {};
   for (const n of list) {
     // PR-2: Skip provider-package nodes to avoid self-mappings in auto_map.
     if (n.name && n.name.startsWith("//third_party/providers:")) {
       continue;
     }
-    const provs = providersForLabels(n.labels);
-    if (provs.length > 0 && n.name) mapping[n.name] = provs;
+    const provs: string[] = [];
+    const labels = Array.isArray(n.labels) ? (n.labels as string[]) : [];
+    for (const l of labels) {
+      if (typeof l !== "string") continue;
+      if (l.startsWith("lockfile:")) {
+        // Map importer-scoped lockfile labels directly to their providers.
+        // Do not gate on filesystem presence; tests synthesize graphs without real files.
+        const parsed = parseLockfileLabel(l);
+        if (!parsed) continue;
+        const [prov] = providersForLabels([l]);
+        if (prov) provs.push(prov);
+      } else if (l.startsWith("nixpkg:")) {
+        const [prov] = providersForLabels([l]);
+        if (prov) provs.push(prov);
+      }
+    }
+    const uniq = Array.from(new Set(provs));
+    if (uniq.length > 0 && n.name) {
+      mapping[n.name] = uniq;
+    }
   }
   const keys = Object.keys(mapping).sort();
   const body = keys

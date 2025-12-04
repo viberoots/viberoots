@@ -16,7 +16,7 @@ This installment focuses on reducing end-to-end test runtime without sacrificing
 
 ### Environment Toggles (Operator Controls)
 
-- `ZX_TEST_NODE_MODULES_IMPORTER=libs/test-deps[-lint|-bundle|-all]` (opt‑in)
+- `ZX_TEST_NODE_MODULES_IMPORTER=<relative importer dir in the temp workspace>` (optional; used by some scaffolded tests)
 - `VERIFY_PREWARM=1` (default on): prewarm heavy toolchains in verify (best‑effort)
 - `TEST_RSYNC_ROOTS="apps/demo,cpp,tools"`: limit repo copy for temp workspaces
 
@@ -28,60 +28,7 @@ This installment focuses on reducing end-to-end test runtime without sacrificing
 
 ---
 
-## PR‑1: Tiered shared importers for Node devDependencies (opt‑in)
-
-### Description
-
-Extend the existing `libs/test-deps` base importer into a small tier of opt‑in shared importers to reduce repeated `node_modules` builds across zx tests:
-
-- `libs/test-deps` (base): `zx`, `typescript`, `vitest`, `esbuild`, `vite`, `c8` (existing)
-- `libs/test-deps-lint` (new): base + `eslint`, `@typescript-eslint/*`, plugins/configs
-- `libs/test-deps-bundle` (new): base + `rollup` and relevant plugins
-- Optional `libs/test-deps-all` (new, CI-only): superset for maximal reuse in CI
-
-Tests opt in with `ZX_TEST_NODE_MODULES_IMPORTER=libs/test-deps-*`. Default remains “nearest importer” to avoid masking template‑local missing devDeps.
-
-### Scope & Changes
-
-- `libs/test-deps-lint/` and `libs/test-deps-bundle/` (new): `package.json`, `pnpm-lock.yaml`
-- `flake.nix`: expose `pnpm-store(.unfixed).test_deps_*` and `node-modules.test_deps_*`
-- `tools/dev/node-modules-build.ts`: already honors `ZX_TEST_NODE_MODULES_IMPORTER` (no default change)
-- Docs: mention tiered importers and opt‑in guidance
-
-### Tests (in this PR)
-
-- Verify all four importers build via `nix build .#node-modules.<name>` on a cold cache
-- Representative zx tests opt in to `*-lint` and `*-bundle`; time deltas recorded across two runs
-- Ensure default (nearest importer) still works and catches missing devDeps
-
-### Docs (in this PR)
-
-- TESTING.md: “Tiered shared importers” section with examples and caveats
-
-### Acceptance Criteria
-
-- Opt‑in tests reuse node_modules across runs with measurable time reduction
-- No tests fail due to missing deps when not opted in
-
-### Risks
-
-- “All” importer can become a kitchen sink; keep CI-only and optional
-
-### Consequence of Not Implementing
-
-- Repeated node_modules builds remain a major cost in cold/warm transitions
-
-### Downsides for Implementing
-
-- Additional lockfiles to maintain
-
-### Recommendation
-
-Implement.
-
----
-
-## PR‑2: Best‑effort prewarm for heavy Nix toolchains in `verify`
+## PR‑1: Best‑effort prewarm for heavy Nix toolchains in `verify`
 
 ### Description
 
@@ -129,49 +76,7 @@ Implement.
 
 ---
 
-## PR‑3: Eliminate per‑test buckd restarts; rely on explicit inputs for invalidation
-
-### Description
-
-Remove buckd kills in zx tests except where we bootstrap a brand‑new temp workspace that genuinely requires a fresh daemon. Ensure tests drive invalidation by declared inputs (labels `srcs`, `deps`, stamps), not by daemon restarts or directory scanning.
-
-### Scope & Changes
-
-- `tools/tests/**/*.test.ts`: strip unconditional `buck2 kill` calls in scaffolding/exporter tests
-- Keep targeted one‑time kill when switching to a brand‑new temp repo (guarded)
-- Convert any `$SRCDIR` scans to explicit declared inputs where they impact invalidation
-
-### Tests (in this PR)
-
-- A/B on representative scaffolding suites: same pass set; improved throughput; fewer restarts logged
-
-### Docs (in this PR)
-
-- TESTING.md: “Don’t depend on buckd restart for invalidation” guideline
-
-### Acceptance Criteria
-
-- Same functional outcomes with fewer buckd restarts; reduced orchestration overhead
-
-### Risks
-
-- Latent assumptions on buckd kill may need explicit inputs to be added (as we did for node invalidation)
-
-### Consequence of Not Implementing
-
-- Overuse of restarts inflates times and introduces flakiness under load
-
-### Downsides for Implementing
-
-- Minor test code churn to wire explicit inputs
-
-### Recommendation
-
-Implement.
-
----
-
-## PR‑4: Shrink temp rsync footprint and add `TEST_RSYNC_ROOTS`
+## PR‑2: Shrink temp rsync footprint and add `TEST_RSYNC_ROOTS`
 
 ### Description
 
@@ -214,16 +119,16 @@ Implement.
 
 ---
 
-## PR‑5: Prebuild/prewarm node_modules for tiered importers (opt‑in)
+## PR‑3: Prebuild/prewarm per‑importer node_modules in runInTemp (opt‑in)
 
 ### Description
 
-When a test opts in to a tiered importer, prebuild its `node-modules.<name>` once per run in `verify`. The opt‑in test then only links/uses the prebuilt output. Default behavior remains unchanged.
+Optionally prebuild per‑importer `node_modules` inside the temp workspace to avoid repeated builds during a run. Tests can enable this; default behavior remains unchanged.
 
 ### Scope & Changes
 
-- `tools/bin/verify`: after PNPM store prewarm, `nix build` `.#node-modules.test_deps_*` if present
-- No changes to test harness defaults; only an optional speedup path
+- `tools/tests/lib/test-helpers.ts`: add an opt‑in hook `TEST_PREBUILD_NM=1` that, after a test scaffolds importers in the temp workspace, invokes `node tools/dev/node-modules-build.ts --print-out-paths` to build/link the importer's `node_modules` once per run
+- No changes to verify defaults; this is a per‑temp‑workspace optimization
 
 ### Tests (in this PR)
 
@@ -239,7 +144,7 @@ When a test opts in to a tiered importer, prebuild its `node-modules.<name>` onc
 
 ### Risks
 
-- Overreliance on shared importers; enforce template tests to keep nearest importer defaults
+- Overuse can add up-front work in cases where very few tests touch Node importers; keep opt‑in and scoped
 
 ### Consequence of Not Implementing
 
@@ -255,7 +160,7 @@ Implement.
 
 ---
 
-## PR‑6: Reuse a single exported Buck graph across zx tests
+## PR‑4: Reuse a single exported Buck graph across zx tests
 
 ### Description
 
@@ -301,30 +206,25 @@ Implement.
 
 ## Rollout & Sequencing
 
-1. PR‑3 (buckd restarts removal) — quick wins; removes orchestration overhead
-2. PR‑4 (rsync footprint + roots) — reduces temp setup time; no behavior change
-3. PR‑1 (tiered importers) — enables opt‑in reuse without global risk
-4. PR‑5 (prebuild node_modules for tiered importers) — capitalizes on PR‑1
-5. PR‑6 (graph export reuse) — system‑wide export reduction
-6. PR‑2 (toolchain prewarm) — last, as pure best‑effort optimization
+1. PR‑1 (toolchain prewarm) — simple, isolated, best‑effort
+2. PR‑2 (rsync footprint + roots) — reduces temp setup time; no behavior change
+3. PR‑3 (prebuild per‑importer node_modules) — optional, guarded by env
+4. PR‑4 (graph export reuse) — system‑wide exporter optimization
 
 ---
 
 ## Verification & Backout Strategy
 
-- PR‑3
-  - Verify: identical pass set; fewer buckd restarts in logs; improved median runtime
-  - Backout: revert test changes; no data migration
-- PR‑4
+- PR‑2
   - Verify: rsync timing drops; zero test failures
   - Backout: restore previous rsync excludes; keep `TEST_RSYNC_ROOTS`
-- PR‑1/5
+- PR‑3
   - Verify: opted‑in tests run faster on warm runs; defaults unchanged and still catch missing deps
-  - Backout: remove tiered importers; tests fall back to nearest importer
-- PR‑6
+  - Backout: disable `TEST_PREBUILD_NM` hook
+- PR‑4
   - Verify: only initial export occurs; re‑export on config hash changes; suite results unchanged
   - Backout: disable reuse; always export
-- PR‑2
+- PR‑1
   - Verify: cold‑cache improvement; no effect on correctness
   - Backout: remove prewarm block in verify
 
@@ -332,7 +232,7 @@ Implement.
 
 ## Summary of Expected Impact
 
-- **Lower orchestration overhead**: fewer buckd restarts; single graph export per run
+- **Lower orchestration overhead**: single graph export per run
 - **Reduced rebuild duplication**: optional reuse of node_modules and prewarmed toolchains
 - **Predictable correctness**: explicit inputs, deterministic content checks, opt‑in reuse only
 - **Faster iterations**: improved cold and warm runtimes without masking template issues

@@ -131,6 +131,15 @@ if [[ ! -f "$ROOT_DIR/buck-out/.unified-pnpm-store/path" ]]; then
   fi
 fi
 
+# Best-effort prewarm of heavy toolchains (Go/Clang/WASM). Controlled by VERIFY_PREWARM (default=1).
+if [[ "${VERIFY_PREWARM:-1}" == "1" ]]; then
+  if command -v node >/dev/null 2>&1; then
+    (cd "$ROOT_DIR" && node "$ROOT_DIR/tools/dev/prewarm-toolchains.ts" >/dev/null 2>&1 || true)
+  elif command -v nix >/dev/null 2>&1; then
+    (cd "$ROOT_DIR" && nix run --accept-flake-config "$ROOT_DIR"#zx-wrapper -- "$ROOT_DIR/tools/dev/prewarm-toolchains.ts" >/dev/null 2>&1 || true)
+  fi
+fi
+
 # No repo-scoped shared importers; zx tests may scaffold ephemeral importers inside temp repos when needed.
 
 build_run_array() {
@@ -219,26 +228,26 @@ else
       STATUS=1
     fi
   else
-    local size=$(( (total + batches - 1) / batches ))
-    (( size < 1 )) && size=1
-    local i=0
-    local batch_idx=0
-    while (( i < total )); do
-      batch_idx=$((batch_idx + 1))
-      # Reuse a single buck2 daemon across batches to avoid repeated cold starts
-      local iso_batch="${ISO}"
-      local -a batch=( )
-      local j=0
-      while (( j < size && i < total )); do
-        batch+=( "//:${ALL_TESTS[i]}" )
-        i=$((i + 1))
-        j=$((j + 1))
-      done
-      echo "[verify] Running batch ${batch_idx} with ${#batch[@]} tests..." 1>&2
-      if ! run_batch "$iso_batch" "${batch[@]}"; then
-        STATUS=1
-      fi
+  local size=$(( (total + batches - 1) / batches ))
+  (( size < 1 )) && size=1
+  local i=0
+  local batch_idx=0
+  while (( i < total )); do
+    batch_idx=$((batch_idx + 1))
+    # Reuse a single buck2 daemon across batches to avoid repeated cold starts
+    local iso_batch="${ISO}"
+    local -a batch=( )
+    local j=0
+    while (( j < size && i < total )); do
+      batch+=( "//:${ALL_TESTS[i]}" )
+      i=$((i + 1))
+      j=$((j + 1))
     done
+    echo "[verify] Running batch ${batch_idx} with ${#batch[@]} tests..." 1>&2
+    if ! run_batch "$iso_batch" "${batch[@]}"; then
+      STATUS=1
+    fi
+  done
   fi
 fi
 # Final best-effort cleanup
