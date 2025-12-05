@@ -144,6 +144,9 @@ async function buildUnfixedAndHash(
     if (!outPath) {
       return { ok: false, output: "nix build returned no out path for " + attrPath };
     }
+    // Hash the entire unfixed output path to match the fixed-output derivation's outputHash.
+    // The output includes both 'store' and 'lockfile' directories; hashing only 'store'
+    // would drift from the fixed-output derivation hash.
     const hashed = await $({
       stdio: "pipe",
     })`nix hash path --sri ${outPath}`;
@@ -308,6 +311,12 @@ async function inner() {
       );
       return;
     }
+    // If still failing or missing SRI, pre-seed a placeholder to force a suggestion on verify
+    if (!pre.ok || !pre.sri) {
+      const key = importer && importer !== "." ? `${importer}/pnpm-lock.yaml` : "pnpm-lock.yaml";
+      const placeholder = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+      await updateHashesJson(key, placeholder);
+    }
   }
   if (pre.ok && pre.sri) {
     await updateHashesJson(key, pre.sri);
@@ -320,9 +329,18 @@ async function inner() {
       console.warn(`[update-pnpm-hash] skip: flake attr missing (${storeAttr}); continuing`);
       return;
     }
-    const suggested = extractHash(verify.output || "");
+    let suggested = extractHash(verify.output || "");
+    if (!suggested && pre && pre.sri) {
+      suggested = pre.sri;
+    }
     if (!suggested) {
-      console.error("pnpm-store still failing and no suggested hash found\n\n" + verify.output);
+      const retry = await buildUnfixedAndHash(unfixedAttr);
+      if (retry.ok && retry.sri) suggested = retry.sri;
+    }
+    if (!suggested) {
+      console.error(
+        "pnpm-store still failing and no suggested hash found\n\n" + (verify.output || ""),
+      );
       process.exit(1);
     }
     await updateHashesJson(key, suggested);

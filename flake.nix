@@ -101,6 +101,22 @@
 
     packages = forAllSystems ({ zx-wrapper, pkgs, nodeMods, prelude, buck2Input, system, uv2nixLib, ... }:
       let
+        lib = pkgs.lib;
+        # Exclude volatile, test-generated dirs from repo snapshots to avoid races during coverage writes
+        filterRepo = path:
+          builtins.filterSource
+            (p: _type:
+              let s = builtins.toString p;
+              in !(
+                lib.hasInfix "/coverage/" s || lib.hasSuffix "/coverage" s ||
+                lib.hasInfix "/buck-out/" s || lib.hasSuffix "/buck-out" s ||
+                lib.hasInfix "/.buck/" s    || lib.hasSuffix "/.buck" s ||
+                lib.hasInfix "/test-logs/" s || lib.hasSuffix "/test-logs" s ||
+                lib.hasInfix "/.clinic/" s
+              )
+            )
+            path;
+        repoSnapshot = builtins.path { path = filterRepo ./.; name = "repo"; };
         # Optional local override to inject a pre-fetched pnpm store into pnpm-store derivations
         localPnpmStore = let s = builtins.getEnv "LOCAL_PNPM_STORE"; in if s != "" then s else null;
         # Unfixed pnpm-store builder exposed via nodeMods (tracked file; safe under git snapshots)
@@ -111,8 +127,8 @@
           graphArg = if (builtins.pathExists graphPath) then (builtins.path { path = graphPath; name = "graph.json"; }) else null;
         in pkgs.callPackage ./tools/nix/graph-generator.nix {
           inherit pkgs;
-          # Use a stable working-tree snapshot of the entire repo
-          src = builtins.path { path = ./.; name = "repo"; };
+          # Use a filtered, stable working-tree snapshot of the entire repo
+          src = repoSnapshot;
           # Explicitly include graph.json: prefer env override, else working tree file
           graphJsonPath = graphArg;
           # Allow tests to override repo-root gomod2nix.toml via env
@@ -131,7 +147,7 @@
         };
         graphGenPure = pkgs.callPackage ./tools/nix/graph-generator.nix {
           inherit pkgs;
-          src = builtins.path { path = ./.; name = "repo"; };
+          src = repoSnapshot;
           graphJsonPath = let envGraph = builtins.getEnv "BUCK_GRAPH_JSON"; in
             if envGraph != "" then envGraph else (buckGraph + "/graph.json");
           rootModulesTomlPath = let envRootToml = builtins.getEnv "ROOT_GOMOD2NIX_TOML"; in
@@ -146,8 +162,8 @@
         # If the working tree lacks these dirs (e.g., in temp tests), prefer WORKSPACE_ROOT
         # so evaluation sees newly scaffolded importers in the temp repo; otherwise fall back.
         srcRoot = let wr = builtins.getEnv "WORKSPACE_ROOT"; in
-          if wr != "" then (builtins.path { path = (builtins.toPath wr); name = "repo"; })
-          else (builtins.path { path = ./.; name = "repo"; });
+          if wr != "" then (builtins.path { path = filterRepo (builtins.toPath wr); name = "repo"; })
+          else repoSnapshot;
         allowGenerate = (builtins.getEnv "NIX_PNPM_ALLOW_GENERATE") == "1";
         appsDirExists = builtins.pathExists ./apps || builtins.pathExists (srcRoot + "/apps") || (
           let wr = builtins.getEnv "WORKSPACE_ROOT"; in (wr != "" && builtins.pathExists (builtins.toPath wr + "/apps"))
@@ -220,10 +236,10 @@
         in pkgs.stdenvNoCC.mkDerivation {
           pname = "node-cli";
           version = sanitize importerDir;
-          # Prefer WORKSPACE_ROOT when provided (temp repos) to avoid stale store snapshots
+          # Prefer WORKSPACE_ROOT when provided (temp repos) with filtering to avoid volatile dirs
           src = let wr = builtins.getEnv "WORKSPACE_ROOT"; in
-                if wr != "" then (builtins.path { path = (builtins.toPath wr); name = "repo"; })
-                else (builtins.path { path = ./.; name = "repo"; });
+                if wr != "" then (builtins.path { path = filterRepo (builtins.toPath wr); name = "repo"; })
+                else repoSnapshot;
           nativeBuildInputs = [ esbuild ];
           buildPhase = ''
             set -euo pipefail

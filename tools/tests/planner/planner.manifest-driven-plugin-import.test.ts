@@ -4,7 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runInTemp } from "../lib/test-helpers";
-import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
+import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const.ts";
 
 test("planner imports plugins listed in langs.json when present", async () => {
   await runInTemp("planner-manifest-plugin", async (tmp, $) => {
