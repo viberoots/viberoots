@@ -111,6 +111,7 @@ export async function rsyncRepoTo(tmp: string) {
       "/.git",
       "/.envrc",
       "/.buck2_shim",
+      "/test-logs",
       // Exclude all product repos; tests must synthesize their own temp content
       "/apps",
       "/libs",

@@ -97,3 +97,22 @@ Notes:
 ```
 PREWARM_ATTRS="toolchains.go,toolchains.cxx" node tools/dev/prewarm-toolchains.ts
 ```
+
+## Faster temp workspaces (rsync)
+
+Many zx tests run in a temporary copy of the workspace created via rsync. To speed this up without affecting correctness, the helper already excludes heavy or irrelevant directories. Notably, `test-logs/` is now excluded by default to avoid copying large artifacts from prior runs.
+
+- By default, the temp copy excludes common heavy paths (e.g., `buck-out`, `.git`, `node_modules`, `coverage`, `.direnv`, `test-logs/`), while keeping essentials like `flake.nix`.
+- When you only need specific roots for a test, you can limit what is copied using `TEST_RSYNC_ROOTS` (comma or space separated).
+
+Examples:
+
+```
+# Only copy the tools tree (plus flake.nix if present)
+TEST_RSYNC_ROOTS=tools buck2 test //tools/tests/rsync:rsync_roots_only_tools_test_ts
+
+# Multiple roots:
+TEST_RSYNC_ROOTS="apps/demo,cpp,tools/nix" buck2 test //<target>
+```
+
+This optimization is best-effort and opt-in; tests remain deterministic regardless of whether `TEST_RSYNC_ROOTS` is set.
