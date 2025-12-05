@@ -39,12 +39,12 @@ done
 # Ensure COVERAGE is visible to the wrapper script environment
 export COVERAGE
 
-# Default free-space target: higher when coverage is enabled (no persistent state; hardcoded, overridable)
+# Default free-space target: higher when coverage is enabled (GB-only threshold; overridable)
 if [[ -z "${VERIFY_TARGET_FREE_GB:-}" ]]; then
   if [[ "${COVERAGE:-0}" == "1" ]]; then
-    export VERIFY_TARGET_FREE_GB=24
+    export VERIFY_TARGET_FREE_GB=30
   else
-    export VERIFY_TARGET_FREE_GB=16
+    export VERIFY_TARGET_FREE_GB=20
   fi
 fi
 
@@ -100,7 +100,6 @@ mkdir -p coverage/raw || true
 # - optimise store (bounded) and, if needed, loop bounded GC until a safe free-space target
 housekeep_once() {
   local target_gb="${VERIFY_TARGET_FREE_GB:-12}"
-  local min_free_pct=12
   echo "[verify] housekeeping preflight: cleaning temp outs and checking disk space..." 1>&2
   if command -v zx-wrapper >/dev/null 2>&1; then
     ( zx-wrapper "$ROOT_DIR/tools/dev/clean-temp-outs.ts" --minutes 30 >/dev/null 2>&1 || true )
@@ -150,7 +149,7 @@ housekeep_once() {
     [[ -n "$use_pct_raw2" ]] && free_pct="$((100 - use_pct_raw2))"
   fi
   free_gb="$((free_kb/1024/1024))"
-  if (( free_gb < target_gb )) || (( free_pct < min_free_pct )); then
+  if (( free_gb < target_gb )); then
     echo "[verify] low disk free detected; running bounded nix-store GC (<=45s each)..." 1>&2
     local cap
     for cap in 2G 4G 8G 16G 32G; do
@@ -169,7 +168,7 @@ housekeep_once() {
       [[ -n "$use_pct_raw3" ]] && free_pct2="$((100 - use_pct_raw3))"
       free_gb="$((free_kb/1024/1024))"
       echo "[verify] post-GC(${cap}) disk free: ${free_pct2}% (~${free_gb}GiB)" 1>&2
-      if (( free_gb >= target_gb )) && (( free_pct2 >= min_free_pct )); then
+      if (( free_gb >= target_gb )); then
         break
       fi
     done
@@ -300,7 +299,6 @@ run_batch() {
 
   hk_between() {
     local target="${VERIFY_TARGET_FREE_GB:-12}"
-    local min_pct=12
     local df_line avail_kb use_pct_raw free_pct free_gb
     df_line="$(df -Pk . 2>/dev/null | tail -n1 || true)"
     avail_kb="$(echo "$df_line" | awk '{print $4}')"
@@ -318,7 +316,7 @@ run_batch() {
       free_gb="$((avail_kb/1024/1024))"
       echo "[verify] between-batch after purge: ${free_gb}GiB (~${free_pct}%)." 1>&2
     fi
-    if (( free_gb < target )) || (( free_pct < min_pct )); then
+    if (( free_gb < target )); then
       # Short optimise
       local TO=""
       if command -v timeout >/dev/null 2>&1; then TO="timeout -k 5s 30s"; elif command -v gtimeout >/dev/null 2>&1; then TO="gtimeout -k 5s 30s"; else TO=""; fi
@@ -336,7 +334,7 @@ run_batch() {
         use_pct_raw="$(echo "$df_line" | awk '{print $5}' | tr -d '%')"
         free_pct="$((100 - ${use_pct_raw:-0}))"
         free_gb="$((avail_kb/1024/1024))"
-        if (( free_gb >= target )) && (( free_pct >= min_pct )); then
+        if (( free_gb >= target )); then
           break
         fi
         local TO2=""
