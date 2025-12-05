@@ -39,12 +39,12 @@ done
 # Ensure COVERAGE is visible to the wrapper script environment
 export COVERAGE
 
-# Default free-space target: higher when coverage is enabled
+# Default free-space target: higher when coverage is enabled (no persistent state; hardcoded, overridable)
 if [[ -z "${VERIFY_TARGET_FREE_GB:-}" ]]; then
   if [[ "${COVERAGE:-0}" == "1" ]]; then
-    export VERIFY_TARGET_FREE_GB=20
+    export VERIFY_TARGET_FREE_GB=24
   else
-    export VERIFY_TARGET_FREE_GB=12
+    export VERIFY_TARGET_FREE_GB=16
   fi
 fi
 
