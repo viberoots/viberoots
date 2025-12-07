@@ -9,17 +9,13 @@ import { parsePnpmLock, effectiveSetForImporter } from "../../lib/pnpm-lock.ts";
 import { ensureAutoSection } from "../../lib/auto-section.ts";
 import { listImporterPatches } from "../../lib/importers.ts";
 import { writeImporterProviders, type ImporterProvider } from "../../lib/provider-writer.ts";
-import { providersHeaderFor, providersLoadFor } from "../../lib/providers-headers.ts";
+import { providersLoadFor } from "../../lib/providers-headers.ts";
+import { writeImporterProvidersByLang } from "../../lib/provider-writer.ts";
 
 export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: string }) {
   const PATCH_DIR = opts?.patchDir || "patches/node";
   const OUT_FILE = opts?.outFile || "third_party/providers/TARGETS.node.auto";
   const LOAD_LINE = providersLoadFor({ lang: "node", rule: "node_importer_deps" });
-  const FILE_HEADER = providersHeaderFor({
-    lang: "node",
-    load: LOAD_LINE,
-    rule: "node_importer_deps",
-  });
 
   const lockfiles = await findImporterLockfiles(["pnpm-lock.yaml"]);
 
@@ -33,18 +29,8 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
   }
 
   if (!lockfiles.length) {
-    // Write deterministic, header-only file via shared writer
-    await writeImporterProviders([], {
-      outFile: OUT_FILE,
-      ruleLoad: LOAD_LINE,
-      ruleName: "node_importer_deps",
-      fileHeader: FILE_HEADER,
-      autoSection: {
-        begin: "# BEGIN AUTO_NODE",
-        end: "# END AUTO_NODE",
-        header: LOAD_LINE,
-      },
-    });
+    // Write deterministic, header-only file via consolidated writer
+    await writeImporterProvidersByLang("node", [], { outFile: OUT_FILE });
     return;
   }
 
@@ -89,17 +75,7 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
     }
   }
 
-  await writeImporterProviders(providers, {
-    outFile: OUT_FILE,
-    ruleLoad: LOAD_LINE,
-    ruleName: "node_importer_deps",
-    fileHeader: FILE_HEADER,
-    autoSection: {
-      begin: "# BEGIN AUTO_NODE",
-      end: "# END AUTO_NODE",
-      header: LOAD_LINE,
-    },
-  });
+  await writeImporterProvidersByLang("node", providers, { outFile: OUT_FILE });
 }
 
 // Minimal surface for provider index generation

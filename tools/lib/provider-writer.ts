@@ -3,6 +3,7 @@ import path from "node:path";
 import { renderTargetsFile, writeIfChanged, maybeAssumeUnchanged } from "./fs-helpers.ts";
 import { ensureAutoSection } from "./auto-section.ts";
 import { providerNameForImporter } from "./providers.ts";
+import { providersHeaderFor, providersLoadFor } from "./providers-headers.ts";
 
 export type ImporterProvider = {
   lockfile: string; // POSIX relative path, e.g. apps/web/pnpm-lock.yaml
@@ -107,3 +108,56 @@ export async function writeImporterProviders(
 }
 
 export default writeImporterProviders;
+
+/**
+ * Convenience wrapper to write importer providers by language with
+ * standardized header, load(...) line, auto-section sentinels, and default out path.
+ *
+ * Supported:
+ * - node   → rule: node_importer_deps,  sentinels: AUTO_NODE,
+ *             out: third_party/providers/TARGETS.node.auto
+ * - python → rule: python_importer_deps, sentinels: AUTO_PYTHON,
+ *             out: third_party/providers/TARGETS.python.auto
+ */
+export async function writeImporterProvidersByLang(
+  lang: string,
+  providers: ImporterProvider[],
+  opts?: Partial<ImporterWriterOptions> & { outFile?: string },
+): Promise<void> {
+  const id = String(lang || "")
+    .trim()
+    .toLowerCase();
+  let ruleName = "";
+  let begin = "";
+  let end = "";
+  let defaultOut = "";
+  if (id === "node") {
+    ruleName = "node_importer_deps";
+    begin = "# BEGIN AUTO_NODE";
+    end = "# END AUTO_NODE";
+    defaultOut = "third_party/providers/TARGETS.node.auto";
+  } else if (id === "python") {
+    ruleName = "python_importer_deps";
+    begin = "# BEGIN AUTO_PYTHON";
+    end = "# END AUTO_PYTHON";
+    defaultOut = "third_party/providers/TARGETS.python.auto";
+  } else {
+    throw new Error(`writeImporterProvidersByLang: unsupported language '${lang}'`);
+  }
+
+  const ruleLoad = providersLoadFor({ lang: id, rule: ruleName });
+  const fileHeader = providersHeaderFor({ lang: id, load: ruleLoad, rule: ruleName });
+  const outFile = (opts && opts.outFile) || defaultOut;
+
+  await writeImporterProviders(providers, {
+    outFile,
+    ruleLoad,
+    ruleName,
+    fileHeader,
+    autoSection: {
+      begin,
+      end,
+      header: ruleLoad,
+    },
+  });
+}

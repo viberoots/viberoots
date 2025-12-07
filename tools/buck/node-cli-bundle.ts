@@ -53,11 +53,11 @@ async function main() {
   const repoRoot = process.env.WORKSPACE_ROOT?.trim() || process.cwd();
   async function run(
     cmd: string,
-    args: string[],
+    argv: string[],
     opts: { cwd?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number },
   ) {
     return await new Promise<string>((resolve, reject) => {
-      const p = spawn(cmd, args, {
+      const p = spawn(cmd, argv, {
         cwd: opts.cwd,
         stdio: ["ignore", "pipe", "inherit"],
         env: opts.env ?? process.env,

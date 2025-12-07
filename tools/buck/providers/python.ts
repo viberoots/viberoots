@@ -12,8 +12,12 @@ import {
   listImporterPatches,
   defaultImporterPatchDir,
 } from "../../lib/importers.ts";
-import { writeImporterProviders, type ImporterProvider } from "../../lib/provider-writer.ts";
-import { providersHeaderFor, providersLoadFor } from "../../lib/providers-headers.ts";
+import {
+  writeImporterProviders,
+  writeImporterProvidersByLang,
+  type ImporterProvider,
+} from "../../lib/provider-writer.ts";
+import { providersLoadFor } from "../../lib/providers-headers.ts";
 
 export async function syncPythonProviders(opts?: {
   outFile?: string;
@@ -25,27 +29,12 @@ export async function syncPythonProviders(opts?: {
   const OUT_FILE = opts?.outFile || "third_party/providers/TARGETS.python.auto";
   const STRICT = opts?.strict ?? false;
   const LOAD_LINE = providersLoadFor({ lang: "python", rule: "python_importer_deps" });
-  const FILE_HEADER = providersHeaderFor({
-    lang: "python",
-    load: LOAD_LINE,
-    rule: "python_importer_deps",
-  });
 
   const lockfiles = await findUvLockfiles();
 
   // Empty state: still ensure deterministic, header-only file exists
   if (!lockfiles.length) {
-    await writeImporterProviders([], {
-      outFile: OUT_FILE,
-      ruleLoad: LOAD_LINE,
-      ruleName: "python_importer_deps",
-      fileHeader: FILE_HEADER,
-      autoSection: {
-        begin: "# BEGIN AUTO_PYTHON",
-        end: "# END AUTO_PYTHON",
-        header: LOAD_LINE,
-      },
-    });
+    await writeImporterProvidersByLang("python", [], { outFile: OUT_FILE });
     return;
   }
 
@@ -78,17 +67,7 @@ export async function syncPythonProviders(opts?: {
     providers.push({ lockfile: relLf, importer: importerLabel, patchPaths: usedPatches });
   }
 
-  await writeImporterProviders(providers, {
-    outFile: OUT_FILE,
-    ruleLoad: LOAD_LINE,
-    ruleName: "python_importer_deps",
-    fileHeader: FILE_HEADER,
-    autoSection: {
-      begin: "# BEGIN AUTO_PYTHON",
-      end: "# END AUTO_PYTHON",
-      header: LOAD_LINE,
-    },
-  });
+  await writeImporterProvidersByLang("python", providers, { outFile: OUT_FILE });
 }
 
 export default syncPythonProviders;
