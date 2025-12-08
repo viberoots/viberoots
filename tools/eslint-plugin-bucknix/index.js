@@ -4,26 +4,37 @@
  */
 
 const ALLOWED_PATHS = [
-  /^tools\/buck\/exporter\//,
-  /^tools\/buck\/export-graph\.ts$/,
-  /^tools\/buck\/gen-auto-map\.ts$/,
-  /^tools\/buck\/prebuild\//,
-  /^tools\/buck\/prebuild-guard\.ts$/,
-  /^tools\/lib\/graph-view\.ts$/,
+  /\/tools\/buck\/exporter\//,
+  /\/tools\/buck\/export-graph\.ts$/,
+  /\/tools\/buck\/gen-auto-map\.ts$/,
+  /\/tools\/buck\/prebuild\//,
+  /\/tools\/buck\/prebuild-guard\.ts$/,
+  /\/tools\/lib\/graph-view\.ts$/,
 ];
 
 const EXCLUDED_PATHS = [
-  /^tools\/tests\//,
-  /^docs\//,
-  /^node_modules\//,
-  /^buck-out\//,
-  /^coverage\//,
+  /\/tools\/tests\//,
+  /\/docs\//,
+  /\/node_modules\//,
+  /\/buck-out\//,
+  /\/coverage\//,
 ];
 
 function isAllowed(filePath) {
   const p = filePath.replace(/\\/g, "/");
-  if (EXCLUDED_PATHS.some((re) => re.test(p))) return true; // never flag excluded
-  return ALLOWED_PATHS.some((re) => re.test(p));
+  // Try repo-relative if possible
+  let rel = p;
+  try {
+    const cwd = process.cwd().replace(/\\/g, "/");
+    if (p.startsWith(cwd + "/")) {
+      rel = p.slice(cwd.length + 1);
+    }
+  } catch {}
+  // Exclude tests/docs/etc. regardless of absolute/relative path
+  if (EXCLUDED_PATHS.some((re) => re.test(p) || re.test(rel))) return true;
+  // Allow specific internal paths
+  if (ALLOWED_PATHS.some((re) => re.test(p) || re.test(rel))) return true;
+  return false;
 }
 
 const TARGET_LITERAL = "tools/buck/graph.json";
