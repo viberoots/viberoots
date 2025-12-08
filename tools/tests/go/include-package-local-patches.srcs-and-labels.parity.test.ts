@@ -45,4 +45,14 @@ await runInTemp("go-include-pkg-local-patches", async (tmp, $) => {
   assert.equal(so.exitCode, 0, "buck2 build --show-output failed for probe_go");
   const outLine = String(so.stdout || "").trim();
   assert.match(outLine, /probe_go\.srcs\.txt/, "expected probe_go.srcs.txt output to be produced");
+  // Parse output artifact path and validate contents include expected patch files
+  const outPath = outLine.split(/\s+/).pop()!;
+  const absOutPath = path.isAbsolute(outPath) ? outPath : path.join(tmp, outPath);
+  const contents = await fs.readFile(absOutPath, "utf8");
+  const lines = contents
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  assert.ok(lines.includes("patches/go/a@1.0.0.patch"), "missing a@1.0.0.patch in srcs");
+  assert.ok(lines.includes("patches/go/b@1.2.3.patch"), "missing b@1.2.3.patch in srcs");
 });

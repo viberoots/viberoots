@@ -49,4 +49,14 @@ await runInTemp("cpp-include-pkg-local-patches", async (tmp, $) => {
     /probe_cpp\.srcs\.txt/,
     "expected probe_cpp.srcs.txt output to be produced",
   );
+  // Parse output artifact path and validate contents include expected patch files
+  const outPath = outLine.split(/\s+/).pop()!;
+  const absOutPath = path.isAbsolute(outPath) ? outPath : path.join(tmp, outPath);
+  const contents = await fs.readFile(absOutPath, "utf8");
+  const lines = contents
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  assert.ok(lines.includes("patches/cpp/x@0.0.1.patch"), "missing x@0.0.1.patch in srcs");
+  assert.ok(lines.includes("patches/cpp/y@2.3.4.patch"), "missing y@2.3.4.patch in srcs");
 });
