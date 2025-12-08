@@ -10,6 +10,10 @@ load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
 def nix_cpp_library(name, **kwargs):
     local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("cpp"))  # per-target local patch directories
     nix_cxx_attrs = kwargs.pop("nix_cxx_attrs", [])
+    # Alias: support unified kwarg name without breaking callers
+    nixpkg_deps = kwargs.pop("nixpkg_deps", [])
+    if isinstance(nixpkg_deps, list) and len(nixpkg_deps) > 0:
+        nix_cxx_attrs = dedupe_preserve(nix_cxx_attrs + nixpkg_deps)
     # Build via Nix, not Buck's C++ toolchain
     deps = kwargs.pop("deps", [])
     # Explicit Nix-level inputs that should affect the rule key.
@@ -43,6 +47,9 @@ def nix_cpp_wasm_static_lib(name, **kwargs):
     """
     local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("cpp"))
     nix_cxx_attrs = kwargs.pop("nix_cxx_attrs", [])
+    nixpkg_deps = kwargs.pop("nixpkg_deps", [])
+    if isinstance(nixpkg_deps, list) and len(nixpkg_deps) > 0:
+        nix_cxx_attrs = dedupe_preserve(nix_cxx_attrs + nixpkg_deps)
     deps = kwargs.pop("deps", [])
     nix_inputs = global_nix_inputs()
     # Uniform WASM labeling across languages
@@ -93,6 +100,9 @@ def nix_cpp_wasm_emscripten_lib(name, **kwargs):
 def nix_cpp_binary(name, **kwargs):
     local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("cpp"))  # per-target local patch directories
     nix_cxx_attrs = kwargs.pop("nix_cxx_attrs", [])
+    nixpkg_deps = kwargs.pop("nixpkg_deps", [])
+    if isinstance(nixpkg_deps, list) and len(nixpkg_deps) > 0:
+        nix_cxx_attrs = dedupe_preserve(nix_cxx_attrs + nixpkg_deps)
     # Build via Nix, not Buck's C++ toolchain
     deps = kwargs.pop("deps", [])
     # Explicit Nix-level inputs that should affect the rule key.
@@ -120,6 +130,9 @@ def nix_cpp_test(name, **kwargs):
     # Define a planner-visible cxx_test (not executed) and an external runner test (executed)
     deps = kwargs.pop("deps", [])
     nix_cxx_attrs = kwargs.pop("nix_cxx_attrs", [])
+    nixpkg_deps = kwargs.pop("nixpkg_deps", [])
+    if isinstance(nixpkg_deps, list) and len(nixpkg_deps) > 0:
+        nix_cxx_attrs = dedupe_preserve(nix_cxx_attrs + nixpkg_deps)
     srcs = kwargs.get("srcs", [])
     planner_name = name + "__planner"
     # Planner-visible: stamps labels and wires providers so exporter->planner can generate the Nix derivation
@@ -172,6 +185,9 @@ def nix_cpp_node_addon(name, **kwargs):
     #   "native/<addon_name or sanitized target name>.node" for loading from JS/TS.
     local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("cpp"))
     nix_cxx_attrs = kwargs.pop("nix_cxx_attrs", [])
+    nixpkg_deps = kwargs.pop("nixpkg_deps", [])
+    if isinstance(nixpkg_deps, list) and len(nixpkg_deps) > 0:
+        nix_cxx_attrs = dedupe_preserve(nix_cxx_attrs + nixpkg_deps)
     deps = kwargs.pop("deps", [])
     # Optional addon_name hint; recorded in labels for planner visibility only
     addon_name = kwargs.pop("addon_name", None)

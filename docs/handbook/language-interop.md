@@ -31,7 +31,7 @@ nix_cpp_library(
 )
 ```
 
-2. Consume it from a Go target via `repo_cgo_deps`; optionally add nixpkgs deps via `nix_cgo_deps`:
+2. Consume it from a Go target via `repo_cgo_deps`; optionally add nixpkgs deps via `nixpkg_deps` (alias: `nix_cgo_deps`):
 
 ```python
 # apps/demo-cli/TARGETS
@@ -41,7 +41,7 @@ nix_go_binary(
     name = "demo",
     srcs = ["cmd/demo/main.go"],
     repo_cgo_deps = ["//libs/greeter:greeter"],          # in-repo C/C++
-    nix_cgo_deps = ["pkgs.openssl"],                      # nixpkgs native deps (optional)
+    nixpkg_deps = ["pkgs.openssl"],                       # nixpkgs native deps (optional)
     # nix_cgo_pkgconfig = {"pkgs.openssl": "openssl"},  # optional pkg-config name override
 )
 ```

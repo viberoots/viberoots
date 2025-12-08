@@ -40,6 +40,10 @@ def _srcs_imply_cgo(kwargs):
 def nix_go_library(name, **kwargs):
     local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("go"))  # per-target local patch directories
     nix_cgo_deps = kwargs.pop("nix_cgo_deps", [])
+    # Alias: prefer unified kwarg name while preserving legacy behavior
+    nixpkg_deps = kwargs.pop("nixpkg_deps", [])
+    if isinstance(nixpkg_deps, list) and len(nixpkg_deps) > 0:
+        nix_cgo_deps = dedupe_preserve(nix_cgo_deps + nixpkg_deps)
     repo_cgo_deps = kwargs.pop("repo_cgo_deps", [])
     nix_cgo_pkgconfig = kwargs.pop("nix_cgo_pkgconfig", {})
     build_tags = kwargs.pop("build_tags", [])
@@ -84,6 +88,10 @@ def nix_go_library(name, **kwargs):
 def nix_go_binary(name, **kwargs):
     local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("go"))  # per-target local patch directories
     nix_cgo_deps = kwargs.pop("nix_cgo_deps", [])
+    # Alias: prefer unified kwarg name while preserving legacy behavior
+    nixpkg_deps = kwargs.pop("nixpkg_deps", [])
+    if isinstance(nixpkg_deps, list) and len(nixpkg_deps) > 0:
+        nix_cgo_deps = dedupe_preserve(nix_cgo_deps + nixpkg_deps)
     repo_cgo_deps = kwargs.pop("repo_cgo_deps", [])
     nix_cgo_pkgconfig = kwargs.pop("nix_cgo_pkgconfig", {})
     build_tags = kwargs.pop("build_tags", [])
@@ -142,6 +150,10 @@ def nix_go_binary(name, **kwargs):
 
 def nix_go_test(name, **kwargs):
     nix_cgo_deps = kwargs.pop("nix_cgo_deps", [])
+    # Alias: prefer unified kwarg name while preserving legacy behavior
+    nixpkg_deps = kwargs.pop("nixpkg_deps", [])
+    if isinstance(nixpkg_deps, list) and len(nixpkg_deps) > 0:
+        nix_cgo_deps = dedupe_preserve(nix_cgo_deps + nixpkg_deps)
     repo_cgo_deps = kwargs.pop("repo_cgo_deps", [])
     nix_cgo_pkgconfig = kwargs.pop("nix_cgo_pkgconfig", {})
     build_tags = kwargs.pop("build_tags", [])

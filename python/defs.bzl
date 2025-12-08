@@ -12,6 +12,10 @@ def nix_python_library(name, lockfile_label = None, nix_native_deps = [], deps =
     """
     stamp_labels(kwargs, "python", "lib")
     ensure_single_lockfile_label(kwargs, lockfile_label)
+    # Alias: support unified kwarg name without breaking callers
+    _alias = kwargs.pop("nixpkg_deps", [])
+    if isinstance(_alias, list) and len(_alias) > 0:
+        nix_native_deps = dedupe_preserve(nix_native_deps + _alias)
     append_nixpkg_labels(kwargs, nix_native_deps)
     # Include importer-local patches in srcs so Buck invalidates precisely on patch changes
     include_importer_patches_from_labels(kwargs, "python")
@@ -24,6 +28,9 @@ def nix_python_binary(name, lockfile_label = None, nix_native_deps = [], deps = 
     """
     stamp_labels(kwargs, "python", "bin")
     ensure_single_lockfile_label(kwargs, lockfile_label)
+    _alias = kwargs.pop("nixpkg_deps", [])
+    if isinstance(_alias, list) and len(_alias) > 0:
+        nix_native_deps = dedupe_preserve(nix_native_deps + _alias)
     append_nixpkg_labels(kwargs, nix_native_deps)
     # Buck prelude python_binary does not accept `srcs`; callers should use `main`.
     if "srcs" in kwargs:
@@ -38,6 +45,9 @@ def nix_python_test(name, lockfile_label = None, nix_native_deps = [], deps = []
     """
     stamp_labels(kwargs, "python", "test")
     ensure_single_lockfile_label(kwargs, lockfile_label)
+    _alias = kwargs.pop("nixpkg_deps", [])
+    if isinstance(_alias, list) and len(_alias) > 0:
+        nix_native_deps = dedupe_preserve(nix_native_deps + _alias)
     append_nixpkg_labels(kwargs, nix_native_deps)
     include_importer_patches_from_labels(kwargs, "python")
     deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps)
@@ -53,6 +63,9 @@ def nix_python_wasm_app(name, lockfile_label = None, nix_native_deps = [], deps 
     stamp_wasm_variant(kwargs, "python", "wasi")
     labels = kwargs.get("labels", []) or []
     ensure_single_lockfile_label(kwargs, lockfile_label)
+    _alias = kwargs.pop("nixpkg_deps", [])
+    if isinstance(_alias, list) and len(_alias) > 0:
+        nix_native_deps = dedupe_preserve(nix_native_deps + _alias)
     append_nixpkg_labels(kwargs, nix_native_deps)
     include_importer_patches_from_labels(kwargs, "python")
     srcs = kwargs.get("srcs", []) or []
@@ -70,6 +83,9 @@ def nix_python_wasm_lib(name, lockfile_label = None, nix_native_deps = [], deps 
     stamp_wasm_variant(kwargs, "python", "wasi")
     labels = kwargs.get("labels", []) or []
     ensure_single_lockfile_label(kwargs, lockfile_label)
+    _alias = kwargs.pop("nixpkg_deps", [])
+    if isinstance(_alias, list) and len(_alias) > 0:
+        nix_native_deps = dedupe_preserve(nix_native_deps + _alias)
     append_nixpkg_labels(kwargs, nix_native_deps)
     include_importer_patches_from_labels(kwargs, "python")
     srcs = kwargs.get("srcs", []) or []
