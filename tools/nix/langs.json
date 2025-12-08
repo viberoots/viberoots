@@ -56,7 +56,8 @@
         "tools/nix/templates/python.nix",
         "python/defs.bzl",
         "tools/buck/exporter/lang/python.ts",
-        "tools/buck/providers/python.ts"
+        "tools/buck/providers/python.ts",
+        "**/uv.lock"
       ],
       "kinds": ["app", "lib"],
       "capabilities": {

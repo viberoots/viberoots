@@ -3,6 +3,7 @@ import fsSync from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 import type { ScaffoldingLanguage } from "./lang-contracts";
+import { findImporterLockfiles } from "./importers.ts";
 
 type ManifestLang = Partial<ScaffoldingLanguage> & { id: string };
 type ManifestObj =
@@ -59,12 +60,30 @@ export async function detectEnabledLanguages(cwd = process.cwd()): Promise<Scaff
       return false;
     }
   };
+  async function matchesGlob(req: string): Promise<boolean> {
+    const r = String(req || "");
+    // Minimal, fast-path glob handling for repo-wide lockfiles:
+    // - **/pnpm-lock.yaml
+    // - **/uv.lock
+    if (/\*\*\/pnpm-lock\.yaml$/.test(r) || /pnpm-lock\.yaml$/.test(r)) {
+      const found = await findImporterLockfiles(["pnpm-lock.yaml"]);
+      return found.length > 0;
+    }
+    if (/\*\*\/uv\.lock$/.test(r) || /uv\.lock$/.test(r)) {
+      const found = await findImporterLockfiles(["uv.lock"]);
+      return found.length > 0;
+    }
+    // For any other pattern, fall back to strict path check (no glob support).
+    return exists(r);
+  }
   const out: ScaffoldingLanguage[] = [];
   for (const s of languages) {
     if (preferred.length && !preferred.includes(s.id)) continue;
     let ok = true;
     for (const req of s.requiredPaths) {
-      if (!(await exists(req))) {
+      const isGlob = /[*?]/.test(req) || /\*\*\//.test(req);
+      const present = isGlob ? await matchesGlob(req) : await exists(req);
+      if (!present) {
         ok = false;
         break;
       }

@@ -22,17 +22,10 @@ async function buildHandlers(narrow?: string): Promise<LanguageProviderSync[]> {
   } catch {
     // best-effort; leave set unchanged
   }
-  // PR-1: Activate Python in sparse/partial clones when uv.lock is present.
-  // Mirrors Node's PNPM detection logic using shared importer utilities.
-  try {
-    if (!enabled.has("python")) {
-      const uv = await findImporterLockfiles(["uv.lock"]);
-      if (uv.length > 0) enabled.add("python");
-    }
-  } catch {
-    // best-effort; leave set unchanged
-  }
-  const want = narrow ? new Set([narrow]) : enabled;
+  // Narrow to a single language when explicitly requested; otherwise plan to run
+  // Node and Python generators unconditionally so header-only files are created
+  // even when no matching lockfiles exist (tests rely on presence).
+  const want = narrow ? new Set([narrow]) : new Set<string>(["node", "python"]);
 
   const out: LanguageProviderSync[] = [];
 
