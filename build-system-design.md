@@ -1090,6 +1090,8 @@ in {
 }
 ```
 
+Implementation note: the TypeScript normalizers in `tools/lib/labels.ts` intentionally mirror the planner’s normalization. Specifically, `normalizeTargetLabel(...)` equals `cleanLabel(...)` followed by dropping any cell prefix (e.g., `"root//"` → `"//"`). A zx test asserts TS ↔ Nix parity on a representative matrix (cell prefixes, trailing `(config//...)` suffixes, absolute and relative forms) to prevent drift.
+
 ### `tools/lib/providers.ts` (shared naming/encoding)
 
 ```ts
