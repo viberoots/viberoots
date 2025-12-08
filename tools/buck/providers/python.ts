@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import path from "node:path";
-import { computeImporterLabel } from "../../lib/importers.ts";
+import { computeImporterLabel, isWorkspaceImporterPath } from "../../lib/importers.ts";
 import { findUvLockfiles } from "../../lib/lockfiles.ts";
+import { collectProviderIndexEntries } from "../../lib/provider-index.ts";
 import { syncImporterProviders } from "../../lib/provider-sync-driver.ts";
-import { decodeNameVersionFromPatch, providerNameForImporter } from "../../lib/providers.ts";
+import { decodeNameVersionFromPatch } from "../../lib/providers.ts";
 import { parseUvLockKeys } from "../../lib/uv-lock.ts";
 
 export async function syncPythonProviders(opts?: {
@@ -47,18 +47,10 @@ export default syncPythonProviders;
 export async function readPythonProviderIndexEntries(): Promise<
   Array<{ provider: string; key: string }>
 > {
-  const out: Array<{ provider: string; key: string }> = [];
-  const lockfiles = await findUvLockfiles();
-  if (!lockfiles.length) return out;
-  for (const lf of lockfiles) {
-    const relLf = lf.replace(/^\.\/+/, "");
-    // Only consider importers under apps/* or libs/* per repo convention
-    if (!/^(apps|libs)\//.test(relLf)) continue;
-    const importerLabel = path.dirname(relLf) || ".";
-    const name = providerNameForImporter(relLf, importerLabel);
-    out.push({ provider: name, key: `lockfile:${relLf}#${importerLabel}` });
-  }
-  // Deterministic ordering
-  out.sort((a, b) => (a.provider < b.provider ? -1 : a.provider > b.provider ? 1 : 0));
-  return out;
+  const entries = await collectProviderIndexEntries({
+    discoverLockfiles: async () => findUvLockfiles(),
+    importersForLockfile: async (_lf: string) => ["."], // single importer per uv.lock (dirname)
+    shouldInclude: (_lf: string, importerLabel: string) => isWorkspaceImporterPath(importerLabel),
+  });
+  return entries;
 }

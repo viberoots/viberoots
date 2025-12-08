@@ -6,6 +6,7 @@ import { findImporterLockfiles, computeImporterLabel } from "../../lib/importers
 import { parsePnpmLock, effectiveSetForImporter } from "../../lib/pnpm-lock.ts";
 import { writeImporterProvidersByLang } from "../../lib/provider-writer.ts";
 import { syncImporterProviders } from "../../lib/provider-sync-driver.ts";
+import { collectProviderIndexEntries } from "../../lib/provider-index.ts";
 
 export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: string }) {
   const PATCH_DIR = opts?.patchDir || "patches/node";
@@ -60,35 +61,21 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
 export async function readNodeProviderIndexEntries(): Promise<
   Array<{ provider: string; key: string }>
 > {
-  const out: Array<{ provider: string; key: string }> = [];
   const lockfiles = await findImporterLockfiles(["pnpm-lock.yaml"]);
-  if (!lockfiles.length) return out;
+  if (!lockfiles.length) return [];
+  // Require YAML parser to be available (preserve existing behavior)
   try {
     await import("yaml");
   } catch {
-    return out;
+    return [];
   }
-
-  // Reuse scan to know which patches exist; only needed to mirror provider naming stability
-  const scanned = await scanFlatPatchDir({
-    patchDir: "patches/node",
-    decodeKey: decodeNameVersionFromPatch,
-    nameForKey: (k) => k,
+  const entries = await collectProviderIndexEntries({
+    discoverLockfiles: async () => lockfiles,
+    importersForLockfile: async (lf: string) => {
+      const doc = await parsePnpmLock(lf);
+      return Object.keys(doc.importers || {});
+    },
+    // No additional filtering — preserve previous behavior
   });
-  const keyToPatchPath = new Map<string, string>();
-  for (const e of scanned) keyToPatchPath.set(e.key, e.patchPath);
-
-  for (const lf of lockfiles) {
-    const relLf = lf.replace(/^\.\/+/, "");
-    if (!/^(apps|libs)\//.test(relLf)) continue;
-    const doc = await parsePnpmLock(lf);
-    for (const importer of Object.keys(doc.importers || {})) {
-      const importerLabel = importer === "." ? path.dirname(lf) || "." : importer;
-      const name = providerNameForImporter(lf, importerLabel);
-      out.push({ provider: name, key: `lockfile:${lf}#${importerLabel}` });
-    }
-  }
-  // Deterministic order
-  out.sort((a, b) => (a.provider < b.provider ? -1 : a.provider > b.provider ? 1 : 0));
-  return out;
+  return entries;
 }
