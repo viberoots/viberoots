@@ -39,6 +39,17 @@ export function computeImporterLabel(lockfilePath: string): string {
 }
 
 /**
+ * Return true when the importer path is a workspace path we support.
+ * Current convention: only importers under apps/* or libs/*.
+ * The input must be a POSIX-style relative path or '.'.
+ */
+export function isWorkspaceImporterPath(importer: string): boolean {
+  const p = toPosixPath(importer);
+  if (p === ".") return false;
+  return /^(apps|libs)\//.test(p);
+}
+
+/**
  * Compute the default importer-local patch directory (POSIX).
  * For importer '.', returns 'patches/<lang>'; otherwise '<importer>/patches/<lang>'.
  */

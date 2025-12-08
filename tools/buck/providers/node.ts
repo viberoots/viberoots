@@ -1,81 +1,59 @@
 #!/usr/bin/env zx-wrapper
-import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { renderTargetsFile, writeIfChanged, maybeAssumeUnchanged } from "../../lib/fs-helpers.ts";
 import { scanFlatPatchDir } from "../../lib/provider-sync.ts";
-import { providerNameForImporter, decodeNameVersionFromPatch } from "../../lib/providers.ts";
+import { decodeNameVersionFromPatch, providerNameForImporter } from "../../lib/providers.ts";
 import { findImporterLockfiles, computeImporterLabel } from "../../lib/importers.ts";
 import { parsePnpmLock, effectiveSetForImporter } from "../../lib/pnpm-lock.ts";
-import { ensureAutoSection } from "../../lib/auto-section.ts";
-import { listImporterPatches } from "../../lib/importers.ts";
-import { writeImporterProviders, type ImporterProvider } from "../../lib/provider-writer.ts";
-import { providersLoadFor } from "../../lib/providers-headers.ts";
 import { writeImporterProvidersByLang } from "../../lib/provider-writer.ts";
+import { syncImporterProviders } from "../../lib/provider-sync-driver.ts";
 
 export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: string }) {
   const PATCH_DIR = opts?.patchDir || "patches/node";
   const OUT_FILE = opts?.outFile || "third_party/providers/TARGETS.node.auto";
-  const LOAD_LINE = providersLoadFor({ lang: "node", rule: "node_importer_deps" });
-
-  const lockfiles = await findImporterLockfiles(["pnpm-lock.yaml"]);
-
-  async function haveYaml(): Promise<boolean> {
-    try {
-      await import("yaml");
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  if (!lockfiles.length) {
-    // Write deterministic, header-only file via consolidated writer
-    await writeImporterProvidersByLang("node", [], { outFile: OUT_FILE });
-    return;
-  }
-
-  const haveYamlMod = await haveYaml();
-
+  // Build a global key → patchPath mapping from patches/node to preserve behavior
   const scanned = await scanFlatPatchDir({
     patchDir: PATCH_DIR,
     decodeKey: decodeNameVersionFromPatch,
-    // Ensure deterministic ordering regardless of filesystem readdir order
     nameForKey: (k) => k,
   });
   const keyToPatchPath = new Map<string, string>();
-  for (const e of scanned) keyToPatchPath.set(e.key, e.patchPath);
+  for (const e of scanned) keyToPatchPath.set(e.key.toLowerCase(), e.patchPath);
 
-  const providers: ImporterProvider[] = [];
-
-  for (const lf of lockfiles) {
-    const relLf = lf.replace(/^\.\/+/, "");
-    // Only generate providers for app/lib importers; skip repo-root lockfile
-    if (!/^(apps|libs)\//.test(relLf)) continue;
-    if (haveYamlMod) {
-      const doc = await parsePnpmLock(lf);
-      for (const importer of Object.keys(doc.importers || {})) {
-        let importerLabel =
-          importer === "." ? computeImporterLabel(lf) : importer.replace(/^\.\/+/, "") || ".";
-        const eff = effectiveSetForImporter(doc, importer);
-        const usedPatches = Array.from(eff)
-          .map((k) => keyToPatchPath.get(k) || "")
-          .filter(Boolean)
-          .sort();
-        // Discover importer-local patches for visibility (does not affect invalidation)
-        const importerLocalPatches = await listImporterPatches(importerLabel, "node");
-        const patchPaths = Array.from(
-          new Set<string>([...usedPatches, ...importerLocalPatches]),
-        ).sort();
-        providers.push({ lockfile: relLf, importer: importerLabel, patchPaths });
-      }
-    } else {
-      // No YAML available: still create a provider per lockfile with importer derived from path
-      const importerLabel = path.dirname(relLf) || ".";
-      providers.push({ lockfile: relLf, importer: importerLabel, patchPaths: [] });
+  // Construct plugin functions for the shared driver
+  const discoverLockfiles = () => findImporterLockfiles(["pnpm-lock.yaml"]);
+  const parseEffectiveSetForLockfile = async (
+    lockfilePath: string,
+  ): Promise<Map<string, Set<string>>> => {
+    // Try YAML; if unavailable, fall back to a single importer derived from path
+    try {
+      await import("yaml");
+    } catch {
+      return new Map([[computeImporterLabel(lockfilePath), new Set()]]);
     }
-  }
+    const doc = await parsePnpmLock(lockfilePath);
+    const map = new Map<string, Set<string>>();
+    for (const importer of Object.keys(doc.importers || {})) {
+      const importerLabel =
+        importer === "."
+          ? computeImporterLabel(lockfilePath)
+          : importer.replace(/^\.\/+/, "") || ".";
+      map.set(importerLabel, effectiveSetForImporter(doc, importer));
+    }
+    return map;
+  };
+  const listImporterPatchesFor = async (importer: string) =>
+    (await import("../../lib/importers.ts")).listImporterPatches(importer, "node");
 
-  await writeImporterProvidersByLang("node", providers, { outFile: OUT_FILE });
+  await syncImporterProviders({
+    lang: "node",
+    discoverLockfiles,
+    parseEffectiveSetForLockfile,
+    listImporterPatchesFor,
+    decodePatchKey: decodeNameVersionFromPatch,
+    includeAllImporterLocalPatches: true, // Node lists importer-local patches regardless of effective set
+    globalKeyToPatchPath: keyToPatchPath,
+    outFile: OUT_FILE,
+  });
 }
 
 // Minimal surface for provider index generation
