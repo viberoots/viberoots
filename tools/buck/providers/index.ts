@@ -10,10 +10,69 @@ export type SyncOptions = {
   lang?: string; // optional narrow
 };
 
-async function buildHandlers(narrow?: string): Promise<LanguageProviderSync[]> {
+/**
+ * Tiny provider driver registry: language id → async loader that returns
+ * a LanguageProviderSync adapter.
+ *
+ * This reduces per-language conditional wiring and centralizes defaults.
+ * Adding a new ecosystem is one registry entry.
+ */
+const REGISTRY: Record<string, () => Promise<LanguageProviderSync>> = {
+  cpp: async () => ({
+    lang: "cpp",
+    sync: async () => {
+      console.info("[providers] C++ provider sync is a no-op — see drop-cpp-provider.md (PR 2).");
+    },
+  }),
+  node: async () => {
+    const { syncNodeProviders } = await import("./node.ts");
+    return {
+      lang: "node",
+      sync: async (opts) =>
+        syncNodeProviders({
+          outFile: opts?.outFile || "third_party/providers/TARGETS.node.auto",
+          patchDir: opts?.patchDir,
+        }),
+    };
+  },
+  python: async () => {
+    const { syncPythonProviders } = await import("./python.ts");
+    return {
+      lang: "python",
+      sync: async (opts) =>
+        syncPythonProviders({
+          outFile: opts?.outFile || "third_party/providers/TARGETS.python.auto",
+          patchDir: opts?.patchDir || "patches/python",
+          strict: opts?.strict,
+        }),
+    };
+  },
+  rust: async () => {
+    try {
+      const { syncRustProviders } = await import("./rust.ts");
+      return {
+        lang: "rust",
+        sync: async (opts) =>
+          syncRustProviders({
+            outFile: opts?.outFile || "third_party/providers/TARGETS.rust.auto",
+            patchDir: opts?.patchDir || "patches/rust",
+            strict: opts?.strict,
+          }),
+      };
+    } catch {
+      // In sparse clones without rust.ts, return a no-op that does nothing.
+      return {
+        lang: "rust",
+        sync: async () => {},
+      };
+    }
+  },
+};
+
+export async function buildHandlers(narrow?: string): Promise<LanguageProviderSync[]> {
   // Discover enabled languages from the manifest; partial-clone safe.
   const enabled = new Set((await detectEnabledLanguages(process.cwd())).map((l) => l.id));
-  // Handle globbed requiredPaths (e.g., Node's **/pnpm-lock.yaml) by probing lockfile presence.
+  // Node fallback PNPM detection (safety net for ultra-thin slices)
   try {
     if (!enabled.has("node")) {
       const pnpm = await findImporterLockfiles(["pnpm-lock.yaml"]);
@@ -22,68 +81,21 @@ async function buildHandlers(narrow?: string): Promise<LanguageProviderSync[]> {
   } catch {
     // best-effort; leave set unchanged
   }
-  // Narrow to a single language when explicitly requested; otherwise plan to run
-  // Node and Python generators unconditionally so header-only files are created
-  // even when no matching lockfiles exist (tests rely on presence).
-  const want = narrow ? new Set([narrow]) : new Set<string>(["node", "python"]);
+  // Selection:
+  // - If --lang was passed, honor it strictly.
+  // - Otherwise, include Node and Python by default (stable header-only files when no lockfiles),
+  //   and union with any additionally detected languages.
+  const defaults = new Set<string>(["node", "python"]);
+  const base = narrow ? new Set<string>([narrow]) : new Set<string>([...defaults, ...enabled]);
+  const want = Array.from(base).filter((id) => id && REGISTRY[id]);
 
   const out: LanguageProviderSync[] = [];
-
-  // C++ — no-op provider sync (documented behavior)
-  if (want.has("cpp")) {
-    out.push({
-      lang: "cpp",
-      sync: async () => {
-        console.info("[providers] C++ provider sync is a no-op — see drop-cpp-provider.md (PR 2).");
-      },
-    });
+  for (const id of want) {
+    // Each registry entry returns an adapter with stable defaults per language
+    const adapter = await REGISTRY[id]();
+    // Skip rust adapter if the module is missing and loader returned a no-op without sync
+    if (typeof adapter?.sync === "function") out.push(adapter);
   }
-
-  // Node — importer-scoped providers (only when language is present)
-  if (want.has("node")) {
-    const { syncNodeProviders } = await import("./node.ts");
-    out.push({
-      lang: "node",
-      sync: async (opts) =>
-        syncNodeProviders({
-          outFile: opts?.outFile || "third_party/providers/TARGETS.node.auto",
-          patchDir: opts?.patchDir,
-        }),
-    });
-  }
-
-  // Python — importer-scoped providers (uv.lock)
-  if (want.has("python")) {
-    const { syncPythonProviders } = await import("./python.ts");
-    out.push({
-      lang: "python",
-      sync: async (opts) =>
-        syncPythonProviders({
-          outFile: opts?.outFile || "third_party/providers/TARGETS.python.auto",
-          patchDir: opts?.patchDir || "patches/python",
-          strict: opts?.strict,
-        }),
-    });
-  }
-
-  // Rust — placeholder sync (stubbed provider writer)
-  if (want.has("rust")) {
-    try {
-      const { syncRustProviders } = await import("./rust.ts");
-      out.push({
-        lang: "rust",
-        sync: async (opts) =>
-          syncRustProviders({
-            outFile: opts?.outFile || "third_party/providers/TARGETS.rust.auto",
-            patchDir: opts?.patchDir || "patches/rust",
-            strict: opts?.strict,
-          }),
-      });
-    } catch {
-      // If rust provider module is absent in a partial clone, skip gracefully.
-    }
-  }
-
   return out;
 }
 
