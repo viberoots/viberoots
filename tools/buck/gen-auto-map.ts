@@ -9,6 +9,7 @@ import { providersForLabels, parseLockfileLabel } from "../lib/labels.ts";
 import * as fssync from "node:fs";
 import { getFlagStr } from "../lib/cli.ts";
 import { ensureGraph } from "./glue-run.ts";
+import { isProviderPackageNode } from "../lib/graph-utils.ts";
 // no path import needed when not checking provider existence
 
 type Node = {
@@ -45,7 +46,7 @@ async function main() {
   const mapping: Record<string, string[]> = {};
   for (const n of list) {
     // PR-2: Skip provider-package nodes to avoid self-mappings in auto_map.
-    if (n.name && n.name.startsWith("//third_party/providers:")) {
+    if (n.name && isProviderPackageNode(n.name)) {
       continue;
     }
     const provs: string[] = [];
