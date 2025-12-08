@@ -127,36 +127,43 @@ export async function writeImporterProvidersByLang(
   const id = String(lang || "")
     .trim()
     .toLowerCase();
-  let ruleName = "";
-  let begin = "";
-  let end = "";
-  let defaultOut = "";
-  if (id === "node") {
-    ruleName = "node_importer_deps";
-    begin = "# BEGIN AUTO_NODE";
-    end = "# END AUTO_NODE";
-    defaultOut = "third_party/providers/TARGETS.node.auto";
-  } else if (id === "python") {
-    ruleName = "python_importer_deps";
-    begin = "# BEGIN AUTO_PYTHON";
-    end = "# END AUTO_PYTHON";
-    defaultOut = "third_party/providers/TARGETS.python.auto";
-  } else {
+  type RegistryEntry = {
+    ruleName: string;
+    begin: string;
+    end: string;
+    defaultOut: string;
+  };
+  const REGISTRY: Record<string, RegistryEntry> = {
+    node: {
+      ruleName: "node_importer_deps",
+      begin: "# BEGIN AUTO_NODE",
+      end: "# END AUTO_NODE",
+      defaultOut: "third_party/providers/TARGETS.node.auto",
+    },
+    python: {
+      ruleName: "python_importer_deps",
+      begin: "# BEGIN AUTO_PYTHON",
+      end: "# END AUTO_PYTHON",
+      defaultOut: "third_party/providers/TARGETS.python.auto",
+    },
+  };
+  const entry = REGISTRY[id];
+  if (!entry) {
     throw new Error(`writeImporterProvidersByLang: unsupported language '${lang}'`);
   }
 
-  const ruleLoad = providersLoadFor({ lang: id, rule: ruleName });
-  const fileHeader = providersHeaderFor({ lang: id, load: ruleLoad, rule: ruleName });
-  const outFile = (opts && opts.outFile) || defaultOut;
+  const ruleLoad = providersLoadFor({ lang: id, rule: entry.ruleName });
+  const fileHeader = providersHeaderFor({ lang: id, load: ruleLoad, rule: entry.ruleName });
+  const outFile = (opts && opts.outFile) || entry.defaultOut;
 
   await writeImporterProviders(providers, {
     outFile,
     ruleLoad,
-    ruleName,
+    ruleName: entry.ruleName,
     fileHeader,
     autoSection: {
-      begin,
-      end,
+      begin: entry.begin,
+      end: entry.end,
       header: ruleLoad,
     },
   });

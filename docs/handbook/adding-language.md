@@ -35,6 +35,7 @@ This guide explains how to add a new language to the build without touching core
   - `defaultImporterPatchDir`, `listImporterPatches`
   - Keeps importer‑local patch discovery and sorting consistent across Node and Python
   - `tools/lib/provider-writer.ts` — emits deterministic importer‑scoped provider TARGETS and synchronizes the curated auto‑managed section. Pass your computed `{ lockfile, importer, patchPaths }` entries plus the rule load/name.
+    - Prefer the convenience wrapper `writeImporterProvidersByLang(...)`, which is table‑driven via a small registry. To add a new importer‑scoped ecosystem, extend that registry instead of adding per‑language conditionals.
 
 ### Python notes
 
