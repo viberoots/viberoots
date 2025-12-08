@@ -9,6 +9,7 @@ All scripts are zx TypeScript using `#!/usr/bin/env zx-wrapper`.
 - Patch handlers reuse `tools/patch/lib/apply.ts: repoRoot()` for repo‑root detection.
 - Filesystem existence checks use `tools/patch/lib/util.ts: pathExists()`.
 - Avoid bespoke implementations; this keeps behavior consistent across Go/C++/Node/Python.
+- Default package-local patch directory selection is centralized in Starlark via `//lang:defs_common.bzl: default_package_patch_dirs(lang)`. Go/C++ macros use this helper instead of hard‑coded strings (e.g., `["patches/go"]`).
 - Flat patch directory checks use `tools/lib/provider-sync.ts: validateFlatDir()`; locally it warns, and in CI (or with `--strict`) it fails.
 - C++ extraction/workspace setup uses the common permission normalizer `tools/patch/cross-platform.ts: chmodRecursive` to guarantee writable workspaces without affecting diffs.
 - Node and Python macros include importer‑local patch files in `srcs` via the unified helper `//lang:defs_common.bzl: append_importer_patches(kwargs, importer, lang)`. Importer is derived from a single `lockfile:<path>#<importer>` label (enforced by `ensure_single_lockfile_label(...)`).

@@ -1,5 +1,6 @@
 load("@prelude//:rules.bzl", "go_binary", "go_library", "go_test", "genrule")
 load("//lang:defs_common.bzl", "dedupe_preserve", "normalize_labels", "stamp_labels", "include_package_local_patches", "realize_provider_edges")
+load("//lang:defs_common.bzl", "default_package_patch_dirs")
 load("//lang:defs_common.bzl", "stamp_wasm_variant")
 load("//lang:defs_common.bzl", "append_nixpkg_labels")
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
@@ -37,7 +38,7 @@ def _srcs_imply_cgo(kwargs):
 
 
 def nix_go_library(name, **kwargs):
-    local_patch_dirs = kwargs.pop("local_patch_dirs", ["patches/go"])  # per-target local patch directories
+    local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("go"))  # per-target local patch directories
     nix_cgo_deps = kwargs.pop("nix_cgo_deps", [])
     repo_cgo_deps = kwargs.pop("repo_cgo_deps", [])
     nix_cgo_pkgconfig = kwargs.pop("nix_cgo_pkgconfig", {})
@@ -81,7 +82,7 @@ def nix_go_library(name, **kwargs):
 
 
 def nix_go_binary(name, **kwargs):
-    local_patch_dirs = kwargs.pop("local_patch_dirs", ["patches/go"])  # per-target local patch directories
+    local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("go"))  # per-target local patch directories
     nix_cgo_deps = kwargs.pop("nix_cgo_deps", [])
     repo_cgo_deps = kwargs.pop("repo_cgo_deps", [])
     nix_cgo_pkgconfig = kwargs.pop("nix_cgo_pkgconfig", {})

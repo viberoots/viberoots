@@ -136,6 +136,16 @@ def include_package_local_patches(kwargs, lang, default_dirs = None):
     append_patch_srcs(kwargs, dirs)
 
 
+def default_package_patch_dirs(lang):
+    """
+    Return the default package-local patch directories for a given language.
+    Currently returns ["patches/<lang>"] and can be extended in future PRs.
+    """
+    if not isinstance(lang, str) or lang == "":
+        return []
+    return ["patches/%s" % lang]
+
+
 def stamp_labels(kwargs, lang, kind=None):
     """
     Ensure kwargs["labels"] contains the language stamp (e.g., "lang:go")

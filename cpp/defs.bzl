@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "cxx_library", "cxx_binary", "cxx_test")
-load("//lang:defs_common.bzl", "stamp_labels", "append_nixpkg_labels", "include_package_local_patches", "dedupe_preserve", "stamp_wasm_variant", "realize_provider_edges")
+load("//lang:defs_common.bzl", "stamp_labels", "append_nixpkg_labels", "include_package_local_patches", "dedupe_preserve", "stamp_wasm_variant", "realize_provider_edges", "default_package_patch_dirs")
 load("//lang:global_inputs.bzl", "global_nix_inputs")
 load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name", _cpp_sanitize_probe="cpp_sanitize_probe")
 load("//cpp/private:planner_stub.bzl", "cpp_planner_stub")
@@ -8,7 +8,7 @@ load("//cpp/private:nix_build.bzl", "cpp_nix_build")
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
 
 def nix_cpp_library(name, **kwargs):
-    local_patch_dirs = kwargs.pop("local_patch_dirs", ["patches/cpp"])  # per-target local patch directories
+    local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("cpp"))  # per-target local patch directories
     nix_cxx_attrs = kwargs.pop("nix_cxx_attrs", [])
     # Build via Nix, not Buck's C++ toolchain
     deps = kwargs.pop("deps", [])
@@ -41,7 +41,7 @@ def nix_cpp_wasm_static_lib(name, **kwargs):
     Stamps:
       - lang:cpp, kind:lib, flavor:wasm
     """
-    local_patch_dirs = kwargs.pop("local_patch_dirs", ["patches/cpp"])
+    local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("cpp"))
     nix_cxx_attrs = kwargs.pop("nix_cxx_attrs", [])
     deps = kwargs.pop("deps", [])
     nix_inputs = global_nix_inputs()
@@ -91,7 +91,7 @@ def nix_cpp_wasm_emscripten_lib(name, **kwargs):
     )
 
 def nix_cpp_binary(name, **kwargs):
-    local_patch_dirs = kwargs.pop("local_patch_dirs", ["patches/cpp"])  # per-target local patch directories
+    local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("cpp"))  # per-target local patch directories
     nix_cxx_attrs = kwargs.pop("nix_cxx_attrs", [])
     # Build via Nix, not Buck's C++ toolchain
     deps = kwargs.pop("deps", [])
@@ -170,7 +170,7 @@ def nix_cpp_node_addon(name, **kwargs):
     # - The build artifact is a single ".node" shared library. Downstream Node packaging
     #   should copy/rename this artifact to a stable runtime path such as
     #   "native/<addon_name or sanitized target name>.node" for loading from JS/TS.
-    local_patch_dirs = kwargs.pop("local_patch_dirs", ["patches/cpp"])
+    local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("cpp"))
     nix_cxx_attrs = kwargs.pop("nix_cxx_attrs", [])
     deps = kwargs.pop("deps", [])
     # Optional addon_name hint; recorded in labels for planner visibility only

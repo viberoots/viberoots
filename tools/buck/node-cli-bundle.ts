@@ -12,15 +12,7 @@
 import path from "node:path";
 import * as fsp from "node:fs/promises";
 import { spawn } from "node:child_process";
-
-type Args = {
-  importer?: string;
-  name?: string;
-  out?: string;
-  entry?: string;
-};
-
-const args = (global as any).argv as Args;
+import { getFlagStr } from "../lib/cli.ts";
 
 function sanitizeImporterAttr(s: string): string {
   // Keep in sync with tools/nix/templates-common.nix sanitizeName
@@ -39,11 +31,11 @@ function fail(msg: string): never {
 }
 
 async function main() {
-  const importer = String(args.importer || "").trim();
-  const name = String(args.name || "").trim();
-  const out = String(args.out || "").trim();
+  const importer = getFlagStr("importer", "").trim();
+  const name = getFlagStr("name", "").trim();
+  const out = getFlagStr("out", "").trim();
   // entry accepted for forward compatibility; unused in current flake pipeline
-  // const entry = (args.entry ?? "").toString().trim();
+  // const entry = getFlagStr("entry", "").trim();
 
   if (!importer) fail("node-cli-bundle: --importer is required (e.g., apps/demo)");
   if (!name) fail("node-cli-bundle: --name is required (e.g., demo)");
