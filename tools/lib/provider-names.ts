@@ -1,5 +1,28 @@
 import { shortHash } from "./providers.ts";
-import { NIX_ATTR_ALIASES } from "./nix-attr-aliases.ts";
+import * as fs from "node:fs";
+import { fileURLToPath } from "node:url";
+import * as path from "node:path";
+
+function loadAliasMap(): Record<string, string> {
+  try {
+    const here = fileURLToPath(import.meta.url);
+    const jsonPath = path.join(path.dirname(here), "nix-attr-aliases.json");
+    const data = fs.readFileSync(jsonPath, "utf8");
+    const parsed = JSON.parse(data) as unknown;
+    if (!parsed || typeof parsed !== "object") return {};
+    const m: Record<string, string> = {};
+    for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof k === "string" && typeof v === "string") {
+        const key = k.trim().toLowerCase();
+        const val = v.trim().toLowerCase();
+        if (key && val) m[key] = val;
+      }
+    }
+    return m;
+  } catch {
+    return {};
+  }
+}
 
 // Normalize a nixpkgs attribute path for provider naming and labeling.
 // - Trims
@@ -7,6 +30,9 @@ import { NIX_ATTR_ALIASES } from "./nix-attr-aliases.ts";
 // - Ensures "pkgs." prefix
 // - Maps historical alias pkgs.gtest -> pkgs.googletest
 export function normalizeNixAttr(attr: string): string {
+  // Prefer JSON source of truth; tolerate missing/invalid at runtime.
+  const NIX_ATTR_ALIASES: Record<string, string> = loadAliasMap();
+
   const s = String(attr || "")
     .trim()
     .toLowerCase();
@@ -14,6 +40,8 @@ export function normalizeNixAttr(attr: string): string {
   let a = s.startsWith("pkgs.") ? s : `pkgs.${s}`;
   const alias = NIX_ATTR_ALIASES[a];
   if (alias) a = alias;
+  // Sparse/partial clone fallback for parity with Starlark/Nix
+  if (a === "pkgs.gtest") a = "pkgs.googletest";
   return a;
 }
 

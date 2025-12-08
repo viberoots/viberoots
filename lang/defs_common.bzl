@@ -1,3 +1,5 @@
+load("//lang:nix_attr_aliases.bzl", "NIX_ATTR_ALIASES")
+
 def normalize_labels(pkg, labels):
     if labels == None:
         return []
@@ -198,7 +200,8 @@ def normalize_nix_attr(attr):
     - Trims
     - Lower-cases
     - Ensures "pkgs." prefix
-    - Maps historical alias pkgs.gtest -> pkgs.googletest
+    - Maps aliases from generated NIX_ATTR_ALIASES (JSON source of truth)
+    - Sparse fallback: also map pkgs.gtest -> pkgs.googletest
     """
     if not isinstance(attr, str):
         return ""
@@ -207,6 +210,10 @@ def normalize_nix_attr(attr):
         return ""
     if not s.startswith("pkgs."):
         s = "pkgs." + s
+    # Prefer generated alias map when present
+    if (s in NIX_ATTR_ALIASES):
+        s = NIX_ATTR_ALIASES[s]
+    # Sparse/partial clone fallback to preserve behavior when alias map is empty
     if s == "pkgs.gtest":
         s = "pkgs.googletest"
     return s

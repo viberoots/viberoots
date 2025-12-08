@@ -25,6 +25,8 @@ Note on Python lockfiles: The initial Python rollout is uv‑only. Poetry/pip‑
 - Maintain determinism and low cyclomatic complexity; prefer small, well-named functions.
 - Prefer shared CLI helpers when parsing flags in zx scripts:
   - Use `tools/lib/cli.ts` (`getFlagStr`, `getFlagBool`, `getFlagList`) instead of bespoke parsing.
+- Nix attr alias source of truth: `tools/lib/nix-attr-aliases.json`. Starlark mirror is generated (dev/test-time) via:
+  - `node tools/dev/gen-nix-attr-aliases-bzl.ts` → writes `lang/nix_attr_aliases.bzl`. A stub exists and runtime does not depend on generation; behavior is unchanged for current aliases.
 
 ### 3. Commands cheat sheet
 
