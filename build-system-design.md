@@ -914,6 +914,7 @@ main().catch((e) => {
 > **Purpose:** Orchestrate provider generation. Currently:
 >
 > - Node: generate importer‑scoped providers from discovered `pnpm-lock.yaml` files and importer‑local patches.
+> - Python: generate importer‑scoped providers from discovered `uv.lock` files; activation in sparse/partial clones is lockfile‑driven (presence of `uv.lock` under `apps/*` or `libs/*` enables Python).
 > - C++: sync is a no‑op (providers are curated); patches are handled via package‑local `srcs`.
 > - Go: no provider generation; patches are handled via package‑local `srcs`.
 

@@ -14,6 +14,7 @@ This guide helps a new contributor land any PR in this plan successfully, follow
   - `node tools/dev/startup-check.ts`
 
 Note on Python lockfiles: The initial Python rollout is uv‑only. Poetry/pip‑tools are out of scope unless/until a future PR adds them. See `lang-design-docs/python-design.md` (PR‑17) for details.
+Python provider sync activation in sparse/partial clones is lockfile‑driven: the presence of an `uv.lock` under `apps/*` or `libs/*` enables Python providers.
 
 ### 2. Project rules you must follow
 
