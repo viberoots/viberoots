@@ -49,7 +49,7 @@ Add a Buck macro that stamps `lang:cpp`/`kind:addon`, includes package‑local `
 ### Scope & Changes
 
 - `cpp/defs.bzl`:
-  - `nix_cpp_node_addon(name, srcs=[], headers=[], addon_name=None, local_patch_dirs=["patches/cpp"], nix_cxx_attrs=[], labels=[], ...)`
+  - `nix_cpp_node_addon(name, srcs=[], headers=[], addon_name=None, local_patch_dirs=["patches/cpp"], nixpkg_deps=[], labels=[], ...)`
   - Output file: `<addon_name or name>.node`.
   - Preserve existing patterns from `nix_cpp_library`/`nix_cpp_binary`.
 - `cpp/private/nix_build.bzl` (if needed):

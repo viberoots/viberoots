@@ -45,13 +45,13 @@ This report lists the work needed to bring Go and C++ local patching up to the s
 
 ### 2) Make C++ nixpkgs usage explicit at the call site (labels), drop provider auto‑map dependency
 
-- Add macro arg `nix_cxx_attrs` to `nix_cpp_*` macros that:
+- Add macro arg `nixpkg_deps` to `nix_cpp_*` macros that:
   - Stamps `nixpkg:<attr>` labels (e.g., `nixpkg:pkgs.zlib`) for planner consumption.
   - Keeps `lang:cpp`/`kind:*` stamping unchanged.
 - Planner reads stamped `nixpkg:` labels (already supported) to pass `nixCxxAttrs` to `cpp.nix`.
 - Remove the need for provider auto‑map to back‑propagate `nixpkg:` labels.
 - Acceptance:
-  - Setting `nix_cxx_attrs = ["pkgs.zlib", "pkgs.openssl"]` at the macro produces correct include/lib flags through `cpp.nix` and deterministically links the right libs.
+  - Setting `nixpkg_deps = ["pkgs.zlib", "pkgs.openssl"]` at the macro produces correct include/lib flags through `cpp.nix` and deterministically links the right libs.
   - No dependency on `third_party/providers/*` for C++ builds.
 
 ### 3) Retire Go global provider generation and index
@@ -108,7 +108,7 @@ This report lists the work needed to bring Go and C++ local patching up to the s
   - [ ] Update docs/scaffolding to note local patch layout and filename conventions.
 
 - C++
-  - [ ] Add `nix_cxx_attrs` to `nix_cpp_*` macros and stamp `nixpkg:` labels.
+  - [ ] Add `nixpkg_deps` to `nix_cpp_*` macros and stamp `nixpkg:` labels.
   - [ ] Update planner logic (reads stamped labels; already supported).
   - [ ] Remove reliance on provider auto‑map for `nixpkg:` propagation in C++.
   - [ ] Remove or gate off `tools/nix/overlays/cpp-patches.nix` (global patch scanning).
@@ -128,7 +128,7 @@ This report lists the work needed to bring Go and C++ local patching up to the s
 - Go/C++ targets build and test successfully using only local patch directories; no global `patches/**` scans or provider files are needed.
 - Modifying a local patch re‑executes only the owning target and its reverse deps.
 - Sparse checkouts of a single target directory (plus shared essentials) can build with local patches.
-- C++ nixpkgs usage is declared explicitly at call sites (`nix_cxx_attrs`) and flows to `cpp.nix` deterministically.
+- C++ nixpkgs usage is declared explicitly at call sites (`nixpkg_deps`) and flows to `cpp.nix` deterministically.
 - patch‑pkg provides a smooth local patch workflow for Go/C++.
 
 ---
@@ -146,7 +146,7 @@ This report lists the work needed to bring Go and C++ local patching up to the s
 
 ## Rollout plan
 
-1. Land macro/planner/template changes (C++ `nix_cxx_attrs`; remove global overlay scan).
+1. Land macro/planner/template changes (C++ `nixpkg_deps`; remove global overlay scan).
 2. Remove Go provider generation/index and guard checks.
 3. Update patch‑pkg for Go/C++ local mode.
 4. Update docs/scaffolds; add zx tests (local invalidation + sparse‑checkout).

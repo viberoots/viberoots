@@ -117,7 +117,7 @@ Rationale: separating Node and C++ into sibling packages preserves clear boundar
 
 Add a small macro in `//cpp:defs.bzl`:
 
-- Signature sketch: `nix_cpp_node_addon(name, srcs = [], headers = [], addon_name = None, local_patch_dirs = ["patches/cpp"], nix_cxx_attrs = [], labels = [], ...)`
+- Signature sketch: `nix_cpp_node_addon(name, srcs = [], headers = [], addon_name = None, local_patch_dirs = ["patches/cpp"], nixpkg_deps = [], labels = [], ...)`
 - Behavior:
   - Stamps labels as `lang:cpp` with kind `addon`.
   - Appends `local_patch_dirs` to `srcs` so patch changes invalidate precisely.

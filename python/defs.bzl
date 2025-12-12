@@ -2,7 +2,7 @@ load("@prelude//:rules.bzl", "python_binary", "python_library", "python_test", "
 load("//lang:defs_common.bzl", "stamp_labels", "ensure_single_lockfile_label", "append_nixpkg_labels", "include_importer_patches_from_labels", "dedupe_preserve", "stamp_wasm_variant", "realize_provider_edges")
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
 
-def nix_python_library(name, lockfile_label = None, nix_native_deps = None, deps = [], **kwargs):
+def nix_python_library(name, lockfile_label = None, deps = [], **kwargs):
     """
     Thin macro over python_library that:
     - stamps lang/kind labels
@@ -12,7 +12,7 @@ def nix_python_library(name, lockfile_label = None, nix_native_deps = None, deps
     """
     stamp_labels(kwargs, "python", "lib")
     ensure_single_lockfile_label(kwargs, lockfile_label)
-    if nix_native_deps != None:
+    if "nix_native_deps" in kwargs:
         fail("nix_native_deps is no longer supported; use nixpkg_deps instead")
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     append_nixpkg_labels(kwargs, nixpkg_deps)
@@ -21,13 +21,13 @@ def nix_python_library(name, lockfile_label = None, nix_native_deps = None, deps
     deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps)
     python_library(name = name, deps = deps, **kwargs)
 
-def nix_python_binary(name, lockfile_label = None, nix_native_deps = None, deps = [], **kwargs):
+def nix_python_binary(name, lockfile_label = None, deps = [], **kwargs):
     """
     See nix_python_library — identical wiring for binaries.
     """
     stamp_labels(kwargs, "python", "bin")
     ensure_single_lockfile_label(kwargs, lockfile_label)
-    if nix_native_deps != None:
+    if "nix_native_deps" in kwargs:
         fail("nix_native_deps is no longer supported; use nixpkg_deps instead")
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     append_nixpkg_labels(kwargs, nixpkg_deps)
@@ -38,13 +38,13 @@ def nix_python_binary(name, lockfile_label = None, nix_native_deps = None, deps 
     deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps)
     python_binary(name = name, deps = deps, **kwargs)
 
-def nix_python_test(name, lockfile_label = None, nix_native_deps = None, deps = [], **kwargs):
+def nix_python_test(name, lockfile_label = None, deps = [], **kwargs):
     """
     See nix_python_library — identical wiring for tests.
     """
     stamp_labels(kwargs, "python", "test")
     ensure_single_lockfile_label(kwargs, lockfile_label)
-    if nix_native_deps != None:
+    if "nix_native_deps" in kwargs:
         fail("nix_native_deps is no longer supported; use nixpkg_deps instead")
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     append_nixpkg_labels(kwargs, nixpkg_deps)
@@ -53,7 +53,7 @@ def nix_python_test(name, lockfile_label = None, nix_native_deps = None, deps = 
     python_test(name = name, deps = deps, **kwargs)
 
 # WASM (WASI) convenience macros — stamp kind:wasm so planner routes to pyWasm* templates
-def nix_python_wasm_app(name, lockfile_label = None, nix_native_deps = None, deps = [], labels = [], **kwargs):
+def nix_python_wasm_app(name, lockfile_label = None, deps = [], labels = [], **kwargs):
     """
     WASI app stamp: uses python_* rules for Buck semantics but marks kind:wasm for the planner.
     """
@@ -62,7 +62,7 @@ def nix_python_wasm_app(name, lockfile_label = None, nix_native_deps = None, dep
     stamp_wasm_variant(kwargs, "python", "wasi")
     labels = kwargs.get("labels", []) or []
     ensure_single_lockfile_label(kwargs, lockfile_label)
-    if nix_native_deps != None:
+    if "nix_native_deps" in kwargs:
         fail("nix_native_deps is no longer supported; use nixpkg_deps instead")
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     append_nixpkg_labels(kwargs, nixpkg_deps)
@@ -73,7 +73,7 @@ def nix_python_wasm_app(name, lockfile_label = None, nix_native_deps = None, dep
     kwargs["srcs"] = srcs
     python_library(name = name, deps = deps, **kwargs)
 
-def nix_python_wasm_lib(name, lockfile_label = None, nix_native_deps = None, deps = [], labels = [], **kwargs):
+def nix_python_wasm_lib(name, lockfile_label = None, deps = [], labels = [], **kwargs):
     """
     WASI lib stamp: emits a reusable overlay (planner builds via pyWasmLib).
     """
@@ -82,7 +82,7 @@ def nix_python_wasm_lib(name, lockfile_label = None, nix_native_deps = None, dep
     stamp_wasm_variant(kwargs, "python", "wasi")
     labels = kwargs.get("labels", []) or []
     ensure_single_lockfile_label(kwargs, lockfile_label)
-    if nix_native_deps != None:
+    if "nix_native_deps" in kwargs:
         fail("nix_native_deps is no longer supported; use nixpkg_deps instead")
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     append_nixpkg_labels(kwargs, nixpkg_deps)

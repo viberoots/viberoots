@@ -76,7 +76,7 @@ We currently duplicate nix attribute normalization in both `go/defs.bzl` and `cp
 
 ### Description
 
-Go macros currently attach provider deps in two ways: (1) via `MODULE_PROVIDERS` from `auto_map.bzl` and (2) by directly constructing provider labels from `nix_cgo_deps`. This duplication is safe but increases maintenance and diverges from Node’s single-path approach. We will remove the direct injection and rely solely on `MODULE_PROVIDERS`, keeping `nixpkg:` labels so the mapping remains correct.
+Go macros currently attach provider deps in two ways: (1) via `MODULE_PROVIDERS` from `auto_map.bzl` and (2) by directly constructing provider labels from `nixpkg_deps`. This duplication is safe but increases maintenance and diverges from Node’s single-path approach. We will remove the direct injection and rely solely on `MODULE_PROVIDERS`, keeping `nixpkg:` labels so the mapping remains correct.
 
 ### Scope & Changes
 
@@ -86,7 +86,7 @@ Go macros currently attach provider deps in two ways: (1) via `MODULE_PROVIDERS`
 
 ### Acceptance Criteria
 
-- For a Go target with `nix_cgo_deps = ["pkgs.zlib"]`, `deps(...)` includes `//third_party/providers:nix_pkgs_zlib` only through `MODULE_PROVIDERS`.
+- For a Go target with `nixpkg_deps = ["pkgs.zlib"]`, `deps(...)` includes `//third_party/providers:nix_pkgs_zlib` only through `MODULE_PROVIDERS`.
 - No change in rebuild invalidation boundaries for CGO-enabled targets (cache keys and impacted tests unaffected, aside from expected PR‑1 mapping cleanup).
 - All Go tests pass; CI green.
 

@@ -64,8 +64,8 @@ Intent/Impact
 Scope
 
 - Go macros (`go/defs.bzl`):
-  - Add optional attrs: `nix_cgo_deps = ["pkgs.zlib", "pkgs.openssl"]`, `nix_cgo_pkgconfig = { "pkgs.openssl": "openssl" }`.
-  - When `nix_cgo_deps` non-empty, stamp label `"cgo:enabled"` and wire explicit deps to curated provider targets (e.g., `//third_party/providers:nix_pkgs_openssl`).
+  - Add optional attrs: `nixpkg_deps = ["pkgs.zlib", "pkgs.openssl"]`, `nix_cgo_pkgconfig = { "pkgs.openssl": "openssl" }`.
+  - When `nixpkg_deps` non-empty, stamp label `"cgo:enabled"` and wire explicit deps to curated provider targets (e.g., `//third_party/providers:nix_pkgs_openssl`).
 
 - Exporter
   - Ensure Go adapter adds `cgo:enabled` and `nixpkg:*` labels for diagnostics (additive only). No deletion.
@@ -86,7 +86,7 @@ Scope
 
 Acceptance criteria
 
-- A Go target with `nix_cgo_deps = ["pkgs.zlib"]` builds; exporter shows `cgo:enabled` and `nixpkg:pkgs.zlib` labels; planner paths remain deterministic.
+- A Go target with `nixpkg_deps = ["pkgs.zlib"]` builds; exporter shows `cgo:enabled` and `nixpkg:pkgs.zlib` labels; planner paths remain deterministic.
 
 Risks/Notes
 

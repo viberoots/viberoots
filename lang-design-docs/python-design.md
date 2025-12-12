@@ -257,24 +257,27 @@ def _providers_for(name):
     load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
     return providers_for(MODULE_PROVIDERS, name)
 
-def nix_python_library(name, lockfile_label = None, nix_native_deps = [], deps = [], **kwargs):
+def nix_python_library(name, lockfile_label = None, deps = [], **kwargs):
     stamp_labels(kwargs, "python", "lib")
     ensure_single_lockfile_label(kwargs, lockfile_label)
-    append_nixpkg_labels(kwargs, nix_native_deps)
+    nixpkg_deps = kwargs.pop("nixpkg_deps", [])
+    append_nixpkg_labels(kwargs, nixpkg_deps)
     deps = deps + _providers_for(name)
     python_library(name = name, deps = deps, **kwargs)
 
-def nix_python_binary(name, lockfile_label = None, nix_native_deps = [], deps = [], **kwargs):
+def nix_python_binary(name, lockfile_label = None, deps = [], **kwargs):
     stamp_labels(kwargs, "python", "bin")
     ensure_single_lockfile_label(kwargs, lockfile_label)
-    append_nixpkg_labels(kwargs, nix_native_deps)
+    nixpkg_deps = kwargs.pop("nixpkg_deps", [])
+    append_nixpkg_labels(kwargs, nixpkg_deps)
     deps = deps + _providers_for(name)
     python_binary(name = name, deps = deps, **kwargs)
 
-def nix_python_test(name, lockfile_label = None, nix_native_deps = [], deps = [], **kwargs):
+def nix_python_test(name, lockfile_label = None, deps = [], **kwargs):
     stamp_labels(kwargs, "python", "test")
     ensure_single_lockfile_label(kwargs, lockfile_label)
-    append_nixpkg_labels(kwargs, nix_native_deps)
+    nixpkg_deps = kwargs.pop("nixpkg_deps", [])
+    append_nixpkg_labels(kwargs, nixpkg_deps)
     deps = deps + _providers_for(name)
     python_test(name = name, deps = deps, **kwargs)
 ```
@@ -282,7 +285,7 @@ def nix_python_test(name, lockfile_label = None, nix_native_deps = [], deps = []
 Notes
 
 - Python macros accept `lockfile_label` explicitly for clarity in scaffolds; callers usually pass `lockfile:"<path>#<importer>"`. The helper dedupes/validates exactly one importer‑scoped label.
-- Use `nix_native_deps = ["pkgs.openssl", ...]` when C‑extensions require toolchain/system libs; labels become `nixpkg:<attr>` and are auto‑mapped to providers just like Go/C++.
+- Use `nixpkg_deps = ["pkgs.openssl", ...]` when C‑extensions require toolchain/system libs; labels become `nixpkg:<attr>` and are auto‑mapped to providers just like Go/C++.
 
 ---
 
@@ -718,7 +721,7 @@ Add `python/defs.bzl` macros that stamp standard labels, validate an importer‑
 
 - `python/defs.bzl`:
   - Use `stamp_labels`, `ensure_single_lockfile_label`, `append_nixpkg_labels`, and `providers_for` from `lang/defs_common.bzl`,
-  - Expose `nix_python_{library,binary,test}` with `lockfile_label` and `nix_native_deps` parameters,
+  - Expose `nix_python_{library,binary,test}` with `lockfile_label` and `nixpkg_deps` parameters,
   - Keep rule args aligned with upstream `python_*` rules.
 
 #### Acceptance Criteria

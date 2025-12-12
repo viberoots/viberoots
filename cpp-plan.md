@@ -699,10 +699,10 @@ Intent/Impact
 Design
 
 - Macros (`//go/defs.bzl`): add optional attrs
-  - `nix_cgo_deps = ["pkgs.openssl", "pkgs.zlib"]`
+  - `nixpkg_deps = ["pkgs.openssl", "pkgs.zlib"]`
   - `nix_cgo_pkgconfig = { "pkgs.openssl": "openssl", "pkgs.zlib": "zlib" }` (optional overrides)
 - Macro behavior:
-  - Stamp as today; set tuple labels to include `cgo:enabled` when `nix_cgo_deps` non-empty
+  - Stamp as today; set tuple labels to include `cgo:enabled` when `nixpkg_deps` non-empty
   - Wire deps to the corresponding nixpkgs provider targets from PR 1
 - Exporter:
   - Add labels `cgo:enabled` and `nixpkg:<attrPath>` for diagnostics/auto-map (even if macro wires deps explicitly)
@@ -714,7 +714,7 @@ Design
 
 Acceptance criteria
 
-- A sample Go lib/bin using cgo and `nix_cgo_deps = ["pkgs.zlib"]` builds and links on supported platforms
+- A sample Go lib/bin using cgo and `nixpkg_deps = ["pkgs.zlib"]` builds and links on supported platforms
 - Exporter shows `cgo:enabled` and `nixpkg:pkgs.zlib` labels; auto-map or explicit deps cause correct invalidation
 
 Risks

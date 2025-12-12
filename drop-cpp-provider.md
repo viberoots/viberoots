@@ -1,13 +1,13 @@
 ### Drop C++ Provider Reliance — Design, Migration, and Acceptance
 
-This document proposes removing the C++ provider dependency path (auto_map → provider deps) and adopting explicit, per‑target Nix attribute declaration via `nix_cxx_attrs`, while preserving precise invalidation and impacted‑tests detection.
+This document proposes removing the C++ provider dependency path (auto_map → provider deps) and adopting explicit, per‑target nixpkgs dependency declaration via `nixpkg_deps`, while preserving precise invalidation and impacted‑tests detection.
 
 ---
 
 ## Goals
 
 - Simplify the C++ build pipeline: eliminate `third_party/providers` dependency for C++ targets.
-- Make inputs explicit at call sites with `nix_cxx_attrs = ["pkgs.zlib", "pkgs.openssl"]`.
+- Make inputs explicit at call sites with `nixpkg_deps = ["pkgs.zlib", "pkgs.openssl"]`.
 - Preserve determinism and impacted‑tests accuracy (rule‑key correctness) without provider nodes.
 - Keep sparse‑checkout friendliness and reduce glue generation and maintenance.
 
@@ -21,18 +21,18 @@ This document proposes removing the C++ provider dependency path (auto_map → p
 ## Current State (baseline)
 
 - C++ macros (`nix_cpp_library`, `nix_cpp_binary`, `nix_cpp_test`) load `//third_party/providers:auto_map.bzl` and append provider deps for invalidation/introspection.
-- Macros stamp `nixpkg:` labels when `nix_cxx_attrs` is used; the planner already reads these labels and passes them into `tools/nix/templates/cpp.nix`.
+- Macros stamp `nixpkg:` labels when `nixpkg_deps` is used; the planner already reads these labels and passes them into `tools/nix/templates/cpp.nix`.
 - Prebuild guard does not require C++ provider files (only Node has strict importer provider presence).
 - Optional overlay `tools/nix/overlays/cpp-patches.nix` is gated behind env and presence checks; it is not used by default.
 
-Problem: provider edges add glue, churn, and complexity without providing unique value once `nix_cxx_attrs` are first‑class and the planner consumes `nixpkg:` labels directly.
+Problem: provider edges add glue, churn, and complexity without providing unique value once `nixpkg_deps` is first‑class and the planner consumes `nixpkg:` labels directly.
 
 ---
 
 ## Target State (after change)
 
 - C++ macros no longer load `auto_map.bzl` nor append provider deps.
-- `nix_cxx_attrs` remains the single source of truth at call sites; macros stamp normalized `nixpkg:` labels for the exporter.
+- `nixpkg_deps` remains the single source of truth at call sites; macros stamp normalized `nixpkg:` labels for the exporter.
 - Planner (`tools/nix/planner/cpp.nix`) continues to read `nixpkg:` labels (already implemented) and passes a stable, sorted `nixCxxAttrs` list to `tools/nix/templates/cpp.nix`.
 - `cpp_nix_build` explicitly declares the Nix inputs that must affect the rule key (e.g., `flake.lock`, optional overlays) in addition to local patch files carried via `srcs`.
 - Prebuild guard remains Node‑focused for provider presence and freshness; no C++ provider checks are (re)introduced.
@@ -56,7 +56,7 @@ Tradeoffs were analyzed in “what is gained or lost” and favor this direction
 
 - Remove provider dependency and `auto_map.bzl` load from `cpp/defs.bzl`:
   - Drop `load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")` and any `_providers_for(...)` usage.
-  - Keep (and normalize) `nix_cxx_attrs` → stamp `nixpkg:` labels in `labels`.
+  - Keep (and normalize) `nixpkg_deps` → stamp `nixpkg:` labels in `labels`.
   - Continue to include local patch files in `srcs` via `local_patch_dirs` so patch edits invalidate only the owning target and rdeps.
 
 Proposed shape (illustrative fragment):
@@ -66,7 +66,7 @@ Proposed shape (illustrative fragment):
 load("@prelude//:rules.bzl", "cxx_library", "cxx_binary", "cxx_test")
 load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve")
 
-def _normalize_cxx_attr(a):
+def _normalize_nixpkg_attr(a):
     if a == None or not isinstance(a, str): return ""
     s = a.strip()
     if s == "": return ""
@@ -76,7 +76,7 @@ def _normalize_cxx_attr(a):
 
 def nix_cpp_library(name, **kwargs):
     local_patch_dirs = kwargs.pop("local_patch_dirs", ["patches/cpp"])
-    nix_cxx_attrs = kwargs.pop("nix_cxx_attrs", [])
+    nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     deps = kwargs.pop("deps", [])
 
     stamp_labels(kwargs, "cpp", "lib")
@@ -88,8 +88,8 @@ def nix_cpp_library(name, **kwargs):
 
     # Stamp normalized nixpkg labels (planner consumes them)
     extra_nix_labels = []
-    for a in nix_cxx_attrs or []:
-        na = _normalize_cxx_attr(a)
+    for a in nixpkg_deps or []:
+        na = _normalize_nixpkg_attr(a)
         if na != "":
             extra_nix_labels.append("nixpkg:%s" % na)
 
@@ -165,7 +165,7 @@ Effect: changes to lockfiles or overlays invalidate affected C++ targets; `buck2
 
 1. Land macro changes behind a short‑lived feature flag (optional):
    - Env var or repo config to disable provider appends; default to “off”; flip to “on” after validation.
-2. Update macros to remove provider loads/appends; keep `nix_cxx_attrs` stamping.
+2. Update macros to remove provider loads/appends; keep `nixpkg_deps` stamping.
 3. Add `nix_inputs` visibility to `cpp_nix_build` and pass `flake.lock` if present; include overlay path when overlay is enabled.
 4. Keep planner/template unchanged; re‑verify sorting/dedup and patch mapping.
 5. Adjust tests:
@@ -173,7 +173,7 @@ Effect: changes to lockfiles or overlays invalidate affected C++ targets; `buck2
    - Add tests that flipping `flake.lock` (or a test overlay) invalidates only relevant C++ targets.
    - Keep Node provider tests untouched.
 6. Remove (or de‑scope) C++ provider sync paths from `tools/buck/providers/*`; leave Node path active.
-7. Update docs (handbook, scaffolding) to show `nix_cxx_attrs` as the only C++ path for Nix deps.
+7. Update docs (handbook, scaffolding) to show `nixpkg_deps` as the only C++ path for nixpkgs deps.
 
 Rollback is trivial: re‑enable provider append in macros and keep prior tools; no data migration is required.
 
@@ -194,7 +194,7 @@ Rollback is trivial: re‑enable provider append in macros and keep prior tools;
 - C++ patch invalidation
   - Create `libs/x/patches/cpp/fix.patch` touching a symbol; verify the `//libs/x:x` bin/lib rebuilds; unrelated targets cache‑hit; verify `testsof(rdeps(...))` scope matches rdeps.
 - `flake.lock` invalidation
-  - Touch `flake.lock` (or simulate a change) and verify only C++ targets depending on specific `nix_cxx_attrs` rebuild (others remain cache‑hit).
+  - Touch `flake.lock` (or simulate a change) and verify only C++ targets depending on specific `nixpkg_deps` rebuild (others remain cache‑hit).
 - Overlay invalidation (when overlay is enabled)
   - Place a trivial overlay; enable env flag; verify changes invalidate only affected targets.
 - No providers in graph
@@ -215,7 +215,7 @@ Rollback is trivial: re‑enable provider append in macros and keep prior tools;
 
 ## Summary
 
-This change removes a non‑essential moving part (C++ providers) in favor of explicit `nix_cxx_attrs` + planner label consumption. It reduces glue and failure modes, keeps invalidation precise by declaring true inputs, and aligns with our design philosophy of minimal, deterministic, local‑first builds.
+This change removes a non‑essential moving part (C++ providers) in favor of explicit `nixpkg_deps` + planner label consumption. It reduces glue and failure modes, keeps invalidation precise by declaring true inputs, and aligns with our design philosophy of minimal, deterministic, local‑first builds.
 
 ---
 
@@ -244,7 +244,7 @@ Both PRs keep risk low and allow quick rollback at any point.
   - `load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")`
   - `_providers_for(name)` usage in `nix_cpp_library`, `nix_cpp_binary`, `nix_cpp_test`
 - Keep and emphasize:
-  - `nix_cxx_attrs` with normalization → stamp `nixpkg:<attr>` into `labels`
+  - `nixpkg_deps` with normalization → stamp `nixpkg:<attr>` into `labels`
   - Include local patches via `local_patch_dirs` → `srcs` (already present)
 - Outcome:
   - The Buck rule key now depends on:
@@ -350,7 +350,7 @@ Purpose: replace provider‑node based graph queries for C++ with a labels/plann
 
 - Invalidation correctness
   - Patch change → only rdeps of owning target rebuild.
-  - `flake.lock` change → targets with relevant `nix_cxx_attrs` rebuild; unrelated targets cache‑hit.
+  - `flake.lock` change → targets with relevant `nixpkg_deps` rebuild; unrelated targets cache‑hit.
   - Overlay enabled + changed → same as above; disabled overlay → no effect.
 - Sparse‑checkout
   - Build a target with local patches present and minimal repo subset.
@@ -361,7 +361,7 @@ Purpose: replace provider‑node based graph queries for C++ with a labels/plann
 
 ### I. Open questions (tracked)
 
-- Do we want inherited `nix_cxx_attrs` (from selected deps) or only self‑declared?
+- Do we want inherited `nixpkg_deps` (from selected deps) or only self‑declared?
   - Default: self‑declared only (explicitness); planner can support inherited view for diagnostics, not for builds.
 - Should the overlay path be treated as an opt‑in per‑target param instead of environment?
   - Recommended: remain opt‑in and centralized, guarded by presence and an explicit flag.
@@ -370,4 +370,4 @@ Purpose: replace provider‑node based graph queries for C++ with a labels/plann
 
 - Simpler C++ path (no provider churn), fewer generated artifacts, faster iteration.
 - Deterministic, explicit invalidation via real inputs (`srcs`, `flake.lock`, optional overlay).
-- Clearer authoring model for engineers and LLM agents: set `nix_cxx_attrs` at the call site; everything else follows.
+- Clearer authoring model for engineers and LLM agents: set `nixpkg_deps` at the call site; everything else follows.

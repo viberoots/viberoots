@@ -43,24 +43,24 @@ This document lays out three focused PRs to complete Go/C++ local patching and a
 ## PR 2 — C++: explicit nixpkgs at call sites; planner pass‑through; drop provider reliance
 
 - Scope
-  - Extend `nix_cpp_*` macros to accept `nix_cxx_attrs` (e.g., `["pkgs.zlib", "pkgs.openssl"]`) and stamp `nixpkg:<attr>` labels.
+  - Extend `nix_cpp_*` macros to accept `nixpkg_deps` (e.g., `["pkgs.zlib", "pkgs.openssl"]`) and stamp `nixpkg:<attr>` labels.
   - Planner (`tools/nix/planner/cpp.nix`) uses stamped `nixpkg:` labels (already supported) to pass `nixCxxAttrs` to `tools/nix/templates/cpp.nix`.
   - `tools/nix/templates/cpp.nix` already consumes `nixCxxAttrs` to produce include/lib flags; validate and keep deterministic ordering.
   - Reduce reliance on C++ provider auto‑map for `nixpkg:` propagation:
     - No need to attach provider deps at call sites just to reflect `nixpkg:` labels.
     - Keep existing provider mapping only if required for legacy sample targets; de‑emphasize in docs.
   - Documentation update:
-    - Show call‑site pattern with `nix_cxx_attrs` and local patches under `patches/cpp/*.patch`.
+    - Show call‑site pattern with `nixpkg_deps` and local patches under `patches/cpp/*.patch`.
 
 - Acceptance criteria
-  - Adding `nix_cxx_attrs` at a `nix_cpp_*` call site results in correct headers/libs being used (deterministically) by `cpp.nix`.
+  - Adding `nixpkg_deps` at a `nix_cpp_*` call site results in correct headers/libs being used (deterministically) by `cpp.nix`.
   - Builds/tests do not depend on provider auto‑map for propagating `nixpkg:` to the planner.
   - Local C++ patches applied via Buck `srcs` → planner → `cpp.nix` are honored.
 
 - Tests (implementation‑agnostic; user‑flow oriented)
   - Call‑site attrs test:
     - Scaffold a C++ lib/app that uses zlib symbols.
-    - In `TARGETS`, add `nix_cxx_attrs = ["pkgs.zlib"]`.
+    - In `TARGETS`, add `nixpkg_deps = ["pkgs.zlib"]`.
     - Build: `buck2 build //<pkg>:<name>` → success; verify binary links (e.g., presence of `-lz` in a captured build log or successful use).
   - Local patch application test:
     - Add `<pkg>/patches/cpp/fix.patch` modifying a source line in `src/…`.
