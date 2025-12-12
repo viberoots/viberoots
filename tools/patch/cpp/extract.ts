@@ -55,15 +55,11 @@ export async function ensureOriginAndWorkspace(
   const attrNorm = normalizeNixAttr(attr);
   const { pname, version, srcPath } = pre || (await resolveNixpkg(attrNorm));
   const key = `${attrNorm}@${version}`.toLowerCase();
-  const stamp = new Date()
-    .toISOString()
-    .replace(/[-:TZ.]/g, "")
-    .slice(0, 14);
   const safeKey = encodeNixAttrForPatchPrefix(key);
   const base = path.join(os.tmpdir(), "bucknix-patch-cpp");
-  const originRoot = path.join(base, `origin-${safeKey}-${stamp}`);
-  const wsRoot = path.join(base, `ws-${safeKey}-${stamp}`);
   await fsp.mkdir(base, { recursive: true });
+  const originRoot = await fsp.mkdtemp(path.join(base, `origin-${safeKey}-`));
+  const wsRoot = await fsp.mkdtemp(path.join(base, `ws-${safeKey}-`));
   const originPath = await extractOrCopySrc(srcPath, originRoot);
   // Create workspace by cloning originPath
   await $`rsync -a ${originPath}/ ${wsRoot}/`;
