@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("nix_cgo_deps wires provider dep for openssl", async () => {
+test("nixpkg_deps wires provider dep for openssl", async () => {
   await runInTemp("go-cgo-openssl-wiring", async (tmp, $) => {
     await $({
       cwd: tmp,
@@ -41,7 +41,7 @@ load("//go:defs.bzl", "nix_go_binary")
 nix_go_binary(
     name = "demo",
     srcs = ["cmd/demo/main.go"],
-    nix_cgo_deps = ["pkgs.openssl"],
+    nixpkg_deps = ["pkgs.openssl"],
 )
 EOF'`;
 

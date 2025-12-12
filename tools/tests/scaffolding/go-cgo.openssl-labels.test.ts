@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("nix_go_library stamps cgo:enabled and nixpkg:pkgs.openssl when nix_cgo_deps set", async () => {
+test("nix_go_library stamps cgo:enabled and nixpkg:pkgs.openssl when nixpkg_deps set", async () => {
   await runInTemp("go-cgo-openssl-labels", async (tmp, $) => {
     await $({ cwd: tmp })`bash -lc 'mkdir -p tmp && cat > tmp/TARGETS <<'\''EOF'\''
 load("//go:defs.bzl", "nix_go_library")
@@ -10,7 +10,7 @@ load("//go:defs.bzl", "nix_go_library")
 nix_go_library(
     name = "lib",
     srcs = [],
-    nix_cgo_deps = ["pkgs.openssl"],
+    nixpkg_deps = ["pkgs.openssl"],
 )
 EOF'`;
 

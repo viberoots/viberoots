@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runInTemp } from "../lib/test-helpers";
 
-test("go macros: nixpkg_deps alias parity with nix_cgo_deps (labels)", async () => {
+test("go macros: legacy nix_cgo_deps fails with an actionable error", async () => {
   await runInTemp("go-nixpkg-alias", async (tmp, $) => {
     // Minimal Go package
     const pkg = path.join(tmp, "apps", "demo");
@@ -20,7 +20,7 @@ test("go macros: nixpkg_deps alias parity with nix_cgo_deps (labels)", async () 
       path.join(tmp, "go", "defs.bzl"),
       await fsp.readFile("go/defs.bzl", "utf8"),
     );
-    // TARGETS with two libs: one uses legacy kwarg, the other the alias
+    // TARGETS: legacy kwarg should fail deterministically
     await fsp.writeFile(
       path.join(pkg, "TARGETS"),
       [
@@ -32,31 +32,18 @@ test("go macros: nixpkg_deps alias parity with nix_cgo_deps (labels)", async () 
         '  nix_cgo_deps = ["pkgs.openssl"],',
         ")",
         "",
-        "nix_go_library(",
-        '  name = "alias",',
-        '  srcs = glob(["pkg/**/*.go"]),',
-        '  nixpkg_deps = ["pkgs.openssl"],',
-        ")",
-        "",
       ].join("\n"),
       "utf8",
     );
 
-    const q = async (name: string) => {
-      const probe = await $({
-        cwd: tmp,
-        stdio: "pipe",
-        reject: false,
-        nothrow: true,
-      })`buck2 cquery --target-platforms //:no_cgo --json --output-attributes labels "deps(//apps/demo:${name}, 0)"`;
-      if (probe.exitCode !== 0) return null;
-      const json = JSON.parse(String(probe.stdout || "[]")) as Array<{ labels?: string[] }>;
-      const labs = (json[0]?.labels || []).slice().sort();
-      return labs;
-    };
-    const legacy = await q("legacy");
-    const alias = await q("alias");
-    if (!legacy || !alias) return;
-    assert.deepEqual(alias, legacy, "labels should be identical for nixpkg_deps vs nix_cgo_deps");
+    const probe = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels "deps(//apps/demo:legacy,0)"`;
+    assert.notEqual(probe.exitCode, 0);
+    const out = String(probe.stdout || "") + "\n" + String(probe.stderr || "");
+    assert.match(out, /nix_cgo_deps is no longer supported; use nixpkg_deps instead/);
   });
 });

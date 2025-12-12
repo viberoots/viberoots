@@ -4,7 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("cpp openssl include via nix_cxx_attrs at call site", async () => {
+test("cpp openssl include via nixpkg_deps at call site", async () => {
   await runInTemp("cpp-nixpkg-include-openssl", async (tmp, $) => {
     const appDir = path.join(tmp, "apps/demo");
     await fs.outputFile(path.join(appDir, "src", "main.cpp"), "int main(){return 0;}\n");
@@ -54,7 +54,7 @@ nix_cpp_binary(
 nix_cpp_test(
     name = "demo_openssl_gtest",
     srcs = ["tests/demo_openssl_gtest.cpp"],
-    nix_cxx_attrs = ["pkgs.googletest", "pkgs.openssl"],
+    nixpkg_deps = ["pkgs.googletest", "pkgs.openssl"],
 )
 `;
     await fs.outputFile(path.join(appDir, "TARGETS"), targets);

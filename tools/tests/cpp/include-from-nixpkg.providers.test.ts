@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("cpp gtest include via nix_cxx_attrs at call site", async () => {
+test("cpp gtest include via nixpkg_deps at call site", async () => {
   await runInTemp("cpp-nixpkg-include", async (tmp, $) => {
     // Write a minimal app with a single gtest
     const appDir = path.join(tmp, "apps/demo");
@@ -59,7 +59,7 @@ nix_cpp_binary(
 nix_cpp_test(
     name = "demo_gtest",
     srcs = ["tests/demo_gtest.cpp"],
-    nix_cxx_attrs = ["pkgs.googletest"],
+    nixpkg_deps = ["pkgs.googletest"],
 )
 `;
     await fs.outputFile(path.join(appDir, "TARGETS"), targets);

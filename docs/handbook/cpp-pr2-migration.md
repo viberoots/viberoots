@@ -1,6 +1,6 @@
 ## C++ Provider Sync → No-op (PR 2)
 
-This repo no longer generates or consumes C++ provider rules. C++ targets declare `nix_cxx_attrs` at call sites, macros stamp `nixpkg:` labels, and the planner consumes those labels directly.
+This repo no longer generates or consumes C++ provider rules. C++ targets declare `nixpkg_deps` at call sites, macros stamp `nixpkg:` labels, and the planner consumes those labels directly.
 
 - What changed:
   - C++ provider sync is a no-op; `tools/buck/sync-providers.ts --lang=cpp` does nothing.

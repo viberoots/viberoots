@@ -45,7 +45,7 @@ nix_cpp_test(
         ":caller",
         "//libs/greetgo:greetgo",
     ],
-    nix_cxx_attrs = [
+    nixpkg_deps = [
         "pkgs.googletest",
     ],
     labels = ["lang:cpp", "kind:test"],

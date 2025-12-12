@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("cpp macros: nixpkg_deps alias parity with nix_cxx_attrs", async () => {
+test("cpp macros: legacy nix_cxx_attrs fails with an actionable error", async () => {
   await runInTemp("cpp-nixpkg-alias", async (tmp, $) => {
     const appDir = path.join(tmp, "apps/demo");
     await fs.outputFile(path.join(appDir, "src", "main.cpp"), "int x(){return 42;}\n");
@@ -58,30 +58,17 @@ nix_cpp_test(
     srcs = ["tests/demo_gtest.cpp"],
     nix_cxx_attrs = ["pkgs.googletest"],
 )
-
-nix_cpp_test(
-    name = "alias",
-    srcs = ["tests/demo_gtest.cpp"],
-    nixpkg_deps = ["pkgs.googletest"],
-)
 `;
     await fs.outputFile(path.join(appDir, "TARGETS"), targets, "utf8");
 
-    const q = async (name: string) => {
-      const probe = await $({
-        cwd: tmp,
-        stdio: "pipe",
-        reject: false,
-        nothrow: true,
-      })`buck2 cquery --target-platforms //:no_cgo --json --output-attributes labels "deps(//apps/demo:${name}, 0)"`;
-      if (probe.exitCode !== 0) return null;
-      const json = JSON.parse(String(probe.stdout || "[]")) as Array<{ labels?: string[] }>;
-      const labs = (json[0]?.labels || []).slice().sort();
-      return labs;
-    };
-    const legacy = await q("legacy");
-    const alias = await q("alias");
-    if (!legacy || !alias) return;
-    assert.deepEqual(alias, legacy, "labels should be identical for nixpkg_deps vs nix_cxx_attrs");
+    const probe = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels "deps(//apps/demo:legacy,0)"`;
+    assert.notEqual(probe.exitCode, 0);
+    const out = String(probe.stdout || "") + "\n" + String(probe.stderr || "");
+    assert.match(out, /nix_cxx_attrs is no longer supported; use nixpkg_deps instead/);
   });
 });

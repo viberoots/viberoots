@@ -10,8 +10,8 @@ def _go_nix_build_wasm_impl(ctx):
     # require the target to be present in the exported graph. Fallback to generic selected.
     run_and_copy = (
         nix_bootstrap_env()
-        + ("OUT_PATH=$(BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"%s\" nix build --impure --print-out-paths --accept-flake-config \"$FLK_ROOT\"#graph-generator-selected-wasm || " % (raw))
-        + ("BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"%s\" nix run --accept-flake-config \"$FLK_ROOT\"#zx-wrapper -- \"$FLK_ROOT/tools/dev/build-selected.ts\"); " % (raw))
+        + ("OUT_PATH=$(BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"%s\" nix build --impure --print-out-paths --accept-flake-config \"path:$FLK_ROOT#graph-generator-selected-wasm\" || " % (raw))
+        + ("BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"%s\" nix run --accept-flake-config \"path:$FLK_ROOT#zx-wrapper\" -- \"$FLK_ROOT/tools/dev/build-selected.ts\"); " % (raw))
         + "test -n \"$OUT_PATH\"; "
         + (
             "if [ ! -e \"$OUT_PATH/%s\" ]; then echo 'go_nix_build_wasm (%s): expected artifact not found: %s' >&2; (ls -la \"$OUT_PATH\"; ls -la \"$OUT_PATH/lib\" 2>/dev/null || true) >&2; exit 2; fi; "

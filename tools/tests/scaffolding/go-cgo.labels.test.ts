@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("nix_go_library stamps cgo:enabled and nixpkg labels when nix_cgo_deps set", async () => {
+test("nix_go_library stamps cgo:enabled and nixpkg labels when nixpkg_deps set", async () => {
   await runInTemp("go-cgo-labels", async (tmp, $) => {
     await $({
       cwd: tmp,
@@ -29,7 +29,7 @@ load("//go:defs.bzl", "nix_go_library")
 nix_go_library(
     name = "lib",
     srcs = [],
-    nix_cgo_deps = ["pkgs.zlib"],
+    nixpkg_deps = ["pkgs.zlib"],
 )
 EOF'`;
 

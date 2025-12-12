@@ -9,11 +9,9 @@ load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
 
 def nix_cpp_library(name, **kwargs):
     local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("cpp"))  # per-target local patch directories
-    nix_cxx_attrs = kwargs.pop("nix_cxx_attrs", [])
-    # Alias: support unified kwarg name without breaking callers
+    if "nix_cxx_attrs" in kwargs:
+        fail("nix_cxx_attrs is no longer supported; use nixpkg_deps instead")
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
-    if isinstance(nixpkg_deps, list) and len(nixpkg_deps) > 0:
-        nix_cxx_attrs = dedupe_preserve(nix_cxx_attrs + nixpkg_deps)
     # Build via Nix, not Buck's C++ toolchain
     deps = kwargs.pop("deps", [])
     # Explicit Nix-level inputs that should affect the rule key.
@@ -23,7 +21,7 @@ def nix_cpp_library(name, **kwargs):
     # Include local patch files in rule inputs so Buck invalidates on patch changes
     include_package_local_patches(kwargs, "cpp", local_patch_dirs)
     srcs = kwargs.get("srcs", []) or []
-    append_nixpkg_labels(kwargs, nix_cxx_attrs)
+    append_nixpkg_labels(kwargs, nixpkg_deps)
     # Realize provider edges for diagnostics/introspection (graph-only)
     deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps)
     cpp_nix_build(
@@ -46,17 +44,16 @@ def nix_cpp_wasm_static_lib(name, **kwargs):
       - lang:cpp, kind:lib, flavor:wasm
     """
     local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("cpp"))
-    nix_cxx_attrs = kwargs.pop("nix_cxx_attrs", [])
+    if "nix_cxx_attrs" in kwargs:
+        fail("nix_cxx_attrs is no longer supported; use nixpkg_deps instead")
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
-    if isinstance(nixpkg_deps, list) and len(nixpkg_deps) > 0:
-        nix_cxx_attrs = dedupe_preserve(nix_cxx_attrs + nixpkg_deps)
     deps = kwargs.pop("deps", [])
     nix_inputs = global_nix_inputs()
     # Uniform WASM labeling across languages
     stamp_wasm_variant(kwargs, "cpp", "static")
     include_package_local_patches(kwargs, "cpp", local_patch_dirs)
     srcs = kwargs.get("srcs", []) or []
-    append_nixpkg_labels(kwargs, nix_cxx_attrs)
+    append_nixpkg_labels(kwargs, nixpkg_deps)
     deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps)
     cpp_nix_build(
         name = name,
@@ -99,10 +96,9 @@ def nix_cpp_wasm_emscripten_lib(name, **kwargs):
 
 def nix_cpp_binary(name, **kwargs):
     local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("cpp"))  # per-target local patch directories
-    nix_cxx_attrs = kwargs.pop("nix_cxx_attrs", [])
+    if "nix_cxx_attrs" in kwargs:
+        fail("nix_cxx_attrs is no longer supported; use nixpkg_deps instead")
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
-    if isinstance(nixpkg_deps, list) and len(nixpkg_deps) > 0:
-        nix_cxx_attrs = dedupe_preserve(nix_cxx_attrs + nixpkg_deps)
     # Build via Nix, not Buck's C++ toolchain
     deps = kwargs.pop("deps", [])
     # Explicit Nix-level inputs that should affect the rule key.
@@ -110,7 +106,7 @@ def nix_cpp_binary(name, **kwargs):
     stamp_labels(kwargs, "cpp", "bin")
     include_package_local_patches(kwargs, "cpp", local_patch_dirs)
     srcs = kwargs.get("srcs", []) or []
-    append_nixpkg_labels(kwargs, nix_cxx_attrs)
+    append_nixpkg_labels(kwargs, nixpkg_deps)
     # Realize provider edges for diagnostics/introspection (graph-only)
     deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps)
     cpp_nix_build(
@@ -129,17 +125,16 @@ def nix_cpp_binary(name, **kwargs):
 def nix_cpp_test(name, **kwargs):
     # Define a planner-visible cxx_test (not executed) and an external runner test (executed)
     deps = kwargs.pop("deps", [])
-    nix_cxx_attrs = kwargs.pop("nix_cxx_attrs", [])
+    if "nix_cxx_attrs" in kwargs:
+        fail("nix_cxx_attrs is no longer supported; use nixpkg_deps instead")
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
-    if isinstance(nixpkg_deps, list) and len(nixpkg_deps) > 0:
-        nix_cxx_attrs = dedupe_preserve(nix_cxx_attrs + nixpkg_deps)
     srcs = kwargs.get("srcs", [])
     planner_name = name + "__planner"
     # Planner-visible: stamps labels and wires providers so exporter->planner can generate the Nix derivation
     _planner_kwargs = dict(kwargs)
     stamp_labels(_planner_kwargs, "cpp", "test")
     # Add direct call-site attrs as nixpkg labels (shared helper)
-    append_nixpkg_labels(_planner_kwargs, nix_cxx_attrs)
+    append_nixpkg_labels(_planner_kwargs, nixpkg_deps)
     _planner_labels = (_planner_kwargs.get("labels", []) or [])
     # Planner-visible stub: declare a cxx_library without compiling test sources; Nix will build the test.
     # Filter provider deps from planner to avoid visibility / graph-edge to providers
@@ -184,10 +179,9 @@ def nix_cpp_node_addon(name, **kwargs):
     #   should copy/rename this artifact to a stable runtime path such as
     #   "native/<addon_name or sanitized target name>.node" for loading from JS/TS.
     local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("cpp"))
-    nix_cxx_attrs = kwargs.pop("nix_cxx_attrs", [])
+    if "nix_cxx_attrs" in kwargs:
+        fail("nix_cxx_attrs is no longer supported; use nixpkg_deps instead")
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
-    if isinstance(nixpkg_deps, list) and len(nixpkg_deps) > 0:
-        nix_cxx_attrs = dedupe_preserve(nix_cxx_attrs + nixpkg_deps)
     deps = kwargs.pop("deps", [])
     # Optional addon_name hint; recorded in labels for planner visibility only
     addon_name = kwargs.pop("addon_name", None)
@@ -200,7 +194,7 @@ def nix_cpp_node_addon(name, **kwargs):
         kwargs["labels"] = _labels
     include_package_local_patches(kwargs, "cpp", local_patch_dirs)
     srcs = kwargs.get("srcs", []) or []
-    append_nixpkg_labels(kwargs, nix_cxx_attrs)
+    append_nixpkg_labels(kwargs, nixpkg_deps)
     deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps)
     cpp_nix_build(
         name = name,

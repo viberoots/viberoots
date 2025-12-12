@@ -4,7 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("cpp zlib include via nix_cxx_attrs at call site (no providers)", async () => {
+test("cpp zlib include via nixpkg_deps at call site (no providers)", async () => {
   await runInTemp("cpp-nixattrs-zlib-include", async (tmp, $) => {
     const appDir = path.join(tmp, "apps/demo");
     await fs.outputFile(path.join(appDir, "src", "main.cpp"), "int main(){return 0;}\n");
@@ -55,7 +55,7 @@ nix_cpp_binary(
 nix_cpp_test(
     name = "demo_zlib_gtest",
     srcs = ["tests/demo_zlib_gtest.cpp"],
-    nix_cxx_attrs = ["pkgs.zlib", "pkgs.googletest"],
+    nixpkg_deps = ["pkgs.zlib", "pkgs.googletest"],
 )
 `;
     await fs.outputFile(path.join(appDir, "TARGETS"), targets);

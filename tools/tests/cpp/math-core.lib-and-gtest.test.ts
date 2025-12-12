@@ -96,7 +96,7 @@ TEST(MathCore, AddWorks) {
       "utf8",
     );
 
-    // Local TARGETS for lib + gtest (use nix_cxx_attrs instead of provider deps in temp)
+    // Local TARGETS for lib + gtest (use nixpkg_deps instead of provider deps in temp)
     const targets = `load("//cpp:defs.bzl", "nix_cpp_library", "nix_cpp_test")
 
 nix_cpp_library(
@@ -117,11 +117,14 @@ nix_cpp_test(
     name = "math_core_gtest",
     srcs = ["tests/math_core_gtest.cpp"],
     deps = [":lib"],
-    nix_cxx_attrs = ["pkgs.googletest"],
+    nixpkg_deps = ["pkgs.googletest"],
     labels = ["lang:cpp", "kind:test"],
 )
 `;
     await fs.outputFile(path.join(libDir, "TARGETS"), targets);
+
+    // Pre-generate a graph.json for the temp repo so cpp_nix_build can find the new target
+    await $({ cwd: tmp })`node tools/buck/export-graph.ts`;
 
     // Build and run the test inside the temp repo
     await $`buck2 build --target-platforms prelude//platforms:default //libs/math-core:lib`;

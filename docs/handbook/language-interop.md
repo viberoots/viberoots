@@ -31,7 +31,7 @@ nix_cpp_library(
 )
 ```
 
-2. Consume it from a Go target via `repo_cgo_deps`; optionally add nixpkgs deps via `nixpkg_deps` (alias: `nix_cgo_deps`):
+2. Consume it from a Go target via `repo_cgo_deps`; optionally add nixpkgs deps via `nixpkg_deps`:
 
 ```python
 # apps/demo-cli/TARGETS
@@ -63,7 +63,7 @@ Implementation notes
 
 - Transparent CGO: our Go macros automatically enable CGO when either of these is true:
   - The target lists any C-family source files in `srcs` (e.g., `.c`, `.cpp`, `.m`, `.mm`, `.s`).
-  - The target declares `nix_cgo_deps` or `repo_cgo_deps`.
+  - The target declares `nixpkg_deps` or `repo_cgo_deps`.
     No TARGETS edits are required when adding/removing C sources.
 - The Go Nix templates set `CGO_ENABLED=1` only for those targets and ensure CC/CXX/AR come from Nix.
 - If `pkg-config` metadata is missing, templates synthesize `CGO_CFLAGS`/`CGO_LDFLAGS` from provided packages.
