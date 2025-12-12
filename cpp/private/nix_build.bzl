@@ -26,9 +26,50 @@ def _cpp_nix_build_impl(ctx):
             "unknown kind for cpp_nix_build: %s. Supported kinds: bin→%s, lib→%s, addon→%s"
             % (kind, expected_bin, expected_lib, expected_addon)
         )
+    # Prepend environment setup to resolve WORKSPACE_ROOT/REPO_ROOT deterministically:
+    # - Source optional workspace-root.env if provided
+    # - Derive WORKSPACE_ROOT from the buck graph.json path when not explicitly set
+    pre_env = (
+        'GRAPH="$1"; '
+        + 'WORKSPACE_ENV="$2"; '
+        + 'FLAKE_FILE="$3"; '
+        + '[ -n "$WORKSPACE_ENV" ] && [ -f "$WORKSPACE_ENV" ] && . "$WORKSPACE_ENV" || true; '
+        + 'if [ -n "$GRAPH" ] && [ -z "${WORKSPACE_ROOT:-}" ]; then '
+        + '  WR="${GRAPH%/tools/buck/graph.json}"; '
+        + '  export WORKSPACE_ROOT="$WR"; '
+        + 'fi; '
+        + 'export REPO_ROOT="${REPO_ROOT:-$WORKSPACE_ROOT}"; '
+        + 'if [ -z "${FLK_ROOT:-}" ] && [ -n "$FLAKE_FILE" ] && [ -f "$FLAKE_FILE" ]; then '
+        + '  FLK_DIR="$(dirname "$FLAKE_FILE")"; '
+        + '  FLK_GIT="$(git -C "$FLK_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$FLK_DIR")"; '
+        + '  export FLK_ROOT="$FLK_GIT"; '
+        + 'fi; '
+    )
+    # Build flow:
+    # 1) Ensure the Buck graph is exported for the temp workspace
+    # 2) Build the planner-selected attr directly via nix build .#graph-generator-cppTargets.<sanitized>
+    # 3) Copy the produced artifact to the declared output
     run_and_copy = (
-        nix_bootstrap_env()
-        + ("OUT_PATH=$(BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"%s\" nix run --accept-flake-config \"$FLK_ROOT\"#zx-wrapper -- \"$FLK_ROOT/tools/dev/build-selected.ts\"); " % (raw))
+        pre_env
+        + "export BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE=1; "
+        + nix_bootstrap_env()
+        + "cd \"$FLK_ROOT\"; "
+        # Export Buck graph for the temp workspace (idempotent).
+        + "mkdir -p \"$WORKSPACE_ROOT/tools/buck\"; "
+        # Do NOT set BUCK_NO_ISOLATION=1 here: this runs during a Buck2 action, so recursive
+        # buck2 invocations must use an isolation dir to avoid "recursive invocation" errors.
+        + "BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_QUERY_ROOTS=\"libs,go,cpp,third_party\" "
+        + "  nix run --accept-flake-config \"path:$FLK_ROOT#zx-wrapper\" -- tools/buck/export-graph.ts --out \"$WORKSPACE_ROOT/tools/buck/graph.json\"; "
+        # Require a pre-exported Buck graph for the temp workspace (fail fast if missing)
+        + "echo \"[cpp_nix_build] WR=$WORKSPACE_ROOT FLK=$FLK_ROOT\" >&2; "
+        + "ls -la \"$WORKSPACE_ROOT/tools/buck\" >/dev/null 2>&1 || true; "
+        + "if [ ! -f \"$WORKSPACE_ROOT/tools/buck/graph.json\" ]; then "
+        + "  echo 'cpp_nix_build: missing $WORKSPACE_ROOT/tools/buck/graph.json; run tools/buck/export-graph.ts first' >&2; "
+        + "  exit 2; "
+        + "fi; "
+        + "export BUCK_GRAPH_JSON=\"$WORKSPACE_ROOT/tools/buck/graph.json\"; "
+        # Build the selected target via the primary flake attr using BUCK_TARGET
+        + ("OUT_PATH=$(PLANNER_ONLY_CPP=1 BUCK_TARGET=\"%s\" BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_GRAPH_JSON=\"$WORKSPACE_ROOT/tools/buck/graph.json\" nix build -L --impure \"path:$FLK_ROOT#graph-generator-selected\" --accept-flake-config --print-out-paths); " % raw)
         + "test -n \"$OUT_PATH\"; "
         + (
             "if [ ! -e \"$OUT_PATH/%s\" ]; then echo 'cpp_nix_build (%s): expected artifact not found for kind \"%s\": %s' >&2; (ls -la \"$OUT_PATH\"; ls -la \"$OUT_PATH/bin\" 2>/dev/null || true; ls -la \"$OUT_PATH/lib\" 2>/dev/null || true) >&2; exit 2; fi; "
@@ -38,12 +79,25 @@ def _cpp_nix_build_impl(ctx):
     )
     out = ctx.actions.declare_output(ctx.attrs.out)
     # For bash -c, $0 is set to the first argument after the script string
+    graph_arg = (ctx.attrs.graph_json if ctx.attrs.graph_json != None else "")
+    env_arg = (ctx.attrs.workspace_env if ctx.attrs.workspace_env != None else "")
     cmd = cmd_args([
         "bash",
         "-c",
         run_and_copy,
         out.as_output(),
-    ], hidden = ctx.attrs.srcs + ctx.attrs.nix_inputs)  # include local patches and explicit Nix inputs
+        # $1: absolute path to tools/buck/graph.json
+        graph_arg,
+        # $2: optional path to tools/buck/workspace-root.env (may be an empty artifact in some contexts)
+        env_arg,
+        # $3: absolute path to the repository flake.nix to pin FLK_ROOT deterministically
+        ctx.attrs.flake_file if ctx.attrs.flake_file != None else "",
+    ], hidden = (
+        ctx.attrs.srcs + ctx.attrs.nix_inputs
+        + ([ctx.attrs.graph_json] if ctx.attrs.graph_json != None else [])
+        + ([ctx.attrs.workspace_env] if ctx.attrs.workspace_env != None else [])
+        + ([ctx.attrs.flake_file] if ctx.attrs.flake_file != None else [])
+    ))  # include local patches and explicit Nix inputs
     ctx.actions.run(cmd, category = "cpp_nix_build")
     return [DefaultInfo(default_output = out)]
 
@@ -58,6 +112,12 @@ cpp_nix_build = rule(
         "srcs": attrs.list(attrs.source(), default = []),  # include local patch files as inputs
         "nix_inputs": attrs.list(attrs.source(), default = []),  # explicit Nix inputs that should affect the rule key
         "labels": attrs.list(attrs.string(), default = []),
+        # Optional: path to a buck graph.json; if provided, used to derive WORKSPACE_ROOT
+        "graph_json": attrs.option(attrs.source(), default = None),
+        # Optional: env file to inject WORKSPACE_ROOT explicitly (used by tests)
+        "workspace_env": attrs.option(attrs.source(), default = None),
+        # Optional: absolute path to flake.nix; when provided, used to pin FLK_ROOT deterministically
+        "flake_file": attrs.option(attrs.source(), default = None),
     },
 )
 
