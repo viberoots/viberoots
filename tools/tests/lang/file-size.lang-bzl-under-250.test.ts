@@ -8,7 +8,7 @@ async function countLines(file: string): Promise<number> {
   return txt.split(/\r?\n/).length;
 }
 
-test("lang/*.bzl files remain under the 250 LOC methodology gate", async () => {
+test("selected *.bzl files remain under the 250 LOC methodology gate", async () => {
   const threshold = 250;
   const files = [
     "lang/defs_common.bzl",
@@ -18,6 +18,10 @@ test("lang/*.bzl files remain under the 250 LOC methodology gate", async () => {
     "lang/patch_inputs.bzl",
     "lang/nixpkg_labels.bzl",
     "lang/provider_edges.bzl",
+
+    "node/defs.bzl",
+    "node/defs_core.bzl",
+    "node/defs_nix.bzl",
   ];
 
   for (const f of files) {
