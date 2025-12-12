@@ -48,3 +48,11 @@ export async function collectProviderIndexEntries(opts: {
   out.sort((a, b) => a.provider.localeCompare(b.provider));
   return out;
 }
+
+export async function readImporterProviderIndexEntries(opts: {
+  discoverLockfiles: DiscoverLockfiles;
+  importersForLockfile: ImportersForLockfile;
+  shouldInclude?: ShouldInclude;
+}): Promise<ProviderIndexEntry[]> {
+  return collectProviderIndexEntries(opts);
+}

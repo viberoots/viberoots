@@ -59,6 +59,12 @@ Node only (Go/C++ don’t require glue for patch invalidation). Local glue is no
 
 Running `node tools/dev/install-deps.ts` in the dev shell runs the full sequence automatically. CI runs the same as separate stages.
 
+Provider index notes:
+
+The provider index reader is shared across Node and Python via `tools/lib/provider-index.ts:readImporterProviderIndexEntries(...)`. It normalizes importer labels, assembles deterministic provider names, and sorts output for stable ordering.
+
+For Node only, `readNodeProviderIndexEntries()` returns an empty list when the YAML parser module is unavailable. This is expected in ultra-thin slices and prevents emitting partial or misleading Node provider index entries.
+
 ## Composite Graph API (tools reference)
 
 When building glue or diagnostics, consume the Composite Graph rather than reading `tools/buck/graph.json` directly. This keeps behavior consistent and lets tools benefit from sidecar indexes when present.

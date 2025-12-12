@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { computeImporterLabel, isWorkspaceImporterPath } from "../../lib/importers.ts";
 import { findUvLockfiles } from "../../lib/lockfiles.ts";
-import { collectProviderIndexEntries } from "../../lib/provider-index.ts";
+import { readImporterProviderIndexEntries } from "../../lib/provider-index.ts";
 import { syncImporterProviders } from "../../lib/provider-sync-driver.ts";
 import { decodeNameVersionFromPatch } from "../../lib/providers.ts";
 import { parseUvLockKeys } from "../../lib/uv-lock.ts";
@@ -47,7 +47,7 @@ export default syncPythonProviders;
 export async function readPythonProviderIndexEntries(): Promise<
   Array<{ provider: string; key: string }>
 > {
-  const entries = await collectProviderIndexEntries({
+  const entries = await readImporterProviderIndexEntries({
     discoverLockfiles: async () => findUvLockfiles(),
     importersForLockfile: async (_lf: string) => ["."], // single importer per uv.lock (dirname)
     shouldInclude: (_lf: string, importerLabel: string) => isWorkspaceImporterPath(importerLabel),

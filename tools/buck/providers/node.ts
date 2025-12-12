@@ -6,7 +6,7 @@ import { findImporterLockfiles, computeImporterLabel } from "../../lib/importers
 import { parsePnpmLock, effectiveSetForImporter } from "../../lib/pnpm-lock.ts";
 import { writeImporterProvidersByLang } from "../../lib/provider-writer.ts";
 import { syncImporterProviders } from "../../lib/provider-sync-driver.ts";
-import { collectProviderIndexEntries } from "../../lib/provider-index.ts";
+import { readImporterProviderIndexEntries } from "../../lib/provider-index.ts";
 
 export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: string }) {
   const PATCH_DIR = opts?.patchDir || "patches/node";
@@ -97,7 +97,7 @@ export async function readNodeProviderIndexEntries(): Promise<
   } catch {
     return [];
   }
-  const entries = await collectProviderIndexEntries({
+  const entries = await readImporterProviderIndexEntries({
     discoverLockfiles: async () => lockfiles,
     importersForLockfile: async (lf: string) => {
       const doc = await parsePnpmLock(lf);
