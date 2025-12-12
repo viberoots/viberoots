@@ -29,7 +29,7 @@ test("nix_node_cli_bin(bundle=True) cmd prefixes nix bootstrap env and timeout w
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --json --output-attributes cmd //apps/cli:tool`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cmd //apps/cli:tool`;
     if (probe.exitCode !== 0) {
       // Environment not fully available in temp — skip to avoid false negatives
       return;

@@ -47,8 +47,13 @@ test("python macros: wasm app/lib parse and stamp labels", async () => {
       nothrow: true,
     })`buck2 --isolation-dir py_macros cquery --json --output-attribute labels //apps/demo:wasm_app`;
     if (probe.exitCode !== 0) return; // skip if prelude not available
-    const nodes = JSON.parse(String(probe.stdout || "")) as Array<{ labels?: string[] }>;
-    const labels = (nodes[0]?.labels || []).sort();
+    const parsed = JSON.parse(String(probe.stdout || "")) as unknown;
+    const values = Array.isArray(parsed)
+      ? (parsed as Array<{ labels?: string[] }>)
+      : (Object.values(parsed as Record<string, { labels?: string[] }>) as Array<{
+          labels?: string[];
+        }>);
+    const labels = (values[0]?.labels || []).sort();
     assert.ok(labels.includes("lang:python"), "missing lang:python label");
     assert.ok(labels.includes("kind:wasm"), "missing kind:wasm label");
   });

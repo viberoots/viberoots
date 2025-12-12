@@ -3,6 +3,19 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runInTemp } from "../lib/test-helpers";
 
+function firstCqueryNode<T>(json: unknown): T | null {
+  if (Array.isArray(json)) return (json[0] as T) ?? null;
+  if (json && typeof json === "object") {
+    const obj = json as Record<string, unknown>;
+    const k = Object.keys(obj)[0];
+    if (!k) return null;
+    const v = obj[k];
+    if (Array.isArray(v)) return (v[0] as T) ?? null;
+    return (v as T) ?? null;
+  }
+  return null;
+}
+
 test("nix_go_test enables override_cgo_enabled when C-family srcs present (without stamping cgo:enabled)", async () => {
   await runInTemp("go-cgo-override-srcs-test", async (tmp, $) => {
     await $({
@@ -36,15 +49,15 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir go_cgo_override_srcs_test cquery --target-platforms //:no_cgo --json --output-attributes override_cgo_enabled,labels //tmp:t`;
+    })`buck2 --isolation-dir go_cgo_override_srcs_test cquery --target-platforms //:no_cgo --json --output-attribute override_cgo_enabled --output-attribute labels //tmp:t`;
     if (probe.exitCode !== 0) return; // skip if prelude not available
 
-    const nodes = JSON.parse(String(probe.stdout || "")) as Array<{
+    const node = firstCqueryNode<{
       labels?: string[];
       override_cgo_enabled?: boolean;
-    }>;
-    assert.equal(nodes[0]?.override_cgo_enabled, true);
-    const labels = nodes[0]?.labels || [];
+    }>(JSON.parse(String(probe.stdout || "")));
+    assert.equal(node?.override_cgo_enabled, true);
+    const labels = node?.labels || [];
     assert.ok(!labels.includes("cgo:enabled"));
   });
 });

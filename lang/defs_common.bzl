@@ -1,4 +1,5 @@
 load("//lang:nix_attr_aliases.bzl", "NIX_ATTR_ALIASES")
+load("//lang:global_inputs.bzl", "global_nix_inputs")
 
 def normalize_labels(pkg, labels):
     if labels == None:
@@ -157,6 +158,17 @@ def stamp_labels(kwargs, lang, kind=None):
     if kind != None and isinstance(kind, str) and kind != "":
         stamps.append("kind:%s" % kind)
     kwargs["labels"] = dedupe_preserve(labels + stamps)
+
+
+# PR-4: Global Nix inputs stamping helper for macros that call Nix
+def stamp_global_nix_inputs(kwargs):
+    """
+    Stamp global Nix inputs into kwargs["labels"] deterministically.
+    Intended for macros that assemble a command invoking Nix (e.g., nix build).
+    """
+    labels = kwargs.get("labels", [])
+    labels_list = labels if isinstance(labels, list) else []
+    kwargs["labels"] = dedupe_preserve(labels_list + global_nix_inputs())
 
 
 def stamp_wasm_variant(kwargs, lang, variant):

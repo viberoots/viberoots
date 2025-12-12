@@ -9,6 +9,10 @@ test("normalizeTargetLabel drops (config//...) and cell prefixes", async () => {
       out: "//apps/foo:svc",
     },
     {
+      in: "//third_party/providers:prov (root//:no_cgo#6eb543497f051f11)",
+      out: "//third_party/providers:prov",
+    },
+    {
       in: "//apps/foo:svc (config//buck:some)",
       out: "//apps/foo:svc",
     },

@@ -39,7 +39,7 @@ test("node macros do not use --out-link in assembled cmd", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --json --output-attributes cmd //apps/web:bundle`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cmd //apps/web:bundle`;
     if (probeApp.exitCode !== 0) {
       // Environment not fully available in temp — skip to avoid false negatives
       return;
@@ -53,7 +53,7 @@ test("node macros do not use --out-link in assembled cmd", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --json --output-attributes cmd //apps/web:tool`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cmd //apps/web:tool`;
     if (probeCli.exitCode !== 0) {
       return;
     }

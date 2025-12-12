@@ -47,7 +47,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attributes deps //apps/web:test`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute deps //apps/web:test`;
     if (probe.exitCode !== 0) return;
     const out = String(probe.stdout || "");
     assert.ok(

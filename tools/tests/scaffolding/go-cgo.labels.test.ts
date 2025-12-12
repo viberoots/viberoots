@@ -40,8 +40,13 @@ EOF'`;
       nothrow: true,
     })`buck2 --isolation-dir cgo_labels cquery "attr(labels, '.*', //tmp:lib)" --json --output-attribute labels`;
     if (probe.exitCode !== 0) return; // skip if prelude not available
-    const nodes = JSON.parse(String(probe.stdout || "")) as Array<{ labels?: string[] }>;
-    const labels = (nodes[0]?.labels || []).sort();
+    const parsed = JSON.parse(String(probe.stdout || "")) as unknown;
+    const values = Array.isArray(parsed)
+      ? (parsed as Array<{ labels?: string[] }>)
+      : (Object.values(parsed as Record<string, { labels?: string[] }>) as Array<{
+          labels?: string[];
+        }>);
+    const labels = (values[0]?.labels || []).sort();
     if (!labels.includes("cgo:enabled")) {
       console.error("expected cgo:enabled label");
       process.exit(2);

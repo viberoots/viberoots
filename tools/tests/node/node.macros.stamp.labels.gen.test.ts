@@ -37,7 +37,7 @@ test("node macros: nix_node_gen stamps lang:node and kind:gen", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attributes labels //:stamp_probe`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //:stamp_probe`;
     if (probe.exitCode !== 0) {
       // Skip when prelude/toolchains unavailable in the ephemeral temp repo
       return;

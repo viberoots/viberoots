@@ -55,8 +55,11 @@ EOF'`;
       nothrow: true,
     })`buck2 --isolation-dir cgo_mixed cquery "deps(//apps/demo-cli:demo)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return; // skip if prelude not available
-    const nodes = JSON.parse(String(probe.stdout || "")) as Array<{ name: string }>;
-    const names = new Set(nodes.map((n) => n.name));
+    const parsed = JSON.parse(String(probe.stdout || "")) as unknown;
+    const values = Array.isArray(parsed)
+      ? (parsed as Array<{ name: string }>)
+      : (Object.values(parsed as Record<string, { name: string }>) as Array<{ name: string }>);
+    const names = new Set(values.map((n) => n.name));
     const expect = [
       "//third_party/providers:nix_pkgs_zlib",
       "//third_party/providers:nix_pkgs_openssl",

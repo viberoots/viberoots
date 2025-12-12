@@ -28,7 +28,7 @@ test("node_webapp cmd prefixes nix bootstrap env and timeout wrapper", async () 
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --json --output-attributes cmd //apps/web:bundle`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cmd //apps/web:bundle`;
     if (probe.exitCode !== 0) {
       // Environment not fully available in temp — skip to avoid false negatives
       return;

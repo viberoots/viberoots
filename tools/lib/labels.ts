@@ -43,9 +43,10 @@ export function providersForLabels(labels: string[] | undefined): string[] {
   return Array.from(out).sort();
 }
 
-// Drop Buck's configuration suffix that appears after a space and "(config//...)".
+// Drop Buck's configuration suffix that appears after a space and "(...)".
+// Buck2 can emit multiple suffix shapes (e.g. "(config//...)" or "(root//:platform#...)").
 export function dropConfigSuffix(label: string): string {
-  return String(label || "").split(" (config//")[0];
+  return String(label || "").split(" (")[0];
 }
 
 // Convert labels like "root//apps/foo:svc" or "prelude//cpp:lib" to "//apps/foo:svc" or "//cpp:lib".

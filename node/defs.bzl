@@ -1,6 +1,5 @@
 load("@prelude//:rules.bzl", "genrule")
-load("//lang:global_inputs.bzl", "global_nix_inputs")
-load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve", "append_patch_srcs", "include_importer_patches_from_labels", "importer_from_labels", "ensure_single_lockfile_label", "realize_provider_edges")
+load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve", "append_patch_srcs", "include_importer_patches_from_labels", "importer_from_labels", "ensure_single_lockfile_label", "realize_provider_edges", "stamp_global_nix_inputs")
 load("//lang:sanitize.bzl", "sanitize_name")
 load("//lang:nix_shell.bzl", "nix_bootstrap_env", "nix_timeout_wrapper_var")
 load("//node/private:nix_test.bzl", "node_nix_test")
@@ -123,7 +122,9 @@ def node_webapp(
     )
 
     # Stamp global Nix inputs for macros that call Nix (policy: PR‑5/PR‑2)
-    stamped_labels = dedupe_preserve((labels or []) + global_nix_inputs())
+    _stamp = { "labels": (labels or []) }
+    stamp_global_nix_inputs(_stamp)
+    stamped_labels = _stamp.get("labels", []) or []
 
     nix_node_gen(
         name = name,
@@ -226,7 +227,9 @@ def nix_node_cli_bin(
     )
 
     # Stamp global Nix inputs when bundling (macro calls Nix)
-    stamped_labels = dedupe_preserve((labels or []) + global_nix_inputs())
+    _stamp = { "labels": (labels or []) }
+    stamp_global_nix_inputs(_stamp)
+    stamped_labels = _stamp.get("labels", []) or []
 
     # Build srcs map to place files at deterministic paths inside the action
     _srcs_map = {

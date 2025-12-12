@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { normalizeTargetLabel } from "../../lib/labels.ts";
 
 type CqueryNode = {
   out?: string;
@@ -15,21 +16,49 @@ type CqueryNode = {
   nix_inputs?: string[];
 };
 
+function normalizeBuckOutputAttributes(n: any): CqueryNode {
+  // Newer buck2 versions emit attributes under "buck.<attr>" keys in JSON output.
+  // Normalize by copying buck.* keys to their unprefixed form for stable test assertions.
+  if (!n || typeof n !== "object") return n as CqueryNode;
+  for (const [k, v] of Object.entries(n)) {
+    if (!k.startsWith("buck.")) continue;
+    const bare = k.slice("buck.".length);
+    if (!(bare in n)) {
+      (n as any)[bare] = v;
+    }
+  }
+  return n as CqueryNode;
+}
+
 async function cqueryOne(
   tmp: string,
   $: any,
   target: string,
   attrs: string,
 ): Promise<CqueryNode | null> {
+  const outputAttrFlags = attrs
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .flatMap((a) => ["--output-attribute", a]);
   const probe = await $({
     cwd: tmp,
     stdio: "pipe",
     reject: false,
     nothrow: true,
-  })`buck2 cquery --target-platforms //:no_cgo --json --output-attributes ${attrs} ${target}`;
+  })`buck2 cquery --target-platforms //:no_cgo --json ${outputAttrFlags} ${target}`;
   if (probe.exitCode !== 0) return null;
-  const nodes = JSON.parse(String(probe.stdout || "")) as CqueryNode[];
-  return nodes[0] || null;
+  const parsed = JSON.parse(String(probe.stdout || "")) as unknown;
+  if (Array.isArray(parsed)) return (parsed[0] as CqueryNode) || null;
+  if (parsed && typeof parsed === "object") {
+    const obj = parsed as Record<string, unknown>;
+    const k = Object.keys(obj)[0];
+    if (!k) return null;
+    const v = obj[k];
+    if (Array.isArray(v)) return (v[0] as CqueryNode) || null;
+    return normalizeBuckOutputAttributes(v as any);
+  }
+  return null;
 }
 
 function sanitizeValueFromProbeOut(out: string): string {
@@ -176,10 +205,11 @@ nix_cpp_node_addon(
     );
 
     const expectsProviderEdge = (n: CqueryNode, label: string) => {
-      const deps = n.deps || [];
+      const deps = (n.deps || []).map((d) => normalizeTargetLabel(String(d)));
+      const want = normalizeTargetLabel("//third_party/providers:prov");
       assert.ok(
-        deps.includes("//third_party/providers:prov"),
-        `expected provider dep realized for ${label}`,
+        deps.includes(want),
+        `expected provider dep realized for ${label}; want=${want}; have=${JSON.stringify(deps)}`,
       );
     };
     expectsProviderEdge(lib, "//libs/demo:lib");

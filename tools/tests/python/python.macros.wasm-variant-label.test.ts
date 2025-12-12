@@ -43,8 +43,13 @@ test("python macros: nix_python_wasm_* stamp wasm:wasi variant", async () => {
       nothrow: true,
     })`buck2 --isolation-dir py_wasm_variant cquery --json --output-attribute labels //apps/demo:wasm_lib`;
     if (probe.exitCode !== 0) return;
-    const nodes = JSON.parse(String(probe.stdout || "")) as Array<{ labels?: string[] }>;
-    const labels = (nodes[0]?.labels || []).sort();
+    const parsed = JSON.parse(String(probe.stdout || "")) as unknown;
+    const values = Array.isArray(parsed)
+      ? (parsed as Array<{ labels?: string[] }>)
+      : (Object.values(parsed as Record<string, { labels?: string[] }>) as Array<{
+          labels?: string[];
+        }>);
+    const labels = (values[0]?.labels || []).sort();
     assert.ok(labels.includes("lang:python"), "missing lang:python label");
     assert.ok(labels.includes("kind:wasm"), "missing kind:wasm label");
     assert.ok(labels.includes("wasm:wasi"), "missing wasm:wasi variant label");

@@ -12,7 +12,7 @@ let
   #   "//apps/demo:demo_gtest__planner (config//platforms:default#hash)"
   # Normalize by stripping the suffix for stable lookups.
   cleanLabel = s:
-    let parts = lib.splitString " (config//" s; in
+    let parts = lib.splitString " (" s; in
       if (builtins.length parts) > 1 then (builtins.elemAt parts 0) else s;
 
   labelsOf = n:

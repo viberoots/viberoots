@@ -32,7 +32,7 @@ test("nix_node_cli_bin(bundle=False) does not stamp global Nix inputs", async ()
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --json --output-attributes labels //apps/cli:tool_copy`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //apps/cli:tool_copy`;
     if (probe.exitCode !== 0) {
       // Environment not fully available in temp — skip to avoid false negatives
       return;
