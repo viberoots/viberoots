@@ -33,7 +33,7 @@ pipeline {
           stage('CPP Addon Smoke') {
             steps { sh 'node tools/ci/run-stage.ts --stage cpp-addon-smoke' }
           }
-          stage('File size lint (warn)') {
+          stage('File size lint') {
             steps { sh 'node tools/ci/run-stage.ts --stage file-size-lint' }
           }
           stage('Patches Lint (strict)') {

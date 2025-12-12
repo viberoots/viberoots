@@ -118,8 +118,8 @@ async function main() {
     }
     case "file-size-lint": {
       const target = path.resolve("tools/dev/file-size-lint.ts");
-      const failFlag = process.env.CI === "true" ? "--fail=true" : "";
-      await $`node ${nodeBase} ${target} --changed-only ${failFlag}`;
+      // Temporary: keep PR-1 green while PR-2..PR-5 split the known >250 LOC offenders.
+      await $`node ${nodeBase} ${target} --scope=source --fail=true --allow-known`;
       break;
     }
     case "nix-build-graph-generator":
