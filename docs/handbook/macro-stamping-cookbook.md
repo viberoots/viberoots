@@ -7,6 +7,10 @@ Stamping ensures exporter preconditions via consistent labels applied in macros.
 - **Lint**: run `node tools/dev/stamping-lint.ts` to detect missing or invalid labels.
 - **Tests**: negative test should demonstrate a missing label is flagged with a clear message.
 
+#### C++ macro core
+
+For C++ macros that build via Nix (`nix_cpp_library`, `nix_cpp_binary`, `nix_cpp_node_addon`), the shared stamping and input wiring lives in a single helper (`_cpp_common`) in `cpp/defs.bzl`. Public macro signatures stay stable; this is a consolidation to reduce drift.
+
 #### Sanitization policy parity (Nix ↔ Starlark)
 
 Ensure artifact/name sanitization in Starlark matches the canonical implementation used by Nix planners.
