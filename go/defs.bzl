@@ -37,6 +37,24 @@ def _srcs_imply_cgo(kwargs):
     return False
 
 
+def _configure_cgo_and_merge_deps(name, kwargs, nixpkg_deps, repo_cgo_deps):
+    deps = kwargs.pop("deps", [])
+    pkg = native.package_name()
+    extra = normalize_labels(pkg, kwargs.pop("extra_module_providers", []))
+    _apply_cgo_labels(kwargs, nixpkg_deps, repo_cgo_deps)
+    if "_go_toolchain" not in kwargs:
+        kwargs["_go_toolchain"] = "@repo_toolchains//:go"
+    if "_cxx_toolchain" not in kwargs:
+        kwargs["_cxx_toolchain"] = "@repo_toolchains//:cxx"
+    if _srcs_imply_cgo(kwargs) or len(nixpkg_deps) > 0 or len(repo_cgo_deps) > 0:
+        kwargs["override_cgo_enabled"] = True
+    return realize_provider_edges(
+        MODULE_PROVIDERS,
+        name,
+        base = (_merge_cgo_deps(deps, nixpkg_deps, repo_cgo_deps) + extra),
+    )
+
+
 def nix_go_library(name, **kwargs):
     local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("go"))  # per-target local patch directories
     if "nix_cgo_deps" in kwargs:
@@ -51,20 +69,7 @@ def nix_go_library(name, **kwargs):
     _append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled)
     # PR3/PR25: Stamp primary target labels for language/kind via helper
     stamp_labels(kwargs, "go", "lib")
-    pkg = native.package_name()
-    deps = kwargs.pop("deps", [])
-    _apply_cgo_labels(kwargs, nixpkg_deps, repo_cgo_deps)
-    extra = normalize_labels(pkg, kwargs.pop("extra_module_providers", []))
-    merged = realize_provider_edges(MODULE_PROVIDERS, name, base = (_merge_cgo_deps(deps, nixpkg_deps, repo_cgo_deps) + extra))
-    # Forward importpath to underlying rule if present; Buck's go_library understands it
-    if "_go_toolchain" not in kwargs:
-        kwargs["_go_toolchain"] = "@repo_toolchains//:go"
-    if "_cxx_toolchain" not in kwargs:
-        kwargs["_cxx_toolchain"] = "@repo_toolchains//:cxx"
-    # Transparent CGO: auto-enable when C-family sources or cgo deps are present
-    if _srcs_imply_cgo(kwargs) or len(nixpkg_deps) > 0 or len(repo_cgo_deps) > 0:
-        # Prefer override so the target is hermetic regardless of inherited platform
-        kwargs["override_cgo_enabled"] = True
+    merged = _configure_cgo_and_merge_deps(name, kwargs, nixpkg_deps, repo_cgo_deps)
     # Include local patch files in srcs so Buck invalidates precisely on patch changes
     include_package_local_patches(kwargs, "go", local_patch_dirs)
     go_library(name = name, deps = merged, **kwargs)
@@ -97,15 +102,7 @@ def nix_go_binary(name, **kwargs):
     _append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled)
     # PR3/PR25: Stamp primary target labels for language/kind via helper
     stamp_labels(kwargs, "go", "bin")
-    pkg = native.package_name()
-    deps = kwargs.pop("deps", [])
-    _apply_cgo_labels(kwargs, nixpkg_deps, repo_cgo_deps)
-    extra = normalize_labels(pkg, kwargs.pop("extra_module_providers", []))
-    merged = realize_provider_edges(MODULE_PROVIDERS, name, base = (_merge_cgo_deps(deps, nixpkg_deps, repo_cgo_deps) + extra))
-    if "_go_toolchain" not in kwargs:
-        kwargs["_go_toolchain"] = "@repo_toolchains//:go"
-    if "_cxx_toolchain" not in kwargs:
-        kwargs["_cxx_toolchain"] = "@repo_toolchains//:cxx"
+    merged = _configure_cgo_and_merge_deps(name, kwargs, nixpkg_deps, repo_cgo_deps)
     # Ensure stable defaults that don't depend on unspecified platform selects
     if "asan" not in kwargs:
         kwargs["asan"] = False
@@ -113,9 +110,6 @@ def nix_go_binary(name, **kwargs):
         kwargs["race"] = False
     if "cgo_enabled" not in kwargs:
         kwargs["cgo_enabled"] = None
-    # Transparent CGO: auto-enable when C-family sources or cgo deps are present
-    if _srcs_imply_cgo(kwargs) or len(nixpkg_deps) > 0 or len(repo_cgo_deps) > 0:
-        kwargs["override_cgo_enabled"] = True
     # Include local patch files in srcs so Buck invalidates precisely on patch changes
     include_package_local_patches(kwargs, "go", local_patch_dirs)
     go_binary(name = name, deps = merged, **kwargs)
@@ -155,13 +149,10 @@ def nix_go_test(name, **kwargs):
     goarch = kwargs.pop("goarch", None)
     cgo_enabled = kwargs.pop("cgo_enabled", None)
     _append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled)
-    pkg = native.package_name()
-    deps = kwargs.pop("deps", [])
-    extra = normalize_labels(pkg, kwargs.pop("extra_module_providers", []))
-    _apply_cgo_labels(kwargs, nixpkg_deps, repo_cgo_deps)
-    merged = realize_provider_edges(MODULE_PROVIDERS, name, base = (_merge_cgo_deps(deps, nixpkg_deps, repo_cgo_deps) + extra))
+    merged = _configure_cgo_and_merge_deps(name, kwargs, nixpkg_deps, repo_cgo_deps)
 
     # If a library is provided, ensure we don't pass the same target in deps.
+    pkg = native.package_name()
     lib = kwargs.get("library")
     if isinstance(lib, str) and lib:
         abs_lib = lib
@@ -175,14 +166,6 @@ def nix_go_test(name, **kwargs):
         kwargs["race"] = False
     if "cgo_enabled" not in kwargs:
         kwargs["cgo_enabled"] = None
-    if "_go_toolchain" not in kwargs:
-        kwargs["_go_toolchain"] = "@repo_toolchains//:go"
-    if "_cxx_toolchain" not in kwargs:
-        kwargs["_cxx_toolchain"] = "@repo_toolchains//:cxx"
-    # Transparent CGO: if test itself declares cgo deps or includes C-family sources, enable it.
-    # Note: if testing a cgo library via `library=":lib"`, cgo will be picked up by the library build.
-    if _srcs_imply_cgo(kwargs) or len(nixpkg_deps) > 0 or len(repo_cgo_deps) > 0:
-        kwargs["override_cgo_enabled"] = True
     go_test(name = name, deps = merged, **kwargs)
 
 # Third-party shim: expose vendor-provided sources as a go_library while
