@@ -3,6 +3,5 @@
   "apps/demo-node/pnpm-lock.yaml": "sha256-FgoYOwTq34snOhhWjKgR2FlDCaQ42+31CaQr+kPCbEI=",
   "apps/demo-web-dev/pnpm-lock.yaml": "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
   "apps/example/pnpm-lock.yaml": "sha256-fRC+K9fncUsjK5qiwi+wkK/yhR/y1VXxR54tU5sB5Ww=",
-  "libs/demo/pnpm-lock.yaml": "sha256-2i00dUA3LgKqEeWluULGZWjFeKQ+lEORSr1lN9yUG0w=",
-  "apps/demo/pnpm-lock.yaml": "sha256-2i00dUA3LgKqEeWluULGZWjFeKQ+lEORSr1lN9yUG0w="
+  "libs/demo/pnpm-lock.yaml": "sha256-2i00dUA3LgKqEeWluULGZWjFeKQ+lEORSr1lN9yUG0w="
 }

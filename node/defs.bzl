@@ -16,16 +16,22 @@ def _sanitize_importer_attr(s):
 def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = [], lockfile_label = None, kind = "gen", **kwargs):
     kwargs["name"] = name
     # Merge explicit deps and provider deps into srcs so edges are realized even if genrule doesn't support `deps`.
-    merged_srcs = list(srcs)
+    _srcs_is_dict = isinstance(srcs, dict)
+    merged_srcs = (dict(srcs) if _srcs_is_dict else list(srcs))
     kwargs["labels"] = labels
     ensure_single_lockfile_label(kwargs, lockfile_label)
     stamp_labels(kwargs, "node", kind)
-    # Include importer-local node patches in srcs so Buck invalidates precisely on patch changes
-    kwargs["srcs"] = merged_srcs
-    include_importer_patches_from_labels(kwargs, "node")
-    merged_srcs = kwargs.get("srcs", [])
-    merged_srcs = realize_provider_edges(MODULE_PROVIDERS, name, into = "srcs", base = (merged_srcs + deps))
-    kwargs["srcs"] = merged_srcs
+    if _srcs_is_dict:
+        # When srcs is a dict mapping dest->source, preserve mapping and skip patch inclusion into srcs.
+        # Provider edges will still be realized into deps below.
+        kwargs["srcs"] = merged_srcs
+    else:
+        # Include importer-local node patches in srcs so Buck invalidates precisely on patch changes
+        kwargs["srcs"] = merged_srcs
+        include_importer_patches_from_labels(kwargs, "node")
+        merged_srcs = kwargs.get("srcs", [])
+        merged_srcs = realize_provider_edges(MODULE_PROVIDERS, name, into = "srcs", base = (merged_srcs + deps))
+        kwargs["srcs"] = merged_srcs
     if out != None:
         kwargs["out"] = out
     if cmd != None:
@@ -186,22 +192,53 @@ def nix_node_cli_bin(
 
     # Use Node shim to build single-file bundle via Nix and copy it to $OUT
     # Escape only command substitutions `$(...)`; keep `$VAR` expansions.
-    _prefix = nix_bootstrap_env().replace("$(", "$$(") + nix_timeout_wrapper_var(default_sec = 240)
+    # Establish WORKSPACE_ROOT/REPO_ROOT from BUCK_GRAPH_JSON BEFORE bootstrapping,
+    # so nix_bootstrap_env computes FLK_ROOT deterministically to the temp repo root.
+    _pre_env = (
+        # Prefer explicit injection if provided by tests (temp repo path); otherwise, use the genrule sandbox root.
+        ". tools/buck/workspace-root.env 2>/dev/null || true; "
+        + "if [ -n \"${WORKSPACE_ROOT:-}\" ]; then export REPO_ROOT=\"$WORKSPACE_ROOT\"; fi; "
+        + "export BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE=1; "
+    )
+    # Bundling may invoke Nix + PNPM and can legitimately take longer than 60s on cold caches.
+    _prefix = _pre_env + nix_bootstrap_env().replace("$(", "$$(") + nix_timeout_wrapper_var(default_sec = 180)
     cmd = (
         "SCRATCH=\"$PWD\"; "
         + _prefix
-        + "OUT_ABS=\"$SCRATCH/$OUT\"; cd \"$WORKSPACE_ROOT\"; "
-        + "export NIX_PNPM_ALLOW_GENERATE=1; "
-        + ("$TIMEOUT node \"$WORKSPACE_ROOT/tools/buck/node-cli-bundle.ts\" --importer \"%s\" --name \"%s\" --out \"$OUT_ABS\"" % (_importer, _basename_importer(_importer)))
+        + "OUT_ABS=\"$SCRATCH/$OUT\"; "
+        + "export NIX_PNPM_FETCH_TIMEOUT=\"${NIX_PNPM_FETCH_TIMEOUT:-60}\"; "
+        + "set -x; "
+        + "command -v nix >/dev/null 2>&1 || { echo '[BNX-BUNDLE] nix not found in PATH' >&2; exit 96; }; "
+        + "command -v node >/dev/null 2>&1 || { echo '[BNX-BUNDLE] node not found in PATH' >&2; exit 97; }; "
+        + "if [ -f \"$FLK_ROOT/flake.nix\" ]; then echo '[BNX-BUNDLE-DEBUG] flake.nix present at '$FLK_ROOT >&2; else echo '[BNX-BUNDLE-DEBUG] flake.nix MISSING at '$FLK_ROOT', listing dir:' >&2; ls -la \"$FLK_ROOT\" >&2 || true; exit 95; fi; "
+        + "if [ -f \"$FLK_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
+        + "  { echo -n '[BNX-BUNDLE-DEBUG] unified_pnpm_store=' >&2; cat \"$FLK_ROOT/buck-out/.unified-pnpm-store/path\" 2>/dev/null >&2 || true; echo '' >&2; }; "
+        + "else echo '[BNX-BUNDLE-DEBUG] unified_pnpm_store=missing' >&2; fi; "
+        + "ls -la \"$FLK_ROOT/buck-out/.unified-pnpm-store\" >/dev/null 2>&1 || true; "
+        + "cd \"${WORKSPACE_ROOT:-$FLK_ROOT}\"; "
+        + "export BUCK_GRAPH_JSON=\"$FLK_ROOT/tools/buck/graph.json\"; "
+            + "export NIX_PNPM_ALLOW_GENERATE=1; "
+        + "DBG_LOG=\"$SCRATCH/bundle-debug.log\"; : > \"$DBG_LOG\"; "
+        + ("$TIMEOUT node --experimental-strip-types --experimental-top-level-await --disable-warning=ExperimentalWarning "
+           + "\"${WORKSPACE_ROOT:-$FLK_ROOT}/tools/buck/node-cli-bundle.ts\" --importer \"%s\" --name \"%s\" --out \"$OUT_ABS\" >> \"$DBG_LOG\" 2>&1 " % (_importer, _basename_importer(_importer)))
+        + "; RC=$?; echo '[BNX-BUNDLE-DEBUG] bundler-exit='$RC >&2; sed -n '1,200p' \"$DBG_LOG\" >&2 || true; "
+        + "exit $RC"
     )
 
     # Stamp global Nix inputs when bundling (macro calls Nix)
     stamped_labels = dedupe_preserve((labels or []) + global_nix_inputs())
 
+    # Build srcs map to place files at deterministic paths inside the action
+    _srcs_map = {
+        # Preserve entry path under bin/
+        entry: entry,
+        # Optional workspace root injection
+        "tools/buck/workspace-root.env": "root//tools/buck:workspace-root.env",
+    }
     nix_node_gen(
         name = name,
-        # Include the CLI entry to ensure source edits invalidate the genrule
-        srcs = [entry],
+        # Include the CLI entry and the repo graph file to allow deriving repo root hermetically
+        srcs = _srcs_map,
         out = out,
         cmd = cmd,
         deps = deps,

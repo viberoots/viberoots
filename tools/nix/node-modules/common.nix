@@ -15,14 +15,31 @@ let
 
   dirnameOf = p: let parts = lib.splitString "/" p; in lib.concatStringsSep "/" (lib.take (lib.length parts - 1) parts);
 
-  # Minimal importer-scoped source snapshot (pure): include only importer dir and lockfile
+  # Minimal importer-scoped source snapshot (pure): include only importer dir and lockfile.
+  # Prefer the flake snapshot (repoRoot); when the importer exists only in a live temp workspace,
+  # fall back to repoFsRoot so temp importers (e.g., scaffolded tests) are visible.
   importerOnlySrc = { importerDir, lockfilePath }:
-    pkgs.lib.cleanSourceWith {
-      src = repoRoot;
+    let
+      srcBase =
+        let
+          importerPathStore = repoRoot + ("/" + importerDir);
+          importerPathLive = repoFsRoot + ("/" + importerDir);
+          haveStore = builtins.pathExists importerPathStore;
+          haveLive = builtins.pathExists importerPathLive;
+          lockPathStore = repoRoot + ("/" + lockfilePath);
+          lockPathLive = repoFsRoot + ("/" + lockfilePath);
+          haveLockStore = builtins.pathExists lockPathStore;
+          haveLockLive = builtins.pathExists lockPathLive;
+        in if haveLive && haveLockLive && (!haveLockStore) then repoFsRoot else (if haveStore || !haveLive then repoRoot else repoFsRoot);
+      genAllowed = (builtins.getEnv "NIX_PNPM_ALLOW_GENERATE") == "1";
+      haveImporterLock = builtins.pathExists (srcBase + ("/" + importerDir + "/pnpm-lock.yaml"));
+      ignoreImporterLock = genAllowed && (!haveImporterLock);
+    in pkgs.lib.cleanSourceWith {
+      src = srcBase;
       filter = path: type:
         let
           p = builtins.toString path;
-          rel = lib.removePrefix ((builtins.toString repoRoot) + "/") p;
+          rel = lib.removePrefix ((builtins.toString srcBase) + "/") p;
           impPrefix = importerDir + "/";
           lockDir = dirnameOf lockfilePath;
           lockPrefix = if lockDir == "" then "" else (lockDir + "/");
@@ -38,6 +55,8 @@ let
           isVendorPath =
             (relHasPrefix (impPrefix + "node_modules") || relHasPrefix (impPrefix + ".pnpm")) ||
             (importerDir == "." && (relHasPrefix "node_modules" || relHasPrefix ".pnpm"));
+          # Detect importer-local lockfile path
+          isImporterLock = (type != "directory") && (rel == (impPrefix + "pnpm-lock.yaml"));
         in
         (
           # Always include parent directories so traversal reaches importerDir/lockDir
@@ -53,9 +72,8 @@ let
           # Top-level files sometimes consulted by pnpm
           || (builtins.match "^pnpm-workspace\\.yaml$" rel != null)
           || (builtins.match "^\\.npmrc$" rel != null)
-          # Always include root lockfile so builders can fallback when importer lock is missing
-          || (type != "directory" && rel == "pnpm-lock.yaml")
-        ) && (!isVendorPath);
+          # Do not include any unrelated root lockfiles; importer derivations must not fall back implicitly
+        ) && (!isVendorPath) && (!ignoreImporterLock || !isImporterLock);
     };
 in {
   inherit lib sanitizeName placeholderDigest hashMap dirnameOf importerOnlySrc repoRoot repoFsRoot prefetchedStorePathGlobal;

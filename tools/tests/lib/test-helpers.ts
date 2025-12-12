@@ -322,6 +322,16 @@ export async function runInTemp<T>(
       } catch {}
     }
   }
+  // Ensure Buck actions that source tools/buck/workspace-root.env (e.g., bundled node cli)
+  // resolve the temp repo as WORKSPACE_ROOT instead of the real checkout path.
+  try {
+    await fsp.mkdir(path.join(tmp, "tools", "buck"), { recursive: true });
+    await fsp.writeFile(
+      path.join(tmp, "tools", "buck", "workspace-root.env"),
+      `WORKSPACE_ROOT=${tmp}\n`,
+      "utf8",
+    );
+  } catch {}
   // Strict dev-shell pre-check: when TEST_NEED_DEV_ENV=1, require buck2 prelude to be buildable in temp repo
   if ((process.env.TEST_NEED_DEV_ENV || "") === "1") {
     try {

@@ -19,7 +19,7 @@ def _zx_test_impl(ctx):
             # Ensure Buck prelude/config present in test sandbox
             + "if [ ! -e .buckconfig ] || ! grep -q '^prelude = prelude' .buckconfig 2>/dev/null; then "
             + "  if [ -d \"$WORKSPACE_ROOT/prelude\" ] || [ -L \"$WORKSPACE_ROOT/prelude\" ]; then PRELUDE_PATH=\"$WORKSPACE_ROOT/prelude\"; fi; "
-            + "  if [ -z \"$PRELUDE_PATH\" ]; then PRE_OUT=$(nix build .#buck2-prelude --no-link --accept-flake-config --print-out-paths 2>/dev/null | tail -1); fi; "
+            + "  if [ -z \"$PRELUDE_PATH\" ]; then PRE_OUT=$(nix build \"$WORKSPACE_ROOT\"#buck2-prelude --no-link --accept-flake-config --print-out-paths 2>/dev/null | tail -1); fi; "
             + "  if [ -z \"$PRELUDE_PATH\" ] && [ -n \"$PRE_OUT\" ]; then PRELUDE_PATH=\"$PRE_OUT/prelude\"; fi; "
             + "  printf '.\\n' > \"$WORKSPACE_ROOT/.buckroot\"; "
             + "  if [ -n \"$PRELUDE_PATH\" ] && [ ! -e \"$WORKSPACE_ROOT/prelude\" ]; then ln -s \"$PRELUDE_PATH\" \"$WORKSPACE_ROOT/prelude\"; fi; "

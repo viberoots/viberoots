@@ -63,7 +63,8 @@
           repoRoot = ./.;
           repoFsRoot = liveFsRoot;
           hashesPath = ./tools/nix/node-modules.hashes.json;
-          prefetchedStorePathGlobal = null;
+          # Prefer a prefetched pnpm store path when provided via env by the runner
+          prefetchedStorePathGlobal = let s = builtins.getEnv "LOCAL_PNPM_STORE"; in if s != "" then (builtins.toPath s) else null;
         };
         prelude = import ./tools/nix/buck-prelude.nix { inherit pkgs; buck2Input = buck2; };
         uv2nixLib =
@@ -112,7 +113,12 @@
                 lib.hasInfix "/buck-out/" s || lib.hasSuffix "/buck-out" s ||
                 lib.hasInfix "/.buck/" s    || lib.hasSuffix "/.buck" s ||
                 lib.hasInfix "/test-logs/" s || lib.hasSuffix "/test-logs" s ||
-                lib.hasInfix "/.clinic/" s
+                lib.hasInfix "/.clinic/" s ||
+                lib.hasInfix "/node_modules/" s || lib.hasSuffix "/node_modules" s ||
+                lib.hasInfix "/.pnpm/" s || lib.hasSuffix "/.pnpm" s ||
+                lib.hasInfix "/.git/" s || lib.hasSuffix "/.git" s ||
+                lib.hasInfix "/.direnv/" s || lib.hasSuffix "/.direnv" s ||
+                lib.hasInfix "/.cache/" s || lib.hasSuffix "/.cache" s
               )
             )
             path;
@@ -230,7 +236,8 @@
         sanitize = (import ./tools/nix/templates-common.nix { inherit pkgs; }).sanitizeName;
         esbuild = pkgs.esbuild;
         makeCliBundle = importerDir: let
-          entry = importerDir + "/src/index.ts";
+          # Resolve entry relative to the importer; buildPhase cd's into importerDir
+          entry = "src/index.ts";
           name = builtins.baseNameOf importerDir;
           nm = nodeMods.mkNodeModules { lockfilePath = importerDir + "/pnpm-lock.yaml"; inherit importerDir; };
         in pkgs.stdenvNoCC.mkDerivation {
@@ -250,7 +257,7 @@
             cd ${importerDir}
             export SOURCE_DATE_EPOCH=1
             # Ensure workspace deps are available to the bundler via Node resolution
-            ln -s ${nm}/node_modules node_modules
+            ${if allowGenerate then "mkdir -p node_modules" else "ln -s ${nm}/node_modules node_modules"}
             outFile="${name}.bundle.js"
             ${esbuild}/bin/esbuild ${entry} \
               --platform=node \
@@ -264,7 +271,7 @@
           installPhase = ''
             set -euo pipefail
             mkdir -p $out
-            install -m0755 ${importerDir}/${name}.bundle.js $out/${name}.bundle.js
+            install -m0755 ${name}.bundle.js $out/${name}.bundle.js
           '';
         };
         nodeCli = builtins.listToAttrs (map (imp: { name = sanitize imp; value = makeCliBundle imp; }) importerDirs);
@@ -326,7 +333,13 @@
             cp -R ${importerSnap} "$out/${importerDir}"
             chmod -R u+rwX "$out"
           '';
-          nm = nodeMods.mkNodeModules { lockfilePath = importerDir + "/pnpm-lock.yaml"; inherit importerDir; };
+          importerLockAbs = ./. + ("/" + importerDir + "/pnpm-lock.yaml");
+          haveImporterLock = builtins.pathExists importerLockAbs;
+          nmDrv = nodeMods.mkNodeModules { lockfilePath = importerDir + "/pnpm-lock.yaml"; inherit importerDir; };
+          # Keep allow-generate semantics, but NEVER ignore a lockfile that exists.
+          # When allow-generate is enabled and the importer lockfile is absent, avoid
+          # referencing node-modules at eval time; if tests are present, we fail clearly.
+          nmPath = if allowGenerate && (!haveImporterLock) then "" else "${nmDrv}";
           name = builtins.baseNameOf importerDir;
           sanitize = (import ./tools/nix/templates-common.nix { inherit pkgs; }).sanitizeName;
           # Optional: if a sibling native addon package exists at libs/<name>-native,
@@ -409,7 +422,12 @@ EOF_PAT
               echo "[nix] no tests matched; skipping runner and passing." >&2
             else
               # Link hermetic node_modules and resolve vitest only when tests are present
-              ln -s ${nm}/node_modules node_modules
+              if [ -z "${nmPath}" ]; then
+                echo "[nix] ERROR: tests matched patterns but ${importerDir}/pnpm-lock.yaml is missing." >&2
+                echo "[nix] Generate and commit a lockfile (or disable tests) so vitest can be installed deterministically." >&2
+                exit 3
+              fi
+              ln -s ${nmPath}/node_modules node_modules
               VITEST_BIN=""
               if [ -x "node_modules/.bin/vitest" ] || [ -f "node_modules/.bin/vitest" ]; then
                 VITEST_BIN="node_modules/.bin/vitest"

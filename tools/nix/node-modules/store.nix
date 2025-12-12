@@ -29,15 +29,29 @@ in {
       preferPrefetch = (builtins.getEnv "NIX_USE_PREFETCHED_PNPM_STORE") == "1";
       # Materialize the chosen path into the Nix store so builders can read it in sandbox.
       prefetchedInput = if (!preferPrefetch) || (chosenPrefetchedPath == null || chosenPrefetchedPath == "") then null else builtins.path { path = chosenPrefetchedPath; name = "prefetched-store"; };
-    in pkgs.stdenvNoCC.mkDerivation {
+      ftVal = let v = builtins.getEnv "NIX_PNPM_FETCH_TIMEOUT"; in if v != "" then v else "180";
+      # Choose FOD hashing strategy:
+      # - When a lockfile is present (in live FS or flake snapshot), fix the output hash to the lockfile hash.
+      # - When lockfile is missing and generation is allowed, do NOT fix the output hash (non-FOD) to avoid hash mismatch.
+      # - When lockfile is missing and generation is not allowed, keep a placeholder FOD digest to preserve previous behavior.
+      genAllowed = (builtins.getEnv "NIX_PNPM_ALLOW_GENERATE") == "1";
+      fixHashAttrs =
+        if (hasLockFs || hasLockStore) then {
+          outputHashMode = "recursive";
+          outputHash = outHash;
+        } else if genAllowed then {
+          # Non-FOD when generation is allowed and no lockfile exists
+        } else {
+          outputHashMode = "recursive";
+          outputHash = placeholderDigest;
+        };
+    in pkgs.stdenvNoCC.mkDerivation ({
       pname = "pnpm-store";
       version = if (hasLockFs || hasLockStore) then "lock-${builtins.hashFile "sha256" (if hasLockFs then lockAbsStrFs else lockAbsStrStore)}" else "lock-missing";
       inherit src;
       nativeBuildInputs = [ node pnpm pkgs.coreutils ];
       preferLocalBuild = true;
       allowSubstitutes = false;
-      outputHashMode = "recursive";
-      outputHash = outHash;
       dontPatchShebangs = true;
       unpackPhase = ''
         echo "[nix] mkPnpmStore: unpackPhase begin"
@@ -70,12 +84,16 @@ in {
         # outside the FOD to avoid non-deterministic outputs across runs.
         LOCK_INPUT_PATH="${if lockInput != null then "${lockInput}" else "/nonexistent"}"
         echo "[nix] mkPnpmStore: lockInput=${if lockInput != null then "present" else "absent"} path=$LOCK_INPUT_PATH" >&2
+        if [ "${if genAllowed then "1" else "0"}" = "1" ] && [ ! -f pnpm-lock.yaml ]; then
+          echo "[nix] mkPnpmStore: allow-generate=1 and no lockfile in src; ignoring any provided lockfile input" >&2
+          LOCK_INPUT_PATH="/nonexistent"
+        fi
         if [ ! -f pnpm-lock.yaml ] && [ -f "$LOCK_INPUT_PATH" ]; then
           echo "[nix] mkPnpmStore: injecting importer lockfile input from $LOCK_INPUT_PATH" >&2
           cp "$LOCK_INPUT_PATH" pnpm-lock.yaml
         fi
         if [ ! -f pnpm-lock.yaml ]; then
-          if [ "${builtins.getEnv "NIX_PNPM_ALLOW_GENERATE"}" = "1" ]; then
+          if [ "${if genAllowed then "1" else "0"}" = "1" ]; then
             echo "[nix] mkPnpmStore: no lockfile present but allow-generate=1; producing empty store and continuing" >&2
             mkdir -p "$out/store" "$out/lockfile"
             # Do not attempt any network; leave store empty. Downstream mkNodeModules will generate a lock offline.
@@ -90,9 +108,8 @@ in {
         # Force workspace root to current directory to avoid inheriting repo-root workspace
         printf '%s\n' "packages:" > pnpm-workspace.yaml
         printf '%s\n' "  - ./" >> pnpm-workspace.yaml
-        echo "[nix] pnpm install (timeout) --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir ."
-        # Allow override via env; increase default to reduce flaky partial stores in CI/temp repos
-        FT="''${NIX_PNPM_FETCH_TIMEOUT:-180}"
+        echo "[nix] pnpm install (timeout) --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir . (FT=${ftVal}s)"
+        FT="${ftVal}"
         timeout "$FT"s env PNPM_HOME="$PNPM_HOME" pnpm install --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
         echo "[nix] mkPnpmStore: install complete"
         # Normalize store timestamps and scrub volatile JSON fields to stabilize FOD output
@@ -147,7 +164,7 @@ in {
         chosenPrefetchedPath = if chosenPrefetchedPath == null then "" else chosenPrefetchedPath;
         prefetchedInputPath = if prefetchedInput == null then "" else prefetchedInput;
       };
-    };
+    } // fixHashAttrs);
 
   mkPnpmStoreUnfixed = { lockfilePath, importerDir, npmrcPath ? null, packageJsonPath ? null }:
     let

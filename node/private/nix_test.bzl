@@ -44,7 +44,7 @@ def _node_nix_test_impl(ctx):
         + "  if command -v node >/dev/null 2>&1; then "
         + "    (cd \"$FLK_ROOT\" && node \"$FLK_ROOT/tools/dev/require-unified-pnpm-store.ts\" >/dev/null 2>&1 || true); "
         + "  elif command -v nix >/dev/null 2>&1; then "
-        + "    (cd \"$FLK_ROOT\" && nix run --accept-flake-config \"$FLK_ROOT\"#zx-wrapper -- \"$FLK_ROOT/tools/dev/require-unified-pnpm-store.ts\" >/dev/null 2>&1 || true); "
+        + "    (cd \"$FLK_ROOT\" && nix run --accept-flake-config \"path:$FLK_ROOT#zx-wrapper\" -- \"$FLK_ROOT/tools/dev/require-unified-pnpm-store.ts\" >/dev/null 2>&1 || true); "
         + "  fi; "
         + "fi; "
         + "if [ -f \"$FLK_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
