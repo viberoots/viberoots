@@ -4,11 +4,11 @@ This installment focuses on small, behavior‑preserving refactors to remove dup
 
 ---
 
-## PR‑1: Kwarg alias merge helper + macro migrations (unify `nixpkg_deps` alias plumbing)
+## PR‑1: Legacy kwarg removal + macro migrations (standardize on `nixpkg_deps`)
 
 ### Description
 
-Introduce a small, breaking change that standardizes on a single kwarg: `nixpkg_deps`. Remove legacy alias kwargs across macros (Go: `nix_cgo_deps`, Python: `nix_native_deps`, C++: `nix_cxx_attrs`). This rips the band‑aid off and eliminates alias plumbing entirely.
+Introduce a small, breaking change that standardizes on a single kwarg: `nixpkg_deps`. Legacy alias kwargs (Go: `nix_cgo_deps`, Python: `nix_native_deps`, C++: `nix_cxx_attrs`) are no longer accepted and now fail fast with deterministic, actionable errors pointing at `nixpkg_deps`.
 
 ### Scope & Changes
 
@@ -28,7 +28,7 @@ Introduce a small, breaking change that standardizes on a single kwarg: `nixpkg_
 
 - Macro docs: document `nixpkg_deps` as the only supported kwarg across languages.
 - Migration note: replace `nix_cgo_deps` / `nix_native_deps` / `nix_cxx_attrs` with `nixpkg_deps`.
-- Templates & Scaffolds: update language templates and scaffolds in `tools/templates/**` to use `nixpkg_deps` exclusively. Regenerate scaffold goldens and example `TARGETS` stubs to reflect the single kwarg.
+- Templates & Scaffolds: update language templates and scaffolds in `tools/scaffolding/templates/**` to use `nixpkg_deps` exclusively. Regenerate scaffold goldens and example `TARGETS` stubs to reflect the single kwarg.
 
 ### Acceptance Criteria
 
@@ -262,7 +262,7 @@ Implement.
 
 ## Rollout & Sequencing
 
-1. PR‑1 (Kwarg alias merge helper + migrations) — unlocks DRY for PR‑2/3.
+1. PR‑1 (Legacy kwarg removal + migrations) — unlocks DRY for PR‑2/3.
 2. PR‑2 (Go CGO consolidation) — reduces duplication across Go macros.
 3. PR‑3 (C++ macro core extraction) — centralizes shared logic in C++ macros.
 4. PR‑4 (Global Nix inputs stamping helper) — standardizes Node label stamping for Nix invocations.
@@ -282,7 +282,7 @@ Implement.
 
 ## Templates & Scaffolds — Maintenance Guidance
 
-- Scope: When macro surfaces or provider wiring change (even behavior‑neutral refactors), update templates and scaffolds under `tools/templates/**` so newly scaffolded code matches current best practices.
+- Scope: When macro surfaces or provider wiring change (even behavior‑neutral refactors), update templates and scaffolds under `tools/scaffolding/templates/**` so newly scaffolded code matches current best practices.
 - Required updates per PR in this series:
   - PR‑1: Replace legacy kwargs with `nixpkg_deps` in Go/Python/C++ templates, example `TARGETS` snippets, and any generator stubs.
   - PR‑2: If CGO examples exist, update them to mirror the consolidated Go helper; outputs remain identical.
@@ -292,7 +292,7 @@ Implement.
 - Verification:
   - Regenerate scaffolded samples (if applicable) and compare against goldens; diffs should be limited to intentional text (e.g., kwarg rename).
   - Build scaffold outputs to confirm label stamping and provider edges exist as expected.
-  - Keep doc snippets synchronized with `tools/templates/**` to avoid drift.
+  - Keep doc snippets synchronized with `tools/scaffolding/templates/**` to avoid drift.
 
 ---
 

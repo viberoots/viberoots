@@ -43,4 +43,6 @@ Python provider sync activation in sparse/partial clones is lockfile‑driven: t
   - Prebuild guard (freshness/presence): `node tools/buck/prebuild-guard.ts [--verbose|--json]`
   - Note: touching any `pnpm-lock.yaml` requires re-running provider sync + auto_map; the guard will fail in CI if importer entries are missing and auto-fix locally unless `PREBUILD_GUARD_NO_FIX=1`.
 - Nix builds (planner outputs):
-  - `
+  - `nix build .#graph-generator`
+- Repo wrappers (preferred; thin shims that delegate into TypeScript and ensure the dev shell is loaded):
+  - `i` (install deps), `b` (build), `v` (verify / full test suite)

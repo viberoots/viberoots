@@ -2,7 +2,7 @@
 
 > **Audience:** Engineers (and future LLM agents) who will be responsible for implementing this design.  
 > **Scope today:** **Go applications & libraries only.** The design deliberately remains **language-agnostic** so other languages (Rust, JVM, Python, Node, etc.) can be added without redesign.
-> **Script policy:** **All scripts MUST be TypeScript zx scripts** using our custom hashbang `#!/usr/bin/env zx-wrapper`. **Do not** write `bash/sh` scripts.
+> **Script policy:** All **substantive automation** MUST be TypeScript zx scripts using our custom hashbang `#!/usr/bin/env zx-wrapper`. Small `tools/bin/*` wrappers may exist as thin `bash` shims that only delegate into TypeScript (for example to ensure commands run inside the dev shell via `direnv exec`). Do not add new `bash/sh` scripts with substantive logic.
 
 ---
 
