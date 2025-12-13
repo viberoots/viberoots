@@ -42,7 +42,8 @@ test("source files remain under the 250 LOC methodology gate", async () => {
     scope: SOURCE_FILES_SCOPE,
   });
 
-  // Temporary: PR-1 documents the source-files scope. PR-2..PR-5 will remove the remaining allowlist.
+  // Temporary: the source-files scope is enforced and only a small allowlist may remain while large
+  // files are split into focused modules.
   const offenderFiles = offenders.map((o) => o.file).sort();
   const known = [...KNOWN_SOURCE_FILES_OVER_250_LOC].sort();
   assert.deepEqual(offenderFiles, known);
