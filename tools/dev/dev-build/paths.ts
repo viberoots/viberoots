@@ -1,0 +1,27 @@
+import path from "node:path";
+
+export function repoRoot(): string {
+  // Prefer the current working directory so tests running in a temp repo operate on that sandbox.
+  // Fall back to script-relative resolution if CWD is unavailable.
+  try {
+    return process.cwd();
+  } catch {
+    const here = path.dirname(new URL(import.meta.url).pathname);
+    return path.resolve(here, "..", "..", "..");
+  }
+}
+
+export function nodeBin(): string {
+  return process.execPath || "node";
+}
+
+export function zxNodeBase(root: string): string {
+  const zxInit = path.resolve(root, "tools/dev/zx-init.mjs");
+  return [
+    "--experimental-top-level-await",
+    "--experimental-strip-types",
+    "--disable-warning=ExperimentalWarning",
+    "--import",
+    zxInit,
+  ].join(" ");
+}
