@@ -9,6 +9,21 @@ def extract_lockfile_labels(labels):
             out.append(l)
     return out
 
+def _parse_importer_scoped_lockfile_label(label):
+    if not (isinstance(label, str) and label.startswith("lockfile:")):
+        fail("Lockfile label must start with 'lockfile:'; got: %s" % label)
+    raw = label[len("lockfile:"):]
+    if raw == "":
+        fail("Lockfile label must be of the form lockfile:<path>#<importer>; got: %s" % label)
+    if "#" not in raw:
+        fail("Lockfile label must be of the form lockfile:<path>#<importer> (missing '#<importer>'); got: %s" % label)
+    if raw.count("#") != 1:
+        fail("Lockfile label must contain exactly one '#'; got: %s" % label)
+    path_part, importer = raw.split("#")
+    if path_part == "" or importer == "":
+        fail("Lockfile label must be of the form lockfile:<path>#<importer>; got: %s" % label)
+    return (path_part, importer)
+
 def ensure_single_lockfile_label(kwargs, lockfile_label):
     labels = kwargs.get("labels", []) or []
     if lockfile_label != None and isinstance(lockfile_label, str) and lockfile_label != "":
@@ -16,6 +31,7 @@ def ensure_single_lockfile_label(kwargs, lockfile_label):
     lf = extract_lockfile_labels(labels)
     if len(lf) != 1:
         fail("Exactly one importer-scoped lockfile label is required (lockfile:<path>#<importer>); got: %s" % lf)
+    _parse_importer_scoped_lockfile_label(lf[0])
     kwargs["labels"] = dedupe_preserve(labels)
 
 def importer_from_labels(kwargs):
@@ -23,8 +39,8 @@ def importer_from_labels(kwargs):
     labs = extract_lockfile_labels(kwargs.get("labels", []) or [])
     if len(labs) != 1:
         fail("Exactly one importer-scoped lockfile label is required (lockfile:<path>#<importer>); got: %s" % labs)
-    lab = labs[0]
-    return (lab.split("#")[1] if ("#" in lab) else "")
+    _, importer = _parse_importer_scoped_lockfile_label(labs[0])
+    return importer
 
 def _importer_from_labels_probe_impl(ctx):
     kw = { "labels": [] }
@@ -45,9 +61,13 @@ _importer_from_labels_probe = rule(
 )
 
 def importer_from_labels_probe(name, lockfile_label):
+    # Output filename is stable and derived from the importer when present.
     imp = "."
-    if isinstance(lockfile_label, str) and ("#" in lockfile_label):
-        imp = lockfile_label.split("#")[1]
+    if isinstance(lockfile_label, str):
+        # Best-effort derivation for output file naming only; parsing/validation happens in the rule impl.
+        parts = lockfile_label.split("#")
+        if len(parts) == 2 and parts[1] != "":
+            imp = parts[1]
     out = ((imp if imp != "." else "dot") + ".txt")
     _importer_from_labels_probe(
         name = name,
