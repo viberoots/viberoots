@@ -40,7 +40,6 @@ export const SOURCE_FILES_SCOPE: FileSizeScope = {
 };
 export const KNOWN_SOURCE_FILES_OVER_250_LOC: ReadonlyArray<string> = [
   // Temporary allowlist for PR-1 only; remove entries as PR-2..PR-5 split these files.
-  "tools/scaffolding/scaf.ts",
   "tools/dev/dev-build.ts",
   "tools/dev/patches-lint.ts",
   "tools/dev/update-pnpm-hash.ts",
