@@ -40,7 +40,6 @@ export const SOURCE_FILES_SCOPE: FileSizeScope = {
 };
 export const KNOWN_SOURCE_FILES_OVER_250_LOC: ReadonlyArray<string> = [
   // Temporary allowlist for the source-files gate; remove entries as follow-up PRs split these files.
-  "tools/dev/update-pnpm-hash.ts",
   "tools/dev/langs-diagnose.ts",
 ];
 
