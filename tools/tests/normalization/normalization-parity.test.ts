@@ -66,6 +66,8 @@ console.log("OK normalization parity");
 const patchCases: Array<{ file: string; expect: string | null }> = [
   { file: "lodash@4.17.21.patch", expect: "lodash@4.17.21" },
   { file: "@scope__name@1.2.3.patch", expect: "@scope/name@1.2.3" },
+  { file: "lodash___core@4.17.21.patch", expect: "lodash/_core@4.17.21" },
+  { file: "foo@bar@1.0.0.patch", expect: "foo@bar@1.0.0" },
   { file: "PKGS__OPENSSL@3.2.0.patch", expect: "pkgs/openssl@3.2.0" }, // liberal decoding of "__" and casing
   { file: "not-a-patch.txt", expect: null },
   { file: "bad@.patch", expect: null },

@@ -2,7 +2,7 @@
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { test } from "node:test";
+import test from "node:test";
 import { scanFlatPatchDir } from "../../lib/provider-sync";
 import { decodeNameVersionFromPatch } from "../../lib/providers";
 
@@ -18,7 +18,9 @@ test("TS<->Nix patch key parity for patchesMapFromDir", async () => {
     const files = [
       "leftpad@1.3.0.patch",
       "lodash__core@4.17.21.patch",
+      "lodash___core@4.17.21.patch",
       "@scope__pkg@1.2.3.patch",
+      "foo@bar@1.0.0.patch",
       ".gitkeep", // should be ignored
       "NOT_A_PATCH.txt", // should be ignored
     ];

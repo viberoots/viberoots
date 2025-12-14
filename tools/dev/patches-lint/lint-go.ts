@@ -1,6 +1,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { decodeNameVersionFromPatch } from "../../lib/providers.ts";
+import { decodeNameVersionFromPatchLoose } from "../../lib/providers.ts";
 import { validateFlatDir } from "../../lib/provider-sync.ts";
 import type { PatchesLintConfig, Violation } from "./types.ts";
 import { isKeeperOrDotfile, isPatchFile, pathExists } from "./fs.ts";
@@ -64,12 +64,15 @@ export async function lintGo(cfg: PatchesLintConfig): Promise<number> {
   const violations: Violation[] = [];
   const byKey = new Map<string, string>();
 
-  const entries = await fsp.readdir(dir, { withFileTypes: true } as any);
+  const entries = (await fsp.readdir(dir, { withFileTypes: true } as any)) as Array<{
+    name: string;
+    isDirectory(): boolean;
+  }>;
   for (const e of entries.sort((a, b) => a.name.localeCompare(b.name))) {
     if (e.isDirectory()) continue;
     validateGoPatchFilename(cfg, e.name, violations);
     if (!isPatchFile(e.name)) continue;
-    const key = decodeNameVersionFromPatch(e.name);
+    const key = decodeNameVersionFromPatchLoose(e.name);
     if (!key) continue;
     const prior = byKey.get(key);
     if (prior && prior !== e.name) {

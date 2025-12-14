@@ -9,8 +9,8 @@ test("patches-lint: duplicate module@version detected in strict mode", async () 
     const dir = path.join(tmp, "patches", "go");
     await fsp.mkdir(dir, { recursive: true });
     // Create two distinct filenames that both decode to the same "import@version" key.
-    // decodeFromPatchFilename collapses groups of 2+ underscores to a single '/', so the following
-    // both decode to "github.com/acme/widget@v1.2.3" regardless of filesystem case sensitivity.
+    // Patches-lint uses a permissive decoder for duplicate detection so we can test collisions
+    // even on case-insensitive filesystems.
     await fsp.writeFile(
       path.join(dir, "github.com____acme__widget@v1.2.3.patch"),
       "# one\n",

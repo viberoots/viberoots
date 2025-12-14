@@ -1,6 +1,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { decodeNameVersionFromPatch } from "../../lib/providers.ts";
+import { decodeNameVersionFromPatchLoose } from "../../lib/providers.ts";
 import { validateFlatDir } from "../../lib/provider-sync.ts";
 import {
   computeImporterLabel,
@@ -92,7 +92,7 @@ export async function lintPython(cfg: PatchesLintConfig): Promise<number> {
 
     for (const rel of patchFiles) {
       const base = path.posix.basename(rel);
-      const key = decodeNameVersionFromPatch(base);
+      const key = decodeNameVersionFromPatchLoose(base);
       if (!key) continue;
       const prior = byKey.get(key);
       if (prior && prior !== base) {

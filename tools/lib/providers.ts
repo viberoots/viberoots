@@ -10,10 +10,12 @@ export function shortHash(s: string, n = 12): string {
 }
 
 export const encodeForPatchFilename = (s: string) => s.replace(/\//g, "__");
-// Be liberal in what we accept when decoding to allow tests to simulate duplicates on case-insensitive FS:
-// Treat any group of 2+ underscores as a single '/'; then collapse multiple slashes.
-export const decodeFromPatchFilename = (s: string) =>
-  s.replace(/_{2,}/g, "/").replace(/\/{2,}/g, "/");
+export const decodeFromPatchFilename = (s: string) => s.replace(/__/g, "/");
+
+// Patches-lint intentionally uses a slightly more permissive decoding to make it possible
+// to exercise duplicate detection even on case-insensitive filesystems.
+export const decodeFromPatchFilenameLoose = (s: string) =>
+  decodeFromPatchFilename(s).replace(/\/{2,}/g, "/");
 
 // Decode a flat patch filename "<name>@<version>.patch" into a canonical "name@version" key.
 // - Accepts PNPM-style encoding where '/' is written as '__' in the filename
@@ -27,6 +29,17 @@ export function decodeNameVersionFromPatch(filename: string): string | null {
   const rawName = base.slice(0, at);
   const version = base.slice(at + 1);
   const name = decodeFromPatchFilename(rawName);
+  return `${name}@${version}`.toLowerCase();
+}
+
+export function decodeNameVersionFromPatchLoose(filename: string): string | null {
+  if (!filename || !filename.endsWith(".patch")) return null;
+  const base = filename.slice(0, -".patch".length);
+  const at = base.lastIndexOf("@");
+  if (at <= 0 || at === base.length - 1) return null;
+  const rawName = base.slice(0, at);
+  const version = base.slice(at + 1);
+  const name = decodeFromPatchFilenameLoose(rawName);
   return `${name}@${version}`.toLowerCase();
 }
 

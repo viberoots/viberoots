@@ -3,6 +3,9 @@
 Provider sync maps patch files under `patches/<lang>` to Buck providers used in builds. Keep it deterministic and idempotent.
 
 - **Patch filenames**: `<module path with / → __>@<version>.patch` (dots are preserved).
+  - Decoding policy (parity): `__` decodes to `/` only (lossless). Examples:
+    - `@scope__pkg@1.2.3.patch` → `@scope/pkg@1.2.3`
+    - `lodash___core@4.17.21.patch` → `lodash/_core@4.17.21`
 - **Unified sync command (orchestrator)**: `node tools/buck/sync-providers.ts` writes all language-specific provider files deterministically:
   - Go: `third_party/providers/TARGETS.auto`
   - Node (PNPM): `third_party/providers/TARGETS.node.auto` (when lockfiles present)

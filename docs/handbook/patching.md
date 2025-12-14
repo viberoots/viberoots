@@ -40,6 +40,12 @@ All scripts are zx TypeScript using `#!/usr/bin/env zx-wrapper`.
 
 Package‑local: `<pkg>/patches/go/<encodedImport>@<version>.patch` (flat directory within the package). One patch per `module@version`.
 
+Encoding policy:
+
+- **Canonical encoding (produced by tools)**: encode `/` as `__` in the filename (example: `golang.org/x/net` → `golang.org__x__net`).
+- **Decoding (used by Nix evaluation)**: decode **only** `__` back to `/`. This is intentionally strict so encoded filenames remain lossless (example: `lodash___core` decodes to `lodash/_core`, not `lodash/core`).
+- **Linting note**: the patches linter uses a slightly more permissive normalization for duplicate detection so we can exercise collision checks even on case-insensitive filesystems, but patch application and provider tooling use the strict decode.
+
 ## Session store
 
 `.patch-sessions.json` at repo root tracks local workspaces. It is ignored by Git and is local-only.
