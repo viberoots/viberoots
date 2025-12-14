@@ -22,7 +22,5 @@
     # Examples (uncomment and adapt in your repo):
     # my_go_service = { template = "go"; kind = "bin"; };
     # my_go_lib  = { template = "go"; kind = "lib"; };
-    python_binary = { template = "python"; kind = "bin"; };
-    python_library = { template = "python"; kind = "lib"; };
   };
 }

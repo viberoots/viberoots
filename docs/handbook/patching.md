@@ -14,6 +14,7 @@ All scripts are zx TypeScript using `#!/usr/bin/env zx-wrapper`.
 - C++ extraction/workspace setup uses the common permission normalizer `tools/patch/cross-platform.ts: chmodRecursive` to guarantee writable workspaces without affecting diffs.
 - Node and Python macros include importer‑local patch files in `srcs` via the unified helper `//lang:defs_common.bzl: append_importer_patches(kwargs, importer, lang)`. Importer is derived from a single `lockfile:<path>#<importer>` label (enforced by `ensure_single_lockfile_label(...)`).
   - Labels must include the `#<importer>` suffix; malformed labels fail fast with deterministic error text.
+- Patch inputs are attached through `//lang:patch_inputs.bzl` helpers. When a rule does not support `srcs`, call sites must choose a supported input attribute explicitly using `into = "<attr>"` or carry patch inputs via a small helper target.
 
 ## Workflow
 
@@ -123,10 +124,11 @@ node tools/dev/patches-lint.ts --lang python
 ## Python (uv) — importer‑local patches and invalidation
 
 - Python targets use importer‑scoped lockfile labels: `lockfile:<path/to/uv.lock>#<importer>`.
-- The Python macros include importer‑local patch files in `srcs` (same mechanism as Node) for precise Buck invalidation:
+- The Python library and test macros include importer‑local patch files in `srcs` for precise Buck invalidation:
   - Patches live under `<importer>/patches/python/*.patch` (e.g., `apps/api/patches/python/...`).
   - Changing a patch only invalidates Python targets bound to that importer.
-- Lockfile label enforcement and parsing are centralized in Starlark: call `ensure_single_lockfile_label(...)` and then use `include_importer_patches_from_labels(kwargs, "python")` to both extract the importer and include importer‑local patches deterministically.
+- `nix_python_binary` carries importer‑local patch files via an internal helper `python_library` dependency (resources), because Buck prelude `python_binary` does not accept `srcs`.
+- Lockfile label enforcement and parsing are centralized in Starlark: call `ensure_single_lockfile_label(...)` and then use `include_importer_patches_from_labels(kwargs, "python", into = "<attr>")` to both extract the importer and include importer‑local patches deterministically.
 
 Quick checks and guidance:
 
@@ -139,8 +141,9 @@ Quick checks and guidance:
 - The Node macros include importer‑local patch files in `srcs` to achieve precise Buck invalidation, mirroring Go:
   - Patches live under `<importer>/patches/node/*.patch` (e.g., `apps/web/patches/node/...`).
   - Changing a patch only invalidates Node targets bound to that importer.
+- Some Node genrule shims pass dict-shaped `srcs` mappings (dest → source) for deterministic in-action paths. In that mode, patch globs are intentionally not injected into `srcs` because it would mutate the mapping shape.
 - Provider stamps for Node are importer‑scoped and do not reference patch files as `srcs` (see Provider sync cookbook below); correctness comes from macro‑side `srcs` inclusion.
-- Lockfile label enforcement and parsing are centralized: macros call `ensure_single_lockfile_label(...)` and then `include_importer_patches_from_labels(kwargs, "node")` from `lang/defs_common.bzl`. Error messages and behavior are stable and shared across Node macros.
+- Lockfile label enforcement and parsing are centralized: macros call `ensure_single_lockfile_label(...)` and then `include_importer_patches_from_labels(kwargs, "node", into = "srcs")` from `lang/defs_common.bzl`. Error messages and behavior are stable and shared across Node macros.
 
 Quick checks and guidance:
 
