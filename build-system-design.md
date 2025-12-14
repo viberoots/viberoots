@@ -91,7 +91,9 @@ extra-experimental-features = nix-command flakes dynamic-derivations ca-derivati
    - WASM stamps: use `//lang:defs_common.bzl:stamp_wasm_variant(kwargs, "<lang>", "<variant>")` to append `lang:<lang>`, `kind:wasm`, and `wasm:<variant>` uniformly across C++/Go/Python macros.
    - Note: For discoverability only, `tools/nix/lang-templates.nix` exposes a `Node` symbol bag (forwarded from `tools/nix/templates/node.nix`). The planner’s Node plugin remains authoritative; no consumers rely on this symbol bag.
    - For a concrete Node→C++ addon scaffold and artifact flow, see `node-call-cpp.md`.
-   - Node macros that call Nix must prepend `nix_bootstrap_env()` and `nix_timeout_wrapper_var()` from `//lang:nix_shell.bzl` to their `cmd` assembly (e.g., `node_webapp`, bundled `nix_node_cli_bin`). This standardizes environment setup and external timeouts across platforms.
+   - Node macros that call Nix must prepend `nix_bootstrap_env_core()` + `nix_bootstrap_env_pnpm_store()` and `nix_timeout_wrapper_var()` from `//lang:nix_shell.bzl` to their `cmd` assembly (e.g., `node_webapp`, bundled `nix_node_cli_bin`).
+     - `nix_bootstrap_env_core()` is cross-language and establishes deterministic `WORKSPACE_ROOT` + `FLK_ROOT`.
+     - `nix_bootstrap_env_pnpm_store()` is Node-specific and opt-in (unified PNPM store setup / env exports).
    - No out‑links: when assembling shell commands that invoke Nix, use `nix build --no-link --print-out-paths` and capture the last printed path (e.g., `outPath=$$($TIMEOUT nix build ... --no-link --print-out-paths | tail -n1)`). Do not use `--out-link` to avoid creating GC roots and stale symlinks.
 
 ## End-to-End Architecture

@@ -38,7 +38,7 @@
 
 Parity with Node:
 
-- C++ ExternalRunner tests now reuse the shared nix-shell bootstrap and external timeout wrapper from `//lang:nix_shell.bzl` (default 10 minutes), matching Node test behavior.
+- C++ ExternalRunner tests now reuse `nix_bootstrap_env_core()` and the external timeout wrapper from `//lang:nix_shell.bzl` (default 10 minutes), matching Node test behavior.
 
 ## zx tests overview
 

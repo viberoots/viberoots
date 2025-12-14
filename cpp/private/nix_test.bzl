@@ -1,5 +1,5 @@
 load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name")
-load("//lang:nix_shell.bzl", "nix_bootstrap_env", "nix_timeout_wrapper_var")
+load("//lang:nix_shell.bzl", "nix_bootstrap_env_core", "nix_timeout_wrapper_var")
 
 
 def _cpp_nix_test_impl(ctx):
@@ -22,7 +22,7 @@ def _cpp_nix_test_impl(ctx):
         return "t" + out
     attr = _sanitize(raw)
     run_and_exec = (
-        nix_bootstrap_env()
+        nix_bootstrap_env_core()
         + ("echo '[cpp_nix_test] planner_label=%s' >&2; " % raw)
         + "# Use centralized zx helper to export graph (if needed) and build selected target\n"
         + ("set +e; OUT_RAW=$(BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"%s\" nix run \"$FLK_ROOT\"#zx-wrapper -- \"$FLK_ROOT/tools/dev/build-selected.ts\" 2> /tmp/cpp_nix_test_build.log); " % raw)

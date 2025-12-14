@@ -1,4 +1,4 @@
-load("//lang:nix_shell.bzl", "nix_bootstrap_env")
+load("//lang:nix_shell.bzl", "nix_bootstrap_env_core")
 
 def _go_nix_build_wasm_impl(ctx):
     """
@@ -9,7 +9,7 @@ def _go_nix_build_wasm_impl(ctx):
     # Prefer the specialized selected-wasm attribute for Go/TinyGo which does not
     # require the target to be present in the exported graph. Fallback to generic selected.
     run_and_copy = (
-        nix_bootstrap_env()
+        nix_bootstrap_env_core()
         + ("OUT_PATH=$(BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"%s\" nix build --impure --print-out-paths --accept-flake-config \"path:$FLK_ROOT#graph-generator-selected-wasm\" || " % (raw))
         + ("BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"%s\" nix run --accept-flake-config \"path:$FLK_ROOT#zx-wrapper\" -- \"$FLK_ROOT/tools/dev/build-selected.ts\"); " % (raw))
         + "test -n \"$OUT_PATH\"; "

@@ -1,5 +1,5 @@
 load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name")
-load("//lang:nix_shell.bzl", "nix_bootstrap_env")
+load("//lang:nix_shell.bzl", "nix_bootstrap_env_core")
 
 
 def _cpp_nix_build_impl(ctx):
@@ -52,7 +52,7 @@ def _cpp_nix_build_impl(ctx):
     run_and_copy = (
         pre_env
         + "export BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE=1; "
-        + nix_bootstrap_env()
+        + nix_bootstrap_env_core()
         + "cd \"$FLK_ROOT\"; "
         # Export Buck graph for the temp workspace (idempotent).
         + "mkdir -p \"$WORKSPACE_ROOT/tools/buck\"; "

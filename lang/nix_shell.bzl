@@ -1,4 +1,4 @@
-def nix_bootstrap_env():
+def nix_bootstrap_env_core():
     return (
         "set -euo pipefail; "
         + "export WORKSPACE_ROOT=\"${WORKSPACE_ROOT:-}\"; "
@@ -15,7 +15,6 @@ def nix_bootstrap_env():
         + "  fi; "
         + "fi; "
         + "export WORKSPACE_ROOT=\"${WORKSPACE_ROOT:-$(pwd)}\"; "
-        # Determine flake root; honor pre-set FLK_ROOT when valid, else derive it.
         + "FLK_ROOT=\"${FLK_ROOT:-}\"; "
         + "if [ -z \"${FLK_ROOT:-}\" ] || [ ! -f \"$FLK_ROOT/flake.nix\" ]; then "
         + "  FLK_ROOT=\"${WORKSPACE_ROOT:-${REPO_ROOT:-$(pwd)}}\"; "
@@ -32,9 +31,12 @@ def nix_bootstrap_env():
         + "fi; "
         + "cd \"$WORKSPACE_ROOT\"; "
         + "test -f \"$FLK_ROOT/flake.nix\"; "
-        # Ensure a unified pnpm store exists once per repo state (mutexed) unless explicitly skipped.
-        # Cheap no-op when already created; safe under parallel test execution.
-        + "if [ \"${BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE:-}\" != \"1\" ]; then "
+    )
+
+
+def nix_bootstrap_env_pnpm_store():
+    return (
+        "if [ \"${BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE:-}\" != \"1\" ]; then "
         + "  if [ ! -f \"$FLK_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
         + "    if command -v node >/dev/null 2>&1; then "
         + "      (cd \"$FLK_ROOT\" && node \"$FLK_ROOT/tools/dev/require-unified-pnpm-store.ts\" >/dev/null 2>&1 || true); "
@@ -43,12 +45,15 @@ def nix_bootstrap_env():
         + "    fi; "
         + "  fi; "
         + "fi; "
-        # If a unified pnpm store path exists (buck-out-scoped), export env for Nix prefetch use.
         + "if [ -f \"$FLK_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
         + "  export NIX_USE_PREFETCHED_PNPM_STORE=1; "
         + "  export LOCAL_PNPM_STORE=\"$(cat \"$FLK_ROOT/buck-out/.unified-pnpm-store/path\" 2>/dev/null || true)\"; "
         + "fi; "
     )
+
+
+def nix_bootstrap_env():
+    return nix_bootstrap_env_core()
 
 
 def nix_timeout_wrapper_var(var_name = "TIMEOUT", default_sec = 600):

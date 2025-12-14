@@ -35,10 +35,15 @@ test("nix_node_cli_bin(bundle=True) cmd prefixes nix bootstrap env and timeout w
       return;
     }
     const out = String(probe.stdout || "");
-    // Should include nix bootstrap markers
+    // Should include nix bootstrap core markers
     assert.ok(
       out.includes("export WORKSPACE_ROOT=") || out.includes("FLK_ROOT="),
-      "expected nix_bootstrap_env() fragments in cmd",
+      "expected nix_bootstrap_env_core() fragments in cmd",
+    );
+    // Bundled Node CLI runs under Nix and must opt in to unified PNPM store handling
+    assert.ok(
+      out.includes("require-unified-pnpm-store.ts") || out.includes(".unified-pnpm-store/path"),
+      "expected nix_bootstrap_env_pnpm_store() fragments in cmd",
     );
     // Should declare TIMEOUT wrapper and use it to invoke nix build
     assert.ok(out.includes("TIMEOUT="), "expected TIMEOUT= assignment in cmd");

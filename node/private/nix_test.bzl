@@ -1,5 +1,5 @@
 load("//lang:sanitize.bzl", "sanitize_name")
-load("//lang:nix_shell.bzl", "nix_bootstrap_env", "nix_timeout_wrapper_var")
+load("//lang:nix_shell.bzl", "nix_bootstrap_env_core", "nix_bootstrap_env_pnpm_store", "nix_timeout_wrapper_var")
 
 def _node_nix_test_impl(ctx):
     imp = ctx.attrs.importer
@@ -29,7 +29,7 @@ def _node_nix_test_impl(ctx):
     run_cmd = (
         # Skip unified pnpm prewarm at bootstrap; we'll do it only if tests exist
         "export BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE=1; "
-        + nix_bootstrap_env()
+        + nix_bootstrap_env_core()
         + ("".join(env_pairs))
         + nix_timeout_wrapper_var(var_name = "TIMEOUT", default_sec = (tout if isinstance(tout, int) and tout > 0 else 600))
         + ("echo '[node_nix_test] importer=%s (attr=%s)' >&2; " % (imp, imp_attr))
@@ -39,18 +39,8 @@ def _node_nix_test_impl(ctx):
         + "  export NIX_USE_PREFETCHED_PNPM_STORE=1; "
         + "  export LOCAL_PNPM_STORE=\"$(cat \"$REPO_ROOT/buck-out/.unified-pnpm-store/path\" 2>/dev/null || true)\"; "
         + "fi; "
-        # Prewarm unified pnpm store only when tests will actually run
-        + "if [ ! -f \"$FLK_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
-        + "  if command -v node >/dev/null 2>&1; then "
-        + "    (cd \"$FLK_ROOT\" && node \"$FLK_ROOT/tools/dev/require-unified-pnpm-store.ts\" >/dev/null 2>&1 || true); "
-        + "  elif command -v nix >/dev/null 2>&1; then "
-        + "    (cd \"$FLK_ROOT\" && nix run --accept-flake-config \"path:$FLK_ROOT#zx-wrapper\" -- \"$FLK_ROOT/tools/dev/require-unified-pnpm-store.ts\" >/dev/null 2>&1 || true); "
-        + "  fi; "
-        + "fi; "
-        + "if [ -f \"$FLK_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
-        + "  export NIX_USE_PREFETCHED_PNPM_STORE=1; "
-        + "  export LOCAL_PNPM_STORE=\"$(cat \"$FLK_ROOT/buck-out/.unified-pnpm-store/path\" 2>/dev/null || true)\"; "
-        + "fi; "
+        + "export BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE=0; "
+        + nix_bootstrap_env_pnpm_store()
         + "NIX_MAXJ=\"${NIX_MAX_JOBS:-0}\"; NIX_CORES=\"${NIX_CORES:-0}\"; "
         + "JOBS_FLAG=\"\"; if [ -n \"$NIX_MAXJ\" ] && [ \"$NIX_MAXJ\" != \"0\" ]; then JOBS_FLAG=\"--max-jobs $NIX_MAXJ\"; fi; "
         + "CORES_FLAG=\"\"; if [ -n \"$NIX_CORES\" ] && [ \"$NIX_CORES\" != \"0\" ]; then CORES_FLAG=\"--option cores $NIX_CORES\"; fi; "
