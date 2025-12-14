@@ -58,5 +58,17 @@ EOF'`;
       out.includes("//third_party/providers:prov"),
       "expected provider target present in srcs for nix_go_carchive",
     );
+
+    const build = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+    })`buck2 build --target-platforms //:no_cgo --show-output //apps/demo:arc`;
+    if (build.exitCode !== 0) return;
+    assert.ok(
+      String(build.stdout || "").includes("arc.stamp"),
+      "expected planner stub to produce a stamp output",
+    );
   });
 });

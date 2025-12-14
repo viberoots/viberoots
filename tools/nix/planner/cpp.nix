@@ -76,13 +76,21 @@ let
       isCArchive = nm:
         let n = if builtins.hasAttr nm byName then byName.${nm} else null; in
           if n == null then false else builtins.elem "kind:carchive" (L.labelsOf n);
+      pkgPathFor = nm:
+        let
+          srcs = srcsOf nm;
+          hasPrefix = pref: builtins.any (s: lib.hasPrefix pref s) srcs;
+        in if hasPrefix "pkg/addon/" then "./pkg/addon"
+           else if hasPrefix "pkg/" then "./pkg"
+           else ".";
       asDerivation = nm: T.goCArchive {
         name = nm;
         modulesToml = ctx.modulesTomlFor nm;
         srcRoot = ctx.repoRoot;
         subdir = pkgPathOf nm;
-        # Scaffolded convention: Go sources live under pkg/addon for c-archive
-        pkgPath = "./pkg/addon";
+        # Prefer a pkgPath inferred from the target's declared srcs so both
+        # scaffolded (pkg/addon) and simple (.) c-archive layouts work.
+        pkgPath = pkgPathFor nm;
       };
       # Primary resolution: direct deps only
       primaries = builtins.filter isCArchive direct;

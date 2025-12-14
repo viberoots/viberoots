@@ -42,6 +42,8 @@ Canonical naming and helpers:
 
 Some macros create planner-visible stub targets for exporter and planner discovery. These stubs are not meant to build, and in some cases they must not depend on provider targets (visibility and graph-shape constraints).
 
+- **Canonical stub rule**: `//lang:planner_stub.bzl:planner_stub` is the only supported mechanism for planner-visible stubs. Do not introduce language-specific stub rules or ad-hoc `genrule` stubs.
+- **When to include `srcs`**: include `srcs` only when the planner must observe package-local files for discovery or invalidation (for example, a planner-only node that represents a package directory or needs patch file inputs). Prefer `deps` for graph edges; use `srcs` for file-like inputs and the few cases where edges must be realized via `srcs`.
 - **Rule of thumb**: when a macro emits a planner-visible stub, pass planner-visible deps through the shared helper `strip_provider_targets(...)` from `//lang:provider_edges.bzl`.
 - **Canonical helper**: `strip_provider_targets(deps, provider_prefix = "//third_party/providers:")` preserves order, removes only provider targets, and does not try to interpret non-string entries.
 

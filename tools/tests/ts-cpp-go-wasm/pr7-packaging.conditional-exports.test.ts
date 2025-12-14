@@ -58,6 +58,18 @@ go 1.22.0
 `,
       "utf8",
     );
+    // Minimal gomod2nix (no deps) so the planner can resolve modulesTomlFor for carchive/wasm targets.
+    await fs.writeFile(
+      path.join(apiDir, "gomod2nix.toml"),
+      [
+        "schema = 3",
+        "mod = {}",
+        "replace = {}",
+        "prune = { go-tests = true, unused-packages = true }",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
     await fs.writeFile(
       path.join(apiDir, "main.go"),
       `package main

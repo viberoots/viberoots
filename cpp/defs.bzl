@@ -1,8 +1,8 @@
 load("@prelude//:rules.bzl", "cxx_library", "cxx_binary", "cxx_test")
 load("//lang:defs_common.bzl", "stamp_labels", "append_nixpkg_labels", "include_package_local_patches", "dedupe_preserve", "stamp_wasm_variant", "realize_provider_edges", "default_package_patch_dirs", "strip_provider_targets")
 load("//lang:global_inputs.bzl", "global_nix_inputs")
+load("//lang:planner_stub.bzl", "planner_stub")
 load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name", _cpp_sanitize_probe="cpp_sanitize_probe")
-load("//cpp/private:planner_stub.bzl", "cpp_planner_stub")
 load("//cpp/private:nix_test.bzl", "cpp_nix_test")
 load("//cpp/private:nix_build.bzl", "cpp_nix_build")
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
@@ -98,7 +98,7 @@ def nix_cpp_wasm_emscripten_lib(name, **kwargs):
     stamp_wasm_variant(kwargs, "cpp", "emscripten")
     labels = kwargs.get("labels", []) or []
     # Use a minimal planner stub that exposes graph edges and labels
-    cpp_planner_stub(
+    planner_stub(
         name = name,
         out = name + ".stamp",
         deps = deps,
@@ -127,7 +127,7 @@ def nix_cpp_test(name, **kwargs):
     # Filter provider deps from planner to avoid visibility / graph-edge to providers
     _planner_deps = strip_provider_targets(deps)
 
-    cpp_planner_stub(
+    planner_stub(
         name = planner_name,
         out = planner_name + ".stamp",
         # Graph edges for planner discovery

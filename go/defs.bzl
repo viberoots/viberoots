@@ -1,8 +1,9 @@
-load("@prelude//:rules.bzl", "go_binary", "go_library", "go_test", "genrule")
+load("@prelude//:rules.bzl", "go_binary", "go_library", "go_test")
 load("//lang:defs_common.bzl", "dedupe_preserve", "normalize_labels", "stamp_labels", "include_package_local_patches", "realize_provider_edges")
 load("//lang:defs_common.bzl", "default_package_patch_dirs")
 load("//lang:defs_common.bzl", "stamp_wasm_variant")
 load("//lang:defs_common.bzl", "append_nixpkg_labels")
+load("//lang:planner_stub.bzl", "planner_stub")
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
 load("//go/private:nix_build_wasm.bzl", "go_nix_build_wasm")
 load("//go/private:labels.bzl", "append_tuple_labels")
@@ -185,16 +186,15 @@ def nix_go_carchive(name, **kwargs):
     labels = kwargs.get("labels", []) or []
     labels = dedupe_preserve(labels + ["lang:go", "kind:carchive"])
     deps = kwargs.pop("deps", [])
-    # Keep a minimal graph node with srcs so planner can find package dir.
-    # Realize edges to provider nodes by merging them into srcs; genrule does not
-    # accept a `deps` parameter in Buck2.
+    # Keep a minimal graph node with srcs so the planner can discover the package.
+    # Preserve the existing behavior where provider edges are realized into `srcs`.
     srcs = kwargs.get("srcs", []) or []
-    merged_srcs = realize_provider_edges(MODULE_PROVIDERS, name, into = "srcs", base = (srcs + deps))
-    genrule(
+    merged_srcs = realize_provider_edges(MODULE_PROVIDERS, name, into = "srcs", base = srcs)
+    planner_stub(
         name = name,
-        srcs = merged_srcs,
         out = name + ".stamp",
-        cmd = "echo go_carchive > $OUT",
+        deps = deps,
+        srcs = merged_srcs,
         labels = labels,
         visibility = kwargs.get("visibility", []),
     )

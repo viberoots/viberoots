@@ -38,17 +38,29 @@ EOF'`;
     // libs/math-api — minimal Go c-archive exporting Add (pure Go for simplicity and determinism here)
     await sh`bash -lc 'mkdir -p libs/math-api/pkg/addon'`;
     await sh`bash -lc 'cat > libs/math-api/pkg/addon/export.go <<"EOF"
-package addon
+package main
+
+// #include <stdint.h>
+import "C"
 
 //export Add
-func Add(a, b int) int {
+func Add(a, b C.int) C.int {
     return a + b
 }
+
+func main() {}
 EOF'`;
     await sh`bash -lc 'cat > libs/math-api/go.mod <<"EOF"
 module example.com/math/api
 
 go 1.22.0
+EOF'`;
+    // Minimal gomod2nix (no deps) so the planner can resolve modulesTomlFor for this Go target.
+    await sh`bash -lc 'cat > libs/math-api/gomod2nix.toml <<"EOF"
+schema = 3
+mod = {}
+replace = {}
+prune = { go-tests = true, unused-packages = true }
 EOF'`;
     // TARGETS declaring a Go c-archive
     await sh`bash -lc 'cat > libs/math-api/TARGETS <<"EOF"

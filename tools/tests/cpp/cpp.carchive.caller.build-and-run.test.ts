@@ -1,5 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
+import * as fsp from "node:fs/promises";
+import path from "node:path";
 import { runInTemp } from "../lib/test-helpers";
 
 // This test scaffolds a minimal Go c-archive and a C++ caller in a temp repo,
@@ -12,7 +14,24 @@ test("cpp calls go c-archive (temp repo)", async () => {
     await $({ cwd: tmp })`bash -lc 'mkdir -p libs/greetgo'`;
     await $({
       cwd: tmp,
-    })`bash -lc 'cat > libs/greetgo/export.go <<"EOF"\npackage greetgo\n\n// #include <stdint.h>\nimport "C"\n\n//export GoGreet\nfunc GoGreet() *C.char {\n    return C.CString("hello from go")\n}\nEOF'`;
+    })`bash -lc 'cat > libs/greetgo/export.go <<"EOF"\npackage main\n\n// #include <stdint.h>\nimport \"C\"\n\n//export GoGreet\nfunc GoGreet() *C.char {\n    return C.CString(\"hello from go\")\n}\n\nfunc main() {}\nEOF'`;
+    // Minimal Go module + gomod2nix for this temp repo package (no deps; fully local).
+    await fsp.writeFile(
+      path.join(tmp, "libs", "greetgo", "go.mod"),
+      "module example.com/greetgo\n\ngo 1.22\n",
+      "utf8",
+    );
+    await fsp.writeFile(
+      path.join(tmp, "libs", "greetgo", "gomod2nix.toml"),
+      [
+        "schema = 3",
+        "mod = {}",
+        "replace = {}",
+        "prune = { go-tests = true, unused-packages = true }",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
     await $({
       cwd: tmp,
     })`bash -lc 'cat > libs/greetgo/TARGETS <<"EOF"\nload("//go:defs.bzl", "nix_go_carchive")\n\nnix_go_carchive(\n    name = "greetgo",\n    srcs = [\n        "export.go",\n    ],\n    labels = ["lang:go", "kind:carchive"],\n    visibility = ["PUBLIC"],\n)\nEOF'`;

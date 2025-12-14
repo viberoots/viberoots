@@ -163,11 +163,12 @@ export async function cqueryNodes(scope: string, attrs: string[]): Promise<Node[
       // Normalize label: drop cell prefix and any config suffix to ensure stable keys
       const { normalizeTargetLabel } = await import("../../lib/labels.ts");
       const clean = normalizeTargetLabel(label);
+      const cleanDeps = deps ? deps.map((d) => normalizeTargetLabel(d)) : undefined;
       const n: any = {
         ...a,
         name: clean,
         rule_type: ruleType || a["rule_type"] || "",
-        deps: deps || a["deps"],
+        deps: cleanDeps || deps || a["deps"],
         labels: Array.from(labs),
         srcs: srcsArr || a["srcs"],
       };

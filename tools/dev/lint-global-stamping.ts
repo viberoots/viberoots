@@ -26,7 +26,15 @@ async function listBzlFiles(): Promise<string[]> {
 }
 
 async function fileContainsDirectStamp(file: string): Promise<Violation[]> {
-  const data = await fsp.readFile(file, "utf8");
+  let data = "";
+  try {
+    data = await fsp.readFile(file, "utf8");
+  } catch (e: any) {
+    // Robust on working trees with deletions (e.g., refactors in-flight):
+    // `git ls-files` may still list paths that no longer exist.
+    if (e && typeof e === "object" && (e as any).code === "ENOENT") return [];
+    throw e;
+  }
   const lines = data.split(/\r?\n/);
   const viols: Violation[] = [];
   for (let i = 0; i < lines.length; i++) {
