@@ -1,10 +1,10 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { decodeNameVersionFromPatchLoose } from "../../lib/providers.ts";
 import { validateFlatDir } from "../../lib/provider-sync.ts";
-import type { PatchesLintConfig, Violation } from "./types.ts";
+import { decodeNameVersionFromPatchLoose } from "../../lib/providers.ts";
 import { isKeeperOrDotfile, isPatchFile, pathExists } from "./fs.ts";
 import { countErrors, reportViolations } from "./report.ts";
+import type { PatchesLintConfig, Violation } from "./types.ts";
 
 function validateNodePatchFilename(cfg: PatchesLintConfig, file: string, violations: Violation[]) {
   if (isKeeperOrDotfile(file)) return;

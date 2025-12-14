@@ -17,13 +17,15 @@ test("nix_shell bootstrap split: core is language-agnostic; PNPM store is opt-in
         "genrule(",
         '  name = "core",',
         '  out = "core.txt",',
-        '  cmd = nix_bootstrap_env_core() + "echo ok > $OUT",',
+        // Buck's genrule `cmd` parses `$(...)` as a macro. Our bootstrap emits shell
+        // command substitutions, so escape them to ensure we can cquery the cmd attr.
+        '  cmd = nix_bootstrap_env_core().replace("$(", "$$(") + "echo ok > $OUT",',
         ")",
         "",
         "genrule(",
         '  name = "pnpm",',
         '  out = "pnpm.txt",',
-        '  cmd = nix_bootstrap_env_core() + nix_bootstrap_env_pnpm_store() + "echo ok > $OUT",',
+        '  cmd = (nix_bootstrap_env_core() + nix_bootstrap_env_pnpm_store()).replace("$(", "$$(") + "echo ok > $OUT",',
         ")",
         "",
       ].join("\n"),

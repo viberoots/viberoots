@@ -1,16 +1,16 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { decodeNameVersionFromPatchLoose } from "../../lib/providers.ts";
-import { validateFlatDir } from "../../lib/provider-sync.ts";
 import {
   computeImporterLabel,
   defaultImporterPatchDir,
   findImporterLockfiles,
   listImporterPatches,
 } from "../../lib/importers.ts";
-import type { PatchesLintConfig, Violation } from "./types.ts";
+import { validateFlatDir } from "../../lib/provider-sync.ts";
+import { decodeNameVersionFromPatchLoose } from "../../lib/providers.ts";
 import { isKeeperOrDotfile, isPatchFile } from "./fs.ts";
 import { countErrors, reportViolations } from "./report.ts";
+import type { PatchesLintConfig, Violation } from "./types.ts";
 
 function validatePythonPatchFilename(
   cfg: PatchesLintConfig,
