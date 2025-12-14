@@ -1,7 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { computeImporterLabel, isWorkspaceImporterPath, listImporterPatches } from "./importers.ts";
+import { computeImporterLabel, isWorkspaceImporterPath } from "./importers.ts";
 import { writeImporterProvidersByLang, type ImporterProvider } from "./provider-writer.ts";
+import { toPosixPath, uniqSorted } from "./posix-path.ts";
 
 export type ParseEffectiveSetFn = (
   lockfilePath: string,
@@ -28,20 +29,6 @@ export type DriverOptions = {
   globalKeyToPatchPath?: Map<string, string>;
 };
 
-function toPosix(s: string): string {
-  return s.replace(/\\/g, "/").replace(/^\.\/+/, "") || ".";
-}
-
-function uniqSorted(list: string[]): string[] {
-  const set = new Set<string>();
-  for (const v of list) {
-    const norm = toPosix(v);
-    if (!norm) continue;
-    set.add(norm);
-  }
-  return Array.from(set).sort((a, b) => a.localeCompare(b));
-}
-
 /**
  * Generic importer-scoped provider sync driver for Node/Python-like ecosystems.
  * Produces ImporterProvider[] and writes standardized TARGETS.*.auto via writer.
@@ -61,7 +48,7 @@ export async function runImporterProviderSync(opts: DriverOptions): Promise<void
 
   // Discover lockfiles and filter to workspace importers under apps/* or libs/*
   const discovered = await discoverLockfiles();
-  const lockfiles = discovered.map((p) => toPosix(p)).filter((p) => /^(apps|libs)\//.test(p));
+  const lockfiles = discovered.map((p) => toPosixPath(p)).filter((p) => /^(apps|libs)\//.test(p));
   if (!lockfiles.length) {
     await writeImporterProvidersByLang(lang, [], { outFile });
     return;
@@ -70,7 +57,7 @@ export async function runImporterProviderSync(opts: DriverOptions): Promise<void
   const providers: ImporterProvider[] = [];
 
   for (const lfRaw of lockfiles) {
-    const lf = toPosix(lfRaw);
+    const lf = toPosixPath(lfRaw);
     // Parse mapping: importer -> Set("<name>@<version>")
     let importerSets: Map<string, Set<string>> = new Map();
     try {
@@ -86,7 +73,7 @@ export async function runImporterProviderSync(opts: DriverOptions): Promise<void
     }
 
     for (const [importerRaw, eff] of importerSets.entries()) {
-      const importer = toPosix(importerRaw);
+      const importer = toPosixPath(importerRaw);
       if (!isWorkspaceImporterPath(importer)) continue;
 
       // Importer-local patches
@@ -105,7 +92,7 @@ export async function runImporterProviderSync(opts: DriverOptions): Promise<void
       if (globalKeyToPatchPath && globalKeyToPatchPath.size > 0) {
         for (const k of eff) {
           const pathFor = globalKeyToPatchPath.get(String(k).toLowerCase());
-          if (pathFor) globalSelected.push(toPosix(pathFor));
+          if (pathFor) globalSelected.push(toPosixPath(pathFor));
         }
       }
 

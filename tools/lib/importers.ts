@@ -2,10 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { findPnpmLockfiles, findUvLockfiles } from "./lockfiles.ts";
-
-function toPosixPath(p: string): string {
-  return p.replace(/\\/g, "/").replace(/^\.\/+/, "") || ".";
-}
+import { toPosixPath } from "./posix-path.ts";
 
 /**
  * Find importer lockfiles given simple filename globs.
