@@ -57,3 +57,35 @@ def realize_provider_edges_probe(name, target_name, providers, base_list = [], i
     )
 
 
+def strip_provider_targets(deps, provider_prefix = "//third_party/providers:"):
+    if deps == None:
+        return []
+    if not isinstance(deps, list):
+        fail("strip_provider_targets: deps must be a list; got: %s" % deps)
+    out = []
+    for d in deps:
+        if isinstance(d, str) and d.startswith(provider_prefix):
+            continue
+        out.append(d)
+    return out
+
+
+def strip_provider_targets_probe(name, items, provider_prefix = "//third_party/providers:"):
+    filtered = strip_provider_targets(items, provider_prefix = provider_prefix)
+    lines = []
+    for x in filtered:
+        if isinstance(x, str):
+            lines.append(x)
+        else:
+            lines.append(repr(x))
+
+    out = name + ".txt"
+    genrule(
+        name = name,
+        srcs = [],
+        out = out,
+        cmd = "cat > $OUT <<'EOF'\n%s\nEOF" % "\n".join(lines),
+        labels = ["kind:probe"],
+    )
+
+

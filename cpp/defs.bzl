@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "cxx_library", "cxx_binary", "cxx_test")
-load("//lang:defs_common.bzl", "stamp_labels", "append_nixpkg_labels", "include_package_local_patches", "dedupe_preserve", "stamp_wasm_variant", "realize_provider_edges", "default_package_patch_dirs")
+load("//lang:defs_common.bzl", "stamp_labels", "append_nixpkg_labels", "include_package_local_patches", "dedupe_preserve", "stamp_wasm_variant", "realize_provider_edges", "default_package_patch_dirs", "strip_provider_targets")
 load("//lang:global_inputs.bzl", "global_nix_inputs")
 load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name", _cpp_sanitize_probe="cpp_sanitize_probe")
 load("//cpp/private:planner_stub.bzl", "cpp_planner_stub")
@@ -125,13 +125,7 @@ def nix_cpp_test(name, **kwargs):
     _planner_labels = (_planner_kwargs.get("labels", []) or [])
     # Planner-visible stub: declare a cxx_library without compiling test sources; Nix will build the test.
     # Filter provider deps from planner to avoid visibility / graph-edge to providers
-    _planner_deps = []
-    for d in deps:
-        if not isinstance(d, str):
-            continue
-        if d.startswith("//third_party/providers:"):
-            continue
-        _planner_deps.append(d)
+    _planner_deps = strip_provider_targets(deps)
 
     cpp_planner_stub(
         name = planner_name,

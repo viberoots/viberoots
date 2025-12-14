@@ -38,6 +38,13 @@ Canonical naming and helpers:
   - `deps(//pkg:target)` will include provider nodes like `//third_party/providers:nix_pkgs_openssl` when the target carries matching `nixpkg:<attr>` labels.
   - These edges are graph‑only; rule keys are unchanged unless provider files themselves change.
 
+#### Planner-visible stubs (exclude provider deps)
+
+Some macros create planner-visible stub targets for exporter and planner discovery. These stubs are not meant to build, and in some cases they must not depend on provider targets (visibility and graph-shape constraints).
+
+- **Rule of thumb**: when a macro emits a planner-visible stub, pass planner-visible deps through the shared helper `strip_provider_targets(...)` from `//lang:provider_edges.bzl`.
+- **Canonical helper**: `strip_provider_targets(deps, provider_prefix = "//third_party/providers:")` preserves order, removes only provider targets, and does not try to interpret non-string entries.
+
 ### Shared Nix helpers (lang-helpers)
 
 For Nix templates that need to apply patches or support dev overrides, import the shared helpers from the canonical location:
