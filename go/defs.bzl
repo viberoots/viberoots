@@ -2,59 +2,11 @@ load("@prelude//:rules.bzl", "go_binary", "go_library", "go_test")
 load("//lang:defs_common.bzl", "dedupe_preserve", "normalize_labels", "stamp_labels", "include_package_local_patches", "realize_provider_edges")
 load("//lang:defs_common.bzl", "default_package_patch_dirs")
 load("//lang:defs_common.bzl", "stamp_wasm_variant")
-load("//lang:defs_common.bzl", "append_nixpkg_labels")
 load("//lang:planner_stub.bzl", "planner_stub", "planner_stub_with_package_local_patches")
 load("//lang:global_inputs.bzl", "global_nix_inputs")
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
 load("//go/private:nix_build_wasm.bzl", "go_nix_build_wasm")
-load("//go/private:labels.bzl", "append_tuple_labels")
-
-def _append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled):
-    append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled)
-
-
-def _apply_cgo_labels(kwargs, nixpkg_deps, repo_cgo_deps):
-    if len(nixpkg_deps) > 0 or len(repo_cgo_deps) > 0:
-        labels = kwargs.get("labels", []) or []
-        kwargs["labels"] = dedupe_preserve(labels + ["cgo:enabled"])
-        # Normalize and append nixpkgs labels using the shared helper
-        append_nixpkg_labels(kwargs, nixpkg_deps)
-
-
-def _merge_cgo_deps(deps, nixpkg_deps, repo_cgo_deps):
-    out = deps
-    if len(repo_cgo_deps) > 0:
-        out = out + repo_cgo_deps
-    return dedupe_preserve(out)
-
-
-def _srcs_imply_cgo(kwargs):
-    srcs = kwargs.get("srcs", []) or []
-    if not isinstance(srcs, list):
-        return False
-    exts = (".c", ".cc", ".cxx", ".cpp", ".m", ".mm", ".s", ".S")
-    for s in srcs:
-        if isinstance(s, str) and s.endswith(exts):
-            return True
-    return False
-
-
-def _configure_cgo_and_merge_deps(name, kwargs, nixpkg_deps, repo_cgo_deps):
-    deps = kwargs.pop("deps", [])
-    pkg = native.package_name()
-    extra = normalize_labels(pkg, kwargs.pop("extra_module_providers", []))
-    _apply_cgo_labels(kwargs, nixpkg_deps, repo_cgo_deps)
-    if "_go_toolchain" not in kwargs:
-        kwargs["_go_toolchain"] = "@repo_toolchains//:go"
-    if "_cxx_toolchain" not in kwargs:
-        kwargs["_cxx_toolchain"] = "@repo_toolchains//:cxx"
-    if _srcs_imply_cgo(kwargs) or len(nixpkg_deps) > 0 or len(repo_cgo_deps) > 0:
-        kwargs["override_cgo_enabled"] = True
-    return realize_provider_edges(
-        MODULE_PROVIDERS,
-        name,
-        base = (_merge_cgo_deps(deps, nixpkg_deps, repo_cgo_deps) + extra),
-    )
+load("//go/private:cgo_wiring.bzl", "apply_go_rule_stable_defaults", "apply_go_tuple_labels", "configure_cgo_and_merge_deps")
 
 
 def nix_go_library(name, **kwargs):
@@ -64,14 +16,10 @@ def nix_go_library(name, **kwargs):
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     repo_cgo_deps = kwargs.pop("repo_cgo_deps", [])
     nix_cgo_pkgconfig = kwargs.pop("nix_cgo_pkgconfig", {})
-    build_tags = kwargs.pop("build_tags", [])
-    goos = kwargs.pop("goos", None)
-    goarch = kwargs.pop("goarch", None)
-    cgo_enabled = kwargs.pop("cgo_enabled", None)
-    _append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled)
+    apply_go_tuple_labels(kwargs)
     # PR3/PR25: Stamp primary target labels for language/kind via helper
     stamp_labels(kwargs, "go", "lib")
-    merged = _configure_cgo_and_merge_deps(name, kwargs, nixpkg_deps, repo_cgo_deps)
+    merged = configure_cgo_and_merge_deps(name, kwargs, nixpkg_deps, repo_cgo_deps, MODULE_PROVIDERS)
     # Include local patch files in srcs so Buck invalidates precisely on patch changes
     include_package_local_patches(kwargs, "go", local_patch_dirs)
     go_library(name = name, deps = merged, **kwargs)
@@ -97,21 +45,11 @@ def nix_go_binary(name, **kwargs):
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     repo_cgo_deps = kwargs.pop("repo_cgo_deps", [])
     nix_cgo_pkgconfig = kwargs.pop("nix_cgo_pkgconfig", {})
-    build_tags = kwargs.pop("build_tags", [])
-    goos = kwargs.pop("goos", None)
-    goarch = kwargs.pop("goarch", None)
-    cgo_enabled = kwargs.pop("cgo_enabled", None)
-    _append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled)
+    apply_go_tuple_labels(kwargs)
     # PR3/PR25: Stamp primary target labels for language/kind via helper
     stamp_labels(kwargs, "go", "bin")
-    merged = _configure_cgo_and_merge_deps(name, kwargs, nixpkg_deps, repo_cgo_deps)
-    # Ensure stable defaults that don't depend on unspecified platform selects
-    if "asan" not in kwargs:
-        kwargs["asan"] = False
-    if "race" not in kwargs:
-        kwargs["race"] = False
-    if "cgo_enabled" not in kwargs:
-        kwargs["cgo_enabled"] = None
+    merged = configure_cgo_and_merge_deps(name, kwargs, nixpkg_deps, repo_cgo_deps, MODULE_PROVIDERS)
+    apply_go_rule_stable_defaults(kwargs)
     # Include local patch files in srcs so Buck invalidates precisely on patch changes
     include_package_local_patches(kwargs, "go", local_patch_dirs)
     go_binary(name = name, deps = merged, **kwargs)
@@ -146,12 +84,8 @@ def nix_go_test(name, **kwargs):
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     repo_cgo_deps = kwargs.pop("repo_cgo_deps", [])
     nix_cgo_pkgconfig = kwargs.pop("nix_cgo_pkgconfig", {})
-    build_tags = kwargs.pop("build_tags", [])
-    goos = kwargs.pop("goos", None)
-    goarch = kwargs.pop("goarch", None)
-    cgo_enabled = kwargs.pop("cgo_enabled", None)
-    _append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled)
-    merged = _configure_cgo_and_merge_deps(name, kwargs, nixpkg_deps, repo_cgo_deps)
+    apply_go_tuple_labels(kwargs)
+    merged = configure_cgo_and_merge_deps(name, kwargs, nixpkg_deps, repo_cgo_deps, MODULE_PROVIDERS)
 
     # If a library is provided, ensure we don't pass the same target in deps.
     pkg = native.package_name()
@@ -162,12 +96,7 @@ def nix_go_test(name, **kwargs):
             abs_lib = "//%s:%s" % (pkg, lib[1:])
         merged = [d for d in merged if d not in (lib, abs_lib)]
 
-    if "asan" not in kwargs:
-        kwargs["asan"] = False
-    if "race" not in kwargs:
-        kwargs["race"] = False
-    if "cgo_enabled" not in kwargs:
-        kwargs["cgo_enabled"] = None
+    apply_go_rule_stable_defaults(kwargs)
     go_test(name = name, deps = merged, **kwargs)
 
 # Third-party shim: expose vendor-provided sources as a go_library while

@@ -65,7 +65,7 @@ Implementation notes
   - The target lists any C-family source files in `srcs` (e.g., `.c`, `.cpp`, `.m`, `.mm`, `.s`).
   - The target declares `nixpkg_deps` or `repo_cgo_deps`.
     No TARGETS edits are required when adding/removing C sources.
-- Implementation detail: the CGO decision and toolchain defaults are centralized in a private helper inside `go/defs.bzl`, shared by `nix_go_library`, `nix_go_binary`, and `nix_go_test`.
+- Implementation detail: the CGO decision and toolchain defaults are centralized in `go/private/cgo_wiring.bzl`, shared by `nix_go_library`, `nix_go_binary`, and `nix_go_test`.
 - Implementation detail: shared behavior for `nix_cpp_library`, `nix_cpp_binary`, and `nix_cpp_node_addon` is centralized in `_cpp_common` in `cpp/defs.bzl`. Public macro surfaces are unchanged; wasm macros stay separate.
 - The Go Nix templates set `CGO_ENABLED=1` only for those targets and ensure CC/CXX/AR come from Nix.
 - If `pkg-config` metadata is missing, templates synthesize `CGO_CFLAGS`/`CGO_LDFLAGS` from provided packages.
