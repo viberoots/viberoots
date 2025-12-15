@@ -1,5 +1,6 @@
 load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name")
 load("//lang:nix_shell.bzl", "nix_bootstrap_env_core", "nix_timeout_wrapper_var")
+load("//lang:nix_attr.bzl", "sanitize_nix_attr_from_target_label")
 
 
 def _cpp_nix_test_impl(ctx):
@@ -10,20 +11,12 @@ def _cpp_nix_test_impl(ctx):
     raw = ctx.attrs.planner_label
     # Compute expected test binary name deterministically based on the planner label
     expected_bin = sanitize_to_bin_name(raw)
-    def _sanitize(s):
-        # Map to [a-z0-9_] only, lowercased; others become '_', then prefix with 't'
-        s = s.lower()
-        out = ""
-        for i in range(len(s)):
-            c = s[i]
-            is_alpha = (c >= "a" and c <= "z")
-            is_num = (c >= "0" and c <= "9")
-            out = out + (c if (is_alpha or is_num or c == "_") else "_")
-        return "t" + out
-    attr = _sanitize(raw)
+    attr = sanitize_nix_attr_from_target_label(raw)
     run_and_exec = (
         nix_bootstrap_env_core()
         + ("echo '[cpp_nix_test] planner_label=%s' >&2; " % raw)
+        + ("echo '[cpp_nix_test] target_attr=%s' >&2; " % attr)
+        + ("export BUCK_TARGET_ATTR='%s'; " % attr)
         + "# Use centralized zx helper to export graph (if needed) and build selected target\n"
         + ("set +e; OUT_RAW=$(BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"%s\" nix run \"$FLK_ROOT\"#zx-wrapper -- \"$FLK_ROOT/tools/dev/build-selected.ts\" 2> /tmp/cpp_nix_test_build.log); " % raw)
         + "NIX_STATUS=$?; set -e; OUT_PATH=$(printf %s \"$OUT_RAW\" | sed -E 's/\\x1B\\[[0-9;]*[A-Za-z]//g' | tr -d '\r'); "

@@ -84,6 +84,9 @@ async function main() {
   }
 
   console.error(`[build-selected] BUCK_TARGET=${target}`);
+  const providedTargetAttr = (process.env.BUCK_TARGET_ATTR || "").trim();
+  const cppTargetAttrSuffix = providedTargetAttr || sanitizeAttrNameFromLabel(target);
+  console.error(`[build-selected] cppTargetAttrSuffix=${cppTargetAttrSuffix}`);
 
   // Sanitize impure dev-override env to avoid accidental JSON parse errors in planner
   const sanitizedEnv: Record<string, string> = {
@@ -104,7 +107,7 @@ async function main() {
   })`nix build --impure ${repoRoot}#graph-generator-selected --accept-flake-config --print-out-paths ${nixTrace}`;
   if (exitCode !== 0) {
     // Fallback: try cppTargetsFlat attribute for any C++-backed target (planner path)
-    const attr = `graph-generator-cppTargets.${sanitizeAttrNameFromLabel(target)}`;
+    const attr = `graph-generator-cppTargets.${cppTargetAttrSuffix}`;
     const res = await $({
       env: sanitizedEnv,
       reject: false,

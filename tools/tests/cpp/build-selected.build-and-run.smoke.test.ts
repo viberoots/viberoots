@@ -5,6 +5,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { runInTemp } from "../lib/test-helpers";
+import { sanitizeAttrNameFromLabel } from "../../lib/labels";
 
 async function main() {
   await runInTemp("build-selected-smoke", async (tmp, $) => {
@@ -73,7 +74,13 @@ async function main() {
     // Ensure executable bit and run via zx-wrapper shebang
     await $({ cwd: tmp })`chmod +x tools/dev/build-selected.ts`;
     const label = "//apps/demo:demo";
-    const env = { ...process.env, BUCK_TARGET: label, BUCK_TEST_SRC: tmp } as any;
+    const cppTargetAttrSuffix = sanitizeAttrNameFromLabel(label);
+    const env = {
+      ...process.env,
+      BUCK_TARGET: label,
+      BUCK_TARGET_ATTR: cppTargetAttrSuffix,
+      BUCK_TEST_SRC: tmp,
+    } as any;
     const cmd = $({ cwd: tmp, env, reject: false, nothrow: true })`tools/dev/build-selected.ts`;
     const { stdout, stderr, exitCode } = await cmd;
     if (exitCode !== 0) {
@@ -91,6 +98,12 @@ async function main() {
     }
     if (!/\[build-selected\] (exporting graph to|using existing graph:)/.test(err)) {
       console.error("missing graph export/usage log in stderr", err);
+      process.exit(2);
+    }
+    if (
+      !new RegExp(`\\[build-selected\\] cppTargetAttrSuffix=${cppTargetAttrSuffix}\\b`).test(err)
+    ) {
+      console.error("missing cppTargetAttrSuffix log in stderr", err);
       process.exit(2);
     }
     const outPath = String(stdout || "").trim();
