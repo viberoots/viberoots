@@ -1,5 +1,6 @@
 load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name")
 load("//lang:nix_shell.bzl", "nix_bootstrap_env_core")
+load("//lang:nix_action_runner.bzl", "nix_action_export_graph_cmd", "nix_action_workspace_setup_from_args")
 
 
 def _cpp_nix_build_impl(ctx):
@@ -26,40 +27,20 @@ def _cpp_nix_build_impl(ctx):
             "unknown kind for cpp_nix_build: %s. Supported kinds: bin→%s, lib→%s, addon→%s"
             % (kind, expected_bin, expected_lib, expected_addon)
         )
-    # Prepend environment setup to resolve WORKSPACE_ROOT/REPO_ROOT deterministically:
-    # - Source optional workspace-root.env if provided
-    # - Derive WORKSPACE_ROOT from the buck graph.json path when not explicitly set
-    pre_env = (
-        'GRAPH="$1"; '
-        + 'WORKSPACE_ENV="$2"; '
-        + 'FLAKE_FILE="$3"; '
-        + '[ -n "$WORKSPACE_ENV" ] && [ -f "$WORKSPACE_ENV" ] && . "$WORKSPACE_ENV" || true; '
-        + 'if [ -n "$GRAPH" ] && [ -z "${WORKSPACE_ROOT:-}" ]; then '
-        + '  WR="${GRAPH%/tools/buck/graph.json}"; '
-        + '  export WORKSPACE_ROOT="$WR"; '
-        + 'fi; '
-        + 'export REPO_ROOT="${REPO_ROOT:-$WORKSPACE_ROOT}"; '
-        + 'if [ -z "${FLK_ROOT:-}" ] && [ -n "$FLAKE_FILE" ] && [ -f "$FLAKE_FILE" ]; then '
-        + '  FLK_DIR="$(dirname "$FLAKE_FILE")"; '
-        + '  FLK_GIT="$(git -C "$FLK_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$FLK_DIR")"; '
-        + '  export FLK_ROOT="$FLK_GIT"; '
-        + 'fi; '
-    )
     # Build flow:
     # 1) Ensure the Buck graph is exported for the temp workspace
     # 2) Build the planner-selected attr directly via nix build .#graph-generator-cppTargets.<sanitized>
     # 3) Copy the produced artifact to the declared output
     run_and_copy = (
-        pre_env
+        nix_action_workspace_setup_from_args()
         + "export BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE=1; "
         + nix_bootstrap_env_core()
         + "cd \"$FLK_ROOT\"; "
-        # Export Buck graph for the temp workspace (idempotent).
-        + "mkdir -p \"$WORKSPACE_ROOT/tools/buck\"; "
-        # Do NOT set BUCK_NO_ISOLATION=1 here: this runs during a Buck2 action, so recursive
-        # buck2 invocations must use an isolation dir to avoid "recursive invocation" errors.
-        + "BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_QUERY_ROOTS=\"libs,go,cpp,third_party\" "
-        + "  nix run --accept-flake-config \"path:$FLK_ROOT#zx-wrapper\" -- tools/buck/export-graph.ts --out \"$WORKSPACE_ROOT/tools/buck/graph.json\"; "
+        + nix_action_export_graph_cmd(
+            out_graph = "$WORKSPACE_ROOT/tools/buck/graph.json",
+            query_roots = "libs,go,cpp,third_party",
+            zx_wrapper = "path:$FLK_ROOT#zx-wrapper",
+        )
         # Require a pre-exported Buck graph for the temp workspace (fail fast if missing)
         + "echo \"[cpp_nix_build] WR=$WORKSPACE_ROOT FLK=$FLK_ROOT\" >&2; "
         + "ls -la \"$WORKSPACE_ROOT/tools/buck\" >/dev/null 2>&1 || true; "

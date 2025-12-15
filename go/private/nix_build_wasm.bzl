@@ -1,4 +1,5 @@
 load("//lang:nix_shell.bzl", "nix_bootstrap_env_core")
+load("//lang:nix_action_runner.bzl", "nix_action_build_selected_out_path_cmd")
 
 def _go_nix_build_wasm_impl(ctx):
     """
@@ -10,8 +11,18 @@ def _go_nix_build_wasm_impl(ctx):
     # require the target to be present in the exported graph. Fallback to generic selected.
     run_and_copy = (
         nix_bootstrap_env_core()
-        + ("OUT_PATH=$(BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"%s\" nix build --impure --print-out-paths --accept-flake-config \"path:$FLK_ROOT#graph-generator-selected-wasm\" || " % (raw))
-        + ("BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"%s\" nix run --accept-flake-config \"path:$FLK_ROOT#zx-wrapper\" -- \"$FLK_ROOT/tools/dev/build-selected.ts\"); " % (raw))
+        + ("OUT_PATH=$(BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"%s\" nix build --impure --print-out-paths --accept-flake-config \"path:$FLK_ROOT#graph-generator-selected-wasm\" || true); " % (raw))
+        + "if [ -z \"$OUT_PATH\" ]; then "
+        + nix_action_build_selected_out_path_cmd(
+            target_label = raw,
+            out_var = "OUT_PATH",
+            raw_var = "OUT_RAW",
+            status_var = "NIX_STATUS",
+            log_file = "/tmp/go_nix_build_wasm_build.log",
+            zx_wrapper = "path:$FLK_ROOT#zx-wrapper",
+        )
+        + "if [ \"$NIX_STATUS\" -ne 0 ] || [ -z \"$OUT_PATH\" ]; then cat /tmp/go_nix_build_wasm_build.log >&2 || true; exit ${NIX_STATUS:-2}; fi; "
+        + "fi; "
         + "test -n \"$OUT_PATH\"; "
         + (
             "if [ ! -e \"$OUT_PATH/%s\" ]; then echo 'go_nix_build_wasm (%s): expected artifact not found: %s' >&2; (ls -la \"$OUT_PATH\"; ls -la \"$OUT_PATH/lib\" 2>/dev/null || true) >&2; exit 2; fi; "

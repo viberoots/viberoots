@@ -1,6 +1,7 @@
 load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name")
 load("//lang:nix_shell.bzl", "nix_bootstrap_env_core", "nix_timeout_wrapper_var")
 load("//lang:nix_attr.bzl", "sanitize_nix_attr_from_target_label")
+load("//lang:nix_action_runner.bzl", "nix_action_build_selected_out_path_cmd")
 
 
 def _cpp_nix_test_impl(ctx):
@@ -17,9 +18,14 @@ def _cpp_nix_test_impl(ctx):
         + ("echo '[cpp_nix_test] planner_label=%s' >&2; " % raw)
         + ("echo '[cpp_nix_test] target_attr=%s' >&2; " % attr)
         + ("export BUCK_TARGET_ATTR='%s'; " % attr)
-        + "# Use centralized zx helper to export graph (if needed) and build selected target\n"
-        + ("set +e; OUT_RAW=$(BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"%s\" nix run \"$FLK_ROOT\"#zx-wrapper -- \"$FLK_ROOT/tools/dev/build-selected.ts\" 2> /tmp/cpp_nix_test_build.log); " % raw)
-        + "NIX_STATUS=$?; set -e; OUT_PATH=$(printf %s \"$OUT_RAW\" | sed -E 's/\\x1B\\[[0-9;]*[A-Za-z]//g' | tr -d '\r'); "
+        + nix_action_build_selected_out_path_cmd(
+            target_label = raw,
+            out_var = "OUT_PATH",
+            raw_var = "OUT_RAW",
+            status_var = "NIX_STATUS",
+            log_file = "/tmp/cpp_nix_test_build.log",
+            zx_wrapper = "path:$FLK_ROOT#zx-wrapper",
+        )
         + "echo \"[cpp_nix_test] OUT_PATH=$OUT_PATH\" >&2; "
         + "if [ \"$NIX_STATUS\" -ne 0 ] || [ -z \"$OUT_PATH\" ]; then echo '[cpp_nix_test] build-selected failed' >&2; cat /tmp/cpp_nix_test_build.log >&2 || true; exit ${NIX_STATUS:-2}; fi; "
         + ("BIN='%s'; " % expected_bin)
@@ -27,7 +33,6 @@ def _cpp_nix_test_impl(ctx):
         + "if [ ! -x \"$CAND\" ]; then "
         + "  echo '[cpp_nix_test] expected bin not found:' \"$CAND\" >&2; "
         + "  base=\"%s\"; base=${base##*:}; " % raw
-        + "  # Fallback: try to locate the produced test binary by suffixing the target name\n"
         + "  found=$(ls -1 \"$OUT_PATH/bin\" 2>/dev/null | grep -E \"(^|-)${base}$\" | head -n1 || true); "
         + "  if [ -n \"$found\" ] && [ -x \"$OUT_PATH/bin/$found\" ]; then CAND=\"$OUT_PATH/bin/$found\"; else ls -la \"$OUT_PATH\" >&2 || true; ls -la \"$OUT_PATH/bin\" >&2 || true; exit 2; fi; "
         + "fi; "
