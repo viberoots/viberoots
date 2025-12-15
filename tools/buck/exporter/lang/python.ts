@@ -1,36 +1,11 @@
 #!/usr/bin/env zx-wrapper
-import * as fsp from "node:fs/promises";
-import path from "node:path";
 import type { Adapter, Batch, Node } from "../types.ts";
 import { hasLabel, isRuleType, validateLanguageClassification } from "./helpers.ts";
 import { packageDirFromTargetName } from "../batch.ts";
+import { computeImporterLabel, findNearestUvLockForPackage } from "../../../lib/importers.ts";
 
 function isPythonTarget(n: Node): boolean {
   return hasLabel(n, "lang:python") || isRuleType(n, "python_");
-}
-
-async function findNearestUvLock(startPkgDir: string): Promise<string | null> {
-  // Walk up from the package directory to repo root looking for uv.lock
-  // Return a repo-relative path when found.
-  const repoRoot = process.cwd();
-  let cur = path.resolve(repoRoot, startPkgDir || ".");
-  // Guard: ensure cur is inside repoRoot
-  const inside = (p: string) => p === repoRoot || p.startsWith(repoRoot + path.sep);
-  while (inside(cur)) {
-    const candidate = path.join(cur, "uv.lock");
-    try {
-      await fsp.access(candidate);
-      // Produce a repo-relative path with forward slashes
-      const rel = path.relative(repoRoot, candidate).replaceAll("\\", "/");
-      return rel || "uv.lock";
-    } catch {
-      // Not found here; move up one directory
-    }
-    const next = path.dirname(cur);
-    if (next === cur) break;
-    cur = next;
-  }
-  return null;
 }
 
 export const adapter: Adapter = {
@@ -65,7 +40,6 @@ export const adapter: Adapter = {
   },
   async attachLabels(nodes: Node[]): Promise<Node[]> {
     const enriched: Node[] = [];
-    const repoRoot = process.cwd();
     for (const n of nodes) {
       if (!isPythonTarget(n)) {
         enriched.push(n);
@@ -79,13 +53,12 @@ export const adapter: Adapter = {
       }
       // Derive importer from Buck package; if uv.lock found, attach importer-scoped label
       const pkg = packageDirFromTargetName(n.name || "") || ".";
-      const lockRel = await findNearestUvLock(pkg);
+      const lockRel = await findNearestUvLockForPackage(pkg);
       if (!lockRel) {
         enriched.push(n);
         continue;
       }
-      const importer =
-        path.dirname(path.resolve(repoRoot, lockRel)) === repoRoot ? "." : path.dirname(lockRel);
+      const importer = computeImporterLabel(lockRel);
       const label = `lockfile:${lockRel}#${importer}`;
       const next = Array.from(new Set([...(labs as string[]), label])).sort();
       enriched.push({ ...n, labels: next });

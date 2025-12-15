@@ -80,3 +80,40 @@ export async function listImporterPatches(
   out.sort();
   return out;
 }
+
+async function pathExists(p: string): Promise<boolean> {
+  try {
+    await fsp.access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Find the nearest uv.lock for a Buck package directory by walking upwards to repo root.
+ *
+ * - Input: package directory path, relative to repo root (POSIX or platform separators).
+ * - Output: repo-relative POSIX lockfile path (e.g., "apps/api/uv.lock", or "uv.lock"), or null.
+ *
+ * This helper is intentionally shared between exporter and provider tooling to avoid drift.
+ */
+export async function findNearestUvLockForPackage(pkgDir: string): Promise<string | null> {
+  const repoRoot = process.cwd();
+  const start = path.resolve(repoRoot, pkgDir || ".");
+  const root = path.resolve(repoRoot);
+  const inside = (p: string) => p === root || p.startsWith(root + path.sep);
+
+  let cur = start;
+  while (inside(cur)) {
+    const candidate = path.join(cur, "uv.lock");
+    if (await pathExists(candidate)) {
+      const rel = path.relative(repoRoot, candidate) || "uv.lock";
+      return toPosixPath(rel);
+    }
+    const next = path.dirname(cur);
+    if (next === cur) break;
+    cur = next;
+  }
+  return null;
+}

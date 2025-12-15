@@ -124,6 +124,9 @@ node tools/dev/patches-lint.ts --lang python
 ## Python (uv) — importer‑local patches and invalidation
 
 - Python targets use importer‑scoped lockfile labels: `lockfile:<path/to/uv.lock>#<importer>`.
+- Exporter and provider sync share the same importer/lockfile conventions via `tools/lib/importers.ts`:
+  - Lockfile discovery for exporter labeling uses the shared nearest-lock helper.
+  - Importer label is defined as the lockfile directory (`.` when the lockfile is at repo root).
 - The Python library and test macros include importer‑local patch files in `srcs` for precise Buck invalidation:
   - Patches live under `<importer>/patches/python/*.patch` (e.g., `apps/api/patches/python/...`).
   - Changing a patch only invalidates Python targets bound to that importer.
