@@ -3,7 +3,9 @@
 Stamping ensures exporter preconditions via consistent labels applied in macros.
 
 - **Helpers**: use `lang/defs_common.bzl: stamp_labels(kwargs, lang, kind)` to add `lang:<id>` and optional `kind:<bin|lib|test>`.
-- **Global Nix inputs (macros that call Nix)**: use `lang/defs_common.bzl: stamp_global_nix_inputs(kwargs)` to stamp the centralized `global_nix_inputs()` set (e.g., `//:flake.lock`) into `labels`. Do not hardcode global inputs in individual macros.
+- **Global Nix inputs (macros and rules that call Nix)**: treat `global_nix_inputs()` as real action inputs. Label stamping is retained for observability, but correctness must not depend on labels.
+  - For **macros that create genrules** that call Nix, attach global inputs into the action inputs (typically `srcs`) via `lang/global_inputs.bzl: attach_global_nix_inputs(kwargs, into="srcs")`, and also stamp labels via `lang/defs_common.bzl: stamp_global_nix_inputs(kwargs)`.
+  - For **rules** that shell out to Nix, accept `nix_inputs` and thread `global_nix_inputs()` into the action `hidden` inputs.
 - **Macros**: call `stamp_labels` early in macro expansion to keep labels on all rule variants.
 - **Lint**: run `node tools/dev/stamping-lint.ts` to detect missing or invalid labels.
 - **Tests**: negative test should demonstrate a missing label is flagged with a clear message.

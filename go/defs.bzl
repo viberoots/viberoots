@@ -4,6 +4,7 @@ load("//lang:defs_common.bzl", "default_package_patch_dirs")
 load("//lang:defs_common.bzl", "stamp_wasm_variant")
 load("//lang:defs_common.bzl", "append_nixpkg_labels")
 load("//lang:planner_stub.bzl", "planner_stub", "planner_stub_with_package_local_patches")
+load("//lang:global_inputs.bzl", "global_nix_inputs")
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
 load("//go/private:nix_build_wasm.bzl", "go_nix_build_wasm")
 load("//go/private:labels.bzl", "append_tuple_labels")
@@ -225,6 +226,7 @@ def nix_go_tiny_wasm_lib(name, **kwargs):
         out = name + ".wasm",
         expected_rel = "lib/top.wasm",
         srcs = merged_srcs,
+        nix_inputs = global_nix_inputs(),
         labels = labels,
         visibility = kwargs.get("visibility", []),
     )

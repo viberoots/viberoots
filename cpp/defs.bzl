@@ -148,6 +148,7 @@ def nix_cpp_test(name, **kwargs):
         out = name + ".stamp",
         planner_label = "//%s:%s" % (native.package_name(), planner_name),
         planner = ":%s" % planner_name,
+        nix_inputs = global_nix_inputs(),
     )
 
 

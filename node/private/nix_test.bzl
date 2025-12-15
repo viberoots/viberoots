@@ -49,7 +49,11 @@ def _node_nix_test_impl(ctx):
 
     # Declare a tiny deterministic output so builds have an artifact
     stamp = ctx.actions.declare_output(ctx.attrs.out)
-    ctx.actions.write(stamp, "node_nix_test\n")
+    cmd = cmd_args(
+        ["bash", "-c", "echo node_nix_test > \"$1\"", "stamp", stamp.as_output()],
+        hidden = ctx.attrs.srcs,
+    )
+    ctx.actions.run(cmd, category = "node_nix_test_stamp")
 
     return [
         DefaultInfo(

@@ -1,5 +1,6 @@
 load("@prelude//:rules.bzl", "genrule")
 load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve", "include_importer_patches_from_labels", "include_importer_patches_from_labels_dict_safe", "importer_from_labels", "ensure_single_lockfile_label", "realize_provider_edges")
+load("//lang:global_inputs.bzl", "global_nix_inputs")
 load("//node/private:nix_test.bzl", "node_nix_test")
 
 # NOTE: Prebuild guard ensures this load is valid before builds/tests run.
@@ -88,6 +89,7 @@ def nix_node_test(
     kw["srcs"] = merged_srcs
     include_importer_patches_from_labels(kw, "node")
     merged_srcs = dedupe_preserve(kw.get("srcs", []) or [])
+    merged_srcs = dedupe_preserve(merged_srcs + global_nix_inputs())
 
     # Forward to external runner rule; ignore legacy 'cmd'
     node_nix_test(

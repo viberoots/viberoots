@@ -42,7 +42,11 @@ def _cpp_nix_test_impl(ctx):
         + "$TIMEOUT \"$CAND\""
     )
     stamp = ctx.actions.declare_output(ctx.attrs.out)
-    ctx.actions.write(stamp, "cpp_nix_test\n")
+    stamp_cmd = cmd_args(
+        ["bash", "-c", "echo cpp_nix_test > \"$1\"", "stamp", stamp.as_output()],
+        hidden = ctx.attrs.nix_inputs,
+    )
+    ctx.actions.run(stamp_cmd, category = "cpp_nix_test_stamp")
     return [
         DefaultInfo(default_output = stamp),
         ExternalRunnerTestInfo(
@@ -59,6 +63,7 @@ cpp_nix_test = rule(
     attrs = {
         "planner_label": attrs.string(),
         "out": attrs.string(),
+        "nix_inputs": attrs.list(attrs.source(), default = []),
         # Create a graph edge so exporter cquery includes the planner cxx_test node
         "planner": attrs.dep(),
     },

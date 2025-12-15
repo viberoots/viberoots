@@ -1,4 +1,5 @@
 load("//lang:defs_common.bzl", "stamp_global_nix_inputs", "importer_from_labels", "ensure_single_lockfile_label")
+load("//lang:global_inputs.bzl", "attach_global_nix_inputs")
 load("//lang:sanitize.bzl", "sanitize_name")
 load("//lang:nix_shell.bzl", "escape_buck_cmd_subst", "nix_bootstrap_env_core", "nix_bootstrap_env_pnpm_store", "nix_build_out_path_cmd", "nix_timeout_wrapper_var")
 load("//node:defs_core.bzl", "nix_node_gen")
@@ -43,9 +44,12 @@ def node_webapp(
     stamp_global_nix_inputs(_stamp)
     stamped_labels = _stamp.get("labels", []) or []
 
+    _inputs = { "srcs": [] }
+    attach_global_nix_inputs(_inputs, into = "srcs")
+
     nix_node_gen(
         name = name,
-        srcs = [],
+        srcs = _inputs["srcs"],
         out = out if out != None else "dist",
         cmd = cmd,
         labels = stamped_labels,
@@ -156,10 +160,14 @@ def nix_node_cli_bin(
         # Optional workspace root injection
         "tools/buck/workspace-root.env": "root//tools/buck:workspace-root.env",
     }
+
+    _inputs = { "srcs": _srcs_map }
+    attach_global_nix_inputs(_inputs, into = "srcs")
+
     nix_node_gen(
         name = name,
         # Include the CLI entry and the repo graph file to allow deriving repo root hermetically
-        srcs = _srcs_map,
+        srcs = _inputs["srcs"],
         out = out,
         cmd = cmd,
         deps = deps,
