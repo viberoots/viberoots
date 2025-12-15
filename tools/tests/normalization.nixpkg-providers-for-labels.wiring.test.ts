@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { providersForLabels } from "../../lib/labels.ts";
+import { providersForLabels } from "../lib/labels.ts";
 
 test("providersForLabels maps nixpkg:<attr> to canonical nix provider target labels", () => {
   const labels = [
