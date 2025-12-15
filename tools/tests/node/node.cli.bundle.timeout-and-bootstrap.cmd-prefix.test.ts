@@ -8,7 +8,8 @@ import { runInTemp } from "../lib/test-helpers";
 test("nix_node_cli_bin(bundle=True) cmd prefixes nix bootstrap env and timeout wrapper", async () => {
   await runInTemp("node-cli-timeout-prefix", async (tmp, $) => {
     const dir = path.join(tmp, "apps", "cli");
-    await fsp.mkdir(dir, { recursive: true });
+    await fsp.mkdir(path.join(dir, "bin"), { recursive: true });
+    await fsp.writeFile(path.join(dir, "bin", "tool"), "#!/usr/bin/env node\n", "utf8");
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
@@ -45,10 +46,13 @@ test("nix_node_cli_bin(bundle=True) cmd prefixes nix bootstrap env and timeout w
       out.includes("require-unified-pnpm-store.ts") || out.includes(".unified-pnpm-store/path"),
       "expected nix_bootstrap_env_pnpm_store() fragments in cmd",
     );
-    // Should declare TIMEOUT wrapper and use it to invoke nix build
+    // Should declare TIMEOUT wrapper and use it to wrap the bundler invocation
     assert.ok(out.includes("TIMEOUT="), "expected TIMEOUT= assignment in cmd");
     const idxTimeout = out.indexOf("TIMEOUT");
-    const idxNix = out.indexOf("nix build");
-    assert.ok(idxTimeout >= 0 && idxNix > idxTimeout, "expected TIMEOUT to precede nix build");
+    const idxNode = out.indexOf("node --experimental-strip-types");
+    assert.ok(
+      idxTimeout >= 0 && idxNode > idxTimeout,
+      "expected TIMEOUT to precede bundler invocation",
+    );
   });
 });

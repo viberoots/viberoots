@@ -49,5 +49,16 @@ test("node_webapp cmd prefixes nix bootstrap env and timeout wrapper", async () 
     const idxTimeout = out.indexOf("TIMEOUT");
     const idxNix = out.indexOf("nix build");
     assert.ok(idxTimeout >= 0 && idxNix > idxTimeout, "expected TIMEOUT to precede nix build");
+
+    // Enforce "no out-links" policy and standard outPath capture structure
+    assert.ok(
+      out.includes("--no-link --print-out-paths"),
+      "expected nix build to use --no-link --print-out-paths",
+    );
+    assert.ok(out.includes("| tail -n1"), "expected nix build outPath capture to use `| tail -n1`");
+    assert.ok(
+      out.includes("outPath=$$($TIMEOUT nix build"),
+      "expected standardized outPath=$$($TIMEOUT nix build ...) structure",
+    );
   });
 });

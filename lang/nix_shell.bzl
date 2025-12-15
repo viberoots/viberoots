@@ -69,5 +69,22 @@ def nix_timeout_wrapper_var(var_name = "TIMEOUT", default_sec = 600):
         + "fi; "
     )
 
+def escape_buck_cmd_subst(s):
+    if not isinstance(s, str):
+        return s
+    return s.replace("$(", "$$(")
+
+
+def nix_build_out_path_cmd(flake_attr, timeout_var = "TIMEOUT"):
+    tout = ""
+    if isinstance(timeout_var, str) and timeout_var != "":
+        tout = "$%s " % timeout_var
+    return (
+        "outPath=$$("
+        + tout
+        + ("nix build %s --accept-flake-config --no-link --print-out-paths | tail -n1" % flake_attr)
+        + "); "
+    )
+
 
 

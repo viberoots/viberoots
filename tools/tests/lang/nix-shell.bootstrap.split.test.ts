@@ -12,20 +12,20 @@ test("nix_shell bootstrap split: core is language-agnostic; PNPM store is opt-in
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
-        'load("//lang:nix_shell.bzl", "nix_bootstrap_env_core", "nix_bootstrap_env_pnpm_store")',
+        'load("//lang:nix_shell.bzl", "escape_buck_cmd_subst", "nix_bootstrap_env_core", "nix_bootstrap_env_pnpm_store")',
         "",
         "genrule(",
         '  name = "core",',
         '  out = "core.txt",',
         // Buck's genrule `cmd` parses `$(...)` as a macro. Our bootstrap emits shell
         // command substitutions, so escape them to ensure we can cquery the cmd attr.
-        '  cmd = nix_bootstrap_env_core().replace("$(", "$$(") + "echo ok > $OUT",',
+        '  cmd = escape_buck_cmd_subst(nix_bootstrap_env_core()) + "echo ok > $OUT",',
         ")",
         "",
         "genrule(",
         '  name = "pnpm",',
         '  out = "pnpm.txt",',
-        '  cmd = (nix_bootstrap_env_core() + nix_bootstrap_env_pnpm_store()).replace("$(", "$$(") + "echo ok > $OUT",',
+        '  cmd = escape_buck_cmd_subst(nix_bootstrap_env_core() + nix_bootstrap_env_pnpm_store()) + "echo ok > $OUT",',
         ")",
         "",
       ].join("\n"),
@@ -50,6 +50,14 @@ test("nix_shell bootstrap split: core is language-agnostic; PNPM store is opt-in
 
     const outCore = String(probeCore.stdout || "");
     assert.ok(
+      !/(^|[^$])\$\(/.test(outCore),
+      "expected escape_buck_cmd_subst to remove unescaped $(...) command substitutions",
+    );
+    assert.ok(
+      outCore.includes("$$("),
+      "expected escape_buck_cmd_subst to produce $$( for cmd subs",
+    );
+    assert.ok(
       outCore.includes("export WORKSPACE_ROOT=") || outCore.includes("FLK_ROOT="),
       "expected core bootstrap to include WORKSPACE_ROOT/FLK_ROOT logic",
     );
@@ -60,6 +68,14 @@ test("nix_shell bootstrap split: core is language-agnostic; PNPM store is opt-in
     );
 
     const outPnpm = String(probePnpm.stdout || "");
+    assert.ok(
+      !/(^|[^$])\$\(/.test(outPnpm),
+      "expected escape_buck_cmd_subst to remove unescaped $(...) command substitutions",
+    );
+    assert.ok(
+      outPnpm.includes("$$("),
+      "expected escape_buck_cmd_subst to produce $$( for cmd subs",
+    );
     assert.ok(
       outPnpm.includes("export WORKSPACE_ROOT=") || outPnpm.includes("FLK_ROOT="),
       "expected pnpm bootstrap to include core bootstrap fragments",

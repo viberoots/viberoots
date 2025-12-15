@@ -1,6 +1,6 @@
 load("//lang:defs_common.bzl", "stamp_global_nix_inputs", "importer_from_labels", "ensure_single_lockfile_label")
 load("//lang:sanitize.bzl", "sanitize_name")
-load("//lang:nix_shell.bzl", "nix_bootstrap_env_core", "nix_bootstrap_env_pnpm_store", "nix_timeout_wrapper_var")
+load("//lang:nix_shell.bzl", "escape_buck_cmd_subst", "nix_bootstrap_env_core", "nix_bootstrap_env_pnpm_store", "nix_build_out_path_cmd", "nix_timeout_wrapper_var")
 load("//node:defs_core.bzl", "nix_node_gen")
 
 def _sanitize_importer_attr(s):
@@ -31,10 +31,10 @@ def node_webapp(
     # Use escaped command substitutions: $$(...) so Buck doesn't parse $(...) as a target pattern.
     # Escape only command substitutions `$(...)` to avoid Buck interpreting them;
     # keep normal `$VAR` expansions intact.
-    _prefix = (nix_bootstrap_env_core() + nix_bootstrap_env_pnpm_store()).replace("$(", "$$(") + nix_timeout_wrapper_var(default_sec = 240)
+    _prefix = escape_buck_cmd_subst(nix_bootstrap_env_core() + nix_bootstrap_env_pnpm_store()) + nix_timeout_wrapper_var(default_sec = 240)
     cmd = (
         _prefix
-        + "outPath=$$($TIMEOUT nix build .#node-webapp.%s --accept-flake-config --no-link --print-out-paths | tail -n1); " % _sanitize_importer_attr(_importer)
+        + nix_build_out_path_cmd(".#node-webapp.%s" % _sanitize_importer_attr(_importer))
         + "if [ -d \"$outPath/dist\" ]; then cp -R \"$outPath/dist\" $OUT; else echo 'dist missing' >&2; exit 2; fi"
     )
 
@@ -119,7 +119,8 @@ def nix_node_cli_bin(
         + "export BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE=1; "
     )
     # Bundling may invoke Nix + PNPM and can legitimately take longer than 60s on cold caches.
-    _prefix = _pre_env + (nix_bootstrap_env_core() + nix_bootstrap_env_pnpm_store()).replace("$(", "$$(") + nix_timeout_wrapper_var(default_sec = 180)
+    _bootstrap = escape_buck_cmd_subst(nix_bootstrap_env_core() + nix_bootstrap_env_pnpm_store())
+    _prefix = _pre_env + _bootstrap + nix_timeout_wrapper_var(default_sec = 180)
     cmd = (
         "SCRATCH=\"$PWD\"; "
         + _prefix

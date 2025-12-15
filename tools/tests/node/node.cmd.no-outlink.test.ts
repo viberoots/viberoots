@@ -11,6 +11,8 @@ test("node macros do not use --out-link in assembled cmd", async () => {
     const appDir = path.join(tmp, "apps", "web");
     await fsp.mkdir(appDir, { recursive: true });
     await fsp.writeFile(path.join(appDir, "pnpm-lock.yaml"), "# stub\n", "utf8");
+    await fsp.mkdir(path.join(appDir, "bin"), { recursive: true });
+    await fsp.writeFile(path.join(appDir, "bin", "tool"), "#!/usr/bin/env node\n", "utf8");
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
