@@ -40,5 +40,23 @@ planner_stub = rule(
     },
 )
 
+load("//lang:patch_inputs.bzl", "include_package_local_patches")
+
+def planner_stub_with_package_local_patches(
+        name,
+        lang,
+        local_patch_dirs = None,
+        deps = [],
+        srcs = [],
+        labels = [],
+        **kwargs):
+    kw = dict(kwargs)
+    kw["name"] = name
+    kw["deps"] = deps or []
+    kw["labels"] = labels or []
+    kw["srcs"] = srcs or []
+    include_package_local_patches(kw, lang, local_patch_dirs)
+    planner_stub(**kw)
+
 
 

@@ -3,7 +3,7 @@ load("//lang:defs_common.bzl", "dedupe_preserve", "normalize_labels", "stamp_lab
 load("//lang:defs_common.bzl", "default_package_patch_dirs")
 load("//lang:defs_common.bzl", "stamp_wasm_variant")
 load("//lang:defs_common.bzl", "append_nixpkg_labels")
-load("//lang:planner_stub.bzl", "planner_stub")
+load("//lang:planner_stub.bzl", "planner_stub", "planner_stub_with_package_local_patches")
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
 load("//go/private:nix_build_wasm.bzl", "go_nix_build_wasm")
 load("//go/private:labels.bzl", "append_tuple_labels")
@@ -182,6 +182,7 @@ def nix_go_carchive(name, **kwargs):
     Buck graph; the actual archive is produced by the Nix planner build when
     a consumer (e.g., a C++ binary) is built.
     """
+    local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("go"))
     # Stamp language/kind labels for planner detection
     labels = kwargs.get("labels", []) or []
     labels = dedupe_preserve(labels + ["lang:go", "kind:carchive"])
@@ -190,9 +191,11 @@ def nix_go_carchive(name, **kwargs):
     # Preserve the existing behavior where provider edges are realized into `srcs`.
     srcs = kwargs.get("srcs", []) or []
     merged_srcs = realize_provider_edges(MODULE_PROVIDERS, name, into = "srcs", base = srcs)
-    planner_stub(
+    planner_stub_with_package_local_patches(
         name = name,
         out = name + ".stamp",
+        lang = "go",
+        local_patch_dirs = local_patch_dirs,
         deps = deps,
         srcs = merged_srcs,
         labels = labels,

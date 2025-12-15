@@ -1,7 +1,7 @@
 load("@prelude//:rules.bzl", "cxx_library", "cxx_binary", "cxx_test")
 load("//lang:defs_common.bzl", "stamp_labels", "append_nixpkg_labels", "include_package_local_patches", "dedupe_preserve", "stamp_wasm_variant", "realize_provider_edges", "default_package_patch_dirs", "strip_provider_targets")
 load("//lang:global_inputs.bzl", "global_nix_inputs")
-load("//lang:planner_stub.bzl", "planner_stub")
+load("//lang:planner_stub.bzl", "planner_stub", "planner_stub_with_package_local_patches")
 load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name", _cpp_sanitize_probe="cpp_sanitize_probe")
 load("//cpp/private:nix_test.bzl", "cpp_nix_test")
 load("//cpp/private:nix_build.bzl", "cpp_nix_build")
@@ -93,16 +93,23 @@ def nix_cpp_wasm_emscripten_lib(name, **kwargs):
       produced by the planner template (cppWasmEmscriptenLib) when built via the
       Nix flake attributes (e.g., graph-generator-selected).
     """
+    local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("cpp"))
     deps = kwargs.pop("deps", [])
+    deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps)
     # Stamp language/kind and wasm variant for planner routing
     stamp_wasm_variant(kwargs, "cpp", "emscripten")
     labels = kwargs.get("labels", []) or []
-    # Use a minimal planner stub that exposes graph edges and labels
-    planner_stub(
+    srcs = kwargs.pop("srcs", []) or []
+    # Use a minimal planner stub that exposes graph edges, labels, and patch inputs.
+    planner_stub_with_package_local_patches(
         name = name,
         out = name + ".stamp",
+        lang = "cpp",
+        local_patch_dirs = local_patch_dirs,
         deps = deps,
+        srcs = srcs,
         labels = labels,
+        visibility = kwargs.get("visibility", []),
     )
 
 def nix_cpp_binary(name, **kwargs):
