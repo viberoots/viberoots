@@ -27,6 +27,51 @@ def append_patch_inputs(kwargs, dirs, into = "srcs"):
     if len(merged) > 0:
         kwargs[into] = dedupe_preserve(merged)
 
+def _unique_dict_key(dst_to_src, desired):
+    if not isinstance(dst_to_src, dict):
+        return desired
+    if desired not in dst_to_src:
+        return desired
+    for i in range(1, 1000):
+        k = "%s__%d" % (desired, i)
+        if k not in dst_to_src:
+            return k
+    fail("append_patch_inputs_dict_safe: failed to find unique synthetic key after 999 attempts: %s" % desired)
+
+def append_patch_inputs_dict_safe(kwargs, dirs, into = "srcs", key_prefix = "__patch_inputs__"):
+    if kwargs == None:
+        return
+    if not isinstance(kwargs, dict):
+        return
+    if not isinstance(into, str) or into == "":
+        return
+
+    if not isinstance(key_prefix, str) or key_prefix == "":
+        key_prefix = "__patch_inputs__"
+
+    existing = kwargs.get(into, None)
+    if existing == None:
+        existing = []
+
+    if isinstance(existing, list):
+        append_patch_inputs(kwargs, dirs, into = into)
+        return
+
+    if not isinstance(existing, dict):
+        return
+
+    patch_paths = []
+    for d in dirs or []:
+        if not isinstance(d, str) or d == "":
+            continue
+        patch_paths = patch_paths + native.glob(["%s/*.patch" % d])
+    patch_paths = dedupe_preserve(sorted(patch_paths))
+    for p in patch_paths:
+        desired = "%s/%s" % (key_prefix, p)
+        key = _unique_dict_key(existing, desired)
+        existing[key] = p
+    kwargs[into] = existing
+
 def append_patch_srcs(kwargs, dirs):
     append_patch_inputs(kwargs, dirs, into = "srcs")
 
@@ -44,11 +89,28 @@ def append_importer_patches(kwargs, importer, lang, into = "srcs"):
     patch_dir = base if same_pkg else ("%s/%s" % (importer, base))
     append_patch_inputs(kwargs, [patch_dir], into = into)
 
+def append_importer_patches_dict_safe(kwargs, importer, lang, into = "srcs", key_prefix = "__patch_inputs__"):
+    if importer == None or not isinstance(importer, str) or importer == "":
+        return
+    if lang == None or not isinstance(lang, str) or lang == "":
+        return
+    base = "patches/%s" % lang
+    cur_pkg = native.package_name()
+    same_pkg = (importer == "." or importer == cur_pkg or (cur_pkg == "" and importer == "."))
+    patch_dir = base if same_pkg else ("%s/%s" % (importer, base))
+    append_patch_inputs_dict_safe(kwargs, [patch_dir], into = into, key_prefix = key_prefix)
+
 def include_importer_patches_from_labels(kwargs, lang, into = "srcs"):
     imp = importer_from_labels(kwargs)
     if imp == None or imp == "":
         return
     append_importer_patches(kwargs, imp, lang, into = into)
+
+def include_importer_patches_from_labels_dict_safe(kwargs, lang, into = "srcs", key_prefix = "__patch_inputs__"):
+    imp = importer_from_labels(kwargs)
+    if imp == None or imp == "":
+        return
+    append_importer_patches_dict_safe(kwargs, imp, lang, into = into, key_prefix = key_prefix)
 
 def include_package_local_patches(kwargs, lang, default_dirs = None):
     if not isinstance(lang, str) or lang == "":
@@ -81,6 +143,23 @@ def patch_inputs_probe(name, dirs, into = "srcs", initial = None):
     if initial != None:
         kw[into] = initial
     append_patch_inputs(kw, dirs, into = into)
+    val = kw.get(into, None)
+    items = []
+    if isinstance(val, dict):
+        items = sorted(val.keys())
+    elif isinstance(val, list):
+        items = val
+    labels_file(
+        name = name,
+        labels = items,
+        out = name + ".items.txt",
+    )
+
+def patch_inputs_dict_safe_probe(name, dirs, into = "srcs", initial = None):
+    kw = {}
+    if initial != None:
+        kw[into] = initial
+    append_patch_inputs_dict_safe(kw, dirs, into = into)
     val = kw.get(into, None)
     items = []
     if isinstance(val, dict):

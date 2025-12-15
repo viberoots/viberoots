@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("node macros do not inject importer-local patches into dict-shaped srcs (cquery)", async () => {
+test("node macros inject importer-local patches into dict-shaped srcs via synthetic keys (cquery)", async () => {
   await runInTemp("node-importer-patches-srcs-dict-shape", async (tmp, $) => {
     const appDir = path.join(tmp, "apps", "web");
     const patchDir = path.join(appDir, "patches", "node");
@@ -48,9 +48,10 @@ test("node macros do not inject importer-local patches into dict-shaped srcs (cq
       return;
     }
     const out = String(probe.stdout || "");
+    const alt = "patches/node/leftpad@1.3.0.patch";
     assert.ok(
-      !out.includes(patchRel),
-      `did not expect importer-local patch path in srcs: ${patchRel}`,
+      out.includes(patchRel) || out.includes(alt),
+      `expected importer-local patch path present in srcs: ${patchRel} (or ${alt})`,
     );
   });
 });

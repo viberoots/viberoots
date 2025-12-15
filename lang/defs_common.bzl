@@ -6,11 +6,15 @@ load(
     "//lang:patch_inputs.bzl",
     _append_importer_patches = "append_importer_patches",
     _append_patch_inputs = "append_patch_inputs",
+    _append_patch_inputs_dict_safe = "append_patch_inputs_dict_safe",
     _append_patch_srcs = "append_patch_srcs",
+    _append_importer_patches_dict_safe = "append_importer_patches_dict_safe",
     _default_package_patch_dirs = "default_package_patch_dirs",
     _include_importer_patches_from_labels = "include_importer_patches_from_labels",
+    _include_importer_patches_from_labels_dict_safe = "include_importer_patches_from_labels_dict_safe",
     _include_package_local_patches = "include_package_local_patches",
     _package_local_patches_probe = "package_local_patches_probe",
+    _patch_inputs_dict_safe_probe = "patch_inputs_dict_safe_probe",
     _patch_inputs_probe = "patch_inputs_probe",
 )
 load(
@@ -38,12 +42,16 @@ importer_from_labels_probe = _importer_from_labels_probe
 
 append_patch_srcs = _append_patch_srcs
 append_patch_inputs = _append_patch_inputs
+append_patch_inputs_dict_safe = _append_patch_inputs_dict_safe
 append_importer_patches = _append_importer_patches
+append_importer_patches_dict_safe = _append_importer_patches_dict_safe
 include_importer_patches_from_labels = _include_importer_patches_from_labels
+include_importer_patches_from_labels_dict_safe = _include_importer_patches_from_labels_dict_safe
 include_package_local_patches = _include_package_local_patches
 default_package_patch_dirs = _default_package_patch_dirs
 package_local_patches_probe = _package_local_patches_probe
 patch_inputs_probe = _patch_inputs_probe
+patch_inputs_dict_safe_probe = _patch_inputs_dict_safe_probe
 
 normalize_nix_attr = _normalize_nix_attr
 append_nixpkg_labels = _append_nixpkg_labels

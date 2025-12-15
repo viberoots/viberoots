@@ -141,9 +141,14 @@ Quick checks and guidance:
 - The Node macros include importer‑local patch files in `srcs` to achieve precise Buck invalidation, mirroring Go:
   - Patches live under `<importer>/patches/node/*.patch` (e.g., `apps/web/patches/node/...`).
   - Changing a patch only invalidates Node targets bound to that importer.
-- Some Node genrule shims pass dict-shaped `srcs` mappings (dest → source) for deterministic in-action paths. In that mode, patch globs are intentionally not injected into `srcs` because it would mutate the mapping shape.
+- Some Node genrule shims pass dict-shaped `srcs` mappings (dest → source) for deterministic in-action paths. In that mode, macros still carry importer-local patches and provider-edge inputs without changing the user mapping semantics:
+  - Patch files are attached by adding synthetic dict entries under `__patch_inputs__/...` (dest keys are stable and derived from the patch path).
+  - Provider deps are attached by adding synthetic dict entries under `__provider_edges__/...`.
 - Provider stamps for Node are importer‑scoped and do not reference patch files as `srcs` (see Provider sync cookbook below); correctness comes from macro‑side `srcs` inclusion.
-- Lockfile label enforcement and parsing are centralized: macros call `ensure_single_lockfile_label(...)` and then `include_importer_patches_from_labels(kwargs, "node", into = "srcs")` from `lang/defs_common.bzl`. Error messages and behavior are stable and shared across Node macros.
+- Lockfile label enforcement and parsing are centralized: macros call `ensure_single_lockfile_label(...)` and then attach importer-local patch files using the shared `//lang:patch_inputs.bzl` helpers:
+  - list-shaped inputs: `include_importer_patches_from_labels(...)`
+  - dict-shaped inputs: `include_importer_patches_from_labels_dict_safe(...)`
+    Both live under `lang/defs_common.bzl` for consistent load paths and error text.
 
 Quick checks and guidance:
 
