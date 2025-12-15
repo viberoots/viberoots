@@ -145,8 +145,8 @@ Quick checks and guidance:
   - Patches live under `<importer>/patches/node/*.patch` (e.g., `apps/web/patches/node/...`).
   - Changing a patch only invalidates Node targets bound to that importer.
 - Some Node genrule shims pass dict-shaped `srcs` mappings (dest → source) for deterministic in-action paths. In that mode, macros still carry importer-local patches and provider-edge inputs without changing the user mapping semantics:
-  - Patch files are attached by adding synthetic dict entries under `__patch_inputs__/...` (dest keys are stable and derived from the patch path).
-  - Provider deps are attached by adding synthetic dict entries under `__provider_edges__/...`.
+  - Patch files are attached by adding synthetic dict entries under `__patch_inputs__/...` with a stable key derived from a canonical sanitizer (see `//lang:sanitize.bzl:sanitize_name`). Collisions are resolved deterministically with a `__<n>` suffix.
+  - Provider deps are attached by adding synthetic dict entries under `__provider_edges__/...` using the same sanitizer and collision contract.
 - Provider stamps for Node are importer‑scoped and do not reference patch files as `srcs` (see Provider sync cookbook below); correctness comes from macro‑side `srcs` inclusion.
 - Lockfile label enforcement and parsing are centralized: macros call `ensure_single_lockfile_label(...)` and then attach importer-local patch files using the shared `//lang:patch_inputs.bzl` helpers:
   - list-shaped inputs: `include_importer_patches_from_labels(...)`

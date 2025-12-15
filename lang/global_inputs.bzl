@@ -1,5 +1,5 @@
 load("//lang:collections.bzl", "dedupe_preserve")
-load("//lang:sanitize.bzl", "sanitize_name")
+load("//lang:dict_inputs.bzl", "attach_items_dict_safe")
 
 def global_nix_inputs():
     """
@@ -10,18 +10,6 @@ def global_nix_inputs():
     # Current policy: include repo-level flake.lock as a single global input.
     # This keeps behavior consistent across languages and avoids ad-hoc stamping.
     return ["//:flake.lock"]
-
-
-def _unique_dict_key(dst_to_src, desired):
-    if not isinstance(dst_to_src, dict):
-        return desired
-    if desired not in dst_to_src:
-        return desired
-    for i in range(1, 1000):
-        k = "%s__%d" % (desired, i)
-        if k not in dst_to_src:
-            return k
-    fail("attach_global_nix_inputs: failed to find unique synthetic key after 999 attempts: %s" % desired)
 
 
 def attach_global_nix_inputs(kwargs, into = "srcs", key_prefix = "__global_nix_inputs__"):
@@ -50,12 +38,7 @@ def attach_global_nix_inputs(kwargs, into = "srcs", key_prefix = "__global_nix_i
         return
 
     if isinstance(existing, dict):
-        for x in sorted(inputs):
-            if not isinstance(x, str) or x == "":
-                continue
-            desired = "%s/%s" % (key_prefix, sanitize_name(x))
-            existing[_unique_dict_key(existing, desired)] = x
-        kwargs[into] = existing
+        kwargs[into] = attach_items_dict_safe(existing, inputs, key_prefix)
         return
 
     # Unknown shape; leave untouched.

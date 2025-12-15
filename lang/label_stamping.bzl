@@ -1,5 +1,6 @@
 load("//lang:collections.bzl", "dedupe_preserve")
 load("//lang:global_inputs.bzl", "global_nix_inputs")
+load("//lang:labels_file.bzl", "labels_file")
 
 def normalize_labels(pkg, labels):
     if labels == None:
@@ -36,19 +37,6 @@ def stamp_wasm_variant(kwargs, lang, variant):
     labels = kwargs.get("labels", []) or []
     stamps = ["lang:%s" % lang, "kind:wasm", "wasm:%s" % variant]
     kwargs["labels"] = dedupe_preserve(labels + stamps)
-
-def _labels_file_impl(ctx):
-    out = ctx.actions.declare_output(ctx.attrs.out)
-    ctx.actions.write(out, "\n".join(ctx.attrs.labels) + "\n")
-    return [DefaultInfo(default_output = out)]
-
-labels_file = rule(
-    impl = _labels_file_impl,
-    attrs = {
-        "labels": attrs.list(attrs.string(), default = []),
-        "out": attrs.string(),
-    },
-)
 
 def wasm_labels_probe(name, lang, variant, labels = []):
     kw = { "labels": (labels or []) }

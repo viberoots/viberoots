@@ -26,6 +26,7 @@ load(
     _strip_provider_targets_probe = "strip_provider_targets_probe",
     _target_key_for_current_package = "target_key_for_current_package",
 )
+load("//lang:dict_inputs.bzl", _attach_items_dict_safe = "attach_items_dict_safe", _dict_items_probe = "dict_items_probe")
 
 dedupe_preserve = _dedupe_preserve
 
@@ -63,4 +64,7 @@ realize_provider_edges = _realize_provider_edges
 realize_provider_edges_probe = _realize_provider_edges_probe
 strip_provider_targets = _strip_provider_targets
 strip_provider_targets_probe = _strip_provider_targets_probe
+
+attach_items_dict_safe = _attach_items_dict_safe
+dict_items_probe = _dict_items_probe
 

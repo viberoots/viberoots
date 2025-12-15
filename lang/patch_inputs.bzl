@@ -1,6 +1,7 @@
 load("//lang:collections.bzl", "dedupe_preserve")
-load("//lang:label_stamping.bzl", "labels_file")
+load("//lang:labels_file.bzl", "labels_file")
 load("//lang:lockfile_labels.bzl", "importer_from_labels")
+load("//lang:dict_inputs.bzl", "attach_items_dict_safe")
 
 def append_patch_inputs(kwargs, dirs, into = "srcs"):
     if kwargs == None:
@@ -26,17 +27,6 @@ def append_patch_inputs(kwargs, dirs, into = "srcs"):
         merged = merged + native.glob(["%s/*.patch" % d])
     if len(merged) > 0:
         kwargs[into] = dedupe_preserve(merged)
-
-def _unique_dict_key(dst_to_src, desired):
-    if not isinstance(dst_to_src, dict):
-        return desired
-    if desired not in dst_to_src:
-        return desired
-    for i in range(1, 1000):
-        k = "%s__%d" % (desired, i)
-        if k not in dst_to_src:
-            return k
-    fail("append_patch_inputs_dict_safe: failed to find unique synthetic key after 999 attempts: %s" % desired)
 
 def append_patch_inputs_dict_safe(kwargs, dirs, into = "srcs", key_prefix = "__patch_inputs__"):
     if kwargs == None:
@@ -66,11 +56,7 @@ def append_patch_inputs_dict_safe(kwargs, dirs, into = "srcs", key_prefix = "__p
             continue
         patch_paths = patch_paths + native.glob(["%s/*.patch" % d])
     patch_paths = dedupe_preserve(sorted(patch_paths))
-    for p in patch_paths:
-        desired = "%s/%s" % (key_prefix, p)
-        key = _unique_dict_key(existing, desired)
-        existing[key] = p
-    kwargs[into] = existing
+    kwargs[into] = attach_items_dict_safe(existing, patch_paths, key_prefix)
 
 def append_patch_srcs(kwargs, dirs):
     append_patch_inputs(kwargs, dirs, into = "srcs")

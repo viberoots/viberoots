@@ -1,37 +1,11 @@
 load("@prelude//:rules.bzl", "genrule")
-load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve", "include_importer_patches_from_labels", "include_importer_patches_from_labels_dict_safe", "importer_from_labels", "ensure_single_lockfile_label", "realize_provider_edges")
+load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve", "include_importer_patches_from_labels", "include_importer_patches_from_labels_dict_safe", "importer_from_labels", "ensure_single_lockfile_label", "realize_provider_edges", "attach_items_dict_safe")
 load("//lang:global_inputs.bzl", "global_nix_inputs")
 load("//node/private:nix_test.bzl", "node_nix_test")
 
 # NOTE: Prebuild guard ensures this load is valid before builds/tests run.
 MODULE_PROVIDERS = {}
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
-
-def _sanitize_for_synthetic_key(s):
-    if not isinstance(s, str) or s == "":
-        return "item"
-    out = s[2:] if s.startswith("//") else s
-    out = out.replace("/", "__").replace(":", "__")
-    return out if out != "" else "item"
-
-def _attach_items_into_srcs_dict(dst_to_src, items, prefix):
-    if not isinstance(dst_to_src, dict):
-        return dst_to_src
-    if items == None:
-        return dst_to_src
-    for x in items:
-        if not isinstance(x, str) or x == "":
-            continue
-        desired = "%s/%s" % (prefix, _sanitize_for_synthetic_key(x))
-        key = desired
-        if key in dst_to_src:
-            for i in range(1, 1000):
-                k = "%s__%d" % (desired, i)
-                if k not in dst_to_src:
-                    key = k
-                    break
-        dst_to_src[key] = x
-    return dst_to_src
 
 def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = [], lockfile_label = None, kind = "gen", **kwargs):
     kwargs["name"] = name
@@ -45,7 +19,7 @@ def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = []
         kwargs["srcs"] = merged_srcs
         include_importer_patches_from_labels_dict_safe(kwargs, "node", into = "srcs", key_prefix = "__patch_inputs__")
         merged_edges = realize_provider_edges(MODULE_PROVIDERS, name, into = "srcs", base = (deps or []))
-        kwargs["srcs"] = _attach_items_into_srcs_dict(kwargs.get("srcs", {}), merged_edges, "__provider_edges__")
+        kwargs["srcs"] = attach_items_dict_safe(kwargs.get("srcs", {}), merged_edges, "__provider_edges__")
     else:
         # Include importer-local node patches in srcs so Buck invalidates precisely on patch changes
         kwargs["srcs"] = merged_srcs

@@ -56,11 +56,11 @@ test("append_patch_inputs_dict_safe attaches patch globs to dict-shaped inputs (
 
     assert.ok(keys.includes("bin/entry.js"), "expected original dict key preserved: bin/entry.js");
     assert.ok(
-      keys.includes("__patch_inputs__/patches/python/a@1.0.0.patch"),
+      keys.includes("__patch_inputs__/patches-python-a@1.0.0.patch"),
       "expected synthetic key for a@1.0.0.patch",
     );
     assert.ok(
-      keys.includes("__patch_inputs__/patches/python/b@2.0.0.patch"),
+      keys.includes("__patch_inputs__/patches-python-b@2.0.0.patch"),
       "expected synthetic key for b@2.0.0.patch",
     );
   });
