@@ -22,22 +22,22 @@ test("node webapp: nix_node_test target passes when no tests present", async () 
     await fs.remove(path.join(tmp, "apps", "demo-web", "test"));
 
     // Commit scaffold and lockfile so Nix flake sees importer under git+file sources
-    await $`bash -lc 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
+    await $`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
 
     // If lockfile wasn't written under the importer (workspace root wrote it), copy it and re-hash
-    await $`bash -lc 'test -f pnpm-lock.yaml && [ ! -f apps/demo-web/pnpm-lock.yaml ] && cp pnpm-lock.yaml apps/demo-web/pnpm-lock.yaml || true'`;
+    await $`bash --noprofile --norc -c 'test -f pnpm-lock.yaml && [ ! -f apps/demo-web/pnpm-lock.yaml ] && cp pnpm-lock.yaml apps/demo-web/pnpm-lock.yaml || true'`;
     await $({
       stdio: "inherit",
     })`node tools/dev/update-pnpm-hash.ts --lockfile apps/demo-web/pnpm-lock.yaml`;
 
     // Ensure importer lockfile exists; if still missing, force-generate it locally and re-hash
-    await $`bash -lc 'set -euo pipefail; if [ ! -f apps/demo-web/pnpm-lock.yaml ]; then mv -f pnpm-workspace.yaml pnpm-workspace.yaml.bak 2>/dev/null || true; echo "packages: \n  - ./" > apps/demo-web/pnpm-workspace.yaml; nix run nixpkgs#pnpm -- install --lockfile-only --prod=false --ignore-scripts --lockfile-dir ./apps/demo-web --dir ./apps/demo-web; rm -f apps/demo-web/pnpm-workspace.yaml; mv -f pnpm-workspace.yaml.bak pnpm-workspace.yaml 2>/dev/null || true; fi'`;
+    await $`bash --noprofile --norc -c 'set -euo pipefail; if [ ! -f apps/demo-web/pnpm-lock.yaml ]; then mv -f pnpm-workspace.yaml pnpm-workspace.yaml.bak 2>/dev/null || true; echo "packages: \n  - ./" > apps/demo-web/pnpm-workspace.yaml; nix run nixpkgs#pnpm -- install --lockfile-only --prod=false --ignore-scripts --lockfile-dir ./apps/demo-web --dir ./apps/demo-web; rm -f apps/demo-web/pnpm-workspace.yaml; mv -f pnpm-workspace.yaml.bak pnpm-workspace.yaml 2>/dev/null || true; fi'`;
     await $({
       stdio: "inherit",
     })`node tools/dev/update-pnpm-hash.ts --lockfile apps/demo-web/pnpm-lock.yaml`;
 
     // Assert lockfile exists and dump importer directory for debugging
-    await $`bash -lc 'set -e; echo "==== ls -la apps/demo-web ====\n"; ls -la apps/demo-web; test -f apps/demo-web/pnpm-lock.yaml'`;
+    await $`bash --noprofile --norc -c 'set -e; echo "==== ls -la apps/demo-web ====\n"; ls -la apps/demo-web; test -f apps/demo-web/pnpm-lock.yaml'`;
     // Confirm Nix sees the importer lockfile path
     await $({
       stdio: "inherit",

@@ -14,7 +14,7 @@ test("sparse checkout: go lib with local patches builds and tests", async () => 
     // Add a local patch placeholder under the target
     const patchDir = path.join(tmp, "libs", "demo-lib", "patches", "go");
     await $`mkdir -p ${patchDir}`;
-    await $`bash -lc 'printf "# sparse noop patch\n" > ${patchDir}/example.com__placeholder@v0.0.0.patch'`;
+    await $`bash --noprofile --norc -c 'printf "# sparse noop patch\n" > ${patchDir}/example.com__placeholder@v0.0.0.patch'`;
 
     // Build the library target directly in sparse context
     await $`buck2 build //libs/demo-lib:demo-lib --target-platforms //:no_cgo`;

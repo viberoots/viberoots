@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 test("prebuild/repair runs without node_modules and generates glue", async () => {
   await runInTemp("prebuild-repair-no-node-mods", async (tmp, $) => {
     // Ensure Buck cell mapping exists in temp repo so repair's ensureLocalPreludeMapping is a no-op
-    await $({ cwd: tmp })`bash -lc ${`set -euo pipefail
+    await $({ cwd: tmp })`bash --noprofile --norc -c ${`set -euo pipefail
       printf '.\\n' > .buckroot
       cat > .buckconfig <<'EOF'
 [buildfile]

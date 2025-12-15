@@ -40,7 +40,7 @@ test(
       // Commit scaffold so pure flake snapshots see new importers
       await $({
         env,
-      })`bash -lc 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
+      })`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
 
       // Ensure a lockfile exists for the importer; generate if missing
       let hasLock = await fsp
@@ -60,7 +60,7 @@ test(
       // Commit the lockfile so pure flake snapshots see it
       await $({
         env,
-      })`bash -lc 'git -C ${tmp} add ${lockfile} && git -C ${tmp} commit -m "chore(test): add importer lockfile"'`.nothrow();
+      })`bash --noprofile --norc -c 'git -C ${tmp} add ${lockfile} && git -C ${tmp} commit -m "chore(test): add importer lockfile"'`.nothrow();
 
       // Compute/update FOD mapping from the committed lockfile (best‑effort; continue on failure)
       try {

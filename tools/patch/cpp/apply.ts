@@ -103,7 +103,7 @@ export async function doApply(args: string[]) {
       const listA = await $({
         cwd: sess.originPath,
         stdio: "pipe",
-      })`bash -lc 'find . -maxdepth 2 -type f -ls | sed -n 1,80p'`.nothrow();
+      })`bash --noprofile --norc -c 'find . -maxdepth 2 -type f -ls | sed -n 1,80p'`.nothrow();
       console.error(
         "[patch-cpp][debug] origin-list:\n" + String(listA.stdout || listA.stderr || "").trim(),
       );
@@ -112,7 +112,7 @@ export async function doApply(args: string[]) {
       const listB = await $({
         cwd: sess.workspacePath,
         stdio: "pipe",
-      })`bash -lc 'find . -maxdepth 2 -type f -ls | sed -n 1,80p'`.nothrow();
+      })`bash --noprofile --norc -c 'find . -maxdepth 2 -type f -ls | sed -n 1,80p'`.nothrow();
       console.error(
         "[patch-cpp][debug] workspace-list:\n" + String(listB.stdout || listB.stderr || "").trim(),
       );

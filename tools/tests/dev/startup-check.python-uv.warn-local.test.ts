@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runInTemp } from "../lib/test-helpers";
 
-// Locally (CI not set), missing python3/uv should WARN but not fail.
+// Locally (CI not set), language toolchains are optional (sparse/partial clones).
+// Missing python3/uv should NOT fail and should NOT warn by default.
 await runInTemp("startup-check-python-uv-warn-local", async (tmp, $) => {
   // Ensure zx init is loaded for TypeScript execution
   const here = new URL(import.meta.url).pathname;
@@ -35,8 +35,8 @@ await runInTemp("startup-check-python-uv-warn-local", async (tmp, $) => {
     console.error("expected startup-check to succeed locally when python3/uv are missing\n", out);
     process.exit(2);
   }
-  if (!out.includes("python3") || !out.includes("uv")) {
-    console.error("expected warning mentioning python3 and uv in output\n", out);
+  if (out.includes("missing tools") || out.includes("python3") || out.includes("uv")) {
+    console.error("expected no python3/uv missing-tools warning in local output\n", out);
     process.exit(2);
   }
 });

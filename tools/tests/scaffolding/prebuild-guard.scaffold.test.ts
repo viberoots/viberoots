@@ -6,7 +6,7 @@ test("prebuild-guard auto-fixes when stale and passes thereafter", async () => {
   await runInTemp("scaf-prebuild-guard", async (_tmp, _$) => {
     const $ = _$({ stdio: "pipe" });
     // Ensure temp repo defines a local platform that disables CGO and sets it as default
-    await $`bash -lc ${`set -euo pipefail
+    await $`bash --noprofile --norc -c ${`set -euo pipefail
       cat > TARGETS <<'EOF'
 platform(
     name = "no_cgo",

@@ -74,7 +74,7 @@ test("python wheelhouse: identical lock+patch → identical store path across im
         const { stdout: pkgs } = await $({
           cwd: tmp,
           stdio: "pipe",
-        })`bash -lc 'sys=$(nix eval --raw --impure --accept-flake-config --expr builtins.currentSystem); nix eval --json --impure --accept-flake-config .#packages."'"$sys"'" | jq -r "keys[]" | sort'`.nothrow();
+        })`bash --noprofile --norc -c 'sys=$(nix eval --raw --impure --accept-flake-config --expr builtins.currentSystem); nix eval --json --impure --accept-flake-config .#packages."'"$sys"'" | jq -r "keys[]" | sort'`.nothrow();
         console.error("diagnostic: packages.<system> keys:\n", String(pkgs || "").trim());
       } catch {}
       console.error("missing outPath(s):", { outA1, outB1 });

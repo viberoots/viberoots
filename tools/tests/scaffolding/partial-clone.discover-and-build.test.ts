@@ -10,7 +10,7 @@ test("partial clone: discover and build scaffolded lib via //...", async () => {
   await runInTemp("partial-clone-discover", async (_tmp, _$) => {
     const $ = _$({ stdio: "pipe" });
     const T = Number(process.env.TEST_CMD_TIMEOUT_S || "300");
-    await $`bash -lc ${`set -euo pipefail
+    await $`bash --noprofile --norc -c ${`set -euo pipefail
       printf '.\n' > .buckroot
       cat > TARGETS <<'EOF'
 platform(

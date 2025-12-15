@@ -9,7 +9,7 @@ test("pr7: ts package packaging with conditional exports and artifact staging", 
     const sh = $({ cwd: tmp, stdio: "inherit" });
 
     // Enable C++ in this temp workspace for planner path parity
-    await sh`bash -lc 'mkdir -p tools/nix && printf %s \'{"enabled":["cpp"]}\' > tools/nix/langs.json'`;
+    await sh`bash --noprofile --norc -c 'mkdir -p tools/nix && printf %s \'{"enabled":["cpp"]}\' > tools/nix/langs.json'`;
 
     // 1) Scaffold minimal C wrapper for pure compute: add(a,b)
     const coreDir = path.join(tmp, "libs", "math-core");
@@ -349,7 +349,8 @@ genrule(
       path.join(distPath, "types", "index.d.ts"),
     ];
     for (const f of expectFiles) {
-      const ok = await $`bash -lc ${`test -f "${f}" && echo ok || true`}`.nothrow();
+      const ok =
+        await $`bash --noprofile --norc -c ${`test -f "${f}" && echo ok || true`}`.nothrow();
       if (
         !String(ok.stdout || "")
           .trim()

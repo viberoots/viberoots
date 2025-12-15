@@ -16,7 +16,10 @@ test("cpp providers sync is a no-op (no TARGETS.cpp.auto header)", async () => {
     if (exists) {
       try {
         console.error("DEBUG third_party/providers listing:");
-        const ls = await $({ cwd: tmp, stdio: "pipe" })`bash -lc 'ls -la third_party/providers'`;
+        const ls = await $({
+          cwd: tmp,
+          stdio: "pipe",
+        })`bash --noprofile --norc -c 'ls -la third_party/providers'`;
         console.error(String(ls.stdout || "").trim());
       } catch {}
       try {

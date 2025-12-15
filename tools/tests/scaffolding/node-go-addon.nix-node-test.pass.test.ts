@@ -52,7 +52,7 @@ test(
       // Commit scaffold so pure flake snapshots see new importers
       await $({
         env,
-      })`bash -lc 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
+      })`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
 
       // Ensure a lockfile exists for the importer; generate if missing
       const importer = "libs/demo";
@@ -78,7 +78,7 @@ test(
       // Commit the lockfile so pure flake snapshots see it
       await $({
         env,
-      })`bash -lc 'git -C ${tmp} add ${lockfile} && git -C ${tmp} commit -m "chore(test): add importer lockfile"'`.nothrow();
+      })`bash --noprofile --norc -c 'git -C ${tmp} add ${lockfile} && git -C ${tmp} commit -m "chore(test): add importer lockfile"'`.nothrow();
 
       // Install deps and ensure gomod2nix.toml is generated for libs/demo-go
       await $({ stdio: "inherit", env })`${path.join(tmp, "tools/bin/i")}`;

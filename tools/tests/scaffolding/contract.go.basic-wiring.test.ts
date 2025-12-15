@@ -11,6 +11,6 @@ test("contract(go): auto_map presence (providers not required for Go)", async ()
     await $`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
     await $`node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
     // Presence assertion
-    await $`bash -lc 'test -s third_party/providers/auto_map.bzl'`;
+    await $`bash --noprofile --norc -c 'test -s third_party/providers/auto_map.bzl'`;
   });
 });

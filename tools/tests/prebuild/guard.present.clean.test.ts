@@ -19,7 +19,7 @@ test("prebuild-guard: clean present outputs passes locally", async () => {
       "utf8",
     );
     // Ensure Buck mapping exists in temp repo
-    await $({ cwd: tmp })`bash -lc ${`set -euo pipefail
+    await $({ cwd: tmp })`bash --noprofile --norc -c ${`set -euo pipefail
       printf '.\n' > .buckroot
       cat > .buckconfig <<'EOF'
 [buildfile]

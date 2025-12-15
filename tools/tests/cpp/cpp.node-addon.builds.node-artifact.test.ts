@@ -5,10 +5,10 @@ import { runInTemp } from "../lib/test-helpers";
 test("cpp Node-API addon builds a .node artifact (nix template smoke)", async () => {
   await runInTemp("cpp-node-addon", async (tmp, $) => {
     // Create minimal Node-API addon sources
-    await $({ cwd: tmp })`bash -lc 'mkdir -p libs/demo-native/src'`;
+    await $({ cwd: tmp })`bash --noprofile --norc -c 'mkdir -p libs/demo-native/src'`;
     await $({
       cwd: tmp,
-    })`bash -lc 'cat > libs/demo-native/src/binding.cc <<"EOF"
+    })`bash --noprofile --norc -c 'cat > libs/demo-native/src/binding.cc <<"EOF"
 #include <node_api.h>
 
 static napi_value Answer(napi_env env, napi_callback_info info) {
@@ -30,7 +30,7 @@ EOF'`;
     // Write a tiny nix file that invokes the new template
     await $({
       cwd: tmp,
-    })`bash -lc 'cat > addon.nix <<"EOF"
+    })`bash --noprofile --norc -c 'cat > addon.nix <<"EOF"
 { pkgs ? (import ((builtins.getFlake (toString ./.)).inputs.nixpkgs) { system = builtins.currentSystem; }) }:
 let
   T = import ./tools/nix/templates/cpp-node-addon.nix { inherit pkgs; };
@@ -51,7 +51,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`bash -lc 'nix build -f ./addon.nix --print-out-paths'`;
+    })`bash --noprofile --norc -c 'nix build -f ./addon.nix --print-out-paths'`;
     if (build.exitCode !== 0) {
       console.error(build.stdout + "\n" + build.stderr);
       throw new Error("nix build failed (cpp-node-addon)");
@@ -61,7 +61,7 @@ EOF'`;
       .split("\n")
       .filter(Boolean)
       .pop()!;
-    await $({ cwd: tmp })`bash -lc 'test -f "${out}/lib/demo_addon.node"'`;
+    await $({ cwd: tmp })`bash --noprofile --norc -c 'test -f "${out}/lib/demo_addon.node"'`;
 
     // otool -L (Darwin) or ldd (Linux) should succeed; no strict assertions on content
     const probe = await $({
@@ -69,7 +69,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`bash -lc 'if [ "$(uname -s)" = "Darwin" ]; then otool -L "${out}/lib/demo_addon.node"; else ldd "${out}/lib/demo_addon.node" || true; fi'`;
+    })`bash --noprofile --norc -c 'if [ "$(uname -s)" = "Darwin" ]; then otool -L "${out}/lib/demo_addon.node"; else ldd "${out}/lib/demo_addon.node" || true; fi'`;
     if (probe.exitCode !== 0) {
       console.error(probe.stdout + "\n" + probe.stderr);
       throw new Error("linkage probe failed");

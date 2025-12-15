@@ -28,7 +28,7 @@ test("prebuild-guard: flags missing MODULE_PROVIDERS mapping for nixpkg-labeled 
     );
 
     // Ensure Buck cell mapping exists in temp repo
-    await $({ cwd: tmp })`bash -lc ${`set -euo pipefail
+    await $({ cwd: tmp })`bash --noprofile --norc -c ${`set -euo pipefail
       printf '.\n' > .buckroot
       cat > .buckconfig <<'EOF'
 [buildfile]

@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
 async function writeMinimalBuckConfig(tmp: string) {
-  await $({ cwd: tmp })`bash -lc ${`set -euo pipefail
+  await $({ cwd: tmp })`bash --noprofile --norc -c ${`set -euo pipefail
     printf '.\\n' > .buckroot
     cat > .buckconfig <<'EOF'
 [buildfile]

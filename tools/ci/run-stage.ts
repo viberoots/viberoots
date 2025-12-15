@@ -174,17 +174,18 @@ async function main() {
       }
       // Build all wheelhouse outputs for this system
       const attrs = keys.map((k) => `.#${k}`).join(" ");
-      await $`bash -lc ${`set -euo pipefail; nix build --impure --accept-flake-config ${attrs}`}`;
+      await $`bash --noprofile --norc -c ${`set -euo pipefail; nix build --impure --accept-flake-config ${attrs}`}`;
       // Optionally push to a binary cache if configured
       if (to && to.trim() !== "") {
-        const pathsOut = await $`bash -lc ${`set -euo pipefail; nix path-info ${attrs}`}`;
+        const pathsOut =
+          await $`bash --noprofile --norc -c ${`set -euo pipefail; nix path-info ${attrs}`}`;
         const paths = String(pathsOut.stdout || "")
           .trim()
           .split(/\s+/)
           .filter(Boolean)
           .join(" ");
         if (paths.length > 0) {
-          await $`bash -lc ${`set -euo pipefail; nix copy --to '${to}' ${paths}`}`;
+          await $`bash --noprofile --norc -c ${`set -euo pipefail; nix copy --to '${to}' ${paths}`}`;
           console.log(`wheelhouse-preload: pushed ${keys.length} outputs to ${to}`);
         }
       } else {

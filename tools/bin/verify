@@ -3,6 +3,16 @@
 # shellcheck source=/dev/null
 . "$(cd "$(dirname "$0")" && pwd)/_env.sh"
 
+# Ensure the entire verify workflow runs inside the dev shell so all tools are nix-supplied.
+if [[ -z "${NO_DEV_SHELL:-}" && -z "${IN_NIX_SHELL:-}" && -z "${BNX_VERIFY_REEXEC:-}" ]]; then
+  if ! command -v direnv >/dev/null 2>&1; then
+    echo "error: direnv not found on PATH; run inside the dev shell" 1>&2
+    exit 127
+  fi
+  export BNX_VERIFY_REEXEC=1
+  exec direnv exec "${LIVE_ROOT}" "$0" "$@"
+fi
+
 # Determine external timeout command (respect VERIFY_TIMEOUT_SECS)
 TSEC="${VERIFY_TIMEOUT_SECS:-3600}"
 TIMEOUT_CMD=()

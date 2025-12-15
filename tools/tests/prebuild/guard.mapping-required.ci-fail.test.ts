@@ -21,7 +21,7 @@ test("prebuild-guard: CI fails when providers exist without nix_attr_map.bzl", a
     );
 
     // Ensure Buck mapping exists in temp repo
-    await $({ cwd: tmp })`bash -lc ${`set -euo pipefail
+    await $({ cwd: tmp })`bash --noprofile --norc -c ${`set -euo pipefail
       printf '.\n' > .buckroot
       cat > .buckconfig <<'EOF'
 [buildfile]

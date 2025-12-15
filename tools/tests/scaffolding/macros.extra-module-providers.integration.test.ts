@@ -7,18 +7,20 @@ test("integration: extra_module_providers works with real prelude when available
     // Prepare providers and auto_map
     await $({
       cwd: tmp,
-    })`bash -lc 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<\'EOF'
+    })`bash --noprofile --norc -c 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<\'EOF'
 genrule(name="mod_auto", out="mod_auto.stamp", cmd=": > $OUT", visibility=["PUBLIC"]) 
 genrule(name="mod_extra", out="mod_extra.stamp", cmd=": > $OUT", visibility=["PUBLIC"]) 
 EOF'`;
-    await $({ cwd: tmp })`bash -lc 'cat > third_party/providers/auto_map.bzl <<\'EOF'
+    await $({
+      cwd: tmp,
+    })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<\'EOF'
 MODULE_PROVIDERS = {
   "//tmp:lib": ["//third_party/providers:mod_auto"],
 }
 EOF'`;
 
     // Create a package that uses the real prelude go_* via our repo go/defs.bzl
-    await $({ cwd: tmp })`bash -lc 'mkdir -p tmp && cat > tmp/TARGETS <<\'EOF'
+    await $({ cwd: tmp })`bash --noprofile --norc -c 'mkdir -p tmp && cat > tmp/TARGETS <<\'EOF'
 load("//go:defs.bzl", "nix_go_library")
 
 genrule(name="localprov", cmd=": > $OUT", out="localprov.stamp")

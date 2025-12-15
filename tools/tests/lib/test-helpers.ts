@@ -94,7 +94,7 @@ export async function rsyncRepoTo(tmp: string) {
         .filter(Boolean);
       // Always copy flake.nix if present so temp repos can run nix commands
       try {
-        await $`bash -lc ${`set -euo pipefail
+        await $`bash --noprofile --norc -c ${`set -euo pipefail
           if [ -f flake.nix ]; then install -D -m0644 flake.nix "${tmp}/flake.nix"; fi
         `}`;
       } catch {}
@@ -452,7 +452,7 @@ export async function runInTemp<T>(
   exportEnv.WORKSPACE_ROOT = tmp;
   // Avoid per-temp nested buck2 isolation; reuse a single daemon for all tests to reduce process churn.
   // Point HOME at the temp repo to avoid loading user login profiles (which may invoke direnv)
-  // when tests run shells like `bash -lc ...`.
+  // when tests run shells like `bash --noprofile --norc -c ...`.
   exportEnv.HOME = tmp;
   // Prefer Go proxy to avoid GitHub API rate limiting; keep a local module cache under tmp
   try {

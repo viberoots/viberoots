@@ -4,7 +4,9 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("nix_go_library stamps gotags and goenv tuple labels deterministically", async () => {
   await runInTemp("go-tuple-labels", async (tmp, $) => {
-    await $({ cwd: tmp })`bash -lc 'mkdir -p tmp && cat > tmp/TARGETS <<'\''EOF'\''
+    await $({
+      cwd: tmp,
+    })`bash --noprofile --norc -c 'mkdir -p tmp && cat > tmp/TARGETS <<'\''EOF'\''
 load("//go:defs.bzl", "nix_go_library")
 
 nix_go_library(

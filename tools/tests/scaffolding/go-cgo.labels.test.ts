@@ -6,7 +6,7 @@ test("nix_go_library stamps cgo:enabled and nixpkg labels when nixpkg_deps set",
   await runInTemp("go-cgo-labels", async (tmp, $) => {
     await $({
       cwd: tmp,
-    })`bash -lc 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<'\''EOF'\''
+    })`bash --noprofile --norc -c 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<'\''EOF'\''
 load("//third_party/providers:defs_cpp.bzl", "nix_cxx_library")
 nix_cxx_library(name="nix_pkgs_zlib", attr="pkgs.zlib")
 EOF'`;
@@ -14,7 +14,7 @@ EOF'`;
     // Provide an auto_map with (optional) mapping; labels test does not rely on deps wiring
     await $({
       cwd: tmp,
-    })`bash -lc 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
+    })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
 # GENERATED for test (mapping can be empty for this label-only check)
 MODULE_PROVIDERS = {
     "//tmp:lib": [
@@ -23,7 +23,9 @@ MODULE_PROVIDERS = {
 }
 EOF'`;
 
-    await $({ cwd: tmp })`bash -lc 'mkdir -p tmp && cat > tmp/TARGETS <<'\''EOF'\''
+    await $({
+      cwd: tmp,
+    })`bash --noprofile --norc -c 'mkdir -p tmp && cat > tmp/TARGETS <<'\''EOF'\''
 load("//go:defs.bzl", "nix_go_library")
 
 nix_go_library(

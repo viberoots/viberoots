@@ -10,7 +10,7 @@ async function writeFileAbs(p: string, content: string) {
 }
 
 async function writeBuckConfig(sh: any) {
-  await sh`bash -lc ${`set -euo pipefail
+  await sh`bash --noprofile --norc -c ${`set -euo pipefail
     printf '.\n' > .buckroot
     cat > .buckconfig <<'EOF'
 [buildfile]

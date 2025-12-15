@@ -14,7 +14,7 @@ test("prebuild-guard: verbose shows missing outputs", async () => {
       "utf8",
     );
     // Buck mapping
-    await $({ cwd: tmp })`bash -lc ${`set -euo pipefail
+    await $({ cwd: tmp })`bash --noprofile --norc -c ${`set -euo pipefail
       printf '.\n' > .buckroot
       cat > .buckconfig <<'EOF'
 [buildfile]

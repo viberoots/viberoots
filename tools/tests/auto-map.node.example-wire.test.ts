@@ -9,7 +9,7 @@ import { providerNameForImporter } from "../lib/providers.ts";
 test("auto-map includes importer-scoped provider for a temp apps/example importer", async () => {
   await runInTemp("auto-map-node-example-wire", async (tmp, $) => {
     // Create a minimal apps/example importer with lockfile and a Buck target that carries the lockfile label.
-    await $`bash -lc ${[
+    await $`bash --noprofile --norc -c ${[
       "set -euo pipefail",
       "mkdir -p apps/example third_party/providers tools/buck",
       // Provide a minimal stub so Buck can load macros before glue is generated.
@@ -29,26 +29,26 @@ test("auto-map includes importer-scoped provider for a temp apps/example importe
       "YAML",
       // Define a simple node gen target with the importer-scoped lockfile label, so auto-map has a node to attach mapping to
       "cat > apps/example/TARGETS <<'ST'",
-      "load(\"//node:defs.bzl\", \"nix_node_gen\")",
+      'load("//node:defs.bzl", "nix_node_gen")',
       "",
       "nix_node_gen(",
-      "    name = \"smoke_test\",",
-      "    labels = [\"lockfile:apps/example/pnpm-lock.yaml#apps/example\"],",
-      "    out = \"smoke.stamp\",",
-      "    cmd = \"echo ok > $OUT\",",
+      '    name = "smoke_test",',
+      '    labels = ["lockfile:apps/example/pnpm-lock.yaml#apps/example"],',
+      '    out = "smoke.stamp",',
+      '    cmd = "echo ok > $OUT",',
       ")",
       "ST",
       // Ensure the exporter includes our target in its deps(...) query by creating
       // a trivial root aggregator that depends on the smoke_test target.
       "cat >> TARGETS <<'ST'",
-      "load(\"@prelude//:rules.bzl\", \"genrule\")",
+      'load("@prelude//:rules.bzl", "genrule")',
       "",
       "genrule(",
-      "    name = \"root_agg\",",
+      '    name = "root_agg",',
       "    srcs = [],",
-      "    out = \"root_agg.stamp\",",
-      "    cmd = \"echo ok > $OUT\",",
-      "    deps = [\"//apps/example:smoke_test\"],",
+      '    out = "root_agg.stamp",',
+      '    cmd = "echo ok > $OUT",',
+      '    deps = ["//apps/example:smoke_test"],',
       ")",
       "ST",
     ].join("\n")}`;
@@ -93,6 +93,9 @@ test("auto-map includes importer-scoped provider for a temp apps/example importe
       autoMap,
     );
     assert.ok(hasSmokeTest, "apps/example target key missing in auto_map.bzl");
-    assert.ok(autoMap.includes(expected), `Expected provider ${expected} not found in auto_map.bzl`);
+    assert.ok(
+      autoMap.includes(expected),
+      `Expected provider ${expected} not found in auto_map.bzl`,
+    );
   });
 });

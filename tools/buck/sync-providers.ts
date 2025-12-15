@@ -35,7 +35,7 @@ async function main() {
     try {
       const { stdout } = await $({
         stdio: "pipe",
-      })`bash -lc 'ls -la third_party/providers 2>/dev/null || true'`;
+      })`bash --noprofile --norc -c 'ls -la third_party/providers 2>/dev/null || true'`;
       dbg("before (third_party/providers):\n" + String(stdout || "").trim());
     } catch {}
   }
@@ -54,7 +54,7 @@ async function main() {
       try {
         const { stdout } = await $({
           stdio: "pipe",
-        })`bash -lc 'ls -la third_party/providers 2>/dev/null || true'`;
+        })`bash --noprofile --norc -c 'ls -la third_party/providers 2>/dev/null || true'`;
         dbg("after (third_party/providers):\n" + String(stdout || "").trim());
       } catch {}
     }

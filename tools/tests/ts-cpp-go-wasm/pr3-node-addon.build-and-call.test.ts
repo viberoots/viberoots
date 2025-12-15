@@ -8,21 +8,21 @@ test("PR-3 Node N-API addon builds and returns add(2,3)=5 (temp repo)", async ()
     const sh = $({ cwd: tmp, stdio: "inherit" });
 
     // Enable C++ (and Go implicitly via planner) in this temp workspace for the planner path
-    await sh`bash -lc 'mkdir -p tools/nix && printf %s \'{"enabled":["cpp"]}\' > tools/nix/langs.json'`;
+    await sh`bash --noprofile --norc -c 'mkdir -p tools/nix && printf %s \'{"enabled":["cpp"]}\' > tools/nix/langs.json'`;
 
     // libs/math-core — minimal C++ core (not strictly required by the binding, but present per plan)
-    await sh`bash -lc 'mkdir -p libs/math-core/include/core libs/math-core/src/core'`;
-    await sh`bash -lc 'cat > libs/math-core/include/core/math.h <<"EOF"
+    await sh`bash --noprofile --norc -c 'mkdir -p libs/math-core/include/core libs/math-core/src/core'`;
+    await sh`bash --noprofile --norc -c 'cat > libs/math-core/include/core/math.h <<"EOF"
 #pragma once
 int add_ints(int a, int b);
 EOF'`;
-    await sh`bash -lc 'cat > libs/math-core/src/core/math.cc <<"EOF"
+    await sh`bash --noprofile --norc -c 'cat > libs/math-core/src/core/math.cc <<"EOF"
 #include "core/math.h"
 int add_ints(int a, int b) {
   return a + b;
 }
 EOF'`;
-    await sh`bash -lc 'cat > libs/math-core/TARGETS <<"EOF"
+    await sh`bash --noprofile --norc -c 'cat > libs/math-core/TARGETS <<"EOF"
 load("//cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
@@ -36,8 +36,8 @@ nix_cpp_library(
 EOF'`;
 
     // libs/math-api — minimal Go c-archive exporting Add (pure Go for simplicity and determinism here)
-    await sh`bash -lc 'mkdir -p libs/math-api/pkg/addon'`;
-    await sh`bash -lc 'cat > libs/math-api/pkg/addon/export.go <<"EOF"
+    await sh`bash --noprofile --norc -c 'mkdir -p libs/math-api/pkg/addon'`;
+    await sh`bash --noprofile --norc -c 'cat > libs/math-api/pkg/addon/export.go <<"EOF"
 package main
 
 // #include <stdint.h>
@@ -50,20 +50,20 @@ func Add(a, b C.int) C.int {
 
 func main() {}
 EOF'`;
-    await sh`bash -lc 'cat > libs/math-api/go.mod <<"EOF"
+    await sh`bash --noprofile --norc -c 'cat > libs/math-api/go.mod <<"EOF"
 module example.com/math/api
 
 go 1.22.0
 EOF'`;
     // Minimal gomod2nix (no deps) so the planner can resolve modulesTomlFor for this Go target.
-    await sh`bash -lc 'cat > libs/math-api/gomod2nix.toml <<"EOF"
+    await sh`bash --noprofile --norc -c 'cat > libs/math-api/gomod2nix.toml <<"EOF"
 schema = 3
 mod = {}
 replace = {}
 prune = { go-tests = true, unused-packages = true }
 EOF'`;
     // TARGETS declaring a Go c-archive
-    await sh`bash -lc 'cat > libs/math-api/TARGETS <<"EOF"
+    await sh`bash --noprofile --norc -c 'cat > libs/math-api/TARGETS <<"EOF"
 load("//go:defs.bzl", "nix_go_carchive")
 
 nix_go_carchive(
@@ -77,8 +77,8 @@ nix_go_carchive(
 EOF'`;
 
     // libs/math-native — Node N-API addon binding to the Go c-archive's exported Add
-    await sh`bash -lc 'mkdir -p libs/math-native/src'`;
-    await sh`bash -lc 'cat > libs/math-native/src/binding.cc <<"EOF"
+    await sh`bash --noprofile --norc -c 'mkdir -p libs/math-native/src'`;
+    await sh`bash --noprofile --norc -c 'cat > libs/math-native/src/binding.cc <<"EOF"
 #include <node_api.h>
 #include <assert.h>
 #include <stdint.h>
@@ -112,7 +112,7 @@ static napi_value Init(napi_env env, napi_value exports) {
 
 NAPI_MODULE(NODE_GYP_MODULE_NAME, Init);
 EOF'`;
-    await sh`bash -lc 'cat > libs/math-native/TARGETS <<"EOF"
+    await sh`bash --noprofile --norc -c 'cat > libs/math-native/TARGETS <<"EOF"
 load("//cpp:defs.bzl", "nix_cpp_node_addon")
 
 nix_cpp_node_addon(
@@ -156,13 +156,13 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`bash -lc ${`test -f "${addonPath}" && echo ok || echo missing`}`;
+    })`bash --noprofile --norc -c ${`test -f "${addonPath}" && echo ok || echo missing`}`;
     if (String(probe.stdout || "").trim() !== "ok") {
       throw new Error("addon .node artifact not found under nix out/lib");
     }
 
     // Write a tiny runner that requires the .node and asserts add(2,3) === 5
-    await sh`bash -lc 'cat > runner.js <<"EOF"
+    await sh`bash --noprofile --norc -c 'cat > runner.js <<"EOF"
 import { createRequire } from "node:module";
 const req = createRequire(import.meta.url);
 const addon = req(process.argv[2]);

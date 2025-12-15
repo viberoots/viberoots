@@ -73,7 +73,7 @@ test("prebuild-guard: coverage falls back to TARGETS.*.auto for Python importer 
     );
 
     // Buck cell mapping (keeps helpers happy in temp repos)
-    await $({ cwd: tmp })`bash -lc ${`set -euo pipefail
+    await $({ cwd: tmp })`bash --noprofile --norc -c ${`set -euo pipefail
       printf '.\\n' > .buckroot
       cat > .buckconfig <<'EOF'
 [buildfile]

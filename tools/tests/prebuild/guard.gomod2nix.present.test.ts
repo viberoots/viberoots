@@ -10,7 +10,7 @@ test("prebuild-guard: CI fails when go.mod present without gomod2nix.toml", asyn
     await fsp.mkdir(app, { recursive: true });
     await fsp.writeFile(path.join(app, "go.mod"), "module example.com/demo\n\ngo 1.22\n", "utf8");
     // Ensure minimal Buck config exists so guard runs
-    await $({ cwd: tmp })`bash -lc ${`set -euo pipefail
+    await $({ cwd: tmp })`bash --noprofile --norc -c ${`set -euo pipefail
       printf '.\n' > .buckroot
       cat > .buckconfig <<'EOF'
 [buildfile]

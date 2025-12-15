@@ -102,16 +102,21 @@ nix_cpp_wasm_static_lib(
         .split(/\n+/)
         .pop() || "";
     if (!outPath) throw new Error("no out path emitted by build-selected.ts");
-    const libGlob = await $`bash -lc ${`ls -1 ${outPath}/lib/lib*.a | head -n 1`}`.nothrow();
+    const libGlob =
+      await $`bash --noprofile --norc -c ${`ls -1 ${outPath}/lib/lib*.a | head -n 1`}`.nothrow();
     const libPath = String(libGlob.stdout || "").trim();
     if (!libPath) throw new Error("no static library (.a) found under out/lib");
     // Header may be placed under include/include/* due to preserved paths; accept either
     const headerA = path.join(outPath, "include", "addon.h");
     const headerB = path.join(outPath, "include", "include", "addon.h");
-    const haveHeaderA = (await $`bash -lc ${`test -f ${headerA} && echo ok || true`}`).stdout
+    const haveHeaderA = (
+      await $`bash --noprofile --norc -c ${`test -f ${headerA} && echo ok || true`}`
+    ).stdout
       .toString()
       .includes("ok");
-    const haveHeaderB = (await $`bash -lc ${`test -f ${headerB} && echo ok || true`}`).stdout
+    const haveHeaderB = (
+      await $`bash --noprofile --norc -c ${`test -f ${headerB} && echo ok || true`}`
+    ).stdout
       .toString()
       .includes("ok");
     if (!haveHeaderA && !haveHeaderB)
@@ -119,7 +124,7 @@ nix_cpp_wasm_static_lib(
 
     // Optional: perform a tiny link to a wasm module if clang is available.
     // This is best-effort and skipped when clang is not present on PATH.
-    const whichClang = await $`bash -lc 'command -v clang || true'`.nothrow();
+    const whichClang = await $`bash --noprofile --norc -c 'command -v clang || true'`.nothrow();
     const clangPath = String(whichClang.stdout || "").trim();
     if (clangPath) {
       const smokeC = path.join(tmp, "smoke.c");
@@ -130,7 +135,7 @@ int main(void) { return add(2, 3) == 5 ? 0 : 42; }`,
         "utf8",
       );
       const smokeWasm = path.join(tmp, "smoke.wasm");
-      await $`bash -lc ${`${clangPath} --target=wasm32-unknown-unknown -nostdlib -Wl,--no-entry -Wl,--export=main -o ${smokeWasm} ${smokeC} ${libPath}`}`.nothrow();
+      await $`bash --noprofile --norc -c ${`${clangPath} --target=wasm32-unknown-unknown -nostdlib -Wl,--no-entry -Wl,--export=main -o ${smokeWasm} ${smokeC} ${libPath}`}`.nothrow();
       await $`test -f ${smokeWasm}`.nothrow();
     }
   });

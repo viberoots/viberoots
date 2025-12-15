@@ -24,7 +24,7 @@ test("nix_node_test: buck2 test fails when importer tests fail", { timeout: 420_
     await $({ env })`scaf new node lib demo --yes`;
     await $({
       env,
-    })`bash -lc 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
+    })`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
 
     const importer = "libs/demo";
     // Overwrite TARGETS to enforce allow-generate semantics in the runner

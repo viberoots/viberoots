@@ -44,7 +44,7 @@ test(
       // Commit scaffold so Nix flake sees importer under git+file sources
       await $({
         env,
-      })`bash -lc 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
+      })`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
 
       const importer = "libs/demo";
       const lockfile = path.join(importer, "pnpm-lock.yaml");
@@ -71,7 +71,7 @@ test(
       // Commit the lockfile so pure flake snapshots see it
       await $({
         env,
-      })`bash -lc 'git -C ${tmp} add ${lockfile} && git -C ${tmp} commit -m "chore(test): add importer lockfile"'`.nothrow();
+      })`bash --noprofile --norc -c 'git -C ${tmp} add ${lockfile} && git -C ${tmp} commit -m "chore(test): add importer lockfile"'`.nothrow();
 
       // 2) Compute/update FOD mapping from the committed lockfile
       await $({

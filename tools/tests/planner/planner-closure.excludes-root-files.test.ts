@@ -65,7 +65,7 @@ test("planner: root-only files are excluded from materialized outputs", async ()
     const { stdout } = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`bash -lc 'BUCK_TARGET="//apps/demo-cli:demo-cli" nix build --impure -L .#graph-generator-selected --no-link --print-out-paths'`;
+    })`bash --noprofile --norc -c 'BUCK_TARGET="//apps/demo-cli:demo-cli" nix build --impure -L .#graph-generator-selected --no-link --print-out-paths'`;
     const outPath =
       String(stdout || "")
         .trim()

@@ -71,10 +71,12 @@ test("cpp macros: lib/bin/addon delegate through shared core and keep emitted at
     // Provider target and mapping used by realize_provider_edges(...)
     await $({
       cwd: tmp,
-    })`bash -lc 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<'\''EOF'\''
+    })`bash --noprofile --norc -c 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<'\''EOF'\''
 genrule(name="prov", out="prov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
 EOF'`;
-    await $({ cwd: tmp })`bash -lc 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
+    await $({
+      cwd: tmp,
+    })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
 MODULE_PROVIDERS = {
   "//libs/demo:lib": ["//third_party/providers:prov"],
   "//apps/demo:demo": ["//third_party/providers:prov"],

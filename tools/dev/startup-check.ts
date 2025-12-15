@@ -11,8 +11,43 @@ async function which(cmd: string) {
   }
 }
 
+async function resolveCmdPath(cmd: string): Promise<string> {
+  try {
+    const { stdout } = await $({ stdio: "pipe" })`command -v ${cmd}`;
+    const raw =
+      String(stdout || "")
+        .trim()
+        .split(/\r?\n/)
+        .filter(Boolean)[0] || "";
+    if (!raw) return "";
+    try {
+      return await fsp.realpath(raw);
+    } catch {
+      return raw;
+    }
+  } catch {
+    return "";
+  }
+}
+
+function isNixStorePath(p: string): boolean {
+  return typeof p === "string" && (p === "/nix/store" || p.startsWith("/nix/store/"));
+}
+
+async function pathExists(p: string): Promise<boolean> {
+  try {
+    await fsp.access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function main() {
-  const need = ["pnpm", "git", "go", "buck2", "nix"];
+  // Only require the glue/orchestrator tools that the repo workflows depend on.
+  // Language-specific toolchains (go/python/etc) are optional: if present they must
+  // be nix-provided, but missing tools should not break sparse/partial clones.
+  const need = ["pnpm", "git", "buck2", "nix"];
   const miss: string[] = [];
   for (const b of need) {
     if (!(await which(b))) {
@@ -24,25 +59,56 @@ async function main() {
     process.exit(1);
   }
 
-  // Python enablement prerequisites (PR-14): python3 and uv
+  // Python enablement prerequisites: python3 and uv.
+  // These should only be required when Python is actually present in the checkout.
+  // Do NOT require developers to edit configs (e.g. langs.json) for sparse/partial clones.
   const isCI = (process.env.CI || "").toLowerCase() === "true";
+  const pythonPresent =
+    (await pathExists("python/defs.bzl")) ||
+    (await pathExists("tools/nix/templates/python.nix")) ||
+    (await pathExists("tools/buck/exporter/lang/python.ts")) ||
+    (await pathExists("tools/buck/providers/python.ts"));
+
   const fakeMissing = String(process.env.STARTUP_CHECK_FAKE_MISSING || "")
     .split(/[,\s]+/)
     .map((s) => s.trim())
     .filter(Boolean);
-  const hasPython3 = fakeMissing.includes("python3") ? false : await which("python3");
-  const hasUv = fakeMissing.includes("uv") ? false : await which("uv");
-  if (!hasPython3 || !hasUv) {
-    const missing = [!hasPython3 ? "python3" : "", !hasUv ? "uv" : ""].filter(Boolean);
-    const msg =
-      "[startup-check] missing tools: " +
-      missing.join(", ") +
-      ". Install via dev shell (direnv/nix).";
-    if (isCI) {
+  // Policy: tools are optional in local dev, but must be present in CI when the
+  // language is present in the checkout (to prevent "it works locally" drift).
+  if (isCI && pythonPresent) {
+    const hasPython3 = fakeMissing.includes("python3") ? false : await which("python3");
+    const hasUv = fakeMissing.includes("uv") ? false : await which("uv");
+    if (!hasPython3 || !hasUv) {
+      const missing = [!hasPython3 ? "python3" : "", !hasUv ? "uv" : ""].filter(Boolean);
+      const msg =
+        "[startup-check] missing tools: " +
+        missing.join(", ") +
+        ". Install via dev shell (direnv/nix).";
       console.error(msg);
       process.exit(1);
-    } else {
-      console.warn(msg);
+    }
+  }
+
+  // Enforce that core toolchains come from /nix/store when present.
+  // This is the project guarantee behind "built by nix-supplied tools".
+  const allowNonStore = (process.env.STARTUP_CHECK_ALLOW_NON_NIX_STORE || "").trim() !== "";
+  if (!allowNonStore) {
+    // Note: do not enforce buck2's path here. In Buck-run contexts (e.g. zx_test),
+    // `buck2` may be a repo-local shim script under buck-out/ that delegates to the
+    // real nix-supplied buck2 binary.
+    const mustBeStore = ["nix", "node", "pnpm", "go", "python3", "uv"];
+    const bad: Array<{ cmd: string; path: string }> = [];
+    for (const cmd of mustBeStore) {
+      const p = await resolveCmdPath(cmd);
+      if (!p) continue;
+      if (!isNixStorePath(p)) bad.push({ cmd, path: p });
+    }
+    if (bad.length) {
+      const msg =
+        "[startup-check] non-Nix toolchain detected (expected /nix/store paths). " +
+        bad.map((b) => `${b.cmd}=${b.path}`).join(" ");
+      console.error(msg);
+      process.exit(1);
     }
   }
 

@@ -22,7 +22,7 @@ test("node lib: nix_node_test target passes when no tests present", async () => 
     await fs.remove(path.join(tmp, "libs", "demo", "test"));
 
     // Commit scaffold and lockfile so Nix flake sees importer under git+file sources
-    await $`bash -lc 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
+    await $`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
 
     // Update fixed-output hash for this importer
     await $({
@@ -30,13 +30,13 @@ test("node lib: nix_node_test target passes when no tests present", async () => 
     })`NIX_PNPM_ALLOW_GENERATE=1 node tools/dev/update-pnpm-hash.ts --lockfile libs/demo/pnpm-lock.yaml`;
 
     // If lockfile wasn't written under the importer (workspace root wrote it), copy it and re-hash
-    await $`bash -lc 'test -f pnpm-lock.yaml && [ ! -f libs/demo/pnpm-lock.yaml ] && cp pnpm-lock.yaml libs/demo/pnpm-lock.yaml || true'`;
+    await $`bash --noprofile --norc -c 'test -f pnpm-lock.yaml && [ ! -f libs/demo/pnpm-lock.yaml ] && cp pnpm-lock.yaml libs/demo/pnpm-lock.yaml || true'`;
     await $({
       stdio: "inherit",
     })`node tools/dev/update-pnpm-hash.ts --lockfile libs/demo/pnpm-lock.yaml`;
 
     // Assert lockfile exists and dump importer directory for debugging
-    await $`bash -lc 'set -e; echo "==== ls -la libs/demo ====\n"; ls -la libs/demo; test -f libs/demo/pnpm-lock.yaml'`;
+    await $`bash --noprofile --norc -c 'set -e; echo "==== ls -la libs/demo ====\n"; ls -la libs/demo; test -f libs/demo/pnpm-lock.yaml'`;
     // Confirm Nix sees the importer lockfile path
     await $({
       stdio: "inherit",

@@ -22,7 +22,7 @@ test("nix templates warn locally and fail in CI when dev overrides set", async (
       cwd: tmp,
       stdio: "pipe",
       env: envLocal,
-    })`bash -lc ${cmdEval}`;
+    })`bash --noprofile --norc -c ${cmdEval}`;
     if (c1 !== 0) {
       console.error("expected success locally when overrides set, got code:", c1);
       process.exit(2);

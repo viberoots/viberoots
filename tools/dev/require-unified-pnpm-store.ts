@@ -86,7 +86,7 @@ async function main() {
     if (cur && fs.existsSync(cur) && fs.statSync(cur).isDirectory()) {
       // Ensure existing store is user-writable so buck-out is removable without sudo
       try {
-        await $`bash -lc ${`chmod -R u+rwX "${cur}" || true`}`;
+        await $`bash --noprofile --norc -c ${`chmod -R u+rwX "${cur}" || true`}`;
       } catch {}
       console.log(cur);
       return;
@@ -131,7 +131,7 @@ async function main() {
       if (!outPath) continue;
       const src = path.join(outPath, "store");
       try {
-        await $`bash -lc ${`set -euo pipefail
+        await $`bash --noprofile --norc -c ${`set -euo pipefail
           if [ -d "${src}" ]; then
             # Copy without preserving owner/perms to ensure user-writable cleanup under buck-out
             rsync -rlt --no-perms --no-owner --no-group "${src}/" "${unifyStore}/" >/dev/null 2>&1 || true
@@ -144,7 +144,7 @@ async function main() {
 
     // Ensure everything under the unified store is user-writable so buck-out is removable without sudo
     try {
-      await $`bash -lc ${`set -euo pipefail
+      await $`bash --noprofile --norc -c ${`set -euo pipefail
         chmod -R u+rwX "${unifyDir}" || true
       `}`;
     } catch {}

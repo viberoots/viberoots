@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 test("export-graph writes tools/buck/graph.json and parses", async () => {
   await runInTemp("export-graph", async (tmp, $) => {
     // Ensure temp repo has a valid Buck mapping to the checked-in prelude
-    await $({ cwd: tmp })`bash -lc ${`set -euo pipefail
+    await $({ cwd: tmp })`bash --noprofile --norc -c ${`set -euo pipefail
       printf '.\n' > .buckroot
       cat > .buckconfig <<'EOF'
 [buildfile]

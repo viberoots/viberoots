@@ -103,7 +103,8 @@ nix_go_tiny_wasm_lib(
         .pop() || "";
     if (!outPath) throw new Error("no out path from graph-generator-selected-wasm");
     const wasmPath = path.join(outPath, "lib", "top.wasm");
-    const ok = await $`bash -lc ${`test -f ${wasmPath} && echo ok || true`}`.nothrow();
+    const ok =
+      await $`bash --noprofile --norc -c ${`test -f ${wasmPath} && echo ok || true`}`.nothrow();
     if (
       !String(ok.stdout || "")
         .trim()

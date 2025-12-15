@@ -20,18 +20,20 @@ test("nix_go_test enables override_cgo_enabled when C-family srcs present (witho
   await runInTemp("go-cgo-override-srcs-test", async (tmp, $) => {
     await $({
       cwd: tmp,
-    })`bash -lc 'mkdir -p tmp/pkg/demo && cat > tmp/pkg/demo/demo_test.go <<'\''EOF'\''
+    })`bash --noprofile --norc -c 'mkdir -p tmp/pkg/demo && cat > tmp/pkg/demo/demo_test.go <<'\''EOF'\''
 package demo
 
 import "testing"
 
 func TestX(t *testing.T) {}
 EOF'`;
-    await $({ cwd: tmp })`bash -lc 'cat > tmp/pkg/demo/shim.c <<'\''EOF'\''
+    await $({ cwd: tmp })`bash --noprofile --norc -c 'cat > tmp/pkg/demo/shim.c <<'\''EOF'\''
 int demo_shim() { return 1; }
 EOF'`;
 
-    await $({ cwd: tmp })`bash -lc 'mkdir -p tmp && cat > tmp/TARGETS <<'\''EOF'\''
+    await $({
+      cwd: tmp,
+    })`bash --noprofile --norc -c 'mkdir -p tmp && cat > tmp/TARGETS <<'\''EOF'\''
 load("//go:defs.bzl", "nix_go_test")
 
 nix_go_test(

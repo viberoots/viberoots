@@ -7,17 +7,21 @@ test("extra_module_providers are appended and normalized", async () => {
     // Create provider targets and auto_map with proper Starlark quoting
     await $({
       cwd: tmp,
-    })`bash -lc 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<\'EOF'
+    })`bash --noprofile --norc -c 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<\'EOF'
 genrule(name="mod_auto", out="mod_auto.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
 genrule(name="mod_extra", out="mod_extra.stamp", cmd=": > $OUT", visibility=["PUBLIC"]) 
 genrule(name="dup", out="dup.stamp", cmd=": > $OUT", visibility=["PUBLIC"]) 
 EOF'`;
-    await $({ cwd: tmp })`bash -lc 'cat > third_party/providers/auto_map.bzl <<\'EOF'
+    await $({
+      cwd: tmp,
+    })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<\'EOF'
 MODULE_PROVIDERS = {
   "//tmp:lib": ["//third_party/providers:mod_auto"],
 }
 EOF'`;
-    await $({ cwd: tmp })`bash -lc 'mkdir -p tmp && cat > tmp/TARGETS <<\'EOF' && cat tmp/TARGETS
+    await $({
+      cwd: tmp,
+    })`bash --noprofile --norc -c 'mkdir -p tmp && cat > tmp/TARGETS <<\'EOF' && cat tmp/TARGETS
 load("//go:defs.bzl", "nix_go_library")
 
 # localprov need not be a go_library; allow any target
@@ -63,13 +67,15 @@ test("dedup keeps first occurrence across deps and extra_module_providers", asyn
     // Provider targets
     await $({
       cwd: tmp,
-    })`bash -lc 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<\'EOF'
+    })`bash --noprofile --norc -c 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<\'EOF'
 genrule(name="dup", out="dup.stamp", cmd=": > $OUT", visibility=["PUBLIC"]) 
 EOF'`;
-    await $({ cwd: tmp })`bash -lc 'cat > third_party/providers/auto_map.bzl <<\'EOF'
+    await $({
+      cwd: tmp,
+    })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<\'EOF'
 MODULE_PROVIDERS = {}
 EOF'`;
-    await $({ cwd: tmp })`bash -lc 'mkdir -p tmp && cat > tmp/TARGETS <<\'EOF'
+    await $({ cwd: tmp })`bash --noprofile --norc -c 'mkdir -p tmp && cat > tmp/TARGETS <<\'EOF'
 load("//go:defs.bzl", "nix_go_library")
 
 nix_go_library(

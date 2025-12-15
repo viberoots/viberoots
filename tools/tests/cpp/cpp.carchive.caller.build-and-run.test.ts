@@ -11,10 +11,10 @@ import { runInTemp } from "../lib/test-helpers";
 test("cpp calls go c-archive (temp repo)", async () => {
   await runInTemp("cpp-carchive-caller", async (tmp, $) => {
     // Create a Go c-archive lib
-    await $({ cwd: tmp })`bash -lc 'mkdir -p libs/greetgo'`;
+    await $({ cwd: tmp })`bash --noprofile --norc -c 'mkdir -p libs/greetgo'`;
     await $({
       cwd: tmp,
-    })`bash -lc 'cat > libs/greetgo/export.go <<"EOF"\npackage main\n\n// #include <stdint.h>\nimport \"C\"\n\n//export GoGreet\nfunc GoGreet() *C.char {\n    return C.CString(\"hello from go\")\n}\n\nfunc main() {}\nEOF'`;
+    })`bash --noprofile --norc -c 'cat > libs/greetgo/export.go <<"EOF"\npackage main\n\n// #include <stdint.h>\nimport \"C\"\n\n//export GoGreet\nfunc GoGreet() *C.char {\n    return C.CString(\"hello from go\")\n}\n\nfunc main() {}\nEOF'`;
     // Minimal Go module + gomod2nix for this temp repo package (no deps; fully local).
     await fsp.writeFile(
       path.join(tmp, "libs", "greetgo", "go.mod"),
@@ -34,19 +34,19 @@ test("cpp calls go c-archive (temp repo)", async () => {
     );
     await $({
       cwd: tmp,
-    })`bash -lc 'cat > libs/greetgo/TARGETS <<"EOF"\nload("//go:defs.bzl", "nix_go_carchive")\n\nnix_go_carchive(\n    name = "greetgo",\n    srcs = [\n        "export.go",\n    ],\n    labels = ["lang:go", "kind:carchive"],\n    visibility = ["PUBLIC"],\n)\nEOF'`;
+    })`bash --noprofile --norc -c 'cat > libs/greetgo/TARGETS <<"EOF"\nload("//go:defs.bzl", "nix_go_carchive")\n\nnix_go_carchive(\n    name = "greetgo",\n    srcs = [\n        "export.go",\n    ],\n    labels = ["lang:go", "kind:carchive"],\n    visibility = ["PUBLIC"],\n)\nEOF'`;
 
     // Create a C++ caller that uses the exported Go symbol
-    await $({ cwd: tmp })`bash -lc 'mkdir -p apps/caller/src apps/caller/tests'`;
+    await $({ cwd: tmp })`bash --noprofile --norc -c 'mkdir -p apps/caller/src apps/caller/tests'`;
     await $({
       cwd: tmp,
-    })`bash -lc 'cat > apps/caller/src/main.cpp <<"EOF"\n#include <iostream>\nextern "C" char* GoGreet();\nint main() {\n  char* s = GoGreet();\n  if (s) std::cout << s << "\\n";\n  return 0;\n}\nEOF'`;
+    })`bash --noprofile --norc -c 'cat > apps/caller/src/main.cpp <<"EOF"\n#include <iostream>\nextern "C" char* GoGreet();\nint main() {\n  char* s = GoGreet();\n  if (s) std::cout << s << "\\n";\n  return 0;\n}\nEOF'`;
     await $({
       cwd: tmp,
-    })`bash -lc 'cat > apps/caller/tests/caller_gtest.cpp <<"EOF"\n#include <gtest/gtest.h>\nextern "C" char* GoGreet();\nTEST(CGoCaller, CallsGo) {\n  char* s = GoGreet();\n  ASSERT_NE(s, nullptr);\n}\nEOF'`;
+    })`bash --noprofile --norc -c 'cat > apps/caller/tests/caller_gtest.cpp <<"EOF"\n#include <gtest/gtest.h>\nextern "C" char* GoGreet();\nTEST(CGoCaller, CallsGo) {\n  char* s = GoGreet();\n  ASSERT_NE(s, nullptr);\n}\nEOF'`;
     await $({
       cwd: tmp,
-    })`bash -lc 'cat > apps/caller/TARGETS <<"EOF"
+    })`bash --noprofile --norc -c 'cat > apps/caller/TARGETS <<"EOF"
 load("//cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_test")
 
 nix_cpp_binary(
@@ -89,7 +89,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`bash -lc 'BUCK_TARGET="//apps/caller:caller" nix build --impure -L .#graph-generator-selected --accept-flake-config --print-out-paths'`;
+    })`bash --noprofile --norc -c 'BUCK_TARGET="//apps/caller:caller" nix build --impure -L .#graph-generator-selected --accept-flake-config --print-out-paths'`;
     if (build.exitCode !== 0) {
       console.error(build.stdout + "\n" + build.stderr);
       throw new Error("nix build failed");

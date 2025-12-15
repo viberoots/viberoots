@@ -6,7 +6,7 @@ test("nixpkg_deps wires both zlib and openssl providers", async () => {
   await runInTemp("go-cgo-mixed-wiring", async (tmp, $) => {
     await $({
       cwd: tmp,
-    })`bash -lc 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<'\''EOF'\''
+    })`bash --noprofile --norc -c 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<'\''EOF'\''
 load("//third_party/providers:defs_cpp.bzl", "nix_cxx_library")
 nix_cxx_library(name="nix_pkgs_zlib", attr="pkgs.zlib")
 nix_cxx_library(name="nix_pkgs_openssl", attr="pkgs.openssl")
@@ -15,7 +15,7 @@ EOF'`;
     // Map the demo target to both providers via MODULE_PROVIDERS (auto_map)
     await $({
       cwd: tmp,
-    })`bash -lc 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
+    })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
 # GENERATED for test
 MODULE_PROVIDERS = {
     "//apps/demo-cli:demo": [
@@ -27,7 +27,7 @@ EOF'`;
 
     await $({
       cwd: tmp,
-    })`bash -lc 'mkdir -p apps/demo-cli/cmd/demo && cat > apps/demo-cli/cmd/demo/main.go <<'\''EOF'\''
+    })`bash --noprofile --norc -c 'mkdir -p apps/demo-cli/cmd/demo && cat > apps/demo-cli/cmd/demo/main.go <<'\''EOF'\''
 package main
 /*
 #cgo pkg-config: zlib openssl
@@ -38,7 +38,7 @@ import "C"
 func main() {}
 EOF'`;
 
-    await $({ cwd: tmp })`bash -lc 'cat > apps/demo-cli/TARGETS <<'\''EOF'\''
+    await $({ cwd: tmp })`bash --noprofile --norc -c 'cat > apps/demo-cli/TARGETS <<'\''EOF'\''
 load("//go:defs.bzl", "nix_go_binary")
 
 nix_go_binary(

@@ -6,7 +6,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("install-deps gomod2nix integration writes deterministic gomod2nix.toml", async () => {
   await runInTemp("install-deps-integration", async (tmp, $) => {
-    await $`bash -lc ${`set -euo pipefail
+    await $`bash --noprofile --norc -c ${`set -euo pipefail
       printf '.\n' > .buckroot
       cat > .buckconfig <<'EOF'
 [buildfile]

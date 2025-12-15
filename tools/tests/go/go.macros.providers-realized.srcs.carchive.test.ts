@@ -10,12 +10,12 @@ test("go macros: provider edges realized into srcs for nix_go_carchive", async (
     // Minimal provider and auto_map mapping
     await $({
       cwd: tmp,
-    })`bash -lc 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<'\''EOF'\''
+    })`bash --noprofile --norc -c 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<'\''EOF'\''
 genrule(name="prov", out="prov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
 EOF'`;
     await $({
       cwd: tmp,
-    })`bash -lc 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
+    })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
 MODULE_PROVIDERS = {
   "//apps/demo:arc": ["//third_party/providers:prov"],
 }

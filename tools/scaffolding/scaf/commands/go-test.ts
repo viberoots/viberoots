@@ -85,7 +85,7 @@ export async function cmdGoTest(ctx: ScafContext, name: string, flags: ScafFlags
   const contents = `package ${pkg}\n\nimport "testing"\n\nfunc Test${funcName}(t *testing.T) {\n}\n`;
   await fsp.writeFile(dest, contents, "utf8");
   try {
-    await $`bash -lc ${`set -euo pipefail; go fmt ${dest} >/dev/null 2>&1 || true`}`;
+    await $`bash --noprofile --norc -c ${`set -euo pipefail; go fmt ${dest} >/dev/null 2>&1 || true`}`;
   } catch {}
 
   const hintLib =

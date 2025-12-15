@@ -20,13 +20,15 @@ test("nix_go_library enables override_cgo_enabled when nixpkg_deps present", asy
   await runInTemp("go-cgo-override-nixpkg-lib", async (tmp, $) => {
     await $({
       cwd: tmp,
-    })`bash -lc 'mkdir -p tmp/pkg/demo && cat > tmp/pkg/demo/demo.go <<'\''EOF'\''
+    })`bash --noprofile --norc -c 'mkdir -p tmp/pkg/demo && cat > tmp/pkg/demo/demo.go <<'\''EOF'\''
 package demo
 
 func X() {}
 EOF'`;
 
-    await $({ cwd: tmp })`bash -lc 'mkdir -p tmp && cat > tmp/TARGETS <<'\''EOF'\''
+    await $({
+      cwd: tmp,
+    })`bash --noprofile --norc -c 'mkdir -p tmp && cat > tmp/TARGETS <<'\''EOF'\''
 load("//go:defs.bzl", "nix_go_library")
 
 nix_go_library(

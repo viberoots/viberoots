@@ -18,19 +18,23 @@ function firstCqueryNode<T>(json: unknown): T | null {
 
 test("nix_go_binary enables override_cgo_enabled when repo_cgo_deps present", async () => {
   await runInTemp("go-cgo-override-repo-bin", async (tmp, $) => {
-    await $({ cwd: tmp })`bash -lc 'mkdir -p libs/native && cat > libs/native/TARGETS <<'\''EOF'\''
+    await $({
+      cwd: tmp,
+    })`bash --noprofile --norc -c 'mkdir -p libs/native && cat > libs/native/TARGETS <<'\''EOF'\''
 genrule(name="native", out="native.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
 EOF'`;
 
     await $({
       cwd: tmp,
-    })`bash -lc 'mkdir -p tmp/cmd/demo && cat > tmp/cmd/demo/main.go <<'\''EOF'\''
+    })`bash --noprofile --norc -c 'mkdir -p tmp/cmd/demo && cat > tmp/cmd/demo/main.go <<'\''EOF'\''
 package main
 
 func main() {}
 EOF'`;
 
-    await $({ cwd: tmp })`bash -lc 'mkdir -p tmp && cat > tmp/TARGETS <<'\''EOF'\''
+    await $({
+      cwd: tmp,
+    })`bash --noprofile --norc -c 'mkdir -p tmp && cat > tmp/TARGETS <<'\''EOF'\''
 load("//go:defs.bzl", "nix_go_binary")
 
 nix_go_binary(

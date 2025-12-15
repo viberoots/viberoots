@@ -14,7 +14,7 @@ test("prebuild-guard: missing outputs warns locally and fails in CI", async () =
       "utf8",
     );
     // Ensure Buck mapping exists in temp repo
-    await $({ cwd: tmp })`bash -lc ${`set -euo pipefail
+    await $({ cwd: tmp })`bash --noprofile --norc -c ${`set -euo pipefail
       printf '.\n' > .buckroot
       cat > .buckconfig <<'EOF'
 [buildfile]
