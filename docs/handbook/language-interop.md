@@ -17,6 +17,11 @@ node tools/dev/startup-check.ts
 
 You can consume both in-repo C/C++ libraries and nixpkgs-provided native libraries from Go.
 
+Before you get into cgo-specific wiring, it helps to know one macro convenience that keeps small CLIs tidy. When `nix_go_binary(name = "<bin>", ...)` detects `*_test.go` files under `cmd/<bin>/**`, it auto-creates two helper targets:
+
+- **`<bin>_pkg`**: a Go library target used as the `library` for tests. It uses the same wiring contracts as `nix_go_library` (provider edges + package-local patch inputs + standard label stamping).
+- **`<bin>_test`**: a Go test target that compiles and runs the `cmd/<bin>` tests without requiring you to edit `TARGETS` after adding new test files.
+
 1. Create or use a C/C++ library target (in-repo):
 
 ```python
