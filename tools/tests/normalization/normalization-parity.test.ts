@@ -31,15 +31,11 @@ async function starlarkProbeOutput(target: string): Promise<string> {
 }
 
 async function nixNormalize(attr: string): Promise<string> {
-  // Evaluate a tiny Nix function inline using nixpkgs lib to trim/lower/prefix/map gtest
+  // Evaluate the repo's canonical Nix normalizer for parity with Starlark/TS.
   // Use --argstr to safely pass the attribute string.
   const expr =
     "with import <nixpkgs> {}; " +
-    "(let normalize = attr: " +
-    "  let s = lib.toLower (lib.strings.trim attr); " +
-    '      a = if lib.hasPrefix "pkgs." s then s else "pkgs." + s; ' +
-    '  in if a == "pkgs.gtest" then "pkgs.googletest" else a ' +
-    "in normalize a)";
+    "(let H = import ./tools/nix/lib/lang-helpers.nix { inherit pkgs; }; in H.normalizeNixAttr a)";
   const { stdout } = await $`nix eval --impure --raw --expr ${expr} --argstr a ${attr}`;
   return stdout.trim();
 }

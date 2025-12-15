@@ -5,6 +5,8 @@ normalize_nix_attr_probe(name = "case1", attr = "gtest")
 normalize_nix_attr_probe(name = "case2", attr = "pkgs.gtest")
 normalize_nix_attr_probe(name = "case3", attr = "pkgs.openssl")
 normalize_nix_attr_probe(name = "case4", attr = "pkgs.gnome.glib")
+normalize_nix_attr_probe(name = "case5", attr = "zlib")
+normalize_nix_attr_probe(name = "case6", attr = "pkgs.zlib")
 
 
 

@@ -30,6 +30,25 @@ Canonical naming and helpers:
 - **Patch fixtures**: `tools/tests/lib/fixtures/go.ts: ensurePatch()` creates a correctly named patch file for tests.
 - **Starlark nixpkgs stamping (canonical)**: use `lang/defs_common.bzl: append_nixpkg_labels(kwargs, attrs)` to append `nixpkg:<normalized>` labels. Normalization trims, lowercases, ensures the `pkgs.` prefix, and maps `pkgs.gtest` → `pkgs.googletest`. Do not re‑implement label loops in language macros.
 
+#### `nixpkg:` normalization contract (single source of truth)
+
+`nixpkg:` is a cross-language public interface. Normalization must match across:
+
+- Starlark: `lang/nixpkg_labels.bzl:normalize_nix_attr`
+- TypeScript: `tools/lib/provider-names.ts:normalizeNixAttr`
+- Nix templates: `tools/nix/lib/lang-helpers.nix:normalizeNixAttr`
+
+Contract:
+
+- Input is trimmed and lowercased.
+- `pkgs.` prefix is added if missing.
+- Alias mapping is applied (source of truth: `tools/lib/nix-attr-aliases.json`; Starlark mirror: `lang/nix_attr_aliases.bzl`).
+- Historical compatibility: `gtest` normalizes to `pkgs.googletest`.
+
+Regression guard:
+
+- `tools/tests/normalization/normalization-parity.test.ts` compares Starlark, TS, and Nix on a shared test matrix.
+
 #### C++ provider edges (optional, graph‑shape uniformity)
 
 - C++ macros (`nix_cpp_library`, `nix_cpp_binary`) may realize provider edges for diagnostics and cquery introspection by merging `providers_for(MODULE_PROVIDERS, name)` into their `deps`.

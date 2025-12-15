@@ -1,6 +1,9 @@
 { pkgs }:
 let
   lib = pkgs.lib;
+  nixAttrAliases =
+    let attempt = builtins.tryEval (builtins.fromJSON (builtins.readFile ../../lib/nix-attr-aliases.json));
+    in if attempt.success && builtins.isAttrs attempt.value then attempt.value else {};
 
   # Split a dotted attribute path (e.g., "pkgs.foo.bar") into segments.
   segs = s: let xs = lib.splitString "." s; in if xs == [] then [] else xs;
@@ -25,6 +28,21 @@ let
 
   sanitizeName = s:
     lib.replaceStrings ["//" ":" "/" " "] ["" "-" "-" "-"] s;
+
+  # Normalize a nixpkgs attribute path for provider naming and labeling.
+  # Contract:
+  # - trims
+  # - lower-cases
+  # - ensures "pkgs." prefix
+  # - applies alias mapping from tools/lib/nix-attr-aliases.json
+  # - preserves gtest compatibility (pkgs.gtest -> pkgs.googletest) even when alias map is unavailable
+  normalizeNixAttr = attr:
+    if !(builtins.isString attr) then "" else
+    let
+      s0 = lib.toLower (lib.trim attr);
+      withPkgs = if s0 == "" then "" else (if lib.hasPrefix "pkgs." s0 then s0 else ("pkgs." + s0));
+      aliased = if withPkgs != "" && builtins.hasAttr withPkgs nixAttrAliases then nixAttrAliases.${withPkgs} else withPkgs;
+    in if aliased == "pkgs.gtest" then "pkgs.googletest" else aliased;
 
   # Build {"importPath@version" = [ /abs/path.patch ... ]} from a flat patches/<lang>/*.patch directory.
   # Filenames encode import path with '/' -> '__' and suffix '@<version>.patch'.
@@ -82,7 +100,7 @@ let
       else null;
 
  in rec {
-  inherit segs getAtPath resolveAttrFromPkgs sanitizeName patchesMapFromDir patchesMapFromDirs readDevOverrides guardNoDevOverridesInCI;
+  inherit segs getAtPath resolveAttrFromPkgs sanitizeName normalizeNixAttr patchesMapFromDir patchesMapFromDirs readDevOverrides guardNoDevOverridesInCI;
 
   /*
     Build {"importPath@version" = [ /nix/store/...-patch1 /nix/store/...-patch2 ... ]}

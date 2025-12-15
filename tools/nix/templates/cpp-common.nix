@@ -22,18 +22,13 @@ let
   devMap = H.readDevOverrides "NIX_CPP_DEV_OVERRIDE_JSON";
   _ci_guard = H.guardNoDevOverridesInCI "NIX_CPP_DEV_OVERRIDE_JSON";
 
-  normalizeAttr = s:
-    let s0 = lib.toLower (lib.trim s);
-        withPkgs = if lib.hasPrefix "pkgs." s0 then s0 else ("pkgs." + s0);
-    in if withPkgs == "pkgs.gtest" then "pkgs.googletest" else withPkgs;
+  normalizeAttr = H.normalizeNixAttr;
 
-  # Resolve a string attribute against pkgs, handling gtest → googletest alias
+  # Resolve a string attribute against pkgs (expects normalizeAttr contract).
   getAtFromPkgs = s:
-    let parts0 = H.segs s;
+    let parts0 = H.segs (normalizeAttr s);
         parts = if parts0 != [] && (lib.head parts0) == "pkgs" then lib.tail parts0 else parts0;
-    in if parts == [ "gtest" ]
-       then H.getAtPath pkgs [ "googletest" ]
-       else H.getAtPath pkgs parts;
+    in H.getAtPath pkgs parts;
 
   overridePkgIfAny = attr: pkg:
     let key = normalizeAttr attr;
