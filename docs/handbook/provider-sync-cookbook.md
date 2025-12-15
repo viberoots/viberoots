@@ -47,7 +47,7 @@ Contract:
 
 Regression guard:
 
-- `tools/tests/normalization/normalization-parity.test.ts` compares Starlark, TS, and Nix on a shared test matrix.
+- `tools/tests/normalization-parity.test.ts` compares Starlark, TS, and Nix on a shared test matrix.
 
 #### C++ provider edges (optional, graph‑shape uniformity)
 

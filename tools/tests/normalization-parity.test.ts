@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { normalizeNixAttr, decodeNameVersionFromPatch } from "../../lib/providers.ts";
+import { decodeNameVersionFromPatch, normalizeNixAttr } from "../lib/providers.ts";
 
 const cases: Array<{ name: string; attr: string }> = [
   { name: "case1", attr: "gtest" },
@@ -31,12 +31,12 @@ async function starlarkProbeOutput(target: string): Promise<string> {
 }
 
 async function nixNormalize(attr: string): Promise<string> {
-  // Evaluate the repo's canonical Nix normalizer for parity with Starlark/TS.
-  // Use --argstr to safely pass the attribute string.
+  const nixStringLiteral = JSON.stringify(String(attr ?? ""));
   const expr =
-    "with import <nixpkgs> {}; " +
-    "(let H = import ./tools/nix/lib/lang-helpers.nix { inherit pkgs; }; in H.normalizeNixAttr a)";
-  const { stdout } = await $`nix eval --impure --raw --expr ${expr} --argstr a ${attr}`;
+    "let pkgs = import <nixpkgs> {}; " +
+    `H = import ./tools/nix/lib/lang-helpers.nix { inherit pkgs; }; ` +
+    `in H.normalizeNixAttr ${nixStringLiteral}`;
+  const { stdout } = await $`nix eval --impure --raw --expr ${expr}`;
   return stdout.trim();
 }
 
@@ -48,7 +48,6 @@ for (const c of cases) {
     console.error(`normalize_nix_attr mismatch for '${c.attr}': starlark='${got}' ts='${want}'`);
     process.exit(2);
   }
-  // Also compare against Nix evaluation parity
   const nix = await nixNormalize(c.attr);
   if (nix !== want) {
     console.error(`normalize_nix_attr mismatch for '${c.attr}': nix='${nix}' ts='${want}'`);
@@ -56,15 +55,14 @@ for (const c of cases) {
   }
 }
 
-console.log("OK normalization parity");
+console.log("OK nixpkg normalization parity");
 
-// Flat patch filename decoding (Go/Node) — ensure decode helper behavior on a small corpus
 const patchCases: Array<{ file: string; expect: string | null }> = [
   { file: "lodash@4.17.21.patch", expect: "lodash@4.17.21" },
   { file: "@scope__name@1.2.3.patch", expect: "@scope/name@1.2.3" },
   { file: "lodash___core@4.17.21.patch", expect: "lodash/_core@4.17.21" },
   { file: "foo@bar@1.0.0.patch", expect: "foo@bar@1.0.0" },
-  { file: "PKGS__OPENSSL@3.2.0.patch", expect: "pkgs/openssl@3.2.0" }, // liberal decoding of "__" and casing
+  { file: "PKGS__OPENSSL@3.2.0.patch", expect: "pkgs/openssl@3.2.0" },
   { file: "not-a-patch.txt", expect: null },
   { file: "bad@.patch", expect: null },
 ];

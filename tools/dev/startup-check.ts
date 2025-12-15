@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 // tools/dev/startup-check.ts — verifies required tools and Nix features; prints fallbacks
 import * as fsp from "node:fs/promises";
+import { isNixStorePath, resolvePreferredCmdPath } from "./startup-check/cmd-paths.ts";
 
 async function which(cmd: string) {
   try {
@@ -9,29 +10,6 @@ async function which(cmd: string) {
   } catch {
     return false;
   }
-}
-
-async function resolveCmdPath(cmd: string): Promise<string> {
-  try {
-    const { stdout } = await $({ stdio: "pipe" })`command -v ${cmd}`;
-    const raw =
-      String(stdout || "")
-        .trim()
-        .split(/\r?\n/)
-        .filter(Boolean)[0] || "";
-    if (!raw) return "";
-    try {
-      return await fsp.realpath(raw);
-    } catch {
-      return raw;
-    }
-  } catch {
-    return "";
-  }
-}
-
-function isNixStorePath(p: string): boolean {
-  return typeof p === "string" && (p === "/nix/store" || p.startsWith("/nix/store/"));
 }
 
 async function pathExists(p: string): Promise<boolean> {
@@ -96,10 +74,14 @@ async function main() {
     // Note: do not enforce buck2's path here. In Buck-run contexts (e.g. zx_test),
     // `buck2` may be a repo-local shim script under buck-out/ that delegates to the
     // real nix-supplied buck2 binary.
-    const mustBeStore = ["nix", "node", "pnpm", "go", "python3", "uv"];
+    // Required tools should be nix-provided in all environments.
+    // Optional language toolchains are only enforced in CI when that language is present.
+    const mustBeStore = ["nix", "node", "pnpm", "go"].concat(
+      isCI && pythonPresent ? ["python3", "uv"] : [],
+    );
     const bad: Array<{ cmd: string; path: string }> = [];
     for (const cmd of mustBeStore) {
-      const p = await resolveCmdPath(cmd);
+      const p = await resolvePreferredCmdPath(cmd);
       if (!p) continue;
       if (!isNixStorePath(p)) bad.push({ cmd, path: p });
     }
@@ -109,6 +91,22 @@ async function main() {
         bad.map((b) => `${b.cmd}=${b.path}`).join(" ");
       console.error(msg);
       process.exit(1);
+    }
+
+    // Local-only advisory: when Python is present in the checkout but CI enforcement is off,
+    // do not fail if the system toolchain is on PATH first.
+    if (!isCI && pythonPresent) {
+      const p3 = await resolvePreferredCmdPath("python3");
+      const uv = await resolvePreferredCmdPath("uv");
+      const warns: Array<{ cmd: string; path: string }> = [];
+      if (p3 && !isNixStorePath(p3)) warns.push({ cmd: "python3", path: p3 });
+      if (uv && !isNixStorePath(uv)) warns.push({ cmd: "uv", path: uv });
+      if (warns.length) {
+        console.warn(
+          "[startup-check] warning: non-Nix python toolchain on PATH. Local dev is OK; CI will enforce it. " +
+            warns.map((w) => `${w.cmd}=${w.path}`).join(" "),
+        );
+      }
     }
   }
 
