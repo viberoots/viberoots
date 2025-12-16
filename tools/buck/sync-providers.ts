@@ -42,7 +42,7 @@ async function main() {
   await syncAllProviders({ outFile: maybeOut as any, strict: STRICT, lang: targetLang });
   if (targetLangRequested(targetLang)) {
     // When a specific language is requested, also ensure downstream glue is present so
-    // Buck macros that load //third_party/providers:auto_map.bzl can parse in temp repos.
+    // Buck macros load provider mappings via //lang:auto_map.bzl (re-export of third_party/providers/auto_map.bzl).
     // Ensure graph.json exists before generating auto_map and provider index
     await ensureGraph();
     await $`node --disable-warning=ExperimentalWarning --experimental-strip-types --import ./tools/dev/zx-init.mjs tools/buck/gen-auto-map.ts --graph ${DEFAULT_GRAPH_PATH} --out ./third_party/providers/auto_map.bzl`;

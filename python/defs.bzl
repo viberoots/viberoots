@@ -1,6 +1,6 @@
 load("@prelude//:rules.bzl", "python_binary", "python_library", "python_test", "genrule")
 load("//lang:defs_common.bzl", "stamp_labels", "ensure_single_lockfile_label", "append_nixpkg_labels", "include_importer_patches_from_labels", "dedupe_preserve", "stamp_wasm_variant", "realize_provider_edges", "synthetic_dep_for_importer_patches_from_labels")
-load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
+load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
 
 def nix_python_library(name, lockfile_label = None, deps = [], **kwargs):
     """

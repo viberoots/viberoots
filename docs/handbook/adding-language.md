@@ -61,7 +61,7 @@ Tip for lockfile-style ecosystems (e.g., Node/PNPM):
 
 - Patches live under `patches/<lang>/` (flat directory).
 - Nix templates live under `tools/nix/templates/<lang>.nix` and are imported by `tools/nix/lang-templates.nix`.
-- Language macros live under `<lang>/defs.bzl` and use `//third_party/providers:auto_map.bzl`.
+- Language macros live under `<lang>/defs.bzl` and load provider mappings via the stable `//lang:auto_map.bzl` re-export.
 - Provider rules live under `//third_party/providers/**` and are generated, not hand-edited.
 
 ## Step-by-step
@@ -105,7 +105,7 @@ Tip for lockfile-style ecosystems (e.g., Node/PNPM):
 - Add `<lang>/defs.bzl` using `lang/defs_common.bzl` helpers to:
   - Stamp labels (`lang:<id>`, `kind:<bin|lib|test>`) on primary targets
   - Auto-wire tests per your language conventions
-  - Append providers from `//third_party/providers:auto_map.bzl`
+  - Append providers from `MODULE_PROVIDERS` loaded via `//lang:auto_map.bzl` (do not load `//third_party/providers:auto_map.bzl` directly)
 
 7. Scaffolding
 

@@ -14,6 +14,14 @@ test("macros use realize_provider_edges() and avoid direct provider labels", asy
   const files = ["go/defs.bzl", "cpp/defs.bzl", "node/defs_core.bzl", "python/defs.bzl"];
   for (const f of files) {
     const txt = await read(f);
+    assert(
+      !txt.includes('load("//third_party/providers:auto_map.bzl"'),
+      `${f} must not load //third_party/providers:auto_map.bzl directly; use //lang:auto_map.bzl`,
+    );
+    assert(
+      txt.includes('load("//lang:auto_map.bzl"'),
+      `${f} must load MODULE_PROVIDERS via //lang:auto_map.bzl`,
+    );
     // Must use realize_provider_edges() helper
     assert(
       txt.includes("realize_provider_edges("),
@@ -23,7 +31,7 @@ test("macros use realize_provider_edges() and avoid direct provider labels", asy
     const lines = txt.split(/\r?\n/).filter((l) => l.includes("//third_party/providers:"));
     const offenders = lines.filter(
       (l) =>
-        !l.includes('load("//third_party/providers:auto_map.bzl"') &&
+        !l.includes('load("//lang:auto_map.bzl"') &&
         // Allow filtering checks that explicitly avoid wiring provider deps.
         !l.includes('.startswith("//third_party/providers:")'),
     );

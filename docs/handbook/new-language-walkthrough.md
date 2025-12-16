@@ -31,7 +31,7 @@ Steps
   - Implement `tools/buck/providers/rust.ts` using the existing provider-sync helpers pattern. If no patches exist, generator writes a minimal `TARGETS.<lang>.auto` deterministically.
 
 - **Auto-map wiring**
-  - If your exporter emits labels (e.g., `module:…`), `tools/buck/gen-auto-map.ts` will map target → provider name; macros read providers from `third_party/providers/auto_map.bzl`.
+  - If your exporter emits labels (e.g., `module:…`), `tools/buck/gen-auto-map.ts` will map target → provider name; macros read providers from `MODULE_PROVIDERS` loaded via the stable `//lang:auto_map.bzl` re-export.
 
 - **Capability gating**
   - Add an entry to `tools/nix/langs.json` with `requiredPaths`, `optionalPaths`, and `capabilities` for your language. Missing required paths in a sparse checkout disables the language; glue and scaf will still work for others.

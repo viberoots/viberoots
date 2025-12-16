@@ -5,7 +5,7 @@ load("//lang:planner_stub.bzl", "planner_stub", "planner_stub_with_package_local
 load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name", _cpp_sanitize_probe="cpp_sanitize_probe")
 load("//cpp/private:nix_test.bzl", "cpp_nix_test")
 load("//cpp/private:nix_build.bzl", "cpp_nix_build")
-load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
+load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
 
 def _cpp_common(name, kind, kwargs):
     local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("cpp"))

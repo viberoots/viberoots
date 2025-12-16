@@ -45,6 +45,15 @@ EOF'`;
       "utf8",
     );
 
+    const macroTxt = await fs.readFile(path.join(tmp, "python", "defs.bzl"), "utf8");
+    if (
+      macroTxt.includes('load("//third_party/providers:auto_map.bzl"') ||
+      !macroTxt.includes('load("//lang:auto_map.bzl"')
+    ) {
+      console.error("expected python/defs.bzl to load MODULE_PROVIDERS via //lang:auto_map.bzl");
+      process.exit(2);
+    }
+
     // Introspect deps; provider edge should be present
     const probe = await $({
       cwd: tmp,
