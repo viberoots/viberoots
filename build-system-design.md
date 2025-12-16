@@ -961,6 +961,20 @@ These helpers are used by provider generators and tests to avoid path/ordering d
 
 - Starlark macro path (Node/Python): macros must enforce exactly one importer‑scoped lockfile label via `ensure_single_lockfile_label(...)` and derive the importer with `importer_from_labels(...)`. Avoid bespoke inference; this keeps error text and behavior consistent across macros.
 
+### Provider patch inclusion semantics (Node vs Python)
+
+Node and Python are both importer-scoped ecosystems, but their provider patch inclusion policies are intentionally different:
+
+- **Node (PNPM)**: the importer provider includes **all importer-local patches** under `<importer>/patches/node/*.patch`, even if a patch is not referenced by the lockfile effective set.
+  - Effect: adding or changing any importer-local Node patch invalidates that importer's provider, and therefore rebuilds/retests Node targets wired to that provider.
+- **Python (uv)**: the importer provider includes **only patches that match the `uv.lock` effective set**.
+  - Effect: adding a patch for a Python package that is not present in `uv.lock` does not affect the provider or downstream targets.
+
+This policy is locked down by tests. See:
+
+- Node includes unused importer-local patches: `tools/tests/providers/providers.golden.node-and-python-importer-output.test.ts`
+- Python filters importer-local patches by `uv.lock`: `tools/tests/providers/providers.golden.node-and-python-importer-output.test.ts` and `tools/tests/providers/sync-providers-python.idempotent.test.ts`
+
 ## Future-Proofing for Other Languages
 
 ### PNPM Importer‑scoped Providers (Node)

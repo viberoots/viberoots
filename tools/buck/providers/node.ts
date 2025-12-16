@@ -73,13 +73,18 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
   const listImporterPatchesFor = async (importer: string) =>
     (await import("../../lib/importers.ts")).listImporterPatches(importer, "node");
 
+  // Patch inclusion policy (Node):
+  // - Provider patch_paths include every importer-local patch file under <importer>/patches/node/*.patch,
+  //   even if the patched package is not present in the lockfile effective set.
+  // - This keeps invalidation simple and predictable: adding or changing any importer-local Node patch
+  //   invalidates that importer's provider and therefore rebuilds/retests Node targets wired to it.
   await syncImporterProviders({
     lang: "node",
     discoverLockfiles,
     parseEffectiveSetForLockfile,
     listImporterPatchesFor,
     decodePatchKey: decodeNameVersionFromPatch,
-    includeAllImporterLocalPatches: true, // Node lists importer-local patches regardless of effective set
+    includeAllImporterLocalPatches: true,
     globalKeyToPatchPath: keyToPatchPath,
     outFile: OUT_FILE,
   });

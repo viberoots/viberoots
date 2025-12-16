@@ -29,13 +29,18 @@ export async function syncPythonProviders(opts?: {
   const listImporterPatchesFor = async (importer: string) =>
     (await import("../../lib/importers.ts")).listImporterPatches(importer, "python");
 
+  // Patch inclusion policy (Python):
+  // - Provider patch_paths include only importer-local patches that match the uv.lock effective set.
+  // - This keeps invalidation precise: adding a patch for a package that is not in uv.lock does not
+  //   affect the provider or downstream targets.
+  // - When strict=false, uv.lock parse failures fall back to an empty effective set (preserve behavior).
   await syncImporterProviders({
     lang: "python",
     discoverLockfiles,
     parseEffectiveSetForLockfile,
     listImporterPatchesFor,
     decodePatchKey: decodeNameVersionFromPatch,
-    includeAllImporterLocalPatches: false, // Python filters by effective set
+    includeAllImporterLocalPatches: false,
     outFile: OUT_FILE,
     strict: STRICT,
   });
