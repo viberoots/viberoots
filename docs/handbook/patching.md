@@ -126,6 +126,7 @@ node tools/dev/patches-lint.ts --lang python
 
 - Python targets use importer‑scoped lockfile labels: `lockfile:<path/to/uv.lock>#<importer>`.
 - Exporter and provider sync share the same importer/lockfile conventions via `tools/lib/importers.ts`:
+  - When a Python target is missing a lockfile label, the exporter attaches one deterministically when a nearest `uv.lock` is discoverable.
   - Lockfile discovery for exporter labeling uses the shared nearest-lock helper.
   - Importer label is defined as the lockfile directory (`.` when the lockfile is at repo root).
 - The Python library and test macros include importer‑local patch files in `srcs` for precise Buck invalidation:
@@ -143,6 +144,7 @@ Quick checks and guidance:
 ## Node (PNPM) — importer‑local patches and invalidation
 
 - Node targets use importer‑scoped lockfile labels: `lockfile:<path/to/pnpm-lock.yaml>#<importer>`.
+- When a Node target is missing a lockfile label, the exporter attaches one deterministically when a nearest `pnpm-lock.yaml` is discoverable.
 - The Node macros include importer‑local patch files in `srcs` to achieve precise Buck invalidation, mirroring Go:
   - Patches live under `<importer>/patches/node/*.patch` (e.g., `apps/web/patches/node/...`).
   - Changing a patch only invalidates Node targets bound to that importer.

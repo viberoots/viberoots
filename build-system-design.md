@@ -360,7 +360,7 @@ The exporter aggregates adapter findings (e.g., labeling irregularities) and app
 
 This preserves strictness in CI while enabling smoother local iteration.
 
-> Node adapter note (tests only): for local experiments, you may set `EXPORTER_NODE_ATTACH=1` to let the exporter stamp a missing importer‑scoped lockfile label on macro‑like Node targets that already carry a `kind:*` label. This toggle is off by default and should not be enabled in CI.
+> Importer-scoped lockfile labeling: the exporter attaches a missing `lockfile:<path>#<importer>` label deterministically for importer-scoped ecosystems (Node: nearest `pnpm-lock.yaml`, Python: nearest `uv.lock`). CI remains strict about malformed or multiple lockfile labels.
 
 ---
 

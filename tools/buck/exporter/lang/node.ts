@@ -1,10 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import * as fsp from "node:fs/promises";
 import type { Adapter, Batch, Node } from "../types.ts";
 import { hasLabel, isRuleType, validateLanguageClassification } from "./helpers.ts";
 import { packageDirFromTargetName } from "../batch.ts";
 import { parseLockfileLabel } from "../../../lib/labels.ts";
+import { computeImporterLabel, findNearestPnpmLockForPackage } from "../../../lib/importers.ts";
 
 function isNodeTarget(n: Node): boolean {
   // Prefer explicit lang stamp; fall back to common js_/node_ rule_type families
@@ -32,15 +32,7 @@ function validateSingleImporterLabel(n: Node): string[] {
   // This avoids tripping validation in tests that use ad-hoc nodes without full macro stamping.
   if (!hasKindLabel(n)) return findings;
   const locks = lockfileLabels(n);
-  if (locks.length === 0) {
-    findings.push(
-      [
-        `[exporter][node] missing importer-scoped lockfile label on ${n.name}.`,
-        `Fix: stamp exactly one label via macros: lockfile:<path>#<importer> (e.g., lockfile:apps/web/pnpm-lock.yaml#apps/web).`,
-      ].join("\n"),
-    );
-    return findings;
-  }
+  if (locks.length === 0) return findings;
   if (locks.length > 1) {
     findings.push(
       [
@@ -62,7 +54,7 @@ function validateSingleImporterLabel(n: Node): string[] {
     );
     return findings;
   }
-  const dir = path.dirname(parsed.lockfile);
+  const dir = path.posix.dirname(parsed.lockfile);
   const importerOk = parsed.importer === "." || parsed.importer === dir;
   if (!importerOk) {
     findings.push(
@@ -95,13 +87,34 @@ export const adapter: Adapter = {
   isNode(n) {
     return isNodeTarget(n);
   },
-  validate(nodes: Node[]) {
+  async validate(nodes: Node[]) {
     const out: string[] = [];
+    const lockByPkg = new Map<string, Promise<string | null>>();
+    const nearestLock = (pkgDir: string) => {
+      const key = pkgDir || ".";
+      const cur = lockByPkg.get(key);
+      if (cur) return cur;
+      const next = findNearestPnpmLockForPackage(key);
+      lockByPkg.set(key, next);
+      return next;
+    };
     for (const n of nodes) {
       if (!isNodeTarget(n)) continue;
       // First, ensure macro-stamped kind label is present for Node targets.
       out.push(...validateKindPresence(n));
       out.push(...validateSingleImporterLabel(n));
+      if (hasKindLabel(n) && lockfileLabels(n).length === 0) {
+        const pkg = packageDirFromTargetName(n.name || "") || ".";
+        const lockRel = await nearestLock(pkg);
+        if (!lockRel) {
+          out.push(
+            [
+              `[exporter][node] missing importer-scoped lockfile label on ${n.name}.`,
+              `Fix: ensure a pnpm-lock.yaml exists in '${pkg}' (or an ancestor) so the exporter can attach lockfile:<path>#<importer>, or stamp the label explicitly via macros.`,
+            ].join("\n"),
+          );
+        }
+      }
     }
     // PR-5: advisory for missing lang:node using shared classification helper.
     // Narrow scope: only consider nodes that appear macro-stamped (have importer-scoped lockfile label).
@@ -131,17 +144,16 @@ export const adapter: Adapter = {
     return [];
   },
   async attachLabels(nodes: Node[]): Promise<Node[]> {
-    // Env-gated authoritative attach (symmetry-only enhancement). Default off.
-    // Set EXPORTER_NODE_ATTACH=1 to enable stamping missing lockfile labels.
-    const attach = (() => {
-      const v = String(process.env.EXPORTER_NODE_ATTACH || "")
-        .trim()
-        .toLowerCase();
-      return v === "1" || v === "true";
-    })();
-    if (!attach) return nodes;
-
     const enriched: Node[] = [];
+    const lockByPkg = new Map<string, Promise<string | null>>();
+    const nearestLock = (pkgDir: string) => {
+      const key = pkgDir || ".";
+      const cur = lockByPkg.get(key);
+      if (cur) return cur;
+      const next = findNearestPnpmLockForPackage(key);
+      lockByPkg.set(key, next);
+      return next;
+    };
     for (const n of nodes) {
       if (!isNodeTarget(n)) {
         enriched.push(n);
@@ -155,20 +167,16 @@ export const adapter: Adapter = {
         enriched.push(n);
         continue;
       }
-      // Derive importer candidate from the Buck target name: //pkg:rule → pkg
       const pkg = packageDirFromTargetName(n.name || "") || ".";
-      const lockRel = pkg === "." ? "pnpm-lock.yaml" : `${pkg}/pnpm-lock.yaml`;
-      try {
-        // If a lockfile exists at the derived path, stamp an importer-scoped label.
-        await fsp.access(path.resolve(process.cwd(), lockRel));
-        const importer = pkg === "." ? "." : pkg;
-        const label = `lockfile:${lockRel}#${importer}`;
-        const next = Array.from(new Set([...(labs as string[]), label])).sort();
-        enriched.push({ ...n, labels: next });
-      } catch {
-        // No lockfile at the derived location; leave node unchanged.
+      const lockRel = await nearestLock(pkg);
+      if (!lockRel) {
         enriched.push(n);
+        continue;
       }
+      const importer = computeImporterLabel(lockRel);
+      const label = `lockfile:${lockRel}#${importer}`;
+      const next = Array.from(new Set([...(labs as string[]), label])).sort();
+      enriched.push({ ...n, labels: next });
     }
     return enriched;
   },

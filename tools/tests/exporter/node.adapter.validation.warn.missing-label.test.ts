@@ -8,6 +8,10 @@ test("node adapter warns when lockfile label is missing (warn mode)", async () =
   await runInTemp("exp-node-warn-missing", async (tmp, $) => {
     const out = path.join(tmp, "tools/buck/graph.json");
     await fs.mkdirp(path.dirname(out));
+    // The temp workspace is a copy of this repo and includes a root pnpm-lock.yaml.
+    // Remove it so "nearest lockfile" discovery returns null and the adapter emits a warning.
+    await fs.remove(path.join(tmp, "pnpm-lock.yaml"));
+    await fs.remove(path.join(tmp, "apps", "web", "pnpm-lock.yaml"));
     const nodes = [
       { name: "//apps/web:bundle", rule_type: "js_binary", labels: ["lang:node", "kind:bundle"] },
     ];
