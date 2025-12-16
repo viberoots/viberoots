@@ -13,7 +13,7 @@ Audience: engineers and LLM agents implementing the Rust path. Scope: add Rust w
 
 - Patches live at `patches/rust/*.patch` (flat; no subdirectories).
 - Nix language templates extend `tools/nix/lang-templates.nix` via `tools/nix/templates/rust.nix`.
-- Buck macros live under `rust/defs.bzl` and append provider deps from `//third_party/providers:auto_map.bzl`.
+- Buck macros live under `rust/defs.bzl` and append provider deps using `MODULE_PROVIDERS` loaded via `//lang:auto_map.bzl` (do not load `//third_party/providers:auto_map.bzl` directly).
 - Provider rules are generated under `//third_party/providers/*` (Rust file: `TARGETS.rust.auto`).
 - Exported graph lives at `tools/buck/graph.json`; no change to file path.
 
@@ -26,8 +26,8 @@ High‑level: identical to Go. Buck exports configured graph → zx exporter att
 Labels for Rust use the existing module form to maximize reuse:
 
 - Format: `module:<crate>@<version>` (crate names have no `/`, so they won’t collide with Go import paths).
-- Auto‑map continues to translate any `module:` label to the provider name using the same helper; no changes required in `gen-auto-map.ts`.
-- Preferred initial wiring: importer‑scoped `lockfile:` labels (e.g., `lockfile:<path/to/Cargo.lock>#<importer>`) so current `gen-auto-map.ts` can map providers without changes. Per‑crate `module:` mapping is optional and would require extending auto‑map to translate `module:` labels for Rust.
+- In the current repo, `module:` labels are primarily diagnostic. Provider mapping is driven by `lockfile:` and `nixpkg:` labels in `tools/buck/gen-auto-map.ts`.
+- Preferred initial wiring: importer‑scoped `lockfile:` labels (e.g., `lockfile:<path/to/Cargo.lock>#<importer>`) so current `gen-auto-map.ts` can map providers without changes. Per‑crate `module:` → provider mapping is optional and would require extending auto‑map.
 - Invalidation: regardless of provider model, include package‑ or importer‑local patch files in target `srcs` so Buck invalidation remains precise; provider stamps stay metadata‑only.
 
 ---
@@ -138,7 +138,7 @@ Behavior:
 
 - Stamp `lang:rust` and `kind:*` labels.
 - Forward configuration that affects dependency resolution to the exporter (features, target triple if provided via attrs/constraints).
-- Append provider deps from `//third_party/providers:auto_map.bzl` using the same `_providers_for(name)` helper pattern as Go.
+- Append provider deps using `realize_provider_edges(...)` (from `//lang:defs_common.bzl`) and `MODULE_PROVIDERS` loaded via `//lang:auto_map.bzl`.
 
 ---
 
@@ -187,7 +187,7 @@ Provider naming: reuse `providerNameForModuleKey(crate, version)` from `tools/li
 
 ## Auto‑map (no changes)
 
-`tools/buck/gen-auto-map.ts` already translates `module:<...>@<...>` labels to provider names. Rust crates labeled as `module:<crate>@<version>` are mapped the same way as Go modules. No code changes are required.
+No changes are required as long as Rust provider mapping is driven by `lockfile:` and `nixpkg:` labels (the current `tools/buck/gen-auto-map.ts` contract). If a future Rust rollout wants `module:` → provider mapping, `gen-auto-map.ts` must be extended and the contract documented and tested.
 
 ---
 
@@ -199,7 +199,7 @@ Now that repository macros and facilities for WASM are available (freestanding a
 - Buck macros: extend `rust/defs.bzl` with `nix_rust_wasm_library` and `nix_rust_wasi_binary` (or a `wasm = "freestanding"|"wasi"` attr) that:
   - Stamp `lang:rust` and `kind:wasm|wasi` labels.
   - Forward `--target` and features to the builder.
-  - Append providers from `//third_party/providers:auto_map.bzl` as today.
+  - Append providers using `MODULE_PROVIDERS` loaded via `//lang:auto_map.bzl` and shared provider-edge wiring helpers.
 - Planner/templates: add `rustWasmLib`/`rustWasiBin` functions in `tools/nix/templates/rust.nix`; compile with cargo for the requested target; reuse patch/override maps.
 - Tests: load freestanding `.wasm` via `WebAssembly.instantiate`; run WASI via `node:wasi` and assert exported functions (e.g., `add(2,3)=5`).
 

@@ -244,6 +244,58 @@ Implement.
 
 ---
 
+## PR‑5: Close the remaining provider re-export gap by routing Rust macro entrypoints through `//lang:auto_map.bzl`
+
+### Description
+
+PR‑3 established a stable `//lang:auto_map.bzl` re-export for `MODULE_PROVIDERS` so language macro entrypoints do not encode provider file layout (`//third_party/providers:auto_map.bzl`) directly.
+
+Today, `rust/defs.bzl` still directly loads `//third_party/providers:auto_map.bzl`. Even though Rust macros are currently a skeleton, this is an abstraction leak and a drift trap: it teaches the wrong pattern and increases the blast radius of future provider-layout changes.
+
+### Scope & Changes
+
+- Update `rust/defs.bzl` so provider mappings are loaded only via the stable entrypoint:
+  - Replace `load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")` with `load("//lang:auto_map.bzl", "MODULE_PROVIDERS")`.
+  - Prefer the shared provider-edge wiring helper (`realize_provider_edges(...)` from `//lang:defs_common.bzl`) rather than bespoke `_providers_for(...)` logic.
+- Extend the existing macro hygiene test to include Rust:
+  - Update `tools/tests/lib/macros.providers-for.usage.test.ts` to include `rust/defs.bzl` in the list of checked macro entrypoints so the invariant is enforced repo-wide.
+
+### Tests (in this PR)
+
+- Extend `tools/tests/lib/macros.providers-for.usage.test.ts` so it fails if any language entrypoint (including Rust) loads `//third_party/providers:auto_map.bzl` directly or embeds `//third_party/providers:` labels outside the approved `//lang:auto_map.bzl` load.
+
+### Docs (in this PR)
+
+- If any macro handbook text lists “the set of language entrypoints that must not load `//third_party/providers:auto_map.bzl` directly”, update it to include Rust as well. Otherwise no docs change is required beyond the enforced invariant.
+
+### Acceptance Criteria
+
+- `rust/defs.bzl` loads provider mappings via `//lang:auto_map.bzl` and uses shared provider-edge realization helpers.
+- The repo-wide macro hygiene test enforces the invariant for Rust alongside Go/Node/C++/Python.
+- No behavior change for existing (non-Rust) targets.
+
+### Risks
+
+- Low. Rust macros are currently skeletal. The main risk is accidental coupling if downstream tooling expects Rust to load the third-party file directly; the test should reveal this immediately.
+
+### Consequence of Not Implementing
+
+- The provider re-export rule is “mostly true” but not universal. Future provider layout refactors become cross-cutting, and the Rust surface will likely drift further from the standard wiring contracts.
+
+### Downsides for Implementing
+
+- Small churn in a skeleton file and one test update.
+
+### Recommendation
+
+Implement.
+
+### Sparse / Partial Clone Guidance
+
+- Touches `//rust` and one narrow zx test. Safe in thin slices.
+
+---
+
 ## Rollout & Sequencing
 
 These PRs are ordered by dependency chain and correctness first:
@@ -252,6 +304,7 @@ These PRs are ordered by dependency chain and correctness first:
 2. PR‑2 (shared helper for “patch inputs via synthetic dep”) should land before additional rule API workarounds appear elsewhere.
 3. PR‑3 (provider re-export) is mechanical and can land at any time, but it reduces churn in later refactors.
 4. PR‑4 (shared importer wiring helper) should land after Part 15 PR‑2 (dict attachment consolidation), so this PR depends on the existence of stable dict-safe primitives.
+5. PR‑5 (Rust entrypoints load provider mappings via `//lang:auto_map.bzl`) is independent and can land at any time; it closes a remaining abstraction leak and makes the provider re-export rule repo-wide.
 
 ---
 

@@ -11,7 +11,13 @@ function assert(cond: boolean, msg: string) {
 }
 
 test("macros use realize_provider_edges() and avoid direct provider labels", async () => {
-  const files = ["go/defs.bzl", "cpp/defs.bzl", "node/defs_core.bzl", "python/defs.bzl"];
+  const files = [
+    "go/defs.bzl",
+    "cpp/defs.bzl",
+    "node/defs_core.bzl",
+    "python/defs.bzl",
+    "rust/defs.bzl",
+  ];
   for (const f of files) {
     const txt = await read(f);
     assert(
