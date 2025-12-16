@@ -1,7 +1,8 @@
 load("//lang:collections.bzl", "dedupe_preserve")
 load("//lang:labels_file.bzl", "labels_file")
-load("//lang:lockfile_labels.bzl", "importer_from_labels")
+load("//lang:lockfile_labels.bzl", "importer_from_labels", "ensure_single_lockfile_label")
 load("//lang:dict_inputs.bzl", "attach_items_dict_safe")
+load("//lang:sanitize.bzl", "sanitize_name")
 
 def append_patch_inputs(kwargs, dirs, into = "srcs"):
     if kwargs == None:
@@ -97,6 +98,47 @@ def include_importer_patches_from_labels_dict_safe(kwargs, lang, into = "srcs", 
     if imp == None or imp == "":
         return
     append_importer_patches_dict_safe(kwargs, imp, lang, into = into, key_prefix = key_prefix)
+
+def synthetic_dep_for_importer_patches_from_labels(parent_name, labels, lang, into = "resources", suffix = "__patch_inputs"):
+    if not isinstance(parent_name, str) or parent_name == "":
+        fail("parent_name must be a non-empty string")
+    if not isinstance(lang, str) or lang == "":
+        fail("lang must be a non-empty string")
+    if not isinstance(into, str) or into == "":
+        fail("into must be a non-empty string")
+    if not isinstance(suffix, str) or suffix == "":
+        suffix = "__patch_inputs"
+
+    synth_name = sanitize_name(parent_name + suffix)
+    kw = {
+        "labels": (labels or []),
+    }
+    ensure_single_lockfile_label(kw, None)
+    include_importer_patches_from_labels(kw, lang, into = into)
+    rule_kwargs = {
+        "name": synth_name,
+        "srcs": [],
+        "labels": (kw.get("labels", []) or []),
+        into: dedupe_preserve(kw.get(into, []) or []),
+    }
+    return struct(
+        dep = ":" + synth_name,
+        name = synth_name,
+        kwargs = rule_kwargs,
+    )
+
+def synthetic_dep_for_importer_patches_from_labels_probe(name, parent_name, lockfile_label, lang, into = "resources"):
+    info = synthetic_dep_for_importer_patches_from_labels(
+        parent_name = parent_name,
+        labels = [lockfile_label],
+        lang = lang,
+        into = into,
+    )
+    labels_file(
+        name = name,
+        labels = [info.dep] + (info.kwargs.get(into, []) or []),
+        out = name + ".items.txt",
+    )
 
 def include_package_local_patches(kwargs, lang, default_dirs = None):
     if not isinstance(lang, str) or lang == "":

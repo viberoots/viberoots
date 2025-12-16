@@ -16,6 +16,8 @@ load(
     _package_local_patches_probe = "package_local_patches_probe",
     _patch_inputs_dict_safe_probe = "patch_inputs_dict_safe_probe",
     _patch_inputs_probe = "patch_inputs_probe",
+    _synthetic_dep_for_importer_patches_from_labels = "synthetic_dep_for_importer_patches_from_labels",
+    _synthetic_dep_for_importer_patches_from_labels_probe = "synthetic_dep_for_importer_patches_from_labels_probe",
 )
 load(
     "//lang:provider_edges.bzl",
@@ -53,6 +55,8 @@ default_package_patch_dirs = _default_package_patch_dirs
 package_local_patches_probe = _package_local_patches_probe
 patch_inputs_probe = _patch_inputs_probe
 patch_inputs_dict_safe_probe = _patch_inputs_dict_safe_probe
+synthetic_dep_for_importer_patches_from_labels = _synthetic_dep_for_importer_patches_from_labels
+synthetic_dep_for_importer_patches_from_labels_probe = _synthetic_dep_for_importer_patches_from_labels_probe
 
 normalize_nix_attr = _normalize_nix_attr
 append_nixpkg_labels = _append_nixpkg_labels

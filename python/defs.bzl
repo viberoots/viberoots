@@ -1,6 +1,5 @@
 load("@prelude//:rules.bzl", "python_binary", "python_library", "python_test", "genrule")
-load("//lang:defs_common.bzl", "stamp_labels", "ensure_single_lockfile_label", "append_nixpkg_labels", "include_importer_patches_from_labels", "dedupe_preserve", "stamp_wasm_variant", "realize_provider_edges")
-load("//lang:sanitize.bzl", "sanitize_name")
+load("//lang:defs_common.bzl", "stamp_labels", "ensure_single_lockfile_label", "append_nixpkg_labels", "include_importer_patches_from_labels", "dedupe_preserve", "stamp_wasm_variant", "realize_provider_edges", "synthetic_dep_for_importer_patches_from_labels")
 load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
 
 def nix_python_library(name, lockfile_label = None, deps = [], **kwargs):
@@ -36,19 +35,14 @@ def nix_python_binary(name, lockfile_label = None, deps = [], **kwargs):
     # synthetic python_library dep so patch edits still invalidate this binary deterministically.
     if "srcs" in kwargs:
         fail("nix_python_binary does not accept srcs; use main/main_module + deps instead")
-    _patch_inputs_name = sanitize_name(name + "__patch_inputs")
-    _patch_kw = {
-        "labels": (kwargs.get("labels", []) or []),
-    }
-    ensure_single_lockfile_label(_patch_kw, None)
-    include_importer_patches_from_labels(_patch_kw, "python", into = "resources")
-    python_library(
-        name = _patch_inputs_name,
-        srcs = [],
-        resources = dedupe_preserve(_patch_kw.get("resources", []) or []),
-        labels = _patch_kw.get("labels", []) or [],
+    patch_dep = synthetic_dep_for_importer_patches_from_labels(
+        parent_name = name,
+        labels = (kwargs.get("labels", []) or []),
+        lang = "python",
+        into = "resources",
     )
-    deps = list(deps) + [":" + _patch_inputs_name]
+    python_library(**patch_dep.kwargs)
+    deps = list(deps) + [patch_dep.dep]
     deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps)
     python_binary(name = name, deps = deps, **kwargs)
 
