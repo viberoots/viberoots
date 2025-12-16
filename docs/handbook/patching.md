@@ -68,6 +68,12 @@ Node only (Go/C++ don’t require glue for patch invalidation). Local glue is no
 
 Running `node tools/dev/install-deps.ts` in the dev shell runs the full sequence automatically. CI runs the same as separate stages.
 
+### `BUCK_TARGET` behavior in `ensureGraph()`
+
+Some tooling flows set `BUCK_TARGET` (for example `tools/dev/build-selected.ts` and the `graph-generator-selected` Nix entrypoint). When `BUCK_TARGET` is set, `ensureGraph()` treats `tools/buck/graph.json` as valid only if the exported graph already contains that target after normalization (drop cell prefixes and config suffixes).
+
+If the existing graph is missing the requested target, `ensureGraph()` regenerates the graph before continuing. This keeps target-scoped tooling reliable in temp workspaces and partial clones where the graph may have been generated with a narrower query.
+
 Provider index notes:
 
 The provider index reader is shared across Node and Python via `tools/lib/provider-index.ts:readImporterProviderIndexEntries(...)`. It normalizes importer labels, assembles deterministic provider names, and sorts output for stable ordering.

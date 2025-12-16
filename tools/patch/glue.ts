@@ -5,6 +5,7 @@ import { findRepoRoot } from "../lib/repo.ts";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
 import { exportInlineGraph } from "../buck/export-inline.ts";
 import { runNodeWithZx } from "../lib/node-run.ts";
+import { normalizeTargetLabel } from "../lib/labels.ts";
 
 async function buck2Present(): Promise<boolean> {
   try {
@@ -16,7 +17,24 @@ async function buck2Present(): Promise<boolean> {
 }
 
 // ensureGraph: writes tools/buck/graph.json if missing by invoking the exporter
-export async function ensureGraph(): Promise<void> {
+function parseGraphNodes(txt: string): any[] {
+  const data = JSON.parse(txt);
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray((data as any).nodes)) return (data as any).nodes;
+  return [];
+}
+
+function graphContainsTarget(txt: string, wantTargetRaw: string): boolean {
+  const want = String(wantTargetRaw || "").trim();
+  if (!want) return true;
+  const normWant = normalizeTargetLabel(want);
+  const nodes = parseGraphNodes(txt);
+  return nodes.some(
+    (n: any) => typeof n?.name === "string" && normalizeTargetLabel(n.name) === normWant,
+  );
+}
+
+export async function ensureGraph(opts: { exportGraph?: () => Promise<void> } = {}): Promise<void> {
   const workspaceRoot = (
     process.env.BUCK_TEST_SRC ||
     process.env.WORKSPACE_ROOT ||
@@ -38,70 +56,61 @@ export async function ensureGraph(): Promise<void> {
   try {
     console.error(`[ensureGraph] workspaceRoot=${workspaceRoot}`);
   } catch {}
-  try {
-    const txt = await fsp.readFile(graphPath, "utf8");
-    const trimmed = String(txt || "").trim();
-    if (trimmed && trimmed !== "[]") {
-      // If a specific target is requested, confirm it is present in the graph; otherwise regenerate.
-      const want = String(process.env.BUCK_TARGET || "").trim();
-      let hasWanted = false;
-      if (want) {
-        try {
-          const data = JSON.parse(trimmed);
-          const arr = Array.isArray(data)
-            ? (data as any[])
-            : Array.isArray((data as any).nodes)
-              ? ((data as any).nodes as any[])
-              : [];
-          const normWant = (await import("../lib/labels.ts")).normalizeTargetLabel(want);
-          for (const n of arr) {
-            const nm = typeof n?.name === "string" ? n.name : "";
-            if (nm && (await import("../lib/labels.ts")).then ? false : false) {
-            }
-          }
-          // dynamic import above can't be awaited inline in loop in TS transpile; do separate import
-        } catch {}
-        try {
-          const mod: any = await import("../lib/labels.ts");
-          const normWant = mod.normalizeTargetLabel(want);
-          const data = JSON.parse(trimmed);
-          const nodes: any[] = Array.isArray(data)
-            ? (data as any[])
-            : Array.isArray((data as any).nodes)
-              ? ((data as any).nodes as any[])
-              : [];
-          hasWanted = nodes.some(
-            (n: any) =>
-              typeof n?.name === "string" && mod.normalizeTargetLabel(n.name) === normWant,
-          );
-        } catch {
-          hasWanted = false;
-        }
+  const wantTargetRaw = (process.env.BUCK_TARGET || "").trim();
+  const shouldRegenerate = async (): Promise<boolean> => {
+    try {
+      const txt = await fsp.readFile(graphPath, "utf8");
+      const trimmed = String(txt || "").trim();
+      if (!trimmed || trimmed === "[]") return true;
+      if (!wantTargetRaw) return false;
+      try {
+        return !graphContainsTarget(trimmed, wantTargetRaw);
+      } catch {
+        return true;
       }
-      if (want && !hasWanted) {
-        try {
-          console.error(`[ensureGraph] target ${want} missing in existing graph — regenerating`);
-        } catch {}
-        // fall through to regenerate
-      } else {
-        try {
-          console.error(`[ensureGraph] graph exists and non-empty: ${graphPath}`);
-        } catch {}
-        return;
-      }
+    } catch {
+      return true;
     }
-    // fall through to regenerate when file is empty or "[]"
-  } catch {
-    // missing or unreadable → regenerate
+  };
+
+  if (!(await shouldRegenerate())) {
+    try {
+      console.error(`[ensureGraph] graph exists and satisfies BUCK_TARGET: ${graphPath}`);
+    } catch {}
+    return;
   }
+
+  if (wantTargetRaw) {
+    try {
+      console.error(
+        `[ensureGraph] target ${wantTargetRaw} missing in existing graph — regenerating`,
+      );
+    } catch {}
+  }
+
+  const tryInjected = async (): Promise<boolean> => {
+    if (!opts.exportGraph) return false;
+    try {
+      await opts.exportGraph();
+      return await isValidJsonFile(graphPath);
+    } catch {
+      return false;
+    }
+  };
+  if (await tryInjected()) return;
+
   const nodeBin = process.execPath;
   const repoRoot =
     (process.env.REPO_ROOT && process.env.REPO_ROOT.trim()) || (await findRepoRoot(process.cwd()));
   const zxInit = path.join(repoRoot, "tools/dev/zx-init.mjs");
   const exportScript = path.join(repoRoot, "tools/buck/export-graph.ts");
-  // Prefer direct Node exporter when buck2 is available; otherwise fallback to nix-run or inline query
-  const haveBuck = await buck2Present();
-  if (forceInline) {
+  const exporterArgs = ["--out", graphPath];
+
+  const exportWithInline = async (inlineOpts: {
+    includeTargetPlatforms: boolean;
+    normalizeLabels: boolean;
+    target: string;
+  }) => {
     try {
       console.error(`[ensureGraph] inline export via buck2 → ${graphPath}`);
     } catch {}
@@ -117,24 +126,33 @@ export async function ensureGraph(): Promise<void> {
         return false;
       }
     });
-    const wantTargetRaw = (process.env.BUCK_TARGET || "").trim();
     await exportInlineGraph({
       workspaceRoot,
       outPath: graphPath,
-      target: wantTargetRaw,
+      target: inlineOpts.target,
       roots: existingRoots.length > 0 ? existingRoots : ["libs"],
+      includeTargetPlatforms: inlineOpts.includeTargetPlatforms,
+      normalizeLabels: inlineOpts.normalizeLabels,
+    });
+  };
+
+  const haveBuck = await buck2Present();
+  if (forceInline) {
+    await exportWithInline({
       includeTargetPlatforms: true,
       normalizeLabels: true,
+      target: wantTargetRaw,
     });
     return;
   }
-  const exporterArgs = ["--out", graphPath];
+
   const passEnv = {
     ...process.env,
     WORKSPACE_ROOT: workspaceRoot,
     BUCK_TEST_SRC: workspaceRoot,
     REPO_ROOT: repoRoot,
   } as Record<string, string>;
+
   if (haveBuck) {
     try {
       await runNodeWithZx({
@@ -143,51 +161,26 @@ export async function ensureGraph(): Promise<void> {
         script: exportScript,
         args: exporterArgs,
       });
-      // Validate JSON; if invalid, fall through to alternate exporters
-      if (await isValidJsonFile(graphPath)) {
-        return;
-      }
+      if (await isValidJsonFile(graphPath)) return;
     } catch {}
   }
-  // Fallback: invoke via nix-run to mirror legacy behavior in temp/nix-driven environments
+
   try {
     await $({
       env: passEnv,
     })`nix run --accept-flake-config ${repoRoot}#zx-wrapper -- ${exportScript} ${exporterArgs}`;
-    // Verify file now exists; throw if still missing
     await fsp.access(graphPath);
-    if (await isValidJsonFile(graphPath)) {
-      return;
-    }
+    if (await isValidJsonFile(graphPath)) return;
   } catch {
-    // Final fallback: perform a minimal inline export using buck2 if available
     if (!(await buck2Present())) {
       throw new Error(
         "tools/buck/graph.json is missing and exporter failed. Ensure buck2 is available and try: nix run .#zx-wrapper -- tools/buck/export-graph.ts",
       );
     }
-    try {
-      console.error(`[ensureGraph] inline export via buck2 → ${graphPath}`);
-    } catch {}
-    const rawRoots = (process.env.BUCK_QUERY_ROOTS || "apps,libs,go,cpp,third_party")
-      .split(/[,\s]+/)
-      .filter(Boolean);
-    const fs = await import("node:fs");
-    const existingRoots = rawRoots.filter((r) => {
-      const dir = r.replace(/^\/+/, "");
-      try {
-        return fs.existsSync(path.join(workspaceRoot, dir));
-      } catch {
-        return false;
-      }
-    });
-    await exportInlineGraph({
-      workspaceRoot,
-      outPath: graphPath,
-      target: "",
-      roots: existingRoots.length > 0 ? existingRoots : ["libs"],
+    await exportWithInline({
       includeTargetPlatforms: false,
       normalizeLabels: false,
+      target: "",
     });
     return;
   }
