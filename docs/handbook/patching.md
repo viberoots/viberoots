@@ -15,6 +15,7 @@ All scripts are zx TypeScript using `#!/usr/bin/env zx-wrapper`.
 - Node and Python macros include importer‑local patch files in `srcs` via the unified helper `//lang:defs_common.bzl: append_importer_patches(kwargs, importer, lang)`. Importer is derived from a single `lockfile:<path>#<importer>` label (enforced by `ensure_single_lockfile_label(...)`).
   - Labels must include the `#<importer>` suffix; malformed labels fail fast with deterministic error text.
 - Patch inputs are attached through `//lang:patch_inputs.bzl` helpers. When a rule does not support `srcs`, call sites must choose a supported input attribute explicitly using `into = "<attr>"` or carry patch inputs via a small helper target.
+  - For importer-scoped ecosystems (Node, Python), macro wiring is standardized via `//lang:importer_wiring.bzl`. New macros must not copy/paste wiring logic; they should call the helper functions (`require_single_importer_lockfile_label`, `attach_importer_patch_inputs`, `merge_provider_edges`).
 
 ## Workflow
 
@@ -132,6 +133,7 @@ node tools/dev/patches-lint.ts --lang python
   - Changing a patch only invalidates Python targets bound to that importer.
 - `nix_python_binary` carries importer‑local patch files via an internal helper `python_library` dependency (resources), because Buck prelude `python_binary` does not accept `srcs`. The synthetic dep pattern is standardized via `//lang:defs_common.bzl:synthetic_dep_for_importer_patches_from_labels(...)`.
 - Lockfile label enforcement and parsing are centralized in Starlark: call `ensure_single_lockfile_label(...)` and then use `include_importer_patches_from_labels(kwargs, "python", into = "<attr>")` to both extract the importer and include importer‑local patches deterministically.
+  - Implementation note: the Python macros use `//lang:importer_wiring.bzl` to keep lockfile enforcement, patch input attachment, and provider edge realization consistent with Node.
 
 Quick checks and guidance:
 
@@ -149,9 +151,10 @@ Quick checks and guidance:
   - Provider deps are attached by adding synthetic dict entries under `__provider_edges__/...` using the same sanitizer and collision contract.
 - Provider stamps for Node are importer‑scoped and do not reference patch files as `srcs` (see Provider sync cookbook below); correctness comes from macro‑side `srcs` inclusion.
 - Lockfile label enforcement and parsing are centralized: macros call `ensure_single_lockfile_label(...)` and then attach importer-local patch files using the shared `//lang:patch_inputs.bzl` helpers:
-  - list-shaped inputs: `include_importer_patches_from_labels(...)`
-  - dict-shaped inputs: `include_importer_patches_from_labels_dict_safe(...)`
-    Both live under `lang/defs_common.bzl` for consistent load paths and error text.
+  - Implementation note: Node macros use `//lang:importer_wiring.bzl` to standardize the wiring sequence:
+    - enforce exactly one importer-scoped lockfile label
+    - attach importer-local patch files as inputs (list and dict shapes)
+    - realize provider edges deterministically
 
 Quick checks and guidance:
 

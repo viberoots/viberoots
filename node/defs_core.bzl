@@ -1,5 +1,13 @@
 load("@prelude//:rules.bzl", "genrule")
-load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve", "include_importer_patches_from_labels", "include_importer_patches_from_labels_dict_safe", "importer_from_labels", "ensure_single_lockfile_label", "realize_provider_edges", "attach_items_dict_safe")
+load(
+    "//lang:defs_common.bzl",
+    "attach_importer_patch_inputs",
+    "dedupe_preserve",
+    "importer_from_labels",
+    "merge_provider_edges",
+    "require_single_importer_lockfile_label",
+    "stamp_labels",
+)
 load("//lang:global_inputs.bzl", "global_nix_inputs")
 load("//node/private:nix_test.bzl", "node_nix_test")
 
@@ -13,19 +21,31 @@ def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = []
     _srcs_is_dict = isinstance(srcs, dict)
     merged_srcs = (dict(srcs) if _srcs_is_dict else list(srcs))
     kwargs["labels"] = labels
-    ensure_single_lockfile_label(kwargs, lockfile_label)
+    require_single_importer_lockfile_label(kwargs, lockfile_label)
     stamp_labels(kwargs, "node", kind)
     if _srcs_is_dict:
         kwargs["srcs"] = merged_srcs
-        include_importer_patches_from_labels_dict_safe(kwargs, "node", into = "srcs", key_prefix = "__patch_inputs__")
-        merged_edges = realize_provider_edges(MODULE_PROVIDERS, name, into = "srcs", base = (deps or []))
-        kwargs["srcs"] = attach_items_dict_safe(kwargs.get("srcs", {}), merged_edges, "__provider_edges__")
+        attach_importer_patch_inputs(kwargs, "node", into = "srcs", dict_safe = True, key_prefix = "__patch_inputs__")
+        kwargs["srcs"] = merge_provider_edges(
+            name,
+            deps,
+            into = "srcs",
+            base = kwargs.get("srcs", {}),
+            dict_safe = True,
+            key_prefix = "__provider_edges__",
+            MODULE_PROVIDERS = MODULE_PROVIDERS,
+        )
     else:
         # Include importer-local node patches in srcs so Buck invalidates precisely on patch changes
         kwargs["srcs"] = merged_srcs
-        include_importer_patches_from_labels(kwargs, "node")
+        attach_importer_patch_inputs(kwargs, "node")
         merged_srcs = kwargs.get("srcs", [])
-        merged_srcs = realize_provider_edges(MODULE_PROVIDERS, name, into = "srcs", base = (merged_srcs + deps))
+        merged_srcs = merge_provider_edges(
+            name,
+            (merged_srcs + deps),
+            into = "srcs",
+            MODULE_PROVIDERS = MODULE_PROVIDERS,
+        )
         kwargs["srcs"] = merged_srcs
     if out != None:
         kwargs["out"] = out
@@ -52,7 +72,7 @@ def nix_node_test(
     # Prepare kwargs and label stamping
     kw = { "name": name }
     kw["labels"] = labels or []
-    ensure_single_lockfile_label(kw, lockfile_label)
+    require_single_importer_lockfile_label(kw, lockfile_label)
     stamp_labels(kw, "node", kind)
 
     # Derive importer from the single required lockfile label (shared helper)
@@ -61,7 +81,7 @@ def nix_node_test(
     # Include importer-local node patches as inputs so changes invalidate tests precisely
     merged_srcs = list(srcs)
     kw["srcs"] = merged_srcs
-    include_importer_patches_from_labels(kw, "node")
+    attach_importer_patch_inputs(kw, "node")
     merged_srcs = dedupe_preserve(kw.get("srcs", []) or [])
     merged_srcs = dedupe_preserve(merged_srcs + global_nix_inputs())
 
@@ -73,7 +93,7 @@ def nix_node_test(
         env = (env or {}),
         timeout_sec = timeout_sec,
         srcs = merged_srcs,
-        deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps),
+        deps = merge_provider_edges(name, deps, MODULE_PROVIDERS = MODULE_PROVIDERS),
         labels = kw.get("labels", []),
         out = (out if out != None else (name + ".stamp")),
         **kwargs

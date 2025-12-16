@@ -16,6 +16,7 @@ test("selected *.bzl files remain under the 250 LOC methodology gate", async () 
     "lang/label_stamping.bzl",
     "lang/lockfile_labels.bzl",
     "lang/patch_inputs.bzl",
+    "lang/importer_wiring.bzl",
     "lang/nixpkg_labels.bzl",
     "lang/provider_edges.bzl",
 

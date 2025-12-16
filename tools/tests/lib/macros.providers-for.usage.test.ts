@@ -22,10 +22,10 @@ test("macros use realize_provider_edges() and avoid direct provider labels", asy
       txt.includes('load("//lang:auto_map.bzl"'),
       `${f} must load MODULE_PROVIDERS via //lang:auto_map.bzl`,
     );
-    // Must use realize_provider_edges() helper
+    // Must use shared provider-edge merge helper (direct or via importer wiring)
     assert(
-      txt.includes("realize_provider_edges("),
-      `${f} did not call realize_provider_edges(...) as expected`,
+      txt.includes("realize_provider_edges(") || txt.includes("merge_provider_edges("),
+      `${f} did not call realize_provider_edges(...) or merge_provider_edges(...) as expected`,
     );
     // Should not embed provider FQ labels directly (except allowed load)
     const lines = txt.split(/\r?\n/).filter((l) => l.includes("//third_party/providers:"));

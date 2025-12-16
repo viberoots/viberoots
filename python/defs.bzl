@@ -1,5 +1,15 @@
 load("@prelude//:rules.bzl", "python_binary", "python_library", "python_test", "genrule")
-load("//lang:defs_common.bzl", "stamp_labels", "ensure_single_lockfile_label", "append_nixpkg_labels", "include_importer_patches_from_labels", "dedupe_preserve", "stamp_wasm_variant", "realize_provider_edges", "synthetic_dep_for_importer_patches_from_labels")
+load(
+    "//lang:defs_common.bzl",
+    "append_nixpkg_labels",
+    "attach_importer_patch_inputs",
+    "dedupe_preserve",
+    "merge_provider_edges",
+    "require_single_importer_lockfile_label",
+    "stamp_labels",
+    "stamp_wasm_variant",
+    "synthetic_dep_for_importer_patches_from_labels",
+)
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
 
 def nix_python_library(name, lockfile_label = None, deps = [], **kwargs):
@@ -11,14 +21,14 @@ def nix_python_library(name, lockfile_label = None, deps = [], **kwargs):
     - wires provider deps from MODULE_PROVIDERS
     """
     stamp_labels(kwargs, "python", "lib")
-    ensure_single_lockfile_label(kwargs, lockfile_label)
+    require_single_importer_lockfile_label(kwargs, lockfile_label)
     if "nix_native_deps" in kwargs:
         fail("nix_native_deps is no longer supported; use nixpkg_deps instead")
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     append_nixpkg_labels(kwargs, nixpkg_deps)
     # Include importer-local patches in srcs so Buck invalidates precisely on patch changes
-    include_importer_patches_from_labels(kwargs, "python")
-    deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps)
+    attach_importer_patch_inputs(kwargs, "python")
+    deps = merge_provider_edges(name, deps, MODULE_PROVIDERS = MODULE_PROVIDERS)
     python_library(name = name, deps = deps, **kwargs)
 
 def nix_python_binary(name, lockfile_label = None, deps = [], **kwargs):
@@ -26,7 +36,7 @@ def nix_python_binary(name, lockfile_label = None, deps = [], **kwargs):
     See nix_python_library — identical wiring for binaries.
     """
     stamp_labels(kwargs, "python", "bin")
-    ensure_single_lockfile_label(kwargs, lockfile_label)
+    require_single_importer_lockfile_label(kwargs, lockfile_label)
     if "nix_native_deps" in kwargs:
         fail("nix_native_deps is no longer supported; use nixpkg_deps instead")
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
@@ -43,7 +53,7 @@ def nix_python_binary(name, lockfile_label = None, deps = [], **kwargs):
     )
     python_library(**patch_dep.kwargs)
     deps = list(deps) + [patch_dep.dep]
-    deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps)
+    deps = merge_provider_edges(name, deps, MODULE_PROVIDERS = MODULE_PROVIDERS)
     python_binary(name = name, deps = deps, **kwargs)
 
 def nix_python_test(name, lockfile_label = None, deps = [], **kwargs):
@@ -51,13 +61,13 @@ def nix_python_test(name, lockfile_label = None, deps = [], **kwargs):
     See nix_python_library — identical wiring for tests.
     """
     stamp_labels(kwargs, "python", "test")
-    ensure_single_lockfile_label(kwargs, lockfile_label)
+    require_single_importer_lockfile_label(kwargs, lockfile_label)
     if "nix_native_deps" in kwargs:
         fail("nix_native_deps is no longer supported; use nixpkg_deps instead")
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     append_nixpkg_labels(kwargs, nixpkg_deps)
-    include_importer_patches_from_labels(kwargs, "python")
-    deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps)
+    attach_importer_patch_inputs(kwargs, "python")
+    deps = merge_provider_edges(name, deps, MODULE_PROVIDERS = MODULE_PROVIDERS)
     python_test(name = name, deps = deps, **kwargs)
 
 # WASM (WASI) convenience macros — stamp kind:wasm so planner routes to pyWasm* templates
@@ -69,15 +79,15 @@ def nix_python_wasm_app(name, lockfile_label = None, deps = [], labels = [], **k
     kwargs["labels"] = dedupe_preserve((labels or []) + (kwargs.get("labels", []) or []))
     stamp_wasm_variant(kwargs, "python", "wasi")
     labels = kwargs.get("labels", []) or []
-    ensure_single_lockfile_label(kwargs, lockfile_label)
+    require_single_importer_lockfile_label(kwargs, lockfile_label)
     if "nix_native_deps" in kwargs:
         fail("nix_native_deps is no longer supported; use nixpkg_deps instead")
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     append_nixpkg_labels(kwargs, nixpkg_deps)
-    include_importer_patches_from_labels(kwargs, "python")
+    attach_importer_patch_inputs(kwargs, "python")
     srcs = kwargs.get("srcs", []) or []
     # Expose true dependency edges so planner sees overlays via depsOf
-    deps = realize_provider_edges(MODULE_PROVIDERS, name, base = (deps or []))
+    deps = merge_provider_edges(name, (deps or []), MODULE_PROVIDERS = MODULE_PROVIDERS)
     kwargs["srcs"] = srcs
     python_library(name = name, deps = deps, **kwargs)
 
@@ -89,14 +99,14 @@ def nix_python_wasm_lib(name, lockfile_label = None, deps = [], labels = [], **k
     kwargs["labels"] = dedupe_preserve((labels or []) + (kwargs.get("labels", []) or []))
     stamp_wasm_variant(kwargs, "python", "wasi")
     labels = kwargs.get("labels", []) or []
-    ensure_single_lockfile_label(kwargs, lockfile_label)
+    require_single_importer_lockfile_label(kwargs, lockfile_label)
     if "nix_native_deps" in kwargs:
         fail("nix_native_deps is no longer supported; use nixpkg_deps instead")
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     append_nixpkg_labels(kwargs, nixpkg_deps)
-    include_importer_patches_from_labels(kwargs, "python")
+    attach_importer_patch_inputs(kwargs, "python")
     srcs = kwargs.get("srcs", []) or []
-    deps = realize_provider_edges(MODULE_PROVIDERS, name, base = (deps or []))
+    deps = merge_provider_edges(name, (deps or []), MODULE_PROVIDERS = MODULE_PROVIDERS)
     kwargs["srcs"] = srcs
     python_library(name = name, deps = deps, **kwargs)
 
