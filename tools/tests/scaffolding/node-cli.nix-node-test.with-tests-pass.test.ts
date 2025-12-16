@@ -69,11 +69,18 @@ test(
         env,
       })`bash --noprofile --norc -c 'git -C ${tmp} add ${lockfile} && git -C ${tmp} commit -m "chore(test): add importer lockfile"'`.nothrow();
 
-      // 2) Compute/update FOD mapping from the committed lockfile
-      await $({
-        stdio: "inherit",
-        env,
-      })`zx-wrapper tools/dev/update-pnpm-hash.ts --lockfile ${lockfile}`;
+      // 2) Compute/update FOD mapping from the committed lockfile (best-effort; retry after warm-up)
+      try {
+        await $({
+          stdio: "inherit",
+          env,
+        })`zx-wrapper tools/dev/update-pnpm-hash.ts --lockfile ${lockfile}`;
+      } catch (e) {
+        console.warn(
+          "[test] initial pnpm hash update failed; will retry after warm-up:",
+          (e as Error)?.message || e,
+        );
+      }
 
       // 3) Warm pnpm-store and node-modules
       {

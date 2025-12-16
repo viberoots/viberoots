@@ -14,19 +14,10 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { ensureGraph } from "../buck/glue-run.ts";
 import { findRepoRoot, pathExists } from "../lib/repo.ts";
-import { sanitizeAttrNameFromLabel, packagePathFromLabel } from "../lib/labels.ts";
+import { sanitizeAttrNameFromLabel } from "../lib/labels.ts";
 
 function stripAnsi(s: string): string {
   return s.replace(/\x1B\[[0-9;]*[A-Za-z]/g, "").replace(/\r/g, "");
-}
-
-function sanitizeName(s: string): string {
-  // Mirrors lang/sanitize.bzl::sanitize_name and tools/nix/lib/lang-helpers.nix::sanitizeName
-  return String(s || "")
-    .replaceAll("//", "")
-    .replaceAll(":", "-")
-    .replaceAll("/", "-")
-    .replaceAll(" ", "-");
 }
 
 async function main() {

@@ -6,5 +6,6 @@ cpp_sanitize_probe(name = "case2", label = "//apps/foo/sub:my bin")
 cpp_sanitize_probe(name = "case3", label = "//third_party/providers:mod_ABC")
 cpp_sanitize_probe(name = "case4", label = "//a:b/c")
 cpp_sanitize_probe(name = "case5", label = "//UPPER:Case With Spaces")
+cpp_sanitize_probe(name = "case6", label = "root//apps/foo:bin (config//toolchains:clang)")
 
 

@@ -20,4 +20,5 @@ Ensure artifact/name sanitization in Starlark matches the canonical implementati
 
 - Canonical helper: `tools/nix/lib/lang-helpers.nix: sanitizeName`.
 - Macro parity: keep the macro-side helper (e.g., `_sanitize_to_bin_name` via `cpp/private/sanitize.bzl`) in strict parity with the Nix helper for `//`, `:`, `/`, spaces, case, and non‑alnum characters.
+- TypeScript policy: tooling scripts must not hand-roll this sanitizer. Use `tools/lib/sanitize.ts:sanitizeName` to keep TS ↔ Nix ↔ Starlark parity stable.
 - Tests: `tools/tests/cpp/sanitize-name.parity.test.ts` runs a parity matrix through the `cpp_sanitize_probe` rule and compares to the Nix helper. Update either side if parity breaks.

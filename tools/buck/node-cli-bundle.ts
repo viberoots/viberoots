@@ -13,11 +13,7 @@ import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { getFlagStr } from "../lib/cli.ts";
-
-function sanitizeImporterAttr(s: string): string {
-  // Keep in sync with tools/nix/templates-common.nix sanitizeName
-  return s.replaceAll("//", "").replaceAll(":", "-").replaceAll("/", "-").replaceAll(" ", "-");
-}
+import { sanitizeName } from "../lib/sanitize.ts";
 
 // No search/fallbacks: the caller must set FLK_ROOT or WORKSPACE_ROOT to a flake root.
 
@@ -134,7 +130,7 @@ async function main() {
   );
   const mj = String(process.env.NIX_MAX_JOBS || "0").trim();
   const cr = String(process.env.NIX_CORES || "0").trim();
-  const attr = `node-cli.${sanitizeImporterAttr(importer)}`;
+  const attr = `node-cli.${sanitizeName(importer)}`;
   console.error("[BNX-BUNDLE-DEBUG] building attr: %s#%s", flakeRoot, attr);
   const nixArgs: string[] = [
     "build",

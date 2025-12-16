@@ -1,16 +1,15 @@
 #!/usr/bin/env zx-wrapper
 // Verifies Starlark _sanitize_to_bin_name matches Nix H.sanitizeName
+import { sanitizeName } from "../../lib/sanitize.ts";
+
 const cases: Array<{ name: string; label: string }> = [
   { name: "case1", label: "//apps/foo:bin" },
   { name: "case2", label: "//apps/foo/sub:my bin" },
   { name: "case3", label: "//third_party/providers:mod_ABC" },
   { name: "case4", label: "//a:b/c" },
   { name: "case5", label: "//UPPER:Case With Spaces" },
+  { name: "case6", label: "root//apps/foo:bin (config//toolchains:clang)" },
 ];
-
-function nixSanitize(s: string): string {
-  return s.replaceAll("//", "").replaceAll(":", "-").replaceAll("/", "-").replaceAll(" ", "-");
-}
 
 async function starlarkProbeOutput(target: string, label: string): Promise<string> {
   const inherited = process.env.BUCK_ISOLATION_DIR;
@@ -36,7 +35,7 @@ async function starlarkProbeOutput(target: string, label: string): Promise<strin
 
 for (const c of cases) {
   const target = `//tools/tests/cpp/sanitize:${c.name}`;
-  const want = nixSanitize(c.label);
+  const want = sanitizeName(c.label);
   const got = await starlarkProbeOutput(target, c.label);
   if (got !== want) {
     console.error(`sanitize mismatch for ${c.label}: starlark='${got}' nix='${want}'`);

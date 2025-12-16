@@ -1,10 +1,11 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { resolveImporterDir } from "../../lib/lockfiles.ts";
+import { sanitizeName as sanitizeNameContract } from "../../lib/sanitize.ts";
 
 // Must mirror tools/nix/templates-common.nix sanitizeName
 export function sanitizeName(input: string): string {
-  return input.replace(/\/\/|:|\/|\s/g, "-");
+  return sanitizeNameContract(input);
 }
 
 export function normalizeImporter(input: string | null | undefined): string {

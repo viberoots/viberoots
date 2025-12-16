@@ -33,6 +33,8 @@ To locate `$OUT`, you can build the derivation and print the path:
 nix build .#node-test.<importer-sanitized> --no-link --print-out-paths
 ```
 
+The `<importer-sanitized>` segment must use the canonical sanitizer (`tools/lib/sanitize.ts:sanitizeName`) to stay in parity with `tools/nix/lib/lang-helpers.nix:sanitizeName`.
+
 ### Notes
 
 - The runner resolves `vitest` strictly from the importer’s `node_modules` (hermetic, no PATH fallbacks). If files match patterns but `vitest` is not installed, the build fails with a clear error.
