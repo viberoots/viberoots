@@ -350,6 +350,8 @@ Inline fallback (buck2 cquery):
 
 > Consumption note: downstream tools should not read `graph.json` directly. Use the Composite Graph API instead — library `tools/lib/graph-view.ts` or CLI `node tools/buck/graph-view.ts`. Glue emits the Node sidecar index at `tools/buck/node-lock-index.json` (via `tools/buck/gen-provider-index.ts`) and both files include `$schema` and `version` fields.
 
+When one TypeScript tooling script needs to invoke another, do not hand-roll Node flags. Use the shared helper `tools/lib/node-run.ts:runNodeWithZx` so `zx-init` loading and Node flags stay consistent across callsites.
+
 ### Validation modes (warn vs error)
 
 The exporter aggregates adapter findings (e.g., labeling irregularities) and applies a severity mode:

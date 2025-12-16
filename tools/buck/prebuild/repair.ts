@@ -3,6 +3,7 @@ import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runGlue } from "../glue-run.ts";
+import { runNodeWithZx } from "../../lib/node-run.ts";
 
 async function ensureLocalPreludeMapping() {
   try {
@@ -92,7 +93,11 @@ export async function autoFixGlue() {
   await ensureLocalPreludeMapping();
   // Ensure gomod2nix.toml is generated before glue; ignore errors in local mode
   try {
-    await $`node --disable-warning=ExperimentalWarning --experimental-strip-types --import ./tools/dev/zx-init.mjs tools/dev/install-deps.ts --glue-only`;
+    await runNodeWithZx({
+      zxInitPath: path.resolve("tools/dev/zx-init.mjs"),
+      script: path.resolve("tools/dev/install-deps.ts"),
+      args: ["--glue-only"],
+    });
   } catch {}
   // Run unified glue orchestration (export graph → provider index → auto-map)
   await runGlue();

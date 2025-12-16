@@ -1,8 +1,10 @@
 #!/usr/bin/env zx-wrapper
+import path from "node:path";
 import { syncAllProviders } from "./providers/index.ts";
 import { ensureGraph } from "./glue-run.ts";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
 import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli.ts";
+import { runNodeWithZx } from "../lib/node-run.ts";
 
 function dbgEnabled(): boolean {
   try {
@@ -45,7 +47,11 @@ async function main() {
     // Buck macros load provider mappings via //lang:auto_map.bzl (re-export of third_party/providers/auto_map.bzl).
     // Ensure graph.json exists before generating auto_map and provider index
     await ensureGraph();
-    await $`node --disable-warning=ExperimentalWarning --experimental-strip-types --import ./tools/dev/zx-init.mjs tools/buck/gen-auto-map.ts --graph ${DEFAULT_GRAPH_PATH} --out ./third_party/providers/auto_map.bzl`;
+    await runNodeWithZx({
+      zxInitPath: path.resolve("tools/dev/zx-init.mjs"),
+      script: path.resolve("tools/buck/gen-auto-map.ts"),
+      args: ["--graph", DEFAULT_GRAPH_PATH, "--out", "./third_party/providers/auto_map.bzl"],
+    });
     try {
       const { generateProviderIndex } = await import("./gen-provider-index.ts");
       await generateProviderIndex({ outFile: "third_party/providers/provider_index.bzl" });

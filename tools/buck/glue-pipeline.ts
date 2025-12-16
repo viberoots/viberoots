@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
+import { runNodeWithZx } from "../lib/node-run.ts";
 
 type RunGluePipelineOptions = {
   graphPath?: string;
@@ -17,38 +18,6 @@ function repoRootFromCwd(): string {
 
 function zxInitDefault(repoRoot: string): string {
   return path.join(repoRoot, "tools/dev/zx-init.mjs");
-}
-
-async function runNodeWithZx(
-  nodeBin: string,
-  zxInit: string,
-  script: string,
-  args: string[] = [],
-): Promise<void> {
-  const { spawn } = await import("node:child_process");
-  await new Promise<void>((resolve, reject) => {
-    const proc = spawn(
-      nodeBin,
-      [
-        "--disable-warning=ExperimentalWarning",
-        "--experimental-strip-types",
-        "--import",
-        zxInit,
-        script,
-        ...args,
-      ],
-      {
-        stdio: "inherit",
-        env: process.env,
-        cwd: process.cwd(),
-      },
-    );
-    proc.on("error", reject);
-    proc.on("exit", (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`${path.basename(script)} exited with code ${code}`));
-    });
-  });
 }
 
 export async function runGluePipeline(opts: RunGluePipelineOptions = {}): Promise<void> {
@@ -69,12 +38,12 @@ export async function runGluePipeline(opts: RunGluePipelineOptions = {}): Promis
   // Step 2: sync providers (all languages; language drivers are no-ops when inactive)
   const syncScript = path.join(repoRoot, "tools/buck/sync-providers.ts");
   if (verbose) console.error("[glue-pipeline] sync-providers");
-  await runNodeWithZx(nodeBin, zxInit, syncScript);
+  await runNodeWithZx({ nodeBin, zxInitPath: zxInit, script: syncScript });
 
   // Step 3: generate provider index for diagnostics and mapping visibility
   const providerIndexScript = path.join(repoRoot, "tools/buck/gen-provider-index.ts");
   if (verbose) console.error("[glue-pipeline] gen-provider-index");
-  await runNodeWithZx(nodeBin, zxInit, providerIndexScript);
+  await runNodeWithZx({ nodeBin, zxInitPath: zxInit, script: providerIndexScript });
 
   // Step 4: generate auto_map deterministically from the graph
   const autoMapScript = path.join(repoRoot, "tools/buck/gen-auto-map.ts");
@@ -83,7 +52,12 @@ export async function runGluePipeline(opts: RunGluePipelineOptions = {}): Promis
   try {
     await fsp.mkdir(path.dirname(outAutoMap), { recursive: true });
   } catch {}
-  await runNodeWithZx(nodeBin, zxInit, autoMapScript, ["--graph", graphPath, "--out", outAutoMap]);
+  await runNodeWithZx({
+    nodeBin,
+    zxInitPath: zxInit,
+    script: autoMapScript,
+    args: ["--graph", graphPath, "--out", outAutoMap],
+  });
 }
 
 async function main() {

@@ -1,5 +1,6 @@
 import path from "node:path";
 import "zx/globals";
+import { nodeFlagsWithZx } from "../../lib/node-run.ts";
 
 export type Isolation = {
   buckIsolation: string;
@@ -87,13 +88,7 @@ export function createIsolation(): Isolation {
   async function startWatchdog(repoRoot: string): Promise<void> {
     try {
       const parentPid = String(process.pid);
-      const nodeBase = [
-        "--experimental-top-level-await",
-        "--experimental-strip-types",
-        "--disable-warning=ExperimentalWarning",
-        "--import",
-        path.resolve(repoRoot, "tools/dev/zx-init.mjs"),
-      ].join(" ");
+      const nodeBase = nodeFlagsWithZx(path.resolve(repoRoot, "tools/dev/zx-init.mjs")).join(" ");
       const node = process.execPath || "node";
       await $({
         stdio: "ignore",

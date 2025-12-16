@@ -1,4 +1,5 @@
 import path from "node:path";
+import { nodeFlagsWithZx } from "../../lib/node-run.ts";
 
 export function repoRoot(): string {
   // Prefer the current working directory so tests running in a temp repo operate on that sandbox.
@@ -17,11 +18,5 @@ export function nodeBin(): string {
 
 export function zxNodeBase(root: string): string {
   const zxInit = path.resolve(root, "tools/dev/zx-init.mjs");
-  return [
-    "--experimental-top-level-await",
-    "--experimental-strip-types",
-    "--disable-warning=ExperimentalWarning",
-    "--import",
-    zxInit,
-  ].join(" ");
+  return nodeFlagsWithZx(zxInit).join(" ");
 }

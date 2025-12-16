@@ -3,6 +3,7 @@ import path from "node:path";
 import process from "node:process";
 import * as fsp from "node:fs/promises";
 import { printSkip } from "../../lib/errors.ts";
+import { nodeFlagsWithZx } from "../../lib/node-run.ts";
 
 function repoRoot(): string {
   // Resolve relative to this file to avoid accidental parent cwd resolution
@@ -19,13 +20,7 @@ function workspaceRoot(): string {
 
 export function zxNodeBase(): string {
   const zxInit = path.resolve(repoRoot(), "tools/dev/zx-init.mjs");
-  return [
-    "--experimental-top-level-await",
-    "--experimental-strip-types",
-    "--disable-warning=ExperimentalWarning",
-    "--import",
-    zxInit,
-  ].join(" ");
+  return nodeFlagsWithZx(zxInit).join(" ");
 }
 
 async function ensurePreludeSymlinkIfMissing() {

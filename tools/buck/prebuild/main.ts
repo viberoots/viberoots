@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { printSkip } from "../../lib/errors";
 import { getFlagBool, getFlagStr } from "../../lib/cli.ts";
+import { runNodeWithZx } from "../../lib/node-run.ts";
 import { autoFixGlue } from "./repair.ts";
 import { collectDiagnostics, logList, mtimeSafe } from "./report.ts";
 import { listInputs, listOutputs } from "./scan.ts";
@@ -80,7 +81,11 @@ export async function run(): Promise<void> {
   if (goMissingSum.length) {
     if (mode === "local") {
       try {
-        await $`node --disable-warning=ExperimentalWarning --experimental-strip-types --import ./tools/dev/zx-init.mjs tools/dev/install-deps.ts --glue-only`;
+        await runNodeWithZx({
+          zxInitPath: path.resolve("tools/dev/zx-init.mjs"),
+          script: path.resolve("tools/dev/install-deps.ts"),
+          args: ["--glue-only"],
+        });
       } catch {}
       // Re-check after best-effort local tidy
       goMissingSum = findGoImporterMissingSum();

@@ -6,6 +6,7 @@ import path from "node:path";
 import { ensureGraph, runGlue } from "../buck/glue-run.ts";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
 import { getFlagStr } from "../lib/cli.ts";
+import { runNodeWithZx } from "../lib/node-run.ts";
 
 type Stage =
   | "codegen"
@@ -24,13 +25,10 @@ type Stage =
 const stage = getFlagStr("stage", "");
 assert(stage, "missing --stage=<name>");
 const zxInit = path.resolve("tools/dev/zx-init.mjs");
-const nodeBase = [
-  "--experimental-top-level-await",
-  "--experimental-strip-types",
-  "--disable-warning=ExperimentalWarning",
-  "--import",
-  zxInit,
-];
+
+async function runTool(script: string, args: string[] = []) {
+  await runNodeWithZx({ zxInitPath: zxInit, script, args });
+}
 
 async function main() {
   // Load capability/enablement manifest (best-effort; skip if missing)
@@ -64,13 +62,13 @@ async function main() {
       const target = path.resolve("tools/codegen.ts");
       try {
         await $`test -f ${target} || exit 0`;
-        await $`node ${nodeBase} ${target}`;
+        await runTool(target);
       } catch {}
       break;
     }
     case "langs-validate": {
       const target = path.resolve("tools/dev/validate-langs.ts");
-      await $`node ${nodeBase} ${target}`;
+      await runTool(target);
       break;
     }
     case "export-graph": {
@@ -84,7 +82,7 @@ async function main() {
     case "sync-providers": {
       // Unified orchestrator: always run for enabled languages; drivers are no-ops if inactive
       const target = path.resolve("tools/buck/sync-providers.ts");
-      await $`node ${nodeBase} ${target}`;
+      await runTool(target);
       break;
     }
     case "gen-auto-map": {
@@ -101,25 +99,30 @@ async function main() {
         if (!any) break;
       }
       const target = path.resolve("tools/buck/gen-auto-map.ts");
-      await $`node ${nodeBase} ${target} --graph ${DEFAULT_GRAPH_PATH} --out third_party/providers/auto_map.bzl`;
+      await runTool(target, [
+        "--graph",
+        DEFAULT_GRAPH_PATH,
+        "--out",
+        "third_party/providers/auto_map.bzl",
+      ]);
       break;
     }
     case "prebuild-guard": {
       const target = path.resolve("tools/buck/prebuild-guard.ts");
-      await $`node ${nodeBase} ${target}`;
+      await runTool(target);
       break;
     }
     case "patches-lint": {
       const target = path.resolve("tools/dev/patches-lint.ts");
       // Strict mode in CI; run for Go and Python (importer-local) to enforce parity
-      await $`node ${nodeBase} ${target} --strict --lang go`;
-      await $`node ${nodeBase} ${target} --strict --lang python`;
+      await runTool(target, ["--strict", "--lang", "go"]);
+      await runTool(target, ["--strict", "--lang", "python"]);
       break;
     }
     case "file-size-lint": {
       const target = path.resolve("tools/dev/file-size-lint.ts");
       // Temporary: keep PR-1 green while PR-2..PR-5 split the known >250 LOC offenders.
-      await $`node ${nodeBase} ${target} --scope=source --fail=true --allow-known`;
+      await runTool(target, ["--scope=source", "--fail=true", "--allow-known"]);
       break;
     }
     case "nix-build-graph-generator":
@@ -139,7 +142,7 @@ async function main() {
       break;
     case "cpp-addon-smoke": {
       const target = path.resolve("tools/ci/cpp-addon-smoke.ts");
-      await $`node ${nodeBase} ${target}`;
+      await runTool(target);
       break;
     }
     case "wheelhouse-preload": {
@@ -198,7 +201,7 @@ async function main() {
   }
   // Post-stage housekeeping: best-effort cleanup of ephemeral temp outs
   try {
-    await $`node ${nodeBase} tools/dev/clean-temp-outs.ts`.nothrow();
+    await runTool(path.resolve("tools/dev/clean-temp-outs.ts"));
   } catch {}
 }
 

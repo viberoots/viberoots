@@ -1,10 +1,10 @@
 #!/usr/bin/env zx-wrapper
-import { execFile } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { findRepoRoot } from "../lib/repo.ts";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
 import { exportInlineGraph } from "../buck/export-inline.ts";
+import { runNodeWithZx } from "../lib/node-run.ts";
 
 async function buck2Present(): Promise<boolean> {
   try {
@@ -13,21 +13,6 @@ async function buck2Present(): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-async function runNode(nodeBin: string, zxInit: string, script: string, args: string[] = []) {
-  const zxArgs = [
-    "--experimental-top-level-await",
-    "--disable-warning=ExperimentalWarning",
-    "--experimental-strip-types",
-    "--import",
-    zxInit,
-    script,
-    ...args,
-  ];
-  await new Promise<void>((resolve, reject) => {
-    execFile(nodeBin, zxArgs, { stdio: "inherit" }, (err) => (err ? reject(err) : resolve()));
-  });
 }
 
 // ensureGraph: writes tools/buck/graph.json if missing by invoking the exporter
@@ -152,7 +137,12 @@ export async function ensureGraph(): Promise<void> {
   } as Record<string, string>;
   if (haveBuck) {
     try {
-      await runNode(nodeBin, zxInit, exportScript, exporterArgs);
+      await runNodeWithZx({
+        nodeBin,
+        zxInitPath: zxInit,
+        script: exportScript,
+        args: exporterArgs,
+      });
       // Validate JSON; if invalid, fall through to alternate exporters
       if (await isValidJsonFile(graphPath)) {
         return;

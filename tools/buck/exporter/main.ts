@@ -194,7 +194,7 @@ export async function run() {
 
   // Success banner: point consumers to composite API and schema version
   try {
-    console.log(
+    console.error(
       `[exporter] graph v${SCHEMA_VERSION} ready — use 'node tools/buck/graph-view.ts' for the Composite Graph API`,
     );
   } catch {}
