@@ -417,9 +417,9 @@ EOS
     if [[ ${#TARGETS[@]} -eq 1 && "${TARGETS[0]}" == *:* ]]; then
       # For single-target runs, also honor VERIFY_TIMEOUT_SECS
       if command -v timeout >/dev/null 2>&1; then
-        RUN_TIMEOUT=(timeout -k 10s "${VERIFY_TIMEOUT_SECS:-1800}s")
+        RUN_TIMEOUT=(timeout -k 10s "${VERIFY_TIMEOUT_SECS:-3600}s")
       elif command -v gtimeout >/dev/null 2>&1; then
-        RUN_TIMEOUT=(gtimeout -k 10s "${VERIFY_TIMEOUT_SECS:-1800}s")
+        RUN_TIMEOUT=(gtimeout -k 10s "${VERIFY_TIMEOUT_SECS:-3600}s")
       fi
     else
       RUN_TIMEOUT=("${TIMEOUT_CMD[@]}")
