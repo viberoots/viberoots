@@ -68,7 +68,7 @@
 
 - Symptom: tests cannot find binaries or `manifest.json` is empty.
 - Fix:
-  - Run glue: `node tools/buck/export-graph.ts` → `node tools/buck/sync-providers.ts` → `node tools/buck/gen-auto-map.ts`.
+  - Run glue: `node tools/buck/glue-pipeline.ts` (or `node tools/buck/prebuild-guard.ts` in local mode).
   - Ensure `gomod2nix.toml` exists at repo root (copy from the authoritative module lock).
   - Inspect `$out/build.log` for target keys and bin discovery.
 

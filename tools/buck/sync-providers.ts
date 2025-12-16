@@ -1,10 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
 import { syncAllProviders } from "./providers/index.ts";
-import { ensureGraph } from "./glue-run.ts";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
 import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli.ts";
-import { runNodeWithZx } from "../lib/node-run.ts";
+import { runGluePipeline } from "./glue-pipeline.ts";
 
 function dbgEnabled(): boolean {
   try {
@@ -45,17 +44,16 @@ async function main() {
   if (targetLangRequested(targetLang)) {
     // When a specific language is requested, also ensure downstream glue is present so
     // Buck macros load provider mappings via //lang:auto_map.bzl (re-export of third_party/providers/auto_map.bzl).
-    // Ensure graph.json exists before generating auto_map and provider index
-    await ensureGraph();
-    await runNodeWithZx({
-      zxInitPath: path.resolve("tools/dev/zx-init.mjs"),
-      script: path.resolve("tools/buck/gen-auto-map.ts"),
-      args: ["--graph", DEFAULT_GRAPH_PATH, "--out", "./third_party/providers/auto_map.bzl"],
+    //
+    // Delegate to the centralized glue pipeline for the shared post-sync steps
+    // (ensureGraph → optional provider_index → auto_map).
+    await runGluePipeline({
+      skipProviderSync: true,
+      graphPath: DEFAULT_GRAPH_PATH,
+      outAutoMap: "third_party/providers/auto_map.bzl",
+      providerIndex: emitIndexRequested() ? "required" : "best-effort",
+      autoMap: "required",
     });
-    try {
-      const { generateProviderIndex } = await import("./gen-provider-index.ts");
-      await generateProviderIndex({ outFile: "third_party/providers/provider_index.bzl" });
-    } catch {}
     if (targetLang === "cpp") {
       try {
         const { stdout } = await $({
@@ -65,8 +63,12 @@ async function main() {
       } catch {}
     }
   } else if (emitIndexRequested()) {
-    const { generateProviderIndex } = await import("./gen-provider-index.ts");
-    await generateProviderIndex({ outFile: "third_party/providers/provider_index.bzl" });
+    // Preserve the existing CLI: allow emitting provider_index without running auto_map.
+    await runGluePipeline({
+      skipProviderSync: true,
+      providerIndex: "required",
+      autoMap: "skip",
+    });
   }
 }
 

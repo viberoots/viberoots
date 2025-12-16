@@ -37,11 +37,12 @@ Python provider sync activation in sparse/partial clones is lockfile‑driven: t
   - Full test with coverage: `buck2 test //... -- --env COVERAGE=1`
   - Single target build/test: `buck2 build //<pkg>:<name>`, `buck2 test //<pkg>:<name>`
 - Glue generation (when working on providers/labels mappings):
+  - Run full glue pipeline (preferred): `node tools/buck/glue-pipeline.ts`
   - Export graph: `node tools/buck/export-graph.ts`
   - Sync providers: `node tools/buck/sync-providers.ts`
   - Sync Node providers: `node tools/buck/sync-providers-node.ts`
   - Sync specific language: `node tools/buck/sync-providers.ts --lang node`
-  - Generate auto_map: `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
+  - Generate auto_map (building block; prefer the pipeline): `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
   - Prebuild guard (freshness/presence): `node tools/buck/prebuild-guard.ts [--verbose|--json]`
   - Note: touching any `pnpm-lock.yaml` requires re-running provider sync + auto_map; the guard will fail in CI if importer entries are missing and auto-fix locally unless `PREBUILD_GUARD_NO_FIX=1`.
 - Nix builds (planner outputs):

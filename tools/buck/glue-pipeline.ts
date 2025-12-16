@@ -10,6 +10,13 @@ type RunGluePipelineOptions = {
   outAutoMap?: string;
   zxInitPath?: string;
   verbose?: boolean;
+  // When true, skip calling tools/buck/sync-providers.ts. This is used when a caller
+  // already performed provider sync and only wants the shared downstream glue steps.
+  skipProviderSync?: boolean;
+  // Control provider index emission: skip entirely, best-effort (ignore failures), or required.
+  providerIndex?: "skip" | "best-effort" | "required";
+  // Control auto_map emission: skip entirely or required.
+  autoMap?: "skip" | "required";
 };
 
 function repoRootFromCwd(): string {
@@ -27,6 +34,9 @@ export async function runGluePipeline(opts: RunGluePipelineOptions = {}): Promis
   const graphPath = opts.graphPath || DEFAULT_GRAPH_PATH;
   const outAutoMap = opts.outAutoMap || "third_party/providers/auto_map.bzl";
   const verbose = !!opts.verbose;
+  const skipProviderSync = !!opts.skipProviderSync;
+  const providerIndexMode = opts.providerIndex || "required";
+  const autoMapMode = opts.autoMap || "required";
 
   // Step 1: ensure graph exists (idempotent)
   if (verbose) console.error(`[glue-pipeline] ensureGraph → ${graphPath}`);
@@ -36,28 +46,45 @@ export async function runGluePipeline(opts: RunGluePipelineOptions = {}): Promis
   }
 
   // Step 2: sync providers (all languages; language drivers are no-ops when inactive)
-  const syncScript = path.join(repoRoot, "tools/buck/sync-providers.ts");
-  if (verbose) console.error("[glue-pipeline] sync-providers");
-  await runNodeWithZx({ nodeBin, zxInitPath: zxInit, script: syncScript });
+  if (!skipProviderSync) {
+    const syncScript = path.join(repoRoot, "tools/buck/sync-providers.ts");
+    if (verbose) console.error("[glue-pipeline] sync-providers");
+    await runNodeWithZx({ nodeBin, zxInitPath: zxInit, script: syncScript });
+  } else if (verbose) {
+    console.error("[glue-pipeline] sync-providers (skipped)");
+  }
 
   // Step 3: generate provider index for diagnostics and mapping visibility
-  const providerIndexScript = path.join(repoRoot, "tools/buck/gen-provider-index.ts");
-  if (verbose) console.error("[glue-pipeline] gen-provider-index");
-  await runNodeWithZx({ nodeBin, zxInitPath: zxInit, script: providerIndexScript });
+  if (providerIndexMode !== "skip") {
+    const providerIndexScript = path.join(repoRoot, "tools/buck/gen-provider-index.ts");
+    if (verbose) console.error("[glue-pipeline] gen-provider-index");
+    try {
+      await runNodeWithZx({ nodeBin, zxInitPath: zxInit, script: providerIndexScript });
+    } catch (e) {
+      if (providerIndexMode === "required") throw e;
+      if (verbose) console.error("[glue-pipeline] gen-provider-index (best-effort):", e);
+    }
+  } else if (verbose) {
+    console.error("[glue-pipeline] gen-provider-index (skipped)");
+  }
 
   // Step 4: generate auto_map deterministically from the graph
-  const autoMapScript = path.join(repoRoot, "tools/buck/gen-auto-map.ts");
-  if (verbose) console.error(`[glue-pipeline] gen-auto-map → ${outAutoMap}`);
-  // Ensure output directory exists to avoid noisy errors in temp repos
-  try {
-    await fsp.mkdir(path.dirname(outAutoMap), { recursive: true });
-  } catch {}
-  await runNodeWithZx({
-    nodeBin,
-    zxInitPath: zxInit,
-    script: autoMapScript,
-    args: ["--graph", graphPath, "--out", outAutoMap],
-  });
+  if (autoMapMode !== "skip") {
+    const autoMapScript = path.join(repoRoot, "tools/buck/gen-auto-map.ts");
+    if (verbose) console.error(`[glue-pipeline] gen-auto-map → ${outAutoMap}`);
+    // Ensure output directory exists to avoid noisy errors in temp repos
+    try {
+      await fsp.mkdir(path.dirname(outAutoMap), { recursive: true });
+    } catch {}
+    await runNodeWithZx({
+      nodeBin,
+      zxInitPath: zxInit,
+      script: autoMapScript,
+      args: ["--graph", graphPath, "--out", outAutoMap],
+    });
+  } else if (verbose) {
+    console.error("[glue-pipeline] gen-auto-map (skipped)");
+  }
 }
 
 async function main() {

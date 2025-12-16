@@ -667,8 +667,7 @@ nix_go_binary(
 
 - [ ] Go/C++: `patch-pkg apply` writes the canonical patch file under the package’s `patches/{go,cpp}` directory and clears dev overrides. No glue steps are required; Buck invalidates via `srcs`.
 - [ ] Node: `patch-pkg apply` commits the pnpm patch and triggers:
-  1. `node tools/buck/sync-providers.ts`
-  2. `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
+  1. `node tools/buck/glue-pipeline.ts` (centralized orchestration: ensure graph → sync providers → provider index → auto_map)
 - Verification:
   - [ ] Go/C++: Immediate `buck2 build` invalidates only the affected targets when patch files change.
   - [ ] Node: Provider and auto_map refresh completes; dependent targets rebuild.

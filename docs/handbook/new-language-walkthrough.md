@@ -44,7 +44,7 @@ Steps
   - Include a small test that proves your adapter’s `validate(nodes)` rejects a misconfigured sample with a clear message.
 
 - **Run glue**
-  - Local: `node tools/buck/export-graph.ts`, `node tools/buck/sync-providers.ts`, `node tools/buck/gen-auto-map.ts` or simply `node tools/buck/prebuild-guard.ts` (auto-fix in local mode).
+  - Local: `node tools/buck/glue-pipeline.ts` (or simply `node tools/buck/prebuild-guard.ts`, which can auto-fix in local mode).
   - CI: stages run these in order; Node sync runs only if `pnpm-lock.yaml` is present.
 
 Tips
