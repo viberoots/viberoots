@@ -5,6 +5,7 @@ load(
     "dedupe_preserve",
     "importer_from_labels",
     "merge_provider_edges",
+    "prepare_importer_genrule_kwargs",
     "require_single_importer_lockfile_label",
     "stamp_labels",
 )
@@ -16,37 +17,17 @@ MODULE_PROVIDERS = {}
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
 
 def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = [], lockfile_label = None, kind = "gen", **kwargs):
-    kwargs["name"] = name
-    # Merge explicit deps and provider deps into srcs so edges are realized even if genrule doesn't support `deps`.
-    _srcs_is_dict = isinstance(srcs, dict)
-    merged_srcs = (dict(srcs) if _srcs_is_dict else list(srcs))
-    kwargs["labels"] = labels
-    require_single_importer_lockfile_label(kwargs, lockfile_label)
-    stamp_labels(kwargs, "node", kind)
-    if _srcs_is_dict:
-        kwargs["srcs"] = merged_srcs
-        attach_importer_patch_inputs(kwargs, "node", into = "srcs", dict_safe = True, key_prefix = "__patch_inputs__")
-        kwargs["srcs"] = merge_provider_edges(
-            name,
-            deps,
-            into = "srcs",
-            base = kwargs.get("srcs", {}),
-            dict_safe = True,
-            key_prefix = "__provider_edges__",
-            MODULE_PROVIDERS = MODULE_PROVIDERS,
-        )
-    else:
-        # Include importer-local node patches in srcs so Buck invalidates precisely on patch changes
-        kwargs["srcs"] = merged_srcs
-        attach_importer_patch_inputs(kwargs, "node")
-        merged_srcs = kwargs.get("srcs", [])
-        merged_srcs = merge_provider_edges(
-            name,
-            (merged_srcs + deps),
-            into = "srcs",
-            MODULE_PROVIDERS = MODULE_PROVIDERS,
-        )
-        kwargs["srcs"] = merged_srcs
+    prepare_importer_genrule_kwargs(
+        name = name,
+        kwargs = kwargs,
+        srcs = srcs,
+        deps = deps,
+        lang = "node",
+        kind = kind,
+        labels = labels,
+        lockfile_label = lockfile_label,
+        MODULE_PROVIDERS = MODULE_PROVIDERS,
+    )
     if out != None:
         kwargs["out"] = out
     if cmd != None:

@@ -1,4 +1,5 @@
 load("//lang:lockfile_labels.bzl", "ensure_single_lockfile_label")
+load("//lang:label_stamping.bzl", "stamp_labels")
 load(
     "//lang:patch_inputs.bzl",
     "include_importer_patches_from_labels",
@@ -59,5 +60,62 @@ def merge_provider_edges(
 
     merged_base = deps if base == None else base
     return realize_provider_edges(provs, name, into = into, base = merged_base)
+
+
+def prepare_importer_genrule_kwargs(
+        name,
+        kwargs,
+        srcs,
+        deps,
+        lang,
+        kind,
+        labels = [],
+        lockfile_label = None,
+        MODULE_PROVIDERS = None,
+        patch_key_prefix = "__patch_inputs__",
+        provider_key_prefix = "__provider_edges__"):
+    """
+    Standard wiring for importer-scoped, genrule-style macros where edges must be realized
+    into an input attribute (usually `srcs`) rather than `deps`.
+
+    Responsibilities:
+    - enforce exactly one importer-scoped lockfile label (stable error text)
+    - stamp `lang:*` and `kind:*` labels
+    - attach importer-local patch files into `srcs` (list and dict shapes)
+    - realize provider edges into `srcs` (list and dict shapes)
+    """
+    kw = {} if kwargs == None else kwargs
+    kw["name"] = name
+    existing_labels = kw.get("labels", []) or []
+    kw["labels"] = (existing_labels if isinstance(existing_labels, list) else []) + (labels or [])
+
+    require_single_importer_lockfile_label(kw, lockfile_label)
+    stamp_labels(kw, lang, kind)
+
+    is_dict_srcs = isinstance(srcs, dict)
+    kw["srcs"] = (dict(srcs) if is_dict_srcs else list(srcs))
+
+    if is_dict_srcs:
+        attach_importer_patch_inputs(kw, lang, into = "srcs", dict_safe = True, key_prefix = patch_key_prefix)
+        kw["srcs"] = merge_provider_edges(
+            name,
+            deps,
+            into = "srcs",
+            base = (kw.get("srcs", {}) or {}),
+            dict_safe = True,
+            key_prefix = provider_key_prefix,
+            MODULE_PROVIDERS = MODULE_PROVIDERS,
+        )
+        return kw
+
+    attach_importer_patch_inputs(kw, lang, into = "srcs")
+    merged_srcs = kw.get("srcs", []) or []
+    kw["srcs"] = merge_provider_edges(
+        name,
+        (merged_srcs + (deps or [])),
+        into = "srcs",
+        MODULE_PROVIDERS = MODULE_PROVIDERS,
+    )
+    return kw
 
 

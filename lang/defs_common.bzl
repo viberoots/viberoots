@@ -40,6 +40,7 @@ load(
     "//lang:importer_wiring.bzl",
     _attach_importer_patch_inputs = "attach_importer_patch_inputs",
     _merge_provider_edges = "merge_provider_edges",
+    _prepare_importer_genrule_kwargs = "prepare_importer_genrule_kwargs",
     _require_single_importer_lockfile_label = "require_single_importer_lockfile_label",
 )
 
@@ -89,4 +90,5 @@ dict_items_probe = _dict_items_probe
 require_single_importer_lockfile_label = _require_single_importer_lockfile_label
 attach_importer_patch_inputs = _attach_importer_patch_inputs
 merge_provider_edges = _merge_provider_edges
+prepare_importer_genrule_kwargs = _prepare_importer_genrule_kwargs
 
