@@ -47,6 +47,22 @@ export function isWorkspaceImporterPath(importer: string): boolean {
 }
 
 /**
+ * Return true when an importer label is supported for importer-scoped ecosystems.
+ *
+ * Supported importer labels:
+ * - "."         (repo-root lockfile importers)
+ * - "apps/*"    (workspace apps)
+ * - "libs/*"    (workspace libs)
+ *
+ * Anything else is treated as unsupported and should not generate providers or auto-map entries.
+ */
+export function isSupportedImporterLabel(importer: string): boolean {
+  const p = toPosixPath(importer);
+  if (p === ".") return true;
+  return /^(apps|libs)\//.test(p);
+}
+
+/**
  * Compute the default importer-local patch directory (POSIX).
  * For importer '.', returns 'patches/<lang>'; otherwise '<importer>/patches/<lang>'.
  */

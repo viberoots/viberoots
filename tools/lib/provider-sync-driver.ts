@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { computeImporterLabel, isWorkspaceImporterPath } from "./importers.ts";
+import { computeImporterLabel, isSupportedImporterLabel } from "./importers.ts";
 import { writeImporterProvidersByLang, type ImporterProvider } from "./provider-writer.ts";
 import { toPosixPath, uniqSorted } from "./posix-path.ts";
 
@@ -46,9 +46,9 @@ export async function runImporterProviderSync(opts: DriverOptions): Promise<void
     globalKeyToPatchPath,
   } = opts;
 
-  // Discover lockfiles and filter to workspace importers under apps/* or libs/*
+  // Discover lockfiles. Filtering is driven by supported importer labels, not lockfile path prefixes.
   const discovered = await discoverLockfiles();
-  const lockfiles = discovered.map((p) => toPosixPath(p)).filter((p) => /^(apps|libs)\//.test(p));
+  const lockfiles = uniqSorted(discovered.map((p) => toPosixPath(p)).filter(Boolean));
   if (!lockfiles.length) {
     await writeImporterProvidersByLang(lang, [], { outFile });
     return;
@@ -74,7 +74,7 @@ export async function runImporterProviderSync(opts: DriverOptions): Promise<void
 
     for (const [importerRaw, eff] of importerSets.entries()) {
       const importer = toPosixPath(importerRaw);
-      if (!isWorkspaceImporterPath(importer)) continue;
+      if (!isSupportedImporterLabel(importer)) continue;
 
       // Importer-local patches
       const localPatches = await listImporterPatchesFor(importer);

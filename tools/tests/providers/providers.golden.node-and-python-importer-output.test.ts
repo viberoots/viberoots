@@ -13,6 +13,11 @@ test("golden: Node importer provider TARGETS.node.auto is stable for representat
   await runInTemp("golden-node-provider-output", async (tmp, $) => {
     await $`git init`;
 
+    // Keep the fixture focused on a single importer-owned lockfile under apps/*.
+    // The workspace copy may include a repo-root pnpm-lock.yaml used for tooling;
+    // remove it here so the golden output remains stable and minimal.
+    await fsp.rm(path.join(tmp, "pnpm-lock.yaml"), { force: true });
+
     const importerDir = path.join(tmp, "apps/web");
     await fsp.mkdir(path.join(importerDir, "patches", "node"), { recursive: true });
     await fsp.writeFile(

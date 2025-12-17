@@ -10,6 +10,11 @@ test("providers registry: partial-clone with no enabled languages runs without e
   await runInTemp("providers-registry-partial", async (tmp, $) => {
     // Ensure providers dir exists (curated auto section lives here in real repos)
     await fsp.mkdir(path.join(tmp, "third_party", "providers"), { recursive: true });
+    // This test asserts the "no enabled languages" case. The workspace copy may include
+    // repo-root lockfiles (e.g. pnpm-lock.yaml) used for tooling; remove them so discovery
+    // does not enable Node/Python in this partial clone.
+    await fsp.rm(path.join(tmp, "pnpm-lock.yaml"), { force: true });
+    await fsp.rm(path.join(tmp, "uv.lock"), { force: true });
     // Run without --lang so discovery uses manifest + requiredPaths gating.
     await $({ cwd: tmp, stdio: "inherit" })`node tools/buck/sync-providers.ts`;
     // With no enabled languages present, provider files must be empty (header-only) if present.

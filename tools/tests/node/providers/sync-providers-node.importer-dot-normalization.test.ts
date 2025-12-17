@@ -39,8 +39,11 @@ packages:
       process.exit(2);
     }
 
-    if (output.includes('importer="."')) {
-      console.error("Importer '.' should not appear in provider entries");
+    if (
+      output.includes('lockfile="apps/example/pnpm-lock.yaml", importer="."') ||
+      output.includes('lockfile="apps/example/pnpm-lock.yaml",importer="."')
+    ) {
+      console.error("Importer '.' should not appear for apps/example lockfile provider entry");
       process.exit(2);
     }
   });

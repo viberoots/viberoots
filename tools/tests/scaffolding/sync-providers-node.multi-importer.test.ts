@@ -8,6 +8,9 @@ test("sync-providers-node deterministic ordering with multiple importers", async
   await runInTemp("node-multi-imp", async (tmp, $) => {
     // Initialize git so git ls-files works
     await $`git init`;
+    // Keep the fixture focused on per-importer lockfiles under apps/* and libs/*.
+    // The workspace copy may include a repo-root pnpm-lock.yaml used for tooling; remove it.
+    await fsp.rm(path.join(tmp, "pnpm-lock.yaml"), { force: true });
 
     // Create separate lockfiles for 3 different projects (per-importer design)
     const webLockfile = path.join(tmp, "apps/web/pnpm-lock.yaml");

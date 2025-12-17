@@ -10,6 +10,7 @@ import * as fssync from "node:fs";
 import { getFlagStr } from "../lib/cli.ts";
 import { ensureGraph } from "./glue-run.ts";
 import { isProviderPackageNode } from "../lib/graph-utils.ts";
+import { isSupportedImporterLabel } from "../lib/importers.ts";
 // no path import needed when not checking provider existence
 
 type Node = {
@@ -44,6 +45,7 @@ async function main() {
   const list = nodes as unknown as Node[];
 
   const mapping: Record<string, string[]> = {};
+  const unsupportedLockfileLabels: Array<{ target: string; label: string; importer: string }> = [];
   for (const n of list) {
     // PR-2: Skip provider-package nodes to avoid self-mappings in auto_map.
     if (n.name && isProviderPackageNode(n.name)) {
@@ -58,6 +60,14 @@ async function main() {
         // Do not gate on filesystem presence; tests synthesize graphs without real files.
         const parsed = parseLockfileLabel(l);
         if (!parsed) continue;
+        if (!isSupportedImporterLabel(parsed.importer)) {
+          unsupportedLockfileLabels.push({
+            target: String(n.name || ""),
+            label: l,
+            importer: parsed.importer,
+          });
+          continue;
+        }
         const [prov] = providersForLabels([l]);
         if (prov) provs.push(prov);
       } else if (l.startsWith("nixpkg:")) {
@@ -78,6 +88,26 @@ async function main() {
   const footer = `\n}\n`;
   const data = header + body + footer;
   await writeIfChanged(outPath, data);
+
+  if (unsupportedLockfileLabels.length > 0) {
+    const lines = unsupportedLockfileLabels
+      .slice()
+      .sort((a, b) => (a.target + a.label).localeCompare(b.target + b.label))
+      .map(
+        (e) =>
+          `- ${e.target}: ${e.label} (importer='${e.importer}' not in {'.', 'apps/*', 'libs/*'})`,
+      );
+    const msg = [
+      "lockfile labels with unsupported importers were ignored (no providers will be generated for them):",
+      ...lines,
+      "",
+      "If this importer should be supported, expand the supported-importer policy in tools/lib/importers.ts.",
+    ].join("\n");
+    if ((process.env.CI || "").toLowerCase() === "true") {
+      throw new Error(msg);
+    }
+    console.warn("WARN:", msg);
+  }
 }
 
 main().catch((e) => {

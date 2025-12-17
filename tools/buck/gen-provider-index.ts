@@ -7,6 +7,7 @@ import { readNodeProviderIndexEntries } from "./providers/node.ts";
 import { readPythonProviderIndexEntries } from "./providers/python.ts";
 import { getFlagStr } from "../lib/cli.ts";
 import { parseLockfileLabel } from "../lib/labels.ts";
+import { isSupportedImporterLabel } from "../lib/importers.ts";
 
 type IndexEntry = { kind: "node" | "cpp" | "python"; key: string };
 
@@ -35,7 +36,9 @@ async function generateNodeLockIndex(outFile = "tools/buck/node-lock-index.json"
     const labs = Array.isArray(n.labels) ? (n.labels as string[]) : [];
     const locks = labs.filter((l) => l.startsWith("lockfile:"));
     if (locks.length !== 1) continue;
-    if (!parseLockfileLabel(locks[0])) continue;
+    const parsed = parseLockfileLabel(locks[0]);
+    if (!parsed) continue;
+    if (!isSupportedImporterLabel(parsed.importer)) continue;
     idx[name] = locks[0].toLowerCase();
   }
   // Deterministic order

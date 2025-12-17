@@ -32,7 +32,7 @@
 
 - Symptom: running Node provider sync makes no changes.
 - Expected reasons:
-  - No `pnpm-lock.yaml` files are present under `apps/*` or `libs/*`.
+  - No `pnpm-lock.yaml` files are present at repo root or under `apps/*` / `libs/*`.
   - Importers exist but no relevant `patches/node/*.patch` exist for their effective sets (normal — providers still emit without patch paths).
   - YAML module unavailable; generator falls back to per‑lockfile providers without importer traversal.
 - Fix:

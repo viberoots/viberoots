@@ -2,7 +2,11 @@
 import path from "node:path";
 import { scanFlatPatchDir } from "../../lib/provider-sync.ts";
 import { decodeNameVersionFromPatch, providerNameForImporter } from "../../lib/providers.ts";
-import { findImporterLockfiles, computeImporterLabel } from "../../lib/importers.ts";
+import {
+  findImporterLockfiles,
+  computeImporterLabel,
+  isSupportedImporterLabel,
+} from "../../lib/importers.ts";
 import { parsePnpmLock, effectiveSetForImporter } from "../../lib/pnpm-lock.ts";
 import { writeImporterProvidersByLang } from "../../lib/provider-writer.ts";
 import { syncImporterProviders } from "../../lib/provider-sync-driver.ts";
@@ -60,15 +64,21 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
       return new Map([[computeImporterLabel(lockfilePath), new Set()]]);
     }
     const doc = await parsePnpmLock(lockfilePath);
-    const map = new Map<string, Set<string>>();
-    for (const importer of Object.keys(doc.importers || {})) {
-      const importerLabel =
-        importer === "."
-          ? computeImporterLabel(lockfilePath)
-          : importer.replace(/^\.\/+/, "") || ".";
-      map.set(importerLabel, effectiveSetForImporter(doc, importer));
-    }
-    return map;
+    const importerLabel = computeImporterLabel(lockfilePath);
+    const importers = doc.importers || {};
+    const candidates = [
+      ".", // most common for per-importer lockfiles
+      importerLabel,
+      `./${importerLabel}`,
+    ];
+    const chosen =
+      candidates.find((k) => Object.prototype.hasOwnProperty.call(importers, k)) ||
+      (Object.keys(importers).length === 1 ? Object.keys(importers)[0] : ".") ||
+      ".";
+    const eff = Object.prototype.hasOwnProperty.call(importers, chosen)
+      ? effectiveSetForImporter(doc, chosen)
+      : new Set<string>();
+    return new Map([[importerLabel, eff]]);
   };
   const listImporterPatchesFor = async (importer: string) =>
     (await import("../../lib/importers.ts")).listImporterPatches(importer, "node");
@@ -104,11 +114,12 @@ export async function readNodeProviderIndexEntries(): Promise<
   }
   const entries = await readImporterProviderIndexEntries({
     discoverLockfiles: async () => lockfiles,
-    importersForLockfile: async (lf: string) => {
-      const doc = await parsePnpmLock(lf);
-      return Object.keys(doc.importers || {});
-    },
-    // No additional filtering — preserve previous behavior
+    // Lockfile-label contract only allows importer '.' for repo-root lockfiles,
+    // and requires importer == dirname(lockfilePath) for non-root lockfiles.
+    // Represent this consistently by always enumerating a single importer key '.' here.
+    // The shared index helper normalizes '.' to computeImporterLabel(lockfilePath).
+    importersForLockfile: async (_lf: string) => ["."],
+    shouldInclude: (_lf: string, importerLabel: string) => isSupportedImporterLabel(importerLabel),
   });
   return entries;
 }

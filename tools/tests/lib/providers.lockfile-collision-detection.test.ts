@@ -53,13 +53,22 @@ packages:
     // We cannot easily simulate a real collision without modifying the hash function
     // So we verify that different inputs produce different provider names
     const lines = output.split("\n");
+    const expectedLockfiles = new Set<string>([
+      "apps/web/pnpm-lock.yaml",
+      "apps/api/pnpm-lock.yaml",
+    ]);
     const providerNames = lines
-      .filter((l) => l.includes('name="lf_'))
       .map((l) => {
-        const match = l.match(/name="([^"]+)"/);
-        return match ? match[1] : "";
+        const m = l.match(
+          /node_importer_deps\(name="([^"]+)", lockfile="([^"]+)", importer="([^"]+)"/,
+        );
+        if (!m) return null;
+        const [, name, lockfile, importer] = m;
+        if (!expectedLockfiles.has(lockfile)) return null;
+        if (importer !== path.posix.dirname(lockfile)) return null;
+        return name;
       })
-      .filter(Boolean);
+      .filter((v): v is string => typeof v === "string" && v.length > 0);
 
     if (providerNames.length !== 2) {
       console.error(`Expected 2 provider names, got ${providerNames.length}`);
