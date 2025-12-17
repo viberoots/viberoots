@@ -37,6 +37,8 @@ test("parseLockfileLabel: rejects malformed labels", () => {
     "lockfile:#", // empty parts
     "lockfile:", // empty
     "lockfile", // not a proper prefix form
+    "lockfile:apps/web/pnpm-lock.yaml#apps/web#extra", // extra '#'
+    "lockfile:apps/web/pnpm-lock.yaml#apps/api", // importer mismatch
     "", // empty string
   ];
   for (const s of bad) {

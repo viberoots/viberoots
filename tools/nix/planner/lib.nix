@@ -44,8 +44,53 @@ let
       dropCell = p: if lib.hasPrefix "root//" p then lib.removePrefix "root//" p else p;
       dropPkg = p: if lib.hasPrefix (pkg + "/") p then lib.removePrefix (pkg + "/") p else p;
     in map (p: dropPkg (dropCell p)) list;
+
+  extractLockfileLabels = labels:
+    if labels == null then []
+    else builtins.filter (l: builtins.isString l && lib.hasPrefix "lockfile:" l) labels;
+
+  stripLeadingDotSlash = s:
+    let
+      step = cur:
+        if lib.hasPrefix "./" cur then step (lib.removePrefix "./" cur) else cur;
+    in step (toString s);
+
+  # Parse and validate an importer-scoped lockfile label:
+  #   lockfile:<path>#<importer>
+  # - Must contain exactly one '#'
+  # - Both path and importer must be non-empty
+  # - Normalize lockfile path by stripping leading './'
+  # - Importer must be '.' or match the lockfile directory (posix)
+  parseImporterScopedLockfileLabel = label:
+    let
+      s = toString label;
+    in
+      if !(lib.hasPrefix "lockfile:" s) then
+        builtins.throw "Lockfile label must start with 'lockfile:'; got: ${s}"
+      else
+        let
+          raw = lib.removePrefix "lockfile:" s;
+          parts = lib.splitString "#" raw;
+        in
+          if raw == "" then
+            builtins.throw "Lockfile label must be of the form lockfile:<path>#<importer>; got: ${s}"
+          else if (builtins.length parts) != 2 then
+            builtins.throw "Lockfile label must contain exactly one '#'; got: ${s}"
+          else
+            let
+              pathPartRaw = builtins.elemAt parts 0;
+              importer = builtins.elemAt parts 1;
+              lockfilePath = stripLeadingDotSlash pathPartRaw;
+              dir = builtins.dirOf lockfilePath;
+            in
+              if lockfilePath == "" || importer == "" then
+                builtins.throw "Lockfile label must be of the form lockfile:<path>#<importer>; got: ${s}"
+              else if !(importer == "." || importer == dir) then
+                builtins.throw "Lockfile label importer must be '.' or match the lockfile directory (${dir}); got: ${s}"
+              else { inherit lockfilePath importer; };
 in {
   inherit get cleanLabel labelsOf nameOf depsOf srcsOf byName;
+  inherit extractLockfileLabels parseImporterScopedLockfileLabel;
   # Generic DFS label collector. Starting from `name`, walk transitive deps
   # and collect unique labels that start with `prefix`. Returns a sorted list
   # of full labels (including the prefix).

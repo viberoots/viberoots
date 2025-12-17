@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { normalizeNixAttr, providerNameForImporter, providerNameForNixAttr } from "./providers.ts";
+import path from "node:path";
 
 function fqProviderLabel(name: string): string {
   return `//third_party/providers:${name}`;
@@ -10,16 +11,29 @@ function fqProviderLabel(name: string): string {
 //   - lockfile:apps/web/pnpm-lock.yaml#apps/web
 //   - lockfile:pnpm-lock.yaml#.
 // Normalizes the lockfile path by stripping any leading "./".
-export function parseLockfileLabel(label: string): { lockfile: string; importer: string } | null {
+export function parseLockfileLabelParts(
+  label: string,
+): { lockfile: string; importer: string } | null {
   const s = String(label || "");
   if (!s.startsWith("lockfile:")) return null;
   const rest = s.slice("lockfile:".length);
   const hashIdx = rest.indexOf("#");
   if (hashIdx < 0) return null;
+  // Must contain exactly one '#'
+  if (rest.indexOf("#", hashIdx + 1) >= 0) return null;
   const pathPart = rest.slice(0, hashIdx).replace(/^\.\/+/, "");
   const importer = rest.slice(hashIdx + 1);
   if (!pathPart || !importer) return null;
   return { lockfile: pathPart, importer };
+}
+
+export function parseLockfileLabel(label: string): { lockfile: string; importer: string } | null {
+  const parsed = parseLockfileLabelParts(label);
+  if (!parsed) return null;
+  // Importer must be '.' or match the lockfile directory (posix semantics).
+  const dir = path.posix.dirname(parsed.lockfile);
+  if (!(parsed.importer === "." || parsed.importer === dir)) return null;
+  return parsed;
 }
 
 export function isImporterScopedLockfileLabel(label: string): boolean {

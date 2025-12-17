@@ -3,7 +3,7 @@ import path from "node:path";
 import type { Adapter, Batch, Node } from "../types.ts";
 import { hasLabel, isRuleType, validateLanguageClassification } from "./helpers.ts";
 import { packageDirFromTargetName } from "../batch.ts";
-import { parseLockfileLabel } from "../../../lib/labels.ts";
+import { parseLockfileLabelParts } from "../../../lib/labels.ts";
 import { computeImporterLabel, findNearestPnpmLockForPackage } from "../../../lib/importers.ts";
 
 function isNodeTarget(n: Node): boolean {
@@ -44,7 +44,7 @@ function validateSingleImporterLabel(n: Node): string[] {
   }
   // Validate format and path/importer consistency for the first label
   const first = locks[0];
-  const parsed = parseLockfileLabel(first);
+  const parsed = parseLockfileLabelParts(first);
   if (!parsed) {
     findings.push(
       [

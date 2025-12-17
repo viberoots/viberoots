@@ -1,6 +1,13 @@
 load("//lang:collections.bzl", _dedupe_preserve = "dedupe_preserve")
 load("//lang:label_stamping.bzl", _normalize_labels = "normalize_labels", _stamp_global_nix_inputs = "stamp_global_nix_inputs", _stamp_labels = "stamp_labels", _stamp_wasm_variant = "stamp_wasm_variant", _wasm_labels_probe = "wasm_labels_probe")
-load("//lang:lockfile_labels.bzl", _ensure_single_lockfile_label = "ensure_single_lockfile_label", _extract_lockfile_labels = "extract_lockfile_labels", _importer_from_labels = "importer_from_labels", _importer_from_labels_probe = "importer_from_labels_probe")
+load(
+    "//lang:lockfile_labels.bzl",
+    _ensure_single_lockfile_label = "ensure_single_lockfile_label",
+    _extract_lockfile_labels = "extract_lockfile_labels",
+    _importer_from_labels = "importer_from_labels",
+    _importer_from_labels_probe = "importer_from_labels_probe",
+    _lockfile_label_parse_probe = "lockfile_label_parse_probe",
+)
 load("//lang:nixpkg_labels.bzl", _append_nixpkg_labels = "append_nixpkg_labels", _normalize_nix_attr = "normalize_nix_attr", _normalize_nix_attr_probe = "normalize_nix_attr_probe")
 load(
     "//lang:patch_inputs.bzl",
@@ -48,6 +55,7 @@ extract_lockfile_labels = _extract_lockfile_labels
 ensure_single_lockfile_label = _ensure_single_lockfile_label
 importer_from_labels = _importer_from_labels
 importer_from_labels_probe = _importer_from_labels_probe
+lockfile_label_parse_probe = _lockfile_label_parse_probe
 
 append_patch_srcs = _append_patch_srcs
 append_patch_inputs = _append_patch_inputs

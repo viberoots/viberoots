@@ -15,18 +15,22 @@ let
   labelsOf = L.labelsOf;
   nameOf = L.nameOf;
   byName = L.byName;
+  parseLock = L.parseImporterScopedLockfileLabel;
+  extractLocks = L.extractLockfileLabels;
 
   # Discover importer directory from lockfile label on a node name
-  importerOfName = name:
+  lockInfoOfName = name:
     let
       n = if builtins.hasAttr name byName then byName.${name} else null;
       labs = if n == null then [] else labelsOf n;
-      locks = builtins.filter (l: lib.hasPrefix "lockfile:" l) labs;
-    in if locks == [] then null else (
-      let rest = lib.removePrefix "lockfile:" (builtins.head locks);
-          parts = lib.splitString "#" rest;
-      in if (builtins.length parts) >= 2 then (builtins.elemAt parts 1) else null
-    );
+      locks = extractLocks labs;
+    in
+      if locks == [] then
+        builtins.throw "node planner: missing importer-scoped lockfile label (lockfile:<path>#<importer>) on ${name}"
+      else if (builtins.length locks) != 1 then
+        builtins.throw "node planner: expected exactly one lockfile:<path>#<importer> label on ${name}; got: ${builtins.toJSON locks}"
+      else
+        parseLock (builtins.head locks);
 
   # Local node-modules utilities (hermetic pnpm store + node_modules)
   nodeMods = import ../node-modules.nix {
@@ -57,9 +61,10 @@ in {
   # Build a single-file CLI bundle using esbuild and the importer's hermetic node_modules
   mkApp = name:
     let
-      importerDir = importerOfName name;
-      # Expect importerDir from lockfile label; caller should filter to those nodes only.
-      nm = nodeMods.mkNodeModules { lockfilePath = importerDir + "/pnpm-lock.yaml"; inherit importerDir; };
+      info = lockInfoOfName name;
+      importerDir = info.importer;
+      # Expect importerDir/lockfilePath from lockfile label; fail deterministically if malformed.
+      nm = nodeMods.mkNodeModules { lockfilePath = info.lockfilePath; inherit importerDir; };
       entryRel = "src/index.ts";
       outBase = targetNameOf name;
       sanitize = s: lib.replaceStrings [ "//" ":" "/" " " ] [ "" "-" "-" "-" ] s;
