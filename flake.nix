@@ -471,11 +471,14 @@ EOF_PAT
                 echo "[nix] junit reporter did not emit a file; writing minimal placeholder" >&2
                 echo "<testsuites/>" > report/junit.xml
               fi
-              # If reporters didn't produce lcov/summary, synthesize them from raw V8 coverage using c8
+              # Coverage artifacts must be present and non-empty when COVERAGE=1.
+              # Primary path: vitest writes coverage directly.
               if [ "${coverageEnv}" = "1" ]; then
-                if [ ! -f coverage/lcov.info ] || [ ! -f coverage/coverage-summary.json ]; then
-                  echo "[nix] coverage: generating lcov/json-summary via c8 report (temp=coverage/raw, out=coverage)" >&2
-                  c8 report --reporter=lcov --reporter=json-summary --reporter=html --report-dir=coverage --temp-directory=coverage/raw || true
+                if [ ! -s coverage/lcov.info ] || [ ! -s coverage/coverage-summary.json ]; then
+                  echo "[nix] ERROR: coverage requested but expected reports were not produced (lcov.info / coverage-summary.json)" >&2
+                  echo "[nix] Ensure the importer has @vitest/coverage-v8 installed, and that vitest is run with '--coverage --coverage.provider=v8'." >&2
+                  (ls -la coverage || true) >&2
+                  exit 3
                 fi
               fi
               else
@@ -488,9 +491,9 @@ EOF_PAT
             set -euo pipefail
             mkdir -p "$out"
             if [ -d report ]; then cp -R report "$out/"; fi
-            if [ -d coverage ]; then
+            if [ -d coverage ] && [ -n "$(ls -A coverage 2>/dev/null || true)" ]; then
               mkdir -p "$out/coverage"
-              cp -R coverage/* "$out/coverage/" || true
+              cp -R coverage/* "$out/coverage/"
             fi
           '';
         };
