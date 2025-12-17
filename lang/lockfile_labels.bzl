@@ -41,9 +41,15 @@ def _parse_importer_scoped_lockfile_label(label):
         fail("Lockfile label must be of the form lockfile:<path>#<importer>; got: %s" % label)
     path_part = _strip_leading_dot_slash(path_part)
     dirname = _dirname_posix(path_part)
-    if not (importer == "." or importer == dirname):
+    if importer == ".":
+        if dirname != ".":
+            fail(
+                "Lockfile label importer '.' is only allowed for repo-root lockfiles; expected importer '%s' for %s"
+                % (dirname, label)
+            )
+    elif importer != dirname:
         fail(
-            "Lockfile label importer must be '.' or match the lockfile directory (%s); got: %s"
+            "Lockfile label importer must match the lockfile directory (%s); got: %s"
             % (dirname, label)
         )
     return (path_part, importer)

@@ -9,7 +9,7 @@ function fqProviderLabel(name: string): string {
 // Parse an importer-scoped PNPM lockfile label.
 // Accepts forms like:
 //   - lockfile:apps/web/pnpm-lock.yaml#apps/web
-//   - lockfile:pnpm-lock.yaml#.
+//   - lockfile:pnpm-lock.yaml#.          (repo-root lockfiles only)
 // Normalizes the lockfile path by stripping any leading "./".
 export function parseLockfileLabelParts(
   label: string,
@@ -30,9 +30,14 @@ export function parseLockfileLabelParts(
 export function parseLockfileLabel(label: string): { lockfile: string; importer: string } | null {
   const parsed = parseLockfileLabelParts(label);
   if (!parsed) return null;
-  // Importer must be '.' or match the lockfile directory (posix semantics).
+  // Importer must match the lockfile directory (posix semantics).
+  // Special-case: importer '.' is allowed only for repo-root lockfiles (dirname == '.').
   const dir = path.posix.dirname(parsed.lockfile);
-  if (!(parsed.importer === "." || parsed.importer === dir)) return null;
+  if (parsed.importer === ".") {
+    if (dir !== ".") return null;
+    return parsed;
+  }
+  if (parsed.importer !== dir) return null;
   return parsed;
 }
 

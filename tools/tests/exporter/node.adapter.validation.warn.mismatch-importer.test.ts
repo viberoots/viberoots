@@ -38,8 +38,8 @@ test("node adapter warns on path/importer mismatch (warn mode)", async () => {
       process.exit(2);
     }
     if (
-      !txt.includes("Fix: set importer to '.'") ||
-      !txt.includes("match the lockfile directory")
+      !txt.includes("Fix: set importer to 'apps/web'") ||
+      !txt.includes("Use importer '.' only for repo-root lockfiles")
     ) {
       console.error("expected remediation guidance for importer mismatch", txt);
       process.exit(2);

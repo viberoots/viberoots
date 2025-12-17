@@ -55,12 +55,14 @@ function validateSingleImporterLabel(n: Node): string[] {
     return findings;
   }
   const dir = path.posix.dirname(parsed.lockfile);
-  const importerOk = parsed.importer === "." || parsed.importer === dir;
+  const importerOk =
+    (parsed.importer === "." && dir === ".") ||
+    (parsed.importer !== "." && parsed.importer === dir);
   if (!importerOk) {
     findings.push(
       [
         `[exporter][node] lockfile importer mismatch on ${n.name}: '${first}'.`,
-        `Fix: set importer to '.' (lockfile at repo root) or to '${dir}' to match the lockfile directory.`,
+        `Fix: set importer to '${dir}' to match the lockfile directory. Use importer '.' only for repo-root lockfiles (example: lockfile:pnpm-lock.yaml#.).`,
       ].join("\n"),
     );
   }

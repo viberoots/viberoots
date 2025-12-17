@@ -13,6 +13,8 @@ This handbook summarizes project-wide conventions that keep behavior determinist
 - Path invariants
   - `patches/<lang>/` is flat; for Go: `<encodedImport>@<version>.patch` with `/` → `__`.
   - For Node/PNPM: importer‑local patches live under `<importer>/patches/node/*.patch`; labels use `lockfile:<relative/path/to/pnpm-lock.yaml>#<importer>`.
+    - `#.` is allowed only for repo-root lockfiles (example: `lockfile:pnpm-lock.yaml#.`).
+    - For non-root lockfiles, `<importer>` must equal `dirname(<path>)` (example: `lockfile:apps/web/pnpm-lock.yaml#apps/web`).
   - For C++: canonical flow is per‑target local patches under `<pkg>/patches/cpp/*.patch` (included in target `srcs`). Optional: a repo‑level overlay at `patches/cpp/*.patch` via `tools/nix/overlays/cpp-patches.nix`.
   - Buck exporter and generators live under `tools/buck/`.
   - Language planner templates live under `tools/nix/` (see `lang-templates.nix`).

@@ -60,7 +60,8 @@ let
   # - Must contain exactly one '#'
   # - Both path and importer must be non-empty
   # - Normalize lockfile path by stripping leading './'
-  # - Importer must be '.' or match the lockfile directory (posix)
+  # - Importer must match the lockfile directory (posix)
+  #   - Special-case: importer '.' is allowed only for repo-root lockfiles (dir == '.')
   parseImporterScopedLockfileLabel = label:
     let
       s = toString label;
@@ -85,8 +86,10 @@ let
             in
               if lockfilePath == "" || importer == "" then
                 builtins.throw "Lockfile label must be of the form lockfile:<path>#<importer>; got: ${s}"
-              else if !(importer == "." || importer == dir) then
-                builtins.throw "Lockfile label importer must be '.' or match the lockfile directory (${dir}); got: ${s}"
+              else if importer == "." && dir != "." then
+                builtins.throw "Lockfile label importer '.' is only allowed for repo-root lockfiles; expected importer '${dir}' for ${s}"
+              else if importer != "." && importer != dir then
+                builtins.throw "Lockfile label importer must match the lockfile directory (${dir}); got: ${s}"
               else { inherit lockfilePath importer; };
 in {
   inherit get cleanLabel labelsOf nameOf depsOf srcsOf byName;
