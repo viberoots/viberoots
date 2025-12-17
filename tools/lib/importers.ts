@@ -97,6 +97,48 @@ export async function listImporterPatches(
   return out;
 }
 
+/**
+ * Discover PNPM lockfiles, plus "synthetic" lockfile paths for workspace importers that
+ * have a package.json but do not yet have a pnpm-lock.yaml.
+ *
+ * This is a Node-only policy used by provider sync to keep importer-scoped provider edges stable
+ * during early scaffolding / partial adoption. The synthesized lockfile path does not claim that
+ * the lockfile exists or that any dependencies are present; it only provides a deterministic key.
+ *
+ * Rules:
+ * - Only workspace importers under apps/* or libs/* are eligible.
+ * - An importer is eligible when <importer>/package.json exists.
+ * - If <importer>/pnpm-lock.yaml already exists (discovered normally), it is not synthesized.
+ * - Returned paths are POSIX-style repo-relative paths, deterministically sorted.
+ */
+export async function findPnpmLockfilesWithSyntheticWorkspaceImporters(): Promise<string[]> {
+  const real = await findImporterLockfiles(["pnpm-lock.yaml"]);
+  const out = new Set(real.map((p) => toPosixPath(p).replace(/^\.\/+/, "")));
+
+  const roots: Array<"apps" | "libs"> = ["apps", "libs"];
+  for (const root of roots) {
+    let children: string[] = [];
+    try {
+      children = await fsp.readdir(path.resolve(root));
+    } catch {
+      children = [];
+    }
+    for (const child of children) {
+      const importer = toPosixPath(path.posix.join(root, child));
+      if (!isWorkspaceImporterPath(importer)) continue;
+      try {
+        await fsp.access(path.resolve(importer, "package.json"));
+      } catch {
+        continue;
+      }
+      const lockRel = toPosixPath(path.posix.join(importer, "pnpm-lock.yaml"));
+      if (!out.has(lockRel)) out.add(lockRel);
+    }
+  }
+
+  return Array.from(out).sort((a, b) => a.localeCompare(b));
+}
+
 async function pathExists(p: string): Promise<boolean> {
   try {
     await fsp.access(p);

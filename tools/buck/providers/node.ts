@@ -6,6 +6,7 @@ import {
   findImporterLockfiles,
   computeImporterLabel,
   isSupportedImporterLabel,
+  findPnpmLockfilesWithSyntheticWorkspaceImporters,
 } from "../../lib/importers.ts";
 import { parsePnpmLock, effectiveSetForImporter } from "../../lib/pnpm-lock.ts";
 import { writeImporterProvidersByLang } from "../../lib/provider-writer.ts";
@@ -25,35 +26,10 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
   for (const e of scanned) keyToPatchPath.set(e.key.toLowerCase(), e.patchPath);
 
   // Construct plugin functions for the shared driver
-  // Discover real pnpm-lock.yaml files; when an importer under apps/* or libs/* has
-  // only a package.json (no lockfile yet), synthesize its canonical lockfile path
-  // so we still emit a metadata-only provider and keep Buck dependency edges intact.
-  const discoverLockfiles = async (): Promise<string[]> => {
-    const real = await findImporterLockfiles(["pnpm-lock.yaml"]);
-    const have = new Set(real.map((p) => p.replace(/^\.\/+/, "")));
-    const extras: string[] = [];
-    for (const base of ["apps", "libs"]) {
-      let names: string[] = [];
-      try {
-        names = await (await import("node:fs/promises")).readdir(base);
-      } catch {
-        names = [];
-      }
-      for (const n of names) {
-        const importer = path.posix.join(base, n);
-        try {
-          await (
-            await import("node:fs/promises")
-          ).access(path.posix.join(importer, "package.json"));
-        } catch {
-          continue;
-        }
-        const lockRel = path.posix.join(importer, "pnpm-lock.yaml");
-        if (!have.has(lockRel)) extras.push(lockRel);
-      }
-    }
-    return [...real, ...extras].sort((a, b) => a.localeCompare(b));
-  };
+  // Node-only policy: include synthetic pnpm-lock.yaml paths for workspace importers that have
+  // package.json but no lockfile yet (metadata-only provider, stable edges).
+  const discoverLockfiles = async (): Promise<string[]> =>
+    await findPnpmLockfilesWithSyntheticWorkspaceImporters();
   const parseEffectiveSetForLockfile = async (
     lockfilePath: string,
   ): Promise<Map<string, Set<string>>> => {

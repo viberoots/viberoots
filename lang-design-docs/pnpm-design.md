@@ -274,6 +274,18 @@ function effectiveSet(importer):
 
 **Result:** Only patches matching packages in the effective set are included in the provider.
 
+#### Synthetic lockfile discovery (provider sync)
+
+Node provider sync also emits **metadata-only providers** for workspace importers under `apps/*` or `libs/*` that have a `package.json` but do not yet have a `pnpm-lock.yaml`.
+
+This is a deliberate policy to keep dependency edges stable during early scaffolding:
+
+- The provider key uses the importer’s canonical lockfile path: `<importer>/pnpm-lock.yaml`.
+- This does **not** claim that the lockfile exists or that any dependencies are present.
+- When a real lockfile appears, provider sync switches to the real lockfile and begins computing the effective set from it.
+
+This discovery contract is implemented in `tools/lib/importers.ts` and consumed by `tools/buck/providers/node.ts` to avoid drift across tooling.
+
 #### Why Importer-Scoped?
 
 Importer-scoped providers enable **precise invalidation**:
