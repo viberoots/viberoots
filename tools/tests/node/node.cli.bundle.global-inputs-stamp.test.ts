@@ -8,9 +8,9 @@ import { runInTemp } from "../lib/test-helpers";
 test("nix_node_cli_bin(bundle=True) stamps global Nix inputs via labels", async () => {
   await runInTemp("node-cli-bundle-stamp", async (tmp, $) => {
     const dir = path.join(tmp, "apps", "cli");
-    await fsp.mkdir(path.join(dir, "bin"), { recursive: true });
+    await fsp.mkdir(path.join(dir, "src"), { recursive: true });
     // Create a dummy entry so cquery can typecheck srcs for the bundled rule
-    await fsp.writeFile(path.join(dir, "bin", "tool"), "#!/usr/bin/env node\n", "utf8");
+    await fsp.writeFile(path.join(dir, "src", "index.ts"), "console.log('cli')\n", "utf8");
     await fsp.mkdir(dir, { recursive: true });
     await fsp.writeFile(
       path.join(dir, "TARGETS"),

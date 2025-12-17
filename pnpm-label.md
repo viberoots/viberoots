@@ -27,14 +27,14 @@ The design preserves the current model: importer‑scoped providers, validate‑
       - Require `importer` (if not provided, infer from a present `lockfile:<path>#<importer>` label; otherwise fail with a clear message).
       - Replace the heredoc “stub” with a `genrule` command that invokes the zx shim to build the Nix bundle and copy it to `$OUT`:
         - Command shape (illustrative):
-          - `node tools/buck/node-cli-bundle.ts --importer <importer> --name <name> --out $OUT [--entry <entry>]`
+          - `node tools/buck/node-cli-bundle.ts --importer <importer> --name <name> --out $OUT`
         - Inputs:
           - Continue to include importer‑local Node patches in `srcs` (already handled by `nix_node_gen`).
           - Include the CLI entry (or a minimal representative file, e.g. `src/index.ts`) in `srcs` so Buck invalidates on code changes within the importer.
         - Labels:
           - Ensure `stamp_labels(..., "node", "bin")` is applied (already done by `nix_node_gen` path), and keep the single importer‑scoped lockfile label enforcement.
   - File: `tools/buck/node-cli-bundle.ts`
-    - Extend CLI to accept an optional `--entry <path>` argument (for future flexibility). The current flake logic can continue to use a default entry; the flag is pass‑through and optional.
+    - Do not accept an `--entry` argument. Bundled mode uses a fixed entry (`src/index.ts`) in the flake.
     - Behavior:
       - Build `.#node-cli.<sanitize(importer)>`.
       - Copy `<name>.bundle.js` from the Nix out path to `$OUT` and `chmod +x` it.
@@ -104,7 +104,7 @@ The design preserves the current model: importer‑scoped providers, validate‑
 ### Estimated Diff Surfaces
 
 - `node/defs.bzl`: adjust `nix_node_cli_bin(bundle=True)` to call the bundling shim; maintain label stamping and lockfile label enforcement.
-- `tools/buck/node-cli-bundle.ts`: accept optional `--entry` (non-breaking); retain importer/name/out behavior.
+- `tools/buck/node-cli-bundle.ts`: remove `--entry`; retain importer/name/out behavior.
 - `third_party/providers/defs_node.bzl`: add `labels = ["lang:node"]` to `node_importer_deps(...)` genrule.
 - `tools/tests/scaffolding/node-cli.scaffold-and-build.shim-and-bundle.test.ts`: extend the bundle test to run the built artifact.
 - New test: `tools/tests/node/providers/node-provider-lang-label.test.ts`.

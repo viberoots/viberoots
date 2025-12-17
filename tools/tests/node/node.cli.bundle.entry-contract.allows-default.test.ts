@@ -5,11 +5,13 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("nix_node_cli_bin(bundle=True) includes global Nix inputs as genrule srcs (action inputs)", async () => {
-  await runInTemp("node-cli-bundle-global-inputs-srcs", async (tmp, $) => {
+test("nix_node_cli_bin(bundle=True) allows default entry (entry unset)", async () => {
+  await runInTemp("node-cli-bundle-entry-allow", async (tmp, $) => {
     const dir = path.join(tmp, "apps", "cli");
     await fsp.mkdir(path.join(dir, "src"), { recursive: true });
     await fsp.writeFile(path.join(dir, "src", "index.ts"), "console.log('cli')\n", "utf8");
+    await fsp.writeFile(path.join(dir, "pnpm-lock.yaml"), "# stub\n", "utf8");
+
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
@@ -30,12 +32,12 @@ test("nix_node_cli_bin(bundle=True) includes global Nix inputs as genrule srcs (
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //apps/cli:tool`;
-    if (probe.exitCode !== 0) return;
-    const out = String(probe.stdout || "");
-    assert.ok(
-      out.includes(":flake.lock"),
-      "expected //:flake.lock to be present in srcs via global_nix_inputs()",
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cmd //apps/cli:tool`;
+
+    assert.equal(
+      probe.exitCode,
+      0,
+      "expected cquery to succeed for bundled CLI with default entry",
     );
   });
 });

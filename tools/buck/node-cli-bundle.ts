@@ -7,7 +7,6 @@
  *   --importer  Importer directory (e.g., apps/demo)
  *   --name      CLI name (used for output filename when copying)
  *   --out       Destination path (Buck's $OUT)
- *   --entry     Optional entry file (unused by the flake today; accepted for future)
  */
 import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
@@ -40,8 +39,11 @@ async function main() {
   const importer = getFlagStr("importer", "").trim();
   const name = getFlagStr("name", "").trim();
   const out = getFlagStr("out", "").trim();
-  // entry accepted for forward compatibility; unused in current flake pipeline
-  // const entry = getFlagStr("entry", "").trim();
+  if (process.argv.includes("--entry")) {
+    fail(
+      "node-cli-bundle: --entry is not supported. Bundled mode uses a fixed entry (src/index.ts) in the flake.",
+    );
+  }
 
   if (!importer) fail("node-cli-bundle: --importer is required (e.g., apps/demo)");
   if (!name) fail("node-cli-bundle: --name is required (e.g., demo)");
@@ -88,7 +90,6 @@ async function main() {
   }
   // Build via the root flake's per-importer attribute to avoid fragile importer-local flakes.
   // Attribute path is resolved from FLK_ROOT (computed by nix_bootstrap_env) for robustness.
-  const importerAbs = path.join(repoRoot, importer);
   // Flake root must be the workspace root to avoid store-snapshot misresolutions.
   const flakeRoot = repoRoot;
   try {

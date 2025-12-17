@@ -8,8 +8,8 @@ import { runInTemp } from "../lib/test-helpers";
 test("nix_node_cli_bin(bundle=True) cmd prefixes nix bootstrap env and timeout wrapper", async () => {
   await runInTemp("node-cli-timeout-prefix", async (tmp, $) => {
     const dir = path.join(tmp, "apps", "cli");
-    await fsp.mkdir(path.join(dir, "bin"), { recursive: true });
-    await fsp.writeFile(path.join(dir, "bin", "tool"), "#!/usr/bin/env node\n", "utf8");
+    await fsp.mkdir(path.join(dir, "src"), { recursive: true });
+    await fsp.writeFile(path.join(dir, "src", "index.ts"), "console.log('cli')\n", "utf8");
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [

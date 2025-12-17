@@ -11,6 +11,9 @@ This repo’s Node macros that invoke Nix are intentionally small. They keep Nod
 - **`nix_node_cli_bin(..., bundle=True)`** (`node/defs_nix.bzl`)
   - Produces a single-file, shebanged bundle for a Node CLI via the bundler shim.
   - Requires exactly one importer-scoped lockfile label: `lockfile:<path>#<importer>`.
+  - Bundled mode uses a fixed entry today: **`src/index.ts`**.
+    - If `entry` is set while `bundle=True`, it must be `src/index.ts` (or omitted).
+    - To copy an arbitrary entry file, use `bundle=False`.
 
 ### Nix invocation policy (required)
 

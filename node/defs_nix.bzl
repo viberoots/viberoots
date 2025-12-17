@@ -80,12 +80,12 @@ def nix_node_cli_bin(
     - When bundle=True, the importer is derived from the single lockfile label via shared helpers
       (importer_from_labels); no explicit `importer` argument is required.
     """
-    if entry == None:
-        entry = "bin/%s" % name
     if out == None:
         out = name
 
     if not bundle:
+        if entry == None:
+            entry = "bin/%s" % name
         # Copy only the CLI entry file to $OUT; provider stamps are included in srcs
         # for dependency edges but should not be passed to cp as multiple sources.
         nix_node_gen(
@@ -100,6 +100,16 @@ def nix_node_cli_bin(
             **kwargs
         )
         return
+
+    # Bundled mode uses a fixed entry today (src/index.ts) via the flake implementation.
+    # Do not accept arbitrary entries here; it would be ignored and would pollute action keys.
+    if entry == None:
+        entry = "src/index.ts"
+    elif entry != "src/index.ts":
+        fail(
+            "nix_node_cli_bin(bundle=True) supports only entry='src/index.ts' (or omit entry). "
+            + "If you need to copy a different entry file, use bundle=False."
+        )
 
     # Bundled mode: build a single-file shebanged bundle via the scaffolded importer's flake
     # Enforce a single importer-scoped lockfile label and derive the importer via shared helpers
