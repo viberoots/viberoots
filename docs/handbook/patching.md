@@ -14,7 +14,7 @@ All scripts are zx TypeScript using `#!/usr/bin/env zx-wrapper`.
 - C++ extraction/workspace setup uses the common permission normalizer `tools/patch/cross-platform.ts: chmodRecursive` to guarantee writable workspaces without affecting diffs.
 - Node and Python macros include importer‑local patch files in `srcs` via the unified helper `//lang:defs_common.bzl: append_importer_patches(kwargs, importer, lang)`. Importer is derived from a single `lockfile:<path>#<importer>` label (enforced by `ensure_single_lockfile_label(...)`).
   - Labels must include the `#<importer>` suffix and contain **exactly one** `#`; malformed labels fail fast with deterministic error text.
-  - Lockfile path normalization: a leading `./` is stripped (example: `lockfile:./apps/web/pnpm-lock.yaml#apps/web` is treated as `lockfile:apps/web/pnpm-lock.yaml#apps/web`).
+  - Lockfile path normalization: any number of repeated leading `./` segments are stripped (example: `lockfile:././apps/web/pnpm-lock.yaml#apps/web` is treated as `lockfile:apps/web/pnpm-lock.yaml#apps/web`).
   - Importer-dir consistency:
     - `#.` is allowed only for repo-root lockfiles (example: `lockfile:pnpm-lock.yaml#.`).
     - For non-root lockfiles, `<importer>` must equal the directory that contains `<path>` (example: `lockfile:apps/web/pnpm-lock.yaml#apps/web`).

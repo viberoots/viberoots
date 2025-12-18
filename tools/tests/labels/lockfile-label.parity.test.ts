@@ -30,6 +30,7 @@ test("lockfile label parsing parity (TS ↔ Starlark): strict '#', ./ normalizat
       { label: "lockfile:pnpm-lock.yaml#." },
       { label: "lockfile:apps/web/pnpm-lock.yaml#apps/web" },
       { label: "lockfile:./apps/web/pnpm-lock.yaml#apps/web" }, // normalization
+      { label: "lockfile:././apps/web/pnpm-lock.yaml#apps/web" }, // repeated normalization
       { label: "lockfile:apps/web/pnpm-lock.yaml#." }, // invalid: '#.' only allowed for repo-root lockfiles
       { label: "lockfile:uv.lock#." },
       { label: "lockfile:apps/api/uv.lock#apps/api" },

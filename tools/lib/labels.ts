@@ -10,7 +10,13 @@ function fqProviderLabel(name: string): string {
 // Accepts forms like:
 //   - lockfile:apps/web/pnpm-lock.yaml#apps/web
 //   - lockfile:pnpm-lock.yaml#.          (repo-root lockfiles only)
-// Normalizes the lockfile path by stripping any leading "./".
+// Normalizes the lockfile path by stripping any number of repeated leading "./" segments.
+function stripRepeatedLeadingDotSlashSegments(s: string): string {
+  let out = String(s || "");
+  while (out.startsWith("./")) out = out.slice(2);
+  return out;
+}
+
 export function parseLockfileLabelParts(
   label: string,
 ): { lockfile: string; importer: string } | null {
@@ -21,7 +27,8 @@ export function parseLockfileLabelParts(
   if (hashIdx < 0) return null;
   // Must contain exactly one '#'
   if (rest.indexOf("#", hashIdx + 1) >= 0) return null;
-  const pathPart = rest.slice(0, hashIdx).replace(/^\.\/+/, "");
+  const pathPartRaw = rest.slice(0, hashIdx);
+  const pathPart = stripRepeatedLeadingDotSlashSegments(pathPartRaw);
   const importer = rest.slice(hashIdx + 1);
   if (!pathPart || !importer) return null;
   return { lockfile: pathPart, importer };
