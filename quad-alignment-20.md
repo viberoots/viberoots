@@ -335,15 +335,80 @@ Implement.
 
 ---
 
+## PR‑6: Validate importer-scoped lockfile labels even on non-macro targets (no heuristic attachment)
+
+### Description
+
+We currently gate importer-scoped lockfile label validation on `kind:*` (macro-stamped targets). This keeps auto-attachment safely macro-only, but it also means a target can carry a malformed `lockfile:<path>#<importer>` label and escape the “malformed label” diagnostics if it is missing `kind:*`.
+
+This PR makes validation behavior consistent with our build system philosophy:
+
+- If a `lockfile:` label exists, treat it as an explicit contract and validate it deterministically.
+- Only auto-attach missing `lockfile:` labels for macro-stamped targets (`kind:*`), preserving the “no heuristic labeling for raw rules” policy.
+
+### Scope & Changes
+
+- Tighten exporter validation in `tools/buck/exporter/lang/importer-lockfile-labels.ts`:
+  - Validate existing `lockfile:` labels regardless of `kind:*` presence.
+  - Keep all existing contract rules unchanged:
+    - Exactly one `#`
+    - `./` normalization behavior
+    - Importer-dir consistency (including `#.` only for repo-root lockfiles)
+- Keep label attachment policy unchanged:
+  - `attachImporterLockfileLabelsIfMacroStamped(...)` remains gated by `kind:*`.
+  - Adapter “missing lockfile label” findings remain gated by `kind:*` (macro-stamped targets).
+
+### Tests (in this PR)
+
+- Extend or add an exporter regression test that asserts:
+  - A target without `kind:*` but with a malformed `lockfile:` label produces a deterministic “malformed lockfile label” finding.
+  - A target without `kind:*` but with an importer mismatch (e.g., `lockfile:apps/web/pnpm-lock.yaml#libs/foo`) produces an importer mismatch finding.
+  - Auto-attachment behavior remains unchanged (still only attaches for `kind:*`).
+
+### Docs (in this PR)
+
+- Update exporter documentation / handbook language to explicitly distinguish:
+  - **Attachment policy**: exporter auto-attaches `lockfile:` labels only for macro-stamped targets (`kind:*`) when missing.
+  - **Validation policy**: exporter validates `lockfile:` label correctness whenever the label is present (even on non-macro targets).
+
+### Acceptance Criteria
+
+- Malformed or inconsistent `lockfile:<path>#<importer>` labels are reported by the exporter even when `kind:*` is missing.
+- Exporter still does not attach `lockfile:` labels to non-macro targets.
+- Error surfaces remain deterministic and reuse canonical parsers/inspectors (no bespoke parsing introduced).
+
+### Risks
+
+- Slightly noisier diagnostics: targets with a `lockfile:` label but missing `kind:*` may now produce both a “missing kind:\*” finding and a “malformed/mismatch lockfile label” finding.
+
+### Consequence of Not Implementing
+
+- A malformed `lockfile:` label can evade the exporter’s contract diagnostics when `kind:*` is missing, weakening the “labels are contracts” story and making it easier for drift to accumulate unnoticed.
+
+### Downsides for Implementing
+
+- Small behavior tightening that may surface previously latent malformed labels in repos that have hand-applied `lockfile:` labels outside macros.
+
+### Recommendation
+
+Implement.
+
+### Sparse / Partial Clone Guidance
+
+- Touches exporter validation helpers and a narrow exporter test only. Safe in tooling slices.
+
+---
+
 ## Rollout & Sequencing
 
 These PRs are ordered by dependency chain and blast radius:
 
 1. PR‑1 first. It establishes consistent exporter attachment behavior for importer-scoped ecosystems.
 2. PR‑2 next. It removes duplicated parsing and tightens the exporter’s use of canonical contracts.
-3. PR‑3 next. It fixes the patch CLI parity gap and aligns messaging and behavior.
-4. PR‑4 after. It makes the patch invalidation strategy explicit without changing behavior.
-5. PR‑5 last. It refactors Node macro wiring and benefits from the earlier contract tightening and clarity.
+3. PR‑6 next. It tightens exporter validation so `lockfile:` labels are treated as contracts whenever present, without changing attachment policy.
+4. PR‑3 next. It fixes the patch CLI parity gap and aligns messaging and behavior.
+5. PR‑4 after. It makes the patch invalidation strategy explicit without changing behavior.
+6. PR‑5 last. It refactors Node macro wiring and benefits from the earlier contract tightening and clarity.
 
 ---
 

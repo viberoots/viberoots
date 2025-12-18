@@ -30,8 +30,6 @@ export function validateImporterLockfileLabels(
   opts: ValidateImporterLockfileLabelsOptions,
 ): string[] {
   const { adapterName, node } = opts;
-  if (!hasKindLabel(node)) return [];
-
   const locks = lockfileLabels(node);
   if (locks.length === 0) return [];
 
