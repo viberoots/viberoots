@@ -1,19 +1,18 @@
 #!/usr/bin/env zx-wrapper
-import path from "node:path";
 import type { Adapter, Batch, Node } from "../types.ts";
 import { hasLabel, isRuleType, validateLanguageClassification } from "./helpers.ts";
 import { packageDirFromTargetName } from "../batch.ts";
-import { parseLockfileLabelParts } from "../../../lib/labels.ts";
-import { computeImporterLabel, findNearestPnpmLockForPackage } from "../../../lib/importers.ts";
+import { findNearestPnpmLockForPackage } from "../../../lib/importers.ts";
+import {
+  attachImporterLockfileLabelsIfMacroStamped,
+  hasKindLabel,
+  lockfileLabels,
+  validateImporterLockfileLabels,
+} from "./importer-lockfile-labels.ts";
 
 function isNodeTarget(n: Node): boolean {
   // Prefer explicit lang stamp; fall back to common js_/node_ rule_type families
   return hasLabel(n, "lang:node") || isRuleType(n, /^js_/) || isRuleType(n, /^node_/);
-}
-
-function lockfileLabels(n: Node): string[] {
-  const labs = Array.isArray(n.labels) ? n.labels : [];
-  return labs.filter((l) => typeof l === "string" && l.startsWith("lockfile:"));
 }
 
 function hasPnpmLockfileLabel(n: Node): boolean {
@@ -21,52 +20,8 @@ function hasPnpmLockfileLabel(n: Node): boolean {
   return locks.some((l) => /lockfile:.*\/?pnpm-lock\.yaml#/.test(l));
 }
 
-function hasKindLabel(n: Node): boolean {
-  const labs = Array.isArray(n.labels) ? n.labels : [];
-  return labs.some((l) => typeof l === "string" && l.startsWith("kind:"));
-}
-
 function validateSingleImporterLabel(n: Node): string[] {
-  const findings: string[] = [];
-  // Require properly stamped targets (kind:*) before enforcing importer label.
-  // This avoids tripping validation in tests that use ad-hoc nodes without full macro stamping.
-  if (!hasKindLabel(n)) return findings;
-  const locks = lockfileLabels(n);
-  if (locks.length === 0) return findings;
-  if (locks.length > 1) {
-    findings.push(
-      [
-        `[exporter][node] multiple importer-scoped lockfile labels on ${n.name}:`,
-        `  - ${locks.join("\n  - ")}`,
-        `Fix: keep exactly one importer label of the form lockfile:<path>#<importer>.`,
-      ].join("\n"),
-    );
-  }
-  // Validate format and path/importer consistency for the first label
-  const first = locks[0];
-  const parsed = parseLockfileLabelParts(first);
-  if (!parsed) {
-    findings.push(
-      [
-        `[exporter][node] malformed lockfile label on ${n.name}: '${first}'.`,
-        `Expected: lockfile:<path>#<importer> (example: lockfile:apps/web/pnpm-lock.yaml#apps/web).`,
-      ].join("\n"),
-    );
-    return findings;
-  }
-  const dir = path.posix.dirname(parsed.lockfile);
-  const importerOk =
-    (parsed.importer === "." && dir === ".") ||
-    (parsed.importer !== "." && parsed.importer === dir);
-  if (!importerOk) {
-    findings.push(
-      [
-        `[exporter][node] lockfile importer mismatch on ${n.name}: '${first}'.`,
-        `Fix: set importer to '${dir}' to match the lockfile directory. Use importer '.' only for repo-root lockfiles (example: lockfile:pnpm-lock.yaml#.).`,
-      ].join("\n"),
-    );
-  }
-  return findings;
+  return validateImporterLockfileLabels({ adapterName: "node", node: n });
 }
 
 function validateKindPresence(n: Node): string[] {
@@ -146,41 +101,11 @@ export const adapter: Adapter = {
     return [];
   },
   async attachLabels(nodes: Node[]): Promise<Node[]> {
-    const enriched: Node[] = [];
-    const lockByPkg = new Map<string, Promise<string | null>>();
-    const nearestLock = (pkgDir: string) => {
-      const key = pkgDir || ".";
-      const cur = lockByPkg.get(key);
-      if (cur) return cur;
-      const next = findNearestPnpmLockForPackage(key);
-      lockByPkg.set(key, next);
-      return next;
-    };
-    for (const n of nodes) {
-      if (!isNodeTarget(n)) {
-        enriched.push(n);
-        continue;
-      }
-      const labs = Array.isArray(n.labels) ? [...n.labels] : [];
-      const hasLock = labs.some((l) => typeof l === "string" && l.startsWith("lockfile:"));
-      // Only attach when a kind:* label is present (macro-like nodes) and no lockfile label exists.
-      const haveKind = hasKindLabel(n);
-      if (hasLock || !haveKind) {
-        enriched.push(n);
-        continue;
-      }
-      const pkg = packageDirFromTargetName(n.name || "") || ".";
-      const lockRel = await nearestLock(pkg);
-      if (!lockRel) {
-        enriched.push(n);
-        continue;
-      }
-      const importer = computeImporterLabel(lockRel);
-      const label = `lockfile:${lockRel}#${importer}`;
-      const next = Array.from(new Set([...(labs as string[]), label])).sort();
-      enriched.push({ ...n, labels: next });
-    }
-    return enriched;
+    return attachImporterLockfileLabelsIfMacroStamped({
+      nodes,
+      isTarget: isNodeTarget,
+      findNearestLockfile: findNearestPnpmLockForPackage,
+    });
   },
 };
 

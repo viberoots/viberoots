@@ -8,6 +8,14 @@ This guide shows how to write and test an exporter adapter with minimal ceremony
 - **Labels**: prefer deriving labels from lockfiles or stable inputs; keep sorting deterministic.
 - **Tests**: unit tests can run `export-graph.ts --simulate` with a tiny nodes.json.
 
+### Importer-scoped lockfile labels (Node + Python)
+
+For importer-scoped ecosystems (currently Node/PNPM and Python/uv), the exporter is allowed to attach a missing `lockfile:<path>#<importer>` label, but it must do so conservatively so raw rules do not accidentally participate in importer wiring.
+
+- **Attachment policy**: auto-attach `lockfile:` labels only for macro-stamped targets (targets that already carry a `kind:*` label) when they have no `lockfile:` label yet.
+- **Validation policy**: when a target already has a `lockfile:` label, validate it strictly using the canonical parser `tools/lib/labels.ts:parseLockfileLabel(...)` (including importer-directory consistency and the repo-root `#.` special case).
+- **Implementation helper**: exporter adapters should reuse `tools/buck/exporter/lang/importer-lockfile-labels.ts` instead of re-implementing label attachment or lockfile-label validation logic.
+
 Example skeleton:
 
 ```ts
