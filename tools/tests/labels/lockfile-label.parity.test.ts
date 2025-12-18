@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { isSupportedImporterLabel } from "../../lib/importers";
 import { parseLockfileLabel } from "../../lib/labels";
 
 type ProbeOut = { lockfile: string; importer: string };
@@ -31,6 +32,7 @@ test("lockfile label parsing parity (TS ↔ Starlark): strict '#', ./ normalizat
       { label: "lockfile:apps/web/pnpm-lock.yaml#apps/web" },
       { label: "lockfile:./apps/web/pnpm-lock.yaml#apps/web" }, // normalization
       { label: "lockfile:././apps/web/pnpm-lock.yaml#apps/web" }, // repeated normalization
+      { label: "lockfile:services/api/pnpm-lock.yaml#services/api" }, // syntactically valid in TS; rejected by Starlark (unsupported importer)
       { label: "lockfile:apps/web/pnpm-lock.yaml#." }, // invalid: '#.' only allowed for repo-root lockfiles
       { label: "lockfile:uv.lock#." },
       { label: "lockfile:apps/api/uv.lock#apps/api" },
@@ -45,6 +47,7 @@ test("lockfile label parsing parity (TS ↔ Starlark): strict '#', ./ normalizat
     // Ensure directories exist for realism (Buck doesn't require contents, but this mirrors real layout).
     await fsp.mkdir(path.join(tmp, "apps", "web"), { recursive: true });
     await fsp.mkdir(path.join(tmp, "apps", "api"), { recursive: true });
+    await fsp.mkdir(path.join(tmp, "services", "api"), { recursive: true });
 
     const body = cases
       .map((c, i) =>
@@ -69,6 +72,25 @@ test("lockfile label parsing parity (TS ↔ Starlark): strict '#', ./ normalizat
         );
         continue;
       }
+
+      if (!isSupportedImporterLabel(ts.importer)) {
+        assert.notEqual(
+          res.exitCode,
+          0,
+          `expected buck2 build to fail for unsupported importer label: ${label}`,
+        );
+        const combined = String(res.stderr || "") + String(res.stdout || "");
+        assert.ok(
+          combined.includes("Unsupported importer label in lockfile label"),
+          `expected unsupported-importer error text; got:\n${combined}`,
+        );
+        assert.ok(
+          combined.includes("apps/*") && combined.includes("libs/*"),
+          `expected supported importer roots to be mentioned; got:\n${combined}`,
+        );
+        continue;
+      }
+
       assert.equal(
         res.exitCode,
         0,

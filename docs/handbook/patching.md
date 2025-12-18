@@ -18,8 +18,11 @@ All scripts are zx TypeScript using `#!/usr/bin/env zx-wrapper`.
   - Importer-dir consistency:
     - `#.` is allowed only for repo-root lockfiles (example: `lockfile:pnpm-lock.yaml#.`).
     - For non-root lockfiles, `<importer>` must equal the directory that contains `<path>` (example: `lockfile:apps/web/pnpm-lock.yaml#apps/web`).
-  - Supported importer labels (provider generation + auto-map): `"."`, `apps/*`, `libs/*`. Any other importer label is treated as unsupported and will not produce providers; in CI, `gen-auto-map` fails if such labels appear in the exported graph.
-  - To support additional importer roots, update `tools/lib/importers.ts:isSupportedImporterLabel(...)` and keep the parity/contract tests passing.
+  - Supported importer labels: `"."`, `apps/*`, `libs/*`. Any other importer label fails early during macro evaluation with deterministic error text.
+  - To support additional importer roots, update both:
+    - `tools/lib/importers.ts:isSupportedImporterLabel(...)` (tooling)
+    - `lang/lockfile_labels.bzl` (macro-time validation)
+      and keep the parity/contract tests passing.
 - Patch inputs are attached through `//lang:patch_inputs.bzl` helpers. When a rule does not support `srcs`, call sites must choose a supported input attribute explicitly using `into = "<attr>"` or carry patch inputs via a small helper target.
   - For importer-scoped ecosystems (Node, Python), macro wiring is standardized via `//lang:importer_wiring.bzl`. New macros must not copy/paste wiring logic; they should call the helper functions (`require_single_importer_lockfile_label`, `attach_importer_patch_inputs`, `merge_provider_edges`).
   - For **genrule-style macros** (or any wrapper where edges must be realized into `srcs`), use the consolidated helper `prepare_importer_genrule_kwargs(...)` instead of re-implementing list-vs-dict `srcs` handling.

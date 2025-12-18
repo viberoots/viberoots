@@ -26,6 +26,11 @@ def _dirname_posix(path_part):
         return "."
     return "/".join(parts[:-1])
 
+def _is_supported_importer_label(importer):
+    if importer == ".":
+        return True
+    return importer.startswith("apps/") or importer.startswith("libs/")
+
 def _parse_importer_scoped_lockfile_label(label):
     if not (isinstance(label, str) and label.startswith("lockfile:")):
         fail("Lockfile label must start with 'lockfile:'; got: %s" % label)
@@ -51,6 +56,11 @@ def _parse_importer_scoped_lockfile_label(label):
         fail(
             "Lockfile label importer must match the lockfile directory (%s); got: %s"
             % (dirname, label)
+        )
+    if not _is_supported_importer_label(importer):
+        fail(
+            "Unsupported importer label in lockfile label (supported importers: '.', 'apps/*', 'libs/*'); got: %s"
+            % label
         )
     return (path_part, importer)
 
