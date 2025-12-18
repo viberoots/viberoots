@@ -6,6 +6,17 @@ function fqProviderLabel(name: string): string {
   return `//third_party/providers:${name}`;
 }
 
+export type LockfileLabelInspection =
+  | { kind: "not-lockfile" }
+  | { kind: "malformed" }
+  | {
+      kind: "invalid-importer";
+      lockfile: string;
+      importer: string;
+      expectedImporter: string;
+    }
+  | { kind: "ok"; lockfile: string; importer: string };
+
 // Parse an importer-scoped PNPM lockfile label.
 // Accepts forms like:
 //   - lockfile:apps/web/pnpm-lock.yaml#apps/web
@@ -34,18 +45,41 @@ export function parseLockfileLabelParts(
   return { lockfile: pathPart, importer };
 }
 
-export function parseLockfileLabel(label: string): { lockfile: string; importer: string } | null {
-  const parsed = parseLockfileLabelParts(label);
-  if (!parsed) return null;
-  // Importer must match the lockfile directory (posix semantics).
-  // Special-case: importer '.' is allowed only for repo-root lockfiles (dirname == '.').
-  const dir = path.posix.dirname(parsed.lockfile);
+export function inspectLockfileLabel(label: string): LockfileLabelInspection {
+  const s = String(label || "");
+  if (!s.startsWith("lockfile:")) return { kind: "not-lockfile" };
+
+  const parsed = parseLockfileLabelParts(s);
+  if (!parsed) return { kind: "malformed" };
+
+  const expectedImporter = path.posix.dirname(parsed.lockfile);
   if (parsed.importer === ".") {
-    if (dir !== ".") return null;
-    return parsed;
+    if (expectedImporter !== ".") {
+      return {
+        kind: "invalid-importer",
+        lockfile: parsed.lockfile,
+        importer: parsed.importer,
+        expectedImporter,
+      };
+    }
+    return { kind: "ok", lockfile: parsed.lockfile, importer: parsed.importer };
   }
-  if (parsed.importer !== dir) return null;
-  return parsed;
+
+  if (parsed.importer !== expectedImporter) {
+    return {
+      kind: "invalid-importer",
+      lockfile: parsed.lockfile,
+      importer: parsed.importer,
+      expectedImporter,
+    };
+  }
+  return { kind: "ok", lockfile: parsed.lockfile, importer: parsed.importer };
+}
+
+export function parseLockfileLabel(label: string): { lockfile: string; importer: string } | null {
+  const inspected = inspectLockfileLabel(label);
+  if (inspected.kind !== "ok") return null;
+  return { lockfile: inspected.lockfile, importer: inspected.importer };
 }
 
 export function isImporterScopedLockfileLabel(label: string): boolean {

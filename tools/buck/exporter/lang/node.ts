@@ -3,6 +3,7 @@ import type { Adapter, Batch, Node } from "../types.ts";
 import { hasLabel, isRuleType, validateLanguageClassification } from "./helpers.ts";
 import { packageDirFromTargetName } from "../batch.ts";
 import { findNearestPnpmLockForPackage } from "../../../lib/importers.ts";
+import { parseLockfileLabel } from "../../../lib/labels.ts";
 import {
   attachImporterLockfileLabelsIfMacroStamped,
   hasKindLabel,
@@ -17,7 +18,11 @@ function isNodeTarget(n: Node): boolean {
 
 function hasPnpmLockfileLabel(n: Node): boolean {
   const locks = lockfileLabels(n);
-  return locks.some((l) => /lockfile:.*\/?pnpm-lock\.yaml#/.test(l));
+  return locks.some((l) => {
+    const parsed = parseLockfileLabel(l);
+    if (!parsed) return false;
+    return parsed.lockfile === "pnpm-lock.yaml" || parsed.lockfile.endsWith("/pnpm-lock.yaml");
+  });
 }
 
 function validateSingleImporterLabel(n: Node): string[] {

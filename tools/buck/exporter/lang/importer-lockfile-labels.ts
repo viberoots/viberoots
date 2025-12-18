@@ -2,7 +2,7 @@
 import path from "node:path";
 import type { Node } from "../types.ts";
 import { packageDirFromTargetName } from "../batch.ts";
-import { parseLockfileLabel, parseLockfileLabelParts } from "../../../lib/labels.ts";
+import { inspectLockfileLabel } from "../../../lib/labels.ts";
 import { computeImporterLabel } from "../../../lib/importers.ts";
 
 function labelsOf(n: Node): string[] {
@@ -47,9 +47,8 @@ export function validateImporterLockfileLabels(
   }
 
   const first = locks[0];
-  const parsedParts = parseLockfileLabelParts(first);
-  const parsed = parseLockfileLabel(first);
-  if (!parsedParts) {
+  const inspected = inspectLockfileLabel(first);
+  if (inspected.kind === "malformed") {
     findings.push(
       [
         `[exporter][${adapterName}] malformed lockfile label on ${node.name}: '${first}'.`,
@@ -58,12 +57,11 @@ export function validateImporterLockfileLabels(
     );
     return findings;
   }
-  if (!parsed) {
-    const dir = path.posix.dirname(parsedParts.lockfile);
+  if (inspected.kind === "invalid-importer") {
     findings.push(
       [
         `[exporter][${adapterName}] lockfile importer mismatch on ${node.name}: '${first}'.`,
-        `Fix: set importer to '${dir}' to match the lockfile directory. Use importer '.' only for repo-root lockfiles (example: lockfile:pnpm-lock.yaml#.).`,
+        `Fix: set importer to '${inspected.expectedImporter}' to match the lockfile directory. Use importer '.' only for repo-root lockfiles (example: lockfile:pnpm-lock.yaml#.).`,
       ].join("\n"),
     );
   }
