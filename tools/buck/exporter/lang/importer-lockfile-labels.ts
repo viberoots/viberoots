@@ -3,7 +3,7 @@ import path from "node:path";
 import type { Node } from "../types.ts";
 import { packageDirFromTargetName } from "../batch.ts";
 import { inspectLockfileLabel } from "../../../lib/labels.ts";
-import { computeImporterLabel } from "../../../lib/importers.ts";
+import { computeImporterLabel, isSupportedImporterLabel } from "../../../lib/importers.ts";
 
 function labelsOf(n: Node): string[] {
   return Array.isArray(n.labels) ? n.labels : [];
@@ -73,6 +73,28 @@ export type AttachImporterLockfileLabelsOptions = {
   findNearestLockfile(pkgDir: string): Promise<string | null>;
 };
 
+export type ValidateAutoAttachImporterSupportOptions = {
+  adapterName: string;
+  node: Node;
+  lockfilePath: string;
+};
+
+export function validateAutoAttachImporterSupport(
+  opts: ValidateAutoAttachImporterSupportOptions,
+): string[] {
+  const { adapterName, node, lockfilePath } = opts;
+  const importer = computeImporterLabel(lockfilePath);
+  if (isSupportedImporterLabel(importer)) return [];
+  return [
+    [
+      `[exporter][${adapterName}] nearest lockfile is under an unsupported importer root for ${node.name}.`,
+      `Found: lockfile:${lockfilePath}#${importer}`,
+      "Supported importers: '.', 'apps/*', 'libs/*'.",
+      "Fix: move the lockfile under apps/*, libs/*, or repo root, or extend supported importer roots with cross-language parity checks.",
+    ].join("\n"),
+  ];
+}
+
 export async function attachImporterLockfileLabelsIfMacroStamped(
   opts: AttachImporterLockfileLabelsOptions,
 ): Promise<Node[]> {
@@ -108,6 +130,10 @@ export async function attachImporterLockfileLabelsIfMacroStamped(
     }
 
     const importer = computeImporterLabel(lockRel);
+    if (!isSupportedImporterLabel(importer)) {
+      out.push(n);
+      continue;
+    }
     const label = `lockfile:${lockRel}#${importer}`;
     const next = stableSortedDedupedLabels([...labs, label]);
     out.push({ ...n, labels: next });

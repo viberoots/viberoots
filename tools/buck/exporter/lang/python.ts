@@ -7,6 +7,7 @@ import {
   attachImporterLockfileLabelsIfMacroStamped,
   hasKindLabel,
   lockfileLabels,
+  validateAutoAttachImporterSupport,
   validateImporterLockfileLabels,
 } from "./importer-lockfile-labels.ts";
 
@@ -56,6 +57,14 @@ export const adapter: Adapter = {
               `[exporter][python] missing importer-scoped lockfile label on ${n.name}.`,
               `Fix: ensure a uv.lock exists in '${pkg}' (or an ancestor) so the exporter can attach lockfile:<path>#<importer>, or stamp the label explicitly via macros.`,
             ].join("\n"),
+          );
+        } else {
+          out.push(
+            ...validateAutoAttachImporterSupport({
+              adapterName: "python",
+              node: n,
+              lockfilePath: lockRel,
+            }),
           );
         }
       }

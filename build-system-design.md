@@ -362,7 +362,7 @@ The exporter aggregates adapter findings (e.g., labeling irregularities) and app
 
 This preserves strictness in CI while enabling smoother local iteration.
 
-> Importer-scoped lockfile labeling: the exporter attaches a missing `lockfile:<path>#<importer>` label deterministically for importer-scoped ecosystems (Node: nearest `pnpm-lock.yaml`, Python: nearest `uv.lock`). CI remains strict about malformed or multiple lockfile labels.
+> Importer-scoped lockfile labeling: the exporter may attach a missing `lockfile:<path>#<importer>` label deterministically for importer-scoped ecosystems (Node: nearest `pnpm-lock.yaml`, Python: nearest `uv.lock`) only when the computed importer is supported (`.`, `apps/*`, `libs/*`). If the nearest lockfile would yield an unsupported importer, the exporter must not auto-attach the label and must emit a deterministic finding with the lockfile path and importer.
 
 ---
 
