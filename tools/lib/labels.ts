@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { normalizeNixAttr, providerNameForImporter, providerNameForNixAttr } from "./providers.ts";
+import { isSupportedImporterLabel } from "./importers.ts";
 import path from "node:path";
 
 function fqProviderLabel(name: string): string {
@@ -94,6 +95,7 @@ export function providersForLabels(labels: string[] | undefined): string[] {
     if (l && l.startsWith("lockfile:")) {
       const parsed = parseLockfileLabel(l);
       if (!parsed) continue;
+      if (!isSupportedImporterLabel(parsed.importer)) continue;
       out.add(fqProviderLabel(providerNameForImporter(parsed.lockfile, parsed.importer)));
     } else if (l.startsWith("nixpkg:")) {
       const attr = normalizeNixAttr(l.slice("nixpkg:".length));

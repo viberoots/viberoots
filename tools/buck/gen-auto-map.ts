@@ -6,7 +6,6 @@ import { readCompositeGraph } from "../lib/graph-view.ts";
 // PR6 (go-cpp-local-patching): provider mapping is Node-only (lockfile:...) and nixpkg; Go `module:`
 // labels are kept for diagnostics and are intentionally ignored here.
 import { providersForLabels, parseLockfileLabel } from "../lib/labels.ts";
-import * as fssync from "node:fs";
 import { getFlagStr } from "../lib/cli.ts";
 import { ensureGraph } from "./glue-run.ts";
 import { isProviderPackageNode } from "../lib/graph-utils.ts";
@@ -51,33 +50,24 @@ async function main() {
     if (n.name && isProviderPackageNode(n.name)) {
       continue;
     }
-    const provs: string[] = [];
     const labels = Array.isArray(n.labels) ? (n.labels as string[]) : [];
+
+    // Mapping is centralized in providersForLabels(...). It is responsible for enforcing
+    // the supported-importer policy for lockfile labels.
+    const provs = providersForLabels(labels);
+    if (provs.length > 0 && n.name) mapping[n.name] = provs;
+
+    // Keep a targeted diagnostic so unsupported importer labels are visible and can be enforced in CI.
     for (const l of labels) {
-      if (typeof l !== "string") continue;
-      if (l.startsWith("lockfile:")) {
-        // Map importer-scoped lockfile labels directly to their providers.
-        // Do not gate on filesystem presence; tests synthesize graphs without real files.
-        const parsed = parseLockfileLabel(l);
-        if (!parsed) continue;
-        if (!isSupportedImporterLabel(parsed.importer)) {
-          unsupportedLockfileLabels.push({
-            target: String(n.name || ""),
-            label: l,
-            importer: parsed.importer,
-          });
-          continue;
-        }
-        const [prov] = providersForLabels([l]);
-        if (prov) provs.push(prov);
-      } else if (l.startsWith("nixpkg:")) {
-        const [prov] = providersForLabels([l]);
-        if (prov) provs.push(prov);
-      }
-    }
-    const uniq = Array.from(new Set(provs));
-    if (uniq.length > 0 && n.name) {
-      mapping[n.name] = uniq;
+      if (typeof l !== "string" || !l.startsWith("lockfile:")) continue;
+      const parsed = parseLockfileLabel(l);
+      if (!parsed) continue;
+      if (isSupportedImporterLabel(parsed.importer)) continue;
+      unsupportedLockfileLabels.push({
+        target: String(n.name || ""),
+        label: l,
+        importer: parsed.importer,
+      });
     }
   }
   const keys = Object.keys(mapping).sort();
