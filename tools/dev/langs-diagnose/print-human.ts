@@ -38,6 +38,23 @@ export function printHuman(out: DiagnoseOutput, filterId: string) {
   console.log("CI stages (would run):");
   for (const s of out.stages) console.log("  -", s);
 
+  if (Object.keys(out.patchInvalidation || {}).length) {
+    sep();
+    console.log("Patch invalidation strategy:");
+    const ids = Object.keys(out.patchInvalidation).sort();
+    for (const id of ids) {
+      if (filterId && id !== filterId) continue;
+      const s = out.patchInvalidation[id];
+      if (!s) {
+        console.log(`  ${id}: (unknown)`);
+        continue;
+      }
+      console.log(
+        `  ${id}: patchScope=${s.patchScope}, glueOnApplyRemove=${s.glueOnApplyRemove}, providerModel=${s.providerModel}`,
+      );
+    }
+  }
+
   if (!filterId || filterId === "cpp") {
     try {
       const attrs = readPatchedCppProviderAttrs();

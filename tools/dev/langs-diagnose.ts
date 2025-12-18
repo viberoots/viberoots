@@ -8,6 +8,7 @@ import { readManifest } from "./langs-diagnose/manifest";
 import { detectPlannerPlugins } from "./langs-diagnose/planner-plugins";
 import { computeStages } from "./langs-diagnose/stages";
 import { printHuman } from "./langs-diagnose/print-human";
+import { patchInvalidationStrategyForLang } from "../lib/lang-contracts.ts";
 
 async function main() {
   const asJson = getFlagBool("json");
@@ -19,12 +20,20 @@ async function main() {
   const plannerPlugins = await detectPlannerPlugins(langs, filterId);
   const stages = await computeStages(enabled, caps, filterId);
 
+  const patchInvalidation = Object.fromEntries(
+    enabled
+      .slice()
+      .sort()
+      .map((id) => [id, patchInvalidationStrategyForLang(id)]),
+  );
+
   const out: DiagnoseOutput = {
     enabled: enabled.sort(),
     disabled: disabled.sort((a, b) => a.id.localeCompare(b.id)),
     adapters,
     plannerPlugins,
     stages,
+    patchInvalidation,
   };
 
   if (asJson) console.log(JSON.stringify(out, null, 2));

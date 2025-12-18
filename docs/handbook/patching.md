@@ -62,6 +62,18 @@ Encoding policy:
 
 Re-applying an unchanged workspace is a no-op. For Go/C++, apply does not run glue. For Node and Python, provider sync and auto_map generation run automatically.
 
+## Patch invalidation strategy (contract)
+
+This repo supports two patch invalidation strategies. Treat this as a cross-language contract and keep it consistent with `tools/lib/lang-contracts.ts`.
+
+### package-local
+
+Go and C++ use **package-local** patches. Patch files live under the Buck package of the target (for example `libs/foo/patches/go/*.patch`). Those patch files are included in the target inputs (via `srcs` or an equivalent input attribute), so Buck invalidation is precise and no glue regeneration is required on apply/remove.
+
+### importer-local
+
+Node and Python use **importer-local** patches. Patch files live under an importer directory (for example `apps/web/patches/node/*.patch` and `apps/api/patches/python/*.patch`). Importer-scoped providers and `auto_map.bzl` are generated artifacts, so apply/remove regenerates glue to keep providers and mappings aligned with the lockfile and patch set.
+
 ## Glue regeneration
 
 Node and Python only (Go/C++ don’t require glue for patch invalidation). Local glue is not committed. Regenerate after apply or on-demand:

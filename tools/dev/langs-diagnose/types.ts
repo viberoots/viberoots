@@ -1,5 +1,7 @@
 export type Capabilities = Record<string, boolean>;
 
+import type { PatchInvalidationStrategy } from "../../lib/lang-contracts.ts";
+
 export type LangEntry = {
   id: string;
   displayName?: string;
@@ -18,4 +20,5 @@ export type DiagnoseOutput = {
   adapters: string[];
   plannerPlugins: string[];
   stages: string[];
+  patchInvalidation: Record<string, PatchInvalidationStrategy | null>;
 };
