@@ -3,6 +3,9 @@
 Stamping ensures exporter preconditions via consistent labels applied in macros.
 
 - **Helpers**: use `lang/defs_common.bzl: stamp_labels(kwargs, lang, kind)` to add `lang:<id>` and optional `kind:<bin|lib|test>`.
+- **Importer-scoped ecosystems (Node, Python)**: avoid bespoke wiring. Use the shared helpers in `lang/importer_wiring.bzl` so lockfile enforcement, patch inputs, and provider edge realization stay drift-free.
+  - For genrule-style wrappers: `prepare_importer_genrule_kwargs(...)`
+  - For non-genrule wrappers: `require_single_importer_lockfile_label(...)`, `attach_importer_patch_inputs(...)`, `merge_provider_edges(...)`, and `importer_from_labels(...)` (for rules that need the importer string)
 - **Global Nix inputs (macros and rules that call Nix)**: treat `global_nix_inputs()` as real action inputs. Label stamping is retained for observability, but correctness must not depend on labels.
   - For **macros that create genrules** that call Nix, attach global inputs into the action inputs (typically `srcs`) via `lang/global_inputs.bzl: attach_global_nix_inputs(kwargs, into="srcs")`, and also stamp labels via `lang/defs_common.bzl: stamp_global_nix_inputs(kwargs)`.
   - For **rules** that shell out to Nix, accept `nix_inputs` and thread `global_nix_inputs()` into the action `hidden` inputs.
