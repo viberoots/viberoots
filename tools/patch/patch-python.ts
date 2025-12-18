@@ -18,6 +18,22 @@ function keyFor(dist: string, ver: string): string {
   return `${String(dist || "").toLowerCase()}@${String(ver || "").toLowerCase()}`;
 }
 
+function resolvePythonPatchDir(opts: {
+  repoRootAbs: string;
+  importerDir: string;
+  overridePatchDir: string;
+}): string {
+  const { repoRootAbs, importerDir, overridePatchDir } = opts;
+  // Default to importer-local patches directory: <importer>/patches/python
+  const defaultImporterLocal = path.isAbsolute(importerDir)
+    ? path.join(importerDir, "patches", "python")
+    : path.join(repoRootAbs, importerDir, "patches", "python");
+  if (!overridePatchDir) return defaultImporterLocal;
+  return path.isAbsolute(overridePatchDir)
+    ? overridePatchDir
+    : path.join(repoRootAbs, overridePatchDir);
+}
+
 async function doStart(args: string[]) {
   const dist = requirePositional(args, 0, {
     name: "<distribution> name",
@@ -91,15 +107,11 @@ async function doApply(args: string[]) {
 
   const root = repoRoot();
   const overridePatchDir = readPatchDirArg("");
-  // Default to importer-local patches directory: <importer>/patches/python
-  const defaultImporterLocal = path.isAbsolute(resolved.importerDir)
-    ? path.join(resolved.importerDir, "patches", "python")
-    : path.join(root, resolved.importerDir, "patches", "python");
-  const patchDir = overridePatchDir
-    ? path.isAbsolute(overridePatchDir)
-      ? overridePatchDir
-      : path.join(root, overridePatchDir)
-    : defaultImporterLocal;
+  const patchDir = resolvePythonPatchDir({
+    repoRootAbs: root,
+    importerDir: resolved.importerDir,
+    overridePatchDir,
+  });
   await fsp.mkdir(patchDir, { recursive: true });
   const dst = path.join(patchDir, `${resolved.importPath}@${resolved.version}.patch`);
   await fsp.writeFile(dst, diff, "utf8");
@@ -152,6 +164,43 @@ async function doReset(args: string[]) {
   } catch {}
 }
 
+async function doRemove(args: string[]) {
+  const dist = requirePositional(args, 0, {
+    name: "<distribution> name",
+    example: "requests",
+  });
+  const importerFlag = readImporterArg("");
+  const resolved = await resolvePythonDist(dist, importerFlag || undefined);
+
+  const root = repoRoot();
+  const overridePatchDir = readPatchDirArg("");
+  const patchDir = resolvePythonPatchDir({
+    repoRootAbs: root,
+    importerDir: resolved.importerDir,
+    overridePatchDir,
+  });
+  const dst = path.join(patchDir, `${resolved.importPath}@${resolved.version}.patch`);
+
+  const existed = await fsp
+    .access(dst)
+    .then(() => true)
+    .catch(() => false);
+  if (!existed) return;
+
+  await fsp.rm(dst, { force: true });
+
+  // Refresh glue so providers/auto_map reflect the removed patch for the importer.
+  const prev = process.cwd();
+  try {
+    process.chdir(root);
+    await runGlue();
+  } finally {
+    try {
+      process.chdir(prev);
+    } catch {}
+  }
+}
+
 async function doSession(args: string[]) {
   const dist = requirePositional(args, 0, {
     name: "<distribution> name",
@@ -177,4 +226,4 @@ const handler: LanguageHandler = {
   session: doSession,
 };
 
-export default handler;
+export default Object.assign({}, handler, { remove: doRemove });

@@ -60,16 +60,16 @@ Encoding policy:
 
 ## Idempotency
 
-Re-applying an unchanged workspace is a no-op. For Go/C++, apply does not run glue. For Node, provider sync and auto_map generation run automatically.
+Re-applying an unchanged workspace is a no-op. For Go/C++, apply does not run glue. For Node and Python, provider sync and auto_map generation run automatically.
 
 ## Glue regeneration
 
-Node only (Go/C++ don’t require glue for patch invalidation). Local glue is not committed. Regenerate after apply or on-demand:
+Node and Python only (Go/C++ don’t require glue for patch invalidation). Local glue is not committed. Regenerate after apply or on-demand:
 
 - Export graph: `node tools/buck/export-graph.ts --out tools/buck/graph.json`
 - Sync providers: `node tools/buck/sync-providers.ts`
-- Generate provider index and Node lockfile sidecar: `node tools/buck/gen-provider-index.ts`
-  - Emits `third_party/providers/provider_index.bzl` and `tools/buck/node-lock-index.json`
+- Generate provider index (and Node lockfile sidecar for Node): `node tools/buck/gen-provider-index.ts`
+  - Emits `third_party/providers/provider_index.bzl` and `tools/buck/node-lock-index.json` (Node only)
 - Generate auto_map: `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
 
 Running `node tools/dev/install-deps.ts` in the dev shell runs the full sequence automatically. CI runs the same as separate stages.
@@ -101,10 +101,10 @@ node tools/buck/graph-view.ts --graph tools/buck/graph.json
 
 If a sidecar is missing, the Composite Graph API returns an empty object for that index and continues.
 
-Note on remove (Go/C++ vs Node):
+Note on remove (Go/C++ vs Node/Python):
 
 - Go/C++: `patch-pkg remove` does not regenerate glue. Local patches live under the target’s `patches/<lang>` directory and are included in the rule’s `srcs`, so removing a patch is picked up directly by Buck/Nix (precise invalidation, no provider/auto_map updates needed).
-- Node: still regenerates providers and `auto_map.bzl` on apply/remove because importer‑scoped providers are generated artifacts derived from the lockfile and the set of applicable patches.
+- Node/Python: still regenerate providers and `auto_map.bzl` on apply/remove because importer‑scoped providers are generated artifacts derived from the lockfile and the set of applicable patches.
 
 ## CI guardrails
 
