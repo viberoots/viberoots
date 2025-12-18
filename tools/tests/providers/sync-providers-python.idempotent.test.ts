@@ -22,9 +22,6 @@ test("sync-providers-python: deterministic generation and idempotency with patch
     ].join("\n");
     await fsp.writeFile(path.join(importer, "uv.lock"), uvLock, "utf8");
 
-    // Global python patches dir
-    const pyPatches = path.join(tmp, "patches", "python");
-    await fsp.mkdir(pyPatches, { recursive: true });
     // Move to importer-local patches directory
     const importerPatches = path.join(importer, "patches", "python");
     await fsp.mkdir(importerPatches, { recursive: true });

@@ -6,11 +6,7 @@ import { syncImporterProviders } from "../../lib/provider-sync-driver.ts";
 import { decodeNameVersionFromPatch } from "../../lib/providers.ts";
 import { parseUvLockKeys } from "../../lib/uv-lock.ts";
 
-export async function syncPythonProviders(opts?: {
-  outFile?: string;
-  patchDir?: string;
-  strict?: boolean;
-}) {
+export async function syncPythonProviders(opts?: { outFile?: string; strict?: boolean }) {
   const OUT_FILE = opts?.outFile || "third_party/providers/TARGETS.python.auto";
   const STRICT = opts?.strict ?? false;
 

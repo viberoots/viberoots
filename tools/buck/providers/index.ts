@@ -42,7 +42,6 @@ const REGISTRY: Record<string, () => Promise<LanguageProviderSync>> = {
       sync: async (opts) =>
         syncPythonProviders({
           outFile: opts?.outFile || "third_party/providers/TARGETS.python.auto",
-          patchDir: opts?.patchDir || "patches/python",
           strict: opts?.strict,
         }),
     };

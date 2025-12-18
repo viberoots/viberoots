@@ -1,6 +1,6 @@
 ### Provider sync cookbook
 
-Provider sync maps patch files under `patches/<lang>` to Buck providers used in builds. Keep it deterministic and idempotent.
+Provider sync writes deterministic Buck provider glue from lockfiles and patch inputs. For importer-scoped ecosystems (Node and Python), patch discovery is importer-local (`<importer>/patches/<lang>`); some ecosystems may also have optional global patch directories (for example `patches/node` for Node global patches).
 
 - **Patch filenames**: `<module path with / → __>@<version>.patch` (dots are preserved).
   - Decoding policy (parity): `__` decodes to `/` only (lossless). Examples:
@@ -21,6 +21,12 @@ Node generator (canonical):
 Node‑specific note (clarity):
 
 - The Node provider rule accepts `patch_paths` for diagnostics and visibility only. These paths are not used as Buck `srcs` to avoid cross‑package references from `third_party/providers/`. Invalidation for Node patches is achieved by macros adding importer‑local patch files to target `srcs` (see Patching Handbook).
+
+Importer‑scoped patch inclusion policy (Node vs Python):
+
+- **Node (PNPM)**: provider `patch_paths` includes **all importer-local patches** under `<importer>/patches/node/*.patch` (even when not present in the lockfile effective set). This keeps invalidation simple: any importer-local patch change affects that importer’s provider.
+- **Python (uv)**: provider `patch_paths` includes **only importer-local patches that match the `uv.lock` effective set**. This keeps invalidation precise: adding a patch for a package not present in `uv.lock` does not affect the provider or downstream targets.
+- The canonical switch is `importerPatchInclusionPolicy: "all" | "effective-set-only"` in `tools/lib/provider-sync-driver.ts`, and a dedicated regression test locks down the behavior.
 
 Canonical naming and helpers:
 

@@ -40,7 +40,7 @@ This guide explains how to add a new language to the build without touching core
 ### Python notes
 
 - Path invariants:
-  - Patches live under `patches/python/` (flat, no subdirectories).
+  - Patches are importer-local: `<importer>/patches/python/` (flat, no subdirectories).
   - Lockfile labeling is importer‑scoped: `lockfile:<path>#<importer>`; standard file is `uv.lock`.
   - Macros: use `nix_python_{library,binary,test}` from `python/defs.bzl` and pass `lockfile_label` explicitly.
 - Scaffolding:
@@ -48,6 +48,7 @@ This guide explains how to add a new language to the build without touching core
   - `scaf new python app <name>` → `apps/<name>` with a small library and binary (`nix_python_binary`) and importer‑scoped `lockfile_label`.
 - Glue:
   - Provider sync reads all `**/uv.lock` and writes `third_party/providers/TARGETS.python.auto` deterministically.
+  - Python provider sync does **not** accept a global `patchDir` input; patch discovery is always importer-local under `<importer>/patches/python`.
   - `gen-auto-map.ts` already maps generic `lockfile:` labels to importer providers; no Python‑specific code required.
   - Reuse `tools/lib/importers.ts` to compute the importer string and list importer‑local patches deterministically.
 
