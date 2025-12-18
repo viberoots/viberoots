@@ -70,7 +70,7 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
     parseEffectiveSetForLockfile,
     listImporterPatchesFor,
     decodePatchKey: decodeNameVersionFromPatch,
-    includeAllImporterLocalPatches: true,
+    importerPatchInclusionPolicy: "all",
     globalKeyToPatchPath: keyToPatchPath,
     outFile: OUT_FILE,
   });

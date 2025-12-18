@@ -9,6 +9,15 @@ export type ParseEffectiveSetFn = (
   strict?: boolean,
 ) => Promise<Map<string, Set<string>>>;
 
+/**
+ * Controls how importer-local patch files under `<importer>/patches/<lang>/*.patch` are included
+ * in provider `patch_paths`.
+ *
+ * - "all": include all importer-local patch files (even if not in the lockfile effective set)
+ * - "effective-set-only": include only patches that match the lockfile effective set
+ */
+export type ImporterPatchInclusionPolicy = "all" | "effective-set-only";
+
 export type DriverOptions = {
   lang: "node" | "python" | string;
   discoverLockfiles: () => Promise<string[]>;
@@ -18,10 +27,11 @@ export type DriverOptions = {
   outFile?: string;
   strict?: boolean;
   /**
-   * When true, include all importer-local patches regardless of effective-set membership.
-   * Node wants visibility of importer-local patch files. Python filters by effective set.
+   * Importer-local patch inclusion policy.
+   *
+   * If unset, we default to "effective-set-only" since it is the stricter behavior.
    */
-  includeAllImporterLocalPatches?: boolean;
+  importerPatchInclusionPolicy?: ImporterPatchInclusionPolicy;
   /**
    * Optional global mapping from "<name>@<version>" (lowercased) to absolute or relative patch path.
    * Used by Node to include global patches from patches/node that match the importer’s effective set.
@@ -42,7 +52,7 @@ export async function runImporterProviderSync(opts: DriverOptions): Promise<void
     decodePatchKey,
     outFile,
     strict,
-    includeAllImporterLocalPatches,
+    importerPatchInclusionPolicy,
     globalKeyToPatchPath,
   } = opts;
 
@@ -79,7 +89,7 @@ export async function runImporterProviderSync(opts: DriverOptions): Promise<void
       // Importer-local patches
       const localPatches = await listImporterPatchesFor(importer);
       const localSelected =
-        includeAllImporterLocalPatches === true
+        importerPatchInclusionPolicy === "all"
           ? localPatches
           : localPatches.filter((p) => {
               const base = path.posix.basename(p);

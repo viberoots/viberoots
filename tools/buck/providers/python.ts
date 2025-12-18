@@ -40,7 +40,7 @@ export async function syncPythonProviders(opts?: {
     parseEffectiveSetForLockfile,
     listImporterPatchesFor,
     decodePatchKey: decodeNameVersionFromPatch,
-    includeAllImporterLocalPatches: false,
+    importerPatchInclusionPolicy: "effective-set-only",
     outFile: OUT_FILE,
     strict: STRICT,
   });

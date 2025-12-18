@@ -970,6 +970,13 @@ Node and Python are both importer-scoped ecosystems, but their provider patch in
 - **Python (uv)**: the importer provider includes **only patches that match the `uv.lock` effective set**.
   - Effect: adding a patch for a Python package that is not present in `uv.lock` does not affect the provider or downstream targets.
 
+This policy is expressed explicitly in the importer provider sync driver:
+
+- `tools/lib/provider-sync-driver.ts` uses `importerPatchInclusionPolicy: "all" | "effective-set-only"`
+- `tools/buck/providers/node.ts` sets `"all"`
+- `tools/buck/providers/python.ts` sets `"effective-set-only"`
+- If unset, the driver defaults to `"effective-set-only"`.
+
 This policy is locked down by tests. See:
 
 - Node includes unused importer-local patches: `tools/tests/providers/providers.golden.node-and-python-importer-output.test.ts`

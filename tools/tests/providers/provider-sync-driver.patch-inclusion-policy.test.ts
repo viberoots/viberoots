@@ -59,7 +59,7 @@ test("provider-sync-driver patch inclusion policy: Node includes all importer-lo
         ...baseOpts,
         lang: "node",
         listImporterPatchesFor: async (imp: string) => listImporterPatches(imp, "node"),
-        includeAllImporterLocalPatches: true,
+        importerPatchInclusionPolicy: "all",
         outFile: "third_party/providers/TARGETS.node.auto",
       });
 
@@ -67,7 +67,7 @@ test("provider-sync-driver patch inclusion policy: Node includes all importer-lo
         ...baseOpts,
         lang: "python",
         listImporterPatchesFor: async (imp: string) => listImporterPatches(imp, "python"),
-        includeAllImporterLocalPatches: false,
+        importerPatchInclusionPolicy: "effective-set-only",
         outFile: "third_party/providers/TARGETS.python.auto",
       });
 
