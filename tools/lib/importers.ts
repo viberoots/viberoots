@@ -101,9 +101,12 @@ export async function listImporterPatches(
  * Discover PNPM lockfiles, plus "synthetic" lockfile paths for workspace importers that
  * have a package.json but do not yet have a pnpm-lock.yaml.
  *
- * This is a Node-only policy used by provider sync to keep importer-scoped provider edges stable
- * during early scaffolding / partial adoption. The synthesized lockfile path does not claim that
- * the lockfile exists or that any dependencies are present; it only provides a deterministic key.
+ * This is an opt-in, Node-only policy used by provider sync to keep importer-scoped provider edges
+ * stable during early scaffolding / partial adoption. By default, the provider sync contract is:
+ * importer-scoped providers are generated only from real pnpm-lock.yaml files.
+ *
+ * The synthesized lockfile path does not claim that the lockfile exists or that any dependencies
+ * are present; it only provides a deterministic key.
  *
  * Rules:
  * - Only workspace importers under apps/* or libs/* are eligible.
@@ -115,11 +118,16 @@ export async function findPnpmLockfilesWithSyntheticWorkspaceImporters(): Promis
   const real = await findImporterLockfiles(["pnpm-lock.yaml"]);
   const out = new Set(real.map((p) => toPosixPath(p).replace(/^\.\/+/, "")));
 
+  const rootAbs = (() => {
+    const wr = String(process.env.WORKSPACE_ROOT || "").trim();
+    return path.resolve(wr || process.cwd());
+  })();
+
   const roots: Array<"apps" | "libs"> = ["apps", "libs"];
   for (const root of roots) {
     let children: string[] = [];
     try {
-      children = await fsp.readdir(path.resolve(root));
+      children = await fsp.readdir(path.join(rootAbs, root));
     } catch {
       children = [];
     }
@@ -127,7 +135,7 @@ export async function findPnpmLockfilesWithSyntheticWorkspaceImporters(): Promis
       const importer = toPosixPath(path.posix.join(root, child));
       if (!isWorkspaceImporterPath(importer)) continue;
       try {
-        await fsp.access(path.resolve(importer, "package.json"));
+        await fsp.access(path.join(rootAbs, importer, "package.json"));
       } catch {
         continue;
       }

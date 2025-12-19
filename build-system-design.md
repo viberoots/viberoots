@@ -1021,6 +1021,9 @@ def node_importer_deps(name, lockfile, importer, patch_paths = []):
 
 - The canonical Node provider generator lives at `tools/buck/providers/node.ts` (`syncNodeProviders(...)`).
 - The `tools/buck/sync-providers-node.ts` file is a thin wrapper kept for back‑compat; it simply delegates to the canonical generator.
+- **Synthetic lockfile providers (opt-in):** Node provider sync supports an opt-in mode that synthesizes `pnpm-lock.yaml` paths for workspace importers that have `package.json` but do not yet have a real lockfile. This is intended for early scaffolding only.
+  - Default: providers are generated **only** for real `pnpm-lock.yaml` files.
+  - Opt-in: set `NODE_PROVIDER_SYNTHETIC_LOCKFILES=1` to enable synthetic lockfile providers. This does **not** change the lockfile label contract for targets.
 - Invoke via the orchestrator:
 
 ```bash

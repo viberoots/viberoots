@@ -10,8 +10,6 @@ test("node cli: scaffold, build shim, run help", async () => {
   await runInTemp("node-cli-scaffold-shim", async (_tmp, $) => {
     await $`git init`;
     await $`scaf new node cli demo --yes`;
-    // Ensure a lockfile exists so providers can be generated deterministically
-    await $`bash --noprofile --norc -c 'cd apps/demo && test -f pnpm-lock.yaml || cat > pnpm-lock.yaml <<\'EOF\'\nlockfileVersion: "9.0"\nimporters:\n  .:\n    dependencies: {}\npackages: {}\nEOF'`;
     // Ensure Buck sees the new target
     await $`buck2 targets //apps/demo:demo`;
     // Glue
@@ -30,7 +28,6 @@ test("node cli: build bundled single-file and run help", async () => {
   await runInTemp("node-cli-bundle", async (tmp, $) => {
     await $`git init`;
     await $`scaf new node cli demo --yes`;
-    await $`bash --noprofile --norc -c 'cd apps/demo && test -f pnpm-lock.yaml || cat > pnpm-lock.yaml <<\'EOF\'\nlockfileVersion: "9.0"\nimporters:\n  .:\n    dependencies: {}\npackages: {}\nEOF'`;
     const targetsPath = path.join(tmp, "apps", "demo", "TARGETS");
     // Toggle bundle mode with importer param
     await $`node -e ${`const fs=require('fs');

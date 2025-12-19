@@ -25,11 +25,25 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
   const keyToPatchPath = new Map<string, string>();
   for (const e of scanned) keyToPatchPath.set(e.key.toLowerCase(), e.patchPath);
 
+  function syntheticLockfilesEnabled(): boolean {
+    const raw = String(process.env.NODE_PROVIDER_SYNTHETIC_LOCKFILES || "")
+      .trim()
+      .toLowerCase();
+    return raw === "1" || raw === "true";
+  }
+
   // Construct plugin functions for the shared driver
-  // Node-only policy: include synthetic pnpm-lock.yaml paths for workspace importers that have
-  // package.json but no lockfile yet (metadata-only provider, stable edges).
-  const discoverLockfiles = async (): Promise<string[]> =>
-    await findPnpmLockfilesWithSyntheticWorkspaceImporters();
+  // Default: discover providers only from real pnpm-lock.yaml files (lockfile-label contract).
+  //
+  // Opt-in: set NODE_PROVIDER_SYNTHETIC_LOCKFILES=1 to also synthesize pnpm-lock.yaml paths for
+  // workspace importers that have package.json but no lockfile yet (metadata-only provider; stable
+  // edges during early scaffolding).
+  const discoverLockfiles = async (): Promise<string[]> => {
+    if (syntheticLockfilesEnabled()) {
+      return await findPnpmLockfilesWithSyntheticWorkspaceImporters();
+    }
+    return await findImporterLockfiles(["pnpm-lock.yaml"]);
+  };
   const parseEffectiveSetForLockfile = async (
     lockfilePath: string,
   ): Promise<Map<string, Set<string>>> => {
