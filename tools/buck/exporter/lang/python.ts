@@ -1,30 +1,15 @@
 #!/usr/bin/env zx-wrapper
 import type { Adapter, Batch, Node } from "../types.ts";
 import { hasLabel, isRuleType, validateLanguageClassification } from "./helpers.ts";
-import { packageDirFromTargetName } from "../batch.ts";
 import { findNearestUvLockForPackage } from "../../../lib/importers.ts";
+import { lockfileLabels } from "./importer-lockfile-labels.ts";
 import {
-  attachImporterLockfileLabelsIfMacroStamped,
-  hasKindLabel,
-  lockfileLabels,
-  validateAutoAttachImporterSupport,
-  validateImporterLockfileLabels,
-} from "./importer-lockfile-labels.ts";
+  attachImporterScopedLockfileLabels,
+  validateImporterScopedAdapter,
+} from "./importer-scoped-adapter.ts";
 
 function isPythonTarget(n: Node): boolean {
   return hasLabel(n, "lang:python") || isRuleType(n, "python_");
-}
-
-function validateKindPresence(n: Node): string[] {
-  if (!isPythonTarget(n)) return [];
-  if (hasKindLabel(n)) return [];
-  if (lockfileLabels(n).length === 0) return [];
-  return [
-    [
-      `[exporter][python] missing kind:* label on ${n.name}.`,
-      "Fix: use macros that stamp a kind label (e.g., 'kind:lib', 'kind:bin', 'kind:test').",
-    ].join("\n"),
-  ];
 }
 
 export const adapter: Adapter = {
@@ -34,41 +19,17 @@ export const adapter: Adapter = {
   },
   async validate(nodes: Node[]) {
     const out: string[] = [];
-    const lockByPkg = new Map<string, Promise<string | null>>();
-    const nearestLock = (pkgDir: string) => {
-      const key = pkgDir || ".";
-      const cur = lockByPkg.get(key);
-      if (cur) return cur;
-      const next = findNearestUvLockForPackage(key);
-      lockByPkg.set(key, next);
-      return next;
-    };
-
-    for (const n of nodes) {
-      if (!isPythonTarget(n)) continue;
-      out.push(...validateKindPresence(n));
-      out.push(...validateImporterLockfileLabels({ adapterName: "python", node: n }));
-      if (hasKindLabel(n) && lockfileLabels(n).length === 0) {
-        const pkg = packageDirFromTargetName(n.name || "") || ".";
-        const lockRel = await nearestLock(pkg);
-        if (!lockRel) {
-          out.push(
-            [
-              `[exporter][python] missing importer-scoped lockfile label on ${n.name}.`,
-              `Fix: ensure a uv.lock exists in '${pkg}' (or an ancestor) so the exporter can attach lockfile:<path>#<importer>, or stamp the label explicitly via macros.`,
-            ].join("\n"),
-          );
-        } else {
-          out.push(
-            ...validateAutoAttachImporterSupport({
-              adapterName: "python",
-              node: n,
-              lockfilePath: lockRel,
-            }),
-          );
-        }
-      }
-    }
+    out.push(
+      ...(await validateImporterScopedAdapter(nodes, {
+        adapterName: "python",
+        lockfileBasename: "uv.lock",
+        isTarget: isPythonTarget,
+        findNearestLockfile: findNearestUvLockForPackage,
+        shouldWarnMissingKindLabel(n) {
+          return lockfileLabels(n).length > 0;
+        },
+      })),
+    );
 
     // Warn-only: .py sources missing both python_* rule_type and lang:python label
     out.push(
@@ -98,8 +59,10 @@ export const adapter: Adapter = {
     return [];
   },
   async attachLabels(nodes: Node[]): Promise<Node[]> {
-    return attachImporterLockfileLabelsIfMacroStamped({
+    return attachImporterScopedLockfileLabels({
       nodes,
+      adapterName: "python",
+      lockfileBasename: "uv.lock",
       isTarget: isPythonTarget,
       findNearestLockfile: findNearestUvLockForPackage,
     });

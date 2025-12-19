@@ -961,6 +961,7 @@ Use `tools/lib/importers.ts` to keep importer logic consistent:
 
 These helpers are used by provider generators and tests to avoid path/ordering drift across ecosystems.
 
+- Exporter adapter authoring (Node + Python): the canonical shared implementation of importer-scoped validation + nearest-lockfile attachment is `tools/buck/exporter/lang/importer-scoped-adapter.ts`. Lower-level parsing/label helpers live in `tools/buck/exporter/lang/importer-lockfile-labels.ts`.
 - Starlark macro path (Node/Python): macros must enforce exactly one importer‑scoped lockfile label via `ensure_single_lockfile_label(...)` and derive the importer with `importer_from_labels(...)`. Avoid bespoke inference; this keeps error text and behavior consistent across macros.
 
 ### Provider patch inclusion semantics (Node vs Python)
