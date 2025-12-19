@@ -49,6 +49,8 @@
 ## Design Principles
 
 - **Authoritative exporter enabled (Go).** Labels come from authoritative `go list -deps -json -test=all`, batched by config, after codegen.
+  - Go `module:*` labels are derived from the authoritative `go list` JSON per tuple batch.
+  - This is an explicit contract: the exporter does not rely on process-global caches for Go labeling, and it does not use secondary fallbacks (for example parsing `go.mod`) that could hide bugs in the primary `go list` path.
 - **Node (optional, experimental): PNPM-only.** Lockfile providers are **importer-scoped**; label format `lockfile:<path>#<importer>` (see “Later / Optional — Node”).
 
 ### Nix Features (enable globally)

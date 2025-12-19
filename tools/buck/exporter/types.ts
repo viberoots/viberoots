@@ -28,6 +28,8 @@ export interface GoPkg {
   } | null;
 }
 
+export type GoListByBatch = Map<Batch, GoPkg[]>;
+
 export interface Batch {
   tuple: Tuple;
   members: Node[];
@@ -47,7 +49,12 @@ export interface Adapter {
   name: string;
   isNode(n: Node): boolean;
   buildBatches(nodes: Node[]): Promise<Batch[]>;
-  attachLabels(nodes: Node[], batches: Batch[], cacheDir: string): Promise<Node[]>;
+  attachLabels(
+    nodes: Node[],
+    batches: Batch[],
+    cacheDir: string,
+    goListByBatch?: GoListByBatch,
+  ): Promise<Node[]>;
   // Optional adapter-specific validation hook:
   // Return a list of human-readable findings (strings). The main driver applies
   // severity handling (warn vs error) and CI overrides. Adapters MUST NOT throw.

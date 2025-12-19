@@ -26,6 +26,7 @@ nix_python_wasm_lib(
   name = "pylib",
   lockfile_label = "lockfile:libs/pylib/uv.lock#libs/pylib",
   srcs = glob(["**/*.py"]),
+  visibility = ["PUBLIC"],
 )
 `,
       "utf8",
@@ -50,6 +51,7 @@ nix_python_wasm_app(
   lockfile_label = "lockfile:apps/pywasm/uv.lock#apps/pywasm",
   srcs = [],
   deps = ["//libs/pylib:pylib"],
+  visibility = ["PUBLIC"],
 )
 `,
       "utf8",

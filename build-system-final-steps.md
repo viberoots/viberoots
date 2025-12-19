@@ -80,7 +80,7 @@ Detailed design (PR 1):
     - `reachableImports(from: GoPkg, byImport: Map<string, GoPkg>): Set<string>`
   - `labeler.ts`
     - `effectiveModuleKey(p: GoPkg): string | null` (handles Replace and pseudo-versions)
-    - `attachGoModuleLabels(nodes: Node[], batches: ReturnType<buildBatches>, cacheDir: string): Promise<Node[]>`
+    - `attachGoModuleLabels(nodes: Node[], batches: ReturnType<buildBatches>, goListByBatch: Map<Batch, GoPkg[]>): Promise<Node[]>`
   - `io.ts`
     - `cqueryNodes(scope: string, attrList: string[]): Promise<Node[]>`
     - `readSimulatedNodes(path: string): Promise<Node[]>`

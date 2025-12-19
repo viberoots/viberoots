@@ -88,9 +88,25 @@ async function ensureLocalPreludeMapping() {
   } catch {}
 }
 
+async function removeInvalidGraphJsonIfPresent() {
+  const graphPath = path.join(process.cwd(), "tools", "buck", "graph.json");
+  try {
+    const txt = await fsp.readFile(graphPath, "utf8");
+    try {
+      JSON.parse(txt);
+      return;
+    } catch {
+      await fsp.rm(graphPath, { force: true });
+    }
+  } catch {}
+}
+
 export async function autoFixGlue() {
   // Ensure local .buckconfig/.buckroot and prelude mapping exist so Buck commands use a valid platform
   await ensureLocalPreludeMapping();
+  // If a previous step created a non-JSON graph (e.g. temp tests touching with a comment),
+  // delete it so ensureGraph regenerates deterministically.
+  await removeInvalidGraphJsonIfPresent();
   // Ensure gomod2nix.toml is generated before glue; ignore errors in local mode
   try {
     await runNodeWithZx({

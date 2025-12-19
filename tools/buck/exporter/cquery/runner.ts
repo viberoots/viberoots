@@ -71,7 +71,10 @@ async function withBuckCleanup<T>(iso: string, fn: () => Promise<T>): Promise<T>
   if (!iso) return await fn();
   const onSignal = async () => {
     try {
-      await $`buck2 --isolation-dir ${iso} kill`;
+      const cwd = String(
+        process.env.BUCK_TEST_SRC || process.env.WORKSPACE_ROOT || process.cwd(),
+      ).trim();
+      await $({ cwd })`buck2 --isolation-dir ${iso} kill`;
     } catch {}
     process.exit(130);
   };
@@ -84,13 +87,18 @@ async function withBuckCleanup<T>(iso: string, fn: () => Promise<T>): Promise<T>
     return await fn();
   } finally {
     try {
-      await $`buck2 --isolation-dir ${iso} kill`;
+      const cwd = String(
+        process.env.BUCK_TEST_SRC || process.env.WORKSPACE_ROOT || process.cwd(),
+      ).trim();
+      await $({ cwd })`buck2 --isolation-dir ${iso} kill`;
     } catch {}
   }
 }
 
 export async function runCqueryMerged(opts: CqueryRunnerOptions): Promise<Record<string, any>> {
-  const cwd = process.cwd();
+  const cwd = String(
+    process.env.BUCK_TEST_SRC || process.env.WORKSPACE_ROOT || process.cwd(),
+  ).trim();
   const flags = (opts.attrs || []).flatMap((a) => ["--output-attribute", a]);
   const platformLabel = computePlatformLabel(cwd);
   const platformFlags = ["--target-platforms", platformLabel];
@@ -104,6 +112,7 @@ export async function runCqueryMerged(opts: CqueryRunnerOptions): Promise<Record
       console.warn(`[exporter][debug] buck2 cquery ${platformFlags.join(" ")} ${query}`);
     }
     const { stdout } = await $({
+      cwd,
       stdio: "pipe",
     })`buck2 ${isolationFlags} cquery ${platformFlags} ${query} --json ${flags}`.quiet();
     return JSON.parse(String(stdout)) as Record<string, any>;

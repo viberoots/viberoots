@@ -7,9 +7,11 @@ import {
 } from "./batch.ts";
 import { deriveTupleForNode } from "./env.ts";
 import { cacheHits, cacheMisses, runGoList } from "./golist.ts";
-import { attrList, cqueryNodes, parseArgs, readSimulatedNodes, writeIfChangedJSON } from "./io.ts";
+import { cqueryNodes } from "./cquery/index.ts";
+import { attrList } from "./cquery/attrs.ts";
+import { parseArgs, readSimulatedNodes, writeIfChangedJSON } from "./io.ts";
 import { loadPresentAdapters } from "./lang/contract.ts";
-import type { Adapter, Batch, Metrics, Node } from "./types.ts";
+import type { Adapter, Batch, GoListByBatch, Metrics, Node } from "./types.ts";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { collectFindings, determineMode, emitFindings, logValidationMode } from "./validation.ts";
@@ -117,6 +119,7 @@ export async function run() {
     }
 
     // If batches carry Go tuples, execute go list to warm cache for labeler
+    let goListByBatch: GoListByBatch | undefined = undefined;
     if (batchesA.length > 0 && (batchesA[0] as any).tuple) {
       const goListResults: Array<{ batch: Batch; pkgs: any[] }> = [];
       let i = 0;
@@ -138,7 +141,7 @@ export async function run() {
       await Promise.all(workers);
       const cache = new Map<Batch, any>();
       for (const r of goListResults) cache.set(r.batch, r.pkgs);
-      (global as any).__GO_LIST_CACHE = { get: (b: Batch) => cache.get(b) };
+      goListByBatch = cache as any;
     }
 
     // Authoritative fallback: if requested and no batches formed (e.g., simulate nodes),
@@ -158,6 +161,7 @@ export async function run() {
       Array.from(byName.values()),
       batchesA as any,
       cacheDir,
+      goListByBatch,
     );
     for (const n of enriched) {
       const cur = byName.get(n.name) || n;

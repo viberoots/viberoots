@@ -56,6 +56,29 @@ async function ensurePreludeSymlinkIfMissing() {
   await fsp.symlink(src, dst, "dir");
 }
 
+async function ensureAutoMapStubIfMissing() {
+  const wsRoot = workspaceRoot();
+  const outPath = path.join(wsRoot, "third_party", "providers", "auto_map.bzl");
+  try {
+    await fsp.access(outPath);
+    return;
+  } catch {}
+  await fsp.mkdir(path.dirname(outPath), { recursive: true });
+  await fsp.writeFile(
+    outPath,
+    [
+      "# //third_party/providers/auto_map.bzl",
+      "# GENERATED FILE — DO NOT EDIT.",
+      "",
+      "MODULE_PROVIDERS = {",
+      "",
+      "}",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+}
+
 export async function runGlue(dryRun: boolean, verbose: boolean) {
   const nodeBase = zxNodeBase();
   const nodeBin = process.execPath || "node";
@@ -161,31 +184,16 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
       when: true,
     },
     {
-      label: "export-graph",
-      cmd: `${nodeBin} ${nodeBase} ${path.join(
-        repoRoot(),
-        "tools",
-        "buck",
-        "export-graph.ts",
-      )} --out ${path.join(wsRoot, "tools", "buck", "graph.json")}`,
-      withZx: true,
-      when: true,
-    },
-    {
       label: "glue-pipeline",
       cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/buck/glue-pipeline.ts")}`,
       withZx: true,
-      // Run unified glue only when languages indicate patching or lockfile labeling; otherwise skip
-      when: (() => {
-        for (const id of enabledLangs) {
-          const c = caps.get(id) || {};
-          if (c.patching || c.lockfileLabels) return true;
-        }
-        return enabledLangs.size === 0; // default to run if no explicit enabled set
-      })(),
-      skipReason: "not-applicable",
+      // Always run: glue-pipeline is idempotent and language drivers are no-ops when inactive.
+      // Skipping based on a manifest-derived capability set is brittle in temp/sparse repos
+      // where the manifest may be missing or partially parsed.
+      when: true,
     },
   ];
+  await ensureAutoMapStubIfMissing();
   await ensurePreludeSymlinkIfMissing();
   for (const c of cmds) {
     if (c.when === false) {

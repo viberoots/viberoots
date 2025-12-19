@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { buildPkgIndexes, reachableImports, runGoList } from "./golist.ts";
-import type { Batch, GoPkg, Node } from "./types.ts";
+import { buildPkgIndexes, reachableImports } from "./golist.ts";
+import type { Batch, GoListByBatch, GoPkg, Node } from "./types.ts";
 
 export function effectiveModuleKey(p: GoPkg): string | null {
   const m = p.Module;
@@ -16,51 +16,42 @@ export function effectiveModuleKey(p: GoPkg): string | null {
 export async function attachGoModuleLabels(
   nodes: Node[],
   batches: Batch[],
-  cacheDir: string,
+  goListByBatch: GoListByBatch | undefined,
 ): Promise<Node[]> {
+  if (batches.length === 0) {
+    return nodes;
+  }
+  if (!goListByBatch) {
+    throw new Error(
+      "[exporter][go] missing go list results map for Go labeling; caller must provide per-batch go list results",
+    );
+  }
   const results: Array<{ members: Node[]; labelsByTarget: Map<string, Set<string>> }> = [];
   for (const b of batches) {
-    // `b` is expected to carry members, roots, cwd; caller already executed go list per batch
-    // For testability, we recompute indexes from a fresh go list run at call site and pass pkgs in; here we assume caller passed pkgs via context.
-    // To keep module small, we rebuild indexes per batch using a closure consumer.
-    let pkgs = (global as any).__GO_LIST_CACHE?.get?.(b) as GoPkg[] | undefined;
+    const pkgs = goListByBatch.get(b);
     if (!pkgs) {
-      // Fallback: fetch go list for this batch if not present in global cache
-      pkgs = await runGoList(b.tuple, b.roots, b.cwd, cacheDir);
+      throw new Error(
+        [
+          "[exporter][go] missing go list results for batch; labeling requires authoritative go list outputs.",
+          `batch.cwd=${b.cwd}`,
+          `batch.tuple=${JSON.stringify(b.tuple)}`,
+        ].join(" "),
+      );
     }
     const { byImport, byDir, testByDir } = buildPkgIndexes(pkgs);
+    const { byModDir, testByModDir } = buildModuleRootIndexes(pkgs, b.cwd);
     const labelsByTarget = new Map<string, Set<string>>();
     for (const n of b.members) {
       const dirs = dirCandidates(n);
       const moduleKeys = new Set<string>();
       for (const d of dirs) {
-        let rootPkg = byDir.get(d);
-        if (!rootPkg) {
-          // Fallback: resolve by comparing against batch cwd (module root)
-          const cwdAbs = path.resolve(process.cwd(), b.cwd);
-          for (const p of byImport.values()) {
-            const pDir = (p.Dir || "").replace(/^\/private/, "");
-            const pDirAbs = path.resolve(pDir);
-            const relToProc = path.relative(process.cwd(), pDirAbs);
-            const relToBatch = path.relative(cwdAbs, pDirAbs) || ".";
-            if (relToProc === d || relToBatch === ".") {
-              const isPTest =
-                (p.ImportPath || "").endsWith(".test") || (!!p.ForTest && p.ForTest !== "");
-              const isTargetTest = ((n as any).srcs || []).some((s: string) =>
-                /_test\.go$/.test(s),
-              );
-              if (!isPTest || isTargetTest) {
-                rootPkg = p;
-                break;
-              }
-            }
-          }
-        }
+        const modRel = moduleRelativeDir(b.cwd, d);
+        const rootPkg = byDir.get(d) || byModDir.get(modRel);
         if (!rootPkg) continue;
         const isTestTarget = ((n as any).srcs || []).some((s: string) => /_test\.go$/.test(s));
         const seeds: GoPkg[] = [rootPkg];
         if (isTestTarget) {
-          const tests = testByDir.get(d) || [];
+          const tests = testByDir.get(d) || testByModDir.get(modRel) || [];
           if (tests.length === 0) {
             // Secondary fallback: include any pkgs in same dir flagged with ForTest
             for (const p of byImport.values()) {
@@ -78,37 +69,6 @@ export async function attachGoModuleLabels(
           include.add(seed.ImportPath);
           const reach = reachableImports(seed, byImport);
           for (const ip of reach) include.add(ip);
-        }
-        if (isTestTarget && include.size === 0) {
-          // Conservative fallback: parse go.mod requires/replaces to attach module labels
-          try {
-            const fs = await import("fs-extra");
-            const gomodPath = path.resolve(process.cwd(), b.cwd, "go.mod");
-            if (await fs.pathExists(gomodPath)) {
-              const txt = await fs.readFile(gomodPath, "utf8");
-              const req = new Map<string, string>();
-              const rep = new Map<string, string>();
-              for (const line of txt.split("\n")) {
-                const l = line.trim();
-                const m1 = l.match(/^require\s+([^\s]+)\s+([^\s]+)$/);
-                if (m1) req.set(m1[1], m1[2]);
-                const m2 = l.match(
-                  /^replace\s+([^\s]+)(?:\s+[^\s]+)?\s+=>\s+([^\s]+)(?:\s+([^\s]+))?$/,
-                );
-                if (m2) {
-                  const mod = m2[1];
-                  const tgt = m2[2];
-                  const ver = m2[3];
-                  if (tgt && tgt.startsWith("http")) continue;
-                  if (ver) rep.set(mod, ver);
-                }
-              }
-              for (const [mod, ver] of req) {
-                const vEff = rep.get(mod) || ver || "unknown";
-                moduleKeys.add(`module:${mod.toLowerCase()}@${vEff}`);
-              }
-            }
-          } catch {}
         }
         for (const ip of include) {
           const p = byImport.get(ip);
@@ -156,4 +116,53 @@ function dirCandidates(n: Node): string[] {
     else out.add(s.slice(0, slash));
   }
   return Array.from(out);
+}
+
+function moduleRelativeDir(moduleRoot: string, repoRelativeDir: string): string {
+  const rel = path.relative(moduleRoot || ".", repoRelativeDir || ".");
+  if (!rel || rel === "") return ".";
+  // Normalize Windows separators defensively; Buck paths should already be POSIX-like.
+  return rel.replaceAll("\\", "/");
+}
+
+function normalizeGoDirAbs(dirAbs: string): string {
+  // macOS sometimes returns /private/var/... while file paths may use /var/...
+  return dirAbs.startsWith("/private/var/") ? dirAbs.slice("/private".length) : dirAbs;
+}
+
+function buildModuleRootIndexes(
+  pkgs: GoPkg[],
+  moduleRoot: string,
+): {
+  byModDir: Map<string, GoPkg>;
+  testByModDir: Map<string, GoPkg[]>;
+} {
+  const byModDir = new Map<string, GoPkg>();
+  const testByModDir = new Map<string, GoPkg[]>();
+  const moduleRootAbs = path.resolve(process.cwd(), moduleRoot || ".");
+  for (const p of pkgs) {
+    if (!p.Dir) continue;
+    const abs = normalizeGoDirAbs(p.Dir);
+    const rel = path.relative(moduleRootAbs, abs);
+    const key = rel === "" ? "." : rel.replaceAll("\\", "/");
+    const isTestPkg = (p.ImportPath || "").endsWith(".test") || (!!p.ForTest && p.ForTest !== "");
+    const existing = byModDir.get(key);
+    if (
+      !existing ||
+      (!isTestPkg &&
+        existing &&
+        ((existing.ImportPath || "").endsWith(".test") ||
+          (existing.ForTest && existing.ForTest !== "")))
+    ) {
+      if (!isTestPkg || !byModDir.has(key)) {
+        byModDir.set(key, p);
+      }
+    }
+    if (isTestPkg) {
+      const arr = testByModDir.get(key) || [];
+      arr.push(p);
+      testByModDir.set(key, arr);
+    }
+  }
+  return { byModDir, testByModDir };
 }
