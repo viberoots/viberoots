@@ -2,6 +2,11 @@
 
 This repo’s Node macros that invoke Nix are intentionally small. They keep Node-specific behavior local, and centralize Nix command assembly (escaping, timeout wrapper, outPath capture) under `//lang`.
 
+They also use the shared importer-scoped wiring helpers so lockfile enforcement, importer derivation, importer-local patch inputs, and provider-edge realization stay consistent across Node and Python:
+
+- `//lang:importer_wiring.bzl:prepare_importer_non_genrule_wiring(...)`
+- `//lang:nix_calling_macros.bzl:wire_global_nix_inputs(...)`
+
 ### Macros
 
 - **`node_webapp(...)`** (`node/defs_nix.bzl`)

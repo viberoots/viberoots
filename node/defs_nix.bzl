@@ -1,4 +1,5 @@
-load("//lang:defs_common.bzl", "wire_global_nix_inputs", "importer_from_labels", "ensure_single_lockfile_label")
+load("@prelude//:rules.bzl", "genrule")
+load("//lang:defs_common.bzl", "prepare_importer_non_genrule_wiring", "wire_global_nix_inputs")
 load("//lang:sanitize.bzl", "sanitize_name")
 load("//lang:nix_shell.bzl", "escape_buck_cmd_subst", "nix_bootstrap_env_core", "nix_bootstrap_env_pnpm_store", "nix_build_out_path_cmd", "nix_timeout_wrapper_var")
 load("//node:defs_core.bzl", "nix_node_gen")
@@ -6,6 +7,12 @@ load("//node:defs_core.bzl", "nix_node_gen")
 def _sanitize_importer_attr(s):
     # Use canonical sanitizer from //lang:sanitize.bzl (mirrors flake-side sanitizeName)
     return sanitize_name(s)
+
+def _pop_list(kwargs, key):
+    if kwargs == None:
+        return []
+    v = kwargs.pop(key, [])
+    return v if isinstance(v, list) else []
 
 def node_webapp(
     name,
@@ -22,34 +29,43 @@ def node_webapp(
     - `importer` is optional; if omitted, derive from the lockfile label's importer suffix.
     - Uses a zx shim to run `nix build .#node-webapp.<importer>` and copies dist/.
     """
-    kw_lock = { "labels": (labels or []) }
-    ensure_single_lockfile_label(kw_lock, lockfile_label)
-    _importer = importer_from_labels(kw_lock)
-
     # Shim: build via Nix and copy dist/* into $OUT (single directory output)
     # Use escaped command substitutions: $$(...) so Buck doesn't parse $(...) as a target pattern.
     # Escape only command substitutions `$(...)` to avoid Buck interpreting them;
     # keep normal `$VAR` expansions intact.
     _prefix = escape_buck_cmd_subst(nix_bootstrap_env_core() + nix_bootstrap_env_pnpm_store()) + nix_timeout_wrapper_var(default_sec = 240)
+
+    kw = dict(kwargs) if kwargs != None else {}
+    kw["labels"] = list(labels or [])
+    kw["srcs"] = []
+    wire_global_nix_inputs(kw, into = "srcs", stamp = True)
+
+    deps = _pop_list(kw, "deps")
+    kw["srcs"] = (kw.get("srcs", []) or []) + deps
+
+    wiring = prepare_importer_non_genrule_wiring(
+        name = name,
+        kwargs = kw,
+        deps = [],
+        lang = "node",
+        kind = "app",
+        labels = [],
+        lockfile_label = lockfile_label,
+        patch_into = "srcs",
+        patch_base = kw.get("srcs", []) or [],
+        provider_into = "srcs",
+    )
+    kw = wiring["kwargs"]
+    _importer = wiring["importer"]
     cmd = (
         _prefix
         + nix_build_out_path_cmd(".#node-webapp.%s" % _sanitize_importer_attr(_importer))
         + "if [ -d \"$outPath/dist\" ]; then cp -R \"$outPath/dist\" $OUT; else echo 'dist missing' >&2; exit 2; fi"
     )
 
-    kw = { "labels": (labels or []), "srcs": [] }
-    wire_global_nix_inputs(kw, into = "srcs", stamp = True)
-
-    nix_node_gen(
-        name = name,
-        srcs = kw["srcs"],
-        out = out if out != None else "dist",
-        cmd = cmd,
-        labels = kw["labels"],
-        lockfile_label = lockfile_label,
-        kind = "app",
-        **kwargs
-    )
+    kw["out"] = out if out != None else "dist"
+    kw["cmd"] = cmd
+    genrule(**kw)
 
 def nix_node_cli_bin(
     name,
@@ -105,10 +121,6 @@ def nix_node_cli_bin(
         )
 
     # Bundled mode: build a single-file shebanged bundle via the scaffolded importer's flake
-    kw_lock = { "labels": (labels or []) }
-    ensure_single_lockfile_label(kw_lock, lockfile_label)
-    _importer = importer_from_labels(kw_lock)
-
     def _basename_importer(s):
         # crude basename: split by '/' and take last non-empty
         parts = [p for p in s.split("/") if p != ""]
@@ -127,6 +139,33 @@ def nix_node_cli_bin(
     # Bundling may invoke Nix + PNPM and can legitimately take longer than 60s on cold caches.
     _bootstrap = escape_buck_cmd_subst(nix_bootstrap_env_core() + nix_bootstrap_env_pnpm_store())
     _prefix = _pre_env + _bootstrap + nix_timeout_wrapper_var(default_sec = 180)
+
+    # Build srcs map to place files at deterministic paths inside the action
+    _srcs_map = {
+        # Preserve entry path under bin/
+        entry: entry,
+        # Optional workspace root injection
+        "tools/buck/workspace-root.env": "root//tools/buck:workspace-root.env",
+    }
+
+    kw = dict(kwargs) if kwargs != None else {}
+    kw["labels"] = list(labels or [])
+    wiring = prepare_importer_non_genrule_wiring(
+        name = name,
+        kwargs = kw,
+        deps = deps,
+        lang = "node",
+        kind = "bin",
+        labels = [],
+        lockfile_label = lockfile_label,
+        patch_into = "srcs",
+        patch_base = _srcs_map,
+        provider_into = "srcs",
+    )
+    kw = wiring["kwargs"]
+    _importer = wiring["importer"]
+    wire_global_nix_inputs(kw, into = "srcs", stamp = True)
+
     cmd = (
         "SCRATCH=\"$PWD\"; "
         + _prefix
@@ -150,29 +189,8 @@ def nix_node_cli_bin(
         + "exit $RC"
     )
 
-    # Build srcs map to place files at deterministic paths inside the action
-    _srcs_map = {
-        # Preserve entry path under bin/
-        entry: entry,
-        # Optional workspace root injection
-        "tools/buck/workspace-root.env": "root//tools/buck:workspace-root.env",
-    }
-
-    kw = { "labels": (labels or []) }
-    kw["srcs"] = _srcs_map
-    wire_global_nix_inputs(kw, into = "srcs", stamp = True)
-
-    nix_node_gen(
-        name = name,
-        # Include the CLI entry and the repo graph file to allow deriving repo root hermetically
-        srcs = kw["srcs"],
-        out = out,
-        cmd = cmd,
-        deps = deps,
-        labels = kw["labels"],
-        lockfile_label = lockfile_label,
-        kind = "bin",
-        **kwargs
-    )
+    kw["out"] = out
+    kw["cmd"] = cmd
+    genrule(**kw)
 
 
