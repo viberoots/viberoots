@@ -26,6 +26,7 @@ All scripts are zx TypeScript using `#!/usr/bin/env zx-wrapper`.
 - Patch inputs are attached through `//lang:patch_inputs.bzl` helpers. When a rule does not support `srcs`, call sites must choose a supported input attribute explicitly using `into = "<attr>"` or carry patch inputs via a small helper target.
   - For importer-scoped ecosystems (Node, Python), macro wiring is standardized via `//lang:importer_wiring.bzl`. New macros must not copy/paste wiring logic; they should call the helper functions (`require_single_importer_lockfile_label`, `attach_importer_patch_inputs`, `merge_provider_edges`).
   - For **genrule-style macros** (or any wrapper where edges must be realized into `srcs`), use the consolidated helper `prepare_importer_genrule_kwargs(...)` instead of re-implementing list-vs-dict `srcs` handling.
+  - For **non-genrule importer-scoped macros** (where the rule needs the importer string explicitly), use `prepare_importer_non_genrule_wiring(...)` so lockfile enforcement, importer derivation, patch inputs, and provider-edge merging remain consistent.
 
 ## Workflow
 

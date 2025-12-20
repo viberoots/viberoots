@@ -1,4 +1,4 @@
-load("//lang:lockfile_labels.bzl", "ensure_single_lockfile_label")
+load("//lang:lockfile_labels.bzl", "ensure_single_lockfile_label", "importer_from_labels")
 load("//lang:label_stamping.bzl", "stamp_labels")
 load(
     "//lang:patch_inputs.bzl",
@@ -118,4 +118,77 @@ def prepare_importer_genrule_kwargs(
     )
     return kw
 
+
+def prepare_importer_non_genrule_wiring(
+        name,
+        kwargs,
+        deps,
+        lang,
+        kind,
+        labels = [],
+        lockfile_label = None,
+        patch_into = "srcs",
+        patch_base = None,
+        patch_dict_safe = None,
+        patch_key_prefix = "__patch_inputs__",
+        provider_into = "deps",
+        provider_base = None,
+        provider_dict_safe = None,
+        provider_key_prefix = "__provider_edges__",
+        MODULE_PROVIDERS = None):
+    """
+    Standard wiring for importer-scoped macros that do not follow the genrule-style path.
+
+    Responsibilities:
+    - enforce exactly one importer-scoped lockfile label (stable error text)
+    - stamp `lang:*` and `kind:*` labels
+    - derive and return the importer string from the lockfile label
+    - attach importer-local patch inputs into a chosen attribute (list and dict shapes)
+    - merge provider edges into deps by default, or into a chosen attribute for rule shapes that
+      cannot accept deps
+    """
+    kw = {} if kwargs == None else kwargs
+    kw["name"] = name
+
+    existing_labels = kw.get("labels", []) or []
+    kw["labels"] = (existing_labels if isinstance(existing_labels, list) else []) + (labels or [])
+
+    require_single_importer_lockfile_label(kw, lockfile_label)
+    stamp_labels(kw, lang, kind)
+    importer = importer_from_labels(kw)
+
+    if patch_into != None:
+        if patch_base != None:
+            kw[patch_into] = dict(patch_base) if isinstance(patch_base, dict) else list(patch_base)
+        elif kw.get(patch_into) == None:
+            kw[patch_into] = []
+
+        is_dict = isinstance(kw.get(patch_into), dict)
+        dict_safe = is_dict if patch_dict_safe == None else patch_dict_safe
+        attach_importer_patch_inputs(kw, lang, into = patch_into, dict_safe = dict_safe, key_prefix = patch_key_prefix)
+
+    wired_deps = deps
+    if provider_into == "deps":
+        wired_deps = merge_provider_edges(name, deps, MODULE_PROVIDERS = MODULE_PROVIDERS)
+    else:
+        base = provider_base if provider_base != None else kw.get(provider_into)
+        is_dict = isinstance(base, dict)
+        dict_safe = is_dict if provider_dict_safe == None else provider_dict_safe
+        if base == None:
+            base = {} if dict_safe else []
+        kw[provider_into] = merge_provider_edges(
+            name,
+            deps,
+            into = provider_into,
+            base = base,
+            dict_safe = dict_safe,
+            key_prefix = provider_key_prefix,
+            MODULE_PROVIDERS = MODULE_PROVIDERS,
+        )
+
+    return {
+        "importer": importer,
+        "kwargs": kw,
+        "deps": wired_deps,
+    }
 

@@ -1,12 +1,8 @@
 load("@prelude//:rules.bzl", "genrule")
 load(
     "//lang:defs_common.bzl",
-    "attach_importer_patch_inputs",
-    "importer_from_labels",
-    "merge_provider_edges",
     "prepare_importer_genrule_kwargs",
-    "require_single_importer_lockfile_label",
-    "stamp_labels",
+    "prepare_importer_non_genrule_wiring",
 )
 load("//lang:global_inputs.bzl", "attach_global_nix_inputs")
 load("//node/private:nix_test.bzl", "node_nix_test")
@@ -49,30 +45,32 @@ def nix_node_test(
     kind = "test",
     **kwargs
 ):
-    # Prepare kwargs and label stamping
-    kw = { "name": name }
-    kw["labels"] = labels or []
-    require_single_importer_lockfile_label(kw, lockfile_label)
-    stamp_labels(kw, "node", kind)
+    wiring = prepare_importer_non_genrule_wiring(
+        name = name,
+        kwargs = {},
+        deps = deps,
+        lang = "node",
+        kind = kind,
+        labels = (labels or []),
+        lockfile_label = lockfile_label,
+        patch_into = "srcs",
+        patch_base = list(srcs),
+        MODULE_PROVIDERS = MODULE_PROVIDERS,
+    )
+    kw = wiring["kwargs"]
 
-    # Derive importer from the single required lockfile label (shared helper)
-    _importer = importer_from_labels(kw)
-
-    # Include importer-local node patches as inputs so changes invalidate tests precisely
-    kw["srcs"] = list(srcs)
-    attach_importer_patch_inputs(kw, "node")
     attach_global_nix_inputs(kw, into = "srcs")
     merged_srcs = kw.get("srcs", []) or []
 
     # Forward to external runner rule; ignore legacy 'cmd'
     node_nix_test(
         name = name,
-        importer = _importer,
+        importer = wiring["importer"],
         patterns = ([] if patterns == None else patterns),
         env = (env or {}),
         timeout_sec = timeout_sec,
         srcs = merged_srcs,
-        deps = merge_provider_edges(name, deps, MODULE_PROVIDERS = MODULE_PROVIDERS),
+        deps = wiring["deps"],
         labels = kw.get("labels", []),
         out = (out if out != None else (name + ".stamp")),
         **kwargs

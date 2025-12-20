@@ -30,8 +30,11 @@ test("macros use realize_provider_edges() and avoid direct provider labels", asy
     );
     // Must use shared provider-edge merge helper (direct or via importer wiring)
     assert(
-      txt.includes("realize_provider_edges(") || txt.includes("merge_provider_edges("),
-      `${f} did not call realize_provider_edges(...) or merge_provider_edges(...) as expected`,
+      txt.includes("realize_provider_edges(") ||
+        txt.includes("merge_provider_edges(") ||
+        txt.includes("prepare_importer_genrule_kwargs(") ||
+        txt.includes("prepare_importer_non_genrule_wiring("),
+      `${f} did not use provider-edge wiring helpers as expected`,
     );
     // Should not embed provider FQ labels directly (except allowed load)
     const lines = txt.split(/\r?\n/).filter((l) => l.includes("//third_party/providers:"));
