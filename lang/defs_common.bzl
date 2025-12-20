@@ -45,6 +45,11 @@ load(
     _require_single_importer_lockfile_label = "require_single_importer_lockfile_label",
 )
 load("//lang:nix_calling_macros.bzl", _wire_global_nix_inputs = "wire_global_nix_inputs")
+load(
+    "//lang:planner_visible_wiring.bzl",
+    _wire_planner_visible_inputs = "wire_planner_visible_inputs",
+    _wire_planner_visible_stub = "wire_planner_visible_stub",
+)
 
 dedupe_preserve = _dedupe_preserve
 
@@ -96,4 +101,7 @@ prepare_importer_genrule_kwargs = _prepare_importer_genrule_kwargs
 prepare_importer_non_genrule_wiring = _prepare_importer_non_genrule_wiring
 
 wire_global_nix_inputs = _wire_global_nix_inputs
+
+wire_planner_visible_inputs = _wire_planner_visible_inputs
+wire_planner_visible_stub = _wire_planner_visible_stub
 

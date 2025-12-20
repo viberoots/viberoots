@@ -5,6 +5,7 @@ load("//lang:defs_common.bzl", "stamp_wasm_variant")
 load("//lang:planner_stub.bzl", "planner_stub", "planner_stub_with_package_local_patches")
 load("//lang:global_inputs.bzl", "global_nix_inputs")
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
+load("//lang:defs_common.bzl", "wire_planner_visible_inputs", "wire_planner_visible_stub")
 load("//go/private:nix_build_wasm.bzl", "go_nix_build_wasm")
 load("//go/private:cgo_wiring.bzl", "apply_go_rule_stable_defaults", "apply_go_tuple_labels", "configure_cgo_and_merge_deps")
 
@@ -134,16 +135,17 @@ def nix_go_carchive(name, **kwargs):
     # Keep a minimal graph node with srcs so the planner can discover the package.
     # Preserve the existing behavior where provider edges are realized into `srcs`.
     srcs = kwargs.get("srcs", []) or []
-    merged_srcs = realize_provider_edges(MODULE_PROVIDERS, name, into = "srcs", base = srcs)
-    planner_stub_with_package_local_patches(
+    wire_planner_visible_stub(
         name = name,
         out = name + ".stamp",
         lang = "go",
         local_patch_dirs = local_patch_dirs,
         deps = deps,
-        srcs = merged_srcs,
+        srcs = srcs,
         labels = labels,
         visibility = kwargs.get("visibility", []),
+        MODULE_PROVIDERS = MODULE_PROVIDERS,
+        realize_providers_into = "srcs",
     )
 
 
@@ -161,7 +163,15 @@ def nix_go_tiny_wasm_lib(name, **kwargs):
     deps = kwargs.pop("deps", [])
     srcs = kwargs.get("srcs", []) or []
     extra = normalize_labels(pkg, kwargs.pop("extra_module_providers", []))
-    merged_srcs = realize_provider_edges(MODULE_PROVIDERS, name, into = "srcs", base = (srcs + deps + extra))
+    merged_srcs = wire_planner_visible_inputs(
+        name = name,
+        MODULE_PROVIDERS = MODULE_PROVIDERS,
+        deps = deps,
+        srcs = srcs,
+        extra_srcs = extra,
+        srcs_include_deps = True,
+        realize_providers_into = "srcs",
+    )["srcs"]
     # Graph-facing shim that copies from the Nix out path produced by planner
     go_nix_build_wasm(
         name = name,

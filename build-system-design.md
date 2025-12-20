@@ -1166,6 +1166,7 @@ As of PR‑3 in `quad-alignment-6.md`, the historical `go_module_patch(...)` pro
 - For most macros, merge into `deps`: `deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps)`.
 - For genrule-style shims that don’t accept `deps` (e.g., Node `nix_node_gen`, Go `nix_go_carchive`), merge into `srcs`: `srcs = realize_provider_edges(MODULE_PROVIDERS, name, into = "srcs", base = srcs + deps)`.
 - This replaces ad‑hoc `providers_for(...) + dedupe_preserve(...)` patterns and keeps behavior stable across languages.
+- **Preferred stub/shim entrypoint**: for planner-visible stubs and “providers into `srcs`” shims, prefer `//lang:defs_common.bzl:wire_planner_visible_inputs(...)` and `wire_planner_visible_stub(...)` so call sites don’t re-learn the same edge cases.
 
 ### Planner-visible stub contract (PR‑2)
 
@@ -1177,6 +1178,7 @@ Some macros must produce a **planner-visible** node without building a normal ar
   - **graph edges**: `deps` (and provider edges realized deterministically via `realize_provider_edges(...)` unless intentionally filtered)
   - **patch inputs**: include package-local patch files as explicit inputs when patches drive invalidation for that target
 - **Pattern**: if the stub can accept `srcs`, prefer the shared wrapper `//lang:planner_stub.bzl:planner_stub_with_package_local_patches(...)` to attach patch inputs without changing the stub’s artifact shape.
+- **Canonical macro-level surface (preferred)**: `//lang:defs_common.bzl:wire_planner_visible_stub(...)` composes the above patterns (optional patch inputs, optional provider-edge realization into `deps`/`srcs`, optional provider stripping from planner deps) so planner-visible call sites stay uniform.
 
 ### `//go/defs.bzl` macros (copy‑pasteable)
 

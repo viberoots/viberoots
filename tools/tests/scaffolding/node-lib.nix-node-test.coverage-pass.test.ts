@@ -21,6 +21,11 @@ test(
       );
       const env = {
         ...process.env,
+        // Force all subprocesses in this test to treat the temp repo as the workspace.
+        // This avoids pulling volatile dirs (like the real repo's coverage/raw) into Nix snapshots
+        // and avoids sourcing user login profiles from the real HOME.
+        WORKSPACE_ROOT: tmp,
+        HOME: tmp,
         NIX_PNPM_ALLOW_GENERATE: "1",
         INSTALL_LOCK_SKIP: "1",
         NIX_PNPM_FETCH_TIMEOUT: String(Number(process.env.NIX_PNPM_FETCH_TIMEOUT || "600")),

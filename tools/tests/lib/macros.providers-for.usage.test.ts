@@ -28,12 +28,14 @@ test("macros use realize_provider_edges() and avoid direct provider labels", asy
       txt.includes('load("//lang:auto_map.bzl"'),
       `${f} must load MODULE_PROVIDERS via //lang:auto_map.bzl`,
     );
-    // Must use shared provider-edge merge helper (direct or via importer wiring)
+    // Must use shared provider-edge wiring helpers (direct, via importer wiring, or via planner-visible stub wiring)
     assert(
       txt.includes("realize_provider_edges(") ||
         txt.includes("merge_provider_edges(") ||
         txt.includes("prepare_importer_genrule_kwargs(") ||
-        txt.includes("prepare_importer_non_genrule_wiring("),
+        txt.includes("prepare_importer_non_genrule_wiring(") ||
+        txt.includes("wire_planner_visible_inputs(") ||
+        txt.includes("wire_planner_visible_stub("),
       `${f} did not use provider-edge wiring helpers as expected`,
     );
     // Should not embed provider FQ labels directly (except allowed load)

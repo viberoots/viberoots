@@ -1,5 +1,6 @@
 load("@prelude//:rules.bzl", "cxx_library", "cxx_binary", "cxx_test")
 load("//lang:defs_common.bzl", "stamp_labels", "append_nixpkg_labels", "include_package_local_patches", "dedupe_preserve", "stamp_wasm_variant", "realize_provider_edges", "default_package_patch_dirs", "strip_provider_targets")
+load("//lang:defs_common.bzl", "wire_planner_visible_stub")
 load("//lang:global_inputs.bzl", "global_nix_inputs")
 load("//lang:planner_stub.bzl", "planner_stub", "planner_stub_with_package_local_patches")
 load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name", _cpp_sanitize_probe="cpp_sanitize_probe")
@@ -95,13 +96,12 @@ def nix_cpp_wasm_emscripten_lib(name, **kwargs):
     """
     local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("cpp"))
     deps = kwargs.pop("deps", [])
-    deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps)
     # Stamp language/kind and wasm variant for planner routing
     stamp_wasm_variant(kwargs, "cpp", "emscripten")
     labels = kwargs.get("labels", []) or []
     srcs = kwargs.pop("srcs", []) or []
     # Use a minimal planner stub that exposes graph edges, labels, and patch inputs.
-    planner_stub_with_package_local_patches(
+    wire_planner_visible_stub(
         name = name,
         out = name + ".stamp",
         lang = "cpp",
@@ -110,6 +110,8 @@ def nix_cpp_wasm_emscripten_lib(name, **kwargs):
         srcs = srcs,
         labels = labels,
         visibility = kwargs.get("visibility", []),
+        MODULE_PROVIDERS = MODULE_PROVIDERS,
+        realize_providers_into = "deps",
     )
 
 def nix_cpp_binary(name, **kwargs):
@@ -132,15 +134,12 @@ def nix_cpp_test(name, **kwargs):
     _planner_labels = (_planner_kwargs.get("labels", []) or [])
     # Planner-visible stub: declare a cxx_library without compiling test sources; Nix will build the test.
     # Filter provider deps from planner to avoid visibility / graph-edge to providers
-    _planner_deps = strip_provider_targets(deps)
-
-    planner_stub(
+    wire_planner_visible_stub(
         name = planner_name,
         out = planner_name + ".stamp",
-        # Graph edges for planner discovery
-        deps = _planner_deps,
-        # labels carry nixpkg attrs for the planner in the exported graph
+        deps = deps,
         labels = _planner_labels,
+        strip_providers_from_deps = True,
     )
     # Executed: external runner builds the corresponding flake attr for planner_name and runs it
     cpp_nix_test(
