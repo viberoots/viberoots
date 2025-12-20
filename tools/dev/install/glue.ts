@@ -3,6 +3,7 @@ import path from "node:path";
 import process from "node:process";
 import * as fsp from "node:fs/promises";
 import { printSkip } from "../../lib/errors.ts";
+import { findRepoRoot } from "../../lib/repo.ts";
 import { nodeFlagsWithZx } from "../../lib/node-run.ts";
 
 function repoRoot(): string {
@@ -12,10 +13,16 @@ function repoRoot(): string {
   return path.resolve(here, "..", "..", "..");
 }
 
-function workspaceRoot(): string {
-  // Prefer explicit WORKSPACE_ROOT (tests set this), else current working directory
+async function workspaceRoot(): Promise<string> {
+  const cwd = process.cwd();
   const wr = String(process.env.WORKSPACE_ROOT || "").trim();
-  return wr ? path.resolve(wr) : process.cwd();
+  if (wr) {
+    try {
+      const abs = path.resolve(wr);
+      if (cwd === abs || cwd.startsWith(abs + path.sep)) return abs;
+    } catch {}
+  }
+  return await findRepoRoot(cwd);
 }
 
 export function zxNodeBase(): string {
@@ -24,7 +31,7 @@ export function zxNodeBase(): string {
 }
 
 async function ensurePreludeSymlinkIfMissing() {
-  const wsRoot = workspaceRoot();
+  const wsRoot = await workspaceRoot();
   try {
     const check = await $({
       stdio: "pipe",
@@ -57,7 +64,7 @@ async function ensurePreludeSymlinkIfMissing() {
 }
 
 async function ensureAutoMapStubIfMissing() {
-  const wsRoot = workspaceRoot();
+  const wsRoot = await workspaceRoot();
   const outPath = path.join(wsRoot, "third_party", "providers", "auto_map.bzl");
   try {
     await fsp.access(outPath);
@@ -83,7 +90,7 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
   const nodeBase = zxNodeBase();
   const nodeBin = process.execPath || "node";
   const zxImport = path.join(repoRoot(), "tools/dev/zx-init.mjs");
-  const wsRoot = workspaceRoot();
+  const wsRoot = await workspaceRoot();
   // Detect enabled languages via templates or optional langs.json
   type LangConfig = {
     enabled?: string[];
@@ -207,14 +214,19 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
       continue;
     }
     if (verbose) console.log(`[run] ${c.cmd}`);
+    const baseEnv: Record<string, string> = {
+      ...process.env,
+      WORKSPACE_ROOT: wsRoot,
+      BUCK_TEST_SRC: wsRoot,
+    };
     const env = c.withZx
       ? {
-          ...process.env,
+          ...baseEnv,
           NODE_OPTIONS: [`--import ${zxImport}`, process.env.NODE_OPTIONS || ""]
             .filter(Boolean)
             .join(" "),
         }
-      : process.env;
+      : baseEnv;
     // Execute language/gen tasks in the workspace root to generate files in the temp repo when running tests
     await $({ stdio: "inherit", cwd: wsRoot, env })`bash --noprofile --norc -c ${c.cmd}`;
   }

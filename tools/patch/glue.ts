@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { findRepoRoot } from "../lib/repo.ts";
-import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
 import { exportInlineGraph } from "../buck/export-inline.ts";
-import { runNodeWithZx } from "../lib/node-run.ts";
+import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
 import { normalizeTargetLabel } from "../lib/labels.ts";
+import { runNodeWithZx } from "../lib/node-run.ts";
+import { findRepoRoot } from "../lib/repo.ts";
 
 async function buck2Present(): Promise<boolean> {
   try {
@@ -62,6 +62,13 @@ export async function ensureGraph(opts: { exportGraph?: () => Promise<void> } = 
       const txt = await fsp.readFile(graphPath, "utf8");
       const trimmed = String(txt || "").trim();
       if (!trimmed || trimmed === "[]") return true;
+      // If the file exists but is not valid JSON (e.g. tests may "touch" it with a comment),
+      // treat it as missing so we regenerate a well-formed graph for downstream consumers.
+      try {
+        JSON.parse(trimmed);
+      } catch {
+        return true;
+      }
       if (!wantTargetRaw) return false;
       try {
         return !graphContainsTarget(trimmed, wantTargetRaw);
@@ -118,7 +125,7 @@ export async function ensureGraph(opts: { exportGraph?: () => Promise<void> } = 
       .split(/[,\s]+/)
       .filter(Boolean);
     const fs = await import("node:fs");
-    const existingRoots = rawRoots.filter((r) => {
+    const existingRoots = rawRoots.filter((r: string) => {
       const dir = r.replace(/^\/+/, "");
       try {
         return fs.existsSync(path.join(workspaceRoot, dir));
@@ -154,35 +161,27 @@ export async function ensureGraph(opts: { exportGraph?: () => Promise<void> } = 
   } as Record<string, string>;
 
   if (haveBuck) {
-    try {
-      await runNodeWithZx({
-        nodeBin,
-        zxInitPath: zxInit,
-        script: exportScript,
-        args: exporterArgs,
-      });
-      if (await isValidJsonFile(graphPath)) return;
-    } catch {}
+    await runNodeWithZx({
+      nodeBin,
+      zxInitPath: zxInit,
+      script: exportScript,
+      args: exporterArgs,
+      cwd: workspaceRoot,
+      env: passEnv,
+    });
+    if (!(await isValidJsonFile(graphPath))) {
+      throw new Error(`export-graph produced invalid JSON at ${graphPath}`);
+    }
+    return;
   }
 
-  try {
-    await $({
-      env: passEnv,
-    })`nix run --accept-flake-config ${repoRoot}#zx-wrapper -- ${exportScript} ${exporterArgs}`;
-    await fsp.access(graphPath);
-    if (await isValidJsonFile(graphPath)) return;
-  } catch {
-    if (!(await buck2Present())) {
-      throw new Error(
-        "tools/buck/graph.json is missing and exporter failed. Ensure buck2 is available and try: nix run .#zx-wrapper -- tools/buck/export-graph.ts",
-      );
-    }
-    await exportWithInline({
-      includeTargetPlatforms: false,
-      normalizeLabels: false,
-      target: "",
-    });
-    return;
+  // Buck2 is not available; try running via nix (still uses the same exporter script).
+  await $({
+    env: passEnv,
+  })`nix run --accept-flake-config ${repoRoot}#zx-wrapper -- ${exportScript} ${exporterArgs}`;
+  await fsp.access(graphPath);
+  if (!(await isValidJsonFile(graphPath))) {
+    throw new Error(`export-graph produced invalid JSON at ${graphPath}`);
   }
 }
 

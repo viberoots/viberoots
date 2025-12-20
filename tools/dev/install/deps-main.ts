@@ -8,6 +8,7 @@ import { runGlue } from "./glue.ts";
 import { runGomod2nixGenerate, runGomod2nixScanAll } from "./gomod2nix.ts";
 import { withExclusiveInstallLock } from "./lock.ts";
 import { runUvRefreshAll } from "./uv.ts";
+import { findRepoRoot } from "../../lib/repo.ts";
 
 type Flags = {
   force: boolean;
@@ -36,29 +37,17 @@ function parseFlags(argv: string[]): Flags {
   return { force, dryRun, verbose, skipGlue, glueOnly, skipGoTidy };
 }
 
-// Resolve absolute workspace root path using ZX_INIT, without changing process CWD.
-function resolveWorkspaceRoot(): string | null {
-  // Prefer explicit temp-repo root when provided by test harness
-  const wr = process.env.WORKSPACE_ROOT || "";
+// Resolve absolute workspace root path without requiring callers to run from repo root.
+async function resolveWorkspaceRoot(): Promise<string> {
+  const cwd = process.cwd();
+  const wr = String(process.env.WORKSPACE_ROOT || "").trim();
   if (wr) {
     try {
-      return path.resolve(wr);
+      const abs = path.resolve(wr);
+      if (cwd === abs || cwd.startsWith(abs + path.sep)) return abs;
     } catch {}
   }
-  // Next prefer current working directory (tests often chdir into the temp repo)
-  try {
-    const cwd = process.cwd();
-    if (cwd) return path.resolve(cwd);
-  } catch {}
-  // Otherwise infer from ZX_INIT path
-  const zx = process.env.ZX_INIT || "";
-  if (zx) {
-    try {
-      const p = path.resolve(zx);
-      return path.resolve(path.dirname(p), "..", "..");
-    } catch {}
-  }
-  return null;
+  return await findRepoRoot(cwd);
 }
 console.log("Installing dependencies...");
 const { force, dryRun, verbose, skipGlue, glueOnly, skipGoTidy } = parseFlags(
@@ -67,7 +56,17 @@ const { force, dryRun, verbose, skipGlue, glueOnly, skipGoTidy } = parseFlags(
 // In glue-only mode, default to skipping go mod tidy unless explicitly overridden
 const effSkipGoTidy =
   skipGoTidy || (glueOnly && String(process.env.INSTALL_DEPS_SKIP_GO_TIDY || "") !== "0");
-const repoRoot = resolveWorkspaceRoot() || process.cwd();
+const repoRoot = await resolveWorkspaceRoot();
+// Make the selected workspace explicit so downstream helpers (ensureGraph, provider writers, etc.)
+// operate on the intended repo root even when invoked from a subdirectory.
+try {
+  if (String(process.env.WORKSPACE_ROOT || "").trim() !== repoRoot) {
+    process.env.WORKSPACE_ROOT = repoRoot;
+  }
+  if (!String(process.env.BUCK_TEST_SRC || "").trim()) {
+    process.env.BUCK_TEST_SRC = repoRoot;
+  }
+} catch {}
 // Discover importers (apps/*, libs/*) that contain a pnpm-lock.yaml.
 async function discoverImportersWithLock(root: string): Promise<string[]> {
   const candidates = ["apps", "libs"];

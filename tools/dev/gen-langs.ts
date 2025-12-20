@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import fsp from "node:fs/promises";
 import path from "node:path";
+import { findRepoRoot } from "../lib/repo.ts";
 
 type Capabilities = Record<string, boolean>;
 type Lang = {
@@ -30,7 +31,7 @@ function toNixBoolean(v: boolean): "true" | "false" {
 }
 
 async function main() {
-  const repo = process.cwd();
+  const repo = await findRepoRoot(process.cwd());
   const langs = (await readManifest(repo)).slice().sort((a, b) => a.id.localeCompare(b.id));
   const header = [
     "# tools/nix/langs.nix — GENERATED FILE — DO NOT EDIT.",
@@ -46,6 +47,7 @@ async function main() {
     .join("\n");
   const out = [header, "{", body, "}", ""].join("\n");
   const outPath = path.join(repo, "tools/nix/langs.nix");
+  await fsp.mkdir(path.dirname(outPath), { recursive: true });
   await fsp.writeFile(outPath, out, "utf8");
   console.log("wrote", path.relative(repo, outPath));
 }

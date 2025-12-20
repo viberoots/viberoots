@@ -50,7 +50,7 @@ function makeEntry(
 function resolveInWorkspace(relOrAbs: string): string {
   if (!relOrAbs) return relOrAbs;
   if (path.isAbsolute(relOrAbs)) return relOrAbs;
-  const root = (process.env.WORKSPACE_ROOT && process.env.WORKSPACE_ROOT.trim()) || process.cwd();
+  const root = (process.env.BUCK_TEST_SRC || process.env.WORKSPACE_ROOT || process.cwd()).trim();
   return path.resolve(root, relOrAbs);
 }
 
