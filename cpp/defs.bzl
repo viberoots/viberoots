@@ -10,8 +10,6 @@ load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
 
 def _cpp_common(name, kind, kwargs):
     local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("cpp"))
-    if "nix_cxx_attrs" in kwargs:
-        fail("nix_cxx_attrs is no longer supported; use nixpkg_deps instead")
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     deps = kwargs.pop("deps", [])
     nix_inputs = global_nix_inputs()
@@ -56,8 +54,6 @@ def nix_cpp_wasm_static_lib(name, **kwargs):
       - lang:cpp, kind:lib, flavor:wasm
     """
     local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("cpp"))
-    if "nix_cxx_attrs" in kwargs:
-        fail("nix_cxx_attrs is no longer supported; use nixpkg_deps instead")
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     deps = kwargs.pop("deps", [])
     nix_inputs = global_nix_inputs()
@@ -121,8 +117,6 @@ def nix_cpp_binary(name, **kwargs):
 def nix_cpp_test(name, **kwargs):
     # Define a planner-visible cxx_test (not executed) and an external runner test (executed)
     deps = kwargs.pop("deps", [])
-    if "nix_cxx_attrs" in kwargs:
-        fail("nix_cxx_attrs is no longer supported; use nixpkg_deps instead")
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     srcs = kwargs.get("srcs", [])
     planner_name = name + "__planner"

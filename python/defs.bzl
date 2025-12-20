@@ -22,8 +22,6 @@ def nix_python_library(name, lockfile_label = None, deps = [], **kwargs):
     """
     stamp_labels(kwargs, "python", "lib")
     require_single_importer_lockfile_label(kwargs, lockfile_label)
-    if "nix_native_deps" in kwargs:
-        fail("nix_native_deps is no longer supported; use nixpkg_deps instead")
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     append_nixpkg_labels(kwargs, nixpkg_deps)
     # Include importer-local patches in srcs so Buck invalidates precisely on patch changes
@@ -37,8 +35,6 @@ def nix_python_binary(name, lockfile_label = None, deps = [], **kwargs):
     """
     stamp_labels(kwargs, "python", "bin")
     require_single_importer_lockfile_label(kwargs, lockfile_label)
-    if "nix_native_deps" in kwargs:
-        fail("nix_native_deps is no longer supported; use nixpkg_deps instead")
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     append_nixpkg_labels(kwargs, nixpkg_deps)
     # Buck prelude python_binary does not accept `srcs`. We carry patch inputs via a tiny
@@ -62,8 +58,6 @@ def nix_python_test(name, lockfile_label = None, deps = [], **kwargs):
     """
     stamp_labels(kwargs, "python", "test")
     require_single_importer_lockfile_label(kwargs, lockfile_label)
-    if "nix_native_deps" in kwargs:
-        fail("nix_native_deps is no longer supported; use nixpkg_deps instead")
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     append_nixpkg_labels(kwargs, nixpkg_deps)
     attach_importer_patch_inputs(kwargs, "python")
@@ -80,8 +74,6 @@ def nix_python_wasm_app(name, lockfile_label = None, deps = [], labels = [], **k
     stamp_wasm_variant(kwargs, "python", "wasi")
     labels = kwargs.get("labels", []) or []
     require_single_importer_lockfile_label(kwargs, lockfile_label)
-    if "nix_native_deps" in kwargs:
-        fail("nix_native_deps is no longer supported; use nixpkg_deps instead")
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     append_nixpkg_labels(kwargs, nixpkg_deps)
     attach_importer_patch_inputs(kwargs, "python")
@@ -100,8 +92,6 @@ def nix_python_wasm_lib(name, lockfile_label = None, deps = [], labels = [], **k
     stamp_wasm_variant(kwargs, "python", "wasi")
     labels = kwargs.get("labels", []) or []
     require_single_importer_lockfile_label(kwargs, lockfile_label)
-    if "nix_native_deps" in kwargs:
-        fail("nix_native_deps is no longer supported; use nixpkg_deps instead")
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     append_nixpkg_labels(kwargs, nixpkg_deps)
     attach_importer_patch_inputs(kwargs, "python")

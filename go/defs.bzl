@@ -12,8 +12,6 @@ load("//go/private:cgo_wiring.bzl", "apply_go_rule_stable_defaults", "apply_go_t
 
 def nix_go_library(name, **kwargs):
     local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("go"))  # per-target local patch directories
-    if "nix_cgo_deps" in kwargs:
-        fail("nix_cgo_deps is no longer supported; use nixpkg_deps instead")
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     repo_cgo_deps = kwargs.pop("repo_cgo_deps", [])
     nix_cgo_pkgconfig = kwargs.pop("nix_cgo_pkgconfig", {})
@@ -41,8 +39,6 @@ def nix_go_library(name, **kwargs):
 
 def nix_go_binary(name, **kwargs):
     local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("go"))  # per-target local patch directories
-    if "nix_cgo_deps" in kwargs:
-        fail("nix_cgo_deps is no longer supported; use nixpkg_deps instead")
     # Preserve key macro inputs for any auto-wired helper targets we synthesize below.
     # (The helpers we call will `pop(...)` from kwargs, so capture first.)
     base_deps = kwargs.get("deps", []) or []
@@ -94,8 +90,6 @@ def nix_go_binary(name, **kwargs):
 
 
 def nix_go_test(name, **kwargs):
-    if "nix_cgo_deps" in kwargs:
-        fail("nix_cgo_deps is no longer supported; use nixpkg_deps instead")
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     repo_cgo_deps = kwargs.pop("repo_cgo_deps", [])
     nix_cgo_pkgconfig = kwargs.pop("nix_cgo_pkgconfig", {})
