@@ -43,6 +43,7 @@ load(
     _prepare_importer_genrule_kwargs = "prepare_importer_genrule_kwargs",
     _require_single_importer_lockfile_label = "require_single_importer_lockfile_label",
 )
+load("//lang:nix_calling_macros.bzl", _wire_global_nix_inputs = "wire_global_nix_inputs")
 
 dedupe_preserve = _dedupe_preserve
 
@@ -91,4 +92,6 @@ require_single_importer_lockfile_label = _require_single_importer_lockfile_label
 attach_importer_patch_inputs = _attach_importer_patch_inputs
 merge_provider_edges = _merge_provider_edges
 prepare_importer_genrule_kwargs = _prepare_importer_genrule_kwargs
+
+wire_global_nix_inputs = _wire_global_nix_inputs
 

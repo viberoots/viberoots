@@ -1,5 +1,4 @@
-load("//lang:defs_common.bzl", "stamp_global_nix_inputs", "importer_from_labels", "ensure_single_lockfile_label")
-load("//lang:global_inputs.bzl", "attach_global_nix_inputs")
+load("//lang:defs_common.bzl", "wire_global_nix_inputs", "importer_from_labels", "ensure_single_lockfile_label")
 load("//lang:sanitize.bzl", "sanitize_name")
 load("//lang:nix_shell.bzl", "escape_buck_cmd_subst", "nix_bootstrap_env_core", "nix_bootstrap_env_pnpm_store", "nix_build_out_path_cmd", "nix_timeout_wrapper_var")
 load("//node:defs_core.bzl", "nix_node_gen")
@@ -23,10 +22,9 @@ def node_webapp(
     - `importer` is optional; if omitted, derive from the lockfile label's importer suffix.
     - Uses a zx shim to run `nix build .#node-webapp.<importer>` and copies dist/.
     """
-    # Enforce a single importer-scoped lockfile label and derive the importer via shared helpers
-    kw = { "labels": (labels or []) }
-    ensure_single_lockfile_label(kw, lockfile_label)
-    _importer = importer_from_labels(kw)
+    kw_lock = { "labels": (labels or []) }
+    ensure_single_lockfile_label(kw_lock, lockfile_label)
+    _importer = importer_from_labels(kw_lock)
 
     # Shim: build via Nix and copy dist/* into $OUT (single directory output)
     # Use escaped command substitutions: $$(...) so Buck doesn't parse $(...) as a target pattern.
@@ -39,20 +37,15 @@ def node_webapp(
         + "if [ -d \"$outPath/dist\" ]; then cp -R \"$outPath/dist\" $OUT; else echo 'dist missing' >&2; exit 2; fi"
     )
 
-    # Stamp global Nix inputs for macros that call Nix (policy: PR‑5/PR‑2)
-    _stamp = { "labels": (labels or []) }
-    stamp_global_nix_inputs(_stamp)
-    stamped_labels = _stamp.get("labels", []) or []
-
-    _inputs = { "srcs": [] }
-    attach_global_nix_inputs(_inputs, into = "srcs")
+    kw = { "labels": (labels or []), "srcs": [] }
+    wire_global_nix_inputs(kw, into = "srcs", stamp = True)
 
     nix_node_gen(
         name = name,
-        srcs = _inputs["srcs"],
+        srcs = kw["srcs"],
         out = out if out != None else "dist",
         cmd = cmd,
-        labels = stamped_labels,
+        labels = kw["labels"],
         lockfile_label = lockfile_label,
         kind = "app",
         **kwargs
@@ -112,10 +105,9 @@ def nix_node_cli_bin(
         )
 
     # Bundled mode: build a single-file shebanged bundle via the scaffolded importer's flake
-    # Enforce a single importer-scoped lockfile label and derive the importer via shared helpers
-    kw = { "labels": (labels or []) }
-    ensure_single_lockfile_label(kw, lockfile_label)
-    _importer = importer_from_labels(kw)
+    kw_lock = { "labels": (labels or []) }
+    ensure_single_lockfile_label(kw_lock, lockfile_label)
+    _importer = importer_from_labels(kw_lock)
 
     def _basename_importer(s):
         # crude basename: split by '/' and take last non-empty
@@ -158,11 +150,6 @@ def nix_node_cli_bin(
         + "exit $RC"
     )
 
-    # Stamp global Nix inputs when bundling (macro calls Nix)
-    _stamp = { "labels": (labels or []) }
-    stamp_global_nix_inputs(_stamp)
-    stamped_labels = _stamp.get("labels", []) or []
-
     # Build srcs map to place files at deterministic paths inside the action
     _srcs_map = {
         # Preserve entry path under bin/
@@ -171,17 +158,18 @@ def nix_node_cli_bin(
         "tools/buck/workspace-root.env": "root//tools/buck:workspace-root.env",
     }
 
-    _inputs = { "srcs": _srcs_map }
-    attach_global_nix_inputs(_inputs, into = "srcs")
+    kw = { "labels": (labels or []) }
+    kw["srcs"] = _srcs_map
+    wire_global_nix_inputs(kw, into = "srcs", stamp = True)
 
     nix_node_gen(
         name = name,
         # Include the CLI entry and the repo graph file to allow deriving repo root hermetically
-        srcs = _inputs["srcs"],
+        srcs = kw["srcs"],
         out = out,
         cmd = cmd,
         deps = deps,
-        labels = stamped_labels,
+        labels = kw["labels"],
         lockfile_label = lockfile_label,
         kind = "bin",
         **kwargs

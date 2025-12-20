@@ -7,7 +7,9 @@ Stamping ensures exporter preconditions via consistent labels applied in macros.
   - For genrule-style wrappers: `prepare_importer_genrule_kwargs(...)`
   - For non-genrule wrappers: `require_single_importer_lockfile_label(...)`, `attach_importer_patch_inputs(...)`, `merge_provider_edges(...)`, and `importer_from_labels(...)` (for rules that need the importer string)
 - **Global Nix inputs (macros and rules that call Nix)**: treat `global_nix_inputs()` as real action inputs. Label stamping is retained for observability, but correctness must not depend on labels.
-  - For **macros that create genrules** that call Nix, attach global inputs into the action inputs (typically `srcs`) via `lang/global_inputs.bzl: attach_global_nix_inputs(kwargs, into="srcs")`, and also stamp labels via `lang/defs_common.bzl: stamp_global_nix_inputs(kwargs)`.
+  - For **macros that create genrules** that call Nix, use the shared helper `lang/defs_common.bzl: wire_global_nix_inputs(kwargs, into="srcs", stamp=True)` so call sites cannot forget either:
+    - attaching global inputs as real action inputs (list and dict shapes)
+    - stamping labels for observability (without hardcoding `//:flake.lock`)
   - For **rules** that shell out to Nix, accept `nix_inputs` and thread `global_nix_inputs()` into the action `hidden` inputs.
 - **Macros**: call `stamp_labels` early in macro expansion to keep labels on all rule variants.
 - **Lint**: run `node tools/dev/stamping-lint.ts` to detect missing or invalid labels.

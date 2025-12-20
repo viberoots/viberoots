@@ -14,6 +14,7 @@ import { recordSource } from "../copier/record-source.ts";
 import { resolveDestination } from "../templates/destination.ts";
 import { normalizeTemplateName } from "../templates/names.ts";
 import { usage } from "../usage.ts";
+import { generateImporterLockfile } from "../../../dev/update-pnpm-hash/lockfile.ts";
 
 export async function cmdNew(args: string[], flags: ScafFlags) {
   const [language, templateRaw, name] = args;
@@ -131,6 +132,13 @@ export async function cmdNew(args: string[], flags: ScafFlags) {
         await fsp.rm(testDir, { recursive: true, force: true });
       } catch {}
     }
+
+    // Primary path: ensure importer lockfile is real and consistent with package.json.
+    // Nix builders run pnpm with --frozen-lockfile; placeholder lockfiles are not acceptable.
+    const repoRoot = process.cwd();
+    const importer =
+      template === "go-addon" || template === "cpp-addon" ? path.join("libs", name) : destInfo.path;
+    await generateImporterLockfile({ repoRoot, importer });
   }
 
   console.log("created:", dest);

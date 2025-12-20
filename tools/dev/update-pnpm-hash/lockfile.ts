@@ -52,7 +52,7 @@ export async function generateImporterLockfile(opts: { repoRoot: string; importe
   await $({
     cwd: importerAbs,
     stdio: "inherit",
-  })`bash --noprofile --norc -c 'set -euo pipefail; mkdir -p ".pnpm-home" ".pnpm-store"; export PNPM_HOME="$(pwd)/.pnpm-home"; nix run ${opts.repoRoot}#pnpm --accept-flake-config -- config set store-dir "$(pwd)/.pnpm-store"; nix run ${opts.repoRoot}#pnpm --accept-flake-config -- install --lockfile-only --prod=false --ignore-scripts --lockfile-dir "." --dir "." --color never'`;
+  })`bash --noprofile --norc -c 'set -euo pipefail; mkdir -p ".pnpm-home" ".pnpm-store"; export PNPM_HOME="$(pwd)/.pnpm-home"; nix run --accept-flake-config "path:${opts.repoRoot}#pnpm" -- config set store-dir "$(pwd)/.pnpm-store"; nix run --accept-flake-config "path:${opts.repoRoot}#pnpm" -- install --lockfile-only --prod=false --ignore-scripts --lockfile-dir "." --dir "." --color never'`;
 
   await seedImporterLockfileFromRootIfNeeded({ repoRoot: opts.repoRoot, importerAbs });
   await cleanupLocalWorkspaceMarker({ workspaceFileAbs, hadLocalWorkspaceFile });
