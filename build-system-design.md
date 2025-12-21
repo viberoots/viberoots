@@ -97,7 +97,8 @@ extra-experimental-features = nix-command flakes dynamic-derivations ca-derivati
    - Node macros that call Nix must prepend `nix_bootstrap_env_core()` + `nix_bootstrap_env_pnpm_store()` and `nix_timeout_wrapper_var()` from `//lang:nix_shell.bzl` to their `cmd` assembly (e.g., `node_webapp`, bundled `nix_node_cli_bin`).
      - `nix_bootstrap_env_core()` is cross-language and establishes deterministic `WORKSPACE_ROOT` + `FLK_ROOT`.
      - `nix_bootstrap_env_pnpm_store()` is Node-specific and opt-in (unified PNPM store setup / env exports).
-   - No out‑links: when assembling shell commands that invoke Nix, use `nix build --no-link --print-out-paths` and capture the last printed path (e.g., `outPath=$$($TIMEOUT nix build ... --no-link --print-out-paths | tail -n1)`). Do not use `--out-link` to avoid creating GC roots and stale symlinks.
+
+- No out‑links: when assembling shell commands that invoke Nix, use `nix build --no-link --print-out-paths` and capture the last printed path (e.g., `outPath=$$($TIMEOUT nix build ... --no-link --print-out-paths | tail -n1)`). Do not use `--out-link` to avoid creating GC roots and stale symlinks. Macro callsites must assemble this through the canonical helper surface in `//lang:nix_shell.bzl` (`nix_cmd_prefix`, `nix_build_out_path_cmd`) rather than re-implementing it.
 
 ## End-to-End Architecture
 

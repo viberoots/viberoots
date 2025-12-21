@@ -12,6 +12,12 @@ Stamping ensures exporter preconditions via consistent labels applied in macros.
     - attaching global inputs as real action inputs (list and dict shapes)
     - stamping labels for observability (without hardcoding `//:flake.lock`)
   - For **rules** that shell out to Nix, accept `nix_inputs` and thread `global_nix_inputs()` into the action `hidden` inputs.
+- **Nix command strings (macros that call Nix)**: assemble command strings via the canonical helper surface in `lang/nix_shell.bzl` so call sites do not partially apply the policy.
+  - Use `nix_cmd_prefix(..., include_pnpm_store=True)` for Node macros that invoke Nix. It composes:
+    - deterministic bootstrap (`WORKSPACE_ROOT`, `FLK_ROOT`)
+    - Buck-safe command substitution escaping (`$(...)` → `$$(...)`)
+    - timeout wrapper variable setup (portable `timeout`/`gtimeout`)
+  - Use `nix_build_out_path_cmd(".#<attr>")` to resolve a flake attribute to `outPath` via `nix build --no-link --print-out-paths | tail -n1` (no `--out-link`).
 - **Macros**: call `stamp_labels` early in macro expansion to keep labels on all rule variants.
 - **Lint**: run `node tools/dev/stamping-lint.ts` to detect missing or invalid labels.
 - **Tests**: negative test should demonstrate a missing label is flagged with a clear message.

@@ -75,6 +75,19 @@ def escape_buck_cmd_subst(s):
     return s.replace("$(", "$$(")
 
 
+def nix_cmd_prefix(
+        timeout_var = "TIMEOUT",
+        timeout_sec = 600,
+        include_pnpm_store = False,
+        escape_cmd_subst = True):
+    boot = nix_bootstrap_env_core()
+    if include_pnpm_store:
+        boot = boot + nix_bootstrap_env_pnpm_store()
+    if escape_cmd_subst:
+        boot = escape_buck_cmd_subst(boot)
+    return boot + nix_timeout_wrapper_var(var_name = timeout_var, default_sec = timeout_sec)
+
+
 def nix_build_out_path_cmd(flake_attr, timeout_var = "TIMEOUT"):
     tout = ""
     if isinstance(timeout_var, str) and timeout_var != "":

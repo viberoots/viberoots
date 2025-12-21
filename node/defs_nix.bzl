@@ -1,7 +1,7 @@
 load("@prelude//:rules.bzl", "genrule")
 load("//lang:defs_common.bzl", "prepare_importer_non_genrule_wiring", "wire_global_nix_inputs")
 load("//lang:sanitize.bzl", "sanitize_name")
-load("//lang:nix_shell.bzl", "escape_buck_cmd_subst", "nix_bootstrap_env_core", "nix_bootstrap_env_pnpm_store", "nix_build_out_path_cmd", "nix_timeout_wrapper_var")
+load("//lang:nix_shell.bzl", "nix_build_out_path_cmd", "nix_cmd_prefix")
 load("//node:defs_core.bzl", "nix_node_gen")
 
 def _sanitize_importer_attr(s):
@@ -29,11 +29,9 @@ def node_webapp(
     - `importer` is optional; if omitted, derive from the lockfile label's importer suffix.
     - Uses a zx shim to run `nix build .#node-webapp.<importer>` and copies dist/.
     """
-    # Shim: build via Nix and copy dist/* into $OUT (single directory output)
+    # Shim: build via Nix and copy dist/* into $OUT (single directory output).
     # Use escaped command substitutions: $$(...) so Buck doesn't parse $(...) as a target pattern.
-    # Escape only command substitutions `$(...)` to avoid Buck interpreting them;
-    # keep normal `$VAR` expansions intact.
-    _prefix = escape_buck_cmd_subst(nix_bootstrap_env_core() + nix_bootstrap_env_pnpm_store()) + nix_timeout_wrapper_var(default_sec = 240)
+    _prefix = nix_cmd_prefix(timeout_sec = 240, include_pnpm_store = True)
 
     kw = dict(kwargs) if kwargs != None else {}
     kw["labels"] = list(labels or [])
@@ -137,8 +135,7 @@ def nix_node_cli_bin(
         + "export BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE=1; "
     )
     # Bundling may invoke Nix + PNPM and can legitimately take longer than 60s on cold caches.
-    _bootstrap = escape_buck_cmd_subst(nix_bootstrap_env_core() + nix_bootstrap_env_pnpm_store())
-    _prefix = _pre_env + _bootstrap + nix_timeout_wrapper_var(default_sec = 180)
+    _prefix = _pre_env + nix_cmd_prefix(timeout_sec = 180, include_pnpm_store = True)
 
     # Build srcs map to place files at deterministic paths inside the action
     _srcs_map = {
