@@ -24,16 +24,14 @@ test("node lib: nix_node_test target passes when no tests present", async () => 
     // Commit scaffold and lockfile so Nix flake sees importer under git+file sources
     await $`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
 
-    // Update fixed-output hash for this importer
-    await $({
-      stdio: "inherit",
-    })`NIX_PNPM_ALLOW_GENERATE=1 node tools/dev/update-pnpm-hash.ts --lockfile libs/demo/pnpm-lock.yaml`;
-
-    // If lockfile wasn't written under the importer (workspace root wrote it), copy it and re-hash
+    // Ensure the importer lockfile exists under libs/demo (some flows may write at repo root).
     await $`bash --noprofile --norc -c 'test -f pnpm-lock.yaml && [ ! -f libs/demo/pnpm-lock.yaml ] && cp pnpm-lock.yaml libs/demo/pnpm-lock.yaml || true'`;
+
+    // Align the fixed-output hash mapping for this importer before running nix_node_test.
     await $({
       stdio: "inherit",
-    })`node tools/dev/update-pnpm-hash.ts --lockfile libs/demo/pnpm-lock.yaml`;
+      env: { ...process.env, NIX_PNPM_ALLOW_GENERATE: "1" },
+    })`zx-wrapper tools/dev/update-pnpm-hash.ts --force --lockfile libs/demo/pnpm-lock.yaml`;
 
     // Assert lockfile exists and dump importer directory for debugging
     await $`bash --noprofile --norc -c 'set -e; echo "==== ls -la libs/demo ====\n"; ls -la libs/demo; test -f libs/demo/pnpm-lock.yaml'`;
@@ -42,18 +40,7 @@ test("node lib: nix_node_test target passes when no tests present", async () => 
       stdio: "inherit",
     })`nix eval --impure --raw --expr 'builtins.toString (builtins.pathExists ./libs/demo/pnpm-lock.yaml)'`;
 
-    // Warm pnpm-store/node-modules for this importer and restart buckd to pick updated digest
-    await $({
-      stdio: "inherit",
-    })`nix build --impure --accept-flake-config --builders "" .#pnpm-store.libs-demo`;
-    await $({
-      stdio: "inherit",
-    })`nix build --impure --accept-flake-config --builders "" .#node-modules.libs-demo`;
-    // Reconcile any FOD digest drift detected during warm-up
-    await $({
-      stdio: "inherit",
-    })`node tools/dev/update-pnpm-hash.ts --lockfile libs/demo/pnpm-lock.yaml`;
-    // Avoid killing the global buckd; zx_test harness reuses a shared daemon across tests.
+    // Avoid pre-warming pnpm-store/node-modules here; nix_node_test will build what it needs.
 
     // Glue and provider mapping (export graph → providers → auto_map)
     await $`node tools/buck/export-graph.ts --out tools/buck/graph.json`;

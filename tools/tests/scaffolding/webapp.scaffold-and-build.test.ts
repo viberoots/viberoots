@@ -22,15 +22,6 @@ test("webapp: scaffold, glue, build dist via Buck", { timeout: TEST_TIMEOUT_MS }
     await $`node tools/buck/sync-providers-node.ts`;
     await $`node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
     // No longer modify flake envs for LOCAL_PNPM_STORE; pure Nix path only
-    // Ensure temp flake uses corrected timeout quoting in node-modules.nix (avoid Nix interpreting ${FT})
-    try {
-      const nmFile = path.join(tmp, "tools/nix/node-modules.nix");
-      let txt = await fsp.readFile(nmFile, "utf8");
-      if (txt.includes('timeout "${FT}s"')) {
-        txt = txt.replace('timeout "${FT}s"', 'timeout "$FT"s');
-        await fsp.writeFile(nmFile, txt, "utf8");
-      }
-    } catch {}
     // Build via Nix directly to avoid nested buck invocations from within a buck test
     const importer = "apps/demo-web";
     // Prefetch removed: rely on pure Nix fetch inside FOD
@@ -51,51 +42,12 @@ test("webapp: scaffold, glue, build dist via Buck", { timeout: TEST_TIMEOUT_MS }
       string,
       string
     >;
-    // Compute/update FOD hash for pnpm-store (works even if lockfile was generated inside FOD)
+    // Ensure node_modules is realizable (reconciles pnpm-store hash if needed) before building dist.
     await $({
-      cwd: tmp,
+      cwd: path.join(tmp, importer),
       stdio: "inherit",
       env: { ...envWithPrefetch, INSTALL_LOCK_SKIP: "1" },
-    })`zx-wrapper tools/dev/update-pnpm-hash.ts --lockfile ${path.join(importer, "pnpm-lock.yaml")}`;
-    // Ensure pnpm-store FOD is built before node-modules
-    {
-      const mj = String(process.env.NIX_MAX_JOBS || "0");
-      const cr = String(process.env.NIX_CORES || "0");
-      const cmd = [
-        "set -euo pipefail;",
-        "nix build",
-        `"${tmp}#pnpm-store.${sanitized}"`,
-        '--impure --no-link --accept-flake-config --builders "" --print-build-logs',
-        mj && mj !== "0" ? `--max-jobs ${mj}` : "",
-        cr && cr !== "0" ? `--option cores ${cr}` : "",
-      ]
-        .filter(Boolean)
-        .join(" ");
-      await $({
-        cwd: tmp,
-        stdio: "inherit",
-        env: { ...envWithPrefetch, INSTALL_LOCK_SKIP: "1" },
-      })`bash --noprofile --norc -c ${cmd}`;
-    }
-    const nmBuild = await (async () => {
-      const mj = String(process.env.NIX_MAX_JOBS || "0");
-      const cr = String(process.env.NIX_CORES || "0");
-      const cmd = [
-        "set -euo pipefail;",
-        "nix build",
-        `"${tmp}#node-modules.${sanitized}"`,
-        '--impure --no-link --accept-flake-config --builders "" --print-build-logs',
-        mj && mj !== "0" ? `--max-jobs ${mj}` : "",
-        cr && cr !== "0" ? `--option cores ${cr}` : "",
-      ]
-        .filter(Boolean)
-        .join(" ");
-      return await $({
-        cwd: tmp,
-        stdio: "inherit",
-        env: { ...envWithPrefetch, INSTALL_LOCK_SKIP: "1" },
-      })`bash --noprofile --norc -c ${cmd}`;
-    })();
+    })`zx-wrapper ../../tools/dev/node-modules-build.ts`;
     const nixOut = await (async () => {
       const mj = String(process.env.NIX_MAX_JOBS || "0");
       const cr = String(process.env.NIX_CORES || "0");

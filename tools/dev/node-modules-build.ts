@@ -87,9 +87,9 @@ if (!outPath) {
 if (!outPath) {
   // Attempt to reconcile pnpm-store FOD hash for the importer, then retry build once
   try {
-    const relLock = info!.lockRel;
+    const relLock = importer === "." ? "pnpm-lock.yaml" : `${importer}/pnpm-lock.yaml`;
     const updater = path.join(flakeRoot, "tools/dev/update-pnpm-hash.ts");
-    await $`zx-wrapper ${updater} --lockfile ${relLock}`.nothrow();
+    await $({ cwd: flakeRoot })`zx-wrapper ${updater} --lockfile ${relLock}`.nothrow();
   } catch {}
   outPath = await tryBuild();
 }

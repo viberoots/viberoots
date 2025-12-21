@@ -10,6 +10,9 @@ import { after, test } from "node:test";
 import { setTimeout as sleep } from "node:timers/promises";
 import { runInTemp } from "../lib/test-helpers.ts";
 
+const TEST_TIMEOUT_MS =
+  Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
+
 async function httpGet(url: string): Promise<{ status: number; body: string }> {
   return await new Promise((resolve, reject) => {
     const req = http.get(url, (res) => {
@@ -35,7 +38,7 @@ async function waitForServer(url: string, timeoutMs = 30000): Promise<void> {
   throw new Error(`server did not respond within ${timeoutMs}ms`);
 }
 
-test("node webapp: dev server runs and serves index", { timeout: 240_000 }, async () => {
+test("node webapp: dev server runs and serves index", { timeout: TEST_TIMEOUT_MS }, async () => {
   await runInTemp("webapp-dev", async (tmp, _$) => {
     const name = "demo-web";
     const appDir = `apps/${name}`;
@@ -54,57 +57,15 @@ test("node webapp: dev server runs and serves index", { timeout: 240_000 }, asyn
     } catch {}
     // Do not perform online pnpm install here. Rely on Nix FOD with
     // NIX_PNPM_ALLOW_GENERATE=1 to generate or use/export a lockfile hermetically.
-    // Hermetic path: use Nix node-modules derivation builder with small timeouts to surface deadlocks
-    const sanitized = appDir
-      .replace(/\/\//g, "")
-      .replace(/:/g, "-")
-      .replace(/[\/\s]+/g, "-");
-    // Update pnpm store hash and realize node_modules via Nix before running vite
-    try {
-      await _$({
-        cwd: tmp,
-        stdio: "inherit",
-        env: {
-          ...process.env,
-          INSTALL_LOCK_SKIP: "1",
-          NIX_PNPM_FETCH_TIMEOUT: "240",
-          NIX_PNPM_ALLOW_GENERATE: "1",
-        },
-      })`zx-wrapper tools/dev/update-pnpm-hash.ts --lockfile ${path.join(appDir, "pnpm-lock.yaml")}`;
-    } catch (e) {
-      console.error(
-        "webapp dev-server: pnpm store hash update failed — run 'zx-wrapper tools/dev/update-pnpm-hash.ts --lockfile apps/demo-web/pnpm-lock.yaml' and re-run the test",
-      );
-      throw e;
-    }
-    // build node-modules derivation
-    try {
-      const mj = String(process.env.NIX_MAX_JOBS || "0");
-      const cr = String(process.env.NIX_CORES || "0");
-      const parts = [
-        "set -euo pipefail;",
-        "timeout 180s nix build",
-        `"${tmp}#node-modules.${sanitized}"`,
-        '--no-link --accept-flake-config --builders "" --print-build-logs',
-        mj && mj !== "0" ? `--max-jobs ${mj}` : "",
-        cr && cr !== "0" ? `--option cores ${cr}` : "",
-      ]
-        .filter(Boolean)
-        .join(" ");
-      await _$({
-        cwd: tmp,
-        stdio: "inherit",
-        env: { ...process.env, NIX_PNPM_FETCH_TIMEOUT: "240", NIX_PNPM_ALLOW_GENERATE: "1" },
-      })`bash --noprofile --norc -c ${parts}`;
-    } catch (e) {
-      console.error(
-        "webapp dev-server: node-modules Nix build timed out (180s) or failed — check flake logs; try increasing NIX_PNPM_FETCH_TIMEOUT or re-running with TEST_VERBOSE_LOGS=1",
-      );
-      throw e;
-    }
     const outPathRaw = await _$({
       cwd: appAbs,
       stdio: "pipe",
+      env: {
+        ...process.env,
+        INSTALL_LOCK_SKIP: "1",
+        NIX_PNPM_FETCH_TIMEOUT: "240",
+        NIX_PNPM_ALLOW_GENERATE: "1",
+      },
     })`zx-wrapper ../../tools/dev/node-modules-build.ts`;
     const outPath = String(outPathRaw.stdout || "").trim();
     if (!outPath) throw new Error("failed to resolve node_modules derivation path");

@@ -39,30 +39,21 @@ test(
         NIX_PNPM_ALLOW_GENERATE: "1",
         INSTALL_LOCK_SKIP: "1",
       } as Record<string, string>;
-      // Seed/update pnpm-store for importer
-      await $({
-        cwd: tmp,
-        stdio: "inherit",
-        env,
-      })`zx-wrapper tools/dev/update-pnpm-hash.ts --lockfile ${path.join(importer, "pnpm-lock.yaml")}`;
       const sanitized = importer
         .replace(/\/\//g, "")
         .replace(/:/g, "-")
         .replace(/[\/\s]+/g, "-");
-      {
-        const mj = String(process.env.NIX_MAX_JOBS || "0");
-        const cr = String(process.env.NIX_CORES || "0");
-        const flags = [
-          mj && mj !== "0" ? `--max-jobs ${mj}` : "",
-          cr && cr !== "0" ? `--option cores ${cr}` : "",
-        ]
-          .filter(Boolean)
-          .join(" ");
-        const cmd1 = `set -euo pipefail; timeout ${TIMEOUT_SECS}s nix build "${tmp}#pnpm-store.${sanitized}" --impure --no-link --accept-flake-config --builders "" --print-build-logs ${flags}`;
-        await $({ cwd: tmp, stdio: "inherit", env })`bash --noprofile --norc -c ${cmd1}`;
-        const cmd2 = `set -euo pipefail; timeout ${TIMEOUT_SECS}s nix build "${tmp}#node-modules.${sanitized}" --impure --no-link --accept-flake-config --builders "" --print-build-logs ${flags}`;
-        await $({ cwd: tmp, stdio: "inherit", env })`bash --noprofile --norc -c ${cmd2}`;
-      }
+      // Ensure lockfile exists and node_modules derivation can be built (this also reconciles pnpm-store hash if needed)
+      await $({
+        cwd: tmp,
+        stdio: "inherit",
+        env,
+      })`bash --noprofile --norc -c 'set -euo pipefail; mkdir -p "${tmp}/${importer}/.pnpm-home" "${tmp}/${importer}/.pnpm-store"; export PNPM_HOME="${tmp}/${importer}/.pnpm-home"; nix run ${tmp}#pnpm --accept-flake-config -- config set store-dir "${tmp}/${importer}/.pnpm-store"; nix run ${tmp}#pnpm --accept-flake-config -- install --filter "./${importer}" --lockfile-only --prod=false --ignore-scripts --lockfile-dir "./${importer}" --dir "./${importer}"'`;
+      await $({
+        cwd: impDir,
+        stdio: "inherit",
+        env,
+      })`zx-wrapper ../../tools/dev/node-modules-build.ts`;
       // Expect build to fail because tests are present but vitest is not installed
       const res = await $({
         cwd: tmp,

@@ -83,26 +83,12 @@ test(
       // Install deps and ensure gomod2nix.toml is generated for libs/demo-go
       await $({ stdio: "inherit", env })`${path.join(tmp, "tools/bin/i")}`;
 
-      // Warm pnpm-store and node-modules (pure derivations). Best-effort only; proceed on failure.
-      try {
-        const mj = String(process.env.NIX_MAX_JOBS || "0");
-        const cr = String(process.env.NIX_CORES || "0");
-        const flags = [
-          mj && mj !== "0" ? `--max-jobs ${mj}` : "",
-          cr && cr !== "0" ? `--option cores ${cr}` : "",
-        ]
-          .filter(Boolean)
-          .join(" ");
-        const cmd1 = `set -euo pipefail; timeout ${TIMEOUT_SECS}s nix build "${tmp}#pnpm-store.${sanitized}" --impure --no-link --accept-flake-config --builders "" --print-build-logs ${flags}`;
-        await $({ stdio: "inherit", env })`bash --noprofile --norc -c ${cmd1}`;
-        const cmd2 = `set -euo pipefail; timeout ${TIMEOUT_SECS}s nix build "${tmp}#node-modules.${sanitized}" --impure --no-link --accept-flake-config --builders "" --print-build-logs ${flags}`;
-        await $({ stdio: "inherit", env })`bash --noprofile --norc -c ${cmd2}`;
-      } catch (e) {
-        console.warn(
-          "[test] pnpm-store/node-modules warm-up failed; continuing:",
-          (e as Error)?.message || e,
-        );
-      }
+      // Ensure node_modules is realizable (this also reconciles pnpm-store hash if needed).
+      await $({
+        cwd: path.join(tmp, importer),
+        stdio: "inherit",
+        env,
+      })`zx-wrapper ../../tools/dev/node-modules-build.ts`;
 
       // Build the importer's Node tests; the builder links the Go c-archive into the addon
       const testOut = await (async () => {
