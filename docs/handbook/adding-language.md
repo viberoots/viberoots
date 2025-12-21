@@ -123,6 +123,7 @@ Tip for lockfile-style ecosystems (e.g., Node/PNPM):
   - Provider sync determinism and duplicate detection
   - Auto-map wiring correctness for your labels
   - Macros stamp labels and auto-wire tests correctly
+  - Importer-scoped macros do not bypass shared wiring helpers (enforcement tests should fail if a macro directly parses lockfile labels instead of routing through `//lang:importer_wiring.bzl`)
 
 ## CI and glue
 

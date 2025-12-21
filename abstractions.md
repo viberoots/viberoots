@@ -355,6 +355,13 @@ These are the usual ways this leaks:
 - A wrapper forgets the dict-safe branch and breaks when `srcs` is a map.
 - A wrapper uses a different key prefix scheme for synthetic entries, and collisions become nondeterministic.
 
+### Enforcement
+
+The contract is guarded by probe and enforcement tests. If a new macro bypasses the shared helper surface, these should fail:
+
+- `tools/tests/lang/importer-wiring.attach-patches-and-providers.probe.test.ts`: proves list and dict `srcs` shapes both receive importer-local patch inputs and provider edges.
+- `tools/tests/lang/importer-wiring.macros-avoid-direct-lockfile-parsing.enforcement.test.ts`: prevents importer-scoped macro implementations from directly loading `//lang:lockfile_labels.bzl` instead of delegating to `//lang:importer_wiring.bzl`.
+
 ---
 
 ## Contract 10: Importer-scoped macro wiring for non-genrule wrappers
@@ -381,6 +388,14 @@ Importer-scoped non-genrule wrappers should:
 - A wrapper calls `ensure_single_lockfile_label(...)` / `importer_from_labels(...)` directly and drifts on error text or future policy changes.
 - A wrapper attaches importer-local patches but not as real action inputs (so patch edits do not invalidate).
 - A wrapper merges provider edges by hand and loses stable ordering/dedupe.
+
+### Enforcement
+
+These tests serve as the regression suite for the non-genrule importer-scoped wiring contract:
+
+- `tools/tests/python/python.importer-patches.srcs-inclusion.cquery.test.ts`: verifies Python macros include importer-local patches as real action inputs.
+- `tools/tests/node/node.webapp-and-cli.importer-patches-action-inputs.srcs.test.ts` and `tools/tests/node/node.nix-test.importer-patches-action-inputs.srcs.test.ts`: verify Node importer-local patches are real action inputs across representative macro shapes.
+- `tools/tests/lang/importer-wiring.macros-avoid-direct-lockfile-parsing.enforcement.test.ts`: ensures macro implementations route lockfile parsing/enforcement through `//lang:importer_wiring.bzl`.
 
 ---
 
