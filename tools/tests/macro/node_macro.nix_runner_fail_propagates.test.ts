@@ -48,7 +48,7 @@ test("nix_node_test: buck2 test fails when importer tests fail", { timeout: 420_
       "    },",
       ")",
       "",
-    ].join("\\n");
+    ].join("\n");
     await fsp.mkdir(path.join(tmp, importer), { recursive: true });
     await fsp.writeFile(path.join(tmp, importer, "TARGETS"), targets, "utf8");
 

@@ -3,8 +3,8 @@ load(
     "//lang:defs_common.bzl",
     "prepare_importer_genrule_kwargs",
     "prepare_importer_non_genrule_wiring",
+    "wire_global_nix_inputs",
 )
-load("//lang:global_inputs.bzl", "attach_global_nix_inputs")
 load("//node/private:nix_test.bzl", "node_nix_test")
 
 # NOTE: Prebuild guard ensures this load is valid before builds/tests run.
@@ -59,7 +59,10 @@ def nix_node_test(
     )
     kw = wiring["kwargs"]
 
-    attach_global_nix_inputs(kw, into = "srcs")
+    # This macro runs a Nix build inside the external runner, so flake inputs must be real action inputs
+    # for invalidation. Keep stamping disabled for this macro to avoid exporter noise; other Nix-calling
+    # Node macros opt into stamping when needed for observability.
+    wire_global_nix_inputs(kw, into = "srcs", stamp = False)
     merged_srcs = kw.get("srcs", []) or []
 
     # Forward to external runner rule; ignore legacy 'cmd'

@@ -37,5 +37,18 @@ test("nix_node_test includes global Nix inputs in srcs (action inputs)", async (
       out.includes(":flake.lock"),
       "expected //:flake.lock to be present in srcs via global_nix_inputs()",
     );
+
+    const labelsProbe = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //apps/web:t`;
+    if (labelsProbe.exitCode !== 0) return;
+    const labelsOut = String(labelsProbe.stdout || "");
+    assert.ok(
+      !labelsOut.includes(":flake.lock"),
+      "expected nix_node_test to not stamp //:flake.lock (stamp=False) while still including it as a real action input",
+    );
   });
 });

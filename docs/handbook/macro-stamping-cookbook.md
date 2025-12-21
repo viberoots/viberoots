@@ -1,5 +1,7 @@
 ### Macro stamping cookbook
 
+This cookbook is the short reference for macro authors. It documents the small set of shared helper surfaces that keep cross-language macro behavior consistent and testable.
+
 Stamping ensures exporter preconditions via consistent labels applied in macros.
 
 - **Helpers**: use `lang/defs_common.bzl: stamp_labels(kwargs, lang, kind)` to add `lang:<id>` and optional `kind:<bin|lib|test>`.
@@ -8,10 +10,41 @@ Stamping ensures exporter preconditions via consistent labels applied in macros.
   - For non-genrule wrappers: `prepare_importer_non_genrule_wiring(...)` (returns the derived importer string and the wired kwargs/deps)
   - Node macros that need the importer string for Nix attribute selection (for example `node_webapp`, bundled `nix_node_cli_bin`) should derive it via `prepare_importer_non_genrule_wiring(...)` rather than parsing labels directly.
 - **Global Nix inputs (macros and rules that call Nix)**: treat `global_nix_inputs()` as real action inputs. Label stamping is retained for observability, but correctness must not depend on labels.
+  - For **macros** that call Nix, use `//lang:defs_common.bzl:wire_global_nix_inputs(...)`. This keeps call sites consistent and keeps list-shaped and dict-shaped inputs correct.
   - For **macros that create genrules** that call Nix, use the shared helper `lang/defs_common.bzl: wire_global_nix_inputs(kwargs, into="srcs", stamp=True)` so call sites cannot forget either:
     - attaching global inputs as real action inputs (list and dict shapes)
     - stamping labels for observability (without hardcoding `//:flake.lock`)
-  - For **rules** that shell out to Nix, accept `nix_inputs` and thread `global_nix_inputs()` into the action `hidden` inputs.
+  - Example (list-shaped `srcs`):
+
+```starlark
+load("//lang:defs_common.bzl", "wire_global_nix_inputs")
+
+kw = dict(kwargs) if kwargs != None else {}
+kw["srcs"] = list(kw.get("srcs", []) or [])
+wire_global_nix_inputs(kw, into = "srcs", stamp = True)
+```
+
+- Example (dict-shaped `srcs`, for stable paths inside the action):
+
+```starlark
+load("//lang:defs_common.bzl", "wire_global_nix_inputs")
+
+kw = dict(kwargs) if kwargs != None else {}
+kw["srcs"] = {
+    "src/index.ts": "src/index.ts",
+}
+wire_global_nix_inputs(kw, into = "srcs", stamp = True)
+```
+
+- Example (attach without stamping, when the macro contract intentionally avoids exporter noise):
+
+```starlark
+load("//lang:defs_common.bzl", "wire_global_nix_inputs")
+
+wire_global_nix_inputs(kw, into = "srcs", stamp = False)
+```
+
+- For **rules** that shell out to Nix, accept `nix_inputs` and thread `global_nix_inputs()` into the action `hidden` inputs.
 - **Nix command strings (macros that call Nix)**: assemble command strings via the canonical helper surface in `lang/nix_shell.bzl` so call sites do not partially apply the policy.
   - Use `nix_cmd_prefix(..., include_pnpm_store=True)` for Node macros that invoke Nix. It composes:
     - deterministic bootstrap (`WORKSPACE_ROOT`, `FLK_ROOT`)

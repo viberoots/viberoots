@@ -35,5 +35,21 @@ test("node_webapp includes global Nix inputs as genrule srcs (action inputs)", a
       out.includes(":flake.lock"),
       "expected //:flake.lock to be present in srcs via global_nix_inputs()",
     );
+
+    const labelsProbe = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //apps/web:bundle`;
+    if (labelsProbe.exitCode !== 0) {
+      // Environment not fully available in temp. Skip to avoid false negatives.
+      return;
+    }
+    const labelsOut = String(labelsProbe.stdout || "");
+    assert.ok(
+      labelsOut.includes(":flake.lock"),
+      "expected node_webapp to stamp //:flake.lock when stamp=True",
+    );
   });
 });

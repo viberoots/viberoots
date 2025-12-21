@@ -42,5 +42,18 @@ test("node_webapp stamps global Nix inputs via labels", async () => {
       out.includes(":flake.lock"),
       "expected //:flake.lock to be present via global_nix_inputs()",
     );
+
+    const srcsProbe = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //apps/web:bundle`;
+    if (srcsProbe.exitCode !== 0) return;
+    const srcsOut = String(srcsProbe.stdout || "");
+    assert.ok(
+      srcsOut.includes(":flake.lock"),
+      "expected node_webapp stamping to be backed by real action inputs (srcs includes //:flake.lock)",
+    );
   });
 });
