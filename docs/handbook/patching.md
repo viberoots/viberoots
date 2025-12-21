@@ -162,8 +162,10 @@ node tools/dev/patches-lint.ts --lang python
   - Patches live under `<importer>/patches/python/*.patch` (e.g., `apps/api/patches/python/...`).
   - Changing a patch only invalidates Python targets bound to that importer.
 - `nix_python_binary` carries importer‑local patch files via an internal helper `python_library` dependency (resources), because Buck prelude `python_binary` does not accept `srcs`. The synthetic dep pattern is standardized via `//lang:defs_common.bzl:synthetic_dep_for_importer_patches_from_labels(...)`.
-- Lockfile label enforcement and parsing are centralized in Starlark: call `ensure_single_lockfile_label(...)` and then use `include_importer_patches_from_labels(kwargs, "python", into = "<attr>")` to both extract the importer and include importer‑local patches deterministically.
-  - Implementation note: the Python macros use `//lang:importer_wiring.bzl` to keep lockfile enforcement, patch input attachment, and provider edge realization consistent with Node.
+- Lockfile label enforcement and parsing are centralized in Starlark. For importer-scoped macros, **do not** parse lockfile labels directly; route through the canonical helper surface in `//lang:importer_wiring.bzl`:
+  - `prepare_importer_non_genrule_wiring(...)` for non-genrule wrappers (Python `nix_python_library`, `nix_python_test`, `nix_python_wasm_*`)
+  - `prepare_importer_genrule_kwargs(...)` for genrule-style wrappers
+  - Implementation note: these helpers encapsulate `ensure_single_lockfile_label(...)` and patch-input attachment (`include_importer_patches_from_labels(...)`) so error text, normalization, and list/dict input handling stay consistent across Node and Python.
 
 Quick checks and guidance:
 
