@@ -49,6 +49,7 @@ coverage/
 
 # zx / misc temp
 *.log
+test-logs/*.pid
 .patch-sessions.json
 graph-gen-pure
 buck-test.*

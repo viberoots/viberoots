@@ -43,6 +43,8 @@ This guide explains how to add a new language to the build without touching core
   - Patches are importer-local: `<importer>/patches/python/` (flat, no subdirectories).
   - Lockfile labeling is importer‑scoped: `lockfile:<path>#<importer>`; standard file is `uv.lock`.
   - Macros: use `nix_python_{library,binary,test}` from `python/defs.bzl` and pass `lockfile_label` explicitly.
+  - Macro wiring: importer-scoped wiring is centralized via `//lang:importer_wiring.bzl:prepare_importer_non_genrule_wiring(...)` for `nix_python_library`, `nix_python_test`, and `nix_python_wasm_*`.
+    - Exception: `nix_python_binary` must carry patch inputs via a synthetic `python_library` dep because Buck prelude `python_binary` does not accept `srcs`.
 - Scaffolding:
   - `scaf new python lib <name>` → `libs/<name>` with `pyproject.toml`, `uv.lock`, `TARGETS` using `nix_python_library` and a sample test via `nix_python_test`.
   - `scaf new python app <name>` → `apps/<name>` with a small library and binary (`nix_python_binary`) and importer‑scoped `lockfile_label`.

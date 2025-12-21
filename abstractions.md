@@ -357,6 +357,33 @@ These are the usual ways this leaks:
 
 ---
 
+## Contract 10: Importer-scoped macro wiring for non-genrule wrappers
+
+Some importer-scoped macros wrap real rules directly (for example `python_library`, `python_test`) and do not follow the genrule-style path. These call sites still need consistent lockfile enforcement, importer derivation, patch-input attachment, and provider-edge realization.
+
+### Contract
+
+Importer-scoped non-genrule wrappers should:
+
+- Enforce exactly one lockfile label (`lockfile:<path>#<importer>`).
+- Stamp `lang:*` and `kind:*`.
+- Derive the importer string from the lockfile label deterministically.
+- Attach importer-local patch files as real action inputs (list and dict shapes, depending on the rule attribute).
+- Merge provider edges deterministically (usually into `deps`, or into an input attribute when a rule shape cannot accept deps).
+
+### Canonical implementations
+
+- **Starlark**: `lang/importer_wiring.bzl:prepare_importer_non_genrule_wiring`
+- **Python macro usage**: `python/defs.bzl` (`nix_python_library`, `nix_python_test`, `nix_python_wasm_*`)
+
+### Common leak patterns
+
+- A wrapper calls `ensure_single_lockfile_label(...)` / `importer_from_labels(...)` directly and drifts on error text or future policy changes.
+- A wrapper attaches importer-local patches but not as real action inputs (so patch edits do not invalidate).
+- A wrapper merges provider edges by hand and loses stable ordering/dedupe.
+
+---
+
 ## Where abstractions are currently “thin” (known seams)
 
 These are not necessarily bugs. They are places where the system is correct, but the abstraction boundary is easier to misuse.
@@ -390,13 +417,7 @@ I would add a single helper in `//lang` that does both in a consistent way, incl
 
 ### Add a single helper for importer-scoped non-genrule macros
 
-We have good coverage for genrule-style macros (`prepare_importer_genrule_kwargs`). For non-genrule wrappers, the wiring is repeated across places. I would add a helper that returns:
-
-- The derived importer string
-- A wired `kwargs` (including patch inputs)
-- A wired `deps` list (including provider edges)
-
-This keeps error text, ordering, and dict-safe behavior consistent.
+Implemented: `lang/importer_wiring.bzl:prepare_importer_non_genrule_wiring` centralizes lockfile enforcement, importer derivation, patch input wiring, and provider-edge realization for non-genrule importer-scoped macros.
 
 ---
 
