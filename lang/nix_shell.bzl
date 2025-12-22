@@ -87,6 +87,59 @@ def nix_cmd_prefix(
         boot = escape_buck_cmd_subst(boot)
     return boot + nix_timeout_wrapper_var(var_name = timeout_var, default_sec = timeout_sec)
 
+def nix_calling_genrule_bootstrap(
+        timeout_var = "TIMEOUT",
+        timeout_sec = 600,
+        include_pnpm_store = False,
+        source_workspace_root_env = False,
+        skip_require_unified_pnpm_store = False,
+        debug_env_var = "BNX_NIX_CALL_DEBUG"):
+    """
+    Standard bootstrap for genrule-style macros that invoke Nix.
+
+    Responsibilities:
+    - optionally source tools/buck/workspace-root.env (when available as an input)
+    - normalize REPO_ROOT from WORKSPACE_ROOT (for git-based flake root fallback)
+    - optionally disable unified PNPM store enforcement (bundling and other special cases)
+    - compose with nix_cmd_prefix(...) so call sites don't reassemble partial variants
+    """
+    pre = ""
+    if source_workspace_root_env:
+        pre = pre + ". tools/buck/workspace-root.env 2>/dev/null || true; "
+    pre = pre + "if [ -n \"${WORKSPACE_ROOT:-}\" ]; then export REPO_ROOT=\"$WORKSPACE_ROOT\"; fi; "
+    if skip_require_unified_pnpm_store:
+        pre = pre + "export BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE=1; "
+    if isinstance(debug_env_var, str) and debug_env_var != "":
+        pre = pre + ("if [ \"${%s:-}\" = \"1\" ]; then set -x; fi; " % debug_env_var)
+
+    return pre + nix_cmd_prefix(
+        timeout_var = timeout_var,
+        timeout_sec = timeout_sec,
+        include_pnpm_store = include_pnpm_store,
+        escape_cmd_subst = True,
+    )
+
+def nix_calling_genrule_nix_build_out_path_prefix(
+        flake_attr,
+        timeout_var = "TIMEOUT",
+        timeout_sec = 600,
+        include_pnpm_store = False,
+        source_workspace_root_env = False,
+        skip_require_unified_pnpm_store = False,
+        debug_env_var = "BNX_NIX_CALL_DEBUG"):
+    """
+    Convenience helper for the common pattern:
+      <bootstrap> + outPath=$$($TIMEOUT nix build ... --no-link --print-out-paths | tail -n1)
+    """
+    return nix_calling_genrule_bootstrap(
+        timeout_var = timeout_var,
+        timeout_sec = timeout_sec,
+        include_pnpm_store = include_pnpm_store,
+        source_workspace_root_env = source_workspace_root_env,
+        skip_require_unified_pnpm_store = skip_require_unified_pnpm_store,
+        debug_env_var = debug_env_var,
+    ) + nix_build_out_path_cmd(flake_attr, timeout_var = timeout_var)
+
 
 def nix_build_out_path_cmd(flake_attr, timeout_var = "TIMEOUT"):
     tout = ""

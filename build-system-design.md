@@ -94,11 +94,14 @@ extra-experimental-features = nix-command flakes dynamic-derivations ca-derivati
    - WASM stamps: use `//lang:defs_common.bzl:stamp_wasm_variant(kwargs, "<lang>", "<variant>")` to append `lang:<lang>`, `kind:wasm`, and `wasm:<variant>` uniformly across C++/Go/Python macros.
    - Note: For discoverability only, `tools/nix/lang-templates.nix` exposes a `Node` symbol bag (forwarded from `tools/nix/templates/node.nix`). The planner’s Node plugin remains authoritative; no consumers rely on this symbol bag.
    - For a concrete Node→C++ addon scaffold and artifact flow, see `node-call-cpp.md`.
-   - Node macros that call Nix must prepend `nix_bootstrap_env_core()` + `nix_bootstrap_env_pnpm_store()` and `nix_timeout_wrapper_var()` from `//lang:nix_shell.bzl` to their `cmd` assembly (e.g., `node_webapp`, bundled `nix_node_cli_bin`).
-     - `nix_bootstrap_env_core()` is cross-language and establishes deterministic `WORKSPACE_ROOT` + `FLK_ROOT`.
-     - `nix_bootstrap_env_pnpm_store()` is Node-specific and opt-in (unified PNPM store setup / env exports).
+
+- Node macros that call Nix must use the standardized helper surface in `//lang:nix_shell.bzl` for genrule-style command assembly (e.g., `node_webapp`, bundled `nix_node_cli_bin`).
+  - Use `nix_calling_genrule_bootstrap(...)` to standardize `WORKSPACE_ROOT`/`REPO_ROOT`/`FLK_ROOT` derivation and optional `tools/buck/workspace-root.env` sourcing (for temp repos and sandboxed actions).
+  - Use `nix_calling_genrule_nix_build_out_path_prefix(...)` (or `nix_build_out_path_cmd(...)`) for the canonical “nix build + capture out path” structure.
+  - `nix_bootstrap_env_pnpm_store()` is Node-specific and opt-in (unified PNPM store setup / env exports).
 
 - No out‑links: when assembling shell commands that invoke Nix, use `nix build --no-link --print-out-paths` and capture the last printed path (e.g., `outPath=$$($TIMEOUT nix build ... --no-link --print-out-paths | tail -n1)`). Do not use `--out-link` to avoid creating GC roots and stale symlinks. Macro callsites must assemble this through the canonical helper surface in `//lang:nix_shell.bzl` (`nix_cmd_prefix`, `nix_build_out_path_cmd`) rather than re-implementing it.
+  - For Node macros, prefer the higher-level helpers (`nix_calling_genrule_bootstrap`, `nix_calling_genrule_nix_build_out_path_prefix`) so call sites don't partially apply the policy.
 
 ## End-to-End Architecture
 

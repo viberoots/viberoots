@@ -1,7 +1,7 @@
 load("@prelude//:rules.bzl", "genrule")
 load("//lang:defs_common.bzl", "prepare_importer_non_genrule_wiring", "wire_global_nix_inputs")
 load("//lang:sanitize.bzl", "sanitize_name")
-load("//lang:nix_shell.bzl", "nix_build_out_path_cmd", "nix_cmd_prefix")
+load("//lang:nix_shell.bzl", "nix_calling_genrule_bootstrap", "nix_calling_genrule_nix_build_out_path_prefix")
 load("//node:defs_core.bzl", "nix_node_gen")
 
 def _sanitize_importer_attr(s):
@@ -29,35 +29,36 @@ def node_webapp(
     - `importer` is optional; if omitted, derive from the lockfile label's importer suffix.
     - Uses a zx shim to run `nix build .#node-webapp.<importer>` and copies dist/.
     """
-    # Shim: build via Nix and copy dist/* into $OUT (single directory output).
-    # Use escaped command substitutions: $$(...) so Buck doesn't parse $(...) as a target pattern.
-    _prefix = nix_cmd_prefix(timeout_sec = 240, include_pnpm_store = True)
-
     kw = dict(kwargs) if kwargs != None else {}
     kw["labels"] = list(labels or [])
-    kw["srcs"] = []
+    kw["srcs"] = {
+        # Optional workspace root injection for sandboxed genrules in temp repo tests.
+        "tools/buck/workspace-root.env": "root//tools/buck:workspace-root.env",
+    }
     wire_global_nix_inputs(kw, into = "srcs", stamp = True)
 
     deps = _pop_list(kw, "deps")
-    kw["srcs"] = (kw.get("srcs", []) or []) + deps
 
     wiring = prepare_importer_non_genrule_wiring(
         name = name,
         kwargs = kw,
-        deps = [],
+        deps = deps,
         lang = "node",
         kind = "app",
         labels = [],
         lockfile_label = lockfile_label,
         patch_into = "srcs",
-        patch_base = kw.get("srcs", []) or [],
         provider_into = "srcs",
     )
     kw = wiring["kwargs"]
     _importer = wiring["importer"]
     cmd = (
-        _prefix
-        + nix_build_out_path_cmd(".#node-webapp.%s" % _sanitize_importer_attr(_importer))
+        nix_calling_genrule_nix_build_out_path_prefix(
+            ".#node-webapp.%s" % _sanitize_importer_attr(_importer),
+            timeout_sec = 240,
+            include_pnpm_store = True,
+            source_workspace_root_env = True,
+        )
         + "if [ -d \"$outPath/dist\" ]; then cp -R \"$outPath/dist\" $OUT; else echo 'dist missing' >&2; exit 2; fi"
     )
 
@@ -118,24 +119,10 @@ def nix_node_cli_bin(
             + "If you need to copy a different entry file, use bundle=False."
         )
 
-    # Bundled mode: build a single-file shebanged bundle via the scaffolded importer's flake
     def _basename_importer(s):
         # crude basename: split by '/' and take last non-empty
         parts = [p for p in s.split("/") if p != ""]
         return parts[-1] if len(parts) > 0 else s
-
-    # Use Node shim to build single-file bundle via Nix and copy it to $OUT
-    # Escape only command substitutions `$(...)`; keep `$VAR` expansions.
-    # Establish WORKSPACE_ROOT/REPO_ROOT from BUCK_GRAPH_JSON BEFORE bootstrapping,
-    # so nix_bootstrap_env_core computes FLK_ROOT deterministically to the temp repo root.
-    _pre_env = (
-        # Prefer explicit injection if provided by tests (temp repo path); otherwise, use the genrule sandbox root.
-        ". tools/buck/workspace-root.env 2>/dev/null || true; "
-        + "if [ -n \"${WORKSPACE_ROOT:-}\" ]; then export REPO_ROOT=\"$WORKSPACE_ROOT\"; fi; "
-        + "export BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE=1; "
-    )
-    # Bundling may invoke Nix + PNPM and can legitimately take longer than 60s on cold caches.
-    _prefix = _pre_env + nix_cmd_prefix(timeout_sec = 180, include_pnpm_store = True)
 
     # Build srcs map to place files at deterministic paths inside the action
     _srcs_map = {
@@ -163,27 +150,29 @@ def nix_node_cli_bin(
     _importer = wiring["importer"]
     wire_global_nix_inputs(kw, into = "srcs", stamp = True)
 
+    # Bundling may invoke Nix + PNPM and can legitimately take longer than 60s on cold caches.
+    _prefix = nix_calling_genrule_bootstrap(
+        timeout_sec = 180,
+        include_pnpm_store = True,
+        source_workspace_root_env = True,
+        skip_require_unified_pnpm_store = True,
+    )
+
     cmd = (
         "SCRATCH=\"$PWD\"; "
         + _prefix
         + "OUT_ABS=\"$SCRATCH/$OUT\"; "
         + "export NIX_PNPM_FETCH_TIMEOUT=\"${NIX_PNPM_FETCH_TIMEOUT:-60}\"; "
-        + "set -x; "
         + "command -v nix >/dev/null 2>&1 || { echo '[BNX-BUNDLE] nix not found in PATH' >&2; exit 96; }; "
         + "command -v node >/dev/null 2>&1 || { echo '[BNX-BUNDLE] node not found in PATH' >&2; exit 97; }; "
-        + "if [ -f \"$FLK_ROOT/flake.nix\" ]; then echo '[BNX-BUNDLE-DEBUG] flake.nix present at '$FLK_ROOT >&2; else echo '[BNX-BUNDLE-DEBUG] flake.nix MISSING at '$FLK_ROOT', listing dir:' >&2; ls -la \"$FLK_ROOT\" >&2 || true; exit 95; fi; "
-        + "if [ -f \"$FLK_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
-        + "  { echo -n '[BNX-BUNDLE-DEBUG] unified_pnpm_store=' >&2; cat \"$FLK_ROOT/buck-out/.unified-pnpm-store/path\" 2>/dev/null >&2 || true; echo '' >&2; }; "
-        + "else echo '[BNX-BUNDLE-DEBUG] unified_pnpm_store=missing' >&2; fi; "
-        + "ls -la \"$FLK_ROOT/buck-out/.unified-pnpm-store\" >/dev/null 2>&1 || true; "
+        + "if [ ! -f \"$FLK_ROOT/flake.nix\" ]; then echo '[BNX-BUNDLE] flake.nix not found at '$FLK_ROOT >&2; exit 95; fi; "
         + "cd \"${WORKSPACE_ROOT:-$FLK_ROOT}\"; "
         + "export BUCK_GRAPH_JSON=\"$FLK_ROOT/tools/buck/graph.json\"; "
         + "export NIX_PNPM_ALLOW_GENERATE=1; "
         + "DBG_LOG=\"$SCRATCH/bundle-debug.log\"; : > \"$DBG_LOG\"; "
         + ("$TIMEOUT node --experimental-strip-types --experimental-top-level-await --disable-warning=ExperimentalWarning "
            + "\"${WORKSPACE_ROOT:-$FLK_ROOT}/tools/buck/node-cli-bundle.ts\" --importer \"%s\" --name \"%s\" --out \"$OUT_ABS\" >> \"$DBG_LOG\" 2>&1 " % (_importer, _basename_importer(_importer)))
-        + "; RC=$?; echo '[BNX-BUNDLE-DEBUG] bundler-exit='$RC >&2; sed -n '1,200p' \"$DBG_LOG\" >&2 || true; "
-        + "exit $RC"
+        + "; RC=$?; if [ \"$RC\" != \"0\" ]; then sed -n '1,200p' \"$DBG_LOG\" >&2 || true; fi; exit $RC"
     )
 
     kw["out"] = out

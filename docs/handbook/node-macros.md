@@ -24,7 +24,14 @@ They also use the shared importer-scoped wiring helpers so lockfile enforcement,
 
 When a Node macro assembles a shell command that invokes Nix:
 
-- **Escaping**: use `escape_buck_cmd_subst(...)` from `//lang:nix_shell.bzl` to turn `$(...)` into `$$(...)` inside `cmd` strings (Buck genrules treat `$(...)` as a macro).
-- **Out path capture**: use `nix_build_out_path_cmd(...)` from `//lang:nix_shell.bzl` to capture a derivation output path without creating GC roots:
+- **Bootstrap (workspace + flake root)**: use `nix_calling_genrule_bootstrap(...)` from `//lang:nix_shell.bzl` so genrule-style macros standardize:
+  - optional `tools/buck/workspace-root.env` sourcing (for temp repos and sandboxed actions)
+  - `WORKSPACE_ROOT`/`REPO_ROOT`/`FLK_ROOT` derivation and validation
+  - unified PNPM store handling (`include_pnpm_store=True`) and optional enforcement skip (bundling scenarios)
+- **Out path capture**: use `nix_calling_genrule_nix_build_out_path_prefix(...)` (or `nix_build_out_path_cmd(...)` for rare cases) from `//lang:nix_shell.bzl` to capture a derivation output path without creating GC roots:
   - always use `nix build --no-link --print-out-paths | tail -n1`
   - never use `--out-link`
+
+Debugging:
+
+- Set `BNX_NIX_CALL_DEBUG=1` to enable `set -x` tracing inside Nix-calling genrule commands and to enable verbose diagnostics in the Node CLI bundler shim.
