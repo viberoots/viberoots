@@ -494,7 +494,14 @@ export async function runInTemp<T>(
     return await fn(tmp, _$);
   } finally {
     // Best-effort: stop any buck2 daemon for this temp repo to prevent buckd accumulation.
-    // Do not kill buck2 daemon per test; reuse across tests to avoid fork storms
+    // Temp repos use distinct buck-out roots, so this does not affect the main workspace daemon.
+    try {
+      await _$({
+        stdio: "pipe",
+        reject: false,
+        nothrow: true,
+      })`buck2 kill`;
+    } catch {}
     // Avoid rewriting shared coverage artifacts concurrently; zx_test already normalizes coverage.
     // Opt-in via TEST_REWRITE_COVERAGE_TMP=1 if a test explicitly needs this legacy behavior.
     if ((process.env.TEST_REWRITE_COVERAGE_TMP || "") === "1") {
