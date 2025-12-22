@@ -30,8 +30,11 @@ function unique<T>(arr: T[]): T[] {
 
 async function psLines(): Promise<string[]> {
   // Cross-platform-ish: use a broad format including command and args
-  const cmd = process.platform === "darwin" ? "ps -A -o pid=,command=" : "ps -e -o pid=,command=";
-  const { stdout } = await $({ stdio: "pipe" })`${cmd}`;
+  const args =
+    process.platform === "darwin"
+      ? ["/bin/ps", "-A", "-o", "pid=,command="]
+      : ["ps", "-e", "-o", "pid=,command="];
+  const { stdout } = await $({ stdio: "pipe" })`${args}`;
   return String(stdout || "")
     .split(/\r?\n/)
     .filter(Boolean);

@@ -163,6 +163,31 @@ export async function exists(p: string) {
   }
 }
 
+let buckReaperStateFile: string | null = null;
+let buckReaperStarted = false;
+
+async function ensureBuckReaperStarted(tmp: string, $: any): Promise<void> {
+  try {
+    if (!buckReaperStateFile) {
+      const token = `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      buckReaperStateFile = path.join(os.tmpdir(), `bucknix-buck-reaper-${token}.txt`);
+    }
+    // Record this temp repo for the per-process reaper to sweep if the worker is killed abruptly.
+    await fsp.appendFile(buckReaperStateFile, `${tmp}\n`, "utf8").catch(() => {});
+
+    if (buckReaperStarted) return;
+    buckReaperStarted = true;
+
+    const repoRoot = process.cwd();
+    const reaper = path.join(repoRoot, "tools", "tests", "lib", "buck-daemon-reaper.ts");
+    const parentPid = String(process.pid);
+    const cmd =
+      `zx-wrapper ${reaper} --parent ${parentPid} ` +
+      `--state-file ${buckReaperStateFile} --poll-ms 1000 >/dev/null 2>&1 & disown`;
+    await $({ stdio: "ignore" })`bash --noprofile --norc -c ${cmd}`.nothrow();
+  } catch {}
+}
+
 export async function runInTemp<T>(
   name: string,
   fn: (tmp: string, $: any) => Promise<T>,
@@ -480,6 +505,7 @@ export async function runInTemp<T>(
     })`node --experimental-strip-types --import ${exportEnv.ZX_INIT} -e ${"console.log('zx-init-loaded')"}`;
   } catch {}
   const _$ = $({ cwd: tmp, env: exportEnv });
+  await ensureBuckReaperStarted(tmp, _$);
   try {
     // quiet: remove temporary diagnostics
     if (process.env.TEST_KEEP_TMP === "1") {
