@@ -28,10 +28,8 @@ export type DriverOptions = {
   strict?: boolean;
   /**
    * Importer-local patch inclusion policy.
-   *
-   * If unset, we default to "effective-set-only" since it is the stricter behavior.
    */
-  importerPatchInclusionPolicy?: ImporterPatchInclusionPolicy;
+  importerPatchInclusionPolicy: ImporterPatchInclusionPolicy;
   /**
    * Optional global mapping from "<name>@<version>" (lowercased) to absolute or relative patch path.
    * Used by Node to include global patches from patches/node that match the importer’s effective set.
@@ -55,6 +53,20 @@ export async function runImporterProviderSync(opts: DriverOptions): Promise<void
     importerPatchInclusionPolicy,
     globalKeyToPatchPath,
   } = opts;
+
+  if (importerPatchInclusionPolicy == null) {
+    throw new Error("[provider-sync-driver] missing importerPatchInclusionPolicy");
+  }
+  if (
+    importerPatchInclusionPolicy !== "all" &&
+    importerPatchInclusionPolicy !== "effective-set-only"
+  ) {
+    throw new Error(
+      `[provider-sync-driver] invalid importerPatchInclusionPolicy: ${String(
+        importerPatchInclusionPolicy,
+      )}`,
+    );
+  }
 
   // Discover lockfiles. Filtering is driven by supported importer labels, not lockfile path prefixes.
   const discovered = await discoverLockfiles();

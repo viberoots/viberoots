@@ -79,6 +79,12 @@ Go and C++ use **package-local** patches. Patch files live under the Buck packag
 
 Node and Python use **importer-local** patches. Patch files live under an importer directory (for example `apps/web/patches/node/*.patch` and `apps/api/patches/python/*.patch`). Importer-scoped providers and `auto_map.bzl` are generated artifacts, so apply/remove regenerates glue to keep providers and mappings aligned with the lockfile and patch set.
 
+Provider patch inclusion policy (Node vs Python):
+
+- **Node (PNPM)**: provider `patch_paths` includes **all importer-local patches** under `<importer>/patches/node/*.patch`.
+- **Python (uv)**: provider `patch_paths` includes **only importer-local patches that match the `uv.lock` effective set**.
+- The policy choice is explicit and required at the shared driver boundary: `tools/lib/provider-sync-driver.ts` (`importerPatchInclusionPolicy`).
+
 ## Glue regeneration
 
 Node and Python only (Go/C++ don’t require glue for patch invalidation). Local glue is not committed. Regenerate after apply or on-demand:

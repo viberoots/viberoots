@@ -979,7 +979,7 @@ This policy is expressed explicitly in the importer provider sync driver:
 - `tools/lib/provider-sync-driver.ts` uses `importerPatchInclusionPolicy: "all" | "effective-set-only"`
 - `tools/buck/providers/node.ts` sets `"all"`
 - `tools/buck/providers/python.ts` sets `"effective-set-only"`
-- If unset, the driver defaults to `"effective-set-only"`.
+- The policy is required at the driver boundary. The driver does not silently default.
 
 This policy is locked down by tests. See:
 

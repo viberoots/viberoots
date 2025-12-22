@@ -26,7 +26,7 @@ Importer‑scoped patch inclusion policy (Node vs Python):
 
 - **Node (PNPM)**: provider `patch_paths` includes **all importer-local patches** under `<importer>/patches/node/*.patch` (even when not present in the lockfile effective set). This keeps invalidation simple: any importer-local patch change affects that importer’s provider.
 - **Python (uv)**: provider `patch_paths` includes **only importer-local patches that match the `uv.lock` effective set**. This keeps invalidation precise: adding a patch for a package not present in `uv.lock` does not affect the provider or downstream targets.
-- The canonical switch is `importerPatchInclusionPolicy: "all" | "effective-set-only"` in `tools/lib/provider-sync-driver.ts`, and a dedicated regression test locks down the behavior.
+- The canonical switch is `importerPatchInclusionPolicy: "all" | "effective-set-only"` in `tools/lib/provider-sync-driver.ts`. The policy is required at the driver boundary, and a dedicated regression test locks down the behavior.
 
 Canonical naming and helpers:
 
