@@ -16,7 +16,10 @@ Provider sync writes deterministic Buck provider glue from lockfiles and patch i
 
 Node generator (canonical):
 
-- The canonical generator implementation is `tools/buck/providers/node.ts` (`syncNodeProviders`). The wrapper `tools/buck/sync-providers-node.ts` delegates to it for back‑compat. Prefer invoking the orchestrator: `node tools/buck/sync-providers.ts --lang node`.
+- The canonical generator implementation is `tools/buck/providers/node.ts` (`syncNodeProviders`). The canonical entrypoint is the orchestrator: `node tools/buck/sync-providers.ts`.
+  - For Node only (full glue): `node tools/buck/sync-providers.ts --lang node`
+  - Providers only (no graph/auto_map): `node tools/buck/sync-providers.ts --lang node --no-glue`
+  - Back-compat wrapper `tools/buck/sync-providers-node.ts` exists as a delegator-only alias to the orchestrator.
 
 Node‑specific note (clarity):
 

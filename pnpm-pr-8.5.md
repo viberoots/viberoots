@@ -130,9 +130,7 @@ node_webapp(
 ### Glue sequence and labels
 
 - After scaffolding (or when lockfile changes), run:
-  - Export graph (if needed by other work): `node tools/buck/export-graph.ts`
-  - Node providers: `node tools/buck/sync-providers-node.ts`
-  - Auto‑map: `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
+  - Node providers + downstream glue (canonical): `node tools/buck/sync-providers.ts --lang node`
 - The template’s importer‑scoped label ensures only targets that depend on `apps/<name>`’s lockfile provider are invalidated when patches/lockfile change.
 
 ## Developer Experience: Dev Mode with HMR / Fast Refresh
@@ -214,8 +212,7 @@ scaf new node webapp demo --yes
 (cd apps/demo && pnpm -w install --lockfile-only)
 
 # Glue
-node tools/buck/sync-providers-node.ts
-node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl
+node tools/buck/sync-providers.ts --lang node
 
 # Dev mode (HMR)
 (cd apps/demo && pnpm dev)

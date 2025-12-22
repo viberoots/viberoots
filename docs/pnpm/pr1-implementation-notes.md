@@ -17,7 +17,8 @@ After implementation and debugging, PR 1 scope is complete:
   - Allows workspace to work cleanly even with Go-only projects in apps/libs
   - Root package.json remains independent
 - `tools/buck/providers/node.ts` — Node provider sync driver already implemented
-- `tools/buck/sync-providers-node.ts` — Wrapper already present
+- `tools/buck/sync-providers.ts` — Unified orchestrator (canonical)
+- `tools/buck/sync-providers-node.ts` — Delegator-only wrapper (back-compat alias)
 - `tools/buck/gen-auto-map.ts` — Already handles `lockfile:<path>#<importer>` labels
 
 ### Critical Fixes Applied (Runaway Process Prevention)

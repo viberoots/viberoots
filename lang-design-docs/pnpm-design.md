@@ -14,7 +14,8 @@ This document proposes how to add first-class PNPM projects to this monorepo, in
 
 - Existing glue for Node providers and auto‑map generation:
   - `tools/buck/providers/node.ts`: parses `pnpm-lock.yaml` and emits `TARGETS.node.auto` with one provider per importer.
-  - `tools/buck/sync-providers-node.ts`: thin wrapper delegating to the provider driver.
+  - `tools/buck/sync-providers.ts`: unified orchestrator (canonical provider sync entrypoint).
+    - Back-compat alias: `tools/buck/sync-providers-node.ts` (delegator-only).
   - `tools/buck/gen-auto-map.ts`: maps target labels to provider deps, including `lockfile:<path>#<importer>`.
   - `hermetic-node-modules.md`: documents immutable, Nix‑built `node_modules`.
 - Sidecars & Composite Graph API:
@@ -52,7 +53,9 @@ This document proposes how to add first-class PNPM projects to this monorepo, in
 
 3. **Provider wiring (already scaffolded)**
    - Add `third_party/providers/defs_node.bzl` with a tiny `node_importer_deps(...)` genrule.
-   - Continue to use `tools/buck/sync-providers-node.ts` to emit `TARGETS.node.auto` deterministically from all lockfiles and relevant `patches/node/*.patch`.
+   - Use the orchestrator `tools/buck/sync-providers.ts` to emit `TARGETS.node.auto` deterministically from all lockfiles and relevant patches.
+     - Providers-only mode: `node tools/buck/sync-providers.ts --lang node --no-glue`
+     - Full glue (ensures graph + auto_map): `node tools/buck/sync-providers.ts --lang node`
    - `gen-auto-map.ts` already maps `lockfile:<path>#<importer>` labels to provider deps used by Buck macros.
    - Note: `patch_paths` in generated `node_importer_deps(...)` include importer‑local patches (e.g., `<importer>/patches/node/*.patch`) for observability only. The provider rule remains metadata‑only (`srcs = []`), and invalidation continues to be driven by macros including importer‑local patches in target `srcs`.
 
@@ -95,7 +98,7 @@ This document proposes how to add first-class PNPM projects to this monorepo, in
 - **Phase A: Workspace bootstrapping**
   - Add `pnpm-workspace.yaml` with `apps/*` and `libs/*`.
   - Commit minimal `third_party/providers/defs_node.bzl`.
-  - Verify `tools/buck/sync-providers-node.ts` runs idempotently with empty or initial projects.
+  - Verify `node tools/buck/sync-providers.ts --lang node --no-glue` runs idempotently with empty or initial projects.
 
 - **Phase B: First PNPM project (per‑project lockfile)**
   - Scaffold `apps/example` with its own `package.json` and `pnpm-lock.yaml`.
@@ -137,7 +140,7 @@ Command mapping
   - Behavior: pnpm returns a temp workspace path. Our wrapper stores it (e.g., under `.tmp/patches-node/<pkg>/…`) and optionally launches `$PATCH_EDITOR`.
 - `patch-pkg apply node <pkg>` → `pnpm patch-commit <tempDir>`
   - Behavior: writes `patches/node/<name>@<version>.patch` (via `patches-dir` setting) and updates `pnpm.patchedDependencies` in the importer’s `package.json`.
-  - Post‑steps (same turn): run `node tools/buck/sync-providers-node.ts` and `node tools/buck/gen-auto-map.ts` so Buck picks up the provider immediately.
+  - Post‑steps (same turn): run `node tools/buck/sync-providers.ts --lang node` so Buck picks up providers and `auto_map.bzl` immediately.
   - Clean up: remove the temp dir.
 - `patch-pkg reset node <pkg>` → discard temp dir (no patch written)
   - Behavior: deletes the stored temp path; no changes to files.

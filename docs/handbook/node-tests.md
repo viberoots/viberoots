@@ -94,5 +94,5 @@ Coverage artifacts are emitted under the derivation output.
 - Tests matched, Vitest missing: add `vitest` to devDependencies for the importer.
 - Lockfile/provider glue: re-run glue stages if lockfiles change:
   - `node tools/buck/export-graph.ts`
-  - `node tools/buck/sync-providers-node.ts`
+  - `node tools/buck/sync-providers.ts --lang node --no-glue`
   - `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`

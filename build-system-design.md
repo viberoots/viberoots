@@ -796,7 +796,8 @@ pipeline {
           stage('Sync Node Providers (optional)') {
             // skips automatically when no pnpm-lock.yaml
             when { expression { return sh(returnStatus: true, script: "git ls-files '**/pnpm-lock.yaml' >/dev/null 2>&1" ) == 0 } }
-            steps { sh 'node tools/buck/sync-providers-node.ts' }
+            // Providers-only (no graph/auto_map). Prefer the unified orchestrator.
+            steps { sh 'node tools/buck/sync-providers.ts --lang node --no-glue' }
           }
           stage('Generate auto_map') {
             steps { sh 'node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl' }
@@ -1025,7 +1026,8 @@ def node_importer_deps(name, lockfile, importer, patch_paths = []):
 #### Node provider generator (canonical)
 
 - The canonical Node provider generator lives at `tools/buck/providers/node.ts` (`syncNodeProviders(...)`).
-- The `tools/buck/sync-providers-node.ts` file is a thin wrapper kept for back‑compat; it simply delegates to the canonical generator.
+- The canonical entrypoint is `tools/buck/sync-providers.ts` (unified orchestrator).
+- The `tools/buck/sync-providers-node.ts` file is a thin wrapper kept for back‑compat; it delegates to the orchestrator (providers-only by default via `--no-glue`).
 - **Synthetic lockfile providers (opt-in):** Node provider sync supports an opt-in mode that synthesizes `pnpm-lock.yaml` paths for workspace importers that have `package.json` but do not yet have a real lockfile. This is intended for early scaffolding only.
   - Default: providers are generated **only** for real `pnpm-lock.yaml` files.
   - Opt-in: set `NODE_PROVIDER_SYNTHETIC_LOCKFILES=1` to enable synthetic lockfile providers. This does **not** change the lockfile label contract for targets.
@@ -1033,7 +1035,7 @@ def node_importer_deps(name, lockfile, importer, patch_paths = []):
 
 ```bash
 node tools/buck/sync-providers.ts --lang node
-# or directly (wrapper → delegates to providers/node.ts)
+# or via the back-compat alias (wrapper → delegates to orchestrator)
 node tools/buck/sync-providers-node.ts
 ```
 
@@ -1051,7 +1053,7 @@ node tools/buck/sync-providers-node.ts
 ### Lockfile Ecosystems (Node, PNPM-Only, Importer‑scoped)
 
 - [ ] Add `//third_party/providers/defs_node.bzl` with `node_importer_deps(...)` (input = **pnpm-lock.yaml** + patch files).
-- [ ] Add `tools/buck/sync-providers-node.ts` that parses **PNPM only** (`pnpm-lock.yaml`) and includes only relevant `<pkg>@<version>` patches.
+- [ ] Add a Node provider generator under `tools/buck/providers/node.ts` and drive it via the orchestrator `tools/buck/sync-providers.ts`.
 - [ ] Extend exporter to attach **`lockfile:<path>#<importer>`** labels to Node targets.
 - Verification:
   - [ ] With a Node workspace using `lodash@4.17.21`, adding `patches/node/lodash@4.17.21.patch` causes only that importer’s provider to change.

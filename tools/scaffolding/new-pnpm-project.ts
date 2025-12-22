@@ -90,8 +90,7 @@ async function main(): Promise<void> {
       console.warn("warning: pnpm lockfile-only step failed (dev shell not loaded?)");
     }
     try {
-      await $`node tools/buck/sync-providers-node.ts`;
-      await $`node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
+      await $`node tools/buck/sync-providers.ts --lang node`;
     } catch {
       console.warn(
         "warning: glue refresh failed; run export-graph/sync-providers/gen-auto-map manually",
@@ -102,8 +101,7 @@ async function main(): Promise<void> {
       [
         "\nNext steps:",
         `- (optional) pnpm -w install --lockfile-only   # inside ${dest}`,
-        "- node tools/buck/sync-providers-node.ts",
-        "- node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl",
+        "- node tools/buck/sync-providers.ts --lang node",
       ].join("\n"),
     );
   }

@@ -40,7 +40,8 @@ Python provider sync activation in sparse/partial clones is lockfile‑driven: t
   - Run full glue pipeline (preferred): `node tools/buck/glue-pipeline.ts`
   - Export graph: `node tools/buck/export-graph.ts`
   - Sync providers: `node tools/buck/sync-providers.ts`
-  - Sync Node providers: `node tools/buck/sync-providers-node.ts`
+  - Sync Node providers only (no graph/auto_map): `node tools/buck/sync-providers.ts --lang node --no-glue`
+  - Sync Python providers only (no graph/auto_map): `node tools/buck/sync-providers.ts --lang python --no-glue`
   - Sync specific language: `node tools/buck/sync-providers.ts --lang node`
   - Generate auto_map (building block; prefer the pipeline): `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
   - Prebuild guard (freshness/presence): `node tools/buck/prebuild-guard.ts [--verbose|--json]`

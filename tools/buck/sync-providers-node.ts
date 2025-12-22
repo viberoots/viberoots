@@ -1,9 +1,19 @@
 #!/usr/bin/env zx-wrapper
-// tools/buck/sync-providers-node.ts — delegate to orchestrator's node driver (back-compat)
-import { syncNodeProviders } from "./providers/node";
+// tools/buck/sync-providers-node.ts — delegator-only wrapper (back-compat)
+import path from "node:path";
+import process from "node:process";
+import { runNodeWithZx } from "../lib/node-run.ts";
 
 async function main() {
-  await syncNodeProviders({});
+  const repoRoot = process.cwd();
+  const zxInitPath = path.join(repoRoot, "tools/dev/zx-init.mjs");
+  const orchestrator = path.join(repoRoot, "tools/buck/sync-providers.ts");
+  const passthrough = process.argv.slice(2);
+  await runNodeWithZx({
+    zxInitPath,
+    script: orchestrator,
+    args: ["--lang", "node", "--no-glue", ...passthrough],
+  });
 }
 
 main().catch((e) => {

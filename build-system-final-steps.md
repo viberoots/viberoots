@@ -9,7 +9,8 @@ References:
 - Remaining Go build plan: `remaining-go-build-dev-plan.md`
 - Key code:
   - Exporter: `tools/buck/export-graph.ts`
-  - Provider sync: `tools/buck/sync-providers.ts`, `tools/buck/sync-providers-node.ts`
+  - Provider sync (canonical): `tools/buck/sync-providers.ts`
+    - Back-compat alias: `tools/buck/sync-providers-node.ts` (delegator-only)
   - Auto-map: `tools/buck/gen-auto-map.ts`
   - Prebuild guard: `tools/buck/prebuild-guard.ts`
   - Patching: `tools/patch/patch-pkg.ts`, `tools/patch/patch-go.ts`

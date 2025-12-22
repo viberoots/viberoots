@@ -32,7 +32,8 @@ This PR hardens the Node provider system by adding comprehensive tests for deter
 ✅ Provider rule defined (`third_party/providers/defs_node.bzl`)  
 ✅ Patch directory exists (`patches/node/`)  
 ✅ Provider sync driver implemented (`tools/buck/providers/node.ts`)  
-✅ Thin wrapper exists (`tools/buck/sync-providers-node.ts`)  
+✅ Unified orchestrator exists (`tools/buck/sync-providers.ts`)  
+✅ Back-compat wrapper exists (`tools/buck/sync-providers-node.ts`) (delegator-only alias)  
 ✅ One idempotency test exists (`sync-providers-node.idempotent.test.ts`)  
 ✅ Auto-map generator supports `lockfile:` labels (`tools/buck/gen-auto-map.ts`)
 
@@ -72,7 +73,7 @@ This PR hardens the Node provider system by adding comprehensive tests for deter
 **Test Strategy:**
 
 1. Create temp repo with synthetic `pnpm-lock.yaml`
-2. Run `sync-providers-node.ts` twice
+2. Run `node tools/buck/sync-providers.ts --lang node --no-glue` twice
 3. Assert byte-for-byte identical output
 4. Hash the output to detect any changes
 
@@ -565,7 +566,7 @@ test("node provider: <specific behavior>", async () => {
 **Add Node-specific commands:**
 ```markdown
 - Node provider operations:
-  - Sync Node providers: `node tools/buck/sync-providers-node.ts`
+  - Sync Node providers only (no graph/auto_map): `node tools/buck/sync-providers.ts --lang node --no-glue`
   - Sync specific language: `node tools/buck/sync-providers.ts --lang node`
   - Generate auto-map: `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
 ````
@@ -777,7 +778,7 @@ packages:
     await fsp.writeFile(lockfilePath, lockfileContent, "utf8");
 
     // 2. Execute: Run the provider sync
-    await $`node tools/buck/sync-providers-node.ts`;
+    await $`node tools/buck/sync-providers.ts --lang node --no-glue`;
 
     // 3. Assert: Verify expected output
     const outPath = path.join(tmp, "third_party/providers/TARGETS.node.auto");
@@ -789,7 +790,7 @@ packages:
     }
 
     // 4. Verify idempotency
-    await $`node tools/buck/sync-providers-node.ts`;
+    await $`node tools/buck/sync-providers.ts --lang node --no-glue`;
     const output2 = await fsp.readFile(outPath, "utf8");
 
     if (output !== output2) {

@@ -26,6 +26,7 @@ const OUT_FILE = getFlagStr("out", "third_party/providers/TARGETS.auto");
 const STRICT = getFlagBool("strict");
 const LANG = getFlagStr("lang", "");
 const EMIT_INDEX = getFlagBool("emit-index") || getFlagBool("emitIndex");
+const NO_GLUE = getFlagBool("no-glue") || getFlagBool("noGlue");
 
 async function main() {
   // Preserve Node default out path unless user explicitly provided --out
@@ -41,7 +42,7 @@ async function main() {
     } catch {}
   }
   await syncAllProviders({ outFile: maybeOut as any, strict: STRICT, lang: targetLang });
-  if (targetLangRequested(targetLang)) {
+  if (targetLangRequested(targetLang) && !NO_GLUE) {
     // When a specific language is requested, also ensure downstream glue is present so
     // Buck macros load provider mappings via //lang:auto_map.bzl (re-export of third_party/providers/auto_map.bzl).
     //
@@ -62,7 +63,7 @@ async function main() {
         dbg("after (third_party/providers):\n" + String(stdout || "").trim());
       } catch {}
     }
-  } else if (emitIndexRequested()) {
+  } else if (emitIndexRequested() && !NO_GLUE) {
     // Preserve the existing CLI: allow emitting provider_index without running auto_map.
     await runGluePipeline({
       skipProviderSync: true,

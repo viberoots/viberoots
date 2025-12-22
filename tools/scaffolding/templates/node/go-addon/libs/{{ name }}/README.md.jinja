@@ -19,11 +19,9 @@ Follow these steps to scaffold, build, and test the addon-backed library:
    - `buck2 build //libs/{{ name }}-go:carchive`
    - `buck2 build //libs/{{ name }}-native:napi_addon`
 
-3) Ensure glue is present (export graph → sync providers (Node, if lockfiles exist) → auto_map):
+3) Ensure glue is present (providers + auto_map):
 
-   - `node tools/buck/export-graph.ts --out tools/buck/graph.json`
-   - `node tools/buck/sync-providers-node.ts` (no-op if no pnpm lockfiles are present)
-   - `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
+   - `node tools/buck/sync-providers.ts --lang node` (idempotent; no-op if no pnpm lockfiles are present)
 
 4) Run the Node unit test (single test file, per project conventions):
 
