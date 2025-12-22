@@ -4,6 +4,7 @@ load(
     "//lang:patch_inputs.bzl",
     "include_importer_patches_from_labels",
     "include_importer_patches_from_labels_dict_safe",
+    "synthetic_dep_for_importer_patches_from_labels",
 )
 load("//lang:provider_edges.bzl", "realize_provider_edges")
 load("//lang:dict_inputs.bzl", "attach_items_dict_safe")
@@ -191,4 +192,57 @@ def prepare_importer_non_genrule_wiring(
         "kwargs": kw,
         "deps": wired_deps,
     }
+
+def prepare_importer_srcsless_rule_wiring(
+        name,
+        kwargs,
+        deps,
+        lang,
+        kind,
+        labels = [],
+        lockfile_label = None,
+        patch_dep_into = "resources",
+        patch_dep_suffix = "__patch_inputs",
+        MODULE_PROVIDERS = None):
+    """
+    Standard wiring for importer-scoped macros wrapping rule shapes that cannot accept `srcs`.
+
+    Responsibilities:
+    - enforce exactly one importer-scoped lockfile label (stable error text)
+    - stamp `lang:*` and `kind:*` labels
+    - derive and return the importer string from the lockfile label
+    - create a synthetic dep that carries importer-local patch files as real action inputs
+    - provide a helper for merging provider edges deterministically into the caller's deps
+    """
+    kw = {} if kwargs == None else kwargs
+    kw["name"] = name
+
+    existing_labels = kw.get("labels", []) or []
+    kw["labels"] = (existing_labels if isinstance(existing_labels, list) else []) + (labels or [])
+
+    require_single_importer_lockfile_label(kw, lockfile_label)
+    stamp_labels(kw, lang, kind)
+    importer = importer_from_labels(kw)
+
+    patch_dep = synthetic_dep_for_importer_patches_from_labels(
+        parent_name = name,
+        labels = (kw.get("labels", []) or []),
+        lang = lang,
+        into = patch_dep_into,
+        suffix = patch_dep_suffix,
+    )
+
+    def merge_deps(base_deps):
+        return merge_provider_edges(
+            name,
+            (list(base_deps) if isinstance(base_deps, list) else []) + [patch_dep.dep],
+            MODULE_PROVIDERS = MODULE_PROVIDERS,
+        )
+
+    return struct(
+        importer = importer,
+        kwargs = kw,
+        patch_dep = patch_dep,
+        merge_deps = merge_deps,
+    )
 

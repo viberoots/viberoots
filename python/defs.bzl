@@ -3,10 +3,9 @@ load(
     "//lang:defs_common.bzl",
     "append_nixpkg_labels",
     "dedupe_preserve",
-    "merge_provider_edges",
     "prepare_importer_non_genrule_wiring",
+    "prepare_importer_srcsless_rule_wiring",
     "stamp_wasm_variant",
-    "synthetic_dep_for_importer_patches_from_labels",
 )
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
 
@@ -35,29 +34,23 @@ def nix_python_binary(name, lockfile_label = None, deps = [], **kwargs):
     """
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     append_nixpkg_labels(kwargs, nixpkg_deps)
-    wiring = prepare_importer_non_genrule_wiring(
+    wiring = prepare_importer_srcsless_rule_wiring(
         name = name,
         kwargs = kwargs,
         deps = deps,
         lang = "python",
         kind = "bin",
         lockfile_label = lockfile_label,
-        patch_into = None,
-        MODULE_PROVIDERS = {},
+        patch_dep_into = "resources",
+        patch_dep_suffix = "__patch_inputs",
+        MODULE_PROVIDERS = MODULE_PROVIDERS,
     )
     # Buck prelude python_binary does not accept `srcs`. We carry patch inputs via a tiny
     # synthetic python_library dep so patch edits still invalidate this binary deterministically.
-    if "srcs" in wiring["kwargs"]:
+    if "srcs" in wiring.kwargs:
         fail("nix_python_binary does not accept srcs; use main/main_module + deps instead")
-    patch_dep = synthetic_dep_for_importer_patches_from_labels(
-        parent_name = name,
-        labels = (wiring["kwargs"].get("labels", []) or []),
-        lang = "python",
-        into = "resources",
-    )
-    python_library(**patch_dep.kwargs)
-    deps = merge_provider_edges(name, (list(wiring["deps"]) + [patch_dep.dep]), MODULE_PROVIDERS = MODULE_PROVIDERS)
-    python_binary(deps = deps, **wiring["kwargs"])
+    python_library(**wiring.patch_dep.kwargs)
+    python_binary(deps = wiring.merge_deps(deps), **wiring.kwargs)
 
 def nix_python_test(name, lockfile_label = None, deps = [], **kwargs):
     """

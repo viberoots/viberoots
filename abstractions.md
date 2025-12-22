@@ -382,6 +382,7 @@ Importer-scoped non-genrule wrappers should:
 
 - **Starlark**: `lang/importer_wiring.bzl:prepare_importer_non_genrule_wiring`
 - **Python macro usage**: `python/defs.bzl` (`nix_python_library`, `nix_python_test`, `nix_python_wasm_*`)
+- **Srcs-less rule shapes**: `lang/importer_wiring.bzl:prepare_importer_srcsless_rule_wiring` (creates a synthetic dep carrying importer-local patches as action inputs)
 
 ### Common leak patterns
 
@@ -413,7 +414,7 @@ Node providers cannot list importer-local patch files as Buck `srcs` without cro
 
 ### Some rules cannot accept `srcs`
 
-Example: Buck prelude `python_binary` does not accept `srcs`. The macro has to carry patch inputs via a synthetic dependency. This is correct, but it is a place where “patch inputs always go in srcs” is false.
+Example: Buck prelude `python_binary` does not accept `srcs`. The macro carries patch inputs via a synthetic dependency. This is exposed as a shared helper so call sites do not re-implement it: `lang/importer_wiring.bzl:prepare_importer_srcsless_rule_wiring`.
 
 ---
 
