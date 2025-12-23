@@ -15,3 +15,4 @@ def wire_global_nix_inputs(kwargs, into = "srcs", stamp = True, key_prefix = "__
         stamp_global_nix_inputs(kwargs)
 
 
+

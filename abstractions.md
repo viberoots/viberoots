@@ -337,16 +337,18 @@ Node uses genrule-style wrappers heavily, and some of them use dict-shaped `srcs
 
 ### Contract
 
-Importer-scoped wrappers should use a standardized wiring sequence:
+Importer-scoped wrappers should use a standardized wiring sequence. When a wrapper also invokes Nix, it should attach global Nix inputs as real action inputs and standardize workspace-root env injection.
 
 - Enforce exactly one lockfile label.
 - Stamp `lang:*` and `kind:*`.
 - Attach importer-local patches as inputs (list and dict shapes).
 - Realize provider edges into action inputs when a rule shape cannot accept `deps`.
+- When invoking Nix, attach `global_nix_inputs()` as real action inputs (list and dict shapes) and optionally stamp the label for observability.
+- When a genrule command needs a stable repo root in sandboxed/temp-repo environments, inject `tools/buck/workspace-root.env` into dict-shaped `srcs` in a standardized way.
 
 ### Canonical implementations
 
-- **Starlark**: `lang/importer_wiring.bzl:prepare_importer_genrule_kwargs`
+- **Starlark**: `lang/defs_common.bzl:prepare_importer_nix_calling_genrule_wiring`
 
 ### Common leak patterns
 
@@ -354,6 +356,7 @@ These are the usual ways this leaks:
 
 - A wrapper forgets the dict-safe branch and breaks when `srcs` is a map.
 - A wrapper uses a different key prefix scheme for synthetic entries, and collisions become nondeterministic.
+- A wrapper shells out to Nix but forgets to attach global inputs as real action inputs, so changes to global inputs do not invalidate.
 
 ### Enforcement
 
@@ -361,6 +364,8 @@ The contract is guarded by probe and enforcement tests. If a new macro bypasses 
 
 - `tools/tests/lang/importer-wiring.attach-patches-and-providers.probe.test.ts`: proves list and dict `srcs` shapes both receive importer-local patch inputs and provider edges.
 - `tools/tests/lang/importer-wiring.macros-avoid-direct-lockfile-parsing.enforcement.test.ts`: prevents importer-scoped macro implementations from directly loading `//lang:lockfile_labels.bzl` instead of delegating to `//lang:importer_wiring.bzl`.
+- `tools/tests/lang/importer-nix-calling-genrule-wiring.attach-patches-providers-global-inputs.probe.test.ts`: proves list and dict `srcs` shapes receive importer-local patch inputs, provider edges, global Nix inputs, and standardized workspace-root env injection.
+- `tools/tests/node/node.nix-calling-macros.use-shared-importer-nix-genrule-helper.enforcement.test.ts`: prevents Node Nix-calling macro implementations from bypassing the shared helper.
 
 ---
 
@@ -429,7 +434,10 @@ Today, some macros need to remember to do two things:
 - Attach `global_nix_inputs()` as real inputs.
 - Optionally stamp labels for observability.
 
-I would add a single helper in `//lang` that does both in a consistent way, including dict-safe inputs.
+Implemented in two layers, depending on the macro shape:
+
+- **Generic “call Nix” helper**: `lang/nix_calling_macros.bzl:wire_global_nix_inputs(...)` (re-exported from `lang/defs_common.bzl`)
+- **Importer-scoped, genrule-style helper**: `lang/defs_common.bzl:prepare_importer_nix_calling_genrule_wiring(...)` (composes importer wiring plus global inputs and workspace-root env injection)
 
 ### Add a single helper for importer-scoped non-genrule macros
 

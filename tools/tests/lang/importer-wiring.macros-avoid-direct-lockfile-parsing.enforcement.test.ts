@@ -19,7 +19,8 @@ test("importer-scoped macros delegate lockfile parsing/enforcement to //lang:imp
 
     assert(
       txt.includes("prepare_importer_genrule_kwargs(") ||
-        txt.includes("prepare_importer_non_genrule_wiring("),
+        txt.includes("prepare_importer_non_genrule_wiring(") ||
+        txt.includes("prepare_importer_nix_calling_genrule_wiring("),
       `${file} must use prepare_importer_* wiring helpers for importer-scoped macros`,
     );
   }

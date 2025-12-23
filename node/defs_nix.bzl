@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "genrule")
-load("//lang:defs_common.bzl", "prepare_importer_non_genrule_wiring", "wire_global_nix_inputs")
+load("//lang:defs_common.bzl", "prepare_importer_nix_calling_genrule_wiring")
 load("//lang:sanitize.bzl", "sanitize_name")
 load("//lang:nix_shell.bzl", "nix_calling_genrule_bootstrap", "nix_calling_genrule_nix_build_out_path_prefix")
 load("//node:defs_core.bzl", "nix_node_gen")
@@ -13,6 +13,30 @@ def _pop_list(kwargs, key):
         return []
     v = kwargs.pop(key, [])
     return v if isinstance(v, list) else []
+
+def _prepare_node_importer_nix_calling_genrule_kwargs(
+        name,
+        kwargs,
+        srcs,
+        deps,
+        kind,
+        labels = [],
+        lockfile_label = None,
+        MODULE_PROVIDERS = None):
+    return prepare_importer_nix_calling_genrule_wiring(
+        name = name,
+        kwargs = kwargs,
+        srcs = srcs,
+        deps = deps,
+        lang = "node",
+        kind = kind,
+        labels = labels,
+        lockfile_label = lockfile_label,
+        MODULE_PROVIDERS = MODULE_PROVIDERS,
+        inject_workspace_root_env = True,
+        global_inputs_into = "srcs",
+        global_inputs_stamp = True,
+    )
 
 def node_webapp(
     name,
@@ -31,27 +55,18 @@ def node_webapp(
     """
     kw = dict(kwargs) if kwargs != None else {}
     kw["labels"] = list(labels or [])
-    kw["srcs"] = {
-        # Optional workspace root injection for sandboxed genrules in temp repo tests.
-        "tools/buck/workspace-root.env": "root//tools/buck:workspace-root.env",
-    }
-    wire_global_nix_inputs(kw, into = "srcs", stamp = True)
-
     deps = _pop_list(kw, "deps")
-
-    wiring = prepare_importer_non_genrule_wiring(
+    wiring = _prepare_node_importer_nix_calling_genrule_kwargs(
         name = name,
         kwargs = kw,
+        srcs = {},
         deps = deps,
-        lang = "node",
         kind = "app",
         labels = [],
         lockfile_label = lockfile_label,
-        patch_into = "srcs",
-        provider_into = "srcs",
     )
-    kw = wiring["kwargs"]
-    _importer = wiring["importer"]
+    kw = wiring.kwargs
+    _importer = wiring.importer
     cmd = (
         nix_calling_genrule_nix_build_out_path_prefix(
             ".#node-webapp.%s" % _sanitize_importer_attr(_importer),
@@ -128,27 +143,21 @@ def nix_node_cli_bin(
     _srcs_map = {
         # Preserve entry path under bin/
         entry: entry,
-        # Optional workspace root injection
-        "tools/buck/workspace-root.env": "root//tools/buck:workspace-root.env",
     }
 
     kw = dict(kwargs) if kwargs != None else {}
     kw["labels"] = list(labels or [])
-    wiring = prepare_importer_non_genrule_wiring(
+    wiring = _prepare_node_importer_nix_calling_genrule_kwargs(
         name = name,
         kwargs = kw,
+        srcs = _srcs_map,
         deps = deps,
-        lang = "node",
         kind = "bin",
         labels = [],
         lockfile_label = lockfile_label,
-        patch_into = "srcs",
-        patch_base = _srcs_map,
-        provider_into = "srcs",
     )
-    kw = wiring["kwargs"]
-    _importer = wiring["importer"]
-    wire_global_nix_inputs(kw, into = "srcs", stamp = True)
+    kw = wiring.kwargs
+    _importer = wiring.importer
 
     # Bundling may invoke Nix + PNPM and can legitimately take longer than 60s on cold caches.
     _prefix = nix_calling_genrule_bootstrap(

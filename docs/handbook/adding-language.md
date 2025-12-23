@@ -57,9 +57,13 @@ This guide explains how to add a new language to the build without touching core
 
 Tip for lockfile-style ecosystems (e.g., Node/PNPM):
 
-- Use the shared helpers from `lang/defs_common.bzl`:
-  - `ensure_single_lockfile_label(kwargs, lockfile_label)` to enforce exactly one importer-scoped label (`lockfile:<path>#<importer>`) with stable dedupe and canonical error text
-  - `include_importer_patches_from_labels(kwargs, lang, into = "srcs")` to derive the importer and include importer-local patches deterministically into a supported input attribute (commonly `srcs` or `resources` depending on the rule shape)
+Use the shared helpers from `lang/defs_common.bzl` so call sites do not reassemble wiring details:
+
+- `ensure_single_lockfile_label(kwargs, lockfile_label)` enforces exactly one importer-scoped label (`lockfile:<path>#<importer>`) with stable dedupe and canonical error text.
+- `include_importer_patches_from_labels(kwargs, lang, into = "srcs")` derives the importer and includes importer-local patches deterministically into a supported input attribute (commonly `srcs` or `resources` depending on the rule shape).
+- For importer-scoped, **Nix-calling genrule-style** macros, use:
+  - `prepare_importer_nix_calling_genrule_wiring(...)`
+    - It composes lockfile enforcement, label stamping, importer patch inputs, provider edge realization into `srcs`, optional `tools/buck/workspace-root.env` injection for dict-shaped `srcs`, and global Nix inputs as real action inputs (optional stamp).
 
 Importer-local patch invalidation (package boundary):
 
