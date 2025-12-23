@@ -37,6 +37,14 @@ This guide explains how to add a new language to the build without touching core
   - `tools/lib/provider-writer.ts` — emits deterministic importer‑scoped provider TARGETS and synchronizes the curated auto‑managed section. Pass your computed `{ lockfile, importer, patchPaths }` entries plus the rule load/name.
     - Prefer the convenience wrapper `writeImporterProvidersByLang(...)`, which is table‑driven via a small registry. To add a new importer‑scoped ecosystem, extend that registry instead of adding per‑language conditionals.
 
+- Starlark (`lang/defs_common.bzl`):
+
+  When authoring a package-local patching macro (Go/C++ style), keep “pop and normalize” boilerplate out of your language macro files. Use the shared helper so defaults and tolerance rules don’t drift across languages:
+  - `pop_package_local_patch_dirs_and_nixpkg_deps(kwargs, "<lang>")`
+    - Pops `local_patch_dirs` with a language default (`default_package_patch_dirs("<lang>")`)
+    - Pops `nixpkg_deps` as a list (non-list shapes are ignored deterministically)
+    - Optionally appends normalized `nixpkg:` labels via the canonical normalizer (`append_nixpkg_labels`)
+
 ### Python notes
 
 - Path invariants:

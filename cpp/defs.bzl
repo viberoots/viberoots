@@ -1,5 +1,6 @@
 load("@prelude//:rules.bzl", "cxx_library", "cxx_binary", "cxx_test")
-load("//lang:defs_common.bzl", "stamp_labels", "append_nixpkg_labels", "include_package_local_patches", "dedupe_preserve", "stamp_wasm_variant", "realize_provider_edges", "default_package_patch_dirs", "strip_provider_targets")
+load("//lang:defs_common.bzl", "stamp_labels", "include_package_local_patches", "dedupe_preserve", "stamp_wasm_variant", "realize_provider_edges", "strip_provider_targets")
+load("//lang:defs_common.bzl", "pop_package_local_patch_dirs_and_nixpkg_deps")
 load("//lang:defs_common.bzl", "wire_planner_visible_stub")
 load("//lang:global_inputs.bzl", "global_nix_inputs")
 load("//lang:planner_stub.bzl", "planner_stub", "planner_stub_with_package_local_patches")
@@ -9,8 +10,8 @@ load("//cpp/private:nix_build.bzl", "cpp_nix_build")
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
 
 def _cpp_common(name, kind, kwargs):
-    local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("cpp"))
-    nixpkg_deps = kwargs.pop("nixpkg_deps", [])
+    info = pop_package_local_patch_dirs_and_nixpkg_deps(kwargs, "cpp", append_labels = True)
+    local_patch_dirs = info.local_patch_dirs
     deps = kwargs.pop("deps", [])
     nix_inputs = global_nix_inputs()
 
@@ -21,7 +22,6 @@ def _cpp_common(name, kind, kwargs):
             kwargs["labels"] = dedupe_preserve((kwargs.get("labels", []) or []) + ["addon_name:%s" % addon_name])
     include_package_local_patches(kwargs, "cpp", local_patch_dirs)
     srcs = kwargs.get("srcs", []) or []
-    append_nixpkg_labels(kwargs, nixpkg_deps)
     deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps)
 
     out = sanitize_to_bin_name("//%s:%s" % (native.package_name(), name))
@@ -53,15 +53,14 @@ def nix_cpp_wasm_static_lib(name, **kwargs):
     Stamps:
       - lang:cpp, kind:lib, flavor:wasm
     """
-    local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("cpp"))
-    nixpkg_deps = kwargs.pop("nixpkg_deps", [])
+    info = pop_package_local_patch_dirs_and_nixpkg_deps(kwargs, "cpp", append_labels = True)
+    local_patch_dirs = info.local_patch_dirs
     deps = kwargs.pop("deps", [])
     nix_inputs = global_nix_inputs()
     # Uniform WASM labeling across languages
     stamp_wasm_variant(kwargs, "cpp", "static")
     include_package_local_patches(kwargs, "cpp", local_patch_dirs)
     srcs = kwargs.get("srcs", []) or []
-    append_nixpkg_labels(kwargs, nixpkg_deps)
     deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps)
     cpp_nix_build(
         name = name,
@@ -90,7 +89,8 @@ def nix_cpp_wasm_emscripten_lib(name, **kwargs):
       produced by the planner template (cppWasmEmscriptenLib) when built via the
       Nix flake attributes (e.g., graph-generator-selected).
     """
-    local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("cpp"))
+    info = pop_package_local_patch_dirs_and_nixpkg_deps(kwargs, "cpp", append_labels = True)
+    local_patch_dirs = info.local_patch_dirs
     deps = kwargs.pop("deps", [])
     # Stamp language/kind and wasm variant for planner routing
     stamp_wasm_variant(kwargs, "cpp", "emscripten")
@@ -117,14 +117,13 @@ def nix_cpp_binary(name, **kwargs):
 def nix_cpp_test(name, **kwargs):
     # Define a planner-visible cxx_test (not executed) and an external runner test (executed)
     deps = kwargs.pop("deps", [])
-    nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     srcs = kwargs.get("srcs", [])
     planner_name = name + "__planner"
     # Planner-visible: stamps labels and wires providers so exporter->planner can generate the Nix derivation
     _planner_kwargs = dict(kwargs)
     stamp_labels(_planner_kwargs, "cpp", "test")
     # Add direct call-site attrs as nixpkg labels (shared helper)
-    append_nixpkg_labels(_planner_kwargs, nixpkg_deps)
+    pop_package_local_patch_dirs_and_nixpkg_deps(_planner_kwargs, "cpp", append_labels = True)
     _planner_labels = (_planner_kwargs.get("labels", []) or [])
     # Planner-visible stub: declare a cxx_library without compiling test sources; Nix will build the test.
     # Filter provider deps from planner to avoid visibility / graph-edge to providers

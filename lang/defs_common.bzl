@@ -10,6 +10,13 @@ load(
 )
 load("//lang:nixpkg_labels.bzl", _append_nixpkg_labels = "append_nixpkg_labels", _normalize_nix_attr = "normalize_nix_attr", _normalize_nix_attr_probe = "normalize_nix_attr_probe")
 load(
+    "//lang:macro_kwargs.bzl",
+    _macro_kwargs_probe = "macro_kwargs_probe",
+    _pop_local_patch_dirs = "pop_local_patch_dirs",
+    _pop_nixpkg_deps = "pop_nixpkg_deps",
+    _pop_package_local_patch_dirs_and_nixpkg_deps = "pop_package_local_patch_dirs_and_nixpkg_deps",
+)
+load(
     "//lang:patch_inputs.bzl",
     _append_importer_patches = "append_importer_patches",
     _append_patch_inputs = "append_patch_inputs",
@@ -88,6 +95,11 @@ synthetic_dep_for_importer_patches_from_labels_probe = _synthetic_dep_for_import
 normalize_nix_attr = _normalize_nix_attr
 append_nixpkg_labels = _append_nixpkg_labels
 normalize_nix_attr_probe = _normalize_nix_attr_probe
+
+pop_local_patch_dirs = _pop_local_patch_dirs
+pop_nixpkg_deps = _pop_nixpkg_deps
+pop_package_local_patch_dirs_and_nixpkg_deps = _pop_package_local_patch_dirs_and_nixpkg_deps
+macro_kwargs_probe = _macro_kwargs_probe
 
 target_key_for_current_package = _target_key_for_current_package
 providers_for = _providers_for

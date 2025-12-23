@@ -1,6 +1,6 @@
 load("@prelude//:rules.bzl", "go_binary", "go_library", "go_test")
 load("//lang:defs_common.bzl", "dedupe_preserve", "normalize_labels", "stamp_labels", "include_package_local_patches", "realize_provider_edges")
-load("//lang:defs_common.bzl", "default_package_patch_dirs")
+load("//lang:defs_common.bzl", "pop_package_local_patch_dirs_and_nixpkg_deps")
 load("//lang:defs_common.bzl", "stamp_wasm_variant")
 load("//lang:planner_stub.bzl", "planner_stub", "planner_stub_with_package_local_patches")
 load("//lang:global_inputs.bzl", "global_nix_inputs")
@@ -11,8 +11,9 @@ load("//go/private:cgo_wiring.bzl", "apply_go_rule_stable_defaults", "apply_go_t
 
 
 def nix_go_library(name, **kwargs):
-    local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("go"))  # per-target local patch directories
-    nixpkg_deps = kwargs.pop("nixpkg_deps", [])
+    info = pop_package_local_patch_dirs_and_nixpkg_deps(kwargs, "go", append_labels = False)
+    local_patch_dirs = info.local_patch_dirs  # per-target local patch directories
+    nixpkg_deps = info.nixpkg_deps
     repo_cgo_deps = kwargs.pop("repo_cgo_deps", [])
     nix_cgo_pkgconfig = kwargs.pop("nix_cgo_pkgconfig", {})
     apply_go_tuple_labels(kwargs)
@@ -37,7 +38,8 @@ def nix_go_library(name, **kwargs):
 
 
 def nix_go_binary(name, **kwargs):
-    local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("go"))  # per-target local patch directories
+    info = pop_package_local_patch_dirs_and_nixpkg_deps(kwargs, "go", append_labels = False)
+    local_patch_dirs = info.local_patch_dirs  # per-target local patch directories
     # Preserve key macro inputs for any auto-wired helper targets we synthesize below.
     # (The helpers we call will `pop(...)` from kwargs, so capture first.)
     base_deps = kwargs.get("deps", []) or []
@@ -46,7 +48,7 @@ def nix_go_binary(name, **kwargs):
     goos = kwargs.get("goos", None)
     goarch = kwargs.get("goarch", None)
     cgo_enabled = kwargs.get("cgo_enabled", None)
-    nixpkg_deps = kwargs.pop("nixpkg_deps", [])
+    nixpkg_deps = info.nixpkg_deps
     repo_cgo_deps = kwargs.pop("repo_cgo_deps", [])
     nix_cgo_pkgconfig = kwargs.pop("nix_cgo_pkgconfig", {})
     apply_go_tuple_labels(kwargs)
@@ -88,7 +90,8 @@ def nix_go_binary(name, **kwargs):
 
 
 def nix_go_test(name, **kwargs):
-    nixpkg_deps = kwargs.pop("nixpkg_deps", [])
+    info = pop_package_local_patch_dirs_and_nixpkg_deps(kwargs, "go", append_labels = False)
+    nixpkg_deps = info.nixpkg_deps
     repo_cgo_deps = kwargs.pop("repo_cgo_deps", [])
     nix_cgo_pkgconfig = kwargs.pop("nix_cgo_pkgconfig", {})
     apply_go_tuple_labels(kwargs)
@@ -120,7 +123,8 @@ def nix_go_carchive(name, **kwargs):
     Buck graph; the actual archive is produced by the Nix planner build when
     a consumer (e.g., a C++ binary) is built.
     """
-    local_patch_dirs = kwargs.pop("local_patch_dirs", default_package_patch_dirs("go"))
+    info = pop_package_local_patch_dirs_and_nixpkg_deps(kwargs, "go", append_labels = False)
+    local_patch_dirs = info.local_patch_dirs
     # Stamp language/kind labels for planner detection
     labels = kwargs.get("labels", []) or []
     labels = dedupe_preserve(labels + ["lang:go", "kind:carchive"])
