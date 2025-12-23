@@ -1,6 +1,5 @@
 load("@prelude//:rules.bzl", "cxx_library", "cxx_binary", "cxx_test")
-load("//lang:defs_common.bzl", "stamp_labels", "include_package_local_patches", "dedupe_preserve", "stamp_wasm_variant", "realize_provider_edges", "strip_provider_targets")
-load("//lang:defs_common.bzl", "pop_package_local_patch_dirs_and_nixpkg_deps")
+load("//lang:defs_common.bzl", "dedupe_preserve", "pop_package_local_patch_dirs_and_nixpkg_deps", "prepare_package_local_wiring", "stamp_labels", "stamp_wasm_variant", "strip_provider_targets")
 load("//lang:defs_common.bzl", "wire_planner_visible_stub")
 load("//lang:global_inputs.bzl", "global_nix_inputs")
 load("//lang:planner_stub.bzl", "planner_stub", "planner_stub_with_package_local_patches")
@@ -10,19 +9,22 @@ load("//cpp/private:nix_build.bzl", "cpp_nix_build")
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
 
 def _cpp_common(name, kind, kwargs):
-    info = pop_package_local_patch_dirs_and_nixpkg_deps(kwargs, "cpp", append_labels = True)
-    local_patch_dirs = info.local_patch_dirs
     deps = kwargs.pop("deps", [])
     nix_inputs = global_nix_inputs()
 
-    stamp_labels(kwargs, "cpp", kind)
+    wiring = prepare_package_local_wiring(
+        name = name,
+        kwargs = kwargs,
+        lang = "cpp",
+        kind = kind,
+        MODULE_PROVIDERS = MODULE_PROVIDERS,
+        base_deps = deps,
+    )
     if kind == "addon":
         addon_name = kwargs.pop("addon_name", None)
         if addon_name:
             kwargs["labels"] = dedupe_preserve((kwargs.get("labels", []) or []) + ["addon_name:%s" % addon_name])
-    include_package_local_patches(kwargs, "cpp", local_patch_dirs)
     srcs = kwargs.get("srcs", []) or []
-    deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps)
 
     out = sanitize_to_bin_name("//%s:%s" % (native.package_name(), name))
     if kind == "lib":
@@ -35,7 +37,7 @@ def _cpp_common(name, kind, kwargs):
         out = out,
         kind = kind,
         self_label = "//%s:%s" % (native.package_name(), name),
-        deps = deps,
+        deps = wiring.deps,
         srcs = srcs,
         labels = kwargs.get("labels", []) or [],
         nix_inputs = nix_inputs,
@@ -53,21 +55,26 @@ def nix_cpp_wasm_static_lib(name, **kwargs):
     Stamps:
       - lang:cpp, kind:lib, flavor:wasm
     """
-    info = pop_package_local_patch_dirs_and_nixpkg_deps(kwargs, "cpp", append_labels = True)
-    local_patch_dirs = info.local_patch_dirs
     deps = kwargs.pop("deps", [])
     nix_inputs = global_nix_inputs()
     # Uniform WASM labeling across languages
     stamp_wasm_variant(kwargs, "cpp", "static")
-    include_package_local_patches(kwargs, "cpp", local_patch_dirs)
+    wiring = prepare_package_local_wiring(
+        name = name,
+        kwargs = kwargs,
+        lang = "cpp",
+        kind = None,
+        MODULE_PROVIDERS = MODULE_PROVIDERS,
+        base_deps = deps,
+        stamp = False,
+    )
     srcs = kwargs.get("srcs", []) or []
-    deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps)
     cpp_nix_build(
         name = name,
         out = sanitize_to_bin_name("//%s:%s" % (native.package_name(), name)) + ".a",
         kind = "lib",
         self_label = "//%s:%s" % (native.package_name(), name),
-        deps = deps,
+        deps = wiring.deps,
         srcs = srcs,
         labels = kwargs.get("labels", []) or [],
         nix_inputs = nix_inputs,

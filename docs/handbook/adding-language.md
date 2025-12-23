@@ -39,11 +39,41 @@ This guide explains how to add a new language to the build without touching core
 
 - Starlark (`lang/defs_common.bzl`):
 
-  When authoring a package-local patching macro (Go/C++ style), keep “pop and normalize” boilerplate out of your language macro files. Use the shared helper so defaults and tolerance rules don’t drift across languages:
-  - `pop_package_local_patch_dirs_and_nixpkg_deps(kwargs, "<lang>")`
-    - Pops `local_patch_dirs` with a language default (`default_package_patch_dirs("<lang>")`)
-    - Pops `nixpkg_deps` as a list (non-list shapes are ignored deterministically)
-    - Optionally appends normalized `nixpkg:` labels via the canonical normalizer (`append_nixpkg_labels`)
+  When authoring a **package-local patching macro** (Go/C++ style), avoid re-assembling the “patch dirs + nixpkg deps + labels + providers” sequence by hand. Use the shared helper so defaults and tolerance rules don’t drift across languages.
+  - `prepare_package_local_wiring(...)`
+    - Pops `local_patch_dirs` with a language default (`default_package_patch_dirs(lang)`)
+    - Pops `nixpkg_deps` and appends normalized `nixpkg:` labels (canonical normalizer)
+    - Stamps `lang:*` and `kind:*` labels (or you can opt out when another stamper is used)
+    - Includes package-local `*.patch` files as action inputs (via `srcs`)
+    - Realizes provider edges deterministically (via `MODULE_PROVIDERS`)
+
+  Minimal example:
+
+```python
+load("@prelude//:rules.bzl", "genrule")
+load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
+load("//lang:defs_common.bzl", "prepare_package_local_wiring")
+
+def my_pkg_local_rule(name, **kwargs):
+    deps = kwargs.pop("deps", [])
+    wiring = prepare_package_local_wiring(
+        name = name,
+        kwargs = kwargs,
+        lang = "cpp",
+        kind = "lib",
+        MODULE_PROVIDERS = MODULE_PROVIDERS,
+        base_deps = deps,
+    )
+    genrule(
+        name = name,
+        srcs = kwargs.get("srcs", []) or [],
+        out = name + ".stamp",
+        cmd = ": > $OUT",
+        deps = wiring.deps,
+        labels = kwargs.get("labels", []) or [],
+        visibility = kwargs.get("visibility", []),
+    )
+```
 
 ### Python notes
 

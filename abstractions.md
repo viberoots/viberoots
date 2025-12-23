@@ -211,7 +211,7 @@ I treat patch invalidation as two explicit models:
 
 - **Starlark package-local**:
   - `lang/patch_inputs.bzl:include_package_local_patches` and `lang/patch_inputs.bzl:default_package_patch_dirs`.
-  - `lang/macro_kwargs.bzl:pop_package_local_patch_dirs_and_nixpkg_deps` (macro-side kwarg normalization so Go/C++ macros don’t duplicate `kwargs.pop(...)` boilerplate).
+  - `lang/package_local_wiring.bzl:prepare_package_local_wiring` (macro-side helper that composes kwarg normalization, nixpkg label stamping, patch input inclusion, and provider-edge realization deterministically).
 - **Starlark importer-local**: `lang/patch_inputs.bzl:include_importer_patches_from_labels` plus `lang/importer_wiring.bzl:attach_importer_patch_inputs`.
 - **TypeScript provider sync**: `tools/lib/provider-sync-driver.ts` and language adapters in `tools/buck/providers/*`.
 

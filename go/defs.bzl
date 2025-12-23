@@ -1,28 +1,29 @@
 load("@prelude//:rules.bzl", "go_binary", "go_library", "go_test")
-load("//lang:defs_common.bzl", "dedupe_preserve", "normalize_labels", "stamp_labels", "include_package_local_patches", "realize_provider_edges")
-load("//lang:defs_common.bzl", "pop_package_local_patch_dirs_and_nixpkg_deps")
-load("//lang:defs_common.bzl", "stamp_wasm_variant")
+load("//lang:defs_common.bzl", "dedupe_preserve", "normalize_labels", "prepare_package_local_wiring", "stamp_wasm_variant")
 load("//lang:planner_stub.bzl", "planner_stub", "planner_stub_with_package_local_patches")
 load("//lang:global_inputs.bzl", "global_nix_inputs")
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
 load("//lang:defs_common.bzl", "wire_planner_visible_inputs", "wire_planner_visible_stub")
 load("//go/private:nix_build_wasm.bzl", "go_nix_build_wasm")
-load("//go/private:cgo_wiring.bzl", "apply_go_rule_stable_defaults", "apply_go_tuple_labels", "configure_cgo_and_merge_deps")
+load("//go/private:cgo_wiring.bzl", "apply_go_rule_stable_defaults", "apply_go_tuple_labels", "configure_cgo_kwargs")
 
 
 def nix_go_library(name, **kwargs):
-    info = pop_package_local_patch_dirs_and_nixpkg_deps(kwargs, "go", append_labels = False)
-    local_patch_dirs = info.local_patch_dirs  # per-target local patch directories
-    nixpkg_deps = info.nixpkg_deps
     repo_cgo_deps = kwargs.pop("repo_cgo_deps", [])
     nix_cgo_pkgconfig = kwargs.pop("nix_cgo_pkgconfig", {})
+    deps = kwargs.pop("deps", [])
+    extra = normalize_labels(native.package_name(), kwargs.pop("extra_module_providers", []))
     apply_go_tuple_labels(kwargs)
-    # PR3/PR25: Stamp primary target labels for language/kind via helper
-    stamp_labels(kwargs, "go", "lib")
-    merged = configure_cgo_and_merge_deps(name, kwargs, nixpkg_deps, repo_cgo_deps, MODULE_PROVIDERS)
-    # Include local patch files in srcs so Buck invalidates precisely on patch changes
-    include_package_local_patches(kwargs, "go", local_patch_dirs)
-    go_library(name = name, deps = merged, **kwargs)
+    wiring = prepare_package_local_wiring(
+        name = name,
+        kwargs = kwargs,
+        lang = "go",
+        kind = "lib",
+        MODULE_PROVIDERS = MODULE_PROVIDERS,
+        base_deps = deps + repo_cgo_deps + extra,
+    )
+    configure_cgo_kwargs(kwargs, wiring.nixpkg_deps, repo_cgo_deps)
+    go_library(name = name, deps = wiring.deps, **kwargs)
 
     # Auto-wire a go_test target if *_test.go files exist alongside the library.
     # This keeps scaffolds simple: adding a test file is enough; no TARGETS edits.
@@ -38,8 +39,6 @@ def nix_go_library(name, **kwargs):
 
 
 def nix_go_binary(name, **kwargs):
-    info = pop_package_local_patch_dirs_and_nixpkg_deps(kwargs, "go", append_labels = False)
-    local_patch_dirs = info.local_patch_dirs  # per-target local patch directories
     # Preserve key macro inputs for any auto-wired helper targets we synthesize below.
     # (The helpers we call will `pop(...)` from kwargs, so capture first.)
     base_deps = kwargs.get("deps", []) or []
@@ -48,17 +47,22 @@ def nix_go_binary(name, **kwargs):
     goos = kwargs.get("goos", None)
     goarch = kwargs.get("goarch", None)
     cgo_enabled = kwargs.get("cgo_enabled", None)
-    nixpkg_deps = info.nixpkg_deps
     repo_cgo_deps = kwargs.pop("repo_cgo_deps", [])
     nix_cgo_pkgconfig = kwargs.pop("nix_cgo_pkgconfig", {})
     apply_go_tuple_labels(kwargs)
-    # PR3/PR25: Stamp primary target labels for language/kind via helper
-    stamp_labels(kwargs, "go", "bin")
-    merged = configure_cgo_and_merge_deps(name, kwargs, nixpkg_deps, repo_cgo_deps, MODULE_PROVIDERS)
+    deps = kwargs.pop("deps", [])
+    extra = normalize_labels(native.package_name(), kwargs.pop("extra_module_providers", []))
+    wiring = prepare_package_local_wiring(
+        name = name,
+        kwargs = kwargs,
+        lang = "go",
+        kind = "bin",
+        MODULE_PROVIDERS = MODULE_PROVIDERS,
+        base_deps = deps + repo_cgo_deps + extra,
+    )
+    configure_cgo_kwargs(kwargs, wiring.nixpkg_deps, repo_cgo_deps)
     apply_go_rule_stable_defaults(kwargs)
-    # Include local patch files in srcs so Buck invalidates precisely on patch changes
-    include_package_local_patches(kwargs, "go", local_patch_dirs)
-    go_binary(name = name, deps = merged, **kwargs)
+    go_binary(name = name, deps = wiring.deps, **kwargs)
 
     # Auto-wire a go_test target for binaries if *_test.go exists under cmd/<name>/**
     # This allows CLI packages to have local tests with no TARGETS edits.
@@ -77,9 +81,9 @@ def nix_go_binary(name, **kwargs):
             goos = goos,
             goarch = goarch,
             cgo_enabled = cgo_enabled,
-            nixpkg_deps = nixpkg_deps,
+            nixpkg_deps = wiring.nixpkg_deps,
             repo_cgo_deps = repo_cgo_deps,
-            local_patch_dirs = local_patch_dirs,
+            local_patch_dirs = wiring.local_patch_dirs,
             visibility = ["PUBLIC"],
         )
         nix_go_test(
@@ -90,13 +94,20 @@ def nix_go_binary(name, **kwargs):
 
 
 def nix_go_test(name, **kwargs):
-    info = pop_package_local_patch_dirs_and_nixpkg_deps(kwargs, "go", append_labels = False)
-    nixpkg_deps = info.nixpkg_deps
     repo_cgo_deps = kwargs.pop("repo_cgo_deps", [])
     nix_cgo_pkgconfig = kwargs.pop("nix_cgo_pkgconfig", {})
+    deps = kwargs.pop("deps", [])
+    extra = normalize_labels(native.package_name(), kwargs.pop("extra_module_providers", []))
     apply_go_tuple_labels(kwargs)
-    stamp_labels(kwargs, "go", "test")
-    merged = configure_cgo_and_merge_deps(name, kwargs, nixpkg_deps, repo_cgo_deps, MODULE_PROVIDERS)
+    wiring = prepare_package_local_wiring(
+        name = name,
+        kwargs = kwargs,
+        lang = "go",
+        kind = "test",
+        MODULE_PROVIDERS = MODULE_PROVIDERS,
+        base_deps = deps + repo_cgo_deps + extra,
+    )
+    configure_cgo_kwargs(kwargs, wiring.nixpkg_deps, repo_cgo_deps)
 
     # If a library is provided, ensure we don't pass the same target in deps.
     pkg = native.package_name()
@@ -105,10 +116,12 @@ def nix_go_test(name, **kwargs):
         abs_lib = lib
         if lib.startswith(":"):
             abs_lib = "//%s:%s" % (pkg, lib[1:])
-        merged = [d for d in merged if d not in (lib, abs_lib)]
+        deps_out = [d for d in wiring.deps if d not in (lib, abs_lib)]
+    else:
+        deps_out = wiring.deps
 
     apply_go_rule_stable_defaults(kwargs)
-    go_test(name = name, deps = merged, **kwargs)
+    go_test(name = name, deps = deps_out, **kwargs)
 
 # Third-party shim: expose vendor-provided sources as a go_library while
 # allowing an explicit import path via package map flags
@@ -123,8 +136,15 @@ def nix_go_carchive(name, **kwargs):
     Buck graph; the actual archive is produced by the Nix planner build when
     a consumer (e.g., a C++ binary) is built.
     """
-    info = pop_package_local_patch_dirs_and_nixpkg_deps(kwargs, "go", append_labels = False)
-    local_patch_dirs = info.local_patch_dirs
+    wiring = prepare_package_local_wiring(
+        name = name,
+        kwargs = kwargs,
+        lang = "go",
+        kind = None,
+        MODULE_PROVIDERS = MODULE_PROVIDERS,
+        base_deps = [],
+        stamp = False,
+    )
     # Stamp language/kind labels for planner detection
     labels = kwargs.get("labels", []) or []
     labels = dedupe_preserve(labels + ["lang:go", "kind:carchive"])
@@ -136,7 +156,7 @@ def nix_go_carchive(name, **kwargs):
         name = name,
         out = name + ".stamp",
         lang = "go",
-        local_patch_dirs = local_patch_dirs,
+        local_patch_dirs = wiring.local_patch_dirs,
         deps = deps,
         srcs = srcs,
         labels = labels,

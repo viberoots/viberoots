@@ -1,4 +1,4 @@
-load("//lang:defs_common.bzl", "append_nixpkg_labels", "dedupe_preserve", "normalize_labels", "realize_provider_edges")
+load("//lang:defs_common.bzl", "dedupe_preserve")
 load("//go/private:labels.bzl", "append_tuple_labels")
 
 def apply_go_tuple_labels(kwargs):
@@ -37,19 +37,12 @@ def _apply_cgo_labels(kwargs, nixpkg_deps, repo_cgo_deps):
         return
     labels = kwargs.get("labels", []) or []
     kwargs["labels"] = dedupe_preserve(labels + ["cgo:enabled"])
-    append_nixpkg_labels(kwargs, nixpkg_deps)
 
-def configure_cgo_and_merge_deps(name, kwargs, nixpkg_deps, repo_cgo_deps, module_providers):
-    deps = kwargs.pop("deps", [])
-    extra = normalize_labels(native.package_name(), kwargs.pop("extra_module_providers", []))
-
+def configure_cgo_kwargs(kwargs, nixpkg_deps, repo_cgo_deps):
     _apply_cgo_labels(kwargs, nixpkg_deps, repo_cgo_deps)
     configure_go_toolchains(kwargs)
 
     if _srcs_imply_cgo(kwargs) or len(nixpkg_deps) > 0 or len(repo_cgo_deps) > 0:
         kwargs["override_cgo_enabled"] = True
-
-    base = deps + repo_cgo_deps + extra
-    return realize_provider_edges(module_providers, name, base = base)
 
 

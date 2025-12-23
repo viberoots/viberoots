@@ -11,9 +11,9 @@ test("go/defs.bzl exports nix_go_* macros and uses shared realize_provider_edges
       "def nix_go_binary(",
       "def nix_go_test(",
       // Ensure we are delegating to private helpers (policy lives in go/private)
-      'load("//lang:defs_common.bzl", "dedupe_preserve", "normalize_labels", "stamp_labels", "include_package_local_patches", "realize_provider_edges")',
-      'load("//go/private:cgo_wiring.bzl", "apply_go_rule_stable_defaults", "apply_go_tuple_labels", "configure_cgo_and_merge_deps")',
-      "configure_cgo_and_merge_deps(",
+      'load("//lang:defs_common.bzl", "dedupe_preserve", "normalize_labels", "prepare_package_local_wiring", "stamp_wasm_variant")',
+      'load("//go/private:cgo_wiring.bzl", "apply_go_rule_stable_defaults", "apply_go_tuple_labels", "configure_cgo_kwargs")',
+      "prepare_package_local_wiring(",
     ];
     for (const needle of need) {
       if (!txt.includes(needle)) {
@@ -30,9 +30,8 @@ test("go/defs.bzl exports nix_go_* macros and uses shared realize_provider_edges
     // Policy lives in go/private; ensure that helper is present and uses shared provider-edge wiring.
     const privateTxt = await fsp.readFile("go/private/cgo_wiring.bzl", "utf8");
     const privateNeed = [
-      'load("//lang:defs_common.bzl", "append_nixpkg_labels", "dedupe_preserve", "normalize_labels", "realize_provider_edges")',
       'load("//go/private:labels.bzl", "append_tuple_labels")',
-      "realize_provider_edges(",
+      "def configure_cgo_kwargs(",
     ];
     for (const needle of privateNeed) {
       if (!privateTxt.includes(needle)) {

@@ -36,11 +36,6 @@ test(
       // Scaffold with tests default-on
       await $`scaf new node cli demo --yes`;
 
-      // Commit scaffold so Nix flake sees importer under git+file sources
-      await $({
-        env,
-      })`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
-
       const importer = "apps/demo";
       const lockfile = path.join(importer, "pnpm-lock.yaml");
       const sanitized = importer
@@ -48,25 +43,16 @@ test(
         .replace(/:/g, "-")
         .replace(/[\/\s]+/g, "-");
 
-      // 1) Ensure lockfile exists first; if missing, generate it explicitly (dev deps included)
-      let hasLock = await fsp
-        .access(path.join(tmp, lockfile))
-        .then(() => true)
-        .catch(() => false);
-      if (!hasLock) {
-        await $({
-          stdio: "inherit",
-          env,
-        })`bash --noprofile --norc -c 'set -euo pipefail; mkdir -p "${tmp}/${importer}/.pnpm-home" "${tmp}/${importer}/.pnpm-store"; export PNPM_HOME="${tmp}/${importer}/.pnpm-home"; nix run ${tmp}#pnpm --accept-flake-config -- config set store-dir "${tmp}/${importer}/.pnpm-store"; nix run ${tmp}#pnpm --accept-flake-config -- install --filter "./${importer}" --lockfile-only --prod=false --ignore-scripts --lockfile-dir "./${importer}" --dir "./${importer}"'`;
-        hasLock = await fsp
-          .access(path.join(tmp, lockfile))
-          .then(() => true)
-          .catch(() => false);
-      }
-      // Commit the lockfile so pure flake snapshots see it
+      // Require the primary scaffold path to produce the lockfile.
+      await fsp.access(path.join(tmp, lockfile));
+
+      // Commit scaffold so Nix flake sees importer under git+file sources (including the lockfile).
       await $({
         env,
-      })`bash --noprofile --norc -c 'git -C ${tmp} add ${lockfile} && git -C ${tmp} commit -m "chore(test): add importer lockfile"'`.nothrow();
+      })`bash --noprofile --norc -c 'set -euo pipefail; git -C ${tmp} config user.email test@example.com; git -C ${tmp} config user.name test; git -C ${tmp} add -A; git -C ${tmp} commit -m scaffold'`;
+      await $({
+        env,
+      })`bash --noprofile --norc -c 'set -euo pipefail; git -C ${tmp} ls-files --error-unmatch ${lockfile} >/dev/null'`;
 
       // Align the fixed-output hash mapping for this importer before building node-test.
       await $({

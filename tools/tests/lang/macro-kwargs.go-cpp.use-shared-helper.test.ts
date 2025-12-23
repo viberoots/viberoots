@@ -25,11 +25,11 @@ test("go/cpp macros: local_patch_dirs and nixpkg_deps pop logic is centralized i
   }
 
   assert.ok(
-    goDefs.includes("pop_package_local_patch_dirs_and_nixpkg_deps("),
-    "expected go/defs.bzl to call pop_package_local_patch_dirs_and_nixpkg_deps(...)",
+    goDefs.includes("prepare_package_local_wiring("),
+    "expected go/defs.bzl to call prepare_package_local_wiring(...)",
   );
   assert.ok(
-    cppDefs.includes("pop_package_local_patch_dirs_and_nixpkg_deps("),
-    "expected cpp/defs.bzl to call pop_package_local_patch_dirs_and_nixpkg_deps(...)",
+    cppDefs.includes("prepare_package_local_wiring("),
+    "expected cpp/defs.bzl to call prepare_package_local_wiring(...)",
   );
 });
