@@ -24,8 +24,11 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir go_tuple_labels cquery "attr(labels, '.*', //tmp:lib)" --json --output-attribute labels`;
-    if (probe.exitCode !== 0) return; // skip if prelude not available
+    })`buck2 --isolation-dir go_tuple_labels cquery --target-platforms //:no_cgo --json --output-attribute labels //tmp:lib`;
+    if (probe.exitCode !== 0) {
+      console.error(String(probe.stderr || probe.stdout || ""));
+      process.exit(2);
+    }
     const parsed = JSON.parse(String(probe.stdout || "")) as unknown;
     const values = Array.isArray(parsed)
       ? (parsed as Array<{ labels?: string[] }>)

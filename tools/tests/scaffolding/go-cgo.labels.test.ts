@@ -4,22 +4,14 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("nix_go_library stamps cgo:enabled and nixpkg labels when nixpkg_deps set", async () => {
   await runInTemp("go-cgo-labels", async (tmp, $) => {
-    await $({
-      cwd: tmp,
-    })`bash --noprofile --norc -c 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<'\''EOF'\''
-load("//third_party/providers:defs_cpp.bzl", "nix_cxx_library")
-nix_cxx_library(name="nix_pkgs_zlib", attr="pkgs.zlib")
-EOF'`;
-
-    // Provide an auto_map with (optional) mapping; labels test does not rely on deps wiring
+    // Provide an auto_map mapping file; this label-only test must not depend on provider edges.
+    // (If MODULE_PROVIDERS maps this target to a provider, Buck package visibility rules apply
+    // and the test becomes a provider-wiring test instead of a label-stamping test.)
     await $({
       cwd: tmp,
     })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
 # GENERATED for test (mapping can be empty for this label-only check)
 MODULE_PROVIDERS = {
-    "//tmp:lib": [
-        "//third_party/providers:nix_pkgs_zlib",
-    ],
 }
 EOF'`;
 
@@ -40,8 +32,11 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir cgo_labels cquery "attr(labels, '.*', //tmp:lib)" --json --output-attribute labels`;
-    if (probe.exitCode !== 0) return; // skip if prelude not available
+    })`buck2 --isolation-dir cgo_labels cquery --target-platforms //:no_cgo --json --output-attribute labels //tmp:lib`;
+    if (probe.exitCode !== 0) {
+      console.error(String(probe.stderr || probe.stdout || ""));
+      process.exit(2);
+    }
     const parsed = JSON.parse(String(probe.stdout || "")) as unknown;
     const values = Array.isArray(parsed)
       ? (parsed as Array<{ labels?: string[] }>)
