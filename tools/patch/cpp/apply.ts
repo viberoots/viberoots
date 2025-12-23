@@ -18,9 +18,6 @@ import { clearOverride } from "../dev-overrides";
 export async function doApply(args: string[]) {
   console.error("[patch-cpp] apply: begin");
   const flags = parseApplyFlags(args);
-  if (flags.force) {
-    (global as any).argv = Object.assign({}, (global as any).argv, { force: true });
-  }
   const attrInput = (flags.restArgs[0] || "").trim();
   if (!attrInput) throw new Error("missing <attr> nixpkgs attribute, e.g. pkgs.zlib or zlib");
   const attrNorm = normalizeNixAttr(attrInput);
@@ -132,7 +129,7 @@ export async function doApply(args: string[]) {
   const root = repoRoot();
   const patchDir = resolvePatchDir("patches/cpp", flags.targetPkg, flags.overridePatchDir, root);
   const dst = path.join(patchDir, `${fileKey}@${sess.version}.patch`);
-  const wrote = await writePatchIfChanged(dst, diff, !!(global as any).argv.force);
+  const wrote = await writePatchIfChanged(dst, diff, flags.force);
   if (wrote === "written") {
     console.error("[patch-cpp] apply: wrote patch", dst);
   }

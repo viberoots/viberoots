@@ -4,6 +4,7 @@
 //   node tools/dev/buck-kill-stale.ts --list
 //   node tools/dev/buck-kill-stale.ts --kill --include exporter- --dry-run
 //   node tools/dev/buck-kill-stale.ts --kill --include '^zxtest-' --yes
+import { getFlagBool, getFlagStr } from "../lib/cli.ts";
 
 type Args = {
   list?: boolean;
@@ -80,13 +81,14 @@ async function confirm(question: string): Promise<boolean> {
 }
 
 async function main() {
-  const argv = (global as any).argv as Args;
-  const listOnly = Boolean(argv.list) || (!argv.kill && !argv.list);
-  const doKill = Boolean(argv.kill);
-  const includeRe = toRegex(argv.include);
-  const excludeRe = toRegex(argv.exclude);
-  const dryRun = Boolean(argv.dryRun);
-  const autoYes = Boolean(argv.yes);
+  const listFlag = getFlagBool("list");
+  const killFlag = getFlagBool("kill");
+  const includeRe = toRegex(getFlagStr("include", "").trim());
+  const excludeRe = toRegex(getFlagStr("exclude", "").trim());
+  const dryRun = getFlagBool("dry-run") || getFlagBool("dryRun");
+  const autoYes = getFlagBool("yes");
+  const listOnly = listFlag || (!killFlag && !listFlag);
+  const doKill = killFlag;
 
   const lines = await psLines();
   const entries = extractBuckIsolations(lines);

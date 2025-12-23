@@ -9,9 +9,9 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { getFlagStr } from "../lib/cli.ts";
 
 type Args = { minutes?: string };
-const argv = (global as any).argv as Args;
 
 function minutesToMs(s: string | undefined, def = 30): number {
   const n = Math.max(1, Number(s || `${def}`));
@@ -34,6 +34,7 @@ async function rmRf(p: string): Promise<void> {
 
 async function main() {
   const repoRoot = process.cwd();
+  const argv = { minutes: getFlagStr("minutes", "").trim() } satisfies Args;
   const cutoffMs = Date.now() - minutesToMs(argv.minutes, 30);
 
   // 1) Remove stale buck-impure-* dirs under buck-out/tmp

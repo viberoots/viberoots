@@ -1,4 +1,4 @@
-import { getFlagStr, hasFlag } from "../../lib/cli.ts";
+import { getFlagBool, getFlagStr, hasFlag } from "../../lib/cli.ts";
 import type { PatchesLintConfig, PatchesLintFormat, PatchesLintLang } from "./types.ts";
 
 function normalizeFormat(v: unknown): PatchesLintFormat {
@@ -25,14 +25,9 @@ function strictFromValue(v: unknown): boolean {
 function readStrictFlag(): boolean {
   if (process.env.CI === "true") return true;
 
-  const g: any = (globalThis as any).argv;
-  if (g && typeof g === "object" && Object.prototype.hasOwnProperty.call(g, "strict")) {
-    return strictFromValue(g.strict);
-  }
-
   if (!hasFlag("strict")) return false;
-  // `getFlagStr` returns "" for `--strict` with no value; interpret that as true.
-  return strictFromValue(getFlagStr("strict", ""));
+  // Preserve: `--strict` implies true; explicit values can flip it.
+  return getFlagBool("strict") || strictFromValue(getFlagStr("strict", ""));
 }
 
 export function readPatchesLintConfig(): PatchesLintConfig {

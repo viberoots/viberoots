@@ -106,6 +106,41 @@ export function hasFlag(name: string): boolean {
 }
 
 /**
+ * getPositionals
+ * Returns positional args in a consistent way across zx (global argv) and plain node (process.argv).
+ *
+ * Rules:
+ * - If zx/yargs populated `globalThis.argv._`, use it.
+ * - Otherwise, parse process.argv:
+ *   - Skip flags like `--name` and `--name=value`
+ *   - If a flag is in `--name value` form, also skip the value
+ *   - Stop interpreting flags after `--` (everything after is positional)
+ */
+export function getPositionals(): string[] {
+  const g: any = (globalThis as any).argv;
+  if (g && Array.isArray(g._)) return (g._ as unknown[]).map((v) => String(v));
+  const raw: string[] = Array.isArray(process.argv) ? process.argv.slice(2) : [];
+  const out: string[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    const a = raw[i] || "";
+    if (a === "--") {
+      out.push(...raw.slice(i + 1));
+      break;
+    }
+    if (a.startsWith("--")) {
+      // equals-form: `--name=value`
+      if (a.includes("=")) continue;
+      // two-token form: `--name value` → skip value token when present
+      const nxt = raw[i + 1] || "";
+      if (nxt && !nxt.startsWith("--")) i++;
+      continue;
+    }
+    out.push(a);
+  }
+  return out;
+}
+
+/**
  * echoSnippetRequested
  * Returns true when the caller should print an export snippet instead of
  * mutating in‑process environment state. Detection is uniform:

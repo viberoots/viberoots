@@ -2,6 +2,7 @@
 import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { getFlagBool } from "../lib/cli.ts";
 
 async function openInBrowser(filePath: string): Promise<void> {
   try {
@@ -22,8 +23,8 @@ async function openInBrowser(filePath: string): Promise<void> {
 
 async function main(): Promise<void> {
   const root = "coverage";
-  const wantJson = process.argv.includes("--json") || process.argv.includes("-j");
-  const wantOpen = process.argv.includes("--open-browser") || process.argv.includes("-b");
+  const wantJson = getFlagBool("json");
+  const wantOpen = getFlagBool("open-browser");
 
   if (!fs.existsSync(root)) {
     const msg = "No coverage yet";

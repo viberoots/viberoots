@@ -14,7 +14,7 @@ try {
   } catch {}
 }
 import path from "node:path";
-import { getFlagStr, getFlagBool } from "../lib/cli.ts";
+import { getFlagStr, getFlagBool, getPositionals } from "../lib/cli.ts";
 import { patchInvalidationStrategyForLang } from "../lib/lang-contracts.ts";
 
 type SubcommandName = "start" | "apply" | "reset" | "session" | "remove" | "help";
@@ -54,20 +54,7 @@ function usage(msg?: string) {
   process.exit(2);
 }
 
-function positionalArgs(): string[] {
-  const g: any = (global as any).argv;
-  if (g && Array.isArray(g._)) return g._ as string[];
-  const raw = (process.argv || []).slice(2);
-  const out: string[] = [];
-  for (let i = 0; i < raw.length; i++) {
-    const a = raw[i] || "";
-    if (a.startsWith("--")) continue; // keep behavior: treat non-flags as positionals
-    out.push(a);
-  }
-  return out;
-}
-
-const [_subRaw, _lang, ...positional] = positionalArgs();
+const [_subRaw, _lang, ...positional] = getPositionals();
 const sub = ((_subRaw as string) || "help").toLowerCase() as SubcommandName;
 const langFlag = getFlagStr("lang", "");
 const lang = (_lang as string) || langFlag;

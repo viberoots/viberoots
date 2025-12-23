@@ -3,27 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { Node } from "./types.ts";
 import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const.ts";
-
-export const attrList = [
-  "name",
-  "rule_type",
-  "buck.type",
-  "srcs",
-  "buck.srcs",
-  "nix_srcs",
-  "deps",
-  "buck.deps",
-  "labels",
-  "buck.labels",
-  "args",
-  "env",
-  "main",
-  "main_class",
-  "includes",
-  "defines",
-  "cflags",
-  "ldflags",
-];
+import { getFlagStr } from "../../lib/cli.ts";
 
 export async function cqueryNodes(scope: string, attrs: string[]): Promise<Node[]> {
   const flags = attrs.flatMap((a) => ["--output-attribute", a]);
@@ -220,7 +200,7 @@ export async function writeIfChangedJSON(file: string, data: any) {
   await writeIfChanged(file, txt);
 }
 
-export function parseArgs(argv: any): {
+export function parseArgs(): {
   out: string;
   scope: string;
   simulate: string;
@@ -229,18 +209,20 @@ export function parseArgs(argv: any): {
   metricsOut: string;
   validation: "warn" | "error";
 } {
-  const a: Record<string, any> = argv && typeof argv === "object" ? argv : {};
+  const maxParallelRaw =
+    getFlagStr("max-parallel", "").trim() || getFlagStr("maxParallel", "").trim();
+  const cacheDirRaw = getFlagStr("cache-dir", "").trim() || getFlagStr("cacheDir", "").trim();
+  const metricsRaw = getFlagStr("metrics-out", "").trim() || getFlagStr("metricsOut", "").trim();
+  const validationRaw = getFlagStr("validation", "").trim();
+  const envValidation = String(process.env.EXPORTER_VALIDATION || "").trim();
+  const effectiveValidation = (validationRaw || envValidation || "error").trim();
   return {
-    out: (a.out as string) || DEFAULT_GRAPH_PATH,
-    scope: (a.scope as string) || "",
-    simulate: (a.simulate as string) || "",
-    maxParallel: Number(a["max-parallel"] || 4),
-    cacheDir: (a["cache-dir"] as string) || "tools/buck/.export-cache",
-    metricsOut: (a["metrics-out"] as string) || "",
-    validation:
-      ((a["validation"] as string) || (process.env.EXPORTER_VALIDATION as string) || "error") ===
-      "warn"
-        ? "warn"
-        : "error",
+    out: getFlagStr("out", DEFAULT_GRAPH_PATH),
+    scope: getFlagStr("scope", ""),
+    simulate: getFlagStr("simulate", ""),
+    maxParallel: Number(maxParallelRaw || 4),
+    cacheDir: cacheDirRaw || "tools/buck/.export-cache",
+    metricsOut: metricsRaw || "",
+    validation: effectiveValidation === "warn" ? "warn" : "error",
   };
 }

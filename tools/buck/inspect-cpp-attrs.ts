@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { readCompositeGraph } from "../lib/graph-view.ts";
 import { normalizeTargetLabel } from "../lib/labels.ts";
+import { getFlagBool, getFlagList, getFlagStr } from "../lib/cli.ts";
 
 type Args = {
   target?: string | string[];
@@ -26,9 +27,13 @@ function extractCppAttrs(node: GraphNode): string[] {
 }
 
 async function main() {
-  const a = (global as any).argv as Args;
+  const a = {
+    graph: getFlagStr("graph", "").trim(),
+    json: getFlagBool("json"),
+    target: getFlagList("target"),
+  } satisfies Args;
   const { nodes } = await readCompositeGraph({
-    graphPath: (a.graph as string) || undefined,
+    graphPath: a.graph || undefined,
   });
 
   const wanted = new Set<string>(toArray<string>(a.target).map((t) => normalizeTargetLabel(t)));

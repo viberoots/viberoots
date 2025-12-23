@@ -5,6 +5,7 @@ This handbook summarizes project-wide conventions that keep behavior determinist
 - Scripts
   - Use zx TypeScript with the hashbang `#!/usr/bin/env zx-wrapper`.
   - Glue scripts run outside Nix; do not wrap them in `nix run`.
+  - Tooling scripts must parse flags via `tools/lib/cli.ts` (`getFlagStr`, `getFlagBool`, `getFlagList`, `hasFlag`) rather than hand-rolling `process.argv` parsing or reading `(globalThis as any).argv` directly.
 
 - TARGETS over BUCK
   - Use `TARGETS` files rather than `BUCK` for new rules and wiring.

@@ -11,7 +11,7 @@
 import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { getFlagStr } from "../lib/cli.ts";
+import { getFlagStr, hasFlag } from "../lib/cli.ts";
 import { sanitizeName } from "../lib/sanitize.ts";
 
 // No search/fallbacks: the caller must set FLK_ROOT or WORKSPACE_ROOT to a flake root.
@@ -44,7 +44,7 @@ async function main() {
   const importer = getFlagStr("importer", "").trim();
   const name = getFlagStr("name", "").trim();
   const out = getFlagStr("out", "").trim();
-  if (process.argv.includes("--entry")) {
+  if (hasFlag("entry")) {
     fail(
       "node-cli-bundle: --entry is not supported. Bundled mode uses a fixed entry (src/index.ts) in the flake.",
     );

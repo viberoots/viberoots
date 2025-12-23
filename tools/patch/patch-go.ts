@@ -80,9 +80,6 @@ async function doStart(args: string[]) {
 
 async function doApply(args: string[]) {
   const flags = parseApplyFlags(args);
-  if (flags.force) {
-    (global as any).argv = Object.assign({}, (global as any).argv, { force: true });
-  }
   const importPath = requirePositional(flags.restArgs, 0, {
     name: "<module> import path",
     example: "golang.org/x/net",
@@ -118,7 +115,7 @@ async function doApply(args: string[]) {
   const patchDir = resolvePatchDir("patches/go", flags.targetPkg, flags.overridePatchDir, root);
   const dst = path.join(patchDir, `${enc}@${version}.patch`);
   dbg("apply: paths", { root, patchDir, dst });
-  const wrote = await writePatchIfChanged(dst, diff, !!(global as any).argv?.force);
+  const wrote = await writePatchIfChanged(dst, diff, flags.force);
   if (wrote === "written") {
     console.error(`[patch-go] writing patch: ${dst}`);
   }

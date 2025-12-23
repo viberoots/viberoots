@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { readCompositeGraph } from "../lib/graph-view.ts";
+import { getFlagStr } from "../lib/cli.ts";
 
 type Args = {
   graph?: string;
@@ -8,11 +9,15 @@ type Args = {
 };
 
 async function main() {
-  const a = (global as any).argv as Args;
+  const a = {
+    graph: getFlagStr("graph", "").trim(),
+    providers: getFlagStr("providers", "").trim(),
+    nodeLock: getFlagStr("nodeLock", "").trim() || getFlagStr("node-lock", "").trim(),
+  } satisfies Args;
   const comp = await readCompositeGraph({
-    graphPath: a.graph,
-    providerIndexPath: a.providers,
-    nodeLockIndexPath: a.nodeLock,
+    graphPath: a.graph || undefined,
+    providerIndexPath: a.providers || undefined,
+    nodeLockIndexPath: a.nodeLock || undefined,
   });
   console.log(JSON.stringify(comp, null, 2));
 }

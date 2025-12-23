@@ -15,19 +15,17 @@ import type { Adapter, Batch, GoListByBatch, Metrics, Node } from "./types.ts";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { collectFindings, determineMode, emitFindings, logValidationMode } from "./validation.ts";
+import { getFlagStr } from "../../lib/cli.ts";
 
 export async function run() {
-  const { out, scope, simulate, maxParallel, cacheDir, metricsOut, validation } = parseArgs(
-    (global as any).argv,
-  );
+  const { out, scope, simulate, maxParallel, cacheDir, metricsOut, validation } = parseArgs();
   const verbose = (() => {
     const v = String(process.env.EXPORTER_VERBOSE || "")
       .trim()
       .toLowerCase();
     return v === "1" || v === "true";
   })();
-  const argvObj: Record<string, any> = ((global as any).argv || {}) as any;
-  const cliValidation = typeof argvObj?.validation === "string" ? String(argvObj.validation) : "";
+  const cliValidation = getFlagStr("validation", "").trim();
   const envValidation = String(process.env.EXPORTER_VALIDATION || "");
   let nodes: Node[];
   if (simulate) nodes = await readSimulatedNodes(simulate);
