@@ -69,7 +69,10 @@ Re-applying an unchanged workspace is a no-op. For Go/C++, apply does not run gl
 
 ## Patch invalidation strategy (contract)
 
-This repo supports two patch invalidation strategies. Treat this as a cross-language contract and keep it consistent with `tools/lib/lang-contracts.ts`.
+This repo supports two patch invalidation strategies. Treat this as a cross-language contract and keep it consistent across:
+
+- **Starlark**: `//lang:lang_contracts.bzl`
+- **TypeScript**: `tools/lib/lang-contracts.ts`
 
 ### package-local
 

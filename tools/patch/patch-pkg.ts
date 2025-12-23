@@ -15,8 +15,19 @@ try {
 }
 import path from "node:path";
 import { getFlagStr, getFlagBool } from "../lib/cli.ts";
+import { patchInvalidationStrategyForLang } from "../lib/lang-contracts.ts";
 
 type SubcommandName = "start" | "apply" | "reset" | "session" | "remove" | "help";
+
+function printPatchModelOneLiner(lang: string) {
+  const s = patchInvalidationStrategyForLang(lang);
+  if (!s) return;
+  if (s.patchScope === "package-local") {
+    console.error("[patch-pkg] no glue refresh is required");
+  } else {
+    console.error("[patch-pkg] glue pipeline will run (graph, providers, auto_map)");
+  }
+}
 
 function usage(msg?: string) {
   if (msg) console.error(msg);
@@ -116,6 +127,10 @@ async function main() {
   const fn = map[sub];
   if (!fn) return usage(`unknown subcommand: ${sub}`);
   await fn(rest);
+
+  if (sub === "apply" || sub === "reset" || sub === "remove") {
+    printPatchModelOneLiner(lang);
+  }
 }
 
 main().catch((e) => {

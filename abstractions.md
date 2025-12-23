@@ -209,6 +209,8 @@ I treat patch invalidation as two explicit models:
 
 ### Canonical implementations
 
+- **Patch model registry (Starlark)**: `//lang:lang_contracts.bzl`
+- **Patch model registry (TypeScript)**: `tools/lib/lang-contracts.ts`
 - **Starlark package-local**:
   - `lang/patch_inputs.bzl:include_package_local_patches` and `lang/patch_inputs.bzl:default_package_patch_dirs`.
   - `lang/package_local_wiring.bzl:prepare_package_local_wiring` (macro-side helper that composes kwarg normalization, nixpkg label stamping, patch input inclusion, and provider-edge realization deterministically).
@@ -219,6 +221,7 @@ I treat patch invalidation as two explicit models:
 
 There are multiple relevant tests. The most important “contract locks” are:
 
+- `tools/tests/lang/lang-contracts.patch-model.parity.test.ts` (Starlark ↔ TS registry parity)
 - `tools/tests/providers/provider-sync-driver.patch-inclusion-policy.test.ts` (Node vs Python importer patch inclusion policy)
 - Any macro tests that assert importer-local patches are included as inputs for Node/Python targets.
 
