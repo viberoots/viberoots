@@ -1,5 +1,6 @@
 load("//lang:lockfile_labels.bzl", "ensure_single_lockfile_label", "importer_from_labels")
 load("//lang:label_stamping.bzl", "stamp_labels")
+load("//lang:importer_package_boundary.bzl", "require_importer_package_boundary")
 load(
     "//lang:patch_inputs.bzl",
     "include_importer_patches_from_labels",
@@ -28,6 +29,7 @@ def attach_importer_patch_inputs(kwargs, lang, into = "srcs", dict_safe = False,
     - When dict_safe = True, expects dict-shaped attributes (dest -> source) and attaches
       synthetic keys under key_prefix without changing caller-provided mappings.
     """
+    require_importer_package_boundary(importer_from_labels(kwargs))
     if dict_safe:
         include_importer_patches_from_labels_dict_safe(kwargs, lang, into = into, key_prefix = key_prefix)
     else:
@@ -216,7 +218,6 @@ def prepare_importer_srcsless_rule_wiring(
     """
     kw = {} if kwargs == None else kwargs
     kw["name"] = name
-
     existing_labels = kw.get("labels", []) or []
     kw["labels"] = (existing_labels if isinstance(existing_labels, list) else []) + (labels or [])
 
@@ -231,7 +232,6 @@ def prepare_importer_srcsless_rule_wiring(
         into = patch_dep_into,
         suffix = patch_dep_suffix,
     )
-
     def merge_deps(base_deps):
         return merge_provider_edges(
             name,

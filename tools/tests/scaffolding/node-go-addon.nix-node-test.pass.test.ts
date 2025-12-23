@@ -2,7 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp, exists } from "../lib/test-helpers";
+import { exists, runInTemp } from "../lib/test-helpers";
 
 // Ensure dev env tooling when spawning Buck/Nix inside temp repos
 process.env.TEST_NEED_DEV_ENV = "1";
@@ -15,16 +15,15 @@ test(
   { timeout: TEST_TIMEOUT_MS },
   async () => {
     await runInTemp("node-go-addon-nix-node-test", async (tmp, _$) => {
-      const $ = _$({ cwd: tmp, stdio: "pipe" });
-      const TIMEOUT_SECS = String(
-        Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200"),
+      const $ = _$;
+      const rawTimeoutSecs = Number(
+        process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200",
       );
-      const env = {
-        ...process.env,
-        NIX_PNPM_ALLOW_GENERATE: "1",
-        INSTALL_LOCK_SKIP: "1",
-        NIX_PNPM_FETCH_TIMEOUT: String(Number(process.env.NIX_PNPM_FETCH_TIMEOUT || "600")),
-      } as Record<string, string>;
+      // This zx_test action has a hard Buck-side timeout (currently 10 minutes). Keep the
+      // internal nix build timeout comfortably below that so we fail deterministically rather
+      // than being SIGKILL'd (which can strand nix-daemon builders).
+      const TIMEOUT_SECS = String(Math.min(rawTimeoutSecs, 9 * 60));
+      const NIX_PNPM_FETCH_TIMEOUT = String(Number(process.env.NIX_PNPM_FETCH_TIMEOUT || "600"));
 
       await $`git init`;
 
@@ -50,9 +49,7 @@ test(
       }
 
       // Commit scaffold so pure flake snapshots see new importers
-      await $({
-        env,
-      })`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
+      await $`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
 
       // Ensure a lockfile exists for the importer; generate if missing
       const importer = "libs/demo";
@@ -68,27 +65,28 @@ test(
       if (!hasLock) {
         await $({
           stdio: "inherit",
-          env,
-        })`bash --noprofile --norc -c 'set -euo pipefail; mkdir -p "${tmp}/${importer}/.pnpm-home" "${tmp}/${importer}/.pnpm-store"; export PNPM_HOME="${tmp}/${importer}/.pnpm-home"; nix run ${tmp}#pnpm --accept-flake-config -- config set store-dir "${tmp}/${importer}/.pnpm-store"; nix run ${tmp}#pnpm --accept-flake-config -- install --filter "./${importer}" --lockfile-only --prod=false --ignore-scripts --lockfile-dir "./${importer}" --dir "./${importer}"'`;
+        })`bash --noprofile --norc -c 'set -euo pipefail; mkdir -p "${tmp}/${importer}/.pnpm-home" "${tmp}/${importer}/.pnpm-store"; export PNPM_HOME="${tmp}/${importer}/.pnpm-home"; env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT="${NIX_PNPM_FETCH_TIMEOUT}" nix run ${tmp}#pnpm --accept-flake-config -- config set store-dir "${tmp}/${importer}/.pnpm-store"; env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT="${NIX_PNPM_FETCH_TIMEOUT}" nix run ${tmp}#pnpm --accept-flake-config -- install --filter "./${importer}" --lockfile-only --prod=false --ignore-scripts --lockfile-dir "./${importer}" --dir "./${importer}"'`;
         hasLock = await fsp
           .access(path.join(tmp, lockfile))
           .then(() => true)
           .catch(() => false);
       }
       // Commit the lockfile so pure flake snapshots see it
-      await $({
-        env,
-      })`bash --noprofile --norc -c 'git -C ${tmp} add ${lockfile} && git -C ${tmp} commit -m "chore(test): add importer lockfile"'`.nothrow();
+      await $`bash --noprofile --norc -c 'git -C ${tmp} add ${lockfile} && git -C ${tmp} commit -m "chore(test): add importer lockfile"'`.nothrow();
 
       // Install deps and ensure gomod2nix.toml is generated for libs/demo-go
-      await $({ stdio: "inherit", env })`${path.join(tmp, "tools/bin/i")}`;
+      await $({
+        stdio: "inherit",
+      })`env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT=${NIX_PNPM_FETCH_TIMEOUT} ${path.join(
+        tmp,
+        "tools/bin/i",
+      )}`;
 
       // Ensure node_modules is realizable (this also reconciles pnpm-store hash if needed).
       await $({
         cwd: path.join(tmp, importer),
         stdio: "inherit",
-        env,
-      })`zx-wrapper ../../tools/dev/node-modules-build.ts`;
+      })`env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT=${NIX_PNPM_FETCH_TIMEOUT} zx-wrapper ../../tools/dev/node-modules-build.ts`;
 
       // Build the importer's Node tests; the builder links the Go c-archive into the addon
       const testOut = await (async () => {
@@ -100,12 +98,9 @@ test(
         ]
           .filter(Boolean)
           .join(" ");
-        const cmd = `set -euo pipefail; timeout ${TIMEOUT_SECS}s nix build "${tmp}#node-test.${sanitized}" --impure --no-link --accept-flake-config --builders "" --print-out-paths ${flags}`;
+        const cmd = `set -euo pipefail; timeout ${TIMEOUT_SECS}s env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT=${NIX_PNPM_FETCH_TIMEOUT} nix build "${tmp}#node-test.${sanitized}" -L --impure --no-link --accept-flake-config --builders "" --print-out-paths ${flags}`;
         return await $({
           stdio: "pipe",
-          env: {
-            ...process.env,
-          },
         })`bash --noprofile --norc -c ${cmd}`;
       })();
       const outPath =

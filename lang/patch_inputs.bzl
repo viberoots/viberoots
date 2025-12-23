@@ -3,6 +3,7 @@ load("//lang:labels_file.bzl", "labels_file")
 load("//lang:lockfile_labels.bzl", "importer_from_labels", "ensure_single_lockfile_label")
 load("//lang:dict_inputs.bzl", "attach_items_dict_safe")
 load("//lang:sanitize.bzl", "sanitize_name")
+load("//lang:importer_package_boundary.bzl", "require_importer_package_boundary")
 
 def append_patch_inputs(kwargs, dirs, into = "srcs"):
     if kwargs == None:
@@ -67,25 +68,23 @@ def append_importer_patches(kwargs, importer, lang, into = "srcs"):
         return
     if lang == None or not isinstance(lang, str) or lang == "":
         return
-    base = "patches/%s" % lang
-    # Patches live under <importer>/patches/<lang>. If this macro is executing inside that
-    # importer package, use the package-relative patch dir to avoid duplicating the path
-    # (e.g. apps/demo/apps/demo/...).
-    cur_pkg = native.package_name()
-    same_pkg = (importer == "." or importer == cur_pkg or (cur_pkg == "" and importer == "."))
-    patch_dir = base if same_pkg else ("%s/%s" % (importer, base))
-    append_patch_inputs(kwargs, [patch_dir], into = into)
+    require_importer_package_boundary(importer)
+    # Importer-local patching is intentionally package-boundary constrained: targets that include
+    # importer-local patches must live in the importer package so native.glob can see the files.
+    append_patch_inputs(kwargs, ["patches/%s" % lang], into = into)
 
 def append_importer_patches_dict_safe(kwargs, importer, lang, into = "srcs", key_prefix = "__patch_inputs__"):
     if importer == None or not isinstance(importer, str) or importer == "":
         return
     if lang == None or not isinstance(lang, str) or lang == "":
         return
-    base = "patches/%s" % lang
-    cur_pkg = native.package_name()
-    same_pkg = (importer == "." or importer == cur_pkg or (cur_pkg == "" and importer == "."))
-    patch_dir = base if same_pkg else ("%s/%s" % (importer, base))
-    append_patch_inputs_dict_safe(kwargs, [patch_dir], into = into, key_prefix = key_prefix)
+    require_importer_package_boundary(importer)
+    append_patch_inputs_dict_safe(
+        kwargs,
+        ["patches/%s" % lang],
+        into = into,
+        key_prefix = key_prefix,
+    )
 
 def include_importer_patches_from_labels(kwargs, lang, into = "srcs"):
     imp = importer_from_labels(kwargs)

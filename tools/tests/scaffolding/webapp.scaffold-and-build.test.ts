@@ -46,7 +46,7 @@ test("webapp: scaffold, glue, build dist via Buck", { timeout: TEST_TIMEOUT_MS }
     await $({
       cwd: path.join(tmp, importer),
       stdio: "inherit",
-      env: { ...envWithPrefetch, INSTALL_LOCK_SKIP: "1" },
+      env: { ...envWithPrefetch },
     })`zx-wrapper ../../tools/dev/node-modules-build.ts`;
     const nixOut = await (async () => {
       const mj = String(process.env.NIX_MAX_JOBS || "0");

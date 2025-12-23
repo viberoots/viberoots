@@ -7,6 +7,10 @@ They also use the shared importer-scoped wiring helpers so lockfile enforcement,
 - `//lang:importer_wiring.bzl:prepare_importer_non_genrule_wiring(...)`
 - `//lang:nix_calling_macros.bzl:wire_global_nix_inputs(...)`
 
+Buck package boundary note:
+
+Node macros include importer-local patches via `native.glob(...)`. Because Buck cannot glob outside the current package, **any Node target that includes importer-local patches must be defined in the importer package** (for example `apps/web/TARGETS`, not a subpackage like `apps/web/ui/TARGETS`). Subpackage call sites fail fast with deterministic guidance.
+
 ### Macros
 
 - **`node_webapp(...)`** (`node/defs_nix.bzl`)

@@ -327,19 +327,43 @@
           # Resolve importer path relative to the flake being evaluated (temp repo for tests)
           importerAbs = ./. + ("/" + importerDir);
           importerSnap = builtins.path { path = importerAbs; name = "importer"; };
+          # IMPORTANT: Avoid unconditional dependencies on node-modules for "no-tests" importers.
+          # Nix derivations have *static* dependencies: if we embed a node-modules store path in the
+          # build script, Nix will realize it even if the script exits early. So we decide at eval
+          # time whether any test files exist in the importer subtree and only depend on node-modules
+          # when we truly need to run vitest.
+          hasTestFiles =
+            let
+              ignored = [ "node_modules" "dist" "build" ".vite" ];
+              isTestName = name:
+                (builtins.match ".*\\.test\\.ts$" name != null) ||
+                (builtins.match ".*\\.test\\.js$" name != null);
+              walk = dir:
+                let entries = builtins.readDir dir;
+                in builtins.any
+                  (n:
+                    let ty = entries.${n};
+                        p = dir + ("/" + n);
+                    in if ty == "directory" then
+                      (if builtins.elem n ignored then false else walk p)
+                    else if ty == "regular" then
+                      isTestName n
+                    else
+                      false
+                  )
+                  (builtins.attrNames entries);
+            in
+              # Missing importers are filtered elsewhere; treat absent dirs as "no tests".
+              if builtins.pathExists importerAbs then walk importerAbs else false;
           importerOnlySrc = pkgs.runCommand "node-test-src-${sanitize importerDir}" {} ''
             set -euo pipefail
-            mkdir -p "$out/$(dirname "${importerDir}")"
-            cp -R ${importerSnap} "$out/${importerDir}"
+            mkdir -p "$out/${importerDir}"
+            # Copy the importer subtree contents into the intended importerDir, not as a nested "importer/" directory.
+            cp -R ${importerSnap}/. "$out/${importerDir}/"
             chmod -R u+rwX "$out"
           '';
           importerLockAbs = ./. + ("/" + importerDir + "/pnpm-lock.yaml");
           haveImporterLock = builtins.pathExists importerLockAbs;
-          nmDrv = nodeMods.mkNodeModules { lockfilePath = importerDir + "/pnpm-lock.yaml"; inherit importerDir; };
-          # Keep allow-generate semantics, but NEVER ignore a lockfile that exists.
-          # When allow-generate is enabled and the importer lockfile is absent, avoid
-          # referencing node-modules at eval time; if tests are present, we fail clearly.
-          nmPath = if allowGenerate && (!haveImporterLock) then "" else "${nmDrv}";
           name = builtins.baseNameOf importerDir;
           sanitize = (import ./tools/nix/templates-common.nix { inherit pkgs; }).sanitizeName;
           # Optional: if a sibling native addon package exists at libs/<name>-native,
@@ -378,11 +402,62 @@
             __tests__/**/*.test.js
             src/**/*.test.ts
             src/**/*.test.js
+            **/*.test.ts
+            **/*.test.js
           '';
           patternsEnv = builtins.getEnv "NIX_NODE_TEST_PATTERNS";
           patternsValue = if patternsEnv != "" then patternsEnv else (builtins.replaceStrings ["\n\n"] ["\n"] defaultPatterns);
           coverageEnv = builtins.getEnv "COVERAGE";
-        in pkgs.stdenvNoCC.mkDerivation {
+        in if (!hasTestFiles) then pkgs.stdenvNoCC.mkDerivation {
+          pname = "node-test";
+          version = sanitize importerDir;
+          src = importerOnlySrc;
+          nativeBuildInputs = [ pkgs.coreutils ];
+          buildPhase = ''
+            set -euo pipefail
+            cd ${importerDir}
+            mkdir -p report
+            echo "[nix] no tests matched; skipping runner and passing." >&2
+            echo "{\"status\":\"no-tests\"}" > report/summary.json
+          '';
+          installPhase = ''
+            set -euo pipefail
+            mkdir -p "$out"
+            cp -R report "$out/"
+          '';
+        } else
+        let
+          # Fast-fail: if tests exist but vitest is not present in the lockfile, do NOT realize
+          # node-modules (expensive) just to discover that vitest is missing at runtime.
+          #
+          # This is safe because if vitest is installed for the importer, pnpm-lock.yaml will
+          # include it. Absence implies "vitest cannot be resolved deterministically".
+          lockTxt = if haveImporterLock then builtins.readFile importerLockAbs else "";
+          lockHasVitest = haveImporterLock && (builtins.match ".*vitest.*" lockTxt != null);
+
+          nodeTestMissingVitest = pkgs.stdenvNoCC.mkDerivation {
+            pname = "node-test";
+            version = sanitize importerDir;
+            src = importerOnlySrc;
+            nativeBuildInputs = [ pkgs.coreutils ];
+            buildPhase = ''
+              set -euo pipefail
+              echo "[nix] ERROR: tests exist but vitest is not present in ${importerDir}/pnpm-lock.yaml." >&2
+              echo "[nix] Add vitest to devDependencies and re-generate the lockfile." >&2
+              exit 3
+            '';
+            installPhase = ''
+              set -euo pipefail
+              mkdir -p "$out"
+            '';
+          };
+
+          nmDrv = nodeMods.mkNodeModules { lockfilePath = importerDir + "/pnpm-lock.yaml"; inherit importerDir; };
+          # Keep allow-generate semantics, but NEVER ignore a lockfile that exists.
+          # When allow-generate is enabled and the importer lockfile is absent, avoid
+          # referencing node-modules at eval time; if tests are present, we fail clearly.
+          nmPath = if allowGenerate && (!haveImporterLock) then "" else "${nmDrv}";
+        in if (!lockHasVitest) then nodeTestMissingVitest else pkgs.stdenvNoCC.mkDerivation {
           pname = "node-test";
           version = sanitize importerDir;
           # Use importer-only snapshot to avoid copying the entire repo into the sandbox
@@ -404,10 +479,16 @@
             cat > "$PATTERNS_FILE" <<'EOF_PAT'
 ${patternsValue}
 EOF_PAT
-            # Determine whether any files match any default test globs; shell globstar may be unavailable,
-            # so use find(1) for a robust check.
+            # Determine whether the *importer source tree* contains any test files.
+            # IMPORTANT: do NOT scan node_modules (it may contain many *.test.* files, which would
+            # incorrectly enable vitest for "no-tests" importers and massively slow down builds).
             FOUND=0
-            if find . -type f \( -name "*.test.ts" -o -name "*.test.js" \) -print -quit | grep -q .; then
+            if find . \
+              -path "./node_modules" -prune -o \
+              -path "./dist" -prune -o \
+              -path "./build" -prune -o \
+              -path "./.vite" -prune -o \
+              -type f \( -name "*.test.ts" -o -name "*.test.js" \) -print -quit | grep -q .; then
               FOUND=1
             fi
             # Coverage arguments (evaluated at flake eval time via allowed impure env)
@@ -443,28 +524,67 @@ EOF_PAT
                 NODE_PATH_SUFFIX=""
                 if [ -n "$NODE_PATH" ]; then NODE_PATH_SUFFIX=":"$NODE_PATH; fi
                 export NODE_PATH="$VITEST_NODE_MODULES$NODE_PATH_SUFFIX"
+                # Vite/Vitest default cacheDir is node_modules/.vite, but our node_modules is a
+                # symlink to a read-only Nix store path. Provide a tiny config that redirects the
+                # cache into the writable build directory.
+                VITE_CFG="$TMPDIR/bnx-vite-config.mjs"
+                # Keep this config dependency-free: vitest loads it as ESM, and ESM resolution
+                # does not consult NODE_PATH. A plain object avoids importing vitest/vite packages.
+                cat > "$VITE_CFG" <<'EOF_VITE_CFG'
+export default {
+  cacheDir: ".vite",
+  // Avoid expensive dependency prebundling in hermetic sandboxes. This can consume a lot of
+  // memory/CPU and has caused hung/OS-killed vitest runs in CI-like environments.
+  optimizeDeps: { disabled: true },
+};
+EOF_VITE_CFG
                 echo "[nix] DEBUG pwd: $(pwd)" >&2
                 echo "[nix] DEBUG vitest bin: $VITEST_BIN" >&2
                 (ls -la "$VITEST_BIN" || true) >&2
                 (command -v node || true) >&2
                 echo "[nix] running vitest (coverage=${coverageEnv:-0})..." >&2
-                # Run once with all patterns; passWithNoTests to avoid failure on empty sets
-                ARGS=""
-                while IFS= read -r __p; do
-                  [ -n "$__p" ] || continue
-                  ARGS="$ARGS \"$__p\""
-                done < "$PATTERNS_FILE"
+                # Run vitest once; passWithNoTests to avoid failure on empty sets.
+                # Note: vitest positional args are treated as name filters (not file globs), so we
+                # do not pass patterns as CLI args here.
               # Try to produce a junit file under ./report
               export VITEST_JUNIT_OUTPUT="report/junit.xml"
+              # Force non-interactive CI semantics. Some vitest/vite stacks can otherwise
+              # keep the process alive waiting for watch/TTY behavior.
+              export CI=1
+              export VITEST_WATCH=false
+              # Prevent macOS from SIGKILL'ing the builder under memory pressure by capping Node's heap.
+              # The scaffolded vitest suites here are tiny; they should not need a multi-GB heap.
+              export NODE_OPTIONS="--max-old-space-size=1536 ''${NODE_OPTIONS:-}"
+                # Guard against hung test runners: if vitest doesn't exit, fail fast and let Nix clean up.
+                # Use a generous timeout to cover native-addon startup without risking indefinite _nixbld leaks.
+                # Keep well below Buck zx_test timeouts; if vitest hangs, fail fast so nix-daemon
+                # doesn't keep _nixbld builders alive for minutes/hours.
+                VITEST_TIMEOUT_SECS=420
                 if [ "$(basename "$VITEST_BIN")" = "vitest" ]; then
-                # .bin wrapper (node shebang)
-              CMD="\"$VITEST_BIN\" run --reporter=junit --outputFile=report/junit.xml --passWithNoTests $COVERAGE_ARGS $ARGS"
-                  echo "[nix] DEBUG exec: $CMD" >&2
-                  eval "$CMD"
+                  # .bin wrapper (node shebang)
+                  echo "[nix] DEBUG exec: timeout -k 15s ''${VITEST_TIMEOUT_SECS}s $VITEST_BIN run ..." >&2
+                  timeout -k 15s ''${VITEST_TIMEOUT_SECS}s "$VITEST_BIN" run \
+                    --pool forks \
+                    --maxWorkers 1 \
+                    --minWorkers 1 \
+                    --no-file-parallelism \
+                    --config "$VITE_CFG" \
+                    --reporter=junit \
+                    --outputFile=report/junit.xml \
+                    --passWithNoTests \
+                    $COVERAGE_ARGS
                 else
-              CMD="node \"$VITEST_BIN\" run --reporter=junit --outputFile=report/junit.xml --passWithNoTests $COVERAGE_ARGS $ARGS"
-                  echo "[nix] DEBUG exec: $CMD" >&2
-                  eval "$CMD"
+                  echo "[nix] DEBUG exec: timeout -k 15s ''${VITEST_TIMEOUT_SECS}s node $VITEST_BIN run ..." >&2
+                  timeout -k 15s ''${VITEST_TIMEOUT_SECS}s node "$VITEST_BIN" run \
+                    --pool forks \
+                    --maxWorkers 1 \
+                    --minWorkers 1 \
+                    --no-file-parallelism \
+                    --config "$VITE_CFG" \
+                    --reporter=junit \
+                    --outputFile=report/junit.xml \
+                    --passWithNoTests \
+                    $COVERAGE_ARGS
                 fi
               # Ensure report directory has at least a minimal junit file for downstream consumers
               if [ ! -s report/junit.xml ]; then

@@ -166,8 +166,34 @@ export async function exists(p: string) {
 let buckReaperStateFile: string | null = null;
 let buckReaperStarted = false;
 
+function shSingleQuote(s: string): string {
+  // Safely single-quote arbitrary strings for bash -c (handles embedded single quotes).
+  return `'${String(s || "").replaceAll("'", `'\"'\"'`)}'`;
+}
+
+async function startSignatureForPid(pid: number, $: any): Promise<string> {
+  try {
+    const res = await $({
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+      timeout: 1000,
+    })`/bin/ps -p ${pid} -o lstart=`;
+    return String(res.stdout || "").trim();
+  } catch {
+    return "";
+  }
+}
+
 async function ensureBuckReaperStarted(tmp: string, $: any): Promise<void> {
   try {
+    // If verify already started a per-run reaper, just register this temp repo and do NOT spawn
+    // additional helper processes (one reaper per zx test process is too many and can leak).
+    const shared = String(process.env.BNX_BUCK_REAPER_STATE_FILE || "").trim();
+    if (shared) {
+      await fsp.appendFile(shared, `${tmp}\n`, "utf8").catch(() => {});
+      return;
+    }
     if (!buckReaperStateFile) {
       const token = `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
       buckReaperStateFile = path.join(os.tmpdir(), `bucknix-buck-reaper-${token}.txt`);
@@ -181,11 +207,19 @@ async function ensureBuckReaperStarted(tmp: string, $: any): Promise<void> {
     const repoRoot = process.cwd();
     const reaper = path.join(repoRoot, "tools", "tests", "lib", "buck-daemon-reaper.ts");
     const parentPid = String(process.pid);
+    const parentSig = await startSignatureForPid(process.pid, $);
+    if (!parentSig) {
+      throw new Error("buck-daemon-reaper: unable to read parent lstart signature via /bin/ps");
+    }
     const cmd =
       `zx-wrapper ${reaper} --parent ${parentPid} ` +
+      (parentSig ? `--parent-sig ${shSingleQuote(parentSig)} ` : "") +
       `--state-file ${buckReaperStateFile} --poll-ms 1000 >/dev/null 2>&1 & disown`;
     await $({ stdio: "ignore" })`bash --noprofile --norc -c ${cmd}`.nothrow();
-  } catch {}
+  } catch (e) {
+    // Primary path must be robust: if we cannot start the reaper safely, surface the failure.
+    throw e;
+  }
 }
 
 export async function runInTemp<T>(

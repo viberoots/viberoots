@@ -13,7 +13,6 @@ test("nix_node_test: buck2 test fails when importer tests fail", { timeout: 420_
     const env = {
       ...process.env,
       NIX_PNPM_ALLOW_GENERATE: "1",
-      INSTALL_LOCK_SKIP: "1",
       NIX_PNPM_FETCH_TIMEOUT: "300",
       // Ensure scaffolding and downstream tools treat the temp repo as the workspace root
       WORKSPACE_ROOT: tmp,
@@ -41,6 +40,7 @@ test("nix_node_test: buck2 test fails when importer tests fail", { timeout: 420_
       "",
       "nix_node_test(",
       '    name = "unit",',
+      '    srcs = glob(["src/**/*.ts", "src/**/*.js", "test/**/*.ts", "test/**/*.js", "__tests__/**/*.ts", "__tests__/**/*.js"]),',
       '    lockfile_label = "lockfile:libs/demo/pnpm-lock.yaml#libs/demo",',
       "    env = {",
       '        "NIX_PNPM_ALLOW_GENERATE": "1",',
@@ -60,12 +60,23 @@ test("nix_node_test: buck2 test fails when importer tests fail", { timeout: 420_
       "});",
       "",
     ].join("\n");
-    await fsp.mkdir(path.join(tmp, importer, "test"), { recursive: true });
-    await fsp.writeFile(
-      path.join(tmp, importer, "test", "failing.buck.test.ts"),
-      failingTest,
-      "utf8",
-    );
+    await fsp.writeFile(path.join(tmp, importer, "src", "failing.test.ts"), failingTest, "utf8");
+
+    // Nix flakes read sources from git-tracked files; ensure the injected failing test and TARGETS
+    // are visible to the flake evaluation inside the external runner.
+    await $({
+      env,
+    })`bash --noprofile --norc -c '
+      set -euo pipefail
+      git -C ${tmp} add -A
+      if git -C ${tmp} diff --cached --quiet; then
+        echo \"expected staged changes for injected failing test, but index is empty\" >&2
+        git -C ${tmp} status --porcelain=v1 || true
+        exit 2
+      fi
+      git -C ${tmp} commit -m injected-failing-test
+      git -C ${tmp} ls-files --error-unmatch ${importer}/src/failing.test.ts >/dev/null
+    '`;
 
     // The scaffold already wires nix_node_test(name="unit", lockfile_label=...) in TARGETS.
     // Run the test target and assert failure is propagated to Buck.

@@ -37,7 +37,6 @@ test(
       const env = {
         ...process.env,
         NIX_PNPM_ALLOW_GENERATE: "1",
-        INSTALL_LOCK_SKIP: "1",
       } as Record<string, string>;
       const sanitized = importer
         .replace(/\/\//g, "")

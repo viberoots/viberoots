@@ -3,6 +3,53 @@
 # shellcheck source=/dev/null
 . "$(cd "$(dirname "$0")" && pwd)/_env.sh"
 
+# Prevent accidental concurrent verify runs locally (they cause massive performance regressions).
+# In CI we intentionally allow concurrent runs.
+# Allow override with VERIFY_ALLOW_CONCURRENT=1.
+if [[ "${CI:-}" != "true" && ( -z "${VERIFY_ALLOW_CONCURRENT:-}" || "${VERIFY_ALLOW_CONCURRENT}" != "1" ) ]]; then
+  LOCK_DIR="${LIVE_ROOT}/buck-out/tmp/verify-lock"
+  mkdir -p "${LIVE_ROOT}/buck-out/tmp" >/dev/null 2>&1 || true
+
+  verify_lock_release() {
+    rm -rf "$LOCK_DIR" >/dev/null 2>&1 || true
+  }
+
+  verify_lock_pid_alive_with_sig() {
+    local pid="$1"
+    local expected_sig="$2"
+    if [[ -z "${pid}" ]]; then return 1; fi
+    if ! kill -0 "${pid}" >/dev/null 2>&1; then return 1; fi
+    local sig=""
+    sig="$(/bin/ps -p "${pid}" -o lstart= 2>/dev/null | tr -d '\r' | xargs || true)"
+    if [[ -z "${sig}" ]]; then return 1; fi
+    [[ "${sig}" == "${expected_sig}" ]]
+  }
+
+  if mkdir "$LOCK_DIR" >/dev/null 2>&1; then
+    echo "$$" > "${LOCK_DIR}/pid"
+    /bin/ps -p "$$" -o lstart= 2>/dev/null | tr -d '\r' | xargs > "${LOCK_DIR}/lstart" || true
+    trap verify_lock_release EXIT INT TERM HUP
+  else
+    pid="$(cat "${LOCK_DIR}/pid" 2>/dev/null || true)"
+    sig="$(cat "${LOCK_DIR}/lstart" 2>/dev/null || true)"
+    if verify_lock_pid_alive_with_sig "${pid}" "${sig}"; then
+      echo "error: verify is already running (pid ${pid}); refusing to start a concurrent run." 1>&2
+      echo "hint: tail its log (or set VERIFY_ALLOW_CONCURRENT=1 if you really mean it)." 1>&2
+      exit 2
+    fi
+    # Stale lock (e.g. SIGKILL): clear and retry once.
+    rm -rf "$LOCK_DIR" >/dev/null 2>&1 || true
+    if mkdir "$LOCK_DIR" >/dev/null 2>&1; then
+      echo "$$" > "${LOCK_DIR}/pid"
+      /bin/ps -p "$$" -o lstart= 2>/dev/null | tr -d '\r' | xargs > "${LOCK_DIR}/lstart" || true
+      trap verify_lock_release EXIT INT TERM HUP
+    else
+      echo "error: verify lock is held and could not be acquired (path: ${LOCK_DIR})." 1>&2
+      exit 2
+    fi
+  fi
+fi
+
 # Ensure the entire verify workflow runs inside the dev shell so all tools are nix-supplied.
 if [[ -z "${NO_DEV_SHELL:-}" && -z "${IN_NIX_SHELL:-}" && -z "${BNX_VERIFY_REEXEC:-}" ]]; then
   if ! command -v direnv >/dev/null 2>&1; then
@@ -247,10 +294,11 @@ fi
 
 build_run_array() {
   local PLATFORM_FLAGS=(--target-platforms prelude//platforms:default)
-  local TARGETS=()
+  local -a TARGETS=()
   if [[ $# -gt 0 ]]; then
     TARGETS=("$@")
   else
+    # Default behavior: run the full suite (Buck schedules execution internally).
     TARGETS=("//...")
   fi
   # Create a small wrapper script to execute tests and always kill the per-run buck2 daemon.
@@ -261,6 +309,9 @@ build_run_array() {
 #!/usr/bin/env bash
 set -euo pipefail
 ISO="v-$$"
+# Determine repo root for helper scripts spawned from this wrapper.
+LIVE_ROOT="${LIVE_ROOT:-$(pwd)}"
+export LIVE_ROOT
 # Ensure we always teardown only our own buck2 daemon and terminate our process group on exit/signals
 cleanup() {
   # Kill foreground/background children in our process group first (best-effort)
@@ -268,6 +319,21 @@ cleanup() {
   "buck2" --isolation-dir "$ISO" kill >/dev/null 2>&1 || true
 }
 trap cleanup EXIT INT TERM HUP
+
+# Start a single buck-daemon-reaper for this verify run (per batch). Individual zx tests register
+# temp repo roots via BNX_BUCK_REAPER_STATE_FILE; they must not spawn their own reapers.
+BNX_BUCK_REAPER_STATE_FILE="${TMPDIR:-/tmp}/bucknix-buck-reaper-${ISO}.txt"
+export BNX_BUCK_REAPER_STATE_FILE
+: > "$BNX_BUCK_REAPER_STATE_FILE" 2>/dev/null || true
+PARENT_SIG="$(/bin/ps -p "$$" -o lstart= 2>/dev/null | tail -1 | tr -d '\n' || true)"
+if command -v node >/dev/null 2>&1 && command -v nohup >/dev/null 2>&1 && [[ -n "$PARENT_SIG" ]]; then
+  # Best-effort; reaper is hardened to self-exit.
+  nohup node --experimental-top-level-await --experimental-strip-types --disable-warning=ExperimentalWarning \
+    --import "$LIVE_ROOT/tools/dev/zx-init.mjs" \
+    "$LIVE_ROOT/tools/tests/lib/buck-daemon-reaper.ts" \
+    --parent "$$" --parent-sig "$PARENT_SIG" --state-file "$BNX_BUCK_REAPER_STATE_FILE" --poll-ms 1000 \
+    >/dev/null 2>&1 & disown || true
+fi
 
 # Spawn a detached watchdog that reaps our isolation if this script dies abruptly (e.g., SIGKILL)
 if command -v nohup >/dev/null 2>&1; then
@@ -299,7 +365,7 @@ run_batch() {
   elif command -v gtimeout >/dev/null 2>&1; then
     prefix="gtimeout -k 10s ${tsec}s "
   fi
-  local cmd="${prefix}buck2 --isolation-dir \"$iso\" test --console super --overall-timeout ${tsec}s --target-platforms prelude//platforms:default ${targets[*]} -- --env COVERAGE=\"${COVERAGE:-0}\" --env TEST_NODE_OPTIONS=\"--test-timeout=${tms}\""
+  local cmd="${prefix}buck2 --isolation-dir \"$iso\" test --console super --overall-timeout ${tsec}s --target-platforms prelude//platforms:default ${targets[*]} -- --env COVERAGE=\"${COVERAGE:-0}\" --env TEST_NODE_OPTIONS=\"--test-timeout=${tms}\" --env BNX_BUCK_REAPER_STATE_FILE=\"${BNX_BUCK_REAPER_STATE_FILE:-}\""
   if command -v script >/dev/null 2>&1; then
     script -q /dev/null bash --noprofile --norc -c "$cmd"
   else
@@ -359,53 +425,7 @@ run_batch() {
   }
 
 STATUS=0
-if [[ "$#" -gt 0 ]]; then
-  # Direct targets given: single batch
-  run_batch "$ISO" "$@" || STATUS=$?
-else
-  # No explicit targets: enumerate all zx tests
-  mapfile -t ALL_TESTS < <(buck2 targets --target-platforms prelude//platforms:default //... --json | jq -r '.[] | select(."buck.type"|endswith(":zx_test")) | .name' | sort)
-  if [[ "${#ALL_TESTS[@]}" -eq 0 ]]; then
-    echo "No tests found" 1>&2
-    exit 2
-  fi
-  # Default to a single batch for maximal efficiency; allow opting into batching via VERIFY_BATCHES
-  local total="${#ALL_TESTS[@]}"
-  local batches="${VERIFY_BATCHES:-1}"
-  if [[ "$batches" -le 1 ]]; then
-    local -a batch=( )
-    for t in "${ALL_TESTS[@]}"; do
-      batch+=( "//:${t}" )
-    done
-    echo "[verify] Running single batch with ${#batch[@]} tests..." 1>&2
-    if ! run_batch "$ISO" "${batch[@]}"; then
-      STATUS=1
-    fi
-  else
-  local size=$(( (total + batches - 1) / batches ))
-  (( size < 1 )) && size=1
-  local i=0
-  local batch_idx=0
-  while (( i < total )); do
-    batch_idx=$((batch_idx + 1))
-    # Reuse a single buck2 daemon across batches to avoid repeated cold starts
-    local iso_batch="${ISO}"
-    local -a batch=( )
-    local j=0
-    while (( j < size && i < total )); do
-      batch+=( "//:${ALL_TESTS[i]}" )
-      i=$((i + 1))
-      j=$((j + 1))
-    done
-    echo "[verify] Running batch ${batch_idx} with ${#batch[@]} tests..." 1>&2
-    if ! run_batch "$iso_batch" "${batch[@]}"; then
-      STATUS=1
-    fi
-    # Between batches, perform quick housekeeping to avoid ENOSPC mid-run
-    hk_between || true
-  done
-  fi
-fi
+run_batch "$ISO" "$@" || STATUS=$?
 # Final best-effort cleanup
 cleanup || true
 exit "$STATUS"
@@ -426,9 +446,17 @@ EOS
     fi
   fi
   if [[ ${#RUN_TIMEOUT[@]} -gt 0 ]]; then
-    RUN=("${RUN_TIMEOUT[@]}" "$TMP_SCRIPT" "${TARGETS[@]}")
+    if [[ ${#TARGETS[@]} -gt 0 ]]; then
+      RUN=("${RUN_TIMEOUT[@]}" "$TMP_SCRIPT" "${TARGETS[@]}")
+    else
+      RUN=("${RUN_TIMEOUT[@]}" "$TMP_SCRIPT")
+    fi
   else
-    RUN=("$TMP_SCRIPT" "${TARGETS[@]}")
+    if [[ ${#TARGETS[@]} -gt 0 ]]; then
+      RUN=("$TMP_SCRIPT" "${TARGETS[@]}")
+    else
+      RUN=("$TMP_SCRIPT")
+    fi
   fi
 }
 

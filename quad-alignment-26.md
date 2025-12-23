@@ -283,6 +283,83 @@ Implement if wrappers are actively used. Otherwise, remove them and keep the uni
 
 ---
 
+## PR‑5: Enforce importer-package boundary for importer-local patch invalidation (fail fast on subpackage call sites)
+
+### Description
+
+Importer-local patching (Node, Python) is a deliberate model choice: patches live under `<importer>/patches/<lang>/*.patch`, and macros include those patch files as real action inputs so patch edits deterministically invalidate only targets bound to that importer.
+
+There is one inconsistency risk: Buck package boundaries. `native.glob(...)` operates relative to the current Buck package, so a target defined in a subpackage (for example `apps/web/ui:bundle`) cannot reliably include importer-local patches that live in the importer root package (`apps/web/patches/node/*.patch`) without either:
+
+- silently failing to include the patches (bad: patch edits would not invalidate the target), or
+- hand-rolling path hacks that drift across macros and languages.
+
+This PR makes the intended contract explicit and deterministic: **importer-scoped macros that include importer-local patches must be called from the importer’s Buck package** (or repo root for importer `"."`). Subpackage call sites fail fast with stable error text that explains the invariant and how to fix the call site.
+
+Clarification: We do not need to preserve backwards compatibility yet. This PR can introduce a strict macro-time validation that rejects subpackage call sites immediately (no migration shims, no transitional flags).
+
+### Scope & Changes
+
+This PR is Starlark wiring and contract enforcement only. It does not change provider generation, lockfile label semantics, or patch file naming.
+
+- Add a shared validation helper in `//lang` that:
+  - derives the importer (already provided by existing helpers),
+  - compares it against `native.package_name()`,
+  - allows only:
+    - importer `"."` when `native.package_name()` is `""` or `"."` (repo root), and
+    - importer `apps/<x>` or `libs/<x>` when `native.package_name()` equals that importer,
+  - otherwise fails with deterministic error text explaining that importer-local patches cannot cross Buck package boundaries.
+- Apply the validation in the canonical importer-local patch inclusion surfaces so call sites do not need to remember it:
+  - `//lang:patch_inputs.bzl` importer-local patch helpers
+  - `//lang:importer_wiring.bzl` wiring helpers that attach importer-local patch inputs
+- Keep Go/C++ package-local patching unchanged (this PR is importer-local only).
+
+### Tests (in this PR)
+
+I will lock down the invariant at the macro boundary with probe-style tests (deterministic failures, no reliance on command strings).
+
+- Add a Node probe test that defines a Node target in a subpackage (e.g., `apps/demo/subpkg:bundle`) with `lockfile:apps/demo/pnpm-lock.yaml#apps/demo` and asserts:
+  - macro evaluation fails,
+  - stderr contains stable guidance (“importer-local patches must be wired from the importer package”).
+- Add a Python probe test that defines `nix_python_library` (or `nix_python_binary`) in a subpackage with `lockfile:apps/demo/uv.lock#apps/demo` and asserts the same deterministic failure and guidance.
+- Add one positive control test that confirms a target defined in the importer package continues to include importer-local patches as action inputs (existing tests should already cover this; extend only if needed for clarity).
+
+### Docs (in this PR)
+
+I will make the package-boundary requirement explicit so it is not tribal knowledge.
+
+- Update `docs/handbook/patching.md`:
+  - add a short “Buck package boundary” note under importer-local patching describing where targets must live to get importer-local patch invalidation.
+- Update `docs/handbook/node-macros.md`:
+  - include a short example showing correct placement (targets in `apps/<importer>/TARGETS`) and a warning that subpackages must not attach importer-local patches.
+- Update `docs/handbook/adding-language.md`:
+  - document the rule for importer-scoped ecosystems: targets must live in the importer package (or adopt package-local patching instead).
+
+### Acceptance Criteria
+
+- Importer-scoped macros fail fast with deterministic error text when called from a subpackage of the importer.
+- Node and Python importer-local patch invalidation remains unchanged for targets defined in the importer package.
+- Tests enforce both the failure mode (subpackage) and the expected success path (importer package).
+- Docs explicitly describe the invariant and how to structure targets to satisfy it.
+
+### Risks
+
+Moderate. This can surface latent repo structure issues where importer-scoped macros are used from subpackages. That is the intended outcome, but it may require some call site moves in follow-up PRs.
+
+### Consequence of Not Implementing
+
+We keep an implicit placement constraint. Subpackage targets can silently fail to include importer-local patch inputs, which breaks deterministic invalidation and is hard to debug.
+
+### Downsides for Implementing
+
+This introduces a strict contract that may force target relocation in repos that prefer deep package trees under an importer. That churn is the cost of keeping invalidation deterministic without cross-package patch references.
+
+### Recommendation
+
+Implement. If we later decide we must support subpackage targets, we should do it via a new explicit mechanism rather than weakening this invariant.
+
+---
+
 ## Rollout & Sequencing
 
 These PRs are ordered by dependency chain and by how isolated the changes are:
@@ -291,6 +368,7 @@ These PRs are ordered by dependency chain and by how isolated the changes are:
 2. PR‑2 next. It hardens provider generation policy at the shared driver boundary with low blast radius.
 3. PR‑3 next. It reduces bespoke Node macro bootstrapping by introducing a standardized helper surface and migrating call sites.
 4. PR‑4 last. It is tooling surface cleanup and should be last so earlier PRs do not need to reconcile entrypoint churn.
+5. PR‑5 last. It makes the importer-local patch invalidation contract explicit and fail-fast, after the wiring surfaces it constrains are already standardized.
 
 ---
 
@@ -305,3 +383,4 @@ Backout strategy:
 
 - Each PR is independently revertible.
 - If PR‑3 exposes a missing edge case in sandbox bootstrapping, I will keep the helper surface but revert only the macro migrations and iterate on the helper until the invariant is stable.
+- If PR‑5 blocks a workflow that truly requires subpackage targets, I will keep the validation helper but revert only the call site enforcement and iterate on an explicit supported mechanism (rather than re-introducing silent drift).

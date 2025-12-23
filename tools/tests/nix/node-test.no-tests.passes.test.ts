@@ -33,32 +33,19 @@ test(
       const env = {
         ...process.env,
         NIX_PNPM_ALLOW_GENERATE: "1",
-        INSTALL_LOCK_SKIP: "1",
       } as Record<string, string>;
       await $({
         cwd: tmp,
         stdio: "inherit",
         env,
       })`zx-wrapper tools/dev/update-pnpm-hash.ts --lockfile ${path.join(importer, "pnpm-lock.yaml")}`;
-      // Build pnpm-store and node-modules for importer (pure, no network)
+      // Do NOT prebuild pnpm-store/node-modules here: the purpose of this test is to ensure
+      // node-test can succeed quickly when no tests exist, without forcing heavyweight deps.
+      // If node-test incorrectly depends on node-modules, this test will regress in wall time.
       const sanitized = importer
         .replace(/\/\//g, "")
         .replace(/:/g, "-")
         .replace(/[\/\s]+/g, "-");
-      {
-        const mj = String(process.env.NIX_MAX_JOBS || "0");
-        const cr = String(process.env.NIX_CORES || "0");
-        const flags = [
-          mj && mj !== "0" ? `--max-jobs ${mj}` : "",
-          cr && cr !== "0" ? `--option cores ${cr}` : "",
-        ]
-          .filter(Boolean)
-          .join(" ");
-        const cmd1 = `set -euo pipefail; timeout ${TIMEOUT_SECS}s nix build "${tmp}#pnpm-store.${sanitized}" --impure --no-link --accept-flake-config --builders "" --print-build-logs ${flags}`;
-        await $({ cwd: tmp, stdio: "inherit", env })`bash --noprofile --norc -c ${cmd1}`;
-        const cmd2 = `set -euo pipefail; timeout ${TIMEOUT_SECS}s nix build "${tmp}#node-modules.${sanitized}" --impure --no-link --accept-flake-config --builders "" --print-build-logs ${flags}`;
-        await $({ cwd: tmp, stdio: "inherit", env })`bash --noprofile --norc -c ${cmd2}`;
-      }
       // Build the node-test derivation; no tests present so it should pass
       const out = await $({
         cwd: tmp,

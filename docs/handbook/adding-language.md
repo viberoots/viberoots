@@ -61,6 +61,10 @@ Tip for lockfile-style ecosystems (e.g., Node/PNPM):
   - `ensure_single_lockfile_label(kwargs, lockfile_label)` to enforce exactly one importer-scoped label (`lockfile:<path>#<importer>`) with stable dedupe and canonical error text
   - `include_importer_patches_from_labels(kwargs, lang, into = "srcs")` to derive the importer and include importer-local patches deterministically into a supported input attribute (commonly `srcs` or `resources` depending on the rule shape)
 
+Importer-local patch invalidation (package boundary):
+
+Importer-local patch attachment uses `native.glob(...)`, which cannot reach across Buck package boundaries. For any importer-scoped ecosystem that relies on importer-local patches (Node, Python), **targets that include importer-local patches must be defined in the importer’s Buck package** (or in repo root for importer `"."`). Subpackage call sites must fail fast so patch edits never silently stop invalidating targets.
+
 ## Path invariants (must-follow)
 
 - Patches live under `patches/<lang>/` (flat directory).

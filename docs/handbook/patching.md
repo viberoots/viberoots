@@ -79,6 +79,12 @@ Go and C++ use **package-local** patches. Patch files live under the Buck packag
 
 Node and Python use **importer-local** patches. Patch files live under an importer directory (for example `apps/web/patches/node/*.patch` and `apps/api/patches/python/*.patch`). Importer-scoped providers and `auto_map.bzl` are generated artifacts, so apply/remove regenerates glue to keep providers and mappings aligned with the lockfile and patch set.
 
+Buck package boundary note (important):
+
+- Importer-local patch inputs are attached via `native.glob(...)`, which cannot reach across Buck package boundaries.
+- Therefore, **targets that include importer-local patches must be defined in the importer’s Buck package** (e.g. define the target in `apps/web/TARGETS`, not `apps/web/ui/TARGETS`).
+- Subpackage call sites fail fast with deterministic guidance so patch edits never silently stop invalidating targets.
+
 Provider patch inclusion policy (Node vs Python):
 
 - **Node (PNPM)**: provider `patch_paths` includes **all importer-local patches** under `<importer>/patches/node/*.patch`.

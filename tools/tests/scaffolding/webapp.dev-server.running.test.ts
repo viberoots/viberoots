@@ -62,7 +62,6 @@ test("node webapp: dev server runs and serves index", { timeout: TEST_TIMEOUT_MS
       stdio: "pipe",
       env: {
         ...process.env,
-        INSTALL_LOCK_SKIP: "1",
         NIX_PNPM_FETCH_TIMEOUT: "240",
         NIX_PNPM_ALLOW_GENERATE: "1",
       },

@@ -22,7 +22,6 @@ test(
       const env = {
         ...process.env,
         NIX_PNPM_ALLOW_GENERATE: "1",
-        INSTALL_LOCK_SKIP: "1",
         NIX_PNPM_FETCH_TIMEOUT: String(Number(process.env.NIX_PNPM_FETCH_TIMEOUT || "600")),
       } as Record<string, string>;
 
