@@ -23,6 +23,15 @@ Node macros include importer-local patches via `native.glob(...)`. Because Buck 
     - If `entry` is set while `bundle=True`, it must be `src/index.ts` (or omitted).
     - To copy an arbitrary entry file, use `bundle=False`.
 
+### Related: `nix_node_test` (stamp policy)
+
+`nix_node_test(...)` is also Nix-backed, but it is not a genrule-style “macro builds via Nix” command string like `node_webapp` / bundled `nix_node_cli_bin`.
+
+- It still **wires `global_nix_inputs()` as real action inputs** (via `srcs`) so changes like `flake.lock` invalidate tests deterministically.
+- It intentionally sets **`stamp=False`** when wiring global inputs to avoid exporter label noise for tests. Correctness must not depend on labels.
+
+See `docs/handbook/node-tests.md` for usage and runner semantics.
+
 ### Nix invocation policy (required)
 
 When a Node macro assembles a shell command that invokes Nix:

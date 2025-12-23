@@ -8,7 +8,7 @@ Stamping ensures exporter preconditions via consistent labels applied in macros.
 - **Importer-scoped ecosystems (Node, Python)**: avoid bespoke wiring. Use the shared helpers in `lang/importer_wiring.bzl` so lockfile enforcement, patch inputs, and provider edge realization stay drift-free.
   - For genrule-style wrappers: `prepare_importer_genrule_kwargs(...)`
   - For non-genrule wrappers: `prepare_importer_non_genrule_wiring(...)` (returns the derived importer string and the wired kwargs/deps)
-  - Node macros that need the importer string for Nix attribute selection (for example `node_webapp`, bundled `nix_node_cli_bin`) should derive it via `prepare_importer_non_genrule_wiring(...)` rather than parsing labels directly.
+  - For importer-scoped, **Nix-calling genrule-style** macros (for example `node_webapp`, bundled `nix_node_cli_bin`), use `prepare_importer_nix_calling_genrule_wiring(...)` so lockfile enforcement, importer derivation, patch inputs, provider edges, optional `workspace-root.env` injection, and global Nix input wiring are composed in one place.
 - **Global Nix inputs (macros and rules that call Nix)**: treat `global_nix_inputs()` as real action inputs. Label stamping is retained for observability, but correctness must not depend on labels.
   - For **macros** that call Nix, use `//lang:defs_common.bzl:wire_global_nix_inputs(...)`. This keeps call sites consistent and keeps list-shaped and dict-shaped inputs correct.
   - For **macros that create genrules** that call Nix, use the shared helper `lang/defs_common.bzl: wire_global_nix_inputs(kwargs, into="srcs", stamp=True)` so call sites cannot forget either:
@@ -46,7 +46,11 @@ wire_global_nix_inputs(kw, into = "srcs", stamp = False)
 
 - For **rules** that shell out to Nix, accept `nix_inputs` and thread `global_nix_inputs()` into the action `hidden` inputs.
 - **Nix command strings (macros that call Nix)**: assemble command strings via the canonical helper surface in `lang/nix_shell.bzl` so call sites do not partially apply the policy.
-  - Use `nix_cmd_prefix(..., include_pnpm_store=True)` for Node macros that invoke Nix. It composes:
+  - Prefer the genrule-focused helpers for genrule-style macros:
+    - `nix_calling_genrule_bootstrap(...)` for standardized `WORKSPACE_ROOT`/`FLK_ROOT` derivation, optional `workspace-root.env` sourcing, timeout wrapper setup, and optional PNPM store bootstrapping.
+    - `nix_calling_genrule_nix_build_out_path_prefix(...)` for `nix build --no-link --print-out-paths | tail -n1` outPath capture (no `--out-link`).
+  - If using lower-level helpers, keep policy identical and centralized:
+    - Use `nix_cmd_prefix(..., include_pnpm_store=True)` for Node macros that invoke Nix. It composes:
     - deterministic bootstrap (`WORKSPACE_ROOT`, `FLK_ROOT`)
     - Buck-safe command substitution escaping (`$(...)` → `$$(...)`)
     - timeout wrapper variable setup (portable `timeout`/`gtimeout`)
