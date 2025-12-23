@@ -73,6 +73,36 @@ Use the shared helpers from `lang/defs_common.bzl` so call sites do not reassemb
   - `prepare_importer_nix_calling_genrule_wiring(...)`
     - It composes lockfile enforcement, label stamping, importer patch inputs, provider edge realization into `srcs`, optional `tools/buck/workspace-root.env` injection for dict-shaped `srcs`, and global Nix inputs as real action inputs (optional stamp).
 
+Minimal example (dict-shaped `srcs`):
+
+```python
+load("@prelude//:rules.bzl", "genrule")
+load("//lang:defs_common.bzl", "prepare_importer_nix_calling_genrule_wiring")
+
+def my_importer_nix_genrule(name, lockfile_label = None):
+    # Dict-shaped srcs: preserve caller mapping, and allow shared helper to attach
+    # synthetic dict keys for patch inputs / provider edges / global inputs.
+    srcs = {
+        "package.json": "package.json",
+    }
+    wiring = prepare_importer_nix_calling_genrule_wiring(
+        name = name,
+        kwargs = {},
+        srcs = srcs,
+        deps = [],
+        lang = "node",
+        kind = "gen",
+        lockfile_label = lockfile_label,
+        inject_workspace_root_env = True,
+        global_inputs_into = "srcs",
+        global_inputs_stamp = True,
+    )
+    kw = wiring.kwargs
+    kw["out"] = name + ".stamp"
+    kw["cmd"] = "echo importer=%s > $OUT" % wiring.importer  # example only
+    genrule(**kw)
+```
+
 Importer-local patch invalidation (package boundary):
 
 Importer-local patch attachment uses `native.glob(...)`, which cannot reach across Buck package boundaries. For any importer-scoped ecosystem that relies on importer-local patches (Node, Python), **targets that include importer-local patches must be defined in the importer’s Buck package** (or in repo root for importer `"."`). Subpackage call sites must fail fast so patch edits never silently stop invalidating targets.
