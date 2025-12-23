@@ -119,6 +119,8 @@ Importer-local patch attachment uses `native.glob(...)`, which cannot reach acro
   - Auto-wire tests per your language conventions
   - Append providers from `MODULE_PROVIDERS` loaded via `//lang:auto_map.bzl` (do not load `//third_party/providers:auto_map.bzl` directly)
 
+Stamping belongs in the macro. If your macro synthesizes helper targets (for example `*_test`), keep stamping in the macro implementation rather than repeating `labels = ["lang:<id>", "kind:<kind>"]` at call sites.
+
 7. Scaffolding
 
 - Add templates under `tools/scaffolding/templates/<lang>`.

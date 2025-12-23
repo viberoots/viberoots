@@ -42,7 +42,6 @@ nix_go_test(
         "pkg/demo/demo_test.go",
         "pkg/demo/shim.c",
     ],
-    labels = ["lang:go", "kind:test"],
 )
 EOF'`;
 

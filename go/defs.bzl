@@ -33,7 +33,6 @@ def nix_go_library(name, **kwargs):
             name = name + "_test",
             library = ":%s" % name,
             srcs = tests,
-            labels = ["lang:go", "kind:test"],
         )
 
 
@@ -85,7 +84,6 @@ def nix_go_binary(name, **kwargs):
             name = name + "_test",
             library = ":%s" % (name + "_pkg"),
             srcs = tests,
-            labels = ["lang:go", "kind:test"],
         )
 
 
@@ -94,6 +92,7 @@ def nix_go_test(name, **kwargs):
     repo_cgo_deps = kwargs.pop("repo_cgo_deps", [])
     nix_cgo_pkgconfig = kwargs.pop("nix_cgo_pkgconfig", {})
     apply_go_tuple_labels(kwargs)
+    stamp_labels(kwargs, "go", "test")
     merged = configure_cgo_and_merge_deps(name, kwargs, nixpkg_deps, repo_cgo_deps, MODULE_PROVIDERS)
 
     # If a library is provided, ensure we don't pass the same target in deps.

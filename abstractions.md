@@ -46,6 +46,10 @@ This contract ensures that a target’s language and kind are visible in the exp
 - Targets that participate in routing stamp `kind:<bin|lib|test|...>`.
 - WASM variants stamp `kind:wasm` and `wasm:<variant>`.
 
+For language macros, stamping is the macro’s responsibility. Call sites should not need to remember `lang:*` or `kind:*` labels.
+
+- Go: `nix_go_test(...)` stamps `lang:go` and `kind:test` (auto-wired `*_test` targets do not pass a literal label list).
+
 ### Canonical implementations
 
 - **Starlark**: `lang/label_stamping.bzl` via `lang/defs_common.bzl` re-exports.
