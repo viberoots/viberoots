@@ -49,7 +49,7 @@ test("auto-map includes importer-scoped provider for a repo-root pnpm-lock.yaml 
       ZX,
     ];
 
-    await $`${NODE} ${nodeFlags} tools/buck/sync-providers-node.ts`;
+    await $`${NODE} ${nodeFlags} tools/buck/sync-providers.ts --lang node --no-glue`;
     await $`${NODE} ${nodeFlags} tools/buck/gen-auto-map.ts --graph ${graph} --out third_party/providers/auto_map.bzl`;
 
     const expected = `//third_party/providers:${providerNameForImporter("pnpm-lock.yaml", ".")}`;

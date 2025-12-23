@@ -49,7 +49,7 @@ test("auto-map skips targets without lockfile labels", async () => {
     await $`git add apps/node/pnpm-lock.yaml`;
 
     // Generate providers
-    await $`node tools/buck/sync-providers-node.ts`;
+    await $`node tools/buck/sync-providers.ts --lang node --no-glue`;
 
     // Generate auto-map
     const autoMapPath = path.join(tmp, "third_party/providers/auto_map.bzl");

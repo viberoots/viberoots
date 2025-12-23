@@ -17,7 +17,7 @@ test("sync-providers-node emits a metadata-only provider for workspace importers
     );
     await $`git add apps/demo/package.json`;
 
-    await $`NODE_PROVIDER_SYNTHETIC_LOCKFILES=1 node tools/buck/sync-providers-node.ts`;
+    await $`NODE_PROVIDER_SYNTHETIC_LOCKFILES=1 node tools/buck/sync-providers.ts --lang node --no-glue`;
 
     const outPath = path.join(tmp, "third_party", "providers", "TARGETS.node.auto");
     const out = await fsp.readFile(outPath, "utf8");

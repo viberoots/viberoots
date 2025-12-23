@@ -78,7 +78,7 @@ test("auto-map includes importer-scoped provider for a temp apps/example importe
       { spaces: 2 },
     );
     // Generate Node providers from the lockfile
-    await $`${NODE} ${nodeFlags} tools/buck/sync-providers-node.ts`;
+    await $`${NODE} ${nodeFlags} tools/buck/sync-providers.ts --lang node --no-glue`;
     // Generate auto_map mapping lockfile label -> provider
     await $`${NODE} ${nodeFlags} tools/buck/gen-auto-map.ts --graph ${graph} --out third_party/providers/auto_map.bzl`;
 

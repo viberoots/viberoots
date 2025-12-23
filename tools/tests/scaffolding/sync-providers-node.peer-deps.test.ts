@@ -40,7 +40,7 @@ packages:
     await $`git add apps/example/pnpm-lock.yaml`;
 
     // Run sync (without patches to simplify test)
-    await $`node tools/buck/sync-providers-node.ts`;
+    await $`node tools/buck/sync-providers.ts --lang node --no-glue`;
 
     const outPath = path.join(tmp, "third_party/providers/TARGETS.node.auto");
     const output = await fsp.readFile(outPath, "utf8");

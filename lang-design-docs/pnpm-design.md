@@ -15,7 +15,6 @@ This document proposes how to add first-class PNPM projects to this monorepo, in
 - Existing glue for Node providers and auto‑map generation:
   - `tools/buck/providers/node.ts`: parses `pnpm-lock.yaml` and emits `TARGETS.node.auto` with one provider per importer.
   - `tools/buck/sync-providers.ts`: unified orchestrator (canonical provider sync entrypoint).
-    - Back-compat alias: `tools/buck/sync-providers-node.ts` (delegator-only).
   - `tools/buck/gen-auto-map.ts`: maps target labels to provider deps, including `lockfile:<path>#<importer>`.
   - `hermetic-node-modules.md`: documents immutable, Nix‑built `node_modules`.
 - Sidecars & Composite Graph API:

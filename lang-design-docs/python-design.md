@@ -163,7 +163,7 @@ Severity
 
 ## Provider Sync for Python
 
-Add a zx generator `tools/buck/sync-providers-python.ts` that:
+Add a Python provider sync driver under `tools/buck/providers/python.ts` that is invoked through the unified orchestrator `tools/buck/sync-providers.ts` (`node tools/buck/sync-providers.ts --lang python --no-glue`) and:
 
 - Scans all `uv.lock` lockfiles (`**/uv.lock`).
 - For each importer, computes an effective set of distributions (simplest approach: full set from the lockfile; future enhancement may trim unused extras if encoded).
@@ -456,7 +456,7 @@ Phase 2 — Exporter Labels
 
 Phase 3 — Provider Sync (Python)
 
-- Implement `sync-providers-python.ts` and update the multi‑driver.
+- Implement the Python provider sync driver and ensure it is wired into the unified orchestrator (`tools/buck/sync-providers.ts`).
 - Acceptance: with a dummy `patches/python/foo@1.2.3.patch` and a lockfile referencing `foo==1.2.3`, the generator writes `TARGETS.python.auto` deterministically.
 
 Phase 4 — Patch Workflow
@@ -648,7 +648,7 @@ Generate deterministic importer‑scoped Python providers that are sensitive to 
 
 #### Scope & Changes
 
-- Add `tools/buck/providers/python.ts` (canonical generator) and thin wrapper `tools/buck/sync-providers-python.ts` (optional).
+- Add `tools/buck/providers/python.ts` (canonical generator) and invoke it only via the unified orchestrator `tools/buck/sync-providers.ts`.
 - Teach `tools/buck/sync-providers.ts` to include Python when `--lang python` or default (all).
 - Emit `third_party/providers/TARGETS.python.auto`:
   - Stable ordering, one target per importer,

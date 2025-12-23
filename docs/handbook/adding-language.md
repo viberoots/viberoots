@@ -9,7 +9,7 @@ This guide explains how to add a new language to the build without touching core
 - Templates: `tools/nix/templates/<lang>.nix` consumed by `tools/nix/lang-templates.nix`
 - Planner registry entry: `LANGS.<lang>` inside the planner (dispatch predicates + mkApp/mkLib)
 - Macros: thin Starlark wrappers using `lang/defs_common.bzl` helpers
-- Provider sync (optional): implement your generator under `tools/buck/providers/<lang>.ts` (scans `patches/<lang>` and writes `TARGETS.<lang>.auto` deterministically). Optionally expose a thin wrapper `tools/buck/sync-providers-<lang>.ts` for back-compat; wrappers must be delegator-only and should invoke the orchestrator (`tools/buck/sync-providers.ts`) with `--lang <lang> --no-glue` rather than importing provider internals.
+- Provider sync (optional): implement your generator under `tools/buck/providers/<lang>.ts` (scans `patches/<lang>` and writes `TARGETS.<lang>.auto` deterministically). Provider sync is invoked through the unified orchestrator `tools/buck/sync-providers.ts` (for example `node tools/buck/sync-providers.ts --lang <lang> --no-glue`).
 - Scaffolding templates: `tools/scaffolding/templates/<lang>/...` + language registry entry
 - Tests: zx tests using `tools/tests/lib/lang-fixtures.ts`
 
@@ -170,10 +170,13 @@ Importer-local patch attachment uses `native.glob(...)`, which cannot reach acro
 
 4. Provider sync (optional/when patches exist)
 
-- Add a zx script `tools/buck/sync-providers-<lang>.ts` which:
+- Add a provider sync driver under `tools/buck/providers/<lang>.ts` which:
   - Scans `patches/<lang>/*.patch` (flat), validates shapes, and writes `third_party/providers/TARGETS.<lang>.auto` deterministically
   - Uses helpers from `tools/lib/providers.ts` for naming (stable, hashed suffix)
   - Enforces one-patch-per-key and no subdirectories (warn in non-strict, fail in strict)
+- Wire the driver into the unified orchestrator `tools/buck/sync-providers.ts` so users run:
+  - Providers only: `node tools/buck/sync-providers.ts --lang <lang> --no-glue`
+  - Full glue (when appropriate): `node tools/buck/sync-providers.ts --lang <lang>`
 
 5. Auto-map integration
 
@@ -219,7 +222,7 @@ Stamping belongs in the macro. If your macro synthesizes helper targets (for exa
   - `tools/nix/templates/go.nix`
   - `go/defs.bzl` and `lang/defs_common.bzl`
   - `tools/buck/providers/go.ts` and `tools/buck/providers/index.ts`
-  - Node provider generator: `tools/buck/providers/node.ts` (invoked by `tools/buck/sync-providers.ts`; wrapper `tools/buck/sync-providers-node.ts` exists for back-compat and delegates to the orchestrator)
+  - Node provider generator: `tools/buck/providers/node.ts` (invoked by `tools/buck/sync-providers.ts`)
   - `tools/buck/gen-auto-map.ts`
   - `tools/lib/langs.ts` and `tools/scaffolding/registry.ts`
   - `tools/tests/**` (scaffolding, provider sync, auto_map, planner, exporter)

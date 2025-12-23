@@ -18,7 +18,7 @@ test("node providers carry lang:node label", async () => {
       "utf8",
     );
     // Generate Node providers
-    await $({ cwd: tmp })`node tools/buck/sync-providers-node.ts`;
+    await $({ cwd: tmp })`node tools/buck/sync-providers.ts --lang node --no-glue`;
     const provider = providerNameForImporter("apps/demo/pnpm-lock.yaml", "apps/demo");
     // Query labels of the provider target
     const cq = await $({

@@ -1028,7 +1028,7 @@ def node_importer_deps(name, lockfile, importer, patch_paths = []):
 
 - The canonical Node provider generator lives at `tools/buck/providers/node.ts` (`syncNodeProviders(...)`).
 - The canonical entrypoint is `tools/buck/sync-providers.ts` (unified orchestrator).
-- The `tools/buck/sync-providers-node.ts` file is a thin wrapper kept for back‑compat; it delegates to the orchestrator (providers-only by default via `--no-glue`).
+- Provider sync is invoked only through the unified orchestrator `tools/buck/sync-providers.ts` (use `--lang <lang>` and `--no-glue` for providers-only mode).
 - **Synthetic lockfile providers (opt-in):** Node provider sync supports an opt-in mode that synthesizes `pnpm-lock.yaml` paths for workspace importers that have `package.json` but do not yet have a real lockfile. This is intended for early scaffolding only.
   - Default: providers are generated **only** for real `pnpm-lock.yaml` files.
   - Opt-in: set `NODE_PROVIDER_SYNTHETIC_LOCKFILES=1` to enable synthetic lockfile providers. This does **not** change the lockfile label contract for targets.
@@ -1037,7 +1037,7 @@ def node_importer_deps(name, lockfile, importer, patch_paths = []):
 ```bash
 node tools/buck/sync-providers.ts --lang node
 # or via the back-compat alias (wrapper → delegates to orchestrator)
-node tools/buck/sync-providers-node.ts
+node tools/buck/sync-providers.ts --lang node --no-glue
 ```
 
 #### Switching Back to Per‑lockfile (if needed)

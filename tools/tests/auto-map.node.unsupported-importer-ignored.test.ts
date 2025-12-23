@@ -49,7 +49,7 @@ test("unsupported importer labels do not generate Node providers or auto-map ent
       ZX,
     ];
 
-    await $`${NODE} ${nodeFlags} tools/buck/sync-providers-node.ts`;
+    await $`${NODE} ${nodeFlags} tools/buck/sync-providers.ts --lang node --no-glue`;
     await $`${NODE} ${nodeFlags} tools/buck/gen-auto-map.ts --graph ${graph} --out third_party/providers/auto_map.bzl`;
 
     const forbiddenProvider = `//third_party/providers:${providerNameForImporter(

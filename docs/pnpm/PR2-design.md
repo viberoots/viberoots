@@ -33,7 +33,6 @@ This PR hardens the Node provider system by adding comprehensive tests for deter
 ✅ Patch directory exists (`patches/node/`)  
 ✅ Provider sync driver implemented (`tools/buck/providers/node.ts`)  
 ✅ Unified orchestrator exists (`tools/buck/sync-providers.ts`)  
-✅ Back-compat wrapper exists (`tools/buck/sync-providers-node.ts`) (delegator-only alias)  
 ✅ One idempotency test exists (`sync-providers-node.idempotent.test.ts`)  
 ✅ Auto-map generator supports `lockfile:` labels (`tools/buck/gen-auto-map.ts`)
 

@@ -37,13 +37,13 @@ packages:
     await $`git add apps/site/pnpm-lock.yaml`;
 
     // First run
-    await $`node tools/buck/sync-providers-node.ts`;
+    await $`node tools/buck/sync-providers.ts --lang node --no-glue`;
     const outPath = path.join(tmp, "third_party/providers/TARGETS.node.auto");
     const output1 = await fsp.readFile(outPath, "utf8");
     const hash1 = crypto.createHash("sha256").update(output1).digest("hex");
 
     // Second run
-    await $`node tools/buck/sync-providers-node.ts`;
+    await $`node tools/buck/sync-providers.ts --lang node --no-glue`;
     const output2 = await fsp.readFile(outPath, "utf8");
     const hash2 = crypto.createHash("sha256").update(output2).digest("hex");
 

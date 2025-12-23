@@ -23,7 +23,7 @@ test("sync-providers-node: synthetic lockfile providers are opt-in", async () =>
     await $`git add apps/demo/package.json`;
 
     // Default behavior: no provider for non-existent lockfiles
-    await $`node tools/buck/sync-providers-node.ts`;
+    await $`node tools/buck/sync-providers.ts --lang node --no-glue`;
     const outPath = path.join(tmp, "third_party", "providers", "TARGETS.node.auto");
     const outDefault = await fsp.readFile(outPath, "utf8");
     assert.ok(!outDefault.includes("node_importer_deps("), "expected no node providers by default");
@@ -33,7 +33,7 @@ test("sync-providers-node: synthetic lockfile providers are opt-in", async () =>
     );
 
     // Opt-in behavior: metadata-only provider keyed by synthetic lockfile path
-    await $`NODE_PROVIDER_SYNTHETIC_LOCKFILES=1 node tools/buck/sync-providers-node.ts`;
+    await $`NODE_PROVIDER_SYNTHETIC_LOCKFILES=1 node tools/buck/sync-providers.ts --lang node --no-glue`;
     const outSynth = await fsp.readFile(outPath, "utf8");
     assert.ok(outSynth.includes("node_importer_deps("), "expected node provider in synthetic mode");
     assert.ok(

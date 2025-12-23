@@ -51,7 +51,7 @@ test("gen-auto-map correctly maps lockfile labels to Node providers", async () =
     await $`git add apps/web/pnpm-lock.yaml apps/api/pnpm-lock.yaml`;
 
     // Generate providers
-    await $`node tools/buck/sync-providers-node.ts`;
+    await $`node tools/buck/sync-providers.ts --lang node --no-glue`;
 
     // Generate auto-map
     const autoMapPath = path.join(tmp, "third_party/providers/auto_map.bzl");

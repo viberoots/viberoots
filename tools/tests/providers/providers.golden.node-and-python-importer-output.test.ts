@@ -49,7 +49,7 @@ packages:
     await fsp.writeFile(lockfilePath, lockfile, "utf8");
     await $`git add apps/web/pnpm-lock.yaml`;
 
-    await $`node tools/buck/sync-providers-node.ts`;
+    await $`node tools/buck/sync-providers.ts --lang node --no-glue`;
     const out = await readText(path.join(tmp, "third_party/providers/TARGETS.node.auto"));
 
     const { providerNameForImporter } = await import("../../lib/providers.ts");

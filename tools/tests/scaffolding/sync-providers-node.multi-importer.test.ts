@@ -82,12 +82,12 @@ packages:
     await $`git add apps/web/pnpm-lock.yaml apps/api/pnpm-lock.yaml libs/utils/pnpm-lock.yaml`;
 
     // First run
-    await $`node tools/buck/sync-providers-node.ts`;
+    await $`node tools/buck/sync-providers.ts --lang node --no-glue`;
     const outPath = path.join(tmp, "third_party/providers/TARGETS.node.auto");
     const output1 = await fsp.readFile(outPath, "utf8");
 
     // Second run
-    await $`node tools/buck/sync-providers-node.ts`;
+    await $`node tools/buck/sync-providers.ts --lang node --no-glue`;
     const output2 = await fsp.readFile(outPath, "utf8");
 
     // Byte-for-byte identical

@@ -19,7 +19,7 @@ test("node provider includes patch only for importer's effective set after patch
     await $`git add apps/example/pnpm-lock.yaml`;
 
     // Initial sync: no patches referenced
-    await $`node tools/buck/sync-providers-node.ts`;
+    await $`node tools/buck/sync-providers.ts --lang node --no-glue`;
     const outPath = path.join(tmp, "third_party/providers/TARGETS.node.auto");
     const before = await fsp.readFile(outPath, "utf8");
     if (!before.includes('importer="apps/example"')) {
@@ -37,7 +37,7 @@ test("node provider includes patch only for importer's effective set after patch
     await fsp.writeFile(path.join(patchDir, "lodash@4.17.21.patch"), "# dummy patch\n", "utf8");
 
     // Sync again: provider should now include the patch path
-    await $`node tools/buck/sync-providers-node.ts`;
+    await $`node tools/buck/sync-providers.ts --lang node --no-glue`;
     const after = await fsp.readFile(outPath, "utf8");
     if (!/patch_paths=\[[^\]]*patches\/node\/lodash@4\.17\.21\.patch/.test(after)) {
       console.error("Expected lodash patch path in provider entry after patch added");

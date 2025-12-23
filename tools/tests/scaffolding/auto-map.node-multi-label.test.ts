@@ -40,7 +40,7 @@ test("auto-map maps only lockfile providers when both module + lockfile labels p
     await $`git add apps/hybrid/pnpm-lock.yaml`;
 
     // Generate Node providers
-    await $`node tools/buck/sync-providers-node.ts`;
+    await $`node tools/buck/sync-providers.ts --lang node --no-glue`;
 
     // Generate auto-map
     const autoMapPath = path.join(tmp, "third_party/providers/auto_map.bzl");

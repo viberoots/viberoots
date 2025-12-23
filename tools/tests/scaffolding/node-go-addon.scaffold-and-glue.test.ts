@@ -33,7 +33,7 @@ test("node go-addon: scaffold and run glue in temp repo", async () => {
 
     // Glue: export graph → sync providers (node) → generate auto_map
     await $`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
-    await $`node tools/buck/sync-providers-node.ts`.nothrow();
+    await $`node tools/buck/sync-providers.ts --lang node --no-glue`.nothrow();
     await $`node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
     // Guard presence of generated files
     if (!(await exists(path.join(tmp, "tools", "buck", "graph.json")))) {

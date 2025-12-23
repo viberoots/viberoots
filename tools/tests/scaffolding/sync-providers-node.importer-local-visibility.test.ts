@@ -36,7 +36,7 @@ packages:
     await fsp.writeFile(lockfilePath, lockfileContent, "utf8");
     await $`git add apps/web/pnpm-lock.yaml`;
 
-    await $`node tools/buck/sync-providers-node.ts`;
+    await $`node tools/buck/sync-providers.ts --lang node --no-glue`;
     const outPath = path.join(tmp, "third_party/providers/TARGETS.node.auto");
     const output = await fsp.readFile(outPath, "utf8");
 
