@@ -36,3 +36,26 @@ Tooling scripts must not hand-roll argument parsing. This prevents subtle mismat
 When one tool needs to invoke another TypeScript zx script, use `tools/lib/node-run.ts:runNodeWithZx`.
 
 This keeps Node flags, zx init, and exit-code propagation consistent.
+
+## Patch tooling boundaries (required)
+
+Patch tooling is split into small entrypoints under `tools/patch/` and shared helper modules under `tools/patch/lib/`.
+
+To keep patch behavior consistent across languages and avoid reintroducing drift, patch tooling entrypoints must delegate to the shared helper surfaces rather than implementing local one-off logic.
+
+### Helper surfaces you must use
+
+- **Importer-local patch directory resolution (Node + Python)**: `tools/patch/lib/importer-local-patch-dir.ts`
+  - Entry points must call `resolveImporterLocalPatchDir(...)`.
+  - Do not assemble `<importer>/patches/<lang>` paths directly.
+- **Workspace-based patch workflow (Go + Python)**: `tools/patch/lib/workspace-workflow.ts`
+  - Entry points must call `startWorkspaceWorkflow(...)`, `applyWorkspaceWorkflow(...)`, and `resetWorkspaceWorkflow(...)`.
+  - Do not reimplement session reuse, no-op apply cleanup, or patch verification at call sites.
+
+### Enforcement test
+
+The repository includes an enforcement-style test that scans patch tooling for known drift patterns:
+
+- Test: `tools/tests/patching/patch-tooling.helper-boundaries.enforcement.test.ts`
+
+When this test fails, the fix is to move the flagged logic behind the canonical helper surfaces listed above. If the test is a false positive, tighten the patterns rather than disabling the enforcement.

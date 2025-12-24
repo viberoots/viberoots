@@ -9,6 +9,7 @@ import { readImporterArg } from "../lib/cli.ts";
 import { resolveImporterDir } from "../lib/lockfiles.ts";
 import { runSession } from "./lib/session";
 import { requirePositional } from "./lib/args";
+import { resolveImporterLocalPatchDir } from "./lib/importer-local-patch-dir";
 
 function pnpmBin(): string {
   const b = (process.env.PNPM_BIN || "").trim();
@@ -60,7 +61,8 @@ async function doApply(args: string[]) {
     example: "lodash or @scope/pkg",
   });
   const importerRel = await resolveImporterDir(process.cwd(), readImporterArg("") || undefined);
-  const importerDir = importerRel === "." ? repoRoot() : path.resolve(repoRoot(), importerRel);
+  const root = repoRoot();
+  const importerDir = importerRel === "." ? root : path.resolve(root, importerRel);
   const key = sessionKey(importerDir, pkg);
   let sess = await getSession("node", key);
   if (!sess) {
@@ -81,7 +83,13 @@ async function doApply(args: string[]) {
     }
   }
   if (!sess) throw new Error(`no active session for ${pkg}; run: patch-pkg start node ${pkg}`);
-  await fsp.mkdir(path.join(importerDir, "patches", "node"), { recursive: true });
+  const patchDir = resolveImporterLocalPatchDir({
+    repoRootAbs: root,
+    importerDirAbs: importerDir,
+    lang: "node",
+    overridePatchDir: "",
+  });
+  await fsp.mkdir(patchDir, { recursive: true });
   // Ensure patches-dir is respected; prefer configuration via .npmrc
   await $({ cwd: importerDir })`${pnpmBin()} patch-commit ${sess.workspacePath}`;
   await deleteSession("node", key);
