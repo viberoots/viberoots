@@ -13,25 +13,10 @@ import { printOverrideSnippet, setOverride, clearOverride, readOverrideMap } fro
 import { getSession, setSession, deleteSession } from "./state";
 import { requirePositional } from "./lib/args";
 import { NOOP_CLEARED_MSG } from "./lib/messages";
+import { resolveImporterLocalPatchDir } from "./lib/importer-local-patch-dir";
 
 function keyFor(dist: string, ver: string): string {
   return `${String(dist || "").toLowerCase()}@${String(ver || "").toLowerCase()}`;
-}
-
-function resolvePythonPatchDir(opts: {
-  repoRootAbs: string;
-  importerDir: string;
-  overridePatchDir: string;
-}): string {
-  const { repoRootAbs, importerDir, overridePatchDir } = opts;
-  // Default to importer-local patches directory: <importer>/patches/python
-  const defaultImporterLocal = path.isAbsolute(importerDir)
-    ? path.join(importerDir, "patches", "python")
-    : path.join(repoRootAbs, importerDir, "patches", "python");
-  if (!overridePatchDir) return defaultImporterLocal;
-  return path.isAbsolute(overridePatchDir)
-    ? overridePatchDir
-    : path.join(repoRootAbs, overridePatchDir);
 }
 
 async function doStart(args: string[]) {
@@ -107,9 +92,10 @@ async function doApply(args: string[]) {
 
   const root = repoRoot();
   const overridePatchDir = readPatchDirArg("");
-  const patchDir = resolvePythonPatchDir({
+  const patchDir = resolveImporterLocalPatchDir({
     repoRootAbs: root,
-    importerDir: resolved.importerDir,
+    importerDirAbs: resolved.importerDir,
+    lang: "python",
     overridePatchDir,
   });
   await fsp.mkdir(patchDir, { recursive: true });
@@ -174,9 +160,10 @@ async function doRemove(args: string[]) {
 
   const root = repoRoot();
   const overridePatchDir = readPatchDirArg("");
-  const patchDir = resolvePythonPatchDir({
+  const patchDir = resolveImporterLocalPatchDir({
     repoRootAbs: root,
-    importerDir: resolved.importerDir,
+    importerDirAbs: resolved.importerDir,
+    lang: "python",
     overridePatchDir,
   });
   const dst = path.join(patchDir, `${resolved.importPath}@${resolved.version}.patch`);

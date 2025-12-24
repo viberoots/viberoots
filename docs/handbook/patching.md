@@ -335,6 +335,33 @@ Notes:
 - Node uses importer‑scoped providers; glue generation is required on apply/remove.
 - Patches are also included in target `srcs` for precise invalidation.
 
+### Python — importer‑scoped patching workflow (uv)
+
+Python patching is importer‑scoped, like Node, but patch files are plain `*.patch` artifacts that we write directly under the importer. Glue regeneration runs on apply/remove to keep importer-scoped providers and `auto_map.bzl` aligned.
+
+By default, patches are written to:
+
+- If the importer lockfile is at repo root: `patches/python/`
+- Otherwise: `<importer>/patches/python/` (for example `apps/api/patches/python/`)
+
+You can override the destination directory with `--patch-dir`:
+
+- An **absolute** `--patch-dir` is used as-is.
+- A **relative** `--patch-dir` is resolved against the repo root.
+
+Example:
+
+```bash
+# Start a patch session (pick importer by locating the nearest uv.lock)
+tools/bin/patch-pkg start python requests --importer apps/api
+
+# Apply with default destination (<importer>/patches/python)
+tools/bin/patch-pkg apply python requests --importer apps/api
+
+# Or, override the destination directory explicitly
+tools/bin/patch-pkg apply python requests --importer apps/api --patch-dir apps/api/patches/python
+```
+
 ### C++ — patching a nixpkgs dependency
 
 This example patches a nixpkgs package (e.g., `pkgs.zlib`) and writes a package‑local patch file for a C++ library target.
