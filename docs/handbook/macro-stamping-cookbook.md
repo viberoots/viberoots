@@ -4,7 +4,11 @@ This cookbook is the short reference for macro authors. It documents the small s
 
 Stamping ensures exporter preconditions via consistent labels applied in macros.
 
-- **Helpers**: use `lang/defs_common.bzl: stamp_labels(kwargs, lang, kind)` to add `lang:<id>` and optional `kind:<bin|lib|test>`.
+- **Helpers**: use `lang/defs_common.bzl: stamp_labels(kwargs, lang, kind)` to add `lang:<id>` and optional `kind:<k>`.
+  - `kind:*` must be in the shared vocabulary:
+    - Starlark: `lang/defs_common.bzl: allowed_kind_values` / `is_allowed_kind_value`
+    - TypeScript: `tools/lib/kind-vocabulary.ts`
+  - Examples used in this repo include: `kind:bin`, `kind:lib`, `kind:test`, `kind:bundle`, `kind:app`, `kind:packaging`, `kind:addon`, `kind:carchive`, `kind:gen`, and `kind:wasm`.
 - **Importer-scoped ecosystems (Node, Python)**: avoid bespoke wiring. Use the shared helpers in `lang/importer_wiring.bzl` so lockfile enforcement, patch inputs, and provider edge realization stay drift-free.
   - For genrule-style wrappers: `prepare_importer_genrule_kwargs(...)`
   - For non-genrule wrappers: `prepare_importer_non_genrule_wiring(...)` (returns the derived importer string and the wired kwargs/deps)

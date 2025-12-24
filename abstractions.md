@@ -43,7 +43,7 @@ This contract ensures that a target’s language and kind are visible in the exp
 ### Contract
 
 - Language targets stamp `lang:<id>`.
-- Targets that participate in routing stamp `kind:<bin|lib|test|...>`.
+- Targets that participate in routing stamp `kind:<k>`, where `<k>` is an explicit, shared vocabulary.
 - WASM variants stamp `kind:wasm` and `wasm:<variant>`.
 
 For language macros, stamping is the macro’s responsibility. Call sites should not need to remember `lang:*` or `kind:*` labels.
@@ -55,6 +55,9 @@ For language macros, stamping is the macro’s responsibility. Call sites should
 - **Starlark**: `lang/label_stamping.bzl` via `lang/defs_common.bzl` re-exports.
   - `stamp_labels(kwargs, lang, kind)`
   - `stamp_wasm_variant(kwargs, lang, variant)`
+- **Kind vocabulary (contract)**:
+  - Starlark: `lang/kind_vocabulary.bzl` (re-exported via `lang/defs_common.bzl`)
+  - TypeScript: `tools/lib/kind-vocabulary.ts`
 - **TypeScript exporter validation**: importer-scoped adapters warn when `kind:*` is missing for targets that should have it.
   - `tools/buck/exporter/lang/importer-scoped-adapter.ts`
 

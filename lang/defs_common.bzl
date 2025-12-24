@@ -58,6 +58,12 @@ load(
 )
 load("//lang:nix_calling_macros.bzl", _wire_global_nix_inputs = "wire_global_nix_inputs")
 load(
+    "//lang:kind_vocabulary.bzl",
+    _allowed_kind_values = "ALLOWED_KIND_VALUES",
+    _is_allowed_kind_value = "is_allowed_kind_value",
+    _kind_vocabulary_probe = "kind_vocabulary_probe",
+)
+load(
     "//lang:planner_visible_wiring.bzl",
     _wire_planner_visible_inputs = "wire_planner_visible_inputs",
     _wire_planner_visible_stub = "wire_planner_visible_stub",
@@ -127,6 +133,10 @@ prepare_importer_srcsless_rule_wiring = _prepare_importer_srcsless_rule_wiring
 prepare_importer_nix_calling_genrule_wiring = _prepare_importer_nix_calling_genrule_wiring
 
 wire_global_nix_inputs = _wire_global_nix_inputs
+
+allowed_kind_values = _allowed_kind_values
+is_allowed_kind_value = _is_allowed_kind_value
+kind_vocabulary_probe = _kind_vocabulary_probe
 
 wire_planner_visible_inputs = _wire_planner_visible_inputs
 wire_planner_visible_stub = _wire_planner_visible_stub
