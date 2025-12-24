@@ -22,6 +22,7 @@ import { cmdUpdateOrRegen } from "./commands/update-regen.ts";
 import { usage } from "./usage.ts";
 
 import { validateTemplates } from "../validate.ts";
+import { getArgvTokens } from "../../lib/cli.ts";
 
 function repoRootFromScafModuleUrl(): string {
   const here = path.dirname(new URL(import.meta.url).pathname);
@@ -63,8 +64,7 @@ export async function runScafCli() {
   normalizeCwd(ctx.repoRoot);
   guardBuckTests(ctx.repoRoot);
 
-  const raw = process.argv.slice(2);
-  const { positionals, flags } = parseScafArgv(raw);
+  const { positionals, flags } = parseScafArgv(getArgvTokens());
   const [cmd, ...rest] = positionals;
 
   switch (cmd) {

@@ -11,6 +11,7 @@ import { repoRoot } from "./paths.ts";
 import { ensureBuckPreludeConfig } from "./prelude.ts";
 import { runStartupCheck } from "./startup.ts";
 import { maybeAutoImpureFromUntrackedFiles } from "./untracked.ts";
+import { getArgvTokens } from "../../lib/cli.ts";
 
 export async function runDevBuild(): Promise<void> {
   const root = repoRoot();
@@ -33,7 +34,7 @@ export async function runDevBuild(): Promise<void> {
     process.chdir(root);
   } catch {}
 
-  const parsed = parseDevBuildArgs(process.argv.slice(2));
+  const parsed = parseDevBuildArgs(getArgvTokens());
   const auto = await maybeAutoImpureFromUntrackedFiles({
     isCI,
     root,

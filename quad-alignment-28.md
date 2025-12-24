@@ -280,6 +280,116 @@ Implement.
 
 ---
 
+## PR‑5: Finish migrating remaining tool CLIs off bespoke argv parsing and add an enforcement guard
+
+### Description
+
+PR‑4 standardized flag parsing on `tools/lib/cli.ts`, but there are still a few tooling scripts under `tools/` that hand-roll `process.argv` parsing (either as a fixed-flag parser or as a small bespoke argv-to-map helper).
+
+This is not a functional bug, but it is a drift surface. These scripts can disagree on precedence (`global argv` vs `process.argv`), accepted forms (`--flag value` vs `--flag=value`), and how unknown flags are handled. This matters in temp-repo test environments and when tooling is invoked via `runNodeWithZx`.
+
+Clarification: This PR is about removing drift in **repo tooling**. It does not change any public build-system contracts or provider glue formats. It aims to make “how tooling parses CLI flags” uniform and enforceable.
+
+### Scope & Changes
+
+This PR identifies and migrates the remaining tooling scripts under `tools/` that parse flags manually:
+
+- Migrate fixed-flag tooling entrypoints to use `tools/lib/cli.ts`:
+  - `tools/dev/planner-gen.ts` (currently parses `--lang`, `--all`, `--check`)
+  - `tools/dev/buck-watchdog.ts` (currently parses `--parent`, `--iso`, `--patterns`)
+  - `tools/dev/install/deps-main.ts` (currently parses `--force`, `--dry-run`, `--verbose/-v`, `--skip-glue`, `--glue-only`, `--skip-go-tidy`)
+  - `tools/scaffolding/new-pnpm-project.ts` (currently parses `--kind`, `--name`, `--importer`, `--yes`, `--run-setup`)
+  - `tools/scaffolding/validate.ts` (currently uses `process.argv` directly for positionals)
+
+- Migrate the remaining “small bespoke CLI” surfaces that still strip flags manually:
+  - `tools/dev/dev-build/run-dev-build.ts` and `tools/dev/dev-build/args.ts`
+    - Stop parsing `process.argv.slice(2)` with bespoke logic for `--impure` and `--no-materialize`.
+    - Use `tools/lib/cli.ts` helpers to read those flags and derive the remaining positional Buck arguments consistently across zx and plain Node invocation.
+
+- For tooling that intentionally needs a “flags map” (arbitrary `--key[=value]` surface), add one small shared helper surface instead of re-implementing it:
+  - Add `parseFlagMap(argv?: string[]) -> { positionals: string[], flags: Record<string, string> }` to `tools/lib/cli.ts` (or a small sibling module under `tools/lib/`) that:
+    - supports `--key=value` and `--key` presence flags (value defaults to `"true"`)
+    - preserves caller ordering for positionals
+    - does not attempt to be a full CLI framework
+  - Refactor:
+    - `tools/scaffolding/scaf/argv.ts` to use the shared helper (it is the canonical “needs a flags map” example)
+
+  - Refactor the `scaf` entrypoint to route argv handling through the shared helper:
+    - `tools/scaffolding/scaf/main.ts` should avoid direct `process.argv.slice(2)` in the entrypoint and instead call the shared parsing surface.
+
+- Optional (recommended): tighten patch tooling parsing drift in helper libraries:
+  - `tools/patch/lib/apply.ts` contains a small argv-array parser (`parseApplyFlags(...)`) for `--target`, `--patch-dir`, `--force`.
+  - If we keep this pattern (parsing a provided argv list for programmatic/test use), it should use the same shared parsing helpers as CLIs (for example a `parseFlagMap(argv)`-based implementation) so behavior does not drift.
+
+- Keep command-line interfaces stable:
+  - preserve existing flag names
+  - preserve defaults and “explicitly provided vs defaulted” semantics where current behavior depends on it (for example `sync-providers.ts` uses `hasFlag("out")` to preserve Node default out path behavior)
+  - retain any legacy aliases in the callsite when they are intentionally supported (for example `-v` in install tooling) without reintroducing bespoke argv parsing
+
+Non-goals in this PR:
+
+- No changes to provider generation behavior or outputs.
+- No changes to patch invalidation models or glue pipeline ordering.
+- No introduction of a new CLI parsing dependency (no yargs/commander/minimist).
+
+### Tests (in this PR)
+
+- Add an enforcement-style TypeScript test that fails if bespoke argv parsing patterns reappear in tool entrypoints:
+  - Scan `tools/**/*.ts` (excluding `tools/tests/**`, scaffolding templates, and the canonical implementation file(s) for CLI helpers).
+  - Fail on common “roll your own argv parsing” patterns, for example:
+    - `process.argv.indexOf("--`
+    - `process.argv.findIndex((a) => a === "--`
+    - local `parseArg(` / `parseFlags(` helpers that exist only to parse CLI flags
+  - The failure message should point authors to `tools/lib/cli.ts` as the canonical mechanism.
+
+- Add or extend unit tests for `tools/lib/cli.ts` to cover any parsing shapes required by the migrated scripts:
+  - presence flags and equals-form parsing
+  - “global argv” precedence over `process.argv`
+  - the shared `parseFlagMap(...)` helper (if introduced)
+
+### Docs (in this PR)
+
+- Add a handbook page `docs/handbook/tooling.md` (or update the existing best-fit handbook page if one already exists) stating:
+  - new tooling must use `tools/lib/cli.ts` (no bespoke `process.argv` parsing)
+  - when one tool invokes another zx script, use `tools/lib/node-run.ts:runNodeWithZx`
+  - `parseFlagMap(...)` is the only supported way to build a free-form flags map (used by `scaf`), and call sites must not copy/paste bespoke variants
+- Update `getting-started-on-a-pr.md` to point at the canonical tooling handbook page so guidance lives in one place.
+
+### Acceptance Criteria
+
+- The remaining tooling scripts no longer hand-roll flag parsing and instead use shared helpers:
+  - `tools/dev/planner-gen.ts`
+  - `tools/dev/buck-watchdog.ts`
+  - `tools/dev/install/deps-main.ts`
+  - `tools/dev/dev-build/run-dev-build.ts` and `tools/dev/dev-build/args.ts`
+  - `tools/scaffolding/new-pnpm-project.ts`
+  - `tools/scaffolding/validate.ts`
+  - `tools/scaffolding/scaf/argv.ts` uses the shared `parseFlagMap(...)` helper (if introduced)
+- `tools/scaffolding/scaf/main.ts` does not bypass the shared parsing surface for argv handling
+- Any remaining argv parsing in patch tooling helper libraries (for example `tools/patch/lib/apply.ts`) either:
+  - uses the same shared parsing helpers as CLIs, or
+  - is explicitly documented as an intentional exception with a regression test that locks down its behavior
+- Tests prevent reintroduction of bespoke argv parsing patterns.
+- Documentation clearly states the canonical CLI parsing policy and points at the shared helpers.
+
+### Risks
+
+Low to moderate. The main risk is subtle differences in how “presence flags” are interpreted (`--flag` vs `--flag=false`) and in how legacy short aliases are handled. Tests should cover the specific shapes used by the migrated scripts.
+
+### Consequence of Not Implementing
+
+We keep a small but persistent source of divergence in how tooling behaves across invocation contexts, and we rely on review to catch bespoke parsing reintroductions.
+
+### Downsides for Implementing
+
+Some churn in scripts that are otherwise correct. The benefit is lower drift risk and fewer one-off parsing inconsistencies.
+
+### Recommendation
+
+Implement.
+
+---
+
 ## Rollout & Sequencing
 
 These PRs are ordered by dependency chain and by the goal of keeping each PR revertible:
@@ -288,6 +398,7 @@ These PRs are ordered by dependency chain and by the goal of keeping each PR rev
 2. PR‑2 next. It makes the patch invalidation seam explicit and testable, and updates patch tooling UX.
 3. PR‑3 next. It removes provider sync wrapper entrypoints and updates all call sites.
 4. PR‑4 last. It standardizes remaining tooling flag parsing and removes bespoke argv parsing.
+5. PR‑5 last. It finishes migrating remaining tool CLIs off bespoke argv parsing and adds an enforcement guard so drift does not return.
 
 ---
 

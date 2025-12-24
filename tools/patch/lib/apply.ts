@@ -7,7 +7,10 @@ import { debugEnabled } from "./util";
 import { repoRoot as _repoRoot } from "../../lib/repo.ts";
 import {
   readForceFlag,
+  readFlagBoolFromTokens,
+  readFlagFromTokens,
   readPatchDirArg,
+  removeKnownFlags,
   readTargetArg,
   normalizeTargetToPkg,
 } from "../../lib/cli.ts";
@@ -21,54 +24,24 @@ export type ApplyFlags = {
 
 export function parseApplyFlags(argv: string[]): ApplyFlags {
   // 1) Parse flags from provided argv (programmatic use in tests)
-  let parsedTarget: string | null = null;
-  let parsedPatchDir: string | null = null;
-  let parsedForce = false;
-  const rest: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i] || "";
-    if (!a.startsWith("--")) {
-      rest.push(a);
-      continue;
-    }
-    if (a === "--target") {
-      const nxt = argv[i + 1] || "";
-      if (nxt && !nxt.startsWith("--")) {
-        parsedTarget = nxt.trim();
-        i++;
-      } else {
-        parsedTarget = "";
-      }
-      continue;
-    }
-    if (a.startsWith("--target=")) {
-      parsedTarget = a.slice("--target=".length).trim();
-      continue;
-    }
-    if (a === "--patch-dir" || a === "--patchDir") {
-      const nxt = argv[i + 1] || "";
-      if (nxt && !nxt.startsWith("--")) {
-        parsedPatchDir = nxt.trim();
-        i++;
-      } else {
-        parsedPatchDir = "";
-      }
-      continue;
-    }
-    if (a.startsWith("--patch-dir=")) {
-      parsedPatchDir = a.slice("--patch-dir=".length).trim();
-      continue;
-    }
-    if (a.startsWith("--patchDir=")) {
-      parsedPatchDir = a.slice("--patchDir=".length).trim();
-      continue;
-    }
-    if (a === "--force") {
-      parsedForce = true;
-      continue;
-    }
-    // Unknown flags are ignored (dropped from rest) to preserve prior behavior
-  }
+  const targetRead = readFlagFromTokens("target", argv);
+  const patchDirRead = readFlagFromTokens("patch-dir", argv);
+  const patchDirLegacyRead = readFlagFromTokens("patchDir", argv);
+  const parsedTarget = targetRead.provided ? targetRead.value.trim() : null;
+  const parsedPatchDir = patchDirRead.provided
+    ? patchDirRead.value.trim()
+    : patchDirLegacyRead.provided
+      ? patchDirLegacyRead.value.trim()
+      : null;
+  const parsedForce = readFlagBoolFromTokens("force", argv);
+
+  // Preserve historical behavior: ignore unknown flags but keep any non-flag tokens
+  // (including values following unknown flags) in restArgs.
+  const { argv: droppedKnown } = removeKnownFlags(argv, {
+    presence: ["--force"],
+    takesValue: ["--target", "--patch-dir", "--patchDir"],
+  });
+  const rest = droppedKnown.filter((t) => !t.startsWith("--"));
 
   // 2) Merge with standardized helpers (CLI invocation via zx/yargs/process.argv)
   const cliTarget = readTargetArg("");

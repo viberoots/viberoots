@@ -5,24 +5,32 @@ import os from "node:os";
 import path from "node:path";
 
 function repoIdentity(): string {
-  // Prefer explicit temp-repo root if provided by the zx test harness
-  const wr = process.env.WORKSPACE_ROOT || "";
+  const cwd = process.cwd();
+
+  // Prefer an explicit workspace root only when it matches the current working directory context.
+  // This avoids accidental cross-repo lock contention when a parent process exports WORKSPACE_ROOT
+  // but a tool is invoked inside a temp repo (common in zx tests).
+  const wr = String(process.env.WORKSPACE_ROOT || "").trim();
   if (wr) {
     try {
-      return path.resolve(wr);
+      const abs = path.resolve(wr);
+      if (cwd === abs || cwd.startsWith(abs + path.sep)) return abs;
     } catch {}
   }
-  // Otherwise, prefer the real workspace root inferred from ZX_INIT
-  const zxInit = process.env.ZX_INIT || "";
+
+  // Prefer the workspace root inferred from ZX_INIT only when it matches the current cwd context.
+  const zxInit = String(process.env.ZX_INIT || "").trim();
   if (zxInit) {
     try {
       const p = path.resolve(zxInit);
       // zx-init.mjs lives at <repo>/tools/dev/zx-init.mjs
-      return path.dirname(path.dirname(path.dirname(p)));
+      const root = path.dirname(path.dirname(path.dirname(p)));
+      if (cwd === root || cwd.startsWith(root + path.sep)) return root;
     } catch {}
   }
-  // Fallback to current working directory
-  return process.cwd();
+
+  // Fallback to current working directory.
+  return cwd;
 }
 
 function lockPathFor(key: string): string {

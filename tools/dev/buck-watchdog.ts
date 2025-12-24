@@ -1,11 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import "zx/globals";
-
-function parseArg(name: string, def: string = ""): string {
-  const idx = process.argv.indexOf(`--${name}`);
-  if (idx >= 0 && idx + 1 < process.argv.length) return process.argv[idx + 1];
-  return def;
-}
+import { getFlagStr } from "../lib/cli.ts";
 
 function isPidAlive(pid: number): boolean {
   try {
@@ -56,9 +51,9 @@ async function sweepOrphans(patterns: RegExp) {
 }
 
 async function main() {
-  const parentPid = Number(parseArg("parent", "0"));
-  const iso = parseArg("iso", "");
-  const patternsRaw = parseArg("patterns", "zxtest-,exporter-,devbuild-");
+  const parentPid = Number(getFlagStr("parent", "0"));
+  const iso = getFlagStr("iso", "");
+  const patternsRaw = getFlagStr("patterns", "zxtest-,exporter-,devbuild-");
   const pat = new RegExp(
     `^(?:${patternsRaw
       .split(",")

@@ -1,3 +1,5 @@
+import { readFlagBoolFromTokens, removeKnownFlags } from "../../lib/cli.ts";
+
 export type DevBuildArgs = {
   subcmd: string;
   restArgs: string[];
@@ -26,21 +28,13 @@ function stripDevBuildFlags(args: string[]): {
   materialize: boolean;
   impure: boolean;
 } {
-  let materialize = true;
-  let impure = false;
-  const out: string[] = [];
-  for (const a of args) {
-    if (a === "--no-materialize") {
-      materialize = false;
-      continue;
-    }
-    if (a === "--impure") {
-      impure = true;
-      continue;
-    }
-    out.push(a);
-  }
-  return { args: out, materialize, impure };
+  const { argv: cleaned } = removeKnownFlags(args, {
+    presence: ["--impure", "--no-materialize"],
+    takesValue: [],
+  });
+  const impure = readFlagBoolFromTokens("impure", args);
+  const materialize = !readFlagBoolFromTokens("no-materialize", args);
+  return { args: cleaned, materialize, impure };
 }
 
 export function parseDevBuildArgs(argsIn: string[]): DevBuildArgs {

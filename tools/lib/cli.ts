@@ -214,3 +214,13 @@ export function readForceFlag(): boolean {
 export function readImporterArg(def: string = ""): string {
   return getFlagStr("importer", def).trim();
 }
+
+export {
+  getArgvTokens,
+  hasShortFlag,
+  parseFlagMap,
+  readFlagBoolFromTokens,
+  readFlagFromTokens,
+  readFlagStrFromTokens,
+  removeKnownFlags,
+} from "./argv.ts";

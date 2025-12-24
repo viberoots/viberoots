@@ -24,10 +24,9 @@ Python provider sync activation in sparse/partial clones is lockfile‑driven: t
 - Use Conventional Commits and real newlines in commit messages.
 - Keep files small and focused (≤ 250 lines ideally); split modules when needed.
 - Maintain determinism and low cyclomatic complexity; prefer small, well-named functions.
-- Prefer shared CLI helpers when parsing flags in zx scripts:
-  - Use `tools/lib/cli.ts` (`getFlagStr`, `getFlagBool`, `getFlagList`) instead of bespoke parsing.
-- Prefer the shared Node runner when one tool needs to invoke another TypeScript zx script:
-  - Use `tools/lib/node-run.ts` (`runNodeWithZx`) instead of hand-rolling `node ... --import tools/dev/zx-init.mjs ...` flags.
+- Follow the tooling rules in `docs/handbook/tooling.md`:
+  - Use `tools/lib/cli.ts` for CLI parsing (no bespoke `process.argv` parsing).
+  - Use `tools/lib/node-run.ts` (`runNodeWithZx`) when one tool invokes another zx script.
 - Nix attr alias source of truth: `tools/lib/nix-attr-aliases.json`. Starlark mirror is generated (dev/test-time) via:
   - `node tools/dev/gen-nix-attr-aliases-bzl.ts` → writes `lang/nix_attr_aliases.bzl`. A stub exists and runtime does not depend on generation; behavior is unchanged for current aliases.
 

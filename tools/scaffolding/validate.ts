@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { getPositionals } from "../lib/cli.ts";
 
 async function exists(p: string) {
   try {
@@ -175,8 +176,7 @@ export async function validateTemplates(targets: string[], quiet: boolean = fals
 }
 
 async function main() {
-  const args = process.argv.slice(2);
-  await validateTemplates(args);
+  await validateTemplates(getPositionals());
 }
 
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith("validate.ts")) {

@@ -8,6 +8,7 @@ import { runGlue } from "./glue.ts";
 import { runGomod2nixGenerate, runGomod2nixScanAll } from "./gomod2nix.ts";
 import { withExclusiveInstallLock } from "./lock.ts";
 import { runUvRefreshAll } from "./uv.ts";
+import { getFlagBool, hasShortFlag } from "../../lib/cli.ts";
 import { findRepoRoot } from "../../lib/repo.ts";
 
 type Flags = {
@@ -18,24 +19,6 @@ type Flags = {
   glueOnly: boolean;
   skipGoTidy: boolean;
 };
-
-function parseFlags(argv: string[]): Flags {
-  let force = false;
-  let dryRun = process.env.INSTALL_DEPS_DRY_RUN === "1";
-  let verbose = false;
-  let skipGlue = false;
-  let glueOnly = false;
-  let skipGoTidy = process.env.INSTALL_DEPS_SKIP_GO_TIDY === "1";
-  for (const a of argv) {
-    if (a === "--force") force = true;
-    if (a === "--dry-run") dryRun = true;
-    if (a === "--verbose" || a === "-v") verbose = true;
-    if (a === "--skip-glue") skipGlue = true;
-    if (a === "--glue-only") glueOnly = true;
-    if (a === "--skip-go-tidy") skipGoTidy = true;
-  }
-  return { force, dryRun, verbose, skipGlue, glueOnly, skipGoTidy };
-}
 
 // Resolve absolute workspace root path without requiring callers to run from repo root.
 async function resolveWorkspaceRoot(): Promise<string> {
@@ -50,9 +33,16 @@ async function resolveWorkspaceRoot(): Promise<string> {
   return await findRepoRoot(cwd);
 }
 console.log("Installing dependencies...");
-const { force, dryRun, verbose, skipGlue, glueOnly, skipGoTidy } = parseFlags(
-  process.argv.slice(2),
-);
+const envDryRun = process.env.INSTALL_DEPS_DRY_RUN === "1";
+const envSkipGoTidy = process.env.INSTALL_DEPS_SKIP_GO_TIDY === "1";
+const { force, dryRun, verbose, skipGlue, glueOnly, skipGoTidy } = {
+  force: getFlagBool("force"),
+  dryRun: getFlagBool("dry-run") || envDryRun,
+  verbose: getFlagBool("verbose") || hasShortFlag("v"),
+  skipGlue: getFlagBool("skip-glue"),
+  glueOnly: getFlagBool("glue-only"),
+  skipGoTidy: getFlagBool("skip-go-tidy") || envSkipGoTidy,
+} satisfies Flags;
 // In glue-only mode, default to skipping go mod tidy unless explicitly overridden
 const effSkipGoTidy =
   skipGoTidy || (glueOnly && String(process.env.INSTALL_DEPS_SKIP_GO_TIDY || "") !== "0");

@@ -3,6 +3,7 @@ import Ajv from "ajv";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { writeIfChanged as writeIfChangedDeterministic } from "../lib/fs-helpers.ts";
+import { getFlagBool, getFlagStr } from "../lib/cli.ts";
 
 type PlannerConfig = {
   id: string;
@@ -150,11 +151,9 @@ async function writePlannerOutput(
 }
 
 async function main() {
-  const args = new Set(process.argv.slice(2));
-  const check = args.has("--check");
-  const all = args.has("--all");
-  const langIdx = process.argv.findIndex((a) => a === "--lang");
-  const one = langIdx >= 0 ? process.argv[langIdx + 1] : "";
+  const check = getFlagBool("check");
+  const all = getFlagBool("all");
+  const one = getFlagStr("lang", "").trim();
 
   const changed: string[] = [];
   const langs: string[] = [];

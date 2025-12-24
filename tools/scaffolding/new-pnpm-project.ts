@@ -1,20 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
 import "zx/globals";
-
-function parse(argv: string[]): { flags: Record<string, string>; name?: string } {
-  const flags: Record<string, string> = {};
-  const rest: string[] = [];
-  for (const a of argv) {
-    if (a.startsWith("--")) {
-      const [k, v = "true"] = a.slice(2).split("=");
-      flags[k] = v;
-    } else {
-      rest.push(a);
-    }
-  }
-  return { flags, name: rest[0] };
-}
+import { getFlagBool, getFlagStr } from "../lib/cli.ts";
 
 function usage(): void {
   console.log(
@@ -59,12 +46,11 @@ async function main(): Promise<void> {
     }
   } catch {}
 
-  const { flags } = parse(process.argv.slice(2));
-  const kind = (flags["kind"] || "").toLowerCase();
-  const name = flags["name"] || flags["project"] || flags["n"] || "";
-  const importer = flags["importer"] || (kind === "lib" ? `libs/${name}` : `apps/${name}`);
-  const yes = flags["yes"] === "true" || flags["yes"] === "1";
-  const runSetup = flags["run-setup"] === "true" || flags["run-setup"] === "1";
+  const kind = getFlagStr("kind", "").toLowerCase();
+  const name = getFlagStr("name", "") || getFlagStr("project", "") || getFlagStr("n", "");
+  const importer = getFlagStr("importer", "") || (kind === "lib" ? `libs/${name}` : `apps/${name}`);
+  const yes = getFlagBool("yes");
+  const runSetup = getFlagBool("run-setup");
 
   if (!kind || !name || (kind !== "cli" && kind !== "lib")) {
     usage();

@@ -205,15 +205,15 @@ async function main() {
   const hardExit = setTimeout(() => process.exit(0), maxWaitMs + 5_000);
   try {
     // Wait for parent to exit (covers normal exit and abrupt termination).
-    let shouldWaitForParent = true;
     const curSig0 = await processStartSignature(parentPid, psTimeoutMs).catch(() => "");
     if (!curSig0 || curSig0 !== parentSigExpected) {
-      // Parent already exited or pid already reused — do not wait.
-      shouldWaitForParent = false;
+      // Parent already exited or pid already reused.
+      // Primary path: do not wait and do not reap, since the observed pid is not the expected parent.
+      return;
     }
     // Parent PID reuse guard: re-check infrequently to avoid spawning /bin/ps in a tight loop.
     let lastSigCheckMs = Date.now();
-    while (shouldWaitForParent && isPidAlive(parentPid)) {
+    while (isPidAlive(parentPid)) {
       if (Date.now() - t0 > maxWaitMs) return;
       if (tmpRepoRoot && !(await tempRepoStillExists(tmpRepoRoot))) return;
       if (Date.now() - lastSigCheckMs > 5 * 60 * 1000) {
