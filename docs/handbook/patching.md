@@ -82,6 +82,22 @@ Go and C++ use **package-local** patches. Patch files live under the Buck packag
 
 Node and Python use **importer-local** patches. Patch files live under an importer directory (for example `apps/web/patches/node/*.patch` and `apps/api/patches/python/*.patch`). Importer-scoped providers and `auto_map.bzl` are generated artifacts, so apply/remove regenerates glue to keep providers and mappings aligned with the lockfile and patch set.
 
+### Graph-visible patch scope labels
+
+Targets are stamped with exactly one patch scope label derived from the language contract:
+
+- `patch_scope:package-local` (Go, C++)
+- `patch_scope:importer-local` (Node, Python)
+
+This is applied at shared wiring helper boundaries, not in per-language macro implementations.
+
+To query by patch scope:
+
+```bash
+buck2 cquery 'attrfilter(labels, "patch_scope:package-local", //...)'
+buck2 cquery 'attrfilter(labels, "patch_scope:importer-local", //...)'
+```
+
 Buck package boundary note (important):
 
 - Importer-local patch inputs are attached via `native.glob(...)`, which cannot reach across Buck package boundaries.

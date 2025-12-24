@@ -31,23 +31,25 @@ test("node go-addon: scaffold, build addon via Buck planner, run and observe Go-
       console.error(String(res.stdout || "") + "\n" + String(res.stderr || ""));
       throw new Error("buck2 build failed for //libs/demo-native:napi_addon");
     }
-    const line =
+
+    const producedAddon =
       String(res.stdout || "")
-        .trim()
         .split(/\r?\n/)
-        .filter(Boolean)
-        .pop() || "";
-    const parts = line.split(/\s+/);
-    const producedAddon = parts[parts.length - 1];
-    if (!producedAddon || !producedAddon.endsWith(".node")) {
+        .reverse()
+        .flatMap((l) => l.trim().split(/\s+/).filter(Boolean).reverse())
+        .find((token) => token.endsWith(".node")) || "";
+    if (!producedAddon) {
       throw new Error("could not locate built addon path from buck2 output");
     }
+    const absProducedAddon = path.isAbsolute(producedAddon)
+      ? producedAddon
+      : path.join(tmp, producedAddon);
 
     // Materialize the addon at the stable runtime path expected by the loader
     const addonName = "demo_addon";
     const stableAddon = path.join(tmp, "libs", "demo", "native", `${addonName}.node`);
     await fsp.mkdir(path.dirname(stableAddon), { recursive: true });
-    await fsp.copyFile(producedAddon, stableAddon);
+    await fsp.copyFile(absProducedAddon, stableAddon);
 
     // Run a tiny Node script that requires the addon and verifies data came from Go
     const runner = path.join(tmp, "run-e2e.cjs");

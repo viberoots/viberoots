@@ -1,5 +1,6 @@
 load("//lang:collections.bzl", "dedupe_preserve")
 load("//lang:global_inputs.bzl", "global_nix_inputs")
+load("//lang:lang_contracts.bzl", "patch_invalidation_strategy_for_lang")
 load("//lang:labels_file.bzl", "labels_file")
 
 def normalize_labels(pkg, labels):
@@ -46,5 +47,19 @@ def wasm_labels_probe(name, lang, variant, labels = []):
         labels = kw.get("labels", []),
         out = name + ".labels.txt",
     )
+
+def stamp_patch_scope(kwargs, patch_scope):
+    if not isinstance(patch_scope, str) or patch_scope == "":
+        return
+    labels = kwargs.get("labels", []) or []
+    labels_list = labels if isinstance(labels, list) else []
+    without_scope = [l for l in labels_list if not (isinstance(l, str) and l.startswith("patch_scope:"))]
+    kwargs["labels"] = dedupe_preserve(without_scope + ["patch_scope:%s" % patch_scope])
+
+def stamp_patch_scope_for_lang(kwargs, lang):
+    s = patch_invalidation_strategy_for_lang(lang)
+    if s == None:
+        fail("unknown patch invalidation strategy for lang: %s" % lang)
+    stamp_patch_scope(kwargs, s.patch_scope)
 
 

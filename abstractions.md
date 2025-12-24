@@ -197,6 +197,14 @@ This repo supports two patch invalidation strategies. They are intentionally dif
 
 I treat patch invalidation as two explicit models:
 
+- **Graph-visible patch scope labels**:
+  - All Go/C++/Node/Python targets are stamped with exactly one patch scope label derived from the language contract:
+    - `patch_scope:package-local`
+    - `patch_scope:importer-local`
+  - Stamping happens only at the shared wiring helper boundaries:
+    - Package-local: `lang/package_local_wiring.bzl:prepare_package_local_wiring`
+    - Importer-local: `lang/importer_wiring.bzl:prepare_importer_*`
+
 - **Package-local patching** (Go, C++):
   - Patch files live under the target’s Buck package, typically `patches/<lang>`.
   - Macros include patch files in the target’s action inputs, usually `srcs`.

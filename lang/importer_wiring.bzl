@@ -1,5 +1,5 @@
 load("//lang:lockfile_labels.bzl", "ensure_single_lockfile_label", "importer_from_labels")
-load("//lang:label_stamping.bzl", "stamp_labels")
+load("//lang:label_stamping.bzl", "stamp_labels", "stamp_patch_scope_for_lang")
 load("//lang:importer_package_boundary.bzl", "require_importer_package_boundary")
 load(
     "//lang:patch_inputs.bzl",
@@ -63,8 +63,6 @@ def merge_provider_edges(
 
     merged_base = deps if base == None else base
     return realize_provider_edges(provs, name, into = into, base = merged_base)
-
-
 def prepare_importer_genrule_kwargs(
         name,
         kwargs,
@@ -93,6 +91,7 @@ def prepare_importer_genrule_kwargs(
     kw["labels"] = (existing_labels if isinstance(existing_labels, list) else []) + (labels or [])
 
     require_single_importer_lockfile_label(kw, lockfile_label)
+    stamp_patch_scope_for_lang(kw, lang)
     stamp_labels(kw, lang, kind)
 
     is_dict_srcs = isinstance(srcs, dict)
@@ -120,8 +119,6 @@ def prepare_importer_genrule_kwargs(
         MODULE_PROVIDERS = MODULE_PROVIDERS,
     )
     return kw
-
-
 def prepare_importer_non_genrule_wiring(
         name,
         kwargs,
@@ -157,6 +154,7 @@ def prepare_importer_non_genrule_wiring(
     kw["labels"] = (existing_labels if isinstance(existing_labels, list) else []) + (labels or [])
 
     require_single_importer_lockfile_label(kw, lockfile_label)
+    stamp_patch_scope_for_lang(kw, lang)
     stamp_labels(kw, lang, kind)
     importer = importer_from_labels(kw)
 
@@ -222,6 +220,7 @@ def prepare_importer_srcsless_rule_wiring(
     kw["labels"] = (existing_labels if isinstance(existing_labels, list) else []) + (labels or [])
 
     require_single_importer_lockfile_label(kw, lockfile_label)
+    stamp_patch_scope_for_lang(kw, lang)
     stamp_labels(kw, lang, kind)
     importer = importer_from_labels(kw)
 
@@ -245,4 +244,3 @@ def prepare_importer_srcsless_rule_wiring(
         patch_dep = patch_dep,
         merge_deps = merge_deps,
     )
-

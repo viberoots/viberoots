@@ -1,6 +1,6 @@
 load("//lang:macro_kwargs.bzl", "pop_package_local_patch_dirs_and_nixpkg_deps")
 load("//lang:patch_inputs.bzl", "include_package_local_patches")
-load("//lang:label_stamping.bzl", "stamp_labels")
+load("//lang:label_stamping.bzl", "stamp_labels", "stamp_patch_scope_for_lang")
 load("//lang:provider_edges.bzl", "realize_provider_edges", "target_key_for_current_package")
 load("@prelude//:rules.bzl", "genrule")
 
@@ -35,6 +35,7 @@ def prepare_package_local_wiring(
         fail("prepare_package_local_wiring: base_deps must be a list")
 
     info = pop_package_local_patch_dirs_and_nixpkg_deps(kwargs, lang, append_labels = True)
+    stamp_patch_scope_for_lang(kwargs, lang)
     if stamp and kind != None:
         stamp_labels(kwargs, lang, kind)
     include_package_local_patches(kwargs, lang, info.local_patch_dirs)
