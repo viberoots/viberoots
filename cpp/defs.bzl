@@ -1,8 +1,7 @@
 load("@prelude//:rules.bzl", "cxx_library", "cxx_binary", "cxx_test")
-load("//lang:defs_common.bzl", "dedupe_preserve", "pop_package_local_patch_dirs_and_nixpkg_deps", "prepare_package_local_wiring", "stamp_labels", "stamp_wasm_variant", "strip_provider_targets")
-load("//lang:defs_common.bzl", "wire_planner_visible_stub")
+load("//lang:defs_common.bzl", "dedupe_preserve", "pop_package_local_patch_dirs_and_nixpkg_deps", "prepare_package_local_wiring", "stamp_labels", "stamp_wasm_variant", "strip_provider_targets", "wire_planner_visible_stub")
 load("//lang:global_inputs.bzl", "global_nix_inputs")
-load("//lang:planner_stub.bzl", "planner_stub", "planner_stub_with_package_local_patches")
+load("//lang:planner_stub.bzl", "planner_stub")
 load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name", _cpp_sanitize_probe="cpp_sanitize_probe")
 load("//cpp/private:nix_test.bzl", "cpp_nix_test")
 load("//cpp/private:nix_build.bzl", "cpp_nix_build")
@@ -96,25 +95,29 @@ def nix_cpp_wasm_emscripten_lib(name, **kwargs):
       produced by the planner template (cppWasmEmscriptenLib) when built via the
       Nix flake attributes (e.g., graph-generator-selected).
     """
-    info = pop_package_local_patch_dirs_and_nixpkg_deps(kwargs, "cpp", append_labels = True)
-    local_patch_dirs = info.local_patch_dirs
     deps = kwargs.pop("deps", [])
     # Stamp language/kind and wasm variant for planner routing
     stamp_wasm_variant(kwargs, "cpp", "emscripten")
+
+    wiring = prepare_package_local_wiring(
+        name = name,
+        kwargs = kwargs,
+        lang = "cpp",
+        kind = None,
+        MODULE_PROVIDERS = MODULE_PROVIDERS,
+        base_deps = deps,
+        stamp = False,
+    )
     labels = kwargs.get("labels", []) or []
-    srcs = kwargs.pop("srcs", []) or []
-    # Use a minimal planner stub that exposes graph edges, labels, and patch inputs.
-    wire_planner_visible_stub(
+    srcs = kwargs.get("srcs", []) or []
+
+    planner_stub(
         name = name,
         out = name + ".stamp",
-        lang = "cpp",
-        local_patch_dirs = local_patch_dirs,
-        deps = deps,
+        deps = wiring.deps,
         srcs = srcs,
         labels = labels,
         visibility = kwargs.get("visibility", []),
-        MODULE_PROVIDERS = MODULE_PROVIDERS,
-        realize_providers_into = "deps",
     )
 
 def nix_cpp_binary(name, **kwargs):
