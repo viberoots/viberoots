@@ -203,6 +203,7 @@ I treat patch invalidation as two explicit models:
     - `patch_scope:importer-local`
   - Stamping happens only at the shared wiring helper boundaries:
     - Package-local: `lang/package_local_wiring.bzl:prepare_package_local_wiring`
+    - Package-local planner-visible stubs: `lang/planner_visible_wiring.bzl:wire_package_local_planner_visible_stub`
     - Importer-local: `lang/importer_wiring.bzl:prepare_importer_*`
 
 - **Package-local patching** (Go, C++):
@@ -210,7 +211,7 @@ I treat patch invalidation as two explicit models:
   - Macros include patch files in the target’s action inputs, usually `srcs`.
   - Provider sync is not required to make patch changes invalidate builds.
   - Planner-visible stubs for package-local languages still carry package-local patch files as real inputs:
-    - `nix_cpp_test`’s `<name>__planner` uses the canonical stub wiring helper (`wire_planner_visible_stub(lang=...)`) so patch edits invalidate the planner-visible boundary.
+    - `nix_cpp_test`’s `<name>__planner` uses the canonical package-local planner-visible stub helper (`wire_package_local_planner_visible_stub(...)`) so patch edits invalidate the planner-visible boundary.
     - `nix_cpp_wasm_emscripten_lib` uses `prepare_package_local_wiring(...)` and emits a `planner_stub(...)` with patch files in `srcs`, so patch edits invalidate the stub’s reverse deps deterministically.
 
 - **Importer-local patching** (Node, Python):

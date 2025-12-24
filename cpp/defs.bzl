@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "cxx_library", "cxx_binary", "cxx_test")
-load("//lang:defs_common.bzl", "dedupe_preserve", "pop_package_local_patch_dirs_and_nixpkg_deps", "prepare_package_local_wiring", "stamp_labels", "stamp_wasm_variant", "strip_provider_targets", "wire_planner_visible_stub")
+load("//lang:defs_common.bzl", "dedupe_preserve", "prepare_package_local_wiring", "stamp_wasm_variant", "wire_package_local_planner_visible_stub")
 load("//lang:global_inputs.bzl", "global_nix_inputs")
 load("//lang:planner_stub.bzl", "planner_stub")
 load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name", _cpp_sanitize_probe="cpp_sanitize_probe")
@@ -128,22 +128,17 @@ def nix_cpp_test(name, **kwargs):
     # Define a planner-visible cxx_test (not executed) and an external runner test (executed)
     deps = kwargs.pop("deps", [])
     planner_name = name + "__planner"
-    # Planner-visible: stamps labels and wires providers so exporter->planner can generate the Nix derivation
+    # Planner-visible stub: Nix builds the test; this node exists for planner discovery and invalidation.
+    # Provider deps are stripped to avoid visibility / graph-shape problems on the planner-visible boundary.
     _planner_kwargs = dict(kwargs)
-    stamp_labels(_planner_kwargs, "cpp", "test")
-    # Add direct call-site attrs as nixpkg labels (shared helper)
-    info = pop_package_local_patch_dirs_and_nixpkg_deps(_planner_kwargs, "cpp", append_labels = True)
-    _planner_labels = (_planner_kwargs.get("labels", []) or [])
-    # Planner-visible stub: declare a cxx_library without compiling test sources; Nix will build the test.
-    # Filter provider deps from planner to avoid visibility / graph-edge to providers
-    wire_planner_visible_stub(
+    wire_package_local_planner_visible_stub(
         name = planner_name,
         out = planner_name + ".stamp",
+        kwargs = _planner_kwargs,
         lang = "cpp",
-        local_patch_dirs = info.local_patch_dirs,
+        kind = "test",
         deps = deps,
         srcs = [],
-        labels = _planner_labels,
         strip_providers_from_deps = True,
     )
     # Executed: external runner builds the corresponding flake attr for planner_name and runs it

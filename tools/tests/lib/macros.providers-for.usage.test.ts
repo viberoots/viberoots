@@ -35,7 +35,8 @@ test("macros use realize_provider_edges() and avoid direct provider labels", asy
         txt.includes("prepare_importer_genrule_kwargs(") ||
         txt.includes("prepare_importer_non_genrule_wiring(") ||
         txt.includes("wire_planner_visible_inputs(") ||
-        txt.includes("wire_planner_visible_stub("),
+        txt.includes("wire_planner_visible_stub(") ||
+        txt.includes("wire_package_local_planner_visible_stub("),
       `${f} did not use provider-edge wiring helpers as expected`,
     );
     // Should not embed provider FQ labels directly (except allowed load)

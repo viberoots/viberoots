@@ -3,7 +3,7 @@ load("//lang:defs_common.bzl", "dedupe_preserve", "normalize_labels", "prepare_p
 load("//lang:planner_stub.bzl", "planner_stub", "planner_stub_with_package_local_patches")
 load("//lang:global_inputs.bzl", "global_nix_inputs")
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
-load("//lang:defs_common.bzl", "wire_planner_visible_inputs", "wire_planner_visible_stub")
+load("//lang:defs_common.bzl", "wire_package_local_planner_visible_stub", "wire_planner_visible_inputs")
 load("//go/private:nix_build_wasm.bzl", "go_nix_build_wasm")
 load("//go/private:cgo_wiring.bzl", "apply_go_rule_stable_defaults", "apply_go_tuple_labels", "configure_cgo_kwargs")
 
@@ -136,31 +136,18 @@ def nix_go_carchive(name, **kwargs):
     Buck graph; the actual archive is produced by the Nix planner build when
     a consumer (e.g., a C++ binary) is built.
     """
-    wiring = prepare_package_local_wiring(
-        name = name,
-        kwargs = kwargs,
-        lang = "go",
-        kind = None,
-        MODULE_PROVIDERS = MODULE_PROVIDERS,
-        base_deps = [],
-        stamp = False,
-    )
-    # Stamp language/kind labels for planner detection
-    labels = kwargs.get("labels", []) or []
-    labels = dedupe_preserve(labels + ["lang:go", "kind:carchive"])
     deps = kwargs.pop("deps", [])
+    srcs = kwargs.get("srcs", []) or []
     # Keep a minimal graph node with srcs so the planner can discover the package.
     # Preserve the existing behavior where provider edges are realized into `srcs`.
-    srcs = kwargs.get("srcs", []) or []
-    wire_planner_visible_stub(
+    wire_package_local_planner_visible_stub(
         name = name,
         out = name + ".stamp",
+        kwargs = kwargs,
         lang = "go",
-        local_patch_dirs = wiring.local_patch_dirs,
+        kind = "carchive",
         deps = deps,
         srcs = srcs,
-        labels = labels,
-        visibility = kwargs.get("visibility", []),
         MODULE_PROVIDERS = MODULE_PROVIDERS,
         realize_providers_into = "srcs",
     )

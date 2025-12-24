@@ -61,6 +61,7 @@ load(
     "//lang:planner_visible_wiring.bzl",
     _wire_planner_visible_inputs = "wire_planner_visible_inputs",
     _wire_planner_visible_stub = "wire_planner_visible_stub",
+    _wire_package_local_planner_visible_stub = "wire_package_local_planner_visible_stub",
 )
 load(
     "//lang:package_local_wiring.bzl",
@@ -129,6 +130,7 @@ wire_global_nix_inputs = _wire_global_nix_inputs
 
 wire_planner_visible_inputs = _wire_planner_visible_inputs
 wire_planner_visible_stub = _wire_planner_visible_stub
+wire_package_local_planner_visible_stub = _wire_package_local_planner_visible_stub
 
 prepare_package_local_wiring = _prepare_package_local_wiring
 package_local_wiring_probe = _package_local_wiring_probe
