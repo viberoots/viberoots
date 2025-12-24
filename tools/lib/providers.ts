@@ -1,13 +1,9 @@
-import crypto from "node:crypto";
+import { shortHash } from "./short-hash.ts";
 import {
   normalizeNixAttr,
   providerNameForImporter,
   providerNameForNixAttr,
 } from "./provider-names.ts";
-
-export function shortHash(s: string, n = 12): string {
-  return crypto.createHash("sha256").update(s).digest("hex").slice(0, n);
-}
 
 export const encodeForPatchFilename = (s: string) => s.replace(/\//g, "__");
 export const decodeFromPatchFilename = (s: string) => s.replace(/__/g, "/");
@@ -71,3 +67,5 @@ export {
   providerNameForImporter,
   providerNameForNixAttr,
 } from "./provider-names.ts";
+
+export { shortHash } from "./short-hash.ts";

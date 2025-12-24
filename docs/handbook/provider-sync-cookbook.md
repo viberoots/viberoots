@@ -44,7 +44,7 @@ Canonical naming and helpers:
 `nixpkg:` is a cross-language public interface. Normalization must match across:
 
 - Starlark: `lang/nixpkg_labels.bzl:normalize_nix_attr`
-- TypeScript: `tools/lib/provider-names.ts:normalizeNixAttr`
+- TypeScript: `tools/lib/providers.ts:normalizeNixAttr`
 - Nix templates: `tools/nix/lib/lang-helpers.nix:normalizeNixAttr`
 
 Contract:

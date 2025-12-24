@@ -308,7 +308,7 @@ The label string is:
 
 - **Starlark**: `lang/nixpkg_labels.bzl:normalize_nix_attr` and `append_nixpkg_labels`
   - Macro guidance: prefer `lang/macro_kwargs.bzl:pop_package_local_patch_dirs_and_nixpkg_deps` so language macro files do not re-implement `nixpkg_deps` parsing and defaulting logic.
-- **TypeScript**: `tools/lib/provider-names.ts:normalizeNixAttr` (re-exported from `tools/lib/providers.ts`)
+- **TypeScript**: `tools/lib/providers.ts:normalizeNixAttr` (canonical import path; implementation lives in `tools/lib/provider-names.ts`)
 - **Nix**: `tools/nix/lib/lang-helpers.nix:normalizeNixAttr`
 
 ### Regression guards
