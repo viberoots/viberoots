@@ -8,6 +8,7 @@ All scripts are zx TypeScript using `#!/usr/bin/env zx-wrapper`.
 
 - Patch handlers reuse `tools/patch/lib/apply.ts: repoRoot()` for repo‑root detection.
 - Filesystem existence checks use `tools/patch/lib/util.ts: pathExists()`.
+- Workspace-based patch handlers (Go and Python) share the control flow in `tools/patch/lib/workspace-workflow.ts` (session reuse, no-op cleanup, patch verification, and consistent messages).
 - Avoid bespoke implementations; this keeps behavior consistent across Go/C++/Node/Python.
 - Default package-local patch directory selection is centralized in Starlark via `//lang:defs_common.bzl: default_package_patch_dirs(lang)`. Go/C++ macros use this helper instead of hard‑coded strings (e.g., `["patches/go"]`).
 - Flat patch directory checks use `tools/lib/provider-sync.ts: validateFlatDir()`; locally it warns, and in CI (or with `--strict`) it fails.
@@ -39,7 +40,7 @@ All scripts are zx TypeScript using `#!/usr/bin/env zx-wrapper`.
 
 - Apply: `tools/bin/patch-pkg apply go <importPath> [--target //<pkg>:name | --patch-dir <dir>]`
   - Produces a unified diff into the canonical filename under the target’s package‑local `patches/go/` directory (or into the directory passed via `--patch-dir`).
-  - Clears dev overrides and removes the workspace.
+  - Clears dev overrides and ends the session. The workspace is left on disk for inspection; use `reset` to delete it.
   - No glue steps are required for Go; Buck invalidates via patch files in `srcs`. (Node still runs glue; see below.)
 
 - Reset: `tools/bin/patch-pkg reset go <importPath>`
@@ -65,7 +66,9 @@ Encoding policy:
 
 ## Idempotency
 
-Re-applying an unchanged workspace is a no-op. For Go/C++, apply does not run glue. For Node and Python, provider sync and auto_map generation run automatically.
+Re-applying an unchanged workspace is a no-op. In that case we do not write a patch file; we still clear dev overrides and end the session so no stale override state leaks into later builds/tests.
+
+For Go/C++, apply does not run glue. For Node and Python, provider sync and auto_map generation run automatically.
 
 ## Patch invalidation strategy (contract)
 

@@ -1,19 +1,19 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import type { LanguageHandler, SessionRecord } from "./types";
-import { makeWorkspace } from "./cross-platform";
-import { makeUnifiedDiff } from "./diff";
+import type { LanguageHandler } from "./types";
 import { repoRoot } from "./lib/apply";
 import { runGlue } from "./glue";
 import { readImporterArg, readPatchDirArg } from "../lib/cli.ts";
 import { resolvePythonDist } from "./python-dist-resolve";
-import { echoSnippetRequested } from "../lib/cli.ts";
-import { printOverrideSnippet, setOverride, clearOverride, readOverrideMap } from "./dev-overrides";
-import { getSession, setSession, deleteSession } from "./state";
 import { requirePositional } from "./lib/args";
-import { NOOP_CLEARED_MSG } from "./lib/messages";
 import { resolveImporterLocalPatchDir } from "./lib/importer-local-patch-dir";
+import {
+  applyWorkspaceWorkflow,
+  resetWorkspaceWorkflow,
+  startWorkspaceWorkflow,
+} from "./lib/workspace-workflow";
+import { runSession } from "./lib/session";
 
 function keyFor(dist: string, ver: string): string {
   return `${String(dist || "").toLowerCase()}@${String(ver || "").toLowerCase()}`;
@@ -27,47 +27,16 @@ async function doStart(args: string[]) {
   const importerFlag = readImporterArg("");
   const resolved = await resolvePythonDist(dist, importerFlag || undefined);
   const key = keyFor(resolved.importPath, resolved.version);
-
-  const existing = await getSession("python", key);
-  if (existing) {
-    try {
-      await fsp.access(existing.workspacePath);
-      if (existing.originPath === resolved.originPath) {
-        console.log(existing.workspacePath);
-        return;
-      }
-    } catch {
-      // fall through and create a new workspace
-    }
-  }
-
-  const ws = await makeWorkspace({
+  await startWorkspaceWorkflow({
     lang: "python",
-    originPath: resolved.originPath,
-    moduleKey: key,
-  });
-  const now = new Date().toISOString();
-  const rec: SessionRecord = {
+    key,
     importPath: resolved.importPath,
     version: resolved.version,
     originPath: resolved.originPath,
-    workspacePath: ws,
-    createdAt: now,
-    updatedAt: now,
-  };
-  await setSession("python", key, rec);
-
-  const echoSnippet = echoSnippetRequested({ env: "PATCH_PY_ECHO_SNIPPET" });
-  if (echoSnippet) {
-    printOverrideSnippet("NIX_PY_DEV_OVERRIDE_JSON", { [key]: ws });
-  } else {
-    setOverride("NIX_PY_DEV_OVERRIDE_JSON", key, ws);
-  }
-  console.log(ws);
-  if (process.env.PATCH_EDITOR && process.env.PATCH_EDITOR.trim() !== "") {
-    const ed = process.env.PATCH_EDITOR;
-    await $({ cwd: ws })`${ed}`.nothrow();
-  }
+    overrideEnvName: "NIX_PY_DEV_OVERRIDE_JSON",
+    echoSnippetEnv: "PATCH_PY_ECHO_SNIPPET",
+    moduleKeyForWorkspace: key,
+  });
 }
 
 async function doApply(args: string[]) {
@@ -78,17 +47,6 @@ async function doApply(args: string[]) {
   const importerFlag = readImporterArg("");
   const resolved = await resolvePythonDist(dist, importerFlag || undefined);
   const key = keyFor(resolved.importPath, resolved.version);
-  const sess = await getSession("python", key);
-  if (!sess) throw new Error(`no active session for ${key}; run: patch-pkg start python ${dist}`);
-
-  const diff = await makeUnifiedDiff(sess.originPath, sess.workspacePath);
-  if (!diff || diff.trim() === "") {
-    const dev = readOverrideMap("NIX_PY_DEV_OVERRIDE_JSON");
-    if (dev[key]) clearOverride("NIX_PY_DEV_OVERRIDE_JSON", key);
-    await deleteSession("python", key);
-    console.log(NOOP_CLEARED_MSG);
-    return;
-  }
 
   const root = repoRoot();
   const overridePatchDir = readPatchDirArg("");
@@ -98,39 +56,31 @@ async function doApply(args: string[]) {
     lang: "python",
     overridePatchDir,
   });
-  await fsp.mkdir(patchDir, { recursive: true });
   const dst = path.join(patchDir, `${resolved.importPath}@${resolved.version}.patch`);
-  await fsp.writeFile(dst, diff, "utf8");
-  // Best-effort verification that the patch applies cleanly against the origin
-  if (String(process.env.PATCH_SKIP_VERIFY || "").trim() !== "1") {
-    try {
-      const { verifyPatchDryRun } = await import("./lib/apply");
-      await verifyPatchDryRun(sess.originPath, dst, "python");
-    } catch (e) {
-      throw new Error(
-        `Patch verification failed: the generated diff did not apply cleanly with -p1 to the origin distribution.\n` +
-          `Distribution: ${resolved.importPath}@${resolved.version}\n` +
-          `Origin: ${sess.originPath}\n` +
-          `Patch: ${dst}`,
-      );
-    }
-  }
-
-  // Clear override and end session before running glue
-  clearOverride("NIX_PY_DEV_OVERRIDE_JSON", key);
-  await deleteSession("python", key);
-
-  // Refresh glue so providers/auto_map reflect the new patch for the importer
-  const prev = process.cwd();
-  try {
-    process.chdir(root);
-    await runGlue();
-  } finally {
-    try {
-      process.chdir(prev);
-    } catch {}
-  }
-  console.log(dst);
+  const skipVerify = String(process.env.PATCH_SKIP_VERIFY || "").trim() === "1";
+  await applyWorkspaceWorkflow({
+    lang: "python",
+    key,
+    missingSessionError: `no active session for ${key}; run: patch-pkg start python ${dist}`,
+    overrideEnvName: "NIX_PY_DEV_OVERRIDE_JSON",
+    patchPathAbs: dst,
+    verifyMode: "python",
+    verifySubjectLabel: "Distribution",
+    verifySubjectValue: `${resolved.importPath}@${resolved.version}`,
+    forceWrite: true,
+    skipVerify,
+    afterApply: async () => {
+      const prev = process.cwd();
+      try {
+        process.chdir(root);
+        await runGlue();
+      } finally {
+        try {
+          process.chdir(prev);
+        } catch {}
+      }
+    },
+  });
 }
 
 async function doReset(args: string[]) {
@@ -141,13 +91,11 @@ async function doReset(args: string[]) {
   const importerFlag = readImporterArg("");
   const resolved = await resolvePythonDist(dist, importerFlag || undefined);
   const key = keyFor(resolved.importPath, resolved.version);
-  const sess = await getSession("python", key);
-  if (!sess) return;
-  clearOverride("NIX_PY_DEV_OVERRIDE_JSON", key);
-  await deleteSession("python", key);
-  try {
-    await fsp.rm(sess.workspacePath, { recursive: true, force: true });
-  } catch {}
+  await resetWorkspaceWorkflow({
+    lang: "python",
+    key,
+    overrideEnvName: "NIX_PY_DEV_OVERRIDE_JSON",
+  });
 }
 
 async function doRemove(args: string[]) {
@@ -194,8 +142,6 @@ async function doSession(args: string[]) {
     example: "requests",
   });
   await doStart([dist]);
-  // Reuse generic session runner to support Ctrl-D/Ctrl-C behaviors
-  const { runSession } = await import("./lib/session");
   await runSession(
     async () => {
       await doApply([dist]);
