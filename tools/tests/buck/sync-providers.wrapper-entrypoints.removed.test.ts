@@ -75,6 +75,23 @@ async function readUtf8IfPossible(file: string): Promise<string | null> {
   }
 }
 
+async function listRepoRootMarkdownFiles(repoRoot: string): Promise<string[]> {
+  const out: string[] = [];
+  let ents: Array<any> = [];
+  try {
+    ents = await fsp.readdir(repoRoot, { withFileTypes: true } as any);
+  } catch {
+    return out;
+  }
+  for (const e of ents) {
+    if (!e.isFile()) continue;
+    if (path.extname(e.name) !== ".md") continue;
+    out.push(path.join(repoRoot, e.name));
+  }
+  out.sort((a, b) => a.localeCompare(b));
+  return out;
+}
+
 test("provider sync wrappers are removed; use tools/buck/sync-providers.ts only", async () => {
   const repoRoot = process.cwd();
   const selfAbs = path.join(
@@ -84,16 +101,15 @@ test("provider sync wrappers are removed; use tools/buck/sync-providers.ts only"
     "buck",
     "sync-providers.wrapper-entrypoints.removed.test.ts",
   );
-  const scanRoots = ["tools", "docs"].map((p) => path.join(repoRoot, p));
-  const extraFiles = [
-    "build-system-design.md",
-    "build-system-final-steps.md",
-    "getting-started-on-a-pr.md",
-  ].map((p) => path.join(repoRoot, p));
+  const scanRoots = ["tools", "docs", "lang-design-docs"].map((p) => path.join(repoRoot, p));
+  const repoRootMarkdownFiles = await listRepoRootMarkdownFiles(repoRoot);
 
-  const files: string[] = [];
-  for (const r of scanRoots) files.push(...(await listTextFilesRec(r)));
-  for (const f of extraFiles) files.push(f);
+  const filesSet = new Set<string>();
+  for (const r of scanRoots) {
+    for (const f of await listTextFilesRec(r)) filesSet.add(f);
+  }
+  for (const f of repoRootMarkdownFiles) filesSet.add(f);
+  const files = Array.from(filesSet).sort((a, b) => a.localeCompare(b));
 
   const hits: Array<{ file: string; needle: string }> = [];
   for (const abs of files) {
@@ -109,7 +125,9 @@ test("provider sync wrappers are removed; use tools/buck/sync-providers.ts only"
     hits.length === 0,
     [
       "Found forbidden references to removed provider sync wrapper entrypoints.",
-      "Use the unified orchestrator instead: node tools/buck/sync-providers.ts --lang <lang> --no-glue",
+      "Use the unified orchestrator instead:",
+      "- Providers-only: node tools/buck/sync-providers.ts --lang <lang> --no-glue",
+      "- Full orchestrator: node tools/buck/sync-providers.ts",
       "",
       ...hits.slice(0, 25).map((h) => `- ${path.relative(repoRoot, h.file)}: ${h.needle}`),
       hits.length > 25 ? `... and ${hits.length - 25} more` : "",

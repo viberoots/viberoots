@@ -8,7 +8,7 @@ This plan implements the next set of focused improvements to keep Go and C++ fea
 
 Scope
 
-- Refactor `tools/buck/sync-providers-node.ts` to reuse `tools/lib/providers.ts` helpers (`shortHash`, `providerNameForImporter`).
+- Refactor Node provider sync (invoked through `node tools/buck/sync-providers.ts --lang node --no-glue`) to reuse `tools/lib/providers.ts` helpers (`shortHash`, `providerNameForImporter`).
 - No behavior changes; only remove local implementations and import shared helpers.
 
 Detailed Design

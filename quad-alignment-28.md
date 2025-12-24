@@ -169,7 +169,7 @@ Implement.
 
 ### Description
 
-The repo currently has a unified provider sync orchestrator (`tools/buck/sync-providers.ts`) and also keeps thin delegator-only wrappers (`tools/buck/sync-providers-node.ts`, `tools/buck/sync-providers-python.ts`) for compatibility and discoverability.
+The repo currently has a unified provider sync orchestrator (`tools/buck/sync-providers.ts`) and also keeps thin delegator-only wrappers for compatibility and discoverability.
 
 At this point, the wrappers are a maintenance surface: tests call them, docs reference them, and any future behavior change must be validated in multiple entrypoints. This PR removes the wrappers and makes the orchestrator the only supported entrypoint.
 
@@ -177,11 +177,9 @@ Clarification: I do not need to preserve backwards compatibility yet. This PR ca
 
 ### Scope & Changes
 
-- Delete:
-  - `tools/buck/sync-providers-node.ts`
-  - `tools/buck/sync-providers-python.ts`
+- Delete the Node/Python provider sync wrapper entrypoints.
 - Update all call sites to invoke:
-  - `node tools/buck/sync-providers.ts --lang node --no-glue` where the old wrappers were used in “providers-only” mode
+  - `node tools/buck/sync-providers.ts --lang node --no-glue` where wrappers were previously used in “providers-only” mode
   - `node tools/buck/sync-providers.ts --lang python --no-glue` similarly
   - or `node tools/buck/sync-providers.ts` when the full orchestrator behavior is intended
 - Update and simplify tests that asserted “wrapper is delegator-only” to instead assert:
@@ -526,8 +524,7 @@ Clarification: I do not need to preserve backwards compatibility yet. This PR ca
   - repo root `*.md` files (excluding large log/output directories already excluded elsewhere like `test-logs/`, `buck-out/`, `coverage/`, etc.)
   - `lang-design-docs/**` and other design-doc locations if present
 - Update any remaining markdown references to:
-  - `tools/buck/sync-providers-node.ts`
-  - `tools/buck/sync-providers-python.ts`
+  - the removed Node/Python provider sync wrapper entrypoints,
     replacing them with the canonical orchestrator commands:
   - `node tools/buck/sync-providers.ts --lang <lang> --no-glue`
   - `node tools/buck/sync-providers.ts`
