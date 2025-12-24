@@ -124,20 +124,22 @@ def nix_cpp_binary(name, **kwargs):
 def nix_cpp_test(name, **kwargs):
     # Define a planner-visible cxx_test (not executed) and an external runner test (executed)
     deps = kwargs.pop("deps", [])
-    srcs = kwargs.get("srcs", [])
     planner_name = name + "__planner"
     # Planner-visible: stamps labels and wires providers so exporter->planner can generate the Nix derivation
     _planner_kwargs = dict(kwargs)
     stamp_labels(_planner_kwargs, "cpp", "test")
     # Add direct call-site attrs as nixpkg labels (shared helper)
-    pop_package_local_patch_dirs_and_nixpkg_deps(_planner_kwargs, "cpp", append_labels = True)
+    info = pop_package_local_patch_dirs_and_nixpkg_deps(_planner_kwargs, "cpp", append_labels = True)
     _planner_labels = (_planner_kwargs.get("labels", []) or [])
     # Planner-visible stub: declare a cxx_library without compiling test sources; Nix will build the test.
     # Filter provider deps from planner to avoid visibility / graph-edge to providers
     wire_planner_visible_stub(
         name = planner_name,
         out = planner_name + ".stamp",
+        lang = "cpp",
+        local_patch_dirs = info.local_patch_dirs,
         deps = deps,
+        srcs = [],
         labels = _planner_labels,
         strip_providers_from_deps = True,
     )

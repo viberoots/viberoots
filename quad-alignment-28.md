@@ -390,6 +390,186 @@ Implement.
 
 ---
 
+## PR‑6: Ensure `nix_cpp_test` planner-visible stubs include package-local patch files as action inputs
+
+### Description
+
+Package-local patching depends on a simple invariant: patch files live under the owning Buck package and are included as real action inputs so edits invalidate precisely. Most package-local macros already compose this via shared helpers, but the `nix_cpp_test` shape is special: it creates a planner-visible stub target (for exporter/planner routing) and a separate executed runner test.
+
+Today the `nix_cpp_test` planner-visible stub is not clearly wired to include `patches/cpp/*.patch` as inputs, which risks patch edits not invalidating the planner-visible boundary for C++ tests.
+
+Clarification: I do not need to preserve backwards compatibility yet. This PR can change macro implementation details as long as behavior and exported graph semantics remain stable.
+
+### Scope & Changes
+
+- Update `cpp/defs.bzl:nix_cpp_test` so the planner-visible stub (`<name>__planner`) includes package-local patch files as action inputs:
+  - Wire patch inputs through the canonical planner-visible helper path (`wire_planner_visible_stub(lang = "cpp", local_patch_dirs = ...)`) so `planner_stub_with_package_local_patches(...)` is used.
+  - Preserve existing behavior where provider targets are stripped from planner-visible deps (to avoid visibility and graph shape issues).
+  - Keep labels stable (`lang:cpp`, `kind:test`, plus any `nixpkg:` labels derived from call-site `nixpkg_deps`) so exporter/planner routing does not drift.
+
+Non-goals in this PR:
+
+- No changes to the patch invalidation model (C++ remains package-local).
+- No changes to provider generation behavior.
+- No changes to how `cpp_nix_test` executes the built binary (runner remains external-runner style).
+
+### Tests (in this PR)
+
+- Add a focused C++ macro regression test that asserts the `nix_cpp_test` planner-visible stub includes package-local patch files as action inputs:
+  - Create a temp repo with `apps/demo/patches/cpp/*.patch`.
+  - Declare a `nix_cpp_test(name = "demo_test", ...)`.
+  - `buck2 cquery` the planner-visible stub target (`//apps/demo:demo_test__planner`) and assert `srcs` includes `apps/demo/patches/cpp/<file>.patch`.
+- Extend or reuse the existing test that asserts provider deps are stripped from planner-visible deps for `nix_cpp_test` so the combined behavior remains locked down (patch inputs present; provider deps still excluded).
+
+### Docs (in this PR)
+
+- Update `docs/handbook/patching.md` and/or `abstractions.md` to explicitly call out that `nix_cpp_test` uses a planner-visible stub and that the stub carries package-local patch inputs (so patch invalidation remains precise).
+
+### Acceptance Criteria
+
+- `nix_cpp_test` planner-visible stub includes package-local patch files as real action inputs.
+- A regression test fails if patch inputs are not present on the planner-visible stub.
+- Exporter/planner routing and `nix_cpp_test` execution behavior remain stable aside from the intended tightening.
+
+### Risks
+
+Moderate. `nix_cpp_test` is a split shape (planner-visible stub + executed runner). The main risk is accidentally changing labels/deps in a way that affects exporter routing or planner selection. The new test should detect this drift early.
+
+### Consequence of Not Implementing
+
+C++ test patch invalidation remains easier to accidentally break than other package-local macro shapes, and the planner-visible seam can stay ambiguous.
+
+### Downsides for Implementing
+
+Slight churn in `cpp/defs.bzl` and one additional regression test.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR‑7: Standardize C++ wasm emscripten macro wiring on the package-local helper surface
+
+### Description
+
+PR‑1 introduced `prepare_package_local_wiring(...)` to eliminate repeated macro boilerplate for package-local languages and to make it hard to forget patch inputs, label stamping, and deterministic provider-edge realization. Most C++ macro shapes now use the helper surface, but one wasm-oriented macro path still assembles parts of the wiring sequence manually.
+
+This PR removes that remaining bypass and makes the emscripten wasm macro follow the same helper boundary as other package-local macros.
+
+Clarification: I do not need to preserve backwards compatibility yet. This PR can change macro implementation details as long as behavior and exported graph semantics remain stable.
+
+### Scope & Changes
+
+- Refactor `cpp/defs.bzl:nix_cpp_wasm_emscripten_lib` to use the same shared package-local wiring helper surface used by `_cpp_common` and wasm static lib:
+  - Use `prepare_package_local_wiring(...)` (or a thin wrapper around it) to centralize:
+    - `local_patch_dirs` defaulting
+    - `nixpkg_deps` normalization and `nixpkg:` label append
+    - deterministic provider-edge realization
+  - Preserve wasm labeling via the existing canonical stamper (`stamp_wasm_variant(...)`) so `kind:wasm` and `wasm:emscripten` remain uniform.
+  - Keep the macro producing a planner-visible stub (stamp output) with the same graph semantics.
+
+Non-goals in this PR:
+
+- No changes to the wasm artifact model (emscripten remains a planner-visible stub shape).
+- No changes to the patch invalidation model (C++ remains package-local).
+
+### Tests (in this PR)
+
+- Add a focused regression test for `nix_cpp_wasm_emscripten_lib` that asserts:
+  - wasm labels are present (`kind:wasm` and `wasm:emscripten`).
+  - package-local patch files under `<pkg>/patches/cpp/*.patch` are present as action inputs on the stub (via `srcs`).
+  - provider edges are realized deterministically when `MODULE_PROVIDERS` maps the target to a provider.
+- Add (or extend) an enforcement-style test that prevents `cpp/defs.bzl` from reintroducing direct calls to lower-level primitives for this macro path (e.g., bypassing the helper boundary).
+
+### Docs (in this PR)
+
+- Update `docs/handbook/adding-language.md` and/or `abstractions.md` to include `nix_cpp_wasm_emscripten_lib` as an explicit example of a planner-visible stub that still uses the shared package-local wiring helper.
+
+### Acceptance Criteria
+
+- `nix_cpp_wasm_emscripten_lib` uses the shared package-local wiring helper surface and does not duplicate the same wiring sequence.
+- Tests lock down wasm labels, package-local patch inputs, and provider-edge realization for the emscripten stub.
+- Exported graph semantics remain stable.
+
+### Risks
+
+Low to moderate. The main risk is changing how labels or deps are assembled (ordering/dedupe), which can cause exporter deltas. Tests should assert invariants rather than brittle ordering.
+
+### Consequence of Not Implementing
+
+We keep a small drift surface in C++ macro wiring and a precedent for bypassing the shared helper in new planner-visible stub macros.
+
+### Downsides for Implementing
+
+Some churn in `cpp/defs.bzl` for an otherwise-correct macro. The payoff is reduced drift risk and a cleaner “one boundary” story for package-local macros.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR‑8: Extend wrapper-reference enforcement to the full repo and remove stale wrapper mentions from non-handbook docs
+
+### Description
+
+PR‑3 removes provider sync wrapper scripts and updates the handbook-style docs to reference only the unified orchestrator entrypoint. However, older root-level and design-history markdown files can still mention the removed wrapper paths. This is not a functional bug, but it is a recurring source of confusion and review churn (“which command is canonical?”).
+
+This PR makes “no wrapper references remain” true at the repository level, not just under `docs/` and `tools/`, and it updates the remaining stale mentions.
+
+Clarification: I do not need to preserve backwards compatibility yet. This PR can tighten enforcement and update documentation references in one change.
+
+### Scope & Changes
+
+- Tighten the existing wrapper-reference enforcement test (added in PR‑3) to scan:
+  - repo root `*.md` files (excluding large log/output directories already excluded elsewhere like `test-logs/`, `buck-out/`, `coverage/`, etc.)
+  - `lang-design-docs/**` and other design-doc locations if present
+- Update any remaining markdown references to:
+  - `tools/buck/sync-providers-node.ts`
+  - `tools/buck/sync-providers-python.ts`
+    replacing them with the canonical orchestrator commands:
+  - `node tools/buck/sync-providers.ts --lang <lang> --no-glue`
+  - `node tools/buck/sync-providers.ts`
+
+Non-goals in this PR:
+
+- No behavior changes to provider sync itself.
+- No changes to glue pipeline ordering.
+
+### Tests (in this PR)
+
+- Extend the existing enforcement test so it fails if any scanned file references the removed wrapper entrypoints.
+- Keep the failure message actionable by pointing to the orchestrator command and the specific files containing stale references.
+
+### Docs (in this PR)
+
+- Update the stale markdown references discovered by the expanded enforcement scan to use only the orchestrator entrypoint.
+
+### Acceptance Criteria
+
+- The wrapper-reference enforcement test scans the full intended doc surface (not just `tools/` and `docs/`) and passes.
+- No markdown in the scanned set references the removed wrapper entrypoints.
+- Documentation consistently presents one canonical command path for provider sync.
+
+### Risks
+
+Low. The main risk is false positives in generated logs or caches; the enforcement test must exclude those directories deterministically.
+
+### Consequence of Not Implementing
+
+Stale docs continue to reintroduce ambiguity around canonical command paths, even after PR‑3 removed the wrappers.
+
+### Downsides for Implementing
+
+Some documentation churn and slightly broader enforcement scope. This is acceptable to keep the “single entrypoint” contract true across the repo.
+
+### Recommendation
+
+Implement.
+
+---
+
 ## Rollout & Sequencing
 
 These PRs are ordered by dependency chain and by the goal of keeping each PR revertible:
@@ -399,6 +579,9 @@ These PRs are ordered by dependency chain and by the goal of keeping each PR rev
 3. PR‑3 next. It removes provider sync wrapper entrypoints and updates all call sites.
 4. PR‑4 last. It standardizes remaining tooling flag parsing and removes bespoke argv parsing.
 5. PR‑5 last. It finishes migrating remaining tool CLIs off bespoke argv parsing and adds an enforcement guard so drift does not return.
+6. PR‑6 next. It tightens C++ `nix_cpp_test` to carry package-local patch files as action inputs at the planner-visible stub boundary.
+7. PR‑7 next. It standardizes the remaining C++ wasm emscripten macro wiring onto the package-local helper surface and locks it down with targeted tests.
+8. PR‑8 last. It broadens wrapper-reference enforcement to the full repo docs surface and removes remaining stale wrapper mentions.
 
 ---
 

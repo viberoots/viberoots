@@ -357,6 +357,7 @@ tools/bin/patch-pkg remove cpp pkgs.zlib --target //libs/cppdemo:lib
 Notes:
 
 - No glue is required for C++; package‑local patch files are included in `srcs` and passed to the Nix C++ derivations.
+- `nix_cpp_test(...)` is a split macro (planner-visible stub + executed runner). The planner-visible stub target (`<name>__planner`) also carries package-local `patches/cpp/*.patch` files as real inputs via `srcs`, so patch edits invalidate the planner boundary precisely.
 - If your C++ targets link against Go C archives, that integration is handled by the planner/templates and requires no special steps in this workflow.
 - C++ macros now use the shared nixpkgs label helper (`append_nixpkg_labels` from `lang/defs_common.bzl`) for stamping `nixpkg:` labels. This change only removes duplication; behavior and exported graphs are unchanged.
 - Alternative (overlay, opt‑in): You can also manage C++ patches globally under `patches/cpp/*.patch` via the nix overlay entry‑point; see `docs/cpp/overlays.md` for details. The overlay is disabled by default; local patching remains the canonical workflow.
