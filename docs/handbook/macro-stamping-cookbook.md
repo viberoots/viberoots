@@ -71,3 +71,12 @@ Ensure artifact/name sanitization in Starlark matches the canonical implementati
 - Macro parity: keep the macro-side helper (e.g., `_sanitize_to_bin_name` via `cpp/private/sanitize.bzl`) in strict parity with the Nix helper for `//`, `:`, `/`, spaces, case, and non‑alnum characters.
 - TypeScript policy: tooling scripts must not hand-roll this sanitizer. Use `tools/lib/sanitize.ts:sanitizeName` to keep TS ↔ Nix ↔ Starlark parity stable.
 - Tests: `tools/tests/cpp/sanitize-name.parity.test.ts` runs a parity matrix through the `cpp_sanitize_probe` rule and compares to the Nix helper. Update either side if parity breaks.
+
+Importer string shaping (Node Nix-calling macros):
+
+When a macro needs to derive a Nix attribute suffix or a display name from an importer string, I route it through the shared helper module `lang/importer_strings.bzl`:
+
+- `sanitize_importer_for_nix_attr(importer)` for `.#<attr>.<importer>` segments
+- `importer_display_name(importer)` for basename-like naming (for example bundling output names)
+
+Do not implement importer sanitization or basename logic as local helpers in macro files. Tests enforce this boundary.

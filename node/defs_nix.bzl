@@ -1,12 +1,8 @@
 load("@prelude//:rules.bzl", "genrule")
 load("//lang:defs_common.bzl", "prepare_importer_nix_calling_genrule_wiring")
-load("//lang:sanitize.bzl", "sanitize_name")
+load("//lang:importer_strings.bzl", "importer_display_name", "sanitize_importer_for_nix_attr")
 load("//lang:nix_shell.bzl", "nix_calling_genrule_bootstrap", "nix_calling_genrule_nix_build_out_path_prefix")
 load("//node:defs_core.bzl", "nix_node_gen")
-
-def _sanitize_importer_attr(s):
-    # Use canonical sanitizer from //lang:sanitize.bzl (mirrors flake-side sanitizeName)
-    return sanitize_name(s)
 
 def _pop_list(kwargs, key):
     if kwargs == None:
@@ -69,7 +65,7 @@ def node_webapp(
     _importer = wiring.importer
     cmd = (
         nix_calling_genrule_nix_build_out_path_prefix(
-            ".#node-webapp.%s" % _sanitize_importer_attr(_importer),
+            ".#node-webapp.%s" % sanitize_importer_for_nix_attr(_importer),
             timeout_sec = 240,
             include_pnpm_store = True,
             source_workspace_root_env = True,
@@ -134,11 +130,6 @@ def nix_node_cli_bin(
             + "If you need to copy a different entry file, use bundle=False."
         )
 
-    def _basename_importer(s):
-        # crude basename: split by '/' and take last non-empty
-        parts = [p for p in s.split("/") if p != ""]
-        return parts[-1] if len(parts) > 0 else s
-
     # Build srcs map to place files at deterministic paths inside the action
     _srcs_map = {
         # Preserve entry path under bin/
@@ -180,7 +171,7 @@ def nix_node_cli_bin(
         + "export NIX_PNPM_ALLOW_GENERATE=1; "
         + "DBG_LOG=\"$SCRATCH/bundle-debug.log\"; : > \"$DBG_LOG\"; "
         + ("$TIMEOUT node --experimental-strip-types --experimental-top-level-await --disable-warning=ExperimentalWarning "
-           + "\"${WORKSPACE_ROOT:-$FLK_ROOT}/tools/buck/node-cli-bundle.ts\" --importer \"%s\" --name \"%s\" --out \"$OUT_ABS\" >> \"$DBG_LOG\" 2>&1 " % (_importer, _basename_importer(_importer)))
+           + "\"${WORKSPACE_ROOT:-$FLK_ROOT}/tools/buck/node-cli-bundle.ts\" --importer \"%s\" --name \"%s\" --out \"$OUT_ABS\" >> \"$DBG_LOG\" 2>&1 " % (_importer, importer_display_name(_importer)))
         + "; RC=$?; if [ \"$RC\" != \"0\" ]; then sed -n '1,200p' \"$DBG_LOG\" >&2 || true; fi; exit $RC"
     )
 
