@@ -228,6 +228,7 @@ export async function runInTemp<T>(
 ): Promise<T> {
   const overallStart = performance.now();
   const tmp = await mktemp(name + "-");
+  const home = await fsp.mkdtemp(path.join(os.tmpdir(), "bucknix-test-home-"));
   await rsyncRepoTo(tmp);
   // Normalize flake.lock path inputs that use relative 'path:./...' to absolute paths within the temp repo.
   // This avoids Nix errors when evaluating from store snapshots where relative path inputs are disallowed.
@@ -509,10 +510,9 @@ export async function runInTemp<T>(
   // Ensure repo-aware bin helpers (e.g., tools/bin/build, verify) operate on the temp copy
   // Keep WORKSPACE_ROOT as the temp repo for file operations
   exportEnv.WORKSPACE_ROOT = tmp;
-  // Avoid per-temp nested buck2 isolation; reuse a single daemon for all tests to reduce process churn.
-  // Point HOME at the temp repo to avoid loading user login profiles (which may invoke direnv)
-  // when tests run shells like `bash --noprofile --norc -c ...`.
-  exportEnv.HOME = tmp;
+  // Avoid polluting the developer's HOME and prevent macOS cache directories (e.g., ~/Library/Caches)
+  // from being created inside the temp repo root (which creates large file-watcher churn for Buck2).
+  exportEnv.HOME = home;
   // Prefer Go proxy to avoid GitHub API rate limiting; keep a local module cache under tmp
   try {
     exportEnv.GOPROXY = exportEnv.GOPROXY || "https://proxy.golang.org,direct";
@@ -581,6 +581,7 @@ export async function runInTemp<T>(
         console.warn("warning: failed to remove temp test dir:", err);
       });
     }
+    await fsp.rm(home, { recursive: true, force: true }).catch(() => {});
     // quiet: timing footer removed (use TEST_TIMING=1 to enable timings)
   }
 }
