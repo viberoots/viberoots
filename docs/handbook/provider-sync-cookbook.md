@@ -35,6 +35,18 @@ The canonical source of truth is the language contract:
 
 `tools/lib/provider-sync-driver.ts` requires the policy at its boundary (no silent defaults), and regression tests lock down the resulting behavior.
 
+Global patches (effective-set gated):
+
+Node optionally supports a repo-root global patch directory (`patches/node`). These patches are merged into a given importer's provider only when the patch key matches the importer lockfile effective set.
+
+The canonical helper for this behavior is:
+
+- `tools/lib/effective-set-patch-selection.ts`
+  - `scanFlatPatchDirToLowercaseKeyToPatchPathMap(...)` builds the `<name>@<version> -> patch path` map from a flat patch dir.
+  - `selectPatchPathsForEffectiveSet(...)` selects and sorts matching patch paths for an importer effective set.
+
+Rule: do not hand-roll global patch scanning or effective-set patch selection in per-language provider generators. Use the shared helper to keep normalization and ordering stable.
+
 Canonical naming and helpers:
 
 - **Source of truth (TS helpers)**: `tools/lib/providers.ts` defines provider naming. Use `providerNameForModuleKey(importPath, version)` for Go module providers and `providerNameForImporter(lockfilePath, importer)` for Node importer‑scoped providers.

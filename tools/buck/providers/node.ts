@@ -1,6 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import path from "node:path";
-import { scanFlatPatchDir } from "../../lib/provider-sync.ts";
+import { scanFlatPatchDirToLowercaseKeyToPatchPathMap } from "../../lib/effective-set-patch-selection.ts";
 import { decodeNameVersionFromPatch, providerNameForImporter } from "../../lib/providers.ts";
 import { importerScopedProviderContractForLang } from "../../lib/lang-contracts.ts";
 import {
@@ -21,14 +20,10 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
   }
   const PATCH_DIR = opts?.patchDir || contract.globalPatchDir?.path || "patches/node";
   const OUT_FILE = opts?.outFile || "third_party/providers/TARGETS.node.auto";
-  // Build a global key → patchPath mapping from patches/node to preserve behavior
-  const scanned = await scanFlatPatchDir({
+  const keyToPatchPath = await scanFlatPatchDirToLowercaseKeyToPatchPathMap({
     patchDir: PATCH_DIR,
     decodeKey: decodeNameVersionFromPatch,
-    nameForKey: (k) => k,
   });
-  const keyToPatchPath = new Map<string, string>();
-  for (const e of scanned) keyToPatchPath.set(e.key.toLowerCase(), e.patchPath);
 
   function syntheticLockfilesEnabled(): boolean {
     const raw = String(process.env.NODE_PROVIDER_SYNTHETIC_LOCKFILES || "")

@@ -3,6 +3,7 @@ import path from "node:path";
 import { computeImporterLabel, isSupportedImporterLabel } from "./importers.ts";
 import { writeImporterProvidersByLang, type ImporterProvider } from "./provider-writer.ts";
 import { toPosixPath, uniqSorted } from "./posix-path.ts";
+import { selectPatchPathsForEffectiveSet } from "./effective-set-patch-selection.ts";
 import type { ImporterPatchInclusionPolicy } from "./lang-contracts.ts";
 
 export type ParseEffectiveSetFn = (
@@ -105,13 +106,13 @@ export async function runImporterProviderSync(opts: DriverOptions): Promise<void
             });
 
       // Global patches that match the effective set (optional)
-      const globalSelected: string[] = [];
-      if (globalKeyToPatchPath && globalKeyToPatchPath.size > 0) {
-        for (const k of eff) {
-          const pathFor = globalKeyToPatchPath.get(String(k).toLowerCase());
-          if (pathFor) globalSelected.push(toPosixPath(pathFor));
-        }
-      }
+      const globalSelected =
+        globalKeyToPatchPath && globalKeyToPatchPath.size > 0
+          ? selectPatchPathsForEffectiveSet({
+              effectiveSet: eff,
+              keyToPatchPath: globalKeyToPatchPath,
+            })
+          : [];
 
       const patchPaths = uniqSorted([...localSelected, ...globalSelected]);
       providers.push({ lockfile: lf, importer, patchPaths });
