@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { computeImporterLabel, isSupportedImporterLabel } from "../../lib/importers.ts";
+import { importerScopedProviderContractForLang } from "../../lib/lang-contracts.ts";
 import { findUvLockfiles } from "../../lib/lockfiles.ts";
 import { readImporterProviderIndexEntries } from "../../lib/provider-index.ts";
 import { syncImporterProviders } from "../../lib/provider-sync-driver.ts";
@@ -7,8 +8,12 @@ import { decodeNameVersionFromPatch } from "../../lib/providers.ts";
 import { parseUvLockKeys } from "../../lib/uv-lock.ts";
 
 export async function syncPythonProviders(opts?: { outFile?: string; strict?: boolean }) {
+  const contract = importerScopedProviderContractForLang("python");
+  if (!contract) {
+    throw new Error("[providers][python] missing importer-scoped provider contract");
+  }
   const OUT_FILE = opts?.outFile || "third_party/providers/TARGETS.python.auto";
-  const STRICT = opts?.strict ?? false;
+  const STRICT = opts?.strict ?? contract.providerSyncParsing.defaultStrict;
 
   const discoverLockfiles = () => findUvLockfiles();
   const parseEffectiveSetForLockfile = async (
@@ -25,18 +30,13 @@ export async function syncPythonProviders(opts?: { outFile?: string; strict?: bo
   const listImporterPatchesFor = async (importer: string) =>
     (await import("../../lib/importers.ts")).listImporterPatches(importer, "python");
 
-  // Patch inclusion policy (Python):
-  // - Provider patch_paths include only importer-local patches that match the uv.lock effective set.
-  // - This keeps invalidation precise: adding a patch for a package that is not in uv.lock does not
-  //   affect the provider or downstream targets.
-  // - When strict=false, uv.lock parse failures fall back to an empty effective set (preserve behavior).
   await syncImporterProviders({
     lang: "python",
     discoverLockfiles,
     parseEffectiveSetForLockfile,
     listImporterPatchesFor,
     decodePatchKey: decodeNameVersionFromPatch,
-    importerPatchInclusionPolicy: "effective-set-only",
+    importerPatchInclusionPolicy: contract.importerPatchInclusionPolicy,
     outFile: OUT_FILE,
     strict: STRICT,
   });

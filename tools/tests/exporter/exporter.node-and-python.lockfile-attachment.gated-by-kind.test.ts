@@ -6,9 +6,19 @@ import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 import { readCompositeGraph } from "../../lib/graph-view.ts";
 import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const.ts";
+import { importerScopedProviderContractForLang } from "../../lib/lang-contracts.ts";
 
 test("exporter attaches importer lockfile labels only for kind:* (node + python)", async () => {
   await runInTemp("exp-kind-gate-lockfile", async (tmp, $) => {
+    assert.equal(
+      importerScopedProviderContractForLang("node")?.lockfileLabelAutoAttachRequirement,
+      "requires-kind-stamp",
+    );
+    assert.equal(
+      importerScopedProviderContractForLang("python")?.lockfileLabelAutoAttachRequirement,
+      "requires-kind-stamp",
+    );
+
     await fs.mkdirp(path.join(tmp, "apps", "web"));
     await fs.writeFile(
       path.join(tmp, "apps", "web", "pnpm-lock.yaml"),

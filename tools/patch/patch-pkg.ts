@@ -15,7 +15,7 @@ try {
 }
 import path from "node:path";
 import { getFlagStr, getFlagBool, getPositionals } from "../lib/cli.ts";
-import { patchInvalidationStrategyForLang } from "../lib/lang-contracts.ts";
+import { patchInvalidationStrategyForLang, patchPkgUsageNotes } from "../lib/lang-contracts.ts";
 
 type SubcommandName = "start" | "apply" | "reset" | "session" | "remove" | "help";
 
@@ -46,9 +46,7 @@ function usage(msg?: string) {
       "  go | cpp | node | python",
       "",
       "notes:",
-      "  - Go/C++ default to local mode: apply/remove write/read patches under <pkg>/patches/<lang>.",
-      "    Removing a Go/C++ patch does not regenerate glue; Buck/Nix pick up the change via srcs.",
-      "  - Node and Python remain importer-scoped: apply/remove regenerates providers and auto_map (glue).",
+      ...patchPkgUsageNotes().map((l) => `  ${l}`),
     ].join("\n"),
   );
   process.exit(2);

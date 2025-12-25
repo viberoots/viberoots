@@ -2,6 +2,7 @@
 import path from "node:path";
 import { scanFlatPatchDir } from "../../lib/provider-sync.ts";
 import { decodeNameVersionFromPatch, providerNameForImporter } from "../../lib/providers.ts";
+import { importerScopedProviderContractForLang } from "../../lib/lang-contracts.ts";
 import {
   findImporterLockfiles,
   computeImporterLabel,
@@ -14,7 +15,11 @@ import { syncImporterProviders } from "../../lib/provider-sync-driver.ts";
 import { readImporterProviderIndexEntries } from "../../lib/provider-index.ts";
 
 export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: string }) {
-  const PATCH_DIR = opts?.patchDir || "patches/node";
+  const contract = importerScopedProviderContractForLang("node");
+  if (!contract) {
+    throw new Error("[providers][node] missing importer-scoped provider contract");
+  }
+  const PATCH_DIR = opts?.patchDir || contract.globalPatchDir?.path || "patches/node";
   const OUT_FILE = opts?.outFile || "third_party/providers/TARGETS.node.auto";
   // Build a global key → patchPath mapping from patches/node to preserve behavior
   const scanned = await scanFlatPatchDir({
@@ -73,18 +78,13 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
   const listImporterPatchesFor = async (importer: string) =>
     (await import("../../lib/importers.ts")).listImporterPatches(importer, "node");
 
-  // Patch inclusion policy (Node):
-  // - Provider patch_paths include every importer-local patch file under <importer>/patches/node/*.patch,
-  //   even if the patched package is not present in the lockfile effective set.
-  // - This keeps invalidation simple and predictable: adding or changing any importer-local Node patch
-  //   invalidates that importer's provider and therefore rebuilds/retests Node targets wired to it.
   await syncImporterProviders({
     lang: "node",
     discoverLockfiles,
     parseEffectiveSetForLockfile,
     listImporterPatchesFor,
     decodePatchKey: decodeNameVersionFromPatch,
-    importerPatchInclusionPolicy: "all",
+    importerPatchInclusionPolicy: contract.importerPatchInclusionPolicy,
     globalKeyToPatchPath: keyToPatchPath,
     outFile: OUT_FILE,
   });

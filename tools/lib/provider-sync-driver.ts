@@ -3,6 +3,7 @@ import path from "node:path";
 import { computeImporterLabel, isSupportedImporterLabel } from "./importers.ts";
 import { writeImporterProvidersByLang, type ImporterProvider } from "./provider-writer.ts";
 import { toPosixPath, uniqSorted } from "./posix-path.ts";
+import type { ImporterPatchInclusionPolicy } from "./lang-contracts.ts";
 
 export type ParseEffectiveSetFn = (
   lockfilePath: string,
@@ -10,14 +11,8 @@ export type ParseEffectiveSetFn = (
 ) => Promise<Map<string, Set<string>>>;
 
 /**
- * Controls how importer-local patch files under `<importer>/patches/<lang>/*.patch` are included
- * in provider `patch_paths`.
- *
- * - "all": include all importer-local patch files (even if not in the lockfile effective set)
- * - "effective-set-only": include only patches that match the lockfile effective set
+ * Generic importer-scoped provider sync driver for Node/Python-like ecosystems.
  */
-export type ImporterPatchInclusionPolicy = "all" | "effective-set-only";
-
 export type DriverOptions = {
   lang: "node" | "python" | string;
   discoverLockfiles: () => Promise<string[]>;

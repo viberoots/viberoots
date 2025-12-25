@@ -230,7 +230,17 @@ I treat patch invalidation as two explicit models:
   - `lang/patch_inputs.bzl:include_package_local_patches` and `lang/patch_inputs.bzl:default_package_patch_dirs`.
   - `lang/package_local_wiring.bzl:prepare_package_local_wiring` (macro-side helper that composes kwarg normalization, nixpkg label stamping, patch input inclusion, and provider-edge realization deterministically).
 - **Starlark importer-local**: `lang/patch_inputs.bzl:include_importer_patches_from_labels` plus `lang/importer_wiring.bzl:attach_importer_patch_inputs`.
-- **TypeScript provider sync**: `tools/lib/provider-sync-driver.ts` and language adapters in `tools/buck/providers/*`.
+
+For importer-scoped ecosystems, there is an additional provider contract surface that is still part of the “patch model”, because it directly determines invalidation behavior and glue content.
+
+- **Importer-scoped provider contract (TypeScript)**: `tools/lib/lang-contracts.ts`
+  - `importerScopedProviderContractForLang(lang)` defines:
+    - importer patch inclusion policy (`all` vs `effective-set-only`)
+    - optional global patch dir inputs (for Node: `patches/node`, effective-set matches only)
+    - lockfile label auto-attach requirement (`requires-kind-stamp`)
+    - provider sync strictness support (Python supports strict parsing; default is non-strict)
+- **TypeScript provider sync driver**: `tools/lib/provider-sync-driver.ts` (takes the contract values as explicit options; does not silently default)
+- **Language adapters**: `tools/buck/providers/*` (read the contract and pass policy into the driver)
 
 ### Dev overrides (environment variable names)
 
@@ -248,6 +258,7 @@ There are multiple relevant tests. The most important “contract locks” are:
 
 - `tools/tests/lang/lang-contracts.patch-model.parity.test.ts` (Starlark ↔ TS registry parity)
 - `tools/tests/providers/provider-sync-driver.patch-inclusion-policy.test.ts` (Node vs Python importer patch inclusion policy)
+- `tools/tests/lib/lang-contracts.importer-scoped-provider-contract.test.ts` (contract values are explicit and stable)
 - Any macro tests that assert importer-local patches are included as inputs for Node/Python targets.
 
 ### Common leak patterns
