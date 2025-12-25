@@ -12,6 +12,7 @@ All scripts are zx TypeScript using `#!/usr/bin/env zx-wrapper`.
 - Avoid bespoke implementations; this keeps behavior consistent across Go/C++/Node/Python.
 - Default package-local patch directory selection is centralized in Starlark via `//lang:defs_common.bzl: default_package_patch_dirs(lang)`. Go/C++ macros use this helper instead of hard‑coded strings (e.g., `["patches/go"]`).
 - Flat patch directory checks use `tools/lib/provider-sync.ts: validateFlatDir()`; locally it warns, and in CI (or with `--strict`) it fails.
+- Go/Node/Python patch linting shares one core implementation for flat-dir scanning, filename-shape validation, and duplicate detection: `tools/dev/patches-lint/flat-patch-dir-lint.ts`. This keeps codes and messages consistent across languages.
 - C++ extraction/workspace setup uses the common permission normalizer `tools/patch/cross-platform.ts: chmodRecursive` to guarantee writable workspaces without affecting diffs.
 - Node and Python macros include importer‑local patch files in `srcs` via the unified helper `//lang:defs_common.bzl: append_importer_patches(kwargs, importer, lang)`. Importer is derived from a single `lockfile:<path>#<importer>` label (enforced by `ensure_single_lockfile_label(...)`).
   - Labels must include the `#<importer>` suffix and contain **exactly one** `#`; malformed labels fail fast with deterministic error text.
@@ -165,7 +166,7 @@ In addition, CI enforces patch directory invariants for Go/C++ local patch direc
 
 - For each package, `<pkg>/patches/{go,cpp}` is flat (no subdirectories)
 - Files must be `.patch` only
-- For Go, exactly one patch per `module@version`
+- For Go/Node/Python, exactly one patch per decoded key (`<name>@<version>`) is allowed. Duplicate detection uses a permissive decode to catch collisions that can otherwise hide on case-insensitive filesystems.
 
 Locally, run advisory mode:
 
