@@ -232,6 +232,16 @@ I treat patch invalidation as two explicit models:
 - **Starlark importer-local**: `lang/patch_inputs.bzl:include_importer_patches_from_labels` plus `lang/importer_wiring.bzl:attach_importer_patch_inputs`.
 - **TypeScript provider sync**: `tools/lib/provider-sync-driver.ts` and language adapters in `tools/buck/providers/*`.
 
+### Dev overrides (environment variable names)
+
+Dev override environment variable names are treated as a cross-language contract. The names are data, not hardcoded strings, to avoid drift across Nix and TypeScript tooling.
+
+- **Manifest (source of truth)**: `tools/lib/dev-override-envs.json`
+- **TypeScript consumer**: `tools/lib/dev-override-envs.ts`
+- **Nix consumer (planner mapping)**: `tools/nix/planner/overrides.nix` reads the JSON manifest
+
+Rule: tooling must not hardcode `NIX_*_DEV_OVERRIDE_JSON` names. Resolve env var names from the manifest instead.
+
 ### Regression guards
 
 There are multiple relevant tests. The most important “contract locks” are:

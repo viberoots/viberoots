@@ -14,6 +14,7 @@ import { debugEnabled, pathExists } from "../lib/util";
 import { encodeNixAttrForPatchPrefix, normalizeNixAttr } from "../../lib/providers";
 import { resolveNixpkg } from "./resolve";
 import { clearOverride } from "../dev-overrides";
+import { devOverrideEnvNameForLang } from "../../lib/dev-override-envs.ts";
 
 export async function doApply(args: string[]) {
   console.error("[patch-cpp] apply: begin");
@@ -155,7 +156,7 @@ export async function doApply(args: string[]) {
   // End session; keep workspace for manual inspection if desired
   try {
     const key = `${attrNorm}@${sess.version}`.toLowerCase();
-    clearOverride("NIX_CPP_DEV_OVERRIDE_JSON", attrNorm);
+    clearOverride(devOverrideEnvNameForLang("cpp"), attrNorm);
     await deleteSession("cpp", key);
   } catch {}
   console.log(dst);

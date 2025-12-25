@@ -6,6 +6,8 @@ All scripts are zx TypeScript using `#!/usr/bin/env zx-wrapper`.
 
 ### Shared helpers (consistency across languages)
 
+This section is a quick index of “don’t re-implement this” utilities. Most patch and glue behavior is intentionally centralized so the Go/C++/Node/Python flows stay consistent and easy to reason about.
+
 - Patch handlers reuse `tools/patch/lib/apply.ts: repoRoot()` for repo‑root detection.
 - Filesystem existence checks use `tools/patch/lib/util.ts: pathExists()`.
 - Workspace-based patch handlers (Go and Python) share the control flow in `tools/patch/lib/workspace-workflow.ts` (session reuse, no-op cleanup, patch verification, and consistent messages).
@@ -29,14 +31,15 @@ All scripts are zx TypeScript using `#!/usr/bin/env zx-wrapper`.
   - For importer-scoped ecosystems (Node, Python), macro wiring is standardized via `//lang:importer_wiring.bzl`. New macros must not copy/paste wiring logic; they should call the helper functions (`require_single_importer_lockfile_label`, `attach_importer_patch_inputs`, `merge_provider_edges`).
   - For **genrule-style macros** (or any wrapper where edges must be realized into `srcs`), use the consolidated helper `prepare_importer_genrule_kwargs(...)` instead of re-implementing list-vs-dict `srcs` handling.
   - For **non-genrule importer-scoped macros** (where the rule needs the importer string explicitly), use `prepare_importer_non_genrule_wiring(...)` so lockfile enforcement, importer derivation, patch inputs, and provider-edge merging remain consistent.
+- Dev override environment variable names are a shared contract and are defined in `tools/lib/dev-override-envs.json`. Tooling must not hardcode `NIX_*_DEV_OVERRIDE_JSON` names.
 
 ## Workflow
 
 - Start: `tools/bin/patch-pkg start go <importPath>`
   - Creates a writable workspace over the Nix store source for the module.
   - macOS uses APFS CoW (`cp -cR`) when available; otherwise falls back to `cp -a`. Other platforms use `cp -a`.
-  - Writes/updates `NIX_GO_DEV_OVERRIDE_JSON` for the current `module@version` key (local-only dev override).
-  - Optional: pass `--echo-snippet` to print `export NIX_GO_DEV_OVERRIDE_JSON='{\"<module@version>\":\"<abs/path>\"}'` to stderr (parity with C++), instead of setting the env var in-process.
+  - Writes/updates the Go dev override env var (as defined by `tools/lib/dev-override-envs.json`; currently `NIX_GO_DEV_OVERRIDE_JSON`) for the current `module@version` key (local-only dev override).
+  - Optional: pass `--echo-snippet` to print `export NIX_GO_DEV_OVERRIDE_JSON='{\"<module@version>\":\"<abs/path>\"}'` to stderr (parity with C++), instead of setting the env var in-process. Tooling derives the env var name from the manifest.
   - If `PATCH_EDITOR` is set, launches it with the workspace.
 
 - Apply: `tools/bin/patch-pkg apply go <importPath> [--target //<pkg>:name | --patch-dir <dir>]`
@@ -160,7 +163,7 @@ Note on remove (Go/C++ vs Node/Python):
 
 ## CI guardrails
 
-Local builds warn when `NIX_GO_DEV_OVERRIDE_JSON` or `NIX_CPP_DEV_OVERRIDE_JSON` is set; CI fails if either is set. These environment variables change derivation hashes and are never allowed in CI.
+Local builds warn when dev overrides are set; CI fails if any dev override env var is set. The canonical list of env var names is `tools/lib/dev-override-envs.json`. These environment variables change derivation hashes and are never allowed in CI.
 
 In addition, CI enforces patch directory invariants for Go/C++ local patch directories:
 

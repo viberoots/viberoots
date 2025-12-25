@@ -1,9 +1,10 @@
 {
   # Mapping of planner languages to their dev override environment variables.
+  # Source of truth: tools/lib/dev-override-envs.json (shared with TS tooling).
+  #
   # Keep keys stable: used for log tokens and iteration order.
-  go = "NIX_GO_DEV_OVERRIDE_JSON";
-  cpp = "NIX_CPP_DEV_OVERRIDE_JSON";
-  python = "NIX_PY_DEV_OVERRIDE_JSON";
-}
+  # If you add a new planner language, add it to the JSON manifest and update
+  # any consumers that depend on the key set.
+} // (builtins.fromJSON (builtins.readFile ../../lib/dev-override-envs.json))
 
 

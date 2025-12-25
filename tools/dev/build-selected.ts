@@ -15,6 +15,7 @@ import path from "node:path";
 import { ensureGraph } from "../buck/glue-run.ts";
 import { findRepoRoot, pathExists } from "../lib/repo.ts";
 import { sanitizeAttrNameFromLabel } from "../lib/labels.ts";
+import { allDevOverrideEnvNames } from "../lib/dev-override-envs.ts";
 
 function stripAnsi(s: string): string {
   return s.replace(/\x1B\[[0-9;]*[A-Za-z]/g, "").replace(/\r/g, "");
@@ -83,9 +84,10 @@ async function main() {
   const sanitizedEnv: Record<string, string> = {
     ...process.env,
     BUCK_TARGET: target,
-    NIX_GO_DEV_OVERRIDE_JSON: "",
-    NIX_CPP_DEV_OVERRIDE_JSON: "",
   };
+  for (const envName of allDevOverrideEnvNames()) {
+    sanitizedEnv[envName] = "";
+  }
   if (!process.env.PLANNER_ONLY_CPP) {
     sanitizedEnv.PLANNER_ONLY_CPP = "1";
   }

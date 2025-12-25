@@ -13,6 +13,7 @@ import {
   resetWorkspaceWorkflow,
   startWorkspaceWorkflow,
 } from "./lib/workspace-workflow";
+import { devOverrideEnvNameForLang } from "../lib/dev-override-envs.ts";
 
 const dbg = createDbg("patch-go");
 
@@ -34,7 +35,7 @@ async function doStart(args: string[]) {
     importPath,
     version,
     originPath,
-    overrideEnvName: "NIX_GO_DEV_OVERRIDE_JSON",
+    overrideEnvName: devOverrideEnvNameForLang("go"),
     echoSnippetEnv: "PATCH_GO_ECHO_SNIPPET",
     moduleKeyForWorkspace: key,
     deps: { pathExists },
@@ -64,7 +65,7 @@ async function doApply(args: string[]) {
     lang: "go",
     key,
     missingSessionError: `no active session for ${key}; run: patch-pkg start go ${importPath}`,
-    overrideEnvName: "NIX_GO_DEV_OVERRIDE_JSON",
+    overrideEnvName: devOverrideEnvNameForLang("go"),
     patchPathAbs: dst,
     verifyMode: "go",
     verifySubjectLabel: "Module",
@@ -81,7 +82,11 @@ async function doReset(args: string[]) {
   });
   const { version } = await resolveModule(importPath);
   const key = moduleKey(importPath, version);
-  await resetWorkspaceWorkflow({ lang: "go", key, overrideEnvName: "NIX_GO_DEV_OVERRIDE_JSON" });
+  await resetWorkspaceWorkflow({
+    lang: "go",
+    key,
+    overrideEnvName: devOverrideEnvNameForLang("go"),
+  });
 }
 
 async function doSession(args: string[]) {

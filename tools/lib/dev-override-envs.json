@@ -1,0 +1,5 @@
+{
+  "go": "NIX_GO_DEV_OVERRIDE_JSON",
+  "cpp": "NIX_CPP_DEV_OVERRIDE_JSON",
+  "python": "NIX_PY_DEV_OVERRIDE_JSON"
+}

@@ -2,6 +2,7 @@
 // tools/dev/startup-check.ts — verifies required tools and Nix features; prints fallbacks
 import * as fsp from "node:fs/promises";
 import { isNixStorePath, resolvePreferredCmdPath } from "./startup-check/cmd-paths.ts";
+import { DEV_OVERRIDE_LANGS, devOverrideEnvNameForLang } from "../lib/dev-override-envs.ts";
 
 async function which(cmd: string) {
   try {
@@ -187,19 +188,11 @@ async function main() {
 
   // No overlayfs requirement: patch workspaces use cp -cR on macOS when available, else cp -a.
 
-  if ((process.env.NIX_GO_DEV_OVERRIDE_JSON || "").trim() !== "") {
+  for (const lang of DEV_OVERRIDE_LANGS) {
+    const envName = devOverrideEnvNameForLang(lang);
+    if ((process.env[envName] || "").trim() === "") continue;
     console.warn(
-      "\n[OVERRIDES ACTIVE] NIX_GO_DEV_OVERRIDE_JSON is set — local derivation hashes will differ. Unset before sharing cache artifacts.\n",
-    );
-  }
-  if ((process.env.NIX_CPP_DEV_OVERRIDE_JSON || "").trim() !== "") {
-    console.warn(
-      "\n[OVERRIDES ACTIVE] NIX_CPP_DEV_OVERRIDE_JSON is set — local derivation hashes will differ. Unset before sharing cache artifacts.\n",
-    );
-  }
-  if ((process.env.NIX_PY_DEV_OVERRIDE_JSON || "").trim() !== "") {
-    console.warn(
-      "\n[OVERRIDES ACTIVE] NIX_PY_DEV_OVERRIDE_JSON is set — local derivation hashes will differ. Unset before sharing cache artifacts.\n",
+      `\n[OVERRIDES ACTIVE] ${envName} is set — local derivation hashes will differ. Unset before sharing cache artifacts.\n`,
     );
   }
 

@@ -14,6 +14,7 @@ import {
   startWorkspaceWorkflow,
 } from "./lib/workspace-workflow";
 import { runSession } from "./lib/session";
+import { devOverrideEnvNameForLang } from "../lib/dev-override-envs.ts";
 
 function keyFor(dist: string, ver: string): string {
   return `${String(dist || "").toLowerCase()}@${String(ver || "").toLowerCase()}`;
@@ -33,7 +34,7 @@ async function doStart(args: string[]) {
     importPath: resolved.importPath,
     version: resolved.version,
     originPath: resolved.originPath,
-    overrideEnvName: "NIX_PY_DEV_OVERRIDE_JSON",
+    overrideEnvName: devOverrideEnvNameForLang("python"),
     echoSnippetEnv: "PATCH_PY_ECHO_SNIPPET",
     moduleKeyForWorkspace: key,
   });
@@ -62,7 +63,7 @@ async function doApply(args: string[]) {
     lang: "python",
     key,
     missingSessionError: `no active session for ${key}; run: patch-pkg start python ${dist}`,
-    overrideEnvName: "NIX_PY_DEV_OVERRIDE_JSON",
+    overrideEnvName: devOverrideEnvNameForLang("python"),
     patchPathAbs: dst,
     verifyMode: "python",
     verifySubjectLabel: "Distribution",
@@ -94,7 +95,7 @@ async function doReset(args: string[]) {
   await resetWorkspaceWorkflow({
     lang: "python",
     key,
-    overrideEnvName: "NIX_PY_DEV_OVERRIDE_JSON",
+    overrideEnvName: devOverrideEnvNameForLang("python"),
   });
 }
 

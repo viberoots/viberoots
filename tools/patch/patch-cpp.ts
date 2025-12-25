@@ -18,6 +18,7 @@ import { ensureOriginAndWorkspace } from "./cpp/extract";
 import { doApply, doRemove } from "./cpp/apply";
 import { echoSnippetRequested } from "../lib/cli.ts";
 import { requirePositional } from "./lib/args";
+import { devOverrideEnvNameForLang } from "../lib/dev-override-envs.ts";
 
 const dbg = createDbg("patch-cpp");
 
@@ -29,6 +30,7 @@ async function doStart(args: string[]) {
     example: "pkgs.zlib or zlib",
   });
   const attrNorm = normalizeNixAttr(attrInput);
+  const overrideEnvName = devOverrideEnvNameForLang("cpp");
   const echoSnippet = echoSnippetRequested({ env: "PATCH_CPP_ECHO_SNIPPET" });
   // Idempotency: if a session already exists and workspace is present, reuse it.
   console.error("[patch-cpp] start: resolve nixpkg", attrNorm);
@@ -40,7 +42,7 @@ async function doStart(args: string[]) {
     dbg("start: reuse-session", { key, existing });
     console.log(existing.workspacePath);
     if (echoSnippet) {
-      printOverrideSnippet("NIX_CPP_DEV_OVERRIDE_JSON", { [attrNorm]: existing.workspacePath });
+      printOverrideSnippet(overrideEnvName, { [attrNorm]: existing.workspacePath });
     }
     return;
   }
@@ -61,9 +63,9 @@ async function doStart(args: string[]) {
   console.log(workspacePath);
   // Default to in-process set; optionally echo a snippet for shells/tools that prefer it
   if (echoSnippet) {
-    printOverrideSnippet("NIX_CPP_DEV_OVERRIDE_JSON", { [attrNorm]: workspacePath });
+    printOverrideSnippet(overrideEnvName, { [attrNorm]: workspacePath });
   } else {
-    setOverride("NIX_CPP_DEV_OVERRIDE_JSON", attrNorm, workspacePath);
+    setOverride(overrideEnvName, attrNorm, workspacePath);
   }
   if (process.env.PATCH_EDITOR && process.env.PATCH_EDITOR.trim() !== "") {
     const ed = process.env.PATCH_EDITOR;
@@ -82,7 +84,7 @@ async function doReset(args: string[]) {
   const sess = await getSession("cpp", key);
   if (!sess) return; // no-op
   // Clear any process-local dev override for parity
-  clearOverride("NIX_CPP_DEV_OVERRIDE_JSON", attrNorm);
+  clearOverride(devOverrideEnvNameForLang("cpp"), attrNorm);
   await deleteSession("cpp", key);
   try {
     await fsp.rm(sess.workspacePath, { recursive: true, force: true });
@@ -102,9 +104,12 @@ async function doSession(args: string[]) {
     const key = `${attrNorm}@${version}`.toLowerCase();
     const sess = await getSession("cpp", key);
     if (sess?.workspacePath) {
+      const overrideEnvName = devOverrideEnvNameForLang("cpp");
       const json = JSON.stringify({ [attrNorm]: sess.workspacePath });
       console.error(
-        "\n[session] You can dev-override locally (do not use in CI):\nexport NIX_CPP_DEV_OVERRIDE_JSON='" +
+        "\n[session] You can dev-override locally (do not use in CI):\nexport " +
+          overrideEnvName +
+          "='" +
           json +
           "'\n",
       );

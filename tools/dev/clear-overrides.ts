@@ -1,27 +1,15 @@
 #!/usr/bin/env zx-wrapper
 // tools/dev/clear-overrides.ts — Unsets Go and C++ dev overrides and prints their values.
 
+import { DEV_OVERRIDE_LANGS, devOverrideEnvNameForLang } from "../lib/dev-override-envs.ts";
+
 const has = (v?: string) => Boolean(v && v.trim() !== "");
 
-if (has(process.env.NIX_GO_DEV_OVERRIDE_JSON)) {
-  delete process.env.NIX_GO_DEV_OVERRIDE_JSON;
+for (const lang of DEV_OVERRIDE_LANGS) {
+  const envName = devOverrideEnvNameForLang(lang);
+  if (has(process.env[envName])) delete process.env[envName];
 }
-if (has(process.env.NIX_CPP_DEV_OVERRIDE_JSON)) {
-  delete process.env.NIX_CPP_DEV_OVERRIDE_JSON;
+for (const lang of DEV_OVERRIDE_LANGS) {
+  const envName = devOverrideEnvNameForLang(lang);
+  console.log(`${envName}=`, JSON.stringify(process.env[envName] || ""));
 }
-if (has(process.env.NIX_PY_DEV_OVERRIDE_JSON)) {
-  delete process.env.NIX_PY_DEV_OVERRIDE_JSON;
-}
-
-console.log(
-  "NIX_GO_DEV_OVERRIDE_JSON=",
-  JSON.stringify(process.env.NIX_GO_DEV_OVERRIDE_JSON || ""),
-);
-console.log(
-  "NIX_CPP_DEV_OVERRIDE_JSON=",
-  JSON.stringify(process.env.NIX_CPP_DEV_OVERRIDE_JSON || ""),
-);
-console.log(
-  "NIX_PY_DEV_OVERRIDE_JSON=",
-  JSON.stringify(process.env.NIX_PY_DEV_OVERRIDE_JSON || ""),
-);
