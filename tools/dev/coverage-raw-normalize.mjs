@@ -22,7 +22,8 @@ function mapTmpToRepo(sf, repoRoot) {
 }
 
 async function normalizeRaw(repoRoot) {
-  const dir = path.join(repoRoot, "coverage", "raw");
+  const envDir = process.env.NODE_V8_COVERAGE;
+  const dir = envDir ? path.resolve(envDir) : path.join(repoRoot, "coverage", "raw");
   if (!fs.existsSync(dir)) return;
   const files = (await fsp.readdir(dir)).filter(
     (f) => f.startsWith("coverage-") && f.endsWith(".json"),

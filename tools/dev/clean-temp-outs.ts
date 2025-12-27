@@ -4,6 +4,8 @@
  * Best-effort cleanup of ephemeral Buck/Nix temp artifacts to avoid GC roots/bloat.
  *
  * - Removes buck-out/tmp/buck-impure-* directories older than N minutes (default 30).
+ * - Removes buck-out/tmp/node-v8-coverage/v-* directories older than N minutes (default 30).
+ * - Removes buck-out/tmp/verify-logs/verify-* log files older than N minutes (default 30).
  * - Optionally removes a repo-root "result" symlink if present and dangling.
  */
 import * as fsp from "node:fs/promises";
@@ -56,7 +58,73 @@ async function main() {
     }
   }
 
-  // 2) Optional: remove dangling repo-root "result" symlink (common from ad-hoc nix build)
+  // 2) Remove stale per-verify raw coverage dirs under buck-out/tmp/node-v8-coverage
+  const v8covParent = path.join(tmpDir, "node-v8-coverage");
+  try {
+    const v8names = await fsp.readdir(v8covParent);
+    for (const name of v8names) {
+      if (!/^v-/.test(name)) continue;
+      const p = path.join(v8covParent, name);
+      const st = await safeLstat(p);
+      if (!st) continue;
+      const mtime = st.mtimeMs || st.ctimeMs || 0;
+      if (mtime > 0 && mtime < cutoffMs) {
+        await rmRf(p);
+      }
+    }
+  } catch {}
+
+  // 2.5) Remove stale verify logs under buck-out/tmp/verify-logs
+  const verifyLogsDir = path.join(tmpDir, "verify-logs");
+  try {
+    const logNames = await fsp.readdir(verifyLogsDir);
+    // Keep at least the most-recent verify log file, regardless of age.
+    let newestName: string | undefined;
+    let newestMtime = -1;
+    for (const name of logNames) {
+      if (!/^verify-/.test(name)) continue;
+      const p = path.join(verifyLogsDir, name);
+      const st = await safeLstat(p);
+      if (!st || !st.isFile()) continue;
+      const mtime = st.mtimeMs || st.ctimeMs || 0;
+      if (mtime > newestMtime) {
+        newestMtime = mtime;
+        newestName = name;
+      }
+    }
+
+    for (const name of logNames) {
+      if (name === "latest.log") continue;
+      if (name === newestName) continue;
+      if (!/^verify-/.test(name)) continue;
+      const p = path.join(verifyLogsDir, name);
+      const st = await safeLstat(p);
+      if (!st) continue;
+      if (!st.isFile()) continue;
+      const mtime = st.mtimeMs || st.ctimeMs || 0;
+      if (mtime > 0 && mtime < cutoffMs) {
+        await rmRf(p);
+      }
+    }
+  } catch {}
+
+  // 2.6) Remove stale verify by-pid pointers under buck-out/tmp/verify-logs/by-pid
+  const verifyByPidDir = path.join(verifyLogsDir, "by-pid");
+  try {
+    const names2 = await fsp.readdir(verifyByPidDir);
+    for (const name of names2) {
+      if (!/\.log$/.test(name)) continue;
+      const p = path.join(verifyByPidDir, name);
+      const st = await safeLstat(p);
+      if (!st) continue;
+      const mtime = st.mtimeMs || st.ctimeMs || 0;
+      if (mtime > 0 && mtime < cutoffMs) {
+        await rmRf(p);
+      }
+    }
+  } catch {}
+
+  // 3) Optional: remove dangling repo-root "result" symlink (common from ad-hoc nix build)
   const resultLink = path.join(repoRoot, "result");
   try {
     const st = await fsp.lstat(resultLink);

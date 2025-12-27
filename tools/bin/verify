@@ -3,12 +3,23 @@
 # shellcheck source=/dev/null
 . "$(cd "$(dirname "$0")" && pwd)/_env.sh"
 
+# Ensure the entire verify workflow runs inside the dev shell so all tools are nix-supplied.
+if [[ -z "${NO_DEV_SHELL:-}" && -z "${IN_NIX_SHELL:-}" && -z "${BNX_VERIFY_REEXEC:-}" ]]; then
+  if ! command -v direnv >/dev/null 2>&1; then
+    echo "error: direnv not found on PATH; run inside the dev shell" 1>&2
+    exit 127
+  fi
+  export BNX_VERIFY_REEXEC=1
+  exec direnv exec "${LIVE_ROOT}" "$0" "$@"
+fi
+
 # Prevent accidental concurrent verify runs locally (they cause massive performance regressions).
 # In CI we intentionally allow concurrent runs.
 # Allow override with VERIFY_ALLOW_CONCURRENT=1.
 if [[ "${CI:-}" != "true" && ( -z "${VERIFY_ALLOW_CONCURRENT:-}" || "${VERIFY_ALLOW_CONCURRENT}" != "1" ) ]]; then
   LOCK_DIR="${LIVE_ROOT}/buck-out/tmp/verify-lock"
   mkdir -p "${LIVE_ROOT}/buck-out/tmp" >/dev/null 2>&1 || true
+  export BNX_VERIFY_LOCK_DIR="${LOCK_DIR}"
 
   verify_lock_release() {
     rm -rf "$LOCK_DIR" >/dev/null 2>&1 || true
@@ -25,39 +36,80 @@ if [[ "${CI:-}" != "true" && ( -z "${VERIFY_ALLOW_CONCURRENT:-}" || "${VERIFY_AL
     [[ "${sig}" == "${expected_sig}" ]]
   }
 
+  ensure_verify_log_path() {
+    # Stable path for l/tail-log to use, but ensure each verify run gets a unique file to avoid
+    # PID reuse / stale content issues.
+    LOG_DIR="${LIVE_ROOT}/buck-out/tmp/verify-logs"
+    mkdir -p "$LOG_DIR" >/dev/null 2>&1 || true
+
+    existing="$(cat "${LOCK_DIR}/log" 2>/dev/null || true)"
+    if [[ -n "${existing}" ]]; then
+      BNX_VERIFY_LOG_FILE="${existing}"
+      export BNX_VERIFY_LOG_FILE
+      # Ensure the file exists immediately so `l --status` works even before the first test output.
+      : > "${BNX_VERIFY_LOG_FILE}" 2>/dev/null || true
+      return 0
+    fi
+
+    # macOS mktemp only replaces X's at the end of the template. Create a temp file first, then
+    # rename to include a .log suffix.
+    tmp_log="$(mktemp "${LOG_DIR}/verify-$(date +%Y%m%d-%H%M%S)-XXXXXXXX")"
+    BNX_VERIFY_LOG_FILE="${tmp_log}.log"
+    mv -f "${tmp_log}" "${BNX_VERIFY_LOG_FILE}" 2>/dev/null || true
+    : > "${BNX_VERIFY_LOG_FILE}" 2>/dev/null || true
+    export BNX_VERIFY_LOG_FILE
+    echo "${BNX_VERIFY_LOG_FILE}" > "${LOCK_DIR}/log" || true
+
+    # Stable per-PID pointer for tools/bin/tail-log when called with an explicit PID.
+    # (Logs are no longer named verify-<pid>.log due to PID reuse risk.)
+    by_pid="${LOG_DIR}/by-pid"
+    mkdir -p "${by_pid}" >/dev/null 2>&1 || true
+    ln -sf "${BNX_VERIFY_LOG_FILE}" "${by_pid}/${$}.log" 2>/dev/null || true
+
+    # Stable pointer for "most recent verify log".
+    ln -sf "${BNX_VERIFY_LOG_FILE}" "${LOG_DIR}/latest.log" 2>/dev/null || true
+  }
+
   if mkdir "$LOCK_DIR" >/dev/null 2>&1; then
     echo "$$" > "${LOCK_DIR}/pid"
     /bin/ps -p "$$" -o lstart= 2>/dev/null | tr -d '\r' | xargs > "${LOCK_DIR}/lstart" || true
+    ensure_verify_log_path
     trap verify_lock_release EXIT INT TERM HUP
   else
     pid="$(cat "${LOCK_DIR}/pid" 2>/dev/null || true)"
     sig="$(cat "${LOCK_DIR}/lstart" 2>/dev/null || true)"
     if verify_lock_pid_alive_with_sig "${pid}" "${sig}"; then
-      echo "error: verify is already running (pid ${pid}); refusing to start a concurrent run." 1>&2
-      echo "hint: tail its log (or set VERIFY_ALLOW_CONCURRENT=1 if you really mean it)." 1>&2
-      exit 2
-    fi
-    # Stale lock (e.g. SIGKILL): clear and retry once.
-    rm -rf "$LOCK_DIR" >/dev/null 2>&1 || true
-    if mkdir "$LOCK_DIR" >/dev/null 2>&1; then
-      echo "$$" > "${LOCK_DIR}/pid"
-      /bin/ps -p "$$" -o lstart= 2>/dev/null | tr -d '\r' | xargs > "${LOCK_DIR}/lstart" || true
-      trap verify_lock_release EXIT INT TERM HUP
+      # Allow our own re-exec (same PID) to continue without tripping the lock.
+      if [[ "${pid}" == "$$" ]]; then
+        ensure_verify_log_path
+      else
+        log_file="$(cat "${LOCK_DIR}/log" 2>/dev/null || true)"
+        echo "error: verify is already running (pid ${pid}); refusing to start a concurrent run." 1>&2
+        if [[ -n "${log_file:-}" && -f "${log_file}" ]]; then
+          echo "hint: tail -f ${log_file}" 1>&2
+        elif [[ -n "${log_file:-}" ]]; then
+          echo "hint: recorded log path does not exist on disk: ${log_file}" 1>&2
+          echo "hint: this usually means buck-out/tmp/verify-logs was deleted while verify was running." 1>&2
+          echo "hint: verify is still running; check progress with: ps -p ${pid} -o pid=,stat=,etime=,command=" 1>&2
+        else
+          echo "hint: tail its log (or set VERIFY_ALLOW_CONCURRENT=1 if you really mean it)." 1>&2
+        fi
+        exit 2
+      fi
     else
-      echo "error: verify lock is held and could not be acquired (path: ${LOCK_DIR})." 1>&2
-      exit 2
+      # Stale lock (e.g. SIGKILL): clear and retry once.
+      rm -rf "$LOCK_DIR" >/dev/null 2>&1 || true
+      if mkdir "$LOCK_DIR" >/dev/null 2>&1; then
+        echo "$$" > "${LOCK_DIR}/pid"
+        /bin/ps -p "$$" -o lstart= 2>/dev/null | tr -d '\r' | xargs > "${LOCK_DIR}/lstart" || true
+        ensure_verify_log_path
+        trap verify_lock_release EXIT INT TERM HUP
+      else
+        echo "error: verify lock is held and could not be acquired (path: ${LOCK_DIR})." 1>&2
+        exit 2
+      fi
     fi
   fi
-fi
-
-# Ensure the entire verify workflow runs inside the dev shell so all tools are nix-supplied.
-if [[ -z "${NO_DEV_SHELL:-}" && -z "${IN_NIX_SHELL:-}" && -z "${BNX_VERIFY_REEXEC:-}" ]]; then
-  if ! command -v direnv >/dev/null 2>&1; then
-    echo "error: direnv not found on PATH; run inside the dev shell" 1>&2
-    exit 127
-  fi
-  export BNX_VERIFY_REEXEC=1
-  exec direnv exec "${LIVE_ROOT}" "$0" "$@"
 fi
 
 # Determine external timeout command (respect VERIFY_TIMEOUT_SECS)
@@ -76,11 +128,19 @@ fi
 
 # Flags
 COVERAGE=0
+VERIFY_CONSOLE="auto" # auto | super | simple
 ARGS=()
 for a in "$@"; do
   case "$a" in
     --coverage)
       COVERAGE=1
+      ;;
+    --console=*)
+      VERIFY_CONSOLE="${a#--console=}"
+      ;;
+    --console)
+      shift
+      VERIFY_CONSOLE="${1:-}"
       ;;
     --)
       shift
@@ -95,11 +155,14 @@ done
 
 # Ensure COVERAGE is visible to the wrapper script environment
 export COVERAGE
+export VERIFY_CONSOLE
 
 # Default free-space target: higher when coverage is enabled (GB-only threshold; overridable)
 if [[ -z "${VERIFY_TARGET_FREE_GB:-}" ]]; then
   if [[ "${COVERAGE:-0}" == "1" ]]; then
-    export VERIFY_TARGET_FREE_GB=30
+    # Coverage mode now generates a single merged report at the end (not per test),
+    # so the free-space requirement can match non-coverage runs in typical workflows.
+    export VERIFY_TARGET_FREE_GB=15
   else
     export VERIFY_TARGET_FREE_GB=20
   fi
@@ -145,11 +208,25 @@ export BUCK_ROOT="$ROOT_DIR"
 # Remove any ephemeral repo-root .tmp that may contain test-generated TARGETS
 rm -rf .tmp || true
 
-# Clean previous coverage artifacts regardless of coverage mode
-# Ensure writable, then remove recursively; ignore errors if already absent
-chmod -R u+w coverage >/dev/null 2>&1 || true
-rm -rf coverage >/dev/null 2>&1 || true
-mkdir -p coverage/raw || true
+# Coverage directories:
+# - Merged reports: $ROOT_DIR/coverage
+# - Raw V8 coverage: per-run dir under $ROOT_DIR/buck-out/tmp/node-v8-coverage (Buck-ignored)
+#   Using a unique dir avoids cross-run accumulation, which can make c8 aggregation unstable.
+V8COV_PARENT="$ROOT_DIR/buck-out/tmp/node-v8-coverage"
+mkdir -p "$V8COV_PARENT" >/dev/null 2>&1 || true
+V8COV_DIR="$(mktemp -d "$V8COV_PARENT/v-XXXXXX")"
+export V8COV_DIR
+
+# Clean previous coverage artifacts (best-effort, but deterministic).
+if [[ -d coverage ]]; then
+  chmod -R u+w coverage >/dev/null 2>&1 || true
+  find coverage -mindepth 1 -maxdepth 1 -print0 2>/dev/null | xargs -0 rm -rf >/dev/null 2>&1 || true
+  rmdir coverage >/dev/null 2>&1 || true
+fi
+mkdir -p coverage >/dev/null 2>&1 || true
+
+# Ensure raw coverage dir exists (unique per verify invocation).
+mkdir -p "$V8COV_DIR" >/dev/null 2>&1 || true
 
 # Preflight housekeeping to reduce ENOSPC risk while preserving full coverage:
 # - prune stale buck-impure temp dirs and dangling result links
@@ -281,8 +358,10 @@ if [[ ! -f "$ROOT_DIR/buck-out/.unified-pnpm-store/path" ]]; then
   fi
 fi
 
-# Best-effort prewarm of heavy toolchains (Go/Clang/WASM). Controlled by VERIFY_PREWARM (default=1).
-if [[ "${VERIFY_PREWARM:-1}" == "1" ]]; then
+# Best-effort prewarm of heavy toolchains (Go/Clang/WASM). Controlled by VERIFY_PREWARM (default=0).
+# Verify already executes a large number of builds/tests, so prewarming by default adds latency without
+# improving determinism. Opt-in when explicitly debugging cold-start behavior.
+if [[ "${VERIFY_PREWARM:-0}" == "1" ]]; then
   if command -v node >/dev/null 2>&1; then
     (cd "$ROOT_DIR" && node "$ROOT_DIR/tools/dev/prewarm-toolchains.ts" >/dev/null 2>&1 || true)
   elif command -v nix >/dev/null 2>&1; then
@@ -291,6 +370,40 @@ if [[ "${VERIFY_PREWARM:-1}" == "1" ]]; then
 fi
 
 # No repo-scoped shared importers; zx tests may scaffold ephemeral importers inside temp repos when needed.
+
+run_merged_coverage_report() {
+  local repo_root="$1"
+  local raw_dir="${V8COV_DIR:-${repo_root}/buck-out/tmp/node-v8-coverage}"
+  if [[ "${COVERAGE:-0}" != "1" ]]; then
+    return 0
+  fi
+  local node_bin="${NODE_BIN:-node}"
+  local c8_js="${repo_root}/node_modules/c8/bin/c8.js"
+  if [[ ! -x "${c8_js}" ]]; then
+    echo "error: coverage enabled but c8 is missing at ${c8_js}" 1>&2
+    echo "hint: run 'i' to ensure node_modules are linked." 1>&2
+    return 2
+  fi
+  # Normalize any temp-repo file:// urls back to the repo root before generating the merged report.
+  NODE_V8_COVERAGE="${raw_dir}" "${node_bin}" "${repo_root}/tools/dev/coverage-raw-normalize.mjs" || true
+  "${node_bin}" "${c8_js}" report \
+    --clean=false \
+    --temp-directory "${raw_dir}" \
+    --reports-dir "${repo_root}/coverage" \
+    --reporter=json-summary \
+    --reporter=lcov \
+    --reporter=html \
+    --merge-async \
+    --extension .ts \
+    --allowExternal \
+    --src "${repo_root}" \
+    --include "**/*.ts" \
+    --exclude "node_modules/**" \
+    --exclude "buck-out/**" \
+    --exclude ".clinic/**" \
+    --exclude "**/*.d.ts"
+  "${node_bin}" "${repo_root}/tools/dev/coverage-normalize.mjs" || true
+}
 
 build_run_array() {
   local PLATFORM_FLAGS=(--target-platforms prelude//platforms:default)
@@ -309,6 +422,11 @@ build_run_array() {
 #!/usr/bin/env bash
 set -euo pipefail
 ISO="v-$$"
+# Record iso in the outer verify lock (if present) and emit a stable marker for status parsing.
+if [[ -n "${BNX_VERIFY_LOCK_DIR:-}" ]]; then
+  echo "${ISO}" > "${BNX_VERIFY_LOCK_DIR}/iso" 2>/dev/null || true
+fi
+echo "[verify] begin iso=${ISO}"
 # Determine repo root for helper scripts spawned from this wrapper.
 LIVE_ROOT="${LIVE_ROOT:-$(pwd)}"
 export LIVE_ROOT
@@ -365,9 +483,37 @@ run_batch() {
   elif command -v gtimeout >/dev/null 2>&1; then
     prefix="gtimeout -k 10s ${tsec}s "
   fi
-  local cmd="${prefix}buck2 --isolation-dir \"$iso\" test --console super --overall-timeout ${tsec}s --target-platforms prelude//platforms:default ${targets[*]} -- --env COVERAGE=\"${COVERAGE:-0}\" --env TEST_NODE_OPTIONS=\"--test-timeout=${tms}\" --env BNX_BUCK_REAPER_STATE_FILE=\"${BNX_BUCK_REAPER_STATE_FILE:-}\""
-  if command -v script >/dev/null 2>&1; then
-    script -q /dev/null bash --noprofile --norc -c "$cmd"
+  local v8cov="${V8COV_DIR:-${LIVE_ROOT}/buck-out/tmp/node-v8-coverage}"
+  mkdir -p "${v8cov}" >/dev/null 2>&1 || true
+  # Console selection:
+  # - auto (default): let Buck pick (superconsole on TTY, simple otherwise)
+  # - super: force superconsole
+  # - simple: force simple line-oriented output (useful for logs/CI)
+  local console_flag=""
+  case "${VERIFY_CONSOLE:-auto}" in
+    auto) console_flag="";;
+    super) console_flag="--console super";;
+    simple) console_flag="--console simple";;
+    *)
+      echo "error: unknown --console value: ${VERIFY_CONSOLE} (expected auto|super|simple)" 1>&2
+      return 2
+      ;;
+  esac
+
+  local cmd="${prefix}buck2 --isolation-dir \"$iso\" test ${console_flag} --overall-timeout ${tsec}s --target-platforms prelude//platforms:default ${targets[*]} -- --env COVERAGE=\"${COVERAGE:-0}\" --env NODE_V8_COVERAGE=\"${v8cov}\" --env TEST_NODE_OPTIONS=\"--test-timeout=${tms}\" --env BNX_BUCK_REAPER_STATE_FILE=\"${BNX_BUCK_REAPER_STATE_FILE:-}\""
+
+  # If a verify log is configured, capture output without forcing buck2 to see a pipe:
+  # 'script' allocates a pty, preserving the superconsole UX in the terminal while recording output.
+  if [[ -n "${BNX_VERIFY_LOG_FILE:-}" ]]; then
+    # Capture output for tailing/status. Note: this makes stdout a pipe, so Buck's console will
+    # behave like non-interactive output; use --console=super if you want to force superconsole.
+    echo "[verify] buck2 test begin iso=${iso} start_s=$(date +%s)" | tee -a "${BNX_VERIFY_LOG_FILE}"
+    set +e
+    bash --noprofile --norc -c "$cmd" 2>&1 | tee -a "${BNX_VERIFY_LOG_FILE}"
+    rc="${PIPESTATUS[0]}"
+    set -e
+    echo "[verify] buck2 test exit iso=${iso} status=${rc} end_s=$(date +%s)" | tee -a "${BNX_VERIFY_LOG_FILE}"
+    return "${rc}"
   else
     eval "$cmd"
   fi
@@ -383,8 +529,8 @@ run_batch() {
     free_gb="$((avail_kb/1024/1024))"
     if (( free_gb < 4 )); then
       echo "[verify] between-batch: very low space (<4GiB); purging repo-local temp dirs..." 1>&2
-      chmod -R u+w "$ROOT_DIR/buck-out/tmp" "$ROOT_DIR/.tmp" >/dev/null 2>&1 || true
-      rm -rf "$ROOT_DIR/buck-out/tmp" "$ROOT_DIR/.tmp" >/dev/null 2>&1 || true
+      chmod -R u+w "$LIVE_ROOT/buck-out/tmp" "$LIVE_ROOT/.tmp" >/dev/null 2>&1 || true
+      rm -rf "$LIVE_ROOT/buck-out/tmp" "$LIVE_ROOT/.tmp" >/dev/null 2>&1 || true
       df_line="$(df -Pk . 2>/dev/null | tail -n1 || true)"
       avail_kb="$(echo "$df_line" | awk '{print $4}')"
       use_pct_raw="$(echo "$df_line" | awk '{print $5}' | tr -d '%')"
@@ -464,9 +610,20 @@ export NO_NODE_MODULES_LINK=1
 # Prefer linking by default; allow caller override
 export NO_NODE_MODULES_LINK="${NO_NODE_MODULES_LINK:-0}"
 if [[ ${#ARGS[@]} -eq 0 ]]; then
-  build_run_array
+build_run_array
 else
   build_run_array "${ARGS[@]}"
 fi
 
-exec_in_dev_shell "${LIVE_ROOT}" "${RUN[@]}"
+set +e
+# This script already re-execs itself into the dev shell near the top. Do not `exec` the test
+# runner here, because we need to run the merged coverage aggregation afterward.
+"${RUN[@]}"
+STATUS="$?"
+set -e
+
+if [[ "${STATUS}" == "0" ]]; then
+  run_merged_coverage_report "${ROOT_DIR}"
+fi
+
+exit "${STATUS}"

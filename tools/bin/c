@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Clear screen + clear scrollback + move cursor to home.
+# Equivalent to: printf '\033[2J\033[3J\033[H'
+#
+# Keep it simple and predictable: always print to stdout (matches the requested one-liner).
+printf '\033[2J\033[3J\033[H'
+
+

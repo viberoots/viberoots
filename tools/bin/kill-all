@@ -1,0 +1,228 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# shell helpers
+# shellcheck source=/dev/null
+. "$(cd "$(dirname "$0")" && pwd)/_env.sh"
+
+LOCK_DIR="${LIVE_ROOT}/buck-out/tmp/verify-lock"
+
+usage() {
+  cat 1>&2 <<'EOF'
+usage:
+  tools/bin/kill-all [--dry-run]
+  tools/bin/k        [--dry-run]
+
+Kills all processes started by the local verification scripts (verify and its descendants).
+
+Notes:
+  - Only kills processes that are (a) running our repo's tools/bin/verify script and (b) their
+    descendant process trees.
+  - Does not kill the parent shell that invoked verify (e.g. "i && b && v").
+  - With --dry-run, prints what would be killed and exits 0.
+EOF
+}
+
+is_verify_process() {
+  local pid="$1"
+  local cmd=""
+  cmd="$(/bin/ps -p "${pid}" -o command= 2>/dev/null || true)"
+  [[ -z "${cmd}" ]] && return 1
+
+  # Canonicalize repo root to avoid non-normalized paths (../..) breaking pgrep matching.
+  local repo_root
+  repo_root="$(cd "${REPO_ROOT}" >/dev/null 2>&1 && pwd || echo "${REPO_ROOT}")"
+  local verify_path="${repo_root}/tools/bin/verify"
+  case "${cmd}" in
+    "${verify_path}"* ) return 0 ;;
+    bash\ "${verify_path}"* ) return 0 ;;
+    /bin/bash\ "${verify_path}"* ) return 0 ;;
+    /usr/bin/env\ bash\ "${verify_path}"* ) return 0 ;;
+    * ) return 1 ;;
+  esac
+}
+
+verify_pids_in_repo() {
+  local repo_root
+  repo_root="$(cd "${REPO_ROOT}" >/dev/null 2>&1 && pwd || echo "${REPO_ROOT}")"
+  local verify_path="${repo_root}/tools/bin/verify"
+  local pids=""
+
+  # Prefer the lock PID if present; it's authoritative for this repo.
+  if [[ -d "${LOCK_DIR}" ]]; then
+    local lock_pid=""
+    lock_pid="$(cat "${LOCK_DIR}/pid" 2>/dev/null || true)"
+    if [[ -n "${lock_pid}" ]] && kill -0 "${lock_pid}" >/dev/null 2>&1; then
+      if is_verify_process "${lock_pid}"; then
+        printf "%s\n" "${lock_pid}"
+        return 0
+      fi
+    fi
+  fi
+
+  if command -v pgrep >/dev/null 2>&1; then
+    pids="$(pgrep -f "${verify_path}" 2>/dev/null || true)"
+    if [[ -n "${pids}" ]]; then
+      while IFS= read -r pid; do
+        [[ -z "${pid}" ]] && continue
+        if is_verify_process "${pid}"; then
+          printf "%s\n" "${pid}"
+        fi
+      done <<< "${pids}"
+      return 0
+    fi
+
+    # Fallback: match generic "tools/bin/verify" and filter to this repo root.
+    pids="$(pgrep -f "tools/bin/verify" 2>/dev/null || true)"
+    if [[ -z "${pids}" ]]; then
+      return 0
+    fi
+    while IFS= read -r pid; do
+      [[ -z "${pid}" ]] && continue
+      if is_verify_process "${pid}"; then
+        printf "%s\n" "${pid}"
+      fi
+    done <<< "${pids}"
+    return 0
+  fi
+
+  # Fallback if pgrep is unavailable: scan ps output.
+  /bin/ps -ax -o pid=,command= | while read -r pid cmd; do
+    [[ -z "${pid}" ]] && continue
+    if [[ "${cmd}" == *"${verify_path}"* ]] && is_verify_process "${pid}"; then
+      printf "%s\n" "${pid}"
+    fi
+  done
+}
+
+collect_descendants() {
+  local root="$1"
+  local -a queue=("${root}")
+  local -a out=()
+
+  if ! command -v pgrep >/dev/null 2>&1; then
+    # Best-effort without pgrep: no descendants.
+    printf "%s\n" ""
+    return 0
+  fi
+
+  while [[ ${#queue[@]} -gt 0 ]]; do
+    local pid="${queue[0]}"
+    queue=("${queue[@]:1}")
+    local children=""
+    children="$(pgrep -P "${pid}" 2>/dev/null || true)"
+    if [[ -z "${children}" ]]; then
+      continue
+    fi
+    while IFS= read -r c; do
+      [[ -z "${c}" ]] && continue
+      out+=("${c}")
+      queue+=("${c}")
+    done <<< "${children}"
+  done
+
+  if [[ ${#out[@]} -gt 0 ]]; then
+    printf "%s\n" "${out[@]}"
+  fi
+}
+
+kill_tree() {
+  local root="$1"
+  local dry_run="$2"
+
+  local -a descendants=()
+  while IFS= read -r line; do
+    [[ -z "${line}" ]] && continue
+    descendants+=("${line}")
+  done < <(collect_descendants "${root}" | awk 'NF' || true)
+  local -a all=("${descendants[@]}" "${root}")
+
+  # De-dupe
+  local -a uniq=()
+  while IFS= read -r line; do
+    [[ -z "${line}" ]] && continue
+    uniq+=("${line}")
+  done < <(printf "%s\n" "${all[@]}" | awk 'NF {print}' | sort -n | uniq)
+
+  if [[ "${dry_run}" == "1" ]]; then
+    echo "would kill verify tree rooted at pid ${root}:"
+    for p in "${uniq[@]}"; do
+      echo "  - ${p}  $(/bin/ps -p "${p}" -o command= 2>/dev/null || true)"
+    done
+    return 0
+  fi
+
+  # TERM children first, then root.
+  for p in "${descendants[@]}"; do
+    kill -TERM "${p}" >/dev/null 2>&1 || true
+  done
+  kill -TERM "${root}" >/dev/null 2>&1 || true
+
+  # Wait a bit, then KILL any remaining.
+  sleep 0.5
+  for p in "${uniq[@]}"; do
+    if kill -0 "${p}" >/dev/null 2>&1; then
+      kill -KILL "${p}" >/dev/null 2>&1 || true
+    fi
+  done
+}
+
+cleanup_stale_lock() {
+  if [[ ! -d "${LOCK_DIR}" ]]; then
+    return 0
+  fi
+  local pid=""
+  pid="$(cat "${LOCK_DIR}/pid" 2>/dev/null || true)"
+  if [[ -z "${pid}" ]]; then
+    rm -rf "${LOCK_DIR}" >/dev/null 2>&1 || true
+    return 0
+  fi
+  if kill -0 "${pid}" >/dev/null 2>&1; then
+    return 0
+  fi
+  rm -rf "${LOCK_DIR}" >/dev/null 2>&1 || true
+}
+
+main() {
+  local dry_run="0"
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --dry-run)
+        dry_run="1"
+        shift
+        ;;
+      -h|--help)
+        usage
+        exit 2
+        ;;
+      *)
+        echo "error: unexpected arg: $1" 1>&2
+        usage
+        exit 2
+        ;;
+    esac
+  done
+
+  local -a pids=()
+  while IFS= read -r pid; do
+    [[ -z "${pid}" ]] && continue
+    pids+=("${pid}")
+  done < <(verify_pids_in_repo | awk 'NF' || true)
+  if [[ "${#pids[@]}" -eq 0 ]]; then
+    repo_root="$(cd "${REPO_ROOT}" >/dev/null 2>&1 && pwd || echo "${REPO_ROOT}")"
+    echo "no verify processes found for repo: ${repo_root}" 1>&2
+    exit 0
+  fi
+
+  for pid in "${pids[@]}"; do
+    kill_tree "${pid}" "${dry_run}"
+  done
+
+  if [[ "${dry_run}" != "1" ]]; then
+    cleanup_stale_lock
+  fi
+}
+
+main "$@"
+
+
