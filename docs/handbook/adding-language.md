@@ -106,6 +106,17 @@ Tip for lockfile-style ecosystems (e.g., Node/PNPM):
 
 Use the shared helpers from `lang/defs_common.bzl` so call sites do not reassemble wiring details:
 
+- Supported importer labels are a cross-language contract surface. The importer string must be:
+  - `.`
+  - `apps/*` (single segment, e.g., `apps/web`)
+  - `libs/*` (single segment, e.g., `libs/core`)
+
+If you change supported importer roots, update both implementations and keep the parity guardrail passing:
+
+- `tools/lib/importers.ts:isSupportedImporterLabel`
+- `lang/lockfile_labels.bzl` (lockfile label validation)
+- `tools/tests/lib/importer-support.parity.test.ts` (TS ↔ Starlark parity matrix)
+
 - `ensure_single_lockfile_label(kwargs, lockfile_label)` enforces exactly one importer-scoped label (`lockfile:<path>#<importer>`) with stable dedupe and canonical error text.
 - `include_importer_patches_from_labels(kwargs, lang, into = "srcs")` derives the importer and includes importer-local patches deterministically into a supported input attribute (commonly `srcs` or `resources` depending on the rule shape).
 - For importer-scoped, **Nix-calling genrule-style** macros, use:

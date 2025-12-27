@@ -16,9 +16,21 @@ test("node exporter does not auto-attach lockfile labels for unsupported importe
       "utf8",
     );
 
+    await fs.mkdirp(path.join(tmp, "apps", "foo", "bar"));
+    await fs.outputFile(
+      path.join(tmp, "apps", "foo", "bar", "pnpm-lock.yaml"),
+      'lockfileVersion: "9.0"\nimporters:\n  apps/foo/bar:\n    dependencies: {}\npackages: {}\n',
+      "utf8",
+    );
+
     const simNodes = [
       {
         name: "//services/api:bundle",
+        rule_type: "js_binary",
+        labels: ["lang:node", "kind:bundle"],
+      },
+      {
+        name: "//apps/foo/bar:bundle",
         rule_type: "js_binary",
         labels: ["lang:node", "kind:bundle"],
       },
@@ -47,9 +59,11 @@ test("node exporter does not auto-attach lockfile labels for unsupported importe
 
       const { nodes } = await readCompositeGraph({ graphPath: outPath });
       const byName = new Map(nodes.map((n: any) => [n?.name, n]));
-      const n = byName.get("//services/api:bundle");
-      const labels: string[] = (n?.labels || []) as string[];
-      assert.ok(!labels.some((l) => l.startsWith("lockfile:")));
+      for (const name of ["//services/api:bundle", "//apps/foo/bar:bundle"]) {
+        const n = byName.get(name);
+        const labels: string[] = (n?.labels || []) as string[];
+        assert.ok(!labels.some((l) => l.startsWith("lockfile:")));
+      }
     }
 
     {

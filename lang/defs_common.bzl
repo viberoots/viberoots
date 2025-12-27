@@ -7,6 +7,7 @@ load(
     _importer_from_labels = "importer_from_labels",
     _importer_from_labels_probe = "importer_from_labels_probe",
     _lockfile_label_parse_probe = "lockfile_label_parse_probe",
+    _supported_importer_label_probe = "supported_importer_label_probe",
 )
 load("//lang:nixpkg_labels.bzl", _append_nixpkg_labels = "append_nixpkg_labels", _normalize_nix_attr = "normalize_nix_attr", _normalize_nix_attr_probe = "normalize_nix_attr_probe")
 load(
@@ -88,6 +89,7 @@ ensure_single_lockfile_label = _ensure_single_lockfile_label
 importer_from_labels = _importer_from_labels
 importer_from_labels_probe = _importer_from_labels_probe
 lockfile_label_parse_probe = _lockfile_label_parse_probe
+supported_importer_label_probe = _supported_importer_label_probe
 
 append_patch_srcs = _append_patch_srcs
 append_patch_inputs = _append_patch_inputs

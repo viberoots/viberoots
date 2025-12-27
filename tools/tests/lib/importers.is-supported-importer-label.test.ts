@@ -7,8 +7,12 @@ test("isSupportedImporterLabel matches '.', apps/*, libs/* only", () => {
   assert.equal(isSupportedImporterLabel("."), true);
   assert.equal(isSupportedImporterLabel("apps/web"), true);
   assert.equal(isSupportedImporterLabel("libs/core"), true);
+  assert.equal(isSupportedImporterLabel("./apps/web"), true);
 
   assert.equal(isSupportedImporterLabel("third_party"), false);
   assert.equal(isSupportedImporterLabel("third_party/pnpm-lock.yaml"), false);
   assert.equal(isSupportedImporterLabel("packages/web"), false);
+  assert.equal(isSupportedImporterLabel("apps/web/sub"), false);
+  assert.equal(isSupportedImporterLabel("libs/core/sub"), false);
+  assert.equal(isSupportedImporterLabel("../apps/web"), false);
 });

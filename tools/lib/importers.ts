@@ -43,7 +43,7 @@ export function computeImporterLabel(lockfilePath: string): string {
 export function isWorkspaceImporterPath(importer: string): boolean {
   const p = toPosixPath(importer);
   if (p === ".") return false;
-  return /^(apps|libs)\//.test(p);
+  return /^(apps|libs)\/[^/]+$/.test(p);
 }
 
 /**
@@ -59,7 +59,7 @@ export function isWorkspaceImporterPath(importer: string): boolean {
 export function isSupportedImporterLabel(importer: string): boolean {
   const p = toPosixPath(importer);
   if (p === ".") return true;
-  return /^(apps|libs)\//.test(p);
+  return /^(apps|libs)\/[^/]+$/.test(p);
 }
 
 /**

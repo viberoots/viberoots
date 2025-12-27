@@ -180,7 +180,10 @@ The validation rules are:
 
 ### Regression guards
 
+These tests are the guardrails for this cross-language contract. If you change importer support rules or label parsing behavior, update the matrix and keep these passing.
+
 - `tools/tests/labels/lockfile-label.parity.test.ts`
+- `tools/tests/lib/importer-support.parity.test.ts`
 
 ### Common leak patterns
 

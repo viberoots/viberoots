@@ -29,7 +29,11 @@ def _dirname_posix(path_part):
 def _is_supported_importer_label(importer):
     if importer == ".":
         return True
-    return importer.startswith("apps/") or importer.startswith("libs/")
+    if importer.startswith("apps/") or importer.startswith("libs/"):
+        # Supported workspace importers are single-segment roots: apps/<name>, libs/<name>.
+        # Nested importers like apps/foo/bar are intentionally unsupported.
+        return importer.count("/") == 1 and importer.split("/")[1] != ""
+    return False
 
 def _parse_importer_scoped_lockfile_label(label):
     if not (isinstance(label, str) and label.startswith("lockfile:")):
@@ -146,6 +150,34 @@ def lockfile_label_parse_probe(name, lockfile_label):
     _lockfile_label_parse_probe(
         name = name,
         lockfile_label = lockfile_label,
+        out = out,
+    )
+
+def _supported_importer_label_probe_impl(ctx):
+    imp = ctx.attrs.importer
+    if not isinstance(imp, str):
+        fail("supported_importer_label_probe requires importer to be a string; got: %s" % type(imp))
+    supported = _is_supported_importer_label(imp)
+    out = ctx.actions.declare_output(ctx.attrs.out)
+    ctx.actions.write(
+        out,
+        "{\"importer\":\"%s\",\"supported\":%s}\n" % (imp, ("true" if supported else "false")),
+    )
+    return [DefaultInfo(default_output = out)]
+
+_supported_importer_label_probe = rule(
+    impl = _supported_importer_label_probe_impl,
+    attrs = {
+        "importer": attrs.string(),
+        "out": attrs.string(),
+    },
+)
+
+def supported_importer_label_probe(name, importer):
+    out = "supported_importer_label_probe.json"
+    _supported_importer_label_probe(
+        name = name,
+        importer = importer,
         out = out,
     )
 
