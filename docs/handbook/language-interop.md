@@ -22,6 +22,8 @@ Before you get into cgo-specific wiring, it helps to know one macro convenience 
 - **`<bin>_pkg`**: a Go library target used as the `library` for tests. It uses the same wiring contracts as `nix_go_library` (provider edges + package-local patch inputs + standard label stamping).
 - **`<bin>_test`**: a Go test target that compiles and runs the `cmd/<bin>` tests without requiring you to edit `TARGETS` after adding new test files.
 
+Implementation detail: the helper-target synthesis lives in `go/private/auto_tests.bzl` and is called by `go/defs.bzl`. Do not duplicate this logic in other macros.
+
 1. Create or use a C/C++ library target (in-repo):
 
 ```python

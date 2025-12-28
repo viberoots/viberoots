@@ -6,6 +6,7 @@ load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
 load("//lang:defs_common.bzl", "wire_package_local_planner_visible_stub", "wire_planner_visible_inputs")
 load("//go/private:nix_build_wasm.bzl", "go_nix_build_wasm")
 load("//go/private:cgo_wiring.bzl", "apply_go_rule_stable_defaults", "apply_go_tuple_labels", "configure_cgo_kwargs")
+load("//go/private:auto_tests.bzl", "maybe_autowire_go_binary_test", "maybe_autowire_go_library_test")
 
 
 def nix_go_library(name, **kwargs):
@@ -25,17 +26,7 @@ def nix_go_library(name, **kwargs):
     configure_cgo_kwargs(kwargs, wiring.nixpkg_deps, repo_cgo_deps)
     go_library(name = name, deps = wiring.deps, **kwargs)
 
-    # Auto-wire a go_test target if *_test.go files exist alongside the library.
-    # This keeps scaffolds simple: adding a test file is enough; no TARGETS edits.
-    # We mirror the scaffolded pattern: tests live under pkg/** for libs.
-    tests = native.glob(["pkg/**/*_test.go"]) or []
-    if len(tests) > 0:
-        # Bind tests to the library to include sources in compilation.
-        nix_go_test(
-            name = name + "_test",
-            library = ":%s" % name,
-            srcs = tests,
-        )
+    maybe_autowire_go_library_test(nix_go_test = nix_go_test, name = name)
 
 
 def nix_go_binary(name, **kwargs):
@@ -64,33 +55,20 @@ def nix_go_binary(name, **kwargs):
     apply_go_rule_stable_defaults(kwargs)
     go_binary(name = name, deps = wiring.deps, **kwargs)
 
-    # Auto-wire a go_test target for binaries if *_test.go exists under cmd/<name>/**
-    # This allows CLI packages to have local tests with no TARGETS edits.
-    tests = native.glob(["cmd/%s/**/*_test.go" % name]) or []
-    if len(tests) > 0:
-        # Synthesize a package library for tests; binaries don't expose GoTestInfo
-        pkg_srcs = native.glob(["cmd/%s/**/*.go" % name], exclude=["**/*_test.go"]) or []
-        if len(pkg_srcs) == 0:
-            pkg_srcs = native.glob(["cmd/**/*.go"], exclude=["**/*_test.go"]) or []
-        nix_go_library(
-            name = name + "_pkg",
-            srcs = pkg_srcs,
-            deps = base_deps,
-            extra_module_providers = extra_module_providers,
-            build_tags = build_tags,
-            goos = goos,
-            goarch = goarch,
-            cgo_enabled = cgo_enabled,
-            nixpkg_deps = wiring.nixpkg_deps,
-            repo_cgo_deps = repo_cgo_deps,
-            local_patch_dirs = wiring.local_patch_dirs,
-            visibility = ["PUBLIC"],
-        )
-        nix_go_test(
-            name = name + "_test",
-            library = ":%s" % (name + "_pkg"),
-            srcs = tests,
-        )
+    maybe_autowire_go_binary_test(
+        nix_go_library = nix_go_library,
+        nix_go_test = nix_go_test,
+        name = name,
+        base_deps = base_deps,
+        extra_module_providers = extra_module_providers,
+        build_tags = build_tags,
+        goos = goos,
+        goarch = goarch,
+        cgo_enabled = cgo_enabled,
+        nixpkg_deps = wiring.nixpkg_deps,
+        repo_cgo_deps = repo_cgo_deps,
+        local_patch_dirs = wiring.local_patch_dirs,
+    )
 
 
 def nix_go_test(name, **kwargs):

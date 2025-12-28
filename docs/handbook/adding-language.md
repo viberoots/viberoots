@@ -241,7 +241,7 @@ Stamping belongs in the macro. If your macro synthesizes helper targets (for exa
 
 - Go implementation in this repo:
   - `tools/nix/templates/go.nix`
-  - `go/defs.bzl` and `lang/defs_common.bzl`
+  - `go/defs.bzl`, `go/private/auto_tests.bzl`, and `lang/defs_common.bzl`
   - `tools/buck/providers/go.ts` and `tools/buck/providers/index.ts`
   - Node provider generator: `tools/buck/providers/node.ts` (invoked by `tools/buck/sync-providers.ts`)
   - `tools/buck/gen-auto-map.ts`

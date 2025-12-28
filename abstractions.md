@@ -49,6 +49,7 @@ This contract ensures that a target’s language and kind are visible in the exp
 For language macros, stamping is the macro’s responsibility. Call sites should not need to remember `lang:*` or `kind:*` labels.
 
 - Go: `nix_go_test(...)` stamps `lang:go` and `kind:test` (auto-wired `*_test` targets do not pass a literal label list).
+  - Implementation detail: `go/private/auto_tests.bzl` is the canonical implementation of Go auto-wired helper targets (called by `go/defs.bzl`).
 
 ### Canonical implementations
 
