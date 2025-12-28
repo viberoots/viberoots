@@ -3,3 +3,4 @@ export { stripAnsiAndCrs } from "./verify-log-status/types.ts";
 export { parseFinalSummary } from "./verify-log-status/summary.ts";
 export { deriveInProgressCounts } from "./verify-log-status/derived.ts";
 export { computeVerifyStatusFromLogText } from "./verify-log-status/compute.ts";
+export { formatVerifyStatusJsonLine, formatVerifyStatusText } from "./verify-log-status/format.ts";

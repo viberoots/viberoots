@@ -3,7 +3,11 @@ import fsp from "node:fs/promises";
 import type { TailLogArgs } from "./args.ts";
 import { resolveLatest, resolvePid, pidAliveWithSignature, pidStartSignature } from "./resolve.ts";
 import type { Resolution } from "./resolve.ts";
-import { computeVerifyStatusFromLogText } from "../../lib/verify-log-status.ts";
+import {
+  computeVerifyStatusFromLogText,
+  formatVerifyStatusJsonLine,
+  formatVerifyStatusText,
+} from "../../lib/verify-log-status.ts";
 
 function emptyNdjson(pid: number, error: string): string {
   return JSON.stringify({
@@ -28,44 +32,6 @@ async function computeStatusFromLogPath(logPath: string, pid: number) {
   return computeVerifyStatusFromLogText({ logPath, pid: pid || undefined, text });
 }
 
-function formatStatusJsonLine(st: ReturnType<typeof computeVerifyStatusFromLogText>): string {
-  // Stable JSON keys for scripting.
-  const out = {
-    pid: st.pid,
-    pass: st.pass,
-    fail: st.fail,
-    fatal: st.fatal,
-    skip: st.skip,
-    build_failure: st.buildFailure,
-    remaining: st.remaining ?? null,
-    failed: st.failed,
-    done: st.done,
-    elapsed: st.elapsed ?? null,
-    log: st.logPath,
-    source: st.source,
-  };
-  return JSON.stringify(out);
-}
-
-function formatStatusText(st: ReturnType<typeof computeVerifyStatusFromLogText>): string {
-  const elapsed = st.elapsed ? st.elapsed : "?";
-  const remaining = st.remaining !== undefined ? String(st.remaining) : "?";
-  const anyFailures = st.fail > 0 || st.fatal > 0 || st.buildFailure > 0;
-  const testsLabel = st.done ? "Tests finished:" : "Tests so far:";
-  const header = `Time elapsed: ${elapsed}\n${testsLabel}   Pass ${st.pass}. Fail ${st.fail}. Fatal ${st.fatal}. Skip ${st.skip}. Build failure ${st.buildFailure}\nTests remaining: ${remaining}\nLog: ${st.logPath}`;
-  if (!anyFailures || st.failed.length === 0) return header;
-  const cap = 10;
-  const shown = st.failed.slice(0, cap);
-  const lines = [
-    header,
-    "",
-    `Failing tests (${st.failed.length}):`,
-    ...shown.map((t) => `  - ${t}`),
-  ];
-  if (st.failed.length > cap) lines.push(`  ... and ${st.failed.length - cap} more`);
-  return lines.join("\n");
-}
-
 async function resolveForArgs(args: TailLogArgs): Promise<Resolution> {
   if (args.selection.kind === "latest") return await resolveLatest();
   return await resolvePid(args.selection.pid);
@@ -80,7 +46,11 @@ export async function runStatusOnce(args: TailLogArgs): Promise<void> {
   }
   try {
     const st = await computeStatusFromLogPath(res.logPath, res.pid || 0);
-    const out = args.json ? formatStatusJsonLine(st) : formatStatusText(st);
+    const out = args.json
+      ? formatVerifyStatusJsonLine(st)
+      : formatVerifyStatusText(st, {
+          isTty: Boolean(process.stdout.isTTY) || (process.env.FORCE_COLOR || "") === "1",
+        });
     process.stdout.write(String(out).trimEnd() + "\n");
     process.exit(0);
   } catch (e: any) {
@@ -115,7 +85,7 @@ export async function renderStatusWatchLoop(args: TailLogArgs): Promise<void> {
       if (json) {
         try {
           const st = await computeStatusFromLogPath(res.logPath, pid);
-          process.stdout.write(formatStatusJsonLine(st) + "\n");
+          process.stdout.write(formatVerifyStatusJsonLine(st) + "\n");
         } catch {
           process.stdout.write(emptyNdjson(pid, "log file missing") + "\n");
         }
@@ -123,7 +93,9 @@ export async function renderStatusWatchLoop(args: TailLogArgs): Promise<void> {
         let out = "";
         try {
           const st = await computeStatusFromLogPath(res.logPath, pid);
-          out = formatStatusText(st);
+          out = formatVerifyStatusText(st, {
+            isTty: isTty || (process.env.FORCE_COLOR || "") === "1",
+          });
         } catch {
           out =
             "Time elapsed: ?\nTests so far:   Pass 0. Fail 0. Fatal 0. Skip 0. Build failure 0\nLog: (missing)\n(error: log file missing; waiting...)";
