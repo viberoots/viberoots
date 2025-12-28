@@ -1,31 +1,41 @@
 def nix_bootstrap_env_core():
     return (
         "set -euo pipefail; "
+        + "export TMP=\"${TMPDIR:-/tmp}\"; "
         + "export WORKSPACE_ROOT=\"${WORKSPACE_ROOT:-}\"; "
         + "if [ -z \"${WORKSPACE_ROOT:-}\" ] && [ -n \"${BUCK_TEST_SRC:-}\" ]; then export WORKSPACE_ROOT=\"$BUCK_TEST_SRC\"; fi; "
         + "if [ -z \"${WORKSPACE_ROOT:-}\" ]; then "
-        + "  if [ -f \"$(pwd)/tools/buck/graph.json\" ]; then "
-        + "    export WORKSPACE_ROOT=\"$(pwd)\"; "
+        + "  if [ -f \"$PWD/tools/buck/graph.json\" ]; then "
+        + "    export WORKSPACE_ROOT=\"$PWD\"; "
         + "  else "
-        + "    CAND=\"$(pwd)\"; "
+        + "    CAND=\"$PWD\"; "
         + "    while [ \"$CAND\" != \"/\" ]; do "
         + "      if [ -f \"$CAND/tools/buck/graph.json\" ]; then export WORKSPACE_ROOT=\"$CAND\"; break; fi; "
-        + "      CAND=\"$(dirname \"$CAND\")\"; "
+        + "      CAND=\"${CAND%/*}\"; "
+        + "      if [ -z \"$CAND\" ]; then CAND=\"/\"; fi; "
         + "    done; "
         + "  fi; "
         + "fi; "
-        + "export WORKSPACE_ROOT=\"${WORKSPACE_ROOT:-$(pwd)}\"; "
+        + "export WORKSPACE_ROOT=\"${WORKSPACE_ROOT:-$PWD}\"; "
         + "FLK_ROOT=\"${FLK_ROOT:-}\"; "
         + "if [ -z \"${FLK_ROOT:-}\" ] || [ ! -f \"$FLK_ROOT/flake.nix\" ]; then "
-        + "  FLK_ROOT=\"${WORKSPACE_ROOT:-${REPO_ROOT:-$(pwd)}}\"; "
+        + "  FLK_ROOT=\"${WORKSPACE_ROOT:-${REPO_ROOT:-$PWD}}\"; "
         + "  if [ ! -f \"$FLK_ROOT/flake.nix\" ]; then "
-        + "    SEARCH_FROM=\"${WORKSPACE_ROOT:-${REPO_ROOT:-$(pwd)}}\"; "
+        + "    SEARCH_FROM=\"${WORKSPACE_ROOT:-${REPO_ROOT:-$PWD}}\"; "
         + "    CAND=\"$SEARCH_FROM\"; "
-        + "    while [ \"$CAND\" != \"/\" ] && [ ! -f \"$CAND/flake.nix\" ]; do CAND=\"$(dirname \"$CAND\")\"; done; "
+        + "    while [ \"$CAND\" != \"/\" ] && [ ! -f \"$CAND/flake.nix\" ]; do "
+        + "      CAND=\"${CAND%/*}\"; "
+        + "      if [ -z \"$CAND\" ]; then CAND=\"/\"; fi; "
+        + "    done; "
         + "    FLK_ROOT=\"$CAND\"; "
         + "  fi; "
         + "  if [ ! -f \"$FLK_ROOT/flake.nix\" ]; then "
-        + "    ROOT_GIT=\"$(git -C \"${REPO_ROOT:-$WORKSPACE_ROOT}\" rev-parse --show-toplevel 2>/dev/null || echo \"${REPO_ROOT:-$WORKSPACE_ROOT}\")\"; "
+        + "    ROOT_GIT_FILE=\"$TMP/bnx-flk-root.git\"; "
+        + "    if git -C \"${REPO_ROOT:-$WORKSPACE_ROOT}\" rev-parse --show-toplevel > \"$ROOT_GIT_FILE\" 2>/dev/null; then "
+        + "      ROOT_GIT=\"\"; read -r ROOT_GIT < \"$ROOT_GIT_FILE\" 2>/dev/null || true; "
+        + "    else "
+        + "      ROOT_GIT=\"${REPO_ROOT:-$WORKSPACE_ROOT}\"; "
+        + "    fi; "
         + "    FLK_ROOT=\"$ROOT_GIT\"; "
         + "  fi; "
         + "fi; "
@@ -47,7 +57,8 @@ def nix_bootstrap_env_pnpm_store():
         + "fi; "
         + "if [ -f \"$FLK_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
         + "  export NIX_USE_PREFETCHED_PNPM_STORE=1; "
-        + "  export LOCAL_PNPM_STORE=\"$(cat \"$FLK_ROOT/buck-out/.unified-pnpm-store/path\" 2>/dev/null || true)\"; "
+        + "  LOCAL_PNPM_STORE=\"\"; read -r LOCAL_PNPM_STORE < \"$FLK_ROOT/buck-out/.unified-pnpm-store/path\" 2>/dev/null || true; "
+        + "  export LOCAL_PNPM_STORE; "
         + "fi; "
     )
 
@@ -83,6 +94,9 @@ def nix_cmd_prefix(
     boot = nix_bootstrap_env_core()
     if include_pnpm_store:
         boot = boot + nix_bootstrap_env_pnpm_store()
+    # Back-compat: historically this helper escaped shell command substitutions ($(...)) so
+    # callers could cquery cmd strings without Buck interpreting them as macros.
+    # Current bootstraps avoid $(...) entirely, but keep the switch for existing call sites.
     if escape_cmd_subst:
         boot = escape_buck_cmd_subst(boot)
     return boot + nix_timeout_wrapper_var(var_name = timeout_var, default_sec = timeout_sec)
@@ -126,6 +140,7 @@ def nix_calling_genrule_nix_build_out_path_prefix(
         include_pnpm_store = False,
         source_workspace_root_env = False,
         skip_require_unified_pnpm_store = False,
+        impure = False,
         debug_env_var = "BNX_NIX_CALL_DEBUG"):
     """
     Convenience helper for the common pattern:
@@ -138,19 +153,31 @@ def nix_calling_genrule_nix_build_out_path_prefix(
         source_workspace_root_env = source_workspace_root_env,
         skip_require_unified_pnpm_store = skip_require_unified_pnpm_store,
         debug_env_var = debug_env_var,
-    ) + nix_build_out_path_cmd(flake_attr, timeout_var = timeout_var)
+    ) + nix_build_out_path_cmd(flake_attr, timeout_var = timeout_var, impure = impure)
 
 
-def nix_build_out_path_cmd(flake_attr, timeout_var = "TIMEOUT"):
+def nix_build_out_path_cmd(flake_attr, timeout_var = "TIMEOUT", impure = False):
     tout = ""
     if isinstance(timeout_var, str) and timeout_var != "":
         tout = "$%s " % timeout_var
+    imp = "--impure " if impure else ""
     return (
-        "outPath=$$("
-        + tout
-        + ("nix build %s --accept-flake-config --no-link --print-out-paths | tail -n1" % flake_attr)
-        + "); "
+        "OUT_PATHS_FILE=\"$TMP/bnx-nix-outpaths.txt\"; "
+        + (tout + ("nix build %s --accept-flake-config %s--no-link --print-out-paths > \"$OUT_PATHS_FILE\"; " % (flake_attr, imp)))
+        + "OUT_LAST_FILE=\"$OUT_PATHS_FILE.last\"; "
+        + "tail -n1 \"$OUT_PATHS_FILE\" > \"$OUT_LAST_FILE\"; "
+        + "outPath=\"\"; read -r outPath < \"$OUT_LAST_FILE\" 2>/dev/null || true; "
+        + "test -n \"$outPath\"; "
     )
+
+
+def nix_calling_env_export_buck_graph_json(graph_json_path = "$WORKSPACE_ROOT/tools/buck/graph.json"):
+    return ("export BUCK_GRAPH_JSON=\"%s\"; " % graph_json_path)
+
+
+def nix_calling_env_export_nix_pnpm_fetch_timeout(default_sec = 600):
+    v = default_sec if isinstance(default_sec, int) and default_sec > 0 else 600
+    return ("export NIX_PNPM_FETCH_TIMEOUT=\"${NIX_PNPM_FETCH_TIMEOUT:-%d}\"; " % v)
 
 
 

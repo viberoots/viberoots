@@ -46,13 +46,19 @@ test("nix_node_cli_bin(bundle=True) cmd prefixes nix bootstrap env and timeout w
       out.includes("require-unified-pnpm-store.ts") || out.includes(".unified-pnpm-store/path"),
       "expected nix_bootstrap_env_pnpm_store() fragments in cmd",
     );
-    // Should declare TIMEOUT wrapper and use it to wrap the bundler invocation
+    // Should declare TIMEOUT wrapper and use it to wrap the nix build invocation
     assert.ok(out.includes("TIMEOUT="), "expected TIMEOUT= assignment in cmd");
     const idxTimeout = out.indexOf("TIMEOUT");
-    const idxNode = out.indexOf("node --experimental-strip-types");
+    const idxNix = out.indexOf("nix build");
     assert.ok(
-      idxTimeout >= 0 && idxNode > idxTimeout,
-      "expected TIMEOUT to precede bundler invocation",
+      idxTimeout >= 0 && idxNix > idxTimeout,
+      "expected TIMEOUT to precede nix build invocation",
+    );
+
+    // Enforce "no out-links" policy and standard outPath capture flags (capture mechanism may evolve)
+    assert.ok(
+      out.includes("--no-link --print-out-paths"),
+      "expected nix build to use --no-link --print-out-paths",
     );
   });
 });

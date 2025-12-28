@@ -53,10 +53,7 @@ test("nix_shell bootstrap split: core is language-agnostic; PNPM store is opt-in
       !/(^|[^$])\$\(/.test(outCore),
       "expected escape_buck_cmd_subst to remove unescaped $(...) command substitutions",
     );
-    assert.ok(
-      outCore.includes("$$("),
-      "expected escape_buck_cmd_subst to produce $$( for cmd subs",
-    );
+    assert.ok(!outCore.includes("$$("), "expected core bootstrap to avoid $$(...) entirely");
     assert.ok(
       outCore.includes("export WORKSPACE_ROOT=") || outCore.includes("FLK_ROOT="),
       "expected core bootstrap to include WORKSPACE_ROOT/FLK_ROOT logic",
@@ -72,10 +69,7 @@ test("nix_shell bootstrap split: core is language-agnostic; PNPM store is opt-in
       !/(^|[^$])\$\(/.test(outPnpm),
       "expected escape_buck_cmd_subst to remove unescaped $(...) command substitutions",
     );
-    assert.ok(
-      outPnpm.includes("$$("),
-      "expected escape_buck_cmd_subst to produce $$( for cmd subs",
-    );
+    assert.ok(!outPnpm.includes("$$("), "expected pnpm bootstrap to avoid $$(...) entirely");
     assert.ok(
       outPnpm.includes("export WORKSPACE_ROOT=") || outPnpm.includes("FLK_ROOT="),
       "expected pnpm bootstrap to include core bootstrap fragments",

@@ -55,10 +55,9 @@ test("node_webapp cmd prefixes nix bootstrap env and timeout wrapper", async () 
       out.includes("--no-link --print-out-paths"),
       "expected nix build to use --no-link --print-out-paths",
     );
-    assert.ok(out.includes("| tail -n1"), "expected nix build outPath capture to use `| tail -n1`");
     assert.ok(
-      out.includes("outPath=$$($TIMEOUT nix build"),
-      "expected standardized outPath=$$($TIMEOUT nix build ...) structure",
+      out.includes("OUT_PATHS_FILE=") || out.includes("bnx-nix-outpaths.txt"),
+      "expected outPath capture to use a deterministic temp file",
     );
   });
 });

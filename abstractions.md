@@ -400,6 +400,10 @@ Importer-scoped wrappers should use a standardized wiring sequence. When a wrapp
 ### Canonical implementations
 
 - **Starlark**: `lang/defs_common.bzl:prepare_importer_nix_calling_genrule_wiring`
+- **Starlark (command assembly)**: `lang/nix_shell.bzl`
+  - `nix_calling_genrule_bootstrap(...)` (root derivation + optional `workspace-root.env` sourcing)
+  - `nix_calling_genrule_nix_build_out_path_prefix(...)` (canonical `nix build --no-link --print-out-paths` outPath capture)
+  - `nix_calling_env_export_buck_graph_json(...)` and `nix_calling_env_export_nix_pnpm_fetch_timeout(...)` (standard env exports used by Node Nix-calling macros)
 
 ### Common leak patterns
 
@@ -408,6 +412,7 @@ These are the usual ways this leaks:
 - A wrapper forgets the dict-safe branch and breaks when `srcs` is a map.
 - A wrapper uses a different key prefix scheme for synthetic entries, and collisions become nondeterministic.
 - A wrapper shells out to Nix but forgets to attach global inputs as real action inputs, so changes to global inputs do not invalidate.
+- A Node macro hand-rolls `nix build ... --no-link --print-out-paths` command assembly or drifts on env exports. Use the `lang/nix_shell.bzl` helpers so `node_webapp` and bundled `nix_node_cli_bin` stay consistent.
 
 ### Dict-safe synthetic key prefixes
 

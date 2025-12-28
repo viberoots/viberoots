@@ -17,7 +17,7 @@ Node macros include importer-local patches via `native.glob(...)`. Because Buck 
   - Requires exactly one importer-scoped lockfile label: `lockfile:<path>#<importer>`.
 
 - **`nix_node_cli_bin(..., bundle=True)`** (`node/defs_nix.bzl`)
-  - Produces a single-file, shebanged bundle for a Node CLI via the bundler shim.
+  - Produces a single-file, shebanged bundle for a Node CLI by building the per-importer flake attr and copying the emitted bundle to `$OUT`.
   - Requires exactly one importer-scoped lockfile label: `lockfile:<path>#<importer>`.
   - Bundled mode uses a fixed entry today: **`src/index.ts`**.
     - If `entry` is set while `bundle=True`, it must be `src/index.ts` (or omitted).
@@ -40,6 +40,9 @@ When a Node macro assembles a shell command that invokes Nix:
   - optional `tools/buck/workspace-root.env` sourcing (for temp repos and sandboxed actions)
   - `WORKSPACE_ROOT`/`REPO_ROOT`/`FLK_ROOT` derivation and validation
   - unified PNPM store handling (`include_pnpm_store=True`) and optional enforcement skip (bundling scenarios)
+- **Required env exports**: use the small helpers in `//lang:nix_shell.bzl` so call sites don’t drift on env conventions:
+  - `nix_calling_env_export_buck_graph_json(...)`
+  - `nix_calling_env_export_nix_pnpm_fetch_timeout(...)`
 - **Out path capture**: use `nix_calling_genrule_nix_build_out_path_prefix(...)` (or `nix_build_out_path_cmd(...)` for rare cases) from `//lang:nix_shell.bzl` to capture a derivation output path without creating GC roots:
   - always use `nix build --no-link --print-out-paths | tail -n1`
   - never use `--out-link`
