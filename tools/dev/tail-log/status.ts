@@ -38,13 +38,14 @@ async function runVerifyLogStatusOnce(
     stdio: "pipe",
     env: { ...process.env, DIRENV_LOG_FORMAT: "" },
   });
-  return (out.stdout || "") + (out.stderr || "");
+  // Keep stdout machine-readable in --json mode. Node may emit warnings to stderr even when
+  // --disable-warning is set, and mixing stderr into stdout breaks NDJSON consumers.
+  return json ? out.stdout || "" : (out.stdout || "") + (out.stderr || "");
 }
 
 async function resolveForArgs(args: TailLogArgs): Promise<Resolution> {
-  return args.selection.kind === "latest"
-    ? await resolveLatest()
-    : await resolvePid(args.selection.pid);
+  if (args.selection.kind === "latest") return await resolveLatest();
+  return await resolvePid(args.selection.pid);
 }
 
 export async function runStatusOnce(args: TailLogArgs): Promise<void> {
