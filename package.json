@@ -10,8 +10,11 @@
     "dev:clear-overrides": "tools/dev/clear-overrides.ts",
     "fmt": "prettier -w .",
     "fmt:check": "prettier -c .",
-    "lint": "eslint . --ext .ts --max-warnings=0 --ignore-pattern coverage --ignore-pattern .clinic",
-    "lint:fix": "eslint . --ext .ts --fix",
+    "fmt:write": "prettier -w",
+    "lint:eslint": "eslint . --ext .ts --max-warnings=0 --ignore-pattern coverage --ignore-pattern .clinic",
+    "lint:eslint:fix": "eslint . --ext .ts --fix --max-warnings=0 --ignore-pattern coverage --ignore-pattern .clinic",
+    "lint": "pnpm -s lint:eslint && pnpm -s fmt:check",
+    "lint:fix": "pnpm -s lint:eslint:fix && pnpm -s fmt",
     "prepare": "husky",
     "coverage:summary": "tools/dev/coverage-summary.ts",
     "coverage:build": "node tools/dev/coverage-raw-normalize.mjs && node ./node_modules/c8/bin/c8.js report --clean=false --temp-directory coverage/raw --reports-dir coverage --reporter=json-summary --reporter=lcov --reporter=html --merge-async --extension .ts --allowExternal --src . --include '**/*.ts' --exclude 'node_modules/**' --exclude 'buck-out/**' --exclude '.clinic/**' --exclude '**/*.d.ts' && node tools/dev/coverage-normalize.mjs",
@@ -20,11 +23,11 @@
   },
   "lint-staged": {
     "**/*.{ts,tsx}": [
-      "eslint --fix",
-      "prettier -w"
+      "pnpm -s lint:eslint:fix --",
+      "pnpm -s fmt:write --"
     ],
     "**/*.{js,mjs,cjs,md,json,yml,yaml}": [
-      "prettier -w"
+      "pnpm -s fmt:write --"
     ]
   },
   "devDependencies": {
