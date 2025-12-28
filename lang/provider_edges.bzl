@@ -62,9 +62,21 @@ def strip_provider_targets(deps, provider_prefix = "//third_party/providers:"):
         return []
     if not isinstance(deps, list):
         fail("strip_provider_targets: deps must be a list; got: %s" % deps)
+    if not isinstance(provider_prefix, str) or provider_prefix == "":
+        fail("strip_provider_targets: provider_prefix must be a non-empty string; got: %s" % provider_prefix)
+    # Normalize for cell-prefixed labels by dropping the leading "//" from the prefix.
+    # Example: "//third_party/providers:" -> "third_party/providers:"
+    suffix = provider_prefix[2:] if provider_prefix.startswith("//") else provider_prefix
     out = []
     for d in deps:
-        if isinstance(d, str) and d.startswith(provider_prefix):
+        if isinstance(d, str):
+            # Accept both cell-less and cell-prefixed labels (e.g. "//..." and "root//...").
+            # Buck often renders labels with a cell prefix in query output; call sites should not
+            # need to account for that when asking to strip provider targets.
+            parts = d.split("//", 1)
+            if len(parts) == 2 and parts[1].startswith(suffix):
+                continue
+            out.append(d)
             continue
         out.append(d)
     return out

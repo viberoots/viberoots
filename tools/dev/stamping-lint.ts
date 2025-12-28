@@ -4,11 +4,40 @@ import "zx/globals";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { isAllowedKindLabel } from "../lib/kind-vocabulary.ts";
+import { patchInvalidationStrategyForLang } from "../lib/lang-contracts.ts";
+import { normalizeTargetLabel } from "../lib/labels.ts";
 
-type Row = { name: string; rule_type: string; labels?: string[] };
+type Row = {
+  name: string;
+  rule_type?: string;
+  "buck.type"?: string;
+  labels?: string[];
+  // buck2 cquery may return this as buck.package
+  "buck.package"?: string;
+};
 
 function kindLabelsOf(labels: string[]): string[] {
   return labels.filter((l) => typeof l === "string" && l.startsWith("kind:"));
+}
+
+function parseCqueryRows(stdout: string): Row[] {
+  try {
+    const parsed: unknown = JSON.parse(String(stdout || ""));
+    if (Array.isArray(parsed)) return parsed as Row[];
+    if (parsed && typeof parsed === "object") {
+      const obj = parsed as Record<string, unknown>;
+      const out: Row[] = [];
+      for (const v of Object.values(obj)) {
+        if (Array.isArray(v)) {
+          out.push(...(v as Row[]));
+        } else if (v && typeof v === "object") {
+          out.push(v as Row);
+        }
+      }
+      return out;
+    }
+  } catch {}
+  return [];
 }
 
 function validateKindLabels(name: string, kindLabels: string[], problems: string[]) {
@@ -22,26 +51,66 @@ function validateKindLabels(name: string, kindLabels: string[], problems: string
   }
 }
 
+function langLabelsOf(labels: string[]): string[] {
+  return labels.filter((l) => typeof l === "string" && l.startsWith("lang:"));
+}
+
+function patchScopeLabelsOf(labels: string[]): string[] {
+  return labels.filter((l) => typeof l === "string" && l.startsWith("patch_scope:"));
+}
+
+function validatePatchScopeLabels(name: string, labels: string[], problems: string[]) {
+  const langs = [...new Set(langLabelsOf(labels))];
+  if (langs.length === 0) return;
+  if (langs.length > 1) {
+    problems.push(`${name} has multiple lang labels: ${langs.join(", ")}`);
+    return;
+  }
+  const lang = langs[0]!.slice("lang:".length);
+  const strat = patchInvalidationStrategyForLang(lang);
+  if (!strat) return; // ignore unknown langs
+
+  const patchScopes = [...new Set(patchScopeLabelsOf(labels))];
+  const expected = `patch_scope:${strat.patchScope}`;
+  if (patchScopes.length === 0) {
+    problems.push(`${name} missing label ${expected}`);
+    return;
+  }
+  if (patchScopes.length > 1) {
+    problems.push(`${name} has multiple patch_scope labels: ${patchScopes.join(", ")}`);
+    return;
+  }
+  const got = patchScopes[0]!;
+  if (got !== expected) {
+    problems.push(`${name} has wrong patch_scope label: ${got} (expected ${expected})`);
+  }
+}
+
 async function main() {
   const problems: string[] = [];
   try {
     const { stdout } =
-      await $`buck2 cquery 'deps(//..., 1, exec_deps())' --target-platform config//platforms:default --json --output-attribute name --output-attribute rule_type --output-attribute labels`.quiet();
-    let arr: Row[] = [];
-    try {
-      arr = JSON.parse(String(stdout || ""));
-    } catch {
-      arr = [];
-    }
+      // Do not force a platform label here; rely on repo (or temp-repo) buckconfig defaults.
+      // Query all targets, not only deps(...): leaf/root targets with no deps still need validation.
+      // Note: Buck2 deprecated --output-attributes; keep using repeated --output-attribute for compatibility.
+      await $`buck2 cquery '//...' --target-platforms config//platforms:default --json --output-attribute name --output-attribute buck.type --output-attribute labels --output-attribute package`.quiet();
+    const arr = parseCqueryRows(String(stdout || ""));
     for (const n of arr) {
-      const labs = Array.isArray(n.labels) ? n.labels : [];
+      const labsRaw: unknown = Array.isArray((n as any).labels)
+        ? (n as any).labels
+        : (n as any)["buck.labels"];
+      const labs = Array.isArray(labsRaw) ? (labsRaw as unknown[]).map(String) : [];
+      const buckPkg = normalizeTargetLabel(String((n as any)["buck.package"] || ""));
+      const isProviderPkg = buckPkg.startsWith("//third_party/providers:");
+      const ruleType = String((n as any)["buck.type"] || (n as any).rule_type || "");
       // Go
-      const looksGo = (n.rule_type || "").startsWith("go_");
+      const looksGo = ruleType.startsWith("go_");
       if (looksGo && !labs.includes("lang:go")) problems.push(`${n.name} missing label lang:go`);
       // C++
-      const looksCpp = (n.rule_type || "").startsWith("cxx_");
+      const looksCpp = ruleType.startsWith("cxx_");
       if (looksCpp && !labs.includes("lang:cpp")) problems.push(`${n.name} missing label lang:cpp`);
       validateKindLabels(n.name, kindLabelsOf(labs), problems);
+      if (!isProviderPkg) validatePatchScopeLabels(n.name, labs, problems);
     }
   } catch {
     // Fallback: lightweight TARGETS scan in minimal repos without invoking Buck

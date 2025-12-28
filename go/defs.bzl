@@ -162,11 +162,28 @@ def nix_go_tiny_wasm_lib(name, **kwargs):
     """
     # Uniform WASM labeling across languages (variant=tinygo)
     stamp_wasm_variant(kwargs, "go", "tinygo")
-    labels = kwargs.get("labels", []) or []
     pkg = native.package_name()
     deps = kwargs.pop("deps", [])
     srcs = kwargs.get("srcs", []) or []
     extra = normalize_labels(pkg, kwargs.pop("extra_module_providers", []))
+
+    # Ensure patch_scope stamping and package-local patch inputs are consistent across all
+    # package-local macro shapes, including planner-visible shims.
+    #
+    # We keep stamp=False here because stamp_wasm_variant(...) already stamps the language/kind.
+    prepare_package_local_wiring(
+        name = name,
+        kwargs = kwargs,
+        lang = "go",
+        kind = None,
+        MODULE_PROVIDERS = MODULE_PROVIDERS,
+        base_deps = [],
+        stamp = False,
+    )
+    # Re-read srcs after wiring so package-local patch inputs are included.
+    srcs = kwargs.get("srcs", []) or []
+    # Re-read labels after wiring so patch scope (and any other stamps) are visible on the rule.
+    labels = kwargs.get("labels", []) or []
     merged_srcs = wire_planner_visible_inputs(
         name = name,
         MODULE_PROVIDERS = MODULE_PROVIDERS,

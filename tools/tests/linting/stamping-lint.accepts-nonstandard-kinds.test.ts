@@ -12,7 +12,7 @@ test("stamping-lint accepts kind labels beyond bin|lib|test (fixture)", async ()
       '  name = "bundle_like",',
       '  out = "bundle_like.txt",',
       '  cmd = "echo ok > $OUT",',
-      '  labels = ["lang:node", "kind:bundle"],',
+      '  labels = ["lang:node", "kind:bundle", "patch_scope:importer-local"],',
       ")",
       "",
     ].join("\n");

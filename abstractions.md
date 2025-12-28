@@ -216,9 +216,9 @@ I treat patch invalidation as two explicit models:
   - Patch files live under the target’s Buck package, typically `patches/<lang>`.
   - Macros include patch files in the target’s action inputs, usually `srcs`.
   - Provider sync is not required to make patch changes invalidate builds.
-  - Planner-visible stubs for package-local languages still carry package-local patch files as real inputs:
+  - Planner-visible stubs for package-local languages still carry package-local patch files as real inputs, and must stamp `patch_scope:package-local`:
     - `nix_cpp_test`’s `<name>__planner` uses the canonical package-local planner-visible stub helper (`wire_package_local_planner_visible_stub(...)`) so patch edits invalidate the planner-visible boundary.
-    - `nix_cpp_wasm_emscripten_lib` uses `prepare_package_local_wiring(...)` and emits a `planner_stub(...)` with patch files in `srcs`, so patch edits invalidate the stub’s reverse deps deterministically.
+    - `nix_cpp_wasm_emscripten_lib` uses `wire_package_local_planner_visible_stub(...)` so patch scope stamping, patch inputs, provider handling, and planner-visible defaults stay consistent.
 
 - **Importer-local patching** (Node, Python):
   - Patch files live under `<importer>/patches/<lang>`.

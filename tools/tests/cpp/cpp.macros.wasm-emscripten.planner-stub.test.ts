@@ -79,6 +79,10 @@ EOF'`;
     const out = String(probeLabels.stdout || "");
     assert.ok(out.includes("wasm:emscripten"), "expected wasm:emscripten label on stub");
     assert.ok(out.includes("kind:wasm"), "expected kind:wasm label on stub");
+    assert.ok(
+      out.includes("patch_scope:package-local"),
+      "expected patch_scope:package-local label on stub",
+    );
 
     const build = await $({
       cwd: tmp,

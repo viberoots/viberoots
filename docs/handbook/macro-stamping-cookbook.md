@@ -60,6 +60,11 @@ wire_global_nix_inputs(kw, into = "srcs", stamp = False)
     - timeout wrapper variable setup (portable `timeout`/`gtimeout`)
   - Use `nix_build_out_path_cmd(".#<attr>")` to resolve a flake attribute to `outPath` via `nix build --no-link --print-out-paths | tail -n1` (no `--out-link`).
 - **Macros**: call `stamp_labels` early in macro expansion to keep labels on all rule variants.
+- **Patch scope**: all Go/C++/Node/Python targets must carry exactly one `patch_scope:*` label derived from the language contract.
+  - Macro implementations must **not** stamp `patch_scope:*` directly; delegate to shared wiring helpers:
+    - Package-local: `lang/package_local_wiring.bzl:prepare_package_local_wiring`
+    - Package-local planner-visible stubs: `lang/planner_visible_wiring.bzl:wire_package_local_planner_visible_stub`
+    - Importer-local: `lang/importer_wiring.bzl:prepare_importer_*`
 - **Lint**: run `node tools/dev/stamping-lint.ts` to detect missing or invalid labels.
 - **Tests**: negative test should demonstrate a missing label is flagged with a clear message.
 

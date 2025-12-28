@@ -20,12 +20,12 @@ test("nix_cpp_wasm_emscripten_lib uses prepare_package_local_wiring (no manual w
   const body = sliceDefBody(cppDefs, "nix_cpp_wasm_emscripten_lib");
 
   assert.ok(
-    body.includes("prepare_package_local_wiring("),
-    "expected nix_cpp_wasm_emscripten_lib to route package-local wiring via prepare_package_local_wiring(...)",
+    body.includes("wire_package_local_planner_visible_stub("),
+    "expected nix_cpp_wasm_emscripten_lib to route planner-visible stub wiring via wire_package_local_planner_visible_stub(...)",
   );
 
   assert.ok(
-    !body.includes("pop_package_local_patch_dirs_and_nixpkg_deps("),
-    "expected nix_cpp_wasm_emscripten_lib to avoid direct pop_package_local_patch_dirs_and_nixpkg_deps(...); use prepare_package_local_wiring(...) instead",
+    !body.includes("planner_stub("),
+    "expected nix_cpp_wasm_emscripten_lib to avoid direct planner_stub(...); use wire_* helper instead",
   );
 });

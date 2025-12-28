@@ -49,5 +49,17 @@ EOF'`;
       String(probe.stdout || "").includes("//third_party/providers:prov"),
       "expected provider target present in srcs for nix_go_tiny_wasm_lib",
     );
+
+    const labelsProbe = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //apps/wasm:mod`;
+    if (labelsProbe.exitCode !== 0) return;
+    assert.ok(
+      String(labelsProbe.stdout || "").includes("patch_scope:package-local"),
+      "expected patch_scope:package-local label on nix_go_tiny_wasm_lib",
+    );
   });
 });
