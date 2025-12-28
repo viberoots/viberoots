@@ -58,7 +58,7 @@ test("planner imports plugins listed in langs.json when present", async () => {
     const { stdout } = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`nix build .#graph-generator --no-link --print-out-paths`;
+    })`nix build .#graph-generator --no-link --print-out-paths --accept-flake-config`;
     const outPath =
       String(stdout || "")
         .trim()

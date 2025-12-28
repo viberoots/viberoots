@@ -314,7 +314,7 @@ async function buildGraphAndFindBin(sh: any, tmp: string, label: string): Promis
     cwd: tmp,
     stdio: "pipe",
     env: {},
-  })`nix build .#graph-generator --no-link --print-out-paths`;
+  })`nix build .#graph-generator --no-link --print-out-paths --accept-flake-config`;
   const outPath =
     String(stdout || "")
       .trim()
