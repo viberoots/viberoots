@@ -220,6 +220,7 @@ Quick checks and guidance:
 - Some Node genrule shims pass dict-shaped `srcs` mappings (dest → source) for deterministic in-action paths. In that mode, macros still carry importer-local patches and provider-edge inputs without changing the user mapping semantics:
   - Patch files are attached by adding synthetic dict entries under `__patch_inputs__/...` with a stable key derived from a canonical sanitizer (see `//lang:sanitize.bzl:sanitize_name`). Collisions are resolved deterministically with a `__<n>` suffix.
   - Provider deps are attached by adding synthetic dict entries under `__provider_edges__/...` using the same sanitizer and collision contract.
+  - The canonical prefix strings are defined once in `//lang:dict_inputs.bzl` (`PATCH_INPUTS_KEY_PREFIX`, `PROVIDER_EDGES_KEY_PREFIX`) and re-exported via `//lang:defs_common.bzl`. Do not hardcode these strings in macros or helpers.
 - Provider stamps for Node are importer‑scoped and do not reference patch files as `srcs` (see Provider sync cookbook below); correctness comes from macro‑side `srcs` inclusion.
 - Lockfile label enforcement and parsing are centralized: macros call `ensure_single_lockfile_label(...)` and then attach importer-local patch files using the shared `//lang:patch_inputs.bzl` helpers:
   - Implementation note: Node macros use `//lang:importer_wiring.bzl` to standardize the wiring sequence:

@@ -409,6 +409,18 @@ These are the usual ways this leaks:
 - A wrapper uses a different key prefix scheme for synthetic entries, and collisions become nondeterministic.
 - A wrapper shells out to Nix but forgets to attach global inputs as real action inputs, so changes to global inputs do not invalidate.
 
+### Dict-safe synthetic key prefixes
+
+Dict-shaped attributes that carry synthetic attachments (for example importer-local patches and provider edges) use two reserved key prefixes:
+
+- `__patch_inputs__/...`
+- `__provider_edges__/...`
+
+These prefixes are a shared contract. Do not hardcode these strings. Import the canonical constants:
+
+- `//lang:defs_common.bzl` (`PATCH_INPUTS_KEY_PREFIX`, `PROVIDER_EDGES_KEY_PREFIX`)
+- Source of truth: `//lang:dict_inputs.bzl`
+
 ### Enforcement
 
 The contract is guarded by probe and enforcement tests. If a new macro bypasses the shared helper surface, these should fail:

@@ -2,6 +2,9 @@ load("//lang:collections.bzl", "dedupe_preserve")
 load("//lang:sanitize.bzl", "sanitize_name")
 load("//lang:labels_file.bzl", "labels_file")
 
+PATCH_INPUTS_KEY_PREFIX = "__patch_inputs__"
+PROVIDER_EDGES_KEY_PREFIX = "__provider_edges__"
+
 def _unique_dict_key(dst_to_src, desired):
     if not isinstance(dst_to_src, dict):
         return desired

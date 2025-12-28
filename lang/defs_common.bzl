@@ -43,7 +43,13 @@ load(
     _strip_provider_targets_probe = "strip_provider_targets_probe",
     _target_key_for_current_package = "target_key_for_current_package",
 )
-load("//lang:dict_inputs.bzl", _attach_items_dict_safe = "attach_items_dict_safe", _dict_items_probe = "dict_items_probe")
+load(
+    "//lang:dict_inputs.bzl",
+    _PATCH_INPUTS_KEY_PREFIX = "PATCH_INPUTS_KEY_PREFIX",
+    _PROVIDER_EDGES_KEY_PREFIX = "PROVIDER_EDGES_KEY_PREFIX",
+    _attach_items_dict_safe = "attach_items_dict_safe",
+    _dict_items_probe = "dict_items_probe",
+)
 load(
     "//lang:importer_wiring.bzl",
     _attach_importer_patch_inputs = "attach_importer_patch_inputs",
@@ -124,6 +130,8 @@ strip_provider_targets_probe = _strip_provider_targets_probe
 
 attach_items_dict_safe = _attach_items_dict_safe
 dict_items_probe = _dict_items_probe
+PATCH_INPUTS_KEY_PREFIX = _PATCH_INPUTS_KEY_PREFIX
+PROVIDER_EDGES_KEY_PREFIX = _PROVIDER_EDGES_KEY_PREFIX
 
 require_single_importer_lockfile_label = _require_single_importer_lockfile_label
 attach_importer_patch_inputs = _attach_importer_patch_inputs

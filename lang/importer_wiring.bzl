@@ -8,7 +8,7 @@ load(
     "synthetic_dep_for_importer_patches_from_labels",
 )
 load("//lang:provider_edges.bzl", "realize_provider_edges")
-load("//lang:dict_inputs.bzl", "attach_items_dict_safe")
+load("//lang:dict_inputs.bzl", "PATCH_INPUTS_KEY_PREFIX", "PROVIDER_EDGES_KEY_PREFIX", "attach_items_dict_safe")
 load("//lang:auto_map.bzl", _DEFAULT_MODULE_PROVIDERS = "MODULE_PROVIDERS")
 
 def require_single_importer_lockfile_label(kwargs, lockfile_label):
@@ -21,7 +21,7 @@ def require_single_importer_lockfile_label(kwargs, lockfile_label):
     """
     ensure_single_lockfile_label(kwargs, lockfile_label)
 
-def attach_importer_patch_inputs(kwargs, lang, into = "srcs", dict_safe = False, key_prefix = "__patch_inputs__"):
+def attach_importer_patch_inputs(kwargs, lang, into = "srcs", dict_safe = False, key_prefix = PATCH_INPUTS_KEY_PREFIX):
     """
     Attach importer-local patch files into kwargs[into].
 
@@ -41,7 +41,7 @@ def merge_provider_edges(
         into = "deps",
         base = None,
         dict_safe = False,
-        key_prefix = "__provider_edges__",
+        key_prefix = PROVIDER_EDGES_KEY_PREFIX,
         MODULE_PROVIDERS = None):
     """
     Merge provider edges from MODULE_PROVIDERS for the current package target name.
@@ -73,8 +73,8 @@ def prepare_importer_genrule_kwargs(
         labels = [],
         lockfile_label = None,
         MODULE_PROVIDERS = None,
-        patch_key_prefix = "__patch_inputs__",
-        provider_key_prefix = "__provider_edges__"):
+        patch_key_prefix = PATCH_INPUTS_KEY_PREFIX,
+        provider_key_prefix = PROVIDER_EDGES_KEY_PREFIX):
     """
     Standard wiring for importer-scoped, genrule-style macros where edges must be realized
     into an input attribute (usually `srcs`) rather than `deps`.
@@ -130,11 +130,11 @@ def prepare_importer_non_genrule_wiring(
         patch_into = "srcs",
         patch_base = None,
         patch_dict_safe = None,
-        patch_key_prefix = "__patch_inputs__",
+        patch_key_prefix = PATCH_INPUTS_KEY_PREFIX,
         provider_into = "deps",
         provider_base = None,
         provider_dict_safe = None,
-        provider_key_prefix = "__provider_edges__",
+        provider_key_prefix = PROVIDER_EDGES_KEY_PREFIX,
         MODULE_PROVIDERS = None):
     """
     Standard wiring for importer-scoped macros that do not follow the genrule-style path.

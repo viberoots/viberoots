@@ -1,6 +1,7 @@
 load("//lang:importer_wiring.bzl", "prepare_importer_genrule_kwargs")
 load("//lang:lockfile_labels.bzl", "importer_from_labels")
 load("//lang:nix_calling_macros.bzl", "wire_global_nix_inputs")
+load("//lang:dict_inputs.bzl", "PATCH_INPUTS_KEY_PREFIX", "PROVIDER_EDGES_KEY_PREFIX")
 
 def prepare_importer_nix_calling_genrule_wiring(
         name,
@@ -12,8 +13,8 @@ def prepare_importer_nix_calling_genrule_wiring(
         labels = [],
         lockfile_label = None,
         MODULE_PROVIDERS = None,
-        patch_key_prefix = "__patch_inputs__",
-        provider_key_prefix = "__provider_edges__",
+        patch_key_prefix = PATCH_INPUTS_KEY_PREFIX,
+        provider_key_prefix = PROVIDER_EDGES_KEY_PREFIX,
         inject_workspace_root_env = False,
         workspace_root_env_src = "root//tools/buck:workspace-root.env",
         global_inputs_into = "srcs",

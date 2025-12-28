@@ -1,7 +1,7 @@
 load("//lang:collections.bzl", "dedupe_preserve")
 load("//lang:labels_file.bzl", "labels_file")
 load("//lang:lockfile_labels.bzl", "importer_from_labels", "ensure_single_lockfile_label")
-load("//lang:dict_inputs.bzl", "attach_items_dict_safe")
+load("//lang:dict_inputs.bzl", "PATCH_INPUTS_KEY_PREFIX", "attach_items_dict_safe")
 load("//lang:sanitize.bzl", "sanitize_name")
 load("//lang:importer_package_boundary.bzl", "require_importer_package_boundary")
 
@@ -30,7 +30,7 @@ def append_patch_inputs(kwargs, dirs, into = "srcs"):
     if len(merged) > 0:
         kwargs[into] = dedupe_preserve(merged)
 
-def append_patch_inputs_dict_safe(kwargs, dirs, into = "srcs", key_prefix = "__patch_inputs__"):
+def append_patch_inputs_dict_safe(kwargs, dirs, into = "srcs", key_prefix = PATCH_INPUTS_KEY_PREFIX):
     if kwargs == None:
         return
     if not isinstance(kwargs, dict):
@@ -39,7 +39,7 @@ def append_patch_inputs_dict_safe(kwargs, dirs, into = "srcs", key_prefix = "__p
         return
 
     if not isinstance(key_prefix, str) or key_prefix == "":
-        key_prefix = "__patch_inputs__"
+        key_prefix = PATCH_INPUTS_KEY_PREFIX
 
     existing = kwargs.get(into, None)
     if existing == None:
@@ -73,7 +73,7 @@ def append_importer_patches(kwargs, importer, lang, into = "srcs"):
     # importer-local patches must live in the importer package so native.glob can see the files.
     append_patch_inputs(kwargs, ["patches/%s" % lang], into = into)
 
-def append_importer_patches_dict_safe(kwargs, importer, lang, into = "srcs", key_prefix = "__patch_inputs__"):
+def append_importer_patches_dict_safe(kwargs, importer, lang, into = "srcs", key_prefix = PATCH_INPUTS_KEY_PREFIX):
     if importer == None or not isinstance(importer, str) or importer == "":
         return
     if lang == None or not isinstance(lang, str) or lang == "":
@@ -92,7 +92,7 @@ def include_importer_patches_from_labels(kwargs, lang, into = "srcs"):
         return
     append_importer_patches(kwargs, imp, lang, into = into)
 
-def include_importer_patches_from_labels_dict_safe(kwargs, lang, into = "srcs", key_prefix = "__patch_inputs__"):
+def include_importer_patches_from_labels_dict_safe(kwargs, lang, into = "srcs", key_prefix = PATCH_INPUTS_KEY_PREFIX):
     imp = importer_from_labels(kwargs)
     if imp == None or imp == "":
         return

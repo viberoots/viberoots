@@ -54,6 +54,7 @@ test("importer_wiring attaches importer patches and merges provider edges for li
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
+        'load("//lang:defs_common.bzl", "PATCH_INPUTS_KEY_PREFIX", "PROVIDER_EDGES_KEY_PREFIX")',
         'load("//lang:importer_wiring.bzl", "prepare_importer_genrule_kwargs")',
         'load("//lang:labels_file.bzl", "labels_file")',
         "",
@@ -86,8 +87,8 @@ test("importer_wiring attaches importer patches and merges provider edges for li
         '  kind = "gen",',
         "  labels = [],",
         '  lockfile_label = "lockfile:apps/web/pnpm-lock.yaml#apps/web",',
-        '  patch_key_prefix = "__patch_inputs__",',
-        '  provider_key_prefix = "__provider_edges__",',
+        "  patch_key_prefix = PATCH_INPUTS_KEY_PREFIX,",
+        "  provider_key_prefix = PROVIDER_EDGES_KEY_PREFIX,",
         ")",
         "labels_file(",
         '  name = "dict_probe",',
