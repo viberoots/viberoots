@@ -11,19 +11,55 @@ try {
   await import(href);
 } catch {}
 
-const ENABLE_TIMING = process.env.TEST_TIMING === "1";
-function logTiming(label: string, ms: number) {
+type TimingAgg = { msTotal: number; count: number };
+const TIMING_MODE = String(process.env.TEST_TIMING || "").trim(); // "" | "1" | "summary"
+const ENABLE_TIMING = TIMING_MODE === "1" || TIMING_MODE === "summary";
+const ENABLE_TIMING_DETAIL = TIMING_MODE === "1";
+const ENABLE_TIMING_SUMMARY = TIMING_MODE === "summary" || process.env.TEST_TIMING_SUMMARY === "1";
+
+const timingAgg: Map<string, TimingAgg> = new Map();
+
+function recordTiming(label: string, ms: number) {
   if (!ENABLE_TIMING) return;
+  const cur = timingAgg.get(label) || { msTotal: 0, count: 0 };
+  cur.msTotal += ms;
+  cur.count += 1;
+  timingAgg.set(label, cur);
+  if (!ENABLE_TIMING_DETAIL) return;
   try {
     console.error(`[timing] ${label}: ${ms.toFixed(1)}ms`);
   } catch {}
 }
+
+process.on("exit", () => {
+  if (!ENABLE_TIMING_SUMMARY) return;
+  try {
+    const rows = Array.from(timingAgg.entries())
+      .map(([label, agg]) => ({
+        label,
+        msTotal: agg.msTotal,
+        count: agg.count,
+        avgMs: agg.count > 0 ? agg.msTotal / agg.count : 0,
+      }))
+      .sort((a, b) => b.msTotal - a.msTotal);
+    if (rows.length === 0) return;
+    console.error("[timing] summary (sorted by total):");
+    for (const r of rows.slice(0, 30)) {
+      console.error(
+        `[timing] ${r.msTotal.toFixed(1)}ms total  (${r.count}x, avg ${r.avgMs.toFixed(1)}ms): ${r.label}`,
+      );
+    }
+    if (rows.length > 30) {
+      console.error(`[timing] ... ${rows.length - 30} more`);
+    }
+  } catch {}
+});
 async function timeAsync<T>(label: string, fn: () => Promise<T>): Promise<T> {
   const t0 = performance.now();
   try {
     return await fn();
   } finally {
-    logTiming(label, performance.now() - t0);
+    recordTiming(label, performance.now() - t0);
   }
 }
 
@@ -442,7 +478,9 @@ export async function runInTemp<T>(
   // Propagate SDKROOT and basic CGO flags on macOS so Go stdlib cgotest can find headers
   try {
     if (process.platform === "darwin") {
-      const { stdout } = await $({ stdio: "pipe" })`xcrun --show-sdk-path`.nothrow();
+      const { stdout } = await timeAsync("xcrun --show-sdk-path", async () => {
+        return await $({ stdio: "pipe" })`xcrun --show-sdk-path`.nothrow();
+      });
       const sdk = String(stdout || "").trim();
       if (sdk) {
         exportEnv.SDKROOT = exportEnv.SDKROOT || sdk;
@@ -463,31 +501,33 @@ export async function runInTemp<T>(
   } catch {}
   // Enforce that core toolchain binaries come from Nix; set CC/CXX accordingly
   try {
-    const which = async (cmd: string): Promise<string> => {
-      const out = await $({ stdio: "pipe" })`command -v ${cmd}`.nothrow();
-      return String(out.stdout || "").trim();
-    };
-    const isNix = (p: string) => !!p && p.startsWith("/nix/store/");
-    const clang = await which("clang");
-    const clangxx = (await which("clang++")) || clang;
-    const llvmAr = await which("llvm-ar");
-    const ar = llvmAr || (await which("ar"));
-    // Only enforce/use tools that are present and Nix-provided
-    if (isNix(clang) && isNix(clangxx)) {
-      if (process.platform === "darwin") {
-        const xcrun = await which("xcrun");
-        if (isNix(xcrun)) {
-          exportEnv.CC = `${xcrun} --sdk macosx ${clang}`;
-          exportEnv.CXX = `${xcrun} --sdk macosx ${clangxx}`;
+    await timeAsync("toolchain probe (command -v clang/clang++/xcrun/llvm-ar/ar)", async () => {
+      const which = async (cmd: string): Promise<string> => {
+        const out = await $({ stdio: "pipe" })`command -v ${cmd}`.nothrow();
+        return String(out.stdout || "").trim();
+      };
+      const isNix = (p: string) => !!p && p.startsWith("/nix/store/");
+      const clang = await which("clang");
+      const clangxx = (await which("clang++")) || clang;
+      const llvmAr = await which("llvm-ar");
+      const ar = llvmAr || (await which("ar"));
+      // Only enforce/use tools that are present and Nix-provided
+      if (isNix(clang) && isNix(clangxx)) {
+        if (process.platform === "darwin") {
+          const xcrun = await which("xcrun");
+          if (isNix(xcrun)) {
+            exportEnv.CC = `${xcrun} --sdk macosx ${clang}`;
+            exportEnv.CXX = `${xcrun} --sdk macosx ${clangxx}`;
+          }
+        } else {
+          exportEnv.CC = clang;
+          exportEnv.CXX = clangxx;
         }
-      } else {
-        exportEnv.CC = clang;
-        exportEnv.CXX = clangxx;
       }
-    }
-    if (!isNix(ar)) {
-      // If ar missing or non-Nix, skip; CGO might not need archiver on this path
-    }
+      if (!isNix(ar)) {
+        // If ar missing or non-Nix, skip; CGO might not need archiver on this path
+      }
+    });
   } catch {}
   const injected = String((envOut as any).stdout || "");
   for (const entry of injected ? injected.split("\0") : []) {
@@ -533,13 +573,15 @@ export async function runInTemp<T>(
   // Ensure zx globals are loaded in the temp repo when tests call bare `$` inside runInTemp
   // by importing the workspace zx-init explicitly once.
   try {
-    await $({
-      cwd: tmp,
-      env: exportEnv,
-    })`node --experimental-strip-types --import ${exportEnv.ZX_INIT} -e ${"console.log('zx-init-loaded')"}`;
+    await timeAsync("zx-init probe (node --import zx-init)", async () => {
+      await $({
+        cwd: tmp,
+        env: exportEnv,
+      })`node --experimental-strip-types --import ${exportEnv.ZX_INIT} -e ${"console.log('zx-init-loaded')"}`;
+    });
   } catch {}
   const _$ = $({ cwd: tmp, env: exportEnv });
-  await ensureBuckReaperStarted(tmp, _$);
+  await timeAsync("buck-daemon-reaper setup", async () => await ensureBuckReaperStarted(tmp, _$));
   try {
     // quiet: remove temporary diagnostics
     if (process.env.TEST_KEEP_TMP === "1") {

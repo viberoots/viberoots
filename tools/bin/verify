@@ -499,7 +499,15 @@ run_batch() {
   local zx_nm_out=""
   zx_nm_out="$(ZX_TEST_NODE_MODULES_IMPORTER="." "$node_bin" --experimental-strip-types --import "${LIVE_ROOT}/tools/dev/zx-init.mjs" "${LIVE_ROOT}/tools/dev/node-modules-build.ts" --print-out-paths)"
 
-  local cmd="${prefix}buck2 --isolation-dir \"$iso\" test ${console_flag} --overall-timeout ${tsec}s --target-platforms prelude//platforms:default ${targets[*]} -- --env COVERAGE=\"${COVERAGE:-0}\" --env NODE_V8_COVERAGE=\"${v8cov}\" --env TEST_NODE_OPTIONS=\"--test-timeout=${tms}\" --env BNX_BUCK_REAPER_STATE_FILE=\"${BNX_BUCK_REAPER_STATE_FILE:-}\" --env ZX_TEST_NODE_MODULES_OUT=\"${zx_nm_out}\""
+  local extra_test_env=""
+  if [[ -n "${TEST_TIMING:-}" ]]; then
+    extra_test_env="${extra_test_env} --env TEST_TIMING=\"${TEST_TIMING}\""
+  fi
+  if [[ -n "${TEST_TIMING_SUMMARY:-}" ]]; then
+    extra_test_env="${extra_test_env} --env TEST_TIMING_SUMMARY=\"${TEST_TIMING_SUMMARY}\""
+  fi
+
+  local cmd="${prefix}buck2 --isolation-dir \"$iso\" test ${console_flag} --overall-timeout ${tsec}s --target-platforms prelude//platforms:default ${targets[*]} -- --env COVERAGE=\"${COVERAGE:-0}\" --env NODE_V8_COVERAGE=\"${v8cov}\" --env TEST_NODE_OPTIONS=\"--test-timeout=${tms}\" --env BNX_BUCK_REAPER_STATE_FILE=\"${BNX_BUCK_REAPER_STATE_FILE:-}\" --env ZX_TEST_NODE_MODULES_OUT=\"${zx_nm_out}\"${extra_test_env}"
 
   # If a verify log is configured, capture output without forcing buck2 to see a pipe:
   # 'script' allocates a pty, preserving the superconsole UX in the terminal while recording output.
