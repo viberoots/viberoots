@@ -58,7 +58,10 @@ def _zx_test_impl(ctx):
             # Ensure node_modules available in sandbox by linking from flake output. Even when linking is disabled,
             # if node_modules is missing, provision a link to avoid ESM resolution failures for dev deps.
             + "if [ \"$NO_NODE_MODULES_LINK\" != \"1\" ] || [ ! -d \"$WORKSPACE_ROOT/node_modules\" ]; then "
-            + "  NM_OUT=$(bash --noprofile --norc -c 'cd \"$WORKSPACE_ROOT\" && NODE_BIN=\"$(command -v node)\" \"$NODE_BIN\" --experimental-strip-types --import \"$WORKSPACE_ROOT/tools/dev/zx-init.mjs\" \"$WORKSPACE_ROOT/tools/dev/node-modules-build.ts\" --print-out-paths 2>/dev/null | tail -1'); "
+            + "  NM_OUT=\"${ZX_TEST_NODE_MODULES_OUT:-}\"; "
+            + "  if [ -z \"$NM_OUT\" ]; then "
+            + "    NM_OUT=$(bash --noprofile --norc -c 'cd \"$WORKSPACE_ROOT\" && NODE_BIN=\"$(command -v node)\" \"$NODE_BIN\" --experimental-strip-types --import \"$WORKSPACE_ROOT/tools/dev/zx-init.mjs\" \"$WORKSPACE_ROOT/tools/dev/node-modules-build.ts\" --print-out-paths | tail -1'); "
+            + "  fi; "
             + "  if [ -n \"$NM_OUT\" ] && [ -d \"$NM_OUT/node_modules\" ]; then "
             + "    DESIRED=\"$NM_OUT/node_modules\"; CUR=\"$WORKSPACE_ROOT/node_modules\"; CUR_TGT=; if [ -L \"$CUR\" ]; then CUR_TGT=\"$(readlink \"$CUR\")\"; fi; "
             + "    if [ \"$CUR_TGT\" != \"$DESIRED\" ]; then rm -rf \"$CUR\"; ln -s \"$DESIRED\" \"$CUR\"; fi; "

@@ -81,7 +81,7 @@ export async function runHousekeeping(opts: { isCI: boolean; root: string }): Pr
       await $({
         stdio: "ignore",
         cwd: opts.root,
-      })`bash --noprofile --norc -c 'TOUT=60; if command -v timeout >/dev/null 2>&1; then T="timeout -k 5s ${TOUT}s"; elif command -v gtimeout >/dev/null 2>&1; then T="gtimeout -k 5s ${TOUT}s"; else T=""; fi; eval "$T nix store optimise" || true'`.nothrow();
+      })`bash --noprofile --norc -c 'set -euo pipefail; TOUT=60; if ! command -v timeout >/dev/null 2>&1; then echo \"housekeeping: error: timeout not found on PATH\" 1>&2; exit 127; fi; set +e; timeout -k 5s ${TOUT}s nix store optimise >/dev/null 2>&1; exit 0'`.nothrow();
       await touch(optStamp);
     } else {
       console.log("[housekeeping] optimise: skipped (cooldown)");
@@ -99,7 +99,7 @@ export async function runHousekeeping(opts: { isCI: boolean; root: string }): Pr
       await $({
         stdio: "ignore",
         cwd: opts.root,
-      })`bash --noprofile --norc -c 'TOUT=45; if command -v timeout >/dev/null 2>&1; then T="timeout -k 5s ${TOUT}s"; elif command -v gtimeout >/dev/null 2>&1; then T="gtimeout -k 5s ${TOUT}s"; else T=""; fi; eval "$T nix-store --gc --max-freed ${cap}" || true'`.nothrow();
+      })`bash --noprofile --norc -c 'set -euo pipefail; TOUT=45; if ! command -v timeout >/dev/null 2>&1; then echo \"housekeeping: error: timeout not found on PATH\" 1>&2; exit 127; fi; set +e; timeout -k 5s ${TOUT}s nix-store --gc --max-freed ${cap} >/dev/null 2>&1; exit 0'`.nothrow();
       await touch(gcStamp);
 
       const { freePct: afterPct, freeBytes: afterBytes } = await getDiskStats(opts.root);

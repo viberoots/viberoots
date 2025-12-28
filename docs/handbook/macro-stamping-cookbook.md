@@ -57,7 +57,7 @@ wire_global_nix_inputs(kw, into = "srcs", stamp = False)
     - Use `nix_cmd_prefix(..., include_pnpm_store=True)` for Node macros that invoke Nix. It composes:
     - deterministic bootstrap (`WORKSPACE_ROOT`, `FLK_ROOT`)
     - Buck-safe command substitution escaping (`$(...)` → `$$(...)`)
-    - timeout wrapper variable setup (portable `timeout`/`gtimeout`)
+    - timeout wrapper variable setup (`timeout`)
   - Use `nix_build_out_path_cmd(".#<attr>")` to resolve a flake attribute to `outPath` via `nix build --no-link --print-out-paths | tail -n1` (no `--out-link`).
 - **Macros**: call `stamp_labels` early in macro expansion to keep labels on all rule variants.
 - **Patch scope**: all Go/C++/Node/Python targets must carry exactly one `patch_scope:*` label derived from the language contract.

@@ -55,13 +55,12 @@ in {
         echo "[BNX-MKNM-DEBUG] env PATH=$PATH" >&2
         echo "[BNX-MKNM-DEBUG] node=$(command -v node || echo none) pnpm=$(command -v pnpm || echo none)" >&2
         echo "[BNX-MKNM-DEBUG] NODE_VERSION=$(node -v 2>/dev/null || echo none) PNPM_VERSION=$(pnpm -v 2>/dev/null || echo none)" >&2
-        TO_BIN="$(command -v timeout || command -v gtimeout || true)"
-        if [ -z "$TO_BIN" ]; then
-          echo "[BNX-MKNM-ERROR] 'timeout'/'gtimeout' not found in PATH; coreutils must provide it in builder env" >&2
+        if ! command -v timeout >/dev/null 2>&1; then
+          echo "[BNX-MKNM-ERROR] 'timeout' not found in PATH; coreutils must provide it in builder env" >&2
           echo "[BNX-MKNM-ERROR] PATH=$PATH" >&2
-          exit 98
+          exit 127
         fi
-        echo "[BNX-MKNM-DEBUG] TIMEOUT_BIN=$TO_BIN" >&2
+        echo "[BNX-MKNM-DEBUG] TIMEOUT_BIN=timeout" >&2
         echo "[BNX-MKNM-DEBUG] begin mkNodeModules buildPhase (importerDir=${importerDir})" >&2
         echo "[BNX-MKNM-DEBUG] CWD=$(pwd)" >&2
         export SSL_CERT_FILE=${certs}/etc/ssl/certs/ca-bundle.crt
@@ -116,7 +115,7 @@ in {
           elif [ "${if genAllowed then "1" else "0"}" = "1" ]; then
             echo "[nix] mkNodeModules: offline install to create lockfile (allow-generate)"
           echo "[BNX-MKNM-DEBUG] pnpm install (generate) --offline --no-frozen-lockfile --ignore-scripts --prod=false (FT=${ftVal}s)" >&2
-          "$TO_BIN" "$FT"s env PNPM_HOME="$PNPM_HOME" pnpm install --offline --no-frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
+          timeout "$FT"s env PNPM_HOME="$PNPM_HOME" pnpm install --offline --no-frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
           else
             echo "[nix] mkNodeModules: no lockfile present and generation not allowed; failing"
             exit 3
@@ -125,7 +124,7 @@ in {
           # Install strictly from the fixed-output store for the specific importer (relative to importer root)
           # Force inclusion of devDependencies so tool binaries (e.g., vite) are available
           echo "[BNX-MKNM-DEBUG] pnpm install (offline) --frozen-lockfile --ignore-scripts --prod=false (FT=${ftVal}s)" >&2
-          "$TO_BIN" "$FT"s env PNPM_HOME="$PNPM_HOME" pnpm install --offline --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
+          timeout "$FT"s env PNPM_HOME="$PNPM_HOME" pnpm install --offline --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
         fi
         echo "[nix] mkNodeModules: install complete"
         echo "[nix] mkNodeModules: listing node_modules/.bin"

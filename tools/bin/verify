@@ -117,10 +117,9 @@ TSEC="${VERIFY_TIMEOUT_SECS:-3600}"
 TIMEOUT_CMD=()
 if command -v timeout >/dev/null 2>&1; then
   TIMEOUT_CMD=(timeout -k 10s "${TSEC}s")
-elif command -v gtimeout >/dev/null 2>&1; then
-  TIMEOUT_CMD=(gtimeout -k 10s "${TSEC}s")
 else
-  TIMEOUT_CMD=()
+  echo "error: timeout not found on PATH (expected via direnv/devshell)" 1>&2
+  exit 127
 fi
 if [[ "${CI:-}" == "true" ]]; then
   TIMEOUT_CMD=()
@@ -268,13 +267,9 @@ housekeep_once() {
     echo "[verify] after purge: ${free_pct}% (~${free_gb}GiB)" 1>&2
   fi
   # Best-effort store optimise (cap ~60s)
-  local TO=""
-  if command -v timeout >/dev/null 2>&1; then TO="timeout -k 5s 60s"; elif command -v gtimeout >/dev/null 2>&1; then TO="gtimeout -k 5s 60s"; else TO=""; fi
-  if [[ -n "$TO" ]]; then
-    ( eval "$TO nix store optimise" >/dev/null 2>&1 || true )
-  else
-    ( nix store optimise >/dev/null 2>&1 || true )
-  fi
+  set +e
+  timeout -k 5s 60s nix store optimise >/dev/null 2>&1
+  set -e
   # If still low, run GC cycles (2G -> 4G -> 8G) with a short cap (45s each)
   df_line="$(df -Pk . 2>/dev/null | tail -n1 || true)"
   if [[ -n "$df_line" ]]; then
@@ -288,13 +283,9 @@ housekeep_once() {
     local cap
     for cap in 2G 4G 8G 16G 32G; do
       echo "[verify] running GC with --max-freed ${cap} ..." 1>&2
-      local TO2=""
-      if command -v timeout >/dev/null 2>&1; then TO2="timeout -k 5s 45s"; elif command -v gtimeout >/dev/null 2>&1; then TO2="gtimeout -k 5s 45s"; else TO2=""; fi
-      if [[ -n "$TO2" ]]; then
-        ( eval "$TO2 nix-store --gc --max-freed ${cap}" >/dev/null 2>&1 || true )
-      else
-        ( nix-store --gc --max-freed "${cap}" >/dev/null 2>&1 || true )
-      fi
+      set +e
+      timeout -k 5s 45s nix-store --gc --max-freed "${cap}" >/dev/null 2>&1
+      set -e
       df_line="$(df -Pk . 2>/dev/null | tail -n1 || true)"
       free_kb="$(echo "$df_line" | awk '{print $4}')"
       local use_pct_raw3; use_pct_raw3="$(echo "$df_line" | awk '{print $5}' | tr -d '%')"
@@ -480,8 +471,9 @@ run_batch() {
   local prefix=""
   if command -v timeout >/dev/null 2>&1; then
     prefix="timeout -k 10s ${tsec}s "
-  elif command -v gtimeout >/dev/null 2>&1; then
-    prefix="gtimeout -k 10s ${tsec}s "
+  else
+    echo "error: timeout not found on PATH (expected via direnv/devshell)" 1>&2
+    return 127
   fi
   local v8cov="${V8COV_DIR:-${LIVE_ROOT}/buck-out/tmp/node-v8-coverage}"
   mkdir -p "${v8cov}" >/dev/null 2>&1 || true
@@ -500,7 +492,14 @@ run_batch() {
       ;;
   esac
 
-  local cmd="${prefix}buck2 --isolation-dir \"$iso\" test ${console_flag} --overall-timeout ${tsec}s --target-platforms prelude//platforms:default ${targets[*]} -- --env COVERAGE=\"${COVERAGE:-0}\" --env NODE_V8_COVERAGE=\"${v8cov}\" --env TEST_NODE_OPTIONS=\"--test-timeout=${tms}\" --env BNX_BUCK_REAPER_STATE_FILE=\"${BNX_BUCK_REAPER_STATE_FILE:-}\""
+  # Compute Node dev-deps node_modules out path once per batch to avoid per-test nix eval storms.
+  # This is consumed by tools/buck/zx_test.bzl via $ZX_TEST_NODE_MODULES_OUT.
+  local node_bin=""
+  node_bin="$(command -v node)"
+  local zx_nm_out=""
+  zx_nm_out="$(ZX_TEST_NODE_MODULES_IMPORTER="." "$node_bin" --experimental-strip-types --import "${LIVE_ROOT}/tools/dev/zx-init.mjs" "${LIVE_ROOT}/tools/dev/node-modules-build.ts" --print-out-paths)"
+
+  local cmd="${prefix}buck2 --isolation-dir \"$iso\" test ${console_flag} --overall-timeout ${tsec}s --target-platforms prelude//platforms:default ${targets[*]} -- --env COVERAGE=\"${COVERAGE:-0}\" --env NODE_V8_COVERAGE=\"${v8cov}\" --env TEST_NODE_OPTIONS=\"--test-timeout=${tms}\" --env BNX_BUCK_REAPER_STATE_FILE=\"${BNX_BUCK_REAPER_STATE_FILE:-}\" --env ZX_TEST_NODE_MODULES_OUT=\"${zx_nm_out}\""
 
   # If a verify log is configured, capture output without forcing buck2 to see a pipe:
   # 'script' allocates a pty, preserving the superconsole UX in the terminal while recording output.
@@ -540,13 +539,9 @@ run_batch() {
     fi
     if (( free_gb < target )); then
       # Short optimise
-      local TO=""
-      if command -v timeout >/dev/null 2>&1; then TO="timeout -k 5s 30s"; elif command -v gtimeout >/dev/null 2>&1; then TO="gtimeout -k 5s 30s"; else TO=""; fi
-      if [[ -n "$TO" ]]; then
-        ( eval "$TO nix store optimise" >/dev/null 2>&1 || true )
-      else
-        ( nix store optimise >/dev/null 2>&1 || true )
-      fi
+      set +e
+      timeout -k 5s 30s nix store optimise >/dev/null 2>&1
+      set -e
       # Single bounded GC pass with escalating caps until target
       local cap
       for cap in 2G 4G 8G 16G 32G; do
@@ -559,13 +554,9 @@ run_batch() {
         if (( free_gb >= target )); then
           break
         fi
-        local TO2=""
-        if command -v timeout >/dev/null 2>&1; then TO2="timeout -k 5s 45s"; elif command -v gtimeout >/dev/null 2>&1; then TO2="gtimeout -k 5s 45s"; else TO2=""; fi
-        if [[ -n "$TO2" ]]; then
-          ( eval "$TO2 nix-store --gc --max-freed ${cap}" >/dev/null 2>&1 || true )
-        else
-          ( nix-store --gc --max-freed "${cap}" >/dev/null 2>&1 || true )
-        fi
+        set +e
+        timeout -k 5s 45s nix-store --gc --max-freed "${cap}" >/dev/null 2>&1
+        set -e
       done
     fi
   }
@@ -582,11 +573,7 @@ EOS
   if [[ -n ${TIMEOUT_CMD+x} && ${#TIMEOUT_CMD[@]} -gt 0 ]]; then
     if [[ ${#TARGETS[@]} -eq 1 && "${TARGETS[0]}" == *:* ]]; then
       # For single-target runs, also honor VERIFY_TIMEOUT_SECS
-      if command -v timeout >/dev/null 2>&1; then
-        RUN_TIMEOUT=(timeout -k 10s "${VERIFY_TIMEOUT_SECS:-3600}s")
-      elif command -v gtimeout >/dev/null 2>&1; then
-        RUN_TIMEOUT=(gtimeout -k 10s "${VERIFY_TIMEOUT_SECS:-3600}s")
-      fi
+      RUN_TIMEOUT=(timeout -k 10s "${VERIFY_TIMEOUT_SECS:-3600}s")
     else
       RUN_TIMEOUT=("${TIMEOUT_CMD[@]}")
     fi

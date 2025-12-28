@@ -73,10 +73,8 @@ def nix_timeout_wrapper_var(var_name = "TIMEOUT", default_sec = 600):
         ("TOUT=%d; " % tout)
         + "if command -v timeout >/dev/null 2>&1; then "
         + ("%s=\"timeout -k 2s ${TOUT}s\"; " % var_name)
-        + "elif command -v gtimeout >/dev/null 2>&1; then "
-        + ("%s=\"gtimeout -k 2s ${TOUT}s\"; " % var_name)
         + "else "
-        + ("%s=\"\"; " % var_name)
+        + "echo \"error: timeout not found on PATH (expected via direnv/devshell)\" 1>&2; exit 127; "
         + "fi; "
     )
 

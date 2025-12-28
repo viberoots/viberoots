@@ -26,7 +26,7 @@
 
 - Full: `timeout -k 10s 300s buck2 test //...`
 - Specific: `buck2 test //<target>`
-- Single-test external timeout (preferred): `gtimeout -k 10s 300s buck2 test //<target>` (or `timeout` on Linux)
+- Single-test external timeout (preferred): `timeout -k 10s 300s buck2 test //<target>`
 
 ## External runner helper (C++)
 
