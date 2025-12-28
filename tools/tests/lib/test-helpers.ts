@@ -72,6 +72,72 @@ const ZX_INIT_PROBE_LABEL = "zx-init probe (node --import zx-init)";
 let zxInitProbeDone = false;
 let zxInitProbePromise: Promise<void> | null = null;
 
+const XCRUN_SHOW_SDK_PATH_LABEL = "xcrun --show-sdk-path";
+const TOOLCHAIN_PROBE_LABEL = "toolchain probe (command -v clang/clang++/xcrun/llvm-ar/ar)";
+
+type CgoToolchainPaths = {
+  clang: string;
+  clangxx: string;
+  xcrun: string;
+  ar: string;
+};
+
+let cachedDarwinSdkPath: string | null = null;
+let cachedDarwinSdkPathPromise: Promise<string | null> | null = null;
+
+let cachedCgoToolchainPaths: CgoToolchainPaths | null = null;
+let cachedCgoToolchainPathsPromise: Promise<CgoToolchainPaths | null> | null = null;
+
+async function getDarwinSdkPathOncePerWorker($: any): Promise<string | null> {
+  if (process.platform !== "darwin") return null;
+  if (cachedDarwinSdkPath !== null) return cachedDarwinSdkPath;
+
+  if (!cachedDarwinSdkPathPromise) {
+    cachedDarwinSdkPathPromise = (async () => {
+      try {
+        const { stdout } = await timeAsync(XCRUN_SHOW_SDK_PATH_LABEL, async () => {
+          return await $({ stdio: "pipe" })`xcrun --show-sdk-path`.nothrow();
+        });
+        cachedDarwinSdkPath = String(stdout || "").trim() || "";
+      } catch {
+        cachedDarwinSdkPath = "";
+      }
+      return cachedDarwinSdkPath || null;
+    })();
+  }
+
+  return await cachedDarwinSdkPathPromise;
+}
+
+async function getCgoToolchainPathsOncePerWorker($: any): Promise<CgoToolchainPaths | null> {
+  if (cachedCgoToolchainPaths) return cachedCgoToolchainPaths;
+
+  if (!cachedCgoToolchainPathsPromise) {
+    cachedCgoToolchainPathsPromise = (async () => {
+      try {
+        return await timeAsync(TOOLCHAIN_PROBE_LABEL, async () => {
+          const which = async (cmd: string): Promise<string> => {
+            const out = await $({ stdio: "pipe" })`command -v ${cmd}`.nothrow();
+            return String(out.stdout || "").trim();
+          };
+          const clang = await which("clang");
+          if (!clang) return null;
+          const clangxx = (await which("clang++")) || clang;
+          const xcrun = (process.platform === "darwin" ? await which("xcrun") : "") || "";
+          const llvmAr = await which("llvm-ar");
+          const ar = llvmAr || (await which("ar")) || "";
+          return { clang, clangxx, xcrun, ar };
+        });
+      } catch {
+        return null;
+      }
+    })();
+  }
+
+  cachedCgoToolchainPaths = await cachedCgoToolchainPathsPromise;
+  return cachedCgoToolchainPaths;
+}
+
 async function ensureZxInitProbedOnce(
   tmp: string,
   $: any,
@@ -527,62 +593,56 @@ export async function runInTemp<T>(
   try {
     exportEnv.REPO_ROOT = process.cwd();
   } catch {}
-  // In temp repos, prefer disabling CGO to avoid stdlib cgotest header dependencies
-  exportEnv.CGO_ENABLED = "0";
-  // Propagate SDKROOT and basic CGO flags on macOS so Go stdlib cgotest can find headers
-  try {
-    if (process.platform === "darwin") {
-      const { stdout } = await timeAsync("xcrun --show-sdk-path", async () => {
-        return await $({ stdio: "pipe" })`xcrun --show-sdk-path`.nothrow();
-      });
-      const sdk = String(stdout || "").trim();
+  // In temp repos, default to CGO disabled unless the caller already made an explicit choice.
+  // (Most tests do not need CGO and this avoids per-temp toolchain probing overhead.)
+  if (String(exportEnv.CGO_ENABLED || "").trim() === "") {
+    exportEnv.CGO_ENABLED = "0";
+  }
+
+  const needCgo =
+    exportEnv.CGO_ENABLED === "1" || String(process.env.TEST_ENABLE_CGO || "").trim() === "1";
+
+  if (needCgo) {
+    // Propagate SDKROOT and basic CGO flags on macOS so Go stdlib cgotest can find headers.
+    try {
+      const sdk = await getDarwinSdkPathOncePerWorker($);
       if (sdk) {
         exportEnv.SDKROOT = exportEnv.SDKROOT || sdk;
         const base = `-isysroot ${sdk}`;
         exportEnv.CGO_CPPFLAGS = [base, exportEnv.CGO_CPPFLAGS || ""].filter(Boolean).join(" ");
         exportEnv.CGO_CFLAGS = [base, exportEnv.CGO_CFLAGS || ""].filter(Boolean).join(" ");
-        // Help clang/cgo find headers and libs inside the SDK even if flags get reset downstream
+        // Help clang/cgo find headers and libs inside the SDK even if flags get reset downstream.
         const inc = `${sdk}/usr/include`;
         const lib = `${sdk}/usr/lib`;
         exportEnv.CPATH = [inc, exportEnv.CPATH || ""].filter(Boolean).join(path.delimiter);
         exportEnv.LIBRARY_PATH = [lib, exportEnv.LIBRARY_PATH || ""]
           .filter(Boolean)
           .join(path.delimiter);
-        // Prefer invoking clang via xcrun so it honors SDKROOT reliably
+        // Prefer invoking clang via xcrun so it honors SDKROOT reliably.
         exportEnv.CC = exportEnv.CC || "xcrun --sdk macosx clang";
       }
-    }
-  } catch {}
-  // Enforce that core toolchain binaries come from Nix; set CC/CXX accordingly
-  try {
-    await timeAsync("toolchain probe (command -v clang/clang++/xcrun/llvm-ar/ar)", async () => {
-      const which = async (cmd: string): Promise<string> => {
-        const out = await $({ stdio: "pipe" })`command -v ${cmd}`.nothrow();
-        return String(out.stdout || "").trim();
-      };
-      const isNix = (p: string) => !!p && p.startsWith("/nix/store/");
-      const clang = await which("clang");
-      const clangxx = (await which("clang++")) || clang;
-      const llvmAr = await which("llvm-ar");
-      const ar = llvmAr || (await which("ar"));
-      // Only enforce/use tools that are present and Nix-provided
-      if (isNix(clang) && isNix(clangxx)) {
-        if (process.platform === "darwin") {
-          const xcrun = await which("xcrun");
-          if (isNix(xcrun)) {
-            exportEnv.CC = `${xcrun} --sdk macosx ${clang}`;
-            exportEnv.CXX = `${xcrun} --sdk macosx ${clangxx}`;
+    } catch {}
+
+    // Enforce that core toolchain binaries come from Nix; set CC/CXX accordingly (once per worker).
+    try {
+      const tc = await getCgoToolchainPathsOncePerWorker($);
+      if (tc) {
+        const isNix = (p: string) => !!p && p.startsWith("/nix/store/");
+        if (isNix(tc.clang) && isNix(tc.clangxx)) {
+          if (process.platform === "darwin") {
+            if (isNix(tc.xcrun)) {
+              exportEnv.CC = `${tc.xcrun} --sdk macosx ${tc.clang}`;
+              exportEnv.CXX = `${tc.xcrun} --sdk macosx ${tc.clangxx}`;
+            }
+          } else {
+            exportEnv.CC = tc.clang;
+            exportEnv.CXX = tc.clangxx;
           }
-        } else {
-          exportEnv.CC = clang;
-          exportEnv.CXX = clangxx;
         }
+        // If ar is missing or non-Nix, skip; CGO might not need archiver on this path.
       }
-      if (!isNix(ar)) {
-        // If ar missing or non-Nix, skip; CGO might not need archiver on this path
-      }
-    });
-  } catch {}
+    } catch {}
+  }
   const injected = String((envOut as any).stdout || "");
   for (const entry of injected ? injected.split("\0") : []) {
     if (!entry) continue;
