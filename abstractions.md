@@ -309,7 +309,7 @@ These are the usual ways this leaks:
 
 - A macro loads `third_party/providers/auto_map.bzl` directly instead of using `lang/auto_map.bzl`.
 - A macro merges provider edges by concatenating lists without stable dedupe, so order changes unexpectedly.
-- A planner-visible stub depends on provider targets, and hits visibility or graph-shape constraints. Use `strip_provider_targets(...)` for planner-visible stubs unless a stub explicitly needs provider deps.
+- A planner-visible stub depends on provider targets, and hits visibility or graph-shape constraints. Prefer `wire_*planner_visible*_stub(...)` helpers, which **strip provider targets from planner-visible `deps` by default**; only opt out when a stub explicitly needs provider deps.
 
 ---
 

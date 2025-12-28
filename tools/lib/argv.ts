@@ -10,8 +10,44 @@
 export type FlagRead = { provided: boolean; value: string };
 
 export function getArgvTokens(): string[] {
-  const raw: string[] = Array.isArray(process.argv) ? process.argv.slice(2) : [];
-  return raw.filter((s) => typeof s === "string");
+  const rawAll: string[] = Array.isArray(process.argv) ? process.argv : [];
+
+  // Node's argv shape is:
+  //   [node, ...nodeFlags, scriptPath, ...userArgs]
+  //
+  // In this repo we commonly run scripts with node flags (e.g. --import zx-init.mjs),
+  // so `process.argv.slice(2)` would incorrectly include node runtime flags and the
+  // script path. That breaks argument parsing for tools that operate on "argv tokens".
+  //
+  // We instead find the script path token and return only the args after it.
+  const isScriptPathToken = (t: string): boolean => {
+    if (!t) return false;
+    // Never treat node flags (including NODE_OPTIONS-injected flags like --import=...) as the script.
+    if (t.startsWith("-")) return false;
+    // Common forms: /abs/path/tools/dev/foo.ts, ./foo.ts, foo.js, foo.mjs, etc.
+    return /\.(ts|js|mjs|cjs)$/.test(t);
+  };
+
+  // In this repo we frequently run:
+  //   node ... --import <zx-init.mjs> <script.ts> <args...>
+  // so we must skip node flags that consume the next token to avoid mistaking the
+  // import path for the script path.
+  const consumesNext = new Set(["--import", "--require", "-r", "--loader"]);
+  let scriptIdx = -1;
+  for (let i = 1; i < rawAll.length; i++) {
+    const a = String(rawAll[i] || "");
+    if (consumesNext.has(a)) {
+      i++; // skip its value token
+      continue;
+    }
+    if (isScriptPathToken(a)) {
+      scriptIdx = i;
+      break;
+    }
+  }
+
+  const user = scriptIdx >= 0 ? rawAll.slice(scriptIdx + 1) : rawAll.slice(2);
+  return user.filter((s) => typeof s === "string");
 }
 
 export function hasShortFlag(letter: string, argv = getArgvTokens()): boolean {

@@ -149,7 +149,7 @@ def nix_go_carchive(name, **kwargs):
         deps = deps,
         srcs = srcs,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
-        realize_providers_into = "srcs",
+        provider_realization_mode = "inputs",
     )
 
 
@@ -174,7 +174,7 @@ def nix_go_tiny_wasm_lib(name, **kwargs):
         srcs = srcs,
         extra_srcs = extra,
         srcs_include_deps = True,
-        realize_providers_into = "srcs",
+        provider_realization_mode = "inputs",
     )["srcs"]
     # Graph-facing shim that copies from the Nix out path produced by planner
     go_nix_build_wasm(

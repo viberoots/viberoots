@@ -139,7 +139,6 @@ def nix_cpp_test(name, **kwargs):
         kind = "test",
         deps = deps,
         srcs = [],
-        strip_providers_from_deps = True,
     )
     # Executed: external runner builds the corresponding flake attr for planner_name and runs it
     cpp_nix_test(

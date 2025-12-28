@@ -18,6 +18,7 @@ EOF'`;
     })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
 MODULE_PROVIDERS = {
   "//apps/probe:stub_realize": ["//third_party/providers:prov"],
+  "//apps/probe_go:stub_realize_go": ["//third_party/providers:prov"],
 }
 EOF'`;
 
@@ -25,6 +26,11 @@ EOF'`;
     await fsp.mkdir(path.join(appDir, "patches", "cpp"), { recursive: true });
     const patchRel = "apps/probe/patches/cpp/demo@0.0.0.patch";
     await fsp.writeFile(path.join(tmp, patchRel), "# noop\n", "utf8");
+
+    const goAppDir = path.join(tmp, "apps", "probe_go");
+    await fsp.mkdir(path.join(goAppDir, "patches", "go"), { recursive: true });
+    const goPatchRel = "apps/probe_go/patches/go/demo@0.0.0.patch";
+    await fsp.writeFile(path.join(tmp, goPatchRel), "# noop\n", "utf8");
 
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
@@ -42,7 +48,17 @@ EOF'`;
         '  lang = "cpp",',
         '  kind = "test",',
         '  deps = ["//third_party/providers:prov"],',
-        "  strip_providers_from_deps = True,",
+        ")",
+        "",
+        'kw_keep = {"labels": [], "deps": []}',
+        "wire_package_local_planner_visible_stub(",
+        '  name = "stub_keep",',
+        '  out = "stub_keep.stamp",',
+        "  kwargs = kw_keep,",
+        '  lang = "cpp",',
+        '  kind = "test",',
+        '  deps = ["//third_party/providers:prov"],',
+        "  strip_providers_from_deps = False,",
         ")",
         "",
         'kw_realize = {"labels": [], "deps": []}',
@@ -53,7 +69,40 @@ EOF'`;
         '  lang = "cpp",',
         '  kind = "test",',
         "  MODULE_PROVIDERS = MODULE_PROVIDERS,",
-        '  realize_providers_into = "srcs",',
+        '  provider_realization_mode = "inputs",',
+        ")",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    await fsp.writeFile(
+      path.join(goAppDir, "TARGETS"),
+      [
+        "",
+        "# test: planner-visible.package-local-wiring.probe.test.ts",
+        'load("//lang:auto_map.bzl", "MODULE_PROVIDERS")',
+        'load("//lang:defs_common.bzl", "wire_package_local_planner_visible_stub")',
+        "",
+        'kw_strip_go = {"labels": [], "deps": []}',
+        "wire_package_local_planner_visible_stub(",
+        '  name = "stub_strip_go",',
+        '  out = "stub_strip_go.stamp",',
+        "  kwargs = kw_strip_go,",
+        '  lang = "go",',
+        '  kind = "test",',
+        '  deps = ["//third_party/providers:prov"],',
+        ")",
+        "",
+        'kw_realize_go = {"labels": [], "deps": []}',
+        "wire_package_local_planner_visible_stub(",
+        '  name = "stub_realize_go",',
+        '  out = "stub_realize_go.stamp",',
+        "  kwargs = kw_realize_go,",
+        '  lang = "go",',
+        '  kind = "test",',
+        "  MODULE_PROVIDERS = MODULE_PROVIDERS,",
+        '  provider_realization_mode = "inputs",',
         ")",
         "",
       ].join("\n"),
@@ -104,6 +153,18 @@ EOF'`;
       `expected package-local patch path present in srcs: ${patchRel}`,
     );
 
+    const qSrcsGo = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+    })`buck2 cquery --target-platforms //:no_cgo //apps/probe_go:stub_strip_go --json --output-attribute srcs`;
+    assert.equal(qSrcsGo.exitCode, 0, "buck2 cquery failed for stub_strip_go srcs");
+    assert.ok(
+      String(qSrcsGo.stdout || "").includes(goPatchRel),
+      `expected package-local patch path present in srcs: ${goPatchRel}`,
+    );
+
     const qDepsStrip = await $({
       cwd: tmp,
       stdio: "pipe",
@@ -113,7 +174,31 @@ EOF'`;
     assert.equal(qDepsStrip.exitCode, 0, "buck2 cquery failed for stub_strip deps");
     assert.ok(
       !String(qDepsStrip.stdout || "").includes("//third_party/providers:prov"),
-      "expected provider dep to be stripped from deps",
+      "expected provider dep to be stripped from deps by default",
+    );
+
+    const qDepsKeep = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+    })`buck2 cquery --target-platforms //:no_cgo //apps/probe:stub_keep --json --output-attribute deps`;
+    assert.equal(qDepsKeep.exitCode, 0, "buck2 cquery failed for stub_keep deps");
+    assert.ok(
+      String(qDepsKeep.stdout || "").includes("//third_party/providers:prov"),
+      "expected provider dep to remain in deps when strip_providers_from_deps is False",
+    );
+
+    const qDepsStripGo = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+    })`buck2 cquery --target-platforms //:no_cgo //apps/probe_go:stub_strip_go --json --output-attribute deps`;
+    assert.equal(qDepsStripGo.exitCode, 0, "buck2 cquery failed for stub_strip_go deps");
+    assert.ok(
+      !String(qDepsStripGo.stdout || "").includes("//third_party/providers:prov"),
+      "expected provider dep to be stripped from deps by default (go)",
     );
 
     const qSrcsRealize = await $({
@@ -126,6 +211,18 @@ EOF'`;
     assert.ok(
       String(qSrcsRealize.stdout || "").includes("//third_party/providers:prov"),
       "expected provider target realized into srcs",
+    );
+
+    const qSrcsRealizeGo = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+    })`buck2 cquery --target-platforms //:no_cgo //apps/probe_go:stub_realize_go --json --output-attribute srcs`;
+    assert.equal(qSrcsRealizeGo.exitCode, 0, "buck2 cquery failed for stub_realize_go srcs");
+    assert.ok(
+      String(qSrcsRealizeGo.stdout || "").includes("//third_party/providers:prov"),
+      "expected provider target realized into srcs (go)",
     );
   });
 });

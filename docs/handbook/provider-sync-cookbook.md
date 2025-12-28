@@ -89,8 +89,8 @@ Some macros create planner-visible stub targets for exporter and planner discove
 
 - **Canonical stub rule**: `//lang:planner_stub.bzl:planner_stub` is the only supported mechanism for planner-visible stubs. Do not introduce language-specific stub rules or ad-hoc `genrule` stubs.
 - **Canonical macro helper (preferred)**: `//lang:defs_common.bzl:wire_planner_visible_stub(...)` standardizes the safe defaults:
-  - strip provider targets from planner-visible `deps` (opt-in)
-  - realize provider edges into `deps` or `srcs` (opt-in, for rule shapes that require it)
+  - strips provider targets from planner-visible `deps` **by default** (opt out via `strip_providers_from_deps = False`)
+  - realizes provider edges into `deps` or **inputs** (i.e., `srcs`) when explicitly requested via `provider_realization_mode = "deps"|"inputs"`
   - attach package-local patch inputs via `planner_stub_with_package_local_patches(...)` (opt-in, when `lang` is provided)
 - **When to include `srcs`**: include `srcs` only when the planner must observe package-local files for discovery or invalidation (for example, a planner-only node that represents a package directory or needs patch file inputs). Prefer `deps` for graph edges; use `srcs` for file-like inputs and the few cases where edges must be realized via `srcs`.
 - **Rule of thumb**: when a macro emits a planner-visible stub, pass planner-visible deps through the shared helper `strip_provider_targets(...)` from `//lang:provider_edges.bzl`.

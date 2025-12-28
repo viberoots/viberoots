@@ -10,8 +10,15 @@ def wire_planner_visible_inputs(
         srcs = [],
         extra_srcs = [],
         srcs_include_deps = False,
+        # Provider realization vocabulary:
+        # - None: do not realize provider edges here
+        # - "deps": realize provider edges into deps
+        # - "inputs": realize provider edges into srcs (for rule shapes that cannot accept deps)
+        provider_realization_mode = None,
+        # Back-compat: older call sites used "deps"|"srcs".
         realize_providers_into = None,
-        strip_providers_from_deps = False):
+        # Planner-visible targets should be safe-by-default: avoid provider targets in deps unless asked.
+        strip_providers_from_deps = True):
     """
     Standard wiring for planner-visible targets.
 
@@ -32,18 +39,26 @@ def wire_planner_visible_inputs(
     if strip_providers_from_deps:
         deps_out = strip_provider_targets(deps_out)
 
-    if realize_providers_into != None:
-        if realize_providers_into != "deps" and realize_providers_into != "srcs":
+    if provider_realization_mode != None and realize_providers_into != None:
+        fail("wire_planner_visible_inputs: set only one of provider_realization_mode or realize_providers_into")
+
+    realize_mode = provider_realization_mode
+    if realize_mode == None:
+        realize_mode = realize_providers_into
+
+    if realize_mode != None:
+        if realize_mode not in ("deps", "inputs", "srcs"):
             fail(
-                "wire_planner_visible_inputs: realize_providers_into must be None, 'deps', or 'srcs'; got: %s" %
-                realize_providers_into,
+                "wire_planner_visible_inputs: provider realization must be None, 'deps', or 'inputs' (legacy: 'srcs'); got: %s" %
+                realize_mode,
             )
         if MODULE_PROVIDERS == None:
-            fail("wire_planner_visible_inputs: MODULE_PROVIDERS is required when realize_providers_into is set")
+            fail("wire_planner_visible_inputs: MODULE_PROVIDERS is required when provider realization is set")
 
-        if realize_providers_into == "deps":
+        if realize_mode == "deps":
             deps_out = realize_provider_edges(MODULE_PROVIDERS, name, base = deps_out)
         else:
+            # "inputs" (and legacy "srcs") means: realize provider edges into srcs.
             srcs_out = realize_provider_edges(MODULE_PROVIDERS, name, into = "srcs", base = srcs_out)
 
     return {
@@ -62,8 +77,10 @@ def wire_planner_visible_stub(
         labels = [],
         visibility = [],
         MODULE_PROVIDERS = None,
+        provider_realization_mode = None,
+        # Back-compat: older call sites used "deps"|"srcs".
         realize_providers_into = None,
-        strip_providers_from_deps = False,
+        strip_providers_from_deps = True,
         **kwargs):
     """
     Canonical planner-visible stub wiring.
@@ -78,6 +95,7 @@ def wire_planner_visible_stub(
         MODULE_PROVIDERS = MODULE_PROVIDERS,
         deps = deps,
         srcs = srcs,
+        provider_realization_mode = provider_realization_mode,
         realize_providers_into = realize_providers_into,
         strip_providers_from_deps = strip_providers_from_deps,
     )
@@ -117,8 +135,10 @@ def wire_package_local_planner_visible_stub(
         deps = [],
         srcs = [],
         MODULE_PROVIDERS = None,
+        provider_realization_mode = None,
+        # Back-compat: older call sites used "deps"|"srcs".
         realize_providers_into = None,
-        strip_providers_from_deps = False):
+        strip_providers_from_deps = True):
     """
     Shared helper for package-local, planner-visible stub targets.
 
@@ -152,6 +172,7 @@ def wire_package_local_planner_visible_stub(
         labels = kwargs.get("labels", []) or [],
         visibility = kwargs.get("visibility", []),
         MODULE_PROVIDERS = MODULE_PROVIDERS,
+        provider_realization_mode = provider_realization_mode,
         realize_providers_into = realize_providers_into,
         strip_providers_from_deps = strip_providers_from_deps,
     )

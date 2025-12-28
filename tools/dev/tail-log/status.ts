@@ -1,10 +1,9 @@
-import path from "node:path";
 import process from "node:process";
-import { runNodeWithZx } from "../../lib/node-run.ts";
+import fsp from "node:fs/promises";
 import type { TailLogArgs } from "./args.ts";
-import { repoRoot, zxInitPath } from "./paths.ts";
-import { resolveLatest, resolvePid, pidAlive } from "./resolve.ts";
+import { resolveLatest, resolvePid, pidAliveWithSignature, pidStartSignature } from "./resolve.ts";
 import type { Resolution } from "./resolve.ts";
+import { computeVerifyStatusFromLogText } from "../../lib/verify-log-status.ts";
 
 function emptyNdjson(pid: number, error: string): string {
   return JSON.stringify({
@@ -24,23 +23,47 @@ function emptyNdjson(pid: number, error: string): string {
   });
 }
 
-async function runVerifyLogStatusOnce(
-  logPath: string,
-  pid: number,
-  json: boolean,
-): Promise<string> {
-  const args = ["--log", logPath, "--pid", String(pid)];
-  if (json) args.push("--json");
-  const out = await runNodeWithZx({
-    script: path.join(repoRoot, "tools", "dev", "verify-log-status.ts"),
-    args,
-    zxInitPath,
-    stdio: "pipe",
-    env: { ...process.env, DIRENV_LOG_FORMAT: "" },
-  });
-  // Keep stdout machine-readable in --json mode. Node may emit warnings to stderr even when
-  // --disable-warning is set, and mixing stderr into stdout breaks NDJSON consumers.
-  return json ? out.stdout || "" : (out.stdout || "") + (out.stderr || "");
+async function computeStatusFromLogPath(logPath: string, pid: number) {
+  const text = await fsp.readFile(logPath, "utf8");
+  return computeVerifyStatusFromLogText({ logPath, pid: pid || undefined, text });
+}
+
+function formatStatusJsonLine(st: ReturnType<typeof computeVerifyStatusFromLogText>): string {
+  // Stable JSON keys for scripting.
+  const out = {
+    pid: st.pid,
+    pass: st.pass,
+    fail: st.fail,
+    fatal: st.fatal,
+    skip: st.skip,
+    build_failure: st.buildFailure,
+    remaining: st.remaining ?? null,
+    failed: st.failed,
+    done: st.done,
+    elapsed: st.elapsed ?? null,
+    log: st.logPath,
+    source: st.source,
+  };
+  return JSON.stringify(out);
+}
+
+function formatStatusText(st: ReturnType<typeof computeVerifyStatusFromLogText>): string {
+  const elapsed = st.elapsed ? st.elapsed : "?";
+  const remaining = st.remaining !== undefined ? String(st.remaining) : "?";
+  const anyFailures = st.fail > 0 || st.fatal > 0 || st.buildFailure > 0;
+  const testsLabel = st.done ? "Tests finished:" : "Tests so far:";
+  const header = `Time elapsed: ${elapsed}\n${testsLabel}   Pass ${st.pass}. Fail ${st.fail}. Fatal ${st.fatal}. Skip ${st.skip}. Build failure ${st.buildFailure}\nTests remaining: ${remaining}\nLog: ${st.logPath}`;
+  if (!anyFailures || st.failed.length === 0) return header;
+  const cap = 10;
+  const shown = st.failed.slice(0, cap);
+  const lines = [
+    header,
+    "",
+    `Failing tests (${st.failed.length}):`,
+    ...shown.map((t) => `  - ${t}`),
+  ];
+  if (st.failed.length > cap) lines.push(`  ... and ${st.failed.length - cap} more`);
+  return lines.join("\n");
 }
 
 async function resolveForArgs(args: TailLogArgs): Promise<Resolution> {
@@ -56,8 +79,9 @@ export async function runStatusOnce(args: TailLogArgs): Promise<void> {
     return;
   }
   try {
-    const out = await runVerifyLogStatusOnce(res.logPath, res.pid || 0, args.json);
-    process.stdout.write(args.json ? String(out).trimEnd() + "\n" : out);
+    const st = await computeStatusFromLogPath(res.logPath, res.pid || 0);
+    const out = args.json ? formatStatusJsonLine(st) : formatStatusText(st);
+    process.stdout.write(String(out).trimEnd() + "\n");
     process.exit(0);
   } catch (e: any) {
     process.stderr.write(String(e?.stderr || e?.message || e) + "\n");
@@ -69,6 +93,8 @@ export async function renderStatusWatchLoop(args: TailLogArgs): Promise<void> {
   const isTty = Boolean(process.stdout.isTTY);
   const json = args.json;
   const intervalSec = args.watchIntervalSec;
+
+  const pidSig = args.selection.kind === "pid" ? await pidStartSignature(args.selection.pid) : "";
 
   let prevLines = 0;
   if (isTty && !json) process.stdout.write("\u001b[?25l");
@@ -88,15 +114,16 @@ export async function renderStatusWatchLoop(args: TailLogArgs): Promise<void> {
     if (res.logPath) {
       if (json) {
         try {
-          const s = await runVerifyLogStatusOnce(res.logPath, pid, true);
-          process.stdout.write(String(s).trimEnd() + "\n");
+          const st = await computeStatusFromLogPath(res.logPath, pid);
+          process.stdout.write(formatStatusJsonLine(st) + "\n");
         } catch {
           process.stdout.write(emptyNdjson(pid, "log file missing") + "\n");
         }
       } else {
         let out = "";
         try {
-          out = await runVerifyLogStatusOnce(res.logPath, pid, false);
+          const st = await computeStatusFromLogPath(res.logPath, pid);
+          out = formatStatusText(st);
         } catch {
           out =
             "Time elapsed: ?\nTests so far:   Pass 0. Fail 0. Fatal 0. Skip 0. Build failure 0\nLog: (missing)\n(error: log file missing; waiting...)";
@@ -124,7 +151,8 @@ export async function renderStatusWatchLoop(args: TailLogArgs): Promise<void> {
     }
 
     if (args.selection.kind === "pid") {
-      const alive = await pidAlive(args.selection.pid);
+      if (!pidSig) return;
+      const alive = await pidAliveWithSignature(args.selection.pid, pidSig);
       if (!alive) return;
     }
     await new Promise((r) => setTimeout(r, intervalSec * 1000));

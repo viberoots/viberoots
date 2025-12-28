@@ -82,7 +82,8 @@ When your macro must emit a **planner-visible stub** (a graph node for planner d
   - Stamps exactly one `patch_scope:*` label for the language
   - Stamps `lang:*` and `kind:*` (including non-standard kinds like `carchive`)
   - Attaches package-local patch files as stub inputs
-  - Optionally realizes provider edges into `deps` or `srcs`, and can strip provider targets from `deps` when a planner-visible boundary must not depend on providers
+  - Strips provider targets from planner-visible `deps` **by default** (opt out via `strip_providers_from_deps = False`)
+  - Optionally realizes provider edges into `deps` or **inputs** (`srcs`) via `provider_realization_mode = "deps"|"inputs"`
 
 ### Python notes
 

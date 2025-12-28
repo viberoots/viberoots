@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { spawn } from "node:child_process";
 import { latestSymlink, lockDir, logsDir } from "./paths.ts";
 
 export type Resolution =
@@ -12,14 +13,75 @@ function isInt(s: string): boolean {
 }
 
 export async function pidAlive(pid: number): Promise<boolean> {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
   try {
     process.kill(pid, 0);
+  } catch {
+    return false;
+  }
+
+  // `kill(pid, 0)` returns success for zombies (the PID exists but has exited).
+  // For tail-log's "watch until pid ends" semantics we treat zombies as not alive.
+  try {
+    const stat = await new Promise<string>((resolve, reject) => {
+      const p = spawn("ps", ["-p", String(pid), "-o", "stat="], {
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      let out = "";
+      let err = "";
+      p.stdout?.on("data", (b) => (out += String(b)));
+      p.stderr?.on("data", (b) => (err += String(b)));
+      p.on("error", reject);
+      p.on("exit", (code) => {
+        if (code === 0) {
+          resolve(out.trim());
+          return;
+        }
+        reject(new Error(`ps exited ${code ?? "null"}: ${err.trim()}`));
+      });
+    });
+    if (!stat) return false;
+    // Common formats: "S+", "R+", "Z+", "Z".
+    if (stat.includes("Z")) return false;
     return true;
   } catch {
+    // If ps is unavailable or errors, treat the PID as not alive to avoid hangs in watch mode.
     return false;
   }
 }
 
+export async function pidStartSignature(pid: number): Promise<string> {
+  if (!Number.isInteger(pid) || pid <= 0) return "";
+  try {
+    const sig = await new Promise<string>((resolve, reject) => {
+      const p = spawn("ps", ["-p", String(pid), "-o", "lstart="], {
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      let out = "";
+      let err = "";
+      p.stdout?.on("data", (b) => (out += String(b)));
+      p.stderr?.on("data", (b) => (err += String(b)));
+      p.on("error", reject);
+      p.on("exit", (code) => {
+        if (code === 0) {
+          resolve(out.trim());
+          return;
+        }
+        reject(new Error(`ps exited ${code ?? "null"}: ${err.trim()}`));
+      });
+    });
+    return sig;
+  } catch {
+    return "";
+  }
+}
+
+export async function pidAliveWithSignature(pid: number, expectedSig: string): Promise<boolean> {
+  if (!(await pidAlive(pid))) return false;
+  const sig = await pidStartSignature(pid);
+  if (!sig) return false;
+  return sig === expectedSig;
+}
 async function readText(p: string): Promise<string> {
   try {
     return String(await fs.readFile(p, "utf8")).trim();
