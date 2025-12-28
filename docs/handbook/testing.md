@@ -21,6 +21,10 @@ Toggles:
 - `TEST_FORCE_SEED_REPO=1`: always use the seed (falls back to `cp -a` from the seed when CoW isn’t supported).
 - `TEST_DISABLE_SEED_REPO=1`: always use rsync (never use the seed).
 
+`runInTemp` also verifies zx initialization using a `node --import <zx-init>` probe, but it does so **once per test worker** (not per temp repo). For debugging, you can force re-probing with:
+
+- `TEST_FORCE_ZX_INIT_PROBE=1`
+
 ## Coverage
 
 - Enable: `COVERAGE=1` via Buck test executor `-- --env COVERAGE=1`.

@@ -64,6 +64,51 @@ async function timeAsync<T>(label: string, fn: () => Promise<T>): Promise<T> {
   }
 }
 
+export function getTimingCountForLabel(label: string): number {
+  return timingAgg.get(label)?.count ?? 0;
+}
+
+const ZX_INIT_PROBE_LABEL = "zx-init probe (node --import zx-init)";
+let zxInitProbeDone = false;
+let zxInitProbePromise: Promise<void> | null = null;
+
+async function ensureZxInitProbedOnce(
+  tmp: string,
+  $: any,
+  exportEnv: Record<string, string>,
+): Promise<void> {
+  const force = String(process.env.TEST_FORCE_ZX_INIT_PROBE || "") === "1";
+  if (!force && zxInitProbeDone) return;
+
+  const doProbe = async () => {
+    try {
+      await timeAsync(ZX_INIT_PROBE_LABEL, async () => {
+        await $({
+          cwd: tmp,
+          env: exportEnv,
+        })`node --experimental-strip-types --import ${exportEnv.ZX_INIT} -e ${"console.log('zx-init-loaded')"}`;
+      });
+    } catch {}
+  };
+
+  if (force) {
+    await doProbe();
+    return;
+  }
+
+  if (!zxInitProbePromise) {
+    zxInitProbePromise = (async () => {
+      try {
+        await doProbe();
+      } finally {
+        zxInitProbeDone = true;
+      }
+    })();
+  }
+
+  await zxInitProbePromise;
+}
+
 async function rewriteCoverageUrls(tmpRoot: string) {
   try {
     const repoRoot = process.cwd();
@@ -581,14 +626,7 @@ export async function runInTemp<T>(
     .join(" ");
   // Ensure zx globals are loaded in the temp repo when tests call bare `$` inside runInTemp
   // by importing the workspace zx-init explicitly once.
-  try {
-    await timeAsync("zx-init probe (node --import zx-init)", async () => {
-      await $({
-        cwd: tmp,
-        env: exportEnv,
-      })`node --experimental-strip-types --import ${exportEnv.ZX_INIT} -e ${"console.log('zx-init-loaded')"}`;
-    });
-  } catch {}
+  await ensureZxInitProbedOnce(tmp, $, exportEnv);
   const _$ = $({ cwd: tmp, env: exportEnv });
   await timeAsync("buck-daemon-reaper setup", async () => await ensureBuckReaperStarted(tmp, _$));
   try {
