@@ -3,7 +3,7 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { sanitizeName } from "./common.ts";
+import { nodeModulesAttr } from "./common.ts";
 import { runGlue } from "./glue.ts";
 import { runGomod2nixGenerate, runGomod2nixScanAll } from "./gomod2nix.ts";
 import { withExclusiveInstallLock } from "./lock.ts";
@@ -61,6 +61,11 @@ try {
 async function discoverImportersWithLock(root: string): Promise<string[]> {
   const candidates = ["apps", "libs"];
   const out: string[] = [];
+  // Root importer (.) is supported when pnpm-lock.yaml exists at repo root.
+  try {
+    await fsp.access(path.join(root, "pnpm-lock.yaml"));
+    out.push(".");
+  } catch {}
   for (const base of candidates) {
     const baseAbs = path.join(root, base);
     try {
@@ -190,10 +195,10 @@ await withExclusiveInstallLock(
         env: { ...process.env, INSTALL_LOCK_SKIP: "1" },
       })`zx-wrapper ${absUpdate} --lockfile ${relLock}`;
       // Build the importer-scoped node_modules via Nix (pure sandbox)
-      const attr = sanitizeName(imp);
+      const attr = nodeModulesAttr(imp);
       await $({
         stdio: "inherit",
-      })`nix build ${repoRoot}#node-modules.${attr} --no-link --accept-flake-config --print-build-logs`;
+      })`nix build ${repoRoot}#${attr} --no-link --accept-flake-config --print-build-logs`;
       // Link apps/<name>/node_modules -> Nix output's node_modules (remove stale link first)
       await $({
         cwd: path.join(repoRoot, imp),
