@@ -28,14 +28,15 @@ test("labels-probe: cpp emscripten stamps lang/kind/variant", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 build --show-output //tests/labels:cpp_ems.labels.txt`;
+    })`buck2 build --show-output //tests/labels:cpp_ems`;
     if (query.exitCode !== 0) return;
     const out =
       String(query.stdout || "")
         .trim()
         .split(/\s+/)
         .pop() || "";
-    const txt = await fs.readFile(out, "utf8");
+    const absOut = path.isAbsolute(out) ? out : path.join(tmp, out);
+    const txt = await fs.readFile(absOut, "utf8");
     assert.match(txt, /lang:cpp/);
     assert.match(txt, /kind:wasm/);
     assert.match(txt, /wasm:emscripten/);
