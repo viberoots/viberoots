@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
 import { pathToFileURL } from "node:url";
+import { initTempRepoFromWorkspaceOrSeed } from "./seed-temp-repo";
 // Ensure zx globals are available in node:test workers by importing workspace zx-init
 try {
   const zxInit = path.join(process.cwd(), "tools", "dev", "zx-init.mjs");
@@ -265,7 +266,15 @@ export async function runInTemp<T>(
   const overallStart = performance.now();
   const tmp = await mktemp(name + "-");
   const home = await fsp.mkdtemp(path.join(os.tmpdir(), "bucknix-test-home-"));
-  await rsyncRepoTo(tmp);
+  await initTempRepoFromWorkspaceOrSeed({
+    tmpDir: tmp,
+    deps: {
+      mktemp,
+      rsyncRepoTo,
+      timeAsync,
+      $,
+    },
+  });
   // Normalize flake.lock path inputs that use relative 'path:./...' to absolute paths within the temp repo.
   // This avoids Nix errors when evaluating from store snapshots where relative path inputs are disallowed.
   try {

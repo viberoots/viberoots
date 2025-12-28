@@ -7,6 +7,20 @@
 - Use zx `#!/usr/bin/env zx-wrapper` for tests.
 - Do not modify PATH inside tests; rely on the dev shell to supply tools.
 
+## Temp repos (`runInTemp`)
+
+Many zx tests use `runInTemp(...)` (in `tools/tests/lib/test-helpers.ts`) to execute in an isolated copy of the repo. For performance, `runInTemp` can create a **per-worker seed repo** once, and then create each temp repo from that seed:
+
+- On filesystems that support it, temp repos are created using copy-on-write cloning:
+  - macOS: `cp -cRp`
+  - Linux: `cp -a --reflink=auto`
+- If CoW clone is not supported, `runInTemp` uses rsync by default (preserving determinism).
+
+Toggles:
+
+- `TEST_FORCE_SEED_REPO=1`: always use the seed (falls back to `cp -a` from the seed when CoW isn’t supported).
+- `TEST_DISABLE_SEED_REPO=1`: always use rsync (never use the seed).
+
 ## Coverage
 
 - Enable: `COVERAGE=1` via Buck test executor `-- --env COVERAGE=1`.
