@@ -2,6 +2,7 @@
 let
   lib = pkgs.lib;
   H = import ../lib/lang-helpers.nix { inherit pkgs; };
+  DevOverrideEnvs = import ../lib/dev-override-envs.nix { inherit pkgs; };
   Common = import ../templates-common.nix { inherit pkgs; };
   Tiny = import ./go-tiny-wasm.nix { inherit pkgs; };
 
@@ -26,7 +27,7 @@ in {
   goApp = {
     name,
     modulesToml,
-    devOverrideEnv ? "NIX_GO_DEV_OVERRIDE_JSON",
+    devOverrideEnv ? DevOverrideEnvs.envNameForLang "go",
     devOverridesMap ? {},
     subdir ? ".",
     srcRoot ? ../../..,
@@ -75,7 +76,7 @@ in {
   goLib = {
     name,
     modulesToml,
-    devOverrideEnv ? "NIX_GO_DEV_OVERRIDE_JSON",
+    devOverrideEnv ? DevOverrideEnvs.envNameForLang "go",
     subdir ? ".",
     srcRoot ? ../../..,
     patchDirs ? [],
@@ -114,7 +115,7 @@ in {
   goCArchive = {
     name,
     modulesToml,
-    devOverrideEnv ? "NIX_GO_DEV_OVERRIDE_JSON",
+    devOverrideEnv ? DevOverrideEnvs.envNameForLang "go",
     subdir ? ".",
     pkgPath ? ".",
     srcRoot ? ../../..,

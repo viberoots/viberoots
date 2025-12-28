@@ -253,6 +253,7 @@ Dev override environment variable names are treated as a cross-language contract
 - **Manifest (source of truth)**: `tools/lib/dev-override-envs.json`
 - **TypeScript consumer**: `tools/lib/dev-override-envs.ts`
 - **Nix consumer (planner mapping)**: `tools/nix/planner/overrides.nix` reads the JSON manifest
+- **Nix consumer (template defaults)**: `tools/nix/lib/dev-override-envs.nix` reads the JSON manifest and templates use `envNameForLang(...)` instead of hardcoded strings
 
 Rule: tooling must not hardcode `NIX_*_DEV_OVERRIDE_JSON` names. Resolve env var names from the manifest instead.
 

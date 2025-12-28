@@ -266,7 +266,7 @@ let
   in builtins.foldl' step {} (lib.filter isPatch names);
 in
 {
-  goApp = { name, modulesToml, devOverrideEnv ? "NIX_GO_DEV_OVERRIDE_JSON", subdir ? ".", patchDir ? ../../patches/go }:
+  goApp = { name, modulesToml, devOverrideEnv ? (import ./lib/dev-override-envs.nix { inherit pkgs; }).envNameForLang "go", subdir ? ".", patchDir ? ../../patches/go }:
     let
       patchesMap   = patchesMapFromDir patchDir;
       devOverrides = let v = builtins.getEnv devOverrideEnv;
@@ -286,7 +286,7 @@ in
       };
     };
 
-  goLib = { name, modulesToml, devOverrideEnv ? "NIX_GO_DEV_OVERRIDE_JSON", subdir ? ".", patchDir ? ../../patches/go }:
+  goLib = { name, modulesToml, devOverrideEnv ? (import ./lib/dev-override-envs.nix { inherit pkgs; }).envNameForLang "go", subdir ? ".", patchDir ? ../../patches/go }:
     let
       patchesMap   = patchesMapFromDir patchDir;
       devOverrides = let v = builtins.getEnv devOverrideEnv;
@@ -1546,7 +1546,7 @@ let
       in acc // { "${key}" = val; };
   in builtins.foldl' step {} (lib.filter isPatch names);
 in {
-  goApp = { name, modulesToml, devOverrideEnv ? "NIX_GO_DEV_OVERRIDE_JSON", subdir ? ".", patchDir ? ../../patches/go }:
+  goApp = { name, modulesToml, devOverrideEnv ? (import ./lib/dev-override-envs.nix { inherit pkgs; }).envNameForLang "go", subdir ? ".", patchDir ? ../../patches/go }:
     let
       patchesMap   = patchesMapFromDir patchDir;
       devOverrides = let v = builtins.getEnv devOverrideEnv; in if v == "" then {} else builtins.fromJSON v;
@@ -1565,7 +1565,7 @@ in {
       };
     };
 
-  goLib = { name, modulesToml, devOverrideEnv ? "NIX_GO_DEV_OVERRIDE_JSON", subdir ? ".", patchDir ? ../../patches/go }:
+  goLib = { name, modulesToml, devOverrideEnv ? (import ./lib/dev-override-envs.nix { inherit pkgs; }).envNameForLang "go", subdir ? ".", patchDir ? ../../patches/go }:
     let
       patchesMap   = patchesMapFromDir patchDir;
       devOverrides = let v = builtins.getEnv devOverrideEnv; in if v == "" then {} else builtins.fromJSON v;

@@ -2,6 +2,7 @@
 let
   lib = pkgs.lib;
   H = import ../../lib/lang-helpers.nix { inherit pkgs; };
+  DevOverrideEnvs = import ../../lib/dev-override-envs.nix { inherit pkgs; };
   UvBackend = import ./backends/uv.nix { inherit pkgs; uv2nixLib = uv2nixLib; };
 
   # Render a tiny WASI module in WAT that writes a fixed message to stdout.
@@ -52,7 +53,7 @@ WAT
     lockfile,
     subdir ? ".",
     srcRoot ? ../../..,
-    devOverrideEnv ? "NIX_PY_DEV_OVERRIDE_JSON",
+    devOverrideEnv ? DevOverrideEnvs.envNameForLang "python",
     groups ? [],
   }:
     let
@@ -106,7 +107,7 @@ in {
     backend ? "wasi",
     subdir ? ".",
     srcRoot ? ../../..,
-    devOverrideEnv ? "NIX_PY_DEV_OVERRIDE_JSON",
+    devOverrideEnv ? DevOverrideEnvs.envNameForLang "python",
     groups ? [],
     libOverlays ? [],
     trim ? "none", # none | safe | aggressive
@@ -212,7 +213,7 @@ JSON
     backend ? "wasi",
     subdir ? ".",
     srcRoot ? ../../..,
-    devOverrideEnv ? "NIX_PY_DEV_OVERRIDE_JSON",
+    devOverrideEnv ? DevOverrideEnvs.envNameForLang "python",
     groups ? [],
     trim ? "none", # none | safe | aggressive
   }:

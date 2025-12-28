@@ -71,6 +71,7 @@ Sketch (illustrative)
 { pkgs }:
 let
   lib = pkgs.lib;
+  DevOverrideEnvs = import ../lib/dev-override-envs.nix { inherit pkgs; };
 
   patchesMapFromDir = patchDir: let
     names = if builtins.pathExists patchDir then builtins.attrNames (builtins.readDir patchDir) else [];
@@ -89,7 +90,7 @@ let
 
   devOverridesFromEnv = envName: let v = builtins.getEnv envName; in if v == "" then {} else builtins.fromJSON v;
 
-  mkPy = { pname, version ? "0.1.0", src ? ./. , lockfile, subdir ? ".", patchDir ? ../../patches/python, devOverrideEnv ? "NIX_PY_DEV_OVERRIDE_JSON", kind ? "app" }:
+  mkPy = { pname, version ? "0.1.0", src ? ./. , lockfile, subdir ? ".", patchDir ? ../../patches/python, devOverrideEnv ? DevOverrideEnvs.envNameForLang "python", kind ? "app" }:
     let
       patchesMap = patchesMapFromDir patchDir;
       devOverrides = devOverridesFromEnv devOverrideEnv;
@@ -103,9 +104,9 @@ let
       inherit pname version src subdir lockfile patchesMap devOverrides kind;
     } else builtins.throw "uv.lock not found at importer root (Python standard is uv)";
 in {
-  pyApp = { name, lockfile, subdir ? ".", patchDir ? ../../patches/python, devOverrideEnv ? "NIX_PY_DEV_OVERRIDE_JSON" }:
+  pyApp = { name, lockfile, subdir ? ".", patchDir ? ../../patches/python, devOverrideEnv ? DevOverrideEnvs.envNameForLang "python" }:
     mkPy { pname = "py-${name}"; inherit lockfile subdir patchDir devOverrideEnv; kind = "app"; };
-  pyLib = { name, lockfile, subdir ? ".", patchDir ? ../../patches/python, devOverrideEnv ? "NIX_PY_DEV_OVERRIDE_JSON" }:
+  pyLib = { name, lockfile, subdir ? ".", patchDir ? ../../patches/python, devOverrideEnv ? DevOverrideEnvs.envNameForLang "python" }:
     mkPy { pname = "pylib-${name}"; inherit lockfile subdir patchDir devOverrideEnv; kind = "lib"; };
 }
 ```

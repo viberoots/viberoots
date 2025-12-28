@@ -378,7 +378,7 @@ This example patches a nixpkgs package (e.g., `pkgs.zlib`) and writes a packageâ
 ```bash
 tools/bin/patch-pkg start cpp pkgs.zlib
 # prints a writable workspace containing the zlib sources; open and edit
-# By default this sets a process-local NIX_CPP_DEV_OVERRIDE_JSON for the selected attr.
+# By default this sets a process-local C++ dev override env var (as defined by `tools/lib/dev-override-envs.json`; currently `NIX_CPP_DEV_OVERRIDE_JSON`) for the selected attr.
 # Pass --echo-snippet if you prefer to export the override in your shell manually.
 ```
 

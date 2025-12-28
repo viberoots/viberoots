@@ -2,6 +2,7 @@
 let
   lib = pkgs.lib;
   H = import ../lib/lang-helpers.nix { inherit pkgs; };
+  DevOverrideEnvs = import ../lib/dev-override-envs.nix { inherit pkgs; };
   clangxx = "${pkgs.llvmPackages.clang}/bin/clang++";
   llvmAr  = "${pkgs.llvmPackages.llvm}/bin/llvm-ar";
 
@@ -18,9 +19,10 @@ let
   nixIncFlags = pkgsList: lib.concatStringsSep " " (map (p: "-isystem ${toIncludeBase p}/include") pkgsList);
   nixLibFlags = pkgsList: lib.concatStringsSep " " (map (p: "-L${toLibBase p}/lib") pkgsList);
 
-  # Standardized dev override handling (shared helper)
-  devMap = H.readDevOverrides "NIX_CPP_DEV_OVERRIDE_JSON";
-  _ci_guard = H.guardNoDevOverridesInCI "NIX_CPP_DEV_OVERRIDE_JSON";
+  # Standardized dev override handling (manifest-driven env name)
+  cppDevOverrideEnv = DevOverrideEnvs.envNameForLang "cpp";
+  devMap = H.readDevOverrides cppDevOverrideEnv;
+  _ci_guard = H.guardNoDevOverridesInCI cppDevOverrideEnv;
 
   normalizeAttr = H.normalizeNixAttr;
 

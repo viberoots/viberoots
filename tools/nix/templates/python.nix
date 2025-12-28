@@ -2,13 +2,14 @@
 let
   lib = pkgs.lib;
   H = import ../lib/lang-helpers.nix { inherit pkgs; };
+  DevOverrideEnvs = import ../lib/dev-override-envs.nix { inherit pkgs; };
 
   UvBackend = import ./python/backends/uv.nix { inherit pkgs; uv2nixLib = uv2nixLib; };
 
   mkPy = {
     name,
     lockfile,
-    devOverrideEnv ? "NIX_PY_DEV_OVERRIDE_JSON",
+    devOverrideEnv ? DevOverrideEnvs.envNameForLang "python",
     subdir ? ".",
     srcRoot ? ../../..,
     patchDirs ? [ ../../patches/python ],
@@ -70,7 +71,7 @@ in {
   pyApp = {
     name,
     lockfile,
-    devOverrideEnv ? "NIX_PY_DEV_OVERRIDE_JSON",
+    devOverrideEnv ? DevOverrideEnvs.envNameForLang "python",
     subdir ? ".",
     srcRoot ? ../../..,
     patchDirs ? [ ../../patches/python ],
@@ -84,7 +85,7 @@ in {
   pyLib = {
     name,
     lockfile,
-    devOverrideEnv ? "NIX_PY_DEV_OVERRIDE_JSON",
+    devOverrideEnv ? DevOverrideEnvs.envNameForLang "python",
     subdir ? ".",
     srcRoot ? ../../..,
     patchDirs ? [ ../../patches/python ],
