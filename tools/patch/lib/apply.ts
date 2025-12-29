@@ -5,6 +5,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { debugEnabled } from "./util";
 import { repoRoot as _repoRoot } from "../../lib/repo.ts";
+import { copyFileCloneAware, copyTree } from "../../lib/copy-tree.ts";
 import {
   readForceFlag,
   readFlagBoolFromTokens,
@@ -114,7 +115,13 @@ export async function writePatchIfChanged(
 }
 
 async function cpRecursive(src: string, dst: string): Promise<void> {
-  await fsp.cp(src, dst, { recursive: true, force: true });
+  const st = await fsp.stat(src);
+  if (st.isDirectory()) {
+    await copyTree(src, dst, { cloneMode: "try", force: true });
+    return;
+  }
+  await fsp.mkdir(path.dirname(dst), { recursive: true });
+  await copyFileCloneAware(src, dst, { cloneMode: "try", force: true });
 }
 
 export async function verifyPatchDryRun(
@@ -124,12 +131,7 @@ export async function verifyPatchDryRun(
 ): Promise<void> {
   const tmpRoot = await fsp.mkdtemp(path.join(os.tmpdir(), `bucknix-patch-verify-${mode}-`));
   const tmpCopy = path.join(tmpRoot, path.basename(originPath));
-  if (mode === "cpp") {
-    await fsp.mkdir(tmpCopy, { recursive: true });
-    await $`rsync -a ${originPath}/ ${tmpCopy}/`;
-  } else {
-    await cpRecursive(originPath, tmpCopy);
-  }
+  await cpRecursive(originPath, tmpCopy);
   if (mode === "cpp") {
     // C++ path: run quiet, capture output; mirror existing behavior
     const res = await $({

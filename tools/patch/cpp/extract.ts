@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { createDbg } from "../lib/util";
 import { encodeNixAttrForPatchPrefix, normalizeNixAttr } from "../../lib/providers";
+import { copyTree } from "../../lib/copy-tree.ts";
 import { resolveNixpkg } from "./resolve";
 import { chmodRecursive } from "../cross-platform";
 
@@ -14,8 +15,7 @@ export async function extractOrCopySrc(srcPath: string, destDir: string): Promis
   const stat = await fsp.stat(srcPath).catch(() => null);
   if (stat && stat.isDirectory()) {
     console.error("[patch-cpp] extract: copy dir", srcPath);
-    // Copy store dir into a writable workspace using the shared fallback copy path
-    await fsp.cp(srcPath, destDir, { recursive: true, force: true });
+    await copyTree(srcPath, destDir, { cloneMode: "try", force: true });
     await chmodRecursive(destDir);
     console.error("[patch-cpp] extract: copy dir done");
     return destDir;
@@ -62,7 +62,7 @@ export async function ensureOriginAndWorkspace(
   const wsRoot = await fsp.mkdtemp(path.join(base, `ws-${safeKey}-`));
   const originPath = await extractOrCopySrc(srcPath, originRoot);
   // Create workspace by cloning originPath
-  await $`rsync -a ${originPath}/ ${wsRoot}/`;
+  await copyTree(originPath, wsRoot, { cloneMode: "try", force: true });
   await chmodRecursive(wsRoot);
   dbg("ensureOriginAndWorkspace", { attr: attrNorm, originRoot, wsRoot, version, pname });
   return { key, originPath, workspacePath: wsRoot, version, pname };
