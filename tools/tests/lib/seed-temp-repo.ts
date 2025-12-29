@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -23,6 +24,10 @@ let seedReady: Promise<SeedState> | null = null;
 type CowMode = "darwin-cp-clone" | "linux-cp-reflink" | "none";
 let cowModeReady: Promise<CowMode> | null = null;
 
+function shortHash(s: string): string {
+  return crypto.createHash("sha256").update(s).digest("hex").slice(0, 12);
+}
+
 function seedConfigKey(): string {
   // If these toggles change mid-process, we must not reuse an old seed, because
   // the seed’s contents would no longer match the requested rsync shape.
@@ -33,14 +38,76 @@ function seedConfigKey(): string {
   });
 }
 
+function sharedSeedPaths(seedKey: string): {
+  root: string;
+  seedDir: string;
+  readyMarker: string;
+  lockFile: string;
+} {
+  const root = path.join(os.tmpdir(), "bucknix-seed-repo-cache");
+  const h = shortHash(seedKey);
+  const seedDir = path.join(root, `seed-${h}`);
+  const readyMarker = path.join(seedDir, ".ready");
+  const lockFile = path.join(root, `seed-${h}.lock`);
+  return { root, seedDir, readyMarker, lockFile };
+}
+
+async function waitForReadyMarker(readyMarker: string, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      await fsp.access(readyMarker);
+      return true;
+    } catch {}
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  return false;
+}
+
+async function ensureSharedSeedRepo(deps: SeedDeps, seedKey: string): Promise<string> {
+  const { root, seedDir, readyMarker, lockFile } = sharedSeedPaths(seedKey);
+  await fsp.mkdir(root, { recursive: true });
+
+  try {
+    await fsp.access(readyMarker);
+    return seedDir;
+  } catch {}
+
+  let lockFd: fsp.FileHandle | null = null;
+  try {
+    lockFd = await fsp.open(lockFile, "wx");
+  } catch {
+    const ok = await waitForReadyMarker(readyMarker, 60_000);
+    if (ok) return seedDir;
+    throw new Error(`seed repo lock held too long (missing ready marker): ${lockFile}`);
+  }
+
+  try {
+    try {
+      await fsp.rm(seedDir, { recursive: true, force: true });
+    } catch {}
+    const tmpDir = await fsp.mkdtemp(path.join(root, `seed-${shortHash(seedKey)}.tmp-`));
+    await deps.rsyncRepoTo(tmpDir);
+    await fsp.writeFile(path.join(tmpDir, ".ready"), "ok\n", "utf8");
+    await fsp.rename(tmpDir, seedDir);
+    return seedDir;
+  } finally {
+    try {
+      await lockFd.close();
+    } catch {}
+    await fsp.rm(lockFile, { force: true }).catch(() => {});
+  }
+}
+
 async function tryCpCloneCowMode($: Zx$, mode: Exclude<CowMode, "none">): Promise<boolean> {
   const src = await fsp.mkdtemp(path.join(os.tmpdir(), "bucknix-cow-probe-src-"));
   const dst = await fsp.mkdtemp(path.join(os.tmpdir(), "bucknix-cow-probe-dst-"));
   try {
     await fsp.writeFile(path.join(src, "hello.txt"), "hello\n", "utf8");
+    const darwinCp = "/bin/cp";
     const res =
       mode === "darwin-cp-clone"
-        ? await $({ stdio: "pipe" })`cp -cRp ${src}/. ${dst}/`.nothrow()
+        ? await $({ stdio: "pipe" })`${darwinCp} -cRp ${src}/. ${dst}/`.nothrow()
         : await $({ stdio: "pipe" })`cp -a --reflink=auto ${src}/. ${dst}/`.nothrow();
     return res.exitCode === 0;
   } finally {
@@ -69,29 +136,15 @@ async function ensureSeedRepoOnce(deps: SeedDeps): Promise<SeedState> {
   const key = seedConfigKey();
   if (seedState && seedState.seedKey === key) return seedState;
 
-  // If config changed, deliberately drop the old seed and create a new one.
-  // Cleanup is best-effort; the old seed is still isolated under tmpdir anyway.
-  if (seedState && seedState.seedKey !== key) {
-    const old = seedState.seedDir;
-    fsp.rm(old, { recursive: true, force: true }).catch(() => {});
-  }
-
   if (seedReady) {
     const s = await seedReady;
     if (s.seedKey === key) return s;
   }
 
   seedReady = (async () => {
-    const seedDir = await deps.mktemp("seed-");
-    await deps.rsyncRepoTo(seedDir);
+    const seedDir = await ensureSharedSeedRepo(deps, key);
     const s: SeedState = { seedKey: key, seedDir };
     seedState = s;
-
-    // Best-effort cleanup when the worker process exits (unless explicitly keeping tmp dirs).
-    process.once("exit", () => {
-      if (process.env.TEST_KEEP_TMP === "1") return;
-      fsp.rm(seedDir, { recursive: true, force: true }).catch(() => {});
-    });
 
     return s;
   })();
@@ -116,7 +169,8 @@ async function cloneSeedToTemp(opts: {
   const { seedDir, tmpDir, mode, $ } = opts;
   if (mode === "seed-cow") {
     if (process.platform === "darwin") {
-      await $`cp -cRp ${seedDir}/. ${tmpDir}/`;
+      const cp = "/bin/cp";
+      await $`${cp} -cRp ${seedDir}/. ${tmpDir}/`;
       return;
     }
     if (process.platform === "linux") {
