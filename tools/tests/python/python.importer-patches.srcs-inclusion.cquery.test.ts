@@ -55,5 +55,20 @@ test("python macros include importer-local patches in srcs (cquery)", async () =
       out.includes(patchRel),
       `expected importer-local patch path present in srcs: ${patchRel}`,
     );
+
+    const labelsQ = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //apps/demo:lib`;
+    if (labelsQ.exitCode !== 0) {
+      return;
+    }
+    const labelsOut = String(labelsQ.stdout || "");
+    assert.ok(
+      labelsOut.includes("patch_scope:importer-local"),
+      "expected patch_scope:importer-local label present on nix_python_library target",
+    );
   });
 });

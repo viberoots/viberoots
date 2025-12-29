@@ -96,8 +96,9 @@ When your macro must emit a **planner-visible stub** (a graph node for planner d
   - Lockfile labeling is importer‑scoped: `lockfile:<path>#<importer>`; standard file is `uv.lock`.
   - Macros: use `nix_python_{library,binary,test}` from `python/defs.bzl` and pass `lockfile_label` explicitly.
   - Macro wiring: importer-scoped wiring is centralized via:
-    - `//lang:importer_wiring.bzl:prepare_importer_non_genrule_wiring(...)` for `nix_python_library`, `nix_python_test`, and `nix_python_wasm_*`.
-    - `//lang:importer_wiring.bzl:prepare_importer_srcsless_rule_wiring(...)` for rule shapes that cannot accept `srcs` (example: prelude `python_binary`).
+    - Prefer `//lang:importer_wiring_v2.bzl:prepare_importer_non_genrule_wiring_v2(...)` for `nix_python_library`, `nix_python_test`, and `nix_python_wasm_*` (non-mutating).
+    - Prefer `//lang:importer_wiring_v2.bzl:prepare_importer_srcsless_rule_wiring_v2(...)` for rule shapes that cannot accept `srcs` (example: prelude `python_binary`).
+    - Legacy helpers remain available in `//lang:importer_wiring.bzl` for older call sites.
 - Scaffolding:
   - `scaf new python lib <name>` → `libs/<name>` with `pyproject.toml`, `uv.lock`, `TARGETS` using `nix_python_library` and a sample test via `nix_python_test`.
   - `scaf new python app <name>` → `apps/<name>` with a small library and binary (`nix_python_binary`) and importer‑scoped `lockfile_label`.

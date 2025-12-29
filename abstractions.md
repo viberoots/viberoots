@@ -238,7 +238,7 @@ I treat patch invalidation as two explicit models:
   - Stamping happens only at the shared wiring helper boundaries:
     - Package-local: `lang/package_local_wiring.bzl:prepare_package_local_wiring`
     - Package-local planner-visible stubs: `lang/planner_visible_wiring.bzl:wire_package_local_planner_visible_stub`
-    - Importer-local: `lang/importer_wiring.bzl:prepare_importer_*`
+    - Importer-local: `lang/importer_wiring*.bzl:prepare_importer_*`
 
 - **Package-local patching** (Go, C++):
   - Patch files live under the target’s Buck package, typically `patches/<lang>`.
@@ -491,9 +491,11 @@ Importer-scoped non-genrule wrappers should:
 
 ### Canonical implementations
 
-- **Starlark**: `lang/importer_wiring.bzl:prepare_importer_non_genrule_wiring`
+- **Starlark (preferred)**: `lang/importer_wiring_v2.bzl:prepare_importer_non_genrule_wiring_v2`
+- **Starlark (legacy)**: `lang/importer_wiring.bzl:prepare_importer_non_genrule_wiring`
 - **Python macro usage**: `python/defs.bzl` (`nix_python_library`, `nix_python_test`, `nix_python_wasm_*`)
-- **Srcs-less rule shapes**: `lang/importer_wiring.bzl:prepare_importer_srcsless_rule_wiring` (creates a synthetic dep carrying importer-local patches as action inputs)
+- **Srcs-less rule shapes (preferred)**: `lang/importer_wiring_v2.bzl:prepare_importer_srcsless_rule_wiring_v2` (creates a synthetic dep carrying importer-local patches as action inputs)
+- **Srcs-less rule shapes (legacy)**: `lang/importer_wiring.bzl:prepare_importer_srcsless_rule_wiring`
 
 ### Common leak patterns
 
@@ -547,7 +549,7 @@ Implemented in two layers, depending on the macro shape:
 
 ### Add a single helper for importer-scoped non-genrule macros
 
-Implemented: `lang/importer_wiring.bzl:prepare_importer_non_genrule_wiring` centralizes lockfile enforcement, importer derivation, patch input wiring, and provider-edge realization for non-genrule importer-scoped macros.
+Implemented: `lang/importer_wiring_v2.bzl:prepare_importer_non_genrule_wiring_v2` centralizes lockfile enforcement, importer derivation, patch input wiring, and provider-edge realization for non-genrule importer-scoped macros without mutating caller kwargs.
 
 ---
 

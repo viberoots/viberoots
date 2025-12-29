@@ -57,6 +57,21 @@ test("python binary carries importer-local patches via internal helper python_li
       "expected internal helper lib to appear in deps",
     );
 
+    const labelsQ = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //apps/demo:bin`;
+    if (labelsQ.exitCode !== 0) {
+      return;
+    }
+    const labelsOut = String(labelsQ.stdout || "");
+    assert.ok(
+      labelsOut.includes("patch_scope:importer-local"),
+      "expected patch_scope:importer-local label present on nix_python_binary target",
+    );
+
     const resQ = await $({
       cwd: tmp,
       stdio: "pipe",
