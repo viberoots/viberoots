@@ -11,7 +11,7 @@ import {
 import { parsePnpmLock, effectiveSetForImporter } from "../../lib/pnpm-lock.ts";
 import { writeImporterProvidersByLang } from "../../lib/provider-writer.ts";
 import { syncImporterProviders } from "../../lib/provider-sync-driver.ts";
-import { readImporterProviderIndexEntriesForSingleImporterLockfiles } from "../../lib/provider-index.ts";
+import { readImporterProviderIndexEntriesForSingleImporterLockfileBasenames } from "../../lib/provider-index.ts";
 
 export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: string }) {
   const contract = importerScopedProviderContractForLang("node");
@@ -89,14 +89,10 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
 export async function readNodeProviderIndexEntries(): Promise<
   Array<{ provider: string; key: string }>
 > {
-  const lockfiles = await findImporterLockfiles(["pnpm-lock.yaml"]);
-  if (!lockfiles.length) return [];
-
-  const entries = await readImporterProviderIndexEntriesForSingleImporterLockfiles({
-    discoverLockfiles: async () => lockfiles,
+  return await readImporterProviderIndexEntriesForSingleImporterLockfileBasenames({
+    lockfileBasenames: ["pnpm-lock.yaml"],
     requireNodeModule: "yaml",
     onMissingRequiredModule: "return-empty",
     shouldInclude: (_lf: string, importerLabel: string) => isSupportedImporterLabel(importerLabel),
   });
-  return entries;
 }

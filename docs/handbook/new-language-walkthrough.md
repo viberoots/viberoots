@@ -29,6 +29,9 @@ Steps
 
 - **Provider sync**
   - Implement `tools/buck/providers/rust.ts` using the existing provider-sync helpers pattern. If no patches exist, generator writes a minimal `TARGETS.<lang>.auto` deterministically.
+  - If your language is **importer-scoped** (lockfile ecosystems like Node/PNPM or Python/uv), reuse the shared lockfile and provider-index helpers:
+    - `tools/lib/importers.ts:findImporterLockfiles`, `computeImporterLabel`
+    - `tools/lib/provider-index.ts:readImporterProviderIndexEntriesForSingleImporterLockfileBasenames` (deterministic provider-index enumeration with supported-importer filtering and optional required-module gating)
 
 - **Auto-map wiring**
   - If your exporter emits labels (e.g., `module:…`), `tools/buck/gen-auto-map.ts` will map target → provider name; macros read providers from `MODULE_PROVIDERS` loaded via the stable `//lang:auto_map.bzl` re-export.

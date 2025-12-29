@@ -1,5 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import { computeImporterLabel } from "./importers.ts";
+import {
+  computeImporterLabel,
+  findImporterLockfiles,
+  isSupportedImporterLabel,
+} from "./importers.ts";
 import { providerNameForImporter } from "./providers.ts";
 
 export type ProviderIndexEntry = { provider: string; key: string };
@@ -88,5 +92,27 @@ export async function readImporterProviderIndexEntriesForSingleImporterLockfiles
     discoverLockfiles: opts.discoverLockfiles,
     importersForLockfile: async (_lf: string) => ["."],
     shouldInclude: opts.shouldInclude,
+  });
+}
+
+/**
+ * Opinionated helper for importer-scoped languages that have exactly one importer per lockfile
+ * (derived from dirname(lockfile)), use shared lockfile discovery, and default to supported-importer
+ * filtering.
+ */
+export async function readImporterProviderIndexEntriesForSingleImporterLockfileBasenames(opts: {
+  lockfileBasenames: string[];
+  shouldInclude?: ShouldInclude;
+  requireNodeModule?: string;
+  onMissingRequiredModule?: "return-empty" | "throw";
+}): Promise<ProviderIndexEntry[]> {
+  const shouldInclude =
+    opts.shouldInclude ||
+    ((_lf: string, importerLabel: string) => isSupportedImporterLabel(importerLabel));
+  return readImporterProviderIndexEntriesForSingleImporterLockfiles({
+    discoverLockfiles: async () => findImporterLockfiles(opts.lockfileBasenames),
+    shouldInclude,
+    requireNodeModule: opts.requireNodeModule,
+    onMissingRequiredModule: opts.onMissingRequiredModule,
   });
 }

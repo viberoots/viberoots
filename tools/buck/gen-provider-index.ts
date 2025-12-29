@@ -3,12 +3,11 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { writeIfChanged } from "../lib/fs-helpers.ts";
 import { readCompositeGraph } from "../lib/graph-view.ts";
-import { readNodeProviderIndexEntries } from "./providers/node.ts";
-import { readPythonProviderIndexEntries } from "./providers/python.ts";
 import { getFlagStr } from "../lib/cli.ts";
 import { parseLockfileLabel } from "../lib/labels.ts";
 import { isSupportedImporterLabel } from "../lib/importers.ts";
 import { normalizeNixAttr } from "../lib/providers.ts";
+import { readImporterProviderIndexEntriesForSingleImporterLockfileBasenames } from "../lib/provider-index.ts";
 
 type PatchScope = "package-local" | "importer-local";
 
@@ -154,7 +153,12 @@ async function readCppIndexEntries(): Promise<Record<string, IndexEntry>> {
 
 async function readNodeIndexEntries(): Promise<Record<string, IndexEntry>> {
   const out: Record<string, IndexEntry> = {};
-  const entries = await readNodeProviderIndexEntries();
+  const entries = await readImporterProviderIndexEntriesForSingleImporterLockfileBasenames({
+    lockfileBasenames: ["pnpm-lock.yaml"],
+    requireNodeModule: "yaml",
+    onMissingRequiredModule: "return-empty",
+    shouldInclude: (_lf: string, importerLabel: string) => isSupportedImporterLabel(importerLabel),
+  });
   for (const e of entries) {
     out[fq(e.provider)] = {
       kind: "node",
@@ -169,7 +173,10 @@ async function readNodeIndexEntries(): Promise<Record<string, IndexEntry>> {
 
 async function readPythonIndexEntries(): Promise<Record<string, IndexEntry>> {
   const out: Record<string, IndexEntry> = {};
-  const entries = await readPythonProviderIndexEntries();
+  const entries = await readImporterProviderIndexEntriesForSingleImporterLockfileBasenames({
+    lockfileBasenames: ["uv.lock"],
+    shouldInclude: (_lf: string, importerLabel: string) => isSupportedImporterLabel(importerLabel),
+  });
   for (const e of entries) {
     out[fq(e.provider)] = {
       kind: "python",

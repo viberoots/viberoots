@@ -29,16 +29,16 @@ test("readImporterProviderIndexEntriesForSingleImporterLockfiles returns stable 
     await $`git add apps/web/pnpm-lock.yaml apps/api/pnpm-lock.yaml apps/web/uv.lock apps/api/uv.lock`;
 
     const { stdout } = await $({ stdio: "pipe" })`node -e ${`
-        import { readImporterProviderIndexEntriesForSingleImporterLockfiles } from './tools/lib/provider-index.ts';
+        import { readImporterProviderIndexEntriesForSingleImporterLockfileBasenames } from './tools/lib/provider-index.ts';
 
-        const pnpm = await readImporterProviderIndexEntriesForSingleImporterLockfiles({
-          discoverLockfiles: async () => ['apps/web/pnpm-lock.yaml', 'apps/api/pnpm-lock.yaml'],
+        const pnpm = await readImporterProviderIndexEntriesForSingleImporterLockfileBasenames({
+          lockfileBasenames: ['pnpm-lock.yaml'],
           requireNodeModule: 'yaml',
           onMissingRequiredModule: 'throw',
         });
 
-        const uv = await readImporterProviderIndexEntriesForSingleImporterLockfiles({
-          discoverLockfiles: async () => ['apps/web/uv.lock', 'apps/api/uv.lock'],
+        const uv = await readImporterProviderIndexEntriesForSingleImporterLockfileBasenames({
+          lockfileBasenames: ['uv.lock'],
         });
 
         console.log(JSON.stringify({ pnpm, uv }));

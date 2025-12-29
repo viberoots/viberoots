@@ -5,7 +5,7 @@ import {
   isSupportedImporterLabel,
 } from "../../lib/importers.ts";
 import { importerScopedProviderContractForLang } from "../../lib/lang-contracts.ts";
-import { readImporterProviderIndexEntriesForSingleImporterLockfiles } from "../../lib/provider-index.ts";
+import { readImporterProviderIndexEntriesForSingleImporterLockfileBasenames } from "../../lib/provider-index.ts";
 import { syncImporterProviders } from "../../lib/provider-sync-driver.ts";
 import { decodeNameVersionFromPatch } from "../../lib/providers.ts";
 import { parseUvLockKeys } from "../../lib/uv-lock.ts";
@@ -51,8 +51,8 @@ export default syncPythonProviders;
 export async function readPythonProviderIndexEntries(): Promise<
   Array<{ provider: string; key: string }>
 > {
-  return await readImporterProviderIndexEntriesForSingleImporterLockfiles({
-    discoverLockfiles: async () => findImporterLockfiles(["uv.lock"]),
+  return await readImporterProviderIndexEntriesForSingleImporterLockfileBasenames({
+    lockfileBasenames: ["uv.lock"],
     shouldInclude: (_lf: string, importerLabel: string) => isSupportedImporterLabel(importerLabel),
   });
 }
