@@ -1,27 +1,20 @@
 #!/usr/bin/env zx-wrapper
 import type { Adapter, Batch, Node } from "../types.ts";
 import { hasLabel, isRuleType, validateLanguageClassification } from "./helpers.ts";
-import { findNearestPnpmLockForPackage } from "../../../lib/importers.ts";
 import { parseLockfileLabel } from "../../../lib/labels.ts";
 import { lockfileLabels } from "./importer-lockfile-labels.ts";
 import {
   attachImporterScopedLockfileLabels,
   validateImporterScopedAdapter,
 } from "./importer-scoped-adapter.ts";
+import { importerScopedAdapterRegistryEntry } from "./importer-scoped-registry.ts";
 
 function isNodeTarget(n: Node): boolean {
   // Prefer explicit lang stamp; fall back to common js_/node_ rule_type families
   return hasLabel(n, "lang:node") || isRuleType(n, /^js_/) || isRuleType(n, /^node_/);
 }
 
-function hasPnpmLockfileLabel(n: Node): boolean {
-  const locks = lockfileLabels(n);
-  return locks.some((l) => {
-    const parsed = parseLockfileLabel(l);
-    if (!parsed) return false;
-    return parsed.lockfile === "pnpm-lock.yaml" || parsed.lockfile.endsWith("/pnpm-lock.yaml");
-  });
-}
+const importerScopedConfig = importerScopedAdapterRegistryEntry("node");
 
 export const adapter: Adapter = {
   name: "node",
@@ -33,15 +26,10 @@ export const adapter: Adapter = {
     out.push(
       ...(await validateImporterScopedAdapter(nodes, {
         adapterName: "node",
-        lockfileBasename: "pnpm-lock.yaml",
+        lockfileBasename: importerScopedConfig.lockfileBasename,
         isTarget: isNodeTarget,
-        findNearestLockfile: findNearestPnpmLockForPackage,
-        shouldWarnMissingKindLabel(n) {
-          // Only enforce kind:* for Node targets that appear to be stamped by our macros
-          // (i.e., carry an importer-scoped lockfile label). This avoids flagging ad-hoc
-          // nodes created in tests or external rules that are not using our macros.
-          return lockfileLabels(n).length > 0;
-        },
+        findNearestLockfile: importerScopedConfig.findNearestLockfile,
+        shouldWarnMissingKindLabel: importerScopedConfig.shouldWarnMissingKindLabel,
       })),
     );
 
@@ -52,7 +40,15 @@ export const adapter: Adapter = {
         name: "node",
         looksLike(n: Node) {
           // Only treat nodes with PNPM importer-scoped lockfile labels as Node-like
-          return hasPnpmLockfileLabel(n);
+          const locks = lockfileLabels(n);
+          return locks.some((l) => {
+            const parsed = parseLockfileLabel(l);
+            if (!parsed) return false;
+            return (
+              parsed.lockfile === importerScopedConfig.lockfileBasename ||
+              parsed.lockfile.endsWith(`/${importerScopedConfig.lockfileBasename}`)
+            );
+          });
         },
         hasRuleType(n: Node) {
           return isRuleType(n, /^js_/) || isRuleType(n, /^node_/);
@@ -76,9 +72,9 @@ export const adapter: Adapter = {
     return attachImporterScopedLockfileLabels({
       nodes,
       adapterName: "node",
-      lockfileBasename: "pnpm-lock.yaml",
+      lockfileBasename: importerScopedConfig.lockfileBasename,
       isTarget: isNodeTarget,
-      findNearestLockfile: findNearestPnpmLockForPackage,
+      findNearestLockfile: importerScopedConfig.findNearestLockfile,
     });
   },
 };

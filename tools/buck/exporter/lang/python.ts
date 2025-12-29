@@ -1,16 +1,18 @@
 #!/usr/bin/env zx-wrapper
 import type { Adapter, Batch, Node } from "../types.ts";
 import { hasLabel, isRuleType, validateLanguageClassification } from "./helpers.ts";
-import { findNearestUvLockForPackage } from "../../../lib/importers.ts";
 import { lockfileLabels } from "./importer-lockfile-labels.ts";
 import {
   attachImporterScopedLockfileLabels,
   validateImporterScopedAdapter,
 } from "./importer-scoped-adapter.ts";
+import { importerScopedAdapterRegistryEntry } from "./importer-scoped-registry.ts";
 
 function isPythonTarget(n: Node): boolean {
   return hasLabel(n, "lang:python") || isRuleType(n, "python_");
 }
+
+const importerScopedConfig = importerScopedAdapterRegistryEntry("python");
 
 export const adapter: Adapter = {
   name: "python",
@@ -22,12 +24,10 @@ export const adapter: Adapter = {
     out.push(
       ...(await validateImporterScopedAdapter(nodes, {
         adapterName: "python",
-        lockfileBasename: "uv.lock",
+        lockfileBasename: importerScopedConfig.lockfileBasename,
         isTarget: isPythonTarget,
-        findNearestLockfile: findNearestUvLockForPackage,
-        shouldWarnMissingKindLabel(n) {
-          return lockfileLabels(n).length > 0;
-        },
+        findNearestLockfile: importerScopedConfig.findNearestLockfile,
+        shouldWarnMissingKindLabel: importerScopedConfig.shouldWarnMissingKindLabel,
       })),
     );
 
@@ -62,9 +62,9 @@ export const adapter: Adapter = {
     return attachImporterScopedLockfileLabels({
       nodes,
       adapterName: "python",
-      lockfileBasename: "uv.lock",
+      lockfileBasename: importerScopedConfig.lockfileBasename,
       isTarget: isPythonTarget,
-      findNearestLockfile: findNearestUvLockForPackage,
+      findNearestLockfile: importerScopedConfig.findNearestLockfile,
     });
   },
 };

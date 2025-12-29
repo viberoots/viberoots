@@ -14,7 +14,8 @@ For importer-scoped ecosystems (currently Node/PNPM and Python/uv), the exporter
 
 - **Attachment policy**: auto-attach `lockfile:` labels only for macro-stamped targets (targets that already carry a `kind:*` label) when they have no `lockfile:` label yet.
 - **Validation policy**: when a target already has a `lockfile:` label, validate it strictly (even if `kind:*` is missing) using the canonical parser `tools/lib/labels.ts:parseLockfileLabel(...)` (including importer-directory consistency and the repo-root `#.` special case).
-- **Implementation helper**: exporter adapters should reuse `tools/buck/exporter/lang/importer-lockfile-labels.ts` instead of re-implementing label attachment or lockfile-label validation logic.
+- **Configuration registry**: importer-scoped adapters must read lockfile basenames and nearest-lockfile lookup from `tools/buck/exporter/lang/importer-scoped-registry.ts`. Do not embed lockfile basenames or bespoke nearest-lockfile scans in per-language adapters.
+- **Implementation helpers**: exporter adapters should reuse `tools/buck/exporter/lang/importer-scoped-adapter.ts` and `tools/buck/exporter/lang/importer-lockfile-labels.ts` instead of re-implementing label attachment, lockfile discovery, or lockfile-label validation logic.
 - **Error diagnostics**: if you need to distinguish “malformed label” vs “importer mismatch”, use `tools/lib/labels.ts:inspectLockfileLabel(...)` rather than hand-rolling partial parsing.
 
 Example skeleton:
