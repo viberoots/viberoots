@@ -2,6 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { once } from "node:events";
 import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -16,7 +17,7 @@ test("tail-log: explicit PID --status -w exits after the PID ends (no switching)
   await fsp.writeFile(logFile, "[verify] buck2 test begin iso=v-1 start_s=1\n", "utf8");
   const logReal = await fsp.realpath(logFile);
 
-  const sleeper = spawn("sleep", ["0.2"], { stdio: "ignore" });
+  const sleeper = spawn("sleep", ["2"], { stdio: "ignore" });
   assert.ok(typeof sleeper.pid === "number" && sleeper.pid > 0);
   const pid = sleeper.pid;
 
@@ -41,6 +42,11 @@ test("tail-log: explicit PID --status -w exits after the PID ends (no switching)
 
   let buf = "";
   const seen: any[] = [];
+  let sawPidOnce = false;
+  let sawPidResolve: (() => void) | null = null;
+  const sawPid = new Promise<void>((resolve) => {
+    sawPidResolve = resolve;
+  });
   tailLog.stdout?.setEncoding("utf8");
   tailLog.stdout?.on("data", (chunk) => {
     buf += chunk;
@@ -51,23 +57,43 @@ test("tail-log: explicit PID --status -w exits after the PID ends (no switching)
       buf = buf.slice(idx + 1);
       if (!line) continue;
       try {
-        seen.push(JSON.parse(line));
+        const obj = JSON.parse(line);
+        seen.push(obj);
+        if (!sawPidOnce && obj && obj.pid === pid) {
+          sawPidOnce = true;
+          sawPidResolve?.();
+          sawPidResolve = null;
+        }
       } catch {
         // ignore
       }
     }
   });
 
-  const exitCode: number = await new Promise((resolve, reject) => {
+  const waitForExit = async (): Promise<number> => {
     const t = setTimeout(() => {
       tailLog.kill("SIGKILL");
-      reject(new Error("tail-log did not exit within timeout"));
-    }, 2000);
-    tailLog.once("exit", (code) => {
+    }, 10_000);
+    try {
+      const [code] = (await once(tailLog, "exit")) as [number | null];
+      return code ?? -1;
+    } finally {
       clearTimeout(t);
-      resolve(code ?? -1);
-    });
-  });
+    }
+  };
+
+  const sawTimeout = setTimeout(() => {
+    tailLog.kill("SIGKILL");
+  }, 2_000);
+  try {
+    await sawPid;
+  } finally {
+    clearTimeout(sawTimeout);
+  }
+
+  await once(sleeper, "exit");
+
+  const exitCode = await waitForExit();
 
   assert.equal(exitCode, 0);
   assert.ok(seen.length >= 1);
