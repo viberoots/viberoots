@@ -13,6 +13,7 @@ load("//lang:nixpkg_labels.bzl", _append_nixpkg_labels = "append_nixpkg_labels",
 load(
     "//lang:macro_kwargs.bzl",
     _macro_kwargs_probe = "macro_kwargs_probe",
+    _extract_package_local_patch_dirs_and_nixpkg_deps = "extract_package_local_patch_dirs_and_nixpkg_deps",
     _pop_local_patch_dirs = "pop_local_patch_dirs",
     _pop_nixpkg_deps = "pop_nixpkg_deps",
     _pop_package_local_patch_dirs_and_nixpkg_deps = "pop_package_local_patch_dirs_and_nixpkg_deps",
@@ -79,7 +80,9 @@ load(
 load(
     "//lang:package_local_wiring.bzl",
     _prepare_package_local_wiring = "prepare_package_local_wiring",
+    _prepare_package_local_wiring_v2 = "prepare_package_local_wiring_v2",
     _package_local_wiring_probe = "package_local_wiring_probe",
+    _package_local_wiring_v2_mutation_probe = "package_local_wiring_v2_mutation_probe",
 )
 load(
     "//lang:wasm_package_local_wiring.bzl",
@@ -124,6 +127,7 @@ normalize_nix_attr_probe = _normalize_nix_attr_probe
 pop_local_patch_dirs = _pop_local_patch_dirs
 pop_nixpkg_deps = _pop_nixpkg_deps
 pop_package_local_patch_dirs_and_nixpkg_deps = _pop_package_local_patch_dirs_and_nixpkg_deps
+extract_package_local_patch_dirs_and_nixpkg_deps = _extract_package_local_patch_dirs_and_nixpkg_deps
 macro_kwargs_probe = _macro_kwargs_probe
 
 target_key_for_current_package = _target_key_for_current_package
@@ -158,7 +162,9 @@ wire_planner_visible_stub = _wire_planner_visible_stub
 wire_package_local_planner_visible_stub = _wire_package_local_planner_visible_stub
 
 prepare_package_local_wiring = _prepare_package_local_wiring
+prepare_package_local_wiring_v2 = _prepare_package_local_wiring_v2
 package_local_wiring_probe = _package_local_wiring_probe
+package_local_wiring_v2_mutation_probe = _package_local_wiring_v2_mutation_probe
 
 prepare_package_local_wasm_wiring = _prepare_package_local_wasm_wiring
 wire_package_local_wasm_planner_visible_stub = _wire_package_local_wasm_planner_visible_stub

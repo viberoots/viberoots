@@ -47,6 +47,24 @@ def pop_package_local_patch_dirs_and_nixpkg_deps(kwargs, lang, append_labels = T
         nixpkg_deps = nixpkg_deps,
     )
 
+def extract_package_local_patch_dirs_and_nixpkg_deps(kwargs, lang, append_labels = True):
+    """
+    Non-mutating variant of pop_package_local_patch_dirs_and_nixpkg_deps.
+
+    Returns a struct:
+      - kwargs: a new dict with `local_patch_dirs` / `nixpkg_deps` removed (and labels appended if enabled)
+      - local_patch_dirs
+      - nixpkg_deps
+    """
+    src = kwargs if isinstance(kwargs, dict) else {}
+    kw = dict(src)
+    info = pop_package_local_patch_dirs_and_nixpkg_deps(kw, lang, append_labels = append_labels)
+    return struct(
+        kwargs = kw,
+        local_patch_dirs = info.local_patch_dirs,
+        nixpkg_deps = info.nixpkg_deps,
+    )
+
 def macro_kwargs_probe(name, lang, local_patch_dirs = None, nixpkg_deps = None, append_labels = True):
     """
     Probe helper for tests. Writes a newline-delimited file of:
@@ -78,6 +96,7 @@ __all__ = [
     "pop_local_patch_dirs",
     "pop_nixpkg_deps",
     "pop_package_local_patch_dirs_and_nixpkg_deps",
+    "extract_package_local_patch_dirs_and_nixpkg_deps",
     "macro_kwargs_probe",
 ]
 

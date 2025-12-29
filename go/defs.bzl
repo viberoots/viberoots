@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "go_binary", "go_library", "go_test")
-load("//lang:defs_common.bzl", "normalize_labels", "prepare_package_local_wasm_wiring", "prepare_package_local_wiring")
+load("//lang:defs_common.bzl", "normalize_labels", "prepare_package_local_wasm_wiring", "prepare_package_local_wiring_v2")
 load("//lang:global_inputs.bzl", "global_nix_inputs")
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
 load("//lang:defs_common.bzl", "wire_package_local_planner_visible_stub")
@@ -9,61 +9,56 @@ load("//go/private:auto_tests.bzl", "maybe_autowire_go_binary_test", "maybe_auto
 
 
 def nix_go_library(name, **kwargs):
-    repo_cgo_deps = kwargs.pop("repo_cgo_deps", [])
-    nix_cgo_pkgconfig = kwargs.pop("nix_cgo_pkgconfig", {})
-    deps = kwargs.pop("deps", [])
-    extra = normalize_labels(native.package_name(), kwargs.pop("extra_module_providers", []))
-    apply_go_tuple_labels(kwargs)
-    wiring = prepare_package_local_wiring(
+    kw = dict(kwargs)
+    repo_cgo_deps = kw.pop("repo_cgo_deps", [])
+    nix_cgo_pkgconfig = kw.pop("nix_cgo_pkgconfig", {})
+    deps = kw.pop("deps", [])
+    extra = normalize_labels(native.package_name(), kw.pop("extra_module_providers", []))
+    apply_go_tuple_labels(kw)
+    wiring = prepare_package_local_wiring_v2(
         name = name,
-        kwargs = kwargs,
+        kwargs = kw,
         lang = "go",
         kind = "lib",
         MODULE_PROVIDERS = MODULE_PROVIDERS,
         base_deps = deps + repo_cgo_deps + extra,
     )
-    configure_cgo_kwargs(kwargs, wiring.nixpkg_deps, repo_cgo_deps)
-    go_library(name = name, deps = wiring.deps, **kwargs)
+    configure_cgo_kwargs(wiring.kwargs, wiring.nixpkg_deps, repo_cgo_deps)
+    go_library(name = name, deps = wiring.deps, **wiring.kwargs)
 
     maybe_autowire_go_library_test(nix_go_test = nix_go_test, name = name)
 
 
 def nix_go_binary(name, **kwargs):
-    # Preserve key macro inputs for any auto-wired helper targets we synthesize below.
-    # (The helpers we call will `pop(...)` from kwargs, so capture first.)
-    base_deps = kwargs.get("deps", []) or []
-    extra_module_providers = kwargs.get("extra_module_providers", []) or []
-    build_tags = kwargs.get("build_tags", []) or []
-    goos = kwargs.get("goos", None)
-    goarch = kwargs.get("goarch", None)
-    cgo_enabled = kwargs.get("cgo_enabled", None)
-    repo_cgo_deps = kwargs.pop("repo_cgo_deps", [])
-    nix_cgo_pkgconfig = kwargs.pop("nix_cgo_pkgconfig", {})
-    apply_go_tuple_labels(kwargs)
-    deps = kwargs.pop("deps", [])
-    extra = normalize_labels(native.package_name(), kwargs.pop("extra_module_providers", []))
-    wiring = prepare_package_local_wiring(
+    orig = dict(kwargs)
+    kw = dict(kwargs)
+    repo_cgo_deps = kw.pop("repo_cgo_deps", [])
+    nix_cgo_pkgconfig = kw.pop("nix_cgo_pkgconfig", {})
+    deps = kw.pop("deps", [])
+    extra = normalize_labels(native.package_name(), kw.pop("extra_module_providers", []))
+    apply_go_tuple_labels(kw)
+    wiring = prepare_package_local_wiring_v2(
         name = name,
-        kwargs = kwargs,
+        kwargs = kw,
         lang = "go",
         kind = "bin",
         MODULE_PROVIDERS = MODULE_PROVIDERS,
         base_deps = deps + repo_cgo_deps + extra,
     )
-    configure_cgo_kwargs(kwargs, wiring.nixpkg_deps, repo_cgo_deps)
-    apply_go_rule_stable_defaults(kwargs)
-    go_binary(name = name, deps = wiring.deps, **kwargs)
+    configure_cgo_kwargs(wiring.kwargs, wiring.nixpkg_deps, repo_cgo_deps)
+    apply_go_rule_stable_defaults(wiring.kwargs)
+    go_binary(name = name, deps = wiring.deps, **wiring.kwargs)
 
     maybe_autowire_go_binary_test(
         nix_go_library = nix_go_library,
         nix_go_test = nix_go_test,
         name = name,
-        base_deps = base_deps,
-        extra_module_providers = extra_module_providers,
-        build_tags = build_tags,
-        goos = goos,
-        goarch = goarch,
-        cgo_enabled = cgo_enabled,
+        base_deps = orig.get("deps", []) or [],
+        extra_module_providers = orig.get("extra_module_providers", []) or [],
+        build_tags = orig.get("build_tags", []) or [],
+        goos = orig.get("goos", None),
+        goarch = orig.get("goarch", None),
+        cgo_enabled = orig.get("cgo_enabled", None),
         nixpkg_deps = wiring.nixpkg_deps,
         repo_cgo_deps = repo_cgo_deps,
         local_patch_dirs = wiring.local_patch_dirs,
@@ -71,24 +66,25 @@ def nix_go_binary(name, **kwargs):
 
 
 def nix_go_test(name, **kwargs):
-    repo_cgo_deps = kwargs.pop("repo_cgo_deps", [])
-    nix_cgo_pkgconfig = kwargs.pop("nix_cgo_pkgconfig", {})
-    deps = kwargs.pop("deps", [])
-    extra = normalize_labels(native.package_name(), kwargs.pop("extra_module_providers", []))
-    apply_go_tuple_labels(kwargs)
-    wiring = prepare_package_local_wiring(
+    kw = dict(kwargs)
+    repo_cgo_deps = kw.pop("repo_cgo_deps", [])
+    nix_cgo_pkgconfig = kw.pop("nix_cgo_pkgconfig", {})
+    deps = kw.pop("deps", [])
+    extra = normalize_labels(native.package_name(), kw.pop("extra_module_providers", []))
+    apply_go_tuple_labels(kw)
+    wiring = prepare_package_local_wiring_v2(
         name = name,
-        kwargs = kwargs,
+        kwargs = kw,
         lang = "go",
         kind = "test",
         MODULE_PROVIDERS = MODULE_PROVIDERS,
         base_deps = deps + repo_cgo_deps + extra,
     )
-    configure_cgo_kwargs(kwargs, wiring.nixpkg_deps, repo_cgo_deps)
+    configure_cgo_kwargs(wiring.kwargs, wiring.nixpkg_deps, repo_cgo_deps)
 
     # If a library is provided, ensure we don't pass the same target in deps.
     pkg = native.package_name()
-    lib = kwargs.get("library")
+    lib = wiring.kwargs.get("library")
     if isinstance(lib, str) and lib:
         abs_lib = lib
         if lib.startswith(":"):
@@ -97,8 +93,8 @@ def nix_go_test(name, **kwargs):
     else:
         deps_out = wiring.deps
 
-    apply_go_rule_stable_defaults(kwargs)
-    go_test(name = name, deps = deps_out, **kwargs)
+    apply_go_rule_stable_defaults(wiring.kwargs)
+    go_test(name = name, deps = deps_out, **wiring.kwargs)
 
 # Third-party shim: expose vendor-provided sources as a go_library while
 # allowing an explicit import path via package map flags

@@ -79,6 +79,30 @@ These are the usual ways this leaks:
 
 ---
 
+## Contract 1.1: Package-local wiring helper usage (non-mutating v2)
+
+Package-local languages (Go, C++) attach patch files as real action inputs and realize provider edges via a shared wiring helper.
+
+### Contract
+
+- Package-local language macros should use `prepare_package_local_wiring_v2(...)` from `lang/defs_common.bzl`.
+- The helper must not mutate the caller’s kwargs dict. It returns a prepared `kwargs` dict for the underlying rule call, plus the derived patch dirs and nixpkgs deps.
+
+### Canonical implementations
+
+- **Starlark**: `lang/package_local_wiring.bzl:prepare_package_local_wiring_v2`
+- **Starlark**: `lang/macro_kwargs.bzl:extract_package_local_patch_dirs_and_nixpkg_deps` (non-mutating macro kwargs extraction)
+
+### Regression guards
+
+- `tools/tests/lang/package-local-wiring.v2.non-mutating.probe.test.ts`
+
+### Common leak patterns
+
+- A macro depends on helper-side mutation ordering (for example, it must pre-capture values before wiring pops keys).
+
+---
+
 ## Contract 2: Sanitization parity for names and artifacts
 
 This contract is the “lowest-level” parity rule. If it drifts, outputs and keys drift across Starlark, TS tooling, and Nix templates.
