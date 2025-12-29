@@ -617,6 +617,23 @@ set +e
 STATUS="$?"
 set -e
 
+# When timing summaries are enabled, produce an aggregated report for the current verify log.
+# This is analysis-only and must not affect verify exit status.
+if [[ "${TEST_TIMING:-}" == "summary" && -n "${BNX_VERIFY_LOG_FILE:-}" && -f "${BNX_VERIFY_LOG_FILE}" ]]; then
+  echo "[verify] timing analysis begin" | tee -a "${BNX_VERIFY_LOG_FILE}" >/dev/null
+  set +e
+  node --experimental-strip-types --import "${ROOT_DIR}/tools/dev/zx-init.mjs" \
+    "${ROOT_DIR}/tools/dev/analyze-verify-timing.ts" --log "${BNX_VERIFY_LOG_FILE}" --comment 2>&1 \
+    | tee -a "${BNX_VERIFY_LOG_FILE}" >/dev/null
+  ANALYZE_RC="${PIPESTATUS[0]}"
+  set -e
+  if [[ "${ANALYZE_RC}" != "0" ]]; then
+    echo "[verify] timing analysis failed status=${ANALYZE_RC}" | tee -a "${BNX_VERIFY_LOG_FILE}" >/dev/null
+  else
+    echo "[verify] timing analysis done" | tee -a "${BNX_VERIFY_LOG_FILE}" >/dev/null
+  fi
+fi
+
 if [[ "${STATUS}" == "0" ]]; then
   run_merged_coverage_report "${ROOT_DIR}"
 fi

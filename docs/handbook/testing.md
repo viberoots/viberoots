@@ -30,6 +30,18 @@ Toggles:
 - Enable: `COVERAGE=1` via Buck test executor `-- --env COVERAGE=1`.
 - Open report: `pnpm coverage:open` after full run.
 
+## Timing analysis (`TEST_TIMING=summary`)
+
+When you run `tools/bin/verify` with `TEST_TIMING=summary`, zx tests that use `runInTemp(...)` will emit `[timing]` bucket summaries. At the end of the verify run, `tools/bin/verify` appends an **aggregated** report into the verify log (comment-prefixed) by running:
+
+- `tools/dev/analyze-verify-timing.ts`
+
+This report includes:
+
+- Total wall clock for the `buck2 test` phase (from verify’s `start_s` / `end_s` markers).
+- Sum of per-test durations parsed from Buck completion lines (for an effective parallelism estimate).
+- Aggregated `[timing]` bucket totals across the suite and estimated wall-clock impact per bucket.
+
 ### Verify helper
 
 - Full suite without coverage:
