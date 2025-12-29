@@ -56,6 +56,9 @@ For language macros, stamping is the macro’s responsibility. Call sites should
 - **Starlark**: `lang/label_stamping.bzl` via `lang/defs_common.bzl` re-exports.
   - `stamp_labels(kwargs, lang, kind)`
   - `stamp_wasm_variant(kwargs, lang, variant)`
+- **Starlark (package-local WASM macro wiring)**: `lang/wasm_package_local_wiring.bzl` via `lang/defs_common.bzl` re-exports.
+  - `prepare_package_local_wasm_wiring(...)` (fixed ordering: wasm stamps → patch_scope → patch inputs → provider edges)
+  - `wire_package_local_wasm_planner_visible_stub(...)` (planner-visible stub wrapper with the same ordering)
 - **Kind vocabulary (contract)**:
   - Starlark: `lang/kind_vocabulary.bzl` (re-exported via `lang/defs_common.bzl`)
   - TypeScript: `tools/lib/kind-vocabulary.ts`
@@ -219,7 +222,8 @@ I treat patch invalidation as two explicit models:
   - Provider sync is not required to make patch changes invalidate builds.
   - Planner-visible stubs for package-local languages still carry package-local patch files as real inputs, and must stamp `patch_scope:package-local`:
     - `nix_cpp_test`’s `<name>__planner` uses the canonical package-local planner-visible stub helper (`wire_package_local_planner_visible_stub(...)`) so patch edits invalidate the planner-visible boundary.
-    - `nix_cpp_wasm_emscripten_lib` uses `wire_package_local_planner_visible_stub(...)` so patch scope stamping, patch inputs, provider handling, and planner-visible defaults stay consistent.
+    - `nix_cpp_wasm_emscripten_lib` uses `wire_package_local_wasm_planner_visible_stub(...)` so WASM stamping, patch scope stamping, patch inputs, provider handling, and planner-visible defaults stay consistent.
+    - Package-local WASM macros use the shared WASM wiring helpers so ordering-sensitive steps (WASM stamping, patch scope, patch inputs, provider edges) cannot drift.
 
 - **Importer-local patching** (Node, Python):
   - Patch files live under `<importer>/patches/<lang>`.

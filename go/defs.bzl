@@ -1,9 +1,8 @@
 load("@prelude//:rules.bzl", "go_binary", "go_library", "go_test")
-load("//lang:defs_common.bzl", "dedupe_preserve", "normalize_labels", "prepare_package_local_wiring", "stamp_wasm_variant")
-load("//lang:planner_stub.bzl", "planner_stub", "planner_stub_with_package_local_patches")
+load("//lang:defs_common.bzl", "normalize_labels", "prepare_package_local_wasm_wiring", "prepare_package_local_wiring")
 load("//lang:global_inputs.bzl", "global_nix_inputs")
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
-load("//lang:defs_common.bzl", "wire_package_local_planner_visible_stub", "wire_planner_visible_inputs")
+load("//lang:defs_common.bzl", "wire_package_local_planner_visible_stub")
 load("//go/private:nix_build_wasm.bzl", "go_nix_build_wasm")
 load("//go/private:cgo_wiring.bzl", "apply_go_rule_stable_defaults", "apply_go_tuple_labels", "configure_cgo_kwargs")
 load("//go/private:auto_tests.bzl", "maybe_autowire_go_binary_test", "maybe_autowire_go_library_test")
@@ -138,48 +137,31 @@ def nix_go_tiny_wasm_lib(name, **kwargs):
     Stamps language/kind labels for adapter detection and uses a thin rule that
     invokes the planner-selected build, copying `$out/lib/top.wasm` to this rule's output.
     """
-    # Uniform WASM labeling across languages (variant=tinygo)
-    stamp_wasm_variant(kwargs, "go", "tinygo")
     pkg = native.package_name()
     deps = kwargs.pop("deps", [])
-    srcs = kwargs.get("srcs", []) or []
     extra = normalize_labels(pkg, kwargs.pop("extra_module_providers", []))
 
-    # Ensure patch_scope stamping and package-local patch inputs are consistent across all
-    # package-local macro shapes, including planner-visible shims.
-    #
-    # We keep stamp=False here because stamp_wasm_variant(...) already stamps the language/kind.
-    prepare_package_local_wiring(
+    wiring = prepare_package_local_wasm_wiring(
         name = name,
         kwargs = kwargs,
         lang = "go",
-        kind = None,
-        MODULE_PROVIDERS = MODULE_PROVIDERS,
-        base_deps = [],
-        stamp = False,
-    )
-    # Re-read srcs after wiring so package-local patch inputs are included.
-    srcs = kwargs.get("srcs", []) or []
-    # Re-read labels after wiring so patch scope (and any other stamps) are visible on the rule.
-    labels = kwargs.get("labels", []) or []
-    merged_srcs = wire_planner_visible_inputs(
-        name = name,
+        variant = "tinygo",
         MODULE_PROVIDERS = MODULE_PROVIDERS,
         deps = deps,
-        srcs = srcs,
         extra_srcs = extra,
         srcs_include_deps = True,
         provider_realization_mode = "inputs",
-    )["srcs"]
+        strip_providers_from_deps = True,
+    )
     # Graph-facing shim that copies from the Nix out path produced by planner
     go_nix_build_wasm(
         name = name,
         self_label = "//%s:%s" % (pkg, name),
         out = name + ".wasm",
         expected_rel = "lib/top.wasm",
-        srcs = merged_srcs,
+        srcs = wiring.srcs,
         nix_inputs = global_nix_inputs(),
-        labels = labels,
+        labels = wiring.labels,
         visibility = kwargs.get("visibility", []),
     )
 

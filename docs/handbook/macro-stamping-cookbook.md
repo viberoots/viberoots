@@ -65,6 +65,9 @@ wire_global_nix_inputs(kw, into = "srcs", stamp = False)
     - Package-local: `lang/package_local_wiring.bzl:prepare_package_local_wiring`
     - Package-local planner-visible stubs: `lang/planner_visible_wiring.bzl:wire_package_local_planner_visible_stub`
     - Importer-local: `lang/importer_wiring.bzl:prepare_importer_*`
+- **Package-local WASM macros (Go, C++)**: do not hand-roll ordering-sensitive wiring.
+  - For rule shapes that carry patch inputs in `srcs` and realize provider edges into `deps` or `srcs`, use `lang/defs_common.bzl:prepare_package_local_wasm_wiring(...)`.
+  - For planner-visible WASM stubs, use `lang/defs_common.bzl:wire_package_local_wasm_planner_visible_stub(...)`.
 - **Lint**: run `node tools/dev/stamping-lint.ts` to detect missing or invalid labels.
 - **Tests**: negative test should demonstrate a missing label is flagged with a clear message.
 
