@@ -2,15 +2,14 @@ import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { copyTree, probeCopyFileCloneSupport } from "../../lib/copy-tree.ts";
 
 type TimeAsync = <T>(label: string, fn: () => Promise<T>) => Promise<T>;
-type Zx$ = any;
 
 type SeedDeps = {
   mktemp: (prefix?: string) => Promise<string>;
   rsyncRepoTo: (dst: string) => Promise<void>;
   timeAsync: TimeAsync;
-  $: Zx$;
 };
 
 type SeedState = {
@@ -21,7 +20,7 @@ type SeedState = {
 let seedState: SeedState | null = null;
 let seedReady: Promise<SeedState> | null = null;
 
-type CowMode = "darwin-cp-clone" | "linux-cp-reflink" | "none";
+type CowMode = "copyfile-clone" | "none";
 let cowModeReady: Promise<CowMode> | null = null;
 
 function shortHash(s: string): string {
@@ -99,35 +98,11 @@ async function ensureSharedSeedRepo(deps: SeedDeps, seedKey: string): Promise<st
   }
 }
 
-async function tryCpCloneCowMode($: Zx$, mode: Exclude<CowMode, "none">): Promise<boolean> {
-  const src = await fsp.mkdtemp(path.join(os.tmpdir(), "bucknix-cow-probe-src-"));
-  const dst = await fsp.mkdtemp(path.join(os.tmpdir(), "bucknix-cow-probe-dst-"));
-  try {
-    await fsp.writeFile(path.join(src, "hello.txt"), "hello\n", "utf8");
-    const darwinCp = "/bin/cp";
-    const res =
-      mode === "darwin-cp-clone"
-        ? await $({ stdio: "pipe" })`${darwinCp} -cRp ${src}/. ${dst}/`.nothrow()
-        : await $({ stdio: "pipe" })`cp -a --reflink=auto ${src}/. ${dst}/`.nothrow();
-    return res.exitCode === 0;
-  } finally {
-    await fsp.rm(src, { recursive: true, force: true }).catch(() => {});
-    await fsp.rm(dst, { recursive: true, force: true }).catch(() => {});
-  }
-}
-
-async function detectCowModeOnce($: Zx$): Promise<CowMode> {
+async function detectCowModeOnce(): Promise<CowMode> {
   if (cowModeReady) return await cowModeReady;
   cowModeReady = (async () => {
-    if (process.platform === "darwin") {
-      const ok = await tryCpCloneCowMode($, "darwin-cp-clone").catch(() => false);
-      return ok ? "darwin-cp-clone" : "none";
-    }
-    if (process.platform === "linux") {
-      const ok = await tryCpCloneCowMode($, "linux-cp-reflink").catch(() => false);
-      return ok ? "linux-cp-reflink" : "none";
-    }
-    return "none";
+    const ok = await probeCopyFileCloneSupport().catch(() => false);
+    return ok ? "copyfile-clone" : "none";
   })();
   return await cowModeReady;
 }
@@ -164,23 +139,14 @@ async function cloneSeedToTemp(opts: {
   seedDir: string;
   tmpDir: string;
   mode: RepoInitMode;
-  $: Zx$;
 }): Promise<void> {
-  const { seedDir, tmpDir, mode, $ } = opts;
+  const { seedDir, tmpDir, mode } = opts;
   if (mode === "seed-cow") {
-    if (process.platform === "darwin") {
-      const cp = "/bin/cp";
-      await $`${cp} -cRp ${seedDir}/. ${tmpDir}/`;
-      return;
-    }
-    if (process.platform === "linux") {
-      await $`cp -a --reflink=auto ${seedDir}/. ${tmpDir}/`;
-      return;
-    }
-    throw new Error(`seed-cow clone requested on unsupported platform: ${process.platform}`);
+    await copyTree(seedDir, tmpDir, { cloneMode: "try", force: true });
+    return;
   }
   if (mode === "seed-copy") {
-    await $`cp -a ${seedDir}/. ${tmpDir}/`;
+    await copyTree(seedDir, tmpDir, { cloneMode: "none", force: true });
     return;
   }
   throw new Error(`unexpected clone mode: ${mode}`);
@@ -192,7 +158,7 @@ export async function initTempRepoFromWorkspaceOrSeed(args: {
 }): Promise<RepoInitMode> {
   const { tmpDir, deps } = args;
 
-  const cow = await deps.timeAsync("seedRepo.detectCowMode", async () => detectCowModeOnce(deps.$));
+  const cow = await deps.timeAsync("seedRepo.detectCowMode", async () => detectCowModeOnce());
   const mode = selectInitMode(cow);
 
   if (mode === "rsync") {
@@ -204,7 +170,7 @@ export async function initTempRepoFromWorkspaceOrSeed(args: {
     ensureSeedRepoOnce(deps),
   );
   await deps.timeAsync(`cloneSeedRepoTo(${path.basename(tmpDir)})`, async () =>
-    cloneSeedToTemp({ seedDir: seed.seedDir, tmpDir, mode, $: deps.$ }),
+    cloneSeedToTemp({ seedDir: seed.seedDir, tmpDir, mode }),
   );
   return mode;
 }

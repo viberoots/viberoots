@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { copyTree } from "../lib/copy-tree.ts";
 
 export async function chmodRecursive(root: string): Promise<void> {
   const stack: string[] = [root];
@@ -45,28 +46,7 @@ export async function makeWorkspace(args: {
   const safeKey = moduleKey.replace(/[^A-Za-z0-9._@-]+/g, "_");
   const dst = path.join(base, `${safeKey}-${stamp}-${pid}-${rand}`);
   await fsp.mkdir(base, { recursive: true });
-  // macOS optimization: prefer APFS CoW clones when available; fall back to a normal copy.
-  // Other platforms: regular copy.
-  let copied = false;
-  if (process.platform === "darwin") {
-    try {
-      const cp = "/bin/cp";
-      // -c: clone, -R: recursive, -p: preserve mode/ownership/timestamps where possible
-      const r1 = await $({ stdio: "pipe" })`${cp} -cRp ${originPath}/ ${dst}/`.nothrow();
-      if (r1.exitCode === 0) {
-        copied = true;
-      } else {
-        const r2 = await $({ stdio: "pipe" })`${cp} -a ${originPath}/ ${dst}/`.nothrow();
-        if (r2.exitCode === 0) copied = true;
-      }
-    } catch {
-      // fall through and use the generic fallback
-    }
-  }
-  if (!copied) {
-    // Node's recursive cp as a robust cross-platform fallback
-    await fsp.cp(originPath, dst, { recursive: true, force: true });
-  }
+  await copyTree(originPath, dst, { cloneMode: "try", force: true });
   // Ensure workspace is writable even if source tree had read-only bits
   await chmodRecursive(dst);
   return dst;

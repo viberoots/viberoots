@@ -383,7 +383,6 @@ export async function runInTemp<T>(
       mktemp,
       rsyncRepoTo,
       timeAsync,
-      $,
     },
   });
   // Normalize flake.lock path inputs that use relative 'path:./...' to absolute paths within the temp repo.
