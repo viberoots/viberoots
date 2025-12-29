@@ -226,6 +226,15 @@ I treat patch invalidation as two explicit models:
   - Macros include importer-local patches in action inputs.
   - Provider sync and `auto_map` remain generated artifacts and are refreshed by glue tooling.
 
+### Diagnostics (how to answer “what invalidates what?”)
+
+When debugging invalidation, it is easy to misread the surface area by looking only at provider files under `third_party/providers/`. The canonical answers are designed to be available without reading macro or generator code:
+
+- `node tools/buck/prebuild-guard.ts` prints short, canonical one-liners that explain where invalidation comes from, using the contract vocabulary (`package-local` / `importer-local`).
+- `third_party/providers/provider_index.json` is a single, stable report that maps provider targets to their origin key and includes additive patch-model metadata (`patch_scope`, `languages`, and where patch inputs are expected to be carried).
+
+Rule: treat provider `patch_paths` as diagnostic/observability data for importer-scoped ecosystems. Invalidation is driven by real action inputs attached by macro wiring.
+
 ### Canonical implementations
 
 - **Patch model registry (Starlark)**: `//lang:lang_contracts.bzl`

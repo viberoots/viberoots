@@ -117,6 +117,15 @@ Provider patch inclusion policy (Node vs Python):
 - **Python (uv)**: provider `patch_paths` includes **only importer-local patches that match the `uv.lock` effective set**.
 - The policy choice is explicit and required at the shared driver boundary: `tools/lib/provider-sync-driver.ts` (`importerPatchInclusionPolicy`).
 
+### Diagnostics (quick, canonical answers)
+
+If you are unsure why a patch edit did or did not invalidate something, start with the two canonical diagnostics:
+
+- `node tools/buck/prebuild-guard.ts` prints one-liners that explain the invalidation surface using the contract vocabulary:
+  - `patch_scope:importer-local`: invalidation is driven by macro action inputs under `<importer>/patches/<lang>`.
+  - `patch_scope:package-local`: invalidation is driven by `<pkg>/patches/<lang>` included as action inputs.
+- `node tools/buck/gen-provider-index.ts` emits `third_party/providers/provider_index.json`, which maps provider targets to origin keys and includes additive patch-model metadata (`patch_scope`, `languages`, and where patch inputs are expected).
+
 ## Glue regeneration
 
 Node and Python only (Go/C++ don’t require glue for patch invalidation). Local glue is not committed. Regenerate after apply or on-demand:

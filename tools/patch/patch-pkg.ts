@@ -23,9 +23,11 @@ function printPatchModelOneLiner(lang: string) {
   const s = patchInvalidationStrategyForLang(lang);
   if (!s) return;
   if (s.patchScope === "package-local") {
-    console.error("[patch-pkg] no glue refresh is required");
+    console.error(`[patch-pkg] patch_scope:${s.patchScope} — no glue refresh is required`);
   } else {
-    console.error("[patch-pkg] glue pipeline will run (graph, providers, auto_map)");
+    console.error(
+      `[patch-pkg] patch_scope:${s.patchScope} — glue pipeline will run (graph, providers, auto_map)`,
+    );
   }
 }
 

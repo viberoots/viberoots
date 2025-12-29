@@ -12,6 +12,25 @@ async function readOrEmpty(p: string): Promise<string> {
   }
 }
 
+async function removeGeneratedProviderOutputs(provDir: string): Promise<void> {
+  const files = [
+    "TARGETS.auto",
+    "TARGETS.cpp.auto",
+    "TARGETS.node.auto",
+    "TARGETS.python.auto",
+    "TARGETS.test.auto",
+    "provider_index.bzl",
+    "provider_index.json",
+    "auto_map.bzl",
+    "nix_attr_map.bzl",
+  ];
+  for (const f of files) {
+    try {
+      await fsp.rm(path.join(provDir, f), { force: true });
+    } catch {}
+  }
+}
+
 test("glue-pipeline: outputs identical to manual steps (with pnpm lockfile present)", async () => {
   await runInTemp("glue-pipeline-pnpm-lock", async (tmp, $) => {
     // Create a minimal importer with a pnpm-lock.yaml (content not parsed without yaml module)
@@ -44,8 +63,7 @@ test("glue-pipeline: outputs identical to manual steps (with pnpm lockfile prese
     const baseMap = await readOrEmpty(path.join(provDir, "auto_map.bzl"));
 
     // Clean outputs and rerun via pipeline
-    await fsp.rm(provDir, { recursive: true, force: true });
-    await fsp.mkdir(provDir, { recursive: true });
+    await removeGeneratedProviderOutputs(provDir);
     await $`node tools/buck/glue-pipeline.ts`;
 
     const pipeNodeTargets = await readOrEmpty(path.join(provDir, "TARGETS.node.auto"));

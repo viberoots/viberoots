@@ -8,6 +8,7 @@ import { autoFixGlue } from "./repair.ts";
 import { collectDiagnostics, logList, mtimeSafe } from "./report.ts";
 import { listInputs, listOutputs } from "./scan.ts";
 import { maybePrintLocalOverridesNotice } from "./notice.ts";
+import { maybePrintPatchInvalidationNotes } from "./patch-invalidation-notes.ts";
 import {
   computeMissingOutputs,
   findMissingGomod2nixToml,
@@ -43,6 +44,7 @@ export async function run(): Promise<void> {
   const verboseLimit = getVerboseLimit(getFlagStr);
 
   maybePrintLocalOverridesNotice(mode);
+  await maybePrintPatchInvalidationNotes();
 
   const inputs = await listInputs();
   const outputs = listOutputs();

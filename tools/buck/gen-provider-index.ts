@@ -8,8 +8,27 @@ import { readPythonProviderIndexEntries } from "./providers/python.ts";
 import { getFlagStr } from "../lib/cli.ts";
 import { parseLockfileLabel } from "../lib/labels.ts";
 import { isSupportedImporterLabel } from "../lib/importers.ts";
+import { normalizeNixAttr } from "../lib/providers.ts";
 
-type IndexEntry = { kind: "node" | "cpp" | "python"; key: string };
+type PatchScope = "package-local" | "importer-local";
+
+type PatchInputsExpectedIn = {
+  // True when patch invalidation is expected to come from real action inputs (e.g., srcs/resources)
+  // attached by macros and/or shared wiring helpers.
+  macroActionInputs: boolean;
+  // "diagnostic": the provider records patch paths for visibility, but they are not action inputs.
+  // "none": provider has no patch-path surface.
+  providerPatchPaths: "none" | "diagnostic";
+};
+
+type IndexEntry = {
+  kind: "node" | "cpp" | "python";
+  key: string;
+  // Additive diagnostics (keep kind/key stable for existing consumers)
+  patch_scope: PatchScope;
+  languages: Array<"go" | "cpp" | "node" | "python">;
+  patch_inputs_expected_in: PatchInputsExpectedIn;
+};
 
 function fq(labelTail: string): string {
   return `//third_party/providers:${labelTail}`;
@@ -54,25 +73,81 @@ async function generateNodeLockIndex(outFile = "tools/buck/node-lock-index.json"
   await writeIfChanged(outFile, JSON.stringify(data, null, 2) + "\n");
 }
 
+function patchInputsExpectedForPatchScope(scope: PatchScope): PatchInputsExpectedIn {
+  if (scope === "package-local") {
+    return { macroActionInputs: true, providerPatchPaths: "none" };
+  }
+  // Importer-local providers may record patch paths, but invalidation is driven by macro action inputs.
+  return { macroActionInputs: true, providerPatchPaths: "diagnostic" };
+}
+
+async function parseNixProvidersFromTargetsFile(
+  fileRel: string,
+): Promise<Array<{ name: string; attr: string }>> {
+  let txt = "";
+  try {
+    txt = await fsp.readFile(path.resolve(fileRel), "utf8");
+  } catch {
+    return [];
+  }
+  if (!txt) return [];
+  const out: Array<{ name: string; attr: string }> = [];
+  const reCall = /nix_cxx_(?:library|provider)\(\s*([\s\S]*?)\)/g;
+  let m: RegExpExecArray | null;
+  while ((m = reCall.exec(txt)) !== null) {
+    const body = m[1] || "";
+    const nameMatch = /\bname\s*=\s*"([^"]+)"/.exec(body);
+    const attrMatch = /\battr\s*=\s*"([^"]+)"/.exec(body);
+    const name = nameMatch?.[1] || "";
+    const attr = attrMatch?.[1] || "";
+    if (!name || !attr) continue;
+    out.push({ name, attr });
+  }
+  return out;
+}
+
+async function generateNixAttrMap(
+  outFile = "third_party/providers/nix_attr_map.bzl",
+): Promise<Record<string, string>> {
+  const sources = ["third_party/providers/TARGETS", "third_party/providers/TARGETS.cpp.auto"];
+  const entries: Array<{ provider: string; nixpkg: string }> = [];
+  for (const src of sources) {
+    for (const { name, attr } of await parseNixProvidersFromTargetsFile(src)) {
+      const provider = `//third_party/providers:${name}`;
+      const nixpkg = `nixpkg:${normalizeNixAttr(attr)}`;
+      entries.push({ provider, nixpkg });
+    }
+  }
+  // Deterministic order, first-wins.
+  const map: Record<string, string> = {};
+  for (const e of entries.sort((a, b) => a.provider.localeCompare(b.provider))) {
+    if (!map[e.provider]) map[e.provider] = e.nixpkg;
+  }
+
+  const lines = [
+    "# GENERATED FILE — DO NOT EDIT.",
+    "",
+    "NIX_ATTR_MAP = {",
+    ...Object.entries(map).map(([k, v]) => `    "${k}": "${v}",`),
+    "}",
+    "",
+  ];
+  await writeIfChanged(outFile, lines.join("\n"));
+  return map;
+}
+
 async function readCppIndexEntries(): Promise<Record<string, IndexEntry>> {
   const out: Record<string, IndexEntry> = {};
-  const mapFile = path.resolve("third_party/providers/nix_attr_map.bzl");
-  let exists = true;
-  try {
-    await fsp.access(mapFile);
-  } catch {
-    exists = false;
-  }
-  if (!exists) return out;
-  const txt = await fsp.readFile(mapFile, "utf8").catch(() => "");
-  if (!txt) return out;
-  // Parse lines like: "//third_party/providers:<name>": "nixpkg:<attr>",
-  const re = /"(\/\/third_party\/providers:[^"]+)"\s*:\s*"(nixpkg:[^"]+)"/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(txt)) !== null) {
-    const fqLabel = m[1];
-    const key = m[2];
-    out[fqLabel] = { kind: "cpp", key };
+  const nixAttrMap = await generateNixAttrMap();
+  for (const [provider, key] of Object.entries(nixAttrMap)) {
+    // These nixpkgs-backed providers are used by both Go (CGO) and C++.
+    out[provider] = {
+      kind: "cpp",
+      key,
+      patch_scope: "package-local",
+      languages: ["go", "cpp"],
+      patch_inputs_expected_in: patchInputsExpectedForPatchScope("package-local"),
+    };
   }
   return out;
 }
@@ -81,7 +156,13 @@ async function readNodeIndexEntries(): Promise<Record<string, IndexEntry>> {
   const out: Record<string, IndexEntry> = {};
   const entries = await readNodeProviderIndexEntries();
   for (const e of entries) {
-    out[fq(e.provider)] = { kind: "node", key: e.key };
+    out[fq(e.provider)] = {
+      kind: "node",
+      key: e.key,
+      patch_scope: "importer-local",
+      languages: ["node"],
+      patch_inputs_expected_in: patchInputsExpectedForPatchScope("importer-local"),
+    };
   }
   return out;
 }
@@ -90,7 +171,13 @@ async function readPythonIndexEntries(): Promise<Record<string, IndexEntry>> {
   const out: Record<string, IndexEntry> = {};
   const entries = await readPythonProviderIndexEntries();
   for (const e of entries) {
-    out[fq(e.provider)] = { kind: "python", key: e.key };
+    out[fq(e.provider)] = {
+      kind: "python",
+      key: e.key,
+      patch_scope: "importer-local",
+      languages: ["python"],
+      patch_inputs_expected_in: patchInputsExpectedForPatchScope("importer-local"),
+    };
   }
   return out;
 }
@@ -116,15 +203,18 @@ export async function generateProviderIndex(opts?: { outFile?: string; jsonOutFi
   );
 
   const header = ["# GENERATED FILE — DO NOT EDIT.", "", "PROVIDER_INDEX = {"];
-  const body = entries.map(([k, v]) => `    "${k}": { "kind": "${v.kind}", "key": "${v.key}" },`);
+  const body = entries.map(([k, v]) => {
+    const langs = v.languages.map((x) => `"${x}"`).join(", ");
+    return `    "${k}": { "kind": "${v.kind}", "key": "${v.key}", "patch_scope": "${v.patch_scope}", "languages": [${langs}], "patch_inputs_expected_in": { "macroActionInputs": ${v.patch_inputs_expected_in.macroActionInputs ? "True" : "False"}, "providerPatchPaths": "${v.patch_inputs_expected_in.providerPatchPaths}" } },`;
+  });
   const footer = ["}", ""]; // trailing newline
   const text = [...header, ...(body.length ? ["", ...body] : []), ...footer].join("\n");
   await writeIfChanged(OUT, text);
 
   // Also emit a JSON sidecar for machine consumption
-  const jsonObj: Record<string, { kind: string; key: string }> = {};
+  const jsonObj: Record<string, IndexEntry> = {};
   for (const [k, v] of entries) {
-    jsonObj[k] = { kind: v.kind, key: v.key };
+    jsonObj[k] = v;
   }
   await writeIfChanged(OUT_JSON, JSON.stringify(jsonObj, null, 2) + "\n");
 
