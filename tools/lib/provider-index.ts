@@ -56,3 +56,37 @@ export async function readImporterProviderIndexEntries(opts: {
 }): Promise<ProviderIndexEntry[]> {
   return collectProviderIndexEntries(opts);
 }
+
+/**
+ * Convenience wrapper for importer-scoped ecosystems where each lockfile produces exactly one
+ * importer entry derived from the lockfile's directory.
+ *
+ * This standardizes:
+ * - importer enumeration (single importer per lockfile)
+ * - optional "required module" gating (e.g., Node requires `yaml` to be present)
+ *
+ * Call sites provide lockfile discovery and (optionally) filtering for supported importer labels.
+ */
+export async function readImporterProviderIndexEntriesForSingleImporterLockfiles(opts: {
+  discoverLockfiles: DiscoverLockfiles;
+  shouldInclude?: ShouldInclude;
+  requireNodeModule?: string;
+  onMissingRequiredModule?: "return-empty" | "throw";
+}): Promise<ProviderIndexEntry[]> {
+  const req = String(opts.requireNodeModule || "").trim();
+  if (req) {
+    try {
+      await import(req);
+    } catch (e) {
+      const mode = opts.onMissingRequiredModule || "return-empty";
+      if (mode === "return-empty") return [];
+      throw e;
+    }
+  }
+
+  return collectProviderIndexEntries({
+    discoverLockfiles: opts.discoverLockfiles,
+    importersForLockfile: async (_lf: string) => ["."],
+    shouldInclude: opts.shouldInclude,
+  });
+}

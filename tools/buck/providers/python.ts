@@ -1,8 +1,11 @@
 #!/usr/bin/env zx-wrapper
-import { computeImporterLabel, isSupportedImporterLabel } from "../../lib/importers.ts";
+import {
+  computeImporterLabel,
+  findImporterLockfiles,
+  isSupportedImporterLabel,
+} from "../../lib/importers.ts";
 import { importerScopedProviderContractForLang } from "../../lib/lang-contracts.ts";
-import { findUvLockfiles } from "../../lib/lockfiles.ts";
-import { readImporterProviderIndexEntries } from "../../lib/provider-index.ts";
+import { readImporterProviderIndexEntriesForSingleImporterLockfiles } from "../../lib/provider-index.ts";
 import { syncImporterProviders } from "../../lib/provider-sync-driver.ts";
 import { decodeNameVersionFromPatch } from "../../lib/providers.ts";
 import { parseUvLockKeys } from "../../lib/uv-lock.ts";
@@ -15,7 +18,7 @@ export async function syncPythonProviders(opts?: { outFile?: string; strict?: bo
   const OUT_FILE = opts?.outFile || "third_party/providers/TARGETS.python.auto";
   const STRICT = opts?.strict ?? contract.providerSyncParsing.defaultStrict;
 
-  const discoverLockfiles = () => findUvLockfiles();
+  const discoverLockfiles = () => findImporterLockfiles(["uv.lock"]);
   const parseEffectiveSetForLockfile = async (
     lockfilePath: string,
   ): Promise<Map<string, Set<string>>> => {
@@ -48,10 +51,8 @@ export default syncPythonProviders;
 export async function readPythonProviderIndexEntries(): Promise<
   Array<{ provider: string; key: string }>
 > {
-  const entries = await readImporterProviderIndexEntries({
-    discoverLockfiles: async () => findUvLockfiles(),
-    importersForLockfile: async (_lf: string) => ["."], // single importer per uv.lock (dirname)
+  return await readImporterProviderIndexEntriesForSingleImporterLockfiles({
+    discoverLockfiles: async () => findImporterLockfiles(["uv.lock"]),
     shouldInclude: (_lf: string, importerLabel: string) => isSupportedImporterLabel(importerLabel),
   });
-  return entries;
 }

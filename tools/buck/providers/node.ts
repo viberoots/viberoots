@@ -11,7 +11,7 @@ import {
 import { parsePnpmLock, effectiveSetForImporter } from "../../lib/pnpm-lock.ts";
 import { writeImporterProvidersByLang } from "../../lib/provider-writer.ts";
 import { syncImporterProviders } from "../../lib/provider-sync-driver.ts";
-import { readImporterProviderIndexEntries } from "../../lib/provider-index.ts";
+import { readImporterProviderIndexEntriesForSingleImporterLockfiles } from "../../lib/provider-index.ts";
 
 export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: string }) {
   const contract = importerScopedProviderContractForLang("node");
@@ -91,19 +91,11 @@ export async function readNodeProviderIndexEntries(): Promise<
 > {
   const lockfiles = await findImporterLockfiles(["pnpm-lock.yaml"]);
   if (!lockfiles.length) return [];
-  // Require YAML parser to be available (preserve existing behavior)
-  try {
-    await import("yaml");
-  } catch {
-    return [];
-  }
-  const entries = await readImporterProviderIndexEntries({
+
+  const entries = await readImporterProviderIndexEntriesForSingleImporterLockfiles({
     discoverLockfiles: async () => lockfiles,
-    // Lockfile-label contract only allows importer '.' for repo-root lockfiles,
-    // and requires importer == dirname(lockfilePath) for non-root lockfiles.
-    // Represent this consistently by always enumerating a single importer key '.' here.
-    // The shared index helper normalizes '.' to computeImporterLabel(lockfilePath).
-    importersForLockfile: async (_lf: string) => ["."],
+    requireNodeModule: "yaml",
+    onMissingRequiredModule: "return-empty",
     shouldInclude: (_lf: string, importerLabel: string) => isSupportedImporterLabel(importerLabel),
   });
   return entries;

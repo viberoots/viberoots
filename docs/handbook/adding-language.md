@@ -30,10 +30,14 @@ This guide explains how to add a new language to the build without touching core
   - `patchesMapFromDir`, `patchesMapFromDirs` for path‑based scanning
   - `patchesMapFromDirToStore`, `patchesMapFromImporterDirToStore` for store‑materialized inputs (Python)
   - `readDevOverrides`, `guardNoDevOverridesInCI` for override parity (Go/C++/Python)
-- TypeScript (`tools/lib/importers.ts`):
-  - `findImporterLockfiles`, `computeImporterLabel`
+
+For importer-scoped ecosystems, we try hard to keep “how we find lockfiles” and “how we enumerate importer-provider index entries” fully shared so Node/Python (and future lockfile ecosystems) can’t drift.
+
+- TypeScript (`tools/lib/importers.ts` + `tools/lib/provider-index.ts`):
+  - `findImporterLockfiles` (use basenames like `["pnpm-lock.yaml"]` or `["uv.lock"]`) and `computeImporterLabel`
   - `defaultImporterPatchDir`, `listImporterPatches`
   - Keeps importer‑local patch discovery and sorting consistent across Node and Python
+  - `readImporterProviderIndexEntriesForSingleImporterLockfiles` — shared “provider index enumeration” surface for importer-scoped languages with one importer per lockfile (dirname-based)
   - `tools/lib/provider-writer.ts` — emits deterministic importer‑scoped provider TARGETS and synchronizes the curated auto‑managed section. Pass your computed `{ lockfile, importer, patchPaths }` entries plus the rule load/name.
     - Prefer the convenience wrapper `writeImporterProvidersByLang(...)`, which is table‑driven via a small registry. To add a new importer‑scoped ecosystem, extend that registry instead of adding per‑language conditionals.
 
