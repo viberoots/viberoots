@@ -18,6 +18,8 @@ For importer-scoped ecosystems (currently Node/PNPM and Python/uv), the exporter
 - **Implementation helpers**: exporter adapters should reuse `tools/buck/exporter/lang/importer-scoped-adapter.ts` and `tools/buck/exporter/lang/importer-lockfile-labels.ts` instead of re-implementing label attachment, lockfile discovery, or lockfile-label validation logic.
 - **Error diagnostics**: if you need to distinguish “malformed label” vs “importer mismatch”, use `tools/lib/labels.ts:inspectLockfileLabel(...)` rather than hand-rolling partial parsing.
 
+The registry delegates upward-walk lockfile discovery into the shared helper `tools/lib/importers.ts:findNearestLockfileForPackage(...)` so Node and Python cannot drift on edge cases.
+
 Example skeleton:
 
 ```ts

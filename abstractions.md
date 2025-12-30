@@ -205,6 +205,8 @@ The validation rules are:
   - `parseLockfileLabel`
 - **TypeScript**: `tools/lib/importers.ts`
   - `isSupportedImporterLabel`
+  - `findNearestLockfileForPackage` (canonical “walk upward to repo root” helper for importer-scoped tooling)
+  - `findNearestPnpmLockForPackage`, `findNearestUvLockForPackage` (thin wrappers for common basenames)
 
 ### Regression guards
 

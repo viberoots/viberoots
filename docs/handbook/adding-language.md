@@ -35,6 +35,7 @@ For importer-scoped ecosystems, we try hard to keep “how we find lockfiles” 
 
 - TypeScript (`tools/lib/importers.ts` + `tools/lib/provider-index.ts`):
   - `findImporterLockfiles` (use basenames like `["pnpm-lock.yaml"]` or `["uv.lock"]`) and `computeImporterLabel`
+  - `findNearestLockfileForPackage` (canonical nearest-lockfile lookup; do not hand-roll upward walks)
   - `defaultImporterPatchDir`, `listImporterPatches`
   - Keeps importer‑local patch discovery and sorting consistent across Node and Python
   - `readImporterProviderIndexEntriesForSingleImporterLockfiles` — shared “provider index enumeration” surface for importer-scoped languages with one importer per lockfile (dirname-based)

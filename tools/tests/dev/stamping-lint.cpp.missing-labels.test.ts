@@ -13,8 +13,9 @@ await runInTemp("stamping-lint-cpp-missing", async (tmp, $) => {
     "utf8",
   );
   await fs.outputFile(path.join(lib, "demo.cpp"), "int add(int a,int b){return a+b;}\n");
-  const res = await $({ cwd: tmp, quiet: true })`node tools/dev/stamping-lint.ts || true`;
+  const res = await $({ cwd: tmp, quiet: true })`node tools/dev/stamping-lint.ts`.nothrow();
   const out = String(res.stdout || "") + String(res.stderr || "");
+  assert.notEqual(res.exitCode, 0);
   assert.match(out, /missing label lang:cpp/);
 
   // Now switch to macro which stamps labels
@@ -31,6 +32,8 @@ await runInTemp("stamping-lint-cpp-missing", async (tmp, $) => {
     "utf8",
   );
   await fs.outputFile(path.join(tmp, "cpp", "defs.bzl"), await fs.readFile("cpp/defs.bzl", "utf8"));
+  // Ensure Buck does not reuse any stale state across TARGETS rewrites.
+  await $({ cwd: tmp, quiet: true })`buck2 kill`.nothrow();
   const res2 = await $({ cwd: tmp, quiet: true })`node tools/dev/stamping-lint.ts`;
   const out2 = String(res2.stdout || "") + String(res2.stderr || "");
   assert.match(out2, /stamping-lint: OK/);

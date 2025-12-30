@@ -10,6 +10,7 @@ This section is a quick index of “don’t re-implement this” utilities. Most
 
 - Patch handlers reuse `tools/patch/lib/apply.ts: repoRoot()` for repo‑root detection.
 - Filesystem existence checks use `tools/patch/lib/util.ts: pathExists()`.
+- Importer-scoped lockfile discovery uses `tools/lib/importers.ts:findNearestLockfileForPackage(...)`. Patch tooling must not hand-roll upward directory walks for `uv.lock` or `pnpm-lock.yaml`.
 - Workspace-based patch handlers (Go and Python) share the control flow in `tools/patch/lib/workspace-workflow.ts` (session reuse, no-op cleanup, patch verification, and consistent messages).
 - Avoid bespoke implementations; this keeps behavior consistent across Go/C++/Node/Python.
 - Default package-local patch directory selection is centralized in Starlark via `//lang:defs_common.bzl: default_package_patch_dirs(lang)`. Go/C++ macros use this helper instead of hard‑coded strings (e.g., `["patches/go"]`).
