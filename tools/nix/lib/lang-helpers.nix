@@ -44,25 +44,51 @@ let
       aliased = if withPkgs != "" && builtins.hasAttr withPkgs nixAttrAliases then nixAttrAliases.${withPkgs} else withPkgs;
     in if aliased == "pkgs.gtest" then "pkgs.googletest" else aliased;
 
+  decodePatchFilename = { name, normalizeVersion ? (v: v) }:
+    if !(builtins.isString name) then null else
+    if !(lib.hasSuffix ".patch" name) then null else
+    let
+      base = lib.removeSuffix ".patch" name;
+      parts = lib.splitString "@" base;
+      partCount = lib.length parts;
+    in
+      if partCount < 2
+      then null
+      else
+        let
+          rawName = lib.concatStringsSep "@" (lib.take (partCount - 1) parts);
+          rawVersion = lib.last parts;
+        in
+          if rawName == "" || rawVersion == ""
+          then null
+          else
+            let
+              importPath = lib.replaceStrings ["__"] ["/"] rawName;
+              version = normalizeVersion rawVersion;
+              key = (lib.toLower importPath) + "@" + (lib.toLower version);
+            in {
+              inherit key;
+              importPath = lib.toLower importPath;
+              version = lib.toLower version;
+            };
+
   # Build {"importPath@version" = [ /abs/path.patch ... ]} from a flat patches/<lang>/*.patch directory.
   # Filenames encode import path with '/' -> '__' and suffix '@<version>.patch'.
   patchesMapFromDir = patchDir:
     let
       names = if builtins.pathExists patchDir then builtins.attrNames (builtins.readDir patchDir) else [];
       isPatch = name: lib.hasSuffix ".patch" name;
-      decode = name:
-        let
-          base = lib.removeSuffix ".patch" name;
-          parts = lib.splitString "@" base;
-          impEnc = lib.concatStringsSep "@" (lib.take (lib.length parts - 1) parts);
-          ver = lib.last parts;
-          importPath = lib.replaceStrings ["__"] ["/"] impEnc;
-        in { path = lib.toLower importPath; ver = lib.toLower ver; };
       step = acc: name:
-        let d = decode name;
-            key = "${d.path}@${d.ver}";
-            val = (acc.${key} or []) ++ [ "${patchDir}/${name}" ];
-        in acc // { "${key}" = val; };
+        let
+          d = decodePatchFilename { inherit name; };
+        in
+          if d == null
+          then acc
+          else
+            let
+              key = d.key;
+              val = (acc.${key} or []) ++ [ "${patchDir}/${name}" ];
+            in acc // { "${key}" = val; };
     in builtins.foldl' step {} (lib.filter isPatch names);
 
   # Build a merged patches map from multiple directories, preserving per-dir list order.
@@ -100,7 +126,7 @@ let
       else null;
 
  in rec {
-  inherit segs getAtPath resolveAttrFromPkgs sanitizeName normalizeNixAttr patchesMapFromDir patchesMapFromDirs readDevOverrides guardNoDevOverridesInCI;
+  inherit segs getAtPath resolveAttrFromPkgs sanitizeName normalizeNixAttr decodePatchFilename patchesMapFromDir patchesMapFromDirs readDevOverrides guardNoDevOverridesInCI;
 
   /*
     Build {"importPath@version" = [ /nix/store/...-patch1 /nix/store/...-patch2 ... ]}
@@ -117,22 +143,19 @@ let
     let
       names = if builtins.pathExists dir then builtins.attrNames (builtins.readDir dir) else [];
       isPatch = name: lib.hasSuffix ".patch" name;
-      toKey = name:
-        let
-          base = lib.removeSuffix ".patch" name;
-          parts = lib.splitString "@" base;
-          impEnc = lib.concatStringsSep "@" (lib.take (lib.length parts - 1) parts);
-          verRaw = lib.last parts;
-          ver = normalizeVersion verRaw;
-          importPath = lib.replaceStrings ["__"] ["/"] impEnc;
-        in (lib.toLower importPath) + "@" + (lib.toLower ver);
       step = acc: name:
         let
-          key = toKey name;
-          content = builtins.readFile (dir + "/" + name);
-          storeFile = pkgs.writeText "${namePrefix}-${key}-${name}" content;
-          prev = acc.${key} or [];
-        in acc // { "${key}" = prev ++ [ (builtins.toString storeFile) ]; };
+          d = decodePatchFilename { inherit name normalizeVersion; };
+        in
+          if d == null
+          then acc
+          else
+            let
+              key = d.key;
+              content = builtins.readFile (dir + "/" + name);
+              storeFile = pkgs.writeText "${namePrefix}-${key}-${name}" content;
+              prev = acc.${key} or [];
+            in acc // { "${key}" = prev ++ [ (builtins.toString storeFile) ]; };
     in builtins.foldl' step {} (lib.filter isPatch names);
 
   /*
@@ -157,3 +180,4 @@ let
       }
       else {};
 }
+

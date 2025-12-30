@@ -286,6 +286,23 @@ For importer-scoped ecosystems, there is an additional provider contract surface
 - **Language adapters**: `tools/buck/providers/*` (read the contract and pass policy into the driver)
 - **Effective set patch selection (TypeScript)**: `tools/lib/effective-set-patch-selection.ts` (scan flat patch dirs into a canonical key map; select global patch paths by importer effective set with stable ordering)
 
+### Patch filename decoding (flat patch dirs)
+
+Several layers scan a flat `patches/<lang>/*.patch` directory and need to agree on how a filename maps to a canonical key. This is a cross-language contract. Tooling and templates must not hand-roll `split("@")` or `__ -> /` decoding logic at call sites.
+
+- **Contract**:
+  - Patch filenames are decoded using the **last** `@` as the version separator.
+  - The name portion is decoded with `__` -> `/` (PNPM-style).
+  - The canonical key is lowercased and formatted as `importPath@version`.
+  - Version normalization is explicit at the call site for languages that require it (Python strips suffix after `-`).
+- **Canonical implementations**:
+  - **TypeScript**: `tools/lib/providers.ts:decodeNameVersionFromPatch`
+  - **Nix**: `tools/nix/lib/lang-helpers.nix:decodePatchFilename`
+  - **Nix (builders)**: `tools/nix/lib/lang-helpers.nix:patchesMapFromDir`, `patchesMapFromDirToStore`, `patchesMapFromImporterDirToStore`
+- **Regression guards**:
+  - `tools/tests/lib/parity.ts_nix_patch_key_parity.test.ts` (TS scan vs Nix `patchesMapFromDir` key set)
+  - `tools/tests/nix/patch-filename-decoding.nix-ts.parity.test.ts` (TS decode vs Nix decode, including Python-style version normalization)
+
 ### Dev overrides (environment variable names)
 
 Dev override environment variable names are treated as a cross-language contract. The names are data, not hardcoded strings, to avoid drift across Nix and TypeScript tooling.
