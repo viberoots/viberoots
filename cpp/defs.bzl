@@ -2,9 +2,9 @@ load("@prelude//:rules.bzl", "cxx_library", "cxx_binary", "cxx_test")
 load(
     "//lang:defs_common.bzl",
     "dedupe_preserve",
-    "prepare_package_local_wiring",
+    "prepare_package_local_wiring_v2",
     "prepare_package_local_wasm_wiring",
-    "wire_package_local_planner_visible_stub",
+    "wire_package_local_planner_visible_stub_v2",
     "wire_package_local_wasm_planner_visible_stub",
 )
 load("//lang:global_inputs.bzl", "global_nix_inputs")
@@ -14,10 +14,10 @@ load("//cpp/private:nix_build.bzl", "cpp_nix_build")
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
 
 def _cpp_common(name, kind, kwargs):
-    deps = kwargs.pop("deps", [])
+    deps = kwargs.get("deps", []) or []
     nix_inputs = global_nix_inputs()
 
-    wiring = prepare_package_local_wiring(
+    wiring = prepare_package_local_wiring_v2(
         name = name,
         kwargs = kwargs,
         lang = "cpp",
@@ -25,11 +25,12 @@ def _cpp_common(name, kind, kwargs):
         MODULE_PROVIDERS = MODULE_PROVIDERS,
         base_deps = deps,
     )
+    kw = wiring.kwargs
     if kind == "addon":
-        addon_name = kwargs.pop("addon_name", None)
+        addon_name = kw.get("addon_name", None)
         if addon_name:
-            kwargs["labels"] = dedupe_preserve((kwargs.get("labels", []) or []) + ["addon_name:%s" % addon_name])
-    srcs = kwargs.get("srcs", []) or []
+            kw["labels"] = dedupe_preserve((kw.get("labels", []) or []) + ["addon_name:%s" % addon_name])
+    srcs = kw.get("srcs", []) or []
 
     out = sanitize_to_bin_name("//%s:%s" % (native.package_name(), name))
     if kind == "lib":
@@ -44,9 +45,9 @@ def _cpp_common(name, kind, kwargs):
         self_label = "//%s:%s" % (native.package_name(), name),
         deps = wiring.deps,
         srcs = srcs,
-        labels = kwargs.get("labels", []) or [],
+        labels = kw.get("labels", []) or [],
         nix_inputs = nix_inputs,
-        visibility = kwargs.get("visibility", []),
+        visibility = kw.get("visibility", []),
     )
 
 
@@ -60,7 +61,7 @@ def nix_cpp_wasm_static_lib(name, **kwargs):
     Stamps:
       - lang:cpp, kind:lib, flavor:wasm
     """
-    deps = kwargs.pop("deps", [])
+    deps = kwargs.get("deps", []) or []
     nix_inputs = global_nix_inputs()
     wiring = prepare_package_local_wasm_wiring(
         name = name,
@@ -99,7 +100,7 @@ def nix_cpp_wasm_emscripten_lib(name, **kwargs):
       produced by the planner template (cppWasmEmscriptenLib) when built via the
       Nix flake attributes (e.g., graph-generator-selected).
     """
-    deps = kwargs.pop("deps", [])
+    deps = kwargs.get("deps", []) or []
     wire_package_local_wasm_planner_visible_stub(
         name = name,
         out = name + ".stamp",
@@ -121,15 +122,14 @@ def nix_cpp_binary(name, **kwargs):
 
 def nix_cpp_test(name, **kwargs):
     # Define a planner-visible cxx_test (not executed) and an external runner test (executed)
-    deps = kwargs.pop("deps", [])
+    deps = kwargs.get("deps", []) or []
     planner_name = name + "__planner"
     # Planner-visible stub: Nix builds the test; this node exists for planner discovery and invalidation.
     # Provider deps are stripped to avoid visibility / graph-shape problems on the planner-visible boundary.
-    _planner_kwargs = dict(kwargs)
-    wire_package_local_planner_visible_stub(
+    wire_package_local_planner_visible_stub_v2(
         name = planner_name,
         out = planner_name + ".stamp",
-        kwargs = _planner_kwargs,
+        kwargs = kwargs,
         lang = "cpp",
         kind = "test",
         deps = deps,

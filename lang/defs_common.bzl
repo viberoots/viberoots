@@ -84,6 +84,7 @@ load(
     _wire_planner_visible_inputs = "wire_planner_visible_inputs",
     _wire_planner_visible_stub = "wire_planner_visible_stub",
     _wire_package_local_planner_visible_stub = "wire_package_local_planner_visible_stub",
+    _wire_package_local_planner_visible_stub_v2 = "wire_package_local_planner_visible_stub_v2",
 )
 load(
     "//lang:package_local_wiring.bzl",
@@ -173,6 +174,7 @@ kind_vocabulary_probe = _kind_vocabulary_probe
 wire_planner_visible_inputs = _wire_planner_visible_inputs
 wire_planner_visible_stub = _wire_planner_visible_stub
 wire_package_local_planner_visible_stub = _wire_package_local_planner_visible_stub
+wire_package_local_planner_visible_stub_v2 = _wire_package_local_planner_visible_stub_v2
 
 prepare_package_local_wiring = _prepare_package_local_wiring
 prepare_package_local_wiring_v2 = _prepare_package_local_wiring_v2

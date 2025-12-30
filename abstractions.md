@@ -236,8 +236,8 @@ I treat patch invalidation as two explicit models:
     - `patch_scope:package-local`
     - `patch_scope:importer-local`
   - Stamping happens only at the shared wiring helper boundaries:
-    - Package-local: `lang/package_local_wiring.bzl:prepare_package_local_wiring`
-    - Package-local planner-visible stubs: `lang/planner_visible_wiring.bzl:wire_package_local_planner_visible_stub`
+    - Package-local: `lang/package_local_wiring.bzl:prepare_package_local_wiring_v2`
+    - Package-local planner-visible stubs: `lang/planner_visible_wiring.bzl:wire_package_local_planner_visible_stub_v2`
     - Importer-local: `lang/importer_wiring*.bzl:prepare_importer_*`
 
 - **Package-local patching** (Go, C++):
@@ -245,7 +245,7 @@ I treat patch invalidation as two explicit models:
   - Macros include patch files in the target’s action inputs, usually `srcs`.
   - Provider sync is not required to make patch changes invalidate builds.
   - Planner-visible stubs for package-local languages still carry package-local patch files as real inputs, and must stamp `patch_scope:package-local`:
-    - `nix_cpp_test`’s `<name>__planner` uses the canonical package-local planner-visible stub helper (`wire_package_local_planner_visible_stub(...)`) so patch edits invalidate the planner-visible boundary.
+    - `nix_cpp_test`’s `<name>__planner` uses the canonical package-local planner-visible stub helper (`wire_package_local_planner_visible_stub_v2(...)`) so patch edits invalidate the planner-visible boundary.
     - `nix_cpp_wasm_emscripten_lib` uses `wire_package_local_wasm_planner_visible_stub(...)` so WASM stamping, patch scope stamping, patch inputs, provider handling, and planner-visible defaults stay consistent.
     - Package-local WASM macros use the shared WASM wiring helpers so ordering-sensitive steps (WASM stamping, patch scope, patch inputs, provider edges) cannot drift.
 
@@ -269,7 +269,7 @@ Rule: treat provider `patch_paths` as diagnostic/observability data for importer
 - **Patch model registry (TypeScript)**: `tools/lib/lang-contracts.ts`
 - **Starlark package-local**:
   - `lang/patch_inputs.bzl:include_package_local_patches` and `lang/patch_inputs.bzl:default_package_patch_dirs`.
-  - `lang/package_local_wiring.bzl:prepare_package_local_wiring` (macro-side helper that composes kwarg normalization, nixpkg label stamping, patch input inclusion, and provider-edge realization deterministically).
+  - `lang/package_local_wiring.bzl:prepare_package_local_wiring_v2` (preferred macro-side helper that composes kwarg normalization, nixpkg label stamping, patch input inclusion, and provider-edge realization deterministically without mutating call-site dicts).
 - **Starlark importer-local**: `lang/patch_inputs.bzl:include_importer_patches_from_labels` plus `lang/importer_wiring.bzl:attach_importer_patch_inputs`.
 
 For importer-scoped ecosystems, there is an additional provider contract surface that is still part of the “patch model”, because it directly determines invalidation behavior and glue content.

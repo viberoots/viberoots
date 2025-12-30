@@ -1,5 +1,5 @@
 load("//lang:planner_stub.bzl", "planner_stub", "planner_stub_with_package_local_patches")
-load("//lang:macro_kwargs.bzl", "pop_package_local_patch_dirs_and_nixpkg_deps")
+load("//lang:macro_kwargs.bzl", "extract_package_local_patch_dirs_and_nixpkg_deps", "pop_package_local_patch_dirs_and_nixpkg_deps")
 load("//lang:label_stamping.bzl", "stamp_labels", "stamp_patch_scope_for_lang")
 load("//lang:provider_edges.bzl", "realize_provider_edges", "strip_provider_targets")
 
@@ -177,6 +177,61 @@ def wire_package_local_planner_visible_stub(
         strip_providers_from_deps = strip_providers_from_deps,
     )
     return struct(
+        local_patch_dirs = info.local_patch_dirs,
+        nixpkg_deps = info.nixpkg_deps,
+    )
+
+
+def wire_package_local_planner_visible_stub_v2(
+        *,
+        name,
+        out = "",
+        kwargs,
+        lang,
+        kind = None,
+        deps = [],
+        srcs = [],
+        MODULE_PROVIDERS = None,
+        provider_realization_mode = None,
+        # Back-compat: older call sites used "deps"|"srcs".
+        realize_providers_into = None,
+        strip_providers_from_deps = True):
+    """
+    Non-mutating variant of wire_package_local_planner_visible_stub.
+
+    This returns a struct with:
+      - kwargs: prepared kwargs dict (with local_patch_dirs/nixpkg_deps removed and labels stamped)
+      - local_patch_dirs
+      - nixpkg_deps
+    """
+    if not isinstance(name, str) or name == "":
+        fail("wire_package_local_planner_visible_stub_v2: name must be a non-empty string")
+    if not isinstance(kwargs, dict):
+        fail("wire_package_local_planner_visible_stub_v2: kwargs must be a dict")
+    if not isinstance(lang, str) or lang == "":
+        fail("wire_package_local_planner_visible_stub_v2: lang must be a non-empty string")
+
+    info = extract_package_local_patch_dirs_and_nixpkg_deps(kwargs, lang, append_labels = True)
+    kw = info.kwargs
+    stamp_patch_scope_for_lang(kw, lang)
+    stamp_labels(kw, lang, kind)
+
+    wire_planner_visible_stub(
+        name = name,
+        out = out,
+        lang = lang,
+        local_patch_dirs = info.local_patch_dirs,
+        deps = deps,
+        srcs = srcs,
+        labels = kw.get("labels", []) or [],
+        visibility = kw.get("visibility", []),
+        MODULE_PROVIDERS = MODULE_PROVIDERS,
+        provider_realization_mode = provider_realization_mode,
+        realize_providers_into = realize_providers_into,
+        strip_providers_from_deps = strip_providers_from_deps,
+    )
+    return struct(
+        kwargs = kw,
         local_patch_dirs = info.local_patch_dirs,
         nixpkg_deps = info.nixpkg_deps,
     )
