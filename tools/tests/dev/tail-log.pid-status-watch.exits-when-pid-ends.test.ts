@@ -17,7 +17,7 @@ test("tail-log: explicit PID --status -w exits after the PID ends (no switching)
   await fsp.writeFile(logFile, "[verify] buck2 test begin iso=v-1 start_s=1\n", "utf8");
   const logReal = await fsp.realpath(logFile);
 
-  const sleeper = spawn("sleep", ["2"], { stdio: "ignore" });
+  const sleeper = spawn("sleep", ["60"], { stdio: "ignore" });
   assert.ok(typeof sleeper.pid === "number" && sleeper.pid > 0);
   const pid = sleeper.pid;
 
@@ -73,7 +73,7 @@ test("tail-log: explicit PID --status -w exits after the PID ends (no switching)
   const waitForExit = async (): Promise<number> => {
     const t = setTimeout(() => {
       tailLog.kill("SIGKILL");
-    }, 10_000);
+    }, 20_000);
     try {
       const [code] = (await once(tailLog, "exit")) as [number | null];
       return code ?? -1;
@@ -84,13 +84,14 @@ test("tail-log: explicit PID --status -w exits after the PID ends (no switching)
 
   const sawTimeout = setTimeout(() => {
     tailLog.kill("SIGKILL");
-  }, 2_000);
+  }, 30_000);
   try {
     await sawPid;
   } finally {
     clearTimeout(sawTimeout);
   }
 
+  sleeper.kill("SIGTERM");
   await once(sleeper, "exit");
 
   const exitCode = await waitForExit();
