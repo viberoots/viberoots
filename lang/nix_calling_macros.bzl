@@ -1,7 +1,8 @@
 load("//lang:global_inputs.bzl", "attach_global_nix_inputs")
 load("//lang:label_stamping.bzl", "stamp_global_nix_inputs")
+load("//lang:dict_inputs.bzl", "GLOBAL_NIX_INPUTS_KEY_PREFIX")
 
-def wire_global_nix_inputs(kwargs, into = "srcs", stamp = True, key_prefix = "__global_nix_inputs__"):
+def wire_global_nix_inputs(kwargs, into = "srcs", stamp = True, key_prefix = GLOBAL_NIX_INPUTS_KEY_PREFIX):
     """
     Apply the centralized "global Nix inputs" policy for macros that call Nix.
 

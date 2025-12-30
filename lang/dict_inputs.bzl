@@ -4,6 +4,7 @@ load("//lang:labels_file.bzl", "labels_file")
 
 PATCH_INPUTS_KEY_PREFIX = "__patch_inputs__"
 PROVIDER_EDGES_KEY_PREFIX = "__provider_edges__"
+GLOBAL_NIX_INPUTS_KEY_PREFIX = "__global_nix_inputs__"
 
 def _unique_dict_key(dst_to_src, desired):
     if not isinstance(dst_to_src, dict):

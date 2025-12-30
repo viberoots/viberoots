@@ -129,6 +129,11 @@ If you change supported importer roots, update both implementations and keep the
 - For importer-scoped, **Nix-calling genrule-style** macros, use:
   - `prepare_importer_nix_calling_genrule_wiring_v2(...)`
     - It composes lockfile enforcement, label stamping, importer patch inputs, provider edge realization into `srcs`, optional `tools/buck/workspace-root.env` injection for dict-shaped `srcs`, and global Nix inputs as real action inputs (optional stamp).
+    - When you need dict-safe synthetic keys, do not hardcode any reserved prefixes. Import:
+      - `PATCH_INPUTS_KEY_PREFIX`
+      - `PROVIDER_EDGES_KEY_PREFIX`
+      - `GLOBAL_NIX_INPUTS_KEY_PREFIX`
+        from `//lang:defs_common.bzl`.
 
 Minimal example (dict-shaped `srcs`):
 

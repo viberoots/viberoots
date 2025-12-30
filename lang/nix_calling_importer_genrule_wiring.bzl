@@ -1,7 +1,7 @@
 load("//lang:importer_wiring.bzl", "prepare_importer_genrule_kwargs")
 load("//lang:lockfile_labels.bzl", "importer_from_labels")
 load("//lang:nix_calling_macros.bzl", "wire_global_nix_inputs")
-load("//lang:dict_inputs.bzl", "PATCH_INPUTS_KEY_PREFIX", "PROVIDER_EDGES_KEY_PREFIX")
+load("//lang:dict_inputs.bzl", "GLOBAL_NIX_INPUTS_KEY_PREFIX", "PATCH_INPUTS_KEY_PREFIX", "PROVIDER_EDGES_KEY_PREFIX")
 
 def _clone_container_or_none(v):
     if isinstance(v, dict):
@@ -26,7 +26,7 @@ def prepare_importer_nix_calling_genrule_wiring(
         workspace_root_env_src = "root//tools/buck:workspace-root.env",
         global_inputs_into = "srcs",
         global_inputs_stamp = True,
-        global_inputs_key_prefix = "__global_nix_inputs__"):
+        global_inputs_key_prefix = GLOBAL_NIX_INPUTS_KEY_PREFIX):
     """
     Shared helper for importer-scoped, Nix-calling genrule-style macros.
 
@@ -93,7 +93,7 @@ def prepare_importer_nix_calling_genrule_wiring_v2(
         workspace_root_env_src = "root//tools/buck:workspace-root.env",
         global_inputs_into = "srcs",
         global_inputs_stamp = True,
-        global_inputs_key_prefix = "__global_nix_inputs__"):
+        global_inputs_key_prefix = GLOBAL_NIX_INPUTS_KEY_PREFIX):
     """
     Non-mutating variant of prepare_importer_nix_calling_genrule_wiring.
     """

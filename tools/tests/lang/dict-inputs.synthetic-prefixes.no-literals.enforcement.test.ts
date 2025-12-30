@@ -3,7 +3,11 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 
-const PREFIX_LITERALS = [/__patch_inputs__/g, /__provider_edges__/g] as const;
+const PREFIX_LITERALS = [
+  /__patch_inputs__/g,
+  /__provider_edges__/g,
+  /__global_nix_inputs__/g,
+] as const;
 
 async function listBzlFilesUnder(dir: string): Promise<string[]> {
   const out: string[] = [];
@@ -42,7 +46,7 @@ test("Starlark does not hardcode dict-safe synthetic prefix literals outside lan
   if (offenders.length > 0) {
     console.error("found dict-safe synthetic prefix literals in *.bzl files:");
     console.error(
-      "expected callers to import PATCH_INPUTS_KEY_PREFIX/PROVIDER_EDGES_KEY_PREFIX via //lang:defs_common.bzl",
+      "expected callers to import PATCH_INPUTS_KEY_PREFIX/PROVIDER_EDGES_KEY_PREFIX/GLOBAL_NIX_INPUTS_KEY_PREFIX via //lang:defs_common.bzl",
     );
     for (const o of offenders) {
       console.error(`- ${o.file}: ${o.matches.join(", ")}`);

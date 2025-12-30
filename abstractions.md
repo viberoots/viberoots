@@ -480,10 +480,11 @@ Dict-shaped attributes that carry synthetic attachments (for example importer-lo
 
 - `__patch_inputs__/...`
 - `__provider_edges__/...`
+- `__global_nix_inputs__/...`
 
 These prefixes are a shared contract. Do not hardcode these strings. Import the canonical constants:
 
-- `//lang:defs_common.bzl` (`PATCH_INPUTS_KEY_PREFIX`, `PROVIDER_EDGES_KEY_PREFIX`)
+- `//lang:defs_common.bzl` (`PATCH_INPUTS_KEY_PREFIX`, `PROVIDER_EDGES_KEY_PREFIX`, `GLOBAL_NIX_INPUTS_KEY_PREFIX`)
 - Source of truth: `//lang:dict_inputs.bzl`
 
 ### Enforcement

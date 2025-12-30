@@ -1,5 +1,5 @@
 load("//lang:collections.bzl", "dedupe_preserve")
-load("//lang:dict_inputs.bzl", "attach_items_dict_safe")
+load("//lang:dict_inputs.bzl", "GLOBAL_NIX_INPUTS_KEY_PREFIX", "attach_items_dict_safe")
 
 def global_nix_inputs():
     """
@@ -12,7 +12,7 @@ def global_nix_inputs():
     return ["//:flake.lock"]
 
 
-def attach_global_nix_inputs(kwargs, into = "srcs", key_prefix = "__global_nix_inputs__"):
+def attach_global_nix_inputs(kwargs, into = "srcs", key_prefix = GLOBAL_NIX_INPUTS_KEY_PREFIX):
     """
     Attach global_nix_inputs() as real action inputs.
 
@@ -25,7 +25,7 @@ def attach_global_nix_inputs(kwargs, into = "srcs", key_prefix = "__global_nix_i
     if not isinstance(into, str) or into == "":
         return
     if not isinstance(key_prefix, str) or key_prefix == "":
-        key_prefix = "__global_nix_inputs__"
+        key_prefix = GLOBAL_NIX_INPUTS_KEY_PREFIX
 
     existing = kwargs.get(into, None)
     if existing == None:

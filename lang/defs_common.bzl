@@ -46,6 +46,7 @@ load(
 )
 load(
     "//lang:dict_inputs.bzl",
+    _GLOBAL_NIX_INPUTS_KEY_PREFIX = "GLOBAL_NIX_INPUTS_KEY_PREFIX",
     _PATCH_INPUTS_KEY_PREFIX = "PATCH_INPUTS_KEY_PREFIX",
     _PROVIDER_EDGES_KEY_PREFIX = "PROVIDER_EDGES_KEY_PREFIX",
     _attach_items_dict_safe = "attach_items_dict_safe",
@@ -150,6 +151,7 @@ attach_items_dict_safe = _attach_items_dict_safe
 dict_items_probe = _dict_items_probe
 PATCH_INPUTS_KEY_PREFIX = _PATCH_INPUTS_KEY_PREFIX
 PROVIDER_EDGES_KEY_PREFIX = _PROVIDER_EDGES_KEY_PREFIX
+GLOBAL_NIX_INPUTS_KEY_PREFIX = _GLOBAL_NIX_INPUTS_KEY_PREFIX
 
 require_single_importer_lockfile_label = _require_single_importer_lockfile_label
 attach_importer_patch_inputs = _attach_importer_patch_inputs
