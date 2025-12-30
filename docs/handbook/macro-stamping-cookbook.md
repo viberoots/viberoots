@@ -10,9 +10,9 @@ Stamping ensures exporter preconditions via consistent labels applied in macros.
     - TypeScript: `tools/lib/kind-vocabulary.ts`
   - Examples used in this repo include: `kind:bin`, `kind:lib`, `kind:test`, `kind:bundle`, `kind:app`, `kind:packaging`, `kind:addon`, `kind:carchive`, `kind:gen`, and `kind:wasm`.
 - **Importer-scoped ecosystems (Node, Python)**: avoid bespoke wiring. Use the shared helpers in `lang/importer_wiring.bzl` so lockfile enforcement, patch inputs, and provider edge realization stay drift-free.
-  - For genrule-style wrappers: `prepare_importer_genrule_kwargs(...)`
+  - For genrule-style wrappers: prefer `prepare_importer_genrule_kwargs_v2(...)` (non-mutating; returns prepared kwargs). The legacy helper `prepare_importer_genrule_kwargs(...)` remains available for older call sites.
   - For non-genrule wrappers: prefer `prepare_importer_non_genrule_wiring_v2(...)` (non-mutating; returns the derived importer string and the wired kwargs/deps). The legacy helper `prepare_importer_non_genrule_wiring(...)` remains available for older call sites.
-  - For importer-scoped, **Nix-calling genrule-style** macros (for example `node_webapp`, bundled `nix_node_cli_bin`), use `prepare_importer_nix_calling_genrule_wiring(...)` so lockfile enforcement, importer derivation, patch inputs, provider edges, optional `workspace-root.env` injection, and global Nix input wiring are composed in one place.
+  - For importer-scoped, **Nix-calling genrule-style** macros (for example `node_webapp`, bundled `nix_node_cli_bin`), prefer `prepare_importer_nix_calling_genrule_wiring_v2(...)` so lockfile enforcement, importer derivation, patch inputs, provider edges, optional `workspace-root.env` injection, and global Nix input wiring are composed in one place.
 - **Global Nix inputs (macros and rules that call Nix)**: treat `global_nix_inputs()` as real action inputs. Label stamping is retained for observability, but correctness must not depend on labels.
   - For **macros** that call Nix, use `//lang:defs_common.bzl:wire_global_nix_inputs(...)`. This keeps call sites consistent and keeps list-shaped and dict-shaped inputs correct.
   - For **macros that create genrules** that call Nix, use the shared helper `lang/defs_common.bzl: wire_global_nix_inputs(kwargs, into="srcs", stamp=True)` so call sites cannot forget either:

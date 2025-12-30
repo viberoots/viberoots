@@ -4,7 +4,7 @@ This repo’s Node macros that invoke Nix are intentionally small. They keep Nod
 
 They also use the shared importer-scoped wiring helpers so lockfile enforcement, importer derivation, importer-local patch inputs, and provider-edge realization stay consistent across Node and Python:
 
-- `//lang:defs_common.bzl:prepare_importer_nix_calling_genrule_wiring(...)` for importer-scoped genrule-style macros that invoke Nix (webapp and bundled CLI).
+- `//lang:defs_common.bzl:prepare_importer_nix_calling_genrule_wiring_v2(...)` for importer-scoped genrule-style macros that invoke Nix (webapp and bundled CLI).
 
 Buck package boundary note:
 

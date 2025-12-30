@@ -437,7 +437,7 @@ Importer-scoped wrappers should use a standardized wiring sequence. When a wrapp
 
 ### Canonical implementations
 
-- **Starlark**: `lang/defs_common.bzl:prepare_importer_nix_calling_genrule_wiring`
+- **Starlark**: `lang/defs_common.bzl:prepare_importer_nix_calling_genrule_wiring_v2`
 - **Starlark (command assembly)**: `lang/nix_shell.bzl`
   - `nix_calling_genrule_bootstrap(...)` (root derivation + optional `workspace-root.env` sourcing)
   - `nix_calling_genrule_nix_build_out_path_prefix(...)` (canonical `nix build --no-link --print-out-paths` outPath capture)
@@ -472,6 +472,7 @@ The contract is guarded by probe and enforcement tests. If a new macro bypasses 
 - `tools/tests/lang/importer-wiring.macros-avoid-direct-lockfile-parsing.enforcement.test.ts`: prevents importer-scoped macro implementations from directly loading `//lang:lockfile_labels.bzl` instead of delegating to `//lang:importer_wiring.bzl`.
 - `tools/tests/lang/importer-nix-calling-genrule-wiring.attach-patches-providers-global-inputs.probe.test.ts`: proves list and dict `srcs` shapes receive importer-local patch inputs, provider edges, global Nix inputs, and standardized workspace-root env injection.
 - `tools/tests/node/node.nix-calling-macros.use-shared-importer-nix-genrule-helper.enforcement.test.ts`: prevents Node Nix-calling macro implementations from bypassing the shared helper.
+- `tools/tests/node/node.defs-core.uses-importer-wiring-v2.enforcement.test.ts`: prevents Node macros from falling back to the mutating importer wiring helpers after the v2 migration.
 
 ---
 
@@ -493,6 +494,7 @@ Importer-scoped non-genrule wrappers should:
 
 - **Starlark (preferred)**: `lang/importer_wiring_v2.bzl:prepare_importer_non_genrule_wiring_v2`
 - **Starlark (legacy)**: `lang/importer_wiring.bzl:prepare_importer_non_genrule_wiring`
+- **Genrule-style (preferred)**: `lang/importer_wiring_v2.bzl:prepare_importer_genrule_kwargs_v2`
 - **Python macro usage**: `python/defs.bzl` (`nix_python_library`, `nix_python_test`, `nix_python_wasm_*`)
 - **Srcs-less rule shapes (preferred)**: `lang/importer_wiring_v2.bzl:prepare_importer_srcsless_rule_wiring_v2` (creates a synthetic dep carrying importer-local patches as action inputs)
 - **Srcs-less rule shapes (legacy)**: `lang/importer_wiring.bzl:prepare_importer_srcsless_rule_wiring`
@@ -545,7 +547,7 @@ Today, some macros need to remember to do two things:
 Implemented in two layers, depending on the macro shape:
 
 - **Generic “call Nix” helper**: `lang/nix_calling_macros.bzl:wire_global_nix_inputs(...)` (re-exported from `lang/defs_common.bzl`)
-- **Importer-scoped, genrule-style helper**: `lang/defs_common.bzl:prepare_importer_nix_calling_genrule_wiring(...)` (composes importer wiring plus global inputs and workspace-root env injection)
+- **Importer-scoped, genrule-style helper**: `lang/defs_common.bzl:prepare_importer_nix_calling_genrule_wiring_v2(...)` (composes importer wiring plus global inputs and workspace-root env injection without mutating caller dicts)
 
 ### Add a single helper for importer-scoped non-genrule macros
 

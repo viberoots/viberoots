@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "genrule")
-load("//lang:defs_common.bzl", "prepare_importer_nix_calling_genrule_wiring")
+load("//lang:defs_common.bzl", "prepare_importer_nix_calling_genrule_wiring_v2")
 load("//lang:importer_strings.bzl", "importer_display_name", "sanitize_importer_for_nix_attr")
 load(
     "//lang:nix_shell.bzl",
@@ -10,12 +10,6 @@ load(
 )
 load("//node:defs_core.bzl", "nix_node_gen")
 
-def _pop_list(kwargs, key):
-    if kwargs == None:
-        return []
-    v = kwargs.pop(key, [])
-    return v if isinstance(v, list) else []
-
 def _prepare_node_importer_nix_calling_genrule_kwargs(
         name,
         kwargs,
@@ -25,7 +19,7 @@ def _prepare_node_importer_nix_calling_genrule_kwargs(
         labels = [],
         lockfile_label = None,
         MODULE_PROVIDERS = None):
-    return prepare_importer_nix_calling_genrule_wiring(
+    return prepare_importer_nix_calling_genrule_wiring_v2(
         name = name,
         kwargs = kwargs,
         srcs = srcs,
@@ -42,6 +36,7 @@ def _prepare_node_importer_nix_calling_genrule_kwargs(
 
 def node_webapp(
     name,
+    deps = [],
     labels = [],
     lockfile_label = None,
     importer = None,
@@ -57,7 +52,6 @@ def node_webapp(
     """
     kw = dict(kwargs) if kwargs != None else {}
     kw["labels"] = list(labels or [])
-    deps = _pop_list(kw, "deps")
     wiring = _prepare_node_importer_nix_calling_genrule_kwargs(
         name = name,
         kwargs = kw,

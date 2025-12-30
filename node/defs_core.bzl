@@ -1,8 +1,8 @@
 load("@prelude//:rules.bzl", "genrule")
 load(
     "//lang:defs_common.bzl",
-    "prepare_importer_genrule_kwargs",
-    "prepare_importer_non_genrule_wiring",
+    "prepare_importer_genrule_kwargs_v2",
+    "prepare_importer_non_genrule_wiring_v2",
     "wire_global_nix_inputs",
 )
 load("//node/private:nix_test.bzl", "node_nix_test")
@@ -12,7 +12,7 @@ MODULE_PROVIDERS = {}
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
 
 def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = [], lockfile_label = None, kind = "gen", **kwargs):
-    prepare_importer_genrule_kwargs(
+    wiring = prepare_importer_genrule_kwargs_v2(
         name = name,
         kwargs = kwargs,
         srcs = srcs,
@@ -23,11 +23,12 @@ def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = []
         lockfile_label = lockfile_label,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
     )
+    kw = wiring.kwargs
     if out != None:
-        kwargs["out"] = out
+        kw["out"] = out
     if cmd != None:
-        kwargs["cmd"] = cmd
-    genrule(**kwargs)
+        kw["cmd"] = cmd
+    genrule(**kw)
 
 def nix_node_test(
     name,
@@ -45,7 +46,7 @@ def nix_node_test(
     kind = "test",
     **kwargs
 ):
-    wiring = prepare_importer_non_genrule_wiring(
+    wiring = prepare_importer_non_genrule_wiring_v2(
         name = name,
         kwargs = {},
         deps = deps,
@@ -57,7 +58,7 @@ def nix_node_test(
         patch_base = list(srcs),
         MODULE_PROVIDERS = MODULE_PROVIDERS,
     )
-    kw = wiring["kwargs"]
+    kw = wiring.kwargs
 
     # This macro runs a Nix build inside the external runner, so flake inputs must be real action inputs
     # for invalidation. Keep stamping disabled for this macro to avoid exporter noise; other Nix-calling
@@ -68,12 +69,12 @@ def nix_node_test(
     # Forward to external runner rule; ignore legacy 'cmd'
     node_nix_test(
         name = name,
-        importer = wiring["importer"],
+        importer = wiring.importer,
         patterns = ([] if patterns == None else patterns),
         env = (env or {}),
         timeout_sec = timeout_sec,
         srcs = merged_srcs,
-        deps = wiring["deps"],
+        deps = wiring.deps,
         labels = kw.get("labels", []),
         out = (out if out != None else (name + ".stamp")),
         **kwargs

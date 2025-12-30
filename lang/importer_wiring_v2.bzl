@@ -1,6 +1,7 @@
 load("//lang:dict_inputs.bzl", "PATCH_INPUTS_KEY_PREFIX", "PROVIDER_EDGES_KEY_PREFIX")
 load(
     "//lang:importer_wiring.bzl",
+    "prepare_importer_genrule_kwargs",
     "prepare_importer_non_genrule_wiring",
     "prepare_importer_srcsless_rule_wiring",
 )
@@ -72,6 +73,44 @@ def prepare_importer_non_genrule_wiring_v2(
         importer = res["importer"],
         kwargs = res["kwargs"],
         deps = res["deps"],
+    )
+
+def prepare_importer_genrule_kwargs_v2(
+        name,
+        kwargs,
+        srcs,
+        deps,
+        lang,
+        kind,
+        labels = [],
+        lockfile_label = None,
+        MODULE_PROVIDERS = None,
+        patch_key_prefix = PATCH_INPUTS_KEY_PREFIX,
+        provider_key_prefix = PROVIDER_EDGES_KEY_PREFIX):
+    """
+    Non-mutating variant of prepare_importer_genrule_kwargs.
+
+    Returns a struct:
+      - kwargs: prepared kwargs dict ready for genrule(**kwargs)
+    """
+    kw = _prepare_non_mutating_kwargs(kwargs, patch_into = "srcs", provider_into = "srcs")
+    base_deps = list(deps) if isinstance(deps, list) else []
+    base_srcs = dict(srcs) if isinstance(srcs, dict) else list(srcs)
+    prepared = prepare_importer_genrule_kwargs(
+        name = name,
+        kwargs = kw,
+        srcs = base_srcs,
+        deps = base_deps,
+        lang = lang,
+        kind = kind,
+        labels = labels,
+        lockfile_label = lockfile_label,
+        MODULE_PROVIDERS = MODULE_PROVIDERS,
+        patch_key_prefix = patch_key_prefix,
+        provider_key_prefix = provider_key_prefix,
+    )
+    return struct(
+        kwargs = prepared,
     )
 
 def prepare_importer_srcsless_rule_wiring_v2(
@@ -161,6 +200,7 @@ def importer_wiring_v2_mutation_probe(name, lang, kind):
     )
 
 __all__ = [
+    "prepare_importer_genrule_kwargs_v2",
     "prepare_importer_non_genrule_wiring_v2",
     "prepare_importer_srcsless_rule_wiring_v2",
     "importer_wiring_v2_mutation_probe",

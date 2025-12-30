@@ -126,14 +126,14 @@ If you change supported importer roots, update both implementations and keep the
 - `ensure_single_lockfile_label(kwargs, lockfile_label)` enforces exactly one importer-scoped label (`lockfile:<path>#<importer>`) with stable dedupe and canonical error text.
 - `include_importer_patches_from_labels(kwargs, lang, into = "srcs")` derives the importer and includes importer-local patches deterministically into a supported input attribute (commonly `srcs` or `resources` depending on the rule shape).
 - For importer-scoped, **Nix-calling genrule-style** macros, use:
-  - `prepare_importer_nix_calling_genrule_wiring(...)`
+  - `prepare_importer_nix_calling_genrule_wiring_v2(...)`
     - It composes lockfile enforcement, label stamping, importer patch inputs, provider edge realization into `srcs`, optional `tools/buck/workspace-root.env` injection for dict-shaped `srcs`, and global Nix inputs as real action inputs (optional stamp).
 
 Minimal example (dict-shaped `srcs`):
 
 ```python
 load("@prelude//:rules.bzl", "genrule")
-load("//lang:defs_common.bzl", "prepare_importer_nix_calling_genrule_wiring")
+load("//lang:defs_common.bzl", "prepare_importer_nix_calling_genrule_wiring_v2")
 
 def my_importer_nix_genrule(name, lockfile_label = None):
     # Dict-shaped srcs: preserve caller mapping, and allow shared helper to attach
@@ -141,7 +141,7 @@ def my_importer_nix_genrule(name, lockfile_label = None):
     srcs = {
         "package.json": "package.json",
     }
-    wiring = prepare_importer_nix_calling_genrule_wiring(
+    wiring = prepare_importer_nix_calling_genrule_wiring_v2(
         name = name,
         kwargs = {},
         srcs = srcs,
