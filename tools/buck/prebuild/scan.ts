@@ -78,10 +78,12 @@ export async function listInputs(): Promise<string[]> {
 export function listOutputs(): string[] {
   const graphOut = path.join("tools", "buck", "graph.json");
   const nodeLockIdx = path.join("tools", "buck", "node-lock-index.json");
+  const invalidationReport = path.join("tools", "buck", "invalidation-report.txt");
   const autoMap = path.join("third_party", "providers", "auto_map.bzl");
   const outs = [
     graphOut,
     nodeLockIdx,
+    invalidationReport,
     autoMap,
     // C++ no longer requires provider→attr mapping; keep only auto_map for Node.
   ];

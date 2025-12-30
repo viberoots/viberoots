@@ -8,6 +8,7 @@ import { runNodeWithZx } from "../lib/node-run.ts";
 type RunGluePipelineOptions = {
   graphPath?: string;
   outAutoMap?: string;
+  outInvalidationReport?: string;
   zxInitPath?: string;
   verbose?: boolean;
   // When true, skip calling tools/buck/sync-providers.ts. This is used when a caller
@@ -17,6 +18,8 @@ type RunGluePipelineOptions = {
   providerIndex?: "skip" | "best-effort" | "required";
   // Control auto_map emission: skip entirely or required.
   autoMap?: "skip" | "required";
+  // Control invalidation-report emission: skip entirely or required.
+  invalidationReport?: "skip" | "required";
 };
 
 function repoRootFromCwd(): string {
@@ -33,10 +36,12 @@ export async function runGluePipeline(opts: RunGluePipelineOptions = {}): Promis
   const zxInit = opts.zxInitPath || zxInitDefault(repoRoot);
   const graphPath = opts.graphPath || DEFAULT_GRAPH_PATH;
   const outAutoMap = opts.outAutoMap || "third_party/providers/auto_map.bzl";
+  const outInvalidationReport = opts.outInvalidationReport || "tools/buck/invalidation-report.txt";
   const verbose = !!opts.verbose;
   const skipProviderSync = !!opts.skipProviderSync;
   const providerIndexMode = opts.providerIndex || "required";
   const autoMapMode = opts.autoMap || "required";
+  const invalidationReportMode = opts.invalidationReport || "required";
 
   // Step 1: ensure graph exists (idempotent)
   if (verbose) console.error(`[glue-pipeline] ensureGraph → ${graphPath}`);
@@ -84,6 +89,23 @@ export async function runGluePipeline(opts: RunGluePipelineOptions = {}): Promis
     });
   } else if (verbose) {
     console.error("[glue-pipeline] gen-auto-map (skipped)");
+  }
+
+  // Step 5: generate invalidation report (diagnostic; stable output)
+  if (invalidationReportMode !== "skip") {
+    const reportScript = path.join(repoRoot, "tools/buck/invalidation-report.ts");
+    if (verbose) console.error(`[glue-pipeline] invalidation-report → ${outInvalidationReport}`);
+    try {
+      await fsp.mkdir(path.dirname(outInvalidationReport), { recursive: true });
+    } catch {}
+    await runNodeWithZx({
+      nodeBin,
+      zxInitPath: zxInit,
+      script: reportScript,
+      args: ["--graph", graphPath, "--auto-map", outAutoMap, "--out", outInvalidationReport],
+    });
+  } else if (verbose) {
+    console.error("[glue-pipeline] invalidation-report (skipped)");
   }
 }
 

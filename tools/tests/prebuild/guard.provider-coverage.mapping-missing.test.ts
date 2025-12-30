@@ -19,6 +19,12 @@ test("prebuild-guard: flags missing MODULE_PROVIDERS mapping for nixpkg-labeled 
       JSON.stringify(graph),
       "utf8",
     );
+    await fsp.writeFile(path.join(tmp, "tools", "buck", "node-lock-index.json"), "{}\n", "utf8");
+    await fsp.writeFile(
+      path.join(tmp, "tools", "buck", "invalidation-report.txt"),
+      "# invalidation-report\n",
+      "utf8",
+    );
 
     // auto_map missing the mapping entry for //apps/a:bin (empty mapping)
     await fsp.writeFile(
@@ -102,6 +108,11 @@ EOF
     );
     // Create a fresh, minimal sidecar so presence/freshness checks pass in CI
     await fsp.writeFile(nodeLockSidecar, JSON.stringify({ index: {} }), "utf8");
+    await fsp.writeFile(
+      path.join(tmp, "tools", "buck", "invalidation-report.txt"),
+      "# invalidation-report\n",
+      "utf8",
+    );
     await $({
       cwd: tmp,
       stdio: "inherit",

@@ -64,6 +64,12 @@ test("prebuild-guard: coverage falls back to TARGETS.*.auto for Python importer 
       JSON.stringify(graph),
       "utf8",
     );
+    await fsp.writeFile(path.join(tmp, "tools", "buck", "node-lock-index.json"), "{}\n", "utf8");
+    await fsp.writeFile(
+      path.join(tmp, "tools", "buck", "invalidation-report.txt"),
+      "# invalidation-report\n",
+      "utf8",
+    );
 
     // Presence check requires nix_attr_map when any TARGETS.*.auto exists
     await fsp.writeFile(

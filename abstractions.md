@@ -261,6 +261,9 @@ I treat patch invalidation as two explicit models:
 When debugging invalidation, it is easy to misread the surface area by looking only at provider files under `third_party/providers/`. The canonical answers are designed to be available without reading macro or generator code:
 
 - `node tools/buck/prebuild-guard.ts` prints short, canonical one-liners that explain where invalidation comes from, using the contract vocabulary (`package-local` / `importer-local`).
+- `tools/buck/invalidation-report.txt` is the canonical per-target report. It answers “what invalidates this target?” using the shared contract vocabulary and includes importer/lockfile metadata, global Nix input expectations, and realized provider edges (as a debugging aid).
+  - Regenerate (preferred): `node tools/buck/glue-pipeline.ts`
+  - Regenerate (report-only): `node tools/buck/invalidation-report.ts`
 - `third_party/providers/provider_index.json` is a single, stable report that maps provider targets to their origin key and includes additive patch-model metadata (`patch_scope`, `languages`, and where patch inputs are expected to be carried).
 
 Rule: treat provider `patch_paths` as diagnostic/observability data for importer-scoped ecosystems. Invalidation is driven by real action inputs attached by macro wiring.

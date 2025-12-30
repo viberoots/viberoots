@@ -87,6 +87,15 @@
 - Importer detection is automatic (the tools walk upward to the nearest `pnpm-lock.yaml`). Override explicitly with `--importer <dir>` if your layout is unusual.
 - Run glue regeneration if needed: export graph → sync providers → gen auto_map, or run the prebuild guard locally to auto‑fix.
 
+## Invalidation report (what invalidates what?)
+
+When I’m debugging “why did this rebuild?” or “why didn’t this rebuild?”, I start with the invalidation report. It’s a deterministic, line-oriented view of each target’s patch scope, importer/lockfile metadata, whether global Nix inputs are expected as real action inputs, and the realized provider edges (as a debugging aid).
+
+- **Where it lives**: `tools/buck/invalidation-report.txt` (generated; do not hand-edit)
+- **How to regenerate**:
+  - `node tools/buck/glue-pipeline.ts` (preferred; refreshes all glue, then emits the report)
+  - Or: `node tools/buck/invalidation-report.ts` (report-only; expects existing `graph.json` and `auto_map.bzl`)
+
 ## Exporter simulate vs authoritative
 
 - For hermetic tests, use `--simulate`. CI uses authoritative mode.

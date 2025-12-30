@@ -69,14 +69,20 @@ EOF
     // Verify glue outputs were generated
     const autoMap = path.join(tmp, "third_party", "providers", "auto_map.bzl");
     const providerIdx = path.join(tmp, "third_party", "providers", "provider_index.bzl");
+    const invalidationReport = path.join(tmp, "tools", "buck", "invalidation-report.txt");
     const autoMapTxt = await fsp.readFile(autoMap, "utf8").catch(() => "");
     const providerIdxTxt = await fsp.readFile(providerIdx, "utf8").catch(() => "");
+    const reportTxt = await fsp.readFile(invalidationReport, "utf8").catch(() => "");
     if (!autoMapTxt.includes("MODULE_PROVIDERS = {")) {
       console.error("auto_map.bzl missing or malformed");
       process.exit(2);
     }
     if (!providerIdxTxt.includes("PROVIDER_INDEX = {")) {
       console.error("provider_index.bzl missing or malformed");
+      process.exit(2);
+    }
+    if (!reportTxt.includes("# invalidation-report")) {
+      console.error("invalidation-report.txt missing or malformed");
       process.exit(2);
     }
   });

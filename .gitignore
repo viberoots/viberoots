@@ -30,6 +30,8 @@ third_party/providers/nix_attr_map.bzl
 tools/buck/graph.json
 tools/buck/export-metrics.json
 tools/buck/node-lock-index.json
+tools/buck/invalidation-report.txt
+tools/buck/invalidation-report.json
 tools/buck/.export-cache/
 
 # Local out-links created during ad-hoc nix builds (not part of normal flow)

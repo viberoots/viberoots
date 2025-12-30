@@ -10,6 +10,12 @@ test("prebuild-guard: flags missing Python importer providers and auto-fixes loc
     await fsp.mkdir(providersDir, { recursive: true });
     // Minimal glue outputs (graph + auto_map) present
     await fsp.writeFile(path.join(tmp, "tools", "buck", "graph.json"), "[]\n", "utf8");
+    await fsp.writeFile(path.join(tmp, "tools", "buck", "node-lock-index.json"), "{}\n", "utf8");
+    await fsp.writeFile(
+      path.join(tmp, "tools", "buck", "invalidation-report.txt"),
+      "# invalidation-report\n",
+      "utf8",
+    );
     await fsp.writeFile(
       path.join(providersDir, "auto_map.bzl"),
       "# gen\nMODULE_PROVIDERS = {}\n",

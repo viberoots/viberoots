@@ -8,6 +8,12 @@ test("prebuild-guard: CI fails when stale", async () => {
   await runInTemp("prebuild-fresh-ci", async (tmp, $) => {
     await fsp.mkdir(path.join(tmp, "third_party", "providers"), { recursive: true });
     await fsp.writeFile(path.join(tmp, "tools", "buck", "graph.json"), "[]", "utf8");
+    await fsp.writeFile(path.join(tmp, "tools", "buck", "node-lock-index.json"), "{}\n", "utf8");
+    await fsp.writeFile(
+      path.join(tmp, "tools", "buck", "invalidation-report.txt"),
+      "# invalidation-report\n",
+      "utf8",
+    );
     await fsp.writeFile(
       path.join(tmp, "third_party", "providers", "auto_map.bzl"),
       "# generated\nMODULE_PROVIDERS = {}\n",

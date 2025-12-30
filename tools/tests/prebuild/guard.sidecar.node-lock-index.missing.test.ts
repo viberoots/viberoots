@@ -10,6 +10,11 @@ test("prebuild-guard: fails when node-lock-index.json is missing (CI), warns loc
     await fsp.mkdir(path.join(tmp, "third_party", "providers"), { recursive: true });
     await fsp.writeFile(path.join(tmp, "tools", "buck", "graph.json"), "{\n}\n", "utf8");
     await fsp.writeFile(
+      path.join(tmp, "tools", "buck", "invalidation-report.txt"),
+      "# invalidation-report\n",
+      "utf8",
+    );
+    await fsp.writeFile(
       path.join(tmp, "third_party", "providers", "auto_map.bzl"),
       "# gen\nMODULE_PROVIDERS = {}\n",
       "utf8",

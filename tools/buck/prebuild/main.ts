@@ -48,6 +48,7 @@ export async function run(): Promise<void> {
 
   const inputs = await listInputs();
   const outputs = listOutputs();
+  const invalidationReportPath = path.join("tools", "buck", "invalidation-report.txt");
 
   const outPresence = await computeMissingOutputs(outputs);
   const presentOutputs = outputs.filter((o) => fs.existsSync(o));
@@ -75,6 +76,7 @@ export async function run(): Promise<void> {
     (diag as any).missingNodeProviders = missingNodeProviders;
     (diag as any).missingPythonProviders = missingPythonProviders;
     (diag as any).coverageMissing = coverageMissing;
+    (diag as any).invalidationReportPath = invalidationReportPath;
     console.log(JSON.stringify(diag));
     return;
   }
@@ -122,6 +124,9 @@ export async function run(): Promise<void> {
 
   if (missingNodeProviders.length) {
     if (mode === "ci") {
+      console.error(
+        `ERROR: invalidation report: ${invalidationReportPath} (regenerate via: node tools/buck/glue-pipeline.ts)`,
+      );
       for (const m of missingNodeProviders) {
         console.error(
           `ERROR: missing Node importer provider: lockfile=${m.lockfile} importer=${m.importer} provider=${m.provider}`,
@@ -149,6 +154,9 @@ export async function run(): Promise<void> {
 
   if (missingPythonProviders.length) {
     if (mode === "ci") {
+      console.error(
+        `ERROR: invalidation report: ${invalidationReportPath} (regenerate via: node tools/buck/glue-pipeline.ts)`,
+      );
       for (const m of missingPythonProviders) {
         console.error(
           `ERROR: missing Python importer provider: lockfile=${m.lockfile} importer=${m.importer} provider=${m.provider}`,
@@ -180,6 +188,11 @@ export async function run(): Promise<void> {
         ? "ERROR: provider coverage check failed"
         : "WARN: provider coverage check";
     console.error(header);
+    if (mode === "ci" || flagStrict) {
+      console.error(
+        `ERROR: invalidation report: ${invalidationReportPath} (regenerate via: node tools/buck/glue-pipeline.ts)`,
+      );
+    }
     for (const miss of coverageMissing) {
       if (miss.kind === "provider") {
         console.error(
@@ -199,6 +212,14 @@ export async function run(): Promise<void> {
   if (!needFix && !missingNodeProviders.length && !missingPythonProviders.length) return;
 
   if (mode === "ci") {
+    if (needFixFreshness || outPresence.length > 0) {
+      console.error(
+        `ERROR: invalidation report: ${invalidationReportPath} (regenerate via: node tools/buck/glue-pipeline.ts)`,
+      );
+    }
+    if (needFixFreshness && outPresence.length === 0) {
+      console.error("ERROR: glue is stale — regenerate via: node tools/buck/glue-pipeline.ts");
+    }
     for (const o of outPresence) {
       console.error(
         `ERROR: ${o} missing — run glue generation in this order: export-graph → sync-providers → gen-auto-map`,

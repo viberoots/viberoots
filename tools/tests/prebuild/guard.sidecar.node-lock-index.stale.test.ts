@@ -11,10 +11,12 @@ test("prebuild-guard: detects stale node-lock-index.json vs graph.json", async (
 
     const graphPath = path.join(tmp, "tools", "buck", "graph.json");
     const sidecarPath = path.join(tmp, "tools", "buck", "node-lock-index.json");
+    const invalidationReport = path.join(tmp, "tools", "buck", "invalidation-report.txt");
 
     // Create initial sidecar and graph
     await fsp.mkdir(path.dirname(graphPath), { recursive: true });
     await fsp.writeFile(sidecarPath, JSON.stringify({ index: {} }, null, 2) + "\n", "utf8");
+    await fsp.writeFile(invalidationReport, "# invalidation-report\n", "utf8");
     await fsp.writeFile(graphPath, JSON.stringify({ nodes: [] }, null, 2) + "\n", "utf8");
     await fsp.writeFile(
       path.join(providersDir, "auto_map.bzl"),

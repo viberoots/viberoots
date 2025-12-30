@@ -48,15 +48,25 @@ test("glue-pipeline: outputs identical to manual steps (no lockfiles present)", 
     await $`node tools/buck/sync-providers.ts`;
     await $`node tools/buck/gen-provider-index.ts --out third_party/providers/provider_index.bzl`;
     await $`node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
+    await $`node tools/buck/invalidation-report.ts --out tools/buck/invalidation-report.txt`;
 
     const provDir = path.join(tmp, "third_party", "providers");
     const baseNodeTargets = await readOrEmpty(path.join(provDir, "TARGETS.node.auto"));
     const basePyTargets = await readOrEmpty(path.join(provDir, "TARGETS.python.auto"));
     const baseIndex = await readOrEmpty(path.join(provDir, "provider_index.bzl"));
     const baseMap = await readOrEmpty(path.join(provDir, "auto_map.bzl"));
+    const baseReport = await readOrEmpty(
+      path.join(tmp, "tools", "buck", "invalidation-report.txt"),
+    );
 
     // Clean outputs to avoid incidental reuse across runs
     await removeGeneratedProviderOutputs(provDir);
+    try {
+      await fsp.rm(path.join(tmp, "tools", "buck", "node-lock-index.json"), { force: true });
+    } catch {}
+    try {
+      await fsp.rm(path.join(tmp, "tools", "buck", "invalidation-report.txt"), { force: true });
+    } catch {}
 
     // Pipeline: single orchestrator
     await $`node tools/buck/glue-pipeline.ts`;
@@ -65,6 +75,9 @@ test("glue-pipeline: outputs identical to manual steps (no lockfiles present)", 
     const pipePyTargets = await readOrEmpty(path.join(provDir, "TARGETS.python.auto"));
     const pipeIndex = await readOrEmpty(path.join(provDir, "provider_index.bzl"));
     const pipeMap = await readOrEmpty(path.join(provDir, "auto_map.bzl"));
+    const pipeReport = await readOrEmpty(
+      path.join(tmp, "tools", "buck", "invalidation-report.txt"),
+    );
 
     function assertEqual(a: string, b: string, label: string) {
       if (a !== b) {
@@ -77,6 +90,7 @@ test("glue-pipeline: outputs identical to manual steps (no lockfiles present)", 
     assertEqual(basePyTargets, pipePyTargets, "TARGETS.python.auto");
     assertEqual(baseIndex, pipeIndex, "provider_index.bzl");
     assertEqual(baseMap, pipeMap, "auto_map.bzl");
+    assertEqual(baseReport, pipeReport, "invalidation-report.txt");
 
     // Sanity: ensure expected files exist
     for (const f of [
@@ -90,6 +104,10 @@ test("glue-pipeline: outputs identical to manual steps (no lockfiles present)", 
         console.error("expected file missing:", f);
         process.exit(2);
       }
+    }
+    if (!(await exists(path.join(tmp, "tools", "buck", "invalidation-report.txt")))) {
+      console.error("expected file missing: invalidation-report.txt");
+      process.exit(2);
     }
   });
 });
