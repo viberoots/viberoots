@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import { test } from "node:test";
 import assert from "node:assert/strict";
-import path from "node:path";
 import * as fsp from "node:fs/promises";
+import path from "node:path";
+import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
 function firstCqueryNode<T>(json: unknown): T | null {

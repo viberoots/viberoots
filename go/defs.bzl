@@ -2,7 +2,7 @@ load("@prelude//:rules.bzl", "go_binary", "go_library", "go_test")
 load("//lang:defs_common.bzl", "normalize_labels", "prepare_package_local_wasm_wiring", "prepare_package_local_wiring_v2")
 load("//lang:global_inputs.bzl", "global_nix_inputs")
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
-load("//lang:defs_common.bzl", "wire_package_local_planner_visible_stub")
+load("//lang:defs_common.bzl", "wire_package_local_planner_visible_stub_v2")
 load("//go/private:nix_build_wasm.bzl", "go_nix_build_wasm")
 load("//go/private:cgo_wiring.bzl", "apply_go_rule_stable_defaults", "apply_go_tuple_labels", "configure_cgo_kwargs")
 load("//go/private:auto_tests.bzl", "maybe_autowire_go_binary_test", "maybe_autowire_go_library_test")
@@ -109,14 +109,15 @@ def nix_go_carchive(name, **kwargs):
     Buck graph; the actual archive is produced by the Nix planner build when
     a consumer (e.g., a C++ binary) is built.
     """
-    deps = kwargs.pop("deps", [])
-    srcs = kwargs.get("srcs", []) or []
+    kw = dict(kwargs)
+    deps = kw.pop("deps", [])
+    srcs = kw.get("srcs", []) or []
     # Keep a minimal graph node with srcs so the planner can discover the package.
     # Preserve the existing behavior where provider edges are realized into `srcs`.
-    wire_package_local_planner_visible_stub(
+    wire_package_local_planner_visible_stub_v2(
         name = name,
         out = name + ".stamp",
-        kwargs = kwargs,
+        kwargs = kw,
         lang = "go",
         kind = "carchive",
         deps = deps,

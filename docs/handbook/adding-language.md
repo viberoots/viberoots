@@ -82,13 +82,15 @@ def my_pkg_local_rule(name, **kwargs):
 
 When your macro must emit a **planner-visible stub** (a graph node for planner discovery / invalidation, without producing a normal Buck-built artifact), use the shared helper instead of wiring the stub by hand:
 
-- `wire_package_local_planner_visible_stub(...)`
+- `wire_package_local_planner_visible_stub_v2(...)` (preferred; non-mutating at the call-site boundary)
   - Pops `local_patch_dirs` and `nixpkg_deps` (when present) and appends normalized `nixpkg:` labels
   - Stamps exactly one `patch_scope:*` label for the language
   - Stamps `lang:*` and `kind:*` (including non-standard kinds like `carchive`)
   - Attaches package-local patch files as stub inputs
   - Strips provider targets from planner-visible `deps` **by default** (opt out via `strip_providers_from_deps = False`)
   - Optionally realizes provider edges into `deps` or **inputs** (`srcs`) via `provider_realization_mode = "deps"|"inputs"`
+
+Rule: new package-local planner-visible stub call sites must use the v2 helper. The mutating helper remains only for legacy migration support and should not appear in new macro code.
 
 ### Python notes
 

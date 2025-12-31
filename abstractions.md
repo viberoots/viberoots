@@ -248,6 +248,7 @@ I treat patch invalidation as two explicit models:
   - Provider sync is not required to make patch changes invalidate builds.
   - Planner-visible stubs for package-local languages still carry package-local patch files as real inputs, and must stamp `patch_scope:package-local`:
     - `nix_cpp_test`’s `<name>__planner` uses the canonical package-local planner-visible stub helper (`wire_package_local_planner_visible_stub_v2(...)`) so patch edits invalidate the planner-visible boundary.
+    - `nix_go_carchive` uses the canonical package-local planner-visible stub helper (`wire_package_local_planner_visible_stub_v2(...)`) with provider edges realized into **inputs** (`provider_realization_mode = "inputs"`) so the stub remains a minimal graph node while still carrying the correct invalidation inputs.
     - `nix_cpp_wasm_emscripten_lib` uses `wire_package_local_wasm_planner_visible_stub(...)` so WASM stamping, patch scope stamping, patch inputs, provider handling, and planner-visible defaults stay consistent.
     - Package-local WASM macros use the shared WASM wiring helpers so ordering-sensitive steps (WASM stamping, patch scope, patch inputs, provider edges) cannot drift.
 
