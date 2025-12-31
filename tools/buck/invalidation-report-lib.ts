@@ -9,6 +9,7 @@ import {
   type PatchScope,
   type ProviderModel,
 } from "../lib/lang-contracts.ts";
+import { formatTextRow } from "./invalidation-report-format.ts";
 
 type AutoMap = Record<string, string[]>;
 
@@ -20,13 +21,13 @@ type Node = {
   deps?: unknown;
 };
 
-type ProviderIndexEntryExt = ProviderIndexEntry & {
+export type ProviderIndexEntryExt = ProviderIndexEntry & {
   patch_scope?: PatchScope;
   languages?: string[];
   patch_inputs_expected_in?: unknown;
 };
 
-type InvalidationRow = {
+export type InvalidationRow = {
   target: string;
   langs: string[];
   patch_scope: PatchScope | "unknown";
@@ -119,39 +120,6 @@ async function readAutoMap(p: string): Promise<AutoMap> {
     out[target] = sortedUnique(provs);
   }
   return out;
-}
-
-function formatTextRow(
-  row: InvalidationRow,
-  providerIndex: Record<string, ProviderIndexEntryExt>,
-): string {
-  const providers = row.module_providers;
-  const providersDetail = providers.map((p) => {
-    const e = providerIndex[p];
-    if (!e) return p;
-    const parts = [
-      `${p}`,
-      `kind=${String((e as any).kind || "")}`,
-      `key=${String((e as any).key || "")}`,
-    ];
-    if ((e as any).patch_scope) parts.push(`patch_scope=${String((e as any).patch_scope)}`);
-    return parts.join(" ");
-  });
-  const fields = [
-    `target=${row.target}`,
-    `langs=${row.langs.join(",") || "-"}`,
-    `patch_scope=${row.patch_scope}`,
-    `provider_model=${row.provider_model}`,
-    row.lockfile_label ? `lockfile_label=${row.lockfile_label}` : `lockfile_label=-`,
-    row.importer ? `importer=${row.importer}` : `importer=-`,
-    row.lockfile ? `lockfile=${row.lockfile}` : `lockfile=-`,
-    `importer_local_patches_action_inputs_expected=${row.importer_local_patches_action_inputs_expected ? "true" : "false"}`,
-    `importer_local_patches_action_inputs_observed_in=${row.importer_local_patches_action_inputs_observed_in.join(",") || "-"}`,
-    `global_nix_inputs_action_inputs_expected=${row.global_nix_inputs_action_inputs_expected ? "true" : "false"}`,
-    `global_nix_inputs_action_inputs_observed_in=${row.global_nix_inputs_action_inputs_observed_in.join(",") || "-"}`,
-    `module_providers=[${providersDetail.join("; ")}]`,
-  ];
-  return fields.join("\t");
 }
 
 function computeRow(
