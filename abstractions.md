@@ -395,7 +395,7 @@ The label string is:
 ### Canonical implementations
 
 - **Starlark**: `lang/nixpkg_labels.bzl:normalize_nix_attr` and `append_nixpkg_labels`
-  - Macro guidance: prefer `lang/macro_kwargs.bzl:pop_package_local_patch_dirs_and_nixpkg_deps` so language macro files do not re-implement `nixpkg_deps` parsing and defaulting logic.
+  - Macro guidance: prefer `lang/defs_common.bzl:prepare_package_local_wiring_v2(...)` so language macro files do not re-implement `nixpkg_deps` parsing/defaulting or patch-dir handling.
 - **TypeScript**: `tools/lib/providers.ts:normalizeNixAttr` (canonical import path; implementation lives in `tools/lib/provider-names.ts`)
 - **Nix**: `tools/nix/lib/lang-helpers.nix:normalizeNixAttr`
 

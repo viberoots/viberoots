@@ -12,17 +12,20 @@ test("package-local language macros must not bypass prepare_package_local_wiring
       offenders.push({
         file,
         reason:
-          "must not call include_package_local_patches directly; use //lang:defs_common.bzl:prepare_package_local_wiring instead",
+          "must not call include_package_local_patches directly; use //lang:defs_common.bzl:prepare_package_local_wiring_v2(...) instead",
       });
     }
-    if (
-      !txt.includes("prepare_package_local_wiring(") &&
-      !txt.includes("prepare_package_local_wiring_v2(")
-    ) {
+    if (!txt.includes("prepare_package_local_wiring_v2(")) {
+      offenders.push({
+        file,
+        reason: "expected to use prepare_package_local_wiring_v2(...) for package-local wiring",
+      });
+    }
+    if (txt.includes("prepare_package_local_wiring(")) {
       offenders.push({
         file,
         reason:
-          "expected to use prepare_package_local_wiring(...) or prepare_package_local_wiring_v2(...) for package-local wiring",
+          "must not call prepare_package_local_wiring(...); v2 wiring is the macro-authoring default",
       });
     }
   }

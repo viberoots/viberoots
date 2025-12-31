@@ -19,13 +19,25 @@ test("importer-scoped macros delegate lockfile parsing/enforcement to //lang:imp
 
     assert(
       txt.includes("prepare_importer_genrule_kwargs_v2(") ||
-        txt.includes("prepare_importer_genrule_kwargs(") ||
-        txt.includes("prepare_importer_non_genrule_wiring(") ||
         txt.includes("prepare_importer_non_genrule_wiring_v2(") ||
         txt.includes("prepare_importer_srcsless_rule_wiring_v2(") ||
         txt.includes("prepare_importer_nix_calling_genrule_wiring_v2(") ||
-        txt.includes("prepare_importer_nix_calling_genrule_wiring("),
-      `${file} must use prepare_importer_* wiring helpers for importer-scoped macros`,
+        txt.includes("prepare_importer_non_genrule_nix_calling_wiring_v2("),
+      `${file} must use v2 prepare_importer_* wiring helpers for importer-scoped macros`,
     );
+
+    const v1Helpers = [
+      "prepare_importer_genrule_kwargs(",
+      "prepare_importer_non_genrule_wiring(",
+      "prepare_importer_srcsless_rule_wiring(",
+      "prepare_importer_nix_calling_genrule_wiring(",
+      "prepare_importer_non_genrule_nix_calling_wiring(",
+    ];
+    for (const needle of v1Helpers) {
+      assert(
+        !txt.includes(needle),
+        `${file} must not call ${needle} directly; v2 wiring is the macro-authoring default`,
+      );
+    }
   }
 });

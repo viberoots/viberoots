@@ -77,23 +77,24 @@ For importer-scoped ecosystems, we try hard to keep “how we find lockfiles” 
 - Starlark (`lang/defs_common.bzl`):
 
   When authoring a **package-local patching macro** (Go/C++ style), avoid re-assembling the “patch dirs + nixpkg deps + labels + providers” sequence by hand. Use the shared helper so defaults and tolerance rules don’t drift across languages.
-  - `prepare_package_local_wiring(...)`
+  - `prepare_package_local_wiring_v2(...)` (default for new macros)
     - Pops `local_patch_dirs` with a language default (`default_package_patch_dirs(lang)`)
     - Pops `nixpkg_deps` and appends normalized `nixpkg:` labels (canonical normalizer)
     - Stamps `lang:*` and `kind:*` labels (or you can opt out when another stamper is used)
     - Includes package-local `*.patch` files as action inputs (via `srcs`)
     - Realizes provider edges deterministically (via `MODULE_PROVIDERS`)
+  - `prepare_package_local_wiring(...)` is legacy-only and should not be used in new macro code.
 
   Minimal example:
 
 ```python
 load("@prelude//:rules.bzl", "genrule")
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
-load("//lang:defs_common.bzl", "prepare_package_local_wiring")
+load("//lang:defs_common.bzl", "prepare_package_local_wiring_v2")
 
 def my_pkg_local_rule(name, **kwargs):
     deps = kwargs.pop("deps", [])
-    wiring = prepare_package_local_wiring(
+    wiring = prepare_package_local_wiring_v2(
         name = name,
         kwargs = kwargs,
         lang = "cpp",

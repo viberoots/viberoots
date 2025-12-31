@@ -14,7 +14,7 @@ try {
   } catch {}
 }
 import path from "node:path";
-import { getFlagStr, getFlagBool, getPositionals } from "../lib/cli.ts";
+import { getFlagBool, getFlagStr, getPositionals } from "../lib/cli.ts";
 import { patchInvalidationStrategyForLang, patchPkgUsageNotes } from "../lib/lang-contracts.ts";
 
 type SubcommandName = "start" | "apply" | "reset" | "session" | "remove" | "help";

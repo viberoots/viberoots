@@ -161,9 +161,8 @@ GLOBAL_NIX_INPUTS_KEY_PREFIX = _GLOBAL_NIX_INPUTS_KEY_PREFIX
 require_single_importer_lockfile_label = _require_single_importer_lockfile_label
 attach_importer_patch_inputs = _attach_importer_patch_inputs
 merge_provider_edges = _merge_provider_edges
-prepare_importer_genrule_kwargs = _prepare_importer_genrule_kwargs
-prepare_importer_non_genrule_wiring = _prepare_importer_non_genrule_wiring
-prepare_importer_srcsless_rule_wiring = _prepare_importer_srcsless_rule_wiring
+
+# Preferred importer-scoped macro wiring helpers (v2, non-mutating at the call-site boundary).
 prepare_importer_genrule_kwargs_v2 = _prepare_importer_genrule_kwargs_v2
 prepare_importer_non_genrule_nix_calling_wiring_v2 = _prepare_importer_non_genrule_nix_calling_wiring_v2
 prepare_importer_non_genrule_wiring_v2 = _prepare_importer_non_genrule_wiring_v2
@@ -173,6 +172,11 @@ importer_wiring_v2_mutation_probe = _importer_wiring_v2_mutation_probe
 prepare_importer_nix_calling_genrule_wiring = _prepare_importer_nix_calling_genrule_wiring
 prepare_importer_nix_calling_genrule_wiring_v2 = _prepare_importer_nix_calling_genrule_wiring_v2
 
+# Legacy importer-scoped macro wiring helpers (v1, mutating). Keep exported for migration only.
+prepare_importer_genrule_kwargs = _prepare_importer_genrule_kwargs
+prepare_importer_non_genrule_wiring = _prepare_importer_non_genrule_wiring
+prepare_importer_srcsless_rule_wiring = _prepare_importer_srcsless_rule_wiring
+
 wire_global_nix_inputs = _wire_global_nix_inputs
 
 allowed_kind_values = _allowed_kind_values
@@ -181,15 +185,22 @@ kind_vocabulary_probe = _kind_vocabulary_probe
 
 wire_planner_visible_inputs = _wire_planner_visible_inputs
 wire_planner_visible_stub = _wire_planner_visible_stub
-wire_package_local_planner_visible_stub = _wire_package_local_planner_visible_stub
 wire_package_local_planner_visible_stub_v2 = _wire_package_local_planner_visible_stub_v2
 
-prepare_package_local_wiring = _prepare_package_local_wiring
+# Legacy planner-visible stub helper (v1, mutating). Keep exported for migration only.
+wire_package_local_planner_visible_stub = _wire_package_local_planner_visible_stub
+
+# Preferred package-local macro wiring helper (v2, non-mutating at the call-site boundary).
 prepare_package_local_wiring_v2 = _prepare_package_local_wiring_v2
 package_local_wiring_probe = _package_local_wiring_probe
 package_local_wiring_v2_mutation_probe = _package_local_wiring_v2_mutation_probe
 
+# Legacy package-local macro wiring helper (v1, mutating). Keep exported for migration only.
+prepare_package_local_wiring = _prepare_package_local_wiring
+
 prepare_package_local_wasm_wiring = _prepare_package_local_wasm_wiring
-wire_package_local_wasm_planner_visible_stub = _wire_package_local_wasm_planner_visible_stub
 wire_package_local_wasm_planner_visible_stub_v2 = _wire_package_local_wasm_planner_visible_stub_v2
+
+# Legacy package-local WASM planner-visible stub wrapper (keep exported; must not be used in new macros).
+wire_package_local_wasm_planner_visible_stub = _wire_package_local_wasm_planner_visible_stub
 
