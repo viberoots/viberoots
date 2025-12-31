@@ -43,6 +43,13 @@ export async function runGluePipeline(opts: RunGluePipelineOptions = {}): Promis
   const autoMapMode = opts.autoMap || "required";
   const invalidationReportMode = opts.invalidationReport || "required";
 
+  // Step 0: ensure importer roots Starlark view is up-to-date (deterministic, idempotent)
+  {
+    const genImporterRoots = path.join(repoRoot, "tools/dev/gen-importer-roots-bzl.ts");
+    if (verbose) console.error("[glue-pipeline] gen-importer-roots");
+    await runNodeWithZx({ nodeBin, zxInitPath: zxInit, script: genImporterRoots });
+  }
+
   // Step 1: ensure graph exists (idempotent)
   if (verbose) console.error(`[glue-pipeline] ensureGraph → ${graphPath}`);
   {

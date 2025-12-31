@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { providerNameForImporter } from "../../lib/providers.ts";
 import { findUvLockfiles } from "../../lib/lockfiles.ts";
+import { getImporterRootsContract } from "../../lib/importer-roots.ts";
 
 export async function computeMissingOutputs(outputs: string[]): Promise<string[]> {
   const outPresence: string[] = [];
@@ -58,7 +59,8 @@ export async function computeMissingOutputs(outputs: string[]): Promise<string[]
 
 export function findGoImporterMissingSum(): string[] {
   const missing: string[] = [];
-  for (const base of ["apps", "libs"]) {
+  const { workspaceRoots } = getImporterRootsContract();
+  for (const base of workspaceRoots) {
     try {
       for (const d of fs.readdirSync(base, { withFileTypes: true })) {
         if (!d.isDirectory()) continue;
@@ -74,7 +76,8 @@ export function findGoImporterMissingSum(): string[] {
 
 export function findMissingGomod2nixToml(): string[] {
   const missing: string[] = [];
-  for (const base of ["apps", "libs"]) {
+  const { workspaceRoots } = getImporterRootsContract();
+  for (const base of workspaceRoots) {
     try {
       for (const d of fs.readdirSync(base, { withFileTypes: true })) {
         if (!d.isDirectory()) continue;
@@ -152,9 +155,13 @@ export async function findMissingPythonImporterProviders(): Promise<
       ? await fsp.readFile(targetsPyAuto, "utf8").catch(() => "")
       : "";
 
+    const { workspaceRoots } = getImporterRootsContract();
+    const isWorkspaceImporterLock = (lfRel: string) =>
+      workspaceRoots.some((r) => lfRel === `${r}/uv.lock` || lfRel.startsWith(`${r}/`));
+
     for (const lfRel of lockfiles) {
-      // Only consider importers under apps/* or libs/* per repo conventions
-      if (!/^(apps|libs)\//.test(lfRel)) continue;
+      // Only consider importer roots allowed by the importer-roots contract.
+      if (!isWorkspaceImporterLock(lfRel)) continue;
       const importerLabel = path.dirname(lfRel) || ".";
       const prov = providerNameForImporter(lfRel, importerLabel);
       const needle = `python_importer_deps(name="${prov}", lockfile="${lfRel}", importer="${importerLabel}"`;

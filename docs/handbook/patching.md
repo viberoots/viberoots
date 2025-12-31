@@ -23,11 +23,8 @@ This section is a quick index of “don’t re-implement this” utilities. Most
   - Importer-dir consistency:
     - `#.` is allowed only for repo-root lockfiles (example: `lockfile:pnpm-lock.yaml#.`).
     - For non-root lockfiles, `<importer>` must equal the directory that contains `<path>` (example: `lockfile:apps/web/pnpm-lock.yaml#apps/web`).
-  - Supported importer labels: `"."`, `apps/*`, `libs/*`. Any other importer label fails early during macro evaluation with deterministic error text.
-  - To support additional importer roots, update both:
-    - `tools/lib/importers.ts:isSupportedImporterLabel(...)` (tooling)
-    - `lang/lockfile_labels.bzl` (macro-time validation)
-      and keep the parity/contract tests passing.
+  - Supported importer labels: defined by the single contract artifact `tools/lib/importer-roots.json` (rendered to Starlark as `lang/importer_roots.bzl`). Any other importer label fails early during macro evaluation with deterministic error text.
+  - To support additional importer roots, update **only** `tools/lib/importer-roots.json`, then run glue generation (for example `i` or `node tools/buck/glue-pipeline.ts`) so `lang/importer_roots.bzl` is regenerated. The parity/enforcement tests will fail if the generated view is stale.
 - Patch inputs are attached through `//lang:patch_inputs.bzl` helpers. When a rule does not support `srcs`, call sites must choose a supported input attribute explicitly using `into = "<attr>"` or carry patch inputs via a small helper target.
   - For importer-scoped ecosystems (Node, Python), macro wiring is standardized via `//lang:importer_wiring.bzl`. New macros must not copy/paste wiring logic; they should call the helper functions (`require_single_importer_lockfile_label`, `attach_importer_patch_inputs`, `merge_provider_edges`).
   - For **genrule-style macros** (or any wrapper where edges must be realized into `srcs`), prefer `prepare_importer_genrule_kwargs(...)` instead of re-implementing list-vs-dict `srcs` handling. Legacy mutating helpers are migration-only and use explicit `*_legacy_mutating` names.

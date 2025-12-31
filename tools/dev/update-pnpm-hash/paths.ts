@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { sanitizeName } from "../install/common.ts";
+import { getImporterRootsContract } from "../../lib/importer-roots.ts";
 
 export function safeRealpath(p: string): string {
   try {
@@ -12,13 +13,20 @@ export function safeRealpath(p: string): string {
 }
 
 export function normalizeImporter(imp: string): string {
-  if (!imp) return ".";
-  // If absolute or contains temp prefixes, try to extract apps/* or libs/*
-  const m = imp.match(/(?:^|\/)((apps|libs)\/[A-Za-z0-9._-]+)(?:\/.+)?$/);
-  if (m && m[1]) return m[1];
-  // If already relative like apps/x or libs/y keep it
-  if (/^(apps|libs)\/[A-Za-z0-9._-]+$/.test(imp)) return imp;
-  // Fallback to "." (root importer)
+  const raw = String(imp || "").trim();
+  if (!raw) return ".";
+  const { workspaceRoots } = getImporterRootsContract();
+  const isSegment = (s: string) => /^[A-Za-z0-9._-]+$/.test(s);
+
+  const parts = raw.replace(/\\/g, "/").split("/").filter(Boolean);
+  if (parts.length >= 2 && workspaceRoots.includes(parts[0]) && isSegment(parts[1])) {
+    return `${parts[0]}/${parts[1]}`;
+  }
+  for (let i = 0; i + 1 < parts.length; i++) {
+    const root = parts[i];
+    const name = parts[i + 1];
+    if (workspaceRoots.includes(root) && isSegment(name)) return `${root}/${name}`;
+  }
   return ".";
 }
 
@@ -27,11 +35,6 @@ export function importerFromLockfile(lockArg: string): string {
   const cwd = safeRealpath(process.cwd());
   const lockAbs0 = path.isAbsolute(lockArg) ? lockArg : path.resolve(cwd, lockArg);
   const lockAbs = safeRealpath(lockAbs0);
-  // Prefer extracting importer from absolute path segments under apps/* or libs/*
-  const m = lockAbs.match(/(?:^|\/)(apps|libs)\/([^\/]+)\/pnpm-lock\.yaml$/);
-  if (m) {
-    return `${m[1]}/${m[2]}`;
-  }
   const rel = path.relative(cwd, lockAbs).split(path.sep).join("/");
   const dir = rel.includes("/") ? rel.slice(0, rel.lastIndexOf("/")) : ".";
   // Normalize and guard against escaping outside repo root
@@ -40,9 +43,9 @@ export function importerFromLockfile(lockArg: string): string {
     // Fallback: if symlinks still confused the relative, derive from lockAbs under cwd
     const maybe = lockAbs.startsWith(cwd + "/") ? lockAbs.slice(cwd.length + 1) : lockAbs;
     const mdir = maybe.includes("/") ? maybe.slice(0, maybe.lastIndexOf("/")) : ".";
-    return mdir;
+    return normalizeImporter(mdir);
   }
-  return norm || ".";
+  return normalizeImporter(norm || ".");
 }
 
 export function pnpmStoreAttrFromImporter(importer: string): string {

@@ -1,6 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { resolveImporterDir } from "../../lib/lockfiles.ts";
+import { getImporterRootsContract } from "../../lib/importer-roots.ts";
 import { sanitizeName as sanitizeNameContract } from "../../lib/sanitize.ts";
 
 // Must mirror tools/nix/templates-common.nix sanitizeName
@@ -9,13 +10,24 @@ export function sanitizeName(input: string): string {
 }
 
 export function normalizeImporter(input: string | null | undefined): string {
-  const imp = (input || "").trim();
-  if (!imp) return ".";
-  // Keep simple relative apps/* or libs/*
-  if (/^(apps|libs)\/[A-Za-z0-9._-]+$/.test(imp)) return imp;
-  // Extract apps/* or libs/* from any longer path
-  const m = imp.match(/(?:^|\/)((apps|libs)\/[A-Za-z0-9._-]+)(?:\/.+)?$/);
-  if (m && m[1]) return m[1];
+  const raw = (input || "").trim();
+  if (!raw) return ".";
+
+  const { workspaceRoots } = getImporterRootsContract();
+  const isSegment = (s: string) => /^[A-Za-z0-9._-]+$/.test(s);
+
+  const parts = raw.replace(/\\/g, "/").split("/").filter(Boolean);
+  if (parts.length >= 2 && workspaceRoots.includes(parts[0]) && isSegment(parts[1])) {
+    return `${parts[0]}/${parts[1]}`;
+  }
+
+  // Best-effort extraction from longer paths (e.g. ".../apps/web/...")
+  for (let i = 0; i + 1 < parts.length; i++) {
+    const root = parts[i];
+    const name = parts[i + 1];
+    if (workspaceRoots.includes(root) && isSegment(name)) return `${root}/${name}`;
+  }
+
   return ".";
 }
 

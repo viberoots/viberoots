@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { getImporterRootsContract } from "./importer-roots.ts";
 import { findPnpmLockfiles, findUvLockfiles } from "./lockfiles.ts";
 import { toPosixPath } from "./posix-path.ts";
 
@@ -37,29 +38,38 @@ export function computeImporterLabel(lockfilePath: string): string {
 
 /**
  * Return true when the importer path is a workspace path we support.
- * Current convention: only importers under apps/* or libs/*.
+ * Workspace roots are defined by the importer-roots contract.
  * The input must be a POSIX-style relative path or '.'.
  */
 export function isWorkspaceImporterPath(importer: string): boolean {
   const p = toPosixPath(importer);
   if (p === ".") return false;
-  return /^(apps|libs)\/[^/]+$/.test(p);
+  const { workspaceRoots } = getImporterRootsContract();
+  const parts = p.split("/").filter(Boolean);
+  if (parts.length !== 2) return false;
+  const [root, name] = parts;
+  if (!root || !name) return false;
+  return workspaceRoots.includes(root);
 }
 
 /**
  * Return true when an importer label is supported for importer-scoped ecosystems.
  *
  * Supported importer labels:
- * - "."         (repo-root lockfile importers)
- * - "apps/*"    (workspace apps)
- * - "libs/*"    (workspace libs)
+ * - "." (optional; repo-root lockfile importers)
+ * - "<root>/*" (workspace importers, where <root> comes from the importer-roots contract)
  *
  * Anything else is treated as unsupported and should not generate providers or auto-map entries.
  */
 export function isSupportedImporterLabel(importer: string): boolean {
   const p = toPosixPath(importer);
-  if (p === ".") return true;
-  return /^(apps|libs)\/[^/]+$/.test(p);
+  const { allowDotImporter, workspaceRoots } = getImporterRootsContract();
+  if (p === ".") return allowDotImporter;
+  const parts = p.split("/").filter(Boolean);
+  if (parts.length !== 2) return false;
+  const [root, name] = parts;
+  if (!root || !name) return false;
+  return workspaceRoots.includes(root);
 }
 
 /**
@@ -123,8 +133,8 @@ export async function findPnpmLockfilesWithSyntheticWorkspaceImporters(): Promis
     return path.resolve(wr || process.cwd());
   })();
 
-  const roots: Array<"apps" | "libs"> = ["apps", "libs"];
-  for (const root of roots) {
+  const { workspaceRoots } = getImporterRootsContract();
+  for (const root of workspaceRoots) {
     let children: string[] = [];
     try {
       children = await fsp.readdir(path.join(rootAbs, root));

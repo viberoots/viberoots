@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { getImporterRootsContract } from "../../lib/importer-roots.ts";
 import { isSupportedImporterLabel } from "../../lib/importers";
 
 type ProbeOut = { importer: string; supported: boolean };
@@ -17,7 +18,13 @@ test("Starlark supported importer predicate ↔ TS isSupportedImporterLabel pari
       "utf8",
     );
 
-    const cases = [".", "apps/foo", "libs/bar", "tools/x", "apps/foo/bar", "../apps/x"] as const;
+    const { allowDotImporter, workspaceRoots } = getImporterRootsContract();
+    const supported: string[] = [];
+    if (allowDotImporter) supported.push(".");
+    for (const r of workspaceRoots) supported.push(`${r}/foo`);
+    const unsupported: string[] = ["tools/x", "../apps/x"];
+    for (const r of workspaceRoots) unsupported.push(`${r}/foo/bar`);
+    const cases = [...supported, ...unsupported];
     const body = cases
       .map((imp, i) =>
         [`supported_importer_label_probe(name = "probe_${i}", importer = "${imp}")`, ""].join("\n"),

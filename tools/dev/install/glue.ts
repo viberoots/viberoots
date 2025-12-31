@@ -3,6 +3,7 @@ import path from "node:path";
 import process from "node:process";
 import * as fsp from "node:fs/promises";
 import { printSkip } from "../../lib/errors.ts";
+import { getImporterRootsContract } from "../../lib/importer-roots.ts";
 import { findRepoRoot } from "../../lib/repo.ts";
 import { nodeFlagsWithZx } from "../../lib/node-run.ts";
 
@@ -133,29 +134,30 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
   if (haveNode) {
     try {
       const repo = repoRoot();
-      // Reuse the importer discovery logic from install/deps-main.ts (inline here to keep deps minimal)
+      // Reuse the importer roots contract (single source of truth).
       const importers: string[] = [];
-      for (const base of ["apps", "libs"]) {
-        const baseAbs = path.join(repo, base);
+      const { allowDotImporter, workspaceRoots } = getImporterRootsContract();
+      if (allowDotImporter) {
         try {
-          const { stdout } = await $({
-            stdio: "pipe",
-          })`bash --noprofile --norc -c ${`test -d ${baseAbs} && ls -1 ${baseAbs}`}`;
-          for (const d of String(stdout || "").split(/\r?\n/)) {
-            const name = d.trim();
-            if (!name) continue;
-            const impDir = path.join(repo, base, name);
-            const lock = path.join(impDir, "pnpm-lock.yaml");
-            try {
-              const res = await $({
-                stdio: "pipe",
-              })`bash --noprofile --norc -c ${`test -f ${lock}`}`;
-              if (res.exitCode === 0) {
-                importers.push(path.join(base, name));
-              }
-            } catch {}
-          }
+          await fsp.access(path.join(repo, "pnpm-lock.yaml"));
+          importers.push(".");
         } catch {}
+      }
+      for (const base of workspaceRoots) {
+        const baseAbs = path.join(repo, base);
+        const entries = await fsp.readdir(baseAbs).catch(() => [] as string[]);
+        for (const name of entries) {
+          const trimmed = String(name || "").trim();
+          if (!trimmed) continue;
+          const impDir = path.join(repo, base, trimmed);
+          const st = await fsp.stat(impDir).catch(() => null);
+          if (!st || !st.isDirectory()) continue;
+          const lock = path.join(impDir, "pnpm-lock.yaml");
+          try {
+            await fsp.access(lock);
+            importers.push(path.join(base, trimmed));
+          } catch {}
+        }
       }
       if (importers.length) {
         const updater = path.join(repo, "tools/dev/update-pnpm-hash.ts");
@@ -184,6 +186,12 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
     when?: boolean;
     skipReason?: string;
   }> = [
+    {
+      label: "gen-importer-roots",
+      cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/dev/gen-importer-roots-bzl.ts")}`,
+      withZx: true,
+      when: true,
+    },
     {
       label: "gen-langs",
       cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "tools/dev/gen-langs.ts")}`,

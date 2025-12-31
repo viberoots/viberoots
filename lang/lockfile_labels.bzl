@@ -1,4 +1,5 @@
 load("//lang:collections.bzl", "dedupe_preserve")
+load("//lang:importer_roots.bzl", "ALLOW_DOT_IMPORTER", "WORKSPACE_IMPORTER_ROOTS")
 
 def extract_lockfile_labels(labels):
     if labels == None:
@@ -28,12 +29,23 @@ def _dirname_posix(path_part):
 
 def _is_supported_importer_label(importer):
     if importer == ".":
-        return True
-    if importer.startswith("apps/") or importer.startswith("libs/"):
-        # Supported workspace importers are single-segment roots: apps/<name>, libs/<name>.
-        # Nested importers like apps/foo/bar are intentionally unsupported.
-        return importer.count("/") == 1 and importer.split("/")[1] != ""
-    return False
+        return ALLOW_DOT_IMPORTER
+    # Supported workspace importers are single-segment roots: <root>/<name>.
+    # Nested importers like <root>/foo/bar are intentionally unsupported.
+    parts = importer.split("/")
+    if len(parts) != 2:
+        return False
+    root = parts[0]
+    name = parts[1]
+    return root in WORKSPACE_IMPORTER_ROOTS and name != ""
+
+def _supported_importer_patterns():
+    out = []
+    if ALLOW_DOT_IMPORTER:
+        out.append(".")
+    for r in WORKSPACE_IMPORTER_ROOTS:
+        out.append("%s/*" % r)
+    return out
 
 def _parse_importer_scoped_lockfile_label(label):
     if not (isinstance(label, str) and label.startswith("lockfile:")):
@@ -62,9 +74,10 @@ def _parse_importer_scoped_lockfile_label(label):
             % (dirname, label)
         )
     if not _is_supported_importer_label(importer):
+        supported = ", ".join(["'%s'" % s for s in _supported_importer_patterns()])
         fail(
-            "Unsupported importer label in lockfile label (supported importers: '.', 'apps/*', 'libs/*'); got: %s"
-            % label
+            "Unsupported importer label in lockfile label (supported importers: %s); got: %s"
+            % (supported, label)
         )
     return (path_part, importer)
 

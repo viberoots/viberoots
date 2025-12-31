@@ -9,6 +9,7 @@ import { runGomod2nixGenerate, runGomod2nixScanAll } from "./gomod2nix.ts";
 import { withExclusiveInstallLock } from "./lock.ts";
 import { runUvRefreshAll } from "./uv.ts";
 import { getFlagBool, hasShortFlag } from "../../lib/cli.ts";
+import { getImporterRootsContract } from "../../lib/importer-roots.ts";
 import { findRepoRoot } from "../../lib/repo.ts";
 
 type Flags = {
@@ -59,14 +60,16 @@ try {
 } catch {}
 // Discover importers (apps/*, libs/*) that contain a pnpm-lock.yaml.
 async function discoverImportersWithLock(root: string): Promise<string[]> {
-  const candidates = ["apps", "libs"];
+  const { allowDotImporter, workspaceRoots } = getImporterRootsContract();
   const out: string[] = [];
-  // Root importer (.) is supported when pnpm-lock.yaml exists at repo root.
-  try {
-    await fsp.access(path.join(root, "pnpm-lock.yaml"));
-    out.push(".");
-  } catch {}
-  for (const base of candidates) {
+  // Root importer (.) is supported when enabled and pnpm-lock.yaml exists at repo root.
+  if (allowDotImporter) {
+    try {
+      await fsp.access(path.join(root, "pnpm-lock.yaml"));
+      out.push(".");
+    } catch {}
+  }
+  for (const base of workspaceRoots) {
     const baseAbs = path.join(root, base);
     try {
       const entries = await fsp.readdir(baseAbs).catch(() => [] as string[]);
