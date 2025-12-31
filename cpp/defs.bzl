@@ -6,6 +6,7 @@ load(
     "prepare_package_local_wasm_wiring",
     "wire_package_local_planner_visible_stub_v2",
     "wire_package_local_wasm_planner_visible_stub",
+    "wire_package_local_wasm_planner_visible_stub_v2",
 )
 load("//lang:global_inputs.bzl", "global_nix_inputs")
 load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name", _cpp_sanitize_probe="cpp_sanitize_probe")
@@ -101,7 +102,7 @@ def nix_cpp_wasm_emscripten_lib(name, **kwargs):
       Nix flake attributes (e.g., graph-generator-selected).
     """
     deps = kwargs.get("deps", []) or []
-    wire_package_local_wasm_planner_visible_stub(
+    wire_package_local_wasm_planner_visible_stub_v2(
         name = name,
         out = name + ".stamp",
         kwargs = kwargs,

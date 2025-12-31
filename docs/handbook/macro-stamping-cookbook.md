@@ -62,12 +62,12 @@ wire_global_nix_inputs(kw, into = "srcs", stamp = False)
 - **Macros**: call `stamp_labels` early in macro expansion to keep labels on all rule variants.
 - **Patch scope**: all Go/C++/Node/Python targets must carry exactly one `patch_scope:*` label derived from the language contract.
   - Macro implementations must **not** stamp `patch_scope:*` directly; delegate to shared wiring helpers:
-    - Package-local: `lang/package_local_wiring.bzl:prepare_package_local_wiring`
-    - Package-local planner-visible stubs: `lang/planner_visible_wiring.bzl:wire_package_local_planner_visible_stub`
+    - Package-local: `lang/package_local_wiring.bzl:prepare_package_local_wiring_v2`
+    - Package-local planner-visible stubs: `lang/planner_visible_wiring.bzl:wire_package_local_planner_visible_stub_v2`
     - Importer-local: `lang/importer_wiring*.bzl:prepare_importer_*`
 - **Package-local WASM macros (Go, C++)**: do not hand-roll ordering-sensitive wiring.
   - For rule shapes that carry patch inputs in `srcs` and realize provider edges into `deps` or `srcs`, use `lang/defs_common.bzl:prepare_package_local_wasm_wiring(...)`.
-  - For planner-visible WASM stubs, use `lang/defs_common.bzl:wire_package_local_wasm_planner_visible_stub(...)`.
+  - For planner-visible package-local WASM stubs, use `lang/defs_common.bzl:wire_package_local_wasm_planner_visible_stub_v2(...)`.
 - **Lint**: run `node tools/dev/stamping-lint.ts` to detect missing or invalid labels.
 - **Tests**: negative test should demonstrate a missing label is flagged with a clear message.
 

@@ -102,6 +102,7 @@ load(
     "//lang:wasm_package_local_wiring.bzl",
     _prepare_package_local_wasm_wiring = "prepare_package_local_wasm_wiring",
     _wire_package_local_wasm_planner_visible_stub = "wire_package_local_wasm_planner_visible_stub",
+    _wire_package_local_wasm_planner_visible_stub_v2 = "wire_package_local_wasm_planner_visible_stub_v2",
 )
 
 dedupe_preserve = _dedupe_preserve
@@ -190,4 +191,5 @@ package_local_wiring_v2_mutation_probe = _package_local_wiring_v2_mutation_probe
 
 prepare_package_local_wasm_wiring = _prepare_package_local_wasm_wiring
 wire_package_local_wasm_planner_visible_stub = _wire_package_local_wasm_planner_visible_stub
+wire_package_local_wasm_planner_visible_stub_v2 = _wire_package_local_wasm_planner_visible_stub_v2
 

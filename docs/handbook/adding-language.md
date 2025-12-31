@@ -27,6 +27,10 @@ When you add or change a macro, keep the wiring table-driven through shared help
     - `tools/tests/lang/package-local-wiring.enforcement.no-bypass.test.ts`
 - **Planner-visible stubs** (graph node for planner discovery/invalidation)
   - Use `wire_package_local_planner_visible_stub_v2(...)` for package-local stubs.
+- **Package-local WASM macros (Go, C++)**
+  - For rule shapes that carry patch inputs in `srcs` and realize provider edges into `deps` or `srcs`, use `prepare_package_local_wasm_wiring(...)`.
+  - For planner-visible package-local WASM stubs, use `wire_package_local_wasm_planner_visible_stub_v2(...)`.
+    - `wire_package_local_wasm_planner_visible_stub(...)` is legacy-only and must not be used in new macro code.
 - **Dict-shaped `srcs`** (when wiring patches/providers/global inputs into dict-safe keys)
   - Do not hardcode reserved synthetic key prefixes. Import `PATCH_INPUTS_KEY_PREFIX`, `PROVIDER_EDGES_KEY_PREFIX`, `GLOBAL_NIX_INPUTS_KEY_PREFIX` from `//lang:defs_common.bzl`.
   - Guardrails:

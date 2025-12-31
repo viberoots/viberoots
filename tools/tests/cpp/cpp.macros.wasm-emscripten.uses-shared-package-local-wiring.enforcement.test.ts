@@ -20,8 +20,8 @@ test("nix_cpp_wasm_emscripten_lib uses prepare_package_local_wiring (no manual w
   const body = sliceDefBody(cppDefs, "nix_cpp_wasm_emscripten_lib");
 
   assert.ok(
-    body.includes("wire_package_local_wasm_planner_visible_stub("),
-    "expected nix_cpp_wasm_emscripten_lib to route planner-visible stub wiring via wire_package_local_wasm_planner_visible_stub(...)",
+    body.includes("wire_package_local_wasm_planner_visible_stub_v2("),
+    "expected nix_cpp_wasm_emscripten_lib to route planner-visible stub wiring via wire_package_local_wasm_planner_visible_stub_v2(...)",
   );
 
   assert.ok(
