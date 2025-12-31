@@ -56,26 +56,26 @@ load(
     "//lang:importer_wiring.bzl",
     _attach_importer_patch_inputs = "attach_importer_patch_inputs",
     _merge_provider_edges = "merge_provider_edges",
-    _prepare_importer_genrule_kwargs = "prepare_importer_genrule_kwargs",
-    _prepare_importer_non_genrule_wiring = "prepare_importer_non_genrule_wiring",
-    _prepare_importer_srcsless_rule_wiring = "prepare_importer_srcsless_rule_wiring",
+    _prepare_importer_genrule_kwargs_legacy_mutating = "prepare_importer_genrule_kwargs_legacy_mutating",
+    _prepare_importer_non_genrule_wiring_legacy_mutating = "prepare_importer_non_genrule_wiring_legacy_mutating",
+    _prepare_importer_srcsless_rule_wiring_legacy_mutating = "prepare_importer_srcsless_rule_wiring_legacy_mutating",
     _require_single_importer_lockfile_label = "require_single_importer_lockfile_label",
 )
 load(
     "//lang:importer_wiring_v2.bzl",
-    _importer_wiring_v2_mutation_probe = "importer_wiring_v2_mutation_probe",
-    _prepare_importer_genrule_kwargs_v2 = "prepare_importer_genrule_kwargs_v2",
-    _prepare_importer_non_genrule_wiring_v2 = "prepare_importer_non_genrule_wiring_v2",
-    _prepare_importer_srcsless_rule_wiring_v2 = "prepare_importer_srcsless_rule_wiring_v2",
+    _importer_wiring_mutation_probe = "importer_wiring_mutation_probe",
+    _prepare_importer_genrule_kwargs = "prepare_importer_genrule_kwargs",
+    _prepare_importer_non_genrule_wiring = "prepare_importer_non_genrule_wiring",
+    _prepare_importer_srcsless_rule_wiring = "prepare_importer_srcsless_rule_wiring",
 )
 load(
     "//lang:importer_wiring_v2_nix_calling.bzl",
-    _prepare_importer_non_genrule_nix_calling_wiring_v2 = "prepare_importer_non_genrule_nix_calling_wiring_v2",
+    _prepare_importer_non_genrule_nix_calling_wiring = "prepare_importer_non_genrule_nix_calling_wiring",
 )
 load(
     "//lang:nix_calling_importer_genrule_wiring.bzl",
     _prepare_importer_nix_calling_genrule_wiring = "prepare_importer_nix_calling_genrule_wiring",
-    _prepare_importer_nix_calling_genrule_wiring_v2 = "prepare_importer_nix_calling_genrule_wiring_v2",
+    _prepare_importer_nix_calling_genrule_wiring_legacy_mutating = "prepare_importer_nix_calling_genrule_wiring_legacy_mutating",
 )
 load("//lang:nix_calling_macros.bzl", _wire_global_nix_inputs = "wire_global_nix_inputs")
 load(
@@ -89,20 +89,20 @@ load(
     _wire_planner_visible_inputs = "wire_planner_visible_inputs",
     _wire_planner_visible_stub = "wire_planner_visible_stub",
     _wire_package_local_planner_visible_stub = "wire_package_local_planner_visible_stub",
-    _wire_package_local_planner_visible_stub_v2 = "wire_package_local_planner_visible_stub_v2",
+    _wire_package_local_planner_visible_stub_legacy_mutating = "wire_package_local_planner_visible_stub_legacy_mutating",
 )
 load(
     "//lang:package_local_wiring.bzl",
     _prepare_package_local_wiring = "prepare_package_local_wiring",
-    _prepare_package_local_wiring_v2 = "prepare_package_local_wiring_v2",
+    _prepare_package_local_wiring_legacy_mutating = "prepare_package_local_wiring_legacy_mutating",
     _package_local_wiring_probe = "package_local_wiring_probe",
-    _package_local_wiring_v2_mutation_probe = "package_local_wiring_v2_mutation_probe",
+    _package_local_wiring_mutation_probe = "package_local_wiring_mutation_probe",
 )
 load(
     "//lang:wasm_package_local_wiring.bzl",
     _prepare_package_local_wasm_wiring = "prepare_package_local_wasm_wiring",
     _wire_package_local_wasm_planner_visible_stub = "wire_package_local_wasm_planner_visible_stub",
-    _wire_package_local_wasm_planner_visible_stub_v2 = "wire_package_local_wasm_planner_visible_stub_v2",
+    _wire_package_local_wasm_planner_visible_stub_legacy_mutating = "wire_package_local_wasm_planner_visible_stub_legacy_mutating",
 )
 
 dedupe_preserve = _dedupe_preserve
@@ -162,20 +162,20 @@ require_single_importer_lockfile_label = _require_single_importer_lockfile_label
 attach_importer_patch_inputs = _attach_importer_patch_inputs
 merge_provider_edges = _merge_provider_edges
 
-# Preferred importer-scoped macro wiring helpers (v2, non-mutating at the call-site boundary).
-prepare_importer_genrule_kwargs_v2 = _prepare_importer_genrule_kwargs_v2
-prepare_importer_non_genrule_nix_calling_wiring_v2 = _prepare_importer_non_genrule_nix_calling_wiring_v2
-prepare_importer_non_genrule_wiring_v2 = _prepare_importer_non_genrule_wiring_v2
-prepare_importer_srcsless_rule_wiring_v2 = _prepare_importer_srcsless_rule_wiring_v2
-importer_wiring_v2_mutation_probe = _importer_wiring_v2_mutation_probe
-
-prepare_importer_nix_calling_genrule_wiring = _prepare_importer_nix_calling_genrule_wiring
-prepare_importer_nix_calling_genrule_wiring_v2 = _prepare_importer_nix_calling_genrule_wiring_v2
-
-# Legacy importer-scoped macro wiring helpers (v1, mutating). Keep exported for migration only.
+# Preferred importer-scoped macro wiring helpers (non-mutating at the call-site boundary).
 prepare_importer_genrule_kwargs = _prepare_importer_genrule_kwargs
+prepare_importer_non_genrule_nix_calling_wiring = _prepare_importer_non_genrule_nix_calling_wiring
 prepare_importer_non_genrule_wiring = _prepare_importer_non_genrule_wiring
 prepare_importer_srcsless_rule_wiring = _prepare_importer_srcsless_rule_wiring
+importer_wiring_mutation_probe = _importer_wiring_mutation_probe
+
+prepare_importer_nix_calling_genrule_wiring = _prepare_importer_nix_calling_genrule_wiring
+prepare_importer_nix_calling_genrule_wiring_legacy_mutating = _prepare_importer_nix_calling_genrule_wiring_legacy_mutating
+
+# Legacy importer-scoped macro wiring helpers (mutating). Keep exported for migration only.
+prepare_importer_genrule_kwargs_legacy_mutating = _prepare_importer_genrule_kwargs_legacy_mutating
+prepare_importer_non_genrule_wiring_legacy_mutating = _prepare_importer_non_genrule_wiring_legacy_mutating
+prepare_importer_srcsless_rule_wiring_legacy_mutating = _prepare_importer_srcsless_rule_wiring_legacy_mutating
 
 wire_global_nix_inputs = _wire_global_nix_inputs
 
@@ -185,22 +185,22 @@ kind_vocabulary_probe = _kind_vocabulary_probe
 
 wire_planner_visible_inputs = _wire_planner_visible_inputs
 wire_planner_visible_stub = _wire_planner_visible_stub
-wire_package_local_planner_visible_stub_v2 = _wire_package_local_planner_visible_stub_v2
-
-# Legacy planner-visible stub helper (v1, mutating). Keep exported for migration only.
 wire_package_local_planner_visible_stub = _wire_package_local_planner_visible_stub
 
-# Preferred package-local macro wiring helper (v2, non-mutating at the call-site boundary).
-prepare_package_local_wiring_v2 = _prepare_package_local_wiring_v2
-package_local_wiring_probe = _package_local_wiring_probe
-package_local_wiring_v2_mutation_probe = _package_local_wiring_v2_mutation_probe
+# Legacy planner-visible stub helper (mutating). Keep exported for migration only.
+wire_package_local_planner_visible_stub_legacy_mutating = _wire_package_local_planner_visible_stub_legacy_mutating
 
-# Legacy package-local macro wiring helper (v1, mutating). Keep exported for migration only.
+# Preferred package-local macro wiring helper (non-mutating at the call-site boundary).
 prepare_package_local_wiring = _prepare_package_local_wiring
+package_local_wiring_probe = _package_local_wiring_probe
+package_local_wiring_mutation_probe = _package_local_wiring_mutation_probe
+
+# Legacy package-local macro wiring helper (mutating). Keep exported for migration only.
+prepare_package_local_wiring_legacy_mutating = _prepare_package_local_wiring_legacy_mutating
 
 prepare_package_local_wasm_wiring = _prepare_package_local_wasm_wiring
-wire_package_local_wasm_planner_visible_stub_v2 = _wire_package_local_wasm_planner_visible_stub_v2
+wire_package_local_wasm_planner_visible_stub = _wire_package_local_wasm_planner_visible_stub
 
 # Legacy package-local WASM planner-visible stub wrapper (keep exported; must not be used in new macros).
-wire_package_local_wasm_planner_visible_stub = _wire_package_local_wasm_planner_visible_stub
+wire_package_local_wasm_planner_visible_stub_legacy_mutating = _wire_package_local_wasm_planner_visible_stub_legacy_mutating
 

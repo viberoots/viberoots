@@ -30,8 +30,8 @@ This section is a quick index of “don’t re-implement this” utilities. Most
       and keep the parity/contract tests passing.
 - Patch inputs are attached through `//lang:patch_inputs.bzl` helpers. When a rule does not support `srcs`, call sites must choose a supported input attribute explicitly using `into = "<attr>"` or carry patch inputs via a small helper target.
   - For importer-scoped ecosystems (Node, Python), macro wiring is standardized via `//lang:importer_wiring.bzl`. New macros must not copy/paste wiring logic; they should call the helper functions (`require_single_importer_lockfile_label`, `attach_importer_patch_inputs`, `merge_provider_edges`).
-  - For **genrule-style macros** (or any wrapper where edges must be realized into `srcs`), prefer `prepare_importer_genrule_kwargs_v2(...)` instead of re-implementing list-vs-dict `srcs` handling. The legacy helper `prepare_importer_genrule_kwargs(...)` remains available for older call sites.
-  - For **non-genrule importer-scoped macros** (where the rule needs the importer string explicitly), prefer `prepare_importer_non_genrule_wiring_v2(...)` so lockfile enforcement, importer derivation, patch inputs, and provider-edge merging remain consistent without mutating caller kwargs. The legacy helper `prepare_importer_non_genrule_wiring(...)` remains available for older call sites.
+  - For **genrule-style macros** (or any wrapper where edges must be realized into `srcs`), prefer `prepare_importer_genrule_kwargs(...)` instead of re-implementing list-vs-dict `srcs` handling. Legacy mutating helpers are migration-only and use explicit `*_legacy_mutating` names.
+  - For **non-genrule importer-scoped macros** (where the rule needs the importer string explicitly), prefer `prepare_importer_non_genrule_wiring(...)` so lockfile enforcement, importer derivation, patch inputs, and provider-edge merging remain consistent without mutating caller kwargs. Legacy mutating helpers are migration-only and use explicit `*_legacy_mutating` names.
 - Dev override environment variable names are a shared contract and are defined in `tools/lib/dev-override-envs.json`. Tooling must not hardcode `NIX_*_DEV_OVERRIDE_JSON` names.
 
 ## Workflow
@@ -211,8 +211,8 @@ node tools/dev/patches-lint.ts --lang python
   - Changing a patch only invalidates Python targets bound to that importer.
 - `nix_python_binary` carries importer‑local patch files via an internal helper `python_library` dependency (resources), because Buck prelude `python_binary` does not accept `srcs`. The synthetic dep pattern is standardized via `//lang:defs_common.bzl:synthetic_dep_for_importer_patches_from_labels(...)`.
 - Lockfile label enforcement and parsing are centralized in Starlark. For importer-scoped macros, **do not** parse lockfile labels directly; route through the canonical helper surface in `//lang:importer_wiring.bzl`:
-  - Prefer `prepare_importer_non_genrule_wiring_v2(...)` for non-genrule wrappers (Python `nix_python_library`, `nix_python_test`, `nix_python_wasm_*`)
-  - Prefer `prepare_importer_genrule_kwargs_v2(...)` for genrule-style wrappers (`nix_node_gen`, similar shims). The legacy helper `prepare_importer_genrule_kwargs(...)` remains available for older call sites.
+  - Prefer `prepare_importer_non_genrule_wiring(...)` for non-genrule wrappers (Python `nix_python_library`, `nix_python_test`, `nix_python_wasm_*`)
+  - Prefer `prepare_importer_genrule_kwargs(...)` for genrule-style wrappers (`nix_node_gen`, similar shims). Legacy mutating helpers are migration-only and use explicit `*_legacy_mutating` names.
   - Implementation note: these helpers encapsulate `ensure_single_lockfile_label(...)` and patch-input attachment (`include_importer_patches_from_labels(...)`) so error text, normalization, and list/dict input handling stay consistent across Node and Python.
 
 Quick checks and guidance:

@@ -4,7 +4,7 @@ load("//lang:label_stamping.bzl", "stamp_labels", "stamp_patch_scope_for_lang")
 load("//lang:provider_edges.bzl", "realize_provider_edges", "target_key_for_current_package")
 load("@prelude//:rules.bzl", "genrule")
 
-def prepare_package_local_wiring(
+def prepare_package_local_wiring_legacy_mutating(
         *,
         name,
         kwargs,
@@ -26,13 +26,13 @@ def prepare_package_local_wiring(
     Returns a struct: { local_patch_dirs, nixpkg_deps, deps }.
     """
     if not isinstance(name, str) or name == "":
-        fail("prepare_package_local_wiring: name must be a non-empty string")
+        fail("prepare_package_local_wiring_legacy_mutating: name must be a non-empty string")
     if not isinstance(kwargs, dict):
-        fail("prepare_package_local_wiring: kwargs must be a dict")
+        fail("prepare_package_local_wiring_legacy_mutating: kwargs must be a dict")
     if not isinstance(lang, str) or lang == "":
-        fail("prepare_package_local_wiring: lang must be a non-empty string")
+        fail("prepare_package_local_wiring_legacy_mutating: lang must be a non-empty string")
     if not isinstance(base_deps, list):
-        fail("prepare_package_local_wiring: base_deps must be a list")
+        fail("prepare_package_local_wiring_legacy_mutating: base_deps must be a list")
 
     info = pop_package_local_patch_dirs_and_nixpkg_deps(kwargs, lang, append_labels = True)
     stamp_patch_scope_for_lang(kwargs, lang)
@@ -46,7 +46,7 @@ def prepare_package_local_wiring(
         deps = deps,
     )
 
-def prepare_package_local_wiring_v2(
+def prepare_package_local_wiring(
         *,
         name,
         kwargs,
@@ -65,13 +65,13 @@ def prepare_package_local_wiring_v2(
       - deps: provider edges realized deterministically, preserving base_deps order
     """
     if not isinstance(name, str) or name == "":
-        fail("prepare_package_local_wiring_v2: name must be a non-empty string")
+        fail("prepare_package_local_wiring: name must be a non-empty string")
     if not isinstance(kwargs, dict):
-        fail("prepare_package_local_wiring_v2: kwargs must be a dict")
+        fail("prepare_package_local_wiring: kwargs must be a dict")
     if not isinstance(lang, str) or lang == "":
-        fail("prepare_package_local_wiring_v2: lang must be a non-empty string")
+        fail("prepare_package_local_wiring: lang must be a non-empty string")
     if not isinstance(base_deps, list):
-        fail("prepare_package_local_wiring_v2: base_deps must be a list")
+        fail("prepare_package_local_wiring: base_deps must be a list")
 
     info = extract_package_local_patch_dirs_and_nixpkg_deps(kwargs, lang, append_labels = True)
     kw = info.kwargs
@@ -111,7 +111,7 @@ def package_local_wiring_probe(
     MODULE_PROVIDERS = {
         target_key_for_current_package(name): providers,
     }
-    info = prepare_package_local_wiring(
+    info = prepare_package_local_wiring_legacy_mutating(
         name = name,
         kwargs = kw,
         lang = lang,
@@ -135,7 +135,7 @@ def package_local_wiring_probe(
         labels = ["kind:probe"],
     )
 
-def package_local_wiring_v2_mutation_probe(
+def package_local_wiring_mutation_probe(
         name,
         lang,
         kind,
@@ -165,7 +165,7 @@ def package_local_wiring_v2_mutation_probe(
     MODULE_PROVIDERS = {
         target_key_for_current_package(name): providers,
     }
-    _ = prepare_package_local_wiring_v2(
+    _ = prepare_package_local_wiring(
         name = name,
         kwargs = kw,
         lang = lang,
@@ -193,9 +193,9 @@ def package_local_wiring_v2_mutation_probe(
 
 __all__ = [
     "prepare_package_local_wiring",
-    "prepare_package_local_wiring_v2",
+    "prepare_package_local_wiring_legacy_mutating",
     "package_local_wiring_probe",
-    "package_local_wiring_v2_mutation_probe",
+    "package_local_wiring_mutation_probe",
 ]
 
 

@@ -10,10 +10,10 @@ test("node Nix-calling macros route through shared importer+nix genrule wiring h
   const file = "node/defs_nix.bzl";
   const txt = await fsp.readFile(file, "utf8");
 
-  const helperCalls = (txt.match(/prepare_importer_nix_calling_genrule_wiring_v2\(/g) || []).length;
+  const helperCalls = (txt.match(/prepare_importer_nix_calling_genrule_wiring\(/g) || []).length;
   assert(
     helperCalls === 1,
-    `${file} must contain exactly one direct call to prepare_importer_nix_calling_genrule_wiring_v2(...); found ${helperCalls}`,
+    `${file} must contain exactly one direct call to prepare_importer_nix_calling_genrule_wiring(...); found ${helperCalls}`,
   );
 
   assert(
@@ -29,7 +29,7 @@ test("node Nix-calling macros route through shared importer+nix genrule wiring h
     `${file} must not call prepare_importer_genrule_kwargs(...); use the shared helper for nix-calling genrules`,
   );
   assert(
-    !txt.includes("prepare_importer_nix_calling_genrule_wiring("),
-    `${file} must not call prepare_importer_nix_calling_genrule_wiring(...); use prepare_importer_nix_calling_genrule_wiring_v2(...)`,
+    !txt.includes("prepare_importer_nix_calling_genrule_wiring_legacy_mutating("),
+    `${file} must not call prepare_importer_nix_calling_genrule_wiring_legacy_mutating(...)`,
   );
 });

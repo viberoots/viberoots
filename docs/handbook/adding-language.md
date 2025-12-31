@@ -9,28 +9,28 @@ This guide explains how to add a new language to the build without touching core
 When you add or change a macro, keep the wiring table-driven through shared helpers. These are the expected helper surfaces, and the enforcement tests that guard them:
 
 - **Importer-scoped, non-genrule wrappers** (wrap `python_library`, `python_test`, etc.)
-  - Use `prepare_importer_non_genrule_wiring_v2(...)` (or `prepare_importer_srcsless_rule_wiring_v2(...)` when the rule shape cannot accept `srcs`).
+  - Use `prepare_importer_non_genrule_wiring(...)` (or `prepare_importer_srcsless_rule_wiring(...)` when the rule shape cannot accept `srcs`).
   - Guardrails:
     - `tools/tests/lang/importer-wiring.macros-avoid-direct-lockfile-parsing.enforcement.test.ts`
 - **Importer-scoped, Nix-calling genrule-style macros** (wrap `genrule` that shells out to Nix)
-  - Use `prepare_importer_nix_calling_genrule_wiring_v2(...)` (do not call `wire_global_nix_inputs(...)` at the call site).
+  - Use `prepare_importer_nix_calling_genrule_wiring(...)` (do not call `wire_global_nix_inputs(...)` at the call site).
   - Guardrails:
     - `tools/tests/node/node.nix-calling-macros.use-shared-importer-nix-genrule-helper.enforcement.test.ts`
 - **Importer-scoped, non-genrule macros that call Nix at runtime** (non-genrule wrapper + needs global Nix action inputs)
-  - Use `prepare_importer_non_genrule_nix_calling_wiring_v2(...)`.
+  - Use `prepare_importer_non_genrule_nix_calling_wiring(...)`.
   - Guardrails:
     - `tools/tests/node/node.defs-core.uses-importer-wiring-v2.enforcement.test.ts`
     - `tools/tests/node/node.defs-core.nix-node-test.must-not-call-wire-global-nix-inputs.enforcement.test.ts`
 - **Package-local macros** (Go/C++ patch scope)
-  - Use `prepare_package_local_wiring_v2(...)` and pass a single `base_deps` list that already includes any repo-local extras.
+  - Use `prepare_package_local_wiring(...)` and pass a single `base_deps` list that already includes any repo-local extras.
   - Guardrails:
     - `tools/tests/lang/package-local-wiring.enforcement.no-bypass.test.ts`
 - **Planner-visible stubs** (graph node for planner discovery/invalidation)
-  - Use `wire_package_local_planner_visible_stub_v2(...)` for package-local stubs.
+  - Use `wire_package_local_planner_visible_stub(...)` for package-local stubs.
 - **Package-local WASM macros (Go, C++)**
   - For rule shapes that carry patch inputs in `srcs` and realize provider edges into `deps` or `srcs`, use `prepare_package_local_wasm_wiring(...)`.
-  - For planner-visible package-local WASM stubs, use `wire_package_local_wasm_planner_visible_stub_v2(...)`.
-    - `wire_package_local_wasm_planner_visible_stub(...)` is legacy-only and must not be used in new macro code.
+  - For planner-visible package-local WASM stubs, use `wire_package_local_wasm_planner_visible_stub(...)`.
+    - `wire_package_local_wasm_planner_visible_stub_legacy_mutating(...)` is legacy-only and must not be used in new macro code.
 - **Dict-shaped `srcs`** (when wiring patches/providers/global inputs into dict-safe keys)
   - Do not hardcode reserved synthetic key prefixes. Import `PATCH_INPUTS_KEY_PREFIX`, `PROVIDER_EDGES_KEY_PREFIX`, `GLOBAL_NIX_INPUTS_KEY_PREFIX` from `//lang:defs_common.bzl`.
   - Guardrails:
@@ -77,24 +77,24 @@ For importer-scoped ecosystems, we try hard to keep “how we find lockfiles” 
 - Starlark (`lang/defs_common.bzl`):
 
   When authoring a **package-local patching macro** (Go/C++ style), avoid re-assembling the “patch dirs + nixpkg deps + labels + providers” sequence by hand. Use the shared helper so defaults and tolerance rules don’t drift across languages.
-  - `prepare_package_local_wiring_v2(...)` (default for new macros)
+  - `prepare_package_local_wiring(...)` (default for new macros)
     - Pops `local_patch_dirs` with a language default (`default_package_patch_dirs(lang)`)
     - Pops `nixpkg_deps` and appends normalized `nixpkg:` labels (canonical normalizer)
     - Stamps `lang:*` and `kind:*` labels (or you can opt out when another stamper is used)
     - Includes package-local `*.patch` files as action inputs (via `srcs`)
     - Realizes provider edges deterministically (via `MODULE_PROVIDERS`)
-  - `prepare_package_local_wiring(...)` is legacy-only and should not be used in new macro code.
+  - `prepare_package_local_wiring_legacy_mutating(...)` is legacy-only and should not be used in new macro code.
 
   Minimal example:
 
 ```python
 load("@prelude//:rules.bzl", "genrule")
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
-load("//lang:defs_common.bzl", "prepare_package_local_wiring_v2")
+load("//lang:defs_common.bzl", "prepare_package_local_wiring")
 
 def my_pkg_local_rule(name, **kwargs):
     deps = kwargs.pop("deps", [])
-    wiring = prepare_package_local_wiring_v2(
+    wiring = prepare_package_local_wiring(
         name = name,
         kwargs = kwargs,
         lang = "cpp",
@@ -115,7 +115,7 @@ def my_pkg_local_rule(name, **kwargs):
 
 When your macro must emit a **planner-visible stub** (a graph node for planner discovery / invalidation, without producing a normal Buck-built artifact), use the shared helper instead of wiring the stub by hand:
 
-- `wire_package_local_planner_visible_stub_v2(...)` (preferred; non-mutating at the call-site boundary)
+- `wire_package_local_planner_visible_stub(...)` (preferred; non-mutating at the call-site boundary)
   - Pops `local_patch_dirs` and `nixpkg_deps` (when present) and appends normalized `nixpkg:` labels
   - Stamps exactly one `patch_scope:*` label for the language
   - Stamps `lang:*` and `kind:*` (including non-standard kinds like `carchive`)
@@ -123,7 +123,7 @@ When your macro must emit a **planner-visible stub** (a graph node for planner d
   - Strips provider targets from planner-visible `deps` **by default** (opt out via `strip_providers_from_deps = False`)
   - Optionally realizes provider edges into `deps` or **inputs** (`srcs`) via `provider_realization_mode = "deps"|"inputs"`
 
-Rule: new package-local planner-visible stub call sites must use the v2 helper. The mutating helper remains only for legacy migration support and should not appear in new macro code.
+Rule: new package-local planner-visible stub call sites must use the non-mutating helper. The legacy mutating helper (`wire_package_local_planner_visible_stub_legacy_mutating(...)`) remains only for migration support and should not appear in new macro code.
 
 ### Python notes
 
@@ -132,9 +132,9 @@ Rule: new package-local planner-visible stub call sites must use the v2 helper. 
   - Lockfile labeling is importer‑scoped: `lockfile:<path>#<importer>`; standard file is `uv.lock`.
   - Macros: use `nix_python_{library,binary,test}` from `python/defs.bzl` and pass `lockfile_label` explicitly.
   - Macro wiring: importer-scoped wiring is centralized via:
-    - Prefer `//lang:importer_wiring_v2.bzl:prepare_importer_non_genrule_wiring_v2(...)` for `nix_python_library`, `nix_python_test`, and `nix_python_wasm_*` (non-mutating).
-    - Prefer `//lang:importer_wiring_v2.bzl:prepare_importer_srcsless_rule_wiring_v2(...)` for rule shapes that cannot accept `srcs` (example: prelude `python_binary`).
-    - Legacy helpers remain available in `//lang:importer_wiring.bzl` for older call sites.
+    - Prefer `//lang:importer_wiring_v2.bzl:prepare_importer_non_genrule_wiring(...)` for `nix_python_library`, `nix_python_test`, and `nix_python_wasm_*` (non-mutating).
+    - Prefer `//lang:importer_wiring_v2.bzl:prepare_importer_srcsless_rule_wiring(...)` for rule shapes that cannot accept `srcs` (example: prelude `python_binary`).
+    - Legacy mutating helpers remain available in `//lang:importer_wiring.bzl` for migration only and use explicit `*_legacy_mutating` names.
 - Scaffolding:
   - `scaf new python lib <name>` → `libs/<name>` with `pyproject.toml`, `uv.lock`, `TARGETS` using `nix_python_library` and a sample test via `nix_python_test`.
   - `scaf new python app <name>` → `apps/<name>` with a small library and binary (`nix_python_binary`) and importer‑scoped `lockfile_label`.
@@ -162,7 +162,7 @@ If you change supported importer roots, update both implementations and keep the
 - `ensure_single_lockfile_label(kwargs, lockfile_label)` enforces exactly one importer-scoped label (`lockfile:<path>#<importer>`) with stable dedupe and canonical error text.
 - `include_importer_patches_from_labels(kwargs, lang, into = "srcs")` derives the importer and includes importer-local patches deterministically into a supported input attribute (commonly `srcs` or `resources` depending on the rule shape).
 - For importer-scoped, **Nix-calling genrule-style** macros, use:
-  - `prepare_importer_nix_calling_genrule_wiring_v2(...)`
+  - `prepare_importer_nix_calling_genrule_wiring(...)`
     - It composes lockfile enforcement, label stamping, importer patch inputs, provider edge realization into `srcs`, optional `tools/buck/workspace-root.env` injection for dict-shaped `srcs`, and global Nix inputs as real action inputs (optional stamp).
     - When you need dict-safe synthetic keys, do not hardcode any reserved prefixes. Import:
       - `PATCH_INPUTS_KEY_PREFIX`
@@ -174,7 +174,7 @@ Minimal example (dict-shaped `srcs`):
 
 ```python
 load("@prelude//:rules.bzl", "genrule")
-load("//lang:defs_common.bzl", "prepare_importer_nix_calling_genrule_wiring_v2")
+load("//lang:defs_common.bzl", "prepare_importer_nix_calling_genrule_wiring")
 
 def my_importer_nix_genrule(name, lockfile_label = None):
     # Dict-shaped srcs: preserve caller mapping, and allow shared helper to attach
@@ -182,7 +182,7 @@ def my_importer_nix_genrule(name, lockfile_label = None):
     srcs = {
         "package.json": "package.json",
     }
-    wiring = prepare_importer_nix_calling_genrule_wiring_v2(
+    wiring = prepare_importer_nix_calling_genrule_wiring(
         name = name,
         kwargs = {},
         srcs = srcs,

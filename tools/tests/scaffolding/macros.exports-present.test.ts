@@ -11,9 +11,9 @@ test("go/defs.bzl exports nix_go_* macros and uses shared realize_provider_edges
       "def nix_go_binary(",
       "def nix_go_test(",
       // Ensure we are delegating to private helpers (policy lives in go/private)
-      'load("//lang:defs_common.bzl", "normalize_labels", "prepare_package_local_wasm_wiring", "prepare_package_local_wiring_v2")',
+      'load("//lang:defs_common.bzl", "normalize_labels", "prepare_package_local_wasm_wiring", "prepare_package_local_wiring")',
       'load("//go/private:cgo_wiring.bzl", "apply_go_rule_stable_defaults", "apply_go_tuple_labels", "configure_cgo_kwargs")',
-      "prepare_package_local_wiring_v2(",
+      "prepare_package_local_wiring(",
       "prepare_package_local_wasm_wiring(",
     ];
     for (const needle of need) {

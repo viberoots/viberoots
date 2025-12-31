@@ -1,9 +1,9 @@
 load("//lang:dict_inputs.bzl", "PATCH_INPUTS_KEY_PREFIX", "PROVIDER_EDGES_KEY_PREFIX")
 load(
     "//lang:importer_wiring.bzl",
-    "prepare_importer_genrule_kwargs",
-    "prepare_importer_non_genrule_wiring",
-    "prepare_importer_srcsless_rule_wiring",
+    "prepare_importer_genrule_kwargs_legacy_mutating",
+    "prepare_importer_non_genrule_wiring_legacy_mutating",
+    "prepare_importer_srcsless_rule_wiring_legacy_mutating",
 )
 load("@prelude//:rules.bzl", "genrule")
 
@@ -24,7 +24,7 @@ def _prepare_non_mutating_kwargs(kwargs, patch_into, provider_into):
         kw[provider_into] = _clone_container_or_none(kw.get(provider_into))
     return kw
 
-def prepare_importer_non_genrule_wiring_v2(
+def prepare_importer_non_genrule_wiring(
         name,
         kwargs,
         deps,
@@ -51,7 +51,7 @@ def prepare_importer_non_genrule_wiring_v2(
     """
     kw = _prepare_non_mutating_kwargs(kwargs, patch_into, provider_into)
     base_deps = list(deps) if isinstance(deps, list) else []
-    res = prepare_importer_non_genrule_wiring(
+    res = prepare_importer_non_genrule_wiring_legacy_mutating(
         name = name,
         kwargs = kw,
         deps = base_deps,
@@ -75,7 +75,7 @@ def prepare_importer_non_genrule_wiring_v2(
         deps = res["deps"],
     )
 
-def prepare_importer_genrule_kwargs_v2(
+def prepare_importer_genrule_kwargs(
         name,
         kwargs,
         srcs,
@@ -96,7 +96,7 @@ def prepare_importer_genrule_kwargs_v2(
     kw = _prepare_non_mutating_kwargs(kwargs, patch_into = "srcs", provider_into = "srcs")
     base_deps = list(deps) if isinstance(deps, list) else []
     base_srcs = dict(srcs) if isinstance(srcs, dict) else list(srcs)
-    prepared = prepare_importer_genrule_kwargs(
+    prepared = prepare_importer_genrule_kwargs_legacy_mutating(
         name = name,
         kwargs = kw,
         srcs = base_srcs,
@@ -113,7 +113,7 @@ def prepare_importer_genrule_kwargs_v2(
         kwargs = prepared,
     )
 
-def prepare_importer_srcsless_rule_wiring_v2(
+def prepare_importer_srcsless_rule_wiring(
         name,
         kwargs,
         deps,
@@ -135,7 +135,7 @@ def prepare_importer_srcsless_rule_wiring_v2(
     """
     kw = _prepare_non_mutating_kwargs(kwargs, patch_into = None, provider_into = "deps")
     base_deps = list(deps) if isinstance(deps, list) else []
-    res = prepare_importer_srcsless_rule_wiring(
+    res = prepare_importer_srcsless_rule_wiring_legacy_mutating(
         name = name,
         kwargs = kw,
         deps = base_deps,
@@ -154,7 +154,7 @@ def prepare_importer_srcsless_rule_wiring_v2(
         merge_deps = res.merge_deps,
     )
 
-def importer_wiring_v2_mutation_probe(name, lang, kind):
+def importer_wiring_mutation_probe(name, lang, kind):
     """
     Probe helper for tests. Asserts importer wiring v2 does not mutate the input dict.
     """
@@ -170,7 +170,7 @@ def importer_wiring_v2_mutation_probe(name, lang, kind):
         "labels_has_patch_scope": _has_prefix(pre_labels, "patch_scope:"),
         "labels_has_lockfile": _has_prefix(pre_labels, "lockfile:"),
     }
-    _ = prepare_importer_non_genrule_wiring_v2(
+    _ = prepare_importer_non_genrule_wiring(
         name = name,
         kwargs = kw,
         deps = [],
@@ -200,10 +200,10 @@ def importer_wiring_v2_mutation_probe(name, lang, kind):
     )
 
 __all__ = [
-    "prepare_importer_genrule_kwargs_v2",
-    "prepare_importer_non_genrule_wiring_v2",
-    "prepare_importer_srcsless_rule_wiring_v2",
-    "importer_wiring_v2_mutation_probe",
+    "prepare_importer_genrule_kwargs",
+    "prepare_importer_non_genrule_wiring",
+    "prepare_importer_srcsless_rule_wiring",
+    "importer_wiring_mutation_probe",
 ]
 
 

@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "genrule")
-load("//lang:defs_common.bzl", "prepare_importer_nix_calling_genrule_wiring_v2")
+load("//lang:defs_common.bzl", "prepare_importer_nix_calling_genrule_wiring")
 load("//lang:importer_strings.bzl", "importer_display_name", "sanitize_importer_for_nix_attr")
 load(
     "//lang:nix_shell.bzl",
@@ -19,7 +19,7 @@ def _prepare_node_importer_nix_calling_genrule_kwargs(
         labels = [],
         lockfile_label = None,
         MODULE_PROVIDERS = None):
-    return prepare_importer_nix_calling_genrule_wiring_v2(
+    return prepare_importer_nix_calling_genrule_wiring(
         name = name,
         kwargs = kwargs,
         srcs = srcs,

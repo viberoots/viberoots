@@ -63,7 +63,7 @@ def merge_provider_edges(
 
     merged_base = deps if base == None else base
     return realize_provider_edges(provs, name, into = into, base = merged_base)
-def prepare_importer_genrule_kwargs(
+def prepare_importer_genrule_kwargs_legacy_mutating(
         name,
         kwargs,
         srcs,
@@ -119,7 +119,7 @@ def prepare_importer_genrule_kwargs(
         MODULE_PROVIDERS = MODULE_PROVIDERS,
     )
     return kw
-def prepare_importer_non_genrule_wiring(
+def prepare_importer_non_genrule_wiring_legacy_mutating(
         name,
         kwargs,
         deps,
@@ -193,7 +193,7 @@ def prepare_importer_non_genrule_wiring(
         "deps": wired_deps,
     }
 
-def prepare_importer_srcsless_rule_wiring(
+def prepare_importer_srcsless_rule_wiring_legacy_mutating(
         name,
         kwargs,
         deps,

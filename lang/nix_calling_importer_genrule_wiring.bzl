@@ -1,4 +1,4 @@
-load("//lang:importer_wiring.bzl", "prepare_importer_genrule_kwargs")
+load("//lang:importer_wiring.bzl", "prepare_importer_genrule_kwargs_legacy_mutating")
 load("//lang:lockfile_labels.bzl", "importer_from_labels")
 load("//lang:nix_calling_macros.bzl", "wire_global_nix_inputs")
 load("//lang:dict_inputs.bzl", "GLOBAL_NIX_INPUTS_KEY_PREFIX", "PATCH_INPUTS_KEY_PREFIX", "PROVIDER_EDGES_KEY_PREFIX")
@@ -10,7 +10,7 @@ def _clone_container_or_none(v):
         return list(v)
     return v
 
-def prepare_importer_nix_calling_genrule_wiring(
+def prepare_importer_nix_calling_genrule_wiring_legacy_mutating(
         name,
         kwargs,
         srcs,
@@ -49,7 +49,7 @@ def prepare_importer_nix_calling_genrule_wiring(
             current["tools/buck/workspace-root.env"] = workspace_root_env_src
         srcs = current
 
-    prepared = prepare_importer_genrule_kwargs(
+    prepared = prepare_importer_genrule_kwargs_legacy_mutating(
         name = name,
         kwargs = kw,
         srcs = srcs,
@@ -77,7 +77,7 @@ def prepare_importer_nix_calling_genrule_wiring(
         kwargs = prepared,
     )
 
-def prepare_importer_nix_calling_genrule_wiring_v2(
+def prepare_importer_nix_calling_genrule_wiring(
         name,
         kwargs,
         srcs,
@@ -95,14 +95,14 @@ def prepare_importer_nix_calling_genrule_wiring_v2(
         global_inputs_stamp = True,
         global_inputs_key_prefix = GLOBAL_NIX_INPUTS_KEY_PREFIX):
     """
-    Non-mutating variant of prepare_importer_nix_calling_genrule_wiring.
+    Non-mutating variant of prepare_importer_nix_calling_genrule_wiring_legacy_mutating.
     """
     kw = dict(kwargs) if kwargs != None else {}
     existing_labels = kw.get("labels", []) or []
     kw["labels"] = list(existing_labels) if isinstance(existing_labels, list) else []
     srcs2 = _clone_container_or_none(srcs)
     deps2 = list(deps) if isinstance(deps, list) else []
-    return prepare_importer_nix_calling_genrule_wiring(
+    return prepare_importer_nix_calling_genrule_wiring_legacy_mutating(
         name = name,
         kwargs = kw,
         srcs = srcs2,

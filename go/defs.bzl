@@ -1,8 +1,8 @@
 load("@prelude//:rules.bzl", "go_binary", "go_library", "go_test")
-load("//lang:defs_common.bzl", "normalize_labels", "prepare_package_local_wasm_wiring", "prepare_package_local_wiring_v2")
+load("//lang:defs_common.bzl", "normalize_labels", "prepare_package_local_wasm_wiring", "prepare_package_local_wiring")
 load("//lang:global_inputs.bzl", "global_nix_inputs")
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
-load("//lang:defs_common.bzl", "wire_package_local_planner_visible_stub_v2")
+load("//lang:defs_common.bzl", "wire_package_local_planner_visible_stub")
 load("//go/private:nix_build_wasm.bzl", "go_nix_build_wasm")
 load("//go/private:cgo_wiring.bzl", "apply_go_rule_stable_defaults", "apply_go_tuple_labels", "configure_cgo_kwargs")
 load("//go/private:auto_tests.bzl", "maybe_autowire_go_binary_test", "maybe_autowire_go_library_test")
@@ -15,7 +15,7 @@ def nix_go_library(name, **kwargs):
     deps = kw.pop("deps", [])
     extra = normalize_labels(native.package_name(), kw.pop("extra_module_providers", []))
     apply_go_tuple_labels(kw)
-    wiring = prepare_package_local_wiring_v2(
+    wiring = prepare_package_local_wiring(
         name = name,
         kwargs = kw,
         lang = "go",
@@ -37,7 +37,7 @@ def nix_go_binary(name, **kwargs):
     deps = kw.pop("deps", [])
     extra = normalize_labels(native.package_name(), kw.pop("extra_module_providers", []))
     apply_go_tuple_labels(kw)
-    wiring = prepare_package_local_wiring_v2(
+    wiring = prepare_package_local_wiring(
         name = name,
         kwargs = kw,
         lang = "go",
@@ -72,7 +72,7 @@ def nix_go_test(name, **kwargs):
     deps = kw.pop("deps", [])
     extra = normalize_labels(native.package_name(), kw.pop("extra_module_providers", []))
     apply_go_tuple_labels(kw)
-    wiring = prepare_package_local_wiring_v2(
+    wiring = prepare_package_local_wiring(
         name = name,
         kwargs = kw,
         lang = "go",
@@ -114,7 +114,7 @@ def nix_go_carchive(name, **kwargs):
     srcs = kw.get("srcs", []) or []
     # Keep a minimal graph node with srcs so the planner can discover the package.
     # Preserve the existing behavior where provider edges are realized into `srcs`.
-    wire_package_local_planner_visible_stub_v2(
+    wire_package_local_planner_visible_stub(
         name = name,
         out = name + ".stamp",
         kwargs = kw,

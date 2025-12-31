@@ -2,11 +2,10 @@ load("@prelude//:rules.bzl", "cxx_library", "cxx_binary", "cxx_test")
 load(
     "//lang:defs_common.bzl",
     "dedupe_preserve",
-    "prepare_package_local_wiring_v2",
+    "prepare_package_local_wiring",
     "prepare_package_local_wasm_wiring",
-    "wire_package_local_planner_visible_stub_v2",
+    "wire_package_local_planner_visible_stub",
     "wire_package_local_wasm_planner_visible_stub",
-    "wire_package_local_wasm_planner_visible_stub_v2",
 )
 load("//lang:global_inputs.bzl", "global_nix_inputs")
 load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name", _cpp_sanitize_probe="cpp_sanitize_probe")
@@ -18,7 +17,7 @@ def _cpp_common(name, kind, kwargs):
     deps = kwargs.get("deps", []) or []
     nix_inputs = global_nix_inputs()
 
-    wiring = prepare_package_local_wiring_v2(
+    wiring = prepare_package_local_wiring(
         name = name,
         kwargs = kwargs,
         lang = "cpp",
@@ -102,7 +101,7 @@ def nix_cpp_wasm_emscripten_lib(name, **kwargs):
       Nix flake attributes (e.g., graph-generator-selected).
     """
     deps = kwargs.get("deps", []) or []
-    wire_package_local_wasm_planner_visible_stub_v2(
+    wire_package_local_wasm_planner_visible_stub(
         name = name,
         out = name + ".stamp",
         kwargs = kwargs,
@@ -127,7 +126,7 @@ def nix_cpp_test(name, **kwargs):
     planner_name = name + "__planner"
     # Planner-visible stub: Nix builds the test; this node exists for planner discovery and invalidation.
     # Provider deps are stripped to avoid visibility / graph-shape problems on the planner-visible boundary.
-    wire_package_local_planner_visible_stub_v2(
+    wire_package_local_planner_visible_stub(
         name = planner_name,
         out = planner_name + ".stamp",
         kwargs = kwargs,

@@ -58,8 +58,8 @@ For language macros, stamping is the macro’s responsibility. Call sites should
   - `stamp_wasm_variant(kwargs, lang, variant)`
 - **Starlark (package-local WASM macro wiring)**: `lang/wasm_package_local_wiring.bzl` via `lang/defs_common.bzl` re-exports.
   - `prepare_package_local_wasm_wiring(...)` (fixed ordering: wasm stamps → patch_scope → patch inputs → provider edges)
-  - `wire_package_local_wasm_planner_visible_stub_v2(...)` (preferred; non-mutating boundary, delegates to `wire_package_local_planner_visible_stub_v2(...)`)
-  - `wire_package_local_wasm_planner_visible_stub(...)` (legacy-only; wrapper now delegates to v2)
+  - `wire_package_local_wasm_planner_visible_stub(...)` (preferred; non-mutating boundary, delegates to `wire_package_local_planner_visible_stub(...)`)
+  - `wire_package_local_wasm_planner_visible_stub_legacy_mutating(...)` (legacy-only; wrapper delegates to the non-mutating helper)
 - **Kind vocabulary (contract)**:
   - Starlark: `lang/kind_vocabulary.bzl` (re-exported via `lang/defs_common.bzl`)
   - TypeScript: `tools/lib/kind-vocabulary.ts`
@@ -80,18 +80,18 @@ These are the usual ways this leaks:
 
 ---
 
-## Contract 1.1: Package-local wiring helper usage (non-mutating v2)
+## Contract 1.1: Package-local wiring helper usage (non-mutating)
 
 Package-local languages (Go, C++) attach patch files as real action inputs and realize provider edges via a shared wiring helper.
 
 ### Contract
 
-- Package-local language macros should use `prepare_package_local_wiring_v2(...)` from `lang/defs_common.bzl`.
+- Package-local language macros should use `prepare_package_local_wiring(...)` from `lang/defs_common.bzl`.
 - The helper must not mutate the caller’s kwargs dict. It returns a prepared `kwargs` dict for the underlying rule call, plus the derived patch dirs and nixpkgs deps.
 
 ### Canonical implementations
 
-- **Starlark**: `lang/package_local_wiring.bzl:prepare_package_local_wiring_v2`
+- **Starlark**: `lang/package_local_wiring.bzl:prepare_package_local_wiring`
 - **Starlark**: `lang/macro_kwargs.bzl:extract_package_local_patch_dirs_and_nixpkg_deps` (non-mutating macro kwargs extraction)
 
 ### Regression guards
@@ -239,8 +239,8 @@ I treat patch invalidation as two explicit models:
     - `patch_scope:package-local`
     - `patch_scope:importer-local`
   - Stamping happens only at the shared wiring helper boundaries:
-    - Package-local: `lang/package_local_wiring.bzl:prepare_package_local_wiring_v2`
-    - Package-local planner-visible stubs: `lang/planner_visible_wiring.bzl:wire_package_local_planner_visible_stub_v2`
+    - Package-local: `lang/package_local_wiring.bzl:prepare_package_local_wiring`
+    - Package-local planner-visible stubs: `lang/planner_visible_wiring.bzl:wire_package_local_planner_visible_stub`
     - Importer-local: `lang/importer_wiring*.bzl:prepare_importer_*`
 
 - **Package-local patching** (Go, C++):
@@ -248,9 +248,9 @@ I treat patch invalidation as two explicit models:
   - Macros include patch files in the target’s action inputs, usually `srcs`.
   - Provider sync is not required to make patch changes invalidate builds.
   - Planner-visible stubs for package-local languages still carry package-local patch files as real inputs, and must stamp `patch_scope:package-local`:
-    - `nix_cpp_test`’s `<name>__planner` uses the canonical package-local planner-visible stub helper (`wire_package_local_planner_visible_stub_v2(...)`) so patch edits invalidate the planner-visible boundary.
-    - `nix_go_carchive` uses the canonical package-local planner-visible stub helper (`wire_package_local_planner_visible_stub_v2(...)`) with provider edges realized into **inputs** (`provider_realization_mode = "inputs"`) so the stub remains a minimal graph node while still carrying the correct invalidation inputs.
-    - `nix_cpp_wasm_emscripten_lib` uses `wire_package_local_wasm_planner_visible_stub_v2(...)` so WASM stamping, patch scope stamping, patch inputs, provider handling, and planner-visible defaults stay consistent.
+    - `nix_cpp_test`’s `<name>__planner` uses the canonical package-local planner-visible stub helper (`wire_package_local_planner_visible_stub(...)`) so patch edits invalidate the planner-visible boundary.
+    - `nix_go_carchive` uses the canonical package-local planner-visible stub helper (`wire_package_local_planner_visible_stub(...)`) with provider edges realized into **inputs** (`provider_realization_mode = "inputs"`) so the stub remains a minimal graph node while still carrying the correct invalidation inputs.
+    - `nix_cpp_wasm_emscripten_lib` uses `wire_package_local_wasm_planner_visible_stub(...)` so WASM stamping, patch scope stamping, patch inputs, provider handling, and planner-visible defaults stay consistent.
     - Package-local WASM macros use the shared WASM wiring helpers so ordering-sensitive steps (WASM stamping, patch scope, patch inputs, provider edges) cannot drift.
 
 - **Importer-local patching** (Node, Python):
@@ -276,7 +276,7 @@ Rule: treat provider `patch_paths` as diagnostic/observability data for importer
 - **Patch model registry (TypeScript)**: `tools/lib/lang-contracts.ts`
 - **Starlark package-local**:
   - `lang/patch_inputs.bzl:include_package_local_patches` and `lang/patch_inputs.bzl:default_package_patch_dirs`.
-  - `lang/package_local_wiring.bzl:prepare_package_local_wiring_v2` (preferred macro-side helper that composes kwarg normalization, nixpkg label stamping, patch input inclusion, and provider-edge realization deterministically without mutating call-site dicts).
+  - `lang/package_local_wiring.bzl:prepare_package_local_wiring` (preferred macro-side helper that composes kwarg normalization, nixpkg label stamping, patch input inclusion, and provider-edge realization deterministically without mutating call-site dicts).
 - **Starlark importer-local**: `lang/patch_inputs.bzl:include_importer_patches_from_labels` plus `lang/importer_wiring.bzl:attach_importer_patch_inputs`.
 
 For importer-scoped ecosystems, there is an additional provider contract surface that is still part of the “patch model”, because it directly determines invalidation behavior and glue content.
@@ -395,7 +395,7 @@ The label string is:
 ### Canonical implementations
 
 - **Starlark**: `lang/nixpkg_labels.bzl:normalize_nix_attr` and `append_nixpkg_labels`
-  - Macro guidance: prefer `lang/defs_common.bzl:prepare_package_local_wiring_v2(...)` so language macro files do not re-implement `nixpkg_deps` parsing/defaulting or patch-dir handling.
+  - Macro guidance: prefer `lang/defs_common.bzl:prepare_package_local_wiring(...)` so language macro files do not re-implement `nixpkg_deps` parsing/defaulting or patch-dir handling.
 - **TypeScript**: `tools/lib/providers.ts:normalizeNixAttr` (canonical import path; implementation lives in `tools/lib/provider-names.ts`)
 - **Nix**: `tools/nix/lib/lang-helpers.nix:normalizeNixAttr`
 
@@ -461,7 +461,7 @@ Importer-scoped wrappers should use a standardized wiring sequence. When a wrapp
 
 ### Canonical implementations
 
-- **Starlark**: `lang/defs_common.bzl:prepare_importer_nix_calling_genrule_wiring_v2`
+- **Starlark**: `lang/defs_common.bzl:prepare_importer_nix_calling_genrule_wiring`
 - **Starlark (command assembly)**: `lang/nix_shell.bzl`
   - `nix_calling_genrule_bootstrap(...)` (root derivation + optional `workspace-root.env` sourcing)
   - `nix_calling_genrule_nix_build_out_path_prefix(...)` (canonical `nix build --no-link --print-out-paths` outPath capture)
@@ -517,13 +517,13 @@ Importer-scoped non-genrule wrappers should:
 
 ### Canonical implementations
 
-- **Starlark (preferred)**: `lang/importer_wiring_v2.bzl:prepare_importer_non_genrule_wiring_v2`
-- **Starlark (Nix-calling, preferred)**: `lang/importer_wiring_v2.bzl:prepare_importer_non_genrule_nix_calling_wiring_v2` (composes non-genrule importer wiring plus `global_nix_inputs()` as real action inputs, without mutating caller dicts)
-- **Starlark (legacy)**: `lang/importer_wiring.bzl:prepare_importer_non_genrule_wiring`
-- **Genrule-style (preferred)**: `lang/importer_wiring_v2.bzl:prepare_importer_genrule_kwargs_v2`
+- **Starlark (preferred)**: `lang/importer_wiring_v2.bzl:prepare_importer_non_genrule_wiring`
+- **Starlark (Nix-calling, preferred)**: `lang/importer_wiring_v2_nix_calling.bzl:prepare_importer_non_genrule_nix_calling_wiring` (composes non-genrule importer wiring plus `global_nix_inputs()` as real action inputs, without mutating caller dicts)
+- **Starlark (legacy)**: `lang/importer_wiring.bzl:prepare_importer_non_genrule_wiring_legacy_mutating`
+- **Genrule-style (preferred)**: `lang/importer_wiring_v2.bzl:prepare_importer_genrule_kwargs`
 - **Python macro usage**: `python/defs.bzl` (`nix_python_library`, `nix_python_test`, `nix_python_wasm_*`)
-- **Srcs-less rule shapes (preferred)**: `lang/importer_wiring_v2.bzl:prepare_importer_srcsless_rule_wiring_v2` (creates a synthetic dep carrying importer-local patches as action inputs)
-- **Srcs-less rule shapes (legacy)**: `lang/importer_wiring.bzl:prepare_importer_srcsless_rule_wiring`
+- **Srcs-less rule shapes (preferred)**: `lang/importer_wiring_v2.bzl:prepare_importer_srcsless_rule_wiring` (creates a synthetic dep carrying importer-local patches as action inputs)
+- **Srcs-less rule shapes (legacy)**: `lang/importer_wiring.bzl:prepare_importer_srcsless_rule_wiring_legacy_mutating`
 
 ### Common leak patterns
 
@@ -573,12 +573,12 @@ Today, some macros need to remember to do two things:
 Implemented in two layers, depending on the macro shape:
 
 - **Generic “call Nix” helper**: `lang/nix_calling_macros.bzl:wire_global_nix_inputs(...)` (re-exported from `lang/defs_common.bzl`)
-- **Importer-scoped, genrule-style helper**: `lang/defs_common.bzl:prepare_importer_nix_calling_genrule_wiring_v2(...)` (composes importer wiring plus global inputs and workspace-root env injection without mutating caller dicts)
-- **Importer-scoped, non-genrule helper**: `lang/defs_common.bzl:prepare_importer_non_genrule_nix_calling_wiring_v2(...)` (composes importer wiring plus global inputs without mutating caller dicts)
+- **Importer-scoped, genrule-style helper**: `lang/defs_common.bzl:prepare_importer_nix_calling_genrule_wiring(...)` (composes importer wiring plus global inputs and workspace-root env injection without mutating caller dicts)
+- **Importer-scoped, non-genrule helper**: `lang/defs_common.bzl:prepare_importer_non_genrule_nix_calling_wiring(...)` (composes importer wiring plus global inputs without mutating caller dicts)
 
 ### Add a single helper for importer-scoped non-genrule macros
 
-Implemented: `lang/importer_wiring_v2.bzl:prepare_importer_non_genrule_wiring_v2` centralizes lockfile enforcement, importer derivation, patch input wiring, and provider-edge realization for non-genrule importer-scoped macros without mutating caller kwargs.
+Implemented: `lang/importer_wiring_v2.bzl:prepare_importer_non_genrule_wiring` centralizes lockfile enforcement, importer derivation, patch input wiring, and provider-edge realization for non-genrule importer-scoped macros without mutating caller kwargs.
 
 ---
 

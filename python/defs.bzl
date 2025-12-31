@@ -3,8 +3,8 @@ load(
     "//lang:defs_common.bzl",
     "append_nixpkg_labels",
     "dedupe_preserve",
-    "prepare_importer_non_genrule_wiring_v2",
-    "prepare_importer_srcsless_rule_wiring_v2",
+    "prepare_importer_non_genrule_wiring",
+    "prepare_importer_srcsless_rule_wiring",
     "stamp_wasm_variant",
 )
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
@@ -17,7 +17,7 @@ def nix_python_library(name, lockfile_label = None, deps = [], **kwargs):
     """
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     append_nixpkg_labels(kwargs, nixpkg_deps)
-    wiring = prepare_importer_non_genrule_wiring_v2(
+    wiring = prepare_importer_non_genrule_wiring(
         name = name,
         kwargs = kwargs,
         deps = deps,
@@ -36,7 +36,7 @@ def nix_python_binary(name, lockfile_label = None, deps = [], **kwargs):
     append_nixpkg_labels(kwargs, nixpkg_deps)
     if "srcs" in kwargs:
         fail("nix_python_binary does not accept srcs; use main/main_module + deps instead")
-    wiring = prepare_importer_srcsless_rule_wiring_v2(
+    wiring = prepare_importer_srcsless_rule_wiring(
         name = name,
         kwargs = kwargs,
         deps = deps,
@@ -56,7 +56,7 @@ def nix_python_test(name, lockfile_label = None, deps = [], **kwargs):
     """
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     append_nixpkg_labels(kwargs, nixpkg_deps)
-    wiring = prepare_importer_non_genrule_wiring_v2(
+    wiring = prepare_importer_non_genrule_wiring(
         name = name,
         kwargs = kwargs,
         deps = deps,
@@ -75,7 +75,7 @@ def nix_python_wasm_app(name, lockfile_label = None, deps = [], labels = [], **k
     kwargs["labels"] = dedupe_preserve((labels or []) + (kwargs.get("labels", []) or []))
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     append_nixpkg_labels(kwargs, nixpkg_deps)
-    wiring = prepare_importer_non_genrule_wiring_v2(
+    wiring = prepare_importer_non_genrule_wiring(
         name = name,
         kwargs = kwargs,
         deps = deps,
@@ -94,7 +94,7 @@ def nix_python_wasm_lib(name, lockfile_label = None, deps = [], labels = [], **k
     kwargs["labels"] = dedupe_preserve((labels or []) + (kwargs.get("labels", []) or []))
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     append_nixpkg_labels(kwargs, nixpkg_deps)
-    wiring = prepare_importer_non_genrule_wiring_v2(
+    wiring = prepare_importer_non_genrule_wiring(
         name = name,
         kwargs = kwargs,
         deps = deps,

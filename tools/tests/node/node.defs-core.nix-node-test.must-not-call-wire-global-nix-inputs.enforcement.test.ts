@@ -11,6 +11,6 @@ test("nix_node_test must not call wire_global_nix_inputs directly (enforced abst
   const txt = await fsp.readFile(file, "utf8");
   assert(
     !txt.includes("wire_global_nix_inputs("),
-    `${file} must not call wire_global_nix_inputs(...); use prepare_importer_non_genrule_nix_calling_wiring_v2(...)`,
+    `${file} must not call wire_global_nix_inputs(...); use prepare_importer_non_genrule_nix_calling_wiring(...)`,
   );
 });

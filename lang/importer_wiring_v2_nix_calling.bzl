@@ -1,11 +1,11 @@
 load(
     "//lang:importer_wiring_v2.bzl",
-    "prepare_importer_non_genrule_wiring_v2",
+    "prepare_importer_non_genrule_wiring",
 )
 load("//lang:nix_calling_macros.bzl", "wire_global_nix_inputs")
 load("//lang:dict_inputs.bzl", "GLOBAL_NIX_INPUTS_KEY_PREFIX", "PATCH_INPUTS_KEY_PREFIX", "PROVIDER_EDGES_KEY_PREFIX")
 
-def prepare_importer_non_genrule_nix_calling_wiring_v2(
+def prepare_importer_non_genrule_nix_calling_wiring(
         name,
         kwargs,
         deps,
@@ -26,7 +26,7 @@ def prepare_importer_non_genrule_nix_calling_wiring_v2(
         global_inputs_stamp = False,
         global_inputs_key_prefix = GLOBAL_NIX_INPUTS_KEY_PREFIX):
     """
-    Like prepare_importer_non_genrule_wiring_v2, but also wires global_nix_inputs() as real action
+    Like prepare_importer_non_genrule_wiring, but also wires global_nix_inputs() as real action
     inputs for macros that call Nix at runtime.
 
     Returns a struct:
@@ -34,7 +34,7 @@ def prepare_importer_non_genrule_nix_calling_wiring_v2(
       - kwargs: prepared kwargs dict (includes patch inputs and global inputs)
       - deps: provider edges realized deterministically (when provider_into == "deps")
     """
-    wiring = prepare_importer_non_genrule_wiring_v2(
+    wiring = prepare_importer_non_genrule_wiring(
         name = name,
         kwargs = kwargs,
         deps = deps,

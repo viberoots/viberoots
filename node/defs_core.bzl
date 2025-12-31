@@ -1,8 +1,8 @@
 load("@prelude//:rules.bzl", "genrule")
 load(
     "//lang:defs_common.bzl",
-    "prepare_importer_genrule_kwargs_v2",
-    "prepare_importer_non_genrule_nix_calling_wiring_v2",
+    "prepare_importer_genrule_kwargs",
+    "prepare_importer_non_genrule_nix_calling_wiring",
 )
 load("//node/private:nix_test.bzl", "node_nix_test")
 
@@ -11,7 +11,7 @@ MODULE_PROVIDERS = {}
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
 
 def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = [], lockfile_label = None, kind = "gen", **kwargs):
-    wiring = prepare_importer_genrule_kwargs_v2(
+    wiring = prepare_importer_genrule_kwargs(
         name = name,
         kwargs = kwargs,
         srcs = srcs,
@@ -45,7 +45,7 @@ def nix_node_test(
     kind = "test",
     **kwargs
 ):
-    wiring = prepare_importer_non_genrule_nix_calling_wiring_v2(
+    wiring = prepare_importer_non_genrule_nix_calling_wiring(
         name = name,
         kwargs = {},
         deps = deps,

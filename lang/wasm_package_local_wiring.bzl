@@ -1,7 +1,7 @@
 load("//lang:label_stamping.bzl", "stamp_patch_scope_for_lang", "stamp_wasm_variant")
 load("//lang:macro_kwargs.bzl", "pop_package_local_patch_dirs_and_nixpkg_deps")
 load("//lang:patch_inputs.bzl", "include_package_local_patches")
-load("//lang:planner_visible_wiring.bzl", "wire_package_local_planner_visible_stub_v2", "wire_planner_visible_inputs")
+load("//lang:planner_visible_wiring.bzl", "wire_package_local_planner_visible_stub", "wire_planner_visible_inputs")
 
 def prepare_package_local_wasm_wiring(
         *,
@@ -62,7 +62,7 @@ def prepare_package_local_wasm_wiring(
         nixpkg_deps = info.nixpkg_deps,
     )
 
-def wire_package_local_wasm_planner_visible_stub(
+def wire_package_local_wasm_planner_visible_stub_legacy_mutating(
         *,
         name,
         out = "",
@@ -81,7 +81,7 @@ def wire_package_local_wasm_planner_visible_stub(
     package-local planner-visible stub wiring helper.
     """
     stamp_wasm_variant(kwargs, lang, variant)
-    return wire_package_local_planner_visible_stub_v2(
+    return wire_package_local_planner_visible_stub(
         name = name,
         out = out,
         kwargs = kwargs,
@@ -94,7 +94,7 @@ def wire_package_local_wasm_planner_visible_stub(
         strip_providers_from_deps = strip_providers_from_deps,
     )
 
-def wire_package_local_wasm_planner_visible_stub_v2(
+def wire_package_local_wasm_planner_visible_stub(
         *,
         name,
         out = "",
@@ -113,19 +113,19 @@ def wire_package_local_wasm_planner_visible_stub_v2(
     to the canonical non-mutating package-local planner-visible stub helper.
     """
     if not isinstance(name, str) or name == "":
-        fail("wire_package_local_wasm_planner_visible_stub_v2: name must be a non-empty string")
+        fail("wire_package_local_wasm_planner_visible_stub: name must be a non-empty string")
     if not isinstance(kwargs, dict):
-        fail("wire_package_local_wasm_planner_visible_stub_v2: kwargs must be a dict")
+        fail("wire_package_local_wasm_planner_visible_stub: kwargs must be a dict")
     if not isinstance(lang, str) or lang == "":
-        fail("wire_package_local_wasm_planner_visible_stub_v2: lang must be a non-empty string")
+        fail("wire_package_local_wasm_planner_visible_stub: lang must be a non-empty string")
     if not isinstance(variant, str) or variant == "":
-        fail("wire_package_local_wasm_planner_visible_stub_v2: variant must be a non-empty string")
+        fail("wire_package_local_wasm_planner_visible_stub: variant must be a non-empty string")
 
     kw = dict(kwargs)
     kw["labels"] = list(kwargs.get("labels", []) or [])
     stamp_wasm_variant(kw, lang, variant)
 
-    return wire_package_local_planner_visible_stub_v2(
+    return wire_package_local_planner_visible_stub(
         name = name,
         out = out,
         kwargs = kw,
@@ -141,7 +141,7 @@ def wire_package_local_wasm_planner_visible_stub_v2(
 __all__ = [
     "prepare_package_local_wasm_wiring",
     "wire_package_local_wasm_planner_visible_stub",
-    "wire_package_local_wasm_planner_visible_stub_v2",
+    "wire_package_local_wasm_planner_visible_stub_legacy_mutating",
 ]
 
 

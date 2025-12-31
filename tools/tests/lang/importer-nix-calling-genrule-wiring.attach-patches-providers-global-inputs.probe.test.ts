@@ -30,7 +30,7 @@ async function buildOutPath(tmp: string, $: any, target: string): Promise<string
   return path.isAbsolute(outPath) ? outPath : path.join(tmp, outPath);
 }
 
-test("prepare_importer_nix_calling_genrule_wiring_v2 composes patches, provider edges, global inputs, and workspace-root.env injection (probe)", async () => {
+test("prepare_importer_nix_calling_genrule_wiring composes patches, provider edges, global inputs, and workspace-root.env injection (probe)", async () => {
   await runInTemp("importer-nix-calling-genrule-wiring-probe", async (tmp, $) => {
     const providersDir = path.join(tmp, "third_party", "providers");
     await fsp.mkdir(providersDir, { recursive: true });
@@ -54,12 +54,12 @@ test("prepare_importer_nix_calling_genrule_wiring_v2 composes patches, provider 
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//lang:defs_common.bzl", "prepare_importer_nix_calling_genrule_wiring_v2")',
+        'load("//lang:defs_common.bzl", "prepare_importer_nix_calling_genrule_wiring")',
         'load("//lang:labels_file.bzl", "labels_file")',
         "",
         "# list-shaped srcs",
         'kw_list = {"labels": [], "srcs": []}',
-        "w_list = prepare_importer_nix_calling_genrule_wiring_v2(",
+        "w_list = prepare_importer_nix_calling_genrule_wiring(",
         '  name = "bin",',
         "  kwargs = kw_list,",
         "  srcs = [],",
@@ -79,7 +79,7 @@ test("prepare_importer_nix_calling_genrule_wiring_v2 composes patches, provider 
         "",
         "# dict-shaped srcs",
         'kw_dict = {"labels": [], "srcs": {"dst.txt": "src.txt"}}',
-        "w_dict = prepare_importer_nix_calling_genrule_wiring_v2(",
+        "w_dict = prepare_importer_nix_calling_genrule_wiring(",
         '  name = "bin",',
         "  kwargs = kw_dict,",
         '  srcs = {"dst.txt": "src.txt"},',

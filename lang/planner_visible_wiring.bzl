@@ -125,7 +125,7 @@ def wire_planner_visible_stub(
     )
 
 
-def wire_package_local_planner_visible_stub(
+def wire_package_local_planner_visible_stub_legacy_mutating(
         *,
         name,
         out = "",
@@ -152,11 +152,11 @@ def wire_package_local_planner_visible_stub(
     Returns a struct with: { local_patch_dirs, nixpkg_deps }.
     """
     if not isinstance(name, str) or name == "":
-        fail("wire_package_local_planner_visible_stub: name must be a non-empty string")
+        fail("wire_package_local_planner_visible_stub_legacy_mutating: name must be a non-empty string")
     if not isinstance(kwargs, dict):
-        fail("wire_package_local_planner_visible_stub: kwargs must be a dict")
+        fail("wire_package_local_planner_visible_stub_legacy_mutating: kwargs must be a dict")
     if not isinstance(lang, str) or lang == "":
-        fail("wire_package_local_planner_visible_stub: lang must be a non-empty string")
+        fail("wire_package_local_planner_visible_stub_legacy_mutating: lang must be a non-empty string")
 
     info = pop_package_local_patch_dirs_and_nixpkg_deps(kwargs, lang, append_labels = True)
     stamp_patch_scope_for_lang(kwargs, lang)
@@ -182,7 +182,7 @@ def wire_package_local_planner_visible_stub(
     )
 
 
-def wire_package_local_planner_visible_stub_v2(
+def wire_package_local_planner_visible_stub(
         *,
         name,
         out = "",
@@ -205,11 +205,11 @@ def wire_package_local_planner_visible_stub_v2(
       - nixpkg_deps
     """
     if not isinstance(name, str) or name == "":
-        fail("wire_package_local_planner_visible_stub_v2: name must be a non-empty string")
+        fail("wire_package_local_planner_visible_stub: name must be a non-empty string")
     if not isinstance(kwargs, dict):
-        fail("wire_package_local_planner_visible_stub_v2: kwargs must be a dict")
+        fail("wire_package_local_planner_visible_stub: kwargs must be a dict")
     if not isinstance(lang, str) or lang == "":
-        fail("wire_package_local_planner_visible_stub_v2: lang must be a non-empty string")
+        fail("wire_package_local_planner_visible_stub: lang must be a non-empty string")
 
     info = extract_package_local_patch_dirs_and_nixpkg_deps(kwargs, lang, append_labels = True)
     kw = info.kwargs

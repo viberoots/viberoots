@@ -4,7 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runInTemp } from "../lib/test-helpers";
 
-await runInTemp("planner-visible-package-local-wiring-v2-non-mutating-probe", async (tmp, $) => {
+await runInTemp("planner-visible-package-local-wiring-non-mutating-probe", async (tmp, $) => {
   const appDir = path.join(tmp, "apps", "probe");
   await fsp.mkdir(path.join(appDir, "patches", "cpp"), { recursive: true });
   await fsp.writeFile(path.join(appDir, "patches", "cpp", "demo@0.0.0.patch"), "# noop\n", "utf8");
@@ -13,13 +13,13 @@ await runInTemp("planner-visible-package-local-wiring-v2-non-mutating-probe", as
     path.join(appDir, "TARGETS"),
     [
       'load("@prelude//:rules.bzl", "genrule")',
-      'load("//lang:defs_common.bzl", "wire_package_local_planner_visible_stub_v2")',
+      'load("//lang:defs_common.bzl", "wire_package_local_planner_visible_stub")',
       "",
       'kw = {"labels": ["probe:v2"], "local_patch_dirs": ["patches/cpp"], "nixpkg_deps": ["zlib"]}',
       'pre_local = "local_patch_dirs" in kw',
       'pre_nix = "nixpkg_deps" in kw',
       "",
-      "wire_package_local_planner_visible_stub_v2(",
+      "wire_package_local_planner_visible_stub(",
       '  name = "stub",',
       '  out = "stub.stamp",',
       "  kwargs = kw,",

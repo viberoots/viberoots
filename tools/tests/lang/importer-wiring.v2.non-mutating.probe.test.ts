@@ -4,7 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runInTemp } from "../lib/test-helpers";
 
-await runInTemp("importer-wiring-v2-non-mutating-probe", async (tmp, $) => {
+await runInTemp("importer-wiring-non-mutating-probe", async (tmp, $) => {
   const appDir = path.join(tmp, "apps", "demo");
   await fsp.mkdir(path.join(appDir, "patches", "python"), { recursive: true });
   await fsp.writeFile(path.join(appDir, "uv.lock"), "# uv lock\n", "utf8");
@@ -17,9 +17,9 @@ await runInTemp("importer-wiring-v2-non-mutating-probe", async (tmp, $) => {
   await fsp.writeFile(
     path.join(appDir, "TARGETS"),
     [
-      'load("//lang:defs_common.bzl", "importer_wiring_v2_mutation_probe")',
+      'load("//lang:defs_common.bzl", "importer_wiring_mutation_probe")',
       "",
-      "importer_wiring_v2_mutation_probe(",
+      "importer_wiring_mutation_probe(",
       '  name = "probe",',
       '  lang = "python",',
       '  kind = "lib",',

@@ -4,16 +4,16 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runInTemp } from "../lib/test-helpers";
 
-await runInTemp("package-local-wiring-v2-non-mutating-probe", async (tmp, $) => {
+await runInTemp("package-local-wiring-non-mutating-probe", async (tmp, $) => {
   const pkg = path.join(tmp, "libs", "demo");
   await fsp.mkdir(pkg, { recursive: true });
 
   await fsp.writeFile(
     path.join(pkg, "TARGETS"),
     [
-      'load("//lang:defs_common.bzl", "package_local_wiring_v2_mutation_probe")',
+      'load("//lang:defs_common.bzl", "package_local_wiring_mutation_probe")',
       "",
-      "package_local_wiring_v2_mutation_probe(",
+      "package_local_wiring_mutation_probe(",
       '  name = "probe",',
       '  lang = "go",',
       '  kind = "lib",',

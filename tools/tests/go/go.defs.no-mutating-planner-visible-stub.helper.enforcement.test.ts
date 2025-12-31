@@ -6,11 +6,11 @@ function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message);
 }
 
-test("Go macros must not use mutating wire_package_local_planner_visible_stub (enforced abstraction boundary)", async () => {
+test("Go macros must not use legacy mutating planner-visible stub helper (enforced abstraction boundary)", async () => {
   const file = "go/defs.bzl";
   const txt = await fsp.readFile(file, "utf8");
   assert(
-    !txt.includes("wire_package_local_planner_visible_stub("),
-    `${file} must not call wire_package_local_planner_visible_stub(...); use wire_package_local_planner_visible_stub_v2(...)`,
+    !txt.includes("wire_package_local_planner_visible_stub_legacy_mutating("),
+    `${file} must not call wire_package_local_planner_visible_stub_legacy_mutating(...)`,
   );
 });
