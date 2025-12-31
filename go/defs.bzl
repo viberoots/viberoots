@@ -71,6 +71,15 @@ def nix_go_test(name, **kwargs):
     nix_cgo_pkgconfig = kw.pop("nix_cgo_pkgconfig", {})
     deps = kw.pop("deps", [])
     extra = normalize_labels(native.package_name(), kw.pop("extra_module_providers", []))
+    lib = kw.get("library")
+    abs_lib = None
+    if isinstance(lib, str) and lib:
+        abs_lib = lib
+        if lib.startswith(":"):
+            abs_lib = "//%s:%s" % (native.package_name(), lib[1:])
+    base_deps = deps + repo_cgo_deps + extra
+    if abs_lib != None:
+        base_deps = [d for d in base_deps if d not in (lib, abs_lib)]
     apply_go_tuple_labels(kw)
     wiring = prepare_package_local_wiring(
         name = name,
@@ -78,23 +87,11 @@ def nix_go_test(name, **kwargs):
         lang = "go",
         kind = "test",
         MODULE_PROVIDERS = MODULE_PROVIDERS,
-        base_deps = deps + repo_cgo_deps + extra,
+        base_deps = base_deps,
     )
     configure_cgo_kwargs(wiring.kwargs, wiring.nixpkg_deps, repo_cgo_deps)
-
-    # If a library is provided, ensure we don't pass the same target in deps.
-    pkg = native.package_name()
-    lib = wiring.kwargs.get("library")
-    if isinstance(lib, str) and lib:
-        abs_lib = lib
-        if lib.startswith(":"):
-            abs_lib = "//%s:%s" % (pkg, lib[1:])
-        deps_out = [d for d in wiring.deps if d not in (lib, abs_lib)]
-    else:
-        deps_out = wiring.deps
-
     apply_go_rule_stable_defaults(wiring.kwargs)
-    go_test(name = name, deps = deps_out, **wiring.kwargs)
+    go_test(name = name, deps = wiring.deps, **wiring.kwargs)
 
 # Third-party shim: expose vendor-provided sources as a go_library while
 # allowing an explicit import path via package map flags

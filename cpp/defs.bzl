@@ -14,23 +14,26 @@ load("//cpp/private:nix_build.bzl", "cpp_nix_build")
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
 
 def _cpp_common(name, kind, kwargs):
-    deps = kwargs.get("deps", []) or []
     nix_inputs = global_nix_inputs()
-
-    wiring = prepare_package_local_wiring(
-        name = name,
-        kwargs = kwargs,
-        lang = "cpp",
-        kind = kind,
-        MODULE_PROVIDERS = MODULE_PROVIDERS,
-        base_deps = deps,
-    )
-    kw = wiring.kwargs
+    kw = dict(kwargs)
+    base_deps = kw.pop("deps", []) or []
+    labels = kw.get("labels", []) or []
     if kind == "addon":
         addon_name = kw.get("addon_name", None)
         if addon_name:
-            kw["labels"] = dedupe_preserve((kw.get("labels", []) or []) + ["addon_name:%s" % addon_name])
-    srcs = kw.get("srcs", []) or []
+            labels = dedupe_preserve(labels + ["addon_name:%s" % addon_name])
+    kw["labels"] = labels
+
+    wiring = prepare_package_local_wiring(
+        name = name,
+        kwargs = kw,
+        lang = "cpp",
+        kind = kind,
+        MODULE_PROVIDERS = MODULE_PROVIDERS,
+        base_deps = base_deps,
+    )
+    prepared = wiring.kwargs
+    srcs = prepared.get("srcs", []) or []
 
     out = sanitize_to_bin_name("//%s:%s" % (native.package_name(), name))
     if kind == "lib":
@@ -45,9 +48,9 @@ def _cpp_common(name, kind, kwargs):
         self_label = "//%s:%s" % (native.package_name(), name),
         deps = wiring.deps,
         srcs = srcs,
-        labels = kw.get("labels", []) or [],
+        labels = prepared.get("labels", []) or [],
         nix_inputs = nix_inputs,
-        visibility = kw.get("visibility", []),
+        visibility = prepared.get("visibility", []),
     )
 
 

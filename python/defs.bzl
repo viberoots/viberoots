@@ -39,7 +39,7 @@ def nix_python_binary(name, lockfile_label = None, deps = [], **kwargs):
     wiring = prepare_importer_srcsless_rule_wiring(
         name = name,
         kwargs = kwargs,
-        deps = deps,
+        deps = [],
         lang = "python",
         kind = "bin",
         lockfile_label = lockfile_label,
@@ -73,6 +73,7 @@ def nix_python_wasm_app(name, lockfile_label = None, deps = [], labels = [], **k
     WASI app stamp: uses python_* rules for Buck semantics but marks kind:wasm for the planner.
     """
     kwargs["labels"] = dedupe_preserve((labels or []) + (kwargs.get("labels", []) or []))
+    stamp_wasm_variant(kwargs, "python", "wasi")
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     append_nixpkg_labels(kwargs, nixpkg_deps)
     wiring = prepare_importer_non_genrule_wiring(
@@ -84,7 +85,6 @@ def nix_python_wasm_app(name, lockfile_label = None, deps = [], labels = [], **k
         lockfile_label = lockfile_label,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
     )
-    stamp_wasm_variant(wiring.kwargs, "python", "wasi")
     python_library(deps = wiring.deps, **wiring.kwargs)
 
 def nix_python_wasm_lib(name, lockfile_label = None, deps = [], labels = [], **kwargs):
@@ -92,6 +92,7 @@ def nix_python_wasm_lib(name, lockfile_label = None, deps = [], labels = [], **k
     WASI lib stamp: emits a reusable overlay (planner builds via pyWasmLib).
     """
     kwargs["labels"] = dedupe_preserve((labels or []) + (kwargs.get("labels", []) or []))
+    stamp_wasm_variant(kwargs, "python", "wasi")
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     append_nixpkg_labels(kwargs, nixpkg_deps)
     wiring = prepare_importer_non_genrule_wiring(
@@ -103,7 +104,6 @@ def nix_python_wasm_lib(name, lockfile_label = None, deps = [], labels = [], **k
         lockfile_label = lockfile_label,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
     )
-    stamp_wasm_variant(wiring.kwargs, "python", "wasi")
     python_library(deps = wiring.deps, **wiring.kwargs)
 
 

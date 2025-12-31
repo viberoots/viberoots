@@ -2,6 +2,8 @@
 
 This handbook summarizes project-wide conventions that keep behavior deterministic and the codebase approachable. When in doubt, prefer clarity and stability over cleverness.
 
+In this repo, I treat Starlark macros as part of the long-lived public surface area. The goal is not only correctness, but predictability in review. When macro code has one obvious place where labels and deps are assembled, it is harder to introduce policy drift by accident.
+
 - Scripts
   - Use zx TypeScript with the hashbang `#!/usr/bin/env zx-wrapper`.
   - Glue scripts run outside Nix; do not wrap them in `nix run`.
@@ -20,6 +22,30 @@ This handbook summarizes project-wide conventions that keep behavior determinist
     - Assemble one `base_deps` list (explicit deps + repo-local extras), then pass it once into the shared wiring helper.
     - After wiring, pass `deps = wiring.deps` exactly once into the underlying rule.
   - Prefer the shared wiring helpers in `//lang:defs_common.bzl` so patch inputs, provider edges, and global inputs stay consistent across languages.
+
+Here is the intended “shape” for a typical package-local macro. The details are language-specific, but the merge points are stable.
+
+Before (harder to review because the merge points are spread out):
+
+```starlark
+def my_rule(name, **kwargs):
+    deps = kwargs.pop("deps", [])
+    wiring = prepare_package_local_wiring(name = name, kwargs = kwargs, lang = "cpp", kind = "lib", MODULE_PROVIDERS = MODULE_PROVIDERS, base_deps = deps)
+    # second merge point, easy to miss in review
+    wiring.kwargs["labels"] = dedupe_preserve((wiring.kwargs.get("labels", []) or []) + ["hint:x"])
+    some_rule(name = name, deps = wiring.deps, **wiring.kwargs)
+```
+
+After (single merge point, then delegate to shared wiring):
+
+```starlark
+def my_rule(name, **kwargs):
+    kw = dict(kwargs)
+    base_deps = kw.pop("deps", []) or []
+    kw["labels"] = dedupe_preserve((kw.get("labels", []) or []) + ["hint:x"])
+    wiring = prepare_package_local_wiring(name = name, kwargs = kw, lang = "cpp", kind = "lib", MODULE_PROVIDERS = MODULE_PROVIDERS, base_deps = base_deps)
+    some_rule(name = name, deps = wiring.deps, **wiring.kwargs)
+```
 
 - Path invariants
   - `patches/<lang>/` is flat; for Go: `<encodedImport>@<version>.patch` with `/` → `__`.
