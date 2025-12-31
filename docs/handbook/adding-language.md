@@ -4,6 +4,34 @@ This guide explains how to add a new language to the build without touching core
 
 > Note (Node/PNPM): The Node Nix template at `tools/nix/templates/node.nix` is a discoverability shim only. The authoritative Node planner logic lives in `tools/nix/planner/node.nix`, and Node builds flow through Buck macros plus importer‑scoped providers. Do not implement build logic in `templates/node.nix`; keep logic in the planner plugin and Starlark macros.
 
+## Macro author checklist (helpers + enforcement)
+
+When you add or change a macro, keep the wiring table-driven through shared helpers. These are the expected helper surfaces, and the enforcement tests that guard them:
+
+- **Importer-scoped, non-genrule wrappers** (wrap `python_library`, `python_test`, etc.)
+  - Use `prepare_importer_non_genrule_wiring_v2(...)` (or `prepare_importer_srcsless_rule_wiring_v2(...)` when the rule shape cannot accept `srcs`).
+  - Guardrails:
+    - `tools/tests/lang/importer-wiring.macros-avoid-direct-lockfile-parsing.enforcement.test.ts`
+- **Importer-scoped, Nix-calling genrule-style macros** (wrap `genrule` that shells out to Nix)
+  - Use `prepare_importer_nix_calling_genrule_wiring_v2(...)` (do not call `wire_global_nix_inputs(...)` at the call site).
+  - Guardrails:
+    - `tools/tests/node/node.nix-calling-macros.use-shared-importer-nix-genrule-helper.enforcement.test.ts`
+- **Importer-scoped, non-genrule macros that call Nix at runtime** (non-genrule wrapper + needs global Nix action inputs)
+  - Use `prepare_importer_non_genrule_nix_calling_wiring_v2(...)`.
+  - Guardrails:
+    - `tools/tests/node/node.defs-core.uses-importer-wiring-v2.enforcement.test.ts`
+    - `tools/tests/node/node.defs-core.nix-node-test.must-not-call-wire-global-nix-inputs.enforcement.test.ts`
+- **Package-local macros** (Go/C++ patch scope)
+  - Use `prepare_package_local_wiring_v2(...)` and pass a single `base_deps` list that already includes any repo-local extras.
+  - Guardrails:
+    - `tools/tests/lang/package-local-wiring.enforcement.no-bypass.test.ts`
+- **Planner-visible stubs** (graph node for planner discovery/invalidation)
+  - Use `wire_package_local_planner_visible_stub_v2(...)` for package-local stubs.
+- **Dict-shaped `srcs`** (when wiring patches/providers/global inputs into dict-safe keys)
+  - Do not hardcode reserved synthetic key prefixes. Import `PATCH_INPUTS_KEY_PREFIX`, `PROVIDER_EDGES_KEY_PREFIX`, `GLOBAL_NIX_INPUTS_KEY_PREFIX` from `//lang:defs_common.bzl`.
+  - Guardrails:
+    - `tools/tests/lang/dict-inputs.synthetic-prefixes.no-literals.enforcement.test.ts`
+
 ## What you’ll implement
 
 - Templates: `tools/nix/templates/<lang>.nix` consumed by `tools/nix/lang-templates.nix`

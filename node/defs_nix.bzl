@@ -51,14 +51,13 @@ def node_webapp(
     - Runs `nix build .#node-webapp.<importer>` and copies dist/.
     """
     kw = dict(kwargs) if kwargs != None else {}
-    kw["labels"] = list(labels or [])
     wiring = _prepare_node_importer_nix_calling_genrule_kwargs(
         name = name,
         kwargs = kw,
         srcs = {},
         deps = deps,
         kind = "app",
-        labels = [],
+        labels = list(labels or []),
         lockfile_label = lockfile_label,
     )
     kw = wiring.kwargs
@@ -147,14 +146,13 @@ def nix_node_cli_bin(
     }
 
     kw = dict(kwargs) if kwargs != None else {}
-    kw["labels"] = list(labels or [])
     wiring = _prepare_node_importer_nix_calling_genrule_kwargs(
         name = name,
         kwargs = kw,
         srcs = _srcs_map,
         deps = deps,
         kind = "bin",
-        labels = [],
+        labels = list(labels or []),
         lockfile_label = lockfile_label,
     )
     kw = wiring.kwargs

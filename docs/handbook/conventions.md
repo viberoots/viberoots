@@ -11,6 +11,16 @@ This handbook summarizes project-wide conventions that keep behavior determinist
   - Use `TARGETS` files rather than `BUCK` for new rules and wiring.
   - Keep macros small and readable; rely on generators for data-heavy glue.
 
+- Macro authoring conventions
+  - Keep a **single labels merge point** per macro:
+    - Start with caller-provided `labels` (and any `kwargs["labels"]` when a macro accepts it).
+    - Then delegate stamping/patch/provider/global-input wiring to shared helpers.
+    - Avoid merging labels in multiple places (it makes diffs noisy and hides accidental policy drift).
+  - Keep a **single deps merge point** per macro:
+    - Assemble one `base_deps` list (explicit deps + repo-local extras), then pass it once into the shared wiring helper.
+    - After wiring, pass `deps = wiring.deps` exactly once into the underlying rule.
+  - Prefer the shared wiring helpers in `//lang:defs_common.bzl` so patch inputs, provider edges, and global inputs stay consistent across languages.
+
 - Path invariants
   - `patches/<lang>/` is flat; for Go: `<encodedImport>@<version>.patch` with `/` → `__`.
   - For Node/PNPM: importer‑local patches live under `<importer>/patches/node/*.patch`; labels use `lockfile:<relative/path/to/pnpm-lock.yaml>#<importer>`.
