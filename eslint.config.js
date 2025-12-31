@@ -12,6 +12,7 @@ export default [
       "**/.direnv/**",
       "**/coverage/**",
       "**/.clinic/**",
+      "**/prelude/**",
       "tools/scaffolding/templates/**",
     ],
     languageOptions: {

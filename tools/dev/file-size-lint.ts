@@ -34,6 +34,7 @@ export const SOURCE_FILES_SCOPE: FileSizeScope = {
     "docs/**",
     "test-logs/**",
     "buck-out/**",
+    "prelude/**",
     "node_modules/**",
     "coverage/**",
   ],

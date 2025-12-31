@@ -204,6 +204,32 @@ ORIG_CWD="$PWD"
 cd "$ROOT_DIR"
 export BUCK_ROOT="$ROOT_DIR"
 
+# Fail fast if the repo is not in a lint-clean state.
+# This prevents wasting minutes on `v` only to discover that Prettier/ESLint would rewrite files.
+# Allow override with VERIFY_SKIP_LINT=1 (use sparingly).
+if [[ -z "${VERIFY_SKIP_LINT:-}" || "${VERIFY_SKIP_LINT}" != "1" ]]; then
+  if ! command -v pnpm >/dev/null 2>&1; then
+    echo "error: pnpm not found on PATH; cannot run lint preflight" 1>&2
+    echo "hint: run inside the dev shell and ensure deps are installed via 'i'" 1>&2
+    exit 127
+  fi
+  if ! command -v timeout >/dev/null 2>&1; then
+    echo "error: timeout not found on PATH; cannot run bounded lint preflight" 1>&2
+    exit 127
+  fi
+  VERIFY_LINT_TIMEOUT_SECS="${VERIFY_LINT_TIMEOUT_SECS:-600}"
+  echo "[verify] lint preflight: timeout -k 10s ${VERIFY_LINT_TIMEOUT_SECS}s pnpm -s lint" 1>&2
+  set +e
+  timeout -k 10s "${VERIFY_LINT_TIMEOUT_SECS}s" pnpm -s lint
+  lint_rc="$?"
+  set -e
+  if [[ "${lint_rc}" != "0" ]]; then
+    echo "error: lint preflight failed; refusing to run verify while formatting/lint is dirty" 1>&2
+    echo "hint: run 'pnpm -s lint:fix' (or format the specific files), then re-run 'v'" 1>&2
+    exit 2
+  fi
+fi
+
 # Remove any ephemeral repo-root .tmp that may contain test-generated TARGETS
 rm -rf .tmp || true
 
