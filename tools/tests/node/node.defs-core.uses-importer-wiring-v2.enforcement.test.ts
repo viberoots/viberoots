@@ -15,8 +15,8 @@ test("node/defs_core.bzl must use functional (v2) importer wiring helpers", asyn
     `${file} must call prepare_importer_genrule_kwargs_v2(...) for nix_node_gen`,
   );
   assert(
-    txt.includes("prepare_importer_non_genrule_wiring_v2("),
-    `${file} must call prepare_importer_non_genrule_wiring_v2(...) for nix_node_test`,
+    txt.includes("prepare_importer_non_genrule_nix_calling_wiring_v2("),
+    `${file} must call prepare_importer_non_genrule_nix_calling_wiring_v2(...) for nix_node_test`,
   );
 
   assert(

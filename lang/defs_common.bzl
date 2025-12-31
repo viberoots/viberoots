@@ -69,6 +69,10 @@ load(
     _prepare_importer_srcsless_rule_wiring_v2 = "prepare_importer_srcsless_rule_wiring_v2",
 )
 load(
+    "//lang:importer_wiring_v2_nix_calling.bzl",
+    _prepare_importer_non_genrule_nix_calling_wiring_v2 = "prepare_importer_non_genrule_nix_calling_wiring_v2",
+)
+load(
     "//lang:nix_calling_importer_genrule_wiring.bzl",
     _prepare_importer_nix_calling_genrule_wiring = "prepare_importer_nix_calling_genrule_wiring",
     _prepare_importer_nix_calling_genrule_wiring_v2 = "prepare_importer_nix_calling_genrule_wiring_v2",
@@ -160,6 +164,7 @@ prepare_importer_genrule_kwargs = _prepare_importer_genrule_kwargs
 prepare_importer_non_genrule_wiring = _prepare_importer_non_genrule_wiring
 prepare_importer_srcsless_rule_wiring = _prepare_importer_srcsless_rule_wiring
 prepare_importer_genrule_kwargs_v2 = _prepare_importer_genrule_kwargs_v2
+prepare_importer_non_genrule_nix_calling_wiring_v2 = _prepare_importer_non_genrule_nix_calling_wiring_v2
 prepare_importer_non_genrule_wiring_v2 = _prepare_importer_non_genrule_wiring_v2
 prepare_importer_srcsless_rule_wiring_v2 = _prepare_importer_srcsless_rule_wiring_v2
 importer_wiring_v2_mutation_probe = _importer_wiring_v2_mutation_probe

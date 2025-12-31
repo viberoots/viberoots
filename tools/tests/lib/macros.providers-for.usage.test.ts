@@ -36,6 +36,7 @@ test("macros use realize_provider_edges() and avoid direct provider labels", asy
         txt.includes("prepare_package_local_wiring(") ||
         txt.includes("prepare_importer_genrule_kwargs(") ||
         txt.includes("prepare_importer_non_genrule_wiring(") ||
+        txt.includes("prepare_importer_non_genrule_nix_calling_wiring_v2(") ||
         txt.includes("prepare_importer_non_genrule_wiring_v2(") ||
         txt.includes("prepare_importer_srcsless_rule_wiring_v2(") ||
         txt.includes("wire_planner_visible_inputs(") ||

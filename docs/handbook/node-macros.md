@@ -29,6 +29,7 @@ Node macros include importer-local patches via `native.glob(...)`. Because Buck 
 
 - It still **wires `global_nix_inputs()` as real action inputs** (via `srcs`) so changes like `flake.lock` invalidate tests deterministically.
 - It intentionally sets **`stamp=False`** when wiring global inputs to avoid exporter label noise for tests. Correctness must not depend on labels.
+- Macro authors should treat this as an importer-scoped, non-genrule, Nix-calling shape and route through `//lang:defs_common.bzl:prepare_importer_non_genrule_nix_calling_wiring_v2(...)`.
 
 See `docs/handbook/node-tests.md` for usage and runner semantics.
 

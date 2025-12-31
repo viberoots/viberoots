@@ -516,6 +516,7 @@ Importer-scoped non-genrule wrappers should:
 ### Canonical implementations
 
 - **Starlark (preferred)**: `lang/importer_wiring_v2.bzl:prepare_importer_non_genrule_wiring_v2`
+- **Starlark (Nix-calling, preferred)**: `lang/importer_wiring_v2.bzl:prepare_importer_non_genrule_nix_calling_wiring_v2` (composes non-genrule importer wiring plus `global_nix_inputs()` as real action inputs, without mutating caller dicts)
 - **Starlark (legacy)**: `lang/importer_wiring.bzl:prepare_importer_non_genrule_wiring`
 - **Genrule-style (preferred)**: `lang/importer_wiring_v2.bzl:prepare_importer_genrule_kwargs_v2`
 - **Python macro usage**: `python/defs.bzl` (`nix_python_library`, `nix_python_test`, `nix_python_wasm_*`)
@@ -571,6 +572,7 @@ Implemented in two layers, depending on the macro shape:
 
 - **Generic “call Nix” helper**: `lang/nix_calling_macros.bzl:wire_global_nix_inputs(...)` (re-exported from `lang/defs_common.bzl`)
 - **Importer-scoped, genrule-style helper**: `lang/defs_common.bzl:prepare_importer_nix_calling_genrule_wiring_v2(...)` (composes importer wiring plus global inputs and workspace-root env injection without mutating caller dicts)
+- **Importer-scoped, non-genrule helper**: `lang/defs_common.bzl:prepare_importer_non_genrule_nix_calling_wiring_v2(...)` (composes importer wiring plus global inputs without mutating caller dicts)
 
 ### Add a single helper for importer-scoped non-genrule macros
 

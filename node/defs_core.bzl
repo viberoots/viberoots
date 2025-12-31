@@ -2,8 +2,7 @@ load("@prelude//:rules.bzl", "genrule")
 load(
     "//lang:defs_common.bzl",
     "prepare_importer_genrule_kwargs_v2",
-    "prepare_importer_non_genrule_wiring_v2",
-    "wire_global_nix_inputs",
+    "prepare_importer_non_genrule_nix_calling_wiring_v2",
 )
 load("//node/private:nix_test.bzl", "node_nix_test")
 
@@ -46,7 +45,7 @@ def nix_node_test(
     kind = "test",
     **kwargs
 ):
-    wiring = prepare_importer_non_genrule_wiring_v2(
+    wiring = prepare_importer_non_genrule_nix_calling_wiring_v2(
         name = name,
         kwargs = {},
         deps = deps,
@@ -57,14 +56,10 @@ def nix_node_test(
         patch_into = "srcs",
         patch_base = list(srcs),
         MODULE_PROVIDERS = MODULE_PROVIDERS,
+        global_inputs_into = "srcs",
+        global_inputs_stamp = False,
     )
     kw = wiring.kwargs
-
-    # This macro runs a Nix build inside the external runner, so flake inputs must be real action inputs
-    # for invalidation. Keep stamping disabled for this macro to avoid exporter noise; other Nix-calling
-    # Node macros opt into stamping when needed for observability.
-    wire_global_nix_inputs(kw, into = "srcs", stamp = False)
-    merged_srcs = kw.get("srcs", []) or []
 
     # Forward to external runner rule; ignore legacy 'cmd'
     node_nix_test(
@@ -73,7 +68,7 @@ def nix_node_test(
         patterns = ([] if patterns == None else patterns),
         env = (env or {}),
         timeout_sec = timeout_sec,
-        srcs = merged_srcs,
+        srcs = (kw.get("srcs", []) or []),
         deps = wiring.deps,
         labels = kw.get("labels", []),
         out = (out if out != None else (name + ".stamp")),
