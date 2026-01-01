@@ -161,10 +161,16 @@ Some tooling needs a stable mapping from a Buck target label to a Nix attribute 
 - **Starlark**: `lang/nix_attr.bzl`
   - `normalize_target_label`
   - `sanitize_nix_attr_from_target_label`
+- **Nix**: `tools/nix/lib/lang-helpers.nix`
+  - `normalizeTargetLabel`
+  - `sanitizeAttrNameFromTargetLabel`
+
+The Nix planner (`tools/nix/graph-generator.nix`) must not re-implement this mapping. It imports these helpers from `tools/nix/lib/lang-helpers.nix` so attr keying stays drift-free.
 
 ### Regression guards
 
 - `tools/tests/labels/nix-attr-sanitize.parity.test.ts`
+- `tools/tests/labels/nix-attr-sanitize.nix-ts.parity.test.ts`
 
 ### Common leak patterns
 

@@ -1,6 +1,7 @@
 { pkgs, src ? ../../., graphJsonPath ? null, rootModulesTomlPath ? null, uv2nixLib ? null }:
 let
   lib = pkgs.lib;
+  H = import ./lib/lang-helpers.nix { inherit pkgs; };
   # Allow tests to override the repo root via BUCK_TEST_SRC; default to provided flake src
   buckTestSrcEnv = builtins.getEnv "BUCK_TEST_SRC";
   repoRootStr = if buckTestSrcEnv != "" then buckTestSrcEnv else builtins.toString src;
@@ -177,7 +178,7 @@ let
         in acc // { "${m}" = p; "${m}@v0.0.0" = p; };
     in builtins.foldl' mk {} entries;
 
-  sanitize = s: lib.replaceStrings ["//" ":" "/" " "] ["" "-" "-" "-"] s;
+  sanitize = H.sanitizeName;
 
   baseNameOf = p:
     let parts = lib.splitString "/" p; in
@@ -265,23 +266,11 @@ let
   cppTargets = cppTargetsFromGraph;
 
   # Provide a flake-friendly flat attrset whose keys are safe identifiers: t + [a-z0-9_]+
-  sanitizeAttr = s:
-    let
-      chars = lib.stringToCharacters (lib.toLower s);
-      allowed = lib.stringToCharacters "abcdefghijklmnopqrstuvwxyz0123456789_";
-      mapChar = c: if builtins.elem c allowed then c else "_";
-    in "t" + (lib.concatStrings (map mapChar chars));
-
   cppTargetsFlat = builtins.listToAttrs (
-    let
-      dropCell = lbl:
-        let parts = lib.splitString "//" lbl; in
-          if (builtins.length parts) > 1 && !(lib.hasPrefix "//" lbl)
-          then "//" + (lib.elemAt parts 1)
-          else lbl;
-    in map (nm:
-      { name = sanitizeAttr (dropCell nm); value = cppTargetsFromGraph.${nm}; }
-    ) (builtins.attrNames cppTargetsFromGraph)
+    map (nm: {
+      name = H.sanitizeAttrNameFromTargetLabel nm;
+      value = cppTargetsFromGraph.${nm};
+    }) (builtins.attrNames cppTargetsFromGraph)
   );
 
   # Optional: select a single target by BUCK_TARGET for impure local builds/tests

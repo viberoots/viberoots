@@ -29,6 +29,37 @@ let
   sanitizeName = s:
     lib.replaceStrings ["//" ":" "/" " "] ["" "-" "-" "-"] s;
 
+  # Drop Buck's configuration suffix that appears after a space and "(...)".
+  dropConfigSuffix = label:
+    let s = if builtins.isString label then label else ""; in (lib.head (lib.splitString " (" s));
+
+  # Convert labels like "root//apps/foo:svc" or "prelude//cpp:lib" to "//apps/foo:svc" or "//cpp:lib".
+  dropCellPrefix = label:
+    let
+      s = if builtins.isString label then label else "";
+      parts = lib.splitString "//" s;
+    in
+      if lib.hasPrefix "//" s
+      then s
+      else if (builtins.length parts) > 1
+      then "//" + (builtins.elemAt parts 1)
+      else s;
+
+  # Normalize a Buck target label for stable keying:
+  # - drop config suffix
+  # - drop cell prefix
+  normalizeTargetLabel = label: dropCellPrefix (dropConfigSuffix label);
+
+  # Produce a safe, deterministic Nix attribute suffix from a Buck target label.
+  # Mirrors tools/lib/labels.ts:sanitizeAttrNameFromLabel and //lang:nix_attr.bzl:sanitize_nix_attr_from_target_label.
+  sanitizeAttrNameFromTargetLabel = label:
+    let
+      s = lib.toLower (normalizeTargetLabel label);
+      chars = lib.stringToCharacters s;
+      allowed = lib.stringToCharacters "abcdefghijklmnopqrstuvwxyz0123456789_";
+      mapChar = c: if builtins.elem c allowed then c else "_";
+    in "t" + (lib.concatStrings (map mapChar chars));
+
   # Normalize a nixpkgs attribute path for provider naming and labeling.
   # Contract:
   # - trims
@@ -126,7 +157,21 @@ let
       else null;
 
  in rec {
-  inherit segs getAtPath resolveAttrFromPkgs sanitizeName normalizeNixAttr decodePatchFilename patchesMapFromDir patchesMapFromDirs readDevOverrides guardNoDevOverridesInCI;
+  inherit
+    segs
+    getAtPath
+    resolveAttrFromPkgs
+    sanitizeName
+    dropConfigSuffix
+    dropCellPrefix
+    normalizeTargetLabel
+    sanitizeAttrNameFromTargetLabel
+    normalizeNixAttr
+    decodePatchFilename
+    patchesMapFromDir
+    patchesMapFromDirs
+    readDevOverrides
+    guardNoDevOverridesInCI;
 
   /*
     Build {"importPath@version" = [ /nix/store/...-patch1 /nix/store/...-patch2 ... ]}
