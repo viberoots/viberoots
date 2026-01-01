@@ -26,8 +26,11 @@ export function formatTextRow(
     row.lockfile ? `lockfile=${row.lockfile}` : `lockfile=-`,
     `importer_local_patches_action_inputs_expected=${row.importer_local_patches_action_inputs_expected ? "true" : "false"}`,
     `importer_local_patches_action_inputs_observed_in=${row.importer_local_patches_action_inputs_observed_in.join(",") || "-"}`,
+    `package_local_patches_action_inputs_expected=${row.package_local_patches_action_inputs_expected ? "true" : "false"}`,
+    `package_local_patches_action_inputs_observed_in=${row.package_local_patches_action_inputs_observed_in.join(",") || "-"}`,
     `global_nix_inputs_action_inputs_expected=${row.global_nix_inputs_action_inputs_expected ? "true" : "false"}`,
     `global_nix_inputs_action_inputs_observed_in=${row.global_nix_inputs_action_inputs_observed_in.join(",") || "-"}`,
+    `global_nix_inputs_labels_stamped=${row.global_nix_inputs_labels_stamped ? "true" : "false"}`,
     `module_providers=[${providersDetail.join("; ")}]`,
   ];
   return fields.join("\t");

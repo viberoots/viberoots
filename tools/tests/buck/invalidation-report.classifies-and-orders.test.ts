@@ -43,13 +43,13 @@ test("invalidation-report: stable ordering, patch scope classification, and glob
           name: "//libs/cpp:lib",
           rule_type: "cxx_library",
           labels: ["lang:cpp", "kind:lib", "patch_scope:package-local"],
-          srcs: ["libs/cpp/lib.cc"],
+          srcs: ["libs/cpp/lib.cc", "libs/cpp/patches/cpp/demo@0.0.0.patch"],
         },
         {
           name: "//libs/go:lib",
           rule_type: "go_library",
           labels: ["lang:go", "kind:lib", "patch_scope:package-local"],
-          srcs: ["libs/go/lib.go"],
+          srcs: ["libs/go/lib.go", "libs/go/patches/go/demo@0.0.0.patch"],
         },
         {
           name: "//third_party/providers:lf_demo",
@@ -136,6 +136,7 @@ test("invalidation-report: stable ordering, patch scope classification, and glob
       "lockfile_label=lockfile:apps/web/pnpm-lock.yaml#apps/web",
       "global_nix_inputs_action_inputs_expected=true",
       "global_nix_inputs_action_inputs_observed_in=srcs(dict)/__global_nix_inputs__",
+      "global_nix_inputs_labels_stamped=true",
       "importer_local_patches_action_inputs_expected=true",
       "importer_local_patches_action_inputs_observed_in=srcs(dict)/__patch_inputs__",
       "module_providers=[//third_party/providers:lf_demo kind=node key=lockfile:apps/web/pnpm-lock.yaml#apps/web patch_scope=importer-local]",
@@ -149,7 +150,10 @@ test("invalidation-report: stable ordering, patch scope classification, and glob
     // Patch scope classification for representative targets (Go/C++/Python).
     const wantOtherParts = [
       "target=//libs/go:lib\tlangs=go\tpatch_scope=package-local",
+      "package_local_patches_action_inputs_expected=true",
+      "package_local_patches_action_inputs_observed_in=srcs(list)/libs/go/patches/go",
       "target=//libs/cpp:lib\tlangs=cpp\tpatch_scope=package-local",
+      "package_local_patches_action_inputs_observed_in=srcs(list)/libs/cpp/patches/cpp",
       "target=//apps/py:bin\tlangs=python\tpatch_scope=importer-local",
     ];
     for (const part of wantOtherParts) {

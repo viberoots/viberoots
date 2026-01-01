@@ -269,12 +269,22 @@ I treat patch invalidation as two explicit models:
 When debugging invalidation, it is easy to misread the surface area by looking only at provider files under `third_party/providers/`. The canonical answers are designed to be available without reading macro or generator code:
 
 - `node tools/buck/prebuild-guard.ts` prints short, canonical one-liners that explain where invalidation comes from, using the contract vocabulary (`package-local` / `importer-local`).
-- `tools/buck/invalidation-report.txt` is the canonical per-target report. It answers “what invalidates this target?” using the shared contract vocabulary and includes importer/lockfile metadata, global Nix input expectations, and realized provider edges (as a debugging aid).
+- `tools/buck/invalidation-report.txt` is the canonical per-target report. It answers “what invalidates this target?” using the shared contract vocabulary and separates **real action inputs** from **diagnostic stamps**:
+  - `patch_scope` and whether patch inputs are expected to be real action inputs (based on the patch model contract).
+  - Where patch inputs are observed (list-shaped `srcs`, dict-shaped `srcs` under `__patch_inputs__/...`, or synthetic deps like `*__patch_inputs`).
+  - Where global Nix inputs are observed as action inputs (`srcs` and/or `nix_inputs`), and whether the global input label was stamped for observability (`global_nix_inputs_labels_stamped`).
+  - Realized provider edges are included as a debugging aid only. They are not the invalidation source of truth.
   - Regenerate (preferred): `node tools/buck/glue-pipeline.ts`
   - Regenerate (report-only): `node tools/buck/invalidation-report.ts`
 - `third_party/providers/provider_index.json` is a single, stable report that maps provider targets to their origin key and includes additive patch-model metadata (`patch_scope`, `languages`, and where patch inputs are expected to be carried).
 
 Rule: treat provider `patch_paths` as diagnostic/observability data for importer-scoped ecosystems. Invalidation is driven by real action inputs attached by macro wiring.
+
+Regression guard for this diagnostic surface:
+
+- `tools/tests/buck/invalidation-report.classifies-and-orders.test.ts` (fixture-level invariants: stable ordering, patch model classification, and action-input observation categories)
+- `tools/tests/node/node.webapp.nix-calling.wiring.global-inputs-and-importer-patches-and-stamps.cquery.test.ts` (importer-local: importer patches are real action inputs for a representative dict-safe macro shape)
+- `tools/tests/cpp/cpp.macros.library.package-local-patch-inputs-and-labels.cquery.test.ts` (package-local: package patches are real action inputs for a representative C++ macro)
 
 ### Canonical implementations
 
