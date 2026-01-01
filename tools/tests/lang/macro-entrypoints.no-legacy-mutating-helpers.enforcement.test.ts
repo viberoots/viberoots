@@ -10,6 +10,7 @@ const macroEntrypointFiles = [
   "node/defs_nix.bzl",
   "node/defs.bzl",
   "python/defs.bzl",
+  "rust/defs.bzl",
 ];
 
 async function readText(file: string): Promise<string> {
