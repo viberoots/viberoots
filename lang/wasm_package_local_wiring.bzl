@@ -1,7 +1,8 @@
 load("//lang:label_stamping.bzl", "stamp_patch_scope_for_lang", "stamp_wasm_variant")
-load("//lang:macro_kwargs.bzl", "pop_package_local_patch_dirs_and_nixpkg_deps")
+load("//lang:macro_kwargs.bzl", "extract_package_local_patch_dirs_and_nixpkg_deps")
 load("//lang:patch_inputs.bzl", "include_package_local_patches")
 load("//lang:planner_visible_wiring.bzl", "wire_package_local_planner_visible_stub", "wire_planner_visible_inputs")
+load("@prelude//:rules.bzl", "genrule")
 
 def prepare_package_local_wasm_wiring(
         *,
@@ -37,13 +38,15 @@ def prepare_package_local_wasm_wiring(
     if not isinstance(deps, list):
         fail("prepare_package_local_wasm_wiring: deps must be a list")
 
-    stamp_wasm_variant(kwargs, lang, variant)
-    info = pop_package_local_patch_dirs_and_nixpkg_deps(kwargs, lang, append_labels = True)
-    stamp_patch_scope_for_lang(kwargs, lang)
-    include_package_local_patches(kwargs, lang, info.local_patch_dirs)
+    info = extract_package_local_patch_dirs_and_nixpkg_deps(kwargs, lang, append_labels = True)
+    kw = info.kwargs
 
-    labels = kwargs.get("labels", []) or []
-    srcs = kwargs.get("srcs", []) or []
+    stamp_wasm_variant(kw, lang, variant)
+    stamp_patch_scope_for_lang(kw, lang)
+    include_package_local_patches(kw, lang, info.local_patch_dirs)
+
+    labels = kw.get("labels", []) or []
+    srcs = kw.get("srcs", []) or []
     wired = wire_planner_visible_inputs(
         name = name,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
@@ -54,12 +57,71 @@ def prepare_package_local_wasm_wiring(
         provider_realization_mode = provider_realization_mode,
         strip_providers_from_deps = strip_providers_from_deps,
     )
+    kw["srcs"] = wired["srcs"]
     return struct(
+        kwargs = kw,
         deps = wired["deps"],
         srcs = wired["srcs"],
-        labels = labels,
+        labels = kw.get("labels", []) or [],
         local_patch_dirs = info.local_patch_dirs,
         nixpkg_deps = info.nixpkg_deps,
+    )
+
+def package_local_wasm_wiring_mutation_probe(
+        name,
+        lang,
+        variant,
+        local_patch_dirs = None,
+        nixpkg_deps = None):
+    """
+    Probe helper for tests. Asserts the v2 helper does not mutate the input dict.
+
+    Writes a newline-delimited file of:
+      - pre_has:<key>:true|false
+      - post_has:<key>:true|false
+      - post_labels_same:true|false
+    """
+    kw = {
+        "labels": ["probe:v2"],
+    }
+    if local_patch_dirs != None:
+        kw["local_patch_dirs"] = local_patch_dirs
+    if nixpkg_deps != None:
+        kw["nixpkg_deps"] = nixpkg_deps
+
+    pre_keys = {
+        "local_patch_dirs": "local_patch_dirs" in kw,
+        "nixpkg_deps": "nixpkg_deps" in kw,
+    }
+    pre_labels = list(kw.get("labels", []) or [])
+
+    _ = prepare_package_local_wasm_wiring(
+        name = name,
+        kwargs = kw,
+        lang = lang,
+        variant = variant,
+        MODULE_PROVIDERS = {},
+        deps = [],
+    )
+
+    post_keys = {
+        "local_patch_dirs": "local_patch_dirs" in kw,
+        "nixpkg_deps": "nixpkg_deps" in kw,
+    }
+    post_labels_same = (kw.get("labels", []) or []) == pre_labels
+
+    out = []
+    for k in ["local_patch_dirs", "nixpkg_deps"]:
+        out.append("pre_has:%s:%s" % (k, "true" if pre_keys[k] else "false"))
+        out.append("post_has:%s:%s" % (k, "true" if post_keys[k] else "false"))
+    out.append("post_labels_same:%s" % ("true" if post_labels_same else "false"))
+
+    genrule(
+        name = name,
+        srcs = [],
+        out = name + ".items.txt",
+        cmd = "cat > $OUT <<'EOF'\n%s\nEOF" % "\n".join(out),
+        labels = ["kind:probe"],
     )
 
 def wire_package_local_wasm_planner_visible_stub_legacy_mutating(
@@ -140,6 +202,7 @@ def wire_package_local_wasm_planner_visible_stub(
 
 __all__ = [
     "prepare_package_local_wasm_wiring",
+    "package_local_wasm_wiring_mutation_probe",
     "wire_package_local_wasm_planner_visible_stub",
     "wire_package_local_wasm_planner_visible_stub_legacy_mutating",
 ]

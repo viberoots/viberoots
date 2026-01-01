@@ -64,11 +64,12 @@ def nix_cpp_wasm_static_lib(name, **kwargs):
     Stamps:
       - lang:cpp, kind:lib, flavor:wasm
     """
-    deps = kwargs.get("deps", []) or []
+    kw = dict(kwargs)
+    deps = kw.pop("deps", []) or []
     nix_inputs = global_nix_inputs()
     wiring = prepare_package_local_wasm_wiring(
         name = name,
-        kwargs = kwargs,
+        kwargs = kw,
         lang = "cpp",
         MODULE_PROVIDERS = MODULE_PROVIDERS,
         variant = "static",
@@ -76,16 +77,17 @@ def nix_cpp_wasm_static_lib(name, **kwargs):
         provider_realization_mode = "deps",
         strip_providers_from_deps = False,
     )
+    prepared = wiring.kwargs
     cpp_nix_build(
         name = name,
         out = sanitize_to_bin_name("//%s:%s" % (native.package_name(), name)) + ".a",
         kind = "lib",
         self_label = "//%s:%s" % (native.package_name(), name),
         deps = wiring.deps,
-        srcs = wiring.srcs,
-        labels = wiring.labels,
+        srcs = prepared.get("srcs", []) or [],
+        labels = prepared.get("labels", []) or [],
         nix_inputs = nix_inputs,
-        visibility = kwargs.get("visibility", []),
+        visibility = prepared.get("visibility", []),
     )
 
 

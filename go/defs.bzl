@@ -132,12 +132,13 @@ def nix_go_tiny_wasm_lib(name, **kwargs):
     invokes the planner-selected build, copying `$out/lib/top.wasm` to this rule's output.
     """
     pkg = native.package_name()
-    deps = kwargs.pop("deps", [])
-    extra = normalize_labels(pkg, kwargs.pop("extra_module_providers", []))
+    kw = dict(kwargs)
+    deps = kw.pop("deps", []) or []
+    extra = normalize_labels(pkg, kw.pop("extra_module_providers", []) or [])
 
     wiring = prepare_package_local_wasm_wiring(
         name = name,
-        kwargs = kwargs,
+        kwargs = kw,
         lang = "go",
         variant = "tinygo",
         MODULE_PROVIDERS = MODULE_PROVIDERS,
@@ -147,15 +148,16 @@ def nix_go_tiny_wasm_lib(name, **kwargs):
         provider_realization_mode = "inputs",
         strip_providers_from_deps = True,
     )
+    prepared = wiring.kwargs
     # Graph-facing shim that copies from the Nix out path produced by planner
     go_nix_build_wasm(
         name = name,
         self_label = "//%s:%s" % (pkg, name),
         out = name + ".wasm",
         expected_rel = "lib/top.wasm",
-        srcs = wiring.srcs,
+        srcs = prepared.get("srcs", []) or [],
         nix_inputs = global_nix_inputs(),
-        labels = wiring.labels,
-        visibility = kwargs.get("visibility", []),
+        labels = prepared.get("labels", []) or [],
+        visibility = prepared.get("visibility", []),
     )
 

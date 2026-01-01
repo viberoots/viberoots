@@ -57,7 +57,7 @@ For language macros, stamping is the macro’s responsibility. Call sites should
   - `stamp_labels(kwargs, lang, kind)`
   - `stamp_wasm_variant(kwargs, lang, variant)`
 - **Starlark (package-local WASM macro wiring)**: `lang/wasm_package_local_wiring.bzl` via `lang/defs_common.bzl` re-exports.
-  - `prepare_package_local_wasm_wiring(...)` (fixed ordering: wasm stamps → patch_scope → patch inputs → provider edges)
+  - `prepare_package_local_wasm_wiring(...)` (non-mutating at the call-site boundary; returns prepared `kwargs`; fixed ordering: wasm stamps → patch_scope → patch inputs → provider edges)
   - `wire_package_local_wasm_planner_visible_stub(...)` (preferred; non-mutating boundary, delegates to `wire_package_local_planner_visible_stub(...)`)
   - `wire_package_local_wasm_planner_visible_stub_legacy_mutating(...)` (legacy-only; wrapper delegates to the non-mutating helper)
 - **Kind vocabulary (contract)**:

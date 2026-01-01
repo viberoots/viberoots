@@ -31,6 +31,7 @@ When you add or change a macro, keep the wiring table-driven through shared help
   - Use `wire_package_local_planner_visible_stub(...)` for package-local stubs.
 - **Package-local WASM macros (Go, C++)**
   - For rule shapes that carry patch inputs in `srcs` and realize provider edges into `deps` or `srcs`, use `prepare_package_local_wasm_wiring(...)`.
+    - This helper is non-mutating at the call-site boundary. Do not rely on helper-side mutation ordering; use the returned prepared `kwargs` for the underlying rule.
   - For planner-visible package-local WASM stubs, use `wire_package_local_wasm_planner_visible_stub(...)`.
     - `wire_package_local_wasm_planner_visible_stub_legacy_mutating(...)` is legacy-only and must not be used in new macro code.
 - **Dict-shaped `srcs`** (when wiring patches/providers/global inputs into dict-safe keys)

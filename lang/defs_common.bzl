@@ -101,6 +101,7 @@ load(
 load(
     "//lang:wasm_package_local_wiring.bzl",
     _prepare_package_local_wasm_wiring = "prepare_package_local_wasm_wiring",
+    _package_local_wasm_wiring_mutation_probe = "package_local_wasm_wiring_mutation_probe",
     _wire_package_local_wasm_planner_visible_stub = "wire_package_local_wasm_planner_visible_stub",
     _wire_package_local_wasm_planner_visible_stub_legacy_mutating = "wire_package_local_wasm_planner_visible_stub_legacy_mutating",
 )
@@ -199,6 +200,7 @@ package_local_wiring_mutation_probe = _package_local_wiring_mutation_probe
 prepare_package_local_wiring_legacy_mutating = _prepare_package_local_wiring_legacy_mutating
 
 prepare_package_local_wasm_wiring = _prepare_package_local_wasm_wiring
+package_local_wasm_wiring_mutation_probe = _package_local_wasm_wiring_mutation_probe
 wire_package_local_wasm_planner_visible_stub = _wire_package_local_wasm_planner_visible_stub
 
 # Legacy package-local WASM planner-visible stub wrapper (keep exported; must not be used in new macros).
