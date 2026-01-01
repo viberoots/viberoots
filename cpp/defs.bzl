@@ -105,15 +105,17 @@ def nix_cpp_wasm_emscripten_lib(name, **kwargs):
       produced by the planner template (cppWasmEmscriptenLib) when built via the
       Nix flake attributes (e.g., graph-generator-selected).
     """
-    deps = kwargs.get("deps", []) or []
+    kw = dict(kwargs)
+    deps = kw.pop("deps", []) or []
+    srcs = kw.get("srcs", []) or []
     wire_package_local_wasm_planner_visible_stub(
         name = name,
         out = name + ".stamp",
-        kwargs = kwargs,
+        kwargs = kw,
         lang = "cpp",
         variant = "emscripten",
         deps = deps,
-        srcs = kwargs.get("srcs", []) or [],
+        srcs = srcs,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
         # Preserve historical behavior for this macro: provider targets remain in deps.
         # This stub shape is used as a graph node and provider deps are part of its invalidation surface.
@@ -127,18 +129,20 @@ def nix_cpp_binary(name, **kwargs):
 
 def nix_cpp_test(name, **kwargs):
     # Define a planner-visible cxx_test (not executed) and an external runner test (executed)
-    deps = kwargs.get("deps", []) or []
+    kw = dict(kwargs)
+    deps = kw.pop("deps", []) or []
     planner_name = name + "__planner"
     # Planner-visible stub: Nix builds the test; this node exists for planner discovery and invalidation.
     # Provider deps are stripped to avoid visibility / graph-shape problems on the planner-visible boundary.
     wire_package_local_planner_visible_stub(
         name = planner_name,
         out = planner_name + ".stamp",
-        kwargs = kwargs,
+        kwargs = kw,
         lang = "cpp",
         kind = "test",
         deps = deps,
         srcs = [],
+        MODULE_PROVIDERS = MODULE_PROVIDERS,
     )
     # Executed: external runner builds the corresponding flake attr for planner_name and runs it
     cpp_nix_test(

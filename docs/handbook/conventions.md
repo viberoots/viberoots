@@ -25,26 +25,40 @@ In this repo, I treat Starlark macros as part of the long-lived public surface a
 
 Here is the intended “shape” for a typical package-local macro. The details are language-specific, but the merge points are stable.
 
-Before (harder to review because the merge points are spread out):
+Before (harder to review because the merge points are spread out, and it is easy to accidentally rely on mutating behavior):
 
 ```starlark
-def my_rule(name, **kwargs):
-    deps = kwargs.pop("deps", [])
-    wiring = prepare_package_local_wiring(name = name, kwargs = kwargs, lang = "cpp", kind = "lib", MODULE_PROVIDERS = MODULE_PROVIDERS, base_deps = deps)
-    # second merge point, easy to miss in review
-    wiring.kwargs["labels"] = dedupe_preserve((wiring.kwargs.get("labels", []) or []) + ["hint:x"])
-    some_rule(name = name, deps = wiring.deps, **wiring.kwargs)
+def nix_cpp_wasm_emscripten_lib(name, **kwargs):
+    deps = kwargs.get("deps", []) or []
+    wire_package_local_wasm_planner_visible_stub(
+        name = name,
+        out = name + ".stamp",
+        kwargs = kwargs,
+        lang = "cpp",
+        variant = "emscripten",
+        deps = deps,
+        srcs = kwargs.get("srcs", []) or [],
+        MODULE_PROVIDERS = MODULE_PROVIDERS,
+    )
 ```
 
-After (single merge point, then delegate to shared wiring):
+After (single deps merge point + single kwargs merge point, then delegate to shared wiring):
 
 ```starlark
-def my_rule(name, **kwargs):
+def nix_cpp_wasm_emscripten_lib(name, **kwargs):
     kw = dict(kwargs)
-    base_deps = kw.pop("deps", []) or []
-    kw["labels"] = dedupe_preserve((kw.get("labels", []) or []) + ["hint:x"])
-    wiring = prepare_package_local_wiring(name = name, kwargs = kw, lang = "cpp", kind = "lib", MODULE_PROVIDERS = MODULE_PROVIDERS, base_deps = base_deps)
-    some_rule(name = name, deps = wiring.deps, **wiring.kwargs)
+    deps = kw.pop("deps", []) or []
+    srcs = kw.get("srcs", []) or []
+    wire_package_local_wasm_planner_visible_stub(
+        name = name,
+        out = name + ".stamp",
+        kwargs = kw,
+        lang = "cpp",
+        variant = "emscripten",
+        deps = deps,
+        srcs = srcs,
+        MODULE_PROVIDERS = MODULE_PROVIDERS,
+    )
 ```
 
 - Path invariants
