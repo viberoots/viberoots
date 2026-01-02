@@ -73,6 +73,7 @@ test("cpp macros: lib/bin/addon delegate through shared core and keep emitted at
       cwd: tmp,
     })`bash --noprofile --norc -c 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<'\''EOF'\''
 genrule(name="prov", out="prov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
+genrule(name="prov_extra", out="prov_extra.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
 EOF'`;
     await $({
       cwd: tmp,
@@ -97,6 +98,8 @@ EOF'`;
       path.join(libDir, "TARGETS"),
       `load("//cpp:defs.bzl", "nix_cpp_library", "cpp_sanitize_probe")
 
+genrule(name="localprov", out="localprov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
+
 cpp_sanitize_probe(
     name = "sanitize_lib",
     label = "//libs/demo:lib",
@@ -106,6 +109,7 @@ nix_cpp_library(
     name = "lib",
     srcs = ["lib.cpp"],
     nixpkg_deps = ["zlib"],
+    extra_module_providers = ["//third_party/providers:prov_extra", ":localprov"],
 )
 `,
       "utf8",
@@ -120,6 +124,8 @@ nix_cpp_library(
       path.join(binDir, "TARGETS"),
       `load("//cpp:defs.bzl", "nix_cpp_binary", "cpp_sanitize_probe")
 
+genrule(name="localprov", out="localprov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
+
 cpp_sanitize_probe(
     name = "sanitize_bin",
     label = "//apps/demo:demo",
@@ -129,6 +135,7 @@ nix_cpp_binary(
     name = "demo",
     srcs = ["main.cpp"],
     nixpkg_deps = ["pkgs.ZLIB"],
+    extra_module_providers = ["//third_party/providers:prov_extra", ":localprov"],
 )
 `,
       "utf8",
@@ -143,6 +150,8 @@ nix_cpp_binary(
       path.join(addonDir, "TARGETS"),
       `load("//cpp:defs.bzl", "nix_cpp_node_addon", "cpp_sanitize_probe")
 
+genrule(name="localprov", out="localprov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
+
 cpp_sanitize_probe(
     name = "sanitize_addon",
     label = "//libs/addon:addon",
@@ -153,6 +162,7 @@ nix_cpp_node_addon(
     srcs = ["addon.cpp"],
     addon_name = "demo_addon",
     nixpkg_deps = ["pkgs.zlib"],
+    extra_module_providers = ["//third_party/providers:prov_extra", ":localprov"],
 )
 `,
       "utf8",
@@ -209,9 +219,19 @@ nix_cpp_node_addon(
     const expectsProviderEdge = (n: CqueryNode, label: string) => {
       const deps = (n.deps || []).map((d) => normalizeTargetLabel(String(d)));
       const want = normalizeTargetLabel("//third_party/providers:prov");
+      const extra = normalizeTargetLabel("//third_party/providers:prov_extra");
+      const local = normalizeTargetLabel(`${label.split(":")[0]}:localprov`);
       assert.ok(
         deps.includes(want),
         `expected provider dep realized for ${label}; want=${want}; have=${JSON.stringify(deps)}`,
+      );
+      assert.ok(
+        deps.includes(extra),
+        `expected extra_module_providers to be present for ${label}; want=${extra}; have=${JSON.stringify(deps)}`,
+      );
+      assert.ok(
+        deps.includes(local),
+        `expected normalized extra_module_providers relative label for ${label}; want=${local}; have=${JSON.stringify(deps)}`,
       );
     };
     expectsProviderEdge(lib, "//libs/demo:lib");

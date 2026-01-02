@@ -2,6 +2,7 @@ load("@prelude//:rules.bzl", "cxx_library", "cxx_binary", "cxx_test")
 load(
     "//lang:defs_common.bzl",
     "dedupe_preserve",
+    "normalize_labels",
     "prepare_package_local_wiring",
     "prepare_package_local_wasm_wiring",
     "wire_package_local_planner_visible_stub",
@@ -17,6 +18,8 @@ def _cpp_common(name, kind, kwargs):
     nix_inputs = global_nix_inputs()
     kw = dict(kwargs)
     base_deps = kw.pop("deps", []) or []
+    extra = normalize_labels(native.package_name(), kw.pop("extra_module_providers", []) or [])
+    base_deps = base_deps + extra
     labels = kw.get("labels", []) or []
     if kind == "addon":
         addon_name = kw.get("addon_name", None)

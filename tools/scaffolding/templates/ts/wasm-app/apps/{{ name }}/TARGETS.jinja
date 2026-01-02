@@ -2,9 +2,7 @@ load("//node:defs.bzl", "node_webapp")
 
 node_webapp(
     name = "webapp",
-    labels = ["lockfile:{{ lockfilePath }}#{{ importer }}"],
     lockfile_label = "lockfile:{{ lockfilePath }}#{{ importer }}",
-    importer = "{{ importer }}",
     out = "dist",
 )
 

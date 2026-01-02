@@ -2,11 +2,8 @@ load("//node:defs.bzl", "node_webapp", "nix_node_test")
 
 node_webapp(
     name = "app",
-    labels = [
-        "lockfile:apps/{{ name }}/pnpm-lock.yaml#apps/{{ name }}",
-        "lang:node",
-        "kind:app",
-    ],
+    labels = ["lang:node", "kind:app"],
+    lockfile_label = "lockfile:apps/{{ name }}/pnpm-lock.yaml#apps/{{ name }}",
 )
 
 nix_node_test(

@@ -12,6 +12,11 @@ def nix_go_library(name, **kwargs):
     kw = dict(kwargs)
     repo_cgo_deps = kw.pop("repo_cgo_deps", [])
     nix_cgo_pkgconfig = kw.pop("nix_cgo_pkgconfig", {})
+    if isinstance(nix_cgo_pkgconfig, dict) and len(nix_cgo_pkgconfig) > 0:
+        fail(
+            "nix_go_library: nix_cgo_pkgconfig is currently unsupported; it was previously ignored. "
+            + "Remove it so importer/package wiring stays deterministic."
+        )
     deps = kw.pop("deps", [])
     extra = normalize_labels(native.package_name(), kw.pop("extra_module_providers", []))
     apply_go_tuple_labels(kw)
@@ -34,6 +39,11 @@ def nix_go_binary(name, **kwargs):
     kw = dict(kwargs)
     repo_cgo_deps = kw.pop("repo_cgo_deps", [])
     nix_cgo_pkgconfig = kw.pop("nix_cgo_pkgconfig", {})
+    if isinstance(nix_cgo_pkgconfig, dict) and len(nix_cgo_pkgconfig) > 0:
+        fail(
+            "nix_go_binary: nix_cgo_pkgconfig is currently unsupported; it was previously ignored. "
+            + "Remove it so importer/package wiring stays deterministic."
+        )
     deps = kw.pop("deps", [])
     extra = normalize_labels(native.package_name(), kw.pop("extra_module_providers", []))
     apply_go_tuple_labels(kw)
@@ -69,6 +79,11 @@ def nix_go_test(name, **kwargs):
     kw = dict(kwargs)
     repo_cgo_deps = kw.pop("repo_cgo_deps", [])
     nix_cgo_pkgconfig = kw.pop("nix_cgo_pkgconfig", {})
+    if isinstance(nix_cgo_pkgconfig, dict) and len(nix_cgo_pkgconfig) > 0:
+        fail(
+            "nix_go_test: nix_cgo_pkgconfig is currently unsupported; it was previously ignored. "
+            + "Remove it so importer/package wiring stays deterministic."
+        )
     deps = kw.pop("deps", [])
     extra = normalize_labels(native.package_name(), kw.pop("extra_module_providers", []))
     lib = kw.get("library")

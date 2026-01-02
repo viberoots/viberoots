@@ -49,7 +49,7 @@ nix_go_binary(
     srcs = ["cmd/demo/main.go"],
     repo_cgo_deps = ["//libs/greeter:greeter"],          # in-repo C/C++
     nixpkg_deps = ["pkgs.openssl"],                       # nixpkgs native deps (optional)
-    # nix_cgo_pkgconfig = {"pkgs.openssl": "openssl"},  # optional pkg-config name override
+    # Note: nix_cgo_pkgconfig is currently unsupported (fails fast if provided).
 )
 ```
 

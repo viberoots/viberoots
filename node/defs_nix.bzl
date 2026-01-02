@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "genrule")
-load("//lang:defs_common.bzl", "prepare_importer_nix_calling_genrule_wiring")
+load("//lang:defs_common.bzl", "importer_from_labels", "prepare_importer_nix_calling_genrule_wiring")
 load("//lang:importer_strings.bzl", "importer_display_name", "sanitize_importer_for_nix_attr")
 load(
     "//lang:nix_shell.bzl",
@@ -13,6 +13,19 @@ load("//node:defs_core.bzl", "nix_node_gen")
 # NOTE: Prebuild guard ensures this load is valid before builds/tests run.
 MODULE_PROVIDERS = {}
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
+
+def _validate_importer_arg_matches_lockfile_label(importer, lockfile_label, labels, macro_name):
+    if importer == None:
+        return
+    kw = {"labels": list(labels or [])}
+    if lockfile_label != None:
+        kw["labels"] = (kw.get("labels", []) or []) + [lockfile_label]
+    derived = importer_from_labels(kw)
+    if importer != derived:
+        fail(
+            ("%s: importer must match the importer suffix in the single lockfile label; " % macro_name) +
+            ("importer=%s lockfile_importer=%s lockfile_label=%s" % (importer, derived, kw.get("labels", [])))
+        )
 
 def _prepare_node_importer_nix_calling_genrule_kwargs(
         name,
@@ -65,6 +78,11 @@ def node_webapp(
     )
     kw = wiring.kwargs
     _importer = wiring.importer
+    if importer != None and importer != _importer:
+        fail(
+            ("node_webapp: importer must match the importer suffix in the single lockfile label; ") +
+            ("importer=%s lockfile_importer=%s lockfile_label=%s" % (importer, _importer, lockfile_label))
+        )
     cmd = (
         # Buck executes genrules from a generated srcs/ directory with OUT as a relative path.
         # Capture an absolute OUT path before we cd during nix bootstrap.
@@ -115,6 +133,12 @@ def nix_node_cli_bin(
         out = name
 
     if not bundle:
+        _validate_importer_arg_matches_lockfile_label(
+            importer = importer,
+            lockfile_label = lockfile_label,
+            labels = labels,
+            macro_name = "nix_node_cli_bin(bundle=False)",
+        )
         if entry == None:
             entry = "bin/%s" % name
         # Copy only the CLI entry file to $OUT; provider stamps are included in srcs
@@ -160,6 +184,11 @@ def nix_node_cli_bin(
     )
     kw = wiring.kwargs
     _importer = wiring.importer
+    if importer != None and importer != _importer:
+        fail(
+            ("nix_node_cli_bin(bundle=True): importer must match the importer suffix in the single lockfile label; ") +
+            ("importer=%s lockfile_importer=%s lockfile_label=%s" % (importer, _importer, lockfile_label))
+        )
 
     # Bundling may invoke Nix + PNPM and can legitimately take longer on cold caches.
     # Keep command assembly standardized via lang/nix_shell.bzl helpers:
