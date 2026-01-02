@@ -124,38 +124,6 @@ def package_local_wasm_wiring_mutation_probe(
         labels = ["kind:probe"],
     )
 
-def wire_package_local_wasm_planner_visible_stub_legacy_mutating(
-        *,
-        name,
-        out = "",
-        kwargs,
-        lang,
-        variant,
-        deps = [],
-        srcs = [],
-        MODULE_PROVIDERS = None,
-        provider_realization_mode = None,
-        strip_providers_from_deps = True):
-    """
-    Wrapper for planner-visible package-local WASM stubs.
-
-    Ensures wasm stamping happens before delegating to the canonical
-    package-local planner-visible stub wiring helper.
-    """
-    stamp_wasm_variant(kwargs, lang, variant)
-    return wire_package_local_planner_visible_stub(
-        name = name,
-        out = out,
-        kwargs = kwargs,
-        lang = lang,
-        kind = None,
-        deps = deps,
-        srcs = srcs,
-        MODULE_PROVIDERS = MODULE_PROVIDERS,
-        provider_realization_mode = provider_realization_mode,
-        strip_providers_from_deps = strip_providers_from_deps,
-    )
-
 def wire_package_local_wasm_planner_visible_stub(
         *,
         name,
@@ -204,7 +172,6 @@ __all__ = [
     "prepare_package_local_wasm_wiring",
     "package_local_wasm_wiring_mutation_probe",
     "wire_package_local_wasm_planner_visible_stub",
-    "wire_package_local_wasm_planner_visible_stub_legacy_mutating",
 ]
 
 

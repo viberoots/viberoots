@@ -1,9 +1,10 @@
 load("//lang:dict_inputs.bzl", "PATCH_INPUTS_KEY_PREFIX", "PROVIDER_EDGES_KEY_PREFIX")
+load("//lang:importer_wiring.bzl", "attach_importer_patch_inputs", "merge_provider_edges", "require_single_importer_lockfile_label")
+load("//lang:label_stamping.bzl", "stamp_labels", "stamp_patch_scope_for_lang")
+load("//lang:lockfile_labels.bzl", "importer_from_labels")
 load(
-    "//lang:importer_wiring.bzl",
-    "prepare_importer_genrule_kwargs_legacy_mutating",
-    "prepare_importer_non_genrule_wiring_legacy_mutating",
-    "prepare_importer_srcsless_rule_wiring_legacy_mutating",
+    "//lang:patch_inputs.bzl",
+    "synthetic_dep_for_importer_patches_from_labels",
 )
 load("@prelude//:rules.bzl", "genrule")
 
@@ -51,28 +52,57 @@ def prepare_importer_non_genrule_wiring(
     """
     kw = _prepare_non_mutating_kwargs(kwargs, patch_into, provider_into)
     base_deps = list(deps) if isinstance(deps, list) else []
-    res = prepare_importer_non_genrule_wiring_legacy_mutating(
-        name = name,
-        kwargs = kw,
-        deps = base_deps,
-        lang = lang,
-        kind = kind,
-        labels = labels,
-        lockfile_label = lockfile_label,
-        patch_into = patch_into,
-        patch_base = patch_base,
-        patch_dict_safe = patch_dict_safe,
-        patch_key_prefix = patch_key_prefix,
-        provider_into = provider_into,
-        provider_base = provider_base,
-        provider_dict_safe = provider_dict_safe,
-        provider_key_prefix = provider_key_prefix,
-        MODULE_PROVIDERS = MODULE_PROVIDERS,
-    )
+
+    kw["name"] = name
+    kw["labels"] = (kw.get("labels", []) or []) + (labels or [])
+    require_single_importer_lockfile_label(kw, lockfile_label)
+    stamp_patch_scope_for_lang(kw, lang)
+    stamp_labels(kw, lang, kind)
+    importer = importer_from_labels(kw)
+
+    if patch_into != None:
+        if patch_base != None:
+            kw[patch_into] = dict(patch_base) if isinstance(patch_base, dict) else list(patch_base)
+        elif kw.get(patch_into) == None:
+            kw[patch_into] = []
+
+        is_dict = isinstance(kw.get(patch_into), dict)
+        dict_safe = is_dict if patch_dict_safe == None else patch_dict_safe
+        attach_importer_patch_inputs(
+            kw,
+            lang,
+            into = patch_into,
+            dict_safe = dict_safe,
+            key_prefix = patch_key_prefix,
+        )
+
+    wired_deps = base_deps
+    if provider_into == "deps":
+        wired_deps = merge_provider_edges(
+            name,
+            base_deps,
+            MODULE_PROVIDERS = MODULE_PROVIDERS,
+        )
+    else:
+        base = provider_base if provider_base != None else kw.get(provider_into)
+        is_dict = isinstance(base, dict)
+        dict_safe = is_dict if provider_dict_safe == None else provider_dict_safe
+        if base == None:
+            base = {} if dict_safe else []
+        kw[provider_into] = merge_provider_edges(
+            name,
+            base_deps,
+            into = provider_into,
+            base = base,
+            dict_safe = dict_safe,
+            key_prefix = provider_key_prefix,
+            MODULE_PROVIDERS = MODULE_PROVIDERS,
+        )
+
     return struct(
-        importer = res["importer"],
-        kwargs = res["kwargs"],
-        deps = res["deps"],
+        importer = importer,
+        kwargs = kw,
+        deps = wired_deps,
     )
 
 def prepare_importer_genrule_kwargs(
@@ -96,19 +126,45 @@ def prepare_importer_genrule_kwargs(
     kw = _prepare_non_mutating_kwargs(kwargs, patch_into = "srcs", provider_into = "srcs")
     base_deps = list(deps) if isinstance(deps, list) else []
     base_srcs = dict(srcs) if isinstance(srcs, dict) else list(srcs)
-    prepared = prepare_importer_genrule_kwargs_legacy_mutating(
-        name = name,
-        kwargs = kw,
-        srcs = base_srcs,
-        deps = base_deps,
-        lang = lang,
-        kind = kind,
-        labels = labels,
-        lockfile_label = lockfile_label,
-        MODULE_PROVIDERS = MODULE_PROVIDERS,
-        patch_key_prefix = patch_key_prefix,
-        provider_key_prefix = provider_key_prefix,
-    )
+
+    kw["name"] = name
+    kw["labels"] = (kw.get("labels", []) or []) + (labels or [])
+    require_single_importer_lockfile_label(kw, lockfile_label)
+    stamp_patch_scope_for_lang(kw, lang)
+    stamp_labels(kw, lang, kind)
+
+    is_dict_srcs = isinstance(base_srcs, dict)
+    kw["srcs"] = base_srcs
+
+    if is_dict_srcs:
+        attach_importer_patch_inputs(
+            kw,
+            lang,
+            into = "srcs",
+            dict_safe = True,
+            key_prefix = patch_key_prefix,
+        )
+        kw["srcs"] = merge_provider_edges(
+            name,
+            base_deps,
+            into = "srcs",
+            base = (kw.get("srcs", {}) or {}),
+            dict_safe = True,
+            key_prefix = provider_key_prefix,
+            MODULE_PROVIDERS = MODULE_PROVIDERS,
+        )
+        prepared = kw
+    else:
+        attach_importer_patch_inputs(kw, lang, into = "srcs")
+        merged_srcs = kw.get("srcs", []) or []
+        kw["srcs"] = merge_provider_edges(
+            name,
+            (merged_srcs + base_deps),
+            into = "srcs",
+            MODULE_PROVIDERS = MODULE_PROVIDERS,
+        )
+        prepared = kw
+
     return struct(
         kwargs = prepared,
     )
@@ -135,17 +191,33 @@ def prepare_importer_srcsless_rule_wiring(
     """
     kw = _prepare_non_mutating_kwargs(kwargs, patch_into = None, provider_into = "deps")
     base_deps = list(deps) if isinstance(deps, list) else []
-    res = prepare_importer_srcsless_rule_wiring_legacy_mutating(
-        name = name,
-        kwargs = kw,
-        deps = base_deps,
+
+    kw["name"] = name
+    kw["labels"] = (kw.get("labels", []) or []) + (labels or [])
+    require_single_importer_lockfile_label(kw, lockfile_label)
+    stamp_patch_scope_for_lang(kw, lang)
+    stamp_labels(kw, lang, kind)
+    importer = importer_from_labels(kw)
+
+    patch_dep = synthetic_dep_for_importer_patches_from_labels(
+        parent_name = name,
+        labels = (kw.get("labels", []) or []),
         lang = lang,
-        kind = kind,
-        labels = labels,
-        lockfile_label = lockfile_label,
-        patch_dep_into = patch_dep_into,
-        patch_dep_suffix = patch_dep_suffix,
-        MODULE_PROVIDERS = MODULE_PROVIDERS,
+        into = patch_dep_into,
+        suffix = patch_dep_suffix,
+    )
+    def merge_deps(base_deps2):
+        return merge_provider_edges(
+            name,
+            (list(base_deps2) if isinstance(base_deps2, list) else []) + [patch_dep.dep],
+            MODULE_PROVIDERS = MODULE_PROVIDERS,
+        )
+
+    res = struct(
+        importer = importer,
+        kwargs = kw,
+        patch_dep = patch_dep,
+        merge_deps = merge_deps,
     )
     return struct(
         importer = res.importer,
@@ -154,56 +226,10 @@ def prepare_importer_srcsless_rule_wiring(
         merge_deps = res.merge_deps,
     )
 
-def importer_wiring_mutation_probe(name, lang, kind):
-    """
-    Probe helper for tests. Asserts importer wiring v2 does not mutate the input dict.
-    """
-    kw = {"labels": ["probe:v2"]}
-    def _has_prefix(xs, prefix):
-        for x in xs:
-            if isinstance(x, str) and x.startswith(prefix):
-                return True
-        return False
-    pre_labels = kw.get("labels", []) or []
-    pre = {
-        "srcs": "srcs" in kw,
-        "labels_has_patch_scope": _has_prefix(pre_labels, "patch_scope:"),
-        "labels_has_lockfile": _has_prefix(pre_labels, "lockfile:"),
-    }
-    _ = prepare_importer_non_genrule_wiring(
-        name = name,
-        kwargs = kw,
-        deps = [],
-        lang = lang,
-        kind = kind,
-        lockfile_label = "lockfile:apps/demo/uv.lock#apps/demo",
-        MODULE_PROVIDERS = {},
-    )
-    post_labels = kw.get("labels", []) or []
-    post = {
-        "srcs": "srcs" in kw,
-        "labels_has_patch_scope": _has_prefix(post_labels, "patch_scope:"),
-        "labels_has_lockfile": _has_prefix(post_labels, "lockfile:"),
-    }
-
-    out = []
-    for k in ["srcs", "labels_has_patch_scope", "labels_has_lockfile"]:
-        out.append("pre:%s:%s" % (k, "true" if pre[k] else "false"))
-        out.append("post:%s:%s" % (k, "true" if post[k] else "false"))
-
-    genrule(
-        name = name,
-        srcs = [],
-        out = name + ".items.txt",
-        cmd = "cat > $OUT <<'EOF'\n%s\nEOF" % "\n".join(out),
-        labels = ["kind:probe"],
-    )
-
 __all__ = [
     "prepare_importer_genrule_kwargs",
     "prepare_importer_non_genrule_wiring",
     "prepare_importer_srcsless_rule_wiring",
-    "importer_wiring_mutation_probe",
 ]
 
 

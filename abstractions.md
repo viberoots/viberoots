@@ -59,7 +59,6 @@ For language macros, stamping is the macro’s responsibility. Call sites should
 - **Starlark (package-local WASM macro wiring)**: `lang/wasm_package_local_wiring.bzl` via `lang/defs_common.bzl` re-exports.
   - `prepare_package_local_wasm_wiring(...)` (non-mutating at the call-site boundary; returns prepared `kwargs`; fixed ordering: wasm stamps → patch_scope → patch inputs → provider edges)
   - `wire_package_local_wasm_planner_visible_stub(...)` (preferred; non-mutating boundary, delegates to `wire_package_local_planner_visible_stub(...)`)
-  - `wire_package_local_wasm_planner_visible_stub_legacy_mutating(...)` (legacy-only; wrapper delegates to the non-mutating helper)
 - **Kind vocabulary (contract)**:
   - Starlark: `lang/kind_vocabulary.bzl` (re-exported via `lang/defs_common.bzl`)
   - TypeScript: `tools/lib/kind-vocabulary.ts`
@@ -523,6 +522,7 @@ The contract is guarded by probe and enforcement tests. If a new macro bypasses 
 - `tools/tests/lang/importer-nix-calling-genrule-wiring.attach-patches-providers-global-inputs.probe.test.ts`: proves list and dict `srcs` shapes receive importer-local patch inputs, provider edges, global Nix inputs, and standardized workspace-root env injection.
 - `tools/tests/node/node.nix-calling-macros.use-shared-importer-nix-genrule-helper.enforcement.test.ts`: prevents Node Nix-calling macro implementations from bypassing the shared helper.
 - `tools/tests/node/node.defs-core.uses-importer-wiring-v2.enforcement.test.ts`: prevents Node macros from falling back to the mutating importer wiring helpers after the v2 migration.
+- `tools/tests/lang/starlark.no-legacy-mutating-outside-lang.enforcement.test.ts`: prevents reintroduction of legacy mutating wiring helpers outside `//lang/*`.
 
 ---
 
@@ -544,11 +544,9 @@ Importer-scoped non-genrule wrappers should:
 
 - **Starlark (preferred)**: `lang/importer_wiring_v2.bzl:prepare_importer_non_genrule_wiring`
 - **Starlark (Nix-calling, preferred)**: `lang/importer_wiring_v2_nix_calling.bzl:prepare_importer_non_genrule_nix_calling_wiring` (composes non-genrule importer wiring plus `global_nix_inputs()` as real action inputs, without mutating caller dicts)
-- **Starlark (legacy)**: `lang/importer_wiring.bzl:prepare_importer_non_genrule_wiring_legacy_mutating`
 - **Genrule-style (preferred)**: `lang/importer_wiring_v2.bzl:prepare_importer_genrule_kwargs`
 - **Python macro usage**: `python/defs.bzl` (`nix_python_library`, `nix_python_test`, `nix_python_wasm_*`)
 - **Srcs-less rule shapes (preferred)**: `lang/importer_wiring_v2.bzl:prepare_importer_srcsless_rule_wiring` (creates a synthetic dep carrying importer-local patches as action inputs)
-- **Srcs-less rule shapes (legacy)**: `lang/importer_wiring.bzl:prepare_importer_srcsless_rule_wiring_legacy_mutating`
 
 ### Common leak patterns
 
@@ -580,7 +578,7 @@ Node providers cannot list importer-local patch files as Buck `srcs` without cro
 
 ### Some rules cannot accept `srcs`
 
-Example: Buck prelude `python_binary` does not accept `srcs`. The macro carries patch inputs via a synthetic dependency. This is exposed as a shared helper so call sites do not re-implement it: `lang/importer_wiring.bzl:prepare_importer_srcsless_rule_wiring`.
+Example: Buck prelude `python_binary` does not accept `srcs`. The macro carries patch inputs via a synthetic dependency. This is exposed as a shared helper so call sites do not re-implement it: `lang/importer_wiring_v2.bzl:prepare_importer_srcsless_rule_wiring`.
 
 ---
 

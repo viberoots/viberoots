@@ -60,10 +60,13 @@ load(
 )
 load(
     "//lang:importer_wiring_v2.bzl",
-    _importer_wiring_mutation_probe = "importer_wiring_mutation_probe",
     _prepare_importer_genrule_kwargs = "prepare_importer_genrule_kwargs",
     _prepare_importer_non_genrule_wiring = "prepare_importer_non_genrule_wiring",
     _prepare_importer_srcsless_rule_wiring = "prepare_importer_srcsless_rule_wiring",
+)
+load(
+    "//lang:importer_wiring_v2_probe.bzl",
+    _importer_wiring_mutation_probe = "importer_wiring_mutation_probe",
 )
 load(
     "//lang:importer_wiring_v2_nix_calling.bzl",

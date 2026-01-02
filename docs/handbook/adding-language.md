@@ -9,7 +9,7 @@ This guide explains how to add a new language to the build without touching core
 When you add or change a macro, keep the wiring table-driven through shared helpers. These are the expected helper surfaces, and the enforcement tests that guard them:
 
 - Follow the macro call-site conventions in `docs/handbook/conventions.md`. In particular, keep a single merge point for labels and deps before calling shared wiring helpers.
-- Legacy mutating helpers (names ending in `*_legacy_mutating`) are migration-only compatibility surfaces under `//lang/*`. They are intentionally **not** re-exported from `//lang:defs_common.bzl`.
+- Legacy mutating helper surfaces have been removed. Any reintroduction is blocked by enforcement tests; do not add new “mutating wiring helpers” at macro boundaries.
 
 - **Importer-scoped, non-genrule wrappers** (wrap `python_library`, `python_test`, etc.)
   - Use `prepare_importer_non_genrule_wiring(...)` (or `prepare_importer_srcsless_rule_wiring(...)` when the rule shape cannot accept `srcs`).
@@ -34,7 +34,6 @@ When you add or change a macro, keep the wiring table-driven through shared help
   - For rule shapes that carry patch inputs in `srcs` and realize provider edges into `deps` or `srcs`, use `prepare_package_local_wasm_wiring(...)`.
     - This helper is non-mutating at the call-site boundary. Do not rely on helper-side mutation ordering; use the returned prepared `kwargs` for the underlying rule.
   - For planner-visible package-local WASM stubs, use `wire_package_local_wasm_planner_visible_stub(...)`.
-    - `wire_package_local_wasm_planner_visible_stub_legacy_mutating(...)` is legacy-only and must not be used in new macro code.
 - **Dict-shaped `srcs`** (when wiring patches/providers/global inputs into dict-safe keys)
   - Do not hardcode reserved synthetic key prefixes. Import `PATCH_INPUTS_KEY_PREFIX`, `PROVIDER_EDGES_KEY_PREFIX`, `GLOBAL_NIX_INPUTS_KEY_PREFIX` from `//lang:defs_common.bzl`.
   - Guardrails:
@@ -87,7 +86,6 @@ For importer-scoped ecosystems, we try hard to keep “how we find lockfiles” 
     - Stamps `lang:*` and `kind:*` labels (or you can opt out when another stamper is used)
     - Includes package-local `*.patch` files as action inputs (via `srcs`)
     - Realizes provider edges deterministically (via `MODULE_PROVIDERS`)
-  - `prepare_package_local_wiring_legacy_mutating(...)` is legacy-only and should not be used in new macro code.
 
   Minimal example:
 
@@ -127,7 +125,8 @@ When your macro must emit a **planner-visible stub** (a graph node for planner d
   - Strips provider targets from planner-visible `deps` **by default** (opt out via `strip_providers_from_deps = False`)
   - Optionally realizes provider edges into `deps` or **inputs** (`srcs`) via `provider_realization_mode = "deps"|"inputs"`
 
-Rule: new package-local planner-visible stub call sites must use the non-mutating helper. The legacy mutating helper (`wire_package_local_planner_visible_stub_legacy_mutating(...)`) remains only for migration support and should not appear in new macro code.
+Rule: new package-local planner-visible stub call sites must use the non-mutating helper. Do not introduce legacy/mutating variants.
+Rule: new package-local planner-visible stub call sites must use the non-mutating helper. Do not introduce legacy/mutating variants.
 
 ### Python notes
 
@@ -138,7 +137,6 @@ Rule: new package-local planner-visible stub call sites must use the non-mutatin
   - Macro wiring: importer-scoped wiring is centralized via:
     - Prefer `//lang:importer_wiring_v2.bzl:prepare_importer_non_genrule_wiring(...)` for `nix_python_library`, `nix_python_test`, and `nix_python_wasm_*` (non-mutating).
     - Prefer `//lang:importer_wiring_v2.bzl:prepare_importer_srcsless_rule_wiring(...)` for rule shapes that cannot accept `srcs` (example: prelude `python_binary`).
-    - Legacy mutating helpers remain available in `//lang:importer_wiring.bzl` for migration only and use explicit `*_legacy_mutating` names.
 - Scaffolding:
   - `scaf new python lib <name>` → `libs/<name>` with `pyproject.toml`, `uv.lock`, `TARGETS` using `nix_python_library` and a sample test via `nix_python_test`.
   - `scaf new python app <name>` → `apps/<name>` with a small library and binary (`nix_python_binary`) and importer‑scoped `lockfile_label`.

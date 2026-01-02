@@ -1,5 +1,5 @@
 load("//lang:planner_stub.bzl", "planner_stub", "planner_stub_with_package_local_patches")
-load("//lang:macro_kwargs.bzl", "extract_package_local_patch_dirs_and_nixpkg_deps", "pop_package_local_patch_dirs_and_nixpkg_deps")
+load("//lang:macro_kwargs.bzl", "extract_package_local_patch_dirs_and_nixpkg_deps")
 load("//lang:label_stamping.bzl", "stamp_labels", "stamp_patch_scope_for_lang")
 load("//lang:provider_edges.bzl", "realize_provider_edges", "strip_provider_targets")
 
@@ -123,64 +123,6 @@ def wire_planner_visible_stub(
         visibility = visibility,
         **kwargs
     )
-
-
-def wire_package_local_planner_visible_stub_legacy_mutating(
-        *,
-        name,
-        out = "",
-        kwargs,
-        lang,
-        kind = None,
-        deps = [],
-        srcs = [],
-        MODULE_PROVIDERS = None,
-        provider_realization_mode = None,
-        # Back-compat: older call sites used "deps"|"srcs".
-        realize_providers_into = None,
-        strip_providers_from_deps = True):
-    """
-    Shared helper for package-local, planner-visible stub targets.
-
-    This composes:
-    - pop package-local patch dirs (and optional nixpkg_deps) + append nixpkg labels
-    - stamp patch_scope:* for the language
-    - stamp lang:* and kind:* (kind may be non-standard, e.g. "carchive")
-    - create a planner-visible stub with optional provider-edge realization and optional provider stripping
-    - attach package-local patch files as stub inputs (via wire_planner_visible_stub(lang=...))
-
-    Returns a struct with: { local_patch_dirs, nixpkg_deps }.
-    """
-    if not isinstance(name, str) or name == "":
-        fail("wire_package_local_planner_visible_stub_legacy_mutating: name must be a non-empty string")
-    if not isinstance(kwargs, dict):
-        fail("wire_package_local_planner_visible_stub_legacy_mutating: kwargs must be a dict")
-    if not isinstance(lang, str) or lang == "":
-        fail("wire_package_local_planner_visible_stub_legacy_mutating: lang must be a non-empty string")
-
-    info = pop_package_local_patch_dirs_and_nixpkg_deps(kwargs, lang, append_labels = True)
-    stamp_patch_scope_for_lang(kwargs, lang)
-    stamp_labels(kwargs, lang, kind)
-
-    wire_planner_visible_stub(
-        name = name,
-        out = out,
-        lang = lang,
-        local_patch_dirs = info.local_patch_dirs,
-        deps = deps,
-        srcs = srcs,
-        labels = kwargs.get("labels", []) or [],
-        visibility = kwargs.get("visibility", []),
-        MODULE_PROVIDERS = MODULE_PROVIDERS,
-        provider_realization_mode = provider_realization_mode,
-        realize_providers_into = realize_providers_into,
-        strip_providers_from_deps = strip_providers_from_deps,
-    )
-    return struct(
-        local_patch_dirs = info.local_patch_dirs,
-        nixpkg_deps = info.nixpkg_deps,
-    )
-
 
 def wire_package_local_planner_visible_stub(
         *,
