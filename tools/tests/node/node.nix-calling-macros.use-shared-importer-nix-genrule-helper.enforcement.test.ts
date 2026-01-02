@@ -17,6 +17,15 @@ test("node Nix-calling macros route through shared importer+nix genrule wiring h
   );
 
   assert(
+    txt.includes('load("//lang:auto_map.bzl", "MODULE_PROVIDERS")'),
+    `${file} must load MODULE_PROVIDERS via //lang:auto_map.bzl so provider edges are realized consistently`,
+  );
+  assert(
+    txt.includes("MODULE_PROVIDERS = MODULE_PROVIDERS"),
+    `${file} must pass MODULE_PROVIDERS into prepare_importer_nix_calling_genrule_wiring(...)`,
+  );
+
+  assert(
     !txt.includes("wire_global_nix_inputs("),
     `${file} must not call wire_global_nix_inputs(...) directly; the shared helper owns global input wiring`,
   );

@@ -9,6 +9,7 @@ This guide explains how to add a new language to the build without touching core
 When you add or change a macro, keep the wiring table-driven through shared helpers. These are the expected helper surfaces, and the enforcement tests that guard them:
 
 - Follow the macro call-site conventions in `docs/handbook/conventions.md`. In particular, keep a single merge point for labels and deps before calling shared wiring helpers.
+- Legacy mutating helpers (names ending in `*_legacy_mutating`) are migration-only compatibility surfaces under `//lang/*`. They are intentionally **not** re-exported from `//lang:defs_common.bzl`.
 
 - **Importer-scoped, non-genrule wrappers** (wrap `python_library`, `python_test`, etc.)
   - Use `prepare_importer_non_genrule_wiring(...)` (or `prepare_importer_srcsless_rule_wiring(...)` when the rule shape cannot accept `srcs`).

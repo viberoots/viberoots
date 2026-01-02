@@ -10,6 +10,10 @@ load(
 )
 load("//node:defs_core.bzl", "nix_node_gen")
 
+# NOTE: Prebuild guard ensures this load is valid before builds/tests run.
+MODULE_PROVIDERS = {}
+load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
+
 def _prepare_node_importer_nix_calling_genrule_kwargs(
         name,
         kwargs,
@@ -17,8 +21,7 @@ def _prepare_node_importer_nix_calling_genrule_kwargs(
         deps,
         kind,
         labels = [],
-        lockfile_label = None,
-        MODULE_PROVIDERS = None):
+        lockfile_label = None):
     return prepare_importer_nix_calling_genrule_wiring(
         name = name,
         kwargs = kwargs,
