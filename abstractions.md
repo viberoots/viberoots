@@ -280,8 +280,8 @@ When debugging invalidation, it is easy to misread the surface area by looking o
 - `node tools/buck/prebuild-guard.ts` prints short, canonical one-liners that explain where invalidation comes from, using the contract vocabulary (`package-local` / `importer-local`).
 - `tools/buck/invalidation-report.txt` is the canonical per-target report. It answers “what invalidates this target?” using the shared contract vocabulary and separates **real action inputs** from **diagnostic stamps**:
   - `patch_scope` and whether patch inputs are expected to be real action inputs (based on the patch model contract).
-  - Where patch inputs are observed (list-shaped `srcs`, dict-shaped `srcs` under `__patch_inputs__/...`, or synthetic deps like `*__patch_inputs`).
-  - Where global Nix inputs are observed as action inputs (`srcs` and/or `nix_inputs`), and whether the global input label was stamped for observability (`global_nix_inputs_labels_stamped`).
+  - Where patch inputs are observed (list-shaped `srcs`, dict-shaped `srcs` under `__patch_inputs__/...`, or synthetic deps like `*__patch_inputs`). Dict-shaped `__patch_inputs__/...` observations are classified according to the target’s `patch_scope` (package-local vs importer-local).
+  - Where global Nix inputs are observed as action inputs (`srcs` and/or `nix_inputs`). Label stamps are observability-only (`global_nix_inputs_labels_stamped`) and must not be treated as the source of truth for invalidation.
   - Realized provider edges are included as a debugging aid only. They are not the invalidation source of truth.
   - Regenerate (preferred): `node tools/buck/glue-pipeline.ts`
   - Regenerate (report-only): `node tools/buck/invalidation-report.ts`

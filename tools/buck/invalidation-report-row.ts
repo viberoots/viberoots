@@ -179,7 +179,13 @@ export function computeInvalidationRow(
       globalNixObserved.push("srcs(dict)/__global_nix_inputs__");
     }
     if (keys.some((k) => k.startsWith("__patch_inputs__/"))) {
-      importerLocalPatchesObserved.push("srcs(dict)/__patch_inputs__");
+      if (importerLocalPatchesExpected) {
+        importerLocalPatchesObserved.push("srcs(dict)/__patch_inputs__");
+      } else if (packageLocalPatchesExpected) {
+        packageLocalPatchesObserved.push("srcs(dict)/__patch_inputs__");
+      } else {
+        importerLocalPatchesObserved.push("srcs(dict)/__patch_inputs__");
+      }
     }
   }
 

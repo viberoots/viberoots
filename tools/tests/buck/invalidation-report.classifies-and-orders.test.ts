@@ -46,6 +46,14 @@ test("invalidation-report: stable ordering, patch scope classification, and glob
           srcs: ["libs/cpp/lib.cc", "libs/cpp/patches/cpp/demo@0.0.0.patch"],
         },
         {
+          name: "//libs/cpp:stub",
+          rule_type: "planner_stub",
+          labels: ["lang:cpp", "kind:stub", "patch_scope:package-local"],
+          srcs: {
+            "__patch_inputs__/libs_cpp_patches_cpp": "root//libs/cpp/patches/cpp/demo@0.0.0.patch",
+          },
+        },
+        {
           name: "//libs/go:lib",
           rule_type: "go_library",
           labels: ["lang:go", "kind:lib", "patch_scope:package-local"],
@@ -154,6 +162,8 @@ test("invalidation-report: stable ordering, patch scope classification, and glob
       "package_local_patches_action_inputs_observed_in=srcs(list)/libs/go/patches/go",
       "target=//libs/cpp:lib\tlangs=cpp\tpatch_scope=package-local",
       "package_local_patches_action_inputs_observed_in=srcs(list)/libs/cpp/patches/cpp",
+      "target=//libs/cpp:stub\tlangs=cpp\tpatch_scope=package-local",
+      "package_local_patches_action_inputs_observed_in=srcs(dict)/__patch_inputs__",
       "target=//apps/py:bin\tlangs=python\tpatch_scope=importer-local",
     ];
     for (const part of wantOtherParts) {
