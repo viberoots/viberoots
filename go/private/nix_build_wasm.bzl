@@ -1,4 +1,4 @@
-load("//lang:nix_shell.bzl", "nix_bootstrap_env_core")
+load("//lang:nix_shell.bzl", "nix_build_out_path_cmd", "nix_cmd_prefix")
 load("//lang:nix_action_runner.bzl", "nix_action_build_selected_out_path_cmd")
 
 def _go_nix_build_wasm_impl(ctx):
@@ -9,26 +9,33 @@ def _go_nix_build_wasm_impl(ctx):
     expected_rel = ctx.attrs.expected_rel
     # Prefer the specialized selected-wasm attribute for Go/TinyGo which does not
     # require the target to be present in the exported graph. Fallback to generic selected.
+    build_prefix = "env BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" " + ("BUCK_TARGET=\"%s\" " % raw)
     run_and_copy = (
-        nix_bootstrap_env_core()
-        + ("OUT_PATH=$(BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"%s\" nix build --impure --print-out-paths --accept-flake-config \"path:$FLK_ROOT#graph-generator-selected-wasm\" || true); " % (raw))
-        + "if [ -z \"$OUT_PATH\" ]; then "
+        nix_cmd_prefix(timeout_var = "TIMEOUT", timeout_sec = 600, include_pnpm_store = False, escape_cmd_subst = True)
+        + "if "
+        + nix_build_out_path_cmd(
+            "\"path:$FLK_ROOT#graph-generator-selected-wasm\"",
+            timeout_var = "TIMEOUT",
+            impure = True,
+            build_prefix = build_prefix,
+        )
+        + "then :; else "
         + nix_action_build_selected_out_path_cmd(
             target_label = raw,
-            out_var = "OUT_PATH",
+            out_var = "outPath",
             raw_var = "OUT_RAW",
             status_var = "NIX_STATUS",
             log_file = "/tmp/go_nix_build_wasm_build.log",
             zx_wrapper = "path:$FLK_ROOT#zx-wrapper",
         )
-        + "if [ \"$NIX_STATUS\" -ne 0 ] || [ -z \"$OUT_PATH\" ]; then cat /tmp/go_nix_build_wasm_build.log >&2 || true; exit ${NIX_STATUS:-2}; fi; "
+        + "if [ \"$NIX_STATUS\" -ne 0 ] || [ -z \"$outPath\" ]; then cat /tmp/go_nix_build_wasm_build.log >&2 || true; exit ${NIX_STATUS:-2}; fi; "
         + "fi; "
-        + "test -n \"$OUT_PATH\"; "
+        + "test -n \"$outPath\"; "
         + (
-            "if [ ! -e \"$OUT_PATH/%s\" ]; then echo 'go_nix_build_wasm (%s): expected artifact not found: %s' >&2; (ls -la \"$OUT_PATH\"; ls -la \"$OUT_PATH/lib\" 2>/dev/null || true) >&2; exit 2; fi; "
+            "if [ ! -e \"$outPath/%s\" ]; then echo 'go_nix_build_wasm (%s): expected artifact not found: %s' >&2; (ls -la \"$outPath\"; ls -la \"$outPath/lib\" 2>/dev/null || true) >&2; exit 2; fi; "
             % (expected_rel, raw, expected_rel)
         )
-        + "DEST=\"$0\"; cp -f \"$OUT_PATH/%s\" \"$DEST\"; " % expected_rel
+        + "DEST=\"$0\"; cp -f \"$outPath/%s\" \"$DEST\"; " % expected_rel
     )
     out = ctx.actions.declare_output(ctx.attrs.out)
     cmd = cmd_args([

@@ -154,14 +154,22 @@ def nix_calling_genrule_nix_build_out_path_prefix(
     ) + nix_build_out_path_cmd(flake_attr, timeout_var = timeout_var, impure = impure)
 
 
-def nix_build_out_path_cmd(flake_attr, timeout_var = "TIMEOUT", impure = False):
+def nix_build_out_path_cmd(flake_attr, timeout_var = "TIMEOUT", impure = False, build_prefix = ""):
     tout = ""
     if isinstance(timeout_var, str) and timeout_var != "":
         tout = "$%s " % timeout_var
+    prefix = ""
+    if isinstance(build_prefix, str) and build_prefix != "":
+        prefix = build_prefix
+        if not prefix.endswith(" "):
+            prefix = prefix + " "
     imp = "--impure " if impure else ""
     return (
         "OUT_PATHS_FILE=\"$TMP/bnx-nix-outpaths.txt\"; "
-        + (tout + ("nix build %s --accept-flake-config %s--no-link --print-out-paths > \"$OUT_PATHS_FILE\"; " % (flake_attr, imp)))
+        + (
+            tout +
+            ("%snix build %s --accept-flake-config %s--no-link --print-out-paths > \"$OUT_PATHS_FILE\"; " % (prefix, flake_attr, imp))
+        )
         + "OUT_LAST_FILE=\"$OUT_PATHS_FILE.last\"; "
         + "tail -n1 \"$OUT_PATHS_FILE\" > \"$OUT_LAST_FILE\"; "
         + "outPath=\"\"; read -r outPath < \"$OUT_LAST_FILE\" 2>/dev/null || true; "

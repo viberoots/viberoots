@@ -1,5 +1,5 @@
 load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name")
-load("//lang:nix_shell.bzl", "nix_bootstrap_env_core")
+load("//lang:nix_shell.bzl", "nix_build_out_path_cmd", "nix_cmd_prefix")
 load("//lang:nix_action_runner.bzl", "nix_action_export_graph_cmd", "nix_action_workspace_setup_from_args")
 
 
@@ -31,10 +31,17 @@ def _cpp_nix_build_impl(ctx):
     # 1) Ensure the Buck graph is exported for the temp workspace
     # 2) Build the planner-selected attr directly via nix build .#graph-generator-cppTargets.<sanitized>
     # 3) Copy the produced artifact to the declared output
+    build_prefix = (
+        "env "
+        + "PLANNER_ONLY_CPP=1 "
+        + ("BUCK_TARGET=\"%s\" " % raw)
+        + "BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" "
+        + "BUCK_GRAPH_JSON=\"$WORKSPACE_ROOT/tools/buck/graph.json\" "
+    )
     run_and_copy = (
         nix_action_workspace_setup_from_args()
         + "export BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE=1; "
-        + nix_bootstrap_env_core()
+        + nix_cmd_prefix(timeout_var = "TIMEOUT", timeout_sec = 600, include_pnpm_store = False, escape_cmd_subst = True)
         + "cd \"$FLK_ROOT\"; "
         + nix_action_export_graph_cmd(
             out_graph = "$WORKSPACE_ROOT/tools/buck/graph.json",
@@ -50,13 +57,17 @@ def _cpp_nix_build_impl(ctx):
         + "fi; "
         + "export BUCK_GRAPH_JSON=\"$WORKSPACE_ROOT/tools/buck/graph.json\"; "
         # Build the selected target via the primary flake attr using BUCK_TARGET
-        + ("OUT_PATH=$(PLANNER_ONLY_CPP=1 BUCK_TARGET=\"%s\" BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_GRAPH_JSON=\"$WORKSPACE_ROOT/tools/buck/graph.json\" nix build -L --impure \"path:$FLK_ROOT#graph-generator-selected\" --accept-flake-config --print-out-paths); " % raw)
-        + "test -n \"$OUT_PATH\"; "
+        + nix_build_out_path_cmd(
+            "\"path:$FLK_ROOT#graph-generator-selected\"",
+            timeout_var = "TIMEOUT",
+            impure = True,
+            build_prefix = build_prefix,
+        )
         + (
-            "if [ ! -e \"$OUT_PATH/%s\" ]; then echo 'cpp_nix_build (%s): expected artifact not found for kind \"%s\": %s' >&2; (ls -la \"$OUT_PATH\"; ls -la \"$OUT_PATH/bin\" 2>/dev/null || true; ls -la \"$OUT_PATH/lib\" 2>/dev/null || true) >&2; exit 2; fi; "
+            "if [ ! -e \"$outPath/%s\" ]; then echo 'cpp_nix_build (%s): expected artifact not found for kind \"%s\": %s' >&2; (ls -la \"$outPath\"; ls -la \"$outPath/bin\" 2>/dev/null || true; ls -la \"$outPath/lib\" 2>/dev/null || true) >&2; exit 2; fi; "
             % (expected, raw, kind, expected)
         )
-        + "DEST=\"$0\"; cp -f \"$OUT_PATH/%s\" \"$DEST\"; " % expected
+        + "DEST=\"$0\"; cp -f \"$outPath/%s\" \"$DEST\"; " % expected
     )
     out = ctx.actions.declare_output(ctx.attrs.out)
     # For bash -c, $0 is set to the first argument after the script string

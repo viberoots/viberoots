@@ -41,13 +41,9 @@ nix_go_tiny_wasm_lib(
       "utf8",
     );
 
-    const res = await $({
+    await $({
       cwd: tmp,
-      reject: false,
-      nothrow: true,
+      stdio: "inherit",
     })`buck2 build --target-platforms prelude//platforms:default //libs/math-api:wasm`;
-    if (res.exitCode !== 0) {
-      return;
-    }
   });
 });
