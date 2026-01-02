@@ -15,12 +15,14 @@ Node macros include importer-local patches via `native.glob(...)`. Because Buck 
 - **`node_webapp(...)`** (`node/defs_nix.bzl`)
   - Builds the importer webapp via Nix (`.#node-webapp.<importer>`) and copies `dist/` into `$OUT`.
   - Requires exactly one importer-scoped lockfile label: `lockfile:<path>#<importer>`.
+  - `lockfile_label` is the single authoritative source of importer identity.
   - Do not pass a separate `importer` argument. If you do, it must match the lockfile label importer or the macro fails fast.
-  - Provide the lockfile label **either** via `lockfile_label=...` **or** as a `lockfile:` entry in `labels`, but not both.
+  - Provide the lockfile label via `lockfile_label=...`. Do not pass a `lockfile:` entry in `labels` (even if it matches), because macros require exactly one lockfile label.
 
 - **`nix_node_cli_bin(..., bundle=True)`** (`node/defs_nix.bzl`)
   - Produces a single-file, shebanged bundle for a Node CLI by building the per-importer flake attr and copying the emitted bundle to `$OUT`.
   - Requires exactly one importer-scoped lockfile label: `lockfile:<path>#<importer>`.
+  - `lockfile_label` is the single authoritative source of importer identity.
   - Do not pass a separate `importer` argument. If you do, it must match the lockfile label importer or the macro fails fast.
   - Bundled mode uses a fixed entry today: **`src/index.ts`**.
     - If `entry` is set while `bundle=True`, it must be `src/index.ts` (or omitted).

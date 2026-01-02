@@ -216,6 +216,7 @@ node tools/dev/patches-lint.ts --lang python
 Quick checks and guidance:
 
 - Ensure exactly one `lockfile:<path>#<importer>` label is present on each Python target (the macros enforce this).
+- Prefer passing the lockfile label via `lockfile_label=...` on macros. Avoid passing `lockfile:` labels via `labels`, because macros require exactly one lockfile label and do not allow duplicates.
 - Place patches under the importer’s `patches/python/` directory; no cross‑package references.
 
 ## Node (PNPM) — importer‑local patches and invalidation
@@ -239,6 +240,7 @@ Quick checks and guidance:
 Quick checks and guidance:
 
 - Ensure exactly one `lockfile:<path>#<importer>` label is present on each Node target (the macros enforce this).
+- Prefer passing the lockfile label via `lockfile_label=...` on macros. Avoid passing `lockfile:` labels via `labels`, because macros require exactly one lockfile label and do not allow duplicates.
 - Place patches under the importer’s `patches/node/` directory; no cross‑package references.
 - Regenerate glue as needed (export graph → sync providers → gen auto_map). The prebuild guard will auto‑fix locally or fail fast in CI.
 

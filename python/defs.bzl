@@ -2,7 +2,6 @@ load("@prelude//:rules.bzl", "python_binary", "python_library", "python_test", "
 load(
     "//lang:defs_common.bzl",
     "append_nixpkg_labels",
-    "dedupe_preserve",
     "prepare_importer_non_genrule_wiring",
     "prepare_importer_srcsless_rule_wiring",
     "stamp_wasm_variant",
@@ -72,16 +71,17 @@ def nix_python_wasm_app(name, lockfile_label = None, deps = [], labels = [], **k
     """
     WASI app stamp: uses python_* rules for Buck semantics but marks kind:wasm for the planner.
     """
-    kwargs["labels"] = dedupe_preserve((labels or []) + (kwargs.get("labels", []) or []))
-    stamp_wasm_variant(kwargs, "python", "wasi")
-    nixpkg_deps = kwargs.pop("nixpkg_deps", [])
-    append_nixpkg_labels(kwargs, nixpkg_deps)
+    kw = dict(kwargs)
+    stamp_wasm_variant(kw, "python", "wasi")
+    nixpkg_deps = kw.pop("nixpkg_deps", [])
+    append_nixpkg_labels(kw, nixpkg_deps)
     wiring = prepare_importer_non_genrule_wiring(
         name = name,
-        kwargs = kwargs,
+        kwargs = kw,
         deps = deps,
         lang = "python",
         kind = "wasm",
+        labels = list(labels or []),
         lockfile_label = lockfile_label,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
     )
@@ -91,16 +91,17 @@ def nix_python_wasm_lib(name, lockfile_label = None, deps = [], labels = [], **k
     """
     WASI lib stamp: emits a reusable overlay (planner builds via pyWasmLib).
     """
-    kwargs["labels"] = dedupe_preserve((labels or []) + (kwargs.get("labels", []) or []))
-    stamp_wasm_variant(kwargs, "python", "wasi")
-    nixpkg_deps = kwargs.pop("nixpkg_deps", [])
-    append_nixpkg_labels(kwargs, nixpkg_deps)
+    kw = dict(kwargs)
+    stamp_wasm_variant(kw, "python", "wasi")
+    nixpkg_deps = kw.pop("nixpkg_deps", [])
+    append_nixpkg_labels(kw, nixpkg_deps)
     wiring = prepare_importer_non_genrule_wiring(
         name = name,
-        kwargs = kwargs,
+        kwargs = kw,
         deps = deps,
         lang = "python",
         kind = "wasm",
+        labels = list(labels or []),
         lockfile_label = lockfile_label,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
     )

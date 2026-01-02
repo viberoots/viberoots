@@ -134,6 +134,7 @@ Rule: new package-local planner-visible stub call sites must use the non-mutatin
   - Patches are importer-local: `<importer>/patches/python/` (flat, no subdirectories).
   - Lockfile labeling is importer‑scoped: `lockfile:<path>#<importer>`; standard file is `uv.lock`.
   - Macros: use `nix_python_{library,binary,test}` from `python/defs.bzl` and pass `lockfile_label` explicitly.
+    - Do not pass `lockfile:` labels through `labels`; importer identity is derived from `lockfile_label` and macros require exactly one lockfile label.
   - Macro wiring: importer-scoped wiring is centralized via:
     - Prefer `//lang:importer_wiring_v2.bzl:prepare_importer_non_genrule_wiring(...)` for `nix_python_library`, `nix_python_test`, and `nix_python_wasm_*` (non-mutating).
     - Prefer `//lang:importer_wiring_v2.bzl:prepare_importer_srcsless_rule_wiring(...)` for rule shapes that cannot accept `srcs` (example: prelude `python_binary`).

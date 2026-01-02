@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "genrule")
-load("//lang:defs_common.bzl", "importer_from_labels", "prepare_importer_nix_calling_genrule_wiring")
+load("//lang:defs_common.bzl", "extract_lockfile_labels", "importer_from_labels", "prepare_importer_nix_calling_genrule_wiring")
 load("//lang:importer_strings.bzl", "importer_display_name", "sanitize_importer_for_nix_attr")
 load(
     "//lang:nix_shell.bzl",
@@ -10,21 +10,47 @@ load(
 )
 load("//node:defs_core.bzl", "nix_node_gen")
 
-# NOTE: Prebuild guard ensures this load is valid before builds/tests run.
 MODULE_PROVIDERS = {}
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
 
-def _validate_importer_arg_matches_lockfile_label(importer, lockfile_label, labels, macro_name):
+def _fail_importer_arg_mismatch(macro_name, importer, lockfile_importer, lockfile_label):
+    fail(
+        ("%s: importer must match the importer suffix in the single lockfile label; " % macro_name) +
+        ("importer=%s lockfile_importer=%s lockfile_label=%s" % (importer, lockfile_importer, lockfile_label))
+    )
+
+def _effective_lockfile_label_from_wiring(wiring):
+    lf = extract_lockfile_labels(wiring.kwargs.get("labels", []) or [])
+    if len(lf) == 1:
+        return lf[0]
+    return lf
+
+def _validate_optional_importer_arg_matches_wiring(importer, wiring, macro_name):
+    if importer == None:
+        return
+    if importer != wiring.importer:
+        _fail_importer_arg_mismatch(
+            macro_name = macro_name,
+            importer = importer,
+            lockfile_importer = wiring.importer,
+            lockfile_label = _effective_lockfile_label_from_wiring(wiring),
+        )
+
+def _validate_optional_importer_arg_matches_single_lockfile_label(importer, lockfile_label, labels, macro_name):
     if importer == None:
         return
     kw = {"labels": list(labels or [])}
     if lockfile_label != None:
         kw["labels"] = (kw.get("labels", []) or []) + [lockfile_label]
     derived = importer_from_labels(kw)
+    lf = extract_lockfile_labels(kw.get("labels", []) or [])
+    effective = lf[0] if len(lf) == 1 else lf
     if importer != derived:
-        fail(
-            ("%s: importer must match the importer suffix in the single lockfile label; " % macro_name) +
-            ("importer=%s lockfile_importer=%s lockfile_label=%s" % (importer, derived, kw.get("labels", [])))
+        _fail_importer_arg_mismatch(
+            macro_name = macro_name,
+            importer = importer,
+            lockfile_importer = derived,
+            lockfile_label = effective,
         )
 
 def _prepare_node_importer_nix_calling_genrule_kwargs(
@@ -76,16 +102,14 @@ def node_webapp(
         labels = list(labels or []),
         lockfile_label = lockfile_label,
     )
+    _validate_optional_importer_arg_matches_wiring(
+        importer = importer,
+        wiring = wiring,
+        macro_name = "node_webapp",
+    )
     kw = wiring.kwargs
     _importer = wiring.importer
-    if importer != None and importer != _importer:
-        fail(
-            ("node_webapp: importer must match the importer suffix in the single lockfile label; ") +
-            ("importer=%s lockfile_importer=%s lockfile_label=%s" % (importer, _importer, lockfile_label))
-        )
     cmd = (
-        # Buck executes genrules from a generated srcs/ directory with OUT as a relative path.
-        # Capture an absolute OUT path before we cd during nix bootstrap.
         "SCRATCH=\"$PWD\"; OUT_ABS=\"$SCRATCH/$OUT\"; "
         + nix_calling_genrule_bootstrap(
             timeout_sec = 240,
@@ -133,7 +157,7 @@ def nix_node_cli_bin(
         out = name
 
     if not bundle:
-        _validate_importer_arg_matches_lockfile_label(
+        _validate_optional_importer_arg_matches_single_lockfile_label(
             importer = importer,
             lockfile_label = lockfile_label,
             labels = labels,
@@ -141,8 +165,6 @@ def nix_node_cli_bin(
         )
         if entry == None:
             entry = "bin/%s" % name
-        # Copy only the CLI entry file to $OUT; provider stamps are included in srcs
-        # for dependency edges but should not be passed to cp as multiple sources.
         nix_node_gen(
             name = name,
             srcs = [entry],
@@ -156,8 +178,6 @@ def nix_node_cli_bin(
         )
         return
 
-    # Bundled mode uses a fixed entry today (src/index.ts) via the flake implementation.
-    # Do not accept arbitrary entries here; it would be ignored and would pollute action keys.
     if entry == None:
         entry = "src/index.ts"
     elif entry != "src/index.ts":
@@ -166,9 +186,7 @@ def nix_node_cli_bin(
             + "If you need to copy a different entry file, use bundle=False."
         )
 
-    # Build srcs map to place files at deterministic paths inside the action
     _srcs_map = {
-        # Preserve entry path under bin/
         entry: entry,
     }
 
@@ -182,23 +200,16 @@ def nix_node_cli_bin(
         labels = list(labels or []),
         lockfile_label = lockfile_label,
     )
+    _validate_optional_importer_arg_matches_wiring(
+        importer = importer,
+        wiring = wiring,
+        macro_name = "nix_node_cli_bin(bundle=True)",
+    )
     kw = wiring.kwargs
     _importer = wiring.importer
-    if importer != None and importer != _importer:
-        fail(
-            ("nix_node_cli_bin(bundle=True): importer must match the importer suffix in the single lockfile label; ") +
-            ("importer=%s lockfile_importer=%s lockfile_label=%s" % (importer, _importer, lockfile_label))
-        )
 
-    # Bundling may invoke Nix + PNPM and can legitimately take longer on cold caches.
-    # Keep command assembly standardized via lang/nix_shell.bzl helpers:
-    # - workspace-root env sourcing
-    # - outPath capture via nix build --no-link --print-out-paths
-    # - required env exports (BUCK_GRAPH_JSON, NIX_PNPM_FETCH_TIMEOUT)
     bundle_name = importer_display_name(_importer)
     cmd = (
-        # Buck executes genrules from a generated srcs/ directory with OUT as a relative path.
-        # Capture an absolute OUT path before we cd during nix bootstrap.
         "SCRATCH=\"$PWD\"; OUT_ABS=\"$SCRATCH/$OUT\"; "
         + nix_calling_genrule_bootstrap(
             timeout_sec = 180,
@@ -227,5 +238,3 @@ def nix_node_cli_bin(
     kw["out"] = out
     kw["cmd"] = cmd
     genrule(**kw)
-
-
