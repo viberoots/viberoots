@@ -107,6 +107,7 @@ extra-experimental-features = nix-command flakes dynamic-derivations ca-derivati
   - use the shared helper surface (`//lang:nix_shell.bzl` and `//lang:nix_action_runner.bzl`) for command assembly and out path capture
   - do not hand-roll `OUT_PATH=$$(...)` capture flows
   - do not mask failures (no `|| true` in Nix build flows)
+  - diagnostics may be best-effort, but must be structured so the build/capture path remains unambiguously strict (prefer explicit existence checks like `if [ -f ... ]; then ...; fi` over `cmd || true`)
 
 ## End-to-End Architecture
 

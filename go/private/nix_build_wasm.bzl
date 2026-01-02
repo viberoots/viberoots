@@ -28,12 +28,21 @@ def _go_nix_build_wasm_impl(ctx):
             log_file = "/tmp/go_nix_build_wasm_build.log",
             zx_wrapper = "path:$FLK_ROOT#zx-wrapper",
         )
-        + "if [ \"$NIX_STATUS\" -ne 0 ] || [ -z \"$outPath\" ]; then cat /tmp/go_nix_build_wasm_build.log >&2 || true; exit ${NIX_STATUS:-2}; fi; "
+        + "if [ \"$NIX_STATUS\" -ne 0 ] || [ -z \"$outPath\" ]; then "
+        + "  if [ -f /tmp/go_nix_build_wasm_build.log ]; then cat /tmp/go_nix_build_wasm_build.log >&2; fi; "
+        + "  exit ${NIX_STATUS:-2}; "
+        + "fi; "
         + "fi; "
         + "test -n \"$outPath\"; "
         + (
-            "if [ ! -e \"$outPath/%s\" ]; then echo 'go_nix_build_wasm (%s): expected artifact not found: %s' >&2; (ls -la \"$outPath\"; ls -la \"$outPath/lib\" 2>/dev/null || true) >&2; exit 2; fi; "
-            % (expected_rel, raw, expected_rel)
+            (
+                "if [ ! -e \"$outPath/%s\" ]; then "
+                + "  echo 'go_nix_build_wasm (%s): expected artifact not found: %s' >&2; "
+                + "  if [ -d \"$outPath\" ]; then ls -la \"$outPath\" >&2; fi; "
+                + "  if [ -d \"$outPath/lib\" ]; then ls -la \"$outPath/lib\" >&2; fi; "
+                + "  exit 2; "
+                + "fi; "
+            ) % (expected_rel, raw, expected_rel)
         )
         + "DEST=\"$0\"; cp -f \"$outPath/%s\" \"$DEST\"; " % expected_rel
     )

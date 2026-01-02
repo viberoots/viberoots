@@ -53,4 +53,10 @@ test("Nix-calling rule implementations use shared nix out-path capture helpers a
       `${label}: expected nix shell helpers to be loaded from //lang:nix_shell.bzl`,
     );
   }
+
+  assertDoesNotContain(
+    wasm,
+    "|| true",
+    "go/private/nix_build_wasm.bzl: expected no failure-masking '|| true' patterns; use conditional diagnostics instead",
+  );
 });
