@@ -50,6 +50,15 @@ let
   # - drop cell prefix
   normalizeTargetLabel = label: dropCellPrefix (dropConfigSuffix label);
 
+  # Derive the Buck package path (without leading "//") from a target label.
+  # Mirrors tools/lib/labels.ts:packagePathFromLabel.
+  packagePathFromTargetLabel = label:
+    let
+      base = normalizeTargetLabel label;
+      left = lib.elemAt (lib.splitString ":" base) 0;
+      pkg = if lib.hasPrefix "//" left then lib.removePrefix "//" left else left;
+    in if pkg == "" then "." else pkg;
+
   # Produce a safe, deterministic Nix attribute suffix from a Buck target label.
   # Mirrors tools/lib/labels.ts:sanitizeAttrNameFromLabel and //lang:nix_attr.bzl:sanitize_nix_attr_from_target_label.
   sanitizeAttrNameFromTargetLabel = label:
@@ -165,6 +174,7 @@ let
     dropConfigSuffix
     dropCellPrefix
     normalizeTargetLabel
+    packagePathFromTargetLabel
     sanitizeAttrNameFromTargetLabel
     normalizeNixAttr
     decodePatchFilename

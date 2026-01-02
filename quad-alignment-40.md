@@ -3,7 +3,7 @@
 This installment follows Part 39, but adjusts the plan based on current repo reality:
 
 - Package-local WASM wiring is already on the **non-mutating helper boundary** pattern (`lang/wasm_package_local_wiring.bzl:prepare_package_local_wasm_wiring(...)` plus mutation probes), so we do **not** need a PR dedicated to “make WASM wiring non-mutating”.
-- The Nix planner already routes some key transforms through the canonical helper surface (`tools/nix/lib/lang-helpers.nix`), so the remaining planner work is about eliminating the *last* locally re-implemented target/label parsing and making the “fallback” path obey the same canonical transforms.
+- The Nix planner already routes some key transforms through the canonical helper surface (`tools/nix/lib/lang-helpers.nix`), so the remaining planner work is about eliminating the _last_ locally re-implemented target/label parsing and making the “fallback” path obey the same canonical transforms.
 - We already have several enforcement tests for “don’t bypass helper surfaces”; the remaining valuable work is to (a) finish standardizing macro entrypoint conventions across languages, and (b) remove remaining legacy surfaces once enforcement proves they are unused.
 
 After re-reviewing the codebase with the contract inventory in `abstractions.md`, the remaining **valuable** (non-polish) gaps are:
@@ -283,5 +283,3 @@ Backout strategy:
 - **PR‑1** can be reverted independently by restoring planner-local normalization helpers and removing any newly introduced canonical helper functions, keeping the tests as the detector for future drift.
 - **PR‑2** can be reverted independently by reverting reporting changes and associated test assertions.
 - **PR‑3** can be reverted independently by reverting macro entrypoint mechanical refactors and relaxing enforcement; legacy exports can be reintroduced temporarily if needed while migrating remaining call sites.
-
-

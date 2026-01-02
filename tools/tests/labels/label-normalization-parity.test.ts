@@ -28,19 +28,13 @@ test("TS ↔ Nix label normalization parity (cell + config suffix + abs/rel)", a
     // Compute TS-normalized outputs
     const tsOut = samples.map((s) => normalizeTargetLabel(s));
 
-    // Ask Nix to apply planner/lib.nix cleanLabel + drop cell prefix for the same inputs
+    // Ask Nix to apply the canonical helper surface for the same inputs
     const listLiteral = `[ ${samples.map((s) => JSON.stringify(s)).join(" ")} ]`;
     const expr = `
       let
         pkgs = import <nixpkgs> {};
-        lib = pkgs.lib;
-        L = import ./tools/nix/planner/lib.nix { inherit lib; };
-        dropCell = lbl:
-          let parts = lib.splitString "//" lbl;
-          in if (builtins.length parts) > 1 && !(lib.hasPrefix "//" lbl)
-             then "//" + (builtins.elemAt parts 1)
-             else lbl;
-        normalize = s: let base = L.cleanLabel s; in dropCell base;
+        H = import ./tools/nix/lib/lang-helpers.nix { inherit pkgs; };
+        normalize = s: H.normalizeTargetLabel s;
         ins = ${listLiteral};
       in map normalize ins
     `;

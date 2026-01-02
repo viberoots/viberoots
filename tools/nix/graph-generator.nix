@@ -185,10 +185,7 @@ let
       if (builtins.length parts) > 0 then lib.elemAt parts ((builtins.length parts) - 1) else p;
 
   pkgPathOf = name:
-    let left = lib.elemAt (lib.splitString ":" name) 0;
-        parts = lib.splitString "//" left;
-        rel = if (builtins.length parts) > 1 then lib.elemAt parts ((builtins.length parts) - 1) else lib.removePrefix "//" left;
-    in if rel == "" then "." else rel;
+    if !(builtins.isString name) then "." else H.packagePathFromTargetLabel name;
 
   targetNameOf = name:
     let parts = lib.splitString ":" name; in
@@ -275,45 +272,42 @@ let
 
   # Optional: select a single target by BUCK_TARGET for impure local builds/tests
   selectedTargetName = builtins.getEnv "BUCK_TARGET";
-  dropCell = lbl:
-    let base0 = ensureFullLabel { name = lbl; };
-        # Strip optional trailing config suffix using shared helper
-        base = cleanLabel base0;
-        # If label starts with a cell like "root//...", convert to "//..."
-        hasCell = lib.hasInfix "//" base && !(lib.hasPrefix "//" base);
-    in if hasCell then ("//" + (lib.elemAt (lib.splitString "//" base) 1)) else base;
-  canon = s:
-    let d = dropCell s;
-    in if lib.hasPrefix "//" d then (lib.removePrefix "//" d) else d;
+  stripLeadingDoubleSlash = s: if lib.hasPrefix "//" s then lib.removePrefix "//" s else s;
+  normalizedTargetKeyFromString = s:
+    stripLeadingDoubleSlash (H.normalizeTargetLabel (ensureFullLabel { name = s; }));
+  normalizedTargetKeyFromNode = n:
+    stripLeadingDoubleSlash (H.normalizeTargetLabel (ensureFullLabel n));
   selected = if selectedTargetName != "" then (
-    let want = canon selectedTargetName; in
+    let want = normalizedTargetKeyFromString selectedTargetName; in
       if onlyCpp then (
         # C++ only mode: limit search to C++ nodes and build with cpp templates
         let matches = builtins.filter (n:
-              let nm = canon (ensureFullLabel n);
-              in nm == want
+              (normalizedTargetKeyFromNode n) == want
             ) safeCppNodes;
         in if matches == [] then pkgs.runCommand "missing-target-${sanitize selectedTargetName}" {} ''
           echo "missing target: ${selectedTargetName}" >&2
           exit 1
         '' else (
-          let n = builtins.head matches; k = LANGS.cpp.kindOf n; in
+          let
+            n = builtins.head matches;
+            k = LANGS.cpp.kindOf n;
+            buildLabel = H.normalizeTargetLabel (ensureFullLabel n);
+          in
             if k == null then pkgs.runCommand "missing-kind-${sanitize selectedTargetName}" {} ''
               echo "missing kind for: ${selectedTargetName}" >&2
               exit 1
             '' else (
-              if k == "bin" then LANGS.cpp.mkApp selectedTargetName
-              else if k == "lib" then LANGS.cpp.mkLib selectedTargetName
-              else if k == "test" then LANGS.cpp.mkTest selectedTargetName
-              else if k == "addon" then LANGS.cpp.mkAddon selectedTargetName
-              else LANGS.cpp.mkApp selectedTargetName
+              if k == "bin" then LANGS.cpp.mkApp buildLabel
+              else if k == "lib" then LANGS.cpp.mkLib buildLabel
+              else if k == "test" then LANGS.cpp.mkTest buildLabel
+              else if k == "addon" then LANGS.cpp.mkAddon buildLabel
+              else LANGS.cpp.mkApp buildLabel
             )
         )
       ) else (
         # Full mode: allow any language via adapter pick
         let matches = builtins.filter (n:
-              let nm = canon (ensureFullLabel n);
-              in nm == want
+              (normalizedTargetKeyFromNode n) == want
             ) nodesList;
         in if matches == [] then (
           # Fallback: when the target is missing from the exported graph (e.g., new Python WASM
@@ -359,27 +353,31 @@ let
                 ) libImporters;
               in T.pyWasmApp { name = nm; lockfile = lockRel; srcRoot = repoRoot; subdir = pkg; libOverlays = overlays; }
         ) else (
-          let n = builtins.head matches; k = pick n; in
+          let
+            n = builtins.head matches;
+            k = pick n;
+            buildLabel = H.normalizeTargetLabel (ensureFullLabel n);
+          in
             if k == null then pkgs.runCommand "missing-kind-${sanitize selectedTargetName}" {} ''
               echo "missing kind for: ${selectedTargetName}" >&2
               exit 1
             '' else (
               if k.template == "go" then (
-                if (k.kind == "bin" || k.kind == "lib") then LANGS.go.mkApp selectedTargetName
-                else if (k.kind == "tinywasm") then LANGS.go.mkTinyWasm selectedTargetName
-                else LANGS.go.mkApp selectedTargetName
+                if (k.kind == "bin" || k.kind == "lib") then LANGS.go.mkApp buildLabel
+                else if (k.kind == "tinywasm") then LANGS.go.mkTinyWasm buildLabel
+                else LANGS.go.mkApp buildLabel
               ) else if k.template == "node" then (
-                LANGS.node.mkApp selectedTargetName
+                LANGS.node.mkApp buildLabel
               ) else if k.template == "python" then (
-                if (k.kind == "wasm") then LANGS.python.mkWasmApp selectedTargetName
-                else if (k.kind == "bin" || k.kind == "lib") then LANGS.python.mkApp selectedTargetName
-                else LANGS.python.mkLib selectedTargetName
+                if (k.kind == "wasm") then LANGS.python.mkWasmApp buildLabel
+                else if (k.kind == "bin" || k.kind == "lib") then LANGS.python.mkApp buildLabel
+                else LANGS.python.mkLib buildLabel
               ) else (
-                if k.kind == "bin" then LANGS.cpp.mkApp selectedTargetName
-                else if k.kind == "lib" then LANGS.cpp.mkLib selectedTargetName
-                else if k.kind == "test" then LANGS.cpp.mkTest selectedTargetName
-                else if k.kind == "addon" then LANGS.cpp.mkAddon selectedTargetName
-                else LANGS.cpp.mkApp selectedTargetName
+                if k.kind == "bin" then LANGS.cpp.mkApp buildLabel
+                else if k.kind == "lib" then LANGS.cpp.mkLib buildLabel
+                else if k.kind == "test" then LANGS.cpp.mkTest buildLabel
+                else if k.kind == "addon" then LANGS.cpp.mkAddon buildLabel
+                else LANGS.cpp.mkApp buildLabel
               )
             )
         )

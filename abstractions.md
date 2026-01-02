@@ -163,14 +163,23 @@ Some tooling needs a stable mapping from a Buck target label to a Nix attribute 
   - `sanitize_nix_attr_from_target_label`
 - **Nix**: `tools/nix/lib/lang-helpers.nix`
   - `normalizeTargetLabel`
+  - `packagePathFromTargetLabel`
   - `sanitizeAttrNameFromTargetLabel`
 
-The Nix planner (`tools/nix/graph-generator.nix`) must not re-implement this mapping. It imports these helpers from `tools/nix/lib/lang-helpers.nix` so attr keying stays drift-free.
+The Nix planner (`tools/nix/graph-generator.nix`) must not re-implement:
+
+- Target label normalization (config suffix + cell prefix stripping)
+- Package path derivation from target labels
+- Nix attribute suffix derivation from target labels
+
+It must route these transforms through `tools/nix/lib/lang-helpers.nix` so planner keying, selection (`BUCK_TARGET`), and package path behavior stay drift-free.
 
 ### Regression guards
 
 - `tools/tests/labels/nix-attr-sanitize.parity.test.ts`
 - `tools/tests/labels/nix-attr-sanitize.nix-ts.parity.test.ts`
+- `tools/tests/labels/label-normalization-parity.test.ts`
+- `tools/tests/planner/planner.flat-attrset-keying.stability.test.ts`
 
 ### Common leak patterns
 
