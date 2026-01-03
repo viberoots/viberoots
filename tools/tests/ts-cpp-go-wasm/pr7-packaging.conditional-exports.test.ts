@@ -289,7 +289,7 @@ genrule(
       reject: false,
       nothrow: true,
       env: { ...process.env, BUCK_TARGET: "//libs/math-api:wasm" },
-    })`nix build --impure -L .#graph-generator-selected-wasm --accept-flake-config --print-out-paths`;
+    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected-wasm`} --accept-flake-config --print-out-paths`;
     const outWasmPath =
       String(outWasmSel || "")
         .trim()
@@ -305,7 +305,7 @@ genrule(
       reject: false,
       nothrow: true,
       env: { ...process.env, BUCK_TARGET: "//libs/math-native:napi_addon" },
-    })`nix run --accept-flake-config .#zx-wrapper -- tools/dev/build-selected.ts`;
+    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- tools/dev/build-selected.ts`;
     const outAddonPath =
       String(outAddonSel || "")
         .trim()

@@ -22,7 +22,7 @@ When you add or change a macro, keep the wiring table-driven through shared help
 - **Importer-scoped, non-genrule macros that call Nix at runtime** (non-genrule wrapper + needs global Nix action inputs)
   - Use `prepare_importer_non_genrule_nix_calling_wiring(...)`.
   - Guardrails:
-    - `tools/tests/node/node.defs-core.uses-importer-wiring-v2.enforcement.test.ts`
+    - `tools/tests/node/node.defs-core.uses-non-mutating-importer-wiring.enforcement.test.ts`
     - `tools/tests/node/node.defs-core.nix-node-test.must-not-call-wire-global-nix-inputs.enforcement.test.ts`
 - **Package-local macros** (Go/C++ patch scope)
   - Use `prepare_package_local_wiring(...)` and pass a single `base_deps` list that already includes any repo-local extras.
@@ -136,8 +136,8 @@ Rule: new package-local planner-visible stub call sites must use the non-mutatin
   - Macros: use `nix_python_{library,binary,test}` from `python/defs.bzl` and pass `lockfile_label` explicitly.
     - Do not pass `lockfile:` labels through `labels`; importer identity is derived from `lockfile_label` and macros require exactly one lockfile label.
   - Macro wiring: importer-scoped wiring is centralized via:
-    - Prefer `//lang:importer_wiring_v2.bzl:prepare_importer_non_genrule_wiring(...)` for `nix_python_library`, `nix_python_test`, and `nix_python_wasm_*` (non-mutating).
-    - Prefer `//lang:importer_wiring_v2.bzl:prepare_importer_srcsless_rule_wiring(...)` for rule shapes that cannot accept `srcs` (example: prelude `python_binary`).
+    - Prefer `//lang:importer_wiring.bzl:prepare_importer_non_genrule_wiring(...)` for `nix_python_library`, `nix_python_test`, and `nix_python_wasm_*` (non-mutating).
+    - Prefer `//lang:importer_wiring.bzl:prepare_importer_srcsless_rule_wiring(...)` for rule shapes that cannot accept `srcs` (example: prelude `python_binary`).
 - Scaffolding:
   - `scaf new python lib <name>` → `libs/<name>` with `pyproject.toml`, `uv.lock`, `TARGETS` using `nix_python_library` and a sample test via `nix_python_test`.
   - `scaf new python app <name>` → `apps/<name>` with a small library and binary (`nix_python_binary`) and importer‑scoped `lockfile_label`.

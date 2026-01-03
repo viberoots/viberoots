@@ -1,11 +1,11 @@
 load("@prelude//:rules.bzl", "genrule")
-load("//lang:importer_wiring_v2.bzl", "prepare_importer_non_genrule_wiring")
+load("//lang:importer_wiring.bzl", "prepare_importer_non_genrule_wiring")
 
 def importer_wiring_mutation_probe(name, lang, kind):
     """
-    Probe helper for tests. Asserts importer wiring v2 does not mutate the input dict.
+    Probe helper for tests. Asserts importer wiring does not mutate the input dict.
     """
-    kw = {"labels": ["probe:v2"]}
+    kw = {"labels": ["probe:importer_wiring"]}
     def _has_prefix(xs, prefix):
         for x in xs:
             if isinstance(x, str) and x.startswith(prefix):

@@ -39,7 +39,7 @@ test("python wheelhouse: identical lock+patch → identical store path across im
             },
           }),
         },
-      })`nix build --impure --accept-flake-config --no-link --print-out-paths .#${attr}`;
+      })`nix build --impure --accept-flake-config --no-link --print-out-paths ${`path:${tmp}#${attr}`}`;
       return String(stdout || "")
         .trim()
         .split(/\s+/)
@@ -62,7 +62,7 @@ test("python wheelhouse: identical lock+patch → identical store path across im
         const { stdout: pkgs } = await $({
           cwd: tmp,
           stdio: "pipe",
-        })`nix eval --json --impure --accept-flake-config .#packages.${sysStr} | jq -r 'keys[]' | sort`.nothrow();
+        })`nix eval --json --impure --accept-flake-config ${`path:${tmp}#packages.${sysStr}`} | jq -r 'keys[]' | sort`.nothrow();
         console.error("diagnostic: packages.%s keys:\n%s", sysStr, String(pkgs || "").trim());
       } catch {}
       throw e;
@@ -74,7 +74,10 @@ test("python wheelhouse: identical lock+patch → identical store path across im
         const { stdout: pkgs } = await $({
           cwd: tmp,
           stdio: "pipe",
-        })`bash --noprofile --norc -c 'sys=$(nix eval --raw --impure --accept-flake-config --expr builtins.currentSystem); nix eval --json --impure --accept-flake-config .#packages."'"$sys"'" | jq -r "keys[]" | sort'`.nothrow();
+        })`bash --noprofile --norc -c ${`set -euo pipefail
+sys="$(nix eval --raw --impure --accept-flake-config --expr builtins.currentSystem)"
+nix eval --json --impure --accept-flake-config "path:${tmp}#packages.$sys" | jq -r 'keys[]' | sort
+`}`.nothrow();
         console.error("diagnostic: packages.<system> keys:\n", String(pkgs || "").trim());
       } catch {}
       console.error("missing outPath(s):", { outA1, outB1 });

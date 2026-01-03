@@ -46,7 +46,7 @@ test("cpp registry-first path equals onlyCpp fast-path", async () => {
       cwd: tmp,
       env: envBase,
       stdio: "pipe",
-    })`nix build .#graph-generator-selected --print-out-paths --accept-flake-config`;
+    })`nix build ${`path:${tmp}#graph-generator-selected`} --print-out-paths --accept-flake-config`;
     const pathDefault = String(a.stdout || "")
       .trim()
       .split("\n")
@@ -57,7 +57,7 @@ test("cpp registry-first path equals onlyCpp fast-path", async () => {
       cwd: tmp,
       env: { ...envBase, PLANNER_ONLY_CPP: "1" },
       stdio: "pipe",
-    })`nix build .#graph-generator-selected --print-out-paths --accept-flake-config`;
+    })`nix build ${`path:${tmp}#graph-generator-selected`} --print-out-paths --accept-flake-config`;
     const pathOnlyCpp = String(b.stdout || "")
       .trim()
       .split("\n")

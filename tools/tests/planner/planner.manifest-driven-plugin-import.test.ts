@@ -53,12 +53,16 @@ test("planner imports plugins listed in langs.json when present", async () => {
 
     // Minimal graph.json (empty) so planner evaluates without needing Buck
     await fs.outputFile(path.join(tmp, DEFAULT_GRAPH_PATH), "[]\n");
+    await $({
+      cwd: tmp,
+      stdio: "pipe",
+    })`git add tools/nix/langs.json tools/nix/planner/toy.nix tools/buck/graph.json`;
 
     // Nix build should succeed and produce graph-generator output
     const { stdout } = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`nix build .#graph-generator --no-link --print-out-paths --accept-flake-config`;
+    })`nix build ${`path:${tmp}#graph-generator`} --no-link --print-out-paths --accept-flake-config`;
     const outPath =
       String(stdout || "")
         .trim()

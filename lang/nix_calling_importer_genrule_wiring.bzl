@@ -1,7 +1,7 @@
 load("//lang:lockfile_labels.bzl", "importer_from_labels")
 load("//lang:nix_calling_macros.bzl", "wire_global_nix_inputs")
 load("//lang:dict_inputs.bzl", "GLOBAL_NIX_INPUTS_KEY_PREFIX", "PATCH_INPUTS_KEY_PREFIX", "PROVIDER_EDGES_KEY_PREFIX")
-load("//lang:importer_wiring_v2.bzl", "prepare_importer_genrule_kwargs")
+load("//lang:importer_wiring.bzl", "prepare_importer_genrule_kwargs")
 
 def _clone_container_or_none(v):
     if isinstance(v, dict):

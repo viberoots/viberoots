@@ -50,10 +50,16 @@ void (async function main() {
 
     // Glue and build via Nix
     await $`tools/dev/install-deps.ts --glue-only`;
+    // runInTemp initializes a git repo; stage generated app/lib + lockfiles so Nix git-flake
+    // evaluation sees them.
+    await $({
+      cwd: tmp,
+      stdio: "pipe",
+    })`git add -A apps libs gomod2nix.toml tools/buck third_party/providers tools/nix`;
     const { stdout } = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`nix build .#graph-generator --no-link --print-out-paths --accept-flake-config`;
+    })`nix build ${`path:${tmp}#graph-generator`} --no-link --print-out-paths --accept-flake-config`;
     const outPath =
       String(stdout || "")
         .trim()

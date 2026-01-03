@@ -11,7 +11,9 @@ test("planner exposes goTargets/all for go_binary", async () => {
     const nodes = [{ name: "//app:bin", rule_type: "go_binary", labels: ["lang:go"] }];
     await fs.writeFile(path.join(graphDir, "graph.json"), JSON.stringify(nodes), "utf8");
 
-    const { stdout } = await $({ cwd: tmp })`nix build .#graph-generator --print-out-paths`;
+    const { stdout } = await $({
+      cwd: tmp,
+    })`nix build ${`path:${tmp}#graph-generator`} --accept-flake-config --print-out-paths`;
     const out = String(stdout || "").trim();
     if (!out) {
       console.error("missing graph-generator out path");

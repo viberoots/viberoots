@@ -52,7 +52,7 @@ test("python lib overlay build smoke: site exists and contains resolved dist", a
         }),
       },
       stdio: "pipe",
-    })`nix build --impure -L .#graph-generator-selected --accept-flake-config --no-link --print-out-paths`.nothrow();
+    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`.nothrow();
     if (buildOut.exitCode !== 0) {
       throw new Error(`nix build failed: ${buildOut.stderr || buildOut.stdout || ""}`);
     }

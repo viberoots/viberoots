@@ -63,7 +63,7 @@ test("python runtime: offline build (no network) succeeds via uv2nix adapter", a
         }),
       },
       stdio: "pipe",
-    })`nix build --impure -L .#graph-generator-selected --accept-flake-config --no-link --print-out-paths --offline`;
+    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths --offline`;
     const outPath = String(build.stdout || "")
       .trim()
       .split(/\s+/)

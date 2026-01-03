@@ -12,67 +12,58 @@ export function mtimeSafe(p: string): number | null {
 }
 
 export async function listInputs(): Promise<string[]> {
-  try {
-    const { stdout } = await $`git ls-files -z`;
-    const raw = String(stdout || "");
-    const files = raw.split("\0").filter(Boolean);
-    return files.filter(
-      (f) =>
-        f === "TARGETS" ||
-        f.endsWith("/TARGETS") ||
-        f.endsWith(".bzl") ||
-        (f.startsWith("patches/") && f.endsWith(".patch")) ||
-        f.endsWith("pnpm-lock.yaml") ||
-        f.endsWith("uv.lock") ||
-        f.endsWith("/go.mod") ||
-        f.endsWith("/go.sum") ||
-        f === "flake.lock" ||
-        f.startsWith("tools/nix/overlays/"),
-    );
-  } catch {
-    const result: string[] = [];
-    const root = process.cwd();
-    const ignoreDirs = new Set([
-      ".git",
-      "buck-out",
-      "node_modules",
-      "coverage",
-      ".clinic",
-      ".direnv",
-      "result",
-    ]);
-    async function walk(dir: string) {
-      let entries: fs.Dirent[] = [];
-      try {
-        entries = await fsp.readdir(dir, { withFileTypes: true });
-      } catch {
-        return;
-      }
-      for (const e of entries) {
-        const rel = path.relative(root, path.join(dir, e.name));
-        if (e.isDirectory()) {
-          if (ignoreDirs.has(e.name)) continue;
-          await walk(path.join(dir, e.name));
-        } else {
-          if (
-            e.name === "TARGETS" ||
-            e.name.endsWith(".bzl") ||
-            (rel.startsWith("patches/") && e.name.endsWith(".patch")) ||
-            e.name === "pnpm-lock.yaml" ||
-            e.name === "uv.lock" ||
-            e.name === "go.mod" ||
-            e.name === "go.sum" ||
-            e.name === "flake.lock" ||
-            rel.startsWith("tools/nix/overlays/")
-          ) {
-            result.push(rel);
-          }
-        }
-      }
+  // Primary path: filesystem scanning with a tight allowlist.
+  // This must work in non-git environments (e.g. temp repos, Nix store snapshots).
+  const result: string[] = [];
+  const root = process.cwd();
+  const ignoreDirs = new Set([
+    ".git",
+    "buck-out",
+    "node_modules",
+    "coverage",
+    ".clinic",
+    ".direnv",
+    ".pnpm-store",
+    "result",
+  ]);
+  const seen = new Set<string>();
+
+  const shouldInclude = (rel: string): boolean => {
+    if (!rel) return false;
+    if (rel === "TARGETS" || rel.endsWith("/TARGETS")) return true;
+    if (rel.endsWith(".bzl")) return true;
+    if (rel === "flake.nix" || rel === "flake.lock") return true;
+    if (rel.endsWith("/go.mod") || rel.endsWith("/go.sum")) return true;
+    if (rel.endsWith("pnpm-lock.yaml") || rel.endsWith("uv.lock")) return true;
+    if (rel.startsWith("patches/") && rel.endsWith(".patch")) return true;
+    if (rel.startsWith("tools/nix/overlays/")) return true;
+    return false;
+  };
+
+  async function walk(dirAbs: string) {
+    let entries: fs.Dirent[] = [];
+    try {
+      entries = await fsp.readdir(dirAbs, { withFileTypes: true });
+    } catch {
+      return;
     }
-    await walk(root);
-    return result;
+    for (const e of entries) {
+      if (e.isDirectory()) {
+        if (ignoreDirs.has(e.name)) continue;
+        await walk(path.join(dirAbs, e.name));
+        continue;
+      }
+      const rel = path.relative(root, path.join(dirAbs, e.name)).replace(/\\/g, "/");
+      if (!shouldInclude(rel)) continue;
+      if (seen.has(rel)) continue;
+      seen.add(rel);
+      result.push(rel);
+    }
   }
+
+  await walk(root);
+  result.sort();
+  return result;
 }
 
 export function listOutputs(): string[] {

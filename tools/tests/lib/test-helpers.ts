@@ -257,6 +257,9 @@ export async function rsyncRepoTo(tmp: string) {
     const excludes = [
       "/buck-out",
       "/.git",
+      // Exclude Buck2 scratch dirs (volatile, large, and can contain permission weirdness).
+      "/.buck",
+      "/.cache",
       "/.envrc",
       "/.buck2_shim",
       "/test-logs",
@@ -373,11 +376,12 @@ async function ensureBuckReaperStarted(tmp: string, $: any): Promise<void> {
 export async function runInTemp<T>(
   name: string,
   fn: (tmp: string, $: any) => Promise<T>,
+  opts?: { git?: boolean },
 ): Promise<T> {
   const overallStart = performance.now();
   const tmp = await mktemp(name + "-");
   const home = await fsp.mkdtemp(path.join(os.tmpdir(), "bucknix-test-home-"));
-  await initTempRepoFromWorkspaceOrSeed({
+  const initMode = await initTempRepoFromWorkspaceOrSeed({
     tmpDir: tmp,
     deps: {
       mktemp,
@@ -385,6 +389,39 @@ export async function runInTemp<T>(
       timeAsync,
     },
   });
+  // Ensure the temp repo is a git worktree with a first commit.
+  // Many tests and tools intentionally run `nix build .#...` from inside temp repos; when the
+  // directory is a git repo, Nix uses a git snapshot that excludes bulky transient dirs.
+  // Tests that generate new files must explicitly `git add` those paths if they need Nix to see them.
+  const wantGit = opts?.git !== false && process.env.TEST_TEMP_GIT !== "0";
+  if (wantGit) {
+    const $tmp = $({ cwd: tmp, stdio: "pipe" });
+    try {
+      if (initMode === "rsync") {
+        // rsync mode does not carry a pre-initialized git dir; create a committed baseline.
+        await $tmp`git -c init.defaultBranch=main -c advice.defaultBranchName=false init -q`;
+        await $tmp`git add -A`;
+        await $tmp`git -c user.name=tmp -c user.email=tmp@example.com commit -q -m init --allow-empty`.nothrow();
+      } else {
+        // Seeded repos should already be committed (see seed-temp-repo.ts).
+        const ok = await $tmp`git rev-parse --is-inside-work-tree`.nothrow();
+        const inside = String(ok.stdout || "").trim();
+        if (inside !== "true") {
+          throw new Error(
+            `runInTemp: expected seeded temp repo to be a git worktree (mode=${initMode})`,
+          );
+        }
+        const head = await $tmp`git rev-parse HEAD`.nothrow();
+        if (head.exitCode !== 0) {
+          throw new Error(
+            `runInTemp: expected seeded temp repo to have an initial commit (mode=${initMode})`,
+          );
+        }
+      }
+    } catch {
+      throw new Error("runInTemp: git is required for deterministic temp-repo nix builds");
+    }
+  }
   // Normalize flake.lock path inputs that use relative 'path:./...' to absolute paths within the temp repo.
   // This avoids Nix errors when evaluating from store snapshots where relative path inputs are disallowed.
   try {
@@ -430,7 +467,7 @@ export async function runInTemp<T>(
         const pre = await $({
           cwd: tmp,
           stdio: "pipe",
-        })`nix build .#buck2-prelude --no-link --accept-flake-config --print-out-paths`;
+        })`nix build ${`path:${tmp}#buck2-prelude`} --no-link --accept-flake-config --print-out-paths`;
         const out = String(pre.stdout || "")
           .trim()
           .split("\n")
@@ -440,7 +477,10 @@ export async function runInTemp<T>(
       } catch {}
       if (!preludePath) {
         try {
-          const ev = await $({ cwd: tmp, stdio: "pipe" })`nix eval --raw .#inputs.buck2.outPath`;
+          const ev = await $({
+            cwd: tmp,
+            stdio: "pipe",
+          })`nix eval --raw ${`path:${tmp}#inputs.buck2.outPath`}`;
           const p = String(ev.stdout || "").trim();
           if (p) preludePath = path.join(p, "prelude").replaceAll("\\", "/");
         } catch {}
@@ -554,10 +594,10 @@ export async function runInTemp<T>(
       const chk = await $({
         cwd: tmp,
         stdio: "pipe",
-      })`nix build '.#buck2-prelude' --no-link --accept-flake-config --print-build-logs`.nothrow();
+      })`nix build ${`path:${tmp}#buck2-prelude`} --no-link --accept-flake-config --print-build-logs`.nothrow();
       if (chk.exitCode !== 0) {
         throw new Error(
-          "dev-shell check failed: nix build .#buck2-prelude did not succeed in temp repo; ensure direnv/dev shell is active",
+          "dev-shell check failed: nix build path:<tmp>#buck2-prelude did not succeed in temp repo; ensure direnv/dev shell is active",
         );
       }
     } catch (e) {

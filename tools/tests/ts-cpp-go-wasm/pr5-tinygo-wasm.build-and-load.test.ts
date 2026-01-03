@@ -88,14 +88,14 @@ nix_go_tiny_wasm_lib(
     await $({
       cwd: tmp,
       stdio: "inherit",
-    })`nix run --accept-flake-config .#zx-wrapper -- tools/buck/export-graph.ts --out tools/buck/graph.json`;
+    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- tools/buck/export-graph.ts --out tools/buck/graph.json`;
     const { stdout: outSel } = await $({
       cwd: tmp,
       stdio: "pipe",
       reject: false,
       nothrow: true,
       env: { ...process.env, BUCK_TARGET: "//libs/math-api:wasm" },
-    })`nix build --impure -L .#graph-generator-selected-wasm --accept-flake-config --print-out-paths`;
+    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected-wasm`} --accept-flake-config --print-out-paths`;
     const outPath =
       String(outSel || "")
         .trim()

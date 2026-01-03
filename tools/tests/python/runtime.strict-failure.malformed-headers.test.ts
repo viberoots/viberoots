@@ -55,7 +55,7 @@ test("python runtime: malformed patch headers are rejected (strict mode)", async
         }),
       },
       stdio: "pipe",
-    })`nix build --impure -L .#graph-generator-selected --accept-flake-config --no-link --print-out-paths`.catch(
+    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`.catch(
       (e: any) => e,
     );
     const stderr = String(build?.stderr || "");

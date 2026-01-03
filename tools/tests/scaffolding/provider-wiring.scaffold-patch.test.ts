@@ -55,7 +55,7 @@ test("provider wiring present only on affected target after patch", async () => 
     const { stdout } = await $({
       cwd: _tmp,
       stdio: "pipe",
-    })`nix build .#graph-generator --no-link --print-out-paths`;
+    })`nix build ${`path:${_tmp}#graph-generator`} --no-link --print-out-paths --accept-flake-config`;
     const outPath =
       String(stdout || "")
         .trim()

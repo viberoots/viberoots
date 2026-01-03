@@ -18,7 +18,7 @@ test("planner logs dev override presence for Python (non-CI)", async () => {
         NIX_PY_DEV_OVERRIDE_JSON: "{}",
         BUCK_GRAPH_JSON: graph,
       },
-    })`nix build .#graph-generator --print-out-paths --impure --accept-flake-config`;
+    })`nix build ${`path:${tmp}#graph-generator`} --print-out-paths --impure --accept-flake-config`;
     const outPath =
       String(res.stdout || "")
         .trim()

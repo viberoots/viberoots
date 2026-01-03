@@ -25,7 +25,7 @@ test("python uv groups: base vs dev/test produce distinct, stable derivations", 
         cwd: tmp,
         stdio: "pipe",
         env: { ...process.env },
-      })`nix build --impure --accept-flake-config --no-link --print-out-paths .#${attr}`;
+      })`nix build --impure --accept-flake-config --no-link --print-out-paths ${`path:${tmp}#${attr}`}`;
       return String(stdout || "")
         .trim()
         .split(/\s+/)

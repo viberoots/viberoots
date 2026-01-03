@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { $ } from "zx";
 import { copyTree, probeCopyFileCloneSupport } from "../../lib/copy-tree.ts";
 
 type TimeAsync = <T>(label: string, fn: () => Promise<T>) => Promise<T>;
@@ -31,10 +32,28 @@ function seedConfigKey(): string {
   // If these toggles change mid-process, we must not reuse an old seed, because
   // the seed’s contents would no longer match the requested rsync shape.
   return JSON.stringify({
+    // Bump when seed layout/contents rules change, to avoid reusing an old incompatible seed dir.
+    SEED_VERSION: "2",
     TEST_RSYNC_ROOTS: String(process.env.TEST_RSYNC_ROOTS || ""),
     TEST_PARTIAL_CLONE_GO_ONLY: String(process.env.TEST_PARTIAL_CLONE_GO_ONLY || ""),
     TEST_EXCLUDE_CPP_REQS: String(process.env.TEST_EXCLUDE_CPP_REQS || ""),
   });
+}
+
+function stableSeedCacheRoot(): string {
+  // Important: avoid caching under os.tmpdir(), because in nix-shell / nix develop environments
+  // TMPDIR can be set to a per-invocation directory like .../T/nix-shell.<random>/, which defeats
+  // caching and can cause large run-to-run variance.
+  //
+  // Use a stable per-user directory under /tmp on Unix, falling back to os.tmpdir() elsewhere.
+  if (process.platform === "win32") return os.tmpdir();
+  const base = "/tmp";
+  let user = "";
+  try {
+    user = os.userInfo().username || "";
+  } catch {}
+  const suffix = user ? `-${user}` : "";
+  return path.join(base, `bucknix-seed-repo-cache${suffix}`);
 }
 
 function sharedSeedPaths(seedKey: string): {
@@ -43,7 +62,7 @@ function sharedSeedPaths(seedKey: string): {
   readyMarker: string;
   lockFile: string;
 } {
-  const root = path.join(os.tmpdir(), "bucknix-seed-repo-cache");
+  const root = stableSeedCacheRoot();
   const h = shortHash(seedKey);
   const seedDir = path.join(root, `seed-${h}`);
   const readyMarker = path.join(seedDir, ".ready");
@@ -87,6 +106,29 @@ async function ensureSharedSeedRepo(deps: SeedDeps, seedKey: string): Promise<st
     } catch {}
     const tmpDir = await fsp.mkdtemp(path.join(root, `seed-${shortHash(seedKey)}.tmp-`));
     await deps.rsyncRepoTo(tmpDir);
+    // Defensive: ensure volatile Buck scratch directories never enter the seed.
+    // (They can be huge and may be mutated/cleaned concurrently by Buck.)
+    try {
+      await fsp.rm(path.join(tmpDir, ".buck"), { recursive: true, force: true });
+    } catch {}
+    try {
+      await fsp.rm(path.join(tmpDir, ".cache"), { recursive: true, force: true });
+    } catch {}
+    // Make the seed repo a committed git worktree once per process/config.
+    // Many tests intentionally run `nix build .#...` in temp repos; when a directory is a git repo,
+    // Nix uses a git snapshot of tracked files. Committing the seed once allows temp repos to inherit
+    // a consistent tracked-files baseline without paying per-temp `git add -A` overhead.
+    try {
+      const $seed = $({ cwd: tmpDir, stdio: "pipe" });
+      await $seed`git -c init.defaultBranch=main -c advice.defaultBranchName=false init -q`;
+      await $seed`git add -A`;
+      await $seed`git -c user.name=seed -c user.email=seed@example.com commit -q -m seed --allow-empty`.nothrow();
+    } catch {
+      throw new Error(
+        "seed-temp-repo: failed to initialize seed repo as git (required for deterministic nix builds)",
+      );
+    }
+    // Ready marker is a cache coordination primitive; do not track it in git.
     await fsp.writeFile(path.join(tmpDir, ".ready"), "ok\n", "utf8");
     await fsp.rename(tmpDir, seedDir);
     return seedDir;

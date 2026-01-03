@@ -19,7 +19,7 @@ test("planner suppresses dev override log when PLANNER_NO_DEV_OVERRIDE_LOG is se
         PLANNER_NO_DEV_OVERRIDE_LOG: "1",
         BUCK_GRAPH_JSON: graph,
       },
-    })`nix build .#graph-generator --print-out-paths --impure --accept-flake-config`;
+    })`nix build ${`path:${tmp}#graph-generator`} --print-out-paths --impure --accept-flake-config`;
     const outPath =
       String(res.stdout || "")
         .trim()

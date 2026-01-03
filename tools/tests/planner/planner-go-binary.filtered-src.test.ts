@@ -51,7 +51,7 @@ test("planner builds go_binary with filtered srcRoot", async () => {
       cwd: tmp,
       stdio: "pipe",
       env: { ...process.env, BUCK_TEST_SRC: tmp },
-    })`nix build .#graph-generator --no-link --print-out-paths`;
+    })`nix build ${`path:${tmp}#graph-generator`} --no-link --accept-flake-config --print-out-paths`;
     const outPath =
       String(stdout || "")
         .trim()

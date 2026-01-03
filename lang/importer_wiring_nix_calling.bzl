@@ -1,5 +1,5 @@
 load(
-    "//lang:importer_wiring_v2.bzl",
+    "//lang:importer_wiring.bzl",
     "prepare_importer_non_genrule_wiring",
 )
 load("//lang:nix_calling_macros.bzl", "wire_global_nix_inputs")

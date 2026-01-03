@@ -21,6 +21,11 @@ test("webapp: scaffold, glue, build dist via Buck", { timeout: TEST_TIMEOUT_MS }
     await $`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
     await $`node tools/buck/sync-providers.ts --lang node --no-glue`;
     await $`node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
+    // runInTemp commits the initial seed; stage generated importer + glue outputs so git-flake evaluation sees them.
+    await $({
+      cwd: tmp,
+      stdio: "pipe",
+    })`git add -A apps/demo-web tools/nix/node-modules.hashes.json tools/nix/langs.nix lang/importer_roots.bzl tools/buck third_party/providers`;
     // No longer modify flake envs for LOCAL_PNPM_STORE; pure Nix path only
     // Build via Nix directly to avoid nested buck invocations from within a buck test
     const importer = "apps/demo-web";

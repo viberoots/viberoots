@@ -86,7 +86,7 @@ test("python runtime e2e: app output changes after patch apply", async () => {
           ...extraEnv,
         },
         stdio: "pipe",
-      })`nix build --impure -L .#graph-generator-selected --accept-flake-config --no-link --print-out-paths`;
+      })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
       const outPath = String(buildOut.stdout || "")
         .trim()
         .split(/\s+/)

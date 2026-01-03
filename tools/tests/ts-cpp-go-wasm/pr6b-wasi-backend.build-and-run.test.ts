@@ -53,7 +53,7 @@ nix_cpp_wasm_static_lib(
     await $({
       cwd: tmp,
       stdio: "inherit",
-    })`nix run --accept-flake-config .#zx-wrapper -- tools/buck/export-graph.ts --out tools/buck/graph.json`;
+    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- tools/buck/export-graph.ts --out tools/buck/graph.json`;
 
     // 4) Build C++ WASI static lib via selected (planner routes flavor:wasm + wasm:wasi)
     const { stdout: outCppSel } = await $({
@@ -66,7 +66,7 @@ nix_cpp_wasm_static_lib(
         BUCK_TARGET: "//libs/math-core:core_wasm",
         PLANNER_ONLY_CPP: "1",
       },
-    })`nix run --accept-flake-config .#zx-wrapper -- tools/dev/build-selected.ts`;
+    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- tools/dev/build-selected.ts`;
     const outCppPath =
       String(outCppSel || "")
         .trim()
@@ -123,7 +123,7 @@ nix_go_tiny_wasm_lib(
       reject: false,
       nothrow: true,
       env: { ...process.env, BUCK_TARGET: "//libs/math-api:wasm", WEB_WASM_BACKEND: "wasi_single" },
-    })`nix build --impure -L .#graph-generator-selected-wasm --accept-flake-config --print-out-paths`;
+    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected-wasm`} --accept-flake-config --print-out-paths`;
     const outWasmPath =
       String(outWasmSel || "")
         .trim()

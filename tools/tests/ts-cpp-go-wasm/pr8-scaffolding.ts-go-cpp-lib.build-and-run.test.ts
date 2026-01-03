@@ -46,7 +46,7 @@ test(
       await $({
         cwd: tmp,
         stdio: "inherit",
-      })`nix run --accept-flake-config .#zx-wrapper -- tools/buck/export-graph.ts --out tools/buck/graph.json`;
+      })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- tools/buck/export-graph.ts --out tools/buck/graph.json`;
 
       // 4) Produce a minimal WASM module that exports `add(i32,i32)->i32` directly (no toolchain)
       const wasmTmp = path.join(tmp, "top.wasm");

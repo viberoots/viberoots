@@ -95,7 +95,7 @@ nix_cpp_wasm_static_lib(
     const sel = await $({
       cwd: tmp,
       env: { ...process.env, BUCK_TARGET: "//libs/math-core:core_wasm" },
-    })`nix run --accept-flake-config .#zx-wrapper -- tools/dev/build-selected.ts`;
+    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- tools/dev/build-selected.ts`;
     const outPath =
       String(sel.stdout || "")
         .trim()

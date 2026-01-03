@@ -306,7 +306,7 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
       cwd: _tmp,
       stdio: "inherit",
       env: { ...process.env, GOPROXY: "off", GOSUMDB: "off" },
-    })`nix build .#app --accept-flake-config --show-trace`;
+    })`nix build ${`path:${_tmp}#app`} --accept-flake-config --show-trace`;
     const bin = path.join(_tmp, "result", "bin", "demo-cli");
     const run = await $({ stdio: "pipe" })`${bin} --name Bob`;
     const outStr = String(run.stdout || "").trim();

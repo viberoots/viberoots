@@ -12,7 +12,8 @@ test("nix packages expose per-importer node-modules attr when importer exists", 
     console.log("skipping: no", `${importer}/pnpm-lock.yaml`);
     return;
   }
-  const cmd = `nix eval --raw .#node-modules.${attr}.outPath --accept-flake-config`;
+  const flakeRef = `path:${process.cwd()}`;
+  const cmd = `nix eval --raw ${flakeRef}#node-modules.${attr}.outPath --accept-flake-config`;
   const { stdout } = await $({ stdio: "pipe" })`bash --noprofile --norc -c ${cmd}`.nothrow();
   const out = String(stdout || "").trim();
   assert.ok(out.length > 0, "expected non-empty outPath for per-importer node-modules");

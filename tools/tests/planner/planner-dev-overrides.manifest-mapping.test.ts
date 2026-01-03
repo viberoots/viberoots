@@ -35,7 +35,7 @@ test("planner detects overrides via manifest mapping and respects PLANNER_NO_DEV
         BUCK_GRAPH_JSON: graph,
         [envName]: "{}",
       },
-    })`nix build .#graph-generator --print-out-paths --impure --accept-flake-config`;
+    })`nix build ${`path:${tmp}#graph-generator`} --print-out-paths --impure --accept-flake-config`;
     const out1 = readLastOutPath(res1.stdout);
     const log1 = await fs.readFile(path.join(out1, "build.log"), "utf8").catch(() => "");
     if (!log1.includes("[planner] dev overrides present: py")) {
@@ -53,7 +53,7 @@ test("planner detects overrides via manifest mapping and respects PLANNER_NO_DEV
         [envName]: "{}",
         PLANNER_NO_DEV_OVERRIDE_LOG: "1",
       },
-    })`nix build .#graph-generator --print-out-paths --impure --accept-flake-config`;
+    })`nix build ${`path:${tmp}#graph-generator`} --print-out-paths --impure --accept-flake-config`;
     const out2 = readLastOutPath(res2.stdout);
     const log2 = await fs.readFile(path.join(out2, "build.log"), "utf8").catch(() => "");
     if (log2.includes("[planner] dev overrides present:")) {

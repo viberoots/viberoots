@@ -29,6 +29,8 @@ test(
         ) + "\n",
         "utf8",
       );
+      // runInTemp initializes a git repo; stage generated files so Nix git-flake evaluation sees them.
+      await $({ cwd: tmp, stdio: "pipe" })`git add -A ${importer}`;
       // Allow lockfile generation and compute/update pnpm-store FOD hash
       const env = {
         ...process.env,
@@ -39,6 +41,7 @@ test(
         stdio: "inherit",
         env,
       })`zx-wrapper tools/dev/update-pnpm-hash.ts --lockfile ${path.join(importer, "pnpm-lock.yaml")}`;
+      await $({ cwd: tmp, stdio: "pipe" })`git add -A ${importer}`;
       // Do NOT prebuild pnpm-store/node-modules here: the purpose of this test is to ensure
       // node-test can succeed quickly when no tests exist, without forcing heavyweight deps.
       // If node-test incorrectly depends on node-modules, this test will regress in wall time.

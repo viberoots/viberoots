@@ -73,7 +73,7 @@ test("python runtime: BUILD-INFO patches include sha256 and deterministic order"
         }),
       },
       stdio: "pipe",
-    })`nix build --impure -L .#graph-generator-selected --accept-flake-config --no-link --print-out-paths`;
+    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
     const outPath = String(build.stdout || "")
       .trim()
       .split(/\s+/)

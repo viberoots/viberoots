@@ -34,6 +34,8 @@ test(
         "export const x = 1;\n",
         "utf8",
       );
+      // runInTemp initializes a git repo; stage generated files so Nix git-flake evaluation sees them.
+      await $({ cwd: tmp, stdio: "pipe" })`git add -A ${importer}`;
       const env = {
         ...process.env,
         NIX_PNPM_ALLOW_GENERATE: "1",
@@ -48,11 +50,14 @@ test(
         stdio: "inherit",
         env,
       })`bash --noprofile --norc -c 'set -euo pipefail; mkdir -p "${tmp}/${importer}/.pnpm-home" "${tmp}/${importer}/.pnpm-store"; export PNPM_HOME="${tmp}/${importer}/.pnpm-home"; nix run ${tmp}#pnpm --accept-flake-config -- config set store-dir "${tmp}/${importer}/.pnpm-store"; nix run ${tmp}#pnpm --accept-flake-config -- install --filter "./${importer}" --lockfile-only --prod=false --ignore-scripts --lockfile-dir "./${importer}" --dir "./${importer}"'`;
+      // Stage the generated lockfile so Nix git-flake evaluation sees it.
+      await $({ cwd: tmp, stdio: "pipe" })`git add -A ${importer}`;
       await $({
         cwd: impDir,
         stdio: "inherit",
         env,
       })`zx-wrapper ../../tools/dev/node-modules-build.ts`;
+      await $({ cwd: tmp, stdio: "pipe" })`git add -A ${importer}`;
       // Expect build to fail because tests are present but vitest is not installed
       const res = await $({
         cwd: tmp,

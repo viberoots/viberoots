@@ -50,7 +50,7 @@ nix_python_wasm_app(
     const out1 = await $({
       cwd: tmp,
       env,
-    })`nix build --impure -L --accept-flake-config '.#graph-generator-selected' --no-link --print-out-paths`;
+    })`nix build --impure -L --accept-flake-config ${`path:${tmp}#graph-generator-selected`} --no-link --print-out-paths`;
     const outPath1 = String(out1.stdout || "")
       .trim()
       .split("\n")
@@ -77,7 +77,7 @@ nix_python_wasm_app(
     const out2 = await $({
       cwd: tmp,
       env,
-    })`nix build --impure -L --accept-flake-config '.#graph-generator-selected' --no-link --print-out-paths`;
+    })`nix build --impure -L --accept-flake-config ${`path:${tmp}#graph-generator-selected`} --no-link --print-out-paths`;
     const outPath2 = String(out2.stdout || "")
       .trim()
       .split("\n")

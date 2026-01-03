@@ -20,7 +20,9 @@ export async function findRepoRoot(start: string): Promise<string> {
     dir = parent;
   }
   try {
-    const { stdout } = await $`git -C ${start} rev-parse --show-toplevel`.nothrow();
+    const { stdout } = await $({
+      stdio: "pipe",
+    })`git -C ${start} rev-parse --show-toplevel`.nothrow();
     const p = String(stdout || "").trim();
     if (p) return p;
   } catch {}

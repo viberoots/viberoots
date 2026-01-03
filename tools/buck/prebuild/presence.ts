@@ -5,43 +5,57 @@ import path from "node:path";
 import { providerNameForImporter } from "../../lib/providers.ts";
 import { findUvLockfiles } from "../../lib/lockfiles.ts";
 import { getImporterRootsContract } from "../../lib/importer-roots.ts";
+import { parseLockfileLabel } from "../../lib/labels.ts";
+
+type NodeLockIndexSidecar = Partial<{
+  index: Record<string, string>;
+}>;
+
+async function readNodeLockIndexLabels(): Promise<string[]> {
+  const rel = path.join("tools", "buck", "node-lock-index.json");
+  let txt = "";
+  try {
+    txt = await fsp.readFile(rel, "utf8");
+  } catch {
+    return [];
+  }
+  if (!txt.trim()) return [];
+  try {
+    const parsed = JSON.parse(txt) as NodeLockIndexSidecar;
+    const idx = parsed?.index && typeof parsed.index === "object" ? parsed.index : {};
+    return Object.values(idx)
+      .map((v) => String(v || "").trim())
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b));
+  } catch {
+    return [];
+  }
+}
 
 export async function computeMissingOutputs(outputs: string[]): Promise<string[]> {
   const outPresence: string[] = [];
   for (const o of outputs) {
     if (!fs.existsSync(o)) outPresence.push(o);
   }
-  // If any pnpm-lock.yaml exists, require TARGETS.node.auto
-  try {
-    let lockfiles: string[] = [];
-    try {
-      const { stdout } = await $`git ls-files '**/pnpm-lock.yaml'`;
-      lockfiles = String(stdout || "")
-        .split(/\r?\n/)
-        .map((s) => s.trim())
-        .filter(Boolean);
-    } catch {}
-    if (lockfiles.length > 0) {
-      const nodeAuto = "third_party/providers/TARGETS.node.auto";
-      if (!fs.existsSync(nodeAuto)) outPresence.push(nodeAuto);
-    }
-  } catch {}
 
   // If any uv.lock exists, require TARGETS.python.auto
-  try {
-    let uvLocks: string[] = [];
-    try {
-      const { stdout } = await $`git ls-files '**/uv.lock'`;
-      uvLocks = String(stdout || "")
-        .split(/\r?\n/)
-        .map((s) => s.trim())
-        .filter(Boolean);
-    } catch {}
+  {
+    const { workspaceRoots } = getImporterRootsContract();
+    const uvLocks = await findUvLockfiles({ roots: workspaceRoots });
     if (uvLocks.length > 0) {
       const pyAuto = "third_party/providers/TARGETS.python.auto";
       if (!fs.existsSync(pyAuto)) outPresence.push(pyAuto);
     }
-  } catch {}
+  }
+
+  // If node-lock-index.json indicates any importer-scoped Node deps exist, require TARGETS.node.auto
+  {
+    const labels = await readNodeLockIndexLabels();
+    if (labels.length > 0) {
+      const nodeAuto = "third_party/providers/TARGETS.node.auto";
+      if (!fs.existsSync(nodeAuto)) outPresence.push(nodeAuto);
+    }
+  }
 
   // If any provider autos exist, require nix_attr_map.bzl (needed for provider index consumers)
   try {
@@ -95,50 +109,25 @@ export async function findMissingNodeImporterProviders(): Promise<
   Array<{ lockfile: string; importer: string; provider: string }>
 > {
   const missing: Array<{ lockfile: string; importer: string; provider: string }> = [];
-  try {
-    let lockfiles: string[] = [];
-    try {
-      const { stdout } = await $`git ls-files '**/pnpm-lock.yaml'`;
-      lockfiles = String(stdout || "")
-        .split(/\r?\n/)
-        .map((s) => s.trim())
-        .filter(Boolean);
-    } catch {}
-    if (!lockfiles.length) return missing;
+  const labels = await readNodeLockIndexLabels();
+  if (!labels.length) return missing;
 
-    const targetsNodeAuto = "third_party/providers/TARGETS.node.auto";
-    const targetsNodeText = fs.existsSync(targetsNodeAuto)
-      ? await fsp.readFile(targetsNodeAuto, "utf8").catch(() => "")
-      : "";
+  const targetsNodeAuto = "third_party/providers/TARGETS.node.auto";
+  const targetsNodeText = fs.existsSync(targetsNodeAuto)
+    ? await fsp.readFile(targetsNodeAuto, "utf8").catch(() => "")
+    : "";
 
-    const haveYaml = await (async () => {
-      try {
-        await import("yaml");
-        return true;
-      } catch {
-        return false;
-      }
-    })();
-    for (const lf of lockfiles) {
-      if (!haveYaml) break;
-      try {
-        const mod = await import("yaml");
-        const YAML: any = (mod as any).default || mod;
-        const doc = YAML.parse(await fsp.readFile(lf, "utf8")) as {
-          importers?: Record<string, unknown>;
-        };
-        const importers = Object.keys(doc?.importers || {});
-        for (const imp of importers) {
-          const importerLabel = imp === "." ? path.dirname(lf) || "." : imp;
-          const prov = providerNameForImporter(lf, importerLabel);
-          const needle = `node_importer_deps(name="${prov}", lockfile="${lf}", importer="${importerLabel}"`;
-          if (!targetsNodeText.includes(needle)) {
-            missing.push({ lockfile: lf, importer: importerLabel, provider: prov });
-          }
-        }
-      } catch {}
+  for (const lbl of labels) {
+    const parsed = parseLockfileLabel(lbl);
+    if (!parsed) continue;
+    const lf = parsed.lockfile;
+    const importerLabel = parsed.importer;
+    const prov = providerNameForImporter(lf, importerLabel);
+    const needle = `node_importer_deps(name="${prov}", lockfile="${lf}", importer="${importerLabel}"`;
+    if (!targetsNodeText.includes(needle)) {
+      missing.push({ lockfile: lf, importer: importerLabel, provider: prov });
     }
-  } catch {}
+  }
   return missing;
 }
 

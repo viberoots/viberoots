@@ -141,7 +141,7 @@ EOF'`;
       reject: false,
       nothrow: true,
       env: { ...process.env, BUCK_TARGET: "//libs/math-native:napi_addon" },
-    })`nix run --accept-flake-config .#zx-wrapper -- tools/dev/build-selected.ts`;
+    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- tools/dev/build-selected.ts`;
     const outPath =
       String(outSel || "")
         .trim()

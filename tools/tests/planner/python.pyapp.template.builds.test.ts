@@ -38,7 +38,7 @@ test("planner builds python binary via selected target when uv.lock present", as
         BUCK_TEST_SRC: tmp,
         BUCK_TARGET: "//apps/pytool:cli",
       },
-    })`nix build --impure -L .#graph-generator-selected --accept-flake-config --print-out-paths`;
+    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --print-out-paths`;
 
     if (exitCode !== 0) {
       console.error(stderr);

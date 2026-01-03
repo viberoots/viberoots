@@ -28,7 +28,11 @@ test("go cli: scaffold and build", async () => {
     await $({
       cwd: _tmp,
       stdio: "inherit",
-      env: { ...process.env, BUCK_GRAPH_JSON: path.join(_tmp, "tools", "buck", "graph.json") },
-    })`BUCK_TARGET="//apps/demo-cli:demo-cli" nix build .#graph-generator --no-link --accept-flake-config --print-build-logs`;
+      env: {
+        ...process.env,
+        BUCK_GRAPH_JSON: path.join(_tmp, "tools", "buck", "graph.json"),
+        BUCK_TARGET: "//apps/demo-cli:demo-cli",
+      },
+    })`nix build ${`path:${_tmp}#graph-generator`} --no-link --accept-flake-config --print-build-logs`;
   });
 });

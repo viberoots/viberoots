@@ -268,13 +268,164 @@ Implement.
 
 ---
 
+## PR-4: Replace temp-repo “seed repo” caching with a Nix-store working-tree seed artifact (single build per verify run, no fallbacks)
+
+### Description
+
+The test harness currently uses a “seed repo” caching mechanism to speed up repeated temp repo creation (copying a filtered workspace into many per-test temp directories).
+
+This has proven to be a meaningful performance lever, but it also introduces two drift risks:
+
+- The seed cache lives outside Nix’s content-addressed store, so invalidation must be managed explicitly (seed key/versioning).
+- Multiple test workers can attempt to “ensure” the seed concurrently unless we centralize the responsibility.
+
+This PR replaces the seed cache with a **single, working-tree-derived Nix store artifact** created once per verify run, and consumed by all `runInTemp` callers.
+
+Policy constraints for this PR:
+
+- **No fallbacks.** We control the dev environment with Nix; required tools (`git`, `nix`, `rsync`/copy tooling) must be present.
+- The primary path must be robust: if the seed cannot be prepared, tests must fail fast with a clear, actionable error.
+- Because the seed is a Nix store artifact, we no longer need a separate `SEED_VERSION` invalidation knob; the seed’s identity is content-addressed via the computed seed key and Nix’s store hash.
+
+### Scope & Changes
+
+- Add a verify-scoped “seed artifact” step:
+  - `tools/bin/verify` prepares a single seed store path **before** starting `buck2 test`.
+  - The seed store path is exported to tests via a single environment variable (e.g., `BNX_TEST_SEED_STORE_PATH`).
+  - The seed export must be part of the same verify wrapper environment that already exports other per-run state (so all Buck test workers inherit it).
+  - This PR removes the existing temp-repo seed cache mechanism (and any `SEED_VERSION`/seed-key caching state associated with it).
+
+- Define a single deterministic seed key (per verify run):
+  - Key includes:
+    - the workspace identity (root path)
+    - the current `HEAD` commit hash
+    - the list of modified/untracked paths (from `git status --porcelain=v1 -z`)
+    - any seed configuration knobs that affect the filtered seed contents
+  - The key must be computed without scanning the filesystem outside `git` (no repo walks).
+  - Invalidation is driven by the seed key + Nix store hashing; no standalone `SEED_VERSION` bump mechanism is required.
+  - Key material must be normalized (stable ordering, no locale-dependent formatting) so two processes compute the same key for the same working tree.
+
+- Build the seed as a Nix store path (working-tree snapshot):
+  - Create a dedicated flake attribute for the seed, built from a filtered working tree snapshot (exclude volatile and heavy dirs like `buck-out/`, `.buck/`, `.cache/`, `node_modules/`, coverage/profiling dirs, etc.).
+  - The build must be a pure “copy filtered snapshot into `$out`” derivation (no network, no dynamic discovery).
+  - The filter must match the test harness’s existing “seeded temp repo shape” (i.e., the same exclusions currently enforced by `runInTemp`/`rsyncRepoTo`) so the change is mechanical, not semantic.
+  - The filter must be an **allowlist (whitelist)** of intended roots/files (mirroring the current seeded temp repo shape). It must not be an open-ended blacklist that risks silently including new heavy/volatile directories over time.
+
+- Prevent repeated eval/build attempts:
+  - The verify process is the single authority that computes/builds the seed.
+  - `runInTemp(...)` must never attempt to invoke Nix to build/ensure the seed; it only consumes `BNX_TEST_SEED_STORE_PATH` and fails fast if it is missing/invalid.
+
+- Ensure seed survival even if GC is triggered mid-run:
+  - Verify must create an explicit GC root under the repo working tree (e.g., `buck-out/tmp/verify-seed/pins/<iso>/seed -> /nix/store/...-seed`) so `nix-collect-garbage` cannot delete it during the run.
+  - The “pin” is cleaned up by verify at the end of the run.
+  - Forced-stop robustness:
+    - verify must register cleanup handlers for normal exit and common termination signals (`SIGINT`, `SIGTERM`) so pins do not leak on typical “stop the run” paths.
+    - leaked pins are still possible under hard-kill (`SIGKILL`) or machine crash; to keep the primary path robust, verify must perform a deterministic startup sweep:
+      - pins are iso-scoped (`pins/<iso>/...`) and contain an ownership marker (pid + start time)
+      - on verify startup, remove any pin directories whose owner pid is not alive (or that exceed a conservative TTL, e.g. 24h)
+      - this sweep is required housekeeping (not a fallback path) and must be safe and deterministic.
+
+- Concurrency safety (cross-process):
+  - Use the existing cross-process lock pattern (similar to `withExclusiveInstallLock(...)`) so that concurrent verifications in the same workspace do not race and do not create redundant seeds.
+  - Lock key must include the seed key so different seed configurations do not contend unnecessarily.
+  - The lock must also write a single “current seed pointer” file (under `buck-out/tmp/verify-seed/`) atomically so readers do not observe partial state.
+
+Non-goals in this PR:
+
+- No semantic changes to patch/provider wiring, exporter behavior, or macro surfaces.
+- No best-effort behavior: no `|| true` adjacent to the seed preparation path.
+
+### Tests (in this PR)
+
+- Add a focused test that asserts **verify exports a seed store path** and `runInTemp` consumes it without invoking Nix:
+  - enforce that `runInTemp` does not call `nix build` for seeding when `BNX_TEST_SEED_STORE_PATH` is set
+  - enforce that missing `BNX_TEST_SEED_STORE_PATH` is a **hard failure** in verify mode (no silent fallback)
+
+- Add a test that simulates “seed missing” mid-run and asserts the failure mode is strict and actionable:
+  - when `BNX_TEST_SEED_STORE_PATH` points at a missing path, `runInTemp` fails fast with a message that includes the missing path and guidance (“rerun verify”).
+
+- Add a test for the GC-root pinning contract:
+  - verify creates the pin path and it points at the seed store path
+  - pin is removed at the end of verify (or on failure cleanup path)
+  - verify startup performs a stale-pin sweep (removes orphaned/expired pins deterministically)
+
+### Implementation Notes (so another engineer can implement without guessing)
+
+- Proposed exported environment variables:
+  - `BNX_TEST_SEED_STORE_PATH`: absolute `/nix/store/...-seed` path to the prepared seed artifact
+  - `BNX_TEST_SEED_KEY`: the computed seed key string (for diagnostics and lock scoping)
+  - `BNX_TEST_SEED_PIN_DIR`: absolute path to the per-run pin dir (e.g., `buck-out/tmp/verify-seed/pins/<iso>`)
+
+- Proposed verify-owned state directory layout:
+  - `buck-out/tmp/verify-seed/`
+    - `current` (text file, seed store path)
+    - `current.key` (text file, seed key)
+    - `pins/<iso>/seed` (symlink to store path; GC root)
+    - `pins/<iso>/owner.json` (pid + startedAt + seedKey; used for stale sweep)
+
+- Proposed locking:
+  - Use the existing install-lock infrastructure to avoid inventing new locking semantics.
+  - Lock key example: `verify-seed:${seedKey}` (repo-identity scoped, cross-process).
+
+- Proposed consumption in `runInTemp`:
+  - If `BNX_TEST_SEED_STORE_PATH` is set, temp repo init must copy from it (no Nix calls).
+  - Copy mechanism should reuse existing utilities (e.g., `copyTree(...)` / clone-aware copy).
+  - If the path does not exist, fail fast with a message that includes:
+    - missing path
+    - seed key (if available)
+    - a single actionable remediation (“rerun v”).
+
+- Required cleanup:
+  - verify must remove its own pin dir at the end of the run.
+  - verify startup must sweep stale pin dirs (pid dead or TTL exceeded) deterministically.
+
+### Docs (in this PR)
+
+- Update `build-system-design.md` (or a dedicated test-harness section) to describe:
+  - the verify-scoped seed artifact contract
+  - the seed key composition rules
+  - the “no fallbacks / fail fast” policy for seed preparation
+
+### Acceptance Criteria
+
+- A full `v` run builds the seed artifact **at most once** per verify run and shares it across all temp repos.
+- Tests do not attempt seed preparation; they only consume the exported store path.
+- If the seed store path is missing or invalid, tests fail fast with a clear message (no silent rebuilds).
+- The seed store path cannot be GC’d during the verify run due to explicit pinning.
+
+### Risks
+
+Moderate. This changes the test harness architecture and introduces a new verify-stage artifact that must be correct across macOS/Linux environments.
+
+Mitigation:
+
+- Keep seed contents strictly filtered and minimal.
+- Make failure mode strict and high-signal (no fallbacks).
+- Add tests that lock the contract (single build, pinning, no per-test Nix calls).
+
+### Consequence of Not Implementing
+
+We keep paying the complexity cost of an out-of-store seed cache (manual invalidation/versioning) and remain exposed to run-to-run variance and concurrency edge cases.
+
+### Downsides for Implementing
+
+- Additional Nix attribute and verify orchestration work.
+- Tighter coupling between verify and test harness setup (by design).
+
+### Recommendation
+
+Implement.
+
+---
+
 ## Rollout and Sequencing
 
 These PRs are ordered by dependency chain and to keep each PR revertible:
 
 1. PR-1 first: unify Nix-calling rule command assembly and lock strict failure propagation at the rule layer.
 2. PR-2 next: macro parameter convention standardization and fail-fast validation to prevent silent mismatch and call-site drift.
-3. PR-3 last: rename preferred “v2” wiring surfaces to canonical names and quarantine primitives behind consistent naming + enforcement.
+3. PR-3 next: rename preferred “v2” wiring surfaces to canonical names and quarantine primitives behind consistent naming + enforcement.
+4. PR-4 last: move temp repo seeding to a verify-scoped Nix store artifact with strict failure semantics (no fallbacks).
 
 ---
 

@@ -98,7 +98,7 @@ nix_go_tiny_wasm_lib(
     await $({
       cwd: tmp,
       stdio: "inherit",
-    })`nix run --accept-flake-config .#zx-wrapper -- tools/buck/export-graph.ts --out tools/buck/graph.json`;
+    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- tools/buck/export-graph.ts --out tools/buck/graph.json`;
 
     // 5) Build TinyGo wasm via selected-wasm
     const { stdout: outWasmSel } = await $({
@@ -107,7 +107,7 @@ nix_go_tiny_wasm_lib(
       reject: false,
       nothrow: true,
       env: { ...process.env, BUCK_TARGET: "//libs/math-api:wasm" },
-    })`nix build --impure -L .#graph-generator-selected-wasm --accept-flake-config --print-out-paths`;
+    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected-wasm`} --accept-flake-config --print-out-paths`;
     const outWasmPath =
       String(outWasmSel || "")
         .trim()
@@ -138,7 +138,7 @@ nix_go_tiny_wasm_lib(
         BUCK_TARGET: "//libs/math-core:core_emscripten",
         PLANNER_ONLY_CPP: "1",
       },
-    })`nix run --accept-flake-config .#zx-wrapper -- tools/dev/build-selected.ts`;
+    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- tools/dev/build-selected.ts`;
     const outEmsPath =
       String(outEmsSel || "")
         .trim()

@@ -105,15 +105,18 @@ export async function copyTree(
 }
 
 export async function probeCopyFileCloneSupport(): Promise<boolean> {
-  const forceFlag = cloneFlagForMode("force");
-  if (forceFlag === null) return false;
+  // We use cloneMode="try" (COPYFILE_FICLONE) for seed repo COW cloning. On some platforms
+  // COPYFILE_FICLONE_FORCE can be unimplemented (ENOSYS) even when COPYFILE_FICLONE works,
+  // so probing "force" would incorrectly disable cloning.
+  const tryFlag = cloneFlagForMode("try");
+  if (tryFlag === null) return false;
 
   const dir = await fsp.mkdtemp(path.join(os.tmpdir(), "bucknix-clone-probe-"));
   try {
     const src = path.join(dir, "src.txt");
     const dst = path.join(dir, "dst.txt");
     await fsp.writeFile(src, "hello\n", "utf8");
-    await fsp.copyFile(src, dst, forceFlag);
+    await fsp.copyFile(src, dst, tryFlag);
     return true;
   } catch (e) {
     if (isCloneUnsupportedError(e)) return false;

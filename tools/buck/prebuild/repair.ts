@@ -57,9 +57,10 @@ async function ensureLocalPreludeMapping() {
     }
 
     let out = "";
+    const flakeRef = `path:${process.cwd()}`;
     try {
       const { stdout } =
-        await $`nix build .#buck2-prelude --no-link --accept-flake-config --print-out-paths`;
+        await $`nix build ${flakeRef}#buck2-prelude --no-link --accept-flake-config --print-out-paths --option warn-dirty false`;
       out =
         String(stdout || "")
           .trim()
@@ -69,7 +70,8 @@ async function ensureLocalPreludeMapping() {
     } catch {}
     if (!out) {
       try {
-        const { stdout } = await $`nix eval --raw .#inputs.buck2.outPath`;
+        const { stdout } =
+          await $`nix eval --raw ${flakeRef}#inputs.buck2.outPath --option warn-dirty false`;
         out = String(stdout || "").trim();
       } catch {}
     }

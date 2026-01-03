@@ -54,22 +54,16 @@ load(
 )
 load(
     "//lang:importer_wiring.bzl",
-    _attach_importer_patch_inputs = "attach_importer_patch_inputs",
-    _merge_provider_edges = "merge_provider_edges",
-    _require_single_importer_lockfile_label = "require_single_importer_lockfile_label",
-)
-load(
-    "//lang:importer_wiring_v2.bzl",
     _prepare_importer_genrule_kwargs = "prepare_importer_genrule_kwargs",
     _prepare_importer_non_genrule_wiring = "prepare_importer_non_genrule_wiring",
     _prepare_importer_srcsless_rule_wiring = "prepare_importer_srcsless_rule_wiring",
 )
 load(
-    "//lang:importer_wiring_v2_probe.bzl",
+    "//lang:importer_wiring_probe.bzl",
     _importer_wiring_mutation_probe = "importer_wiring_mutation_probe",
 )
 load(
-    "//lang:importer_wiring_v2_nix_calling.bzl",
+    "//lang:importer_wiring_nix_calling.bzl",
     _prepare_importer_non_genrule_nix_calling_wiring = "prepare_importer_non_genrule_nix_calling_wiring",
 )
 load(
@@ -154,10 +148,6 @@ dict_items_probe = _dict_items_probe
 PATCH_INPUTS_KEY_PREFIX = _PATCH_INPUTS_KEY_PREFIX
 PROVIDER_EDGES_KEY_PREFIX = _PROVIDER_EDGES_KEY_PREFIX
 GLOBAL_NIX_INPUTS_KEY_PREFIX = _GLOBAL_NIX_INPUTS_KEY_PREFIX
-
-require_single_importer_lockfile_label = _require_single_importer_lockfile_label
-attach_importer_patch_inputs = _attach_importer_patch_inputs
-merge_provider_edges = _merge_provider_edges
 
 # Preferred importer-scoped macro wiring helpers (non-mutating at the call-site boundary).
 prepare_importer_genrule_kwargs = _prepare_importer_genrule_kwargs

@@ -52,7 +52,7 @@ test("planner: touching root-only file does not change app bin store path", asyn
     const { stdout: outStd1 } = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`bash --noprofile --norc -c 'nix build --impure -L .#graph-generator --accept-flake-config --no-link --print-out-paths'`;
+    })`nix build --impure -L ${`path:${tmp}#graph-generator`} --accept-flake-config --no-link --print-out-paths`;
     const outPath1 =
       String(outStd1 || "")
         .trim()
@@ -84,7 +84,7 @@ test("planner: touching root-only file does not change app bin store path", asyn
     const { stdout: outStd2 } = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`bash --noprofile --norc -c 'nix build --impure -L .#graph-generator --accept-flake-config --no-link --print-out-paths'`;
+    })`nix build --impure -L ${`path:${tmp}#graph-generator`} --accept-flake-config --no-link --print-out-paths`;
     const outPath2 =
       String(outStd2 || "")
         .trim()

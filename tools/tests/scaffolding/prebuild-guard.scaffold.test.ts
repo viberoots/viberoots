@@ -21,8 +21,6 @@ EOF
       awk '1; NR==1{print ""} END{print "[build]"; print "prelude = prelude"; print "default_platform = //:no_cgo"; print "user_platform = //:no_cgo"; print "target_platforms = //:no_cgo"}' .buckconfig > .buckconfig.new || cp .buckconfig .buckconfig.new
       mv .buckconfig.new .buckconfig
     `}`;
-    // Initialize git so git-based checks in dev-build don't error out in temp repos
-    await $`git init`;
     // Rely on runInTemp's default .buckconfig (no_cgo) instead of writing our own
     await $`scaf new go lib demo-lib --yes`;
     // Guard should auto-fix glue if stale and succeed

@@ -13,8 +13,7 @@ describe("pre-commit hook (lint-staged with Prettier + ESLint)", () => {
       // Speed: avoid running pre-commit across the entire temp repo during the
       // initial commit. Configure hooks after the first commit so the test only
       // exercises the hook on the targeted commit(s) below.
-      await $`git add -A`;
-      await $`git commit -m "chore: init"`;
+      await $`git commit --allow-empty -m "chore: init"`;
       await $`git config core.hooksPath .husky`;
 
       const badFile = path.join(tmp, "tools", "dev", "bad.ts");

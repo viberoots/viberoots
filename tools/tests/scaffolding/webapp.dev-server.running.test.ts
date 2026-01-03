@@ -47,6 +47,10 @@ test("node webapp: dev server runs and serves index", { timeout: TEST_TIMEOUT_MS
     let chosenPort: number | undefined;
 
     await _$`scaf new node webapp ${name} --yes`;
+    // runInTemp initializes a git repo; stage generated files so Nix git-flake evaluation sees them.
+    try {
+      await _$({ cwd: tmp, stdio: "pipe" })`git add -A ${appDir}`;
+    } catch {}
     // Ensure any pre-existing symlinked node_modules in the importer is removed
     try {
       const nmPath = path.join(appAbs, "node_modules");
@@ -66,6 +70,9 @@ test("node webapp: dev server runs and serves index", { timeout: TEST_TIMEOUT_MS
         NIX_PNPM_ALLOW_GENERATE: "1",
       },
     })`zx-wrapper ../../tools/dev/node-modules-build.ts`;
+    try {
+      await _$({ cwd: tmp, stdio: "pipe" })`git add -A ${appDir}`;
+    } catch {}
     const outPath = String(outPathRaw.stdout || "").trim();
     if (!outPath) throw new Error("failed to resolve node_modules derivation path");
     await _$({

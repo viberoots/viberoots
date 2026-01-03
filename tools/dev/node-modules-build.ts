@@ -44,10 +44,13 @@ if (!importer) {
 }
 const fullAttr = nodeModulesAttr(importer);
 const flakeRoot = await findFlakeRoot(cwd);
+// Use a path flake reference to avoid git-snapshot semantics (dirty-tree warnings, missing untracked
+// generated files in temp repos, and flaky evaluations when running from synthesized repos).
+const flakeRef = `path:${flakeRoot}`;
 // Fast path: if output is already realized in the store, prefer path-info
 let outPath = "";
 try {
-  const pi = await $`nix path-info ${flakeRoot}#${fullAttr} --accept-flake-config`;
+  const pi = await $`nix path-info ${flakeRef}#${fullAttr} --accept-flake-config`;
   const cand =
     String(pi.stdout || "")
       .trim()
@@ -71,7 +74,7 @@ async function tryBuild(): Promise<string> {
     'TO="timeout -k 10s ${TS}s ";',
     'JOBS_FLAG=""; if [ -n "$MJ" ] && [ "$MJ" != "0" ]; then JOBS_FLAG="--max-jobs $MJ"; fi;',
     'CORES_FLAG=""; if [ -n "$CR" ] && [ "$CR" != "0" ]; then CORES_FLAG="--option cores $CR"; fi;',
-    `$TO nix build "${flakeRoot}#${fullAttr}" --no-link --accept-flake-config --builders "" --print-out-paths $JOBS_FLAG $CORES_FLAG`,
+    `$TO nix build "${flakeRef}#${fullAttr}" --no-link --accept-flake-config --builders "" --print-out-paths $JOBS_FLAG $CORES_FLAG`,
   ].join(" ");
   const built = await $`bash --noprofile --norc -c ${cmd}`.nothrow();
   const txt = String(built.stdout || "").trim();

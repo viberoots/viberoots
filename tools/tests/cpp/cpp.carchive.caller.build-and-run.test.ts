@@ -89,7 +89,8 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`bash --noprofile --norc -c 'BUCK_TARGET="//apps/caller:caller" nix build --impure -L .#graph-generator-selected --accept-flake-config --print-out-paths'`;
+      env: { ...process.env, BUCK_TARGET: "//apps/caller:caller" },
+    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --print-out-paths`;
     if (build.exitCode !== 0) {
       console.error(build.stdout + "\n" + build.stderr);
       throw new Error("nix build failed");
