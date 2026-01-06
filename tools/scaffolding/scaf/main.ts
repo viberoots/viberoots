@@ -48,7 +48,12 @@ function guardBuckTests(repoRoot: string) {
       process.env.BUCK_TEST_TARGET || process.env.BUCK_TARGET || process.env.BUCK_TEST_SRC,
     );
     const hasSandboxRoot = Boolean(envRootAbs);
-    const usingLiveRoot = hasSandboxRoot && envRootAbs === repoRoot;
+    // When running under Buck tests, REPO_ROOT points at the real developer checkout, while
+    // WORKSPACE_ROOT points at the temp workspace (runInTemp). Only block when we're about to
+    // scaffold into the real checkout.
+    const realRootRaw = String(process.env.REPO_ROOT || "").trim();
+    const realRootAbs = realRootRaw ? path.resolve(realRootRaw) : path.resolve(repoRoot);
+    const usingLiveRoot = hasSandboxRoot && envRootAbs === realRootAbs;
     if (underBuck && (!hasSandboxRoot || usingLiveRoot)) {
       console.error(
         "error: refusing to scaffold in the live repo under Buck tests; use runInTemp so WORKSPACE_ROOT points to a temp workspace",

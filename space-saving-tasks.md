@@ -16,17 +16,17 @@ The core failure mode we observed was:
 
 Raw V8 coverage (`NODE_V8_COVERAGE`) can generate large per-test artifacts. We changed verify so that raw coverage is only enabled when `COVERAGE=1` (i.e. `v --coverage`), preventing silent accumulation during normal runs.
 
-- **Where**: `tools/bin/verify`
+- **Where**: `tools/bin/verify` (wrapper) + `tools/dev/verify/*` (implementation)
 - **What**:
-  - Creates a per-run `V8COV_DIR` only in coverage mode.
-  - Cleans up stale `buck-out/tmp/node-v8-coverage/v-*` dirs when coverage is disabled.
+  - Creates a per-run raw coverage directory under `buck-out/tmp/node-v8-coverage/v-*` only in coverage mode.
+  - Cleans up stale `buck-out/tmp/node-v8-coverage/v-*` dirs when coverage is disabled (local runs only).
   - Passes `NODE_V8_COVERAGE=...` into Buck test execution only when coverage is enabled.
 
 ### 2) Preflight housekeeping + bounded Nix maintenance + hard disk gate
 
 When disk is tight, repeated builds/tests can quickly spiral into ENOSPC and additional churn. Verify now does a preflight that cleans repo-local temp outputs, runs bounded `nix store optimise`, optionally runs bounded `nix-store --gc --max-freed …`, and then **refuses to start** if free space is still below a configurable threshold.
 
-- **Where**: `tools/bin/verify`
+- **Where**: `tools/bin/verify` (wrapper) + `tools/dev/verify/housekeeping.ts` (implementation)
 - **What**:
   - `tools/dev/clean-temp-outs.ts` best-effort cleanup.
   - Purges repo-local `buck-out/tmp` and `.tmp` when critically low.
@@ -133,7 +133,7 @@ Clone-aware copying reduces the wall-clock cost and IO overhead of creating temp
 
 We found that scanning large stores (e.g. `find /nix/store … | du`) can take minutes and make `v` look “hung”. We made this analysis step opt-in.
 
-- **Where**: `tools/bin/verify`
+- **Where**: `tools/bin/verify` + `tools/dev/verify/safety-rails.ts`
 - **What**:
   - Store totals are collected only when `VERIFY_ANALYSIS_STORE_TOTALS=1`.
 
@@ -141,7 +141,7 @@ We found that scanning large stores (e.g. `find /nix/store … | du`) can take m
 
 CI may run multiple `v` instances concurrently, so we explicitly avoided a global mutex. Instead, each run monitors `/nix/store` and stops itself if it’s about to become disruptive.
 
-- **Where**: `tools/bin/verify` + `tools/dev/verify-analysis/*.sh`
+- **Where**: `tools/bin/verify` + `tools/dev/verify/safety-rails.ts`
 - **What**:
   - Per-run analysis directory under `buck-out/tmp/verify-analysis/run-*`.
   - Per-run monitors that snapshot state and signal only the current run if:
@@ -210,7 +210,7 @@ In practice, the highest-signal checks are:
 ## Files touched (high-level)
 
 - `tools/bin/verify`: coverage gating, housekeeping, disk gate.
-- `tools/dev/verify-analysis/*.sh`: per-run diagnostics scripts (`sample.sh`, `monitor.sh`, `low-space-trigger.sh`, `drop-budget-trigger.sh`).
+- `tools/dev/verify/*`: verify implementation (coverage gating, housekeeping/disk gate, workspace temp roots, safety rails).
 - `tools/bin/tail-log`: status/watch mode for verify runs and better log selection behavior.
 - `tools/dev/verify-log-status.ts` + `tools/lib/verify-log-status/*`: log parsing/formatting for `tail-log --status`.
 - `tools/tests/lib/test-helpers.ts`: temp repo rsync excludes and removal of per-temp `flake.lock` rewriting.

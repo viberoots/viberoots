@@ -103,25 +103,36 @@
     packages = forAllSystems ({ zx-wrapper, pkgs, nodeMods, prelude, buck2Input, system, uv2nixLib, ... }:
       let
         lib = pkgs.lib;
-        # Exclude volatile, test-generated dirs from repo snapshots to avoid races during coverage writes
+        # Exclude volatile, test-generated dirs from repo snapshots to avoid races during coverage writes.
+        #
+        # Important: local tests may run in temp repos under buck-out/tmp/tmpdir; in that case, the
+        # repo root path itself contains "/buck-out/". So we must exclude by *root-relative prefix*
+        # rather than "anywhere in the path", or we'd accidentally filter the entire repo to empty.
         filterRepo = path:
           builtins.filterSource
             (p: _type:
               let s = builtins.toString p;
+                  root = builtins.toString path;
+                  isRootDir = d: (s == (root + "/" + d)) || (lib.hasPrefix (root + "/" + d + "/") s);
+                  isRootFile = f: s == (root + "/" + f);
+                  isAnyDir = d: lib.hasInfix ("/" + d + "/") s || lib.hasSuffix ("/" + d) s;
               in !(
-                lib.hasInfix "/coverage/" s || lib.hasSuffix "/coverage" s ||
-                lib.hasInfix "/buck-out/" s || lib.hasSuffix "/buck-out" s ||
-                lib.hasInfix "/.buck/" s    || lib.hasSuffix "/.buck" s ||
-                lib.hasInfix "/test-logs/" s || lib.hasSuffix "/test-logs" s ||
-                lib.hasInfix "/.clinic/" s ||
-                lib.hasInfix "/node_modules/" s || lib.hasSuffix "/node_modules" s ||
-                lib.hasInfix "/.pnpm/" s || lib.hasSuffix "/.pnpm" s ||
-                lib.hasInfix "/.pnpm-store/" s || lib.hasSuffix "/.pnpm-store" s ||
-                lib.hasInfix "/.git/" s || lib.hasSuffix "/.git" s ||
-                lib.hasInfix "/.direnv/" s || lib.hasSuffix "/.direnv" s ||
-                lib.hasInfix "/.cache/" s || lib.hasSuffix "/.cache" s ||
-                lib.hasInfix "/result/" s || lib.hasSuffix "/result" s ||
-                lib.hasInfix "/.envrc" s || lib.hasSuffix "/.envrc" s
+                # root-relative volatile dirs
+                isRootDir "coverage" ||
+                isRootDir "buck-out" ||
+                isRootDir ".buck" ||
+                isRootDir "test-logs" ||
+                isRootDir ".clinic" ||
+                isRootDir ".cache" ||
+                isRootDir "result" ||
+                isRootDir ".direnv" ||
+                isRootDir ".git" ||
+                # root-relative volatile files
+                isRootFile ".envrc" ||
+                # anywhere (can be nested): dependency/vendor artifacts
+                isAnyDir "node_modules" ||
+                isAnyDir ".pnpm" ||
+                isAnyDir ".pnpm-store"
               )
             )
             path;

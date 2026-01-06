@@ -137,6 +137,8 @@ nix_go_tiny_wasm_lib(
         ...process.env,
         BUCK_TARGET: "//libs/math-core:core_emscripten",
         PLANNER_ONLY_CPP: "1",
+        WORKSPACE_ROOT: tmp,
+        BUCK_TEST_SRC: tmp,
       },
     })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- tools/dev/build-selected.ts`;
     const outEmsPath =

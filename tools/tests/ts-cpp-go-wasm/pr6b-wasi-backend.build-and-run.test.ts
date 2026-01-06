@@ -65,6 +65,8 @@ nix_cpp_wasm_static_lib(
         ...process.env,
         BUCK_TARGET: "//libs/math-core:core_wasm",
         PLANNER_ONLY_CPP: "1",
+        WORKSPACE_ROOT: tmp,
+        BUCK_TEST_SRC: tmp,
       },
     })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- tools/dev/build-selected.ts`;
     const outCppPath =
@@ -122,7 +124,13 @@ nix_go_tiny_wasm_lib(
       stdio: "pipe",
       reject: false,
       nothrow: true,
-      env: { ...process.env, BUCK_TARGET: "//libs/math-api:wasm", WEB_WASM_BACKEND: "wasi_single" },
+      env: {
+        ...process.env,
+        BUCK_TARGET: "//libs/math-api:wasm",
+        WEB_WASM_BACKEND: "wasi_single",
+        WORKSPACE_ROOT: tmp,
+        BUCK_TEST_SRC: tmp,
+      },
     })`nix build --impure -L ${`path:${tmp}#graph-generator-selected-wasm`} --accept-flake-config --no-link --print-out-paths`;
     const outWasmPath =
       String(outWasmSel || "")

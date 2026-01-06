@@ -37,7 +37,9 @@ async function main(): Promise<void> {
       process.env.BUCK_TEST_TARGET || process.env.BUCK_TARGET || process.env.BUCK_TEST_SRC,
     );
     const hasSandboxRoot = Boolean(envRootAbs);
-    const usingLiveRoot = hasSandboxRoot && envRootAbs === realRoot;
+    const repoRootRaw = String(process.env.REPO_ROOT || "").trim();
+    const liveRootAbs = repoRootRaw ? path.resolve(repoRootRaw) : realRoot;
+    const usingLiveRoot = hasSandboxRoot && envRootAbs === liveRootAbs;
     if (underBuck && (!hasSandboxRoot || usingLiveRoot)) {
       console.error(
         "error: refusing to scaffold in the live repo under Buck tests; ensure WORKSPACE_ROOT points to a temp workspace (use runInTemp)",

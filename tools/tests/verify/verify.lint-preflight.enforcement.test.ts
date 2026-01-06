@@ -4,7 +4,7 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
 test("verify includes a bounded lint preflight (enforcement)", async () => {
-  const txt = await fsp.readFile("tools/bin/verify", "utf8");
+  const txt = await fsp.readFile("tools/dev/verify/lint-preflight.ts", "utf8");
   assert.ok(
     txt.includes("lint preflight"),
     "expected tools/bin/verify to include a lint preflight to avoid wasting time on verify when formatting/lint is dirty",

@@ -9,6 +9,7 @@
  * - BUCK_TARGET: required label (e.g., //apps/foo:foo)
  * - BUCK_GRAPH_JSON: optional path to tools/buck/graph.json for the CURRENT workspace
  * - BUCK_TEST_SRC: optional path to current repo working tree (defaults to cwd)
+ * - WORKSPACE_ROOT: optional working tree root (preferred when present in Buck actions)
  */
 import * as fsp from "node:fs/promises";
 import path from "node:path";
@@ -27,22 +28,28 @@ async function main() {
     console.error("BUCK_TARGET is required (e.g., //apps/foo:foo)");
     process.exit(2);
   }
-  const workDir = path.resolve(process.env.BUCK_TEST_SRC || process.cwd());
-  const repoRoot =
-    (process.env.REPO_ROOT && String(process.env.REPO_ROOT).trim()) ||
-    (await findRepoRoot(workDir));
-  if (!(await pathExists(path.join(repoRoot, "flake.nix")))) {
-    console.error("flake.nix not found at repo root");
+  const cwd = path.resolve(process.cwd());
+  // This tool must always operate on the *current working tree*.
+  //
+  // In Buck tests, the parent process often has env vars like BUCK_TEST_SRC/WORKSPACE_ROOT pointing
+  // at the developer checkout ("live repo"), but the test itself runs inside a temp repo (cwd=tmp).
+  // Using those env vars here would silently target the wrong workspace and make builds flaky.
+  const workspaceRoot = await findRepoRoot(cwd);
+  if (!(await pathExists(path.join(workspaceRoot, "flake.nix")))) {
+    console.error(`flake.nix not found at workspace root: ${workspaceRoot}`);
     process.exit(2);
   }
 
   // Ensure the graph exists via the canonical helper; preserve exporter env behavior
-  const graphPath = path.join(workDir, "tools", "buck", "graph.json");
+  const graphPath = path.join(workspaceRoot, "tools", "buck", "graph.json");
   // Prefer working tree as BUCK_TEST_SRC so exporter operates on the correct repo root
   const queryRoots =
     (process.env.BUCK_QUERY_ROOTS && String(process.env.BUCK_QUERY_ROOTS).trim()) ||
     ["apps", "libs", "go", "cpp", "third_party"].join(",");
-  process.env.BUCK_TEST_SRC = workDir;
+  process.env.BUCK_TEST_SRC = workspaceRoot;
+  // ensureGraph prefers WORKSPACE_ROOT when set; force it to the chosen workDir so we don't
+  // accidentally export a graph into the outer verify workspace when invoked from a temp repo.
+  process.env.WORKSPACE_ROOT = workspaceRoot;
   process.env.EXPORTER_DEBUG = "1";
   // Prefer warn-level validation during local/dev builds to avoid spurious failures in temp repos
   if (!process.env.EXPORTER_VALIDATION) {
@@ -65,7 +72,7 @@ async function main() {
   }
   await ensureGraph();
   process.env.BUCK_GRAPH_JSON = graphPath;
-  process.env.BUCK_TEST_SRC = workDir;
+  process.env.BUCK_TEST_SRC = workspaceRoot;
   // Optional debug: surface a snippet of graph.json for diagnostics when requested
   if ((process.env.EXPORTER_DEBUG || "").trim() === "1") {
     try {
@@ -97,33 +104,13 @@ async function main() {
     env: sanitizedEnv,
     reject: false,
     nothrow: true,
-  })`nix build --impure ${repoRoot}#graph-generator-selected --accept-flake-config --print-out-paths ${nixTrace}`;
+  })`nix build --impure ${workspaceRoot}#graph-generator-selected --accept-flake-config --print-out-paths ${nixTrace}`;
   if (exitCode !== 0) {
-    // Fallback: try cppTargetsFlat attribute for any C++-backed target (planner path)
-    const attr = `graph-generator-cppTargets.${cppTargetAttrSuffix}`;
-    const res = await $({
-      env: sanitizedEnv,
-      reject: false,
-      nothrow: true,
-    })`nix build --impure ${repoRoot}#${attr} --accept-flake-config --print-out-paths ${nixTrace}`;
-    if (res.exitCode !== 0) {
-      console.error(
-        "[build-selected] planner build failed for both graph-generator-selected and cppTargetsFlat.\n" +
-          "Ensure tools/buck/graph.json includes the requested target and re-run glue export.",
-      );
-      process.exit(res.exitCode || 1);
-    }
-    const lines = stripAnsi(String(res.stdout || ""))
-      .split(/\n+/)
-      .map((l) => l.trim())
-      .filter(Boolean);
-    const outPath = lines[lines.length - 1] || "";
-    if (!outPath) {
-      console.error("no out path emitted by nix build (fallback)");
-      process.exit(2);
-    }
-    process.stdout.write(outPath + "\n");
-    return;
+    console.error(
+      "[build-selected] nix build failed.\n" +
+        "Ensure tools/buck/graph.json includes the requested target and re-run glue export.",
+    );
+    process.exit(exitCode || 1);
   }
   const lines = stripAnsi(String(stdout || ""))
     .split(/\n+/)

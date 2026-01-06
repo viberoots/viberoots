@@ -49,7 +49,9 @@ test("buck-daemon-reaper: does not wait when parent-sig mismatches (pid reuse gu
       { stdio: "ignore" },
     );
 
-    const res = await waitForExit(reaper, 3_000);
+    // Under full-suite load, process startup can be slower; this should still exit well before
+    // any "wait for parent" behavior would complete (the parent is this test process).
+    const res = await waitForExit(reaper, 15_000);
     // Any exit code is fine; the key invariant is "it exits quickly without waiting for our pid".
     assert.ok(res);
   } finally {

@@ -589,7 +589,15 @@ export async function runInTemp<T>(
           $({
             cwd: tmp,
             stdio: "pipe",
-            env: { ...process.env, TEST_NEED_DEV_ENV: "1" },
+            // Ensure direnv (which searches upward for .envrc) sees a stable WORKSPACE_ROOT for
+            // downstream tools/bin wrappers, even though the temp repo lives under buck-out/tmp/tmpdir.
+            env: {
+              ...process.env,
+              TEST_NEED_DEV_ENV: "1",
+              WORKSPACE_ROOT: tmp,
+              BUCK_TEST_SRC: tmp,
+              IN_NIX_SHELL: "1",
+            },
           })`bash --noprofile --norc -c 'if command -v direnv >/dev/null 2>&1; then direnv allow . >/dev/null 2>&1 || true; eval "$(direnv export bash)"; env -0; elif command -v nix >/dev/null 2>&1; then NO_NODE_MODULES_LINK=1 nix develop --accept-flake-config -c env -0; else printf ""; fi'`,
       );
     } catch {
@@ -664,6 +672,10 @@ export async function runInTemp<T>(
       exportEnv[k] = v;
     }
   }
+  // Tools/bin wrappers key off IN_NIX_SHELL to decide whether to re-exec via direnv.
+  // In Buck tests we already run under the dev shell, and some test paths (direnv export)
+  // may unset IN_NIX_SHELL — keep it enabled to avoid slow/blocked re-execs.
+  exportEnv.IN_NIX_SHELL = exportEnv.IN_NIX_SHELL || "1";
   // Ensure dev deps (fs-extra, c8, yaml, etc.) resolve from the main workspace initially.
   // When tests install additional deps in the temp repo, local node_modules will take precedence.
   try {
@@ -675,6 +687,9 @@ export async function runInTemp<T>(
   // Ensure repo-aware bin helpers (e.g., tools/bin/build, verify) operate on the temp copy
   // Keep WORKSPACE_ROOT as the temp repo for file operations
   exportEnv.WORKSPACE_ROOT = tmp;
+  // Some tooling still consults BUCK_TEST_SRC to find the workspace root; ensure it points at the
+  // temp repo so graph export/build helpers operate on the temp copy (not the developer checkout).
+  exportEnv.BUCK_TEST_SRC = tmp;
   // Avoid polluting the developer's HOME and prevent macOS cache directories (e.g., ~/Library/Caches)
   // from being created inside the temp repo root (which creates large file-watcher churn for Buck2).
   exportEnv.HOME = home;
@@ -713,15 +728,21 @@ export async function runInTemp<T>(
     }
     return await fn(tmp, _$);
   } finally {
-    // Best-effort: stop any buck2 daemon for this temp repo to prevent buckd accumulation.
-    // Temp repos use distinct buck-out roots, so this does not affect the main workspace daemon.
-    try {
-      await _$({
-        stdio: "pipe",
-        reject: false,
-        nothrow: true,
-      })`buck2 kill`;
-    } catch {}
+    // Cleanup policy:
+    // - When running under `v`/verify, a single per-run buck-daemon-reaper is responsible for
+    //   terminating daemons across all temp repos. Avoid `buck2 kill` per test to reduce overhead.
+    // - When running tests outside verify (no shared state file), keep a best-effort kill to avoid
+    //   leaking buck2 daemons on developer machines.
+    const sharedReaperState = String(process.env.BNX_BUCK_REAPER_STATE_FILE || "").trim();
+    if (!sharedReaperState) {
+      try {
+        await _$({
+          stdio: "pipe",
+          reject: false,
+          nothrow: true,
+        })`buck2 kill`;
+      } catch {}
+    }
     // Avoid rewriting shared coverage artifacts concurrently; zx_test already normalizes coverage.
     // Opt-in via TEST_REWRITE_COVERAGE_TMP=1 if a test explicitly needs this legacy behavior.
     if ((process.env.TEST_REWRITE_COVERAGE_TMP || "") === "1") {
@@ -737,6 +758,16 @@ export async function runInTemp<T>(
         await fsp.appendFile(logFile, tmp + "\n", "utf8").catch(() => {});
       } catch {}
     } else {
+      // Best-effort: make temp trees writable before removal. Some toolchains produce read-only
+      // files/dirs (e.g. Go module caches) which can trigger EACCES and leave behind large trees.
+      try {
+        await $({
+          stdio: "ignore",
+          cwd: process.cwd(),
+          reject: false,
+          nothrow: true,
+        })`bash --noprofile --norc -c ${`chmod -R u+w ${shSingleQuote(tmp)} ${shSingleQuote(home)} >/dev/null 2>&1 || true`}`;
+      } catch {}
       await fsp.rm(tmp, { recursive: true, force: true }).catch((err) => {
         console.warn("warning: failed to remove temp test dir:", err);
       });

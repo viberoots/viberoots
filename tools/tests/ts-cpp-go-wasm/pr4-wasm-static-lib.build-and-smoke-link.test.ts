@@ -94,7 +94,12 @@ nix_cpp_wasm_static_lib(
     // Query the Nix out path for the selected target and verify archive + headers
     const sel = await $({
       cwd: tmp,
-      env: { ...process.env, BUCK_TARGET: "//libs/math-core:core_wasm" },
+      env: {
+        ...process.env,
+        BUCK_TARGET: "//libs/math-core:core_wasm",
+        WORKSPACE_ROOT: tmp,
+        BUCK_TEST_SRC: tmp,
+      },
     })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- tools/dev/build-selected.ts`;
     const outPath =
       String(sel.stdout || "")

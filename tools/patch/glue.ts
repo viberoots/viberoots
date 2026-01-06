@@ -36,8 +36,8 @@ function graphContainsTarget(txt: string, wantTargetRaw: string): boolean {
 
 export async function ensureGraph(opts: { exportGraph?: () => Promise<void> } = {}): Promise<void> {
   const workspaceRoot = (
-    process.env.BUCK_TEST_SRC ||
     process.env.WORKSPACE_ROOT ||
+    process.env.BUCK_TEST_SRC ||
     process.cwd()
   ).trim();
   const graphPath = path.join(workspaceRoot, "tools", "buck", "graph.json");

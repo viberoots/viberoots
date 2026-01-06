@@ -42,6 +42,21 @@ is_verify_process() {
   esac
 }
 
+pid_start_signature() {
+  local pid="$1"
+  /bin/ps -p "${pid}" -o lstart= 2>/dev/null | tr -d '\n' | sed -e 's/[[:space:]]*$//'
+}
+
+pid_alive_with_signature() {
+  local pid="$1"
+  local want_sig="$2"
+  [[ -z "${pid}" || -z "${want_sig}" ]] && return 1
+  kill -0 "${pid}" >/dev/null 2>&1 || return 1
+  local cur_sig=""
+  cur_sig="$(pid_start_signature "${pid}")"
+  [[ -n "${cur_sig}" && "${cur_sig}" == "${want_sig}" ]]
+}
+
 verify_pids_in_repo() {
   local repo_root
   repo_root="$(cd "${REPO_ROOT}" >/dev/null 2>&1 && pwd || echo "${REPO_ROOT}")"
@@ -49,11 +64,15 @@ verify_pids_in_repo() {
   local pids=""
 
   # Prefer the lock PID if present; it's authoritative for this repo.
+  # Since verify now runs as a Node process (TypeScript entrypoint), matching argv strings is not
+  # reliable. The lock stores both pid and lstart signature; use that to avoid PID reuse races.
   if [[ -d "${LOCK_DIR}" ]]; then
     local lock_pid=""
     lock_pid="$(cat "${LOCK_DIR}/pid" 2>/dev/null || true)"
-    if [[ -n "${lock_pid}" ]] && kill -0 "${lock_pid}" >/dev/null 2>&1; then
-      if is_verify_process "${lock_pid}"; then
+    local lock_sig=""
+    lock_sig="$(cat "${LOCK_DIR}/lstart" 2>/dev/null || true)"
+    if [[ -n "${lock_pid}" && -n "${lock_sig}" ]]; then
+      if pid_alive_with_signature "${lock_pid}" "${lock_sig}"; then
         printf "%s\n" "${lock_pid}"
         return 0
       fi

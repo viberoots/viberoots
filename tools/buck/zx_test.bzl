@@ -4,6 +4,10 @@ def _zx_test_impl(ctx):
     run_and_report = (
         (
             "export WORKSPACE_ROOT=\"${WORKSPACE_ROOT:-${BUCK_TEST_SRC:-$(pwd)}}\"; "
+            # Tests run under verify inside the dev shell, but Buck actions do not propagate IN_NIX_SHELL.
+            # Many tools/bin wrappers will re-exec via direnv when IN_NIX_SHELL is unset, which breaks
+            # in tests that set HOME to a temp dir (direnv treats the repo .envrc as "blocked").
+            + "export IN_NIX_SHELL=\"${IN_NIX_SHELL:-1}\"; "
             + "ORIG_BUCK2=\"$(command -v buck2)\"; "
             + "if [ \"$ZX_TEST_KILL_DAEMON\" = \"1\" ]; then \"$ORIG_BUCK2\" kill >/dev/null 2>&1 || true; fi; "
             # Default to linking workspace node_modules; tests may disable with NO_NODE_MODULES_LINK=1

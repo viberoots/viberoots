@@ -16,7 +16,9 @@ const EXCLUDED_PATHS = [
   /\/tools\/tests\//,
   /\/docs\//,
   /\/node_modules\//,
-  /\/buck-out\//,
+  // Usually, buck-out is generated and should not participate in lint rules.
+  // However, our test temp repos live under buck-out/tmp/tmpdir/ and must still be lintable.
+  /\/buck-out\/(?!tmp\/tmpdir\/)/,
   /\/coverage\//,
 ];
 
