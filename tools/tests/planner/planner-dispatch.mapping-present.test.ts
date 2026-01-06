@@ -27,7 +27,7 @@ test("planner uses mapping.nix dispatch for custom go_service rule", async () =>
 
     const { stdout } = await $({
       cwd: tmp,
-    })`nix build ${`path:${tmp}#graph-generator`} --accept-flake-config --print-out-paths`;
+    })`nix build ${`path:${tmp}#graph-generator`} --accept-flake-config --no-link --print-out-paths`;
     const out = String(stdout || "").trim();
     if (!out) {
       console.error("missing graph-generator out path");

@@ -306,8 +306,22 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
       cwd: _tmp,
       stdio: "inherit",
       env: { ...process.env, GOPROXY: "off", GOSUMDB: "off" },
-    })`nix build ${`path:${_tmp}#app`} --accept-flake-config --show-trace`;
-    const bin = path.join(_tmp, "result", "bin", "demo-cli");
+    })`bash --noprofile --norc -c 'rm -f ./result'`.nothrow();
+    const { stdout: outStdout } = await $({
+      cwd: _tmp,
+      stdio: "pipe",
+      env: { ...process.env, GOPROXY: "off", GOSUMDB: "off" },
+    })`nix build ${`path:${_tmp}#app`} --accept-flake-config --no-link --print-out-paths --show-trace`;
+    const outPath =
+      String(outStdout || "")
+        .trim()
+        .split(/\n+/)
+        .filter(Boolean)
+        .pop() || "";
+    if (!outPath) {
+      throw new Error("nix build produced no out path for app");
+    }
+    const bin = path.join(outPath, "bin", "demo-cli");
     const run = await $({ stdio: "pipe" })`${bin} --name Bob`;
     const outStr = String(run.stdout || "").trim();
     if (!/^Bob 00000000-0000-0000-0000-000000000000$/.test(outStr)) {

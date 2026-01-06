@@ -123,7 +123,7 @@ nix_go_tiny_wasm_lib(
       reject: false,
       nothrow: true,
       env: { ...process.env, BUCK_TARGET: "//libs/math-api:wasm", WEB_WASM_BACKEND: "wasi_single" },
-    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected-wasm`} --accept-flake-config --print-out-paths`;
+    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected-wasm`} --accept-flake-config --no-link --print-out-paths`;
     const outWasmPath =
       String(outWasmSel || "")
         .trim()

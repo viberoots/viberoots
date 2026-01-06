@@ -75,7 +75,7 @@ test("cpp cli scaffold builds via planner (binary exists)", async () => {
     const system = process.platform === "darwin" ? "aarch64-darwin" : "x86_64-linux";
     const res = await $({
       cwd: tmp,
-    })`nix build --accept-flake-config -f ${flake} --arg pkgs 'import <nixpkgs> {}' --arg src ./. --argstr system ${system} --arg graphJsonPath ${graphPath}`.nothrow();
+    })`nix build --accept-flake-config -f ${flake} --arg pkgs 'import <nixpkgs> {}' --arg src ./. --argstr system ${system} --arg graphJsonPath ${graphPath} --no-link --print-out-paths`.nothrow();
     assert.equal(res.exitCode, 0, "planner build should succeed for cpp bin");
   });
 });

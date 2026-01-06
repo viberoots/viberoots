@@ -18,7 +18,7 @@ test("planner logs dev override presence for C++ (non-CI)", async () => {
         NIX_CPP_DEV_OVERRIDE_JSON: "{}",
         BUCK_GRAPH_JSON: graph,
       },
-    })`nix build ${`path:${tmp}#graph-generator`} --print-out-paths --impure --accept-flake-config`;
+    })`nix build ${`path:${tmp}#graph-generator`} --print-out-paths --impure --accept-flake-config --no-link`;
     const outPath =
       String(res.stdout || "")
         .trim()

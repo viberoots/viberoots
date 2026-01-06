@@ -49,7 +49,7 @@ test("cpp planner imports and detects cxx_* and lang:cpp", async () => {
     const flake = path.join(process.cwd(), "tools/nix/graph-generator.nix");
     const res = await $({
       cwd: tmp,
-    })`nix build --accept-flake-config -f ${flake} --argstr system ${process.platform === "darwin" ? "aarch64-darwin" : "x86_64-linux"}`.nothrow();
+    })`nix build --accept-flake-config -f ${flake} --argstr system ${process.platform === "darwin" ? "aarch64-darwin" : "x86_64-linux"} --no-link --print-out-paths`.nothrow();
     // Nix call shape varies across environments; just assert plugin file exists and no syntax errors on import
     assert.ok(await fs.pathExists(path.join(tmp, "tools/nix/planner/cpp.nix")));
   });

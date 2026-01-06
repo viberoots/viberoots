@@ -51,7 +51,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`bash --noprofile --norc -c 'nix build -f ./addon.nix --print-out-paths'`;
+    })`bash --noprofile --norc -c 'nix build -f ./addon.nix --no-link --print-out-paths'`;
     if (build.exitCode !== 0) {
       console.error(build.stdout + "\n" + build.stderr);
       throw new Error("nix build failed (cpp-node-addon)");

@@ -46,7 +46,7 @@ test("repo_cgo_deps wires local cpp lib and runs", async () => {
       reject: false,
       nothrow: true,
       env: { ...process.env, BUCK_TARGET: "//apps/demo-cli:demo" },
-    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --print-out-paths`;
+    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
     if (build.exitCode !== 0) {
       console.error(build.stdout + "\n" + build.stderr);
       throw new Error("nix build failed");

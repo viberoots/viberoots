@@ -47,7 +47,7 @@ test("cppApp template builds a binary via planner", async () => {
     const flake = path.join(process.cwd(), "tools/nix/graph-generator.nix");
     const res = await $({
       cwd: tmp,
-    })`nix build --accept-flake-config -f ${flake} --arg pkgs 'import <nixpkgs> {}' --arg src ./. --argstr system ${process.platform === "darwin" ? "aarch64-darwin" : "x86_64-linux"} --arg graphJsonPath ./tools/buck/graph.json`.nothrow();
+    })`nix build --accept-flake-config -f ${flake} --arg pkgs 'import <nixpkgs> {}' --arg src ./. --argstr system ${process.platform === "darwin" ? "aarch64-darwin" : "x86_64-linux"} --arg graphJsonPath ./tools/buck/graph.json --no-link --print-out-paths`.nothrow();
     assert.equal(res.exitCode, 0);
   });
 });

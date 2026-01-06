@@ -11,7 +11,7 @@ test("nix builds graph-generator", async () => {
     const { stdout } = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`nix build ${`path:${tmp}#graph-generator`} --accept-flake-config --print-out-paths`;
+    })`nix build ${`path:${tmp}#graph-generator`} --accept-flake-config --no-link --print-out-paths`;
     if (!String(stdout || "").trim()) {
       console.error("graph-generator produced no out path");
       process.exit(2);
