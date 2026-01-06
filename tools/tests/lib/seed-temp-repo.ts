@@ -177,6 +177,22 @@ function selectInitMode(cow: CowMode): RepoInitMode {
   return cow === "none" ? "rsync" : "seed-cow";
 }
 
+async function isWorkspaceGitDirty(): Promise<boolean> {
+  const repoRoot = process.cwd();
+  const res = await $({
+    cwd: repoRoot,
+    stdio: "pipe",
+    reject: false,
+    nothrow: true,
+  })`git status --porcelain=v1`;
+  if (res.exitCode !== 0) {
+    throw new Error(
+      "seed-temp-repo: git status failed (git is required for deterministic temp repos)",
+    );
+  }
+  return String(res.stdout || "").trim() !== "";
+}
+
 async function cloneSeedToTemp(opts: {
   seedDir: string;
   tmpDir: string;
@@ -201,7 +217,20 @@ export async function initTempRepoFromWorkspaceOrSeed(args: {
   const { tmpDir, deps } = args;
 
   const cow = await deps.timeAsync("seedRepo.detectCowMode", async () => detectCowModeOnce());
-  const mode = selectInitMode(cow);
+  const mode0 = selectInitMode(cow);
+
+  // Correctness: when the workspace is dirty, do not reuse a shared seed repo that was created
+  // from an older clean snapshot. Prefer rsync so temp repos reflect the current working tree.
+  if (mode0 != "rsync") {
+    const dirty = await deps.timeAsync("seedRepo.workspaceDirty", async () =>
+      isWorkspaceGitDirty(),
+    );
+    if (dirty) {
+      await deps.rsyncRepoTo(tmpDir);
+      return "rsync";
+    }
+  }
+  const mode = mode0;
 
   if (mode === "rsync") {
     await deps.rsyncRepoTo(tmpDir);

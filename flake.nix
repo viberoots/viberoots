@@ -116,9 +116,12 @@
                 lib.hasInfix "/.clinic/" s ||
                 lib.hasInfix "/node_modules/" s || lib.hasSuffix "/node_modules" s ||
                 lib.hasInfix "/.pnpm/" s || lib.hasSuffix "/.pnpm" s ||
+                lib.hasInfix "/.pnpm-store/" s || lib.hasSuffix "/.pnpm-store" s ||
                 lib.hasInfix "/.git/" s || lib.hasSuffix "/.git" s ||
                 lib.hasInfix "/.direnv/" s || lib.hasSuffix "/.direnv" s ||
-                lib.hasInfix "/.cache/" s || lib.hasSuffix "/.cache" s
+                lib.hasInfix "/.cache/" s || lib.hasSuffix "/.cache" s ||
+                lib.hasInfix "/result/" s || lib.hasSuffix "/result" s ||
+                lib.hasInfix "/.envrc" s || lib.hasSuffix "/.envrc" s
               )
             )
             path;

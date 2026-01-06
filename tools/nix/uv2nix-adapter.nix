@@ -80,12 +80,35 @@ let
   _ = if (uv2nixLib == null)
       then builtins.throw "uv2nix adapter requires uv2nixLib"
       else null;
+  _lockfileRequired =
+    if lockfile == null || lockfile == ""
+    then builtins.throw "uv2nix adapter requires lockfile"
+    else null;
+
+  srcForUv2nixEnv =
+    let
+      srcStr = builtins.toString src;
+      subdirStr = if subdir == "." || subdir == "" then "" else subdir;
+      lockAbs = builtins.toPath (
+        srcStr
+        + (if subdirStr == "" then "" else "/" + subdirStr)
+        + "/" + lockfile
+      );
+      lockStore = builtins.path { path = lockAbs; name = "uv.lock"; };
+      dest = "$out/" + (if subdirStr == "" then "" else subdirStr + "/") + lockfile;
+    in
+      pkgs.runCommand "uv2nix-env-src" {} ''
+        set -euo pipefail
+        mkdir -p "$(dirname "${dest}")"
+        cp ${lockStore} "${dest}"
+      '';
 in
 # Primary path: call uv2nixLib to realize the environment (no silent fallbacks).
 
   let
     uvDrv = uv2nixLib.mkEnv {
-      inherit src subdir lockfile wsRoot;
+      src = srcForUv2nixEnv;
+      inherit subdir lockfile wsRoot;
       devOverrides = devOverridesCoerced;
       # PR-2: delegate patching to uv2nix; pass patchesMap and testResolve as structured inputs.
       patchesMap = patchesMap;
@@ -97,6 +120,10 @@ in
   in
   pkgs.stdenvNoCC.mkDerivation {
     inherit pname version src;
+    passthru = {
+      uv2nixEnv = uvDrv;
+      srcForUv2nixEnv = srcForUv2nixEnv;
+    };
     nativeBuildInputs = [ pkgs.coreutils pkgs.jq pkgs.git pkgs.gnused pkgs.patch py ];
 
     installPhase = ''

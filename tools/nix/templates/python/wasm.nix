@@ -68,9 +68,11 @@ WAT
       uv = UvBackend {
         pname = "pylib-${H.sanitizeName name}";
         version = "0.1.0";
+        # Snapshot the importer subtree directly; uv2nix-adapter expects lockfile paths to be
+        # relative to srcAbs, so do not pass subdir through again.
         srcAbs = builtins.path { path = builtins.toPath ("${builtins.toString srcRoot}/${subdir}"); name = "py-src"; };
         lockfile = if lib.hasSuffix "/uv.lock" lockfile then "uv.lock" else lockfile;
-        subdir = subdir;
+        subdir = ".";
         patchesMap = H.patchesMapFromImporterDirToStore {
           srcRoot = srcRoot;
           subdir = subdir;
@@ -137,9 +139,11 @@ in {
       uv = UvBackend {
         pname = "py-${H.sanitizeName name}";
         version = "0.1.0";
+        # Snapshot the importer subtree directly; uv2nix-adapter expects lockfile paths to be
+        # relative to srcAbs, so do not pass subdir through again.
         srcAbs = builtins.path { path = builtins.toPath ("${builtins.toString srcRoot}/${subdir}"); name = "py-src"; };
         lockfile = if lib.hasSuffix "/uv.lock" lockfile then "uv.lock" else lockfile;
-        subdir = subdir;
+        subdir = ".";
         patchesMap = patchesMap;
         devOverrides = H.readDevOverrides devOverrideEnv;
         kind = "app";

@@ -52,6 +52,15 @@ test("nix_node_test: buck2 test fails when importer tests fail", { timeout: 420_
     await fsp.mkdir(path.join(tmp, importer), { recursive: true });
     await fsp.writeFile(path.join(tmp, importer, "TARGETS"), targets, "utf8");
 
+    // Ensure the importer lockfile exists at libs/demo/pnpm-lock.yaml (some scaffolding flows
+    // write at repo root). Then align the fixed-output hash mapping for the importer so nix_node_test
+    // fails for the intended reason (test failures), not due to pnpm-store hash mismatch.
+    await $`bash --noprofile --norc -c 'test -f pnpm-lock.yaml && [ ! -f libs/demo/pnpm-lock.yaml ] && cp pnpm-lock.yaml libs/demo/pnpm-lock.yaml || true'`;
+    await $({
+      stdio: "inherit",
+      env: { ...env, NIX_PNPM_ALLOW_GENERATE: "1" },
+    })`zx-wrapper tools/dev/update-pnpm-hash.ts --force --lockfile libs/demo/pnpm-lock.yaml`;
+
     // Add an explicitly failing test file
     const failingTest = [
       'import { test, expect } from "vitest";',
