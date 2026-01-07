@@ -38,6 +38,11 @@ async function resolveForArgs(args: TailLogArgs): Promise<Resolution> {
 }
 
 export async function runStatusOnce(args: TailLogArgs): Promise<void> {
+  process.stdout.on("error", (e: any) => {
+    // When consumers pipe `s --json` into tools like `head`, stdout can be closed early.
+    // Treat broken pipes as a clean exit.
+    if (e?.code === "EPIPE") process.exit(0);
+  });
   const res = await resolveForArgs(args);
   if (!res.logPath) {
     process.stderr.write(`error: ${res.error}\n`);
@@ -63,6 +68,11 @@ export async function renderStatusWatchLoop(args: TailLogArgs): Promise<void> {
   const isTty = Boolean(process.stdout.isTTY);
   const json = args.json;
   const intervalSec = args.watchIntervalSec;
+
+  process.stdout.on("error", (e: any) => {
+    // Watch mode writes repeatedly; piping to `head` will close stdout quickly.
+    if (e?.code === "EPIPE") process.exit(0);
+  });
 
   const pidSig = args.selection.kind === "pid" ? await pidStartSignature(args.selection.pid) : "";
 
