@@ -78,32 +78,28 @@ async function main() {
   const verifyLogsDir = path.join(tmpDir, "verify-logs");
   try {
     const logNames = await fsp.readdir(verifyLogsDir);
-    // Keep at least the most-recent verify log file, regardless of age.
-    let newestName: string | undefined;
-    let newestMtime = -1;
+    // Keep a small number of the newest verify logs even if old.
+    // Rationale: we want verify logs to be available for debugging failures from the last few runs,
+    // but still bounded to avoid disk growth.
+    const KEEP_VERIFY_LOGS = 10;
+
+    const entries: Array<{ name: string; mtime: number }> = [];
     for (const name of logNames) {
       if (!/^verify-/.test(name)) continue;
       const p = path.join(verifyLogsDir, name);
       const st = await safeLstat(p);
       if (!st || !st.isFile()) continue;
       const mtime = st.mtimeMs || st.ctimeMs || 0;
-      if (mtime > newestMtime) {
-        newestMtime = mtime;
-        newestName = name;
-      }
+      if (mtime > 0) entries.push({ name, mtime });
     }
 
-    for (const name of logNames) {
-      if (name === "latest.log") continue;
-      if (name === newestName) continue;
-      if (!/^verify-/.test(name)) continue;
-      const p = path.join(verifyLogsDir, name);
-      const st = await safeLstat(p);
-      if (!st) continue;
-      if (!st.isFile()) continue;
-      const mtime = st.mtimeMs || st.ctimeMs || 0;
-      if (mtime > 0 && mtime < cutoffMs) {
-        await rmRf(p);
+    entries.sort((a, b) => b.mtime - a.mtime);
+    const keep = new Set(entries.slice(0, KEEP_VERIFY_LOGS).map((e) => e.name));
+
+    for (const { name, mtime } of entries) {
+      if (keep.has(name)) continue;
+      if (mtime < cutoffMs) {
+        await rmRf(path.join(verifyLogsDir, name));
       }
     }
   } catch {}
