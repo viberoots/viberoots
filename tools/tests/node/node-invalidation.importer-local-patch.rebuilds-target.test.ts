@@ -6,6 +6,8 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("node: importer-local patch touch triggers rebuild of target", async () => {
   await runInTemp("node-invalidation-patch-touch", async (tmp, $) => {
+    const iso1 = `node-inval-1-${process.pid}-${Date.now()}`;
+    const iso2 = `node-inval-2-${process.pid}-${Date.now()}`;
     await $`git init`;
 
     // Minimal PNPM lockfile with one importer
@@ -36,8 +38,9 @@ test("node: importer-local patch touch triggers rebuild of target", async () => 
     await fsp.writeFile(path.join(tmp, "apps/demo/TARGETS"), targets, "utf8");
 
     // Initial build
-    await $`buck2 build --target-platforms //:no_cgo //apps/demo:t`;
-    const so1 = await $`buck2 targets --target-platforms //:no_cgo --show-output //apps/demo:t`;
+    await $`buck2 --isolation-dir ${iso1} build --target-platforms //:no_cgo //apps/demo:t`;
+    const so1 =
+      await $`buck2 --isolation-dir ${iso1} targets --target-platforms //:no_cgo --show-output //apps/demo:t`;
     const line =
       String(so1.stdout || "")
         .trim()
@@ -59,11 +62,26 @@ test("node: importer-local patch touch triggers rebuild of target", async () => 
     const c1 = await fsp.readFile(outAbs, "utf8").then((s) => s.trim());
     // Modify the existing importer-local patch and rebuild
     await fsp.appendFile(basePatch, "# change\n", "utf8");
-    // Ensure daemon sees new/changed sources deterministically
-    await $`buck2 kill`.nothrow();
 
-    await $`buck2 build --target-platforms //:no_cgo //apps/demo:t`;
-    const c2 = await fsp.readFile(outAbs, "utf8").then((s) => s.trim());
+    await $`buck2 --isolation-dir ${iso2} build --target-platforms //:no_cgo //apps/demo:t`;
+    const so2 =
+      await $`buck2 --isolation-dir ${iso2} targets --target-platforms //:no_cgo --show-output //apps/demo:t`;
+    const line2 =
+      String(so2.stdout || "")
+        .trim()
+        .split(/\r?\n/)
+        .find((l) => l.includes("apps/demo:t")) ||
+      String(so2.stdout || "")
+        .trim()
+        .split(/\r?\n/)[0] ||
+      "";
+    const outPath2 = line2.split(/\s+/)[1];
+    if (!outPath2) {
+      console.error("could not determine genrule output path from --show-output (second build)");
+      process.exit(2);
+    }
+    const outAbs2 = path.isAbsolute(outPath2) ? outPath2 : path.join(tmp, outPath2);
+    const c2 = await fsp.readFile(outAbs2, "utf8").then((s) => s.trim());
     if (c1 === c2) {
       console.error("expected target output content to change after importer-local patch change");
       console.error("before-content:", JSON.stringify(c1), "after-content:", JSON.stringify(c2));

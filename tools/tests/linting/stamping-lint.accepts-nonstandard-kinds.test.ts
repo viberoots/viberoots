@@ -7,6 +7,7 @@ import fs from "fs-extra";
 
 test("stamping-lint accepts kind labels beyond bin|lib|test (fixture)", async () => {
   await runInTemp("stamping-lint-kind-vocab", async (tmp, $) => {
+    const iso = `stamping-lint-kind-vocab-${process.pid}-${Date.now()}`;
     const targets = [
       "genrule(",
       '  name = "bundle_like",',
@@ -17,7 +18,11 @@ test("stamping-lint accepts kind labels beyond bin|lib|test (fixture)", async ()
       "",
     ].join("\n");
     await fs.outputFile(path.join(tmp, "apps/demo/TARGETS"), targets);
-    const res = await $({ cwd: tmp, quiet: true })`node tools/dev/stamping-lint.ts`;
+    const res = await $({
+      cwd: tmp,
+      quiet: true,
+      env: { ...process.env, BUCK_ISOLATION_DIR: iso },
+    })`node --experimental-strip-types --import ./tools/dev/zx-init.mjs tools/dev/stamping-lint.ts`;
     const out = String(res.stdout || "") + String(res.stderr || "");
     assert.match(out, /stamping-lint: OK/);
   });

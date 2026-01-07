@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("python binary carries importer-local patches via internal helper python_library (cquery)", async () => {
+test("python binary carries importer-local patches via internal helper (cquery)", async () => {
   await runInTemp("py-binary-importer-patches-helper-lib", async (tmp, $) => {
     const appDir = path.join(tmp, "apps", "demo");
     const patchDir = path.join(appDir, "patches", "python");
@@ -77,14 +77,14 @@ test("python binary carries importer-local patches via internal helper python_li
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute resources //apps/demo:bin__patch_inputs`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //apps/demo:bin__patch_inputs`;
     if (resQ.exitCode !== 0) {
       return;
     }
     const resOut = String(resQ.stdout || "");
     assert.ok(
-      resOut.includes("patches/python/leftpad@1.3.0.patch") || resOut.includes(patchRel),
-      "expected importer-local patch to be present in helper lib resources",
+      resOut.includes("bin__patch_inputs_hash"),
+      "expected helper lib to include the patch hash stamp target in srcs",
     );
   });
 });

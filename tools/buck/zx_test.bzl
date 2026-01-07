@@ -9,7 +9,6 @@ def _zx_test_impl(ctx):
             # in tests that set HOME to a temp dir (direnv treats the repo .envrc as "blocked").
             + "export IN_NIX_SHELL=\"${IN_NIX_SHELL:-1}\"; "
             + "ORIG_BUCK2=\"$(command -v buck2)\"; "
-            + "if [ \"$ZX_TEST_KILL_DAEMON\" = \"1\" ]; then \"$ORIG_BUCK2\" kill >/dev/null 2>&1 || true; fi; "
             # Default to linking workspace node_modules; tests may disable with NO_NODE_MODULES_LINK=1
             + "export NO_NODE_MODULES_LINK=\"${NO_NODE_MODULES_LINK:-0}\"; "
             + "# Coverage: keep NODE_V8_COVERAGE scoped to the actual node --test process (not helper node scripts),\n"

@@ -4,28 +4,25 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-async function whatRanIdentities(tmp: string, $: any, eventLogPath: string): Promise<string[]> {
+async function showOutputPath(tmp: string, $: any, target: string, iso: string): Promise<string> {
   const res = await $({
     cwd: tmp,
     stdio: "pipe",
     reject: false,
     nothrow: true,
-  })`buck2 log what-ran --format json ${eventLogPath}`;
-  if (res.exitCode !== 0) return [];
-  const lines = String(res.stdout || "")
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean);
-  const out: string[] = [];
-  for (const line of lines) {
-    try {
-      const obj: any = JSON.parse(line);
-      if (obj && typeof obj.identity === "string" && obj.identity) out.push(obj.identity);
-    } catch {
-      // ignore non-json lines
-    }
-  }
-  return out;
+  })`buck2 --isolation-dir ${iso} targets --target-platforms //:no_cgo --show-output ${target}`;
+  if (res.exitCode !== 0) return "";
+  const line =
+    String(res.stdout || "")
+      .trim()
+      .split(/\r?\n/)
+      .find((l) => l.includes(target.replace(/^\/\//, "").split(":")[0] || "")) ||
+    String(res.stdout || "")
+      .trim()
+      .split(/\r?\n/)[0] ||
+    "";
+  const outPath = (line.split(/\s+/)[1] || "").trim();
+  return outPath && path.isAbsolute(outPath) ? outPath : outPath ? path.join(tmp, outPath) : "";
 }
 
 test("python: importer-local patch change triggers rebuild of python binary", async () => {
@@ -66,35 +63,39 @@ test("python: importer-local patch change triggers rebuild of python binary", as
       "utf8",
     );
 
-    const ev1 = path.join(tmp, "buck-out", "ev1.json-lines");
+    const iso1 = `py-inval-1-${process.pid}-${Date.now()}`;
+    const iso2 = `py-inval-2-${process.pid}-${Date.now()}`;
+
     await $({
       cwd: tmp,
       stdio: "pipe",
-    })`buck2 build --no-remote-cache --target-platforms //:no_cgo --event-log ${ev1} //apps/demo:bin`;
-    const ran1 = await whatRanIdentities(tmp, $, ev1);
+    })`buck2 --isolation-dir ${iso1} build --no-remote-cache --target-platforms //:no_cgo //apps/demo:bin`;
+
+    const hashTarget = "//apps/demo:bin__patch_inputs_hash";
+    const hashOut1 = await showOutputPath(tmp, $, hashTarget, iso1);
+    if (!hashOut1) {
+      console.error("could not determine output path for", hashTarget);
+      process.exit(2);
+    }
+    const hash1 = await fsp.readFile(hashOut1, "utf8").then((s) => s.trim());
 
     await fsp.appendFile(patchFile, "# change\n", "utf8");
-    await $`buck2 kill`.nothrow();
 
-    const ev2 = path.join(tmp, "buck-out", "ev2.json-lines");
     await $({
       cwd: tmp,
       stdio: "pipe",
-    })`buck2 build --no-remote-cache --target-platforms //:no_cgo --event-log ${ev2} //apps/demo:bin`;
-    const ran2 = await whatRanIdentities(tmp, $, ev2);
+    })`buck2 --isolation-dir ${iso2} build --no-remote-cache --target-platforms //:no_cgo //apps/demo:bin`;
 
-    const touched = "apps/demo:bin";
-    const touchedHelper = "apps/demo:bin__patch_inputs";
-    const identityMentionsTarget = (s: string) => s.includes(touched) || s.includes(touchedHelper);
-    const ranTargetActions = ran2.some(identityMentionsTarget);
-    if (!ranTargetActions) {
-      console.error(
-        "expected at least one executed command associated with",
-        touched,
-        "after patch change",
-      );
-      console.error("ran1_count:", ran1.length, "ran2_count:", ran2.length);
-      console.error("ran2_identities_sample:", ran2.slice(0, 10));
+    const hashOut2 = await showOutputPath(tmp, $, hashTarget, iso2);
+    if (!hashOut2) {
+      console.error("could not determine output path for", hashTarget, "after patch change");
+      process.exit(2);
+    }
+    const hash2 = await fsp.readFile(hashOut2, "utf8").then((s) => s.trim());
+    if (hash1 === hash2) {
+      console.error("expected patch hash stamp output to change after importer-local patch edit");
+      console.error("before:", JSON.stringify(hash1));
+      console.error("after: ", JSON.stringify(hash2));
       process.exit(2);
     }
   });

@@ -7,6 +7,7 @@ import fs from "fs-extra";
 
 test("stamping-lint flags go_* targets missing lang:go", async () => {
   await runInTemp("stamping-lint-missing", async (tmp, $) => {
+    const iso = `stamping-lint-missing-labels-${process.pid}-${Date.now()}`;
     // Minimal TARGETS with a raw go_library lacking lang:go label
     const targets = [
       "load('@prelude//:rules.bzl', 'go_library')",
@@ -20,14 +21,12 @@ test("stamping-lint flags go_* targets missing lang:go", async () => {
       path.join(process.cwd(), "tools/dev/stamping-lint.ts"),
       path.join(tmp, "tools/dev/stamping-lint.ts"),
     );
-    let failed = false;
-    try {
-      await $({ cwd: tmp })`node tools/dev/stamping-lint.ts`;
-    } catch (e: any) {
-      failed = true;
-      const out = String(e.stdout || "") + String(e.stderr || "");
-      assert.match(out, /missing label lang:go/);
-    }
-    assert.ok(failed, "lint should fail when labels are missing");
+    const res = await $({
+      cwd: tmp,
+      env: { ...process.env, BUCK_ISOLATION_DIR: iso },
+    })`node --experimental-strip-types --import ./tools/dev/zx-init.mjs tools/dev/stamping-lint.ts`.nothrow();
+    const out = String(res.stdout || "") + String(res.stderr || "");
+    assert.notEqual(res.exitCode, 0);
+    assert.match(out, /missing label lang:go/);
   });
 });

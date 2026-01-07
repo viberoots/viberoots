@@ -6,6 +6,8 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("node: importer-local patch rebuilds only affected importer's target", async () => {
   await runInTemp("node-invalidation-only-affected", async (tmp, $) => {
+    const iso1 = `node-inval-only-affected-1-${process.pid}-${Date.now()}`;
+    const iso2 = `node-inval-only-affected-2-${process.pid}-${Date.now()}`;
     await $`git init`;
 
     // Two importers with their own lockfiles
@@ -45,9 +47,11 @@ test("node: importer-local patch rebuilds only affected importer's target", asyn
     await fsp.writeFile(path.join(tmp, "apps/b/TARGETS"), targetsB, "utf8");
 
     // Initial build
-    await $`buck2 build --target-platforms //:no_cgo //apps/a:ta //apps/b:tb`;
-    const outA1 = await $`buck2 targets --target-platforms //:no_cgo --show-output //apps/a:ta`;
-    const outB1 = await $`buck2 targets --target-platforms //:no_cgo --show-output //apps/b:tb`;
+    await $`buck2 --isolation-dir ${iso1} build --target-platforms //:no_cgo //apps/a:ta //apps/b:tb`;
+    const outA1 =
+      await $`buck2 --isolation-dir ${iso1} targets --target-platforms //:no_cgo --show-output //apps/a:ta`;
+    const outB1 =
+      await $`buck2 --isolation-dir ${iso1} targets --target-platforms //:no_cgo --show-output //apps/b:tb`;
     const lineA1 =
       String(outA1.stdout || "")
         .trim()
@@ -86,11 +90,12 @@ test("node: importer-local patch rebuilds only affected importer's target", asyn
     // Change importer-local patch only for importer A (modify the declared input)
     await fsp.appendFile(path.join(patchDirA, "base@0.0.0.patch"), "# change\n", "utf8");
 
-    // Rebuild both targets (ensure daemon refresh so glob picks up newly created files)
-    await $`buck2 kill`.nothrow();
-    await $`buck2 build --target-platforms //:no_cgo //apps/a:ta //apps/b:tb`;
-    const outA2 = await $`buck2 targets --target-platforms //:no_cgo --show-output //apps/a:ta`;
-    const outB2 = await $`buck2 targets --target-platforms //:no_cgo --show-output //apps/b:tb`;
+    // Rebuild both targets. The declared input is an existing file, so Buck should observe the change.
+    await $`buck2 --isolation-dir ${iso2} build --target-platforms //:no_cgo //apps/a:ta //apps/b:tb`;
+    const outA2 =
+      await $`buck2 --isolation-dir ${iso2} targets --target-platforms //:no_cgo --show-output //apps/a:ta`;
+    const outB2 =
+      await $`buck2 --isolation-dir ${iso2} targets --target-platforms //:no_cgo --show-output //apps/b:tb`;
     const lineA2 =
       String(outA2.stdout || "")
         .trim()

@@ -88,12 +88,14 @@ function validatePatchScopeLabels(name: string, labels: string[], problems: stri
 
 async function main() {
   const problems: string[] = [];
+  const buckIsolationDir = String(process.env.BUCK_ISOLATION_DIR || "").trim();
+  const isolationFlags = buckIsolationDir ? ["--isolation-dir", buckIsolationDir] : [];
   try {
     const { stdout } =
       // Do not force a platform label here; rely on repo (or temp-repo) buckconfig defaults.
       // Query all targets, not only deps(...): leaf/root targets with no deps still need validation.
       // Note: Buck2 deprecated --output-attributes; keep using repeated --output-attribute for compatibility.
-      await $`buck2 cquery '//...' --target-platforms config//platforms:default --json --output-attribute name --output-attribute buck.type --output-attribute labels --output-attribute package`.quiet();
+      await $`buck2 ${isolationFlags} cquery '//...' --target-platforms config//platforms:default --json --output-attribute name --output-attribute buck.type --output-attribute labels --output-attribute package`.quiet();
     const arr = parseCqueryRows(String(stdout || ""));
     for (const n of arr) {
       const labsRaw: unknown = Array.isArray((n as any).labels)
