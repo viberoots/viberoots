@@ -24,9 +24,9 @@ export function computeVerifyStatusFromLogText(opts: {
   const exitMarker = parseBuck2ExitMarker(window);
   const beginSec = parseBuck2BeginEpochSec(window);
 
-  // Prefer summary *for the current run window*.
-  // This avoids incorrectly reporting "done" if the log contains an older full-suite summary
-  // but a newer full-suite run has started (common when the same log file accumulates content).
+  // Prefer summary *for the current run window* when present.
+  // parseFinalSummary is strict about ignoring nested harness output and won't accept a summary
+  // if it appears to be followed by still-running-suite status lines (e.g., "Waiting on ...").
   const fromSummary = parseFinalSummary(window);
   const base = fromSummary ?? deriveInProgressCounts(window);
 

@@ -15,15 +15,26 @@ export function parseFinalSummary(lines: string[]): Omit<VerifyStatus, "logPath"
   // This avoids incorrectly reporting completion when the log contains older full-suite summaries.
   const tailWindow = lines.slice(Math.max(0, lines.length - 800));
 
-  let last: RegExpExecArray | null = null;
-  for (const line of tailWindow) {
-    const { normalized, isComment } = parseLineFromBuckLogForMatching(line);
+  let last: { idx: number; m: RegExpExecArray } | null = null;
+  for (let i = 0; i < tailWindow.length; i++) {
+    const { normalized, isComment } = parseLineFromBuckLogForMatching(tailWindow[i]);
     // Ignore node:test / harness summaries (often prefixed with '#').
     if (isComment) continue;
     const m = summaryRe.exec(normalized);
-    if (m) last = m;
+    if (m) last = { idx: i, m };
   }
   if (!last) return null;
+
+  // Guard: do not treat an action-level summary as the full-suite summary.
+  // We've observed "Tests finished: ..." lines from nested zx/node test output while the overall
+  // buck2 test run is still running; those are typically followed by "Waiting on ..." / "Remaining"
+  // status lines for the still-running suite.
+  const inProgressAfterSummaryRe = /^(?:Loading targets\.|Remaining:?\s+\d+\b|Waiting on\b)/;
+  for (let i = last.idx + 1; i < tailWindow.length; i++) {
+    const { normalized, isComment } = parseLineFromBuckLogForMatching(tailWindow[i]);
+    if (isComment) continue;
+    if (inProgressAfterSummaryRe.test(normalized)) return null;
+  }
 
   // Find the closest preceding "Time elapsed:" for a nicer status output.
   let elapsed: string | undefined;
@@ -37,14 +48,14 @@ export function parseFinalSummary(lines: string[]): Omit<VerifyStatus, "logPath"
   }
 
   return {
-    pass: Number(last[1]),
-    fail: Number(last[2]),
-    fatal: Number(last[3]),
-    skip: Number(last[4]),
-    buildFailure: Number(last[5]),
+    pass: Number(last.m[1]),
+    fail: Number(last.m[2]),
+    fatal: Number(last.m[3]),
+    skip: Number(last.m[4]),
+    buildFailure: Number(last.m[5]),
     remaining: 0,
     failed:
-      Number(last[2]) + Number(last[3]) + Number(last[5]) > 0
+      Number(last.m[2]) + Number(last.m[3]) + Number(last.m[5]) > 0
         ? (() => {
             const fromBlock = parseFinalFailedTargetsBlock(lines);
             return fromBlock.length > 0 ? fromBlock : collectFailedLabels(lines);
