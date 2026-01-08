@@ -342,7 +342,8 @@ async function ensureBuckReaperStarted(tmp: string, $: any): Promise<void> {
     // additional helper processes (one reaper per zx test process is too many and can leak).
     const shared = String(process.env.BNX_BUCK_REAPER_STATE_FILE || "").trim();
     if (shared) {
-      await fsp.appendFile(shared, `${tmp}\n`, "utf8").catch(() => {});
+      // Primary path must be robust: if we cannot register, we may leak daemons on interruption.
+      await fsp.appendFile(shared, `${tmp}\n`, "utf8");
       return;
     }
     if (!buckReaperStateFile) {
@@ -350,7 +351,7 @@ async function ensureBuckReaperStarted(tmp: string, $: any): Promise<void> {
       buckReaperStateFile = path.join(os.tmpdir(), `bucknix-buck-reaper-${token}.txt`);
     }
     // Record this temp repo for the per-process reaper to sweep if the worker is killed abruptly.
-    await fsp.appendFile(buckReaperStateFile, `${tmp}\n`, "utf8").catch(() => {});
+    await fsp.appendFile(buckReaperStateFile, `${tmp}\n`, "utf8");
 
     if (buckReaperStarted) return;
     buckReaperStarted = true;
@@ -371,6 +372,216 @@ async function ensureBuckReaperStarted(tmp: string, $: any): Promise<void> {
     // Primary path must be robust: if we cannot start the reaper safely, surface the failure.
     throw e;
   }
+}
+
+async function buckIsolationDirsForRepo(repoRoot: string): Promise<string[]> {
+  // Buck2 stores state under <repo>/buck-out/<isolation>/...; enumerate isolation dirs present.
+  const dirs: string[] = [];
+  try {
+    const buckOut = path.join(repoRoot, "buck-out");
+    const ents = await fsp.readdir(buckOut, { withFileTypes: true });
+    for (const ent of ents) {
+      if (!ent.isDirectory()) continue;
+      const name = ent.name;
+      if (!name) continue;
+      if (name === "tmp") continue;
+      dirs.push(name);
+    }
+  } catch {}
+  // Prefer including the default isolation dir too (even if buck-out/v2 doesn't exist yet).
+  if (!dirs.includes("v2")) dirs.unshift("v2");
+  // If a test/tool set BUCK_ISOLATION_DIR explicitly, ensure it is included.
+  const envIso = String(process.env.BUCK_ISOLATION_DIR || "").trim();
+  if (envIso && !dirs.includes(envIso)) dirs.unshift(envIso);
+  return Array.from(new Set(dirs)).filter(Boolean);
+}
+
+async function assertNoBuckForkserversUnderRepo(repoRoot: string, $: any): Promise<void> {
+  const offenders = await forkserversUnderRepo(repoRoot, $);
+  if (offenders.length > 0) {
+    throw new Error(
+      `buck cleanup: leaked buck2-forkserver under temp repo root:\n${offenders
+        .slice(0, 20)
+        .map((o) => `${o.pid} ${o.ppid} ${o.cmd}`)
+        .join("\n")}`,
+    );
+  }
+}
+
+function repoRootCandidatePaths(repoRoot: string): string[] {
+  const abs0 = path.resolve(repoRoot);
+  const absCandidates = [abs0];
+  if (abs0.startsWith("/var/")) absCandidates.push(path.resolve("/private" + abs0));
+  if (abs0.startsWith("/tmp/")) absCandidates.push(path.resolve("/private" + abs0));
+  return absCandidates;
+}
+
+async function forkserversUnderRepo(
+  repoRoot: string,
+  $: any,
+): Promise<Array<{ pid: number; ppid: number; cmd: string }>> {
+  const absCandidates = repoRootCandidatePaths(repoRoot);
+  const res = await $({
+    stdio: "pipe",
+    reject: false,
+    nothrow: true,
+    timeout: 2000,
+  })`/bin/ps -A -o pid=,ppid=,command=`;
+  const lines = String(res.stdout || "")
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  return lines
+    .map((l) => {
+      const m = l.match(/^(\d+)\s+(\d+)\s+(.*)$/);
+      return m ? { pid: Number(m[1]), ppid: Number(m[2]), cmd: m[3] || "" } : null;
+    })
+    .filter((x): x is { pid: number; ppid: number; cmd: string } => !!x && x.pid > 1)
+    .filter((p) => p.cmd.includes("(buck2-forkserver)") && p.cmd.includes("--state-dir"))
+    .filter((p) => {
+      const sm = p.cmd.match(/--state-dir\s+([^\s]+)/);
+      const stateDirRaw = sm && sm[1] ? String(sm[1]).trim() : "";
+      if (!stateDirRaw) return false;
+      const stateDir = path.resolve(stateDirRaw);
+      return absCandidates.some((c) => stateDir === c || stateDir.startsWith(c + path.sep));
+    });
+}
+
+async function pidCmdline(pid: number, $: any): Promise<string> {
+  if (!Number.isFinite(pid) || pid <= 1) return "";
+  const res = await $({
+    stdio: "pipe",
+    reject: false,
+    nothrow: true,
+    timeout: 1500,
+  })`/bin/ps -p ${pid} -o command=`;
+  return String(res.stdout || "").trim();
+}
+
+type Buck2dProc = { pid: number; iso: string; cmd: string };
+
+function isolationDirFromCmd(cmd: string): string {
+  const m = String(cmd || "").match(/--isolation-dir\s+([^\s]+)/);
+  return m && m[1] ? String(m[1]).trim() : "";
+}
+
+async function buck2dProcsForRepo(repoRoot: string, $: any): Promise<Buck2dProc[]> {
+  const base = path.basename(path.resolve(repoRoot));
+  if (!base) return [];
+  const res = await $({
+    stdio: "pipe",
+    reject: false,
+    nothrow: true,
+    timeout: 2000,
+  })`/bin/ps -A -o pid=,command=`;
+  const lines = String(res.stdout || "")
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const out: Buck2dProc[] = [];
+  for (const l of lines) {
+    const m = l.match(/^(\d+)\s+(.*)$/);
+    if (!m) continue;
+    const pid = Number(m[1]);
+    const cmd = m[2] || "";
+    if (!Number.isFinite(pid) || pid <= 1) continue;
+    if (!cmd.includes(`buck2d[${base}]`)) continue;
+    const iso = isolationDirFromCmd(cmd);
+    out.push({ pid, iso, cmd });
+  }
+  return out;
+}
+
+async function killBuck2dForRepoIsos(repoRoot: string, isos: string[], $: any): Promise<void> {
+  const want = new Set(isos.filter(Boolean));
+  if (want.size === 0) return;
+  const procs = await buck2dProcsForRepo(repoRoot, $);
+  for (const p of procs) {
+    if (!p.iso || !want.has(p.iso)) continue;
+    try {
+      process.kill(p.pid, "SIGKILL");
+    } catch {}
+  }
+}
+
+function isoFromForkserverStateDir(repoRoot: string, forkserverCmd: string): string {
+  const sm = String(forkserverCmd || "").match(/--state-dir\s+([^\s]+)/);
+  const stateDirRaw = sm && sm[1] ? String(sm[1]).trim() : "";
+  if (!stateDirRaw) return "";
+  const root0 = path.resolve(repoRoot);
+  const roots = [root0];
+  if (root0.startsWith("/var/")) roots.push(path.resolve("/private" + root0));
+  if (root0.startsWith("/tmp/")) roots.push(path.resolve("/private" + root0));
+  const stateDir = path.resolve(stateDirRaw);
+  let matched = "";
+  for (const r of roots) {
+    if (stateDir === r || stateDir.startsWith(r + path.sep)) {
+      matched = r;
+      break;
+    }
+  }
+  if (!matched) return "";
+  try {
+    const rel = path.relative(matched, stateDir);
+    const parts = rel.split(path.sep).filter(Boolean);
+    const idx = parts.indexOf("buck-out");
+    if (idx >= 0 && idx + 1 < parts.length) return parts[idx + 1] || "";
+  } catch {}
+  return "";
+}
+
+async function killBuckForkserversUnderRepo(repoRoot: string, $: any): Promise<void> {
+  const offenders = await forkserversUnderRepo(repoRoot, $);
+  for (const o of offenders) {
+    // If the forkserver is still running, its parent should be the matching buck2d.
+    // Only kill the parent when we can prove it matches the repo+isolation dir, to avoid
+    // disrupting other concurrent runs (PID reuse safety).
+    const iso = isoFromForkserverStateDir(repoRoot, o.cmd);
+    if (iso && o.ppid > 1) {
+      const parentCmd = await pidCmdline(o.ppid, $);
+      if (parentCmd.includes("buck2d[") && parentCmd.includes(`--isolation-dir ${iso} `)) {
+        try {
+          process.kill(o.ppid, "SIGKILL");
+        } catch {}
+      }
+    }
+    try {
+      if (o.pid > 1) process.kill(o.pid, "SIGKILL");
+    } catch {}
+  }
+}
+
+async function killBuckDaemonsForRepo(repoRoot: string, $: any): Promise<void> {
+  const isoDirs = await buckIsolationDirsForRepo(repoRoot);
+  // In practice, buck2 can leave an idle buck2d behind after the forkserver exits.
+  // Do a single process-table scan and stop only daemons that match this temp repo
+  // basename + one of the isolation dirs we used, so we don't disrupt other concurrent runs.
+  //
+  // IMPORTANT: avoid invoking `buck2 ... kill` here. Spawning `buck2` for every temp repo
+  // creates noticeable overhead at verify scale (hundreds of tests), and may itself spin up
+  // helper processes. Temp repos are disposable; a targeted signal-based shutdown is sufficient.
+  const want = new Set(isoDirs.filter(Boolean));
+  if (want.size > 0) {
+    const procs = await buck2dProcsForRepo(repoRoot, $);
+    for (const p of procs) {
+      if (!p.iso || !want.has(p.iso)) continue;
+      try {
+        process.kill(p.pid, "SIGTERM");
+      } catch {}
+    }
+    // Give daemons a moment to exit cleanly, then SIGKILL any stragglers.
+    await new Promise((r) => setTimeout(r, 250));
+    for (const p of procs) {
+      if (!p.iso || !want.has(p.iso)) continue;
+      try {
+        process.kill(p.pid, "SIGKILL");
+      } catch {}
+    }
+  }
+  // Some failure modes can leave behind an orphaned forkserver even if the buck2d is gone.
+  // Ensure we explicitly SIGKILL any forkservers rooted under this repo.
+  await killBuckForkserversUnderRepo(repoRoot, $);
+  await assertNoBuckForkserversUnderRepo(repoRoot, $);
 }
 
 export async function runInTemp<T>(
@@ -729,20 +940,11 @@ export async function runInTemp<T>(
     return await fn(tmp, _$);
   } finally {
     // Cleanup policy:
-    // - When running under `v`/verify, a single per-run buck-daemon-reaper is responsible for
-    //   terminating daemons across all temp repos. Avoid `buck2 kill` per test to reduce overhead.
-    // - When running tests outside verify (no shared state file), keep a best-effort kill to avoid
-    //   leaking buck2 daemons on developer machines.
-    const sharedReaperState = String(process.env.BNX_BUCK_REAPER_STATE_FILE || "").trim();
-    if (!sharedReaperState) {
-      try {
-        await _$({
-          stdio: "pipe",
-          reject: false,
-          nothrow: true,
-        })`buck2 kill`;
-      } catch {}
-    }
+    // - Temp repos are deleted at the end of each runInTemp. Any buck2 daemon started inside the
+    //   temp repo must be terminated BEFORE deletion, otherwise we will orphan buck2d/forkserver
+    //   processes that can no longer be targeted by `buck2 kill` (the repo root is gone).
+    // - This does not conflict with daemon reuse goals, because each test uses a distinct temp repo.
+    await timeAsync("buck-daemon cleanup", async () => await killBuckDaemonsForRepo(tmp, _$));
     // Avoid rewriting shared coverage artifacts concurrently; zx_test already normalizes coverage.
     // Opt-in via TEST_REWRITE_COVERAGE_TMP=1 if a test explicitly needs this legacy behavior.
     if ((process.env.TEST_REWRITE_COVERAGE_TMP || "") === "1") {

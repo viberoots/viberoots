@@ -66,7 +66,7 @@ async function sleep(ms: number): Promise<void> {
 
 async function psLines(timeoutMs: number): Promise<string[]> {
   const stdout = await new Promise<string>((resolve) => {
-    const child = spawn("/bin/ps", ["-A", "-o", "pid=,command="], {
+    const child = spawn("/bin/ps", ["-A", "-o", "pid=,ppid=,command="], {
       stdio: ["ignore", "pipe", "ignore"],
     });
     let buf = "";
@@ -97,9 +97,28 @@ async function readBuck2dProcesses(): Promise<Array<{ pid: number; cmd: string }
   const out: Array<{ pid: number; cmd: string }> = [];
   for (const ln of lines) {
     if (!ln.includes("buck2d[")) continue;
-    const m = ln.match(/^(\d+)\s+(.*)$/);
+    const m = ln.match(/^(\d+)\s+(\d+)\s+(.*)$/);
     if (!m) continue;
-    out.push({ pid: Number(m[1]), cmd: m[2] || "" });
+    out.push({ pid: Number(m[1]), cmd: m[3] || "" });
+  }
+  return out;
+}
+
+async function readForkserverProcesses(): Promise<
+  Array<{ pid: number; ppid: number; cmd: string; stateDir: string }>
+> {
+  const lines = await psLines(2000);
+  const out: Array<{ pid: number; ppid: number; cmd: string; stateDir: string }> = [];
+  for (const ln of lines) {
+    if (!ln.includes("(buck2-forkserver)")) continue;
+    const m = ln.match(/^(\d+)\s+(\d+)\s+(.*)$/);
+    if (!m) continue;
+    const pid = Number(m[1]);
+    const ppid = Number(m[2]);
+    const cmd = m[3] || "";
+    const sm = cmd.match(/--state-dir\s+([^\s]+)/);
+    const stateDir = sm && sm[1] ? String(sm[1]).trim() : "";
+    out.push({ pid, ppid, cmd, stateDir });
   }
   return out;
 }
@@ -157,25 +176,140 @@ async function killBuckIsoInRepo(
     child.on("close", () => clearTimeout(t));
   });
 
-  if (Number.isFinite(buck2dPid) && isPidAlive(buck2dPid)) {
-    try {
-      process.kill(buck2dPid, "SIGKILL");
-    } catch {}
+  // If buck2 kill didn't terminate the daemon, SIGKILL the matching buck2d.
+  // Guard against PID reuse by verifying the command line includes the expected isolation dir.
+  if (Number.isFinite(buck2dPid) && buck2dPid > 1 && isPidAlive(buck2dPid)) {
+    const cmd = await new Promise<string>((resolve) => {
+      const child = spawn("/bin/ps", ["-p", String(buck2dPid), "-o", "command="], {
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+      let buf = "";
+      child.stdout.setEncoding("utf8");
+      child.stdout.on("data", (d) => (buf += d));
+      child.on("error", () => resolve(""));
+      child.on("close", () => resolve(String(buf || "").trim()));
+      const t = setTimeout(() => {
+        try {
+          child.kill("SIGKILL");
+        } catch {}
+        resolve("");
+      }, 1500);
+      child.on("close", () => clearTimeout(t));
+    });
+    if (cmd.includes("buck2d[") && cmd.includes(`--isolation-dir ${iso} `)) {
+      try {
+        process.kill(buck2dPid, "SIGKILL");
+      } catch {}
+    }
   }
 }
 
 async function reapBuckDaemonsForTempRepo(tmpRepoRoot: string): Promise<void> {
+  // Primary path: do not rely on buck2d cwd (can drift). Instead, map from the forkserver's
+  // --state-dir, which is anchored under the repo's buck-out/<isolation>/forkserver directory.
   const reapDeadlineMs = 60_000;
   const reapStart = Date.now();
-  const procs = await readBuck2dProcesses();
-  for (const p of procs) {
+
+  const forks = await readForkserverProcesses();
+  for (const f of forks) {
     if (Date.now() - reapStart > reapDeadlineMs) return;
-    const iso = isolationDirFromCmd(p.cmd);
-    if (!iso) continue;
-    const cwd = await cwdForPid(p.pid);
-    if (!cwdIsInsideTempRepo(cwd, tmpRepoRoot)) continue;
-    await killBuckIsoInRepo(tmpRepoRoot, iso, p.pid);
+    if (!f.stateDir) continue;
+    const sd = path.resolve(f.stateDir);
+    const root0 = path.resolve(tmpRepoRoot);
+    const roots = [root0];
+    if (root0.startsWith("/var/")) roots.push(path.resolve("/private" + root0));
+    if (root0.startsWith("/tmp/")) roots.push(path.resolve("/private" + root0));
+    let matchedRoot = "";
+    for (const r of roots) {
+      if (sd === r || sd.startsWith(r + path.sep)) {
+        matchedRoot = r;
+        break;
+      }
+    }
+    if (!matchedRoot) continue;
+    // Graceful shutdown: infer isolation dir from forkserver --state-dir path:
+    // <repo>/buck-out/<iso>/forkserver
+    let iso = "";
+    try {
+      const rel = path.relative(matchedRoot, sd);
+      const parts = rel.split(path.sep).filter(Boolean);
+      const idx = parts.indexOf("buck-out");
+      if (idx >= 0 && idx + 1 < parts.length) iso = parts[idx + 1] || "";
+    } catch {}
+    if (iso) await killBuckIsoInRepo(tmpRepoRoot, iso, f.ppid);
+    if (Number.isFinite(f.pid) && f.pid > 1 && isPidAlive(f.pid)) {
+      try {
+        process.kill(f.pid, "SIGKILL");
+      } catch {}
+    }
+    // Safety: if buck2 kill didn't manage to stop the daemon but we can prove the PPID is the
+    // matching buck2d for this forkserver+iso, SIGKILL it. Guard against PID reuse by verifying
+    // command line contains both buck2d and the expected isolation dir.
+    if (iso && Number.isFinite(f.ppid) && f.ppid > 1 && isPidAlive(f.ppid)) {
+      const parentCmd = await new Promise<string>((resolve) => {
+        const child = spawn("/bin/ps", ["-p", String(f.ppid), "-o", "command="], {
+          stdio: ["ignore", "pipe", "ignore"],
+        });
+        let buf = "";
+        child.stdout.setEncoding("utf8");
+        child.stdout.on("data", (d) => (buf += d));
+        child.on("error", () => resolve(""));
+        child.on("close", () => resolve(String(buf || "").trim()));
+        const t = setTimeout(() => {
+          try {
+            child.kill("SIGKILL");
+          } catch {}
+          resolve("");
+        }, 1500);
+        child.on("close", () => clearTimeout(t));
+      });
+      if (parentCmd.includes("buck2d[") && parentCmd.includes(`--isolation-dir ${iso} `)) {
+        try {
+          process.kill(f.ppid, "SIGKILL");
+        } catch {}
+      }
+    }
   }
+
+  // Secondary path: sometimes the forkserver exits but buck2d remains idle.
+  // If we have a temp repo root, kill any remaining buck2d tagged with this repo basename.
+  try {
+    const base = path.basename(path.resolve(tmpRepoRoot));
+    if (base) {
+      const res = await new Promise<string>((resolve) => {
+        const child = spawn("/bin/ps", ["-A", "-o", "pid=,command="], {
+          stdio: ["ignore", "pipe", "ignore"],
+        });
+        let buf = "";
+        child.stdout.setEncoding("utf8");
+        child.stdout.on("data", (d) => (buf += d));
+        child.on("error", () => resolve(""));
+        child.on("close", () => resolve(buf));
+        const t = setTimeout(() => {
+          try {
+            child.kill("SIGKILL");
+          } catch {}
+          resolve(buf);
+        }, 2000);
+        child.on("close", () => clearTimeout(t));
+      });
+      const lines = String(res || "")
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean);
+      for (const l of lines) {
+        const m = l.match(/^(\d+)\s+(.*)$/);
+        if (!m) continue;
+        const pid = Number(m[1]);
+        const cmd = m[2] || "";
+        if (!Number.isFinite(pid) || pid <= 1) continue;
+        if (!cmd.includes(`buck2d[${base}]`)) continue;
+        try {
+          process.kill(pid, "SIGKILL");
+        } catch {}
+      }
+    }
+  } catch {}
 }
 
 async function main() {
@@ -241,7 +375,6 @@ async function main() {
       const abs = path.resolve(r);
       if (seen.has(abs)) continue;
       seen.add(abs);
-      if (!(await tempRepoStillExists(abs))) continue;
       await reapBuckDaemonsForTempRepo(abs);
     }
   } finally {
