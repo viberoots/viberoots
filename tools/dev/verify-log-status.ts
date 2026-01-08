@@ -2,7 +2,7 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { getFlagStr } from "../lib/cli.ts";
+import { getFlagBool, getFlagStr } from "../lib/cli.ts";
 import {
   computeVerifyStatusFromLogText,
   formatVerifyStatusJsonLine,
@@ -19,7 +19,7 @@ function parseIntOpt(s: string | undefined): number | undefined {
 
 async function main() {
   const logPath = getFlagStr("log", "").trim();
-  const json = getFlagStr("json", "").trim() === "1" || process.argv.includes("--json");
+  const json = getFlagBool("json");
   const pid = parseIntOpt(getFlagStr("pid", "").trim());
 
   if (!logPath) {

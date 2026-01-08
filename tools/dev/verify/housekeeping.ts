@@ -117,13 +117,24 @@ export async function runVerifyHousekeeping(opts: {
   return { freeGiB: free };
 }
 
-export function enforceVerifyDiskGate(opts: { freeGiB: number; targetFreeGiB: number }): void {
-  if (opts.freeGiB >= opts.targetFreeGiB) return;
-  const msg =
+export const VERIFY_DISK_GATE_EXIT_CODE = 2;
+
+export function computeVerifyDiskGateFailure(opts: {
+  freeGiB: number;
+  targetFreeGiB: number;
+}): string | null {
+  if (opts.freeGiB >= opts.targetFreeGiB) return null;
+  return (
     `error: verify refused to start due to low disk free space.\n` +
     `need: >=${opts.targetFreeGiB}GiB\n` +
     `have: ~${opts.freeGiB}GiB\n` +
-    `hint: try freeing space (repo temp outs, nix-store --gc), or override threshold via VERIFY_TARGET_FREE_GB.\n`;
+    `hint: try freeing space (repo temp outs, nix-store --gc), or override threshold via VERIFY_TARGET_FREE_GB.\n`
+  );
+}
+
+export function enforceVerifyDiskGate(opts: { freeGiB: number; targetFreeGiB: number }): void {
+  const msg = computeVerifyDiskGateFailure(opts);
+  if (!msg) return;
   process.stderr.write(msg);
-  process.exit(2);
+  process.exit(VERIFY_DISK_GATE_EXIT_CODE);
 }

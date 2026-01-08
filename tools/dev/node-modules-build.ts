@@ -44,9 +44,25 @@ if (!importer) {
 }
 const fullAttr = nodeModulesAttr(importer);
 const flakeRoot = await findFlakeRoot(cwd);
-// Use a path flake reference to avoid git-snapshot semantics (dirty-tree warnings, missing untracked
-// generated files in temp repos, and flaky evaluations when running from synthesized repos).
-const flakeRef = `path:${flakeRoot}`;
+// Performance + determinism: require a git worktree and use git-snapshot semantics.
+// This avoids expensive full-directory hashing that can make even `nix eval` take minutes.
+//
+// Tests that create/modify files that must be visible to Nix must `git add` them in their temp repo.
+try {
+  const chk = await $({
+    cwd: flakeRoot,
+    stdio: "pipe",
+  })`git rev-parse --is-inside-work-tree`.nothrow();
+  if (String(chk.stdout || "").trim() !== "true") {
+    throw new Error("not a git worktree");
+  }
+} catch {
+  console.error(
+    `node-modules-build: error: expected flake root to be a git worktree for fast deterministic evaluation: ${flakeRoot}`,
+  );
+  process.exit(2);
+}
+const flakeRef = flakeRoot;
 // Fast path: if output is already realized in the store, prefer path-info
 let outPath = "";
 try {

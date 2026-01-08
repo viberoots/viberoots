@@ -160,11 +160,12 @@ We found it much easier to diagnose “verify is stuck” vs “verify is making
 
 ### H) Keep `v` under a fixed runtime budget (make lint preflight opt-in or tightly bounded)
 
-We observed that running `pnpm lint` inside `v` can materially increase runtime (and compete with the 18-minute full-suite expectation). The effective change was to remove (or make opt-in) the lint preflight in `v`, while keeping CI as the source of truth for linting.
+We observed that running `pnpm lint` inside `v` can materially increase runtime (and compete with the 18-minute full-suite expectation). The effective change was to keep a **bounded** lint preflight by default (so `v` fails fast on obviously dirty formatting), and provide an explicit opt-out (`VERIFY_SKIP_LINT=1`) for cases where lint is intentionally deferred.
 
 - **Where**: `tools/bin/verify` and related docs/tests (verify lint preflight enforcement)
 - **What**:
-  - Drop the implicit “lint preflight” from `v`, or make it opt-in with a strict timeout so `v` remains bounded.
+  - Run `pnpm -s lint` behind a strict timeout (`VERIFY_LINT_TIMEOUT_SECS`, default 600s).
+  - Allow skipping the preflight explicitly via `VERIFY_SKIP_LINT=1`.
 
 ---
 
@@ -248,6 +249,7 @@ _Important:_ The PR numbering in this section is **local to this document** and 
   - **(F) Per-run safety rails (low-space + drop-budget, no mutex)** → PR-3
   - **(G) Verify progress visibility (tail-log status/watch + verify-log-status)** → PR-3
   - **(H) Keep `v` under a fixed runtime budget (lint preflight opt-in or bounded)** → PR-3
+  - **(I) Close remaining enforcement gaps (behavioral verify tests + file-size compliance + CLI parsing hygiene)** → PR-5
 
 ### PR-1: Eliminate per-test Nix store churn from temp repos (flake inputs + uv2nix + repo snapshots)
 
@@ -504,6 +506,100 @@ Mitigation:
 #### Downsides for Implementing
 
 Some additional harness complexity, but it pays back in runtime and reliability.
+
+#### Recommendation
+
+Implement.
+
+---
+
+### PR-5: Close remaining enforcement gaps (behavioral verify tests + file-size compliance + CLI parsing hygiene)
+
+#### Description
+
+The mitigations above address the primary disk-growth failure modes, but there are still gaps that make regressions easier:
+
+- Some verify safety behaviors are enforced by “contract string” checks, not behavioral tests.
+- A few key files exceed the ≤250 line rule in `METHODOLOGY.XML`, which makes long-term maintenance harder and increases regression risk.
+- A small amount of CLI parsing drift exists (minor `process.argv` checks), which conflicts with the tooling hygiene rules in `getting-started-on-a-pr.md`.
+
+This PR closes those gaps without changing the user-facing behavior of `v` or the build system contracts.
+
+#### Scope & Changes
+
+- `tools/dev/verify/safety-rails.ts`:
+  - Factor the “trigger decision” logic into a small exported helper with injectable side-effects (snapshot writer, `df` sampler, process-group killer) so we can test the behavior deterministically without requiring real low-disk conditions.
+  - Keep default behavior unchanged for normal runs.
+- `tools/dev/verify/housekeeping.ts`:
+  - Add a small exported helper for disk-gate decisions so tests can validate the exact failure message and exit behavior without depending on the real filesystem’s free space.
+  - Keep the public behavior and env knobs unchanged.
+- `tools/tests/verify/*`:
+  - Add behavioral tests for:
+    - disk gate refusal logic (including message content and exit code),
+    - safety rails triggers (low-space + drop-budget) proving we write a snapshot and send signals only to the intended process group.
+- `tools/tests/lib/test-helpers.ts`:
+  - Split the monolithic helper into small focused modules under `tools/tests/lib/test-helpers/`.
+  - Keep `tools/tests/lib/test-helpers.ts` as a stable re-export surface so existing imports continue to work unchanged.
+- `flake.nix`:
+  - Factor the large flake into small imported modules under `tools/nix/` (e.g., snapshot filtering, package wiring, devshell wiring) so the top-level flake stays readable and within the file-size constraint.
+  - Keep flake outputs and attribute names unchanged.
+- `tools/dev/verify-log-status.ts`:
+  - Remove any bespoke `process.argv` parsing and rely only on `tools/lib/cli.ts` helpers for flags/tokens.
+- `space-saving-tasks.md`:
+  - Align wording for lint preflight to match actual behavior: bounded by default with an explicit opt-out (`VERIFY_SKIP_LINT=1`).
+
+Non-goals:
+
+- No changes to the verify CLI surface (`v` flags and env vars stay the same).
+- No changes to Nix feature flags, store policies, or the high-level build graph/exporter contracts.
+- No “tune the thresholds” work; this PR is about correctness, enforcement, and maintainability.
+
+#### Tests (in this PR)
+
+- Verify disk gate behavioral test:
+  - Proves verify refuses to start (exit code + message) when computed free space is below the configured target threshold.
+- Verify safety rails behavioral tests:
+  - Proves low-space trigger and drop-budget trigger both:
+    - write a snapshot file under the per-run analysis directory, and
+    - signal only the intended process group (no cross-run interference).
+- File-size compliance enforcement (scoped to touched areas):
+  - Fails if `tools/tests/lib/test-helpers.ts` and the refactored flake entrypoint exceed the 250-line limit after the split.
+- CLI parsing hygiene:
+  - A small test or linting check that `tools/dev/verify-log-status.ts` does not use `process.argv` directly for flag parsing.
+
+#### Docs (in this PR)
+
+- Update `space-saving-tasks.md` PR plan and the verify operator notes to reflect:
+  - bounded lint preflight default + explicit opt-out,
+  - what the new behavioral tests cover (so future refactors know what they must preserve),
+  - why the file-size splits exist (maintenance + regression containment).
+
+#### Acceptance Criteria
+
+- Verify disk gate and safety rails have behavioral tests that fail if the logic regresses.
+- `tools/tests/lib/test-helpers.ts` is ≤ 250 lines and public imports remain stable via re-exports.
+- The flake entrypoint remains functionally identical but is decomposed into ≤250-line modules.
+- `tools/dev/verify-log-status.ts` uses `tools/lib/cli.ts` only (no bespoke argv parsing).
+
+#### Risks
+
+Moderate. The file splits (especially `flake.nix`) can accidentally change evaluation wiring or output structure if not done carefully.
+
+Mitigation:
+
+- Keep the top-level flake outputs stable and add a small “flake outputs invariant” check (e.g., `nix flake show` output shape or a targeted `nix eval` of key attrs) in tests where practical.
+- Make refactors incremental and validate with a representative local `v` run before landing.
+
+#### Consequence of Not Implementing
+
+- Regressions in verify safety behavior may not be caught until a real low-disk event occurs.
+- Large, monolithic files remain hard to safely evolve, increasing the chance of accidental churn regressions.
+- Tooling hygiene drift accumulates (argv parsing, policy inconsistencies), making future automation harder to standardize.
+
+#### Downsides for Implementing
+
+- Mechanical churn: splitting files and updating imports/paths while preserving behavior.
+- A small increase in test surface area to lock in safety-rail behavior.
 
 #### Recommendation
 

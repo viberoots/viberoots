@@ -218,21 +218,17 @@ export async function initTempRepoFromWorkspaceOrSeed(args: {
 
   const cow = await deps.timeAsync("seedRepo.detectCowMode", async () => detectCowModeOnce());
   const mode0 = selectInitMode(cow);
-
-  // Correctness: when the workspace is dirty, do not reuse a shared seed repo that was created
-  // from an older clean snapshot. Prefer rsync so temp repos reflect the current working tree.
-  if (mode0 != "rsync") {
-    const dirty = await deps.timeAsync("seedRepo.workspaceDirty", async () =>
-      isWorkspaceGitDirty(),
-    );
-    if (dirty) {
-      await deps.rsyncRepoTo(tmpDir);
-      return "rsync";
-    }
-  }
   const mode = mode0;
 
   if (mode === "rsync") {
+    await deps.rsyncRepoTo(tmpDir);
+    return "rsync";
+  }
+
+  // Correctness: when the workspace is dirty, do not reuse a shared seed repo that was created
+  // from an older clean snapshot. Prefer rsync so temp repos reflect the current working tree.
+  const dirty = await deps.timeAsync("seedRepo.workspaceDirty", async () => isWorkspaceGitDirty());
+  if (dirty) {
     await deps.rsyncRepoTo(tmpDir);
     return "rsync";
   }

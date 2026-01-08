@@ -65,6 +65,19 @@ export async function runVerify(): Promise<void> {
   const iso = `v-${process.pid}`;
   await writeVerifyIsoMarker(lock.lockDir, iso);
   await appendVerifyLogLine(lock.logFile, `[verify] begin iso=${iso}`);
+  // Log the current git revision for performance correlation across runs.
+  // This intentionally runs after we have a logFile (verify-lock acquired).
+  try {
+    const revOut = await $({ cwd: root, stdio: "pipe", reject: false })`git rev-parse HEAD`;
+    const rev = String((revOut as any).stdout || "").trim();
+    const dirtyOut = await $({
+      cwd: root,
+      stdio: "pipe",
+      reject: false,
+    })`bash --noprofile --norc -c 'test -z \"$(git status --porcelain 2>/dev/null)\" && echo 0 || echo 1'`;
+    const dirty = String((dirtyOut as any).stdout || "").trim() || "0";
+    if (rev) await appendVerifyLogLine(lock.logFile, `[verify] rev=${rev} dirty=${dirty}`);
+  } catch {}
 
   // One buck-daemon-reaper per verify run. zx tests register temp repo roots via BNX_BUCK_REAPER_STATE_FILE.
   const stateFile = path.join(process.env.TMPDIR || "/tmp", `bucknix-buck-reaper-${iso}.txt`);

@@ -56,3 +56,6 @@ test-logs/*.pid
 graph-gen-pure
 buck-test.*
 .pnpm-store
+
+# Verify analysis output (generated)
+tools/dev/verify-analysis/
