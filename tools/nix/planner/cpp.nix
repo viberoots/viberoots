@@ -59,6 +59,40 @@ let
   isNixLabel = l: lib.hasPrefix "nixpkg:" l;
   attrFrom = l: lib.removePrefix "nixpkg:" l;
 
+  ensureStringList = ctx: xs:
+    if xs == null then []
+    else if builtins.isList xs && builtins.all (x: builtins.isString x) xs then xs
+    else builtins.throw ("cpp planner: expected " + ctx + " to be a list of strings");
+
+  nodeOfName = nm: if builtins.hasAttr nm byName then byName.${nm} else null;
+
+  # Read an attribute list from a node and normalize target labels for stable lookups.
+  labelsFromNodeAttr = { name, attr }:
+    let
+      n = nodeOfName name;
+      raw = if n == null then null else get n attr;
+      xs = ensureStringList (attr + " for " + name) raw;
+    in builtins.map cleanLabel xs;
+
+  # Repo-provided C++ package inputs for consumers (Phase 1: direct-only).
+  # - link_deps entries that are C++ libraries become T.cppLib inputs
+  # - header_deps entries that are header-only targets become T.cppHeaders inputs
+  repoCppLibPkgsFor = name:
+    let
+      linkDeps = labelsFromNodeAttr { inherit name; attr = "link_deps"; };
+      isRepoCppLib = dn:
+        let depNode = nodeOfName dn;
+        in depNode != null && (hasLangCpp depNode) && (kindOf depNode == "lib");
+    in builtins.map mkLib (builtins.filter isRepoCppLib linkDeps);
+
+  repoCppHeaderPkgsFor = name:
+    let
+      headerDeps = labelsFromNodeAttr { inherit name; attr = "header_deps"; };
+      isRepoCppHeaders = dn:
+        let depNode = nodeOfName dn;
+        in depNode != null && (hasLangCpp depNode) && (kindOf depNode == "headers");
+    in builtins.map mkHeaders (builtins.filter isRepoCppHeaders headerDeps);
+
   # DFS over deps to collect nixpkg labels; bounded by nodes present
   collectNixAttrsFor = name:
     let
@@ -147,7 +181,7 @@ let
       srcRoot = ctx.repoRoot;
       subdir = pkgPathOf name;
       nixCxxAttrs = collectNixAttrsFor name;
-      nixCxxPkgs = repoGoCArchivesFor name;
+      nixCxxPkgs = (repoCppHeaderPkgsFor name) ++ (repoCppLibPkgsFor name) ++ (repoGoCArchivesFor name);
       srcList = normSrcsOf name;
       patches = (
         let
@@ -215,7 +249,7 @@ let
           uniq = xs: builtins.attrNames (builtins.listToAttrs (map (a: { name = a; value = true; }) xs));
           all = builtins.sort (a: b: a < b) (uniq merged);
         in if all == [] then providerAttrsFallback else all;
-      nixCxxPkgs = repoGoCArchivesFor name;
+      nixCxxPkgs = (repoCppHeaderPkgsFor name) ++ (repoCppLibPkgsFor name) ++ (repoGoCArchivesFor name);
       srcList = normSrcsOf name;
       patches = (
         let
@@ -231,7 +265,7 @@ let
       srcRoot = ctx.repoRoot;
       subdir = pkgPathOf name;
       nixCxxAttrs = collectNixAttrsFor name;
-      nixCxxPkgs = repoGoCArchivesFor name;
+      nixCxxPkgs = (repoCppHeaderPkgsFor name) ++ (repoCppLibPkgsFor name) ++ (repoGoCArchivesFor name);
       srcList = normSrcsOf name;
       patches = (
         let

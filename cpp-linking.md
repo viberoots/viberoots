@@ -19,7 +19,9 @@ Today, a `nix_cpp_binary(..., deps=[...])` edge is useful for:
 - collecting transitive `nixpkg:*` labels so Nix can add include and link flags for nixpkgs-provided dependencies
 - a special case: direct deps labeled `kind:carchive` (Go c-archives) are routed to Nix and linked into C++ binaries/addons
 
-But the C++ planner does not currently translate in-repo C++ library deps into linkable Nix inputs for C++ binaries/addons. As a result, a C++ binary does not automatically link an in-repo `nix_cpp_library` just because it is listed in `deps`.
+The C++ planner intentionally does not treat plain `deps` as link intent. A C++ binary does not automatically link an in-repo `nix_cpp_library` just because it is listed in `deps`.
+
+Instead, call sites must opt in via explicit intent attributes (`link_deps`, `header_deps`). The planner then materializes in-repo C++ targets as Nix package inputs (`T.cppLib`, `T.cppHeaders`) for consumers.
 
 This gap makes C++ feel inconsistent with:
 
@@ -164,7 +166,10 @@ Notes:
 
 - Status:
   - PR-2 in `linking-plan-2.md` implements the macro-level surface: these attributes are accepted on C++ macros and the deterministic `deps` union contract is enforced.
-  - Planner behavior is unchanged until PR-3 (consumers do not yet link in-repo C++ libs just because they are listed in `link_deps`).
+  - PR-3 implements planner behavior for Phase 1 consumers:
+    - `link_deps` materializes `T.cppLib` inputs for C++ bins, Node addons, and tests
+    - `header_deps` materializes `T.cppHeaders` inputs for the same consumers
+    - behavior is direct-only (no transitive link closure yet)
 
 - `deps` remains the graph edge list, but for ergonomics the macro will compute:
   - `deps := deps ∪ link_deps ∪ header_deps` (deterministic union)

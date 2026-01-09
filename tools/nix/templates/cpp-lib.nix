@@ -37,7 +37,8 @@ in {
     extraC   = joinExtraC cflags;
     # Note: ldflags are reserved for future parity with cppApp; unused here.
     srcsCmd = if srcList != [] then (
-      "printf '%s\\n' " + (lib.concatStringsSep " " (map (s: "'" + s + "'") (lib.sort (a: b: a < b) srcList))) + " | sort"
+      "printf '%s\\n' " + (lib.concatStringsSep " " (map (s: "'" + s + "'") (lib.sort (a: b: a < b) srcList))) +
+      " | grep -E '\\.(c|cc|cpp|cxx)$' | sort"
     ) else (
       # Fallback: restrict to conventional source dir to avoid picking up tests/** by accident
       "find ./src -type f \\( -name '*.cpp' -o -name '*.cc' -o -name '*.cxx' \\) 2>/dev/null | sed 's#^./##' | sort"
@@ -66,8 +67,10 @@ in {
       cflags_common="-std=${std} -fno-record-gcc-switches -ffile-prefix-map=$PWD=. -g0 -O2 -pipe ${nixInc}"
       for s in "''${SRCS[@]}"; do
         rel="''${s#./}"
-        obj="$tmp/''${rel%.*}.o"
-        mkdir -p "$(dirname "$obj")"
+        key="''${rel%.*}"
+        key="''${key//\//__}"
+        key="''${key//[^A-Za-z0-9_]/_}"
+        obj="$tmp/''${key}.o"
         ${clangxx} $cflags_common ${incFlags} ${defFlags} ${extraC} -c "$s" -o "$obj"
       done
 
@@ -76,7 +79,13 @@ in {
       install -Dm644 "lib${H.sanitizeName name}.a" "$out/lib/lib${H.sanitizeName name}.a"
 
       for h in "''${HDRS[@]}"; do
-        install -Dm644 "$h" "$out/include/''${h#./}"
+        rel="''${h#./}"
+        if [[ "$rel" == include/* ]]; then
+          dest="$out/include/''${rel#include/}"
+        else
+          dest="$out/include/$rel"
+        fi
+        install -Dm644 "$h" "$dest"
       done
 
       : > "$out/build.log"
