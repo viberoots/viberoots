@@ -69,6 +69,13 @@ Canonical shared Starlark helpers for this contract live under `//lang` and are 
 - `merge_link_intent_deps(deps, link_deps, header_deps)`
 - `validate_link_closure_overrides(link_deps, link_closure_overrides)`
 
+The Buck graph exporter must include these intent fields in `tools/buck/graph.json` so planners can consume them without rule-type-specific fallbacks:
+
+- `link_deps`
+- `header_deps`
+- `link_closure`
+- `link_closure_overrides`
+
 ### Nix Features (enable globally)
 
 **Tool versions (pin or newer):** Node ≥ 18.x, PNPM ≥ 8.x, Go ≥ 1.22, Buck2 ≥ 2024-xx, Nix ≥ 2.18.
@@ -356,6 +363,10 @@ const attrs = [
   "rule_type",
   "srcs",
   "deps",
+  "link_deps",
+  "header_deps",
+  "link_closure",
+  "link_closure_overrides",
   "labels",
   "args",
   "env",
