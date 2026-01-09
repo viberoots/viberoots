@@ -66,32 +66,35 @@ let
 
   nodeOfName = nm: if builtins.hasAttr nm byName then byName.${nm} else null;
 
-  # Read an attribute list from a node and normalize target labels for stable lookups.
-  labelsFromNodeAttr = { name, attr }:
-    let
-      n = nodeOfName name;
-      raw = if n == null then null else get n attr;
-      xs = ensureStringList (attr + " for " + name) raw;
-    in builtins.map cleanLabel xs;
+  Phase1 = import ./cpp-phase1-helpers.nix {
+    inherit lib get cleanLabel ensureStringList nodeOfName kindOf labelsOf hasLangCpp;
+    normSrcsOf = normSrcsOf;
+    pkgPathOf = pkgPathOf;
+    repoRoot = ctx.repoRoot;
+  };
+
+  labelsFromNodeAttr = Phase1.labelsFromNodeAttr;
+  dedupePreserveOrder = Phase1.dedupePreserveOrder;
+  ensureRepoCppLibDep = Phase1.ensureRepoCppLibDep;
+  ensureRepoCppHeadersDep = Phase1.ensureRepoCppHeadersDep;
+  patchInputsFor = Phase1.patchInputsFor;
 
   # Repo-provided C++ package inputs for consumers (Phase 1: direct-only).
   # - link_deps entries that are C++ libraries become T.cppLib inputs
   # - header_deps entries that are header-only targets become T.cppHeaders inputs
   repoCppLibPkgsFor = name:
     let
-      linkDeps = labelsFromNodeAttr { inherit name; attr = "link_deps"; };
-      isRepoCppLib = dn:
-        let depNode = nodeOfName dn;
-        in depNode != null && (hasLangCpp depNode) && (kindOf depNode == "lib");
-    in builtins.map mkLib (builtins.filter isRepoCppLib linkDeps);
+      linkDeps0 = labelsFromNodeAttr { inherit name; attr = "link_deps"; };
+      linkDeps = dedupePreserveOrder linkDeps0;
+      validated = builtins.map (dn: ensureRepoCppLibDep name dn) linkDeps;
+    in builtins.map mkLib validated;
 
   repoCppHeaderPkgsFor = name:
     let
-      headerDeps = labelsFromNodeAttr { inherit name; attr = "header_deps"; };
-      isRepoCppHeaders = dn:
-        let depNode = nodeOfName dn;
-        in depNode != null && (hasLangCpp depNode) && (kindOf depNode == "headers");
-    in builtins.map mkHeaders (builtins.filter isRepoCppHeaders headerDeps);
+      headerDeps0 = labelsFromNodeAttr { inherit name; attr = "header_deps"; };
+      headerDeps = dedupePreserveOrder headerDeps0;
+      validated = builtins.map (dn: ensureRepoCppHeadersDep name dn) headerDeps;
+    in builtins.map mkHeaders validated;
 
   # DFS over deps to collect nixpkg labels; bounded by nodes present
   collectNixAttrsFor = name:
@@ -160,20 +163,11 @@ let
 
   # Fallback: some Buck cquery configurations may omit deps edges on planner stubs.
   # In that case, detect common provider nodes directly and seed attrs accordingly.
-  providerAttrsFallback = let
-    names = builtins.map (n: let nm = get n "name"; in if nm == null then "" else L.cleanLabel nm) nodes;
-    # Extract provider attr from a full label when it matches our providers pattern
-    toAttr = full:
-      let marker = "//third_party/providers:nix_pkgs_";
-          parts = lib.splitString marker full;
-      in if (builtins.length parts) < 2 then null else
-      let tail = builtins.elemAt parts ((builtins.length parts) - 1);
-          # Map gtest/gtest_main to pkgs.googletest; otherwise use pkgs.<tail with '_' -> '.'>
-          isGTest = lib.hasPrefix "gtest" tail;
-      in if isGTest then "pkgs.googletest" else ("pkgs." + (lib.replaceStrings ["_"] ["."] tail));
-    acc = builtins.filter (a: a != null) (builtins.map toAttr names);
-    uniq = xs: builtins.attrNames (builtins.listToAttrs (map (a: { name = a; value = true; }) xs));
-  in builtins.sort (a: b: a < b) (uniq acc);
+  providerAttrsFallback =
+    (import ./cpp-provider-attrs-fallback.nix {
+      inherit lib get nodes;
+      cleanLabel = L.cleanLabel;
+    }).providerAttrsFallback;
 
   mkApp = name:
     T.cppApp {
@@ -183,12 +177,7 @@ let
       nixCxxAttrs = collectNixAttrsFor name;
       nixCxxPkgs = (repoCppHeaderPkgsFor name) ++ (repoCppLibPkgsFor name) ++ (repoGoCArchivesFor name);
       srcList = normSrcsOf name;
-      patches = (
-        let
-          rels = builtins.filter (s: lib.hasSuffix ".patch" s) (normSrcsOf name);
-          relsNonPlaceholder = builtins.filter (s: !(lib.hasInfix "placeholder" s)) rels;
-        in map (p: builtins.toPath (ctx.repoRoot + "/" + (pkgPathOf name) + "/" + p)) relsNonPlaceholder
-      );
+      patches = patchInputsFor name;
     };
 
   mkLib = name:
@@ -207,12 +196,7 @@ let
             subdir = pkgPathOf name;
             nixCxxAttrs = collectNixAttrsFor name;
             srcList = normSrcsOf name;
-            patches = (
-              let
-                rels = builtins.filter (s: lib.hasSuffix ".patch" s) (normSrcsOf name);
-                relsNonPlaceholder = builtins.filter (s: !(lib.hasInfix "placeholder" s)) rels;
-              in map (p: builtins.toPath (ctx.repoRoot + "/" + (pkgPathOf name) + "/" + p)) relsNonPlaceholder
-            );
+            patches = patchInputsFor name;
           };
           wasmAttrs = if isWasmStatic then { wasmTarget = if wantWasi then "wasm32-wasi" else "wasm32-unknown-unknown"; } else {};
           attrs = baseAttrs // wasmAttrs;
@@ -228,12 +212,7 @@ let
       srcRoot = ctx.repoRoot;
       subdir = pkgPathOf name;
       srcList = normSrcsOf name;
-      patches = (
-        let
-          rels = builtins.filter (s: lib.hasSuffix ".patch" s) (normSrcsOf name);
-          relsNonPlaceholder = builtins.filter (s: !(lib.hasInfix "placeholder" s)) rels;
-        in map (p: builtins.toPath (ctx.repoRoot + "/" + (pkgPathOf name) + "/" + p)) relsNonPlaceholder
-      );
+      patches = patchInputsFor name;
     };
 
   mkTest = name:
@@ -251,12 +230,7 @@ let
         in if all == [] then providerAttrsFallback else all;
       nixCxxPkgs = (repoCppHeaderPkgsFor name) ++ (repoCppLibPkgsFor name) ++ (repoGoCArchivesFor name);
       srcList = normSrcsOf name;
-      patches = (
-        let
-          rels = builtins.filter (s: lib.hasSuffix ".patch" s) (normSrcsOf name);
-          relsNonPlaceholder = builtins.filter (s: !(lib.hasInfix "placeholder" s)) rels;
-        in map (p: builtins.toPath (ctx.repoRoot + "/" + (pkgPathOf name) + "/" + p)) relsNonPlaceholder
-      );
+      patches = patchInputsFor name;
     };
   # Node-API addon builder (produces .node)
   mkAddon = name:
@@ -267,17 +241,10 @@ let
       nixCxxAttrs = collectNixAttrsFor name;
       nixCxxPkgs = (repoCppHeaderPkgsFor name) ++ (repoCppLibPkgsFor name) ++ (repoGoCArchivesFor name);
       srcList = normSrcsOf name;
-      patches = (
-        let
-          rels = builtins.filter (s: lib.hasSuffix ".patch" s) (normSrcsOf name);
-          relsNonPlaceholder = builtins.filter (s: !(lib.hasInfix "placeholder" s)) rels;
-        in map (p: builtins.toPath (ctx.repoRoot + "/" + (pkgPathOf name) + "/" + p)) relsNonPlaceholder
-      );
+      patches = patchInputsFor name;
     };
 in {
   isTarget = n: (isCxx n) || (hasLangCpp n);
   inherit kindOf mkApp mkLib mkHeaders mkTest mkAddon;
   modulesFileFor = name: "";
 }
-
-

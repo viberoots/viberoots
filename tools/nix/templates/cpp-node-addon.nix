@@ -119,7 +119,7 @@ in {
             n="''${b#lib}"
             n="''${n%.a}"
             LIBFLAGS+=("-l$n")
-          done < <(find "$d" -maxdepth 1 -type f -name 'lib*.a' 2>/dev/null)
+          done < <(find "$d" -maxdepth 1 -type f -name 'lib*.a' 2>/dev/null | sort)
         fi
       done
 
@@ -137,6 +137,7 @@ in {
       echo "defines=${defFlags}" >> "$out/build.log"
       echo "cflags=${extraC}" >> "$out/build.log"
       echo "ldflags=${extraLD} ${platLDGC}" >> "$out/build.log"
+      echo "link_libs=''${LIBFLAGS[*]}" >> "$out/build.log"
       echo "sources=''${#SRCS[@]}" >> "$out/build.log"
       echo "objects=''${#OBJS[@]}" >> "$out/build.log"
       echo "outmod=$outmod" >> "$out/build.log"

@@ -1,0 +1,79 @@
+{ lib
+, get
+, cleanLabel
+, ensureStringList
+, nodeOfName
+, kindOf
+, labelsOf
+, hasLangCpp
+, normSrcsOf
+, pkgPathOf
+, repoRoot
+}:
+let
+  labelsFromNodeAttr = { name, attr }:
+    let
+      n = nodeOfName name;
+      raw = if n == null then null else get n attr;
+      xs = ensureStringList (attr + " for " + name) raw;
+    in builtins.map cleanLabel xs;
+
+  dedupePreserveOrder = xs:
+    let
+      step = st: x:
+        if builtins.hasAttr x st.seen then st else { seen = st.seen // { "${x}" = true; }; out = st.out ++ [ x ]; };
+      st0 = { seen = {}; out = []; };
+    in (builtins.foldl' step st0 xs).out;
+
+  failLinkDep = consumer: dep: msg:
+    builtins.throw ("cpp planner: link_deps for " + consumer + " contains " + dep + " — " + msg);
+
+  failHeaderDep = consumer: dep: msg:
+    builtins.throw ("cpp planner: header_deps for " + consumer + " contains " + dep + " — " + msg);
+
+  ensureRepoCppLibDep = consumer: dep:
+    let
+      depNode = nodeOfName dep;
+      rt = if depNode == null then null else get depNode "rule_type";
+      k = if depNode == null then null else kindOf depNode;
+      labs = if depNode == null then [] else labelsOf depNode;
+      haveLang = depNode != null && hasLangCpp depNode;
+    in
+      if depNode == null then failLinkDep consumer dep "unknown target (missing from exported graph)"
+      else if !haveLang then failLinkDep consumer dep ("expected lang:cpp; got labels=" + (builtins.toString labs) + " rule_type=" + (builtins.toString rt))
+      else if k != "lib" then failLinkDep consumer dep ("expected kind:lib for Phase 1; got kind=" + (builtins.toString k) + " labels=" + (builtins.toString labs) + " rule_type=" + (builtins.toString rt))
+      else dep;
+
+  ensureRepoCppHeadersDep = consumer: dep:
+    let
+      depNode = nodeOfName dep;
+      rt = if depNode == null then null else get depNode "rule_type";
+      k = if depNode == null then null else kindOf depNode;
+      labs = if depNode == null then [] else labelsOf depNode;
+      haveLang = depNode != null && hasLangCpp depNode;
+    in
+      if depNode == null then failHeaderDep consumer dep "unknown target (missing from exported graph)"
+      else if !haveLang then failHeaderDep consumer dep ("expected lang:cpp; got labels=" + (builtins.toString labs) + " rule_type=" + (builtins.toString rt))
+      else if k != "headers" then failHeaderDep consumer dep ("expected kind:headers for Phase 1; got kind=" + (builtins.toString k) + " labels=" + (builtins.toString labs) + " rule_type=" + (builtins.toString rt))
+      else dep;
+
+  patchInputsFor = name:
+    let
+      rels0 = builtins.filter (s: lib.hasSuffix ".patch" s) (normSrcsOf name);
+      rels = builtins.filter (s: !(lib.hasInfix "placeholder" s)) rels0;
+      pkg = pkgPathOf name;
+      toImportedPath = p: builtins.path {
+        path = (repoRoot + "/" + pkg + "/" + p);
+        name = "patch";
+      };
+    in builtins.map toImportedPath rels;
+in {
+  inherit
+    labelsFromNodeAttr
+    dedupePreserveOrder
+    ensureRepoCppLibDep
+    ensureRepoCppHeadersDep
+    patchInputsFor;
+}
+
+

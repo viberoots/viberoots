@@ -460,7 +460,32 @@ This yields:
 - deterministic evaluation and stable link input ordering
 - a simple “if link breaks, you can either reorder link_deps or switch to direct mode and list what you need”
 
-⚠️ I have not validated whether our current Nix templates preserve a deterministic order of the discovered `lib*.a` files inside each package. If not, we should sort that list in the templates. Otherwise, we can have stable `nixCxxPkgs` ordering but still have nondeterministic `-l...` ordering.
+Phase 1 hardening notes:
+
+- The planner deduplicates `link_deps` (and `header_deps`) while preserving the first-occurrence order from the call site.
+- The C++ templates sort the discovered `lib*.a` files inside each package before producing `-l...` flags.
+
+This prevents a common source of nondeterminism where link inputs are stable at the planner level but `find` returns `lib*.a` in filesystem order.
+
+### Patch invalidation contract (Phase 1)
+
+In Phase 1, patch invalidation is intentionally explicit and monotonic:
+
+- Patch files live under the producer package (for example, `libs/foo/patches/cpp/*.patch`).
+- Patch files must be included in the producer target’s `srcs` so Buck invalidation is precise and predictable.
+- If a C++ library is used via `link_deps`, changing one of its patch files must rebuild:
+  - the library derivation, and
+  - any consumer derivation that links it via `link_deps`.
+
+### Failure modes (Phase 1)
+
+Phase 1 does not attempt to infer “what you meant” when `link_deps` is misused.
+
+- `link_deps` entries must resolve to in-repo C++ library producers (`lang:cpp` + `kind:lib`).
+- If an entry does not resolve to a supported producer shape, the planner fails fast with an error that names:
+  - the consumer label,
+  - the offending dep label, and
+  - the expected shape (C++ lib for Phase 1).
 
 ### Optional extension: per-dependency link closure overrides
 

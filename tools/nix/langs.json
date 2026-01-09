@@ -32,6 +32,9 @@
       "displayName": "C++",
       "requiredPaths": [
         "cpp/defs.bzl",
+        "tools/nix/planner/cpp.nix",
+        "tools/nix/planner/cpp-phase1-helpers.nix",
+        "tools/nix/planner/cpp-provider-attrs-fallback.nix",
         "tools/nix/templates/cpp.nix",
         "tools/nix/templates/cpp-headers.nix"
       ],
