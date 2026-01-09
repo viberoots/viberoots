@@ -158,6 +158,13 @@ def wire_package_local_planner_visible_stub(
     stamp_patch_scope_for_lang(kw, lang)
     stamp_labels(kw, lang, kind)
 
+    # Preserve link-intent attrs on planner-visible stubs so export-graph can surface them.
+    # This keeps the macro-level contract visible to planners and tests.
+    link_deps = kw.get("link_deps", []) or []
+    header_deps = kw.get("header_deps", []) or []
+    link_closure = kw.get("link_closure", "direct") or "direct"
+    link_closure_overrides = kw.get("link_closure_overrides", {}) or {}
+
     wire_planner_visible_stub(
         name = name,
         out = out,
@@ -171,6 +178,10 @@ def wire_package_local_planner_visible_stub(
         provider_realization_mode = provider_realization_mode,
         realize_providers_into = realize_providers_into,
         strip_providers_from_deps = strip_providers_from_deps,
+        link_deps = link_deps,
+        header_deps = header_deps,
+        link_closure = link_closure,
+        link_closure_overrides = link_closure_overrides,
     )
     return struct(
         kwargs = kw,

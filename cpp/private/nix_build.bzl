@@ -101,6 +101,11 @@ cpp_nix_build = rule(
         "kind": attrs.string(),  # "bin" | "lib" | "addon"
         "out": attrs.string(),
         "deps": attrs.list(attrs.dep(), default = []),
+        # Link intent surface (planner/exporter contract; unused by this rule impl).
+        "link_deps": attrs.list(attrs.dep(), default = []),
+        "header_deps": attrs.list(attrs.dep(), default = []),
+        "link_closure": attrs.string(default = "direct"),
+        "link_closure_overrides": attrs.dict(key = attrs.label(), value = attrs.string(), default = {}),
         "srcs": attrs.list(attrs.source(), default = []),  # include local patch files as inputs
         "nix_inputs": attrs.list(attrs.source(), default = []),  # explicit Nix inputs that should affect the rule key
         "labels": attrs.list(attrs.string(), default = []),

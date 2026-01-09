@@ -2,6 +2,7 @@ load("@prelude//:rules.bzl", "cxx_library", "cxx_binary", "cxx_test")
 load(
     "//lang:defs_common.bzl",
     "dedupe_preserve",
+    "merge_link_intent_deps",
     "normalize_labels",
     "prepare_package_local_wiring",
     "prepare_package_local_wasm_wiring",
@@ -17,9 +18,18 @@ load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
 def _cpp_common(name, kind, kwargs):
     nix_inputs = global_nix_inputs()
     kw = dict(kwargs)
-    base_deps = kw.pop("deps", []) or []
+    deps = kw.pop("deps", []) or []
+    link_deps = kw.pop("link_deps", []) or []
+    header_deps = kw.pop("header_deps", []) or []
+    link_closure = kw.pop("link_closure", "direct") or "direct"
+    # Preserve normalized values for downstream tooling and for passing through to the underlying rule.
+    kw["link_deps"] = link_deps
+    kw["header_deps"] = header_deps
+    kw["link_closure"] = link_closure
+
+    merged = merge_link_intent_deps(deps, link_deps, header_deps)
     extra = normalize_labels(native.package_name(), kw.pop("extra_module_providers", []) or [])
-    base_deps = base_deps + extra
+    base_deps = merged + extra
     labels = kw.get("labels", []) or []
     if kind == "addon":
         addon_name = kw.get("addon_name", None)
@@ -50,6 +60,9 @@ def _cpp_common(name, kind, kwargs):
         kind = kind,
         self_label = "//%s:%s" % (native.package_name(), name),
         deps = wiring.deps,
+        link_deps = prepared.get("link_deps", []) or [],
+        header_deps = prepared.get("header_deps", []) or [],
+        link_closure = prepared.get("link_closure", link_closure),
         srcs = srcs,
         labels = prepared.get("labels", []) or [],
         nix_inputs = nix_inputs,
@@ -134,6 +147,13 @@ def nix_cpp_headers(name, **kwargs):
     # materializes a derivation with an include tree via T.cppHeaders.
     kw = dict(kwargs)
     deps = kw.pop("deps", []) or []
+    link_deps = kw.pop("link_deps", []) or []
+    header_deps = kw.pop("header_deps", []) or []
+    link_closure = kw.pop("link_closure", "direct") or "direct"
+    kw["link_deps"] = link_deps
+    kw["header_deps"] = header_deps
+    kw["link_closure"] = link_closure
+    merged = merge_link_intent_deps(deps, link_deps, header_deps)
     srcs = kw.get("srcs", []) or []
     wire_package_local_planner_visible_stub(
         name = name,
@@ -141,7 +161,7 @@ def nix_cpp_headers(name, **kwargs):
         kwargs = kw,
         lang = "cpp",
         kind = "headers",
-        deps = deps,
+        deps = merged,
         srcs = srcs,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
     )
@@ -151,6 +171,13 @@ def nix_cpp_test(name, **kwargs):
     # Define a planner-visible cxx_test (not executed) and an external runner test (executed)
     kw = dict(kwargs)
     deps = kw.pop("deps", []) or []
+    link_deps = kw.pop("link_deps", []) or []
+    header_deps = kw.pop("header_deps", []) or []
+    link_closure = kw.pop("link_closure", "direct") or "direct"
+    kw["link_deps"] = link_deps
+    kw["header_deps"] = header_deps
+    kw["link_closure"] = link_closure
+    merged = merge_link_intent_deps(deps, link_deps, header_deps)
     planner_name = name + "__planner"
     # Planner-visible stub: Nix builds the test; this node exists for planner discovery and invalidation.
     # Provider deps are stripped to avoid visibility / graph-shape problems on the planner-visible boundary.
@@ -160,7 +187,7 @@ def nix_cpp_test(name, **kwargs):
         kwargs = kw,
         lang = "cpp",
         kind = "test",
-        deps = deps,
+        deps = merged,
         srcs = [],
         MODULE_PROVIDERS = MODULE_PROVIDERS,
     )

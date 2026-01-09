@@ -33,6 +33,11 @@ planner_stub = rule(
         # Optional: lets callers keep stable output naming; defaults to "<name>.stamp".
         "out": attrs.string(default = ""),
         "deps": attrs.list(attrs.dep(), default = []),
+        # Link intent surface (planner/exporter contract; unused by this rule impl).
+        "link_deps": attrs.list(attrs.dep(), default = []),
+        "header_deps": attrs.list(attrs.dep(), default = []),
+        "link_closure": attrs.string(default = "direct"),
+        "link_closure_overrides": attrs.dict(key = attrs.label(), value = attrs.string(), default = {}),
         # `attrs.source()` allows both files and target outputs (like genrule srcs),
         # which is useful for planner-only nodes that must carry edges via srcs.
         "srcs": attrs.list(attrs.source(), default = []),

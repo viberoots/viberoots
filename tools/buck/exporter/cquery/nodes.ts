@@ -1,9 +1,21 @@
 #!/usr/bin/env zx-wrapper
-import { normalizeTargetLabel } from "../../../lib/labels.ts";
+import { normalizeTargetLabel, packagePathFromLabel } from "../../../lib/labels.ts";
 import type { Node } from "../types.ts";
 
 function uniqSorted(xs: string[]): string[] {
   return Array.from(new Set((xs || []).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+}
+
+function dedupePreserve(xs: string[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const x of xs || []) {
+    if (!x) continue;
+    if (seen.has(x)) continue;
+    seen.add(x);
+    out.push(x);
+  }
+  return out;
 }
 
 function isTmpTarget(label: string): boolean {
@@ -13,6 +25,24 @@ function isTmpTarget(label: string): boolean {
 
 function coerceStringArray(v: any): string[] | undefined {
   return Array.isArray(v) ? (v as any[]).filter((x) => typeof x === "string") : undefined;
+}
+
+function resolveRelativeTarget(raw: string, ownerLabel: string): string {
+  const s = String(raw || "").trim();
+  if (!s) return "";
+  if (!s.startsWith(":")) return s;
+  const pkg = packagePathFromLabel(ownerLabel);
+  if (!pkg) return s;
+  return `//${pkg}${s}`;
+}
+
+function normalizeTargetsForOwner(ownerLabel: string, raw: unknown): string[] | undefined {
+  const xs = coerceStringArray(raw) || [];
+  if (xs.length === 0) return undefined;
+  const normalized = xs
+    .map((d) => normalizeTargetLabel(resolveRelativeTarget(d, ownerLabel)))
+    .filter(Boolean);
+  return dedupePreserve(normalized);
 }
 
 export function nodesFromCqueryJson(merged: Record<string, any>): Node[] {
@@ -38,7 +68,29 @@ export function nodesFromCqueryJson(merged: Record<string, any>): Node[] {
 
     const clean = normalizeTargetLabel(label);
     if (!clean || isTmpTarget(clean)) continue;
-    const cleanDeps = deps ? deps.map((d) => normalizeTargetLabel(d)) : undefined;
+    const cleanDeps = deps
+      ? deps.map((d) => normalizeTargetLabel(resolveRelativeTarget(d, clean)))
+      : undefined;
+
+    const linkDeps = normalizeTargetsForOwner(clean, a["link_deps"] ?? a["buck.link_deps"]);
+    const headerDeps = normalizeTargetsForOwner(clean, a["header_deps"] ?? a["buck.header_deps"]);
+    const linkClosure =
+      typeof a["link_closure"] === "string"
+        ? (a["link_closure"] as string)
+        : typeof a["buck.link_closure"] === "string"
+          ? (a["buck.link_closure"] as string)
+          : undefined;
+    const overridesRaw = (a["link_closure_overrides"] ?? a["buck.link_closure_overrides"]) as any;
+    const overridesNormalized: Record<string, string> | undefined = (() => {
+      if (!overridesRaw || typeof overridesRaw !== "object") return undefined;
+      const out: Record<string, string> = {};
+      for (const [k, v] of Object.entries(overridesRaw)) {
+        const nk = normalizeTargetLabel(resolveRelativeTarget(String(k || ""), clean));
+        if (!nk) continue;
+        out[nk] = String(v || "");
+      }
+      return out;
+    })();
 
     nodes.push({
       ...(a as any),
@@ -47,6 +99,10 @@ export function nodesFromCqueryJson(merged: Record<string, any>): Node[] {
       deps: cleanDeps || deps || a["deps"],
       labels: uniqSorted(labelsArr || []),
       srcs: srcsArr || a["srcs"],
+      ...(linkDeps ? { link_deps: linkDeps } : {}),
+      ...(headerDeps ? { header_deps: headerDeps } : {}),
+      ...(linkClosure ? { link_closure: linkClosure } : {}),
+      ...(overridesNormalized ? { link_closure_overrides: overridesNormalized } : {}),
     } as Node);
   }
 
@@ -71,6 +127,14 @@ export function nodesFromCqueryJson(merged: Record<string, any>): Node[] {
       labels: uniqSorted([...(cur.labels || []), ...((n.labels as any) || [])]),
       deps: uniqSorted([...(cur.deps || []), ...((n.deps as any) || [])]),
       srcs: uniqSorted([...(cur.srcs || []), ...((n.srcs as any) || [])]),
+      link_deps: dedupePreserve([
+        ...((cur as any).link_deps || []),
+        ...((n as any).link_deps || []),
+      ]),
+      header_deps: dedupePreserve([
+        ...((cur as any).header_deps || []),
+        ...((n as any).header_deps || []),
+      ]),
     });
   }
 

@@ -162,6 +162,10 @@ I propose adding three small, orthogonal knobs to:
 
 Notes:
 
+- Status:
+  - PR-2 in `linking-plan-2.md` implements the macro-level surface: these attributes are accepted on C++ macros and the deterministic `deps` union contract is enforced.
+  - Planner behavior is unchanged until PR-3 (consumers do not yet link in-repo C++ libs just because they are listed in `link_deps`).
+
 - `deps` remains the graph edge list, but for ergonomics the macro will compute:
   - `deps := deps ∪ link_deps ∪ header_deps` (deterministic union)
   - This ensures any link or header dependency is also a real Buck graph edge, without requiring users to repeat labels.
