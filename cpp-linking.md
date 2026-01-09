@@ -417,6 +417,8 @@ For a C++ consumer target `T` of kind `lib`, `bin`, `addon`, or `test`:
 
 This design is intentionally parallel to what `tools/nix/planner/go.nix` already does for Go cgo, but scoped to C++.
 
+Note: PR-1 in `linking-plan-2.md` implements the header-only _producer_ (`nix_cpp_headers` + `kind:headers` + `T.cppHeaders`) first. It does not wire `header_deps` into consumers yet. The consumption path is implemented in a later PR as part of the shared link-intent contract.
+
 ### Classification rules
 
 I propose a conservative classification:
@@ -558,7 +560,7 @@ Implementation details (proposed):
 
 To make header-only targets explicit and easy to use, I propose adding:
 
-- `nix_cpp_headers(name=..., headers=[...], ...)`
+- `nix_cpp_headers(name=..., srcs=[...], ...)`
 
 This macro would:
 

@@ -30,9 +30,13 @@
     {
       "id": "cpp",
       "displayName": "C++",
-      "requiredPaths": ["cpp/defs.bzl", "tools/nix/templates/cpp.nix"],
+      "requiredPaths": [
+        "cpp/defs.bzl",
+        "tools/nix/templates/cpp.nix",
+        "tools/nix/templates/cpp-headers.nix"
+      ],
       "optionalPaths": [],
-      "kinds": ["bin", "lib", "test"],
+      "kinds": ["bin", "headers", "lib", "test"],
       "capabilities": {
         "patching": true
       },

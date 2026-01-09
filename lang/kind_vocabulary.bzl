@@ -15,6 +15,7 @@ ALLOWED_KIND_VALUES = [
     "bundle",
     "carchive",
     "gen",
+    "headers",
     "lib",
     "packaging",
     "probe",

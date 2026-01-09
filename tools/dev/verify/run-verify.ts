@@ -62,7 +62,7 @@ export async function runVerify(): Promise<void> {
 
   const cov = await setupCoverage({ root, enabled: args.coverage });
 
-  const iso = `v-${process.pid}`;
+  const iso = `v-${process.pid}-${Date.now()}`;
   await writeVerifyIsoMarker(lock.lockDir, iso);
   await appendVerifyLogLine(lock.logFile, `[verify] begin iso=${iso}`);
   // Log the current git revision for performance correlation across runs.

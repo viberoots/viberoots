@@ -7,6 +7,7 @@ export type KindValue =
   | "bundle"
   | "carchive"
   | "gen"
+  | "headers"
   | "lib"
   | "packaging"
   | "probe"
@@ -20,6 +21,7 @@ export const ALLOWED_KIND_VALUES: ReadonlyArray<KindValue> = [
   "bundle",
   "carchive",
   "gen",
+  "headers",
   "lib",
   "packaging",
   "probe",

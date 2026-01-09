@@ -209,6 +209,7 @@ let
         acc // {
           "${nm}" =
             if k == "bin" then LANGS.cpp.mkApp nm
+            else if k == "headers" then LANGS.cpp.mkHeaders nm
             else if k == "lib" then LANGS.cpp.mkLib nm
             else if k == "test" then LANGS.cpp.mkTest nm
             else if k == "addon" then LANGS.cpp.mkAddon nm
@@ -298,6 +299,7 @@ let
               exit 1
             '' else (
               if k == "bin" then LANGS.cpp.mkApp buildLabel
+              else if k == "headers" then LANGS.cpp.mkHeaders buildLabel
               else if k == "lib" then LANGS.cpp.mkLib buildLabel
               else if k == "test" then LANGS.cpp.mkTest buildLabel
               else if k == "addon" then LANGS.cpp.mkAddon buildLabel
@@ -374,6 +376,7 @@ let
                 else LANGS.python.mkLib buildLabel
               ) else (
                 if k.kind == "bin" then LANGS.cpp.mkApp buildLabel
+                else if k.kind == "headers" then LANGS.cpp.mkHeaders buildLabel
                 else if k.kind == "lib" then LANGS.cpp.mkLib buildLabel
                 else if k.kind == "test" then LANGS.cpp.mkTest buildLabel
                 else if k.kind == "addon" then LANGS.cpp.mkAddon buildLabel

@@ -129,6 +129,23 @@ def nix_cpp_wasm_emscripten_lib(name, **kwargs):
 def nix_cpp_binary(name, **kwargs):
     _cpp_common(name, "bin", kwargs)
 
+def nix_cpp_headers(name, **kwargs):
+    # Planner-visible header-only target. This produces no linkable artifact; the planner
+    # materializes a derivation with an include tree via T.cppHeaders.
+    kw = dict(kwargs)
+    deps = kw.pop("deps", []) or []
+    srcs = kw.get("srcs", []) or []
+    wire_package_local_planner_visible_stub(
+        name = name,
+        out = name + ".stamp",
+        kwargs = kw,
+        lang = "cpp",
+        kind = "headers",
+        deps = deps,
+        srcs = srcs,
+        MODULE_PROVIDERS = MODULE_PROVIDERS,
+    )
+
 
 def nix_cpp_test(name, **kwargs):
     # Define a planner-visible cxx_test (not executed) and an external runner test (executed)
@@ -179,6 +196,7 @@ __all__ = [
     "nix_cpp_wasm_static_lib",
     "nix_cpp_wasm_emscripten_lib",
     "nix_cpp_binary",
+    "nix_cpp_headers",
     "nix_cpp_test",
     "nix_cpp_node_addon",
     "cpp_sanitize_probe",

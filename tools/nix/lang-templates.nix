@@ -8,7 +8,7 @@ let
   PythonWasm = if uv2nixLib != null then import ./templates/python/wasm.nix { inherit pkgs uv2nixLib; } else null;
 in {
   inherit (Go)  goApp goLib goCArchive goTinyWasmLib;
-  inherit (Cpp) cppApp cppLib cppTest cppNodeAddon cppWasmStaticLib cppWasmEmscriptenLib;
+  inherit (Cpp) cppApp cppHeaders cppLib cppTest cppNodeAddon cppWasmStaticLib cppWasmEmscriptenLib;
   # Expose Node symbol bag for discoverability; planner's Node plugin remains authoritative.
   inherit Node;
   # Only expose Python symbols when available

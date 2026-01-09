@@ -33,6 +33,7 @@ let
       isPlanner = (nm != null) && (lib.hasSuffix "__planner" nm);
     in if builtins.elem "kind:test" labs || isPlanner then "test"
       else if builtins.elem "kind:bin" labs then "bin"
+      else if builtins.elem "kind:headers" labs then "headers"
       else if builtins.elem "kind:lib" labs then "lib"
       else if builtins.elem "kind:addon" labs then "addon"
       else if rt == "cxx_test" then "test"
@@ -187,6 +188,20 @@ let
           else T.cppLib attrs
       );
 
+  mkHeaders = name:
+    T.cppHeaders {
+      inherit name;
+      srcRoot = ctx.repoRoot;
+      subdir = pkgPathOf name;
+      srcList = normSrcsOf name;
+      patches = (
+        let
+          rels = builtins.filter (s: lib.hasSuffix ".patch" s) (normSrcsOf name);
+          relsNonPlaceholder = builtins.filter (s: !(lib.hasInfix "placeholder" s)) rels;
+        in map (p: builtins.toPath (ctx.repoRoot + "/" + (pkgPathOf name) + "/" + p)) relsNonPlaceholder
+      );
+    };
+
   mkTest = name:
     T.cppTest {
       inherit name;
@@ -227,7 +242,7 @@ let
     };
 in {
   isTarget = n: (isCxx n) || (hasLangCpp n);
-  inherit kindOf mkApp mkLib mkTest mkAddon;
+  inherit kindOf mkApp mkLib mkHeaders mkTest mkAddon;
   modulesFileFor = name: "";
 }
 

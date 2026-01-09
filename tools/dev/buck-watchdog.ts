@@ -40,7 +40,16 @@ async function sweepOrphans(patterns: RegExp) {
       if (!m) continue;
       const iso = m[1];
       if (!patterns.test(iso)) continue;
-      const pidMatch = iso.match(/(\d+)$/);
+      // Determine whether this buck2d is orphaned by inferring its "owner pid" from the
+      // isolation dir naming convention.
+      //
+      // Conventions in this repo:
+      // - v-<pid>[-...]
+      // - zxtest-<pid>
+      // - exporter-<pid>
+      // - devbuild-<pid>
+      const ownerMatch = iso.match(/^(?:v|zxtest|exporter|devbuild)-(\d+)/);
+      const pidMatch = ownerMatch || iso.match(/(\d+)$/);
       const suffixPid = pidMatch ? Number(pidMatch[1]) : NaN;
       if (!Number.isFinite(suffixPid) || isPidAlive(suffixPid)) continue;
       await tryBuckKillIsolation(iso);
