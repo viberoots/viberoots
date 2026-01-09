@@ -187,6 +187,9 @@ let
       isWasmStatic = builtins.elem "flavor:wasm" labs || builtins.elem "wasm:static" labs;
       isEmscripten = builtins.elem "flavor:emscripten" labs || builtins.elem "wasm:emscripten" labs;
       wantWasi = builtins.elem "wasm:wasi" labs;
+      headerPkgsForWasm =
+        if isWasmStatic then (repoCppHeaderPkgsFor name) else [];
+      includeRootsForWasm = builtins.map (p: "${p}/include") headerPkgsForWasm;
     in
       (
         let
@@ -199,7 +202,8 @@ let
             patches = patchInputsFor name;
           };
           wasmAttrs = if isWasmStatic then { wasmTarget = if wantWasi then "wasm32-wasi" else "wasm32-unknown-unknown"; } else {};
-          attrs = baseAttrs // wasmAttrs;
+          wasmHeaderAttrs = if isWasmStatic then { includes = includeRootsForWasm; } else {};
+          attrs = baseAttrs // wasmAttrs // wasmHeaderAttrs;
         in
           if isEmscripten then T.cppWasmEmscriptenLib attrs
           else if isWasmStatic then T.cppWasmStaticLib attrs

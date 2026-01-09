@@ -82,6 +82,12 @@ def nix_cpp_wasm_static_lib(name, **kwargs):
     """
     kw = dict(kwargs)
     deps = kw.pop("deps", []) or []
+    link_deps = kw.pop("link_deps", []) or []
+    header_deps = kw.pop("header_deps", []) or []
+    # Preserve normalized values for downstream tooling and for passing through to the underlying rule.
+    kw["link_deps"] = link_deps
+    kw["header_deps"] = header_deps
+    merged = merge_link_intent_deps(deps, link_deps, header_deps)
     nix_inputs = global_nix_inputs()
     wiring = prepare_package_local_wasm_wiring(
         name = name,
@@ -89,7 +95,7 @@ def nix_cpp_wasm_static_lib(name, **kwargs):
         lang = "cpp",
         MODULE_PROVIDERS = MODULE_PROVIDERS,
         variant = "static",
-        deps = deps,
+        deps = merged,
         provider_realization_mode = "deps",
         strip_providers_from_deps = False,
     )
@@ -100,6 +106,8 @@ def nix_cpp_wasm_static_lib(name, **kwargs):
         kind = "lib",
         self_label = "//%s:%s" % (native.package_name(), name),
         deps = wiring.deps,
+        link_deps = prepared.get("link_deps", []) or [],
+        header_deps = prepared.get("header_deps", []) or [],
         srcs = prepared.get("srcs", []) or [],
         labels = prepared.get("labels", []) or [],
         nix_inputs = nix_inputs,

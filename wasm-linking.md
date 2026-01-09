@@ -177,7 +177,9 @@ For `nix_cpp_wasm_static_lib`:
 
 - It compiles to a `.a` built for a specific Wasm target.
 - If it declares `header_deps`, those are include-only inputs used during compilation.
+  - The C++ planner resolves each `header_dep` to a `T.cppHeaders` derivation and passes its include root (`${drv}/include`) into `T.cppWasmStaticLib` via `includes`.
 - If it declares `link_deps`, those are its link requirements and are used only when a downstream consumer selects transitive closure.
+  - `link_deps` is not consumed by the archive build itself. It exists so downstream consumers can compute closure deterministically.
 
 ## Ordering and determinism
 
