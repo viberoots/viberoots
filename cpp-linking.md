@@ -26,6 +26,70 @@ This gap makes C++ feel inconsistent with:
 - Go cgo depending on in-repo C++ libraries (supported)
 - C++ depending on Go c-archives (supported)
 
+## Cross-language linking (related, but not the main focus)
+
+This document is primarily about **C++ target dependency semantics** (C++ lib/bin/addon/test).
+In this repo we also have **cross-language linking** that touches C++ artifacts. I want this called out explicitly so the model is complete.
+
+### Go app or library linking an in-repo C++ library (cgo)
+
+This is supported today via Go macros using `repo_cgo_deps` (see `docs/handbook/language-interop.md` and `go/defs.bzl`).
+
+This is a “Go consumer, C++ producer” case. It is not driven by `nix_cpp_binary` at all, but it does depend on C++ library artifact shape and headers.
+
+Example call site:
+
+```python
+# libs/greeter/TARGETS
+load("//cpp:defs.bzl", "nix_cpp_library")
+
+nix_cpp_library(
+    name = "greeter",
+    srcs = ["src/greeter.cpp"],
+    headers = ["include/greeter.h"],
+    visibility = ["PUBLIC"],
+)
+```
+
+```python
+# apps/demo-cli/TARGETS
+load("//go:defs.bzl", "nix_go_binary")
+
+nix_go_binary(
+    name = "demo",
+    srcs = ["cmd/demo/main.go"],
+    repo_cgo_deps = ["//libs/greeter:greeter"],
+)
+```
+
+Design interaction with this document:
+
+- If we add `link_deps` semantics to C++ libraries, we may eventually want the Go planner to optionally follow the C++ library’s `link_deps` when building cgo consumers (similar to `link_closure="transitive"`).
+- I am not changing Go’s behavior in this document, but the shared “link closure” helper described later is intended to make this possible without inventing a second closure algorithm.
+
+### C++ consumer linking a Go c-archive
+
+This is supported today and is already in-scope of the planner-side discussion here:
+
+- Go producer: `nix_go_carchive`
+- C++ consumer: `nix_cpp_binary` / `nix_cpp_node_addon` depending on the c-archive target
+
+### Python native extension modules (CPython C extensions)
+
+⚠️ I do not see an existing first-class macro surface in this repo for building and consuming in-repo Python C-extension modules (for example, a `.so`/`.dylib` built from C/C++ and imported from Python).
+
+If we want this, it should be designed explicitly because it crosses three concerns:
+
+- build of the native extension artifact (C/C++ build, likely via Nix templates)
+- Python packaging/runtime discovery (where the `.so` lives and how it is imported)
+- lockfile/importer scoping (uv-based Python targets and their dependency closure)
+
+This document does not attempt to design Python extension modules. If we decide to support it, I would write a dedicated design doc that mirrors the same semantic model:
+
+- explicit intent lists (what gets built, what gets included at runtime)
+- deterministic closure resolution
+- explicit ABI/variant constraints (CPython version, platform tags, and possibly manylinux/macos wheel semantics)
+
 ## Goals
 
 The design must:
@@ -623,6 +687,8 @@ This document and `wasm-linking.md` share the same core semantic model:
 
 If I implement either C++ native linking or Wasm linking first, I want to avoid duplicating these mechanics.
 
+This same shared model is also intended to be reused by `python-extension-design.md` (Python extension modules), which is another “native link consumer” that benefits from the same deterministic closure resolution.
+
 ### Shared semantics helper for deterministic traversal
 
 Both designs need a tiny, deterministic “link closure” resolver:
@@ -644,3 +710,9 @@ Both designs rely on the exported Buck graph containing the intent attributes:
 - `link_deps`, `header_deps`, `link_closure`, `link_closure_overrides`
 
 If the exporter needs to be extended to emit these fields, I should do it once and reuse it for both native C++ and Wasm.
+
+Python extension modules (`python-extension-design.md`) should reuse the same attribute names for the same semantics, rather than inventing a parallel surface.
+
+## Implementation sequence
+
+See `linking-roadmap.md` for a proposed order that implements shared primitives once and then applies them across native C++, Wasm, and Python extension modules.

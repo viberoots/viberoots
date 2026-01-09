@@ -408,6 +408,12 @@ Both designs require the exporter to include the new attributes in the exported 
 
 If we add these attributes for C++ first, we should reuse them for Wasm, rather than inventing Wasm-only names.
 
+Python extension modules (`python-extension-design.md`) are another consumer of the same shared “link closure” primitives, so I want the same attribute names and the same Nix/Starlark helpers reused there as well.
+
+## Implementation sequence
+
+See `linking-roadmap.md` for a proposed order that implements shared primitives once and then applies them across native C++, Wasm, and Python extension modules.
+
 ## Notes to update in `cpp-linking.md`
 
 I will keep `cpp-linking.md` and `wasm-linking.md` aligned on:
