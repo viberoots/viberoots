@@ -26,6 +26,7 @@ These are shared across all three efforts:
   - `link_closure = "direct" | "transitive"`
   - optional `link_closure_overrides` (per-dep)
   - deterministic traversal over the link graph (follow `link_deps`)
+  - canonical implementation: `tools/nix/planner/link-closure.nix` (`resolveLinkClosure`)
 - **Exporter attribute surface**:
   - ensure `link_deps`, `header_deps`, `link_closure`, and `link_closure_overrides` are exported where needed
 
