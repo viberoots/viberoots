@@ -95,6 +95,11 @@ load(
     _package_local_wasm_wiring_mutation_probe = "package_local_wasm_wiring_mutation_probe",
     _wire_package_local_wasm_planner_visible_stub = "wire_package_local_wasm_planner_visible_stub",
 )
+load(
+    "//lang:link_intent.bzl",
+    _merge_link_intent_deps = "merge_link_intent_deps",
+    _validate_link_closure_overrides = "validate_link_closure_overrides",
+)
 
 dedupe_preserve = _dedupe_preserve
 
@@ -176,4 +181,7 @@ package_local_wiring_mutation_probe = _package_local_wiring_mutation_probe
 prepare_package_local_wasm_wiring = _prepare_package_local_wasm_wiring
 package_local_wasm_wiring_mutation_probe = _package_local_wasm_wiring_mutation_probe
 wire_package_local_wasm_planner_visible_stub = _wire_package_local_wasm_planner_visible_stub
+
+merge_link_intent_deps = _merge_link_intent_deps
+validate_link_closure_overrides = _validate_link_closure_overrides
 

@@ -53,6 +53,22 @@
   - This is an explicit contract: the exporter does not rely on process-global caches for Go labeling, and it does not use secondary fallbacks (for example parsing `go.mod`) that could hide bugs in the primary `go list` path.
 - **Node (optional, experimental): PNPM-only.** Lockfile providers are **importer-scoped**; label format `lockfile:<path>#<importer>` (see “Later / Optional — Node”).
 
+### Macro-level link intent contract (shared across languages)
+
+Some target types need to separate “general build deps” from “linking intent.” We standardize this at the macro surface so all languages can reuse the same semantics and planners can consume a consistent graph.
+
+- **`link_deps`**: explicit deps that represent link-time intent (the planner may follow these edges for link closure computation).
+- **`header_deps`**: explicit deps that are header-only intent (build-time include surface; may not imply linking).
+- **`deps` merge rule**: macros must compute a deterministic union:
+  - \(deps := deps \cup link_deps \cup header_deps\)
+  - ordering must be deterministic (stable first-occurrence order; no sorting)
+- **`link_closure_overrides` validation**: when a macro accepts per-dep closure overrides, each override key must appear in `link_deps` (fail fast otherwise).
+
+Canonical shared Starlark helpers for this contract live under `//lang` and are re-exported from `//lang:defs_common.bzl`:
+
+- `merge_link_intent_deps(deps, link_deps, header_deps)`
+- `validate_link_closure_overrides(link_deps, link_closure_overrides)`
+
 ### Nix Features (enable globally)
 
 **Tool versions (pin or newer):** Node ≥ 18.x, PNPM ≥ 8.x, Go ≥ 1.22, Buck2 ≥ 2024-xx, Nix ≥ 2.18.
