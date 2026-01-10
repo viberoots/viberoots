@@ -130,6 +130,19 @@ I propose to add the following attributes where they are meaningful:
   - `link_closure` (direct/transitive)
   - `link_closure_overrides` (optional extension, same as `cpp-linking.md`)
 
+### Build path: graph-aware selected vs selected-wasm
+
+For TinyGo Wasm, there are two build paths in this repo:
+
+- **Graph-aware selected (default for Buck builds)**:
+  - Buck builds of `nix_go_tiny_wasm_lib` route through the graph-aware selected path (`tools/dev/build-selected.ts`, which builds `#graph-generator-selected`).
+  - This path can consume exported graph semantics and is required for Phase 2 linking behavior (`link_deps` / closure).
+
+- **Minimal selected-wasm (explicit opt-in)**:
+  - The flake attribute `#graph-generator-selected-wasm` intentionally bypasses the exported graph and cannot incorporate repo Wasm link inputs (for example, `wasmStaticLibs` is empty).
+  - This path is intended only for small smoke scaffolds that do not link in-repo C/C++.
+  - If a call site must use this minimal path via Buck, it must opt in explicitly (for example, `use_selected_wasm = True` on `nix_go_tiny_wasm_lib`).
+
 - For `nix_cpp_wasm_static_lib`:
   - `header_deps` (for includes while compiling)
   - `link_deps` (its own link requirements, used when a downstream consumer chooses transitive closure)

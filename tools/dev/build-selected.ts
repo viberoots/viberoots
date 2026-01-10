@@ -95,9 +95,6 @@ async function main() {
   for (const envName of allDevOverrideEnvNames()) {
     sanitizedEnv[envName] = "";
   }
-  if (!process.env.PLANNER_ONLY_CPP) {
-    sanitizedEnv.PLANNER_ONLY_CPP = "1";
-  }
 
   const nixTrace = (process.env.EXPORTER_DEBUG || "").trim() === "1" ? "--show-trace" : "";
   const { stdout, exitCode } = await $({

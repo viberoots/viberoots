@@ -1,5 +1,6 @@
 load("@prelude//:rules.bzl", "go_binary", "go_library", "go_test")
 load("//lang:defs_common.bzl", "normalize_labels", "prepare_package_local_wasm_wiring", "prepare_package_local_wiring")
+load("//lang:defs_common.bzl", "merge_link_intent_deps", "validate_link_closure_overrides")
 load("//lang:global_inputs.bzl", "global_nix_inputs")
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
 load("//lang:defs_common.bzl", "wire_package_local_planner_visible_stub")
@@ -149,7 +150,18 @@ def nix_go_tiny_wasm_lib(name, **kwargs):
     pkg = native.package_name()
     kw = dict(kwargs)
     deps = kw.pop("deps", []) or []
+    link_deps = kw.pop("link_deps", []) or []
+    link_closure = kw.pop("link_closure", "direct") or "direct"
+    link_closure_overrides = kw.pop("link_closure_overrides", {}) or {}
+    use_selected_wasm = kw.pop("use_selected_wasm", False) or False
     extra = normalize_labels(pkg, kw.pop("extra_module_providers", []) or [])
+
+    validate_link_closure_overrides(link_deps, link_closure_overrides)
+    kw["link_deps"] = link_deps
+    kw["link_closure"] = link_closure
+    kw["link_closure_overrides"] = link_closure_overrides
+
+    merged = merge_link_intent_deps(deps, link_deps, [])
 
     wiring = prepare_package_local_wasm_wiring(
         name = name,
@@ -157,7 +169,7 @@ def nix_go_tiny_wasm_lib(name, **kwargs):
         lang = "go",
         variant = "tinygo",
         MODULE_PROVIDERS = MODULE_PROVIDERS,
-        deps = deps,
+        deps = merged,
         extra_srcs = extra,
         srcs_include_deps = True,
         provider_realization_mode = "inputs",
@@ -170,6 +182,11 @@ def nix_go_tiny_wasm_lib(name, **kwargs):
         self_label = "//%s:%s" % (pkg, name),
         out = name + ".wasm",
         expected_rel = "lib/top.wasm",
+        deps = wiring.deps,
+        link_deps = prepared.get("link_deps", []) or [],
+        link_closure = prepared.get("link_closure", link_closure),
+        link_closure_overrides = prepared.get("link_closure_overrides", link_closure_overrides),
+        use_selected_wasm = use_selected_wasm,
         srcs = prepared.get("srcs", []) or [],
         nix_inputs = global_nix_inputs(),
         labels = prepared.get("labels", []) or [],

@@ -66,9 +66,9 @@ in {
         isBinLabel = lbs != null && builtins.elem "kind:bin" lbs;
         isWasmLabel = lbs != null && builtins.elem "kind:wasm" lbs;
     in if (lbs != null && builtins.elem "kind:carchive" lbs) then "lib"
+         else if isWasmLabel then "tinywasm"
        else if (rt != null) && lib.hasPrefix "go_" rt
          then (if lib.hasSuffix "_binary" rt then "bin" else "lib")
-         else if isWasmLabel then "tinywasm"
          else if isBinLabel then "bin" else "lib";
 
   modulesFileFor = name: modulesTomlFor name;
