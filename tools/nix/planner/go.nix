@@ -20,12 +20,41 @@ let
   };
   # Shared, top-level helpers (deduplicated from mkApp/mkLib)
   byName = L.byName;
+  LC = import ./link-closure.nix { inherit lib; };
   depsOfName = nm:
     let n = if builtins.hasAttr nm byName then byName.${nm} else null;
     in if n == null then [] else L.depsOf n;
   labelsOfName = nm:
     let n = if builtins.hasAttr nm byName then byName.${nm} else null;
     in if n == null then [] else L.labelsOf n;
+  nodeOfName = nm:
+    if builtins.hasAttr nm byName then byName.${nm}
+    else builtins.throw "go planner: unknown node '${nm}' (missing from byName)";
+  ensureStringList = ctxStr: xs:
+    if xs == null then []
+    else if builtins.isList xs && builtins.all (x: builtins.isString x) xs then xs
+    else builtins.throw "go planner: expected ${ctxStr} to be a list of strings";
+  ensureStringAttrs = ctxStr: x:
+    if x == null then {}
+    else if builtins.isAttrs x then x
+    else builtins.throw "go planner: expected ${ctxStr} to be an attrset";
+  normalizeLabelList = ctxStr: xs:
+    builtins.map L.cleanLabel (ensureStringList ctxStr xs);
+  normalizeOverrides = name: overridesRaw:
+    let
+      overrides0 = ensureStringAttrs "link_closure_overrides for '${name}'" overridesRaw;
+      keys = builtins.attrNames overrides0;
+      pairs = builtins.map (k: { name = L.cleanLabel k; value = overrides0.${k}; }) keys;
+      _ = builtins.map (p:
+        if builtins.isString p.value then true
+        else builtins.throw "go planner: expected link_closure_overrides['${p.name}'] to be a string"
+      ) pairs;
+      names = builtins.map (p: p.name) pairs;
+      uniqNames = builtins.attrNames (builtins.listToAttrs (builtins.map (n: { name = n; value = true; }) names));
+      _dupes =
+        if (builtins.length uniqNames) == (builtins.length names) then null
+        else builtins.throw "go planner: normalized link_closure_overrides has duplicate keys for '${name}'";
+    in builtins.listToAttrs pairs;
   isCppNode = nm:
     let n = if builtins.hasAttr nm byName then byName.${nm} else null;
         rt0 = if n == null then null else (get n "rule_type");
@@ -120,16 +149,73 @@ in {
   # Build a TinyGo WebAssembly module that optionally links C/C++ wasm archives
   mkTinyWasm = name:
     let
-      directDeps = depsOfName name;
-      cppLibDeps = builtins.filter (dn: isCppNode dn && isCppLib dn) directDeps;
-      # Resolve repo-local wasm static libs for direct C++ deps
-      repoWasmLibs = map (dn: T.cppWasmStaticLib { name = dn; srcRoot = repoRoot; subdir = (pkgPathOf dn); }) cppLibDeps;
+      consumer = nodeOfName name;
+      linkDepsRaw =
+        let v = get consumer "link_deps";
+        in if v != null then v else (get consumer "buck.link_deps");
+      linkDeps = normalizeLabelList "link_deps for '${name}'" linkDepsRaw;
+      defaultClosure =
+        let raw0 = get consumer "link_closure";
+            raw = if raw0 != null then raw0 else (get consumer "buck.link_closure");
+        in if raw == null then "direct" else raw;
+      overridesRaw =
+        let v = get consumer "link_closure_overrides";
+        in if v != null then v else (get consumer "buck.link_closure_overrides");
+      overrides = normalizeOverrides name overridesRaw;
+      backend = builtins.getEnv "WEB_WASM_BACKEND";
+      tinyTarget = if backend == "wasi_single" then "wasi" else "wasm";
+      wasmTarget = if tinyTarget == "wasi" then "wasm32-wasi" else "wasm32-unknown-unknown";
+
+      linkDepsOf = nm:
+        let n = nodeOfName nm;
+            raw0 = get n "link_deps";
+            raw = if raw0 != null then raw0 else (get n "buck.link_deps");
+        in normalizeLabelList "link_deps for '${nm}'" raw;
+
+      resolved = LC.resolveLinkClosure {
+        inherit byName;
+        linkDepsOf = linkDepsOf;
+        roots = linkDeps;
+        defaultClosure = defaultClosure;
+        overrides = overrides;
+      };
+
+      hasLabel = nm: l: builtins.elem l (labelsOfName nm);
+      ensureSupportedWasmProducer = dep:
+        let
+          expected = "lang:cpp, kind:wasm, wasm:static";
+          ok =
+            (hasLabel dep "lang:cpp") &&
+            (hasLabel dep "kind:wasm") &&
+            (hasLabel dep "wasm:static");
+        in if ok then true
+           else builtins.throw "go planner (mkTinyWasm): ${name} link_dep '${dep}' is unsupported; expected labels ${expected}";
+
+      ensureVariantCompatible = dep:
+        let
+          depIsWasi = hasLabel dep "wasm:wasi";
+          wantWasi = tinyTarget == "wasi";
+        in if wantWasi && (!depIsWasi)
+           then builtins.throw "go planner (mkTinyWasm): ${name} (target=wasi) cannot link '${dep}' (missing label wasm:wasi)"
+           else if (!wantWasi) && depIsWasi
+           then builtins.throw "go planner (mkTinyWasm): ${name} (target=wasm) cannot link '${dep}' (dep is stamped wasm:wasi)"
+           else true;
+
+      validated = builtins.map (dep: builtins.seq (ensureVariantCompatible dep) (builtins.seq (ensureSupportedWasmProducer dep) dep)) resolved;
+
+      repoWasmLibs = builtins.map (dep: T.cppWasmStaticLib {
+        name = dep;
+        srcRoot = repoRoot;
+        subdir = (pkgPathOf dep);
+        wasmTarget = wasmTarget;
+      }) validated;
     in T.goTinyWasmLib {
       inherit name;
       # TinyGo build uses module sources directly; gomod2nix not required here
       srcRoot = repoRoot;
       subdir = (pkgPathOf name);
       wasmStaticLibs = repoWasmLibs;
+      target = tinyTarget;
     };
 }
 

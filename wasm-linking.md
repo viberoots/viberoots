@@ -174,12 +174,18 @@ For a Go TinyGo Wasm target `T`:
 
 1. Read `link_deps` (possibly empty) and closure settings.
 2. Resolve each `link_dep` to a node and ensure it is a compatible Wasm producer:
-   - expected: `lang:cpp` and `kind:lib` with a Wasm stamp (`wasm:static` and an appropriate target triple)
+   - expected labels: `lang:cpp`, `kind:wasm`, `wasm:static`
+   - variant compatibility is enforced via the optional `wasm:wasi` label:
+     - if TinyGo is built as `target="wasi"`, each linked dep must be stamped `wasm:wasi`
+     - if TinyGo is built as `target="wasm"`, linked deps must not be stamped `wasm:wasi`
 3. Apply closure:
    - direct: include only direct `link_deps`
    - transitive: walk the link graph via each dep’s `link_deps`
 4. Instantiate Nix derivations for each resolved dep:
    - `T.cppWasmStaticLib { name = dep; subdir = pkgPathOf dep; wasmTarget = ... }`
+   - `wasmTarget` is selected consistently with TinyGo:
+     - `target="wasi"` → `wasmTarget="wasm32-wasi"`
+     - `target="wasm"` → `wasmTarget="wasm32-unknown-unknown"`
 5. Pass the list into the TinyGo Wasm template as `wasmStaticLibs`.
 
 This is structurally the same as the C++ native linking design, except the producer template is `cppWasmStaticLib` and the consumer template is TinyGo.
