@@ -55,6 +55,14 @@ let
         if (builtins.length uniqNames) == (builtins.length names) then null
         else builtins.throw "go planner: normalized link_closure_overrides has duplicate keys for '${name}'";
     in builtins.listToAttrs pairs;
+  dedupePreserveOrder = xs:
+    let
+      step = st: x:
+        if builtins.hasAttr x st.seen
+        then st
+        else { seen = st.seen // { "${x}" = true; }; out = st.out ++ [ x ]; };
+      st0 = { seen = {}; out = []; };
+    in (builtins.foldl' step st0 xs).out;
   isCppNode = nm:
     let n = if builtins.hasAttr nm byName then byName.${nm} else null;
         rt0 = if n == null then null else (get n "rule_type");
@@ -81,6 +89,16 @@ let
         ))
       );
     in map (d: builtins.toPath (repoRoot + "/" + (pkgPathOf name) + "/" + d)) patchDirsLocalRel;
+  patchInputsFor = name:
+    let
+      rels0 = builtins.filter (s: lib.hasSuffix ".patch" s) (L.srcsOf name);
+      rels = builtins.filter (s: !(lib.hasInfix "placeholder" s)) rels0;
+      pkg = pkgPathOf name;
+      toImportedPath = p: builtins.path {
+        path = (repoRoot + "/" + pkg + "/" + p);
+        name = "patch";
+      };
+    in builtins.map toImportedPath rels;
 in {
   isTarget = n:
     let rt = get n "rule_type";
@@ -184,12 +202,13 @@ in {
       ensureSupportedWasmProducer = dep:
         let
           expected = "lang:cpp, kind:wasm, wasm:static";
+          got = builtins.toString (labelsOfName dep);
           ok =
             (hasLabel dep "lang:cpp") &&
             (hasLabel dep "kind:wasm") &&
             (hasLabel dep "wasm:static");
         in if ok then true
-           else builtins.throw "go planner (mkTinyWasm): ${name} link_dep '${dep}' is unsupported; expected labels ${expected}";
+           else builtins.throw "go planner (mkTinyWasm): ${name} link_dep '${dep}' is unsupported; expected labels ${expected}; got labels ${got}";
 
       ensureVariantCompatible = dep:
         let
@@ -201,12 +220,46 @@ in {
            then builtins.throw "go planner (mkTinyWasm): ${name} (target=wasm) cannot link '${dep}' (dep is stamped wasm:wasi)"
            else true;
 
-      validated = builtins.map (dep: builtins.seq (ensureVariantCompatible dep) (builtins.seq (ensureSupportedWasmProducer dep) dep)) resolved;
+      # Validate dep shape before variant compatibility so error messages stay targeted:
+      # a non-wasm producer should fail as "unsupported", not as a variant mismatch.
+      validated = builtins.map (dep:
+        builtins.seq (ensureSupportedWasmProducer dep)
+          (builtins.seq (ensureVariantCompatible dep) dep)
+      ) resolved;
 
+      headerDepsOf = nm:
+        let
+          n = nodeOfName nm;
+          raw0 = get n "header_deps";
+          raw = if raw0 != null then raw0 else (get n "buck.header_deps");
+        in normalizeLabelList "header_deps for '${nm}'" raw;
+      ensureSupportedHeaderDep = dep: hd:
+        let
+          expected = "lang:cpp, kind:headers";
+          got = builtins.toString (labelsOfName hd);
+          ok = (hasLabel hd "lang:cpp") && (hasLabel hd "kind:headers");
+        in if ok then true
+           else builtins.throw "go planner (mkTinyWasm): ${dep} header_dep '${hd}' is unsupported; expected labels ${expected}; got labels ${got}";
+      headerIncludeRootsFor = dep:
+        let
+          headerDeps0 = headerDepsOf dep;
+          headerDeps = dedupePreserveOrder headerDeps0;
+          _validated = builtins.map (hd: ensureSupportedHeaderDep dep hd) headerDeps;
+          headerPkgs = builtins.map (hd: T.cppHeaders {
+            name = hd;
+            srcRoot = repoRoot;
+            subdir = (pkgPathOf hd);
+            srcList = L.srcsOf hd;
+            patches = patchInputsFor hd;
+          }) headerDeps;
+        in builtins.map (p: "${p}/include") headerPkgs;
       repoWasmLibs = builtins.map (dep: T.cppWasmStaticLib {
         name = dep;
         srcRoot = repoRoot;
         subdir = (pkgPathOf dep);
+        srcList = L.srcsOf dep;
+        patches = patchInputsFor dep;
+        includes = headerIncludeRootsFor dep;
         wasmTarget = wasmTarget;
       }) validated;
     in T.goTinyWasmLib {
@@ -215,6 +268,7 @@ in {
       srcRoot = repoRoot;
       subdir = (pkgPathOf name);
       wasmStaticLibs = repoWasmLibs;
+      wasmStaticLibLabels = validated;
       target = tinyTarget;
     };
 }

@@ -23,6 +23,8 @@ in {
     patchDirs ? [],
     # List of derivations produced by cppWasmStaticLib (optional)
     wasmStaticLibs ? [],
+    # For determinism diagnostics (planner-provided; not used for building)
+    wasmStaticLibLabels ? [],
     # Build options
     # TinyGo target: "wasm" (bare) or "wasi" (WASI single-artifact backend)
     target ? "wasm",
@@ -151,6 +153,7 @@ EOF
       echo "name=${name}" >> "$out/build.log"
       echo "subdir=${subdir}" >> "$out/build.log"
       echo "wasmStaticLibs=${toString (builtins.length wasmStaticLibs)}" >> "$out/build.log"
+      echo "wasmStaticLibLabels=${lib.concatStringsSep "," wasmStaticLibLabels}" >> "$out/build.log"
       echo "target=${target}" >> "$out/build.log"
       echo "opt=${optimize}" >> "$out/build.log"
       echo "panic=${panicMode}" >> "$out/build.log"

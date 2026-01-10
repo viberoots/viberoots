@@ -211,6 +211,24 @@ Wasm adds one additional constraint:
 
 - Ordering and traversal are performed within a single variant. If a mismatch is detected, fail rather than trying to coerce.
 
+In addition to the algorithm-level rules above, I also want a concrete, testable artifact-level signal so we can lock ordering down over time. For TinyGo Wasm builds, the Go template writes the resolved link order into `$out/build.log` as `wasmStaticLibLabels=...`.
+
+## Invalidation contract (Phase 2)
+
+For Phase 2, I want patch edits on Wasm producers to rebuild consumers when there is an explicit `link_deps` edge.
+
+In practice this means:
+
+- If a `nix_go_tiny_wasm_lib` links a `nix_cpp_wasm_static_lib` via `link_deps`, and the C++ producer’s declared patch inputs change (package-local `patches/cpp/*.patch` included in the producer target’s `srcs`), the TinyGo Wasm consumer must rebuild.
+- This is implemented by threading the producer’s patch inputs (derived from the exported graph node `srcs`) into the planned `cppWasmStaticLib` derivations, so Nix sees the patch edits as real inputs.
+
+## Common failures (Phase 2)
+
+When a build fails, I want the failure mode to be deterministic and actionable:
+
+- **Unsupported `link_deps` entry**: if a TinyGo Wasm target links something that is not a C++ Wasm static lib, the planner fails fast and names the consumer, the offending dep, and the expected labels (`lang:cpp`, `kind:wasm`, `wasm:static`).
+- **Variant mismatch**: if `WEB_WASM_BACKEND=wasi_single`, the planner requires linked deps to be stamped `wasm:wasi`. If a dep is missing that stamp (or has it when the consumer is bare wasm), the planner fails fast and explains the mismatch.
+
 ## Example call sites
 
 These examples assume the same union rule:
