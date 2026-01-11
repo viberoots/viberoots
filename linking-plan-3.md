@@ -92,6 +92,57 @@ Implement.
 
 ---
 
+## PR-5: Scaffolding templates for Phase 2 Wasm linking (demo app)
+
+### Description
+
+Phase 2 adds new user-facing capabilities that should be easy to adopt correctly:
+
+- Wasm linking semantics for TinyGo consumers + C++ Wasm static lib producers (`link_deps`, `header_deps`, `link_closure`).
+
+This PR adds **scaffolding templates** that encode the “happy path” layouts and labels so users do not have to rediscover the conventions by reading tests.
+
+This PR is intentionally about templates + `scaf` wiring + tests. It should not introduce any new planner or macro semantics beyond what was implemented in PR-1..PR-4.
+
+### Scope & Changes
+
+- Add a new `scaf` template: **`ts wasm-linking-app`** (name bikeshed OK) that generates a minimal repo layout demonstrating Phase 2:
+  - A C++ Wasm static lib producer using `nix_cpp_wasm_static_lib` with `header_deps` and `link_deps`.
+  - A TinyGo Wasm consumer using `nix_go_tiny_wasm_lib` with `link_deps` and `link_closure`.
+  - A small TS/Node webapp that loads the built Wasm and asserts a simple function result (kept minimal; test should validate correctness).
+  - The template must use importer-scoped `lockfile:` labels correctly for any Node app it creates.
+
+Note: Python native extension scaffolding belongs to **Phase 3** and should be tracked in the Phase 3 plan alongside the implementation in `python-extension-design.md`.
+
+### Tests (in this PR)
+
+Add zx tests (one test per file):
+
+- `tools/tests/scaffolding/scaf-new.ts.wasm-linking-app.scaffold-and-build.test.ts`
+  - runs `scaf new ts wasm-linking-app <name>`
+  - asserts key files exist and the target labels are correct
+  - builds the resulting app (or a subset target) and asserts the Wasm module can be loaded and returns the expected value
+
+### Docs (in this PR)
+
+- Update `wasm-linking.md`:
+  - add a short “Scaffolding” section that points users to the Phase 2 demo template and explains what it demonstrates.
+
+### Acceptance Criteria
+
+- A developer can scaffold a Phase 2 Wasm linking demo app using `scaf` and build/run it successfully without hand-editing.
+- Templates are deterministic and tested.
+
+### Risks
+
+Low. Primary risk is template drift (templates not updated as macro surfaces evolve). Tests should be explicit about the contracts to keep drift visible.
+
+### Recommendation
+
+Implement.
+
+---
+
 ## PR-2: Add Wasm link intent attrs to `nix_go_tiny_wasm_lib` and route builds through the planner-selected path (not the minimal selected-wasm fallback)
 
 ### Description
