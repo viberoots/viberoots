@@ -151,7 +151,8 @@ export async function cmdNew(args: string[], flags: ScafFlags) {
             : destInfo.path;
         }
         // TS templates currently scaffold Node/TS importers and use pnpm lockfiles.
-        if (template === "wasm-app") return path.join("apps", name);
+        if (template === "wasm-app" || template === "wasm-linking-app")
+          return path.join("apps", name);
         if (template === "go-cpp-lib") return path.join("libs", `${name}-ts`);
         return destInfo.path;
       })();

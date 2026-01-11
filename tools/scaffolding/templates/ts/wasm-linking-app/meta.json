@@ -1,0 +1,13 @@
+{
+  "language": "ts",
+  "template": "wasm-linking-app",
+  "description": "Phase 2 Wasm linking demo: TinyGo consumer + C++ Wasm static libs + minimal webapp",
+  "help": {
+    "usage": "scaf new ts wasm-linking-app <name> [--path=DEST]",
+    "notes": [
+      "Creates a minimal Phase 2 Wasm linking demo.",
+      "The C++ Wasm libs use header_deps + link_deps, and the TinyGo module links via link_deps with transitive closure."
+    ],
+    "examples": ["scaf new ts wasm-linking-app demo"]
+  }
+}

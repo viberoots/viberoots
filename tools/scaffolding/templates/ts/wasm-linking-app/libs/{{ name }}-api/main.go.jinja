@@ -1,0 +1,15 @@
+package main
+
+/*
+int add2(int x);
+*/
+import "C"
+
+//export callAdd2
+func callAdd2() int32 {
+  return int32(C.add2(3))
+}
+
+func main() {}
+
+

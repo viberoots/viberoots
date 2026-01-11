@@ -121,6 +121,20 @@ And it includes “application target” examples for:
 - Python WASI apps (`nix_python_wasm_app`)
 - Node webapps (`node_webapp`)
 
+## Scaffolding
+
+To get a working Phase 2 demo layout quickly, use the `scaf` template:
+
+```bash
+scaf new ts wasm-linking-app <name>
+```
+
+This scaffold includes:
+
+- a C++ Wasm static lib that declares `header_deps` and `link_deps`
+- a TinyGo Wasm target that links the C++ lib via `link_deps` with `link_closure="transitive"`
+- a minimal Node/Vite webapp stub (it expects a `top.wasm` at runtime)
+
 ### New attributes
 
 I propose to add the following attributes where they are meaningful:

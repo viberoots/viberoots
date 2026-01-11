@@ -24,6 +24,7 @@
   },
   "ts": {
     "wasm-app": ".",
+    "wasm-linking-app": ".",
     "go-cpp-lib": "."
   }
 }

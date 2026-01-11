@@ -1,0 +1,20 @@
+load("//cpp:defs.bzl", "nix_cpp_headers", "nix_cpp_wasm_static_lib")
+
+nix_cpp_headers(
+    name = "headers",
+    srcs = ["include/support.h"],
+    visibility = ["PUBLIC"],
+)
+
+nix_cpp_wasm_static_lib(
+    name = "support_wasm",
+    srcs = [
+        "src/support.c",
+        "include/support.h",
+    ],
+    labels = ["wasm:wasi"],
+    visibility = ["PUBLIC"],
+)
+
+
+
