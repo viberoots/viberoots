@@ -21,12 +21,24 @@ test("stamping-lint flags go_* targets missing lang:go", async () => {
       path.join(process.cwd(), "tools/dev/stamping-lint.ts"),
       path.join(tmp, "tools/dev/stamping-lint.ts"),
     );
-    const res = await $({
-      cwd: tmp,
-      env: { ...process.env, BUCK_ISOLATION_DIR: iso },
-    })`node --experimental-strip-types --import ./tools/dev/zx-init.mjs tools/dev/stamping-lint.ts`.nothrow();
-    const out = String(res.stdout || "") + String(res.stderr || "");
-    assert.notEqual(res.exitCode, 0);
-    assert.match(out, /missing label lang:go/);
+    const env = { ...process.env, BUCK_ISOLATION_DIR: iso };
+    try {
+      const res = await $({
+        cwd: tmp,
+        env,
+      })`node --experimental-strip-types --import ./tools/dev/zx-init.mjs tools/dev/stamping-lint.ts`.nothrow();
+      const out = String(res.stdout || "") + String(res.stderr || "");
+      assert.notEqual(res.exitCode, 0);
+      assert.match(out, /missing label lang:go/);
+    } finally {
+      // Ensure the stamping-lint buck2 daemon is not left running.
+      await $({
+        cwd: tmp,
+        env,
+        stdio: "ignore",
+        reject: false,
+        nothrow: true,
+      })`buck2 --isolation-dir ${iso} kill`;
+    }
   });
 });

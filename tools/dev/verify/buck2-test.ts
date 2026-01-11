@@ -1,11 +1,35 @@
 import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
+import os from "node:os";
 import process from "node:process";
 
 export type SpawnedVerifyTests = {
   pgid: number;
   wait: () => Promise<number>;
 };
+
+function verifyBuck2Threads(): number {
+  const raw = String(process.env.VERIFY_BUCK2_THREADS || "").trim();
+  if (raw) {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n >= 1) return Math.floor(n);
+  }
+  // Default: mild oversubscription can help when many actions are IO-bound.
+  // CI can set VERIFY_BUCK2_THREADS or rely on default behavior (no cap) if desired.
+  const isCi =
+    String(process.env.CI || "").trim() === "1" || String(process.env.CI || "").trim() === "true";
+  if (isCi) return 0;
+  const cores = Math.max(1, os.cpus()?.length || 1);
+  const oversubscribed = Math.ceil(cores * 1.5);
+  return Math.max(1, Math.min(16, oversubscribed));
+}
+
+async function countLogPassFail(logFile: string): Promise<{ pass: number; fail: number }> {
+  const txt = await fsp.readFile(logFile, "utf8").catch(() => "");
+  const pass = (txt.match(/^\[[^\]]+\] ✓ Pass:/gm) || []).length;
+  const fail = (txt.match(/^\[[^\]]+\] ✗ Fail:/gm) || []).length;
+  return { pass, fail };
+}
 
 export function spawnVerifyBuck2Tests(opts: {
   root: string;
@@ -46,11 +70,13 @@ export function spawnVerifyBuck2Tests(opts: {
     testEnvArgs.push("--env", `NODE_V8_COVERAGE=${process.env.NODE_V8_COVERAGE}`);
   }
 
+  const threads = verifyBuck2Threads();
   const buckArgs = [
     "--isolation-dir",
     opts.iso,
     "test",
     ...consoleFlag,
+    ...(threads > 0 ? ["--num-threads", String(threads)] : []),
     "--overall-timeout",
     `${tsec}s`,
     "--target-platforms",
@@ -81,10 +107,27 @@ export function spawnVerifyBuck2Tests(opts: {
   if (opts.logFile) {
     void fsp.appendFile(
       opts.logFile,
-      `[verify] buck2 test begin iso=${opts.iso} start_s=${startS}\n`,
+      `[verify] buck2 test begin iso=${opts.iso} start_s=${startS} threads=${threads > 0 ? threads : "default"}\n`,
       "utf8",
     );
   }
+
+  const schedulePacingCheckpoint = (afterMs: number) => {
+    if (!opts.logFile) return;
+    setTimeout(() => {
+      void (async () => {
+        const elapsedS = Math.max(0, Math.floor(Date.now() / 1000) - startS);
+        const { pass, fail } = await countLogPassFail(opts.logFile!);
+        const ppm = elapsedS > 0 ? (pass / (elapsedS / 60)).toFixed(1) : "0.0";
+        const line = `[verify] pacing checkpoint elapsed_s=${elapsedS} pass=${pass} fail=${fail} pass_per_min=${ppm} threads=${threads > 0 ? threads : "default"}`;
+        process.stderr.write(line + "\n");
+        await fsp.appendFile(opts.logFile!, line + "\n", "utf8").catch(() => {});
+      })();
+    }, afterMs);
+  };
+  // Validate early throughput (helps spot too-low or too-high thread caps).
+  schedulePacingCheckpoint(5 * 60 * 1000);
+  schedulePacingCheckpoint(10 * 60 * 1000);
 
   proc.stdout?.on("data", (b) => {
     const s = String(b);

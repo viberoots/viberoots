@@ -1,4 +1,5 @@
 import "zx/globals";
+import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
@@ -128,18 +129,15 @@ export async function acquireVerifyLock(opts: {
   process.env.BNX_VERIFY_LOCK_DIR = lockDir;
   process.env.BNX_VERIFY_LOG_FILE = logFile;
 
-  const release = async () => {
-    await fsp.rm(lockDir, { recursive: true, force: true }).catch(() => {});
-  };
-  const releaseOnExit = () => {
-    void release();
-  };
-  process.on("exit", releaseOnExit);
-  for (const sigName of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+  // IMPORTANT: process.exit() and the 'exit' event do not await async work.
+  // Keep this cleanup synchronous so we don't leave behind a stale verify-lock dir.
+  const releaseSync = () => {
     try {
-      process.on(sigName as any, releaseOnExit);
+      fs.rmSync(lockDir, { recursive: true, force: true });
     } catch {}
-  }
+  };
+  // Only hook 'exit' here. Signal handling is owned by run-verify.ts so it can kill process groups.
+  process.once("exit", releaseSync);
 
   return { lockDir, logFile };
 }

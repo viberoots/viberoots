@@ -18,12 +18,23 @@ test("stamping-lint accepts kind labels beyond bin|lib|test (fixture)", async ()
       "",
     ].join("\n");
     await fs.outputFile(path.join(tmp, "apps/demo/TARGETS"), targets);
-    const res = await $({
-      cwd: tmp,
-      quiet: true,
-      env: { ...process.env, BUCK_ISOLATION_DIR: iso },
-    })`node --experimental-strip-types --import ./tools/dev/zx-init.mjs tools/dev/stamping-lint.ts`;
-    const out = String(res.stdout || "") + String(res.stderr || "");
-    assert.match(out, /stamping-lint: OK/);
+    const env = { ...process.env, BUCK_ISOLATION_DIR: iso };
+    try {
+      const res = await $({
+        cwd: tmp,
+        quiet: true,
+        env,
+      })`node --experimental-strip-types --import ./tools/dev/zx-init.mjs tools/dev/stamping-lint.ts`;
+      const out = String(res.stdout || "") + String(res.stderr || "");
+      assert.match(out, /stamping-lint: OK/);
+    } finally {
+      await $({
+        cwd: tmp,
+        env,
+        stdio: "ignore",
+        reject: false,
+        nothrow: true,
+      })`buck2 --isolation-dir ${iso} kill`;
+    }
   });
 });

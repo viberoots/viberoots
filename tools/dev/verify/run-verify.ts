@@ -17,6 +17,7 @@ import {
 import { startVerifySafetyRails } from "./safety-rails.ts";
 import { spawnVerifyBuck2Tests } from "./buck2-test.ts";
 import { runVerifyLintPreflight } from "./lint-preflight.ts";
+import { cleanupOrphanBuckDaemons } from "./buck-orphan-cleanup.ts";
 import {
   appendVerifyLogLine,
   killBuckIsolation,
@@ -37,6 +38,10 @@ export async function runVerify(): Promise<void> {
   await runStartupCheck(root);
   process.chdir(root);
 
+  // Run lint preflight before acquiring the verify lock so formatting-only failures
+  // don't create a verify-lock dir.
+  await runVerifyLintPreflight(root);
+
   const allowConcurrent = process.env.VERIFY_ALLOW_CONCURRENT === "1";
   const lock = await acquireVerifyLock({ root, allowConcurrent });
   await ensureRepoLocalTmpRoot(root);
@@ -49,8 +54,6 @@ export async function runVerify(): Promise<void> {
     `run-${process.pid}-${Date.now()}`,
   );
   await fsp.mkdir(analysisDir, { recursive: true }).catch(() => {});
-
-  await runVerifyLintPreflight(root);
 
   await fsp.rm(path.join(root, ".tmp"), { recursive: true, force: true }).catch(() => {});
 
@@ -86,6 +89,19 @@ export async function runVerify(): Promise<void> {
   await startBuckDaemonReaper({ root, zxInitPath, iso, stateFile });
   await startBuckWatchdog({ root, zxInitPath, iso });
   await prewarmVerifyOnce(root, zxInitPath);
+
+  // Proactively kill *orphaned* buck2 daemons rooted under temp repos to avoid host overload.
+  // This is intentionally scoped to temp-repo roots (e.g. /tmp/bnx-* or buck-out/tmp/tmpdir/*).
+  try {
+    const res = await cleanupOrphanBuckDaemons({
+      log: async (line) => await appendVerifyLogLine(lock.logFile, line),
+      maxKills: 50,
+    });
+    await appendVerifyLogLine(
+      lock.logFile,
+      `[verify] buck2 orphan cleanup: scanned_forkservers=${res.scanned} candidates=${res.candidates} killed=${res.killed}`,
+    );
+  } catch {}
 
   let pgid = process.pid;
   const signalHandler = (sig: NodeJS.Signals) => {

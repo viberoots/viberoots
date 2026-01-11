@@ -22,13 +22,24 @@ test("stamping-lint flags targets that have lang:* but are missing patch_scope:*
     // which defines the //:no_cgo platform used by stamping-lint's cquery.
     await fs.outputFile(path.join(tmp, "apps/demo/TARGETS"), targets);
 
-    const res = await $({
-      cwd: tmp,
-      quiet: true,
-      env: { ...process.env, BUCK_ISOLATION_DIR: iso },
-    })`node --experimental-strip-types --import ./tools/dev/zx-init.mjs tools/dev/stamping-lint.ts`.nothrow();
-    const out = String(res.stdout || "") + String(res.stderr || "");
-    assert.notEqual(res.exitCode, 0);
-    assert.match(out, /missing label patch_scope:package-local/);
+    const env = { ...process.env, BUCK_ISOLATION_DIR: iso };
+    try {
+      const res = await $({
+        cwd: tmp,
+        quiet: true,
+        env,
+      })`node --experimental-strip-types --import ./tools/dev/zx-init.mjs tools/dev/stamping-lint.ts`.nothrow();
+      const out = String(res.stdout || "") + String(res.stderr || "");
+      assert.notEqual(res.exitCode, 0);
+      assert.match(out, /missing label patch_scope:package-local/);
+    } finally {
+      await $({
+        cwd: tmp,
+        env,
+        stdio: "ignore",
+        reject: false,
+        nothrow: true,
+      })`buck2 --isolation-dir ${iso} kill`;
+    }
   });
 });
