@@ -381,3 +381,86 @@ Adds more integration tests. The benefit is stable semantics as Phase 3 (Python 
 ### Recommendation
 
 Implement.
+
+---
+
+## PR-6: Close remaining Phase 1 gap needed for Phase 3 — implement C++ `link_closure="transitive"` in the C++ planner (and lock it with tests)
+
+### Description
+
+`linking-roadmap.md` Phase 1 acceptance includes: “A C++ library can declare `link_deps` and consumers can opt into `link_closure="transitive"`.”
+
+Today, Phase 1 is implemented and tested for:
+
+- macro-level intent attrs (`link_deps`, `header_deps`, `link_closure`) and deterministic deps union
+- direct-only planner materialization of repo inputs (`T.cppLib`, `T.cppHeaders`) for consumers
+
+But the C++ planner does not yet consume `link_closure` / `link_closure_overrides` to compute transitive link closure.
+
+Phase 3 (Python extensions) wants to reuse the same closure semantics and the shared closure resolver (`tools/nix/planner/link-closure.nix`). Before adding another consumer (Python), I want to close this missing Phase 1 behavior and lock it down with integration tests.
+
+### Scope & Changes
+
+- Extend the C++ planner (`tools/nix/planner/cpp.nix`) to consume closure intent for **native C++ consumers**:
+  - read `link_deps`, `link_closure`, and `link_closure_overrides` from exported nodes
+  - compute a resolved ordered unique list using `tools/nix/planner/link-closure.nix` (`resolveLinkClosure`):
+    - roots are the consumer’s `link_deps`
+    - traversal follows `link_deps` on C++ library producer nodes (not general `deps`)
+  - preserve Phase 1 conservative defaults:
+    - default closure remains `"direct"`
+    - no inference from general `deps`
+  - apply per-dep overrides deterministically (normalize labels first, reject duplicate normalized keys)
+- Validate resolved link deps:
+  - fail fast with a targeted error if a resolved dep is not a supported C++ native producer for Phase 1 (`lang:cpp`, `kind:lib`)
+  - keep the existing separate validation for `header_deps` (`kind:headers`)
+- Wire the resolved library list into C++ consumers consistently:
+  - ensure `mkApp`, `mkAddon`, `mkTest` use the resolved closure list for `T.cppLib` inputs
+  - keep ordering deterministic and stable, and include each library once (first occurrence wins)
+
+### Tests (in this PR)
+
+Add zx integration tests (one test per file):
+
+- `tools/tests/cpp/cpp.link-closure.transitive.follows-link-deps.build-and-run.test.ts`
+  - temp repo defines:
+    - `//libs/support:support` (C++ lib)
+    - `//libs/core:core` (C++ lib) that uses a symbol from `support` and declares `link_deps=["//libs/support:support"]`
+    - `//apps/demo:demo` (C++ bin) with `link_deps=["//libs/core:core"]` and `link_closure="transitive"`
+  - builds and runs the binary and asserts output proves the transitive lib was linked (symbol resolution is real)
+- `tools/tests/cpp/cpp.link-closure.direct.does-not-follow-link-deps.fails.test.ts`
+  - same repo shape, but `link_closure="direct"`
+  - asserts the build fails deterministically due to an unresolved symbol (or fails with a targeted error if we choose to make the planner validate missing transitive requirements)
+- `tools/tests/cpp/cpp.link-closure.overrides.apply.deterministic.test.ts`
+  - temp repo defines multiple roots with mixed overrides (e.g. default direct, override one root to transitive)
+  - asserts the resolved library list is deterministic (for example, by asserting a stable ordering signal already emitted by templates, or by reading a build log field)
+
+### Docs (in this PR)
+
+- Update `cpp-linking.md`:
+  - document the implemented C++ planner algorithm for `link_closure` (direct vs transitive)
+  - document that traversal follows `link_deps` (link graph) and does not infer from general `deps`
+  - document the override behavior and error shape at a high level
+
+### Acceptance Criteria
+
+- C++ consumers can opt into `link_closure="transitive"` and deterministically link the transitive closure of `link_deps`.
+- Closure uses the shared resolver (`tools/nix/planner/link-closure.nix`) and preserves deterministic ordering.
+- Misuse (unsupported dep in closure) fails fast with a targeted error message.
+- Tests lock down direct vs transitive behavior and overrides behavior.
+- Documentation matches the tested behavior.
+
+### Risks
+
+Medium. This changes C++ planner behavior for consumers that already set `link_closure="transitive"` (even if it previously had no effect). Tests must be explicit so failures are actionable.
+
+### Consequence of Not Implementing
+
+Phase 1 remains incomplete relative to `linking-roadmap.md`, and Phase 3 would either need to invent a parallel closure implementation for Python extensions or proceed with an inconsistent semantic model.
+
+### Downsides for Implementing
+
+Adds planner logic and tests. The benefit is a single shared closure model reused across C++ native, Wasm linking, and Python extensions.
+
+### Recommendation
+
+Implement.
