@@ -50,7 +50,7 @@ export async function cmdNew(args: string[], flags: ScafFlags) {
       data[k] = v;
     }
   }
-  if (language === "node") {
+  if (language === "node" || language === "ts") {
     const noTests = (flags["no-tests"] || "").toString().toLowerCase() === "true";
     if (noTests) {
       data["includeNodeTests"] = false;
@@ -122,7 +122,7 @@ export async function cmdNew(args: string[], flags: ScafFlags) {
     }
   }
 
-  if (language === "node") {
+  if (language === "node" || language === "ts") {
     const noTests =
       (flags["no-tests"] || "").toString().toLowerCase() === "true" ||
       data["includeNodeTests"] === false;
@@ -133,12 +133,30 @@ export async function cmdNew(args: string[], flags: ScafFlags) {
       } catch {}
     }
 
-    // Primary path: ensure importer lockfile is real and consistent with package.json.
-    // Nix builders run pnpm with --frozen-lockfile; placeholder lockfiles are not acceptable.
-    const repoRoot = process.cwd();
-    const importer =
-      template === "go-addon" || template === "cpp-addon" ? path.join("libs", name) : destInfo.path;
-    await generateImporterLockfile({ repoRoot, importer });
+    const skipLockfileGen =
+      ["true", "1", "yes"].includes(String(flags["skip-lockfile-gen"] || "").toLowerCase()) ||
+      // Buck tests should not depend on registry/network for lockfile generation.
+      Boolean(process.env.BUCK_TEST_TARGET || process.env.BUCK_TEST_SRC || process.env.BUCK_TARGET);
+
+    if (skipLockfileGen) {
+      printSkip("lockfile-gen", "skipping importer lockfile regeneration");
+    } else {
+      // Primary path: ensure importer lockfile is real and consistent with package.json.
+      // Nix builders run pnpm with --frozen-lockfile; placeholder lockfiles are not acceptable.
+      const repoRoot = process.cwd();
+      const importer = (() => {
+        if (language === "node") {
+          return template === "go-addon" || template === "cpp-addon"
+            ? path.join("libs", name)
+            : destInfo.path;
+        }
+        // TS templates currently scaffold Node/TS importers and use pnpm lockfiles.
+        if (template === "wasm-app") return path.join("apps", name);
+        if (template === "go-cpp-lib") return path.join("libs", `${name}-ts`);
+        return destInfo.path;
+      })();
+      await generateImporterLockfile({ repoRoot, importer });
+    }
   }
 
   console.log("created:", dest);

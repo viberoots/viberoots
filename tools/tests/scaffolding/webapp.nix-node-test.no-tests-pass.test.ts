@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import fs from "fs-extra";
 import { runInTemp } from "../lib/test-helpers";
 
 // Ensure dev env tooling when spawning Buck/Nix inside temp repos
@@ -12,36 +12,29 @@ test("node webapp: nix_node_test target passes when no tests present", async () 
     const $ = _$({ cwd: tmp, stdio: "pipe" });
     await $`git init`;
     // Scaffold with test target enabled by default
-    await $`scaf new node webapp demo-web --yes`;
+    await $`scaf new node webapp demo-web --yes --skip-lockfile-gen`;
 
     // Proceed; environment is expected to provide Buck prelude via runInTemp setup
 
     // Keep devDependencies; update-pnpm-hash will align lockfile/FOD
 
     // Remove any sample tests so the runner passes with no matches
-    await fs.remove(path.join(tmp, "apps", "demo-web", "test"));
+    await fsp.rm(path.join(tmp, "apps", "demo-web", "test"), { recursive: true, force: true });
 
     // Commit scaffold and lockfile so Nix flake sees importer under git+file sources
     await $`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
 
-    // If lockfile wasn't written under the importer (workspace root wrote it), copy it and re-hash
-    await $`bash --noprofile --norc -c 'test -f pnpm-lock.yaml && [ ! -f apps/demo-web/pnpm-lock.yaml ] && cp pnpm-lock.yaml apps/demo-web/pnpm-lock.yaml || true'`;
+    // Primary path: lockfile is created under the importer by the template.
+    // (Do not regenerate lockfiles in tests; that can hit the registry and is non-hermetic.)
+    const lockfile = path.join(tmp, "apps", "demo-web", "pnpm-lock.yaml");
+    try {
+      await fsp.access(lockfile);
+    } catch {
+      throw new Error("expected importer lockfile at apps/demo-web/pnpm-lock.yaml");
+    }
     await $({
       stdio: "inherit",
     })`node tools/dev/update-pnpm-hash.ts --lockfile apps/demo-web/pnpm-lock.yaml`;
-
-    // Ensure importer lockfile exists; if still missing, force-generate it locally and re-hash
-    await $`bash --noprofile --norc -c 'set -euo pipefail; if [ ! -f apps/demo-web/pnpm-lock.yaml ]; then mv -f pnpm-workspace.yaml pnpm-workspace.yaml.bak 2>/dev/null || true; echo "packages: \n  - ./" > apps/demo-web/pnpm-workspace.yaml; nix run nixpkgs#pnpm -- install --lockfile-only --prod=false --ignore-scripts --lockfile-dir ./apps/demo-web --dir ./apps/demo-web; rm -f apps/demo-web/pnpm-workspace.yaml; mv -f pnpm-workspace.yaml.bak pnpm-workspace.yaml 2>/dev/null || true; fi'`;
-    await $({
-      stdio: "inherit",
-    })`node tools/dev/update-pnpm-hash.ts --lockfile apps/demo-web/pnpm-lock.yaml`;
-
-    // Assert lockfile exists and dump importer directory for debugging
-    await $`bash --noprofile --norc -c 'set -e; echo "==== ls -la apps/demo-web ====\n"; ls -la apps/demo-web; test -f apps/demo-web/pnpm-lock.yaml'`;
-    // Confirm Nix sees the importer lockfile path
-    await $({
-      stdio: "inherit",
-    })`nix eval --impure --raw --expr 'builtins.toString (builtins.pathExists ./apps/demo-web/pnpm-lock.yaml)'`;
 
     // Glue and provider mapping (export graph → providers → auto_map)
     await $`node tools/buck/export-graph.ts --out tools/buck/graph.json`;

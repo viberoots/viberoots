@@ -246,6 +246,25 @@ Notes:
 - Favor zx-wrapper post steps when logic is shared across templates (formatting, linting, bootstrapping language-specific artifacts).
 - Keep hook scripts idempotent and fast.
 
+### Lockfiles are required (and must live with the importer)
+
+This repo’s Nix builders are **lockfile-driven**. Scaffolds must include the correct lockfile for the language/runtime so that:
+
+- `i` can discover importers and build/link their dependencies deterministically.
+- Nix builds can run with a frozen lockfile policy (no implicit resolution from the network).
+
+Conventions:
+
+- **Node/TS importers**: must include `pnpm-lock.yaml` at the importer root (e.g. `apps/<name>/pnpm-lock.yaml` or `libs/<name>/pnpm-lock.yaml`), and Buck targets should set `lockfile_label` accordingly.
+- **Python importers**: must include `uv.lock` at the importer root (e.g. `apps/<name>/uv.lock` or `libs/<name>/uv.lock`), and Buck targets should set `lockfile_label` accordingly.
+
+For Node/TS scaffolds, `scaf new` ensures the importer lockfile is **real and consistent with `package.json`** (because Nix builds run with a frozen-lockfile policy).
+
+If you change dependencies in an importer, update the lockfile and then run:
+
+- `i` (updates hashes, builds Nix `node_modules`, links outputs, and refreshes glue as needed)
+- or, for just updating the hash: `node tools/dev/update-pnpm-hash.ts --lockfile <importer>/pnpm-lock.yaml`
+
 ### Determinism and safety
 
 - Always run Copier and post steps via Nix to pin tool versions.

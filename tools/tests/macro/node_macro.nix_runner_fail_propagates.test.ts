@@ -20,7 +20,7 @@ test("nix_node_test: buck2 test fails when importer tests fail", { timeout: 420_
     } as Record<string, string>;
 
     await $`git init`;
-    await $({ env })`scaf new node lib demo --yes`;
+    await $({ env })`scaf new node lib demo --yes --skip-lockfile-gen`;
     await $({
       env,
     })`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();

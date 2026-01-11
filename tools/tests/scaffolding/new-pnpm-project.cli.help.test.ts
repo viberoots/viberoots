@@ -6,7 +6,7 @@ import { runInTemp } from "../lib/test-helpers";
 test("node cli scaffold: renders and help runs", async () => {
   await runInTemp("node-cli-scaffold-help", async (tmp, _$) => {
     const $ = _$({ cwd: tmp, stdio: "pipe" });
-    await $`scaf new node cli demo --yes`;
+    await $`scaf new node cli demo --yes --skip-lockfile-gen`;
     await $({ cwd: path.join(tmp, "apps", "demo") })`node bin/demo --help`;
   });
 });

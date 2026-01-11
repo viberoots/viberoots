@@ -21,5 +21,9 @@
   "python": {
     "lib": "libs/{name}",
     "app": "apps/{name}"
+  },
+  "ts": {
+    "wasm-app": ".",
+    "go-cpp-lib": "."
   }
 }

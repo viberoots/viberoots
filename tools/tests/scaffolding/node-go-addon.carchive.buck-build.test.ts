@@ -8,7 +8,7 @@ test("node go-addon: scaffolded go TARGETS declares nix_go_carchive with labels"
   await runInTemp("node-go-addon-carchive-targets", async (tmp, _$) => {
     const $ = _$({ cwd: tmp, stdio: "inherit" });
     await $`git init`;
-    await $`scaf new node go-addon demo --yes`;
+    await $`scaf new node go-addon demo --yes --skip-lockfile-gen`;
 
     const targetsPath = path.join(tmp, "libs", "demo-go", "TARGETS");
     const txt = await fsp.readFile(targetsPath, "utf8");

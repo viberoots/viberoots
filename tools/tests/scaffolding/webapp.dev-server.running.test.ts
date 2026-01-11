@@ -46,7 +46,7 @@ test("node webapp: dev server runs and serves index", { timeout: TEST_TIMEOUT_MS
     // Choose a free port programmatically to avoid both contention and reliance on Vite logs
     let chosenPort: number | undefined;
 
-    await _$`scaf new node webapp ${name} --yes`;
+    await _$`scaf new node webapp ${name} --yes --skip-lockfile-gen`;
     // runInTemp initializes a git repo; stage generated files so Nix git-flake evaluation sees them.
     try {
       await _$({ cwd: tmp, stdio: "pipe" })`git add -A ${appDir}`;

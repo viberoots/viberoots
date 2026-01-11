@@ -36,7 +36,7 @@ test(
 
       await $`git init`;
       // Scaffold with tests default-on
-      await $`scaf new node lib demo --yes`;
+      await $`scaf new node lib demo --yes --skip-lockfile-gen`;
 
       // Commit scaffold so Nix flake sees importer under git+file sources
       await $({

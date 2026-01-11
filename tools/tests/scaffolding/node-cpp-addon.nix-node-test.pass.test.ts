@@ -27,7 +27,7 @@ test(
 
       await $`git init`;
       // Scaffold the Node TS package and C++ addon sibling
-      await $`scaf new node cpp-addon demo --yes`;
+      await $`scaf new node cpp-addon demo --yes --skip-lockfile-gen`;
 
       const importer = "libs/demo";
       const sanitized = importer

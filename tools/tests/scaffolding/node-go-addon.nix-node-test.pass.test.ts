@@ -28,7 +28,7 @@ test(
       await $`git init`;
 
       // Scaffold the Node TS package, Go c-archive sibling, and C N-API addon sibling
-      await $`scaf new node go-addon demo --yes`;
+      await $`scaf new node go-addon demo --yes --skip-lockfile-gen`;
 
       // Basic assertions on created files
       const nodePkg = path.join(tmp, "libs", "demo");
