@@ -41,6 +41,7 @@ let
     in
       if depNode == null then failLinkDep consumer dep "unknown target (missing from exported graph)"
       else if !haveLang then failLinkDep consumer dep ("expected lang:cpp; got labels=" + (builtins.toString labs) + " rule_type=" + (builtins.toString rt))
+      else if builtins.elem "kind:wasm" labs then failLinkDep consumer dep ("expected kind:lib for Phase 1; got labels=" + (builtins.toString labs) + " rule_type=" + (builtins.toString rt))
       else if k != "lib" then failLinkDep consumer dep ("expected kind:lib for Phase 1; got kind=" + (builtins.toString k) + " labels=" + (builtins.toString labs) + " rule_type=" + (builtins.toString rt))
       else dep;
 

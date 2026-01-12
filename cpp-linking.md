@@ -166,10 +166,12 @@ Notes:
 
 - Status:
   - PR-2 in `linking-plan-2.md` implements the macro-level surface: these attributes are accepted on C++ macros and the deterministic `deps` union contract is enforced.
-  - PR-3 implements planner behavior for Phase 1 consumers:
+  - PR-3 implements planner behavior for Phase 1 consumers (direct-only):
     - `link_deps` materializes `T.cppLib` inputs for C++ bins, Node addons, and tests
     - `header_deps` materializes `T.cppHeaders` inputs for the same consumers
-    - behavior is direct-only (no transitive link closure yet)
+  - PR-6 (this doc’s Phase 2) extends the C++ planner to consume:
+    - `link_closure="direct" | "transitive"` via `tools/nix/planner/link-closure.nix`
+    - `link_closure_overrides` with deterministic normalization (reject duplicate keys after normalization)
 
 - `deps` remains the graph edge list, but for ergonomics the macro will compute:
   - `deps := deps ∪ link_deps ∪ header_deps` (deterministic union)
@@ -398,7 +400,10 @@ To implement explicit C++ linking, the planner must also be able to read:
 - `link_closure`
 - `link_kind`
 
-⚠️ I have not verified that our exporter currently includes arbitrary custom attributes beyond the fixed output attributes list. If it does not, we must add these fields to the export list in `tools/buck/export-graph.ts` / `tools/buck/export-inline.ts` consistently.
+The exporter includes these intent attributes in the configured graph output:
+
+- `tools/buck/exporter/cquery/attrs.ts` (Node exporter)
+- `tools/buck/export-inline.ts` (inline fallback)
 
 ### Core algorithm
 
@@ -487,11 +492,11 @@ Phase 1 does not attempt to infer “what you meant” when `link_deps` is misus
   - the offending dep label, and
   - the expected shape (C++ lib for Phase 1).
 
-### Optional extension: per-dependency link closure overrides
+### Per-dependency link closure overrides
 
 Sometimes a target wants “mostly direct” linking but needs one dependency to pull in its full transitive link requirements. That can happen with registration-style libraries or a “bundle” library that intentionally aggregates functionality.
 
-If I add this, I would keep the default simple and add an explicit override map:
+The planner supports an explicit override map:
 
 - `link_closure`: `"direct"` or `"transitive"` (global default)
 - `link_closure_overrides`: dict mapping dep label to `"direct"` or `"transitive"`

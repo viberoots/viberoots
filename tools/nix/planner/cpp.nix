@@ -78,15 +78,69 @@ let
   ensureRepoCppLibDep = Phase1.ensureRepoCppLibDep;
   ensureRepoCppHeadersDep = Phase1.ensureRepoCppHeadersDep;
   patchInputsFor = Phase1.patchInputsFor;
+  LC = import ./link-closure.nix { inherit lib; };
+
+  ensureStringAttrs = ctxStr: x:
+    if x == null then {}
+    else if builtins.isAttrs x then x
+    else builtins.throw ("cpp planner: expected " + ctxStr + " to be an attrset");
+
+  normalizeLabelList = ctxStr: xs:
+    builtins.map cleanLabel (ensureStringList ctxStr xs);
+
+  normalizeOverrides = name: overridesRaw:
+    let
+      overrides0 = ensureStringAttrs ("link_closure_overrides for " + name) overridesRaw;
+      keys = builtins.attrNames overrides0;
+      pairs = builtins.map (k: { name = cleanLabel k; value = overrides0.${k}; }) keys;
+      _ = builtins.map (p:
+        if builtins.isString p.value then true
+        else builtins.throw ("cpp planner: expected link_closure_overrides['" + p.name + "'] to be a string")
+      ) pairs;
+      names = builtins.map (p: p.name) pairs;
+      uniqNames = builtins.attrNames (builtins.listToAttrs (builtins.map (n: { name = n; value = true; }) names));
+      _dupes =
+        if (builtins.length uniqNames) == (builtins.length names) then null
+        else builtins.throw ("cpp planner: normalized link_closure_overrides has duplicate keys for " + name);
+    in builtins.listToAttrs pairs;
 
   # Repo-provided C++ package inputs for consumers (Phase 1: direct-only).
   # - link_deps entries that are C++ libraries become T.cppLib inputs
   # - header_deps entries that are header-only targets become T.cppHeaders inputs
   repoCppLibPkgsFor = name:
     let
+      consumer = nodeOfName name;
       linkDeps0 = labelsFromNodeAttr { inherit name; attr = "link_deps"; };
       linkDeps = dedupePreserveOrder linkDeps0;
-      validated = builtins.map (dn: ensureRepoCppLibDep name dn) linkDeps;
+      defaultClosure =
+        let raw = if consumer == null then null else get consumer "link_closure";
+        in if raw == null then "direct"
+           else if builtins.isString raw then raw
+           else builtins.throw ("cpp planner: expected link_closure for " + name + " to be a string");
+      overridesRaw = if consumer == null then null else get consumer "link_closure_overrides";
+      overrides0 = normalizeOverrides name overridesRaw;
+      overrideKeys = builtins.attrNames overrides0;
+      missingOverrideKeys = builtins.filter (k: !(builtins.elem k linkDeps)) overrideKeys;
+      _overrideKeysValid =
+        if missingOverrideKeys == [] then null
+        else builtins.throw ("cpp planner: link_closure_overrides for " + name + " contains keys not present in link_deps: " + (builtins.toString missingOverrideKeys));
+
+      linkDepsOf = nm:
+        let
+          n = nodeOfName nm;
+          raw = if n == null then null else get n "link_deps";
+          xs = normalizeLabelList ("link_deps for " + nm) raw;
+        in dedupePreserveOrder xs;
+
+      resolved = LC.resolveLinkClosure {
+        inherit byName;
+        linkDepsOf = linkDepsOf;
+        roots = linkDeps;
+        defaultClosure = defaultClosure;
+        overrides = overrides0;
+      };
+
+      validated = builtins.map (dn: ensureRepoCppLibDep name dn) resolved;
     in builtins.map mkLib validated;
 
   repoCppHeaderPkgsFor = name:
