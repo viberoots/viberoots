@@ -45,7 +45,13 @@ test("nix_go_tiny_wasm_lib builds via graph-aware selected path (build-selected.
       stdio: "inherit",
     })`buck2 build --target-platforms prelude//platforms:default ${label}`;
 
-    const logPath = `/tmp/go_nix_build_wasm_build.${safeLogKeyFromLabel(label)}.log`;
+    const logPath = path.join(
+      tmp,
+      "buck-out",
+      "tmp",
+      "build-selected",
+      `go_nix_build_wasm_build.${safeLogKeyFromLabel(label)}.log`,
+    );
     assert.ok(await fs.pathExists(logPath), `expected build-selected log to exist: ${logPath}`);
     const log = await fs.readFile(logPath, "utf8");
     assert.match(log, /\[build-selected\] BUCK_TARGET=\/\/libs\/math-api:wasm/);

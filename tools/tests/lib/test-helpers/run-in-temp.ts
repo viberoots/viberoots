@@ -53,6 +53,13 @@ export async function runInTemp<T>(
   opts?: { git?: boolean },
 ): Promise<T> {
   const tmp = await mktemp(name + "-");
+  // Optional early signal for tests that need the temp path even if setup is interrupted or slow
+  // (e.g. to coordinate out-of-process cleanup/reaping assertions).
+  if (String(process.env.TEST_EARLY_TMP_STDOUT || "").trim() === "1") {
+    try {
+      console.log(`TMP ${tmp}`);
+    } catch {}
+  }
   const homeBase = await stableTestHomeRoot();
   const home = await fsp.mkdtemp(path.join(homeBase, "home-"));
   const initMode = await initTempRepoFromWorkspaceOrSeed({

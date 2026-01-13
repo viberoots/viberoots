@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { exists, runInTemp } from "../lib/test-helpers";
+import { ensureImporterLockfileFresh } from "../../lib/pnpm-importer-lockfile";
 
 // Ensure dev env tooling when spawning Buck/Nix inside temp repos
 process.env.TEST_NEED_DEV_ENV = "1";
@@ -51,26 +52,21 @@ test(
       // Commit scaffold so pure flake snapshots see new importers
       await $`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
 
-      // Ensure a lockfile exists for the importer; generate if missing
+      // Ensure the importer lockfile is real and consistent with package.json.
+      // The scaffold includes a placeholder lockfile when --skip-lockfile-gen is used; that file
+      // is not acceptable for Nix builds (pnpm runs with --frozen-lockfile).
       const importer = "libs/demo";
       const sanitized = importer
         .replace(/\/\//g, "")
         .replace(/:/g, "-")
         .replace(/[\/\s]+/g, "-");
       const lockfile = path.join(importer, "pnpm-lock.yaml");
-      let hasLock = await fsp
-        .access(path.join(tmp, lockfile))
-        .then(() => true)
-        .catch(() => false);
-      if (!hasLock) {
-        await $({
-          stdio: "inherit",
-        })`bash --noprofile --norc -c 'set -euo pipefail; mkdir -p "${tmp}/${importer}/.pnpm-home" "${tmp}/${importer}/.pnpm-store"; export PNPM_HOME="${tmp}/${importer}/.pnpm-home"; env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT="${NIX_PNPM_FETCH_TIMEOUT}" nix run ${tmp}#pnpm --accept-flake-config -- config set store-dir "${tmp}/${importer}/.pnpm-store"; env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT="${NIX_PNPM_FETCH_TIMEOUT}" nix run ${tmp}#pnpm --accept-flake-config -- install --filter "./${importer}" --lockfile-only --prod=false --ignore-scripts --lockfile-dir "./${importer}" --dir "./${importer}"'`;
-        hasLock = await fsp
-          .access(path.join(tmp, lockfile))
-          .then(() => true)
-          .catch(() => false);
-      }
+      await ensureImporterLockfileFresh({
+        tmp,
+        $,
+        importerRel: importer,
+        nixPnpmFetchTimeoutSecs: NIX_PNPM_FETCH_TIMEOUT,
+      });
       // Commit the lockfile so pure flake snapshots see it
       await $`bash --noprofile --norc -c 'git -C ${tmp} add ${lockfile} && git -C ${tmp} commit -m "chore(test): add importer lockfile"'`.nothrow();
 

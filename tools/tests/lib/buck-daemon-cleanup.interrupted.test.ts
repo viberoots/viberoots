@@ -62,6 +62,7 @@ test("buck cleanup: interrupted temp repo run is reaped (no orphan buck2 daemons
 
   let tmp = "";
   let stdout = "";
+  let stderr = "";
   let ready = false;
   child.stdout.setEncoding("utf8");
   child.stdout.on("data", (d) => {
@@ -70,26 +71,41 @@ test("buck cleanup: interrupted temp repo run is reaped (no orphan buck2 daemons
     if (m && m[1]) tmp = String(m[1]).trim();
     if (stdout.includes("\nREADY\n") || stdout.trimEnd().endsWith("READY")) ready = true;
   });
-
-  // Wait for the child to report its temp path (and start buck2).
-  const t0 = Date.now();
-  while ((!tmp || !ready) && Date.now() - t0 < 60_000) {
-    await new Promise((r) => setTimeout(r, 50));
-  }
-  assert.ok(tmp, `expected child to print temp path; got stdout:\n${stdout}`);
-  assert.ok(ready, `expected child to reach READY; got stdout:\n${stdout}`);
-
-  // Ensure a forkserver exists before killing (otherwise the test is vacuous).
-  const token = path.basename(tmp);
-  {
-    const lines = await psForkserversForToken(token);
-    assert.ok(lines.length > 0, "expected at least one buck2-forkserver before interruption");
-  }
+  child.stderr.setEncoding("utf8");
+  child.stderr.on("data", (d) => {
+    stderr += d;
+  });
 
   try {
-    child.kill("SIGKILL");
-  } catch {}
+    // Wait for the child to report its temp path (and start buck2).
+    const t0 = Date.now();
+    while ((!tmp || !ready) && Date.now() - t0 < 60_000) {
+      // If the child exits early, surface diagnostics immediately instead of hanging the test.
+      if (child.exitCode !== null) break;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    assert.ok(
+      tmp,
+      `expected child to print temp path; got stdout:\n${stdout}\n\nstderr:\n${stderr}`,
+    );
+    assert.ok(ready, `expected child to reach READY; got stdout:\n${stdout}\n\nstderr:\n${stderr}`);
 
-  // The reaper polls at ~1s; allow a bit of time for cleanup.
-  await waitForGone(token, 30_000);
+    // Ensure a forkserver exists before killing (otherwise the test is vacuous).
+    const token = path.basename(tmp);
+    {
+      const lines = await psForkserversForToken(token);
+      assert.ok(lines.length > 0, "expected at least one buck2-forkserver before interruption");
+    }
+
+    try {
+      child.kill("SIGKILL");
+    } catch {}
+
+    // The reaper polls at ~1s; allow a bit of time for cleanup.
+    await waitForGone(token, 30_000);
+  } finally {
+    try {
+      child.kill("SIGKILL");
+    } catch {}
+  }
 });

@@ -14,21 +14,42 @@ function verifyBuck2Threads(): number {
     const n = Number(raw);
     if (Number.isFinite(n) && n >= 1) return Math.floor(n);
   }
-  // Default: mild oversubscription can help when many actions are IO-bound.
-  // CI can set VERIFY_BUCK2_THREADS or rely on default behavior (no cap) if desired.
+  // Default: aggressive oversubscription helps in this repo because many test actions are IO-bound
+  // (Nix builds, file IO, temp repo scaffolds). Users can always override via VERIFY_BUCK2_THREADS.
+  //
+  // CI can set VERIFY_BUCK2_THREADS explicitly, or rely on buck2 defaults (no --num-threads) by
+  // returning 0 below.
   const isCi =
     String(process.env.CI || "").trim() === "1" || String(process.env.CI || "").trim() === "true";
   if (isCi) return 0;
   const cores = Math.max(1, os.cpus()?.length || 1);
-  const oversubscribed = Math.ceil(cores * 1.5);
-  return Math.max(1, Math.min(16, oversubscribed));
+  // Historically, 30 threads has been a good local default on macOS for overall verify throughput.
+  const oversubscribed = Math.ceil(cores * 3);
+  return Math.max(1, Math.min(32, oversubscribed));
 }
 
-async function countLogPassFail(logFile: string): Promise<{ pass: number; fail: number }> {
-  const txt = await fsp.readFile(logFile, "utf8").catch(() => "");
-  const pass = (txt.match(/^\[[^\]]+\] ✓ Pass:/gm) || []).length;
-  const fail = (txt.match(/^\[[^\]]+\] ✗ Fail:/gm) || []).length;
-  return { pass, fail };
+function stripAnsi(s: string): string {
+  return s.replace(/\x1B\[[0-9;]*[A-Za-z]/g, "").replace(/\r/g, "");
+}
+
+function countPassFailFromLines(
+  chunk: string,
+  carry: string,
+): { pass: number; fail: number; carry: string } {
+  // Buck writes output in arbitrary chunk boundaries; keep a carry buffer for incomplete lines.
+  const joined = carry + chunk;
+  const parts = joined.split("\n");
+  const complete = parts.slice(0, -1);
+  const nextCarry = parts[parts.length - 1] ?? "";
+
+  let pass = 0;
+  let fail = 0;
+  for (const rawLine of complete) {
+    const line = stripAnsi(rawLine);
+    if (/^\[[^\]]+\] ✓ Pass:/.test(line)) pass++;
+    else if (/^\[[^\]]+\] ✗ Fail:/.test(line)) fail++;
+  }
+  return { pass, fail, carry: nextCarry };
 }
 
 export function spawnVerifyBuck2Tests(opts: {
@@ -104,6 +125,13 @@ export function spawnVerifyBuck2Tests(opts: {
   });
   const pgid = proc.pid || process.pid;
 
+  // Keep incremental pass/fail counts without rereading the full verify log (which can be huge).
+  // This makes pacing checkpoints O(1) and avoids slowdowns late in long verify runs.
+  let passCount = 0;
+  let failCount = 0;
+  let stdoutCarry = "";
+  let stderrCarry = "";
+
   if (opts.logFile) {
     void fsp.appendFile(
       opts.logFile,
@@ -117,7 +145,8 @@ export function spawnVerifyBuck2Tests(opts: {
     setTimeout(() => {
       void (async () => {
         const elapsedS = Math.max(0, Math.floor(Date.now() / 1000) - startS);
-        const { pass, fail } = await countLogPassFail(opts.logFile!);
+        const pass = passCount;
+        const fail = failCount;
         const ppm = elapsedS > 0 ? (pass / (elapsedS / 60)).toFixed(1) : "0.0";
         const line = `[verify] pacing checkpoint elapsed_s=${elapsedS} pass=${pass} fail=${fail} pass_per_min=${ppm} threads=${threads > 0 ? threads : "default"}`;
         process.stderr.write(line + "\n");
@@ -131,11 +160,19 @@ export function spawnVerifyBuck2Tests(opts: {
 
   proc.stdout?.on("data", (b) => {
     const s = String(b);
+    const r = countPassFailFromLines(s, stdoutCarry);
+    stdoutCarry = r.carry;
+    passCount += r.pass;
+    failCount += r.fail;
     process.stdout.write(s);
     if (opts.logFile) void fsp.appendFile(opts.logFile, s, "utf8").catch(() => {});
   });
   proc.stderr?.on("data", (b) => {
     const s = String(b);
+    const r = countPassFailFromLines(s, stderrCarry);
+    stderrCarry = r.carry;
+    passCount += r.pass;
+    failCount += r.fail;
     process.stderr.write(s);
     if (opts.logFile) void fsp.appendFile(opts.logFile, s, "utf8").catch(() => {});
   });

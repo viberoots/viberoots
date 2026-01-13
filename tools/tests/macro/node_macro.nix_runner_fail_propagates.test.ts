@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { test } from "node:test";
+import test from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
 // Verify that the nix_node_test external runner propagates test failures to Buck (non-zero).
@@ -10,20 +10,14 @@ test("nix_node_test: buck2 test fails when importer tests fail", { timeout: 420_
   process.env.TEST_NEED_DEV_ENV = "1";
   await runInTemp("node-macro-fail-propagates", async (tmp, _$) => {
     const $ = _$({ cwd: tmp, stdio: "inherit" });
-    const env = {
-      ...process.env,
-      NIX_PNPM_ALLOW_GENERATE: "1",
-      NIX_PNPM_FETCH_TIMEOUT: "300",
-      // Ensure scaffolding and downstream tools treat the temp repo as the workspace root
-      WORKSPACE_ROOT: tmp,
-      HOME: tmp,
-    } as Record<string, string>;
 
     await $`git init`;
-    await $({ env })`scaf new node lib demo --yes --skip-lockfile-gen`;
-    await $({
-      env,
-    })`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
+    // IMPORTANT: rely on runInTemp's injected env (WORKSPACE_ROOT/HOME/etc). Do not spread
+    // process.env here; Buck tests set WORKSPACE_ROOT/BUCK_TEST_SRC for the *outer* repo.
+    await $`scaf new node lib demo --yes --skip-lockfile-gen`;
+    await $(
+      {},
+    )`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
 
     const importer = "libs/demo";
     // Overwrite TARGETS to enforce allow-generate semantics in the runner
@@ -58,8 +52,7 @@ test("nix_node_test: buck2 test fails when importer tests fail", { timeout: 420_
     await $`bash --noprofile --norc -c 'test -f pnpm-lock.yaml && [ ! -f libs/demo/pnpm-lock.yaml ] && cp pnpm-lock.yaml libs/demo/pnpm-lock.yaml || true'`;
     await $({
       stdio: "inherit",
-      env: { ...env, NIX_PNPM_ALLOW_GENERATE: "1" },
-    })`zx-wrapper tools/dev/update-pnpm-hash.ts --force --lockfile libs/demo/pnpm-lock.yaml`;
+    })`bash --noprofile --norc -c 'set -euo pipefail; NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT=300 zx-wrapper tools/dev/update-pnpm-hash.ts --force --lockfile libs/demo/pnpm-lock.yaml'`;
 
     // Add an explicitly failing test file
     const failingTest = [
@@ -73,9 +66,7 @@ test("nix_node_test: buck2 test fails when importer tests fail", { timeout: 420_
 
     // Nix flakes read sources from git-tracked files; ensure the injected failing test and TARGETS
     // are visible to the flake evaluation inside the external runner.
-    await $({
-      env,
-    })`bash --noprofile --norc -c '
+    await $({})`bash --noprofile --norc -c '
       set -euo pipefail
       git -C ${tmp} add -A
       if git -C ${tmp} diff --cached --quiet; then
@@ -92,7 +83,6 @@ test("nix_node_test: buck2 test fails when importer tests fail", { timeout: 420_
     const res = await $({
       cwd: tmp,
       stdio: "pipe",
-      env,
     })`buck2 test //libs/demo:unit`.nothrow();
     console.error("[debug] buck2 exitCode=", res.exitCode);
     if (res.stdout) console.error("[debug] buck2 stdout:\n" + res.stdout);

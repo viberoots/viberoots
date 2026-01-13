@@ -13,11 +13,15 @@ def _go_nix_build_wasm_impl(ctx):
     build_prefix = "env BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" " + ("BUCK_TARGET=\"%s\" " % raw)
     # Use a per-target stable log path so tests can assert the build path deterministically
     # without racing on a single global /tmp file across concurrent builds.
+    #
+    # IMPORTANT: keep the log under WORKSPACE_ROOT so parallel Buck tests running in distinct
+    # temp repos don't collide on shared /tmp paths.
     safe_log_path_prefix = (
         "SAFE_LOG_KEY=\"%s\"; " % raw
         + "SAFE_LOG_KEY=\"${SAFE_LOG_KEY//\\//_}\"; "
         + "SAFE_LOG_KEY=\"${SAFE_LOG_KEY//:/_}\"; "
-        + "BUILD_SELECTED_LOG=\"/tmp/go_nix_build_wasm_build.${SAFE_LOG_KEY}.log\"; "
+        + "BUILD_SELECTED_LOG=\"$WORKSPACE_ROOT/buck-out/tmp/build-selected/go_nix_build_wasm_build.${SAFE_LOG_KEY}.log\"; "
+        + "mkdir -p \"$(dirname \"$BUILD_SELECTED_LOG\")\"; "
     )
     run_and_copy = (
         nix_cmd_prefix(timeout_var = "TIMEOUT", timeout_sec = 600, include_pnpm_store = False, escape_cmd_subst = True)

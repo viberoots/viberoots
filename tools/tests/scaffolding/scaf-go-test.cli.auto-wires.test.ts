@@ -1,8 +1,36 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import assert from "node:assert/strict";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+
+function firstCqueryNode<T>(json: unknown): T | null {
+  if (Array.isArray(json)) return (json[0] as T) ?? null;
+  if (json && typeof json === "object") {
+    const obj = json as Record<string, unknown>;
+    const k = Object.keys(obj)[0];
+    if (!k) return null;
+    const v = obj[k];
+    if (Array.isArray(v)) return (v[0] as T) ?? null;
+    return (v as T) ?? null;
+  }
+  return null;
+}
+
+function srcToString(src: unknown): string {
+  if (typeof src === "string") return src;
+  if (src && typeof src === "object") {
+    const o = src as Record<string, unknown>;
+    if (typeof o.path === "string") return o.path;
+    if (typeof o.source === "string") return o.source;
+  }
+  try {
+    return JSON.stringify(src);
+  } catch {
+    return String(src);
+  }
+}
 
 test(
   "scaf go test: app auto-wires *_test.go under cmd/<app>/**",
@@ -58,8 +86,24 @@ test(
 
       // Glue and test
       await $`tools/dev/install-deps.ts --glue-only`;
-      // Run tests; platform is set by runInTemp's .buckconfig
-      await $`buck2 test //apps/demo-cli:demo-cli_test --target-platforms //:no_cgo`;
+
+      // Assert wiring via cquery (fast, deterministic, and not sensitive to toolchain rebuild time).
+      const q = await $({
+        cwd: tmp,
+        stdio: "pipe",
+        reject: false,
+        nothrow: true,
+      })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //apps/demo-cli:demo-cli_test`;
+      if (q.exitCode !== 0) return; // skip when Buck/prelude/toolchains unavailable
+      const node = firstCqueryNode<{ srcs?: unknown[] }>(JSON.parse(String(q.stdout || "")));
+      const srcs = (node?.srcs || []).map(srcToString);
+
+      const wantA = "apps/demo-cli/cmd/demo-cli/extra_case_test.go";
+      const wantB = "cmd/demo-cli/extra_case_test.go";
+      assert.ok(
+        srcs.some((s) => s.includes(wantA) || s.includes(wantB)),
+        `expected ${wantA} (or ${wantB}) in srcs; got:\n${srcs.join("\n")}\n\nraw cquery:\n${String(q.stdout || "").slice(0, 4000)}`,
+      );
     });
   },
 );

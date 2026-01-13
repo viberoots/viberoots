@@ -28,15 +28,54 @@ function shortHash(s: string): string {
   return crypto.createHash("sha256").update(s).digest("hex").slice(0, 12);
 }
 
-function seedConfigKey(): string {
+let workspaceDirtySigOnce: Promise<string> | null = null;
+async function workspaceDirtySignature(): Promise<string> {
+  // Robustness + speed: when the workspace is dirty, we still want to use a seed repo to avoid
+  // paying the rsync cost for every temp repo. We do this by including a signature of the current
+  // working tree state in the seed key, so a "dirty seed" is never reused across different edits.
+  //
+  // Note: this is a best-effort signature. If git is unavailable, fall back to a sentinel value
+  // (which will still behave correctly; it just won't dedupe as effectively).
+  if (workspaceDirtySigOnce) return await workspaceDirtySigOnce;
+  workspaceDirtySigOnce = (async () => {
+    try {
+      const repoRoot = process.cwd();
+      const status = await $({
+        cwd: repoRoot,
+        stdio: "pipe",
+        reject: false,
+        nothrow: true,
+      })`git status --porcelain=v1 -z`;
+      if (status.exitCode !== 0) return "nogit";
+      const s = String(status.stdout || "");
+      if (!s) return "clean";
+      const diff = await $({
+        cwd: repoRoot,
+        stdio: "pipe",
+        reject: false,
+        nothrow: true,
+      })`git diff --no-ext-diff`;
+      const d = String(diff.stdout || "");
+      return shortHash(s + "\n---\n" + d);
+    } catch {
+      return "nogit";
+    }
+  })();
+  return await workspaceDirtySigOnce;
+}
+
+async function seedConfigKey(): Promise<string> {
   // If these toggles change mid-process, we must not reuse an old seed, because
   // the seed’s contents would no longer match the requested rsync shape.
+  const dirtySig = await workspaceDirtySignature();
   return JSON.stringify({
     // Bump when seed layout/contents rules change, to avoid reusing an old incompatible seed dir.
     SEED_VERSION: "2",
     TEST_RSYNC_ROOTS: String(process.env.TEST_RSYNC_ROOTS || ""),
     TEST_PARTIAL_CLONE_GO_ONLY: String(process.env.TEST_PARTIAL_CLONE_GO_ONLY || ""),
     TEST_EXCLUDE_CPP_REQS: String(process.env.TEST_EXCLUDE_CPP_REQS || ""),
+    // Include working tree signature so we can safely seed from a dirty checkout once per run.
+    WORKSPACE_DIRTY_SIG: dirtySig,
   });
 }
 
@@ -150,7 +189,7 @@ async function detectCowModeOnce(): Promise<CowMode> {
 }
 
 async function ensureSeedRepoOnce(deps: SeedDeps): Promise<SeedState> {
-  const key = seedConfigKey();
+  const key = await seedConfigKey();
   if (seedState && seedState.seedKey === key) return seedState;
 
   if (seedReady) {
@@ -175,22 +214,6 @@ function selectInitMode(cow: CowMode): RepoInitMode {
   if (process.env.TEST_DISABLE_SEED_REPO === "1") return "rsync";
   if (process.env.TEST_FORCE_SEED_REPO === "1") return cow === "none" ? "seed-copy" : "seed-cow";
   return cow === "none" ? "rsync" : "seed-cow";
-}
-
-async function isWorkspaceGitDirty(): Promise<boolean> {
-  const repoRoot = process.cwd();
-  const res = await $({
-    cwd: repoRoot,
-    stdio: "pipe",
-    reject: false,
-    nothrow: true,
-  })`git status --porcelain=v1`;
-  if (res.exitCode !== 0) {
-    throw new Error(
-      "seed-temp-repo: git status failed (git is required for deterministic temp repos)",
-    );
-  }
-  return String(res.stdout || "").trim() !== "";
 }
 
 async function cloneSeedToTemp(opts: {
@@ -221,14 +244,6 @@ export async function initTempRepoFromWorkspaceOrSeed(args: {
   const mode = mode0;
 
   if (mode === "rsync") {
-    await deps.rsyncRepoTo(tmpDir);
-    return "rsync";
-  }
-
-  // Correctness: when the workspace is dirty, do not reuse a shared seed repo that was created
-  // from an older clean snapshot. Prefer rsync so temp repos reflect the current working tree.
-  const dirty = await deps.timeAsync("seedRepo.workspaceDirty", async () => isWorkspaceGitDirty());
-  if (dirty) {
     await deps.rsyncRepoTo(tmpDir);
     return "rsync";
   }

@@ -6,6 +6,7 @@ import { withExclusiveInstallLock } from "./install/lock.ts";
 import { parseUpdatePnpmHashArgs } from "./update-pnpm-hash/args.ts";
 import { updateNodeModulesHashesJson } from "./update-pnpm-hash/hashes-json.ts";
 import { generateImporterLockfile } from "./update-pnpm-hash/lockfile.ts";
+import { importerLockfileNeedsRegen } from "../lib/pnpm-importer-lockfile.ts";
 import {
   buildStore,
   buildUnfixedAndHash,
@@ -49,11 +50,17 @@ async function inner() {
   // If importer lockfile is missing and generation is allowed, generate it OUTSIDE Nix first
   const impAbsGen = path.resolve(repoRoot, importer);
   const impLockGen = path.join(impAbsGen, "pnpm-lock.yaml");
-  if (
-    !fs.existsSync(impLockGen) &&
-    String(process.env.NIX_PNPM_ALLOW_GENERATE || "").trim() === "1"
-  ) {
-    await generateImporterLockfile({ repoRoot, importer });
+  const allowGenerate = String(process.env.NIX_PNPM_ALLOW_GENERATE || "").trim() === "1";
+  if (allowGenerate) {
+    const missing = !fs.existsSync(impLockGen);
+    const stale = !missing
+      ? await importerLockfileNeedsRegen({ repoRootAbs: repoRoot, importerRel: importer }).catch(
+          () => true,
+        )
+      : true;
+    if (missing || stale) {
+      await generateImporterLockfile({ repoRoot, importer });
+    }
   }
 
   // Robust path: build unfixed store and compute SRI from its normalized 'store' directory
