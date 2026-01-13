@@ -4,6 +4,7 @@ export const attrList = [
   "name",
   "rule_type",
   "buck.type",
+  "module",
   "srcs",
   "buck.srcs",
   "nix_srcs",

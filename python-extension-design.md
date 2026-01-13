@@ -58,7 +58,7 @@ In `TARGETS`, I want to be able to write:
 
 I propose adding a macro in `python/defs.bzl`:
 
-`nix_python_extension_module(name, module, srcs, headers = [], deps = [], nixpkg_deps = [], cflags = [], ldflags = [], link_deps = [], header_deps = [], lockfile_label = None, visibility = [...])`
+`nix_python_extension_module(name, module, srcs, headers = [], deps = [], nixpkg_deps = [], cflags = [], ldflags = [], link_deps = [], header_deps = [], link_closure = "direct", link_closure_overrides = {}, lockfile_label = None, visibility = [...])`
 
 Key points:
 
@@ -284,6 +284,8 @@ Acceptance:
   - `srcs`
   - `labels` (`lang:python`, `kind:pyext`)
   - `module` string
+  - `link_deps`, `header_deps`, `link_closure`, `link_closure_overrides`
+  - `cflags`, `ldflags`
 
 ### Phase 1: Nix build of extension module and app integration
 

@@ -66,6 +66,12 @@ export function nodesFromCqueryJson(merged: Record<string, any>): Node[] {
       coerceStringArray(a["buck.srcs"]) ??
       coerceStringArray(a["srcs"]);
 
+    const moduleRaw = a["module"] ?? a["buck.module"];
+    const module =
+      typeof moduleRaw === "string" && String(moduleRaw).trim() !== ""
+        ? String(moduleRaw).trim()
+        : undefined;
+
     const clean = normalizeTargetLabel(label);
     if (!clean || isTmpTarget(clean)) continue;
     const cleanDeps = deps
@@ -92,18 +98,21 @@ export function nodesFromCqueryJson(merged: Record<string, any>): Node[] {
       return out;
     })();
 
-    nodes.push({
+    const node: any = {
       ...(a as any),
       name: clean,
       rule_type: ruleType || a["rule_type"] || "",
       deps: cleanDeps || deps || a["deps"],
       labels: uniqSorted(labelsArr || []),
       srcs: srcsArr || a["srcs"],
+      ...(module ? { module } : {}),
       ...(linkDeps ? { link_deps: linkDeps } : {}),
       ...(headerDeps ? { header_deps: headerDeps } : {}),
       ...(linkClosure ? { link_closure: linkClosure } : {}),
       ...(overridesNormalized ? { link_closure_overrides: overridesNormalized } : {}),
-    } as Node);
+    };
+    if (!module && "module" in node) delete node.module;
+    nodes.push(node as Node);
   }
 
   // De-duplicate by normalized target label (node.name), preferring richer nodes.
