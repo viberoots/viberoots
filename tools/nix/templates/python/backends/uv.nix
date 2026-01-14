@@ -12,6 +12,7 @@ let
   kind = args.kind or "app";
   wsRoot = args.wsRoot or null;
   groups = args.groups or [];
+  siteOverlays = args.siteOverlays or [];
 
   _requireUv2nix = if uv2nixLib == null then builtins.throw "uv2nix backend requires uv2nixLib" else null;
   Uv2nixAdapter = import ../../../uv2nix-adapter.nix { inherit pkgs; uv2nixLib = uv2nixLib; };
@@ -23,5 +24,6 @@ Uv2nixAdapter {
   subdir = subdir;
   patchesMap = patchesMap;
   devOverrides = devOverrides;
+  siteOverlays = siteOverlays;
 }
 

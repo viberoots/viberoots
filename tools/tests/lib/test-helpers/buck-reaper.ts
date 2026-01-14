@@ -1,9 +1,9 @@
 import "./worker-init";
+import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { shSingleQuote } from "./shell-quote";
 
 let buckReaperStateFile: string | null = null;
 let buckReaperStarted = false;
@@ -45,11 +45,30 @@ export async function ensureBuckReaperStarted(tmp: string, $: any): Promise<void
     if (!parentSig) {
       throw new Error("buck-daemon-reaper: unable to read parent lstart signature via /bin/ps");
     }
-    const cmd =
-      `zx-wrapper ${reaper} --parent ${parentPid} ` +
-      (parentSig ? `--parent-sig ${shSingleQuote(parentSig)} ` : "") +
-      `--state-file ${buckReaperStateFile} --poll-ms 1000 >/dev/null 2>&1 & disown`;
-    await $({ stdio: "ignore" })`bash --noprofile --norc -c ${cmd}`.nothrow();
+    // Avoid shelling out to `zx-wrapper` here: some environments/tests may not have it on PATH,
+    // and non-interactive shells may not support job control (`disown`). Use a detached Node
+    // process instead so cleanup is robust even if the test process is SIGKILLed.
+    const child = spawn(
+      process.execPath,
+      [
+        "--experimental-strip-types",
+        reaper,
+        "--parent",
+        parentPid,
+        "--parent-sig",
+        parentSig,
+        "--state-file",
+        buckReaperStateFile,
+        "--poll-ms",
+        "1000",
+      ],
+      {
+        cwd: repoRoot,
+        stdio: "ignore",
+        detached: true,
+      },
+    );
+    child.unref();
   } catch (e) {
     throw e;
   }

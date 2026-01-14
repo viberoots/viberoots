@@ -13,11 +13,29 @@ let
   src = args.srcAbs or args.src or ./.;
   lockfile = args.lockfile or null;
   subdir = args.subdir or ".";
-  patchesMap = args.patchesMap or {};
-  devOverrides = args.devOverrides or {};
+  ensureAttrs = ctxStr: x:
+    if x == null then {}
+    else if builtins.isAttrs x then x
+    else builtins.throw ("uv2nix adapter: expected " + ctxStr + " to be an attrset");
+  ensureStringList = ctxStr: xs:
+    if xs == null then []
+    else if builtins.isList xs && builtins.all builtins.isString xs then xs
+    else builtins.throw ("uv2nix adapter: expected " + ctxStr + " to be a list of strings");
+
+  patchesMap = ensureAttrs "patchesMap" (args.patchesMap or {});
+  devOverrides = ensureAttrs "devOverrides" (args.devOverrides or {});
   kind = args.kind or "app";
   wsRoot = args.wsRoot or null;
-  groups = args.groups or [];
+  groups = ensureStringList "groups" (args.groups or []);
+  siteOverlays0 = args.siteOverlays or [];
+  siteOverlays =
+    if builtins.isList siteOverlays0 then siteOverlays0
+    else builtins.throw "uv2nix adapter: siteOverlays must be a list";
+  # Note: overlays may be derivations; do NOT use builtins.toFile here (it rejects derivation refs).
+  overlayArgs =
+    let
+      asArg = x: lib.escapeShellArg (builtins.toString x);
+    in lib.concatStringsSep " " (builtins.map asArg siteOverlays);
   # Normalize dev override paths into the Nix store to avoid sandbox permission issues
   isAbs = p: lib.hasPrefix "/" p;
   isRepoRel = p: lib.hasPrefix "apps/" p || lib.hasPrefix "libs/" p;
@@ -116,7 +134,16 @@ in
       groups = groups;
       kind = kind;
     };
-    meta = uv2nixLib.meta or { version = "unknown"; rev = "unknown"; };
+    _uv2nixLibOk =
+      if uv2nixLib == null then builtins.throw "uv2nix adapter requires uv2nixLib"
+      else if !(builtins.isAttrs uv2nixLib) then builtins.throw "uv2nix adapter: uv2nixLib must be an attrset"
+      else if !(uv2nixLib ? mkEnv) then builtins.throw "uv2nix adapter: uv2nixLib.mkEnv missing"
+      else null;
+    metaRaw = if (uv2nixLib ? meta) then uv2nixLib.meta else null;
+    meta =
+      if (metaRaw != null && builtins.isAttrs metaRaw)
+      then metaRaw
+      else { version = "unknown"; rev = "unknown"; };
   in
   pkgs.stdenvNoCC.mkDerivation {
     inherit pname version src;
@@ -130,10 +157,25 @@ in
       set -euo pipefail
       mkdir -p "$out/site" "$out/bin"
       if [ -d "${uvDrv}/site" ]; then
-        cp -R "${uvDrv}/site/." "$out/site/" || true
+        cp -R "${uvDrv}/site/." "$out/site/"
       fi
-      chmod -R u+w "$out/site" || true
-      # Compute provenance patches list with sha256 in deterministic order (adapter-side, stable legacy format)
+      # Copy app/lib sources into site-packages so native modules can live alongside their packages.
+      # This keeps runtime imports deterministic and avoids relying on mixed PYTHONPATH layouts.
+      if [ -d "${src}/${subdir}/src" ]; then
+        cp -R "${src}/${subdir}/src/." "$out/site/"
+      fi
+      # The source tree comes from the Nix store (read-only perms). Make the merged site writable
+      # so overlays can be merged deterministically without permission errors.
+      chmod -R u+w "$out/site"
+      # Merge optional site overlays deterministically (caller provides stable order).
+      for ov in ${overlayArgs}; do
+        if [ -d "$ov/site" ]; then
+          cp -R "$ov/site/." "$out/site/"
+        fi
+      done
+
+      # Patch provenance: record (key, file, sha256) in deterministic order.
+      # - Order by key, then by patch filename.
       tmpPList="$TMPDIR/patches.list"
       : > "$tmpPList"
       ${pkgs.jq}/bin/jq -rc '
@@ -141,55 +183,72 @@ in
         | sort_by(.key)
         | .[]
         | .key as $k
-        | ((.value // []) | .[] | {key:$k, path:., display:((.|split("/")[-1]) | sub("^.*-py-patch-"; "") | sub("^" + $k + "-"; ""))})
+        | (
+            (.value // [])
+            | map(
+                {
+                  key: $k,
+                  path: .,
+                  file: (
+                    (.|split("/")[-1])
+                    | sub("^.*-py-patch-"; "")
+                    | (
+                        ($k | gsub("@"; "-") + "-") as $prefix
+                        | sub("^" + $prefix; "")
+                      )
+                  )
+                }
+              )
+            | sort_by(.file)
+            | .[]
+          )
       ' '${patchesMapFile}' | while IFS= read -r obj; do
         key="$(${pkgs.jq}/bin/jq -r '.key' <<<"$obj")"
-        file="$(${pkgs.jq}/bin/jq -r '.path' <<<"$obj")"
-        display="$(${pkgs.jq}/bin/jq -r '.display' <<<"$obj")"
-        [ -n "$file" ] || continue
-        if command -v sha256sum >/dev/null 2>&1; then
-          sha="$(sha256sum "$file" | awk '{print $1}')"
-        else
-          sha="$(shasum -a 256 "$file" | awk '{print $1}')"
-        fi
-        printf '%s\n' "{\"key\":\"$key\",\"file\":\"$display\",\"sha256\":\"$sha\"}" >> "$tmpPList"
+        file="$(${pkgs.jq}/bin/jq -r '.file' <<<"$obj")"
+        p="$(${pkgs.jq}/bin/jq -r '.path' <<<"$obj")"
+        [ -n "$p" ] || continue
+        sha="$(${pkgs.coreutils}/bin/sha256sum "$p" | awk '{print $1}')"
+        printf '%s\n' "{\"key\":\"$key\",\"file\":\"$file\",\"sha256\":\"$sha\"}" >> "$tmpPList"
       done
       patchesJson="[$(paste -sd, "$tmpPList")]"
+
       wrapper="$out/bin/${pname}"
-      {
-        echo '#!/usr/bin/env bash'
-        echo 'set -euo pipefail'
-        echo 'HERE="$(cd "$(dirname "$0")" && pwd)"'
-        echo 'PY="$(command -v python3 || true)"'
-        echo 'if [ -z "$PY" ]; then PY="${py}/bin/python"; fi'
-        echo 'export PYTHONPATH="$HERE/../site:${src}/${subdir}/src''${PYTHONPATH:+:$PYTHONPATH}"'
-        echo 'if [ -n "''${WORKSPACE_ROOT:-}" ] && [ -d "''${WORKSPACE_ROOT}/${subdir}/src" ]; then'
-        echo '  export PYTHONPATH="''${WORKSPACE_ROOT}/${subdir}/src''${PYTHONPATH:+:}''${PYTHONPATH}"'
-        echo 'fi'
-        echo 'MAIN="${src}/${subdir}/bin/__main__.py"'
-        echo 'if [ -f "$MAIN" ]; then'
-        echo '  exec "$PY" "$MAIN" "$@"'
-        echo 'fi'
-        echo 'if [ -n "''${WORKSPACE_ROOT:-}" ] && [ -f "''${WORKSPACE_ROOT}/${subdir}/bin/__main__.py" ]; then'
-        echo '  exec "$PY" "''${WORKSPACE_ROOT}/${subdir}/bin/__main__.py" "$@"'
-        echo 'fi'
-        echo 'echo "python app entrypoint not found at $MAIN" >&2'
-        echo 'echo "PYTHONPATH=$PYTHONPATH" >&2'
-        echo 'exit 2'
-      } > "$wrapper"
+      cat > "$wrapper" <<'SH'
+      #!/usr/bin/env bash
+      set -euo pipefail
+      HERE="$(cd "$(dirname "$0")" && pwd)"
+      # Use the pinned Nix Python to ensure EXT_SUFFIX / ABI matches native modules in $out/site.
+      PY="${py}/bin/python"
+      export PYTHONPATH="$HERE/../site''${PYTHONPATH:+:$PYTHONPATH}"
+      # If a live workspace is provided, append its src tree for debugging/iteration.
+      # Keep site-packages first so native modules remain importable.
+      if [ -n "''${WORKSPACE_ROOT:-}" ] && [ -d "''${WORKSPACE_ROOT}/${subdir}/src" ]; then
+        export PYTHONPATH="''${PYTHONPATH}:''${WORKSPACE_ROOT}/${subdir}/src"
+      fi
+      MAIN="${src}/${subdir}/bin/__main__.py"
+      if [ -f "$MAIN" ]; then
+        exec "$PY" "$MAIN" "$@"
+      fi
+      if [ -n "''${WORKSPACE_ROOT:-}" ] && [ -f "''${WORKSPACE_ROOT}/${subdir}/bin/__main__.py" ]; then
+        exec "$PY" "''${WORKSPACE_ROOT}/${subdir}/bin/__main__.py" "$@"
+      fi
+      echo "python app entrypoint not found at $MAIN" >&2
+      echo "PYTHONPATH=$PYTHONPATH" >&2
+      exit 2
+      SH
       chmod +x "$wrapper"
-      # Write BUILD-INFO.json (authoritative in adapter for now to preserve legacy expectations)
+
+      cat > "$out/BUILD-INFO.json" <<JSON
       {
-        echo '{'
-        echo '  "kind": "'"${kind}"'",'
-        echo '  "lockfile": "'"${lockfile}"'",'
-        echo '  "subdir": "'"${subdir}"'",'
-        printf '%s\n' "  \"groups\": ${builtins.toJSON groups},"
-        printf '%s\n' "  \"patches\": ''${patchesJson},"
-        echo '  "backend": "uv2nix",'
-        echo '  "uv2nix": { "version": "'"${meta.version or "unknown"}"'", "rev": "'"${meta.rev or "unknown"}"'" }'
-        echo '}'
-      } > "$out/BUILD-INFO.json"
+        "kind": "${kind}",
+        "lockfile": "${lockfile}",
+        "subdir": "${subdir}",
+        "groups": ${builtins.toJSON groups},
+        "patches": $patchesJson,
+        "backend": "uv2nix",
+        "uv2nix": { "version": "${meta.version}", "rev": "${meta.rev}" }
+      }
+      JSON
     '';
   }
  

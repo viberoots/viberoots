@@ -4,17 +4,17 @@ import path from "node:path";
 
 import * as fsp from "node:fs/promises";
 
+import { generateImporterLockfile } from "../../../dev/update-pnpm-hash/lockfile.ts";
 import { printSkip } from "../../../lib/errors.ts";
 import { confirmOrExit } from "../confirm.ts";
-import { exists } from "../fs.ts";
-import { isLanguageEnabled } from "../language-enablement.ts";
 import { runCopierCopy } from "../copier/copy.ts";
 import { runPostSteps } from "../copier/post-steps.ts";
 import { recordSource } from "../copier/record-source.ts";
+import { exists } from "../fs.ts";
+import { isLanguageEnabled } from "../language-enablement.ts";
 import { resolveDestination } from "../templates/destination.ts";
 import { normalizeTemplateName } from "../templates/names.ts";
 import { usage } from "../usage.ts";
-import { generateImporterLockfile } from "../../../dev/update-pnpm-hash/lockfile.ts";
 
 export async function cmdNew(args: string[], flags: ScafFlags) {
   const [language, templateRaw, name] = args;
@@ -133,13 +133,12 @@ export async function cmdNew(args: string[], flags: ScafFlags) {
       } catch {}
     }
 
-    const skipLockfileGen =
-      ["true", "1", "yes"].includes(String(flags["skip-lockfile-gen"] || "").toLowerCase()) ||
-      // Buck tests should not depend on registry/network for lockfile generation.
-      Boolean(process.env.BUCK_TEST_TARGET || process.env.BUCK_TEST_SRC || process.env.BUCK_TARGET);
+    const skipLockfileGen = ["true", "1", "yes"].includes(
+      String(flags["skip-lockfile-gen"] || "").toLowerCase(),
+    );
 
     if (skipLockfileGen) {
-      printSkip("lockfile-gen", "skipping importer lockfile regeneration");
+      printSkip("not-applicable", "skipping importer lockfile regeneration");
     } else {
       // Primary path: ensure importer lockfile is real and consistent with package.json.
       // Nix builders run pnpm with --frozen-lockfile; placeholder lockfiles are not acceptable.

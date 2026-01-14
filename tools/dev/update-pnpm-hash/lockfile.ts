@@ -49,10 +49,11 @@ export async function generateImporterLockfile(opts: { repoRoot: string; importe
   const importerAbs = path.resolve(opts.repoRoot, opts.importer);
 
   const { workspaceFileAbs, hadLocalWorkspaceFile } = await ensureLocalWorkspaceMarker(importerAbs);
+  const fetchTimeout = String(process.env.NIX_PNPM_FETCH_TIMEOUT || "").trim() || "180";
   await $({
     cwd: importerAbs,
     stdio: "inherit",
-  })`bash --noprofile --norc -c 'set -euo pipefail; mkdir -p ".pnpm-home" ".pnpm-store"; export PNPM_HOME="$(pwd)/.pnpm-home"; nix run --accept-flake-config "path:${opts.repoRoot}#pnpm" -- config set store-dir "$(pwd)/.pnpm-store"; nix run --accept-flake-config "path:${opts.repoRoot}#pnpm" -- install --lockfile-only --prod=false --ignore-scripts --lockfile-dir "." --dir "." --color never'`;
+  })`bash --noprofile --norc -c 'set -euo pipefail; mkdir -p ".pnpm-home" ".pnpm-store"; export PNPM_HOME="$(pwd)/.pnpm-home"; env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT="${fetchTimeout}" nix run --accept-flake-config "path:${opts.repoRoot}#pnpm" -- config set store-dir "$(pwd)/.pnpm-store"; env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT="${fetchTimeout}" nix run --accept-flake-config "path:${opts.repoRoot}#pnpm" -- install --lockfile-only --prod=false --ignore-scripts --lockfile-dir "." --dir "." --color never'`;
 
   await seedImporterLockfileFromRootIfNeeded({ repoRoot: opts.repoRoot, importerAbs });
   await cleanupLocalWorkspaceMarker({ workspaceFileAbs, hadLocalWorkspaceFile });

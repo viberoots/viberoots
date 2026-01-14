@@ -90,7 +90,7 @@ export async function flakeAttrExists(attrset: string, key: string): Promise<boo
     if (!sys) return false;
     const out = await $({
       stdio: "pipe",
-    })`bash --noprofile --norc -c ${`nix eval .#packages.${sys}.${attrset} --apply 'builtins.hasAttr "${key}"' --accept-flake-config`}`;
+    })`bash --noprofile --norc -c ${`nix eval --impure .#packages.${sys}.${attrset} --apply 'builtins.hasAttr "${key}"' --accept-flake-config`}`;
     const val = String(out.stdout || "").trim();
     return val === "true";
   } catch {

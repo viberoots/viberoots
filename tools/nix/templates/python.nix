@@ -5,6 +5,7 @@ let
   DevOverrideEnvs = import ../lib/dev-override-envs.nix { inherit pkgs; };
 
   UvBackend = import ./python/backends/uv.nix { inherit pkgs; uv2nixLib = uv2nixLib; };
+  PyExt = import ./python/pyext.nix { inherit pkgs; };
 
   mkPy = {
     name,
@@ -15,6 +16,7 @@ let
     patchDirs ? [ ../../patches/python ],
     kind ? "app",
     groups ? [],
+    nativeModuleOverlays ? [],
   }:
     let
       _guard = H.guardNoDevOverridesInCI devOverrideEnv;
@@ -66,6 +68,7 @@ let
       kind = kind;
       wsRoot = wsRoot;
       groups = groups;
+      siteOverlays = nativeModuleOverlays;
     };
 in {
   pyApp = {
@@ -76,9 +79,10 @@ in {
     srcRoot ? ../../..,
     patchDirs ? [ ../../patches/python ],
     groups ? [],
+    nativeModuleOverlays ? [],
   }:
     mkPy {
-      inherit name lockfile devOverrideEnv subdir srcRoot patchDirs groups;
+      inherit name lockfile devOverrideEnv subdir srcRoot patchDirs groups nativeModuleOverlays;
       kind = "app";
     };
 
@@ -90,10 +94,25 @@ in {
     srcRoot ? ../../..,
     patchDirs ? [ ../../patches/python ],
     groups ? [],
+    nativeModuleOverlays ? [],
   }:
     mkPy {
-      inherit name lockfile devOverrideEnv subdir srcRoot patchDirs groups;
+      inherit name lockfile devOverrideEnv subdir srcRoot patchDirs groups nativeModuleOverlays;
       kind = "lib";
+    };
+
+  pyExt = {
+    name,
+    module,
+    srcRoot ? ../../..,
+    subdir ? ".",
+    srcList ? [],
+    cflags ? [],
+    ldflags ? [],
+    nixCxxAttrs ? [],
+  }:
+    PyExt {
+      inherit name module srcRoot subdir srcList cflags ldflags nixCxxAttrs;
     };
 
   # Reusable, content-addressed wheelhouse keyed ONLY by lockfile + patches.

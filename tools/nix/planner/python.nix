@@ -16,11 +16,28 @@ let
   labelsOf = L.labelsOf;
   nameOf = L.nameOf;
   byName = L.byName;
+  srcsOf = name: L.srcsOf name;
   depsOfName = nm:
-    let n = if builtins.hasAttr nm byName then byName.${nm} else null;
+    let
+      _byNameOk =
+        if builtins.isAttrs byName then null
+        else builtins.throw "python planner: internal error: byName is not an attrset";
+      n = if builtins.hasAttr nm byName then byName.${nm} else null;
+      _nodeOk =
+        if n != null && !(builtins.isAttrs n)
+        then builtins.throw ("python planner: internal error: node value for '" + nm + "' is not an attrset")
+        else null;
     in if n == null then [] else L.depsOf n;
   labelsOfName = nm:
-    let n = if builtins.hasAttr nm byName then byName.${nm} else null;
+    let
+      _byNameOk =
+        if builtins.isAttrs byName then null
+        else builtins.throw "python planner: internal error: byName is not an attrset";
+      n = if builtins.hasAttr nm byName then byName.${nm} else null;
+      _nodeOk =
+        if n != null && !(builtins.isAttrs n)
+        then builtins.throw ("python planner: internal error: node value for '" + nm + "' is not an attrset")
+        else null;
     in if n == null then [] else L.labelsOf n;
 
   # Find nearest uv.lock for a target by walking up from its package path.
@@ -42,6 +59,46 @@ let
   lockRelFor = name:
     let abs = lockfileFor name; absStr = builtins.toString abs; rootStr = builtins.toString repoRoot;
     in if lib.hasPrefix (rootStr + "/") absStr then lib.removePrefix (rootStr + "/") absStr else absStr;
+
+  ensureString = ctxStr: x:
+    if x == null then ""
+    else if builtins.isString x then x
+    else builtins.throw ("python planner: expected " + ctxStr + " to be a string");
+
+  ensureStringList = ctxStr: xs:
+    if xs == null then []
+    else if builtins.isList xs && builtins.all builtins.isString xs then xs
+    else builtins.throw ("python planner: expected " + ctxStr + " to be a list of strings");
+
+  nodeOfName = nm:
+    if builtins.hasAttr nm byName then byName.${nm} else null;
+
+  collectNixAttrsFor = name:
+    let
+      labels = L.collectLabelsWithPrefix name "nixpkg:";
+      attrs = map (l: lib.removePrefix "nixpkg:" l) labels;
+      uniq = xs: builtins.attrNames (builtins.listToAttrs (map (a: { name = a; value = true; }) xs));
+    in builtins.sort (a: b: a < b) (uniq attrs);
+
+  collectPyExtDepsTransitive = name:
+    let
+      startDeps = depsOfName name;
+      go = st: q:
+        if q == [] then st.out else
+        let
+          dn0 = builtins.head q;
+          dn = L.cleanLabel dn0;
+          rest = builtins.tail q;
+        in
+          if builtins.hasAttr dn st.seen then go st rest else
+          let
+            seen' = st.seen // { "${dn}" = true; };
+            n = nodeOfName dn;
+            isPyExt = n != null && builtins.elem "kind:pyext" (labelsOf n);
+            out' = if isPyExt then st.out ++ [ dn ] else st.out;
+            nexts = if n == null then [] else depsOfName dn;
+          in go { seen = seen'; out = out'; } (rest ++ nexts);
+    in go { seen = {}; out = []; } startDeps;
 in rec {
   # Detect Python nodes by rule_type prefix or lang label
   isTarget = n:
@@ -57,7 +114,9 @@ in rec {
         isBinLabel = lbs != null && builtins.elem "kind:bin" lbs;
         isWasmLabel = lbs != null && builtins.elem "kind:wasm" lbs;
         isTestLabel = lbs != null && builtins.elem "kind:test" lbs;
+        isPyExtLabel = lbs != null && builtins.elem "kind:pyext" lbs;
     in if isWasmLabel then "wasm"
+       else if isPyExtLabel then "pyext"
        else if isTestLabel then "test"
        else if (rt != null) && lib.hasSuffix "_binary" rt then "bin"
        else if (rt != null) && lib.hasSuffix "_test" rt then "test"
@@ -67,19 +126,44 @@ in rec {
   modulesFileFor = name: lockRelFor name;
 
   mkApp = name:
-    T.pyApp {
+    let
+      pyExtDeps = collectPyExtDepsTransitive name;
+      overlays = map mkPyExt pyExtDeps;
+    in T.pyApp {
       inherit name;
       lockfile = lockRelFor name;
       srcRoot = repoRoot;
       subdir = pkgPathOf name;
+      nativeModuleOverlays = overlays;
     };
 
   mkLib = name:
-    T.pyLib {
+    let
+      pyExtDeps = collectPyExtDepsTransitive name;
+      overlays = map mkPyExt pyExtDeps;
+    in T.pyLib {
       inherit name;
       lockfile = lockRelFor name;
       srcRoot = repoRoot;
       subdir = pkgPathOf name;
+      nativeModuleOverlays = overlays;
+    };
+
+  mkPyExt = name:
+    let
+      n = nodeOfName name;
+      mod = ensureString ("module for " + name) (if n == null then null else get n "module");
+      cflags = ensureStringList ("cflags for " + name) (if n == null then null else get n "cflags");
+      ldflags = ensureStringList ("ldflags for " + name) (if n == null then null else get n "ldflags");
+    in T.pyExt {
+      inherit name;
+      module = mod;
+      srcRoot = repoRoot;
+      subdir = pkgPathOf name;
+      srcList = srcsOf name;
+      nixCxxAttrs = collectNixAttrsFor name;
+      cflags = cflags;
+      ldflags = ldflags;
     };
 
   # WASM variants (Phase 1: WASI baseline)

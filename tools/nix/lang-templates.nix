@@ -16,7 +16,7 @@ in {
   # Downstream code should guard access appropriately.
   # When unavailable, omit the attributes entirely.
 } // (if Python != null then {
-  inherit (Python) pyApp pyLib pyWheelhouse;
+  inherit (Python) pyApp pyLib pyWheelhouse pyExt;
 } else {}) // (if PythonWasm != null then {
   inherit (PythonWasm) pyWasmApp pyWasmLib;
 } else {})

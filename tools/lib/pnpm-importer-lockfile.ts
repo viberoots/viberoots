@@ -1,7 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 
-import { parsePnpmLock } from "./pnpm-lock";
+import { parsePnpmLock } from "./pnpm-lock.ts";
 
 type PkgJson = {
   dependencies?: Record<string, string>;

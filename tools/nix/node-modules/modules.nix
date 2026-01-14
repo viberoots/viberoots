@@ -32,7 +32,7 @@ in {
       pname = "node-modules";
       version = if (hasLockFs || hasLockStore) then "lock-${builtins.hashFile "sha256" (if hasLockFs then lockAbsStrFs else lockAbsStrStore)}" else "lock-missing";
       inherit src;
-      nativeBuildInputs = [ node pnpm pkgs.coreutils ];
+      nativeBuildInputs = [ node pnpm pkgs.coreutils pkgs.findutils ];
       preferLocalBuild = true;
       allowSubstitutes = false;
       unpackPhase = ''
@@ -74,18 +74,40 @@ in {
         mkdir -p "$PNPM_HOME"
         # Strip packageManager to prevent corepack/pnpm self-bootstrap loops inside hermetic builds
         node -e 'const fs=require("fs"); const p="package.json"; if(fs.existsSync(p)){const j=JSON.parse(fs.readFileSync(p,"utf8")); delete j.packageManager; fs.writeFileSync(p, JSON.stringify(j, null, 2));}'
-        # Use a writable local copy of the prefetched/fetched store to avoid EACCES when pnpm
-        # attempts to create internal versioned subdirectories (e.g., v10) under the store.
-        echo "[BNX-MKNM-DEBUG] preparing local pnpm store mirror" >&2
+        # Ensure pnpm cache is confined to the build directory (avoid ~/Library/Caches on darwin).
+        export XDG_CACHE_HOME="$HOME/.cache"
+        export npm_config_cache="$HOME/.npm-cache"
+        mkdir -p "$XDG_CACHE_HOME" "$npm_config_cache"
+
+        # Use a writable local store directory.
+        # To avoid copying the huge content-addressed `files/` tree into the build dir,
+        # symlink it from the fixed-output store, and copy only the smaller `index/`
+        # tree into the local store so pnpm can read/write metadata offline.
+        echo "[BNX-MKNM-DEBUG] preparing local pnpm store (symlink files/, copy index/)" >&2
         LOCAL_STORE="$HOME/.pnpm-store"
         mkdir -p "$LOCAL_STORE"
-        if [ -d "${store}/store" ]; then
-          # Best-effort copy; the store is content-addressed and can be read-only in FODs
-          cp -R "${store}/store/." "$LOCAL_STORE/" || true
-        fi
-        # If a unified prefetched store was provided at eval time, seed from it as well
+
+        seed_store() {
+          src="$1"
+          [ -d "$src" ] || return 0
+          for verDir in "$src"/v*; do
+            [ -d "$verDir" ] || continue
+            ver="$(basename "$verDir")"
+            mkdir -p "$LOCAL_STORE/$ver"
+            if [ -d "$verDir/files" ] && [ ! -e "$LOCAL_STORE/$ver/files" ]; then
+              ln -s "$verDir/files" "$LOCAL_STORE/$ver/files"
+            fi
+            if [ -d "$verDir/index" ]; then
+              rm -rf "$LOCAL_STORE/$ver/index"
+              mkdir -p "$LOCAL_STORE/$ver/index"
+              cp -R "$verDir/index/." "$LOCAL_STORE/$ver/index/"
+            fi
+          done
+        }
+
+        seed_store "${store}/store"
         if [ -d ${if prefetchedInput != null then "\"${prefetchedInput}\"" else "\"/nonexistent\""} ]; then
-          cp -R ${if prefetchedInput != null then "\"${prefetchedInput}\"" else "\"/nonexistent\""}"/." "$LOCAL_STORE/" || true
+          seed_store ${if prefetchedInput != null then "\"${prefetchedInput}\"" else "\"/nonexistent\""}
         fi
         pnpm config set store-dir "$LOCAL_STORE"
         FT="${ftVal}"
