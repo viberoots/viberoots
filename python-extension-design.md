@@ -79,6 +79,39 @@ The intent is that extension builds are invalidated by the same importer-scoped 
 - extension sources (`srcs`) and build flags (`cflags`, `ldflags`)
 - nixpkgs native inputs requested via `nixpkg:` labels
 
+## PR-3: Build-time Python deps for `T.pyExt` (uv wheelhouse env)
+
+Many extension modules need **Python packages at build time** (headers from `numpy`, `pybind11`, or project-specific helper packages).
+
+To keep this deterministic and importer-scoped, `T.pyExt` builds against the **same uv2nix wheelhouse environment** as its importer:
+
+- The wheelhouse is keyed only by:
+  - importer `uv.lock`
+  - importer-local Python patches (`<importer>/patches/python/*.patch`)
+  - global Nix inputs (via the existing uv2nix machinery)
+- It is **not** keyed by extension sources.
+
+### `build_py_deps` (exported graph contract)
+
+`kind:pyext` nodes may set:
+
+- `build_py_deps: [ "pkg", ... ]`
+
+When non-empty, `T.pyExt`:
+
+- uses the importer wheelhouse’s `$out/site` as `PYTHONPATH` during compilation
+- for each requested package, resolves a deterministic include directory by:
+  - calling `<pkg>.get_include()` when available, otherwise
+  - using `<pkg>/include` next to the imported module
+- adds `-I<includeDir>` for each resolved include directory
+
+This keeps build-time Python deps:
+
+- **explicit** at the Buck surface
+- **hermetic** (no user site-packages)
+- **deterministic** (wheelhouse key is importer-scoped)
+- **fast by default**: when `build_py_deps` is empty, `T.pyExt` does not instantiate the wheelhouse env at all (so simple extensions don’t pay for uv2nix).
+
 ## Open questions (explicitly deferred)
 
 - **Buck runtime**: if we want `buck2 test` to import native modules directly, we’ll need a runfiles / `sys.path` contract for extension artifacts in Buck’s Python rules.

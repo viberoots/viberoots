@@ -122,6 +122,7 @@ def nix_python_extension_module(
         nixpkg_deps = [],
         cflags = [],
         ldflags = [],
+        build_py_deps = [],
         link_deps = [],
         header_deps = [],
         link_closure = "direct",
@@ -159,6 +160,7 @@ def nix_python_extension_module(
     kw["link_closure_overrides"] = link_closure_overrides
     kw["cflags"] = cflags or []
     kw["ldflags"] = ldflags or []
+    kw["build_py_deps"] = build_py_deps or []
 
     # Treat headers as build inputs; this is a stub (does not compile in PR-1) but
     # still participates in invalidation and planner discovery via srcs.

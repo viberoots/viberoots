@@ -12,7 +12,7 @@ test("node webapp: nix_node_test target passes when no tests present", async () 
     const $ = _$({ cwd: tmp, stdio: "pipe" });
     await $`git init`;
     // Scaffold with test target enabled by default
-    await $`scaf new node webapp demo-web --yes --skip-lockfile-gen`;
+    await $`scaf new node webapp demo-web --yes`;
 
     // Proceed; environment is expected to provide Buck prelude via runInTemp setup
 
@@ -24,8 +24,7 @@ test("node webapp: nix_node_test target passes when no tests present", async () 
     // Commit scaffold and lockfile so Nix flake sees importer under git+file sources
     await $`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
 
-    // Primary path: lockfile is created under the importer by the template.
-    // (Do not regenerate lockfiles in tests; that can hit the registry and is non-hermetic.)
+    // Primary path: `scaf new` produces a real importer lockfile under the importer directory.
     const lockfile = path.join(tmp, "apps", "demo-web", "pnpm-lock.yaml");
     try {
       await fsp.access(lockfile);

@@ -5,6 +5,7 @@ export const attrList = [
   "rule_type",
   "buck.type",
   "module",
+  "build_py_deps",
   "srcs",
   "buck.srcs",
   "nix_srcs",

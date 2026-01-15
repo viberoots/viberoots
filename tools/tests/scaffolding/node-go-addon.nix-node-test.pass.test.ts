@@ -3,10 +3,11 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { exists, runInTemp } from "../lib/test-helpers";
-import { ensureImporterLockfileFresh } from "../../lib/pnpm-importer-lockfile";
 
 // Ensure dev env tooling when spawning Buck/Nix inside temp repos
 process.env.TEST_NEED_DEV_ENV = "1";
+process.env.NIX_PNPM_ALLOW_GENERATE = "1";
+process.env.NIX_PNPM_FETCH_TIMEOUT = process.env.NIX_PNPM_FETCH_TIMEOUT || "600";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
@@ -29,7 +30,7 @@ test(
       await $`git init`;
 
       // Scaffold the Node TS package, Go c-archive sibling, and C N-API addon sibling
-      await $`scaf new node go-addon demo --yes --skip-lockfile-gen`;
+      await $`scaf new node go-addon demo --yes`;
 
       // Basic assertions on created files
       const nodePkg = path.join(tmp, "libs", "demo");
@@ -52,23 +53,12 @@ test(
       // Commit scaffold so pure flake snapshots see new importers
       await $`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
 
-      // Ensure the importer lockfile is real and consistent with package.json.
-      // The scaffold includes a placeholder lockfile when --skip-lockfile-gen is used; that file
-      // is not acceptable for Nix builds (pnpm runs with --frozen-lockfile).
       const importer = "libs/demo";
       const sanitized = importer
         .replace(/\/\//g, "")
         .replace(/:/g, "-")
         .replace(/[\/\s]+/g, "-");
       const lockfile = path.join(importer, "pnpm-lock.yaml");
-      await ensureImporterLockfileFresh({
-        tmp,
-        $,
-        importerRel: importer,
-        nixPnpmFetchTimeoutSecs: NIX_PNPM_FETCH_TIMEOUT,
-      });
-      // Commit the lockfile so pure flake snapshots see it
-      await $`bash --noprofile --norc -c 'git -C ${tmp} add ${lockfile} && git -C ${tmp} commit -m "chore(test): add importer lockfile"'`.nothrow();
 
       // Install deps and ensure gomod2nix.toml is generated for libs/demo-go
       await $({
@@ -77,12 +67,6 @@ test(
         tmp,
         "tools/bin/i",
       )}`;
-
-      // Ensure node_modules is realizable (this also reconciles pnpm-store hash if needed).
-      await $({
-        cwd: path.join(tmp, importer),
-        stdio: "inherit",
-      })`env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT=${NIX_PNPM_FETCH_TIMEOUT} zx-wrapper ../../tools/dev/node-modules-build.ts`;
 
       // Build the importer's Node tests; the builder links the Go c-archive into the addon
       const testOut = await (async () => {

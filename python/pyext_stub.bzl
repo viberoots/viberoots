@@ -47,6 +47,9 @@ python_pyext_stub = rule(
         # Preserve compile/link flags in the exported node contract (consumed in PR-2+).
         "cflags": attrs.list(attrs.string(), default = []),
         "ldflags": attrs.list(attrs.string(), default = []),
+        # PR-3: build-time Python deps (from importer uv.lock wheelhouse env).
+        # This is a planner/exporter contract only; this stub does not interpret it.
+        "build_py_deps": attrs.list(attrs.string(), default = []),
         # `attrs.source()` allows both files and target outputs (like genrule srcs).
         "srcs": attrs.list(attrs.source(), default = []),
         "labels": attrs.list(attrs.string(), default = []),

@@ -3,10 +3,11 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
-import { ensureImporterLockfileFresh } from "../../lib/pnpm-importer-lockfile";
 
 // Ensure dev env tooling when spawning Buck/Nix inside temp repos
 process.env.TEST_NEED_DEV_ENV = "1";
+process.env.NIX_PNPM_ALLOW_GENERATE = "1";
+process.env.NIX_PNPM_FETCH_TIMEOUT = process.env.NIX_PNPM_FETCH_TIMEOUT || "600";
 
 /**
  * Stabilization strategy:
@@ -28,28 +29,13 @@ test(
       const TIMEOUT_SECS = String(
         Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200"),
       );
-      const env = {
-        ...process.env,
-        // Force all subprocesses in this test to treat the temp repo as the workspace.
-        // This avoids pulling volatile dirs (like the real repo's coverage/raw) into Nix snapshots
-        // and avoids sourcing user login profiles from the real HOME.
-        WORKSPACE_ROOT: tmp,
-        HOME: tmp,
-        NIX_PNPM_ALLOW_GENERATE: "1",
-        NIX_PNPM_FETCH_TIMEOUT: String(Number(process.env.NIX_PNPM_FETCH_TIMEOUT || "600")),
-        NODE_TEST_TIMEOUT: String(
-          Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200"),
-        ),
-      } as Record<string, string>;
+      process.env.NODE_TEST_TIMEOUT = String(
+        Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200"),
+      );
 
       await $`git init`;
       // Scaffold with tests default-on
-      await $`scaf new node lib demo --yes --skip-lockfile-gen`;
-
-      // Commit scaffold so Nix flake sees importer under git+file sources
-      await $({
-        env,
-      })`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
+      await $`scaf new node lib demo --yes`;
 
       const importer = "libs/demo";
       const lockfile = path.join(importer, "pnpm-lock.yaml");
@@ -58,23 +44,15 @@ test(
         .replace(/:/g, "-")
         .replace(/[\/\s]+/g, "-");
 
-      // 1) Ensure the importer lockfile is real and consistent with package.json.
-      await ensureImporterLockfileFresh({
-        tmp,
-        $,
-        env,
-        importerRel: importer,
-        nixPnpmFetchTimeoutSecs: String(env.NIX_PNPM_FETCH_TIMEOUT || "600"),
-      });
-      // Commit the lockfile so pure flake snapshots see it
-      await $({
-        env,
-      })`bash --noprofile --norc -c 'git -C ${tmp} add ${lockfile} && git -C ${tmp} commit -m "chore(test): add importer lockfile"'`.nothrow();
+      // Require `scaf new` primary path to produce the importer lockfile.
+      await fsp.access(path.join(tmp, lockfile));
+
+      // Commit scaffold so Nix flake sees importer under git+file sources (including lockfile).
+      await $`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
 
       // 2) Compute/update FOD mapping from the committed lockfile
       await $({
         stdio: "inherit",
-        env,
       })`zx-wrapper tools/dev/update-pnpm-hash.ts --lockfile ${lockfile}`;
 
       // 3) Warm pnpm-store and node-modules
@@ -88,15 +66,14 @@ test(
           .filter(Boolean)
           .join(" ");
         const cmd1 = `set -euo pipefail; timeout ${TIMEOUT_SECS}s nix build "${tmp}#pnpm-store.${sanitized}" --impure --no-link --accept-flake-config --builders "" --print-build-logs ${flags}`;
-        await $({ stdio: "inherit", env })`bash --noprofile --norc -c ${cmd1}`;
+        await $({ stdio: "inherit" })`bash --noprofile --norc -c ${cmd1}`;
         const cmd2 = `set -euo pipefail; timeout ${TIMEOUT_SECS}s nix build "${tmp}#node-modules.${sanitized}" --impure --no-link --accept-flake-config --builders "" --print-build-logs ${flags}`;
-        await $({ stdio: "inherit", env })`bash --noprofile --norc -c ${cmd2}`;
+        await $({ stdio: "inherit" })`bash --noprofile --norc -c ${cmd2}`;
       }
 
       // 4) Reconcile any FOD digest drift detected during warm-up; force rehash to align mapping
       await $({
         stdio: "inherit",
-        env,
       })`zx-wrapper tools/dev/update-pnpm-hash.ts --force --lockfile ${lockfile}`;
 
       // 5) Build the node-test derivation; sample tests should pass
@@ -110,7 +87,7 @@ test(
           .filter(Boolean)
           .join(" ");
         const cmd = `set -euo pipefail; timeout ${TIMEOUT_SECS}s nix build "${tmp}#node-test.${sanitized}" --impure --no-link --accept-flake-config --builders "" --print-out-paths ${flags}`;
-        return await $({ stdio: "pipe", env })`bash --noprofile --norc -c ${cmd}`;
+        return await $({ stdio: "pipe" })`bash --noprofile --norc -c ${cmd}`;
       })();
       const outPath =
         String(out.stdout || "")

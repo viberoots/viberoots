@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import process from "node:process";
+import { type Buck2Completion, parseBuck2ProgressFromLines } from "./buck2-output";
 
 export type SpawnedVerifyTests = {
   pgid: number;
@@ -26,30 +27,6 @@ function verifyBuck2Threads(): number {
   // Historically, 30 threads has been a good local default on macOS for overall verify throughput.
   const oversubscribed = Math.ceil(cores * 3);
   return Math.max(1, Math.min(32, oversubscribed));
-}
-
-function stripAnsi(s: string): string {
-  return s.replace(/\x1B\[[0-9;]*[A-Za-z]/g, "").replace(/\r/g, "");
-}
-
-function countPassFailFromLines(
-  chunk: string,
-  carry: string,
-): { pass: number; fail: number; carry: string } {
-  // Buck writes output in arbitrary chunk boundaries; keep a carry buffer for incomplete lines.
-  const joined = carry + chunk;
-  const parts = joined.split("\n");
-  const complete = parts.slice(0, -1);
-  const nextCarry = parts[parts.length - 1] ?? "";
-
-  let pass = 0;
-  let fail = 0;
-  for (const rawLine of complete) {
-    const line = stripAnsi(rawLine);
-    if (/^\[[^\]]+\] ✓ Pass:/.test(line)) pass++;
-    else if (/^\[[^\]]+\] ✗ Fail:/.test(line)) fail++;
-  }
-  return { pass, fail, carry: nextCarry };
 }
 
 export function spawnVerifyBuck2Tests(opts: {
@@ -131,6 +108,15 @@ export function spawnVerifyBuck2Tests(opts: {
   let failCount = 0;
   let stdoutCarry = "";
   let stderrCarry = "";
+  const slowest: Buck2Completion[] = [];
+  const SLOWEST_MAX = 25;
+
+  const recordCompletion = (c: Buck2Completion) => {
+    // Keep only the slowest N completions. N is small so O(N) insert is fine.
+    slowest.push(c);
+    slowest.sort((a, b) => b.durationSec - a.durationSec);
+    if (slowest.length > SLOWEST_MAX) slowest.length = SLOWEST_MAX;
+  };
 
   if (opts.logFile) {
     void fsp.appendFile(
@@ -160,19 +146,21 @@ export function spawnVerifyBuck2Tests(opts: {
 
   proc.stdout?.on("data", (b) => {
     const s = String(b);
-    const r = countPassFailFromLines(s, stdoutCarry);
+    const r = parseBuck2ProgressFromLines(s, stdoutCarry);
     stdoutCarry = r.carry;
     passCount += r.pass;
     failCount += r.fail;
+    for (const c of r.completions) recordCompletion(c);
     process.stdout.write(s);
     if (opts.logFile) void fsp.appendFile(opts.logFile, s, "utf8").catch(() => {});
   });
   proc.stderr?.on("data", (b) => {
     const s = String(b);
-    const r = countPassFailFromLines(s, stderrCarry);
+    const r = parseBuck2ProgressFromLines(s, stderrCarry);
     stderrCarry = r.carry;
     passCount += r.pass;
     failCount += r.fail;
+    for (const c of r.completions) recordCompletion(c);
     process.stderr.write(s);
     if (opts.logFile) void fsp.appendFile(opts.logFile, s, "utf8").catch(() => {});
   });
@@ -190,6 +178,18 @@ export function spawnVerifyBuck2Tests(opts: {
           "utf8",
         )
         .catch(() => {});
+    }
+    if (opts.logFile && slowest.length > 0) {
+      const header = `[verify] slowest targets (top ${Math.min(SLOWEST_MAX, slowest.length)}):`;
+      const lines = slowest.map((c) => {
+        const secs = c.durationSec.toFixed(1);
+        return `[verify] slow ${secs}s ${c.status} ${c.target} (${c.rawDuration})`;
+      });
+      try {
+        process.stderr.write(header + "\n");
+        for (const l of lines) process.stderr.write(l + "\n");
+      } catch {}
+      await fsp.appendFile(opts.logFile, [header, ...lines, ""].join("\n"), "utf8").catch(() => {});
     }
     return exitCode ?? 1;
   };

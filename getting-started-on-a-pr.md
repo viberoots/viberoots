@@ -49,3 +49,24 @@ Python provider sync activation in sparse/partial clones is lockfile‑driven: t
   - `nix build .#graph-generator`
 - Repo wrappers (preferred; thin shims that delegate into TypeScript and ensure the dev shell is loaded):
   - `i` (install deps), `b` (build), `v` (verify / full test suite)
+
+### 4. When `v` is slow (performance regression workflow)
+
+`v` is expected to complete in a predictable window locally. If a run regresses substantially (for example jumping from ~20 minutes to ~30+ minutes), treat it like a failing test: identify the root cause and fix it.
+
+Practical workflow:
+
+- **Find slow targets**: `v` writes a full log at `buck-out/tmp/verify-logs/latest.log`.
+  - The verify runner also appends a “slowest targets” list at the end of that log.
+- **Get structured timing** (optional but recommended): run with timing summaries enabled and then aggregate:
+
+```bash
+TEST_TIMING=summary v
+node tools/dev/analyze-verify-timing.ts --log buck-out/tmp/verify-logs/latest.log
+```
+
+Common causes we’ve seen:
+
+- **Accidentally added “heavy” tests** (tests that do full scaffolds, Nix builds, or large temp-repo operations without a good reason).
+- **Tests doing extra work by default** (for example, creating expensive environments even when the feature isn’t used). Prefer making heavyweight inputs opt-in and keyed narrowly.
+- **Too many nested Buck/Nix invocations at once** causing resource contention (adjust `VERIFY_BUCK2_THREADS` if needed, but fix avoidable work first).

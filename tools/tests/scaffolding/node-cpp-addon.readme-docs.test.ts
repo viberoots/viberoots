@@ -9,6 +9,7 @@ test("node cpp-addon: README documents quickstart and canonical links", async ()
     const $ = _$({ cwd: tmp, stdio: "inherit" });
     await $`git init`;
 
+    // Skip lockfile generation: this test is about rendered docs, not lockfile production.
     await $`scaf new node cpp-addon demo --yes --skip-lockfile-gen`;
 
     const readmePath = path.join(tmp, "libs", "demo", "README.md");

@@ -42,7 +42,7 @@ test("scaf: new ts wasm-linking-app; build tinygo wasm; callAdd2() returns 5", a
     await $({
       cwd: tmp,
       stdio: "inherit",
-    })`node tools/scaffolding/scaf.ts new ts wasm-linking-app ${name} --yes --skip-lockfile-gen`;
+    })`node tools/scaffolding/scaf.ts new ts wasm-linking-app ${name} --yes`;
 
     const appTargets = path.join(tmp, "apps", name, "TARGETS");
     const coreTargets = path.join(tmp, "libs", `${name}-core`, "TARGETS");

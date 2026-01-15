@@ -7,6 +7,8 @@ import fs from "fs-extra";
 test("node lib scaffold: TARGETS includes lockfile label and auto_map wires provider", async () => {
   await runInTemp("node-lib-scaffold-wiring", async (tmp, _$) => {
     const $ = _$({ cwd: tmp, stdio: "pipe" });
+    // Skip lockfile generation: this test only asserts label wiring and provider mapping generation.
+    // The primary lockfile generation path is exercised elsewhere.
     await $`scaf new node lib demo --yes --skip-lockfile-gen`;
     const lockLabel = "lockfile:libs/demo/pnpm-lock.yaml#libs/demo";
     const tPath = path.join(tmp, "libs", "demo", "TARGETS");

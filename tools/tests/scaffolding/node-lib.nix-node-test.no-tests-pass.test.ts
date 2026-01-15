@@ -12,7 +12,7 @@ test("node lib: nix_node_test target passes when no tests present", async () => 
     const $ = _$({ cwd: tmp, stdio: "pipe" });
     await $`git init`;
     // Scaffold with test target enabled by default
-    await $`scaf new node lib demo --yes --skip-lockfile-gen`;
+    await $`scaf new node lib demo --yes`;
 
     // Fail fast if buck2 prelude is not available
 
@@ -24,8 +24,8 @@ test("node lib: nix_node_test target passes when no tests present", async () => 
     // Commit scaffold and lockfile so Nix flake sees importer under git+file sources
     await $`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
 
-    // Ensure the importer lockfile exists under libs/demo (some flows may write at repo root).
-    await $`bash --noprofile --norc -c 'test -f pnpm-lock.yaml && [ ! -f libs/demo/pnpm-lock.yaml ] && cp pnpm-lock.yaml libs/demo/pnpm-lock.yaml || true'`;
+    // Require `scaf new` primary path to produce the importer lockfile.
+    await $`bash --noprofile --norc -c 'test -f libs/demo/pnpm-lock.yaml'`;
 
     // Align the fixed-output hash mapping for this importer before running nix_node_test.
     await $({
@@ -33,8 +33,6 @@ test("node lib: nix_node_test target passes when no tests present", async () => 
       env: { ...process.env, NIX_PNPM_ALLOW_GENERATE: "1" },
     })`zx-wrapper tools/dev/update-pnpm-hash.ts --force --lockfile libs/demo/pnpm-lock.yaml`;
 
-    // Assert lockfile exists and dump importer directory for debugging
-    await $`bash --noprofile --norc -c 'set -e; echo "==== ls -la libs/demo ====\n"; ls -la libs/demo; test -f libs/demo/pnpm-lock.yaml'`;
     // Confirm Nix sees the importer lockfile path
     await $({
       stdio: "inherit",

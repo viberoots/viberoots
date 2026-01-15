@@ -1,6 +1,6 @@
-import "./worker-init";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import "./worker-init";
 
 export async function ensureBuckConfigForTempRepo(tmp: string, $: any): Promise<void> {
   let preludePath = "";
@@ -107,6 +107,20 @@ export async function ensureBuckConfigForTempRepo(tmp: string, $: any): Promise<
     ")",
     "EOF",
     "cat > .gitignore <<'EOF'",
+    "# Temp repo hygiene: keep tool/shell noise out of git snapshots.",
+    ".DS_Store",
+    "/.nix-zsh/",
+    "/.vscode/",
+    "/.zsh_history",
+    "/.zcompdump*",
+    "/.full-test-output.log",
+    "/.patch-sessions.json",
+    "/.ready",
+    "/*.log",
+    "/devbuild.*.log",
+    "/proc.*.log",
+    "/node.sample.*.log",
+    "/test-tmp-paths.log",
     "/.buck/",
     "/.cache/",
     "/buck-out/",

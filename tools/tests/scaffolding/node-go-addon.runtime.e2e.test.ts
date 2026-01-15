@@ -13,7 +13,7 @@ test("node go-addon: scaffold, build addon via Buck planner, run and observe Go-
 
     // Scaffold the three sibling packages (Node TS, Go c-archive, C N-API binding)
     await $`git init`;
-    await $`scaf new node go-addon demo --yes --skip-lockfile-gen`;
+    await $`scaf new node go-addon demo --yes`;
 
     // Export Buck graph for the temp repo (exercise exporter path; not strictly required to build)
     await $({

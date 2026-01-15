@@ -155,6 +155,21 @@ in rec {
       mod = ensureString ("module for " + name) (if n == null then null else get n "module");
       cflags = ensureStringList ("cflags for " + name) (if n == null then null else get n "cflags");
       ldflags = ensureStringList ("ldflags for " + name) (if n == null then null else get n "ldflags");
+      buildPyDeps = ensureStringList ("build_py_deps for " + name) (if n == null then null else get n "build_py_deps");
+      lockRel = lockRelFor name;
+      importerDir =
+        if lib.hasSuffix "/uv.lock" lockRel then lib.removeSuffix "/uv.lock" lockRel
+        else pkgPathOf name;
+      wheelhouse =
+        if (builtins.length buildPyDeps) > 0 then (
+          T.pyWheelhouse {
+            # Name is not part of the wheelhouse key (template uses constant pname); keep for debugging only.
+            name = name;
+            lockfile = lockRel;
+            subdir = importerDir;
+            srcRoot = repoRoot;
+          }
+        ) else null;
     in T.pyExt {
       inherit name;
       module = mod;
@@ -164,6 +179,8 @@ in rec {
       nixCxxAttrs = collectNixAttrsFor name;
       cflags = cflags;
       ldflags = ldflags;
+      wheelhouse = wheelhouse;
+      buildPyDeps = buildPyDeps;
     };
 
   # WASM variants (Phase 1: WASI baseline)

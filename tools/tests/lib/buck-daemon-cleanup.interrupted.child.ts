@@ -24,12 +24,20 @@ await runInTemp("buck-cleanup-interrupted", async (tmp, $) => {
   });
   const fsDir = path.join(tmp, "buck-out", "v2", "forkserver");
   const t0 = Date.now();
+  let forkserverReady = false;
   while (Date.now() - t0 < 30_000) {
     try {
       await fsp.access(fsDir);
+      forkserverReady = true;
       break;
     } catch {}
     await new Promise((r) => setTimeout(r, 50));
+  }
+  if (!forkserverReady) {
+    console.error(
+      `buck cleanup child: forkserver dir did not appear within 30s (expected at ${fsDir})`,
+    );
+    process.exit(2);
   }
   console.log("READY");
   // Block forever so the parent can SIGKILL us (simulating an interruption).

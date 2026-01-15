@@ -7,7 +7,7 @@ test("node go-addon: scaffold writes pnpm-lock.yaml for importer-scoped wiring",
   await runInTemp("node-go-addon-scaffold-lockfile", async (tmp, _$) => {
     const $ = _$({ cwd: tmp, stdio: "inherit" });
     await $`git init`;
-    await $`scaf new node go-addon demo --yes --skip-lockfile-gen`;
+    await $`scaf new node go-addon demo --yes`;
     const lf = path.join(tmp, "libs", "demo", "pnpm-lock.yaml");
     if (!(await exists(lf))) {
       throw new Error(`expected pnpm-lock.yaml to exist after scaffold: ${lf}`);

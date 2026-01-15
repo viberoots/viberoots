@@ -3,7 +3,6 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
-import { ensureImporterLockfileFresh } from "../../lib/pnpm-importer-lockfile";
 
 // Ensure dev env tooling when spawning Buck/Nix inside temp repos
 process.env.TEST_NEED_DEV_ENV = "1";
@@ -28,7 +27,7 @@ test(
 
       await $`git init`;
       // Scaffold the Node TS package and C++ addon sibling
-      await $`scaf new node cpp-addon demo --yes --skip-lockfile-gen`;
+      await $`scaf new node cpp-addon demo --yes`;
 
       const importer = "libs/demo";
       const sanitized = importer
@@ -41,19 +40,6 @@ test(
       await $({
         env,
       })`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
-
-      // Ensure the importer lockfile is real and consistent with package.json.
-      await ensureImporterLockfileFresh({
-        tmp,
-        $,
-        env,
-        importerRel: importer,
-        nixPnpmFetchTimeoutSecs: String(env.NIX_PNPM_FETCH_TIMEOUT || "600"),
-      });
-      // Commit the lockfile so pure flake snapshots see it
-      await $({
-        env,
-      })`bash --noprofile --norc -c 'git -C ${tmp} add ${lockfile} && git -C ${tmp} commit -m "chore(test): add importer lockfile"'`.nothrow();
 
       // Align the fixed-output hash mapping for this importer before building node-test.
       await $({

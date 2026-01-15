@@ -11,7 +11,7 @@ test("node go-addon: scaffold and run glue in temp repo", async () => {
     await $`git init`;
 
     // Scaffold the three sibling packages
-    await $`scaf new node go-addon demo --yes --skip-lockfile-gen`;
+    await $`scaf new node go-addon demo --yes`;
 
     // Basic assertions on created files
     const nodePkg = path.join(tmp, "libs", "demo");

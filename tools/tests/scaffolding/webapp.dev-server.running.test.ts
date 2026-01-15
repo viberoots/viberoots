@@ -39,6 +39,8 @@ async function waitForServer(url: string, timeoutMs = 30000): Promise<void> {
 }
 
 test("node webapp: dev server runs and serves index", { timeout: TEST_TIMEOUT_MS }, async () => {
+  process.env.NIX_PNPM_ALLOW_GENERATE = "1";
+  process.env.NIX_PNPM_FETCH_TIMEOUT = process.env.NIX_PNPM_FETCH_TIMEOUT || "240";
   await runInTemp("webapp-dev", async (tmp, _$) => {
     const name = "demo-web";
     const appDir = `apps/${name}`;
@@ -46,7 +48,7 @@ test("node webapp: dev server runs and serves index", { timeout: TEST_TIMEOUT_MS
     // Choose a free port programmatically to avoid both contention and reliance on Vite logs
     let chosenPort: number | undefined;
 
-    await _$`scaf new node webapp ${name} --yes --skip-lockfile-gen`;
+    await _$`scaf new node webapp ${name} --yes`;
     // runInTemp initializes a git repo; stage generated files so Nix git-flake evaluation sees them.
     try {
       await _$({ cwd: tmp, stdio: "pipe" })`git add -A ${appDir}`;
@@ -64,11 +66,6 @@ test("node webapp: dev server runs and serves index", { timeout: TEST_TIMEOUT_MS
     const outPathRaw = await _$({
       cwd: appAbs,
       stdio: "pipe",
-      env: {
-        ...process.env,
-        NIX_PNPM_FETCH_TIMEOUT: "240",
-        NIX_PNPM_ALLOW_GENERATE: "1",
-      },
     })`zx-wrapper ../../tools/dev/node-modules-build.ts`;
     try {
       await _$({ cwd: tmp, stdio: "pipe" })`git add -A ${appDir}`;

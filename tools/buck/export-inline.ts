@@ -19,6 +19,7 @@ function buildAttrs(): string[] {
     "name",
     "rule_type",
     "buck.type",
+    "build_py_deps",
     "srcs",
     "buck.srcs",
     "deps",

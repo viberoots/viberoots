@@ -9,7 +9,7 @@ process.env.TEST_NEED_DEV_ENV = "1";
 test("node cli: scaffold, build shim, run help", async () => {
   await runInTemp("node-cli-scaffold-shim", async (_tmp, $) => {
     await $`git init`;
-    await $`scaf new node cli demo --yes --skip-lockfile-gen`;
+    await $`scaf new node cli demo --yes`;
     // Ensure Buck sees the new target
     await $`buck2 targets //apps/demo:demo`;
     // Glue
@@ -27,7 +27,7 @@ test("node cli: scaffold, build shim, run help", async () => {
 test("node cli: build bundled single-file and run help", async () => {
   await runInTemp("node-cli-bundle", async (tmp, $) => {
     await $`git init`;
-    await $`scaf new node cli demo --yes --skip-lockfile-gen`;
+    await $`scaf new node cli demo --yes`;
     const targetsPath = path.join(tmp, "apps", "demo", "TARGETS");
     // Toggle bundle mode with importer param
     await $`node -e ${`const fs=require('fs');

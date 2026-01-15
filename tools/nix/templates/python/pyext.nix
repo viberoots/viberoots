@@ -13,6 +13,8 @@ let
   cflags0 = args.cflags or [];
   ldflags0 = args.ldflags or [];
   nixCxxAttrs0 = args.nixCxxAttrs or [];
+  wheelhouse0 = args.wheelhouse or null;
+  buildPyDeps0 = args.buildPyDeps or [];
 
   ensureStringList = ctx: xs:
     if xs == null then []
@@ -23,6 +25,11 @@ let
   cflags = ensureStringList "cflags" cflags0;
   ldflags = ensureStringList "ldflags" ldflags0;
   nixCxxAttrs = ensureStringList "nixCxxAttrs" nixCxxAttrs0;
+  buildPyDeps = ensureStringList "buildPyDeps" buildPyDeps0;
+  wheelhouse =
+    if wheelhouse0 == null then null
+    else if builtins.isAttrs wheelhouse0 then wheelhouse0
+    else builtins.throw "pyExt: expected wheelhouse to be a derivation/attrset (or null)";
 
   _moduleRequired =
     if module == "" then builtins.throw ("pyExt: module is required for " + name) else null;
@@ -52,8 +59,14 @@ pkgs.stdenv.mkDerivation {
   version = "0.1.0";
   src = pkgSrc;
 
-  buildInputs = nixPkgs ++ [ py ];
+  buildInputs = nixPkgs ++ [ py ] ++ (if wheelhouse == null then [] else [ wheelhouse ]);
   nativeBuildInputs = [ pkgs.llvmPackages.clang pkgs.coreutils ];
+  passthru =
+    (if wheelhouse == null then {}
+     else {
+       wheelhouse = wheelhouse;
+       wheelhouseEnv = wheelhouse.passthru.uv2nixEnv or null;
+     });
 
   dontConfigure = true;
   dontInstallCheck = true;
@@ -77,6 +90,51 @@ pkgs.stdenv.mkDerivation {
       exit 2
     fi
 
+    WHEELHOUSE_SITE="${if wheelhouse == null then "" else "${wheelhouse}/site"}"
+    EXTRA_PY_INC=""
+    if [ -n "$WHEELHOUSE_SITE" ] && [ ${toString (builtins.length buildPyDeps)} -gt 0 ]; then
+      export PYTHONPATH="$WHEELHOUSE_SITE"
+      export PYTHONNOUSERSITE=1
+      for pkg in ${lib.concatStringsSep " " (map lib.escapeShellArg buildPyDeps)}; do
+        inc="$(${py}/bin/python - "$pkg" <<'PY'
+import importlib
+import os
+import sys
+
+pkg = sys.argv[1]
+try:
+    m = importlib.import_module(pkg)
+except Exception as e:
+    raise SystemExit(f"pyExt: build_py_deps includes '{pkg}' but it is not importable from wheelhouse (check uv.lock): {e}")
+
+get_inc = getattr(m, "get_include", None)
+if callable(get_inc):
+    p = str(get_inc())
+    if not p:
+        raise SystemExit(f"pyExt: {pkg}.get_include() returned empty")
+    print(p)
+    raise SystemExit(0)
+
+mod_file = getattr(m, "__file__", None)
+if not mod_file:
+    raise SystemExit(f"pyExt: cannot determine include dir for '{pkg}' (no __file__ and no get_include())")
+
+base = os.path.dirname(os.path.abspath(mod_file))
+cand = os.path.join(base, "include")
+if os.path.isdir(cand):
+    print(cand)
+    raise SystemExit(0)
+
+raise SystemExit(
+    f"pyExt: cannot determine include dir for '{pkg}'. "
+    f"Expected {pkg}.get_include() or a directory at {cand}"
+)
+PY
+)"
+        EXTRA_PY_INC="$EXTRA_PY_INC -I$inc"
+      done
+    fi
+
     mkdir -p build/obj
     objs=""
 
@@ -85,7 +143,7 @@ pkgs.stdenv.mkDerivation {
       base="$(basename "$rel")"
       obj="build/obj/$base.o"
       mkdir -p "$(dirname "$obj")"
-      ${compiler} -fPIC ${nixInc} -I"$INCLUDEPY" ${lib.concatStringsSep " " (map lib.escapeShellArg cflags)} -c "$srcPath" -o "$obj"
+      ${compiler} -fPIC ${nixInc} -I"$INCLUDEPY" $EXTRA_PY_INC ${lib.concatStringsSep " " (map lib.escapeShellArg cflags)} -c "$srcPath" -o "$obj"
       objs="$objs $obj"
     done
 
