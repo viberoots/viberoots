@@ -112,6 +112,38 @@ This keeps build-time Python deps:
 - **deterministic** (wheelhouse key is importer-scoped)
 - **fast by default**: when `build_py_deps` is empty, `T.pyExt` does not instantiate the wheelhouse env at all (so simple extensions don’t pay for uv2nix).
 
+## PR-4: In-repo native linking for Python extensions (`link_deps` / `header_deps`)
+
+Python extension modules should be able to link in-repo native code explicitly, using the same “link intent” model as C++ targets:
+
+- `link_deps`: link-time intent (the planner follows these edges for closure)
+- `header_deps`: include-time intent (header-only surfaces)
+- `link_closure`: `"direct"` or `"transitive"`
+- `link_closure_overrides`: per-dep closure overrides (keys must be present in `link_deps`)
+
+### Supported producers (Phase 3)
+
+For this phase, `kind:pyext` supports only:
+
+- **C++ native libraries**: `lang:cpp` + `kind:lib` (used via `link_deps`)
+- **C++ header-only targets**: `lang:cpp` + `kind:headers` (used via `header_deps`)
+
+Wasm producers (labels like `kind:wasm` or `wasm:*`) are rejected as `link_deps` for native CPython extensions.
+
+### Planner behavior
+
+For a `kind:pyext` node, the Python planner:
+
+- resolves a deterministic link closure using the shared resolver in `tools/nix/planner/link-closure.nix`
+  - roots: the consumer’s `link_deps` (in order)
+  - traversal: follows `link_deps` on producer nodes
+  - each dep appears at most once (first occurrence wins)
+- materializes in-repo native inputs:
+  - each resolved `lang:cpp kind:lib` dep becomes a `T.cppLib` derivation and is passed to `T.pyExt` for linking
+  - each `lang:cpp kind:headers` dep becomes a `T.cppHeaders` derivation and contributes include roots (`$out/include`) to `T.pyExt`
+
+When an unsupported target appears in `link_deps`/`header_deps`, the planner fails fast with an actionable error that names the expected stamps.
+
 ## Open questions (explicitly deferred)
 
 - **Buck runtime**: if we want `buck2 test` to import native modules directly, we’ll need a runfiles / `sys.path` contract for extension artifacts in Buck’s Python rules.

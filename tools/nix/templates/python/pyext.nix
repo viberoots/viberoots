@@ -13,6 +13,8 @@ let
   cflags0 = args.cflags or [];
   ldflags0 = args.ldflags or [];
   nixCxxAttrs0 = args.nixCxxAttrs or [];
+  repoCxxPkgs0 = args.repoCxxPkgs or [];
+  includeRoots0 = args.includeRoots or [];
   wheelhouse0 = args.wheelhouse or null;
   buildPyDeps0 = args.buildPyDeps or [];
 
@@ -26,6 +28,16 @@ let
   ldflags = ensureStringList "ldflags" ldflags0;
   nixCxxAttrs = ensureStringList "nixCxxAttrs" nixCxxAttrs0;
   buildPyDeps = ensureStringList "buildPyDeps" buildPyDeps0;
+
+  ensureDrvList = ctx: xs:
+    if xs == null then []
+    else if builtins.isList xs && builtins.all builtins.isAttrs xs then xs
+    else builtins.throw ("pyExt: expected " + ctx + " to be a list of derivations");
+
+  repoCxxPkgs = ensureDrvList "repoCxxPkgs" repoCxxPkgs0;
+  includeRoots = ensureStringList "includeRoots" includeRoots0;
+  includeRootsSorted = lib.sort (a: b: a < b) includeRoots;
+  repoInc = lib.concatStringsSep " " (map (p: "-I${p}") includeRootsSorted);
   wheelhouse =
     if wheelhouse0 == null then null
     else if builtins.isAttrs wheelhouse0 then wheelhouse0
@@ -48,6 +60,7 @@ let
   nixPkgs = C.resolveAttrsToPkgs nixCxxAttrs;
   nixInc = C.nixIncFlags nixPkgs;
   nixLib = C.nixLibFlags nixPkgs;
+  repoLib = C.nixLibFlags repoCxxPkgs;
 
   py = pkgs.python3;
   compiler = if wantCxx then "${pkgs.llvmPackages.clang}/bin/clang++" else "${pkgs.llvmPackages.clang}/bin/clang";
@@ -59,7 +72,7 @@ pkgs.stdenv.mkDerivation {
   version = "0.1.0";
   src = pkgSrc;
 
-  buildInputs = nixPkgs ++ [ py ] ++ (if wheelhouse == null then [] else [ wheelhouse ]);
+  buildInputs = nixPkgs ++ repoCxxPkgs ++ [ py ] ++ (if wheelhouse == null then [] else [ wheelhouse ]);
   nativeBuildInputs = [ pkgs.llvmPackages.clang pkgs.coreutils ];
   passthru =
     (if wheelhouse == null then {}
@@ -143,7 +156,7 @@ PY
       base="$(basename "$rel")"
       obj="build/obj/$base.o"
       mkdir -p "$(dirname "$obj")"
-      ${compiler} -fPIC ${nixInc} -I"$INCLUDEPY" $EXTRA_PY_INC ${lib.concatStringsSep " " (map lib.escapeShellArg cflags)} -c "$srcPath" -o "$obj"
+      ${compiler} -fPIC ${nixInc} ${repoInc} -I"$INCLUDEPY" $EXTRA_PY_INC ${lib.concatStringsSep " " (map lib.escapeShellArg cflags)} -c "$srcPath" -o "$obj"
       objs="$objs $obj"
     done
 
@@ -151,10 +164,27 @@ PY
     outDir="$(dirname "$outRel")"
     mkdir -p "build/site/$outDir"
 
+    # Auto-discover static libraries from repo pkgs to link with -l<name> in stable order
+    declare -a REPO_LIB_DIRS
+    REPO_LIB_DIRS=(
+      ${lib.concatStringsSep " " (map (p: ("${p}/lib")) repoCxxPkgs)}
+    )
+    declare -a REPO_LIBFLAGS
+    for d in "''${REPO_LIB_DIRS[@]}"; do
+      if [ -d "$d" ]; then
+        while IFS= read -r f; do
+          b=$(basename "$f")
+          n="''${b#lib}"
+          n="''${n%.a}"
+          REPO_LIBFLAGS+=("-l$n")
+        done < <(find "$d" -maxdepth 1 -type f -name 'lib*.a' 2>/dev/null | sort)
+      fi
+    done
+
     if [ "${if pkgs.stdenv.isDarwin then "1" else "0"}" = "1" ]; then
-      ${compiler} -bundle -undefined dynamic_lookup ${nixLib} ${lib.concatStringsSep " " (map lib.escapeShellArg ldflags)} $objs -o "build/site/$outRel"
+      ${compiler} -bundle -undefined dynamic_lookup ${repoLib} ${nixLib} ${lib.concatStringsSep " " (map lib.escapeShellArg ldflags)} $objs "''${REPO_LIBFLAGS[@]}" -o "build/site/$outRel"
     else
-      ${compiler} -shared ${nixLib} ${lib.concatStringsSep " " (map lib.escapeShellArg ldflags)} $objs -o "build/site/$outRel"
+      ${compiler} -shared ${repoLib} ${nixLib} ${lib.concatStringsSep " " (map lib.escapeShellArg ldflags)} $objs "''${REPO_LIBFLAGS[@]}" -o "build/site/$outRel"
     fi
   '';
 

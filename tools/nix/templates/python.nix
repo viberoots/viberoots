@@ -112,9 +112,11 @@ in {
     ldflags ? [],
     nixCxxAttrs ? [],
     buildPyDeps ? [],
+    repoCxxPkgs ? [],
+    includeRoots ? [],
   }:
     PyExt {
-      inherit name module srcRoot subdir srcList cflags ldflags nixCxxAttrs wheelhouse buildPyDeps;
+      inherit name module srcRoot subdir srcList cflags ldflags nixCxxAttrs wheelhouse buildPyDeps repoCxxPkgs includeRoots;
     };
 
   # Reusable, content-addressed wheelhouse keyed ONLY by lockfile + patches.

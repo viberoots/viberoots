@@ -6,6 +6,7 @@ let
   get = ctx.get;
   repoRoot = ctx.repoRoot;
   pkgPathOf = ctx.pkgPathOf;
+  LC = import ./link-closure.nix { inherit lib; };
   L = import ./lib.nix {
     inherit lib;
     get = ctx.get;
@@ -72,6 +73,105 @@ let
 
   nodeOfName = nm:
     if builtins.hasAttr nm byName then byName.${nm} else null;
+
+  dedupePreserveOrder = xs:
+    let
+      step = st: x:
+        if builtins.hasAttr x st.seen then st else { seen = st.seen // { "${x}" = true; }; out = st.out ++ [ x ]; };
+      st0 = { seen = {}; out = []; };
+    in (builtins.foldl' step st0 xs).out;
+
+  cleanLabel = L.cleanLabel;
+
+  normalizeLabelList = ctxStr: xs:
+    builtins.map cleanLabel (dedupePreserveOrder (ensureStringList ctxStr xs));
+
+  ensureStringAttrs = ctxStr: x:
+    if x == null then {}
+    else if builtins.isAttrs x then x
+    else builtins.throw ("python planner: expected " + ctxStr + " to be an attrset");
+
+  normalizeOverrides = name: overridesRaw:
+    let
+      overrides0 = ensureStringAttrs ("link_closure_overrides for " + name) overridesRaw;
+      keys = builtins.attrNames overrides0;
+      pairs = builtins.map (k: { name = cleanLabel k; value = overrides0.${k}; }) keys;
+      _ = builtins.map (p:
+        if builtins.isString p.value then true
+        else builtins.throw ("python planner: expected link_closure_overrides['" + p.name + "'] to be a string")
+      ) pairs;
+      names = builtins.map (p: p.name) pairs;
+      uniqNames = builtins.attrNames (builtins.listToAttrs (builtins.map (n: { name = n; value = true; }) names));
+      _dupes =
+        if (builtins.length uniqNames) == (builtins.length names) then null
+        else builtins.throw ("python planner: normalized link_closure_overrides has duplicate keys for " + name);
+    in builtins.listToAttrs pairs;
+
+  isWasmish = labs:
+    builtins.any (l:
+      builtins.isString l && (
+        l == "kind:wasm" ||
+        l == "flavor:wasm" ||
+        lib.hasPrefix "wasm:" l
+      )
+    ) (if labs == null then [] else labs);
+
+  ensureRepoCppLibDep = consumer: dep:
+    let
+      depNode = nodeOfName dep;
+      rt = if depNode == null then null else get depNode "rule_type";
+      labs = if depNode == null then [] else labelsOf depNode;
+      haveLang = depNode != null && builtins.elem "lang:cpp" labs;
+      haveLib = depNode != null && builtins.elem "kind:lib" labs;
+    in
+      if depNode == null then builtins.throw ("python planner: link_deps for " + consumer + " contains " + dep + " — unknown target (missing from exported graph)")
+      else if !haveLang then builtins.throw ("python planner: link_deps for " + consumer + " contains " + dep + " — expected lang:cpp; got labels=" + (builtins.toString labs) + " rule_type=" + (builtins.toString rt))
+      else if isWasmish labs then builtins.throw ("python planner: link_deps for " + consumer + " contains " + dep + " — Python native extensions cannot link wasm producers; got labels=" + (builtins.toString labs))
+      else if !haveLib then builtins.throw ("python planner: link_deps for " + consumer + " contains " + dep + " — expected kind:lib; got labels=" + (builtins.toString labs) + " rule_type=" + (builtins.toString rt))
+      else dep;
+
+  ensureRepoCppHeadersDep = consumer: dep:
+    let
+      depNode = nodeOfName dep;
+      rt = if depNode == null then null else get depNode "rule_type";
+      labs = if depNode == null then [] else labelsOf depNode;
+      haveLang = depNode != null && builtins.elem "lang:cpp" labs;
+      haveHeaders = depNode != null && builtins.elem "kind:headers" labs;
+    in
+      if depNode == null then builtins.throw ("python planner: header_deps for " + consumer + " contains " + dep + " — unknown target (missing from exported graph)")
+      else if !haveLang then builtins.throw ("python planner: header_deps for " + consumer + " contains " + dep + " — expected lang:cpp; got labels=" + (builtins.toString labs) + " rule_type=" + (builtins.toString rt))
+      else if !haveHeaders then builtins.throw ("python planner: header_deps for " + consumer + " contains " + dep + " — expected kind:headers; got labels=" + (builtins.toString labs) + " rule_type=" + (builtins.toString rt))
+      else dep;
+
+  patchInputsFor = name:
+    let
+      rels0 = builtins.filter (s: lib.hasSuffix ".patch" s) (srcsOf name);
+      rels = builtins.filter (s: !(lib.hasInfix "placeholder" s)) rels0;
+      pkg = pkgPathOf name;
+      toImportedPath = p: builtins.path {
+        path = (repoRoot + "/" + pkg + "/" + p);
+        name = "patch";
+      };
+    in builtins.map toImportedPath rels;
+
+  mkCppLib = name:
+    T.cppLib {
+      inherit name;
+      srcRoot = repoRoot;
+      subdir = pkgPathOf name;
+      nixCxxAttrs = collectNixAttrsFor name;
+      srcList = srcsOf name;
+      patches = patchInputsFor name;
+    };
+
+  mkCppHeaders = name:
+    T.cppHeaders {
+      inherit name;
+      srcRoot = repoRoot;
+      subdir = pkgPathOf name;
+      srcList = srcsOf name;
+      patches = patchInputsFor name;
+    };
 
   collectNixAttrsFor = name:
     let
@@ -156,6 +256,36 @@ in rec {
       cflags = ensureStringList ("cflags for " + name) (if n == null then null else get n "cflags");
       ldflags = ensureStringList ("ldflags for " + name) (if n == null then null else get n "ldflags");
       buildPyDeps = ensureStringList ("build_py_deps for " + name) (if n == null then null else get n "build_py_deps");
+      linkDeps0 = normalizeLabelList ("link_deps for " + name) (if n == null then null else get n "link_deps");
+      headerDeps0 = normalizeLabelList ("header_deps for " + name) (if n == null then null else get n "header_deps");
+      defaultClosure =
+        let raw = if n == null then null else get n "link_closure";
+        in if raw == null then "direct"
+           else if builtins.isString raw then raw
+           else builtins.throw ("python planner: expected link_closure for " + name + " to be a string");
+      overridesRaw = if n == null then null else get n "link_closure_overrides";
+      overrides0 = normalizeOverrides name overridesRaw;
+      overrideKeys = builtins.attrNames overrides0;
+      missingOverrideKeys = builtins.filter (k: !(builtins.elem k linkDeps0)) overrideKeys;
+      _overrideKeysValid =
+        if missingOverrideKeys == [] then null
+        else builtins.throw ("python planner: link_closure_overrides for " + name + " contains keys not present in link_deps: " + (builtins.toString missingOverrideKeys));
+      linkDepsOf = nm:
+        let
+          dn = cleanLabel nm;
+          nn = nodeOfName dn;
+          raw = if nn == null then null else get nn "link_deps";
+        in normalizeLabelList ("link_deps for " + dn) raw;
+      resolvedLinkDeps = LC.resolveLinkClosure {
+        inherit byName;
+        linkDepsOf = linkDepsOf;
+        roots = linkDeps0;
+        defaultClosure = defaultClosure;
+        overrides = overrides0;
+      };
+      repoLinkPkgs = builtins.map (dn: mkCppLib (ensureRepoCppLibDep name dn)) resolvedLinkDeps;
+      repoHeaderPkgs = builtins.map (dn: mkCppHeaders (ensureRepoCppHeadersDep name dn)) headerDeps0;
+      includeRoots = builtins.map (p: "${p}/include") repoHeaderPkgs;
       lockRel = lockRelFor name;
       importerDir =
         if lib.hasSuffix "/uv.lock" lockRel then lib.removeSuffix "/uv.lock" lockRel
@@ -181,6 +311,8 @@ in rec {
       ldflags = ldflags;
       wheelhouse = wheelhouse;
       buildPyDeps = buildPyDeps;
+      repoCxxPkgs = repoLinkPkgs;
+      includeRoots = includeRoots;
     };
 
   # WASM variants (Phase 1: WASI baseline)
