@@ -79,6 +79,41 @@ The intent is that extension builds are invalidated by the same importer-scoped 
 - extension sources (`srcs`) and build flags (`cflags`, `ldflags`)
 - nixpkgs native inputs requested via `nixpkg:` labels
 
+## PR-5: Phase 3 invariants (hardening)
+
+After Phase 3 works end-to-end, we lock down the invariants that keep it stable and predictable.
+
+### Determinism (ordering)
+
+- **Native link closure ordering**: the Python planner resolves `kind:pyext` `link_deps` using `tools/nix/planner/link-closure.nix`:
+  - roots are visited in order
+  - when a node is `"transitive"`, its `link_deps` are visited in order
+  - each dep appears at most once (first occurrence wins)
+- **Overlay merge ordering**: `pyApp` / `pyLib` merge `nativeModuleOverlays` in the order provided by the planner.
+  - The uv2nix adapter copies each overlay’s `$out/site/**` into the final `$out/site/**` by iterating the overlay list in order.
+  - Overlay ordering is a semantic choice when two overlays collide on the same path. The planner order is the only source of truth.
+
+### Invalidation (in-repo native deps)
+
+When a Python extension links an in-repo native producer, patch edits under that producer must invalidate:
+
+- the producer derivation (e.g. `T.cppLib`)
+- the extension derivation (`T.pyExt`)
+- the downstream Python app/lib runtime that imports the extension
+
+The required rule for Phase 3 is:
+
+- native producer patch files are part of the exported graph surface (typically by being included in the producer target’s `srcs`)
+- the Python planner passes those patch files as explicit `patches` inputs when materializing repo-native producers (`T.cppLib`, `T.cppHeaders`)
+
+This avoids “hidden dependencies” where the planner links a repo native target but patch changes do not appear in the planner-visible graph inputs.
+
+### Backend boundaries (WASM)
+
+Python WASM backends (WASI / Pyodide) remain **pure-Python only** for this phase:
+
+- if a `kind:wasm` Python target has any `kind:pyext` target in its dependency closure, the Python planner fails fast with a targeted error that names the offending `kind:pyext` targets
+
 ## PR-3: Build-time Python deps for `T.pyExt` (uv wheelhouse env)
 
 Many extension modules need **Python packages at build time** (headers from `numpy`, `pybind11`, or project-specific helper packages).

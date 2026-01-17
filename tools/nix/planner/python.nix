@@ -324,6 +324,14 @@ in rec {
           labs = labelsOfName nm;
           hits = builtins.filter (l: (builtins.typeOf l) == "string" && lib.hasPrefix "backend:" l) (if labs == null then [] else labs);
         in if hits == [] then "wasi" else (lib.removePrefix "backend:" (builtins.head hits));
+      _noPyExt =
+        let
+          pyExtDeps = collectPyExtDepsTransitive name;
+        in if pyExtDeps == [] then null else builtins.throw (
+          "python planner: kind:wasm target " + name
+          + " (backend:" + (backendFor name) + ") depends on kind:pyext targets, which are not supported for Python WASM backends: "
+          + (builtins.toString pyExtDeps)
+        );
       # Determine trim mode from labels; default to "none". Accept labels like "trim:safe" or "trim:aggressive".
       trimFor = nm:
         let
@@ -347,7 +355,7 @@ in rec {
         subdir = pkgPathOf dn;
         trim = trimFor dn;
       }) pyLibDeps;
-    in T.pyWasmApp {
+    in builtins.seq _noPyExt (T.pyWasmApp {
       inherit name;
       lockfile = lockRelFor name;
       srcRoot = repoRoot;
@@ -355,22 +363,30 @@ in rec {
       libOverlays = overlays;
       backend = backendFor name;
       trim = trimFor name;
-    };
+    });
 
   mkWasmLib = name:
     let
+      _noPyExt =
+        let
+          pyExtDeps = collectPyExtDepsTransitive name;
+        in if pyExtDeps == [] then null else builtins.throw (
+          "python planner: kind:wasm target " + name
+          + " depends on kind:pyext targets, which are not supported for Python WASM backends: "
+          + (builtins.toString pyExtDeps)
+        );
       trimFor = nm:
         let
           labs = labelsOfName nm;
           hits = builtins.filter (l: (builtins.typeOf l) == "string" && lib.hasPrefix "trim:" l) (if labs == null then [] else labs);
         in if hits == [] then "none" else (lib.removePrefix "trim:" (builtins.head hits));
     in
-      T.pyWasmLib {
+      builtins.seq _noPyExt (T.pyWasmLib {
         inherit name;
         lockfile = lockRelFor name;
         srcRoot = repoRoot;
         subdir = pkgPathOf name;
         trim = trimFor name;
-      };
+      });
 }
 

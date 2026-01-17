@@ -42,6 +42,14 @@ export async function rsyncRepoTo(tmp: string) {
       "/.direnv",
       "/result",
       "/tools/buck/graph.json",
+      "/docs",
+      "/lang-design-docs",
+      "/quad-alignment-*.md",
+      "/trio-alignment-*.md",
+      "/collect-garbage-log.txt",
+      "/devbuild.run.*.out",
+      "/run.*.out",
+      "/v.*.out",
     ];
     if (goOnly) {
       excludes.push("/cpp", "/tools/nix/templates", "/tools/scaffolding/templates");

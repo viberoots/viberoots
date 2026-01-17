@@ -70,7 +70,7 @@ async function seedConfigKey(): Promise<string> {
   const dirtySig = await workspaceDirtySignature();
   return JSON.stringify({
     // Bump when seed layout/contents rules change, to avoid reusing an old incompatible seed dir.
-    SEED_VERSION: "2",
+    SEED_VERSION: "6",
     TEST_RSYNC_ROOTS: String(process.env.TEST_RSYNC_ROOTS || ""),
     TEST_PARTIAL_CLONE_GO_ONLY: String(process.env.TEST_PARTIAL_CLONE_GO_ONLY || ""),
     TEST_EXCLUDE_CPP_REQS: String(process.env.TEST_EXCLUDE_CPP_REQS || ""),
@@ -100,13 +100,15 @@ function sharedSeedPaths(seedKey: string): {
   seedDir: string;
   readyMarker: string;
   lockFile: string;
+  seedTar: string;
 } {
   const root = stableSeedCacheRoot();
   const h = shortHash(seedKey);
   const seedDir = path.join(root, `seed-${h}`);
+  const seedTar = seedDir + ".tar";
   const readyMarker = path.join(seedDir, ".ready");
   const lockFile = path.join(root, `seed-${h}.lock`);
-  return { root, seedDir, readyMarker, lockFile };
+  return { root, seedDir, readyMarker, lockFile, seedTar };
 }
 
 async function waitForReadyMarker(readyMarker: string, timeoutMs: number): Promise<boolean> {
@@ -122,11 +124,18 @@ async function waitForReadyMarker(readyMarker: string, timeoutMs: number): Promi
 }
 
 async function ensureSharedSeedRepo(deps: SeedDeps, seedKey: string): Promise<string> {
-  const { root, seedDir, readyMarker, lockFile } = sharedSeedPaths(seedKey);
+  const { root, seedDir, readyMarker, lockFile, seedTar } = sharedSeedPaths(seedKey);
   await fsp.mkdir(root, { recursive: true });
 
   try {
     await fsp.access(readyMarker);
+    try {
+      await fsp.access(seedTar);
+    } catch {
+      try {
+        await $`tar -cf ${seedTar} -C ${seedDir} .`;
+      } catch {}
+    }
     return seedDir;
   } catch {}
 
@@ -170,6 +179,9 @@ async function ensureSharedSeedRepo(deps: SeedDeps, seedKey: string): Promise<st
     // Ready marker is a cache coordination primitive; do not track it in git.
     await fsp.writeFile(path.join(tmpDir, ".ready"), "ok\n", "utf8");
     await fsp.rename(tmpDir, seedDir);
+    try {
+      await $`tar -cf ${seedTar} -C ${seedDir} .`;
+    } catch {}
     return seedDir;
   } finally {
     try {
@@ -222,12 +234,59 @@ async function cloneSeedToTemp(opts: {
   mode: RepoInitMode;
 }): Promise<void> {
   const { seedDir, tmpDir, mode } = opts;
+  const seedTar = seedDir + ".tar";
+  const tryTar = async (): Promise<boolean> => {
+    try {
+      await fsp.access(seedTar);
+    } catch {
+      return false;
+    }
+    try {
+      await $`tar -xf ${seedTar} -C ${tmpDir}`;
+      const flakeOk = await fsp
+        .access(path.join(tmpDir, "flake.nix"))
+        .then(() => true)
+        .catch(() => false);
+      const exportGraphOk = await fsp
+        .access(path.join(tmpDir, "tools", "buck", "export-graph.ts"))
+        .then(() => true)
+        .catch(() => false);
+      return flakeOk && exportGraphOk;
+    } catch {
+      return false;
+    }
+  };
+  const tryShellClone = async (useCow: boolean): Promise<boolean> => {
+    if (process.platform === "win32") return false;
+    const src = path.join(seedDir, ".");
+    const dst = path.join(tmpDir, ".");
+    const run = async (flags: string[]): Promise<boolean> => {
+      try {
+        await $`cp ${flags} ${src} ${dst}`;
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    if (useCow) {
+      if (await run(["-a", "--reflink=auto"])) return true;
+      if (await run(["-a", "-c"])) return true;
+      return await run(["-a"]);
+    }
+    return await run(["-a"]);
+  };
   if (mode === "seed-cow") {
-    await copyTree(seedDir, tmpDir, { cloneMode: "try", force: true });
+    if (await tryTar()) return;
+    if (!(await tryShellClone(true))) {
+      await copyTree(seedDir, tmpDir, { cloneMode: "try", force: true });
+    }
     return;
   }
   if (mode === "seed-copy") {
-    await copyTree(seedDir, tmpDir, { cloneMode: "none", force: true });
+    if (await tryTar()) return;
+    if (!(await tryShellClone(false))) {
+      await copyTree(seedDir, tmpDir, { cloneMode: "none", force: true });
+    }
     return;
   }
   throw new Error(`unexpected clone mode: ${mode}`);

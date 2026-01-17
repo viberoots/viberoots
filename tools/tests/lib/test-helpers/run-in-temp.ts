@@ -52,6 +52,15 @@ export async function runInTemp<T>(
   fn: (tmp: string, $: any) => Promise<T>,
   opts?: { git?: boolean },
 ): Promise<T> {
+  const envKeys = [
+    "TEST_RSYNC_ROOTS",
+    "TEST_PARTIAL_CLONE_GO_ONLY",
+    "TEST_EXCLUDE_CPP_REQS",
+    "TEST_FORCE_SEED_REPO",
+    "TEST_DISABLE_SEED_REPO",
+  ] as const;
+  const envSnapshot: Record<string, string | undefined> = {};
+  for (const key of envKeys) envSnapshot[key] = process.env[key];
   const tmp = await mktemp(name + "-");
   // Optional early signal for tests that need the temp path even if setup is interrupted or slow
   // (e.g. to coordinate out-of-process cleanup/reaping assertions).
@@ -197,6 +206,11 @@ export async function runInTemp<T>(
   try {
     return await fn(tmp, _$);
   } finally {
+    for (const key of envKeys) {
+      const prev = envSnapshot[key];
+      if (prev === undefined) delete process.env[key];
+      else process.env[key] = prev;
+    }
     await timeAsync("buck-daemon cleanup", async () => await killBuckDaemonsForRepo(tmp, _$));
     if ((process.env.TEST_REWRITE_COVERAGE_TMP || "") === "1") {
       await timeAsync(`rewriteCoverageUrls(${path.basename(tmp)})`, async () =>

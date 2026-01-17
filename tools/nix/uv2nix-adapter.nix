@@ -126,7 +126,7 @@ in
   let
     uvDrv = uv2nixLib.mkEnv {
       src = srcForUv2nixEnv;
-      inherit subdir lockfile wsRoot;
+      inherit subdir lockfile;
       devOverrides = devOverridesCoerced;
       # PR-2: delegate patching to uv2nix; pass patchesMap and testResolve as structured inputs.
       patchesMap = patchesMap;

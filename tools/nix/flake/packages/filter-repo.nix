@@ -14,6 +14,7 @@ builtins.filterSource
       isRootDir "buck-out" ||
       isRootDir ".buck" ||
       isRootDir "test-logs" ||
+      isRootDir "tools/tests" ||
       isRootDir ".clinic" ||
       isRootDir ".cache" ||
       isRootDir "result" ||
