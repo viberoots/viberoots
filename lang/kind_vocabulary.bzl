@@ -19,6 +19,7 @@ ALLOWED_KIND_VALUES = [
     "lib",
     "packaging",
     "pyext",
+    "pyext_wasm",
     "probe",
     "test",
     "wasm",

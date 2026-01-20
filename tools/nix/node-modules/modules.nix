@@ -94,13 +94,15 @@ in {
             [ -d "$verDir" ] || continue
             ver="$(basename "$verDir")"
             mkdir -p "$LOCAL_STORE/$ver"
+            chmod -R u+rwX "$LOCAL_STORE/$ver"
             if [ -d "$verDir/files" ] && [ ! -e "$LOCAL_STORE/$ver/files" ]; then
               ln -s "$verDir/files" "$LOCAL_STORE/$ver/files"
             fi
             if [ -d "$verDir/index" ]; then
               rm -rf "$LOCAL_STORE/$ver/index"
               mkdir -p "$LOCAL_STORE/$ver/index"
-              cp -R "$verDir/index/." "$LOCAL_STORE/$ver/index/"
+              cp -R --no-preserve=mode,ownership "$verDir/index/." "$LOCAL_STORE/$ver/index/"
+              chmod -R u+rwX "$LOCAL_STORE/$ver/index"
             fi
           done
         }

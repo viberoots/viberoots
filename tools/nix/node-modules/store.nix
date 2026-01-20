@@ -24,11 +24,10 @@ in {
       lockInput = if hasLockFs then (builtins.path { path = lockAbsStrFs; name = "pnpm-lock.yaml"; }) else (if hasLockStore then (builtins.path { path = lockAbsStrStore; name = "pnpm-lock.yaml"; }) else null);
       # Prefer an explicit mkPnpmStore argument; fall back to the global arg/env.
       chosenPrefetchedPath = if prefetchedStorePath == null || prefetchedStorePath == "" then prefetchedStorePathGlobal else prefetchedStorePath;
-      # Only use a prefetched store when explicitly enabled via env. Default is to fetch inside the FOD
-      # to avoid loops caused by partially hydrated local stores.
-      preferPrefetch = (builtins.getEnv "NIX_USE_PREFETCHED_PNPM_STORE") == "1";
-      # Materialize the chosen path into the Nix store so builders can read it in sandbox.
-      prefetchedInput = if (!preferPrefetch) || (chosenPrefetchedPath == null || chosenPrefetchedPath == "") then null else builtins.path { path = chosenPrefetchedPath; name = "prefetched-store"; };
+      # Do not use prefetched stores for pnpm-store FODs. They can include extra packages
+      # beyond the lockfile, which makes the fixed-output hash unstable.
+      preferPrefetch = false;
+      prefetchedInput = null;
       ftVal = let v = builtins.getEnv "NIX_PNPM_FETCH_TIMEOUT"; in if v != "" then v else "180";
       # Choose FOD hashing strategy:
       # - When a lockfile is present (in live FS or flake snapshot), fix the output hash to the lockfile hash.

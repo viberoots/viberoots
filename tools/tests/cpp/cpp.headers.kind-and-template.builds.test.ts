@@ -5,10 +5,6 @@ import path from "node:path";
 import { runInTemp } from "../lib/test-helpers";
 import { sanitizeAttrNameFromLabel } from "../../lib/labels";
 
-function systemForPlatform(): string {
-  return process.platform === "darwin" ? "aarch64-darwin" : "x86_64-linux";
-}
-
 function parseOutPath(stdout: unknown): string {
   const lines = String(stdout || "")
     .trim()
@@ -59,7 +55,7 @@ await runInTemp("cpp-headers-builds", async (tmp, $) => {
     stdio: "pipe",
     reject: false,
     nothrow: true,
-  })`nix build --accept-flake-config -f ${flakeGraphGen} --arg pkgs 'import <nixpkgs> {}' --arg src ./. --arg graphJsonPath ./tools/buck/graph.json --no-link --print-out-paths cppTargetsFlat.${attrSuffix}`;
+  })`nix build --impure --accept-flake-config --file ${flakeGraphGen} --arg pkgs 'import <nixpkgs> {}' --arg src ./. --arg graphJsonPath ./tools/buck/graph.json --no-link --print-out-paths cppTargetsFlat.${attrSuffix}`;
   assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
 
   const outPath = parseOutPath(res.stdout);

@@ -10,6 +10,10 @@ load(
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
 load("//lang:sanitize.bzl", "sanitize_name")
 load("//python:pyext_stub.bzl", "python_pyext_stub")
+load(
+    "//python:defs_pyext_wasm.bzl",
+    _nix_python_wasm_extension_module = "nix_python_wasm_extension_module",
+)
 
 def nix_python_library(name, lockfile_label = None, deps = [], **kwargs):
     """
@@ -178,6 +182,9 @@ def nix_python_extension_module(
     )
     python_pyext_stub(deps = wiring.deps, **wiring.kwargs)
 
+def nix_python_wasm_extension_module(*args, **kwargs):
+    return _nix_python_wasm_extension_module(*args, **kwargs)
+
 # WASM (WASI) convenience macros — stamp kind:wasm so planner routes to pyWasm* templates
 def nix_python_wasm_app(name, lockfile_label = None, deps = [], labels = [], **kwargs):
     """
@@ -218,5 +225,15 @@ def nix_python_wasm_lib(name, lockfile_label = None, deps = [], labels = [], **k
         MODULE_PROVIDERS = MODULE_PROVIDERS,
     )
     python_library(deps = wiring.deps, **wiring.kwargs)
+
+__all__ = [
+    "nix_python_binary",
+    "nix_python_extension_module",
+    "nix_python_library",
+    "nix_python_test",
+    "nix_python_wasm_app",
+    "nix_python_wasm_extension_module",
+    "nix_python_wasm_lib",
+]
 
 

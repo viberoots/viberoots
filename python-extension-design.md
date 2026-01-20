@@ -37,6 +37,19 @@ The Buck-side target shape is:
   - `cflags`, `ldflags`
   - link intent attrs (`link_deps`, `header_deps`, `link_closure`, `link_closure_overrides`)
 
+## WASM extension modules (separate contract)
+
+I keep WASM-targeted extension modules separate from native `kind:pyext` to avoid ABI confusion. The WASM contract is a graph-only producer for now and does not imply runtime wiring.
+
+- **labels**: `lang:python`, `kind:pyext_wasm`, plus one explicit backend label (`backend:wasi` or `backend:pyodide`)
+- **attrs**:
+  - `module` (e.g. `"demo._native"`)
+  - `srcs` and optional `headers`
+  - `cflags`, `ldflags`
+  - `build_py_deps` (build-time Python packages for headers)
+
+I keep `link_deps` and `header_deps` out of `kind:pyext_wasm` until a dedicated WASM link model is added.
+
 ## Nix realization contract
 
 ### `T.pyExt`

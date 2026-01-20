@@ -94,6 +94,10 @@ async function discoverImportersWithLock(root: string): Promise<string[]> {
 
 if (glueOnly) {
   if (verbose) console.log("[install-deps] glue-only mode");
+  try {
+    process.env.INSTALL_DEPS_GLUE_ONLY = "1";
+    process.env.INSTALL_GLUE_SKIP_PNPM_HASH = "1";
+  } catch {}
   // Minimal Go preparation so Nix graph builds are deterministic and fast
   if (!effSkipGoTidy) {
     await runGoModTidyForMissingSum(repoRoot, dryRun, verbose);
@@ -104,7 +108,11 @@ if (glueOnly) {
   process.env.INSTALL_DEPS_GOMOD_TIMEOUT = process.env.INSTALL_DEPS_GOMOD_TIMEOUT || "60";
   await runGomod2nixGenerate(dryRun, verbose);
   await runGomod2nixScanAll(dryRun, verbose);
-  await runGlue(dryRun, verbose);
+  if (!skipGlue) {
+    await runGlue(dryRun, verbose);
+  } else if (verbose) {
+    console.log("[skip] glue regeneration");
+  }
   console.log("Glue refreshed.");
   process.exit(0);
 }

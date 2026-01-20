@@ -9,8 +9,13 @@ if ! command -v nix >/dev/null 2>&1; then
 fi
 
 # Run lint-staged inside the repo's Nix dev shell so pnpm and tools are on PATH.
+# If already in a dev shell, avoid spawning nix develop again (slow, can hang in CI).
 # Disable node_modules linking and skip node install to avoid spawning many node processes.
 # Avoid mutating flake.lock during hooks with --no-write-lock-file
-BUCK_CONFIG_LOCK=1 NO_NODE_MODULES_LINK=1 SKIP_NODE_INSTALL=1 nix develop "${ROOT_DIR}" --accept-flake-config --no-write-lock-file -c pnpm exec lint-staged --relative --allow-empty
+if [ "${IN_NIX_SHELL:-}" = "1" ]; then
+  BUCK_CONFIG_LOCK=1 NO_NODE_MODULES_LINK=1 SKIP_NODE_INSTALL=1 timeout 9m pnpm exec lint-staged --relative --allow-empty
+else
+  BUCK_CONFIG_LOCK=1 NO_NODE_MODULES_LINK=1 SKIP_NODE_INSTALL=1 timeout 9m nix develop "${ROOT_DIR}" --accept-flake-config --no-write-lock-file -c pnpm exec lint-staged --relative --allow-empty
+fi
 
 # Do not force-clean tree here; lint-staged already restages intended fixes and preserves partial commits.

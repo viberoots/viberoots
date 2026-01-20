@@ -5,11 +5,13 @@ import { test } from "node:test";
 import { scaffoldLib } from "../lib/lang-fixtures";
 import { runInTemp } from "../lib/test-helpers";
 
+process.env.TEST_NEED_DEV_ENV = "1";
+
 test("go lib: scaffold and build+test", { timeout: 240_000 }, async () => {
   // Ensure minimal roots are available in the temp repo for Buck macros.
   const prevRoots = process.env.TEST_RSYNC_ROOTS;
   if (!prevRoots) {
-    process.env.TEST_RSYNC_ROOTS = "tools toolchains go lang third_party/providers";
+    process.env.TEST_RSYNC_ROOTS = "tools toolchains go lang third_party/providers prelude";
   }
   try {
     await runInTemp("lib-scaffold-and-build", async (_tmp, _$) => {

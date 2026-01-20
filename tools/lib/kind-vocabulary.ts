@@ -11,6 +11,7 @@ export type KindValue =
   | "lib"
   | "packaging"
   | "pyext"
+  | "pyext_wasm"
   | "probe"
   | "test"
   | "wasm";
@@ -26,6 +27,7 @@ export const ALLOWED_KIND_VALUES: ReadonlyArray<KindValue> = [
   "lib",
   "packaging",
   "pyext",
+  "pyext_wasm",
   "probe",
   "test",
   "wasm",

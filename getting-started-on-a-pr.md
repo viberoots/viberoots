@@ -70,3 +70,21 @@ Common causes we’ve seen:
 - **Accidentally added “heavy” tests** (tests that do full scaffolds, Nix builds, or large temp-repo operations without a good reason).
 - **Tests doing extra work by default** (for example, creating expensive environments even when the feature isn’t used). Prefer making heavyweight inputs opt-in and keyed narrowly.
 - **Too many nested Buck/Nix invocations at once** causing resource contention (adjust `VERIFY_BUCK2_THREADS` if needed, but fix avoidable work first).
+
+### 5. Performance guardrails for new PRs
+
+I want performance regressions treated as correctness issues. Use these guardrails while you implement:
+
+These guardrails assume test tooling stays aligned with the dev shell and global Nix configuration so we avoid accidental slow paths and hidden network errors.
+
+- **Honor `XDG_CONFIG_HOME` for Nix**: if temp test environments hide or bypass it, Nix can ignore configured substituters and keys, forcing slow source builds and spurious failures.
+
+- **Avoid `--impure` cache busts**: untracked files can force impure mode and invalidate flake snapshots. Track new tests early or exclude them intentionally from the flake source snapshot.
+- **Use the planner path**: prefer `graph-generator-selected` and avoid building larger outputs when a derivation path is enough, for example `nix eval ... .drvPath`.
+- **Minimize temp-repo copy cost**: seed repo cloning can dominate runtime. Prefer tar or CoW copies, and keep rsync excludes conservative.
+- **Keep test HOME stable**: per-test HOME isolation wipes tool caches (Nix/pnpm) and can multiply runtime. Only set `TEST_HOME_PER_TEST=1` for tests that truly require a fresh HOME.
+- **Prevent env leakage between tests**: restore `TEST_*` env vars in `finally` blocks or shared helpers.
+- **Do not remove required files**: excluding `tools/tests`, `*.md`, or patch session files causes missing inputs and expensive retries.
+- **Target invalidation explicitly**: include patch files in graph-visible inputs so Nix can track them without extra runtime work.
+- **Measure before optimizing**: identify the dominant cost first, then optimize only that path.
+- **Stage updated pnpm-store hashes in temp repos**: when a test updates `tools/nix/node-modules.hashes.json`, `git add` it before any Nix builds so the flake snapshot sees the new hash instead of the placeholder.

@@ -74,7 +74,14 @@ async function withBuckCleanup<T>(iso: string, fn: () => Promise<T>): Promise<T>
       const cwd = String(
         process.env.BUCK_TEST_SRC || process.env.WORKSPACE_ROOT || process.cwd(),
       ).trim();
-      await $({ cwd })`buck2 --isolation-dir ${iso} kill`;
+      await $({
+        cwd,
+        env: {
+          ...process.env,
+          HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
+          SSL_CERT_FILE: process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE,
+        },
+      })`buck2 --isolation-dir ${iso} kill`;
     } catch {}
     process.exit(130);
   };
@@ -90,7 +97,14 @@ async function withBuckCleanup<T>(iso: string, fn: () => Promise<T>): Promise<T>
       const cwd = String(
         process.env.BUCK_TEST_SRC || process.env.WORKSPACE_ROOT || process.cwd(),
       ).trim();
-      await $({ cwd })`buck2 --isolation-dir ${iso} kill`;
+      await $({
+        cwd,
+        env: {
+          ...process.env,
+          HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
+          SSL_CERT_FILE: process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE,
+        },
+      })`buck2 --isolation-dir ${iso} kill`;
     } catch {}
   }
 }
@@ -111,9 +125,15 @@ export async function runCqueryMerged(opts: CqueryRunnerOptions): Promise<Record
     if (String(process.env.EXPORTER_DEBUG || "").trim() === "1") {
       console.warn(`[exporter][debug] buck2 cquery ${platformFlags.join(" ")} ${query}`);
     }
+    const buckEnv = {
+      ...process.env,
+      HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
+      SSL_CERT_FILE: process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE,
+    };
     const { stdout } = await $({
       cwd,
       stdio: "pipe",
+      env: buckEnv,
     })`buck2 ${isolationFlags} cquery ${platformFlags} ${query} --json ${flags}`.quiet();
     return JSON.parse(String(stdout)) as Record<string, any>;
   };

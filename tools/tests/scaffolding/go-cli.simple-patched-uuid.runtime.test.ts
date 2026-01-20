@@ -66,7 +66,11 @@ async function ensureNodeOnPath(tmp: string): Promise<string> {
   return localBin;
 }
 
-async function startPatchPkgSession($: any, tmp: string): Promise<{ origin: string; ws: string }> {
+async function startPatchPkgSession(
+  $: any,
+  tmp: string,
+  goEnv: NodeJS.ProcessEnv,
+): Promise<{ origin: string; ws: string }> {
   const { stdout: gomodcacheOut } = await $({ cwd: tmp, stdio: "pipe" })`go env GOMODCACHE`;
   const gomodcache = String(gomodcacheOut || "").trim();
   if (!gomodcache) throw new Error("GOMODCACHE not found");
@@ -83,6 +87,7 @@ async function startPatchPkgSession($: any, tmp: string): Promise<{ origin: stri
       NODE_BIN: process.execPath,
       PATH: `${path.dirname(process.execPath)}:${localBin}:${process.env.PATH || ""}`,
       NIX_GO_TEST_RESOLVE_JSON: resolveMap,
+      ...goEnv,
     },
   })`tools/bin/patch-pkg start go github.com/google/uuid`;
   const ws =
@@ -94,7 +99,49 @@ async function startPatchPkgSession($: any, tmp: string): Promise<{ origin: stri
   return { origin, ws };
 }
 
-async function applyPatchPkg($: any, tmp: string, resolveOrigin: string) {
+async function seedUuidModuleCache(
+  tmp: string,
+  $: any,
+  gomodcacheOverride?: string,
+): Promise<{ proxyRoot: string; gomodcache: string }> {
+  const gomodcache =
+    gomodcacheOverride ||
+    String((await $({ cwd: tmp, stdio: "pipe" })`go env GOMODCACHE`).stdout || "").trim();
+  if (!gomodcache) throw new Error("GOMODCACHE not found");
+  const moduleDir = path.join(gomodcache, "github.com", "google", "uuid@v1.6.0");
+  const fixtureDir = new URL("../fixtures/go/github.com/google/uuid@v1.6.0", import.meta.url)
+    .pathname;
+  await fsp.rm(moduleDir, { recursive: true, force: true }).catch(() => {});
+  await fsp.mkdir(moduleDir, { recursive: true });
+  await fsp.copyFile(path.join(fixtureDir, "uuid.go"), path.join(moduleDir, "uuid.go"));
+  const goMod = "module github.com/google/uuid\n\ngo 1.22\n";
+  await fsp.writeFile(path.join(moduleDir, "go.mod"), goMod, "utf8");
+
+  const proxyRoot = path.join(tmp, ".go-proxy");
+  const proxyDir = path.join(proxyRoot, "github.com", "google", "uuid", "@v");
+  await fsp.mkdir(proxyDir, { recursive: true });
+  await fsp.writeFile(path.join(proxyDir, "v1.6.0.mod"), goMod, "utf8");
+  await fsp.writeFile(
+    path.join(proxyDir, "v1.6.0.info"),
+    JSON.stringify({ Version: "v1.6.0", Time: "2024-01-01T00:00:00Z" }) + "\n",
+    "utf8",
+  );
+  await fsp.writeFile(path.join(proxyDir, "list"), "v1.6.0\n", "utf8").catch(() => {});
+
+  const zipRoot = path.join(tmp, ".uuid-module-zip");
+  await fsp.rm(zipRoot, { recursive: true, force: true }).catch(() => {});
+  const zipModuleDir = path.join(zipRoot, "github.com", "google", "uuid@v1.6.0");
+  await fsp.mkdir(zipModuleDir, { recursive: true });
+  await fsp.copyFile(path.join(fixtureDir, "uuid.go"), path.join(zipModuleDir, "uuid.go"));
+  await fsp.writeFile(path.join(zipModuleDir, "go.mod"), goMod, "utf8");
+
+  await $({ stdio: "pipe" })`command -v zip`;
+  const zipPath = path.join(proxyDir, "v1.6.0.zip");
+  await $({ cwd: zipRoot, stdio: "pipe" })`zip -qr -X ${zipPath} github.com/google/uuid@v1.6.0`;
+  return { proxyRoot, gomodcache };
+}
+
+async function applyPatchPkg($: any, tmp: string, resolveOrigin: string, goEnv: NodeJS.ProcessEnv) {
   const localBin = await ensureNodeOnPath(tmp);
   const resolveMap = JSON.stringify({
     "github.com/google/uuid": { version: "v1.6.0", originPath: resolveOrigin },
@@ -107,12 +154,13 @@ async function applyPatchPkg($: any, tmp: string, resolveOrigin: string) {
       NODE_BIN: process.execPath,
       PATH: `${path.dirname(process.execPath)}:${localBin}:${process.env.PATH || ""}`,
       NIX_GO_TEST_RESOLVE_JSON: resolveMap,
+      ...goEnv,
     },
   })`tools/bin/patch-pkg apply go github.com/google/uuid --target //apps/demo-cli:demo-cli --force`;
 }
 
 async function patchUuidWorkspaceToZero($: any, ws: string) {
-  // Replace only UUID.String to return zero (leave NewString as-is to avoid redeclarations)
+  // Replace UUID.String and NewString to return a zero UUID deterministically.
   const walk = async (dir: string) => {
     const names = await fsp.readdir(dir);
     for (const n of names) {
@@ -122,6 +170,10 @@ async function patchUuidWorkspaceToZero($: any, ws: string) {
       else if (p.endsWith(".go")) {
         let txt = await fsp.readFile(p, "utf8");
         let out = txt.replace(
+          /func\s+NewString\s*\(\s*\)\s*string\s*\{[\s\S]*?\}/m,
+          'func NewString() string {\n\treturn "00000000-0000-0000-0000-000000000000"\n}',
+        );
+        out = out.replace(
           /func\s*\(\s*\w+\s+UUID\s*\)\s*String\s*\(\s*\)\s*string\s*\{[\s\S]*?\}/m,
           'func (u UUID) String() string {\n\treturn "00000000-0000-0000-0000-000000000000"\n}',
         );
@@ -130,6 +182,31 @@ async function patchUuidWorkspaceToZero($: any, ws: string) {
     }
   };
   await walk(ws);
+}
+
+async function writeGoSumFromDownload(
+  $: any,
+  moduleDir: string,
+  goEnv: NodeJS.ProcessEnv,
+): Promise<void> {
+  const { stdout } = await $({
+    cwd: moduleDir,
+    stdio: "pipe",
+    env: { ...process.env, ...goEnv },
+  })`go mod download -json github.com/google/uuid@v1.6.0`;
+  const payload = String(stdout || "").trim();
+  if (!payload) throw new Error("go mod download did not return JSON output");
+  const data = JSON.parse(payload);
+  const sum = String(data?.Sum || "");
+  const goModSum = String(data?.GoModSum || "");
+  if (!sum || !goModSum) throw new Error("go mod download JSON missing sums");
+  const goSumPath = path.join(moduleDir, "go.sum");
+  const goSum = [
+    `github.com/google/uuid v1.6.0 ${sum}`,
+    `github.com/google/uuid v1.6.0/go.mod ${goModSum}`,
+    "",
+  ].join("\n");
+  await fsp.writeFile(goSumPath, goSum, "utf8");
 }
 
 async function readPinnedNixpkgsUrl(tmpRepoRoot: string): Promise<string> {
@@ -180,7 +257,24 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
         "",
       ].join("\n"),
     );
-    await $({ cwd: path.join(_tmp, "apps", "demo-cli"), stdio: "inherit" })`go mod tidy`;
+    const moduleCache = path.join(_tmp, ".gomodcache");
+    await fsp.mkdir(moduleCache, { recursive: true });
+    const { proxyRoot, gomodcache } = await seedUuidModuleCache(_tmp, $, moduleCache);
+    const goEnv = {
+      GOPROXY: `file://${proxyRoot},off`,
+      GOSUMDB: "off",
+      GONOSUMDB: "github.com/google/uuid",
+      ...(gomodcache ? { GOMODCACHE: gomodcache } : {}),
+    };
+    await $({
+      cwd: path.join(_tmp, "apps", "demo-cli"),
+      stdio: "inherit",
+      env: {
+        ...process.env,
+        ...goEnv,
+      },
+    })`go mod tidy`;
+    await writeGoSumFromDownload($, path.join(_tmp, "apps", "demo-cli"), goEnv);
 
     // Generate gomod2nix.toml via local stub (avoid network)
     const stubDir = path.join(_tmp, "bin");
@@ -226,9 +320,9 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
     })`tools/dev/install-deps.ts --glue-only`;
 
     // Start a patch session and patch uuid to zero
-    const { origin, ws } = await startPatchPkgSession($, _tmp);
+    const { origin, ws } = await startPatchPkgSession($, _tmp, goEnv);
     await patchUuidWorkspaceToZero($, ws);
-    await applyPatchPkg($, _tmp, origin);
+    await applyPatchPkg($, _tmp, origin, goEnv);
     // Regenerate providers and auto_map after writing patch
     await $`node tools/buck/sync-providers.ts`;
     await $`node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
@@ -237,7 +331,7 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
     await $({
       cwd: path.join(_tmp, "apps", "demo-cli"),
       stdio: "inherit",
-      env: { ...process.env, GOPROXY: "off", GOSUMDB: "off" },
+      env: { ...process.env, ...goEnv },
     })`go mod vendor`;
     const vendUuidDir = path.join(
       _tmp,

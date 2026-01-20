@@ -99,12 +99,32 @@ export async function runGomod2nixGenerateIn(dir: string, dryRun: boolean, verbo
     }
     tmpOut = path.join(tmp, "gomod2nix.toml");
     const tmpExists = await exists(tmpOut);
+    const dst = path.join(dir, "gomod2nix.toml");
     if (!tmpExists) {
+      let goModTxt = "";
+      try {
+        goModTxt = await fsp.readFile(path.join(dir, "go.mod"), "utf8");
+      } catch {}
+      const stripped = String(goModTxt || "")
+        .split(/\r?\n/)
+        .map((line) => line.replace(/\s*\/\/.*$/, ""))
+        .join("\n");
+      const hasDeps = /^\s*(require|replace)\s*(\(|\S)/m.test(stripped);
+      if (!hasDeps) {
+        const minimal = "schema = 3\n\n[mod]\n";
+        const cur = (await exists(dst)) ? await fsp.readFile(dst, "utf8") : "";
+        if (cur !== minimal) {
+          await fsp.writeFile(dst, minimal, "utf8");
+          console.log(`[gomod2nix] updated ${path.relative(process.cwd(), dst)}`);
+        } else if (verbose) {
+          console.log(`[gomod2nix] no changes: ${path.relative(process.cwd(), dst)}`);
+        }
+        return;
+      }
       console.error("[gomod2nix] error: primary path did not produce gomod2nix.toml");
       process.exit(3);
     }
     const next = await fsp.readFile(tmpOut, "utf8");
-    const dst = path.join(dir, "gomod2nix.toml");
     const cur = (await exists(dst)) ? await fsp.readFile(dst, "utf8") : "";
     if (cur !== next) {
       await fsp.writeFile(dst, next, "utf8");

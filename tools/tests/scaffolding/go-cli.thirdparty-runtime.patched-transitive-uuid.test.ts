@@ -59,7 +59,52 @@ async function ensureNodeOnPath(tmp: string): Promise<string> {
   return localBin;
 }
 
-async function startPatchPkgSession(sh: any, tmp: string): Promise<{ origin: string; ws: string }> {
+async function seedUuidModuleCache(
+  tmp: string,
+  sh: any,
+  gomodcacheOverride?: string,
+): Promise<{ proxyRoot: string; gomodcache: string }> {
+  const gomodcache =
+    gomodcacheOverride ||
+    String((await sh({ cwd: tmp, stdio: "pipe" })`go env GOMODCACHE`).stdout || "").trim();
+  if (!gomodcache) throw new Error("GOMODCACHE not found");
+  const moduleDir = path.join(gomodcache, "github.com", "google", "uuid@v1.6.0");
+  const fixtureDir = new URL("../fixtures/go/github.com/google/uuid@v1.6.0", import.meta.url)
+    .pathname;
+  await fsp.rm(moduleDir, { recursive: true, force: true }).catch(() => {});
+  await fsp.mkdir(moduleDir, { recursive: true });
+  await fsp.copyFile(path.join(fixtureDir, "uuid.go"), path.join(moduleDir, "uuid.go"));
+  const goMod = "module github.com/google/uuid\n\ngo 1.22\n";
+  await fsp.writeFile(path.join(moduleDir, "go.mod"), goMod, "utf8");
+
+  const proxyRoot = path.join(tmp, ".go-proxy");
+  const proxyDir = path.join(proxyRoot, "github.com", "google", "uuid", "@v");
+  await fsp.mkdir(proxyDir, { recursive: true });
+  await fsp.writeFile(path.join(proxyDir, "v1.6.0.mod"), goMod, "utf8");
+  await fsp.writeFile(
+    path.join(proxyDir, "v1.6.0.info"),
+    JSON.stringify({ Version: "v1.6.0", Time: "2024-01-01T00:00:00Z" }) + "\n",
+    "utf8",
+  );
+  await fsp.writeFile(path.join(proxyDir, "list"), "v1.6.0\n", "utf8").catch(() => {});
+
+  const zipRoot = path.join(tmp, ".uuid-module-zip");
+  await fsp.rm(zipRoot, { recursive: true, force: true }).catch(() => {});
+  const zipModuleDir = path.join(zipRoot, "github.com", "google", "uuid@v1.6.0");
+  await fsp.mkdir(zipModuleDir, { recursive: true });
+  await fsp.copyFile(path.join(fixtureDir, "uuid.go"), path.join(zipModuleDir, "uuid.go"));
+  await fsp.writeFile(path.join(zipModuleDir, "go.mod"), goMod, "utf8");
+  await sh({ stdio: "pipe" })`command -v zip`;
+  const zipPath = path.join(proxyDir, "v1.6.0.zip");
+  await sh({ cwd: zipRoot, stdio: "pipe" })`zip -qr -X ${zipPath} github.com/google/uuid@v1.6.0`;
+  return { proxyRoot, gomodcache };
+}
+
+async function startPatchPkgSession(
+  sh: any,
+  tmp: string,
+  goEnv: NodeJS.ProcessEnv,
+): Promise<{ origin: string; ws: string }> {
   const { stdout: gomodcacheOut } = await sh({ cwd: tmp, stdio: "pipe" })`go env GOMODCACHE`;
   const gomodcache = String(gomodcacheOut || "").trim();
   if (!gomodcache) throw new Error("GOMODCACHE not found");
@@ -81,6 +126,7 @@ async function startPatchPkgSession(sh: any, tmp: string): Promise<{ origin: str
         .filter(Boolean)
         .join(path.delimiter),
       PATH: `${path.dirname(process.execPath)}:${localBin}:${process.env.PATH || ""}`,
+      ...goEnv,
     },
   })`tools/bin/patch-pkg start go github.com/google/uuid`;
   const ws =
@@ -92,7 +138,12 @@ async function startPatchPkgSession(sh: any, tmp: string): Promise<{ origin: str
   return { origin, ws };
 }
 
-async function applyPatchPkg(sh: any, tmp: string, resolveOrigin: string) {
+async function applyPatchPkg(
+  sh: any,
+  tmp: string,
+  resolveOrigin: string,
+  goEnv: NodeJS.ProcessEnv,
+) {
   const resolveMap = JSON.stringify({
     "github.com/google/uuid": { version: "v1.6.0", originPath: resolveOrigin },
   });
@@ -110,17 +161,23 @@ async function applyPatchPkg(sh: any, tmp: string, resolveOrigin: string) {
         .filter(Boolean)
         .join(path.delimiter),
       PATH: `${path.dirname(process.execPath)}:${localBin}:${process.env.PATH || ""}`,
+      ...goEnv,
     },
   })`tools/bin/patch-pkg apply go github.com/google/uuid --target //apps/demo-cli:demo-cli --force`;
 }
 
-async function scaffoldHelperLib(sh: any, tmp: string) {
+async function scaffoldHelperLib(sh: any, tmp: string, goEnv: NodeJS.ProcessEnv) {
   await sh`scaf new go lib helper-lib --yes --path=libs/helper-lib`;
   await sh({
     cwd: path.join(tmp, "libs", "helper-lib"),
     stdio: "inherit",
+    env: { ...process.env, ...goEnv },
   })`go get github.com/google/uuid@v1.6.0`;
-  await sh({ cwd: path.join(tmp, "libs", "helper-lib"), stdio: "inherit" })`go mod tidy`;
+  await sh({
+    cwd: path.join(tmp, "libs", "helper-lib"),
+    stdio: "inherit",
+    env: { ...process.env, ...goEnv },
+  })`go mod tidy`;
   await writeFileAbs(
     path.join(tmp, "libs", "helper-lib", "pkg", "helper-lib", "helper-lib.go"),
     [
@@ -425,13 +482,26 @@ test("go cli with transitive third-party patched uuid runtime", async () => {
     await $`git init`;
     await writeBuckConfig($);
 
-    await scaffoldHelperLib($, _tmp);
+    const moduleCache = path.join(_tmp, ".gomodcache");
+    const { proxyRoot, gomodcache } = await seedUuidModuleCache(_tmp, $, moduleCache);
+    const goEnv = {
+      GOPROXY: `file://${proxyRoot},off`,
+      GOSUMDB: "off",
+      GONOSUMDB: "github.com/google/uuid",
+      ...(gomodcache ? { GOMODCACHE: gomodcache } : {}),
+    };
+
+    await scaffoldHelperLib($, _tmp, goEnv);
     await scaffoldDemoLib($, _tmp);
     await scaffoldCli($, _tmp);
-    await $({ cwd: path.join(_tmp, "apps", "demo-cli"), stdio: "inherit" })`go mod tidy`;
+    await $({
+      cwd: path.join(_tmp, "apps", "demo-cli"),
+      stdio: "inherit",
+      env: { ...process.env, ...goEnv },
+    })`go mod tidy`;
 
     // Create a uuid patch in a temporary workspace and apply it via patch-pkg
-    const { origin, ws } = await startPatchPkgSession($, _tmp);
+    const { origin, ws } = await startPatchPkgSession($, _tmp, goEnv);
     await patchUuidWorkspace(ws);
     {
       const T = Number(process.env.TEST_CMD_TIMEOUT_S || "300");
@@ -452,6 +522,7 @@ test("go cli with transitive third-party patched uuid runtime", async () => {
             .filter(Boolean)
             .join(path.delimiter),
           PATH: `${path.dirname(process.execPath)}:${localBin}:${process.env.PATH || ""}`,
+          ...goEnv,
         },
       })`tools/bin/patch-pkg apply go github.com/google/uuid --target //apps/demo-cli:demo-cli --force`;
     }

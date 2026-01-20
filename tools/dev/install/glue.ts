@@ -128,12 +128,13 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
   const goCaps = caps.get("go") || {};
   const nodeCaps = caps.get("node") || {};
 
-  // If Node is enabled, proactively reconcile pnpm fixed-output hashes for any
-  // discovered importers with a pnpm-lock.yaml. This avoids placeholder-digest
-  // mismatches during glue-only runs used by scaffolding tests.
-  if (haveNode) {
+  const skipPnpmHash =
+    String(process.env.INSTALL_GLUE_SKIP_PNPM_HASH || "").trim() === "1" ||
+    String(process.env.INSTALL_DEPS_GLUE_ONLY || "").trim() === "1";
+  // If Node is enabled, reconcile pnpm fixed-output hashes for any discovered importers.
+  if (haveNode && !skipPnpmHash) {
     try {
-      const repo = repoRoot();
+      const repo = wsRoot;
       // Reuse the importer roots contract (single source of truth).
       const importers: string[] = [];
       const { allowDotImporter, workspaceRoots } = getImporterRootsContract();
@@ -163,16 +164,23 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
         const updater = path.join(repo, "tools/dev/update-pnpm-hash.ts");
         for (const imp of importers) {
           const relLock = path.join(imp, "pnpm-lock.yaml");
-          const cmd = `zx-wrapper ${updater} --lockfile ${relLock}`;
           if (dryRun) {
-            console.log(`[dry-run] ${cmd}`);
+            console.log(`[dry-run] ${nodeBin} ${nodeBase} ${updater} --lockfile ${relLock}`);
           } else {
-            if (verbose) console.log(`[run] ${cmd}`);
-            await $({
-              stdio: "inherit",
+            if (verbose) console.log(`[run] ${updater} --lockfile ${relLock}`);
+            await runNodeWithZx({
+              nodeBin,
+              zxInitPath: zxImport,
+              script: updater,
+              args: ["--lockfile", relLock],
               cwd: repo,
-              env: { ...process.env, INSTALL_LOCK_SKIP: "1" },
-            })`bash --noprofile --norc -c ${cmd}`;
+              env: {
+                ...process.env,
+                INSTALL_LOCK_SKIP: "1",
+                WORKSPACE_ROOT: wsRoot,
+                BUCK_TEST_SRC: wsRoot,
+              },
+            });
           }
         }
       }

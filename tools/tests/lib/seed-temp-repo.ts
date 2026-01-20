@@ -70,7 +70,7 @@ async function seedConfigKey(): Promise<string> {
   const dirtySig = await workspaceDirtySignature();
   return JSON.stringify({
     // Bump when seed layout/contents rules change, to avoid reusing an old incompatible seed dir.
-    SEED_VERSION: "6",
+    SEED_VERSION: "8",
     TEST_RSYNC_ROOTS: String(process.env.TEST_RSYNC_ROOTS || ""),
     TEST_PARTIAL_CLONE_GO_ONLY: String(process.env.TEST_PARTIAL_CLONE_GO_ONLY || ""),
     TEST_EXCLUDE_CPP_REQS: String(process.env.TEST_EXCLUDE_CPP_REQS || ""),
@@ -133,7 +133,9 @@ async function ensureSharedSeedRepo(deps: SeedDeps, seedKey: string): Promise<st
       await fsp.access(seedTar);
     } catch {
       try {
-        await $`tar -cf ${seedTar} -C ${seedDir} .`;
+        const seedTarTmp = seedTar + ".tmp";
+        await $`tar -cf ${seedTarTmp} -C ${seedDir} .`;
+        await fsp.rename(seedTarTmp, seedTar);
       } catch {}
     }
     return seedDir;
@@ -176,12 +178,14 @@ async function ensureSharedSeedRepo(deps: SeedDeps, seedKey: string): Promise<st
         "seed-temp-repo: failed to initialize seed repo as git (required for deterministic nix builds)",
       );
     }
-    // Ready marker is a cache coordination primitive; do not track it in git.
-    await fsp.writeFile(path.join(tmpDir, ".ready"), "ok\n", "utf8");
-    await fsp.rename(tmpDir, seedDir);
     try {
-      await $`tar -cf ${seedTar} -C ${seedDir} .`;
+      const seedTarTmp = seedTar + ".tmp";
+      await $`tar -cf ${seedTarTmp} -C ${tmpDir} .`;
+      await fsp.rename(seedTarTmp, seedTar);
     } catch {}
+    await fsp.rename(tmpDir, seedDir);
+    // Ready marker is a cache coordination primitive; do not track it in git.
+    await fsp.writeFile(path.join(seedDir, ".ready"), "ok\n", "utf8");
     return seedDir;
   } finally {
     try {
@@ -235,6 +239,29 @@ async function cloneSeedToTemp(opts: {
 }): Promise<void> {
   const { seedDir, tmpDir, mode } = opts;
   const seedTar = seedDir + ".tar";
+  const requiredFiles = ["flake.nix", path.join("tools", "buck", "export-graph.ts")];
+  const hasRequiredFiles = async (): Promise<boolean> => {
+    for (const rel of requiredFiles) {
+      try {
+        await fsp.access(path.join(tmpDir, rel));
+      } catch {
+        return false;
+      }
+    }
+    return true;
+  };
+  const ensureRequiredFiles = async (label: string) => {
+    if (await hasRequiredFiles()) return;
+    const missing: string[] = [];
+    for (const rel of requiredFiles) {
+      try {
+        await fsp.access(path.join(tmpDir, rel));
+      } catch {
+        missing.push(rel);
+      }
+    }
+    throw new Error(`seed-temp-repo: ${label} missing ${missing.join(", ")}`);
+  };
   const tryTar = async (): Promise<boolean> => {
     try {
       await fsp.access(seedTar);
@@ -243,16 +270,11 @@ async function cloneSeedToTemp(opts: {
     }
     try {
       await $`tar -xf ${seedTar} -C ${tmpDir}`;
-      const flakeOk = await fsp
-        .access(path.join(tmpDir, "flake.nix"))
-        .then(() => true)
-        .catch(() => false);
-      const exportGraphOk = await fsp
-        .access(path.join(tmpDir, "tools", "buck", "export-graph.ts"))
-        .then(() => true)
-        .catch(() => false);
-      return flakeOk && exportGraphOk;
+      return await hasRequiredFiles();
     } catch {
+      try {
+        await fsp.rm(seedTar, { force: true });
+      } catch {}
       return false;
     }
   };
@@ -269,6 +291,10 @@ async function cloneSeedToTemp(opts: {
       }
     };
     if (useCow) {
+      if (process.platform === "darwin") {
+        if (await run(["-a", "-c"])) return true;
+        return await run(["-a"]);
+      }
       if (await run(["-a", "--reflink=auto"])) return true;
       if (await run(["-a", "-c"])) return true;
       return await run(["-a"]);
@@ -276,17 +302,25 @@ async function cloneSeedToTemp(opts: {
     return await run(["-a"]);
   };
   if (mode === "seed-cow") {
-    if (await tryTar()) return;
+    if (await tryTar()) {
+      await ensureRequiredFiles("tar extraction");
+      return;
+    }
     if (!(await tryShellClone(true))) {
       await copyTree(seedDir, tmpDir, { cloneMode: "try", force: true });
     }
+    await ensureRequiredFiles("seed-cow clone");
     return;
   }
   if (mode === "seed-copy") {
-    if (await tryTar()) return;
+    if (await tryTar()) {
+      await ensureRequiredFiles("tar extraction");
+      return;
+    }
     if (!(await tryShellClone(false))) {
       await copyTree(seedDir, tmpDir, { cloneMode: "none", force: true });
     }
+    await ensureRequiredFiles("seed-copy clone");
     return;
   }
   throw new Error(`unexpected clone mode: ${mode}`);

@@ -16,16 +16,42 @@ await runInTemp("buck-cleanup-interrupted", async (tmp, $) => {
   //
   // IMPORTANT: do not rely on zx's command stdio defaults here; the parent test expects READY on
   // the child's stdout stream.
-  spawn("buck2", ["build", "//:flake.lock"], {
+  let certFile = process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE || "";
+  if (!certFile) {
+    const fallback = "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt";
+    try {
+      await fsp.access(fallback);
+      certFile = fallback;
+    } catch {}
+  }
+  const buck = spawn("buck2", ["build", "//:flake.lock"], {
     cwd: tmp,
-    env: process.env,
-    stdio: "ignore",
+    env: {
+      ...process.env,
+      HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
+      SSL_CERT_FILE: certFile,
+    },
+    stdio: ["ignore", "pipe", "pipe"],
     detached: true,
+  });
+  let buckOut = "";
+  let buckErr = "";
+  if (buck.stdout) {
+    buck.stdout.setEncoding("utf8");
+    buck.stdout.on("data", (d) => (buckOut += d));
+  }
+  if (buck.stderr) {
+    buck.stderr.setEncoding("utf8");
+    buck.stderr.on("data", (d) => (buckErr += d));
+  }
+  buck.on("error", (err) => {
+    buckErr += `\n[spawn error] ${String(err)}\n`;
   });
   const fsDir = path.join(tmp, "buck-out", "v2", "forkserver");
   const t0 = Date.now();
   let forkserverReady = false;
-  while (Date.now() - t0 < 30_000) {
+  const waitMs = 60_000;
+  while (Date.now() - t0 < waitMs) {
     try {
       await fsp.access(fsDir);
       forkserverReady = true;
@@ -35,8 +61,20 @@ await runInTemp("buck-cleanup-interrupted", async (tmp, $) => {
   }
   if (!forkserverReady) {
     console.error(
-      `buck cleanup child: forkserver dir did not appear within 30s (expected at ${fsDir})`,
+      `buck cleanup child: forkserver dir did not appear within ${Math.round(waitMs / 1000)}s (expected at ${fsDir})`,
     );
+    if (buckOut.trim() || buckErr.trim()) {
+      console.error("buck2 stdout:\n" + buckOut.trim());
+      console.error("buck2 stderr:\n" + buckErr.trim());
+    }
+    console.error(`buck2 HOME: ${process.env.BUCK2_REAL_HOME || process.env.HOME || ""}`);
+    console.error(
+      `buck2 SSL_CERT_FILE: ${process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE || ""}`,
+    );
+    console.error(`buck2 PATH: ${process.env.PATH || ""}`);
+    if (buck.exitCode !== null) {
+      console.error(`buck2 exit code: ${buck.exitCode}`);
+    }
     process.exit(2);
   }
   console.log("READY");

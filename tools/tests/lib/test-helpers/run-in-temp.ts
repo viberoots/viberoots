@@ -47,17 +47,67 @@ async function stableTestHomeRoot(): Promise<string> {
   return root;
 }
 
+async function stableGoModCacheRoot(): Promise<string> {
+  if (process.platform === "win32") return path.join(os.tmpdir(), "bucknix-go-modcache");
+  const base = "/tmp";
+  let user = "";
+  try {
+    user = os.userInfo().username || "";
+  } catch {}
+  const suffix = user ? `-${user}` : "";
+  const root = path.join(base, `bucknix-go-modcache${suffix}`);
+  await fsp.mkdir(root, { recursive: true }).catch(() => {});
+  return root;
+}
+
+async function unifiedPnpmStoreFromRepoRoot(repoRoot: string): Promise<string> {
+  const pathFile = path.join(repoRoot, "buck-out", ".unified-pnpm-store", "path");
+  try {
+    const txt = await fsp.readFile(pathFile, "utf8");
+    const p = String(txt || "").trim();
+    if (!p) return "";
+    const st = await fsp.stat(p).catch(() => null);
+    if (!st || !st.isDirectory()) return "";
+    return p;
+  } catch {
+    return "";
+  }
+}
+
+let stableTestHomeOnce: Promise<string> | null = null;
+async function stableTestHomeOncePerWorker(): Promise<string> {
+  if (stableTestHomeOnce) return await stableTestHomeOnce;
+  stableTestHomeOnce = (async () => {
+    const homeBase = await stableTestHomeRoot();
+    return await fsp.mkdtemp(path.join(homeBase, "home-"));
+  })();
+  return await stableTestHomeOnce;
+}
+
+async function resolveTestHome(): Promise<{ home: string; removeOnExit: boolean }> {
+  if (String(process.env.TEST_HOME_PER_TEST || "").trim() === "1") {
+    const homeBase = await stableTestHomeRoot();
+    const home = await fsp.mkdtemp(path.join(homeBase, "home-"));
+    return { home, removeOnExit: true };
+  }
+  const home = await stableTestHomeOncePerWorker();
+  return { home, removeOnExit: false };
+}
+
 export async function runInTemp<T>(
   name: string,
   fn: (tmp: string, $: any) => Promise<T>,
   opts?: { git?: boolean },
 ): Promise<T> {
+  const realHome = String(process.env.HOME || os.homedir() || "").trim();
   const envKeys = [
     "TEST_RSYNC_ROOTS",
     "TEST_PARTIAL_CLONE_GO_ONLY",
     "TEST_EXCLUDE_CPP_REQS",
     "TEST_FORCE_SEED_REPO",
     "TEST_DISABLE_SEED_REPO",
+    "WORKSPACE_ROOT",
+    "BUCK_TEST_SRC",
   ] as const;
   const envSnapshot: Record<string, string | undefined> = {};
   for (const key of envKeys) envSnapshot[key] = process.env[key];
@@ -69,8 +119,10 @@ export async function runInTemp<T>(
       console.log(`TMP ${tmp}`);
     } catch {}
   }
-  const homeBase = await stableTestHomeRoot();
-  const home = await fsp.mkdtemp(path.join(homeBase, "home-"));
+  process.env.WORKSPACE_ROOT = tmp;
+  process.env.BUCK_TEST_SRC = tmp;
+  const { home, removeOnExit: removeHome } = await resolveTestHome();
+  const goModCacheRoot = await stableGoModCacheRoot();
   const initMode = await initTempRepoFromWorkspaceOrSeed({
     tmpDir: tmp,
     deps: { mktemp, rsyncRepoTo, timeAsync },
@@ -151,12 +203,39 @@ export async function runInTemp<T>(
   exportEnv.WORKSPACE_ROOT = tmp;
   exportEnv.BUCK_TEST_SRC = tmp;
   exportEnv.HOME = home;
+  if (!exportEnv.BUCK2_REAL_HOME && realHome) {
+    exportEnv.BUCK2_REAL_HOME = realHome;
+  }
+  if (!exportEnv.XDG_CONFIG_HOME) {
+    exportEnv.XDG_CONFIG_HOME = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
+  }
 
   exportEnv.GOPROXY = exportEnv.GOPROXY || "https://proxy.golang.org,direct";
   exportEnv.GOSUMDB = exportEnv.GOSUMDB || "sum.golang.org";
-  exportEnv.GOMODCACHE = exportEnv.GOMODCACHE || path.join(tmp, ".gomodcache");
+  exportEnv.GOMODCACHE = exportEnv.GOMODCACHE || goModCacheRoot;
+  if (!exportEnv.SSL_CERT_FILE && exportEnv.NIX_SSL_CERT_FILE) {
+    exportEnv.SSL_CERT_FILE = exportEnv.NIX_SSL_CERT_FILE;
+  }
+  if (!exportEnv.SSL_CERT_FILE) {
+    const defaultCert = "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt";
+    try {
+      await fsp.access(defaultCert);
+      exportEnv.SSL_CERT_FILE = defaultCert;
+    } catch {}
+  }
+  if (!exportEnv.SSL_CERT_DIR && exportEnv.NIX_SSL_CERT_DIR) {
+    exportEnv.SSL_CERT_DIR = exportEnv.NIX_SSL_CERT_DIR;
+  }
   exportEnv.DIRENV_LOG_FORMAT = "";
   exportEnv.ZX_INIT = zxInitPathFromWorkspace();
+  try {
+    const unified = await unifiedPnpmStoreFromRepoRoot(process.cwd());
+    // Only opt into prefetched stores when explicitly requested; some temp importers
+    // introduce new deps that are not present in the unified store and must be fetched.
+    if (unified && exportEnv.NIX_USE_PREFETCHED_PNPM_STORE === "1") {
+      exportEnv.LOCAL_PNPM_STORE = exportEnv.LOCAL_PNPM_STORE || unified;
+    }
+  } catch {}
 
   const nodeOpts = ["--experimental-strip-types", `--import ${exportEnv.ZX_INIT}`];
   exportEnv.NODE_OPTIONS = [nodeOpts.join(" "), exportEnv.NODE_OPTIONS || ""]
@@ -226,17 +305,22 @@ export async function runInTemp<T>(
       } catch {}
     } else {
       try {
+        const chmodTargets = [tmp, ...(removeHome ? [home] : [])]
+          .map((target) => shSingleQuote(target))
+          .join(" ");
         await $({
           stdio: "ignore",
           cwd: process.cwd(),
           reject: false,
           nothrow: true,
-        })`bash --noprofile --norc -c ${`chmod -R u+w ${shSingleQuote(tmp)} ${shSingleQuote(home)} >/dev/null 2>&1 || true`}`;
+        })`bash --noprofile --norc -c ${`chmod -R u+w ${chmodTargets} >/dev/null 2>&1 || true`}`;
       } catch {}
       await fsp.rm(tmp, { recursive: true, force: true }).catch((err) => {
         console.warn("warning: failed to remove temp test dir:", err);
       });
     }
-    await fsp.rm(home, { recursive: true, force: true }).catch(() => {});
+    if (removeHome) {
+      await fsp.rm(home, { recursive: true, force: true }).catch(() => {});
+    }
   }
 }

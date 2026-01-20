@@ -26,6 +26,17 @@ This document defines a minimal, deterministic plan to add Python/WASM support t
 - Importer‑scoped providers: WASM does not add new labels or providers.
 - Patching: `patch-pkg start/apply/reset/session` remains authoritative; dev overrides warn locally, fail in CI.
 
+## WASM extension modules (graph contract only)
+
+I add a Buck macro for WASM-targeted extension modules so the planner can route them by backend without mixing native `kind:pyext` and WASM contracts.
+
+- Macro: `nix_python_wasm_extension_module`
+- Required attrs: `module`, `srcs`
+- Optional attrs: `headers`, `cflags`, `ldflags`, `build_py_deps`
+- Labels: `lang:python`, `kind:pyext_wasm`, plus one backend label (`backend:wasi` or `backend:pyodide`)
+
+I keep `link_deps` out of this contract until a dedicated WASM linking plan lands.
+
 ---
 
 ## Backend 1 — WASI (CPython wasm32‑wasi)

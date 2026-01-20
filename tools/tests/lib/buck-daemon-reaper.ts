@@ -341,8 +341,30 @@ async function main() {
     // Wait for parent to exit (covers normal exit and abrupt termination).
     const curSig0 = await processStartSignature(parentPid, psTimeoutMs).catch(() => "");
     if (!curSig0 || curSig0 !== parentSigExpected) {
-      // Parent already exited or pid already reused.
-      // Primary path: do not wait and do not reap, since the observed pid is not the expected parent.
+      // If the parent is already gone, still perform a one-time reap based on the temp roots
+      // we've recorded. This avoids leaking forkservers when the parent dies before we can
+      // read its lstart signature.
+      if (!isPidAlive(parentPid)) {
+        const tmpRoots: string[] = [];
+        if (tmpRepoRoot) tmpRoots.push(tmpRepoRoot);
+        if (stateFile) {
+          try {
+            const txt = await (await import("node:fs/promises")).readFile(stateFile, "utf8");
+            for (const ln of String(txt || "").split(/\r?\n/)) {
+              const p = ln.trim();
+              if (p) tmpRoots.push(p);
+            }
+          } catch {}
+        }
+        const seen = new Set<string>();
+        for (const r of tmpRoots) {
+          const abs = path.resolve(r);
+          if (seen.has(abs)) continue;
+          seen.add(abs);
+          await reapBuckDaemonsForTempRepo(abs);
+        }
+      }
+      // Primary path: do not wait and do not reap if the observed pid is not the expected parent.
       return;
     }
     // Parent PID reuse guard: re-check infrequently to avoid spawning /bin/ps in a tight loop.

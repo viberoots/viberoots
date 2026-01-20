@@ -13,8 +13,8 @@ export async function rsyncRepoTo(tmp: string) {
         .filter(Boolean);
       try {
         await $`bash --noprofile --norc -c ${`set -euo pipefail
-          if [ -f flake.nix ]; then install -D -m0644 flake.nix "${tmp}/flake.nix"; fi
-          if [ -f flake.lock ]; then install -D -m0644 flake.lock "${tmp}/flake.lock"; fi
+          if [ -f flake.nix ]; then mkdir -p "${tmp}"; cp -f flake.nix "${tmp}/flake.nix"; fi
+          if [ -f flake.lock ]; then mkdir -p "${tmp}"; cp -f flake.lock "${tmp}/flake.lock"; fi
         `}`;
       } catch {}
       for (const r of roots as string[]) {

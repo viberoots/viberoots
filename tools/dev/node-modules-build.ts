@@ -2,8 +2,8 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { findNearestImporterLock, nodeModulesAttr } from "./install/common.ts";
 import { resolveImporterDir } from "../lib/lockfiles.ts";
+import { findNearestImporterLock, nodeModulesAttr } from "./install/common.ts";
 
 async function findFlakeRoot(start: string): Promise<string> {
   let dir = path.resolve(start);
@@ -110,6 +110,11 @@ if (!outPath) {
     const relLock = importer === "." ? "pnpm-lock.yaml" : `${importer}/pnpm-lock.yaml`;
     const updater = path.join(flakeRoot, "tools/dev/update-pnpm-hash.ts");
     await $({ cwd: flakeRoot })`zx-wrapper ${updater} --lockfile ${relLock}`.nothrow();
+    const hashFile = path.join(flakeRoot, "tools", "nix", "node-modules.hashes.json");
+    try {
+      await fsp.access(hashFile);
+      await $({ cwd: flakeRoot })`git add ${hashFile}`.nothrow();
+    } catch {}
   } catch {}
   outPath = await tryBuild();
 }
