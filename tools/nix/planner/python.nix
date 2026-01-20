@@ -215,7 +215,9 @@ in rec {
         isWasmLabel = lbs != null && builtins.elem "kind:wasm" lbs;
         isTestLabel = lbs != null && builtins.elem "kind:test" lbs;
         isPyExtLabel = lbs != null && builtins.elem "kind:pyext" lbs;
+        isPyExtWasmLabel = lbs != null && builtins.elem "kind:pyext_wasm" lbs;
     in if isWasmLabel then "wasm"
+       else if isPyExtWasmLabel then "pyext_wasm"
        else if isPyExtLabel then "pyext"
        else if isTestLabel then "test"
        else if (rt != null) && lib.hasSuffix "_binary" rt then "bin"
@@ -315,15 +317,52 @@ in rec {
       includeRoots = includeRoots;
     };
 
+  backendFor = nm:
+    let
+      labs = labelsOfName nm;
+      hits = builtins.filter (l: (builtins.typeOf l) == "string" && lib.hasPrefix "backend:" l) (if labs == null then [] else labs);
+    in if hits == [] then "wasi" else (lib.removePrefix "backend:" (builtins.head hits));
+
+  mkPyExtWasm = name:
+    let
+      n = nodeOfName name;
+      mod = ensureString ("module for " + name) (if n == null then null else get n "module");
+      cflags = ensureStringList ("cflags for " + name) (if n == null then null else get n "cflags");
+      ldflags = ensureStringList ("ldflags for " + name) (if n == null then null else get n "ldflags");
+      buildPyDeps = ensureStringList ("build_py_deps for " + name) (if n == null then null else get n "build_py_deps");
+      backend = backendFor name;
+      _backendOk =
+        if backend == "pyodide" then null
+        else builtins.throw ("python planner: kind:pyext_wasm target " + name + " requires backend:pyodide for this phase (got backend:" + backend + ")");
+      lockRel = lockRelFor name;
+      importerDir =
+        if lib.hasSuffix "/uv.lock" lockRel then lib.removeSuffix "/uv.lock" lockRel
+        else pkgPathOf name;
+      wheelhouse =
+        if (builtins.length buildPyDeps) > 0 then (
+          T.pyWheelhouse {
+            name = name;
+            lockfile = lockRel;
+            subdir = importerDir;
+            srcRoot = repoRoot;
+          }
+        ) else null;
+    in builtins.seq _backendOk (T.pyExtWasm {
+      inherit name;
+      module = mod;
+      srcRoot = repoRoot;
+      subdir = pkgPathOf name;
+      srcList = srcsOf name;
+      cflags = cflags;
+      ldflags = ldflags;
+      wheelhouse = wheelhouse;
+      buildPyDeps = buildPyDeps;
+    });
+
   # WASM variants (Phase 1: WASI baseline)
   mkWasmApp = name:
     let
       # Determine backend from labels; default to "wasi". Accept labels like "backend:pyodide".
-      backendFor = nm:
-        let
-          labs = labelsOfName nm;
-          hits = builtins.filter (l: (builtins.typeOf l) == "string" && lib.hasPrefix "backend:" l) (if labs == null then [] else labs);
-        in if hits == [] then "wasi" else (lib.removePrefix "backend:" (builtins.head hits));
       _noPyExt =
         let
           pyExtDeps = collectPyExtDepsTransitive name;

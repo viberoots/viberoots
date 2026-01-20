@@ -373,6 +373,7 @@ let
               ) else if k.template == "python" then (
                 if (k.kind == "wasm") then LANGS.python.mkWasmApp buildLabel
                 else if (k.kind == "pyext") then LANGS.python.mkPyExt buildLabel
+                else if (k.kind == "pyext_wasm") then LANGS.python.mkPyExtWasm buildLabel
                 else if (k.kind == "bin" || k.kind == "lib") then LANGS.python.mkApp buildLabel
                 else LANGS.python.mkLib buildLabel
               ) else (

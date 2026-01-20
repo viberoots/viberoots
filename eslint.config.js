@@ -13,6 +13,7 @@ export default [
       "**/coverage/**",
       "**/.clinic/**",
       "**/prelude/**",
+      "**/._*.ts",
       "tools/scaffolding/templates/**",
     ],
     languageOptions: {

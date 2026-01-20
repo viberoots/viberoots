@@ -6,6 +6,7 @@ let
 
   UvBackend = import ./python/backends/uv.nix { inherit pkgs; uv2nixLib = uv2nixLib; };
   PyExt = import ./python/pyext.nix { inherit pkgs; };
+  PyExtWasm = import ./python/pyext-wasm.nix { inherit pkgs; };
 
   mkPy = {
     name,
@@ -117,6 +118,21 @@ in {
   }:
     PyExt {
       inherit name module srcRoot subdir srcList cflags ldflags nixCxxAttrs wheelhouse buildPyDeps repoCxxPkgs includeRoots;
+    };
+
+  pyExtWasm = {
+    name,
+    module,
+    wheelhouse ? null,
+    srcRoot ? ../../..,
+    subdir ? ".",
+    srcList ? [],
+    cflags ? [],
+    ldflags ? [],
+    buildPyDeps ? [],
+  }:
+    PyExtWasm {
+      inherit name module srcRoot subdir srcList cflags ldflags wheelhouse buildPyDeps;
     };
 
   # Reusable, content-addressed wheelhouse keyed ONLY by lockfile + patches.

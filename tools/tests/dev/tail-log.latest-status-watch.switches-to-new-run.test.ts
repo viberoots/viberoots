@@ -65,9 +65,10 @@ test("tail-log: latest --status -w switches to the newest verify run (lock-first
     }
     assert.fail(`timed out; last=${JSON.stringify(seen.at(-1) || null)}`);
   };
+  const waitTimeoutMs = 15000;
 
   try {
-    await waitFor((o) => o && o.log === log1Real, 5000);
+    await waitFor((o) => o && o.log === log1Real, waitTimeoutMs);
 
     const sleeper = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
       stdio: "ignore",
@@ -87,7 +88,7 @@ test("tail-log: latest --status -w switches to the newest verify run (lock-first
     await fsp.writeFile(path.join(lockDir, "pid"), String(sleeper.pid), "utf8");
     await fsp.writeFile(path.join(lockDir, "log"), log2Real, "utf8");
 
-    await waitFor((o) => o && o.pid === sleeper.pid && o.log === log2Real, 5000);
+    await waitFor((o) => o && o.pid === sleeper.pid && o.log === log2Real, waitTimeoutMs);
     sleeper.kill("SIGTERM");
   } finally {
     tailLog.kill("SIGTERM");

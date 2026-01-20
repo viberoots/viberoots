@@ -72,6 +72,8 @@ Description
   - Assemble a browser bundle: `{ .wasm, loader JS, FS image }` from pinned Pyodide + importer deps.
   - Apply `patches/python/*.patch` at build time before bundling.
 
+For Pyodide extension modules, I build Emscripten side modules with `T.pyExtWasm` and keep the output under `$out/site/<module path>${EXT_SUFFIX}` so overlays remain deterministic.
+
 Pros
 
 - Enables true in‑browser execution and tests.

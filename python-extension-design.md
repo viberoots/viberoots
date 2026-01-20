@@ -61,6 +61,15 @@ I keep `link_deps` and `header_deps` out of `kind:pyext_wasm` until a dedicated 
 
 The `EXT_SUFFIX` is derived from the pinned interpreter at build time (via `sysconfig`) to avoid hardcoding CPython tags.
 
+### `T.pyExtWasm` (Pyodide)
+
+I add a dedicated template for Pyodide-targeted extension modules. It builds an Emscripten side module and places the output under the same `$out/site` overlay contract so planners can compose it later.
+
+- **output path**: `$out/site/<module path>${EXT_SUFFIX}`
+- **example**: `demo._native` → `$out/site/demo/_native${EXT_SUFFIX}`
+
+The `EXT_SUFFIX` is derived from the pinned Pyodide sysconfig data for wasm32-emscripten.
+
 ### `pyApp` / `pyLib` overlay composition
 
 `T.pyApp` / `T.pyLib` accept:
