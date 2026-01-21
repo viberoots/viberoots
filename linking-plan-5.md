@@ -356,3 +356,168 @@ It expands planner logic and link surface area across languages.
 ### Recommendation
 
 Implement only when there is a real consumer need.
+
+---
+
+## PR-6: Fix inline exporter attr coverage for `kind:pyext_wasm`
+
+### Description
+
+This PR closes the graph export gap where inline export omits the `module` attribute.
+
+### Scope & Changes
+
+This PR makes the following changes:
+
+- Include `module` in the inline exporter attribute list
+- Keep attr parity between `tools/buck/export-graph.ts` and `tools/buck/export-inline.ts`
+
+### Tests (in this PR)
+
+I add zx tests (one test per file):
+
+- `tools/tests/python/python.pyext-wasm.attrs.exported-by-inline-graph.test.ts`
+  - runs the inline exporter path
+  - asserts `module`, `cflags`, `ldflags`, `build_py_deps` are present for `kind:pyext_wasm`
+
+### Docs (in this PR)
+
+No doc changes. This is a parity fix.
+
+### Acceptance Criteria
+
+The following must be true:
+
+- Inline export includes `module` for `kind:pyext_wasm` nodes
+- Inline export matches the attr list used by the cquery exporter
+
+### Risks
+
+Low. The change is additive.
+
+### Consequence of Not Implementing
+
+Fallback graph export can drop `module` for `kind:pyext_wasm`, breaking planner wiring in some environments.
+
+### Downsides for Implementing
+
+Minimal.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-7: Pin WASI Python config for `T.pyExtWasi`
+
+### Description
+
+This PR aligns the WASI extension template with the pinned CPython WASI toolchain and removes reliance on host Python for `EXT_SUFFIX` and include paths.
+
+### Scope & Changes
+
+This PR makes the following changes:
+
+- Add a pinned WASI CPython toolchain input under `tools/nix/toolchains`
+- Update `T.pyExtWasi` to derive `EXT_SUFFIX` and include paths from the pinned toolchain
+- Keep the existing overlay contract and output path unchanged
+
+### Tests (in this PR)
+
+I add zx tests (one test per file):
+
+- `tools/tests/python/python.pyext-wasm.wasi.ext-suffix.uses-pinned-toolchain.test.ts`
+  - builds a WASI extension
+  - asserts the suffix matches the pinned toolchain value
+
+### Docs (in this PR)
+
+I update documentation to record the toolchain source:
+
+- Update `python-extension-design.md` with the pinned WASI config source for `EXT_SUFFIX`
+- Update `python-wasm-design.md` with the same detail
+
+### Acceptance Criteria
+
+The following must be true:
+
+- `T.pyExtWasi` no longer relies on host `python3` for `EXT_SUFFIX` or include dirs
+- The pinned toolchain is the single source of truth for WASI config
+
+### Risks
+
+Medium. Toolchain pinning can be brittle if upstream layout changes.
+
+### Consequence of Not Implementing
+
+WASI extensions remain tied to host Python config and can drift across machines.
+
+### Downsides for Implementing
+
+Adds a toolchain pin that must be maintained.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-8: Runtime execution for WASI and Pyodide extensions
+
+### Description
+
+This PR makes the WASI and Pyodide runtime paths actually import and execute `kind:pyext_wasm` modules in tests, rather than only asserting overlay presence.
+
+### Scope & Changes
+
+This PR makes the following changes:
+
+- Extend the WASI runner to execute the app entrypoint and import the extension
+- Add a Pyodide test harness path that runs a headless runtime and imports the extension
+- Replace banner-only assertions with runtime assertions that call a function from the extension
+
+### Tests (in this PR)
+
+I add zx integration tests (one test per file):
+
+- `tools/tests/python/python.wasm.wasi.ext.imports-and-runs.real-runtime.test.ts`
+  - builds a WASI app with a `kind:pyext_wasm` dep
+  - runs the WASI runtime and asserts a function call result
+- `tools/tests/python/python.wasm.pyodide.ext.imports-and-runs.real-runtime.test.ts`
+  - builds a Pyodide app with a `kind:pyext_wasm` dep
+  - runs the headless Pyodide harness and asserts a function call result
+- `tools/tests/python/python.wasm.pyodide.ext.linked-wasm-lib.executes.test.ts`
+  - builds a Pyodide extension with a wasm static lib
+  - asserts the linked symbol is invoked at runtime
+
+### Docs (in this PR)
+
+I update documentation to align with the runtime behavior:
+
+- Update `python-wasm-design.md` with the runtime execution contract for tests
+- Update `python-extension-design.md` to clarify that tests must execute, not just build
+
+### Acceptance Criteria
+
+The following must be true:
+
+- WASI and Pyodide tests execute the runtime and import the extension
+- Tests assert a real function call result from the extension module
+- Overlay-only checks are no longer the sole signal for success
+
+### Risks
+
+Medium. Runtime harnesses can be sensitive to toolchain versions and environment.
+
+### Consequence of Not Implementing
+
+The plan claims runtime support without tests that prove it.
+
+### Downsides for Implementing
+
+Adds test runtime dependencies and longer test time.
+
+### Recommendation
+
+Implement.
