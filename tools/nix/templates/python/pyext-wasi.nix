@@ -3,7 +3,9 @@ args:
 let
   lib = pkgs.lib;
   H = import ../../lib/lang-helpers.nix { inherit pkgs; };
+  WasiPython = import ../../toolchains/python-wasi.nix { inherit pkgs; };
   crossPkgs = pkgs.pkgsCross.wasi32;
+  buildPkgs = crossPkgs.buildPackages or pkgs;
 
   name = args.name or "pyext-wasi-unnamed";
   module = args.module or "";
@@ -51,7 +53,7 @@ let
   sortedCompileSrcs = lib.sort (a: b: a < b) compileSrcs;
   wantCxx = builtins.any isCxx compileSrcs;
 
-  py = pkgs.python3;
+  py = buildPkgs.python3;
 
   moduleRel = lib.replaceStrings [ "." ] [ "/" ] module;
   libDirs = map (d: "${d}/lib") wasmStaticLibs;
@@ -64,7 +66,7 @@ crossPkgs.stdenv.mkDerivation {
   version = "0.1.0";
   src = pkgSrc;
 
-  nativeBuildInputs = [ pkgs.coreutils py ] ++ (if wheelhouse == null then [] else [ wheelhouse ]);
+  nativeBuildInputs = [ buildPkgs.coreutils py WasiPython ] ++ (if wheelhouse == null then [] else [ wheelhouse ]);
   passthru =
     (if wheelhouse == null then {}
      else {
@@ -87,14 +89,14 @@ crossPkgs.stdenv.mkDerivation {
       exit 2
     fi
 
-    EXT_SUFFIX="$(${py}/bin/python -c 'import sysconfig; print(sysconfig.get_config_var("EXT_SUFFIX") or "")')"
+    EXT_SUFFIX="$(cat ${WasiPython}/config/ext-suffix.txt)"
     if [ -z "$EXT_SUFFIX" ]; then
-      echo "pyExtWasi: failed to determine EXT_SUFFIX from ${py}/bin/python" >&2
+      echo "pyExtWasi: EXT_SUFFIX missing from pinned WASI toolchain" >&2
       exit 2
     fi
-    INCLUDEPY="$(${py}/bin/python -c 'import sysconfig; print(sysconfig.get_config_var("INCLUDEPY") or "")')"
-    if [ -z "$INCLUDEPY" ]; then
-      echo "pyExtWasi: failed to determine INCLUDEPY from ${py}/bin/python" >&2
+    INCLUDEPY="${WasiPython}/include"
+    if [ ! -d "$INCLUDEPY" ]; then
+      echo "pyExtWasi: include dir missing from pinned WASI toolchain at $INCLUDEPY" >&2
       exit 2
     fi
 

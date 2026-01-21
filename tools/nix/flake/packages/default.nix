@@ -32,6 +32,7 @@ let
   };
 
   python = import ./python.nix { inherit pkgs repoRoot uv2nixLib; };
+  pyWasiToolchain = import ../../toolchains/python-wasi.nix { inherit pkgs; };
 in
 {
   buck2-prelude = prelude.buck2-prelude;
@@ -47,6 +48,7 @@ in
   node-cli = nodeCli;
   node-webapp = nodeWebapp;
   node-test = nodeTest;
+  py-wasi-toolchain = pyWasiToolchain;
 } // python
 
 

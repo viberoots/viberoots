@@ -57,6 +57,8 @@ Description
   - Build `kind:pyext_wasm` modules with `T.pyExtWasi` and merge overlays into WASI app/lib outputs.
   - Fail fast when a WASI app or lib depends on `kind:pyext_wasm` targets labeled for another backend.
 
+The WASI extension toolchain is pinned in `tools/nix/toolchains/python-wasi.nix`. `T.pyExtWasi` reads `EXT_SUFFIX` and headers from that toolchain instead of host Python.
+
 Pros
 
 - Closest to CPython semantics for pure‑Python stacks.

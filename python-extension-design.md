@@ -84,7 +84,7 @@ I add a WASI-specific template for `kind:pyext_wasm` that compiles sources for `
 - **output path**: `$out/site/<module path>${EXT_SUFFIX}`
 - **example**: `demo._native` → `$out/site/demo/_native${EXT_SUFFIX}`
 
-The `EXT_SUFFIX` is derived from the pinned CPython sysconfig data used for the WASI toolchain.
+The `EXT_SUFFIX` and include headers come from the pinned WASI toolchain at `tools/nix/toolchains/python-wasi.nix`. `T.pyExtWasi` does not read host Python config for these values.
 
 ### `pyApp` / `pyLib` overlay composition
 
