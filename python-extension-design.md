@@ -70,6 +70,15 @@ I add a dedicated template for Pyodide-targeted extension modules. It builds an 
 
 The `EXT_SUFFIX` is derived from the pinned Pyodide sysconfig data for wasm32-emscripten.
 
+### `T.pyExtWasi`
+
+I add a WASI-specific template for `kind:pyext_wasm` that compiles sources for `wasm32-wasi` and emits the same overlay contract so WASI apps and libs can merge extension modules deterministically.
+
+- **output path**: `$out/site/<module path>${EXT_SUFFIX}`
+- **example**: `demo._native` → `$out/site/demo/_native${EXT_SUFFIX}`
+
+The `EXT_SUFFIX` is derived from the pinned CPython sysconfig data used for the WASI toolchain.
+
 ### `pyApp` / `pyLib` overlay composition
 
 `T.pyApp` / `T.pyLib` accept:

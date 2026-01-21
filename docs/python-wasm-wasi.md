@@ -14,10 +14,11 @@ Both macros stamp `lang:python` and `kind:wasm` so the planner routes to WASI te
 
 ### Expectations and Constraints
 
-- Pure‑Python only (no native C‑extensions) for the initial baseline.
+- Third‑party native C‑extensions are out of scope; in‑repo `kind:pyext_wasm` modules are supported with explicit backend labels.
 - Lockfile: `uv.lock` at the importer root; use importer‑scoped labels like `lockfile:apps/tool/uv.lock#apps/tool`.
 - Patches: flat directory `patches/python/<dist>@<version>.patch`. Re‑applying an identical patch is a no‑op.
 - Runner: a tiny Node `node:wasi` loader is emitted at `<out>/bin/run.mjs` for convenience.
+- WASI extension modules are built with `nix_python_wasm_extension_module` (labels include `backend:wasi`) and merged into app/lib outputs as deterministic overlays.
 
 ### Example
 

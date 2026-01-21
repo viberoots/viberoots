@@ -14,7 +14,7 @@ This document defines a minimal, deterministic plan to add Python/WASM support t
 
 ### Non‑goals (initial phase)
 
-- Universal support for native C‑extensions inside WASM.
+- Third‑party native C‑extensions inside WASM (in‑repo `kind:pyext_wasm` modules are supported separately).
 - Immediate full parity between WASI and Emscripten on day one. We will stage delivery.
 
 ---
@@ -25,6 +25,7 @@ This document defines a minimal, deterministic plan to add Python/WASM support t
 - Hermetic Nix: toolchains pinned; outputs content‑addressed.
 - Importer‑scoped providers: WASM does not add new labels or providers.
 - Patching: `patch-pkg start/apply/reset/session` remains authoritative; dev overrides warn locally, fail in CI.
+- WASI extension modules are limited to in‑repo `kind:pyext_wasm` producers with explicit backend labels.
 
 ## WASM extension modules (graph contract only)
 
@@ -48,6 +49,8 @@ Description
   - Materialize site‑packages from `uv.lock` (pure‑Python deps only).
   - Apply `patches/python/*.patch` keyed by `<name>@<version>` at build time.
   - Create a WASI entry driving `bin/__main__.py` for app targets.
+  - Build `kind:pyext_wasm` modules with `T.pyExtWasi` and merge overlays into WASI app/lib outputs.
+  - Fail fast when a WASI app or lib depends on `kind:pyext_wasm` targets labeled for another backend.
 
 Pros
 

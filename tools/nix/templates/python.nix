@@ -7,6 +7,7 @@ let
   UvBackend = import ./python/backends/uv.nix { inherit pkgs; uv2nixLib = uv2nixLib; };
   PyExt = import ./python/pyext.nix { inherit pkgs; };
   PyExtWasm = import ./python/pyext-wasm.nix { inherit pkgs; };
+  PyExtWasi = import ./python/pyext-wasi.nix { inherit pkgs; };
 
   mkPy = {
     name,
@@ -132,6 +133,21 @@ in {
     buildPyDeps ? [],
   }:
     PyExtWasm {
+      inherit name module srcRoot subdir srcList cflags ldflags wheelhouse buildPyDeps;
+    };
+
+  pyExtWasi = {
+    name,
+    module,
+    wheelhouse ? null,
+    srcRoot ? ../../..,
+    subdir ? ".",
+    srcList ? [],
+    cflags ? [],
+    ldflags ? [],
+    buildPyDeps ? [],
+  }:
+    PyExtWasi {
       inherit name module srcRoot subdir srcList cflags ldflags wheelhouse buildPyDeps;
     };
 
