@@ -159,17 +159,20 @@ in
       if [ -d "${uvDrv}/site" ]; then
         cp -R "${uvDrv}/site/." "$out/site/"
       fi
+      # The uv2nix site tree comes from the Nix store (read-only perms). Make it writable
+      # before merging importer sources or overlays.
+      chmod -R u+w "$out/site"
       # Copy app/lib sources into site-packages so native modules can live alongside their packages.
       # This keeps runtime imports deterministic and avoids relying on mixed PYTHONPATH layouts.
       if [ -d "${src}/${subdir}/src" ]; then
         cp -R "${src}/${subdir}/src/." "$out/site/"
       fi
-      # The source tree comes from the Nix store (read-only perms). Make the merged site writable
-      # so overlays can be merged deterministically without permission errors.
+      # Ensure merged site remains writable before overlays.
       chmod -R u+w "$out/site"
       # Merge optional site overlays deterministically (caller provides stable order).
       for ov in ${overlayArgs}; do
         if [ -d "$ov/site" ]; then
+          chmod -R u+w "$out/site"
           cp -R "$ov/site/." "$out/site/"
         fi
       done

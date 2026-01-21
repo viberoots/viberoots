@@ -74,6 +74,15 @@ Description
 
 For Pyodide extension modules, I build Emscripten side modules with `T.pyExtWasm` and keep the output under `$out/site/<module path>${EXT_SUFFIX}` so overlays remain deterministic.
 
+### Pyodide extension overlays (planner + templates)
+
+For Pyodide apps and libs, I merge extension overlays directly into the Pyodide filesystem so imports resolve from a single, deterministic site tree. This keeps the WASM extension contract aligned with the native overlay flow.
+
+- The planner collects **direct** `kind:pyext_wasm` deps only when the consumer is `backend:pyodide`.
+- `pyWasmApp` merges overlays in a fixed order: app site → lib overlays → extension overlays.
+- `pyWasmLib` merges its own site, then its extension overlays.
+- If a Pyodide target depends on a `backend:wasi` extension, the planner fails fast with a targeted error.
+
 Pros
 
 - Enables true in‑browser execution and tests.

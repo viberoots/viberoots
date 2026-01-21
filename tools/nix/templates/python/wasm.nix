@@ -112,6 +112,7 @@ in {
     devOverrideEnv ? DevOverrideEnvs.envNameForLang "python",
     groups ? [],
     libOverlays ? [],
+    nativeModuleOverlays ? [],
     trim ? "none", # none | safe | aggressive
   }:
     let
@@ -131,6 +132,7 @@ in {
       };
       patchedKeys = builtins.attrNames patchesMap;
       overlaysCount = builtins.length libOverlays;
+      nativeOverlaysCount = builtins.length nativeModuleOverlays;
       # Allow test/local override of backend via env for selected-target fallback builds
       backendEnv = builtins.getEnv "PY_WASM_BACKEND";
       effBackend = if backendEnv != "" then backendEnv else backend;
@@ -156,6 +158,7 @@ in {
           parts = [
             (msgPrefix + ":" + effBackend)
             ("overlays=" + (toString overlaysCount))
+            ("nativeOverlays=" + (toString nativeOverlaysCount))
             ("patched=" + (if patchedKeys == [] then "none" else (lib.concatStringsSep "," patchedKeys)))
           ];
         in lib.concatStringsSep " " parts;
@@ -166,9 +169,19 @@ in {
       if [ -d "${uv}/site" ]; then
         cp -R "${uv}/site/." "$out/site/" || true
       fi
+      # Ensure we can mutate files under $out/site before overlay merges
+      chmod -R u+w "$out/site" || true
       # Merge lib overlay sites
       for ov in ${lib.concatStringsSep " " (map (x: x) libOverlays)}; do
         if [ -d "$ov/site" ]; then
+          chmod -R u+w "$out/site" || true
+          cp -R "$ov/site/." "$out/site/" || true
+        fi
+      done
+      # Merge native module overlays
+      for ov in ${lib.concatStringsSep " " (map (x: x) nativeModuleOverlays)}; do
+        if [ -d "$ov/site" ]; then
+          chmod -R u+w "$out/site" || true
           cp -R "$ov/site/." "$out/site/" || true
         fi
       done
@@ -205,6 +218,7 @@ chmod +x "$out/bin/run.mjs"
         "subdir": "${subdir}",
         "groups": ${builtins.toJSON groups},
         "patchedKeys": ${builtins.toJSON patchedKeys},
+        "nativeOverlays": ${builtins.toJSON nativeOverlaysCount},
         "trim": "${trim}"
       }
 JSON
@@ -219,16 +233,27 @@ JSON
     srcRoot ? ../../..,
     devOverrideEnv ? DevOverrideEnvs.envNameForLang "python",
     groups ? [],
+    nativeModuleOverlays ? [],
     trim ? "none", # none | safe | aggressive
   }:
     let
       site = mkOverlaySite { inherit name lockfile subdir srcRoot devOverrideEnv groups; };
+      nativeOverlaysCount = builtins.length nativeModuleOverlays;
     in pkgs.runCommand ("pywasm-lib-" + H.sanitizeName name + "-trimmed") {} ''
       set -euo pipefail
       mkdir -p "$out/site" "$out/meta"
       if [ -d "${site}/site" ]; then
         cp -R "${site}/site/." "$out/site/" || true
       fi
+      # Ensure we can mutate files under $out/site before overlay merges
+      chmod -R u+w "$out/site" || true
+      # Merge native module overlays
+      for ov in ${lib.concatStringsSep " " (map (x: x) nativeModuleOverlays)}; do
+        if [ -d "$ov/site" ]; then
+          chmod -R u+w "$out/site" || true
+          cp -R "$ov/site/." "$out/site/" || true
+        fi
+      done
       # Optional size trimming (deterministic, opt-in)
       trim_mode='${trim}'
       if [ "$trim_mode" = "safe" ] || [ "$trim_mode" = "aggressive" ]; then
@@ -246,7 +271,7 @@ JSON
       fi
       # Build info passthrough + trim
       if [ -f "${site}/BUILD-INFO.json" ]; then
-        jq '. + { "trim": "'${trim}'" }' "${site}/BUILD-INFO.json" > "$out/BUILD-INFO.json" || cp "${site}/BUILD-INFO.json" "$out/BUILD-INFO.json"
+        ${pkgs.jq}/bin/jq --arg trim "${trim}" --argjson nativeOverlays ${toString nativeOverlaysCount} '. + { "trim": $trim, "nativeOverlays": $nativeOverlays }' "${site}/BUILD-INFO.json" > "$out/BUILD-INFO.json" || cp "${site}/BUILD-INFO.json" "$out/BUILD-INFO.json"
       else
         cat > "$out/BUILD-INFO.json" <<JSON
         {
@@ -254,6 +279,7 @@ JSON
           "lockfile": "${lockfile}",
           "subdir": "${subdir}",
           "groups": ${builtins.toJSON groups},
+          "nativeOverlays": ${builtins.toJSON nativeOverlaysCount},
           "trim": "${trim}"
         }
 JSON

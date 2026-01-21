@@ -199,6 +199,15 @@ let
             nexts = if n == null then [] else depsOfName dn;
           in go { seen = seen'; out = out'; } (rest ++ nexts);
     in go { seen = {}; out = []; } startDeps;
+
+  collectPyExtWasmDepsDirect = name:
+    let
+      directDeps = depsOfName name;
+    in builtins.filter (dn:
+      let n = nodeOfName dn;
+          lbs = if n == null then [] else (get n "labels");
+      in n != null && lbs != null && builtins.elem "kind:pyext_wasm" lbs
+    ) directDeps;
 in rec {
   # Detect Python nodes by rule_type prefix or lang label
   isTarget = n:
@@ -363,13 +372,31 @@ in rec {
   mkWasmApp = name:
     let
       # Determine backend from labels; default to "wasi". Accept labels like "backend:pyodide".
+      backend = backendFor name;
       _noPyExt =
         let
           pyExtDeps = collectPyExtDepsTransitive name;
         in if pyExtDeps == [] then null else builtins.throw (
           "python planner: kind:wasm target " + name
-          + " (backend:" + (backendFor name) + ") depends on kind:pyext targets, which are not supported for Python WASM backends: "
+          + " (backend:" + backend + ") depends on kind:pyext targets, which are not supported for Python WASM backends: "
           + (builtins.toString pyExtDeps)
+        );
+      pyExtWasmDeps = collectPyExtWasmDepsDirect name;
+      badPyExtBackends =
+        builtins.filter (dn: (backendFor dn) != "pyodide") pyExtWasmDeps;
+      _pyExtWasmBackendOk =
+        if backend == "pyodide" then (
+          if badPyExtBackends == [] then null else builtins.throw (
+            "python planner: kind:wasm target " + name
+            + " (backend:pyodide) depends on kind:pyext_wasm targets with unsupported backend labels: "
+            + (builtins.toString badPyExtBackends)
+          )
+        ) else (
+          if pyExtWasmDeps == [] then null else builtins.throw (
+            "python planner: kind:wasm target " + name
+            + " (backend:" + backend + ") depends on kind:pyext_wasm targets, which are only supported for backend:pyodide in this phase: "
+            + (builtins.toString pyExtWasmDeps)
+          )
         );
       # Determine trim mode from labels; default to "none". Accept labels like "trim:safe" or "trim:aggressive".
       trimFor = nm:
@@ -387,22 +414,19 @@ in rec {
               isLib = (lbs != null) && (builtins.elem "kind:lib" lbs || builtins.elem "kind:wasm" lbs);
           in hasPy && isLib
         ) directDeps;
-      overlays = map (dn: T.pyWasmLib {
-        name = dn;
-        lockfile = lockRelFor dn;
-        srcRoot = repoRoot;
-        subdir = pkgPathOf dn;
-        trim = trimFor dn;
-      }) pyLibDeps;
-    in builtins.seq _noPyExt (T.pyWasmApp {
+      overlays = map mkWasmLib pyLibDeps;
+      nativeOverlays =
+        if backend == "pyodide" then map mkPyExtWasm pyExtWasmDeps else [];
+    in builtins.seq _noPyExt (builtins.seq _pyExtWasmBackendOk (T.pyWasmApp {
       inherit name;
       lockfile = lockRelFor name;
       srcRoot = repoRoot;
       subdir = pkgPathOf name;
       libOverlays = overlays;
-      backend = backendFor name;
+      nativeModuleOverlays = nativeOverlays;
+      backend = backend;
       trim = trimFor name;
-    });
+    }));
 
   mkWasmLib = name:
     let
@@ -414,18 +438,40 @@ in rec {
           + " depends on kind:pyext targets, which are not supported for Python WASM backends: "
           + (builtins.toString pyExtDeps)
         );
+      backend = backendFor name;
+      pyExtWasmDeps = collectPyExtWasmDepsDirect name;
+      badPyExtBackends =
+        builtins.filter (dn: (backendFor dn) != "pyodide") pyExtWasmDeps;
+      _pyExtWasmBackendOk =
+        if backend == "pyodide" then (
+          if badPyExtBackends == [] then null else builtins.throw (
+            "python planner: kind:wasm target " + name
+            + " (backend:pyodide) depends on kind:pyext_wasm targets with unsupported backend labels: "
+            + (builtins.toString badPyExtBackends)
+          )
+        ) else (
+          if pyExtWasmDeps == [] then null else builtins.throw (
+            "python planner: kind:wasm target " + name
+            + " (backend:" + backend + ") depends on kind:pyext_wasm targets, which are only supported for backend:pyodide in this phase: "
+            + (builtins.toString pyExtWasmDeps)
+          )
+        );
       trimFor = nm:
         let
           labs = labelsOfName nm;
           hits = builtins.filter (l: (builtins.typeOf l) == "string" && lib.hasPrefix "trim:" l) (if labs == null then [] else labs);
         in if hits == [] then "none" else (lib.removePrefix "trim:" (builtins.head hits));
+      nativeOverlays =
+        if backend == "pyodide" then map mkPyExtWasm pyExtWasmDeps else [];
     in
-      builtins.seq _noPyExt (T.pyWasmLib {
+      builtins.seq _noPyExt (builtins.seq _pyExtWasmBackendOk (T.pyWasmLib {
         inherit name;
         lockfile = lockRelFor name;
         srcRoot = repoRoot;
         subdir = pkgPathOf name;
         trim = trimFor name;
-      });
+        nativeModuleOverlays = nativeOverlays;
+        backend = backend;
+      }));
 }
 
