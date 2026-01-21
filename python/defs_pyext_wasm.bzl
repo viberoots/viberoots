@@ -1,6 +1,8 @@
 load(
     "//lang:defs_common.bzl",
+    "merge_link_intent_deps",
     "prepare_importer_non_genrule_wiring",
+    "validate_link_closure_overrides",
 )
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
 load("//python:pyext_stub.bzl", "python_pyext_stub")
@@ -40,6 +42,10 @@ def nix_python_wasm_extension_module(
         cflags = [],
         ldflags = [],
         build_py_deps = [],
+        link_deps = [],
+        header_deps = [],
+        link_closure = "direct",
+        link_closure_overrides = None,
         **kwargs):
     if not module or not isinstance(module, str):
         fail("module must be a non-empty string (e.g. 'mypkg._native')")
@@ -56,16 +62,26 @@ def nix_python_wasm_extension_module(
     kw["labels"] = base_labels
     _require_backend_label(base_labels + extra_labels)
 
+    if link_closure_overrides == None:
+        link_closure_overrides = {}
+
+    validate_link_closure_overrides(link_deps, link_closure_overrides)
+
     kw["module"] = module
     kw["cflags"] = cflags or []
     kw["ldflags"] = ldflags or []
     kw["build_py_deps"] = build_py_deps or []
+    kw["link_deps"] = link_deps or []
+    kw["header_deps"] = header_deps or []
+    kw["link_closure"] = link_closure or "direct"
+    kw["link_closure_overrides"] = link_closure_overrides
     kw["srcs"] = list(srcs or []) + list(headers or [])
 
+    merged = merge_link_intent_deps(deps, kw["link_deps"], kw["header_deps"])
     wiring = prepare_importer_non_genrule_wiring(
         name = name,
         kwargs = kw,
-        deps = deps,
+        deps = merged,
         lang = "python",
         kind = "pyext_wasm",
         labels = extra_labels,

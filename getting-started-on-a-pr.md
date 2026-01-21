@@ -87,4 +87,4 @@ These guardrails assume test tooling stays aligned with the dev shell and global
 - **Do not remove required files**: excluding `tools/tests`, `*.md`, or patch session files causes missing inputs and expensive retries.
 - **Target invalidation explicitly**: include patch files in graph-visible inputs so Nix can track them without extra runtime work.
 - **Measure before optimizing**: identify the dominant cost first, then optimize only that path.
-- **Stage updated pnpm-store hashes in temp repos**: when a test updates `tools/nix/node-modules.hashes.json`, `git add` it before any Nix builds so the flake snapshot sees the new hash instead of the placeholder.
+- **Stage updated pnpm-store hashes in temp repos**: when a test updates `tools/nix/node-modules.hashes.json`, `git add` it before any Nix builds so the flake snapshot sees the new hash instead of the placeholder. If a test generates a new `pnpm-lock.yaml`, always regenerate its hash even if an older entry exists in the map.

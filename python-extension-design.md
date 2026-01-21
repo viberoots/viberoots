@@ -39,7 +39,7 @@ The Buck-side target shape is:
 
 ## WASM extension modules (separate contract)
 
-I keep WASM-targeted extension modules separate from native `kind:pyext` to avoid ABI confusion. The WASM contract is a graph-only producer for now and does not imply runtime wiring.
+I keep WASM-targeted extension modules separate from native `kind:pyext` to avoid ABI confusion. The WASM contract is a graph-only producer and does not imply native CPython wiring.
 
 - **labels**: `lang:python`, `kind:pyext_wasm`, plus one explicit backend label (`backend:wasi` or `backend:pyodide`)
 - **attrs**:
@@ -47,8 +47,15 @@ I keep WASM-targeted extension modules separate from native `kind:pyext` to avoi
   - `srcs` and optional `headers`
   - `cflags`, `ldflags`
   - `build_py_deps` (build-time Python packages for headers)
+  - link intent attrs (`link_deps`, `header_deps`, `link_closure`, `link_closure_overrides`)
 
-I keep `link_deps` and `header_deps` out of `kind:pyext_wasm` until a dedicated WASM link model is added.
+The WASM link model is intentionally narrower than native `kind:pyext`:
+
+- supported `link_deps`: `lang:cpp`, `kind:wasm`, `wasm:static`
+- supported `header_deps`: `lang:cpp`, `kind:headers`
+- backend guardrails:
+  - `backend:wasi` requires linked deps to also be stamped `wasm:wasi`
+  - `backend:pyodide` rejects `wasm:wasi` deps to avoid ABI mismatches
 
 ## Nix realization contract
 

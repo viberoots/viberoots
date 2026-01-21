@@ -12,6 +12,8 @@ let
   srcList0 = args.srcList or [];
   cflags0 = args.cflags or [];
   ldflags0 = args.ldflags or [];
+  includeRoots0 = args.includeRoots or [];
+  wasmStaticLibs0 = args.wasmStaticLibs or [];
   wheelhouse0 = args.wheelhouse or null;
   buildPyDeps0 = args.buildPyDeps or [];
 
@@ -23,7 +25,12 @@ let
   srcList = ensureStringList "srcList" srcList0;
   cflags = ensureStringList "cflags" cflags0;
   ldflags = ensureStringList "ldflags" ldflags0;
+  includeRoots = ensureStringList "includeRoots" includeRoots0;
   buildPyDeps = ensureStringList "buildPyDeps" buildPyDeps0;
+  wasmStaticLibs =
+    if wasmStaticLibs0 == null then []
+    else if builtins.isList wasmStaticLibs0 then wasmStaticLibs0
+    else builtins.throw "pyExtWasi: expected wasmStaticLibs to be a list";
 
   wheelhouse =
     if wheelhouse0 == null then null
@@ -47,6 +54,10 @@ let
   py = pkgs.python3;
 
   moduleRel = lib.replaceStrings [ "." ] [ "/" ] module;
+  libDirs = map (d: "${d}/lib") wasmStaticLibs;
+  incDirs = map (d: "${d}/include") wasmStaticLibs;
+  ldPathFlags = lib.concatStringsSep " " (map (p: "-L" + p) libDirs);
+  includeFlags = lib.concatStringsSep " " (map (p: "-I" + p) (includeRoots ++ incDirs));
 in
 crossPkgs.stdenv.mkDerivation {
   pname = "pyext-wasi-${H.sanitizeName name}";
@@ -153,6 +164,7 @@ PY
       done
     fi
 
+    EXTRA_WASM_INC="${includeFlags}"
     mkdir -p build/obj
     objs=""
 
@@ -163,10 +175,10 @@ PY
       mkdir -p "$(dirname "$obj")"
       case "$srcPath" in
         *.c)
-        $CC -O2 -fPIC -I"$PYCONFIG_DIR" -I"$INCLUDEPY" $EXTRA_PY_INC ${lib.concatStringsSep " " (map lib.escapeShellArg cflags)} -c "$srcPath" -o "$obj"
+        $CC -O2 -fPIC -I"$PYCONFIG_DIR" -I"$INCLUDEPY" $EXTRA_PY_INC $EXTRA_WASM_INC ${lib.concatStringsSep " " (map lib.escapeShellArg cflags)} -c "$srcPath" -o "$obj"
           ;;
         *.cpp|*.cc|*.cxx)
-        $CXX -O2 -fPIC -I"$PYCONFIG_DIR" -I"$INCLUDEPY" $EXTRA_PY_INC ${lib.concatStringsSep " " (map lib.escapeShellArg cflags)} -c "$srcPath" -o "$obj"
+        $CXX -O2 -fPIC -I"$PYCONFIG_DIR" -I"$INCLUDEPY" $EXTRA_PY_INC $EXTRA_WASM_INC ${lib.concatStringsSep " " (map lib.escapeShellArg cflags)} -c "$srcPath" -o "$obj"
           ;;
       esac
       objs="$objs $obj"
@@ -176,7 +188,18 @@ PY
     outDir="$(dirname "$outRel")"
     mkdir -p "build/site/$outDir"
 
-    $CC -Wl,--no-entry -Wl,--export-all -Wl,--allow-undefined ${lib.concatStringsSep " " (map lib.escapeShellArg ldflags)} $objs -o "build/site/$outRel"
+    extraArchives=""
+    for d in ${lib.concatStringsSep " " (map (p: ''"${p}"'') wasmStaticLibs)}; do
+      if [ -d "$d/lib" ]; then
+        shopt -s nullglob
+        for a in "$d/lib"/*.a; do
+          extraArchives="$extraArchives $a"
+        done
+        shopt -u nullglob
+      fi
+    done
+
+    $CC -Wl,--no-entry -Wl,--export-all -Wl,--allow-undefined ${ldPathFlags} ${lib.concatStringsSep " " (map lib.escapeShellArg ldflags)} $objs $extraArchives -o "build/site/$outRel"
   '';
 
   installPhase = ''

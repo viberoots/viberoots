@@ -131,9 +131,11 @@ in {
     cflags ? [],
     ldflags ? [],
     buildPyDeps ? [],
+    includeRoots ? [],
+    wasmStaticLibs ? [],
   }:
     PyExtWasm {
-      inherit name module srcRoot subdir srcList cflags ldflags wheelhouse buildPyDeps;
+      inherit name module srcRoot subdir srcList cflags ldflags wheelhouse buildPyDeps includeRoots wasmStaticLibs;
     };
 
   pyExtWasi = {
@@ -146,9 +148,11 @@ in {
     cflags ? [],
     ldflags ? [],
     buildPyDeps ? [],
+    includeRoots ? [],
+    wasmStaticLibs ? [],
   }:
     PyExtWasi {
-      inherit name module srcRoot subdir srcList cflags ldflags wheelhouse buildPyDeps;
+      inherit name module srcRoot subdir srcList cflags ldflags wheelhouse buildPyDeps includeRoots wasmStaticLibs;
     };
 
   # Reusable, content-addressed wheelhouse keyed ONLY by lockfile + patches.

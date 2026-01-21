@@ -33,10 +33,15 @@ I add a Buck macro for WASM-targeted extension modules so the planner can route 
 
 - Macro: `nix_python_wasm_extension_module`
 - Required attrs: `module`, `srcs`
-- Optional attrs: `headers`, `cflags`, `ldflags`, `build_py_deps`
+- Optional attrs: `headers`, `cflags`, `ldflags`, `build_py_deps`, `link_deps`, `header_deps`, `link_closure`, `link_closure_overrides`
 - Labels: `lang:python`, `kind:pyext_wasm`, plus one backend label (`backend:wasi` or `backend:pyodide`)
 
-I keep `link_deps` out of this contract until a dedicated WASM linking plan lands.
+The link model is intentionally narrow and enforced in the planner:
+
+- `link_deps` must be `lang:cpp`, `kind:wasm`, `wasm:static`
+- `header_deps` must be `lang:cpp`, `kind:headers`
+- `backend:wasi` requires linked deps to be stamped `wasm:wasi`
+- `backend:pyodide` rejects `wasm:wasi` deps to avoid ABI mismatches
 
 ---
 

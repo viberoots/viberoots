@@ -4,6 +4,30 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { runInTemp } from "./test-helpers";
 
+async function findForkserverDir(tmp: string): Promise<string | null> {
+  const buckOut = path.join(tmp, "buck-out");
+  const v2 = path.join(buckOut, "v2", "forkserver");
+  try {
+    await fsp.access(v2);
+    return v2;
+  } catch {}
+  let entries: Array<{ name: string; isDirectory: () => boolean }> = [];
+  try {
+    entries = await fsp.readdir(buckOut, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+  for (const ent of entries) {
+    if (!ent.isDirectory()) continue;
+    const candidate = path.join(buckOut, ent.name, "forkserver");
+    try {
+      await fsp.access(candidate);
+      return candidate;
+    } catch {}
+  }
+  return null;
+}
+
 // Keep the temp repo on disk so the detached reaper can locate buck-out/<iso>/forkserver.
 process.env.TEST_KEEP_TMP = "1";
 // Print TMP as early as possible (before temp repo seeding), so the parent can coordinate even if
@@ -47,21 +71,22 @@ await runInTemp("buck-cleanup-interrupted", async (tmp, $) => {
   buck.on("error", (err) => {
     buckErr += `\n[spawn error] ${String(err)}\n`;
   });
-  const fsDir = path.join(tmp, "buck-out", "v2", "forkserver");
   const t0 = Date.now();
   let forkserverReady = false;
+  let forkserverPath = "";
   const waitMs = 60_000;
   while (Date.now() - t0 < waitMs) {
-    try {
-      await fsp.access(fsDir);
+    const found = await findForkserverDir(tmp);
+    if (found) {
+      forkserverPath = found;
       forkserverReady = true;
       break;
-    } catch {}
+    }
     await new Promise((r) => setTimeout(r, 50));
   }
   if (!forkserverReady) {
     console.error(
-      `buck cleanup child: forkserver dir did not appear within ${Math.round(waitMs / 1000)}s (expected at ${fsDir})`,
+      `buck cleanup child: forkserver dir did not appear within ${Math.round(waitMs / 1000)}s`,
     );
     if (buckOut.trim() || buckErr.trim()) {
       console.error("buck2 stdout:\n" + buckOut.trim());
@@ -76,6 +101,9 @@ await runInTemp("buck-cleanup-interrupted", async (tmp, $) => {
       console.error(`buck2 exit code: ${buck.exitCode}`);
     }
     process.exit(2);
+  }
+  if (forkserverPath) {
+    console.error(`buck cleanup child: forkserver ready at ${forkserverPath}`);
   }
   console.log("READY");
   // Block forever so the parent can SIGKILL us (simulating an interruption).
