@@ -235,11 +235,11 @@ Implement.
 
 ---
 
-## PR-4: WASI backend support for `kind:pyext_wasm`
+## PR-4: WASI backend support for `kind:pyext_wasm` (blocked)
 
 ### Description
 
-I add a WASI-specific build and runtime path so a WASI app or lib can import a WASM extension module.
+I add a WASI-specific build and runtime path so a WASI app or lib can import a WASM extension module. **This is blocked** by the pinned WASI runtime lacking dynamic module loading; until a compatible runtime exists, we fail fast at build time when a WASI target depends on `kind:pyext_wasm`.
 
 This targets the backend that already exists by default (`backend` falls back to `wasi` in the planner).
 
@@ -263,7 +263,7 @@ I add zx integration tests (one test per file):
 
 - `tools/tests/python/python.wasm.wasi.ext.imports-and-runs.test.ts`
   - WASI app depends on a `kind:pyext_wasm` module via `nix_python_wasm_app`
-  - run via the WASI runner and assert the module executes
+  - asserts a targeted build-time failure until a dynamic-loading runtime is pinned
 - `tools/tests/python/python.wasm.wasi.ext.build-py-deps.headers.available.test.ts`
   - extension uses a header from `build_py_deps` and builds successfully
 - `tools/tests/python/python.wasm.wasi.ext.lib-consumed-by-app.test.ts`
@@ -282,7 +282,7 @@ I add zx integration tests (one test per file):
 
 ### Acceptance Criteria
 
-- WASI apps and libs can import a `kind:pyext_wasm` module.
+- WASI apps and libs can import a `kind:pyext_wasm` module once a compatible runtime is pinned.
 - `EXT_SUFFIX` is derived from the pinned CPython WASI config.
 - Backend mismatches fail fast with a clear error.
 
@@ -292,7 +292,7 @@ Medium. WASI runtime support for extension loading can be limited and needs to b
 
 ### Consequence of Not Implementing
 
-WASI remains pure-Python only for this repo’s Python WASM backends.
+WASI remains pure-Python only for this repo’s Python WASM backends; `kind:pyext_wasm` deps fail fast.
 
 ### Downsides for Implementing
 
