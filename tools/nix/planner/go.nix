@@ -242,6 +242,11 @@ in {
         let v = get consumer "link_closure_overrides";
         in if v != null then v else (get consumer "buck.link_closure_overrides");
       overrides = normalizeOverrides name overridesRaw;
+      overridesSummary =
+        let
+          ordered = builtins.filter (dep: builtins.hasAttr dep overrides) linkDeps;
+          entries = builtins.map (dep: "${dep}=${overrides.${dep}}") ordered;
+        in lib.concatStringsSep "," entries;
       backend = builtins.getEnv "WEB_WASM_BACKEND";
       tinyTarget = if backend == "wasi_single" then "wasi" else "wasm";
       wasmTarget = if tinyTarget == "wasi" then "wasm32-wasi" else "wasm32-unknown-unknown";
@@ -331,6 +336,7 @@ in {
       subdir = (pkgPathOf name);
       wasmStaticLibs = repoWasmLibs;
       wasmStaticLibLabels = validated;
+      linkClosureOverridesSummary = overridesSummary;
       target = tinyTarget;
     };
 }

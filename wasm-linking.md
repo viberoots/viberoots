@@ -225,7 +225,7 @@ Wasm adds one additional constraint:
 
 - Ordering and traversal are performed within a single variant. If a mismatch is detected, fail rather than trying to coerce.
 
-In addition to the algorithm-level rules above, I also want a concrete, testable artifact-level signal so we can lock ordering down over time. For TinyGo Wasm builds, the Go template writes the resolved link order into `$out/build.log` as `wasmStaticLibLabels=...`.
+In addition to the algorithm-level rules above, I also want a concrete, testable artifact-level signal so we can lock ordering down over time. For TinyGo Wasm builds, the Go template writes the resolved link order into `$out/build.log` as `wasmStaticLibLabels=...`. It also logs per-dep overrides for TinyGo Wasm builds as `linkClosureOverrides=...` so tests can lock the override behavior.
 
 ## Invalidation contract (Phase 2)
 

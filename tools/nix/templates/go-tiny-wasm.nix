@@ -25,6 +25,8 @@ in {
     wasmStaticLibs ? [],
     # For determinism diagnostics (planner-provided; not used for building)
     wasmStaticLibLabels ? [],
+    # For determinism diagnostics (planner-provided; not used for building)
+    linkClosureOverridesSummary ? "",
     # Build options
     # TinyGo target: "wasm" (bare) or "wasi" (WASI single-artifact backend)
     target ? "wasm",
@@ -154,6 +156,7 @@ EOF
       echo "subdir=${subdir}" >> "$out/build.log"
       echo "wasmStaticLibs=${toString (builtins.length wasmStaticLibs)}" >> "$out/build.log"
       echo "wasmStaticLibLabels=${lib.concatStringsSep "," wasmStaticLibLabels}" >> "$out/build.log"
+      echo "linkClosureOverrides=${linkClosureOverridesSummary}" >> "$out/build.log"
       echo "target=${target}" >> "$out/build.log"
       echo "opt=${optimize}" >> "$out/build.log"
       echo "panic=${panicMode}" >> "$out/build.log"
