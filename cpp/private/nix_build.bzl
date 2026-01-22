@@ -11,15 +11,20 @@ def _cpp_nix_build_impl(ctx):
     # - kind="addon" → lib/<sanitized>.node
     raw = ctx.attrs.self_label
     kind = ctx.attrs.kind
+    link_mode = ctx.attrs.link_mode or "static"
     # Expected artifact names mirror tools/nix/templates/cpp.nix sanitize logic
     sanitized = sanitize_to_bin_name(raw)
     expected_bin = "bin/%s" % sanitized
     expected_lib = "lib/lib%s.a" % sanitized
+    expected_shared_lib = "lib/lib%s.so" % sanitized
     expected_addon = "lib/%s.node" % sanitized
     if kind == "bin":
         expected = expected_bin
     elif kind == "lib":
-        expected = expected_lib
+        if link_mode == "shared":
+            expected = expected_shared_lib
+        else:
+            expected = expected_lib
     elif kind == "addon":
         expected = expected_addon
     else:
@@ -106,6 +111,7 @@ cpp_nix_build = rule(
         "header_deps": attrs.list(attrs.dep(), default = []),
         "link_closure": attrs.string(default = "direct"),
         "link_closure_overrides": attrs.dict(key = attrs.label(), value = attrs.string(), default = {}),
+        "link_mode": attrs.string(default = "static"),
         "srcs": attrs.list(attrs.source(), default = []),  # include local patch files as inputs
         "nix_inputs": attrs.list(attrs.source(), default = []),  # explicit Nix inputs that should affect the rule key
         "labels": attrs.list(attrs.string(), default = []),

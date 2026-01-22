@@ -93,6 +93,10 @@ nix_go_tiny_wasm_lib(
       path.join(tmp, "cpp", "defs.bzl"),
       await fsp.readFile("cpp/defs.bzl", "utf8"),
     );
+    await fsp.writeFile(
+      path.join(tmp, "cpp", "wasm_defs.bzl"),
+      await fsp.readFile("cpp/wasm_defs.bzl", "utf8"),
+    );
 
     // 4) Export graph once
     await $({

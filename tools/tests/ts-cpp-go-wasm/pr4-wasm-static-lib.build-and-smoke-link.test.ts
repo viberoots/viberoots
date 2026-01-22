@@ -57,6 +57,10 @@ int add(int a, int b) { return a + b; }
       path.join(tmp, "cpp", "defs.bzl"),
       await fs.readFile("cpp/defs.bzl", "utf8"),
     );
+    await fs.outputFile(
+      path.join(tmp, "cpp", "wasm_defs.bzl"),
+      await fs.readFile("cpp/wasm_defs.bzl", "utf8"),
+    );
     // Make planner templates visible (temp repo will prefer main workspace templates when absent)
     await fs.mkdirp(path.join(tmp, "tools/nix/templates"));
     await fs.copy(

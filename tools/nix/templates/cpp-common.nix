@@ -18,6 +18,8 @@ let
   # Common flag joiners for nix pkgs include/lib paths (need access to toIncludeBase/toLibBase)
   nixIncFlags = pkgsList: lib.concatStringsSep " " (map (p: "-isystem ${toIncludeBase p}/include") pkgsList);
   nixLibFlags = pkgsList: lib.concatStringsSep " " (map (p: "-L${toLibBase p}/lib") pkgsList);
+  nixLibDirs = pkgsList: map (p: "${toLibBase p}/lib") pkgsList;
+  nixRpathFlags = pkgsList: lib.concatStringsSep " " (map (p: "-Wl,-rpath,${p}") (nixLibDirs pkgsList));
 
   # Standardized dev override handling (manifest-driven env name)
   cppDevOverrideEnv = DevOverrideEnvs.envNameForLang "cpp";
@@ -68,7 +70,7 @@ let
     else pkgs.nodejs;
 in {
   inherit lib H clangxx llvmAr sorted joinInc joinDef joinExtraC
-          toIncludeBase toLibBase nixIncFlags nixLibFlags
+          toIncludeBase toLibBase nixIncFlags nixLibFlags nixLibDirs nixRpathFlags
           devMap _ci_guard normalizeAttr getAtFromPkgs overridePkgIfAny resolveAttrsToPkgs
           hasGTestAttr gtestPkgsAllFor nodeToolchain;
 }

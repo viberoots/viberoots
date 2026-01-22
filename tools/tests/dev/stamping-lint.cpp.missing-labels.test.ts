@@ -50,6 +50,10 @@ await runInTemp("stamping-lint-cpp-missing", async (tmp, $) => {
     "utf8",
   );
   await fs.outputFile(path.join(tmp, "cpp", "defs.bzl"), await fs.readFile("cpp/defs.bzl", "utf8"));
+  await fs.outputFile(
+    path.join(tmp, "cpp", "wasm_defs.bzl"),
+    await fs.readFile("cpp/wasm_defs.bzl", "utf8"),
+  );
   try {
     const res2 = await $({
       cwd: tmp,

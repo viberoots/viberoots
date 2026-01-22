@@ -191,12 +191,17 @@ This avoids guessing. Libraries declare their own link requirements. Consumers d
 
 I propose a separate, opt-in knob:
 
-- `link_kind`: `"static"` (default) or `"shared"`.
+- `link_mode`: `"static"` (default) or `"shared"`.
 
 Rationale:
 
 - Static is the simplest and matches our current in-repo C++ template shape (`cppLib` produces `.a`).
 - Shared requires additional runtime-path semantics and testing, and I do not want to silently switch behavior.
+
+Notes:
+
+- For library targets, `link_mode` controls the artifact (`cppLib` vs `cppSharedLib`).
+- For consumers (bin/test/addon), `link_mode="shared"` requires `link_deps` to resolve to shared-capable producers and fails fast otherwise.
 
 ### Example call sites
 
@@ -397,7 +402,7 @@ To implement explicit C++ linking, the planner must also be able to read:
 - `link_deps`
 - `header_deps`
 - `link_closure`
-- `link_kind`
+- `link_mode`
 
 The exporter includes these intent attributes in the configured graph output:
 
@@ -566,7 +571,7 @@ Shared libs require two things:
 I propose to implement shared libs as a separate, explicit step:
 
 - `cppSharedLib` template producing `$out/lib/lib<name>.so|dylib` and `$out/include`
-- `link_kind="shared"` causes the planner to instantiate `cppSharedLib` for link deps
+- `link_mode="shared"` causes the planner to instantiate `cppSharedLib` for link deps
 
 For runtime:
 
@@ -587,7 +592,7 @@ Implementation details (proposed):
 - Extend `cpp/defs.bzl` public macros:
   - `nix_cpp_library`, `nix_cpp_binary`, `nix_cpp_node_addon`, `nix_cpp_test`
   - accept and forward the new attrs:
-    - `link_deps`, `header_deps`, `link_closure`, `link_kind`
+    - `link_deps`, `header_deps`, `link_closure`, `link_mode`
 - Implement deterministic deps merging:
   - `base_deps := (caller deps) ∪ link_deps ∪ header_deps ∪ extra_module_providers`
   - pass `base_deps` through the existing wiring helper so patch inputs and other policy remain centralized
@@ -615,7 +620,7 @@ Scope:
 
 - land the doc (this file)
 - define target labels/stamps for `kind:headers`
-- define exporter fields required for the planner (`link_deps`, `header_deps`, `link_closure`, `link_kind`)
+- define exporter fields required for the planner (`link_deps`, `header_deps`, `link_closure`, `link_mode`)
 
 Acceptance:
 
@@ -655,7 +660,7 @@ Acceptance:
 Scope:
 
 - implement `cppSharedLib` template
-- implement `link_kind="shared"`
+- implement `link_mode="shared"`
 - implement runtime strategy (rpath or packaging)
 
 Acceptance:
@@ -704,7 +709,7 @@ This project is “finished” when:
 
 ⚠️ Exporter attribute surface:
 
-- If the exporter only emits a fixed set of attributes, we must extend it to export `link_deps`, `header_deps`, `link_closure`, and `link_kind`.
+- If the exporter only emits a fixed set of attributes, we must extend it to export `link_deps`, `header_deps`, `link_closure`, and `link_mode`.
 
 ⚠️ Deterministic `-l` ordering in templates:
 

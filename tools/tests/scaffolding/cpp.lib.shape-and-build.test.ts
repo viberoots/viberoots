@@ -13,6 +13,10 @@ test("cpp lib scaffold: files render and TARGETS wires gtest deps", async () => 
     await fs.ensureFile(path.join(tmp, "cpp", "defs.bzl"));
     await fs.copy(path.join(process.cwd(), "cpp", "defs.bzl"), path.join(tmp, "cpp", "defs.bzl"));
     await fs.copy(
+      path.join(process.cwd(), "cpp", "wasm_defs.bzl"),
+      path.join(tmp, "cpp", "wasm_defs.bzl"),
+    );
+    await fs.copy(
       path.join(process.cwd(), "tools", "nix", "templates", "cpp.nix"),
       path.join(tmp, "tools", "nix", "templates", "cpp.nix"),
     );

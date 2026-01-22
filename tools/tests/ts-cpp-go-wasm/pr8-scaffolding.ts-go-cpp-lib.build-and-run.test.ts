@@ -38,6 +38,10 @@ test(
         await fs.readFile("cpp/defs.bzl", "utf8"),
       );
       await fs.outputFile(
+        path.join(tmp, "cpp", "wasm_defs.bzl"),
+        await fs.readFile("cpp/wasm_defs.bzl", "utf8"),
+      );
+      await fs.outputFile(
         path.join(tmp, "go", "defs.bzl"),
         await fs.readFile("go/defs.bzl", "utf8"),
       );

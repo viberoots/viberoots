@@ -64,6 +64,10 @@ TEST(MathCore, AddWorks) {
       path.join(tmp, "cpp", "defs.bzl"),
       await fs.readFile("cpp/defs.bzl", "utf8"),
     );
+    await fs.outputFile(
+      path.join(tmp, "cpp", "wasm_defs.bzl"),
+      await fs.readFile("cpp/wasm_defs.bzl", "utf8"),
+    );
     await fs.mkdirp(path.join(tmp, "tools/nix/templates"));
     await fs.copy(
       path.join(process.cwd(), "tools/nix/templates/cpp.nix"),

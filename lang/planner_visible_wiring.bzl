@@ -164,6 +164,7 @@ def wire_package_local_planner_visible_stub(
     header_deps = kw.get("header_deps", []) or []
     link_closure = kw.get("link_closure", "direct") or "direct"
     link_closure_overrides = kw.get("link_closure_overrides", {}) or {}
+    link_mode = kw.get("link_mode", "static") or "static"
 
     wire_planner_visible_stub(
         name = name,
@@ -182,6 +183,7 @@ def wire_package_local_planner_visible_stub(
         header_deps = header_deps,
         link_closure = link_closure,
         link_closure_overrides = link_closure_overrides,
+        link_mode = link_mode,
     )
     return struct(
         kwargs = kw,

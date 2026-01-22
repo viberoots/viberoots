@@ -15,6 +15,10 @@ test("cpp gtest include via nixpkg_deps at call site", async () => {
       path.join(tmp, "cpp", "defs.bzl"),
       await fs.readFile("cpp/defs.bzl", "utf8"),
     );
+    await fs.outputFile(
+      path.join(tmp, "cpp", "wasm_defs.bzl"),
+      await fs.readFile("cpp/wasm_defs.bzl", "utf8"),
+    );
     // Provide the Nix template used by the external runner
     await fs.mkdirp(path.join(tmp, "tools/nix/templates"));
     await fs.copy(

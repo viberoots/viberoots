@@ -4,8 +4,6 @@ let
   lib = C.lib;
   H = C.H;
   clangxx = C.clangxx;
-  toIncludeBase = C.toIncludeBase;
-  toLibBase = C.toLibBase;
   nixIncFlags = C.nixIncFlags;
   nixLibFlags = C.nixLibFlags;
   nixLibDirs = C.nixLibDirs;
@@ -14,11 +12,10 @@ let
   joinDef = C.joinDef;
   joinExtraC = C.joinExtraC;
   resolveAttrsToPkgs = C.resolveAttrsToPkgs;
-  hasGTestAttr = C.hasGTestAttr;
-  gtestPkgsAllFor = C.gtestPkgsAllFor;
 in {
-  # Build a GoogleTest-style test binary. Determinism: stable ordering and flags.
-  cppTest = {
+  # Build a shared C++ library from sources under subdir of srcRoot.
+  # Determinism: stable file ordering, stable flag ordering, reproducible flags.
+  cppSharedLib = {
     name,
     srcRoot ? ../../..,
     subdir ? ".",
@@ -33,31 +30,24 @@ in {
     patches ? [],
   }:
   let
-    pname = "cpptest-${H.sanitizeName name}";
+    pname = "cxxshared-${H.sanitizeName name}";
     srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + subdir));
-    resolvedPkgs =
-      let base = nixCxxPkgs ++ (resolveAttrsToPkgs nixCxxAttrs);
-      in base ++ (if hasGTest then gtestPkgsAll else []);
+    resolvedPkgs = nixCxxPkgs ++ (resolveAttrsToPkgs nixCxxAttrs);
     nixInc = nixIncFlags resolvedPkgs;
     nixLib = nixLibFlags resolvedPkgs;
     libDirs = nixLibDirs resolvedPkgs;
     rpathFlags = nixRpathFlags resolvedPkgs;
     incFlags = joinInc includes;
     defFlags = joinDef defines;
-    extraC   = joinExtraC (cflags ++ [ "-ffunction-sections" "-fdata-sections" ]);
+    extraC   = joinExtraC (cflags ++ [ "-fPIC" ]);
     extraLD  = joinExtraC ldflags;
-    platLD   = if pkgs.stdenv.isDarwin then "-Wl,-dead_strip" else "-Wl,--gc-sections";
-    # Heuristic: if gtest/googletest is among nixCxxAttrs, add -lgtest and -lgtest_main and force include/lib paths
-    hasGTest = hasGTestAttr nixCxxAttrs;
-    gtestLibs = if hasGTest then "-lgtest_main -lgtest" else "";
-    gtestPkgsAll = gtestPkgsAllFor nixCxxAttrs;
-    gtestInc = if hasGTest && (gtestPkgsAll != []) then (
-      lib.concatStringsSep " " (map (p: "-isystem ${toIncludeBase p}/include") gtestPkgsAll)
-    ) else "";
-    gtestLibPath = if hasGTest && (gtestPkgsAll != []) then (
-      lib.concatStringsSep " " (map (p: "-L${toLibBase p}/lib") gtestPkgsAll)
-    ) else "";
-    threadLib = if pkgs.stdenv.isDarwin then "" else "-pthread";
+    srcsCmd = if srcList != [] then (
+      "printf '%s\\n' " + (lib.concatStringsSep " " (map (s: "'" + s + "'") (lib.sort (a: b: a < b) srcList))) +
+      " | grep -E '\\.(c|cc|cpp|cxx)$' | sort"
+    ) else (
+      # Fallback: restrict to conventional source dir to avoid picking up tests/** by accident
+      "find ./src -type f \\( -name '*.cpp' -o -name '*.cc' -o -name '*.cxx' \\) 2>/dev/null | sed 's#^./##' | sort"
+    );
   in pkgs.stdenv.mkDerivation {
     inherit pname;
     version = "0.1.0";
@@ -70,21 +60,18 @@ in {
     dontInstallCheck = true;
     doCheck = false;
     installPhase = ''
-      set -eu
-      mkdir -p "$out/bin" "$out/include"
+      set -euo pipefail
+      export SOURCE_DATE_EPOCH=1
+      mkdir -p "$out/lib" "$out/include"
       tmp="$TMPDIR/obj"; mkdir -p "$tmp"
 
-      echo "[cpp.test] nixCxxAttrs=${lib.concatStringsSep "," nixCxxAttrs}" >&2
-      echo "[cpp.test] resolvedPkgs=${lib.concatStringsSep " " (map (p: toIncludeBase p) resolvedPkgs)}" >&2
-      echo "[cpp.test] nixInc=${nixInc}" >&2
-      echo "[cpp.test] gtestInc=${gtestInc}" >&2
+      echo "[cpp.shared-lib] nixCxxAttrs=${lib.concatStringsSep "," nixCxxAttrs}" >&2
+      echo "[cpp.shared-lib] nixInc=${nixInc}" >&2
 
-      # Discover sources deterministically from working directory
-      mapfile -t SRCS < <(find . -type f \( -name '*.cpp' -o -name '*.cc' -o -name '*.cxx' \) | sed 's#^\./##' | sort)
+      mapfile -t SRCS < <(${srcsCmd})
       mapfile -t HDRS < <(find . -type f \( -name '*.h' -o -name '*.hpp' -o -name '*.hh' -o -name '*.hxx' \) | sort)
 
-      cflags_common="-std=${std} -fno-record-gcc-switches -ffile-prefix-map=$PWD=. -g0 -O2 -pipe ${nixInc} ${gtestInc}"
-      echo "[cpp.test] cflags_common=$cflags_common" >&2
+      cflags_common="-std=${std} -fno-record-gcc-switches -ffile-prefix-map=$PWD=. -g0 -O2 -pipe ${nixInc}"
       for s in "''${SRCS[@]}"; do
         rel="''${s#./}"
         obj="$tmp/''${rel%.*}.o"
@@ -93,8 +80,9 @@ in {
       done
 
       mapfile -t OBJS < <(find "$tmp" -type f -name '*.o' | sort)
-      outbin="$out/bin/${H.sanitizeName name}"
-      # Auto-discover static libraries from nix pkgs to link with -l<name>
+      outso="$out/lib/lib${H.sanitizeName name}.so"
+      outdylib="$out/lib/lib${H.sanitizeName name}.dylib"
+
       declare -a PKG_LIB_DIRS
       PKG_LIB_DIRS=(
         ${lib.concatStringsSep " " libDirs}
@@ -116,10 +104,22 @@ in {
           done < <(find "$d" -maxdepth 1 -type f \( -name 'lib*.a' -o -name 'lib*.so' -o -name 'lib*.dylib' \) 2>/dev/null | sort)
         fi
       done
-      ${clangxx} ${platLD} ${nixLib} ${rpathFlags} ${gtestLibPath} ${extraLD} "''${OBJS[@]}" ${gtestLibs} ${threadLib} "''${LIBFLAGS[@]}" -o "$outbin"
+
+      if ${if pkgs.stdenv.isDarwin then "true" else "false"}; then
+        ${clangxx} -dynamiclib ${nixLib} ${rpathFlags} ${extraLD} "''${OBJS[@]}" "''${LIBFLAGS[@]}" -o "$outdylib"
+        ln -s "lib${H.sanitizeName name}.dylib" "$outso"
+      else
+        ${clangxx} -shared ${nixLib} ${rpathFlags} ${extraLD} "''${OBJS[@]}" "''${LIBFLAGS[@]}" -o "$outso"
+      fi
 
       for h in "''${HDRS[@]}"; do
-        install -Dm644 "$h" "$out/include/''${h#./}"
+        rel="''${h#./}"
+        if [[ "$rel" == include/* ]]; then
+          dest="$out/include/''${rel#include/}"
+        else
+          dest="$out/include/$rel"
+        fi
+        install -Dm644 "$h" "$dest"
       done
 
       : > "$out/build.log"
@@ -128,15 +128,9 @@ in {
       echo "includes=${incFlags}" >> "$out/build.log"
       echo "defines=${defFlags}" >> "$out/build.log"
       echo "cflags=${extraC}" >> "$out/build.log"
-      echo "ldflags=${extraLD} ${platLD}" >> "$out/build.log"
-      echo "nixLib=${nixLib}" >> "$out/build.log"
-      echo "gtestLibs=${gtestLibs}" >> "$out/build.log"
+      echo "ldflags=${extraLD}" >> "$out/build.log"
       echo "link_libs=''${LIBFLAGS[*]}" >> "$out/build.log"
-      echo "sources=''${#SRCS[@]}" >> "$out/build.log"
-      echo "objects=''${#OBJS[@]}" >> "$out/build.log"
-      echo "outbin=$outbin" >> "$out/build.log"
+      echo "outso=$outso" >> "$out/build.log"
     '';
   };
 }
-
-

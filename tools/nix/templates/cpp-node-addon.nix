@@ -8,6 +8,8 @@ let
   toLibBase = C.toLibBase;
   nixIncFlags = C.nixIncFlags;
   nixLibFlags = C.nixLibFlags;
+  nixLibDirs = C.nixLibDirs;
+  nixRpathFlags = C.nixRpathFlags;
   joinInc = C.joinInc;
   joinDef = C.joinDef;
   joinExtraC = C.joinExtraC;
@@ -36,6 +38,8 @@ in {
     resolvedPkgs = nixCxxPkgs ++ (resolveAttrsToPkgs nixCxxAttrs);
     nixInc = nixIncFlags resolvedPkgs;
     nixLib = nixLibFlags resolvedPkgs;
+    libDirs = nixLibDirs resolvedPkgs;
+    rpathFlags = nixRpathFlags resolvedPkgs;
     nodeInc = "-isystem ${C.nodeToolchain}/include/node";
     incFlags = joinInc includes;
     # Ensure NODE_GYP_MODULE_NAME and a default NAPI version are defined for compatibility.
@@ -49,10 +53,10 @@ in {
     # On macOS, build a -dynamiclib with undefined symbols resolved at runtime by Node.
     # On Linux, build a -shared .so renamed to .node.
     linkCmdDarwin = ''
-      ${clangxx} -dynamiclib -undefined dynamic_lookup ${platLDGC} ${nixLib} ${extraLD} "''${OBJS[@]}" "''${LIBFLAGS[@]}" -o "$outmod"
+      ${clangxx} -dynamiclib -undefined dynamic_lookup ${platLDGC} ${nixLib} ${rpathFlags} ${extraLD} "''${OBJS[@]}" "''${LIBFLAGS[@]}" -o "$outmod"
     '';
     linkCmdLinux = ''
-      ${clangxx} -shared ${platLDGC} ${nixLib} ${extraLD} "''${OBJS[@]}" "''${LIBFLAGS[@]}" -o "$outmod"
+      ${clangxx} -shared ${platLDGC} ${nixLib} ${rpathFlags} ${extraLD} "''${OBJS[@]}" "''${LIBFLAGS[@]}" -o "$outmod"
     '';
     srcsCmd = if srcList != [] then (
       "printf '%s\\n' " + (lib.concatStringsSep " " (map (s: "'" + s + "'") (lib.sort (a: b: a < b) srcList))) + " | sort"
@@ -66,6 +70,7 @@ in {
     src = srcAbs;
     inherit patches;
     nativeBuildInputs = [ pkgs.llvmPackages.clang pkgs.llvmPackages.llvm ];
+    buildInputs = resolvedPkgs;
     dontStrip = true;
     dontConfigure = true;
     dontInstallCheck = true;
@@ -109,17 +114,23 @@ in {
       # Auto-discover static libraries from nix packages to link with -l<name>
       declare -a PKG_LIB_DIRS
       PKG_LIB_DIRS=(
-        ${lib.concatStringsSep " " (map (p: ("${toLibBase p}/lib")) resolvedPkgs)}
+        ${lib.concatStringsSep " " libDirs}
       )
       declare -a LIBFLAGS
+      declare -A SEEN_LIBS
       for d in "''${PKG_LIB_DIRS[@]}"; do
         if [ -d "$d" ]; then
           while IFS= read -r f; do
             b=$(basename "$f")
             n="''${b#lib}"
             n="''${n%.a}"
-            LIBFLAGS+=("-l$n")
-          done < <(find "$d" -maxdepth 1 -type f -name 'lib*.a' 2>/dev/null | sort)
+            n="''${n%.so}"
+            n="''${n%.dylib}"
+            if [ -z "''${SEEN_LIBS[$n]-}" ]; then
+              SEEN_LIBS[$n]=1
+              LIBFLAGS+=("-l$n")
+            fi
+          done < <(find "$d" -maxdepth 1 -type f \( -name 'lib*.a' -o -name 'lib*.so' -o -name 'lib*.dylib' \) 2>/dev/null | sort)
         fi
       done
 

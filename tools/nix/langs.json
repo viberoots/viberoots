@@ -32,11 +32,15 @@
       "displayName": "C++",
       "requiredPaths": [
         "cpp/defs.bzl",
+        "cpp/wasm_defs.bzl",
         "tools/nix/planner/cpp.nix",
+        "tools/nix/planner/cpp-link-helpers.nix",
+        "tools/nix/planner/cpp-go-archives.nix",
         "tools/nix/planner/cpp-phase1-helpers.nix",
         "tools/nix/planner/cpp-provider-attrs-fallback.nix",
         "tools/nix/templates/cpp.nix",
-        "tools/nix/templates/cpp-headers.nix"
+        "tools/nix/templates/cpp-headers.nix",
+        "tools/nix/templates/cpp-shared-lib.nix"
       ],
       "optionalPaths": [],
       "kinds": ["bin", "headers", "lib", "test"],

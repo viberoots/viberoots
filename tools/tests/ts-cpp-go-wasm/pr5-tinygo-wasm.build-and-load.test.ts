@@ -83,6 +83,10 @@ nix_go_tiny_wasm_lib(
       path.join(tmp, "cpp", "defs.bzl"),
       await fs.readFile("cpp/defs.bzl", "utf8"),
     );
+    await fs.outputFile(
+      path.join(tmp, "cpp", "wasm_defs.bzl"),
+      await fs.readFile("cpp/wasm_defs.bzl", "utf8"),
+    );
 
     // 4) Export graph and build TinyGo wasm via graph-generator-selected-wasm
     await $({

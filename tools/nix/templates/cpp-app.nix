@@ -8,6 +8,8 @@ let
   toLibBase = C.toLibBase;
   nixIncFlags = C.nixIncFlags;
   nixLibFlags = C.nixLibFlags;
+  nixLibDirs = C.nixLibDirs;
+  nixRpathFlags = C.nixRpathFlags;
   joinInc = C.joinInc;
   joinDef = C.joinDef;
   joinExtraC = C.joinExtraC;
@@ -35,6 +37,8 @@ in {
     # include flags from explicit includes and resolved nixCxx packages
     nixInc = nixIncFlags resolvedPkgs;
     nixLib = nixLibFlags resolvedPkgs;
+    libDirs = nixLibDirs resolvedPkgs;
+    rpathFlags = nixRpathFlags resolvedPkgs;
     incFlags = joinInc includes;
     defFlags = joinDef defines;
     extraC   = joinExtraC (cflags ++ [ "-ffunction-sections" "-fdata-sections" ]);
@@ -52,6 +56,7 @@ in {
     src = srcAbs;
     inherit patches;
     nativeBuildInputs = [ pkgs.llvmPackages.clang pkgs.llvmPackages.llvm ];
+    buildInputs = resolvedPkgs;
     dontStrip = true;
     dontConfigure = true;
     dontInstallCheck = true;
@@ -80,21 +85,27 @@ in {
       # Auto-discover static libraries from nix pkgs to link with -l<name>
       declare -a PKG_LIB_DIRS
       PKG_LIB_DIRS=(
-        ${lib.concatStringsSep " " (map (p: ("${toLibBase p}/lib")) resolvedPkgs)}
+        ${lib.concatStringsSep " " libDirs}
       )
       declare -a LIBFLAGS
+      declare -A SEEN_LIBS
       for d in "''${PKG_LIB_DIRS[@]}"; do
         if [ -d "$d" ]; then
           while IFS= read -r f; do
             b=$(basename "$f")
             n="''${b#lib}"
             n="''${n%.a}"
-            LIBFLAGS+=("-l$n")
-          done < <(find "$d" -maxdepth 1 -type f -name 'lib*.a' 2>/dev/null | sort)
+            n="''${n%.so}"
+            n="''${n%.dylib}"
+            if [ -z "''${SEEN_LIBS[$n]-}" ]; then
+              SEEN_LIBS[$n]=1
+              LIBFLAGS+=("-l$n")
+            fi
+          done < <(find "$d" -maxdepth 1 -type f \( -name 'lib*.a' -o -name 'lib*.so' -o -name 'lib*.dylib' \) 2>/dev/null | sort)
         fi
       done
       # Link resolved nix libraries first so -l flags can resolve
-      ${clangxx} ${platLD} ${nixLib} ${extraLD} "''${OBJS[@]}" "''${LIBFLAGS[@]}" -o "$outbin"
+      ${clangxx} ${platLD} ${nixLib} ${rpathFlags} ${extraLD} "''${OBJS[@]}" "''${LIBFLAGS[@]}" -o "$outbin"
 
       for h in "''${HDRS[@]}"; do
         install -Dm644 "$h" "$out/include/''${h#./}"

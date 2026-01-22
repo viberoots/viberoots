@@ -55,7 +55,7 @@ export async function rsyncRepoTo(tmp: string) {
       excludes.push("/cpp", "/tools/nix/templates", "/tools/scaffolding/templates");
     }
     if (process.env.TEST_EXCLUDE_CPP_REQS === "1") {
-      excludes.push("/cpp/defs.bzl", "/tools/nix/templates/cpp.nix");
+      excludes.push("/cpp/defs.bzl", "/cpp/wasm_defs.bzl", "/tools/nix/templates/cpp.nix");
     }
     excludes.push(
       "/third_party/providers/TARGETS.auto",

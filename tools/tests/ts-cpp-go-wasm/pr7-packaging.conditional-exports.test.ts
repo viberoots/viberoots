@@ -169,6 +169,10 @@ nix_cpp_node_addon(
       path.join(tmp, "cpp", "defs.bzl"),
       await fs.readFile("cpp/defs.bzl", "utf8"),
     );
+    await fs.outputFile(
+      path.join(tmp, "cpp", "wasm_defs.bzl"),
+      await fs.readFile("cpp/wasm_defs.bzl", "utf8"),
+    );
 
     // 5) TS package with dual entries and conditional exports
     const tsPkg = path.join(tmp, "libs", "math-ts");

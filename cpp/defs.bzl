@@ -14,6 +14,11 @@ load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name", _cpp_sanitize_probe="
 load("//cpp/private:nix_test.bzl", "cpp_nix_test")
 load("//cpp/private:nix_build.bzl", "cpp_nix_build")
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
+load(
+    "//cpp:wasm_defs.bzl",
+    _nix_cpp_wasm_static_lib = "nix_cpp_wasm_static_lib",
+    _nix_cpp_wasm_emscripten_lib = "nix_cpp_wasm_emscripten_lib",
+)
 
 def _cpp_common(name, kind, kwargs):
     nix_inputs = global_nix_inputs()
@@ -22,10 +27,17 @@ def _cpp_common(name, kind, kwargs):
     link_deps = kw.pop("link_deps", []) or []
     header_deps = kw.pop("header_deps", []) or []
     link_closure = kw.pop("link_closure", "direct") or "direct"
+    link_mode = kw.pop("link_mode", None)
+    link_kind = kw.pop("link_kind", None)
+    if link_mode == None and link_kind != None:
+        link_mode = link_kind
+    if link_mode == None:
+        link_mode = "static"
     # Preserve normalized values for downstream tooling and for passing through to the underlying rule.
     kw["link_deps"] = link_deps
     kw["header_deps"] = header_deps
     kw["link_closure"] = link_closure
+    kw["link_mode"] = link_mode
 
     merged = merge_link_intent_deps(deps, link_deps, header_deps)
     extra = normalize_labels(native.package_name(), kw.pop("extra_module_providers", []) or [])
@@ -50,7 +62,10 @@ def _cpp_common(name, kind, kwargs):
 
     out = sanitize_to_bin_name("//%s:%s" % (native.package_name(), name))
     if kind == "lib":
-        out = out + ".a"
+        if link_mode == "shared":
+            out = out + ".so"
+        else:
+            out = out + ".a"
     elif kind == "addon":
         out = out + ".node"
 
@@ -63,6 +78,7 @@ def _cpp_common(name, kind, kwargs):
         link_deps = prepared.get("link_deps", []) or [],
         header_deps = prepared.get("header_deps", []) or [],
         link_closure = prepared.get("link_closure", link_closure),
+        link_mode = prepared.get("link_mode", link_mode),
         srcs = srcs,
         labels = prepared.get("labels", []) or [],
         nix_inputs = nix_inputs,
@@ -72,80 +88,6 @@ def _cpp_common(name, kind, kwargs):
 
 def nix_cpp_library(name, **kwargs):
     _cpp_common(name, "lib", kwargs)
-
-def nix_cpp_wasm_static_lib(name, **kwargs):
-    """
-    Build a wasm-targeted static library via the Nix planner (cppWasmStaticLib).
-
-    Stamps:
-      - lang:cpp, kind:lib, flavor:wasm
-    """
-    kw = dict(kwargs)
-    deps = kw.pop("deps", []) or []
-    link_deps = kw.pop("link_deps", []) or []
-    header_deps = kw.pop("header_deps", []) or []
-    # Preserve normalized values for downstream tooling and for passing through to the underlying rule.
-    kw["link_deps"] = link_deps
-    kw["header_deps"] = header_deps
-    merged = merge_link_intent_deps(deps, link_deps, header_deps)
-    nix_inputs = global_nix_inputs()
-    wiring = prepare_package_local_wasm_wiring(
-        name = name,
-        kwargs = kw,
-        lang = "cpp",
-        MODULE_PROVIDERS = MODULE_PROVIDERS,
-        variant = "static",
-        deps = merged,
-        provider_realization_mode = "deps",
-        strip_providers_from_deps = False,
-    )
-    prepared = wiring.kwargs
-    cpp_nix_build(
-        name = name,
-        out = sanitize_to_bin_name("//%s:%s" % (native.package_name(), name)) + ".a",
-        kind = "lib",
-        self_label = "//%s:%s" % (native.package_name(), name),
-        deps = wiring.deps,
-        link_deps = prepared.get("link_deps", []) or [],
-        header_deps = prepared.get("header_deps", []) or [],
-        srcs = prepared.get("srcs", []) or [],
-        labels = prepared.get("labels", []) or [],
-        nix_inputs = nix_inputs,
-        visibility = prepared.get("visibility", []),
-    )
-
-
-def nix_cpp_wasm_emscripten_lib(name, **kwargs):
-    """
-    Planner-visible stub for an Emscripten C/C++ bundle (JS + WASM) via the Nix planner.
-
-    Stamps:
-      - lang:cpp, kind:lib, wasm:emscripten
-
-    Note:
-      This macro intentionally declares a lightweight planner stub instead of invoking
-      the generic cpp_nix_build rule, because the artifact shape is a dual output
-      (.js + .wasm) rather than a single .a/.node. The actual JS/WASM bundle is
-      produced by the planner template (cppWasmEmscriptenLib) when built via the
-      Nix flake attributes (e.g., graph-generator-selected).
-    """
-    kw = dict(kwargs)
-    deps = kw.pop("deps", []) or []
-    srcs = kw.get("srcs", []) or []
-    wire_package_local_wasm_planner_visible_stub(
-        name = name,
-        out = name + ".stamp",
-        kwargs = kw,
-        lang = "cpp",
-        variant = "emscripten",
-        deps = deps,
-        srcs = srcs,
-        MODULE_PROVIDERS = MODULE_PROVIDERS,
-        # Preserve historical behavior for this macro: provider targets remain in deps.
-        # This stub shape is used as a graph node and provider deps are part of its invalidation surface.
-        provider_realization_mode = "deps",
-        strip_providers_from_deps = False,
-    )
 
 def nix_cpp_binary(name, **kwargs):
     _cpp_common(name, "bin", kwargs)
@@ -158,9 +100,18 @@ def nix_cpp_headers(name, **kwargs):
     link_deps = kw.pop("link_deps", []) or []
     header_deps = kw.pop("header_deps", []) or []
     link_closure = kw.pop("link_closure", "direct") or "direct"
+    link_mode = kw.pop("link_mode", None)
+    link_kind = kw.pop("link_kind", None)
+    if link_mode == None and link_kind != None:
+        link_mode = link_kind
+    if link_mode == None:
+        link_mode = "static"
+    if link_mode == "shared":
+        fail("nix_cpp_headers: link_mode=\"shared\" is invalid for header-only targets; use nix_cpp_library instead")
     kw["link_deps"] = link_deps
     kw["header_deps"] = header_deps
     kw["link_closure"] = link_closure
+    kw["link_mode"] = link_mode
     merged = merge_link_intent_deps(deps, link_deps, header_deps)
     srcs = kw.get("srcs", []) or []
     wire_package_local_planner_visible_stub(
@@ -182,9 +133,16 @@ def nix_cpp_test(name, **kwargs):
     link_deps = kw.pop("link_deps", []) or []
     header_deps = kw.pop("header_deps", []) or []
     link_closure = kw.pop("link_closure", "direct") or "direct"
+    link_mode = kw.pop("link_mode", None)
+    link_kind = kw.pop("link_kind", None)
+    if link_mode == None and link_kind != None:
+        link_mode = link_kind
+    if link_mode == None:
+        link_mode = "static"
     kw["link_deps"] = link_deps
     kw["header_deps"] = header_deps
     kw["link_closure"] = link_closure
+    kw["link_mode"] = link_mode
     merged = merge_link_intent_deps(deps, link_deps, header_deps)
     planner_name = name + "__planner"
     # Planner-visible stub: Nix builds the test; this node exists for planner discovery and invalidation.
@@ -226,14 +184,20 @@ def nix_cpp_node_addon(name, **kwargs):
     #   "native/<addon_name or sanitized target name>.node" for loading from JS/TS.
     _cpp_common(name, "addon", kwargs)
 
+def nix_cpp_wasm_static_lib(name, **kwargs):
+    _nix_cpp_wasm_static_lib(name, **kwargs)
+
+def nix_cpp_wasm_emscripten_lib(name, **kwargs):
+    _nix_cpp_wasm_emscripten_lib(name, **kwargs)
+
 __all__ = [
     "nix_cpp_library",
-    "nix_cpp_wasm_static_lib",
-    "nix_cpp_wasm_emscripten_lib",
     "nix_cpp_binary",
     "nix_cpp_headers",
     "nix_cpp_test",
     "nix_cpp_node_addon",
+    "nix_cpp_wasm_static_lib",
+    "nix_cpp_wasm_emscripten_lib",
     "cpp_sanitize_probe",
 ]
 

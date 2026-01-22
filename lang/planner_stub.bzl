@@ -38,6 +38,8 @@ planner_stub = rule(
         "header_deps": attrs.list(attrs.dep(), default = []),
         "link_closure": attrs.string(default = "direct"),
         "link_closure_overrides": attrs.dict(key = attrs.label(), value = attrs.string(), default = {}),
+        # Shared-lib opt-in (planner/exporter contract; unused by this rule impl).
+        "link_mode": attrs.string(default = "static"),
         # `attrs.source()` allows both files and target outputs (like genrule srcs),
         # which is useful for planner-only nodes that must carry edges via srcs.
         "srcs": attrs.list(attrs.source(), default = []),

@@ -57,6 +57,7 @@ async function main() {
     // Provide cpp macro defs
     await fs.ensureDir(path.join(tmp, "cpp"));
     await fs.copy(path.join(repo, "cpp", "defs.bzl"), path.join(tmp, "cpp", "defs.bzl"));
+    await fs.copy(path.join(repo, "cpp", "wasm_defs.bzl"), path.join(tmp, "cpp", "wasm_defs.bzl"));
     // Also copy cpp/private so defs.bzl loads resolve (planner_stub, nix_build, etc.)
     await fs.copy(path.join(repo, "cpp", "private"), path.join(tmp, "cpp", "private"));
     const targets = [

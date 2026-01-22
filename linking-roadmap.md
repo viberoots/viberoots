@@ -115,7 +115,7 @@ Acceptance:
 Possible follow-ups:
 
 - Apply the shared closure resolver to Go cgo consumers (optional), so Go can optionally follow C++ library `link_deps` when linking.
-- Add shared-lib support for C++ native linking (opt-in) if needed.
+- Add shared-lib support for C++ native linking (opt-in) if needed. **Implemented (PR-2, link_mode="shared").**
 
 ## Notes for doc readers
 
