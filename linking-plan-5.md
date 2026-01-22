@@ -463,33 +463,33 @@ Implement.
 
 ---
 
-## PR-8: Runtime execution for WASI and Pyodide extensions
+## PR-8: Runtime execution for Pyodide extensions + WASI fail-fast
 
 ### Description
 
-This PR makes the WASI and Pyodide runtime paths actually import and execute `kind:pyext_wasm` modules in tests, rather than only asserting overlay presence.
+This PR makes the Pyodide runtime path actually import and execute `kind:pyext_wasm` modules in tests, rather than only asserting overlay presence. For WASI, the planner fails fast at build time when `kind:pyext_wasm` deps are present because the pinned runtime lacks dynamic module loading.
 
 ### Scope & Changes
 
 This PR makes the following changes:
 
-- Extend the WASI runner to execute the app entrypoint and import the extension
 - Add a Pyodide test harness path that runs a headless runtime and imports the extension
-- Replace banner-only assertions with runtime assertions that call a function from the extension
+- Replace banner-only assertions with runtime assertions that call a function from the extension (Pyodide)
+- Fail fast at build time when a WASI app/lib depends on `kind:pyext_wasm` targets
 
 ### Tests (in this PR)
 
 I add zx integration tests (one test per file):
 
-- `tools/tests/python/python.wasm.wasi.ext.imports-and-runs.real-runtime.test.ts`
-  - builds a WASI app with a `kind:pyext_wasm` dep
-  - runs the WASI runtime and asserts a function call result
-- `tools/tests/python/python.wasm.pyodide.ext.imports-and-runs.real-runtime.test.ts`
+- `tools/tests/python/python.wasm.pyodide.ext.imports-and-runs.test.ts`
   - builds a Pyodide app with a `kind:pyext_wasm` dep
   - runs the headless Pyodide harness and asserts a function call result
-- `tools/tests/python/python.wasm.pyodide.ext.linked-wasm-lib.executes.test.ts`
+- `tools/tests/python/python.wasm.pyodide.ext.links-wasm-lib.builds-and-runs.test.ts`
   - builds a Pyodide extension with a wasm static lib
   - asserts the linked symbol is invoked at runtime
+- `tools/tests/python/python.wasm.wasi.ext.imports-and-runs.test.ts`
+  - builds a WASI app with a `kind:pyext_wasm` dep
+  - asserts a targeted build-time failure
 
 ### Docs (in this PR)
 
@@ -502,13 +502,14 @@ I update documentation to align with the runtime behavior:
 
 The following must be true:
 
-- WASI and Pyodide tests execute the runtime and import the extension
-- Tests assert a real function call result from the extension module
+- Pyodide tests execute the runtime and import the extension
+- Pyodide tests assert a real function call result from the extension module
+- WASI tests fail fast at build time when `kind:pyext_wasm` deps are present
 - Overlay-only checks are no longer the sole signal for success
 
 ### Risks
 
-Medium. Runtime harnesses can be sensitive to toolchain versions and environment.
+Medium. Runtime harnesses can be sensitive to toolchain versions and environment; WASI is currently limited by runtime capability.
 
 ### Consequence of Not Implementing
 
@@ -516,7 +517,7 @@ The plan claims runtime support without tests that prove it.
 
 ### Downsides for Implementing
 
-Adds test runtime dependencies and longer test time.
+Adds test runtime dependencies and longer test time; WASI is explicitly fail-fast until a compatible runtime is available.
 
 ### Recommendation
 
