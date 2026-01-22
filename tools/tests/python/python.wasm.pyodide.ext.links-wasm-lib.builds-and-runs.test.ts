@@ -49,7 +49,11 @@ test("python wasm (pyodide): extension links a wasm static lib (build + overlay)
     await fs.mkdir(path.join(libDir, "src"), { recursive: true });
 
     await fs.writeFile(path.join(appDir, "src", "demo", "__init__.py"), "", "utf8");
-    await fs.writeFile(path.join(appDir, "bin", "__main__.py"), 'print("ok")\n', "utf8");
+    await fs.writeFile(
+      path.join(appDir, "bin", "__main__.py"),
+      ["from demo import _native", 'print(f"RESULT={_native.add(2, 3)}")', ""].join("\n"),
+      "utf8",
+    );
     await fs.writeFile(
       path.join(appDir, "uv.lock"),
       ["[[package]]", 'name = "hello"', 'version = "1.0.0"'].join("\n") + "\n",
@@ -159,6 +163,8 @@ nix_python_wasm_app(
 
     const runJs = path.join(outPath, "bin", "run.mjs");
     const runOut = await $`node ${runJs}`;
-    assert.match(String(runOut.stdout || ""), /nativeOverlays=1/);
+    const stdout = String(runOut.stdout || "");
+    assert.match(stdout, /nativeOverlays=1/);
+    assert.match(stdout, /RESULT=5/);
   });
 });

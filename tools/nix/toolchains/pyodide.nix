@@ -162,6 +162,14 @@ for key in required:
 with open(pyconfig_out, "w", encoding="utf8") as f:
     f.writelines(out_lines)
 PY
+
+    mkdir -p "$out/runtime"
+    tar xf ${pyodideTar} -C "$out/runtime" --strip-components=1 \
+      pyodide/pyodide.mjs \
+      pyodide/pyodide.asm.wasm \
+      pyodide/pyodide.asm.js \
+      pyodide/pyodide-lock.json \
+      pyodide/python_stdlib.zip
   '';
   installPhase = "true";
 }

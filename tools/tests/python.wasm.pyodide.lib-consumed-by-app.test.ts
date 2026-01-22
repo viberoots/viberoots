@@ -35,6 +35,7 @@ nix_python_wasm_lib(
     // App that depends on the lib
     const appDir = path.join(tmp, "apps", "pywasm");
     await fs.mkdir(path.join(appDir, "bin"), { recursive: true });
+    await fs.writeFile(path.join(appDir, "bin", "__main__.py"), 'print("ok")\n', "utf8");
     await fs.writeFile(
       path.join(appDir, "uv.lock"),
       ["[[package]]", 'name = "hello"', 'version = "1.0.0"'].join("\n") + "\n",

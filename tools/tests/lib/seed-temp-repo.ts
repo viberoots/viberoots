@@ -24,6 +24,20 @@ let seedReady: Promise<SeedState> | null = null;
 type CowMode = "copyfile-clone" | "none";
 let cowModeReady: Promise<CowMode> | null = null;
 
+async function isGitWorktree(): Promise<boolean> {
+  try {
+    const res = await $({
+      cwd: process.cwd(),
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+    })`git rev-parse --is-inside-work-tree`;
+    return String(res.stdout || "").trim() == "true";
+  } catch {
+    return false;
+  }
+}
+
 function shortHash(s: string): string {
   return crypto.createHash("sha256").update(s).digest("hex").slice(0, 12);
 }
@@ -335,6 +349,14 @@ export async function initTempRepoFromWorkspaceOrSeed(args: {
   const cow = await deps.timeAsync("seedRepo.detectCowMode", async () => detectCowModeOnce());
   const mode0 = selectInitMode(cow);
   const mode = mode0;
+
+  if (mode != "rsync" && process.env.TEST_FORCE_SEED_REPO != "1") {
+    const hasGit = await deps.timeAsync("seedRepo.detectGit", async () => isGitWorktree());
+    if (!hasGit) {
+      await deps.rsyncRepoTo(tmpDir);
+      return "rsync";
+    }
+  }
 
   if (mode === "rsync") {
     await deps.rsyncRepoTo(tmpDir);

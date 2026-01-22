@@ -9,11 +9,15 @@ let
   minor = if builtins.length parts > 1 then lib.elemAt parts 1 else "12";
   soabi = "cpython-${major}${minor}-wasm32-wasi";
   extSuffix = ".${soabi}.so";
+  wasiRuntimeTar = pkgs.fetchurl {
+    url = "https://github.com/vmware-labs/webassembly-language-runtimes/releases/download/python/3.12.0%2B20231211-040d5a6/python-3.12.0-wasi-sdk-20.0.tar.gz";
+    sha256 = "0kbxnrp6lkkx8pwac64qjvrgbgrr0p3vs1i9xrzfh2dfd6xxs73c";
+  };
 in
 pkgs.stdenvNoCC.mkDerivation {
   pname = "python-wasi-toolchain";
   version = version;
-  nativeBuildInputs = [ pkgs.coreutils pkgs.findutils ];
+  nativeBuildInputs = [ pkgs.coreutils pkgs.findutils pkgs.gnutar ];
   dontUnpack = true;
   buildPhase = ''
     set -euo pipefail
@@ -31,6 +35,14 @@ pkgs.stdenvNoCC.mkDerivation {
 
     mkdir -p "$out/include"
     cp -R "$includeDir/." "$out/include/"
+
+    mkdir -p "$out/runtime"
+    ${pkgs.gnutar}/bin/tar xf ${wasiRuntimeTar} -C "$out/runtime"
+    if [ ! -f "$out/runtime/bin/python-3.12.0.wasm" ]; then
+      echo "python-wasi toolchain: runtime wasm missing under $out/runtime/bin" >&2
+      exit 2
+    fi
+    cp "$out/runtime/bin/python-3.12.0.wasm" "$out/runtime/bin/python.wasm"
   '';
   installPhase = "true";
 }

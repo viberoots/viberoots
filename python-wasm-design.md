@@ -25,7 +25,7 @@ This document defines a minimal, deterministic plan to add Python/WASM support t
 - Hermetic Nix: toolchains pinned; outputs content‑addressed.
 - Importer‑scoped providers: WASM does not add new labels or providers.
 - Patching: `patch-pkg start/apply/reset/session` remains authoritative; dev overrides warn locally, fail in CI.
-- WASI extension modules are limited to in‑repo `kind:pyext_wasm` producers with explicit backend labels.
+- WASI extension modules are not supported at runtime today (the pinned WASI CPython build lacks dynamic module loading). The planner fails fast when a WASI target depends on `kind:pyext_wasm` producers.
 
 ## WASM extension modules (graph contract only)
 
@@ -49,15 +49,15 @@ The link model is intentionally narrow and enforced in the planner:
 
 Description
 
-- Use CPython’s wasm32‑wasi build (or an equivalent Nix‑packaged variant) to execute Python bytecode under a WASI runtime (Node’s WASI or `wasmtime`).
+- Use a pinned CPython wasm32‑wasi runtime to execute Python bytecode under Node’s WASI runner.
 - Template behavior:
   - Materialize site‑packages from `uv.lock` (pure‑Python deps only).
   - Apply `patches/python/*.patch` keyed by `<name>@<version>` at build time.
-  - Create a WASI entry driving `bin/__main__.py` for app targets.
-  - Build `kind:pyext_wasm` modules with `T.pyExtWasi` and merge overlays into WASI app/lib outputs.
-  - Fail fast when a WASI app or lib depends on `kind:pyext_wasm` targets labeled for another backend.
+- Create a WASI entry that runs `bin/__main__.py` and imports extension overlays at runtime.
+  - Build `kind:pyext_wasm` modules with `T.pyExtWasi` (for Pyodide only today) and merge overlays into app/lib outputs.
+  - Fail fast when a WASI app or lib depends on any `kind:pyext_wasm` targets (runtime lacks dynamic module loading).
 
-The WASI extension toolchain is pinned in `tools/nix/toolchains/python-wasi.nix`. `T.pyExtWasi` reads `EXT_SUFFIX` and headers from that toolchain instead of host Python.
+The WASI toolchain is pinned in `tools/nix/toolchains/python-wasi.nix`. `T.pyExtWasi` reads `EXT_SUFFIX` and headers from that toolchain, and the runtime uses the same pinned WASI Python artifacts for execution.
 
 Pros
 
@@ -77,7 +77,7 @@ Cons / Risks
 
 Description
 
-- Package a pinned Pyodide runtime for browser/WASM and assemble dependencies entirely offline using Nix. Execution is via a headless browser (or JS+DOM emulation when acceptable).
+- Package a pinned Pyodide runtime for browser/WASM and assemble dependencies entirely offline using Nix. Execution is via a headless Node harness that runs `bin/__main__.py`.
 - Template behavior:
   - Assemble a browser bundle: `{ .wasm, loader JS, FS image }` from pinned Pyodide + importer deps.
   - Apply `patches/python/*.patch` at build time before bundling.
@@ -88,7 +88,7 @@ For Pyodide extension modules, I build Emscripten side modules with `T.pyExtWasm
 
 For Pyodide apps and libs, I merge extension overlays directly into the Pyodide filesystem so imports resolve from a single, deterministic site tree. This keeps the WASM extension contract aligned with the native overlay flow.
 
-- The planner collects **direct** `kind:pyext_wasm` deps only when the consumer is `backend:pyodide`.
+- The planner collects `kind:pyext_wasm` deps only when the consumer is `backend:pyodide` (WASI targets fail fast).
 - `pyWasmApp` merges overlays in a fixed order: app site → lib overlays → extension overlays.
 - `pyWasmLib` merges its own site, then its extension overlays.
 - If a Pyodide target depends on a `backend:wasi` extension, the planner fails fast with a targeted error.
@@ -142,7 +142,7 @@ Phase 2 — Template (Pyodide) and Browser Harness
 - For `backend="pyodide"`:
   - App: pin Pyodide and inputs in Nix; build an offline bundle `{ .wasm, loader JS, FS }`; apply patches before bundling.
   - Lib: emit a Pyodide FS overlay (or preindexed wheel set) that the app bundle mounts before execution; apply patches before overlay creation.
-  - Provide a tiny browser harness (headless) reused across tests.
+- Provide a tiny headless harness (Node + Pyodide) reused across tests.
 
 Phase 3 — Buck Macros and Scaffolding
 

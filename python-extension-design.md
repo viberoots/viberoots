@@ -57,6 +57,13 @@ The WASM link model is intentionally narrower than native `kind:pyext`:
   - `backend:wasi` requires linked deps to also be stamped `wasm:wasi`
   - `backend:pyodide` rejects `wasm:wasi` deps to avoid ABI mismatches
 
+### WASM runtime wrapper
+
+For WASM apps and libs, the runtime harness executes the importer entrypoint and exercises extension imports:
+
+- WASI: Node’s WASI runner executes the pinned `python.wasm` with `PYTHONHOME` pointing at the runtime stdlib and `PYTHONPATH=/site`.
+- Pyodide: a headless Node harness loads the pinned Pyodide runtime, mounts `/site`, and runs `bin/__main__.py`.
+
 ## Nix realization contract
 
 ### `T.pyExt`
@@ -79,7 +86,7 @@ The `EXT_SUFFIX` is derived from the pinned Pyodide sysconfig data for wasm32-em
 
 ### `T.pyExtWasi`
 
-I add a WASI-specific template for `kind:pyext_wasm` that compiles sources for `wasm32-wasi` and emits the same overlay contract so WASI apps and libs can merge extension modules deterministically.
+I add a WASI-specific template for `kind:pyext_wasm` that compiles sources for `wasm32-wasi` and emits the same overlay contract. **However, the pinned WASI CPython runtime does not support dynamic module loading**, so WASI apps/libs fail fast at build time if they depend on `kind:pyext_wasm`. Use `backend:pyodide` for runnable extension modules today.
 
 - **output path**: `$out/site/<module path>${EXT_SUFFIX}`
 - **example**: `demo._native` → `$out/site/demo/_native${EXT_SUFFIX}`

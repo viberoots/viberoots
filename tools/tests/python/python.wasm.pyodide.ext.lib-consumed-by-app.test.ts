@@ -56,7 +56,17 @@ test("python wasm (pyodide): app consumes lib overlay with extension", async () 
       [
         "#include <Python.h>",
         "",
+        "static PyObject* add_wrap(PyObject* self, PyObject* args) {",
+        "  int a = 0;",
+        "  int b = 0;",
+        '  if (!PyArg_ParseTuple(args, "ii", &a, &b)) {',
+        "    return NULL;",
+        "  }",
+        "  return PyLong_FromLong((long)(a + b));",
+        "}",
+        "",
         "static PyMethodDef Methods[] = {",
+        '  {"add", add_wrap, METH_VARARGS, NULL},',
         "  {NULL, NULL, 0, NULL},",
         "};",
         "",
@@ -104,7 +114,11 @@ nix_python_wasm_lib(
     const appDir = path.join(tmp, appRel);
     await fs.mkdir(path.join(appDir, "bin"), { recursive: true });
     await fs.mkdir(path.join(appDir, "src"), { recursive: true });
-    await fs.writeFile(path.join(appDir, "bin", "__main__.py"), 'print("ok")\n', "utf8");
+    await fs.writeFile(
+      path.join(appDir, "bin", "__main__.py"),
+      ["from world import _native", 'print(f"RESULT={_native.add(2, 3)}")', ""].join("\n"),
+      "utf8",
+    );
     await fs.writeFile(
       path.join(appDir, "uv.lock"),
       ["[[package]]", 'name = "hello"', 'version = "1.0.0"'].join("\n") + "\n",
@@ -135,5 +149,11 @@ nix_python_wasm_app(
     const entries = await fs.readdir(outDir);
     const hit = entries.find((entry) => entry.startsWith("_native") && entry.endsWith(".so"));
     assert.ok(hit, `expected extension under ${outDir}, got: ${entries.join(", ")}`);
+
+    const runJs = path.join(outPath, "bin", "run.mjs");
+    const runOut = await $`node ${runJs}`;
+    const stdout = String(runOut.stdout || "");
+    assert.match(stdout, /nativeOverlays=1/);
+    assert.match(stdout, /RESULT=5/);
   });
 });

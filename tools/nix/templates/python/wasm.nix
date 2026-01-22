@@ -4,105 +4,13 @@ let
   H = import ../../lib/lang-helpers.nix { inherit pkgs; };
   DevOverrideEnvs = import ../../lib/dev-override-envs.nix { inherit pkgs; };
   UvBackend = import ./backends/uv.nix { inherit pkgs; uv2nixLib = uv2nixLib; };
-
-  # Render a tiny WASI module in WAT that writes a fixed message to stdout.
-  # We generate the message at eval time to reflect inputs (e.g., overlays/patch keys).
-  mkWasiHello = { message }:
-    let
-      # WASI fd_write requires an iovec buffer at memory[0..8):
-      #   i32 ptr -> message start
-      #   i32 len -> message length
-      # We place the UTF-8 bytes at offset 16; iovec occupies 0..7; nwritten at 8..11.
-      msg = message;
-      msgLen = lib.stringLength msg;
-      wat = ''
-        (module
-          (type $fd_write_t (func (param i32 i32 i32 i32) (result i32)))
-          (import "wasi_snapshot_preview1" "fd_write" (func $fd_write (type $fd_write_t)))
-          (memory (export "memory") 1)
-          (data (i32.const 16) "${msg}")
-          (func $_start (export "_start")
-            (i32.store (i32.const 0) (i32.const 16))   ;; iov[0].buf = 16
-            (i32.store (i32.const 4) (i32.const ${toString msgLen})) ;; iov[0].len = msgLen
-            (call $fd_write
-              (i32.const 1)   ;; fd = stdout
-              (i32.const 0)   ;; iov ptr
-              (i32.const 1)   ;; iov cnt
-              (i32.const 8)   ;; nwritten ptr (ignored)
-            )
-            drop
-          )
-        )
-      '';
-    in pkgs.stdenvNoCC.mkDerivation {
-      pname = "py-wasi-wat";
-      version = "0.0.1";
-      nativeBuildInputs = [ pkgs.wabt ]; # provides wat2wasm
-      buildCommand = ''
-        set -euo pipefail
-        mkdir -p $out
-        cat > module.wat <<'WAT'
-${wat}
-WAT
-        ${pkgs.wabt}/bin/wat2wasm module.wat -o $out/top.wasm
-      '';
-    };
-
-  mkOverlaySite = {
-    name,
-    lockfile,
-    subdir ? ".",
-    srcRoot ? ../../..,
-    devOverrideEnv ? DevOverrideEnvs.envNameForLang "python",
-    groups ? [],
-  }:
-    let
-      _guard = H.guardNoDevOverridesInCI devOverrideEnv;
-      buckTestSrc = builtins.getEnv "BUCK_TEST_SRC";
-      workspaceEnv = builtins.getEnv "WORKSPACE_ROOT";
-      wsRoot =
-        if buckTestSrc != "" then buckTestSrc
-        else if workspaceEnv != "" then workspaceEnv
-        else builtins.toString srcRoot;
-      # Build a site overlay using the existing uv backend (pure-Python only)
-      uv = UvBackend {
-        pname = "pylib-${H.sanitizeName name}";
-        version = "0.1.0";
-        # Snapshot the importer subtree directly; uv2nix-adapter expects lockfile paths to be
-        # relative to srcAbs, so do not pass subdir through again.
-        srcAbs = builtins.path { path = builtins.toPath ("${builtins.toString srcRoot}/${subdir}"); name = "py-src"; };
-        lockfile = if lib.hasSuffix "/uv.lock" lockfile then "uv.lock" else lockfile;
-        subdir = ".";
-        patchesMap = H.patchesMapFromImporterDirToStore {
-          srcRoot = srcRoot;
-          subdir = subdir;
-          lang = "python";
-          normalizeVersion = (v: lib.head (lib.splitString "-" v));
-          namePrefix = "py-patch";
-        };
-        devOverrides = H.readDevOverrides devOverrideEnv;
-        kind = "lib";
-        wsRoot = wsRoot;
-        groups = groups;
-      };
-    in pkgs.runCommand ("pywasm-lib-" + H.sanitizeName name) {} ''
-      set -euo pipefail
-      mkdir -p $out/site $out/meta
-      if [ -d "${uv}/site" ]; then
-        cp -R "${uv}/site/." "$out/site/" || true
-      fi
-      cat > "$out/BUILD-INFO.json" <<JSON
-      {
-        "kind": "wasm-lib",
-        "lockfile": "${lockfile}",
-        "subdir": "${subdir}",
-        "groups": ${builtins.toJSON groups}
-      }
-JSON
-    '';
+  Pyodide = import ../../toolchains/pyodide.nix { inherit pkgs; };
+  WasiPython = import ../../toolchains/python-wasi.nix { inherit pkgs; };
+  Runner = import ./wasm-runner.nix { inherit lib; };
+  Site = import ./wasm-site.nix { inherit lib pkgs H DevOverrideEnvs UvBackend; };
 in {
-  # Build a WASI app: stage a merged site overlay and emit a tiny Node runner
-  # that prints a diagnostic banner (keeps tests hermetic without relying on WASI runtime).
+  # Build a WASI app: stage a merged site overlay and emit a Node runner
+  # that prints a diagnostic banner and executes the entrypoint.
   pyWasmApp = {
     name,
     lockfile,
@@ -152,6 +60,10 @@ in {
         wsRoot = wsRoot;
         groups = groups;
       };
+      appSrc = builtins.path {
+        path = builtins.toPath ("${builtins.toString srcRoot}/${subdir}");
+        name = "py-app-src";
+      };
       msg =
         let
           msgPrefix = if effBackend == "pyodide" then "python-pyodide" else "python-wasi";
@@ -164,7 +76,7 @@ in {
         in lib.concatStringsSep " " parts;
     in pkgs.runCommand ("pywasm-app-" + H.sanitizeName name) {} ''
       set -euo pipefail
-      mkdir -p $out/site $out/bin
+      mkdir -p $out/site $out/bin $out/app
       # Copy current app site
       if [ -d "${uv}/site" ]; then
         cp -R "${uv}/site/." "$out/site/" || true
@@ -205,11 +117,23 @@ in {
         find "$out/site" -type f -name "INSTALLER" -delete || true
         find "$out/site" -type f -name "WHEEL" -delete || true
       fi
-cat > "$out/bin/run.mjs" <<EOF
-// Minimal runner: print diagnostic banner (backend/overlays/patches)
-console.log("${msg}");
+
+      app_src="${appSrc}/bin"
+      if [ -d "$app_src" ]; then
+        mkdir -p "$out/app/bin"
+        cp -R "$app_src/." "$out/app/bin/"
+      fi
+
+      if [ "${effBackend}" = "pyodide" ]; then
+        cat > "$out/bin/run.mjs" <<'EOF'
+${Runner.pyodideRunner { msg = msg; runtimeDir = "${Pyodide}/runtime"; }}
 EOF
-chmod +x "$out/bin/run.mjs"
+      else
+        cat > "$out/bin/run.mjs" <<'EOF'
+${Runner.wasiRunner { msg = msg; runtimeDir = "${WasiPython}/runtime"; }}
+EOF
+      fi
+      chmod +x "$out/bin/run.mjs"
       cat > "$out/BUILD-INFO.json" <<JSON
       {
         "kind": "wasm-app",
@@ -237,7 +161,7 @@ JSON
     trim ? "none", # none | safe | aggressive
   }:
     let
-      site = mkOverlaySite { inherit name lockfile subdir srcRoot devOverrideEnv groups; };
+      site = Site.mkOverlaySite { inherit name lockfile subdir srcRoot devOverrideEnv groups; };
       nativeOverlaysCount = builtins.length nativeModuleOverlays;
     in pkgs.runCommand ("pywasm-lib-" + H.sanitizeName name + "-trimmed") {} ''
       set -euo pipefail

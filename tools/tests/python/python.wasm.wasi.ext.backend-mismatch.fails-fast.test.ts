@@ -90,7 +90,6 @@ nix_python_wasm_app(
     })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
     assert.notEqual(res.exitCode, 0, "expected nix build to fail");
     const stderr = String(res.stderr || "");
-    assert.match(stderr, /kind:pyext_wasm/);
-    assert.match(stderr, /backend:wasi/);
+    assert.match(stderr, /wasi does not support kind:pyext_wasm/);
   });
 });

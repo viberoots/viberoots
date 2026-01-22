@@ -1,9 +1,9 @@
 ## Python WASM (WASI) — Minimal Usage
 
-This repository provides a minimal, deterministic WASI baseline for Python:
+This repository provides a deterministic WASI runtime for Python:
 
 - Build a WASI app or lib with importer‑scoped `uv.lock` and optional patches in `patches/python/*.patch`.
-- The WASI baseline materializes a pure‑Python site and emits a tiny WASI module that prints a banner at startup. It is designed to be small, fast, and fully offline for CI.
+- The WASI runtime materializes a pure‑Python site and executes `bin/__main__.py` with a pinned wasm32‑wasi CPython build. It is designed to be offline and deterministic for CI.
 
 ### Targets
 
@@ -14,11 +14,11 @@ Both macros stamp `lang:python` and `kind:wasm` so the planner routes to WASI te
 
 ### Expectations and Constraints
 
-- Third‑party native C‑extensions are out of scope; in‑repo `kind:pyext_wasm` modules are supported with explicit backend labels.
+- Third‑party native C‑extensions are out of scope; in‑repo `kind:pyext_wasm` modules are **not supported** for WASI at runtime today (the pinned WASI CPython build lacks dynamic module loading). The planner fails fast if a WASI target depends on `kind:pyext_wasm` producers.
 - Lockfile: `uv.lock` at the importer root; use importer‑scoped labels like `lockfile:apps/tool/uv.lock#apps/tool`.
 - Patches: flat directory `patches/python/<dist>@<version>.patch`. Re‑applying an identical patch is a no‑op.
-- Runner: a tiny Node `node:wasi` loader is emitted at `<out>/bin/run.mjs` for convenience.
-- WASI extension modules are built with `nix_python_wasm_extension_module` (labels include `backend:wasi`) and merged into app/lib outputs as deterministic overlays.
+- Runner: a Node `node:wasi` loader is emitted at `<out>/bin/run.mjs` for convenience.
+- WASI extension modules are currently not runnable; use `backend:pyodide` for `nix_python_wasm_extension_module` until the WASI runtime gains dynamic loading support.
 
 ### Example
 
@@ -41,10 +41,11 @@ BUCK_TARGET=//apps/pywasm:pyapp nix build .#graph-generator.selected
 node result/bin/run.mjs
 ```
 
-You should see a banner like:
+You should see output that includes the runtime banner and your app output, for example:
 
 ```
 python-wasi:wasi overlays=0 patched=none
+hello from python app
 ```
 
 Patching `hello@1.0.0` under `patches/python/` and rebuilding updates the banner to reflect the applied patch.

@@ -25,17 +25,12 @@ async function nixBuildSelected(tmp: string, $: any, target: string): Promise<st
       }),
     },
   })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
-  if (res.exitCode !== 0) {
-    console.error(String(res.stderr || ""));
-    throw new Error(`nix build failed (exit=${res.exitCode})`);
+  if (res.exitCode == 0) {
+    throw new Error("expected nix build to fail for WASI pyext_wasm");
   }
-  const outPath =
-    String(res.stdout || "")
-      .trim()
-      .split(/\n+/)
-      .pop() || "";
-  assert.ok(outPath.startsWith("/"), `expected nix out path, got: ${outPath}`);
-  return outPath;
+  const stderr = String(res.stderr || "");
+  assert.match(stderr, /wasi does not support kind:pyext_wasm/);
+  return "";
 }
 
 test("python wasm (wasi): extension build_py_deps headers are available", async () => {
@@ -131,10 +126,6 @@ nix_python_wasm_app(
     );
 
     await $`node tools/buck/export-graph.ts --out tools/buck/graph.json`;
-    const outPath = await nixBuildSelected(tmp, $, "//apps/pywasm:pyapp");
-    const outDir = path.join(outPath, "site", "demo");
-    const entries = await fs.readdir(outDir);
-    const hit = entries.find((entry) => entry.startsWith("_native"));
-    assert.ok(hit, `expected extension under ${outDir}, got: ${entries.join(", ")}`);
+    await nixBuildSelected(tmp, $, "//apps/pywasm:pyapp");
   });
 });
