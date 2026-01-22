@@ -13,9 +13,10 @@ let
   mkCgoEnv = { nixCgoPkgs ? [], nixCgoAttrs ? [], repoCgoPkgs ? [] }:
     let
       resolvedCgo = builtins.filter (v: v != null) (map H.resolveAttrFromPkgs nixCgoAttrs);
-      cgoPkgs = nixCgoPkgs ++ resolvedCgo ++ repoCgoPkgs;
+      pkgCfgPkgs = nixCgoPkgs ++ resolvedCgo;
+      cgoPkgs = pkgCfgPkgs ++ repoCgoPkgs;
       haveCgo = (builtins.length cgoPkgs) > 0;
-      pkgCfgPaths = lib.concatStringsSep ":" (map (p: "${p}/lib/pkgconfig") cgoPkgs);
+      pkgCfgPaths = lib.concatStringsSep ":" (map (p: "${p}/lib/pkgconfig") pkgCfgPkgs);
       synthCFlags = lib.concatStringsSep " " (map (p: "-I${p}/include") cgoPkgs);
       synthLdFlags = lib.concatStringsSep " " (map (p: "-L${p}/lib") cgoPkgs);
       repoStaticLibs = lib.concatStringsSep " " (map (p: let a = "${p}/lib"; in ''$(ls -1 "${a}" 2>/dev/null | sed -n 's/^lib\(.*\)\.a$/-l\1/p' | tr '\n' ' ')'') repoCgoPkgs);

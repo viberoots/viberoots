@@ -66,8 +66,7 @@ nix_go_binary(
 
 Design interaction with this document:
 
-- If we add `link_deps` semantics to C++ libraries, we may eventually want the Go planner to optionally follow the C++ library’s `link_deps` when building cgo consumers (similar to `link_closure="transitive"`).
-- I am not changing Go’s behavior in this document, but the shared “link closure” helper described later is intended to make this possible without inventing a second closure algorithm.
+Go cgo consumers can now opt into following a C++ library’s `link_deps` transitively by setting `link_closure` (see `go-linking.md`). This uses the same shared link-closure resolver as C++ targets, so traversal order and failure modes are consistent across languages.
 
 ### C++ consumer linking a Go c-archive
 
