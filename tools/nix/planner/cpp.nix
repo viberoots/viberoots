@@ -187,14 +187,18 @@ let
             srcList = normSrcsOf name;
             patches = patchInputsFor name;
           };
-          wasmAttrs = if isWasmStatic then { wasmTarget = if wantWasi then "wasm32-wasi" else "wasm32-unknown-unknown"; } else {};
+          wasmAttrs =
+            if isWasmStatic
+            then { wasmTarget = if wantWasi then "wasm32-wasi" else "wasm32-unknown-unknown"; }
+            else {};
           wasmHeaderAttrs = if isWasmStatic then { includes = includeRootsForWasm; } else {};
-          attrs = baseAttrs // wasmAttrs // wasmHeaderAttrs;
+          wasmLibAttrs = baseAttrs // wasmAttrs // wasmHeaderAttrs;
+          nativeLibAttrs = baseAttrs // { nixCxxPkgs = repoCppHeaderPkgsFor name; };
         in
-          if isEmscripten then T.cppWasmEmscriptenLib attrs
-          else if isWasmStatic then T.cppWasmStaticLib attrs
-          else if mode == "shared" then T.cppSharedLib attrs
-          else T.cppLib attrs
+          if isEmscripten then T.cppWasmEmscriptenLib wasmLibAttrs
+          else if isWasmStatic then T.cppWasmStaticLib wasmLibAttrs
+          else if mode == "shared" then T.cppSharedLib nativeLibAttrs
+          else T.cppLib nativeLibAttrs
       );
 
   mkHeaders = name:

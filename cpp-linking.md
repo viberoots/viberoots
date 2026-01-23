@@ -187,6 +187,8 @@ For a library target `L`:
 
 This avoids guessing. Libraries declare their own link requirements. Consumers decide whether to pull the full link closure automatically.
 
+Planner note: `header_deps` are applied to library compilation by passing `T.cppHeaders` inputs into `cppLib` and `cppSharedLib`.
+
 ### Static vs shared
 
 I propose a separate, opt-in knob:
