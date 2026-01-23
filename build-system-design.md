@@ -112,6 +112,22 @@ extra-experimental-features = nix-command flakes dynamic-derivations ca-derivati
 1. **Platforms:** Everything must work on at least **aarch64-darwin**, **aarch64-linux**, and **x86_64-linux**.
 1. **Glue scripts run outside Nix.** Generators are plain Node tools; do not wrap them in `nix run`.
 1. **Planner languages vs. macro-only languages:** Go and C++ are “planner languages” (the Nix planner emits derivations for them via templates). Node is handled by Buck macros and importer‑scoped providers; it is built and tested through Nix shims. For CLI bundling, a narrowly scoped Node planner plugin (`tools/nix/planner/node.nix`) is used as a shim to invoke bundling without coupling the core planner to Node specifics. This does not change provider/auto_map flows or the Node importer‑scoped provider model. The Go planner is split into `tools/nix/planner/go.nix` for core Go and `tools/nix/planner/go-wasm.nix` for TinyGo Wasm handling.
+   I keep the Python planner and uv2nix adapter split into smaller files so each module stays under 250 lines and the responsibilities remain clear. The entrypoints remain stable and only delegate.
+   Python planner relocation map:
+   - `tools/nix/planner/python.nix` stays the entrypoint
+   - `tools/nix/planner/python-core.nix` holds shared helpers, lockfile resolution, and kind detection
+   - `tools/nix/planner/python-cpp.nix` holds C++ dependency validation and patch input wiring
+   - `tools/nix/planner/python-pyext.nix` holds `pyext` construction and native overlay wiring
+   - `tools/nix/planner/python-wasm.nix` stays the wasm entrypoint
+   - `tools/nix/planner/python-wasm-app.nix` holds wasm app and wasm lib construction
+   - `tools/nix/planner/python-wasm-pyext.nix` holds `pyext_wasm` construction and backend helpers
+     Cleanup: once split, remove helper and `pyext` and wasm logic from the entrypoint so it only wires modules.
+     uv2nix adapter relocation map:
+   - `tools/nix/uv2nix-adapter.nix` remains the wrapper
+   - `tools/nix/uv2nix-inputs.nix` normalizes args and resolves dev overrides and test resolve inputs
+   - `tools/nix/uv2nix-overlays.nix` validates overlays and prepares the overlay arguments
+   - `tools/nix/uv2nix-env.nix` builds the uv2nix environment and lockfile source wrapper
+     Cleanup: keep only wiring and validation in the wrapper, and move normalization logic to the helper modules.
    - Language-specific helper placement: `//lang:defs_common.bzl` is language‑agnostic. Go‑specific tuple label helpers (`normalize_build_tags`, `append_tuple_labels`) live in `//go/private:labels.bzl` and are loaded by Go macros.
    - Shared helper error text is argument‑agnostic for reuse across call‑sites. For example, `normalize_labels(...)` reports generic “labels must be a list of string labels”; macros should add parameter context at the call‑site if a named argument is relevant to users.
    - WASM stamps: use `//lang:defs_common.bzl:stamp_wasm_variant(kwargs, "<lang>", "<variant>")` to append `lang:<lang>`, `kind:wasm`, and `wasm:<variant>` uniformly across C++/Go/Python macros.
