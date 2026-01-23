@@ -106,6 +106,7 @@ in {
   pyExt = {
     name,
     module,
+    lockfile,
     wheelhouse ? null,
     srcRoot ? ../../..,
     subdir ? ".",
@@ -118,7 +119,7 @@ in {
     includeRoots ? [],
   }:
     PyExt {
-      inherit name module srcRoot subdir srcList cflags ldflags nixCxxAttrs wheelhouse buildPyDeps repoCxxPkgs includeRoots;
+      inherit name module lockfile srcRoot subdir srcList cflags ldflags nixCxxAttrs wheelhouse buildPyDeps repoCxxPkgs includeRoots;
     };
 
   pyExtWasm = {

@@ -9,6 +9,7 @@ let
   module = args.module or "";
   srcRoot = args.srcRoot or ../../..;
   subdir = args.subdir or ".";
+  lockfile0 = args.lockfile or "";
   srcList0 = args.srcList or [];
   cflags0 = args.cflags or [];
   ldflags0 = args.ldflags or [];
@@ -17,6 +18,11 @@ let
   includeRoots0 = args.includeRoots or [];
   wheelhouse0 = args.wheelhouse or null;
   buildPyDeps0 = args.buildPyDeps or [];
+
+  ensureString = ctx: x:
+    if x == null then ""
+    else if builtins.isString x then x
+    else builtins.throw ("pyExt: expected " + ctx + " to be a string");
 
   ensureStringList = ctx: xs:
     if xs == null then []
@@ -28,6 +34,7 @@ let
   ldflags = ensureStringList "ldflags" ldflags0;
   nixCxxAttrs = ensureStringList "nixCxxAttrs" nixCxxAttrs0;
   buildPyDeps = ensureStringList "buildPyDeps" buildPyDeps0;
+  lockfile = ensureString "lockfile" lockfile0;
 
   ensureDrvList = ctx: xs:
     if xs == null then []
@@ -45,6 +52,17 @@ let
 
   _moduleRequired =
     if module == "" then builtins.throw ("pyExt: module is required for " + name) else null;
+  _lockfileRequired =
+    if lockfile == "" then builtins.throw ("pyExt: lockfile is required for " + name) else null;
+
+  lockfileAbs =
+    if lib.hasPrefix "/" lockfile then builtins.toPath lockfile
+    else builtins.toPath ("${builtins.toString srcRoot}/${lockfile}");
+  lockfileInput = pkgs.runCommand "pyext-uv-lock" {} ''
+    set -euo pipefail
+    mkdir -p "$out"
+    cp ${builtins.path { path = lockfileAbs; name = "uv.lock"; }} "$out/uv.lock"
+  '';
 
   pkgSrc = builtins.path {
     path = builtins.toPath ("${builtins.toString srcRoot}/${subdir}");
@@ -72,7 +90,11 @@ pkgs.stdenv.mkDerivation {
   version = "0.1.0";
   src = pkgSrc;
 
-  buildInputs = nixPkgs ++ repoCxxPkgs ++ [ py ] ++ (if wheelhouse == null then [] else [ wheelhouse ]);
+  buildInputs =
+    nixPkgs
+    ++ repoCxxPkgs
+    ++ [ py lockfileInput ]
+    ++ (if wheelhouse == null then [] else [ wheelhouse ]);
   nativeBuildInputs = [ pkgs.llvmPackages.clang pkgs.coreutils ];
   passthru =
     (if wheelhouse == null then {}

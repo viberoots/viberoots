@@ -43,6 +43,12 @@ test("python: patch change in linked C++ producer rebuilds pyext consumer runtim
     await fs.mkdirp(path.dirname(libPatchAbs));
 
     await fs.writeFile(
+      path.join(appDir, "uv.lock"),
+      ["# uv lock", "[[package]]", 'name = "hello"', 'version = "1.0.0"', ""].join("\n"),
+      "utf8",
+    );
+
+    await fs.writeFile(
       path.join(libDir, "src", "add.cc"),
       ['extern "C" int add(int a, int b) { return 0; }', ""].join("\n"),
       "utf8",

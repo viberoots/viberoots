@@ -124,6 +124,8 @@ The intent is that extension builds are invalidated by the same importer-scoped 
 - extension sources (`srcs`) and build flags (`cflags`, `ldflags`)
 - nixpkgs native inputs requested via `nixpkg:` labels
 
+`kind:pyext` always treats the importer `uv.lock` as an explicit input, even when `build_py_deps` is empty. This keeps native extension outputs deterministic with respect to lockfile changes without forcing a wheelhouse build.
+
 ## PR-5: Phase 3 invariants (hardening)
 
 After Phase 3 works end-to-end, we lock down the invariants that keep it stable and predictable.

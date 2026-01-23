@@ -28,33 +28,19 @@ async function nixEvalSelectedDrvPath(tmp: string, $: any, target: string): Prom
   return drvPath;
 }
 
-test("python: pyext link input ordering is deterministic across builds", async () => {
-  await runInTemp("python-pyext-link-order", async (tmp, $) => {
-    const appRel = path.join("apps", "pyext_link_order");
+test("python: pyext rebuilds when uv.lock changes with empty build_py_deps", async () => {
+  await runInTemp("python-pyext-lockfile-invalidation", async (tmp, $) => {
+    const appRel = path.join("apps", "pyext_lockfile");
     const appDir = path.join(tmp, appRel);
-    const libARel = path.join("libs", "pick_a");
-    const libBRel = path.join("libs", "pick_b");
-    const libADir = path.join(tmp, libARel);
-    const libBDir = path.join(tmp, libBRel);
+    const libRel = path.join("libs", "math");
+    const libDir = path.join(tmp, libRel);
 
     await fs.mkdirp(path.join(appDir, "native"));
-    await fs.mkdirp(path.join(libADir, "src"));
-    await fs.mkdirp(path.join(libBDir, "src"));
+    await fs.mkdirp(path.join(libDir, "src"));
 
     await fs.writeFile(
-      path.join(appDir, "uv.lock"),
-      ["# uv lock", "[[package]]", 'name = "hello"', 'version = "1.0.0"', ""].join("\n"),
-      "utf8",
-    );
-
-    await fs.writeFile(
-      path.join(libADir, "src", "pick.cc"),
-      ['extern "C" int pick() { return 1; }', ""].join("\n"),
-      "utf8",
-    );
-    await fs.writeFile(
-      path.join(libBDir, "src", "pick.cc"),
-      ['extern "C" int pick() { return 2; }', ""].join("\n"),
+      path.join(libDir, "src", "noop.cc"),
+      ['extern "C" int noop() { return 0; }', ""].join("\n"),
       "utf8",
     );
 
@@ -63,14 +49,12 @@ test("python: pyext link input ordering is deterministic across builds", async (
       [
         "#include <Python.h>",
         "",
-        'extern "C" int pick();',
-        "",
-        "static PyObject* pick_wrap(PyObject* self, PyObject* args) {",
-        "  return PyLong_FromLong((long)pick());",
+        "static PyObject* value(PyObject* self, PyObject* args) {",
+        "  return PyLong_FromLong(1);",
         "}",
         "",
         "static PyMethodDef Methods[] = {",
-        '  {"pick", pick_wrap, METH_NOARGS, NULL},',
+        '  {"value", value, METH_NOARGS, NULL},',
         "  {NULL, NULL, 0, NULL},",
         "};",
         "",
@@ -90,12 +74,16 @@ test("python: pyext link input ordering is deterministic across builds", async (
       "utf8",
     );
 
-    const relPosix = appRel.replace(/\\/g, "/");
-    const libAPosix = libARel.replace(/\\/g, "/");
-    const libBPosix = libBRel.replace(/\\/g, "/");
-    const libALabel = `//${libAPosix}:a`;
-    const libBLabel = `//${libBPosix}:b`;
-    const extLabel = `//${relPosix}:ext`;
+    await fs.writeFile(
+      path.join(appDir, "uv.lock"),
+      ["# uv lock", "[[package]]", 'name = "hello"', 'version = "1.0.0"', ""].join("\n"),
+      "utf8",
+    );
+
+    const appPosix = appRel.replace(/\\/g, "/");
+    const libPosix = libRel.replace(/\\/g, "/");
+    const extLabel = `//${appPosix}:ext`;
+    const libLabel = `//${libPosix}:noop`;
 
     await fs.mkdirp(path.join(tmp, "tools", "buck"));
     await fs.writeFile(
@@ -103,19 +91,10 @@ test("python: pyext link input ordering is deterministic across builds", async (
       JSON.stringify(
         [
           {
-            name: libALabel,
+            name: libLabel,
             rule_type: "cxx_library",
             labels: ["lang:cpp", "kind:lib"],
-            srcs: [`${libAPosix}/src/pick.cc`],
-            deps: [],
-            link_deps: [],
-            header_deps: [],
-          },
-          {
-            name: libBLabel,
-            rule_type: "cxx_library",
-            labels: ["lang:cpp", "kind:lib"],
-            srcs: [`${libBPosix}/src/pick.cc`],
+            srcs: [`${libPosix}/src/noop.cc`],
             deps: [],
             link_deps: [],
             header_deps: [],
@@ -125,9 +104,9 @@ test("python: pyext link input ordering is deterministic across builds", async (
             rule_type: "python_pyext_stub",
             labels: ["lang:python", "kind:pyext"],
             module: "demo._native",
-            srcs: [`${relPosix}/native/ext.cpp`],
-            deps: [libALabel, libBLabel],
-            link_deps: [libALabel, libBLabel],
+            srcs: [`${appPosix}/native/ext.cpp`],
+            deps: [],
+            link_deps: [],
             header_deps: [],
             link_closure: "direct",
             link_closure_overrides: {},
@@ -142,8 +121,15 @@ test("python: pyext link input ordering is deterministic across builds", async (
       "utf8",
     );
 
-    const drv1 = await nixEvalSelectedDrvPath(tmp, $, extLabel);
-    const drv2 = await nixEvalSelectedDrvPath(tmp, $, extLabel);
-    assert.equal(drv1, drv2, "expected identical drvPath across repeated evals");
+    const pyextDrv1 = await nixEvalSelectedDrvPath(tmp, $, extLabel);
+    const controlDrv1 = await nixEvalSelectedDrvPath(tmp, $, libLabel);
+
+    await fs.appendFile(path.join(appDir, "uv.lock"), "\n# changed\n", "utf8");
+
+    const pyextDrv2 = await nixEvalSelectedDrvPath(tmp, $, extLabel);
+    const controlDrv2 = await nixEvalSelectedDrvPath(tmp, $, libLabel);
+
+    assert.notEqual(pyextDrv1, pyextDrv2, "expected pyext drvPath to change after uv.lock edit");
+    assert.equal(controlDrv1, controlDrv2, "expected control drvPath to remain cached");
   });
 });

@@ -333,6 +333,7 @@ in rec {
     in T.pyExt {
       inherit name;
       module = mod;
+      lockfile = lockRel;
       srcRoot = repoRoot;
       subdir = pkgPathOf name;
       srcList = srcsOf name;
