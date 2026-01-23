@@ -126,3 +126,117 @@ Refactor cost and risk of import errors without functional gain.
 ### Recommendation
 
 Implement to keep the planner compliant with the methodology and maintainable.
+
+---
+
+## PR-3: Buck path opt-in for selected-wasm is tested and locked
+
+### Description
+
+This PR adds a Buck-side test that proves `use_selected_wasm = True` routes `nix_go_tiny_wasm_lib` through the minimal `graph-generator-selected-wasm` path. It closes the gap where the flag exists but its behavior is not covered by a test.
+
+### Scope & Changes
+
+This PR makes the following changes:
+
+- Add a zx test that creates a TinyGo wasm target with `use_selected_wasm = True` and asserts the build path is `graph-generator-selected-wasm` by checking the build log and emitted output path.
+- Keep the macro and rule behavior unchanged; the test only locks the existing behavior.
+
+### Tests (in this PR)
+
+I add a zx test (one test per file):
+
+- `tools/tests/go/go.tinygo-wasm.use-selected-wasm.builds-via-minimal-path.test.ts`
+  - defines a TinyGo wasm target with `use_selected_wasm = True`
+  - runs a Buck build for the target
+  - asserts the build log indicates the selected-wasm path and the output contains `lib/top.wasm`
+
+### Docs (in this PR)
+
+I update documentation to make the opt-in path explicit and test-backed:
+
+- Update `wasm-linking.md` to mention the Buck-side opt-in is validated by a test and uses `graph-generator-selected-wasm`.
+
+### Acceptance Criteria
+
+The following must be true:
+
+- The new test fails if the selected-wasm path is not used when `use_selected_wasm = True`.
+- The test passes on all supported platforms.
+- The documentation reflects the test-backed behavior.
+
+### Risks
+
+Low. This is a test-only addition over existing behavior.
+
+### Consequence of Not Implementing
+
+The selected-wasm opt-in path remains untested and could regress without detection.
+
+### Downsides for Implementing
+
+Adds a small test and maintenance burden when test helpers change.
+
+### Recommendation
+
+Implement to lock down the opt-in path and prevent regressions.
+
+---
+
+## PR-4: WASI target stamping for C++ wasm static libs is explicit and tested
+
+### Description
+
+This PR makes WASI compatibility explicit for `nix_cpp_wasm_static_lib` by adding a macro-level `wasm_abi` attribute that stamps `wasm:wasi` when set to `wasi`. It closes the gap where docs imply WASI labeling but call sites must manually add the label.
+
+### Scope & Changes
+
+This PR makes the following changes:
+
+- Add an optional attribute to `nix_cpp_wasm_static_lib`: `wasm_abi = "bare" | "wasi"` (default: `bare`).
+- When `wasm_abi = "wasi"`, stamp `wasm:wasi` in addition to the existing wasm static labels.
+- Map `wasm_abi` to the concrete target triple (`wasm32-unknown-unknown` vs `wasm32-wasi`) in one place and thread the resolved value to the planner-visible node.
+- Update the TinyGo wasm planner tests to use `wasm_abi = "wasi"` rather than manual `wasm:wasi` labels.
+
+### Tests (in this PR)
+
+I add/update zx tests (one test per file):
+
+- Add `tools/tests/cpp/cpp.wasm-static-lib.wasi-stamping.from-wasm-abi.test.ts`
+  - defines a `nix_cpp_wasm_static_lib` with `wasm_abi = "wasi"`
+  - asserts `wasm:wasi` appears in exported labels
+- Update `tools/tests/wasm/wasm.variant-mismatch.wasi-vs-bare.fails-fast.test.ts`
+  - replace manual `wasm:wasi` label with `wasm_abi = "wasi"`
+  - keep the failure expectation and targeted error message
+- Update `tools/tests/wasm/wasm.link-input-ordering.deterministic.test.ts`
+  - replace manual `wasm:wasi` label with `wasm_abi = "wasi"`
+
+### Docs (in this PR)
+
+I update documentation to describe the new attribute:
+
+- Update `wasm-linking.md` to show `wasm_abi = "wasi"` in C++ wasm static lib examples and explain automatic `wasm:wasi` stamping and the internal mapping to `wasm32-wasi`.
+
+### Acceptance Criteria
+
+The following must be true:
+
+- `nix_cpp_wasm_static_lib` stamps `wasm:wasi` automatically when `wasm_abi = "wasi"`.
+- The updated wasm tests pass without manual `wasm:wasi` labels.
+- The doc examples align with the new attribute.
+
+### Risks
+
+Low. This is a macro-level attribute addition with predictable label behavior.
+
+### Consequence of Not Implementing
+
+WASI compatibility remains implicit and relies on manual labeling, which is easy to miss.
+
+### Downsides for Implementing
+
+Adds a small macro surface area that must remain stable across languages.
+
+### Recommendation
+
+Implement to make WASI compatibility explicit, deterministic, and test-backed.

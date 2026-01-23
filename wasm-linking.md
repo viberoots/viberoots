@@ -156,6 +156,7 @@ For TinyGo Wasm, there are two build paths in this repo:
   - The flake attribute `#graph-generator-selected-wasm` intentionally bypasses the exported graph and cannot incorporate repo Wasm link inputs (for example, `wasmStaticLibs` is empty).
   - This path is intended only for small smoke scaffolds that do not link in-repo C/C++.
   - If a call site must use this minimal path via Buck, it must opt in explicitly (for example, `use_selected_wasm = True` on `nix_go_tiny_wasm_lib`).
+  - I lock this opt-in path with `tools/tests/go/go.tinygo-wasm.use-selected-wasm.builds-via-minimal-path.test.ts`.
 
 - For `nix_cpp_wasm_static_lib`:
   - `header_deps` (for includes while compiling)
