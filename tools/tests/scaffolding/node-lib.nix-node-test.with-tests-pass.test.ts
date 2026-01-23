@@ -12,9 +12,7 @@ process.env.NIX_PNPM_FETCH_TIMEOUT = process.env.NIX_PNPM_FETCH_TIMEOUT || "600"
 /**
  * Stabilization strategy:
  * - Allow lockfile generation (no network in FOD) and use the update-pnpm-hash helper to compute the FOD digest.
- * - Warm pnpm-store and node-modules derivations.
- * - Re-run update to reconcile any drift after warm-up.
- * - Build the node-test derivation directly via Nix and assert a report is produced.
+ * - Build the node-test derivation directly via Nix (which pulls required deps) and assert a report is produced.
  */
 
 const TEST_TIMEOUT_MS =
@@ -55,28 +53,7 @@ test(
         stdio: "inherit",
       })`zx-wrapper tools/dev/update-pnpm-hash.ts --lockfile ${lockfile}`;
 
-      // 3) Warm pnpm-store and node-modules
-      {
-        const mj = String(process.env.NIX_MAX_JOBS || "0");
-        const cr = String(process.env.NIX_CORES || "0");
-        const flags = [
-          mj && mj !== "0" ? `--max-jobs ${mj}` : "",
-          cr && cr !== "0" ? `--option cores ${cr}` : "",
-        ]
-          .filter(Boolean)
-          .join(" ");
-        const cmd1 = `set -euo pipefail; timeout ${TIMEOUT_SECS}s nix build "${tmp}#pnpm-store.${sanitized}" --impure --no-link --accept-flake-config --builders "" --print-build-logs ${flags}`;
-        await $({ stdio: "inherit" })`bash --noprofile --norc -c ${cmd1}`;
-        const cmd2 = `set -euo pipefail; timeout ${TIMEOUT_SECS}s nix build "${tmp}#node-modules.${sanitized}" --impure --no-link --accept-flake-config --builders "" --print-build-logs ${flags}`;
-        await $({ stdio: "inherit" })`bash --noprofile --norc -c ${cmd2}`;
-      }
-
-      // 4) Reconcile any FOD digest drift detected during warm-up; force rehash to align mapping
-      await $({
-        stdio: "inherit",
-      })`zx-wrapper tools/dev/update-pnpm-hash.ts --force --lockfile ${lockfile}`;
-
-      // 5) Build the node-test derivation; sample tests should pass
+      // 3) Build the node-test derivation; sample tests should pass
       const out = await (async () => {
         const mj = String(process.env.NIX_MAX_JOBS || "0");
         const cr = String(process.env.NIX_CORES || "0");

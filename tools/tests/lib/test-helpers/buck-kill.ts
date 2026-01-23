@@ -65,10 +65,22 @@ async function killBuckForkserversUnderRepo(repoRoot: string, $: any): Promise<v
 }
 
 export async function killBuckDaemonsForRepo(repoRoot: string, $: any): Promise<void> {
+  const procs = await buck2dProcsForRepo(repoRoot, $);
+  const procIsos = new Set(procs.map((p) => p.iso).filter(Boolean));
   const isoDirs = await buckIsolationDirsForRepo(repoRoot);
-  const want = new Set(isoDirs.filter(Boolean));
-  if (want.size > 0) {
-    const procs = await buck2dProcsForRepo(repoRoot, $);
+  const want = new Set([...isoDirs, ...procIsos].filter(Boolean));
+  if (want.size > 0 && procIsos.size > 0) {
+    for (const iso of procIsos) {
+      await $({
+        stdio: "ignore",
+        cwd: repoRoot,
+        reject: false,
+        nothrow: true,
+        timeout: 10_000,
+      })`buck2 --isolation-dir ${iso} kill`;
+    }
+  }
+  if (want.size > 0 && procs.length > 0) {
     for (const p of procs) {
       if (!p.iso || !want.has(p.iso)) continue;
       try {
@@ -83,6 +95,11 @@ export async function killBuckDaemonsForRepo(repoRoot: string, $: any): Promise<
       } catch {}
     }
   }
-  await killBuckForkserversUnderRepo(repoRoot, $);
+  for (let i = 0; i < 3; i += 1) {
+    await killBuckForkserversUnderRepo(repoRoot, $);
+    const offenders = await forkserversUnderRepo(repoRoot, $);
+    if (offenders.length === 0) return;
+    await new Promise((r) => setTimeout(r, 250));
+  }
   await assertNoBuckForkserversUnderRepo(repoRoot, $);
 }

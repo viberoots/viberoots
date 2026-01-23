@@ -1,4 +1,5 @@
 import "zx/globals";
+import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
@@ -39,13 +40,33 @@ export async function startBuckDaemonReaper(opts: {
     .catch(() => "");
   if (!parentSig) return;
 
-  const quotedSig = parentSig.replaceAll("'", `'\"'\"'`);
   const script = path.join(opts.root, "tools", "tests", "lib", "buck-daemon-reaper.ts");
 
-  await $({
-    stdio: "ignore",
-    cwd: opts.root,
-  })`bash --noprofile --norc -c ${`node --experimental-top-level-await --experimental-strip-types --disable-warning=ExperimentalWarning --import ${opts.zxInitPath} ${script} --parent ${process.pid} --parent-sig '${quotedSig}' --state-file ${opts.stateFile} --poll-ms 1000 >/dev/null 2>&1 & disown`}`.nothrow();
+  const child = spawn(
+    process.execPath,
+    [
+      "--experimental-top-level-await",
+      "--experimental-strip-types",
+      "--disable-warning=ExperimentalWarning",
+      "--import",
+      opts.zxInitPath,
+      script,
+      "--parent",
+      String(process.pid),
+      "--parent-sig",
+      parentSig,
+      "--state-file",
+      opts.stateFile,
+      "--poll-ms",
+      "1000",
+    ],
+    {
+      cwd: opts.root,
+      stdio: "ignore",
+      detached: true,
+    },
+  );
+  child.unref();
 }
 
 export async function startBuckWatchdog(opts: {
