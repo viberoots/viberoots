@@ -386,6 +386,37 @@ nix_cpp_binary(
 )
 ```
 
+#### 9) C++ Node-API addon links a shared C++ library
+
+The addon template emits rpath entries for each linked Nix package so the runtime loader
+can resolve shared libs without `DYLD_LIBRARY_PATH`/`LD_LIBRARY_PATH`.
+
+```python
+# libs/runtime/TARGETS
+load("//cpp:defs.bzl", "nix_cpp_library")
+
+nix_cpp_library(
+    name = "runtime",
+    srcs = glob(["src/**/*.cpp"]),
+    headers = glob(["include/**/*.h"]),
+    link_mode = "shared",
+    visibility = ["PUBLIC"],
+)
+```
+
+```python
+# libs/addon-native/TARGETS
+load("//cpp:defs.bzl", "nix_cpp_node_addon")
+
+nix_cpp_node_addon(
+    name = "napi_addon",
+    srcs = glob(["src/**/*.cc"]),
+    link_deps = ["//libs/runtime:runtime"],
+    addon_name = "runtime_addon",
+    visibility = ["PUBLIC"],
+)
+```
+
 ## Planner changes (Nix)
 
 All translation from Buck graph deps to Nix link inputs lives in `tools/nix/planner/cpp.nix`.
