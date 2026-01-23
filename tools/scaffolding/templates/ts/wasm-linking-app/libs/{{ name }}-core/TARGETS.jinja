@@ -5,7 +5,7 @@ nix_cpp_wasm_static_lib(
     srcs = ["src/core.c"],
     header_deps = ["//libs/{{ name }}-support:headers"],
     link_deps = ["//libs/{{ name }}-support:support_wasm"],
-    labels = ["wasm:wasi"],
+    wasm_abi = "wasi",
     visibility = ["PUBLIC"],
 )
 

@@ -161,6 +161,7 @@ For TinyGo Wasm, there are two build paths in this repo:
 - For `nix_cpp_wasm_static_lib`:
   - `header_deps` (for includes while compiling)
   - `link_deps` (its own link requirements, used when a downstream consumer chooses transitive closure)
+  - `wasm_abi = "bare" | "wasi"` (default: `bare`) stamps `wasm:wasi` and `wasm_target:wasm32-wasi` when set to `wasi`
 
 For Python WASI app/lib targets:
 
@@ -190,7 +191,7 @@ For a Go TinyGo Wasm target `T`:
 1. Read `link_deps` (possibly empty) and closure settings.
 2. Resolve each `link_dep` to a node and ensure it is a compatible Wasm producer:
    - expected labels: `lang:cpp`, `kind:wasm`, `wasm:static`
-   - variant compatibility is enforced via the optional `wasm:wasi` label:
+   - variant compatibility is enforced via the `wasm:wasi` label (stamped by `wasm_abi = "wasi"` on C++ wasm static libs):
      - if TinyGo is built as `target="wasi"`, each linked dep must be stamped `wasm:wasi`
      - if TinyGo is built as `target="wasm"`, linked deps must not be stamped `wasm:wasi`
 3. Apply closure:
@@ -210,6 +211,7 @@ This is structurally the same as the C++ native linking design, except the produ
 For `nix_cpp_wasm_static_lib`:
 
 - It compiles to a `.a` built for a specific Wasm target.
+- `wasm_abi` maps to a concrete target triple and is recorded via `wasm_target:<triple>` labels (`wasm32-unknown-unknown` or `wasm32-wasi`).
 - If it declares `header_deps`, those are include-only inputs used during compilation.
   - The C++ planner resolves each `header_dep` to a `T.cppHeaders` derivation and passes its include root (`${drv}/include`) into `T.cppWasmStaticLib` via `includes`.
 - If it declares `link_deps`, those are its link requirements and are used only when a downstream consumer selects transitive closure.
@@ -260,6 +262,7 @@ nix_cpp_wasm_static_lib(
     name = "cpp_core_wasm",
     srcs = glob(["src/**/*.cpp"]),
     headers = glob(["include/**/*.h"]),
+    wasm_abi = "wasi",
     visibility = ["PUBLIC"],
 )
 ```
@@ -274,6 +277,7 @@ nix_cpp_wasm_static_lib(
     name = "cpp_support_wasm",
     srcs = glob(["src/**/*.cpp"]),
     headers = glob(["include/**/*.h"]),
+    wasm_abi = "wasi",
     visibility = ["PUBLIC"],
 )
 ```
@@ -287,6 +291,7 @@ nix_cpp_wasm_static_lib(
     srcs = glob(["src/**/*.cpp"]),
     headers = glob(["include/**/*.h"]),
     link_deps = ["//libs/cpp-support:cpp_support_wasm"],
+    wasm_abi = "wasi",
     visibility = ["PUBLIC"],
 )
 ```
@@ -364,6 +369,7 @@ nix_cpp_wasm_static_lib(
     srcs = glob(["src/**/*.cpp"]),
     headers = glob(["include/**/*.h"]),
     header_deps = ["//libs/headers:api_headers"],
+    wasm_abi = "wasi",
     visibility = ["PUBLIC"],
 )
 ```

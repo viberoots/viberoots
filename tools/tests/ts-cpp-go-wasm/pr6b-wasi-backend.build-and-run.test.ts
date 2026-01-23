@@ -36,8 +36,8 @@ nix_cpp_wasm_static_lib(
     name = "core_wasm",
     srcs = ["src/cwrapper/addon.c"],
     headers = ["include/addon.h"],
-    # Indicate WASI backend selection via label (planner reads "wasm:wasi")
-    labels = ["lang:cpp", "kind:lib", "wasm:wasi"],
+    wasm_abi = "wasi",
+    labels = ["lang:cpp", "kind:lib"],
     visibility = ["PUBLIC"],
 )
 `,

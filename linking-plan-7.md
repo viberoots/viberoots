@@ -240,3 +240,112 @@ Adds a small macro surface area that must remain stable across languages.
 ### Recommendation
 
 Implement to make WASI compatibility explicit, deterministic, and test-backed.
+
+---
+
+## PR-5: Python native extensions always invalidate on `uv.lock` changes
+
+### Description
+
+This PR closes the remaining correctness gap for native Python extensions: `kind:pyext` must invalidate when the importer `uv.lock` changes, even when `build_py_deps` is empty. Today, the planner only constructs a wheelhouse when `build_py_deps` is non-empty, which means a lockfile change can leave extension outputs cached. This PR makes `uv.lock` a deterministic input to `T.pyExt` in all cases and locks the behavior with a test.
+
+### Scope & Changes
+
+This PR makes the following changes:
+
+- Extend the Python planner to pass a lockfile input for `kind:pyext` unconditionally.
+- Update `tools/nix/templates/python/pyext.nix` to accept the lockfile input and use it as an explicit build-time input even when no wheelhouse is used.
+- Keep the existing optimization: only instantiate the wheelhouse env when `build_py_deps` is non-empty.
+
+### Tests (in this PR)
+
+I add zx tests (one test per file):
+
+- `tools/tests/python/python.pyext.lockfile-invalidation.rebuilds-on-uv-lock-change.test.ts`
+  - builds a `kind:pyext` with empty `build_py_deps`
+  - edits the importer `uv.lock` in a temp repo
+  - asserts the extension derivation rebuilds (and a control target without pyext stays cached)
+
+### Docs (in this PR)
+
+I update documentation to clarify the invalidation rule:
+
+- Update `python-extension-design.md` to explicitly state that `uv.lock` is a required input for `T.pyExt` even when `build_py_deps` is empty.
+
+### Acceptance Criteria
+
+The following must be true:
+
+- A `kind:pyext` target rebuilds when its importer `uv.lock` changes, regardless of `build_py_deps`.
+- The new test fails if lockfile invalidation regresses.
+- Documentation reflects the unconditional lockfile dependency.
+
+### Risks
+
+Low. This adds an explicit input and does not change the build outputs or linking logic.
+
+### Consequence of Not Implementing
+
+Native extension artifacts can become stale relative to the importer lockfile, violating determinism guarantees.
+
+### Downsides for Implementing
+
+Slightly broader invalidation scope for pyext builds, but aligned with the design.
+
+### Recommendation
+
+Implement to guarantee deterministic invalidation for Python native extensions.
+
+---
+
+## PR-6: Split oversized Python planner modules to comply with the 250-line rule
+
+### Description
+
+This PR brings the Python planner and uv2nix adapter back into methodology compliance by splitting oversized modules into smaller, single-responsibility files. It is a refactor with no behavior change, paired with tests and updated documentation.
+
+### Scope & Changes
+
+This PR makes the following changes:
+
+- Split `tools/nix/planner/python.nix` into smaller modules (e.g., `python-core.nix`, `python-pyext.nix`, `python-wasm.nix`), keeping each file at or under 250 lines.
+- Split `tools/nix/uv2nix-adapter.nix` into a thin wrapper plus focused helper modules (e.g., `uv2nix-inputs.nix`, `uv2nix-overlays.nix`, `uv2nix-env.nix`).
+- Ensure all imports are centralized and the planner entrypoint remains `tools/nix/planner/python.nix`.
+
+### Tests (in this PR)
+
+I run existing tests that cover Python planner behavior and uv2nix materialization:
+
+- `tools/tests/python/python.pyext.imported-by-pyapp.build-and-run.test.ts`
+- `tools/tests/python/python.pyext.transitive-closure.follows-link-deps.build-and-run.test.ts`
+- `tools/tests/python/python.pyext-wasm.builds-with-emscripten.test.ts`
+
+### Docs (in this PR)
+
+I update documentation to reflect the module split:
+
+- Update `build-system-design.md` to list the new Python planner module layout and the uv2nix adapter split.
+
+### Acceptance Criteria
+
+The following must be true:
+
+- All Python planner and uv2nix adapter files are at or under 250 lines.
+- The listed Python tests pass without behavior changes.
+- Documentation reflects the new module boundaries.
+
+### Risks
+
+Low. This is a refactor; the main risk is import miswiring in Nix.
+
+### Consequence of Not Implementing
+
+The Python planner continues to violate the methodology’s file size constraint, and the adapter remains harder to audit.
+
+### Downsides for Implementing
+
+Refactor cost and minor risk of Nix evaluation errors.
+
+### Recommendation
+
+Implement to restore compliance and maintainability without changing behavior.

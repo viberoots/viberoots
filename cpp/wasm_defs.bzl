@@ -1,5 +1,6 @@
 load(
     "//lang:defs_common.bzl",
+    "dedupe_preserve",
     "merge_link_intent_deps",
     "prepare_package_local_wasm_wiring",
     "wire_package_local_wasm_planner_visible_stub",
@@ -9,14 +10,34 @@ load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name")
 load("//cpp/private:nix_build.bzl", "cpp_nix_build")
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
 
+def _wasm_target_for_abi(wasm_abi):
+    if wasm_abi == "wasi":
+        return "wasm32-wasi"
+    return "wasm32-unknown-unknown"
+
+def _apply_wasm_abi(kw):
+    wasm_abi = kw.pop("wasm_abi", "bare") or "bare"
+    if wasm_abi not in ["bare", "wasi"]:
+        fail("nix_cpp_wasm_static_lib: wasm_abi must be \"bare\" or \"wasi\"")
+    wasm_target = _wasm_target_for_abi(wasm_abi)
+    labels = kw.get("labels", []) or []
+    extra = ["wasm_target:%s" % wasm_target]
+    if wasm_abi == "wasi":
+        extra.append("wasm:wasi")
+    kw["labels"] = dedupe_preserve(labels + extra)
+    return wasm_target
+
 def nix_cpp_wasm_static_lib(name, **kwargs):
     """
     Build a wasm-targeted static library via the Nix planner (cppWasmStaticLib).
 
     Stamps:
       - lang:cpp, kind:lib, flavor:wasm
+      - wasm:wasi when wasm_abi = "wasi" (default is bare)
+      - wasm_target:<triple> derived from wasm_abi
     """
     kw = dict(kwargs)
+    _ = _apply_wasm_abi(kw)
     deps = kw.pop("deps", []) or []
     link_deps = kw.pop("link_deps", []) or []
     header_deps = kw.pop("header_deps", []) or []

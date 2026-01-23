@@ -96,7 +96,8 @@ nix_cpp_wasm_static_lib(
     name = "core_wasm",
     srcs = ["src/addon.c", "patches/cpp/core_wasm@0.0.0.patch"],
     headers = ["include/addon.h"],
-    labels = ["kind:lib", "wasm:wasi"],
+    labels = ["kind:lib"],
+    wasm_abi = "wasi",
     visibility = ["PUBLIC"],
 )
 `,

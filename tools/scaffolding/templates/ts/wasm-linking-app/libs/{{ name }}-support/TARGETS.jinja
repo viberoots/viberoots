@@ -12,7 +12,7 @@ nix_cpp_wasm_static_lib(
         "src/support.c",
         "include/support.h",
     ],
-    labels = ["wasm:wasi"],
+    wasm_abi = "wasi",
     visibility = ["PUBLIC"],
 )
 

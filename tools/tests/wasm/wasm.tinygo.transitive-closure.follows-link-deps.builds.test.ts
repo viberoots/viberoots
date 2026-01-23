@@ -59,7 +59,8 @@ nix_cpp_wasm_static_lib(
     name = "support_wasm",
     srcs = ["src/support.c"],
     headers = ["include/support.h"],
-    labels = ["kind:lib", "wasm:wasi"],
+    labels = ["kind:lib"],
+    wasm_abi = "wasi",
     visibility = ["PUBLIC"],
 )
 `,
@@ -90,7 +91,8 @@ nix_cpp_wasm_static_lib(
     srcs = ["src/core.c"],
     headers = ["include/core.h"],
     link_deps = ["//libs/support:support_wasm"],
-    labels = ["kind:lib", "wasm:wasi"],
+    labels = ["kind:lib"],
+    wasm_abi = "wasi",
     visibility = ["PUBLIC"],
 )
 `,
