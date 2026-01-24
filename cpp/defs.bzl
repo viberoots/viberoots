@@ -138,15 +138,18 @@ def nix_cpp_test(name, **kwargs):
     link_deps = kw.pop("link_deps", []) or []
     header_deps = kw.pop("header_deps", []) or []
     link_closure = kw.pop("link_closure", "direct") or "direct"
+    link_closure_overrides = kw.pop("link_closure_overrides", {}) or {}
     link_mode = kw.pop("link_mode", None)
     link_kind = kw.pop("link_kind", None)
     if link_mode == None and link_kind != None:
         link_mode = link_kind
     if link_mode == None:
         link_mode = "static"
+    validate_link_closure_overrides(link_deps, link_closure_overrides)
     kw["link_deps"] = link_deps
     kw["header_deps"] = header_deps
     kw["link_closure"] = link_closure
+    kw["link_closure_overrides"] = link_closure_overrides
     kw["link_mode"] = link_mode
     merged = merge_link_intent_deps(deps, link_deps, header_deps)
     planner_name = name + "__planner"

@@ -551,7 +551,7 @@ Constraints:
   - For each dep `d`, determine `closure(d)` from `link_closure_overrides.get(d, link_closure)`.
   - If `closure(d) == "direct"`, include `d` only.
   - If `closure(d) == "transitive"`, include `d` and recursively include its `link_deps`.
-- C++ macros (`nix_cpp_binary`, `nix_cpp_library`, `nix_cpp_node_addon`) validate overrides at the call site and forward them to the planner.
+- C++ macros (`nix_cpp_binary`, `nix_cpp_library`, `nix_cpp_node_addon`, `nix_cpp_test`) validate overrides at the call site and forward them to the planner.
 
 Example call site:
 
