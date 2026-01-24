@@ -262,6 +262,65 @@ Implement to keep the Node macro surface consistent.
 
 ---
 
+### PR-3: Enforce Node deps parity between package.json and TARGETS
+
+#### Description
+
+Add a deterministic enforcement mechanism that keeps Node workspace dependencies in sync between `package.json` and Buck `deps`. This prevents drift where users update one and forget the other.
+
+#### Scope & Changes
+
+- Add `tools/buck/enforce-node-deps.ts` (zx):
+  - Reads each importer `package.json` under `apps/*` and `libs/*`.
+  - Resolves workspace dependencies to Buck target labels via a deterministic mapping file:
+    - `tools/node/workspace-map.json` (package name → Buck label).
+  - For each Node target in the importer package, compare declared Buck `deps` with the expected set.
+  - Supports two modes:
+    - `--check` (default): fail on drift with a minimal diff.
+    - `--fix`: rewrite the Node target `deps` to match the expected set.
+- Update the `i` script to run `node tools/buck/enforce-node-deps.ts --check` and print a user-facing warning on drift.
+  - The warning must include the exact fix command:
+    - `node tools/buck/enforce-node-deps.ts --fix`
+- Update `tools/buck/prebuild-guard.ts` to call `node tools/buck/enforce-node-deps.ts --check` in CI.
+- Update `docs/handbook/node-macros.md` to describe the enforcement and the `--fix` workflow.
+- Update `lang-design-docs/pnpm-design.md` with the high-level rule: `package.json` is the source of truth, Buck `deps` must match.
+
+#### Tests (in this PR)
+
+- `tools/tests/node/node.deps-enforcement.matches-package-json.passes.test.ts`
+  - Create a temp importer with a workspace dep and matching Buck `deps`.
+  - Assert `--check` succeeds.
+- `tools/tests/node/node.deps-enforcement.drift.fails-fast.test.ts`
+  - Create a temp importer where `package.json` and Buck `deps` diverge.
+  - Assert `--check` fails with a targeted error.
+- `tools/tests/node/node.deps-enforcement.fix.rewrites-deps.test.ts`
+  - Start with drift, run `--fix`, and assert the `deps` list matches the expected mapping.
+
+#### Acceptance Criteria
+
+- Drift between `package.json` and Buck `deps` is detected in CI.
+- The `--fix` mode rewrites Buck `deps` deterministically.
+- Documentation for the enforcement and fix workflow is updated in the same PR.
+- Tests cover success, failure, and fix flows.
+
+#### Risks
+
+Low to medium. The mapping file requires maintenance when adding or renaming packages.
+
+#### Consequence of Not Implementing
+
+Users can forget to update Buck `deps`, leading to incorrect invalidation and missing graph edges.
+
+#### Downsides for Implementing
+
+Adds a small maintenance surface (`workspace-map.json`) and a new check in CI.
+
+#### Recommendation
+
+Implement to keep dependency edges correct and prevent drift without adding runtime heuristics.
+
+---
+
 ## Completion Criteria
 
 - All Node macros accept omitted `lockfile_label` when the package follows the importer convention.
