@@ -719,6 +719,7 @@ For transitive linking:
 
 - create `libs/a` depending on `libs/b`
 - ensure `apps/c` only lists `link_deps=["//libs/a:a"]` and still links and runs with `link_closure="transitive"`
+- add addon and test cases that follow the same nested `link_deps` chain
 
 For header-only:
 
@@ -736,6 +737,7 @@ This project is “finished” when:
 - All patterns described in this doc are supported and tested:
   - C++ bin → in-repo C++ lib (direct and transitive)
   - C++ addon → in-repo C++ lib (direct and transitive)
+  - C++ test → in-repo C++ lib (direct and transitive)
   - header-only deps
   - static and shared link kinds (shared is opt-in)
 - The planner remains the single place where Buck deps are translated into Nix link inputs for C++.
