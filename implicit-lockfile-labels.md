@@ -86,6 +86,75 @@ Keep errors concrete and actionable:
 
 ---
 
+## User-Level Examples
+
+These examples show the expected callsites after the change. The default case relies on the package path convention. The non-default cases show when an explicit `lockfile_label` remains necessary.
+
+### Default Cases (convention-based)
+
+App under `apps/web` with its own importer and lockfile. No explicit `lockfile_label` is needed.
+
+`apps/web/TARGETS`:
+
+```python
+load("//node:defs_nix.bzl", "node_webapp")
+
+node_webapp(
+    name = "web",
+    deps = ["//libs/ui:ui"],
+)
+```
+
+This expands to `lockfile:apps/web/pnpm-lock.yaml#apps/web` and fails fast if the lockfile is missing.
+
+Library under `libs/ui` using the default convention:
+
+`libs/ui/TARGETS`:
+
+```python
+load("//node:defs_core.bzl", "nix_node_lib")
+
+nix_node_lib(
+    name = "ui",
+)
+```
+
+### Non-Default Cases (explicit override)
+
+Root tooling importer with `importer="."` and `pnpm-lock.yaml` at the repo root. A tool target under `tools/dev` needs an explicit label because the package name is `tools/dev`, not `.`.
+
+`tools/dev/TARGETS`:
+
+```python
+load("//node:defs_core.bzl", "nix_node_gen")
+
+nix_node_gen(
+    name = "sync-providers",
+    srcs = ["sync-providers.ts"],
+    cmd = "node $SRCS > $OUT",
+    lockfile_label = "lockfile:pnpm-lock.yaml#.",
+)
+```
+
+Migration case where the importer id does not match the package path. For example, an app under `apps/admin` uses a lockfile importer id of `apps/web` during a staged move.
+
+`apps/admin/TARGETS`:
+
+```python
+load("//node:defs_core.bzl", "nix_node_gen")
+
+nix_node_gen(
+    name = "admin-bundle",
+    srcs = ["bundle.ts"],
+    cmd = "node $SRCS > $OUT",
+    lockfile_label = "lockfile:apps/web/pnpm-lock.yaml#apps/web",
+)
+```
+
+This keeps the override explicit and avoids implicit cross-importer deduction.
+
+---
+
 ## Development Plan
 
 I follow the structure used in `linking-plan-11.md`. Each PR includes functionality, tests, and documentation updates in the same change.
