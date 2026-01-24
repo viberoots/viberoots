@@ -1,0 +1,201 @@
+# Implicit Lockfile Labels for Node Macros
+
+This document proposes a small, deterministic change to the Node macro surface so callers do not need to manually compute lockfile labels. It follows the design principles in `build-system-design.md` and the PNPM design in `lang-design-docs/pnpm-design.md`.
+
+I keep the behavior explicit and deterministic. I do not add filesystem scans or nearest-lockfile deduction. The default is derived from the Buck package path and fails fast if the lockfile is missing.
+
+---
+
+## Goals
+
+- Reduce boilerplate for Node macro call sites.
+- Keep importer identity deterministic and unambiguous.
+- Preserve current provider wiring and invalidation behavior.
+- Avoid filesystem heuristics or ambiguous deduction.
+
+## Non-Goals
+
+- Do not infer importer from nearest lockfile or `package.json`.
+- Do not change provider naming or auto-map semantics.
+- Do not change Node macro caller package placement requirements.
+
+---
+
+## Design
+
+### Summary
+
+For Node macros that require `lockfile_label`, derive a default when the caller does not supply one:
+
+- importer = `native.package_name()`
+- lockfile path = `<importer>/pnpm-lock.yaml`
+- label = `lockfile:<importer>/pnpm-lock.yaml#<importer>`
+
+The macro continues to allow an explicit `lockfile_label` override.
+
+### Rationale
+
+- Determinism: `native.package_name()` is stable and unambiguous.
+- Consistency: matches the per‑importer lockfile model in `lang-design-docs/pnpm-design.md`.
+- Predictability: no filesystem scanning and no label guessing.
+- Failure mode: missing lockfile fails fast with a targeted error.
+
+### Behavior Changes
+
+1. If `lockfile_label` is provided, behavior is unchanged.
+2. If `lockfile_label` is omitted:
+   - compute the default label from the package name
+   - validate that the computed lockfile exists
+   - wire labels and providers as normal
+
+### API Surface
+
+No new macro parameters. This preserves current call sites and allows the convention-based default without adding a new parameter.
+
+### Validation Rules
+
+- Exactly one importer-scoped lockfile label must be in effect after applying the default or override.
+- The default lockfile path must exist or the macro fails.
+- If both `lockfile_label` and a `labels` entry with `lockfile:` are provided, fail as today.
+
+### Files and Responsibilities
+
+- `//lang:defs_common.bzl`
+  - Add a helper to compute default lockfile label from `native.package_name()`.
+  - Add a helper to validate lockfile existence when the default is used.
+- `//node:defs_core.bzl`
+  - Use the helper when `lockfile_label` is omitted.
+  - Keep `nix_node_gen`, `nix_node_lib`, `nix_node_bin`, `nix_node_test` wiring unchanged.
+- `//node:defs_nix.bzl`
+  - Apply the same defaulting behavior for `node_webapp` and bundled `nix_node_cli_bin`.
+
+### Error Message Shape
+
+Keep errors concrete and actionable:
+
+- Missing lockfile:
+  - `nix_node_gen: missing lockfile at <path>. Provide lockfile_label or create <path>.`
+- Multiple lockfile labels:
+  - Keep existing error behavior.
+
+### Interaction with Existing Policies
+
+- Buck package boundary rule stays the same. Node targets must live in the importer package.
+- Provider sync stays the same. The auto-map already maps `lockfile:<path>#<importer>` labels.
+- No change to `tools/buck/sync-providers.ts` or `tools/buck/gen-auto-map.ts`.
+
+---
+
+## Development Plan
+
+I follow the structure used in `linking-plan-11.md`. Each PR includes functionality, tests, and documentation updates in the same change.
+
+### PR-1: Default lockfile label for node/defs_core.bzl
+
+#### Description
+
+Introduce a convention-based default lockfile label for `nix_node_gen`, `nix_node_lib`, `nix_node_bin`, and `nix_node_test` when `lockfile_label` is omitted.
+
+#### Scope & Changes
+
+- Add helper in `//lang:defs_common.bzl`:
+  - `default_lockfile_label_from_package()` returns `lockfile:<pkg>/pnpm-lock.yaml#<pkg>`.
+  - `ensure_default_lockfile_exists(path)` validates the file exists.
+- Update `//node:defs_core.bzl` to:
+  - derive a default when `lockfile_label` is omitted
+  - validate the default lockfile exists
+  - preserve the existing enforcement of exactly one lockfile label
+- Update `lang-design-docs/pnpm-design.md`:
+  - document the default label convention
+  - note the fast-fail on missing lockfile
+
+#### Tests (in this PR)
+
+- `tools/tests/node/node.lockfile-label.default-from-package.uses-default.test.ts`
+  - define a node target without `lockfile_label` in `apps/foo/TARGETS`
+  - ensure the macro expands successfully when `apps/foo/pnpm-lock.yaml` exists
+- `tools/tests/node/node.lockfile-label.default-from-package.missing-lockfile.fails-fast.test.ts`
+  - define a node target without `lockfile_label` in `apps/bar/TARGETS`
+  - assert the macro fails with the missing lockfile error
+
+#### Acceptance Criteria
+
+- Node macros in `defs_core.bzl` work without `lockfile_label` when the convention path exists.
+- Missing lockfile fails fast with a targeted error.
+- Existing behavior with explicit `lockfile_label` is unchanged.
+- Tests pass and are one-test-per-file.
+
+#### Risks
+
+Low. The default is deterministic and does not change provider wiring or label shape.
+
+#### Consequence of Not Implementing
+
+Node macro call sites remain verbose and error-prone when specifying lockfile labels.
+
+#### Downsides for Implementing
+
+Slightly more macro logic and two new tests.
+
+#### Recommendation
+
+Implement to reduce boilerplate while keeping deterministic importer identity.
+
+---
+
+### PR-2: Default lockfile label for node/defs_nix.bzl
+
+#### Description
+
+Apply the same defaulting behavior to Nix-calling Node macros (`node_webapp` and bundled `nix_node_cli_bin`).
+
+#### Scope & Changes
+
+- Reuse the shared defaulting helper from `//lang:defs_common.bzl`.
+- Update `//node:defs_nix.bzl`:
+  - derive a default lockfile label when omitted
+  - validate the default lockfile exists
+  - preserve the existing optional `importer` arg mismatch checks
+- Update `docs/handbook/node-macros.md`:
+  - document the convention-based default and failure mode
+
+#### Tests (in this PR)
+
+- `tools/tests/node/node.defs-nix.lockfile-label.default-from-package.webapp.test.ts`
+  - define a `node_webapp` without `lockfile_label` under `apps/web`
+  - assert the macro expands and the derived lockfile label is used
+- `tools/tests/node/node.defs-nix.lockfile-label.default-from-package.missing-lockfile.fails-fast.test.ts`
+  - define a `node_webapp` without `lockfile_label` under `apps/missing`
+  - assert fast-fail with missing lockfile error
+
+#### Acceptance Criteria
+
+- `node_webapp` and bundled `nix_node_cli_bin` accept omitted `lockfile_label` when the convention path exists.
+- Missing lockfile fails fast with a targeted error.
+- Documentation explains the new default and how to override it.
+- Tests pass and are one-test-per-file.
+
+#### Risks
+
+Low. The change is limited to lockfile label defaulting and validation.
+
+#### Consequence of Not Implementing
+
+Nix-calling Node macros keep requiring manual labels while core Node macros do not.
+
+#### Downsides for Implementing
+
+Small macro changes and two new tests.
+
+#### Recommendation
+
+Implement to keep the Node macro surface consistent.
+
+---
+
+## Completion Criteria
+
+- All Node macros accept omitted `lockfile_label` when the package follows the importer convention.
+- Missing lockfile yields deterministic, actionable errors.
+- Documentation updated in the same PRs as the behavior changes.
+- Tests cover both success and failure paths for `defs_core.bzl` and `defs_nix.bzl`.
