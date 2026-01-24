@@ -124,7 +124,7 @@ I separate “graph dependency” from “link intent”.
 1. Call sites keep using Buck `deps` to express the dependency graph.
 2. Call sites optionally specify which of those deps are link deps vs header deps.
 3. The C++ planner reads the graph and:
-   - resolves header deps to Nix package inputs that provide include paths
+   - resolves header deps to Nix package inputs that provide include paths only, even when the dep is a C++ library
    - resolves link deps to Nix package inputs that provide libraries and include paths
    - applies an explicit closure policy (direct or transitive) when constructing link inputs
 4. The existing C++ Nix templates continue to:
@@ -176,6 +176,7 @@ Notes:
   - `deps := deps ∪ link_deps ∪ header_deps` (deterministic union)
   - This ensures any link or header dependency is also a real Buck graph edge, without requiring users to repeat labels.
 - Overlap between `link_deps` and `header_deps` is allowed. The union is deterministic, and the planner tolerates the overlap without requiring separate validation.
+- Link inputs come only from `link_deps`. Even if a dep appears in both lists, the `header_deps` path remains header-only.
 - If `link_deps` and `header_deps` are both empty, C++ behaves exactly as today.
 - `link_closure = "transitive"` applies only to `link_deps` (and optionally to `header_deps` if we decide it is useful; default is direct-only for header deps too).
 
@@ -452,7 +453,6 @@ For a C++ consumer target `T` of kind `lib`, `bin`, `addon`, or `test`:
 1. Read its `deps` list (graph deps).
 2. Read `link_deps` and `header_deps` (possibly empty).
 3. Validate:
-   - `link_deps ∩ header_deps = ∅`
    - invalid values fail evaluation with an actionable error.
 4. Resolve each dep label to a node in the graph and classify:
    - in-repo C++ library target
@@ -464,7 +464,7 @@ For a C++ consumer target `T` of kind `lib`, `bin`, `addon`, or `test`:
    - transitive: walk the _link graph_ by following `link_deps` recursively, starting from each direct `link_dep`
 6. Build Nix package inputs:
    - for each C++ lib: `T.cppLib { name = dep; subdir = pkgPathOf dep; ... }`
-   - for each header dep: `T.cppHeaders { ... }` (new template described below)
+   - for each header dep: `T.cppHeaders { ... }` (header-only, even if the dep is a C++ library)
    - for each Go c-archive dep: existing `T.goCArchive { ... }` path remains
 7. Pass the resulting Nix package input list to the C++ template as `nixCxxPkgs`.
 8. Continue to pass `nixCxxAttrs` (from `nixpkg:*`) as today.
