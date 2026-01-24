@@ -187,6 +187,8 @@ For a library target `L`:
 
 This avoids guessing. Libraries declare their own link requirements. Consumers decide whether to pull the full link closure automatically.
 
+When `link_mode="shared"`, the library itself links its own `link_deps`. The planner applies the library’s `link_closure` when resolving those link inputs, so shared libs can be self-contained without requiring consumers to restate the same link requirements.
+
 Planner note: `header_deps` are applied to library compilation by passing `T.cppHeaders` inputs into `cppLib` and `cppSharedLib`.
 
 ### Static vs shared

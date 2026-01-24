@@ -193,7 +193,12 @@ let
             else {};
           wasmHeaderAttrs = if isWasmStatic then { includes = includeRootsForWasm; } else {};
           wasmLibAttrs = baseAttrs // wasmAttrs // wasmHeaderAttrs;
-          nativeLibAttrs = baseAttrs // { nixCxxPkgs = repoCppHeaderPkgsFor name; };
+          nativeLibAttrs = baseAttrs // {
+            nixCxxPkgs =
+              if mode == "shared"
+              then (repoCppHeaderPkgsFor name) ++ (repoCppLibPkgsFor name)
+              else repoCppHeaderPkgsFor name;
+          };
         in
           if isEmscripten then T.cppWasmEmscriptenLib wasmLibAttrs
           else if isWasmStatic then T.cppWasmStaticLib wasmLibAttrs
