@@ -72,6 +72,56 @@ I follow the repo-wide linking model described in `cpp-linking.md`, `wasm-linkin
    - For each Node target, include `labels = ["lockfile:<relative/path/to/pnpm-lock.yaml#<importer>"]`.
    - Auto‑map includes the appropriate provider so only impacted targets rebuild.
 
+### Example: app depends on in-repo lib
+
+This is the minimal coordination between PNPM and Buck. PNPM handles runtime module resolution via a workspace dependency, and Buck gets a graph edge for invalidation via `deps`.
+
+`libs/utils/package.json`:
+
+```json
+{
+  "name": "@repo/utils",
+  "version": "0.1.0",
+  "exports": "./dist/index.js",
+  "types": "./dist/index.d.ts"
+}
+```
+
+`apps/web/package.json`:
+
+```json
+{
+  "name": "@repo/web",
+  "version": "0.1.0",
+  "dependencies": {
+    "@repo/utils": "workspace:*"
+  }
+}
+```
+
+`apps/web/TARGETS`:
+
+```python
+load("//node:defs_nix.bzl", "node_webapp")
+
+node_webapp(
+    name = "web",
+    lockfile_label = "lockfile:apps/web/pnpm-lock.yaml#apps/web",
+    deps = ["//libs/utils:utils"],
+)
+```
+
+`libs/utils/TARGETS`:
+
+```python
+load("//node:defs_core.bzl", "nix_node_lib")
+
+nix_node_lib(
+    name = "utils",
+    lockfile_label = "lockfile:libs/utils/pnpm-lock.yaml#libs/utils",
+)
+```
+
 5. **Scaffolding command**
    - Extend `tools/scaffolding` to create a new PNPM project (e.g., `apps/web` or `libs/utils`) with:
      - `package.json` (name, version, scripts), `pnpm-lock.yaml` (after `pnpm install` run in dev shell), and `.npmrc` if needed.

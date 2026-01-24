@@ -47,8 +47,10 @@ load("//cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
     name = "greeter",
-    srcs = ["src/greeter.cpp"],
-    headers = ["include/greeter.h"],
+    srcs = [
+        "src/greeter.cpp",
+        "include/greeter.h",
+    ],
     visibility = ["PUBLIC"],
 )
 ```
@@ -225,8 +227,7 @@ load("//cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
     name = "math_core",
-    srcs = glob(["src/**/*.cpp"]),
-    headers = glob(["include/**/*.h"]),
+    srcs = glob(["src/**/*.cpp", "include/**/*.h"]),
     visibility = ["PUBLIC"],
 )
 ```
@@ -251,8 +252,7 @@ load("//cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
     name = "support",
-    srcs = glob(["src/**/*.cpp"]),
-    headers = glob(["include/**/*.h"]),
+    srcs = glob(["src/**/*.cpp", "include/**/*.h"]),
     visibility = ["PUBLIC"],
 )
 ```
@@ -263,8 +263,7 @@ load("//cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
     name = "math_core",
-    srcs = glob(["src/**/*.cpp"]),
-    headers = glob(["include/**/*.h"]),
+    srcs = glob(["src/**/*.cpp", "include/**/*.h"]),
     link_deps = ["//libs/support:support"],
     visibility = ["PUBLIC"],
 )
@@ -294,7 +293,7 @@ load("//cpp:defs.bzl", "nix_cpp_headers")
 
 nix_cpp_headers(
     name = "api_headers",
-    headers = glob(["include/**/*.h"]),
+    srcs = glob(["include/**/*.h"]),
     visibility = ["PUBLIC"],
 )
 ```
@@ -336,8 +335,8 @@ nix_cpp_node_addon(
     srcs = [
         "src/addon.cc",
         "src/binding.cc",
+        "include/addon.h",
     ],
-    headers = glob(["include/**/*.h"]),
     link_deps = ["//libs/math:math_core"],
     addon_name = "calc_native",
     visibility = ["PUBLIC"],
@@ -372,8 +371,7 @@ load("//cpp:defs.bzl", "nix_cpp_shared_library")
 
 nix_cpp_shared_library(
     name = "runtime",
-    srcs = glob(["src/**/*.cpp"]),
-    headers = glob(["include/**/*.h"]),
+    srcs = glob(["src/**/*.cpp", "include/**/*.h"]),
     visibility = ["PUBLIC"],
 )
 ```
@@ -401,8 +399,7 @@ load("//cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
     name = "runtime",
-    srcs = glob(["src/**/*.cpp"]),
-    headers = glob(["include/**/*.h"]),
+    srcs = glob(["src/**/*.cpp", "include/**/*.h"]),
     link_mode = "shared",
     visibility = ["PUBLIC"],
 )
