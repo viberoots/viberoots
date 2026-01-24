@@ -10,6 +10,16 @@ This document proposes adding Zig as a first-class language in a way that aligns
 - Ergonomic patching flow via `patch-pkg zig` with idempotency and CI guardrails.
 - Minimal, readable integration that reuses existing helpers and patterns.
 
+### Linking expectations
+
+I follow the repo-wide linking model described in `cpp-linking.md`, `wasm-linking.md`, and `linking-roadmap.md`. If this language does not introduce native or cross-language linking, `deps` remains a graph edge list and no link intent is inferred.
+
+- `deps` is the Buck graph edge list. It does not imply link intent.
+- `link_deps` declares linkable inputs. `header_deps` is include-only when that concept applies.
+- Macros compute `deps := deps ∪ link_deps ∪ header_deps` deterministically and validate `link_closure_overrides` keys.
+- `link_closure` defaults to `"direct"`. `"transitive"` follows `link_deps` only via `tools/nix/planner/link-closure.nix`.
+- Ordering is deterministic and unsupported deps fail fast with targeted errors.
+
 ### Scope and Completion Criteria
 
 - Zig targets are discoverable by the planner and exported in `tools/buck/graph.json` with deterministic `module:` labels.

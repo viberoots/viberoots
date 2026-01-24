@@ -9,6 +9,16 @@ This document proposes how to add C# (and optionally other .NET languages like F
 - **Goal**: Keep design language‑agnostic inside the planner; .NET is a pluggable language like Go/Node.
 - **Non‑goal**: Replace `dotnet` test runner or re‑implement MSBuild. We orchestrate deterministically and call supported Nix builders.
 
+### Linking expectations
+
+I follow the repo-wide linking model described in `cpp-linking.md`, `wasm-linking.md`, and `linking-roadmap.md`. If this language does not introduce native or cross-language linking, `deps` remains a graph edge list and no link intent is inferred.
+
+- `deps` is the Buck graph edge list. It does not imply link intent.
+- `link_deps` declares linkable inputs. `header_deps` is include-only when that concept applies.
+- Macros compute `deps := deps ∪ link_deps ∪ header_deps` deterministically and validate `link_closure_overrides` keys.
+- `link_closure` defaults to `"direct"`. `"transitive"` follows `link_deps` only via `tools/nix/planner/link-closure.nix`.
+- Ordering is deterministic and unsupported deps fail fast with targeted errors.
+
 ### Alignment with Methodology
 
 - **Separation of concerns**: exporter (Buck graph → authoritative package labels), provider sync (deterministic provider nodes), auto‑map (target → providers), planner templates (Nix derivations), macros (Buck DX + labels), patch wrapper (dev UX). Clear modular boundaries, minimal shared helpers.

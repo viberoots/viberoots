@@ -10,6 +10,16 @@ This document proposes how to add first-class PNPM projects to this monorepo, in
 - **Patching:** Use PNPM’s native `patchedDependencies` and optional flat `patches/node/*.patch` for advanced cases; wire providers automatically.
 - **Scaffolding:** Provide a generator to create a new PNPM project with TS, ESLint/Prettier, and tests.
 
+### Linking expectations
+
+I follow the repo-wide linking model described in `cpp-linking.md`, `wasm-linking.md`, and `linking-roadmap.md`. If this language does not introduce native or cross-language linking, `deps` remains a graph edge list and no link intent is inferred.
+
+- `deps` is the Buck graph edge list. It does not imply link intent.
+- `link_deps` declares linkable inputs. `header_deps` is include-only when that concept applies.
+- Macros compute `deps := deps ∪ link_deps ∪ header_deps` deterministically and validate `link_closure_overrides` keys.
+- `link_closure` defaults to `"direct"`. `"transitive"` follows `link_deps` only via `tools/nix/planner/link-closure.nix`.
+- Ordering is deterministic and unsupported deps fail fast with targeted errors.
+
 ### Current State (repo)
 
 - Existing glue for Node providers and auto‑map generation:

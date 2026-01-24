@@ -15,6 +15,16 @@ Audience: Engineers and LLM agents implementing Gleam support. This design integ
 - Single‑importer per project (no workspace importers like PNPM). Treat each Gleam project as one “importer”.
 - Build/test via Gleam’s toolchain; dependencies come from Hex.
 
+### Linking expectations
+
+I follow the repo-wide linking model described in `cpp-linking.md`, `wasm-linking.md`, and `linking-roadmap.md`. If this language does not introduce native or cross-language linking, `deps` remains a graph edge list and no link intent is inferred.
+
+- `deps` is the Buck graph edge list. It does not imply link intent.
+- `link_deps` declares linkable inputs. `header_deps` is include-only when that concept applies.
+- Macros compute `deps := deps ∪ link_deps ∪ header_deps` deterministically and validate `link_closure_overrides` keys.
+- `link_closure` defaults to `"direct"`. `"transitive"` follows `link_deps` only via `tools/nix/planner/link-closure.nix`.
+- Ordering is deterministic and unsupported deps fail fast with targeted errors.
+
 ### Key Assumptions (to validate)
 
 1. Lock and manifest: Gleam projects provide `gleam.toml` and a lock artifact (manifest) we can parse deterministically. Many projects generate `manifest.toml` under `build/`; we assume a repo‑tracked lock file (e.g., `manifest.toml` or `gleam.lock`) will be available or we will generate/commit a stable lock snapshot file (see Risks/Mitigations).

@@ -18,6 +18,16 @@ Scope: Introduce PHP (Composer-based) with hermetic, reproducible builds, Buck2-
 - `patch-pkg` supports PHP with dev overrides (`NIX_PHP_DEV_OVERRIDE_JSON`) and canonical patch authoring.
 - Provider wiring ensures only targets that actually consume a patched package rebuild.
 
+### Linking expectations
+
+I follow the repo-wide linking model described in `cpp-linking.md`, `wasm-linking.md`, and `linking-roadmap.md`. If this language does not introduce native or cross-language linking, `deps` remains a graph edge list and no link intent is inferred.
+
+- `deps` is the Buck graph edge list. It does not imply link intent.
+- `link_deps` declares linkable inputs. `header_deps` is include-only when that concept applies.
+- Macros compute `deps := deps ∪ link_deps ∪ header_deps` deterministically and validate `link_closure_overrides` keys.
+- `link_closure` defaults to `"direct"`. `"transitive"` follows `link_deps` only via `tools/nix/planner/link-closure.nix`.
+- Ordering is deterministic and unsupported deps fail fast with targeted errors.
+
 ### Path Invariants
 
 - Patches: `patches/php/*.patch` (flat; one patch per `package@version`).

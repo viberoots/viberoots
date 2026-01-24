@@ -9,6 +9,16 @@ This document proposes how to add Ruby (including a Ruby on Rails web app templa
 - Support both generic Ruby libraries and a Rails web app template.
 - Keep partial clone friendly: Ruby support is enabled by file presence; other languages keep working without Ruby.
 
+### Linking expectations
+
+I follow the repo-wide linking model described in `cpp-linking.md`, `wasm-linking.md`, and `linking-roadmap.md`. If this language does not introduce native or cross-language linking, `deps` remains a graph edge list and no link intent is inferred.
+
+- `deps` is the Buck graph edge list. It does not imply link intent.
+- `link_deps` declares linkable inputs. `header_deps` is include-only when that concept applies.
+- Macros compute `deps := deps ∪ link_deps ∪ header_deps` deterministically and validate `link_closure_overrides` keys.
+- `link_closure` defaults to `"direct"`. `"transitive"` follows `link_deps` only via `tools/nix/planner/link-closure.nix`.
+- Ordering is deterministic and unsupported deps fail fast with targeted errors.
+
 ## Architecture overview
 
 - Buck2 computes the build graph, we export configured nodes to `tools/buck/graph.json` (existing exporter, extended with a Ruby adapter). The Ruby adapter reads each target’s `Gemfile.lock` and emits deterministic labels per gem.
