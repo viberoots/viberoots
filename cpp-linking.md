@@ -471,7 +471,7 @@ For a C++ consumer target `T` of kind `lib`, `bin`, `addon`, or `test`:
 
 This design is intentionally parallel to what `tools/nix/planner/go.nix` already does for Go cgo, but scoped to C++.
 
-Note: PR-1 in `linking-plan-2.md` implements the header-only _producer_ (`nix_cpp_headers` + `kind:headers` + `T.cppHeaders`) first. It does not wire `header_deps` into consumers yet. The consumption path is implemented in a later PR as part of the shared link-intent contract.
+Note: PR-1 in `linking-plan-2.md` implements the header-only _producer_ (`nix_cpp_headers` + `kind:headers` + `T.cppHeaders`) first. The consumer wiring for `header_deps` is now implemented and exercised by tests.
 
 ### Classification rules
 
@@ -616,7 +616,7 @@ For runtime:
 - for binaries: set rpath to include each dep’s `$out/lib` via linker flags in the template
 - for Node addons: similarly set rpath, or copy libs into a well-defined `native/` directory at packaging time
 
-⚠️ We need to confirm how our current Node addon packaging copies artifacts and whether it has a stable place to put dependent shared libs. If not, we should default to static for addons until we have a packaging contract.
+Node addon shared-library runtime is handled via rpath in the addon template. This matches the binary path strategy and avoids relying on `DYLD_LIBRARY_PATH`/`LD_LIBRARY_PATH`.
 
 ## Buck macro changes (C++)
 
