@@ -79,6 +79,7 @@ let
   dedupePreserveOrder = Phase1.dedupePreserveOrder;
   ensureRepoCppLibDep = Phase1.ensureRepoCppLibDep;
   ensureRepoCppHeadersDep = Phase1.ensureRepoCppHeadersDep;
+  ensureRepoCppHeaderDepInfo = Phase1.ensureRepoCppHeaderDepInfo;
   patchInputsFor = Phase1.patchInputsFor;
   LC = import ./link-closure.nix { inherit lib; };
   normalizeLabelList = LinkHelpers.normalizeLabelList;
@@ -134,8 +135,10 @@ let
     let
       headerDeps0 = labelsFromNodeAttr { inherit name; attr = "header_deps"; };
       headerDeps = dedupePreserveOrder headerDeps0;
-      validated = builtins.map (dn: ensureRepoCppHeadersDep name dn) headerDeps;
-    in builtins.map mkHeaders validated;
+      infos = builtins.map (dn: ensureRepoCppHeaderDepInfo name dn) headerDeps;
+      mkHeaderPkg = info:
+        if info.kind == "headers" then mkHeaders info.name else mkLib info.name;
+    in builtins.map mkHeaderPkg infos;
 
   collectNixAttrsFor = name:
     let

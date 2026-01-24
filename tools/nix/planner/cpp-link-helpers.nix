@@ -24,10 +24,10 @@ let
       ) pairs;
       names = builtins.map (p: p.name) pairs;
       uniqNames = builtins.attrNames (builtins.listToAttrs (builtins.map (n: { name = n; value = true; }) names));
-      _dupes =
-        if (builtins.length uniqNames) == (builtins.length names) then null
-        else builtins.throw ("cpp planner: normalized link_closure_overrides has duplicate keys for " + name);
-    in builtins.listToAttrs pairs;
+    in
+      if (builtins.length uniqNames) == (builtins.length names)
+      then builtins.listToAttrs pairs
+      else builtins.throw ("cpp planner: normalized link_closure_overrides has duplicate keys for " + name);
 
   normalizeLinkMode = name: raw:
     let

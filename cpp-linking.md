@@ -175,6 +175,7 @@ Notes:
 - `deps` remains the graph edge list, but for ergonomics the macro will compute:
   - `deps := deps ∪ link_deps ∪ header_deps` (deterministic union)
   - This ensures any link or header dependency is also a real Buck graph edge, without requiring users to repeat labels.
+- Overlap between `link_deps` and `header_deps` is allowed. The union is deterministic, and the planner tolerates the overlap without requiring separate validation.
 - If `link_deps` and `header_deps` are both empty, C++ behaves exactly as today.
 - `link_closure = "transitive"` applies only to `link_deps` (and optionally to `header_deps` if we decide it is useful; default is direct-only for header deps too).
 
@@ -544,6 +545,7 @@ Constraints:
 
 - Overrides apply only to entries in `link_deps`.
 - Every key in `link_closure_overrides` must also be present in `link_deps`.
+- Override keys are normalized before use; duplicate keys after normalization are rejected.
 - Traversal must remain deterministic:
   - Start from `link_deps` in order.
   - For each dep `d`, determine `closure(d)` from `link_closure_overrides.get(d, link_closure)`.

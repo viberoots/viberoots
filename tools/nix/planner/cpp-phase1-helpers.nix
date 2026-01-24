@@ -58,6 +58,19 @@ let
       else if k != "headers" then failHeaderDep consumer dep ("expected kind:headers for Phase 1; got kind=" + (builtins.toString k) + " labels=" + (builtins.toString labs) + " rule_type=" + (builtins.toString rt))
       else dep;
 
+  ensureRepoCppHeaderDepInfo = consumer: dep:
+    let
+      depNode = nodeOfName dep;
+      rt = if depNode == null then null else get depNode "rule_type";
+      k = if depNode == null then null else kindOf depNode;
+      labs = if depNode == null then [] else labelsOf depNode;
+      haveLang = depNode != null && hasLangCpp depNode;
+    in
+      if depNode == null then failHeaderDep consumer dep "unknown target (missing from exported graph)"
+      else if !haveLang then failHeaderDep consumer dep ("expected lang:cpp; got labels=" + (builtins.toString labs) + " rule_type=" + (builtins.toString rt))
+      else if k == "headers" || k == "lib" then { name = dep; kind = k; }
+      else failHeaderDep consumer dep ("expected kind:headers or kind:lib for Phase 1; got kind=" + (builtins.toString k) + " labels=" + (builtins.toString labs) + " rule_type=" + (builtins.toString rt));
+
   patchInputsFor = name:
     let
       rels0 = builtins.filter (s: lib.hasSuffix ".patch" s) (normSrcsOf name);
@@ -74,6 +87,7 @@ in {
     dedupePreserveOrder
     ensureRepoCppLibDep
     ensureRepoCppHeadersDep
+    ensureRepoCppHeaderDepInfo
     patchInputsFor;
 }
 
