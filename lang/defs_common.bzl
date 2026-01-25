@@ -2,6 +2,9 @@ load("//lang:collections.bzl", _dedupe_preserve = "dedupe_preserve")
 load("//lang:label_stamping.bzl", _normalize_labels = "normalize_labels", _stamp_global_nix_inputs = "stamp_global_nix_inputs", _stamp_labels = "stamp_labels", _stamp_wasm_variant = "stamp_wasm_variant", _wasm_labels_probe = "wasm_labels_probe")
 load(
     "//lang:lockfile_labels.bzl",
+    _default_lockfile_label_from_package = "default_lockfile_label_from_package",
+    _default_lockfile_path_from_package = "default_lockfile_path_from_package",
+    _ensure_default_lockfile_exists = "ensure_default_lockfile_exists",
     _ensure_single_lockfile_label = "ensure_single_lockfile_label",
     _extract_lockfile_labels = "extract_lockfile_labels",
     _importer_from_labels = "importer_from_labels",
@@ -115,6 +118,9 @@ importer_from_labels = _importer_from_labels
 importer_from_labels_probe = _importer_from_labels_probe
 lockfile_label_parse_probe = _lockfile_label_parse_probe
 supported_importer_label_probe = _supported_importer_label_probe
+default_lockfile_label_from_package = _default_lockfile_label_from_package
+default_lockfile_path_from_package = _default_lockfile_path_from_package
+ensure_default_lockfile_exists = _ensure_default_lockfile_exists
 
 append_patch_srcs = _append_patch_srcs
 append_patch_inputs = _append_patch_inputs

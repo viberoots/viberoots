@@ -12,9 +12,9 @@ const cases: Array<{ name: string; label: string }> = [
 ];
 
 async function starlarkProbeOutput(target: string, label: string): Promise<string> {
-  const inherited = process.env.BUCK_ISOLATION_DIR;
-  const iso = inherited && inherited.trim() ? inherited : `parity_${process.pid}`;
-  const createdOwnIso = !inherited;
+  const safeTarget = target.replace(/[^a-zA-Z0-9]+/g, "_");
+  const iso = `parity_${process.pid}_${Date.now()}_${safeTarget}`;
+  const createdOwnIso = true;
   try {
     await $`buck2 --isolation-dir ${iso} build ${target}`;
     const { stdout } = await $`buck2 --isolation-dir ${iso} targets --show-output ${target}`;

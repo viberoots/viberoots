@@ -1,6 +1,10 @@
 load("@prelude//:rules.bzl", "genrule")
 load(
     "//lang:defs_common.bzl",
+    "default_lockfile_label_from_package",
+    "default_lockfile_path_from_package",
+    "ensure_default_lockfile_exists",
+    "extract_lockfile_labels",
     "prepare_importer_genrule_kwargs",
     "prepare_importer_non_genrule_nix_calling_wiring",
 )
@@ -11,6 +15,10 @@ MODULE_PROVIDERS = {}
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
 
 def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = [], lockfile_label = None, kind = "gen", **kwargs):
+    if (lockfile_label == None or lockfile_label == "") and len(extract_lockfile_labels(labels or [])) == 0:
+        default_path = default_lockfile_path_from_package()
+        ensure_default_lockfile_exists(default_path, "nix_node_gen")
+        lockfile_label = default_lockfile_label_from_package()
     wiring = prepare_importer_genrule_kwargs(
         name = name,
         kwargs = kwargs,
@@ -45,6 +53,10 @@ def nix_node_test(
     kind = "test",
     **kwargs
 ):
+    if (lockfile_label == None or lockfile_label == "") and len(extract_lockfile_labels(labels or [])) == 0:
+        default_path = default_lockfile_path_from_package()
+        ensure_default_lockfile_exists(default_path, "nix_node_test")
+        lockfile_label = default_lockfile_label_from_package()
     wiring = prepare_importer_non_genrule_nix_calling_wiring(
         name = name,
         kwargs = {},

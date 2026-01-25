@@ -27,6 +27,33 @@ def _dirname_posix(path_part):
         return "."
     return "/".join(parts[:-1])
 
+def _normalize_package_name(pkg):
+    if pkg == "" or pkg == ".":
+        return "."
+    return pkg
+
+def _default_lockfile_path_for_package(pkg):
+    if pkg == ".":
+        return "pnpm-lock.yaml"
+    return "%s/pnpm-lock.yaml" % pkg
+
+def default_lockfile_path_from_package():
+    pkg = _normalize_package_name(native.package_name())
+    return _default_lockfile_path_for_package(pkg)
+
+def default_lockfile_label_from_package():
+    pkg = _normalize_package_name(native.package_name())
+    path = _default_lockfile_path_for_package(pkg)
+    return "lockfile:%s#%s" % (path, pkg)
+
+def ensure_default_lockfile_exists(path, macro_name = None):
+    if not (isinstance(path, str) and path != ""):
+        fail("Default lockfile path must be a non-empty string; got: %s" % path)
+    matches = native.glob(["pnpm-lock.yaml"])
+    if len(matches) == 0:
+        prefix = ("%s: " % macro_name) if isinstance(macro_name, str) and macro_name != "" else ""
+        fail("%smissing lockfile at %s. Provide lockfile_label or create %s." % (prefix, path, path))
+
 def _is_supported_importer_label(importer):
     if importer == ".":
         return ALLOW_DOT_IMPORTER
