@@ -105,7 +105,11 @@ async function startPatchPkgSession(
   tmp: string,
   goEnv: NodeJS.ProcessEnv,
 ): Promise<{ origin: string; ws: string }> {
-  const { stdout: gomodcacheOut } = await sh({ cwd: tmp, stdio: "pipe" })`go env GOMODCACHE`;
+  const { stdout: gomodcacheOut } = await sh({
+    cwd: tmp,
+    stdio: "pipe",
+    env: { ...process.env, ...goEnv },
+  })`go env GOMODCACHE`;
   const gomodcache = String(gomodcacheOut || "").trim();
   if (!gomodcache) throw new Error("GOMODCACHE not found");
   const origin = path.join(gomodcache, "github.com/google/uuid@v1.6.0");
