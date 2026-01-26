@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("nix_node_cli_bin(bundle=True) requires exactly one importer-scoped lockfile label (shared error text)", async () => {
+test("nix_node_cli_bin(bundle=True) defaults lockfile label and fails fast when missing", async () => {
   await runInTemp("node-cli-bundle-lockfile-required", async (tmp, $) => {
     const dir = path.join(tmp, "apps", "cli");
     await fsp.mkdir(dir, { recursive: true });
@@ -33,14 +33,14 @@ test("nix_node_cli_bin(bundle=True) requires exactly one importer-scoped lockfil
       nothrow: true,
     })`buck2 build //apps/cli:tool`;
 
-    // Expect failure with shared, stable error text from ensure_single_lockfile_label
+    // Expect failure with targeted missing lockfile error from defaulting path
     assert.notEqual(res.exitCode, 0, "expected buck2 build to fail when lockfile label is missing");
     const combined = String(res.stderr || "") + String(res.stdout || "");
     assert.ok(
       combined.includes(
-        "Exactly one importer-scoped lockfile label is required (lockfile:<path>#<importer>)",
+        "nix_node_cli_bin(bundle=True): missing lockfile at apps/cli/pnpm-lock.yaml. Provide lockfile_label or create apps/cli/pnpm-lock.yaml.",
       ),
-      "expected shared error message for missing importer-scoped lockfile label",
+      "expected targeted missing lockfile error",
     );
   });
 });

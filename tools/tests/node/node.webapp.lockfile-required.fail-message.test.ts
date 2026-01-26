@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("node_webapp requires exactly one importer-scoped lockfile label (shared error text)", async () => {
+test("node_webapp defaults lockfile label and fails fast when missing", async () => {
   await runInTemp("node-webapp-lockfile-required", async (tmp, $) => {
     const dir = path.join(tmp, "apps", "web");
     await fsp.mkdir(dir, { recursive: true });
@@ -31,14 +31,14 @@ test("node_webapp requires exactly one importer-scoped lockfile label (shared er
       nothrow: true,
     })`buck2 build //apps/web:bundle`;
 
-    // Expect failure with shared, stable error text from ensure_single_lockfile_label
+    // Expect failure with targeted missing lockfile error from defaulting path
     assert.notEqual(res.exitCode, 0, "expected buck2 build to fail when lockfile label is missing");
     const combined = String(res.stderr || "") + String(res.stdout || "");
     assert.ok(
       combined.includes(
-        "Exactly one importer-scoped lockfile label is required (lockfile:<path>#<importer>)",
+        "node_webapp: missing lockfile at apps/web/pnpm-lock.yaml. Provide lockfile_label or create apps/web/pnpm-lock.yaml.",
       ),
-      "expected shared error message for missing importer-scoped lockfile label",
+      "expected targeted missing lockfile error",
     );
   });
 });

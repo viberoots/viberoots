@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "genrule")
-load("//lang:defs_common.bzl", "extract_lockfile_labels", "importer_from_labels", "prepare_importer_nix_calling_genrule_wiring")
+load("//lang:defs_common.bzl", "default_lockfile_label_from_package", "default_lockfile_path_from_package", "ensure_default_lockfile_exists", "extract_lockfile_labels", "importer_from_labels", "prepare_importer_nix_calling_genrule_wiring")
 load("//lang:importer_strings.bzl", "importer_display_name", "sanitize_importer_for_nix_attr")
 load(
     "//lang:nix_shell.bzl",
@@ -53,6 +53,13 @@ def _validate_optional_importer_arg_matches_single_lockfile_label(importer, lock
             lockfile_label = effective,
         )
 
+def _apply_default_lockfile_label(lockfile_label, labels, macro_name):
+    if (lockfile_label == None or lockfile_label == "") and len(extract_lockfile_labels(labels or [])) == 0:
+        default_path = default_lockfile_path_from_package()
+        ensure_default_lockfile_exists(default_path, macro_name)
+        return default_lockfile_label_from_package()
+    return lockfile_label
+
 def _prepare_node_importer_nix_calling_genrule_kwargs(
         name,
         kwargs,
@@ -93,6 +100,7 @@ def node_webapp(
     - Runs `nix build .#node-webapp.<importer>` and copies dist/.
     """
     kw = dict(kwargs) if kwargs != None else {}
+    lockfile_label = _apply_default_lockfile_label(lockfile_label, labels, "node_webapp")
     wiring = _prepare_node_importer_nix_calling_genrule_kwargs(
         name = name,
         kwargs = kw,
@@ -191,6 +199,7 @@ def nix_node_cli_bin(
     }
 
     kw = dict(kwargs) if kwargs != None else {}
+    lockfile_label = _apply_default_lockfile_label(lockfile_label, labels, "nix_node_cli_bin(bundle=True)")
     wiring = _prepare_node_importer_nix_calling_genrule_kwargs(
         name = name,
         kwargs = kw,
