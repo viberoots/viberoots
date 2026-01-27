@@ -29,9 +29,11 @@ test("node_webapp defaults lockfile label from package path", async () => {
       reject: false,
       nothrow: true,
     })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //apps/web:web`;
-    if (res.exitCode !== 0) {
-      return;
-    }
+    assert.equal(
+      res.exitCode,
+      0,
+      `expected cquery to succeed, got ${res.exitCode}: ${String(res.stderr || "")}`,
+    );
     const out = String(res.stdout || "");
     assert.match(
       out,

@@ -62,7 +62,19 @@ async function workspaceDirtySignature(): Promise<string> {
       })`git status --porcelain=v1 -z`;
       if (status.exitCode !== 0) return "nogit";
       const s = String(status.stdout || "");
-      if (!s) return "clean";
+      if (!s) {
+        const head = await $({
+          cwd: repoRoot,
+          stdio: "pipe",
+          reject: false,
+          nothrow: true,
+        })`git rev-parse HEAD`;
+        if (head.exitCode === 0) {
+          const sha = String(head.stdout || "").trim();
+          if (sha) return `clean:${sha}`;
+        }
+        return "clean";
+      }
       const diff = await $({
         cwd: repoRoot,
         stdio: "pipe",
