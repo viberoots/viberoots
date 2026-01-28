@@ -4,6 +4,7 @@ import path from "node:path";
 import { printSkip } from "../../lib/errors";
 import { getFlagBool, getFlagStr } from "../../lib/cli.ts";
 import { runNodeWithZx } from "../../lib/node-run.ts";
+import { checkNodeDepsInCi } from "../../lib/node-deps-enforcement.ts";
 import { autoFixGlue } from "./repair.ts";
 import { collectDiagnostics, logList, mtimeSafe } from "./report.ts";
 import { listInputs, listOutputs } from "./scan.ts";
@@ -207,6 +208,10 @@ export async function run(): Promise<void> {
     if (mode === "ci" || flagStrict) {
       process.exit(1);
     }
+  }
+
+  if (mode === "ci") {
+    await checkNodeDepsInCi(path.resolve("."));
   }
 
   if (!needFix && !missingNodeProviders.length && !missingPythonProviders.length) return;

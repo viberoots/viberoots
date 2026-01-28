@@ -72,6 +72,11 @@ I follow the repo-wide linking model described in `cpp-linking.md`, `wasm-linkin
    - For each Node target, include `labels = ["lockfile:<relative/path/to/pnpm-lock.yaml#<importer>"]`.
    - Auto‑map includes the appropriate provider so only impacted targets rebuild.
 
+5. **Dependency parity rule**
+   - I treat `package.json` as the source of truth for workspace dependencies.
+   - Buck `deps` on Node targets in the same importer package must match workspace dependencies.
+   - Enforcement uses `tools/buck/enforce-node-deps.ts` and `tools/node/workspace-map.json`.
+
 ### Example: app depends on in-repo lib
 
 This is the minimal coordination between PNPM and Buck. PNPM handles runtime module resolution via a workspace dependency, and Buck gets a graph edge for invalidation via `deps`.

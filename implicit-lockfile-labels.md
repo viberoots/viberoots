@@ -321,6 +321,55 @@ Implement to keep dependency edges correct and prevent drift without adding runt
 
 ---
 
+### PR-4: Auto-generate workspace-map.json from provider metadata
+
+#### Description
+
+Eliminate manual maintenance of `tools/buck/workspace-map.json` by generating it deterministically from existing provider metadata in the glue pipeline. This keeps enforcement strict while removing hidden, user-maintained state.
+
+#### Scope & Changes
+
+- Add a generator script (e.g. `tools/node/gen-workspace-map.ts`):
+  - Read the existing provider/auto-map metadata that already encodes package name → Buck label.
+  - Emit a stable, sorted `tools/buck/workspace-map.json`.
+- Wire the generator into the glue pipeline:
+  - Run after provider sync and auto-map generation so the metadata is available.
+  - Fail if the generator cannot build a complete mapping for workspace deps.
+- Update `tools/buck/enforce-node-deps.ts` to rely on the generated mapping without fallbacks.
+- Update documentation to state the mapping is generated and should not be edited by hand.
+
+#### Tests (in this PR)
+
+- `tools/tests/node/node.workspace-map.generation.matches-providers.test.ts`
+  - Generate the map from a temp provider dataset and assert the output mapping is stable and complete.
+- `tools/tests/node/node.deps-enforcement.generated-map.required.test.ts`
+  - Ensure enforcement fails fast when the generated map is missing or incomplete.
+
+#### Acceptance Criteria
+
+- `tools/buck/workspace-map.json` is generated deterministically from provider metadata.
+- Enforcement uses the generated mapping and does not rely on manual edits.
+- Missing or incomplete mapping fails fast with a targeted error.
+- Tests validate generation and enforcement expectations.
+
+#### Risks
+
+Low to medium. Adds a dependency on the glue pipeline order and provider metadata stability.
+
+#### Consequence of Not Implementing
+
+Users must manually maintain `workspace-map.json`, which is easy to forget or drift.
+
+#### Downsides for Implementing
+
+Additional generator step and tests; tighter coupling to provider metadata.
+
+#### Recommendation
+
+Implement to remove hidden manual upkeep while keeping deterministic enforcement.
+
+---
+
 ## Completion Criteria
 
 - All Node macros accept omitted `lockfile_label` when the package follows the importer convention.

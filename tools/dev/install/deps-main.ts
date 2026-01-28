@@ -11,7 +11,7 @@ import { runUvRefreshAll } from "./uv.ts";
 import { getFlagBool, hasShortFlag } from "../../lib/cli.ts";
 import { getImporterRootsContract } from "../../lib/importer-roots.ts";
 import { findRepoRoot } from "../../lib/repo.ts";
-
+import { warnNodeDepsInLocal } from "../../lib/node-deps-enforcement.ts";
 type Flags = {
   force: boolean;
   dryRun: boolean;
@@ -20,7 +20,6 @@ type Flags = {
   glueOnly: boolean;
   skipGoTidy: boolean;
 };
-
 // Resolve absolute workspace root path without requiring callers to run from repo root.
 async function resolveWorkspaceRoot(): Promise<string> {
   const cwd = process.cwd();
@@ -241,5 +240,10 @@ if (!skipGlue) {
   await runGlue(dryRun, verbose);
 } else if (verbose) {
   console.log("[skip] glue regeneration");
+}
+if (!skipGlue) {
+  await warnNodeDepsInLocal(repoRoot);
+} else if (verbose) {
+  console.log("[skip] node deps enforcement");
 }
 console.log("Dependencies installed and node_modules linked.");

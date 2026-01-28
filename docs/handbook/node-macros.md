@@ -60,3 +60,11 @@ When a Node macro assembles a shell command that invokes Nix:
 Debugging:
 
 - Set `BNX_NIX_CALL_DEBUG=1` to enable `set -x` tracing inside Nix-calling genrule commands and to enable verbose diagnostics in the Node CLI bundler shim.
+
+### Dependency parity (package.json vs Buck deps)
+
+I enforce that workspace dependencies in `package.json` are mirrored in Buck `deps` for Node targets in the same importer package. The source of truth is `package.json`. The check uses `tools/node/workspace-map.json` to map package names to Buck labels.
+
+The install workflow runs a check and prints a warning when drift is detected. CI runs the same check and fails on drift. I fix drift by running:
+
+`node tools/buck/enforce-node-deps.ts --fix`
