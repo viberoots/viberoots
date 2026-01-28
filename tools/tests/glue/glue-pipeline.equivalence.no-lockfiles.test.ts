@@ -33,6 +33,13 @@ async function removeGeneratedProviderOutputs(provDir: string): Promise<void> {
 
 test("glue-pipeline: outputs identical to manual steps (no lockfiles present)", async () => {
   await runInTemp("glue-pipeline-no-locks", async (tmp, $) => {
+    const impDir = path.join(tmp, "apps", "web");
+    await fsp.mkdir(impDir, { recursive: true });
+    await fsp.writeFile(
+      path.join(impDir, "package.json"),
+      JSON.stringify({ name: "@repo/web", version: "0.0.0" }, null, 2),
+      "utf8",
+    );
     // Synthesize a minimal graph with one node carrying a lockfile label
     const graphPath = path.join(tmp, "tools", "buck", "graph.json");
     await fsp.mkdir(path.dirname(graphPath), { recursive: true });
@@ -48,6 +55,7 @@ test("glue-pipeline: outputs identical to manual steps (no lockfiles present)", 
     await $`node tools/buck/sync-providers.ts`;
     await $`node tools/buck/gen-provider-index.ts --out third_party/providers/provider_index.bzl`;
     await $`node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
+    await $`node tools/node/gen-workspace-map.ts`;
     await $`node tools/buck/invalidation-report.ts --out tools/buck/invalidation-report.txt`;
 
     const provDir = path.join(tmp, "third_party", "providers");
@@ -55,6 +63,9 @@ test("glue-pipeline: outputs identical to manual steps (no lockfiles present)", 
     const basePyTargets = await readOrEmpty(path.join(provDir, "TARGETS.python.auto"));
     const baseIndex = await readOrEmpty(path.join(provDir, "provider_index.bzl"));
     const baseMap = await readOrEmpty(path.join(provDir, "auto_map.bzl"));
+    const baseWorkspaceMap = await readOrEmpty(
+      path.join(tmp, "tools", "node", "workspace-map.json"),
+    );
     const baseReport = await readOrEmpty(
       path.join(tmp, "tools", "buck", "invalidation-report.txt"),
     );
@@ -63,6 +74,9 @@ test("glue-pipeline: outputs identical to manual steps (no lockfiles present)", 
     await removeGeneratedProviderOutputs(provDir);
     try {
       await fsp.rm(path.join(tmp, "tools", "buck", "node-lock-index.json"), { force: true });
+    } catch {}
+    try {
+      await fsp.rm(path.join(tmp, "tools", "node", "workspace-map.json"), { force: true });
     } catch {}
     try {
       await fsp.rm(path.join(tmp, "tools", "buck", "invalidation-report.txt"), { force: true });
@@ -75,6 +89,9 @@ test("glue-pipeline: outputs identical to manual steps (no lockfiles present)", 
     const pipePyTargets = await readOrEmpty(path.join(provDir, "TARGETS.python.auto"));
     const pipeIndex = await readOrEmpty(path.join(provDir, "provider_index.bzl"));
     const pipeMap = await readOrEmpty(path.join(provDir, "auto_map.bzl"));
+    const pipeWorkspaceMap = await readOrEmpty(
+      path.join(tmp, "tools", "node", "workspace-map.json"),
+    );
     const pipeReport = await readOrEmpty(
       path.join(tmp, "tools", "buck", "invalidation-report.txt"),
     );
@@ -90,6 +107,7 @@ test("glue-pipeline: outputs identical to manual steps (no lockfiles present)", 
     assertEqual(basePyTargets, pipePyTargets, "TARGETS.python.auto");
     assertEqual(baseIndex, pipeIndex, "provider_index.bzl");
     assertEqual(baseMap, pipeMap, "auto_map.bzl");
+    assertEqual(baseWorkspaceMap, pipeWorkspaceMap, "workspace-map.json");
     assertEqual(baseReport, pipeReport, "invalidation-report.txt");
 
     // Sanity: ensure expected files exist
@@ -107,6 +125,10 @@ test("glue-pipeline: outputs identical to manual steps (no lockfiles present)", 
     }
     if (!(await exists(path.join(tmp, "tools", "buck", "invalidation-report.txt")))) {
       console.error("expected file missing: invalidation-report.txt");
+      process.exit(2);
+    }
+    if (!(await exists(path.join(tmp, "tools", "node", "workspace-map.json")))) {
+      console.error("expected file missing: workspace-map.json");
       process.exit(2);
     }
   });

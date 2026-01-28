@@ -98,7 +98,14 @@ export async function runGluePipeline(opts: RunGluePipelineOptions = {}): Promis
     console.error("[glue-pipeline] gen-auto-map (skipped)");
   }
 
-  // Step 5: generate invalidation report (diagnostic; stable output)
+  // Step 5: generate workspace map for Node deps enforcement
+  {
+    const workspaceMapScript = path.join(repoRoot, "tools/node/gen-workspace-map.ts");
+    if (verbose) console.error("[glue-pipeline] gen-workspace-map");
+    await runNodeWithZx({ nodeBin, zxInitPath: zxInit, script: workspaceMapScript });
+  }
+
+  // Step 6: generate invalidation report (diagnostic; stable output)
   if (invalidationReportMode !== "skip") {
     const reportScript = path.join(repoRoot, "tools/buck/invalidation-report.ts");
     if (verbose) console.error(`[glue-pipeline] invalidation-report → ${outInvalidationReport}`);
