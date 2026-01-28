@@ -1,13 +1,13 @@
-import process from "node:process";
 import fsp from "node:fs/promises";
-import type { TailLogArgs } from "./args.ts";
-import { resolveLatest, resolvePid, pidAliveWithSignature, pidStartSignature } from "./resolve.ts";
-import type { Resolution } from "./resolve.ts";
+import process from "node:process";
 import {
   computeVerifyStatusFromLogText,
   formatVerifyStatusJsonLine,
   formatVerifyStatusText,
 } from "../../lib/verify-log-status.ts";
+import type { TailLogArgs } from "./args.ts";
+import type { Resolution } from "./resolve.ts";
+import { pidAliveWithSignature, pidStartSignature, resolveLatest, resolvePid } from "./resolve.ts";
 import { clearScreen, getExtraStatusLines, trimToTerminal } from "./status-helpers.ts";
 
 function emptyNdjson(pid: number, error: string): string {

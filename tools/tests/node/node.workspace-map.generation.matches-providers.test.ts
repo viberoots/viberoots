@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
+import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import fs from "fs-extra";
 import { runInTemp } from "../lib/test-helpers";
 
 test("workspace map generation matches providers", async () => {

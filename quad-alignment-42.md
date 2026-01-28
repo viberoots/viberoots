@@ -272,7 +272,7 @@ Implement.
 
 ### Description
 
-The test harness currently uses a “seed repo” caching mechanism to speed up repeated temp repo creation (copying a filtered workspace into many per-test temp directories).
+The test harness currently uses a “seed repo” caching mechanism to speed up repeated temp repo creation. It is implemented in `tools/tests/lib/seed-temp-repo.ts` and invoked via `tools/tests/lib/test-helpers/run-in-temp.ts` (`initTempRepoFromWorkspaceOrSeed(...)`).
 
 This has proven to be a meaningful performance lever, but it also introduces two drift risks:
 
@@ -290,10 +290,10 @@ Policy constraints for this PR:
 ### Scope & Changes
 
 - Add a verify-scoped “seed artifact” step:
-  - `tools/bin/verify` prepares a single seed store path **before** starting `buck2 test`.
-  - The seed store path is exported to tests via a single environment variable (e.g., `BNX_TEST_SEED_STORE_PATH`).
-  - The seed export must be part of the same verify wrapper environment that already exports other per-run state (so all Buck test workers inherit it).
-  - This PR removes the existing temp-repo seed cache mechanism (and any `SEED_VERSION`/seed-key caching state associated with it).
+  - The verify runner (`tools/dev/verify/run-verify.ts`) prepares a single seed store path **before** starting `buck2 test` (before `spawnVerifyBuck2Tests(...)`).
+  - The seed store path is exported to tests via a single environment variable: `BNX_TEST_SEED_STORE_PATH`.
+  - The seed export must be part of the same verify environment that already exports other per-run state (so all Buck test workers inherit it).
+  - This PR removes the existing temp-repo seed cache mechanism in `tools/tests/lib/seed-temp-repo.ts` (and any `SEED_VERSION`/seed-key caching state associated with it).
 
 - Define a single deterministic seed key (per verify run):
   - Key includes:
@@ -308,7 +308,7 @@ Policy constraints for this PR:
 - Build the seed as a Nix store path (working-tree snapshot):
   - Create a dedicated flake attribute for the seed, built from a filtered working tree snapshot (exclude volatile and heavy dirs like `buck-out/`, `.buck/`, `.cache/`, `node_modules/`, coverage/profiling dirs, etc.).
   - The build must be a pure “copy filtered snapshot into `$out`” derivation (no network, no dynamic discovery).
-  - The filter must match the test harness’s existing “seeded temp repo shape” (i.e., the same exclusions currently enforced by `runInTemp`/`rsyncRepoTo`) so the change is mechanical, not semantic.
+  - The filter must match the test harness’s existing “seeded temp repo shape” (i.e., the same exclusions currently enforced by `rsyncRepoTo(...)` and `seed-temp-repo.ts`) so the change is mechanical, not semantic.
   - The filter must be an **allowlist (whitelist)** of intended roots/files (mirroring the current seeded temp repo shape). It must not be an open-ended blacklist that risks silently including new heavy/volatile directories over time.
 
 - Prevent repeated eval/build attempts:
@@ -326,9 +326,9 @@ Policy constraints for this PR:
       - this sweep is required housekeeping (not a fallback path) and must be safe and deterministic.
 
 - Concurrency safety (cross-process):
-  - Use the existing cross-process lock pattern (similar to `withExclusiveInstallLock(...)`) so that concurrent verifications in the same workspace do not race and do not create redundant seeds.
-  - Lock key must include the seed key so different seed configurations do not contend unnecessarily.
-  - The lock must also write a single “current seed pointer” file (under `buck-out/tmp/verify-seed/`) atomically so readers do not observe partial state.
+  - Use the existing verify lock to scope the seed build so concurrent verifications in the same workspace do not race and do not create redundant seeds. The lock is already acquired in `tools/dev/verify/run-verify.ts`.
+  - Write a single “current seed pointer” file (under `buck-out/tmp/verify-seed/`) atomically so readers do not observe partial state.
+  - Store the seed key alongside the pointer (`current.key`) to make diagnostics and stale-pin sweeps deterministic.
 
 Non-goals in this PR:
 
@@ -364,12 +364,12 @@ Non-goals in this PR:
     - `pins/<iso>/owner.json` (pid + startedAt + seedKey; used for stale sweep)
 
 - Proposed locking:
-  - Use the existing install-lock infrastructure to avoid inventing new locking semantics.
+  - Use the existing verify lock infrastructure to avoid inventing new locking semantics.
   - Lock key example: `verify-seed:${seedKey}` (repo-identity scoped, cross-process).
 
 - Proposed consumption in `runInTemp`:
   - If `BNX_TEST_SEED_STORE_PATH` is set, temp repo init must copy from it (no Nix calls).
-  - Copy mechanism should reuse existing utilities (e.g., `copyTree(...)` / clone-aware copy).
+  - Copy mechanism should reuse existing utilities (`copyTree(...)` / clone-aware copy) currently used in `seed-temp-repo.ts`.
   - If the path does not exist, fail fast with a message that includes:
     - missing path
     - seed key (if available)
