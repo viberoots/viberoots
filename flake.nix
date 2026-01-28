@@ -19,6 +19,9 @@
       "NIX_NODE_TEST_PATTERNS"
       "COVERAGE"
       "WORKSPACE_ROOT"
+      "TEST_RSYNC_ROOTS"
+      "TEST_PARTIAL_CLONE_GO_ONLY"
+      "TEST_EXCLUDE_CPP_REQS"
     ];
   };
 

@@ -5,8 +5,6 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-process.env.TEST_DISABLE_SEED_REPO = "1";
-
 test("node deps enforcement: generated map required", async () => {
   await runInTemp("node-deps-generated-map-required", async (tmp, $) => {
     const appDir = path.join(tmp, "apps", "web");

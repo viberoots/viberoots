@@ -27,6 +27,7 @@ import {
   writeVerifyIsoMarker,
 } from "./process-control.ts";
 import { prewarmVerifyOnce } from "./prewarm.ts";
+import { prepareVerifySeed } from "./seed.ts";
 import { ensureRepoLocalTmpRoot } from "./tmp-root.ts";
 import { computeZxTestNodeModulesOut } from "./zx-node-modules.ts";
 
@@ -89,6 +90,11 @@ export async function runVerify(): Promise<void> {
   await startBuckDaemonReaper({ root, zxInitPath, iso, stateFile });
   await startBuckWatchdog({ root, zxInitPath, iso });
   await prewarmVerifyOnce(root, zxInitPath);
+  const seed = await prepareVerifySeed({ root, iso });
+  process.env.BNX_TEST_SEED_STORE_PATH = seed.seedPath;
+  process.env.BNX_TEST_SEED_KEY = seed.seedKey;
+  process.env.BNX_TEST_SEED_PIN_DIR = seed.pinDir;
+  let seedCleanup: (() => Promise<void>) | null = seed.cleanup;
 
   // Proactively kill *orphaned* buck2 daemons rooted under temp repos to avoid host overload.
   // This is intentionally scoped to temp-repo roots (e.g. /tmp/bnx-* or buck-out/tmp/tmpdir/*).
@@ -106,6 +112,7 @@ export async function runVerify(): Promise<void> {
   let pgid = process.pid;
   const signalHandler = (sig: NodeJS.Signals) => {
     void (async () => {
+      if (seedCleanup) await seedCleanup();
       await killProcessGroup(pgid);
       await killBuckIsolation(root, iso);
       process.exit(sig === "SIGINT" ? 130 : 143);
@@ -149,6 +156,10 @@ export async function runVerify(): Promise<void> {
     await runMergedCoverageReport({ root, rawDir: cov.rawDir });
   }
 
+  if (seedCleanup) {
+    await seedCleanup();
+    seedCleanup = null;
+  }
   await killBuckIsolation(root, iso);
   process.exit(status);
 }

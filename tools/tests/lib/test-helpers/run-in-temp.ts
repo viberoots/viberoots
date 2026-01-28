@@ -2,7 +2,7 @@ import "./worker-init";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { initTempRepoFromWorkspaceOrSeed } from "../seed-temp-repo";
+import { initTempRepoFromSeedStore } from "./seed-store";
 import { ensureBuckConfigForTempRepo, ensureWorkspaceRootEnvFile } from "./buck-config";
 import { ensureBuckReaperStarted } from "./buck-reaper";
 import { killBuckDaemonsForRepo } from "./buck-kill";
@@ -104,10 +104,13 @@ export async function runInTemp<T>(
     "TEST_RSYNC_ROOTS",
     "TEST_PARTIAL_CLONE_GO_ONLY",
     "TEST_EXCLUDE_CPP_REQS",
-    "TEST_FORCE_SEED_REPO",
-    "TEST_DISABLE_SEED_REPO",
     "WORKSPACE_ROOT",
     "BUCK_TEST_SRC",
+    "BNX_TEST_SEED_STORE_PATH",
+    "BNX_TEST_SEED_KEY",
+    "BNX_TEST_SEED_PIN_DIR",
+    "BNX_VERIFY_LOCK_DIR",
+    "BNX_VERIFY_LOG_FILE",
   ] as const;
   const envSnapshot: Record<string, string | undefined> = {};
   for (const key of envKeys) envSnapshot[key] = process.env[key];
@@ -123,9 +126,9 @@ export async function runInTemp<T>(
   process.env.BUCK_TEST_SRC = tmp;
   const { home, removeOnExit: removeHome } = await resolveTestHome();
   const goModCacheRoot = await stableGoModCacheRoot();
-  const initMode = await initTempRepoFromWorkspaceOrSeed({
+  const initMode = await initTempRepoFromSeedStore({
     tmpDir: tmp,
-    deps: { mktemp, rsyncRepoTo, timeAsync },
+    deps: { rsyncRepoTo, timeAsync },
   });
 
   const wantGit = opts?.git !== false && process.env.TEST_TEMP_GIT !== "0";

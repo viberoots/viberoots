@@ -613,6 +613,17 @@ patch-pkg apply go golang.org/x/net
 
 ---
 
+## Verify Seed Artifact (Temp Repo Seeding)
+
+I prepare a single Nix-store seed at the start of `v` and share it with all tests.
+
+Behavior:
+
+- The verify runner builds `.#test-seed` once and writes `buck-out/tmp/verify-seed/current` plus `current.key`.
+- `runInTemp` consumes `BNX_TEST_SEED_STORE_PATH` and fails fast in verify mode if it is missing or invalid.
+- The seed key includes workspace root, `HEAD`, `git status --porcelain=v1 -z`, and filter toggles (`TEST_RSYNC_ROOTS`, `TEST_PARTIAL_CLONE_GO_ONLY`, `TEST_EXCLUDE_CPP_REQS`).
+- The seed contents are a filtered working-tree snapshot built from an allowlist that mirrors the temp repo shape.
+
 ## Implementation Plan (bite‑sized, ordered, with verification)
 
 > This plan is designed for a junior engineer or an LLM agent. Each step is **small**, has **clear acceptance criteria**, and includes a **verification** recipe to prevent regressions. Follow in order.

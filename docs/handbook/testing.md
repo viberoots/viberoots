@@ -9,17 +9,13 @@
 
 ## Temp repos (`runInTemp`)
 
-Many zx tests use `runInTemp(...)` (in `tools/tests/lib/test-helpers.ts`) to execute in an isolated copy of the repo. For performance, `runInTemp` can create a **per-worker seed repo** once, and then create each temp repo from that seed:
+Many zx tests use `runInTemp(...)` (in `tools/tests/lib/test-helpers.ts`) to execute in an isolated copy of the repo. During `v`, the verify runner prepares a **single** Nix-store seed and exports it to all tests:
 
-- On filesystems that support it, temp repos are created using copy-on-write cloning:
-  - macOS: `cp -cRp`
-  - Linux: `cp -a --reflink=auto`
-- If CoW clone is not supported, `runInTemp` uses rsync by default (preserving determinism).
+- `BNX_TEST_SEED_STORE_PATH` points at the seed store path.
+- `BNX_TEST_SEED_KEY` is exported for diagnostics.
+- `BNX_TEST_SEED_PIN_DIR` is a GC root pinned for the verify run.
 
-Toggles:
-
-- `TEST_FORCE_SEED_REPO=1`: always use the seed (falls back to `cp -a` from the seed when CoW isn’t supported).
-- `TEST_DISABLE_SEED_REPO=1`: always use rsync (never use the seed).
+In verify mode, `runInTemp` requires `BNX_TEST_SEED_STORE_PATH` and fails fast if it is missing or invalid. Outside verify, you can still set `BNX_TEST_SEED_STORE_PATH` explicitly to reuse a seed.
 
 `runInTemp` also verifies zx initialization using a `node --import <zx-init>` probe, but it does so **once per test worker** (not per temp repo). For debugging, you can force re-probing with:
 

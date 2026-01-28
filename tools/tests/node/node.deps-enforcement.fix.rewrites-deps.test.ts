@@ -5,8 +5,6 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-process.env.TEST_DISABLE_SEED_REPO = "1";
-
 test("node deps enforcement: fix rewrites deps", async () => {
   await runInTemp("node-deps-enforcement-fix", async (tmp, $) => {
     const appDir = path.join(tmp, "apps", "admin");

@@ -370,6 +370,54 @@ Implement to remove hidden manual upkeep while keeping deterministic enforcement
 
 ---
 
+### PR-5: Speed up devshell entry by caching node_modules link freshness
+
+#### Description
+
+Reduce `direnv`/devshell entry time by avoiding repeated `nix eval` for `node_modules` when the existing symlink is already valid. This keeps correctness by validating freshness against a lockfile hash marker and skips linking in non-root contexts (e.g. temp repos).
+
+#### Scope & Changes
+
+- Add a lightweight marker file under `buck-out/tmp/`:
+  - Store importer, lockfile path, lockfile hash, and resolved store path.
+- Update `tools/nix/devshell.nix` shellHook:
+  - If `node_modules` is a symlink and the marker matches the current lockfile hash, skip `nix eval`.
+  - If missing or stale, fall back to the current behavior and refresh the marker.
+  - Only apply the fast-path at repo root and avoid writes in temp repos.
+  - Preserve existing `NO_NODE_MODULES_LINK` behavior.
+- Update docs to describe the marker behavior and the stale-link mitigation.
+
+#### Tests (in this PR)
+
+- Add a small devshell timing probe (or a focused test) that:
+  - Ensures the marker is written on first link.
+  - Ensures a matching marker skips re-linking.
+  - Ensures lockfile changes force a relink and marker refresh.
+
+#### Acceptance Criteria
+
+- `direnv exec . true` drops to low single-digit seconds when `node_modules` is already linked and unchanged.
+- Lockfile changes trigger relinking deterministically.
+- No per-test temp repo writes for the marker.
+
+#### Risks
+
+Low to medium. A stale marker could hide a needed relink, but the lockfile hash check prevents this under normal workflows.
+
+#### Consequence of Not Implementing
+
+Dev shell entry remains slow, and frequent `direnv` reloads add unnecessary overhead to tests and local workflow.
+
+#### Downsides for Implementing
+
+Adds a small marker file and extra shellHook logic to maintain.
+
+#### Recommendation
+
+Implement to improve DX while retaining deterministic correctness.
+
+---
+
 ## Completion Criteria
 
 - All Node macros accept omitted `lockfile_label` when the package follows the importer convention.

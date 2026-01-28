@@ -33,6 +33,7 @@ let
 
   python = import ./python.nix { inherit pkgs repoRoot uv2nixLib; };
   pyWasiToolchain = import ../../toolchains/python-wasi.nix { inherit pkgs; };
+  testSeed = import ./test-seed.nix { inherit pkgs repoRoot; };
 in
 {
   buck2-prelude = prelude.buck2-prelude;
@@ -45,6 +46,7 @@ in
   buck-graph = graph.buckGraph;
   graph-generator-pure = graph.graphGenPure.all;
   graph-generator-pure-selected = graph.graphGenPure.selected;
+  test-seed = testSeed;
   node-cli = nodeCli;
   node-webapp = nodeWebapp;
   node-test = nodeTest;

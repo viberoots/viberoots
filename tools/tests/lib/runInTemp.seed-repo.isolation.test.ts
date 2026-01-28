@@ -3,14 +3,21 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "./test-helpers";
+import { mktemp, rsyncRepoTo, runInTemp } from "./test-helpers";
 
 test("runInTemp seed repo does not leak mutations across temp repos", async () => {
-  // Force the seed path so this test exercises the PR-1 implementation even on platforms
-  // that don't support CoW clones.
-  const prevForce = process.env.TEST_FORCE_SEED_REPO;
-  process.env.TEST_FORCE_SEED_REPO = "1";
+  const prevSeed = process.env.BNX_TEST_SEED_STORE_PATH;
+  const prevKey = process.env.BNX_TEST_SEED_KEY;
   try {
+    const seedDir = await mktemp("seed-store-");
+    await rsyncRepoTo(seedDir);
+    const $seed = $({ cwd: seedDir, stdio: "pipe" });
+    await $seed`git -c init.defaultBranch=main -c advice.defaultBranchName=false init -q`;
+    await $seed`git add -A`;
+    await $seed`git -c user.name=seed -c user.email=seed@example.com commit -q -m seed --allow-empty`;
+    process.env.BNX_TEST_SEED_STORE_PATH = seedDir;
+    process.env.BNX_TEST_SEED_KEY = "seed-store-test";
+
     const realRepoRoot = process.cwd();
     const targetRel = "abstractions.md";
     const realPath = path.join(realRepoRoot, targetRel);
@@ -31,7 +38,9 @@ test("runInTemp seed repo does not leak mutations across temp repos", async () =
       );
     });
   } finally {
-    if (prevForce === undefined) delete process.env.TEST_FORCE_SEED_REPO;
-    else process.env.TEST_FORCE_SEED_REPO = prevForce;
+    if (prevSeed === undefined) delete process.env.BNX_TEST_SEED_STORE_PATH;
+    else process.env.BNX_TEST_SEED_STORE_PATH = prevSeed;
+    if (prevKey === undefined) delete process.env.BNX_TEST_SEED_KEY;
+    else process.env.BNX_TEST_SEED_KEY = prevKey;
   }
 });
