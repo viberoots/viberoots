@@ -1,6 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { copyTree } from "../../../lib/copy-tree.ts";
+import "./worker-init";
 
 type TimeAsync = <T>(label: string, fn: () => Promise<T>) => Promise<T>;
 
@@ -15,6 +16,14 @@ const requiredFiles = ["flake.nix", path.join("tools", "buck", "export-graph.ts"
 
 function isVerifyMode(): boolean {
   return Boolean(process.env.BNX_VERIFY_LOCK_DIR || process.env.BNX_VERIFY_LOG_FILE);
+}
+
+function wantsFilteredRsync(): boolean {
+  return (
+    String(process.env.TEST_RSYNC_ROOTS || "").trim() !== "" ||
+    String(process.env.TEST_PARTIAL_CLONE_GO_ONLY || "").trim() === "1" ||
+    String(process.env.TEST_EXCLUDE_CPP_REQS || "").trim() === "1"
+  );
 }
 
 async function assertRequiredFiles(dir: string, label: string): Promise<void> {
@@ -46,6 +55,10 @@ export async function initTempRepoFromSeedStore(args: {
   const { tmpDir, deps } = args;
   const seedPath = String(process.env.BNX_TEST_SEED_STORE_PATH || "").trim();
   const seedKey = String(process.env.BNX_TEST_SEED_KEY || "").trim();
+  if (wantsFilteredRsync()) {
+    await deps.rsyncRepoTo(tmpDir);
+    return "rsync";
+  }
   if (!seedPath) {
     if (isVerifyMode()) {
       throw new Error("runInTemp: missing BNX_TEST_SEED_STORE_PATH; rerun v");
@@ -58,6 +71,9 @@ export async function initTempRepoFromSeedStore(args: {
   await deps.timeAsync(`seedStoreCopy(${path.basename(tmpDir)})`, async () => {
     await copyTree(seedPath, tmpDir, { cloneMode: "try", force: true });
   });
+  try {
+    await $`bash --noprofile --norc -c ${`chmod -R u+w ${tmpDir} >/dev/null 2>&1 || true`}`;
+  } catch {}
   await assertRequiredFiles(tmpDir, "seed copy");
   return "seed-store";
 }

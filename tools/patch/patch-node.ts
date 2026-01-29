@@ -1,15 +1,23 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { runGlue } from "./glue";
-import { deleteSession, findSessionBy, getSession, setSession } from "./state";
-import type { LanguageHandler, SessionRecord } from "./types";
-import { repoRoot } from "./lib/apply";
 import { readImporterArg } from "../lib/cli.ts";
 import { resolveImporterDir } from "../lib/lockfiles.ts";
-import { runSession } from "./lib/session";
+import { runGlue } from "./glue";
+import { repoRoot } from "./lib/apply";
 import { requirePositional } from "./lib/args";
 import { resolveImporterLocalPatchDir } from "./lib/importer-local-patch-dir";
+import { runSession } from "./lib/session";
+import {
+  deleteSession,
+  deleteSessionAtPath,
+  findSessionBy,
+  findSessionByAtPath,
+  getSession,
+  getSessionAtPath,
+  setSession,
+} from "./state";
+import type { LanguageHandler, SessionRecord } from "./types";
 
 function pnpmBin(): string {
   const b = (process.env.PNPM_BIN || "").trim();
@@ -20,6 +28,42 @@ function sessionKey(importerDir: string, pkgName: string): string {
   const root = repoRoot();
   const rel = path.relative(root, importerDir).replace(/\\/g, "/");
   return `${rel || "."}#${pkgName}`.toLowerCase();
+}
+
+async function findSessionFromNearestStore(args: {
+  importerDir: string;
+  key: string;
+  pkg: string;
+}): Promise<{ rec: SessionRecord; moduleKey: string; storeFile: string } | null> {
+  let cur = path.resolve(args.importerDir);
+  for (;;) {
+    const storeFile = path.join(cur, ".patch-sessions.json");
+    try {
+      await fsp.access(storeFile);
+    } catch {
+      // ignore
+    }
+    try {
+      const direct = await getSessionAtPath("node", args.key, storeFile);
+      if (direct) return { rec: direct, moduleKey: args.key, storeFile };
+      const byOrigin = await findSessionByAtPath("node", storeFile, (_k, rec) => {
+        return rec.originPath === args.importerDir && rec.importPath === args.pkg;
+      });
+      if (byOrigin) return { rec: byOrigin.rec, moduleKey: byOrigin.moduleKey, storeFile };
+      const byPkg = await findSessionByAtPath(
+        "node",
+        storeFile,
+        (_k, rec) => rec.importPath === args.pkg,
+      );
+      if (byPkg) return { rec: byPkg.rec, moduleKey: byPkg.moduleKey, storeFile };
+    } catch {
+      // ignore parse errors while probing alternate stores
+    }
+    const parent = path.dirname(cur);
+    if (parent === cur) break;
+    cur = parent;
+  }
+  return null;
 }
 
 async function doStart(args: string[]) {
@@ -64,6 +108,8 @@ async function doApply(args: string[]) {
   const root = repoRoot();
   const importerDir = importerRel === "." ? root : path.resolve(root, importerRel);
   const key = sessionKey(importerDir, pkg);
+  let sessionKeyUsed = key;
+  let sessionStorePath: string | null = null;
   let sess = await getSession("node", key);
   if (!sess) {
     // Fallback: locate by originPath and package name
@@ -73,6 +119,7 @@ async function doApply(args: string[]) {
     );
     if (found) {
       sess = found.rec;
+      sessionKeyUsed = found.moduleKey;
     }
   }
   if (!sess) {
@@ -80,6 +127,19 @@ async function doApply(args: string[]) {
     const foundAny = await findSessionBy("node", (_k, rec) => rec.importPath === pkg);
     if (foundAny) {
       sess = foundAny.rec;
+      sessionKeyUsed = foundAny.moduleKey;
+    }
+  }
+  if (!sess) {
+    const fallback = await findSessionFromNearestStore({
+      importerDir,
+      key,
+      pkg,
+    });
+    if (fallback) {
+      sess = fallback.rec;
+      sessionKeyUsed = fallback.moduleKey;
+      sessionStorePath = fallback.storeFile;
     }
   }
   if (!sess) throw new Error(`no active session for ${pkg}; run: patch-pkg start node ${pkg}`);
@@ -92,7 +152,11 @@ async function doApply(args: string[]) {
   await fsp.mkdir(patchDir, { recursive: true });
   // Ensure patches-dir is respected; prefer configuration via .npmrc
   await $({ cwd: importerDir })`${pnpmBin()} patch-commit ${sess.workspacePath}`;
-  await deleteSession("node", key);
+  if (sessionStorePath) {
+    await deleteSessionAtPath("node", sessionKeyUsed, sessionStorePath);
+  } else {
+    await deleteSession("node", sessionKeyUsed);
+  }
   const prev = process.cwd();
   try {
     process.chdir(repoRoot());

@@ -18,54 +18,10 @@ in {
       fi
       export _BUCKNIX_DEVSHELL_ACTIVE=1
       
-      # link Nix-built node_modules for IDEs/CLIs (read-only)
-      # NO_NODE_MODULES_LINK skips expensive nix eval but still tries to link if already built.
       if [ -e node_modules ] && [ ! -L node_modules ]; then
         echo "(devShell) existing non-symlink node_modules detected; not overwriting" >&2 || true
       else
-        out_path=""
-        # Skip expensive nix eval in non-interactive contexts (tests, CI, hooks)
-        if [ -z "''${NO_NODE_MODULES_LINK:-}" ] && [ -t 1 ]; then
-          # Detect importer (nearest directory up containing pnpm-lock.yaml under apps/* or libs/*)
-          imp=""
-          here="$PWD"
-          while [ "$here" != "/" ]; do
-            if [ -f "$here/pnpm-lock.yaml" ]; then
-              rel="''${here#$PWD}" # may be empty when same dir
-              # Prefer relative to repo root when inside apps/* or libs/*
-              case "$here" in
-                *"/apps/"*|*"/libs/"*)
-                  imp="''${here#$PWD/}"
-                  ;;
-              esac
-              break
-            fi
-            here=$(dirname "$here")
-          done
-          if [ -n "$imp" ]; then
-            attr=$(echo "$imp" | sed 's|/|-|g; s| |-|g')
-            out_path=$(nix eval --raw .#node-modules.''${attr}.outPath 2>/dev/null || true)
-          fi
-          if [ -z "$out_path" ]; then
-            # Fallback to default attr without building
-            out_path=$(nix eval --raw .#node-modules.outPath 2>/dev/null || true)
-          fi
-        fi
-        # If eval was skipped or failed, check if the parent workspace has node_modules,
-        # but only when linking is allowed.
-        if [ -z "$out_path" ] && [ -z "''${NO_NODE_MODULES_LINK:-}" ] \
-           && [ -n "''${WORKSPACE_ROOT:-}" ] && [ "$PWD" != "''${WORKSPACE_ROOT}" ]; then
-          # Test sandbox: use parent workspace's node_modules if available
-          if [ -L "''${WORKSPACE_ROOT}/node_modules" ]; then
-            out_path=$(readlink "''${WORKSPACE_ROOT}/node_modules" | sed 's|/node_modules$||')
-          fi
-        fi
-        if [ -n "$out_path" ] && [ -d "$out_path/node_modules" ]; then
-          ln -sfn "$out_path/node_modules" node_modules || true
-          if [ -d "$out_path/node_modules/.bin" ]; then
-            export PATH="$out_path/node_modules/.bin:$PATH"
-          fi
-        fi
+        zx-wrapper "$PWD/tools/dev/devshell-link-node-modules.ts" || true
       fi
 
       export PATH="$PWD/tools/bin:$PWD/node_modules/.bin:$PATH"

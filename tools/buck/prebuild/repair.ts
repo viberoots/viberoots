@@ -2,8 +2,51 @@
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { runGlue } from "../glue-run.ts";
 import { runNodeWithZx } from "../../lib/node-run.ts";
+import { runGlue } from "../glue-run.ts";
+
+async function ensureProviderIndexArtifacts(): Promise<void> {
+  const idxPath = path.join(process.cwd(), "third_party", "providers", "provider_index.bzl");
+  const jsonPath = path.join(process.cwd(), "third_party", "providers", "provider_index.json");
+  const ensureDir = async () => {
+    try {
+      await fsp.mkdir(path.dirname(idxPath), { recursive: true });
+    } catch {}
+  };
+  const hasValidIndex = async (): Promise<boolean> => {
+    try {
+      const txt = await fsp.readFile(idxPath, "utf8");
+      return txt.includes("PROVIDER_INDEX = {");
+    } catch {
+      return false;
+    }
+  };
+  if (!(await hasValidIndex())) {
+    try {
+      await runNodeWithZx({
+        zxInitPath: path.resolve("tools/dev/zx-init.mjs"),
+        script: path.resolve("tools/buck/gen-provider-index.ts"),
+      });
+    } catch {}
+  }
+  if (!(await hasValidIndex())) {
+    await ensureDir();
+    const minimal = ["# GENERATED FILE — DO NOT EDIT.", "", "PROVIDER_INDEX = {", "}", ""].join(
+      "\n",
+    );
+    try {
+      await fsp.writeFile(idxPath, minimal, "utf8");
+    } catch {}
+  }
+  try {
+    await fsp.access(jsonPath);
+  } catch {
+    await ensureDir();
+    try {
+      await fsp.writeFile(jsonPath, "{}\n", "utf8");
+    } catch {}
+  }
+}
 
 async function ensureLocalPreludeMapping() {
   try {
@@ -119,4 +162,17 @@ export async function autoFixGlue() {
   } catch {}
   // Run unified glue orchestration (export graph → provider index → auto-map)
   await runGlue();
+  // Repair mode should leave provider index artifacts in a readable state.
+  await ensureProviderIndexArtifacts();
+}
+
+async function main() {
+  await autoFixGlue();
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
 }

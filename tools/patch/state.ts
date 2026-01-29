@@ -1,7 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import type { SessionRecord, SessionStore } from "./types";
 import { createDbg } from "./lib/util";
+import type { SessionRecord, SessionStore } from "./types";
 
 const dbg = createDbg("patch-state");
 
@@ -9,6 +9,9 @@ function storePath(): string {
   try {
     const repoRoot =
       (process.env.WORKSPACE_ROOT && path.resolve(process.env.WORKSPACE_ROOT)) ||
+      (process.env.BUCK_TEST_SRC && path.resolve(process.env.BUCK_TEST_SRC)) ||
+      (process.env.LIVE_ROOT && path.resolve(process.env.LIVE_ROOT)) ||
+      (process.env.REPO_ROOT && path.resolve(process.env.REPO_ROOT)) ||
       path.resolve(process.cwd());
     const p = path.join(repoRoot, ".patch-sessions.json");
     dbg("storePath", { repoRoot, p });
@@ -18,8 +21,7 @@ function storePath(): string {
   }
 }
 
-async function readStore(): Promise<SessionStore> {
-  const p = storePath();
+async function readStoreAt(p: string): Promise<SessionStore> {
   try {
     await fsp.access(p);
   } catch {
@@ -40,8 +42,7 @@ async function readStore(): Promise<SessionStore> {
   }
 }
 
-async function writeStore(store: SessionStore): Promise<void> {
-  const p = storePath();
+async function writeStoreAt(p: string, store: SessionStore): Promise<void> {
   const tmp = p + ".tmp";
   await fsp.mkdir(path.dirname(p), { recursive: true }).catch(() => {});
   await fsp.writeFile(tmp, JSON.stringify(store, null, 2) + "\n", "utf8");
@@ -58,8 +59,28 @@ async function writeStore(store: SessionStore): Promise<void> {
   }
 }
 
+async function readStore(): Promise<SessionStore> {
+  return await readStoreAt(storePath());
+}
+
+async function writeStore(store: SessionStore): Promise<void> {
+  await writeStoreAt(storePath(), store);
+}
+
 export async function getSession(lang: string, moduleKey: string): Promise<SessionRecord | null> {
   const st = await readStore();
+  const byLang = st.sessions[lang] || {};
+  const out = (byLang as any)[moduleKey] || null;
+  dbg("getSession", { lang, moduleKey, hit: !!out });
+  return out;
+}
+
+export async function getSessionAtPath(
+  lang: string,
+  moduleKey: string,
+  storeFile: string,
+): Promise<SessionRecord | null> {
+  const st = await readStoreAt(storeFile);
   const byLang = st.sessions[lang] || {};
   const out = (byLang as any)[moduleKey] || null;
   dbg("getSession", { lang, moduleKey, hit: !!out });
@@ -87,11 +108,37 @@ export async function deleteSession(lang: string, moduleKey: string): Promise<vo
   dbg("deleteSession", { lang, moduleKey });
 }
 
+export async function deleteSessionAtPath(
+  lang: string,
+  moduleKey: string,
+  storeFile: string,
+): Promise<void> {
+  const st = await readStoreAt(storeFile);
+  if (st.sessions[lang]) {
+    delete st.sessions[lang]![moduleKey];
+  }
+  await writeStoreAt(storeFile, st);
+  dbg("deleteSession", { lang, moduleKey });
+}
+
 export async function findSessionBy(
   lang: string,
   predicate: (moduleKey: string, rec: SessionRecord) => boolean,
 ): Promise<{ moduleKey: string; rec: SessionRecord } | null> {
   const st = await readStore();
+  const byLang = st.sessions[lang] || {};
+  for (const [k, rec] of Object.entries(byLang)) {
+    if (predicate(k, rec as SessionRecord)) return { moduleKey: k, rec: rec as SessionRecord };
+  }
+  return null;
+}
+
+export async function findSessionByAtPath(
+  lang: string,
+  storeFile: string,
+  predicate: (moduleKey: string, rec: SessionRecord) => boolean,
+): Promise<{ moduleKey: string; rec: SessionRecord } | null> {
+  const st = await readStoreAt(storeFile);
   const byLang = st.sessions[lang] || {};
   for (const [k, rec] of Object.entries(byLang)) {
     if (predicate(k, rec as SessionRecord)) return { moduleKey: k, rec: rec as SessionRecord };

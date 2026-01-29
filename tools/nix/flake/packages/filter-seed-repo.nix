@@ -11,6 +11,7 @@ let
     else builtins.split "[,[:space:]]+" rootsEnv;
   roots = lib.filter (r: r != "") (map (r: lib.removePrefix "/" r) rootsRaw);
   rootDirs = [
+    ".husky"
     "cpp"
     "go"
     "lang"
@@ -25,6 +26,18 @@ let
   isRootFile = rel: !(lib.hasInfix "/" rel) && rel != "";
   isExcludedRootFile = base:
     base == ".envrc" ||
+    base == ".git" ||
+    base == ".buck" ||
+    base == ".buck2_shim" ||
+    base == ".cache" ||
+    base == ".direnv" ||
+    base == ".pnpm-store" ||
+    base == "buck-out" ||
+    base == "node_modules" ||
+    base == "coverage" ||
+    base == ".clinic" ||
+    base == "result" ||
+    base == "test-logs" ||
     base == "collect-garbage-log.txt" ||
     base == ".patch-sessions.json.tmp" ||
     (lib.hasPrefix "quad-alignment-" base && lib.hasSuffix ".md" base) ||
