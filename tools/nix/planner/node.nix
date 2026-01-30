@@ -8,6 +8,7 @@ let
     nodes = (if builtins.hasAttr "nodes" ctx then ctx.nodes else []);
     pkgPathOf = ctx.pkgPathOf;
   };
+  H = import ../lib/lang-helpers.nix { inherit pkgs; };
   get = ctx.get;
   pkgs = ctx.pkgs or null;
   repoRoot = ctx.repoRoot;
@@ -67,7 +68,7 @@ in {
       nm = nodeMods.mkNodeModules { lockfilePath = info.lockfilePath; inherit importerDir; };
       entryRel = "src/index.ts";
       outBase = targetNameOf name;
-      sanitize = s: lib.replaceStrings [ "//" ":" "/" " " ] [ "" "-" "-" "-" ] s;
+      sanitize = H.sanitizeName;
     in pkgs.stdenvNoCC.mkDerivation {
       pname = "node-cli-" + (sanitize name);
       version = sanitize importerDir;

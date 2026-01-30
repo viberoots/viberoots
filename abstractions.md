@@ -328,6 +328,9 @@ Several layers scan a flat `patches/<lang>/*.patch` directory and need to agree 
   - **TypeScript**: `tools/lib/providers.ts:decodeNameVersionFromPatch`
   - **Nix**: `tools/nix/lib/lang-helpers.nix:decodePatchFilename`
   - **Nix (builders)**: `tools/nix/lib/lang-helpers.nix:patchesMapFromDir`, `patchesMapFromDirToStore`, `patchesMapFromImporterDirToStore`
+- **Loose decoding (lint-only)**:
+  - **TypeScript**: `tools/lib/providers.ts:decodeNameVersionFromPatchLoose`
+  - The loose variant is for `patches-lint` duplicate detection on case-insensitive filesystems only. It is not part of the cross-language contract and must not be used in build or planner paths.
 - **Regression guards**:
   - `tools/tests/lib/parity.ts_nix_patch_key_parity.test.ts` (TS scan vs Nix `patchesMapFromDir` key set)
   - `tools/tests/nix/patch-filename-decoding.nix-ts.parity.test.ts` (TS decode vs Nix decode, including Python-style version normalization)
