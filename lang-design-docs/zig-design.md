@@ -24,6 +24,16 @@ I follow the repo-wide linking model described in `cpp-linking.md`, `wasm-linkin
 
 If the language can support C interop, I must provide a documented and tested path to link or call C code using the repo linking model (explicit `link_deps` and deterministic closure). If the language cannot support C interop, this doc must state why and list the constraints.
 
+### Shared wiring and contracts (current repo)
+
+Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:language_wiring.bzl`. Macro call sites should not re‑implement wiring or load provider maps directly.
+
+- Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
+- Provider wiring: load `MODULE_PROVIDERS` from `//lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
+- Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
+- Patch model contract: `lang/lang_contracts.bzl` and `tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
+- Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
+
 ### Scope and Completion Criteria
 
 - Zig targets are discoverable by the planner and exported in `tools/buck/graph.json` with deterministic `module:` labels.
@@ -42,7 +52,7 @@ If the language can support C interop, I must provide a documented and tested pa
 - Nix templates (`tools/nix/templates/zig.nix`, re-exported via `tools/nix/lang-templates.nix`): build Zig projects hermetically; scan `patches/zig` to map `pkg@ver → [patch files]`; apply `NIX_ZIG_DEV_OVERRIDE_JSON` locally (warn) and fail in CI.
 - Providers: `third_party/providers/defs_zig.bzl` + generated `TARGETS.zig.auto`.
 - Auto-map (`tools/buck/gen-auto-map.ts`): maps `module:` labels to provider names; no code changes needed (existing module label path reused).
-- Macros (`zig/defs.bzl`): stamp `lang:zig` labels, `kind:*` labels, and append providers from `//third_party/providers:auto_map.bzl`.
+- Macros (`zig/defs.bzl`): stamp `lang:zig` labels, `kind:*` labels, and append providers from `//lang:auto_map.bzl`.
 - Patching CLI (`tools/patch/patch-zig.ts` delegated by `patch-pkg`): implements start/reset/apply/session with idempotency and glue steps.
 
 ### Path Invariants
@@ -149,7 +159,7 @@ Thin macros mirroring Go’s approach:
 Behavior:
 
 - Stamp `lang:zig` and `kind:lib|bin|test` labels.
-- Append providers from `//third_party/providers:auto_map.bzl` by reading `MODULE_PROVIDERS["//pkg:name"]`.
+- Append providers from `//lang:auto_map.bzl` by reading `MODULE_PROVIDERS["//pkg:name"]`.
 - Underlying rule can be a `genrule`-based shell to copy Nix-built artifacts into Buck outputs, or a future `zig_*` rule if available. The initial version may rely on `genrule` for artifact exposure while validation/invalidation relies on provider wiring.
 
 ---

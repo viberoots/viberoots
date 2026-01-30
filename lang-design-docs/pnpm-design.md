@@ -24,6 +24,16 @@ I follow the repo-wide linking model described in `cpp-linking.md`, `wasm-linkin
 
 If the language can support C interop, I must provide a documented and tested path to link or call C code using the repo linking model (explicit `link_deps` and deterministic closure). If the language cannot support C interop, this doc must state why and list the constraints.
 
+### Shared wiring and contracts (current repo)
+
+Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:language_wiring.bzl`. Macro call sites should not re‑implement wiring or load provider maps directly.
+
+- Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
+- Provider wiring: load `MODULE_PROVIDERS` from `//lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
+- Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
+- Patch model contract: `lang/lang_contracts.bzl` and `tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
+- Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
+
 ### Current State (repo)
 
 - Existing glue for Node providers and auto‑map generation:
@@ -154,7 +164,7 @@ nix_node_lib(
     - `nix_node_gen(...)` and `nix_node_test(...)` — thin wrappers over `genrule` that:
       - enforce exactly one importer‑scoped lockfile label (`lockfile:<path>#<importer>`),
       - stamp `lang:node` and `kind:*`, and
-      - append providers from `//third_party/providers:auto_map.bzl` using `MODULE_PROVIDERS["//pkg:name"]`.
+      - append providers from `//lang:auto_map.bzl` using `MODULE_PROVIDERS["//pkg:name"]`.
     - `nix_node_lib(...)` and `nix_node_bin(...)` — ergonomic aliases that set `kind` to `lib`/`bin` and reuse `nix_node_gen`.
   - Escape hatch: callers may still pass additional `deps` manually when needed.
 
@@ -422,7 +432,7 @@ test("node provider: <specific behavior>", async () => {
 
 - Adding a language: PNPM/Node hooks in as an existing language variant. We reuse the provider sync orchestrator and `gen-auto-map.ts`, and propose a thin Node macro (`//node/defs.bzl`) consistent with `lang/defs_common.bzl` stamping.
 - Provider sync cookbook: Covered — Node provider generator exists (`tools/buck/providers/node.ts`), invoked via `tools/buck/sync-providers.ts`, deterministic outputs, and `tools/lib/providers.ts` for naming.
-- Macro stamping: Planned — Node macro should call `stamp_labels(lang="node", kind=...)` and append providers from `//third_party/providers:auto_map.bzl`.
+- Macro stamping: Planned — Node macro should call `stamp_labels(lang="node", kind=...)` and append providers from `//lang:auto_map.bzl`.
 - Testing: No changes to harness; zx tests and external timeouts remain. Add focused zx tests for Node provider determinism and auto-map wiring when we add the macro.
 - Troubleshooting: Glue sequence, prebuild-guard, and patches lint patterns already documented for Go; Node follows the same flow with importer‑scoped lockfile inputs and `TARGETS.node.auto` presence. Documented in this design and consistent with the handbook.
 

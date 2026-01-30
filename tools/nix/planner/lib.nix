@@ -15,9 +15,37 @@ let
     let parts = lib.splitString " (" s; in
       if (builtins.length parts) > 1 then (builtins.elemAt parts 0) else s;
 
+  ruleTypeOf = n:
+    let rt = get n "rule_type"; in if rt == null then "" else rt;
+
   labelsOf = n:
     let labs = (get n "labels"); in
       if labs == null then [] else (if builtins.isList labs then labs else []);
+
+  hasRuleTypePrefix = rt: prefix: lib.hasPrefix prefix rt;
+  hasRuleTypeSuffix = rt: suffix: lib.hasSuffix suffix rt;
+  hasRuleTypeInfix = rt: infix: lib.hasInfix infix rt;
+
+  isTargetByRuleTypeOrLabel = { ruleTypePrefixes ? [], ruleTypeInfixes ? [], label ? null }:
+    n:
+      let rt = ruleTypeOf n; labs = labelsOf n; in
+        (lib.any (p: hasRuleTypePrefix rt p) ruleTypePrefixes) ||
+        (lib.any (i: hasRuleTypeInfix rt i) ruleTypeInfixes) ||
+        (label != null && label != "" && builtins.elem label labs);
+
+  kindFromLabels = labels: pairs:
+    let matches = builtins.filter (p: builtins.elem p.label labels) pairs;
+    in if matches == [] then null else (builtins.head matches).kind;
+
+  kindFromRuleType = ruleType: { equals ? [], suffixes ? [], prefixes ? [] }:
+    let
+      eq = builtins.filter (p: p.ruleType == ruleType) equals;
+      sf = builtins.filter (p: hasRuleTypeSuffix ruleType p.suffix) suffixes;
+      pf = builtins.filter (p: hasRuleTypePrefix ruleType p.prefix) prefixes;
+    in if eq != [] then (builtins.head eq).kind
+       else if sf != [] then (builtins.head sf).kind
+       else if pf != [] then (builtins.head pf).kind
+       else null;
 
   nameOf = n:
     let nm = get n "name"; in if nm == null then "" else cleanLabel nm;
@@ -92,7 +120,8 @@ let
                 builtins.throw "Lockfile label importer must match the lockfile directory (${dir}); got: ${s}"
               else { inherit lockfilePath importer; };
 in {
-  inherit get cleanLabel labelsOf nameOf depsOf srcsOf byName;
+  inherit get cleanLabel ruleTypeOf labelsOf nameOf depsOf srcsOf byName;
+  inherit isTargetByRuleTypeOrLabel kindFromLabels kindFromRuleType;
   inherit extractLockfileLabels parseImporterScopedLockfileLabel;
   # Generic DFS label collector. Starting from `name`, walk transitive deps
   # and collect unique labels that start with `prefix`. Returns a sorted list

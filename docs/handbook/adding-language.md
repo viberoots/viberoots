@@ -73,7 +73,7 @@ For importer-scoped ecosystems, we try hard to keep “how we find lockfiles” 
   - `findNearestLockfileForPackage` (canonical nearest-lockfile lookup; do not hand-roll upward walks)
   - `defaultImporterPatchDir`, `listImporterPatches`
   - Keeps importer‑local patch discovery and sorting consistent across Node and Python
-  - `readImporterProviderIndexEntriesForSingleImporterLockfiles` — shared “provider index enumeration” surface for importer-scoped languages with one importer per lockfile (dirname-based)
+- `readImporterProviderIndexEntriesForSingleImporterLockfileBasenames` — shared “provider index enumeration” surface for importer-scoped languages with one importer per lockfile (dirname-based), keyed by lockfile basenames
   - `tools/lib/provider-writer.ts` — emits deterministic importer‑scoped provider TARGETS and synchronizes the curated auto‑managed section. Pass your computed `{ lockfile, importer, patchPaths }` entries plus the rule load/name.
     - Prefer the convenience wrapper `writeImporterProvidersByLang(...)`, which is table‑driven via a small registry. To add a new importer‑scoped ecosystem, extend that registry instead of adding per‑language conditionals.
 

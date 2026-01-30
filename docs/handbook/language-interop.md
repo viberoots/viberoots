@@ -74,6 +74,7 @@ Implementation notes
     No TARGETS edits are required when adding/removing C sources.
 - Implementation detail: the CGO decision and toolchain defaults are centralized in `go/private/cgo_wiring.bzl`, shared by `nix_go_library`, `nix_go_binary`, and `nix_go_test`.
 - Implementation detail: shared behavior for `nix_cpp_library`, `nix_cpp_binary`, and `nix_cpp_node_addon` is centralized in `_cpp_common` in `cpp/defs.bzl`. Public macro surfaces are unchanged; wasm macros stay separate.
+- Macro wiring note: macro implementations should route through the shared wiring surface (`prepare_language_wiring(...)`) and load provider mappings via `//lang:auto_map.bzl` rather than `//third_party/providers/auto_map.bzl`.
 - The Go Nix templates set `CGO_ENABLED=1` only for those targets and ensure CC/CXX/AR come from Nix.
 - If `pkg-config` metadata is missing, templates synthesize `CGO_CFLAGS`/`CGO_LDFLAGS` from provided packages.
 - Planner wiring passes nixpkgs attributes and in-repo C/C++ libs so builds are hermetic and deterministic.

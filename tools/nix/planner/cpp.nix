@@ -12,29 +12,32 @@ let
     pkgPathOf = ctx.pkgPathOf;
   };
   cleanLabel = L.cleanLabel;
-  isCxx = n:
-    let rt = get n "rule_type"; in
-    (rt != null) && (lib.hasPrefix "cxx_" rt || lib.hasInfix "cpp_nix_build" rt);
-
   hasLangCpp = n:
-    let ls = (get n "labels"); in
-    (ls != null) && (builtins.isList ls) && builtins.elem "lang:cpp" ls;
+    let ls = labelsOf n; in builtins.elem "lang:cpp" ls;
 
   kindOf = n:
     let
-      rtVal = get n "rule_type"; rt = if rtVal == null then "" else rtVal;
+      rt = L.ruleTypeOf n;
       labs = labelsOf n;
       nm = nameOf n;
       isPlanner = (nm != null) && (lib.hasSuffix "__planner" nm);
-    in if builtins.elem "kind:test" labs || isPlanner then "test"
-      else if builtins.elem "kind:bin" labs then "bin"
-      else if builtins.elem "kind:headers" labs then "headers"
-      else if builtins.elem "kind:lib" labs then "lib"
-      else if builtins.elem "kind:addon" labs then "addon"
-      else if rt == "cxx_test" then "test"
-      else if rt == "cxx_binary" then "bin"
-      else if rt == "cxx_library" then (if isPlanner then "test" else "lib")
-      else null;
+      fromLabels = L.kindFromLabels labs [
+        { label = "kind:test"; kind = "test"; }
+        { label = "kind:bin"; kind = "bin"; }
+        { label = "kind:headers"; kind = "headers"; }
+        { label = "kind:lib"; kind = "lib"; }
+        { label = "kind:addon"; kind = "addon"; }
+      ];
+      fromRule = L.kindFromRuleType rt {
+        equals = [
+          { ruleType = "cxx_test"; kind = "test"; }
+          { ruleType = "cxx_binary"; kind = "bin"; }
+          { ruleType = "cxx_library"; kind = "lib"; }
+        ];
+      };
+    in if isPlanner then "test"
+      else if fromLabels != null then fromLabels
+      else fromRule;
 
   nodes = if builtins.hasAttr "nodes" ctx then ctx.nodes else [];
   byName = L.byName;
@@ -108,7 +111,11 @@ let
     mkAddon = Targets.mkAddon;
   };
 in {
-  isTarget = n: (isCxx n) || (hasLangCpp n);
+  isTarget = L.isTargetByRuleTypeOrLabel {
+    ruleTypePrefixes = [ "cxx_" ];
+    ruleTypeInfixes = [ "cpp_nix_build" ];
+    label = "lang:cpp";
+  };
   inherit kindOf;
   inherit (Rec) mkApp mkLib mkHeaders mkTest mkAddon;
   modulesFileFor = name: "";

@@ -14,8 +14,9 @@ Stamping ensures exporter preconditions via consistent labels applied in macros.
   - Use `prepare_language_wiring(...)` with `wiring = "non_genrule"` for non-genrule wrappers.
   - For importer-scoped, **Nix-calling** macros (for example `node_webapp`, bundled `nix_node_cli_bin`), use `prepare_language_wiring(...)` with `wiring = "nix_calling_genrule"` or `wiring = "non_genrule_nix_calling"` so lockfile enforcement, importer derivation, patch inputs, provider edges, optional `workspace-root.env` injection, and global Nix input wiring are composed in one place.
 - **Global Nix inputs (macros and rules that call Nix)**: treat `global_nix_inputs()` as real action inputs. Label stamping is retained for observability, but correctness must not depend on labels.
-  - For **macros** that call Nix, use `//lang:defs_common.bzl:wire_global_nix_inputs(...)`. This keeps call sites consistent and keeps list-shaped and dict-shaped inputs correct.
-  - For **macros that create genrules** that call Nix, use the shared helper `lang/defs_common.bzl: wire_global_nix_inputs(kwargs, into="srcs", stamp=True)` so call sites cannot forget either:
+  - For **macros that already route through** `prepare_language_wiring(...)` with `wiring = "nix_calling_genrule"` or `wiring = "non_genrule_nix_calling"`, **do not** call `wire_global_nix_inputs(...)` at the call site; the shared wiring composes it for you.
+  - For **macros that call Nix without** `prepare_language_wiring(...)`, use `//lang:defs_common.bzl:wire_global_nix_inputs(...)`. This keeps call sites consistent and keeps list-shaped and dict-shaped inputs correct.
+  - For **macros that create genrules** that call Nix (and do not go through `prepare_language_wiring(...)`), use the shared helper `lang/defs_common.bzl: wire_global_nix_inputs(kwargs, into="srcs", stamp=True)` so call sites cannot forget either:
     - attaching global inputs as real action inputs (list and dict shapes)
     - stamping labels for observability (without hardcoding `//:flake.lock`)
   - Example (list-shaped `srcs`):

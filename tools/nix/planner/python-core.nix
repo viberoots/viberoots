@@ -105,27 +105,31 @@ let
     in builtins.listToAttrs pairs;
 
   isTarget = n:
-    let rt = get n "rule_type";
-        lbs = get n "labels";
-        hasPyRT = (rt != null) && lib.hasPrefix "python_" rt;
-        hasPyLabel = (lbs != null) && builtins.elem "lang:python" lbs;
-    in hasPyRT || hasPyLabel;
+    L.isTargetByRuleTypeOrLabel {
+      ruleTypePrefixes = [ "python_" ];
+      label = "lang:python";
+    } n;
 
   kindOf = n:
-    let rt = get n "rule_type";
-        lbs = get n "labels";
-        isBinLabel = lbs != null && builtins.elem "kind:bin" lbs;
-        isWasmLabel = lbs != null && builtins.elem "kind:wasm" lbs;
-        isTestLabel = lbs != null && builtins.elem "kind:test" lbs;
-        isPyExtLabel = lbs != null && builtins.elem "kind:pyext" lbs;
-        isPyExtWasmLabel = lbs != null && builtins.elem "kind:pyext_wasm" lbs;
-    in if isWasmLabel then "wasm"
-       else if isPyExtWasmLabel then "pyext_wasm"
-       else if isPyExtLabel then "pyext"
-       else if isTestLabel then "test"
-       else if (rt != null) && lib.hasSuffix "_binary" rt then "bin"
-       else if (rt != null) && lib.hasSuffix "_test" rt then "test"
-       else if isBinLabel then "bin"
+    let
+      labels = L.labelsOf n;
+      ruleType = L.ruleTypeOf n;
+      preRule = L.kindFromLabels labels [
+        { label = "kind:wasm"; kind = "wasm"; }
+        { label = "kind:pyext_wasm"; kind = "pyext_wasm"; }
+        { label = "kind:pyext"; kind = "pyext"; }
+        { label = "kind:test"; kind = "test"; }
+      ];
+      fromRule = L.kindFromRuleType ruleType {
+        suffixes = [
+          { suffix = "_binary"; kind = "bin"; }
+          { suffix = "_test"; kind = "test"; }
+        ];
+      };
+      postRule = L.kindFromLabels labels [ { label = "kind:bin"; kind = "bin"; } ];
+    in if preRule != null then preRule
+       else if fromRule != null then fromRule
+       else if postRule != null then postRule
        else "lib";
 
   modulesFileFor = name: lockRelFor name;

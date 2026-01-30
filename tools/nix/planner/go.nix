@@ -162,23 +162,28 @@ let
       );
     in map (d: builtins.toPath (repoRoot + "/" + (pkgPathOf name) + "/" + d)) patchDirsLocalRel;
 in {
-  isTarget = n:
-    let rt = get n "rule_type";
-        lbs = get n "labels";
-        hasGoRT = (rt != null) && lib.hasPrefix "go_" rt;
-        hasGoLabel = (lbs != null) && builtins.elem "lang:go" lbs;
-    in hasGoRT || hasGoLabel;
+  isTarget = L.isTargetByRuleTypeOrLabel {
+    ruleTypePrefixes = [ "go_" ];
+    label = "lang:go";
+  };
 
   kindOf = n:
-    let rt = get n "rule_type";
-        lbs = get n "labels";
-        isBinLabel = lbs != null && builtins.elem "kind:bin" lbs;
-        isWasmLabel = lbs != null && builtins.elem "kind:wasm" lbs;
-    in if (lbs != null && builtins.elem "kind:carchive" lbs) then "lib"
-         else if isWasmLabel then "tinywasm"
-       else if (rt != null) && lib.hasPrefix "go_" rt
-         then (if lib.hasSuffix "_binary" rt then "bin" else "lib")
-         else if isBinLabel then "bin" else "lib";
+    let
+      labels = L.labelsOf n;
+      ruleType = L.ruleTypeOf n;
+      fromLabels = L.kindFromLabels labels [
+        { label = "kind:carchive"; kind = "lib"; }
+        { label = "kind:wasm"; kind = "tinywasm"; }
+      ];
+      fromRuleType = L.kindFromRuleType ruleType {
+        suffixes = [ { suffix = "_binary"; kind = "bin"; } ];
+        prefixes = [ { prefix = "go_"; kind = "lib"; } ];
+      };
+      fromBinLabel = L.kindFromLabels labels [ { label = "kind:bin"; kind = "bin"; } ];
+    in if fromLabels != null then fromLabels
+       else if fromRuleType != null then fromRuleType
+       else if fromBinLabel != null then fromBinLabel
+       else "lib";
 
   modulesFileFor = name: modulesTomlFor name;
 

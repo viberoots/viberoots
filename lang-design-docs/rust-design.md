@@ -23,6 +23,16 @@ I follow the repo-wide linking model described in `cpp-linking.md`, `wasm-linkin
 
 If the language can support C interop, I must provide a documented and tested path to link or call C code using the repo linking model (explicit `link_deps` and deterministic closure). If the language cannot support C interop, this doc must state why and list the constraints.
 
+### Shared wiring and contracts (current repo)
+
+Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:language_wiring.bzl`. Macro call sites should not re‑implement wiring or load provider maps directly.
+
+- Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
+- Provider wiring: load `MODULE_PROVIDERS` from `//lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
+- Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
+- Patch model contract: `lang/lang_contracts.bzl` and `tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
+- Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
+
 ### Path invariants (must‑follow)
 
 - Patches live at `patches/rust/*.patch` (flat; no subdirectories).

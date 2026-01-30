@@ -40,13 +40,23 @@ I follow the repo-wide linking model described in `cpp-linking.md`, `wasm-linkin
 
 If the language can support C interop, I must provide a documented and tested path to link or call C code using the repo linking model (explicit `link_deps` and deterministic closure). If the language cannot support C interop, this doc must state why and list the constraints.
 
+### Shared wiring and contracts (current repo)
+
+Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:language_wiring.bzl`. Macro call sites should not re‑implement wiring or load provider maps directly.
+
+- Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
+- Provider wiring: load `MODULE_PROVIDERS` from `//lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
+- Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
+- Patch model contract: `lang/lang_contracts.bzl` and `tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
+- Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
+
 ---
 
 ## Path Invariants and Naming
 
 - Patches live at `patches/swift/*.patch`, one patch per `identity@version` (flat dir, no subdirectories).
 - Language templates live under `tools/nix/templates/swift.nix` and are imported by `tools/nix/lang-templates.nix`.
-- Language macros live under `swift/defs.bzl` and use `//third_party/providers:auto_map.bzl`.
+- Language macros live under `swift/defs.bzl` and use `//lang:auto_map.bzl`.
 - Provider rules for Swift live under `//third_party/providers/**` and are generated (e.g., `TARGETS.swift.auto`).
 - Dev overrides environment variable: `NIX_SWIFT_DEV_OVERRIDE_JSON` with shape `{ "identity@version": "/abs/local/override" }`.
 
@@ -328,7 +338,7 @@ load("@prelude//cxx:cxx.bzl", "cxx_library")  # placeholder; real rules may diff
 
 def _providers_for(name):
     MODULE_PROVIDERS = {}
-    load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")
+    load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
     pkg = native.package_name()
     key = "//%s:%s" % (pkg, name)
     return MODULE_PROVIDERS.get(key, [])
