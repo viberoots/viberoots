@@ -85,7 +85,8 @@ in {
     installPhase = ''
       set -euo pipefail
       export SOURCE_DATE_EPOCH=1
-      mkdir -p "$out/lib" "$out/include" "$TMPDIR/obj"
+      export EM_CACHE="$TMPDIR/emscripten-cache"
+      mkdir -p "$out/lib" "$out/include" "$TMPDIR/obj" "$EM_CACHE"
 
       # Discover sources deterministically (Nix-computed command)
       mapfile -t SRCS < <(${srcsCmd})

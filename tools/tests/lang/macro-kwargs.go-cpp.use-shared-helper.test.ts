@@ -22,20 +22,20 @@ test("go/cpp macros: local_patch_dirs and nixpkg_deps pop logic is centralized i
   for (const needle of forbidden) {
     assert.ok(
       !goDefs.includes(needle),
-      `expected go/defs.bzl to avoid direct ${needle}; rely on prepare_package_local_wiring(...) to extract patch dirs + nixpkg deps`,
+      `expected go/defs.bzl to avoid direct ${needle}; rely on prepare_language_wiring(...) to extract patch dirs + nixpkg deps`,
     );
     assert.ok(
       !cppDefs.includes(needle),
-      `expected cpp/defs.bzl to avoid direct ${needle}; rely on prepare_package_local_wiring(...) to extract patch dirs + nixpkg deps`,
+      `expected cpp/defs.bzl to avoid direct ${needle}; rely on prepare_language_wiring(...) to extract patch dirs + nixpkg deps`,
     );
   }
 
   assert.ok(
-    goDefs.includes("prepare_package_local_wiring("),
-    "expected go/defs.bzl to call prepare_package_local_wiring(...)",
+    goDefs.includes("prepare_language_wiring("),
+    "expected go/defs.bzl to call prepare_language_wiring(...)",
   );
   assert.ok(
-    cppDefs.includes("prepare_package_local_wiring("),
-    "expected cpp/defs.bzl to call prepare_package_local_wiring(...)",
+    cppDefs.includes("prepare_language_wiring("),
+    "expected cpp/defs.bzl to call prepare_language_wiring(...)",
   );
 });

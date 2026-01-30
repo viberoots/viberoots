@@ -2,7 +2,7 @@ load(
     "//lang:defs_common.bzl",
     "dedupe_preserve",
     "merge_link_intent_deps",
-    "prepare_package_local_wasm_wiring",
+    "prepare_language_wiring",
     "wire_package_local_wasm_planner_visible_stub",
 )
 load("//lang:global_inputs.bzl", "global_nix_inputs")
@@ -46,15 +46,16 @@ def nix_cpp_wasm_static_lib(name, **kwargs):
     kw["header_deps"] = header_deps
     merged = merge_link_intent_deps(deps, link_deps, header_deps)
     nix_inputs = global_nix_inputs()
-    wiring = prepare_package_local_wasm_wiring(
+    wiring = prepare_language_wiring(
         name = name,
         kwargs = kw,
         lang = "cpp",
+        kind = None,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
-        variant = "static",
         deps = merged,
-        provider_realization_mode = "deps",
-        strip_providers_from_deps = False,
+        wasm_variant = "static",
+        wasm_provider_realization_mode = "deps",
+        wasm_strip_providers_from_deps = False,
     )
     prepared = wiring.kwargs
     cpp_nix_build(

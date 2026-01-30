@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "go_binary", "go_library", "go_test")
-load("//lang:defs_common.bzl", "normalize_labels", "prepare_package_local_wasm_wiring", "prepare_package_local_wiring")
+load("//lang:defs_common.bzl", "normalize_labels", "prepare_language_wiring")
 load("//lang:defs_common.bzl", "merge_link_intent_deps", "validate_link_closure_overrides")
 load("//lang:global_inputs.bzl", "global_nix_inputs")
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
@@ -21,13 +21,13 @@ def nix_go_library(name, **kwargs):
     deps = kw.pop("deps", [])
     extra = normalize_labels(native.package_name(), kw.pop("extra_module_providers", []))
     apply_go_tuple_labels(kw)
-    wiring = prepare_package_local_wiring(
+    wiring = prepare_language_wiring(
         name = name,
         kwargs = kw,
         lang = "go",
         kind = "lib",
         MODULE_PROVIDERS = MODULE_PROVIDERS,
-        base_deps = deps + repo_cgo_deps + extra,
+        deps = deps + repo_cgo_deps + extra,
     )
     configure_cgo_kwargs(wiring.kwargs, wiring.nixpkg_deps, repo_cgo_deps)
     go_library(name = name, deps = wiring.deps, **wiring.kwargs)
@@ -48,13 +48,13 @@ def nix_go_binary(name, **kwargs):
     deps = kw.pop("deps", [])
     extra = normalize_labels(native.package_name(), kw.pop("extra_module_providers", []))
     apply_go_tuple_labels(kw)
-    wiring = prepare_package_local_wiring(
+    wiring = prepare_language_wiring(
         name = name,
         kwargs = kw,
         lang = "go",
         kind = "bin",
         MODULE_PROVIDERS = MODULE_PROVIDERS,
-        base_deps = deps + repo_cgo_deps + extra,
+        deps = deps + repo_cgo_deps + extra,
     )
     configure_cgo_kwargs(wiring.kwargs, wiring.nixpkg_deps, repo_cgo_deps)
     apply_go_rule_stable_defaults(wiring.kwargs)
@@ -97,13 +97,13 @@ def nix_go_test(name, **kwargs):
     if abs_lib != None:
         base_deps = [d for d in base_deps if d not in (lib, abs_lib)]
     apply_go_tuple_labels(kw)
-    wiring = prepare_package_local_wiring(
+    wiring = prepare_language_wiring(
         name = name,
         kwargs = kw,
         lang = "go",
         kind = "test",
         MODULE_PROVIDERS = MODULE_PROVIDERS,
-        base_deps = base_deps,
+        deps = base_deps,
     )
     configure_cgo_kwargs(wiring.kwargs, wiring.nixpkg_deps, repo_cgo_deps)
     apply_go_rule_stable_defaults(wiring.kwargs)
@@ -163,17 +163,18 @@ def nix_go_tiny_wasm_lib(name, **kwargs):
 
     merged = merge_link_intent_deps(deps, link_deps, [])
 
-    wiring = prepare_package_local_wasm_wiring(
+    wiring = prepare_language_wiring(
         name = name,
         kwargs = kw,
         lang = "go",
-        variant = "tinygo",
+        kind = None,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
         deps = merged,
-        extra_srcs = extra,
-        srcs_include_deps = True,
-        provider_realization_mode = "inputs",
-        strip_providers_from_deps = True,
+        wasm_variant = "tinygo",
+        wasm_extra_srcs = extra,
+        wasm_srcs_include_deps = True,
+        wasm_provider_realization_mode = "inputs",
+        wasm_strip_providers_from_deps = True,
     )
     prepared = wiring.kwargs
     # Graph-facing shim that copies from the Nix out path produced by planner

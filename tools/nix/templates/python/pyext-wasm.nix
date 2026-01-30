@@ -78,6 +78,8 @@ pkgs.stdenv.mkDerivation {
 
   buildPhase = ''
     set -euo pipefail
+    export EM_CACHE="$TMPDIR/emscripten-cache"
+    mkdir -p "$EM_CACHE"
 
     if [ ${toString (builtins.length sortedCompileSrcs)} -eq 0 ]; then
       echo "pyExtWasm: no compilable sources in srcList for ${name}" >&2

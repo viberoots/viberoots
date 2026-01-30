@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
-test("package-local language macros must not bypass prepare_package_local_wiring()", async () => {
+test("package-local language macros must not bypass prepare_language_wiring()", async () => {
   const offenders: Array<{ file: string; reason: string }> = [];
   const files = ["go/defs.bzl", "cpp/defs.bzl"];
   for (const file of files) {
@@ -12,13 +12,13 @@ test("package-local language macros must not bypass prepare_package_local_wiring
       offenders.push({
         file,
         reason:
-          "must not call include_package_local_patches directly; use //lang:defs_common.bzl:prepare_package_local_wiring(...) instead",
+          "must not call include_package_local_patches directly; use //lang:defs_common.bzl:prepare_language_wiring(...) instead",
       });
     }
-    if (!txt.includes("prepare_package_local_wiring(")) {
+    if (!txt.includes("prepare_language_wiring(")) {
       offenders.push({
         file,
-        reason: "expected to use prepare_package_local_wiring(...) for package-local wiring",
+        reason: "expected to use prepare_language_wiring(...) for package-local wiring",
       });
     }
     if (txt.includes("prepare_package_local_wiring_legacy_mutating(")) {

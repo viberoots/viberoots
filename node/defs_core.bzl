@@ -5,8 +5,7 @@ load(
     "default_lockfile_path_from_package",
     "ensure_default_lockfile_exists",
     "extract_lockfile_labels",
-    "prepare_importer_genrule_kwargs",
-    "prepare_importer_non_genrule_nix_calling_wiring",
+    "prepare_language_wiring",
 )
 load("//node/private:nix_test.bzl", "node_nix_test")
 
@@ -19,7 +18,7 @@ def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = []
         default_path = default_lockfile_path_from_package()
         ensure_default_lockfile_exists(default_path, "nix_node_gen")
         lockfile_label = default_lockfile_label_from_package()
-    wiring = prepare_importer_genrule_kwargs(
+    wiring = prepare_language_wiring(
         name = name,
         kwargs = kwargs,
         srcs = srcs,
@@ -29,6 +28,7 @@ def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = []
         labels = labels,
         lockfile_label = lockfile_label,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
+        wiring = "genrule",
     )
     kw = wiring.kwargs
     if out != None:
@@ -57,7 +57,7 @@ def nix_node_test(
         default_path = default_lockfile_path_from_package()
         ensure_default_lockfile_exists(default_path, "nix_node_test")
         lockfile_label = default_lockfile_label_from_package()
-    wiring = prepare_importer_non_genrule_nix_calling_wiring(
+    wiring = prepare_language_wiring(
         name = name,
         kwargs = {},
         deps = deps,
@@ -70,6 +70,7 @@ def nix_node_test(
         MODULE_PROVIDERS = MODULE_PROVIDERS,
         global_inputs_into = "srcs",
         global_inputs_stamp = False,
+        wiring = "non_genrule_nix_calling",
     )
     kw = wiring.kwargs
 

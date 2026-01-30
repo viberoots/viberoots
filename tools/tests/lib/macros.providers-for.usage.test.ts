@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import { test } from "node:test";
 import * as fsp from "node:fs/promises";
+import { test } from "node:test";
 
 async function read(file: string) {
   return await fsp.readFile(file, "utf8");
@@ -32,6 +32,7 @@ test("macros use realize_provider_edges() and avoid direct provider labels", asy
     assert(
       txt.includes("realize_provider_edges(") ||
         txt.includes("merge_provider_edges(") ||
+        txt.includes("prepare_language_wiring(") ||
         txt.includes("prepare_package_local_wiring(") ||
         txt.includes("prepare_importer_genrule_kwargs(") ||
         txt.includes("prepare_importer_non_genrule_wiring(") ||

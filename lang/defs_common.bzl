@@ -66,6 +66,14 @@ load(
     _importer_wiring_mutation_probe = "importer_wiring_mutation_probe",
 )
 load(
+    "//lang:language_wiring.bzl",
+    _prepare_language_wiring = "prepare_language_wiring",
+)
+load(
+    "//lang:language_wiring_probe.bzl",
+    _language_wiring_mutation_probe = "language_wiring_mutation_probe",
+)
+load(
     "//lang:importer_wiring_nix_calling.bzl",
     _prepare_importer_non_genrule_nix_calling_wiring = "prepare_importer_non_genrule_nix_calling_wiring",
 )
@@ -179,7 +187,11 @@ wire_planner_visible_inputs = _wire_planner_visible_inputs
 wire_planner_visible_stub = _wire_planner_visible_stub
 wire_package_local_planner_visible_stub = _wire_package_local_planner_visible_stub
 
-# Preferred package-local macro wiring helper (non-mutating at the call-site boundary).
+# Preferred unified macro wiring helper (non-mutating at the call-site boundary).
+prepare_language_wiring = _prepare_language_wiring
+language_wiring_mutation_probe = _language_wiring_mutation_probe
+#
+# Package-local helper (internal surface).
 prepare_package_local_wiring = _prepare_package_local_wiring
 package_local_wiring_probe = _package_local_wiring_probe
 package_local_wiring_mutation_probe = _package_local_wiring_mutation_probe

@@ -10,7 +10,7 @@ This repository standardizes Node tests through a Nix-backed runner that execute
 
 `nix_node_test(...)` shells out to Nix inside the external runner. To keep invalidation correct, it must attach `global_nix_inputs()` (for example `flake.lock`) as **real action inputs**, not only as labels.
 
-In this repo, Node importer-scoped, non-genrule, Nix-calling macros must route through `prepare_importer_non_genrule_nix_calling_wiring(...)` so importer wiring and global input wiring stay consistent and non-mutating at the call site.
+In this repo, Node importer-scoped, non-genrule, Nix-calling macros must route through `prepare_language_wiring(...)` with `wiring = "non_genrule_nix_calling"` so importer wiring and global input wiring stay consistent and non-mutating at the call site.
 
 ### Running
 

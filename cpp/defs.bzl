@@ -4,8 +4,7 @@ load(
     "dedupe_preserve",
     "merge_link_intent_deps",
     "normalize_labels",
-    "prepare_package_local_wiring",
-    "prepare_package_local_wasm_wiring",
+    "prepare_language_wiring",
     "validate_link_closure_overrides",
     "wire_package_local_planner_visible_stub",
     "wire_package_local_wasm_planner_visible_stub",
@@ -53,13 +52,13 @@ def _cpp_common(name, kind, kwargs):
             labels = dedupe_preserve(labels + ["addon_name:%s" % addon_name])
     kw["labels"] = labels
 
-    wiring = prepare_package_local_wiring(
+    wiring = prepare_language_wiring(
         name = name,
         kwargs = kw,
         lang = "cpp",
         kind = kind,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
-        base_deps = base_deps,
+        deps = base_deps,
     )
     prepared = wiring.kwargs
     srcs = prepared.get("srcs", []) or []

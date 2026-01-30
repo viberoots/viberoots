@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
+import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
-import * as fsp from "node:fs/promises";
 
 test("go/defs.bzl exports nix_go_* macros and uses shared realize_provider_edges", async () => {
   await runInTemp("macros-exports", async (tmp, $) => {
@@ -11,10 +11,9 @@ test("go/defs.bzl exports nix_go_* macros and uses shared realize_provider_edges
       "def nix_go_binary(",
       "def nix_go_test(",
       // Ensure we are delegating to private helpers (policy lives in go/private)
-      'load("//lang:defs_common.bzl", "normalize_labels", "prepare_package_local_wasm_wiring", "prepare_package_local_wiring")',
+      'load("//lang:defs_common.bzl", "normalize_labels", "prepare_language_wiring")',
       'load("//go/private:cgo_wiring.bzl", "apply_go_rule_stable_defaults", "apply_go_tuple_labels", "configure_cgo_kwargs")',
-      "prepare_package_local_wiring(",
-      "prepare_package_local_wasm_wiring(",
+      "prepare_language_wiring(",
     ];
     for (const needle of need) {
       if (!txt.includes(needle)) {

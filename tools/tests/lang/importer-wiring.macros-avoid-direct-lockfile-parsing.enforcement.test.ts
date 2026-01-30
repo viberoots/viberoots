@@ -1,12 +1,17 @@
 #!/usr/bin/env zx-wrapper
-import { test } from "node:test";
 import * as fsp from "node:fs/promises";
+import { test } from "node:test";
 
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message);
 }
 
-const importerScopedMacroImplFiles = ["node/defs_core.bzl", "node/defs_nix.bzl", "python/defs.bzl"];
+const importerScopedMacroImplFiles = [
+  "node/defs_core.bzl",
+  "node/defs_nix.bzl",
+  "python/defs.bzl",
+  "python/defs_pyext_wasm.bzl",
+];
 
 test("importer-scoped macros delegate lockfile parsing/enforcement to //lang:importer_wiring.bzl", async () => {
   for (const file of importerScopedMacroImplFiles) {
@@ -14,16 +19,12 @@ test("importer-scoped macros delegate lockfile parsing/enforcement to //lang:imp
 
     assert(
       !txt.includes('load("//lang:lockfile_labels.bzl"'),
-      `${file} must not load //lang:lockfile_labels.bzl directly; use importer_wiring helpers`,
+      `${file} must not load //lang:lockfile_labels.bzl directly; use shared wiring helpers`,
     );
 
     assert(
-      txt.includes("prepare_importer_genrule_kwargs(") ||
-        txt.includes("prepare_importer_non_genrule_wiring(") ||
-        txt.includes("prepare_importer_srcsless_rule_wiring(") ||
-        txt.includes("prepare_importer_nix_calling_genrule_wiring(") ||
-        txt.includes("prepare_importer_non_genrule_nix_calling_wiring("),
-      `${file} must use the shared prepare_importer_* wiring helpers for importer-scoped macros`,
+      txt.includes("prepare_language_wiring("),
+      `${file} must use prepare_language_wiring(...) for importer-scoped macros`,
     );
 
     const legacyOrRemovedHelpers = [

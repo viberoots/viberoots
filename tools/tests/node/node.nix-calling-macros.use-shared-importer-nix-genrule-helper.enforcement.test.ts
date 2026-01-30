@@ -1,19 +1,19 @@
 #!/usr/bin/env zx-wrapper
-import { test } from "node:test";
 import * as fsp from "node:fs/promises";
+import { test } from "node:test";
 
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message);
 }
 
-test("node Nix-calling macros route through shared importer+nix genrule wiring helper", async () => {
+test("node Nix-calling macros route through unified wiring helper", async () => {
   const file = "node/defs_nix.bzl";
   const txt = await fsp.readFile(file, "utf8");
 
-  const helperCalls = (txt.match(/prepare_importer_nix_calling_genrule_wiring\(/g) || []).length;
+  const helperCalls = (txt.match(/prepare_language_wiring\(/g) || []).length;
   assert(
     helperCalls === 1,
-    `${file} must contain exactly one direct call to prepare_importer_nix_calling_genrule_wiring(...); found ${helperCalls}`,
+    `${file} must contain exactly one direct call to prepare_language_wiring(...); found ${helperCalls}`,
   );
 
   assert(
@@ -22,7 +22,7 @@ test("node Nix-calling macros route through shared importer+nix genrule wiring h
   );
   assert(
     txt.includes("MODULE_PROVIDERS = MODULE_PROVIDERS"),
-    `${file} must pass MODULE_PROVIDERS into prepare_importer_nix_calling_genrule_wiring(...)`,
+    `${file} must pass MODULE_PROVIDERS into prepare_language_wiring(...)`,
   );
 
   assert(

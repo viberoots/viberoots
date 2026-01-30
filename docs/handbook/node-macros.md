@@ -4,7 +4,7 @@ This repo’s Node macros that invoke Nix are intentionally small. They keep Nod
 
 They also use the shared importer-scoped wiring helpers so lockfile enforcement, importer derivation, importer-local patch inputs, and provider-edge realization stay consistent across Node and Python:
 
-- `//lang:defs_common.bzl:prepare_importer_nix_calling_genrule_wiring(...)` for importer-scoped genrule-style macros that invoke Nix (webapp and bundled CLI).
+- `//lang:defs_common.bzl:prepare_language_wiring(...)` with `wiring = "nix_calling_genrule"` for importer-scoped genrule-style macros that invoke Nix (webapp and bundled CLI).
 
 Buck package boundary note:
 
@@ -38,7 +38,7 @@ Node macros include importer-local patches via `native.glob(...)`. Because Buck 
 
 - It still **wires `global_nix_inputs()` as real action inputs** (via `srcs`) so changes like `flake.lock` invalidate tests deterministically.
 - It intentionally sets **`stamp=False`** when wiring global inputs to avoid exporter label noise for tests. Correctness must not depend on labels.
-- Macro authors should treat this as an importer-scoped, non-genrule, Nix-calling shape and route through `//lang:defs_common.bzl:prepare_importer_non_genrule_nix_calling_wiring(...)`.
+- Macro authors should treat this as an importer-scoped, non-genrule, Nix-calling shape and route through `//lang:defs_common.bzl:prepare_language_wiring(...)` with `wiring = "non_genrule_nix_calling"`.
 
 See `docs/handbook/node-tests.md` for usage and runner semantics.
 

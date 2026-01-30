@@ -1,7 +1,7 @@
 load(
     "//lang:defs_common.bzl",
     "merge_link_intent_deps",
-    "prepare_importer_non_genrule_wiring",
+    "prepare_language_wiring",
     "validate_link_closure_overrides",
 )
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
@@ -78,7 +78,7 @@ def nix_python_wasm_extension_module(
     kw["srcs"] = list(srcs or []) + list(headers or [])
 
     merged = merge_link_intent_deps(deps, kw["link_deps"], kw["header_deps"])
-    wiring = prepare_importer_non_genrule_wiring(
+    wiring = prepare_language_wiring(
         name = name,
         kwargs = kw,
         deps = merged,
@@ -87,6 +87,7 @@ def nix_python_wasm_extension_module(
         labels = extra_labels,
         lockfile_label = lockfile_label,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
+        wiring = "non_genrule",
     )
     python_pyext_stub(deps = wiring.deps, **wiring.kwargs)
 

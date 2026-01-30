@@ -3,7 +3,7 @@ load(
     "//lang:defs_common.bzl",
     "append_nixpkg_labels",
     "merge_link_intent_deps",
-    "prepare_importer_non_genrule_wiring",
+    "prepare_language_wiring",
     "stamp_wasm_variant",
     "validate_link_closure_overrides",
 )
@@ -23,7 +23,7 @@ def nix_python_library(name, lockfile_label = None, deps = [], **kwargs):
     """
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     append_nixpkg_labels(kwargs, nixpkg_deps)
-    wiring = prepare_importer_non_genrule_wiring(
+    wiring = prepare_language_wiring(
         name = name,
         kwargs = kwargs,
         deps = deps,
@@ -31,6 +31,7 @@ def nix_python_library(name, lockfile_label = None, deps = [], **kwargs):
         kind = "lib",
         lockfile_label = lockfile_label,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
+        wiring = "non_genrule",
     )
     python_library(deps = wiring.deps, **wiring.kwargs)
 
@@ -42,7 +43,7 @@ def nix_python_binary(name, lockfile_label = None, deps = [], **kwargs):
     append_nixpkg_labels(kwargs, nixpkg_deps)
     if "srcs" in kwargs:
         fail("nix_python_binary does not accept srcs; use main/main_module + deps instead")
-    wiring = prepare_importer_non_genrule_wiring(
+    wiring = prepare_language_wiring(
         name = name,
         kwargs = kwargs,
         deps = deps,
@@ -55,6 +56,7 @@ def nix_python_binary(name, lockfile_label = None, deps = [], **kwargs):
         # without shipping patch files as runtime resources.
         patch_into = None,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
+        wiring = "non_genrule",
     )
 
     # If no patches exist, skip helper targets to avoid extra actions. native.glob tracks future
@@ -105,7 +107,7 @@ def nix_python_test(name, lockfile_label = None, deps = [], **kwargs):
     """
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     append_nixpkg_labels(kwargs, nixpkg_deps)
-    wiring = prepare_importer_non_genrule_wiring(
+    wiring = prepare_language_wiring(
         name = name,
         kwargs = kwargs,
         deps = deps,
@@ -113,6 +115,7 @@ def nix_python_test(name, lockfile_label = None, deps = [], **kwargs):
         kind = "test",
         lockfile_label = lockfile_label,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
+        wiring = "non_genrule",
     )
     python_test(deps = wiring.deps, **wiring.kwargs)
 
@@ -171,7 +174,7 @@ def nix_python_extension_module(
     kw["srcs"] = list(srcs or []) + list(headers or [])
 
     merged = merge_link_intent_deps(deps, kw["link_deps"], kw["header_deps"])
-    wiring = prepare_importer_non_genrule_wiring(
+    wiring = prepare_language_wiring(
         name = name,
         kwargs = kw,
         deps = merged,
@@ -179,6 +182,7 @@ def nix_python_extension_module(
         kind = "pyext",
         lockfile_label = lockfile_label,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
+        wiring = "non_genrule",
     )
     python_pyext_stub(deps = wiring.deps, **wiring.kwargs)
 
@@ -194,7 +198,7 @@ def nix_python_wasm_app(name, lockfile_label = None, deps = [], labels = [], **k
     stamp_wasm_variant(kw, "python", "wasi")
     nixpkg_deps = kw.pop("nixpkg_deps", [])
     append_nixpkg_labels(kw, nixpkg_deps)
-    wiring = prepare_importer_non_genrule_wiring(
+    wiring = prepare_language_wiring(
         name = name,
         kwargs = kw,
         deps = deps,
@@ -203,6 +207,7 @@ def nix_python_wasm_app(name, lockfile_label = None, deps = [], labels = [], **k
         labels = list(labels or []),
         lockfile_label = lockfile_label,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
+        wiring = "non_genrule",
     )
     python_library(deps = wiring.deps, **wiring.kwargs)
 
@@ -214,7 +219,7 @@ def nix_python_wasm_lib(name, lockfile_label = None, deps = [], labels = [], **k
     stamp_wasm_variant(kw, "python", "wasi")
     nixpkg_deps = kw.pop("nixpkg_deps", [])
     append_nixpkg_labels(kw, nixpkg_deps)
-    wiring = prepare_importer_non_genrule_wiring(
+    wiring = prepare_language_wiring(
         name = name,
         kwargs = kw,
         deps = deps,
@@ -223,6 +228,7 @@ def nix_python_wasm_lib(name, lockfile_label = None, deps = [], labels = [], **k
         labels = list(labels or []),
         lockfile_label = lockfile_label,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
+        wiring = "non_genrule",
     )
     python_library(deps = wiring.deps, **wiring.kwargs)
 

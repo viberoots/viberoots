@@ -15,8 +15,8 @@ test("package-local WASM macros use the shared //lang wasm wiring helpers", asyn
     "go/defs.bzl must not call stamp_wasm_variant directly for package-local WASM macros; use prepare_package_local_wasm_wiring(...)",
   );
   assert(
-    goDefs.includes("prepare_package_local_wasm_wiring("),
-    "go/defs.bzl must use prepare_package_local_wasm_wiring(...) for package-local WASM macros",
+    goDefs.includes("prepare_language_wiring("),
+    "go/defs.bzl must use prepare_language_wiring(...) for package-local WASM macros",
   );
 
   assert(
@@ -24,8 +24,8 @@ test("package-local WASM macros use the shared //lang wasm wiring helpers", asyn
     "cpp/wasm_defs.bzl must not call stamp_wasm_variant directly for package-local WASM macros; use prepare_package_local_wasm_wiring(...) or wire_package_local_wasm_planner_visible_stub(...)",
   );
   assert(
-    cppDefs.includes("prepare_package_local_wasm_wiring("),
-    "cpp/wasm_defs.bzl must use prepare_package_local_wasm_wiring(...) for nix_cpp_wasm_static_lib",
+    cppDefs.includes("prepare_language_wiring("),
+    "cpp/wasm_defs.bzl must use prepare_language_wiring(...) for nix_cpp_wasm_static_lib",
   );
   assert(
     cppDefs.includes("wire_package_local_wasm_planner_visible_stub("),

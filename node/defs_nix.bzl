@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "genrule")
-load("//lang:defs_common.bzl", "default_lockfile_label_from_package", "default_lockfile_path_from_package", "ensure_default_lockfile_exists", "extract_lockfile_labels", "importer_from_labels", "prepare_importer_nix_calling_genrule_wiring")
+load("//lang:defs_common.bzl", "default_lockfile_label_from_package", "default_lockfile_path_from_package", "ensure_default_lockfile_exists", "extract_lockfile_labels", "importer_from_labels", "prepare_language_wiring")
 load("//lang:importer_strings.bzl", "importer_display_name", "sanitize_importer_for_nix_attr")
 load(
     "//lang:nix_shell.bzl",
@@ -68,7 +68,7 @@ def _prepare_node_importer_nix_calling_genrule_kwargs(
         kind,
         labels = [],
         lockfile_label = None):
-    return prepare_importer_nix_calling_genrule_wiring(
+    return prepare_language_wiring(
         name = name,
         kwargs = kwargs,
         srcs = srcs,
@@ -81,6 +81,7 @@ def _prepare_node_importer_nix_calling_genrule_kwargs(
         inject_workspace_root_env = True,
         global_inputs_into = "srcs",
         global_inputs_stamp = True,
+        wiring = "nix_calling_genrule",
     )
 
 def node_webapp(
@@ -138,7 +139,6 @@ def node_webapp(
     kw["out"] = out if out != None else "dist"
     kw["cmd"] = cmd
     genrule(**kw)
-
 def nix_node_cli_bin(
     name,
     entry = None,
