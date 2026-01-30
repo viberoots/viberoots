@@ -23,6 +23,10 @@ let
     "tools"
     "types"
   ];
+  rootMdKeep = [
+    "abstractions.md"
+    "getting-started-on-a-pr.md"
+  ];
   isRootFile = rel: !(lib.hasInfix "/" rel) && rel != "";
   isExcludedRootFile = base:
     base == ".envrc" ||
@@ -42,6 +46,7 @@ let
     base == ".patch-sessions.json.tmp" ||
     (lib.hasPrefix "quad-alignment-" base && lib.hasSuffix ".md" base) ||
     (lib.hasPrefix "trio-alignment-" base && lib.hasSuffix ".md" base) ||
+    (lib.hasSuffix ".md" base && !(lib.elem base rootMdKeep)) ||
     (lib.hasPrefix "devbuild.run." base && lib.hasSuffix ".out" base) ||
     (lib.hasPrefix "run." base && lib.hasSuffix ".out" base) ||
     (lib.hasPrefix "v." base && lib.hasSuffix ".out" base);

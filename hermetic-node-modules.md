@@ -22,13 +22,13 @@ This document captures the exact approach we use to make `node_modules` immutabl
   - Copies the resulting directories into its output under the Nix store (read‑only).
 
 - **devShell linking**
-  - On entry, resolves the `.#node-modules` output and symlinks `./node_modules` to it.
-  - Prepends `node_modules/.bin` to `PATH` for CLIs.
-  - Never runs an installer in the shell hook (pure symlink only).
+  - On entry, I only reuse a cached marker or an existing symlink.
+  - I do not run `nix eval` in the shell hook.
+  - I never run an installer in the shell hook (pure symlink only).
 
 ### Dev shell marker and relink checks
 
-I write a marker at `buck-out/tmp/node-modules-link.json` when I link `node_modules` from the repo root. The marker stores the importer, lockfile path, lockfile hash, and Nix output path. On entry, I skip `nix eval` when the symlink target matches the marker and the lockfile hash still matches. When the lockfile changes, I relink and refresh the marker. I skip linking in temp repos unless I set `BNX_DEVSHELL_ALLOW_TMP=1`.
+I write a marker at `buck-out/tmp/node-modules-link.json` when I link `node_modules` from the repo root. The marker stores the importer, lockfile path, lockfile hash, and Nix output path. On entry, I only trust the marker or an existing `node_modules` symlink. If the lockfile changes or the marker is missing, I skip linking. To refresh the link, I run `tools/bin/i`.
 
 ---
 

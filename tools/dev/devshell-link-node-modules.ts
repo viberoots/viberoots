@@ -3,9 +3,8 @@ import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { writeIfChanged } from "../lib/fs-helpers.ts";
 import { findRepoRoot } from "../lib/repo.ts";
-import { findNearestImporterLock, nodeModulesAttr } from "./install/common.ts";
+import { findNearestImporterLock } from "./install/common.ts";
 
 type Marker = {
   importer: string;
@@ -111,17 +110,10 @@ async function main() {
   let outPath = markerValid ? marker?.outPath || "" : "";
 
   if (!outPath) {
-    const assumeTty = String(process.env.BNX_DEVSHELL_ASSUME_TTY || "").trim() === "1";
-    if (!process.stdout.isTTY && !assumeTty) return;
-    const attr = nodeModulesAttr(importer);
-    const flakeRef = `path:${repoRoot}`;
-    const { stdout } =
-      await $`nix eval --raw ${flakeRef}#${attr}.outPath --accept-flake-config`.nothrow();
-    outPath = String(stdout || "").trim();
-    if (!outPath) {
-      const { stdout: s2 } =
-        await $`nix eval --raw ${flakeRef}#node-modules.outPath --accept-flake-config`.nothrow();
-      outPath = String(s2 || "").trim();
+    const existing = await readSymlinkTarget(path.join(cwd, "node_modules"));
+    if (existing && existing.endsWith(`${path.sep}node_modules`)) {
+      const parent = path.dirname(existing);
+      if (await pathExists(path.join(parent, "node_modules"))) outPath = parent;
     }
   }
 
@@ -131,16 +123,7 @@ async function main() {
   const ok = await ensureSymlink(target, path.join(cwd, "node_modules"));
   if (!ok) return;
 
-  if (!lockRel || !lockHash) return;
-  const allowMarker = !isTmp || allowTmp;
-  if (!allowMarker) return;
-  const next: Marker = {
-    importer,
-    lockfile: lockRel,
-    lockHash,
-    outPath,
-  };
-  await writeIfChanged(markerPath, JSON.stringify(next, null, 2) + "\n");
+  if (!markerValid) return;
 }
 
 main().catch((err) => {

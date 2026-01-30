@@ -26,14 +26,41 @@ in {
 
       export PATH="$PWD/tools/bin:$PWD/node_modules/.bin:$PATH"
       
-      # Prefer upstream buck2 binary on PATH (fallback to flake buck2)
-      buck_out=$(nix build github:facebook/buck2#buck2 --no-link --print-out-paths 2>/dev/null || true)
-      if [ -n "$buck_out" ] && [ -x "$buck_out/bin/buck2" ]; then
-        export PATH="$buck_out/bin:$PATH"
+      cache_dir="$PWD/buck-out/tmp/devshell-cache"
+      mkdir -p "$cache_dir" 2>/dev/null || true
+      lock_hash=""
+      if [ -f flake.lock ]; then
+        if command -v shasum >/dev/null 2>&1; then
+          lock_hash="$(shasum -a 256 flake.lock 2>/dev/null | awk '{print $1}')"
+        elif command -v sha256sum >/dev/null 2>&1; then
+          lock_hash="$(sha256sum flake.lock 2>/dev/null | awk '{print $1}')"
+        fi
+      fi
+      if [ -n "$lock_hash" ]; then
+        lock_suffix="-$lock_hash"
       else
-        buck_out_local=$(nix build .#buck2 --no-link --accept-flake-config --print-out-paths 2>/dev/null || true)
-        if [ -n "$buck_out_local" ] && [ -x "$buck_out_local/bin/buck2" ]; then
-          export PATH="$buck_out_local/bin:$PATH"
+        lock_suffix=""
+      fi
+
+      # Prefer upstream buck2 binary on PATH (fallback to flake buck2)
+      buck_cache="$cache_dir/buck2-path$lock_suffix"
+      buck_cached=""
+      if [ -f "$buck_cache" ]; then
+        buck_cached="$(cat "$buck_cache" 2>/dev/null || true)"
+      fi
+      if [ -n "$buck_cached" ] && [ -x "$buck_cached/bin/buck2" ]; then
+        export PATH="$buck_cached/bin:$PATH"
+      else
+        buck_out=$(nix build github:facebook/buck2#buck2 --no-link --print-out-paths 2>/dev/null || true)
+        if [ -n "$buck_out" ] && [ -x "$buck_out/bin/buck2" ]; then
+          export PATH="$buck_out/bin:$PATH"
+          printf "%s\n" "$buck_out" > "$buck_cache" 2>/dev/null || true
+        else
+          buck_out_local=$(nix build .#buck2 --no-link --accept-flake-config --print-out-paths 2>/dev/null || true)
+          if [ -n "$buck_out_local" ] && [ -x "$buck_out_local/bin/buck2" ]; then
+            export PATH="$buck_out_local/bin:$PATH"
+            printf "%s\n" "$buck_out_local" > "$buck_cache" 2>/dev/null || true
+          fi
         fi
       fi
 
@@ -83,12 +110,22 @@ EOF
 
       # Symlink prelude from flake output for local dev if missing; do not edit .buckconfig here
       if [ ! -e prelude ]; then
-        pre_out=$(nix build .#buck2-prelude --no-link --accept-flake-config --print-out-paths 2>/dev/null || true)
-        if [ -z "$pre_out" ]; then
-          pre_out="${pkgs.nix}/bin/nix eval --raw .#inputs.buck2.outPath 2>/dev/null || true"
+        pre_cache="$cache_dir/prelude-path$lock_suffix"
+        pre_cached=""
+        if [ -f "$pre_cache" ]; then
+          pre_cached="$(cat "$pre_cache" 2>/dev/null || true)"
         fi
-        if [ -n "$pre_out" ] && [ -d "$pre_out/prelude" ]; then
-          ln -s "$pre_out/prelude" prelude 2>/dev/null || true
+        if [ -n "$pre_cached" ] && [ -d "$pre_cached/prelude" ]; then
+          ln -s "$pre_cached/prelude" prelude 2>/dev/null || true
+        else
+          pre_out=$(nix build .#buck2-prelude --no-link --accept-flake-config --print-out-paths 2>/dev/null || true)
+          if [ -z "$pre_out" ]; then
+            pre_out="${pkgs.nix}/bin/nix eval --raw .#inputs.buck2.outPath 2>/dev/null || true"
+          fi
+          if [ -n "$pre_out" ] && [ -d "$pre_out/prelude" ]; then
+            ln -s "$pre_out/prelude" prelude 2>/dev/null || true
+            printf "%s\n" "$pre_out" > "$pre_cache" 2>/dev/null || true
+          fi
         fi
       fi
     '';

@@ -125,3 +125,24 @@ export async function probeCopyFileCloneSupport(): Promise<boolean> {
     await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
   }
 }
+
+export async function probeCopyFileCloneSupportFrom(args: {
+  srcFile: string;
+  dstDir: string;
+  cloneMode: CopyFileCloneMode;
+}): Promise<boolean> {
+  const flag = cloneFlagForMode(args.cloneMode);
+  if (flag === null) return false;
+
+  const probeDir = await fsp.mkdtemp(path.join(args.dstDir, ".clone-probe-"));
+  try {
+    const dst = path.join(probeDir, "probe.txt");
+    await fsp.copyFile(args.srcFile, dst, flag);
+    return true;
+  } catch (e) {
+    if (isCloneUnsupportedError(e)) return false;
+    throw e;
+  } finally {
+    await fsp.rm(probeDir, { recursive: true, force: true }).catch(() => {});
+  }
+}

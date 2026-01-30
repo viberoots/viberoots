@@ -418,6 +418,72 @@ Implement to improve DX while retaining deterministic correctness.
 
 ---
 
+### PR-6: Seed copy CoW + smaller single seed
+
+#### Description
+
+Reduce full-suite verify time by (1) making seed repo copies CoW when supported and (2) trimming the single seed snapshot without introducing per-test seed builds. This keeps isolation, keeps one seed derivation, and avoids extra build churn.
+
+#### Scope & Changes
+
+- `tools/tests/lib/test-helpers/seed-store.ts`:
+  - Probe clone support once per worker and choose a fixed copy strategy.
+  - Prefer `copyTree` with `cloneMode="force"` when reflink CoW is supported.
+  - Fall back to `cloneMode="none"` when unsupported to avoid per-file clone fallbacks.
+- `tools/lib/copy-tree.ts`:
+  - Reuse existing `probeCopyFileCloneSupport()` for a stable, cross-platform decision.
+  - No platform-specific tooling required.
+- `tools/nix/flake/packages/filter-seed-repo.nix`:
+  - Tighten the seed filter to exclude additional non-test-critical files.
+  - Keep a single seed derivation; do not add per-test or per-scope seeds.
+
+#### Tight-Loop Validation (before full suite)
+
+Use the existing verify timing summary to validate improvements quickly:
+
+1. Run a short sample:
+   - `TEST_TIMING=summary ./tools/bin/v //:devshell_node_modules_marker_fast_path`
+2. Confirm timing output:
+   - `seedStoreCopy(...)` entries should drop when reflink is supported.
+   - No increase in `rsyncRepoTo` counts.
+3. Run a focused subset of heavy scaffolders:
+   - `TEST_TIMING=summary ./tools/bin/v //:scaffolding_node_cli_scaffold_and_build_shim_and_bundle`
+   - `TEST_TIMING=summary ./tools/bin/v //:scaffolding_node_go_addon_nix_node_test_pass`
+4. Only after the above looks good, run the full suite.
+
+#### Tests (in this PR)
+
+- Extend `tools/tests/lib/runInTemp.seed-store.isolation.test.ts`:
+  - Verify seed copy still produces a writable workspace when clone mode is enabled.
+- Add `tools/tests/lib/runInTemp.seed-store.clone-mode.probe.test.ts`:
+  - Assert the probe result is cached per worker and does not re-run per test.
+- Update the existing seed-store tests to ensure no new seed derivations are created.
+
+#### Acceptance Criteria
+
+- Full suite completes with reduced aggregate `seedStoreCopy(...)` time when reflink is supported.
+- No increase in `rsyncRepoTo` occurrences.
+- All tests pass on platforms without reflink support (falls back cleanly).
+- Only one seed derivation is built per verify run.
+
+#### Risks
+
+Low to medium. Over-trimming the seed could remove files used by some tests; the tight-loop validation is intended to catch this before a full run.
+
+#### Consequence of Not Implementing
+
+Full-suite verify continues to spend most of its time copying the seed repo.
+
+#### Downsides for Implementing
+
+Adds probe logic and a slightly stricter seed filter that must be kept aligned with test needs.
+
+#### Recommendation
+
+Implement to reduce the dominant `seedStoreCopy` overhead without adding extra seed builds.
+
+---
+
 ## Completion Criteria
 
 - All Node macros accept omitted `lockfile_label` when the package follows the importer convention.

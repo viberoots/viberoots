@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
@@ -23,10 +24,20 @@ async function readLines(file: string): Promise<string[]> {
   }
 }
 
-test("devshell marker skips nix eval when fresh", async () => {
+async function pathExists(p: string): Promise<boolean> {
+  try {
+    await fsp.access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+test("devshell marker avoids nix eval", async () => {
   await runInTemp("devshell-marker", async (tmp) => {
     const lockfile = path.join(tmp, "pnpm-lock.yaml");
-    await fsp.writeFile(lockfile, "lockfileVersion: 1\n", "utf8");
+    const lockV1 = "lockfileVersion: 1\n";
+    await fsp.writeFile(lockfile, lockV1, "utf8");
 
     const fakeOut1 = path.join(tmp, "fake-out-1");
     await fsp.mkdir(path.join(fakeOut1, "node_modules"), { recursive: true });
@@ -50,10 +61,30 @@ test("devshell marker skips nix eval when fresh", async () => {
       ...process.env,
       PATH: `${binDir}:${process.env.PATH || ""}`,
       BNX_DEVSHELL_ALLOW_TMP: "1",
-      BNX_DEVSHELL_ASSUME_TTY: "1",
       WORKSPACE_ROOT: tmp,
       NO_NODE_MODULES_LINK: "",
     };
+
+    await runNodeWithZx({ script, cwd: tmp, env: baseEnv, zxInitPath, stdio: "pipe" });
+    assert.equal(await pathExists(path.join(tmp, "node_modules")), false);
+
+    const lockHash = crypto.createHash("sha256").update(lockV1).digest("hex");
+    const markerPath = path.join(tmp, "buck-out", "tmp", "node-modules-link.json");
+    await fsp.mkdir(path.dirname(markerPath), { recursive: true });
+    await fsp.writeFile(
+      markerPath,
+      JSON.stringify(
+        {
+          importer: ".",
+          lockfile: "pnpm-lock.yaml",
+          lockHash,
+          outPath: fakeOut1,
+        },
+        null,
+        2,
+      ) + "\n",
+      "utf8",
+    );
 
     await runNodeWithZx({ script, cwd: tmp, env: baseEnv, zxInitPath, stdio: "pipe" });
 
@@ -63,44 +94,22 @@ test("devshell marker skips nix eval when fresh", async () => {
     const target = await fsp.readlink(nm);
     assert.equal(target, path.join(fakeOut1, "node_modules"));
 
-    const markerPath = path.join(tmp, "buck-out", "tmp", "node-modules-link.json");
     const marker = JSON.parse(await fsp.readFile(markerPath, "utf8"));
     assert.equal(marker.importer, ".");
     assert.equal(marker.lockfile, "pnpm-lock.yaml");
     assert.equal(marker.outPath, fakeOut1);
 
     const calls1 = await readLines(callsFile);
-    assert.equal(calls1.length, 1);
+    assert.equal(calls1.length, 0);
 
-    await writeExecutable(
-      nixPath,
-      ["#!/usr/bin/env bash", "set -euo pipefail", `echo call >> "${callsFile}"`, "exit 2"].join(
-        "\n",
-      ),
-    );
-    await runNodeWithZx({ script, cwd: tmp, env: baseEnv, zxInitPath, stdio: "pipe" });
-    const calls2 = await readLines(callsFile);
-    assert.equal(calls2.length, 1);
-
-    const fakeOut2 = path.join(tmp, "fake-out-2");
-    await fsp.mkdir(path.join(fakeOut2, "node_modules"), { recursive: true });
-    await writeExecutable(
-      nixPath,
-      [
-        "#!/usr/bin/env bash",
-        "set -euo pipefail",
-        `echo call >> "${callsFile}"`,
-        `echo "${fakeOut2}"`,
-      ].join("\n"),
-    );
     await fsp.writeFile(lockfile, "lockfileVersion: 2\n", "utf8");
     await runNodeWithZx({ script, cwd: tmp, env: baseEnv, zxInitPath, stdio: "pipe" });
 
     const target2 = await fsp.readlink(nm);
-    assert.equal(target2, path.join(fakeOut2, "node_modules"));
-    const calls3 = await readLines(callsFile);
-    assert.equal(calls3.length, 2);
+    assert.equal(target2, path.join(fakeOut1, "node_modules"));
+    const calls2 = await readLines(callsFile);
+    assert.equal(calls2.length, 0);
     const marker2 = JSON.parse(await fsp.readFile(markerPath, "utf8"));
-    assert.equal(marker2.outPath, fakeOut2);
+    assert.equal(marker2.outPath, fakeOut1);
   });
 });

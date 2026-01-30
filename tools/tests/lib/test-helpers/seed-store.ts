@@ -1,6 +1,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { copyTree } from "../../../lib/copy-tree.ts";
+import { copyTree, probeCopyFileCloneSupportFrom } from "../../../lib/copy-tree.ts";
 import "./worker-init";
 
 type TimeAsync = <T>(label: string, fn: () => Promise<T>) => Promise<T>;
@@ -13,6 +13,10 @@ type SeedDeps = {
 type RepoInitMode = "rsync" | "seed-store";
 
 const requiredFiles = ["flake.nix", path.join("tools", "buck", "export-graph.ts")];
+const CLONE_PROBE_LABEL = "seedStore clone probe (copyFileCloneSupport)";
+
+let seedStoreCloneMode: "force" | "none" | null = null;
+let seedStoreCloneModePromise: Promise<"force" | "none"> | null = null;
 
 function isVerifyMode(): boolean {
   return Boolean(process.env.BNX_VERIFY_LOCK_DIR || process.env.BNX_VERIFY_LOG_FILE);
@@ -48,6 +52,29 @@ async function requireSeedPath(seedPath: string, seedKey: string): Promise<void>
   }
 }
 
+async function seedStoreCloneModeOncePerWorker(args: {
+  timeAsync: TimeAsync;
+  seedPath: string;
+  tmpDir: string;
+}): Promise<"force" | "none"> {
+  if (seedStoreCloneMode) return seedStoreCloneMode;
+  if (!seedStoreCloneModePromise) {
+    seedStoreCloneModePromise = (async () => {
+      const srcFile = path.join(args.seedPath, "flake.nix");
+      const supported = await args.timeAsync(CLONE_PROBE_LABEL, async () => {
+        return await probeCopyFileCloneSupportFrom({
+          srcFile,
+          dstDir: args.tmpDir,
+          cloneMode: "force",
+        });
+      });
+      seedStoreCloneMode = supported ? "force" : "none";
+      return seedStoreCloneMode;
+    })();
+  }
+  return await seedStoreCloneModePromise;
+}
+
 export async function initTempRepoFromSeedStore(args: {
   tmpDir: string;
   deps: SeedDeps;
@@ -68,8 +95,13 @@ export async function initTempRepoFromSeedStore(args: {
   }
   await requireSeedPath(seedPath, seedKey);
   await assertRequiredFiles(seedPath, "seed store");
+  const cloneMode = await seedStoreCloneModeOncePerWorker({
+    timeAsync: deps.timeAsync,
+    seedPath,
+    tmpDir,
+  });
   await deps.timeAsync(`seedStoreCopy(${path.basename(tmpDir)})`, async () => {
-    await copyTree(seedPath, tmpDir, { cloneMode: "try", force: true });
+    await copyTree(seedPath, tmpDir, { cloneMode, force: true });
   });
   try {
     await $`bash --noprofile --norc -c ${`chmod -R u+w ${tmpDir} >/dev/null 2>&1 || true`}`;

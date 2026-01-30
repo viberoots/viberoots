@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
@@ -25,6 +26,7 @@ test("runInTemp seed repo does not leak mutations across temp repos", async () =
 
     await runInTemp("seed-isolation-1", async (tmp) => {
       const p = path.join(tmp, targetRel);
+      await fsp.access(p, fs.constants.W_OK);
       await fsp.appendFile(p, "\nseed-isolation-test: mutated\n", "utf8");
     });
 
