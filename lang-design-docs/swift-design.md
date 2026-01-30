@@ -36,6 +36,10 @@ I follow the repo-wide linking model described in `cpp-linking.md`, `wasm-linkin
 - `link_closure` defaults to `"direct"`. `"transitive"` follows `link_deps` only via `tools/nix/planner/link-closure.nix`.
 - Ordering is deterministic and unsupported deps fail fast with targeted errors.
 
+### C interop requirement
+
+If the language can support C interop, I must provide a documented and tested path to link or call C code using the repo linking model (explicit `link_deps` and deterministic closure). If the language cannot support C interop, this doc must state why and list the constraints.
+
 ---
 
 ## Path Invariants and Naming

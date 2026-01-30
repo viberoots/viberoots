@@ -40,6 +40,9 @@ load(
 )
 load(
     "//lang:provider_edges.bzl",
+    _merge_provider_edges_dict_safe_probe = "merge_provider_edges_dict_safe_probe",
+    _merge_provider_edges_list_probe = "merge_provider_edges_list_probe",
+    _merge_provider_edges = "merge_provider_edges",
     _providers_for = "providers_for",
     _realize_provider_edges = "realize_provider_edges",
     _realize_provider_edges_probe = "realize_provider_edges_probe",
@@ -159,6 +162,9 @@ target_key_for_current_package = _target_key_for_current_package
 providers_for = _providers_for
 realize_provider_edges = _realize_provider_edges
 realize_provider_edges_probe = _realize_provider_edges_probe
+merge_provider_edges = _merge_provider_edges
+merge_provider_edges_list_probe = _merge_provider_edges_list_probe
+merge_provider_edges_dict_safe_probe = _merge_provider_edges_dict_safe_probe
 strip_provider_targets = _strip_provider_targets
 strip_provider_targets_probe = _strip_provider_targets_probe
 

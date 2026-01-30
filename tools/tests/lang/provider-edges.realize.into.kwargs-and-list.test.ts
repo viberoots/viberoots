@@ -13,7 +13,7 @@ test("realize_provider_edges merges deterministically for both list and kwargs b
       [
         "",
         "# test: provider-edges.realize.into.kwargs-and-list.test.ts",
-        'load("//lang:defs_common.bzl", "realize_provider_edges_probe")',
+        'load("//lang:defs_common.bzl", "merge_provider_edges_list_probe", "realize_provider_edges_probe")',
         "",
         "realize_provider_edges_probe(",
         '  name = "list_base",',
@@ -22,6 +22,14 @@ test("realize_provider_edges merges deterministically for both list and kwargs b
         '  base_list = ["//a:x", "//third_party/providers:p2"],',
         '  into = "deps",',
         "  use_kwargs = False,",
+        ")",
+        "",
+        "merge_provider_edges_list_probe(",
+        '  name = "merge_list_base",',
+        '  target_name = "t",',
+        '  providers = ["//third_party/providers:p1", "//third_party/providers:p2", "//third_party/providers:p1"],',
+        '  base_list = ["//a:x", "//third_party/providers:p2"],',
+        '  into = "deps",',
         ")",
         "",
         "realize_provider_edges_probe(",
@@ -40,7 +48,7 @@ test("realize_provider_edges merges deterministically for both list and kwargs b
     const res = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`buck2 build --target-platforms //:no_cgo --show-output //:list_base //:kwargs_base`;
+    })`buck2 build --target-platforms //:no_cgo --show-output //:list_base //:kwargs_base //:merge_list_base`;
 
     const txt = String(res.stdout || "").trim();
     const outputs = new Map<string, string>();
@@ -51,8 +59,10 @@ test("realize_provider_edges merges deterministically for both list and kwargs b
 
     const listOut = outputs.get("root//:list_base");
     const kwargsOut = outputs.get("root//:kwargs_base");
+    const mergeListOut = outputs.get("root//:merge_list_base");
     assert.ok(listOut, "expected output for list_base");
     assert.ok(kwargsOut, "expected output for kwargs_base");
+    assert.ok(mergeListOut, "expected output for merge_list_base");
 
     const listLines = (await fsp.readFile(path.join(tmp, listOut!), "utf8"))
       .trim()
@@ -62,9 +72,14 @@ test("realize_provider_edges merges deterministically for both list and kwargs b
       .trim()
       .split("\n")
       .filter(Boolean);
+    const mergeListLines = (await fsp.readFile(path.join(tmp, mergeListOut!), "utf8"))
+      .trim()
+      .split("\n")
+      .filter(Boolean);
 
     const expected = ["//a:x", "//third_party/providers:p2", "//third_party/providers:p1"];
     assert.deepEqual(listLines, expected, "list base merge should be stable and deduped");
     assert.deepEqual(kwargsLines, expected, "kwargs base merge should be stable and deduped");
+    assert.deepEqual(mergeListLines, expected, "merge_provider_edges should preserve ordering");
   });
 });

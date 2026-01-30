@@ -1,4 +1,6 @@
 load("//lang:collections.bzl", "dedupe_preserve")
+load("//lang:dict_inputs.bzl", "PROVIDER_EDGES_KEY_PREFIX", "attach_items_dict_safe")
+load("//lang:auto_map.bzl", _DEFAULT_MODULE_PROVIDERS = "MODULE_PROVIDERS")
 load("@prelude//:rules.bzl", "genrule")
 
 def target_key_for_current_package(name):
@@ -35,6 +37,73 @@ def realize_provider_edges(MODULE_PROVIDERS, name, into = "deps", base = None):
         return merged
 
     fail("realize_provider_edges: base must be None, list, or dict; got: %s" % base)
+
+
+def merge_provider_edges(
+        name,
+        deps,
+        into = "deps",
+        base = None,
+        dict_safe = False,
+        key_prefix = PROVIDER_EDGES_KEY_PREFIX,
+        MODULE_PROVIDERS = None):
+    provs = _DEFAULT_MODULE_PROVIDERS if MODULE_PROVIDERS == None else MODULE_PROVIDERS
+
+    if dict_safe:
+        dst_to_src = {} if base == None else (dict(base) if isinstance(base, dict) else {})
+        merged = realize_provider_edges(provs, name, into = into, base = (deps or []))
+        return attach_items_dict_safe(dst_to_src, merged, key_prefix)
+
+    merged_base = deps if base == None else base
+    return realize_provider_edges(provs, name, into = into, base = merged_base)
+
+
+def merge_provider_edges_list_probe(name, target_name, providers, base_list = [], into = "deps"):
+    MODULE_PROVIDERS = {
+        target_key_for_current_package(target_name): providers,
+    }
+    merged = merge_provider_edges(target_name, base_list, into = into, MODULE_PROVIDERS = MODULE_PROVIDERS)
+    out = name + ".txt"
+    genrule(
+        name = name,
+        srcs = [],
+        out = out,
+        cmd = "cat > $OUT <<'EOF'\n%s\nEOF" % "\n".join(merged),
+        labels = ["kind:probe"],
+    )
+
+
+def merge_provider_edges_dict_safe_probe(
+        name,
+        target_name,
+        providers,
+        deps = [],
+        base_dict = None,
+        key_prefix = PROVIDER_EDGES_KEY_PREFIX):
+    MODULE_PROVIDERS = {
+        target_key_for_current_package(target_name): providers,
+    }
+    dst_to_src = {} if base_dict == None else (dict(base_dict) if isinstance(base_dict, dict) else {})
+    merged = merge_provider_edges(
+        target_name,
+        deps,
+        into = "srcs",
+        base = dst_to_src,
+        dict_safe = True,
+        key_prefix = key_prefix,
+        MODULE_PROVIDERS = MODULE_PROVIDERS,
+    )
+    out = name + ".items.txt"
+    lines = []
+    for k in sorted(merged.keys()):
+        lines.append("%s=%s" % (k, merged[k]))
+    genrule(
+        name = name,
+        srcs = [],
+        out = out,
+        cmd = "cat > $OUT <<'EOF'\n%s\nEOF" % "\n".join(lines),
+        labels = ["kind:probe"],
+    )
 
 
 def realize_provider_edges_probe(name, target_name, providers, base_list = [], into = "deps", use_kwargs = False):

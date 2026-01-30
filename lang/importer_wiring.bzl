@@ -1,5 +1,6 @@
 load("//lang:dict_inputs.bzl", "PATCH_INPUTS_KEY_PREFIX", "PROVIDER_EDGES_KEY_PREFIX")
-load("//lang:importer_wiring_primitives.bzl", "attach_importer_patch_inputs", "merge_provider_edges", "require_single_importer_lockfile_label")
+load("//lang:importer_wiring_primitives.bzl", "attach_importer_patch_inputs", "require_single_importer_lockfile_label")
+load("//lang:provider_edges.bzl", "merge_provider_edges")
 load("//lang:label_stamping.bzl", "stamp_labels", "stamp_patch_scope_for_lang")
 load("//lang:lockfile_labels.bzl", "importer_from_labels")
 load(
