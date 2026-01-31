@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { isProviderPackageNode } from "../../lib/graph-utils.ts";
 import { readCompositeGraph } from "../../lib/graph-view.ts";
 import { providersForLabels } from "../../lib/labels.ts";
 
@@ -99,6 +100,7 @@ export async function computeCoverageMissing(): Promise<CoverageMiss[]> {
     for (const n of comp.nodes) {
       const nodeName = (n as any)?.name || "";
       if (!nodeName) continue;
+      if (isProviderPackageNode(nodeName)) continue;
       const expected = providersForLabels((n as any).labels);
       if (expected.length === 0) continue;
       for (const prov of expected) {
