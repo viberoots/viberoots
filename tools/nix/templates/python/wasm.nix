@@ -31,12 +31,12 @@ in {
         if buckTestSrc != "" then buckTestSrc
         else if workspaceEnv != "" then workspaceEnv
         else builtins.toString srcRoot;
-      patchesMap = H.patchesMapFromImporterDirToStore {
-        srcRoot = srcRoot;
-        subdir = subdir;
-        lang = "python";
+      patchDir = builtins.toPath ("${builtins.toString srcRoot}/${subdir}/patches/python");
+      patchesMap = H.patchesMapFromDirsWith {
+        dirs = [ patchDir ];
         normalizeVersion = (v: lib.head (lib.splitString "-" v));
         namePrefix = "py-patch";
+        materialize = true;
       };
       patchedKeys = builtins.attrNames patchesMap;
       overlaysCount = builtins.length libOverlays;

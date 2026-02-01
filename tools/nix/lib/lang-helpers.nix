@@ -112,32 +112,42 @@ let
               version = lib.toLower version;
             };
 
-  # Build {"importPath@version" = [ /abs/path.patch ... ]} from a flat patches/<lang>/*.patch directory.
-  # Filenames encode import path with '/' -> '__' and suffix '@<version>.patch'.
-  patchesMapFromDir = patchDir:
+  patchesMapFromDirWith = { dir, normalizeVersion ? (v: v), materialize ? false, namePrefix ? "patch" }:
     let
-      names = if builtins.pathExists patchDir then builtins.attrNames (builtins.readDir patchDir) else [];
+      names = if builtins.pathExists dir then builtins.attrNames (builtins.readDir dir) else [];
       isPatch = name: lib.hasSuffix ".patch" name;
       step = acc: name:
         let
-          d = decodePatchFilename { inherit name; };
+          d = decodePatchFilename { inherit name normalizeVersion; };
         in
           if d == null
           then acc
           else
             let
               key = d.key;
-              val = (acc.${key} or []) ++ [ "${patchDir}/${name}" ];
-            in acc // { "${key}" = val; };
+              val =
+                if materialize
+                then
+                  let
+                    content = builtins.readFile (dir + "/" + name);
+                    storeFile = pkgs.writeText "${namePrefix}-${key}-${name}" content;
+                  in builtins.toString storeFile
+                else "${dir}/${name}";
+              prev = acc.${key} or [];
+            in acc // { "${key}" = prev ++ [ val ]; };
     in builtins.foldl' step {} (lib.filter isPatch names);
 
-  # Build a merged patches map from multiple directories, preserving per-dir list order.
-  # Later directories append to earlier ones for identical keys.
-  patchesMapFromDirs = dirs:
+  patchesMapFromDirsWith = { dirs, normalizeVersion ? (v: v), materialize ? false, namePrefix ? "patch" }:
     let
-      scan = dir: patchesMapFromDir dir;
+      scan = dir: patchesMapFromDirWith { inherit dir normalizeVersion materialize namePrefix; };
       merge = a: b: pkgs.lib.foldlAttrs (acc: k: v: acc // { "${k}" = (acc.${k} or []) ++ v; }) a b;
     in pkgs.lib.foldl' merge {} (map scan dirs);
+
+  patchesMapFromDir = patchDir:
+    patchesMapFromDirWith { dir = patchDir; };
+
+  patchesMapFromDirs = dirs:
+    patchesMapFromDirsWith { inherit dirs; };
 
   readDevOverrides = envName:
     let
@@ -178,46 +188,15 @@ let
     sanitizeAttrNameFromTargetLabel
     normalizeNixAttr
     decodePatchFilename
+    patchesMapFromDirWith
+    patchesMapFromDirsWith
     patchesMapFromDir
     patchesMapFromDirs
     readDevOverrides
     guardNoDevOverridesInCI;
-
-  /*
-    Build {"importPath@version" = [ /nix/store/...-patch1 /nix/store/...-patch2 ... ]}
-    by scanning a flat patches/<lang>/*.patch directory and materializing each file
-    into the store for stable content-addressed inputs (used by Python).
-
-    Options:
-      - dir: absolute path to the flat directory containing *.patch files
-      - normalizeVersion: function string -> string to normalize version segments
-                          (default = identity; Python strips suffix after "-")
-      - namePrefix: prefix used for pkgs.writeText store file names
-  */
   patchesMapFromDirToStore = { dir, normalizeVersion ? (v: v), namePrefix ? "patch" }:
-    let
-      names = if builtins.pathExists dir then builtins.attrNames (builtins.readDir dir) else [];
-      isPatch = name: lib.hasSuffix ".patch" name;
-      step = acc: name:
-        let
-          d = decodePatchFilename { inherit name normalizeVersion; };
-        in
-          if d == null
-          then acc
-          else
-            let
-              key = d.key;
-              content = builtins.readFile (dir + "/" + name);
-              storeFile = pkgs.writeText "${namePrefix}-${key}-${name}" content;
-              prev = acc.${key} or [];
-            in acc // { "${key}" = prev ++ [ (builtins.toString storeFile) ]; };
-    in builtins.foldl' step {} (lib.filter isPatch names);
+    patchesMapFromDirWith { inherit dir normalizeVersion namePrefix; materialize = true; };
 
-  /*
-    Convenience wrapper for importer-local patches living under:
-      <srcRoot>/<subdir>/patches/<lang>
-    Produces the same {"importPath@version" = [ /nix/store/... ]} map as above.
-  */
   patchesMapFromImporterDirToStore = {
     srcRoot,
     subdir ? ".",
@@ -229,11 +208,11 @@ let
       rootStr = builtins.toString srcRoot;
       dir = builtins.toPath ("${rootStr}/${subdir}/patches/${lang}");
     in
-      if builtins.pathExists dir
-      then patchesMapFromDirToStore {
-        inherit dir normalizeVersion namePrefix;
-      }
-      else {};
+      patchesMapFromDirsWith {
+        dirs = [ dir ];
+        inherit normalizeVersion namePrefix;
+        materialize = true;
+      };
 }
 
 

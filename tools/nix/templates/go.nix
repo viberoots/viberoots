@@ -40,7 +40,7 @@ in {
   }:
     let
       # Merge patches from multiple directories; preserve keys and lists
-      patchesMap = H.patchesMapFromDirs patchDirs;
+      patchesMap = H.patchesMapFromDirsWith { dirs = patchDirs; };
       devOverridesFromEnv = H.readDevOverrides devOverrideEnv;
       _guard = H.guardNoDevOverridesInCI devOverrideEnv;
       devOverrides = (devOverridesMap // devOverridesFromEnv);
@@ -87,7 +87,7 @@ in {
     repoCgoPkgs ? [],
   }:
     let
-      patchesMap = H.patchesMapFromDirs patchDirs;
+      patchesMap = H.patchesMapFromDirsWith { dirs = patchDirs; };
       _guard = H.guardNoDevOverridesInCI devOverrideEnv;
       srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + subdir));
       cgo = mkCgoEnv { inherit nixCgoPkgs nixCgoAttrs repoCgoPkgs; };
@@ -126,7 +126,7 @@ in {
     repoCgoPkgs ? [],
   }:
     let
-      patchesMap = H.patchesMapFromDir patchDir;
+      patchesMap = H.patchesMapFromDirsWith { dirs = [ patchDir ]; };
       _guard = H.guardNoDevOverridesInCI devOverrideEnv;
       srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + subdir));
       cgo = mkCgoEnv { inherit nixCgoPkgs nixCgoAttrs repoCgoPkgs; };

@@ -282,8 +282,8 @@ in
 
 Canonical patch map helpers live in `tools/nix/lib/lang-helpers.nix`. Templates must import these rather than re‑implementing scanners:
 
-- `patchesMapFromDir`, `patchesMapFromDirs` — path‑based scanning (Go/C++).
-- `patchesMapFromDirToStore`, `patchesMapFromImporterDirToStore` — store‑materialized inputs (Python), same canonical keying (`__` ↔ `/`, case‑insensitive `importPath@version`).
+- `patchesMapFromDirsWith` — canonical helper; accepts patch dirs, optional version normalization, and store materialization (Python).
+- Wrappers: `patchesMapFromDir`, `patchesMapFromDirs`, `patchesMapFromDirToStore`, `patchesMapFromImporterDirToStore`.
 
 For the canonical cross-language patch filename decoding contract (and the parity tests that lock it), see `abstractions.md`.
 

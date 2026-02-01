@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
+import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import assert from "node:assert/strict";
 import { runInTemp } from "../lib/test-helpers";
 
 test("lang-helpers: patchesMapFromDirs merges per-dir maps preserving order", async () => {
@@ -23,7 +23,9 @@ test("lang-helpers: patchesMapFromDirs merges per-dir maps preserving order", as
       let
         pkgs = import <nixpkgs> {};
         H = import ./tools/nix/lib/lang-helpers.nix { inherit pkgs; };
-      in H.patchesMapFromDirs (map builtins.toPath [ ${JSON.stringify(d1)} ${JSON.stringify(d2)} ])
+      in H.patchesMapFromDirsWith {
+        dirs = map builtins.toPath [ ${JSON.stringify(d1)} ${JSON.stringify(d2)} ];
+      }
     `;
     const { stdout } = await $({ cwd: tmp })`nix eval --impure --expr ${expr} --json`;
     const obj = JSON.parse(String(stdout || "{}"));

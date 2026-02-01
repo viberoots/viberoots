@@ -22,12 +22,12 @@ let
   }:
     let
       _guard = H.guardNoDevOverridesInCI devOverrideEnv;
-      # Prefer scanning importer-local patches under <subdir>/patches/python using shared helper
-      patchesMap = H.patchesMapFromImporterDirToStore {
-        inherit srcRoot subdir;
-        lang = "python";
+      patchDir = builtins.toPath ("${builtins.toString srcRoot}/${subdir}/patches/python");
+      patchesMap = H.patchesMapFromDirsWith {
+        dirs = [ patchDir ];
         normalizeVersion = (v: lib.head (lib.splitString "-" v));
         namePrefix = "py-patch";
+        materialize = true;
       };
       devOverrides = H.readDevOverrides devOverrideEnv;
       # Also pass through the live workspace root for test-only origin lookups
@@ -167,12 +167,12 @@ in {
     patchDirs ? [ ../../patches/python ],
   }:
     let
-      # Compute importer-local patch map exactly as mkPy (reuse logic to ensure identical keys).
-      patchesMap = H.patchesMapFromImporterDirToStore {
-        inherit srcRoot subdir;
-        lang = "python";
+      patchDir = builtins.toPath ("${builtins.toString srcRoot}/${subdir}/patches/python");
+      patchesMap = H.patchesMapFromDirsWith {
+        dirs = [ patchDir ];
         normalizeVersion = (v: lib.head (lib.splitString "-" v));
         namePrefix = "py-patch";
+        materialize = true;
       };
 
       # Build a minimal store directory containing only the lockfile at ./uv.lock
