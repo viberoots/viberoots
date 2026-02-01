@@ -65,6 +65,8 @@ For language macros, stamping is the macro’s responsibility. Call sites should
 - **Nix planner kind inference (shared)**: `tools/nix/planner/lib.nix:kindOf` with per-language configs in planner plugins. Planners must not re-implement `kindOf`.
 - **TypeScript exporter validation**: importer-scoped adapters warn when `kind:*` is missing for targets that should have it.
   - `tools/buck/exporter/lang/importer-scoped-adapter.ts`
+- **TypeScript exporter classification registry**: shared config for looks-like rules, rule-type prefixes, labels, and guidance.
+  - `tools/buck/exporter/lang/classification-registry.ts`
 
 ### Regression guards
 

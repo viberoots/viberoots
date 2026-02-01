@@ -4,6 +4,7 @@ This guide shows how to write and test an exporter adapter with minimal ceremony
 
 - **Auto-discovery**: put `tools/buck/exporter/lang/<id>.ts` next to `contract.ts`. It will be discovered automatically.
 - **Helpers**: import from `tools/buck/exporter/lang/helpers.ts` for quick rule/label checks and sorted labels.
+- **Classification registry**: use `tools/buck/exporter/lang/classification-registry.ts` to reuse looks-like rules, rule-type prefixes, labels, and guidance.
 - **Detect hook**: implement a fast `detect(node)` filter when possible.
 - **Labels**: prefer deriving labels from lockfiles or stable inputs; keep sorting deterministic.
 - **Tests**: unit tests can run `export-graph.ts --simulate` with a tiny nodes.json.

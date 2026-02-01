@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import type { Adapter, Batch, Node } from "../types.ts";
-import { hasLabel, isRuleType, validateLanguageClassification } from "./helpers.ts";
+import { classificationRegistryEntry } from "./classification-registry.ts";
+import { validateLanguageClassification } from "./helpers.ts";
 
 function isCppNode(n: Node): boolean {
   if ((n.rule_type || "").startsWith("cxx_")) return true;
@@ -22,23 +23,7 @@ export const adapter: Adapter = {
   },
   // Warn-only validation: return advisory messages; main driver decides severity.
   validate(nodes: Node[]) {
-    return validateLanguageClassification(nodes, {
-      name: "cpp",
-      looksLike(n: Node) {
-        const srcs = Array.isArray((n as any).srcs) ? ((n as any).srcs as string[]) : [];
-        return srcs.some((s) => /\.(cc|cpp|cxx)$/i.test(s));
-      },
-      hasRuleType(n: Node) {
-        return isRuleType(n, "cxx_");
-      },
-      hasLangLabel(n: Node) {
-        return hasLabel(n, "lang:cpp");
-      },
-      ruleTypePrefix: "cxx_*",
-      langLabel: "lang:cpp",
-      subject: "C++-looking sources",
-      guidance: "Guidance: stamp 'lang:cpp' in macros or use cxx_* rules to classify C++ targets.",
-    });
+    return validateLanguageClassification(nodes, classificationRegistryEntry("cpp"));
   },
   async buildBatches(_nodes: Node[]): Promise<Batch[]> {
     return [];

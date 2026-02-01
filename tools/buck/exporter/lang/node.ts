@@ -1,8 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import type { Adapter, Batch, Node } from "../types.ts";
+import { classificationRegistryEntry } from "./classification-registry.ts";
 import { hasLabel, isRuleType, validateLanguageClassification } from "./helpers.ts";
-import { parseLockfileLabel } from "../../../lib/labels.ts";
-import { lockfileLabels } from "./importer-lockfile-labels.ts";
 import {
   attachImporterScopedLockfileLabels,
   validateImporterScopedAdapter,
@@ -35,33 +34,7 @@ export const adapter: Adapter = {
 
     // PR-5: advisory for missing lang:node using shared classification helper.
     // Narrow scope: only consider nodes that appear macro-stamped (have importer-scoped lockfile label).
-    out.push(
-      ...validateLanguageClassification(nodes, {
-        name: "node",
-        looksLike(n: Node) {
-          // Only treat nodes with PNPM importer-scoped lockfile labels as Node-like
-          const locks = lockfileLabels(n);
-          return locks.some((l) => {
-            const parsed = parseLockfileLabel(l);
-            if (!parsed) return false;
-            return (
-              parsed.lockfile === importerScopedConfig.lockfileBasename ||
-              parsed.lockfile.endsWith(`/${importerScopedConfig.lockfileBasename}`)
-            );
-          });
-        },
-        hasRuleType(n: Node) {
-          return isRuleType(n, /^js_/) || isRuleType(n, /^node_/);
-        },
-        hasLangLabel(n: Node) {
-          return hasLabel(n, "lang:node");
-        },
-        ruleTypePrefix: "js_* or node_*",
-        langLabel: "lang:node",
-        subject: "macro-stamped Node targets",
-        guidance: "Fix: ensure macros stamp 'lang:node' to classify Node targets consistently.",
-      }),
-    );
+    out.push(...validateLanguageClassification(nodes, classificationRegistryEntry("node")));
     return out;
   },
   async buildBatches(_nodes: Node[]): Promise<Batch[]> {

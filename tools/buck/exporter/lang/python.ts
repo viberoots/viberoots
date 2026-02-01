@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import type { Adapter, Batch, Node } from "../types.ts";
+import { classificationRegistryEntry } from "./classification-registry.ts";
 import { hasLabel, isRuleType, validateLanguageClassification } from "./helpers.ts";
-import { lockfileLabels } from "./importer-lockfile-labels.ts";
 import {
   attachImporterScopedLockfileLabels,
   validateImporterScopedAdapter,
@@ -32,26 +32,7 @@ export const adapter: Adapter = {
     );
 
     // Warn-only: .py sources missing both python_* rule_type and lang:python label
-    out.push(
-      ...validateLanguageClassification(nodes, {
-        name: "python",
-        looksLike(n: Node) {
-          const srcs = Array.isArray((n as any).srcs) ? ((n as any).srcs as string[]) : [];
-          return srcs.some((s) => /\.py$/i.test(s));
-        },
-        hasRuleType(n: Node) {
-          return isRuleType(n, "python_");
-        },
-        hasLangLabel(n: Node) {
-          return hasLabel(n, "lang:python");
-        },
-        ruleTypePrefix: "python_*",
-        langLabel: "lang:python",
-        subject: "Python-looking sources",
-        guidance:
-          "Guidance: stamp 'lang:python' via macros or use python_* rules to classify Python targets.",
-      }),
-    );
+    out.push(...validateLanguageClassification(nodes, classificationRegistryEntry("python")));
     return out;
   },
   async buildBatches(_nodes: Node[]): Promise<Batch[]> {
