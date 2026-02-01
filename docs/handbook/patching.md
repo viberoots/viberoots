@@ -207,7 +207,7 @@ node tools/dev/patches-lint.ts --lang python
 - The Python library and test macros include importer‑local patch files in `srcs` for precise Buck invalidation:
   - Patches live under `<importer>/patches/python/*.patch` (e.g., `apps/api/patches/python/...`).
   - Changing a patch only invalidates Python targets bound to that importer.
-- `nix_python_binary` cannot carry patches via `srcs` (Buck prelude `python_binary` does not accept `srcs`). Instead it creates an internal helper that hashes the patch contents into a tiny generated `.py` file and adds that helper to `deps`, so patch edits deterministically invalidate the binary without shipping patch files as runtime resources.
+- `nix_python_binary` cannot carry patches via `srcs` (Buck prelude `python_binary` does not accept `srcs`). Instead it uses `prepare_language_wiring(..., wiring = "srcsless_rule")` to create a synthetic dep that carries importer‑local patches as real action inputs (`resources`) and adds that dep to `deps`, so patch edits deterministically invalidate the binary.
 - Lockfile label enforcement and parsing are centralized in Starlark. For importer-scoped macros, **do not** parse lockfile labels directly; route through the canonical helper surface in `//lang:defs_common.bzl`:
   - Prefer `prepare_language_wiring(...)` with `wiring = "non_genrule"` for non-genrule wrappers (Python `nix_python_library`, `nix_python_test`, `nix_python_wasm_*`)
   - Prefer `prepare_language_wiring(...)` with `wiring = "genrule"` for genrule-style wrappers (`nix_node_gen`, similar shims).
