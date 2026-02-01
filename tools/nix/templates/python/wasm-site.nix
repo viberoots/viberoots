@@ -23,12 +23,7 @@
         srcAbs = builtins.path { path = builtins.toPath ("${builtins.toString srcRoot}/${subdir}"); name = "py-src"; };
         lockfile = if lib.hasSuffix "/uv.lock" lockfile then "uv.lock" else lockfile;
         subdir = ".";
-        patchesMap = H.patchesMapFromDirsWith {
-          dirs = [ patchDir ];
-          normalizeVersion = (v: lib.head (lib.splitString "-" v));
-          namePrefix = "py-patch";
-          materialize = true;
-        };
+        patchesMap = H.pythonPatchesMapFromDirs { dirs = [ patchDir ]; };
         devOverrides = H.readDevOverrides devOverrideEnv;
         kind = "lib";
         wsRoot = wsRoot;

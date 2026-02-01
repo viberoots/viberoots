@@ -336,6 +336,7 @@ Several layers scan a flat `patches/<lang>/*.patch` directory and need to agree 
   - **Nix**: `tools/nix/lib/lang-helpers.nix:decodePatchFilename`
 - **Nix (builders)**: `tools/nix/lib/lang-helpers.nix:patchesMapFromDirsWith` (canonical surface with optional `normalizeVersion` and store materialization)
 - **Nix (builders, wrappers)**: `patchesMapFromDir`, `patchesMapFromDirs`, `patchesMapFromDirToStore`, `patchesMapFromImporterDirToStore`
+- **Nix (builders, Python defaults)**: `tools/nix/lib/lang-helpers.nix:pythonPatchesMapFromDirs`
 - **Loose decoding (lint-only)**:
   - **TypeScript**: `tools/lib/providers.ts:decodeNameVersionFromPatchLoose`
   - The loose variant is for `patches-lint` duplicate detection on case-insensitive filesystems only. It is not part of the cross-language contract and must not be used in build or planner paths.

@@ -149,6 +149,13 @@ let
   patchesMapFromDirs = dirs:
     patchesMapFromDirsWith { inherit dirs; };
 
+  pythonPatchesMapFromDirs = { dirs, namePrefix ? "py-patch" }:
+    patchesMapFromDirsWith {
+      inherit dirs namePrefix;
+      normalizeVersion = (v: lib.head (lib.splitString "-" v));
+      materialize = true;
+    };
+
   readDevOverrides = envName:
     let
       v = builtins.getEnv envName;
@@ -192,6 +199,7 @@ let
     patchesMapFromDirsWith
     patchesMapFromDir
     patchesMapFromDirs
+    pythonPatchesMapFromDirs
     readDevOverrides
     guardNoDevOverridesInCI;
   patchesMapFromDirToStore = { dir, normalizeVersion ? (v: v), namePrefix ? "patch" }:

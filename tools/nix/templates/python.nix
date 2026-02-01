@@ -23,12 +23,7 @@ let
     let
       _guard = H.guardNoDevOverridesInCI devOverrideEnv;
       patchDir = builtins.toPath ("${builtins.toString srcRoot}/${subdir}/patches/python");
-      patchesMap = H.patchesMapFromDirsWith {
-        dirs = [ patchDir ];
-        normalizeVersion = (v: lib.head (lib.splitString "-" v));
-        namePrefix = "py-patch";
-        materialize = true;
-      };
+      patchesMap = H.pythonPatchesMapFromDirs { dirs = [ patchDir ]; };
       devOverrides = H.readDevOverrides devOverrideEnv;
       # Also pass through the live workspace root for test-only origin lookups
       wsRootEnv = builtins.getEnv "WORKSPACE_ROOT";
@@ -168,12 +163,7 @@ in {
   }:
     let
       patchDir = builtins.toPath ("${builtins.toString srcRoot}/${subdir}/patches/python");
-      patchesMap = H.patchesMapFromDirsWith {
-        dirs = [ patchDir ];
-        normalizeVersion = (v: lib.head (lib.splitString "-" v));
-        namePrefix = "py-patch";
-        materialize = true;
-      };
+      patchesMap = H.pythonPatchesMapFromDirs { dirs = [ patchDir ]; };
 
       # Build a minimal store directory containing only the lockfile at ./uv.lock
       # Lockfile path relative to repo root (flake calls pass importer+'/uv.lock')

@@ -32,12 +32,7 @@ in {
         else if workspaceEnv != "" then workspaceEnv
         else builtins.toString srcRoot;
       patchDir = builtins.toPath ("${builtins.toString srcRoot}/${subdir}/patches/python");
-      patchesMap = H.patchesMapFromDirsWith {
-        dirs = [ patchDir ];
-        normalizeVersion = (v: lib.head (lib.splitString "-" v));
-        namePrefix = "py-patch";
-        materialize = true;
-      };
+      patchesMap = H.pythonPatchesMapFromDirs { dirs = [ patchDir ]; };
       patchedKeys = builtins.attrNames patchesMap;
       overlaysCount = builtins.length libOverlays;
       nativeOverlaysCount = builtins.length nativeModuleOverlays;
