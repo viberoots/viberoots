@@ -1228,12 +1228,13 @@ As of PR‑3 in `quad-alignment-6.md`, the historical `go_module_patch(...)` pro
 
 ### Provider-edge realization helper (PR‑4)
 
-- Use `//lang:defs_common.bzl:realize_provider_edges(MODULE_PROVIDERS, name, into="deps"|"srcs", base)` to append provider edges deterministically.
+- Use `//lang:defs_common.bzl:merge_provider_edges(name, deps, into="deps"|"srcs", base, dict_safe)` as the canonical macro wiring entry point.
+  `realize_provider_edges(...)` remains the lower-level helper that `merge_provider_edges(...)` uses internally.
   - `base` may be either:
     - a list (common): returns the merged list
     - a `kwargs` dict (optional): updates `kwargs[into]` in-place and returns the merged list
-- For most macros, merge into `deps`: `deps = realize_provider_edges(MODULE_PROVIDERS, name, base = deps)`.
-- For genrule-style shims that don’t accept `deps` (e.g., Node `nix_node_gen`, Go `nix_go_carchive`), merge into `srcs`: `srcs = realize_provider_edges(MODULE_PROVIDERS, name, into = "srcs", base = srcs + deps)`.
+- For most macros, merge into `deps`: `deps = merge_provider_edges(name, deps, MODULE_PROVIDERS = MODULE_PROVIDERS)`.
+- For genrule-style shims that don’t accept `deps` (e.g., Node `nix_node_gen`, Go `nix_go_carchive`), merge into `srcs`: `srcs = merge_provider_edges(name, srcs + deps, into = "srcs", MODULE_PROVIDERS = MODULE_PROVIDERS)`.
 - This replaces ad‑hoc `providers_for(...) + dedupe_preserve(...)` patterns and keeps behavior stable across languages.
 - **Preferred stub/shim entrypoint**: for planner-visible stubs and “providers into inputs” shims, prefer `//lang:defs_common.bzl:wire_planner_visible_inputs(...)` and `wire_planner_visible_stub(...)` so call sites don’t re-learn the same edge cases.
 
@@ -1244,7 +1245,7 @@ Some macros must produce a **planner-visible** node without building a normal ar
 - **Canonical rule**: use `//lang:planner_stub.bzl:planner_stub`. Do not introduce ad-hoc `genrule` stubs.
 - **Contract**: a planner-visible stub should carry:
   - **labels**: routing labels for exporter/planner
-  - **graph edges**: `deps` (and provider edges realized deterministically via `realize_provider_edges(...)` unless intentionally filtered)
+  - **graph edges**: `deps` (and provider edges realized deterministically via `merge_provider_edges(...)` unless intentionally filtered)
   - **patch inputs**: include package-local patch files as explicit inputs when patches drive invalidation for that target
 - **Pattern**: if the stub can accept `srcs`, prefer the shared wrapper `//lang:planner_stub.bzl:planner_stub_with_package_local_patches(...)` to attach patch inputs without changing the stub’s artifact shape.
 - **Canonical macro-level surface (preferred)**: `//lang:defs_common.bzl:wire_planner_visible_stub(...)` composes the above patterns (optional patch inputs, explicit provider-edge realization into `"deps"` vs `"inputs"`, and **default provider stripping from planner-visible deps**) so planner-visible call sites stay uniform.

@@ -1,11 +1,16 @@
 # //rust/defs.bzl — skeleton macros
 
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
-load("//lang:defs_common.bzl", "realize_provider_edges")
+load("//lang:defs_common.bzl", "merge_provider_edges")
 
 
 def _stub_rule_with_provider_edges(name, base_srcs):
-    srcs = realize_provider_edges(MODULE_PROVIDERS, name, into = "srcs", base = base_srcs)
+    srcs = merge_provider_edges(
+        name,
+        base_srcs,
+        into = "srcs",
+        MODULE_PROVIDERS = MODULE_PROVIDERS,
+    )
     native.genrule(
         name = name,
         srcs = srcs,

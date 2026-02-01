@@ -1,7 +1,8 @@
 load("//lang:planner_stub.bzl", "planner_stub", "planner_stub_with_package_local_patches")
 load("//lang:macro_kwargs.bzl", "extract_package_local_patch_dirs_and_nixpkg_deps")
 load("//lang:label_stamping.bzl", "stamp_labels", "stamp_patch_scope_for_lang")
-load("//lang:provider_edges.bzl", "realize_provider_edges", "strip_provider_targets")
+load("//lang:provider_edges.bzl", "merge_provider_edges", "strip_provider_targets")
+load("//lang:dict_inputs.bzl", "PROVIDER_EDGES_KEY_PREFIX")
 
 def wire_planner_visible_inputs(
         name,
@@ -18,7 +19,9 @@ def wire_planner_visible_inputs(
         # Back-compat: older call sites used "deps"|"srcs".
         realize_providers_into = None,
         # Planner-visible targets should be safe-by-default: avoid provider targets in deps unless asked.
-        strip_providers_from_deps = True):
+        strip_providers_from_deps = True,
+        provider_dict_safe = False,
+        provider_key_prefix = PROVIDER_EDGES_KEY_PREFIX):
     """
     Standard wiring for planner-visible targets.
 
@@ -30,11 +33,18 @@ def wire_planner_visible_inputs(
     deps_out = deps or []
     srcs_out = srcs or []
 
+    extra_inputs = []
     if srcs_include_deps:
-        srcs_out = srcs_out + deps_out
+        if isinstance(srcs_out, list):
+            srcs_out = srcs_out + deps_out
+        else:
+            extra_inputs = extra_inputs + deps_out
 
     if extra_srcs:
-        srcs_out = srcs_out + extra_srcs
+        if isinstance(srcs_out, list):
+            srcs_out = srcs_out + extra_srcs
+        else:
+            extra_inputs = extra_inputs + extra_srcs
 
     if strip_providers_from_deps:
         deps_out = strip_provider_targets(deps_out)
@@ -56,10 +66,36 @@ def wire_planner_visible_inputs(
             fail("wire_planner_visible_inputs: MODULE_PROVIDERS is required when provider realization is set")
 
         if realize_mode == "deps":
-            deps_out = realize_provider_edges(MODULE_PROVIDERS, name, base = deps_out)
+            deps_out = merge_provider_edges(
+                name,
+                deps_out,
+                base = deps_out,
+                MODULE_PROVIDERS = MODULE_PROVIDERS,
+            )
         else:
             # "inputs" (and legacy "srcs") means: realize provider edges into srcs.
-            srcs_out = realize_provider_edges(MODULE_PROVIDERS, name, into = "srcs", base = srcs_out)
+            if isinstance(srcs_out, dict):
+                if not provider_dict_safe:
+                    fail("wire_planner_visible_inputs: provider_dict_safe must be true when srcs is dict-shaped")
+                inputs_base = extra_inputs
+                srcs_out = merge_provider_edges(
+                    name,
+                    inputs_base,
+                    into = "srcs",
+                    base = srcs_out,
+                    dict_safe = True,
+                    key_prefix = provider_key_prefix,
+                    MODULE_PROVIDERS = MODULE_PROVIDERS,
+                )
+            else:
+                inputs_base = srcs_out if isinstance(srcs_out, list) else extra_inputs
+                srcs_out = merge_provider_edges(
+                    name,
+                    inputs_base,
+                    into = "srcs",
+                    base = inputs_base,
+                    MODULE_PROVIDERS = MODULE_PROVIDERS,
+                )
 
     return {
         "deps": deps_out,
@@ -81,6 +117,8 @@ def wire_planner_visible_stub(
         # Back-compat: older call sites used "deps"|"srcs".
         realize_providers_into = None,
         strip_providers_from_deps = True,
+        provider_dict_safe = False,
+        provider_key_prefix = PROVIDER_EDGES_KEY_PREFIX,
         **kwargs):
     """
     Canonical planner-visible stub wiring.
@@ -98,6 +136,8 @@ def wire_planner_visible_stub(
         provider_realization_mode = provider_realization_mode,
         realize_providers_into = realize_providers_into,
         strip_providers_from_deps = strip_providers_from_deps,
+        provider_dict_safe = provider_dict_safe,
+        provider_key_prefix = provider_key_prefix,
     )
 
     if lang:
@@ -137,7 +177,9 @@ def wire_package_local_planner_visible_stub(
         provider_realization_mode = None,
         # Back-compat: older call sites used "deps"|"srcs".
         realize_providers_into = None,
-        strip_providers_from_deps = True):
+        strip_providers_from_deps = True,
+        provider_dict_safe = False,
+        provider_key_prefix = PROVIDER_EDGES_KEY_PREFIX):
     """
     Non-mutating variant of wire_package_local_planner_visible_stub.
 
@@ -179,6 +221,8 @@ def wire_package_local_planner_visible_stub(
         provider_realization_mode = provider_realization_mode,
         realize_providers_into = realize_providers_into,
         strip_providers_from_deps = strip_providers_from_deps,
+        provider_dict_safe = provider_dict_safe,
+        provider_key_prefix = provider_key_prefix,
         link_deps = link_deps,
         header_deps = header_deps,
         link_closure = link_closure,
@@ -190,6 +234,7 @@ def wire_package_local_planner_visible_stub(
         local_patch_dirs = info.local_patch_dirs,
         nixpkg_deps = info.nixpkg_deps,
     )
+
 
 
 

@@ -386,6 +386,7 @@ Providers are how we attach “shared dependency state” to build targets witho
 - `third_party/providers/auto_map.bzl` is generated and provides `MODULE_PROVIDERS`.
 - Language macros load providers through the stable re-export `lang/auto_map.bzl`.
 - Macros realize provider edges deterministically using shared helpers. They do not hand-roll mapping logic.
+  Direct calls to `realize_provider_edges(...)` are reserved for lower-level helpers and probes, not macro wiring.
 
 ### Canonical implementations
 
