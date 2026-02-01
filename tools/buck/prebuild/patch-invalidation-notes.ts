@@ -20,6 +20,7 @@ export async function maybePrintPatchInvalidationNotes(): Promise<void> {
     const goPatches = await gitLsFiles("**/patches/go/*.patch");
     const cppPatches = await gitLsFiles("**/patches/cpp/*.patch");
 
+    const importerLocalDetected = pnpmLocks.length > 0 || uvLocks.length > 0;
     if (pnpmLocks.length > 0) {
       const s = patchInvalidationStrategyForLang("node");
       if (s) {
@@ -35,6 +36,11 @@ export async function maybePrintPatchInvalidationNotes(): Promise<void> {
           `[prebuild] python patch_scope:${s.patchScope} — patch invalidation is driven by macro action inputs under <importer>/patches/python`,
         );
       }
+    }
+    if (importerLocalDetected) {
+      console.warn(
+        "[prebuild] importer-local patches: see tools/buck/invalidation-report.txt for per-target action inputs",
+      );
     }
     if (goPatches.length > 0) {
       const s = patchInvalidationStrategyForLang("go");

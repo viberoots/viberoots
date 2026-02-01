@@ -284,6 +284,7 @@ I treat patch invalidation as two explicit models:
 When debugging invalidation, it is easy to misread the surface area by looking only at provider files under `third_party/providers/`. The canonical answers are designed to be available without reading macro or generator code:
 
 - `node tools/buck/prebuild-guard.ts` prints short, canonical one-liners that explain where invalidation comes from, using the contract vocabulary (`package-local` / `importer-local`).
+- When importer-local patching is enabled, prebuild guard prints a short line that points to `tools/buck/invalidation-report.txt` for per-target action inputs.
 - `tools/buck/invalidation-report.txt` is the canonical per-target report. It answers “what invalidates this target?” using the shared contract vocabulary and separates **real action inputs** from **diagnostic stamps**:
   - `patch_scope` and whether patch inputs are expected to be real action inputs (based on the patch model contract).
   - Where patch inputs are observed (list-shaped `srcs`, dict-shaped `srcs` under `__patch_inputs__/...`, or synthetic deps like `*__patch_inputs`). Dict-shaped `__patch_inputs__/...` observations are classified according to the target’s `patch_scope` (package-local vs importer-local).
