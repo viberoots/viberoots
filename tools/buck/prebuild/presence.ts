@@ -2,10 +2,10 @@
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { providerNameForImporter } from "../../lib/providers.ts";
-import { findUvLockfiles } from "../../lib/lockfiles.ts";
 import { getImporterRootsContract } from "../../lib/importer-roots.ts";
 import { parseLockfileLabel } from "../../lib/labels.ts";
+import { findUvLockfiles } from "../../lib/lockfiles.ts";
+import { providerNameForImporter } from "../../lib/providers.ts";
 
 type NodeLockIndexSidecar = Partial<{
   index: Record<string, string>;
@@ -36,6 +36,23 @@ export async function computeMissingOutputs(outputs: string[]): Promise<string[]
   const outPresence: string[] = [];
   for (const o of outputs) {
     if (!fs.existsSync(o)) outPresence.push(o);
+  }
+
+  {
+    const preludePath = "prelude";
+    try {
+      const st = await fsp.lstat(preludePath);
+      if (!st.isSymbolicLink()) {
+        outPresence.push("prelude (expected Nix store symlink)");
+      } else {
+        const target = await fsp.readlink(preludePath).catch(() => "");
+        if (!target.startsWith("/nix/store/")) {
+          outPresence.push("prelude (expected Nix store symlink)");
+        }
+      }
+    } catch {
+      outPresence.push(preludePath);
+    }
   }
 
   // If any uv.lock exists, require TARGETS.python.auto

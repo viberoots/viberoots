@@ -51,15 +51,12 @@ in {
       if [ -n "$buck_cached" ] && [ -x "$buck_cached/bin/buck2" ]; then
         export PATH="$buck_cached/bin:$PATH"
       else
-        buck_out=$(nix build github:facebook/buck2#buck2 --no-link --print-out-paths 2>/dev/null || true)
-        if [ -n "$buck_out" ] && [ -x "$buck_out/bin/buck2" ]; then
-          export PATH="$buck_out/bin:$PATH"
-          printf "%s\n" "$buck_out" > "$buck_cache" 2>/dev/null || true
-        else
-          buck_out_local=$(nix build .#buck2 --no-link --accept-flake-config --print-out-paths 2>/dev/null || true)
-          if [ -n "$buck_out_local" ] && [ -x "$buck_out_local/bin/buck2" ]; then
-            export PATH="$buck_out_local/bin:$PATH"
-            printf "%s\n" "$buck_out_local" > "$buck_cache" 2>/dev/null || true
+        if command -v buck2 >/dev/null 2>&1; then
+          buck_bin="$(command -v buck2)"
+          buck_root="$(cd "$(dirname "$buck_bin")/.." && pwd)"
+          if [ -x "$buck_root/bin/buck2" ]; then
+            export PATH="$buck_root/bin:$PATH"
+            printf "%s\n" "$buck_root" > "$buck_cache" 2>/dev/null || true
           fi
         fi
       fi
