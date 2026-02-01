@@ -76,12 +76,7 @@ let
   nodeOfName = nm:
     if builtins.hasAttr nm byName then byName.${nm} else null;
 
-  dedupePreserveOrder = xs:
-    let
-      step = st: x:
-        if builtins.hasAttr x st.seen then st else { seen = st.seen // { "${x}" = true; }; out = st.out ++ [ x ]; };
-      st0 = { seen = {}; out = []; };
-    in (builtins.foldl' step st0 xs).out;
+  dedupePreserveOrder = L.dedupePreserveOrder;
 
   cleanLabel = L.cleanLabel;
 
@@ -111,26 +106,27 @@ let
     } n;
 
   kindOf = n:
-    let
+    L.kindOf {
       labels = L.labelsOf n;
       ruleType = L.ruleTypeOf n;
-      preRule = L.kindFromLabels labels [
-        { label = "kind:wasm"; kind = "wasm"; }
-        { label = "kind:pyext_wasm"; kind = "pyext_wasm"; }
-        { label = "kind:pyext"; kind = "pyext"; }
-        { label = "kind:test"; kind = "test"; }
-      ];
-      fromRule = L.kindFromRuleType ruleType {
-        suffixes = [
-          { suffix = "_binary"; kind = "bin"; }
-          { suffix = "_test"; kind = "test"; }
+      name = L.nameOf n;
+      config = {
+        labelPriorityPre = [
+          { label = "kind:wasm"; kind = "wasm"; }
+          { label = "kind:pyext_wasm"; kind = "pyext_wasm"; }
+          { label = "kind:pyext"; kind = "pyext"; }
+          { label = "kind:test"; kind = "test"; }
         ];
+        ruleTypes = {
+          suffixes = [
+            { suffix = "_binary"; kind = "bin"; }
+            { suffix = "_test"; kind = "test"; }
+          ];
+        };
+        labelPriorityPost = [ { label = "kind:bin"; kind = "bin"; } ];
+        defaultKind = "lib";
       };
-      postRule = L.kindFromLabels labels [ { label = "kind:bin"; kind = "bin"; } ];
-    in if preRule != null then preRule
-       else if fromRule != null then fromRule
-       else if postRule != null then postRule
-       else "lib";
+    };
 
   modulesFileFor = name: lockRelFor name;
 in {

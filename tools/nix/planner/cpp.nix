@@ -16,28 +16,28 @@ let
     let ls = labelsOf n; in builtins.elem "lang:cpp" ls;
 
   kindOf = n:
-    let
-      rt = L.ruleTypeOf n;
-      labs = labelsOf n;
-      nm = nameOf n;
-      isPlanner = (nm != null) && (lib.hasSuffix "__planner" nm);
-      fromLabels = L.kindFromLabels labs [
-        { label = "kind:test"; kind = "test"; }
-        { label = "kind:bin"; kind = "bin"; }
-        { label = "kind:headers"; kind = "headers"; }
-        { label = "kind:lib"; kind = "lib"; }
-        { label = "kind:addon"; kind = "addon"; }
-      ];
-      fromRule = L.kindFromRuleType rt {
-        equals = [
-          { ruleType = "cxx_test"; kind = "test"; }
-          { ruleType = "cxx_binary"; kind = "bin"; }
-          { ruleType = "cxx_library"; kind = "lib"; }
+    L.kindOf {
+      labels = labelsOf n;
+      ruleType = L.ruleTypeOf n;
+      name = nameOf n;
+      config = {
+        plannerStubs = [ { nameSuffix = "__planner"; kind = "test"; } ];
+        labelPriorityPre = [
+          { label = "kind:test"; kind = "test"; }
+          { label = "kind:bin"; kind = "bin"; }
+          { label = "kind:headers"; kind = "headers"; }
+          { label = "kind:lib"; kind = "lib"; }
+          { label = "kind:addon"; kind = "addon"; }
         ];
+        ruleTypes = {
+          equals = [
+            { ruleType = "cxx_test"; kind = "test"; }
+            { ruleType = "cxx_binary"; kind = "bin"; }
+            { ruleType = "cxx_library"; kind = "lib"; }
+          ];
+        };
       };
-    in if isPlanner then "test"
-      else if fromLabels != null then fromLabels
-      else fromRule;
+    };
 
   nodes = if builtins.hasAttr "nodes" ctx then ctx.nodes else [];
   byName = L.byName;
@@ -56,6 +56,7 @@ let
 
   Phase1 = import ./cpp-phase1-helpers.nix {
     inherit lib get cleanLabel ensureStringList nodeOfName kindOf labelsOf hasLangCpp;
+    dedupePreserveOrder = L.dedupePreserveOrder;
     normSrcsOf = normSrcsOf;
     pkgPathOf = pkgPathOf;
     repoRoot = repoRoot;

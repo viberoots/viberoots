@@ -56,14 +56,7 @@ let
         if (builtins.length uniqNames) == (builtins.length names) then null
         else builtins.throw "go planner: normalized link_closure_overrides has duplicate keys for '${name}'";
     in builtins.listToAttrs pairs;
-  dedupePreserveOrder = xs:
-    let
-      step = st: x:
-        if builtins.hasAttr x st.seen
-        then st
-        else { seen = st.seen // { "${x}" = true; }; out = st.out ++ [ x ]; };
-      st0 = { seen = {}; out = []; };
-    in (builtins.foldl' step st0 xs).out;
+  dedupePreserveOrder = L.dedupePreserveOrder;
   isCppNode = nm:
     let n = if builtins.hasAttr nm byName then byName.${nm} else null;
         rt0 = if n == null then null else (get n "rule_type");
@@ -168,22 +161,23 @@ in {
   };
 
   kindOf = n:
-    let
+    L.kindOf {
       labels = L.labelsOf n;
       ruleType = L.ruleTypeOf n;
-      fromLabels = L.kindFromLabels labels [
-        { label = "kind:carchive"; kind = "lib"; }
-        { label = "kind:wasm"; kind = "tinywasm"; }
-      ];
-      fromRuleType = L.kindFromRuleType ruleType {
-        suffixes = [ { suffix = "_binary"; kind = "bin"; } ];
-        prefixes = [ { prefix = "go_"; kind = "lib"; } ];
+      name = L.nameOf n;
+      config = {
+        labelPriorityPre = [
+          { label = "kind:carchive"; kind = "lib"; }
+          { label = "kind:wasm"; kind = "tinywasm"; }
+        ];
+        ruleTypes = {
+          suffixes = [ { suffix = "_binary"; kind = "bin"; } ];
+          prefixes = [ { prefix = "go_"; kind = "lib"; } ];
+        };
+        labelPriorityPost = [ { label = "kind:bin"; kind = "bin"; } ];
+        defaultKind = "lib";
       };
-      fromBinLabel = L.kindFromLabels labels [ { label = "kind:bin"; kind = "bin"; } ];
-    in if fromLabels != null then fromLabels
-       else if fromRuleType != null then fromRuleType
-       else if fromBinLabel != null then fromBinLabel
-       else "lib";
+    };
 
   modulesFileFor = name: modulesTomlFor name;
 

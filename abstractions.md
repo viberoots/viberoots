@@ -62,6 +62,7 @@ For language macros, stamping is the macro’s responsibility. Call sites should
 - **Kind vocabulary (contract)**:
   - Starlark: `lang/kind_vocabulary.bzl` (re-exported via `lang/defs_common.bzl`)
   - TypeScript: `tools/lib/kind-vocabulary.ts`
+- **Nix planner kind inference (shared)**: `tools/nix/planner/lib.nix:kindOf` with per-language configs in planner plugins. Planners must not re-implement `kindOf`.
 - **TypeScript exporter validation**: importer-scoped adapters warn when `kind:*` is missing for targets that should have it.
   - `tools/buck/exporter/lang/importer-scoped-adapter.ts`
 

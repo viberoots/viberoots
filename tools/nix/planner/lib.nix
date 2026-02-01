@@ -47,6 +47,37 @@ let
        else if pf != [] then (builtins.head pf).kind
        else null;
 
+  dedupePreserveOrder = xs:
+    let
+      step = st: x:
+        if builtins.hasAttr x st.seen then st
+        else { seen = st.seen // { "${x}" = true; }; out = st.out ++ [ x ]; };
+      st0 = { seen = {}; out = []; };
+    in (builtins.foldl' step st0 xs).out;
+
+  kindOf = { labels ? [], ruleType ? "", name ? "", config ? {} }:
+    let
+      nameVal = if name == null then "" else name;
+      labelPriorityPre = config.labelPriorityPre or [];
+      labelPriorityPost = config.labelPriorityPost or [];
+      ruleTypes = config.ruleTypes or { equals = []; suffixes = []; prefixes = []; };
+      plannerStubs = config.plannerStubs or [];
+      defaultKind =
+        if builtins.hasAttr "defaultKind" config
+        then config.defaultKind
+        else null;
+      plannerMatch =
+        let matches = builtins.filter (p: (p.nameSuffix or "") != "" && lib.hasSuffix p.nameSuffix nameVal) plannerStubs;
+        in if matches == [] then null else (builtins.head matches).kind;
+      fromLabelsPre = kindFromLabels labels labelPriorityPre;
+      fromRuleType = kindFromRuleType ruleType ruleTypes;
+      fromLabelsPost = kindFromLabels labels labelPriorityPost;
+    in if plannerMatch != null then plannerMatch
+       else if fromLabelsPre != null then fromLabelsPre
+       else if fromRuleType != null then fromRuleType
+       else if fromLabelsPost != null then fromLabelsPost
+       else defaultKind;
+
   nameOf = n:
     let nm = get n "name"; in if nm == null then "" else cleanLabel nm;
 
@@ -121,7 +152,7 @@ let
               else { inherit lockfilePath importer; };
 in {
   inherit get cleanLabel ruleTypeOf labelsOf nameOf depsOf srcsOf byName;
-  inherit isTargetByRuleTypeOrLabel kindFromLabels kindFromRuleType;
+  inherit isTargetByRuleTypeOrLabel kindFromLabels kindFromRuleType dedupePreserveOrder kindOf;
   inherit extractLockfileLabels parseImporterScopedLockfileLabel;
   # Generic DFS label collector. Starting from `name`, walk transitive deps
   # and collect unique labels that start with `prefix`. Returns a sorted list

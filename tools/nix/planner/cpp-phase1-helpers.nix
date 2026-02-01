@@ -6,6 +6,7 @@
 , kindOf
 , labelsOf
 , hasLangCpp
+, dedupePreserveOrder
 , normSrcsOf
 , pkgPathOf
 , repoRoot
@@ -17,13 +18,6 @@ let
       raw = if n == null then null else get n attr;
       xs = ensureStringList (attr + " for " + name) raw;
     in builtins.map cleanLabel xs;
-
-  dedupePreserveOrder = xs:
-    let
-      step = st: x:
-        if builtins.hasAttr x st.seen then st else { seen = st.seen // { "${x}" = true; }; out = st.out ++ [ x ]; };
-      st0 = { seen = {}; out = []; };
-    in (builtins.foldl' step st0 xs).out;
 
   failLinkDep = consumer: dep: msg:
     builtins.throw ("cpp planner: link_deps for " + consumer + " contains " + dep + " — " + msg);

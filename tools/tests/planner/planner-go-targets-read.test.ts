@@ -55,6 +55,35 @@ test("planner selected outputs resolve for go/cpp/python targets", async () => {
     ];
     await fs.writeFile(path.join(graphDir, "graph.json"), JSON.stringify(nodes), "utf8");
 
+    const kindExpr = `
+      let
+        pkgs = import <nixpkgs> {};
+        lib = pkgs.lib;
+        nodes = builtins.fromJSON (builtins.readFile ./tools/buck/graph.json);
+        get = attrs: k: if builtins.hasAttr k attrs then attrs.\${k} else null;
+        ctx = {
+          inherit lib get nodes;
+          T = {};
+          repoRoot = ./.;
+          pkgPathOf = name: ".";
+          modulesTomlFor = name: "";
+          localModuleOverrides = {};
+        };
+        go = (import ./tools/nix/planner/go.nix { inherit lib; }) ctx;
+        cpp = (import ./tools/nix/planner/cpp.nix { inherit lib; }) ctx;
+        py = (import ./tools/nix/planner/python-core.nix { inherit lib; ctx = ctx; });
+        pick = name: builtins.head (builtins.filter (n: (get n "name") == name) nodes);
+        goKind = go.kindOf (pick "//apps/goapp:goapp");
+        cppKind = cpp.kindOf (pick "//apps/cppapp:cppapp");
+        pyKind = py.kindOf (pick "//apps/pyapp:pyapp");
+      in { inherit goKind cppKind pyKind; }
+    `;
+    const { stdout: kindOut } = await $({ cwd: tmp })`nix eval --impure --expr ${kindExpr} --json`;
+    const kindObj = JSON.parse(String(kindOut || "{}"));
+    assert.equal(kindObj.goKind, "bin");
+    assert.equal(kindObj.cppKind, "bin");
+    assert.equal(kindObj.pyKind, "bin");
+
     const targets = ["//apps/goapp:goapp", "//apps/cppapp:cppapp", "//apps/pyapp:pyapp"];
     for (const BUCK_TARGET of targets) {
       const { stdout } = await $({
