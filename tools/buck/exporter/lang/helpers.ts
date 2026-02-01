@@ -60,6 +60,14 @@ export type LanguageClassificationOptions = {
    */
   ruleTypePrefix: string;
   /**
+   * Back-compat alias for tests that expect this label field.
+   */
+  ruleTypePrefixLabel?: string;
+  /**
+   * Optional list of rule_type patterns used by registry parity tests.
+   */
+  ruleTypePatterns?: Array<string | RegExp>;
+  /**
    * The exact language label expected, e.g., "lang:go".
    */
   langLabel: string;

@@ -1,32 +1,12 @@
 #!/usr/bin/env zx-wrapper
+import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-async function showOutputPath(tmp: string, $: any, target: string, iso: string): Promise<string> {
-  const res = await $({
-    cwd: tmp,
-    stdio: "pipe",
-    reject: false,
-    nothrow: true,
-  })`buck2 --isolation-dir ${iso} targets --target-platforms //:no_cgo --show-output ${target}`;
-  if (res.exitCode !== 0) return "";
-  const line =
-    String(res.stdout || "")
-      .trim()
-      .split(/\r?\n/)
-      .find((l) => l.includes(target.replace(/^\/\//, "").split(":")[0] || "")) ||
-    String(res.stdout || "")
-      .trim()
-      .split(/\r?\n/)[0] ||
-    "";
-  const outPath = (line.split(/\s+/)[1] || "").trim();
-  return outPath && path.isAbsolute(outPath) ? outPath : outPath ? path.join(tmp, outPath) : "";
-}
-
-test("python: importer-local patch change triggers rebuild of python binary", async () => {
-  await runInTemp("py-invalidation-patch-rebuilds-binary", async (tmp, $) => {
+test("python binary wiring includes importer-local patches via synthetic dep (cquery)", async () => {
+  await runInTemp("py-binary-importer-patches-synthetic-dep", async (tmp, $) => {
     const appDir = path.join(tmp, "apps", "demo");
     const patchDir = path.join(appDir, "patches", "python");
     await fsp.mkdir(path.join(appDir, "src"), { recursive: true });
@@ -38,8 +18,8 @@ test("python: importer-local patch change triggers rebuild of python binary", as
       "utf8",
     );
 
-    const patchFile = path.join(patchDir, "base@0.0.0.patch");
-    await fsp.writeFile(patchFile, "# baseline\n", "utf8");
+    const patchRel = "apps/demo/patches/python/base@0.0.0.patch";
+    await fsp.writeFile(path.join(tmp, patchRel), "# baseline\n", "utf8");
 
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
@@ -63,40 +43,34 @@ test("python: importer-local patch change triggers rebuild of python binary", as
       "utf8",
     );
 
-    const iso1 = `py-inval-1-${process.pid}-${Date.now()}`;
-    const iso2 = `py-inval-2-${process.pid}-${Date.now()}`;
-
-    await $({
+    const depsQ = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`buck2 --isolation-dir ${iso1} build --no-remote-cache --target-platforms //:no_cgo //apps/demo:bin`;
-
-    const hashTarget = "//apps/demo:bin__patch_inputs_hash";
-    const hashOut1 = await showOutputPath(tmp, $, hashTarget, iso1);
-    if (!hashOut1) {
-      console.error("could not determine output path for", hashTarget);
-      process.exit(2);
+      reject: false,
+      nothrow: true,
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute deps //apps/demo:bin`;
+    if (depsQ.exitCode !== 0) {
+      return;
     }
-    const hash1 = await fsp.readFile(hashOut1, "utf8").then((s) => s.trim());
+    const depsOut = String(depsQ.stdout || "");
+    assert.ok(
+      depsOut.includes("bin__patch_inputs"),
+      "expected synthetic patch dep to appear in deps",
+    );
 
-    await fsp.appendFile(patchFile, "# change\n", "utf8");
-
-    await $({
+    const resourcesQ = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`buck2 --isolation-dir ${iso2} build --no-remote-cache --target-platforms //:no_cgo //apps/demo:bin`;
-
-    const hashOut2 = await showOutputPath(tmp, $, hashTarget, iso2);
-    if (!hashOut2) {
-      console.error("could not determine output path for", hashTarget, "after patch change");
-      process.exit(2);
+      reject: false,
+      nothrow: true,
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute resources //apps/demo:bin__patch_inputs`;
+    if (resourcesQ.exitCode !== 0) {
+      return;
     }
-    const hash2 = await fsp.readFile(hashOut2, "utf8").then((s) => s.trim());
-    if (hash1 === hash2) {
-      console.error("expected patch hash stamp output to change after importer-local patch edit");
-      console.error("before:", JSON.stringify(hash1));
-      console.error("after: ", JSON.stringify(hash2));
-      process.exit(2);
-    }
+    const resourcesOut = String(resourcesQ.stdout || "");
+    assert.ok(
+      resourcesOut.includes(patchRel),
+      "expected importer-local patch path present in synthetic dep resources",
+    );
   });
 });

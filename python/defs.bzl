@@ -1,14 +1,14 @@
-load("@prelude//:rules.bzl", "python_binary", "python_library", "python_test", "genrule")
+load("@prelude//:rules.bzl", "python_binary", "python_library", "python_test")
 load(
     "//lang:defs_common.bzl",
     "append_nixpkg_labels",
+    "merge_provider_edges",
     "merge_link_intent_deps",
     "prepare_language_wiring",
     "stamp_wasm_variant",
     "validate_link_closure_overrides",
 )
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
-load("//lang:sanitize.bzl", "sanitize_name")
 load("//python:pyext_stub.bzl", "python_pyext_stub")
 load(
     "//python:defs_pyext_wasm.bzl",
@@ -50,56 +50,22 @@ def nix_python_binary(name, lockfile_label = None, deps = [], **kwargs):
         lang = "python",
         kind = "bin",
         lockfile_label = lockfile_label,
-        # python_binary does not accept srcs. For importer-local patch invalidation we use an internal
-        # helper python_library that depends on a genrule hashing the patch contents into a tiny
-        # generated .py file. This makes patch edits affect the binary's deps and therefore rebuilds,
-        # without shipping patch files as runtime resources.
-        patch_into = None,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
-        wiring = "non_genrule",
+        wiring = "srcsless_rule",
     )
-
-    # If no patches exist, skip helper targets to avoid extra actions. native.glob tracks future
-    # additions so introducing a patch later will still update the build graph deterministically.
-    patch_files = native.glob(["patches/python/*.patch"])
-    extra_deps = []
-    if len(patch_files) > 0:
-        hash_rule = sanitize_name(name + "__patch_inputs_hash")
-        hash_out = hash_rule + ".py"
-        genrule(
-            name = hash_rule,
-            srcs = patch_files,
-            out = hash_out,
-            cmd = """set -euo pipefail
-if [ -z "${SRCS:-}" ]; then
-  echo "nix_python_binary patch hash: SRCS is empty (unexpected)" >&2
-  exit 2
-fi
-python3 - $SRCS <<'PY' > "$OUT"
-import hashlib
-import sys
-
-paths = sys.argv[1:]
-h = hashlib.sha256()
-for p in sorted(paths):
-    with open(p, "rb") as f:
-        h.update(f.read())
-    h.update(b"\\0")
-
-print("# generated: python importer-local patch invalidation")
-print("PATCH_INPUTS_SHA256 = %r" % h.hexdigest())
-PY
-""",
+    base_deps = list(deps) if isinstance(deps, list) else []
+    patch_inputs = wiring.patch_dep.kwargs.get("resources", []) or []
+    if len(patch_inputs) > 0:
+        python_library(**wiring.patch_dep.kwargs)
+        deps = wiring.merge_deps(base_deps)
+    else:
+        deps = merge_provider_edges(
+            name,
+            base_deps,
+            MODULE_PROVIDERS = MODULE_PROVIDERS,
         )
-        patch_lib = sanitize_name(name + "__patch_inputs")
-        python_library(
-            name = patch_lib,
-            srcs = [":" + hash_rule],
-            labels = wiring.kwargs.get("labels", []),
-        )
-        extra_deps = [":" + patch_lib]
 
-    python_binary(deps = wiring.deps + extra_deps, **wiring.kwargs)
+    python_binary(deps = deps, **wiring.kwargs)
 
 def nix_python_test(name, lockfile_label = None, deps = [], **kwargs):
     """
