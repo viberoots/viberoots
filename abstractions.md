@@ -385,8 +385,8 @@ Providers are how we attach “shared dependency state” to build targets witho
 ### Canonical implementations
 
 - **Starlark**:
-  - `lang/provider_edges.bzl:realize_provider_edges`
-  - `lang/provider_edges.bzl:merge_provider_edges`
+  - `lang/provider_edges.bzl:merge_provider_edges` is the canonical macro wiring helper. It supports list inputs and dict-safe attachment via `dict_safe = True`.
+  - `lang/provider_edges.bzl:realize_provider_edges` is the lower-level helper used by `merge_provider_edges` for list and kwargs bases.
   - `lang/provider_edges.bzl:strip_provider_targets`
 - **TypeScript**:
   - `tools/buck/gen-auto-map.ts` (generator)

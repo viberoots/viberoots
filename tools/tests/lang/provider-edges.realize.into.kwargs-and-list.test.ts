@@ -13,7 +13,7 @@ test("realize_provider_edges merges deterministically for both list and kwargs b
       [
         "",
         "# test: provider-edges.realize.into.kwargs-and-list.test.ts",
-        'load("//lang:defs_common.bzl", "merge_provider_edges_list_probe", "realize_provider_edges_probe")',
+        'load("//lang:defs_common.bzl", "merge_provider_edges_list_probe", "package_local_wiring_probe", "realize_provider_edges_probe")',
         "",
         "realize_provider_edges_probe(",
         '  name = "list_base",',
@@ -41,6 +41,14 @@ test("realize_provider_edges merges deterministically for both list and kwargs b
         "  use_kwargs = True,",
         ")",
         "",
+        "package_local_wiring_probe(",
+        '  name = "package_local",',
+        '  lang = "go",',
+        '  kind = "lib",',
+        '  base_deps = ["//a:x", "//third_party/providers:p2"],',
+        '  providers = ["//third_party/providers:p1", "//third_party/providers:p2", "//third_party/providers:p1"],',
+        ")",
+        "",
       ].join("\n"),
       "utf8",
     );
@@ -48,7 +56,7 @@ test("realize_provider_edges merges deterministically for both list and kwargs b
     const res = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`buck2 build --target-platforms //:no_cgo --show-output //:list_base //:kwargs_base //:merge_list_base`;
+    })`buck2 build --target-platforms //:no_cgo --show-output //:list_base //:kwargs_base //:merge_list_base //:package_local`;
 
     const txt = String(res.stdout || "").trim();
     const outputs = new Map<string, string>();
@@ -60,9 +68,11 @@ test("realize_provider_edges merges deterministically for both list and kwargs b
     const listOut = outputs.get("root//:list_base");
     const kwargsOut = outputs.get("root//:kwargs_base");
     const mergeListOut = outputs.get("root//:merge_list_base");
+    const packageLocalOut = outputs.get("root//:package_local");
     assert.ok(listOut, "expected output for list_base");
     assert.ok(kwargsOut, "expected output for kwargs_base");
     assert.ok(mergeListOut, "expected output for merge_list_base");
+    assert.ok(packageLocalOut, "expected output for package_local");
 
     const listLines = (await fsp.readFile(path.join(tmp, listOut!), "utf8"))
       .trim()
@@ -76,10 +86,18 @@ test("realize_provider_edges merges deterministically for both list and kwargs b
       .trim()
       .split("\n")
       .filter(Boolean);
+    const packageLocalLines = (await fsp.readFile(path.join(tmp, packageLocalOut!), "utf8"))
+      .trim()
+      .split("\n")
+      .filter(Boolean);
 
     const expected = ["//a:x", "//third_party/providers:p2", "//third_party/providers:p1"];
     assert.deepEqual(listLines, expected, "list base merge should be stable and deduped");
     assert.deepEqual(kwargsLines, expected, "kwargs base merge should be stable and deduped");
     assert.deepEqual(mergeListLines, expected, "merge_provider_edges should preserve ordering");
+    const packageLocalDeps = packageLocalLines
+      .filter((line) => line.startsWith("dep:"))
+      .map((line) => line.slice("dep:".length));
+    assert.deepEqual(packageLocalDeps, expected, "package-local wiring should preserve ordering");
   });
 });

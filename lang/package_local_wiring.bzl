@@ -1,7 +1,7 @@
 load("//lang:macro_kwargs.bzl", "extract_package_local_patch_dirs_and_nixpkg_deps")
 load("//lang:patch_inputs.bzl", "include_package_local_patches")
 load("//lang:label_stamping.bzl", "stamp_labels", "stamp_patch_scope_for_lang")
-load("//lang:provider_edges.bzl", "realize_provider_edges", "target_key_for_current_package")
+load("//lang:provider_edges.bzl", "merge_provider_edges", "target_key_for_current_package")
 load("@prelude//:rules.bzl", "genrule")
 
 def prepare_package_local_wiring(
@@ -37,7 +37,7 @@ def prepare_package_local_wiring(
     if stamp and kind != None:
         stamp_labels(kw, lang, kind)
     include_package_local_patches(kw, lang, info.local_patch_dirs)
-    deps = realize_provider_edges(MODULE_PROVIDERS, name, base = base_deps)
+    deps = merge_provider_edges(name, base_deps, MODULE_PROVIDERS = MODULE_PROVIDERS)
     return struct(
         kwargs = kw,
         local_patch_dirs = info.local_patch_dirs,
