@@ -11,6 +11,7 @@ let
     nodes = (if builtins.hasAttr "nodes" ctx then ctx.nodes else []);
     pkgPathOf = ctx.pkgPathOf;
   };
+  kindConfigs = import ./kind-configs.nix;
   cleanLabel = L.cleanLabel;
   hasLangCpp = n:
     let ls = labelsOf n; in builtins.elem "lang:cpp" ls;
@@ -20,23 +21,7 @@ let
       labels = labelsOf n;
       ruleType = L.ruleTypeOf n;
       name = nameOf n;
-      config = {
-        plannerStubs = [ { nameSuffix = "__planner"; kind = "test"; } ];
-        labelPriorityPre = [
-          { label = "kind:test"; kind = "test"; }
-          { label = "kind:bin"; kind = "bin"; }
-          { label = "kind:headers"; kind = "headers"; }
-          { label = "kind:lib"; kind = "lib"; }
-          { label = "kind:addon"; kind = "addon"; }
-        ];
-        ruleTypes = {
-          equals = [
-            { ruleType = "cxx_test"; kind = "test"; }
-            { ruleType = "cxx_binary"; kind = "bin"; }
-            { ruleType = "cxx_library"; kind = "lib"; }
-          ];
-        };
-      };
+      config = kindConfigs.cpp;
     };
 
   nodes = if builtins.hasAttr "nodes" ctx then ctx.nodes else [];

@@ -10,6 +10,7 @@ let
     nodes = (ctx.nodes or []);
     pkgPathOf = ctx.pkgPathOf;
   };
+  kindConfigs = import ./kind-configs.nix;
 
   labelsOf = L.labelsOf;
   nameOf = L.nameOf;
@@ -110,22 +111,7 @@ let
       labels = L.labelsOf n;
       ruleType = L.ruleTypeOf n;
       name = L.nameOf n;
-      config = {
-        labelPriorityPre = [
-          { label = "kind:wasm"; kind = "wasm"; }
-          { label = "kind:pyext_wasm"; kind = "pyext_wasm"; }
-          { label = "kind:pyext"; kind = "pyext"; }
-          { label = "kind:test"; kind = "test"; }
-        ];
-        ruleTypes = {
-          suffixes = [
-            { suffix = "_binary"; kind = "bin"; }
-            { suffix = "_test"; kind = "test"; }
-          ];
-        };
-        labelPriorityPost = [ { label = "kind:bin"; kind = "bin"; } ];
-        defaultKind = "lib";
-      };
+      config = kindConfigs.python;
     };
 
   modulesFileFor = name: lockRelFor name;

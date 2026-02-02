@@ -18,6 +18,7 @@ let
     nodes = (ctx.nodes or []);
     pkgPathOf = ctx.pkgPathOf;
   };
+  kindConfigs = import ./kind-configs.nix;
   # Shared, top-level helpers (deduplicated from mkApp/mkLib)
   byName = L.byName;
   LC = import ./link-closure.nix { inherit lib; };
@@ -165,18 +166,7 @@ in {
       labels = L.labelsOf n;
       ruleType = L.ruleTypeOf n;
       name = L.nameOf n;
-      config = {
-        labelPriorityPre = [
-          { label = "kind:carchive"; kind = "lib"; }
-          { label = "kind:wasm"; kind = "tinywasm"; }
-        ];
-        ruleTypes = {
-          suffixes = [ { suffix = "_binary"; kind = "bin"; } ];
-          prefixes = [ { prefix = "go_"; kind = "lib"; } ];
-        };
-        labelPriorityPost = [ { label = "kind:bin"; kind = "bin"; } ];
-        defaultKind = "lib";
-      };
+      config = kindConfigs.go;
     };
 
   modulesFileFor = name: modulesTomlFor name;

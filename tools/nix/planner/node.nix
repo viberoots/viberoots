@@ -8,6 +8,7 @@ let
     nodes = (if builtins.hasAttr "nodes" ctx then ctx.nodes else []);
     pkgPathOf = ctx.pkgPathOf;
   };
+  kindConfigs = import ./kind-configs.nix;
   H = import ../lib/lang-helpers.nix { inherit pkgs; };
   get = ctx.get;
   pkgs = ctx.pkgs or null;
@@ -51,10 +52,12 @@ in {
 
   # Infer kind from labels (bin/lib); default null
   kindOf = n:
-    let labs = labelsOf n;
-    in if builtins.elem "kind:bin" labs then "bin"
-       else if builtins.elem "kind:lib" labs then "lib"
-       else null;
+    L.kindOf {
+      labels = labelsOf n;
+      ruleType = L.ruleTypeOf n;
+      name = L.nameOf n;
+      config = kindConfigs.node;
+    };
 
   # Unused for Node; keep interface parity
   modulesFileFor = name: ctx.modulesTomlFor name;
