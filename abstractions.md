@@ -324,6 +324,7 @@ For importer-scoped ecosystems, there is an additional provider contract surface
     - lockfile label auto-attach requirement (`requires-kind-stamp`)
     - provider sync strictness support (Python supports strict parsing; default is non-strict)
 - **TypeScript provider sync driver**: `tools/lib/provider-sync-driver.ts` (takes the contract values as explicit options; does not silently default)
+- **TypeScript importer-scoped provider sync helper**: `tools/buck/providers/importer-scoped.ts` (shared scaffolding for Node/Python; extension points for synthetic lockfiles and strict parsing)
 - **Language adapters**: `tools/buck/providers/*` (read the contract and pass policy into the driver)
 - **Effective set patch selection (TypeScript)**: `tools/lib/effective-set-patch-selection.ts` (scan flat patch dirs into a canonical key map; select global patch paths by importer effective set with stable ordering)
 

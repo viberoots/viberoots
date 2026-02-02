@@ -1,30 +1,16 @@
 #!/usr/bin/env zx-wrapper
-import { scanFlatPatchDirToLowercaseKeyToPatchPathMap } from "../../lib/effective-set-patch-selection.ts";
 import { decodeNameVersionFromPatch, providerNameForImporter } from "../../lib/providers.ts";
-import { importerScopedProviderContractForLang } from "../../lib/lang-contracts.ts";
 import {
-  findImporterLockfiles,
   computeImporterLabel,
+  findImporterLockfiles,
   isSupportedImporterLabel,
   findPnpmLockfilesWithSyntheticWorkspaceImporters,
 } from "../../lib/importers.ts";
 import { parsePnpmLock, effectiveSetForImporter } from "../../lib/pnpm-lock.ts";
-import { writeImporterProvidersByLang } from "../../lib/provider-writer.ts";
-import { syncImporterProviders } from "../../lib/provider-sync-driver.ts";
 import { readImporterProviderIndexEntriesForSingleImporterLockfileBasenames } from "../../lib/provider-index.ts";
+import { syncImporterScopedProviders } from "./importer-scoped.ts";
 
 export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: string }) {
-  const contract = importerScopedProviderContractForLang("node");
-  if (!contract) {
-    throw new Error("[providers][node] missing importer-scoped provider contract");
-  }
-  const PATCH_DIR = opts?.patchDir || contract.globalPatchDir?.path || "patches/node";
-  const OUT_FILE = opts?.outFile || "third_party/providers/TARGETS.node.auto";
-  const keyToPatchPath = await scanFlatPatchDirToLowercaseKeyToPatchPathMap({
-    patchDir: PATCH_DIR,
-    decodeKey: decodeNameVersionFromPatch,
-  });
-
   function syntheticLockfilesEnabled(): boolean {
     const raw = String(process.env.NODE_PROVIDER_SYNTHETIC_LOCKFILES || "")
       .trim()
@@ -70,18 +56,14 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
       : new Set<string>();
     return new Map([[importerLabel, eff]]);
   };
-  const listImporterPatchesFor = async (importer: string) =>
-    (await import("../../lib/importers.ts")).listImporterPatches(importer, "node");
-
-  await syncImporterProviders({
+  await syncImporterScopedProviders({
     lang: "node",
+    lockfileBasenames: ["pnpm-lock.yaml"],
     discoverLockfiles,
     parseEffectiveSetForLockfile,
-    listImporterPatchesFor,
     decodePatchKey: decodeNameVersionFromPatch,
-    importerPatchInclusionPolicy: contract.importerPatchInclusionPolicy,
-    globalKeyToPatchPath: keyToPatchPath,
-    outFile: OUT_FILE,
+    outFile: opts?.outFile,
+    patchDir: opts?.patchDir,
   });
 }
 

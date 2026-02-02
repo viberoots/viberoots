@@ -1,47 +1,31 @@
 #!/usr/bin/env zx-wrapper
-import {
-  computeImporterLabel,
-  findImporterLockfiles,
-  isSupportedImporterLabel,
-} from "../../lib/importers.ts";
-import { importerScopedProviderContractForLang } from "../../lib/lang-contracts.ts";
+import { computeImporterLabel, isSupportedImporterLabel } from "../../lib/importers.ts";
 import { readImporterProviderIndexEntriesForSingleImporterLockfileBasenames } from "../../lib/provider-index.ts";
-import { syncImporterProviders } from "../../lib/provider-sync-driver.ts";
 import { decodeNameVersionFromPatch } from "../../lib/providers.ts";
 import { parseUvLockKeys } from "../../lib/uv-lock.ts";
+import { syncImporterScopedProviders } from "./importer-scoped.ts";
 
 export async function syncPythonProviders(opts?: { outFile?: string; strict?: boolean }) {
-  const contract = importerScopedProviderContractForLang("python");
-  if (!contract) {
-    throw new Error("[providers][python] missing importer-scoped provider contract");
-  }
-  const OUT_FILE = opts?.outFile || "third_party/providers/TARGETS.python.auto";
-  const STRICT = opts?.strict ?? contract.providerSyncParsing.defaultStrict;
-
-  const discoverLockfiles = () => findImporterLockfiles(["uv.lock"]);
   const parseEffectiveSetForLockfile = async (
     lockfilePath: string,
+    strict?: boolean,
   ): Promise<Map<string, Set<string>>> => {
     try {
       const eff = await parseUvLockKeys(lockfilePath);
       return new Map([[computeImporterLabel(lockfilePath), eff]]);
     } catch (e) {
-      if (STRICT) throw e;
+      if (strict) throw e;
       return new Map([[computeImporterLabel(lockfilePath), new Set()]]);
     }
   };
-  const listImporterPatchesFor = async (importer: string) =>
-    (await import("../../lib/importers.ts")).listImporterPatches(importer, "python");
 
-  await syncImporterProviders({
+  await syncImporterScopedProviders({
     lang: "python",
-    discoverLockfiles,
+    lockfileBasenames: ["uv.lock"],
     parseEffectiveSetForLockfile,
-    listImporterPatchesFor,
     decodePatchKey: decodeNameVersionFromPatch,
-    importerPatchInclusionPolicy: contract.importerPatchInclusionPolicy,
-    outFile: OUT_FILE,
-    strict: STRICT,
+    outFile: opts?.outFile,
+    strict: opts?.strict,
   });
 }
 
