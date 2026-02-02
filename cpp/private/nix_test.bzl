@@ -1,4 +1,4 @@
-load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name")
+load("//lang:sanitize.bzl", "sanitize_name")
 load("//lang:nix_shell.bzl", "nix_bootstrap_env_core", "nix_timeout_wrapper_var")
 load("//lang:nix_attr.bzl", "sanitize_nix_attr_from_target_label")
 load("//lang:nix_action_runner.bzl", "nix_action_build_selected_out_path_cmd")
@@ -11,7 +11,7 @@ def _cpp_nix_test_impl(ctx):
     # Sanitize label to match cppTargetsFlat in graph-generator.nix
     raw = ctx.attrs.planner_label
     # Compute expected test binary name deterministically based on the planner label
-    expected_bin = sanitize_to_bin_name(raw)
+    expected_bin = sanitize_name(raw)
     attr = sanitize_nix_attr_from_target_label(raw)
     run_and_exec = (
         nix_bootstrap_env_core()

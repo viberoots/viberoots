@@ -132,6 +132,7 @@ No other transformations are part of this contract.
 - **Starlark**: `lang/sanitize.bzl:sanitize_name`
 - **TypeScript**: `tools/lib/sanitize.ts:sanitizeName`
 - **Nix**: `tools/nix/lib/lang-helpers.nix:sanitizeName`
+  - C++ macros and rules call `sanitize_name` directly; no C++-local wrapper is part of the contract.
 
 ### Regression guards
 

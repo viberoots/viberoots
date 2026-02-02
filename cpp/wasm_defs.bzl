@@ -6,7 +6,7 @@ load(
     "wire_package_local_wasm_planner_visible_stub",
 )
 load("//lang:global_inputs.bzl", "global_nix_inputs")
-load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name")
+load("//lang:sanitize.bzl", "sanitize_name")
 load("//cpp/private:nix_build.bzl", "cpp_nix_build")
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
 
@@ -60,7 +60,7 @@ def nix_cpp_wasm_static_lib(name, **kwargs):
     prepared = wiring.kwargs
     cpp_nix_build(
         name = name,
-        out = sanitize_to_bin_name("//%s:%s" % (native.package_name(), name)) + ".a",
+        out = sanitize_name("//%s:%s" % (native.package_name(), name)) + ".a",
         kind = "lib",
         self_label = "//%s:%s" % (native.package_name(), name),
         deps = wiring.deps,

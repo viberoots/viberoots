@@ -1,11 +1,11 @@
-load("//cpp/private:sanitize.bzl", "sanitize_to_bin_name")
+load("//lang:sanitize.bzl", "sanitize_name")
 load("//lang:nix_shell.bzl", "nix_build_out_path_cmd", "nix_cmd_prefix")
 load("//lang:nix_action_runner.bzl", "nix_action_export_graph_cmd", "nix_action_workspace_setup_from_args")
 
 
 def _cpp_nix_build_impl(ctx):
     # Build a C++ bin/lib/addon via Nix graph-generator-selected and export the artifact as this rule's output.
-    # Expected artifact layout (sanitized from the target label via sanitize_to_bin_name):
+    # Expected artifact layout (sanitized from the target label via sanitize_name):
     # - kind="bin"   → bin/<sanitized>
     # - kind="lib"   → lib/lib<sanitized>.a
     # - kind="addon" → lib/<sanitized>.node
@@ -13,7 +13,7 @@ def _cpp_nix_build_impl(ctx):
     kind = ctx.attrs.kind
     link_mode = ctx.attrs.link_mode or "static"
     # Expected artifact names mirror tools/nix/templates/cpp.nix sanitize logic
-    sanitized = sanitize_to_bin_name(raw)
+    sanitized = sanitize_name(raw)
     expected_bin = "bin/%s" % sanitized
     expected_lib = "lib/lib%s.a" % sanitized
     expected_shared_lib = "lib/lib%s.so" % sanitized

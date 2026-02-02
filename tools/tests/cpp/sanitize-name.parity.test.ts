@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-// Verifies Starlark _sanitize_to_bin_name matches Nix H.sanitizeName
+// Verifies Starlark sanitize_name matches Nix H.sanitizeName
 import { sanitizeName } from "../../lib/sanitize.ts";
 
 const cases: Array<{ name: string; label: string }> = [
