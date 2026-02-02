@@ -1,8 +1,10 @@
-import "zx/globals";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import "zx/globals";
 import { writeIfChanged } from "../../lib/fs-helpers.ts";
+import { shouldStageSeed, stageSeedStore } from "./seed-staging.ts";
+import { pidAlive } from "./seed-utils.ts";
 
 type SeedInfo = {
   seedKey: string;
@@ -19,17 +21,6 @@ function seedRootDir(root: string): string {
 
 function pinRootDir(root: string): string {
   return path.join(seedRootDir(root), "pins");
-}
-
-function pidAlive(pid: number): boolean {
-  if (!pid) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (e: any) {
-    if (e && (e.code === "ESRCH" || e.code === "ENOENT")) return false;
-    return true;
-  }
 }
 
 async function sweepStalePins(root: string): Promise<void> {
@@ -133,10 +124,13 @@ export async function prepareVerifySeed(opts: { root: string; iso: string }): Pr
   await sweepStalePins(opts.root);
   const seedKey = await computeSeedKey(opts.root);
   const seedPath = await buildSeedStorePath(opts.root);
-  await writeCurrentSeed(opts.root, seedPath, seedKey);
-  const pinDir = await createPin(opts.root, opts.iso, seedPath, seedKey);
+  const seedPathForRun = (await shouldStageSeed(seedPath))
+    ? await stageSeedStore(seedPath, seedKey, seedTtlMs)
+    : seedPath;
+  await writeCurrentSeed(opts.root, seedPathForRun, seedKey);
+  const pinDir = await createPin(opts.root, opts.iso, seedPathForRun, seedKey);
   const cleanup = async () => {
     await fsp.rm(pinDir, { recursive: true, force: true }).catch(() => {});
   };
-  return { seedKey, seedPath, pinDir, cleanup };
+  return { seedKey, seedPath: seedPathForRun, pinDir, cleanup };
 }

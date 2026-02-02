@@ -25,7 +25,6 @@ let
   ];
   rootMdKeep = [
     "abstractions.md"
-    "getting-started-on-a-pr.md"
   ];
   isRootFile = rel: !(lib.hasInfix "/" rel) && rel != "";
   isExcludedRootFile = base:

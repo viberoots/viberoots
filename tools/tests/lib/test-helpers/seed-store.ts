@@ -15,8 +15,8 @@ type RepoInitMode = "rsync" | "seed-store";
 const requiredFiles = ["flake.nix", path.join("tools", "buck", "export-graph.ts")];
 const CLONE_PROBE_LABEL = "seedStore clone probe (copyFileCloneSupport)";
 
-let seedStoreCloneMode: "force" | "none" | null = null;
-let seedStoreCloneModePromise: Promise<"force" | "none"> | null = null;
+let seedStoreCloneMode: "try" | "none" | null = null;
+let seedStoreCloneModePromise: Promise<"try" | "none"> | null = null;
 
 function isVerifyMode(): boolean {
   return Boolean(process.env.BNX_VERIFY_LOCK_DIR || process.env.BNX_VERIFY_LOG_FILE);
@@ -56,7 +56,7 @@ async function seedStoreCloneModeOncePerWorker(args: {
   timeAsync: TimeAsync;
   seedPath: string;
   tmpDir: string;
-}): Promise<"force" | "none"> {
+}): Promise<"try" | "none"> {
   if (seedStoreCloneMode) return seedStoreCloneMode;
   if (!seedStoreCloneModePromise) {
     seedStoreCloneModePromise = (async () => {
@@ -65,10 +65,10 @@ async function seedStoreCloneModeOncePerWorker(args: {
         return await probeCopyFileCloneSupportFrom({
           srcFile,
           dstDir: args.tmpDir,
-          cloneMode: "force",
+          cloneMode: "try",
         });
       });
-      seedStoreCloneMode = supported ? "force" : "none";
+      seedStoreCloneMode = supported ? "try" : "none";
       return seedStoreCloneMode;
     })();
   }
