@@ -4,17 +4,13 @@ let
   patchDir = root + "/patches/cpp";
   exists = builtins.pathExists patchDir;
   dir = if exists then builtins.readDir patchDir else {};
+  pkgs = final;
+  lib = pkgs.lib;
+  H = import ../lib/lang-helpers.nix { inherit pkgs; };
 
   isPatch = n: builtins.match ".*\\.patch" n != null;
 
-  # Parse "<enc>@<ver>.patch" → { enc, ver }
-  parse = n:
-    let base = builtins.replaceStrings [".patch"] [""] n;
-        idx = builtins.stringLength base - builtins.stringLength (builtins.elemAt (builtins.split "@" base) ((builtins.length (builtins.split "@" base)) - 1)) - 1;
-    in if builtins.match ".*@.*" base == null then null else {
-      enc = builtins.substring 0 idx base;
-      ver = builtins.substring (idx + 1) (builtins.stringLength base - idx - 1) base;
-    };
+  parse = n: H.decodePatchFilename { name = n; };
 
   # Decode: "pkgs__gnome__glib" → "pkgs.gnome.glib"
   decodeAttr = enc:
@@ -29,11 +25,11 @@ let
       if (info == "regular") && (isPatch file) then
         let p = parse file; in
         if p == null then acc else
-          let attrFull = decodeAttr p.enc; in
-          if !(builtins.hasPrefix "pkgs." attrFull) then acc else
+          let attrFull = decodeAttr p.importPath; in
+          if !(lib.hasPrefix "pkgs." attrFull) then acc else
           let name = builtins.replaceStrings ["pkgs."] [""] attrFull;
               arr = if builtins.hasAttr name acc then builtins.getAttr name acc else [];
-              new = arr ++ [ { path = patchDir + "/" + file; ver = p.ver; } ];
+              new = arr ++ [ { path = patchDir + "/" + file; ver = p.version; } ];
           in acc // { "${name}" = new; }
       else acc
     ) {} names;
