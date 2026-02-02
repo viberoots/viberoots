@@ -1,11 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import type { Adapter, Batch, Node } from "../types.ts";
+import type { Adapter, Node } from "../types.ts";
 import { classificationRegistryEntry } from "./classification-registry.ts";
-import { hasLabel, isRuleType, validateLanguageClassification } from "./helpers.ts";
-import {
-  attachImporterScopedLockfileLabels,
-  validateImporterScopedAdapter,
-} from "./importer-scoped-adapter.ts";
+import { hasLabel, isRuleType } from "./helpers.ts";
+import { buildImporterScopedAdapter } from "./importer-scoped-adapter.ts";
 import { importerScopedAdapterRegistryEntry } from "./importer-scoped-registry.ts";
 
 function isNodeTarget(n: Node): boolean {
@@ -15,41 +12,11 @@ function isNodeTarget(n: Node): boolean {
 
 const importerScopedConfig = importerScopedAdapterRegistryEntry("node");
 
-export const adapter: Adapter = {
+export const adapter: Adapter = buildImporterScopedAdapter({
   name: "node",
-  isNode(n) {
-    return isNodeTarget(n);
-  },
-  async validate(nodes: Node[]) {
-    const out: string[] = [];
-    out.push(
-      ...(await validateImporterScopedAdapter(nodes, {
-        adapterName: "node",
-        lockfileBasename: importerScopedConfig.lockfileBasename,
-        isTarget: isNodeTarget,
-        findNearestLockfile: importerScopedConfig.findNearestLockfile,
-        shouldWarnMissingKindLabel: importerScopedConfig.shouldWarnMissingKindLabel,
-      })),
-    );
-
-    // PR-5: advisory for missing lang:node using shared classification helper.
-    // Narrow scope: only consider nodes that appear macro-stamped (have importer-scoped lockfile label).
-    out.push(...validateLanguageClassification(nodes, classificationRegistryEntry("node")));
-    return out;
-  },
-  async buildBatches(_nodes: Node[]): Promise<Batch[]> {
-    // Node adapter does not batch external queries; label pass-through only.
-    return [];
-  },
-  async attachLabels(nodes: Node[]): Promise<Node[]> {
-    return attachImporterScopedLockfileLabels({
-      nodes,
-      adapterName: "node",
-      lockfileBasename: importerScopedConfig.lockfileBasename,
-      isTarget: isNodeTarget,
-      findNearestLockfile: importerScopedConfig.findNearestLockfile,
-    });
-  },
-};
+  isTarget: isNodeTarget,
+  importerScopedConfig,
+  classification: classificationRegistryEntry("node"),
+});
 
 export default adapter;

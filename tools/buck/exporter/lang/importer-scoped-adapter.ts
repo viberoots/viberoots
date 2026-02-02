@@ -1,6 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import type { Node } from "../types.ts";
+import type { Adapter, Batch, Node } from "../types.ts";
 import { packageDirFromTargetName } from "../batch.ts";
+import type { LanguageClassificationOptions } from "./helpers.ts";
+import { validateLanguageClassification } from "./helpers.ts";
+import type { ImporterScopedAdapterRegistryEntry } from "./importer-scoped-registry.ts";
 import {
   attachImporterLockfileLabelsIfMacroStamped,
   hasKindLabel,
@@ -91,4 +94,46 @@ export async function attachImporterScopedLockfileLabels(
     isTarget: opts.isTarget,
     findNearestLockfile: opts.findNearestLockfile,
   });
+}
+
+export type ImporterScopedAdapterFactoryOptions = {
+  name: string;
+  isTarget(node: Node): boolean;
+  importerScopedConfig: ImporterScopedAdapterRegistryEntry;
+  classification: LanguageClassificationOptions;
+};
+
+export function buildImporterScopedAdapter(opts: ImporterScopedAdapterFactoryOptions): Adapter {
+  return {
+    name: opts.name,
+    isNode(n) {
+      return opts.isTarget(n);
+    },
+    async validate(nodes: Node[]) {
+      const out: string[] = [];
+      out.push(
+        ...(await validateImporterScopedAdapter(nodes, {
+          adapterName: opts.name,
+          lockfileBasename: opts.importerScopedConfig.lockfileBasename,
+          isTarget: opts.isTarget,
+          findNearestLockfile: opts.importerScopedConfig.findNearestLockfile,
+          shouldWarnMissingKindLabel: opts.importerScopedConfig.shouldWarnMissingKindLabel,
+        })),
+      );
+      out.push(...validateLanguageClassification(nodes, opts.classification));
+      return out;
+    },
+    async buildBatches(_nodes: Node[]): Promise<Batch[]> {
+      return [];
+    },
+    async attachLabels(nodes: Node[]): Promise<Node[]> {
+      return attachImporterScopedLockfileLabels({
+        nodes,
+        adapterName: opts.name,
+        lockfileBasename: opts.importerScopedConfig.lockfileBasename,
+        isTarget: opts.isTarget,
+        findNearestLockfile: opts.importerScopedConfig.findNearestLockfile,
+      });
+    },
+  };
 }
