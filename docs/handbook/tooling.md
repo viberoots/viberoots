@@ -8,6 +8,17 @@ This repository has a lot of automation under `tools/`. These scripts run in mul
 
 To keep behavior deterministic and avoid drift, I follow the rules below when I add or modify tooling.
 
+## Top-level layout anchors
+
+I keep stable anchor directories for the reorg. These are structural only:
+
+- `build-tools/` — build system and tooling anchor
+- `apps/` — application roots
+- `libs/` — library roots
+- `build-tools/docs/` — build-system docs
+- `build-tools/docs/lang/` — language-specific build docs
+- `docs/build-history/` — historical build notes
+
 ## CLI parsing (required)
 
 Tooling scripts must not hand-roll argument parsing. This prevents subtle mismatches across:
