@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "genrule")
-load("//lang:importer_wiring.bzl", "prepare_importer_non_genrule_wiring")
+load("//lang/internal:importer_wiring.bzl", "prepare_importer_non_genrule_wiring")
 
 def importer_wiring_mutation_probe(name, lang, kind):
     """

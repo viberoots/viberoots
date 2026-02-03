@@ -16,7 +16,7 @@ test("writeImporterProvidersByLang(python) writes header, load line, and AUTO_PY
       },
     ];
     const runner = `#!/usr/bin/env zx-wrapper
-import { writeImporterProvidersByLang } from "./tools/lib/provider-writer.ts";
+import { writeImporterProvidersByLang } from "./tools/lib/provider-writer";
 const lang = process.env.LANG || "python";
 const outFile = process.env.OUT_FILE || "third_party/providers/TARGETS.python.auto";
 const providers = JSON.parse(process.env.PROVIDERS_JSON || "[]");

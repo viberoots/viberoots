@@ -1,13 +1,13 @@
 #!/usr/bin/env zx-wrapper
-import { test } from "node:test";
-import * as fsp from "node:fs/promises";
 import fg from "fast-glob";
+import * as fsp from "node:fs/promises";
+import { test } from "node:test";
 
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message);
 }
 
-test("only //lang/* may load //lang:importer_wiring_primitives.bzl", async () => {
+test("only //lang/* may load internal importer wiring primitives", async () => {
   const files = await fg(["**/*.bzl"], {
     dot: false,
     onlyFiles: true,
@@ -17,9 +17,11 @@ test("only //lang/* may load //lang:importer_wiring_primitives.bzl", async () =>
 
   for (const file of files) {
     const txt = await fsp.readFile(file, "utf8");
+    const oldPath = 'load("//lang:importer_wiring_primitives.bzl"';
+    const internalPath = 'load("//lang/internal:importer_wiring_primitives.bzl"';
     assert(
-      !txt.includes('load("//lang:importer_wiring_primitives.bzl"'),
-      `${file} must not load //lang:importer_wiring_primitives.bzl; use //lang:defs_common.bzl or //lang:importer_wiring.bzl`,
+      !txt.includes(oldPath) && !txt.includes(internalPath),
+      `${file} must not load importer wiring primitives; use //lang:language_wiring.bzl:prepare_language_wiring(...)`,
     );
   }
 });

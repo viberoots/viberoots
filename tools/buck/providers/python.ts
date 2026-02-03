@@ -1,11 +1,16 @@
 #!/usr/bin/env zx-wrapper
-import { computeImporterLabel, isSupportedImporterLabel } from "../../lib/importers.ts";
-import { readImporterProviderIndexEntriesForSingleImporterLockfileBasenames } from "../../lib/provider-index.ts";
-import { decodeNameVersionFromPatch } from "../../lib/providers.ts";
-import { parseUvLockKeys } from "../../lib/uv-lock.ts";
-import { syncImporterScopedProviders } from "./importer-scoped.ts";
+import { computeImporterLabel, isSupportedImporterLabel } from "../../lib/importers";
+import { lockfileBasenamesForLang } from "../../lib/lockfiles";
+import { readImporterProviderIndexEntriesForSingleImporterLockfileBasenames } from "../../lib/provider-index";
+import { decodeNameVersionFromPatch } from "../../lib/providers";
+import { parseUvLockKeys } from "../../lib/uv-lock";
+import { syncImporterScopedProviders } from "./importer-scoped";
 
 export async function syncPythonProviders(opts?: { outFile?: string; strict?: boolean }) {
+  const lockfileBasenames = lockfileBasenamesForLang("python") || [];
+  if (lockfileBasenames.length === 0) {
+    throw new Error("[python providers] missing lockfile basenames for lang: python");
+  }
   const parseEffectiveSetForLockfile = async (
     lockfilePath: string,
     strict?: boolean,
@@ -21,7 +26,7 @@ export async function syncPythonProviders(opts?: { outFile?: string; strict?: bo
 
   await syncImporterScopedProviders({
     lang: "python",
-    lockfileBasenames: ["uv.lock"],
+    lockfileBasenames,
     parseEffectiveSetForLockfile,
     decodePatchKey: decodeNameVersionFromPatch,
     outFile: opts?.outFile,
@@ -35,8 +40,12 @@ export default syncPythonProviders;
 export async function readPythonProviderIndexEntries(): Promise<
   Array<{ provider: string; key: string }>
 > {
+  const lockfileBasenames = lockfileBasenamesForLang("python") || [];
+  if (lockfileBasenames.length === 0) {
+    throw new Error("[python providers] missing lockfile basenames for lang: python");
+  }
   return await readImporterProviderIndexEntriesForSingleImporterLockfileBasenames({
-    lockfileBasenames: ["uv.lock"],
+    lockfileBasenames,
     shouldInclude: (_lf: string, importerLabel: string) => isSupportedImporterLabel(importerLabel),
   });
 }

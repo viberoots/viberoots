@@ -1,17 +1,17 @@
-import "./worker-init";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { initTempRepoFromSeedStore } from "./seed-store";
 import { ensureBuckConfigForTempRepo, ensureWorkspaceRootEnvFile } from "./buck-config";
-import { ensureBuckReaperStarted } from "./buck-reaper";
 import { killBuckDaemonsForRepo } from "./buck-kill";
+import { ensureBuckReaperStarted } from "./buck-reaper";
+import { getCgoToolchainPathsOncePerWorker, getDarwinSdkPathOncePerWorker } from "./cgo-toolchain";
 import { rewriteCoverageUrls } from "./coverage";
 import { rsyncRepoTo } from "./rsync";
+import { initTempRepoFromSeedStore } from "./seed-store";
 import { shSingleQuote } from "./shell-quote";
 import { timeAsync } from "./timing";
 import { mktemp } from "./tmp";
-import { getCgoToolchainPathsOncePerWorker, getDarwinSdkPathOncePerWorker } from "./cgo-toolchain";
+import "./worker-init";
 import { ensureZxInitProbedOnce, zxInitPathFromWorkspace } from "./zx-init-probe";
 
 let cachedDevEnvExport: Promise<string> | null = null;
@@ -104,6 +104,9 @@ export async function runInTemp<T>(
     "TEST_RSYNC_ROOTS",
     "TEST_PARTIAL_CLONE_GO_ONLY",
     "TEST_EXCLUDE_CPP_REQS",
+    "NIX_CPP_DEV_OVERRIDE_JSON",
+    "NIX_GO_DEV_OVERRIDE_JSON",
+    "NIX_PY_DEV_OVERRIDE_JSON",
     "WORKSPACE_ROOT",
     "BUCK_TEST_SRC",
     "BNX_TEST_SEED_STORE_PATH",

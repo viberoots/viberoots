@@ -3,11 +3,11 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { syncImporterScopedProviders } from "../../buck/providers/importer-scoped";
+import { computeImporterLabel } from "../../lib/importers";
+import { decodeNameVersionFromPatch } from "../../lib/providers";
+import { parseUvLockKeys } from "../../lib/uv-lock";
 import { runInTemp } from "../lib/test-helpers";
-import { computeImporterLabel } from "../../lib/importers.ts";
-import { decodeNameVersionFromPatch } from "../../lib/providers.ts";
-import { parseUvLockKeys } from "../../lib/uv-lock.ts";
-import { syncImporterScopedProviders } from "../../buck/providers/importer-scoped.ts";
 
 function expectIncludes(haystack: string, needle: string) {
   assert.ok(haystack.includes(needle), `expected to include ${needle}`);

@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import { writeIfChanged } from "../../lib/fs-helpers";
-import { pathExists } from "../../lib/repo.ts";
+import { pathExists } from "../../lib/repo";
 
 export async function syncRustProviders(opts?: {
   outFile?: string;

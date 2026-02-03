@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { providersHeaderFor, providersLoadFor } from "../../lib/providers-headers.ts";
+import { providersHeaderFor, providersLoadFor } from "../../lib/providers-headers";
 
 test("providers-headers: node header snapshot", () => {
   const load = providersLoadFor({ lang: "node", rule: "node_importer_deps" });

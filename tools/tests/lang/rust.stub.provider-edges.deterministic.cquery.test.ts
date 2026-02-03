@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { normalizeTargetLabel } from "../../lib/labels.ts";
+import { normalizeTargetLabel } from "../../lib/labels";
 import { runInTemp } from "../lib/test-helpers";
 
 function parseCqueryOne(stdout: string): any | null {

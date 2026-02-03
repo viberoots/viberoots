@@ -25,7 +25,7 @@ test("providers: buildHandlers() yields Node and Python when both lockfiles exis
 
     // Runner that imports buildHandlers and prints planned languages as JSON
     const runner = `#!/usr/bin/env zx-wrapper
-import { buildHandlers } from "./tools/buck/providers/index.ts";
+import { buildHandlers } from "./tools/buck/providers/index";
 const hs = await buildHandlers();
 console.log(JSON.stringify(hs.map(h => h.lang)));
 `;

@@ -18,7 +18,7 @@ test("writeImporterProvidersByLang(node) writes header, load line, and AUTO_NODE
     ];
     // Create a small runner so execution happens inside the temp repo env
     const runner = `#!/usr/bin/env zx-wrapper
-import { writeImporterProvidersByLang } from "./tools/lib/provider-writer.ts";
+import { writeImporterProvidersByLang } from "./tools/lib/provider-writer";
 const lang = process.env.LANG || "node";
 const outFile = process.env.OUT_FILE || "third_party/providers/TARGETS.node.auto";
 const providers = JSON.parse(process.env.PROVIDERS_JSON || "[]");

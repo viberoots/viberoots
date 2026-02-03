@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 // Verifies Starlark sanitize_name matches Nix/TS sanitizer
-import { sanitizeName } from "../../lib/sanitize.ts";
+import { sanitizeName } from "../../lib/sanitize";
 
 const cases: Array<{ name: string; value: string }> = [
   { name: "case1", value: "//apps/foo:bin" },

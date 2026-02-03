@@ -1,6 +1,16 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import {
+  LOCKFILE_BASENAMES_BY_LANG,
+  defaultLockfileBasenameForLang,
+  lockfileBasenamesForLang,
+} from "./lockfile-contracts.ts";
+
+export { LOCKFILE_BASENAMES_BY_LANG, defaultLockfileBasenameForLang, lockfileBasenamesForLang };
+
+const PNPM_LOCKFILE = defaultLockfileBasenameForLang("node");
+const UV_LOCKFILE = defaultLockfileBasenameForLang("python");
 
 function repoRoot(): string {
   // Prefer explicit roots when provided (keeps behavior stable in tests and CI)
@@ -13,7 +23,7 @@ function repoRoot(): string {
 
 async function hasPnpmLock(dir: string): Promise<boolean> {
   try {
-    await fsp.access(path.join(dir, "pnpm-lock.yaml"));
+    await fsp.access(path.join(dir, PNPM_LOCKFILE));
     return true;
   } catch {
     return false;
@@ -26,17 +36,10 @@ function toPosixRel(fromRootAbs: string, absDir: string): string {
   return norm === "" ? "." : norm;
 }
 
-/**
- * Resolve the PNPM importer directory.
- * - If `flag` is provided, treat it as an explicit importer directory (absolute or repo-root-relative).
- * - Otherwise, walk upward from `cwd` until the nearest directory containing `pnpm-lock.yaml` within the repo root.
- * - Returns a normalized POSIX-style relative path from the repo root ('.' for repo root).
- */
 export async function resolveImporterDir(cwd?: string, flag?: string): Promise<string> {
   const root = repoRoot();
   const startCwdAbs = path.isAbsolute(cwd || "") ? (cwd as string) : path.resolve(root, cwd || ".");
 
-  // 1) Honor explicit flag when provided
   const raw = String(flag || "").trim();
   if (raw) {
     const abs = path.isAbsolute(raw) ? raw : path.resolve(root, raw);
@@ -45,13 +48,11 @@ export async function resolveImporterDir(cwd?: string, flag?: string): Promise<s
     }
   }
 
-  // 2) Walk upward from cwd to the repo root
   let cur = startCwdAbs;
   while (true) {
     if (await hasPnpmLock(cur)) return toPosixRel(root, cur);
     const next = path.dirname(cur);
     if (next === cur) break;
-    // stop when leaving the repo root
     const relToRoot = path.relative(root, next);
     if (relToRoot.startsWith("..")) break;
     cur = next;
@@ -116,7 +117,7 @@ async function walkForLockfiles(
       if (st.isDirectory()) {
         if (ignore.has(name)) continue;
         stack.push(full);
-      } else if (name === "pnpm-lock.yaml") {
+      } else if (name === PNPM_LOCKFILE) {
         out.add(toPosixRelativeFrom(baseRoot, full));
       }
     }
@@ -126,13 +127,11 @@ async function walkForLockfiles(
 export async function findPnpmLockfiles(opts?: FindLockfilesOptions): Promise<string[]> {
   const ignore = new Set<string>(opts?.ignore || []);
   for (const d of DEFAULT_IGNORES) ignore.add(d);
-  // Anchor discovery to the caller's current working directory to cooperate with test sandboxes
   const baseRoot = path.resolve(process.cwd());
   const rootsRel = (opts?.roots && opts.roots.length ? opts.roots : ["."])
     .map((r) => (path.isAbsolute(r) ? r : path.resolve(baseRoot, r)))
     .map((r) => r.trim())
     .filter(Boolean);
-  // Track rel prefixes for filtering git results to requested roots
   const rootPrefixes = rootsRel.map((abs) => {
     const rel = toPosixRelativeFrom(baseRoot, abs);
     return rel === "." ? "." : rel.replace(/\/+$/, "");
@@ -140,21 +139,19 @@ export async function findPnpmLockfiles(opts?: FindLockfilesOptions): Promise<st
 
   const found = new Set<string>();
 
-  // Source 1: git-tracked lockfiles (when available)
   const useGitStage = !opts?.roots || opts.roots.length === 0;
   if (useGitStage) {
     try {
       const { stdout, exitCode } = await $({
         stdio: "pipe",
         cwd: baseRoot,
-      })`git ls-files '**/pnpm-lock.yaml'`.nothrow();
+      })`git ls-files '**/${PNPM_LOCKFILE}'`.nothrow();
       if (exitCode === 0) {
         const candidates = String(stdout || "")
           .split(/\r?\n/)
           .map((s) => s.trim())
           .filter(Boolean);
         for (const lfRel of candidates) {
-          // Filter ignores by path segment membership
           const segs = lfRel.split("/").filter(Boolean);
           if (segs.some((s) => ignore.has(s))) continue;
           const abs = path.resolve(baseRoot, lfRel);
@@ -166,7 +163,6 @@ export async function findPnpmLockfiles(opts?: FindLockfilesOptions): Promise<st
     }
   }
 
-  // Source 2: filesystem walk under roots
   for (const r of rootsRel) {
     const abs = path.resolve(r);
     await walkForLockfiles(abs, baseRoot, ignore, found);
@@ -175,7 +171,6 @@ export async function findPnpmLockfiles(opts?: FindLockfilesOptions): Promise<st
   return Array.from(found).sort((a, b) => a.localeCompare(b));
 }
 
-// Find uv.lock files under the repository, honoring default ignores and optional roots.
 export async function findUvLockfiles(opts?: FindLockfilesOptions): Promise<string[]> {
   const ignore = new Set<string>(opts?.ignore || []);
   for (const d of DEFAULT_IGNORES) ignore.add(d);
@@ -187,7 +182,6 @@ export async function findUvLockfiles(opts?: FindLockfilesOptions): Promise<stri
 
   const found = new Set<string>();
 
-  // Source 1: git-tracked uv.lock files
   const useGitStage = !opts?.roots || opts.roots.length === 0;
   if (useGitStage) {
     try {
@@ -212,7 +206,6 @@ export async function findUvLockfiles(opts?: FindLockfilesOptions): Promise<stri
     }
   }
 
-  // Source 2: filesystem walk
   async function walkUv(rootDir: string, baseRoot: string, ignore: Set<string>, out: Set<string>) {
     const stack: string[] = [rootDir];
     while (stack.length) {
@@ -234,7 +227,7 @@ export async function findUvLockfiles(opts?: FindLockfilesOptions): Promise<stri
         if (st.isDirectory()) {
           if (ignore.has(name)) continue;
           stack.push(full);
-        } else if (name === "uv.lock") {
+        } else if (name === UV_LOCKFILE) {
           out.add(toPosixRelativeFrom(baseRoot, full));
         }
       }

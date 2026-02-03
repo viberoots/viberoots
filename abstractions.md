@@ -97,8 +97,21 @@ Language macros attach patch inputs and realize provider edges via a single shar
 ### Canonical implementations
 
 - **Starlark**: `lang/language_wiring.bzl:prepare_language_wiring`
-- **Starlark (internal)**: `lang/package_local_wiring.bzl:prepare_package_local_wiring`
-- **Starlark (internal)**: `lang/importer_wiring*.bzl:prepare_importer_*`
+- **Starlark (internal)**: `lang/internal/package_local_wiring.bzl:prepare_package_local_wiring`
+- **Starlark (internal)**: `lang/internal/importer_wiring*.bzl:prepare_importer_*`
+
+### Relocation map (refactor guardrail)
+
+- `lang/package_local_wiring.bzl` -> `lang/internal/package_local_wiring.bzl`
+- `lang/importer_wiring.bzl` -> `lang/internal/importer_wiring.bzl`
+- `lang/importer_wiring_primitives.bzl` -> `lang/internal/importer_wiring_primitives.bzl`
+- `lang/importer_wiring_nix_calling.bzl` -> `lang/internal/importer_wiring_nix_calling.bzl`
+- `lang/nix_calling_importer_genrule_wiring.bzl` -> `lang/internal/nix_calling_importer_genrule_wiring.bzl`
+
+Cleanup required:
+
+- Remove direct loads of the above helpers in macro files.
+- Keep macro wiring on `prepare_language_wiring(...)` only.
 
 ### Regression guards
 
@@ -250,6 +263,36 @@ These are the usual ways this leaks:
 
 ---
 
+## Contract 4.1: Lockfile basename registry
+
+Lockfile basenames are a shared contract so lockfile discovery and default labels stay consistent across
+Starlark and TypeScript. Do not hardcode basenames in tooling or macros.
+
+### Contract
+
+- Basenames are defined per language.
+- The first basename is the default for `default_lockfile_*` helpers.
+
+### Canonical implementations
+
+- **Starlark**: `lang/lockfile_contracts.bzl`
+  - `LOCKFILE_BASENAMES_BY_LANG`
+  - `default_lockfile_basename_for_lang`
+- **TypeScript**: `tools/lib/lockfile-contracts.ts`
+  - `lockfileBasenamesForLang`
+  - `defaultLockfileBasenameForLang`
+
+### Regression guards
+
+- `tools/tests/lang/lockfile-contracts.parity.test.ts` (Starlark ↔ TS registry parity)
+
+### Common leak patterns
+
+- A provider sync adapter hardcodes a basename and drifts from the registry.
+- A macro defaults to a basename that is no longer in the registry.
+
+---
+
 ## Contract 5: Patch invalidation models
 
 This repo supports two patch invalidation strategies. They are intentionally different. The abstraction boundary is that call sites should not mix models accidentally.
@@ -265,7 +308,7 @@ I treat patch invalidation as two explicit models:
 - Stamping happens only at the shared wiring helper boundaries:
   - Canonical entrypoint: `lang/language_wiring.bzl:prepare_language_wiring`
   - Package-local planner-visible stubs: `lang/planner_visible_wiring.bzl:wire_package_local_planner_visible_stub`
-  - Per-model helpers are internal (`lang/package_local_wiring.bzl`, `lang/importer_wiring*.bzl`).
+  - Per-model helpers are internal (`lang/internal/package_local_wiring.bzl`, `lang/internal/importer_wiring*.bzl`).
 
 - **Package-local patching** (Go, C++):
   - Patch files live under the target’s Buck package, typically `patches/<lang>`.
@@ -313,8 +356,8 @@ Regression guard for this diagnostic surface:
   - `lang/language_wiring.bzl:prepare_language_wiring` (preferred macro-side helper that composes kwarg normalization, label stamping, patch input inclusion, and provider-edge realization deterministically without mutating call-site dicts).
 - **Starlark package-local internals**:
   - `lang/patch_inputs.bzl:include_package_local_patches` and `lang/patch_inputs.bzl:default_package_patch_dirs`.
-  - `lang/package_local_wiring.bzl:prepare_package_local_wiring`.
-- **Starlark importer-local internals**: `lang/patch_inputs.bzl:include_importer_patches_from_labels` plus `lang/importer_wiring_primitives.bzl:attach_importer_patch_inputs`.
+  - `lang/internal/package_local_wiring.bzl:prepare_package_local_wiring`.
+- **Starlark importer-local internals**: `lang/patch_inputs.bzl:include_importer_patches_from_labels` plus `lang/internal/importer_wiring_primitives.bzl:attach_importer_patch_inputs`.
 
 For importer-scoped ecosystems, there is an additional provider contract surface that is still part of the “patch model”, because it directly determines invalidation behavior and glue content.
 
@@ -324,6 +367,8 @@ For importer-scoped ecosystems, there is an additional provider contract surface
     - optional global patch dir inputs (for Node: `patches/node`, effective-set matches only)
     - lockfile label auto-attach requirement (`requires-kind-stamp`)
     - provider sync strictness support (Python supports strict parsing; default is non-strict)
+- **Importer-scoped provider policy (Starlark)**: `lang/importer_contracts.bzl`
+  - `importer_patch_inclusion_for_lang(lang)` mirrors the patch inclusion policy so probe tests can enforce parity.
 - **TypeScript provider sync driver**: `tools/lib/provider-sync-driver.ts` (takes the contract values as explicit options; does not silently default)
 - **TypeScript importer-scoped provider sync helper**: `tools/buck/providers/importer-scoped.ts` (shared scaffolding for Node/Python; extension points for synthetic lockfiles and strict parsing)
 - **Language adapters**: `tools/buck/providers/*` (read the contract and pass policy into the driver)

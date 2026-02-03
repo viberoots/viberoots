@@ -1,5 +1,6 @@
 load("//lang:collections.bzl", "dedupe_preserve")
 load("//lang:importer_roots.bzl", "ALLOW_DOT_IMPORTER", "WORKSPACE_IMPORTER_ROOTS")
+load("//lang:lockfile_contracts.bzl", "default_lockfile_basename_for_lang")
 
 def extract_lockfile_labels(labels):
     if labels == None:
@@ -32,18 +33,19 @@ def _normalize_package_name(pkg):
         return "."
     return pkg
 
-def _default_lockfile_path_for_package(pkg):
+def _default_lockfile_path_for_package(pkg, lang = "node"):
+    base = default_lockfile_basename_for_lang(lang)
     if pkg == ".":
-        return "pnpm-lock.yaml"
-    return "%s/pnpm-lock.yaml" % pkg
+        return base
+    return "%s/%s" % (pkg, base)
 
-def default_lockfile_path_from_package():
+def default_lockfile_path_from_package(lang = "node"):
     pkg = _normalize_package_name(native.package_name())
-    return _default_lockfile_path_for_package(pkg)
+    return _default_lockfile_path_for_package(pkg, lang = lang)
 
-def default_lockfile_label_from_package():
+def default_lockfile_label_from_package(lang = "node"):
     pkg = _normalize_package_name(native.package_name())
-    path = _default_lockfile_path_for_package(pkg)
+    path = _default_lockfile_path_for_package(pkg, lang = lang)
     return "lockfile:%s#%s" % (path, pkg)
 
 def ensure_default_lockfile_exists(path, macro_name = None):

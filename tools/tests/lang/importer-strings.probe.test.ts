@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
-import { sanitizeName } from "../../lib/sanitize.ts";
+import { sanitizeName } from "../../lib/sanitize";
 
 type Case = {
   target: string;

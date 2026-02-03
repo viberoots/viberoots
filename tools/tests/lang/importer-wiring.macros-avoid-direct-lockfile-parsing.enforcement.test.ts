@@ -21,6 +21,14 @@ test("importer-scoped macros delegate lockfile parsing/enforcement to //lang:imp
       !txt.includes('load("//lang:lockfile_labels.bzl"'),
       `${file} must not load //lang:lockfile_labels.bzl directly; use shared wiring helpers`,
     );
+    assert(
+      !txt.includes('load("//lang:importer_wiring.bzl"'),
+      `${file} must not load //lang:importer_wiring.bzl directly; use prepare_language_wiring(...)`,
+    );
+    assert(
+      !txt.includes('load("//lang/internal:importer_wiring.bzl"'),
+      `${file} must not load internal importer wiring; use prepare_language_wiring(...)`,
+    );
 
     assert(
       txt.includes("prepare_language_wiring("),

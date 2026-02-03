@@ -5,7 +5,7 @@ import {
   findFileSizeOffenders,
   KNOWN_SOURCE_FILES_OVER_250_LOC,
   SOURCE_FILES_SCOPE,
-} from "../../dev/file-size-lint.ts";
+} from "../../dev/file-size-lint";
 
 test("source files remain under the 250 LOC methodology gate", async () => {
   const root = (process.env.WORKSPACE_ROOT || process.cwd()).trim();

@@ -2,7 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { getImporterRootsContract } from "./importer-roots.ts";
-import { findPnpmLockfiles, findUvLockfiles } from "./lockfiles.ts";
+import { defaultLockfileBasenameForLang, findPnpmLockfiles, findUvLockfiles } from "./lockfiles.ts";
 import { toPosixPath } from "./posix-path.ts";
 
 /**
@@ -125,7 +125,8 @@ export async function listImporterPatches(
  * - Returned paths are POSIX-style repo-relative paths, deterministically sorted.
  */
 export async function findPnpmLockfilesWithSyntheticWorkspaceImporters(): Promise<string[]> {
-  const real = await findImporterLockfiles(["pnpm-lock.yaml"]);
+  const pnpmBasename = defaultLockfileBasenameForLang("node");
+  const real = await findImporterLockfiles([pnpmBasename]);
   const out = new Set(real.map((p) => toPosixPath(p).replace(/^\.\/+/, "")));
 
   const rootAbs = (() => {
@@ -149,7 +150,7 @@ export async function findPnpmLockfilesWithSyntheticWorkspaceImporters(): Promis
       } catch {
         continue;
       }
-      const lockRel = toPosixPath(path.posix.join(importer, "pnpm-lock.yaml"));
+      const lockRel = toPosixPath(path.posix.join(importer, pnpmBasename));
       if (!out.has(lockRel)) out.add(lockRel);
     }
   }

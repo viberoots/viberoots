@@ -1,16 +1,22 @@
 #!/usr/bin/env zx-wrapper
-import { decodeNameVersionFromPatch, providerNameForImporter } from "../../lib/providers.ts";
 import {
   computeImporterLabel,
   findImporterLockfiles,
-  isSupportedImporterLabel,
   findPnpmLockfilesWithSyntheticWorkspaceImporters,
-} from "../../lib/importers.ts";
-import { parsePnpmLock, effectiveSetForImporter } from "../../lib/pnpm-lock.ts";
-import { readImporterProviderIndexEntriesForSingleImporterLockfileBasenames } from "../../lib/provider-index.ts";
-import { syncImporterScopedProviders } from "./importer-scoped.ts";
+  isSupportedImporterLabel,
+} from "../../lib/importers";
+import { lockfileBasenamesForLang } from "../../lib/lockfiles";
+import { effectiveSetForImporter, parsePnpmLock } from "../../lib/pnpm-lock";
+import { readImporterProviderIndexEntriesForSingleImporterLockfileBasenames } from "../../lib/provider-index";
+import { decodeNameVersionFromPatch } from "../../lib/providers";
+import { syncImporterScopedProviders } from "./importer-scoped";
 
 export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: string }) {
+  const lockfileBasenames = lockfileBasenamesForLang("node") || [];
+  if (lockfileBasenames.length === 0) {
+    throw new Error("[node providers] missing lockfile basenames for lang: node");
+  }
+
   function syntheticLockfilesEnabled(): boolean {
     const raw = String(process.env.NODE_PROVIDER_SYNTHETIC_LOCKFILES || "")
       .trim()
@@ -28,7 +34,7 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
     if (syntheticLockfilesEnabled()) {
       return await findPnpmLockfilesWithSyntheticWorkspaceImporters();
     }
-    return await findImporterLockfiles(["pnpm-lock.yaml"]);
+    return await findImporterLockfiles(lockfileBasenames);
   };
   const parseEffectiveSetForLockfile = async (
     lockfilePath: string,
@@ -58,7 +64,7 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
   };
   await syncImporterScopedProviders({
     lang: "node",
-    lockfileBasenames: ["pnpm-lock.yaml"],
+    lockfileBasenames,
     discoverLockfiles,
     parseEffectiveSetForLockfile,
     decodePatchKey: decodeNameVersionFromPatch,
@@ -71,8 +77,12 @@ export async function syncNodeProviders(opts?: { outFile?: string; patchDir?: st
 export async function readNodeProviderIndexEntries(): Promise<
   Array<{ provider: string; key: string }>
 > {
+  const basenames = lockfileBasenamesForLang("node") || [];
+  if (basenames.length === 0) {
+    throw new Error("[node providers] missing lockfile basenames for lang: node");
+  }
   return await readImporterProviderIndexEntriesForSingleImporterLockfileBasenames({
-    lockfileBasenames: ["pnpm-lock.yaml"],
+    lockfileBasenames: basenames,
     requireNodeModule: "yaml",
     onMissingRequiredModule: "return-empty",
     shouldInclude: (_lf: string, importerLabel: string) => isSupportedImporterLabel(importerLabel),

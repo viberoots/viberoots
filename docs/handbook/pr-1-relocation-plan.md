@@ -16,8 +16,8 @@ I will add a single macro wiring entrypoint under `//lang` and route all macro c
 
 ## Helpers to keep internal
 
-- Package-local: `lang/package_local_wiring.bzl:prepare_package_local_wiring(...)`.
-- Importer-scoped: `lang/importer_wiring*.bzl:prepare_importer_*`.
+- Package-local: `lang/internal/package_local_wiring.bzl:prepare_package_local_wiring(...)`.
+- Importer-scoped: `lang/internal/importer_wiring*.bzl:prepare_importer_*`.
 - Package-local WASM: `lang/wasm_package_local_wiring.bzl:prepare_package_local_wasm_wiring(...)`.
 
 ## Tests and docs to update

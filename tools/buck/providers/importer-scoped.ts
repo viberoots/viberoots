@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import { scanFlatPatchDirToLowercaseKeyToPatchPathMap } from "../../lib/effective-set-patch-selection.ts";
-import { findImporterLockfiles, listImporterPatches } from "../../lib/importers.ts";
-import { importerScopedProviderContractForLang } from "../../lib/lang-contracts.ts";
-import { syncImporterProviders, type ParseEffectiveSetFn } from "../../lib/provider-sync-driver.ts";
+import { scanFlatPatchDirToLowercaseKeyToPatchPathMap } from "../../lib/effective-set-patch-selection";
+import { findImporterLockfiles, listImporterPatches } from "../../lib/importers";
+import { importerScopedProviderContractForLang } from "../../lib/lang-contracts";
+import { syncImporterProviders, type ParseEffectiveSetFn } from "../../lib/provider-sync-driver";
 
 export type ImporterScopedProviderSyncOptions = {
   lang: string;

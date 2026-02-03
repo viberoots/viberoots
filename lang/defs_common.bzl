@@ -59,30 +59,12 @@ load(
     _dict_items_probe = "dict_items_probe",
 )
 load(
-    "//lang:importer_wiring.bzl",
-    _prepare_importer_genrule_kwargs = "prepare_importer_genrule_kwargs",
-    _prepare_importer_non_genrule_wiring = "prepare_importer_non_genrule_wiring",
-    _prepare_importer_srcsless_rule_wiring = "prepare_importer_srcsless_rule_wiring",
-)
-load(
-    "//lang:importer_wiring_probe.bzl",
-    _importer_wiring_mutation_probe = "importer_wiring_mutation_probe",
-)
-load(
     "//lang:language_wiring.bzl",
     _prepare_language_wiring = "prepare_language_wiring",
 )
 load(
     "//lang:language_wiring_probe.bzl",
     _language_wiring_mutation_probe = "language_wiring_mutation_probe",
-)
-load(
-    "//lang:importer_wiring_nix_calling.bzl",
-    _prepare_importer_non_genrule_nix_calling_wiring = "prepare_importer_non_genrule_nix_calling_wiring",
-)
-load(
-    "//lang:nix_calling_importer_genrule_wiring.bzl",
-    _prepare_importer_nix_calling_genrule_wiring = "prepare_importer_nix_calling_genrule_wiring",
 )
 load("//lang:nix_calling_macros.bzl", _wire_global_nix_inputs = "wire_global_nix_inputs")
 load(
@@ -96,12 +78,6 @@ load(
     _wire_planner_visible_inputs = "wire_planner_visible_inputs",
     _wire_planner_visible_stub = "wire_planner_visible_stub",
     _wire_package_local_planner_visible_stub = "wire_package_local_planner_visible_stub",
-)
-load(
-    "//lang:package_local_wiring.bzl",
-    _prepare_package_local_wiring = "prepare_package_local_wiring",
-    _package_local_wiring_probe = "package_local_wiring_probe",
-    _package_local_wiring_mutation_probe = "package_local_wiring_mutation_probe",
 )
 load(
     "//lang:wasm_package_local_wiring.bzl",
@@ -174,15 +150,6 @@ PATCH_INPUTS_KEY_PREFIX = _PATCH_INPUTS_KEY_PREFIX
 PROVIDER_EDGES_KEY_PREFIX = _PROVIDER_EDGES_KEY_PREFIX
 GLOBAL_NIX_INPUTS_KEY_PREFIX = _GLOBAL_NIX_INPUTS_KEY_PREFIX
 
-# Preferred importer-scoped macro wiring helpers (non-mutating at the call-site boundary).
-prepare_importer_genrule_kwargs = _prepare_importer_genrule_kwargs
-prepare_importer_non_genrule_nix_calling_wiring = _prepare_importer_non_genrule_nix_calling_wiring
-prepare_importer_non_genrule_wiring = _prepare_importer_non_genrule_wiring
-prepare_importer_srcsless_rule_wiring = _prepare_importer_srcsless_rule_wiring
-importer_wiring_mutation_probe = _importer_wiring_mutation_probe
-
-prepare_importer_nix_calling_genrule_wiring = _prepare_importer_nix_calling_genrule_wiring
-
 wire_global_nix_inputs = _wire_global_nix_inputs
 
 allowed_kind_values = _allowed_kind_values
@@ -197,11 +164,6 @@ wire_package_local_planner_visible_stub = _wire_package_local_planner_visible_st
 prepare_language_wiring = _prepare_language_wiring
 language_wiring_mutation_probe = _language_wiring_mutation_probe
 #
-# Package-local helper (internal surface).
-prepare_package_local_wiring = _prepare_package_local_wiring
-package_local_wiring_probe = _package_local_wiring_probe
-package_local_wiring_mutation_probe = _package_local_wiring_mutation_probe
-
 prepare_package_local_wasm_wiring = _prepare_package_local_wasm_wiring
 package_local_wasm_wiring_mutation_probe = _package_local_wasm_wiring_mutation_probe
 wire_package_local_wasm_planner_visible_stub = _wire_package_local_wasm_planner_visible_stub

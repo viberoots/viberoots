@@ -11,7 +11,7 @@ await runInTemp("package-local-wiring-non-mutating-probe", async (tmp, $) => {
   await fsp.writeFile(
     path.join(pkg, "TARGETS"),
     [
-      'load("//lang:defs_common.bzl", "package_local_wiring_mutation_probe")',
+      'load("//lang/internal:package_local_wiring.bzl", "package_local_wiring_mutation_probe")',
       "",
       "package_local_wiring_mutation_probe(",
       '  name = "probe",',

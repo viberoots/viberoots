@@ -1,9 +1,20 @@
 load("//lang:dict_inputs.bzl", "GLOBAL_NIX_INPUTS_KEY_PREFIX", "PATCH_INPUTS_KEY_PREFIX", "PROVIDER_EDGES_KEY_PREFIX")
-load("//lang:importer_wiring.bzl", "prepare_importer_genrule_kwargs", "prepare_importer_non_genrule_wiring", "prepare_importer_srcsless_rule_wiring")
-load("//lang:importer_wiring_nix_calling.bzl", "prepare_importer_non_genrule_nix_calling_wiring")
+load(
+    "//lang/internal:importer_wiring.bzl",
+    "prepare_importer_genrule_kwargs",
+    "prepare_importer_non_genrule_wiring",
+    "prepare_importer_srcsless_rule_wiring",
+)
+load(
+    "//lang/internal:importer_wiring_nix_calling.bzl",
+    "prepare_importer_non_genrule_nix_calling_wiring",
+)
 load("//lang:lang_contracts.bzl", "patch_invalidation_strategy_for_lang")
-load("//lang:nix_calling_importer_genrule_wiring.bzl", "prepare_importer_nix_calling_genrule_wiring")
-load("//lang:package_local_wiring.bzl", "prepare_package_local_wiring")
+load(
+    "//lang/internal:nix_calling_importer_genrule_wiring.bzl",
+    "prepare_importer_nix_calling_genrule_wiring",
+)
+load("//lang/internal:package_local_wiring.bzl", "prepare_package_local_wiring")
 load("//lang:wasm_package_local_wiring.bzl", "prepare_package_local_wasm_wiring")
 
 def _clone_labels(labels):

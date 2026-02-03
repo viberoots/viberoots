@@ -55,7 +55,7 @@ test("importer_wiring attaches importer patches and merges provider edges for li
       path.join(appDir, "TARGETS"),
       [
         'load("//lang:defs_common.bzl", "PATCH_INPUTS_KEY_PREFIX", "PROVIDER_EDGES_KEY_PREFIX")',
-        'load("//lang:importer_wiring.bzl", "prepare_importer_genrule_kwargs")',
+        'load("//lang/internal:importer_wiring.bzl", "prepare_importer_genrule_kwargs")',
         'load("//lang:labels_file.bzl", "labels_file")',
         "",
         "# list-shaped attachment (prepared kwargs for genrule-style macros)",

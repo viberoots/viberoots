@@ -168,7 +168,8 @@ Introduce a convention-based default lockfile label for `nix_node_gen`, `nix_nod
 #### Scope & Changes
 
 - Add helper in `//lang:defs_common.bzl`:
-  - `default_lockfile_label_from_package()` returns `lockfile:<pkg>/pnpm-lock.yaml#<pkg>`.
+  - `default_lockfile_label_from_package()` returns `lockfile:<pkg>/<default-lockfile>#<pkg>`.
+  - The default lockfile basename is defined by `lang/lockfile_contracts.bzl` (node: `pnpm-lock.yaml`).
   - `ensure_default_lockfile_exists(path)` validates the file exists.
 - Update `//node:defs_core.bzl` to:
   - derive a default when `lockfile_label` is omitted

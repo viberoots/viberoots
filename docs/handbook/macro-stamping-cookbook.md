@@ -65,7 +65,7 @@ wire_global_nix_inputs(kw, into = "srcs", stamp = False)
   - Macro implementations must **not** stamp `patch_scope:*` directly; delegate to shared wiring helpers:
     - Canonical entrypoint: `lang/defs_common.bzl:prepare_language_wiring`
     - Planner-visible stubs remain package-local: `lang/planner_visible_wiring.bzl:wire_package_local_planner_visible_stub`
-    - Per-model helpers in `lang/package_local_wiring.bzl` and `lang/importer_wiring*.bzl` are internal implementation details.
+- Per-model helpers in `lang/internal/package_local_wiring.bzl` and `lang/internal/importer_wiring*.bzl` are internal implementation details.
 - **Package-local WASM macros (Go, C++)**: do not hand-roll ordering-sensitive wiring.
   - Use `lang/defs_common.bzl:prepare_language_wiring(...)` with `wasm_variant = "<variant>"` to compose WASM stamping, patch inputs, and provider edges.
   - For planner-visible package-local WASM stubs, use `lang/defs_common.bzl:wire_package_local_wasm_planner_visible_stub(...)`.

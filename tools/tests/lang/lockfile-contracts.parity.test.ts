@@ -3,9 +3,8 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-
+import { lockfileBasenamesForLang } from "../../lib/lockfiles";
 import { runInTemp } from "../lib/test-helpers";
-import { ALLOWED_KIND_VALUES } from "../../lib/kind-vocabulary";
 
 async function buildOutPath(tmp: string, $: any, target: string): Promise<string> {
   const res = await $({
@@ -28,31 +27,38 @@ async function buildOutPath(tmp: string, $: any, target: string): Promise<string
   return path.isAbsolute(last) ? last : path.resolve(tmp, last);
 }
 
-function parseKindValues(txt: string): string[] {
+function parseProbe(txt: string): string[] {
   return String(txt || "")
     .split("\n")
     .map((s) => s.trim())
+    .filter(Boolean)
+    .map((line) => line.replace(/^basename:/, ""))
     .filter(Boolean);
 }
 
-test("kind vocabulary is consistent (Starlark ↔ TS)", async () => {
-  await runInTemp("kind-vocabulary-parity", async (tmp, $) => {
+test("lockfile basenames are consistent (Starlark ↔ TS)", async () => {
+  await runInTemp("lockfile-contracts-parity", async (tmp, $) => {
     const appDir = path.join(tmp, "apps", "demo");
     await fsp.mkdir(appDir, { recursive: true });
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//lang:kind_vocabulary.bzl", "kind_vocabulary_probe")',
+        'load("//lang:lockfile_contracts.bzl", "lockfile_contract_probe")',
         "",
-        'kind_vocabulary_probe(name = "kinds")',
+        'lockfile_contract_probe(name = "node", lang = "node")',
+        'lockfile_contract_probe(name = "python", lang = "python")',
         "",
       ].join("\n"),
       "utf8",
     );
 
-    const outPath = await buildOutPath(tmp, $, "//apps/demo:kinds");
-    const starlarkKinds = parseKindValues(await fsp.readFile(outPath, "utf8")).sort();
-    const tsKinds = [...ALLOWED_KIND_VALUES].sort();
-    assert.deepEqual(starlarkKinds, tsKinds);
+    for (const lang of ["node", "python"] as const) {
+      const target = `//apps/demo:${lang}`;
+      const outPath = await buildOutPath(tmp, $, target);
+      const probe = parseProbe(await fsp.readFile(outPath, "utf8"));
+      const ts = lockfileBasenamesForLang(lang);
+      assert.ok(ts && ts.length > 0, `missing TS lockfile basenames for ${lang}`);
+      assert.deepEqual(probe, ts, `lockfile basenames mismatch for ${lang}`);
+    }
   });
 });

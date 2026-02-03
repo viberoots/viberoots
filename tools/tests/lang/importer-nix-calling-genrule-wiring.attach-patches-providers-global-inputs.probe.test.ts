@@ -54,7 +54,7 @@ test("prepare_importer_nix_calling_genrule_wiring composes patches, provider edg
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//lang:defs_common.bzl", "prepare_importer_nix_calling_genrule_wiring")',
+        'load("//lang/internal:nix_calling_importer_genrule_wiring.bzl", "prepare_importer_nix_calling_genrule_wiring")',
         'load("//lang:labels_file.bzl", "labels_file")',
         "",
         "# list-shaped srcs",

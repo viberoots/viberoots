@@ -3,9 +3,9 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
-import { listImporterPatches } from "../../lib/importers.ts";
-import { runImporterProviderSync } from "../../lib/provider-sync-driver.ts";
-import { decodeNameVersionFromPatch } from "../../lib/providers.ts";
+import { listImporterPatches } from "../../lib/importers";
+import { runImporterProviderSync } from "../../lib/provider-sync-driver";
+import { decodeNameVersionFromPatch } from "../../lib/providers";
 
 function extractPatchPathsFromTargetsAuto(output: string): string[] {
   const m = output.match(/patch_paths=\[([^\]]*)\]/);

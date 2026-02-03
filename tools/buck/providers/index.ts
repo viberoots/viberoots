@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { findImporterLockfiles } from "../../lib/importers.ts";
+import { findImporterLockfiles } from "../../lib/importers";
 import type { LanguageProviderSync } from "../../lib/lang-contracts";
 import { detectEnabledLanguages } from "../../lib/langs";
 
@@ -25,7 +25,7 @@ const REGISTRY: Record<string, () => Promise<LanguageProviderSync>> = {
     },
   }),
   node: async () => {
-    const { syncNodeProviders } = await import("./node.ts");
+    const { syncNodeProviders } = await import("./node");
     return {
       lang: "node",
       sync: async (opts) =>
@@ -36,7 +36,7 @@ const REGISTRY: Record<string, () => Promise<LanguageProviderSync>> = {
     };
   },
   python: async () => {
-    const { syncPythonProviders } = await import("./python.ts");
+    const { syncPythonProviders } = await import("./python");
     return {
       lang: "python",
       sync: async (opts) =>
@@ -48,7 +48,7 @@ const REGISTRY: Record<string, () => Promise<LanguageProviderSync>> = {
   },
   rust: async () => {
     try {
-      const { syncRustProviders } = await import("./rust.ts");
+      const { syncRustProviders } = await import("./rust");
       return {
         lang: "rust",
         sync: async (opts) =>
