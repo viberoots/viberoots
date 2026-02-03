@@ -3,8 +3,8 @@
 This document proposes an implementation sequence for:
 
 - C++ native linking semantics (`cpp-linking.md`)
-- Wasm linking semantics (`wasm-linking.md`)
-- Python extension module support (`python-extension-design.md`)
+- Wasm linking semantics (`build-tools/docs/wasm-linking.md`)
+- Python extension module support (`build-tools/docs/python-extension-design.md`)
 
 The goal is to implement shared primitives once, then apply them across target types without reinventing the wheel.
 
@@ -74,7 +74,7 @@ Acceptance:
 
 ### Phase 2: Wasm linking semantics (TinyGo + C++ Wasm static libs)
 
-Scope (from `wasm-linking.md`):
+Scope (from `build-tools/docs/wasm-linking.md`):
 
 - Extend `nix_go_tiny_wasm_lib` to accept `link_deps`/closure semantics and enforce variant compatibility.
 - Treat `nix_cpp_wasm_static_lib` as the Wasm-producer analogue of `nix_cpp_library`.
@@ -91,7 +91,7 @@ Acceptance:
 
 ### Phase 3: Python extension modules (in-repo)
 
-Scope (from `python-extension-design.md`):
+Scope (from `build-tools/docs/python-extension-design.md`):
 
 - Add `nix_python_extension_module` macro (importer-scoped).
 - Add `kind:pyext` and `T.pyExt` template that builds an extension and emits `$out/site/<module path>${EXT_SUFFIX}`.
@@ -119,7 +119,7 @@ Possible follow-ups:
 
 ## Notes for doc readers
 
-- `cpp-linking.md`, `wasm-linking.md`, and `python-extension-design.md` should be read as:
+- `cpp-linking.md`, `build-tools/docs/wasm-linking.md`, and `build-tools/docs/python-extension-design.md` should be read as:
   - a conceptual model
   - a concrete target surface
   - a phased rollout

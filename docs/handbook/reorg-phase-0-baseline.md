@@ -33,28 +33,28 @@ I am recording the baseline run list and a root-level inventory snapshot for the
 - `python/`
 - `rust/`
 - `lang/`
-- `lang-design-docs/`
+- `build-tools/docs/lang/`
 
 ### Build-system reference docs to `/build-tools/docs`
 
-- `build-system-design.md`
-- `build-system-final-steps.md`
-- `mapping-design.md`
-- `nix-node-test.md`
-- `nix-rename.md`
-- `pnpm-label.md`
-- `pnpm-exporter-adapter-prs.md`
-- `go-cpp-local-patching.md`
-- `node-cpp-addon-plan.md`
-- `python-extension-design.md`
-- `python-wasm-design.md`
-- `uv2nix-design.md`
-- `patch-in-uv2nix.md`
-- `wasm-linking.md`
-- `ts-cpp-go-wasm-plan.md`
-- `scaf-go-test-design.md`
-- `scaffolding.md`
-- `remote-build-setup.md`
+- `build-tools/docs/build-system-design.md`
+- `build-tools/docs/build-system-final-steps.md`
+- `build-tools/docs/mapping-design.md`
+- `build-tools/docs/nix-node-test.md`
+- `build-tools/docs/nix-rename.md`
+- `build-tools/docs/pnpm-label.md`
+- `build-tools/docs/pnpm-exporter-adapter-prs.md`
+- `build-tools/docs/go-cpp-local-patching.md`
+- `build-tools/docs/node-cpp-addon-plan.md`
+- `build-tools/docs/python-extension-design.md`
+- `build-tools/docs/python-wasm-design.md`
+- `build-tools/docs/uv2nix-design.md`
+- `build-tools/docs/patch-in-uv2nix.md`
+- `build-tools/docs/wasm-linking.md`
+- `build-tools/docs/ts-cpp-go-wasm-plan.md`
+- `build-tools/docs/scaf-go-test-design.md`
+- `build-tools/docs/scaffolding.md`
+- `build-tools/docs/remote-build-setup.md`
 
 ### Build-history docs to `/docs/build-history`
 

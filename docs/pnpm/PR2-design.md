@@ -922,7 +922,7 @@ This PR enables:
 
 - [pnpm-plan.md](./pnpm-plan.md) — Original PR plan
 - [pnpm-design.md](./pnpm-design.md) — Overall PNPM design
-- [build-system-design.md](../../build-system-design.md) — Provider strategy
+- [build-tools/docs/build-system-design.md](../../build-tools/docs/build-system-design.md) — Provider strategy
 - [METHODOLOGY.XML](../../METHODOLOGY.XML) — Development methodology
 - [PR1-COMPLETE.md](./PR1-COMPLETE.md) — PR 1 completion status
 

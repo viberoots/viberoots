@@ -6,7 +6,7 @@ This note sketches the cleanest path to ship a pure-logic library usable from:
 - Go (native library consuming the same logic via cgo)
 - C++ (native library directly, mainly for tests/tooling)
 
-The core requirement: reuse the same source files for logic (no platform/system calls), while staying consistent with our repository rules, build-system-design.md, and METHODOLOGY.XML.
+The core requirement: reuse the same source files for logic (no platform/system calls), while staying consistent with our repository rules, build-tools/docs/build-system-design.md, and METHODOLOGY.XML.
 
 ### Goals and constraints
 
@@ -230,7 +230,7 @@ The Buck/Nix wiring copies `top.wasm` into `dist/` for web and copies the `.node
   - Add one test per file (repo convention) so Buck controls parallelism.
   - Keep external timeouts for long `nix build` steps (repo convention).
 
-### Consistency with build-system-design.md
+### Consistency with build-tools/docs/build-system-design.md
 
 - Buck remains the orchestrator (labels/impact), Nix performs hermetic builds.
 - Patching remains package-local; dev overrides warn locally and fail in CI.

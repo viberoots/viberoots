@@ -1,6 +1,6 @@
 # Implicit Lockfile Labels for Node Macros
 
-This document proposes a small, deterministic change to the Node macro surface so callers do not need to manually compute lockfile labels. It follows the design principles in `build-system-design.md` and the PNPM design in `lang-design-docs/pnpm-design.md`.
+This document proposes a small, deterministic change to the Node macro surface so callers do not need to manually compute lockfile labels. It follows the design principles in `build-tools/docs/build-system-design.md` and the PNPM design in `build-tools/docs/lang/pnpm-design.md`.
 
 I keep the behavior explicit and deterministic. I do not add filesystem scans or nearest-lockfile deduction. The default is derived from the Buck package path and fails fast if the lockfile is missing.
 
@@ -36,7 +36,7 @@ The macro continues to allow an explicit `lockfile_label` override.
 ### Rationale
 
 - Determinism: `native.package_name()` is stable and unambiguous.
-- Consistency: matches the per‑importer lockfile model in `lang-design-docs/pnpm-design.md`.
+- Consistency: matches the per‑importer lockfile model in `build-tools/docs/lang/pnpm-design.md`.
 - Predictability: no filesystem scanning and no label guessing.
 - Failure mode: missing lockfile fails fast with a targeted error.
 
@@ -175,7 +175,7 @@ Introduce a convention-based default lockfile label for `nix_node_gen`, `nix_nod
   - derive a default when `lockfile_label` is omitted
   - validate the default lockfile exists
   - preserve the existing enforcement of exactly one lockfile label
-- Update `lang-design-docs/pnpm-design.md`:
+- Update `build-tools/docs/lang/pnpm-design.md`:
   - document the default label convention
   - note the fast-fail on missing lockfile
 
@@ -284,7 +284,7 @@ Add a deterministic enforcement mechanism that keeps Node workspace dependencies
     - `node tools/buck/enforce-node-deps.ts --fix`
 - Update `tools/buck/prebuild-guard.ts` to call `node tools/buck/enforce-node-deps.ts --check` in CI.
 - Update `docs/handbook/node-macros.md` to describe the enforcement and the `--fix` workflow.
-- Update `lang-design-docs/pnpm-design.md` with the high-level rule: `package.json` is the source of truth, Buck `deps` must match.
+- Update `build-tools/docs/lang/pnpm-design.md` with the high-level rule: `package.json` is the source of truth, Buck `deps` must match.
 
 #### Tests (in this PR)
 

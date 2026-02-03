@@ -15,7 +15,7 @@ This focuses on a Node library scaffold; a CLI variant can follow the same patte
 
 ### Alignment with our build system
 
-- Buck2 remains the orchestrator; Nix performs the actual builds for planner languages (C++), with dynamic derivations and patch‑aware invalidation. See build-system-design.md for the language split and planner responsibilities.
+- Buck2 remains the orchestrator; Nix performs the actual builds for planner languages (C++), with dynamic derivations and patch‑aware invalidation. See build-tools/docs/build-system-design.md for the language split and planner responsibilities.
 - Node is handled by macros with importer‑scoped providers; no changes are required to Node provider wiring for this feature.
 - Patches are package‑local: `patches/cpp/` under the C++ package, included in `srcs`, so patch edits precisely invalidate reverse deps.
 - Use `TARGETS` files rather than BUCK for new rules and wiring to match repo conventions [[memory:6971968]].

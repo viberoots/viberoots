@@ -1,6 +1,6 @@
 ### PNPM–Go–C++ Parity Plan
 
-This document proposes targeted, minimal changes to close practical gaps between PNPM/Node, Go, and C++ while staying aligned with our build-system philosophy in `build-system-design.md`: Buck2 as the orchestrator, Nix as the hermetic executor (dynamic derivations), and ergonomic, idempotent patching.
+This document proposes targeted, minimal changes to close practical gaps between PNPM/Node, Go, and C++ while staying aligned with our build-system philosophy in `build-tools/docs/build-system-design.md`: Buck2 as the orchestrator, Nix as the hermetic executor (dynamic derivations), and ergonomic, idempotent patching.
 
 The plan focuses on outcomes (precise invalidation, deterministic behavior, and clear UX) rather than making all ecosystems identical. Where mechanisms differ, we preserve the stronger/cleaner approach and adapt the others to match outcomes.
 

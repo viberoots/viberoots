@@ -14,7 +14,7 @@ Phase 1 is a hard prerequisite for Phase 2 because Copier requires stable variab
 
 ### Constraints and repository rules (summarized)
 
-- All glue scripts are zx TypeScript and run outside Nix (see build-system-design.md).
+- All glue scripts are zx TypeScript and run outside Nix (see build-tools/docs/build-system-design.md).
 - Decentralized registration is a hard requirement to support partial clones: each scaffold owns its `TARGETS` and no central registry must be edited later.
 - Tests run in temporary copies of the repo and under a direnv-loaded dev shell; tests must not modify PATH.
 - Template metadata must reside in `meta.json` with `help` (no `help.md` files).

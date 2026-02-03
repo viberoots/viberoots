@@ -13,12 +13,12 @@ This guide helps a new contributor land any PR in this plan successfully, follow
 - Optional: run our startup check if present (prints clear hints):
   - `node tools/dev/startup-check.ts`
 
-Note on Python lockfiles: The initial Python rollout is uv‑only. Poetry/pip‑tools are out of scope unless/until a future PR adds them. See `lang-design-docs/python-design.md` (PR‑17) for details.
+Note on Python lockfiles: The initial Python rollout is uv‑only. Poetry/pip‑tools are out of scope unless/until a future PR adds them. See `build-tools/docs/lang/python-design.md` (PR‑17) for details.
 Python provider sync activation in sparse/partial clones is lockfile‑driven: the presence of an `uv.lock` under `apps/*` or `libs/*` enables Python providers.
 
 ### 2. Project rules you must follow
 
-- Follow `@METHODOLOGY.XML` and `@build-system-design.md` at all times.
+- Follow `@METHODOLOGY.XML` and `@build-tools/docs/build-system-design.md` at all times.
 - Never commit without verifying that all tests are wired and passing (full suite with coverage):
   - `buck2 test //... -- --env COVERAGE=1`
 - Use Conventional Commits and real newlines in commit messages.

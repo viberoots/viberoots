@@ -239,7 +239,7 @@ This plan sequences small, verifiable PRs to implement PNPM workspaces (apps/lib
   - Emit `TARGETS` using the Node macro (from PR5) with `labels = ["lockfile:<path>#<importer>", "lang:node", "kind:app"]` so importer‑scoped providers auto‑wire.
 
 - Detailed design
-  - The scaffold chooses the Vite “vanilla TS” template (framework‑neutral) to minimize dependencies and align with hermeticity goals in `build-system-design.md`.
+  - The scaffold chooses the Vite “vanilla TS” template (framework‑neutral) to minimize dependencies and align with hermeticity goals in `build-tools/docs/build-system-design.md`.
   - `vite.config.ts` is minimal and deterministic (no ambient FS reads). Environment values flow via Vite defaults; no Nix wrappers for running Vite.
   - The generator runs `pnpm -w install --lockfile-only` (in dev shell) to materialize a stable importer lockfile; provider sync then includes the correct importer.
   - Buck TARGETS use the Node macro to append provider deps from `//third_party/providers:auto_map.bzl` and carry the importer‑scoped lockfile label.

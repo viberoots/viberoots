@@ -1,6 +1,6 @@
 ## Build Alignment Plan (PR Sequence)
 
-This plan brings the repository into alignment with `build-system-design.md`, favoring simplicity and early erroring over fallbacks. Each PR is small, testable, and reversible.
+This plan brings the repository into alignment with `build-tools/docs/build-system-design.md`, favoring simplicity and early erroring over fallbacks. Each PR is small, testable, and reversible.
 
 ### PR 1 — Restore filtered source for planner (apps/libs only) and fix working dirs
 

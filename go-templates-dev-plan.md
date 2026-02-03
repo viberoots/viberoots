@@ -8,7 +8,7 @@ Create production-ready Copier templates in `tools/scaffolding/templates/go/*` t
 - **Done when**:
   - `scaf new go lib <name>` produces a buildable, testable Go library wired into Buck2 macros and our provider mapping.
   - `scaf new go cli <name>` produces a buildable Go CLI, imports a local lib by example, and runs under Buck2.
-  - Generated projects align with `build-system-design.md` (graph export, provider sync, auto-map, prebuild-guard) and pass validation with `tools/scaffolding/validate.ts`.
+  - Generated projects align with `build-tools/docs/build-system-design.md` (graph export, provider sync, auto-map, prebuild-guard) and pass validation with `tools/scaffolding/validate.ts`.
   - E2E scaffold tests verify build and minimal test execution using Buck2.
   - Presence of a scaffold directory with its own `TARGETS` (using `nix_go_*` macros) is sufficient for Buck2 discovery via `//...` — no central registry.
   - HARD REQUIREMENT (partial clones): Decentralized registration is mandatory so that a partial clone containing only certain `apps/<name>` or `libs/<name>` directories (plus required shared files) can be built without modifying any central registry.

@@ -412,7 +412,7 @@ All PRs are independently reversible and behavior‑preserving outside the scaff
 
 ## References
 
-- `build-system-design.md` — Buck2 orchestrator, Nix dynamic derivations, patching invariants
+- `build-tools/docs/build-system-design.md` — Buck2 orchestrator, Nix dynamic derivations, patching invariants
 - `node-cpp-addon-plan.md` — C++ addon scaffold; this design mirrors its artifact flow using Go
 - `tools/nix/templates/go.nix` — `goCArchive` template
 - `tools/nix/templates/cpp-node-addon.nix` — addon linker (links repo packages + nixpkgs libs)

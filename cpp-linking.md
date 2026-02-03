@@ -9,7 +9,7 @@ This document proposes a design to support explicit, deterministic C++ dependenc
 - Direct-only and transitive link closure policies
 - Static and shared linking (with a clear default)
 
-I wrote this to be consistent with our build design in `build-system-design.md` and our methodology in `METHODOLOGY.XML`. Buck remains the source of truth for the graph. Nix remains the builder. The planner stays small. Semantics are explicit at call sites.
+I wrote this to be consistent with our build design in `build-tools/docs/build-system-design.md` and our methodology in `METHODOLOGY.XML`. Buck remains the source of truth for the graph. Nix remains the builder. The planner stays small. Semantics are explicit at call sites.
 
 ## Problem statement
 
@@ -760,7 +760,7 @@ This project is “finished” when:
 
 ## Shared code opportunities (avoid reinvention with Wasm linking)
 
-This document and `wasm-linking.md` share the same core semantic model:
+This document and `build-tools/docs/wasm-linking.md` share the same core semantic model:
 
 - explicit `link_deps` and `header_deps` intent lists
 - `deps := deps ∪ link_deps ∪ header_deps` as a deterministic union at the macro layer
@@ -769,7 +769,7 @@ This document and `wasm-linking.md` share the same core semantic model:
 
 If I implement either C++ native linking or Wasm linking first, I want to avoid duplicating these mechanics.
 
-This same shared model is also intended to be reused by `python-extension-design.md` (Python extension modules), which is another “native link consumer” that benefits from the same deterministic closure resolution.
+This same shared model is also intended to be reused by `build-tools/docs/python-extension-design.md` (Python extension modules), which is another “native link consumer” that benefits from the same deterministic closure resolution.
 
 ### Shared semantics helper for deterministic traversal
 
@@ -793,7 +793,7 @@ Both designs rely on the exported Buck graph containing the intent attributes:
 
 If the exporter needs to be extended to emit these fields, I should do it once and reuse it for both native C++ and Wasm.
 
-Python extension modules (`python-extension-design.md`) should reuse the same attribute names for the same semantics, rather than inventing a parallel surface.
+Python extension modules (`build-tools/docs/python-extension-design.md`) should reuse the same attribute names for the same semantics, rather than inventing a parallel surface.
 
 ## Implementation sequence
 

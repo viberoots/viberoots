@@ -281,6 +281,6 @@ test("node go-addon: scaffold, build addon, and pass nix_node_test", async () =>
 ## References
 
 - `node-golang-addon.md` (scaffold architecture and acceptance)
-- `build-system-design.md` (Buck2 orchestrator, Nix dynamic derivations, patching invariants)
+- `build-tools/docs/build-system-design.md` (Buck2 orchestrator, Nix dynamic derivations, patching invariants)
 - `getting-started-on-a-pr.md` (dev shell, build/test commands, glue steps)
 - `tools/tests/lib/test-helpers.ts` (temp repo setup, dev env export)

@@ -111,7 +111,7 @@ scaf new go test main_case --path=apps/demo-cli/cmd/demo-cli/main_case_test.go
   - Apps: tests under `apps/<app>/cmd/<app>/**/_test.go` are discovered and bound to `//apps/<app>:<app>_test`.
   - Package name is inferred from existing files; under `/cmd/` it defaults to `main`.
 
-Further reading: `build-system-design.md`, `docs/handbook/`.
+Further reading: `build-tools/docs/build-system-design.md`, `docs/handbook/`.
 
 Related docs:
 

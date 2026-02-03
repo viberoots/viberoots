@@ -53,7 +53,7 @@ Generalize provider coverage fallback to read all TARGETS.\*.auto files (Python 
   - Keep the current fast path via provider_index; only use the autos scan as a fallback.
   - Tests: add tools/tests/prebuild/coverage.python-provider-fallback.test.ts
     - With provider_index absent/stale but TARGETS.python.auto present and correct, coverage reports success for Python importers.
-  - Docs: update build-system-design.md
+  - Docs: update build-tools/docs/build-system-design.md
     - Brief note in the “Prebuild guard / provider coverage” area that fallback checks scan TARGETS.\*.auto (including Python), with provider_index as the primary source.
 
 ### Acceptance Criteria

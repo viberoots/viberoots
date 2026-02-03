@@ -33,7 +33,7 @@ This document proposes adding C++ as a first-class language to the repo with min
 
 ### Project rules and operational requirements (global)
 
-- Follow repository rules and design docs at all times: `@METHODOLOGY.XML` and `@build-system-design.md`.
+- Follow repository rules and design docs at all times: `@METHODOLOGY.XML` and `@build-tools/docs/build-system-design.md`.
 - Never commit without first verifying that all tests are wired and passing. Run the full suite with coverage and the project's external timeout policy (e.g., `buck2 test //... -- --env COVERAGE=1`).
 - Ensure the dev shell environment is loaded via `direnv` so required tools (e.g., `buck2`, `timeout`, `nix`, `pnpm`) are on PATH. If needed: `direnv allow` and ensure your shell evaluates `direnv` before running commands.
 
@@ -576,7 +576,7 @@ If not implemented
 - Determinism: stable sorts, no ambient FS reads; pure Nix evaluation
 - Partial clone grace: existence checks only; no hard failures
 - Low cyclomatic complexity: small functions in adapter, planner, templates
-- Consistent with build-system-design.md (Buck2 orchestrates, Nix builds)
+- Consistent with build-tools/docs/build-system-design.md (Buck2 orchestrates, Nix builds)
 - One-test-per-file rule adhered to in C++ scaffolds
 - Full suite green with coverage
 
@@ -821,7 +821,7 @@ Design
 - Patches live under `patches/cpp/*.patch` (flat dir). Use `fetchpatch` or pass patches directly in the overlay for the target attr
 - CI guardrails: fail when a dev override env var is set (mirroring Go policy). Local warning only
 - Diagnostics: extend `langs-diagnose` to list patched nixpkgs attrs (attr path + patch filenames)
-- Provider input stamping (consistency with build-system-design.md):
+- Provider input stamping (consistency with build-tools/docs/build-system-design.md):
   - Ensure the provider rule that represents a patched nixpkgs package includes both the patch files under `patches/cpp/*.patch` and the overlay files (e.g., `tools/nix/overlays/*.nix`) as explicit srcs (via a tiny content-addressed stamp rule), so Buck invalidates dependents when any of these inputs change.
   - Treat `flake.lock` as an input to the provider rule (directly or through the Nix evaluation path) to guarantee rebuilds when nixpkgs pins change.
   - Prebuild guard: extend inputs list to include overlay files and `flake.lock`; report stale/missing glue accordingly.
