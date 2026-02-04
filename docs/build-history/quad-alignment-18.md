@@ -19,7 +19,7 @@ As in prior parts, each PR includes the tests and documentation required for the
 
 We already define a canonical sanitizer contract in:
 
-- Starlark: `lang/sanitize.bzl:sanitize_name`
+- Starlark: `build-tools/lang/sanitize.bzl:sanitize_name`
 - Nix: `build-tools/tools/nix/lib/lang-helpers.nix:sanitizeName`
 
 Some TypeScript tooling callsites still re-implement sanitizer logic locally (for example, `build-tools/tools/buck/node-cli-bundle.ts` and `build-tools/tools/dev/build-selected.ts`). This is a drift vector because sanitizer output is part of external interfaces (flake attribute names, output filenames).
@@ -89,7 +89,7 @@ Importer-scoped lockfile labels (`lockfile:<path>#<importer>`) are the shared co
 Today:
 
 - TypeScript already has a parser and unit tests: `build-tools/tools/lib/labels.ts:parseLockfileLabel` and `build-tools/tools/tests/lib/labels.parse-lockfile-label.test.ts`.
-- Starlark validates lockfile label shape strictly: `lang/lockfile_labels.bzl:_parse_importer_scoped_lockfile_label`.
+- Starlark validates lockfile label shape strictly: `build-tools/lang/lockfile_labels.bzl:_parse_importer_scoped_lockfile_label`.
 - Nix (Node planner) still does a minimal `splitString "#"` without the same validation surface.
 
 This is a drift vector because small differences (extra `#`, importer mismatch, leading `./`) surface as confusing downstream failures.
@@ -151,7 +151,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `build-tools/tools/lib/labels.ts`, `lang/lockfile_labels.bzl`, `build-tools/tools/nix/planner/*`, and narrow tests. Safe in tooling slices that include the exporter/planner.
+- Touches `build-tools/tools/lib/labels.ts`, `build-tools/lang/lockfile_labels.bzl`, `build-tools/tools/nix/planner/*`, and narrow tests. Safe in tooling slices that include the exporter/planner.
 
 ---
 
@@ -232,7 +232,7 @@ Node implements this logic in `build-tools/node/defs_core.bzl` with custom branc
 
 ### Scope & Changes
 
-- Add a shared helper in `lang/importer_wiring.bzl` (or `lang/defs_common.bzl` if preferred) that:
+- Add a shared helper in `build-tools/lang/importer_wiring.bzl` (or `build-tools/lang/defs_common.bzl` if preferred) that:
   - takes `(name, kwargs, srcs, deps, lang, MODULE_PROVIDERS, lockfile_label, kind)`
   - enforces `require_single_importer_lockfile_label`
   - stamps `lang:*` and `kind:*`
@@ -283,7 +283,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `lang/importer_wiring.bzl`, `build-tools/node/defs_core.bzl`, and narrow Starlark/Node macro tests. Safe in Starlark-only slices.
+- Touches `build-tools/lang/importer_wiring.bzl`, `build-tools/node/defs_core.bzl`, and narrow Starlark/Node macro tests. Safe in Starlark-only slices.
 
 ---
 

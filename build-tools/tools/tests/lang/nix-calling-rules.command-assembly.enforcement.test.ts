@@ -49,8 +49,8 @@ test("Nix-calling rule implementations use shared nix out-path capture helpers a
     );
     assertContains(
       src,
-      'load("//lang:nix_shell.bzl"',
-      `${label}: expected nix shell helpers to be loaded from //lang:nix_shell.bzl`,
+      'load("//build-tools/lang:nix_shell.bzl"',
+      `${label}: expected nix shell helpers to be loaded from //build-tools/lang:nix_shell.bzl`,
     );
   }
 

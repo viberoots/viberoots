@@ -29,7 +29,7 @@ test("planner_stub: deterministic stamp with deps-only and srcs+deps+labels", as
         "",
         "# test: planner-stub.probe.test.ts",
         'load("@prelude//:rules.bzl", "genrule")',
-        'load("//lang:planner_stub.bzl", "planner_stub")',
+        'load("//build-tools/lang:planner_stub.bzl", "planner_stub")',
         "",
         'genrule(name="dep", out="dep.out", cmd="echo dep > $OUT", visibility=["PUBLIC"])',
         "",

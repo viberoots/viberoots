@@ -12,7 +12,7 @@ Make the `normalize_labels(...)` error messaging argument‑agnostic so it appli
 
 ### Scope & Changes
 
-- `lang/defs_common.bzl`:
+- `build-tools/lang/defs_common.bzl`:
   - Adjust error strings in `normalize_labels(...)` to refer generically to “labels list” rather than a specific macro argument name.
   - No semantic change to normalization behavior.
 
@@ -54,7 +54,7 @@ Create a tiny shared helper to attach package‑local patch dirs for non‑impor
 
 ### Scope & Changes
 
-- `lang/defs_common.bzl`:
+- `build-tools/lang/defs_common.bzl`:
   - Add `include_package_local_patches(kwargs, lang, default_dirs)` that delegates to `append_patch_srcs(...)` and dedupes.
 - `build-tools/go/defs.bzl`, `build-tools/cpp/defs.bzl`:
   - Replace direct `append_patch_srcs(kwargs, ["patches/<lang>"])` with the new helper.
@@ -94,7 +94,7 @@ Implement.
 
 ### Description
 
-Adopt the shared `//lang:nix_shell.bzl` helpers in Node macros that shell out to Nix so these rules have uniform bootstrap and timeout handling across environments. This eliminates bespoke command assembly and aligns with our reliability goals.
+Adopt the shared `//build-tools/lang:nix_shell.bzl` helpers in Node macros that shell out to Nix so these rules have uniform bootstrap and timeout handling across environments. This eliminates bespoke command assembly and aligns with our reliability goals.
 
 ### Scope & Changes
 
@@ -110,7 +110,7 @@ Adopt the shared `//lang:nix_shell.bzl` helpers in Node macros that shell out to
 
 #### Docs (in this PR)
 
-- Build‑system design note: macros that call Nix should prepend `nix_bootstrap_env()` and `nix_timeout_wrapper_var()` from `//lang:nix_shell.bzl`.
+- Build‑system design note: macros that call Nix should prepend `nix_bootstrap_env()` and `nix_timeout_wrapper_var()` from `//build-tools/lang:nix_shell.bzl`.
 
 ### Acceptance Criteria
 
@@ -143,7 +143,7 @@ Standardize our Nix invocation patterns to avoid creating persistent GC roots an
 
 ### Scope & Changes
 
-- `//lang:nix_shell.bzl`:
+- `//build-tools/lang:nix_shell.bzl`:
   - Guidance: from macro‑assembled shell `cmd`s, use `nix build --no-link --print-out-paths` and capture the output path via a shell variable instead of creating named out‑links with `--out-link`.
   - Optional follow‑up: provide a tiny helper snippet (as a Starlark string fragment) to capture the last printed out path into a variable, e.g. `OUT_PATH="$($TIMEOUT nix build ... --no-link --print-out-paths | tail -n1)"`.
 

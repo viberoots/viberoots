@@ -1,6 +1,6 @@
-load("//lang:sanitize.bzl", "sanitize_name")
-load("//lang:nix_shell.bzl", "nix_build_out_path_cmd", "nix_cmd_prefix")
-load("//lang:nix_action_runner.bzl", "nix_action_export_graph_cmd", "nix_action_workspace_setup_from_args")
+load("//build-tools/lang:sanitize.bzl", "sanitize_name")
+load("//build-tools/lang:nix_shell.bzl", "nix_build_out_path_cmd", "nix_cmd_prefix")
+load("//build-tools/lang:nix_action_runner.bzl", "nix_action_export_graph_cmd", "nix_action_workspace_setup_from_args")
 
 
 def _cpp_nix_build_impl(ctx):

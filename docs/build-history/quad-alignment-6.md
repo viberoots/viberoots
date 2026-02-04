@@ -12,7 +12,7 @@ Introduce a single Starlark helper to (a) enforce exactly one importer‑scoped 
 
 ### Scope & Changes
 
-- `lang/defs_common.bzl`:
+- `build-tools/lang/defs_common.bzl`:
   - Add `importer_from_labels(kwargs)` that:
     - Delegates to `ensure_single_lockfile_label(...)` to validate presence (and dedupe) of the single lockfile label.
     - Extracts and returns the importer (text after `#`), with consistent error text.
@@ -75,7 +75,7 @@ Align Node macros that shell out to `nix build` with the unified global inputs p
 ### Scope & Changes
 
 - `build-tools/node/defs.bzl`:
-  - For `node_webapp(...)`: import `//lang:global_inputs.bzl:global_nix_inputs` and append returned labels to `kwargs["labels"]` before invoking the genrule that runs `nix build`.
+  - For `node_webapp(...)`: import `//build-tools/lang:global_inputs.bzl:global_nix_inputs` and append returned labels to `kwargs["labels"]` before invoking the genrule that runs `nix build`.
   - For `nix_node_cli_bin(bundle=True)`: same as above when bundling is enabled (the non‑bundled cp‑only mode remains unchanged).
 - Macro update detail:
   - Use the existing pattern and ordering stability: `kwargs["labels"] = dedupe_preserve((kwargs.get("labels", []) or []) + global_nix_inputs())`.

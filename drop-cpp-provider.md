@@ -64,7 +64,7 @@ Proposed shape (illustrative fragment):
 ```starlark
 # build-tools/cpp/defs.bzl (illustrative; provider load removed)
 load("@prelude//:rules.bzl", "cxx_library", "cxx_binary", "cxx_test")
-load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve")
+load("//build-tools/lang:defs_common.bzl", "stamp_labels", "dedupe_preserve")
 
 def _normalize_nixpkg_attr(a):
     if a == None or not isinstance(a, str): return ""

@@ -163,7 +163,7 @@ Reduce duplication in Starlark helpers by introducing a single importer‑patch 
 
 ### Scope & Changes
 
-- lang/defs_common.bzl:
+- build-tools/lang/defs_common.bzl:
   - Add `append_importer_patches(kwargs, importer, lang)` which routes to the correct `<importer>/patches/<lang>` directory and appends `*.patch` to `srcs` deterministically.
   - Deprecate `append_node_patches_for_importer` and `append_python_patches_for_importer` (keep temporary shims calling the unified helper).
 - build-tools/node/defs.bzl and build-tools/python/defs.bzl:

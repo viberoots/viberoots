@@ -2,7 +2,7 @@
 
 This installment follows Part 39, but adjusts the plan based on current repo reality:
 
-- Package-local WASM wiring is already on the **non-mutating helper boundary** pattern (`lang/wasm_package_local_wiring.bzl:prepare_package_local_wasm_wiring(...)` plus mutation probes), so we do **not** need a PR dedicated to “make WASM wiring non-mutating”.
+- Package-local WASM wiring is already on the **non-mutating helper boundary** pattern (`build-tools/lang/wasm_package_local_wiring.bzl:prepare_package_local_wasm_wiring(...)` plus mutation probes), so we do **not** need a PR dedicated to “make WASM wiring non-mutating”.
 - The Nix planner already routes some key transforms through the canonical helper surface (`build-tools/tools/nix/lib/lang-helpers.nix`), so the remaining planner work is about eliminating the _last_ locally re-implemented target/label parsing and making the “fallback” path obey the same canonical transforms.
 - We already have several enforcement tests for “don’t bypass helper surfaces”; the remaining valuable work is to (a) finish standardizing macro entrypoint conventions across languages, and (b) remove remaining legacy surfaces once enforcement proves they are unused.
 
@@ -176,7 +176,7 @@ Implement.
 
 ### Description
 
-The core abstraction boundary is the shared helper surface in `//lang:*` (re-exported via `//lang:defs_common.bzl`). The repo already has enforcement tests that prevent several bypass patterns.
+The core abstraction boundary is the shared helper surface in `//build-tools/lang:*` (re-exported via `//build-tools/lang:defs_common.bzl`). The repo already has enforcement tests that prevent several bypass patterns.
 
 The remaining valuable work is:
 
@@ -197,13 +197,13 @@ The remaining valuable work is:
   - `build-tools/node/defs_core.bzl`, `build-tools/node/defs_nix.bzl`
   - `build-tools/python/defs.bzl`
 
-- Tighten enforcement (allowlisted to macro entrypoints and/or all non-`//lang/*` Starlark code, depending on what is already enforced):
-  - Disallow `_legacy_mutating` helper usage outside `//lang/*`.
-  - Disallow direct loads of low-level parsing helpers (e.g., `//lang:lockfile_labels.bzl`) from macro entrypoints when a dedicated wiring helper exists (must route via importer wiring surfaces).
+- Tighten enforcement (allowlisted to macro entrypoints and/or all non-`//build-tools/lang/*` Starlark code, depending on what is already enforced):
+  - Disallow `_legacy_mutating` helper usage outside `//build-tools/lang/*`.
+  - Disallow direct loads of low-level parsing helpers (e.g., `//build-tools/lang:lockfile_labels.bzl`) from macro entrypoints when a dedicated wiring helper exists (must route via importer wiring surfaces).
   - Disallow bypassing package-local wiring surfaces (for example, calling low-level `pop_*` helpers directly at macro boundaries) when `prepare_package_local_wiring(...)` exists.
 
 - Once enforcement proves no call sites use them:
-  - remove re-exports of legacy mutating helpers from `lang/defs_common.bzl`
+  - remove re-exports of legacy mutating helpers from `build-tools/lang/defs_common.bzl`
   - (optional, depending on current usage) remove or quarantine the legacy helper implementations themselves
 
 Non-goals in this PR:
@@ -228,14 +228,14 @@ Non-goals in this PR:
   - single labels merge point
   - single deps merge point
 - Update `docs/handbook/adding-language.md` with a short “macro author checklist” that:
-  - points to `//lang:defs_common.bzl` as the only intended helper surface
+  - points to `//build-tools/lang:defs_common.bzl` as the only intended helper surface
   - references the enforcement tests added/extended in this PR
 
 ### Acceptance Criteria
 
 - Macro entrypoint call sites follow consistent conventions across languages (no semantic changes).
 - Enforcement prevents reintroducing the known bypass patterns.
-- Legacy helper exports are removed from `lang/defs_common.bzl` once unused.
+- Legacy helper exports are removed from `build-tools/lang/defs_common.bzl` once unused.
 - Outcome-based tests prove stamping and action-input invariants are unchanged.
 
 ### Risks

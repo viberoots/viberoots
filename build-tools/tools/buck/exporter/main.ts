@@ -1,21 +1,21 @@
 #!/usr/bin/env zx-wrapper
+import * as fsp from "node:fs/promises";
+import path from "node:path";
+import { getFlagStr } from "../../lib/cli.ts";
 import {
   dirsForTarget,
   findModuleRootForDirs,
   isGoNode,
   packageDirFromTargetName,
 } from "./batch.ts";
+import { attrList } from "./cquery/attrs.ts";
+import { cqueryNodes } from "./cquery/index.ts";
 import { deriveTupleForNode } from "./env.ts";
 import { cacheHits, cacheMisses, runGoList } from "./golist.ts";
-import { cqueryNodes } from "./cquery/index.ts";
-import { attrList } from "./cquery/attrs.ts";
 import { parseArgs, readSimulatedNodes, writeIfChangedJSON } from "./io.ts";
 import { loadPresentAdapters } from "./lang/contract.ts";
 import type { Adapter, Batch, GoListByBatch, Metrics, Node } from "./types.ts";
-import * as fsp from "node:fs/promises";
-import path from "node:path";
 import { collectFindings, determineMode, emitFindings, logValidationMode } from "./validation.ts";
-import { getFlagStr } from "../../lib/cli.ts";
 
 export async function run() {
   const { out, scope, simulate, maxParallel, cacheDir, metricsOut, validation } = parseArgs();

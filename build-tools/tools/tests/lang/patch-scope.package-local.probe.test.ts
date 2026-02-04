@@ -12,8 +12,8 @@ await runInTemp("patch-scope-package-local-probe", async (tmp, $) => {
   await fsp.writeFile(
     path.join(pkg, "TARGETS"),
     [
-      'load("//lang:defs_common.bzl", "prepare_language_wiring")',
-      'load("//lang:labels_file.bzl", "labels_file")',
+      'load("//build-tools/lang:defs_common.bzl", "prepare_language_wiring")',
+      'load("//build-tools/lang:labels_file.bzl", "labels_file")',
       "",
       'kw = {"labels": ["patch_scope:importer-local", "patch_scope:package-local", "custom:tag"]}',
       "w = prepare_language_wiring(",

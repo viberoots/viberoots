@@ -44,7 +44,7 @@ test("importer patch inclusion policy is consistent (Starlark ↔ TS)", async ()
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//lang:importer_contracts.bzl", "importer_contract_probe")',
+        'load("//build-tools/lang:importer_contracts.bzl", "importer_contract_probe")',
         "",
         'importer_contract_probe(name = "node", lang = "node")',
         'importer_contract_probe(name = "python", lang = "python")',

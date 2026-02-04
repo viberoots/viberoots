@@ -44,7 +44,7 @@ async function main() {
   await syncAllProviders({ outFile: maybeOut as any, strict: STRICT, lang: targetLang });
   if (targetLangRequested(targetLang) && !NO_GLUE) {
     // When a specific language is requested, also ensure downstream glue is present so
-    // Buck macros load provider mappings via //lang:auto_map.bzl (re-export of third_party/providers/auto_map.bzl).
+    // Buck macros load provider mappings via //build-tools/lang:auto_map.bzl (re-export of third_party/providers/auto_map.bzl).
     //
     // Delegate to the centralized glue pipeline for the shared post-sync steps
     // (ensureGraph → optional provider_index → auto_map).

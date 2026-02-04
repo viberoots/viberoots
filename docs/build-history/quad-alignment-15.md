@@ -20,8 +20,8 @@ This is an abstraction leak. A label is not inherently an action input. If the g
 
 In this PR I will unify “global Nix inputs” as an explicit input attachment mechanism for rules/macros that execute Nix:
 
-- Extend `//lang:global_inputs.bzl` (or add a sibling helper module) with a helper that attaches `global_nix_inputs()` to a caller-specified attribute.
-  - It must support both list-shaped and dict-shaped input attributes in the same way `//lang:patch_inputs.bzl` does.
+- Extend `//build-tools/lang:global_inputs.bzl` (or add a sibling helper module) with a helper that attaches `global_nix_inputs()` to a caller-specified attribute.
+  - It must support both list-shaped and dict-shaped input attributes in the same way `//build-tools/lang:patch_inputs.bzl` does.
   - It must not hardcode `//:flake.lock` at call-sites.
 - Update Node macros that execute Nix:
   - `build-tools/node/defs_nix.bzl:node_webapp`
@@ -72,23 +72,23 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `//lang`, `//build-tools/node`, `//build-tools/go/private`, and `//build-tools/cpp/private`, plus narrow tests. It should remain safe in thin slices that include these packages.
+- Touches `//build-tools/lang`, `//build-tools/node`, `//build-tools/go/private`, and `//build-tools/cpp/private`, plus narrow tests. It should remain safe in thin slices that include these packages.
 
 ---
 
-## PR‑2: Consolidate dict-shaped input attachment (patches, provider edges, and global inputs) into shared `//lang` helpers
+## PR‑2: Consolidate dict-shaped input attachment (patches, provider edges, and global inputs) into shared `//build-tools/lang` helpers
 
 ### Description
 
 We support dict-shaped inputs (dest → source) for some macros (notably Node `nix_node_gen`). This shape is useful, but it forces call-sites to deal with “attach more inputs without breaking the dict contract.”
 
-Right now Node has bespoke logic to inject provider edges into a dict-shaped `srcs`. We also have shared dict-safe machinery for patches (`//lang:patch_inputs.bzl`). This is duplication and drift risk.
+Right now Node has bespoke logic to inject provider edges into a dict-shaped `srcs`. We also have shared dict-safe machinery for patches (`//build-tools/lang:patch_inputs.bzl`). This is duplication and drift risk.
 
 ### Scope & Changes
 
 In this PR I will make dict-safe “attach arbitrary items into a dict-shaped input” a shared primitive:
 
-- Extend `//lang:patch_inputs.bzl` (or add a small new helper module under `//lang`) with a dict-safe attach helper that can add a list of items into an existing dict-shaped attribute:
+- Extend `//build-tools/lang:patch_inputs.bzl` (or add a small new helper module under `//build-tools/lang`) with a dict-safe attach helper that can add a list of items into an existing dict-shaped attribute:
   - stable keying strategy (prefix + sanitized + collision suffix)
   - deterministic order
   - no overwrites of user-provided keys
@@ -144,7 +144,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `//lang` and `//build-tools/node` plus narrow tests. Safe for thin slices that include Node macros.
+- Touches `//build-tools/lang` and `//build-tools/node` plus narrow tests. Safe for thin slices that include Node macros.
 
 ---
 
@@ -161,8 +161,8 @@ Even small drift here creates “build-selected computed attr does not exist” 
 
 ### Scope & Changes
 
-- Introduce a canonical Starlark helper under `//lang` for Nix attribute sanitization, matching `build-tools/tools/lib/labels.ts:sanitizeAttrNameFromLabel`:
-  - Example location: `lang/nix_attr.bzl` with `sanitize_nix_attr_from_target_label(label)`.
+- Introduce a canonical Starlark helper under `//build-tools/lang` for Nix attribute sanitization, matching `build-tools/tools/lib/labels.ts:sanitizeAttrNameFromLabel`:
+  - Example location: `build-tools/lang/nix_attr.bzl` with `sanitize_nix_attr_from_target_label(label)`.
 - Update `build-tools/cpp/private/nix_test.bzl` to use the shared helper instead of a local `_sanitize(...)`.
 - If any other Starlark rules/macros re-implement this transform, migrate them as well.
 
@@ -180,7 +180,7 @@ Even small drift here creates “build-selected computed attr does not exist” 
 ### Docs (in this PR)
 
 - Update the build-system docs (the most relevant section in `build-tools/docs/build-system-design.md` or a handbook doc) to state:
-  - the canonical mapping lives in `build-tools/tools/lib/labels.ts` and `//lang:nix_attr.bzl`
+  - the canonical mapping lives in `build-tools/tools/lib/labels.ts` and `//build-tools/lang:nix_attr.bzl`
   - contributors must update both sides and the parity test when changing the contract
 
 ### Acceptance Criteria
@@ -198,7 +198,7 @@ Even small drift here creates “build-selected computed attr does not exist” 
 
 ### Downsides for Implementing
 
-- Adds another small shared helper module in `//lang`.
+- Adds another small shared helper module in `//build-tools/lang`.
 
 ### Recommendation
 
@@ -206,11 +206,11 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `//lang`, `//build-tools/cpp/private`, and one zx test. Safe in thin slices that include these packages.
+- Touches `//build-tools/lang`, `//build-tools/cpp/private`, and one zx test. Safe in thin slices that include these packages.
 
 ---
 
-## PR‑4: Consolidate Nix-executing action boilerplate into a shared `//lang` runner helper (bootstrap, timeouts, and build-selected flow)
+## PR‑4: Consolidate Nix-executing action boilerplate into a shared `//build-tools/lang` runner helper (bootstrap, timeouts, and build-selected flow)
 
 ### Description
 
@@ -232,8 +232,8 @@ This is an abstraction leak. The behavior must remain consistent across language
 
 ### Scope & Changes
 
-- Add a shared Starlark helper under `//lang` that composes the standard “Nix-executing action” shell:
-  - consumes `nix_bootstrap_env_core()` and `nix_timeout_wrapper_var()` from `//lang:nix_shell.bzl`
+- Add a shared Starlark helper under `//build-tools/lang` that composes the standard “Nix-executing action” shell:
+  - consumes `nix_bootstrap_env_core()` and `nix_timeout_wrapper_var()` from `//build-tools/lang:nix_shell.bzl`
   - supports the “build-selected” flow via `build-tools/tools/dev/build-selected.ts` where required
   - supports passing explicit inputs (from PR‑1) through `hidden` inputs for rule implementations
 - Migrate:
@@ -281,7 +281,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `//lang`, `//build-tools/cpp/private`, and `//build-tools/go/private` plus tests. Not suitable for ultra-thin slices that omit those packages.
+- Touches `//build-tools/lang`, `//build-tools/cpp/private`, and `//build-tools/go/private` plus tests. Not suitable for ultra-thin slices that omit those packages.
 
 ---
 
@@ -308,7 +308,7 @@ This is not a correctness bug, but it is a maintainability and boundary clarity 
 - Update `build-tools/go/defs.bzl` to:
   - keep its public macro surface stable
   - delegate to the new private helper
-  - keep using shared `//lang:*` helpers for provider edges and patch inputs
+  - keep using shared `//build-tools/lang:*` helpers for provider edges and patch inputs
 
 ### Tests (in this PR)
 

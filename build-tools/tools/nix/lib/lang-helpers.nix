@@ -60,7 +60,7 @@ let
     in if pkg == "" then "." else pkg;
 
   # Produce a safe, deterministic Nix attribute suffix from a Buck target label.
-  # Mirrors build-tools/tools/lib/labels.ts:sanitizeAttrNameFromLabel and //lang:nix_attr.bzl:sanitize_nix_attr_from_target_label.
+  # Mirrors build-tools/tools/lib/labels.ts:sanitizeAttrNameFromLabel and //build-tools/lang:nix_attr.bzl:sanitize_nix_attr_from_target_label.
   sanitizeAttrNameFromTargetLabel = label:
     let
       s = lib.toLower (normalizeTargetLabel label);

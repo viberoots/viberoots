@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 test("TS ↔ Nix sanitizeAttrNameFromTargetLabel parity", async () => {
   await runInTemp("nix-attr-sanitize-nix-ts-parity", async (tmp, $) => {
     const cases: string[] = [
-      "root//apps/foo:svc (config//toolchains:default#buck2/default//:default#linkerlang/cxx)",
+      "root//apps/foo:svc (config//toolchains:default#buck2/default//:default#linkerbuild-tools/lang/cxx)",
       "prelude//build-tools/cpp:lib (config//toolchains:xyz)",
       "//apps/foo:my bin",
       "root//apps/foo:my@target",

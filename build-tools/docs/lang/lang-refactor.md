@@ -90,7 +90,7 @@ Intent/Impact
 
 Changes
 
-- Add `lang/defs_common.bzl` with helpers for:
+- Add `build-tools/lang/defs_common.bzl` with helpers for:
   - Label stamping (`lang`, `kind`)
   - Auto-wiring tests (pattern input, library binding)
   - Visibility and default attrs
@@ -195,7 +195,7 @@ Changes
 - Expand `docs/handbook/adding-language.md` with:
   - Implementing `build-tools/tools/nix/templates/<lang>.nix`
   - Registering in planner registry
-  - Adding Starlark macros via `lang/defs_common.bzl`
+  - Adding Starlark macros via `build-tools/lang/defs_common.bzl`
   - Provider sync handler (optional)
   - Scaffolding templates and registry entry
   - Tests (using fixtures)

@@ -48,7 +48,7 @@ test("lang patch invalidation model mapping is consistent (Starlark ↔ TS)", as
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//lang:lang_contracts.bzl", "lang_contract_probe")',
+        'load("//build-tools/lang:lang_contracts.bzl", "lang_contract_probe")',
         "",
         'lang_contract_probe(name = "go", lang = "go")',
         'lang_contract_probe(name = "cpp", lang = "cpp")',

@@ -4,7 +4,7 @@ This installment follows Part 37.
 
 After reviewing the current repo state, I still see one concrete abstraction gap and one “convention drift” gap:
 
-- Package-local WASM wiring still has a **mutating call-site boundary**. `lang/wasm_package_local_wiring.bzl:prepare_package_local_wasm_wiring(...)` pops/updates the caller kwargs dict. This is correct today, but it keeps the mutation-ordering risk alive in the WASM surface area and makes it easier to write new WASM macros that “work by accident”.
+- Package-local WASM wiring still has a **mutating call-site boundary**. `build-tools/lang/wasm_package_local_wiring.bzl:prepare_package_local_wasm_wiring(...)` pops/updates the caller kwargs dict. This is correct today, but it keeps the mutation-ordering risk alive in the WASM surface area and makes it easier to write new WASM macros that “work by accident”.
 - Starlark macro call-site conventions are mostly consistent across languages, but we still have small differences in where labels and deps are assembled. This is not a correctness issue, but it increases review/debug burden and creates room for new macros to drift.
 
 As in prior parts, each PR includes the tests and documentation required for the change. There are no PRs dedicated solely to tests or docs.
@@ -23,13 +23,13 @@ For package-local languages we treat “non-mutating helper boundaries” as the
 
 However, the package-local WASM wiring helper that is used by “normal” WASM build shims is still mutating:
 
-- `lang/wasm_package_local_wiring.bzl:prepare_package_local_wasm_wiring(...)` uses `pop_package_local_patch_dirs_and_nixpkg_deps(...)` and mutates the caller kwargs dict.
+- `build-tools/lang/wasm_package_local_wiring.bzl:prepare_package_local_wasm_wiring(...)` uses `pop_package_local_patch_dirs_and_nixpkg_deps(...)` and mutates the caller kwargs dict.
 
 This PR makes that helper non-mutating at the public boundary and updates the existing WASM macro call sites to follow one consistent pattern.
 
 ### Scope & Changes
 
-- Refactor `lang/wasm_package_local_wiring.bzl:prepare_package_local_wasm_wiring(...)`:
+- Refactor `build-tools/lang/wasm_package_local_wiring.bzl:prepare_package_local_wasm_wiring(...)`:
   - stop using `pop_package_local_patch_dirs_and_nixpkg_deps(...)`
   - use the non-mutating extraction path (`extract_*`) so the helper does not mutate the caller’s kwargs dict
   - keep the existing behavior and ordering guarantees:
@@ -122,7 +122,7 @@ This PR standardizes call-site conventions across the macro entrypoints and adds
 - Add enforcement to prevent the highest-signal bypass patterns, scoped to a small allowlist of macro files so the test remains focused:
   - package-local macro files must not call `pop_package_local_patch_dirs_and_nixpkg_deps(...)`
   - importer-scoped macro files must not directly load or call low-level lockfile parsing helpers where the shared importer wiring should be used
-  - macros should not call the legacy mutating helper exports (names ending with `_legacy_mutating`) except inside `//lang` compatibility surfaces
+  - macros should not call the legacy mutating helper exports (names ending with `_legacy_mutating`) except inside `//build-tools/lang` compatibility surfaces
 
 Non-goals in this PR:
 

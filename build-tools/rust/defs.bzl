@@ -1,7 +1,7 @@
 # //build-tools/rust/defs.bzl — skeleton macros
 
-load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
-load("//lang:defs_common.bzl", "merge_provider_edges")
+load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
+load("//build-tools/lang:defs_common.bzl", "merge_provider_edges")
 
 
 def _stub_rule_with_provider_edges(name, base_srcs):

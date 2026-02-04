@@ -106,7 +106,7 @@ Intent/Impact
 
 Changes
 
-- Add `lang/defs_common.bzl` helpers to stamp `lang:<id>` and `kind:bin|lib` consistently.
+- Add `build-tools/lang/defs_common.bzl` helpers to stamp `lang:<id>` and `kind:bin|lib` consistently.
 - Add `build-tools/tools/dev/stamping-lint.ts` to scan Buck targets (via `cquery`) ensuring targets that use language macros are appropriately stamped.
 - Document usage in `docs/handbook/adding-language.md`.
 
@@ -323,4 +323,4 @@ If not implemented
 - Kotlin/Java: Lockfile or build tool metadata (Gradle/Maven) guide labeling; macro stamping recommended.
 - Rust: Cargo lockfile with optional `[patch]` overrides; macro stamping recommended.
 - C# (.NET): NuGet lockfile ecosystems; macro stamping recommended.
-- Erlang/Elixir: rebar/mix lockfiles; macro stamping recommended.
+- Erbuild-tools/lang/Elixir: rebar/mix lockfiles; macro stamping recommended.

@@ -11,7 +11,7 @@ Audience: Engineers and LLM agents implementing Gleam support. This design integ
 
 ### Scope (initial)
 
-- Target Gleam → Erlang/BEAM builds. JS target may be added later.
+- Target Gleam → Erbuild-tools/lang/BEAM builds. JS target may be added later.
 - Single‑importer per project (no workspace importers like PNPM). Treat each Gleam project as one “importer”.
 - Build/test via Gleam’s toolchain; dependencies come from Hex.
 
@@ -31,19 +31,19 @@ If the language can support C interop, I must provide a documented and tested pa
 
 ### Shared wiring and contracts (current repo)
 
-Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:language_wiring.bzl`. Macro call sites should not re‑implement wiring or load provider maps directly.
+Use the canonical helper surface from `//build-tools/lang:defs_common.bzl` and `//build-tools/lang:language_wiring.bzl`. Macro call sites should not re‑implement wiring or load provider maps directly.
 
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
-- Provider wiring: load `MODULE_PROVIDERS` from `//lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
+- Provider wiring: load `MODULE_PROVIDERS` from `//build-tools/lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
 - Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
-- Patch model contract: `lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
+- Patch model contract: `build-tools/lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
 
 ### Key Assumptions (to validate)
 
 1. Lock and manifest: Gleam projects provide `gleam.toml` and a lock artifact (manifest) we can parse deterministically. Many projects generate `manifest.toml` under `build/`; we assume a repo‑tracked lock file (e.g., `manifest.toml` or `gleam.lock`) will be available or we will generate/commit a stable lock snapshot file (see Risks/Mitigations).
 2. Nix inputs: We can model Gleam deps as fixed‑output derivations (FOD) with pre‑computed hashes, analogous to `gomod2nix`. If no community tool exists, we will generate a repo‑tracked lock snapshot with URL+hash for Hex tarballs (gleam/erlang pkgs) via a zx script.
-3. Tooling availability: nixpkgs provides `gleam` and Erlang/OTP; if needed we pin versions in the dev shell and CI.
+3. Tooling availability: nixpkgs provides `gleam` and Erbuild-tools/lang/OTP; if needed we pin versions in the dev shell and CI.
 4. Patching: Third‑party deps resolved from Hex tarballs can be patched by applying unified diffs in Nix before compile, same as Go patches.
 
 ### High‑Level Architecture
@@ -65,7 +65,7 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 
 - Provide thin wrappers `nix_gleam_library`, `nix_gleam_binary`, `nix_gleam_test` analogous to Go/Node macros.
 - Stamp labels: `lang:gleam`, `kind:<lib|bin|test>`, and the importer‑scoped lockfile label (see Exporter Labels).
-- Append providers from `//lang:auto_map.bzl` using `MODULE_PROVIDERS["//pkg:name"]`.
+- Append providers from `//build-tools/lang:auto_map.bzl` using `MODULE_PROVIDERS["//pkg:name"]`.
 
 ### Exporter Labels (authoritative)
 

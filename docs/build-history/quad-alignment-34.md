@@ -31,7 +31,7 @@ This PR adds a parallel “functional” helper surface that returns a prepared 
 
 ### Scope & Changes
 
-- Add new shared helpers under `//lang:` for package-local wiring that do not mutate call-site dicts.
+- Add new shared helpers under `//build-tools/lang:` for package-local wiring that do not mutate call-site dicts.
   - Example shape (final naming up to implementation details):
     - `prepare_package_local_wiring_v2(...) -> struct(kwargs, deps, local_patch_dirs, nixpkg_deps)`
   - The helper should:
@@ -107,7 +107,7 @@ This PR adds a parallel “functional” importer-scoped wiring surface that ret
 
 ### Scope & Changes
 
-- Add new importer-scoped functional helpers under `//lang:` that return prepared values without mutating input dicts.
+- Add new importer-scoped functional helpers under `//build-tools/lang:` that return prepared values without mutating input dicts.
   - Cover at least:
     - non-genrule wiring (returns `{ importer, kwargs, deps }`)
     - srcs-less wiring (returns `{ importer, kwargs, patch_dep, merge_deps }`)

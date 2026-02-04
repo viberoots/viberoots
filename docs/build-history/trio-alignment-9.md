@@ -10,7 +10,7 @@ Introduce a single Starlark helper to stamp `nixpkg:` labels with consistent nor
 
 ### Scope & Changes
 
-- Add to `lang/defs_common.bzl`:
+- Add to `build-tools/lang/defs_common.bzl`:
   - `def append_nixpkg_labels(kwargs, attrs):` applies `normalize_nix_attr()` and appends `nixpkg:<normalized>` into `kwargs["labels"]`, deduping and preserving order.
 - No language macro is switched yet in this PR (helper addition only).
 - Docs: introduce the helper in handbook/provider-mapping notes as the canonical place where nixpkgs label normalization is defined (no behavior guidance changes).
@@ -108,7 +108,7 @@ Ongoing duplication and potential drift from Go.
 
 ### Downsides for Implementing
 
-Minor file edits; consistent dependency on `lang/defs_common.bzl`.
+Minor file edits; consistent dependency on `build-tools/lang/defs_common.bzl`.
 
 ### Recommendation
 

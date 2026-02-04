@@ -14,7 +14,7 @@ Finish the deprecation by switching Python macros to use the unified `append_imp
 
 - `build-tools/python/defs.bzl`:
   - Replace remaining calls to `append_python_patches_for_importer(...)` with `append_importer_patches(..., "python")`.
-- `lang/defs_common.bzl`:
+- `build-tools/lang/defs_common.bzl`:
   - Remove the deprecated Python wrapper after in‑tree references are updated.
 - Tests (in this PR):
   - Create a minimal Python importer fixture with `uv.lock` and a patch under `<importer>/patches/python/<name>@<ver>.patch`; build a tiny `nix_python_library` and assert the macro’s realized `srcs` include the importer‑local patch path (via `buck2 cquery --json --output-attributes=srcs` and a stable contains check).
@@ -87,7 +87,7 @@ Implement.
 
 ### Description
 
-Normalize artifact/attribute name sanitization by using `//lang:sanitize.bzl:sanitize_name` wherever applicable. Where a language needs extra semantics (e.g., C++ bin/addon output base names), keep a tiny wrapper that delegates to the shared sanitizer for the common portion to avoid drift.
+Normalize artifact/attribute name sanitization by using `//build-tools/lang:sanitize.bzl:sanitize_name` wherever applicable. Where a language needs extra semantics (e.g., C++ bin/addon output base names), keep a tiny wrapper that delegates to the shared sanitizer for the common portion to avoid drift.
 
 ### Scope & Changes
 
@@ -96,7 +96,7 @@ Normalize artifact/attribute name sanitization by using `//lang:sanitize.bzl:san
   - If `build-tools/cpp/private/sanitize.bzl` adds C++‑specific behavior, preserve it but delegate shared portions to `sanitize_name` to keep cross‑language parity.
 - Verify flake‑side sanitizer equivalence (already documented to mirror the same transform).
 - Tests (in this PR):
-  - Add a small Starlark probe `sanitize_name_probe(name, value)` in `lang/sanitize.bzl` mirroring the existing nix‑attr probe pattern; use zx test to materialize sanitized outputs for representative inputs and compare to expected golden values.
+  - Add a small Starlark probe `sanitize_name_probe(name, value)` in `build-tools/lang/sanitize.bzl` mirroring the existing nix‑attr probe pattern; use zx test to materialize sanitized outputs for representative inputs and compare to expected golden values.
   - Snapshot relevant macro outputs that include sanitized names to confirm no drift for unchanged inputs.
 - Docs (in this PR):
   - Amend Adding‑language guide to instruct new languages to use `sanitize_name` (or a thin wrapper that delegates to it) for artifact/attribute naming.

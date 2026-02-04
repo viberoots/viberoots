@@ -23,12 +23,12 @@ keep dict-safe behavior and ordering consistent.
 
 ### Scope & Changes
 
-- Update `lang/planner_visible_wiring.bzl`:
+- Update `build-tools/lang/planner_visible_wiring.bzl`:
   - Replace direct `realize_provider_edges(...)` calls with `merge_provider_edges(...)`.
   - Preserve existing behavior for `provider_realization_mode` and `strip_providers_from_deps`.
 - Update `build-tools/rust/defs.bzl`:
   - Replace direct `realize_provider_edges(...)` usage with `merge_provider_edges(...)`.
-- If needed, adjust `lang/provider_edges.bzl` visibility or docstrings to clarify
+- If needed, adjust `build-tools/lang/provider_edges.bzl` visibility or docstrings to clarify
   `merge_provider_edges(...)` as the canonical entry point.
 
 ### Tests (in this PR)
@@ -238,7 +238,7 @@ Implement.
 ### Description
 
 I will remove the thin `sanitize_to_bin_name(...)` wrapper in `build-tools/cpp/private/sanitize.bzl` and use
-the canonical `lang/sanitize.bzl:sanitize_name` directly at call sites.
+the canonical `build-tools/lang/sanitize.bzl:sanitize_name` directly at call sites.
 
 ### Scope & Changes
 
@@ -253,7 +253,7 @@ the canonical `lang/sanitize.bzl:sanitize_name` directly at call sites.
 
 ### Docs (in this PR)
 
-- Update `abstractions.md` to list only `lang/sanitize.bzl:sanitize_name` as the C++ sanitizer entry
+- Update `abstractions.md` to list only `build-tools/lang/sanitize.bzl:sanitize_name` as the C++ sanitizer entry
   point.
 
 ### Acceptance Criteria

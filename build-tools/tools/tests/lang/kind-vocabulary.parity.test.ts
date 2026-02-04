@@ -42,7 +42,7 @@ test("kind vocabulary is consistent (Starlark ↔ TS)", async () => {
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//lang:kind_vocabulary.bzl", "kind_vocabulary_probe")',
+        'load("//build-tools/lang:kind_vocabulary.bzl", "kind_vocabulary_probe")',
         "",
         'kind_vocabulary_probe(name = "kinds")',
         "",

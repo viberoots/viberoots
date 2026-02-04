@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("nix_node_test (Nix-calling) wires global inputs + importer patches as action inputs and stamps lang/kind/patch_scope (cquery)", async () => {
+test("nix_node_test (Nix-calling) wires global inputs + importer patches as action inputs and stamps build-tools/lang/kind/patch_scope (cquery)", async () => {
   await runInTemp("node-nix-test-nix-calling-wiring-cquery", async (tmp, $) => {
     const appDir = path.join(tmp, "apps", "web");
     const patchDir = path.join(appDir, "patches", "node");

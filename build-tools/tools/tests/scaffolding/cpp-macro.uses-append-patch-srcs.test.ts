@@ -9,6 +9,6 @@ test("cpp macros use shared helper for local patches", async () => {
   assert.doesNotMatch(
     txt,
     /include_package_local_patches\(/,
-    "cpp macros must not call include_package_local_patches directly; use //lang:defs_common.bzl:prepare_language_wiring",
+    "cpp macros must not call include_package_local_patches directly; use //build-tools/lang:defs_common.bzl:prepare_language_wiring",
   );
 });

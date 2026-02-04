@@ -17,7 +17,9 @@ test("runInTemp caches toolchain probing when CGO is enabled", async () => {
     await runInTemp("cgo-on-2", async (_tmp, _$) => {});
 
     assert.equal(
-      getTimingCountForLabel("toolchain probe (command -v clang/clang++/xcrun/llvm-ar/ar)"),
+      getTimingCountForLabel(
+        "toolchain probe (command -v cbuild-tools/lang/clang++/xcrun/llvm-ar/ar)",
+      ),
       1,
     );
     const expectedXcrun = process.platform === "darwin" ? 1 : 0;

@@ -9,7 +9,7 @@ Part 36 proposed two macro-authoring risk fixes. After checking the current repo
 
 After reviewing the current repo state, I still see a small set of remaining gaps that are easy to trip during macro authoring and review:
 
-- Package-local WASM planner-visible stubs still use a mutating helper path (`lang/wasm_package_local_wiring.bzl` delegates to `wire_package_local_planner_visible_stub(...)`). This keeps the “mutation ordering” risk alive in the WASM surface area.
+- Package-local WASM planner-visible stubs still use a mutating helper path (`build-tools/lang/wasm_package_local_wiring.bzl` delegates to `wire_package_local_planner_visible_stub(...)`). This keeps the “mutation ordering” risk alive in the WASM surface area.
 - We still have multiple helper entrypoints that are all “valid”, but not equally safe. v1 helpers remain easy to copy-paste, which makes drift likely as new macros are added.
 - Starlark call-site conventions are mostly consistent, but there are still small differences in where labels and deps are assembled across languages. This is not a correctness issue, but it increases review/debug burden.
 
@@ -23,15 +23,15 @@ As in prior parts, each PR includes the tests and documentation required for the
 
 We already have a v2 (non-mutating) helper for package-local planner-visible stubs (`wire_package_local_planner_visible_stub_v2(...)`), and most call sites use it.
 
-The package-local WASM planner-visible stub wrapper still routes through the mutating v1 helper (`lang/wasm_package_local_wiring.bzl:wire_package_local_wasm_planner_visible_stub(...)`).
+The package-local WASM planner-visible stub wrapper still routes through the mutating v1 helper (`build-tools/lang/wasm_package_local_wiring.bzl:wire_package_local_wasm_planner_visible_stub(...)`).
 This is correct today, but it keeps the “mutation ordering” risk alive and makes it easier for new WASM macro shapes to copy the mutating pattern.
 
 This PR introduces a v2 wrapper for WASM planner-visible stubs and migrates the C++ Emscripten stub macro to use it.
 
 ### Scope & Changes
 
-- Add a non-mutating v2 wrapper in `//lang` for package-local WASM planner-visible stubs, for example:
-  - `lang/wasm_package_local_wiring.bzl:wire_package_local_wasm_planner_visible_stub_v2(...)`
+- Add a non-mutating v2 wrapper in `//build-tools/lang` for package-local WASM planner-visible stubs, for example:
+  - `build-tools/lang/wasm_package_local_wiring.bzl:wire_package_local_wasm_planner_visible_stub_v2(...)`
 - Helper requirements:
   - must perform wasm stamping before delegating to the package-local stub helper
   - must be non-mutating at the public boundary (like other v2 helpers)
@@ -59,7 +59,7 @@ Non-goals in this PR:
   - `patch_scope:package-local` is present
   - package-local patch files are present as real action inputs for the stub
   - provider edge realization behavior remains unchanged for this stub (provider targets present in deps when configured)
-- Add an enforcement test that fails if `lang/wasm_package_local_wiring.bzl` contains `wire_package_local_planner_visible_stub(`.
+- Add an enforcement test that fails if `build-tools/lang/wasm_package_local_wiring.bzl` contains `wire_package_local_planner_visible_stub(`.
   - This prevents introducing new mutating call sites via the WASM wrapper.
 
 ### Docs (in this PR)
@@ -72,7 +72,7 @@ Non-goals in this PR:
 
 ### Acceptance Criteria
 
-- `lang/wasm_package_local_wiring.bzl` provides a v2 helper and does not call the mutating package-local stub helper.
+- `build-tools/lang/wasm_package_local_wiring.bzl` provides a v2 helper and does not call the mutating package-local stub helper.
 - `build-tools/cpp/defs.bzl:nix_cpp_wasm_emscripten_lib` uses the v2 WASM stub helper.
 - Tests prove the stub still carries the correct action inputs and labels.
 
@@ -111,7 +111,7 @@ This PR tightens conventions so new macros use v2 helpers by default, while keep
 ### Scope & Changes
 
 - Standardize “v2-first” guidance at the shared re-export boundary:
-  - adjust `lang/defs_common.bzl` docstrings and exported symbols so v2 helpers are the ones referenced in examples
+  - adjust `build-tools/lang/defs_common.bzl` docstrings and exported symbols so v2 helpers are the ones referenced in examples
   - keep v1 helpers exported for compatibility, but treat them as legacy-only in the macro authoring guidance
 - Add enforcement that prevents new v1 usage in macro files:
   - package-local macros must use `prepare_package_local_wiring_v2(...)`
@@ -203,7 +203,7 @@ This PR renames the current non-mutating “v2” helpers to become the canonica
   - move the old mutating helpers under explicit legacy names:
     - for example `prepare_package_local_wiring_legacy_mutating`, `wire_package_local_planner_visible_stub_legacy_mutating`
     - do the same for importer wiring v1 helpers
-  - update `lang/defs_common.bzl` re-exports so:
+  - update `build-tools/lang/defs_common.bzl` re-exports so:
     - versionless names refer to the non-mutating implementations
     - legacy names are still available for internal migration work only
 - Update macro call sites across:
@@ -236,7 +236,7 @@ Non-goals in this PR:
 
 ### Acceptance Criteria
 
-- No Starlark call sites (including shared `//lang` helpers) reference `_v2` helper names.
+- No Starlark call sites (including shared `//build-tools/lang` helpers) reference `_v2` helper names.
 - Versionless helper names refer to the non-mutating implementations everywhere.
 - Tests continue to assert the same action-input and label invariants.
 
@@ -267,7 +267,7 @@ Implement.
 
 ### Description
 
-Importer support rules currently exist in both TypeScript (`build-tools/tools/lib/importers.ts`) and Starlark (`lang/lockfile_labels.bzl`). Parity tests reduce risk, but the update workflow is still “touch two implementations”.
+Importer support rules currently exist in both TypeScript (`build-tools/tools/lib/importers.ts`) and Starlark (`build-tools/lang/lockfile_labels.bzl`). Parity tests reduce risk, but the update workflow is still “touch two implementations”.
 
 This PR creates a single source of truth for supported importer roots and generates (or consumes) it in both layers so adding a new importer root is a single change.
 
@@ -276,7 +276,7 @@ This PR creates a single source of truth for supported importer roots and genera
 - Introduce a single contract artifact that defines supported importer labels, for example:
   - `build-tools/tools/lib/importer-roots.json` (data-only)
 - Update TypeScript importer support logic to consume the artifact (instead of hardcoding the regex).
-- Generate a small Starlark file from the artifact (for example `lang/importer_roots.bzl`) and make `lang/lockfile_labels.bzl` validate against that generated list.
+- Generate a small Starlark file from the artifact (for example `build-tools/lang/importer_roots.bzl`) and make `build-tools/lang/lockfile_labels.bzl` validate against that generated list.
   - Generation should be deterministic and invoked through the existing dev tooling flow (glue / install), not a new bespoke pipeline.
 - Keep parity tests, but shift their goal:
   - from “two hardcoded implementations match”
@@ -292,7 +292,7 @@ Non-goals in this PR:
 - Extend the existing importer-support parity test to assert both layers read the same values.
 - Add an enforcement test that fails if:
   - `build-tools/tools/lib/importers.ts` contains a hardcoded importer regex (must use the artifact)
-  - `lang/lockfile_labels.bzl` contains a hardcoded list/regex for importer roots (must use the generated file)
+  - `build-tools/lang/lockfile_labels.bzl` contains a hardcoded list/regex for importer roots (must use the generated file)
 
 ### Docs (in this PR)
 

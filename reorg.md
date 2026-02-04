@@ -90,7 +90,7 @@ Target contents of `/build-tools`:
 Path-sensitive areas I must validate:
 
 - Buck `load()` paths in `*.bzl` files.
-- Buck target labels for `//lang` if moved.
+- Buck target labels for `//build-tools/lang` if moved.
 - Script paths in `package.json`, `build-tools/tools/bin/*`, `Jenkinsfile`, and `toolchains`.
 - Nix paths in `flake.nix` and `build-tools/tools/nix/*`.
 - Repo-relative paths embedded in zx scripts.
@@ -118,7 +118,7 @@ I will list a destination for each current root item. This is required before an
 - `python/` -> `build-tools/python/`
 - `rust/` -> `build-tools/rust/`
 - `lang/` -> `build-tools/lang/`
-- `build-tools/docs/lang/`
+- `docs/lang/` -> `build-tools/docs/lang/`
 - Root-level build design docs -> `build-tools/docs/` (see list below)
 
 ### Move to `/docs/build-history`
@@ -175,7 +175,7 @@ Tasks:
 
 - Record a list of root-level items and their destination path.
 - Identify all path-sensitive files: Buck `load` sites, Nix imports, scripts, CI configs.
-- Decide whether `lang/` can move under `/builder` without breaking Buck label conventions.
+- Decide whether `lang/` can move under `/build-tools` without breaking Buck label conventions.
 - Capture a short baseline run list for later comparison.
 
 Outputs:
@@ -235,10 +235,10 @@ Tasks:
 
 - Move `build-tools/tools/` to `build-tools/tools/`.
 - Move language rule folders (`go`, `cpp`, `node`, `python`, `rust`) to `build-tools/`.
-- Move `lang/` to `build-tools/lang/`.
+- Move `build-tools/lang/` to `build-tools/lang/`.
 - Keep `third_party/`, `toolchains`, and `target_platforms` at root.
 - Update all Buck `load()` paths and any `filegroup` or `glob` references.
-- Update Buck labels only if `lang/` moves.
+- Update Buck labels only if `build-tools/lang/` moves.
 - Update all Node and zx script paths (`package.json`, `build-tools/tools/bin/*`).
 - Update Nix paths in `flake.nix` and `build-tools/tools/nix/*`.
 - Update CI paths in `Jenkinsfile`.
@@ -297,13 +297,13 @@ Outputs:
 
 Checks:
 
-- `rg` shows no old `build-tools/tools/` or `lang/` references unless intentional.
+- `rg` shows no old `build-tools/tools/` or `build-tools/lang/` references unless intentional.
 - Baseline runs still match.
 
 ## Dependencies and Risks
 
 - Buck `load` paths are the highest risk.
-- Buck target labels will change if `lang/` moves.
+- Buck target labels will change if `build-tools/lang/` moves.
 - Nix paths and flake inputs are the next highest risk.
 - Tooling scripts often assume repo-root-relative paths.
 - CI scripts may hardcode old paths.
@@ -328,9 +328,9 @@ I will mark each phase and task with one of these statuses during execution.
 
 ## Open Decisions
 
-- Do we add a compatibility shim for `lang/` after moving under `/build-tools`
+- Do we add a compatibility shim for `build-tools/lang/` after moving under `/build-tools`
 - Should `docs` remain a mix of general and build docs, or should build docs live only under `/build-tools/docs`
-- Should we keep a compatibility shim for `build-tools/tools/` and `lang/` paths or hard-cut to `/build-tools`
+- Should we keep a compatibility shim for `build-tools/tools/` and `build-tools/lang/` paths or hard-cut to `/build-tools`
 
 ## Patches Policy
 

@@ -42,11 +42,11 @@ The plan is intentionally incremental. Each PR is scoped to be reviewable, indep
 
 ### Description
 
-We currently duplicate nix attribute normalization in both `build-tools/go/defs.bzl` and `build-tools/cpp/defs.bzl`, and also in TS. We will add a single Starlark helper in `lang/defs_common.bzl` (mirroring the TS rules) and have Go/C++ macros consume it.
+We currently duplicate nix attribute normalization in both `build-tools/go/defs.bzl` and `build-tools/cpp/defs.bzl`, and also in TS. We will add a single Starlark helper in `build-tools/lang/defs_common.bzl` (mirroring the TS rules) and have Go/C++ macros consume it.
 
 ### Scope & Changes
 
-- Add `normalize_nix_attr(attr: str) -> str` in `lang/defs_common.bzl` (trim, lower-case, ensure `pkgs.` prefix, map `pkgs.gtest → pkgs.googletest`).
+- Add `normalize_nix_attr(attr: str) -> str` in `build-tools/lang/defs_common.bzl` (trim, lower-case, ensure `pkgs.` prefix, map `pkgs.gtest → pkgs.googletest`).
 - Replace local `_normalize_nix_attr` uses in `build-tools/go/defs.bzl` and `_normalize_cxx_attr` in `build-tools/cpp/defs.bzl` with the shared helper.
 - Ensure emitted `nixpkg:` labels are bit-for-bit identical to current output.
 
@@ -147,11 +147,11 @@ Enhance `build-tools/tools/buck/prebuild-guard.ts` to validate that any node wit
 
 ### Description
 
-Each language macro includes local patch files (e.g., `patches/go/*.patch`, importer-local Node patches) into `srcs` for precise invalidation. We can DRY this with a small helper in `lang/defs_common.bzl`.
+Each language macro includes local patch files (e.g., `patches/go/*.patch`, importer-local Node patches) into `srcs` for precise invalidation. We can DRY this with a small helper in `build-tools/lang/defs_common.bzl`.
 
 ### Scope & Changes
 
-- Add `append_patch_srcs(kwargs, dirs: list[str])` in `lang/defs_common.bzl`:
+- Add `append_patch_srcs(kwargs, dirs: list[str])` in `build-tools/lang/defs_common.bzl`:
   - Globs `*.patch` per dir, appends to `srcs`, stable-dedup via `dedupe_preserve`.
 - Update Go/Node/C++ macros to use the helper instead of open-coding glob logic.
 

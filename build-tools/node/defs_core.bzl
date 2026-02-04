@@ -1,6 +1,6 @@
 load("@prelude//:rules.bzl", "genrule")
 load(
-    "//lang:defs_common.bzl",
+    "//build-tools/lang:defs_common.bzl",
     "default_lockfile_label_from_package",
     "default_lockfile_path_from_package",
     "ensure_default_lockfile_exists",
@@ -11,7 +11,7 @@ load("//build-tools/node/private:nix_test.bzl", "node_nix_test")
 
 # NOTE: Prebuild guard ensures this load is valid before builds/tests run.
 MODULE_PROVIDERS = {}
-load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
+load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
 
 def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = [], lockfile_label = None, kind = "gen", **kwargs):
     if (lockfile_label == None or lockfile_label == "") and len(extract_lockfile_labels(labels or [])) == 0:

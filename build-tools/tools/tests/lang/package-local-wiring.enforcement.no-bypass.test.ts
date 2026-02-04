@@ -8,25 +8,25 @@ test("package-local language macros must not bypass prepare_language_wiring()", 
   const files = ["build-tools/go/defs.bzl", "build-tools/cpp/defs.bzl"];
   for (const file of files) {
     const txt = await fsp.readFile(file, "utf8");
-    if (txt.includes('load("//lang:package_local_wiring.bzl"')) {
+    if (txt.includes('load("//build-tools/lang:package_local_wiring.bzl"')) {
       offenders.push({
         file,
         reason:
-          "must not load //lang:package_local_wiring.bzl directly; use //lang:defs_common.bzl:prepare_language_wiring(...) instead",
+          "must not load //build-tools/lang:package_local_wiring.bzl directly; use //build-tools/lang:defs_common.bzl:prepare_language_wiring(...) instead",
       });
     }
-    if (txt.includes('load("//lang/internal:package_local_wiring.bzl"')) {
+    if (txt.includes('load("//build-tools/lang/internal:package_local_wiring.bzl"')) {
       offenders.push({
         file,
         reason:
-          "must not load internal package-local wiring; use //lang:defs_common.bzl:prepare_language_wiring(...) instead",
+          "must not load internal package-local wiring; use //build-tools/lang:defs_common.bzl:prepare_language_wiring(...) instead",
       });
     }
     if (txt.includes("include_package_local_patches(")) {
       offenders.push({
         file,
         reason:
-          "must not call include_package_local_patches directly; use //lang:defs_common.bzl:prepare_language_wiring(...) instead",
+          "must not call include_package_local_patches directly; use //build-tools/lang:defs_common.bzl:prepare_language_wiring(...) instead",
       });
     }
     if (!txt.includes("prepare_language_wiring(")) {

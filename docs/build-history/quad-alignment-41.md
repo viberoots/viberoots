@@ -16,7 +16,7 @@ As in prior parts, each PR includes the tests and documentation required for the
 
 ### Description
 
-Node macros that call Nix already assemble their `nix build` flows via the shared helper surface (`//lang:nix_shell.bzl` and `//lang:nix_action_runner.bzl`).
+Node macros that call Nix already assemble their `nix build` flows via the shared helper surface (`//build-tools/lang:nix_shell.bzl` and `//build-tools/lang:nix_action_runner.bzl`).
 
 Some lower-level rules still build command strings in-line. This is a contract duplication risk. It can drift on:
 
@@ -176,16 +176,16 @@ Implement.
 
 ### Description
 
-We have v2 non-mutating wiring surfaces in `lang/*` that are the intended macro boundary. Legacy mutating implementations still exist and can be imported accidentally.
+We have v2 non-mutating wiring surfaces in `build-tools/lang/*` that are the intended macro boundary. Legacy mutating implementations still exist and can be imported accidentally.
 
-This PR removes (or quarantines) the legacy wiring internals after tightening enforcement so we can prove they are unused in non-`//lang/*` call sites.
+This PR removes (or quarantines) the legacy wiring internals after tightening enforcement so we can prove they are unused in non-`//build-tools/lang/*` call sites.
 
 This reduces surface area and makes it harder to introduce new abstraction leaks by copy-pasting older patterns.
 
 ### Scope & Changes
 
 - Tighten enforcement tests:
-  - forbid `_legacy_mutating` usage outside `//lang/*`
+  - forbid `_legacy_mutating` usage outside `//build-tools/lang/*`
   - forbid direct lockfile parsing helpers in macro entrypoints when a shared wiring helper exists
   - forbid direct use of low-level package-local kwarg pop helpers at macro boundaries when `prepare_package_local_wiring(...)` exists
 
@@ -201,7 +201,7 @@ Non-goals in this PR:
 
 ### Tests (in this PR)
 
-- Extend enforcement tests so they fail if any non-`//lang/*` Starlark code imports legacy wiring helpers.
+- Extend enforcement tests so they fail if any non-`//build-tools/lang/*` Starlark code imports legacy wiring helpers.
 - Keep at least one outcome-based probe test that asserts v2 wiring is non-mutating at the macro boundary.
 
 ### Docs (in this PR)
@@ -225,7 +225,7 @@ Moderate. Removing legacy internals can break any hidden or out-of-tree call sit
 Mitigation:
 
 - Tighten enforcement first and run it across the repo.
-- If needed, quarantine legacy helpers behind an explicit internal-only filename and do not re-export them from `lang/defs_common.bzl`.
+- If needed, quarantine legacy helpers behind an explicit internal-only filename and do not re-export them from `build-tools/lang/defs_common.bzl`.
 
 ### Consequence of Not Implementing
 
@@ -233,7 +233,7 @@ We keep two ways to do the same thing. This increases drift risk and increases r
 
 ### Downsides for Implementing
 
-Some churn in `lang/*` and enforcement tests. The benefit is lower long-term drift.
+Some churn in `build-tools/lang/*` and enforcement tests. The benefit is lower long-term drift.
 
 ### Recommendation
 
@@ -262,4 +262,4 @@ Backout strategy:
 
 - PR-1 can be reverted independently by restoring the previous in-line command assembly while keeping the new tests as detectors for future drift.
 - PR-2 can be reverted independently by reverting macro signature changes and relaxing mismatch validation, but keep the test coverage for importer identity as the future guardrail.
-- PR-3 can be reverted independently by reintroducing legacy internals temporarily if a hidden dependency is discovered, but do not re-export them from `lang/defs_common.bzl` without updating enforcement.
+- PR-3 can be reverted independently by reintroducing legacy internals temporarily if a hidden dependency is discovered, but do not re-export them from `build-tools/lang/defs_common.bzl` without updating enforcement.

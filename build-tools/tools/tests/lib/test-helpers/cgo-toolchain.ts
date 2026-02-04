@@ -10,7 +10,8 @@ export type CgoToolchainPaths = {
 };
 
 const XCRUN_SHOW_SDK_PATH_LABEL = "xcrun --show-sdk-path";
-const TOOLCHAIN_PROBE_LABEL = "toolchain probe (command -v clang/clang++/xcrun/llvm-ar/ar)";
+const TOOLCHAIN_PROBE_LABEL =
+  "toolchain probe (command -v cbuild-tools/lang/clang++/xcrun/llvm-ar/ar)";
 
 let cachedDarwinSdkPath: string | null = null;
 let cachedDarwinSdkPathPromise: Promise<string | null> | null = null;

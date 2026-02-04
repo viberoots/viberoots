@@ -45,7 +45,7 @@ Implement.
 
 Add a tiny zx test that asserts equivalence of our normalization/decoding across runtimes:
 
-- nixpkgs attr normalization (`build-tools/tools/lib/provider-names.ts.normalizeNixAttr`, `lang/defs_common.bzl:normalize_nix_attr`, and Nix helper used by C++).
+- nixpkgs attr normalization (`build-tools/tools/lib/provider-names.ts.normalizeNixAttr`, `build-tools/lang/defs_common.bzl:normalize_nix_attr`, and Nix helper used by C++).
 - flat patch filename decoding (Go/Node) using `build-tools/tools/lib/providers.decodeNameVersionFromPatch`.
 
 ### Scope & Changes

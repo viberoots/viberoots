@@ -20,18 +20,18 @@ Node has a small set of genrule-style macros that call Nix. The repository alrea
 
 - importer-scoped wiring (`prepare_importer_*` helpers)
 - global Nix inputs as real action inputs (`wire_global_nix_inputs`)
-- Nix command bootstrapping (`//lang:nix_shell.bzl`)
+- Nix command bootstrapping (`//build-tools/lang:nix_shell.bzl`)
 - dict-safe attachment helpers (`attach_items_dict_safe`)
 
-The leak is that each Nix-calling macro still has to assemble a correct combination of these primitives. This is easy to drift. It also means that “how to call Nix from an importer-scoped macro” is not a single abstraction boundary in `//lang`.
+The leak is that each Nix-calling macro still has to assemble a correct combination of these primitives. This is easy to drift. It also means that “how to call Nix from an importer-scoped macro” is not a single abstraction boundary in `//build-tools/lang`.
 
-This PR adds one shared helper in `//lang` that composes these pieces into one stable surface for importer-scoped, Nix-calling genrule macros. Node macros will use it in PR‑2.
+This PR adds one shared helper in `//build-tools/lang` that composes these pieces into one stable surface for importer-scoped, Nix-calling genrule macros. Node macros will use it in PR‑2.
 
 Clarification: I do not need to preserve backwards compatibility yet. This PR can introduce a new helper surface and immediately cut over the macros that use it in later PRs, with no compatibility shims.
 
 ### Scope & Changes
 
-- Add a new helper in `//lang` (location choice: `//lang:importer_wiring.bzl` or `//lang:nix_calling_macros.bzl`) that:
+- Add a new helper in `//build-tools/lang` (location choice: `//build-tools/lang:importer_wiring.bzl` or `//build-tools/lang:nix_calling_macros.bzl`) that:
   - enforces exactly one importer-scoped lockfile label (`lockfile:<path>#<importer>`)
   - stamps `lang:*` and `kind:*`
   - derives the importer and returns it to the caller
@@ -43,7 +43,7 @@ Clarification: I do not need to preserve backwards compatibility yet. This PR ca
   - optionally injects `build-tools/tools/buck/workspace-root.env` into dict-shaped `srcs` maps in a standardized way
   - wires `global_nix_inputs()` into action inputs in a standardized way
     - supports `stamp=True|False` so call sites can opt into observability or keep exporter noise down
-- Add one short section to `lang/defs_common.bzl` re-exporting the helper, so language macro files do not need to import a new low-level module.
+- Add one short section to `build-tools/lang/defs_common.bzl` re-exporting the helper, so language macro files do not need to import a new low-level module.
 
 Non-goals in this PR:
 
@@ -75,7 +75,7 @@ Non-goals in this PR:
 
 ### Acceptance Criteria
 
-- There is one shared helper surface in `//lang` for importer-scoped macros that call Nix via genrule commands.
+- There is one shared helper surface in `//build-tools/lang` for importer-scoped macros that call Nix via genrule commands.
 - The helper handles list/dict input shapes and does not require call sites to hand-roll workspace-root or global-input wiring.
 - Tests prove the helper attaches patch inputs, provider edges, and global Nix inputs deterministically.
 - Docs point at the helper as the canonical mechanism.
@@ -90,7 +90,7 @@ We keep bespoke composition logic inside each Nix-calling macro. That encourages
 
 ### Downsides for Implementing
 
-This adds one more helper surface in `//lang`. That is acceptable only if it removes duplicated call-site wiring.
+This adds one more helper surface in `//build-tools/lang`. That is acceptable only if it removes duplicated call-site wiring.
 
 ### Recommendation
 
@@ -109,7 +109,7 @@ This PR migrates:
 - `build-tools/node/defs_nix.bzl:node_webapp`
 - `build-tools/node/defs_nix.bzl:nix_node_cli_bin(bundle=True)`
 
-The goal is to make these macros “thin wrappers” over the shared wiring surface and `//lang:nix_shell.bzl` command helpers.
+The goal is to make these macros “thin wrappers” over the shared wiring surface and `//build-tools/lang:nix_shell.bzl` command helpers.
 
 Clarification: I do not need to preserve backwards compatibility yet. This PR can change macro implementation details directly as long as behavior is stable.
 
@@ -236,11 +236,11 @@ Go and C++ macros repeatedly implement small “pop and normalize” patterns:
 
 This duplication is not large, but it is a drift risk. When we change default patch dir policy or nixpkgs label normalization, we should not need to update multiple language macro files.
 
-This PR introduces one small shared helper surface in `//lang` and migrates Go and C++ macros to use it. I will keep it narrow to avoid growing a “macro framework”.
+This PR introduces one small shared helper surface in `//build-tools/lang` and migrates Go and C++ macros to use it. I will keep it narrow to avoid growing a “macro framework”.
 
 ### Scope & Changes
 
-- Add a small helper in `//lang` (location choice: `//lang:defs_common.bzl` or a new `//lang:macro_kwargs.bzl`) that:
+- Add a small helper in `//build-tools/lang` (location choice: `//build-tools/lang:defs_common.bzl` or a new `//build-tools/lang:macro_kwargs.bzl`) that:
   - pops `local_patch_dirs` from kwargs with a language default (`default_package_patch_dirs(lang)`)
   - pops `nixpkg_deps` from kwargs as a list of strings (or empty list)
   - optionally appends nixpkg labels via the existing canonical normalizer

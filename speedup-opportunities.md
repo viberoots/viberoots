@@ -219,7 +219,7 @@ Implement (low risk, measurable ~minute-class win).
 `runInTemp` currently does two per-temp probes:
 
 - `xcrun --show-sdk-path` (49.2s aggregate)
-- `command -v clang/clang++/xcrun/llvm-ar/ar` toolchain probing (93.5s aggregate)
+- `command -v cbuild-tools/lang/clang++/xcrun/llvm-ar/ar` toolchain probing (93.5s aggregate)
 
 But `runInTemp` also sets `CGO_ENABLED=0` by default. When CGO is off, most of this work is unnecessary; we can:
 

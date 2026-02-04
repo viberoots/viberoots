@@ -10,7 +10,7 @@ Ensure `normalizeNixAttr` produces identical results across TypeScript and Starl
 
 ### Scope & Changes
 
-- `build-tools/tools/lib/provider-names.ts` and `lang/defs_common.bzl`:
+- `build-tools/tools/lib/provider-names.ts` and `build-tools/lang/defs_common.bzl`:
   - Introduce a tiny, shared alias table source (TS) and mirror it in a Starlark test probe.
   - Keep existing normalization logic; do not change semantics.
 - Tests:

@@ -53,7 +53,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Changes are confined to `//lang` and language macro files; typical slices already include these paths.
+- Changes are confined to `//build-tools/lang` and language macro files; typical slices already include these paths.
 
 ---
 
@@ -169,8 +169,8 @@ Create a small helper to stamp global Nix inputs into `labels` when a macro asse
 
 ### Scope & Changes
 
-- Add `stamp_global_nix_inputs(kwargs)` in `//lang:defs_common.bzl`:
-  - Reads `global_nix_inputs()` from `//lang:global_inputs.bzl` and dedupe‑merges into `kwargs["labels"]`.
+- Add `stamp_global_nix_inputs(kwargs)` in `//build-tools/lang:defs_common.bzl`:
+  - Reads `global_nix_inputs()` from `//build-tools/lang:global_inputs.bzl` and dedupe‑merges into `kwargs["labels"]`.
 - Migrate:
   - `build-tools/node/defs.bzl:node_webapp` and the bundled branch of `nix_node_cli_bin` to call `stamp_global_nix_inputs(...)`.
 - Keep command assembly and timeouts unchanged; only label stamping is centralized.
@@ -206,7 +206,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Only `//lang` and `//build-tools/node` macro files change; typical slices already include these paths.
+- Only `//build-tools/lang` and `//build-tools/node` macro files change; typical slices already include these paths.
 
 ---
 

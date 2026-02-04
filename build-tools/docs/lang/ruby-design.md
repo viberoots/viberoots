@@ -25,12 +25,12 @@ If the language can support C interop, I must provide a documented and tested pa
 
 ### Shared wiring and contracts (current repo)
 
-Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:language_wiring.bzl`. Macro call sites should not re‑implement wiring or load provider maps directly.
+Use the canonical helper surface from `//build-tools/lang:defs_common.bzl` and `//build-tools/lang:language_wiring.bzl`. Macro call sites should not re‑implement wiring or load provider maps directly.
 
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
-- Provider wiring: load `MODULE_PROVIDERS` from `//lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
+- Provider wiring: load `MODULE_PROVIDERS` from `//build-tools/lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
 - Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
-- Patch model contract: `lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
+- Patch model contract: `build-tools/lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
 
 ## Architecture overview
@@ -48,7 +48,7 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 - Providers:
   - Ruby provider rules generated to `third_party/providers/TARGETS.ruby.auto`.
   - Provider macro defined in `third_party/providers/defs_ruby.bzl` (tiny genrule stamp).
-- Macros: `ruby/defs.bzl` thin wrappers over upstream rules (or genrules) that stamp labels and append providers from `//lang:auto_map.bzl`.
+- Macros: `ruby/defs.bzl` thin wrappers over upstream rules (or genrules) that stamp labels and append providers from `//build-tools/lang:auto_map.bzl`.
 - Labels:
   - Per‑gem labels: `module:<gem>@<version>` added to Ruby targets by the exporter.
   - Optional lockfile label: `lockfile:<path/to/Gemfile.lock>` for diagnostics (not used for providers).
@@ -130,14 +130,14 @@ def ruby_gem_patch(name, gem_key, patch_path):
 
 ## Buck macros (`ruby/defs.bzl`)
 
-Provide thin macros consistent with Go/Node style and `lang/defs_common.bzl` helpers:
+Provide thin macros consistent with Go/Node style and `build-tools/lang/defs_common.bzl` helpers:
 
 ```starlark
 load("@prelude//:defs.bzl", "genrule")  # or appropriate upstream ruby rules when available
 
 def _providers_for(name):
     MODULE_PROVIDERS = {}
-    load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
+    load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
     pkg = native.package_name()
     key = "//%s:%s" % (pkg, name)
     return MODULE_PROVIDERS.get(key, [])

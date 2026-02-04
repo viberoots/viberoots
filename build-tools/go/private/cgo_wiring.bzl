@@ -1,4 +1,4 @@
-load("//lang:defs_common.bzl", "dedupe_preserve")
+load("//build-tools/lang:defs_common.bzl", "dedupe_preserve")
 load("//build-tools/go/private:labels.bzl", "append_tuple_labels")
 
 def apply_go_tuple_labels(kwargs):

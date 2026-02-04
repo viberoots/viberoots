@@ -25,7 +25,7 @@ This PR introduces one shared Starlark helper that makes the wiring hard to appl
 
 This PR changes Starlark helper plumbing and migrates the small set of macros that directly call Nix.
 
-- Add a shared helper under `//lang` (file name TBD, but intended to be small and narrowly scoped) that:
+- Add a shared helper under `//build-tools/lang` (file name TBD, but intended to be small and narrowly scoped) that:
   - takes `kwargs`, `into`, and `dict_safe` (or infers dict-safe based on current shape)
   - calls `attach_global_nix_inputs(...)` to ensure global inputs are real action inputs
   - optionally calls `stamp_global_nix_inputs(...)` for observability, without hardcoding `//:flake.lock`
@@ -101,7 +101,7 @@ This PR adds one shared helper for non-genrule importer-scoped wiring and refact
 
 ### Scope & Changes
 
-- Add a shared helper under `lang/importer_wiring.bzl` (or an adjacent `//lang` file) that:
+- Add a shared helper under `build-tools/lang/importer_wiring.bzl` (or an adjacent `//build-tools/lang` file) that:
   - enforces the lockfile label contract (exactly one label, importer-dir rule, supported importer roots)
   - stamps `lang:*` and `kind:*`
   - returns the derived importer string (for rules that need it)
@@ -173,14 +173,14 @@ Across languages, we have several cases where a macro must expose a planner-visi
 
 The repo already has pieces of this:
 
-- `//lang:planner_stub.bzl:planner_stub` and `planner_stub_with_package_local_patches`
-- `//lang:provider_edges.bzl:strip_provider_targets` and `realize_provider_edges`
+- `//build-tools/lang:planner_stub.bzl:planner_stub` and `planner_stub_with_package_local_patches`
+- `//build-tools/lang:provider_edges.bzl:strip_provider_targets` and `realize_provider_edges`
 
 This PR consolidates the “right default” patterns into one helper surface so new macros do not re-learn the same edge cases.
 
 ### Scope & Changes
 
-- Extend or add a helper under `//lang` that standardizes planner-visible stub wiring, including:
+- Extend or add a helper under `//build-tools/lang` that standardizes planner-visible stub wiring, including:
   - optional package-local patch input attachment (via existing `planner_stub_with_package_local_patches`)
   - optional provider edge realization into a chosen input attribute when required
   - optional stripping of provider targets for stubs that must remain free of provider deps

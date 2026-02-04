@@ -19,7 +19,7 @@ As in prior parts, each PR includes the tests and documentation required for the
 
 We already have an explicit contract mapping languages to patch invalidation models:
 
-- Starlark: `//lang:lang_contracts.bzl`
+- Starlark: `//build-tools/lang:lang_contracts.bzl`
 - TypeScript: `build-tools/tools/lib/lang-contracts.ts`
 
 However, the Buck graph does not currently expose this model as a label. That makes the seam harder to see when using `buck2 cquery`, exporter outputs, or provider debugging tools.
@@ -32,8 +32,8 @@ This PR stamps a stable label on targets, derived from the language’s patch in
   - `patch_scope:package-local`
   - `patch_scope:importer-local`
 - Implement stamping at the helper boundary, not in each language macro:
-  - Package-local helper: `lang/package_local_wiring.bzl:prepare_package_local_wiring`
-  - Importer-scoped helper: `lang/importer_wiring.bzl:prepare_importer_*` (the shared wiring surfaces)
+  - Package-local helper: `build-tools/lang/package_local_wiring.bzl:prepare_package_local_wiring`
+  - Importer-scoped helper: `build-tools/lang/importer_wiring.bzl:prepare_importer_*` (the shared wiring surfaces)
 - Ensure stamping is deterministic and tolerant:
   - Only add one `patch_scope:*` label.
   - Preserve existing user-provided labels and ordering semantics (stable dedupe).
@@ -292,12 +292,12 @@ Part 28 tightened Node Nix-calling macros using shared wiring helpers (`prepare_
 
 These helpers are likely to be copied into the next Nix-calling macro shape (or the next language) and drift over time.
 
-This PR moves those helpers into `//lang` as a shared, narrow surface and refactors Node Nix-calling macros to call that surface.
+This PR moves those helpers into `//build-tools/lang` as a shared, narrow surface and refactors Node Nix-calling macros to call that surface.
 
 ### Scope & Changes
 
-- Add a small shared Starlark helper module under `//lang` (name and location intentionally narrow), for example:
-  - `lang/importer_strings.bzl` (or similar)
+- Add a small shared Starlark helper module under `//build-tools/lang` (name and location intentionally narrow), for example:
+  - `build-tools/lang/importer_strings.bzl` (or similar)
   - Expose:
     - `sanitize_importer_for_nix_attr(importer: str) -> str`
     - `importer_display_name(importer: str) -> str` (basename-like, deterministic)
@@ -330,7 +330,7 @@ Non-goals in this PR:
 ### Acceptance Criteria
 
 - Node Nix-calling macros no longer contain local importer normalization helpers.
-- The shared helper surface exists in `//lang` and is covered by tests.
+- The shared helper surface exists in `//build-tools/lang` and is covered by tests.
 - Behavior is stable (same Nix attr naming, same display-name behavior).
 
 ### Risks
@@ -343,7 +343,7 @@ The repo keeps a small local-helper drift surface in one of the more complex mac
 
 ### Downsides for Implementing
 
-One more small helper module in `//lang`. This is acceptable if it prevents copy/paste helper drift.
+One more small helper module in `//build-tools/lang`. This is acceptable if it prevents copy/paste helper drift.
 
 ### Recommendation
 

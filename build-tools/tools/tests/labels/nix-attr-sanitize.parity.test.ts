@@ -11,12 +11,15 @@ test("Starlark sanitize_nix_attr_from_target_label ↔ TS sanitizeAttrNameFromLa
     const targetsPath = path.join(tmp, "TARGETS");
     await fsp.appendFile(
       targetsPath,
-      ['load("//lang:nix_attr.bzl", "sanitize_nix_attr_from_target_label_probe")', ""].join("\n"),
+      [
+        'load("//build-tools/lang:nix_attr.bzl", "sanitize_nix_attr_from_target_label_probe")',
+        "",
+      ].join("\n"),
       "utf8",
     );
 
     const cases: string[] = [
-      "root//apps/foo:svc (config//toolchains:default#buck2/default//:default#linkerlang/cxx)",
+      "root//apps/foo:svc (config//toolchains:default#buck2/default//:default#linkerbuild-tools/lang/cxx)",
       "prelude//build-tools/cpp:lib (config//toolchains:xyz)",
       "//apps/foo:my bin",
       "root//apps/foo:my@target",

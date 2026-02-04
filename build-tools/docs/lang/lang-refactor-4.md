@@ -35,7 +35,7 @@ Detailed design
 - Add `build-tools/tools/dev/langs.codegen.ts` that:
   1. Invokes `planner-gen` for each language with detect/kindOf hints
   2. Emits or updates `build-tools/tools/buck/exporter/lang/<id>.ts` with a minimal adapter that composes `helpers.ts` and the manifest-provided predicates
-  3. Emits `<id>/defs.bzl` that calls `lang/defs_common.bzl#stamp_labels`, loads `MODULE_PROVIDERS`, and forwards through to the underlying language rules
+  3. Emits `<id>/defs.bzl` that calls `build-tools/lang/defs_common.bzl#stamp_labels`, loads `MODULE_PROVIDERS`, and forwards through to the underlying language rules
   4. Optionally creates `build-tools/tools/buck/providers/<id>.ts` using a small interface if `providers.kind` is not `none`
   5. Updates docs stubs and links
 - Add exporter adapter template (TypeScript) that consumes `detect` hints:

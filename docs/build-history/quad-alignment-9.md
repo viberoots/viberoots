@@ -13,7 +13,7 @@ Ensure TS (`normalizeNixAttr`) and Starlark (`normalize_nix_attr`) normalize nix
 ### Scope & Changes
 
 - Introduce a small canonical alias manifest (`build-tools/tools/lib/nix-attr-aliases.json`).
-- Generate (at dev/test time) a Starlark alias module consumed by `lang/defs_common.bzl` (mirrors the JSON).
+- Generate (at dev/test time) a Starlark alias module consumed by `build-tools/lang/defs_common.bzl` (mirrors the JSON).
 - Update TS to source aliases from the same JSON (migrate from current `nix-attr-aliases.ts` to eliminate drift).
 - Keep normalized output strings unchanged for existing inputs.
 

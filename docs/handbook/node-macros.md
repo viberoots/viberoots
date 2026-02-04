@@ -1,10 +1,10 @@
 ## Node macros (webapp + CLI)
 
-This repo’s Node macros that invoke Nix are intentionally small. They keep Node-specific behavior local, and centralize Nix command assembly (escaping, timeout wrapper, outPath capture) under `//lang`.
+This repo’s Node macros that invoke Nix are intentionally small. They keep Node-specific behavior local, and centralize Nix command assembly (escaping, timeout wrapper, outPath capture) under `//build-tools/lang`.
 
 They also use the shared importer-scoped wiring helpers so lockfile enforcement, importer derivation, importer-local patch inputs, and provider-edge realization stay consistent across Node and Python:
 
-- `//lang:defs_common.bzl:prepare_language_wiring(...)` with `wiring = "nix_calling_genrule"` for importer-scoped genrule-style macros that invoke Nix (webapp and bundled CLI).
+- `//build-tools/lang:defs_common.bzl:prepare_language_wiring(...)` with `wiring = "nix_calling_genrule"` for importer-scoped genrule-style macros that invoke Nix (webapp and bundled CLI).
 
 Buck package boundary note:
 
@@ -38,7 +38,7 @@ Node macros include importer-local patches via `native.glob(...)`. Because Buck 
 
 - It still **wires `global_nix_inputs()` as real action inputs** (via `srcs`) so changes like `flake.lock` invalidate tests deterministically.
 - It intentionally sets **`stamp=False`** when wiring global inputs to avoid exporter label noise for tests. Correctness must not depend on labels.
-- Macro authors should treat this as an importer-scoped, non-genrule, Nix-calling shape and route through `//lang:defs_common.bzl:prepare_language_wiring(...)` with `wiring = "non_genrule_nix_calling"`.
+- Macro authors should treat this as an importer-scoped, non-genrule, Nix-calling shape and route through `//build-tools/lang:defs_common.bzl:prepare_language_wiring(...)` with `wiring = "non_genrule_nix_calling"`.
 
 See `docs/handbook/node-tests.md` for usage and runner semantics.
 
@@ -46,14 +46,14 @@ See `docs/handbook/node-tests.md` for usage and runner semantics.
 
 When a Node macro assembles a shell command that invokes Nix:
 
-- **Bootstrap (workspace + flake root)**: use `nix_calling_genrule_bootstrap(...)` from `//lang:nix_shell.bzl` so genrule-style macros standardize:
+- **Bootstrap (workspace + flake root)**: use `nix_calling_genrule_bootstrap(...)` from `//build-tools/lang:nix_shell.bzl` so genrule-style macros standardize:
   - optional `build-tools/tools/buck/workspace-root.env` sourcing (for temp repos and sandboxed actions)
   - `WORKSPACE_ROOT`/`REPO_ROOT`/`FLK_ROOT` derivation and validation
   - unified PNPM store handling (`include_pnpm_store=True`) and optional enforcement skip (bundling scenarios)
-- **Required env exports**: use the small helpers in `//lang:nix_shell.bzl` so call sites don’t drift on env conventions:
+- **Required env exports**: use the small helpers in `//build-tools/lang:nix_shell.bzl` so call sites don’t drift on env conventions:
   - `nix_calling_env_export_buck_graph_json(...)`
   - `nix_calling_env_export_nix_pnpm_fetch_timeout(...)`
-- **Out path capture**: use `nix_calling_genrule_nix_build_out_path_prefix(...)` (or `nix_build_out_path_cmd(...)` for rare cases) from `//lang:nix_shell.bzl` to capture a derivation output path without creating GC roots:
+- **Out path capture**: use `nix_calling_genrule_nix_build_out_path_prefix(...)` (or `nix_build_out_path_cmd(...)` for rare cases) from `//build-tools/lang:nix_shell.bzl` to capture a derivation output path without creating GC roots:
   - always use `nix build --no-link --print-out-paths | tail -n1`
   - never use `--out-link`
 

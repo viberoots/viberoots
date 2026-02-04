@@ -7,7 +7,7 @@ async function read(p: string): Promise<string> {
   return await fsp.readFile(p, "utf8");
 }
 
-test("go/cpp macros: local_patch_dirs and nixpkg_deps pop logic is centralized in //lang helper", async () => {
+test("go/cpp macros: local_patch_dirs and nixpkg_deps pop logic is centralized in //build-tools/lang helper", async () => {
   const goDefs = await read("build-tools/go/defs.bzl");
   const cppDefs = await read("build-tools/cpp/defs.bzl");
 

@@ -7,7 +7,7 @@ let
   llvmAr = C.llvmAr;
 in {
   # Build a wasm32 static library from C/C++ sources under subdir of srcRoot.
-  # - Uses clang/clang++ with --target=wasm32-unknown-unknown by default (no syscalls).
+  # - Uses cbuild-tools/lang/clang++ with --target=wasm32-unknown-unknown by default (no syscalls).
   # - Produces $out/lib/lib<sanitized>.a and installs headers to $out/include/**.
   # - Intended to be linked into a higher-level wasm artifact (e.g., TinyGo).
   cppWasmStaticLib = {

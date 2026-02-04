@@ -34,19 +34,19 @@ If the language can support C interop, I must provide a documented and tested pa
 
 ### Shared wiring and contracts (current repo)
 
-Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:language_wiring.bzl`. Macro call sites should not re‑implement wiring or load provider maps directly.
+Use the canonical helper surface from `//build-tools/lang:defs_common.bzl` and `//build-tools/lang:language_wiring.bzl`. Macro call sites should not re‑implement wiring or load provider maps directly.
 
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
-- Provider wiring: load `MODULE_PROVIDERS` from `//lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
+- Provider wiring: load `MODULE_PROVIDERS` from `//build-tools/lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
 - Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
-- Patch model contract: `lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
+- Patch model contract: `build-tools/lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
 
 ### Path Invariants
 
 - Patches: `patches/php/*.patch` (flat; one patch per `package@version`).
 - Nix templates: `build-tools/tools/nix/templates/php.nix` imported by `build-tools/tools/nix/lang-templates.nix`.
-- Macros: `php/defs.bzl` using `lang/defs_common.bzl` helpers and `//lang:auto_map.bzl`.
+- Macros: `php/defs.bzl` using `build-tools/lang/defs_common.bzl` helpers and `//build-tools/lang:auto_map.bzl`.
 - Providers: generated files under `third_party/providers/` (e.g., `TARGETS.php.auto`).
 - Glue scripts: zx TypeScript under `build-tools/tools/buck/**`, `build-tools/tools/patch/**`.
 
@@ -197,7 +197,7 @@ No changes required. Existing `build-tools/tools/buck/gen-auto-map.ts` maps `loc
 
 ### Macros (`php/defs.bzl`)
 
-Provide thin wrappers aligned with `lang/defs_common.bzl`:
+Provide thin wrappers aligned with `build-tools/lang/defs_common.bzl`:
 
 - `nix_php_library(name, deps = [], labels = [...], ...)`
 - `nix_php_binary(name, deps = [], labels = [...], ...)` (if you package CLI scripts)
@@ -207,7 +207,7 @@ Behavior:
 
 - Stamp `lang:php` and `kind:<lib|bin|test>` labels.
 - Require/derive one lockfile label `lockfile:<path>#<importer>`.
-- Append providers from `//lang:auto_map.bzl` by key `"//pkg:name"`.
+- Append providers from `//build-tools/lang:auto_map.bzl` by key `"//pkg:name"`.
 
 Example TARGETS entries:
 

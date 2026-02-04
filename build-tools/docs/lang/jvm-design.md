@@ -35,12 +35,12 @@ If the language can support C interop, I must provide a documented and tested pa
 
 ## Shared wiring and contracts (current repo)
 
-Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:language_wiring.bzl`. Macro call sites should not re‑implement wiring or load provider maps directly.
+Use the canonical helper surface from `//build-tools/lang:defs_common.bzl` and `//build-tools/lang:language_wiring.bzl`. Macro call sites should not re‑implement wiring or load provider maps directly.
 
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
-- Provider wiring: load `MODULE_PROVIDERS` from `//lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
+- Provider wiring: load `MODULE_PROVIDERS` from `//build-tools/lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
 - Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
-- Patch model contract: `lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
+- Patch model contract: `build-tools/lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
 
 ---
@@ -63,7 +63,7 @@ The flow mirrors Go and Node patterns:
 - Patches: `patches/jvm/*.patch` (flat; one patch per key). No subdirectories.
 - Templates: `build-tools/tools/nix/templates/jvm.nix` (consumed by `build-tools/tools/nix/lang-templates.nix`).
 - Planner: dispatch entry in `graph-generator.nix` (language registry) for JVM.
-- Macros: `jvm/defs.bzl` using `lang/defs_common.bzl` helpers.
+- Macros: `jvm/defs.bzl` using `build-tools/lang/defs_common.bzl` helpers.
 - Providers:
   - Starlark: `//third_party/providers/defs_jvm.bzl` with `jvm_artifact_patch(...)`.
   - Generated: `third_party/providers/TARGETS.jvm.auto` (deterministic; not hand‑edited).
@@ -226,7 +226,7 @@ load("@prelude//java:def.bzl", "java_library", "java_test", "java_binary")
 
 def _providers_for(name):
     MODULE_PROVIDERS = {}
-    load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
+    load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
     pkg = native.package_name()
     key = "//%s:%s" % (pkg, name)
     return MODULE_PROVIDERS.get(key, [])

@@ -57,7 +57,7 @@ Keeping the temp repo minimal reduces IO and avoids pulling large artifacts into
 
 On macOS, path aliasing (e.g. `/var` vs `/private/var`) can cause Nix to treat paths as different and/or error. We canonicalize key roots with `pwd -P`.
 
-- **Where**: `lang/nix_shell.bzl`
+- **Where**: `build-tools/lang/nix_shell.bzl`
 - **What**:
   - Canonicalizes `WORKSPACE_ROOT` and `FLK_ROOT` to physical paths before invoking Nix.
 
@@ -215,7 +215,7 @@ In practice, the highest-signal checks are:
 - `build-tools/tools/bin/tail-log`: status/watch mode for verify runs and better log selection behavior.
 - `build-tools/tools/dev/verify-log-status.ts` + `build-tools/tools/lib/verify-log-status/*`: log parsing/formatting for `tail-log --status`.
 - `build-tools/tools/tests/lib/test-helpers.ts`: temp repo rsync excludes and removal of per-temp `flake.lock` rewriting.
-- `lang/nix_shell.bzl`: canonicalize roots via physical paths (`pwd -P`) to avoid path-alias issues.
+- `build-tools/lang/nix_shell.bzl`: canonicalize roots via physical paths (`pwd -P`) to avoid path-alias issues.
 - `flake.nix`: filter repo snapshots to avoid volatile paths that create churny `*-source` store paths.
 - `build-tools/tools/nix/uv2nix-adapter.nix`: reduce uv2nix env churn by hashing only the lockfile subset for env realization.
 
@@ -268,7 +268,7 @@ This PR ensures that evaluating/building from temp repos does not accidentally m
   - Make uv2nix env derivations depend on a **lockfile-only** `src` snapshot (instead of hashing the full workspace).
 - `flake.nix`:
   - Ensure `filterRepo` excludes volatile paths (e.g. `buck-out/`, coverage, profiling, node_modules, VCS metadata) so repo snapshots do not churn.
-- `lang/nix_shell.bzl`:
+- `build-tools/lang/nix_shell.bzl`:
   - Canonicalize key roots via physical paths (`pwd -P`) to avoid macOS path-alias drift affecting Nix evaluation and store reuse.
 
 Non-goals:

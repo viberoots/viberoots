@@ -24,9 +24,9 @@ add an enforcement test that checks macros only call `prepare_language_wiring(..
 
 ### Scope & Changes
 
-- Move `lang/package_local_wiring.bzl` and `lang/importer_wiring*.bzl` to an internal namespace and
+- Move `build-tools/lang/package_local_wiring.bzl` and `build-tools/lang/importer_wiring*.bzl` to an internal namespace and
   update their load paths.
-- Keep `lang/language_wiring.bzl:prepare_language_wiring` as the only public macro wiring
+- Keep `build-tools/lang/language_wiring.bzl:prepare_language_wiring` as the only public macro wiring
   entrypoint.
 - Add a test that fails if macro files call internal wiring helpers directly.
 - Update `abstractions.md` to mark the internal helpers as implementation details only.
@@ -80,10 +80,10 @@ TypeScript provider sync. This removes repeated string constants and reduces dri
 ### Scope & Changes
 
 - Add a shared lockfile basename registry:
-  - Starlark: `lang/lockfile_contracts.bzl` with `LOCKFILE_BASENAMES_BY_LANG`.
+  - Starlark: `build-tools/lang/lockfile_contracts.bzl` with `LOCKFILE_BASENAMES_BY_LANG`.
   - TypeScript: `build-tools/tools/lib/lockfile-contracts.ts` with the same mapping.
 - Update Node and Python provider sync to use the shared registry.
-- Update `lang/lockfile_labels.bzl` default lockfile helpers to use the registry.
+- Update `build-tools/lang/lockfile_labels.bzl` default lockfile helpers to use the registry.
 - Add a parity test that checks Starlark and TypeScript registries match.
 - Update `abstractions.md` to list the new registry as the canonical source.
 
@@ -134,7 +134,7 @@ Python divergence is clear and enforced at the macro layer.
 ### Scope & Changes
 
 - Add a Starlark mirror of importer patch inclusion policy, and expose it in a probe rule.
-- Update `lang/lang_contracts.bzl` or a new `lang/importer_contracts.bzl` to include:
+- Update `build-tools/lang/lang_contracts.bzl` or a new `build-tools/lang/importer_contracts.bzl` to include:
   - Node: `importer_patch_inclusion = "all"`
   - Python: `importer_patch_inclusion = "effective-set-only"`
 - Add a parity test that compares the Starlark policy to

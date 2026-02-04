@@ -8,7 +8,7 @@ test("TS ↔ Nix label normalization parity (cell + config suffix + abs/rel)", a
   await runInTemp("labels-parity", async (tmp, $) => {
     const samples: string[] = [
       // cell + config suffix
-      "root//apps/foo:svc (config//toolchains:default#buck2/default//:default#linkerlang/cxx)",
+      "root//apps/foo:svc (config//toolchains:default#buck2/default//:default#linkerbuild-tools/lang/cxx)",
       "prelude//build-tools/cpp:lib (config//toolchains:xyz)",
       // alternate suffix shape (platform / cfg hash)
       "//third_party/providers:prov (root//:no_cgo#6eb543497f051f11)",

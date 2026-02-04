@@ -172,7 +172,7 @@ Today, this ordering is implemented correctly but partly inlined. This PR introd
 
 ### Scope & Changes
 
-- Add a shared Starlark helper under `//lang:` for package-local WASM macro wiring that composes:
+- Add a shared Starlark helper under `//build-tools/lang:` for package-local WASM macro wiring that composes:
   - wasm stamping
   - patch_scope stamping
   - package-local patch input inclusion

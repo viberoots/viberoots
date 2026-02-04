@@ -25,7 +25,7 @@ test("webapp: scaffold, glue, build dist via Buck", { timeout: TEST_TIMEOUT_MS }
     await $({
       cwd: tmp,
       stdio: "pipe",
-    })`git add -A apps/demo-web build-tools/tools/nix/node-modules.hashes.json build-tools/tools/nix/langs.nix lang/importer_roots.bzl build-tools/tools/buck third_party/providers`;
+    })`git add -A apps/demo-web build-tools/tools/nix/node-modules.hashes.json build-tools/tools/nix/langs.nix build-tools/lang/importer_roots.bzl build-tools/tools/buck third_party/providers`;
     // No longer modify flake envs for LOCAL_PNPM_STORE; pure Nix path only
     // Build via Nix directly to avoid nested buck invocations from within a buck test
     const importer = "apps/demo-web";

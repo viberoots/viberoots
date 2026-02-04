@@ -16,7 +16,7 @@ As in prior parts, each PR includes the tests and documentation required for the
 
 ### Description
 
-Importer-scoped macros (Node and Python) use `//lang:importer_wiring.bzl` as a single helper boundary for lockfile enforcement, label stamping, patch inputs, and provider edges. Go and C++ are intentionally different in patch model (package-local patches), but the macro wiring is still assembled across multiple call sites today.
+Importer-scoped macros (Node and Python) use `//build-tools/lang:importer_wiring.bzl` as a single helper boundary for lockfile enforcement, label stamping, patch inputs, and provider edges. Go and C++ are intentionally different in patch model (package-local patches), but the macro wiring is still assembled across multiple call sites today.
 
 This PR adds one small helper surface for “package-local patching macro wiring”. The helper is intentionally narrow. It aims to eliminate repeated macro boilerplate and make it harder to forget critical steps such as including patch files as action inputs.
 
@@ -24,9 +24,9 @@ Clarification: I do not need to preserve backwards compatibility yet. This PR ca
 
 ### Scope & Changes
 
-This PR introduces one helper and migrates the existing Go and C++ macros to use it. The helper stays in `//lang` so language macro files do not need to re-implement the same sequence.
+This PR introduces one helper and migrates the existing Go and C++ macros to use it. The helper stays in `//build-tools/lang` so language macro files do not need to re-implement the same sequence.
 
-- Add a helper in `//lang` (location: `//lang:macro_kwargs.bzl` or a new small `//lang:package_local_wiring.bzl`) that:
+- Add a helper in `//build-tools/lang` (location: `//build-tools/lang:macro_kwargs.bzl` or a new small `//build-tools/lang:package_local_wiring.bzl`) that:
   - reads `local_patch_dirs` from kwargs with the existing default (`default_package_patch_dirs(lang)`)
   - reads `nixpkg_deps` from kwargs and appends normalized `nixpkg:*` labels via the existing canonical helper
   - stamps `lang:*` and `kind:*` labels via the existing canonical helper
@@ -70,7 +70,7 @@ I will update documentation so “how to write a package-local patching macro”
 
 ### Acceptance Criteria
 
-- There is one shared helper surface for package-local patching macro wiring in `//lang`.
+- There is one shared helper surface for package-local patching macro wiring in `//build-tools/lang`.
 - Go and C++ macro files use the helper and no longer duplicate the same wiring sequence.
 - Tests prove patch invalidation and provider wiring are unchanged.
 - Docs point at the helper as the canonical mechanism.
@@ -85,7 +85,7 @@ We keep a drift surface where package-local languages have to assemble wiring pr
 
 ### Downsides for Implementing
 
-This adds one more helper surface in `//lang`. The surface must remain narrow so it does not become a macro framework.
+This adds one more helper surface in `//build-tools/lang`. The surface must remain narrow so it does not become a macro framework.
 
 ### Recommendation
 
@@ -110,7 +110,7 @@ Clarification: I do not need to preserve backwards compatibility yet. This PR ca
 
 This PR introduces a minimal contract registry and uses it in two places where the seam shows up in practice: patch tooling messages and regression tests.
 
-- Add a small Starlark contract surface (location: `//lang:lang_contracts.bzl`) that exposes:
+- Add a small Starlark contract surface (location: `//build-tools/lang:lang_contracts.bzl`) that exposes:
   - whether a language is package-local or importer-local for patch invalidation
   - whether applying a patch should run glue (importer-local languages) or not (package-local languages)
 - Update `build-tools/tools/lib/lang-contracts.ts` if needed so it is the single TS-side definition for the same mapping, and add a parity-style test that asserts Starlark and TS agree on the mapping.
@@ -522,7 +522,7 @@ Clarification: I do not need to preserve backwards compatibility yet. This PR ca
 
 - Tighten the existing wrapper-reference enforcement test (added in PR‑3) to scan:
   - repo root `*.md` files (excluding large log/output directories already excluded elsewhere like `test-logs/`, `buck-out/`, `coverage/`, etc.)
-  - `build-tools/docs/lang/**` and other design-doc locations if present
+  - `build-tools/docs/build-tools/lang/**` and other design-doc locations if present
 - Update any remaining markdown references to:
   - the removed Node/Python provider sync wrapper entrypoints,
     replacing them with the canonical orchestrator commands:

@@ -28,7 +28,7 @@ This hardens the importer-dir consistency rule and prevents a class of labels th
 
 ### Scope & Changes
 
-- Update the Starlark validator in `lang/lockfile_labels.bzl`:
+- Update the Starlark validator in `build-tools/lang/lockfile_labels.bzl`:
   - allow `#.` only when the lockfile path is at repo root
   - otherwise require `#<dirname(lockfilePath)>`
   - keep `./` stripping normalization unchanged
@@ -77,7 +77,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `lang/lockfile_labels.bzl`, `build-tools/tools/lib/labels.ts`, and narrow tests. Safe in tooling slices.
+- Touches `build-tools/lang/lockfile_labels.bzl`, `build-tools/tools/lib/labels.ts`, and narrow tests. Safe in tooling slices.
 
 ---
 
@@ -288,7 +288,7 @@ This PR makes the primary path robust by making TypeScript’s normalization exa
 
 ### Scope & Changes
 
-- Update `build-tools/tools/lib/labels.ts` lockfile label parsing to strip **all** repeated leading `./` segments from the lockfile path (mirror `lang/lockfile_labels.bzl` and `build-tools/tools/nix/planner/lib.nix`).
+- Update `build-tools/tools/lib/labels.ts` lockfile label parsing to strip **all** repeated leading `./` segments from the lockfile path (mirror `build-tools/lang/lockfile_labels.bzl` and `build-tools/tools/nix/planner/lib.nix`).
 - Keep strict parsing rules unchanged:
   - exactly one `#`
   - non-empty path and importer

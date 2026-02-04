@@ -10,7 +10,7 @@ test("planner BUCK_TARGET selection accepts cell-prefixed and config-suffixed la
     await fsp.mkdir(path.join(tmp, "build-tools", "tools", "buck"), { recursive: true });
     const graph = [
       {
-        name: "root//apps/foo:svc (config//toolchains:default#buck2/default//:default#linkerlang/cxx)",
+        name: "root//apps/foo:svc (config//toolchains:default#buck2/default//:default#linkerbuild-tools/lang/cxx)",
         rule_type: "cxx_binary",
         labels: ["lang:cpp"],
       },
@@ -35,8 +35,8 @@ test("planner BUCK_TARGET selection accepts cell-prefixed and config-suffixed la
     const variants = [
       "//apps/foo:svc",
       "root//apps/foo:svc",
-      "//apps/foo:svc (config//toolchains:default#buck2/default//:default#linkerlang/cxx)",
-      "root//apps/foo:svc (config//toolchains:default#buck2/default//:default#linkerlang/cxx)",
+      "//apps/foo:svc (config//toolchains:default#buck2/default//:default#linkerbuild-tools/lang/cxx)",
+      "root//apps/foo:svc (config//toolchains:default#buck2/default//:default#linkerbuild-tools/lang/cxx)",
     ];
 
     for (const BUCK_TARGET of variants) {

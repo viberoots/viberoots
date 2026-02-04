@@ -29,8 +29,8 @@ The goal is to implement this once in a shared helper surface and lock the behav
 ### Scope & Changes
 
 - Add Starlark helper(s) under the canonical shared surface:
-  - Preferred: `//lang:defs_common.bzl` (since many macros already load this).
-  - If we want tighter SoC: add `lang/link_intent.bzl` and re-export from `defs_common.bzl`.
+  - Preferred: `//build-tools/lang:defs_common.bzl` (since many macros already load this).
+  - If we want tighter SoC: add `build-tools/lang/link_intent.bzl` and re-export from `defs_common.bzl`.
 
 - Implement helpers (names illustrative):
   - `merge_link_intent_deps(deps, link_deps, header_deps) -> list[str]`:
@@ -38,14 +38,14 @@ The goal is to implement this once in a shared helper surface and lock the behav
   - `validate_link_closure_overrides(link_deps, link_closure_overrides)`:
     - fail fast if override keys are not present in `link_deps`
 
-- Add a tiny “probe macro” used only in tests (kept under `//lang/` so it does not become an accidental public surface) that:
+- Add a tiny “probe macro” used only in tests (kept under `//build-tools/lang/` so it does not become an accidental public surface) that:
   - accepts `deps`, `link_deps`, `header_deps`, `link_closure`, `link_closure_overrides`
   - calls `merge_link_intent_deps` and `validate_link_closure_overrides`
   - emits a simple rule whose `deps` attribute can be inspected via `buck2 cquery --output-attributes=deps`
 
 Notes on reuse (avoid reinventing):
 
-- Reuse the repo’s existing deterministic list merge helpers if present in `//lang:defs_common.bzl` (or adjacent files) rather than adding new ad-hoc dedupe/sort logic.
+- Reuse the repo’s existing deterministic list merge helpers if present in `//build-tools/lang:defs_common.bzl` (or adjacent files) rather than adding new ad-hoc dedupe/sort logic.
 - Match the “single deps merge point” convention already documented in `docs/handbook/conventions.md`.
 
 ### Tests (in this PR)
@@ -70,7 +70,7 @@ Add zx tests under `build-tools/tools/tests/lang/` (one test per file) that:
 
 ### Acceptance Criteria
 
-- Shared helper(s) exist under `//lang` and are used by at least one macro in-tree (the test probe macro is sufficient).
+- Shared helper(s) exist under `//build-tools/lang` and are used by at least one macro in-tree (the test probe macro is sufficient).
 - Tests prove:
   - deterministic union behavior
   - override validation fails fast

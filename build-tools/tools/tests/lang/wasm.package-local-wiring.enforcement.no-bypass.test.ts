@@ -6,7 +6,7 @@ function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message);
 }
 
-test("package-local WASM macros use the shared //lang wasm wiring helpers", async () => {
+test("package-local WASM macros use the shared //build-tools/lang wasm wiring helpers", async () => {
   const goDefs = await fsp.readFile("build-tools/go/defs.bzl", "utf8");
   const cppDefs = await fsp.readFile("build-tools/cpp/wasm_defs.bzl", "utf8");
 

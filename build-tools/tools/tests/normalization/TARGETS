@@ -1,4 +1,4 @@
-load("//lang:defs_common.bzl", "normalize_nix_attr_probe")
+load("//build-tools/lang:defs_common.bzl", "normalize_nix_attr_probe")
 
 # Starlark probes for normalization parity checks
 normalize_nix_attr_probe(name = "case1", attr = "gtest")

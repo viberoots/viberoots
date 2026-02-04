@@ -23,7 +23,7 @@ test("macro entrypoints must not call legacy mutating helpers or bypass shared w
 
     assert.ok(
       !txt.includes("_legacy_mutating("),
-      `${file} must not call any *_legacy_mutating helper; legacy helpers are migration-only and belong under //lang compatibility surfaces`,
+      `${file} must not call any *_legacy_mutating helper; legacy helpers are migration-only and belong under //build-tools/lang compatibility surfaces`,
     );
 
     assert.ok(

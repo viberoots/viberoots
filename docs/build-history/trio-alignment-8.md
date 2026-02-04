@@ -10,10 +10,10 @@ Unify the common sanitize algorithm (replace `//` → ``, `:`→`-`, `/`→`-`, 
 
 ### Scope & Changes
 
-- Add `//lang:sanitize.bzl` with `sanitize_name(s: string): string`.
+- Add `//build-tools/lang:sanitize.bzl` with `sanitize_name(s: string): string`.
 - Update `build-tools/cpp/private/sanitize.bzl` to import and delegate to `sanitize_name`.
 - Update `build-tools/node/defs.bzl` and `node/private/nix_test.bzl` to use the shared helper for importer/attr sanitization.
-- Docstring references in C++/Node updated to point to `lang/sanitize.bzl` as canonical.
+- Docstring references in C++/Node updated to point to `build-tools/lang/sanitize.bzl` as canonical.
 
 ### Acceptance Criteria
 
@@ -44,10 +44,10 @@ Deduplicate the `//pkg:name` key computation and MODULE_PROVIDERS lookup used by
 
 ### Scope & Changes
 
-- Add in `lang/defs_common.bzl`:
+- Add in `build-tools/lang/defs_common.bzl`:
   - `def target_key_for_current_package(name): string`
   - `def providers_for(MODULE_PROVIDERS, name): list`
-- Replace custom `_providers_for` in `build-tools/go/defs.bzl` and `build-tools/node/defs.bzl` with `providers_for` from `lang/defs_common.bzl`.
+- Replace custom `_providers_for` in `build-tools/go/defs.bzl` and `build-tools/node/defs.bzl` with `providers_for` from `build-tools/lang/defs_common.bzl`.
 
 ### Acceptance Criteria
 
@@ -78,7 +78,7 @@ Extract a tiny helper to include importer-local Node patches in `srcs`, used by 
 
 ### Scope & Changes
 
-- Add `def append_node_patches_for_importer(kwargs, importer)` to `lang/defs_common.bzl`.
+- Add `def append_node_patches_for_importer(kwargs, importer)` to `build-tools/lang/defs_common.bzl`.
 - Replace duplicated importer/patch-dir logic in:
   - `build-tools/node/defs.bzl` (`nix_node_gen`)
   - `build-tools/node/defs.bzl` (`nix_node_test`)
@@ -143,7 +143,7 @@ Consolidate the repeated shell bootstrap used by Node external tests and C++ Nix
 
 ### Scope & Changes
 
-- Add `//lang:nix_shell.bzl` with tiny constructors:
+- Add `//build-tools/lang:nix_shell.bzl` with tiny constructors:
   - `def nix_bootstrap_env(): string` (WORKSPACE_ROOT, FLK_ROOT detection)
   - `def nix_timeout_wrapper_var(var_name="TIMEOUT", default_sec=600): string`
 - Update:
@@ -179,7 +179,7 @@ Add a small test that asserts TS and Starlark agree on nix attribute normalizati
 
 ### Scope & Changes
 
-- Starlark probe in `lang/defs_common.bzl`: `normalize_nix_attr_probe(name, attr)` rule that writes normalized value to an output (mirrors `cpp_sanitize_probe` style).
+- Starlark probe in `build-tools/lang/defs_common.bzl`: `normalize_nix_attr_probe(name, attr)` rule that writes normalized value to an output (mirrors `cpp_sanitize_probe` style).
 - zx test `build-tools/tools/tests/normalization-parity.ts`:
   - Builds the probe for a small set of inputs and reads its outputs.
   - Compares each result with TS `normalizeNixAttr()` from `build-tools/tools/lib/provider-names.ts`.

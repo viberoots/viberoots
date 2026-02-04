@@ -1,14 +1,14 @@
 load(
-    "//lang:defs_common.bzl",
+    "//build-tools/lang:defs_common.bzl",
     "dedupe_preserve",
     "merge_link_intent_deps",
     "prepare_language_wiring",
     "wire_package_local_wasm_planner_visible_stub",
 )
-load("//lang:global_inputs.bzl", "global_nix_inputs")
-load("//lang:sanitize.bzl", "sanitize_name")
+load("//build-tools/lang:global_inputs.bzl", "global_nix_inputs")
+load("//build-tools/lang:sanitize.bzl", "sanitize_name")
 load("//build-tools/cpp/private:nix_build.bzl", "cpp_nix_build")
-load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
+load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
 
 def _wasm_target_for_abi(wasm_abi):
     if wasm_abi == "wasi":

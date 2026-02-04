@@ -4,15 +4,15 @@ This installment completes targeted cross-language refactors identified in the l
 
 ---
 
-## PR‑1: Extract Go tuple label logic from `//lang:defs_common.bzl` to a Go‑local module
+## PR‑1: Extract Go tuple label logic from `//build-tools/lang:defs_common.bzl` to a Go‑local module
 
 ### Description
 
-Move Go‑specific label logic (`append_tuple_labels`, `normalize_build_tags`) out of the shared `//lang:defs_common.bzl` into `//build-tools/go/private:labels.bzl`. Update `build-tools/go/defs.bzl` to import and use the new helper, keeping `defs_common` truly language‑agnostic and reducing the chance of future cross‑language drift. Behavior and labels remain identical.
+Move Go‑specific label logic (`append_tuple_labels`, `normalize_build_tags`) out of the shared `//build-tools/lang:defs_common.bzl` into `//build-tools/go/private:labels.bzl`. Update `build-tools/go/defs.bzl` to import and use the new helper, keeping `defs_common` truly language‑agnostic and reducing the chance of future cross‑language drift. Behavior and labels remain identical.
 
 ### Scope & Changes
 
-- `lang/defs_common.bzl`:
+- `build-tools/lang/defs_common.bzl`:
   - Remove Go‑specific helpers (`normalize_build_tags`, `append_tuple_labels`).
   - Keep purely cross‑language helpers unchanged (e.g., `stamp_labels`, `append_nixpkg_labels`, `append_patch_srcs`, importer helpers).
 - `build-tools/go/private/labels.bzl` (new):
@@ -28,7 +28,7 @@ Move Go‑specific label logic (`append_tuple_labels`, `normalize_build_tags`) o
 
 #### Docs (in this PR)
 
-- Add a brief note in the build‑system design: Go‑specific tuple label logic lives in `//build-tools/go/private:labels.bzl`; `//lang:defs_common.bzl` is language‑agnostic.
+- Add a brief note in the build‑system design: Go‑specific tuple label logic lives in `//build-tools/go/private:labels.bzl`; `//build-tools/lang:defs_common.bzl` is language‑agnostic.
 
 ### Acceptance Criteria
 
@@ -105,7 +105,7 @@ Implement.
 
 ### Description
 
-Add a shared `stamp_wasm_variant(kwargs, variant)` helper in `//lang:defs_common.bzl` that appends `["lang:<x>", "kind:wasm", "wasm:<variant>"]` deterministically, then update existing WASM macros to use it:
+Add a shared `stamp_wasm_variant(kwargs, variant)` helper in `//build-tools/lang:defs_common.bzl` that appends `["lang:<x>", "kind:wasm", "wasm:<variant>"]` deterministically, then update existing WASM macros to use it:
 
 - C++: `nix_cpp_wasm_static_lib(...)` (`variant="static"`), `nix_cpp_wasm_emscripten_lib(...)` (`variant="emscripten"`).
 - Go: `nix_go_tiny_wasm_lib(...)` (`variant="tinygo"`).
@@ -115,7 +115,7 @@ No behavior changes; labels become uniformly stamped.
 
 ### Scope & Changes
 
-- `lang/defs_common.bzl`: add `stamp_wasm_variant(kwargs, variant)`.
+- `build-tools/lang/defs_common.bzl`: add `stamp_wasm_variant(kwargs, variant)`.
 - `build-tools/cpp/defs.bzl`, `build-tools/go/defs.bzl`, `build-tools/python/defs.bzl`: replace bespoke WASM label additions with `stamp_wasm_variant(...)`.
 
 #### Tests (in this PR)
@@ -158,7 +158,7 @@ Adopt across C++, Go, Node, and Python macros. No behavior change expected.
 
 ### Scope & Changes
 
-- `lang/defs_common.bzl`:
+- `build-tools/lang/defs_common.bzl`:
   - Add `realize_provider_edges(...)` returning a deterministic, deduped list of provider targets for `//<pkg>:<name>`.
 - Macro adoptions:
   - C++: `nix_cpp_{library,binary,addon}` merge via `deps += realize_provider_edges(...)`.

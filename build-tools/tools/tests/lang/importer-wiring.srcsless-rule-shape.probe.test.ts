@@ -61,8 +61,8 @@ test("importer_wiring exposes srcs-less rule shape wiring via synthetic dep help
       path.join(appDir, "TARGETS"),
       [
         'load("@prelude//:rules.bzl", "python_library")',
-        'load("//lang/internal:importer_wiring.bzl", "prepare_importer_srcsless_rule_wiring")',
-        'load("//lang:labels_file.bzl", "labels_file")',
+        'load("//build-tools/lang/internal:importer_wiring.bzl", "prepare_importer_srcsless_rule_wiring")',
+        'load("//build-tools/lang:labels_file.bzl", "labels_file")',
         "",
         'kw = {"labels": []}',
         "w = prepare_importer_srcsless_rule_wiring(",

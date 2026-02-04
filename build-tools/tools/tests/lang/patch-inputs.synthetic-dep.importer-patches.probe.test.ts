@@ -41,7 +41,7 @@ test("synthetic_dep_for_importer_patches_from_labels computes stable dep name an
     await fsp.writeFile(
       path.join(pkgDir, "TARGETS"),
       [
-        'load("//lang:defs_common.bzl", "synthetic_dep_for_importer_patches_from_labels_probe")',
+        'load("//build-tools/lang:defs_common.bzl", "synthetic_dep_for_importer_patches_from_labels_probe")',
         "",
         "synthetic_dep_for_importer_patches_from_labels_probe(",
         '  name = "probe_bin",',

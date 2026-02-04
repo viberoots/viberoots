@@ -20,7 +20,7 @@ Scope
 
 High-Level Architecture
 
-- Exporter (`build-tools/tools/buck/exporter/main.ts` + `lang/cpp.ts`) attaches `nixpkg:<attr>` labels to C++ nodes via macros and rule_type.
+- Exporter (`build-tools/tools/buck/exporter/main.ts` + `build-tools/lang/cpp.ts`) attaches `nixpkg:<attr>` labels to C++ nodes via macros and rule_type.
 - Generator (`build-tools/tools/buck/providers/cpp.ts`, invoked via `build-tools/tools/buck/sync-providers.ts --lang=cpp`) scans the exported graph, collects all `nixpkg:<attr>` labels, discovers related overlay/patch/lockfile inputs, and emits one stamped provider per attr.
 - Auto-map (`build-tools/tools/buck/gen-auto-map.ts`) translates `nixpkg:<attr>` labels to concrete provider labels `//third_party/providers:nix_pkgs_<attr_underscored>`.
 - Macros (`build-tools/cpp/defs.bzl`) append providers from `MODULE_PROVIDERS` to all `nix_cpp_*` targets, so per-attr changes invalidate only affected targets.

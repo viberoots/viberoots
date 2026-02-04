@@ -25,7 +25,7 @@ by routing package-local wiring through the same canonical helper used by import
 
 ### Scope & Changes
 
-- Update `lang/package_local_wiring.bzl` to call the canonical helper (`merge_provider_edges(...)`)
+- Update `build-tools/lang/package_local_wiring.bzl` to call the canonical helper (`merge_provider_edges(...)`)
   instead of `realize_provider_edges(...)`.
 - Keep ordering and dedupe behavior identical to current package-local wiring.
 - Keep dict-safe behavior supported for importer-scoped wiring (no behavior change).

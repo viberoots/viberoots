@@ -1,4 +1,4 @@
-load("//lang:importer_strings.bzl", "importer_strings_probe")
+load("//build-tools/lang:importer_strings.bzl", "importer_strings_probe")
 
 # One probe target per representative importer string
 importer_strings_probe(name = "dot", importer = ".")

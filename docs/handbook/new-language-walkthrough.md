@@ -34,10 +34,10 @@ Steps
     - `build-tools/tools/lib/provider-index.ts:readImporterProviderIndexEntriesForSingleImporterLockfileBasenames` (deterministic provider-index enumeration with supported-importer filtering and optional required-module gating)
 
 - **Auto-map wiring**
-  - If your exporter emits labels (e.g., `module:…`), `build-tools/tools/buck/gen-auto-map.ts` will map target → provider name; macros read providers from `MODULE_PROVIDERS` loaded via the stable `//lang:auto_map.bzl` re-export.
+  - If your exporter emits labels (e.g., `module:…`), `build-tools/tools/buck/gen-auto-map.ts` will map target → provider name; macros read providers from `MODULE_PROVIDERS` loaded via the stable `//build-tools/lang:auto_map.bzl` re-export.
 
 - **Macros (Starlark wiring)**
-  - Use `//lang:defs_common.bzl:prepare_language_wiring(...)` as the default macro entrypoint (non-mutating).
+  - Use `//build-tools/lang:defs_common.bzl:prepare_language_wiring(...)` as the default macro entrypoint (non-mutating).
   - For Nix-calling macros, select `wiring = "nix_calling_genrule"` or `wiring = "non_genrule_nix_calling"` so global Nix inputs are wired consistently; do not call `wire_global_nix_inputs(...)` at the call site when using these helpers.
 
 - **Capability gating**

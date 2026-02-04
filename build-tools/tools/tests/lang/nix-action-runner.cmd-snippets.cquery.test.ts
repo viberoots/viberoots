@@ -12,8 +12,8 @@ test("nix_action_runner helpers assemble stable cmd snippets (cquery)", async ()
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
-        'load("//lang:nix_shell.bzl", "escape_buck_cmd_subst")',
-        'load("//lang:nix_action_runner.bzl", "nix_action_shell_prefix_core", "nix_action_export_graph_cmd", "nix_action_build_selected_out_path_cmd")',
+        'load("//build-tools/lang:nix_shell.bzl", "escape_buck_cmd_subst")',
+        'load("//build-tools/lang:nix_action_runner.bzl", "nix_action_shell_prefix_core", "nix_action_export_graph_cmd", "nix_action_build_selected_out_path_cmd")',
         "",
         "genrule(",
         '  name = "probe",',

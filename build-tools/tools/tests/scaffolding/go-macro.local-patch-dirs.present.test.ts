@@ -10,6 +10,6 @@ test("go macros declare local_patch_dirs and include *.patch globs", async () =>
   assert.doesNotMatch(
     txt,
     /include_package_local_patches\(/,
-    "go macros must not call include_package_local_patches directly; use //lang:defs_common.bzl:prepare_language_wiring",
+    "go macros must not call include_package_local_patches directly; use //build-tools/lang:defs_common.bzl:prepare_language_wiring",
   );
 });

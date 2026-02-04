@@ -50,17 +50,17 @@ Rule: do not hand-roll global patch scanning or effective-set patch selection in
 Canonical naming and helpers:
 
 - **Source of truth (TS helpers)**: `build-tools/tools/lib/providers.ts` defines provider naming. Use `providerNameForModuleKey(importPath, version)` for Go module providers and `providerNameForImporter(lockfilePath, importer)` for Node importer‑scoped providers.
-- **Go nixpkgs providers (CGO)**: Go macros do not inject direct provider deps for `nixpkg_deps`. Instead, they attach `nixpkg:<attr>` labels and rely on `MODULE_PROVIDERS` loaded via `//lang:auto_map.bzl` (re-export of `third_party/providers/auto_map.bzl`) to map targets to providers (format: `//third_party/providers:nix_<normalized_attr>`; example: `pkgs.openssl` → `nix_pkgs_openssl`). Do not handcraft names.
+- **Go nixpkgs providers (CGO)**: Go macros do not inject direct provider deps for `nixpkg_deps`. Instead, they attach `nixpkg:<attr>` labels and rely on `MODULE_PROVIDERS` loaded via `//build-tools/lang:auto_map.bzl` (re-export of `third_party/providers/auto_map.bzl`) to map targets to providers (format: `//third_party/providers:nix_<normalized_attr>`; example: `pkgs.openssl` → `nix_pkgs_openssl`). Do not handcraft names.
 - **Stamp‑time normalization (Go)**: Go macros stamp `nixpkg:` labels using the shared helper at stamp‑time (via `append_nixpkg_labels`). This only changes where normalization occurs; behavior and mappings are unchanged because the mapper already normalizes.
 - **nixpkgs attr map**: The unified orchestrator generates `third_party/providers/nix_attr_map.bzl` deterministically; Starlark macros should load from this mapping instead of deriving attrs heuristically.
 - **Patch fixtures**: `build-tools/tools/tests/lib/fixtures/go.ts: ensurePatch()` creates a correctly named patch file for tests.
-- **Starlark nixpkgs stamping (canonical)**: use `lang/defs_common.bzl: append_nixpkg_labels(kwargs, attrs)` to append `nixpkg:<normalized>` labels. Normalization trims, lowercases, ensures the `pkgs.` prefix, and maps `pkgs.gtest` → `pkgs.googletest`. Do not re‑implement label loops in language macros.
+- **Starlark nixpkgs stamping (canonical)**: use `build-tools/lang/defs_common.bzl: append_nixpkg_labels(kwargs, attrs)` to append `nixpkg:<normalized>` labels. Normalization trims, lowercases, ensures the `pkgs.` prefix, and maps `pkgs.gtest` → `pkgs.googletest`. Do not re‑implement label loops in language macros.
 
 #### `nixpkg:` normalization contract (single source of truth)
 
 `nixpkg:` is a cross-language public interface. Normalization must match across:
 
-- Starlark: `lang/nixpkg_labels.bzl:normalize_nix_attr`
+- Starlark: `build-tools/lang/nixpkg_labels.bzl:normalize_nix_attr`
 - TypeScript: `build-tools/tools/lib/providers.ts:normalizeNixAttr`
 - Nix templates: `build-tools/tools/nix/lib/lang-helpers.nix:normalizeNixAttr`
 
@@ -68,7 +68,7 @@ Contract:
 
 - Input is trimmed and lowercased.
 - `pkgs.` prefix is added if missing.
-- Alias mapping is applied (source of truth: `build-tools/tools/lib/nix-attr-aliases.json`; Starlark mirror: `lang/nix_attr_aliases.bzl`).
+- Alias mapping is applied (source of truth: `build-tools/tools/lib/nix-attr-aliases.json`; Starlark mirror: `build-tools/lang/nix_attr_aliases.bzl`).
 - Historical compatibility: `gtest` normalizes to `pkgs.googletest`.
 
 Regression guard:
@@ -87,13 +87,13 @@ Regression guard:
 
 Some macros create planner-visible stub targets for exporter and planner discovery. These stubs are not meant to build, and in some cases they must not depend on provider targets (visibility and graph-shape constraints).
 
-- **Canonical stub rule**: `//lang:planner_stub.bzl:planner_stub` is the only supported mechanism for planner-visible stubs. Do not introduce language-specific stub rules or ad-hoc `genrule` stubs.
-- **Canonical macro helper (preferred)**: `//lang:defs_common.bzl:wire_planner_visible_stub(...)` standardizes the safe defaults:
+- **Canonical stub rule**: `//build-tools/lang:planner_stub.bzl:planner_stub` is the only supported mechanism for planner-visible stubs. Do not introduce language-specific stub rules or ad-hoc `genrule` stubs.
+- **Canonical macro helper (preferred)**: `//build-tools/lang:defs_common.bzl:wire_planner_visible_stub(...)` standardizes the safe defaults:
   - strips provider targets from planner-visible `deps` **by default** (opt out via `strip_providers_from_deps = False`)
   - realizes provider edges into `deps` or **inputs** (i.e., `srcs`) when explicitly requested via `provider_realization_mode = "deps"|"inputs"`
   - attach package-local patch inputs via `planner_stub_with_package_local_patches(...)` (opt-in, when `lang` is provided)
 - **When to include `srcs`**: include `srcs` only when the planner must observe package-local files for discovery or invalidation (for example, a planner-only node that represents a package directory or needs patch file inputs). Prefer `deps` for graph edges; use `srcs` for file-like inputs and the few cases where edges must be realized via `srcs`.
-- **Rule of thumb**: when a macro emits a planner-visible stub, pass planner-visible deps through the shared helper `strip_provider_targets(...)` from `//lang:provider_edges.bzl`.
+- **Rule of thumb**: when a macro emits a planner-visible stub, pass planner-visible deps through the shared helper `strip_provider_targets(...)` from `//build-tools/lang:provider_edges.bzl`.
 - **Canonical helper**: `strip_provider_targets(deps, provider_prefix = "//third_party/providers:")` preserves order, removes only provider targets, and does not try to interpret non-string entries.
 
 ### Shared Nix helpers (lang-helpers)

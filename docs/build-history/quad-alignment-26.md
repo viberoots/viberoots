@@ -16,11 +16,11 @@ As in prior parts, each PR includes the tests and documentation required for the
 
 ### Description
 
-Importer-scoped macros are intended to use one canonical helper surface: `//lang:importer_wiring.bzl`. That helper surface already handles lockfile label enforcement, label stamping, importer derivation, patch inputs, and provider edges.
+Importer-scoped macros are intended to use one canonical helper surface: `//build-tools/lang:importer_wiring.bzl`. That helper surface already handles lockfile label enforcement, label stamping, importer derivation, patch inputs, and provider edges.
 
 There is one recurring leakage point. Some underlying Buck rule shapes cannot accept `srcs` (or cannot accept the attribute we would prefer to use for action inputs). Python `python_binary` is the current example. Today the macro compensates by creating a synthetic dep that carries patch inputs. This is correct but it is call-site knowledge that will be easy to duplicate incorrectly if we add a second “srcs-less” macro later.
 
-This PR makes that “srcs-less rule shape” pattern a first-class helper in `//lang:importer_wiring.bzl`, and then refactors `build-tools/python/defs.bzl:nix_python_binary` to use the shared helper.
+This PR makes that “srcs-less rule shape” pattern a first-class helper in `//build-tools/lang:importer_wiring.bzl`, and then refactors `build-tools/python/defs.bzl:nix_python_binary` to use the shared helper.
 
 Clarification: We do not need to preserve backwards compatibility yet. This PR can change macro call paths and helper surfaces directly, with no intermediate migration steps, no compatibility shims, and no legacy-argument linting.
 
@@ -28,8 +28,8 @@ Clarification: We do not need to preserve backwards compatibility yet. This PR c
 
 This PR changes wiring only. The goal is behavior stability and reduced drift risk.
 
-- Add a new helper in `//lang:importer_wiring.bzl` that:
-  - enforces exactly one importer-scoped lockfile label (delegating to `//lang:lockfile_labels.bzl` via the existing wrapper)
+- Add a new helper in `//build-tools/lang:importer_wiring.bzl` that:
+  - enforces exactly one importer-scoped lockfile label (delegating to `//build-tools/lang:lockfile_labels.bzl` via the existing wrapper)
   - derives the importer
   - creates a synthetic dep that carries importer-local patch inputs as real action inputs
   - returns a struct that includes:
@@ -62,7 +62,7 @@ I will update documentation so the exception case is described in terms of the s
 ### Acceptance Criteria
 
 - `nix_python_binary` no longer hand-assembles importer patch invalidation logic.
-- The srcs-less rule shape helper exists in `//lang:importer_wiring.bzl` and is used by `nix_python_binary`.
+- The srcs-less rule shape helper exists in `//build-tools/lang:importer_wiring.bzl` and is used by `nix_python_binary`.
 - Tests prove importer-local patch invalidation is preserved and lockfile contract failures remain deterministic.
 
 ### Risks
@@ -154,7 +154,7 @@ Implement.
 
 ### Description
 
-Node has a small set of macros that “call Nix” via a genrule-style shell command (for example webapp builds and CLI bundling). These macros correctly use `//lang:nix_shell.bzl` for the core bootstrapping, but they still contain bespoke logic for:
+Node has a small set of macros that “call Nix” via a genrule-style shell command (for example webapp builds and CLI bundling). These macros correctly use `//build-tools/lang:nix_shell.bzl` for the core bootstrapping, but they still contain bespoke logic for:
 
 - sourcing a workspace root environment file (for tests and temp repos)
 - deciding whether to skip unified PNPM store requirements
@@ -162,7 +162,7 @@ Node has a small set of macros that “call Nix” via a genrule-style shell com
 
 This is correct but it concentrates complexity in Node macro files and makes it harder to keep behavior consistent as we evolve the bootstrap contract.
 
-This PR introduces one small helper surface in `//lang:nix_shell.bzl` that standardizes the “workspace-root + flake-root bootstrap” flow used by Node Nix-calling macros, and then refactors the Node macros to use it.
+This PR introduces one small helper surface in `//build-tools/lang:nix_shell.bzl` that standardizes the “workspace-root + flake-root bootstrap” flow used by Node Nix-calling macros, and then refactors the Node macros to use it.
 
 Clarification: We do not need to preserve backwards compatibility yet. This PR should do a direct cutover of the Node macro implementations (no staged rollout, no dual-path code, no transitional flags).
 
@@ -170,7 +170,7 @@ Clarification: We do not need to preserve backwards compatibility yet. This PR s
 
 This PR is macro wiring and shell command assembly only. It does not change provider generation and it does not change label contracts.
 
-- Add a helper in `//lang:nix_shell.bzl` that:
+- Add a helper in `//build-tools/lang:nix_shell.bzl` that:
   - optionally sources `build-tools/tools/buck/workspace-root.env`
   - standardizes how `WORKSPACE_ROOT`, `REPO_ROOT`, and `FLK_ROOT` are derived in a genrule sandbox
   - optionally disables unified store enforcement when the macro’s contract requires it (for example bundling scenarios)
@@ -302,7 +302,7 @@ Clarification: We do not need to preserve backwards compatibility yet. This PR c
 
 This PR is Starlark wiring and contract enforcement only. It does not change provider generation, lockfile label semantics, or patch file naming.
 
-- Add a shared validation helper in `//lang` that:
+- Add a shared validation helper in `//build-tools/lang` that:
   - derives the importer (already provided by existing helpers),
   - compares it against `native.package_name()`,
   - allows only:
@@ -310,8 +310,8 @@ This PR is Starlark wiring and contract enforcement only. It does not change pro
     - importer `apps/<x>` or `libs/<x>` when `native.package_name()` equals that importer,
   - otherwise fails with deterministic error text explaining that importer-local patches cannot cross Buck package boundaries.
 - Apply the validation in the canonical importer-local patch inclusion surfaces so call sites do not need to remember it:
-  - `//lang:patch_inputs.bzl` importer-local patch helpers
-  - `//lang:importer_wiring.bzl` wiring helpers that attach importer-local patch inputs
+  - `//build-tools/lang:patch_inputs.bzl` importer-local patch helpers
+  - `//build-tools/lang:importer_wiring.bzl` wiring helpers that attach importer-local patch inputs
 - Keep Go/C++ package-local patching unchanged (this PR is importer-local only).
 
 ### Tests (in this PR)

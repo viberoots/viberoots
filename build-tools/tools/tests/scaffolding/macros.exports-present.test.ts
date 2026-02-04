@@ -11,7 +11,7 @@ test("build-tools/go/defs.bzl exports nix_go_* macros and uses shared realize_pr
       "def nix_go_binary(",
       "def nix_go_test(",
       // Ensure we are delegating to private helpers (policy lives in go/private)
-      'load("//lang:defs_common.bzl", "normalize_labels", "prepare_language_wiring")',
+      'load("//build-tools/lang:defs_common.bzl", "normalize_labels", "prepare_language_wiring")',
       'load("//build-tools/go/private:cgo_wiring.bzl", "apply_go_rule_stable_defaults", "apply_go_tuple_labels", "configure_cgo_kwargs")',
       "prepare_language_wiring(",
     ];

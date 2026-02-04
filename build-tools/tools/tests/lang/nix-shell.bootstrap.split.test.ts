@@ -12,7 +12,7 @@ test("nix_shell bootstrap split: core is language-agnostic; PNPM store is opt-in
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
-        'load("//lang:nix_shell.bzl", "escape_buck_cmd_subst", "nix_bootstrap_env_core", "nix_bootstrap_env_pnpm_store")',
+        'load("//build-tools/lang:nix_shell.bzl", "escape_buck_cmd_subst", "nix_bootstrap_env_core", "nix_bootstrap_env_pnpm_store")',
         "",
         "genrule(",
         '  name = "core",',

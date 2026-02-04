@@ -1,5 +1,5 @@
-load("//lang:nix_shell.bzl", "nix_build_out_path_cmd", "nix_cmd_prefix")
-load("//lang:nix_action_runner.bzl", "nix_action_build_selected_out_path_cmd")
+load("//build-tools/lang:nix_shell.bzl", "nix_build_out_path_cmd", "nix_cmd_prefix")
+load("//build-tools/lang:nix_action_runner.bzl", "nix_action_build_selected_out_path_cmd")
 
 def _go_nix_build_wasm_impl(ctx):
     """

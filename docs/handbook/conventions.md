@@ -21,7 +21,7 @@ In this repo, I treat Starlark macros as part of the long-lived public surface a
   - Keep a **single deps merge point** per macro:
     - Assemble one `base_deps` list (explicit deps + repo-local extras), then pass it once into the shared wiring helper.
     - After wiring, pass `deps = wiring.deps` exactly once into the underlying rule.
-  - Prefer the shared wiring helpers in `//lang:defs_common.bzl` so patch inputs, provider edges, and global inputs stay consistent across languages.
+  - Prefer the shared wiring helpers in `//build-tools/lang:defs_common.bzl` so patch inputs, provider edges, and global inputs stay consistent across languages.
 
 Here is the intended “shape” for a typical package-local macro. The details are language-specific, but the merge points are stable.
 
@@ -66,7 +66,7 @@ def nix_cpp_wasm_emscripten_lib(name, **kwargs):
   - For Node/PNPM: importer‑local patches live under `<importer>/patches/node/*.patch`; labels use `lockfile:<relative/path/to/pnpm-lock.yaml>#<importer>`.
     - `#.` is allowed only for repo-root lockfiles (example: `lockfile:pnpm-lock.yaml#.`).
     - For non-root lockfiles, `<importer>` must equal `dirname(<path>)` (example: `lockfile:apps/web/pnpm-lock.yaml#apps/web`).
-    - Supported importer labels: defined by `build-tools/tools/lib/importer-roots.json` (rendered to Starlark as `lang/importer_roots.bzl`). Any other importer label is unsupported.
+    - Supported importer labels: defined by `build-tools/tools/lib/importer-roots.json` (rendered to Starlark as `build-tools/lang/importer_roots.bzl`). Any other importer label is unsupported.
   - For C++: canonical flow is per‑target local patches under `<pkg>/patches/cpp/*.patch` (included in target `srcs`). Optional: a repo‑level overlay at `patches/cpp/*.patch` via `build-tools/tools/nix/overlays/cpp-patches.nix`.
   - Buck exporter and generators live under `build-tools/tools/buck/`.
   - Language planner templates live under `build-tools/tools/nix/` (see `lang-templates.nix`).

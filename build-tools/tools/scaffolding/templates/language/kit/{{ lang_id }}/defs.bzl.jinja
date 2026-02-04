@@ -2,7 +2,7 @@
 
 def _providers_for(name):
     MODULE_PROVIDERS = {}
-    load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
+    load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
     pkg = native.package_name()
     key = "//%s:%s" % (pkg, name)
     return MODULE_PROVIDERS.get(key, [])

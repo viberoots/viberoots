@@ -9,7 +9,12 @@ function assert(condition: boolean, message: string) {
 
 test("preferred importer wiring surfaces do not use v2 filenames/import paths", async () => {
   const files = await fg(
-    ["lang/**/*.bzl", "docs/handbook/**/*.md", "abstractions.md", "getting-started-on-a-pr.md"],
+    [
+      "build-tools/lang/**/*.bzl",
+      "docs/handbook/**/*.md",
+      "abstractions.md",
+      "getting-started-on-a-pr.md",
+    ],
     {
       dot: false,
       onlyFiles: true,

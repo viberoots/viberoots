@@ -114,7 +114,7 @@ node_webapp(
 
 - **Responsibilities**
   - Enforce exactly one importer‑scoped lockfile label (`lockfile:<path>#<importer>`).
-  - Stamp labels via `lang/defs_common.bzl` (`lang:node`, `kind:app`).
+  - Stamp labels via `build-tools/lang/defs_common.bzl` (`lang:node`, `kind:app`).
   - Append provider deps from `//third_party/providers:auto_map.bzl` for `//pkg:name`.
 
 - **Build behavior**

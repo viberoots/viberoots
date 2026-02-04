@@ -32,8 +32,8 @@ Then it migrates Node `nix_node_test` to use the single composed helper, so the 
 
 ### Scope & Changes
 
-- Add a new helper in `//lang` (final naming is an implementation detail), for example:
-  - `lang/importer_wiring_v2.bzl:prepare_importer_non_genrule_nix_calling_wiring_v2(...)`
+- Add a new helper in `//build-tools/lang` (final naming is an implementation detail), for example:
+  - `build-tools/lang/importer_wiring_v2.bzl:prepare_importer_non_genrule_nix_calling_wiring_v2(...)`
 - Helper requirements:
   - must be non-mutating at the public boundary, like other v2 helpers
   - must accept:
@@ -196,7 +196,7 @@ This PR strengthens enforcement and standardizes conventions across Starlark mac
 ### Scope & Changes
 
 - Add or extend enforcement tests to fail when:
-  - importer-scoped macros directly load `//lang:lockfile_labels.bzl` (instead of using importer wiring helpers)
+  - importer-scoped macros directly load `//build-tools/lang:lockfile_labels.bzl` (instead of using importer wiring helpers)
   - importer-scoped Nix-calling genrule macros bypass `prepare_importer_nix_calling_genrule_wiring_v2(...)`
   - importer-scoped non-genrule Nix-calling macros bypass the new composed helper introduced in PR‑1
   - dict-safe synthetic key prefixes are hardcoded instead of using the canonical constants

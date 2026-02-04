@@ -17,7 +17,7 @@ I am recording the baseline run list and a root-level inventory snapshot for the
 ## Path-sensitive areas
 
 - Buck `load()` paths in `**/*.bzl`
-- Buck target labels if `//lang` moves
+- Buck target labels if `//build-tools/lang` moves
 - Script paths in `package.json`, `build-tools/tools/bin/*`, `Jenkinsfile`, and `toolchains`
 - Nix paths in `flake.nix` and `build-tools/tools/nix/**`
 - Repo-relative paths embedded in zx scripts under `build-tools/tools/**`
@@ -32,8 +32,8 @@ I am recording the baseline run list and a root-level inventory snapshot for the
 - `node/`
 - `python/`
 - `rust/`
-- `lang/`
-- `build-tools/docs/lang/`
+- `build-tools/lang/`
+- `build-tools/docs/build-tools/lang/`
 
 ### Build-system reference docs to `/build-tools/docs`
 

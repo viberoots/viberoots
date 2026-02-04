@@ -37,8 +37,8 @@ EOF'`;
       [
         "",
         "# test: planner-visible.package-local-wiring.probe.test.ts",
-        'load("//lang:auto_map.bzl", "MODULE_PROVIDERS")',
-        'load("//lang:defs_common.bzl", "wire_package_local_planner_visible_stub")',
+        'load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")',
+        'load("//build-tools/lang:defs_common.bzl", "wire_package_local_planner_visible_stub")',
         "",
         'kw_strip = {"labels": [], "deps": []}',
         "wire_package_local_planner_visible_stub(",
@@ -81,8 +81,8 @@ EOF'`;
       [
         "",
         "# test: planner-visible.package-local-wiring.probe.test.ts",
-        'load("//lang:auto_map.bzl", "MODULE_PROVIDERS")',
-        'load("//lang:defs_common.bzl", "wire_package_local_planner_visible_stub")',
+        'load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")',
+        'load("//build-tools/lang:defs_common.bzl", "wire_package_local_planner_visible_stub")',
         "",
         'kw_strip_go = {"labels": [], "deps": []}',
         "wire_package_local_planner_visible_stub(",

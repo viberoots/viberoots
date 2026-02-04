@@ -30,12 +30,12 @@ If the language can support C interop, I must provide a documented and tested pa
 
 ### Shared wiring and contracts (current repo)
 
-Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:language_wiring.bzl`. Macro call sites should not re‑implement wiring or load provider maps directly.
+Use the canonical helper surface from `//build-tools/lang:defs_common.bzl` and `//build-tools/lang:language_wiring.bzl`. Macro call sites should not re‑implement wiring or load provider maps directly.
 
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
-- Provider wiring: load `MODULE_PROVIDERS` from `//lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
+- Provider wiring: load `MODULE_PROVIDERS` from `//build-tools/lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
 - Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
-- Patch model contract: `lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
+- Patch model contract: `build-tools/lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
 
 ---
@@ -54,7 +54,7 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 - Patches live under `patches/lua/` (flat; no subdirectories). Naming: `<rockName>@<version>.patch`.
 - Nix language templates: `build-tools/tools/nix/templates/lua.nix` (consumed by `build-tools/tools/nix/lang-templates.nix`).
 - Planner registry: Lua plugged into the planner via a small registry entry (see Planner Integration).
-- Buck macros: `lua/defs.bzl`, using `lang/defs_common.bzl` for stamping and `//lang:auto_map.bzl` for providers.
+- Buck macros: `lua/defs.bzl`, using `build-tools/lang/defs_common.bzl` for stamping and `//build-tools/lang:auto_map.bzl` for providers.
 - Provider sync: `third_party/providers/TARGETS.lua.auto` is generated, never hand-edited.
 
 ---
@@ -147,10 +147,10 @@ Exporter severity remains strict in CI and warn-only locally, consistent with ex
 
 - Provide `nix_lua_binary`, `nix_lua_library`, and `nix_lua_test` mirroring Go macros:
   - Stamp labels: `lang:lua`, `kind:bin|lib|test`, and the importer-scoped lockfile label.
-  - Append providers from `//lang:auto_map.bzl` using `MODULE_PROVIDERS["//pkg:name"]`.
+  - Append providers from `//build-tools/lang:auto_map.bzl` using `MODULE_PROVIDERS["//pkg:name"]`.
   - Forward attrs that affect configuration (e.g., entrypoint scripts, `lockfile`, `lua_version`).
 
-Use `lang/defs_common.bzl` helpers for stamping. Error UX and glue presence are handled by `build-tools/tools/buck/prebuild-guard.ts`.
+Use `build-tools/lang/defs_common.bzl` helpers for stamping. Error UX and glue presence are handled by `build-tools/tools/buck/prebuild-guard.ts`.
 
 ---
 

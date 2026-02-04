@@ -1,6 +1,6 @@
 # Implicit Lockfile Labels for Node Macros
 
-This document proposes a small, deterministic change to the Node macro surface so callers do not need to manually compute lockfile labels. It follows the design principles in `build-tools/docs/build-system-design.md` and the PNPM design in `build-tools/docs/lang/pnpm-design.md`.
+This document proposes a small, deterministic change to the Node macro surface so callers do not need to manually compute lockfile labels. It follows the design principles in `build-tools/docs/build-system-design.md` and the PNPM design in `build-tools/docs/build-tools/lang/pnpm-design.md`.
 
 I keep the behavior explicit and deterministic. I do not add filesystem scans or nearest-lockfile deduction. The default is derived from the Buck package path and fails fast if the lockfile is missing.
 
@@ -36,7 +36,7 @@ The macro continues to allow an explicit `lockfile_label` override.
 ### Rationale
 
 - Determinism: `native.package_name()` is stable and unambiguous.
-- Consistency: matches the per‑importer lockfile model in `build-tools/docs/lang/pnpm-design.md`.
+- Consistency: matches the per‑importer lockfile model in `build-tools/docs/build-tools/lang/pnpm-design.md`.
 - Predictability: no filesystem scanning and no label guessing.
 - Failure mode: missing lockfile fails fast with a targeted error.
 
@@ -60,7 +60,7 @@ No new macro parameters. This preserves current call sites and allows the conven
 
 ### Files and Responsibilities
 
-- `//lang:defs_common.bzl`
+- `//build-tools/lang:defs_common.bzl`
   - Add a helper to compute default lockfile label from `native.package_name()`.
   - Add a helper to validate lockfile existence when the default is used.
 - `//build-tools/node:defs_core.bzl`
@@ -167,15 +167,15 @@ Introduce a convention-based default lockfile label for `nix_node_gen`, `nix_nod
 
 #### Scope & Changes
 
-- Add helper in `//lang:defs_common.bzl`:
+- Add helper in `//build-tools/lang:defs_common.bzl`:
   - `default_lockfile_label_from_package()` returns `lockfile:<pkg>/<default-lockfile>#<pkg>`.
-  - The default lockfile basename is defined by `lang/lockfile_contracts.bzl` (node: `pnpm-lock.yaml`).
+  - The default lockfile basename is defined by `build-tools/lang/lockfile_contracts.bzl` (node: `pnpm-lock.yaml`).
   - `ensure_default_lockfile_exists(path)` validates the file exists.
 - Update `//build-tools/node:defs_core.bzl` to:
   - derive a default when `lockfile_label` is omitted
   - validate the default lockfile exists
   - preserve the existing enforcement of exactly one lockfile label
-- Update `build-tools/docs/lang/pnpm-design.md`:
+- Update `build-tools/docs/build-tools/lang/pnpm-design.md`:
   - document the default label convention
   - note the fast-fail on missing lockfile
 
@@ -221,7 +221,7 @@ Apply the same defaulting behavior to Nix-calling Node macros (`node_webapp` and
 
 #### Scope & Changes
 
-- Reuse the shared defaulting helper from `//lang:defs_common.bzl`.
+- Reuse the shared defaulting helper from `//build-tools/lang:defs_common.bzl`.
 - Update `//build-tools/node:defs_nix.bzl`:
   - derive a default lockfile label when omitted
   - validate the default lockfile exists
@@ -284,7 +284,7 @@ Add a deterministic enforcement mechanism that keeps Node workspace dependencies
     - `node build-tools/tools/buck/enforce-node-deps.ts --fix`
 - Update `build-tools/tools/buck/prebuild-guard.ts` to call `node build-tools/tools/buck/enforce-node-deps.ts --check` in CI.
 - Update `docs/handbook/node-macros.md` to describe the enforcement and the `--fix` workflow.
-- Update `build-tools/docs/lang/pnpm-design.md` with the high-level rule: `package.json` is the source of truth, Buck `deps` must match.
+- Update `build-tools/docs/build-tools/lang/pnpm-design.md` with the high-level rule: `package.json` is the source of truth, Buck `deps` must match.
 
 #### Tests (in this PR)
 

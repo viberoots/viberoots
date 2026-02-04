@@ -76,7 +76,7 @@ This PR makes the following changes:
   - `libs/`
   - `docs/build-history/`
   - `build-tools/docs/`
-  - `build-tools/docs/lang/`
+  - `build-tools/docs/build-tools/lang/`
 - Add a short note in `docs/handbook/tooling.md` describing the new top-level layout and intent.
 
 ### Tests (in this PR)

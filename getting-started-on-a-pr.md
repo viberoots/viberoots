@@ -13,7 +13,7 @@ This guide helps a new contributor land any PR in this plan successfully, follow
 - Optional: run our startup check if present (prints clear hints):
   - `node build-tools/tools/dev/startup-check.ts`
 
-Note on Python lockfiles: The initial Python rollout is uv‑only. Poetry/pip‑tools are out of scope unless/until a future PR adds them. See `build-tools/docs/lang/python-design.md` (PR‑17) for details.
+Note on Python lockfiles: The initial Python rollout is uv‑only. Poetry/pip‑tools are out of scope unless/until a future PR adds them. See `build-tools/docs/build-tools/lang/python-design.md` (PR‑17) for details.
 Python provider sync activation in sparse/partial clones is lockfile‑driven: the presence of an `uv.lock` under `apps/*` or `libs/*` enables Python providers.
 
 ### 2. Project rules you must follow
@@ -28,7 +28,7 @@ Python provider sync activation in sparse/partial clones is lockfile‑driven: t
   - Use `build-tools/tools/lib/cli.ts` for CLI parsing (no bespoke `process.argv` parsing).
   - Use `build-tools/tools/lib/node-run.ts` (`runNodeWithZx`) when one tool invokes another zx script.
 - Nix attr alias source of truth: `build-tools/tools/lib/nix-attr-aliases.json`. Starlark mirror is generated (dev/test-time) via:
-  - `node build-tools/tools/dev/gen-nix-attr-aliases-bzl.ts` → writes `lang/nix_attr_aliases.bzl`. A stub exists and runtime does not depend on generation; behavior is unchanged for current aliases.
+  - `node build-tools/tools/dev/gen-nix-attr-aliases-bzl.ts` → writes `build-tools/lang/nix_attr_aliases.bzl`. A stub exists and runtime does not depend on generation; behavior is unchanged for current aliases.
 
 ### 3. Commands cheat sheet
 

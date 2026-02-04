@@ -28,7 +28,7 @@ This PR tightens the abstraction by shifting those defaults into shared helper s
 ### Scope & Changes
 
 - Update the shared helper surface for planner-visible stubs:
-  - Extend `//lang:planner_visible_wiring.bzl` and/or `//lang:planner_stub.bzl` wrappers so the default behavior for planner-visible stubs is:
+  - Extend `//build-tools/lang:planner_visible_wiring.bzl` and/or `//build-tools/lang:planner_stub.bzl` wrappers so the default behavior for planner-visible stubs is:
     - strip provider targets from `deps` unless explicitly requested
     - keep provider realization mode explicit as a small vocabulary (for example `"deps"` vs `"inputs"`) rather than leaking `"deps"` vs `"srcs"` string choices into call sites
 - Refactor existing call sites to rely on the new defaults:
@@ -89,14 +89,14 @@ This is a drift surface. If we ever need to adjust prefix naming (or add a third
 
 ### Scope & Changes
 
-- Introduce a single canonical definition of dict-safe key prefixes in Starlark, exposed via `//lang:defs_common.bzl` so call sites and helpers import it rather than restating strings.
+- Introduce a single canonical definition of dict-safe key prefixes in Starlark, exposed via `//build-tools/lang:defs_common.bzl` so call sites and helpers import it rather than restating strings.
   - Example approach (exact location can vary):
-    - `//lang:dict_inputs.bzl` exports `PATCH_INPUTS_KEY_PREFIX` and `PROVIDER_EDGES_KEY_PREFIX`
-    - `//lang:defs_common.bzl` re-exports them
+    - `//build-tools/lang:dict_inputs.bzl` exports `PATCH_INPUTS_KEY_PREFIX` and `PROVIDER_EDGES_KEY_PREFIX`
+    - `//build-tools/lang:defs_common.bzl` re-exports them
 - Refactor helper implementations to use the constants:
-  - `//lang:importer_wiring.bzl`
-  - `//lang:patch_inputs.bzl`
-  - `//lang:nix_calling_importer_genrule_wiring.bzl` (if it forwards prefixes)
+  - `//build-tools/lang:importer_wiring.bzl`
+  - `//build-tools/lang:patch_inputs.bzl`
+  - `//build-tools/lang:nix_calling_importer_genrule_wiring.bzl` (if it forwards prefixes)
 - Cleanup/standardization across call sites:
   - Remove any remaining literal uses of these prefixes in language macro files.
 
@@ -116,7 +116,7 @@ Non-goals in this PR:
 
 - Update `abstractions.md`:
   - document the canonical prefix constants and the rule: “do not hardcode synthetic key prefixes”
-- Update any macro wiring cookbook pages to show usage through `//lang:defs_common.bzl` exports.
+- Update any macro wiring cookbook pages to show usage through `//build-tools/lang:defs_common.bzl` exports.
 
 ### Acceptance Criteria
 
@@ -155,7 +155,7 @@ This PR extracts the shared Node Nix-calling command assembly into a reusable he
 ### Scope & Changes
 
 - Add a shared command assembly helper:
-  - Prefer placing it under `//lang:nix_shell.bzl` or `//lang:nix_action_runner.bzl` so it is available cross-language where applicable.
+  - Prefer placing it under `//build-tools/lang:nix_shell.bzl` or `//build-tools/lang:nix_action_runner.bzl` so it is available cross-language where applicable.
   - The helper should:
     - standardize root derivation (`WORKSPACE_ROOT` / `FLK_ROOT`) and workspace-root env sourcing
     - standardize how `nix build --no-link --print-out-paths` is invoked and captured

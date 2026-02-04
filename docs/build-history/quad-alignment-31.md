@@ -85,7 +85,7 @@ Implement.
 
 ### Description
 
-We have a patch model contract (`build-tools/tools/lib/lang-contracts.ts` and `lang/lang_contracts.bzl`) that drives tooling messaging and enables consistent reasoning about invalidation. However, it does not fully describe the behavior we already depend on:
+We have a patch model contract (`build-tools/tools/lib/lang-contracts.ts` and `build-tools/lang/lang_contracts.bzl`) that drives tooling messaging and enables consistent reasoning about invalidation. However, it does not fully describe the behavior we already depend on:
 
 - Node uses importer-local patches and can also include a global patch dir when patches match the importer effective set.
 - Python provider sync has strict and non-strict parsing modes, which changes failure behavior.
@@ -230,7 +230,7 @@ This PR adds explicit parity tests for importer support rules so changes to impo
 
 ### Scope & Changes
 
-- Add a small Starlark probe surface (under `//lang`) that classifies importer labels as supported or unsupported using the macro-side rules.
+- Add a small Starlark probe surface (under `//build-tools/lang`) that classifies importer labels as supported or unsupported using the macro-side rules.
 - Add a TypeScript parity test that:
   - runs the Starlark probe for a matrix of importer labels
   - compares results against `build-tools/tools/lib/importers.ts:isSupportedImporterLabel`

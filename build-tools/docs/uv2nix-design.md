@@ -68,7 +68,7 @@
 
 - Fix `build-tools/python/defs.bzl`:
   - Add missing `load("@prelude//:rules.bzl", "genrule")`.
-  - Add missing `dedupe_preserve` import from `//lang:defs_common.bzl`.
+  - Add missing `dedupe_preserve` import from `//build-tools/lang:defs_common.bzl`.
   - Acceptance: macros parse and WASM stamp rules (`nix_python_wasm_app/lib`) instantiate in Buck without load errors.
 
 ### Patching Workflow
@@ -119,7 +119,7 @@
 
 - Changes:
   - Add `load("@prelude//:rules.bzl", "genrule")`.
-  - Add `dedupe_preserve` to the `//lang:defs_common.bzl` load.
+  - Add `dedupe_preserve` to the `//build-tools/lang:defs_common.bzl` load.
   - Keep all macro semantics identical.
 - Tests (zx, one‑test‑per‑file):
   - “python.macros.parse-and-stamp.test.ts”: load a minimal `TARGETS` with `nix_python_wasm_app/lib` and confirm graph export succeeds.

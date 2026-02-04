@@ -13,20 +13,20 @@ This section is a quick index of “don’t re-implement this” utilities. Most
 - Importer-scoped lockfile discovery uses `build-tools/tools/lib/importers.ts:findNearestLockfileForPackage(...)`. Patch tooling must not hand-roll upward directory walks for `uv.lock` or `pnpm-lock.yaml`.
 - Workspace-based patch handlers (Go and Python) share the control flow in `build-tools/tools/patch/lib/workspace-workflow.ts` (session reuse, no-op cleanup, patch verification, and consistent messages).
 - Avoid bespoke implementations; this keeps behavior consistent across Go/C++/Node/Python.
-- Default package-local patch directory selection is centralized in Starlark via `//lang:defs_common.bzl: default_package_patch_dirs(lang)`. Go/C++ macros use this helper instead of hard‑coded strings (e.g., `["patches/go"]`).
+- Default package-local patch directory selection is centralized in Starlark via `//build-tools/lang:defs_common.bzl: default_package_patch_dirs(lang)`. Go/C++ macros use this helper instead of hard‑coded strings (e.g., `["patches/go"]`).
 - Flat patch directory checks use `build-tools/tools/lib/provider-sync.ts: validateFlatDir()`; locally it warns, and in CI (or with `--strict`) it fails.
 - Go/Node/Python patch linting shares one core implementation for flat-dir scanning, filename-shape validation, and duplicate detection: `build-tools/tools/dev/patches-lint/flat-patch-dir-lint.ts`. This keeps codes and messages consistent across languages.
 - C++ extraction/workspace setup uses the common permission normalizer `build-tools/tools/patch/cross-platform.ts: chmodRecursive` to guarantee writable workspaces without affecting diffs.
-- Node and Python macros include importer‑local patch files in `srcs` via the unified helper `//lang:defs_common.bzl:prepare_language_wiring(...)`. Importer is derived from a single `lockfile:<path>#<importer>` label (enforced by `ensure_single_lockfile_label(...)`).
+- Node and Python macros include importer‑local patch files in `srcs` via the unified helper `//build-tools/lang:defs_common.bzl:prepare_language_wiring(...)`. Importer is derived from a single `lockfile:<path>#<importer>` label (enforced by `ensure_single_lockfile_label(...)`).
   - Labels must include the `#<importer>` suffix and contain **exactly one** `#`; malformed labels fail fast with deterministic error text.
   - Lockfile path normalization: any number of repeated leading `./` segments are stripped (example: `lockfile:././apps/web/pnpm-lock.yaml#apps/web` is treated as `lockfile:apps/web/pnpm-lock.yaml#apps/web`).
   - Importer-dir consistency:
     - `#.` is allowed only for repo-root lockfiles (example: `lockfile:pnpm-lock.yaml#.`).
     - For non-root lockfiles, `<importer>` must equal the directory that contains `<path>` (example: `lockfile:apps/web/pnpm-lock.yaml#apps/web`).
-  - Supported importer labels: defined by the single contract artifact `build-tools/tools/lib/importer-roots.json` (rendered to Starlark as `lang/importer_roots.bzl`). Any other importer label fails early during macro evaluation with deterministic error text.
-  - To support additional importer roots, update **only** `build-tools/tools/lib/importer-roots.json`, then run glue generation (for example `i` or `node build-tools/tools/buck/glue-pipeline.ts`) so `lang/importer_roots.bzl` is regenerated. The parity/enforcement tests will fail if the generated view is stale.
-- Patch inputs are attached through `//lang:patch_inputs.bzl` helpers. When a rule does not support `srcs`, call sites must choose a supported input attribute explicitly using `into = "<attr>"` or carry patch inputs via a small helper target.
-  - For importer-scoped ecosystems (Node, Python), macro wiring is standardized via the unified helper surface re-exported from `//lang:defs_common.bzl`:
+  - Supported importer labels: defined by the single contract artifact `build-tools/tools/lib/importer-roots.json` (rendered to Starlark as `build-tools/lang/importer_roots.bzl`). Any other importer label fails early during macro evaluation with deterministic error text.
+  - To support additional importer roots, update **only** `build-tools/tools/lib/importer-roots.json`, then run glue generation (for example `i` or `node build-tools/tools/buck/glue-pipeline.ts`) so `build-tools/lang/importer_roots.bzl` is regenerated. The parity/enforcement tests will fail if the generated view is stale.
+- Patch inputs are attached through `//build-tools/lang:patch_inputs.bzl` helpers. When a rule does not support `srcs`, call sites must choose a supported input attribute explicitly using `into = "<attr>"` or carry patch inputs via a small helper target.
+  - For importer-scoped ecosystems (Node, Python), macro wiring is standardized via the unified helper surface re-exported from `//build-tools/lang:defs_common.bzl`:
     - `prepare_language_wiring(...)` with `wiring = "genrule"` for genrule-style wrappers (handles list vs dict `srcs`)
     - `prepare_language_wiring(...)` with `wiring = "non_genrule"` for non-genrule wrappers (returns `importer`, prepared `kwargs`, and provider-wired `deps`)
     - `prepare_language_wiring(...)` with `wiring = "srcsless_rule"` for rule shapes that cannot accept `srcs` (synthetic dep carries patch inputs)
@@ -77,7 +77,7 @@ For Go/C++, apply does not run glue. For Node and Python, provider sync and auto
 
 This repo supports two patch invalidation strategies. Treat this as a cross-language contract and keep it consistent across:
 
-- **Starlark**: `//lang:lang_contracts.bzl`
+- **Starlark**: `//build-tools/lang:lang_contracts.bzl`
 - **TypeScript**: `build-tools/tools/lib/lang-contracts.ts`
 
 ### package-local
@@ -208,7 +208,7 @@ node build-tools/tools/dev/patches-lint.ts --lang python
   - Patches live under `<importer>/patches/python/*.patch` (e.g., `apps/api/patches/python/...`).
   - Changing a patch only invalidates Python targets bound to that importer.
 - `nix_python_binary` cannot carry patches via `srcs` (Buck prelude `python_binary` does not accept `srcs`). Instead it uses `prepare_language_wiring(..., wiring = "srcsless_rule")` to create a synthetic dep that carries importer‑local patches as real action inputs (`resources`) and adds that dep to `deps`, so patch edits deterministically invalidate the binary.
-- Lockfile label enforcement and parsing are centralized in Starlark. For importer-scoped macros, **do not** parse lockfile labels directly; route through the canonical helper surface in `//lang:defs_common.bzl`:
+- Lockfile label enforcement and parsing are centralized in Starlark. For importer-scoped macros, **do not** parse lockfile labels directly; route through the canonical helper surface in `//build-tools/lang:defs_common.bzl`:
   - Prefer `prepare_language_wiring(...)` with `wiring = "non_genrule"` for non-genrule wrappers (Python `nix_python_library`, `nix_python_test`, `nix_python_wasm_*`)
   - Prefer `prepare_language_wiring(...)` with `wiring = "genrule"` for genrule-style wrappers (`nix_node_gen`, similar shims).
   - Implementation note: the unified helper encapsulates `ensure_single_lockfile_label(...)` and patch-input attachment (`include_importer_patches_from_labels(...)`) so error text, normalization, and list/dict input handling stay consistent across Node and Python.
@@ -227,12 +227,12 @@ Quick checks and guidance:
   - Patches live under `<importer>/patches/node/*.patch` (e.g., `apps/web/patches/node/...`).
   - Changing a patch only invalidates Node targets bound to that importer.
 - Some Node genrule shims pass dict-shaped `srcs` mappings (dest → source) for deterministic in-action paths. In that mode, macros still carry importer-local patches and provider-edge inputs without changing the user mapping semantics:
-  - Patch files are attached by adding synthetic dict entries under `__patch_inputs__/...` with a stable key derived from a canonical sanitizer (see `//lang:sanitize.bzl:sanitize_name`). Collisions are resolved deterministically with a `__<n>` suffix.
+  - Patch files are attached by adding synthetic dict entries under `__patch_inputs__/...` with a stable key derived from a canonical sanitizer (see `//build-tools/lang:sanitize.bzl:sanitize_name`). Collisions are resolved deterministically with a `__<n>` suffix.
   - Provider deps are attached by adding synthetic dict entries under `__provider_edges__/...` using the same sanitizer and collision contract.
-  - The canonical prefix strings are defined once in `//lang:dict_inputs.bzl` (`PATCH_INPUTS_KEY_PREFIX`, `PROVIDER_EDGES_KEY_PREFIX`) and re-exported via `//lang:defs_common.bzl`. Do not hardcode these strings in macros or helpers.
+  - The canonical prefix strings are defined once in `//build-tools/lang:dict_inputs.bzl` (`PATCH_INPUTS_KEY_PREFIX`, `PROVIDER_EDGES_KEY_PREFIX`) and re-exported via `//build-tools/lang:defs_common.bzl`. Do not hardcode these strings in macros or helpers.
 - Provider stamps for Node are importer‑scoped and do not reference patch files as `srcs` (see Provider sync cookbook below); correctness comes from macro‑side `srcs` inclusion.
-- Lockfile label enforcement and parsing are centralized: macros call `ensure_single_lockfile_label(...)` and then attach importer-local patch files using the shared `//lang:patch_inputs.bzl` helpers:
-  - Implementation note: Node macros use `//lang:defs_common.bzl:prepare_language_wiring(...)` to standardize the wiring sequence:
+- Lockfile label enforcement and parsing are centralized: macros call `ensure_single_lockfile_label(...)` and then attach importer-local patch files using the shared `//build-tools/lang:patch_inputs.bzl` helpers:
+  - Implementation note: Node macros use `//build-tools/lang:defs_common.bzl:prepare_language_wiring(...)` to standardize the wiring sequence:
     - enforce exactly one importer-scoped lockfile label
     - attach importer-local patch files as inputs (list and dict shapes)
     - realize provider edges deterministically
@@ -420,5 +420,5 @@ Notes:
 - No glue is required for C++; package‑local patch files are included in `srcs` and passed to the Nix C++ derivations.
 - `nix_cpp_test(...)` is a split macro (planner-visible stub + executed runner). The planner-visible stub target (`<name>__planner`) also carries package-local `patches/cpp/*.patch` files as real inputs via `srcs`, so patch edits invalidate the planner boundary precisely.
 - If your C++ targets link against Go C archives, that integration is handled by the planner/templates and requires no special steps in this workflow.
-- C++ macros now use the shared nixpkgs label helper (`append_nixpkg_labels` from `lang/defs_common.bzl`) for stamping `nixpkg:` labels. This change only removes duplication; behavior and exported graphs are unchanged.
+- C++ macros now use the shared nixpkgs label helper (`append_nixpkg_labels` from `build-tools/lang/defs_common.bzl`) for stamping `nixpkg:` labels. This change only removes duplication; behavior and exported graphs are unchanged.
 - Alternative (overlay, opt‑in): You can also manage C++ patches globally under `patches/cpp/*.patch` via the nix overlay entry‑point; see `docs/cpp/overlays.md` for details. The overlay is disabled by default; local patching remains the canonical workflow.

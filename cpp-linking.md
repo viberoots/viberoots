@@ -781,7 +781,7 @@ Both designs need a tiny, deterministic “link closure” resolver:
 Candidate placements:
 
 - **Nix side**: `build-tools/tools/nix/planner/link-closure.nix` that both `build-tools/tools/nix/planner/cpp.nix` and `build-tools/tools/nix/planner/go.nix` can import.
-- **Starlark side**: `//lang:defs_common.bzl` helper that:
+- **Starlark side**: `//build-tools/lang:defs_common.bzl` helper that:
   - merges `deps/link_deps/header_deps` deterministically
   - validates `link_closure_overrides` keys are present in `link_deps`
 

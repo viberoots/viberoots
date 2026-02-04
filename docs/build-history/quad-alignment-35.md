@@ -245,7 +245,7 @@ This PR adds enforcement tests and small cleanups to make these bypasses fail qu
 ### Scope & Changes
 
 - Add or extend enforcement tests that fail when:
-  - importer-scoped macros directly load `//lang:lockfile_labels.bzl` instead of delegating through the shared wiring helpers
+  - importer-scoped macros directly load `//build-tools/lang:lockfile_labels.bzl` instead of delegating through the shared wiring helpers
   - importer-scoped Nix-calling genrule macros bypass `prepare_importer_nix_calling_genrule_wiring(...)`
   - Nix-calling macros do not attach `global_nix_inputs()` as real action inputs where required by the macro contract
   - dict-safe wiring uses ad-hoc key prefixes rather than the canonical constants

@@ -1,10 +1,10 @@
 load(
-    "//lang:defs_common.bzl",
+    "//build-tools/lang:defs_common.bzl",
     "merge_link_intent_deps",
     "prepare_language_wiring",
     "validate_link_closure_overrides",
 )
-load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
+load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
 load("//build-tools/python:pyext_stub.bzl", "python_pyext_stub")
 
 _BACKEND_LABELS = ["backend:wasi", "backend:pyodide"]

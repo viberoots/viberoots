@@ -17,7 +17,7 @@ await runInTemp("importer-wiring-non-mutating-probe", async (tmp, $) => {
   await fsp.writeFile(
     path.join(appDir, "TARGETS"),
     [
-      'load("//lang:importer_wiring_probe.bzl", "importer_wiring_mutation_probe")',
+      'load("//build-tools/lang:importer_wiring_probe.bzl", "importer_wiring_mutation_probe")',
       "",
       "importer_wiring_mutation_probe(",
       '  name = "probe",',

@@ -2,14 +2,14 @@
 
 This installment follows Part 23. Part 23 established most of the shared helper surfaces I want to rely on going forward:
 
-- `//lang:nix_calling_macros.bzl:wire_global_nix_inputs(...)` for “macro calls Nix” global inputs wiring.
-- `//lang:importer_wiring.bzl:prepare_importer_genrule_kwargs(...)` and `prepare_importer_non_genrule_wiring(...)` for importer-scoped wiring.
-- `//lang:defs_common.bzl:wire_planner_visible_stub(...)` and `wire_planner_visible_inputs(...)` for planner-visible stubs and “providers into srcs” shims.
+- `//build-tools/lang:nix_calling_macros.bzl:wire_global_nix_inputs(...)` for “macro calls Nix” global inputs wiring.
+- `//build-tools/lang:importer_wiring.bzl:prepare_importer_genrule_kwargs(...)` and `prepare_importer_non_genrule_wiring(...)` for importer-scoped wiring.
+- `//build-tools/lang:defs_common.bzl:wire_planner_visible_stub(...)` and `wire_planner_visible_inputs(...)` for planner-visible stubs and “providers into srcs” shims.
 
 In Part 24 I focus on the remaining seams I still see in the codebase after parity work:
 
 - Node macros that call Nix still hand-assemble importer-scoped wiring (lockfile enforcement, importer derivation) in `build-tools/node/defs_nix.bzl` instead of using the shared helper surface.
-- Node macros that call Nix still hand-assemble the “bootstrap + timeout + nix build out-path” command prefix sequence. The primitives exist in `//lang:nix_shell.bzl`, but the final “compose a safe cmd string” pattern is still duplicated.
+- Node macros that call Nix still hand-assemble the “bootstrap + timeout + nix build out-path” command prefix sequence. The primitives exist in `//build-tools/lang:nix_shell.bzl`, but the final “compose a safe cmd string” pattern is still duplicated.
 
 As in prior parts, each PR includes the tests and documentation required for the change. There are no PRs dedicated solely to tests or docs.
 
@@ -62,7 +62,7 @@ I will update the docs where users are pointed at the Node Nix macros so they re
 
 - `docs/handbook/node-macros.md`:
   - note that `build-tools/node/defs_nix.bzl` uses the shared importer wiring helper (non-genrule path)
-  - point at `//lang:importer_wiring.bzl` for the canonical contract text and error behavior
+  - point at `//build-tools/lang:importer_wiring.bzl` for the canonical contract text and error behavior
 - `docs/handbook/macro-stamping-cookbook.md`:
   - add a short section under Node describing that Nix-calling macros still use importer-scoped wiring helpers (and that lockfile label enforcement is not optional)
 
@@ -97,7 +97,7 @@ Implement.
 
 ### Description
 
-`//lang:nix_shell.bzl` provides primitives (bootstrap env, timeout wrapper, command-substitution escaping, and `nix build --no-link --print-out-paths` capture). Today, each macro that shells out to Nix still composes these primitives manually into a `cmd` string.
+`//build-tools/lang:nix_shell.bzl` provides primitives (bootstrap env, timeout wrapper, command-substitution escaping, and `nix build --no-link --print-out-paths` capture). Today, each macro that shells out to Nix still composes these primitives manually into a `cmd` string.
 
 This is correct, but it is easy to partially apply. I can forget to:
 
@@ -110,7 +110,7 @@ This PR introduces a small helper surface in Starlark that returns a safe, reusa
 
 ### Scope & Changes
 
-- Add a small helper (new file under `//lang`, or extend `//lang:nix_shell.bzl`) that:
+- Add a small helper (new file under `//build-tools/lang`, or extend `//build-tools/lang:nix_shell.bzl`) that:
   - provides a canonical “prefix” for Nix-calling macros:
     - bootstraps `WORKSPACE_ROOT` / `FLK_ROOT` deterministically
     - optionally bootstraps unified PNPM store env

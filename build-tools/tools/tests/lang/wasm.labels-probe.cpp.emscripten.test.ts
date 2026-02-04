@@ -5,14 +5,14 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("labels-probe: cpp emscripten stamps lang/kind/variant", async () => {
+test("labels-probe: cpp emscripten stamps build-tools/lang/kind/variant", async () => {
   await runInTemp("probe-cpp-ems", async (tmp, $) => {
     const dir = path.join(tmp, "tests", "labels");
     await fs.mkdirp(dir);
     await fs.writeFile(
       path.join(dir, "TARGETS"),
       [
-        'load("//lang:defs_common.bzl", "wasm_labels_probe")',
+        'load("//build-tools/lang:defs_common.bzl", "wasm_labels_probe")',
         "",
         "wasm_labels_probe(",
         '  name = "cpp_ems",',

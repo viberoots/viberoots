@@ -76,7 +76,7 @@ See also: `getting-started-on-a-pr.md` for a practical, step-by-step guide (env,
 
 4. Macros (`//build-tools/cpp/defs.bzl`):
    - Thin wrappers around `cxx_*` that:
-     - Stamp `lang:cpp` + `kind:*` via `lang/defs_common.bzl#stamp_labels`
+     - Stamp `lang:cpp` + `kind:*` via `build-tools/lang/defs_common.bzl#stamp_labels`
      - Append `MODULE_PROVIDERS` deps (noop for v1 if we have no provider mapping)
 
 5. Provider sync & auto-map:
@@ -339,7 +339,7 @@ Error handling
 Pseudocode (sketch)
 
 ```ts
-const adapters = loadPresentAdapters(); // discovered from lang/*.ts
+const adapters = loadPresentAdapters(); // discovered from build-tools/lang/*.ts
 const active = adapters
   .filter((a) => nodes.some(a.isNode))
   .sort((a, b) => a.name.localeCompare(b.name));
@@ -400,7 +400,7 @@ Design
   - Loads:
     ```starlark
     load("@prelude//cxx:cxx.bzl", "cxx_library", "cxx_binary", "cxx_test")
-    load("//lang:defs_common.bzl", "stamp_labels", "merge_labels")
+    load("//build-tools/lang:defs_common.bzl", "stamp_labels", "merge_labels")
     ```
   - Each macro is a simple wrapper that:
     - Accepts the same kwargs as its underlying `cxx_*` rule plus optional pass-throughs (`includes`, `defines`, `cflags`, `ldflags`).
@@ -412,7 +412,7 @@ Design
     ```starlark
     # build-tools/cpp/defs.bzl
     load("@prelude//cxx:cxx.bzl", "cxx_library", "cxx_binary", "cxx_test")
-    load("//lang:defs_common.bzl", "stamp_labels")
+    load("//build-tools/lang:defs_common.bzl", "stamp_labels")
 
     def _providers_for(name):
         MODULE_PROVIDERS = {}

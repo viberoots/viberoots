@@ -64,14 +64,14 @@ This report includes:
 
 Parity with Node:
 
-- C++ ExternalRunner tests now reuse `nix_bootstrap_env_core()` and the external timeout wrapper from `//lang:nix_shell.bzl` (default 10 minutes), matching Node test behavior.
+- C++ ExternalRunner tests now reuse `nix_bootstrap_env_core()` and the external timeout wrapper from `//build-tools/lang:nix_shell.bzl` (default 10 minutes), matching Node test behavior.
 
 ## Nix-executing runner boilerplate (shared)
 
 Rules and macros that execute `nix build` or `nix run` inside Buck actions must assemble their shell via shared helpers:
 
-- `//lang:nix_shell.bzl`: workspace and flake root bootstrap, timeout wrapper primitives.
-- `//lang:nix_action_runner.bzl`: common “runner” snippets (graph export, build-selected out path parsing, optional workspace-root injection).
+- `//build-tools/lang:nix_shell.bzl`: workspace and flake root bootstrap, timeout wrapper primitives.
+- `//build-tools/lang:nix_action_runner.bzl`: common “runner” snippets (graph export, build-selected out path parsing, optional workspace-root injection).
 
 Do not copy/paste shell fragments between languages. If you need to change the bootstrap or the build-selected invocation contract, update the shared helper and add or extend a cquery probe test under `build-tools/tools/tests/lang/`.
 

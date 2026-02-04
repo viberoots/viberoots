@@ -64,7 +64,7 @@ Some target types need to separate “general build deps” from “linking inte
   - ordering must be deterministic (stable first-occurrence order; no sorting)
 - **`link_closure_overrides` validation**: when a macro accepts per-dep closure overrides, each override key must appear in `link_deps` (fail fast otherwise).
 
-Canonical shared Starlark helpers for this contract live under `//lang` and are re-exported from `//lang:defs_common.bzl`:
+Canonical shared Starlark helpers for this contract live under `//build-tools/lang` and are re-exported from `//build-tools/lang:defs_common.bzl`:
 
 - `merge_link_intent_deps(deps, link_deps, header_deps)`
 - `validate_link_closure_overrides(link_deps, link_closure_overrides)`
@@ -104,9 +104,9 @@ extra-experimental-features = nix-command flakes dynamic-derivations ca-derivati
 1. **Patching UX:** One **outer** command: `patch-pkg <subcommand> <language> …` that **delegates** to language-specific scripts (e.g., `patch-go.ts`).
    - Echo snippet mode: pass `--echo-snippet` or set the global `PATCH_ECHO_SNIPPET=1|true` to print a standardized export snippet (stderr) instead of mutating process-local env. The message format is unified across languages and includes the reminder: “Unset before CI: unset <ENV_NAME>”.
 1. **Idempotent patches:** Re-applying the **same** patch must **not** cause rebuilds.
-1. **Sanitization (names/attrs):** All Starlark macros should use `//lang:sanitize.bzl:sanitize_name` for artifact and attribute names. The Nix side mirrors this transform in `build-tools/tools/nix/lib/lang-helpers.nix:sanitizeName`. TypeScript tooling must not hand-roll this contract; use `build-tools/tools/lib/sanitize.ts:sanitizeName` so callsites stay drift-free.
-   - **Nix “target label → attr suffix” mapping**: the canonical contract lives in `build-tools/tools/lib/labels.ts:sanitizeAttrNameFromLabel` and `//lang:nix_attr.bzl:sanitize_nix_attr_from_target_label`. If this mapping changes, update both and keep `build-tools/tools/tests/labels/nix-attr-sanitize.parity.test.ts` passing.
-1. **Global inputs policy (PR‑5):** Treat repository‑level global inputs (e.g., `flake.lock`) primarily at the builder/Nix level. Macros must not hardcode `//:flake.lock`. When a macro directly calls Nix, wire global inputs through `//lang:defs_common.bzl:wire_global_nix_inputs(...)` (implemented in `//lang:nix_calling_macros.bzl` and backed by `//lang:global_inputs.bzl:global_nix_inputs()`).
+1. **Sanitization (names/attrs):** All Starlark macros should use `//build-tools/lang:sanitize.bzl:sanitize_name` for artifact and attribute names. The Nix side mirrors this transform in `build-tools/tools/nix/lib/lang-helpers.nix:sanitizeName`. TypeScript tooling must not hand-roll this contract; use `build-tools/tools/lib/sanitize.ts:sanitizeName` so callsites stay drift-free.
+   - **Nix “target label → attr suffix” mapping**: the canonical contract lives in `build-tools/tools/lib/labels.ts:sanitizeAttrNameFromLabel` and `//build-tools/lang:nix_attr.bzl:sanitize_nix_attr_from_target_label`. If this mapping changes, update both and keep `build-tools/tools/tests/labels/nix-attr-sanitize.parity.test.ts` passing.
+1. **Global inputs policy (PR‑5):** Treat repository‑level global inputs (e.g., `flake.lock`) primarily at the builder/Nix level. Macros must not hardcode `//:flake.lock`. When a macro directly calls Nix, wire global inputs through `//build-tools/lang:defs_common.bzl:wire_global_nix_inputs(...)` (implemented in `//build-tools/lang:nix_calling_macros.bzl` and backed by `//build-tools/lang:global_inputs.bzl:global_nix_inputs()`).
    - Node alignment (PR‑2): We stamp `global_nix_inputs()` only in Node macros that directly call Nix (`node_webapp`, `nix_node_cli_bin(bundle=True)`). Non‑Nix macros remain unstamped at the macro level.
 1. **Scaffolding:** When you add new target types, **update/augment** the existing scaffolding tools in `build-tools/tools/` (don’t invent new scaffolding).
 1. **Platforms:** Everything must work on at least **aarch64-darwin**, **aarch64-linux**, and **x86_64-linux**.
@@ -129,22 +129,22 @@ extra-experimental-features = nix-command flakes dynamic-derivations ca-derivati
    - `build-tools/tools/nix/uv2nix-overlays.nix` validates overlays and prepares the overlay arguments
    - `build-tools/tools/nix/uv2nix-env.nix` builds the uv2nix environment and lockfile source wrapper
      Cleanup: keep only wiring and validation in the wrapper, and move normalization logic to the helper modules.
-   - Language-specific helper placement: `//lang:defs_common.bzl` is language‑agnostic. Go‑specific tuple label helpers (`normalize_build_tags`, `append_tuple_labels`) live in `//build-tools/go/private:labels.bzl` and are loaded by Go macros.
+   - Language-specific helper placement: `//build-tools/lang:defs_common.bzl` is language‑agnostic. Go‑specific tuple label helpers (`normalize_build_tags`, `append_tuple_labels`) live in `//build-tools/go/private:labels.bzl` and are loaded by Go macros.
    - Shared helper error text is argument‑agnostic for reuse across call‑sites. For example, `normalize_labels(...)` reports generic “labels must be a list of string labels”; macros should add parameter context at the call‑site if a named argument is relevant to users.
-   - WASM stamps: use `//lang:defs_common.bzl:stamp_wasm_variant(kwargs, "<lang>", "<variant>")` to append `lang:<lang>`, `kind:wasm`, and `wasm:<variant>` uniformly across C++/Go/Python macros.
+   - WASM stamps: use `//build-tools/lang:defs_common.bzl:stamp_wasm_variant(kwargs, "<lang>", "<variant>")` to append `lang:<lang>`, `kind:wasm`, and `wasm:<variant>` uniformly across C++/Go/Python macros.
    - Note: For discoverability only, `build-tools/tools/nix/lang-templates.nix` exposes a `Node` symbol bag (forwarded from `build-tools/tools/nix/templates/node.nix`). The planner’s Node plugin remains authoritative; no consumers rely on this symbol bag.
    - For a concrete Node→C++ addon scaffold and artifact flow, see `node-call-cpp.md`.
 
-- Node macros that call Nix must use the standardized helper surface in `//lang:nix_shell.bzl` for genrule-style command assembly (e.g., `node_webapp`, bundled `nix_node_cli_bin`).
+- Node macros that call Nix must use the standardized helper surface in `//build-tools/lang:nix_shell.bzl` for genrule-style command assembly (e.g., `node_webapp`, bundled `nix_node_cli_bin`).
   - Use `nix_calling_genrule_bootstrap(...)` to standardize `WORKSPACE_ROOT`/`REPO_ROOT`/`FLK_ROOT` derivation and optional `build-tools/tools/buck/workspace-root.env` sourcing (for temp repos and sandboxed actions).
   - Use `nix_calling_genrule_nix_build_out_path_prefix(...)` (or `nix_build_out_path_cmd(...)`) for the canonical “nix build + capture out path” structure.
   - `nix_bootstrap_env_pnpm_store()` is Node-specific and opt-in (unified PNPM store setup / env exports).
-- For **importer-scoped, Nix-calling genrule-style** macros, use the shared wiring helper `//lang:defs_common.bzl:prepare_language_wiring(...)` with `wiring = "nix_calling_genrule"` to compose lockfile enforcement, label stamping, importer-local patch inputs, provider-edge realization into action inputs, standardized `build-tools/tools/buck/workspace-root.env` injection for dict-shaped `srcs`, and `global_nix_inputs()` wiring without mutating call-site dicts.
+- For **importer-scoped, Nix-calling genrule-style** macros, use the shared wiring helper `//build-tools/lang:defs_common.bzl:prepare_language_wiring(...)` with `wiring = "nix_calling_genrule"` to compose lockfile enforcement, label stamping, importer-local patch inputs, provider-edge realization into action inputs, standardized `build-tools/tools/buck/workspace-root.env` injection for dict-shaped `srcs`, and `global_nix_inputs()` wiring without mutating call-site dicts.
 
-- No out‑links: when assembling shell commands that invoke Nix, use `nix build --no-link --print-out-paths` and capture the last printed path (e.g., `outPath=$$($TIMEOUT nix build ... --no-link --print-out-paths | tail -n1)`). Do not use `--out-link` to avoid creating GC roots and stale symlinks. Macro callsites must assemble this through the canonical helper surface in `//lang:nix_shell.bzl` (`nix_cmd_prefix`, `nix_build_out_path_cmd`) rather than re-implementing it.
+- No out‑links: when assembling shell commands that invoke Nix, use `nix build --no-link --print-out-paths` and capture the last printed path (e.g., `outPath=$$($TIMEOUT nix build ... --no-link --print-out-paths | tail -n1)`). Do not use `--out-link` to avoid creating GC roots and stale symlinks. Macro callsites must assemble this through the canonical helper surface in `//build-tools/lang:nix_shell.bzl` (`nix_cmd_prefix`, `nix_build_out_path_cmd`) rather than re-implementing it.
   - For Node macros, prefer the higher-level helpers (`nix_calling_genrule_bootstrap`, `nix_calling_genrule_nix_build_out_path_prefix`) so call sites don't partially apply the policy.
 - Rule implementations that call Nix (for example, action-runner rules that assemble `bash -c` command strings) must follow the same policy:
-  - use the shared helper surface (`//lang:nix_shell.bzl` and `//lang:nix_action_runner.bzl`) for command assembly and out path capture
+  - use the shared helper surface (`//build-tools/lang:nix_shell.bzl` and `//build-tools/lang:nix_action_runner.bzl`) for command assembly and out path capture
   - do not hand-roll `OUT_PATH=$$(...)` capture flows
   - do not mask failures (no `|| true` in Nix build flows)
   - diagnostics may be best-effort, but must be structured so the build/capture path remains unambiguously strict (prefer explicit existence checks like `if [ -f ... ]; then ...; fi` over `cmd || true`)
@@ -918,7 +918,7 @@ When adding **new** Go targets (libs or apps):
 
 > **Purpose:** Map targets to provider rules so that only targets that actually consume a patched module (or a lockfile provider) get invalidated.
 
-This file is generated by `build-tools/tools/buck/gen-auto-map.ts`. Buck macros should load `MODULE_PROVIDERS` via the canonical re-export `//lang:auto_map.bzl` (do not load `//third_party/providers/auto_map.bzl` directly). Do not edit by hand.
+This file is generated by `build-tools/tools/buck/gen-auto-map.ts`. Buck macros should load `MODULE_PROVIDERS` via the canonical re-export `//build-tools/lang:auto_map.bzl` (do not load `//third_party/providers/auto_map.bzl` directly). Do not edit by hand.
 
 #### Generator Script `build-tools/tools/buck/gen-auto-map.ts` (zx/TypeScript)
 
@@ -1228,7 +1228,7 @@ As of PR‑3 in `quad-alignment-6.md`, the historical `go_module_patch(...)` pro
 
 ### Provider-edge realization helper (PR‑4)
 
-- Use `//lang:defs_common.bzl:merge_provider_edges(name, deps, into="deps"|"srcs", base, dict_safe)` as the canonical macro wiring entry point.
+- Use `//build-tools/lang:defs_common.bzl:merge_provider_edges(name, deps, into="deps"|"srcs", base, dict_safe)` as the canonical macro wiring entry point.
   `realize_provider_edges(...)` remains the lower-level helper that `merge_provider_edges(...)` uses internally.
   - `base` may be either:
     - a list (common): returns the merged list
@@ -1236,19 +1236,19 @@ As of PR‑3 in `quad-alignment-6.md`, the historical `go_module_patch(...)` pro
 - For most macros, merge into `deps`: `deps = merge_provider_edges(name, deps, MODULE_PROVIDERS = MODULE_PROVIDERS)`.
 - For genrule-style shims that don’t accept `deps` (e.g., Node `nix_node_gen`, Go `nix_go_carchive`), merge into `srcs`: `srcs = merge_provider_edges(name, srcs + deps, into = "srcs", MODULE_PROVIDERS = MODULE_PROVIDERS)`.
 - This replaces ad‑hoc `providers_for(...) + dedupe_preserve(...)` patterns and keeps behavior stable across languages.
-- **Preferred stub/shim entrypoint**: for planner-visible stubs and “providers into inputs” shims, prefer `//lang:defs_common.bzl:wire_planner_visible_inputs(...)` and `wire_planner_visible_stub(...)` so call sites don’t re-learn the same edge cases.
+- **Preferred stub/shim entrypoint**: for planner-visible stubs and “providers into inputs” shims, prefer `//build-tools/lang:defs_common.bzl:wire_planner_visible_inputs(...)` and `wire_planner_visible_stub(...)` so call sites don’t re-learn the same edge cases.
 
 ### Planner-visible stub contract (PR‑2)
 
 Some macros must produce a **planner-visible** node without building a normal artifact (for example, C++ Emscripten `.js` + `.wasm` bundles, or other non-standard shapes). These targets still participate in invalidation and planner discovery.
 
-- **Canonical rule**: use `//lang:planner_stub.bzl:planner_stub`. Do not introduce ad-hoc `genrule` stubs.
+- **Canonical rule**: use `//build-tools/lang:planner_stub.bzl:planner_stub`. Do not introduce ad-hoc `genrule` stubs.
 - **Contract**: a planner-visible stub should carry:
   - **labels**: routing labels for exporter/planner
   - **graph edges**: `deps` (and provider edges realized deterministically via `merge_provider_edges(...)` unless intentionally filtered)
   - **patch inputs**: include package-local patch files as explicit inputs when patches drive invalidation for that target
-- **Pattern**: if the stub can accept `srcs`, prefer the shared wrapper `//lang:planner_stub.bzl:planner_stub_with_package_local_patches(...)` to attach patch inputs without changing the stub’s artifact shape.
-- **Canonical macro-level surface (preferred)**: `//lang:defs_common.bzl:wire_planner_visible_stub(...)` composes the above patterns (optional patch inputs, explicit provider-edge realization into `"deps"` vs `"inputs"`, and **default provider stripping from planner-visible deps**) so planner-visible call sites stay uniform.
+- **Pattern**: if the stub can accept `srcs`, prefer the shared wrapper `//build-tools/lang:planner_stub.bzl:planner_stub_with_package_local_patches(...)` to attach patch inputs without changing the stub’s artifact shape.
+- **Canonical macro-level surface (preferred)**: `//build-tools/lang:defs_common.bzl:wire_planner_visible_stub(...)` composes the above patterns (optional patch inputs, explicit provider-edge realization into `"deps"` vs `"inputs"`, and **default provider stripping from planner-visible deps**) so planner-visible call sites stay uniform.
 
 ### `//build-tools/go/defs.bzl` macros (copy‑pasteable)
 
@@ -1262,7 +1262,7 @@ def _providers_for(name):
     # Mapping is generated; guard its presence via prebuild-guard in CI/local.
     # Macro-level loads cannot easily provide friendly errors without try/except.
     MODULE_PROVIDERS = {}
-    load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
+    load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
     pkg = native.package_name()
     key = "//%s:%s" % (pkg, name)
     return MODULE_PROVIDERS.get(key, [])

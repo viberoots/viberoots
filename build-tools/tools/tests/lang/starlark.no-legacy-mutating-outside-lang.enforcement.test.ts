@@ -23,7 +23,7 @@ async function listBzlFilesUnder(rootDir: string, relDir = ""): Promise<string[]
   return out;
 }
 
-test("no legacy mutating wiring helpers are referenced outside //lang/*", async () => {
+test("no legacy mutating wiring helpers are referenced outside //build-tools/lang/*", async () => {
   const rootDir = process.cwd();
   const bzlFiles = await listBzlFilesUnder(rootDir);
 
@@ -32,7 +32,7 @@ test("no legacy mutating wiring helpers are referenced outside //lang/*", async 
     const txt = await fsp.readFile(file, "utf8");
     assert.ok(
       !txt.includes("_legacy_mutating"),
-      `${file} must not reference *_legacy_mutating helpers; use //lang shared wiring helpers instead`,
+      `${file} must not reference *_legacy_mutating helpers; use //build-tools/lang shared wiring helpers instead`,
     );
   }
 });

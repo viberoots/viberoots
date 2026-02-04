@@ -35,7 +35,7 @@ When you add or change a macro, keep the wiring table-driven through shared help
     - This helper is non-mutating at the call-site boundary. Do not rely on helper-side mutation ordering; use the returned prepared `kwargs` for the underlying rule.
   - For planner-visible package-local WASM stubs, use `wire_package_local_wasm_planner_visible_stub(...)`.
 - **Dict-shaped `srcs`** (when wiring patches/providers/global inputs into dict-safe keys)
-  - Do not hardcode reserved synthetic key prefixes. Import `PATCH_INPUTS_KEY_PREFIX`, `PROVIDER_EDGES_KEY_PREFIX`, `GLOBAL_NIX_INPUTS_KEY_PREFIX` from `//lang:defs_common.bzl`.
+  - Do not hardcode reserved synthetic key prefixes. Import `PATCH_INPUTS_KEY_PREFIX`, `PROVIDER_EDGES_KEY_PREFIX`, `GLOBAL_NIX_INPUTS_KEY_PREFIX` from `//build-tools/lang:defs_common.bzl`.
   - Guardrails:
     - `build-tools/tools/tests/lang/dict-inputs.synthetic-prefixes.no-literals.enforcement.test.ts`
 
@@ -43,7 +43,7 @@ When you add or change a macro, keep the wiring table-driven through shared help
 
 - Templates: `build-tools/tools/nix/templates/<lang>.nix` consumed by `build-tools/tools/nix/lang-templates.nix`
 - Planner registry entry: `LANGS.<lang>` inside the planner (dispatch predicates + mkApp/mkLib)
-- Macros: thin Starlark wrappers using `lang/defs_common.bzl` helpers
+- Macros: thin Starlark wrappers using `build-tools/lang/defs_common.bzl` helpers
 - Provider sync (optional): implement your generator under `build-tools/tools/buck/providers/<lang>.ts` (scans `patches/<lang>` and writes `TARGETS.<lang>.auto` deterministically). Provider sync is invoked through the unified orchestrator `build-tools/tools/buck/sync-providers.ts` (for example `node build-tools/tools/buck/sync-providers.ts --lang <lang> --no-glue`).
 - Scaffolding templates: `build-tools/tools/scaffolding/templates/<lang>/...` + language registry entry
 - Tests: zx tests using `build-tools/tools/tests/lib/lang-fixtures.ts`
@@ -77,7 +77,7 @@ For importer-scoped ecosystems, we try hard to keep “how we find lockfiles” 
   - `build-tools/tools/lib/provider-writer.ts` — emits deterministic importer‑scoped provider TARGETS and synchronizes the curated auto‑managed section. Pass your computed `{ lockfile, importer, patchPaths }` entries plus the rule load/name.
     - Prefer the convenience wrapper `writeImporterProvidersByLang(...)`, which is table‑driven via a small registry. To add a new importer‑scoped ecosystem, extend that registry instead of adding per‑language conditionals.
 
-- Starlark (`lang/defs_common.bzl`):
+- Starlark (`build-tools/lang/defs_common.bzl`):
 
   When authoring a **package-local patching macro** (Go/C++ style), avoid re-assembling the “patch dirs + nixpkg deps + labels + providers” sequence by hand. Use the shared helper so defaults and tolerance rules don’t drift across languages.
   - `prepare_language_wiring(...)` (default for new macros)
@@ -91,8 +91,8 @@ For importer-scoped ecosystems, we try hard to keep “how we find lockfiles” 
 
 ```python
 load("@prelude//:rules.bzl", "genrule")
-load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
-load("//lang:defs_common.bzl", "prepare_language_wiring")
+load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
+load("//build-tools/lang:defs_common.bzl", "prepare_language_wiring")
 
 def my_pkg_local_rule(name, **kwargs):
     deps = kwargs.pop("deps", [])
@@ -136,8 +136,8 @@ Rule: new package-local planner-visible stub call sites must use the non-mutatin
   - Macros: use `nix_python_{library,binary,test}` from `build-tools/python/defs.bzl` and pass `lockfile_label` explicitly.
     - Do not pass `lockfile:` labels through `labels`; importer identity is derived from `lockfile_label` and macros require exactly one lockfile label.
   - Macro wiring: importer-scoped wiring is centralized via:
-    - Prefer `//lang:defs_common.bzl:prepare_language_wiring(...)` with `wiring = "non_genrule"` for `nix_python_library`, `nix_python_test`, and `nix_python_wasm_*` (non-mutating).
-    - Prefer `//lang:defs_common.bzl:prepare_language_wiring(...)` with `wiring = "srcsless_rule"` for rule shapes that cannot accept `srcs` (example: prelude `python_binary`).
+    - Prefer `//build-tools/lang:defs_common.bzl:prepare_language_wiring(...)` with `wiring = "non_genrule"` for `nix_python_library`, `nix_python_test`, and `nix_python_wasm_*` (non-mutating).
+    - Prefer `//build-tools/lang:defs_common.bzl:prepare_language_wiring(...)` with `wiring = "srcsless_rule"` for rule shapes that cannot accept `srcs` (example: prelude `python_binary`).
 - Scaffolding:
   - `scaf new python lib <name>` → `libs/<name>` with `pyproject.toml`, `uv.lock`, `TARGETS` using `nix_python_library` and a sample test via `nix_python_test`.
   - `scaf new python app <name>` → `apps/<name>` with a small library and binary (`nix_python_binary`) and importer‑scoped `lockfile_label`.
@@ -149,11 +149,11 @@ Rule: new package-local planner-visible stub call sites must use the non-mutatin
 
 Tip for lockfile-style ecosystems (e.g., Node/PNPM):
 
-Use the shared helpers from `lang/defs_common.bzl` so call sites do not reassemble wiring details:
+Use the shared helpers from `build-tools/lang/defs_common.bzl` so call sites do not reassemble wiring details:
 
 - Supported importer labels are a cross-language contract surface. The importer string must be:
   - defined by `build-tools/tools/lib/importer-roots.json` (single source of truth)
-  - rendered to Starlark as `lang/importer_roots.bzl`
+  - rendered to Starlark as `build-tools/lang/importer_roots.bzl`
 
 If you need to change supported importer roots, update `build-tools/tools/lib/importer-roots.json` and re-run glue generation (for example via `i` or `node build-tools/tools/buck/glue-pipeline.ts`). The parity/enforcement tests will fail if the generated Starlark view is stale.
 
@@ -166,13 +166,13 @@ If you need to change supported importer roots, update `build-tools/tools/lib/im
     - `PATCH_INPUTS_KEY_PREFIX`
     - `PROVIDER_EDGES_KEY_PREFIX`
     - `GLOBAL_NIX_INPUTS_KEY_PREFIX`
-      from `//lang:defs_common.bzl`.
+      from `//build-tools/lang:defs_common.bzl`.
 
 Minimal example (dict-shaped `srcs`):
 
 ```python
 load("@prelude//:rules.bzl", "genrule")
-load("//lang:defs_common.bzl", "prepare_language_wiring")
+load("//build-tools/lang:defs_common.bzl", "prepare_language_wiring")
 
 def my_importer_nix_genrule(name, lockfile_label = None):
     # Dict-shaped srcs: preserve caller mapping, and allow shared helper to attach
@@ -207,7 +207,7 @@ Importer-local patch attachment uses `native.glob(...)`, which cannot reach acro
 
 - Patches live under `patches/<lang>/` (flat directory).
 - Nix templates live under `build-tools/tools/nix/templates/<lang>.nix` and are imported by `build-tools/tools/nix/lang-templates.nix`.
-- Language macros live under `<lang>/defs.bzl` and load provider mappings via the stable `//lang:auto_map.bzl` re-export.
+- Language macros live under `<lang>/defs.bzl` and load provider mappings via the stable `//build-tools/lang:auto_map.bzl` re-export.
 - Provider rules live under `//third_party/providers/**` and are generated, not hand-edited.
 
 ## Step-by-step
@@ -251,10 +251,10 @@ Importer-local patch attachment uses `native.glob(...)`, which cannot reach acro
 
 6. Macros
 
-- Add `<lang>/defs.bzl` using `lang/defs_common.bzl` helpers to:
+- Add `<lang>/defs.bzl` using `build-tools/lang/defs_common.bzl` helpers to:
   - Stamp labels (`lang:<id>`, `kind:<bin|lib|test>`) on primary targets
   - Auto-wire tests per your language conventions
-  - Append providers from `MODULE_PROVIDERS` loaded via `//lang:auto_map.bzl` (do not load `//third_party/providers:auto_map.bzl` directly)
+  - Append providers from `MODULE_PROVIDERS` loaded via `//build-tools/lang:auto_map.bzl` (do not load `//third_party/providers:auto_map.bzl` directly)
 
 Stamping belongs in the macro. If your macro synthesizes helper targets (for example `*_test`), keep stamping in the macro implementation rather than repeating `labels = ["lang:<id>", "kind:<kind>"]` at call sites.
 
@@ -271,7 +271,7 @@ Stamping belongs in the macro. If your macro synthesizes helper targets (for exa
   - Provider sync determinism and duplicate detection
   - Auto-map wiring correctness for your labels
   - Macros stamp labels and auto-wire tests correctly
-  - Importer-scoped macros do not bypass shared wiring helpers (enforcement tests should fail if a macro directly parses lockfile labels instead of routing through `//lang:importer_wiring.bzl`)
+  - Importer-scoped macros do not bypass shared wiring helpers (enforcement tests should fail if a macro directly parses lockfile labels instead of routing through `//build-tools/lang:importer_wiring.bzl`)
 
 ## CI and glue
 
@@ -286,7 +286,7 @@ Stamping belongs in the macro. If your macro synthesizes helper targets (for exa
 
 - Go implementation in this repo:
   - `build-tools/tools/nix/templates/go.nix`
-  - `build-tools/go/defs.bzl`, `build-tools/go/private/auto_tests.bzl`, and `lang/defs_common.bzl`
+  - `build-tools/go/defs.bzl`, `build-tools/go/private/auto_tests.bzl`, and `build-tools/lang/defs_common.bzl`
   - `build-tools/tools/buck/providers/go.ts` and `build-tools/tools/buck/providers/index.ts`
   - Node provider generator: `build-tools/tools/buck/providers/node.ts` (invoked by `build-tools/tools/buck/sync-providers.ts`)
   - `build-tools/tools/buck/gen-auto-map.ts`

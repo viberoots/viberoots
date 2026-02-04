@@ -9,7 +9,7 @@ async function readUtf8(p: string): Promise<string> {
 
 test("importer roots are not hardcoded in TS/Starlark implementations", async () => {
   const ts = await readUtf8("build-tools/tools/lib/importers.ts");
-  const bzl = await readUtf8("lang/lockfile_labels.bzl");
+  const bzl = await readUtf8("build-tools/lang/lockfile_labels.bzl");
 
   // TS: previously hardcoded in a single regex; must now be derived from importer-roots contract.
   assert.ok(
@@ -20,10 +20,10 @@ test("importer roots are not hardcoded in TS/Starlark implementations", async ()
   // Starlark: previously hardcoded via startswith checks.
   assert.ok(
     !bzl.includes('startswith("apps/")'),
-    "lang/lockfile_labels.bzl must not hardcode apps/ importer roots",
+    "build-tools/lang/lockfile_labels.bzl must not hardcode apps/ importer roots",
   );
   assert.ok(
     !bzl.includes('startswith("libs/")'),
-    "lang/lockfile_labels.bzl must not hardcode libs/ importer roots",
+    "build-tools/lang/lockfile_labels.bzl must not hardcode libs/ importer roots",
   );
 });

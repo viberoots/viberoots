@@ -2,7 +2,7 @@
 
 This installment follows Part 15. It focuses on the remaining small leaks and duplication that are still present after we reached feature parity across C++, Go, PNPM (Node), and Python.
 
-The theme here is “keep the public macro surfaces boring.” When a language macro is forced to special-case behavior due to a Buck rule API shape, I want that workaround centralized as a shared `//lang` helper and protected by a focused probe or macro regression test.
+The theme here is “keep the public macro surfaces boring.” When a language macro is forced to special-case behavior due to a Buck rule API shape, I want that workaround centralized as a shared `//build-tools/lang` helper and protected by a focused probe or macro regression test.
 
 Each PR below includes its own tests and documentation updates. There are no PRs dedicated solely to testing or documentation.
 
@@ -64,7 +64,7 @@ Implement.
 
 ---
 
-## PR‑2: Add a shared `//lang` helper for “attach patch inputs via synthetic dep” when a rule cannot carry inputs directly
+## PR‑2: Add a shared `//build-tools/lang` helper for “attach patch inputs via synthetic dep” when a rule cannot carry inputs directly
 
 ### Description
 
@@ -74,8 +74,8 @@ This pattern is correct but it is not centralized. If a second language hits the
 
 ### Scope & Changes
 
-- Introduce a small shared helper under `//lang` for the “synthetic dep carries patch inputs” pattern. I will keep it narrowly scoped:
-  - It must create a deterministic helper target name derived from the parent target name (via `//lang:sanitize.bzl:sanitize_name`).
+- Introduce a small shared helper under `//build-tools/lang` for the “synthetic dep carries patch inputs” pattern. I will keep it narrowly scoped:
+  - It must create a deterministic helper target name derived from the parent target name (via `//build-tools/lang:sanitize.bzl:sanitize_name`).
   - It must attach patch inputs from labels (importer-scoped) into a caller-provided attribute name (for Python, this is `resources` on the synthetic `python_library`).
   - It must return the dep label (e.g., `":<synthetic_name>"`) so call-sites can append it deterministically.
 - Refactor `build-tools/python/defs.bzl:nix_python_binary` to use the shared helper rather than an inline copy of the pattern.
@@ -92,7 +92,7 @@ This pattern is correct but it is not centralized. If a second language hits the
 
 - Update the Python macro documentation to describe:
   - why the synthetic dep exists
-  - that the pattern is standardized via a shared `//lang` helper
+  - that the pattern is standardized via a shared `//build-tools/lang` helper
 
 ### Acceptance Criteria
 
@@ -116,11 +116,11 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `//lang` and `//build-tools/python` plus a narrow test. Safe in thin slices that include those packages.
+- Touches `//build-tools/lang` and `//build-tools/python` plus a narrow test. Safe in thin slices that include those packages.
 
 ---
 
-## PR‑3: Hide `//third_party/providers:auto_map.bzl` behind a stable `//lang` re-export
+## PR‑3: Hide `//third_party/providers:auto_map.bzl` behind a stable `//build-tools/lang` re-export
 
 ### Description
 
@@ -130,8 +130,8 @@ This is a small leak. It makes “providers file layout changes” cross-cutting
 
 ### Scope & Changes
 
-- Add a small `//lang` module (example: `lang/auto_map.bzl`) that re-exports `MODULE_PROVIDERS` from `//third_party/providers:auto_map.bzl`.
-- Update language macro entrypoints to load `MODULE_PROVIDERS` via the `//lang` re-export:
+- Add a small `//build-tools/lang` module (example: `build-tools/lang/auto_map.bzl`) that re-exports `MODULE_PROVIDERS` from `//third_party/providers:auto_map.bzl`.
+- Update language macro entrypoints to load `MODULE_PROVIDERS` via the `//build-tools/lang` re-export:
   - `build-tools/go/defs.bzl`
   - `build-tools/node/defs_core.bzl`
   - `build-tools/cpp/defs.bzl`
@@ -140,18 +140,18 @@ This is a small leak. It makes “providers file layout changes” cross-cutting
 
 ### Tests (in this PR)
 
-- Add a minimal Starlark probe that loads `//lang:auto_map.bzl` and asserts `realize_provider_edges(...)` behavior is unchanged when the mapping is supplied via the re-export.
+- Add a minimal Starlark probe that loads `//build-tools/lang:auto_map.bzl` and asserts `realize_provider_edges(...)` behavior is unchanged when the mapping is supplied via the re-export.
 - Extend one macro regression test (pick one language) that indirectly depends on provider wiring so the PR proves “call-sites still work” end-to-end.
 
 ### Docs (in this PR)
 
 - Update the macro handbook documentation to state:
   - macros must not load `//third_party/providers:auto_map.bzl` directly
-  - the stable entrypoint for provider mappings is `//lang:auto_map.bzl`
+  - the stable entrypoint for provider mappings is `//build-tools/lang:auto_map.bzl`
 
 ### Acceptance Criteria
 
-- All language macro entrypoints load provider mappings via `//lang:auto_map.bzl`.
+- All language macro entrypoints load provider mappings via `//build-tools/lang:auto_map.bzl`.
 - No behavior change in provider edge realization or invalidation.
 
 ### Risks
@@ -172,7 +172,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `//lang` and each language’s macro entrypoint. Safe for typical slices that include those entrypoints.
+- Touches `//build-tools/lang` and each language’s macro entrypoint. Safe for typical slices that include those entrypoints.
 
 ---
 
@@ -192,7 +192,7 @@ This is duplication. It is also the most likely source of future drift once we k
 
 ### Scope & Changes
 
-- Add a shared `//lang` helper module for importer-scoped macro wiring (example: `lang/importer_wiring.bzl`):
+- Add a shared `//build-tools/lang` helper module for importer-scoped macro wiring (example: `build-tools/lang/importer_wiring.bzl`):
   - Provide small functions that do one thing and preserve shape:
     - `require_single_importer_lockfile_label(kwargs, lockfile_label)`
     - `attach_importer_patch_inputs(kwargs, lang, into, dict_safe, key_prefix)`
@@ -240,29 +240,29 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `//lang`, `//build-tools/node`, and `//build-tools/python`, plus narrow tests. Safe in slices that include Node and Python.
+- Touches `//build-tools/lang`, `//build-tools/node`, and `//build-tools/python`, plus narrow tests. Safe in slices that include Node and Python.
 
 ---
 
-## PR‑5: Close the remaining provider re-export gap by routing Rust macro entrypoints through `//lang:auto_map.bzl`
+## PR‑5: Close the remaining provider re-export gap by routing Rust macro entrypoints through `//build-tools/lang:auto_map.bzl`
 
 ### Description
 
-PR‑3 established a stable `//lang:auto_map.bzl` re-export for `MODULE_PROVIDERS` so language macro entrypoints do not encode provider file layout (`//third_party/providers:auto_map.bzl`) directly.
+PR‑3 established a stable `//build-tools/lang:auto_map.bzl` re-export for `MODULE_PROVIDERS` so language macro entrypoints do not encode provider file layout (`//third_party/providers:auto_map.bzl`) directly.
 
 Today, `build-tools/rust/defs.bzl` still directly loads `//third_party/providers:auto_map.bzl`. Even though Rust macros are currently a skeleton, this is an abstraction leak and a drift trap: it teaches the wrong pattern and increases the blast radius of future provider-layout changes.
 
 ### Scope & Changes
 
 - Update `build-tools/rust/defs.bzl` so provider mappings are loaded only via the stable entrypoint:
-  - Replace `load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")` with `load("//lang:auto_map.bzl", "MODULE_PROVIDERS")`.
-  - Prefer the shared provider-edge wiring helper (`realize_provider_edges(...)` from `//lang:defs_common.bzl`) rather than bespoke `_providers_for(...)` logic.
+  - Replace `load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")` with `load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")`.
+  - Prefer the shared provider-edge wiring helper (`realize_provider_edges(...)` from `//build-tools/lang:defs_common.bzl`) rather than bespoke `_providers_for(...)` logic.
 - Extend the existing macro hygiene test to include Rust:
   - Update `build-tools/tools/tests/lib/macros.providers-for.usage.test.ts` to include `build-tools/rust/defs.bzl` in the list of checked macro entrypoints so the invariant is enforced repo-wide.
 
 ### Tests (in this PR)
 
-- Extend `build-tools/tools/tests/lib/macros.providers-for.usage.test.ts` so it fails if any language entrypoint (including Rust) loads `//third_party/providers:auto_map.bzl` directly or embeds `//third_party/providers:` labels outside the approved `//lang:auto_map.bzl` load.
+- Extend `build-tools/tools/tests/lib/macros.providers-for.usage.test.ts` so it fails if any language entrypoint (including Rust) loads `//third_party/providers:auto_map.bzl` directly or embeds `//third_party/providers:` labels outside the approved `//build-tools/lang:auto_map.bzl` load.
 
 ### Docs (in this PR)
 
@@ -270,7 +270,7 @@ Today, `build-tools/rust/defs.bzl` still directly loads `//third_party/providers
 
 ### Acceptance Criteria
 
-- `build-tools/rust/defs.bzl` loads provider mappings via `//lang:auto_map.bzl` and uses shared provider-edge realization helpers.
+- `build-tools/rust/defs.bzl` loads provider mappings via `//build-tools/lang:auto_map.bzl` and uses shared provider-edge realization helpers.
 - The repo-wide macro hygiene test enforces the invariant for Rust alongside Go/Node/C++/Python.
 - No behavior change for existing (non-Rust) targets.
 
@@ -304,7 +304,7 @@ These PRs are ordered by dependency chain and correctness first:
 2. PR‑2 (shared helper for “patch inputs via synthetic dep”) should land before additional rule API workarounds appear elsewhere.
 3. PR‑3 (provider re-export) is mechanical and can land at any time, but it reduces churn in later refactors.
 4. PR‑4 (shared importer wiring helper) should land after Part 15 PR‑2 (dict attachment consolidation), so this PR depends on the existence of stable dict-safe primitives.
-5. PR‑5 (Rust entrypoints load provider mappings via `//lang:auto_map.bzl`) is independent and can land at any time; it closes a remaining abstraction leak and makes the provider re-export rule repo-wide.
+5. PR‑5 (Rust entrypoints load provider mappings via `//build-tools/lang:auto_map.bzl`) is independent and can land at any time; it closes a remaining abstraction leak and makes the provider re-export rule repo-wide.
 
 ---
 

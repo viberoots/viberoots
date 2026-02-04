@@ -13,8 +13,8 @@ test("realize_provider_edges merges deterministically for both list and kwargs b
       [
         "",
         "# test: provider-edges.realize.into.kwargs-and-list.test.ts",
-        'load("//lang:defs_common.bzl", "merge_provider_edges_list_probe", "realize_provider_edges_probe")',
-        'load("//lang/internal:package_local_wiring.bzl", "package_local_wiring_probe")',
+        'load("//build-tools/lang:defs_common.bzl", "merge_provider_edges_list_probe", "realize_provider_edges_probe")',
+        'load("//build-tools/lang/internal:package_local_wiring.bzl", "package_local_wiring_probe")',
         "",
         "realize_provider_edges_probe(",
         '  name = "list_base",',

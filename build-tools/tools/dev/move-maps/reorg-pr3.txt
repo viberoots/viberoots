@@ -19,22 +19,22 @@ scaffolding.md -> build-tools/docs/scaffolding.md
 remote-build-setup.md -> build-tools/docs/remote-build-setup.md
 
 # build-tools/docs/lang
-lang-refactor.md -> build-tools/docs/lang/lang-refactor.md
-lang-refactor-2.md -> build-tools/docs/lang/lang-refactor-2.md
-lang-refactor-3.md -> build-tools/docs/lang/lang-refactor-3.md
-lang-refactor-4.md -> build-tools/docs/lang/lang-refactor-4.md
-lang-design-docs/csharp-design.md -> build-tools/docs/lang/csharp-design.md
-lang-design-docs/erlang-design.md -> build-tools/docs/lang/erlang-design.md
-lang-design-docs/gleam-design.md -> build-tools/docs/lang/gleam-design.md
-lang-design-docs/jvm-design.md -> build-tools/docs/lang/jvm-design.md
-lang-design-docs/lua-design.md -> build-tools/docs/lang/lua-design.md
-lang-design-docs/php-design.md -> build-tools/docs/lang/php-design.md
-lang-design-docs/pnpm-design.md -> build-tools/docs/lang/pnpm-design.md
-lang-design-docs/python-design.md -> build-tools/docs/lang/python-design.md
-lang-design-docs/ruby-design.md -> build-tools/docs/lang/ruby-design.md
-lang-design-docs/rust-design.md -> build-tools/docs/lang/rust-design.md
-lang-design-docs/swift-design.md -> build-tools/docs/lang/swift-design.md
-lang-design-docs/zig-design.md -> build-tools/docs/lang/zig-design.md
+lang-refactor.md -> build-tools/docs/build-tools/lang/lang-refactor.md
+lang-refactor-2.md -> build-tools/docs/build-tools/lang/lang-refactor-2.md
+lang-refactor-3.md -> build-tools/docs/build-tools/lang/lang-refactor-3.md
+lang-refactor-4.md -> build-tools/docs/build-tools/lang/lang-refactor-4.md
+lang-design-docs/csharp-design.md -> build-tools/docs/build-tools/lang/csharp-design.md
+lang-design-docs/erlang-design.md -> build-tools/docs/build-tools/lang/erlang-design.md
+lang-design-docs/gleam-design.md -> build-tools/docs/build-tools/lang/gleam-design.md
+lang-design-docs/jvm-design.md -> build-tools/docs/build-tools/lang/jvm-design.md
+lang-design-docs/lua-design.md -> build-tools/docs/build-tools/lang/lua-design.md
+lang-design-docs/php-design.md -> build-tools/docs/build-tools/lang/php-design.md
+lang-design-docs/pnpm-design.md -> build-tools/docs/build-tools/lang/pnpm-design.md
+lang-design-docs/python-design.md -> build-tools/docs/build-tools/lang/python-design.md
+lang-design-docs/ruby-design.md -> build-tools/docs/build-tools/lang/ruby-design.md
+lang-design-docs/rust-design.md -> build-tools/docs/build-tools/lang/rust-design.md
+lang-design-docs/swift-design.md -> build-tools/docs/build-tools/lang/swift-design.md
+lang-design-docs/zig-design.md -> build-tools/docs/build-tools/lang/zig-design.md
 
 # docs/build-history
 cpp-gaps-plan.md -> docs/build-history/cpp-gaps-plan.md

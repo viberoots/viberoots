@@ -456,7 +456,7 @@ Candidates:
 
 - **Nix side**: a small helper module under `build-tools/tools/nix/planner/` such as `link-closure.nix` that implements:
   - `resolveLinkClosure { byName, linkDepsOf, roots, defaultClosure, overrides } -> [ordered unique deps]`
-- **Starlark side**: a helper in `//lang:defs_common.bzl` that:
+- **Starlark side**: a helper in `//build-tools/lang:defs_common.bzl` that:
   - merges `deps/link_deps/header_deps` deterministically
   - validates `link_closure_overrides` keys are in `link_deps`
 

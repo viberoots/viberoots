@@ -46,7 +46,7 @@ test("macro kwargs helper probe: defaults, overrides, and tolerant nixpkg_deps p
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//lang:defs_common.bzl", "macro_kwargs_probe")',
+        'load("//build-tools/lang:defs_common.bzl", "macro_kwargs_probe")',
         "",
         'macro_kwargs_probe(name = "default_go", lang = "go", append_labels = False)',
         "",

@@ -32,7 +32,7 @@ These are shared across all three efforts:
 
 Recommended shared implementation points:
 
-- **Starlark**: `//lang:defs_common.bzl` (or `//lang:importer_wiring.bzl` where importer-scoped) for deterministic union and validation.
+- **Starlark**: `//build-tools/lang:defs_common.bzl` (or `//build-tools/lang:importer_wiring.bzl` where importer-scoped) for deterministic union and validation.
 - **Nix**: `build-tools/tools/nix/planner/link-closure.nix` for deterministic closure resolution.
 
 ## Proposed sequence (phased)

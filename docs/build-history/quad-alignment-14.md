@@ -18,7 +18,7 @@ This PR makes the dict-shaped `srcs` case explicit and correct. It keeps the dic
 
 ### Scope & Changes
 
-- Extend `//lang:patch_inputs.bzl` with a dict-safe attach mechanism:
+- Extend `//build-tools/lang:patch_inputs.bzl` with a dict-safe attach mechanism:
   - Add a helper that can attach patch files into dict-shaped inputs by adding stable synthetic keys (for example `__patch_inputs__/...`).
   - Keep `append_patch_inputs(...)` behavior unchanged for list-shaped inputs.
 - Update `build-tools/node/defs_core.bzl`:
@@ -72,7 +72,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `//lang` and `//build-tools/node`. Should be safe in thin slices that include these packages and the relevant test fixtures.
+- Touches `//build-tools/lang` and `//build-tools/node`. Should be safe in thin slices that include these packages and the relevant test fixtures.
 
 ---
 
@@ -92,9 +92,9 @@ This PR tightens the stub contract. A planner-visible stub should carry:
   - include package-local patch files as inputs (via `include_package_local_patches` into a supported attribute)
   - realize provider edges deterministically (using `realize_provider_edges(...)`)
   - keep the stub artifact shape unchanged (still a stamp)
-- Add a shared helper or documented pattern in `//lang` for “planner stub with patch inputs” so we do not repeat this in each language:
+- Add a shared helper or documented pattern in `//build-tools/lang` for “planner stub with patch inputs” so we do not repeat this in each language:
   - either add an optional `srcs` parameter to `planner_stub` usage consistently
-  - or add a wrapper in `//lang` that produces a patch-carrying stub safely for rules that only accept limited attrs
+  - or add a wrapper in `//build-tools/lang` that produces a patch-carrying stub safely for rules that only accept limited attrs
 - Audit other planner-visible stubs:
   - confirm Go `nix_go_carchive` and Python WASM stubs already carry patch inputs and provider edges as intended
   - migrate any remaining stub shapes that omit patch inputs
@@ -136,7 +136,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `//build-tools/cpp` and `//lang` with narrow changes plus tests.
+- Touches `//build-tools/cpp` and `//build-tools/lang` with narrow changes plus tests.
 
 ---
 
@@ -208,7 +208,7 @@ Implement.
 
 We normalize nixpkgs attrs in three places:
 
-- Starlark labeling (`//lang:nixpkg_labels.bzl`)
+- Starlark labeling (`//build-tools/lang:nixpkg_labels.bzl`)
 - TypeScript provider naming and label mapping (`build-tools/tools/lib/provider-names.ts` and `build-tools/tools/lib/labels.ts`)
 - Nix planner/template resolution (`build-tools/tools/nix/lib/lang-helpers.nix` and C++ helpers)
 
@@ -224,7 +224,7 @@ This PR codifies a single shared contract and backs it with a parity test matrix
   - ensuring `pkgs.` prefix
   - alias mapping and the `gtest` compatibility rule
 - Align implementations as needed so the contract matches:
-  - `//lang:nixpkg_labels.bzl:normalize_nix_attr`
+  - `//build-tools/lang:nixpkg_labels.bzl:normalize_nix_attr`
   - `build-tools/tools/lib/provider-names.ts:normalizeNixAttr`
   - Nix-side resolution helpers used by templates and planners
 - Add a parity test matrix:
@@ -272,7 +272,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `//lang` and `build-tools/tools/lib` plus tests. Avoids changes to large language templates.
+- Touches `//build-tools/lang` and `build-tools/tools/lib` plus tests. Avoids changes to large language templates.
 
 ---
 

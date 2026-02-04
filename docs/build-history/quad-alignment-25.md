@@ -2,8 +2,8 @@
 
 This installment follows Part 24. Part 24 focused on Node Nix-calling macros and Nix command assembly. In Part 25 I close the remaining cross-language abstraction gaps I still see after parity:
 
-- Python importer-scoped macros still hand-assemble wiring that is already centralized in `//lang:importer_wiring.bzl`.
-- “Macro calls Nix” global-input wiring is not consistently expressed through the single helper surface (`//lang:nix_calling_macros.bzl:wire_global_nix_inputs(...)`) across call sites.
+- Python importer-scoped macros still hand-assemble wiring that is already centralized in `//build-tools/lang:importer_wiring.bzl`.
+- “Macro calls Nix” global-input wiring is not consistently expressed through the single helper surface (`//build-tools/lang:nix_calling_macros.bzl:wire_global_nix_inputs(...)`) across call sites.
 - The importer-scoped vs package-local patch models are intentional, but it is still easy to partially apply the contract (especially in new macros). I want enforcement tests that fail when call sites bypass the canonical helper surfaces.
 
 As in prior parts, each PR includes the tests and documentation required for the change. There are no PRs dedicated solely to tests or docs.
@@ -14,7 +14,7 @@ As in prior parts, each PR includes the tests and documentation required for the
 
 ### Description
 
-Python is an importer-scoped ecosystem (uv). The macro contract for importer-scoped targets is already centralized in `//lang:importer_wiring.bzl:prepare_importer_non_genrule_wiring(...)`:
+Python is an importer-scoped ecosystem (uv). The macro contract for importer-scoped targets is already centralized in `//build-tools/lang:importer_wiring.bzl:prepare_importer_non_genrule_wiring(...)`:
 
 - exactly one `lockfile:<path>#<importer>` label
 - deterministic importer derivation
@@ -77,7 +77,7 @@ Moderate. The main risk is accidentally changing which attribute receives patch 
 
 ### Consequence of Not Implementing
 
-Python remains a drift point. Contract changes in `//lang:importer_wiring.bzl` will require manual “keep in sync” edits in `build-tools/python/defs.bzl`.
+Python remains a drift point. Contract changes in `//build-tools/lang:importer_wiring.bzl` will require manual “keep in sync” edits in `build-tools/python/defs.bzl`.
 
 ### Downsides for Implementing
 
@@ -95,7 +95,7 @@ Implement.
 
 Some macros shell out to Nix. Those actions must be invalidated by the centralized global input set (`global_nix_inputs()`), and call sites should not have to remember the policy details (list vs dict shapes, key prefixing, optional label stamping).
 
-The canonical helper already exists: `//lang:nix_calling_macros.bzl:wire_global_nix_inputs(kwargs, into=..., stamp=...)`.
+The canonical helper already exists: `//build-tools/lang:nix_calling_macros.bzl:wire_global_nix_inputs(kwargs, into=..., stamp=...)`.
 
 Today, some call sites use `attach_global_nix_inputs(...)` directly. That is correct, but it makes future policy changes harder and increases the chance of inconsistent stamping vs action inputs.
 
@@ -169,7 +169,7 @@ This PR adds enforcement tests that fail when these mistakes happen.
 ### Scope & Changes
 
 - Add or extend tests that assert macros route through the canonical helper surfaces:
-  - importer-scoped macros should use `prepare_importer_genrule_kwargs(...)` or `prepare_importer_non_genrule_wiring(...)` (directly or via `//lang:defs_common.bzl` re-exports)
+  - importer-scoped macros should use `prepare_importer_genrule_kwargs(...)` or `prepare_importer_non_genrule_wiring(...)` (directly or via `//build-tools/lang:defs_common.bzl` re-exports)
   - package-local patching macros should use `include_package_local_patches(...)` (or planner-visible wrappers that include package-local patch inputs)
 - Add one or two “probe-style” targets and tests that assert the final cquery-visible inputs contain:
   - importer-local patches for importer-scoped macros

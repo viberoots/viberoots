@@ -6,7 +6,7 @@ After reviewing the codebase against the contract inventory in `abstractions.md`
 
 - A concrete abstraction leak risk in **Nix-calling rule implementations**: a small number of rules still assemble parts of their `nix build` flows “inline” (even when they partially use shared helpers). This is a drift risk for `nix build` flags, out path capture, and strict failure propagation. We also still have `|| true` patterns adjacent to these flows (often for “best-effort debug output”) that make it harder to enforce “no failure masking” consistently at the rule layer.
 - A remaining authoring drift risk in **Starlark macro call sites**: we are mostly using the shared helper surface, but there are still inconsistent macro parameter conventions (especially around importer identity) and a few call-site parameters that can look meaningful while being redundant or enforced only inconsistently.
-- A remaining legacy surface area risk: we have a preferred, non-mutating wiring boundary for importer-scoped macros, but it is currently named with a literal `v2` (`lang/importer_wiring_v2*.bzl`). If it’s the preferred interface, it should not be named like an alternate version. We should rename it to the canonical name and rename any older / lower-level surfaces according to what they are (primitives vs legacy), while keeping the overall naming scheme consistent.
+- A remaining legacy surface area risk: we have a preferred, non-mutating wiring boundary for importer-scoped macros, but it is currently named with a literal `v2` (`build-tools/lang/importer_wiring_v2*.bzl`). If it’s the preferred interface, it should not be named like an alternate version. We should rename it to the canonical name and rename any older / lower-level surfaces according to what they are (primitives vs legacy), while keeping the overall naming scheme consistent.
 
 As in prior parts, each PR includes the tests and documentation required for the change. There are no PRs dedicated solely to tests or docs.
 
@@ -16,7 +16,7 @@ As in prior parts, each PR includes the tests and documentation required for the
 
 ### Description
 
-Node Nix-calling macros already assemble `nix build` flows via the shared helper surface (`//lang:nix_shell.bzl`, `//lang:nix_action_runner.bzl`).
+Node Nix-calling macros already assemble `nix build` flows via the shared helper surface (`//build-tools/lang:nix_shell.bzl`, `//build-tools/lang:nix_action_runner.bzl`).
 
 Some **rule implementations** still carry their own variations of:
 
@@ -35,7 +35,7 @@ This PR standardizes those rule implementations on the same shared helper surfac
 
 - Refactor Nix-calling rule implementations to route through shared helpers:
   - `build-tools/cpp/private/nix_build.bzl`:
-    - Ensure out path capture is assembled only via `//lang:nix_shell.bzl` (`nix_build_out_path_cmd(...)`) and rule-layer workspace setup is via `//lang:nix_action_runner.bzl`.
+    - Ensure out path capture is assembled only via `//build-tools/lang:nix_shell.bzl` (`nix_build_out_path_cmd(...)`) and rule-layer workspace setup is via `//build-tools/lang:nix_action_runner.bzl`.
     - Remove any duplicated “out path capture” patterns and ensure all required env variables remain part of the contract (`BUCK_TARGET`, `BUCK_TEST_SRC`, `BUCK_GRAPH_JSON`).
     - Restructure best-effort debug output so it cannot be misconstrued as failure masking in enforcement tests.
   - `build-tools/go/private/nix_build_wasm.bzl`:
@@ -187,8 +187,8 @@ If a wiring surface is the preferred macro boundary, it should not be named with
 
 Today we have:
 
-- a preferred, non-mutating importer wiring surface named `lang/importer_wiring_v2*.bzl`
-- a lower-level importer wiring surface named `lang/importer_wiring.bzl` that provides primitives used by the v2 boundary
+- a preferred, non-mutating importer wiring surface named `build-tools/lang/importer_wiring_v2*.bzl`
+- a lower-level importer wiring surface named `build-tools/lang/importer_wiring.bzl` that provides primitives used by the v2 boundary
 
 This is a long-term drift risk:
 
@@ -202,22 +202,22 @@ This PR renames the preferred surface to the canonical name and renames the olde
 
 - Rename importer wiring surfaces (naming policy):
   - Preferred interface gets the simple name:
-    - `lang/importer_wiring_v2.bzl` → `lang/importer_wiring.bzl`
+    - `build-tools/lang/importer_wiring_v2.bzl` → `build-tools/lang/importer_wiring.bzl`
   - Lower-level primitives are explicitly named as such:
-    - current `lang/importer_wiring.bzl` → `lang/importer_wiring_primitives.bzl`
+    - current `build-tools/lang/importer_wiring.bzl` → `build-tools/lang/importer_wiring_primitives.bzl`
   - Nix-calling helper wrapper follows the same scheme:
-    - `lang/importer_wiring_v2_nix_calling.bzl` → `lang/importer_wiring_nix_calling.bzl`
+    - `build-tools/lang/importer_wiring_v2_nix_calling.bzl` → `build-tools/lang/importer_wiring_nix_calling.bzl`
   - Probe helpers follow the same scheme:
-    - `lang/importer_wiring_v2_probe.bzl` → `lang/importer_wiring_probe.bzl`
+    - `build-tools/lang/importer_wiring_v2_probe.bzl` → `build-tools/lang/importer_wiring_probe.bzl`
 
 - Update all Starlark load sites and re-exports:
-  - `lang/defs_common.bzl` continues to re-export only the preferred, canonical entrypoints for macro authorship.
+  - `build-tools/lang/defs_common.bzl` continues to re-export only the preferred, canonical entrypoints for macro authorship.
   - Non-preferred surfaces (primitives) are either:
     - not re-exported from `defs_common.bzl`, or
-    - re-exported only with clearly “internal/primitives” names (only if needed inside `//lang/*`).
+    - re-exported only with clearly “internal/primitives” names (only if needed inside `//build-tools/lang/*`).
 
 - Tighten enforcement:
-  - forbid non-`//lang/*` Starlark code from importing importer wiring primitives directly
+  - forbid non-`//build-tools/lang/*` Starlark code from importing importer wiring primitives directly
   - require importer-scoped macro entrypoints to route through the preferred importer wiring boundary (directly or via `defs_common.bzl`)
 
 Non-goals in this PR:
@@ -227,7 +227,7 @@ Non-goals in this PR:
 
 ### Tests (in this PR)
 
-- Extend enforcement tests so they fail if any non-`//lang/*` Starlark code imports the primitives surface (`importer_wiring_primitives.bzl`).
+- Extend enforcement tests so they fail if any non-`//build-tools/lang/*` Starlark code imports the primitives surface (`importer_wiring_primitives.bzl`).
 - Keep (and rename) the non-mutation probe test so it asserts the canonical importer wiring boundary does not mutate its input dict at the call-site boundary.
 - Extend doc/reference tests (or small grep-based tests) to ensure no “v2” import paths remain in the repository for preferred wiring surfaces.
 
@@ -241,7 +241,7 @@ Non-goals in this PR:
 ### Acceptance Criteria
 
 - Preferred wiring surfaces do not contain literal `v2` in filenames or import paths.
-- Lower-level wiring helpers are named consistently as `*_primitives` (or, where truly necessary, `*_legacy`) and are not reachable from non-`//lang/*` macro call sites.
+- Lower-level wiring helpers are named consistently as `*_primitives` (or, where truly necessary, `*_legacy`) and are not reachable from non-`//build-tools/lang/*` macro call sites.
 - Enforcement blocks reintroduction of legacy/v2 wiring patterns.
 - Outcome-based tests prove wiring invariants are unchanged.
 

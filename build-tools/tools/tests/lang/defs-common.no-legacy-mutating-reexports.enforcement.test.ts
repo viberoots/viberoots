@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
-test("//lang:defs_common.bzl must not re-export legacy mutating helpers", async () => {
-  const txt = await fsp.readFile("lang/defs_common.bzl", "utf8");
+test("//build-tools/lang:defs_common.bzl must not re-export legacy mutating helpers", async () => {
+  const txt = await fsp.readFile("build-tools/lang/defs_common.bzl", "utf8");
   const offenders = txt
     .split("\n")
     .map((l, i) => ({ line: i + 1, text: l }))
@@ -14,8 +14,8 @@ test("//lang:defs_common.bzl must not re-export legacy mutating helpers", async 
     offenders.length,
     0,
     [
-      "lang/defs_common.bzl must not export *_legacy_mutating symbols.",
-      "Legacy helpers are migration-only and must remain under dedicated //lang compatibility files.",
+      "build-tools/lang/defs_common.bzl must not export *_legacy_mutating symbols.",
+      "Legacy helpers are migration-only and must remain under dedicated //build-tools/lang compatibility files.",
       "",
       ...offenders.map((o) => `- L${o.line}: ${o.text}`),
     ].join("\n"),

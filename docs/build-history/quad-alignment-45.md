@@ -32,7 +32,7 @@
 
 I will remove the custom genrule hash workaround in `nix_python_binary` and route importer-local
 patch invalidation through the shared `srcsless_rule` wiring path. This keeps the workaround
-inside `//lang` wiring helpers and aligns Python binary wiring with the stated contract.
+inside `//build-tools/lang` wiring helpers and aligns Python binary wiring with the stated contract.
 
 #
 
@@ -44,7 +44,7 @@ inside `//lang` wiring helpers and aligns Python binary wiring with the stated c
   - Remove the `genrule` and helper `python_library` used for patch hashing in `nix_python_binary`.
   - Call `prepare_language_wiring(...)` with `wiring = "srcsless_rule"` for `nix_python_binary`.
   - Keep label stamping and provider edge realization behavior unchanged.
-- If needed, adjust `lang/importer_wiring.bzl` or `lang/defs_common.bzl` so the `srcsless_rule`
+- If needed, adjust `build-tools/lang/importer_wiring.bzl` or `build-tools/lang/defs_common.bzl` so the `srcsless_rule`
   path carries importer-local patch inputs as action inputs for `python_binary` consistently.
 
 #

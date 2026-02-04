@@ -218,7 +218,7 @@ This PR tightens the Starlark contract so unsupported importers fail at macro de
 
 ### Scope & Changes
 
-- Update `lang/lockfile_labels.bzl`:
+- Update `build-tools/lang/lockfile_labels.bzl`:
   - after parsing `(path_part, importer)`, validate importer is supported:
     - `"."` is allowed
     - `apps/*` and `libs/*` are allowed
@@ -270,7 +270,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-Touches `lang/lockfile_labels.bzl` and one parity test.
+Touches `build-tools/lang/lockfile_labels.bzl` and one parity test.
 
 ---
 

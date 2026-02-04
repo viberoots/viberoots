@@ -25,7 +25,7 @@ This PR introduces a single shared Starlark helper for “package-local, planner
 
 ### Scope & Changes
 
-- Add a shared helper under `//lang` for package-local planner-visible wiring.
+- Add a shared helper under `//build-tools/lang` for package-local planner-visible wiring.
   - The helper composes:
     - package-local patch dir parsing and inclusion
     - nixpkg label append (when applicable)
@@ -99,7 +99,7 @@ This PR replaces the hardcoded `kind:*` regex with a shared, explicit vocabulary
 ### Scope & Changes
 
 - Define a single `kind:*` vocabulary surface:
-  - Starlark: add a helper in `//lang` that exports the allowed kind strings (or a predicate).
+  - Starlark: add a helper in `//build-tools/lang` that exports the allowed kind strings (or a predicate).
   - TypeScript: add a helper that exports the same allowed kind strings (or a predicate).
   - Keep the vocabulary small and tied to actual routing/debugging needs.
 - Update `build-tools/tools/dev/stamping-lint.ts`:

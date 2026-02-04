@@ -48,10 +48,10 @@ EOF'`;
     const macroTxt = await fs.readFile(path.join(tmp, "build-tools", "python", "defs.bzl"), "utf8");
     if (
       macroTxt.includes('load("//third_party/providers:auto_map.bzl"') ||
-      !macroTxt.includes('load("//lang:auto_map.bzl"')
+      !macroTxt.includes('load("//build-tools/lang:auto_map.bzl"')
     ) {
       console.error(
-        "expected build-tools/python/defs.bzl to load MODULE_PROVIDERS via //lang:auto_map.bzl",
+        "expected build-tools/python/defs.bzl to load MODULE_PROVIDERS via //build-tools/lang:auto_map.bzl",
       );
       process.exit(2);
     }

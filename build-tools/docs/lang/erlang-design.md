@@ -5,7 +5,7 @@
 ### Goals and Scope
 
 - **Goal**: Add Erlang (Rebar3/Hex ecosystem) as a first‑class language integrated with Buck2 (graph/orchestration) and Nix (hermetic builds), with patching and provider wiring consistent with Go and Node.
-- **Scope (initial)**: Build Erlang libraries and applications using Rebar3; importer‑scoped lockfile providers from `rebar.lock`; patching of third‑party deps via flat `patches/erlang/*.patch` keyed by package@version; dev overrides for fast iteration.
+- **Scope (initial)**: Build Erlang libraries and applications using Rebar3; importer‑scoped lockfile providers from `rebar.lock`; patching of third‑party deps via flat `patches/erbuild-tools/lang/*.patch` keyed by package@version; dev overrides for fast iteration.
 - **Out‑of‑scope (initial)**: Elixir/Mix; cross‑language BEAM release packaging; OTP releases; rebar profiles beyond `default` (not blocked, just deferred).
 
 ### Philosophy Alignment (from Methodology)
@@ -30,20 +30,20 @@ If the language can support C interop, I must provide a documented and tested pa
 
 ### Shared wiring and contracts (current repo)
 
-Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:language_wiring.bzl`. Macro call sites should not re‑implement wiring or load provider maps directly.
+Use the canonical helper surface from `//build-tools/lang:defs_common.bzl` and `//build-tools/lang:language_wiring.bzl`. Macro call sites should not re‑implement wiring or load provider maps directly.
 
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
-- Provider wiring: load `MODULE_PROVIDERS` from `//lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
+- Provider wiring: load `MODULE_PROVIDERS` from `//build-tools/lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
 - Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
-- Patch model contract: `lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
+- Patch model contract: `build-tools/lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
 
 ### Path Invariants (must‑follow)
 
-- **Patches**: `patches/erlang/` (flat directory; one file per `pkg@version`), no subdirectories.
+- **Patches**: `patches/erbuild-tools/lang/` (flat directory; one file per `pkg@version`), no subdirectories.
 - **Nix templates**: `build-tools/tools/nix/templates/erlang.nix` (exposed by `build-tools/tools/nix/lang-templates.nix`).
 - **Planner integration**: `build-tools/tools/nix/planner/erlang.nix` or a small addition in `graph-generator.nix` registry that imports planner helpers if present.
-- **Buck macros**: `erlang/defs.bzl` using `lang/defs_common.bzl` helpers; macros inject providers from `//lang:auto_map.bzl`.
+- **Buck macros**: `erbuild-tools/lang/defs.bzl` using `build-tools/lang/defs_common.bzl` helpers; macros inject providers from `//build-tools/lang:auto_map.bzl`.
 - **Provider rules**: `//third_party/providers/defs_erlang.bzl` with `erlang_lockfile_deps(...)` (tiny genrule stamp), and an auto‑generated `third_party/providers/TARGETS.erlang.auto`.
 - **Provider driver**: `build-tools/tools/buck/providers/erlang.ts`; orchestrated by `build-tools/tools/buck/sync-providers.ts` alongside Go/Node.
 - **Capability gating**: Add `erlang` entry to `build-tools/tools/nix/langs.json` (requiredPaths include the files above) so sparse checkouts cleanly disable Erlang glue.
@@ -65,11 +65,11 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 ### Architecture Overview
 
 - **Labels**: Erlang targets carry a deterministic lockfile label: `lockfile:<relative/path/to/rebar.lock>#<importer>`. The importer is the Erlang app name (from `rebar.config`/`{project_applications, [...]}` or `{app, Name}`); default to the package directory (e.g., `apps/foo`) if an explicit name isn’t resolvable.
-- **Providers**: A zx generator scans all `rebar.lock` files and `patches/erlang/*.patch`, computes per‑importer effective dep sets, and emits `TARGETS.erlang.auto` with one provider per `(lockfile, importer)`; patch paths included only if relevant to the importer’s effective set.
+- **Providers**: A zx generator scans all `rebar.lock` files and `patches/erbuild-tools/lang/*.patch`, computes per‑importer effective dep sets, and emits `TARGETS.erlang.auto` with one provider per `(lockfile, importer)`; patch paths included only if relevant to the importer’s effective set.
 - **Invalidation**: Macros also include importer‑local patch files in target `srcs` (mirroring Node) so Buck invalidation is precise. Provider stamps remain metadata‑only.
 - **Auto‑map**: `gen-auto-map.ts` maps `lockfile:...#...` labels to the fully qualified provider target names using shared naming helpers.
-- **Nix**: Templates `erlangApp`/`erlangLib` consume the lockfile path and optional dev overrides (`NIX_ERLANG_DEV_OVERRIDE_JSON`), apply patches deterministically by scanning `patches/erlang/`, and perform the Rebar3 build under `beamPackages`.
-- **Patching UX**: `patch-pkg` gets an Erlang handler mirroring Go/Node flows: `start`, `apply`, `reset`, `session`; canonical patch filenames in `patches/erlang/`.
+- **Nix**: Templates `erlangApp`/`erlangLib` consume the lockfile path and optional dev overrides (`NIX_ERLANG_DEV_OVERRIDE_JSON`), apply patches deterministically by scanning `patches/erbuild-tools/lang/`, and perform the Rebar3 build under `beamPackages`.
+- **Patching UX**: `patch-pkg` gets an Erlang handler mirroring Go/Node flows: `start`, `apply`, `reset`, `session`; canonical patch filenames in `patches/erbuild-tools/lang/`.
 
 ### Nix Templates (build-tools/tools/nix/templates/erlang.nix)
 
@@ -106,7 +106,7 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 
 - Input discovery:
   - All `rebar.lock` files in the repo (globby `**/rebar.lock`).
-  - Optional `patches/erlang/*.patch` files (flat directory).
+  - Optional `patches/erbuild-tools/lang/*.patch` files (flat directory).
 - Lockfile parsing:
   - Parse `rebar.lock` (Erlang term format) into JSON. Strategy:
     - Prefer a small, pure parser (JS) or shell out to `erl` with a tiny script that prints JSON (under Nix tools) — either way, ensure deterministic output.
@@ -127,7 +127,7 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
   - Output: `<name>.stamp` produced by hashing inputs.
   - Public visibility; tiny by design.
 
-### Buck Macros (erlang/defs.bzl)
+### Buck Macros (erbuild-tools/lang/defs.bzl)
 
 - Thin wrappers (mirroring Node macros):
   - `nix_erlang_lib(name, srcs=..., deps=[], labels=["lang:erlang", "kind:lib"], lockfile=..., importer=..., **kwargs)`
@@ -135,7 +135,7 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
   - `nix_erlang_test(name, ... kind:test ...)` (optional, may wrap `ct` or `eunit` via genrule)
 - Behavior:
   - Stamp `labels` including `lockfile:<path>#<importer>`, `lang:erlang`, and `kind:*`.
-  - Append providers from `//lang:auto_map.bzl` using `MODULE_PROVIDERS["//pkg:name"]`.
+  - Append providers from `//build-tools/lang:auto_map.bzl` using `MODULE_PROVIDERS["//pkg:name"]`.
   - Under the hood, start with `genrule` + `rebar3` invocation inside a hermetic Nix env (acceptance: parity with direct `rebar3 compile`).
 - Notes:
   - Keep macro interfaces stable so we can transparently swap the implementation to native `erlang_*` rules later.
@@ -145,7 +145,7 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 
 - Subcommands under the outer `patch-pkg`:
   - `start erlang <pkg>`: Resolve `<pkg>` against the importer’s lockfile; fetch its source (Hex or git) into a temp editable dir (macOS: APFS CoW or copy); set `NIX_ERLANG_DEV_OVERRIDE_JSON` for the exact key; optionally open `$PATCH_EDITOR`.
-  - `apply erlang <pkg>`: Produce a unified diff vs original sources and write to `patches/erlang/<key>.patch` where `<key>` is `name@version` or normalized git key; run provider sync + auto‑map; clear overrides and temp.
+  - `apply erlang <pkg>`: Produce a unified diff vs original sources and write to `patches/erbuild-tools/lang/<key>.patch` where `<key>` is `name@version` or normalized git key; run provider sync + auto‑map; clear overrides and temp.
   - `reset erlang <pkg>`: Abandon and clean temp + override.
   - `session erlang <pkg>`: Long‑lived edit; Ctrl‑D commits (`apply`), Ctrl‑C aborts (`reset`).
 - Idempotency: Reapplying the same patch is a no‑op; dev overrides forbidden in CI.
@@ -218,7 +218,7 @@ Repo‑level WASM support exists, but compiling BEAM code to WASM is not practic
 ### Completion Criteria
 
 - `build-tools/tools/nix/templates/erlang.nix` implements `erlangApp` and `erlangLib` with patch/override maps and CI override guard.
-- `erlang/defs.bzl` exists; macros stamp labels and append providers from `auto_map.bzl`.
+- `erbuild-tools/lang/defs.bzl` exists; macros stamp labels and append providers from `auto_map.bzl`.
 - `third_party/providers/defs_erlang.bzl` exists; `TARGETS.erlang.auto` is generated deterministically by `sync-providers-erlang.ts`.
 - `gen-auto-map.ts` maps Erlang lockfile labels to providers; macros consume them.
 - `patch-pkg` supports Erlang with `start/apply/reset/session` flows.
@@ -228,7 +228,7 @@ Repo‑level WASM support exists, but compiling BEAM code to WASM is not practic
 ### Phased Implementation (small, verifiable steps)
 
 1. Scaffolding and invariants
-   - Create `patches/erlang/` (empty), `third_party/providers/defs_erlang.bzl` (genrule stamp), stub macros in `erlang/defs.bzl` stamping labels.
+   - Create `patches/erbuild-tools/lang/` (empty), `third_party/providers/defs_erlang.bzl` (genrule stamp), stub macros in `erbuild-tools/lang/defs.bzl` stamping labels.
    - Verification: Macros compile; labels appear in `build-tools/tools/buck/graph.json` via exporter.
 2. Provider sync (Erlang)
    - Implement `build-tools/tools/buck/sync-providers-erlang.ts`; parse `rebar.lock`, emit `TARGETS.erlang.auto` idempotently; add zx tests.

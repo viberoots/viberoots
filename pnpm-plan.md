@@ -80,7 +80,7 @@ This plan sequences small, verifiable PRs to implement PNPM workspaces (apps/lib
 
 - Scope
   - Create `//build-tools/node/defs.bzl` providing thin macros (e.g., `node_gen`, `node_test`) that:
-    - Call `lang/defs_common.bzl` stamping helpers to add `lang:node` and `kind:*` labels.
+    - Call `build-tools/lang/defs_common.bzl` stamping helpers to add `lang:node` and `kind:*` labels.
     - Append providers from `//third_party/providers:auto_map.bzl`.
     - Accept a `labels` parameter so the lockfile label is explicit in the macro call.
   - Migrate `apps/example` TARGETS to use the macro.
@@ -244,7 +244,7 @@ This plan sequences small, verifiable PRs to implement PNPM workspaces (apps/lib
   - The generator runs `pnpm -w install --lockfile-only` (in dev shell) to materialize a stable importer lockfile; provider sync then includes the correct importer.
   - Buck TARGETS use the Node macro to append provider deps from `//third_party/providers:auto_map.bzl` and carry the importer‑scoped lockfile label.
   - Add a thin Buck macro `node_webapp(...)` (in `//build-tools/node/defs.bzl`) that builds via Nix, consistent with other templates:
-    - Stamps `lang:node` and `kind:app` using `lang/defs_common.bzl`.
+    - Stamps `lang:node` and `kind:app` using `build-tools/lang/defs_common.bzl`.
     - Requires the importer‑scoped lockfile label at call sites and appends providers from `auto_map.bzl`.
     - Expands to a `genrule` that invokes a zx shim to run `nix build .#node-webapp[${system}].<importer>` and copies its `dist/` to `$OUT` (no network; uses pinned flake inputs). The shim should be minimal and deterministic.
     - Nix side: expose a flake output `packages.<system>.node-webapp.<importer>` that runs `vite build` with the per‑importer `node-modules` derivation from PR4, producing `dist/` as the derivation output.

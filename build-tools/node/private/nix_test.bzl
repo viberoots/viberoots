@@ -1,5 +1,5 @@
-load("//lang:sanitize.bzl", "sanitize_name")
-load("//lang:nix_shell.bzl", "nix_bootstrap_env_core", "nix_bootstrap_env_pnpm_store", "nix_timeout_wrapper_var")
+load("//build-tools/lang:sanitize.bzl", "sanitize_name")
+load("//build-tools/lang:nix_shell.bzl", "nix_bootstrap_env_core", "nix_bootstrap_env_pnpm_store", "nix_timeout_wrapper_var")
 
 def _node_nix_test_impl(ctx):
     imp = ctx.attrs.importer

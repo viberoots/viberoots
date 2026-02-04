@@ -25,19 +25,19 @@ If the language can support C interop, I must provide a documented and tested pa
 
 ### Shared wiring and contracts (current repo)
 
-Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:language_wiring.bzl`. Macro call sites should not re‑implement wiring or load provider maps directly.
+Use the canonical helper surface from `//build-tools/lang:defs_common.bzl` and `//build-tools/lang:language_wiring.bzl`. Macro call sites should not re‑implement wiring or load provider maps directly.
 
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
-- Provider wiring: load `MODULE_PROVIDERS` from `//lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
+- Provider wiring: load `MODULE_PROVIDERS` from `//build-tools/lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
 - Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
-- Patch model contract: `lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
+- Patch model contract: `build-tools/lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
 
 ### Path invariants (must‑follow)
 
 - Patches live at `patches/rust/*.patch` (flat; no subdirectories).
 - Nix language templates extend `build-tools/tools/nix/lang-templates.nix` via `build-tools/tools/nix/templates/rust.nix`.
-- Buck macros live under `build-tools/rust/defs.bzl` and append provider deps using `MODULE_PROVIDERS` loaded via `//lang:auto_map.bzl` (do not load `//third_party/providers:auto_map.bzl` directly).
+- Buck macros live under `build-tools/rust/defs.bzl` and append provider deps using `MODULE_PROVIDERS` loaded via `//build-tools/lang:auto_map.bzl` (do not load `//third_party/providers:auto_map.bzl` directly).
 - Provider rules are generated under `//third_party/providers/*` (Rust file: `TARGETS.rust.auto`).
 - Exported graph lives at `build-tools/tools/buck/graph.json`; no change to file path.
 
@@ -162,7 +162,7 @@ Behavior:
 
 - Stamp `lang:rust` and `kind:*` labels.
 - Forward configuration that affects dependency resolution to the exporter (features, target triple if provided via attrs/constraints).
-- Append provider deps using `realize_provider_edges(...)` (from `//lang:defs_common.bzl`) and `MODULE_PROVIDERS` loaded via `//lang:auto_map.bzl`.
+- Append provider deps using `realize_provider_edges(...)` (from `//build-tools/lang:defs_common.bzl`) and `MODULE_PROVIDERS` loaded via `//build-tools/lang:auto_map.bzl`.
 
 ---
 
@@ -223,7 +223,7 @@ Now that repository macros and facilities for WASM are available (freestanding a
 - Buck macros: extend `build-tools/rust/defs.bzl` with `nix_rust_wasm_library` and `nix_rust_wasi_binary` (or a `wasm = "freestanding"|"wasi"` attr) that:
   - Stamp `lang:rust` and `kind:wasm|wasi` labels.
   - Forward `--target` and features to the builder.
-  - Append providers using `MODULE_PROVIDERS` loaded via `//lang:auto_map.bzl` and shared provider-edge wiring helpers.
+  - Append providers using `MODULE_PROVIDERS` loaded via `//build-tools/lang:auto_map.bzl` and shared provider-edge wiring helpers.
 - Planner/templates: add `rustWasmLib`/`rustWasiBin` functions in `build-tools/tools/nix/templates/rust.nix`; compile with cargo for the requested target; reuse patch/override maps.
 - Tests: load freestanding `.wasm` via `WebAssembly.instantiate`; run WASI via `node:wasi` and assert exported functions (e.g., `add(2,3)=5`).
 

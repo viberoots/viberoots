@@ -59,28 +59,28 @@ Implement.
 
 ---
 
-## PR‑2: Split `//lang:defs_common.bzl` to satisfy the ≤250 LOC methodology gate
+## PR‑2: Split `//build-tools/lang:defs_common.bzl` to satisfy the ≤250 LOC methodology gate
 
 ### Description
 
-Bring `lang/defs_common.bzl` (currently >250 lines) into compliance by splitting it into small, single-purpose `.bzl` modules while preserving the existing public surface for call sites.
+Bring `build-tools/lang/defs_common.bzl` (currently >250 lines) into compliance by splitting it into small, single-purpose `.bzl` modules while preserving the existing public surface for call sites.
 
 ### Scope & Changes
 
-- Introduce small focused modules under `lang/` (exact filenames can be tuned to current conventions), for example:
-  - `lang/lockfile_labels.bzl` (lockfile label validation + importer extraction)
-  - `lang/patch_inputs.bzl` (patch src inclusion helpers)
-  - `lang/label_stamping.bzl` (`dedupe_preserve`, `stamp_labels`, wasm stamping, global nix input stamping)
-  - `lang/nixpkg_labels.bzl` (nixpkgs attr normalization + nixpkg label emission)
-  - `lang/provider_edges.bzl` (provider lookup + realize edges)
-- Convert `lang/defs_common.bzl` into a thin compatibility wrapper:
-  - keeps the original `load("//lang:defs_common.bzl", ...)` call sites stable
+- Introduce small focused modules under `build-tools/lang/` (exact filenames can be tuned to current conventions), for example:
+  - `build-tools/lang/lockfile_labels.bzl` (lockfile label validation + importer extraction)
+  - `build-tools/lang/patch_inputs.bzl` (patch src inclusion helpers)
+  - `build-tools/lang/label_stamping.bzl` (`dedupe_preserve`, `stamp_labels`, wasm stamping, global nix input stamping)
+  - `build-tools/lang/nixpkg_labels.bzl` (nixpkgs attr normalization + nixpkg label emission)
+  - `build-tools/lang/provider_edges.bzl` (provider lookup + realize edges)
+- Convert `build-tools/lang/defs_common.bzl` into a thin compatibility wrapper:
+  - keeps the original `load("//build-tools/lang:defs_common.bzl", ...)` call sites stable
   - re-exports the same function names
 - Ensure each new file is ≤250 lines.
 
 ### Tests (in this PR)
 
-- Existing zx tests that rely on `//lang:defs_common.bzl` behavior (no changes expected).
+- Existing zx tests that rely on `//build-tools/lang:defs_common.bzl` behavior (no changes expected).
 - Add a small “file size guard” zx test (or extend the existing `build-tools/tools/dev/file-size-lint.ts` usage) to ensure new split files do not regress above 250 LOC.
 - Full suite validation via `build-tools/tools/bin/v`.
 
@@ -90,7 +90,7 @@ Bring `lang/defs_common.bzl` (currently >250 lines) into compliance by splitting
 
 ### Acceptance Criteria
 
-- `lang/defs_common.bzl` ≤250 lines.
+- `build-tools/lang/defs_common.bzl` ≤250 lines.
 - No semantic diffs in macro behavior:
   - label stamping, nixpkg normalization, patch src inclusion, and provider edge realization remain identical.
 - `build-tools/tools/bin/v` passes.
@@ -113,7 +113,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Only Starlark helper files under `//lang` change; no new external dependencies.
+- Only Starlark helper files under `//build-tools/lang` change; no new external dependencies.
 
 ---
 
@@ -227,7 +227,7 @@ Implement.
 ## Rollout & Sequencing
 
 1. PR‑1 (C++ patch workspace uniqueness) — removes the most likely batch-test flake vector.
-2. PR‑2 (`lang/defs_common.bzl` split) — restores methodology compliance for shared Starlark helpers.
+2. PR‑2 (`build-tools/lang/defs_common.bzl` split) — restores methodology compliance for shared Starlark helpers.
 3. PR‑3 (`build-tools/node/defs.bzl` split) — restores methodology compliance for Node macros.
 4. PR‑4 (Docs & policy clarification) — aligns the plan with repo reality and resolves the remaining policy ambiguity (Option A).
 

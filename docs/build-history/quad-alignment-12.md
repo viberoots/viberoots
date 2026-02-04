@@ -19,12 +19,12 @@ The intent is to make the shared interface accurate and fail fast with determini
 
 ### Scope & Changes
 
-The scope is limited to `//lang` helpers.
+The scope is limited to `//build-tools/lang` helpers.
 
-- Adjust `//lang:provider_edges.bzl`:
+- Adjust `//build-tools/lang:provider_edges.bzl`:
   - Either remove the unused `into` parameter, or implement the “merge into deps vs srcs” behavior in a way that is actually usable by macros.
   - Keep output deterministic (stable order, deduped).
-- Tighten `//lang:lockfile_labels.bzl`:
+- Tighten `//build-tools/lang:lockfile_labels.bzl`:
   - Enforce the documented shape `lockfile:<path>#<importer>` (require `#` and a non-empty importer).
   - Keep error text actionable and deterministic.
 - If any macros rely on the old permissive behavior, update them in the same PR to pass correct labels (behavior-preserving).
@@ -71,7 +71,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Changes are confined to `//lang` and any directly impacted macro files. Typical slices already include these paths.
+- Changes are confined to `//build-tools/lang` and any directly impacted macro files. Typical slices already include these paths.
 
 ---
 
@@ -88,7 +88,7 @@ This PR splits bootstrap into:
 
 ### Scope & Changes
 
-- Refactor `//lang:nix_shell.bzl`:
+- Refactor `//build-tools/lang:nix_shell.bzl`:
   - Extract “root detection + cd” into `nix_bootstrap_env_core()` (or equivalent name).
   - Move PNPM unified store logic into `nix_bootstrap_env_pnpm_store()` (or equivalent name), keeping existing gating semantics.
   - Keep existing `nix_timeout_wrapper_var(...)` unchanged.
@@ -132,7 +132,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Mostly `//lang` plus the Node macro file(s) that assemble Nix commands.
+- Mostly `//build-tools/lang` plus the Node macro file(s) that assemble Nix commands.
 
 ---
 

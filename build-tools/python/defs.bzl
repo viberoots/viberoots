@@ -1,6 +1,6 @@
 load("@prelude//:rules.bzl", "python_binary", "python_library", "python_test")
 load(
-    "//lang:defs_common.bzl",
+    "//build-tools/lang:defs_common.bzl",
     "append_nixpkg_labels",
     "merge_provider_edges",
     "merge_link_intent_deps",
@@ -8,7 +8,7 @@ load(
     "stamp_wasm_variant",
     "validate_link_closure_overrides",
 )
-load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
+load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
 load("//build-tools/python:pyext_stub.bzl", "python_pyext_stub")
 load(
     "//build-tools/python:defs_pyext_wasm.bzl",

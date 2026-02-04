@@ -48,7 +48,7 @@ async function fileContainsDirectStamp(file: string): Promise<Violation[]> {
 
 async function main() {
   const allowlist = new Set<string>([
-    "lang/global_inputs.bzl", // centralized policy (PR‑5)
+    "build-tools/lang/global_inputs.bzl", // centralized policy (PR‑5)
   ]);
   const files = await listBzlFiles();
   const viols: Violation[] = [];

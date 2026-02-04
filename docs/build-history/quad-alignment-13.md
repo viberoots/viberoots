@@ -18,7 +18,7 @@ This PR makes “provider filtering” a shared, explicit helper, and migrates e
 
 ### Scope & Changes
 
-- Add a shared helper in `//lang:provider_edges.bzl`:
+- Add a shared helper in `//build-tools/lang:provider_edges.bzl`:
   - `strip_provider_targets(deps, provider_prefix = "//third_party/providers:")` (or equivalent name).
   - Deterministic behavior: preserve order, drop only provider targets, ignore non-strings.
 - Update C++ macros:
@@ -65,11 +65,11 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Affects `//lang` and a small number of macro files; should be safe in thin slices.
+- Affects `//build-tools/lang` and a small number of macro files; should be safe in thin slices.
 
 ---
 
-## PR‑2: Shared planner-visible stub rule (`//lang:planner_stub.bzl`) + migrate C++ and Go planner stubs
+## PR‑2: Shared planner-visible stub rule (`//build-tools/lang:planner_stub.bzl`) + migrate C++ and Go planner stubs
 
 ### Description
 
@@ -80,17 +80,17 @@ We currently have multiple “planner-visible stub” shapes across languages:
 
 This is functional, but it leaks per-language conventions and increases the chance that one stub carries slightly different edges/labels semantics.
 
-This PR introduces one shared planner stub rule under `//lang` and migrates existing uses to it.
+This PR introduces one shared planner stub rule under `//build-tools/lang` and migrates existing uses to it.
 
 ### Scope & Changes
 
-- Add `//lang:planner_stub.bzl` defining a rule that:
+- Add `//build-tools/lang:planner_stub.bzl` defining a rule that:
   - produces a single stamp output
   - accepts `deps` (for graph edges)
   - accepts `labels` (for exporter/planner routing)
   - optionally accepts `srcs` (to carry package-local file inputs when needed for planner discovery)
 - Migrate C++:
-  - Replace `//build-tools/cpp/private:planner_stub.bzl` usage with `//lang:planner_stub.bzl`.
+  - Replace `//build-tools/cpp/private:planner_stub.bzl` usage with `//build-tools/lang:planner_stub.bzl`.
 - Migrate Go:
   - Replace the `genrule` stub used by `nix_go_carchive` with `planner_stub` so the planner-visible node is uniform.
   - Keep existing behavior for provider-edge realization (merge provider edges into `srcs` where required) but route it through a shared stub.
@@ -139,7 +139,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Confined to Starlark rule additions plus macro call sites; should work in partial clones that include `//lang`.
+- Confined to Starlark rule additions plus macro call sites; should work in partial clones that include `//build-tools/lang`.
 
 ---
 
@@ -159,7 +159,7 @@ This PR makes “where patch inputs attach” explicit and resolves the Python b
 
 ### Scope & Changes
 
-- Extend `//lang:patch_inputs.bzl`:
+- Extend `//build-tools/lang:patch_inputs.bzl`:
   - Add `append_patch_inputs(kwargs, dirs, into = "srcs")` (or equivalent).
   - Add `include_importer_patches_from_labels(kwargs, lang, into = "srcs")`.
   - Preserve existing helpers as wrappers (`append_patch_srcs(...)` remains, implemented via the new function).
@@ -187,7 +187,7 @@ This PR makes “where patch inputs attach” explicit and resolves the Python b
 ### Docs (in this PR)
 
 - Update the patching/invalidation docs to explicitly state:
-  - patch inputs are attached via `//lang:patch_inputs.bzl`
+  - patch inputs are attached via `//build-tools/lang:patch_inputs.bzl`
   - the supported `into` values and how to choose them
   - the Python binary strategy (so contributors do not cargo-cult `srcs` assumptions)
 
@@ -215,7 +215,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `//lang`, `build-tools/python/defs.bzl`, `build-tools/node/defs_core.bzl`, and tests. Should remain compatible with thin slices if the fixtures live under `build-tools/tools/tests`.
+- Touches `//build-tools/lang`, `build-tools/python/defs.bzl`, `build-tools/node/defs_core.bzl`, and tests. Should remain compatible with thin slices if the fixtures live under `build-tools/tools/tests`.
 
 ---
 
@@ -236,7 +236,7 @@ This PR centralizes those patterns so Node macros remain small and consistent.
 
 ### Scope & Changes
 
-- Extend `//lang:nix_shell.bzl` (or add a small `//lang:nix_cmd.bzl`) with helpers:
+- Extend `//build-tools/lang:nix_shell.bzl` (or add a small `//build-tools/lang:nix_cmd.bzl`) with helpers:
   - `escape_buck_cmd_subst(s)` (or similar) that performs the minimum `$(` → `$$(` transform.
   - `nix_build_out_path_cmd(flake_attr, timeout_var = "TIMEOUT")` that returns the standard `outPath=$$(...)` snippet using `--no-link --print-out-paths`.
 - Update `build-tools/node/defs_nix.bzl`:
@@ -274,7 +274,7 @@ This PR centralizes those patterns so Node macros remain small and consistent.
 
 ### Downsides for Implementing
 
-- Slightly more shared helper surface in `//lang`; mitigated by keeping helpers narrow and Node-focused.
+- Slightly more shared helper surface in `//build-tools/lang`; mitigated by keeping helpers narrow and Node-focused.
 
 ### Recommendation
 
@@ -282,7 +282,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `//lang` and `build-tools/node/defs_nix.bzl` plus existing Node tests.
+- Touches `//build-tools/lang` and `build-tools/node/defs_nix.bzl` plus existing Node tests.
 
 ---
 
@@ -293,7 +293,7 @@ The PRs are ordered by dependency chain and “surface tightening first”:
 1. PR‑1 (provider filtering helper) removes ad-hoc logic and provides a shared primitive used by later work.
 2. PR‑2 (shared planner stub) reduces language-specific stubs and benefits from PR‑1’s shared filtering.
 3. PR‑3 (patch-input attach surface) uses the shared stub patterns and closes the Python ambiguity with tests.
-4. PR‑4 (Node Nix invocation consolidation) is isolated but benefits from the stabilized `//lang` helper approach.
+4. PR‑4 (Node Nix invocation consolidation) is isolated but benefits from the stabilized `//build-tools/lang` helper approach.
 
 ---
 

@@ -14,7 +14,9 @@ test("Starlark supported importer predicate ↔ TS isSupportedImporterLabel pari
     const targetsPath = path.join(tmp, "TARGETS");
     await fsp.appendFile(
       targetsPath,
-      ['load("//lang:defs_common.bzl", "supported_importer_label_probe")', ""].join("\n"),
+      ['load("//build-tools/lang:defs_common.bzl", "supported_importer_label_probe")', ""].join(
+        "\n",
+      ),
       "utf8",
     );
 

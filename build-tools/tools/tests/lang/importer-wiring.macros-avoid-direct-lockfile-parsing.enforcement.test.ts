@@ -13,20 +13,20 @@ const importerScopedMacroImplFiles = [
   "build-tools/python/defs_pyext_wasm.bzl",
 ];
 
-test("importer-scoped macros delegate lockfile parsing/enforcement to //lang:importer_wiring.bzl", async () => {
+test("importer-scoped macros delegate lockfile parsing/enforcement to //build-tools/lang:importer_wiring.bzl", async () => {
   for (const file of importerScopedMacroImplFiles) {
     const txt = await fsp.readFile(file, "utf8");
 
     assert(
-      !txt.includes('load("//lang:lockfile_labels.bzl"'),
-      `${file} must not load //lang:lockfile_labels.bzl directly; use shared wiring helpers`,
+      !txt.includes('load("//build-tools/lang:lockfile_labels.bzl"'),
+      `${file} must not load //build-tools/lang:lockfile_labels.bzl directly; use shared wiring helpers`,
     );
     assert(
-      !txt.includes('load("//lang:importer_wiring.bzl"'),
-      `${file} must not load //lang:importer_wiring.bzl directly; use prepare_language_wiring(...)`,
+      !txt.includes('load("//build-tools/lang:importer_wiring.bzl"'),
+      `${file} must not load //build-tools/lang:importer_wiring.bzl directly; use prepare_language_wiring(...)`,
     );
     assert(
-      !txt.includes('load("//lang/internal:importer_wiring.bzl"'),
+      !txt.includes('load("//build-tools/lang/internal:importer_wiring.bzl"'),
       `${file} must not load internal importer wiring; use prepare_language_wiring(...)`,
     );
 

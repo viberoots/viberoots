@@ -25,7 +25,7 @@ async function listBzlFilesUnder(dir: string): Promise<string[]> {
   return out;
 }
 
-test("Starlark does not hardcode dict-safe synthetic prefix literals outside lang/dict_inputs.bzl", async () => {
+test("Starlark does not hardcode dict-safe synthetic prefix literals outside build-tools/lang/dict_inputs.bzl", async () => {
   const repoRoot = process.cwd();
   const allowlist = new Set([path.join(repoRoot, "lang", "dict_inputs.bzl")]);
   const roots = ["lang", "go", "node", "python", "cpp"].map((d) => path.join(repoRoot, d));
@@ -46,7 +46,7 @@ test("Starlark does not hardcode dict-safe synthetic prefix literals outside lan
   if (offenders.length > 0) {
     console.error("found dict-safe synthetic prefix literals in *.bzl files:");
     console.error(
-      "expected callers to import PATCH_INPUTS_KEY_PREFIX/PROVIDER_EDGES_KEY_PREFIX/GLOBAL_NIX_INPUTS_KEY_PREFIX via //lang:defs_common.bzl",
+      "expected callers to import PATCH_INPUTS_KEY_PREFIX/PROVIDER_EDGES_KEY_PREFIX/GLOBAL_NIX_INPUTS_KEY_PREFIX via //build-tools/lang:defs_common.bzl",
     );
     for (const o of offenders) {
       console.error(`- ${o.file}: ${o.matches.join(", ")}`);

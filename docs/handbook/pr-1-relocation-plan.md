@@ -1,11 +1,11 @@
 # PR-1 Relocation Plan (Unified Language Wiring)
 
-I will add a single macro wiring entrypoint under `//lang` and route all macro call sites through it. This keeps patch scope decisions inside the language contract and removes patch-model branching from macro files.
+I will add a single macro wiring entrypoint under `//build-tools/lang` and route all macro call sites through it. This keeps patch scope decisions inside the language contract and removes patch-model branching from macro files.
 
 ## New entrypoint
 
-- Add `lang/language_wiring.bzl:prepare_language_wiring(...)`.
-- Re-export it from `lang/defs_common.bzl` as the canonical wiring helper.
+- Add `build-tools/lang/language_wiring.bzl:prepare_language_wiring(...)`.
+- Re-export it from `build-tools/lang/defs_common.bzl` as the canonical wiring helper.
 
 ## Call sites to update
 
@@ -16,9 +16,9 @@ I will add a single macro wiring entrypoint under `//lang` and route all macro c
 
 ## Helpers to keep internal
 
-- Package-local: `lang/internal/package_local_wiring.bzl:prepare_package_local_wiring(...)`.
-- Importer-scoped: `lang/internal/importer_wiring*.bzl:prepare_importer_*`.
-- Package-local WASM: `lang/wasm_package_local_wiring.bzl:prepare_package_local_wasm_wiring(...)`.
+- Package-local: `build-tools/lang/internal/package_local_wiring.bzl:prepare_package_local_wiring(...)`.
+- Importer-scoped: `build-tools/lang/internal/importer_wiring*.bzl:prepare_importer_*`.
+- Package-local WASM: `build-tools/lang/wasm_package_local_wiring.bzl:prepare_package_local_wasm_wiring(...)`.
 
 ## Tests and docs to update
 

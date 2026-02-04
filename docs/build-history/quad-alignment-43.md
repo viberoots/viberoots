@@ -19,9 +19,9 @@ I will add a single, canonical wiring entrypoint for macro authors. The entrypoi
 
 ### Scope & Changes
 
-- Add a canonical wiring entrypoint under `//lang`:
-  - New helper, for example `//lang:defs_common.bzl:prepare_language_wiring(...)`.
-  - The helper uses the language contract in `lang/lang_contracts.bzl` to choose the wiring model.
+- Add a canonical wiring entrypoint under `//build-tools/lang`:
+  - New helper, for example `//build-tools/lang:defs_common.bzl:prepare_language_wiring(...)`.
+  - The helper uses the language contract in `build-tools/lang/lang_contracts.bzl` to choose the wiring model.
 - Refactor macro call sites:
   - Go and C++ macros use the unified entrypoint instead of package-local specific helpers.
   - Node and Python macros use the unified entrypoint instead of importer-specific helpers.
@@ -88,12 +88,12 @@ Provider-edge realization is currently duplicated across package-local and impor
 
 ### Scope & Changes
 
-- Create a single provider-edge helper in `lang/provider_edges.bzl` that:
+- Create a single provider-edge helper in `build-tools/lang/provider_edges.bzl` that:
   - accepts list or dict-shaped `srcs` and `deps`
   - merges provider edges deterministically
   - keeps the same ordering and filtering behavior as today
 - Update package-local and importer-scoped wiring helpers to call the unified helper.
-- Remove or deprecate duplicate edge-merge logic in `lang/importer_wiring_primitives.bzl`.
+- Remove or deprecate duplicate edge-merge logic in `build-tools/lang/importer_wiring_primitives.bzl`.
 - Document the new canonical helper and its shape requirements in `abstractions.md`.
 - Before refactor work, I will document the relocation plan in the PR description:
   - which functions are removed or replaced

@@ -18,7 +18,7 @@ As in prior parts, each PR includes the tests and documentation required for the
 
 The exporter has a convenience behavior for importer-scoped ecosystems: for targets that appear macro-stamped (they have `kind:*`), it can attach a missing `lockfile:<path>#<importer>` label by searching for the nearest lockfile.
 
-Today, this attachment path does not enforce the supported importer policy. If the nearest lockfile is under an unsupported root (not `apps/*`, not `libs/*`, not `.`), the exporter can attach a label whose importer is unsupported. That label is syntactically valid, but it violates the macro contract in `lang/lockfile_labels.bzl` and can fail later during macro evaluation with confusing causality.
+Today, this attachment path does not enforce the supported importer policy. If the nearest lockfile is under an unsupported root (not `apps/*`, not `libs/*`, not `.`), the exporter can attach a label whose importer is unsupported. That label is syntactically valid, but it violates the macro contract in `build-tools/lang/lockfile_labels.bzl` and can fail later during macro evaluation with confusing causality.
 
 This PR makes “supported importer roots” a contract in the exporter lockfile-label attachment path. The exporter must not generate labels that the macro layer will reject.
 

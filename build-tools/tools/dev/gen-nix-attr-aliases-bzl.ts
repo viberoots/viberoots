@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 /**
- * Generate lang/nix_attr_aliases.bzl from build-tools/tools/lib/nix-attr-aliases.json
+ * Generate build-tools/lang/nix_attr_aliases.bzl from build-tools/tools/lib/nix-attr-aliases.json
  * - Deterministic key ordering
  * - Safe no-op when JSON is missing or empty
  */
@@ -60,7 +60,7 @@ async function writeIfChanged(dst: string, data: string) {
 
 async function main() {
   const jsonPath = "build-tools/tools/lib/nix-attr-aliases.json";
-  const bzlPath = "lang/nix_attr_aliases.bzl";
+  const bzlPath = "build-tools/lang/nix_attr_aliases.bzl";
   const src = await readJsonIfExists<Record<string, string>>(jsonPath);
   const map = validateMap(src || {});
   const data = renderBzl(map);

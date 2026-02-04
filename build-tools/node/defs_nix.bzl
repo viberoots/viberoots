@@ -1,8 +1,8 @@
 load("@prelude//:rules.bzl", "genrule")
-load("//lang:defs_common.bzl", "default_lockfile_label_from_package", "default_lockfile_path_from_package", "ensure_default_lockfile_exists", "extract_lockfile_labels", "importer_from_labels", "prepare_language_wiring")
-load("//lang:importer_strings.bzl", "importer_display_name", "sanitize_importer_for_nix_attr")
+load("//build-tools/lang:defs_common.bzl", "default_lockfile_label_from_package", "default_lockfile_path_from_package", "ensure_default_lockfile_exists", "extract_lockfile_labels", "importer_from_labels", "prepare_language_wiring")
+load("//build-tools/lang:importer_strings.bzl", "importer_display_name", "sanitize_importer_for_nix_attr")
 load(
-    "//lang:nix_shell.bzl",
+    "//build-tools/lang:nix_shell.bzl",
     "nix_calling_env_export_buck_graph_json",
     "nix_calling_env_export_nix_pnpm_fetch_timeout",
     "nix_build_out_path_cmd",
@@ -11,7 +11,7 @@ load(
 load("//build-tools/node:defs_core.bzl", "nix_node_gen")
 
 MODULE_PROVIDERS = {}
-load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
+load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
 
 def _fail_importer_arg_mismatch(macro_name, importer, lockfile_importer, lockfile_label):
     fail(

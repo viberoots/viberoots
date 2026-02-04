@@ -277,7 +277,7 @@ Implement.
 
 ### Description
 
-The Node macros already use `prepare_importer_genrule_kwargs(...)` for genrule-style wrappers, and Python macros route through `lang/importer_wiring.bzl`. The Node `nix_node_test` macro still performs a portion of the importer wiring manually (lockfile label enforcement, importer derivation, patch input attachment).
+The Node macros already use `prepare_importer_genrule_kwargs(...)` for genrule-style wrappers, and Python macros route through `build-tools/lang/importer_wiring.bzl`. The Node `nix_node_test` macro still performs a portion of the importer wiring manually (lockfile label enforcement, importer derivation, patch input attachment).
 
 This is not incorrect, but it is a drift vector because:
 
@@ -306,7 +306,7 @@ This PR routes Node `nix_node_test` through the shared importer wiring helpers w
 ### Docs (in this PR)
 
 - Update the macro authoring guidance to say:
-  - importer-scoped ecosystems should use `lang/importer_wiring.bzl` helpers rather than re-implementing wiring steps
+  - importer-scoped ecosystems should use `build-tools/lang/importer_wiring.bzl` helpers rather than re-implementing wiring steps
 
 ### Acceptance Criteria
 

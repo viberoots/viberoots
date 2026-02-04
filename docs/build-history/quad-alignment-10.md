@@ -150,7 +150,7 @@ Implement.
 
 ### Description
 
-Add `default_package_patch_dirs(lang)` (tiny helper) in `//lang:defs_common.bzl` and migrate macros to use it instead of hard‑coded strings, keeping current defaults exactly the same.
+Add `default_package_patch_dirs(lang)` (tiny helper) in `//build-tools/lang:defs_common.bzl` and migrate macros to use it instead of hard‑coded strings, keeping current defaults exactly the same.
 
 ### Scope & Changes
 
@@ -187,7 +187,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Helper lives under `//lang`; macro files already sliced in standard clones.
+- Helper lives under `//build-tools/lang`; macro files already sliced in standard clones.
 
 ---
 

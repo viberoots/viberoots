@@ -2,7 +2,7 @@
 
 This installment follows Part 38, but with one important update from the current repo state:
 
-- Package-local WASM wiring is already on the **non-mutating helper boundary** pattern (`lang/wasm_package_local_wiring.bzl:prepare_package_local_wasm_wiring(...)` uses `extract_*`, returns a prepared `kwargs`, and has a mutation probe). So we do **not** need a PR dedicated to “make WASM wiring non-mutating” anymore.
+- Package-local WASM wiring is already on the **non-mutating helper boundary** pattern (`build-tools/lang/wasm_package_local_wiring.bzl:prepare_package_local_wasm_wiring(...)` uses `extract_*`, returns a prepared `kwargs`, and has a mutation probe). So we do **not** need a PR dedicated to “make WASM wiring non-mutating” anymore.
 
 After re-reviewing the codebase with the contract inventory in `abstractions.md`, the remaining **valuable** (non-polish) gaps are:
 
@@ -161,7 +161,7 @@ Implement.
 
 ### Description
 
-The shared helper surfaces in `//lang:*` are the core abstraction boundary that keeps cross-language behavior consistent. The system is correct today, but drift risk reappears whenever we add new macro shapes and people copy patterns.
+The shared helper surfaces in `//build-tools/lang:*` are the core abstraction boundary that keeps cross-language behavior consistent. The system is correct today, but drift risk reappears whenever we add new macro shapes and people copy patterns.
 
 We should standardize the macro entrypoint conventions and add a small, allowlisted enforcement suite that blocks the highest-signal bypass patterns.
 
@@ -178,12 +178,12 @@ We should standardize the macro entrypoint conventions and add a small, allowlis
   - `build-tools/python/defs.bzl`
   - `build-tools/rust/defs.bzl` (if it participates in the same provider/label wiring contracts)
 - Tighten “preferred helper surface” usage:
-  - importer-scoped macros should go through `prepare_importer_*_wiring` v2-style helpers (non-mutating boundary) via `//lang:defs_common.bzl`
-  - package-local macros should go through `prepare_package_local_wiring(...)` via `//lang:defs_common.bzl`
+  - importer-scoped macros should go through `prepare_importer_*_wiring` v2-style helpers (non-mutating boundary) via `//build-tools/lang:defs_common.bzl`
+  - package-local macros should go through `prepare_package_local_wiring(...)` via `//build-tools/lang:defs_common.bzl`
   - macros should not directly load low-level parsing helpers when a dedicated wiring helper exists
 - Add narrow enforcement (allowlisted to these macro entrypoint files only):
-  - Disallow calling any helper ending in `_legacy_mutating` outside `//lang/*`.
-  - Disallow direct loads of `//lang:lockfile_labels.bzl` from macro entrypoints (must route via importer wiring surfaces).
+  - Disallow calling any helper ending in `_legacy_mutating` outside `//build-tools/lang/*`.
+  - Disallow direct loads of `//build-tools/lang:lockfile_labels.bzl` from macro entrypoints (must route via importer wiring surfaces).
   - Disallow direct calls to `pop_package_local_patch_dirs_and_nixpkg_deps(...)` from macro entrypoints.
 
 Non-goals in this PR:
@@ -207,7 +207,7 @@ Non-goals in this PR:
   - document the two conventions (single labels merge point, single deps merge point)
   - include one short, real before/after snippet from an entrypoint macro file
 - Update `docs/handbook/adding-language.md`:
-  - add a concise “macro author checklist” that points to `//lang:defs_common.bzl` surfaces and the enforcement test
+  - add a concise “macro author checklist” that points to `//build-tools/lang:defs_common.bzl` surfaces and the enforcement test
 
 ### Acceptance Criteria
 

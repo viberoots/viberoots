@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 /**
- * Generate lang/importer_roots.bzl from build-tools/tools/lib/importer-roots.json
+ * Generate build-tools/lang/importer_roots.bzl from build-tools/tools/lib/importer-roots.json
  * - Deterministic ordering
  * - Fail fast when the contract is missing or invalid
  */
@@ -57,7 +57,7 @@ async function writeIfChanged(dst: string, data: string) {
 
 async function main() {
   const jsonPath = "build-tools/tools/lib/importer-roots.json";
-  const bzlPath = "lang/importer_roots.bzl";
+  const bzlPath = "build-tools/lang/importer_roots.bzl";
   const txt = await fsp.readFile(jsonPath, "utf8");
   const raw = JSON.parse(txt) as RawContract;
   const allowDotImporter = raw.allowDotImporter === false ? false : true;

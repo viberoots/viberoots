@@ -8,7 +8,7 @@ If you are adding a language, changing macro wiring, or changing glue generation
 
 This audit covers the cross-language “shared layer” and the places where it is consumed:
 
-- **Starlark**: `//lang:*` helpers and language macros (`build-tools/go/defs.bzl`, `build-tools/cpp/defs.bzl`, `build-tools/node/defs_*.bzl`, `build-tools/python/defs.bzl`).
+- **Starlark**: `//build-tools/lang:*` helpers and language macros (`build-tools/go/defs.bzl`, `build-tools/cpp/defs.bzl`, `build-tools/node/defs_*.bzl`, `build-tools/python/defs.bzl`).
 - **TypeScript tooling**: exporter, provider sync, auto-map generation, patch tooling.
 - **Nix templates**: shared helpers and language templates used by the planner.
 
@@ -53,14 +53,14 @@ For language macros, stamping is the macro’s responsibility. Call sites should
 
 ### Canonical implementations
 
-- **Starlark**: `lang/label_stamping.bzl` via `lang/defs_common.bzl` re-exports.
+- **Starlark**: `build-tools/lang/label_stamping.bzl` via `build-tools/lang/defs_common.bzl` re-exports.
   - `stamp_labels(kwargs, lang, kind)`
   - `stamp_wasm_variant(kwargs, lang, variant)`
-- **Starlark (package-local WASM macro wiring)**: `lang/wasm_package_local_wiring.bzl` via `lang/defs_common.bzl` re-exports.
+- **Starlark (package-local WASM macro wiring)**: `build-tools/lang/wasm_package_local_wiring.bzl` via `build-tools/lang/defs_common.bzl` re-exports.
   - `prepare_package_local_wasm_wiring(...)` (non-mutating at the call-site boundary; returns prepared `kwargs`; fixed ordering: wasm stamps → patch_scope → patch inputs → provider edges)
   - `wire_package_local_wasm_planner_visible_stub(...)` (preferred; non-mutating boundary, delegates to `wire_package_local_planner_visible_stub(...)`)
 - **Kind vocabulary (contract)**:
-  - Starlark: `lang/kind_vocabulary.bzl` (re-exported via `lang/defs_common.bzl`)
+  - Starlark: `build-tools/lang/kind_vocabulary.bzl` (re-exported via `build-tools/lang/defs_common.bzl`)
   - TypeScript: `build-tools/tools/lib/kind-vocabulary.ts`
 - **Nix planner kind inference (shared)**: I keep `build-tools/tools/nix/planner/lib.nix:kindOf` with per-language configs in `build-tools/tools/nix/planner/kind-configs.nix`, imported by planner plugins. Planners must not re-implement `kindOf`. Relocation note: configs moved from `build-tools/tools/nix/planner/{go,cpp,python-core,node}.nix` into the registry.
 - **TypeScript exporter validation**: importer-scoped adapters warn when `kind:*` is missing for targets that should have it.
@@ -90,23 +90,23 @@ Language macros attach patch inputs and realize provider edges via a single shar
 
 ### Contract
 
-- Language macros should use `prepare_language_wiring(...)` from `lang/defs_common.bzl`.
+- Language macros should use `prepare_language_wiring(...)` from `build-tools/lang/defs_common.bzl`.
 - The entrypoint must not mutate the caller’s kwargs dict. It returns a prepared `kwargs` dict for the underlying rule call, plus any derived patch dirs, nixpkgs deps, and/or importer info depending on the language contract.
 - Per-model helpers remain internal implementation details; macro call sites must not select patch scope directly.
 
 ### Canonical implementations
 
-- **Starlark**: `lang/language_wiring.bzl:prepare_language_wiring`
-- **Starlark (internal)**: `lang/internal/package_local_wiring.bzl:prepare_package_local_wiring`
-- **Starlark (internal)**: `lang/internal/importer_wiring*.bzl:prepare_importer_*`
+- **Starlark**: `build-tools/lang/language_wiring.bzl:prepare_language_wiring`
+- **Starlark (internal)**: `build-tools/lang/internal/package_local_wiring.bzl:prepare_package_local_wiring`
+- **Starlark (internal)**: `build-tools/lang/internal/importer_wiring*.bzl:prepare_importer_*`
 
 ### Relocation map (refactor guardrail)
 
-- `lang/package_local_wiring.bzl` -> `lang/internal/package_local_wiring.bzl`
-- `lang/importer_wiring.bzl` -> `lang/internal/importer_wiring.bzl`
-- `lang/importer_wiring_primitives.bzl` -> `lang/internal/importer_wiring_primitives.bzl`
-- `lang/importer_wiring_nix_calling.bzl` -> `lang/internal/importer_wiring_nix_calling.bzl`
-- `lang/nix_calling_importer_genrule_wiring.bzl` -> `lang/internal/nix_calling_importer_genrule_wiring.bzl`
+- `build-tools/lang/package_local_wiring.bzl` -> `build-tools/lang/internal/package_local_wiring.bzl`
+- `build-tools/lang/importer_wiring.bzl` -> `build-tools/lang/internal/importer_wiring.bzl`
+- `build-tools/lang/importer_wiring_primitives.bzl` -> `build-tools/lang/internal/importer_wiring_primitives.bzl`
+- `build-tools/lang/importer_wiring_nix_calling.bzl` -> `build-tools/lang/internal/importer_wiring_nix_calling.bzl`
+- `build-tools/lang/nix_calling_importer_genrule_wiring.bzl` -> `build-tools/lang/internal/nix_calling_importer_genrule_wiring.bzl`
 
 Cleanup required:
 
@@ -142,7 +142,7 @@ No other transformations are part of this contract.
 
 ### Canonical implementations
 
-- **Starlark**: `lang/sanitize.bzl:sanitize_name`
+- **Starlark**: `build-tools/lang/sanitize.bzl:sanitize_name`
 - **TypeScript**: `build-tools/tools/lib/sanitize.ts:sanitizeName`
 - **Nix**: `build-tools/tools/nix/lib/lang-helpers.nix:sanitizeName`
   - C++ macros and rules call `sanitize_name` directly; no C++-local wrapper is part of the contract.
@@ -180,7 +180,7 @@ Some tooling needs a stable mapping from a Buck target label to a Nix attribute 
 - **TypeScript**: `build-tools/tools/lib/labels.ts`
   - `normalizeTargetLabel`
   - `sanitizeAttrNameFromLabel`
-- **Starlark**: `lang/nix_attr.bzl`
+- **Starlark**: `build-tools/lang/nix_attr.bzl`
   - `normalize_target_label`
   - `sanitize_nix_attr_from_target_label`
 - **Nix**: `build-tools/tools/nix/lib/lang-helpers.nix`
@@ -235,7 +235,7 @@ The validation rules are:
 
 ### Canonical implementations
 
-- **Starlark**: `lang/lockfile_labels.bzl`
+- **Starlark**: `build-tools/lang/lockfile_labels.bzl`
   - `ensure_single_lockfile_label`
   - `importer_from_labels`
 - **TypeScript**: `build-tools/tools/lib/labels.ts`
@@ -275,7 +275,7 @@ Starlark and TypeScript. Do not hardcode basenames in tooling or macros.
 
 ### Canonical implementations
 
-- **Starlark**: `lang/lockfile_contracts.bzl`
+- **Starlark**: `build-tools/lang/lockfile_contracts.bzl`
   - `LOCKFILE_BASENAMES_BY_LANG`
   - `default_lockfile_basename_for_lang`
 - **TypeScript**: `build-tools/tools/lib/lockfile-contracts.ts`
@@ -306,9 +306,9 @@ I treat patch invalidation as two explicit models:
     - `patch_scope:package-local`
     - `patch_scope:importer-local`
 - Stamping happens only at the shared wiring helper boundaries:
-  - Canonical entrypoint: `lang/language_wiring.bzl:prepare_language_wiring`
-  - Package-local planner-visible stubs: `lang/planner_visible_wiring.bzl:wire_package_local_planner_visible_stub`
-  - Per-model helpers are internal (`lang/internal/package_local_wiring.bzl`, `lang/internal/importer_wiring*.bzl`).
+  - Canonical entrypoint: `build-tools/lang/language_wiring.bzl:prepare_language_wiring`
+  - Package-local planner-visible stubs: `build-tools/lang/planner_visible_wiring.bzl:wire_package_local_planner_visible_stub`
+  - Per-model helpers are internal (`build-tools/lang/internal/package_local_wiring.bzl`, `build-tools/lang/internal/importer_wiring*.bzl`).
 
 - **Package-local patching** (Go, C++):
   - Patch files live under the target’s Buck package, typically `patches/<lang>`.
@@ -350,14 +350,14 @@ Regression guard for this diagnostic surface:
 
 ### Canonical implementations
 
-- **Patch model registry (Starlark)**: `//lang:lang_contracts.bzl`
+- **Patch model registry (Starlark)**: `//build-tools/lang:lang_contracts.bzl`
 - **Patch model registry (TypeScript)**: `build-tools/tools/lib/lang-contracts.ts`
 - **Starlark wiring entrypoint**:
-  - `lang/language_wiring.bzl:prepare_language_wiring` (preferred macro-side helper that composes kwarg normalization, label stamping, patch input inclusion, and provider-edge realization deterministically without mutating call-site dicts).
+  - `build-tools/lang/language_wiring.bzl:prepare_language_wiring` (preferred macro-side helper that composes kwarg normalization, label stamping, patch input inclusion, and provider-edge realization deterministically without mutating call-site dicts).
 - **Starlark package-local internals**:
-  - `lang/patch_inputs.bzl:include_package_local_patches` and `lang/patch_inputs.bzl:default_package_patch_dirs`.
-  - `lang/internal/package_local_wiring.bzl:prepare_package_local_wiring`.
-- **Starlark importer-local internals**: `lang/patch_inputs.bzl:include_importer_patches_from_labels` plus `lang/internal/importer_wiring_primitives.bzl:attach_importer_patch_inputs`.
+  - `build-tools/lang/patch_inputs.bzl:include_package_local_patches` and `build-tools/lang/patch_inputs.bzl:default_package_patch_dirs`.
+  - `build-tools/lang/internal/package_local_wiring.bzl:prepare_package_local_wiring`.
+- **Starlark importer-local internals**: `build-tools/lang/patch_inputs.bzl:include_importer_patches_from_labels` plus `build-tools/lang/internal/importer_wiring_primitives.bzl:attach_importer_patch_inputs`.
 
 For importer-scoped ecosystems, there is an additional provider contract surface that is still part of the “patch model”, because it directly determines invalidation behavior and glue content.
 
@@ -367,7 +367,7 @@ For importer-scoped ecosystems, there is an additional provider contract surface
     - optional global patch dir inputs (for Node: `patches/node`, effective-set matches only)
     - lockfile label auto-attach requirement (`requires-kind-stamp`)
     - provider sync strictness support (Python supports strict parsing; default is non-strict)
-- **Importer-scoped provider policy (Starlark)**: `lang/importer_contracts.bzl`
+- **Importer-scoped provider policy (Starlark)**: `build-tools/lang/importer_contracts.bzl`
   - `importer_patch_inclusion_for_lang(lang)` mirrors the patch inclusion policy so probe tests can enforce parity.
 - **TypeScript provider sync driver**: `build-tools/tools/lib/provider-sync-driver.ts` (takes the contract values as explicit options; does not silently default)
 - **TypeScript importer-scoped provider sync helper**: `build-tools/tools/buck/providers/importer-scoped.ts` (shared scaffolding for Node/Python; extension points for synthetic lockfiles and strict parsing)
@@ -434,16 +434,16 @@ Providers are how we attach “shared dependency state” to build targets witho
 ### Contract
 
 - `third_party/providers/auto_map.bzl` is generated and provides `MODULE_PROVIDERS`.
-- Language macros load providers through the stable re-export `lang/auto_map.bzl`.
+- Language macros load providers through the stable re-export `build-tools/lang/auto_map.bzl`.
 - Macros realize provider edges deterministically using shared helpers. They do not hand-roll mapping logic.
   Direct calls to `realize_provider_edges(...)` are reserved for lower-level helpers and probes, not macro wiring.
 
 ### Canonical implementations
 
 - **Starlark**:
-  - `lang/provider_edges.bzl:merge_provider_edges` is the canonical macro wiring helper. It supports list inputs and dict-safe attachment via `dict_safe = True`.
-  - `lang/provider_edges.bzl:realize_provider_edges` is the lower-level helper used by `merge_provider_edges` for list and kwargs bases.
-  - `lang/provider_edges.bzl:strip_provider_targets`
+  - `build-tools/lang/provider_edges.bzl:merge_provider_edges` is the canonical macro wiring helper. It supports list inputs and dict-safe attachment via `dict_safe = True`.
+  - `build-tools/lang/provider_edges.bzl:realize_provider_edges` is the lower-level helper used by `merge_provider_edges` for list and kwargs bases.
+  - `build-tools/lang/provider_edges.bzl:strip_provider_targets`
 - **TypeScript**:
   - `build-tools/tools/buck/gen-auto-map.ts` (generator)
   - `build-tools/tools/lib/labels.ts:providersForLabels` (mapping labels to provider targets)
@@ -459,7 +459,7 @@ Providers are how we attach “shared dependency state” to build targets witho
 
 These are the usual ways this leaks:
 
-- A macro loads `third_party/providers/auto_map.bzl` directly instead of using `lang/auto_map.bzl`.
+- A macro loads `third_party/providers/auto_map.bzl` directly instead of using `build-tools/lang/auto_map.bzl`.
 - A macro merges provider edges by concatenating lists without stable dedupe, so order changes unexpectedly.
 - A planner-visible stub depends on provider targets, and hits visibility or graph-shape constraints. Prefer `wire_*planner_visible*_stub(...)` helpers, which **strip provider targets from planner-visible `deps` by default**; only opt out when a stub explicitly needs provider deps.
 
@@ -484,8 +484,8 @@ The label string is:
 
 ### Canonical implementations
 
-- **Starlark**: `lang/nixpkg_labels.bzl:normalize_nix_attr` and `append_nixpkg_labels`
-- Macro guidance: prefer `lang/defs_common.bzl:prepare_language_wiring(...)` so language macro files do not re-implement `nixpkg_deps` parsing/defaulting or patch-dir handling.
+- **Starlark**: `build-tools/lang/nixpkg_labels.bzl:normalize_nix_attr` and `append_nixpkg_labels`
+- Macro guidance: prefer `build-tools/lang/defs_common.bzl:prepare_language_wiring(...)` so language macro files do not re-implement `nixpkg_deps` parsing/defaulting or patch-dir handling.
 - **TypeScript**: `build-tools/tools/lib/providers.ts:normalizeNixAttr` (canonical import path; implementation lives in `build-tools/tools/lib/provider-names.ts`)
 - **Nix**: `build-tools/tools/nix/lib/lang-helpers.nix:normalizeNixAttr`
 
@@ -515,10 +515,10 @@ Some rules and macros call Nix. Those actions must be invalidated by a small set
 
 ### Canonical implementations
 
-- **Starlark**: `lang/global_inputs.bzl`
+- **Starlark**: `build-tools/lang/global_inputs.bzl`
   - `global_nix_inputs`
   - `attach_global_nix_inputs`
-- **Starlark label stamp**: `lang/label_stamping.bzl:stamp_global_nix_inputs` (used only when justified)
+- **Starlark label stamp**: `build-tools/lang/label_stamping.bzl:stamp_global_nix_inputs` (used only when justified)
 - **Lint**: `build-tools/tools/dev/lint-global-stamping.ts` (fails on direct `//:flake.lock` stamping)
 
 ### Regression guards
@@ -551,8 +551,8 @@ Importer-scoped wrappers should use a standardized wiring sequence. When a wrapp
 
 ### Canonical implementations
 
-- **Starlark**: `lang/defs_common.bzl:prepare_language_wiring(...)` with `wiring = "nix_calling_genrule"`
-- **Starlark (command assembly)**: `lang/nix_shell.bzl`
+- **Starlark**: `build-tools/lang/defs_common.bzl:prepare_language_wiring(...)` with `wiring = "nix_calling_genrule"`
+- **Starlark (command assembly)**: `build-tools/lang/nix_shell.bzl`
   - `nix_calling_genrule_bootstrap(...)` (root derivation + optional `workspace-root.env` sourcing)
   - `nix_calling_genrule_nix_build_out_path_prefix(...)` (canonical `nix build --no-link --print-out-paths` outPath capture)
   - `nix_calling_env_export_buck_graph_json(...)` and `nix_calling_env_export_nix_pnpm_fetch_timeout(...)` (standard env exports used by Node Nix-calling macros)
@@ -564,7 +564,7 @@ These are the usual ways this leaks:
 - A wrapper forgets the dict-safe branch and breaks when `srcs` is a map.
 - A wrapper uses a different key prefix scheme for synthetic entries, and collisions become nondeterministic.
 - A wrapper shells out to Nix but forgets to attach global inputs as real action inputs, so changes to global inputs do not invalidate.
-- A Node macro hand-rolls `nix build ... --no-link --print-out-paths` command assembly or drifts on env exports. Use the `lang/nix_shell.bzl` helpers so `node_webapp` and bundled `nix_node_cli_bin` stay consistent.
+- A Node macro hand-rolls `nix build ... --no-link --print-out-paths` command assembly or drifts on env exports. Use the `build-tools/lang/nix_shell.bzl` helpers so `node_webapp` and bundled `nix_node_cli_bin` stay consistent.
 
 ### Dict-safe synthetic key prefixes
 
@@ -576,19 +576,19 @@ Dict-shaped attributes that carry synthetic attachments (for example importer-lo
 
 These prefixes are a shared contract. Do not hardcode these strings. Import the canonical constants:
 
-- `//lang:defs_common.bzl` (`PATCH_INPUTS_KEY_PREFIX`, `PROVIDER_EDGES_KEY_PREFIX`, `GLOBAL_NIX_INPUTS_KEY_PREFIX`)
-- Source of truth: `//lang:dict_inputs.bzl`
+- `//build-tools/lang:defs_common.bzl` (`PATCH_INPUTS_KEY_PREFIX`, `PROVIDER_EDGES_KEY_PREFIX`, `GLOBAL_NIX_INPUTS_KEY_PREFIX`)
+- Source of truth: `//build-tools/lang:dict_inputs.bzl`
 
 ### Enforcement
 
 The contract is guarded by probe and enforcement tests. If a new macro bypasses the shared helper surface, these should fail:
 
 - `build-tools/tools/tests/lang/importer-wiring.attach-patches-and-providers.probe.test.ts`: proves list and dict `srcs` shapes both receive importer-local patch inputs and provider edges.
-- `build-tools/tools/tests/lang/importer-wiring.macros-avoid-direct-lockfile-parsing.enforcement.test.ts`: prevents importer-scoped macro implementations from directly loading `//lang:lockfile_labels.bzl` instead of delegating to shared wiring.
+- `build-tools/tools/tests/lang/importer-wiring.macros-avoid-direct-lockfile-parsing.enforcement.test.ts`: prevents importer-scoped macro implementations from directly loading `//build-tools/lang:lockfile_labels.bzl` instead of delegating to shared wiring.
 - `build-tools/tools/tests/lang/importer-nix-calling-genrule-wiring.attach-patches-providers-global-inputs.probe.test.ts`: proves list and dict `srcs` shapes receive importer-local patch inputs, provider edges, global Nix inputs, and standardized workspace-root env injection.
 - `build-tools/tools/tests/node/node.nix-calling-macros.use-shared-importer-nix-genrule-helper.enforcement.test.ts`: prevents Node Nix-calling macro implementations from bypassing the shared helper.
 - `build-tools/tools/tests/node/node.defs-core.uses-non-mutating-importer-wiring.enforcement.test.ts`: prevents Node macros from falling back to the mutating importer wiring helpers.
-- `build-tools/tools/tests/lang/starlark.no-legacy-mutating-outside-lang.enforcement.test.ts`: prevents reintroduction of legacy mutating wiring helpers outside `//lang/*`.
+- `build-tools/tools/tests/lang/starlark.no-legacy-mutating-outside-lang.enforcement.test.ts`: prevents reintroduction of legacy mutating wiring helpers outside `//build-tools/lang/*`.
 
 ---
 
@@ -608,11 +608,11 @@ Importer-scoped non-genrule wrappers should:
 
 ### Canonical implementations
 
-- **Starlark (preferred)**: `lang/defs_common.bzl:prepare_language_wiring(...)` with `wiring = "non_genrule"`
-- **Starlark (Nix-calling, preferred)**: `lang/defs_common.bzl:prepare_language_wiring(...)` with `wiring = "non_genrule_nix_calling"` (composes non-genrule importer wiring plus `global_nix_inputs()` as real action inputs, without mutating caller dicts)
-- **Genrule-style (preferred)**: `lang/defs_common.bzl:prepare_language_wiring(...)` with `wiring = "genrule"`
+- **Starlark (preferred)**: `build-tools/lang/defs_common.bzl:prepare_language_wiring(...)` with `wiring = "non_genrule"`
+- **Starlark (Nix-calling, preferred)**: `build-tools/lang/defs_common.bzl:prepare_language_wiring(...)` with `wiring = "non_genrule_nix_calling"` (composes non-genrule importer wiring plus `global_nix_inputs()` as real action inputs, without mutating caller dicts)
+- **Genrule-style (preferred)**: `build-tools/lang/defs_common.bzl:prepare_language_wiring(...)` with `wiring = "genrule"`
 - **Python macro usage**: `build-tools/python/defs.bzl` (`nix_python_library`, `nix_python_test`, `nix_python_wasm_*`)
-- **Srcs-less rule shapes (preferred)**: `lang/defs_common.bzl:prepare_language_wiring(...)` with `wiring = "srcsless_rule"` (creates a synthetic dep carrying importer-local patches as action inputs)
+- **Srcs-less rule shapes (preferred)**: `build-tools/lang/defs_common.bzl:prepare_language_wiring(...)` with `wiring = "srcsless_rule"` (creates a synthetic dep carrying importer-local patches as action inputs)
   - Python macro usage: `build-tools/python/defs.bzl` (`nix_python_binary`)
 
 ### Common leak patterns
@@ -627,7 +627,7 @@ These tests serve as the regression suite for the non-genrule importer-scoped wi
 
 - `build-tools/tools/tests/python/python.importer-patches.srcs-inclusion.cquery.test.ts`: verifies Python macros include importer-local patches as real action inputs.
 - `build-tools/tools/tests/node/node.webapp-and-cli.importer-patches-action-inputs.srcs.test.ts` and `build-tools/tools/tests/node/node.nix-test.importer-patches-action-inputs.srcs.test.ts`: verify Node importer-local patches are real action inputs across representative macro shapes.
-- `build-tools/tools/tests/lang/importer-wiring.macros-avoid-direct-lockfile-parsing.enforcement.test.ts`: ensures macro implementations route lockfile parsing/enforcement through `//lang:importer_wiring.bzl`.
+- `build-tools/tools/tests/lang/importer-wiring.macros-avoid-direct-lockfile-parsing.enforcement.test.ts`: ensures macro implementations route lockfile parsing/enforcement through `//build-tools/lang:importer_wiring.bzl`.
 
 ---
 
@@ -662,13 +662,13 @@ Today, some macros need to remember to do two things:
 
 Implemented in two layers, depending on the macro shape:
 
-- **Generic “call Nix” helper**: `lang/nix_calling_macros.bzl:wire_global_nix_inputs(...)` (re-exported from `lang/defs_common.bzl`)
-- **Importer-scoped, genrule-style helper**: `lang/defs_common.bzl:prepare_language_wiring(...)` with `wiring = "nix_calling_genrule"` (composes importer wiring plus global inputs and workspace-root env injection without mutating caller dicts)
-- **Importer-scoped, non-genrule helper**: `lang/defs_common.bzl:prepare_language_wiring(...)` with `wiring = "non_genrule_nix_calling"` (composes importer wiring plus global inputs without mutating caller dicts)
+- **Generic “call Nix” helper**: `build-tools/lang/nix_calling_macros.bzl:wire_global_nix_inputs(...)` (re-exported from `build-tools/lang/defs_common.bzl`)
+- **Importer-scoped, genrule-style helper**: `build-tools/lang/defs_common.bzl:prepare_language_wiring(...)` with `wiring = "nix_calling_genrule"` (composes importer wiring plus global inputs and workspace-root env injection without mutating caller dicts)
+- **Importer-scoped, non-genrule helper**: `build-tools/lang/defs_common.bzl:prepare_language_wiring(...)` with `wiring = "non_genrule_nix_calling"` (composes importer wiring plus global inputs without mutating caller dicts)
 
 ### Add a single helper for importer-scoped non-genrule macros
 
-Implemented: `lang/defs_common.bzl:prepare_language_wiring(...)` with `wiring = "non_genrule"` centralizes lockfile enforcement, importer derivation, patch input wiring, and provider-edge realization for non-genrule importer-scoped macros without mutating caller kwargs.
+Implemented: `build-tools/lang/defs_common.bzl:prepare_language_wiring(...)` with `wiring = "non_genrule"` centralizes lockfile enforcement, importer derivation, patch input wiring, and provider-edge realization for non-genrule importer-scoped macros without mutating caller kwargs.
 
 ---
 
@@ -676,7 +676,7 @@ Implemented: `lang/defs_common.bzl:prepare_language_wiring(...)` with `wiring = 
 
 When I review a change that touches cross-language wiring, I check these items:
 
-- Does it use `lang/defs_common.bzl` helpers instead of re-implementing logic?
+- Does it use `build-tools/lang/defs_common.bzl` helpers instead of re-implementing logic?
 - If it is importer-scoped, does it enforce exactly one `lockfile:<path>#<importer>` label?
 - Are patch inputs attached in a way that matches the rule shape (list vs dict, `srcs` vs `resources`)?
 - If the macro or rule calls Nix, does it attach `global_nix_inputs()` as real action inputs and avoid hardcoding `//:flake.lock`?
