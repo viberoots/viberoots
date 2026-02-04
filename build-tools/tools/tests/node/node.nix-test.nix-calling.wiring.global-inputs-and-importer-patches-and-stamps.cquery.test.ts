@@ -20,7 +20,7 @@ test("nix_node_test (Nix-calling) wires global inputs + importer patches as acti
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//node:defs.bzl", "nix_node_test")',
+        'load("//build-tools/node:defs.bzl", "nix_node_test")',
         "",
         "nix_node_test(",
         '  name = "t",',

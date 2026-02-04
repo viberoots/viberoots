@@ -20,7 +20,7 @@ Importer-scoped macros are intended to use one canonical helper surface: `//lang
 
 There is one recurring leakage point. Some underlying Buck rule shapes cannot accept `srcs` (or cannot accept the attribute we would prefer to use for action inputs). Python `python_binary` is the current example. Today the macro compensates by creating a synthetic dep that carries patch inputs. This is correct but it is call-site knowledge that will be easy to duplicate incorrectly if we add a second “srcs-less” macro later.
 
-This PR makes that “srcs-less rule shape” pattern a first-class helper in `//lang:importer_wiring.bzl`, and then refactors `python/defs.bzl:nix_python_binary` to use the shared helper.
+This PR makes that “srcs-less rule shape” pattern a first-class helper in `//lang:importer_wiring.bzl`, and then refactors `build-tools/python/defs.bzl:nix_python_binary` to use the shared helper.
 
 Clarification: We do not need to preserve backwards compatibility yet. This PR can change macro call paths and helper surfaces directly, with no intermediate migration steps, no compatibility shims, and no legacy-argument linting.
 
@@ -36,8 +36,8 @@ This PR changes wiring only. The goal is behavior stability and reduced drift ri
     - the importer string
     - the synthetic dep (label and rule kwargs)
     - a helper for merging provider edges deterministically into the caller’s deps
-- Refactor `python/defs.bzl:nix_python_binary` to use that helper instead of hand-assembling the synthetic dep logic.
-- Keep `python/defs.bzl:nix_python_library`, `nix_python_test`, and `nix_python_wasm_*` unchanged in this PR. They already route through `prepare_importer_non_genrule_wiring(...)` and can carry patch inputs directly when the rule shape allows it.
+- Refactor `build-tools/python/defs.bzl:nix_python_binary` to use that helper instead of hand-assembling the synthetic dep logic.
+- Keep `build-tools/python/defs.bzl:nix_python_library`, `nix_python_test`, and `nix_python_wasm_*` unchanged in this PR. They already route through `prepare_importer_non_genrule_wiring(...)` and can carry patch inputs directly when the rule shape allows it.
 
 ### Tests (in this PR)
 
@@ -176,8 +176,8 @@ This PR is macro wiring and shell command assembly only. It does not change prov
   - optionally disables unified store enforcement when the macro’s contract requires it (for example bundling scenarios)
   - composes with `nix_cmd_prefix(...)` and `nix_build_out_path_cmd(...)` so call sites do not assemble partial variants
 - Refactor:
-  - `node/defs_nix.bzl:node_webapp`
-  - `node/defs_nix.bzl:nix_node_cli_bin(bundle=True)`
+  - `build-tools/node/defs_nix.bzl:node_webapp`
+  - `build-tools/node/defs_nix.bzl:nix_node_cli_bin(bundle=True)`
     to use the helper, reducing bespoke pre-env logic.
 - Keep existing debug logging behavior, but gate it behind an explicit env flag so default builds stay quiet.
 

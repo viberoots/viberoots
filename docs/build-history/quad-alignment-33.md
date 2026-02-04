@@ -178,8 +178,8 @@ Today, this ordering is implemented correctly but partly inlined. This PR introd
   - package-local patch input inclusion
   - provider edge realization into the intended location for the rule shape
 - Refactor package-local WASM call sites to use the helper:
-  - `go/defs.bzl`: `nix_go_tiny_wasm_lib`
-  - `cpp/defs.bzl`: `nix_cpp_wasm_static_lib` and any planner-visible wasm shims where applicable
+  - `build-tools/go/defs.bzl`: `nix_go_tiny_wasm_lib`
+  - `build-tools/cpp/defs.bzl`: `nix_cpp_wasm_static_lib` and any planner-visible wasm shims where applicable
 
 Cleanup/standardization in this PR:
 

@@ -53,7 +53,7 @@ test("cpp: link input ordering is deterministic (repo link deps)", async () => {
     await fs.outputFile(
       path.join(libsAlpha, "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_library")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
         "nix_cpp_library(",
         '  name = "alpha",',
@@ -74,7 +74,7 @@ test("cpp: link input ordering is deterministic (repo link deps)", async () => {
     await fs.outputFile(
       path.join(libsBravo, "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_library")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
         "nix_cpp_library(",
         '  name = "bravo",',
@@ -104,7 +104,7 @@ test("cpp: link input ordering is deterministic (repo link deps)", async () => {
     await fs.outputFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_binary")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")',
         "",
         "nix_cpp_binary(",
         '  name = "demo",',

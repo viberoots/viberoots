@@ -10,11 +10,14 @@ test("cpp lib scaffold: files render and TARGETS wires gtest deps", async () => 
     const $ = _$({ stdio: "inherit" });
 
     // Ensure language is enabled by presence
-    await fs.ensureFile(path.join(tmp, "cpp", "defs.bzl"));
-    await fs.copy(path.join(process.cwd(), "cpp", "defs.bzl"), path.join(tmp, "cpp", "defs.bzl"));
+    await fs.ensureFile(path.join(tmp, "build-tools", "cpp", "defs.bzl"));
     await fs.copy(
-      path.join(process.cwd(), "cpp", "wasm_defs.bzl"),
-      path.join(tmp, "cpp", "wasm_defs.bzl"),
+      path.join(process.cwd(), "build-tools", "cpp", "defs.bzl"),
+      path.join(tmp, "build-tools", "cpp", "defs.bzl"),
+    );
+    await fs.copy(
+      path.join(process.cwd(), "build-tools", "cpp", "wasm_defs.bzl"),
+      path.join(tmp, "build-tools", "cpp", "wasm_defs.bzl"),
     );
     await fs.copy(
       path.join(process.cwd(), "build-tools", "tools", "nix", "templates", "cpp.nix"),

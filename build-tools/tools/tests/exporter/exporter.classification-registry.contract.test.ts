@@ -24,7 +24,7 @@ test("language classification registry is stable contract data", () => {
     cpp.guidance,
     "Guidance: stamp 'lang:cpp' in macros or use cxx_* rules to classify C++ targets.",
   );
-  assert.equal(cpp.looksLike({ name: "//cpp:bin", srcs: ["main.cpp"] } as any), true);
+  assert.equal(cpp.looksLike({ name: "//build-tools/cpp:bin", srcs: ["main.cpp"] } as any), true);
   assert.equal(cpp.hasRuleType({ rule_type: "cxx_binary" } as any), true);
   assert.equal(cpp.hasLangLabel({ labels: ["lang:cpp"] } as any), true);
 

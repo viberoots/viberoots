@@ -14,7 +14,7 @@ test("cpp missing: diagnose reports disabled with missing paths", async () => {
         {
           id: "cpp",
           displayName: "C++",
-          requiredPaths: ["cpp/defs.bzl", "build-tools/tools/nix/templates/cpp.nix"],
+          requiredPaths: ["build-tools/cpp/defs.bzl", "build-tools/tools/nix/templates/cpp.nix"],
           kinds: ["bin", "lib", "test"],
           templatesDir: "build-tools/tools/scaffolding/templates/cpp",
           capabilities: { patching: false },
@@ -43,7 +43,7 @@ test("cpp missing: diagnose reports disabled with missing paths", async () => {
     assert.ok(cpp, "cpp should appear disabled");
     const miss = (cpp.missingPaths || []) as string[];
     // Both required paths should be reported missing
-    assert.ok(miss.includes("cpp/defs.bzl"));
+    assert.ok(miss.includes("build-tools/cpp/defs.bzl"));
     assert.ok(miss.includes("build-tools/tools/nix/templates/cpp.nix"));
   });
 });

@@ -7,11 +7,11 @@ function assert(condition: boolean, message: string) {
 }
 
 const macroImplFiles = [
-  "go/defs.bzl",
-  "cpp/defs.bzl",
-  "node/defs_core.bzl",
-  "node/defs_nix.bzl",
-  "python/defs.bzl",
+  "build-tools/go/defs.bzl",
+  "build-tools/cpp/defs.bzl",
+  "build-tools/node/defs_core.bzl",
+  "build-tools/node/defs_nix.bzl",
+  "build-tools/python/defs.bzl",
 ];
 
 test("language macros must not stamp patch_scope:* directly (delegate to shared wiring helpers)", async () => {

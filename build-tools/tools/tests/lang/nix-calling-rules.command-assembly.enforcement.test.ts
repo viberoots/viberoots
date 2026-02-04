@@ -20,12 +20,12 @@ function assertNoLineMatches(haystack: string, re: RegExp, msg: string) {
 }
 
 test("Nix-calling rule implementations use shared nix out-path capture helpers and do not mask failures", async () => {
-  const cpp = await read("cpp/private/nix_build.bzl");
-  const wasm = await read("go/private/nix_build_wasm.bzl");
+  const cpp = await read("build-tools/cpp/private/nix_build.bzl");
+  const wasm = await read("build-tools/go/private/nix_build_wasm.bzl");
 
   for (const [label, src] of [
-    ["cpp/private/nix_build.bzl", cpp],
-    ["go/private/nix_build_wasm.bzl", wasm],
+    ["build-tools/cpp/private/nix_build.bzl", cpp],
+    ["build-tools/go/private/nix_build_wasm.bzl", wasm],
   ] as const) {
     assertNoLineMatches(
       src,
@@ -57,6 +57,6 @@ test("Nix-calling rule implementations use shared nix out-path capture helpers a
   assertDoesNotContain(
     wasm,
     "|| true",
-    "go/private/nix_build_wasm.bzl: expected no failure-masking '|| true' patterns; use conditional diagnostics instead",
+    "build-tools/go/private/nix_build_wasm.bzl: expected no failure-masking '|| true' patterns; use conditional diagnostics instead",
   );
 });

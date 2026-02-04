@@ -31,7 +31,7 @@ test("exporter: nix_go_tiny_wasm_lib preserves link intent attrs in build-tools/
     await fs.writeFile(
       path.join(app, "TARGETS"),
       [
-        'load("//go:defs.bzl", "nix_go_tiny_wasm_lib")',
+        'load("//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")',
         "",
         "filegroup(",
         '  name = "dep_a",',

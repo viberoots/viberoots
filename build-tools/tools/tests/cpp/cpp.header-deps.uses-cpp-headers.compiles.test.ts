@@ -21,7 +21,7 @@ test("cpp consumer compiles with header_deps via nix_cpp_headers (build)", async
     await fs.outputFile(
       path.join(tmp, "libs", "hdrs", "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_headers")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_headers")',
         "",
         "nix_cpp_headers(",
         '  name = "hdrs",',
@@ -44,7 +44,7 @@ test("cpp consumer compiles with header_deps via nix_cpp_headers (build)", async
     await fs.outputFile(
       path.join(tmp, "apps", "demo", "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_binary")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")',
         "",
         "nix_cpp_binary(",
         '  name = "demo",',

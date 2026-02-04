@@ -30,7 +30,7 @@ test("node Nix-calling macros use standardized command assembly helpers (cquery 
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//node:defs.bzl", "node_webapp", "nix_node_cli_bin")',
+        'load("//build-tools/node:defs.bzl", "node_webapp", "nix_node_cli_bin")',
         "",
         "node_webapp(",
         '  name = "bundle",',

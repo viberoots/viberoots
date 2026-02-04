@@ -15,7 +15,7 @@ References:
   - Patching: `build-tools/tools/patch/patch-pkg.ts`, `build-tools/tools/patch/patch-go.ts`
   - Nix templates: `build-tools/tools/nix/lang-templates.nix`
   - Nix planner: `build-tools/tools/nix/graph-generator.nix`
-  - Buck macros: `go/defs.bzl`
+  - Buck macros: `build-tools/go/defs.bzl`
 
 ---
 

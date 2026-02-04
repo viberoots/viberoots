@@ -6,7 +6,7 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "dev:check": "build-tools/tools/dev/startup-check.ts",
+    "dev:check": "zx-wrapper build-tools/tools/dev/startup-check.ts",
     "dev:clear-overrides": "build-tools/tools/dev/clear-overrides.ts",
     "fmt": "prettier -w .",
     "fmt:check": "prettier -c .",

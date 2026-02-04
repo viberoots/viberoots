@@ -32,7 +32,7 @@ This PR is intentionally **producer-only**. It does not wire `header_deps` into 
 
 ### Scope & Changes
 
-- Add `nix_cpp_headers` to `cpp/defs.bzl`:
+- Add `nix_cpp_headers` to `build-tools/cpp/defs.bzl`:
   - stamps `lang:cpp` and `kind:headers`
   - uses the same package-local wiring conventions as other C++ macros
   - keeps behavior minimal and deterministic, consistent with existing macro design
@@ -106,7 +106,7 @@ This PR is macro-only. It does not attempt to make the planner actually link in-
 
 ### Scope & Changes
 
-- Extend public macros in `cpp/defs.bzl`:
+- Extend public macros in `build-tools/cpp/defs.bzl`:
   - `nix_cpp_library`
   - `nix_cpp_binary`
   - `nix_cpp_node_addon`

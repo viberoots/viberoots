@@ -24,12 +24,12 @@ In this PR I will unify “global Nix inputs” as an explicit input attachment 
   - It must support both list-shaped and dict-shaped input attributes in the same way `//lang:patch_inputs.bzl` does.
   - It must not hardcode `//:flake.lock` at call-sites.
 - Update Node macros that execute Nix:
-  - `node/defs_nix.bzl:node_webapp`
-  - `node/defs_nix.bzl:nix_node_cli_bin(bundle=True)`
+  - `build-tools/node/defs_nix.bzl:node_webapp`
+  - `build-tools/node/defs_nix.bzl:nix_node_cli_bin(bundle=True)`
     so that the resulting `genrule` inputs include `global_nix_inputs()` as actual inputs (not only labels).
 - Update “Nix runner” style rules that execute Nix during a Buck action to accept and carry `global_nix_inputs()` consistently:
-  - `go/private/nix_build_wasm.bzl:go_nix_build_wasm`
-  - `cpp/private/nix_test.bzl:cpp_nix_test`
+  - `build-tools/go/private/nix_build_wasm.bzl:go_nix_build_wasm`
+  - `build-tools/cpp/private/nix_test.bzl:cpp_nix_test`
   - Any `node/private/*` rules that shell out to Nix during test execution, if they exist and currently lack an equivalent input mechanism.
 
 ### Tests (in this PR)
@@ -72,7 +72,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `//lang`, `//node`, `//go/private`, and `//cpp/private`, plus narrow tests. It should remain safe in thin slices that include these packages.
+- Touches `//lang`, `//build-tools/node`, `//build-tools/go/private`, and `//build-tools/cpp/private`, plus narrow tests. It should remain safe in thin slices that include these packages.
 
 ---
 
@@ -92,7 +92,7 @@ In this PR I will make dict-safe “attach arbitrary items into a dict-shaped in
   - stable keying strategy (prefix + sanitized + collision suffix)
   - deterministic order
   - no overwrites of user-provided keys
-- Update `node/defs_core.bzl:nix_node_gen` so that in dict-shaped `srcs` mode it uses the shared helper for:
+- Update `build-tools/node/defs_core.bzl:nix_node_gen` so that in dict-shaped `srcs` mode it uses the shared helper for:
   - importer patch inputs (already handled via `include_importer_patches_from_labels_dict_safe`)
   - provider edges realized into `srcs` (replace bespoke `_attach_items_into_srcs_dict`)
   - global Nix inputs (from PR‑1) when the caller is a Nix-executing macro and uses dict-shaped `srcs`
@@ -123,7 +123,7 @@ In this PR I will make dict-safe “attach arbitrary items into a dict-shaped in
   - importer-local patches change
   - provider mappings change
   - global Nix inputs change (when the action shells out to Nix)
-- Node no longer carries bespoke “dict attach” logic in `node/defs_core.bzl`.
+- Node no longer carries bespoke “dict attach” logic in `build-tools/node/defs_core.bzl`.
 
 ### Risks
 
@@ -144,7 +144,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `//lang` and `//node` plus narrow tests. Safe for thin slices that include Node macros.
+- Touches `//lang` and `//build-tools/node` plus narrow tests. Safe for thin slices that include Node macros.
 
 ---
 
@@ -155,7 +155,7 @@ Implement.
 We compute “sanitized Nix attribute names” from Buck target labels in more than one place:
 
 - TypeScript uses `build-tools/tools/lib/labels.ts:sanitizeAttrNameFromLabel`.
-- Starlark C++ test runner has a local `_sanitize(...)` implementation in `cpp/private/nix_test.bzl`.
+- Starlark C++ test runner has a local `_sanitize(...)` implementation in `build-tools/cpp/private/nix_test.bzl`.
 
 Even small drift here creates “build-selected computed attr does not exist” failures. This is a cross-language abstraction boundary. It should be represented as a shared contract and protected by a parity matrix test.
 
@@ -163,7 +163,7 @@ Even small drift here creates “build-selected computed attr does not exist” 
 
 - Introduce a canonical Starlark helper under `//lang` for Nix attribute sanitization, matching `build-tools/tools/lib/labels.ts:sanitizeAttrNameFromLabel`:
   - Example location: `lang/nix_attr.bzl` with `sanitize_nix_attr_from_target_label(label)`.
-- Update `cpp/private/nix_test.bzl` to use the shared helper instead of a local `_sanitize(...)`.
+- Update `build-tools/cpp/private/nix_test.bzl` to use the shared helper instead of a local `_sanitize(...)`.
 - If any other Starlark rules/macros re-implement this transform, migrate them as well.
 
 ### Tests (in this PR)
@@ -206,7 +206,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `//lang`, `//cpp/private`, and one zx test. Safe in thin slices that include these packages.
+- Touches `//lang`, `//build-tools/cpp/private`, and one zx test. Safe in thin slices that include these packages.
 
 ---
 
@@ -216,9 +216,9 @@ Implement.
 
 We have several Buck rules that execute Nix during a Buck action:
 
-- `cpp/private/nix_build.bzl:cpp_nix_build`
-- `cpp/private/nix_test.bzl:cpp_nix_test`
-- `go/private/nix_build_wasm.bzl:go_nix_build_wasm`
+- `build-tools/cpp/private/nix_build.bzl:cpp_nix_build`
+- `build-tools/cpp/private/nix_test.bzl:cpp_nix_test`
+- `build-tools/go/private/nix_build_wasm.bzl:go_nix_build_wasm`
 - Node bundling and webapp shims build via Nix inside `genrule` commands
 
 They all embed similar shell boilerplate:
@@ -237,9 +237,9 @@ This is an abstraction leak. The behavior must remain consistent across language
   - supports the “build-selected” flow via `build-tools/tools/dev/build-selected.ts` where required
   - supports passing explicit inputs (from PR‑1) through `hidden` inputs for rule implementations
 - Migrate:
-  - `cpp/private/nix_build.bzl`
-  - `cpp/private/nix_test.bzl`
-  - `go/private/nix_build_wasm.bzl`
+  - `build-tools/cpp/private/nix_build.bzl`
+  - `build-tools/cpp/private/nix_test.bzl`
+  - `build-tools/go/private/nix_build_wasm.bzl`
     to use the shared helper for their shell assembly, keeping their external behavior the same.
 
 ### Tests (in this PR)
@@ -281,11 +281,11 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `//lang`, `//cpp/private`, and `//go/private` plus tests. Not suitable for ultra-thin slices that omit those packages.
+- Touches `//lang`, `//build-tools/cpp/private`, and `//build-tools/go/private` plus tests. Not suitable for ultra-thin slices that omit those packages.
 
 ---
 
-## PR‑5: Reduce policy logic in `go/defs.bzl` by moving CGO wiring and tuple labeling into `go/private` (keep public macros thin)
+## PR‑5: Reduce policy logic in `build-tools/go/defs.bzl` by moving CGO wiring and tuple labeling into `go/private` (keep public macros thin)
 
 ### Description
 
@@ -296,16 +296,16 @@ The Go macros currently contain a significant amount of policy:
 - label tuple stamping
 - deps merging and special-case handling
 
-This is not a correctness bug, but it is a maintainability and boundary clarity issue. The public macro file is the cross-language entry point. It should be a thin orchestrator that delegates ecosystem details into `go/private/*`.
+This is not a correctness bug, but it is a maintainability and boundary clarity issue. The public macro file is the cross-language entry point. It should be a thin orchestrator that delegates ecosystem details into `build-tools/go/private/*`.
 
 ### Scope & Changes
 
-- Introduce `go/private/cgo_wiring.bzl` (or similar) that provides:
+- Introduce `build-tools/go/private/cgo_wiring.bzl` (or similar) that provides:
   - CGO inference (`srcs` imply CGO)
   - consistent toolchain defaulting
   - deps merging (repo CGO deps + nixpkg providers + extra module providers)
   - label stamping for `cgo:enabled` and `nixpkg:` labels
-- Update `go/defs.bzl` to:
+- Update `build-tools/go/defs.bzl` to:
   - keep its public macro surface stable
   - delegate to the new private helper
   - keep using shared `//lang:*` helpers for provider edges and patch inputs
@@ -320,13 +320,13 @@ This is not a correctness bug, but it is a maintainability and boundary clarity 
 ### Docs (in this PR)
 
 - Update the Go macro handbook doc to state:
-  - where CGO wiring policy lives (`go/private/*`)
+  - where CGO wiring policy lives (`build-tools/go/private/*`)
   - what the public macros guarantee (stable surface, shared helper usage)
 
 ### Acceptance Criteria
 
 - No behavior change in produced Go targets (labels and deps remain equivalent).
-- `go/defs.bzl` is materially simpler and delegates policy to private helpers.
+- `build-tools/go/defs.bzl` is materially simpler and delegates policy to private helpers.
 
 ### Risks
 
@@ -346,7 +346,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `//go` and `//go/private` plus tests. Safe in slices that already include Go.
+- Touches `//build-tools/go` and `//build-tools/go/private` plus tests. Safe in slices that already include Go.
 
 ---
 

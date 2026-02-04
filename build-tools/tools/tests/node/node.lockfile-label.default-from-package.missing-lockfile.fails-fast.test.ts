@@ -12,7 +12,7 @@ test("node macros default lockfile label fails fast when missing", async () => {
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
-        'load("//node:defs.bzl", "nix_node_gen")',
+        'load("//build-tools/node:defs.bzl", "nix_node_gen")',
         "",
         "nix_node_gen(",
         '  name = "gen",',

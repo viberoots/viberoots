@@ -13,7 +13,7 @@ test("nix_cpp_binary: defaults build unchanged when no link intent attrs are pro
     await fs.writeFile(
       path.join(app, "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_binary")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")',
         "",
         "nix_cpp_binary(",
         '  name = "demo",',

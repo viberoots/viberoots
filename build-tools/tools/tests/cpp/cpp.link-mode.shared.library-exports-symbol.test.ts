@@ -35,7 +35,7 @@ test("cpp shared lib links into binary and exports symbol", async () => {
     await fs.outputFile(
       path.join(tmp, "libs", "shared", "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_library")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
         "nix_cpp_library(",
         '  name = "shared",',
@@ -65,7 +65,7 @@ test("cpp shared lib links into binary and exports symbol", async () => {
     await fs.outputFile(
       path.join(tmp, "apps", "demo", "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_binary")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")',
         "",
         "nix_cpp_binary(",
         '  name = "demo",',

@@ -5,7 +5,7 @@ This installment follows Part 36.
 Part 36 proposed two macro-authoring risk fixes. After checking the current repo state, those two items are already implemented:
 
 - Importer-scoped, non-genrule Nix-calling macros now have a single composed helper. Node `nix_node_test` is migrated to `prepare_importer_non_genrule_nix_calling_wiring_v2(...)`.
-- The remaining Go package-local planner-visible stub call site is already migrated. `go/defs.bzl:nix_go_carchive` uses `wire_package_local_planner_visible_stub_v2(...)`.
+- The remaining Go package-local planner-visible stub call site is already migrated. `build-tools/go/defs.bzl:nix_go_carchive` uses `wire_package_local_planner_visible_stub_v2(...)`.
 
 After reviewing the current repo state, I still see a small set of remaining gaps that are easy to trip during macro authoring and review:
 
@@ -39,7 +39,7 @@ This PR introduces a v2 wrapper for WASM planner-visible stubs and migrates the 
   - must preserve existing behavior knobs:
     - `provider_realization_mode`
     - `strip_providers_from_deps`
-- Migrate `cpp/defs.bzl:nix_cpp_wasm_emscripten_lib`:
+- Migrate `build-tools/cpp/defs.bzl:nix_cpp_wasm_emscripten_lib`:
   - use the new v2 WASM stub helper
   - preserve behavior (labels and provider handling), including the existing choice:
     - provider targets remain in deps (`strip_providers_from_deps = False`)
@@ -73,7 +73,7 @@ Non-goals in this PR:
 ### Acceptance Criteria
 
 - `lang/wasm_package_local_wiring.bzl` provides a v2 helper and does not call the mutating package-local stub helper.
-- `cpp/defs.bzl:nix_cpp_wasm_emscripten_lib` uses the v2 WASM stub helper.
+- `build-tools/cpp/defs.bzl:nix_cpp_wasm_emscripten_lib` uses the v2 WASM stub helper.
 - Tests prove the stub still carries the correct action inputs and labels.
 
 ### Risks
@@ -118,11 +118,11 @@ This PR tightens conventions so new macros use v2 helpers by default, while keep
   - importer-scoped macros must use v2 helpers (`prepare_importer_*_v2(...)`)
   - planner-visible stubs must use v2 helpers (`wire_*_planner_visible_stub_v2(...)`), including the WASM wrapper after PR‑1
 - Where enforcement flags remaining call sites, migrate them in this PR, scoped to:
-  - `go/defs.bzl`
-  - `cpp/defs.bzl`
-  - `node/defs_core.bzl`
-  - `node/defs_nix.bzl`
-  - `python/defs.bzl`
+  - `build-tools/go/defs.bzl`
+  - `build-tools/cpp/defs.bzl`
+  - `build-tools/node/defs_core.bzl`
+  - `build-tools/node/defs_nix.bzl`
+  - `build-tools/python/defs.bzl`
 
 Non-goals in this PR:
 
@@ -207,11 +207,11 @@ This PR renames the current non-mutating “v2” helpers to become the canonica
     - versionless names refer to the non-mutating implementations
     - legacy names are still available for internal migration work only
 - Update macro call sites across:
-  - `go/defs.bzl`
-  - `cpp/defs.bzl`
-  - `node/defs_core.bzl`
-  - `node/defs_nix.bzl`
-  - `python/defs.bzl`
+  - `build-tools/go/defs.bzl`
+  - `build-tools/cpp/defs.bzl`
+  - `build-tools/node/defs_core.bzl`
+  - `build-tools/node/defs_nix.bzl`
+  - `build-tools/python/defs.bzl`
   - and any other Starlark call site using the renamed helpers
 - Update enforcement tests and docs to reference the new versionless names.
 
@@ -352,11 +352,11 @@ The intent is to standardize the _shape_ of macro code, not to introduce new con
   - remove redundant local variables that are no longer needed after helper composition
   - avoid re-merging labels after wiring unless explicitly justified (example: truly post-wiring derived metadata labels)
 - Apply across:
-  - `go/defs.bzl`
-  - `cpp/defs.bzl`
-  - `node/defs_core.bzl`
-  - `node/defs_nix.bzl`
-  - `python/defs.bzl`
+  - `build-tools/go/defs.bzl`
+  - `build-tools/cpp/defs.bzl`
+  - `build-tools/node/defs_core.bzl`
+  - `build-tools/node/defs_nix.bzl`
+  - `build-tools/python/defs.bzl`
 
 Non-goals in this PR:
 

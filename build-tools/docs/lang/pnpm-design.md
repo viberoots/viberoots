@@ -123,7 +123,7 @@ This is the minimal coordination between PNPM and Buck. PNPM handles runtime mod
 `apps/web/TARGETS`:
 
 ```python
-load("//node:defs_nix.bzl", "node_webapp")
+load("//build-tools/node:defs_nix.bzl", "node_webapp")
 
 node_webapp(
     name = "web",
@@ -135,7 +135,7 @@ node_webapp(
 `libs/utils/TARGETS`:
 
 ```python
-load("//node:defs_core.bzl", "nix_node_lib")
+load("//build-tools/node:defs_core.bzl", "nix_node_lib")
 
 nix_node_lib(
     name = "utils",
@@ -160,7 +160,7 @@ nix_node_lib(
 - **Thin macro over genrules (recommended)**
   - Pros: injects provider deps from `MODULE_PROVIDERS` automatically; enforces presence/shape of lockfile labels; fewer footguns; single place to evolve Node build conventions.
   - Cons: small initial effort to add the macro; still limited by underlying genrule capabilities (which is acceptable for our current needs).
-  - **Call:** Implement `//node/defs.bzl` with:
+  - **Call:** Implement `//build-tools/node/defs.bzl` with:
     - `nix_node_gen(...)` and `nix_node_test(...)` — thin wrappers over `genrule` that:
       - enforce exactly one importer‑scoped lockfile label (`lockfile:<path>#<importer>`),
       - stamp `lang:node` and `kind:*`, and
@@ -430,7 +430,7 @@ test("node provider: <specific behavior>", async () => {
 
 ### Handbook alignment checklist
 
-- Adding a language: PNPM/Node hooks in as an existing language variant. We reuse the provider sync orchestrator and `gen-auto-map.ts`, and propose a thin Node macro (`//node/defs.bzl`) consistent with `lang/defs_common.bzl` stamping.
+- Adding a language: PNPM/Node hooks in as an existing language variant. We reuse the provider sync orchestrator and `gen-auto-map.ts`, and propose a thin Node macro (`//build-tools/node/defs.bzl`) consistent with `lang/defs_common.bzl` stamping.
 - Provider sync cookbook: Covered — Node provider generator exists (`build-tools/tools/buck/providers/node.ts`), invoked via `build-tools/tools/buck/sync-providers.ts`, deterministic outputs, and `build-tools/tools/lib/providers.ts` for naming.
 - Macro stamping: Planned — Node macro should call `stamp_labels(lang="node", kind=...)` and append providers from `//lang:auto_map.bzl`.
 - Testing: No changes to harness; zx tests and external timeouts remain. Add focused zx tests for Node provider determinism and auto-map wiring when we add the macro.

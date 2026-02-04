@@ -146,7 +146,7 @@ Phase 2 — Template (Pyodide) and Browser Harness
 
 Phase 3 — Buck Macros and Scaffolding
 
-- Add in `python/defs.bzl`:
+- Add in `build-tools/python/defs.bzl`:
   - `nix_python_wasm_app(name, lockfile_label, backend = "wasi")` stamping `lang:python`, `kind:wasm`, wiring providers from `auto_map.bzl`.
   - `nix_python_wasm_lib(name, lockfile_label, backend = "wasi")` stamping `lang:python`, `kind:wasm`, wiring providers from `auto_map.bzl`; emits a reusable bundle with no entrypoint.
 - Optional scaffolding switch to demonstrate WASI and browser variants (pure‑Python only).
@@ -227,7 +227,7 @@ Deliver a fully usable WASI path for Python/WASM: templates, planner wiring, mac
   - Build app wrapper and lib site/overlay from `uv.lock`; apply `patches/python/*.patch` deterministically.
 - `build-tools/tools/nix/planner/python.nix`:
   - Add `mkWasmApp` and `mkWasmLib` routing to WASI templates when selected.
-- `python/defs.bzl`:
+- `build-tools/python/defs.bzl`:
   - `nix_python_wasm_app(name, lockfile_label, backend="wasi")`
   - `nix_python_wasm_lib(name, lockfile_label, backend="wasi")`
 - Tests (zx):

@@ -171,12 +171,12 @@ We should standardize the macro entrypoint conventions and add a small, allowlis
   - **Single labels merge point**: assemble labels once, then pass them into shared helpers.
   - **Single deps merge point**: assemble base deps once; provider edge realization happens only via shared helpers.
 - Standardize across these entrypoint files (adjust list to current repo reality):
-  - `go/defs.bzl`
-  - `cpp/defs.bzl`
-  - `node/defs_core.bzl`
-  - `node/defs_nix.bzl`
-  - `python/defs.bzl`
-  - `rust/defs.bzl` (if it participates in the same provider/label wiring contracts)
+  - `build-tools/go/defs.bzl`
+  - `build-tools/cpp/defs.bzl`
+  - `build-tools/node/defs_core.bzl`
+  - `build-tools/node/defs_nix.bzl`
+  - `build-tools/python/defs.bzl`
+  - `build-tools/rust/defs.bzl` (if it participates in the same provider/label wiring contracts)
 - Tighten “preferred helper surface” usage:
   - importer-scoped macros should go through `prepare_importer_*_wiring` v2-style helpers (non-mutating boundary) via `//lang:defs_common.bzl`
   - package-local macros should go through `prepare_package_local_wiring(...)` via `//lang:defs_common.bzl`

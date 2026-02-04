@@ -11,8 +11,8 @@ Unify the common sanitize algorithm (replace `//` → ``, `:`→`-`, `/`→`-`, 
 ### Scope & Changes
 
 - Add `//lang:sanitize.bzl` with `sanitize_name(s: string): string`.
-- Update `cpp/private/sanitize.bzl` to import and delegate to `sanitize_name`.
-- Update `node/defs.bzl` and `node/private/nix_test.bzl` to use the shared helper for importer/attr sanitization.
+- Update `build-tools/cpp/private/sanitize.bzl` to import and delegate to `sanitize_name`.
+- Update `build-tools/node/defs.bzl` and `node/private/nix_test.bzl` to use the shared helper for importer/attr sanitization.
 - Docstring references in C++/Node updated to point to `lang/sanitize.bzl` as canonical.
 
 ### Acceptance Criteria
@@ -47,7 +47,7 @@ Deduplicate the `//pkg:name` key computation and MODULE_PROVIDERS lookup used by
 - Add in `lang/defs_common.bzl`:
   - `def target_key_for_current_package(name): string`
   - `def providers_for(MODULE_PROVIDERS, name): list`
-- Replace custom `_providers_for` in `go/defs.bzl` and `node/defs.bzl` with `providers_for` from `lang/defs_common.bzl`.
+- Replace custom `_providers_for` in `build-tools/go/defs.bzl` and `build-tools/node/defs.bzl` with `providers_for` from `lang/defs_common.bzl`.
 
 ### Acceptance Criteria
 
@@ -80,8 +80,8 @@ Extract a tiny helper to include importer-local Node patches in `srcs`, used by 
 
 - Add `def append_node_patches_for_importer(kwargs, importer)` to `lang/defs_common.bzl`.
 - Replace duplicated importer/patch-dir logic in:
-  - `node/defs.bzl` (`nix_node_gen`)
-  - `node/defs.bzl` (`nix_node_test`)
+  - `build-tools/node/defs.bzl` (`nix_node_gen`)
+  - `build-tools/node/defs.bzl` (`nix_node_test`)
 
 ### Acceptance Criteria
 
@@ -107,11 +107,11 @@ Implement.
 
 ### Description
 
-Drop `_nixpkg_provider_for` from `go/defs.bzl` (provider names are sourced from generators; Go macros rely on labels + `auto_map.bzl`). This reduces confusion around multiple provider strategies.
+Drop `_nixpkg_provider_for` from `build-tools/go/defs.bzl` (provider names are sourced from generators; Go macros rely on labels + `auto_map.bzl`). This reduces confusion around multiple provider strategies.
 
 ### Scope & Changes
 
-- Delete `_nixpkg_provider_for` from `go/defs.bzl`.
+- Delete `_nixpkg_provider_for` from `build-tools/go/defs.bzl`.
 - Confirm no call sites remain (search + build).
 
 ### Acceptance Criteria
@@ -148,7 +148,7 @@ Consolidate the repeated shell bootstrap used by Node external tests and C++ Nix
   - `def nix_timeout_wrapper_var(var_name="TIMEOUT", default_sec=600): string`
 - Update:
   - `node/private/nix_test.bzl` to compose `run_cmd` via the helpers.
-  - `cpp/private/nix_build.bzl` to prepend the bootstrap portion via the helper.
+  - `build-tools/cpp/private/nix_build.bzl` to prepend the bootstrap portion via the helper.
 
 ### Acceptance Criteria
 

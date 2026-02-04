@@ -7,7 +7,7 @@ load(
     "extract_lockfile_labels",
     "prepare_language_wiring",
 )
-load("//node/private:nix_test.bzl", "node_nix_test")
+load("//build-tools/node/private:nix_test.bzl", "node_nix_test")
 
 # NOTE: Prebuild guard ensures this load is valid before builds/tests run.
 MODULE_PROVIDERS = {}

@@ -19,7 +19,7 @@ test("node macros inject importer-local patches into dict-shaped srcs via synthe
       [
         "",
         "# test: node.importer-patches.srcs-dict-shape.not-included.cquery.test.ts",
-        'load("//node:defs.bzl", "nix_node_gen")',
+        'load("//build-tools/node:defs.bzl", "nix_node_gen")',
         "",
         "nix_node_gen(",
         '  name = "node_gen_dict_srcs_probe",',

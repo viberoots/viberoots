@@ -8,7 +8,7 @@ await runInTemp("startup-check-buck-prelude", async (tmp, $) => {
   await fs.remove(path.join(tmp, ".buckconfig")).catch(() => {});
   let failed = false;
   try {
-    await $({ cwd: tmp })`build-tools/tools/dev/startup-check.ts`;
+    await $({ cwd: tmp })`zx-wrapper build-tools/tools/dev/startup-check.ts`;
   } catch {
     failed = true;
   }
@@ -32,7 +32,7 @@ await runInTemp("startup-check-buck-prelude", async (tmp, $) => {
   );
   failed = false;
   try {
-    await $({ cwd: tmp })`build-tools/tools/dev/startup-check.ts`;
+    await $({ cwd: tmp })`zx-wrapper build-tools/tools/dev/startup-check.ts`;
   } catch {
     failed = true;
   }

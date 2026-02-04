@@ -25,7 +25,7 @@ This PR introduces a new, explicit producer for WASM-targeted extension modules.
 
 This PR makes the following changes:
 
-- Add `nix_python_wasm_extension_module` to `python/defs.bzl`:
+- Add `nix_python_wasm_extension_module` to `build-tools/python/defs.bzl`:
   - importer-scoped lockfile label validation (same rule as other Python macros)
   - required attrs:
     - `module` (import name, e.g. `"mypkg._native"`)

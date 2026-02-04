@@ -4,8 +4,8 @@
 
 import fs from "fs-extra";
 import path from "node:path";
-import { runInTemp } from "../lib/test-helpers";
 import { sanitizeAttrNameFromLabel } from "../../lib/labels";
+import { runInTemp } from "../lib/test-helpers";
 
 async function main() {
   await runInTemp("build-selected-smoke", async (tmp, $) => {
@@ -58,13 +58,22 @@ async function main() {
     await fs.ensureDir(path.join(appDir, "src"));
     await fs.writeFile(path.join(appDir, "src", "main.cpp"), "int main(){return 0;}\n", "utf8");
     // Provide cpp macro defs
-    await fs.ensureDir(path.join(tmp, "cpp"));
-    await fs.copy(path.join(repo, "cpp", "defs.bzl"), path.join(tmp, "cpp", "defs.bzl"));
-    await fs.copy(path.join(repo, "cpp", "wasm_defs.bzl"), path.join(tmp, "cpp", "wasm_defs.bzl"));
+    await fs.ensureDir(path.join(tmp, "build-tools", "cpp"));
+    await fs.copy(
+      path.join(repo, "build-tools", "cpp", "defs.bzl"),
+      path.join(tmp, "build-tools", "cpp", "defs.bzl"),
+    );
+    await fs.copy(
+      path.join(repo, "build-tools", "cpp", "wasm_defs.bzl"),
+      path.join(tmp, "build-tools", "cpp", "wasm_defs.bzl"),
+    );
     // Also copy cpp/private so defs.bzl loads resolve (planner_stub, nix_build, etc.)
-    await fs.copy(path.join(repo, "cpp", "private"), path.join(tmp, "cpp", "private"));
+    await fs.copy(
+      path.join(repo, "build-tools", "cpp", "private"),
+      path.join(tmp, "build-tools", "cpp", "private"),
+    );
     const targets = [
-      'load("//cpp:defs.bzl", "nix_cpp_binary")',
+      'load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")',
       "",
       "nix_cpp_binary(",
       '    name = "demo",',

@@ -35,7 +35,7 @@ EOF'`;
       [
         "",
         "# test: go.macros.providers-realized.srcs.carchive.test.ts",
-        'load("//go:defs.bzl", "nix_go_carchive")',
+        'load("//build-tools/go:defs.bzl", "nix_go_carchive")',
         "",
         "nix_go_carchive(",
         '  name = "arc",',

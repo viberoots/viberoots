@@ -7,7 +7,7 @@ function assert(condition: boolean, message: string) {
 }
 
 test("nix_node_test must not call wire_global_nix_inputs directly (enforced abstraction boundary)", async () => {
-  const file = "node/defs_core.bzl";
+  const file = "build-tools/node/defs_core.bzl";
   const txt = await fsp.readFile(file, "utf8");
   assert(
     !txt.includes("wire_global_nix_inputs("),

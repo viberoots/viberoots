@@ -41,9 +41,12 @@ test("cpp lib scaffold builds via planner (archive exists)", async () => {
       path.join(tmp, "build-tools/tools/nix/templates/cpp.nix"),
     );
 
-    // Copy cpp macros so TARGETS can load //cpp:defs.bzl
-    await fs.mkdirp(path.join(tmp, "cpp"));
-    await fs.copy(path.join(process.cwd(), "cpp/defs.bzl"), path.join(tmp, "cpp/defs.bzl"));
+    // Copy cpp macros so TARGETS can load //build-tools/cpp:defs.bzl
+    await fs.mkdirp(path.join(tmp, "build-tools", "cpp"));
+    await fs.copy(
+      path.join(process.cwd(), "build-tools/cpp/defs.bzl"),
+      path.join(tmp, "build-tools/cpp/defs.bzl"),
+    );
 
     // Scaffold a minimal C++ library under libs/demo
     const libDir = path.join(tmp, "libs/demo");
@@ -56,7 +59,7 @@ test("cpp lib scaffold builds via planner (archive exists)", async () => {
       "utf8",
     );
     const targets = [
-      'load("//cpp:defs.bzl", "nix_cpp_library")',
+      'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
       "",
       "nix_cpp_library(",
       '    name = "demo",',

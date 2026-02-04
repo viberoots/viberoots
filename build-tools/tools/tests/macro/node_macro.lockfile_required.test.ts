@@ -10,7 +10,7 @@ test("node macro: lockfile label is required (exactly one)", async () => {
     // minimal TARGETS missing lockfile label
     const targets = [
       'load("@prelude//:rules.bzl", "export_file")',
-      'load("//node:defs.bzl", "nix_node_test")',
+      'load("//build-tools/node:defs.bzl", "nix_node_test")',
       "",
       "export_file(",
       '  name = "flake.lock",',

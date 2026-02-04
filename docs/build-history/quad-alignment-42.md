@@ -34,11 +34,11 @@ This PR standardizes those rule implementations on the same shared helper surfac
 ### Scope & Changes
 
 - Refactor Nix-calling rule implementations to route through shared helpers:
-  - `cpp/private/nix_build.bzl`:
+  - `build-tools/cpp/private/nix_build.bzl`:
     - Ensure out path capture is assembled only via `//lang:nix_shell.bzl` (`nix_build_out_path_cmd(...)`) and rule-layer workspace setup is via `//lang:nix_action_runner.bzl`.
     - Remove any duplicated “out path capture” patterns and ensure all required env variables remain part of the contract (`BUCK_TARGET`, `BUCK_TEST_SRC`, `BUCK_GRAPH_JSON`).
     - Restructure best-effort debug output so it cannot be misconstrued as failure masking in enforcement tests.
-  - `go/private/nix_build_wasm.bzl`:
+  - `build-tools/go/private/nix_build_wasm.bzl`:
     - Remove `|| true` patterns in the failure path that are adjacent to build failure handling (for example log printing).
     - Use the same shared helper structure for out path capture and failure handling in both the preferred and fallback path.
 

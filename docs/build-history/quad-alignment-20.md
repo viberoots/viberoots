@@ -288,7 +288,7 @@ This PR routes Node `nix_node_test` through the shared importer wiring helpers w
 
 ### Scope & Changes
 
-- Refactor `node/defs_core.bzl:nix_node_test` to:
+- Refactor `build-tools/node/defs_core.bzl:nix_node_test` to:
   - enforce a single importer-scoped lockfile label via `require_single_importer_lockfile_label(...)`
   - attach importer-local patches via `attach_importer_patch_inputs(...)`
   - merge provider edges via `merge_provider_edges(...)`

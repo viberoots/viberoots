@@ -25,7 +25,7 @@ test("nix_cpp_test follows transitive link_deps with link_closure=transitive", a
     await fs.outputFile(
       path.join(tmp, "libs", "support", "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_headers", "nix_cpp_library")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_headers", "nix_cpp_library")',
         "",
         "nix_cpp_headers(",
         '  name = "headers",',
@@ -65,7 +65,7 @@ test("nix_cpp_test follows transitive link_deps with link_closure=transitive", a
     await fs.outputFile(
       path.join(tmp, "libs", "core", "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_library")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
         "nix_cpp_library(",
         '  name = "core",',
@@ -96,7 +96,7 @@ test("nix_cpp_test follows transitive link_deps with link_closure=transitive", a
     await fs.outputFile(
       path.join(tmp, "apps", "demo", "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_test")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_test")',
         "",
         "nix_cpp_test(",
         '  name = "t",',

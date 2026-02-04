@@ -29,7 +29,7 @@ test("auto-map includes importer-scoped provider for a temp apps/example importe
       "YAML",
       // Define a simple node gen target with the importer-scoped lockfile label, so auto-map has a node to attach mapping to
       "cat > apps/example/TARGETS <<'ST'",
-      'load("//node:defs.bzl", "nix_node_gen")',
+      'load("//build-tools/node:defs.bzl", "nix_node_gen")',
       "",
       "nix_node_gen(",
       '    name = "smoke_test",',

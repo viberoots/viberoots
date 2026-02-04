@@ -17,7 +17,7 @@ test("repo_cgo_deps wires local cpp lib and runs", async () => {
 
     await $({
       cwd: tmp,
-    })`bash --noprofile --norc -c 'cat > libs/greeter/TARGETS <<"EOF"\nload("//cpp:defs.bzl", "nix_cpp_library")\n\n# Build the C++ static lib via Nix\nnix_cpp_library(\n    name = "greeter",\n    srcs = ["src/greeter.cpp"],\n    headers = ["include/greeter.h"],\n    labels = ["lang:cpp", "kind:lib"],\n)\nEOF'`;
+    })`bash --noprofile --norc -c 'cat > libs/greeter/TARGETS <<"EOF"\nload("//build-tools/cpp:defs.bzl", "nix_cpp_library")\n\n# Build the C++ static lib via Nix\nnix_cpp_library(\n    name = "greeter",\n    srcs = ["src/greeter.cpp"],\n    headers = ["include/greeter.h"],\n    labels = ["lang:cpp", "kind:lib"],\n)\nEOF'`;
 
     await $({
       cwd: tmp,
@@ -25,7 +25,7 @@ test("repo_cgo_deps wires local cpp lib and runs", async () => {
 
     await $({
       cwd: tmp,
-    })`bash --noprofile --norc -c 'cat > apps/demo-cli/TARGETS <<"EOF"\nload("//go:defs.bzl", "nix_go_binary")\n\n# Consume the local C++ lib via repo_cgo_deps\nnix_go_binary(\n    name = "demo",\n    srcs = ["cmd/demo/main.go"],\n    repo_cgo_deps = ["//libs/greeter:greeter"],\n)\nEOF'`;
+    })`bash --noprofile --norc -c 'cat > apps/demo-cli/TARGETS <<"EOF"\nload("//build-tools/go:defs.bzl", "nix_go_binary")\n\n# Consume the local C++ lib via repo_cgo_deps\nnix_go_binary(\n    name = "demo",\n    srcs = ["cmd/demo/main.go"],\n    repo_cgo_deps = ["//libs/greeter:greeter"],\n)\nEOF'`;
 
     // Export a graph and attempt a planner build of the selected target
     const probe = await $({

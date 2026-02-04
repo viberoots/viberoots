@@ -42,12 +42,12 @@ The plan is intentionally incremental. Each PR is scoped to be reviewable, indep
 
 ### Description
 
-We currently duplicate nix attribute normalization in both `go/defs.bzl` and `cpp/defs.bzl`, and also in TS. We will add a single Starlark helper in `lang/defs_common.bzl` (mirroring the TS rules) and have Go/C++ macros consume it.
+We currently duplicate nix attribute normalization in both `build-tools/go/defs.bzl` and `build-tools/cpp/defs.bzl`, and also in TS. We will add a single Starlark helper in `lang/defs_common.bzl` (mirroring the TS rules) and have Go/C++ macros consume it.
 
 ### Scope & Changes
 
 - Add `normalize_nix_attr(attr: str) -> str` in `lang/defs_common.bzl` (trim, lower-case, ensure `pkgs.` prefix, map `pkgs.gtest → pkgs.googletest`).
-- Replace local `_normalize_nix_attr` uses in `go/defs.bzl` and `_normalize_cxx_attr` in `cpp/defs.bzl` with the shared helper.
+- Replace local `_normalize_nix_attr` uses in `build-tools/go/defs.bzl` and `_normalize_cxx_attr` in `build-tools/cpp/defs.bzl` with the shared helper.
 - Ensure emitted `nixpkg:` labels are bit-for-bit identical to current output.
 
 ### Acceptance Criteria
@@ -80,7 +80,7 @@ Go macros currently attach provider deps in two ways: (1) via `MODULE_PROVIDERS`
 
 ### Scope & Changes
 
-- In `go/defs.bzl`, stop appending `_nixpkg_provider_for(...)` results in `_merge_cgo_deps`; keep `nixpkg:` labels via `_apply_cgo_labels`.
+- In `build-tools/go/defs.bzl`, stop appending `_nixpkg_provider_for(...)` results in `_merge_cgo_deps`; keep `nixpkg:` labels via `_apply_cgo_labels`.
 - Ensure `gen-auto-map.ts` (which already translates `nixpkg:` labels via `build-tools/tools/lib/labels.ts`) provides the necessary providers to Go targets.
 - Update any tests that assumed direct provider deps to assert provider presence via deps resolved from `MODULE_PROVIDERS`.
 

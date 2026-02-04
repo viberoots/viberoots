@@ -29,7 +29,7 @@ The current templates already include an optional `nix_node_test` block gated by
 Example TARGETS (lib):
 
 ```python
-load("//node:defs.bzl", "nix_node_lib", "nix_node_test")
+load("//build-tools/node:defs.bzl", "nix_node_lib", "nix_node_test")
 
 nix_node_lib(
     name = "{{ name }}",

@@ -160,7 +160,7 @@ Intent/Impact
 Detailed Design
 
 - Confirm canonical `sanitizeName` location (currently used via `build-tools/tools/nix/lang-helpers.nix` as `H.sanitizeName`). Document the algorithm.
-- Update `cpp/defs.bzl` `_sanitize_to_bin_name` to match the canonical algorithm exactly (cover `//`, `:`, `/`, spaces, case, non‑alnum behavior) or add a tiny test asserting equality with a generated value.
+- Update `build-tools/cpp/defs.bzl` `_sanitize_to_bin_name` to match the canonical algorithm exactly (cover `//`, `:`, `/`, spaces, case, non‑alnum behavior) or add a tiny test asserting equality with a generated value.
 - Add a test that computes a matrix of labels and verifies equality between Nix and Starlark sanitization for expected names.
 
 Tests
@@ -197,7 +197,7 @@ Detailed Design
   - Ensures `build-tools/tools/buck/graph.json` exists (export it if missing for the current repo context).
   - Runs `nix build .#graph-generator-selected` with `BUCK_TARGET` and `--accept-flake-config`.
   - Writes concise logs and returns the out path.
-- Update `cpp/defs.bzl` `_cpp_nix_build_impl` and `_cpp_nix_test_impl` to invoke the zx helper instead of inlined bash (keep behavior identical).
+- Update `build-tools/cpp/defs.bzl` `_cpp_nix_build_impl` and `_cpp_nix_test_impl` to invoke the zx helper instead of inlined bash (keep behavior identical).
 - Optionally add a thin wrapper for Go if external‑runner is used similarly.
 
 Tests

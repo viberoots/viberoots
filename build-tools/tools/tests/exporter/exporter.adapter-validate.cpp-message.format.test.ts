@@ -7,11 +7,13 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("cpp adapter validation message uses consistent classification wording (warn-only)", async () => {
   await runInTemp("exp-cpp-validate-message", async (tmp, $) => {
-    const pkg = path.join(tmp, "cpp", "app");
+    const pkg = path.join(tmp, "build-tools", "cpp", "app");
     await fs.mkdirp(pkg);
     await fs.outputFile(path.join(pkg, "main.cpp"), "int main(){return 0;}\n", "utf8");
 
-    const nodes = [{ name: "//cpp/app:bin", srcs: ["cpp/app/main.cpp"], labels: [] }];
+    const nodes = [
+      { name: "//build-tools/cpp/app:bin", srcs: ["build-tools/cpp/app/main.cpp"], labels: [] },
+    ];
     const graph = path.join(tmp, "build-tools/tools/buck", "graph.json");
     await fs.mkdirp(path.dirname(graph));
     await fs.outputFile(graph, JSON.stringify(nodes, null, 2));
@@ -29,7 +31,7 @@ test("cpp adapter validation message uses consistent classification wording (war
       out,
       /\[exporter\]\[cpp\] targets include C\+\+-looking sources but lack both cxx_\* rule_type and 'lang:cpp' label:/,
     );
-    assert.match(out, /-\s*\/\/cpp\/app:bin/);
+    assert.match(out, /-\s*\/\/build-tools\/cpp\/app:bin/);
     assert.match(out, /Guidance: stamp 'lang:cpp' in macros or use cxx_\* rules/i);
   });
 });

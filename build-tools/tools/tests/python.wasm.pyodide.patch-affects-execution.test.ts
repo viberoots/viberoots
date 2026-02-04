@@ -25,7 +25,7 @@ test("python wasm (pyodide): patch affects execution banner", async () => {
     await fs.writeFile(
       path.join(appDir, "TARGETS"),
       `
-load("//python:defs.bzl", "nix_python_wasm_app")
+load("//build-tools/python:defs.bzl", "nix_python_wasm_app")
 nix_python_wasm_app(
   name = "pyapp",
   labels = ["backend:pyodide"],

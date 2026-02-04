@@ -26,7 +26,7 @@ test("cpp: header_deps on a library still compiles with header-only usage", asyn
     await fs.outputFile(
       path.join(tmp, "libs", "dep", "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_library")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
         "nix_cpp_library(",
         '  name = "dep",',
@@ -49,7 +49,7 @@ test("cpp: header_deps on a library still compiles with header-only usage", asyn
     await fs.outputFile(
       path.join(tmp, "apps", "demo", "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_binary")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")',
         "",
         "nix_cpp_binary(",
         '  name = "demo",',

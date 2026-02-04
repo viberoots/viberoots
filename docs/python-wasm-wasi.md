@@ -25,7 +25,7 @@ Both macros stamp `lang:python` and `kind:wasm` so the planner routes to WASI te
 In `apps/pywasm/TARGETS`:
 
 ```starlark
-load("//python:defs.bzl", "nix_python_wasm_app")
+load("//build-tools/python:defs.bzl", "nix_python_wasm_app")
 
 nix_python_wasm_app(
     name = "pyapp",
@@ -60,7 +60,7 @@ You can enable deterministic bundle slimming via labels on your WASM targets:
 Example:
 
 ```starlark
-load("//python:defs.bzl", "nix_python_wasm_app")
+load("//build-tools/python:defs.bzl", "nix_python_wasm_app")
 
 nix_python_wasm_app(
     name = "pyapp",

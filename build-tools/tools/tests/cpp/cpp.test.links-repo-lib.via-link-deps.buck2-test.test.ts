@@ -25,7 +25,7 @@ test("nix_cpp_test links an in-repo C++ lib via link_deps (buck2 test)", async (
     await fs.outputFile(
       path.join(tmp, "libs", "greeter", "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_library")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
         "nix_cpp_library(",
         '  name = "greeter",',
@@ -54,7 +54,7 @@ test("nix_cpp_test links an in-repo C++ lib via link_deps (buck2 test)", async (
     await fs.outputFile(
       path.join(tmp, "apps", "demo", "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_test")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_test")',
         "",
         "nix_cpp_test(",
         '  name = "t",',

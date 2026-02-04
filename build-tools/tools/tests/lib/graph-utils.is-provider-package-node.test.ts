@@ -7,7 +7,7 @@ test("graph-utils: isProviderPackageNode classifies provider-package nodes corre
     "//third_party/providers:lf_abcdef_apps_web__pnpm_lock_yaml",
     "root//third_party/providers:mod_deadbeef_tail (config//platforms:default#1234abcd)",
   ];
-  const noCases = ["//apps/web:bundle", "prelude//cpp:lib", "", "apps/web:lib"];
+  const noCases = ["//apps/web:bundle", "prelude//build-tools/cpp:lib", "", "apps/web:lib"];
 
   for (const s of yesCases) {
     if (!isProviderPackageNode(s)) {

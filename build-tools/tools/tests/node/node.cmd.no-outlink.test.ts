@@ -16,7 +16,7 @@ test("node macros do not use --out-link in assembled cmd", async () => {
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//node:defs.bzl", "node_webapp", "nix_node_cli_bin")',
+        'load("//build-tools/node:defs.bzl", "node_webapp", "nix_node_cli_bin")',
         "",
         "# App rule",
         "node_webapp(",

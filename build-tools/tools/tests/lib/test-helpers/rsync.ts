@@ -60,8 +60,8 @@ export async function rsyncRepoTo(tmp: string) {
     }
     if (process.env.TEST_EXCLUDE_CPP_REQS === "1") {
       excludes.push(
-        "/cpp/defs.bzl",
-        "/cpp/wasm_defs.bzl",
+        "/build-tools/cpp/defs.bzl",
+        "/build-tools/cpp/wasm_defs.bzl",
         "/build-tools/tools/nix/templates/cpp.nix",
       );
     }

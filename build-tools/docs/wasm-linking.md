@@ -256,7 +256,7 @@ These examples assume the same union rule:
 
 ```python
 # libs/cpp-core/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_wasm_static_lib")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_static_lib")
 
 nix_cpp_wasm_static_lib(
     name = "cpp_core_wasm",
@@ -271,7 +271,7 @@ nix_cpp_wasm_static_lib(
 
 ```python
 # libs/cpp-support/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_wasm_static_lib")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_static_lib")
 
 nix_cpp_wasm_static_lib(
     name = "cpp_support_wasm",
@@ -284,7 +284,7 @@ nix_cpp_wasm_static_lib(
 
 ```python
 # libs/cpp-core/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_wasm_static_lib")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_static_lib")
 
 nix_cpp_wasm_static_lib(
     name = "cpp_core_wasm",
@@ -300,7 +300,7 @@ nix_cpp_wasm_static_lib(
 
 ```python
 # libs/wasm-module/TARGETS
-load("//go:defs.bzl", "nix_go_tiny_wasm_lib")
+load("//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")
 
 nix_go_tiny_wasm_lib(
     name = "wasm_module",
@@ -317,7 +317,7 @@ If `//libs/cpp-core:cpp_core_wasm` declares `link_deps = ["//libs/cpp-support:cp
 
 ```python
 # libs/wasm-module/TARGETS
-load("//go:defs.bzl", "nix_go_tiny_wasm_lib")
+load("//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")
 
 nix_go_tiny_wasm_lib(
     name = "wasm_module",
@@ -331,7 +331,7 @@ nix_go_tiny_wasm_lib(
 ### 5) Per-dependency closure override (optional extension)
 
 ```python
-load("//go:defs.bzl", "nix_go_tiny_wasm_lib")
+load("//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")
 
 nix_go_tiny_wasm_lib(
     name = "wasm_module",
@@ -351,7 +351,7 @@ nix_go_tiny_wasm_lib(
 
 ```python
 # libs/headers/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_headers")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_headers")
 
 nix_cpp_headers(
     name = "api_headers",
@@ -362,7 +362,7 @@ nix_cpp_headers(
 
 ```python
 # libs/cpp-core/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_wasm_static_lib")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_static_lib")
 
 nix_cpp_wasm_static_lib(
     name = "cpp_core_wasm",
@@ -380,7 +380,7 @@ This is a planner-visible stub for a JS+Wasm output pair. It is not a general-pu
 
 ```python
 # libs/emscripten/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_wasm_emscripten_lib")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_emscripten_lib")
 
 nix_cpp_wasm_emscripten_lib(
     name = "cpp_emscripten_bundle",
@@ -396,7 +396,7 @@ Python has a Wasm “app” macro today: `nix_python_wasm_app`. This is the clos
 
 ```python
 # apps/pywasm/TARGETS
-load("//python:defs.bzl", "nix_python_wasm_app")
+load("//build-tools/python:defs.bzl", "nix_python_wasm_app")
 
 nix_python_wasm_app(
     name = "pyapp",
@@ -410,7 +410,7 @@ nix_python_wasm_app(
 
 ```python
 # libs/pywasm-lib/TARGETS
-load("//python:defs.bzl", "nix_python_wasm_lib")
+load("//build-tools/python:defs.bzl", "nix_python_wasm_lib")
 
 nix_python_wasm_lib(
     name = "pylib",
@@ -426,7 +426,7 @@ The TS wasm-app scaffold in this repo uses `node_webapp`. This is an application
 
 ```python
 # apps/my-wasm-webapp/TARGETS
-load("//node:defs.bzl", "node_webapp")
+load("//build-tools/node:defs.bzl", "node_webapp")
 
 node_webapp(
     name = "webapp",

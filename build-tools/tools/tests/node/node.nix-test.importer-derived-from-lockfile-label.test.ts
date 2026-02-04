@@ -22,7 +22,7 @@ test("nix_node_test derives importer deterministically from lockfile label", asy
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
-        'load("//node:defs.bzl", "nix_node_test")',
+        'load("//build-tools/node:defs.bzl", "nix_node_test")',
         "",
         "nix_node_test(",
         '  name = "t",',

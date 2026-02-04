@@ -34,7 +34,7 @@ test("cpp calls go c-archive (temp repo)", async () => {
     );
     await $({
       cwd: tmp,
-    })`bash --noprofile --norc -c 'cat > libs/greetgo/TARGETS <<"EOF"\nload("//go:defs.bzl", "nix_go_carchive")\n\nnix_go_carchive(\n    name = "greetgo",\n    srcs = [\n        "export.go",\n    ],\n    labels = ["lang:go", "kind:carchive"],\n    visibility = ["PUBLIC"],\n)\nEOF'`;
+    })`bash --noprofile --norc -c 'cat > libs/greetgo/TARGETS <<"EOF"\nload("//build-tools/go:defs.bzl", "nix_go_carchive")\n\nnix_go_carchive(\n    name = "greetgo",\n    srcs = [\n        "export.go",\n    ],\n    labels = ["lang:go", "kind:carchive"],\n    visibility = ["PUBLIC"],\n)\nEOF'`;
 
     // Create a C++ caller that uses the exported Go symbol
     await $({ cwd: tmp })`bash --noprofile --norc -c 'mkdir -p apps/caller/src apps/caller/tests'`;
@@ -47,7 +47,7 @@ test("cpp calls go c-archive (temp repo)", async () => {
     await $({
       cwd: tmp,
     })`bash --noprofile --norc -c 'cat > apps/caller/TARGETS <<"EOF"
-load("//cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_test")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_test")
 
 nix_cpp_binary(
     name = "caller",

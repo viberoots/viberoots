@@ -37,7 +37,7 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 
 - Patches live at `patches/rust/*.patch` (flat; no subdirectories).
 - Nix language templates extend `build-tools/tools/nix/lang-templates.nix` via `build-tools/tools/nix/templates/rust.nix`.
-- Buck macros live under `rust/defs.bzl` and append provider deps using `MODULE_PROVIDERS` loaded via `//lang:auto_map.bzl` (do not load `//third_party/providers:auto_map.bzl` directly).
+- Buck macros live under `build-tools/rust/defs.bzl` and append provider deps using `MODULE_PROVIDERS` loaded via `//lang:auto_map.bzl` (do not load `//third_party/providers:auto_map.bzl` directly).
 - Provider rules are generated under `//third_party/providers/*` (Rust file: `TARGETS.rust.auto`).
 - Exported graph lives at `build-tools/tools/buck/graph.json`; no change to file path.
 
@@ -150,7 +150,7 @@ Notes:
 
 ---
 
-## Buck macros (rust/defs.bzl)
+## Buck macros (build-tools/rust/defs.bzl)
 
 Provide thin wrappers that stamp labels and append providers from `auto_map.bzl`:
 
@@ -220,7 +220,7 @@ No changes are required as long as Rust provider mapping is driven by `lockfile:
 Now that repository macros and facilities for WASM are available (freestanding and WASI), Rust will ship with WASM options:
 
 - Target triples: `wasm32-unknown-unknown` (freestanding) and `wasm32-wasi` (WASI).
-- Buck macros: extend `rust/defs.bzl` with `nix_rust_wasm_library` and `nix_rust_wasi_binary` (or a `wasm = "freestanding"|"wasi"` attr) that:
+- Buck macros: extend `build-tools/rust/defs.bzl` with `nix_rust_wasm_library` and `nix_rust_wasi_binary` (or a `wasm = "freestanding"|"wasi"` attr) that:
   - Stamp `lang:rust` and `kind:wasm|wasi` labels.
   - Forward `--target` and features to the builder.
   - Append providers using `MODULE_PROVIDERS` loaded via `//lang:auto_map.bzl` and shared provider-edge wiring helpers.
@@ -319,7 +319,7 @@ All new tests follow the one‑test‑per‑file convention and are wired via `T
 Phase 1 — Minimal viable Rust integration
 
 - Add `build-tools/tools/nix/templates/rust.nix` with `rustApp`/`rustLib` and `cargoPatches` support; no dev overrides.
-- Add `rust/defs.bzl` macros to stamp labels and append providers.
+- Add `build-tools/rust/defs.bzl` macros to stamp labels and append providers.
 - Add `build-tools/tools/buck/sync-providers-rust.ts` and `third_party/providers/defs_rust.bzl`.
 - Extend exporter to label Rust targets via `cargo metadata`.
 - Verify with a tiny sample crate (lib + bin). Glue runs end‑to‑end; provider updates cause only affected targets to rebuild.
@@ -342,7 +342,7 @@ Completion criteria
 ## Implementation checklist (high level)
 
 - Nix: `build-tools/tools/nix/templates/rust.nix` + `lang-templates.nix` import and planner dispatch.
-- Buck: `rust/defs.bzl` macros; label stamping and providers append.
+- Buck: `build-tools/rust/defs.bzl` macros; label stamping and providers append.
 - Exporter: Rust adapter and batcher using `cargo metadata`.
 - Providers: `build-tools/tools/buck/sync-providers-rust.ts`, `third_party/providers/defs_rust.bzl`.
 - CLI: `build-tools/tools/patch/patch-rust.ts` wired into `patch-pkg`.

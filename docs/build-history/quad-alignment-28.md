@@ -34,8 +34,8 @@ This PR introduces one helper and migrates the existing Go and C++ macros to use
   - realizes provider edges deterministically (via `realize_provider_edges`)
   - returns a small struct so call sites can keep rule-specific concerns (for example Go tuple labels, CGO wiring, and C++ output naming) outside the shared helper
 - Refactor:
-  - `go/defs.bzl` macros that currently perform the full sequence themselves (`nix_go_library`, `nix_go_binary`, `nix_go_test`) to use the helper
-  - `cpp/defs.bzl` macros that currently perform the full sequence themselves (`_cpp_common` and wasm variants) to use the helper
+  - `build-tools/go/defs.bzl` macros that currently perform the full sequence themselves (`nix_go_library`, `nix_go_binary`, `nix_go_test`) to use the helper
+  - `build-tools/cpp/defs.bzl` macros that currently perform the full sequence themselves (`_cpp_common` and wasm variants) to use the helper
 
 Non-goals in this PR:
 
@@ -53,8 +53,8 @@ I will use the same style of regression guards used elsewhere in the repo. The t
   - provider edges are realized deterministically
   - `nixpkg:*` labels are appended only via the canonical normalizer
 - Add an enforcement-style TypeScript test that prevents language macro files from bypassing the helper for package-local languages:
-  - `go/defs.bzl` should not call `include_package_local_patches` directly after the refactor
-  - `cpp/defs.bzl` should not call `include_package_local_patches` directly after the refactor
+  - `build-tools/go/defs.bzl` should not call `include_package_local_patches` directly after the refactor
+  - `build-tools/cpp/defs.bzl` should not call `include_package_local_patches` directly after the refactor
   - the enforcement test should fail with a clear message that points authors to the helper surface
 
 ### Docs (in this PR)
@@ -400,7 +400,7 @@ Clarification: I do not need to preserve backwards compatibility yet. This PR ca
 
 ### Scope & Changes
 
-- Update `cpp/defs.bzl:nix_cpp_test` so the planner-visible stub (`<name>__planner`) includes package-local patch files as action inputs:
+- Update `build-tools/cpp/defs.bzl:nix_cpp_test` so the planner-visible stub (`<name>__planner`) includes package-local patch files as action inputs:
   - Wire patch inputs through the canonical planner-visible helper path (`wire_planner_visible_stub(lang = "cpp", local_patch_dirs = ...)`) so `planner_stub_with_package_local_patches(...)` is used.
   - Preserve existing behavior where provider targets are stripped from planner-visible deps (to avoid visibility and graph shape issues).
   - Keep labels stable (`lang:cpp`, `kind:test`, plus any `nixpkg:` labels derived from call-site `nixpkg_deps`) so exporter/planner routing does not drift.
@@ -439,7 +439,7 @@ C++ test patch invalidation remains easier to accidentally break than other pack
 
 ### Downsides for Implementing
 
-Slight churn in `cpp/defs.bzl` and one additional regression test.
+Slight churn in `build-tools/cpp/defs.bzl` and one additional regression test.
 
 ### Recommendation
 
@@ -459,7 +459,7 @@ Clarification: I do not need to preserve backwards compatibility yet. This PR ca
 
 ### Scope & Changes
 
-- Refactor `cpp/defs.bzl:nix_cpp_wasm_emscripten_lib` to use the same shared package-local wiring helper surface used by `_cpp_common` and wasm static lib:
+- Refactor `build-tools/cpp/defs.bzl:nix_cpp_wasm_emscripten_lib` to use the same shared package-local wiring helper surface used by `_cpp_common` and wasm static lib:
   - Use `prepare_package_local_wiring(...)` (or a thin wrapper around it) to centralize:
     - `local_patch_dirs` defaulting
     - `nixpkg_deps` normalization and `nixpkg:` label append
@@ -478,7 +478,7 @@ Non-goals in this PR:
   - wasm labels are present (`kind:wasm` and `wasm:emscripten`).
   - package-local patch files under `<pkg>/patches/cpp/*.patch` are present as action inputs on the stub (via `srcs`).
   - provider edges are realized deterministically when `MODULE_PROVIDERS` maps the target to a provider.
-- Add (or extend) an enforcement-style test that prevents `cpp/defs.bzl` from reintroducing direct calls to lower-level primitives for this macro path (e.g., bypassing the helper boundary).
+- Add (or extend) an enforcement-style test that prevents `build-tools/cpp/defs.bzl` from reintroducing direct calls to lower-level primitives for this macro path (e.g., bypassing the helper boundary).
 
 ### Docs (in this PR)
 
@@ -500,7 +500,7 @@ We keep a small drift surface in C++ macro wiring and a precedent for bypassing 
 
 ### Downsides for Implementing
 
-Some churn in `cpp/defs.bzl` for an otherwise-correct macro. The payoff is reduced drift risk and a cleaner “one boundary” story for package-local macros.
+Some churn in `build-tools/cpp/defs.bzl` for an otherwise-correct macro. The payoff is reduced drift risk and a cleaner “one boundary” story for package-local macros.
 
 ### Recommendation
 

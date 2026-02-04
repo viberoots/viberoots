@@ -8,17 +8,17 @@ This installment completes targeted cross-language refactors identified in the l
 
 ### Description
 
-Move Go‑specific label logic (`append_tuple_labels`, `normalize_build_tags`) out of the shared `//lang:defs_common.bzl` into `//go/private:labels.bzl`. Update `go/defs.bzl` to import and use the new helper, keeping `defs_common` truly language‑agnostic and reducing the chance of future cross‑language drift. Behavior and labels remain identical.
+Move Go‑specific label logic (`append_tuple_labels`, `normalize_build_tags`) out of the shared `//lang:defs_common.bzl` into `//build-tools/go/private:labels.bzl`. Update `build-tools/go/defs.bzl` to import and use the new helper, keeping `defs_common` truly language‑agnostic and reducing the chance of future cross‑language drift. Behavior and labels remain identical.
 
 ### Scope & Changes
 
 - `lang/defs_common.bzl`:
   - Remove Go‑specific helpers (`normalize_build_tags`, `append_tuple_labels`).
   - Keep purely cross‑language helpers unchanged (e.g., `stamp_labels`, `append_nixpkg_labels`, `append_patch_srcs`, importer helpers).
-- `go/private/labels.bzl` (new):
+- `build-tools/go/private/labels.bzl` (new):
   - Provide `normalize_build_tags(tags: [str]) -> [str]` and `append_tuple_labels(kwargs, build_tags, goos, goarch, cgo_enabled)`.
-- `go/defs.bzl`:
-  - Replace the local wrapper `_append_tuple_labels(...)` to load and delegate to `//go/private:labels.bzl`.
+- `build-tools/go/defs.bzl`:
+  - Replace the local wrapper `_append_tuple_labels(...)` to load and delegate to `//build-tools/go/private:labels.bzl`.
   - No functional changes to CGO enablement or default toolchains.
 
 #### Tests (in this PR)
@@ -28,7 +28,7 @@ Move Go‑specific label logic (`append_tuple_labels`, `normalize_build_tags`) o
 
 #### Docs (in this PR)
 
-- Add a brief note in the build‑system design: Go‑specific tuple label logic lives in `//go/private:labels.bzl`; `//lang:defs_common.bzl` is language‑agnostic.
+- Add a brief note in the build‑system design: Go‑specific tuple label logic lives in `//build-tools/go/private:labels.bzl`; `//lang:defs_common.bzl` is language‑agnostic.
 
 ### Acceptance Criteria
 
@@ -61,7 +61,7 @@ Standardize importer inference by replacing bespoke logic in `node_webapp` and `
 
 ### Scope & Changes
 
-- `node/defs.bzl`:
+- `build-tools/node/defs.bzl`:
   - `node_webapp(...)`: derive the `importer` strictly via `importer_from_labels(...)` after enforcing a single `lockfile:` label (with consistent error text), then build the Nix attribute using the sanitized importer.
   - `nix_node_cli_bin(bundle=True)`: same importer derivation path as above; keep non‑bundled mode unchanged.
   - Continue to stamp `global_nix_inputs()` only for macros that shell out to Nix (unchanged policy).
@@ -116,7 +116,7 @@ No behavior changes; labels become uniformly stamped.
 ### Scope & Changes
 
 - `lang/defs_common.bzl`: add `stamp_wasm_variant(kwargs, variant)`.
-- `cpp/defs.bzl`, `go/defs.bzl`, `python/defs.bzl`: replace bespoke WASM label additions with `stamp_wasm_variant(...)`.
+- `build-tools/cpp/defs.bzl`, `build-tools/go/defs.bzl`, `build-tools/python/defs.bzl`: replace bespoke WASM label additions with `stamp_wasm_variant(...)`.
 
 #### Tests (in this PR)
 

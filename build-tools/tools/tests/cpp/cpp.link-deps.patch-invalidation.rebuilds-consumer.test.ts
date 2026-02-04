@@ -65,7 +65,7 @@ test("cpp: patch change in repo lib via link_deps rebuilds consumer", async () =
     await fsp.writeFile(
       path.join(libDir, "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_library")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
         "nix_cpp_library(",
         '  name = "greeter",',
@@ -95,7 +95,7 @@ test("cpp: patch change in repo lib via link_deps rebuilds consumer", async () =
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_binary")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")',
         "",
         "nix_cpp_binary(",
         '  name = "demo",',

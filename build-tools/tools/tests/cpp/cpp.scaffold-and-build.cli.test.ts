@@ -40,15 +40,18 @@ test("cpp cli scaffold builds via planner (binary exists)", async () => {
       path.join(process.cwd(), "build-tools/tools/nix/templates/cpp.nix"),
       path.join(tmp, "build-tools/tools/nix/templates/cpp.nix"),
     );
-    await fs.mkdirp(path.join(tmp, "cpp"));
-    await fs.copy(path.join(process.cwd(), "cpp/defs.bzl"), path.join(tmp, "cpp/defs.bzl"));
+    await fs.mkdirp(path.join(tmp, "build-tools", "cpp"));
+    await fs.copy(
+      path.join(process.cwd(), "build-tools/cpp/defs.bzl"),
+      path.join(tmp, "build-tools/cpp/defs.bzl"),
+    );
 
     // Scaffold a minimal CLI under apps/demo
     const appDir = path.join(tmp, "apps/demo");
     await fs.mkdirp(path.join(appDir, "src"));
     await fs.outputFile(path.join(appDir, "src", "main.cpp"), "int main(){return 0;}\n", "utf8");
     const targets = [
-      'load("//cpp:defs.bzl", "nix_cpp_binary")',
+      'load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")',
       "",
       "nix_cpp_binary(",
       '    name = "demo",',

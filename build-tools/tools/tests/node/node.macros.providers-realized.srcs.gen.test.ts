@@ -32,7 +32,7 @@ EOF'`;
       [
         "",
         "# test: node.macros.providers-realized.srcs.gen.test.ts",
-        'load("//node:defs.bzl", "nix_node_gen")',
+        'load("//build-tools/node:defs.bzl", "nix_node_gen")',
         "",
         "nix_node_gen(",
         '  name = "gen",',

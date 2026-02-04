@@ -37,7 +37,7 @@ test("python wasm (wasi): trim:safe prunes caches/tests and preserves run", asyn
     await fs.writeFile(
       path.join(appDir, "TARGETS"),
       `
-load("//python:defs.bzl", "nix_python_wasm_app")
+load("//build-tools/python:defs.bzl", "nix_python_wasm_app")
 
 nix_python_wasm_app(
     name = "pyapp",

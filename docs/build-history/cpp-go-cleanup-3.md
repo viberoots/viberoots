@@ -8,7 +8,7 @@ This plan implements the improvements discussed while explicitly choosing Approa
 
 Scope
 
-- Update `go/defs.bzl` to generate provider names for `nix_cgo_deps` using the same rules as `build-tools/tools/lib/providers.ts` (`normalizeNixAttr` + `providerNameForNixAttr`).
+- Update `build-tools/go/defs.bzl` to generate provider names for `nix_cgo_deps` using the same rules as `build-tools/tools/lib/providers.ts` (`normalizeNixAttr` + `providerNameForNixAttr`).
 - Remove the Starlark‑local naming differences (e.g., dropping `pkgs.` prefix) to ensure names match the TS path and avoid duplicate stamp files.
 
 Detailed Design

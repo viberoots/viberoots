@@ -35,7 +35,7 @@ test("cpp addon follows transitive link_deps with link_closure=transitive (build
     await fs.outputFile(
       path.join(tmp, "libs", "support", "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_headers", "nix_cpp_library")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_headers", "nix_cpp_library")',
         "",
         "nix_cpp_headers(",
         '  name = "headers",',
@@ -75,7 +75,7 @@ test("cpp addon follows transitive link_deps with link_closure=transitive (build
     await fs.outputFile(
       path.join(tmp, "libs", "core", "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_library")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
         "nix_cpp_library(",
         '  name = "core",',
@@ -117,7 +117,7 @@ test("cpp addon follows transitive link_deps with link_closure=transitive (build
     await fs.outputFile(
       path.join(tmp, "libs", "addon-native", "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_node_addon")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_node_addon")',
         "",
         "nix_cpp_node_addon(",
         '  name = "addon",',

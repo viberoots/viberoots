@@ -30,10 +30,10 @@ This PR standardizes these Nix-calling rule implementations on the same shared h
 ### Scope & Changes
 
 - Refactor Nix-calling rule implementations to route through shared helpers:
-  - `cpp/private/nix_build.bzl`:
+  - `build-tools/cpp/private/nix_build.bzl`:
     - Use a shared helper for selected-target out path capture and failure handling (do not hand-roll `OUT_PATH=$(...)` flows).
     - Ensure `nix build` out path capture uses a consistent structure (no out-links, deterministic capture, strict failure propagation).
-  - `go/private/nix_build_wasm.bzl`:
+  - `build-tools/go/private/nix_build_wasm.bzl`:
     - Remove `|| true` from the preferred selected-wasm build attempt.
     - Use the same shared helper structure for out path capture and failure handling as the fallback path.
 

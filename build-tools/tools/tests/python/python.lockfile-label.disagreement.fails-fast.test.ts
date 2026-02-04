@@ -17,7 +17,7 @@ test("python importer-scoped macros fail fast when labels and lockfile_label dis
     await fsp.writeFile(
       path.join(aDir, "TARGETS"),
       [
-        'load("//python:defs.bzl", "nix_python_library")',
+        'load("//build-tools/python:defs.bzl", "nix_python_library")',
         "",
         "nix_python_library(",
         '  name = "lib",',

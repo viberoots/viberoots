@@ -9,9 +9,9 @@ load(
     "validate_link_closure_overrides",
 )
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
-load("//python:pyext_stub.bzl", "python_pyext_stub")
+load("//build-tools/python:pyext_stub.bzl", "python_pyext_stub")
 load(
-    "//python:defs_pyext_wasm.bzl",
+    "//build-tools/python:defs_pyext_wasm.bzl",
     _nix_python_wasm_extension_module = "nix_python_wasm_extension_module",
 )
 

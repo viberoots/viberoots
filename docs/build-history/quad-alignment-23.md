@@ -30,8 +30,8 @@ This PR changes Starlark helper plumbing and migrates the small set of macros th
   - calls `attach_global_nix_inputs(...)` to ensure global inputs are real action inputs
   - optionally calls `stamp_global_nix_inputs(...)` for observability, without hardcoding `//:flake.lock`
 - Migrate Node macros that call Nix to use the helper consistently:
-  - `node/defs_nix.bzl:node_webapp`
-  - `node/defs_nix.bzl:nix_node_cli_bin(bundle=True)`
+  - `build-tools/node/defs_nix.bzl:node_webapp`
+  - `build-tools/node/defs_nix.bzl:nix_node_cli_bin(bundle=True)`
 - Keep behavior stable:
   - labels remain as before (still include `//:flake.lock` through `global_nix_inputs()`)
   - action inputs remain as before (still include `//:flake.lock` via `attach_global_nix_inputs`)
@@ -110,7 +110,7 @@ This PR adds one shared helper for non-genrule importer-scoped wiring and refact
     - dict-shaped attributes via dict-safe synthetic keys
   - merges provider edges into `deps` by default, or into a chosen attribute when a rule shape requires it
 - Refactor Node and Python non-genrule call sites to use the helper:
-  - `node/defs_core.bzl:nix_node_test` (today it repeats the sequence to derive importer and attach patches)
+  - `build-tools/node/defs_core.bzl:nix_node_test` (today it repeats the sequence to derive importer and attach patches)
   - Any Python macro call sites that manually sequence the same steps outside the genrule-style path (expected to be few; if none exist, keep Python unchanged and scope the PR to Node only)
 
 This PR should not change behavior. It should reduce the number of places where the importer-scoped contract is assembled manually.
@@ -186,11 +186,11 @@ This PR consolidates the “right default” patterns into one helper surface so
   - optional stripping of provider targets for stubs that must remain free of provider deps
 - Refactor the existing call sites that currently hand-roll parts of this behavior, prioritizing:
   - Go planner-visible stubs that realize provider edges into `srcs`:
-    - `go/defs.bzl:nix_go_carchive`
-    - `go/defs.bzl:nix_go_tiny_wasm_lib`
+    - `build-tools/go/defs.bzl:nix_go_carchive`
+    - `build-tools/go/defs.bzl:nix_go_tiny_wasm_lib`
   - C++ planner-visible stubs and the split “planner-visible vs executed” test macro:
-    - `cpp/defs.bzl:nix_cpp_wasm_emscripten_lib`
-    - `cpp/defs.bzl:nix_cpp_test` (planner stub path uses `strip_provider_targets`)
+    - `build-tools/cpp/defs.bzl:nix_cpp_wasm_emscripten_lib`
+    - `build-tools/cpp/defs.bzl:nix_cpp_test` (planner stub path uses `strip_provider_targets`)
 
 The goal is not to change behavior. The goal is to make the helper surface the canonical pattern.
 

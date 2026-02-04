@@ -35,7 +35,7 @@ int add(int a, int b) { return a + b; }
     );
     await fs.outputFile(
       path.join(coreDir, "TARGETS"),
-      `load("//cpp:defs.bzl", "nix_cpp_wasm_static_lib")
+      `load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_static_lib")
 
 nix_cpp_wasm_static_lib(
     name = "core_wasm",
@@ -85,7 +85,7 @@ func main() {}
     );
     await fs.writeFile(
       path.join(apiDir, "TARGETS"),
-      `load("//go:defs.bzl", "nix_go_tiny_wasm_lib", "nix_go_carchive")
+      `load("//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib", "nix_go_carchive")
 
 nix_go_tiny_wasm_lib(
     name = "wasm",
@@ -148,7 +148,7 @@ NAPI_MODULE(NODE_GYP_MODULE_NAME, Init);
     );
     await fs.writeFile(
       path.join(nativeDir, "TARGETS"),
-      `load("//cpp:defs.bzl", "nix_cpp_node_addon")
+      `load("//build-tools/cpp:defs.bzl", "nix_cpp_node_addon")
 
 nix_cpp_node_addon(
     name = "napi_addon",
@@ -166,12 +166,12 @@ nix_cpp_node_addon(
 
     // 4) Provide C++ defs in the temp repo (planner-visible)
     await fs.outputFile(
-      path.join(tmp, "cpp", "defs.bzl"),
-      await fs.readFile("cpp/defs.bzl", "utf8"),
+      path.join(tmp, "build-tools", "cpp", "defs.bzl"),
+      await fs.readFile("build-tools/cpp/defs.bzl", "utf8"),
     );
     await fs.outputFile(
-      path.join(tmp, "cpp", "wasm_defs.bzl"),
-      await fs.readFile("cpp/wasm_defs.bzl", "utf8"),
+      path.join(tmp, "build-tools", "cpp", "wasm_defs.bzl"),
+      await fs.readFile("build-tools/cpp/wasm_defs.bzl", "utf8"),
     );
 
     // 5) TS package with dual entries and conditional exports

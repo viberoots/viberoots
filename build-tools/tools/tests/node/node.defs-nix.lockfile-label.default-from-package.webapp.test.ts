@@ -13,7 +13,7 @@ test("node_webapp defaults lockfile label from package path", async () => {
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
-        'load("//node:defs.bzl", "node_webapp")',
+        'load("//build-tools/node:defs.bzl", "node_webapp")',
         "",
         "node_webapp(",
         '  name = "web",',

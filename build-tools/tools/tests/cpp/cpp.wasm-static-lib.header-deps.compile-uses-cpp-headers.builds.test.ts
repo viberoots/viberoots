@@ -21,7 +21,7 @@ test("cpp wasm static lib compiles with header_deps via nix_cpp_headers (build)"
     await fs.outputFile(
       path.join(tmp, "libs", "hdrs", "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_headers")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_headers")',
         "",
         "nix_cpp_headers(",
         '  name = "hdrs",',
@@ -44,7 +44,7 @@ test("cpp wasm static lib compiles with header_deps via nix_cpp_headers (build)"
     await fs.outputFile(
       path.join(tmp, "libs", "core", "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_wasm_static_lib")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_static_lib")',
         "",
         "nix_cpp_wasm_static_lib(",
         '  name = "core_wasm",',

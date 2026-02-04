@@ -7,7 +7,7 @@ This document proposes adding C++ as a first-class language to the repo with min
 - Templates: `cpp/lib`, `cpp/cli`
 - Planner templates and mapping
 - Exporter adapter and labels
-- Macros (`//cpp/defs.bzl`) stamping `lang:cpp` + `kind:*`
+- Macros (`//build-tools/cpp/defs.bzl`) stamping `lang:cpp` + `kind:*`
 - Provider sync:
   - v1: no module providers (Buck deps for local libs/prebuilts)
   - v2: nixpkgs-backed providers for third-party C++ libraries (canonical source)
@@ -74,7 +74,7 @@ See also: `getting-started-on-a-pr.md` for a practical, step-by-step guide (env,
      - Honor `//toolchains/cxx.bzl` rules for purity; do not read workspace tools
      - No patches/overrides in v1; later PR can adopt a patch story similar to Go if needed
 
-4. Macros (`//cpp/defs.bzl`):
+4. Macros (`//build-tools/cpp/defs.bzl`):
    - Thin wrappers around `cxx_*` that:
      - Stamp `lang:cpp` + `kind:*` via `lang/defs_common.bzl#stamp_labels`
      - Append `MODULE_PROVIDERS` deps (noop for v1 if we have no provider mapping)
@@ -120,7 +120,7 @@ Design
 - Add language entry:
   - `id: "cpp"`
   - `displayName: "C++"`
-  - `requiredPaths: ["cpp/defs.bzl", "build-tools/tools/nix/templates/cpp.nix"]`
+  - `requiredPaths: ["build-tools/cpp/defs.bzl", "build-tools/tools/nix/templates/cpp.nix"]`
   - `kinds: ["bin", "lib", "test"]`
   - `templatesDir: "build-tools/tools/scaffolding/templates/cpp"`
   - `capabilities: { patching: false }`
@@ -388,7 +388,7 @@ If not implemented
 
 ---
 
-### PR 9: Macros (`//cpp/defs.bzl`) and stamping lint
+### PR 9: Macros (`//build-tools/cpp/defs.bzl`) and stamping lint
 
 Intent/Impact
 
@@ -396,7 +396,7 @@ Intent/Impact
 
 Design
 
-- Starlark file: `cpp/defs.bzl` (≤ 250 lines; one responsibility: thin macros)
+- Starlark file: `build-tools/cpp/defs.bzl` (≤ 250 lines; one responsibility: thin macros)
   - Loads:
     ```starlark
     load("@prelude//cxx:cxx.bzl", "cxx_library", "cxx_binary", "cxx_test")
@@ -410,7 +410,7 @@ Design
   - Sketch:
 
     ```starlark
-    # cpp/defs.bzl
+    # build-tools/cpp/defs.bzl
     load("@prelude//cxx:cxx.bzl", "cxx_library", "cxx_binary", "cxx_test")
     load("//lang:defs_common.bzl", "stamp_labels")
 
@@ -488,7 +488,7 @@ Determinism & Sparse Checkout
 
 - Macros are pure Starlark wrappers around `cxx_*` with label stamping only; no file scanning or IO.
 - If `third_party/providers/auto_map.bzl` is missing, `_providers_for` effectively yields no deps; prebuild-guard in CI ensures generated glue presence only when needed.
-- If `cpp/defs.bzl` is missing in a sparse checkout, teams can continue using raw `cxx_*` rules; exporter still recognizes C++ via `rule_type` and tests for other languages continue to work.
+- If `build-tools/cpp/defs.bzl` is missing in a sparse checkout, teams can continue using raw `cxx_*` rules; exporter still recognizes C++ via `rule_type` and tests for other languages continue to work.
 
 ### PR 10: Scaffolding templates (cpp/lib and cpp/cli)
 
@@ -624,7 +624,7 @@ These examples show how to consume curated providers such as `pkgs.zlib` and `pk
 
 ```starlark
 # apps/demo/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_test")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_test")
 
 nix_cpp_binary(
     name = "demo",
@@ -655,7 +655,7 @@ TEST(Demo, ZlibSmoke) {
 
 ```starlark
 # apps/demo/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_test")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_test")
 
 nix_cpp_binary(
     name = "demo",
@@ -698,7 +698,7 @@ Intent/Impact
 
 Design
 
-- Macros (`//go/defs.bzl`): add optional attrs
+- Macros (`//build-tools/go/defs.bzl`): add optional attrs
   - `nixpkg_deps = ["pkgs.openssl", "pkgs.zlib"]`
   - `nix_cgo_pkgconfig = { "pkgs.openssl": "openssl", "pkgs.zlib": "zlib" }` (optional overrides)
 - Macro behavior:

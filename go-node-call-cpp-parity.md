@@ -10,7 +10,7 @@ Route Node‑API addon builds through the same Nix planner path used for C++ bin
 
 ### Scope & Changes
 
-- `cpp/private/nix_build.bzl`:
+- `build-tools/cpp/private/nix_build.bzl`:
   - Remove the special‑case “addon” inline Nix expression; invoke the planner-selected attribute (same path as bin/lib).
   - Keep output shape stable (`lib/<sanitized>.node`).
 - `flake.nix` + planner:
@@ -34,7 +34,7 @@ Route Node‑API addon builds through the same Nix planner path used for C++ bin
 
 ### Downsides for Implementing
 
-- Small refactor; brief churn in `cpp/private/nix_build.bzl` and planner outputs.
+- Small refactor; brief churn in `build-tools/cpp/private/nix_build.bzl` and planner outputs.
 
 ### Recommendation
 
@@ -82,7 +82,7 @@ Clarify the role of `addon_name` in `nix_cpp_node_addon` (macro label hint and o
 
 ### Scope & Changes
 
-- `cpp/defs.bzl`: brief docstring/comments for `nix_cpp_node_addon` clarifying `addon_name` usage and output path.
+- `build-tools/cpp/defs.bzl`: brief docstring/comments for `nix_cpp_node_addon` clarifying `addon_name` usage and output path.
 - `node-call-cpp.md`: add a short “Naming and load path” note referencing the macro contract and stable `native/<addon_name>.node` runtime path.
 
 ### Acceptance Criteria
@@ -147,7 +147,7 @@ Tighten comments and error messages to explicitly list `"addon"` as a supported 
 
 ### Scope & Changes
 
-- `cpp/private/nix_build.bzl`:
+- `build-tools/cpp/private/nix_build.bzl`:
   - Update docstrings and `fail(...)` messages to include the “addon” kind and show the expected artifact path.
 
 ### Acceptance Criteria
@@ -191,7 +191,7 @@ All PRs are independently reversible.
 - PR‑4:
   - Run existing zx tests: Go CGO (`go-cgo.repo-lib.build-and-run`), C→Go c-archive (`cpp.carchive.caller`). Expect no diffs. Backout: restore prior functions.
 - PR‑1:
-  - Ensure `buck2 build //libs/demo-native:napi_addon` uses the planner path; re-run `cpp.node-addon.builds.node-artifact` zx test and CI smoke. Backout: restore the inline addon branch in `cpp/private/nix_build.bzl` (no planner changes needed).
+  - Ensure `buck2 build //libs/demo-native:napi_addon` uses the planner path; re-run `cpp.node-addon.builds.node-artifact` zx test and CI smoke. Backout: restore the inline addon branch in `build-tools/cpp/private/nix_build.bzl` (no planner changes needed).
 
 ## Summary of Expected Impact
 

@@ -1,4 +1,4 @@
-load("//node:defs.bzl", "nix_node_lib", "nix_node_test", "nix_node_gen")
+load("//build-tools/node:defs.bzl", "nix_node_lib", "nix_node_test", "nix_node_gen")
 
 # Copy the compiled addon (.node) into a predictable relative path for runtime loading
 nix_node_gen(

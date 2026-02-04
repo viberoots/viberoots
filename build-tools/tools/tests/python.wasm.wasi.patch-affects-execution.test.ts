@@ -25,7 +25,7 @@ test("python wasm (wasi): patch affects execution banner", async () => {
     await fs.writeFile(
       path.join(appDir, "TARGETS"),
       `
-load("//python:defs.bzl", "nix_python_wasm_app")
+load("//build-tools/python:defs.bzl", "nix_python_wasm_app")
 nix_python_wasm_app(
   name = "pyapp",
   lockfile_label = "lockfile:apps/pywasm/uv.lock#apps/pywasm",

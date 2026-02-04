@@ -34,16 +34,16 @@ test(
         path.join(tmp, "build-tools/tools/nix/planner"),
       );
       await fs.outputFile(
-        path.join(tmp, "cpp", "defs.bzl"),
-        await fs.readFile("cpp/defs.bzl", "utf8"),
+        path.join(tmp, "build-tools", "cpp", "defs.bzl"),
+        await fs.readFile("build-tools/cpp/defs.bzl", "utf8"),
       );
       await fs.outputFile(
-        path.join(tmp, "cpp", "wasm_defs.bzl"),
-        await fs.readFile("cpp/wasm_defs.bzl", "utf8"),
+        path.join(tmp, "build-tools", "cpp", "wasm_defs.bzl"),
+        await fs.readFile("build-tools/cpp/wasm_defs.bzl", "utf8"),
       );
       await fs.outputFile(
-        path.join(tmp, "go", "defs.bzl"),
-        await fs.readFile("go/defs.bzl", "utf8"),
+        path.join(tmp, "build-tools", "go", "defs.bzl"),
+        await fs.readFile("build-tools/go/defs.bzl", "utf8"),
       );
 
       // 3) Export Buck graph for the temp repo (avoid broader glue to keep scope minimal)

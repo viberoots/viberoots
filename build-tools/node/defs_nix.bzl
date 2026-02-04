@@ -8,7 +8,7 @@ load(
     "nix_build_out_path_cmd",
     "nix_calling_genrule_bootstrap",
 )
-load("//node:defs_core.bzl", "nix_node_gen")
+load("//build-tools/node:defs_core.bzl", "nix_node_gen")
 
 MODULE_PROVIDERS = {}
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")

@@ -8,7 +8,7 @@ If you are adding a language, changing macro wiring, or changing glue generation
 
 This audit covers the cross-language “shared layer” and the places where it is consumed:
 
-- **Starlark**: `//lang:*` helpers and language macros (`go/defs.bzl`, `cpp/defs.bzl`, `node/defs_*.bzl`, `python/defs.bzl`).
+- **Starlark**: `//lang:*` helpers and language macros (`build-tools/go/defs.bzl`, `build-tools/cpp/defs.bzl`, `build-tools/node/defs_*.bzl`, `build-tools/python/defs.bzl`).
 - **TypeScript tooling**: exporter, provider sync, auto-map generation, patch tooling.
 - **Nix templates**: shared helpers and language templates used by the planner.
 
@@ -49,7 +49,7 @@ This contract ensures that a target’s language and kind are visible in the exp
 For language macros, stamping is the macro’s responsibility. Call sites should not need to remember `lang:*` or `kind:*` labels.
 
 - Go: `nix_go_test(...)` stamps `lang:go` and `kind:test` (auto-wired `*_test` targets do not pass a literal label list).
-  - Implementation detail: `go/private/auto_tests.bzl` is the canonical implementation of Go auto-wired helper targets (called by `go/defs.bzl`).
+  - Implementation detail: `build-tools/go/private/auto_tests.bzl` is the canonical implementation of Go auto-wired helper targets (called by `build-tools/go/defs.bzl`).
 
 ### Canonical implementations
 
@@ -611,9 +611,9 @@ Importer-scoped non-genrule wrappers should:
 - **Starlark (preferred)**: `lang/defs_common.bzl:prepare_language_wiring(...)` with `wiring = "non_genrule"`
 - **Starlark (Nix-calling, preferred)**: `lang/defs_common.bzl:prepare_language_wiring(...)` with `wiring = "non_genrule_nix_calling"` (composes non-genrule importer wiring plus `global_nix_inputs()` as real action inputs, without mutating caller dicts)
 - **Genrule-style (preferred)**: `lang/defs_common.bzl:prepare_language_wiring(...)` with `wiring = "genrule"`
-- **Python macro usage**: `python/defs.bzl` (`nix_python_library`, `nix_python_test`, `nix_python_wasm_*`)
+- **Python macro usage**: `build-tools/python/defs.bzl` (`nix_python_library`, `nix_python_test`, `nix_python_wasm_*`)
 - **Srcs-less rule shapes (preferred)**: `lang/defs_common.bzl:prepare_language_wiring(...)` with `wiring = "srcsless_rule"` (creates a synthetic dep carrying importer-local patches as action inputs)
-  - Python macro usage: `python/defs.bzl` (`nix_python_binary`)
+  - Python macro usage: `build-tools/python/defs.bzl` (`nix_python_binary`)
 
 ### Common leak patterns
 

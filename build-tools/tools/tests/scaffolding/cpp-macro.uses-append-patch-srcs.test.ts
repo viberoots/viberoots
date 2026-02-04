@@ -4,7 +4,7 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
 test("cpp macros use shared helper for local patches", async () => {
-  const txt = await fsp.readFile("cpp/defs.bzl", "utf8");
+  const txt = await fsp.readFile("build-tools/cpp/defs.bzl", "utf8");
   assert.match(txt, /prepare_language_wiring\(/);
   assert.doesNotMatch(
     txt,

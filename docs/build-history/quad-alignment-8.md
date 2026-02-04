@@ -56,7 +56,7 @@ Create a tiny shared helper to attach package‑local patch dirs for non‑impor
 
 - `lang/defs_common.bzl`:
   - Add `include_package_local_patches(kwargs, lang, default_dirs)` that delegates to `append_patch_srcs(...)` and dedupes.
-- `go/defs.bzl`, `cpp/defs.bzl`:
+- `build-tools/go/defs.bzl`, `build-tools/cpp/defs.bzl`:
   - Replace direct `append_patch_srcs(kwargs, ["patches/<lang>"])` with the new helper.
   - Defaults preserved (`patches/go`, `patches/cpp`); no behavior change.
 
@@ -98,7 +98,7 @@ Adopt the shared `//lang:nix_shell.bzl` helpers in Node macros that shell out to
 
 ### Scope & Changes
 
-- `node/defs.bzl`:
+- `build-tools/node/defs.bzl`:
   - `node_webapp(...)`: prepend `nix_bootstrap_env()` and `nix_timeout_wrapper_var()` into `cmd`; preserve existing `global_nix_inputs()` stamping and importer derivation via `ensure_single_lockfile_label(...)` + `importer_from_labels(...)`.
   - `nix_node_cli_bin(bundle=True)`: same treatment as above for the bundled path.
 - No behavior change for outputs; only command bootstrap/timeout wrapping is standardized.
@@ -147,7 +147,7 @@ Standardize our Nix invocation patterns to avoid creating persistent GC roots an
   - Guidance: from macro‑assembled shell `cmd`s, use `nix build --no-link --print-out-paths` and capture the output path via a shell variable instead of creating named out‑links with `--out-link`.
   - Optional follow‑up: provide a tiny helper snippet (as a Starlark string fragment) to capture the last printed out path into a variable, e.g. `OUT_PATH="$($TIMEOUT nix build ... --no-link --print-out-paths | tail -n1)"`.
 
-- `node/defs.bzl` (no output changes):
+- `build-tools/node/defs.bzl` (no output changes):
   - `node_webapp(...)`:
     - Replace `--out-link "$tmp/out"; outPath=$(readlink -f "$tmp/out")` with:
       - `outPath=$($TIMEOUT nix build .#node-webapp.<importer> --accept-flake-config --no-link --print-out-paths | tail -n1)`

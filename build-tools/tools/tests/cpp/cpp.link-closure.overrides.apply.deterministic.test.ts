@@ -67,7 +67,7 @@ test("cpp: link_closure_overrides apply deterministically (ordering locked by bu
     await fs.outputFile(
       path.join(tmp, "libs", "support", "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_library")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
         "nix_cpp_library(",
         '  name = "support",',
@@ -82,7 +82,7 @@ test("cpp: link_closure_overrides apply deterministically (ordering locked by bu
     await fs.outputFile(
       path.join(tmp, "libs", "core", "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_library")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
         "nix_cpp_library(",
         '  name = "core",',
@@ -98,7 +98,7 @@ test("cpp: link_closure_overrides apply deterministically (ordering locked by bu
     await fs.outputFile(
       path.join(tmp, "libs", "alpha", "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_library")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
         "nix_cpp_library(",
         '  name = "alpha",',
@@ -113,7 +113,7 @@ test("cpp: link_closure_overrides apply deterministically (ordering locked by bu
     await fs.outputFile(
       path.join(tmp, "apps", "demo", "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_binary")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")',
         "",
         "nix_cpp_binary(",
         '  name = "demo",',

@@ -94,7 +94,7 @@ Changes
   - Label stamping (`lang`, `kind`)
   - Auto-wiring tests (pattern input, library binding)
   - Visibility and default attrs
-- Refactor `go/defs.bzl` to use common helpers; keep Go-specific patterns:
+- Refactor `build-tools/go/defs.bzl` to use common helpers; keep Go-specific patterns:
   - Lib tests: `pkg/**/*_test.go`
   - App tests: `cmd/<name>/**/*_test.go` (synth lib as needed)
 

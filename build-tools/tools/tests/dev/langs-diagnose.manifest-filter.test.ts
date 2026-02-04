@@ -14,7 +14,7 @@ test("langs-diagnose respects --lang filter and reads manifest", async () => {
         {
           id: "go",
           displayName: "Go",
-          requiredPaths: ["go/defs.bzl"],
+          requiredPaths: ["build-tools/go/defs.bzl"],
           kinds: ["cli", "lib"],
           templatesDir: "build-tools/tools/scaffolding/templates/go",
         },

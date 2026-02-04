@@ -6,12 +6,14 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("exporter --validation=warn prints warnings and exits zero", async () => {
   await runInTemp("exp-warn-succeeds", async (tmp, $) => {
-    const pkg = path.join(tmp, "go", "app");
+    const pkg = path.join(tmp, "build-tools", "go", "app");
     await fs.mkdirp(pkg);
     await fs.outputFile(path.join(pkg, "main.go"), "package main\nfunc main(){}\n", "utf8");
 
     // Node with .go srcs but no rule_type and no labels triggers a go finding
-    const nodes = [{ name: "//go/app:bin", srcs: ["go/app/main.go"], labels: [] }];
+    const nodes = [
+      { name: "//build-tools/go/app:bin", srcs: ["build-tools/go/app/main.go"], labels: [] },
+    ];
     const graph = path.join(tmp, "build-tools/tools/buck/graph.json");
     await fs.mkdirp(path.dirname(graph));
     await fs.outputFile(graph, JSON.stringify(nodes, null, 2));

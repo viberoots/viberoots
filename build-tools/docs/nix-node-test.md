@@ -35,7 +35,7 @@ We introduce a Buck macro `nix_node_test(...)` that expands to an external runne
 ### Macro surface (proposed)
 
 ```
-# node/defs.bzl
+# build-tools/node/defs.bzl
 def nix_node_test(
     name,
     labels = [],                  # MUST include lockfile:<path>#<importer> (or pass lockfile_label)
@@ -155,7 +155,7 @@ The `node_nix_test` rule’s `ExternalRunnerTestInfo` will:
    - Accepts `importer`, `patterns`, `timeout_sec`, `env`
    - Emits a deterministic default output (e.g., `<name>.stamp`)
 
-2. Public macro in `node/defs.bzl`:
+2. Public macro in `build-tools/node/defs.bzl`:
    - `nix_node_test(...)`
    - Enforces lockfile label; stamps `lang:node`, `kind:test`; appends provider deps; expands to `node_nix_test` with computed args
 
@@ -197,7 +197,7 @@ The `node_nix_test` rule’s `ExternalRunnerTestInfo` will:
 
 - **Scope**
   - Add `node/private/nix_test.bzl` implementing an external runner test rule
-  - Update `node/defs.bzl` to export `nix_node_test(...)` that:
+  - Update `build-tools/node/defs.bzl` to export `nix_node_test(...)` that:
     - stamps labels (`lang:node`, `kind:test`) and enforces one importer lockfile label
     - appends provider deps via `auto_map.bzl`
     - includes importer‑local `patches/node/*.patch` in `srcs`

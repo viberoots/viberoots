@@ -6,11 +6,11 @@ This plan lands small, high‑value refinements to keep abstractions tight and r
 
 ### Description
 
-Unify the C++ ExternalRunner test rule with Node by reusing `nix_bootstrap_env()` and `nix_timeout_wrapper_var()` from `//lang:nix_shell.bzl`. Today, `cpp/private/nix_test.bzl` embeds a custom bootstrap/timeout shell sequence. This refactor reduces duplication and keeps timeouts and environment handling consistent across languages. No functional change expected.
+Unify the C++ ExternalRunner test rule with Node by reusing `nix_bootstrap_env()` and `nix_timeout_wrapper_var()` from `//lang:nix_shell.bzl`. Today, `build-tools/cpp/private/nix_test.bzl` embeds a custom bootstrap/timeout shell sequence. This refactor reduces duplication and keeps timeouts and environment handling consistent across languages. No functional change expected.
 
 ### Scope & Changes
 
-- `cpp/private/nix_test.bzl`:
+- `build-tools/cpp/private/nix_test.bzl`:
   - Load and use `nix_bootstrap_env()` and `nix_timeout_wrapper_var()` in the test runner command.
   - Preserve existing semantics for `planner_label`, expected binary name resolution (`sanitize_to_bin_name`), and fallback lookup.
 - Documentation:
@@ -50,7 +50,7 @@ Factor Node’s lockfile label parsing/enforcement into shared helpers so Node m
 - `lang/defs_common.bzl`:
   - Add helpers analogous to Node’s `_extract_lockfile_labels()` and `_ensure_lockfile_label()` (names appropriate for shared use).
   - Preserve current semantics: exactly one importer‑scoped label required; stable dedupe; precise error text.
-- `node/defs.bzl`:
+- `build-tools/node/defs.bzl`:
   - Replace local helpers with imports from `lang/defs_common.bzl` in `nix_node_gen` and `nix_node_test`.
 - Documentation:
   - Mention the shared helpers in the handbook’s “Adding a Language” and Node macro sections as the canonical place for importer‑scoped label handling.

@@ -30,7 +30,7 @@ int add(int a, int b) { return a + b; }
     );
     await fs.outputFile(
       path.join(coreDir, "TARGETS"),
-      `load("//cpp:defs.bzl", "nix_cpp_wasm_static_lib")
+      `load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_static_lib")
 
 nix_cpp_wasm_static_lib(
     name = "core_wasm",
@@ -66,7 +66,7 @@ func main() {}
     );
     await fs.outputFile(
       path.join(apiDir, "TARGETS"),
-      `load("//go:defs.bzl", "nix_go_tiny_wasm_lib")
+      `load("//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")
 
 nix_go_tiny_wasm_lib(
     name = "wasm",
@@ -80,12 +80,12 @@ nix_go_tiny_wasm_lib(
 
     // 3) Provide C++ defs in the temp repo
     await fs.outputFile(
-      path.join(tmp, "cpp", "defs.bzl"),
-      await fs.readFile("cpp/defs.bzl", "utf8"),
+      path.join(tmp, "build-tools", "cpp", "defs.bzl"),
+      await fs.readFile("build-tools/cpp/defs.bzl", "utf8"),
     );
     await fs.outputFile(
-      path.join(tmp, "cpp", "wasm_defs.bzl"),
-      await fs.readFile("cpp/wasm_defs.bzl", "utf8"),
+      path.join(tmp, "build-tools", "cpp", "wasm_defs.bzl"),
+      await fs.readFile("build-tools/cpp/wasm_defs.bzl", "utf8"),
     );
 
     // 4) Export graph and build TinyGo wasm via graph-generator-selected-wasm

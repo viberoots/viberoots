@@ -58,7 +58,7 @@ let
     (goOnly && (lib.hasPrefix "cpp/" rel || rel == "cpp")) ||
     (goOnly && lib.hasPrefix "build-tools/tools/nix/templates" rel) ||
     (goOnly && lib.hasPrefix "build-tools/tools/scaffolding/templates" rel) ||
-    (excludeCppReqs && (rel == "cpp/defs.bzl" || rel == "cpp/wasm_defs.bzl")) ||
+    (excludeCppReqs && (rel == "build-tools/cpp/defs.bzl" || rel == "build-tools/cpp/wasm_defs.bzl")) ||
     (excludeCppReqs && rel == "build-tools/tools/nix/templates/cpp.nix");
   allowByRoots = rel:
     rel == "flake.nix" ||

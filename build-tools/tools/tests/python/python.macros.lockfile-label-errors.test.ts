@@ -32,7 +32,7 @@ test("python macros fail with deterministic error text when lockfile label is mi
       await fsp.writeFile(
         path.join(appDir, "TARGETS"),
         [
-          'load("//python:defs.bzl", "nix_python_library")',
+          'load("//build-tools/python:defs.bzl", "nix_python_library")',
           "",
           "nix_python_library(",
           '  name = "lib",',

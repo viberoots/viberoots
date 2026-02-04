@@ -17,7 +17,7 @@ test("cpp: nix_cpp_test rejects invalid link_closure_overrides (fails fast)", as
     await fsp.writeFile(
       path.join(supportDir, "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_library")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
         "nix_cpp_library(",
         '  name = "support",',
@@ -40,7 +40,7 @@ test("cpp: nix_cpp_test rejects invalid link_closure_overrides (fails fast)", as
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_test")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_test")',
         "",
         "nix_cpp_test(",
         '  name = "demo_test",',

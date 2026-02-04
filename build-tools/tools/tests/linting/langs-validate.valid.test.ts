@@ -13,7 +13,7 @@ test("langs.json valid passes validator", async () => {
         {
           id: "go",
           displayName: "Go",
-          requiredPaths: ["build-tools/tools/nix/templates/go.nix", "go/defs.bzl"],
+          requiredPaths: ["build-tools/tools/nix/templates/go.nix", "build-tools/go/defs.bzl"],
           kinds: ["cli", "lib"],
           templatesDir: "build-tools/tools/scaffolding/templates/go",
         },

@@ -74,7 +74,7 @@ wire_global_nix_inputs(kw, into = "srcs", stamp = False)
 
 #### C++ macro core
 
-For C++ macros that build via Nix (`nix_cpp_library`, `nix_cpp_binary`, `nix_cpp_node_addon`), the shared stamping and input wiring lives in a single helper (`_cpp_common`) in `cpp/defs.bzl`. Public macro signatures stay stable; this is a consolidation to reduce drift.
+For C++ macros that build via Nix (`nix_cpp_library`, `nix_cpp_binary`, `nix_cpp_node_addon`), the shared stamping and input wiring lives in a single helper (`_cpp_common`) in `build-tools/cpp/defs.bzl`. Public macro signatures stay stable; this is a consolidation to reduce drift.
 
 #### Sanitization policy parity (Nix ↔ Starlark)
 

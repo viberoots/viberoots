@@ -21,7 +21,7 @@ test("cpp library compiles with header_deps via nix_cpp_headers (build)", async 
     await fs.outputFile(
       path.join(tmp, "libs", "hdrs", "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_headers")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_headers")',
         "",
         "nix_cpp_headers(",
         '  name = "hdrs",',
@@ -42,7 +42,7 @@ test("cpp library compiles with header_deps via nix_cpp_headers (build)", async 
     await fs.outputFile(
       path.join(tmp, "libs", "core", "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_library")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
         "nix_cpp_library(",
         '  name = "core",',

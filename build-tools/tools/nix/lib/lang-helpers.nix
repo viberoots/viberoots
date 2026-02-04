@@ -33,7 +33,7 @@ let
   dropConfigSuffix = label:
     let s = if builtins.isString label then label else ""; in (lib.head (lib.splitString " (" s));
 
-  # Convert labels like "root//apps/foo:svc" or "prelude//cpp:lib" to "//apps/foo:svc" or "//cpp:lib".
+  # Convert labels like "root//apps/foo:svc" or "prelude//build-tools/cpp:lib" to "//apps/foo:svc" or "//build-tools/cpp:lib".
   dropCellPrefix = label:
     let
       s = if builtins.isString label then label else "";

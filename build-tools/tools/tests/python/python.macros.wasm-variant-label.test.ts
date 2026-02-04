@@ -18,7 +18,7 @@ test("python macros: nix_python_wasm_* stamp wasm:wasi variant", async () => {
     await fs.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//python:defs.bzl", "nix_python_wasm_app", "nix_python_wasm_lib")',
+        'load("//build-tools/python:defs.bzl", "nix_python_wasm_app", "nix_python_wasm_lib")',
         "",
         "nix_python_wasm_app(",
         '  name = "wasm_app",',

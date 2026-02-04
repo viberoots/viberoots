@@ -11,7 +11,7 @@ Steps
   - Generated files:
     - `build-tools/tools/nix/templates/rust.nix`
     - `build-tools/tools/nix/planner/rust.nix`
-    - `rust/defs.bzl`
+    - `build-tools/rust/defs.bzl`
     - `build-tools/tools/buck/providers/rust.ts`
     - `patches/rust/.gitkeep`
 

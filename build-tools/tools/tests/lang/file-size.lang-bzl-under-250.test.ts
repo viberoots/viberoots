@@ -30,9 +30,9 @@ test("selected *.bzl files remain under the 250 LOC methodology gate", async () 
     "lang/internal/nix_calling_importer_genrule_wiring.bzl",
     "lang/internal/package_local_wiring.bzl",
 
-    "node/defs.bzl",
-    "node/defs_core.bzl",
-    "node/defs_nix.bzl",
+    "build-tools/node/defs.bzl",
+    "build-tools/node/defs_core.bzl",
+    "build-tools/node/defs_nix.bzl",
   ];
 
   for (const f of files) {

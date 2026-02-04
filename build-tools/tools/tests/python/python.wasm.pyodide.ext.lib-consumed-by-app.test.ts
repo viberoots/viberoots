@@ -88,7 +88,7 @@ test("python wasm (pyodide): app consumes lib overlay with extension", async () 
     await fs.writeFile(
       path.join(libDir, "TARGETS"),
       `
-load("//python:defs.bzl", "nix_python_wasm_lib", "nix_python_wasm_extension_module")
+load("//build-tools/python:defs.bzl", "nix_python_wasm_lib", "nix_python_wasm_extension_module")
 
 nix_python_wasm_extension_module(
   name = "ext",
@@ -130,7 +130,7 @@ nix_python_wasm_lib(
     await fs.writeFile(
       path.join(appDir, "TARGETS"),
       `
-load("//python:defs.bzl", "nix_python_wasm_app")
+load("//build-tools/python:defs.bzl", "nix_python_wasm_app")
 
 nix_python_wasm_app(
   name = "pyapp",

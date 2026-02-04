@@ -87,7 +87,7 @@ test("python wasm (pyodide): native overlay order is deterministic", async () =>
     await fs.writeFile(
       path.join(appDir, "TARGETS"),
       `
-load("//python:defs.bzl", "nix_python_wasm_app", "nix_python_wasm_extension_module")
+load("//build-tools/python:defs.bzl", "nix_python_wasm_app", "nix_python_wasm_extension_module")
 
 nix_python_wasm_extension_module(
   name = "ext_one",

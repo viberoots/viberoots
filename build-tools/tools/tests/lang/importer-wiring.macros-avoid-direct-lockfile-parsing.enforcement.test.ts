@@ -7,10 +7,10 @@ function assert(condition: boolean, message: string) {
 }
 
 const importerScopedMacroImplFiles = [
-  "node/defs_core.bzl",
-  "node/defs_nix.bzl",
-  "python/defs.bzl",
-  "python/defs_pyext_wasm.bzl",
+  "build-tools/node/defs_core.bzl",
+  "build-tools/node/defs_nix.bzl",
+  "build-tools/python/defs.bzl",
+  "build-tools/python/defs_pyext_wasm.bzl",
 ];
 
 test("importer-scoped macros delegate lockfile parsing/enforcement to //lang:importer_wiring.bzl", async () => {

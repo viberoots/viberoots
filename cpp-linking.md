@@ -35,7 +35,7 @@ In this repo we also have **cross-language linking** that touches C++ artifacts.
 
 ### Go app or library linking an in-repo C++ library (cgo)
 
-This is supported today via Go macros using `repo_cgo_deps` (see `docs/handbook/language-interop.md` and `go/defs.bzl`).
+This is supported today via Go macros using `repo_cgo_deps` (see `docs/handbook/language-interop.md` and `build-tools/go/defs.bzl`).
 
 This is a “Go consumer, C++ producer” case. It is not driven by `nix_cpp_binary` at all, but it does depend on C++ library artifact shape and headers.
 
@@ -43,7 +43,7 @@ Example call site:
 
 ```python
 # libs/greeter/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_library")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
     name = "greeter",
@@ -57,7 +57,7 @@ nix_cpp_library(
 
 ```python
 # apps/demo-cli/TARGETS
-load("//go:defs.bzl", "nix_go_binary")
+load("//build-tools/go:defs.bzl", "nix_go_binary")
 
 nix_go_binary(
     name = "demo",
@@ -223,7 +223,7 @@ These examples assume the deterministic union rule above:
 
 ```python
 # libs/math/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_library")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
     name = "math_core",
@@ -234,7 +234,7 @@ nix_cpp_library(
 
 ```python
 # apps/calc/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_binary")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 
 nix_cpp_binary(
     name = "calc",
@@ -248,7 +248,7 @@ nix_cpp_binary(
 
 ```python
 # libs/support/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_library")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
     name = "support",
@@ -259,7 +259,7 @@ nix_cpp_library(
 
 ```python
 # libs/math/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_library")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
     name = "math_core",
@@ -275,7 +275,7 @@ nix_cpp_library(
 
 ```python
 # apps/calc/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_binary")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 
 nix_cpp_binary(
     name = "calc",
@@ -289,7 +289,7 @@ nix_cpp_binary(
 
 ```python
 # libs/api-headers/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_headers")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_headers")
 
 nix_cpp_headers(
     name = "api_headers",
@@ -300,7 +300,7 @@ nix_cpp_headers(
 
 ```python
 # apps/uses-headers/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_binary")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 
 nix_cpp_binary(
     name = "uses_headers",
@@ -315,7 +315,7 @@ Example shape: declare function prototypes yourself (C ABI) or only use opaque h
 
 ```python
 # apps/link-only/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_binary")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 
 nix_cpp_binary(
     name = "link_only",
@@ -328,7 +328,7 @@ nix_cpp_binary(
 
 ```python
 # libs/addon-native/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_node_addon")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_node_addon")
 
 nix_cpp_node_addon(
     name = "napi_addon",
@@ -347,7 +347,7 @@ nix_cpp_node_addon(
 
 ```python
 # libs/math/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_test")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_test")
 
 nix_cpp_test(
     name = "math_gtest",
@@ -367,7 +367,7 @@ and that runtime loading is handled (rpath or packaging) as described later in t
 
 ```python
 # libs/runtime/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_shared_library")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_shared_library")
 
 nix_cpp_shared_library(
     name = "runtime",
@@ -378,7 +378,7 @@ nix_cpp_shared_library(
 
 ```python
 # apps/uses-shared/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_binary")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 
 nix_cpp_binary(
     name = "uses_shared",
@@ -395,7 +395,7 @@ can resolve shared libs without `DYLD_LIBRARY_PATH`/`LD_LIBRARY_PATH`.
 
 ```python
 # libs/runtime/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_library")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
     name = "runtime",
@@ -407,7 +407,7 @@ nix_cpp_library(
 
 ```python
 # libs/addon-native/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_node_addon")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_node_addon")
 
 nix_cpp_node_addon(
     name = "napi_addon",
@@ -553,7 +553,7 @@ Constraints:
 Example call site:
 
 ```python
-load("//cpp:defs.bzl", "nix_cpp_binary")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 
 nix_cpp_binary(
     name = "app",
@@ -624,7 +624,7 @@ The macro layer should remain small and deterministic, consistent with our conve
 
 Implementation details (proposed):
 
-- Extend `cpp/defs.bzl` public macros:
+- Extend `build-tools/cpp/defs.bzl` public macros:
   - `nix_cpp_library`, `nix_cpp_binary`, `nix_cpp_node_addon`, `nix_cpp_test`
   - accept and forward the new attrs:
     - `link_deps`, `header_deps`, `link_closure`, `link_mode`

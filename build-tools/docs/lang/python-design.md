@@ -51,7 +51,7 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 
 - Patches live in `<importer>/patches/python/` (importer‑local, flat directory, no subdirectories). Filenames: `<distribution-name>@<version>.patch` (case‑insensitive keys in logic).
 - Python Nix templates live in `build-tools/tools/nix/templates/python.nix`, imported by `build-tools/tools/nix/lang-templates.nix`.
-- Buck macros live under `python/defs.bzl` and use `//lang:auto_map.bzl`.
+- Buck macros live under `build-tools/python/defs.bzl` and use `//lang:auto_map.bzl`.
 - Provider rules live under `//third_party/providers/**` and are generated, not hand‑edited.
 - Dev overrides via `NIX_PY_DEV_OVERRIDE_JSON` (JSON: `{ "name@ver": "/abs/local/src" }`). CI forbids overrides.
 - Reuse common utilities:
@@ -238,7 +238,7 @@ Patch invalidation is handled by Python macros that include importer‑local pat
 
 ---
 
-## Buck Macros: //python/defs.bzl
+## Buck Macros: //build-tools/python/defs.bzl
 
 Thin wrappers around `python_*` rules that:
 
@@ -246,7 +246,7 @@ Thin wrappers around `python_*` rules that:
 - Append providers from `//lang:auto_map.bzl` using `MODULE_PROVIDERS["//pkg:name"]`.
 
 ```starlark
-load("@prelude//python:defs.bzl", "python_binary", "python_library", "python_test")
+load("@prelude//build-tools/python:defs.bzl", "python_binary", "python_library", "python_test")
 
 def _providers_for(name):
     MODULE_PROVIDERS = {}
@@ -274,7 +274,7 @@ def nix_python_test(name, labels = [], deps = [], **kwargs):
 Using common helpers (macro outline)
 
 ```starlark
-load("@prelude//python:defs.bzl", "python_binary", "python_library", "python_test")
+load("@prelude//build-tools/python:defs.bzl", "python_binary", "python_library", "python_test")
 load("//lang:defs_common.bzl", "stamp_labels", "ensure_single_lockfile_label", "append_nixpkg_labels", "providers_for")
 
 def _providers_for(name):
@@ -740,11 +740,11 @@ Re-evaluation: After landing this PR, re-evaluate the remaining PR list and adju
 
 #### Description
 
-Add `python/defs.bzl` macros that stamp standard labels, validate an importer‑scoped lockfile, optionally attach native nixpkgs deps, and wire providers from `auto_map.bzl`.
+Add `build-tools/python/defs.bzl` macros that stamp standard labels, validate an importer‑scoped lockfile, optionally attach native nixpkgs deps, and wire providers from `auto_map.bzl`.
 
 #### Scope & Changes
 
-- `python/defs.bzl`:
+- `build-tools/python/defs.bzl`:
   - Use `stamp_labels`, `ensure_single_lockfile_label`, `append_nixpkg_labels`, and `providers_for` from `lang/defs_common.bzl`,
   - Expose `nix_python_{library,binary,test}` with `lockfile_label` and `nixpkg_deps` parameters,
   - Keep rule args aligned with upstream `python_*` rules.

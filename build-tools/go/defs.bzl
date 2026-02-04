@@ -4,9 +4,9 @@ load("//lang:defs_common.bzl", "merge_link_intent_deps", "validate_link_closure_
 load("//lang:global_inputs.bzl", "global_nix_inputs")
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
 load("//lang:defs_common.bzl", "wire_package_local_planner_visible_stub")
-load("//go/private:nix_build_wasm.bzl", "go_nix_build_wasm")
-load("//go/private:cgo_wiring.bzl", "apply_go_rule_stable_defaults", "apply_go_tuple_labels", "configure_cgo_kwargs")
-load("//go/private:auto_tests.bzl", "maybe_autowire_go_binary_test", "maybe_autowire_go_library_test")
+load("//build-tools/go/private:nix_build_wasm.bzl", "go_nix_build_wasm")
+load("//build-tools/go/private:cgo_wiring.bzl", "apply_go_rule_stable_defaults", "apply_go_tuple_labels", "configure_cgo_kwargs")
+load("//build-tools/go/private:auto_tests.bzl", "maybe_autowire_go_binary_test", "maybe_autowire_go_library_test")
 
 
 def nix_go_library(name, **kwargs):

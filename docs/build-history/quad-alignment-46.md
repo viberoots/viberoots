@@ -26,7 +26,7 @@ keep dict-safe behavior and ordering consistent.
 - Update `lang/planner_visible_wiring.bzl`:
   - Replace direct `realize_provider_edges(...)` calls with `merge_provider_edges(...)`.
   - Preserve existing behavior for `provider_realization_mode` and `strip_providers_from_deps`.
-- Update `rust/defs.bzl`:
+- Update `build-tools/rust/defs.bzl`:
   - Replace direct `realize_provider_edges(...)` usage with `merge_provider_edges(...)`.
 - If needed, adjust `lang/provider_edges.bzl` visibility or docstrings to clarify
   `merge_provider_edges(...)` as the canonical entry point.
@@ -237,13 +237,13 @@ Implement.
 
 ### Description
 
-I will remove the thin `sanitize_to_bin_name(...)` wrapper in `cpp/private/sanitize.bzl` and use
+I will remove the thin `sanitize_to_bin_name(...)` wrapper in `build-tools/cpp/private/sanitize.bzl` and use
 the canonical `lang/sanitize.bzl:sanitize_name` directly at call sites.
 
 ### Scope & Changes
 
 - Update any C++ macros or rules that call `sanitize_to_bin_name(...)` to call `sanitize_name(...)`.
-- Remove or simplify `cpp/private/sanitize.bzl` to avoid redundant indirection.
+- Remove or simplify `build-tools/cpp/private/sanitize.bzl` to avoid redundant indirection.
 - Keep parity tests that ensure sanitizer behavior remains unchanged.
 
 ### Tests (in this PR)

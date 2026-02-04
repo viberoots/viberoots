@@ -218,5 +218,5 @@ Checks:
 With Phase 1 in place, Phase 2 can:
 
 - Generate files using `module_computed`, `package_name`, `go_min`, etc.
-- Emit per-package `TARGETS` that load `//go:defs.bzl` macros (decentralized registration).
+- Emit per-package `TARGETS` that load `//build-tools/go:defs.bzl` macros (decentralized registration).
 - Keep README steps aligned with glue generation and testing rules.

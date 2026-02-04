@@ -8,7 +8,7 @@ test("TS ↔ Nix sanitizeAttrNameFromTargetLabel parity", async () => {
   await runInTemp("nix-attr-sanitize-nix-ts-parity", async (tmp, $) => {
     const cases: string[] = [
       "root//apps/foo:svc (config//toolchains:default#buck2/default//:default#linkerlang/cxx)",
-      "prelude//cpp:lib (config//toolchains:xyz)",
+      "prelude//build-tools/cpp:lib (config//toolchains:xyz)",
       "//apps/foo:my bin",
       "root//apps/foo:my@target",
       "apps/foo:svc (config//buck:some)",

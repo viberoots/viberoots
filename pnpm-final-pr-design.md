@@ -8,7 +8,7 @@ This PR finalizes the PNPM/Node path by adding missing tests around importer‑s
   - `build-tools/tools/buck/providers/node.ts` generates `third_party/providers/TARGETS.node.auto` deterministically.
   - Normalizes importer "." to the lockfile directory, sorts entries, and writes an auto‑managed section in `third_party/providers/TARGETS` to ensure Buck can load `defs_node.bzl` providers.
 - Provider naming helpers exist: `build-tools/tools/lib/providers.ts` implements `providerNameForImporter()`.
-- Node macros exist: `node/defs.bzl` (`nix_node_gen`, `nix_node_lib`, `nix_node_bin`, `nix_node_test`, `node_webapp`, `nix_node_cli_bin`) and enforce exactly one `lockfile:<path>#<importer>` label while stamping `lang:node`/`kind:*`.
+- Node macros exist: `build-tools/node/defs.bzl` (`nix_node_gen`, `nix_node_lib`, `nix_node_bin`, `nix_node_test`, `node_webapp`, `nix_node_cli_bin`) and enforce exactly one `lockfile:<path>#<importer>` label while stamping `lang:node`/`kind:*`.
 - Patch wrapper exists: `build-tools/tools/patch/patch-node.ts` supports `start`, `apply`, `reset`, `session`, `remove`, and calls `runGlue()` after apply/remove.
 - Existing Node tests cover idempotency, scoped packages, `--lang node` orchestration, macro provider wiring, and auto‑map label→provider mapping.
 

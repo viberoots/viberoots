@@ -23,7 +23,7 @@ int add_ints(int a, int b) {
 }
 EOF'`;
     await sh`bash --noprofile --norc -c 'cat > libs/math-core/TARGETS <<"EOF"
-load("//cpp:defs.bzl", "nix_cpp_library")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
     name = "lib",
@@ -64,7 +64,7 @@ prune = { go-tests = true, unused-packages = true }
 EOF'`;
     // TARGETS declaring a Go c-archive
     await sh`bash --noprofile --norc -c 'cat > libs/math-api/TARGETS <<"EOF"
-load("//go:defs.bzl", "nix_go_carchive")
+load("//build-tools/go:defs.bzl", "nix_go_carchive")
 
 nix_go_carchive(
     name = "carchive",
@@ -113,7 +113,7 @@ static napi_value Init(napi_env env, napi_value exports) {
 NAPI_MODULE(NODE_GYP_MODULE_NAME, Init);
 EOF'`;
     await sh`bash --noprofile --norc -c 'cat > libs/math-native/TARGETS <<"EOF"
-load("//cpp:defs.bzl", "nix_cpp_node_addon")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_node_addon")
 
 nix_cpp_node_addon(
     name = "napi_addon",

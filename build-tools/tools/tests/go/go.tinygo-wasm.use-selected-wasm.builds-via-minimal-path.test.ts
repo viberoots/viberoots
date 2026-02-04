@@ -26,7 +26,7 @@ test("nix_go_tiny_wasm_lib use_selected_wasm routes to selected-wasm path", asyn
     await fs.writeFile(
       path.join(apiDir, "TARGETS"),
       [
-        'load("//go:defs.bzl", "nix_go_tiny_wasm_lib")',
+        'load("//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")',
         "",
         "nix_go_tiny_wasm_lib(",
         '    name = "wasm",',

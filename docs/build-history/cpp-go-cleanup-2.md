@@ -72,7 +72,7 @@ Detailed Design
 - Write a deterministic Starlark file:
 - `NIX_ATTR_MAP = { "//third_party/providers:nix_pkgs_zlib": "nixpkg:pkgs.zlib", ... }`
 - Sorted keys, newline‑terminated, generated idempotently.
-- In `cpp/defs.bzl`, replace heuristic derivation of `nixpkg:` labels with a mapping lookup:
+- In `build-tools/cpp/defs.bzl`, replace heuristic derivation of `nixpkg:` labels with a mapping lookup:
   - For each provider dep under `//third_party/providers:*`, if present in `NIX_ATTR_MAP`, append the associated `nixpkg:` label to the planner labels.
 - Keep existing provider nodes (`third_party/providers/defs_cpp.bzl`) unchanged; they already carry `nixpkg:` labels for visibility.
 
@@ -96,7 +96,7 @@ Consequence if not implemented
 
 Scope
 
-- Add a small parity test ensuring `_sanitize_to_bin_name` in `cpp/defs.bzl` matches the canonical Nix `sanitizeName` used by the planner/templates.
+- Add a small parity test ensuring `_sanitize_to_bin_name` in `build-tools/cpp/defs.bzl` matches the canonical Nix `sanitizeName` used by the planner/templates.
 
 Detailed Design
 
@@ -179,12 +179,12 @@ Consequence if not implemented
 
 Scope
 
-- Move helpers from `cpp/defs.bzl` into `cpp/private/*.bzl` while preserving public API (`nix_cpp_library`, `nix_cpp_binary`, `nix_cpp_test`).
+- Move helpers from `build-tools/cpp/defs.bzl` into `build-tools/cpp/private/*.bzl` while preserving public API (`nix_cpp_library`, `nix_cpp_binary`, `nix_cpp_test`).
 
 Detailed Design
 
 - Extract `_sanitize_to_bin_name`, planner stub rule, and external runner rule implementations into private modules.
-- Keep loads and public wrappers in `cpp/defs.bzl` small and focused.
+- Keep loads and public wrappers in `build-tools/cpp/defs.bzl` small and focused.
 
 Acceptance Criteria
 

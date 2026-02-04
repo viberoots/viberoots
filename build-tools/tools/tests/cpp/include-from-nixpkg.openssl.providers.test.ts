@@ -10,12 +10,12 @@ test("cpp openssl include via nixpkg_deps at call site", async () => {
     await fs.outputFile(path.join(appDir, "src", "main.cpp"), "int main(){return 0;}\n");
 
     await fs.outputFile(
-      path.join(tmp, "cpp", "defs.bzl"),
-      await fs.readFile("cpp/defs.bzl", "utf8"),
+      path.join(tmp, "build-tools", "cpp", "defs.bzl"),
+      await fs.readFile("build-tools/cpp/defs.bzl", "utf8"),
     );
     await fs.outputFile(
-      path.join(tmp, "cpp", "wasm_defs.bzl"),
-      await fs.readFile("cpp/wasm_defs.bzl", "utf8"),
+      path.join(tmp, "build-tools", "cpp", "wasm_defs.bzl"),
+      await fs.readFile("build-tools/cpp/wasm_defs.bzl", "utf8"),
     );
     await fs.mkdirp(path.join(tmp, "build-tools/tools/nix/templates"));
     await fs.copy(
@@ -51,7 +51,7 @@ test("cpp openssl include via nixpkg_deps at call site", async () => {
       `#include <openssl/ssl.h>\n#include <gtest/gtest.h>\n\nTEST(OpenSSL, CanInclude) { SUCCEED(); }\n`,
     );
 
-    const targets = `load("//cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_test")
+    const targets = `load("//build-tools/cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_test")
 
 nix_cpp_binary(
     name = "demo",

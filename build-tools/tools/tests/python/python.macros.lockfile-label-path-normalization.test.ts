@@ -25,7 +25,7 @@ test("python macros accept lockfile labels with repeated leading ./ and still wi
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//python:defs.bzl", "nix_python_library")',
+        'load("//build-tools/python:defs.bzl", "nix_python_library")',
         "",
         "nix_python_library(",
         '  name = "lib",',

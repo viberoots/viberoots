@@ -35,7 +35,7 @@ test("cpp bin links an in-repo C++ lib via link_deps (build + run)", async () =>
     await fs.outputFile(
       path.join(tmp, "libs", "greeter", "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_library")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
         "nix_cpp_library(",
         '  name = "greeter",',
@@ -64,7 +64,7 @@ test("cpp bin links an in-repo C++ lib via link_deps (build + run)", async () =>
     await fs.outputFile(
       path.join(tmp, "apps", "demo", "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_binary")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")',
         "",
         "nix_cpp_binary(",
         '  name = "demo",',

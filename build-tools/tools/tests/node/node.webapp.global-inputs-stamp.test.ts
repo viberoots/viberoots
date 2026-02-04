@@ -12,7 +12,7 @@ test("node_webapp stamps global Nix inputs via labels", async () => {
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
-        'load("//node:defs.bzl", "node_webapp")',
+        'load("//build-tools/node:defs.bzl", "node_webapp")',
         "",
         "node_webapp(",
         '  name = "bundle",',

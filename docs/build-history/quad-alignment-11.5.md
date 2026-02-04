@@ -117,18 +117,18 @@ Implement.
 
 ---
 
-## PR‑3: Split `//node:defs.bzl` to satisfy the ≤250 LOC methodology gate
+## PR‑3: Split `//build-tools/node:defs.bzl` to satisfy the ≤250 LOC methodology gate
 
 ### Description
 
-Bring `node/defs.bzl` (currently >250 lines) into compliance by splitting into a small set of modules while keeping `//node:defs.bzl` as the stable public entry point.
+Bring `build-tools/node/defs.bzl` (currently >250 lines) into compliance by splitting into a small set of modules while keeping `//build-tools/node:defs.bzl` as the stable public entry point.
 
 ### Scope & Changes
 
-- Split `node/defs.bzl` into:
+- Split `build-tools/node/defs.bzl` into:
   - one module for generic gen/test wrappers (`nix_node_gen`, `nix_node_test`, `nix_node_lib`, `nix_node_bin`)
   - one module for Nix-invoking macros (`node_webapp`, bundled `nix_node_cli_bin`)
-- Keep `node/defs.bzl` as a thin re-export wrapper so existing `load("//node:defs.bzl", ...)` call sites remain unchanged.
+- Keep `build-tools/node/defs.bzl` as a thin re-export wrapper so existing `load("//build-tools/node:defs.bzl", ...)` call sites remain unchanged.
 - Ensure each new file is ≤250 lines.
 
 ### Tests (in this PR)
@@ -144,7 +144,7 @@ Bring `node/defs.bzl` (currently >250 lines) into compliance by splitting into a
 
 ### Acceptance Criteria
 
-- `node/defs.bzl` ≤250 lines.
+- `build-tools/node/defs.bzl` ≤250 lines.
 - No diffs in macro output attributes (labels, srcs/deps realization, command assembly) beyond formatting/stable ordering.
 - `build-tools/tools/bin/v` passes.
 
@@ -228,7 +228,7 @@ Implement.
 
 1. PR‑1 (C++ patch workspace uniqueness) — removes the most likely batch-test flake vector.
 2. PR‑2 (`lang/defs_common.bzl` split) — restores methodology compliance for shared Starlark helpers.
-3. PR‑3 (`node/defs.bzl` split) — restores methodology compliance for Node macros.
+3. PR‑3 (`build-tools/node/defs.bzl` split) — restores methodology compliance for Node macros.
 4. PR‑4 (Docs & policy clarification) — aligns the plan with repo reality and resolves the remaining policy ambiguity (Option A).
 
 ---

@@ -38,5 +38,9 @@ export async function runStartupCheck(root: string): Promise<void> {
         }
       : {}),
   } as any;
-  await $({ stdio: "inherit", cwd: root, env: envStartup })`build-tools/tools/dev/startup-check.ts`;
+  await $({
+    stdio: "inherit",
+    cwd: root,
+    env: envStartup,
+  })`zx-wrapper build-tools/tools/dev/startup-check.ts`;
 }

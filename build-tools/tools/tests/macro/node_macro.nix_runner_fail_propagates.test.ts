@@ -28,7 +28,7 @@ test(
       const importer = "libs/demo";
       // Overwrite TARGETS to enforce allow-generate semantics in the runner
       const targets = [
-        'load("//node:defs.bzl", "nix_node_lib", "nix_node_test")',
+        'load("//build-tools/node:defs.bzl", "nix_node_lib", "nix_node_test")',
         "",
         "nix_node_lib(",
         '    name = "demo",',

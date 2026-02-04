@@ -23,7 +23,7 @@ This PR makes `nix_cpp_test` validate `link_closure_overrides` at the macro laye
 
 This PR makes the following changes:
 
-- Update `cpp/defs.bzl` so `nix_cpp_test` calls `validate_link_closure_overrides` on `link_deps`
+- Update `build-tools/cpp/defs.bzl` so `nix_cpp_test` calls `validate_link_closure_overrides` on `link_deps`
 - Keep the deterministic deps union rule unchanged
 - Keep planner behavior unchanged and rely on the macro validation for early feedback
 

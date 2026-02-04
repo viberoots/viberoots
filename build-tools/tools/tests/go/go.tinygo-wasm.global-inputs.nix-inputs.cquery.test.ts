@@ -12,7 +12,7 @@ test("nix_go_tiny_wasm_lib passes global Nix inputs through go_nix_build_wasm(ni
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
-        'load("//go:defs.bzl", "nix_go_tiny_wasm_lib")',
+        'load("//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")',
         "",
         "nix_go_tiny_wasm_lib(",
         '  name = "mod",',

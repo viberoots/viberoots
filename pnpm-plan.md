@@ -79,7 +79,7 @@ This plan sequences small, verifiable PRs to implement PNPM workspaces (apps/lib
 ### PR5 — Thin Node macro for provider auto‑wiring and stamping
 
 - Scope
-  - Create `//node/defs.bzl` providing thin macros (e.g., `node_gen`, `node_test`) that:
+  - Create `//build-tools/node/defs.bzl` providing thin macros (e.g., `node_gen`, `node_test`) that:
     - Call `lang/defs_common.bzl` stamping helpers to add `lang:node` and `kind:*` labels.
     - Append providers from `//third_party/providers:auto_map.bzl`.
     - Accept a `labels` parameter so the lockfile label is explicit in the macro call.
@@ -173,7 +173,7 @@ This plan sequences small, verifiable PRs to implement PNPM workspaces (apps/lib
   - Add Nix‑backed Node build rules for TS compilation/bundling to produce a single‑file, shebanged CLI bundle as a Buck materialized artifact.
 
 - Detailed design
-  - Implementation location: `//node/defs.bzl` alongside `nix_node_gen`, `nix_node_bin`, `nix_node_lib`.
+  - Implementation location: `//build-tools/node/defs.bzl` alongside `nix_node_gen`, `nix_node_bin`, `nix_node_lib`.
   - Macro signature (conceptual):
     - `nix_node_cli_bin(name, entry = None, out = None, labels = [], deps = [], lockfile_label = None, bundle = False, **kwargs)`
     - Defaults:
@@ -243,7 +243,7 @@ This plan sequences small, verifiable PRs to implement PNPM workspaces (apps/lib
   - `vite.config.ts` is minimal and deterministic (no ambient FS reads). Environment values flow via Vite defaults; no Nix wrappers for running Vite.
   - The generator runs `pnpm -w install --lockfile-only` (in dev shell) to materialize a stable importer lockfile; provider sync then includes the correct importer.
   - Buck TARGETS use the Node macro to append provider deps from `//third_party/providers:auto_map.bzl` and carry the importer‑scoped lockfile label.
-  - Add a thin Buck macro `node_webapp(...)` (in `//node/defs.bzl`) that builds via Nix, consistent with other templates:
+  - Add a thin Buck macro `node_webapp(...)` (in `//build-tools/node/defs.bzl`) that builds via Nix, consistent with other templates:
     - Stamps `lang:node` and `kind:app` using `lang/defs_common.bzl`.
     - Requires the importer‑scoped lockfile label at call sites and appends providers from `auto_map.bzl`.
     - Expands to a `genrule` that invokes a zx shim to run `nix build .#node-webapp[${system}].<importer>` and copies its `dist/` to `$OUT` (no network; uses pinned flake inputs). The shim should be minimal and deterministic.

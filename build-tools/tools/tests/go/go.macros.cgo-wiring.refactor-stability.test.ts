@@ -45,7 +45,7 @@ EOF'`;
     await $({
       cwd: tmp,
     })`bash --noprofile --norc -c 'mkdir -p tmp && cat > tmp/TARGETS <<'\''EOF'\''
-load("//go:defs.bzl", "nix_go_library")
+load("//build-tools/go:defs.bzl", "nix_go_library")
 
 genrule(name="localprov", out="localprov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
 

@@ -27,7 +27,7 @@ test("node deps enforcement: fix rewrites deps", async () => {
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//node:defs_core.bzl", "nix_node_lib")',
+        'load("//build-tools/node:defs_core.bzl", "nix_node_lib")',
         "",
         "nix_node_lib(",
         '  name = "admin",',

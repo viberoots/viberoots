@@ -18,7 +18,7 @@ test("scaffolding registry: discovery only lists present languages and allows ot
     await fsp.mkdir(path.join(tmp, "build-tools/tools/scaffolding/templates/go/lib"), {
       recursive: true,
     });
-    await fsp.mkdir(path.join(tmp, "go"), { recursive: true });
+    await fsp.mkdir(path.join(tmp, "build-tools", "go"), { recursive: true });
 
     // Required files for Go
     await fsp.writeFile(
@@ -26,7 +26,7 @@ test("scaffolding registry: discovery only lists present languages and allows ot
       "# stub go template\n",
       "utf8",
     );
-    await fsp.writeFile(path.join(tmp, "go/defs.bzl"), "# stub go defs\n", "utf8");
+    await fsp.writeFile(path.join(tmp, "build-tools/go/defs.bzl"), "# stub go defs\n", "utf8");
     await fsp.writeFile(
       path.join(tmp, "build-tools/tools/scaffolding/templates/go/.keep"),
       "",

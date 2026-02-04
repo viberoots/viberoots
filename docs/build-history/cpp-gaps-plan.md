@@ -63,7 +63,7 @@ Intent/Impact
 
 Scope
 
-- Go macros (`go/defs.bzl`):
+- Go macros (`build-tools/go/defs.bzl`):
   - Add optional attrs: `nixpkg_deps = ["pkgs.zlib", "pkgs.openssl"]`, `nix_cgo_pkgconfig = { "pkgs.openssl": "openssl" }`.
   - When `nixpkg_deps` non-empty, stamp label `"cgo:enabled"` and wire explicit deps to curated provider targets (e.g., `//third_party/providers:nix_pkgs_openssl`).
 

@@ -36,7 +36,7 @@ EOF'`;
       [
         "",
         "# test: go.macros.providers-realized.deps.lib.test.ts",
-        'load("//go:defs.bzl", "nix_go_library")',
+        'load("//build-tools/go:defs.bzl", "nix_go_library")',
         "",
         "nix_go_library(",
         '  name = "lib",',

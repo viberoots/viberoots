@@ -27,7 +27,7 @@ test("python macros include importer-local patches in srcs (cquery)", async () =
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//python:defs.bzl", "nix_python_library")',
+        'load("//build-tools/python:defs.bzl", "nix_python_library")',
         "",
         "nix_python_library(",
         '  name = "lib",',

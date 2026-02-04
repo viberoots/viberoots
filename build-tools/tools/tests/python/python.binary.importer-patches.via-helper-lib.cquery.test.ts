@@ -24,7 +24,7 @@ test("python binary carries importer-local patches via synthetic dep (cquery)", 
       path.join(appDir, "TARGETS"),
       [
         'load("@prelude//:rules.bzl", "python_library")',
-        'load("//python:defs.bzl", "nix_python_binary")',
+        'load("//build-tools/python:defs.bzl", "nix_python_binary")',
         "",
         "python_library(",
         '  name = "lib",',

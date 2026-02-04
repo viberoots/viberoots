@@ -61,7 +61,7 @@ Implement.
 
 ### Description
 
-Factor repeated CGO and toolchain logic in `go/defs.bzl` into one private helper used by `nix_go_library`, `nix_go_binary`, and `nix_go_test`. Preserve current defaults and override behavior; reduce cognitive load and divergence risk.
+Factor repeated CGO and toolchain logic in `build-tools/go/defs.bzl` into one private helper used by `nix_go_library`, `nix_go_binary`, and `nix_go_test`. Preserve current defaults and override behavior; reduce cognitive load and divergence risk.
 
 ### Scope & Changes
 
@@ -106,7 +106,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Single‑file macro refactor in `go/defs.bzl`; thin slices with Go macros are unaffected.
+- Single‑file macro refactor in `build-tools/go/defs.bzl`; thin slices with Go macros are unaffected.
 
 ---
 
@@ -157,7 +157,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Single‑file macro refactor in `cpp/defs.bzl`; no additional dependencies in thin slices.
+- Single‑file macro refactor in `build-tools/cpp/defs.bzl`; no additional dependencies in thin slices.
 
 ---
 
@@ -172,7 +172,7 @@ Create a small helper to stamp global Nix inputs into `labels` when a macro asse
 - Add `stamp_global_nix_inputs(kwargs)` in `//lang:defs_common.bzl`:
   - Reads `global_nix_inputs()` from `//lang:global_inputs.bzl` and dedupe‑merges into `kwargs["labels"]`.
 - Migrate:
-  - `node/defs.bzl:node_webapp` and the bundled branch of `nix_node_cli_bin` to call `stamp_global_nix_inputs(...)`.
+  - `build-tools/node/defs.bzl:node_webapp` and the bundled branch of `nix_node_cli_bin` to call `stamp_global_nix_inputs(...)`.
 - Keep command assembly and timeouts unchanged; only label stamping is centralized.
 
 ### Tests (in this PR)
@@ -206,7 +206,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Only `//lang` and `//node` macro files change; typical slices already include these paths.
+- Only `//lang` and `//build-tools/node` macro files change; typical slices already include these paths.
 
 ---
 

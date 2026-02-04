@@ -106,8 +106,8 @@ After PR‑1, Node Nix-calling macros should not assemble importer wiring, patch
 
 This PR migrates:
 
-- `node/defs_nix.bzl:node_webapp`
-- `node/defs_nix.bzl:nix_node_cli_bin(bundle=True)`
+- `build-tools/node/defs_nix.bzl:node_webapp`
+- `build-tools/node/defs_nix.bzl:nix_node_cli_bin(bundle=True)`
 
 The goal is to make these macros “thin wrappers” over the shared wiring surface and `//lang:nix_shell.bzl` command helpers.
 
@@ -115,7 +115,7 @@ Clarification: I do not need to preserve backwards compatibility yet. This PR ca
 
 ### Scope & Changes
 
-- Update `node/defs_nix.bzl`:
+- Update `build-tools/node/defs_nix.bzl`:
   - replace direct calls to `prepare_importer_non_genrule_wiring(...)`, `wire_global_nix_inputs(...)`, and ad-hoc `srcs` map injection with a single call to the shared helper from PR‑1
   - ensure both macros still:
     - enforce exactly one lockfile label
@@ -145,7 +145,7 @@ Clarification: I do not need to preserve backwards compatibility yet. This PR ca
 
 ### Acceptance Criteria
 
-- `node/defs_nix.bzl` Nix-calling macros do not hand-assemble importer wiring or global input wiring.
+- `build-tools/node/defs_nix.bzl` Nix-calling macros do not hand-assemble importer wiring or global input wiring.
 - Tests prove patch invalidation and provider wiring are unchanged.
 - Temp-repo scenarios still work.
 - Docs describe the canonical helper surface.
@@ -172,7 +172,7 @@ Implement.
 
 ### Description
 
-Go macros already stamp `lang:*` and `kind:*` for libraries and binaries. Go tests are currently different. They rely on call sites to set labels. This shows up as manual label lists for synthesized `*_test` targets in `go/defs.bzl`.
+Go macros already stamp `lang:*` and `kind:*` for libraries and binaries. Go tests are currently different. They rely on call sites to set labels. This shows up as manual label lists for synthesized `*_test` targets in `build-tools/go/defs.bzl`.
 
 This is a cross-language abstraction leak because other languages treat label stamping as a macro responsibility, not a call-site requirement.
 
@@ -182,9 +182,9 @@ Clarification: I do not need to preserve backwards compatibility yet. This PR ca
 
 ### Scope & Changes
 
-- Update `go/defs.bzl:nix_go_test` to call `stamp_labels(kwargs, "go", "test")`.
+- Update `build-tools/go/defs.bzl:nix_go_test` to call `stamp_labels(kwargs, "go", "test")`.
   - This should dedupe cleanly if the caller already supplied labels.
-- Update `go/defs.bzl` synthesized `*_test` call sites (auto-wired tests) to stop passing literal `labels = ["lang:go", "kind:test"]`.
+- Update `build-tools/go/defs.bzl` synthesized `*_test` call sites (auto-wired tests) to stop passing literal `labels = ["lang:go", "kind:test"]`.
 - Optional tightening: add a small Starlark probe test that asserts `nix_go_test(...)` always includes `lang:go` and `kind:test` labels even when `labels` is absent or empty.
 
 ### Tests (in this PR)
@@ -245,8 +245,8 @@ This PR introduces one small shared helper surface in `//lang` and migrates Go a
   - pops `nixpkg_deps` from kwargs as a list of strings (or empty list)
   - optionally appends nixpkg labels via the existing canonical normalizer
 - Refactor:
-  - `go/defs.bzl:nix_go_library` and `nix_go_binary`
-  - `cpp/defs.bzl:_cpp_common` and the wasm variants
+  - `build-tools/go/defs.bzl:nix_go_library` and `nix_go_binary`
+  - `build-tools/cpp/defs.bzl:_cpp_common` and the wasm variants
     to use the helper instead of duplicating the same `kwargs.pop(...)` patterns.
 
 Non-goals:

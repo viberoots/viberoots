@@ -45,7 +45,7 @@ Then it migrates Node `nix_node_test` to use the single composed helper, so the 
     - `importer`
     - `kwargs` (prepared kwargs for the rule call, including patch inputs and global inputs)
     - `deps` (when provider edges are realized into deps)
-- Migrate `node/defs_core.bzl:nix_node_test`:
+- Migrate `build-tools/node/defs_core.bzl:nix_node_test`:
   - remove the call site `wire_global_nix_inputs(...)` call
   - rely on the new composed helper so global inputs are attached exactly once
   - preserve the existing “do not stamp global inputs” behavior for `nix_node_test` unless the contract explicitly changes
@@ -65,7 +65,7 @@ Non-goals in this PR:
   - importer-local patches are present as real action inputs
   - global Nix inputs are present as real action inputs
   - patch scope stamping and `lang:*` and `kind:*` stamping remain present and stable
-- Add an enforcement test that fails if `node/defs_core.bzl` contains `wire_global_nix_inputs(` inside `nix_node_test`.
+- Add an enforcement test that fails if `build-tools/node/defs_core.bzl` contains `wire_global_nix_inputs(` inside `nix_node_test`.
   - This asserts the intended abstraction boundary, not the exact helper name.
 
 ### Docs (in this PR)
@@ -121,7 +121,7 @@ This PR migrates the remaining Go call site to the v2 helper and standardizes ca
 
 ### Scope & Changes
 
-- Migrate `go/defs.bzl:nix_go_carchive` to use `wire_package_local_planner_visible_stub_v2(...)`.
+- Migrate `build-tools/go/defs.bzl:nix_go_carchive` to use `wire_package_local_planner_visible_stub_v2(...)`.
   - preserve behavior:
     - provider edge realization mode remains `inputs`
     - patch inputs remain attached as real action inputs for the planner-visible stub
@@ -138,7 +138,7 @@ Non-goals in this PR:
 
 ### Tests (in this PR)
 
-- Add an enforcement test that fails if `go/defs.bzl` contains `wire_package_local_planner_visible_stub(`.
+- Add an enforcement test that fails if `build-tools/go/defs.bzl` contains `wire_package_local_planner_visible_stub(`.
   - This is narrow and intended to prevent new mutating call sites from being introduced in Go.
 - Add a probe test that exercises `nix_go_carchive` and asserts:
   - patch_scope is `package-local`
@@ -230,7 +230,7 @@ Non-goals in this PR:
 
 - New macro shapes cannot bypass the shared helper surfaces without tripping enforcement tests.
 - Representative cquery tests confirm action-input level invariants for invalidation across languages.
-- Macro call-site conventions are consistent across `go/defs.bzl`, `cpp/defs.bzl`, `node/defs_*.bzl`, and `python/defs.bzl`.
+- Macro call-site conventions are consistent across `build-tools/go/defs.bzl`, `build-tools/cpp/defs.bzl`, `build-tools/node/defs_*.bzl`, and `build-tools/python/defs.bzl`.
 
 ### Risks
 

@@ -22,7 +22,7 @@ EOF'`;
     await $({
       cwd: tmp,
     })`bash --noprofile --norc -c 'mkdir -p tmp && cat > tmp/TARGETS <<\'EOF' && cat tmp/TARGETS
-load("//go:defs.bzl", "nix_go_library")
+load("//build-tools/go:defs.bzl", "nix_go_library")
 
 # localprov need not be a go_library; allow any target
 genrule(name="localprov", cmd="echo ok > $OUT", out="localprov.stamp")
@@ -76,7 +76,7 @@ EOF'`;
 MODULE_PROVIDERS = {}
 EOF'`;
     await $({ cwd: tmp })`bash --noprofile --norc -c 'mkdir -p tmp && cat > tmp/TARGETS <<\'EOF'
-load("//go:defs.bzl", "nix_go_library")
+load("//build-tools/go:defs.bzl", "nix_go_library")
 
 nix_go_library(
     name = "lib",

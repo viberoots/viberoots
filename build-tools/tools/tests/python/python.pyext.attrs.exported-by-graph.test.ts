@@ -27,7 +27,7 @@ test("exporter: python pyext nodes include module + link intent attrs in build-t
     await fs.writeFile(
       path.join(app, "TARGETS"),
       [
-        'load("//python:defs.bzl", "nix_python_extension_module")',
+        'load("//build-tools/python:defs.bzl", "nix_python_extension_module")',
         "",
         "filegroup(",
         '  name = "dep_link",',

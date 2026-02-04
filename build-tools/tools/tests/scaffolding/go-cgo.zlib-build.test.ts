@@ -42,7 +42,7 @@ func main() {
 EOF'`;
 
     await $({ cwd: tmp })`bash --noprofile --norc -c 'cat > apps/demo-cli/TARGETS <<'\''EOF'\''
-load("//go:defs.bzl", "nix_go_binary")
+load("//build-tools/go:defs.bzl", "nix_go_binary")
 
 nix_go_binary(
     name = "demo",

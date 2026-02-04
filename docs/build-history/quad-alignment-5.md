@@ -12,7 +12,7 @@ Finish the deprecation by switching Python macros to use the unified `append_imp
 
 ### Scope & Changes
 
-- `python/defs.bzl`:
+- `build-tools/python/defs.bzl`:
   - Replace remaining calls to `append_python_patches_for_importer(...)` with `append_importer_patches(..., "python")`.
 - `lang/defs_common.bzl`:
   - Remove the deprecated Python wrapper after in‑tree references are updated.
@@ -93,7 +93,7 @@ Normalize artifact/attribute name sanitization by using `//lang:sanitize.bzl:san
 
 - Adopt `sanitize_name` as the common sanitizer in macro code paths that currently hand‑roll or import language‑local variants.
 - In C++:
-  - If `cpp/private/sanitize.bzl` adds C++‑specific behavior, preserve it but delegate shared portions to `sanitize_name` to keep cross‑language parity.
+  - If `build-tools/cpp/private/sanitize.bzl` adds C++‑specific behavior, preserve it but delegate shared portions to `sanitize_name` to keep cross‑language parity.
 - Verify flake‑side sanitizer equivalence (already documented to mirror the same transform).
 - Tests (in this PR):
   - Add a small Starlark probe `sanitize_name_probe(name, value)` in `lang/sanitize.bzl` mirroring the existing nix‑attr probe pattern; use zx test to materialize sanitized outputs for representative inputs and compare to expected golden values.
@@ -132,7 +132,7 @@ Eliminate special‑case coupling to the repo overlay in C++ macros and stamp gl
 
 ### Scope & Changes
 
-- `cpp/defs.bzl`:
+- `build-tools/cpp/defs.bzl`:
   - Remove the `//build-tools/tools/nix/overlays:cpp-patches.nix` item from `nix_inputs` in `nix_cpp_*` macros.
   - Keep per‑target local patch dirs via existing shared helpers (unchanged behavior).
   - Ensure `append_nixpkg_labels(...)` drives native deps for invalidation, aligning with other languages.

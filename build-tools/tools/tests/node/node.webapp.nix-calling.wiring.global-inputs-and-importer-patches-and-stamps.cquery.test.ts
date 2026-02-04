@@ -18,7 +18,7 @@ test("node_webapp (Nix-calling) wires global inputs + importer patches as action
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//node:defs.bzl", "node_webapp")',
+        'load("//build-tools/node:defs.bzl", "node_webapp")',
         "",
         "node_webapp(",
         '  name = "bundle",',

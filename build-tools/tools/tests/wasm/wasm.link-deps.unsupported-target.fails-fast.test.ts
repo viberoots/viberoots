@@ -13,7 +13,7 @@ test("wasm: unsupported target in link_deps fails fast with targeted error", asy
       path.join(appDir, "TARGETS"),
       [
         'load("@prelude//:rules.bzl", "genrule")',
-        'load("//go:defs.bzl", "nix_go_tiny_wasm_lib")',
+        'load("//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")',
         "",
         'genrule(name = "not_wasm", out = "x.txt", cmd = "echo x > $OUT")',
         "",

@@ -17,7 +17,7 @@ Introduce a single Starlark helper to stamp `nixpkg:` labels with consistent nor
 
 ### Acceptance Criteria
 
-- Helper compiles and is importable from `go/defs.bzl` and `cpp/defs.bzl` without usage.
+- Helper compiles and is importable from `build-tools/go/defs.bzl` and `build-tools/cpp/defs.bzl` without usage.
 - No output or graph changes anywhere (no callers yet).
 - Docs snippet added and passes lint/CI.
 
@@ -45,7 +45,7 @@ Switch Go macros to call the shared helper so `nixpkg:` labels are normalized at
 
 ### Scope & Changes
 
-- In `go/defs.bzl`:
+- In `build-tools/go/defs.bzl`:
   - Replace raw `"nixpkg:%s" % a` with `append_nixpkg_labels(kwargs, nix_cgo_deps)` inside `_apply_cgo_labels` (or equivalent call site).
   - Ensure `stamp_labels` and CGO auto‑enablement remain untouched.
 - Docs: clarify in handbook/provider-mapping that Go macros normalize nixpkgs labels at stamp‑time.
@@ -80,11 +80,11 @@ Implement.
 
 ### Description
 
-Refactor `cpp/defs.bzl` to use the same helper for appending `nixpkg:` labels. This removes duplicated loops and guarantees identical normalization logic across languages.
+Refactor `build-tools/cpp/defs.bzl` to use the same helper for appending `nixpkg:` labels. This removes duplicated loops and guarantees identical normalization logic across languages.
 
 ### Scope & Changes
 
-- In `cpp/defs.bzl`:
+- In `build-tools/cpp/defs.bzl`:
   - Replace local normalization loop with `append_nixpkg_labels(kwargs, nix_cxx_attrs)` for `nix_cpp_library` and `nix_cpp_binary`.
 - Keep planner stubs, external Nix build, and sanitizer behavior unchanged.
 - Docs: note C++ macros now use the shared nixpkgs label helper; no behavior change expected.
@@ -122,7 +122,7 @@ Align C++ graph visibility with Go/Node by realizing provider edges (from `MODUL
 
 ### Scope & Changes
 
-- In `cpp/defs.bzl`:
+- In `build-tools/cpp/defs.bzl`:
   - Load `//third_party/providers:auto_map.bzl` `MODULE_PROVIDERS`.
   - Merge `providers_for(MODULE_PROVIDERS, name)` into `deps` (or into `srcs` if preferred for genrule‑like parity) for `nix_cpp_library` and `nix_cpp_binary`.
 - Keep planner/test wiring untouched; no change to external Nix build rule behavior.

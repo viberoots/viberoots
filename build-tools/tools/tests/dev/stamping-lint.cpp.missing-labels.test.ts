@@ -40,7 +40,7 @@ await runInTemp("stamping-lint-cpp-missing", async (tmp, $) => {
   await fs.outputFile(
     path.join(lib, "TARGETS"),
     [
-      'load("//cpp:defs.bzl", "nix_cpp_library")',
+      'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
       "nix_cpp_library(",
       '  name = "demo",',
       '  srcs = ["demo.cpp"],',
@@ -49,10 +49,13 @@ await runInTemp("stamping-lint-cpp-missing", async (tmp, $) => {
     ].join("\n"),
     "utf8",
   );
-  await fs.outputFile(path.join(tmp, "cpp", "defs.bzl"), await fs.readFile("cpp/defs.bzl", "utf8"));
   await fs.outputFile(
-    path.join(tmp, "cpp", "wasm_defs.bzl"),
-    await fs.readFile("cpp/wasm_defs.bzl", "utf8"),
+    path.join(tmp, "build-tools", "cpp", "defs.bzl"),
+    await fs.readFile("build-tools/cpp/defs.bzl", "utf8"),
+  );
+  await fs.outputFile(
+    path.join(tmp, "build-tools", "cpp", "wasm_defs.bzl"),
+    await fs.readFile("build-tools/cpp/wasm_defs.bzl", "utf8"),
   );
   try {
     const res2 = await $({

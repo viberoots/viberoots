@@ -26,10 +26,10 @@ Introduce a single Starlark helper to (a) enforce exactly one importer‑scoped 
   - `def include_importer_patches_from_labels(kwargs, lang):`
     - Behavior: `imp = importer_from_labels(kwargs)`; then `append_importer_patches(kwargs, imp, lang)`; no-op if `imp` is empty (should not occur if preconditions pass).
     - Ordering: preserves callers’ existing `srcs` order and uses `dedupe_preserve`.
-- `node/defs.bzl`:
+- `build-tools/node/defs.bzl`:
   - Replace local importer extraction logic with `include_importer_patches_from_labels(kwargs, "node")` in `nix_node_gen(...)` and `nix_node_test(...)`.
   - No other call sites required: `nix_node_lib/bin` delegate to `nix_node_gen`.
-- `python/defs.bzl`:
+- `build-tools/python/defs.bzl`:
   - Replace local importer extraction logic with `include_importer_patches_from_labels(kwargs, "python")` in all `nix_python_*` macros (including wasm stamps).
 - Edge cases handled:
   - Root importer `"."` vs nested importers (`apps/*`, `libs/*`) produce the correct patch directory (`patches/<lang>` vs `<importer>/patches/<lang>`).
@@ -74,7 +74,7 @@ Align Node macros that shell out to `nix build` with the unified global inputs p
 
 ### Scope & Changes
 
-- `node/defs.bzl`:
+- `build-tools/node/defs.bzl`:
   - For `node_webapp(...)`: import `//lang:global_inputs.bzl:global_nix_inputs` and append returned labels to `kwargs["labels"]` before invoking the genrule that runs `nix build`.
   - For `nix_node_cli_bin(bundle=True)`: same as above when bundling is enabled (the non‑bundled cp‑only mode remains unchanged).
 - Macro update detail:

@@ -26,7 +26,7 @@ test("nix_go_tiny_wasm_lib builds via graph-aware selected path (build-selected.
     await fs.writeFile(
       path.join(apiDir, "TARGETS"),
       [
-        'load("//go:defs.bzl", "nix_go_tiny_wasm_lib")',
+        'load("//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")',
         "",
         "nix_go_tiny_wasm_lib(",
         '    name = "wasm",',

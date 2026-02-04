@@ -6,7 +6,7 @@ test("extra_module_providers: non-list arg fails with generic labels error text"
   await runInTemp("macro-extra-providers-nonlist", async (tmp, $) => {
     // Minimal TARGETS using nix_go_library with an invalid type for extra_module_providers
     await $({ cwd: tmp })`bash --noprofile --norc -c 'mkdir -p tmp && cat > tmp/TARGETS <<\'EOF'
-load("//go:defs.bzl", "nix_go_library")
+load("//build-tools/go:defs.bzl", "nix_go_library")
 
 genrule(name="localprov", cmd=": > $OUT", out="localprov.stamp")
 
@@ -38,7 +38,7 @@ EOF'`;
 test("extra_module_providers: list with non-string elements fails with generic labels error", async () => {
   await runInTemp("macro-extra-providers-bad-elem", async (tmp, $) => {
     await $({ cwd: tmp })`bash --noprofile --norc -c 'mkdir -p tmp && cat > tmp/TARGETS <<\'EOF'
-load("//go:defs.bzl", "nix_go_library")
+load("//build-tools/go:defs.bzl", "nix_go_library")
 
 genrule(name="localprov", cmd=": > $OUT", out="localprov.stamp")
 

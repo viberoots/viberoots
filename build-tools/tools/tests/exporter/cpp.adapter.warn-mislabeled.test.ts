@@ -6,12 +6,14 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("cpp adapter emit warning for C++-looking srcs missing cxx_* and lang:cpp", async () => {
   await runInTemp("exp-cpp-warn-mislabeled", async (tmp, $) => {
-    const pkg = path.join(tmp, "cpp", "app");
+    const pkg = path.join(tmp, "build-tools", "cpp", "app");
     await fs.mkdirp(pkg);
     await fs.outputFile(path.join(pkg, "main.cpp"), "int main(){return 0;}\n", "utf8");
 
     // Node with .cpp srcs but neither cxx_* rule_type nor 'lang:cpp' label
-    const nodes = [{ name: "//cpp/app:bin", srcs: ["cpp/app/main.cpp"], labels: [] }];
+    const nodes = [
+      { name: "//build-tools/cpp/app:bin", srcs: ["build-tools/cpp/app/main.cpp"], labels: [] },
+    ];
     const graph = path.join(tmp, "build-tools/tools/buck/graph.json");
     await fs.mkdirp(path.dirname(graph));
     await fs.outputFile(graph, JSON.stringify(nodes, null, 2));

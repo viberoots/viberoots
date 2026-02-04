@@ -12,7 +12,7 @@ test("ensure_single_lockfile_label rejects labels missing '#<importer>' suffix (
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
-        'load("//node:defs.bzl", "node_webapp")',
+        'load("//build-tools/node:defs.bzl", "node_webapp")',
         "",
         "node_webapp(",
         '  name = "bundle",',

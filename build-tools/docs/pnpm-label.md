@@ -22,7 +22,7 @@ The design preserves the current model: importer‑scoped providers, validate‑
 ### Proposed Changes (Code-Level Plan)
 
 - Node CLI bundling (macro + shim)
-  - File: `node/defs.bzl`
+  - File: `build-tools/node/defs.bzl`
     - In `nix_node_cli_bin(...)`, when `bundle = True`:
       - Require `importer` (if not provided, infer from a present `lockfile:<path>#<importer>` label; otherwise fail with a clear message).
       - Replace the heredoc “stub” with a `genrule` command that invokes the zx shim to build the Nix bundle and copy it to `$OUT`:
@@ -103,7 +103,7 @@ The design preserves the current model: importer‑scoped providers, validate‑
 
 ### Estimated Diff Surfaces
 
-- `node/defs.bzl`: adjust `nix_node_cli_bin(bundle=True)` to call the bundling shim; maintain label stamping and lockfile label enforcement.
+- `build-tools/node/defs.bzl`: adjust `nix_node_cli_bin(bundle=True)` to call the bundling shim; maintain label stamping and lockfile label enforcement.
 - `build-tools/tools/buck/node-cli-bundle.ts`: remove `--entry`; retain importer/name/out behavior.
 - `third_party/providers/defs_node.bzl`: add `labels = ["lang:node"]` to `node_importer_deps(...)` genrule.
 - `build-tools/tools/tests/scaffolding/node-cli.scaffold-and-build.shim-and-bundle.test.ts`: extend the bundle test to run the built artifact.

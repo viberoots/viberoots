@@ -111,7 +111,7 @@ export function dropConfigSuffix(label: string): string {
   return String(label || "").split(" (")[0];
 }
 
-// Convert labels like "root//apps/foo:svc" or "prelude//cpp:lib" to "//apps/foo:svc" or "//cpp:lib".
+// Convert labels like "root//apps/foo:svc" or "prelude//build-tools/cpp:lib" to "//apps/foo:svc" or "//build-tools/cpp:lib".
 export function dropCellPrefix(label: string): string {
   const s = String(label || "");
   if (s.startsWith("//")) return s;

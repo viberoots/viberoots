@@ -21,7 +21,7 @@ This PR makes the dict-shaped `srcs` case explicit and correct. It keeps the dic
 - Extend `//lang:patch_inputs.bzl` with a dict-safe attach mechanism:
   - Add a helper that can attach patch files into dict-shaped inputs by adding stable synthetic keys (for example `__patch_inputs__/...`).
   - Keep `append_patch_inputs(...)` behavior unchanged for list-shaped inputs.
-- Update `node/defs_core.bzl`:
+- Update `build-tools/node/defs_core.bzl`:
   - In `nix_node_gen`, when `srcs` is a dict, include importer-local patches into `srcs` via the new helper.
   - Ensure provider edges are realized even when `srcs` is a dict.
   - Keep existing behavior for list-shaped `srcs`.
@@ -72,7 +72,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `//lang` and `//node`. Should be safe in thin slices that include these packages and the relevant test fixtures.
+- Touches `//lang` and `//build-tools/node`. Should be safe in thin slices that include these packages and the relevant test fixtures.
 
 ---
 
@@ -88,7 +88,7 @@ This PR tightens the stub contract. A planner-visible stub should carry:
 
 ### Scope & Changes
 
-- Update `cpp/defs.bzl:nix_cpp_wasm_emscripten_lib`:
+- Update `build-tools/cpp/defs.bzl:nix_cpp_wasm_emscripten_lib`:
   - include package-local patch files as inputs (via `include_package_local_patches` into a supported attribute)
   - realize provider edges deterministically (using `realize_provider_edges(...)`)
   - keep the stub artifact shape unchanged (still a stamp)
@@ -136,7 +136,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `//cpp` and `//lang` with narrow changes plus tests.
+- Touches `//build-tools/cpp` and `//lang` with narrow changes plus tests.
 
 ---
 

@@ -17,8 +17,8 @@ test("normalizeTargetLabel drops (config//...) and cell prefixes", async () => {
       out: "//apps/foo:svc",
     },
     {
-      in: "prelude//cpp:lib (config//toolchains:xyz)",
-      out: "//cpp:lib",
+      in: "prelude//build-tools/cpp:lib (config//toolchains:xyz)",
+      out: "//build-tools/cpp:lib",
     },
     {
       in: "root//libs/helper:lib",

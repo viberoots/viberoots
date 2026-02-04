@@ -35,7 +35,7 @@ test("cpp Node-API addon links an in-repo C++ lib via link_deps (build + load)",
     await fs.outputFile(
       path.join(tmp, "libs", "greeter", "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_library")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
         "nix_cpp_library(",
         '  name = "greeter",',
@@ -75,7 +75,7 @@ test("cpp Node-API addon links an in-repo C++ lib via link_deps (build + load)",
     await fs.outputFile(
       path.join(tmp, "libs", "addon-native", "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_node_addon")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_node_addon")',
         "",
         "nix_cpp_node_addon(",
         '  name = "addon",',

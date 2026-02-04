@@ -33,7 +33,7 @@ int add(int a, int b) { return a + b; }
     );
     await fsp.writeFile(
       path.join(coreDir, "TARGETS"),
-      `load("//cpp:defs.bzl", "nix_cpp_wasm_static_lib", "nix_cpp_wasm_emscripten_lib")
+      `load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_static_lib", "nix_cpp_wasm_emscripten_lib")
 
 nix_cpp_wasm_static_lib(
     name = "core_wasm",
@@ -76,7 +76,7 @@ func main() {}
     );
     await fsp.writeFile(
       path.join(apiDir, "TARGETS"),
-      `load("//go:defs.bzl", "nix_go_tiny_wasm_lib")
+      `load("//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")
 
 nix_go_tiny_wasm_lib(
     name = "wasm",
@@ -90,12 +90,12 @@ nix_go_tiny_wasm_lib(
 
     // 3) Provide C++ defs in the temp repo (planner-visible)
     await fsp.writeFile(
-      path.join(tmp, "cpp", "defs.bzl"),
-      await fsp.readFile("cpp/defs.bzl", "utf8"),
+      path.join(tmp, "build-tools", "cpp", "defs.bzl"),
+      await fsp.readFile("build-tools/cpp/defs.bzl", "utf8"),
     );
     await fsp.writeFile(
-      path.join(tmp, "cpp", "wasm_defs.bzl"),
-      await fsp.readFile("cpp/wasm_defs.bzl", "utf8"),
+      path.join(tmp, "build-tools", "cpp", "wasm_defs.bzl"),
+      await fsp.readFile("build-tools/cpp/wasm_defs.bzl", "utf8"),
     );
 
     // 4) Export graph once

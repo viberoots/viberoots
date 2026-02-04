@@ -12,17 +12,17 @@ Each PR below includes its own tests and documentation updates. There are no PRs
 
 ### Description
 
-In `go/defs.bzl`, `nix_go_binary` auto-wires a `*_pkg` library when `cmd/<name>/**` contains `*_test.go`. Today that auto-generated library is created with the raw prelude `go_library(...)` rule rather than the repo-standard `nix_go_library(...)` wrapper.
+In `build-tools/go/defs.bzl`, `nix_go_binary` auto-wires a `*_pkg` library when `cmd/<name>/**` contains `*_test.go`. Today that auto-generated library is created with the raw prelude `go_library(...)` rule rather than the repo-standard `nix_go_library(...)` wrapper.
 
 This is an abstraction leak. It creates a second Go library pathway that can drift on patch inputs, provider edges, label stamping, and CGO wiring.
 
 ### Scope & Changes
 
-- Update `go/defs.bzl:nix_go_binary` so the auto-wired `name + "_pkg"` library is created via the same macro wiring as hand-written libraries:
+- Update `build-tools/go/defs.bzl:nix_go_binary` so the auto-wired `name + "_pkg"` library is created via the same macro wiring as hand-written libraries:
   - Prefer calling `nix_go_library(name = name + "_pkg", ...)` with the correct `srcs`, `labels`, `visibility`, and any required toolchain defaults.
   - Ensure package-local patch inputs (Go patches) are included as action inputs on the auto-wired library, the same as ordinary Go libraries.
   - Ensure provider edges (from `MODULE_PROVIDERS`) are realized consistently.
-- If there are constraints that require keeping a raw `go_library(...)` (for example, toolchain attribute restrictions), introduce a tiny private helper in `go/private/*` that implements “create the pkg library for tests” once and use it from `nix_go_binary`.
+- If there are constraints that require keeping a raw `go_library(...)` (for example, toolchain attribute restrictions), introduce a tiny private helper in `build-tools/go/private/*` that implements “create the pkg library for tests” once and use it from `nix_go_binary`.
 
 ### Tests (in this PR)
 
@@ -52,7 +52,7 @@ This is an abstraction leak. It creates a second Go library pathway that can dri
 
 ### Downsides for Implementing
 
-- Small churn in `go/defs.bzl` and a new regression test.
+- Small churn in `build-tools/go/defs.bzl` and a new regression test.
 
 ### Recommendation
 
@@ -60,7 +60,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `//go` (and possibly `//go/private`) plus a narrow test. Safe in slices that already include Go.
+- Touches `//build-tools/go` (and possibly `//build-tools/go/private`) plus a narrow test. Safe in slices that already include Go.
 
 ---
 
@@ -78,7 +78,7 @@ This pattern is correct but it is not centralized. If a second language hits the
   - It must create a deterministic helper target name derived from the parent target name (via `//lang:sanitize.bzl:sanitize_name`).
   - It must attach patch inputs from labels (importer-scoped) into a caller-provided attribute name (for Python, this is `resources` on the synthetic `python_library`).
   - It must return the dep label (e.g., `":<synthetic_name>"`) so call-sites can append it deterministically.
-- Refactor `python/defs.bzl:nix_python_binary` to use the shared helper rather than an inline copy of the pattern.
+- Refactor `build-tools/python/defs.bzl:nix_python_binary` to use the shared helper rather than an inline copy of the pattern.
 - Keep the existing behavior (including label stamping and lockfile label enforcement) unchanged.
 
 ### Tests (in this PR)
@@ -116,7 +116,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `//lang` and `//python` plus a narrow test. Safe in thin slices that include those packages.
+- Touches `//lang` and `//build-tools/python` plus a narrow test. Safe in thin slices that include those packages.
 
 ---
 
@@ -132,10 +132,10 @@ This is a small leak. It makes “providers file layout changes” cross-cutting
 
 - Add a small `//lang` module (example: `lang/auto_map.bzl`) that re-exports `MODULE_PROVIDERS` from `//third_party/providers:auto_map.bzl`.
 - Update language macro entrypoints to load `MODULE_PROVIDERS` via the `//lang` re-export:
-  - `go/defs.bzl`
-  - `node/defs_core.bzl`
-  - `cpp/defs.bzl`
-  - `python/defs.bzl`
+  - `build-tools/go/defs.bzl`
+  - `build-tools/node/defs_core.bzl`
+  - `build-tools/cpp/defs.bzl`
+  - `build-tools/python/defs.bzl`
 - Do not change the underlying provider data or generation pipeline.
 
 ### Tests (in this PR)
@@ -199,8 +199,8 @@ This is duplication. It is also the most likely source of future drift once we k
     - `merge_provider_edges(name, deps, into, base, dict_safe)`
   - Keep the helper focused on wiring. It should not introduce new policy.
 - Refactor:
-  - `node/defs_core.bzl` to use the shared helper for the common sequence
-  - `python/defs.bzl` to use the shared helper for the common sequence
+  - `build-tools/node/defs_core.bzl` to use the shared helper for the common sequence
+  - `build-tools/python/defs.bzl` to use the shared helper for the common sequence
 - If Part 15 PR‑2 (“dict-shaped input attachment consolidation”) lands first, this PR should rely on that shared dict-safe primitive rather than adding any new dict attachment logic.
 
 ### Tests (in this PR)
@@ -240,7 +240,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `//lang`, `//node`, and `//python`, plus narrow tests. Safe in slices that include Node and Python.
+- Touches `//lang`, `//build-tools/node`, and `//build-tools/python`, plus narrow tests. Safe in slices that include Node and Python.
 
 ---
 
@@ -250,15 +250,15 @@ Implement.
 
 PR‑3 established a stable `//lang:auto_map.bzl` re-export for `MODULE_PROVIDERS` so language macro entrypoints do not encode provider file layout (`//third_party/providers:auto_map.bzl`) directly.
 
-Today, `rust/defs.bzl` still directly loads `//third_party/providers:auto_map.bzl`. Even though Rust macros are currently a skeleton, this is an abstraction leak and a drift trap: it teaches the wrong pattern and increases the blast radius of future provider-layout changes.
+Today, `build-tools/rust/defs.bzl` still directly loads `//third_party/providers:auto_map.bzl`. Even though Rust macros are currently a skeleton, this is an abstraction leak and a drift trap: it teaches the wrong pattern and increases the blast radius of future provider-layout changes.
 
 ### Scope & Changes
 
-- Update `rust/defs.bzl` so provider mappings are loaded only via the stable entrypoint:
+- Update `build-tools/rust/defs.bzl` so provider mappings are loaded only via the stable entrypoint:
   - Replace `load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")` with `load("//lang:auto_map.bzl", "MODULE_PROVIDERS")`.
   - Prefer the shared provider-edge wiring helper (`realize_provider_edges(...)` from `//lang:defs_common.bzl`) rather than bespoke `_providers_for(...)` logic.
 - Extend the existing macro hygiene test to include Rust:
-  - Update `build-tools/tools/tests/lib/macros.providers-for.usage.test.ts` to include `rust/defs.bzl` in the list of checked macro entrypoints so the invariant is enforced repo-wide.
+  - Update `build-tools/tools/tests/lib/macros.providers-for.usage.test.ts` to include `build-tools/rust/defs.bzl` in the list of checked macro entrypoints so the invariant is enforced repo-wide.
 
 ### Tests (in this PR)
 
@@ -270,7 +270,7 @@ Today, `rust/defs.bzl` still directly loads `//third_party/providers:auto_map.bz
 
 ### Acceptance Criteria
 
-- `rust/defs.bzl` loads provider mappings via `//lang:auto_map.bzl` and uses shared provider-edge realization helpers.
+- `build-tools/rust/defs.bzl` loads provider mappings via `//lang:auto_map.bzl` and uses shared provider-edge realization helpers.
 - The repo-wide macro hygiene test enforces the invariant for Rust alongside Go/Node/C++/Python.
 - No behavior change for existing (non-Rust) targets.
 
@@ -292,7 +292,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `//rust` and one narrow zx test. Safe in thin slices.
+- Touches `//build-tools/rust` and one narrow zx test. Safe in thin slices.
 
 ---
 

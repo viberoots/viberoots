@@ -192,10 +192,10 @@ The remaining valuable work is:
   - Prefer non-mutating v2 helpers for importer-scoped macros and non-mutating package-local helpers for Go/C++.
 
 - Apply this standardization across the language macro entrypoints (adjust list to current repo reality):
-  - `go/defs.bzl`
-  - `cpp/defs.bzl` (and any `cpp/defs_*.bzl` entrypoints)
-  - `node/defs_core.bzl`, `node/defs_nix.bzl`
-  - `python/defs.bzl`
+  - `build-tools/go/defs.bzl`
+  - `build-tools/cpp/defs.bzl` (and any `cpp/defs_*.bzl` entrypoints)
+  - `build-tools/node/defs_core.bzl`, `build-tools/node/defs_nix.bzl`
+  - `build-tools/python/defs.bzl`
 
 - Tighten enforcement (allowlisted to macro entrypoints and/or all non-`//lang/*` Starlark code, depending on what is already enforced):
   - Disallow `_legacy_mutating` helper usage outside `//lang/*`.

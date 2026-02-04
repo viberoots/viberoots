@@ -18,7 +18,7 @@ await runInTemp("cpp-headers-builds", async (tmp, $) => {
   const repo = process.cwd();
 
   // Sanity check: macro exists in this workspace revision.
-  const defs = await fsp.readFile(path.join(repo, "cpp", "defs.bzl"), "utf8");
+  const defs = await fsp.readFile(path.join(repo, "build-tools", "cpp", "defs.bzl"), "utf8");
   assert.ok(defs.includes("def nix_cpp_headers("), "expected nix_cpp_headers macro to exist");
 
   await fsp.mkdir(path.join(tmp, "libs", "demo", "include"), { recursive: true });

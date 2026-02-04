@@ -39,8 +39,8 @@ This PR makes that helper non-mutating at the public boundary and updates the ex
     - provider edges are still realized only through the planner-visible wiring helper surface
   - return a struct that includes a prepared `kwargs` dict (like other v2-style helpers), while keeping back-compat fields (`deps`, `srcs`, `labels`) when possible so call sites can stay simple.
 - Migrate the current macro call sites that use `prepare_package_local_wasm_wiring(...)`:
-  - `cpp/defs.bzl:nix_cpp_wasm_static_lib`
-  - `go/defs.bzl:nix_go_tiny_wasm_lib`
+  - `build-tools/cpp/defs.bzl:nix_cpp_wasm_static_lib`
+  - `build-tools/go/defs.bzl:nix_go_tiny_wasm_lib`
   - Ensure each call site has:
     - one “labels merge point” (assemble labels once, then pass into the helper)
     - one “deps merge point” (assemble base deps once; provider realization stays in shared helpers)
@@ -114,11 +114,11 @@ This PR standardizes call-site conventions across the macro entrypoints and adds
   - **Single labels merge point**: assemble labels exactly once (user labels + macro stamps + any additional metadata labels), then pass them into shared helpers.
   - **Single deps merge point**: assemble base deps exactly once; provider edge realization occurs only through shared helper surfaces (`prepare_*` helpers and `wire_planner_visible_inputs` / `realize_provider_edges`).
 - Mechanical cleanup and standardization across:
-  - `go/defs.bzl`
-  - `cpp/defs.bzl`
-  - `node/defs_core.bzl`
-  - `node/defs_nix.bzl` (if it still exists as a separate macro file)
-  - `python/defs.bzl`
+  - `build-tools/go/defs.bzl`
+  - `build-tools/cpp/defs.bzl`
+  - `build-tools/node/defs_core.bzl`
+  - `build-tools/node/defs_nix.bzl` (if it still exists as a separate macro file)
+  - `build-tools/python/defs.bzl`
 - Add enforcement to prevent the highest-signal bypass patterns, scoped to a small allowlist of macro files so the test remains focused:
   - package-local macro files must not call `pop_package_local_patch_dirs_and_nixpkg_deps(...)`
   - importer-scoped macro files must not directly load or call low-level lockfile parsing helpers where the shared importer wiring should be used

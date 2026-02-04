@@ -13,7 +13,7 @@ test("nix_node_test includes global Nix inputs in srcs (action inputs)", async (
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
-        'load("//node:defs.bzl", "nix_node_test")',
+        'load("//build-tools/node:defs.bzl", "nix_node_test")',
         "",
         "nix_node_test(",
         '  name = "t",',

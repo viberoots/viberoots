@@ -36,7 +36,7 @@ test("node nix runner: minimal importer with no tests passes", async () => {
     await fsp.writeFile(path.join(app, "pnpm-lock.yaml"), lock, "utf8");
     // TARGETS wiring using nix_node_test external runner; allow lockfile generation in FOD
     const targets = [
-      'load("//node:defs.bzl", "nix_node_test")',
+      'load("//build-tools/node:defs.bzl", "nix_node_test")',
       "",
       "nix_node_test(",
       '    name = "node_tests",',

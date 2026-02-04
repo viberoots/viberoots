@@ -32,7 +32,7 @@ EOF'`;
 
     // TARGETS using the new macro
     await $`bash --noprofile --norc -c 'cat > libs/demo-native/TARGETS <<"EOF"
-load("//cpp:defs.bzl", "nix_cpp_node_addon")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_node_addon")
 
 nix_cpp_node_addon(
     name = "napi_addon",

@@ -22,7 +22,7 @@ Python is an importer-scoped ecosystem (uv). The macro contract for importer-sco
 - provider edges merged deterministically
 - stable error text (through `ensure_single_lockfile_label(...)`)
 
-Today, `python/defs.bzl` repeats these steps directly (stamping, lockfile enforcement, patch input attachment, provider merge). This is correct but it increases drift risk when the contract changes.
+Today, `build-tools/python/defs.bzl` repeats these steps directly (stamping, lockfile enforcement, patch input attachment, provider merge). This is correct but it increases drift risk when the contract changes.
 
 This PR removes that duplication and makes Python macros depend on the same shared helper surface used by other importer-scoped macros.
 
@@ -30,13 +30,13 @@ This PR removes that duplication and makes Python macros depend on the same shar
 
 This PR changes Python macro wiring only. The goal is behavior stability and contract consolidation.
 
-- Refactor `python/defs.bzl:nix_python_library` to:
+- Refactor `build-tools/python/defs.bzl:nix_python_library` to:
   - delegate lockfile enforcement and importer derivation to `prepare_importer_non_genrule_wiring(...)`
   - attach importer-local patches through the helper surface
   - keep provider edges merged deterministically via the helper surface (default into deps)
   - keep existing nixpkg label behavior unchanged
-- Refactor `python/defs.bzl:nix_python_test` and `python/defs.bzl:nix_python_wasm_*` similarly.
-- Keep `python/defs.bzl:nix_python_binary` behavior intact:
+- Refactor `build-tools/python/defs.bzl:nix_python_test` and `build-tools/python/defs.bzl:nix_python_wasm_*` similarly.
+- Keep `build-tools/python/defs.bzl:nix_python_binary` behavior intact:
   - `python_binary` does not accept `srcs`, so patch inputs must remain carried via a synthetic dep.
   - This PR may still use `prepare_importer_non_genrule_wiring(...)` for the parts that apply (lockfile enforcement, label stamping, provider deps), but it must not change the existing “patch dep” modeling unless tests prove equivalence.
 
@@ -64,7 +64,7 @@ I will update docs where Python macros are described so they point at the canoni
 
 ### Acceptance Criteria
 
-- `python/defs.bzl` no longer hand-assembles importer-scoped wiring for library/test/WASM macros.
+- `build-tools/python/defs.bzl` no longer hand-assembles importer-scoped wiring for library/test/WASM macros.
 - Python importer-scoped macros enforce the lockfile label contract via `prepare_importer_non_genrule_wiring(...)`.
 - Tests prove:
   - importer-local patches remain real action inputs for Python targets (including the synthetic-dep path for binaries)
@@ -77,7 +77,7 @@ Moderate. The main risk is accidentally changing which attribute receives patch 
 
 ### Consequence of Not Implementing
 
-Python remains a drift point. Contract changes in `//lang:importer_wiring.bzl` will require manual “keep in sync” edits in `python/defs.bzl`.
+Python remains a drift point. Contract changes in `//lang:importer_wiring.bzl` will require manual “keep in sync” edits in `build-tools/python/defs.bzl`.
 
 ### Downsides for Implementing
 

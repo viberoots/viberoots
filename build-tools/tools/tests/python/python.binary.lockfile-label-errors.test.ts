@@ -37,7 +37,7 @@ test("python binary fails with deterministic error text when lockfile label is m
         path.join(appDir, "TARGETS"),
         [
           'load("@prelude//:rules.bzl", "python_library")',
-          'load("//python:defs.bzl", "nix_python_binary")',
+          'load("//build-tools/python:defs.bzl", "nix_python_binary")',
           "",
           "python_library(",
           '  name = "lib",',

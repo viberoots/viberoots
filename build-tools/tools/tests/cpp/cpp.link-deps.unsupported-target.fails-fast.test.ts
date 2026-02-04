@@ -16,7 +16,7 @@ test("cpp: link_deps rejects unsupported target kinds with actionable error", as
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_binary")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")',
         "",
         "nix_cpp_binary(",
         '  name = "demo",',

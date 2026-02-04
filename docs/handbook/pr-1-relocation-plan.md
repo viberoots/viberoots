@@ -9,10 +9,10 @@ I will add a single macro wiring entrypoint under `//lang` and route all macro c
 
 ## Call sites to update
 
-- Go macros: `go/defs.bzl` (`nix_go_library`, `nix_go_binary`, `nix_go_test`, `nix_go_tiny_wasm_lib`).
-- C++ macros: `cpp/defs.bzl` (`_cpp_common`), `cpp/wasm_defs.bzl` (`nix_cpp_wasm_static_lib`).
-- Node macros: `node/defs_core.bzl` (`nix_node_gen`, `nix_node_test`), `node/defs_nix.bzl` (shared Nix-calling genrule wiring).
-- Python macros: `python/defs.bzl` (`nix_python_library`, `nix_python_binary`, `nix_python_test`, `nix_python_extension_module`, `nix_python_wasm_*`), `python/defs_pyext_wasm.bzl` (`nix_python_wasm_extension_module`).
+- Go macros: `build-tools/go/defs.bzl` (`nix_go_library`, `nix_go_binary`, `nix_go_test`, `nix_go_tiny_wasm_lib`).
+- C++ macros: `build-tools/cpp/defs.bzl` (`_cpp_common`), `build-tools/cpp/wasm_defs.bzl` (`nix_cpp_wasm_static_lib`).
+- Node macros: `build-tools/node/defs_core.bzl` (`nix_node_gen`, `nix_node_test`), `build-tools/node/defs_nix.bzl` (shared Nix-calling genrule wiring).
+- Python macros: `build-tools/python/defs.bzl` (`nix_python_library`, `nix_python_binary`, `nix_python_test`, `nix_python_extension_module`, `nix_python_wasm_*`), `build-tools/python/defs_pyext_wasm.bzl` (`nix_python_wasm_extension_module`).
 
 ## Helpers to keep internal
 

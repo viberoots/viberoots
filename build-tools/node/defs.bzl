@@ -1,5 +1,5 @@
-load("//node:defs_core.bzl", _nix_node_gen = "nix_node_gen", _nix_node_test = "nix_node_test", _nix_node_lib = "nix_node_lib", _nix_node_bin = "nix_node_bin")
-load("//node:defs_nix.bzl", _node_webapp = "node_webapp", _nix_node_cli_bin = "nix_node_cli_bin")
+load("//build-tools/node:defs_core.bzl", _nix_node_gen = "nix_node_gen", _nix_node_test = "nix_node_test", _nix_node_lib = "nix_node_lib", _nix_node_bin = "nix_node_bin")
+load("//build-tools/node:defs_nix.bzl", _node_webapp = "node_webapp", _nix_node_cli_bin = "nix_node_cli_bin")
 
 def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = [], lockfile_label = None, kind = "gen", **kwargs):
     _nix_node_gen(

@@ -63,10 +63,10 @@ No new macro parameters. This preserves current call sites and allows the conven
 - `//lang:defs_common.bzl`
   - Add a helper to compute default lockfile label from `native.package_name()`.
   - Add a helper to validate lockfile existence when the default is used.
-- `//node:defs_core.bzl`
+- `//build-tools/node:defs_core.bzl`
   - Use the helper when `lockfile_label` is omitted.
   - Keep `nix_node_gen`, `nix_node_lib`, `nix_node_bin`, `nix_node_test` wiring unchanged.
-- `//node:defs_nix.bzl`
+- `//build-tools/node:defs_nix.bzl`
   - Apply the same defaulting behavior for `node_webapp` and bundled `nix_node_cli_bin`.
 
 ### Error Message Shape
@@ -97,7 +97,7 @@ App under `apps/web` with its own importer and lockfile. No explicit `lockfile_l
 `apps/web/TARGETS`:
 
 ```python
-load("//node:defs_nix.bzl", "node_webapp")
+load("//build-tools/node:defs_nix.bzl", "node_webapp")
 
 node_webapp(
     name = "web",
@@ -112,7 +112,7 @@ Library under `libs/ui` using the default convention:
 `libs/ui/TARGETS`:
 
 ```python
-load("//node:defs_core.bzl", "nix_node_lib")
+load("//build-tools/node:defs_core.bzl", "nix_node_lib")
 
 nix_node_lib(
     name = "ui",
@@ -126,7 +126,7 @@ Root tooling importer with `importer="."` and `pnpm-lock.yaml` at the repo root.
 `build-tools/tools/dev/TARGETS`:
 
 ```python
-load("//node:defs_core.bzl", "nix_node_gen")
+load("//build-tools/node:defs_core.bzl", "nix_node_gen")
 
 nix_node_gen(
     name = "sync-providers",
@@ -141,7 +141,7 @@ Migration case where the importer id does not match the package path. For exampl
 `apps/admin/TARGETS`:
 
 ```python
-load("//node:defs_core.bzl", "nix_node_gen")
+load("//build-tools/node:defs_core.bzl", "nix_node_gen")
 
 nix_node_gen(
     name = "admin-bundle",
@@ -159,7 +159,7 @@ This keeps the override explicit and avoids implicit cross-importer deduction.
 
 I follow the structure used in `linking-plan-11.md`. Each PR includes functionality, tests, and documentation updates in the same change.
 
-### PR-1: Default lockfile label for node/defs_core.bzl
+### PR-1: Default lockfile label for build-tools/node/defs_core.bzl
 
 #### Description
 
@@ -171,7 +171,7 @@ Introduce a convention-based default lockfile label for `nix_node_gen`, `nix_nod
   - `default_lockfile_label_from_package()` returns `lockfile:<pkg>/<default-lockfile>#<pkg>`.
   - The default lockfile basename is defined by `lang/lockfile_contracts.bzl` (node: `pnpm-lock.yaml`).
   - `ensure_default_lockfile_exists(path)` validates the file exists.
-- Update `//node:defs_core.bzl` to:
+- Update `//build-tools/node:defs_core.bzl` to:
   - derive a default when `lockfile_label` is omitted
   - validate the default lockfile exists
   - preserve the existing enforcement of exactly one lockfile label
@@ -213,7 +213,7 @@ Implement to reduce boilerplate while keeping deterministic importer identity.
 
 ---
 
-### PR-2: Default lockfile label for node/defs_nix.bzl
+### PR-2: Default lockfile label for build-tools/node/defs_nix.bzl
 
 #### Description
 
@@ -222,7 +222,7 @@ Apply the same defaulting behavior to Nix-calling Node macros (`node_webapp` and
 #### Scope & Changes
 
 - Reuse the shared defaulting helper from `//lang:defs_common.bzl`.
-- Update `//node:defs_nix.bzl`:
+- Update `//build-tools/node:defs_nix.bzl`:
   - derive a default lockfile label when omitted
   - validate the default lockfile exists
   - preserve the existing optional `importer` arg mismatch checks

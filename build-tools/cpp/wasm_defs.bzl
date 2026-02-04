@@ -7,7 +7,7 @@ load(
 )
 load("//lang:global_inputs.bzl", "global_nix_inputs")
 load("//lang:sanitize.bzl", "sanitize_name")
-load("//cpp/private:nix_build.bzl", "cpp_nix_build")
+load("//build-tools/cpp/private:nix_build.bzl", "cpp_nix_build")
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
 
 def _wasm_target_for_abi(wasm_abi):

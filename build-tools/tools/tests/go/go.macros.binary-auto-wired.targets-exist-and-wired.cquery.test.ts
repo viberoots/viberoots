@@ -60,7 +60,7 @@ EOF'`;
       [
         "",
         "# test: go.macros.binary-auto-wired.targets-exist-and-wired.cquery.test.ts",
-        'load("//go:defs.bzl", "nix_go_binary")',
+        'load("//build-tools/go:defs.bzl", "nix_go_binary")',
         "",
         "nix_go_binary(",
         '  name = "demo",',

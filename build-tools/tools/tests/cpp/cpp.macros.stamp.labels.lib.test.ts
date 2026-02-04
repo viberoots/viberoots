@@ -10,15 +10,18 @@ await runInTemp("cpp-macro-stamp-lib", async (tmp, $) => {
   const pkg = path.join(tmp, "libs", "demo");
   await fs.mkdirp(path.join(pkg, "src"));
   await fs.outputFile(path.join(pkg, "src", "demo.cpp"), "int add(int a,int b){return a+b;}\n");
-  await fs.outputFile(path.join(tmp, "cpp", "defs.bzl"), await fs.readFile("cpp/defs.bzl", "utf8"));
   await fs.outputFile(
-    path.join(tmp, "cpp", "wasm_defs.bzl"),
-    await fs.readFile("cpp/wasm_defs.bzl", "utf8"),
+    path.join(tmp, "build-tools", "cpp", "defs.bzl"),
+    await fs.readFile("build-tools/cpp/defs.bzl", "utf8"),
+  );
+  await fs.outputFile(
+    path.join(tmp, "build-tools", "cpp", "wasm_defs.bzl"),
+    await fs.readFile("build-tools/cpp/wasm_defs.bzl", "utf8"),
   );
   await fs.outputFile(
     path.join(pkg, "TARGETS"),
     [
-      'load("//cpp:defs.bzl", "nix_cpp_library")',
+      'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
       "",
       "nix_cpp_library(",
       '  name = "demo",',

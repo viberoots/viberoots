@@ -34,7 +34,7 @@ EOF'`;
     await $({
       cwd: tmp,
     })`bash --noprofile --norc -c 'mkdir -p tmp && cat > tmp/TARGETS <<'\''EOF'\''
-load("//go:defs.bzl", "nix_go_test")
+load("//build-tools/go:defs.bzl", "nix_go_test")
 
 nix_go_test(
     name = "t",

@@ -14,14 +14,14 @@ test("cpp present: validator passes and diagnose enables cpp", async () => {
         {
           id: "go",
           displayName: "Go",
-          requiredPaths: ["build-tools/tools/nix/templates/go.nix", "go/defs.bzl"],
+          requiredPaths: ["build-tools/tools/nix/templates/go.nix", "build-tools/go/defs.bzl"],
           kinds: ["cli", "lib"],
           templatesDir: "build-tools/tools/scaffolding/templates/go",
         },
         {
           id: "cpp",
           displayName: "C++",
-          requiredPaths: ["cpp/defs.bzl", "build-tools/tools/nix/templates/cpp.nix"],
+          requiredPaths: ["build-tools/cpp/defs.bzl", "build-tools/tools/nix/templates/cpp.nix"],
           kinds: ["bin", "lib", "test"],
           templatesDir: "build-tools/tools/scaffolding/templates/cpp",
           capabilities: { patching: false },
@@ -34,7 +34,7 @@ test("cpp present: validator passes and diagnose enables cpp", async () => {
     );
 
     // Create requiredPaths for cpp
-    await fs.outputFile(path.join(tmp, "cpp/defs.bzl"), "# cpp defs\n");
+    await fs.outputFile(path.join(tmp, "build-tools/cpp/defs.bzl"), "# cpp defs\n");
     await fs.outputFile(path.join(tmp, "build-tools/tools/nix/templates/cpp.nix"), "# nix\n");
 
     // Copy validator/diagnose scripts into temp

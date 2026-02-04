@@ -5,7 +5,7 @@ import { exists } from "./fs.ts";
 export async function isLanguageEnabled(language: string): Promise<boolean> {
   if (language === "go") {
     const goTpl = path.join("build-tools", "tools", "nix", "templates", "go.nix");
-    const goDefs = path.join("go", "defs.bzl");
+    const goDefs = path.join("build-tools", "go", "defs.bzl");
     return (await exists(goTpl)) && (await exists(goDefs));
   }
   if (language === "node") {

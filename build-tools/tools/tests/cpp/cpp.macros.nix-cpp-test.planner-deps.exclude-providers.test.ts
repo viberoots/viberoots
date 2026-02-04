@@ -21,7 +21,7 @@ test("nix_cpp_test planner stub deps exclude //third_party/providers:* targets",
       path.join(app, "TARGETS"),
       [
         'load("@prelude//:rules.bzl", "cxx_library")',
-        'load("//cpp:defs.bzl", "nix_cpp_test")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_test")',
         "",
         "cxx_library(",
         '  name = "helper",',

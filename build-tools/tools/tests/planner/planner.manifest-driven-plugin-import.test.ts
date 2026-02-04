@@ -15,7 +15,7 @@ test("planner imports plugins listed in langs.json when present", async () => {
         {
           id: "go",
           displayName: "Go",
-          requiredPaths: ["build-tools/tools/nix/templates/go.nix", "go/defs.bzl"],
+          requiredPaths: ["build-tools/tools/nix/templates/go.nix", "build-tools/go/defs.bzl"],
           kinds: ["cli", "lib", "test"],
           templatesDir: "build-tools/tools/scaffolding/templates/go",
         },

@@ -32,7 +32,7 @@ test("exporter: C++ macros preserve link intent attrs in build-tools/tools/buck/
     await fs.writeFile(
       path.join(app, "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_headers", "nix_cpp_library", "nix_cpp_node_addon", "nix_cpp_test")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_headers", "nix_cpp_library", "nix_cpp_node_addon", "nix_cpp_test")',
         "",
         "filegroup(",
         '  name = "dep_link",',

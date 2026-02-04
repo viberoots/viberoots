@@ -14,7 +14,7 @@ test("cpp planner imports and detects cxx_* and lang:cpp", async () => {
         {
           id: "go",
           displayName: "Go",
-          requiredPaths: ["go/defs.bzl"],
+          requiredPaths: ["build-tools/go/defs.bzl"],
           kinds: ["lib"],
           templatesDir: "build-tools/tools/scaffolding/templates/go",
         },

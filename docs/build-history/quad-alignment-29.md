@@ -285,7 +285,7 @@ Implement.
 
 ### Description
 
-Part 28 tightened Node Nix-calling macros using shared wiring helpers (`prepare_importer_nix_calling_genrule_wiring`). The remaining drift surface is small but real: `node/defs_nix.bzl` still carries local helper functions for:
+Part 28 tightened Node Nix-calling macros using shared wiring helpers (`prepare_importer_nix_calling_genrule_wiring`). The remaining drift surface is small but real: `build-tools/node/defs_nix.bzl` still carries local helper functions for:
 
 - Sanitizing an importer string into a Nix attribute segment.
 - Deriving a display name (basename) for bundling output naming.
@@ -301,7 +301,7 @@ This PR moves those helpers into `//lang` as a shared, narrow surface and refact
   - Expose:
     - `sanitize_importer_for_nix_attr(importer: str) -> str`
     - `importer_display_name(importer: str) -> str` (basename-like, deterministic)
-- Refactor `node/defs_nix.bzl`:
+- Refactor `build-tools/node/defs_nix.bzl`:
   - Remove `_sanitize_importer_attr(...)` and `_basename_importer(...)`.
   - Call the shared helper functions instead.
 - Keep behavior stable:
@@ -320,7 +320,7 @@ Non-goals in this PR:
   - `"apps/web"`
   - `"libs/some_tool"`
   - A path with repeated separators or trailing slashes (normalized behavior should be deterministic).
-- Add an enforcement-style test that fails if `node/defs_nix.bzl` reintroduces local helper definitions matching the removed patterns.
+- Add an enforcement-style test that fails if `build-tools/node/defs_nix.bzl` reintroduces local helper definitions matching the removed patterns.
 
 ### Docs (in this PR)
 

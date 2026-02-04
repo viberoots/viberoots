@@ -39,7 +39,7 @@ This PR adds a parallel “functional” helper surface that returns a prepared 
     - stamp labels (including `patch_scope`) into the returned kwargs
     - attach package-local patch inputs into returned kwargs
     - return provider edges as a separate list or as a merged `deps` list (explicit)
-- Migrate `go/defs.bzl` to the new helper surface.
+- Migrate `build-tools/go/defs.bzl` to the new helper surface.
   - Remove call-site pre-capture patterns that exist only because helpers mutate kwargs.
   - Ensure auto-wired Go helper targets continue to receive the intended macro inputs.
 - Cleanup and consistent conventions across Starlark call sites (Go):
@@ -85,7 +85,7 @@ Mutation leaks remain. New macro shapes will keep re-learning ordering constrain
 
 ### Downsides for Implementing
 
-Some churn in `go/defs.bzl` and the shared wiring helpers, plus one new test surface.
+Some churn in `build-tools/go/defs.bzl` and the shared wiring helpers, plus one new test surface.
 
 ### Recommendation
 
@@ -112,7 +112,7 @@ This PR adds a parallel “functional” importer-scoped wiring surface that ret
     - non-genrule wiring (returns `{ importer, kwargs, deps }`)
     - srcs-less wiring (returns `{ importer, kwargs, patch_dep, merge_deps }`)
   - Preserve dict-safe attachment behavior and key prefix contracts.
-- Migrate `python/defs.bzl` to the new helper surface.
+- Migrate `build-tools/python/defs.bzl` to the new helper surface.
 - Cleanup and consistent conventions across Starlark call sites (Python):
   - Standardize how `labels` are merged at the start of macro execution (single merge point).
   - Ensure srcs-less path does not accidentally accept or create `srcs`.
@@ -151,7 +151,7 @@ Importer-scoped macro authoring remains higher-risk than necessary. New importer
 
 ### Downsides for Implementing
 
-Some churn in shared wiring and `python/defs.bzl`, plus additional probe coverage.
+Some churn in shared wiring and `build-tools/python/defs.bzl`, plus additional probe coverage.
 
 ### Recommendation
 
@@ -175,10 +175,10 @@ This PR migrates Node macros to the functional importer-scoped wiring helpers in
 
 ### Scope & Changes
 
-- Update `node/defs_core.bzl` to use the functional importer-scoped wiring helper for:
+- Update `build-tools/node/defs_core.bzl` to use the functional importer-scoped wiring helper for:
   - `nix_node_gen`
   - `nix_node_test`
-- Update `node/defs_nix.bzl` to use the functional Nix-calling importer wiring helper.
+- Update `build-tools/node/defs_nix.bzl` to use the functional Nix-calling importer wiring helper.
   - Preserve existing defaults (workspace-root env injection, global Nix inputs in `srcs`, stamping choice).
 - Cleanup and consistent conventions across Starlark call sites (Node):
   - Avoid any call-site branching that depends on whether `srcs` is a dict vs list. Prefer centralizing that inside the helper surface.
@@ -233,7 +233,7 @@ C++ macros are package-local, but they include planner-visible stub shapes (test
 
 ### Scope & Changes
 
-- Migrate `cpp/defs.bzl` to the package-local functional helper surface introduced in PR‑1.
+- Migrate `build-tools/cpp/defs.bzl` to the package-local functional helper surface introduced in PR‑1.
 - Standardize planner-visible call sites:
   - avoid manual `kwargs` cloning to compensate for mutation (for example `dict(kwargs)` patterns used only to avoid side effects)
   - ensure patch scope stamping stays consistent via shared helpers
@@ -275,7 +275,7 @@ C++ macro changes remain higher-risk than necessary. Ordering-sensitive call sit
 
 ### Downsides for Implementing
 
-Some churn across `cpp/defs.bzl` and shared helper usage.
+Some churn across `build-tools/cpp/defs.bzl` and shared helper usage.
 
 ### Recommendation
 

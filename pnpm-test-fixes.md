@@ -20,7 +20,7 @@ This file tracks the test-hardening and stability fixes applied while getting th
 
 ### Rule/runtime fixes
 
-- cpp/private/nix_test.bzl
+- build-tools/cpp/private/nix_test.bzl
   - Add fallback to locate produced test binary by suffix when the expected name isn’t present; prevents false negatives for C++ Nix tests.
 
 - build-tools/tools/lib/fs-helpers.ts

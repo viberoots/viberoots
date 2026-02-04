@@ -61,12 +61,12 @@ TEST(MathCore, AddWorks) {
 
     // Ensure C++ macros and planner/templates are available in the temp repo
     await fs.outputFile(
-      path.join(tmp, "cpp", "defs.bzl"),
-      await fs.readFile("cpp/defs.bzl", "utf8"),
+      path.join(tmp, "build-tools", "cpp", "defs.bzl"),
+      await fs.readFile("build-tools/cpp/defs.bzl", "utf8"),
     );
     await fs.outputFile(
-      path.join(tmp, "cpp", "wasm_defs.bzl"),
-      await fs.readFile("cpp/wasm_defs.bzl", "utf8"),
+      path.join(tmp, "build-tools", "cpp", "wasm_defs.bzl"),
+      await fs.readFile("build-tools/cpp/wasm_defs.bzl", "utf8"),
     );
     await fs.mkdirp(path.join(tmp, "build-tools/tools/nix/templates"));
     await fs.copy(
@@ -104,7 +104,7 @@ TEST(MathCore, AddWorks) {
     );
 
     // Local TARGETS for lib + gtest (use nixpkg_deps instead of provider deps in temp)
-    const targets = `load("//cpp:defs.bzl", "nix_cpp_library", "nix_cpp_test")
+    const targets = `load("//build-tools/cpp:defs.bzl", "nix_cpp_library", "nix_cpp_test")
 
 nix_cpp_library(
     name = "lib",

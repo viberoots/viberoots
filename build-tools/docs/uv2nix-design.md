@@ -4,14 +4,14 @@
 
 - Close the remaining Python gaps while staying aligned with our methodology:
   - Implement a real, pinned uv2nix-backed backend for `pyApp`/`pyLib` (deterministic, no network, importer‑scoped).
-  - Fix `python/defs.bzl` macro loads so WASM convenience macros parse reliably.
+  - Fix `build-tools/python/defs.bzl` macro loads so WASM convenience macros parse reliably.
   - Keep glue minimal and idempotent; tests and docs ship with each PR.
 
 ### Scope and Non‑Goals
 
 - Scope
   - Replace the stub uv backend with uv2nix-backed realization (apps/libs).
-  - Macro correctness fix in `python/defs.bzl` (missing loads).
+  - Macro correctness fix in `build-tools/python/defs.bzl` (missing loads).
   - Optional: enable uv “groups” (dev/test) as first‑class parameters.
 - Non‑Goals
   - Poetry/pip‑tools support (out of scope).
@@ -66,7 +66,7 @@
 
 ### Buck Macros (macro fix)
 
-- Fix `python/defs.bzl`:
+- Fix `build-tools/python/defs.bzl`:
   - Add missing `load("@prelude//:rules.bzl", "genrule")`.
   - Add missing `dedupe_preserve` import from `//lang:defs_common.bzl`.
   - Acceptance: macros parse and WASM stamp rules (`nix_python_wasm_app/lib`) instantiate in Buck without load errors.
@@ -115,7 +115,7 @@
 
 ### Phased Implementation with Acceptance Criteria
 
-#### PR‑P1: Macro correctness (python/defs.bzl) — tiny fix, with tests/docs
+#### PR‑P1: Macro correctness (build-tools/python/defs.bzl) — tiny fix, with tests/docs
 
 - Changes:
   - Add `load("@prelude//:rules.bzl", "genrule")`.
@@ -204,7 +204,7 @@
 
 ### Completion Criteria
 
-- `python/defs.bzl` macros load cleanly (including WASM stamps).
+- `build-tools/python/defs.bzl` macros load cleanly (including WASM stamps).
 - uv2nix-backed `pyApp`/`pyLib` produce deterministic, runnable outputs; patches affect behavior; re‑apply is a no‑op.
 - Scaffolds create working importers that build and run under Buck/Nix without manual steps.
 

@@ -23,7 +23,7 @@ int add(int a, int b) { return a + b; }
     );
     await fs.outputFile(
       path.join(coreDir, "TARGETS"),
-      `load("//cpp:defs.bzl", "nix_cpp_wasm_static_lib")
+      `load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_static_lib")
 
 nix_cpp_wasm_static_lib(
     name = "core_wasm",
@@ -62,7 +62,7 @@ func main() {}
     );
     await fs.outputFile(
       path.join(apiDir, "TARGETS"),
-      `load("//go:defs.bzl", "nix_go_tiny_wasm_lib")
+      `load("//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")
 
 nix_go_tiny_wasm_lib(
     name = "wasm",

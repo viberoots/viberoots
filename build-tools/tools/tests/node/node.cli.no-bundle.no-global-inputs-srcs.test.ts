@@ -15,7 +15,7 @@ test("nix_node_cli_bin(bundle=False) does not include global Nix inputs as actio
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
-        'load("//node:defs.bzl", "nix_node_cli_bin")',
+        'load("//build-tools/node:defs.bzl", "nix_node_cli_bin")',
         "",
         "nix_node_cli_bin(",
         '  name = "tool_copy",',

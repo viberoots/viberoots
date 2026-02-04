@@ -40,7 +40,7 @@ Introduce a Nix template that builds a `.node` shared library implementing a Nod
 
 Implement.
 
-## PR‑2: Add `nix_cpp_node_addon` macro in `//cpp:defs.bzl`
+## PR‑2: Add `nix_cpp_node_addon` macro in `//build-tools/cpp:defs.bzl`
 
 ### Description
 
@@ -48,11 +48,11 @@ Add a Buck macro that stamps `lang:cpp`/`kind:addon`, includes package‑local `
 
 ### Scope & Changes
 
-- `cpp/defs.bzl`:
+- `build-tools/cpp/defs.bzl`:
   - `nix_cpp_node_addon(name, srcs=[], headers=[], addon_name=None, local_patch_dirs=["patches/cpp"], nixpkg_deps=[], labels=[], ...)`
   - Output file: `<addon_name or name>.node`.
   - Preserve existing patterns from `nix_cpp_library`/`nix_cpp_binary`.
-- `cpp/private/nix_build.bzl` (if needed):
+- `build-tools/cpp/private/nix_build.bzl` (if needed):
   - Add `kind="addon"` branch to select `cpp-node-addon.nix`.
 
 ### Acceptance Criteria

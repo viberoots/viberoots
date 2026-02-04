@@ -53,7 +53,7 @@ int inc(int x) { return x + 1; }
     );
     await fs.outputFile(
       path.join(supportDir, "TARGETS"),
-      `load("//cpp:defs.bzl", "nix_cpp_wasm_static_lib")
+      `load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_static_lib")
 
 nix_cpp_wasm_static_lib(
     name = "support_wasm",
@@ -84,7 +84,7 @@ int add2(int x) { return inc(x) + 1; }
     );
     await fs.outputFile(
       path.join(coreDir, "TARGETS"),
-      `load("//cpp:defs.bzl", "nix_cpp_wasm_static_lib")
+      `load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_static_lib")
 
 nix_cpp_wasm_static_lib(
     name = "core_wasm",
@@ -125,7 +125,7 @@ func main() {}
     );
     await fs.outputFile(
       path.join(apiDir, "TARGETS"),
-      `load("//go:defs.bzl", "nix_go_tiny_wasm_lib")
+      `load("//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")
 
 nix_go_tiny_wasm_lib(
     name = "wasm",

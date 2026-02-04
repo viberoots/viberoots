@@ -12,12 +12,12 @@ test("cpp gtest include via nixpkg_deps at call site", async () => {
     await fs.outputFile(path.join(appDir, "src", "main.cpp"), "int main(){return 0;}\n");
     // Ensure C++ macros are available in the temp repo
     await fs.outputFile(
-      path.join(tmp, "cpp", "defs.bzl"),
-      await fs.readFile("cpp/defs.bzl", "utf8"),
+      path.join(tmp, "build-tools", "cpp", "defs.bzl"),
+      await fs.readFile("build-tools/cpp/defs.bzl", "utf8"),
     );
     await fs.outputFile(
-      path.join(tmp, "cpp", "wasm_defs.bzl"),
-      await fs.readFile("cpp/wasm_defs.bzl", "utf8"),
+      path.join(tmp, "build-tools", "cpp", "wasm_defs.bzl"),
+      await fs.readFile("build-tools/cpp/wasm_defs.bzl", "utf8"),
     );
     // Provide the Nix template used by the external runner
     await fs.mkdirp(path.join(tmp, "build-tools/tools/nix/templates"));
@@ -56,7 +56,7 @@ test("cpp gtest include via nixpkg_deps at call site", async () => {
       path.join(appDir, "tests", "demo_gtest.cpp"),
       `#include <gtest/gtest.h>\n\nTEST(Demo, Smoke) { EXPECT_EQ(1,1); }\n`,
     );
-    const targets = `load("//cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_test")
+    const targets = `load("//build-tools/cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_test")
 
 nix_cpp_binary(
     name = "demo",

@@ -59,7 +59,7 @@ This repo provides a hermetic Node test runner integrated with Buck2 via a Nix d
 - Add a test target in your importer `TARGETS` using the macro (scaffolding generates this by default):
 
 ```starlark
-load("//node:defs.bzl", "nix_node_test")
+load("//build-tools/node:defs.bzl", "nix_node_test")
 
 nix_node_test(
     name = "unit",

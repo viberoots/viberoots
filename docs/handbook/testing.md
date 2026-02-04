@@ -103,7 +103,7 @@ Do not copy/paste shell fragments between languages. If you need to change the b
 
 ## Buck prelude alias
 
-- Entering the dev shell (`nix develop`) writes `.buckconfig` with `[repositories] prelude = <nix-store>/prelude`, so loads like `@prelude//go:def.bzl` resolve automatically.
+- Entering the dev shell (`nix develop`) writes `.buckconfig` with `[repositories] prelude = <nix-store>/prelude`, so loads like `@prelude//build-tools/go:def.bzl` resolve automatically.
 - If you run Buck outside the dev shell, ensure the alias exists (use the committed `.buckconfig` or configure the alias yourself).
 
 ## Prelude-gated tests

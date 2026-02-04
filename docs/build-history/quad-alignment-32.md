@@ -32,8 +32,8 @@ This PR tightens the abstraction by shifting those defaults into shared helper s
     - strip provider targets from `deps` unless explicitly requested
     - keep provider realization mode explicit as a small vocabulary (for example `"deps"` vs `"inputs"`) rather than leaking `"deps"` vs `"srcs"` string choices into call sites
 - Refactor existing call sites to rely on the new defaults:
-  - `cpp/defs.bzl`: remove explicit `strip_providers_from_deps = True` where it becomes default behavior for planner-visible stubs
-  - `go/defs.bzl`: replace explicit `realize_providers_into = "srcs"` usage in planner-visible helper targets with the new vocabulary and defaults
+  - `build-tools/cpp/defs.bzl`: remove explicit `strip_providers_from_deps = True` where it becomes default behavior for planner-visible stubs
+  - `build-tools/go/defs.bzl`: replace explicit `realize_providers_into = "srcs"` usage in planner-visible helper targets with the new vocabulary and defaults
   - Any other macros that create planner-visible nodes should be updated similarly (including WASM shims).
 
 Non-goals in this PR:
@@ -162,7 +162,7 @@ This PR extracts the shared Node Nix-calling command assembly into a reusable he
     - standardize required env exports for Node Nix-calling actions (`BUCK_GRAPH_JSON`, PNPM store setup when enabled, fetch timeout defaults)
     - standardize failure diagnostics (for example, consistent debug log behavior)
 - Refactor Node macros to consume the helper:
-  - `node/defs_nix.bzl`: use the helper for `node_webapp` and bundled `nix_node_cli_bin`
+  - `build-tools/node/defs_nix.bzl`: use the helper for `node_webapp` and bundled `nix_node_cli_bin`
   - Keep behavior stable; reduce inline shell logic to the minimal “copy outPath output to $OUT” steps.
 - Cleanup/standardization:
   - remove any duplicated “bootstrap + nix build out path” command snippets from Node macro call sites
@@ -202,7 +202,7 @@ Node remains the largest source of bespoke macro-shell logic. Future changes to 
 
 ### Downsides for Implementing
 
-Refactor churn in `node/defs_nix.bzl` and the helper surface, plus one additional test that inspects assembled commands.
+Refactor churn in `build-tools/node/defs_nix.bzl` and the helper surface, plus one additional test that inspects assembled commands.
 
 ### Recommendation
 
@@ -223,10 +223,10 @@ This PR ensures that every macro shape that participates in patch invalidation a
 - Update shared helper(s) to make patch_scope stamping hard to bypass:
   - Ensure `wire_planner_visible_inputs` and `wire_package_local_planner_visible_stub` (and importer equivalents) stamp patch scope whenever they stamp language/kind labels.
 - Standardize Starlark call sites:
-  - `go/defs.bzl`: ensure `nix_go_tiny_wasm_lib` and other planner-visible shims include patch_scope stamp via shared helpers (not by ad-hoc label appends)
-  - `cpp/defs.bzl`: ensure planner stubs that skip stamping still get patch_scope via the appropriate helper surface
-  - `node/defs_core.bzl` / `node/defs_nix.bzl`: confirm importer wiring paths always stamp patch_scope and do not regress when dict-shaped srcs are used
-  - `python/defs.bzl`: confirm srcs-less wiring path stamps patch_scope (including synthetic dep targets)
+  - `build-tools/go/defs.bzl`: ensure `nix_go_tiny_wasm_lib` and other planner-visible shims include patch_scope stamp via shared helpers (not by ad-hoc label appends)
+  - `build-tools/cpp/defs.bzl`: ensure planner stubs that skip stamping still get patch_scope via the appropriate helper surface
+  - `build-tools/node/defs_core.bzl` / `build-tools/node/defs_nix.bzl`: confirm importer wiring paths always stamp patch_scope and do not regress when dict-shaped srcs are used
+  - `build-tools/python/defs.bzl`: confirm srcs-less wiring path stamps patch_scope (including synthetic dep targets)
 
 Non-goals in this PR:
 
@@ -271,16 +271,16 @@ Implement.
 
 ### Description
 
-Go macros auto-wire tests for libraries and binaries. That feature is useful, but it introduces a small amount of duplication in `go/defs.bzl` where the synthesized helper targets must replay wiring inputs (tuple labels, providers, patch dirs, CGO config).
+Go macros auto-wire tests for libraries and binaries. That feature is useful, but it introduces a small amount of duplication in `build-tools/go/defs.bzl` where the synthesized helper targets must replay wiring inputs (tuple labels, providers, patch dirs, CGO config).
 
 This PR extracts the duplicated wiring into a small Go-private helper so future changes (tuple label rules, provider-edge wiring, patch dir defaults) are made in one place.
 
 ### Scope & Changes
 
-- Introduce a small helper module under `go/private/` (for example `go/private:auto_tests.bzl`) that:
+- Introduce a small helper module under `build-tools/go/private/` (for example `go/private:auto_tests.bzl`) that:
   - takes the minimal set of macro inputs needed to synthesize the `*_pkg` and `*_test` targets
   - delegates to the existing public macros (`nix_go_library`, `nix_go_test`) rather than re-implementing wiring
-- Refactor `go/defs.bzl`:
+- Refactor `build-tools/go/defs.bzl`:
   - replace inline synthesis logic in `nix_go_binary` and `nix_go_library` with calls to the helper
 - Cleanup/standardization:
   - ensure synthesized targets continue to carry consistent labels, patch inputs, and tuple labels
@@ -304,7 +304,7 @@ Non-goals in this PR:
 
 ### Acceptance Criteria
 
-- `go/defs.bzl` no longer duplicates the wiring logic for synthesized helper targets.
+- `build-tools/go/defs.bzl` no longer duplicates the wiring logic for synthesized helper targets.
 - Auto-wired behavior remains unchanged and is covered by a regression test.
 
 ### Risks

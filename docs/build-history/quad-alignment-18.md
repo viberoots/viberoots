@@ -165,7 +165,7 @@ This is an abstraction leak because the caller can supply an entry that is ignor
 
 ### Scope & Changes
 
-- In `node/defs_nix.bzl:nix_node_cli_bin`:
+- In `build-tools/node/defs_nix.bzl:nix_node_cli_bin`:
   - in `bundle=False` mode: keep `entry` behavior unchanged (copy a file to `$OUT`)
   - in `bundle=True` mode: enforce the contract explicitly:
     - require `entry` to be unset or equal to the fixed bundle entry (`src/index.ts`)
@@ -215,7 +215,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `node/defs_nix.bzl`, `build-tools/tools/buck/node-cli-bundle.ts`, and narrow Node tests. Safe in Node-focused slices.
+- Touches `build-tools/node/defs_nix.bzl`, `build-tools/tools/buck/node-cli-bundle.ts`, and narrow Node tests. Safe in Node-focused slices.
 
 ---
 
@@ -228,7 +228,7 @@ Macros that wrap `genrule`-style rules need to handle two special cases consiste
 - attributes like `srcs` can be list-shaped or dict-shaped
 - some wrappers cannot use `deps`, so dependency edges must be realized into `srcs` (or attached as synthetic dict items)
 
-Node implements this logic in `node/defs_core.bzl` with custom branching. This is correct but it is a drift vector and makes it easy for future languages to copy-paste a slightly different implementation.
+Node implements this logic in `build-tools/node/defs_core.bzl` with custom branching. This is correct but it is a drift vector and makes it easy for future languages to copy-paste a slightly different implementation.
 
 ### Scope & Changes
 
@@ -239,7 +239,7 @@ Node implements this logic in `node/defs_core.bzl` with custom branching. This i
   - attaches importer-local patch inputs into `srcs` with correct list/dict handling
   - realizes provider edges into `srcs` with correct list/dict handling
   - returns the fully prepared `kwargs` for a `genrule(**kwargs)` call
-- Refactor `node/defs_core.bzl:nix_node_gen` to delegate to this helper and delete the bespoke branching.
+- Refactor `build-tools/node/defs_core.bzl:nix_node_gen` to delegate to this helper and delete the bespoke branching.
 
 This PR does not change the underlying policies (Node includes importer-local patches as inputs; providers remain metadata-only).
 
@@ -283,7 +283,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `lang/importer_wiring.bzl`, `node/defs_core.bzl`, and narrow Starlark/Node macro tests. Safe in Starlark-only slices.
+- Touches `lang/importer_wiring.bzl`, `build-tools/node/defs_core.bzl`, and narrow Starlark/Node macro tests. Safe in Starlark-only slices.
 
 ---
 

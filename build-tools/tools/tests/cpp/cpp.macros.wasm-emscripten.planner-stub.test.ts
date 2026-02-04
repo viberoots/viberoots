@@ -33,7 +33,7 @@ EOF'`;
       [
         "",
         "# test: cpp.macros.wasm-emscripten.planner-stub.test.ts",
-        'load("//cpp:defs.bzl", "nix_cpp_wasm_emscripten_lib")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_emscripten_lib")',
         "",
         "nix_cpp_wasm_emscripten_lib(",
         '  name = "core_emscripten",',

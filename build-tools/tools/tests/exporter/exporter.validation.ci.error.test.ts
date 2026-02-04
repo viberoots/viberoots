@@ -6,11 +6,13 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("CI forces error severity regardless of --validation=warn", async () => {
   await runInTemp("exp-ci-error", async (tmp, $) => {
-    const pkg = path.join(tmp, "go", "app");
+    const pkg = path.join(tmp, "build-tools", "go", "app");
     await fs.mkdirp(pkg);
     await fs.outputFile(path.join(pkg, "main.go"), "package main\nfunc main(){}\n", "utf8");
 
-    const nodes = [{ name: "//go/app:bin", srcs: ["go/app/main.go"], labels: [] }];
+    const nodes = [
+      { name: "//build-tools/go/app:bin", srcs: ["build-tools/go/app/main.go"], labels: [] },
+    ];
     const graph = path.join(tmp, "build-tools/tools/buck/graph.json");
     await fs.mkdirp(path.dirname(graph));
     await fs.outputFile(graph, JSON.stringify(nodes, null, 2));

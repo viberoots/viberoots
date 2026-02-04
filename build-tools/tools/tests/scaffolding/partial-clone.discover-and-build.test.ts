@@ -69,7 +69,7 @@ EOF
       await $`mkdir -p ${rel}`;
     }
 
-    await ensureFile("go/defs.bzl");
+    await ensureFile("build-tools/go/defs.bzl");
     await ensureFile("build-tools/tools/buck/export-graph.ts");
     await ensureFile("build-tools/tools/buck/sync-providers.ts");
     await ensureFile("build-tools/tools/buck/gen-auto-map.ts");

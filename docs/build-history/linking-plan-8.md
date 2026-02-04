@@ -22,7 +22,7 @@ This PR makes `link_closure_overrides` effective for C++ binaries, libraries, an
 
 This PR makes the following changes:
 
-- Wire `link_closure_overrides` through `cpp/defs.bzl` into `cpp_nix_build` for `nix_cpp_binary`, `nix_cpp_library`, and `nix_cpp_node_addon`.
+- Wire `link_closure_overrides` through `build-tools/cpp/defs.bzl` into `cpp_nix_build` for `nix_cpp_binary`, `nix_cpp_library`, and `nix_cpp_node_addon`.
 - Add a small macro level validation that rejects `link_closure_overrides` keys not present in `link_deps` for C++ macros, mirroring the shared contract.
 - Update the C++ planner tests to cover the wiring on a C++ binary case that relies on overrides.
 

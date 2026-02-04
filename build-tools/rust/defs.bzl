@@ -1,4 +1,4 @@
-# //rust/defs.bzl — skeleton macros
+# //build-tools/rust/defs.bzl — skeleton macros
 
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
 load("//lang:defs_common.bzl", "merge_provider_edges")

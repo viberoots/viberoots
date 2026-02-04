@@ -12,7 +12,7 @@ This file contains example call sites for the semantics and patterns described i
 
 ```python
 # libs/math/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_library")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
     name = "math_core",
@@ -24,7 +24,7 @@ nix_cpp_library(
 
 ```python
 # apps/calc/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_binary")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 
 nix_cpp_binary(
     name = "calc",
@@ -38,7 +38,7 @@ nix_cpp_binary(
 
 ```python
 # libs/support/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_library")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
     name = "support",
@@ -50,7 +50,7 @@ nix_cpp_library(
 
 ```python
 # libs/math/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_library")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
     name = "math_core",
@@ -69,7 +69,7 @@ Consumers can choose whether to list support explicitly (direct) or rely on tran
 
 ```python
 # apps/calc/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_binary")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 
 nix_cpp_binary(
     name = "calc",
@@ -83,7 +83,7 @@ nix_cpp_binary(
 
 ```python
 # libs/api-headers/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_headers")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_headers")
 
 nix_cpp_headers(
     name = "api_headers",
@@ -94,7 +94,7 @@ nix_cpp_headers(
 
 ```python
 # apps/uses-headers/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_binary")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 
 nix_cpp_binary(
     name = "uses_headers",
@@ -109,7 +109,7 @@ Example shape: you declare function prototypes yourself (C ABI) or only use opaq
 
 ```python
 # apps/link-only/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_binary")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 
 nix_cpp_binary(
     name = "link_only",
@@ -122,7 +122,7 @@ nix_cpp_binary(
 
 ```python
 # libs/addon-native/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_node_addon")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_node_addon")
 
 nix_cpp_node_addon(
     name = "napi_addon",
@@ -141,7 +141,7 @@ nix_cpp_node_addon(
 
 ```python
 # libs/math/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_test")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_test")
 
 nix_cpp_test(
     name = "math_gtest",
@@ -161,7 +161,7 @@ and that runtime loading is handled (rpath or packaging) as described in `cpp-li
 
 ```python
 # libs/runtime/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_shared_library")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_shared_library")
 
 nix_cpp_shared_library(
     name = "runtime",
@@ -173,7 +173,7 @@ nix_cpp_shared_library(
 
 ```python
 # apps/uses-shared/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_binary")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 
 nix_cpp_binary(
     name = "uses_shared",

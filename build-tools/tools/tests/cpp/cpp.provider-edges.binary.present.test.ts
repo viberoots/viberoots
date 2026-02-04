@@ -27,7 +27,7 @@ EOF'`;
     await fs.outputFile(path.join(appDir, "main.cpp"), "int main(){return 0;}\n");
     await fs.outputFile(
       path.join(appDir, "TARGETS"),
-      `load("//cpp:defs.bzl", "nix_cpp_binary")
+      `load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 
 nix_cpp_binary(
     name = "demo",

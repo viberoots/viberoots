@@ -21,7 +21,7 @@ test("exporter: python pyext_wasm nodes include module attrs in build-tools/tool
     await fs.writeFile(
       path.join(app, "TARGETS"),
       [
-        'load("//python:defs.bzl", "nix_python_wasm_extension_module")',
+        'load("//build-tools/python:defs.bzl", "nix_python_wasm_extension_module")',
         "",
         "nix_python_wasm_extension_module(",
         '  name = "ext",',

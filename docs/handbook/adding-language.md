@@ -133,7 +133,7 @@ Rule: new package-local planner-visible stub call sites must use the non-mutatin
 - Path invariants:
   - Patches are importer-local: `<importer>/patches/python/` (flat, no subdirectories).
   - Lockfile labeling is importer‑scoped: `lockfile:<path>#<importer>`; standard file is `uv.lock`.
-  - Macros: use `nix_python_{library,binary,test}` from `python/defs.bzl` and pass `lockfile_label` explicitly.
+  - Macros: use `nix_python_{library,binary,test}` from `build-tools/python/defs.bzl` and pass `lockfile_label` explicitly.
     - Do not pass `lockfile:` labels through `labels`; importer identity is derived from `lockfile_label` and macros require exactly one lockfile label.
   - Macro wiring: importer-scoped wiring is centralized via:
     - Prefer `//lang:defs_common.bzl:prepare_language_wiring(...)` with `wiring = "non_genrule"` for `nix_python_library`, `nix_python_test`, and `nix_python_wasm_*` (non-mutating).
@@ -286,7 +286,7 @@ Stamping belongs in the macro. If your macro synthesizes helper targets (for exa
 
 - Go implementation in this repo:
   - `build-tools/tools/nix/templates/go.nix`
-  - `go/defs.bzl`, `go/private/auto_tests.bzl`, and `lang/defs_common.bzl`
+  - `build-tools/go/defs.bzl`, `build-tools/go/private/auto_tests.bzl`, and `lang/defs_common.bzl`
   - `build-tools/tools/buck/providers/go.ts` and `build-tools/tools/buck/providers/index.ts`
   - Node provider generator: `build-tools/tools/buck/providers/node.ts` (invoked by `build-tools/tools/buck/sync-providers.ts`)
   - `build-tools/tools/buck/gen-auto-map.ts`

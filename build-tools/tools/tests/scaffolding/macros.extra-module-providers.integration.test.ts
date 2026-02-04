@@ -19,9 +19,9 @@ MODULE_PROVIDERS = {
 }
 EOF'`;
 
-    // Create a package that uses the real prelude go_* via our repo go/defs.bzl
+    // Create a package that uses the real prelude go_* via our repo build-tools/go/defs.bzl
     await $({ cwd: tmp })`bash --noprofile --norc -c 'mkdir -p tmp && cat > tmp/TARGETS <<\'EOF'
-load("//go:defs.bzl", "nix_go_library")
+load("//build-tools/go:defs.bzl", "nix_go_library")
 
 genrule(name="localprov", cmd=": > $OUT", out="localprov.stamp")
 

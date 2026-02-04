@@ -38,7 +38,7 @@ EOF'`;
       [
         "",
         "# test: go.macros.carchive.planner-visible.contract.probe.test.ts",
-        'load("//go:defs.bzl", "nix_go_carchive")',
+        'load("//build-tools/go:defs.bzl", "nix_go_carchive")',
         "",
         "nix_go_carchive(",
         '  name = "arc",',

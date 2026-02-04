@@ -5,7 +5,7 @@ import { test } from "node:test";
 
 test("package-local language macros must not bypass prepare_language_wiring()", async () => {
   const offenders: Array<{ file: string; reason: string }> = [];
-  const files = ["go/defs.bzl", "cpp/defs.bzl"];
+  const files = ["build-tools/go/defs.bzl", "build-tools/cpp/defs.bzl"];
   for (const file of files) {
     const txt = await fsp.readFile(file, "utf8");
     if (txt.includes('load("//lang:package_local_wiring.bzl"')) {

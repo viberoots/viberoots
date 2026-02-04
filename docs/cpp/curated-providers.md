@@ -6,7 +6,7 @@ These examples show how to consume curated providers such as `pkgs.zlib` and `pk
 
 ```starlark
 # apps/demo/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_test")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_test")
 
 nix_cpp_binary(
     name = "demo",
@@ -36,7 +36,7 @@ TEST(Demo, ZlibSmoke) {
 
 ```starlark
 # apps/demo/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_test")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_test")
 
 nix_cpp_binary(
     name = "demo",

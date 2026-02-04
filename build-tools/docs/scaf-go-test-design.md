@@ -6,7 +6,7 @@ This command creates a Go test file with a single empty/passing test that is aut
 
 - One command to drop a ready‑to‑run `*_test.go` file.
 - Defaults that “just work” inside scaffolded Go lib/app directories.
-- No TARGETS edits required; relies on the auto‑wiring in `go/defs.bzl`.
+- No TARGETS edits required; relies on the auto‑wiring in `build-tools/go/defs.bzl`.
 
 ### Command
 

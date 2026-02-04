@@ -54,7 +54,7 @@ Tradeoffs were analyzed in “what is gained or lost” and favor this direction
 
 ### 1) Starlark macros (C++)
 
-- Remove provider dependency and `auto_map.bzl` load from `cpp/defs.bzl`:
+- Remove provider dependency and `auto_map.bzl` load from `build-tools/cpp/defs.bzl`:
   - Drop `load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")` and any `_providers_for(...)` usage.
   - Keep (and normalize) `nixpkg_deps` → stamp `nixpkg:` labels in `labels`.
   - Continue to include local patch files in `srcs` via `local_patch_dirs` so patch edits invalidate only the owning target and rdeps.
@@ -62,7 +62,7 @@ Tradeoffs were analyzed in “what is gained or lost” and favor this direction
 Proposed shape (illustrative fragment):
 
 ```starlark
-# cpp/defs.bzl (illustrative; provider load removed)
+# build-tools/cpp/defs.bzl (illustrative; provider load removed)
 load("@prelude//:rules.bzl", "cxx_library", "cxx_binary", "cxx_test")
 load("//lang:defs_common.bzl", "stamp_labels", "dedupe_preserve")
 
@@ -226,7 +226,7 @@ This change removes a non‑essential moving part (C++ providers) in favor of ex
 Although this can be shipped in a single PR, we recommend two fast, focused PRs:
 
 1. Behavior PR (minimal footprint)
-   - Remove provider deps from C++ macros and stop loading `auto_map.bzl` in `cpp/defs.bzl`.
+   - Remove provider deps from C++ macros and stop loading `auto_map.bzl` in `build-tools/cpp/defs.bzl`.
    - Add explicit Nix inputs to `cpp_nix_build` (e.g., `flake.lock`, optional overlay path when enabled).
    - Verify planner/template integration (no code change expected; just add tests).
    - Update targeted tests to no longer expect provider edges for C++.

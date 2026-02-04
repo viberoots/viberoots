@@ -6,7 +6,7 @@
 
 - Go
   - Patch UX complete (start/apply/reset/session/remove) with strict apply verification.
-  - Buck invalidation is precise: `go/defs.bzl` includes local `patches/go/*.patch` in `srcs`, so Buck re-evaluates impacted targets when a patch changes.
+  - Buck invalidation is precise: `build-tools/go/defs.bzl` includes local `patches/go/*.patch` in `srcs`, so Buck re-evaluates impacted targets when a patch changes.
   - Provider mapping available but gated behind provider index (optional), keeping correctness via srcs inclusion regardless.
 - C++
   - Patch UX complete with strict verification and nixpkgs resolution.
@@ -34,7 +34,7 @@
 ### 1) Node patch invalidation via importer‑local srcs (macro‑level)
 
 - Problem: Provider stamps in `third_party/providers/` cannot include importer‑local patch files as `srcs` (they live outside the provider package), so changing a patch file does not directly invalidate consumer targets.
-- Approach: Mirror Go’s strategy at the target site. In `node/defs.bzl`, resolve the importer directory from the lockfile label (already enforced by macros), and include importer‑local `patches/node/*.patch` in the consumer target’s `srcs`.
+- Approach: Mirror Go’s strategy at the target site. In `build-tools/node/defs.bzl`, resolve the importer directory from the lockfile label (already enforced by macros), and include importer‑local `patches/node/*.patch` in the consumer target’s `srcs`.
 - Effect: Any change to `apps/<imp>/patches/node/*.patch` becomes an input to the Node target’s Buck rule key, matching Go’s precision and C++’s stamp‑based behavior.
 
 Implementation sketch (illustrative; actual edits will follow repo style and helpers):
@@ -86,7 +86,7 @@ Notes:
 
 ### Phase 1 — Node macro invalidation parity
 
-- Edit `node/defs.bzl`:
+- Edit `build-tools/node/defs.bzl`:
   - Derive `importer` from `lockfile_label` (already enforced).
   - Compute `patch_dir = importer + "/patches/node"` (normalize `"."` to repo root).
   - Merge `native.glob(["%s/*.patch" % patch_dir])` into `srcs` within `nix_node_gen`.

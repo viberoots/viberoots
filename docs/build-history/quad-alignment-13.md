@@ -90,7 +90,7 @@ This PR introduces one shared planner stub rule under `//lang` and migrates exis
   - accepts `labels` (for exporter/planner routing)
   - optionally accepts `srcs` (to carry package-local file inputs when needed for planner discovery)
 - Migrate C++:
-  - Replace `//cpp/private:planner_stub.bzl` usage with `//lang:planner_stub.bzl`.
+  - Replace `//build-tools/cpp/private:planner_stub.bzl` usage with `//lang:planner_stub.bzl`.
 - Migrate Go:
   - Replace the `genrule` stub used by `nix_go_carchive` with `planner_stub` so the planner-visible node is uniform.
   - Keep existing behavior for provider-edge realization (merge provider edges into `srcs` where required) but route it through a shared stub.
@@ -170,7 +170,7 @@ This PR makes “where patch inputs attach” explicit and resolves the Python b
   - Decide and enforce one policy:
     - If prelude `python_binary` supports `srcs`: keep attaching patch files into `srcs`.
     - If it does not: attach patch files into the supported input attribute (e.g. `resources`/`data`) or ensure patch inputs are carried by a required dependent target.
-  - Implement the chosen policy in `python/defs.bzl` and lock it in with tests that fail at analysis-time if the attribute is unsupported.
+  - Implement the chosen policy in `build-tools/python/defs.bzl` and lock it in with tests that fail at analysis-time if the attribute is unsupported.
 
 ### Tests (in this PR)
 
@@ -215,7 +215,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `//lang`, `python/defs.bzl`, `node/defs_core.bzl`, and tests. Should remain compatible with thin slices if the fixtures live under `build-tools/tools/tests`.
+- Touches `//lang`, `build-tools/python/defs.bzl`, `build-tools/node/defs_core.bzl`, and tests. Should remain compatible with thin slices if the fixtures live under `build-tools/tools/tests`.
 
 ---
 
@@ -239,7 +239,7 @@ This PR centralizes those patterns so Node macros remain small and consistent.
 - Extend `//lang:nix_shell.bzl` (or add a small `//lang:nix_cmd.bzl`) with helpers:
   - `escape_buck_cmd_subst(s)` (or similar) that performs the minimum `$(` → `$$(` transform.
   - `nix_build_out_path_cmd(flake_attr, timeout_var = "TIMEOUT")` that returns the standard `outPath=$$(...)` snippet using `--no-link --print-out-paths`.
-- Update `node/defs_nix.bzl`:
+- Update `build-tools/node/defs_nix.bzl`:
   - Replace inlined command assembly with calls to these shared helpers.
   - Keep Node-specific logic (importer sanitizer, bundler invocation, debug logs) local.
 
@@ -260,7 +260,7 @@ This PR centralizes those patterns so Node macros remain small and consistent.
 
 ### Acceptance Criteria
 
-- `node/defs_nix.bzl` no longer hand-rolls the `nix build --no-link --print-out-paths` pattern.
+- `build-tools/node/defs_nix.bzl` no longer hand-rolls the `nix build --no-link --print-out-paths` pattern.
 - Escaping and timeout policy are centralized and tested.
 - Node behavior remains unchanged for existing targets.
 
@@ -282,7 +282,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `//lang` and `node/defs_nix.bzl` plus existing Node tests.
+- Touches `//lang` and `build-tools/node/defs_nix.bzl` plus existing Node tests.
 
 ---
 

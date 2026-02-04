@@ -33,7 +33,7 @@ This PR introduces a single shared Starlark helper for “package-local, planner
     - `lang:*` and `kind:*` stamping (or explicit override when a macro wants a non-standard kind label)
     - planner stub creation via the existing stub rule(s)
     - optional provider-edge realization and optional provider stripping
-- Refactor `cpp/defs.bzl:nix_cpp_test` to route the planner-visible stub setup through the new shared helper.
+- Refactor `build-tools/cpp/defs.bzl:nix_cpp_test` to route the planner-visible stub setup through the new shared helper.
   - Keep the “executed runner” structure unchanged.
   - Keep the current behavior of stripping provider edges from the planner-visible stub deps.
 - Refactor Go planner-visible macro paths that currently use bespoke wiring to use the new helper (starting with the smallest, highest-signal case).

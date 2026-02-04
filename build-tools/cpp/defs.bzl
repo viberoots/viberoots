@@ -10,13 +10,13 @@ load(
     "wire_package_local_wasm_planner_visible_stub",
 )
 load("//lang:global_inputs.bzl", "global_nix_inputs")
-load("//cpp/private:sanitize.bzl", _cpp_sanitize_probe="cpp_sanitize_probe")
+load("//build-tools/cpp/private:sanitize.bzl", _cpp_sanitize_probe="cpp_sanitize_probe")
 load("//lang:sanitize.bzl", "sanitize_name")
-load("//cpp/private:nix_test.bzl", "cpp_nix_test")
-load("//cpp/private:nix_build.bzl", "cpp_nix_build")
+load("//build-tools/cpp/private:nix_test.bzl", "cpp_nix_test")
+load("//build-tools/cpp/private:nix_build.bzl", "cpp_nix_build")
 load("//lang:auto_map.bzl", "MODULE_PROVIDERS")
 load(
-    "//cpp:wasm_defs.bzl",
+    "//build-tools/cpp:wasm_defs.bzl",
     _nix_cpp_wasm_static_lib = "nix_cpp_wasm_static_lib",
     _nix_cpp_wasm_emscripten_lib = "nix_cpp_wasm_emscripten_lib",
 )

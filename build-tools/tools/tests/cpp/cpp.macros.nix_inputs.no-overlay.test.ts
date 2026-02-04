@@ -13,7 +13,7 @@ test("cpp macros do not couple to overlay in nix_inputs (cquery)", async () => {
       [
         "",
         "# test: cpp.macros.nix_inputs.no-overlay.test.ts",
-        'load("//cpp:defs.bzl", "nix_cpp_library")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
         "nix_cpp_library(",
         '  name = "probe_lib",',

@@ -9,15 +9,18 @@ await runInTemp("cpp-macro-stamp-test", async (tmp, $) => {
   const app = path.join(tmp, "apps", "demo");
   await fs.mkdirp(path.join(app, "src"));
   await fs.outputFile(path.join(app, "src", "main.cpp"), "int main(){return 0;}\n");
-  await fs.outputFile(path.join(tmp, "cpp", "defs.bzl"), await fs.readFile("cpp/defs.bzl", "utf8"));
   await fs.outputFile(
-    path.join(tmp, "cpp", "wasm_defs.bzl"),
-    await fs.readFile("cpp/wasm_defs.bzl", "utf8"),
+    path.join(tmp, "build-tools", "cpp", "defs.bzl"),
+    await fs.readFile("build-tools/cpp/defs.bzl", "utf8"),
+  );
+  await fs.outputFile(
+    path.join(tmp, "build-tools", "cpp", "wasm_defs.bzl"),
+    await fs.readFile("build-tools/cpp/wasm_defs.bzl", "utf8"),
   );
   await fs.outputFile(
     path.join(app, "TARGETS"),
     [
-      'load("//cpp:defs.bzl", "nix_cpp_test")',
+      'load("//build-tools/cpp:defs.bzl", "nix_cpp_test")',
       "",
       "nix_cpp_test(",
       '  name = "demo_test",',

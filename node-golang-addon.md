@@ -90,7 +90,7 @@ Generated files (high‑level)
 Go c-archive (planner‑visible; no direct link in Buck)
 
 ```
-load("//go:defs.bzl", "nix_go_carchive")
+load("//build-tools/go:defs.bzl", "nix_go_carchive")
 
 nix_go_carchive(
     name = "carchive",
@@ -105,7 +105,7 @@ nix_go_carchive(
 C N‑API binding → .node (links the Go c-archive via planner)
 
 ```
-load("//cpp:defs.bzl", "nix_cpp_node_addon", "nix_cpp_test")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_node_addon", "nix_cpp_test")
 
 nix_cpp_node_addon(
     name = "napi_addon",
@@ -123,7 +123,7 @@ nix_cpp_node_addon(
 Node package (stable path copy + library/test)
 
 ```
-load("//node:defs.bzl", "nix_node_lib", "nix_node_test", "nix_node_gen")
+load("//build-tools/node:defs.bzl", "nix_node_lib", "nix_node_test", "nix_node_gen")
 
 nix_node_gen(
     name = "copy_addon",
@@ -416,5 +416,5 @@ All PRs are independently reversible and behavior‑preserving outside the scaff
 - `node-cpp-addon-plan.md` — C++ addon scaffold; this design mirrors its artifact flow using Go
 - `build-tools/tools/nix/templates/go.nix` — `goCArchive` template
 - `build-tools/tools/nix/templates/cpp-node-addon.nix` — addon linker (links repo packages + nixpkgs libs)
-- `go/defs.bzl` — `nix_go_carchive` macro
-- `cpp/defs.bzl` — `nix_cpp_node_addon` macro
+- `build-tools/go/defs.bzl` — `nix_go_carchive` macro
+- `build-tools/cpp/defs.bzl` — `nix_cpp_node_addon` macro

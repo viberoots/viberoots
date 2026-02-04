@@ -19,7 +19,7 @@ test("python pyext_wasm macro requires a backend label", async () => {
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//python:defs.bzl", "nix_python_wasm_extension_module")',
+        'load("//build-tools/python:defs.bzl", "nix_python_wasm_extension_module")',
         "",
         "nix_python_wasm_extension_module(",
         '  name = "ext",',

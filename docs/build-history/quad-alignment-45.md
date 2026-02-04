@@ -40,7 +40,7 @@ inside `//lang` wiring helpers and aligns Python binary wiring with the stated c
 
 #
 
-- Update `python/defs.bzl`:
+- Update `build-tools/python/defs.bzl`:
   - Remove the `genrule` and helper `python_library` used for patch hashing in `nix_python_binary`.
   - Call `prepare_language_wiring(...)` with `wiring = "srcsless_rule"` for `nix_python_binary`.
   - Keep label stamping and provider edge realization behavior unchanged.

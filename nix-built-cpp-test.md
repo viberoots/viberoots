@@ -22,7 +22,7 @@ Today, Buck’s native `cxx_test` compiles test sources and must know include/li
 
 ## High‑Level Architecture
 
-- Buck macros under `//cpp/defs.bzl` gain a new rule: `nix_cpp_test`.
+- Buck macros under `//build-tools/cpp/defs.bzl` gain a new rule: `nix_cpp_test`.
 - `nix_cpp_test` mirrors `nix_cpp_binary`/`nix_cpp_library` but produces a test runnable by Buck via `ExternalRunnerTestInfo`.
 - The test binary itself is built by calling into Nix (via our dynamic derivation planner/templates) using the same `nixCxxAttrs` derived from provider labels `nixpkg:*` in the test’s transitive deps.
 - Buck wires identity‑only providers into the target graph so changes to patch overlays or nixpkgs pins invalidate the right test targets.
@@ -52,7 +52,7 @@ Diagram:
 
 ### 2) Buck Macro: `nix_cpp_test` (Starlark)
 
-- File: `cpp/defs.bzl`.
+- File: `build-tools/cpp/defs.bzl`.
 - Behavior:
   - Accepts similar attrs to `nix_cpp_binary` with `srcs`, `deps`, optional `includes`/`defines`/`cflags`/`ldflags`.
   - Stamps `lang:cpp` + `kind:test` using `stamp_labels` from `lang/defs_common.bzl`.
@@ -99,7 +99,7 @@ Notes:
    - Keep partial‑clone safe and avoid heavy repo scans.
 
 4. Buck Macros
-   - Add `nix_cpp_test` to `cpp/defs.bzl`:
+   - Add `nix_cpp_test` to `build-tools/cpp/defs.bzl`:
      - Stamp labels, append providers, and produce `ExternalRunnerTestInfo` with a tiny shell wrapper that invokes the Nix‑built test binary path for this target.
      - Output a small `.stamp` as Buck output.
 
@@ -118,7 +118,7 @@ Notes:
 
 ## Acceptance Criteria
 
-- `nix_cpp_test` exists and is documented in `cpp/defs.bzl` comments.
+- `nix_cpp_test` exists and is documented in `build-tools/cpp/defs.bzl` comments.
 - A target defined with `nix_cpp_test` that uses `#include <gtest/gtest.h>` builds and runs successfully without any local shim.
 - Provider wiring: changing a `nixpkg` overlay or label invalidates only impacted C++ tests.
 - Full test suite passes locally with coverage enabled per project policy.
@@ -144,6 +144,6 @@ Notes:
 
 ## Handoff Notes
 
-- This work touches: `build-tools/tools/nix/templates/cpp.nix`, `build-tools/tools/nix/planner/cpp.nix`, `build-tools/tools/nix/graph-generator.nix`, `cpp/defs.bzl`, scaffolding templates under `build-tools/tools/scaffolding/templates/cpp/*`, and tests under `build-tools/tools/tests/cpp/`.
+- This work touches: `build-tools/tools/nix/templates/cpp.nix`, `build-tools/tools/nix/planner/cpp.nix`, `build-tools/tools/nix/graph-generator.nix`, `build-tools/cpp/defs.bzl`, scaffolding templates under `build-tools/tools/scaffolding/templates/cpp/*`, and tests under `build-tools/tools/tests/cpp/`.
 - Keep functions small (≤10–15 lines), early‑return style, explicitly typed where applicable. Maintain determinism and stable sorts throughout. Avoid ambient FS reads.
 - Follow the CI stage order; do not commit glue. Ensure prebuild guard covers the new outputs.

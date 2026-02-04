@@ -8,7 +8,7 @@ This installment follows Part 23. Part 23 established most of the shared helper 
 
 In Part 24 I focus on the remaining seams I still see in the codebase after parity work:
 
-- Node macros that call Nix still hand-assemble importer-scoped wiring (lockfile enforcement, importer derivation) in `node/defs_nix.bzl` instead of using the shared helper surface.
+- Node macros that call Nix still hand-assemble importer-scoped wiring (lockfile enforcement, importer derivation) in `build-tools/node/defs_nix.bzl` instead of using the shared helper surface.
 - Node macros that call Nix still hand-assemble the “bootstrap + timeout + nix build out-path” command prefix sequence. The primitives exist in `//lang:nix_shell.bzl`, but the final “compose a safe cmd string” pattern is still duplicated.
 
 As in prior parts, each PR includes the tests and documentation required for the change. There are no PRs dedicated solely to tests or docs.
@@ -26,23 +26,23 @@ Node has a small set of macros that shell out to Nix or invoke Nix-adjacent tool
 - importer-local patch inputs attached to the action inputs
 - provider edges merged deterministically
 
-The repo already has a shared helper for the “non-genrule” path (`prepare_importer_non_genrule_wiring(...)`). `node/defs_nix.bzl` still repeats parts of this sequence (for example it calls `ensure_single_lockfile_label(...)` and `importer_from_labels(...)` directly).
+The repo already has a shared helper for the “non-genrule” path (`prepare_importer_non_genrule_wiring(...)`). `build-tools/node/defs_nix.bzl` still repeats parts of this sequence (for example it calls `ensure_single_lockfile_label(...)` and `importer_from_labels(...)` directly).
 
-This PR removes that duplication and makes `node/defs_nix.bzl` depend on the same shared helper that other importer-scoped macros use.
+This PR removes that duplication and makes `build-tools/node/defs_nix.bzl` depend on the same shared helper that other importer-scoped macros use.
 
 ### Scope & Changes
 
 This PR changes Node macro wiring only. The goal is behavior stability and contract consolidation.
 
-- Refactor `node/defs_nix.bzl:node_webapp` to:
+- Refactor `build-tools/node/defs_nix.bzl:node_webapp` to:
   - delegate lockfile enforcement and importer derivation to `prepare_importer_non_genrule_wiring(...)`
   - attach importer-local patches through the helper surface (not by re-deriving importer manually)
   - keep existing `wire_global_nix_inputs(...)` usage for global inputs
-- Refactor `node/defs_nix.bzl:nix_node_cli_bin(bundle=True)` to:
+- Refactor `build-tools/node/defs_nix.bzl:nix_node_cli_bin(bundle=True)` to:
   - delegate lockfile enforcement and importer derivation to `prepare_importer_non_genrule_wiring(...)`
   - keep dict-shaped `srcs` wiring, but attach importer patch inputs and provider edges via the helper rather than ad-hoc logic
   - keep the existing entry contract (`entry == "src/index.ts"`) unchanged
-- Keep `node/defs_core.bzl` unchanged unless it becomes a net reduction in duplication (this PR is intentionally narrow to `node/defs_nix.bzl`).
+- Keep `build-tools/node/defs_core.bzl` unchanged unless it becomes a net reduction in duplication (this PR is intentionally narrow to `build-tools/node/defs_nix.bzl`).
 
 ### Tests (in this PR)
 
@@ -61,14 +61,14 @@ I will update the existing Node macro tests to prove behavior did not change and
 I will update the docs where users are pointed at the Node Nix macros so they reflect the shared helper surfaces:
 
 - `docs/handbook/node-macros.md`:
-  - note that `node/defs_nix.bzl` uses the shared importer wiring helper (non-genrule path)
+  - note that `build-tools/node/defs_nix.bzl` uses the shared importer wiring helper (non-genrule path)
   - point at `//lang:importer_wiring.bzl` for the canonical contract text and error behavior
 - `docs/handbook/macro-stamping-cookbook.md`:
   - add a short section under Node describing that Nix-calling macros still use importer-scoped wiring helpers (and that lockfile label enforcement is not optional)
 
 ### Acceptance Criteria
 
-- `node/defs_nix.bzl` no longer directly calls `ensure_single_lockfile_label(...)` / `importer_from_labels(...)` for primary wiring.
+- `build-tools/node/defs_nix.bzl` no longer directly calls `ensure_single_lockfile_label(...)` / `importer_from_labels(...)` for primary wiring.
 - Node Nix-calling macros enforce the lockfile label contract via `prepare_importer_non_genrule_wiring(...)`.
 - Existing Node macro tests pass and continue to prove:
   - global Nix inputs are real action inputs
@@ -118,7 +118,7 @@ This PR introduces a small helper surface in Starlark that returns a safe, reusa
     - applies `escape_buck_cmd_subst(...)` where required
   - provides a canonical snippet to resolve a flake attr to `outPath` using:
     - `nix build --no-link --print-out-paths | tail -n1`
-- Refactor `node/defs_nix.bzl:node_webapp` to use the helper for cmd assembly.
+- Refactor `build-tools/node/defs_nix.bzl:node_webapp` to use the helper for cmd assembly.
 - Refactor bundled `nix_node_cli_bin(bundle=True)` only where it reduces duplication without obscuring the debugging flow. If bundling remains intentionally bespoke, keep it bespoke but use the helper for the common bootstrap + timeout prefix.
 
 ### Tests (in this PR)
@@ -155,7 +155,7 @@ We keep duplicating cmd assembly patterns. Each new Nix-calling macro has to rel
 
 ### Downsides for Implementing
 
-Some churn in `node/defs_nix.bzl` and test expectations. The benefit is a smaller surface area for subtle command bugs.
+Some churn in `build-tools/node/defs_nix.bzl` and test expectations. The benefit is a smaller surface area for subtle command bugs.
 
 ### Recommendation
 

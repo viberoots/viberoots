@@ -75,7 +75,7 @@ Scope
 Implementation
 
 - Delete code paths in `build-tools/tools/buck/sync-go-mods.ts` that copy from `GOMODCACHE` or emit third-party targets.
-- Ensure macros in `go/defs.bzl` don’t attempt to re-wire external imports via Buck deps; rely on Nix for third-party resolution.
+- Ensure macros in `build-tools/go/defs.bzl` don’t attempt to re-wire external imports via Buck deps; rely on Nix for third-party resolution.
 
 Acceptance Criteria
 

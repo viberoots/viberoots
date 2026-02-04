@@ -15,7 +15,7 @@ test("nix_node_cli_bin(bundle=True) fails fast when importer argument disagrees 
     await fsp.writeFile(
       path.join(importerDir, "TARGETS"),
       [
-        'load("//node:defs.bzl", "nix_node_cli_bin")',
+        'load("//build-tools/node:defs.bzl", "nix_node_cli_bin")',
         "",
         "nix_node_cli_bin(",
         '  name = "cli",',

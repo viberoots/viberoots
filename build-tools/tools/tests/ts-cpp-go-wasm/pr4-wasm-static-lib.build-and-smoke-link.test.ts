@@ -54,12 +54,12 @@ int add(int a, int b) { return a + b; }
 
     // Ensure C++ macros are available in the temp repo
     await fs.outputFile(
-      path.join(tmp, "cpp", "defs.bzl"),
-      await fs.readFile("cpp/defs.bzl", "utf8"),
+      path.join(tmp, "build-tools", "cpp", "defs.bzl"),
+      await fs.readFile("build-tools/cpp/defs.bzl", "utf8"),
     );
     await fs.outputFile(
-      path.join(tmp, "cpp", "wasm_defs.bzl"),
-      await fs.readFile("cpp/wasm_defs.bzl", "utf8"),
+      path.join(tmp, "build-tools", "cpp", "wasm_defs.bzl"),
+      await fs.readFile("build-tools/cpp/wasm_defs.bzl", "utf8"),
     );
     // Make planner templates visible (temp repo will prefer main workspace templates when absent)
     await fs.mkdirp(path.join(tmp, "build-tools/tools/nix/templates"));
@@ -74,7 +74,7 @@ int add(int a, int b) { return a + b; }
     );
 
     // TARGETS: wasm static lib
-    const targets = `load("//cpp:defs.bzl", "nix_cpp_wasm_static_lib")
+    const targets = `load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_static_lib")
 
 nix_cpp_wasm_static_lib(
     name = "core_wasm",

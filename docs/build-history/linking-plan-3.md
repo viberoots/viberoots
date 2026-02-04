@@ -33,7 +33,7 @@ This PR focuses only on the C++ Wasm static library producer side. It does not c
 
 ### Scope & Changes
 
-- Extend `cpp/defs.bzl` `nix_cpp_wasm_static_lib`:
+- Extend `build-tools/cpp/defs.bzl` `nix_cpp_wasm_static_lib`:
   - accept `link_deps` and `header_deps` (default `[]`)
   - compute `deps := deps ∪ link_deps ∪ header_deps` via the shared helper (same macro contract as native C++)
   - preserve the intent attrs on the rule so they appear in the exported graph node
@@ -158,13 +158,13 @@ This PR introduces the macro and rule surface needed for planners to observe Tin
 
 ### Scope & Changes
 
-- Extend `go/defs.bzl` `nix_go_tiny_wasm_lib`:
+- Extend `build-tools/go/defs.bzl` `nix_go_tiny_wasm_lib`:
   - accept `link_deps` (default `[]`)
   - accept `link_closure` (default `"direct"`)
   - accept `link_closure_overrides` (default `{}` or `None`, consistent with Phase 0 conventions)
   - compute `deps := deps ∪ link_deps` deterministically (TinyGo does not meaningfully consume `header_deps` today; any header needs come from the C++ Wasm libs it links)
   - preserve the intent attrs on the rule so they appear in the exported graph
-- Extend `go/private/nix_build_wasm.bzl` rule `go_nix_build_wasm`:
+- Extend `build-tools/go/private/nix_build_wasm.bzl` rule `go_nix_build_wasm`:
   - add attrs to carry intent into the graph:
     - `link_deps`, `link_closure`, `link_closure_overrides`
   - switch the default build to graph-aware selection:

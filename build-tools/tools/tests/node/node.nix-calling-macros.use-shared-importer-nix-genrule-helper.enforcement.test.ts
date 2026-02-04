@@ -7,7 +7,7 @@ function assert(condition: boolean, message: string) {
 }
 
 test("node Nix-calling macros route through unified wiring helper", async () => {
-  const file = "node/defs_nix.bzl";
+  const file = "build-tools/node/defs_nix.bzl";
   const txt = await fsp.readFile(file, "utf8");
 
   const helperCalls = (txt.match(/prepare_language_wiring\(/g) || []).length;

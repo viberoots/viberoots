@@ -25,7 +25,7 @@ test("python macros include importer-local patches in srcs for nix_python_test (
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//python:defs.bzl", "nix_python_test")',
+        'load("//build-tools/python:defs.bzl", "nix_python_test")',
         "",
         "nix_python_test(",
         '  name = "t",',

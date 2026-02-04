@@ -21,7 +21,7 @@ test("cpp link_mode=shared rejects header-only targets", async () => {
     await fs.outputFile(
       path.join(tmp, "libs", "headers", "TARGETS"),
       [
-        'load("//cpp:defs.bzl", "nix_cpp_headers")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_headers")',
         "",
         "nix_cpp_headers(",
         '  name = "headers",',

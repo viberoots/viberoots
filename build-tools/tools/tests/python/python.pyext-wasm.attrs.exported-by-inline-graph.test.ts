@@ -21,7 +21,7 @@ test("inline exporter: python pyext_wasm nodes include module attrs in inline gr
     await fs.writeFile(
       path.join(app, "TARGETS"),
       [
-        'load("//python:defs.bzl", "nix_python_wasm_extension_module")',
+        'load("//build-tools/python:defs.bzl", "nix_python_wasm_extension_module")',
         "",
         "nix_python_wasm_extension_module(",
         '  name = "ext",',

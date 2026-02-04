@@ -6,8 +6,8 @@ function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message);
 }
 
-test("node/defs_nix.bzl must not reintroduce local importer normalization helpers", async () => {
-  const file = "node/defs_nix.bzl";
+test("build-tools/node/defs_nix.bzl must not reintroduce local importer normalization helpers", async () => {
+  const file = "build-tools/node/defs_nix.bzl";
   const txt = await fsp.readFile(file, "utf8");
 
   assert(

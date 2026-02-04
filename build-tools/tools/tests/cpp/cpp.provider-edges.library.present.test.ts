@@ -27,7 +27,7 @@ EOF'`;
     await fs.outputFile(path.join(libDir, "lib.cpp"), "int add(int a,int b){return a+b;}\n");
     await fs.outputFile(
       path.join(libDir, "TARGETS"),
-      `load("//cpp:defs.bzl", "nix_cpp_library")
+      `load("//build-tools/cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
     name = "lib",

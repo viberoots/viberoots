@@ -43,7 +43,7 @@ async function main() {
   // Do NOT require developers to edit configs (e.g. langs.json) for sparse/partial clones.
   const isCI = (process.env.CI || "").toLowerCase() === "true";
   const pythonPresent =
-    (await pathExists("python/defs.bzl")) ||
+    (await pathExists("build-tools/python/defs.bzl")) ||
     (await pathExists("build-tools/tools/nix/templates/python.nix")) ||
     (await pathExists("build-tools/tools/buck/exporter/lang/python.ts")) ||
     (await pathExists("build-tools/tools/buck/providers/python.ts"));

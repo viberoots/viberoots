@@ -33,7 +33,7 @@ EOF'`;
     await fs.outputFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//python:defs.bzl", "nix_python_wasm_app")',
+        'load("//build-tools/python:defs.bzl", "nix_python_wasm_app")',
         "",
         "nix_python_wasm_app(",
         '  name = "wasm_app",',
@@ -45,12 +45,14 @@ EOF'`;
       "utf8",
     );
 
-    const macroTxt = await fs.readFile(path.join(tmp, "python", "defs.bzl"), "utf8");
+    const macroTxt = await fs.readFile(path.join(tmp, "build-tools", "python", "defs.bzl"), "utf8");
     if (
       macroTxt.includes('load("//third_party/providers:auto_map.bzl"') ||
       !macroTxt.includes('load("//lang:auto_map.bzl"')
     ) {
-      console.error("expected python/defs.bzl to load MODULE_PROVIDERS via //lang:auto_map.bzl");
+      console.error(
+        "expected build-tools/python/defs.bzl to load MODULE_PROVIDERS via //lang:auto_map.bzl",
+      );
       process.exit(2);
     }
 

@@ -35,7 +35,7 @@ This PR does not yet build a working native module. That comes in PR-2 when the 
 
 ### Scope & Changes
 
-- Add `nix_python_extension_module` to `python/defs.bzl`:
+- Add `nix_python_extension_module` to `build-tools/python/defs.bzl`:
   - enforce importer-scoped lockfile label conventions (consistent with other Python macros)
   - accept required attrs:
     - `module` (import name, e.g. `"mypkg._native"`)

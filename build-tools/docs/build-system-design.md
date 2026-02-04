@@ -129,7 +129,7 @@ extra-experimental-features = nix-command flakes dynamic-derivations ca-derivati
    - `build-tools/tools/nix/uv2nix-overlays.nix` validates overlays and prepares the overlay arguments
    - `build-tools/tools/nix/uv2nix-env.nix` builds the uv2nix environment and lockfile source wrapper
      Cleanup: keep only wiring and validation in the wrapper, and move normalization logic to the helper modules.
-   - Language-specific helper placement: `//lang:defs_common.bzl` is language‑agnostic. Go‑specific tuple label helpers (`normalize_build_tags`, `append_tuple_labels`) live in `//go/private:labels.bzl` and are loaded by Go macros.
+   - Language-specific helper placement: `//lang:defs_common.bzl` is language‑agnostic. Go‑specific tuple label helpers (`normalize_build_tags`, `append_tuple_labels`) live in `//build-tools/go/private:labels.bzl` and are loaded by Go macros.
    - Shared helper error text is argument‑agnostic for reuse across call‑sites. For example, `normalize_labels(...)` reports generic “labels must be a list of string labels”; macros should add parameter context at the call‑site if a named argument is relevant to users.
    - WASM stamps: use `//lang:defs_common.bzl:stamp_wasm_variant(kwargs, "<lang>", "<variant>")` to append `lang:<lang>`, `kind:wasm`, and `wasm:<variant>` uniformly across C++/Go/Python macros.
    - Note: For discoverability only, `build-tools/tools/nix/lang-templates.nix` exposes a `Node` symbol bag (forwarded from `build-tools/tools/nix/templates/node.nix`). The planner’s Node plugin remains authoritative; no consumers rely on this symbol bag.
@@ -659,7 +659,7 @@ Behavior:
 
 ```python
 # TARGETS example
-load("//go:defs.bzl", "nix_go_binary")
+load("//build-tools/go:defs.bzl", "nix_go_binary")
 
 nix_go_binary(
     name = "payments_service",
@@ -679,7 +679,7 @@ nix_go_binary(
 
 **Acceptance check:** When you change any of these attrs and re‑run the exporter, the target’s `labels` in `build-tools/tools/buck/graph.json` should update accordingly (different `module:` set if imports change). Patch edits under `<pkg>/patches/go` should invalidate only the affected targets.
 
-- [ ] Land `//go/defs.bzl` with the **generic macro** (`nix_go_binary` / `nix_go_library` / `nix_go_test`) that wraps the underlying `go_*` rules and includes package‑local patch files in `srcs` for precise invalidation.
+- [ ] Land `//build-tools/go/defs.bzl` with the **generic macro** (`nix_go_binary` / `nix_go_library` / `nix_go_test`) that wraps the underlying `go_*` rules and includes package‑local patch files in `srcs` for precise invalidation.
 - [ ] Convert **one small target** to the macro (leave the rest untouched).
 - Verification:
   - [ ] `buck2 build` for that target succeeds and produces identical binaries compared to pre-macro (hash or size/time check).
@@ -1250,13 +1250,13 @@ Some macros must produce a **planner-visible** node without building a normal ar
 - **Pattern**: if the stub can accept `srcs`, prefer the shared wrapper `//lang:planner_stub.bzl:planner_stub_with_package_local_patches(...)` to attach patch inputs without changing the stub’s artifact shape.
 - **Canonical macro-level surface (preferred)**: `//lang:defs_common.bzl:wire_planner_visible_stub(...)` composes the above patterns (optional patch inputs, explicit provider-edge realization into `"deps"` vs `"inputs"`, and **default provider stripping from planner-visible deps**) so planner-visible call sites stay uniform.
 
-### `//go/defs.bzl` macros (copy‑pasteable)
+### `//build-tools/go/defs.bzl` macros (copy‑pasteable)
 
 ```starlark
-# //go/defs.bzl — wrap go_* and attach providers from auto_map.bzl
+# //build-tools/go/defs.bzl — wrap go_* and attach providers from auto_map.bzl
 # Note: Some repos don’t define the `prelude` cell alias. If so, adjust the load
 # to your local alias or expose go rules via a repo-local forwarding bzl.
-load("@prelude//go:def.bzl", "go_binary", "go_library", "go_test")
+load("@prelude//build-tools/go:def.bzl", "go_binary", "go_library", "go_test")
 
 def _providers_for(name):
     # Mapping is generated; guard its presence via prebuild-guard in CI/local.
@@ -1283,7 +1283,7 @@ def nix_go_test(name, **kwargs):
     go_test(name = name, deps = deps, **kwargs)
 ```
 
-> Macro error UX: We intentionally rely on `build-tools/tools/buck/prebuild-guard.ts` to emit actionable messages when glue is missing/stale, because Starlark macro loads cannot portably catch and reword load errors. If your repo can’t use the `@prelude` alias, set the alias in Buck config or change the `load("@prelude//go:def.bzl", ...)` to a repo-local forwarding bzl that re-exports `go_*`.
+> Macro error UX: We intentionally rely on `build-tools/tools/buck/prebuild-guard.ts` to emit actionable messages when glue is missing/stale, because Starlark macro loads cannot portably catch and reword load errors. If your repo can’t use the `@prelude` alias, set the alias in Buck config or change the `load("@prelude//build-tools/go:def.bzl", ...)` to a repo-local forwarding bzl that re-exports `go_*`.
 
 ### Example TARGETS Entries (Go)
 

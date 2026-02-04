@@ -33,7 +33,7 @@ EOF'`;
       [
         "",
         "# test: cpp.wasm-static.package-local-wiring.probe.test.ts",
-        'load("//cpp:defs.bzl", "nix_cpp_wasm_static_lib")',
+        'load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_static_lib")',
         "",
         "nix_cpp_wasm_static_lib(",
         '  name = "core_static",',

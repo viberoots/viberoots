@@ -15,7 +15,7 @@ This document specifies the design for adding a Vite + TypeScript webapp templat
   - Files: `index.html`, `src/main.ts`, `src/style.css`, `vite.config.ts`, `.npmrc`, `tsconfig.json`, `package.json`, `TARGETS`
 - **Scaffolding CLI:** expose template via `scaf new node webapp <name>`; integrate with `build-tools/tools/scaffolding/new-pnpm-project.ts` as `--kind webapp`.
 - **Labels & providers:** template `TARGETS` includes `labels = ["lockfile:apps/<name>/pnpm-lock.yaml#apps/<name>", "lang:node", "kind:app"]` so `gen-auto-map.ts` maps to the importer‑scoped provider.
-- **Buck macro (initial):** add `node_webapp(...)` to `node/defs.bzl` that stamps labels and appends providers from `//third_party/providers:auto_map.bzl`, and uses a zx shim to copy a Nix‑built `dist/` into `$OUT`.
+- **Buck macro (initial):** add `node_webapp(...)` to `build-tools/node/defs.bzl` that stamps labels and appends providers from `//third_party/providers:auto_map.bzl`, and uses a zx shim to copy a Nix‑built `dist/` into `$OUT`.
 - **Tests:** add a zx test that scaffolds a webapp, refreshes glue, asserts correct provider mapping, and asserts `dist/index.html` materializes via Buck.
 
 ### Out of Scope (separate PRs)
@@ -98,7 +98,7 @@ export default defineConfig({
 - `TARGETS` (macro call + importer‑scoped label)
 
 ```starlark
-load("//node:defs.bzl", "node_webapp")
+load("//build-tools/node:defs.bzl", "node_webapp")
 
 node_webapp(
     name = "app",

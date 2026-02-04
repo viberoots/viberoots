@@ -8,8 +8,8 @@ async function read(p: string): Promise<string> {
 }
 
 test("go/cpp macros: local_patch_dirs and nixpkg_deps pop logic is centralized in //lang helper", async () => {
-  const goDefs = await read("go/defs.bzl");
-  const cppDefs = await read("cpp/defs.bzl");
+  const goDefs = await read("build-tools/go/defs.bzl");
+  const cppDefs = await read("build-tools/cpp/defs.bzl");
 
   const forbidden = [
     'kwargs.pop("local_patch_dirs"',
@@ -22,20 +22,20 @@ test("go/cpp macros: local_patch_dirs and nixpkg_deps pop logic is centralized i
   for (const needle of forbidden) {
     assert.ok(
       !goDefs.includes(needle),
-      `expected go/defs.bzl to avoid direct ${needle}; rely on prepare_language_wiring(...) to extract patch dirs + nixpkg deps`,
+      `expected build-tools/go/defs.bzl to avoid direct ${needle}; rely on prepare_language_wiring(...) to extract patch dirs + nixpkg deps`,
     );
     assert.ok(
       !cppDefs.includes(needle),
-      `expected cpp/defs.bzl to avoid direct ${needle}; rely on prepare_language_wiring(...) to extract patch dirs + nixpkg deps`,
+      `expected build-tools/cpp/defs.bzl to avoid direct ${needle}; rely on prepare_language_wiring(...) to extract patch dirs + nixpkg deps`,
     );
   }
 
   assert.ok(
     goDefs.includes("prepare_language_wiring("),
-    "expected go/defs.bzl to call prepare_language_wiring(...)",
+    "expected build-tools/go/defs.bzl to call prepare_language_wiring(...)",
   );
   assert.ok(
     cppDefs.includes("prepare_language_wiring("),
-    "expected cpp/defs.bzl to call prepare_language_wiring(...)",
+    "expected build-tools/cpp/defs.bzl to call prepare_language_wiring(...)",
   );
 });

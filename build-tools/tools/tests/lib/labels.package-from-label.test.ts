@@ -6,7 +6,7 @@ test("packagePathFromLabel extracts package from normalized labels", async () =>
   const cases: Array<{ in: string; out: string }> = [
     { in: "root//apps/foo:svc (config//buck:cfg)", out: "apps/foo" },
     { in: "//libs/demo:lib", out: "libs/demo" },
-    { in: "prelude//cpp:lib", out: "cpp" },
+    { in: "prelude//build-tools/cpp:lib", out: "build-tools/cpp" },
   ];
   for (const c of cases) {
     const got = packagePathFromLabel(c.in);

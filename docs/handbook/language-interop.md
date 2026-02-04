@@ -22,13 +22,13 @@ Before you get into cgo-specific wiring, it helps to know one macro convenience 
 - **`<bin>_pkg`**: a Go library target used as the `library` for tests. It uses the same wiring contracts as `nix_go_library` (provider edges + package-local patch inputs + standard label stamping).
 - **`<bin>_test`**: a Go test target that compiles and runs the `cmd/<bin>` tests without requiring you to edit `TARGETS` after adding new test files.
 
-Implementation detail: the helper-target synthesis lives in `go/private/auto_tests.bzl` and is called by `go/defs.bzl`. Do not duplicate this logic in other macros.
+Implementation detail: the helper-target synthesis lives in `build-tools/go/private/auto_tests.bzl` and is called by `build-tools/go/defs.bzl`. Do not duplicate this logic in other macros.
 
 1. Create or use a C/C++ library target (in-repo):
 
 ```python
 # libs/greeter/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_library")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
     name = "greeter",
@@ -42,7 +42,7 @@ nix_cpp_library(
 
 ```python
 # apps/demo-cli/TARGETS
-load("//go:defs.bzl", "nix_go_binary")
+load("//build-tools/go:defs.bzl", "nix_go_binary")
 
 nix_go_binary(
     name = "demo",
@@ -72,8 +72,8 @@ Implementation notes
   - The target lists any C-family source files in `srcs` (e.g., `.c`, `.cpp`, `.m`, `.mm`, `.s`).
   - The target declares `nixpkg_deps` or `repo_cgo_deps`.
     No TARGETS edits are required when adding/removing C sources.
-- Implementation detail: the CGO decision and toolchain defaults are centralized in `go/private/cgo_wiring.bzl`, shared by `nix_go_library`, `nix_go_binary`, and `nix_go_test`.
-- Implementation detail: shared behavior for `nix_cpp_library`, `nix_cpp_binary`, and `nix_cpp_node_addon` is centralized in `_cpp_common` in `cpp/defs.bzl`. Public macro surfaces are unchanged; wasm macros stay separate.
+- Implementation detail: the CGO decision and toolchain defaults are centralized in `build-tools/go/private/cgo_wiring.bzl`, shared by `nix_go_library`, `nix_go_binary`, and `nix_go_test`.
+- Implementation detail: shared behavior for `nix_cpp_library`, `nix_cpp_binary`, and `nix_cpp_node_addon` is centralized in `_cpp_common` in `build-tools/cpp/defs.bzl`. Public macro surfaces are unchanged; wasm macros stay separate.
 - Macro wiring note: macro implementations should route through the shared wiring surface (`prepare_language_wiring(...)`) and load provider mappings via `//lang:auto_map.bzl` rather than `//third_party/providers/auto_map.bzl`.
 - The Go Nix templates set `CGO_ENABLED=1` only for those targets and ensure CC/CXX/AR come from Nix.
 - If `pkg-config` metadata is missing, templates synthesize `CGO_CFLAGS`/`CGO_LDFLAGS` from provided packages.
@@ -89,7 +89,7 @@ To call Go from C/C++, build your Go package as a c-archive and link it into a C
 
 ```python
 # libs/greetgo/TARGETS
-load("//go:defs.bzl", "nix_go_carchive")
+load("//build-tools/go:defs.bzl", "nix_go_carchive")
 
 nix_go_carchive(
     name = "greetgo",
@@ -116,7 +116,7 @@ func GoGreet() *C.char { return C.CString("hello from go") }
 
 ```python
 # apps/caller/TARGETS
-load("//cpp:defs.bzl", "nix_cpp_binary")
+load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 
 nix_cpp_binary(
     name = "caller",

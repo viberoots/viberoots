@@ -20,7 +20,7 @@ test("gen-langs: generates langs.nix from manifest capabilities deterministicall
         {
           id: "go",
           displayName: "Go",
-          requiredPaths: ["build-tools/tools/nix/templates/go.nix", "go/defs.bzl"],
+          requiredPaths: ["build-tools/tools/nix/templates/go.nix", "build-tools/go/defs.bzl"],
           kinds: ["cli", "lib", "test"],
           templatesDir: "build-tools/tools/scaffolding/templates/go",
           capabilities: { patching: true, lockfileLabels: false, testAutoWire: true },
@@ -28,7 +28,7 @@ test("gen-langs: generates langs.nix from manifest capabilities deterministicall
         {
           id: "cpp",
           displayName: "C++",
-          requiredPaths: ["build-tools/tools/nix/templates/cpp.nix", "cpp/defs.bzl"],
+          requiredPaths: ["build-tools/tools/nix/templates/cpp.nix", "build-tools/cpp/defs.bzl"],
           kinds: ["bin", "lib", "test"],
           templatesDir: "build-tools/tools/scaffolding/templates/cpp",
           capabilities: { patching: false },
