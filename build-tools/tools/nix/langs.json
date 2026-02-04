@@ -1,0 +1,81 @@
+{
+  "enabled": ["cpp", "go", "node", "rust", "python"],
+  "languages": [
+    {
+      "id": "go",
+      "displayName": "Go",
+      "requiredPaths": ["build-tools/tools/nix/templates/go.nix", "go/defs.bzl"],
+      "optionalPaths": [],
+      "kinds": ["cli", "lib", "test"],
+      "capabilities": {
+        "patching": true,
+        "lockfileLabels": false,
+        "testAutoWire": true
+      },
+      "templatesDir": "build-tools/tools/scaffolding/templates/go"
+    },
+    {
+      "id": "node",
+      "displayName": "Node",
+      "requiredPaths": ["**/pnpm-lock.yaml"],
+      "optionalPaths": ["patches/node"],
+      "kinds": ["app", "lib", "workspace"],
+      "capabilities": {
+        "patching": true,
+        "lockfileLabels": true,
+        "testAutoWire": false
+      },
+      "templatesDir": "build-tools/tools/scaffolding/templates/node"
+    },
+    {
+      "id": "cpp",
+      "displayName": "C++",
+      "requiredPaths": [
+        "cpp/defs.bzl",
+        "cpp/wasm_defs.bzl",
+        "build-tools/tools/nix/planner/cpp.nix",
+        "build-tools/tools/nix/planner/cpp-link-helpers.nix",
+        "build-tools/tools/nix/planner/cpp-go-archives.nix",
+        "build-tools/tools/nix/planner/cpp-phase1-helpers.nix",
+        "build-tools/tools/nix/planner/cpp-provider-attrs-fallback.nix",
+        "build-tools/tools/nix/templates/cpp.nix",
+        "build-tools/tools/nix/templates/cpp-headers.nix",
+        "build-tools/tools/nix/templates/cpp-shared-lib.nix"
+      ],
+      "optionalPaths": [],
+      "kinds": ["bin", "headers", "lib", "test"],
+      "capabilities": {
+        "patching": true
+      },
+      "templatesDir": "build-tools/tools/scaffolding/templates/cpp"
+    },
+    {
+      "id": "rust",
+      "displayName": "Rust",
+      "requiredPaths": [
+        "build-tools/tools/nix/planner/rust.nix",
+        "build-tools/tools/buck/exporter/lang/rust.ts",
+        "build-tools/tools/buck/providers/rust.ts"
+      ],
+      "kinds": ["bin", "lib"],
+      "templatesDir": "build-tools/tools/scaffolding/templates/rust"
+    },
+    {
+      "id": "python",
+      "displayName": "Python",
+      "requiredPaths": [
+        "build-tools/tools/nix/templates/python.nix",
+        "python/defs.bzl",
+        "build-tools/tools/buck/exporter/lang/python.ts",
+        "build-tools/tools/buck/providers/python.ts",
+        "**/uv.lock"
+      ],
+      "kinds": ["app", "lib"],
+      "capabilities": {
+        "patching": true,
+        "lockfileLabels": true
+      },
+      "templatesDir": "build-tools/tools/scaffolding/templates/python"
+    }
+  ]
+}

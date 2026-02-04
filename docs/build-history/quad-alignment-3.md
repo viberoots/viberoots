@@ -10,10 +10,10 @@ Align temporary workspace paths across languages. Behavior for C++ extraction re
 
 ### Scope & Changes
 
-- tools/patch/cross-platform.ts:
+- build-tools/tools/patch/cross-platform.ts:
   - Change `makeWorkspace(originPath, moduleKey)` → `makeWorkspace({ lang, originPath, moduleKey })`.
   - Workspace base moves from a fixed `bucknix-patch-go` to `bucknix-patch-<lang>`.
-- tools/patch/patch-go.ts, tools/patch/patch-python.ts:
+- build-tools/tools/patch/patch-go.ts, build-tools/tools/patch/patch-python.ts:
   - Pass `lang: "go"` / `lang: "python"` to `makeWorkspace(...)`.
 - C++ path (already uses `bucknix-patch-cpp` and bespoke extraction):
   - No functional change. Keep existing `ensureOriginAndWorkspace` logic; new parity is achieved by aligning Go/Python naming with C++.
@@ -51,11 +51,11 @@ Add a global `PATCH_ECHO_SNIPPET=1` toggle to request “echo export snippet” 
 
 ### Scope & Changes
 
-- tools/lib/cli.ts:
+- build-tools/tools/lib/cli.ts:
   - Extend `echoSnippetRequested({ env? })` to also honor `PATCH_ECHO_SNIPPET=1|true` (global), while keeping per‑language envs (`PATCH_GO_ECHO_SNIPPET`, `PATCH_CPP_ECHO_SNIPPET`, `PATCH_PY_ECHO_SNIPPET`) and `--echo-snippet` precedence.
-- tools/patch/dev-overrides.ts:
+- build-tools/tools/patch/dev-overrides.ts:
   - Add `printOverrideSnippet(envName, map)` to format and print a consistent message using `formatExportSnippet(...)`, including the standard “Unset before CI …” hint.
-- tools/patch/patch-go.ts, tools/patch/patch-cpp.ts, tools/patch/patch-python.ts:
+- build-tools/tools/patch/patch-go.ts, build-tools/tools/patch/patch-cpp.ts, build-tools/tools/patch/patch-python.ts:
   - Replace inline echo blocks with `printOverrideSnippet(...)`. Default behavior (process‑local env mutation) remains unchanged when echo not requested.
 - Tests (in this PR):
   - zx tests confirm: `--echo-snippet` and `PATCH_ECHO_SNIPPET=1` both cause snippet printing for Go/C++/Python; output message matches the unified format exactly.
@@ -92,9 +92,9 @@ Move small, repeated functions from the Go template to a shared location to redu
 
 ### Scope & Changes
 
-- tools/nix/templates-common.nix (or extend if already present):
+- build-tools/tools/nix/templates-common.nix (or extend if already present):
   - Add shared helpers for `mkOverrides` (composition of `patches` + `src` overrides) and `mkConfigurePhase` (CGO/env set‑up with current semantics and flags).
-- tools/nix/templates/go.nix:
+- build-tools/tools/nix/templates/go.nix:
   - Import helpers from templates-common; remove in‑file duplicates; keep all arguments, env logic, and CGO composition identical.
 - Tests (in this PR):
   - Nix derivation identity/regression checks: build representative Go bin/lib before/after and assert either identical store paths (when practical) or identical computed args/overrides in a snapshot test.
@@ -131,11 +131,11 @@ Merge small duplicated code paths across patch handlers by centralizing position
 
 ### Scope & Changes
 
-- tools/patch/lib/args.ts (new):
+- build-tools/tools/patch/lib/args.ts (new):
   - `requirePositional(args: string[], index: number, { name, example }): string` — returns trimmed positional or throws with a standardized, per‑handler message that matches today’s wording.
-- tools/patch/lib/messages.ts (new):
+- build-tools/tools/patch/lib/messages.ts (new):
   - `NOOP_CLEARED_MSG = "no changes; no-op (cleared dev overrides and ended session)"` — shared constant matching the current printed text.
-- tools/patch/patch-go.ts, tools/patch/patch-python.ts, tools/patch/patch-cpp.ts, tools/patch/patch-node.ts:
+- build-tools/tools/patch/patch-go.ts, build-tools/tools/patch/patch-python.ts, build-tools/tools/patch/patch-cpp.ts, build-tools/tools/patch/patch-node.ts:
   - Replace inline first‑arg extraction and duplicated no‑op strings with calls to the new helpers/constants.
   - Keep language‑specific wording for “missing argument” identical to today by passing current examples (`golang.org/x/net`, `pkgs.zlib`, `requests`, `lodash`) to `requirePositional(...)`.
 - Tests (in this PR):

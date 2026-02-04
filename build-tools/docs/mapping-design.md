@@ -1,6 +1,6 @@
-### tools/nix/mapping.nix — Dispatch Table Design
+### build-tools/tools/nix/mapping.nix — Dispatch Table Design
 
-This document defines the purpose, shape, and usage of `tools/nix/mapping.nix`, an optional and minimal dispatch table that the Nix planner (`tools/nix/graph-generator.nix`) consults to route custom Buck rule types to language templates.
+This document defines the purpose, shape, and usage of `build-tools/tools/nix/mapping.nix`, an optional and minimal dispatch table that the Nix planner (`build-tools/tools/nix/graph-generator.nix`) consults to route custom Buck rule types to language templates.
 
 ### Goals
 
@@ -10,10 +10,10 @@ This document defines the purpose, shape, and usage of `tools/nix/mapping.nix`, 
 
 ### How the Planner Uses It
 
-The planner imports `tools/nix/mapping.nix` when present and reads `dispatch`:
+The planner imports `build-tools/tools/nix/mapping.nix` when present and reads `dispatch`:
 
 ```nix
-# tools/nix/graph-generator.nix (excerpt; already implemented)
+# build-tools/tools/nix/graph-generator.nix (excerpt; already implemented)
 T = import ./lang-templates.nix { inherit pkgs; };
 M = if builtins.pathExists ./mapping.nix then import ./mapping.nix else {};
 D = M.dispatch or {};
@@ -35,13 +35,13 @@ If a node’s `rule_type` matches a key in `dispatch`, the corresponding entry (
 
 ### File Location
 
-- Path: `tools/nix/mapping.nix`
+- Path: `build-tools/tools/nix/mapping.nix`
 - Not committed? It should be committed to version control alongside planner templates to ensure reproducibility.
 
 ### Minimal Schema (v1)
 
 ```nix
-# tools/nix/mapping.nix
+# build-tools/tools/nix/mapping.nix
 {
   # Map Buck rule_type (string) -> { template = "<lang>"; kind = "bin"|"lib"; }
   dispatch = {
@@ -52,7 +52,7 @@ If a node’s `rule_type` matches a key in `dispatch`, the corresponding entry (
 }
 ```
 
-- **template**: Name of the language template exposed by `tools/nix/lang-templates.nix` (currently `"go"`).
+- **template**: Name of the language template exposed by `build-tools/tools/nix/lang-templates.nix` (currently `"go"`).
 - **kind**: Either `"bin"` or `"lib"` (selects `goApp` vs `goLib`).
 
 This matches how `graph-generator.nix` consumes the mapping today. No other keys are read by the planner in v1.
@@ -106,14 +106,14 @@ This matches how `graph-generator.nix` consumes the mapping today. No other keys
 
 ### Migration Plan
 
-1. Create `tools/nix/mapping.nix` with an empty `dispatch = {}`.
+1. Create `build-tools/tools/nix/mapping.nix` with an empty `dispatch = {}`.
 2. For each custom rule type you already use, add a single line mapping to `template = "go"` and `kind`.
 3. Run glue stages locally:
-   - `node tools/buck/export-graph.ts --out tools/buck/graph.json`
-   - `node tools/buck/sync-providers.ts`
-   - `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
+   - `node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`
+   - `node build-tools/tools/buck/sync-providers.ts`
+   - `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`
 4. Build a representative target and confirm no behavior change.
 
 ### Rollback
 
-- Removing `tools/nix/mapping.nix` reverts behavior to the existing label- and prefix-based detection in the planner.
+- Removing `build-tools/tools/nix/mapping.nix` reverts behavior to the existing label- and prefix-based detection in the planner.

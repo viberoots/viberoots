@@ -12,15 +12,15 @@ Intent/Impact
 
 Detailed Design
 
-- `tools/buck/exporter/lang/contract.ts`: add optional `validate(nodes: Node[]): Promise<void> | void` on `Adapter`.
-- `tools/buck/exporter/main.ts`: after computing `active` adapters and before label merges, call `await adapter.validate(nodes)` (best effort; fail fast if throws).
-- `tools/buck/exporter/lang/go.ts` (or current Go adapter): implement the existing authority check (targets with `.go` sources must have `rule_type` starting with `go_` or a `lang:go` label) inside `validate`.
+- `build-tools/tools/buck/exporter/lang/contract.ts`: add optional `validate(nodes: Node[]): Promise<void> | void` on `Adapter`.
+- `build-tools/tools/buck/exporter/main.ts`: after computing `active` adapters and before label merges, call `await adapter.validate(nodes)` (best effort; fail fast if throws).
+- `build-tools/tools/buck/exporter/lang/go.ts` (or current Go adapter): implement the existing authority check (targets with `.go` sources must have `rule_type` starting with `go_` or a `lang:go` label) inside `validate`.
 - Keep deterministic ordering/metrics unchanged.
 
 Tests
 
-- `tools/tests/exporter/exporter.adapter-validate.go-missing-labels.test.ts`: simulate nodes with `.go` sources missing `lang:go` and expect validate() to fail with actionable error.
-- `tools/tests/exporter/exporter.adapter-validate.cpp-noop.test.ts`: ensure cpp adapter validate() is a no‑op (or minimal checks) and exporter succeeds.
+- `build-tools/tools/tests/exporter/exporter.adapter-validate.go-missing-labels.test.ts`: simulate nodes with `.go` sources missing `lang:go` and expect validate() to fail with actionable error.
+- `build-tools/tools/tests/exporter/exporter.adapter-validate.cpp-noop.test.ts`: ensure cpp adapter validate() is a no‑op (or minimal checks) and exporter succeeds.
 
 Docs
 
@@ -48,16 +48,16 @@ Intent/Impact
 
 Detailed Design
 
-- `tools/lib/providers.ts`:
+- `build-tools/tools/lib/providers.ts`:
   - Add `normalizeNixAttr(attr: string): string` (force `pkgs.` prefix; map `pkgs.gtest` → `pkgs.googletest`; lower‑case; trim).
   - Add `providerNameForNixAttr(attr: string): string` → `nix_pkgs_<attr_with_non_alnum_to_underscore>`.
 - Refactor usages:
-  - `tools/buck/gen-auto-map.ts`: replace inline `nixpkg:` normalization and naming with new helpers.
-  - `tools/buck/providers/cpp.ts`: remove local name/normalize helpers and use shared implementations; keep stamping logic.
+  - `build-tools/tools/buck/gen-auto-map.ts`: replace inline `nixpkg:` normalization and naming with new helpers.
+  - `build-tools/tools/buck/providers/cpp.ts`: remove local name/normalize helpers and use shared implementations; keep stamping logic.
 
 Tests
 
-- `tools/tests/provider-names/nix-attr-normalization.test.ts`: table‑driven tests for representative attrs (openssl, zlib, gtest/googletest, deep paths like `pkgs.gnome.glib`).
+- `build-tools/tools/tests/provider-names/nix-attr-normalization.test.ts`: table‑driven tests for representative attrs (openssl, zlib, gtest/googletest, deep paths like `pkgs.gnome.glib`).
 - Adjust existing provider wiring and auto‑map tests to assert normalized names.
 
 Docs
@@ -74,7 +74,7 @@ Risks
 
 Acceptance Criteria
 
-- All provider naming originates from `tools/lib/providers.ts`. Auto‑map and provider sync generate identical names for the same attrs.
+- All provider naming originates from `build-tools/tools/lib/providers.ts`. Auto‑map and provider sync generate identical names for the same attrs.
 
 ---
 
@@ -86,17 +86,17 @@ Intent/Impact
 
 Detailed Design
 
-- Add `tools/nix/planner/lib.nix` with small pure helpers:
+- Add `build-tools/tools/nix/planner/lib.nix` with small pure helpers:
   - `get = attrs: k: attrs.${k} or null`
   - `cleanLabel = s: strip trailing \" (config//...)\" suffix`
   - `labelsOf`, `nameOf`, `depsOf`, `srcsOf`
-- Refactor `tools/nix/planner/cpp.nix` to import and use these helpers.
+- Refactor `build-tools/tools/nix/planner/cpp.nix` to import and use these helpers.
 - (If/when Go planner module exists) migrate to same helpers; otherwise leave Go using existing path until planner extraction occurs.
 
 Tests
 
 - Existing C++ scaffold/build tests must continue to pass.
-- Add `tools/tests/cpp/planner.lib-helpers.integration.test.ts` to verify helper behavior (e.g., `cleanLabel` on configured labels).
+- Add `build-tools/tools/tests/cpp/planner.lib-helpers.integration.test.ts` to verify helper behavior (e.g., `cleanLabel` on configured labels).
 
 Docs
 
@@ -124,14 +124,14 @@ Intent/Impact
 
 Detailed Design
 
-- Add `tools/nix/dev-overrides.nix` exposing:
+- Add `build-tools/tools/nix/dev-overrides.nix` exposing:
   - `readJsonOverride = { envName, ciForbidden ? true }: { map, warnEffect, ciGuard }`
   - Normalizes env, emits `builtins.trace` warning locally when set, throws in CI when `ciForbidden`.
-- Update `tools/nix/templates/cpp.nix` and Go templates (`tools/nix/lang-templates.nix` excerpts) to use it.
+- Update `build-tools/tools/nix/templates/cpp.nix` and Go templates (`build-tools/tools/nix/lang-templates.nix` excerpts) to use it.
 
 Tests
 
-- `tools/tests/cpp/dev-override.warning.local.test.ts` and `.ci-forbidden.test.ts` continue to pass; add symmetric Go tests if not present.
+- `build-tools/tools/tests/cpp/dev-override.warning.local.test.ts` and `.ci-forbidden.test.ts` continue to pass; add symmetric Go tests if not present.
 
 Docs
 
@@ -159,13 +159,13 @@ Intent/Impact
 
 Detailed Design
 
-- Confirm canonical `sanitizeName` location (currently used via `tools/nix/lang-helpers.nix` as `H.sanitizeName`). Document the algorithm.
+- Confirm canonical `sanitizeName` location (currently used via `build-tools/tools/nix/lang-helpers.nix` as `H.sanitizeName`). Document the algorithm.
 - Update `cpp/defs.bzl` `_sanitize_to_bin_name` to match the canonical algorithm exactly (cover `//`, `:`, `/`, spaces, case, non‑alnum behavior) or add a tiny test asserting equality with a generated value.
 - Add a test that computes a matrix of labels and verifies equality between Nix and Starlark sanitization for expected names.
 
 Tests
 
-- `tools/tests/cpp/sanitize-name.parity.test.ts`: build a table of labels and assert equality against the Starlark macro’s expectations.
+- `build-tools/tools/tests/cpp/sanitize-name.parity.test.ts`: build a table of labels and assert equality against the Starlark macro’s expectations.
 
 Docs
 
@@ -193,8 +193,8 @@ Intent/Impact
 
 Detailed Design
 
-- Add `tools/dev/build-selected.ts` (zx) that:
-  - Ensures `tools/buck/graph.json` exists (export it if missing for the current repo context).
+- Add `build-tools/tools/dev/build-selected.ts` (zx) that:
+  - Ensures `build-tools/tools/buck/graph.json` exists (export it if missing for the current repo context).
   - Runs `nix build .#graph-generator-selected` with `BUCK_TARGET` and `--accept-flake-config`.
   - Writes concise logs and returns the out path.
 - Update `cpp/defs.bzl` `_cpp_nix_build_impl` and `_cpp_nix_test_impl` to invoke the zx helper instead of inlined bash (keep behavior identical).
@@ -230,10 +230,10 @@ Intent/Impact
 
 Detailed Design
 
-- Extend `tools/lib/fs-helpers.ts` with:
+- Extend `build-tools/tools/lib/fs-helpers.ts` with:
   - `writeStamp(file: string, inputs: Array<{ path: string; content?: string }>)`
   - `stableUnique<T>(arr: T[], key: (t: T) => string): T[]`
-- Refactor `tools/buck/providers/cpp.ts` and Go provider sync to use these helpers.
+- Refactor `build-tools/tools/buck/providers/cpp.ts` and Go provider sync to use these helpers.
 
 Tests
 

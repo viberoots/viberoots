@@ -28,15 +28,15 @@ This plan closes the gaps surfaced by the new e2e test for the scaffolded Go add
 
 Code reference (current `makeNodeTest` snippet):
 
-```248:391:tools/nix/flake.nix
+```248:391:build-tools/tools/nix/flake.nix
         makeNodeTest = importerDir: let
           nm = nodeMods.mkNodeModules { lockfilePath = importerDir + "/pnpm-lock.yaml"; inherit importerDir; };
           name = builtins.baseNameOf importerDir;
-          sanitize = (import ./tools/nix/templates-common.nix { inherit pkgs; }).sanitizeName;
+          sanitize = (import ./build-tools/tools/nix/templates-common.nix { inherit pkgs; }).sanitizeName;
           # Optional: if a sibling native addon package exists at libs/<name>-native,
           # build a Node-API addon derivation and make its artifact available for tests.
           hasNative = builtins.pathExists (./. + ("/" + importerDir + "-native"));
-          TAddon = import ./tools/nix/templates/cpp-node-addon.nix { inherit pkgs; };
+          TAddon = import ./build-tools/tools/nix/templates/cpp-node-addon.nix { inherit pkgs; };
           addonName = name + "_addon";
           addonDrv = if hasNative then TAddon.cppNodeAddon {
             name = sanitize name;
@@ -49,7 +49,7 @@ Code reference (current `makeNodeTest` snippet):
 ```
 
 - Update the above to import the language templates and build the Go c-archive:
-  - `T = import ./tools/nix/lang-templates.nix { inherit pkgs; };`
+  - `T = import ./build-tools/tools/nix/lang-templates.nix { inherit pkgs; };`
   - Compute `modulesToml = ./libs/${name}-go/gomod2nix.toml` and `subdir = "libs/${name}-go"`.
   - `carchive = T.Go.goCArchive { name = "libs/${name}-go:carchive"; inherit modulesToml; subdir = "libs/${name}-go"; srcRoot = ./.; };`
   - Pass `nixCxxPkgs = [ carchive ]` to `TAddon.cppNodeAddon` and keep `includes = [ "include" ]` (the template already adds `-isystem <drv>/include` and `-L<drv>/lib`).
@@ -65,7 +65,7 @@ Acceptance checks
 
 Code reference (current template):
 
-```23:28:tools/scaffolding/templates/node/go-addon/libs/{{ name }}/TARGETS.jinja
+```23:28:build-tools/tools/scaffolding/templates/node/go-addon/libs/{{ name }}/TARGETS.jinja
 {% if includeNodeTests -%}
 nix_node_test(
     name = "unit",
@@ -87,27 +87,27 @@ Acceptance checks
 
 Phase 1 — Flake builder integration (Go c-archive → addon)
 
-- Task 1.1: Edit `tools/nix/flake.nix` in `makeNodeTest`:
-  - Import `T = import ./tools/nix/lang-templates.nix { inherit pkgs; };`
+- Task 1.1: Edit `build-tools/tools/nix/flake.nix` in `makeNodeTest`:
+  - Import `T = import ./build-tools/tools/nix/lang-templates.nix { inherit pkgs; };`
   - If `hasNative`, build `carchive = T.Go.goCArchive { modulesToml = ./libs/${name}-go/gomod2nix.toml; subdir = "libs/${name}-go"; srcRoot = ./.; name = "libs/${name}-go:carchive"; };`
   - Call `TAddon.cppNodeAddon` with `nixCxxPkgs = [ carchive ]` (keep `includes = [ "include" ]` and existing flags).
 - Task 1.2: Ensure Go dependencies are locked for the c-archive:
-  - Update the e2e test to run `tools/bin/i` (or `zx-wrapper tools/dev/install-deps.ts`) after scaffolding so `libs/<name>-go/gomod2nix.toml` is generated/updated before the flake builds.
+  - Update the e2e test to run `build-tools/tools/bin/i` (or `zx-wrapper build-tools/tools/dev/install-deps.ts`) after scaffolding so `libs/<name>-go/gomod2nix.toml` is generated/updated before the flake builds.
 - Acceptance:
   - `nix build .#node-test.libs_demo` passes in a fresh temp scaffold (macOS and Linux).
 
 Phase 2 — Buck test visibility hardening
 
 - Task 2.1: Update the scaffold template for the Node test deps:
-  - In `tools/scaffolding/templates/node/go-addon/libs/{{ name }}/TARGETS.jinja`, change `deps` on `nix_node_test("unit", ...)` from `//libs/<name>-native:napi_addon` to `:copy_addon`.
+  - In `build-tools/tools/scaffolding/templates/node/go-addon/libs/{{ name }}/TARGETS.jinja`, change `deps` on `nix_node_test("unit", ...)` from `//libs/<name>-native:napi_addon` to `:copy_addon`.
 - Task 2.2: Validate in a temp repo:
   - `buck2 test --target-platforms prelude//platforms:default //libs/demo:unit` runs and passes (optional smoke; flake path remains the main test path).
 - Acceptance:
   - No visibility errors when using Buck’s Node test target locally.
 
-Phase 3 — E2E test update (tools/tests/...)
+Phase 3 — E2E test update (build-tools/tools/tests/...)
 
-- Task 3.1: Call `tools/bin/i` early in the test to ensure `gomod2nix.toml` for the Go package is present.
+- Task 3.1: Call `build-tools/tools/bin/i` early in the test to ensure `gomod2nix.toml` for the Go package is present.
 - Task 3.2: Keep the e2e test on the Nix flake path (`.#node-test.libs_demo`). The builder now links the Go c-archive, so no external graph/planner calls are needed for this particular flow.
 - Task 3.3: Retain coverage plumbing and report checks as currently implemented by the flake builder. Verify junit exists (or a synthesized placeholder is produced as fallback).
 
@@ -126,7 +126,7 @@ Phase 3 — E2E test update (tools/tests/...)
 ### Risks and mitigations
 
 - Missing or stale `gomod2nix.toml` in the Go package:
-  - Mitigation: explicitly run `tools/bin/i` in the e2e test and document the requirement for contributors.
+  - Mitigation: explicitly run `build-tools/tools/bin/i` in the e2e test and document the requirement for contributors.
 - Divergence between Buck and flake outputs:
   - We keep Buck for general orchestration and impact; the flake Node test derivation is a convenience to run hermetic Node tests. Unit tests for planners remain in zx tests to prevent drift.
 - Cross-platform cgo variability:
@@ -136,9 +136,9 @@ Phase 3 — E2E test update (tools/tests/...)
 
 - Developer:
   - `direnv allow`
-  - `tools/bin/i` (ensures gomod2nix for new Go package)
-  - `tools/bin/b`
-  - `tools/bin/v` (full suite); the new e2e test is included.
+  - `build-tools/tools/bin/i` (ensures gomod2nix for new Go package)
+  - `build-tools/tools/bin/b`
+  - `build-tools/tools/bin/v` (full suite); the new e2e test is included.
 - CI:
   - No structural changes to stages are required. The Node test builder stays pure and internal to Nix.
 
@@ -148,21 +148,21 @@ Phase 3 — E2E test update (tools/tests/...)
 
 ### File-by-file changes checklist
 
-- tools/nix/flake.nix
+- build-tools/tools/nix/flake.nix
   - In `makeNodeTest`:
-    - Import `T = import ./tools/nix/lang-templates.nix { inherit pkgs; };`
+    - Import `T = import ./build-tools/tools/nix/lang-templates.nix { inherit pkgs; };`
     - Build `carchive = T.Go.goCArchive {...}` with `modulesToml = ./libs/${name}-go/gomod2nix.toml`, `subdir = "libs/${name}-go"`, `srcRoot = ./.`.
     - Pass `nixCxxPkgs = [ carchive ]` to `TAddon.cppNodeAddon`.
-- tools/scaffolding/templates/node/go-addon/libs/{{ name }}/TARGETS.jinja
+- build-tools/tools/scaffolding/templates/node/go-addon/libs/{{ name }}/TARGETS.jinja
   - Change `nix_node_test(..., deps = [":copy_addon"], ...)`.
-- tools/tests/scaffolding/node-go-addon.nix-node-test.pass.test.ts
-  - Add an early `tools/bin/i` invocation (or `zx-wrapper tools/dev/install-deps.ts`) to refresh `gomod2nix.toml` before building the Node test derivation.
+- build-tools/tools/tests/scaffolding/node-go-addon.nix-node-test.pass.test.ts
+  - Add an early `build-tools/tools/bin/i` invocation (or `zx-wrapper build-tools/tools/dev/install-deps.ts`) to refresh `gomod2nix.toml` before building the Node test derivation.
 
 ### Acceptance
 
 - Temp run (macOS + Linux builders):
   - `scaf new node go-addon demo --yes`
-  - `tools/bin/i`
+  - `build-tools/tools/bin/i`
   - `nix build .#node-test.libs_demo` succeeds and produces non-empty `report/`.
   - Node runtime smoke: `node -e "const a=require('./libs/demo/native/demo_addon.node'); if(a.add(2,3)!==5) process.exit(3)"` exits 0.
   - Optional: `buck2 test --target-platforms prelude//platforms:default //libs/demo:unit` succeeds.

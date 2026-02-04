@@ -17,7 +17,7 @@ I follow the repo-wide linking model described in `cpp-linking.md`, `build-tools
 - `deps` is the Buck graph edge list. It does not imply link intent.
 - `link_deps` declares linkable inputs. `header_deps` is include-only when that concept applies.
 - Macros compute `deps := deps ∪ link_deps ∪ header_deps` deterministically and validate `link_closure_overrides` keys.
-- `link_closure` defaults to `"direct"`. `"transitive"` follows `link_deps` only via `tools/nix/planner/link-closure.nix`.
+- `link_closure` defaults to `"direct"`. `"transitive"` follows `link_deps` only via `build-tools/tools/nix/planner/link-closure.nix`.
 - Ordering is deterministic and unsupported deps fail fast with targeted errors.
 
 ### C interop requirement
@@ -31,12 +31,12 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
 - Provider wiring: load `MODULE_PROVIDERS` from `//lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
 - Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
-- Patch model contract: `lang/lang_contracts.bzl` and `tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
+- Patch model contract: `lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
 
 ### Scope and Completion Criteria
 
-- Zig targets are discoverable by the planner and exported in `tools/buck/graph.json` with deterministic `module:` labels.
+- Zig targets are discoverable by the planner and exported in `build-tools/tools/buck/graph.json` with deterministic `module:` labels.
 - Provider sync generates `third_party/providers/TARGETS.zig.auto` from `patches/zig/*.patch` (flat dir), one provider per `pkg@version`.
 - `gen-auto-map.ts` maps Zig labels to provider deps, and Zig macros append these deps to targets.
 - Nix templates build Zig bins/libs with patches applied and optional dev overrides, failing in CI if overrides are set.
@@ -47,13 +47,13 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 ## Architecture
 
 - Buck2: orchestrates target graph, test impact, and label propagation.
-- Exporter (`tools/buck/export-graph.ts` + Zig adapter): emits `module:<pkgId>@<version>` labels for Zig targets.
+- Exporter (`build-tools/tools/buck/export-graph.ts` + Zig adapter): emits `module:<pkgId>@<version>` labels for Zig targets.
 - Planner (`graph-generator.nix`): detects Zig targets and dispatches to Zig Nix templates (`zigApp`/`zigLib`).
-- Nix templates (`tools/nix/templates/zig.nix`, re-exported via `tools/nix/lang-templates.nix`): build Zig projects hermetically; scan `patches/zig` to map `pkg@ver → [patch files]`; apply `NIX_ZIG_DEV_OVERRIDE_JSON` locally (warn) and fail in CI.
+- Nix templates (`build-tools/tools/nix/templates/zig.nix`, re-exported via `build-tools/tools/nix/lang-templates.nix`): build Zig projects hermetically; scan `patches/zig` to map `pkg@ver → [patch files]`; apply `NIX_ZIG_DEV_OVERRIDE_JSON` locally (warn) and fail in CI.
 - Providers: `third_party/providers/defs_zig.bzl` + generated `TARGETS.zig.auto`.
-- Auto-map (`tools/buck/gen-auto-map.ts`): maps `module:` labels to provider names; no code changes needed (existing module label path reused).
+- Auto-map (`build-tools/tools/buck/gen-auto-map.ts`): maps `module:` labels to provider names; no code changes needed (existing module label path reused).
 - Macros (`zig/defs.bzl`): stamp `lang:zig` labels, `kind:*` labels, and append providers from `//lang:auto_map.bzl`.
-- Patching CLI (`tools/patch/patch-zig.ts` delegated by `patch-pkg`): implements start/reset/apply/session with idempotency and glue steps.
+- Patching CLI (`build-tools/tools/patch/patch-zig.ts` delegated by `patch-pkg`): implements start/reset/apply/session with idempotency and glue steps.
 
 ### Path Invariants
 
@@ -68,8 +68,8 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 
 - Label format (reused, language-agnostic): `module:<pkgId>@<version>`
   - We intentionally reuse the `module:` label convention so `gen-auto-map.ts` and provider naming helpers work without change.
-- Provider names are generated via existing `tools/lib/providers.ts` helpers (same as Go): `providerNameForModuleKey(pkgId, version)` → `//third_party/providers:mod_<hash>_<tail>`.
-- Auto-map: Existing logic in `tools/buck/gen-auto-map.ts` already maps `module:` labels to provider names and emits `MODULE_PROVIDERS` keyed by `//pkg:name`.
+- Provider names are generated via existing `build-tools/tools/lib/providers.ts` helpers (same as Go): `providerNameForModuleKey(pkgId, version)` → `//third_party/providers:mod_<hash>_<tail>`.
+- Auto-map: Existing logic in `build-tools/tools/buck/gen-auto-map.ts` already maps `module:` labels to provider names and emits `MODULE_PROVIDERS` keyed by `//pkg:name`.
 
 ---
 
@@ -116,13 +116,13 @@ We add Zig detection and dispatch in the planner (mirrors Go):
 - Templates: `T.zigApp { name, modulesZon, subdir ? ".", patchDir ? ../../patches/zig, devOverrideEnv ? "NIX_ZIG_DEV_OVERRIDE_JSON" }` and `T.zigLib { … }`.
 - Expose `zigTargets` and include them in the aggregated `all` output just like `goTargets`.
 
-Optional mapping support via `tools/nix/mapping.nix`:
+Optional mapping support via `build-tools/tools/nix/mapping.nix`:
 
 - Allow custom aliases (`zig_service`, `my_zig_lib`) mapped to `{ template = "zig"; kind = "bin"|"lib" }`.
 
 ---
 
-## Nix Templates (`tools/nix/templates/zig.nix`)
+## Nix Templates (`build-tools/tools/nix/templates/zig.nix`)
 
 We implement minimal, readable templates that align with the Go pattern and reuse the same patch/override conventions.
 
@@ -175,15 +175,15 @@ Behavior:
 
 ### Generator (zx)
 
-- `tools/buck/sync-providers-zig.ts`:
+- `build-tools/tools/buck/sync-providers-zig.ts`:
   - Scan `patches/zig/*.patch` (flat) and decode filename → `pkgId@version`.
   - Enforce one patch per `pkgId@version` and no subdirectories (warn locally, fail strictly when run in CI or strict mode).
-  - Generate `third_party/providers/TARGETS.zig.auto` deterministically using `providerNameForModuleKey(pkgId, version)` from `tools/lib/providers.ts`.
+  - Generate `third_party/providers/TARGETS.zig.auto` deterministically using `providerNameForModuleKey(pkgId, version)` from `build-tools/tools/lib/providers.ts`.
   - Idempotent and stable ordering.
 
 Integration:
 
-- Extend `tools/buck/sync-providers.ts` orchestrator to call the Zig provider driver alongside existing languages (reuse existing pattern of providers “drivers/index”).
+- Extend `build-tools/tools/buck/sync-providers.ts` orchestrator to call the Zig provider driver alongside existing languages (reuse existing pattern of providers “drivers/index”).
 
 ---
 
@@ -193,7 +193,7 @@ With repo-level WASM facilities in place, Zig should support building WASM outpu
 
 - Targets: `wasm32-wasi` and `wasm32-freestanding` via Zig’s native cross-compilation.
 - Buck macros: add `nix_zig_wasm_library`/`nix_zig_wasm_binary` (or a `wasm = "wasi"|"freestanding"` attribute) that stamp `kind:wasm` and forward the target to the planner.
-- Planner/templates: extend `tools/nix/templates/zig.nix` with `zigWasmLib`/`zigWasmBin` building `.wasm` artifacts; reuse patch/override maps.
+- Planner/templates: extend `build-tools/tools/nix/templates/zig.nix` with `zigWasmLib`/`zigWasmBin` building `.wasm` artifacts; reuse patch/override maps.
 - Tests: freestanding modules loaded with `WebAssembly.instantiate`; WASI with `node:wasi` to validate exports run as expected.
 
 Initial scope: WASI first (best portability), then freestanding where practical.
@@ -205,12 +205,12 @@ Initial scope: WASI first (best portability), then freestanding where practical.
 - `patch-pkg start zig <pkgId>`
   - Resolve current source for `<pkgId@version>` from the Nix derivation’s vendored tree.
   - Create a CoW/APFS copy on macOS (`cp -cR`) or `cp -a` elsewhere.
-  - Record temp dir in `.patch-sessions.json` (reuse `tools/patch/state.ts`).
+  - Record temp dir in `.patch-sessions.json` (reuse `build-tools/tools/patch/state.ts`).
   - Honor `$PATCH_EDITOR` to open the temp dir.
 
 - `patch-pkg apply zig <pkgId>`
   - Generate unified diff against the pristine vendored source and write to `patches/zig/<enc_pkgId>@<version>.patch`.
-  - Run glue: `node tools/buck/sync-providers.ts` → `node tools/buck/gen-auto-map.ts`.
+  - Run glue: `node build-tools/tools/buck/sync-providers.ts` → `node build-tools/tools/buck/gen-auto-map.ts`.
   - Remove dev override (if any) and clean up temp dir.
 
 - `patch-pkg reset zig <pkgId>`
@@ -226,13 +226,13 @@ Idempotency & CI guardrails mirror Go’s.
 ## Glue & CI
 
 - Glue scripts are zx TypeScript and not committed; they run locally and in CI stages:
-  1. Export Graph → `tools/buck/graph.json` (includes Zig nodes/labels).
+  1. Export Graph → `build-tools/tools/buck/graph.json` (includes Zig nodes/labels).
   2. Sync Providers → writes `TARGETS.zig.auto` (and other languages).
   3. Generate auto_map → `third_party/providers/auto_map.bzl`.
   4. Pre-build guard → fail if glue missing/stale.
   5. Build & Test → Buck builds; Nix `graph-generator` may be built as an artifact check.
 
-- `tools/dev/startup-check.ts` additions:
+- `build-tools/tools/dev/startup-check.ts` additions:
   - Ensure `zig` is on PATH; check minimum supported version (assumption: ≥ 0.12).
   - Print platform note similar to other languages.
   - Warn if `NIX_ZIG_DEV_OVERRIDE_JSON` is set; fail in CI.
@@ -246,7 +246,7 @@ Idempotency & CI guardrails mirror Go’s.
 - Auto-map wiring for Zig labels:
   - Confirm `module:<pkg>@<ver>` produces the expected provider name and is attached only to targets carrying that label.
 - E2E provider wiring:
-  - Reuse `tools/tests/e2e-provider-wiring.ts` with `--related <pkg@ver>` for a Zig target; verify presence/absence of providers in `deps(<target>)`.
+  - Reuse `build-tools/tools/tests/e2e-provider-wiring.ts` with `--related <pkg@ver>` for a Zig target; verify presence/absence of providers in `deps(<target>)`.
 - Optional smoke: touching an unrelated `patches/zig/*.patch` does not change rule keys for unrelated Zig targets.
 
 ---
@@ -292,8 +292,8 @@ Idempotency & CI guardrails mirror Go’s.
 
 1. Baseline & Scaffolding
 
-- Create `patches/zig/` (empty), `zig/defs.bzl`, `third_party/providers/defs_zig.bzl` (stamp macro), and `tools/nix/templates/zig.nix`.
-- Wire `tools/buck/sync-providers.ts` to call `sync-providers-zig.ts` driver.
+- Create `patches/zig/` (empty), `zig/defs.bzl`, `third_party/providers/defs_zig.bzl` (stamp macro), and `build-tools/tools/nix/templates/zig.nix`.
+- Wire `build-tools/tools/buck/sync-providers.ts` to call `sync-providers-zig.ts` driver.
 - Tests: provider sync determinism (empty vs with one patch).
 
 2. Exporter Adapter (labels)
@@ -303,7 +303,7 @@ Idempotency & CI guardrails mirror Go’s.
 
 3. Planner Dispatch
 
-- Add Zig detection/dispatch to `graph-generator.nix`; templates `zigApp`/`zigLib` wired in `tools/nix/lang-templates.nix`.
+- Add Zig detection/dispatch to `graph-generator.nix`; templates `zigApp`/`zigLib` wired in `build-tools/tools/nix/lang-templates.nix`.
 - Expose `zigTargets` and include in `all` aggregate.
 - Verify Nix instantiation works and patches/dev overrides are visible in derivations.
 
@@ -314,7 +314,7 @@ Idempotency & CI guardrails mirror Go’s.
 
 5. Patch Flow
 
-- Implement `tools/patch/patch-zig.ts` with start/apply/reset/session.
+- Implement `build-tools/tools/patch/patch-zig.ts` with start/apply/reset/session.
 - On apply: provider sync + auto-map; remove overrides; clean temp.
 - Tests: idempotent apply; duplicate detection; e2e provider wiring.
 
@@ -337,7 +337,7 @@ Idempotency & CI guardrails mirror Go’s.
 ## Appendix: Naming & Encoding
 
 - Filename encoding for patches: `/` → `__` (labels keep `/`).
-- Provider name generation: reuse `tools/lib/providers.ts` (`providerNameForModuleKey`).
+- Provider name generation: reuse `build-tools/tools/lib/providers.ts` (`providerNameForModuleKey`).
 - Env for dev overrides: `NIX_ZIG_DEV_OVERRIDE_JSON` with shape `{ "pkgId@version": "/abs/path" }`.
 
 ---
@@ -349,5 +349,5 @@ This design adds Zig with minimal bespoke logic by reusing our established patte
 ### Mapping and invalidation alignment with current design
 
 - Prefer importer‑scoped lockfile labels for Zig initially (e.g., `lockfile:<path/to/build.zig.zon>#<packageDir>`). Current `gen-auto-map.ts` maps `lockfile:` labels; no changes required.
-- If per‑module `module:<pkgId>@<version>` providers are adopted, extend `tools/buck/gen-auto-map.ts` to translate Zig `module:` labels to provider names; until then, treat `module:` labels as diagnostic.
+- If per‑module `module:<pkgId>@<version>` providers are adopted, extend `build-tools/tools/buck/gen-auto-map.ts` to translate Zig `module:` labels to provider names; until then, treat `module:` labels as diagnostic.
 - Include package‑ or importer‑local patch files in target `srcs` to ensure precise Buck invalidation; provider stamps remain metadata‑only.

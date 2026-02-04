@@ -174,7 +174,7 @@
   "version": 7
 }
 
-# path=tools/nix/overlays/cpp-patches.nix
+# path=build-tools/tools/nix/overlays/cpp-patches.nix
 final: prev:
 let
   root = ../../..;

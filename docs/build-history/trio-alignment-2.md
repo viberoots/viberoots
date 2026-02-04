@@ -8,11 +8,11 @@ The PRs are small, independently reversible, and covered by targeted tests. CI c
 
 ### Description
 
-`tools/nix/graph-generator.nix` currently contains Node CLI bundling logic inline. Extract it into a `LANGS.node` planner plugin (e.g., `tools/nix/planner/node.nix`) so the outer planner remains a small dispatcher. No behavior change.
+`build-tools/tools/nix/graph-generator.nix` currently contains Node CLI bundling logic inline. Extract it into a `LANGS.node` planner plugin (e.g., `build-tools/tools/nix/planner/node.nix`) so the outer planner remains a small dispatcher. No behavior change.
 
 ### Scope & Changes
 
-- Create `tools/nix/planner/node.nix` exposing:
+- Create `build-tools/tools/nix/planner/node.nix` exposing:
   - `isTarget`, `kindOf` (detect `lang:node` + `kind:bin`), `mkApp` for CLI bundling.
 - Register in `graph-generator.nix` via `LANGS` (mirroring Go/CPP discovery).
 - Move the existing Node CLI mk logic (today in `graph-generator.nix`) into the plugin.
@@ -26,7 +26,7 @@ The PRs are small, independently reversible, and covered by targeted tests. CI c
 
 - `nix build .#graph-generator` yields identical Node CLI outputs and `graph-outputs` manifest.
 - Export/build/test flows remain unchanged across supported platforms.
-- No diffs in `tools/buck/graph.json`, `third_party/providers/**`, or Buck build outputs (aside from non‑functional ordering noise, if any).
+- No diffs in `build-tools/tools/buck/graph.json`, `third_party/providers/**`, or Buck build outputs (aside from non‑functional ordering noise, if any).
 
 ### Risks
 
@@ -52,10 +52,10 @@ Go’s `patch-go.ts` writes `NIX_GO_DEV_OVERRIDE_JSON` directly; C++’s `patch-
 
 ### Scope & Changes
 
-- Add `tools/patch/dev-overrides.ts` (get/set/clear JSON map; warn locally; throw in CI if set).
+- Add `build-tools/tools/patch/dev-overrides.ts` (get/set/clear JSON map; warn locally; throw in CI if set).
 - Make `patch-go.ts` use the helper for reads/writes; keep current behavior semantics.
 - Make `patch-cpp.ts` use the helper (support both echo‑snippet and in‑process set as a flag; default to in‑process set for parity).
-- Keep `tools/nix/dev-overrides.nix` unchanged (source of truth inside Nix).
+- Keep `build-tools/tools/nix/dev-overrides.nix` unchanged (source of truth inside Nix).
 
 ### Acceptance Criteria
 
@@ -86,7 +86,7 @@ Both Go and C++ adapters validate “looks like language X but missing labels/ru
 
 ### Scope & Changes
 
-- Add `validateLanguageClassification(nodes, { looksLike, hasRuleType, hasLangLabel, name })` in `tools/buck/exporter/lang/helpers.ts`.
+- Add `validateLanguageClassification(nodes, { looksLike, hasRuleType, hasLangLabel, name })` in `build-tools/tools/buck/exporter/lang/helpers.ts`.
 - Replace inline checks in `exporter/lang/go.ts` and `exporter/lang/cpp.ts` with the helper.
 - Keep severity policy unchanged (exporter main determines warn/error mode).
 
@@ -115,12 +115,12 @@ Both Go and C++ adapters validate “looks like language X but missing labels/ru
 
 ### Description
 
-`tools/buck/exporter/main.ts` emits `tools/buck/node-lock-index.json`. Relocate this to the Node adapter or to the glue step so the exporter core stays adapter‑agnostic.
+`build-tools/tools/buck/exporter/main.ts` emits `build-tools/tools/buck/node-lock-index.json`. Relocate this to the Node adapter or to the glue step so the exporter core stays adapter‑agnostic.
 
 ### Scope & Changes
 
 - Option A (adapter‑local): generate the sidecar from `exporter/lang/node.ts` after label attach.
-- Option B (glue): drop sidecar from exporter and emit it in `tools/buck/gen-provider-index.ts` (already run by `tools/patch/glue.ts`) or add a tiny `gen-lock-index.ts` called from glue.
+- Option B (glue): drop sidecar from exporter and emit it in `build-tools/tools/buck/gen-provider-index.ts` (already run by `build-tools/tools/patch/glue.ts`) or add a tiny `gen-lock-index.ts` called from glue.
 - Keep the file path and schema unchanged.
 
 ### Acceptance Criteria
@@ -152,11 +152,11 @@ Both Go and C++ adapters validate “looks like language X but missing labels/ru
 
 ### Scope & Changes
 
-- Add `tools/patch/lib/apply.ts` with:
+- Add `build-tools/tools/patch/lib/apply.ts` with:
   - flag parsing (`--target`, `--patch-dir`, `--force`),
   - “write canonical patch if changed” logic,
   - verify via `patch -p1 --dry-run`.
-- Extend `tools/lib/providers.ts` (or add `tools/lib/patch-encoding.ts`) with:
+- Extend `build-tools/tools/lib/providers.ts` (or add `build-tools/tools/lib/patch-encoding.ts`) with:
   - `encodeImportPathForPatchFilename()` (existing),
   - `encodeNixAttrForPatchFilename()` (normalize `pkgs.foo` → `pkgs__foo`).
 - Update Go/C++ patch handlers to use both helpers.

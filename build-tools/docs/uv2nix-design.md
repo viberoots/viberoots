@@ -31,7 +31,7 @@
 
 ### Nix Templates (uv2nix realization)
 
-- Replace the current minimal `tools/nix/templates/python/backends/uv.nix` with a uv2nix‑backed builder:
+- Replace the current minimal `build-tools/tools/nix/templates/python/backends/uv.nix` with a uv2nix‑backed builder:
   - Inputs:
     - `lockfile` (repo‑relative), `subdir`, `patchesMap`, `devOverrides`, optional `groups`.
   - Behavior:
@@ -47,7 +47,7 @@
 
 ### Planner Integration
 
-- Keep current Python planner (`tools/nix/planner/python.nix`):
+- Keep current Python planner (`build-tools/tools/nix/planner/python.nix`):
   - Detect `uv.lock` by walking up from package path.
   - Route `kind:bin|lib|test|wasm` consistently.
   - Optionally expose per‑importer flake outputs (e.g., `.#py-<importer>`, and variants with groups) if we add a manifest entry later.
@@ -58,7 +58,7 @@
 
 ### Provider Sync
 
-- No changes: `tools/buck/providers/python.ts` is importer‑scoped and idempotent; it lists only patch_paths that match the importer’s `uv.lock` effective set.
+- No changes: `build-tools/tools/buck/providers/python.ts` is importer‑scoped and idempotent; it lists only patch_paths that match the importer’s `uv.lock` effective set.
 
 ### Provider Rule
 
@@ -132,14 +132,14 @@
 #### PR‑P2: uv2nix-backed backend for pyApp/pyLib (groups optional) — with tests/docs
 
 - Changes:
-  - Implement uv2nix in `tools/nix/templates/python/backends/uv.nix`.
-  - Wire `tools/nix/templates/python.nix` to call uv2nix backend (replacing the stub).
+  - Implement uv2nix in `build-tools/tools/nix/templates/python/backends/uv.nix`.
+  - Wire `build-tools/tools/nix/templates/python.nix` to call uv2nix backend (replacing the stub).
   - Preserve `patchesMap` and `devOverrides` behavior and CI guardrails.
   - Optional: `groups` parameter with deterministic effect on outputs and `BUILD-INFO.json`.
   - Ensure `pyApp` emits a runnable wrapper; `pyLib` emits a reusable overlay/site.
 - Pinning and inputs (required):
   - Add a pinned `uv2nix` input to `flake.nix` (e.g., `inputs.uv2nix.url = "github:<org>/uv2nix/<rev>"`; follow the repo’s pinning conventions).
-  - Route the backend through a tiny adapter module (e.g., `tools/nix/uv2nix-adapter.nix`) that:
+  - Route the backend through a tiny adapter module (e.g., `build-tools/tools/nix/uv2nix-adapter.nix`) that:
     - Imports `uv2nix` from flake inputs.
     - Exposes a pure function to realize environments from `uv.lock` using only Nix store paths (no network).
     - Accepts `groups = []` and makes them part of the derivation key.

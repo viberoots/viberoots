@@ -8,10 +8,10 @@ Ensure the prebuild guard’s freshness detection accounts for Python importer c
 
 ### Scope & Changes
 
-- tools/buck/prebuild/scan.ts
+- build-tools/tools/buck/prebuild/scan.ts
   - Add uv.lock to the input filters in both git-based discovery and the filesystem fallback walker.
   - No changes to outputs listing; presence/coverage logic remains in presence.ts and coverage.ts.
-  - Tests: add tools/tests/prebuild/freshness.uv-lock.stale-triggers-fix.test.ts
+  - Tests: add build-tools/tools/tests/prebuild/freshness.uv-lock.stale-triggers-fix.test.ts
     - Temp repo with apps/pytool/uv.lock and valid glue → touch uv.lock → guard marks stale and auto-fixes locally.
   - Docs: update docs/python-wasm-wasi.md
     - Add a “Prebuild guard” subsection noting freshness inputs include uv.lock and describing the local auto-fix vs CI-fail behavior.
@@ -48,10 +48,10 @@ Generalize provider coverage fallback to read all TARGETS.\*.auto files (Python 
 
 ### Scope & Changes
 
-- tools/buck/prebuild/coverage.ts
+- build-tools/tools/buck/prebuild/coverage.ts
   - When provider*index.json lacks an entry for an expected importer provider (lf*_), search across every file matching third_party/providers/TARGETS._.auto for a matching rule stanza.
   - Keep the current fast path via provider_index; only use the autos scan as a fallback.
-  - Tests: add tools/tests/prebuild/coverage.python-provider-fallback.test.ts
+  - Tests: add build-tools/tools/tests/prebuild/coverage.python-provider-fallback.test.ts
     - With provider_index absent/stale but TARGETS.python.auto present and correct, coverage reports success for Python importers.
   - Docs: update build-tools/docs/build-system-design.md
     - Brief note in the “Prebuild guard / provider coverage” area that fallback checks scan TARGETS.\*.auto (including Python), with provider_index as the primary source.
@@ -87,11 +87,11 @@ Add a precise diagnostic for Python importers missing corresponding providers (a
 
 ### Scope & Changes
 
-- tools/buck/prebuild/presence.ts
+- build-tools/tools/buck/prebuild/presence.ts
   - Implement findMissingPythonImporterProviders(): discover \*\*/uv.lock via git (fallback: FS), compute importer label (dirname or "."), derive expected provider via providerNameForImporter, and check for a matching python_importer_deps in TARGETS.python.auto.
-- tools/buck/prebuild/main.ts
+- build-tools/tools/buck/prebuild/main.ts
   - Integrate the Python check alongside Node’s; in CI, fail with a targeted error; locally, run auto-fix and re-check.
-  - Tests: update tools/tests/prebuild/guard.python-importers.presence-and-autofix.test.ts
+  - Tests: update build-tools/tools/tests/prebuild/guard.python-importers.presence-and-autofix.test.ts
     - Assert precise missing-provider diagnostics for Python and successful local auto-fix.
   - Docs: update docs/python-wasm-wasi.md
     - Extend the “Prebuild guard” subsection with a short “Missing provider diagnostics and auto-fix” paragraph for Python importers.

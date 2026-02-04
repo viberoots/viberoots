@@ -7,7 +7,7 @@ Stamping ensures exporter preconditions via consistent labels applied in macros.
 - **Helpers**: use `lang/defs_common.bzl: stamp_labels(kwargs, lang, kind)` to add `lang:<id>` and optional `kind:<k>`.
   - `kind:*` must be in the shared vocabulary:
     - Starlark: `lang/defs_common.bzl: allowed_kind_values` / `is_allowed_kind_value`
-    - TypeScript: `tools/lib/kind-vocabulary.ts`
+    - TypeScript: `build-tools/tools/lib/kind-vocabulary.ts`
   - Examples used in this repo include: `kind:bin`, `kind:lib`, `kind:test`, `kind:bundle`, `kind:app`, `kind:packaging`, `kind:addon`, `kind:carchive`, `kind:gen`, and `kind:wasm`.
 - **Importer-scoped ecosystems (Node, Python)**: avoid bespoke wiring. Use the unified helper (re-exported from `lang/defs_common.bzl`) so lockfile enforcement, patch inputs, and provider edge realization stay drift-free.
   - Use `prepare_language_wiring(...)` with `wiring = "genrule"` for genrule-style wrappers.
@@ -69,7 +69,7 @@ wire_global_nix_inputs(kw, into = "srcs", stamp = False)
 - **Package-local WASM macros (Go, C++)**: do not hand-roll ordering-sensitive wiring.
   - Use `lang/defs_common.bzl:prepare_language_wiring(...)` with `wasm_variant = "<variant>"` to compose WASM stamping, patch inputs, and provider edges.
   - For planner-visible package-local WASM stubs, use `lang/defs_common.bzl:wire_package_local_wasm_planner_visible_stub(...)`.
-- **Lint**: run `node tools/dev/stamping-lint.ts` to detect missing or invalid labels.
+- **Lint**: run `node build-tools/tools/dev/stamping-lint.ts` to detect missing or invalid labels.
 - **Tests**: negative test should demonstrate a missing label is flagged with a clear message.
 
 #### C++ macro core
@@ -80,10 +80,10 @@ For C++ macros that build via Nix (`nix_cpp_library`, `nix_cpp_binary`, `nix_cpp
 
 Ensure artifact/name sanitization in Starlark matches the canonical implementation used by Nix planners.
 
-- Canonical helper: `tools/nix/lib/lang-helpers.nix: sanitizeName`.
+- Canonical helper: `build-tools/tools/nix/lib/lang-helpers.nix: sanitizeName`.
 - Macro parity: use `lang/sanitize.bzl:sanitize_name` directly in macros to stay in strict parity with the Nix helper for `//`, `:`, `/`, spaces, case, and non‑alnum characters.
-- TypeScript policy: tooling scripts must not hand-roll this sanitizer. Use `tools/lib/sanitize.ts:sanitizeName` to keep TS ↔ Nix ↔ Starlark parity stable.
-- Tests: `tools/tests/cpp/sanitize-name.parity.test.ts` runs a parity matrix through the `cpp_sanitize_probe` rule and compares to the Nix helper. Update either side if parity breaks.
+- TypeScript policy: tooling scripts must not hand-roll this sanitizer. Use `build-tools/tools/lib/sanitize.ts:sanitizeName` to keep TS ↔ Nix ↔ Starlark parity stable.
+- Tests: `build-tools/tools/tests/cpp/sanitize-name.parity.test.ts` runs a parity matrix through the `cpp_sanitize_probe` rule and compares to the Nix helper. Update either side if parity breaks.
 
 Importer string shaping (Node Nix-calling macros):
 

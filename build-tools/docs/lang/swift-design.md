@@ -33,7 +33,7 @@ I follow the repo-wide linking model described in `cpp-linking.md`, `build-tools
 - `deps` is the Buck graph edge list. It does not imply link intent.
 - `link_deps` declares linkable inputs. `header_deps` is include-only when that concept applies.
 - Macros compute `deps := deps ∪ link_deps ∪ header_deps` deterministically and validate `link_closure_overrides` keys.
-- `link_closure` defaults to `"direct"`. `"transitive"` follows `link_deps` only via `tools/nix/planner/link-closure.nix`.
+- `link_closure` defaults to `"direct"`. `"transitive"` follows `link_deps` only via `build-tools/tools/nix/planner/link-closure.nix`.
 - Ordering is deterministic and unsupported deps fail fast with targeted errors.
 
 ### C interop requirement
@@ -47,7 +47,7 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
 - Provider wiring: load `MODULE_PROVIDERS` from `//lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
 - Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
-- Patch model contract: `lang/lang_contracts.bzl` and `tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
+- Patch model contract: `lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
 
 ---
@@ -55,7 +55,7 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 ## Path Invariants and Naming
 
 - Patches live at `patches/swift/*.patch`, one patch per `identity@version` (flat dir, no subdirectories).
-- Language templates live under `tools/nix/templates/swift.nix` and are imported by `tools/nix/lang-templates.nix`.
+- Language templates live under `build-tools/tools/nix/templates/swift.nix` and are imported by `build-tools/tools/nix/lang-templates.nix`.
 - Language macros live under `swift/defs.bzl` and use `//lang:auto_map.bzl`.
 - Provider rules for Swift live under `//third_party/providers/**` and are generated (e.g., `TARGETS.swift.auto`).
 - Dev overrides environment variable: `NIX_SWIFT_DEV_OVERRIDE_JSON` with shape `{ "identity@version": "/abs/local/override" }`.
@@ -65,7 +65,7 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 ## High‑Level Architecture (mirrors Go/Node)
 
 1. Buck2 remains orchestrator, exporter emits labels for Swift targets.
-2. Nix `graph-generator.nix` routes Swift targets to `tools/nix/templates/swift.nix` functions (`swiftApp`, `swiftLib`).
+2. Nix `graph-generator.nix` routes Swift targets to `build-tools/tools/nix/templates/swift.nix` functions (`swiftApp`, `swiftLib`).
 3. Provider sync scans `patches/swift/*.patch` and writes `third_party/providers/TARGETS.swift.auto`.
 4. Auto‑map translates Swift labels → provider deps and macros append them to target deps.
 5. `patch-pkg` adds a Swift handler to start/reset/apply/session for SPM packages.
@@ -78,7 +78,7 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 
 - Add Swift to the planner dispatch. Detection rules:
   - Prefer stamped labels by macros: `lang:swift`, `kind:bin|lib|test`.
-  - Fallback: custom `swift_*` rule types (if present) or mapping via `tools/nix/mapping.nix`.
+  - Fallback: custom `swift_*` rule types (if present) or mapping via `build-tools/tools/nix/mapping.nix`.
 
 Template selection:
 
@@ -94,7 +94,7 @@ Inputs forwarded to templates:
 
 ---
 
-## Nix Language Templates (tools/nix/templates/swift.nix)
+## Nix Language Templates (build-tools/tools/nix/templates/swift.nix)
 
 Design principles:
 
@@ -209,7 +209,7 @@ Notes:
 
 With repository WASM/WASI facilities available, Swift can target WASM via the emerging Swift WASI toolchain:
 
-- Planner/templates: add `swiftWasiApp` to `tools/nix/templates/swift.nix` that drives `swift build` for a WASI target when supported; reuse patch/override maps.
+- Planner/templates: add `swiftWasiApp` to `build-tools/tools/nix/templates/swift.nix` that drives `swift build` for a WASI target when supported; reuse patch/override maps.
 - Buck macros: introduce a `nix_swift_wasm_binary` (or `wasm = "wasi"`) that stamps `kind:wasm` and forwards configuration to the planner.
 - Tests: execute minimal exports under `node:wasi` and assert behavior.
 
@@ -217,7 +217,7 @@ Status: toolchain maturity varies; treat as a later phase without blocking basel
 
 ---
 
-## Exporter Labels (tools/buck/export-graph.ts)
+## Exporter Labels (build-tools/tools/buck/export-graph.ts)
 
 Two‑phase labeling strategy:
 
@@ -259,12 +259,12 @@ def swift_package_patch(name, package_key, patch_path):
     )
 ```
 
-### Generator (zx): tools/buck/sync-providers-swift.ts
+### Generator (zx): build-tools/tools/buck/sync-providers-swift.ts
 
 Behavior mirrors Go and Node generators:
 
 - Scan `patches/swift/*.patch`; decode `identity@version`; enforce one patch per key; warn on subdirs.
-- Name providers deterministically using `tools/lib/providers.ts` (reuse `providerNameForModuleKey`, or introduce a small `providerNameForSpmKey` alias that calls the same helper to keep naming uniform).
+- Name providers deterministically using `build-tools/tools/lib/providers.ts` (reuse `providerNameForModuleKey`, or introduce a small `providerNameForSpmKey` alias that calls the same helper to keep naming uniform).
 - Emit `third_party/providers/TARGETS.swift.auto` with sorted rules.
 
 ```ts
@@ -314,7 +314,7 @@ await fs.outputFile(OUT, header + entries.join("\n") + "\n");
 console.log("wrote", OUT);
 ```
 
-### Auto‑map (tools/buck/gen-auto-map.ts)
+### Auto‑map (build-tools/tools/buck/gen-auto-map.ts)
 
 Extend existing mapping logic to understand `spm:` labels (treated like `module:`), or, for Phase A, rely purely on existing lockfile mapping since the label is `lockfile:...#importer`.
 
@@ -368,7 +368,7 @@ Notes:
 
 ## Patch Workflow (patch-pkg)
 
-Add a Swift handler (`tools/patch/patch-swift.ts`) implementing the shared `LanguageHandler` interface:
+Add a Swift handler (`build-tools/tools/patch/patch-swift.ts`) implementing the shared `LanguageHandler` interface:
 
 - `start <identity>`: Locate the Swift package in the Nix store (from the resolved lock), or fetch the exact revision, then create a writable temp dir. If `$PATCH_EDITOR` is set, open it.
 - `session <identity>`: Like start; Ctrl‑D applies; Ctrl‑C resets.
@@ -386,7 +386,7 @@ Idempotency:
 
 Stages mirror existing design:
 
-1. Export Graph → writes `tools/buck/graph.json` (Swift adapter included but may start in lockfile mode only).
+1. Export Graph → writes `build-tools/tools/buck/graph.json` (Swift adapter included but may start in lockfile mode only).
 2. Sync Providers (Go + Swift + Node) → updates `TARGETS*.auto`.
 3. Generate auto_map → writes `third_party/providers/auto_map.bzl`.
 4. Pre‑build guard → ensures glue freshness.
@@ -402,7 +402,7 @@ Pre‑build guard additions:
 
 - Provider determinism tests (zx): one‑test‑per‑file verifying idempotent sync and collision detection for Swift patches.
 - Auto‑map wiring tests (zx): ensure Swift targets labeled with lockfile or `spm:` labels receive the correct providers and exclude irrelevant ones.
-- E2E provider‑wiring (zx): replicate existing `tools/tests/e2e-provider-wiring.ts` pattern with Swift examples.
+- E2E provider‑wiring (zx): replicate existing `build-tools/tools/tests/e2e-provider-wiring.ts` pattern with Swift examples.
 
 Timeout conventions and coverage flags match repository standards.
 
@@ -412,9 +412,9 @@ Timeout conventions and coverage flags match repository standards.
 
 ### Phase A — Minimal Enablement
 
-- Add `tools/buck/sync-providers-swift.ts`, `third_party/providers/defs_swift.bzl`.
+- Add `build-tools/tools/buck/sync-providers-swift.ts`, `third_party/providers/defs_swift.bzl`.
 - Extend `gen-auto-map.ts` if needed for `spm:` later; for now ensure lockfile labels work.
-- Wire planner dispatch and `tools/nix/templates/swift.nix` with SPM build using `Package.resolved` only.
+- Wire planner dispatch and `build-tools/tools/nix/templates/swift.nix` with SPM build using `Package.resolved` only.
 - Add macros `swift/defs.bzl` (stamp labels, append providers).
 - Add `patch-pkg` Swift handler with `start/apply/reset/session` minimal flow.
 
@@ -435,7 +435,7 @@ Acceptance:
 ### Phase C — Dev Overrides
 
 - Enable `NIX_SWIFT_DEV_OVERRIDE_JSON` in templates (warn local, throw in CI).
-- Add `tools/dev/clear-overrides.ts` parity for Swift variable.
+- Add `build-tools/tools/dev/clear-overrides.ts` parity for Swift variable.
 
 Acceptance:
 
@@ -500,7 +500,7 @@ Acceptance:
 ## Completion Criteria (Phase 1)
 
 - `patches/swift/` exists; `sync-providers-swift.ts` generates deterministic `TARGETS.swift.auto` from patches.
-- Planner dispatch routes Swift targets to `swiftApp/swiftLib` templates in `tools/nix/templates/swift.nix`.
+- Planner dispatch routes Swift targets to `swiftApp/swiftLib` templates in `build-tools/tools/nix/templates/swift.nix`.
 - Swift targets carry lockfile labels and auto‑map includes Swift providers for those targets.
 - `patch-pkg` supports Swift with start/apply/reset/session and updates glue automatically.
 - Pre‑build guard enforces presence of Swift provider files when Swift patches exist.

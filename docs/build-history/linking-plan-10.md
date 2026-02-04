@@ -6,7 +6,7 @@ This plan closes the remaining gaps from the C++ linking assessment and aligns b
 
 This plan assumes the shared link intent contract and current C++ linking phases are in place:
 
-- `tools/nix/planner/link-closure.nix` exists and is used by the C++ planner
+- `build-tools/tools/nix/planner/link-closure.nix` exists and is used by the C++ planner
 - C++ macros accept `link_deps`, `header_deps`, `link_closure`, and `link_closure_overrides`
 - Exporter surfaces link intent attributes in the graph
 - Shared library template `cppSharedLib` exists and builds a `.so` or `.dylib`
@@ -23,19 +23,19 @@ This PR makes `header_deps` behave as header-only include inputs even when the d
 
 This PR makes the following changes:
 
-- Update `tools/nix/planner/cpp.nix` to pass header-only packages for `header_deps` even when the dep is a library.
+- Update `build-tools/tools/nix/planner/cpp.nix` to pass header-only packages for `header_deps` even when the dep is a library.
 - Ensure link inputs are derived only from `link_deps`, not from `header_deps`.
-- Refactor `tools/nix/planner/cpp.nix` into smaller helper modules so each file is within the 250 line limit.
+- Refactor `build-tools/tools/nix/planner/cpp.nix` into smaller helper modules so each file is within the 250 line limit.
 - Keep existing link intent overlap behavior unchanged. If a dep is in both lists, it remains a link dep and a header dep, but header-only handling applies only to the header list.
 
 ### Tests (in this PR)
 
 I add zx tests (one test per file):
 
-- `tools/tests/cpp/cpp.header-deps.library.does-not-link.test.ts`
+- `build-tools/tools/tests/cpp/cpp.header-deps.library.does-not-link.test.ts`
   - define a C++ library with headers and a binary that lists it only in `header_deps`
   - assert the binary build log does not include `-l<lib>` for that dep
-- `tools/tests/cpp/cpp.header-deps.library.still-compiles.test.ts`
+- `build-tools/tools/tests/cpp/cpp.header-deps.library.still-compiles.test.ts`
   - compile a binary that includes the library headers and uses inline or header-only constructs
   - prove the build succeeds without link inputs for that library
 
@@ -90,7 +90,7 @@ This PR makes the following changes:
 
 I add zx tests (one test per file):
 
-- `tools/tests/cpp/cpp.link-intent.overlap.link-and-header-deps.allowed.builds.test.ts`
+- `build-tools/tools/tests/cpp/cpp.link-intent.overlap.link-and-header-deps.allowed.builds.test.ts`
   - define a target where one dep appears in both lists
   - verify the build succeeds and link order is deterministic
 

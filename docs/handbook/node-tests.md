@@ -39,7 +39,7 @@ To locate `$OUT`, you can build the derivation and print the path:
 nix build .#node-test.<importer-sanitized> --no-link --print-out-paths
 ```
 
-The `<importer-sanitized>` segment must use the canonical sanitizer (`tools/lib/sanitize.ts:sanitizeName`) to stay in parity with `tools/nix/lib/lang-helpers.nix:sanitizeName`.
+The `<importer-sanitized>` segment must use the canonical sanitizer (`build-tools/tools/lib/sanitize.ts:sanitizeName`) to stay in parity with `build-tools/tools/nix/lib/lang-helpers.nix:sanitizeName`.
 
 ### Notes
 
@@ -99,6 +99,6 @@ Coverage artifacts are emitted under the derivation output.
 - No tests matched: the runner passes (useful during bootstrap).
 - Tests matched, Vitest missing: add `vitest` to devDependencies for the importer.
 - Lockfile/provider glue: re-run glue stages if lockfiles change:
-  - `node tools/buck/export-graph.ts`
-  - `node tools/buck/sync-providers.ts --lang node --no-glue`
-  - `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
+  - `node build-tools/tools/buck/export-graph.ts`
+  - `node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`
+  - `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`

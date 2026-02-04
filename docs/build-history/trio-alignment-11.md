@@ -6,11 +6,11 @@ This plan lands small, high‑value refinements to keep abstractions tight, redu
 
 ### Description
 
-Unify `patch-node` with Go/C++ patch handlers by reusing shared helpers for repo‑root detection and filesystem checks. Today, `tools/patch/patch-node.ts` carries local implementations for `pathExists` and repo root resolution. This refactor reduces duplication and ensures consistent behavior across languages.
+Unify `patch-node` with Go/C++ patch handlers by reusing shared helpers for repo‑root detection and filesystem checks. Today, `build-tools/tools/patch/patch-node.ts` carries local implementations for `pathExists` and repo root resolution. This refactor reduces duplication and ensures consistent behavior across languages.
 
 ### Scope & Changes
 
-- `tools/patch/patch-node.ts`:
+- `build-tools/tools/patch/patch-node.ts`:
   - Replace local `pathExists()` with `./lib/util.pathExists`.
   - Replace `repoRootFromScript()` + ad‑hoc cwd juggling with `repoRoot()` from `./lib/apply` where appropriate.
   - Preserve existing CLI flags and glue invocation.
@@ -19,8 +19,8 @@ Unify `patch-node` with Go/C++ patch handlers by reusing shared helpers for repo
 
 ### Acceptance Criteria
 
-- `tools/bin/patch-pkg start|apply|reset|session node …` works identically pre/post.
-- No changes to `tools/buck/sync-providers.ts` or `gen-auto-map.ts` outputs when running the same sequence.
+- `build-tools/tools/bin/patch-pkg start|apply|reset|session node …` works identically pre/post.
+- No changes to `build-tools/tools/buck/sync-providers.ts` or `gen-auto-map.ts` outputs when running the same sequence.
 - zx tests that exercise Node patching continue to pass locally and in CI.
 
 ### Risks
@@ -47,10 +47,10 @@ Add a lightweight lint that enforces flat patch directories (no subdirectories) 
 
 ### Scope & Changes
 
-- `tools/dev/lint-patch-dirs.ts` (new):
-  - Uses `tools/lib/provider-sync.validateFlatDir()` to check `patches/go`, `patches/cpp`, and `patches/node` (when present).
+- `build-tools/tools/dev/lint-patch-dirs.ts` (new):
+  - Uses `build-tools/tools/lib/provider-sync.validateFlatDir()` to check `patches/go`, `patches/cpp`, and `patches/node` (when present).
   - Warns locally; can be elevated to error via `--strict` or `CI=true`.
-- `tools/dev/install-deps.ts`:
+- `build-tools/tools/dev/install-deps.ts`:
   - Invoke the lint early (warn mode) to surface issues during routine workflows.
 - Documentation:
   - Add a brief note under patching handbook about flat directories and the lint behavior.
@@ -81,14 +81,14 @@ Implement.
 
 ### Description
 
-Consolidate ad‑hoc argument parsing in patchers/generators to `tools/lib/cli.ts` helpers (e.g., `getFlagStr`, `getFlagBool`), maintaining the current flag surface. This reduces bespoke parsing and improves testability.
+Consolidate ad‑hoc argument parsing in patchers/generators to `build-tools/tools/lib/cli.ts` helpers (e.g., `getFlagStr`, `getFlagBool`), maintaining the current flag surface. This reduces bespoke parsing and improves testability.
 
 ### Scope & Changes
 
-- `tools/patch/patch-node.ts`, `tools/patch/patch-cpp.ts`, `tools/patch/patch-go.ts`:
-  - Replace hand‑rolled parsing for common flags (`--importer`, `--target`, `--patch-dir`, `--force`) with `tools/lib/cli.ts` when feasible without altering UX.
+- `build-tools/tools/patch/patch-node.ts`, `build-tools/tools/patch/patch-cpp.ts`, `build-tools/tools/patch/patch-go.ts`:
+  - Replace hand‑rolled parsing for common flags (`--importer`, `--target`, `--patch-dir`, `--force`) with `build-tools/tools/lib/cli.ts` when feasible without altering UX.
 - Generators (only where not already standardized):
-  - Audit `tools/buck/*` zx scripts; ensure `getFlagStr/Bool` usage is consistent (many already comply).
+  - Audit `build-tools/tools/buck/*` zx scripts; ensure `getFlagStr/Bool` usage is consistent (many already comply).
 - Documentation:
   - Update developer snippets to reflect consistent flags/help across patchers.
 
@@ -121,11 +121,11 @@ Split oversized files into focused modules to improve readability and align with
 
 ### Scope & Changes
 
-- `tools/nix/graph-generator.nix` (~480+ lines):
-  - Extract small helper modules (e.g., target selection, language collection, manifest/bin linking) under `tools/nix/planner/` and import them in the main file.
-- `tools/nix/templates/cpp.nix` (~350+ lines):
+- `build-tools/tools/nix/graph-generator.nix` (~480+ lines):
+  - Extract small helper modules (e.g., target selection, language collection, manifest/bin linking) under `build-tools/tools/nix/planner/` and import them in the main file.
+- `build-tools/tools/nix/templates/cpp.nix` (~350+ lines):
   - Split into `cpp-app.nix`, `cpp-lib.nix`, `cpp-test.nix` and re‑export from a thin `cpp.nix` facade.
-- `tools/patch/patch-cpp.ts` (~430+ lines):
+- `build-tools/tools/patch/patch-cpp.ts` (~430+ lines):
   - Extract `resolve.ts` (nixpkgs resolution), `extract.ts` (source materialization), and `apply.ts` (diff/write/verify), imported by a thin top‑level file.
 - Tests/Docs:
   - Ensure zx tests reference stable entrypoints; add brief notes in internal docs indicating module locations.
@@ -133,7 +133,7 @@ Split oversized files into focused modules to improve readability and align with
 ### Acceptance Criteria
 
 - `nix build .#graph-generator` and representative Buck builds/tests succeed unchanged.
-- No diffs in generated artifacts (`tools/buck/graph.json` consumers, provider outputs) for unchanged inputs.
+- No diffs in generated artifacts (`build-tools/tools/buck/graph.json` consumers, provider outputs) for unchanged inputs.
 - zx tests pass without updates beyond import path adjustments (if any).
 
 ### Risks
@@ -152,17 +152,17 @@ Temporary churn in diffs/imports; reviewers must scan module boundaries once.
 
 Implement.
 
-## PR‑5: Optional — Extract PNPM lock traversal to `tools/lib/pnpm-lock.ts`
+## PR‑5: Optional — Extract PNPM lock traversal to `build-tools/tools/lib/pnpm-lock.ts`
 
 ### Description
 
-Factor the importer‑scoped PNPM lock traversal into a shared library reused by `tools/buck/providers/node.ts` (and optional diagnostics). Preserve current behavior and output determinism.
+Factor the importer‑scoped PNPM lock traversal into a shared library reused by `build-tools/tools/buck/providers/node.ts` (and optional diagnostics). Preserve current behavior and output determinism.
 
 ### Scope & Changes
 
-- `tools/lib/pnpm-lock.ts` (new):
+- `build-tools/tools/lib/pnpm-lock.ts` (new):
   - Parse lockfile, construct dependency graph, compute importer effective set (including peer resolution), and expose stable APIs.
-- `tools/buck/providers/node.ts`:
+- `build-tools/tools/buck/providers/node.ts`:
   - Replace in‑file traversal with calls to the new library; keep naming, ordering, and output identical.
 - Tests:
   - Reuse existing zx tests for provider wiring; add a focused unit test for effective‑set computation with peers to guard behavior.

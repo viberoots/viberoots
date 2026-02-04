@@ -26,14 +26,14 @@ These are shared across all three efforts:
   - `link_closure = "direct" | "transitive"`
   - optional `link_closure_overrides` (per-dep)
   - deterministic traversal over the link graph (follow `link_deps`)
-  - canonical implementation: `tools/nix/planner/link-closure.nix` (`resolveLinkClosure`)
+  - canonical implementation: `build-tools/tools/nix/planner/link-closure.nix` (`resolveLinkClosure`)
 - **Exporter attribute surface**:
   - ensure `link_deps`, `header_deps`, `link_closure`, and `link_closure_overrides` are exported where needed
 
 Recommended shared implementation points:
 
 - **Starlark**: `//lang:defs_common.bzl` (or `//lang:importer_wiring.bzl` where importer-scoped) for deterministic union and validation.
-- **Nix**: `tools/nix/planner/link-closure.nix` for deterministic closure resolution.
+- **Nix**: `build-tools/tools/nix/planner/link-closure.nix` for deterministic closure resolution.
 
 ## Proposed sequence (phased)
 
@@ -44,10 +44,10 @@ Scope:
 - Implement the shared Starlark helper(s) for:
   - deterministic union of deps/link_deps/header_deps
   - optional validation of `link_closure_overrides`
-- Implement `tools/nix/planner/link-closure.nix` used by:
-  - C++ planner (`tools/nix/planner/cpp.nix`)
-  - Go planner (`tools/nix/planner/go.nix`) for Wasm linking
-  - Python planner (`tools/nix/planner/python.nix`) for extension modules (when added)
+- Implement `build-tools/tools/nix/planner/link-closure.nix` used by:
+  - C++ planner (`build-tools/tools/nix/planner/cpp.nix`)
+  - Go planner (`build-tools/tools/nix/planner/go.nix`) for Wasm linking
+  - Python planner (`build-tools/tools/nix/planner/python.nix`) for extension modules (when added)
 - Ensure exporter JSON includes the intent attributes for targets that use them.
 
 Acceptance:

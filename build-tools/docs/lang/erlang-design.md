@@ -21,7 +21,7 @@ I follow the repo-wide linking model described in `cpp-linking.md`, `build-tools
 - `deps` is the Buck graph edge list. It does not imply link intent.
 - `link_deps` declares linkable inputs. `header_deps` is include-only when that concept applies.
 - Macros compute `deps := deps ∪ link_deps ∪ header_deps` deterministically and validate `link_closure_overrides` keys.
-- `link_closure` defaults to `"direct"`. `"transitive"` follows `link_deps` only via `tools/nix/planner/link-closure.nix`.
+- `link_closure` defaults to `"direct"`. `"transitive"` follows `link_deps` only via `build-tools/tools/nix/planner/link-closure.nix`.
 - Ordering is deterministic and unsupported deps fail fast with targeted errors.
 
 ### C interop requirement
@@ -35,19 +35,19 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
 - Provider wiring: load `MODULE_PROVIDERS` from `//lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
 - Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
-- Patch model contract: `lang/lang_contracts.bzl` and `tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
+- Patch model contract: `lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
 
 ### Path Invariants (must‑follow)
 
 - **Patches**: `patches/erlang/` (flat directory; one file per `pkg@version`), no subdirectories.
-- **Nix templates**: `tools/nix/templates/erlang.nix` (exposed by `tools/nix/lang-templates.nix`).
-- **Planner integration**: `tools/nix/planner/erlang.nix` or a small addition in `graph-generator.nix` registry that imports planner helpers if present.
+- **Nix templates**: `build-tools/tools/nix/templates/erlang.nix` (exposed by `build-tools/tools/nix/lang-templates.nix`).
+- **Planner integration**: `build-tools/tools/nix/planner/erlang.nix` or a small addition in `graph-generator.nix` registry that imports planner helpers if present.
 - **Buck macros**: `erlang/defs.bzl` using `lang/defs_common.bzl` helpers; macros inject providers from `//lang:auto_map.bzl`.
 - **Provider rules**: `//third_party/providers/defs_erlang.bzl` with `erlang_lockfile_deps(...)` (tiny genrule stamp), and an auto‑generated `third_party/providers/TARGETS.erlang.auto`.
-- **Provider driver**: `tools/buck/providers/erlang.ts`; orchestrated by `tools/buck/sync-providers.ts` alongside Go/Node.
-- **Capability gating**: Add `erlang` entry to `tools/nix/langs.json` (requiredPaths include the files above) so sparse checkouts cleanly disable Erlang glue.
-- **Glue**: zx scripts under `tools/buck/` and shared helpers in `tools/lib/` (reuse existing patterns).
+- **Provider driver**: `build-tools/tools/buck/providers/erlang.ts`; orchestrated by `build-tools/tools/buck/sync-providers.ts` alongside Go/Node.
+- **Capability gating**: Add `erlang` entry to `build-tools/tools/nix/langs.json` (requiredPaths include the files above) so sparse checkouts cleanly disable Erlang glue.
+- **Glue**: zx scripts under `build-tools/tools/buck/` and shared helpers in `build-tools/tools/lib/` (reuse existing patterns).
 
 ### Key Assumptions (to validate)
 
@@ -71,7 +71,7 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 - **Nix**: Templates `erlangApp`/`erlangLib` consume the lockfile path and optional dev overrides (`NIX_ERLANG_DEV_OVERRIDE_JSON`), apply patches deterministically by scanning `patches/erlang/`, and perform the Rebar3 build under `beamPackages`.
 - **Patching UX**: `patch-pkg` gets an Erlang handler mirroring Go/Node flows: `start`, `apply`, `reset`, `session`; canonical patch filenames in `patches/erlang/`.
 
-### Nix Templates (tools/nix/templates/erlang.nix)
+### Nix Templates (build-tools/tools/nix/templates/erlang.nix)
 
 - Expose functions analogous to Go:
   - `erlangApp { name, lockfilePath, projectDir ? ".", patchDir ? ../../patches/erlang, devOverrideEnv ? "NIX_ERLANG_DEV_OVERRIDE_JSON" }`
@@ -82,27 +82,27 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
   - Read `devOverrideEnv` and decode JSON → `{ key → /abs/local/path }`. Fail in CI if non‑empty (matching Go/Node policy).
   - Use a fixed‑output derivation for fetched deps keyed by `rebar.lock` (see risks below). Build app/lib via Rebar3 with `src` patched/overridden according to maps.
   - Respect conventional excludes for vendored paths (`_build`, `deps`, `vendor`) to avoid double counting.
-  - Keep the template tiny; complex logic lives in shared Nix helpers under `tools/nix/planner` if needed.
+  - Keep the template tiny; complex logic lives in shared Nix helpers under `build-tools/tools/nix/planner` if needed.
 
 ### Planner Dispatch (graph-generator.nix)
 
 - Detect Erlang targets via either:
   - `rule_type` prefix `erlang_...` (if/when we add such macros), or
   - `labels` containing `lang:erlang` (stamped by the macros).
-- For detected targets, call `T.erlangApp` or `T.erlangLib` from `tools/nix/lang-templates.nix` with `{ name, lockfilePath, projectDir }` resolved from attributes/macros.
+- For detected targets, call `T.erlangApp` or `T.erlangLib` from `build-tools/tools/nix/lang-templates.nix` with `{ name, lockfilePath, projectDir }` resolved from attributes/macros.
 - Keep dispatch simple; all policy belongs in the Nix template and macros.
-- Optional: support custom rule names via `tools/nix/mapping.nix` (dispatch table), mirroring the Go mapping pattern.
+- Optional: support custom rule names via `build-tools/tools/nix/mapping.nix` (dispatch table), mirroring the Go mapping pattern.
 
 ### Labels and Auto‑Map
 
 - **Target label**: `lockfile:<path/to/rebar.lock>#<importer>` attached to each Erlang target.
-- **Mapping**: Reuse `tools/lib/providers.ts` `providerNameForImporter(lockfilePath, importer)` to generate provider target names (same hashing/suffix scheme used for Node).
-- **Auto‑map**: Extend `tools/buck/gen-auto-map.ts` (if necessary) to treat Erlang lockfile labels exactly like Node’s: translate to `//third_party/providers:<name>`, dedupe, sort, emit under `MODULE_PROVIDERS` for use in macros.
+- **Mapping**: Reuse `build-tools/tools/lib/providers.ts` `providerNameForImporter(lockfilePath, importer)` to generate provider target names (same hashing/suffix scheme used for Node).
+- **Auto‑map**: Extend `build-tools/tools/buck/gen-auto-map.ts` (if necessary) to treat Erlang lockfile labels exactly like Node’s: translate to `//third_party/providers:<name>`, dedupe, sort, emit under `MODULE_PROVIDERS` for use in macros.
 - Example:
   - Target label: `lockfile:apps/er/foo/rebar.lock#foo`
   - Provider: `//third_party/providers:lf_<hash>_foo__apps_er_foo_rebar_lock`
 
-### Provider Sync (tools/buck/sync-providers-erlang.ts)
+### Provider Sync (build-tools/tools/buck/sync-providers-erlang.ts)
 
 - Input discovery:
   - All `rebar.lock` files in the repo (globby `**/rebar.lock`).
@@ -118,7 +118,7 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 - Output: `third_party/providers/TARGETS.erlang.auto` consisting of entries:
   - `erlang_lockfile_deps(name="<providerName>", lockfile="<lockfile>", importer="<importer>", patch_paths=[...])`
 - Determinism: stable ordering, deduplication, collision checks (provider name collisions cause an error), idempotent writes.
-- Orchestration: hook this driver into `tools/buck/sync-providers.ts` and `tools/buck/providers/index.ts` so the unified "Sync Providers" step covers Erlang alongside Go/Node.
+- Orchestration: hook this driver into `build-tools/tools/buck/sync-providers.ts` and `build-tools/tools/buck/providers/index.ts` so the unified "Sync Providers" step covers Erlang alongside Go/Node.
 
 ### Provider Rule (third_party/providers/defs_erlang.bzl)
 
@@ -141,7 +141,7 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
   - Keep macro interfaces stable so we can transparently swap the implementation to native `erlang_*` rules later.
   - Encourage per‑target one‑test‑per‑file conventions when adding Erlang tests.
 
-### Patching Workflow (tools/patch/patch-erlang.ts)
+### Patching Workflow (build-tools/tools/patch/patch-erlang.ts)
 
 - Subcommands under the outer `patch-pkg`:
   - `start erlang <pkg>`: Resolve `<pkg>` against the importer’s lockfile; fetch its source (Hex or git) into a temp editable dir (macOS: APFS CoW or copy); set `NIX_ERLANG_DEV_OVERRIDE_JSON` for the exact key; optionally open `$PATCH_EDITOR`.
@@ -149,9 +149,9 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
   - `reset erlang <pkg>`: Abandon and clean temp + override.
   - `session erlang <pkg>`: Long‑lived edit; Ctrl‑D commits (`apply`), Ctrl‑C aborts (`reset`).
 - Idempotency: Reapplying the same patch is a no‑op; dev overrides forbidden in CI.
-- Filename encoding: For git deps, encode `/` as `__` when forming `<key>` (reuse `tools/lib/providers.ts` encode/decode helpers) to mirror consistency with other languages.
+- Filename encoding: For git deps, encode `/` as `__` when forming `<key>` (reuse `build-tools/tools/lib/providers.ts` encode/decode helpers) to mirror consistency with other languages.
 
-### Exporter Adapter (tools/buck/export-graph.ts)
+### Exporter Adapter (build-tools/tools/buck/export-graph.ts)
 
 - Add a minimal Erlang adapter with two responsibilities:
   - Stamp labels onto Erlang targets if macros are not yet stamping (temporary safety net).
@@ -162,7 +162,7 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 
 ### Prebuild Guard
 
-- Extend `tools/buck/prebuild-guard.ts` to:
+- Extend `build-tools/tools/buck/prebuild-guard.ts` to:
   - If any `rebar.lock` exists, require a corresponding `TARGETS.erlang.auto` provider file.
   - Ensure `auto_map.bzl` exists when Erlang labels are present.
 - Local UX: In non‑strict mode, allow auto‑regeneration by invoking the Erlang provider sync driver when files are stale, mirroring existing behavior for other languages.
@@ -171,10 +171,10 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 
 - Mirror the existing stages:
   1. Codegen (no‑op or Erlang codegen if used) → OK to keep stub.
-  2. Export Graph (`tools/buck/export-graph.ts`)
+  2. Export Graph (`build-tools/tools/buck/export-graph.ts`)
   3. Sync Providers (Go) — existing
   4. Sync Providers (Node) — existing
-  5. **Sync Providers (Erlang)** — new: run via unified orchestrator (`node tools/buck/sync-providers.ts` picks Erlang driver)
+  5. **Sync Providers (Erlang)** — new: run via unified orchestrator (`node build-tools/tools/buck/sync-providers.ts` picks Erlang driver)
   6. Generate auto_map → includes Erlang providers
   7. Prebuild Guard
   8. Build & Test
@@ -217,45 +217,45 @@ Repo‑level WASM support exists, but compiling BEAM code to WASM is not practic
 
 ### Completion Criteria
 
-- `tools/nix/templates/erlang.nix` implements `erlangApp` and `erlangLib` with patch/override maps and CI override guard.
+- `build-tools/tools/nix/templates/erlang.nix` implements `erlangApp` and `erlangLib` with patch/override maps and CI override guard.
 - `erlang/defs.bzl` exists; macros stamp labels and append providers from `auto_map.bzl`.
 - `third_party/providers/defs_erlang.bzl` exists; `TARGETS.erlang.auto` is generated deterministically by `sync-providers-erlang.ts`.
 - `gen-auto-map.ts` maps Erlang lockfile labels to providers; macros consume them.
 - `patch-pkg` supports Erlang with `start/apply/reset/session` flows.
 - zx tests for provider determinism and auto‑map wiring pass locally and in CI.
-- Capability gating wired in `tools/nix/langs.json`; sparse checkout disables Erlang cleanly.
+- Capability gating wired in `build-tools/tools/nix/langs.json`; sparse checkout disables Erlang cleanly.
 
 ### Phased Implementation (small, verifiable steps)
 
 1. Scaffolding and invariants
    - Create `patches/erlang/` (empty), `third_party/providers/defs_erlang.bzl` (genrule stamp), stub macros in `erlang/defs.bzl` stamping labels.
-   - Verification: Macros compile; labels appear in `tools/buck/graph.json` via exporter.
+   - Verification: Macros compile; labels appear in `build-tools/tools/buck/graph.json` via exporter.
 2. Provider sync (Erlang)
-   - Implement `tools/buck/sync-providers-erlang.ts`; parse `rebar.lock`, emit `TARGETS.erlang.auto` idempotently; add zx tests.
+   - Implement `build-tools/tools/buck/sync-providers-erlang.ts`; parse `rebar.lock`, emit `TARGETS.erlang.auto` idempotently; add zx tests.
    - Verification: With a dummy lockfile and dummy patches, generator output is stable; collisions detected.
 3. Auto‑map integration
    - Ensure `gen-auto-map.ts` maps Erlang lockfile labels to provider names (reuse Node path); add wiring tests.
    - Verification: Targets depend only on their importer’s provider.
 4. Nix templates
-   - Add `tools/nix/templates/erlang.nix` using `beamPackages` + Rebar3; implement patch/override maps; CI override guard.
+   - Add `build-tools/tools/nix/templates/erlang.nix` using `beamPackages` + Rebar3; implement patch/override maps; CI override guard.
    - Verification: Build a small sample Erlang lib/app under Buck via macros; parity with direct `rebar3 compile`.
 5. Patching UX
-   - Add `tools/patch/patch-erlang.ts`; hook into `patch-pkg`; canonical patch filenames; run glue on apply.
+   - Add `build-tools/tools/patch/patch-erlang.ts`; hook into `patch-pkg`; canonical patch filenames; run glue on apply.
    - Verification: Start→edit→apply produces a patch file and updates provider + auto‑map.
 6. CI stages
    - Add Erlang provider sync into CI; extend prebuild guard; ensure green on matrix.
    - Verification: Glue generated; builds succeed; tests pass.
 7. Capability gating
-   - Add `erlang` entry to `tools/nix/langs.json` (required and optional paths); ensure glue respects gating.
+   - Add `erlang` entry to `build-tools/tools/nix/langs.json` (required and optional paths); ensure glue respects gating.
    - Verification: Removing required paths disables Erlang glue without affecting other languages.
 
 ### Notes on Code Reuse
 
-- Reuse `tools/lib/providers.ts` for provider naming; keep one source of truth.
-- Reuse `tools/buck/gen-auto-map.ts` machinery for mapping `lockfile:...#...` labels.
+- Reuse `build-tools/tools/lib/providers.ts` for provider naming; keep one source of truth.
+- Reuse `build-tools/tools/buck/gen-auto-map.ts` machinery for mapping `lockfile:...#...` labels.
 - Mirror Node provider generator structure for Erlang (naming, hashing, validations, idempotency).
 - Follow Go’s Nix patch/override map patterns inside `erlang.nix`.
-- Reuse `tools/buck/sync-providers.ts` orchestrator and `tools/buck/providers/index.ts` driver registry pattern to integrate Erlang cleanly.
+- Reuse `build-tools/tools/buck/sync-providers.ts` orchestrator and `build-tools/tools/buck/providers/index.ts` driver registry pattern to integrate Erlang cleanly.
 
 ### Future Extensions
 

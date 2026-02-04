@@ -10,11 +10,11 @@ Ensure `normalizeNixAttr` produces identical results across TypeScript and Starl
 
 ### Scope & Changes
 
-- `tools/lib/provider-names.ts` and `lang/defs_common.bzl`:
+- `build-tools/tools/lib/provider-names.ts` and `lang/defs_common.bzl`:
   - Introduce a tiny, shared alias table source (TS) and mirror it in a Starlark test probe.
   - Keep existing normalization logic; do not change semantics.
 - Tests:
-  - Add `tools/tests/lib/normalize-nix-attr.parity.test.ts`:
+  - Add `build-tools/tools/tests/lib/normalize-nix-attr.parity.test.ts`:
     - Calls TS `normalizeNixAttr` and Starlark `normalize_nix_attr_probe` on the same inputs and asserts identical normalized values.
 
 ### Acceptance Criteria
@@ -46,14 +46,14 @@ Unify logic that determines the PNPM importer directory to avoid local ad‑hoc 
 
 ### Scope & Changes
 
-- `tools/lib/lockfiles.ts`:
+- `build-tools/tools/lib/lockfiles.ts`:
   - Add `resolveImporterDir(cwd?: string, flag?: string): Promise<string>` that:
     - Honors an explicit `--importer` (or equivalent flag value),
     - Falls back to walking upward from `cwd` for the nearest directory containing `pnpm-lock.yaml`,
     - Returns a normalized POSIX‑style relative path from repo root.
-- `tools/patch/patch-node.ts`:
+- `build-tools/tools/patch/patch-node.ts`:
   - Replace local importer discovery with `resolveImporterDir`.
-- (Optional) `tools/buck/prebuild/*` and provider generation entrypoints:
+- (Optional) `build-tools/tools/buck/prebuild/*` and provider generation entrypoints:
   - Where importer detection is needed, use the shared helper or rely on already parsed lockfiles.
 
 ### Acceptance Criteria
@@ -85,7 +85,7 @@ Add clear local warnings when `NIX_GO_DEV_OVERRIDE_JSON` or `NIX_CPP_DEV_OVERRID
 
 ### Scope & Changes
 
-- `tools/buck/prebuild/main.ts`:
+- `build-tools/tools/buck/prebuild/main.ts`:
   - When `CI!=true` and either env var is non‑empty, print a one‑line notice explaining that local derivation hashes will differ and how to clear overrides.
   - No exit/status changes; purely informational locally.
 
@@ -114,11 +114,11 @@ Implement.
 
 ### Description
 
-Clarify that `tools/nix/templates/node.nix` serves as a discoverability shim (planner plugin remains authoritative) to prevent misinterpretation by newcomers.
+Clarify that `build-tools/tools/nix/templates/node.nix` serves as a discoverability shim (planner plugin remains authoritative) to prevent misinterpretation by newcomers.
 
 ### Scope & Changes
 
-- `tools/nix/templates/node.nix`:
+- `build-tools/tools/nix/templates/node.nix`:
   - Add a brief header comment describing the shim role and where the authoritative Node planner logic lives.
 - Docs:
   - Add a short note to `docs/handbook/adding-language.md` reinforcing the separation.
@@ -147,31 +147,31 @@ Implement.
 
 ### Description
 
-Refactor `tools/buck/prebuild/main.ts` into smaller, purpose‑built modules to comply with file size/clarity guidelines while preserving behavior and all existing test outcomes. No functional changes; orchestration remains in `prebuild-guard.ts`.
+Refactor `build-tools/tools/buck/prebuild/main.ts` into smaller, purpose‑built modules to comply with file size/clarity guidelines while preserving behavior and all existing test outcomes. No functional changes; orchestration remains in `prebuild-guard.ts`.
 
 ### Scope & Changes
 
-- Create submodules under `tools/buck/prebuild/` and move logic:
+- Create submodules under `build-tools/tools/buck/prebuild/` and move logic:
   - `notice.ts`: local dev‑override notice logic (env checks + message composition)
   - `presence.ts`: glue presence checks (graph.json, auto_map, TARGETS.\*.auto, nix_attr_map.bzl)
   - `freshness.ts`: input vs output freshness computation and diagnostics
   - `coverage.ts`: provider coverage analysis (expected providers vs MODULE_PROVIDERS mapping)
   - Reuse existing helpers (`report.ts`, `scan.ts`, `repair.ts`) without behavior changes
-- Keep `tools/buck/prebuild/main.ts` as a thin orchestrator calling these modules; target file size < 250 lines
-- No changes to CLI surface: `tools/buck/prebuild-guard.ts` import path remains the same
+- Keep `build-tools/tools/buck/prebuild/main.ts` as a thin orchestrator calling these modules; target file size < 250 lines
+- No changes to CLI surface: `build-tools/tools/buck/prebuild-guard.ts` import path remains the same
 - Update imports only; do not alter messages, exit codes, or JSON output schema
 - Minor test updates only if import paths are referenced directly; otherwise tests remain unchanged
 
 ### Acceptance Criteria
 
-- Running `node tools/buck/prebuild-guard.ts` produces identical outputs (stderr/stdout content, JSON mode shape) and exit codes across:
+- Running `node build-tools/tools/buck/prebuild-guard.ts` produces identical outputs (stderr/stdout content, JSON mode shape) and exit codes across:
   - clean repo
   - missing outputs (presence failures)
   - stale glue (freshness failures)
   - missing Node importer providers
   - provider coverage gaps (both provider missing and mapping missing)
 - File sizes:
-  - `tools/buck/prebuild/main.ts` ≤ 250 lines
+  - `build-tools/tools/buck/prebuild/main.ts` ≤ 250 lines
   - Each new module ≤ 250 lines
 - All existing prebuild guard tests pass without logic changes
 
@@ -252,7 +252,7 @@ All PRs are independent and reversible.
   - Backout: delete comment/doc lines.
 - PR‑5:
   - All prebuild guard tests pass unchanged; manual spot‑checks show identical outputs and exit codes.
-  - Backout: revert the module split and restore `tools/buck/prebuild/main.ts` monolith.
+  - Backout: revert the module split and restore `build-tools/tools/buck/prebuild/main.ts` monolith.
 - PR‑6:
   - Re‑run provider sync/gen‑auto‑map; expect identical outputs; all zx tests green.
   - Backout: revert individual adoptions (no schema changes).

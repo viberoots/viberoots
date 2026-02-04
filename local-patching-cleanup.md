@@ -24,7 +24,7 @@ This report lists the work needed to bring Go and C++ local patching up to the s
 - C++
   - Local patches are included in Buck `srcs` and forwarded as an explicit `patches` list to Nix (done).
   - C++ Nix template applies local patches to project sources deterministically (done).
-  - A global overlay `tools/nix/overlays/cpp-patches.nix` still scans `patches/cpp/**` to patch nixpkgs attrs (to remove/replace).
+  - A global overlay `build-tools/tools/nix/overlays/cpp-patches.nix` still scans `patches/cpp/**` to patch nixpkgs attrs (to remove/replace).
   - Provider syncing/mapping exists for C++ nixpkgs attrs (largely to support the global overlay flow); with local patching, we should stamp `nixpkg:` labels at call sites and drop provider plumbing.
 - pnpm (reference)
   - Importer‑scoped lockfile labels drive invalidation and provider stamping. Tests, bundles, and builds are hermetic; coverage is env‑gated. No global scans are required.
@@ -56,7 +56,7 @@ This report lists the work needed to bring Go and C++ local patching up to the s
 
 ### 3) Retire Go global provider generation and index
 
-- Remove `tools/buck/providers/go.*` and any references in provider index generation.
+- Remove `build-tools/tools/buck/providers/go.*` and any references in provider index generation.
 - Keep Go exporter module labels for diagnostics; do not map them to providers.
 - Acceptance:
   - Building/testing Go apps/libs that use local patching and CGO `nix_cgo_*` args succeeds without any Go provider files.
@@ -101,7 +101,7 @@ This report lists the work needed to bring Go and C++ local patching up to the s
 ## Detailed task checklist
 
 - Go
-  - [ ] Remove Go provider generation (`tools/buck/providers/go.*`) and usages in provider index.
+  - [ ] Remove Go provider generation (`build-tools/tools/buck/providers/go.*`) and usages in provider index.
   - [ ] Update prebuild guard to stop enforcing Go provider/index outputs.
   - [ ] Confirm exporter diagnostics remain helpful (module labels retained).
   - [ ] Add/adjust zx tests for local patch invalidation and sparse checkout.
@@ -111,7 +111,7 @@ This report lists the work needed to bring Go and C++ local patching up to the s
   - [ ] Add `nixpkg_deps` to `nix_cpp_*` macros and stamp `nixpkg:` labels.
   - [ ] Update planner logic (reads stamped labels; already supported).
   - [ ] Remove reliance on provider auto‑map for `nixpkg:` propagation in C++.
-  - [ ] Remove or gate off `tools/nix/overlays/cpp-patches.nix` (global patch scanning).
+  - [ ] Remove or gate off `build-tools/tools/nix/overlays/cpp-patches.nix` (global patch scanning).
   - [ ] Update prebuild guard to stop checking global overlay/provider artifacts.
   - [ ] Add/adjust zx tests for local patch invalidation and sparse checkout.
   - [ ] Update docs/scaffolding to include local `patches/cpp` with examples.

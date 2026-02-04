@@ -6,7 +6,7 @@ Provider sync writes deterministic Buck provider glue from lockfiles and patch i
   - Decoding policy (parity): `__` decodes to `/` only (lossless). Examples:
     - `@scope__pkg@1.2.3.patch` → `@scope/pkg@1.2.3`
     - `lodash___core@4.17.21.patch` → `lodash/_core@4.17.21`
-- **Unified sync command (orchestrator)**: `node tools/buck/sync-providers.ts` writes all language-specific provider files deterministically:
+- **Unified sync command (orchestrator)**: `node build-tools/tools/buck/sync-providers.ts` writes all language-specific provider files deterministically:
   - Go: `third_party/providers/TARGETS.auto`
   - Node (PNPM): `third_party/providers/TARGETS.node.auto` (when lockfiles present)
   - Mapping file: `third_party/providers/nix_attr_map.bzl` (canonical nixpkgs attr map)
@@ -16,9 +16,9 @@ Provider sync writes deterministic Buck provider glue from lockfiles and patch i
 
 Node generator (canonical):
 
-- The canonical generator implementation is `tools/buck/providers/node.ts` (`syncNodeProviders`). The canonical entrypoint is the orchestrator: `node tools/buck/sync-providers.ts`.
-  - For Node only (full glue): `node tools/buck/sync-providers.ts --lang node`
-  - Providers only (no graph/auto_map): `node tools/buck/sync-providers.ts --lang node --no-glue`
+- The canonical generator implementation is `build-tools/tools/buck/providers/node.ts` (`syncNodeProviders`). The canonical entrypoint is the orchestrator: `node build-tools/tools/buck/sync-providers.ts`.
+  - For Node only (full glue): `node build-tools/tools/buck/sync-providers.ts --lang node`
+  - Providers only (no graph/auto_map): `node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`
 
 Node‑specific note (clarity):
 
@@ -31,9 +31,9 @@ Importer‑scoped patch inclusion policy (Node vs Python):
 
 The canonical source of truth is the language contract:
 
-- `tools/lib/lang-contracts.ts:importerScopedProviderContractForLang(lang)` (policy + optional global patch dir)
+- `build-tools/tools/lib/lang-contracts.ts:importerScopedProviderContractForLang(lang)` (policy + optional global patch dir)
 
-`tools/lib/provider-sync-driver.ts` requires the policy at its boundary (no silent defaults), and regression tests lock down the resulting behavior.
+`build-tools/tools/lib/provider-sync-driver.ts` requires the policy at its boundary (no silent defaults), and regression tests lock down the resulting behavior.
 
 Global patches (effective-set gated):
 
@@ -41,7 +41,7 @@ Node optionally supports a repo-root global patch directory (`patches/node`). Th
 
 The canonical helper for this behavior is:
 
-- `tools/lib/effective-set-patch-selection.ts`
+- `build-tools/tools/lib/effective-set-patch-selection.ts`
   - `scanFlatPatchDirToLowercaseKeyToPatchPathMap(...)` builds the `<name>@<version> -> patch path` map from a flat patch dir.
   - `selectPatchPathsForEffectiveSet(...)` selects and sorts matching patch paths for an importer effective set.
 
@@ -49,11 +49,11 @@ Rule: do not hand-roll global patch scanning or effective-set patch selection in
 
 Canonical naming and helpers:
 
-- **Source of truth (TS helpers)**: `tools/lib/providers.ts` defines provider naming. Use `providerNameForModuleKey(importPath, version)` for Go module providers and `providerNameForImporter(lockfilePath, importer)` for Node importer‑scoped providers.
+- **Source of truth (TS helpers)**: `build-tools/tools/lib/providers.ts` defines provider naming. Use `providerNameForModuleKey(importPath, version)` for Go module providers and `providerNameForImporter(lockfilePath, importer)` for Node importer‑scoped providers.
 - **Go nixpkgs providers (CGO)**: Go macros do not inject direct provider deps for `nixpkg_deps`. Instead, they attach `nixpkg:<attr>` labels and rely on `MODULE_PROVIDERS` loaded via `//lang:auto_map.bzl` (re-export of `third_party/providers/auto_map.bzl`) to map targets to providers (format: `//third_party/providers:nix_<normalized_attr>`; example: `pkgs.openssl` → `nix_pkgs_openssl`). Do not handcraft names.
 - **Stamp‑time normalization (Go)**: Go macros stamp `nixpkg:` labels using the shared helper at stamp‑time (via `append_nixpkg_labels`). This only changes where normalization occurs; behavior and mappings are unchanged because the mapper already normalizes.
 - **nixpkgs attr map**: The unified orchestrator generates `third_party/providers/nix_attr_map.bzl` deterministically; Starlark macros should load from this mapping instead of deriving attrs heuristically.
-- **Patch fixtures**: `tools/tests/lib/fixtures/go.ts: ensurePatch()` creates a correctly named patch file for tests.
+- **Patch fixtures**: `build-tools/tools/tests/lib/fixtures/go.ts: ensurePatch()` creates a correctly named patch file for tests.
 - **Starlark nixpkgs stamping (canonical)**: use `lang/defs_common.bzl: append_nixpkg_labels(kwargs, attrs)` to append `nixpkg:<normalized>` labels. Normalization trims, lowercases, ensures the `pkgs.` prefix, and maps `pkgs.gtest` → `pkgs.googletest`. Do not re‑implement label loops in language macros.
 
 #### `nixpkg:` normalization contract (single source of truth)
@@ -61,19 +61,19 @@ Canonical naming and helpers:
 `nixpkg:` is a cross-language public interface. Normalization must match across:
 
 - Starlark: `lang/nixpkg_labels.bzl:normalize_nix_attr`
-- TypeScript: `tools/lib/providers.ts:normalizeNixAttr`
-- Nix templates: `tools/nix/lib/lang-helpers.nix:normalizeNixAttr`
+- TypeScript: `build-tools/tools/lib/providers.ts:normalizeNixAttr`
+- Nix templates: `build-tools/tools/nix/lib/lang-helpers.nix:normalizeNixAttr`
 
 Contract:
 
 - Input is trimmed and lowercased.
 - `pkgs.` prefix is added if missing.
-- Alias mapping is applied (source of truth: `tools/lib/nix-attr-aliases.json`; Starlark mirror: `lang/nix_attr_aliases.bzl`).
+- Alias mapping is applied (source of truth: `build-tools/tools/lib/nix-attr-aliases.json`; Starlark mirror: `lang/nix_attr_aliases.bzl`).
 - Historical compatibility: `gtest` normalizes to `pkgs.googletest`.
 
 Regression guard:
 
-- `tools/tests/normalization-parity.test.ts` compares Starlark, TS, and Nix on a shared test matrix.
+- `build-tools/tools/tests/normalization-parity.test.ts` compares Starlark, TS, and Nix on a shared test matrix.
 
 #### C++ provider edges (optional, graph‑shape uniformity)
 
@@ -101,7 +101,7 @@ Some macros create planner-visible stub targets for exporter and planner discove
 For Nix templates that need to apply patches or support dev overrides, import the shared helpers from the canonical location:
 
 ```nix
-# tools/nix/templates/<lang>.nix
+# build-tools/tools/nix/templates/<lang>.nix
 { pkgs }:
 let
   lib = pkgs.lib;
@@ -124,7 +124,7 @@ These helpers keep behavior consistent across languages and reduce boilerplate i
 
 ### Deterministic IO and stamps for provider sync
 
-Leverage the shared utilities in `tools/lib/fs-helpers.ts` to keep outputs stable:
+Leverage the shared utilities in `build-tools/tools/lib/fs-helpers.ts` to keep outputs stable:
 
 - `writeIfChanged(path, content)` writes only when content differs (prevents churn).
 - `writeStamp(file, inputs)` writes a deterministic stamp capturing ordered inputs and their contents.

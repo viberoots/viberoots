@@ -6,7 +6,7 @@ This document is a development plan to implement Phase 4 from `linking-roadmap.m
 
 This plan assumes the shared primitives and the Phase 1 through Phase 3 work are present and stable:
 
-- shared link closure resolver in `tools/nix/planner/link-closure.nix`
+- shared link closure resolver in `build-tools/tools/nix/planner/link-closure.nix`
 - C++ native linking for `link_deps` and `header_deps`
 - Wasm linking semantics for TinyGo and C++ Wasm static libs
 - Python extension module support for native `kind:pyext` (and optional wasm path if already landed)
@@ -23,7 +23,7 @@ This PR lets Go cgo targets opt into following C++ `link_deps` transitively. It 
 
 This PR makes the following changes:
 
-- Extend the Go planner (`tools/nix/planner/go.nix`) to accept `link_closure` and `link_closure_overrides` for cgo consumers only.
+- Extend the Go planner (`build-tools/tools/nix/planner/go.nix`) to accept `link_closure` and `link_closure_overrides` for cgo consumers only.
 - Route the resolved link closure into the Go template inputs that produce cgo link flags or native inputs.
 - Add a targeted error when a Go cgo target opts in to `link_closure` but a dep is not a supported native producer.
 - Keep the default behavior unchanged when `link_closure` is unset.
@@ -32,13 +32,13 @@ This PR makes the following changes:
 
 I add zx tests (one test per file):
 
-- `tools/tests/go/go.cgo.link-closure.direct.only-direct-deps.test.ts`
+- `build-tools/tools/tests/go/go.cgo.link-closure.direct.only-direct-deps.test.ts`
   - defines a cgo binary that depends on a C++ library with `link_deps`
   - sets `link_closure="direct"` and asserts only direct libs are included
-- `tools/tests/go/go.cgo.link-closure.transitive.includes-link-deps.test.ts`
+- `build-tools/tools/tests/go/go.cgo.link-closure.transitive.includes-link-deps.test.ts`
   - defines a cgo binary and a library graph where `link_deps` are transitive
   - sets `link_closure="transitive"` and asserts transitive libs are included
-- `tools/tests/go/go.cgo.link-closure.unsupported-producer.fails-fast.test.ts`
+- `build-tools/tools/tests/go/go.cgo.link-closure.unsupported-producer.fails-fast.test.ts`
   - depends on a non-native target through `link_deps`
   - asserts a targeted error that names supported producers
 
@@ -95,13 +95,13 @@ This PR makes the following changes:
 
 I add zx tests (one test per file):
 
-- `tools/tests/cpp/cpp.link-mode.shared.library-exports-symbol.test.ts`
+- `build-tools/tools/tests/cpp/cpp.link-mode.shared.library-exports-symbol.test.ts`
   - builds a shared library and a consumer binary
   - asserts the binary links and calls a symbol from the shared lib
-- `tools/tests/cpp/cpp.link-mode.shared.header-only-lib.fails-fast.test.ts`
+- `build-tools/tools/tests/cpp/cpp.link-mode.shared.header-only-lib.fails-fast.test.ts`
   - sets `link_mode="shared"` on a header-only target
   - asserts a targeted error that explains the mismatch
-- `tools/tests/cpp/cpp.link-mode.default.static.still-works.test.ts`
+- `build-tools/tools/tests/cpp/cpp.link-mode.default.static.still-works.test.ts`
   - builds existing static linkage without specifying `link_mode`
   - asserts behavior is unchanged
 

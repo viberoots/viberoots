@@ -1,7 +1,7 @@
 """
 Lockfile contracts (Starlark side).
 
-This file intentionally mirrors tools/lib/lockfile-contracts.ts.
+This file intentionally mirrors build-tools/tools/lib/lockfile-contracts.ts.
 """
 
 LOCKFILE_BASENAMES_BY_LANG = {

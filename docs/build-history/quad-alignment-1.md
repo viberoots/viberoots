@@ -13,13 +13,13 @@ Unify patch filename scanning and key generation across languages by introducing
 
 ### Scope & Changes
 
-- tools/nix/lib/lang-helpers.nix:
+- build-tools/tools/nix/lib/lang-helpers.nix:
   - Add a generic `patchesMapFromDirToStore` (and `patchesMapFromImporterDirToStore`) that:
     - scans flat `*.patch` directories,
     - decodes canonical keys (case-insensitive, `__` → `/`, `<name>@<version>`),
     - materializes content into the store (`writeText`) for stable inputs where needed.
   - Keep existing `patchesMapFromDir` and `patchesMapFromDirs` for pass-through behavior.
-- tools/nix/templates/python.nix:
+- build-tools/tools/nix/templates/python.nix:
   - Replace inline scan/materialization logic with the new helper (no behavior change).
 - No change to Go/C++ templates’ behavior; optionally wire them through the common helper to remove local duplication without altering outputs.
 
@@ -53,12 +53,12 @@ Make dev‑override detection/logging uniform across Go, C++, and Python in the 
 
 ### Scope & Changes
 
-- tools/nix/graph-generator.nix:
+- build-tools/tools/nix/graph-generator.nix:
   - Detect `NIX_PY_DEV_OVERRIDE_JSON` alongside existing Go/CPP envs.
   - When `CI!=true`, emit the same neutral one‑liner notice used for other languages (honor `PLANNER_NO_DEV_OVERRIDE_LOG=1`).
-- tools/dev/clear-overrides.ts:
+- build-tools/tools/dev/clear-overrides.ts:
   - Add Python override clearing (keep behavior identical for Go/CPP).
-- tools/buck/prebuild/\* (notice path):
+- build-tools/tools/buck/prebuild/\* (notice path):
   - Extend any local “friendly notices” to include Python for completeness (no CI change).
 
 ### Acceptance Criteria
@@ -90,13 +90,13 @@ Factor shared importer logic out of Node and Python provider generators into a s
 
 ### Scope & Changes
 
-- tools/lib/importers.ts (new):
+- build-tools/tools/lib/importers.ts (new):
   - `findImporterLockfiles(globs: string[]): Promise<string[]>`
   - `computeImporterLabel(lockfilePath: string): string` (POSIX relative from repo root)
   - `defaultImporterPatchDir(importer: string, lang: "node"|"python"): string`
   - `listImporterPatches(importer: string, lang: "node"|"python"): Promise<string[]>`
   - Stable sorting and path normalization helpers reused by generators.
-- tools/buck/providers/node.ts and tools/buck/providers/python.ts:
+- build-tools/tools/buck/providers/node.ts and build-tools/tools/buck/providers/python.ts:
   - Replace bespoke importer/patch listing with shared helpers.
   - Keep lockfile parsing specific to each ecosystem (PNPM vs uv2nix).
 
@@ -230,11 +230,11 @@ Implement.
 
 ### Description
 
-Align the Python WASM template with the standard Python template by using the shared `patchesMapFromDirToStore`/`patchesMapFromImporterDirToStore` helper from `tools/nix/lib/lang-helpers.nix`. This replaces the local `toStoreMap` transformation inside `tools/nix/templates/python/wasm.nix`, ensuring one canonical implementation for scanning, key normalization, and store materialization.
+Align the Python WASM template with the standard Python template by using the shared `patchesMapFromDirToStore`/`patchesMapFromImporterDirToStore` helper from `build-tools/tools/nix/lib/lang-helpers.nix`. This replaces the local `toStoreMap` transformation inside `build-tools/tools/nix/templates/python/wasm.nix`, ensuring one canonical implementation for scanning, key normalization, and store materialization.
 
 ### Scope & Changes
 
-- tools/nix/templates/python/wasm.nix:
+- build-tools/tools/nix/templates/python/wasm.nix:
   - Replace the manual `toStoreMap (H.patchesMapFromDir ...)` mapping with:
     - `H.patchesMapFromImporterDirToStore { srcRoot; subdir; lang = "python"; normalizeVersion = (v: lib.head (lib.splitString "-" v)); namePrefix = "py-patch"; }`
     - or, equivalently, `H.patchesMapFromDirToStore { dir = patchDirAbs; normalizeVersion = (v: lib.head (lib.splitString "-" v)); namePrefix = "py-patch"; }`

@@ -44,9 +44,9 @@ See also: `getting-started-on-a-pr.md` for a practical, step-by-step guide (env,
 ### Sparse checkout and auto-discovery policy (global requirement)
 
 - Must work with partial clones and sparse checkouts: if `cpp` files are absent, the system fails gracefully (no crashes), and other languages continue to work.
-- No centralized registration step post-checkout: the presence of `cpp` files (planner plugin `tools/nix/planner/cpp.nix`, macros under `cpp/`, templates under `tools/nix/templates/cpp.nix`) is sufficient to enable C++.
-- Planner discovery: prefer manifest-driven (`tools/nix/langs.json`) when present; otherwise fall back to on-disk existence check for `tools/nix/planner/cpp.nix`.
-- Exporter adapter discovery: adapter files under `tools/buck/exporter/lang/` are glob-loaded; missing files simply mean no adapter for that language.
+- No centralized registration step post-checkout: the presence of `cpp` files (planner plugin `build-tools/tools/nix/planner/cpp.nix`, macros under `cpp/`, templates under `build-tools/tools/nix/templates/cpp.nix`) is sufficient to enable C++.
+- Planner discovery: prefer manifest-driven (`build-tools/tools/nix/langs.json`) when present; otherwise fall back to on-disk existence check for `build-tools/tools/nix/planner/cpp.nix`.
+- Exporter adapter discovery: adapter files under `build-tools/tools/buck/exporter/lang/` are glob-loaded; missing files simply mean no adapter for that language.
 - Diagnostics: must clearly indicate when C++ is disabled due to missing required paths.
 
 ---
@@ -60,15 +60,15 @@ See also: `getting-started-on-a-pr.md` for a practical, step-by-step guide (env,
      - Optional module-like labels only if we adopt patchable third-party flows later (not required for initial bring-up).
 
 2. Planner (Nix dynamic derivations):
-   - `tools/nix/planner/cpp.nix` plugin exposes:
+   - `build-tools/tools/nix/planner/cpp.nix` plugin exposes:
      - `isTarget(n)` → true if `rule_type` matches `cxx_*` or `lang:cpp` present
      - `kindOf(n)` → "bin" for `cxx_binary`, "lib" for `cxx_library`, "test" for `cxx_test` (or `kind:*` labels)
-     - `mkApp(name)`, `mkLib(name)` → call into `tools/nix/templates/cpp.nix`
+     - `mkApp(name)`, `mkLib(name)` → call into `build-tools/tools/nix/templates/cpp.nix`
    - `modulesFileFor(name)` → not used initially (no lockfile); return `null`/"" safely
-   - Discovery: manifest-driven (`tools/nix/langs.json`); fallback to on-disk plugin existence for sparse checkouts (no centralized registration)
+   - Discovery: manifest-driven (`build-tools/tools/nix/langs.json`); fallback to on-disk plugin existence for sparse checkouts (no centralized registration)
 
 3. Templates (Nix):
-   - `tools/nix/templates/cpp.nix` implements two functions `cppApp` and `cppLib`:
+   - `build-tools/tools/nix/templates/cpp.nix` implements two functions `cppApp` and `cppLib`:
      - Inputs: `name`, `srcRoot`, `subdir`, `defines`, `includes`, `cflags`, `ldflags`
      - Use `pkgs.stdenv.mkDerivation` with a small `buildPhase` that calls `c++`/`ar` via `pkgs.llvm` or repo toolchain
      - Honor `//toolchains/cxx.bzl` rules for purity; do not read workspace tools
@@ -101,7 +101,7 @@ Phase A → Phase B → Phase C → Phase D
 6. PR 15 — Overlay-based patching for nixpkgs C++ libs (optional)
 
 7. Diagnostics:
-   - `tools/dev/langs-diagnose.ts` already shows detected adapters and planner plugins; add the `cpp` manifest entry to participate in output.
+   - `build-tools/tools/dev/langs-diagnose.ts` already shows detected adapters and planner plugins; add the `cpp` manifest entry to participate in output.
 
 ---
 
@@ -113,18 +113,18 @@ Phase A → Phase B → Phase C → Phase D
 
 Intent/Impact
 
-- Introduce `cpp` in `tools/nix/langs.json` so codegen, diagnostics, and planner discovery include it.
+- Introduce `cpp` in `build-tools/tools/nix/langs.json` so codegen, diagnostics, and planner discovery include it.
 
 Design
 
 - Add language entry:
   - `id: "cpp"`
   - `displayName: "C++"`
-  - `requiredPaths: ["cpp/defs.bzl", "tools/nix/templates/cpp.nix"]`
+  - `requiredPaths: ["cpp/defs.bzl", "build-tools/tools/nix/templates/cpp.nix"]`
   - `kinds: ["bin", "lib", "test"]`
-  - `templatesDir: "tools/scaffolding/templates/cpp"`
+  - `templatesDir: "build-tools/tools/scaffolding/templates/cpp"`
   - `capabilities: { patching: false }`
-- Update `tools/dev/validate-langs.ts` schema if needed (likely no changes).
+- Update `build-tools/tools/dev/validate-langs.ts` schema if needed (likely no changes).
 
 Acceptance criteria
 
@@ -144,7 +144,7 @@ If not implemented
 
 Intent/Impact
 
-- Add `tools/nix/planner/cpp.nix` to build derivations for C++ targets.
+- Add `build-tools/tools/nix/planner/cpp.nix` to build derivations for C++ targets.
 
 Design
 
@@ -176,7 +176,7 @@ Intent/Impact
 
 Design
 
-- `tools/nix/templates/cpp.nix`:
+- `build-tools/tools/nix/templates/cpp.nix`:
   - `cppLib = { name, srcRoot ? ../../.., subdir ? ".", includes ? [], defines ? [], cflags ? [], ldflags ? [] }: ...`
   - Use `pkgs.llvmPackages` (or Buck-provided toolchain path) for `clang++`/`ar`.
   - `src = lib.cleanSource (builtins.toPath ("${srcRoot}/" + subdir))`
@@ -208,7 +208,7 @@ Intent/Impact
 
 Design
 
-- `tools/nix/templates/cpp.nix`:
+- `build-tools/tools/nix/templates/cpp.nix`:
   - `cppApp = { name, srcRoot ? ../../.., subdir ? ".", includes ? [], defines ? [], cflags ? [], ldflags ? [] }: ...`
   - Compile objects from `subdir` and link with `clang++`/`ldflags`
   - Determinism: same ordering policies as cppLib
@@ -235,7 +235,7 @@ Intent/Impact
 
 Design
 
-- `tools/buck/exporter/lang/cpp.ts`:
+- `build-tools/tools/buck/exporter/lang/cpp.ts`:
   - `isNode(n)`: `isRuleType(n, "cxx_") || hasLabel(n, "lang:cpp")`
   - `buildBatches`: trivial (group by directory or single batch)
   - `attachLabels`: preserve and sort labels; no extra labels for now
@@ -263,7 +263,7 @@ Intent/Impact
 
 Adapter contract (no breaking changes)
 
-- File: `tools/buck/exporter/lang/contract.ts`
+- File: `build-tools/tools/buck/exporter/lang/contract.ts`
 - Types (reference):
   ```ts
   export type Node = {
@@ -290,11 +290,11 @@ Adapter contract (no breaking changes)
 
 Dispatcher/orchestration (exporter main)
 
-- Discovery: Glob-load present adapters from `tools/buck/exporter/lang/*.ts` (already implemented for single adapter).
+- Discovery: Glob-load present adapters from `build-tools/tools/buck/exporter/lang/*.ts` (already implemented for single adapter).
 - Active set: `active = adapters.filter(a => nodes.some(n => a.isNode(n)))`.
 - Batching:
   - For each `a ∈ active`: `nodesA = nodes.filter(a.isNode)`; `batchesA = await a.buildBatches(nodesA)`.
-  - Cache directory: `${cacheRoot}/adapters/${a.name}` where `cacheRoot` defaults to `tools/buck/.cache` (created if missing). Stable path → deterministic keys.
+  - Cache directory: `${cacheRoot}/adapters/${a.name}` where `cacheRoot` defaults to `build-tools/tools/buck/.cache` (created if missing). Stable path → deterministic keys.
 - Deterministic execution order:
   - Sort `active` by `a.name` ascending.
   - Execute adapters sequentially by default to simplify determinism and IO (can parallelize later with bounded concurrency if needed).
@@ -358,14 +358,14 @@ for (const a of active) {
 const out = Array.from(byName.values()).sort((x, y) => x.name.localeCompare(y.name));
 ```
 
-Tests (add to `tools/tests/exporter/`)
+Tests (add to `build-tools/tools/tests/exporter/`)
 
 - `exporter.mixed-lang.labels.merge.test.ts`:
   - Simulated nodes: 1 Go lib/test and 1 C++ bin.
   - Expect: Go targets keep `lang:go` + module labels; C++ target gets `lang:cpp` + `kind:bin`.
   - Labels are deduped and lexicographically sorted per node.
 - `exporter.adapters.inactive.skip.test.ts`:
-  - Remove `tools/buck/exporter/lang/cpp.ts` from temp repo; ensure run still succeeds and Go labels present.
+  - Remove `build-tools/tools/buck/exporter/lang/cpp.ts` from temp repo; ensure run still succeeds and Go labels present.
 - `exporter.metrics.adapters.batches.test.ts` (if metrics enabled):
   - Verify `adaptersActive` and `adapterBatches` include `go` and `cpp` appropriately.
 
@@ -445,10 +445,10 @@ Design
         cxx_test(name = name, labels = labels, deps = deps, **kwargs)
     ```
 
-- Stamping lint: extend `tools/dev/stamping-lint.ts` to include C++
+- Stamping lint: extend `build-tools/tools/dev/stamping-lint.ts` to include C++
   - Policy: any `cxx_*` rule (or `nix_cpp_*` macro) with C/C++ sources must include `lang:cpp` and the appropriate `kind:*` label.
   - Implementation: reuse existing lint framework; add a C++ predicate and emit actionable messages with target names.
-  - The lint runs in CI and locally via `tools/dev/install-deps.ts` or dedicated lint target; it is non-destructive (reports errors/warnings; does not write files).
+  - The lint runs in CI and locally via `build-tools/tools/dev/install-deps.ts` or dedicated lint target; it is non-destructive (reports errors/warnings; does not write files).
 
 - Exporter interplay
   - Exporter already detects `cxx_*` and/or `lang:cpp`. Macros guarantee presence of the label even when `rule_type` is opaque or repo-specific.
@@ -477,11 +477,11 @@ If not implemented
 
 Verification & Tests
 
-- Macro stamping tests (`tools/tests/cpp/`):
+- Macro stamping tests (`build-tools/tools/tests/cpp/`):
   - `cpp.macros.stamp.labels.lib.test.ts`: creates a temporary repo with a small `nix_cpp_library` and verifies labels contain `lang:cpp` and `kind:lib` after export.
   - `cpp.macros.stamp.labels.bin.test.ts`: same for `nix_cpp_binary`, expecting `kind:bin`.
   - `cpp.macros.stamp.labels.test.test.ts`: same for `nix_cpp_test`, expecting `kind:test`.
-- Stamping lint tests (`tools/tests/dev/`):
+- Stamping lint tests (`build-tools/tools/tests/dev/`):
   - `stamping-lint.cpp.missing-labels.test.ts`: introduces a raw `cxx_library` with sources but without labels and asserts the lint reports a violation; adding `nix_cpp_library` resolves it.
 
 Determinism & Sparse Checkout
@@ -498,7 +498,7 @@ Intent/Impact
 
 Design
 
-- `tools/scaffolding/templates/cpp/lib`:
+- `build-tools/tools/scaffolding/templates/cpp/lib`:
   - `libs/{{ name }}/`
   - `TARGETS`:
     - `nix_cpp_library(name = "{{ name }}", srcs = glob(["src/**/*.cpp"]))`
@@ -517,7 +517,7 @@ Design
     }
     ```
 
-- `tools/scaffolding/templates/cpp/cli`:
+- `build-tools/tools/scaffolding/templates/cpp/cli`:
   - `apps/{{ name }}/`
   - `TARGETS` with `nix_cpp_binary(name = "{{ name }}", srcs = ["src/main.cpp"], deps = [])`
   - `src/main.cpp` hello world
@@ -544,7 +544,7 @@ Intent/Impact
 
 - Design
 
-- Tests under `tools/tests/cpp/`:
+- Tests under `build-tools/tools/tests/cpp/`:
   - `cpp.scaffold-and-build.lib.test.ts`
   - `cpp.scaffold-and-build.cli.test.ts`
   - Validate labels include `lang:cpp` and `kind:*`
@@ -597,7 +597,7 @@ Design
   - Resolves `attr` through the flake inputs (pinned by `flake.lock`)
   - Exposes include path(s) and library outputs; links static by default
   - Emits a provider node stamped with the derivation hash
-- Provider generator: extend `tools/buck/providers` with a `cpp-nixpkgs.ts` handler that renders `TARGETS.cpp.auto` entries for `nix_cxx_library` usages (or treat each macro as a self-contained provider rule)
+- Provider generator: extend `build-tools/tools/buck/providers` with a `cpp-nixpkgs.ts` handler that renders `TARGETS.cpp.auto` entries for `nix_cxx_library` usages (or treat each macro as a self-contained provider rule)
 - Auto-map: no graph analysis needed; macros add their provider deps explicitly; `auto_map.bzl` remains unchanged
 
 Acceptance criteria
@@ -685,7 +685,7 @@ TEST(Demo, OpenSSLSmoke) {
 Notes
 
 - Naming convention: `//third_party/providers:nix_pkgs_<attr>` where `<attr>` is the nixpkgs attribute path with dots replaced by underscores (e.g., `pkgs.openssl` → `nix_pkgs_openssl`).
-- Determinism: the planner collects `nixpkg:*` labels from deps and passes them to `tools/nix/templates/cpp.nix`, which resolves include and library paths from nixpkgs; no paths are hard-coded in Starlark.
+- Determinism: the planner collects `nixpkg:*` labels from deps and passes them to `build-tools/tools/nix/templates/cpp.nix`, which resolves include and library paths from nixpkgs; no paths are hard-coded in Starlark.
 - Linking: GoogleTest linking is auto-detected by the template when `pkgs.googletest` is present; other libraries only need to be listed as provider deps.
 
 ---
@@ -706,7 +706,7 @@ Design
   - Wire deps to the corresponding nixpkgs provider targets from PR 1
 - Exporter:
   - Add labels `cgo:enabled` and `nixpkg:<attrPath>` for diagnostics/auto-map (even if macro wires deps explicitly)
-- Nix Go templates (`tools/nix/templates/go.nix`):
+- Nix Go templates (`build-tools/tools/nix/templates/go.nix`):
   - New params: `nixCgoPkgs = []`, `pkgConfigNames = {}`
   - Add `nativeBuildInputs = nixCgoPkgs ++ [ pkgs.pkg-config ]`
   - Set `CGO_ENABLED=1` when `nixCgoPkgs != []`
@@ -817,12 +817,12 @@ Intent/Impact
 
 Design
 
-- Overlays: add `tools/nix/overlays/cpp-patches.nix` and wire it in `flake.nix`
+- Overlays: add `build-tools/tools/nix/overlays/cpp-patches.nix` and wire it in `flake.nix`
 - Patches live under `patches/cpp/*.patch` (flat dir). Use `fetchpatch` or pass patches directly in the overlay for the target attr
 - CI guardrails: fail when a dev override env var is set (mirroring Go policy). Local warning only
 - Diagnostics: extend `langs-diagnose` to list patched nixpkgs attrs (attr path + patch filenames)
 - Provider input stamping (consistency with build-tools/docs/build-system-design.md):
-  - Ensure the provider rule that represents a patched nixpkgs package includes both the patch files under `patches/cpp/*.patch` and the overlay files (e.g., `tools/nix/overlays/*.nix`) as explicit srcs (via a tiny content-addressed stamp rule), so Buck invalidates dependents when any of these inputs change.
+  - Ensure the provider rule that represents a patched nixpkgs package includes both the patch files under `patches/cpp/*.patch` and the overlay files (e.g., `build-tools/tools/nix/overlays/*.nix`) as explicit srcs (via a tiny content-addressed stamp rule), so Buck invalidates dependents when any of these inputs change.
   - Treat `flake.lock` as an input to the provider rule (directly or through the Nix evaluation path) to guarantee rebuilds when nixpkgs pins change.
   - Prebuild guard: extend inputs list to include overlay files and `flake.lock`; report stale/missing glue accordingly.
 

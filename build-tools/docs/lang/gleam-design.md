@@ -22,7 +22,7 @@ I follow the repo-wide linking model described in `cpp-linking.md`, `build-tools
 - `deps` is the Buck graph edge list. It does not imply link intent.
 - `link_deps` declares linkable inputs. `header_deps` is include-only when that concept applies.
 - Macros compute `deps := deps ∪ link_deps ∪ header_deps` deterministically and validate `link_closure_overrides` keys.
-- `link_closure` defaults to `"direct"`. `"transitive"` follows `link_deps` only via `tools/nix/planner/link-closure.nix`.
+- `link_closure` defaults to `"direct"`. `"transitive"` follows `link_deps` only via `build-tools/tools/nix/planner/link-closure.nix`.
 - Ordering is deterministic and unsupported deps fail fast with targeted errors.
 
 ### C interop requirement
@@ -36,7 +36,7 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
 - Provider wiring: load `MODULE_PROVIDERS` from `//lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
 - Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
-- Patch model contract: `lang/lang_contracts.bzl` and `tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
+- Patch model contract: `lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
 
 ### Key Assumptions (to validate)
@@ -58,7 +58,7 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 
 - Lock/manifest lives in project (e.g., `apps/<name>/gleam.lock` or `apps/<name>/manifest.toml`).
 - Patches live under `patches/gleam/` (flat directory, no subdirs). Filenames: `<package>@<version>.patch` (lowercased; `/` encoded as `__` if needed).
-- Language templates under `tools/nix/templates/gleam.nix` and aggregated from `tools/nix/lang-templates.nix`.
+- Language templates under `build-tools/tools/nix/templates/gleam.nix` and aggregated from `build-tools/tools/nix/lang-templates.nix`.
 - Provider files under `//third_party/providers/**` are generated (not hand‑edited).
 
 ### Buck Macros (`//gleam/defs.bzl`)
@@ -79,7 +79,7 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 - For each Gleam node, pick kind: `bin` for binaries, `lib` for libraries/tests.
 - Provide minimal inputs to templates: `name`, `subdir`, `lockfilePath`, `patchDir`, and `devOverrideEnv`.
 
-### Nix Language Templates (`tools/nix/templates/gleam.nix`)
+### Nix Language Templates (`build-tools/tools/nix/templates/gleam.nix`)
 
 Functions: `gleamApp { name, lockfilePath, subdir ? ".", devOverrideEnv ? "NIX_GLEAM_DEV_OVERRIDE_JSON", patchDir ? ../../patches/gleam }` and `gleamLib { ... }`.
 
@@ -105,22 +105,22 @@ Patches and Overrides application:
 
 ### Tooling (zx)
 
-- `tools/dev/install-deps.ts` integration: add a Gleam path that, when `gleam.toml` is detected, runs a zx helper to generate/update the lock snapshot file (e.g., `gleam-deps.lock.json`) from the project’s manifest/lock. This mirrors `gomod2nix` integration policy.
-- `tools/buck/export-graph.ts`: add a Gleam adapter that ensures targets with Gleam sources carry `lang:gleam` and the importer lockfile label.
-- `tools/buck/sync-providers-gleam.ts`: parse the Gleam lock snapshot; emit `third_party/providers/TARGETS.gleam.auto` with exactly one provider per importer (lockfile), including only relevant `patches/gleam/*.patch` used by that importer’s effective dependency set.
-- `tools/buck/gen-auto-map.ts`: no language change required; it already maps any `lockfile:<path>#<importer>` to a provider name via shared helpers. We will reuse `providerNameForImporter`.
-- `tools/patch/patch-gleam.ts`: implement `LanguageHandler` for Gleam. Subcommands:
+- `build-tools/tools/dev/install-deps.ts` integration: add a Gleam path that, when `gleam.toml` is detected, runs a zx helper to generate/update the lock snapshot file (e.g., `gleam-deps.lock.json`) from the project’s manifest/lock. This mirrors `gomod2nix` integration policy.
+- `build-tools/tools/buck/export-graph.ts`: add a Gleam adapter that ensures targets with Gleam sources carry `lang:gleam` and the importer lockfile label.
+- `build-tools/tools/buck/sync-providers-gleam.ts`: parse the Gleam lock snapshot; emit `third_party/providers/TARGETS.gleam.auto` with exactly one provider per importer (lockfile), including only relevant `patches/gleam/*.patch` used by that importer’s effective dependency set.
+- `build-tools/tools/buck/gen-auto-map.ts`: no language change required; it already maps any `lockfile:<path>#<importer>` to a provider name via shared helpers. We will reuse `providerNameForImporter`.
+- `build-tools/tools/patch/patch-gleam.ts`: implement `LanguageHandler` for Gleam. Subcommands:
   - `start <package>`: prepares a temp workspace by copying the package’s Nix‑materialized source (from deps derivation) to a writable dir; records in `.patch-sessions.json`; launches `$PATCH_EDITOR` if set.
   - `apply <package>`: produces canonical diff `patches/gleam/<pkg>@<ver>.patch`, then runs provider sync + auto‑map.
   - `reset <package>`: discards temp and clears dev override.
   - `session <package>`: interactive apply/reset flow.
-- `tools/dev/startup-check.ts`: print a warning if `NIX_GLEAM_DEV_OVERRIDE_JSON` is set; fail in CI (pattern reuse).
+- `build-tools/tools/dev/startup-check.ts`: print a warning if `NIX_GLEAM_DEV_OVERRIDE_JSON` is set; fail in CI (pattern reuse).
 
 ### Providers and Auto‑Map
 
 - Provider rule file: `//third_party/providers/defs_gleam.bzl` with a simple `gleam_importer_deps(name, lockfile, importer, patch_paths = [])` genrule that stamps content hash of the lockfile + patch files (mirroring Node’s `node_importer_deps`).
 - Provider sync output: `third_party/providers/TARGETS.gleam.auto` listing `gleam_importer_deps(...)` entries for each detected Gleam importer.
-- Auto‑map: `tools/buck/gen-auto-map.ts` already converts any `lockfile:...#...` label to `providerNameForImporter(...)`; thus Gleam targets will receive the correct provider dependency automatically via macros. Per‑module mapping can be added later by extending auto‑map.
+- Auto‑map: `build-tools/tools/buck/gen-auto-map.ts` already converts any `lockfile:...#...` label to `providerNameForImporter(...)`; thus Gleam targets will receive the correct provider dependency automatically via macros. Per‑module mapping can be added later by extending auto‑map.
 - Invalidation: Macros include importer‑local patch files in `srcs` to ensure precise Buck invalidation; provider stamps remain metadata‑only (mirrors Node).
 
 ### Labels Summary
@@ -134,7 +134,7 @@ Patches and Overrides application:
 2. Export Graph — includes Gleam targets and labels.
 3. Sync Providers (Go) — unchanged.
 4. Sync Providers (Node) — unchanged (optional).
-5. Sync Providers (Gleam) — run `tools/buck/sync-providers-gleam.ts`.
+5. Sync Providers (Gleam) — run `build-tools/tools/buck/sync-providers-gleam.ts`.
 6. Generate auto_map — unchanged.
 7. Pre‑build guard — extend to fail if Gleam lockfiles exist but `TARGETS.gleam.auto` is missing.
 8. Build & Test — Buck builds Gleam targets; Nix planner instantiates Gleam derivations.
@@ -147,7 +147,7 @@ With repository WASM facilities, a direct Gleam→WASM path is not currently fir
 
 - Add zx tests mirroring existing suites:
   - Provider determinism/idempotency: running sync twice with unchanged inputs writes identical `TARGETS.gleam.auto`.
-  - Auto‑map wiring: use `tools/tests/e2e-provider-wiring.ts` with `--lockfile <path> --importer <project>` to assert provider presence.
+  - Auto‑map wiring: use `build-tools/tools/tests/e2e-provider-wiring.ts` with `--lockfile <path> --importer <project>` to assert provider presence.
   - Patching smoke: add a dummy `patches/gleam/<pkg>@<ver>.patch` and verify only targets labeled with the matching lockfile provider are impacted.
 
 ### Phased Implementation
@@ -160,18 +160,18 @@ Phase A — Scaffolding & Labels
 
 Phase B — Provider Sync & Auto‑Map
 
-- Implement `tools/buck/sync-providers-gleam.ts`; write `TARGETS.gleam.auto` deterministically; reuse `tools/lib/providers.ts` naming.
+- Implement `build-tools/tools/buck/sync-providers-gleam.ts`; write `TARGETS.gleam.auto` deterministically; reuse `build-tools/tools/lib/providers.ts` naming.
 - Extend prebuild guard for Gleam.
 
 Phase C — Nix Templates & Deps Derivation
 
-- Introduce `tools/nix/templates/gleam.nix` (`gleamApp`, `gleamLib`).
+- Introduce `build-tools/tools/nix/templates/gleam.nix` (`gleamApp`, `gleamLib`).
 - Add deps derivation keyed by a repo‑tracked lock snapshot.
 - Wire dev overrides and patches.
 
 Phase D — Patching UX
 
-- Implement `tools/patch/patch-gleam.ts`; integrate with `patch-pkg`.
+- Implement `build-tools/tools/patch/patch-gleam.ts`; integrate with `patch-pkg`.
 - On apply: run provider sync and auto‑map.
 
 Phase E — Tests & CI

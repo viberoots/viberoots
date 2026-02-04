@@ -2,7 +2,7 @@
 
 CI runs zx-backed stages and does not commit generated glue.
 
-## Stages (via tools/ci/run-stage.ts)
+## Stages (via build-tools/tools/ci/run-stage.ts)
 
 1. `export-graph`
 2. `sync-providers` (unified orchestrator; per-language drivers run conditionally)
@@ -12,13 +12,13 @@ CI runs zx-backed stages and does not commit generated glue.
 6. `wheelhouse-preload` (Python; optional cache push)
 7. `buck-test`
 
-Run locally with `CI=true tools/ci/run-stage.ts --stage <name>`.
+Run locally with `CI=true build-tools/tools/ci/run-stage.ts --stage <name>`.
 
 ## What each stage does (simple)
 
-- **export-graph**: Freeze the configured Buck graph to `tools/buck/graph.json` so other steps read a stable view.
+- **export-graph**: Freeze the configured Buck graph to `build-tools/tools/buck/graph.json` so other steps read a stable view.
 - **sync-providers**: Unified orchestrator regenerates language providers and `third_party/providers/nix_attr_map.bzl` deterministically (Node is skipped when no PNPM lockfiles are present).
-  - Provider naming is canonical and shared across languages via `tools/lib/providers.ts`. Do not handcraft provider labels in docs or examples; prefer helpers: `providerNameForModuleKey`, `providerNameForImporter`.
+  - Provider naming is canonical and shared across languages via `build-tools/tools/lib/providers.ts`. Do not handcraft provider labels in docs or examples; prefer helpers: `providerNameForModuleKey`, `providerNameForImporter`.
 - **gen-auto-map**: Map targets → providers based on labels in the exported graph; keeps invalidation tight.
 - **prebuild-guard**: Ensure glue exists and is fresh. Locally it can auto‑fix; CI fails fast with clear errors.
   - Reference: `docs/handbook/troubleshooting.md#prebuild-guard-glue-presence--freshness`.

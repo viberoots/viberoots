@@ -12,8 +12,8 @@ The plan is intentionally incremental. Each PR is scoped to be reviewable, indep
 
 ### Scope & Changes
 
-- Update `tools/buck/gen-auto-map.ts` to ignore nodes whose `name` starts with `//third_party/providers:`.
-- Keep existing label parsing logic via `tools/lib/labels.ts` unchanged.
+- Update `build-tools/tools/buck/gen-auto-map.ts` to ignore nodes whose `name` starts with `//third_party/providers:`.
+- Keep existing label parsing logic via `build-tools/tools/lib/labels.ts` unchanged.
 - No changes to Starlark macros or planners.
 
 ### Acceptance Criteria
@@ -81,7 +81,7 @@ Go macros currently attach provider deps in two ways: (1) via `MODULE_PROVIDERS`
 ### Scope & Changes
 
 - In `go/defs.bzl`, stop appending `_nixpkg_provider_for(...)` results in `_merge_cgo_deps`; keep `nixpkg:` labels via `_apply_cgo_labels`.
-- Ensure `gen-auto-map.ts` (which already translates `nixpkg:` labels via `tools/lib/labels.ts`) provides the necessary providers to Go targets.
+- Ensure `gen-auto-map.ts` (which already translates `nixpkg:` labels via `build-tools/tools/lib/labels.ts`) provides the necessary providers to Go targets.
 - Update any tests that assumed direct provider deps to assert provider presence via deps resolved from `MODULE_PROVIDERS`.
 
 ### Acceptance Criteria
@@ -111,7 +111,7 @@ Go macros currently attach provider deps in two ways: (1) via `MODULE_PROVIDERS`
 
 ### Description
 
-Enhance `tools/buck/prebuild-guard.ts` to validate that any node with `lockfile:` or `nixpkg:` labels (from `tools/buck/graph.json`) is covered by a generated provider and mapped in `auto_map.bzl`. Fail in CI; warn locally unless `--strict` is passed.
+Enhance `build-tools/tools/buck/prebuild-guard.ts` to validate that any node with `lockfile:` or `nixpkg:` labels (from `build-tools/tools/buck/graph.json`) is covered by a generated provider and mapped in `auto_map.bzl`. Fail in CI; warn locally unless `--strict` is passed.
 
 ### Scope & Changes
 
@@ -185,7 +185,7 @@ Add/align tests that assert (a) provider self-mappings are absent, (b) prebuild-
 ### Scope & Changes
 
 - Tests:
-  - Extend or add zx tests under `tools/tests`:
+  - Extend or add zx tests under `build-tools/tools/tests`:
     - `gen-auto-map.no-self-entries.test.ts` (assert no `//third_party/providers:*` keys in `MODULE_PROVIDERS`).
     - `prebuild-guard.provider-coverage.test.ts` (simulate missing provider file or stale auto_map and assert guard behavior for warn vs CI error).
     - `go.wiring-cgo-provider.test.ts` (assert providers appear via mapping, not direct injection).

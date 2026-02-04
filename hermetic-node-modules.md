@@ -28,7 +28,7 @@ This document captures the exact approach we use to make `node_modules` immutabl
 
 ### Dev shell marker and relink checks
 
-I write a marker at `buck-out/tmp/node-modules-link.json` when I link `node_modules` from the repo root. The marker stores the importer, lockfile path, lockfile hash, and Nix output path. On entry, I only trust the marker or an existing `node_modules` symlink. If the lockfile changes or the marker is missing, I skip linking. To refresh the link, I run `tools/bin/i`.
+I write a marker at `buck-out/tmp/node-modules-link.json` when I link `node_modules` from the repo root. The marker stores the importer, lockfile path, lockfile hash, and Nix output path. On entry, I only trust the marker or an existing `node_modules` symlink. If the lockfile changes or the marker is missing, I skip linking. To refresh the link, I run `build-tools/tools/bin/i`.
 
 ---
 
@@ -155,7 +155,7 @@ devShells.default = pkgs.mkShell {
 Helper to auto‑update the FOD hash when the lockfile changes:
 
 ```bash
-tools/dev/update-pnpm-hash.ts
+build-tools/tools/dev/update-pnpm-hash.ts
 ```
 
 ---
@@ -174,7 +174,7 @@ pnpm patch-commit /path/to/temp/dir
 Rebuild:
 
 ```bash
-nix build .#pnpm-store --no-link      # update FOD hash if prompted (or run tools/dev/update-pnpm-hash.ts)
+nix build .#pnpm-store --no-link      # update FOD hash if prompted (or run build-tools/tools/dev/update-pnpm-hash.ts)
 nix build .#node-modules
 nix develop                            # links node_modules automatically
 ```
@@ -261,7 +261,7 @@ With the above, rebuilds happen only when the effective dependency graph changes
 ## Quick reference
 
 - Build store once (update FOD hash if prompted):
-  - `nix build .#pnpm-store --no-link` → `tools/dev/update-pnpm-hash.ts`
+  - `nix build .#pnpm-store --no-link` → `build-tools/tools/dev/update-pnpm-hash.ts`
 - Build `node_modules` (immutable in Nix store):
   - `nix build .#node-modules`
 - Use in dev shell (auto‑links and adds `.bin` to PATH):

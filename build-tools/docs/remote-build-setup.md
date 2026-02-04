@@ -150,7 +150,7 @@ nix copy --to 'https://<cache-endpoint>' $(nix path-info .#graph-generator)
 
 ```bash
 # Build and push all wheelhouse outputs for importers with uv.lock
-node tools/ci/run-stage.ts --stage wheelhouse-preload --to 'https://<cache-endpoint>'
+node build-tools/tools/ci/run-stage.ts --stage wheelhouse-preload --to 'https://<cache-endpoint>'
 # Equivalent (manual): discover attributes, then copy their closures
 nix build .#py-wheelhouse-apps-foo .#py-wheelhouse-libs-bar --accept-flake-config
 nix copy --to 'https://<cache-endpoint>' $(nix path-info .#py-wheelhouse-apps-foo .#py-wheelhouse-libs-bar)
@@ -228,7 +228,7 @@ cachix use <your-cache-name>
 
 ```bash
 direnv allow || true
-node tools/dev/startup-check.ts
+node build-tools/tools/dev/startup-check.ts
 nix build .#graph-generator --accept-flake-config --rebuild
 ```
 

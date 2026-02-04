@@ -82,7 +82,7 @@ Target contents of `/build-tools`:
 - `/build-tools/tools` (from current `/tools`)
 - `/build-tools/lang` (from current `/lang`)
 - `/build-tools/go`, `/build-tools/cpp`, `/build-tools/node`, `/build-tools/python`, `/build-tools/rust` (from current language rule dirs)
-- `/build-tools/nix` (from current `/tools/nix` and possibly root `flake.nix` related inputs)
+- `/build-tools/nix` (from current `/build-tools/tools/nix` and possibly root `flake.nix` related inputs)
 - `/build-tools/docs` for build-system design docs that are currently in root
 - `/patches` remains at root (not moved)
 - `/third_party`, `/toolchains`, and `target_platforms` remain at root (not moved)
@@ -91,8 +91,8 @@ Path-sensitive areas I must validate:
 
 - Buck `load()` paths in `*.bzl` files.
 - Buck target labels for `//lang` if moved.
-- Script paths in `package.json`, `tools/bin/*`, `Jenkinsfile`, and `toolchains`.
-- Nix paths in `flake.nix` and `tools/nix/*`.
+- Script paths in `package.json`, `build-tools/tools/bin/*`, `Jenkinsfile`, and `toolchains`.
+- Nix paths in `flake.nix` and `build-tools/tools/nix/*`.
 - Repo-relative paths embedded in zx scripts.
 
 ## Move Map (Root-Level Items)
@@ -111,7 +111,7 @@ I will list a destination for each current root item. This is required before an
 
 ### Move to `/build-tools`
 
-- `tools/` -> `build-tools/tools/`
+- `build-tools/tools/` -> `build-tools/tools/`
 - `go/` -> `build-tools/go/`
 - `cpp/` -> `build-tools/cpp/`
 - `node/` -> `build-tools/node/`
@@ -233,13 +233,13 @@ Purpose: centralize build system code under `/builder`.
 
 Tasks:
 
-- Move `tools/` to `build-tools/tools/`.
+- Move `build-tools/tools/` to `build-tools/tools/`.
 - Move language rule folders (`go`, `cpp`, `node`, `python`, `rust`) to `build-tools/`.
 - Move `lang/` to `build-tools/lang/`.
 - Keep `third_party/`, `toolchains`, and `target_platforms` at root.
 - Update all Buck `load()` paths and any `filegroup` or `glob` references.
 - Update Buck labels only if `lang/` moves.
-- Update all Node and zx script paths (`package.json`, `tools/bin/*`).
+- Update all Node and zx script paths (`package.json`, `build-tools/tools/bin/*`).
 - Update Nix paths in `flake.nix` and `build-tools/tools/nix/*`.
 - Update CI paths in `Jenkinsfile`.
 - Validate only path and import changes in moved files.
@@ -297,7 +297,7 @@ Outputs:
 
 Checks:
 
-- `rg` shows no old `tools/` or `lang/` references unless intentional.
+- `rg` shows no old `build-tools/tools/` or `lang/` references unless intentional.
 - Baseline runs still match.
 
 ## Dependencies and Risks
@@ -330,7 +330,7 @@ I will mark each phase and task with one of these statuses during execution.
 
 - Do we add a compatibility shim for `lang/` after moving under `/build-tools`
 - Should `docs` remain a mix of general and build docs, or should build docs live only under `/build-tools/docs`
-- Should we keep a compatibility shim for `tools/` and `lang/` paths or hard-cut to `/build-tools`
+- Should we keep a compatibility shim for `build-tools/tools/` and `lang/` paths or hard-cut to `/build-tools`
 
 ## Patches Policy
 

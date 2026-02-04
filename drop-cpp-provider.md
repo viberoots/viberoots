@@ -21,9 +21,9 @@ This document proposes removing the C++ provider dependency path (auto_map → p
 ## Current State (baseline)
 
 - C++ macros (`nix_cpp_library`, `nix_cpp_binary`, `nix_cpp_test`) load `//third_party/providers:auto_map.bzl` and append provider deps for invalidation/introspection.
-- Macros stamp `nixpkg:` labels when `nixpkg_deps` is used; the planner already reads these labels and passes them into `tools/nix/templates/cpp.nix`.
+- Macros stamp `nixpkg:` labels when `nixpkg_deps` is used; the planner already reads these labels and passes them into `build-tools/tools/nix/templates/cpp.nix`.
 - Prebuild guard does not require C++ provider files (only Node has strict importer provider presence).
-- Optional overlay `tools/nix/overlays/cpp-patches.nix` is gated behind env and presence checks; it is not used by default.
+- Optional overlay `build-tools/tools/nix/overlays/cpp-patches.nix` is gated behind env and presence checks; it is not used by default.
 
 Problem: provider edges add glue, churn, and complexity without providing unique value once `nixpkg_deps` is first‑class and the planner consumes `nixpkg:` labels directly.
 
@@ -33,7 +33,7 @@ Problem: provider edges add glue, churn, and complexity without providing unique
 
 - C++ macros no longer load `auto_map.bzl` nor append provider deps.
 - `nixpkg_deps` remains the single source of truth at call sites; macros stamp normalized `nixpkg:` labels for the exporter.
-- Planner (`tools/nix/planner/cpp.nix`) continues to read `nixpkg:` labels (already implemented) and passes a stable, sorted `nixCxxAttrs` list to `tools/nix/templates/cpp.nix`.
+- Planner (`build-tools/tools/nix/planner/cpp.nix`) continues to read `nixpkg:` labels (already implemented) and passes a stable, sorted `nixCxxAttrs` list to `build-tools/tools/nix/templates/cpp.nix`.
 - `cpp_nix_build` explicitly declares the Nix inputs that must affect the rule key (e.g., `flake.lock`, optional overlays) in addition to local patch files carried via `srcs`.
 - Prebuild guard remains Node‑focused for provider presence and freshness; no C++ provider checks are (re)introduced.
 
@@ -110,14 +110,14 @@ Repeat analogously for `nix_cpp_binary` and keep `nix_cpp_test` planner‑visibl
 
 ### 2) Planner (C++)
 
-- Keep current logic in `tools/nix/planner/cpp.nix`: read `nixpkg:` labels from the target (and, if desired, selected deps), build a stable, deduped list as `nixCxxAttrs`, and pass them to `tools/nix/templates/cpp.nix`.
+- Keep current logic in `build-tools/tools/nix/planner/cpp.nix`: read `nixpkg:` labels from the target (and, if desired, selected deps), build a stable, deduped list as `nixCxxAttrs`, and pass them to `build-tools/tools/nix/templates/cpp.nix`.
 - Ensure local patches flow: plan already turns `.patch` files in `srcs` into the `patches` list for the Nix derivation.
 
 No structural change required; verify sorting/dedup is stable.
 
 ### 3) Nix template (C++)
 
-- No functional change: `tools/nix/templates/cpp.nix` already accepts `nixCxxAttrs` and resolves pkgs deterministically to include/lib flags and static libraries.
+- No functional change: `build-tools/tools/nix/templates/cpp.nix` already accepts `nixCxxAttrs` and resolves pkgs deterministically to include/lib flags and static libraries.
 - Confirm the template continues to be independent of provider names and uses normalized attributes only.
 
 ### 4) Buck rule implementation (`cpp_nix_build`)
@@ -129,7 +129,7 @@ No structural change required; verify sorting/dedup is stable.
 Implementation approach (two options):
 
 - Minimal: add a `nix_inputs` attribute (list of sources) to `cpp_nix_build`, defaulting to `["flake.lock"]` if present, and include it in the action’s hidden inputs.
-- Alternative: in macros, probe and pass a normalized list (e.g., if `//:flake.lock` exists, include it; if `tools/nix/overlays/cpp-patches.nix` exists and overlay is enabled, include it).
+- Alternative: in macros, probe and pass a normalized list (e.g., if `//:flake.lock` exists, include it; if `build-tools/tools/nix/overlays/cpp-patches.nix` exists and overlay is enabled, include it).
 
 Effect: changes to lockfiles or overlays invalidate affected C++ targets; `buck2 cquery 'testsof(rdeps(...))'` remains precise without provider nodes.
 
@@ -141,7 +141,7 @@ Effect: changes to lockfiles or overlays invalidate affected C++ targets; `buck2
 
 ### 6) Provider generation tools
 
-- Deprecate C++ path in `tools/buck/providers/`; Node remains enabled.
+- Deprecate C++ path in `build-tools/tools/buck/providers/`; Node remains enabled.
 - Keep the file around temporarily with a clear “no‑op for C++” note to avoid breaking scripts calling a unified “sync‑providers” step. The step becomes Node‑only.
 
 ---
@@ -156,7 +156,7 @@ Effect: changes to lockfiles or overlays invalidate affected C++ targets; `buck2
 
 ## Introspection and Tooling
 
-- Add a small CLI (`tools/buck/inspect-cpp-attrs.ts`) that reads the exported graph and prints effective `nixpkg:` attrs per target (based on labels). This replaces provider‑node based queries for auditing/debug.
+- Add a small CLI (`build-tools/tools/buck/inspect-cpp-attrs.ts`) that reads the exported graph and prints effective `nixpkg:` attrs per target (based on labels). This replaces provider‑node based queries for auditing/debug.
 - Optionally add a planner view in `graph-generator` outputs for C++: for each C++ target, emit the `nixCxxAttrs` alongside the derivation reference for easy inspection in Nix CLI or tests.
 
 ---
@@ -172,7 +172,7 @@ Effect: changes to lockfiles or overlays invalidate affected C++ targets; `buck2
    - Remove expectations of provider targets for C++.
    - Add tests that flipping `flake.lock` (or a test overlay) invalidates only relevant C++ targets.
    - Keep Node provider tests untouched.
-6. Remove (or de‑scope) C++ provider sync paths from `tools/buck/providers/*`; leave Node path active.
+6. Remove (or de‑scope) C++ provider sync paths from `build-tools/tools/buck/providers/*`; leave Node path active.
 7. Update docs (handbook, scaffolding) to show `nixpkg_deps` as the only C++ path for nixpkgs deps.
 
 Rollback is trivial: re‑enable provider append in macros and keep prior tools; no data migration is required.
@@ -233,7 +233,7 @@ Although this can be shipped in a single PR, we recommend two fast, focused PRs:
 
 2. Cleanup and operability PR
    - Make C++ a no‑op in provider sync tooling; keep Node path intact.
-   - Add `tools/buck/inspect-cpp-attrs.ts` for introspection.
+   - Add `build-tools/tools/buck/inspect-cpp-attrs.ts` for introspection.
    - Update docs and scaffolds; prune dead references; add a brief migration note in the handbook.
 
 Both PRs keep risk low and allow quick rollback at any point.
@@ -285,8 +285,8 @@ def _maybe_nix_inputs():
     if native.glob(["flake.lock"]):
         xs.append("//:flake.lock")
     # Optional overlay when enabled by env/config; only if file exists
-    if native.glob(["tools/nix/overlays/cpp-patches.nix"]) and read_config("cpp_overlay_enabled", "0") == "1":
-        xs.append("//tools/nix/overlays:cpp-patches.nix")
+    if native.glob(["build-tools/tools/nix/overlays/cpp-patches.nix"]) and read_config("cpp_overlay_enabled", "0") == "1":
+        xs.append("//build-tools/tools/nix/overlays:cpp-patches.nix")
     return xs
 
 cpp_nix_build(
@@ -306,11 +306,11 @@ This keeps the rule key faithful to real Nix inputs without provider nodes.
 
 - Continue reading `nixpkg:` labels from the target (and tests/planner stub as needed).
 - Build a stable, deduped list of `nixCxxAttrs`.
-- Pass to `tools/nix/templates/cpp.nix`.
+- Pass to `build-tools/tools/nix/templates/cpp.nix`.
 - Ensure patches discovered from `srcs` are mapped to `patches = [...]` for the derivation.
 - Confirm attribute sorting/dedup for deterministic derivation keys.
 
-### E. Introspection CLI spec (`tools/buck/inspect-cpp-attrs.ts`)
+### E. Introspection CLI spec (`build-tools/tools/buck/inspect-cpp-attrs.ts`)
 
 Purpose: replace provider‑node based graph queries for C++ with a labels/planner‑based view.
 
@@ -318,7 +318,7 @@ Purpose: replace provider‑node based graph queries for C++ with a labels/plann
   - `--target //<pkg>:name` (repeatable)
   - `--json` for machine‑readable output
 - Behavior:
-  - Load `tools/buck/graph.json` (via shared `readGraph`)
+  - Load `build-tools/tools/buck/graph.json` (via shared `readGraph`)
   - For each target, collect `nixpkg:` labels on the node (and optionally on its direct deps if we decide to reflect inherited attrs)
   - Print a sorted, deduped list of effective attrs
 - Output example (text):

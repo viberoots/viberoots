@@ -57,7 +57,7 @@ Effect: Editing a patch file under a target’s local directory re‑executes on
 
 ### Nix Templates (Go)
 
-Update `tools/nix/lang-templates.nix` so Go derivations accept multiple local patch directories and drop the global default path.
+Update `build-tools/tools/nix/lang-templates.nix` so Go derivations accept multiple local patch directories and drop the global default path.
 
 Key changes:
 
@@ -137,7 +137,7 @@ stdenv.mkDerivation {
 
 - Remove Go/C++ provider wiring that existed only to reflect global patch files.
 - Keep Node’s importer‑scoped providers and `auto_map.bzl` unchanged.
-- Update `tools/buck/gen-auto-map.ts` to stop mapping Go `module:` labels to providers; only Node `lockfile:` labels are mapped. The Go exporter remains authoritative for labels (diagnostics) but is not used for provider mapping for patching.
+- Update `build-tools/tools/buck/gen-auto-map.ts` to stop mapping Go `module:` labels to providers; only Node `lockfile:` labels are mapped. The Go exporter remains authoritative for labels (diagnostics) but is not used for provider mapping for patching.
 
 ---
 
@@ -193,8 +193,8 @@ Each PR is small, testable, and independently valuable.
 2. PR: Remove global Go/C++ provider wiring and glue
    - Changes:
      - Delete/disable any Go/C++ provider generation previously tied to global `patches/**`.
-     - Simplify `tools/buck/sync-providers.ts` to focus on Node only.
-     - Update `tools/buck/gen-auto-map.ts` docs/comments to clarify Go/C++ no longer use providers for patching.
+     - Simplify `build-tools/tools/buck/sync-providers.ts` to focus on Node only.
+     - Update `build-tools/tools/buck/gen-auto-map.ts` docs/comments to clarify Go/C++ no longer use providers for patching.
    - Tests:
      - Ensure Node provider sync remains green.
    - Acceptance:

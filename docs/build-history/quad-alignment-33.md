@@ -31,11 +31,11 @@ This PR adds a single, canonical diagnostic report that answers “what invalida
     - patch scope (`package-local` vs `importer-local`)
     - what is expected to carry patch inputs (provider `patch_paths` vs macro action inputs, or both)
   - Keep the index format stable and additive.
-- Extend `tools/buck/prebuild-guard.ts` (or the existing prebuild presence guard) to print a short, consistent explanation when glue exists but invalidation expectations are likely to be misread:
+- Extend `build-tools/tools/buck/prebuild-guard.ts` (or the existing prebuild presence guard) to print a short, consistent explanation when glue exists but invalidation expectations are likely to be misread:
   - For importer-local languages, print one line that states importer-local patch invalidation is driven by macro action inputs under `<importer>/patches/<lang>`.
   - For package-local languages, print one line that states invalidation is driven by `<pkg>/patches/<lang>` included in target inputs.
 - Update patching UX messaging to reference the same terms:
-  - `tools/patch/patch-pkg.ts` should continue to print whether glue runs, but should also print the patch scope in the same vocabulary used elsewhere.
+  - `build-tools/tools/patch/patch-pkg.ts` should continue to print whether glue runs, but should also print the patch scope in the same vocabulary used elsewhere.
 
 Cleanup/standardization in this PR:
 
@@ -247,8 +247,8 @@ This PR removes that duplication without forcing ecosystem parsing logic to merg
   - standardizes importer enumeration behavior for the supported importer label contract
   - preserves the existing single-importer-per-lockfile convention where applicable
 - Refactor:
-  - `tools/buck/providers/node.ts:readNodeProviderIndexEntries`
-  - `tools/buck/providers/python.ts:readPythonProviderIndexEntries`
+  - `build-tools/tools/buck/providers/node.ts:readNodeProviderIndexEntries`
+  - `build-tools/tools/buck/providers/python.ts:readPythonProviderIndexEntries`
     to call the shared helper.
 - Introduce a small, consistent lockfile discovery helper that can cover both:
   - `pnpm-lock.yaml` (Node)

@@ -46,7 +46,7 @@ Notes:
 
 We replace any hand-maintained overlay with a tiny, stable overlay that scans `patches/cpp/*.patch`, decodes the attr/version, filters to the current nixpkgs version, and applies patches via `final.applyPatches`. Only this file needs to be committed; no generated JSON.
 
-- File: `tools/nix/overlays/cpp-patches.nix`
+- File: `build-tools/tools/nix/overlays/cpp-patches.nix`
 - Included by `flake.nix` when present (already implemented)
 
 Behavior:
@@ -61,7 +61,7 @@ Behavior:
 Reference overlay:
 
 ```nix
-# tools/nix/overlays/cpp-patches.nix
+# build-tools/tools/nix/overlays/cpp-patches.nix
 final: prev:
 let
   root = ../../..;                           # repo root relative to this file
@@ -135,7 +135,7 @@ Properties:
 
 ---
 
-## CLI changes (`tools/patch/patch-cpp.ts`)
+## CLI changes (`build-tools/tools/patch/patch-cpp.ts`)
 
 Update filename generation and messaging; keep subcommands the same.
 
@@ -179,12 +179,12 @@ const dst = path.join("patches", "cpp", `${enc}@${sess.version}.patch`);
 
 ## Tests
 
-Update and add tests under `tools/tests/patching/`.
+Update and add tests under `build-tools/tools/tests/patching/`.
 
 1. Create test: apply creates encoded patch and overlay picks it up
 
 ```ts
-// tools/tests/patching/patch-cpp.apply.encoded-name.test.ts
+// build-tools/tools/tests/patching/patch-cpp.apply.encoded-name.test.ts
 // - run patch-pkg start/apply cpp zlib
 // - assert file exists: patches/cpp/pkgs__zlib@<ver>.patch
 // - assert output mentions auto-discovery (no snippet)
@@ -215,11 +215,11 @@ Update and add tests under `tools/tests/patching/`.
 
 1. Add overlay file
 
-- Create `tools/nix/overlays/cpp-patches.nix` as above
+- Create `build-tools/tools/nix/overlays/cpp-patches.nix` as above
 
 2. Update CLI
 
-- Modify `tools/patch/patch-cpp.ts`:
+- Modify `build-tools/tools/patch/patch-cpp.ts`:
   - replace filename sanitize with `encodeAttrForFilename`
   - stop printing the overlay snippet; print auto-discovery note
 

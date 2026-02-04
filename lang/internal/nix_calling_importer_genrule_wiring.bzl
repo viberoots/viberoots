@@ -23,7 +23,7 @@ def prepare_importer_nix_calling_genrule_wiring(
         patch_key_prefix = PATCH_INPUTS_KEY_PREFIX,
         provider_key_prefix = PROVIDER_EDGES_KEY_PREFIX,
         inject_workspace_root_env = False,
-        workspace_root_env_src = "root//tools/buck:workspace-root.env",
+        workspace_root_env_src = "root//build-tools/tools/buck:workspace-root.env",
         global_inputs_into = "srcs",
         global_inputs_stamp = True,
         global_inputs_key_prefix = GLOBAL_NIX_INPUTS_KEY_PREFIX):
@@ -32,7 +32,7 @@ def prepare_importer_nix_calling_genrule_wiring(
 
     This composes:
     - importer-scoped wiring (lockfile label enforcement, label stamping, importer patches, provider edges)
-    - optional tools/buck/workspace-root.env injection for dict-shaped `srcs`
+    - optional build-tools/tools/buck/workspace-root.env injection for dict-shaped `srcs`
     - global Nix inputs as real action inputs (optional label stamping)
     """
     kw = dict(kwargs) if kwargs != None else {}
@@ -46,8 +46,8 @@ def prepare_importer_nix_calling_genrule_wiring(
         current = srcs2 or {}
         if not isinstance(current, dict):
             current = {}
-        if "tools/buck/workspace-root.env" not in current:
-            current["tools/buck/workspace-root.env"] = workspace_root_env_src
+        if "build-tools/tools/buck/workspace-root.env" not in current:
+            current["build-tools/tools/buck/workspace-root.env"] = workspace_root_env_src
         srcs2 = current
 
     prepared = prepare_importer_genrule_kwargs(

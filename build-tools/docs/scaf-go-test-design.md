@@ -56,7 +56,7 @@ Optionally, after write, best‑effort `go fmt <file>` (non‑fatal on failure).
 
 ### CLI integration plan
 
-- Extend `tools/scaffolding/scaf.ts` with a new command group:
+- Extend `build-tools/tools/scaffolding/scaf.ts` with a new command group:
   - `scaf go test <name> [--path=DEST] [--yes] [--dry-run]`
   - Parser: add top‑level `go` with subcommand `test`.
   - Help: add `scaf help go test` to show usage and examples.
@@ -76,13 +76,13 @@ Optionally, after write, best‑effort `go fmt <file>` (non‑fatal on failure).
 
 ### Tests (zx)
 
-- `tools/tests/scaffolding/scaf-go-test.lib.auto-wires.test.ts`
+- `build-tools/tools/tests/scaffolding/scaf-go-test.lib.auto-wires.test.ts`
   - Scaffold lib: `scaf new go lib demo-lib --path=libs/demo-lib`.
   - Run: `scaf go test demo_case --path=libs/demo-lib/pkg/demo-lib/demo_case_test.go`.
-  - `tools/dev/install-deps.ts --glue-only`.
+  - `build-tools/tools/dev/install-deps.ts --glue-only`.
   - `buck2 test --target-platforms prelude//platforms:default //libs/demo-lib:demo-lib_test` → pass.
 
-- `tools/tests/scaffolding/scaf-go-test.cli.auto-wires.test.ts`
+- `build-tools/tools/tests/scaffolding/scaf-go-test.cli.auto-wires.test.ts`
   - Scaffold app: `scaf new go cli demo-cli --path=apps/demo-cli`.
   - Run: `scaf go test main_case --path=apps/demo-cli/cmd/demo-cli/main_case_test.go`.
   - Glue; then `buck2 test --target-platforms prelude//platforms:default //apps/demo-cli:demo-cli_test` → pass.
@@ -100,7 +100,7 @@ Note: TARGETS is already using `auto_zx_tests`, so these new tests auto‑regist
 #### PR 1 — feat(scaf): add `scaf go test` command
 
 - Scope
-  - Introduce a new top‑level `go` command group with a `test` subcommand in `tools/scaffolding/scaf.ts`.
+  - Introduce a new top‑level `go` command group with a `test` subcommand in `build-tools/tools/scaffolding/scaf.ts`.
   - Implement path resolution, package detection, file generation, best‑effort formatting, usage/help, and shell completions.
 
 - UX/CLI
@@ -111,7 +111,7 @@ Note: TARGETS is already using `auto_zx_tests`, so these new tests auto‑regist
   - Hints: warn when the resolved path is not under `pkg/**` (libs) or `cmd/<app>/**` (apps).
 
 - Implementation details (files and functions)
-  - `tools/scaffolding/scaf.ts`
+  - `build-tools/tools/scaffolding/scaf.ts`
     - Parser: accept `go` as first token, then subcommand dispatch for `test`.
     - Add `cmdGoTest(name: string, flags: Record<string,string>)`:
       - Resolve destination path: `flags.path ?? path.join(process.cwd(), ensureSuffix(name, "_test.go"))`.
@@ -148,14 +148,14 @@ Note: TARGETS is already using `auto_zx_tests`, so these new tests auto‑regist
   - Add two zx tests verifying that files created via `scaf go test` are auto‑wired by our Buck macros without TARGETS edits.
 
 - Files
-  - `tools/tests/scaffolding/scaf-go-test.lib.auto-wires.test.ts`
-  - `tools/tests/scaffolding/scaf-go-test.cli.auto-wires.test.ts`
+  - `build-tools/tools/tests/scaffolding/scaf-go-test.lib.auto-wires.test.ts`
+  - `build-tools/tools/tests/scaffolding/scaf-go-test.cli.auto-wires.test.ts`
 
 - Test flow (both use `runInTemp` helper)
   1. Initialize a temp repo (helper writes `.buckconfig`, links `@prelude`, ensures toolchains cell).
   2. Scaffold target (lib or cli) with `scaf new`.
   3. `go mod tidy`; generate `gomod2nix.toml`; copy to repo root.
-  4. `tools/dev/install-deps.ts --glue-only` to refresh glue.
+  4. `build-tools/tools/dev/install-deps.ts --glue-only` to refresh glue.
   5. Invoke `scaf go test ... --path=...` into the canonical subtree:
      - Lib: `libs/demo-lib/pkg/demo-lib/demo_case_test.go`.
      - App: `apps/demo-cli/cmd/demo-cli/main_case_test.go`.
@@ -164,7 +164,7 @@ Note: TARGETS is already using `auto_zx_tests`, so these new tests auto‑regist
      - App: `buck2 test --target-platforms prelude//platforms:default //apps/demo-cli:demo-cli_test` → pass.
 
 - Wiring
-  - No changes to top‑level `TARGETS`; `auto_zx_tests` already discovers `tools/tests/**/*.test.ts`.
+  - No changes to top‑level `TARGETS`; `auto_zx_tests` already discovers `build-tools/tools/tests/**/*.test.ts`.
 
 - Acceptance criteria
   - Both tests pass locally and in CI; total suite remains green with coverage.

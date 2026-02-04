@@ -69,18 +69,18 @@ buck2 test //:scaffolding_help -- --env COVERAGE=1
 
 - Pure (CI-equivalent, default):
   - Uses a store-pinned Buck graph built via Nix (`nix build .#buck-graph`).
-  - Example: `tools/dev/dev-build.ts build //...`
+  - Example: `build-tools/tools/dev/dev-build.ts build //...`
 
 - Impure (fast local loop):
-  - Regenerates `tools/buck/graph.json` from the live workspace and evaluates with `--impure`.
-  - Example: `tools/dev/dev-build.ts --impure build //...`
+  - Regenerates `build-tools/tools/buck/graph.json` from the live workspace and evaluates with `--impure`.
+  - Example: `build-tools/tools/dev/dev-build.ts --impure build //...`
 
 CI should always use the pure path. Local development can opt into `--impure` for fast iteration.
 ```
 
 ## Verify prewarm (toolchains)
 
-`tools/bin/verify` supports an optional, best-effort prewarm step for heavy Nix toolchains to reduce cold-start time. It never affects correctness and is skipped silently if a flake attribute is missing.
+`build-tools/tools/bin/verify` supports an optional, best-effort prewarm step for heavy Nix toolchains to reduce cold-start time. It never affects correctness and is skipped silently if a flake attribute is missing.
 
 - Enabled by default: `VERIFY_PREWARM=1` (set `VERIFY_PREWARM=0` to disable)
 - Prewarms by attempting to build these flake attrs when available:
@@ -95,7 +95,7 @@ Notes:
 - You can customize the attribute list for local experiments by running the script directly:
 
 ```
-PREWARM_ATTRS="toolchains.go,toolchains.cxx" node tools/dev/prewarm-toolchains.ts
+PREWARM_ATTRS="toolchains.go,toolchains.cxx" node build-tools/tools/dev/prewarm-toolchains.ts
 ```
 
 ## Faster temp workspaces (seed store)
@@ -117,10 +117,10 @@ Examples:
 
 ```
 # Only copy the tools tree (plus flake.nix if present)
-TEST_RSYNC_ROOTS=tools buck2 test //tools/tests/rsync:rsync_roots_only_tools_test_ts
+TEST_RSYNC_ROOTS=tools buck2 test //build-tools/tools/tests/rsync:rsync_roots_only_tools_test_ts
 
 # Multiple roots:
-TEST_RSYNC_ROOTS="apps/demo,cpp,tools/nix" buck2 test //<target>
+TEST_RSYNC_ROOTS="apps/demo,cpp,build-tools/tools/nix" buck2 test //<target>
 ```
 
 This optimization is best-effort and opt-in; tests remain deterministic regardless of whether `TEST_RSYNC_ROOTS` is set.

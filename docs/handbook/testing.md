@@ -9,7 +9,7 @@
 
 ## Temp repos (`runInTemp`)
 
-Many zx tests use `runInTemp(...)` (in `tools/tests/lib/test-helpers.ts`) to execute in an isolated copy of the repo. During `v`, the verify runner prepares a **single** Nix-store seed and exports it to all tests:
+Many zx tests use `runInTemp(...)` (in `build-tools/tools/tests/lib/test-helpers.ts`) to execute in an isolated copy of the repo. During `v`, the verify runner prepares a **single** Nix-store seed and exports it to all tests:
 
 - `BNX_TEST_SEED_STORE_PATH` points at the seed store path.
 - `BNX_TEST_SEED_KEY` is exported for diagnostics.
@@ -28,9 +28,9 @@ In verify mode, `runInTemp` requires `BNX_TEST_SEED_STORE_PATH` and fails fast i
 
 ## Timing analysis (`TEST_TIMING=summary`)
 
-When you run `tools/bin/verify` with `TEST_TIMING=summary`, zx tests that use `runInTemp(...)` will emit `[timing]` bucket summaries. At the end of the verify run, `tools/bin/verify` appends an **aggregated** report into the verify log (comment-prefixed) by running:
+When you run `build-tools/tools/bin/verify` with `TEST_TIMING=summary`, zx tests that use `runInTemp(...)` will emit `[timing]` bucket summaries. At the end of the verify run, `build-tools/tools/bin/verify` appends an **aggregated** report into the verify log (comment-prefixed) by running:
 
-- `tools/dev/analyze-verify-timing.ts`
+- `build-tools/tools/dev/analyze-verify-timing.ts`
 
 This report includes:
 
@@ -41,12 +41,12 @@ This report includes:
 ### Verify helper
 
 - Full suite without coverage:
-  - `tools/bin/verify`
+  - `build-tools/tools/bin/verify`
 - Full suite with coverage (single merged report):
-  - `tools/bin/verify --coverage`
+  - `build-tools/tools/bin/verify --coverage`
 - Focused target(s):
-  - `tools/bin/verify //<target>` (40s external timeout per focused run)
-  - `tools/bin/verify --coverage //<target>`
+  - `build-tools/tools/bin/verify //<target>` (40s external timeout per focused run)
+  - `build-tools/tools/bin/verify --coverage //<target>`
 
 ## Running
 
@@ -57,8 +57,8 @@ This report includes:
 ## External runner helper (C++)
 
 - For C++ tests and binaries built via the Nix planner, use the centralized helper:
-  - `node tools/dev/build-selected.ts` (or `nix run .#zx-wrapper -- tools/dev/build-selected.ts`)
-- It ensures `tools/buck/graph.json` exists for the current workspace and runs:
+  - `node build-tools/tools/dev/build-selected.ts` (or `nix run .#zx-wrapper -- build-tools/tools/dev/build-selected.ts`)
+- It ensures `build-tools/tools/buck/graph.json` exists for the current workspace and runs:
   - `nix build .#graph-generator-selected` with `BUCK_TARGET` and `--accept-flake-config`
 - Output: prints only the Nix out path on stdout; logs go to stderr. Buck macros call this helper under the hood.
 
@@ -73,7 +73,7 @@ Rules and macros that execute `nix build` or `nix run` inside Buck actions must 
 - `//lang:nix_shell.bzl`: workspace and flake root bootstrap, timeout wrapper primitives.
 - `//lang:nix_action_runner.bzl`: common “runner” snippets (graph export, build-selected out path parsing, optional workspace-root injection).
 
-Do not copy/paste shell fragments between languages. If you need to change the bootstrap or the build-selected invocation contract, update the shared helper and add or extend a cquery probe test under `tools/tests/lang/`.
+Do not copy/paste shell fragments between languages. If you need to change the bootstrap or the build-selected invocation contract, update the shared helper and add or extend a cquery probe test under `build-tools/tools/tests/lang/`.
 
 ## zx tests overview
 
@@ -91,9 +91,9 @@ Do not copy/paste shell fragments between languages. If you need to change the b
 ## Go dependencies (gomod2nix)
 
 - After editing `go.mod` or `go.sum`, run:
-  - `node tools/dev/install-deps.ts` (regenerates `gomod2nix.toml` deterministically)
+  - `node build-tools/tools/dev/install-deps.ts` (regenerates `gomod2nix.toml` deterministically)
 - Preview without changes:
-  - `node tools/dev/install-deps.ts --dry-run`
+  - `node build-tools/tools/dev/install-deps.ts --dry-run`
 
 ## Nix-first runtime validation (Go)
 

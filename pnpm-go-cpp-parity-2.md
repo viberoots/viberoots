@@ -53,7 +53,7 @@ Notes:
 ### 2) Optional: Enable Go provider‑based mapping across the board
 
 - Today, Go invalidation correctness does not depend on provider mapping because local patch files are included in `srcs`. For feature parity with Node/C++ mapping visibility, we can make glue emit the provider index JSON before `gen-auto-map` so `module:` labels are translated into provider labels consistently.
-- Change: In glue, invoke `tools/buck/gen-provider-index.ts` (or `sync-providers.ts --emit-index`) prior to running `gen-auto-map.ts`.
+- Change: In glue, invoke `build-tools/tools/buck/gen-provider-index.ts` (or `sync-providers.ts --emit-index`) prior to running `gen-auto-map.ts`.
 - Impact: No change to correctness; improves visibility and consistency of provider wiring for diagnostics.
 
 ### 3) Optional: Clarify Node provider sync semantics
@@ -99,7 +99,7 @@ Notes:
 
 ### Phase 2 — Glue: Go provider index emission (optional but recommended)
 
-- Update `tools/patch/glue.ts`:
+- Update `build-tools/tools/patch/glue.ts`:
   - After `sync-providers.ts`, invoke `gen-provider-index.ts` (or `sync-providers.ts --emit-index`) to produce `third_party/providers/provider_index.{bzl,json}`.
   - Keep order: export graph → sync providers → provider index → gen auto map.
 - Add tests:
@@ -148,4 +148,4 @@ Notes:
 
 ---
 
-If you’d like, I can implement Phase 1 immediately and provide the targeted tests in the `tools/tests/scaffolding` and `tools/tests/e2e` areas consistent with our conventions.
+If you’d like, I can implement Phase 1 immediately and provide the targeted tests in the `build-tools/tools/tests/scaffolding` and `build-tools/tools/tests/e2e` areas consistent with our conventions.

@@ -17,7 +17,7 @@ I follow the repo-wide linking model described in `cpp-linking.md`, `build-tools
 - `deps` is the Buck graph edge list. It does not imply link intent.
 - `link_deps` declares linkable inputs. `header_deps` is include-only when that concept applies.
 - Macros compute `deps := deps ∪ link_deps ∪ header_deps` deterministically and validate `link_closure_overrides` keys.
-- `link_closure` defaults to `"direct"`. `"transitive"` follows `link_deps` only via `tools/nix/planner/link-closure.nix`.
+- `link_closure` defaults to `"direct"`. `"transitive"` follows `link_deps` only via `build-tools/tools/nix/planner/link-closure.nix`.
 - Ordering is deterministic and unsupported deps fail fast with targeted errors.
 
 ### C interop requirement
@@ -31,20 +31,20 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
 - Provider wiring: load `MODULE_PROVIDERS` from `//lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
 - Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
-- Patch model contract: `lang/lang_contracts.bzl` and `tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
+- Patch model contract: `lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
 
 ### Current State (repo)
 
 - Existing glue for Node providers and auto‑map generation:
-  - `tools/buck/providers/node.ts`: parses `pnpm-lock.yaml` and emits `TARGETS.node.auto` with one provider per importer.
-  - `tools/buck/sync-providers.ts`: unified orchestrator (canonical provider sync entrypoint).
-  - `tools/buck/gen-auto-map.ts`: maps target labels to provider deps, including `lockfile:<path>#<importer>`.
+  - `build-tools/tools/buck/providers/node.ts`: parses `pnpm-lock.yaml` and emits `TARGETS.node.auto` with one provider per importer.
+  - `build-tools/tools/buck/sync-providers.ts`: unified orchestrator (canonical provider sync entrypoint).
+  - `build-tools/tools/buck/gen-auto-map.ts`: maps target labels to provider deps, including `lockfile:<path>#<importer>`.
   - `hermetic-node-modules.md`: documents immutable, Nix‑built `node_modules`.
 - Sidecars & Composite Graph API:
-  - Glue emits a Node sidecar index at `tools/buck/node-lock-index.json` (via `tools/buck/gen-provider-index.ts`) alongside `tools/buck/graph.json`.
-  - Consumption MUST go through the Composite Graph API (`tools/lib/graph-view.ts` or CLI `tools/buck/graph-view.ts`). Do not read `graph.json` directly.
-  - The prebuild guard (`tools/buck/prebuild-guard.ts`) enforces freshness/presence of sidecars and `auto_map.bzl` before builds.
+  - Glue emits a Node sidecar index at `build-tools/tools/buck/node-lock-index.json` (via `build-tools/tools/buck/gen-provider-index.ts`) alongside `build-tools/tools/buck/graph.json`.
+  - Consumption MUST go through the Composite Graph API (`build-tools/tools/lib/graph-view.ts` or CLI `build-tools/tools/buck/graph-view.ts`). Do not read `graph.json` directly.
+  - The prebuild guard (`build-tools/tools/buck/prebuild-guard.ts`) enforces freshness/presence of sidecars and `auto_map.bzl` before builds.
 - Missing pieces:
   - No committed `pnpm-workspace.yaml` yet.
   - `third_party/providers/defs_node.bzl` exists in this repo (tiny `node_importer_deps` stamp macro).
@@ -76,9 +76,9 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 
 3. **Provider wiring (already scaffolded)**
    - Add `third_party/providers/defs_node.bzl` with a tiny `node_importer_deps(...)` genrule.
-   - Use the orchestrator `tools/buck/sync-providers.ts` to emit `TARGETS.node.auto` deterministically from all lockfiles and relevant patches.
-     - Providers-only mode: `node tools/buck/sync-providers.ts --lang node --no-glue`
-     - Full glue (ensures graph + auto_map): `node tools/buck/sync-providers.ts --lang node`
+   - Use the orchestrator `build-tools/tools/buck/sync-providers.ts` to emit `TARGETS.node.auto` deterministically from all lockfiles and relevant patches.
+     - Providers-only mode: `node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`
+     - Full glue (ensures graph + auto_map): `node build-tools/tools/buck/sync-providers.ts --lang node`
    - `gen-auto-map.ts` already maps `lockfile:<path>#<importer>` labels to provider deps used by Buck macros.
    - Note: `patch_paths` in generated `node_importer_deps(...)` include importer‑local patches (e.g., `<importer>/patches/node/*.patch`) for observability only. The provider rule remains metadata‑only (`srcs = []`), and invalidation continues to be driven by macros including importer‑local patches in target `srcs`.
 
@@ -90,8 +90,8 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
    - I treat `package.json` as the source of truth for workspace dependencies.
    - Buck `deps` on Node targets in the same importer package must match workspace dependencies.
 
-- Enforcement uses `tools/buck/enforce-node-deps.ts` and `tools/node/workspace-map.json`.
-  - The workspace map is generated by `tools/node/gen-workspace-map.ts` during the glue pipeline.
+- Enforcement uses `build-tools/tools/buck/enforce-node-deps.ts` and `build-tools/tools/node/workspace-map.json`.
+  - The workspace map is generated by `build-tools/tools/node/gen-workspace-map.ts` during the glue pipeline.
 
 ### Example: app depends on in-repo lib
 
@@ -144,7 +144,7 @@ nix_node_lib(
 ```
 
 5. **Scaffolding command**
-   - Extend `tools/scaffolding` to create a new PNPM project (e.g., `apps/web` or `libs/utils`) with:
+   - Extend `build-tools/tools/scaffolding` to create a new PNPM project (e.g., `apps/web` or `libs/utils`) with:
      - `package.json` (name, version, scripts), `pnpm-lock.yaml` (after `pnpm install` run in dev shell), and `.npmrc` if needed.
      - `tsconfig.json` with top‑level await if required by zx scripts; sensible module/target defaults.
      - ESLint + Prettier config aligned with repo standards.
@@ -178,7 +178,7 @@ nix_node_lib(
 - **Phase A: Workspace bootstrapping**
   - Add `pnpm-workspace.yaml` with `apps/*` and `libs/*`.
   - Commit minimal `third_party/providers/defs_node.bzl`.
-  - Verify `node tools/buck/sync-providers.ts --lang node --no-glue` runs idempotently with empty or initial projects.
+  - Verify `node build-tools/tools/buck/sync-providers.ts --lang node --no-glue` runs idempotently with empty or initial projects.
 
 - **Phase B: First PNPM project (per‑project lockfile)**
   - Scaffold `apps/example` with its own `package.json` and `pnpm-lock.yaml`.
@@ -190,7 +190,7 @@ nix_node_lib(
   - Ensure CI stages call Node provider sync and auto‑map before builds (as in `build-tools/docs/build-system-design.md`).
 
 - **Phase D: Scaffolding command**
-  - Add a zx script (e.g., `tools/scaffolding/new-pnpm-project.ts`) to generate the skeleton with TS, ESLint/Prettier, tests, labels, and scripts.
+  - Add a zx script (e.g., `build-tools/tools/scaffolding/new-pnpm-project.ts`) to generate the skeleton with TS, ESLint/Prettier, tests, labels, and scripts.
 
 ### Completion Criteria
 
@@ -220,7 +220,7 @@ Command mapping
   - Behavior: pnpm returns a temp workspace path. Our wrapper stores it (e.g., under `.tmp/patches-node/<pkg>/…`) and optionally launches `$PATCH_EDITOR`.
 - `patch-pkg apply node <pkg>` → `pnpm patch-commit <tempDir>`
   - Behavior: writes `patches/node/<name>@<version>.patch` (via `patches-dir` setting) and updates `pnpm.patchedDependencies` in the importer’s `package.json`.
-  - Post‑steps (same turn): run `node tools/buck/sync-providers.ts --lang node` so Buck picks up providers and `auto_map.bzl` immediately.
+  - Post‑steps (same turn): run `node build-tools/tools/buck/sync-providers.ts --lang node` so Buck picks up providers and `auto_map.bzl` immediately.
   - Clean up: remove the temp dir.
 - `patch-pkg reset node <pkg>` → discard temp dir (no patch written)
   - Behavior: deletes the stored temp path; no changes to files.
@@ -240,44 +240,44 @@ Notes
 
 Our current zx setup remains compatible with PNPM workspaces and the Node provider flow:
 
-- zx bootstrap: `tools/dev/zx-init.mjs` injects zx globals and a resolver, independent of `node_modules` layout. Scripts run via `node --import tools/dev/zx-init.mjs ...` (already handled by helpers).
-- Unified glue: `tools/patch/glue.ts` exports `runGlue()` which runs `sync-providers` and `gen-auto-map` with zx flags; `ensureGraph()` calls the exporter when needed. This works for Node as well.
-- Orchestrator: `tools/buck/sync-providers.ts` delegates to `tools/buck/providers/index.ts`, which already includes the Node driver (`syncNodeProviders`). No changes needed.
+- zx bootstrap: `build-tools/tools/dev/zx-init.mjs` injects zx globals and a resolver, independent of `node_modules` layout. Scripts run via `node --import build-tools/tools/dev/zx-init.mjs ...` (already handled by helpers).
+- Unified glue: `build-tools/tools/patch/glue.ts` exports `runGlue()` which runs `sync-providers` and `gen-auto-map` with zx flags; `ensureGraph()` calls the exporter when needed. This works for Node as well.
+- Orchestrator: `build-tools/tools/buck/sync-providers.ts` delegates to `build-tools/tools/buck/providers/index.ts`, which already includes the Node driver (`syncNodeProviders`). No changes needed.
 
 Consolidation and reuse for a Node patch wrapper
 
-- Add `tools/patch/patch-node.ts` implementing `LanguageHandler` using pnpm’s patch flow (see mapping above). It should:
-  - Use `.patch-sessions.json` via `tools/patch/state.ts` to track temp edit dirs (language key `node`).
-  - On apply/remove, call `runGlue()` from `tools/patch/glue.ts` to update providers and auto_map.
+- Add `build-tools/tools/patch/patch-node.ts` implementing `LanguageHandler` using pnpm’s patch flow (see mapping above). It should:
+  - Use `.patch-sessions.json` via `build-tools/tools/patch/state.ts` to track temp edit dirs (language key `node`).
+  - On apply/remove, call `runGlue()` from `build-tools/tools/patch/glue.ts` to update providers and auto_map.
   - Respect `$PATCH_EDITOR` for `start`/`session`.
   - Read and honor `.npmrc` `patches-dir=patches/node` (or set it in process env temporarily) so `patch-commit` writes under `patches/node/`.
-- Update `tools/patch/patch-pkg.ts` to accept `node` as a supported language and dynamic‑import `tools/patch/patch-node.ts` (mirroring Go and C++ handlers).
+- Update `build-tools/tools/patch/patch-pkg.ts` to accept `node` as a supported language and dynamic‑import `build-tools/tools/patch/patch-node.ts` (mirroring Go and C++ handlers).
 - Keep shared helpers in place:
-  - Provider naming stays in `tools/lib/providers.ts`.
-  - Provider sync driver already lives at `tools/buck/providers/node.ts`.
-  - Auto‑map (`tools/buck/gen-auto-map.ts`) already maps `lockfile:<path>#<importer>` labels to providers.
+  - Provider naming stays in `build-tools/tools/lib/providers.ts`.
+  - Provider sync driver already lives at `build-tools/tools/buck/providers/node.ts`.
+  - Auto‑map (`build-tools/tools/buck/gen-auto-map.ts`) already maps `lockfile:<path>#<importer>` labels to providers.
 
-Net result: zx scripts continue to run the same way (via `tools/bin/patch-pkg` and other zx entrypoints). The Node patch wrapper reuses existing session/glue infrastructure for a consistent developer experience.
+Net result: zx scripts continue to run the same way (via `build-tools/tools/bin/patch-pkg` and other zx entrypoints). The Node patch wrapper reuses existing session/glue infrastructure for a consistent developer experience.
 
 ### Isolation and non‑inheritance (no shadow dependencies)
 
 Requirements
 
 - Projects under `apps/*` and `libs/*` must not inherit dependencies or devDependencies from the repo root.
-- zx bootstrap (`tools/dev/zx-init.mjs`) is for zx scripts only; app/lib runtime must not depend on it or run with the zx loader.
+- zx bootstrap (`build-tools/tools/dev/zx-init.mjs`) is for zx scripts only; app/lib runtime must not depend on it or run with the zx loader.
 
 How we enforce this
 
 - Per‑importer lockfiles: each app/lib has its own `package.json` and `pnpm-lock.yaml`; builds key to that importer only.
 - No hoisting/shadowing: set `node-linker=isolated` in `.npmrc` (root or per importer) so packages can only access declared deps.
-- No global NODE_PATH: do not set `NODE_PATH` in dev shell or CI for app/lib execution; zx scripts run with their own loader via `node --import tools/dev/zx-init.mjs` and do not affect app processes.
+- No global NODE_PATH: do not set `NODE_PATH` in dev shell or CI for app/lib execution; zx scripts run with their own loader via `node --import build-tools/tools/dev/zx-init.mjs` and do not affect app processes.
 - No root devDep leakage: root `package.json` is for repo tooling only (zx scripts, generators). Do not reference root as a workspace dependency. Avoid `workspace:*` pointing to the root.
 - Nix hermetic installs: per‑importer `node-modules` derivations materialize exactly the declared graph; the dev shell only symlinks that specific output.
 
 Implication for scaffolding
 
 - Generated projects include their own `package.json`, `.npmrc` (with `patches-dir=patches/node` and `node-linker=isolated`), `pnpm-lock.yaml`, and tool configs (TS, ESLint/Prettier, tests).
-- Scripts in apps/libs run with plain `node` (or bundler) without the zx import hook. zx is reserved for `tools/**` scripts.
+- Scripts in apps/libs run with plain `node` (or bundler) without the zx import hook. zx is reserved for `build-tools/tools/**` scripts.
 
 ### Provider Naming and Labeling
 
@@ -369,7 +369,7 @@ This is a deliberate policy to keep dependency edges stable during early scaffol
 - This does **not** claim that the lockfile exists or that any dependencies are present.
 - When a real lockfile appears, provider sync switches to the real lockfile and begins computing the effective set from it.
 
-This discovery contract is implemented in `tools/lib/importers.ts` and consumed by `tools/buck/providers/node.ts` to avoid drift across tooling.
+This discovery contract is implemented in `build-tools/tools/lib/importers.ts` and consumed by `build-tools/tools/buck/providers/node.ts` to avoid drift across tooling.
 
 #### Why Importer-Scoped?
 
@@ -401,8 +401,8 @@ The Node provider system has comprehensive tests ensuring deterministic behavior
 
 ```bash
 # Run all Node provider tests
-buck2 test //tools/tests/... --filter sync-providers-node
-buck2 test //tools/tests/... --filter auto-map.node
+buck2 test //build-tools/tools/tests/... --filter sync-providers-node
+buck2 test //build-tools/tools/tests/... --filter auto-map.node
 
 # Run with coverage
 buck2 test //... -- --env COVERAGE=1
@@ -426,12 +426,12 @@ test("node provider: <specific behavior>", async () => {
 });
 ```
 
-**File naming:** `tools/tests/scaffolding/sync-providers-node.<behavior>.test.ts`
+**File naming:** `build-tools/tools/tests/scaffolding/sync-providers-node.<behavior>.test.ts`
 
 ### Handbook alignment checklist
 
 - Adding a language: PNPM/Node hooks in as an existing language variant. We reuse the provider sync orchestrator and `gen-auto-map.ts`, and propose a thin Node macro (`//node/defs.bzl`) consistent with `lang/defs_common.bzl` stamping.
-- Provider sync cookbook: Covered — Node provider generator exists (`tools/buck/providers/node.ts`), invoked via `tools/buck/sync-providers.ts`, deterministic outputs, and `tools/lib/providers.ts` for naming.
+- Provider sync cookbook: Covered — Node provider generator exists (`build-tools/tools/buck/providers/node.ts`), invoked via `build-tools/tools/buck/sync-providers.ts`, deterministic outputs, and `build-tools/tools/lib/providers.ts` for naming.
 - Macro stamping: Planned — Node macro should call `stamp_labels(lang="node", kind=...)` and append providers from `//lang:auto_map.bzl`.
 - Testing: No changes to harness; zx tests and external timeouts remain. Add focused zx tests for Node provider determinism and auto-map wiring when we add the macro.
 - Troubleshooting: Glue sequence, prebuild-guard, and patches lint patterns already documented for Go; Node follows the same flow with importer‑scoped lockfile inputs and `TARGETS.node.auto` presence. Documented in this design and consistent with the handbook.

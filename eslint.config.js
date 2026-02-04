@@ -1,7 +1,7 @@
 import tseslint from "@typescript-eslint/eslint-plugin";
 import tsparser from "@typescript-eslint/parser";
 import prettier from "eslint-config-prettier";
-import bucknix from "./tools/eslint-plugin-bucknix/index.js";
+import bucknix from "./build-tools/tools/eslint-plugin-bucknix/index.js";
 
 export default [
   {
@@ -14,7 +14,7 @@ export default [
       "**/.clinic/**",
       "**/prelude/**",
       "**/._*.ts",
-      "tools/scaffolding/templates/**",
+      "build-tools/tools/scaffolding/templates/**",
     ],
     languageOptions: {
       sourceType: "module",

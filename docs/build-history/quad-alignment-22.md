@@ -26,7 +26,7 @@ This PR makes “supported importer roots” a contract in the exporter lockfile
 
 This PR changes exporter logic and validation only. It does not change provider generation policies.
 
-- Update `tools/buck/exporter/lang/importer-lockfile-labels.ts` to:
+- Update `build-tools/tools/buck/exporter/lang/importer-lockfile-labels.ts` to:
   - validate that `computeImporterLabel(lockRel)` is a supported importer label
   - skip auto-attaching the label when the importer is unsupported
   - emit a deterministic exporter finding that points at the unsupported importer and the lockfile path
@@ -36,7 +36,7 @@ This PR changes exporter logic and validation only. It does not change provider 
 
 ### Tests (in this PR)
 
-Add a focused exporter test under `tools/tests/exporter/` that:
+Add a focused exporter test under `build-tools/tools/tests/exporter/` that:
 
 - constructs a simulated graph containing a Node or Python target that has:
   - `kind:*`
@@ -86,7 +86,7 @@ Touches only exporter code plus one narrow exporter test and a doc update.
 
 ### Description
 
-Go module labeling in `tools/buck/exporter/labeler.ts` depends on two implicit behaviors:
+Go module labeling in `build-tools/tools/buck/exporter/labeler.ts` depends on two implicit behaviors:
 
 - A process-global `__GO_LIST_CACHE` populated by `exporter/main.ts`
 - A fallback path that dynamically imports `fs-extra` to read `go.mod` for a conservative label attach in an edge case
@@ -100,7 +100,7 @@ This PR makes the Go labeler’s inputs explicit and removes the optional depend
 
 ### Scope & Changes
 
-- Update `tools/buck/exporter/main.ts` and `tools/buck/exporter/labeler.ts` so that:
+- Update `build-tools/tools/buck/exporter/main.ts` and `build-tools/tools/buck/exporter/labeler.ts` so that:
   - `attachGoModuleLabels(...)` receives Go list results via an explicit parameter (for example, a `Map<Batch, GoPkg[]>`), not via `global.__GO_LIST_CACHE`
   - the labeler no longer dynamically imports `fs-extra`
   - any remaining filesystem access uses `node:fs/promises` (or the fallback is removed entirely if it is no longer needed)
@@ -125,8 +125,8 @@ Update `build-tools/docs/build-system-design.md` (exporter section) to state the
 ### Acceptance Criteria
 
 - Go module labels produced by the exporter are unchanged for the same inputs.
-- `tools/buck/exporter/labeler.ts` no longer uses `global.__GO_LIST_CACHE`.
-- `tools/buck/exporter/labeler.ts` no longer imports `fs-extra`.
+- `build-tools/tools/buck/exporter/labeler.ts` no longer uses `global.__GO_LIST_CACHE`.
+- `build-tools/tools/buck/exporter/labeler.ts` no longer imports `fs-extra`.
 
 ### Risks
 
@@ -165,7 +165,7 @@ This PR makes synthetic lockfile providers opt-in, so the default behavior align
 
 ### Scope & Changes
 
-- Update `tools/buck/providers/node.ts` to:
+- Update `build-tools/tools/buck/providers/node.ts` to:
   - disable synthetic lockfile discovery by default
   - add an explicit option or environment flag to enable it (example: `NODE_PROVIDER_SYNTHETIC_LOCKFILES=1`)
 - Update provider index generation and any prebuild checks (if needed) so they do not assume synthetic providers are present by default.
@@ -173,7 +173,7 @@ This PR makes synthetic lockfile providers opt-in, so the default behavior align
 
 ### Tests (in this PR)
 
-Add a focused provider test under `tools/tests/providers/` that:
+Add a focused provider test under `build-tools/tools/tests/providers/` that:
 
 - creates a temp workspace importer under `apps/*` with `package.json` but no `pnpm-lock.yaml`
 - runs Node provider sync with default settings and asserts:
@@ -233,13 +233,13 @@ This PR consolidates the importer-scoped adapter wiring into a shared helper so 
 
 ### Scope & Changes
 
-- Introduce a small shared helper under `tools/buck/exporter/lang/` that:
+- Introduce a small shared helper under `build-tools/tools/buck/exporter/lang/` that:
   - runs the common validation steps
   - runs the common attach step (including the supported importer enforcement from PR‑1)
   - standardizes finding prefixes and guidance text
 - Update:
-  - `tools/buck/exporter/lang/node.ts`
-  - `tools/buck/exporter/lang/python.ts`
+  - `build-tools/tools/buck/exporter/lang/node.ts`
+  - `build-tools/tools/buck/exporter/lang/python.ts`
     to use the shared helper.
 
 This PR should be a refactor with no behavior change relative to PR‑1, except for improved consistency of messages.

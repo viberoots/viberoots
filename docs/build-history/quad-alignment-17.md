@@ -26,10 +26,10 @@ This PR will standardize the policy to: **exporter attaches missing importer-sco
 
 The work is:
 
-- Add a shared helper in `tools/lib/importers.ts` analogous to `findNearestUvLockForPackage(...)`, for PNPM:
+- Add a shared helper in `build-tools/tools/lib/importers.ts` analogous to `findNearestUvLockForPackage(...)`, for PNPM:
   - `findNearestPnpmLockForPackage(pkgDir: string): Promise<string | null>`
   - Behavior: walk upward from a Buck package directory to repo root and return the first `pnpm-lock.yaml` found, as a repo-relative POSIX path.
-- Update `tools/buck/exporter/lang/node.ts` to attach a `lockfile:<pnpm-lock.yaml path>#<importer>` label when:
+- Update `build-tools/tools/buck/exporter/lang/node.ts` to attach a `lockfile:<pnpm-lock.yaml path>#<importer>` label when:
   - the node is classified as Node (existing `isNodeTarget` rule)
   - there is no existing `lockfile:` label
   - a pnpm lockfile is discoverable via `findNearestPnpmLockForPackage(...)`
@@ -43,7 +43,7 @@ This PR intentionally does not change the Starlark `require_single_importer_lock
 
 This PR should include tests that lock down both behavior and non-behavior changes:
 
-- Add a focused unit test for `findNearestPnpmLockForPackage(...)` in `tools/tests/lib/` using the existing temp repo helpers. It should cover:
+- Add a focused unit test for `findNearestPnpmLockForPackage(...)` in `build-tools/tools/tests/lib/` using the existing temp repo helpers. It should cover:
   - lockfile in same package dir
   - lockfile in ancestor dir
   - none found returns null
@@ -86,7 +86,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `tools/lib/importers.ts`, `tools/buck/exporter/lang/node.ts`, and a narrow test. Safe in slices that already include the exporter tooling.
+- Touches `build-tools/tools/lib/importers.ts`, `build-tools/tools/buck/exporter/lang/node.ts`, and a narrow test. Safe in slices that already include the exporter tooling.
 
 ---
 
@@ -98,15 +98,15 @@ We currently have multiple ad-hoc implementations of “run Node with zx-init an
 
 ### Scope & Changes
 
-Introduce a single helper under `tools/lib/` to run Node scripts consistently:
+Introduce a single helper under `build-tools/tools/lib/` to run Node scripts consistently:
 
-- Add `tools/lib/node-run.ts` (name can vary but should be stable and discoverable) that exports something like:
+- Add `build-tools/tools/lib/node-run.ts` (name can vary but should be stable and discoverable) that exports something like:
   - `runNodeWithZx({ script, args, cwd, env, zxInitPath, nodeBin }): Promise<void>`
   - It should use a single canonical flag set (the repo’s current defaults) and inherit stdio.
 - Refactor callsites to use it:
-  - `tools/buck/glue-pipeline.ts` (replace local `runNodeWithZx`)
-  - `tools/patch/glue.ts` (replace `runNode(...)`)
-  - `tools/buck/sync-providers.ts` (replace direct `node ... gen-auto-map.ts` spawn where applicable)
+  - `build-tools/tools/buck/glue-pipeline.ts` (replace local `runNodeWithZx`)
+  - `build-tools/tools/patch/glue.ts` (replace `runNode(...)`)
+  - `build-tools/tools/buck/sync-providers.ts` (replace direct `node ... gen-auto-map.ts` spawn where applicable)
 - Keep the public CLI behavior unchanged (same scripts, same flags, same exit behavior).
 
 ### Tests (in this PR)
@@ -147,7 +147,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `tools/lib/*` and a few scripts in `tools/buck` and `tools/patch`, plus tests. Safe for thin slices that include tooling.
+- Touches `build-tools/tools/lib/*` and a few scripts in `build-tools/tools/buck` and `build-tools/tools/patch`, plus tests. Safe for thin slices that include tooling.
 
 ---
 
@@ -155,18 +155,18 @@ Implement.
 
 ### Description
 
-`tools/buck/glue-pipeline.ts` is intended to be the centralized orchestration for:
+`build-tools/tools/buck/glue-pipeline.ts` is intended to be the centralized orchestration for:
 
-- ensuring `tools/buck/graph.json`
+- ensuring `build-tools/tools/buck/graph.json`
 - syncing providers
 - generating provider index
 - generating `auto_map.bzl`
 
-However, `tools/buck/sync-providers.ts` currently contains its own logic to shell out to `gen-auto-map.ts` and optionally generate provider index when `--lang` is passed. This duplicates orchestration and can drift from `glue-pipeline`.
+However, `build-tools/tools/buck/sync-providers.ts` currently contains its own logic to shell out to `gen-auto-map.ts` and optionally generate provider index when `--lang` is passed. This duplicates orchestration and can drift from `glue-pipeline`.
 
 ### Scope & Changes
 
-- Refactor `tools/buck/sync-providers.ts` so that when it needs downstream glue regeneration, it calls `runGluePipeline(...)` (or a new small shared “post-sync glue” helper), rather than spawning `node ... gen-auto-map.ts` directly.
+- Refactor `build-tools/tools/buck/sync-providers.ts` so that when it needs downstream glue regeneration, it calls `runGluePipeline(...)` (or a new small shared “post-sync glue” helper), rather than spawning `node ... gen-auto-map.ts` directly.
 - Preserve the CLI contract:
   - `--lang` continues to narrow which provider generator runs
   - optional `--emit-index` continues to be supported
@@ -175,7 +175,7 @@ However, `tools/buck/sync-providers.ts` currently contains its own logic to shel
 ### Tests (in this PR)
 
 - Add a test that runs `sync-providers.ts --lang node` in a temp repo and asserts:
-  - `tools/buck/graph.json` exists afterward
+  - `build-tools/tools/buck/graph.json` exists afterward
   - `third_party/providers/auto_map.bzl` exists afterward
   - provider index is generated when requested.
 - Ensure the test does not require real lockfiles by using the existing “metadata-only provider” behavior where appropriate.
@@ -208,7 +208,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `tools/buck/sync-providers.ts` and tests only. Safe in very thin tooling slices.
+- Touches `build-tools/tools/buck/sync-providers.ts` and tests only. Safe in very thin tooling slices.
 
 ---
 
@@ -216,7 +216,7 @@ Implement.
 
 ### Description
 
-`tools/patch/glue.ts:ensureGraph()` is a core reliability boundary. It currently contains dead/garbled code in the “target presence” check path, which is a maintenance hazard and can lead to accidental behavioral changes during future edits.
+`build-tools/tools/patch/glue.ts:ensureGraph()` is a core reliability boundary. It currently contains dead/garbled code in the “target presence” check path, which is a maintenance hazard and can lead to accidental behavioral changes during future edits.
 
 ### Scope & Changes
 
@@ -231,7 +231,7 @@ Implement.
 ### Tests (in this PR)
 
 - Add a regression test that:
-  - writes a minimal `tools/buck/graph.json` missing a requested `BUCK_TARGET`
+  - writes a minimal `build-tools/tools/buck/graph.json` missing a requested `BUCK_TARGET`
   - sets `BUCK_TARGET` in env
   - runs `ensureGraph()` with a stubbed exporter (or uses inline export in a temp workspace with a small TARGETS setup)
   - asserts the graph is regenerated and contains the target.
@@ -273,13 +273,13 @@ Implement.
 
 ### Description
 
-C++ provider sync is intentionally a no-op, but `tools/buck/providers/cpp.ts` still contains substantial unused logic related to curated provider scanning and patch listing. Keeping unused code here is confusing and makes it easier for future edits to accidentally reintroduce provider sync behavior.
+C++ provider sync is intentionally a no-op, but `build-tools/tools/buck/providers/cpp.ts` still contains substantial unused logic related to curated provider scanning and patch listing. Keeping unused code here is confusing and makes it easier for future edits to accidentally reintroduce provider sync behavior.
 
 ### Scope & Changes
 
-- Delete unused logic from `tools/buck/providers/cpp.ts` that is not referenced by any exported function or other module.
+- Delete unused logic from `build-tools/tools/buck/providers/cpp.ts` that is not referenced by any exported function or other module.
 - Keep the explicit no-op messaging and contract intact:
-  - provider sync registry remains a no-op for C++ (`tools/buck/providers/index.ts`).
+  - provider sync registry remains a no-op for C++ (`build-tools/tools/buck/providers/index.ts`).
 - If any of the helper functions are used indirectly (e.g., by tests), replace those tests with ones that assert the no-op behavior directly, rather than relying on unused implementation details.
 
 ### Tests (in this PR)
@@ -296,7 +296,7 @@ C++ provider sync is intentionally a no-op, but `tools/buck/providers/cpp.ts` st
 
 ### Acceptance Criteria
 
-- `tools/buck/providers/cpp.ts` contains only what is needed for the no-op contract.
+- `build-tools/tools/buck/providers/cpp.ts` contains only what is needed for the no-op contract.
 - No other code path depends on removed helpers.
 
 ### Risks
@@ -317,7 +317,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `tools/buck/providers/cpp.ts` and one test. Safe in thin tooling slices.
+- Touches `build-tools/tools/buck/providers/cpp.ts` and one test. Safe in thin tooling slices.
 
 ---
 
@@ -334,7 +334,7 @@ This difference is reasonable, but it is easy to forget. Without a test and a sh
 
 ### Scope & Changes
 
-- Add a short, explicit contract comment in the provider sync driver callsites (`tools/buck/providers/node.ts` and `tools/buck/providers/python.ts`) explaining the policy and its intended invalidation effect.
+- Add a short, explicit contract comment in the provider sync driver callsites (`build-tools/tools/buck/providers/node.ts` and `build-tools/tools/buck/providers/python.ts`) explaining the policy and its intended invalidation effect.
 - Add or extend a shared documentation section (handbook or `build-tools/docs/build-system-design.md`) describing:
   - why Node is “include-all importer patches”
   - why Python is “filter by effective set”
@@ -379,7 +379,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `tools/buck/providers/{node,python}.ts`, a doc file, and narrow tests. Safe in tooling-focused slices.
+- Touches `build-tools/tools/buck/providers/{node,python}.ts`, a doc file, and narrow tests. Safe in tooling-focused slices.
 
 ---
 

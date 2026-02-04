@@ -38,13 +38,13 @@ Diagram:
 
 ### 1) Planner and Template Inputs (Nix)
 
-- Reuse the existing `tools/nix/planner/cpp.nix` plugin:
+- Reuse the existing `build-tools/tools/nix/planner/cpp.nix` plugin:
   - `isTarget(n)` detects `cxx_*` or `lang:cpp`.
   - `kindOf(n)` is `bin|lib|test` from `rule_type` or labels.
   - `collectNixAttrsFor(name)` DFS over deps to collect `nixpkg:*` labels → `nixCxxAttrs`.
   - New function for tests: `mkTest(name)` which delegates to a new template function `T.cppTest`.
 
-- Add `cppTest` to `tools/nix/templates/cpp.nix`:
+- Add `cppTest` to `build-tools/tools/nix/templates/cpp.nix`:
   - Inputs: `name`, `srcRoot`, `subdir`, `includes`, `defines`, `cflags`, `ldflags`, `std`, `nixCxxAttrs`.
   - Resolve `nixCxxAttrs` to nixpkgs values; inject `-isystem <pkg>/include` per attr. If we later need lib flags, add deterministic `-L<lib>` and `-l<name>` (sorted, stable).
   - Build a single test binary `out/bin/<sanitized-name>` containing all test objects.
@@ -75,7 +75,7 @@ Notes:
 ### 4) Providers and Auto Map
 
 - No change in policy: providers are identity‑only rules with `labels = ["lang:cpp", "nixpkg:pkgs.<attr>"]`.
-- `tools/buck/gen-auto-map.ts` already maps `nixpkg:*` labels to named provider targets for wiring.
+- `build-tools/tools/buck/gen-auto-map.ts` already maps `nixpkg:*` labels to named provider targets for wiring.
   - Tests include those providers via auto map or explicit deps; changing nixpkgs attr or overlays invalidates only impacted tests.
 
 ### 5) Coverage & Test Runner Semantics
@@ -87,15 +87,15 @@ Notes:
 ## Implementation Plan (Engineer‑Ready)
 
 1. Nix Templates
-   - Add `cppTest` to `tools/nix/templates/cpp.nix` mirroring `cppApp` with deterministic compile/link and `nixCxxAttrs` resolution.
+   - Add `cppTest` to `build-tools/tools/nix/templates/cpp.nix` mirroring `cppApp` with deterministic compile/link and `nixCxxAttrs` resolution.
    - Ensure headers are copied to `$out/include` for diagnostics; binary to `$out/bin/<name>`.
 
 2. Planner Plugin
-   - In `tools/nix/planner/cpp.nix`, add `mkTest(name)` using `T.cppTest { nixCxxAttrs = collectNixAttrsFor name; ... }`.
+   - In `build-tools/tools/nix/planner/cpp.nix`, add `mkTest(name)` using `T.cppTest { nixCxxAttrs = collectNixAttrsFor name; ... }`.
    - Export tests in a new attr set (e.g., `cppTargets.tests`) for `graph-generator` outputs.
 
 3. Graph Generator
-   - Extend `tools/nix/graph-generator.nix` to include C++ targets (bin, lib, test) in the outputs attrset, similar to how Go is handled.
+   - Extend `build-tools/tools/nix/graph-generator.nix` to include C++ targets (bin, lib, test) in the outputs attrset, similar to how Go is handled.
    - Keep partial‑clone safe and avoid heavy repo scans.
 
 4. Buck Macros
@@ -108,7 +108,7 @@ Notes:
    - Update C++ scaffolding templates to use `nix_cpp_test` and depend only on providers.
 
 6. Tests
-   - Add a zx test under `tools/tests/cpp/` that scaffolds a C++ lib/app + `nix_cpp_test` and runs it; assert no references to the local shim; verify pass.
+   - Add a zx test under `build-tools/tools/tests/cpp/` that scaffolds a C++ lib/app + `nix_cpp_test` and runs it; assert no references to the local shim; verify pass.
    - Add a provider wiring test ensuring `nixpkg:*` labels map correctly to providers for test targets.
 
 7. CI
@@ -144,6 +144,6 @@ Notes:
 
 ## Handoff Notes
 
-- This work touches: `tools/nix/templates/cpp.nix`, `tools/nix/planner/cpp.nix`, `tools/nix/graph-generator.nix`, `cpp/defs.bzl`, scaffolding templates under `tools/scaffolding/templates/cpp/*`, and tests under `tools/tests/cpp/`.
+- This work touches: `build-tools/tools/nix/templates/cpp.nix`, `build-tools/tools/nix/planner/cpp.nix`, `build-tools/tools/nix/graph-generator.nix`, `cpp/defs.bzl`, scaffolding templates under `build-tools/tools/scaffolding/templates/cpp/*`, and tests under `build-tools/tools/tests/cpp/`.
 - Keep functions small (≤10–15 lines), early‑return style, explicitly typed where applicable. Maintain determinism and stable sorts throughout. Avoid ambient FS reads.
 - Follow the CI stage order; do not commit glue. Ensure prebuild guard covers the new outputs.

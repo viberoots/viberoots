@@ -16,7 +16,7 @@ I follow the repo-wide linking model described in `cpp-linking.md`, `build-tools
 - `deps` is the Buck graph edge list. It does not imply link intent.
 - `link_deps` declares linkable inputs. `header_deps` is include-only when that concept applies.
 - Macros compute `deps := deps ∪ link_deps ∪ header_deps` deterministically and validate `link_closure_overrides` keys.
-- `link_closure` defaults to `"direct"`. `"transitive"` follows `link_deps` only via `tools/nix/planner/link-closure.nix`.
+- `link_closure` defaults to `"direct"`. `"transitive"` follows `link_deps` only via `build-tools/tools/nix/planner/link-closure.nix`.
 - Ordering is deterministic and unsupported deps fail fast with targeted errors.
 
 ### C interop requirement
@@ -30,7 +30,7 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
 - Provider wiring: load `MODULE_PROVIDERS` from `//lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
 - Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
-- Patch model contract: `lang/lang_contracts.bzl` and `tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
+- Patch model contract: `lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
 
 ### Alignment with Methodology
@@ -44,8 +44,8 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 1. Buck targets (C#) are labeled with `lang:dotnet` and `kind:<bin|lib|test>` via `//csharp/defs.bzl`.
 2. Exporter inspects configured C# targets, runs authoritative queries to compute the set of NuGet packages used, tagging targets with `nuget:<id>@<version>` labels.
 3. Default providers are importer‑scoped (lockfile + importer), mirroring Node; per‑package providers are optional.
-4. Auto‑map maps `lockfile:<path>#<importer>` and `nixpkg:<attr>` labels; mapping `nuget:` per‑package labels would require extending `tools/buck/gen-auto-map.ts`.
-5. Planner templates (`tools/nix/templates/csharp.nix`) build .NET apps/libs with `buildDotnetModule` (or equivalent), applying patches and dev overrides.
+4. Auto‑map maps `lockfile:<path>#<importer>` and `nixpkg:<attr>` labels; mapping `nuget:` per‑package labels would require extending `build-tools/tools/buck/gen-auto-map.ts`.
+5. Planner templates (`build-tools/tools/nix/templates/csharp.nix`) build .NET apps/libs with `buildDotnetModule` (or equivalent), applying patches and dev overrides.
 
 ### Labels and naming
 
@@ -55,7 +55,7 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 
 ### Exporter (authoritative, batched)
 
-- File: `tools/buck/export-graph.ts` (extend existing exporter with a .NET adapter).
+- File: `build-tools/tools/buck/export-graph.ts` (extend existing exporter with a .NET adapter).
 - **Detection**: A target is .NET if:
   - `rule_type` starts with `csharp_` or stamped `lang:dotnet` label (preferred via macros).
 - **Config tuple for batching** (keys the package graph run):
@@ -68,7 +68,7 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 
 ### Planner templates (Nix)
 
-- File: `tools/nix/templates/csharp.nix` imported by `tools/nix/lang-templates.nix`.
+- File: `build-tools/tools/nix/templates/csharp.nix` imported by `build-tools/tools/nix/lang-templates.nix`.
 - **Inputs**: `{ name, projectPath, nugetDepsNix, tfm, rid ? null, selfContained ? false, devOverrideEnv ? "NIX_CSHARP_DEV_OVERRIDE_JSON", patchDir ? ../../patches/csharp }`.
 - **Implementation**: Use `pkgs.buildDotnetModule` (from nixpkgs) or a thin wrapper around it:
   - `nugetDeps` points to `nuget-deps.nix` (generated deterministically; see Install‑deps below).
@@ -86,7 +86,7 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 
 ### Provider sync (C#)
 
-Default path mirrors Node (importer‑scoped): use the existing orchestrator `tools/buck/sync-providers.ts` and, when needed, a C# driver that emits one provider per `(packages.lock.json, importer)` pair. Include only patches relevant to that importer, and prefer importer‑ or package‑local patch files in macro `srcs` for precise invalidation. A per‑package provider mode is optional and would require extending auto‑map alongside a `providerNameForNuget` helper.
+Default path mirrors Node (importer‑scoped): use the existing orchestrator `build-tools/tools/buck/sync-providers.ts` and, when needed, a C# driver that emits one provider per `(packages.lock.json, importer)` pair. Include only patches relevant to that importer, and prefer importer‑ or package‑local patch files in macro `srcs` for precise invalidation. A per‑package provider mode is optional and would require extending auto‑map alongside a `providerNameForNuget` helper.
 
 #### Provider rule macro
 
@@ -111,8 +111,8 @@ Default path mirrors Node (importer‑scoped): use the existing orchestrator `to
 - **Command**: `patch-pkg <subcommand> csharp <PackageId>`.
 - **start** `<id>`: materialize the package source for the exact version present in the current project set (using `nuget-deps.nix` mapping); unpack into a temp dir; set `NIX_CSHARP_DEV_OVERRIDE_JSON["id@ver"] = /abs/tmp`; if `$PATCH_EDITOR` is set, open it.
 - **apply** `<id>`: produce a unified diff between the canonical extracted source and the temp dir and write to a package‑ or importer‑local patch directory (recommended), or `patches/csharp/<id>@<ver>.patch` when shared. For importer‑scoped flows, then run:
-  - `node tools/buck/sync-providers.ts`
-  - `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
+  - `node build-tools/tools/buck/sync-providers.ts`
+  - `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`
   - remove dev override and delete temp dir.
 - **reset** `<id>`: remove override and delete temp dir.
 - **session** `<id>`: long‑running edit session; Ctrl‑D applies; Ctrl‑C resets.
@@ -120,7 +120,7 @@ Default path mirrors Node (importer‑scoped): use the existing orchestrator `to
 
 ### Install‑deps and lock materialization
 
-- Extend `tools/dev/install-deps.ts` to generate `nuget-deps.nix` per project or solution using a deterministic zx step (e.g., `nuget-to-nix` equivalent or a small wrapper that resolves the transitive set via `dotnet restore --locked-mode` and writes a fixed‑output mapping of `(id@version → sha256)` for offline fetch).
+- Extend `build-tools/tools/dev/install-deps.ts` to generate `nuget-deps.nix` per project or solution using a deterministic zx step (e.g., `nuget-to-nix` equivalent or a small wrapper that resolves the transitive set via `dotnet restore --locked-mode` and writes a fixed‑output mapping of `(id@version → sha256)` for offline fetch).
 - This file becomes a planner input; changes to `*.csproj`/`packages.lock.json` regenerate it.
 
 ### CI and glue
@@ -136,7 +136,7 @@ Default path mirrors Node (importer‑scoped): use the existing orchestrator `to
 
 ### Tests
 
-- Add zx tests under `tools/tests/` mirroring Go/Node patterns:
+- Add zx tests under `build-tools/tools/tests/` mirroring Go/Node patterns:
   - `exporter/csharp.labels.transitive.test.ts`: ensures `nuget:<id>@<ver>` labels attach only to targets that use them.
   - `providers/csharp.sync.idempotent.test.ts`: provider sync determinism and duplicate detection.
   - `auto-map.csharp.mapping.test.ts`: verifies `nuget:` labels map to provider deps.
@@ -149,7 +149,7 @@ With repo-level WASM/WASI facilities available, .NET targets can optionally prod
 
 - Approach: leverage the .NET WASI workload to publish `wasm-wasi` outputs for console‑style apps or libraries.
 - Buck macros: introduce `nix_csharp_wasm_binary` (or a `wasm = "wasi"` knob) that stamps `kind:wasm` and forwards TFM/RID to the planner.
-- Planner/templates: extend `tools/nix/templates/csharp.nix` to a `csharpWasiApp` builder that runs `dotnet publish -r wasm-wasi` hermetically; reuse patch/override maps.
+- Planner/templates: extend `build-tools/tools/nix/templates/csharp.nix` to a `csharpWasiApp` builder that runs `dotnet publish -r wasm-wasi` hermetically; reuse patch/override maps.
 - Tests: execute under Node using `node:wasi` where applicable, asserting basic exports/behavior.
 
 Status: platform/toolchain dependent; treated as an experimental later phase with no impact on base C# rollout.
@@ -178,7 +178,7 @@ Status: platform/toolchain dependent; treated as an experimental later phase wit
 ### Risks and mitigations
 
 - **Network access during restore**: dotnet may attempt network access. Mitigation: use Nix‑materialized `nuget-deps.nix` and offline source; set `--locked-mode`; fail fast if network is attempted in CI.
-- **SDK drift**: different SDKs produce different assets. Mitigation: pin SDK via Nix dev shell and CI; validate via `tools/dev/startup-check.ts`.
+- **SDK drift**: different SDKs produce different assets. Mitigation: pin SDK via Nix dev shell and CI; validate via `build-tools/tools/dev/startup-check.ts`.
 - **RID/TFM variability**: packages can vary by RID/TFM. Mitigation: include these in the exporter config tuple and in `buildDotnetModule` parameters; batch correctly.
 - **Patch application fidelity**: not all nupkgs have sources; some are DLL‑only. Mitigation: restrict patches to packages with source (e.g., `SourceLink`/symbols or packages that ship sources). Document limitations; add guardrails in `patch-csharp.ts`.
 - **Large dependency graphs**: exporter performance on large solutions. Mitigation: batching, caching, and limiting to configured targets similar to Go exporter.
@@ -198,15 +198,15 @@ Status: platform/toolchain dependent; treated as an experimental later phase wit
 
 ### Implementation map (files to add/extend)
 
-- `tools/nix/templates/csharp.nix` — .NET template (patches, dev overrides, buildDotnetModule).
-- `tools/buck/export-graph.ts` — add .NET adapter (batching, `nuget:` labels).
-- `tools/buck/sync-providers-csharp.ts` — provider generator for C# patches.
+- `build-tools/tools/nix/templates/csharp.nix` — .NET template (patches, dev overrides, buildDotnetModule).
+- `build-tools/tools/buck/export-graph.ts` — add .NET adapter (batching, `nuget:` labels).
+- `build-tools/tools/buck/sync-providers-csharp.ts` — provider generator for C# patches.
 - `third_party/providers/defs_csharp.bzl` — provider rule macro.
-- `tools/buck/gen-auto-map.ts` — map `nuget:` labels to providers.
-- `tools/lib/providers.ts` — `providerNameForNuget(id, version)`.
+- `build-tools/tools/buck/gen-auto-map.ts` — map `nuget:` labels to providers.
+- `build-tools/tools/lib/providers.ts` — `providerNameForNuget(id, version)`.
 - `csharp/defs.bzl` — macros to stamp labels and append providers.
-- `tools/patch/patch-csharp.ts` — `patch-pkg` language handler.
-- `tools/tests/**` — exporter/provider/auto‑map/e2e wiring tests (one‑test‑per‑file).
+- `build-tools/tools/patch/patch-csharp.ts` — `patch-pkg` language handler.
+- `build-tools/tools/tests/**` — exporter/provider/auto‑map/e2e wiring tests (one‑test‑per‑file).
 
 ### Completion criteria
 

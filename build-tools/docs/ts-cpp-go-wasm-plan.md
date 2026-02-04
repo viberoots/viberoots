@@ -17,7 +17,7 @@ Introduce the C++ core library with a tiny, stable C ABI surface (wrapper) and b
     - native: `nix_cpp_lib`
     - wasm: `nix_cpp_wasm_static_lib` (new macro in a later PR; stub now)
 - Nix templates (scaffold only for now):
-  - Placeholder for `cppWasmStaticLib` in `tools/nix/templates/cpp.nix` (no behavior change; wiring lands in PR‑4).
+  - Placeholder for `cppWasmStaticLib` in `build-tools/tools/nix/templates/cpp.nix` (no behavior change; wiring lands in PR‑4).
 - Docs:
   - Short README in `libs/math-core` documenting the C ABI contract (`addon.h`) and portability constraints (no exceptions/RTTI across boundary).
 - Tests:
@@ -100,7 +100,7 @@ Build a Node addon that links the Go API as a `c-archive` and the native C++ cor
   - `src/binding.cc` (N‑API shim calling Go `extern "C"` symbols)
   - `TARGETS` uses `nix_cpp_node_addon` with `nixCxxPkgs=[ //libs/math-api:carchive, //libs/math-core:lib ]`.
 - Exercise a temp `libs/math-ts/src/node/index.ts` that `require("./native/math_native.node")` and exports functions (live packaging lands in PR‑7).
-- Add a small TS test (`tools/tests/...`) asserting `add(2,3)=5` via the node entrypoint.
+- Add a small TS test (`build-tools/tools/tests/...`) asserting `add(2,3)=5` via the node entrypoint.
 - Docs:
   - `libs/math-native/README.md` documenting symbol exposure, platform notes, and how the TS node entry consumes the addon.
 
@@ -137,7 +137,7 @@ Add Nix template/macro to compile the C++ core into a wasm static library (`libc
 ### Scope & Changes
 
 - Nix templates:
-  - `cppWasmStaticLib` in `tools/nix/templates/cpp.nix` (clang `--target=wasm32-{unknown-unknown|wasi}` → `libcore_wasm.a`)
+  - `cppWasmStaticLib` in `build-tools/tools/nix/templates/cpp.nix` (clang `--target=wasm32-{unknown-unknown|wasi}` → `libcore_wasm.a`)
 - Buck macros:
   - `nix_cpp_wasm_static_lib`
 - Tests (runInTemp):
@@ -332,10 +332,10 @@ Add scaffolding templates to generate a minimal library and a demo app that exer
 
 ### Scope & Changes
 
-- `tools/scaffolding/templates/ts-go-cpp-lib/`:
+- `build-tools/tools/scaffolding/templates/ts-go-cpp-lib/`:
   - `libs/<name>-core` (C++ core + C wrapper), `libs/<name>-go-core` (cgo), `libs/<name>-api` (Go API), `libs/<name>-native` (N‑API), `libs/<name>-ts` (TS package with dual entries)
   - `TARGETS` stubs for each; optional gtest stub.
-- `tools/scaffolding/templates/wasm-app/`:
+- `build-tools/tools/scaffolding/templates/wasm-app/`:
   - Minimal browser app that imports `@org/<name>/browser` (and a Node script that imports `@org/<name>/node`)
   - TARGETS to bundle/copy assets; test that runs both codepaths (`add(2,3)=5`)
 - CLI integration (scaf): new blueprint names, prompts, and README.
@@ -421,7 +421,7 @@ Implement (optional).
 ## Compliance with build-tools/docs/build-system-design.md
 
 - Buck as orchestrator; Nix performs hermetic builds via language templates/macros. No new provider shapes.
-- Planner vs exporter homes respected: language templates under `tools/nix/templates/**`; glue is zx TypeScript; no `nix run` wrappers for generators.
+- Planner vs exporter homes respected: language templates under `build-tools/tools/nix/templates/**`; glue is zx TypeScript; no `nix run` wrappers for generators.
 - Package‑local patches (`patches/{cpp,go}/*.patch`) included in `srcs`; precise invalidation preserved.
 - Dev override environment variables honored: warn locally; fail in CI per shared helpers; templates in PR‑5 include guardrails.
 - Node importer‑scoped providers unchanged; TS packaging does not alter provider mapping or auto_map behavior.

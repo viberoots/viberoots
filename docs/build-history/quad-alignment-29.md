@@ -20,7 +20,7 @@ As in prior parts, each PR includes the tests and documentation required for the
 We already have an explicit contract mapping languages to patch invalidation models:
 
 - Starlark: `//lang:lang_contracts.bzl`
-- TypeScript: `tools/lib/lang-contracts.ts`
+- TypeScript: `build-tools/tools/lib/lang-contracts.ts`
 
 However, the Buck graph does not currently expose this model as a label. That makes the seam harder to see when using `buck2 cquery`, exporter outputs, or provider debugging tools.
 
@@ -87,7 +87,7 @@ Implement.
 
 ### Description
 
-`tools/patch/patch-python.ts` currently re-implements importer-local patch directory resolution in a local helper (`resolvePythonPatchDir`). Go patching already routes patch path selection through shared helpers (`tools/patch/lib/apply.ts:resolvePatchDir`).
+`build-tools/tools/patch/patch-python.ts` currently re-implements importer-local patch directory resolution in a local helper (`resolvePythonPatchDir`). Go patching already routes patch path selection through shared helpers (`build-tools/tools/patch/lib/apply.ts:resolvePatchDir`).
 
 This duplication is a drift surface. It is also a subtle contract. The path chosen for importer-local patches affects invalidation and provider sync behavior.
 
@@ -99,7 +99,7 @@ This PR introduces one shared patch-dir resolver for importer-local languages an
   - A small function to compute the default importer-local patch directory for an importer and language (`node` and `python`).
   - Resolve relative override `--patch-dir` values consistently against repo root.
   - Preserve the existing Python behavior for importer `"."` vs `apps/*` and `libs/*`.
-- Refactor `tools/patch/patch-python.ts`:
+- Refactor `build-tools/tools/patch/patch-python.ts`:
   - Remove `resolvePythonPatchDir(...)`.
   - Route path selection through the shared helper surface.
 
@@ -162,23 +162,23 @@ Go and Python patch tooling are structurally similar:
 - Verify the patch applies cleanly
 - Clear the dev override and close the session
 
-Today these flows are implemented separately in `tools/patch/patch-go.ts` and `tools/patch/patch-python.ts`. This is correct but duplicated. The duplication is a drift surface for session reuse rules, no-op clearing, and verification behavior.
+Today these flows are implemented separately in `build-tools/tools/patch/patch-go.ts` and `build-tools/tools/patch/patch-python.ts`. This is correct but duplicated. The duplication is a drift surface for session reuse rules, no-op clearing, and verification behavior.
 
 This PR extracts one shared workflow helper for “workspace-based patching” and refactors Go and Python patch handlers to use it.
 
 ### Scope & Changes
 
-- Add a shared helper in `tools/patch/lib/` that encapsulates the common workflow:
+- Add a shared helper in `build-tools/tools/patch/lib/` that encapsulates the common workflow:
   - session reuse policy (only reuse when workspace exists and origin matches)
   - no-op apply behavior (clear override and delete session)
   - patch verification (shared `verifyPatchDryRun` path)
   - consistent stdout/stderr messaging conventions for patch handlers
 - Refactor:
-  - `tools/patch/patch-go.ts` uses the shared helper for start/apply/reset/session.
-  - `tools/patch/patch-python.ts` uses the shared helper for start/apply/reset/session.
+  - `build-tools/tools/patch/patch-go.ts` uses the shared helper for start/apply/reset/session.
+  - `build-tools/tools/patch/patch-python.ts` uses the shared helper for start/apply/reset/session.
 - Preserve language-specific concerns at the edges:
-  - Go module resolution remains in `tools/patch/go-module-resolve.ts`.
-  - Python distribution resolution remains in `tools/patch/python-dist-resolve.ts`.
+  - Go module resolution remains in `build-tools/tools/patch/go-module-resolve.ts`.
+  - Python distribution resolution remains in `build-tools/tools/patch/python-dist-resolve.ts`.
 
 Non-goals in this PR:
 
@@ -235,7 +235,7 @@ This PR adds an enforcement-style guard that keeps patch tooling on the shared h
 
 ### Scope & Changes
 
-- Add a TypeScript enforcement test that scans patch tooling entrypoints under `tools/patch/` and fails on:
+- Add a TypeScript enforcement test that scans patch tooling entrypoints under `build-tools/tools/patch/` and fails on:
   - importer-local patch directory construction in leaf scripts (outside the shared helper module)
   - new session-state logic duplicated in leaf scripts (outside the shared workflow helper)
 - Keep the enforcement test narrow and explicit:

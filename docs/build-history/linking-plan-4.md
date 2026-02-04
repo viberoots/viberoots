@@ -50,26 +50,26 @@ This PR does not yet build a working native module. That comes in PR-2 when the 
 - Add `kind:pyext` stamping and ensure the node shape is planner-visible:
   - `labels` must include `lang:python` and `kind:pyext`
   - node must export `module` as a string
-- Extend the exporter surface if needed so `tools/buck/graph.json` includes `module` for `kind:pyext` nodes.
+- Extend the exporter surface if needed so `build-tools/tools/buck/graph.json` includes `module` for `kind:pyext` nodes.
   - If the exporter already carries unknown attrs through for this rule shape, keep the change minimal and only add `module` if it is missing.
 
 ### Tests (in this PR)
 
 Add zx tests (one test per file):
 
-- `tools/tests/python/python.pyext.macro.enforces.lockfile-label.test.ts`
+- `build-tools/tools/tests/python/python.pyext.macro.enforces.lockfile-label.test.ts`
   - temp repo defines a `nix_python_extension_module` with an invalid or missing `lockfile_label`
   - asserts the failure is fast and targeted (macro-level error)
-- `tools/tests/python/python.pyext.attrs.exported-by-graph.test.ts`
+- `build-tools/tools/tests/python/python.pyext.attrs.exported-by-graph.test.ts`
   - temp repo defines a `nix_python_extension_module` with:
     - `module`
     - `link_deps`, `header_deps`, `link_closure`, `link_closure_overrides`
-  - runs `tools/buck/export-graph.ts`
-  - asserts the node in `tools/buck/graph.json` includes:
+  - runs `build-tools/tools/buck/export-graph.ts`
+  - asserts the node in `build-tools/tools/buck/graph.json` includes:
     - `labels` (`lang:python`, `kind:pyext`)
     - `module`
     - the link intent attrs
-- `tools/tests/python/python.pyext.deps-union.deterministic.cquery.test.ts`
+- `build-tools/tools/tests/python/python.pyext.deps-union.deterministic.cquery.test.ts`
   - temp repo defines a `nix_python_extension_module` where `deps`, `link_deps`, and `header_deps` overlap
   - asserts cquery sees `deps` as the deterministic union
 
@@ -83,7 +83,7 @@ Add zx tests (one test per file):
 
 - `nix_python_extension_module` exists, is importer-scoped, and stamps `lang:python`, `kind:pyext`.
 - `deps := deps ∪ link_deps ∪ header_deps` is deterministic and locked by test.
-- `tools/buck/graph.json` contains `module` and link intent attrs for a `kind:pyext` node that sets them.
+- `build-tools/tools/buck/graph.json` contains `module` and link intent attrs for a `kind:pyext` node that sets them.
 - Documentation describes the macro and exported-graph contract in one place.
 
 ### Risks
@@ -117,18 +117,18 @@ This PR focuses on artifact shape and runtime composition. It does not yet imple
 
 ### Scope & Changes
 
-- Add a new Nix template `T.pyExt` (canonical surface under `tools/nix/templates/`):
+- Add a new Nix template `T.pyExt` (canonical surface under `build-tools/tools/nix/templates/`):
   - compile and link the extension from `srcs`
   - output contract:
     - `$out/site/<module path>${EXT_SUFFIX}`
   - compute `EXT_SUFFIX` from the interpreter used at runtime (do not hardcode)
-- Extend Python planner (`tools/nix/planner/python.nix`):
+- Extend Python planner (`build-tools/tools/nix/planner/python.nix`):
   - recognize `kind:pyext`
   - instantiate `T.pyExt` for `kind:pyext` nodes
   - when planning `pyApp` / `pyLib` nodes:
     - collect direct `kind:pyext` deps
     - pass them as `nativeModuleOverlays` (or the equivalent template input) to the Python templates
-- Extend Python templates and adapter wiring (`tools/nix/templates/python.nix` and uv adapter integration) so `pyApp` and `pyLib` can merge extension overlays:
+- Extend Python templates and adapter wiring (`build-tools/tools/nix/templates/python.nix` and uv adapter integration) so `pyApp` and `pyLib` can merge extension overlays:
   - copy each overlay’s `$out/site/**` into the final `$out/site/**` deterministically
   - keep ordering deterministic and stable (do not rely on filesystem traversal order)
 
@@ -136,13 +136,13 @@ This PR focuses on artifact shape and runtime composition. It does not yet imple
 
 Add zx integration tests (one test per file). These should validate runtime behavior by actually importing the module from the planner-built output.
 
-- `tools/tests/python/python.pyext.imported-by-pyapp.build-and-run.test.ts`
+- `build-tools/tools/tests/python/python.pyext.imported-by-pyapp.build-and-run.test.ts`
   - temp repo defines:
     - `nix_python_extension_module` implementing a minimal module with one function (C or C++)
     - `nix_python_binary` that imports the module and calls the function
   - builds the Python binary via the normal planner-selected path
   - runs the produced wrapper and asserts output is correct
-- `tools/tests/python/python.pyext.imported-by-pylib.runtime-import.test.ts`
+- `build-tools/tools/tests/python/python.pyext.imported-by-pylib.runtime-import.test.ts`
   - temp repo defines:
     - `nix_python_extension_module`
     - `nix_python_library` that depends on it
@@ -198,18 +198,18 @@ This PR is about build-time Python deps only. It does not add in-repo native lin
 - Extend `T.pyExt` to optionally build inside (or against) that wheelhouse environment:
   - provide a stable way for extension builds to locate Python package headers that come from the lockfile (for example `pybind11` include dirs)
   - keep behavior deterministic and hermetic (no network, no ambient user site-packages)
-- Extend the Python planner (`tools/nix/planner/python.nix`) for `kind:pyext` nodes to pass the wheelhouse env input derived from the importer boundary.
+- Extend the Python planner (`build-tools/tools/nix/planner/python.nix`) for `kind:pyext` nodes to pass the wheelhouse env input derived from the importer boundary.
 
 ### Tests (in this PR)
 
 Add zx integration tests (one test per file). These should validate that build-time Python deps are available deterministically from the lockfile environment.
 
-- `tools/tests/python/python.pyext.build-time-python-deps.from-lockfile.builds.test.ts`
+- `build-tools/tools/tests/python/python.pyext.build-time-python-deps.from-lockfile.builds.test.ts`
   - temp repo defines:
     - a Python importer lockfile that includes a header-providing package (for example `pybind11` or a minimal package the repo already uses for this purpose)
     - a `nix_python_extension_module` that includes a header from that package at compile time
   - builds the extension module and asserts it succeeds
-- `tools/tests/python/python.pyext.build-time-python-deps.deterministic-across-builds.test.ts`
+- `build-tools/tools/tests/python/python.pyext.build-time-python-deps.deterministic-across-builds.test.ts`
   - temp repo builds the same extension twice and asserts the wheelhouse/env input used by the extension is stable (using existing “build log” or input-fingerprint harness patterns)
 
 ### Docs (in this PR)
@@ -257,9 +257,9 @@ This PR teaches the Python planner and `T.pyExt` how to materialize link inputs 
 
 ### Scope & Changes
 
-- Extend the Python planner (`tools/nix/planner/python.nix`) `kind:pyext` construction:
+- Extend the Python planner (`build-tools/tools/nix/planner/python.nix`) `kind:pyext` construction:
   - read `link_deps`, `header_deps`, `link_closure`, `link_closure_overrides` from the exported node
-  - compute a resolved ordered unique list using the shared closure resolver (`tools/nix/planner/link-closure.nix`)
+  - compute a resolved ordered unique list using the shared closure resolver (`build-tools/tools/nix/planner/link-closure.nix`)
     - roots are the consumer’s `link_deps`
     - traversal follows `link_deps` on producer nodes
   - validate each resolved dep is a supported native producer for Phase 3:
@@ -282,17 +282,17 @@ This PR teaches the Python planner and `T.pyExt` how to materialize link inputs 
 
 Add zx integration tests (one test per file). These should validate real symbol resolution by calling into a symbol implemented in the linked library.
 
-- `tools/tests/python/python.pyext.links-cpp-lib.via-link-deps.build-and-run.test.ts`
+- `build-tools/tools/tests/python/python.pyext.links-cpp-lib.via-link-deps.build-and-run.test.ts`
   - temp repo defines:
     - `nix_cpp_library` exporting a function (e.g. `int add(int,int)`)
     - `nix_python_extension_module` that links it via `link_deps` and exposes a Python-callable wrapper
     - a Python binary that imports the module and asserts the function returns the expected value
-- `tools/tests/python/python.pyext.transitive-closure.follows-link-deps.build-and-run.test.ts`
+- `build-tools/tools/tests/python/python.pyext.transitive-closure.follows-link-deps.build-and-run.test.ts`
   - temp repo defines:
     - C++ lib `core` with `link_deps=["//libs/support:support"]` and uses a symbol from `support`
     - extension module links only `core` with `link_closure="transitive"`
     - runtime asserts success (import + function call)
-- `tools/tests/python/python.pyext.link-deps.unsupported-target.fails-fast.test.ts`
+- `build-tools/tools/tests/python/python.pyext.link-deps.unsupported-target.fails-fast.test.ts`
   - temp repo places a non-native producer target in `link_deps`
   - asserts the error message is targeted and names the expected stamps
 
@@ -356,16 +356,16 @@ After Phase 3 works, this PR locks down the invariants that keep it stable:
 
 Add zx tests (one test per file):
 
-- `tools/tests/python/python.pyext.link-input-ordering.deterministic.test.ts`
+- `build-tools/tools/tests/python/python.pyext.link-input-ordering.deterministic.test.ts`
   - temp repo with multiple in-repo link deps and a fixed expected resolved order
   - runs multiple builds and asserts ordering is stable
-- `tools/tests/python/python.pyext.patch-invalidation.rebuilds-consumers.test.ts`
+- `build-tools/tools/tests/python/python.pyext.patch-invalidation.rebuilds-consumers.test.ts`
   - temp repo:
     - Python app imports extension module
     - extension links an in-repo C++ lib
     - modify a `.patch` file under the C++ producer’s patch surface
   - asserts the Python app rebuilds (using existing invalidation harness patterns)
-- `tools/tests/python/python.pyext.rejected-by-wasm-backend.fails-fast.test.ts`
+- `build-tools/tools/tests/python/python.pyext.rejected-by-wasm-backend.fails-fast.test.ts`
   - temp repo selects a Python WASM backend and depends on `kind:pyext`
   - asserts the failure message is targeted and names the unsupported combination
 

@@ -5,11 +5,11 @@ This PR finalizes the PNPM/Node path by adding missing tests around importer‑s
 ### Current state (as of this PR)
 
 - Provider sync driver exists and is used by the orchestrator:
-  - `tools/buck/providers/node.ts` generates `third_party/providers/TARGETS.node.auto` deterministically.
+  - `build-tools/tools/buck/providers/node.ts` generates `third_party/providers/TARGETS.node.auto` deterministically.
   - Normalizes importer "." to the lockfile directory, sorts entries, and writes an auto‑managed section in `third_party/providers/TARGETS` to ensure Buck can load `defs_node.bzl` providers.
-- Provider naming helpers exist: `tools/lib/providers.ts` implements `providerNameForImporter()`.
+- Provider naming helpers exist: `build-tools/tools/lib/providers.ts` implements `providerNameForImporter()`.
 - Node macros exist: `node/defs.bzl` (`nix_node_gen`, `nix_node_lib`, `nix_node_bin`, `nix_node_test`, `node_webapp`, `nix_node_cli_bin`) and enforce exactly one `lockfile:<path>#<importer>` label while stamping `lang:node`/`kind:*`.
-- Patch wrapper exists: `tools/patch/patch-node.ts` supports `start`, `apply`, `reset`, `session`, `remove`, and calls `runGlue()` after apply/remove.
+- Patch wrapper exists: `build-tools/tools/patch/patch-node.ts` supports `start`, `apply`, `reset`, `session`, `remove`, and calls `runGlue()` after apply/remove.
 - Existing Node tests cover idempotency, scoped packages, `--lang node` orchestration, macro provider wiring, and auto‑map label→provider mapping.
 
 ### Scope for PR 9 (what we add now)
@@ -44,7 +44,7 @@ This PR finalizes the PNPM/Node path by adding missing tests around importer‑s
 
 7. Node patches lint
 
-- Extend `tools/dev/patches-lint.ts` to support `node` with rules mirroring Go:
+- Extend `build-tools/tools/dev/patches-lint.ts` to support `node` with rules mirroring Go:
   - Flat dir: `patches/node/` contains no subdirectories
   - Files end with `.patch`
   - Exactly one patch per `<pkg>@<version>` (case‑insensitive key); decode PNPM scoped names by mapping `__` → `/`
@@ -57,24 +57,24 @@ This PR finalizes the PNPM/Node path by adding missing tests around importer‑s
 ### Test files to add (one‑test‑per‑file; zx)
 
 - Effective set (peers + optional):
-  - `tools/tests/node/providers/sync-providers-node.effective-set-peers.test.ts`
-  - `tools/tests/node/providers/sync-providers-node.effective-set-optional.test.ts`
+  - `build-tools/tools/tests/node/providers/sync-providers-node.effective-set-peers.test.ts`
+  - `build-tools/tools/tests/node/providers/sync-providers-node.effective-set-optional.test.ts`
 - Importer normalization + determinism:
-  - `tools/tests/node/providers/sync-providers-node.importer-dot-normalization.test.ts`
-  - `tools/tests/node/providers/sync-providers-node.multi-importer-determinism.test.ts`
+  - `build-tools/tools/tests/node/providers/sync-providers-node.importer-dot-normalization.test.ts`
+  - `build-tools/tools/tests/node/providers/sync-providers-node.multi-importer-determinism.test.ts`
 - Collision guard:
-  - `tools/tests/node/providers/sync-providers-node.collision-guard.test.ts`
+  - `build-tools/tools/tests/node/providers/sync-providers-node.collision-guard.test.ts`
 - Graceful degradation:
-  - `tools/tests/node/providers/sync-providers-node.no-yaml-package.test.ts`
+  - `build-tools/tools/tests/node/providers/sync-providers-node.no-yaml-package.test.ts`
 - Auto‑map edge (no lockfile label):
-  - `tools/tests/node/auto-map/auto-map.node.no-lockfile-label-skip.test.ts`
+  - `build-tools/tools/tests/node/auto-map/auto-map.node.no-lockfile-label-skip.test.ts`
 - Provider index:
-  - `tools/tests/node/providers/node-provider-index.entries-ordering.test.ts`
+  - `build-tools/tools/tests/node/providers/node-provider-index.entries-ordering.test.ts`
 - Patch wrapper (hermetic + gated E2E):
-  - `tools/tests/node/patch/patch-node.behavioral-apply-glue.test.ts`
-  - `tools/tests/node/patch/patch-node.e2e-session-optional.test.ts` (skips unless `NODE_PATCH_E2E=1`)
+  - `build-tools/tools/tests/node/patch/patch-node.behavioral-apply-glue.test.ts`
+  - `build-tools/tools/tests/node/patch/patch-node.e2e-session-optional.test.ts` (skips unless `NODE_PATCH_E2E=1`)
 - Patches lint:
-  - `tools/tests/node/lint/node-patches.lint-flat-and-uniqueness.test.ts`
+  - `build-tools/tools/tests/node/lint/node-patches.lint-flat-and-uniqueness.test.ts`
 
 All tests:
 
@@ -94,11 +94,11 @@ All tests:
 
 ### CI and coverage
 
-- Auto‑discovery under `tools/tests/**` (no per‑file rules). Full suite with coverage:
+- Auto‑discovery under `build-tools/tools/tests/**` (no per‑file rules). Full suite with coverage:
   - `buck2 test //... -- --env COVERAGE=1`
 - Optional focused runs (developer convenience):
-  - `buck2 test //tools/tests/... --filter sync-providers-node`
-  - `buck2 test //tools/tests/... --filter auto-map.node`
+  - `buck2 test //build-tools/tools/tests/... --filter sync-providers-node`
+  - `buck2 test //build-tools/tools/tests/... --filter auto-map.node`
 - Integrate Node patch lint into the existing `patches-lint` stage; strict mode in CI.
 
 ### Acceptance criteria
@@ -126,5 +126,5 @@ All tests:
 3. Add auto‑map edge (no lockfile label) test.
 4. Add provider index test.
 5. Add hermetic patch wrapper test; add optional gated E2E.
-6. Extend `tools/dev/patches-lint.ts` with Node support and add Node lint test.
+6. Extend `build-tools/tools/dev/patches-lint.ts` with Node support and add Node lint test.
 7. Ensure CI stage runs lint in strict mode and that full suite passes with coverage.

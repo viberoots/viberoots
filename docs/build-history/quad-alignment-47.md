@@ -24,12 +24,12 @@ decode behavior against the canonical helper.
 
 ### Scope & Changes
 
-- Update `tools/nix/overlays/cpp-patches.nix`:
+- Update `build-tools/tools/nix/overlays/cpp-patches.nix`:
   - Replace the hand-rolled `<enc>@<ver>.patch` parsing with
-    `tools/nix/lib/lang-helpers.nix:decodePatchFilename`.
+    `build-tools/tools/nix/lib/lang-helpers.nix:decodePatchFilename`.
   - Keep the existing attr decoding (`__` -> `/` then `/` -> `.`) to preserve the nixpkgs attr
     mapping.
-- Add or extend a test under `tools/tests/nix/` to assert the overlay decode uses the canonical
+- Add or extend a test under `build-tools/tools/tests/nix/` to assert the overlay decode uses the canonical
   decoder and matches expected keys for a small fixture set.
 - Update `abstractions.md` to call out the overlay as using the shared decoder, so any future drift
   is reviewable.
@@ -44,11 +44,11 @@ decode behavior against the canonical helper.
 ### Docs (in this PR)
 
 - Update `abstractions.md` to list the C++ overlay as a consumer of
-  `tools/nix/lib/lang-helpers.nix:decodePatchFilename`.
+  `build-tools/tools/nix/lib/lang-helpers.nix:decodePatchFilename`.
 
 ### Acceptance Criteria
 
-- `tools/nix/overlays/cpp-patches.nix` no longer implements its own filename parsing.
+- `build-tools/tools/nix/overlays/cpp-patches.nix` no longer implements its own filename parsing.
 - The overlay still selects the same patches for a given nixpkgs attribute and version.
 - New parity test passes and protects the contract.
 

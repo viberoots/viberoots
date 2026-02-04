@@ -1,7 +1,7 @@
 """
 Importer-scoped contract surface (Starlark side).
 
-This file intentionally mirrors tools/lib/lang-contracts.ts for importer patch inclusion policy.
+This file intentionally mirrors build-tools/tools/lib/lang-contracts.ts for importer patch inclusion policy.
 """
 
 IMPORTER_PATCH_INCLUSION_BY_LANG = {

@@ -155,21 +155,21 @@ Standardize our Nix invocation patterns to avoid creating persistent GC roots an
   - `nix_node_cli_bin(bundle=True)`:
     - Ensure the bundled artifact path is obtained without out‑links:
       - Either have the macro capture the printed out path directly (as above), or
-      - Ensure `tools/buck/node-cli-bundle.ts` uses `--no-link --print-out-paths` and prints the path for the macro to consume.
+      - Ensure `build-tools/tools/buck/node-cli-bundle.ts` uses `--no-link --print-out-paths` and prints the path for the macro to consume.
   - Preserve `global_nix_inputs()` stamping and importer derivation from PR‑3; only out‑link removal is new.
 
 - Node bundler shim:
-  - If `tools/buck/node-cli-bundle.ts` shells to Nix, switch to `--no-link --print-out-paths` and print the absolute path via stdout; avoid creating named out‑links.
+  - If `build-tools/tools/buck/node-cli-bundle.ts` shells to Nix, switch to `--no-link --print-out-paths` and print the absolute path via stdout; avoid creating named out‑links.
 
 - Test scaffolding and examples:
   - Replace any remaining `nix build ... --out-link <path>` in zx tests with `--no-link --print-out-paths` and local capture.
   - Add a small zx test that asserts macro‑generated `cmd` strings contain no `--out-link` (via `buck2 cquery --output-attributes cmd`).
 
 - Lightweight cleanup for Buck temp artifacts:
-  - Add `tools/dev/clean-temp-outs.ts`:
+  - Add `build-tools/tools/dev/clean-temp-outs.ts`:
     - Removes stale `buck-out/tmp/buck-impure-*` (older than N minutes, default 30).
     - Optionally prunes temporary `result` symlinks under known temp roots if any remain from external tooling.
-  - CI (`tools/ci/run-stage.ts`): invoke `clean-temp-outs.ts` after each stage (best‑effort, non‑fatal). Provide a dev command to run it locally.
+  - CI (`build-tools/tools/ci/run-stage.ts`): invoke `clean-temp-outs.ts` after each stage (best‑effort, non‑fatal). Provide a dev command to run it locally.
 
 ### Tests (in this PR)
 
@@ -219,10 +219,10 @@ Reduce duplication in Node/Python provider writers by centralizing header/banner
 
 ### Scope & Changes
 
-- `tools/lib/provider-writer.ts`:
+- `build-tools/tools/lib/provider-writer.ts`:
   - Add `writeImporterProvidersByLang(lang, providers, opts?)` that derives header, `load(...)` line, and auto‑section sentinels from `lang` when not explicitly provided.
   - Preserve stable formatting and collision detection logic.
-- `tools/buck/providers/{node,python}.ts`:
+- `build-tools/tools/buck/providers/{node,python}.ts`:
   - Switch to `writeImporterProvidersByLang(...)` to drop repeated header/sentinel wiring.
   - No change to provider content or ordering; logic remains identical.
 
@@ -265,12 +265,12 @@ Factor the common scaffolding in Node/Python provider sync into a generic “imp
 
 ### Scope & Changes
 
-- `tools/lib/importers.ts`:
+- `build-tools/tools/lib/importers.ts`:
   - Add `isWorkspaceImporterPath(path: string): boolean` for consistent filtering of supported importers.
   - Keep existing helpers (`computeImporterLabel`, `listImporterPatches`, etc.).
-- `tools/lib/provider-sync-driver.ts` (new):
+- `build-tools/tools/lib/provider-sync-driver.ts` (new):
   - Export `syncImporterProviders({ lang, discoverLockfiles, parseEffectiveSet, listImporterPatchesFor, decodePatchKey })` producing `ImporterProvider[]` and delegating to `writeImporterProvidersByLang(...)`.
-- `tools/buck/providers/{node,python}.ts`:
+- `build-tools/tools/buck/providers/{node,python}.ts`:
   - Switch to the shared driver with language‑specific plugins:
     - Node: `findImporterLockfiles` + `parsePnpmLock/effectiveSetForImporter` + `decodeNameVersionFromPatch`.
     - Python: `findUvLockfiles` + `parseUvLockKeys` + `decodeNameVersionFromPatch`.
@@ -317,7 +317,7 @@ Add a small, repository‑local lint/test suite that validates macro usage patte
 
 ### Scope & Changes
 
-- `tools/tests/`:
+- `build-tools/tools/tests/`:
   - Add zx tests that instantiate minimal representative macros per language and assert:
     - Labels contain `lang:*` and the expected `kind:*`/`wasm:*` shape.
     - Provider edges realized in the correct attribute by inspecting cquery output attributes (`deps` or `srcs` materialization as applicable).

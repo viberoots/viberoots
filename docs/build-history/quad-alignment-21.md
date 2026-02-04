@@ -27,17 +27,17 @@ This PR makes the supported importer policy a contract in the TS mapping layer, 
 
 This PR changes only TS tooling behavior. It does not change provider generation policies.
 
-- Update `tools/lib/labels.ts:providersForLabels(...)` to:
+- Update `build-tools/tools/lib/labels.ts:providersForLabels(...)` to:
   - parse `lockfile:` labels with the canonical parser
   - require `isSupportedImporterLabel(importer)` before emitting the corresponding `//third_party/providers:lf_*` provider label
 - Add a small unit test covering the contract:
   - a valid lockfile label for an unsupported importer does not produce a provider label
   - supported importers continue to produce provider labels deterministically
-- Update `tools/buck/gen-auto-map.ts` (if needed) to rely on `providersForLabels(...)` without adding any extra filtering logic.
+- Update `build-tools/tools/buck/gen-auto-map.ts` (if needed) to rely on `providersForLabels(...)` without adding any extra filtering logic.
 
 ### Tests (in this PR)
 
-Add a focused test under `tools/tests/lib/` that:
+Add a focused test under `build-tools/tools/tests/lib/` that:
 
 - feeds `providersForLabels(...)` a set of `lockfile:` labels with importers:
   - `"apps/demo"`
@@ -51,7 +51,7 @@ Add a focused test under `tools/tests/lib/` that:
 Update the glue and mapping documentation to clarify the policy:
 
 - The label `lockfile:<path>#<importer>` can be present anywhere, but only supported importer labels participate in provider wiring and auto-map.
-- If a repo wants to support additional importer roots, it should extend the supported importer predicate in `tools/lib/importers.ts` and keep parity checks passing.
+- If a repo wants to support additional importer roots, it should extend the supported importer predicate in `build-tools/tools/lib/importers.ts` and keep parity checks passing.
 
 ### Acceptance Criteria
 
@@ -76,7 +76,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-Touches only `tools/lib/labels.ts`, `tools/buck/gen-auto-map.ts` (if needed), and a narrow unit test.
+Touches only `build-tools/tools/lib/labels.ts`, `build-tools/tools/buck/gen-auto-map.ts` (if needed), and a narrow unit test.
 
 ---
 
@@ -95,13 +95,13 @@ This PR replaces the boolean with an explicit enum and keeps the policy behavior
 
 ### Scope & Changes
 
-- Update `tools/lib/provider-sync-driver.ts`:
+- Update `build-tools/tools/lib/provider-sync-driver.ts`:
   - replace `includeAllImporterLocalPatches?: boolean` with something explicit, for example:
     - `importerPatchInclusionPolicy?: "all" | "effective-set-only"`
   - update selection logic accordingly
 - Update Node and Python adapters:
-  - `tools/buck/providers/node.ts` uses `"all"`
-  - `tools/buck/providers/python.ts` uses `"effective-set-only"`
+  - `build-tools/tools/buck/providers/node.ts` uses `"all"`
+  - `build-tools/tools/buck/providers/python.ts` uses `"effective-set-only"`
 - Update any shared wrappers or call sites that pass the old boolean.
 - Keep behavior identical:
   - Node continues to include all importer-local patches
@@ -143,7 +143,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-Touches `tools/lib/provider-sync-driver.ts`, Node/Python provider adapters, and one existing regression test.
+Touches `build-tools/tools/lib/provider-sync-driver.ts`, Node/Python provider adapters, and one existing regression test.
 
 ---
 
@@ -157,10 +157,10 @@ This PR removes the dead option surface. It keeps the actual patch discovery beh
 
 ### Scope & Changes
 
-- Update `tools/buck/providers/python.ts`:
+- Update `build-tools/tools/buck/providers/python.ts`:
   - remove the `patchDir` option from the function signature
   - remove any related plumbing
-- Update `tools/buck/providers/index.ts`:
+- Update `build-tools/tools/buck/providers/index.ts`:
   - stop passing `patchDir` to Python provider sync
   - keep default out file wiring unchanged
 - Confirm there are no other call sites depending on the parameter.

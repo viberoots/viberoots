@@ -50,14 +50,14 @@ Notes on reuse (avoid reinventing):
 
 ### Tests (in this PR)
 
-Add zx tests under `tools/tests/lang/` (one test per file) that:
+Add zx tests under `build-tools/tools/tests/lang/` (one test per file) that:
 
-- `tools/tests/lang/link-intent.merges-deps.deterministic.cquery.test.ts`
+- `build-tools/tools/tests/lang/link-intent.merges-deps.deterministic.cquery.test.ts`
   - creates a temp repo with the probe macro
   - defines a target where `deps`, `link_deps`, and `header_deps` overlap
   - asserts cquery sees exactly the union, deterministically ordered
 
-- `tools/tests/lang/link-intent.overrides.must-be-in-link-deps.fails-fast.test.ts`
+- `build-tools/tools/tests/lang/link-intent.overrides.must-be-in-link-deps.fails-fast.test.ts`
   - creates a temp repo where `link_closure_overrides` references a dep not in `link_deps`
   - asserts the build/analysis fails with a targeted error message
 
@@ -112,7 +112,7 @@ This must be shared across:
 
 ### Scope & Changes
 
-- Add `tools/nix/planner/link-closure.nix` implementing a pure function (shape illustrative):
+- Add `build-tools/tools/nix/planner/link-closure.nix` implementing a pure function (shape illustrative):
   - `resolveLinkClosure = {`
     - `byName` (node map),
     - `linkDepsOf` (function),
@@ -131,20 +131,20 @@ This must be shared across:
 
 Notes on reuse:
 
-- Reuse existing normalization helpers from `tools/nix/planner/lib.nix` where appropriate (for label normalization).
+- Reuse existing normalization helpers from `build-tools/tools/nix/planner/lib.nix` where appropriate (for label normalization).
 - Keep this helper pure; do not read filesystem.
 
 ### Tests (in this PR)
 
-Add zx tests under `tools/tests/nix/` that validate the function via `nix eval` in a temp repo:
+Add zx tests under `build-tools/tools/tests/nix/` that validate the function via `nix eval` in a temp repo:
 
-- `tools/tests/nix/nix.link-closure.direct-and-transitive.eval.test.ts`
+- `build-tools/tools/tests/nix/nix.link-closure.direct-and-transitive.eval.test.ts`
   - evaluates `resolveLinkClosure` against a small in-memory graph fixture
   - asserts output lists are stable and match expected for:
     - direct mode
     - transitive mode
 
-- `tools/tests/nix/nix.link-closure.overrides.eval.test.ts`
+- `build-tools/tools/tests/nix/nix.link-closure.overrides.eval.test.ts`
   - same graph, default direct
   - override one dep to transitive and assert mixed behavior is deterministic
 
@@ -153,12 +153,12 @@ These tests must use the repo’s existing testing harness conventions (external
 ### Docs (in this PR)
 
 - Update `linking-roadmap.md` and/or `cpp-linking.md` / `build-tools/docs/wasm-linking.md` to reference:
-  - `tools/nix/planner/link-closure.nix` as the canonical planner primitive
+  - `build-tools/tools/nix/planner/link-closure.nix` as the canonical planner primitive
   - its deterministic traversal rules
 
 ### Acceptance Criteria
 
-- `tools/nix/planner/link-closure.nix` exists and is pure/deterministic.
+- `build-tools/tools/nix/planner/link-closure.nix` exists and is pure/deterministic.
 - Tests prove direct/transitive and overrides behavior.
 - Docs reference the helper as the canonical planner-level closure resolver.
 
@@ -184,9 +184,9 @@ Implement.
 
 ### Description
 
-Phase 0 requires that when targets start using the new intent attributes, they actually appear in `tools/buck/graph.json` so planners can consume them.
+Phase 0 requires that when targets start using the new intent attributes, they actually appear in `build-tools/tools/buck/graph.json` so planners can consume them.
 
-Today, `tools/buck/export-graph.ts` exports a fixed set of output attributes. We need to extend it to include:
+Today, `build-tools/tools/buck/export-graph.ts` exports a fixed set of output attributes. We need to extend it to include:
 
 - `link_deps`
 - `header_deps`
@@ -198,8 +198,8 @@ This PR should not depend on any one language adopting the attrs yet. It should 
 ### Scope & Changes
 
 - Extend exporter attribute list(s):
-  - `tools/buck/export-graph.ts`
-  - `tools/buck/export-inline.ts` (if it has its own attribute list)
+  - `build-tools/tools/buck/export-graph.ts`
+  - `build-tools/tools/buck/export-inline.ts` (if it has its own attribute list)
 
 - Add the intent attributes to the `--output-attributes` list.
 
@@ -213,9 +213,9 @@ Notes on reuse:
 
 ### Tests (in this PR)
 
-Add a zx test under `tools/tests/exporter/`:
+Add a zx test under `build-tools/tools/tests/exporter/`:
 
-- `tools/tests/exporter/exporter.exports.link-intent-attrs.test.ts`
+- `build-tools/tools/tests/exporter/exporter.exports.link-intent-attrs.test.ts`
   - create a temp repo with a tiny custom Starlark rule that accepts the new attrs (because built-in rules do not accept arbitrary attributes)
   - define a target with `link_deps`, `header_deps`, `link_closure`, `link_closure_overrides`
   - run the exporter and assert `graph.json` contains these fields with the expected values

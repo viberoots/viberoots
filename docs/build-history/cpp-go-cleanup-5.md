@@ -12,7 +12,7 @@ This plan consolidates small, high‑value improvements to our cross‑language 
 - **PR‑3:** Factor a tiny shared TARGETS rendering helper for consistent output formatting.
 - **PR‑4:** Add an optional cross‑language provider index for introspection and tooling.
 - **PR‑5:** Add a validation severity mode (warn vs error) for exporter, with CI forcing error.
-- **PR‑6:** DRY small repetition in `tools/nix/templates/cpp.nix` without behavior changes.
+- **PR‑6:** DRY small repetition in `build-tools/tools/nix/templates/cpp.nix` without behavior changes.
 - **PR‑7:** Documentation updates and quickstart snippets.
 
 ---
@@ -21,12 +21,12 @@ This plan consolidates small, high‑value improvements to our cross‑language 
 
 - **Title:** feat(glue): add shared label→provider parsing helper
 - **Scope:**
-  - Add `tools/lib/labels.ts` exporting `providersForLabels(labels: string[]): string[]`.
-  - Update `tools/buck/gen-auto-map.ts` to use it.
+  - Add `build-tools/tools/lib/labels.ts` exporting `providersForLabels(labels: string[]): string[]`.
+  - Update `build-tools/tools/buck/gen-auto-map.ts` to use it.
   - No behavior change expected; output must be bit‑for‑bit identical.
 - **Detailed design:**
   - The helper accepts Buck node `labels` and returns fully qualified provider targets (e.g., `//third_party/providers:mod_...`, `//third_party/providers:lf_...`, `//third_party/providers:nix_...`).
-  - Internally reuse existing functions from `tools/lib/providers.ts`: `providerNameForModuleKey`, `providerNameForImporter`, `normalizeNixAttr`, and `providerNameForNixAttr`.
+  - Internally reuse existing functions from `build-tools/tools/lib/providers.ts`: `providerNameForModuleKey`, `providerNameForImporter`, `normalizeNixAttr`, and `providerNameForNixAttr`.
   - Deduplicate and sort outputs for determinism.
 - **Acceptance criteria:**
   - `gen-auto-map.ts` writes a file identical to pre‑change across the repository.
@@ -41,7 +41,7 @@ This plan consolidates small, high‑value improvements to our cross‑language 
 - **Title:** refactor(providers): reuse flat patch scanning/validation across languages
 - **Scope:**
   - Keep Node’s importer‑scoped logic and C++’s attr‑scoped logic intact.
-  - Reuse `tools/lib/provider-sync.ts` where practical to validate flat directories and detect duplicate patches.
+  - Reuse `build-tools/tools/lib/provider-sync.ts` where practical to validate flat directories and detect duplicate patches.
   - For Node: use the scanner for basic validation (flatness, duplicates), then apply current importer‑scoped filtering.
   - For C++: preserve attr‑prefix filtering; add a small helper to warn/error on subdirectories (flatness) for consistency.
 - **Detailed design:**
@@ -60,8 +60,8 @@ This plan consolidates small, high‑value improvements to our cross‑language 
 
 - **Title:** refactor(glue): factor TARGETS rendering helper
 - **Scope:**
-  - Add `renderTargetsFile(header: string, entries: string[])` to `tools/lib/fs-helpers.ts` or a new `tools/lib/render.ts`.
-  - Adopt in `tools/buck/providers/go.ts`, `tools/buck/providers/node.ts`, and `tools/buck/providers/cpp.ts`.
+  - Add `renderTargetsFile(header: string, entries: string[])` to `build-tools/tools/lib/fs-helpers.ts` or a new `build-tools/tools/lib/render.ts`.
+  - Adopt in `build-tools/tools/buck/providers/go.ts`, `build-tools/tools/buck/providers/node.ts`, and `build-tools/tools/buck/providers/cpp.ts`.
 - **Detailed design:**
   - Helper ensures stable trailing newlines and empty‑state headers.
   - No behavioral changes; textual outputs must be identical.
@@ -77,9 +77,9 @@ This plan consolidates small, high‑value improvements to our cross‑language 
 
 - **Title:** feat(glue): emit `provider_index.bzl` for introspection
 - **Scope:**
-  - Add `tools/buck/gen-provider-index.ts` and `third_party/providers/provider_index.bzl` (generated).
-  - Provide `--emit-index` flag in `tools/buck/sync-providers.ts` to generate alongside provider files.
-  - Non‑blocking for builds; used by tools/tests only.
+  - Add `build-tools/tools/buck/gen-provider-index.ts` and `third_party/providers/provider_index.bzl` (generated).
+  - Provide `--emit-index` flag in `build-tools/tools/buck/sync-providers.ts` to generate alongside provider files.
+  - Non‑blocking for builds; used by build-tools/tools/tests only.
 - **Detailed design:**
   - Index maps each provider target to `{ kind: "go"|"cpp"|"node", key: string }` where key is:
     - Go: `module:<import>@<version>`
@@ -88,9 +88,9 @@ This plan consolidates small, high‑value improvements to our cross‑language 
   - Implementation strategy:
     - Reuse in‑memory entries produced during provider sync (Go and Node) and the C++ `nix_attr_map.bzl` map to build a single dictionary.
     - Deterministic sorting and stable output.
-  - Optional CLI support in `tools/patch/glue.ts` to explain provider origins for a given target by joining `auto_map.bzl` with the index.
+  - Optional CLI support in `build-tools/tools/patch/glue.ts` to explain provider origins for a given target by joining `auto_map.bzl` with the index.
 - **Acceptance criteria:**
-  - `node tools/buck/sync-providers.ts --emit-index` writes `third_party/providers/provider_index.bzl` with consistent content across runs.
+  - `node build-tools/tools/buck/sync-providers.ts --emit-index` writes `third_party/providers/provider_index.bzl` with consistent content across runs.
   - A small e2e script demonstrates explaining providers for a target using the index.
   - No change to build behavior or dependencies of targets.
 - **Risks:** Low; outputs are additive. Keep the index opt‑in to avoid new required files in workflows.
@@ -102,7 +102,7 @@ This plan consolidates small, high‑value improvements to our cross‑language 
 
 - **Title:** feat(exporter): add `--validation=warn|error` with CI override
 - **Scope:**
-  - Add `--validation` flag and `EXPORTER_VALIDATION` env in `tools/buck/exporter/main.ts`.
+  - Add `--validation` flag and `EXPORTER_VALIDATION` env in `build-tools/tools/buck/exporter/main.ts`.
   - Unify adapter `validate()` to return findings rather than throw; the main driver applies severity.
   - CI always treats findings as errors regardless of flag.
 - **Detailed design:**
@@ -120,7 +120,7 @@ This plan consolidates small, high‑value improvements to our cross‑language 
 
 ---
 
-## PR‑6: DRY repetition in `tools/nix/templates/cpp.nix`
+## PR‑6: DRY repetition in `build-tools/tools/nix/templates/cpp.nix`
 
 - **Title:** refactor(cpp.nix): factor attr resolution and flag joins
 - **Scope:**
@@ -143,7 +143,7 @@ This plan consolidates small, high‑value improvements to our cross‑language 
 - **Scope:**
   - Add a short section to `README.md` and `build-tools/docs/build-system-design.md`:
     - Validation modes (`--validation=warn|error`, CI override).
-    - Optional provider index: purpose, how to enable (`--emit-index`), and example of using `tools/patch/glue.ts` to explain providers for a target.
+    - Optional provider index: purpose, how to enable (`--emit-index`), and example of using `build-tools/tools/patch/glue.ts` to explain providers for a target.
 - **Detailed design:**
   - Provide concise examples; avoid long narrative.
 - **Acceptance criteria:**

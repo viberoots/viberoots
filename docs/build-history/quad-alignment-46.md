@@ -78,13 +78,13 @@ Implement.
 ### Description
 
 I will extract per-language `kindOf` configuration (label priorities and rule type tables) into a
-shared registry so planners do not duplicate config tables. `tools/nix/planner/lib.nix:kindOf` will
+shared registry so planners do not duplicate config tables. `build-tools/tools/nix/planner/lib.nix:kindOf` will
 remain the logic engine, but each language will pull its config from the registry.
 
 ### Scope & Changes
 
-- Add `tools/nix/planner/kind-configs.nix` (or equivalent) containing per-language config tables.
-- Update `tools/nix/planner/go.nix`, `cpp.nix`, `python-core.nix`, and `node.nix` to import configs
+- Add `build-tools/tools/nix/planner/kind-configs.nix` (or equivalent) containing per-language config tables.
+- Update `build-tools/tools/nix/planner/go.nix`, `cpp.nix`, `python-core.nix`, and `node.nix` to import configs
   from the shared registry rather than inlining tables.
 - Keep existing `kindOf` behavior unchanged.
 
@@ -136,9 +136,9 @@ Node and Python adapters do not duplicate validation and label-attachment logic.
 
 ### Scope & Changes
 
-- Add a helper in `tools/buck/exporter/lang/importer-scoped-adapter.ts` (or a new small file) that
+- Add a helper in `build-tools/tools/buck/exporter/lang/importer-scoped-adapter.ts` (or a new small file) that
   builds a standard adapter given `isTarget`, lockfile basename, and classification registry entry.
-- Update `tools/buck/exporter/lang/node.ts` and `python.ts` to use the helper.
+- Update `build-tools/tools/buck/exporter/lang/node.ts` and `python.ts` to use the helper.
 - Preserve current warnings and validation behavior.
 
 ### Tests (in this PR)
@@ -189,10 +189,10 @@ do not duplicate the same driver wiring patterns.
 
 ### Scope & Changes
 
-- Add a helper for importer-scoped provider sync in `tools/buck/providers` (or `tools/lib`) that:
+- Add a helper for importer-scoped provider sync in `build-tools/tools/buck/providers` (or `build-tools/tools/lib`) that:
   - builds `discoverLockfiles`, `parseEffectiveSetForLockfile`, and `listImporterPatchesFor`.
   - accepts language-specific parser and lockfile basenames.
-- Update `tools/buck/providers/node.ts` and `python.ts` to call the helper.
+- Update `build-tools/tools/buck/providers/node.ts` and `python.ts` to call the helper.
 - Preserve existing behavior, including Node synthetic lockfile support and Python strict parsing.
 
 ### Tests (in this PR)
@@ -248,7 +248,7 @@ the canonical `lang/sanitize.bzl:sanitize_name` directly at call sites.
 
 ### Tests (in this PR)
 
-- Update `tools/tests/cpp/sanitize-name.parity.test.ts` if needed to reference the canonical
+- Update `build-tools/tools/tests/cpp/sanitize-name.parity.test.ts` if needed to reference the canonical
   sanitizer directly.
 
 ### Docs (in this PR)

@@ -24,9 +24,9 @@ Intent/Impact
 
 Changes
 
-- Add `tools/nix/lib/lang-helpers.nix` with shared helpers (patch dir scan, dev overrides, sanitize, resolve module root, cleanSource helpers)
-- Move Go templates from `tools/nix/lang-templates.nix` to `tools/nix/templates/go.nix` importing helpers
-- Make `tools/nix/lang-templates.nix` a registry re-exporting `{ go = import ./templates/go.nix; }`
+- Add `build-tools/tools/nix/lib/lang-helpers.nix` with shared helpers (patch dir scan, dev overrides, sanitize, resolve module root, cleanSource helpers)
+- Move Go templates from `build-tools/tools/nix/lang-templates.nix` to `build-tools/tools/nix/templates/go.nix` importing helpers
+- Make `build-tools/tools/nix/lang-templates.nix` a registry re-exporting `{ go = import ./templates/go.nix; }`
 
 Acceptance criteria
 
@@ -47,7 +47,7 @@ Changes
 - Introduce `LANGS` attrset (registry). For each language provide:
   - `isTarget(n) -> bool`, `kindOf(n) -> "bin"|"lib"|null`
   - `modulesFileFor(name) -> path` (language-specific lockfile resolver)
-  - `mkApp(name)`/`mkLib(name)` using `tools/nix/lang-templates.nix.<lang>`
+  - `mkApp(name)`/`mkLib(name)` using `build-tools/tools/nix/lang-templates.nix.<lang>`
 - Refactor current Go logic (`modulesTomlFor`, overrides, `mkGo`) into `LANGS.go`
 - Update `pick()` to dispatch by:
   1. mapping.nix; else
@@ -71,8 +71,8 @@ Intent/Impact
 Changes
 
 - Confirm all macros stamp `labels = ["lang:<lang>", "kind:<bin|lib|test>"]`
-- Add `tools/buck/exporter/lang/go.ts` with any Go-specific label tweaks
-- Update `tools/buck/exporter/main.ts` to call adapters based on `lang:*` label; default path stays language-agnostic
+- Add `build-tools/tools/buck/exporter/lang/go.ts` with any Go-specific label tweaks
+- Update `build-tools/tools/buck/exporter/main.ts` to call adapters based on `lang:*` label; default path stays language-agnostic
 
 Acceptance criteria
 
@@ -114,9 +114,9 @@ Intent/Impact
 
 Changes
 
-- Move current Go sync logic to `tools/buck/providers/go.ts`
-- Add `tools/buck/providers/index.ts` that scans `patches/<lang>` and dispatches to language handlers
-- Make `tools/buck/sync-providers.ts` call the index; keep CLI unchanged
+- Move current Go sync logic to `build-tools/tools/buck/providers/go.ts`
+- Add `build-tools/tools/buck/providers/index.ts` that scans `patches/<lang>` and dispatches to language handlers
+- Make `build-tools/tools/buck/sync-providers.ts` call the index; keep CLI unchanged
 
 Acceptance criteria
 
@@ -134,7 +134,7 @@ Intent/Impact
 
 Changes
 
-- In `tools/dev/install/glue.ts`, detect enabled languages by presence of `tools/nix/templates/<lang>.nix` or a small `tools/nix/langs.json`
+- In `build-tools/tools/dev/install/glue.ts`, detect enabled languages by presence of `build-tools/tools/nix/templates/<lang>.nix` or a small `build-tools/tools/nix/langs.json`
 - Loop per-language glue steps (provider sync, optional generators), plus universal export-graph
 
 Acceptance criteria
@@ -152,9 +152,9 @@ Intent/Impact
 
 Changes
 
-- Create a `languages` registry in `tools/scaffolding/scaf.ts` (name, kinds, commands)
+- Create a `languages` registry in `build-tools/tools/scaffolding/scaf.ts` (name, kinds, commands)
 - Wire `scaf new <lang> <kind>` via registry; keep Go behavior and help text intact
-- Keep per-language templates under `tools/scaffolding/templates/<lang>`
+- Keep per-language templates under `build-tools/tools/scaffolding/templates/<lang>`
 
 Acceptance criteria
 
@@ -171,7 +171,7 @@ Intent/Impact
 
 Changes
 
-- Add `tools/tests/lib/lang-fixtures.ts` exposing:
+- Add `build-tools/tools/tests/lib/lang-fixtures.ts` exposing:
   - `scaffoldApp(lang, name)` / `scaffoldLib(lang, name)`
   - `writeTest(lang, path, name)`
   - `buckBuild(target)` / `buckTest(target)` / `nixBuildBuckTarget(target)`
@@ -193,7 +193,7 @@ Intent/Impact
 Changes
 
 - Expand `docs/handbook/adding-language.md` with:
-  - Implementing `tools/nix/templates/<lang>.nix`
+  - Implementing `build-tools/tools/nix/templates/<lang>.nix`
   - Registering in planner registry
   - Adding Starlark macros via `lang/defs_common.bzl`
   - Provider sync handler (optional)

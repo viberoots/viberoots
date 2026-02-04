@@ -107,7 +107,7 @@ def nix_python_extension_module(
     Contract (PR-1):
     - importer-scoped lockfile label enforcement (lockfile:<path>#<importer>)
     - stamps labels: lang:python, kind:pyext
-    - exports `module` and link intent attrs to tools/buck/graph.json
+    - exports `module` and link intent attrs to build-tools/tools/buck/graph.json
     - deps := deps ∪ link_deps ∪ header_deps (deterministic union)
     """
     if not module or not isinstance(module, str):

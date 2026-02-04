@@ -18,15 +18,15 @@ I am recording the baseline run list and a root-level inventory snapshot for the
 
 - Buck `load()` paths in `**/*.bzl`
 - Buck target labels if `//lang` moves
-- Script paths in `package.json`, `tools/bin/*`, `Jenkinsfile`, and `toolchains`
-- Nix paths in `flake.nix` and `tools/nix/**`
-- Repo-relative paths embedded in zx scripts under `tools/**`
+- Script paths in `package.json`, `build-tools/tools/bin/*`, `Jenkinsfile`, and `toolchains`
+- Nix paths in `flake.nix` and `build-tools/tools/nix/**`
+- Repo-relative paths embedded in zx scripts under `build-tools/tools/**`
 
 ## Root-level items to move
 
 ### Build system sources to `/build-tools`
 
-- `tools/`
+- `build-tools/tools/`
 - `go/`
 - `cpp/`
 - `node/`

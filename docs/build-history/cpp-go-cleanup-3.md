@@ -8,7 +8,7 @@ This plan implements the improvements discussed while explicitly choosing Approa
 
 Scope
 
-- Update `go/defs.bzl` to generate provider names for `nix_cgo_deps` using the same rules as `tools/lib/providers.ts` (`normalizeNixAttr` + `providerNameForNixAttr`).
+- Update `go/defs.bzl` to generate provider names for `nix_cgo_deps` using the same rules as `build-tools/tools/lib/providers.ts` (`normalizeNixAttr` + `providerNameForNixAttr`).
 - Remove the Starlark‑local naming differences (e.g., dropping `pkgs.` prefix) to ensure names match the TS path and avoid duplicate stamp files.
 
 Detailed Design
@@ -41,7 +41,7 @@ Consequence if not implemented
 
 Scope
 
-- Update `tools/buck/providers/node.ts` to use `writeIfChanged` when writing `TARGETS.node.auto`.
+- Update `build-tools/tools/buck/providers/node.ts` to use `writeIfChanged` when writing `TARGETS.node.auto`.
 - Ensure empty/no‑op outputs are stable and avoid unnecessary diffs.
 
 Detailed Design
@@ -99,7 +99,7 @@ Scope
 
 Detailed Design
 
-- Audit `tools/buck/providers/*.ts`:
+- Audit `build-tools/tools/buck/providers/*.ts`:
   - Confirm Go/C++ already use `writeIfChanged` and `writeStamp` (`fs-helpers`).
   - Switch Node to `writeIfChanged` (covered by PR 2).
   - Confirm `stableUnique` is used where deduping is needed (C++ path already imports it).
@@ -127,7 +127,7 @@ Scope
 Detailed Design
 
 - Update relevant sections:
-  - Provider naming source of truth: `tools/lib/providers.ts`.
+  - Provider naming source of truth: `build-tools/tools/lib/providers.ts`.
   - Go macros keep direct provider deps for `nix_cgo_deps`, but naming is now canonical.
   - Prebuild guard: missing or stale `auto_map.bzl` and provider files fails fast.
 - Ensure examples use provider names consistent with the canonical helper (retain `pkgs.` prefix in names).

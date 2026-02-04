@@ -6,21 +6,21 @@ This plan continues the consolidation from Parts 3–5. Each PR is small, indepe
 
 ### Description
 
-Replace bespoke `getArg/flagStr/flagBool` snippets across glue scripts with a single helper library (`tools/lib/cli.ts`) that provides consistent typed accessors and fallbacks.
+Replace bespoke `getArg/flagStr/flagBool` snippets across glue scripts with a single helper library (`build-tools/tools/lib/cli.ts`) that provides consistent typed accessors and fallbacks.
 
 ### Scope & Changes
 
-- Add `tools/lib/cli.ts` with:
+- Add `build-tools/tools/lib/cli.ts` with:
   - `getFlagStr(name: string, def?: string): string`
   - `getFlagBool(name: string): boolean`
   - `getFlagList(name: string): string[]`
 - Tests:
   - Add unit tests for helpers (argv object vs process.argv vs default precedence, equals‑form flags, list parsing, boolean switches).
 - Docs:
-  - Update glue tooling docs to reference the shared `tools/lib/cli.ts` helpers and show one canonical usage snippet.
+  - Update glue tooling docs to reference the shared `build-tools/tools/lib/cli.ts` helpers and show one canonical usage snippet.
 - Migrate callers:
-  - `tools/buck/gen-auto-map.ts`, `tools/buck/sync-providers.ts`, `tools/buck/prebuild-guard.ts`
-  - `tools/buck/gen-provider-index.ts`, `tools/ci/run-stage.ts`, `tools/dev/build-selected.ts`
+  - `build-tools/tools/buck/gen-auto-map.ts`, `build-tools/tools/buck/sync-providers.ts`, `build-tools/tools/buck/prebuild-guard.ts`
+  - `build-tools/tools/buck/gen-provider-index.ts`, `build-tools/tools/ci/run-stage.ts`, `build-tools/tools/dev/build-selected.ts`
 - Keep exact current defaults and precedence (argv object → process.argv → default).
 
 ### Acceptance Criteria
@@ -54,9 +54,9 @@ Ensure all glue/CI runners execute before `node_modules` are linked. Replace `fs
 ### Scope & Changes
 
 - Update scripts that currently import `fs-extra`:
-  - `tools/ci/run-stage.ts`, `tools/dev/planner-gen.ts`, `tools/dev/langs-diagnose.ts`
+  - `build-tools/tools/ci/run-stage.ts`, `build-tools/tools/dev/planner-gen.ts`, `build-tools/tools/dev/langs-diagnose.ts`
   - Any other glue entrypoints invoked pre‑install
-- Use `node:fs/promises` and `tools/lib/fs-helpers.ts` where appropriate.
+- Use `node:fs/promises` and `build-tools/tools/lib/fs-helpers.ts` where appropriate.
 - Keep behavior and logging identical.
 - Tests:
   - Add zx tests that execute glue stages (`export-graph`, `sync-providers`, `gen-auto-map`, `prebuild-guard`) in a temp repo without `node_modules`, asserting exit 0 and no diffs vs. baseline outputs.
@@ -93,10 +93,10 @@ Centralize discovery of `pnpm-lock.yaml` files (with common ignores) into a reus
 
 ### Scope & Changes
 
-- Add `tools/lib/lockfiles.ts`:
+- Add `build-tools/tools/lib/lockfiles.ts`:
   - `findPnpmLockfiles(opts?: { roots?: string[]; ignore?: string[] }): Promise<string[]>`
 - Update callers to use the helper:
-  - `tools/buck/providers/node.ts`, `tools/dev/langs-diagnose.ts`, `tools/buck/gen-provider-index.ts`
+  - `build-tools/tools/buck/providers/node.ts`, `build-tools/tools/dev/langs-diagnose.ts`, `build-tools/tools/buck/gen-provider-index.ts`
 - Keep current ignore set (e.g., `.git`, `buck-out`, `node_modules`, `.pnpm-store`, `.clinic`, `coverage`) and deterministic ordering.
 - Tests:
   - Add zx/unit tests covering ignore handling, multiple roots, deterministic ordering, and empty‑tree behavior.
@@ -129,7 +129,7 @@ Implement.
 
 ### Description
 
-Ensure all glue scripts that read the Buck graph consume it via the Composite Graph API (`tools/lib/graph-view.ts`) rather than ad‑hoc JSON reads.
+Ensure all glue scripts that read the Buck graph consume it via the Composite Graph API (`build-tools/tools/lib/graph-view.ts`) rather than ad‑hoc JSON reads.
 
 ### Scope & Changes
 
@@ -139,7 +139,7 @@ Ensure all glue scripts that read the Buck graph consume it via the Composite Gr
 - Tests:
   - Add zx tests that run affected scripts before and after the change in a temp repo, asserting identical outputs and tolerant behavior when sidecars are missing.
 - Docs:
-  - Add a brief “Composite Graph API” section (tools reference) with the `tools/buck/graph-view.ts` CLI example.
+  - Add a brief “Composite Graph API” section (tools reference) with the `build-tools/tools/buck/graph-view.ts` CLI example.
 
 ### Acceptance Criteria
 

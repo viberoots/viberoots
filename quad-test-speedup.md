@@ -42,7 +42,7 @@ This prewarm never affects correctness; tests must remain hermetic if prewarm is
 
 ### Scope & Changes
 
-- `tools/bin/verify`: optional prewarm block guarded by `VERIFY_PREWARM=1` (default on)
+- `build-tools/tools/bin/verify`: optional prewarm block guarded by `VERIFY_PREWARM=1` (default on)
 - Use `nix build` of stable flake outputs (e.g., `.#toolchains.go`, `.#toolchains.cxx`, `.#toolchains.emscripten`, `.#toolchains.tinygo`) if exposed; otherwise skip silently
 
 ### Tests (in this PR)
@@ -83,11 +83,11 @@ Implement.
 Speed up `runInTemp` by syncing only what a test needs:
 
 - Exclude `test-logs/` and other large, irrelevant trees by default
-- Support `TEST_RSYNC_ROOTS` to copy only specific roots (e.g., `apps/demo,cpp,tools/nix`)
+- Support `TEST_RSYNC_ROOTS` to copy only specific roots (e.g., `apps/demo,cpp,build-tools/tools/nix`)
 
 ### Scope & Changes
 
-- `tools/tests/lib/test-helpers.ts:rsyncRepoTo(...)`: already excludes many heavy dirs; extend with `test-logs/` and document `TEST_RSYNC_ROOTS`
+- `build-tools/tools/tests/lib/test-helpers.ts:rsyncRepoTo(...)`: already excludes many heavy dirs; extend with `test-logs/` and document `TEST_RSYNC_ROOTS`
 
 ### Tests (in this PR)
 
@@ -127,7 +127,7 @@ Optionally prebuild per‑importer `node_modules` inside the temp workspace to a
 
 ### Scope & Changes
 
-- `tools/tests/lib/test-helpers.ts`: add an opt‑in hook `TEST_PREBUILD_NM=1` that, after a test scaffolds importers in the temp workspace, invokes `node tools/dev/node-modules-build.ts --print-out-paths` to build/link the importer's `node_modules` once per run
+- `build-tools/tools/tests/lib/test-helpers.ts`: add an opt‑in hook `TEST_PREBUILD_NM=1` that, after a test scaffolds importers in the temp workspace, invokes `node build-tools/tools/dev/node-modules-build.ts --print-out-paths` to build/link the importer's `node_modules` once per run
 - No changes to verify defaults; this is a per‑temp‑workspace optimization
 
 ### Tests (in this PR)
@@ -168,10 +168,10 @@ Export the Buck graph once per repo state and reuse it across zx tests run in th
 
 ### Scope & Changes
 
-- `tools/buck/export-graph.ts` and/or `tools/buck/exporter/main.ts`:
+- `build-tools/tools/buck/export-graph.ts` and/or `build-tools/tools/buck/exporter/main.ts`:
   - Add a content hash guard (e.g., files affecting config: `.buckconfig`, `TARGETS`, `prelude/**`, `third_party/providers/**`, `flake.lock`)
-  - Write `tools/buck/graph.json` only when hash changes; otherwise reuse
-- `tools/buck/zx_test.bzl`: favor reuse by default; tests retain the ability to force re‑export when required
+  - Write `build-tools/tools/buck/graph.json` only when hash changes; otherwise reuse
+- `build-tools/tools/buck/zx_test.bzl`: favor reuse by default; tests retain the ability to force re‑export when required
 
 ### Tests (in this PR)
 

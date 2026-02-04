@@ -6,7 +6,7 @@ This plan closes the remaining gaps from the C++ linking review and our follow u
 
 This plan assumes the shared link intent contract and current C++ linking phases are in place:
 
-- `tools/nix/planner/link-closure.nix` exists and is used by the C++ planner
+- `build-tools/tools/nix/planner/link-closure.nix` exists and is used by the C++ planner
 - C++ macros accept `link_deps`, `header_deps`, `link_closure`, and `link_closure_overrides`
 - Exporter surfaces link intent attributes in the graph
 - Shared library template `cppSharedLib` exists and builds a `.so` or `.dylib`
@@ -23,7 +23,7 @@ This PR makes shared C++ libraries link their own declared `link_deps`. It uses 
 
 This PR makes the following changes:
 
-- Update `tools/nix/planner/cpp.nix` so `cppSharedLib` receives `repoCppLibPkgsFor` when `link_mode="shared"`, not only header packages.
+- Update `build-tools/tools/nix/planner/cpp.nix` so `cppSharedLib` receives `repoCppLibPkgsFor` when `link_mode="shared"`, not only header packages.
 - Apply the producer's `link_closure` to shared lib `link_deps` using the existing resolver, just like consumers.
 - Keep consumer semantics unchanged. Consumers still decide their own `link_closure` for their own `link_deps`.
 
@@ -31,9 +31,9 @@ This PR makes the following changes:
 
 I add zx tests (one test per file):
 
-- `tools/tests/cpp/cpp.shared-lib.links-direct-link-deps.builds.test.ts`
+- `build-tools/tools/tests/cpp/cpp.shared-lib.links-direct-link-deps.builds.test.ts`
   - define a shared lib with a direct `link_dep` and verify it builds without unresolved symbols
-- `tools/tests/cpp/cpp.shared-lib.link-closure.transitive.links-deps.builds.test.ts`
+- `build-tools/tools/tests/cpp/cpp.shared-lib.link-closure.transitive.links-deps.builds.test.ts`
   - define a shared lib whose `link_deps` include another lib with its own `link_deps`
   - set `link_closure="transitive"` and verify build success and deterministic order
 
@@ -86,10 +86,10 @@ This PR makes the following changes:
 
 I add zx tests (one test per file):
 
-- `tools/tests/cpp/cpp.addon.link-closure.transitive.follows-link-deps.build-and-load.test.ts`
+- `build-tools/tools/tests/cpp/cpp.addon.link-closure.transitive.follows-link-deps.build-and-load.test.ts`
   - addon links `//libs/core:core` and `core` links `//libs/support:support`
   - addon sets `link_closure="transitive"` and loads successfully
-- `tools/tests/cpp/cpp.test.link-closure.transitive.follows-link-deps.build-and-run.test.ts`
+- `build-tools/tools/tests/cpp/cpp.test.link-closure.transitive.follows-link-deps.build-and-run.test.ts`
   - C++ test links `//libs/core:core` with transitive closure and runs
 
 ### Docs (in this PR)
@@ -142,10 +142,10 @@ This PR makes the following changes:
 
 I add zx tests (one test per file):
 
-- `tools/tests/cpp/cpp.link-intent.overlap.link-and-header-deps.allowed.builds.test.ts`
+- `build-tools/tools/tests/cpp/cpp.link-intent.overlap.link-and-header-deps.allowed.builds.test.ts`
   - define a target where one dep appears in both `link_deps` and `header_deps`
   - verify the build succeeds and link inputs are deterministic
-- `tools/tests/cpp/cpp.link-closure.overrides.duplicate-keys.normalized.fails.test.ts`
+- `build-tools/tools/tests/cpp/cpp.link-closure.overrides.duplicate-keys.normalized.fails.test.ts`
   - define `link_closure_overrides` with keys that normalize to the same label
   - verify the planner fails with the duplicate keys error
 

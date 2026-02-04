@@ -25,7 +25,7 @@ I follow the repo-wide linking model described in `cpp-linking.md`, `build-tools
 - `deps` is the Buck graph edge list. It does not imply link intent.
 - `link_deps` declares linkable inputs. `header_deps` is include-only when that concept applies.
 - Macros compute `deps := deps ∪ link_deps ∪ header_deps` deterministically and validate `link_closure_overrides` keys.
-- `link_closure` defaults to `"direct"`. `"transitive"` follows `link_deps` only via `tools/nix/planner/link-closure.nix`.
+- `link_closure` defaults to `"direct"`. `"transitive"` follows `link_deps` only via `build-tools/tools/nix/planner/link-closure.nix`.
 - Ordering is deterministic and unsupported deps fail fast with targeted errors.
 
 ### C interop requirement
@@ -39,16 +39,16 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
 - Provider wiring: load `MODULE_PROVIDERS` from `//lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
 - Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
-- Patch model contract: `lang/lang_contracts.bzl` and `tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
+- Patch model contract: `lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
 
 ### Path Invariants
 
 - Patches: `patches/php/*.patch` (flat; one patch per `package@version`).
-- Nix templates: `tools/nix/templates/php.nix` imported by `tools/nix/lang-templates.nix`.
+- Nix templates: `build-tools/tools/nix/templates/php.nix` imported by `build-tools/tools/nix/lang-templates.nix`.
 - Macros: `php/defs.bzl` using `lang/defs_common.bzl` helpers and `//lang:auto_map.bzl`.
 - Providers: generated files under `third_party/providers/` (e.g., `TARGETS.php.auto`).
-- Glue scripts: zx TypeScript under `tools/buck/**`, `tools/patch/**`.
+- Glue scripts: zx TypeScript under `build-tools/tools/buck/**`, `build-tools/tools/patch/**`.
 
 ### End-to-End Architecture (conceptual)
 
@@ -81,11 +81,11 @@ graph LR
   - `lockfile:<relative/path/to/composer.lock>#<importer>`
   - `<importer>` is the project root containing the `composer.json` (e.g., `apps/php-api`).
 - Rationale: Composer lockfiles are per-project; importer ID gives stability if multiple PHP projects exist.
-- `tools/buck/gen-auto-map.ts` already maps `lockfile:` labels to provider names via `providerNameForImporter()`; no changes needed.
+- `build-tools/tools/buck/gen-auto-map.ts` already maps `lockfile:` labels to provider names via `providerNameForImporter()`; no changes needed.
 
 ### Nix Templates (PHP)
 
-Add `tools/nix/templates/php.nix` exposing two functions analogous to Go templates:
+Add `build-tools/tools/nix/templates/php.nix` exposing two functions analogous to Go templates:
 
 - `phpApp { name, composerLock, projectDir ./. , devOverrideEnv ? "NIX_PHP_DEV_OVERRIDE_JSON", patchDir ? ../../patches/php }`
 - `phpLib { name, composerLock, projectDir ./. , devOverrideEnv ? "NIX_PHP_DEV_OVERRIDE_JSON", patchDir ? ../../patches/php }`
@@ -141,11 +141,11 @@ in {
 Notes:
 
 - Exact builder calls may use `composer2nix` outputs; details validated during implementation.
-- Keep templates small; push shared helpers to `tools/nix/planner/lib.nix` if needed.
+- Keep templates small; push shared helpers to `build-tools/tools/nix/planner/lib.nix` if needed.
 
 ### Planner Integration (graph-generator.nix)
 
-- Dispatch: Either via `tools/nix/mapping.nix` or simple prefix detection (`php_` rule types) or `labels` including `lang:php`.
+- Dispatch: Either via `build-tools/tools/nix/mapping.nix` or simple prefix detection (`php_` rule types) or `labels` including `lang:php`.
 - Provide `phpTargets` analogous to `goTargets`, constructing derivations using `lang-templates.nix` → `phpApp`/`phpLib` with inputs:
   - `composerLock` path (relative to repo root)
   - `projectDir` path (root of the PHP project)
@@ -153,7 +153,7 @@ Notes:
 
 ### Provider Sync (PHP)
 
-Implement `tools/buck/sync-providers-php.ts`:
+Implement `build-tools/tools/buck/sync-providers-php.ts`:
 
 - Scan `**/composer.lock` (project roots) and `patches/php/*.patch`.
 - Build effective set for each importer (project):
@@ -193,7 +193,7 @@ def php_importer_deps(name, lockfile, importer, patch_paths = []):
 
 ### Auto-map Integration
 
-No changes required. Existing `tools/buck/gen-auto-map.ts` maps `lockfile:<path>#<importer>` labels to providers using `providerNameForImporter()` from `tools/lib/providers.ts`.
+No changes required. Existing `build-tools/tools/buck/gen-auto-map.ts` maps `lockfile:<path>#<importer>` labels to providers using `providerNameForImporter()` from `build-tools/tools/lib/providers.ts`.
 
 ### Macros (`php/defs.bzl`)
 
@@ -259,8 +259,8 @@ Source resolution for `start`:
 
 Post-apply glue (same turn):
 
-- `node tools/buck/sync-providers-php.ts`
-- `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
+- `node build-tools/tools/buck/sync-providers-php.ts`
+- `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`
 
 ### Exporter Adapter (optional initial phase)
 
@@ -271,13 +271,13 @@ Post-apply glue (same turn):
 
 - Reuse the existing sequence:
   1. Export Graph → 2) Sync Providers (Go/Node/PHP) → 3) Generate auto_map → 4) Pre-build guard → 5) Build & Test.
-- Provider sync driver (`tools/buck/sync-providers.ts`) should delegate to a PHP driver; runs only if Composer projects or `patches/php/*.patch` exist.
+- Provider sync driver (`build-tools/tools/buck/sync-providers.ts`) should delegate to a PHP driver; runs only if Composer projects or `patches/php/*.patch` exist.
 
 ### Tests (zx; one-test-per-file)
 
-- Provider sync determinism: `tools/tests/providers/php.sync-determinism.test.ts`.
-- Auto-map wiring: `tools/tests/auto-map/php.auto-map-wiring.test.ts` verifying that a target with `lockfile:` label gains the expected provider dep.
-- E2E provider wiring: Adapt `tools/tests/e2e-provider-wiring.ts` calls for a PHP target with a known `vendor/name@version` patch.
+- Provider sync determinism: `build-tools/tools/tests/providers/php.sync-determinism.test.ts`.
+- Auto-map wiring: `build-tools/tools/tests/auto-map/php.auto-map-wiring.test.ts` verifying that a target with `lockfile:` label gains the expected provider dep.
+- E2E provider wiring: Adapt `build-tools/tools/tests/e2e-provider-wiring.ts` calls for a PHP target with a known `vendor/name@version` patch.
 - Prebuild guard behavior when Composer lockfiles exist but providers are missing.
 
 ### Phased Rollout
@@ -286,7 +286,7 @@ Phase A — Scaffolding & Guards
 
 - Create `patches/php/` and `.gitkeep`.
 - Add `third_party/providers/defs_php.bzl`.
-- Add `tools/buck/sync-providers-php.ts` and register in the sync orchestrator.
+- Add `build-tools/tools/buck/sync-providers-php.ts` and register in the sync orchestrator.
 - Verify idempotent generation of `TARGETS.php.auto` on an empty repo.
 
 ### WASM Targets (Exploratory)
@@ -301,13 +301,13 @@ This is not part of the initial PHP scope.
 
 Phase B — Templates & Macros
 
-- Implement `tools/nix/templates/php.nix` with `phpApp`/`phpLib`.
+- Implement `build-tools/tools/nix/templates/php.nix` with `phpApp`/`phpLib`.
 - Land `php/defs.bzl` macros that stamp labels and append providers.
 - Convert one small sample PHP target to macros (if a sample app exists) or add tests covering macro output only.
 
 Phase C — Patching
 
-- Implement `tools/patch/patch-php.ts` with start/apply/reset/session.
+- Implement `build-tools/tools/patch/patch-php.ts` with start/apply/reset/session.
 - Validate canonical filenames and duplicate guards.
 - Ensure `apply` runs provider sync + auto-map.
 

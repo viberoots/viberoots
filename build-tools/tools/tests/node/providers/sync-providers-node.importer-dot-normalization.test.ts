@@ -1,0 +1,50 @@
+#!/usr/bin/env zx-wrapper
+import * as fsp from "node:fs/promises";
+import path from "node:path";
+import { test } from "node:test";
+import { runInTemp } from "../../lib/test-helpers";
+
+test("sync-providers-node normalizes importer '.' to lockfile dirname", async () => {
+  await runInTemp("node-importer-dot", async (tmp, $) => {
+    await $`git init`;
+
+    const lockfilePath = path.join(tmp, "apps/example/pnpm-lock.yaml");
+    const lockfileContent = `
+lockfileVersion: "9.0"
+
+importers:
+  .:
+    dependencies:
+      lodash:
+        specifier: ^4.17.21
+        version: 4.17.21
+
+packages:
+  /lodash/4.17.21:
+    resolution: { integrity: sha512-... }
+`.trim();
+
+    await fsp.mkdir(path.dirname(lockfilePath), { recursive: true });
+    await fsp.writeFile(lockfilePath, lockfileContent, "utf8");
+    await $`git add apps/example/pnpm-lock.yaml`;
+
+    await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
+
+    const outPath = path.join(tmp, "third_party/providers/TARGETS.node.auto");
+    const output = await fsp.readFile(outPath, "utf8");
+
+    if (!output.includes('importer="apps/example"')) {
+      console.error("Expected importer to be normalized to apps/example");
+      console.error(output);
+      process.exit(2);
+    }
+
+    if (
+      output.includes('lockfile="apps/example/pnpm-lock.yaml", importer="."') ||
+      output.includes('lockfile="apps/example/pnpm-lock.yaml",importer="."')
+    ) {
+      console.error("Importer '.' should not appear for apps/example lockfile provider entry");
+      process.exit(2);
+    }
+  });
+});

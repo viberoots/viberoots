@@ -37,7 +37,7 @@ This PR makes the following changes:
     - `backend:wasi` or `backend:pyodide`
   - wire `deps` as-is, without native `link_deps` for this phase
 - Stamp `labels` with `lang:python` and `kind:pyext_wasm`
-- Export the required attrs so `tools/buck/graph.json` contains:
+- Export the required attrs so `build-tools/tools/buck/graph.json` contains:
   - `module`, `srcs`, `cflags`, `ldflags`, `build_py_deps`
   - `labels` with `backend:<name>` to drive planner routing
 
@@ -45,16 +45,16 @@ This PR makes the following changes:
 
 I add zx tests (one test per file):
 
-- `tools/tests/python/python.pyext-wasm.macro.enforces.lockfile-label.test.ts`
+- `build-tools/tools/tests/python/python.pyext-wasm.macro.enforces.lockfile-label.test.ts`
   - defines `nix_python_wasm_extension_module` with invalid or missing `lockfile_label`
   - asserts macro-level failure
-- `tools/tests/python/python.pyext-wasm.attrs.exported-by-graph.test.ts`
+- `build-tools/tools/tests/python/python.pyext-wasm.attrs.exported-by-graph.test.ts`
   - defines a module with `module`, `build_py_deps`, `cflags`, `ldflags`, `labels=["backend:wasi"]`
   - exports graph and asserts attrs are present on `kind:pyext_wasm`
-- `tools/tests/python/python.pyext-wasm.backend.label-required.fails-fast.test.ts`
+- `build-tools/tools/tests/python/python.pyext-wasm.backend.label-required.fails-fast.test.ts`
   - defines a module without a `backend:*` label
   - asserts a targeted failure that names the required backend labels
-- `tools/tests/python/python.pyext-wasm.backend.label.invalid.fails-fast.test.ts`
+- `build-tools/tools/tests/python/python.pyext-wasm.backend.label.invalid.fails-fast.test.ts`
   - defines a module with `labels=["backend:unknown"]`
   - asserts a targeted failure that lists supported backends
 
@@ -73,7 +73,7 @@ I update documentation to record the new contract:
 The following must be true:
 
 - `nix_python_wasm_extension_module` exists, is importer-scoped, and stamps `lang:python`, `kind:pyext_wasm`
-- `tools/buck/graph.json` includes `module` and build attrs for a `kind:pyext_wasm` node
+- `build-tools/tools/buck/graph.json` includes `module` and build attrs for a `kind:pyext_wasm` node
 - Missing or unknown backend labels fail fast with a clear error
 - Documentation describes the node contract in one place
 
@@ -105,7 +105,7 @@ This PR introduces a dedicated Nix template that builds a Pyodide-compatible ext
 
 This PR makes the following changes:
 
-- Add a new template `T.pyExtWasm` under `tools/nix/templates/python/`:
+- Add a new template `T.pyExtWasm` under `build-tools/tools/nix/templates/python/`:
   - compile C/C++ sources with Emscripten as a side module
   - use Pyodide-provided CPython headers and build config
   - compute `EXT_SUFFIX` from the pinned Pyodide Python configuration
@@ -120,10 +120,10 @@ This PR makes the following changes:
 
 I add zx tests (one test per file):
 
-- `tools/tests/python/python.pyext-wasm.builds-with-emscripten.test.ts`
+- `build-tools/tools/tests/python/python.pyext-wasm.builds-with-emscripten.test.ts`
   - defines a minimal extension with a known symbol
   - builds the module and asserts the output path exists at `$out/site/<module path>${EXT_SUFFIX}`
-- `tools/tests/python/python.pyext-wasm.build-py-deps.headers.available.test.ts`
+- `build-tools/tools/tests/python/python.pyext-wasm.build-py-deps.headers.available.test.ts`
   - requests a header-only Python package via `build_py_deps`
   - asserts the build succeeds
 
@@ -172,13 +172,13 @@ This PR wires the new `kind:pyext_wasm` nodes into the Python planner and integr
 
 This PR makes the following changes:
 
-- Extend the Python planner (`tools/nix/planner/python.nix`):
+- Extend the Python planner (`build-tools/tools/nix/planner/python.nix`):
   - recognize `kind:pyext_wasm`
   - build `T.pyExtWasm` for those nodes
   - when planning `pyWasmApp` and `pyWasmLib` with `backend="pyodide"`:
     - collect direct `kind:pyext_wasm` deps
     - pass them as `nativeModuleOverlays` to the wasm templates
-- Extend Pyodide templates (`tools/nix/templates/python/wasm.nix`):
+- Extend Pyodide templates (`build-tools/tools/nix/templates/python/wasm.nix`):
   - merge `nativeModuleOverlays` into the Pyodide filesystem deterministically
   - keep overlay order stable and explicit
 - Add a targeted backend mismatch error for Pyodide apps that depend on `backend:wasi` extensions
@@ -187,18 +187,18 @@ This PR makes the following changes:
 
 I add zx integration tests (one test per file):
 
-- `tools/tests/python/python.wasm.pyodide.ext.imports-and-runs.test.ts`
+- `build-tools/tools/tests/python/python.wasm.pyodide.ext.imports-and-runs.test.ts`
   - defines a Pyodide app that depends on a `kind:pyext_wasm` module
   - runs in the Pyodide harness and asserts the module is imported and executed
-- `tools/tests/python/python.wasm.pyodide.ext.build-py-deps.headers.available.test.ts`
+- `build-tools/tools/tests/python/python.wasm.pyodide.ext.build-py-deps.headers.available.test.ts`
   - extension uses a header from `build_py_deps` and builds successfully
-- `tools/tests/python/python.wasm.pyodide.ext.lib-consumed-by-app.test.ts`
+- `build-tools/tools/tests/python/python.wasm.pyodide.ext.lib-consumed-by-app.test.ts`
   - Pyodide app depends on a `nix_python_wasm_lib` that depends on a `kind:pyext_wasm` module
   - assert the app runtime can import the extension from the lib overlay
-- `tools/tests/python/python.wasm.pyodide.ext.overlay-order.deterministic.test.ts`
+- `build-tools/tools/tests/python/python.wasm.pyodide.ext.overlay-order.deterministic.test.ts`
   - two extension overlays with conflicting paths
   - assert deterministic overlay order from planner inputs
-- `tools/tests/python/python.wasm.pyodide.ext.backend-mismatch.fails-fast.test.ts`
+- `build-tools/tools/tests/python/python.wasm.pyodide.ext.backend-mismatch.fails-fast.test.ts`
   - Pyodide app depends on a `backend:wasi` extension module
   - assert a targeted backend mismatch error
 
@@ -250,10 +250,10 @@ This targets the backend that already exists by default (`backend` falls back to
   - derive `EXT_SUFFIX` from the pinned CPython WASI config
   - output `$out/site/<module path>${EXT_SUFFIX}`
   - use the importer wheelhouse env for `build_py_deps` headers
-- Extend the Python planner (`tools/nix/planner/python.nix`):
+- Extend the Python planner (`build-tools/tools/nix/planner/python.nix`):
   - route `kind:pyext_wasm` nodes with `backend="wasi"` to the WASI path
   - reject mismatched backend combinations with a targeted error
-- Extend the WASI runtime path in `tools/nix/templates/python/wasm.nix`:
+- Extend the WASI runtime path in `build-tools/tools/nix/templates/python/wasm.nix`:
   - ensure the WASI runner uses a CPython WASI runtime capable of loading extension modules
   - keep the existing pure-Python behavior intact
 
@@ -261,15 +261,15 @@ This targets the backend that already exists by default (`backend` falls back to
 
 I add zx integration tests (one test per file):
 
-- `tools/tests/python/python.wasm.wasi.ext.imports-and-runs.test.ts`
+- `build-tools/tools/tests/python/python.wasm.wasi.ext.imports-and-runs.test.ts`
   - WASI app depends on a `kind:pyext_wasm` module via `nix_python_wasm_app`
   - asserts a targeted build-time failure until a dynamic-loading runtime is pinned
-- `tools/tests/python/python.wasm.wasi.ext.build-py-deps.headers.available.test.ts`
+- `build-tools/tools/tests/python/python.wasm.wasi.ext.build-py-deps.headers.available.test.ts`
   - extension uses a header from `build_py_deps` and builds successfully
-- `tools/tests/python/python.wasm.wasi.ext.lib-consumed-by-app.test.ts`
+- `build-tools/tools/tests/python/python.wasm.wasi.ext.lib-consumed-by-app.test.ts`
   - WASI app depends on a `nix_python_wasm_lib` that depends on a `kind:pyext_wasm` module
   - assert the app runtime can import the extension from the lib overlay
-- `tools/tests/python/python.wasm.wasi.ext.backend-mismatch.fails-fast.test.ts`
+- `build-tools/tools/tests/python/python.wasm.wasi.ext.backend-mismatch.fails-fast.test.ts`
   - WASI app depends on a `backend:pyodide` extension module
   - assert a targeted error
 
@@ -323,9 +323,9 @@ This PR makes the following changes:
 
 I add zx integration tests (one test per file):
 
-- `tools/tests/python/python.wasm.pyodide.ext.links-wasm-lib.builds-and-runs.test.ts`
+- `build-tools/tools/tests/python/python.wasm.pyodide.ext.links-wasm-lib.builds-and-runs.test.ts`
   - links a wasm C++ library and calls a symbol through the extension (Pyodide backend)
-- `tools/tests/python/python.wasm.pyodide.ext.link-deps.unsupported-target.fails-fast.test.ts`
+- `build-tools/tools/tests/python/python.wasm.pyodide.ext.link-deps.unsupported-target.fails-fast.test.ts`
   - asserts a targeted error for unsupported producers
 
 ### Docs (in this PR)
@@ -370,13 +370,13 @@ This PR closes the graph export gap where inline export omits the `module` attri
 This PR makes the following changes:
 
 - Include `module` in the inline exporter attribute list
-- Keep attr parity between `tools/buck/export-graph.ts` and `tools/buck/export-inline.ts`
+- Keep attr parity between `build-tools/tools/buck/export-graph.ts` and `build-tools/tools/buck/export-inline.ts`
 
 ### Tests (in this PR)
 
 I add zx tests (one test per file):
 
-- `tools/tests/python/python.pyext-wasm.attrs.exported-by-inline-graph.test.ts`
+- `build-tools/tools/tests/python/python.pyext-wasm.attrs.exported-by-inline-graph.test.ts`
   - runs the inline exporter path
   - asserts `module`, `cflags`, `ldflags`, `build_py_deps` are present for `kind:pyext_wasm`
 
@@ -419,7 +419,7 @@ This PR aligns the WASI extension template with the pinned CPython WASI toolchai
 
 This PR makes the following changes:
 
-- Add a pinned WASI CPython toolchain input under `tools/nix/toolchains`
+- Add a pinned WASI CPython toolchain input under `build-tools/tools/nix/toolchains`
 - Update `T.pyExtWasi` to derive `EXT_SUFFIX` and include paths from the pinned toolchain
 - Keep the existing overlay contract and output path unchanged
 
@@ -427,7 +427,7 @@ This PR makes the following changes:
 
 I add zx tests (one test per file):
 
-- `tools/tests/python/python.pyext-wasm.wasi.ext-suffix.uses-pinned-toolchain.test.ts`
+- `build-tools/tools/tests/python/python.pyext-wasm.wasi.ext-suffix.uses-pinned-toolchain.test.ts`
   - builds a WASI extension
   - asserts the suffix matches the pinned toolchain value
 
@@ -481,13 +481,13 @@ This PR makes the following changes:
 
 I add zx integration tests (one test per file):
 
-- `tools/tests/python/python.wasm.pyodide.ext.imports-and-runs.test.ts`
+- `build-tools/tools/tests/python/python.wasm.pyodide.ext.imports-and-runs.test.ts`
   - builds a Pyodide app with a `kind:pyext_wasm` dep
   - runs the headless Pyodide harness and asserts a function call result
-- `tools/tests/python/python.wasm.pyodide.ext.links-wasm-lib.builds-and-runs.test.ts`
+- `build-tools/tools/tests/python/python.wasm.pyodide.ext.links-wasm-lib.builds-and-runs.test.ts`
   - builds a Pyodide extension with a wasm static lib
   - asserts the linked symbol is invoked at runtime
-- `tools/tests/python/python.wasm.wasi.ext.imports-and-runs.test.ts`
+- `build-tools/tools/tests/python/python.wasm.wasi.ext.imports-and-runs.test.ts`
   - builds a WASI app with a `kind:pyext_wasm` dep
   - asserts a targeted build-time failure
 

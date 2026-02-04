@@ -82,7 +82,7 @@ Keep errors concrete and actionable:
 
 - Buck package boundary rule stays the same. Node targets must live in the importer package.
 - Provider sync stays the same. The auto-map already maps `lockfile:<path>#<importer>` labels.
-- No change to `tools/buck/sync-providers.ts` or `tools/buck/gen-auto-map.ts`.
+- No change to `build-tools/tools/buck/sync-providers.ts` or `build-tools/tools/buck/gen-auto-map.ts`.
 
 ---
 
@@ -121,9 +121,9 @@ nix_node_lib(
 
 ### Non-Default Cases (explicit override)
 
-Root tooling importer with `importer="."` and `pnpm-lock.yaml` at the repo root. A tool target under `tools/dev` needs an explicit label because the package name is `tools/dev`, not `.`.
+Root tooling importer with `importer="."` and `pnpm-lock.yaml` at the repo root. A tool target under `build-tools/tools/dev` needs an explicit label because the package name is `build-tools/tools/dev`, not `.`.
 
-`tools/dev/TARGETS`:
+`build-tools/tools/dev/TARGETS`:
 
 ```python
 load("//node:defs_core.bzl", "nix_node_gen")
@@ -181,10 +181,10 @@ Introduce a convention-based default lockfile label for `nix_node_gen`, `nix_nod
 
 #### Tests (in this PR)
 
-- `tools/tests/node/node.lockfile-label.default-from-package.uses-default.test.ts`
+- `build-tools/tools/tests/node/node.lockfile-label.default-from-package.uses-default.test.ts`
   - define a node target without `lockfile_label` in `apps/foo/TARGETS`
   - ensure the macro expands successfully when `apps/foo/pnpm-lock.yaml` exists
-- `tools/tests/node/node.lockfile-label.default-from-package.missing-lockfile.fails-fast.test.ts`
+- `build-tools/tools/tests/node/node.lockfile-label.default-from-package.missing-lockfile.fails-fast.test.ts`
   - define a node target without `lockfile_label` in `apps/bar/TARGETS`
   - assert the macro fails with the missing lockfile error
 
@@ -231,10 +231,10 @@ Apply the same defaulting behavior to Nix-calling Node macros (`node_webapp` and
 
 #### Tests (in this PR)
 
-- `tools/tests/node/node.defs-nix.lockfile-label.default-from-package.webapp.test.ts`
+- `build-tools/tools/tests/node/node.defs-nix.lockfile-label.default-from-package.webapp.test.ts`
   - define a `node_webapp` without `lockfile_label` under `apps/web`
   - assert the macro expands and the derived lockfile label is used
-- `tools/tests/node/node.defs-nix.lockfile-label.default-from-package.missing-lockfile.fails-fast.test.ts`
+- `build-tools/tools/tests/node/node.defs-nix.lockfile-label.default-from-package.missing-lockfile.fails-fast.test.ts`
   - define a `node_webapp` without `lockfile_label` under `apps/missing`
   - assert fast-fail with missing lockfile error
 
@@ -271,30 +271,30 @@ Add a deterministic enforcement mechanism that keeps Node workspace dependencies
 
 #### Scope & Changes
 
-- Add `tools/buck/enforce-node-deps.ts` (zx):
+- Add `build-tools/tools/buck/enforce-node-deps.ts` (zx):
   - Reads each importer `package.json` under `apps/*` and `libs/*`.
   - Resolves workspace dependencies to Buck target labels via a deterministic mapping file:
-    - `tools/node/workspace-map.json` (package name → Buck label).
+    - `build-tools/tools/node/workspace-map.json` (package name → Buck label).
   - For each Node target in the importer package, compare declared Buck `deps` with the expected set.
   - Supports two modes:
     - `--check` (default): fail on drift with a minimal diff.
     - `--fix`: rewrite the Node target `deps` to match the expected set.
-- Update the `i` script to run `node tools/buck/enforce-node-deps.ts --check` and print a user-facing warning on drift.
+- Update the `i` script to run `node build-tools/tools/buck/enforce-node-deps.ts --check` and print a user-facing warning on drift.
   - The warning must include the exact fix command:
-    - `node tools/buck/enforce-node-deps.ts --fix`
-- Update `tools/buck/prebuild-guard.ts` to call `node tools/buck/enforce-node-deps.ts --check` in CI.
+    - `node build-tools/tools/buck/enforce-node-deps.ts --fix`
+- Update `build-tools/tools/buck/prebuild-guard.ts` to call `node build-tools/tools/buck/enforce-node-deps.ts --check` in CI.
 - Update `docs/handbook/node-macros.md` to describe the enforcement and the `--fix` workflow.
 - Update `build-tools/docs/lang/pnpm-design.md` with the high-level rule: `package.json` is the source of truth, Buck `deps` must match.
 
 #### Tests (in this PR)
 
-- `tools/tests/node/node.deps-enforcement.matches-package-json.passes.test.ts`
+- `build-tools/tools/tests/node/node.deps-enforcement.matches-package-json.passes.test.ts`
   - Create a temp importer with a workspace dep and matching Buck `deps`.
   - Assert `--check` succeeds.
-- `tools/tests/node/node.deps-enforcement.drift.fails-fast.test.ts`
+- `build-tools/tools/tests/node/node.deps-enforcement.drift.fails-fast.test.ts`
   - Create a temp importer where `package.json` and Buck `deps` diverge.
   - Assert `--check` fails with a targeted error.
-- `tools/tests/node/node.deps-enforcement.fix.rewrites-deps.test.ts`
+- `build-tools/tools/tests/node/node.deps-enforcement.fix.rewrites-deps.test.ts`
   - Start with drift, run `--fix`, and assert the `deps` list matches the expected mapping.
 
 #### Acceptance Criteria
@@ -326,29 +326,29 @@ Implement to keep dependency edges correct and prevent drift without adding runt
 
 #### Description
 
-Eliminate manual maintenance of `tools/buck/workspace-map.json` by generating it deterministically from existing provider metadata in the glue pipeline. This keeps enforcement strict while removing hidden, user-maintained state.
+Eliminate manual maintenance of `build-tools/tools/buck/workspace-map.json` by generating it deterministically from existing provider metadata in the glue pipeline. This keeps enforcement strict while removing hidden, user-maintained state.
 
 #### Scope & Changes
 
-- Add a generator script (e.g. `tools/node/gen-workspace-map.ts`):
+- Add a generator script (e.g. `build-tools/tools/node/gen-workspace-map.ts`):
   - Read the existing provider/auto-map metadata that already encodes package name → Buck label.
-  - Emit a stable, sorted `tools/buck/workspace-map.json`.
+  - Emit a stable, sorted `build-tools/tools/buck/workspace-map.json`.
 - Wire the generator into the glue pipeline:
   - Run after provider sync and auto-map generation so the metadata is available.
   - Fail if the generator cannot build a complete mapping for workspace deps.
-- Update `tools/buck/enforce-node-deps.ts` to rely on the generated mapping without fallbacks.
+- Update `build-tools/tools/buck/enforce-node-deps.ts` to rely on the generated mapping without fallbacks.
 - Update documentation to state the mapping is generated and should not be edited by hand.
 
 #### Tests (in this PR)
 
-- `tools/tests/node/node.workspace-map.generation.matches-providers.test.ts`
+- `build-tools/tools/tests/node/node.workspace-map.generation.matches-providers.test.ts`
   - Generate the map from a temp provider dataset and assert the output mapping is stable and complete.
-- `tools/tests/node/node.deps-enforcement.generated-map.required.test.ts`
+- `build-tools/tools/tests/node/node.deps-enforcement.generated-map.required.test.ts`
   - Ensure enforcement fails fast when the generated map is missing or incomplete.
 
 #### Acceptance Criteria
 
-- `tools/buck/workspace-map.json` is generated deterministically from provider metadata.
+- `build-tools/tools/buck/workspace-map.json` is generated deterministically from provider metadata.
 - Enforcement uses the generated mapping and does not rely on manual edits.
 - Missing or incomplete mapping fails fast with a targeted error.
 - Tests validate generation and enforcement expectations.
@@ -381,7 +381,7 @@ Reduce `direnv`/devshell entry time by avoiding repeated `nix eval` for `node_mo
 
 - Add a lightweight marker file under `buck-out/tmp/`:
   - Store importer, lockfile path, lockfile hash, and resolved store path.
-- Update `tools/nix/devshell.nix` shellHook:
+- Update `build-tools/tools/nix/devshell.nix` shellHook:
   - If `node_modules` is a symlink and the marker matches the current lockfile hash, skip `nix eval`.
   - If missing or stale, fall back to the current behavior and refresh the marker.
   - Only apply the fast-path at repo root and avoid writes in temp repos.
@@ -427,14 +427,14 @@ Reduce full-suite verify time by (1) making seed repo copies CoW when supported 
 
 #### Scope & Changes
 
-- `tools/tests/lib/test-helpers/seed-store.ts`:
+- `build-tools/tools/tests/lib/test-helpers/seed-store.ts`:
   - Probe clone support once per worker and choose a fixed copy strategy.
   - Prefer `copyTree` with `cloneMode="force"` when reflink CoW is supported.
   - Fall back to `cloneMode="none"` when unsupported to avoid per-file clone fallbacks.
-- `tools/lib/copy-tree.ts`:
+- `build-tools/tools/lib/copy-tree.ts`:
   - Reuse existing `probeCopyFileCloneSupport()` for a stable, cross-platform decision.
   - No platform-specific tooling required.
-- `tools/nix/flake/packages/filter-seed-repo.nix`:
+- `build-tools/tools/nix/flake/packages/filter-seed-repo.nix`:
   - Tighten the seed filter to exclude additional non-test-critical files.
   - Keep a single seed derivation; do not add per-test or per-scope seeds.
 
@@ -443,20 +443,20 @@ Reduce full-suite verify time by (1) making seed repo copies CoW when supported 
 Use the existing verify timing summary to validate improvements quickly:
 
 1. Run a short sample:
-   - `TEST_TIMING=summary ./tools/bin/v //:devshell_node_modules_marker_fast_path`
+   - `TEST_TIMING=summary ./build-tools/tools/bin/v //:devshell_node_modules_marker_fast_path`
 2. Confirm timing output:
    - `seedStoreCopy(...)` entries should drop when reflink is supported.
    - No increase in `rsyncRepoTo` counts.
 3. Run a focused subset of heavy scaffolders:
-   - `TEST_TIMING=summary ./tools/bin/v //:scaffolding_node_cli_scaffold_and_build_shim_and_bundle`
-   - `TEST_TIMING=summary ./tools/bin/v //:scaffolding_node_go_addon_nix_node_test_pass`
+   - `TEST_TIMING=summary ./build-tools/tools/bin/v //:scaffolding_node_cli_scaffold_and_build_shim_and_bundle`
+   - `TEST_TIMING=summary ./build-tools/tools/bin/v //:scaffolding_node_go_addon_nix_node_test_pass`
 4. Only after the above looks good, run the full suite.
 
 #### Tests (in this PR)
 
-- Extend `tools/tests/lib/runInTemp.seed-store.isolation.test.ts`:
+- Extend `build-tools/tools/tests/lib/runInTemp.seed-store.isolation.test.ts`:
   - Verify seed copy still produces a writable workspace when clone mode is enabled.
-- Add `tools/tests/lib/runInTemp.seed-store.clone-mode.probe.test.ts`:
+- Add `build-tools/tools/tests/lib/runInTemp.seed-store.clone-mode.probe.test.ts`:
   - Assert the probe result is cached per worker and does not re-run per test.
 - Update the existing seed-store tests to ensure no new seed derivations are created.
 

@@ -6,7 +6,7 @@
 
 - ✅ **`pnpm -w list` shows an empty or minimal workspace without errors**
   - Verified: runs successfully, shows root dev dependencies
-- ✅ **Running `node tools/buck/sync-providers.ts --lang node` creates deterministic `third_party/providers/TARGETS.node.auto`**
+- ✅ **Running `node build-tools/tools/buck/sync-providers.ts --lang node` creates deterministic `third_party/providers/TARGETS.node.auto`**
   - Verified: creates file with empty header (no lockfiles present yet)
   - Idempotent: running twice produces no diff
 - ✅ **CI prebuild-guard passes (no missing glue after running glue steps)**
@@ -35,12 +35,12 @@
 
 ### Infrastructure (Critical Fixes)
 
-5. `tools/nix/devshell.nix` — Recursion guard + smart node_modules linking
+5. `build-tools/tools/nix/devshell.nix` — Recursion guard + smart node_modules linking
 6. `.husky/pre-commit` — Process leak prevention
-7. `tools/bin/verify` — Test environment guards
-8. `tools/tests/lib/test-helpers.ts` — Test sandbox isolation
-9. `tools/dev/install/deps-main.ts` — Skip node install in tests
-10. `tools/tests/dev/install-deps.*.test.ts` — Test-specific guards
+7. `build-tools/tools/bin/verify` — Test environment guards
+8. `build-tools/tools/tests/lib/test-helpers.ts` — Test sandbox isolation
+9. `build-tools/tools/dev/install/deps-main.ts` — Skip node install in tests
+10. `build-tools/tools/tests/dev/install-deps.*.test.ts` — Test-specific guards
 
 ### Documentation
 
@@ -69,7 +69,7 @@
 pnpm -w list  # ✅ works
 
 # Provider sync (idempotent)
-tools/buck/sync-providers.ts --lang node  # ✅ deterministic output
+build-tools/tools/buck/sync-providers.ts --lang node  # ✅ deterministic output
 
 # Full test suite
 v  # ✅ 177/177 pass in ~4 minutes

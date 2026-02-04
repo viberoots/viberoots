@@ -10,20 +10,20 @@ Unify parsing of importer‑scoped lockfile labels into a single helper to avoid
 
 ### Scope & Changes
 
-- `tools/lib/labels.ts`:
+- `build-tools/tools/lib/labels.ts`:
   - Add `parseLockfileLabel(label: string): { lockfile: string; importer: string } | null`.
   - Add `isImporterScopedLockfileLabel(label: string): boolean` (thin wrapper).
-- `tools/buck/exporter/lang/node.ts`:
+- `build-tools/tools/buck/exporter/lang/node.ts`:
   - Replace the local `parseLockLabel` with the shared helper.
   - Use the helper in `validateSingleImporterLabel`.
-- `tools/buck/gen-provider-index.ts`:
+- `build-tools/tools/buck/gen-provider-index.ts`:
   - Replace the local regex parser with the shared helper.
 - Tests:
-  - New: `tools/tests/lib/labels.parse-lockfile-label.test.ts` to cover edge cases (root `.` importer, nested importers, bad formats).
+  - New: `build-tools/tools/tests/lib/labels.parse-lockfile-label.test.ts` to cover edge cases (root `.` importer, nested importers, bad formats).
 
 ### Acceptance Criteria
 
-- For the same inputs, `tools/buck/graph.json` and provider index outputs are byte‑for‑byte identical pre/post.
+- For the same inputs, `build-tools/tools/buck/graph.json` and provider index outputs are byte‑for‑byte identical pre/post.
 - All existing exporter/provider zx tests remain green without updates.
 
 ### Risks
@@ -50,8 +50,8 @@ Deduplicate the default graph path constant so all consumers import it from one 
 
 ### Scope & Changes
 
-- `tools/lib/graph-view.ts`:
-  - Remove the local `DEFAULT_GRAPH_PATH`; import from `tools/lib/graph-const.ts`.
+- `build-tools/tools/lib/graph-view.ts`:
+  - Remove the local `DEFAULT_GRAPH_PATH`; import from `build-tools/tools/lib/graph-const.ts`.
 - Audit scripts that hardcode the default (e.g., CLI defaults) and, when feasible, import the shared constant:
   - Keep CLI flags/overrides intact; only unify the fallback default value.
 - Tests: none expected.
@@ -81,14 +81,14 @@ Implement.
 
 ### Description
 
-Reduce duplication in `tools/nix/planner/go.nix` by relying more on shared helpers and lifting repeated local helpers once per file.
+Reduce duplication in `build-tools/tools/nix/planner/go.nix` by relying more on shared helpers and lifting repeated local helpers once per file.
 
 ### Scope & Changes
 
-- `tools/nix/planner/go.nix`:
+- `build-tools/tools/nix/planner/go.nix`:
   - Replace repeated inline constructions of `byName`, `depsOfName`, and `labelsOfName` inside `mkApp` and `mkLib` with top‑level bindings.
-  - Prefer existing functions from `tools/nix/planner/lib.nix` (`byName`, `depsOf`, `labelsOf`) where possible.
-- Optional (only if clearly beneficial): extend `tools/nix/planner/lib.nix` with narrow helper(s) to avoid re‑creating trivial lookups in language plugins.
+  - Prefer existing functions from `build-tools/tools/nix/planner/lib.nix` (`byName`, `depsOf`, `labelsOf`) where possible.
+- Optional (only if clearly beneficial): extend `build-tools/tools/nix/planner/lib.nix` with narrow helper(s) to avoid re‑creating trivial lookups in language plugins.
 
 ### Acceptance Criteria
 
@@ -115,14 +115,14 @@ Implement.
 
 ### Description
 
-Move validation severity selection and presentation from `tools/buck/exporter/main.ts` into `tools/buck/exporter/validation.ts` to reduce file size and align with methodology constraints, without changing behavior.
+Move validation severity selection and presentation from `build-tools/tools/buck/exporter/main.ts` into `build-tools/tools/buck/exporter/validation.ts` to reduce file size and align with methodology constraints, without changing behavior.
 
 ### Scope & Changes
 
-- `tools/buck/exporter/main.ts`:
+- `build-tools/tools/buck/exporter/main.ts`:
   - Extract the mode selection (`warn`/`error`, CI override), adapter validation aggregation, and logging to a new module.
   - Keep the exact message text and timing prints.
-- `tools/buck/exporter/validation.ts` (new):
+- `build-tools/tools/buck/exporter/validation.ts` (new):
   - Export small, pure functions used by `main.ts`.
 - Tests: run existing zx tests; no changes expected.
 
@@ -155,7 +155,7 @@ Fix minor identifier typos and add a guard test to prevent regressions. No behav
 
 ### Scope & Changes
 
-- `tools/buck/sync-providers.ts`:
+- `build-tools/tools/buck/sync-providers.ts`:
   - Rename `targetLgLangRequested` → `targetLangRequested`; `EMETIndexRequested` → `EMITIndexRequested` (or equivalent clear names).
 - Tests:
   - Add a tiny zx test that imports the module and exercises the renamed functions via a dry‑run path to ensure they remain referenced correctly.

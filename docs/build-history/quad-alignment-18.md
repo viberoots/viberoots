@@ -20,33 +20,33 @@ As in prior parts, each PR includes the tests and documentation required for the
 We already define a canonical sanitizer contract in:
 
 - Starlark: `lang/sanitize.bzl:sanitize_name`
-- Nix: `tools/nix/lib/lang-helpers.nix:sanitizeName`
+- Nix: `build-tools/tools/nix/lib/lang-helpers.nix:sanitizeName`
 
-Some TypeScript tooling callsites still re-implement sanitizer logic locally (for example, `tools/buck/node-cli-bundle.ts` and `tools/dev/build-selected.ts`). This is a drift vector because sanitizer output is part of external interfaces (flake attribute names, output filenames).
+Some TypeScript tooling callsites still re-implement sanitizer logic locally (for example, `build-tools/tools/buck/node-cli-bundle.ts` and `build-tools/tools/dev/build-selected.ts`). This is a drift vector because sanitizer output is part of external interfaces (flake attribute names, output filenames).
 
 ### Scope & Changes
 
-- Add a TypeScript sanitizer helper in `tools/lib/` (e.g. `tools/lib/sanitize.ts`) that implements the exact contract:
+- Add a TypeScript sanitizer helper in `build-tools/tools/lib/` (e.g. `build-tools/tools/lib/sanitize.ts`) that implements the exact contract:
   - replace `//` with empty string
   - replace `:` `/` and space with `-`
 - Refactor TypeScript callsites to use the helper:
-  - `tools/buck/node-cli-bundle.ts` (importer attr sanitization)
-  - `tools/dev/build-selected.ts` (flake attr naming and logging)
+  - `build-tools/tools/buck/node-cli-bundle.ts` (importer attr sanitization)
+  - `build-tools/tools/dev/build-selected.ts` (flake attr naming and logging)
   - any other ad-hoc sanitizer implementations found in tooling scripts
 - Keep the Starlark and Nix implementations unchanged; this PR is about eliminating TS drift.
 
 ### Tests (in this PR)
 
 - Update the existing parity tests to use the TS helper (rather than duplicating `replaceAll(...)` logic inline):
-  - `tools/tests/lang/sanitize-name.parity.test.ts`
-  - `tools/tests/cpp/sanitize-name.parity.test.ts`
+  - `build-tools/tools/tests/lang/sanitize-name.parity.test.ts`
+  - `build-tools/tools/tests/cpp/sanitize-name.parity.test.ts`
 - Add one more test case that covers a drift-prone input (cell prefix + config suffix) and asserts the sanitizer contract still matches the Starlark probe’s output filename.
 
 ### Docs (in this PR)
 
 - Update tooling docs to state:
   - TypeScript must not hand-roll sanitization when the output participates in naming contracts
-  - the canonical entrypoint is the new helper in `tools/lib/`.
+  - the canonical entrypoint is the new helper in `build-tools/tools/lib/`.
 
 ### Acceptance Criteria
 
@@ -88,7 +88,7 @@ Importer-scoped lockfile labels (`lockfile:<path>#<importer>`) are the shared co
 
 Today:
 
-- TypeScript already has a parser and unit tests: `tools/lib/labels.ts:parseLockfileLabel` and `tools/tests/lib/labels.parse-lockfile-label.test.ts`.
+- TypeScript already has a parser and unit tests: `build-tools/tools/lib/labels.ts:parseLockfileLabel` and `build-tools/tools/tests/lib/labels.parse-lockfile-label.test.ts`.
 - Starlark validates lockfile label shape strictly: `lang/lockfile_labels.bzl:_parse_importer_scoped_lockfile_label`.
 - Nix (Node planner) still does a minimal `splitString "#"` without the same validation surface.
 
@@ -96,13 +96,13 @@ This is a drift vector because small differences (extra `#`, importer mismatch, 
 
 ### Scope & Changes
 
-- Add a small shared Nix parsing helper in `tools/nix/planner/lib.nix` (or a similarly central planner helper) with the same contract as TS/Starlark:
+- Add a small shared Nix parsing helper in `build-tools/tools/nix/planner/lib.nix` (or a similarly central planner helper) with the same contract as TS/Starlark:
   - input must start with `lockfile:`
   - must contain exactly one `#`
   - both `path` and `importer` must be non-empty
   - normalize lockfile path by stripping leading `./` (match TS behavior)
   - (Node policy) importer must be `.` or equal to `dirname(lockfilePath)`
-- Update `tools/nix/planner/node.nix` to use the helper:
+- Update `build-tools/tools/nix/planner/node.nix` to use the helper:
   - require exactly one `lockfile:` label for Node targets that the planner intends to build
   - if multiple lockfile labels are present, fail with a deterministic error that references the target and the labels
 - Keep TS parsing behavior unchanged (it already strips `./`); this PR hardens parity and centralizes Nix behavior.
@@ -111,7 +111,7 @@ This PR intentionally does not change provider selection semantics (`auto_map.bz
 
 ### Tests (in this PR)
 
-- Add a parity test `tools/tests/labels/lockfile-label.parity.test.ts` that:
+- Add a parity test `build-tools/tools/tests/labels/lockfile-label.parity.test.ts` that:
   - feeds a table of valid and invalid lockfile labels
   - asserts TS parsing results (or null) match Starlark behavior via `importer_from_labels_probe` (and a new probe that also writes the normalized lockfile path, not only importer)
   - locks down normalization (`lockfile:./apps/web/pnpm-lock.yaml#apps/web` → `apps/web/pnpm-lock.yaml#apps/web`)
@@ -151,7 +151,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `tools/lib/labels.ts`, `lang/lockfile_labels.bzl`, `tools/nix/planner/*`, and narrow tests. Safe in tooling slices that include the exporter/planner.
+- Touches `build-tools/tools/lib/labels.ts`, `lang/lockfile_labels.bzl`, `build-tools/tools/nix/planner/*`, and narrow tests. Safe in tooling slices that include the exporter/planner.
 
 ---
 
@@ -170,7 +170,7 @@ This is an abstraction leak because the caller can supply an entry that is ignor
   - in `bundle=True` mode: enforce the contract explicitly:
     - require `entry` to be unset or equal to the fixed bundle entry (`src/index.ts`)
     - otherwise fail with a clear message explaining the supported bundled entry contract
-- In `tools/buck/node-cli-bundle.ts`:
+- In `build-tools/tools/buck/node-cli-bundle.ts`:
   - remove `--entry` (or treat it as a hard error) so the tool surface matches the flake behavior
 - In `flake.nix`:
   - keep bundling entry fixed (do not add a new configuration surface in this PR)
@@ -179,7 +179,7 @@ This PR does not attempt to generalize the flake to support arbitrary bundle ent
 
 ### Tests (in this PR)
 
-- Add a regression test under `tools/tests/node/bundle/` that:
+- Add a regression test under `build-tools/tools/tests/node/bundle/` that:
   - creates a temp importer with a minimal layout and lockfile wiring
   - calls the bundled macro path with a non-default `entry` and asserts it fails with the expected error text
   - calls it with default/unset `entry` and asserts the bundling path proceeds (smoke success)
@@ -215,7 +215,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `node/defs_nix.bzl`, `tools/buck/node-cli-bundle.ts`, and narrow Node tests. Safe in Node-focused slices.
+- Touches `node/defs_nix.bzl`, `build-tools/tools/buck/node-cli-bundle.ts`, and narrow Node tests. Safe in Node-focused slices.
 
 ---
 

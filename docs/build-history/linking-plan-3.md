@@ -37,7 +37,7 @@ This PR focuses only on the C++ Wasm static library producer side. It does not c
   - accept `link_deps` and `header_deps` (default `[]`)
   - compute `deps := deps ∪ link_deps ∪ header_deps` via the shared helper (same macro contract as native C++)
   - preserve the intent attrs on the rule so they appear in the exported graph node
-- Extend `tools/nix/planner/cpp.nix` Wasm-lib construction:
+- Extend `build-tools/tools/nix/planner/cpp.nix` Wasm-lib construction:
   - when planning a `wasm:static` C++ lib, resolve its `header_deps` to `T.cppHeaders` derivations
   - pass include roots to `T.cppWasmStaticLib` via its `includes` input
   - keep ordering deterministic:
@@ -45,17 +45,17 @@ This PR focuses only on the C++ Wasm static library producer side. It does not c
     - dedupe while preserving first-seen order
 - Update label and target selection notes:
   - keep using existing variant stamping (`kind:wasm`, `wasm:static`) from `prepare_package_local_wasm_wiring`
-  - keep `wasm:wasi` as an explicit label used to select `wasmTarget = wasm32-wasi` (this already exists in `tools/nix/planner/cpp.nix`)
+  - keep `wasm:wasi` as an explicit label used to select `wasmTarget = wasm32-wasi` (this already exists in `build-tools/tools/nix/planner/cpp.nix`)
 
 ### Tests (in this PR)
 
 Add zx tests (one test per file):
 
-- `tools/tests/cpp/cpp.wasm-static-lib.accepts.link-intent-attrs.exported-by-graph.test.ts`
+- `build-tools/tools/tests/cpp/cpp.wasm-static-lib.accepts.link-intent-attrs.exported-by-graph.test.ts`
   - temp repo defines `nix_cpp_wasm_static_lib` with `link_deps` and `header_deps`
-  - runs `tools/buck/export-graph.ts`
-  - asserts `tools/buck/graph.json` includes `link_deps` and `header_deps` on the node
-- `tools/tests/cpp/cpp.wasm-static-lib.header-deps.compile-uses-cpp-headers.builds.test.ts`
+  - runs `build-tools/tools/buck/export-graph.ts`
+  - asserts `build-tools/tools/buck/graph.json` includes `link_deps` and `header_deps` on the node
+- `build-tools/tools/tests/cpp/cpp.wasm-static-lib.header-deps.compile-uses-cpp-headers.builds.test.ts`
   - temp repo defines:
     - a `nix_cpp_headers` target exporting a header with a constant or inline function
     - a `nix_cpp_wasm_static_lib` target that includes that header via `header_deps`
@@ -71,7 +71,7 @@ Add zx tests (one test per file):
 ### Acceptance Criteria
 
 - `nix_cpp_wasm_static_lib` accepts `link_deps` and `header_deps` and merges them into `deps` deterministically.
-- `link_deps` and `header_deps` are present in `tools/buck/graph.json` for a target that sets them.
+- `link_deps` and `header_deps` are present in `build-tools/tools/buck/graph.json` for a target that sets them.
 - A Wasm static library can compile while including headers from a header-only target referenced via `header_deps`.
 
 ### Risks
@@ -118,7 +118,7 @@ Note: Python native extension scaffolding belongs to **Phase 3** and should be t
 
 Add zx tests (one test per file):
 
-- `tools/tests/scaffolding/scaf-new.ts.wasm-linking-app.scaffold-and-build.test.ts`
+- `build-tools/tools/tests/scaffolding/scaf-new.ts.wasm-linking-app.scaffold-and-build.test.ts`
   - runs `scaf new ts wasm-linking-app <name>`
   - asserts key files exist and the target labels are correct
   - builds the resulting app (or a subset target) and asserts the Wasm module can be loaded and returns the expected value
@@ -168,7 +168,7 @@ This PR introduces the macro and rule surface needed for planners to observe Tin
   - add attrs to carry intent into the graph:
     - `link_deps`, `link_closure`, `link_closure_overrides`
   - switch the default build to graph-aware selection:
-    - prefer `tools/dev/build-selected.ts` (builds `#graph-generator-selected` which routes to `LANGS.go.mkTinyWasm`)
+    - prefer `build-tools/tools/dev/build-selected.ts` (builds `#graph-generator-selected` which routes to `LANGS.go.mkTinyWasm`)
     - keep the minimal `#graph-generator-selected-wasm` as an explicit fallback only when a consumer opts in (or behind a clear environment flag), because it cannot support Wasm linking semantics
   - preserve existing behavior for `WEB_WASM_BACKEND` by passing it through unchanged (Phase 2 will use this consistently in the planner)
 
@@ -176,14 +176,14 @@ This PR introduces the macro and rule surface needed for planners to observe Tin
 
 Add zx tests (one test per file):
 
-- `tools/tests/go/go.tinygo-wasm.link-intent-attrs.exported-by-graph.test.ts`
+- `build-tools/tools/tests/go/go.tinygo-wasm.link-intent-attrs.exported-by-graph.test.ts`
   - temp repo defines a `nix_go_tiny_wasm_lib` with `link_deps`, `link_closure`, and `link_closure_overrides`
-  - runs `tools/buck/export-graph.ts`
-  - asserts `tools/buck/graph.json` includes these fields on the node
-- `tools/tests/go/go.tinygo-wasm.builds-via-graph-selected-path.smoke.test.ts`
+  - runs `build-tools/tools/buck/export-graph.ts`
+  - asserts `build-tools/tools/buck/graph.json` includes these fields on the node
+- `build-tools/tools/tests/go/go.tinygo-wasm.builds-via-graph-selected-path.smoke.test.ts`
   - temp repo defines a minimal `nix_go_tiny_wasm_lib`
   - runs a Buck build of the target
-  - asserts the build path goes through `tools/dev/build-selected.ts` (for example by asserting a stable log prefix emitted by build-selected)
+  - asserts the build path goes through `build-tools/tools/dev/build-selected.ts` (for example by asserting a stable log prefix emitted by build-selected)
 
 ### Docs (in this PR)
 
@@ -233,9 +233,9 @@ The implementation should follow the model described in `build-tools/docs/wasm-l
 
 ### Scope & Changes
 
-- Extend `tools/nix/planner/go.nix` `mkTinyWasm`:
+- Extend `build-tools/tools/nix/planner/go.nix` `mkTinyWasm`:
   - read `link_deps`, `link_closure`, and `link_closure_overrides` from the exported node
-  - compute a resolved ordered unique list using the shared closure resolver (`tools/nix/planner/link-closure.nix`)
+  - compute a resolved ordered unique list using the shared closure resolver (`build-tools/tools/nix/planner/link-closure.nix`)
     - roots are the consumer’s `link_deps`
     - traversal follows `link_deps` on Wasm producer nodes
   - validate each resolved dep is a supported Wasm producer:
@@ -255,7 +255,7 @@ The implementation should follow the model described in `build-tools/docs/wasm-l
 
 Add zx integration tests (one test per file). These should validate real symbol resolution so we know the C++ archive is actually linked.
 
-- `tools/tests/wasm/wasm.tinygo.links-cpp-wasm-static-lib.via-link-deps.build-and-load.test.ts`
+- `build-tools/tools/tests/wasm/wasm.tinygo.links-cpp-wasm-static-lib.via-link-deps.build-and-load.test.ts`
   - temp repo defines:
     - `nix_cpp_wasm_static_lib` exporting `int add(int,int)` from a C unit, plus a header
     - `nix_go_tiny_wasm_lib` that:
@@ -264,13 +264,13 @@ Add zx integration tests (one test per file). These should validate real symbol 
       - exports a Wasm function that returns the result
   - builds the wasm target via the normal Buck rule path
   - loads it in Node (WebAssembly instantiate) and asserts the exported function returns 5
-- `tools/tests/wasm/wasm.tinygo.transitive-closure.follows-link-deps.builds.test.ts`
+- `build-tools/tools/tests/wasm/wasm.tinygo.transitive-closure.follows-link-deps.builds.test.ts`
   - temp repo defines a chain:
     - `//libs/support:support_wasm` exporting `int inc(int)`
     - `//libs/core:core_wasm` exporting `int add2(int)` and referencing `inc` and declaring `link_deps=["//libs/support:support_wasm"]`
     - `//libs/api:wasm` tinygo module with `link_deps=["//libs/core:core_wasm"]` and `link_closure="transitive"`, calling `C.add2(3)` and exporting the result
   - asserts the build succeeds and the result is correct
-- `tools/tests/wasm/wasm.variant-mismatch.wasi-vs-bare.fails-fast.test.ts`
+- `build-tools/tools/tests/wasm/wasm.variant-mismatch.wasi-vs-bare.fails-fast.test.ts`
   - temp repo defines a mismatch case, for example:
     - TinyGo build is selected as WASI (`WEB_WASM_BACKEND=wasi_single`)
     - a linked C++ Wasm static lib lacks `wasm:wasi` (or the opposite mismatch)
@@ -299,7 +299,7 @@ Wasm linking semantics remain implicit and inconsistent. Users cannot rely on ex
 
 ### Downsides for Implementing
 
-Planner logic becomes more complex, but it stays concentrated in `tools/nix/planner/go.nix` and the shared closure helper.
+Planner logic becomes more complex, but it stays concentrated in `build-tools/tools/nix/planner/go.nix` and the shared closure helper.
 
 ### Recommendation
 
@@ -338,15 +338,15 @@ This PR should stay narrowly scoped to Phase 2 behavior.
 
 Add zx tests (one test per file):
 
-- `tools/tests/wasm/wasm.link-input-ordering.deterministic.test.ts`
+- `build-tools/tools/tests/wasm/wasm.link-input-ordering.deterministic.test.ts`
   - temp repo with multiple `link_deps` and a fixed expected resolved order
   - runs multiple builds and asserts the resolved list is stable (for example by reading a build log field emitted by templates)
-- `tools/tests/wasm/wasm.link-deps.patch-invalidation.rebuilds-consumer.test.ts`
+- `build-tools/tools/tests/wasm/wasm.link-deps.patch-invalidation.rebuilds-consumer.test.ts`
   - temp repo:
     - TinyGo wasm links a C++ Wasm static lib
     - modify a `.patch` file under the producer’s patch surface
   - asserts the consumer rebuilds (using existing invalidation harness patterns)
-- `tools/tests/wasm/wasm.link-deps.unsupported-target.fails-fast.test.ts`
+- `build-tools/tools/tests/wasm/wasm.link-deps.unsupported-target.fails-fast.test.ts`
   - temp repo places a non-C++ Wasm target in `link_deps`
   - asserts the error message is targeted and names expected stamps
 
@@ -397,13 +397,13 @@ Today, Phase 1 is implemented and tested for:
 
 But the C++ planner does not yet consume `link_closure` / `link_closure_overrides` to compute transitive link closure.
 
-Phase 3 (Python extensions) wants to reuse the same closure semantics and the shared closure resolver (`tools/nix/planner/link-closure.nix`). Before adding another consumer (Python), I want to close this missing Phase 1 behavior and lock it down with integration tests.
+Phase 3 (Python extensions) wants to reuse the same closure semantics and the shared closure resolver (`build-tools/tools/nix/planner/link-closure.nix`). Before adding another consumer (Python), I want to close this missing Phase 1 behavior and lock it down with integration tests.
 
 ### Scope & Changes
 
-- Extend the C++ planner (`tools/nix/planner/cpp.nix`) to consume closure intent for **native C++ consumers**:
+- Extend the C++ planner (`build-tools/tools/nix/planner/cpp.nix`) to consume closure intent for **native C++ consumers**:
   - read `link_deps`, `link_closure`, and `link_closure_overrides` from exported nodes
-  - compute a resolved ordered unique list using `tools/nix/planner/link-closure.nix` (`resolveLinkClosure`):
+  - compute a resolved ordered unique list using `build-tools/tools/nix/planner/link-closure.nix` (`resolveLinkClosure`):
     - roots are the consumer’s `link_deps`
     - traversal follows `link_deps` on C++ library producer nodes (not general `deps`)
   - preserve Phase 1 conservative defaults:
@@ -421,16 +421,16 @@ Phase 3 (Python extensions) wants to reuse the same closure semantics and the sh
 
 Add zx integration tests (one test per file):
 
-- `tools/tests/cpp/cpp.link-closure.transitive.follows-link-deps.build-and-run.test.ts`
+- `build-tools/tools/tests/cpp/cpp.link-closure.transitive.follows-link-deps.build-and-run.test.ts`
   - temp repo defines:
     - `//libs/support:support` (C++ lib)
     - `//libs/core:core` (C++ lib) that uses a symbol from `support` and declares `link_deps=["//libs/support:support"]`
     - `//apps/demo:demo` (C++ bin) with `link_deps=["//libs/core:core"]` and `link_closure="transitive"`
   - builds and runs the binary and asserts output proves the transitive lib was linked (symbol resolution is real)
-- `tools/tests/cpp/cpp.link-closure.direct.does-not-follow-link-deps.fails.test.ts`
+- `build-tools/tools/tests/cpp/cpp.link-closure.direct.does-not-follow-link-deps.fails.test.ts`
   - same repo shape, but `link_closure="direct"`
   - asserts the build fails deterministically due to an unresolved symbol (or fails with a targeted error if we choose to make the planner validate missing transitive requirements)
-- `tools/tests/cpp/cpp.link-closure.overrides.apply.deterministic.test.ts`
+- `build-tools/tools/tests/cpp/cpp.link-closure.overrides.apply.deterministic.test.ts`
   - temp repo defines multiple roots with mixed overrides (e.g. default direct, override one root to transitive)
   - asserts the resolved library list is deterministic (for example, by asserting a stable ordering signal already emitted by templates, or by reading a build log field)
 
@@ -444,7 +444,7 @@ Add zx integration tests (one test per file):
 ### Acceptance Criteria
 
 - C++ consumers can opt into `link_closure="transitive"` and deterministically link the transitive closure of `link_deps`.
-- Closure uses the shared resolver (`tools/nix/planner/link-closure.nix`) and preserves deterministic ordering.
+- Closure uses the shared resolver (`build-tools/tools/nix/planner/link-closure.nix`) and preserves deterministic ordering.
 - Misuse (unsupported dep in closure) fails fast with a targeted error message.
 - Tests lock down direct vs transitive behavior and overrides behavior.
 - Documentation matches the tested behavior.

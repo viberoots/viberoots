@@ -21,7 +21,7 @@ Design
 
 - Buck macros
   - Keep `nix_cxx_library(name, attr, ...)` as a thin identity wrapper with labels: `"lang:cpp"`, `"nixpkg:<attr>"`.
-  - Do not attempt to encode include/lib paths in Buck; rely on Nix evaluation to resolve attr paths (consistent with `tools/nix/templates/cpp.nix`).
+  - Do not attempt to encode include/lib paths in Buck; rely on Nix evaluation to resolve attr paths (consistent with `build-tools/tools/nix/templates/cpp.nix`).
 
 - Providers catalogue
   - Add entries to `third_party/providers/TARGETS`:
@@ -30,11 +30,11 @@ Design
   - Convention: only create curated entries for libraries we test against. Avoid large catalog explosion.
 
 - Labels and planner interoperability
-  - The planner collects `nixpkg:*` labels by DFS (already implemented in `tools/nix/planner/cpp.nix`).
+  - The planner collects `nixpkg:*` labels by DFS (already implemented in `build-tools/tools/nix/planner/cpp.nix`).
   - No changes needed to planner; ensure curated provider targets carry labels.
 
 - Scaffolding/tests
-  - Add tests under `tools/tests/cpp/`:
+  - Add tests under `build-tools/tools/tests/cpp/`:
     - `include-from-nixpkg.zlib.providers.test.ts`: build a tiny `nix_cpp_test` that includes a zlib header and links (if needed) via `cppTest` template detection.
     - `include-from-nixpkg.openssl.providers.test.ts`: same for openssl with a simple include. Keep tests minimal and platform-neutral.
   - Extend scaffolding validation (optional): an example C++ lib template variant that depends on `nix_pkgs_zlib` to validate provider edge in planner.
@@ -70,7 +70,7 @@ Scope
 - Exporter
   - Ensure Go adapter adds `cgo:enabled` and `nixpkg:*` labels for diagnostics (additive only). No deletion.
 
-- Nix Go template (`tools/nix/templates/go.nix`)
+- Nix Go template (`build-tools/tools/nix/templates/go.nix`)
   - New params: `nixCgoPkgs = []`, `pkgConfigNames = {}`.
   - Behavior:
     - If `nixCgoPkgs != []`: set `nativeBuildInputs = nixCgoPkgs ++ [ pkgs.pkg-config ]`, export `CGO_ENABLED=1`.
@@ -79,7 +79,7 @@ Scope
   - Keep flag ordering deterministic.
 
 - Tests
-  - Under `tools/tests/go/`:
+  - Under `build-tools/tools/tests/go/`:
     - `go.cgo.zlib.builds.test.ts`: minimal Go file with a cgo comment and a reference to zlib via pkg-config; expect successful build.
     - `go.cgo.openssl.builds.test.ts`: same for openssl; if platform variance is high, keep to include-only smoke.
   - Exporter label tests to verify `cgo:enabled` and `nixpkg:*` presence.
@@ -103,15 +103,15 @@ Intent/Impact
 
 Current state
 
-- `tools/buck/exporter/main.ts` already discovers adapters, filters active, runs them in a deterministic order, and merges labels.
+- `build-tools/tools/buck/exporter/main.ts` already discovers adapters, filters active, runs them in a deterministic order, and merges labels.
 
 Design additions
 
 - Metrics tests (optional but recommended):
-  - Add `tools/tests/exporter/metrics.adapters.batches.test.ts`:
+  - Add `build-tools/tools/tests/exporter/metrics.adapters.batches.test.ts`:
     - Simulate a mixed-language graph; enable metrics output via `--metrics-out` flag.
     - Assert adapter names (sorted), total batches, and tuple keys presence (for Go batches).
-  - Add `tools/tests/exporter/adapters.inactive.skip.test.ts`:
+  - Add `build-tools/tools/tests/exporter/adapters.inactive.skip.test.ts`:
     - Simulate missing `cpp` adapter file (by removing it in temp repo); ensure run succeeds and Go labels are still added.
 
 - Determinism checks

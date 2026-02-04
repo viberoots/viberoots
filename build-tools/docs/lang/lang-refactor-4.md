@@ -16,27 +16,27 @@ This phase builds on Phase 3 and focuses on converting our language enablement i
 
 Intent/Impact
 
-- One declarative entry in `tools/nix/langs.json` drives:
-  - exporter adapter stub (`tools/buck/exporter/lang/<id>.ts`)
-  - planner plugin via `planner-gen` (`tools/nix/planner/<id>.nix`)
+- One declarative entry in `build-tools/tools/nix/langs.json` drives:
+  - exporter adapter stub (`build-tools/tools/buck/exporter/lang/<id>.ts`)
+  - planner plugin via `planner-gen` (`build-tools/tools/nix/planner/<id>.nix`)
   - stamping macros (`<id>/defs.bzl`) with `lang:<id>` and `kind:*`
-  - provider-sync skeleton in `tools/buck/providers/<id>.ts` when applicable
+  - provider-sync skeleton in `build-tools/tools/buck/providers/<id>.ts` when applicable
 - Eliminates drift between detection, planning, stamping, and provider wiring.
 
 Detailed design
 
-- Extend manifest schema (validated by `tools/dev/validate-langs.ts`) with optional per-language hints:
+- Extend manifest schema (validated by `build-tools/tools/dev/validate-langs.ts`) with optional per-language hints:
   - `detect.ruleTypePrefixes: string[]`
   - `detect.requireAnyLabels: string[]`
   - `kinds: ["bin"|"lib"|"test"]` (declared capabilities)
   - `providers.kind: "module@version" | "lockfile/importer" | "none"`
   - `templatesDir: string` (existing)
   - `requiredPaths: string[]` (existing)
-- Add `tools/dev/langs.codegen.ts` that:
+- Add `build-tools/tools/dev/langs.codegen.ts` that:
   1. Invokes `planner-gen` for each language with detect/kindOf hints
-  2. Emits or updates `tools/buck/exporter/lang/<id>.ts` with a minimal adapter that composes `helpers.ts` and the manifest-provided predicates
+  2. Emits or updates `build-tools/tools/buck/exporter/lang/<id>.ts` with a minimal adapter that composes `helpers.ts` and the manifest-provided predicates
   3. Emits `<id>/defs.bzl` that calls `lang/defs_common.bzl#stamp_labels`, loads `MODULE_PROVIDERS`, and forwards through to the underlying language rules
-  4. Optionally creates `tools/buck/providers/<id>.ts` using a small interface if `providers.kind` is not `none`
+  4. Optionally creates `build-tools/tools/buck/providers/<id>.ts` using a small interface if `providers.kind` is not `none`
   5. Updates docs stubs and links
 - Add exporter adapter template (TypeScript) that consumes `detect` hints:
   - `isNode(n)`: return `hasLabel(n, anyOf(manifest.detect.requireAnyLabels)) || isRuleType(n, anyPrefix(manifest.detect.ruleTypePrefixes))`
@@ -45,11 +45,11 @@ Detailed design
 
 Acceptance criteria
 
-- Adding an entry to `tools/nix/langs.json` and running `node tools/dev/langs.codegen.ts` produces:
-  - `tools/nix/planner/<id>.nix` via `planner-gen` (deterministic)
-  - `tools/buck/exporter/lang/<id>.ts` (compiles)
+- Adding an entry to `build-tools/tools/nix/langs.json` and running `node build-tools/tools/dev/langs.codegen.ts` produces:
+  - `build-tools/tools/nix/planner/<id>.nix` via `planner-gen` (deterministic)
+  - `build-tools/tools/buck/exporter/lang/<id>.ts` (compiles)
   - `<id>/defs.bzl` that loads successfully in Buck
-  - `tools/buck/providers/<id>.ts` when `providers.kind` ≠ `none`
+  - `build-tools/tools/buck/providers/<id>.ts` when `providers.kind` ≠ `none`
 - Existing languages (Go, Node where applicable) remain unchanged behaviorally.
 - Tests validate codegen idempotency and stable outputs (no drift on second run).
 
@@ -67,17 +67,17 @@ If not implemented
 
 Intent/Impact
 
-- Factor Go’s `patchesMapFromDir`, `devOverrideEnv` reading, and CI guard into a reusable Nix module (`tools/nix/templates-common.nix`).
+- Factor Go’s `patchesMapFromDir`, `devOverrideEnv` reading, and CI guard into a reusable Nix module (`build-tools/tools/nix/templates-common.nix`).
 - Consumers (Go now; Rust/Python later) import helpers to eliminate copy/paste and align behavior.
 
 Detailed design
 
-- Create `tools/nix/templates-common.nix` with:
+- Create `build-tools/tools/nix/templates-common.nix` with:
   - `patchesMapFromDir = patchDir: { "module@ver" = [ /abs/patch1 ... ]; }`
   - `readDevOverrides = env: (envVar=="" ? {} : builtins.fromJSON envVar)`
   - `guardNoDevOverridesInCI envName`: throws in CI when overrides present
   - Small utility `lowerKey(k)` for case-insensitive keys
-- Adapt `tools/nix/lang-templates.nix` to import common helpers for Go path; keep exact behavior.
+- Adapt `build-tools/tools/nix/lang-templates.nix` to import common helpers for Go path; keep exact behavior.
 - Document example usage for other languages in `docs/handbook/provider-sync-cookbook.md`.
 
 Acceptance criteria
@@ -109,9 +109,9 @@ Intent/Impact
 
 Detailed design
 
-- Add `tools/scaffolding/templates/language/kit/tests` with generic zx tests parameterized by `<id>` and manifest capabilities.
-- `scaf language new <id>` emits `tools/tests/<id>/contract/*` using these templates.
-- Tests rely on `--simulate` where possible; where real lockfiles are needed, tiny fixtures are created under `tools/tests/lib/fixtures/<id>`.
+- Add `build-tools/tools/scaffolding/templates/language/kit/tests` with generic zx tests parameterized by `<id>` and manifest capabilities.
+- `scaf language new <id>` emits `build-tools/tools/tests/<id>/contract/*` using these templates.
+- Tests rely on `--simulate` where possible; where real lockfiles are needed, tiny fixtures are created under `build-tools/tools/tests/lib/fixtures/<id>`.
 
 Acceptance criteria
 
@@ -136,20 +136,20 @@ Intent/Impact
 
 Detailed design
 
-- Extend `tools/scaffolding/scaf.ts`:
+- Extend `build-tools/tools/scaffolding/scaf.ts`:
   - Flags: `--write-manifest`, `--no-manifest`, `--tests`, `--yes` (non-interactive)
-  - When `--write-manifest` is set, append to `tools/nix/langs.json` with minimal fields (`id`, `displayName`, `requiredPaths`, `kinds`, `templatesDir`, `providers.kind`) and run `tools/dev/validate-langs.ts`.
-  - Invoke `node tools/dev/langs.codegen.ts` to generate planner/adapter/macros/provider skeletons.
-  - If `--tests`, emit language contract tests under `tools/tests/<id>/contract/*`.
+  - When `--write-manifest` is set, append to `build-tools/tools/nix/langs.json` with minimal fields (`id`, `displayName`, `requiredPaths`, `kinds`, `templatesDir`, `providers.kind`) and run `build-tools/tools/dev/validate-langs.ts`.
+  - Invoke `node build-tools/tools/dev/langs.codegen.ts` to generate planner/adapter/macros/provider skeletons.
+  - If `--tests`, emit language contract tests under `build-tools/tools/tests/<id>/contract/*`.
   - Print follow-up TODOs only when necessary (e.g., to fill lockfile parser logic).
 - Update `docs/handbook/new-language-walkthrough.md` with the one-shot flow.
 
 Acceptance criteria
 
 - Running `scaf language new toy --write-manifest --tests --yes` yields a repo state where:
-  - `buck2 test //tools/tests/toy/...` passes
-  - `node tools/dev/langs-diagnose.ts --lang=toy` shows enabled/disabled status with actionable messages
-- Partial-clone grace: command is no-op (skip) when repo lacks needed directories (`tools/nix/planner`, etc.).
+  - `buck2 test //build-tools/tools/tests/toy/...` passes
+  - `node build-tools/tools/dev/langs-diagnose.ts --lang=toy` shows enabled/disabled status with actionable messages
+- Partial-clone grace: command is no-op (skip) when repo lacks needed directories (`build-tools/tools/nix/planner`, etc.).
 
 Risks
 
@@ -165,12 +165,12 @@ If not implemented
 
 Intent/Impact
 
-- Extend `tools/dev/langs-diagnose.ts` with `--fix` to materialize missing skeletons and stub files (never destructive), improving time-to-first-green.
+- Extend `build-tools/tools/dev/langs-diagnose.ts` with `--fix` to materialize missing skeletons and stub files (never destructive), improving time-to-first-green.
 
 Detailed design
 
 - `--fix` behavior:
-  - Create missing `tools/nix/planner/<id>.nix` via `planner-gen` if config exists
+  - Create missing `build-tools/tools/nix/planner/<id>.nix` via `planner-gen` if config exists
   - Create exporter adapter/macros/provider stub if absent and manifest declares language
   - Never edit `langs.json` unless `--write-manifest` is explicitly passed through (proxied to `scaf language new`)
   - CI mode prints actionable messages, never mutates files
@@ -199,7 +199,7 @@ Detailed design
 
 - Add a small schema + validator for labels in exporter results (node-level check):
   - Known prefixes only; `kind:*` in {bin, lib, test}; `lang:*` required where macro or adapter detects language
-- Add a zx lint `tools/dev/labels-lint.ts` that scans `tools/buck/graph.json` and fails on violations.
+- Add a zx lint `build-tools/tools/dev/labels-lint.ts` that scans `build-tools/tools/buck/graph.json` and fails on violations.
 
 Acceptance criteria
 

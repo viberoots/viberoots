@@ -20,14 +20,14 @@ Intent/Impact
 
 Changes
 
-- Exporter: extend `tools/buck/exporter/lang/contract.ts` to automatically `glob` and import `tools/buck/exporter/lang/*.ts` (excluding `contract.ts`).
-- Planner: teach `tools/nix/graph-generator.nix` to import `./planner/<lang>.nix` by enumerating language ids from `tools/nix/langs.json` when present; fallback to on‑disk existence (`builtins.pathExists`).
-- Codegen: ensure `tools/dev/codegen.ts` keeps `tools/nix/langs.nix` in sync for Nix consumers.
+- Exporter: extend `build-tools/tools/buck/exporter/lang/contract.ts` to automatically `glob` and import `build-tools/tools/buck/exporter/lang/*.ts` (excluding `contract.ts`).
+- Planner: teach `build-tools/tools/nix/graph-generator.nix` to import `./planner/<lang>.nix` by enumerating language ids from `build-tools/tools/nix/langs.json` when present; fallback to on‑disk existence (`builtins.pathExists`).
+- Codegen: ensure `build-tools/tools/dev/codegen.ts` keeps `build-tools/tools/nix/langs.nix` in sync for Nix consumers.
 
 Acceptance criteria
 
-- Dropping a new `tools/buck/exporter/lang/rust.ts` adapter makes exporter pick it up with zero code edits.
-- Adding `tools/nix/planner/rust.nix` and an entry in `tools/nix/langs.json` makes planner load it when present; in sparse checkouts without the file, planner remains inert for `rust`.
+- Dropping a new `build-tools/tools/buck/exporter/lang/rust.ts` adapter makes exporter pick it up with zero code edits.
+- Adding `build-tools/tools/nix/planner/rust.nix` and an entry in `build-tools/tools/nix/langs.json` makes planner load it when present; in sparse checkouts without the file, planner remains inert for `rust`.
 - Tests updated to verify discovery order stability and partial‑clone no‑ops.
 
 Risks
@@ -40,7 +40,7 @@ If not implemented
 
 ---
 
-## PR 21: JSON Schema + validator for `tools/nix/langs.json`
+## PR 21: JSON Schema + validator for `build-tools/tools/nix/langs.json`
 
 Intent/Impact
 
@@ -48,10 +48,10 @@ Intent/Impact
 
 Changes
 
-- Add `tools/dev/validate-langs.ts` using JSON Schema (bundled) to validate:
+- Add `build-tools/tools/dev/validate-langs.ts` using JSON Schema (bundled) to validate:
   - required fields: `id`, `displayName`, `requiredPaths`, `kinds`, `templatesDir`
   - that all `requiredPaths` are strings and not empty
-- Wire a CI stage `langs-validate` (optional locally) in `tools/ci/run-stage.ts`.
+- Wire a CI stage `langs-validate` (optional locally) in `build-tools/tools/ci/run-stage.ts`.
 
 Acceptance criteria
 
@@ -79,7 +79,7 @@ Changes
 - Extend `ExporterAdapter` to support optional hooks:
   - `detect(node)`: quick filter when `rule_type` or `labels` patterns are known
   - `labelFromLockfile(node)`: helper for lockfile‑driven ecosystems
-- Provide utilities in `tools/buck/exporter/lang/helpers.ts`:
+- Provide utilities in `build-tools/tools/buck/exporter/lang/helpers.ts`:
   - `hasLabel(node, "lang:<id>")`, `isRuleType(node, /^go_/)`
   - `sortedUniqueLabels(nodes)` and batch roots helpers
 
@@ -107,7 +107,7 @@ Intent/Impact
 Changes
 
 - Add `lang/defs_common.bzl` helpers to stamp `lang:<id>` and `kind:bin|lib` consistently.
-- Add `tools/dev/stamping-lint.ts` to scan Buck targets (via `cquery`) ensuring targets that use language macros are appropriately stamped.
+- Add `build-tools/tools/dev/stamping-lint.ts` to scan Buck targets (via `cquery`) ensuring targets that use language macros are appropriately stamped.
 - Document usage in `docs/handbook/adding-language.md`.
 
 Acceptance criteria
@@ -132,7 +132,7 @@ Intent/Impact
 
 Changes
 
-- Add `tools/dev/planner-gen.ts` that converts a tiny TS config (predicates + kindOf) into a Nix file, using a stable template.
+- Add `build-tools/tools/dev/planner-gen.ts` that converts a tiny TS config (predicates + kindOf) into a Nix file, using a stable template.
 - Integrate with `scaf language new <id>` so it can optionally emit a generated planner file from TS config (same behavior, cleaner UX).
 
 Acceptance criteria
@@ -157,8 +157,8 @@ Intent/Impact
 
 Changes
 
-- Extend `tools/scaffolding/templates/language/kit` to generate:
-  - `tools/tests/<lang>/contract/*` with minimal fixtures and TARGETS
+- Extend `build-tools/tools/scaffolding/templates/language/kit` to generate:
+  - `build-tools/tools/tests/<lang>/contract/*` with minimal fixtures and TARGETS
   - CI wiring based on capabilities
 
 Acceptance criteria
@@ -183,7 +183,7 @@ Intent/Impact
 
 Changes
 
-- Add `tools/dev/langs-diagnose.ts`:
+- Add `build-tools/tools/dev/langs-diagnose.ts`:
   - Prints enabled languages, missing `requiredPaths`, detected exporter adapters and planner plugins
   - Shows which CI stages would run given current capabilities
 
@@ -209,7 +209,7 @@ Intent/Impact
 
 Changes
 
-- Add `tools/lib/cli-wrap.ts` exposing `runMain(fn)` that catches known errors and renders `printSkip`/exit codes consistently.
+- Add `build-tools/tools/lib/cli-wrap.ts` exposing `runMain(fn)` that catches known errors and renders `printSkip`/exit codes consistently.
 - Adopt in `scaf`, prebuild guard, provider sync, and diagnostics CLI.
 
 Acceptance criteria
@@ -235,8 +235,8 @@ Intent/Impact
 Changes
 
 - Extend `scaf language new <id>` to optionally:
-  - append entry to `tools/nix/langs.json`
-  - run `node tools/dev/codegen.ts`
+  - append entry to `build-tools/tools/nix/langs.json`
+  - run `node build-tools/tools/dev/codegen.ts`
   - create planner/provider/exporter stubs
   - open follow‑up TODOs in output (printed)
 
@@ -262,7 +262,7 @@ Intent/Impact
 
 Changes
 
-- Add `tools/tests/lib/fixtures/<lang>` with helpers and tiny lockfiles/source trees.
+- Add `build-tools/tools/tests/lib/fixtures/<lang>` with helpers and tiny lockfiles/source trees.
 - Provide param helpers to point tools at temp paths created per test.
 
 Acceptance criteria

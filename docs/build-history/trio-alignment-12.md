@@ -10,7 +10,7 @@ Align `patch-go` UX with `patch-cpp` by adding an optional flag to print an expo
 
 ### Scope & Changes
 
-- `tools/patch/patch-go.ts`:
+- `build-tools/tools/patch/patch-go.ts`:
   - Add a `--echo-snippet` flag, mirroring C++ behavior.
   - When present, print `export NIX_GO_DEV_OVERRIDE_JSON='{"<module@version>":"<abs/path>"}'` to stderr in the same format used by C++.
   - Default remains to set the env in‑process; no behavior change for existing flows.
@@ -45,12 +45,12 @@ Implement.
 
 Add a tiny zx test that asserts equivalence of our normalization/decoding across runtimes:
 
-- nixpkgs attr normalization (`tools/lib/provider-names.ts.normalizeNixAttr`, `lang/defs_common.bzl:normalize_nix_attr`, and Nix helper used by C++).
-- flat patch filename decoding (Go/Node) using `tools/lib/providers.decodeNameVersionFromPatch`.
+- nixpkgs attr normalization (`build-tools/tools/lib/provider-names.ts.normalizeNixAttr`, `lang/defs_common.bzl:normalize_nix_attr`, and Nix helper used by C++).
+- flat patch filename decoding (Go/Node) using `build-tools/tools/lib/providers.decodeNameVersionFromPatch`.
 
 ### Scope & Changes
 
-- `tools/tests/normalize-parity.test.ts` (new):
+- `build-tools/tools/tests/normalize-parity.test.ts` (new):
   - Invokes the Starlark probe (`normalize_nix_attr_probe`) and a mini Nix function via `nix eval`, and compares results with TS helpers for a small corpus (e.g., `pkgs.zlib`, `zlib`, `pkgs.gtest`, scoped node names, and encoded patch names).
 - No product code changes.
 
@@ -83,9 +83,9 @@ Factor the “managed block between BEGIN/END markers” logic used by Node prov
 
 ### Scope & Changes
 
-- `tools/lib/auto-section.ts` (new):
+- `build-tools/tools/lib/auto-section.ts` (new):
   - `ensureAutoSection({ file, begin, end, header, body })` reads/creates the file, replaces or inserts the auto block deterministically, and keeps the rest untouched.
-- `tools/buck/providers/node.ts`:
+- `build-tools/tools/buck/providers/node.ts`:
   - Replace in‑file section management with `ensureAutoSection`.
 - No format/output changes.
 
@@ -114,11 +114,11 @@ Implement.
 
 ### Description
 
-Expose a `Node` symbol bag (e.g., `inherit (Node) nodeBundle;`) from `tools/nix/lang-templates.nix` for discoverability, keeping the planner’s Node plugin as the authoritative path. This is a non‑functional ergonomics improvement for engineers exploring the template registry.
+Expose a `Node` symbol bag (e.g., `inherit (Node) nodeBundle;`) from `build-tools/tools/nix/lang-templates.nix` for discoverability, keeping the planner’s Node plugin as the authoritative path. This is a non‑functional ergonomics improvement for engineers exploring the template registry.
 
 ### Scope & Changes
 
-- `tools/nix/lang-templates.nix`:
+- `build-tools/tools/nix/lang-templates.nix`:
   - Add an `import ./templates/node.nix` and re‑export of stable names (no consumers rely on this today).
 - Docs:
   - One‑line note that Node remains planner‑plugin driven; the symbol bag is for discoverability only.
@@ -152,7 +152,7 @@ Reuse `validateLanguageClassification` for a narrow advisory: when a Node target
 
 ### Scope & Changes
 
-- `tools/buck/exporter/lang/node.ts`:
+- `build-tools/tools/buck/exporter/lang/node.ts`:
   - Add a gated call to the shared classification helper for “missing lang label” only (warn‑level, same severity as today’s advisories).
   - Retain importer‑scoped lockfile and kind validations unchanged.
 - No changes to label stamping or behavior.

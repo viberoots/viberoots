@@ -28,7 +28,7 @@ This document proposes a careful, low-risk migration of the C++/general Nix prov
     - `pkgs.googletest` → `nix_pkgs_pkgs_googletest`
 
 - Curated providers in `third_party/providers/TARGETS` currently use canonical names (post recent cleanup), and tests/docs reference them.
-- `tools/lib/providers.ts` provides `providerNameForNixAttr(attr)` → `nix_pkgs_${tail}` and is used by generators (auto-map, CPP provider sync) and some tests.
+- `build-tools/tools/lib/providers.ts` provides `providerNameForNixAttr(attr)` → `nix_pkgs_${tail}` and is used by generators (auto-map, CPP provider sync) and some tests.
 - `third_party/providers/nix_attr_map.bzl` is emitted by the CPP provider sync to map provider targets back to canonical `nixpkg:<attr>` labels for planner-visible edges.
 
 ---
@@ -52,13 +52,13 @@ Rationale: The family `nix_` is sufficiently descriptive and shorter. Attribute 
 ## Impacted Components
 
 1. **Shared Naming Helper**
-   - `tools/lib/providers.ts` `providerNameForNixAttr(attr)`
+   - `build-tools/tools/lib/providers.ts` `providerNameForNixAttr(attr)`
      - Old: `return \`nix*pkgs*${tail}\``
      - New: `return \`nix\_${tail}\``
 
 2. **Generators / Consumers**
-   - `tools/buck/gen-auto-map.ts` (reads `nixpkg:<attr>` labels and calls `providerNameForNixAttr`).
-   - `tools/buck/providers/cpp.ts` (names providers and emits `nix_attr_map.bzl`).
+   - `build-tools/tools/buck/gen-auto-map.ts` (reads `nixpkg:<attr>` labels and calls `providerNameForNixAttr`).
+   - `build-tools/tools/buck/providers/cpp.ts` (names providers and emits `nix_attr_map.bzl`).
    - Any other generator referencing `providerNameForNixAttr` must be recompiled and run.
 
 3. **Curated Providers**
@@ -116,7 +116,7 @@ Acceptance (Stage 2):
 
 ## Detailed Change List
 
-1. `tools/lib/providers.ts`
+1. `build-tools/tools/lib/providers.ts`
 
 ```ts
 // BEFORE
@@ -159,8 +159,8 @@ alias(name = "nix_pkgs_pkgs_openssl",     actual = ":nix_openssl")
 
 4. Generators
 
-- `tools/buck/gen-auto-map.ts`: no logic change beyond picking up the new helper result.
-- `tools/buck/providers/cpp.ts`: no logic change; it will emit new names via the helper and regenerate `nix_attr_map.bzl`.
+- `build-tools/tools/buck/gen-auto-map.ts`: no logic change beyond picking up the new helper result.
+- `build-tools/tools/buck/providers/cpp.ts`: no logic change; it will emit new names via the helper and regenerate `nix_attr_map.bzl`.
 
 5. Tests & Docs
 

@@ -154,14 +154,14 @@ Implement.
 
 We compute “sanitized Nix attribute names” from Buck target labels in more than one place:
 
-- TypeScript uses `tools/lib/labels.ts:sanitizeAttrNameFromLabel`.
+- TypeScript uses `build-tools/tools/lib/labels.ts:sanitizeAttrNameFromLabel`.
 - Starlark C++ test runner has a local `_sanitize(...)` implementation in `cpp/private/nix_test.bzl`.
 
 Even small drift here creates “build-selected computed attr does not exist” failures. This is a cross-language abstraction boundary. It should be represented as a shared contract and protected by a parity matrix test.
 
 ### Scope & Changes
 
-- Introduce a canonical Starlark helper under `//lang` for Nix attribute sanitization, matching `tools/lib/labels.ts:sanitizeAttrNameFromLabel`:
+- Introduce a canonical Starlark helper under `//lang` for Nix attribute sanitization, matching `build-tools/tools/lib/labels.ts:sanitizeAttrNameFromLabel`:
   - Example location: `lang/nix_attr.bzl` with `sanitize_nix_attr_from_target_label(label)`.
 - Update `cpp/private/nix_test.bzl` to use the shared helper instead of a local `_sanitize(...)`.
 - If any other Starlark rules/macros re-implement this transform, migrate them as well.
@@ -180,7 +180,7 @@ Even small drift here creates “build-selected computed attr does not exist” 
 ### Docs (in this PR)
 
 - Update the build-system docs (the most relevant section in `build-tools/docs/build-system-design.md` or a handbook doc) to state:
-  - the canonical mapping lives in `tools/lib/labels.ts` and `//lang:nix_attr.bzl`
+  - the canonical mapping lives in `build-tools/tools/lib/labels.ts` and `//lang:nix_attr.bzl`
   - contributors must update both sides and the parity test when changing the contract
 
 ### Acceptance Criteria
@@ -234,7 +234,7 @@ This is an abstraction leak. The behavior must remain consistent across language
 
 - Add a shared Starlark helper under `//lang` that composes the standard “Nix-executing action” shell:
   - consumes `nix_bootstrap_env_core()` and `nix_timeout_wrapper_var()` from `//lang:nix_shell.bzl`
-  - supports the “build-selected” flow via `tools/dev/build-selected.ts` where required
+  - supports the “build-selected” flow via `build-tools/tools/dev/build-selected.ts` where required
   - supports passing explicit inputs (from PR‑1) through `hidden` inputs for rule implementations
 - Migrate:
   - `cpp/private/nix_build.bzl`

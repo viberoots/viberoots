@@ -1,0 +1,58 @@
+#!/usr/bin/env zx-wrapper
+import fs from "fs-extra";
+import assert from "node:assert/strict";
+import path from "node:path";
+import { test } from "node:test";
+import { runInTemp } from "../lib/test-helpers";
+
+test("generator emits node-lock-index with sorted keys and no rewrite on second run", async () => {
+  await runInTemp("exp-node-sidecar-sorted", async (tmp, $) => {
+    const sidecar = path.join(tmp, "build-tools/tools/buck/node-lock-index.json");
+    await fs.mkdirp(path.dirname(sidecar));
+    await fs.mkdirp(path.dirname(sidecar));
+
+    // Simulate two Node targets in reverse order to ensure exporter sorts output keys
+    const nodes = [
+      {
+        name: "//zz/app:bin",
+        rule_type: "js_binary",
+        labels: ["lang:node", "kind:bin", "lockfile:apps/zz/pnpm-lock.yaml#apps/zz"],
+      },
+      {
+        name: "//aa/web:bundle",
+        rule_type: "js_binary",
+        labels: ["lang:node", "kind:bundle", "lockfile:apps/aa/pnpm-lock.yaml#apps/aa"],
+      },
+    ];
+    const sim = path.join(tmp, "build-tools/tools/buck/simulated.json");
+    await fs.outputFile(sim, JSON.stringify(nodes) + "\n");
+
+    // First run
+    await $({ cwd: tmp })`build-tools/tools/buck/export-graph.ts --simulate ${sim}`;
+    // Generate sidecar via glue/generator
+    await $({ cwd: tmp })`node build-tools/tools/buck/gen-provider-index.ts`;
+    assert.ok(await fs.pathExists(sidecar), "node-lock-index.json should exist");
+
+    // Validate sorted keys in sidecar index
+    const aTxt = await fs.readFile(sidecar, "utf8");
+    const aJson = JSON.parse(aTxt);
+    const idxA = aJson && typeof aJson === "object" && aJson.index ? aJson.index : aJson;
+    const keys = Object.keys(idxA);
+    const sorted = [...keys].sort((x, y) => x.localeCompare(y));
+    assert.deepEqual(keys, sorted, "sidecar index keys should be sorted");
+
+    // Capture mtime, wait a tick to ensure detectable change if rewritten
+    const statBefore = await fs.stat(sidecar);
+    await new Promise((r) => setTimeout(r, 15));
+
+    // Second run must be a no-op write (mtime unchanged)
+    await $({ cwd: tmp })`build-tools/tools/buck/export-graph.ts --simulate ${sim}`;
+    await $({ cwd: tmp })`node build-tools/tools/buck/gen-provider-index.ts`;
+    const statAfter = await fs.stat(sidecar);
+    assert.equal(
+      Number(statAfter.mtimeMs),
+      Number(statBefore.mtimeMs),
+      "sidecar file mtime should be unchanged on identical second run",
+    );
+  });
+});

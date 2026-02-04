@@ -16,7 +16,7 @@ I follow the repo-wide linking model described in `cpp-linking.md`, `build-tools
 - `deps` is the Buck graph edge list. It does not imply link intent.
 - `link_deps` declares linkable inputs. `header_deps` is include-only when that concept applies.
 - Macros compute `deps := deps ∪ link_deps ∪ header_deps` deterministically and validate `link_closure_overrides` keys.
-- `link_closure` defaults to `"direct"`. `"transitive"` follows `link_deps` only via `tools/nix/planner/link-closure.nix`.
+- `link_closure` defaults to `"direct"`. `"transitive"` follows `link_deps` only via `build-tools/tools/nix/planner/link-closure.nix`.
 - Ordering is deterministic and unsupported deps fail fast with targeted errors.
 
 ### C interop requirement
@@ -30,20 +30,20 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
 - Provider wiring: load `MODULE_PROVIDERS` from `//lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
 - Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
-- Patch model contract: `lang/lang_contracts.bzl` and `tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
+- Patch model contract: `lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
 
 ## Architecture overview
 
-- Buck2 computes the build graph, we export configured nodes to `tools/buck/graph.json` (existing exporter, extended with a Ruby adapter). The Ruby adapter reads each target’s `Gemfile.lock` and emits deterministic labels per gem.
-- Nix dynamic derivations plan Ruby builds via new language templates in `tools/nix/templates/ruby.nix`, invoked from the planner (`graph-generator.nix`).
+- Buck2 computes the build graph, we export configured nodes to `build-tools/tools/buck/graph.json` (existing exporter, extended with a Ruby adapter). The Ruby adapter reads each target’s `Gemfile.lock` and emits deterministic labels per gem.
+- Nix dynamic derivations plan Ruby builds via new language templates in `build-tools/tools/nix/templates/ruby.nix`, invoked from the planner (`graph-generator.nix`).
 - Patches live in `patches/ruby/*.patch` with flat naming `<gem>@<version>.patch`. A Ruby provider sync script generates `third_party/providers/TARGETS.ruby.auto` with one provider per gem@version. Auto‑map ties targets to providers via `module:<gem>@<version>` labels.
 - Patching workflow is unified under `patch-pkg` with a Ruby handler that supports start/reset/apply/session, dev overrides via `NIX_RUBY_DEV_OVERRIDE_JSON`, and idempotency.
 
 ## Path invariants and naming
 
 - Patches: `patches/ruby/*.patch` (flat directory, one patch per `gem@version`).
-- Nix templates: `tools/nix/templates/ruby.nix` (consumed by `tools/nix/lang-templates.nix`).
+- Nix templates: `build-tools/tools/nix/templates/ruby.nix` (consumed by `build-tools/tools/nix/lang-templates.nix`).
 - Planner registry: Ruby entry in `graph-generator.nix` (dispatch by `rule_type` or `labels`), calling `rubyApp`/`rubyLib` from `lang-templates.nix`.
 - Providers:
   - Ruby provider rules generated to `third_party/providers/TARGETS.ruby.auto`.
@@ -55,7 +55,7 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 
 ## Nix integration (templates)
 
-Add `tools/nix/templates/ruby.nix` that exposes two functions mirroring Go’s `goApp`/`goLib` pattern:
+Add `build-tools/tools/nix/templates/ruby.nix` that exposes two functions mirroring Go’s `goApp`/`goLib` pattern:
 
 - `rubyApp` — builds an app using Bundler; targeted at Rails apps but generic enough for any app with a `Gemfile.lock`.
 - `rubyLib` — builds a library/test environment using Bundler.
@@ -87,7 +87,7 @@ Notes:
   - Detect via `rule_type` or `labels` containing `lang:ruby`.
   - Compute `kind` as `bin` (app) vs `lib` based on `rule_type` or `labels` (`kind:bin`/`kind:lib`).
   - Extract `gemfileLock` location and `subdir` from node attributes (the Ruby macros will forward these).
-  - Instantiate `rubyApp` or `rubyLib` from `tools/nix/lang-templates.nix`.
+  - Instantiate `rubyApp` or `rubyLib` from `build-tools/tools/nix/lang-templates.nix`.
 
 ## Exporter labels (Ruby adapter)
 
@@ -119,14 +119,14 @@ def ruby_gem_patch(name, gem_key, patch_path):
     )
 ```
 
-- Provider sync: add `tools/buck/sync-providers-ruby.ts` (zx) that:
+- Provider sync: add `build-tools/tools/buck/sync-providers-ruby.ts` (zx) that:
   - Scans `patches/ruby/*.patch` (flat directory).
   - Decodes a gem key from filename (`<gem>@<version>.patch` → `<gem>@<version>`; lowercase).
   - Emits deterministic `third_party/providers/TARGETS.ruby.auto` with one `ruby_gem_patch(...)` per gem@version.
   - Enforces one patch per gem@version (fail on duplicates). Warn on subdirectories.
-  - Use `providerNameForModuleKey(gem, version)` from `tools/lib/providers.ts` for naming to keep consistency (`mod_<hash>_<suffix>`).
+  - Use `providerNameForModuleKey(gem, version)` from `build-tools/tools/lib/providers.ts` for naming to keep consistency (`mod_<hash>_<suffix>`).
 
-- Auto‑map: no changes required. `tools/buck/gen-auto-map.ts` already maps `module:<…>` labels to provider names via `providerNameForModuleKey`. Ruby targets will automatically pick up the correct providers.
+- Auto‑map: no changes required. `build-tools/tools/buck/gen-auto-map.ts` already maps `module:<…>` labels to provider names via `providerNameForModuleKey`. Ruby targets will automatically pick up the correct providers.
 
 ## Buck macros (`ruby/defs.bzl`)
 
@@ -159,7 +159,7 @@ Notes:
 
 ## Patching workflow (`patch-pkg ruby`)
 
-Add a Ruby handler `tools/patch/patch-ruby.ts` implementing the shared `LanguageHandler` interface:
+Add a Ruby handler `build-tools/tools/patch/patch-ruby.ts` implementing the shared `LanguageHandler` interface:
 
 - `start <gem>`: materialize a writable copy of the gem source (prefer APFS CoW on macOS; `cp -a` fallback). Set `NIX_RUBY_DEV_OVERRIDE_JSON["<gem>@<version>"] = "/abs/tmp/dir"`. Optionally open `$PATCH_EDITOR`.
 - `apply <gem>`: compute a unified diff from the original gem source to the temp dir and write to `patches/ruby/<gem>@<version>.patch`. Then run glue: `sync-providers` and `gen-auto-map`. Clear the override and delete the temp dir.
@@ -172,7 +172,7 @@ Dev overrides: show a local warning whenever `NIX_RUBY_DEV_OVERRIDE_JSON` is set
 
 ## Rails app template (scaffolding)
 
-Add scaffolding templates under `tools/scaffolding/templates/ruby/rails-app`:
+Add scaffolding templates under `build-tools/tools/scaffolding/templates/ruby/rails-app`:
 
 - Files:
   - `Gemfile` with minimal Rails, Puma, and standard gems.
@@ -190,7 +190,7 @@ Integration notes:
 
 - CI stages unchanged in shape; Ruby plugs into existing glue:
   1. Export Graph: exporter includes Ruby adapter, writes `graph.json`.
-  2. Sync Providers: run `tools/buck/sync-providers.ts` which delegates to language drivers including Ruby (or call `sync-providers-ruby.ts` directly if not yet integrated).
+  2. Sync Providers: run `build-tools/tools/buck/sync-providers.ts` which delegates to language drivers including Ruby (or call `sync-providers-ruby.ts` directly if not yet integrated).
   3. Generate auto_map: unchanged.
   4. Build & Test: Buck builds that pull in Ruby derivations via the planner.
   5. Pre‑build guard: unchanged; it validates glue presence. Optionally extend to detect `Gemfile.lock` → requires `TARGETS.ruby.auto` present.
@@ -209,9 +209,9 @@ This remains a later‑phase exploration and is not required for baseline Ruby s
 
 Add zx tests, one per file, consistent with repo conventions:
 
-- Provider sync determinism: `tools/tests/ruby/sync-providers-ruby.deterministic.test.ts`.
-- Exporter labels correctness: `tools/tests/ruby/exporter.ruby-labels.test.ts` — ensures `module:<gem>@<version>` labels match `Gemfile.lock` contents.
-- Auto‑map wiring: reuse `tools/tests/e2e-provider-wiring.ts` to assert that a Ruby target depends on the expected `mod_*` providers.
+- Provider sync determinism: `build-tools/tools/tests/ruby/sync-providers-ruby.deterministic.test.ts`.
+- Exporter labels correctness: `build-tools/tools/tests/ruby/exporter.ruby-labels.test.ts` — ensures `module:<gem>@<version>` labels match `Gemfile.lock` contents.
+- Auto‑map wiring: reuse `build-tools/tools/tests/e2e-provider-wiring.ts` to assert that a Ruby target depends on the expected `mod_*` providers.
 - Patching idempotency: create/edit/apply the same patch twice; second run is a no‑op.
 
 Run tests with repo conventions (external timeouts and coverage env).
@@ -220,7 +220,7 @@ Run tests with repo conventions (external timeouts and coverage env).
 
 1. Scaffolding & invariants
    - Create `patches/ruby/` and `third_party/providers/defs_ruby.bzl`.
-   - Add `tools/nix/templates/ruby.nix` with placeholder functions; wire in `lang-templates.nix`.
+   - Add `build-tools/tools/nix/templates/ruby.nix` with placeholder functions; wire in `lang-templates.nix`.
    - Acceptance: `sync-providers-ruby.ts` runs idempotently on empty patches.
 
 2. Planner & macros
@@ -233,7 +233,7 @@ Run tests with repo conventions (external timeouts and coverage env).
    - Acceptance: labels are stable, sorted, and correct for a sample app.
 
 4. Provider sync
-   - Implement `tools/buck/sync-providers-ruby.ts` using `tools/lib/providers.ts` for naming.
+   - Implement `build-tools/tools/buck/sync-providers-ruby.ts` using `build-tools/tools/lib/providers.ts` for naming.
    - Acceptance: adding `patches/ruby/rack@2.2.9.patch` generates one provider with stable name.
 
 5. Auto‑map wiring
@@ -241,7 +241,7 @@ Run tests with repo conventions (external timeouts and coverage env).
    - Acceptance: only targets that transitively use `rack@2.2.9` map to its provider.
 
 6. Patching workflow
-   - Implement `tools/patch/patch-ruby.ts` and register in `patch-pkg`.
+   - Implement `build-tools/tools/patch/patch-ruby.ts` and register in `patch-pkg`.
    - Acceptance: `patch-pkg start/apply/reset ruby rack` works; glue regenerates.
 
 7. Rails template
@@ -255,7 +255,7 @@ Run tests with repo conventions (external timeouts and coverage env).
 ## Assumptions to validate
 
 - nixpkgs provides a stable `bundlerEnv`/`bundlerApp` interface suitable for per‑gem patch application and source override.
-- Using `bundix` to generate `gemset.nix` is acceptable and can be invoked from `tools/dev/install-deps.ts` similarly to `gomod2nix`.
+- Using `bundix` to generate `gemset.nix` is acceptable and can be invoked from `build-tools/tools/dev/install-deps.ts` similarly to `gomod2nix`.
 - Exporter may invoke a local `ruby` binary to parse `Gemfile.lock` (Ruby present in dev shell and CI).
 - Rails app’s minimal Node usage can be isolated (esbuild) or integrated via existing Node provider flow when needed.
 
@@ -280,7 +280,7 @@ Run tests with repo conventions (external timeouts and coverage env).
 
 ## Completion criteria
 
-- `tools/nix/templates/ruby.nix` exists and supports per‑gem patches and dev overrides.
+- `build-tools/tools/nix/templates/ruby.nix` exists and supports per‑gem patches and dev overrides.
 - Planner dispatch includes Ruby; `rubyApp/rubyLib` are callable for targets.
 - Exporter emits correct `module:<gem>@<version>` labels for Ruby targets.
 - `sync-providers-ruby.ts` generates `TARGETS.ruby.auto` deterministically from `patches/ruby/`.
@@ -289,5 +289,5 @@ Run tests with repo conventions (external timeouts and coverage env).
 - Rails template scaffolds a working example that builds under Buck2.
 - Tests pass locally and in CI, with coverage following repo conventions.
 
-- **Default mapping:** start with importer‑scoped lockfile labels (mirroring Node) so existing auto‑map wiring works out of the box. Per‑gem `module:` mapping can be added later; doing so requires extending `tools/buck/gen-auto-map.ts` to translate Ruby `module:` labels to provider names.
+- **Default mapping:** start with importer‑scoped lockfile labels (mirroring Node) so existing auto‑map wiring works out of the box. Per‑gem `module:` mapping can be added later; doing so requires extending `build-tools/tools/buck/gen-auto-map.ts` to translate Ruby `module:` labels to provider names.
 - **Invalidation:** include importer‑local patch files in target `srcs` (e.g., `<importer>/patches/ruby/*.patch`) so Buck invalidation is precise. Provider stamps remain metadata‑only.

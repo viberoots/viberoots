@@ -8,17 +8,17 @@ This round consolidates small, high‑value refactors to reduce duplication acro
 
 Scope
 
-- Add `tools/patch/glue.ts` exporting `ensureGraph()` and `runGlue()`.
-- Refactor `tools/patch/patch-go.ts` and `tools/patch/patch-cpp.ts` to import and use these helpers.
+- Add `build-tools/tools/patch/glue.ts` exporting `ensureGraph()` and `runGlue()`.
+- Refactor `build-tools/tools/patch/patch-go.ts` and `build-tools/tools/patch/patch-cpp.ts` to import and use these helpers.
 
 Detailed Design
 
 - `ensureGraph()`
-  - If `tools/buck/graph.json` is missing, invoke `tools/buck/export-graph.ts` via zx (reusing `tools/dev/zx-init.mjs`).
+  - If `build-tools/tools/buck/graph.json` is missing, invoke `build-tools/tools/buck/export-graph.ts` via zx (reusing `build-tools/tools/dev/zx-init.mjs`).
   - Fail with actionable error if exporter cannot run (consistent with current `patch-go.ts`).
 - `runGlue()`
-  - Invoke `tools/buck/sync-providers.ts` (no `--lang`, so all languages update deterministically).
-  - Invoke `tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`.
+  - Invoke `build-tools/tools/buck/sync-providers.ts` (no `--lang`, so all languages update deterministically).
+  - Invoke `build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`.
   - Keep command lines and write order identical to today to preserve byte‑stable outputs.
 - Replace local glue code in `patch-go.ts` and `patch-cpp.ts` with calls to the shared helpers.
 
@@ -41,12 +41,12 @@ Consequence if not implemented
 
 Scope
 
-- Extend `tools/nix/planner/lib.nix` with a generic `collectLabelsWithPrefix` helper.
-- Refactor `tools/nix/planner/cpp.nix` and `tools/nix/planner/go.nix` to use this helper for `nixpkg:*` label discovery.
+- Extend `build-tools/tools/nix/planner/lib.nix` with a generic `collectLabelsWithPrefix` helper.
+- Refactor `build-tools/tools/nix/planner/cpp.nix` and `build-tools/tools/nix/planner/go.nix` to use this helper for `nixpkg:*` label discovery.
 
 Detailed Design
 
-- In `tools/nix/planner/lib.nix`, add:
+- In `build-tools/tools/nix/planner/lib.nix`, add:
   - `collectLabelsWithPrefix = { nodes, get, byName, labelsOf, depsOf, name }: prefix -> [labels]` performing a DFS from `name`, collecting unique labels with the given prefix.
   - Keep the function pure, stable, and bounded by the provided `nodes` graph.
 - `planner/cpp.nix`:
@@ -73,8 +73,8 @@ Consequence if not implemented
 
 Scope
 
-- `tools/nix/templates/cpp.nix`: factor shared compile/link logic used by `cppApp`/`cppTest` into small internal helpers.
-- `tools/nix/templates/go.nix`: factor CGO/base argument setup shared by `goApp`/`goLib`/`goCArchive` into small internal helpers.
+- `build-tools/tools/nix/templates/cpp.nix`: factor shared compile/link logic used by `cppApp`/`cppTest` into small internal helpers.
+- `build-tools/tools/nix/templates/go.nix`: factor CGO/base argument setup shared by `goApp`/`goLib`/`goCArchive` into small internal helpers.
 
 Detailed Design
 
@@ -104,7 +104,7 @@ Consequence if not implemented
 
 Scope
 
-- Add a light validation step in `tools/buck/exporter/lang/cpp.ts` to warn (not fail) when a node seems C++‑related but lacks both `cxx_*` rule_type and `lang:cpp` label.
+- Add a light validation step in `build-tools/tools/buck/exporter/lang/cpp.ts` to warn (not fail) when a node seems C++‑related but lacks both `cxx_*` rule_type and `lang:cpp` label.
 
 Detailed Design
 
@@ -131,8 +131,8 @@ Consequence if not implemented
 
 Scope
 
-- Add `tools/lib/graph.ts` with a tiny helper `readGraph(graphPath)` that returns a normalized `Node[]` from either an array or object‑map JSON.
-- Refactor `tools/buck/gen-auto-map.ts` and `tools/buck/providers/cpp.ts` to import and use this helper.
+- Add `build-tools/tools/lib/graph.ts` with a tiny helper `readGraph(graphPath)` that returns a normalized `Node[]` from either an array or object‑map JSON.
+- Refactor `build-tools/tools/buck/gen-auto-map.ts` and `build-tools/tools/buck/providers/cpp.ts` to import and use this helper.
 
 Detailed Design
 

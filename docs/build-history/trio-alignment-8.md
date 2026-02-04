@@ -180,9 +180,9 @@ Add a small test that asserts TS and Starlark agree on nix attribute normalizati
 ### Scope & Changes
 
 - Starlark probe in `lang/defs_common.bzl`: `normalize_nix_attr_probe(name, attr)` rule that writes normalized value to an output (mirrors `cpp_sanitize_probe` style).
-- zx test `tools/tests/normalization-parity.ts`:
+- zx test `build-tools/tools/tests/normalization-parity.ts`:
   - Builds the probe for a small set of inputs and reads its outputs.
-  - Compares each result with TS `normalizeNixAttr()` from `tools/lib/provider-names.ts`.
+  - Compares each result with TS `normalizeNixAttr()` from `build-tools/tools/lib/provider-names.ts`.
 
 ### Acceptance Criteria
 

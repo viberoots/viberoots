@@ -16,20 +16,20 @@ After implementation and debugging, PR 1 scope is complete:
   - Prevents pnpm from creating a shared lockfile when apps/libs have no Node projects yet
   - Allows workspace to work cleanly even with Go-only projects in apps/libs
   - Root package.json remains independent
-- `tools/buck/providers/node.ts` — Node provider sync driver already implemented
-- `tools/buck/sync-providers.ts` — Unified orchestrator (canonical)
-- `tools/buck/gen-auto-map.ts` — Already handles `lockfile:<path>#<importer>` labels
+- `build-tools/tools/buck/providers/node.ts` — Node provider sync driver already implemented
+- `build-tools/tools/buck/sync-providers.ts` — Unified orchestrator (canonical)
+- `build-tools/tools/buck/gen-auto-map.ts` — Already handles `lockfile:<path>#<importer>` labels
 
 ### Critical Fixes Applied (Runaway Process Prevention)
 
-- `tools/nix/devshell.nix`:
+- `build-tools/tools/nix/devshell.nix`:
   - Added `_BUCKNIX_DEVSHELL_ACTIVE` guard to prevent recursive shellHook invocation
   - Changed node-modules linking to use `nix eval` instead of `node-modules-build.ts` to avoid triggering builds
   - Only link when TTY present and NO_NODE_MODULES_LINK unset
 - `.husky/pre-commit`: Set `NO_NODE_MODULES_LINK=1`
-- `tools/bin/verify`: Export `NO_NODE_MODULES_LINK=1`
-- `tools/tests/lib/test-helpers.ts`: Export `NO_NODE_MODULES_LINK=1` for test sandboxes
-- `tools/dev/install/deps-main.ts`: Pure Nix path (no `SKIP_NODE_INSTALL` logic); per‑importer builds/link only
+- `build-tools/tools/bin/verify`: Export `NO_NODE_MODULES_LINK=1`
+- `build-tools/tools/tests/lib/test-helpers.ts`: Export `NO_NODE_MODULES_LINK=1` for test sandboxes
+- `build-tools/tools/dev/install/deps-main.ts`: Pure Nix path (no `SKIP_NODE_INSTALL` logic); per‑importer builds/link only
 - All install-deps tests: no `SKIP_NODE_INSTALL`; rely on pure Nix builds
 
 ## Root Cause Analysis — Runaway Node Processes

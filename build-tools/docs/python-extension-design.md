@@ -91,7 +91,7 @@ I add a WASI-specific template for `kind:pyext_wasm` that compiles sources for `
 - **output path**: `$out/site/<module path>${EXT_SUFFIX}`
 - **example**: `demo._native` → `$out/site/demo/_native${EXT_SUFFIX}`
 
-The `EXT_SUFFIX` and include headers come from the pinned WASI toolchain at `tools/nix/toolchains/python-wasi.nix`. `T.pyExtWasi` does not read host Python config for these values.
+The `EXT_SUFFIX` and include headers come from the pinned WASI toolchain at `build-tools/tools/nix/toolchains/python-wasi.nix`. `T.pyExtWasi` does not read host Python config for these values.
 
 ### `pyApp` / `pyLib` overlay composition
 
@@ -132,7 +132,7 @@ After Phase 3 works end-to-end, we lock down the invariants that keep it stable 
 
 ### Determinism (ordering)
 
-- **Native link closure ordering**: the Python planner resolves `kind:pyext` `link_deps` using `tools/nix/planner/link-closure.nix`:
+- **Native link closure ordering**: the Python planner resolves `kind:pyext` `link_deps` using `build-tools/tools/nix/planner/link-closure.nix`:
   - roots are visited in order
   - when a node is `"transitive"`, its `link_deps` are visited in order
   - each dep appears at most once (first occurrence wins)
@@ -216,7 +216,7 @@ Wasm producers (labels like `kind:wasm` or `wasm:*`) are rejected as `link_deps`
 
 For a `kind:pyext` node, the Python planner:
 
-- resolves a deterministic link closure using the shared resolver in `tools/nix/planner/link-closure.nix`
+- resolves a deterministic link closure using the shared resolver in `build-tools/tools/nix/planner/link-closure.nix`
   - roots: the consumer’s `link_deps` (in order)
   - traversal: follows `link_deps` on producer nodes
   - each dep appears at most once (first occurrence wins)

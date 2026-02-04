@@ -272,7 +272,7 @@ Implement.
 
 ### Description
 
-The test harness currently uses a “seed repo” caching mechanism to speed up repeated temp repo creation. It is implemented in `tools/tests/lib/seed-temp-repo.ts` and invoked via `tools/tests/lib/test-helpers/run-in-temp.ts` (`initTempRepoFromWorkspaceOrSeed(...)`).
+The test harness currently uses a “seed repo” caching mechanism to speed up repeated temp repo creation. It is implemented in `build-tools/tools/tests/lib/seed-temp-repo.ts` and invoked via `build-tools/tools/tests/lib/test-helpers/run-in-temp.ts` (`initTempRepoFromWorkspaceOrSeed(...)`).
 
 This has proven to be a meaningful performance lever, but it also introduces two drift risks:
 
@@ -290,10 +290,10 @@ Policy constraints for this PR:
 ### Scope & Changes
 
 - Add a verify-scoped “seed artifact” step:
-  - The verify runner (`tools/dev/verify/run-verify.ts`) prepares a single seed store path **before** starting `buck2 test` (before `spawnVerifyBuck2Tests(...)`).
+  - The verify runner (`build-tools/tools/dev/verify/run-verify.ts`) prepares a single seed store path **before** starting `buck2 test` (before `spawnVerifyBuck2Tests(...)`).
   - The seed store path is exported to tests via a single environment variable: `BNX_TEST_SEED_STORE_PATH`.
   - The seed export must be part of the same verify environment that already exports other per-run state (so all Buck test workers inherit it).
-  - This PR removes the existing temp-repo seed cache mechanism in `tools/tests/lib/seed-temp-repo.ts` (and any `SEED_VERSION`/seed-key caching state associated with it).
+  - This PR removes the existing temp-repo seed cache mechanism in `build-tools/tools/tests/lib/seed-temp-repo.ts` (and any `SEED_VERSION`/seed-key caching state associated with it).
 
 - Define a single deterministic seed key (per verify run):
   - Key includes:
@@ -326,7 +326,7 @@ Policy constraints for this PR:
       - this sweep is required housekeeping (not a fallback path) and must be safe and deterministic.
 
 - Concurrency safety (cross-process):
-  - Use the existing verify lock to scope the seed build so concurrent verifications in the same workspace do not race and do not create redundant seeds. The lock is already acquired in `tools/dev/verify/run-verify.ts`.
+  - Use the existing verify lock to scope the seed build so concurrent verifications in the same workspace do not race and do not create redundant seeds. The lock is already acquired in `build-tools/tools/dev/verify/run-verify.ts`.
   - Write a single “current seed pointer” file (under `buck-out/tmp/verify-seed/`) atomically so readers do not observe partial state.
   - Store the seed key alongside the pointer (`current.key`) to make diagnostics and stale-pin sweeps deterministic.
 

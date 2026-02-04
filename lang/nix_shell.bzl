@@ -5,7 +5,7 @@ def nix_bootstrap_env_core():
         + "WS_ENV=\"\"; "
         + "CAND_WS=\"$PWD\"; "
         + "while [ \"$CAND_WS\" != \"/\" ]; do "
-        + "  if [ -f \"$CAND_WS/tools/buck/workspace-root.env\" ]; then WS_ENV=\"$CAND_WS/tools/buck/workspace-root.env\"; break; fi; "
+        + "  if [ -f \"$CAND_WS/build-tools/tools/buck/workspace-root.env\" ]; then WS_ENV=\"$CAND_WS/build-tools/tools/buck/workspace-root.env\"; break; fi; "
         + "  CAND_WS=\"${CAND_WS%/*}\"; "
         + "  if [ -z \"$CAND_WS\" ]; then CAND_WS=\"/\"; fi; "
         + "done; "
@@ -13,12 +13,12 @@ def nix_bootstrap_env_core():
         + "export WORKSPACE_ROOT=\"${WORKSPACE_ROOT:-}\"; "
         + "if [ -z \"${WORKSPACE_ROOT:-}\" ] && [ -n \"${BUCK_TEST_SRC:-}\" ]; then export WORKSPACE_ROOT=\"$BUCK_TEST_SRC\"; fi; "
         + "if [ -z \"${WORKSPACE_ROOT:-}\" ]; then "
-        + "  if [ -f \"$PWD/tools/buck/graph.json\" ]; then "
+        + "  if [ -f \"$PWD/build-tools/tools/buck/graph.json\" ]; then "
         + "    export WORKSPACE_ROOT=\"$PWD\"; "
         + "  else "
         + "    CAND=\"$PWD\"; "
         + "    while [ \"$CAND\" != \"/\" ]; do "
-        + "      if [ -f \"$CAND/tools/buck/graph.json\" ]; then export WORKSPACE_ROOT=\"$CAND\"; break; fi; "
+        + "      if [ -f \"$CAND/build-tools/tools/buck/graph.json\" ]; then export WORKSPACE_ROOT=\"$CAND\"; break; fi; "
         + "      CAND=\"${CAND%/*}\"; "
         + "      if [ -z \"$CAND\" ]; then CAND=\"/\"; fi; "
         + "    done; "
@@ -65,9 +65,9 @@ def nix_bootstrap_env_pnpm_store():
         "if [ \"${BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE:-}\" != \"1\" ]; then "
         + "  if [ ! -f \"$FLK_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
         + "    if command -v node >/dev/null 2>&1; then "
-        + "      (cd \"$FLK_ROOT\" && node \"$FLK_ROOT/tools/dev/require-unified-pnpm-store.ts\" >/dev/null 2>&1 || true); "
+        + "      (cd \"$FLK_ROOT\" && node \"$FLK_ROOT/build-tools/tools/dev/require-unified-pnpm-store.ts\" >/dev/null 2>&1 || true); "
         + "    elif command -v nix >/dev/null 2>&1; then "
-        + "      (cd \"$FLK_ROOT\" && nix run --accept-flake-config \"path:$FLK_ROOT#zx-wrapper\" -- tools/dev/require-unified-pnpm-store.ts >/dev/null 2>&1 || true); "
+        + "      (cd \"$FLK_ROOT\" && nix run --accept-flake-config \"path:$FLK_ROOT#zx-wrapper\" -- build-tools/tools/dev/require-unified-pnpm-store.ts >/dev/null 2>&1 || true); "
         + "    fi; "
         + "  fi; "
         + "fi; "
@@ -126,14 +126,14 @@ def nix_calling_genrule_bootstrap(
     Standard bootstrap for genrule-style macros that invoke Nix.
 
     Responsibilities:
-    - optionally source tools/buck/workspace-root.env (when available as an input)
+    - optionally source build-tools/tools/buck/workspace-root.env (when available as an input)
     - normalize REPO_ROOT from WORKSPACE_ROOT (for git-based flake root fallback)
     - optionally disable unified PNPM store enforcement (bundling and other special cases)
     - compose with nix_cmd_prefix(...) so call sites don't reassemble partial variants
     """
     pre = ""
     if source_workspace_root_env:
-        pre = pre + ". tools/buck/workspace-root.env 2>/dev/null || true; "
+        pre = pre + ". build-tools/tools/buck/workspace-root.env 2>/dev/null || true; "
     pre = pre + "if [ -n \"${WORKSPACE_ROOT:-}\" ]; then export REPO_ROOT=\"$WORKSPACE_ROOT\"; fi; "
     if skip_require_unified_pnpm_store:
         pre = pre + "export BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE=1; "
@@ -193,7 +193,7 @@ def nix_build_out_path_cmd(flake_attr, timeout_var = "TIMEOUT", impure = False, 
     )
 
 
-def nix_calling_env_export_buck_graph_json(graph_json_path = "$WORKSPACE_ROOT/tools/buck/graph.json"):
+def nix_calling_env_export_buck_graph_json(graph_json_path = "$WORKSPACE_ROOT/build-tools/tools/buck/graph.json"):
     return ("export BUCK_GRAPH_JSON=\"%s\"; " % graph_json_path)
 
 

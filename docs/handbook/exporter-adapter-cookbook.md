@@ -2,9 +2,9 @@
 
 This guide shows how to write and test an exporter adapter with minimal ceremony using helpers and manifest-driven discovery.
 
-- **Auto-discovery**: put `tools/buck/exporter/lang/<id>.ts` next to `contract.ts`. It will be discovered automatically.
-- **Helpers**: import from `tools/buck/exporter/lang/helpers.ts` for quick rule/label checks and sorted labels.
-- **Classification registry**: use `tools/buck/exporter/lang/classification-registry.ts` to reuse looks-like rules, rule-type prefixes, labels, and guidance.
+- **Auto-discovery**: put `build-tools/tools/buck/exporter/lang/<id>.ts` next to `contract.ts`. It will be discovered automatically.
+- **Helpers**: import from `build-tools/tools/buck/exporter/lang/helpers.ts` for quick rule/label checks and sorted labels.
+- **Classification registry**: use `build-tools/tools/buck/exporter/lang/classification-registry.ts` to reuse looks-like rules, rule-type prefixes, labels, and guidance.
 - **Detect hook**: implement a fast `detect(node)` filter when possible.
 - **Labels**: prefer deriving labels from lockfiles or stable inputs; keep sorting deterministic.
 - **Tests**: unit tests can run `export-graph.ts --simulate` with a tiny nodes.json.
@@ -14,17 +14,17 @@ This guide shows how to write and test an exporter adapter with minimal ceremony
 For importer-scoped ecosystems (currently Node/PNPM and Python/uv), the exporter is allowed to attach a missing `lockfile:<path>#<importer>` label, but it must do so conservatively so raw rules do not accidentally participate in importer wiring.
 
 - **Attachment policy**: auto-attach `lockfile:` labels only for macro-stamped targets (targets that already carry a `kind:*` label) when they have no `lockfile:` label yet.
-- **Validation policy**: when a target already has a `lockfile:` label, validate it strictly (even if `kind:*` is missing) using the canonical parser `tools/lib/labels.ts:parseLockfileLabel(...)` (including importer-directory consistency and the repo-root `#.` special case).
-- **Configuration registry**: importer-scoped adapters must read lockfile basenames and nearest-lockfile lookup from `tools/buck/exporter/lang/importer-scoped-registry.ts`. Do not embed lockfile basenames or bespoke nearest-lockfile scans in per-language adapters.
-- **Implementation helpers**: exporter adapters should reuse `tools/buck/exporter/lang/importer-scoped-adapter.ts` and `tools/buck/exporter/lang/importer-lockfile-labels.ts` instead of re-implementing label attachment, lockfile discovery, or lockfile-label validation logic.
-- **Error diagnostics**: if you need to distinguish “malformed label” vs “importer mismatch”, use `tools/lib/labels.ts:inspectLockfileLabel(...)` rather than hand-rolling partial parsing.
+- **Validation policy**: when a target already has a `lockfile:` label, validate it strictly (even if `kind:*` is missing) using the canonical parser `build-tools/tools/lib/labels.ts:parseLockfileLabel(...)` (including importer-directory consistency and the repo-root `#.` special case).
+- **Configuration registry**: importer-scoped adapters must read lockfile basenames and nearest-lockfile lookup from `build-tools/tools/buck/exporter/lang/importer-scoped-registry.ts`. Do not embed lockfile basenames or bespoke nearest-lockfile scans in per-language adapters.
+- **Implementation helpers**: exporter adapters should reuse `build-tools/tools/buck/exporter/lang/importer-scoped-adapter.ts` and `build-tools/tools/buck/exporter/lang/importer-lockfile-labels.ts` instead of re-implementing label attachment, lockfile discovery, or lockfile-label validation logic.
+- **Error diagnostics**: if you need to distinguish “malformed label” vs “importer mismatch”, use `build-tools/tools/lib/labels.ts:inspectLockfileLabel(...)` rather than hand-rolling partial parsing.
 
-The registry delegates upward-walk lockfile discovery into the shared helper `tools/lib/importers.ts:findNearestLockfileForPackage(...)` so Node and Python cannot drift on edge cases.
+The registry delegates upward-walk lockfile discovery into the shared helper `build-tools/tools/lib/importers.ts:findNearestLockfileForPackage(...)` so Node and Python cannot drift on edge cases.
 
 Example skeleton:
 
 ```ts
-// tools/buck/exporter/lang/toy.ts
+// build-tools/tools/buck/exporter/lang/toy.ts
 import { Adapter } from "./contract";
 import { hasLabel, isRuleType } from "./helpers";
 

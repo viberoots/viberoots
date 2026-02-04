@@ -6,7 +6,7 @@ This installment follows Part 38, but with one important update from the current
 
 After re-reviewing the codebase with the contract inventory in `abstractions.md`, the remaining **valuable** (non-polish) gaps are:
 
-- A concrete **contract duplication** risk in the Nix planner (`tools/nix/graph-generator.nix`) where “canonical transforms” are re-implemented locally instead of importing the shared helper surface.
+- A concrete **contract duplication** risk in the Nix planner (`build-tools/tools/nix/graph-generator.nix`) where “canonical transforms” are re-implemented locally instead of importing the shared helper surface.
 - A concrete **debuggability gap** around the intentionally different patch invalidation models (package-local vs importer-local). The code is correct, but the system is still easy to misread when you inspect only provider metadata.
 - A remaining **authoring drift** gap: macro entrypoints across languages are mostly consistent, but we should standardize the call-site conventions and add narrow enforcement to prevent bypassing the shared helper surfaces.
 
@@ -20,16 +20,16 @@ As in prior parts, each PR includes the tests and documentation required for the
 
 We already treat some cross-language transforms as contracts with canonical implementations and parity tests (sanitization, patch filename decoding, nixpkgs attr normalization, lockfile label parsing rules, target-label normalization).
 
-However, `tools/nix/graph-generator.nix` still locally re-implements at least one of these transforms (notably a `sanitize = replaceStrings [...]` helper). That’s a classic slow-burn leak: it’s correct today, but drift here causes confusing cache/key divergence and makes it harder to reason about cross-layer parity.
+However, `build-tools/tools/nix/graph-generator.nix` still locally re-implements at least one of these transforms (notably a `sanitize = replaceStrings [...]` helper). That’s a classic slow-burn leak: it’s correct today, but drift here causes confusing cache/key divergence and makes it harder to reason about cross-layer parity.
 
-This PR removes the duplicated logic from the planner and uses `tools/nix/lib/lang-helpers.nix` as the canonical implementation on the Nix side.
+This PR removes the duplicated logic from the planner and uses `build-tools/tools/nix/lib/lang-helpers.nix` as the canonical implementation on the Nix side.
 
 ### Scope & Changes
 
-- Refactor `tools/nix/graph-generator.nix`:
-  - Replace any local “sanitizeName-style” logic with `tools/nix/lib/lang-helpers.nix:sanitizeName`.
+- Refactor `build-tools/tools/nix/graph-generator.nix`:
+  - Replace any local “sanitizeName-style” logic with `build-tools/tools/nix/lib/lang-helpers.nix:sanitizeName`.
   - Where the planner needs “target label → safe attr suffix”, use a single canonical helper rather than re-implementing it inline:
-    - Add `sanitizeAttrNameFromTargetLabel(...)` to `tools/nix/lib/lang-helpers.nix` (mirroring the existing contract in TypeScript and Starlark), then update the planner to call it.
+    - Add `sanitizeAttrNameFromTargetLabel(...)` to `build-tools/tools/nix/lib/lang-helpers.nix` (mirroring the existing contract in TypeScript and Starlark), then update the planner to call it.
   - Keep behavior identical:
     - No change to flake outputs.
     - No change to attr names produced for existing targets.
@@ -43,19 +43,19 @@ Non-goals in this PR:
 ### Tests (in this PR)
 
 - Add a parity test that proves the planner’s Nix “target → attr suffix” helper matches the canonical contract:
-  - TS (`tools/lib/labels.ts:sanitizeAttrNameFromLabel`) vs Nix (`tools/nix/lib/lang-helpers.nix:sanitizeAttrNameFromTargetLabel`).
+  - TS (`build-tools/tools/lib/labels.ts:sanitizeAttrNameFromLabel`) vs Nix (`build-tools/tools/nix/lib/lang-helpers.nix:sanitizeAttrNameFromTargetLabel`).
   - Include a small matrix: cell prefixes, config suffixes, mixed punctuation, and representative `//apps/*` / `//libs/*` labels.
 - Add (or extend) an integration-ish planner test that asserts the exported “flat attrset keying” remains stable for a small fixture graph.
 
 ### Docs (in this PR)
 
 - Update `abstractions.md`:
-  - Add a short note under the relevant contract section that the Nix planner must not re-implement sanitizer / attr-suffix derivation, and must import from `tools/nix/lib/lang-helpers.nix`.
+  - Add a short note under the relevant contract section that the Nix planner must not re-implement sanitizer / attr-suffix derivation, and must import from `build-tools/tools/nix/lib/lang-helpers.nix`.
   - Link to the new parity test as the regression guard.
 
 ### Acceptance Criteria
 
-- `tools/nix/graph-generator.nix` no longer re-implements the canonical sanitizer logic; it imports and uses `tools/nix/lib/lang-helpers.nix`.
+- `build-tools/tools/nix/graph-generator.nix` no longer re-implements the canonical sanitizer logic; it imports and uses `build-tools/tools/nix/lib/lang-helpers.nix`.
 - A parity test fails if TS/Starlark and Nix disagree on the attr-suffix derivation contract.
 - Planner outputs remain identical for existing targets (no attr renames, no output shape changes).
 
@@ -95,14 +95,14 @@ The build behavior is correct, but people still get tripped up when debugging in
 
 ### Scope & Changes
 
-- Tighten `tools/buck/invalidation-report*.ts` reporting:
+- Tighten `build-tools/tools/buck/invalidation-report*.ts` reporting:
   - For each target, clearly report:
     - `patch_scope` (from labels, or from the language contract fallback)
     - whether patch inputs are expected to be present as real action inputs (based on `patch_scope`)
     - where they are observed (list `srcs`, dict `srcs` `__patch_inputs__/...`, synthetic deps, etc.)
   - Ensure global Nix inputs reporting uses the canonical dict-prefix attachment model (not label-based heuristics).
   - Keep the report stable and deterministic (sorted output, stable sections).
-- Tighten `tools/buck/prebuild/*` messaging:
+- Tighten `build-tools/tools/buck/prebuild/*` messaging:
   - When lockfiles are present, print a single high-signal reminder that importer-local invalidation is driven by macro action inputs under `<importer>/patches/<lang>`.
   - Avoid verbosity; the goal is to prevent misreads, not spam logs.
 

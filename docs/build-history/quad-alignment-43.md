@@ -151,14 +151,14 @@ Planner files duplicate logic for language and kind detection. I will extract a 
 
 ### Scope & Changes
 
-- Add shared node inspection helpers in `tools/nix/planner/lib.nix`:
+- Add shared node inspection helpers in `build-tools/tools/nix/planner/lib.nix`:
   - language detection by rule type and labels
   - kind inference with consistent behavior
   - normalization helpers for target labels if needed for planner logic
 - Update these planners to use the shared helpers:
-  - `tools/nix/planner/go.nix`
-  - `tools/nix/planner/cpp.nix`
-  - `tools/nix/planner/python-core.nix`
+  - `build-tools/tools/nix/planner/go.nix`
+  - `build-tools/tools/nix/planner/cpp.nix`
+  - `build-tools/tools/nix/planner/python-core.nix`
 - Keep all behavior stable. No changes to planner outputs.
 - Before refactor work, I will document relocation points for the helper functions in the PR description:
   - which helper functions move
@@ -215,14 +215,14 @@ Patch map construction is implemented at multiple entrypoints with slightly diff
 
 ### Scope & Changes
 
-- Add a single patch map helper in `tools/nix/lib/lang-helpers.nix` that:
+- Add a single patch map helper in `build-tools/tools/nix/lib/lang-helpers.nix` that:
   - accepts patch directories
   - supports language-specific version normalization via an injected normalizer
   - supports store materialization where required by Python
 - Update templates to use the shared helper:
-  - `tools/nix/templates/go.nix`
-  - `tools/nix/templates/cpp*.nix`
-  - `tools/nix/templates/python*.nix`
+  - `build-tools/tools/nix/templates/go.nix`
+  - `build-tools/tools/nix/templates/cpp*.nix`
+  - `build-tools/tools/nix/templates/python*.nix`
 - Keep the patch filename decoding contract unchanged.
 - Before refactor work, I will document how existing helpers are replaced in the PR description:
   - helper names removed or merged

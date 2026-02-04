@@ -1,0 +1,76 @@
+#!/usr/bin/env zx-wrapper
+import fs from "fs-extra";
+import assert from "node:assert/strict";
+import path from "node:path";
+import { test } from "node:test";
+import { runInTemp } from "../lib/test-helpers";
+
+test("gen-langs: generates langs.nix from manifest capabilities deterministically", async () => {
+  await runInTemp("gen-langs-capabilities", async (tmp, $) => {
+    const manifest = {
+      languages: [
+        {
+          id: "node",
+          displayName: "Node",
+          requiredPaths: ["**/pnpm-lock.yaml"],
+          kinds: ["app", "lib", "workspace"],
+          templatesDir: "build-tools/tools/scaffolding/templates/node",
+          capabilities: { patching: true, lockfileLabels: true, testAutoWire: false },
+        },
+        {
+          id: "go",
+          displayName: "Go",
+          requiredPaths: ["build-tools/tools/nix/templates/go.nix", "go/defs.bzl"],
+          kinds: ["cli", "lib", "test"],
+          templatesDir: "build-tools/tools/scaffolding/templates/go",
+          capabilities: { patching: true, lockfileLabels: false, testAutoWire: true },
+        },
+        {
+          id: "cpp",
+          displayName: "C++",
+          requiredPaths: ["build-tools/tools/nix/templates/cpp.nix", "cpp/defs.bzl"],
+          kinds: ["bin", "lib", "test"],
+          templatesDir: "build-tools/tools/scaffolding/templates/cpp",
+          capabilities: { patching: false },
+        },
+        {
+          id: "rust",
+          displayName: "Rust",
+          requiredPaths: ["build-tools/tools/nix/planner/rust.nix"],
+          kinds: ["bin", "lib"],
+          templatesDir: "build-tools/tools/scaffolding/templates/rust",
+          // no capabilities → empty attr set
+        },
+      ],
+    } as any;
+    await fs.outputFile(
+      path.join(tmp, "build-tools/tools/nix/langs.json"),
+      JSON.stringify(manifest, null, 2) + "\n",
+    );
+
+    // Copy generator script
+    await fs.copy(
+      path.join(process.cwd(), "build-tools/tools/dev/gen-langs.ts"),
+      path.join(tmp, "build-tools/tools/dev/gen-langs.ts"),
+    );
+
+    // Run generator
+    await $({ cwd: tmp })`node build-tools/tools/dev/gen-langs.ts`;
+
+    // Verify output
+    const outPath = path.join(tmp, "build-tools/tools/nix/langs.nix");
+    const txt = await fs.readFile(outPath, "utf8");
+    assert.match(txt, /# build-tools\/tools\/nix\/langs\.nix — GENERATED FILE — DO NOT EDIT\./);
+    // Sorted by id: cpp, go, node, rust
+    assert.match(
+      txt,
+      /\{\s*[^]*cpp\s*=\s*\{[^}]*\}[^]*go\s*=\s*\{[^}]*\}[^]*node\s*=\s*\{[^}]*\}[^]*rust\s*=\s*\{[^}]*\}[^]*\}/m,
+    );
+    // Capabilities encoded as booleans
+    assert.match(txt, /go = [\s\S]*patching = true;/);
+    assert.match(txt, /go = [\s\S]*lockfileLabels = false;/);
+    assert.match(txt, /go = [\s\S]*testAutoWire = true;/);
+    assert.match(txt, /node = [\s\S]*lockfileLabels = true;/);
+    assert.match(txt, /cpp = [\s\S]*patching = false;/);
+  });
+});

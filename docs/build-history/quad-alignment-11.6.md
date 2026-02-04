@@ -16,13 +16,13 @@ Make the file-size rule objective and enforceable. Today, the repo contains both
   - Tracked files from `git ls-files`
   - Extensions: `.ts`, `.tsx`, `.js`, `.mjs`, `.cjs`, `.bzl`, `.py`, `.go`, `.rs`
   - Exclusions (non-source or intentionally large fixtures):
-    - `tools/tests/**`
+    - `build-tools/tools/tests/**`
     - `docs/**`
     - `test-logs/**`
     - `buck-out/**`
     - `node_modules/**`
     - `coverage/**`
-- Extend `tools/dev/file-size-lint.ts` to support explicit include/exclude globs (and to run in `--fail` mode in verify/CI for the source-file set).
+- Extend `build-tools/tools/dev/file-size-lint.ts` to support explicit include/exclude globs (and to run in `--fail` mode in verify/CI for the source-file set).
 - Add a dedicated zx test that asserts the enforcement rule matches the documented scope:
   - A “source files are under 250 LOC” test that uses the same include/exclude rules as the lint script.
 - Keep the existing focused `.bzl` guard test (it is still useful as a tight regression check for macro helpers).
@@ -30,7 +30,7 @@ Make the file-size rule objective and enforceable. Today, the repo contains both
 ### Tests (in this PR)
 
 - New test: “source files remain under the 250 LOC methodology gate”.
-- Existing: `tools/tests/lang/file-size.lang-bzl-under-250.test.ts` remains unchanged.
+- Existing: `build-tools/tools/tests/lang/file-size.lang-bzl-under-250.test.ts` remains unchanged.
 
 ### Docs (in this PR)
 
@@ -42,11 +42,11 @@ Make the file-size rule objective and enforceable. Today, the repo contains both
 
 ```bash
 git ls-files | egrep '\.(ts|tsx|js|mjs|cjs|bzl|py|go|rs)$' \
-  | egrep -v '^(tools/tests/|docs/|test-logs/)' \
+  | egrep -v '^(build-tools/tools/tests/|docs/|test-logs/)' \
   | xargs wc -l | awk '$1>250{print}' | wc -l | tr -d ' ' | grep '^0$'
 ```
 
-- `tools/bin/v` (or `buck2 test //...`) fails if a source file exceeds 250 LOC.
+- `build-tools/tools/bin/v` (or `buck2 test //...`) fails if a source file exceeds 250 LOC.
 
 ### Risks
 
@@ -66,28 +66,28 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches only `tools/dev/file-size-lint.ts` and `tools/tests/**` (plus docs).
+- Touches only `build-tools/tools/dev/file-size-lint.ts` and `build-tools/tools/tests/**` (plus docs).
 
 ---
 
-## PR‑2: Split `tools/scaffolding/scaf.ts` (currently ~1349 LOC) into small modules
+## PR‑2: Split `build-tools/tools/scaffolding/scaf.ts` (currently ~1349 LOC) into small modules
 
 ### Description
 
-`tools/scaffolding/scaf.ts` is the largest file in the repo by line count. Split it into cohesive modules with clear responsibilities (CLI parsing, template resolution, render orchestration, filesystem operations, and helpers), keeping behavior identical.
+`build-tools/tools/scaffolding/scaf.ts` is the largest file in the repo by line count. Split it into cohesive modules with clear responsibilities (CLI parsing, template resolution, render orchestration, filesystem operations, and helpers), keeping behavior identical.
 
 ### Scope & Changes
 
-- Create a `tools/scaffolding/scaf/` directory (or a similarly named folder consistent with existing conventions) containing:
+- Create a `build-tools/tools/scaffolding/scaf/` directory (or a similarly named folder consistent with existing conventions) containing:
   - CLI command table + argument parsing
   - Template discovery/selection
   - Render/apply orchestration
   - Validation and error shaping
-  - IO helpers kept minimal and reused (prefer existing `tools/lib/*` helpers when applicable)
-- Keep `tools/scaffolding/scaf.ts` as a thin entry point that wires the CLI to the new modules.
+  - IO helpers kept minimal and reused (prefer existing `build-tools/tools/lib/*` helpers when applicable)
+- Keep `build-tools/tools/scaffolding/scaf.ts` as a thin entry point that wires the CLI to the new modules.
 - Keep public CLI behavior unchanged:
   - same commands, flags, output formatting, and exit codes
-  - same default template paths (`tools/scaffolding/templates/**`)
+  - same default template paths (`build-tools/tools/scaffolding/templates/**`)
 
 ### Tests (in this PR)
 
@@ -100,9 +100,9 @@ Implement.
 
 ### Acceptance Criteria
 
-- `tools/scaffolding/scaf.ts` ≤250 lines and delegates to modules.
+- `build-tools/tools/scaffolding/scaf.ts` ≤250 lines and delegates to modules.
 - No diffs in scaffolded outputs for representative commands (existing tests provide coverage).
-- `tools/bin/v` passes.
+- `build-tools/tools/bin/v` passes.
 
 ### Risks
 
@@ -122,24 +122,24 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Confined to `tools/scaffolding/**` and existing scaffolding tests.
+- Confined to `build-tools/tools/scaffolding/**` and existing scaffolding tests.
 
 ---
 
-## PR‑3: Split `tools/dev/dev-build.ts` and related dev orchestration into ≤250 LOC modules
+## PR‑3: Split `build-tools/tools/dev/dev-build.ts` and related dev orchestration into ≤250 LOC modules
 
 ### Description
 
-`tools/dev/dev-build.ts` is large and acts as orchestration glue. Split it into a small entrypoint plus narrowly scoped modules (build mode selection, argument parsing, invocation plumbing), preserving behavior and error text.
+`build-tools/tools/dev/dev-build.ts` is large and acts as orchestration glue. Split it into a small entrypoint plus narrowly scoped modules (build mode selection, argument parsing, invocation plumbing), preserving behavior and error text.
 
 ### Scope & Changes
 
-- Move distinct responsibilities into focused modules under `tools/dev/dev-build/` (or similar):
+- Move distinct responsibilities into focused modules under `build-tools/tools/dev/dev-build/` (or similar):
   - parse flags and environment
   - determine build mode (pure vs impure) and required prerequisites
   - run buck/nix invocations (delegating to existing helpers if present)
   - reporting and exit handling
-- Keep `tools/dev/dev-build.ts` as a thin entrypoint.
+- Keep `build-tools/tools/dev/dev-build.ts` as a thin entrypoint.
 
 ### Tests (in this PR)
 
@@ -152,8 +152,8 @@ Implement.
 
 ### Acceptance Criteria
 
-- `tools/dev/dev-build.ts` ≤250 lines.
-- `tools/bin/v` passes.
+- `build-tools/tools/dev/dev-build.ts` ≤250 lines.
+- `build-tools/tools/bin/v` passes.
 
 ### Risks
 
@@ -173,24 +173,24 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Confined to `tools/dev/**`.
+- Confined to `build-tools/tools/dev/**`.
 
 ---
 
-## PR‑4: Split `tools/dev/patches-lint.ts` and tighten shared lint utilities
+## PR‑4: Split `build-tools/tools/dev/patches-lint.ts` and tighten shared lint utilities
 
 ### Description
 
-`tools/dev/patches-lint.ts` is another large dev script. Split it into small modules and ensure shared patch naming/parsing logic is reused (avoid parallel implementations).
+`build-tools/tools/dev/patches-lint.ts` is another large dev script. Split it into small modules and ensure shared patch naming/parsing logic is reused (avoid parallel implementations).
 
 ### Scope & Changes
 
-- Create a small module set under `tools/dev/patches-lint/`:
+- Create a small module set under `build-tools/tools/dev/patches-lint/`:
   - scanning + filtering
   - filename parsing + key normalization
   - reporting
-- Keep `tools/dev/patches-lint.ts` as a thin entrypoint.
-- Prefer existing shared helpers in `tools/lib/` for path normalization and key parsing.
+- Keep `build-tools/tools/dev/patches-lint.ts` as a thin entrypoint.
+- Prefer existing shared helpers in `build-tools/tools/lib/` for path normalization and key parsing.
 
 ### Tests (in this PR)
 
@@ -203,8 +203,8 @@ Implement.
 
 ### Acceptance Criteria
 
-- `tools/dev/patches-lint.ts` ≤250 lines.
-- `tools/bin/v` passes.
+- `build-tools/tools/dev/patches-lint.ts` ≤250 lines.
+- `build-tools/tools/bin/v` passes.
 
 ### Risks
 
@@ -224,19 +224,19 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Confined to `tools/dev/**` and existing tests.
+- Confined to `build-tools/tools/dev/**` and existing tests.
 
 ---
 
-## PR‑5: Split `tools/scaffolding/lib/scaffold-utils.ts` into focused utilities
+## PR‑5: Split `build-tools/tools/scaffolding/lib/scaffold-utils.ts` into focused utilities
 
 ### Description
 
-Split `tools/scaffolding/lib/scaffold-utils.ts` into smaller files that separate concerns cleanly (templating helpers vs filesystem helpers vs text transformations), preserving existing callers.
+Split `build-tools/tools/scaffolding/lib/scaffold-utils.ts` into smaller files that separate concerns cleanly (templating helpers vs filesystem helpers vs text transformations), preserving existing callers.
 
 ### Scope & Changes
 
-- Create `tools/scaffolding/lib/` submodules:
+- Create `build-tools/tools/scaffolding/lib/` submodules:
   - filesystem helpers (copy/write/atomic)
   - template helpers (vars, render steps, path mapping)
   - validation helpers
@@ -252,8 +252,8 @@ Split `tools/scaffolding/lib/scaffold-utils.ts` into smaller files that separate
 
 ### Acceptance Criteria
 
-- `tools/scaffolding/lib/scaffold-utils.ts` ≤250 lines (wrapper or removed).
-- `tools/bin/v` passes.
+- `build-tools/tools/scaffolding/lib/scaffold-utils.ts` ≤250 lines (wrapper or removed).
+- `build-tools/tools/bin/v` passes.
 
 ### Risks
 
@@ -273,25 +273,25 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Confined to `tools/scaffolding/**`.
+- Confined to `build-tools/tools/scaffolding/**`.
 
 ---
 
-## PR‑6: Split `tools/dev/update-pnpm-hash.ts` into focused utilities
+## PR‑6: Split `build-tools/tools/dev/update-pnpm-hash.ts` into focused utilities
 
 ### Description
 
-`tools/dev/update-pnpm-hash.ts` is still over the source-files limit. Split it into small, single-purpose modules (argument parsing, importer normalization, Nix build invocation, lockfile generation, hash-file update), keeping behavior identical.
+`build-tools/tools/dev/update-pnpm-hash.ts` is still over the source-files limit. Split it into small, single-purpose modules (argument parsing, importer normalization, Nix build invocation, lockfile generation, hash-file update), keeping behavior identical.
 
 ### Scope & Changes
 
-- Create `tools/dev/update-pnpm-hash/` modules, for example:
+- Create `build-tools/tools/dev/update-pnpm-hash/` modules, for example:
   - args parsing (`--lockfile`, `--force`)
   - importer normalization (apps/_ and libs/_)
   - Nix build runner (including timeout + `--no-link --print-out-paths` handling)
   - lockfile seeding/generation behavior (`NIX_PNPM_ALLOW_GENERATE`)
-  - `tools/nix/node-modules.hashes.json` read/modify/write
-- Keep `tools/dev/update-pnpm-hash.ts` as a thin entrypoint that delegates to these modules.
+  - `build-tools/tools/nix/node-modules.hashes.json` read/modify/write
+- Keep `build-tools/tools/dev/update-pnpm-hash.ts` as a thin entrypoint that delegates to these modules.
 - Prefer existing shared helpers where applicable (avoid bespoke flag parsing and path-existence helpers if the repo already provides them).
 
 ### Tests (in this PR)
@@ -304,9 +304,9 @@ None required.
 
 ### Acceptance Criteria
 
-- `tools/dev/update-pnpm-hash.ts` ≤250 lines and delegates to modules.
+- `build-tools/tools/dev/update-pnpm-hash.ts` ≤250 lines and delegates to modules.
 - No behavior drift (flags, env vars, and printed diagnostics remain stable).
-- `tools/bin/v` passes.
+- `build-tools/tools/bin/v` passes.
 
 ### Risks
 
@@ -326,26 +326,26 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Confined to `tools/dev/**` and existing scaffolding tests.
+- Confined to `build-tools/tools/dev/**` and existing scaffolding tests.
 
 ---
 
-## PR‑7: Split `tools/dev/langs-diagnose.ts` into focused utilities
+## PR‑7: Split `build-tools/tools/dev/langs-diagnose.ts` into focused utilities
 
 ### Description
 
-`tools/dev/langs-diagnose.ts` is slightly over the source-files limit. Split it into small modules (manifest reading, filesystem detection, exporter adapter detection, planner plugin detection, stage computation, output formatting), keeping output stable.
+`build-tools/tools/dev/langs-diagnose.ts` is slightly over the source-files limit. Split it into small modules (manifest reading, filesystem detection, exporter adapter detection, planner plugin detection, stage computation, output formatting), keeping output stable.
 
 ### Scope & Changes
 
-- Create `tools/dev/langs-diagnose/` modules for:
-  - manifest IO and parsing (`tools/nix/langs.json`)
+- Create `build-tools/tools/dev/langs-diagnose/` modules for:
+  - manifest IO and parsing (`build-tools/tools/nix/langs.json`)
   - enabled/disabled evaluation and missing-path detection
   - exporter adapter discovery
   - planner plugin discovery
   - stage computation (including pnpm-lock activation rules)
   - printing (human + `--json`)
-- Keep `tools/dev/langs-diagnose.ts` as a thin entrypoint that delegates to modules.
+- Keep `build-tools/tools/dev/langs-diagnose.ts` as a thin entrypoint that delegates to modules.
 - Prefer existing shared CLI helpers and filesystem helpers where applicable to avoid duplicated logic.
 
 ### Tests (in this PR)
@@ -358,9 +358,9 @@ None required.
 
 ### Acceptance Criteria
 
-- `tools/dev/langs-diagnose.ts` ≤250 lines and delegates to modules.
+- `build-tools/tools/dev/langs-diagnose.ts` ≤250 lines and delegates to modules.
 - Output remains stable for both `--json` and human mode (existing tests cover `--json`).
-- `tools/bin/v` passes.
+- `build-tools/tools/bin/v` passes.
 
 ### Risks
 
@@ -380,7 +380,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Confined to `tools/dev/**` and existing tests.
+- Confined to `build-tools/tools/dev/**` and existing tests.
 
 ## Rollout & Sequencing
 
@@ -398,12 +398,12 @@ Implement.
 
 ### Verification (each PR)
 
-- Run `tools/bin/v` once before landing.
+- Run `build-tools/tools/bin/v` once before landing.
 - Run the canonical grep command from PR‑1’s Acceptance Criteria (or rely on the new enforcement test).
 
 ### Verification (end of series)
 
-- Run `tools/bin/v` twice back-to-back on the same machine.
+- Run `build-tools/tools/bin/v` twice back-to-back on the same machine.
 - Confirm the canonical grep command returns zero offenders.
 - Confirm `KNOWN_SOURCE_FILES_OVER_250_LOC` is empty (or removed) so the source-files gate is “mechanically true” without a temporary allowlist.
 

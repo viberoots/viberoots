@@ -10,7 +10,7 @@ Align `patch-pkg session node` with the shared session loop used by Go/C++ to el
 
 ### Scope & Changes
 
-- `tools/patch/patch-node.ts`:
+- `build-tools/tools/patch/patch-node.ts`:
   - Replace the inline Ctrl‑D/Ctrl‑C loop with `runSession(onApply, onReset)` (already used by Go/C++).
   - No change to `start/apply/reset/remove` behaviors or pnpm integration.
 
@@ -43,9 +43,9 @@ Unify `--echo-snippet` handling so both Go and C++ patchers provide the same fla
 
 ### Scope & Changes
 
-- `tools/patch/lib/cli.ts`:
+- `build-tools/tools/patch/lib/cli.ts`:
   - Add `echoSnippetRequested(): boolean` (reads flag/env consistently).
-- `tools/patch/patch-go.ts`, `tools/patch/patch-cpp.ts`:
+- `build-tools/tools/patch/patch-go.ts`, `build-tools/tools/patch/patch-cpp.ts`:
   - Use the shared helper to decide whether to print the `export NIX_*_DEV_OVERRIDE_JSON='{}'` snippet instead of setting env in‑process.
   - Preserve existing env var names and messages; align wording where they differ.
 
@@ -78,9 +78,9 @@ Standardize parsing of `--target`, `--patch-dir`, `--force` (and Node’s `--imp
 
 ### Scope & Changes
 
-- `tools/patch/lib/cli.ts`:
+- `build-tools/tools/patch/lib/cli.ts`:
   - Add helpers: `readTargetArg()`, `readPatchDirArg()`, `readForceFlag()`, and reuse existing `getFlagStr/getFlagBool` where appropriate.
-- `tools/patch/patch-go.ts`, `tools/patch/patch-cpp.ts`, `tools/patch/patch-node.ts`:
+- `build-tools/tools/patch/patch-go.ts`, `build-tools/tools/patch/patch-cpp.ts`, `build-tools/tools/patch/patch-node.ts`:
   - Adopt shared helpers in place of local flag scanning where they diverge.
   - No change to user‑facing flags; only centralize parsing.
 
@@ -113,9 +113,9 @@ Trim redundant dev‑override notices by consolidating them in the prebuild guar
 
 ### Scope & Changes
 
-- `tools/buck/prebuild/notice.ts`:
+- `build-tools/tools/buck/prebuild/notice.ts`:
   - Ensure a single, concise local notice is printed when `NIX_GO_DEV_OVERRIDE_JSON` or `NIX_CPP_DEV_OVERRIDE_JSON` is set and `CI!=true` (already present; verify wording parity).
-- `tools/nix/lib/lang-helpers.nix`:
+- `build-tools/tools/nix/lib/lang-helpers.nix`:
   - Optionally gate `builtins.trace` behind an env toggle (e.g., `PLANNER_DEV_OVERRIDE_TRACE=1`) to suppress the default trace locally while leaving behavior unchanged in CI (templates still `throw` in CI when set).
 - Documentation comment noting the preferred place to see local notices (prebuild guard).
 
@@ -144,11 +144,11 @@ Implement with the conservative env toggle; keep CI strictness intact.
 
 ### Description
 
-Clarify in code and docs that `tools/nix/templates/node.nix` is a discoverability shim and the authoritative Node planner logic lives elsewhere, preventing misinterpretation by newcomers.
+Clarify in code and docs that `build-tools/tools/nix/templates/node.nix` is a discoverability shim and the authoritative Node planner logic lives elsewhere, preventing misinterpretation by newcomers.
 
 ### Scope & Changes
 
-- `tools/nix/templates/node.nix`:
+- `build-tools/tools/nix/templates/node.nix`:
   - Add a short header comment explaining the shim role and pointing to the planner plugin + macros.
 - Docs:
   - Expand `docs/handbook/adding-language.md` with a brief subsection reinforcing the separation.
@@ -183,7 +183,7 @@ Ensure all patch‑consuming scripts rely on the shared decoders to handle encod
 
 - TS audit:
   - Replace any ad‑hoc parsing with `decodeNameVersionFromPatch` (Node/Go) or `decodeNixAttrFromPatchPrefix` (C++).
-  - Verify `tools/dev/patches-lint.ts` and provider generators already use the shared helpers; no code changes if audit is clean.
+  - Verify `build-tools/tools/dev/patches-lint.ts` and provider generators already use the shared helpers; no code changes if audit is clean.
 
 ### Acceptance Criteria
 

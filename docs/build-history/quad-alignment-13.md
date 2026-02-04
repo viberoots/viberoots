@@ -215,7 +215,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `//lang`, `python/defs.bzl`, `node/defs_core.bzl`, and tests. Should remain compatible with thin slices if the fixtures live under `tools/tests`.
+- Touches `//lang`, `python/defs.bzl`, `node/defs_core.bzl`, and tests. Should remain compatible with thin slices if the fixtures live under `build-tools/tools/tests`.
 
 ---
 

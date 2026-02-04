@@ -19,7 +19,7 @@ This focuses on a Node library scaffold; a CLI variant can follow the same patte
 - Node is handled by macros with importer‑scoped providers; no changes are required to Node provider wiring for this feature.
 - Patches are package‑local: `patches/cpp/` under the C++ package, included in `srcs`, so patch edits precisely invalidate reverse deps.
 - Use `TARGETS` files rather than BUCK for new rules and wiring to match repo conventions [[memory:6971968]].
-- Implement the scaffold using the existing Copier-based scaffolding system under `tools/scaffolding/templates/...` [[memory:6263280]].
+- Implement the scaffold using the existing Copier-based scaffolding system under `build-tools/tools/scaffolding/templates/...` [[memory:6263280]].
 
 ## Approaches for Node ↔ C++ integration
 
@@ -59,7 +59,7 @@ Adopt the Node-API C++ addon approach. It aligns best with our philosophy of det
 
 ### Template name and location
 
-- Location: `tools/scaffolding/templates/node/cpp-addon/`
+- Location: `build-tools/tools/scaffolding/templates/node/cpp-addon/`
 - Purpose: scaffold a Node TS library that calls into a C++ Node-API addon.
 - Default destination structure (two packages created together):
   - `libs/{{ name }}/` — Node TS library
@@ -106,7 +106,7 @@ Rationale: separating Node and C++ into sibling packages preserves clear boundar
 
 ### C++ build details (Nix)
 
-- Add a flake template for a C++ Node-API addon, e.g., `tools/nix/templates/cpp-node-addon.nix`, with outputs producing a `{{ addon_name }}.node` shared library.
+- Add a flake template for a C++ Node-API addon, e.g., `build-tools/tools/nix/templates/cpp-node-addon.nix`, with outputs producing a `{{ addon_name }}.node` shared library.
 - Link against Node’s N-API headers/libraries provided via `pkgs.nodejs` (headers are part of Node). Optionally include the `node-addon-api` header-only wrapper for ergonomics; either path must remain reproducible via Nix.
 - Platform specifics:
   - macOS: `.node` is a Mach-O dylib bundle; ensure correct `-undefined dynamic_lookup` or explicit Node symbols resolution per Node-API guidance.
@@ -153,16 +153,16 @@ This keeps C++ a planner language and avoids introducing Node‑specific logic i
 - `copier.yaml` — variables and defaults (see above).
 - Node package files (TS lib): `package.json.jinja`, `tsconfig.json.jinja`, `src/index.ts.jinja`, `test/index.test.ts.jinja`, `TARGETS.jinja`.
 - C++ addon files: `include/{{ name }}.h.jinja`, `src/{{ name }}.cc.jinja`, `src/binding.cc.jinja`, `tests/{{ name }}_gtest.cpp.jinja`, `patches/cpp/pkgs__placeholder@0.0.0.patch.jinja`, `TARGETS.jinja`.
-- Nix template (shared, not per scaffold instance): `tools/nix/templates/cpp-node-addon.nix` (added once in repo, referenced by the C++ addon macro).
+- Nix template (shared, not per scaffold instance): `build-tools/tools/nix/templates/cpp-node-addon.nix` (added once in repo, referenced by the C++ addon macro).
 
 ### Post‑gen and local iteration
 
 - After `scaf new node cpp-addon <name>`:
   - If the workspace lacks a PNPM lock for the Node importer, run dependency setup (per existing Node templates). The Node project follows the same dev shell conventions.
   - Run:
-    - `node tools/buck/export-graph.ts`
-    - `node tools/buck/sync-providers.ts --lang node` (if lockfiles exist)
-    - `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
+    - `node build-tools/tools/buck/export-graph.ts`
+    - `node build-tools/tools/buck/sync-providers.ts --lang node` (if lockfiles exist)
+    - `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`
   - Build: `buck2 build //libs/{{ name }}:{{ name }}`
   - Test: `buck2 test //libs/{{ name }}:{{ name }}_test`
 
@@ -172,14 +172,14 @@ No new glue stages are required; prebuild guard continues to check for graph and
 
 Phase 0 — Nix + macro substrate
 
-- Add `tools/nix/templates/cpp-node-addon.nix` that produces a `.node` shared library for macOS and Linux given a set of sources/headers and an `addon_name`.
+- Add `build-tools/tools/nix/templates/cpp-node-addon.nix` that produces a `.node` shared library for macOS and Linux given a set of sources/headers and an `addon_name`.
 - Extend `//cpp/private:nix_build.bzl` and/or add `nix_cpp_node_addon` in `//cpp:defs.bzl` selecting the addon template.
 - Acceptance:
   - A tiny hand-built sample addon compiles via `buck2 build` and produces `*.node` on Darwin/Linux (CI matrix).
 
 Phase 1 — Scaffolding template
 
-- Add `tools/scaffolding/templates/node/cpp-addon/` with the content outlined above.
+- Add `build-tools/tools/scaffolding/templates/node/cpp-addon/` with the content outlined above.
 - Ensure the Node `TARGETS` uses a `nix_node_gen` helper (e.g., `:copy_addon`) that copies `$(location //libs/{{ name }}-native:napi_addon)` into a `native/{{ addon_name }}.node` path the wrapper loads.
 - Acceptance:
   - `scaf new node cpp-addon demo` creates both `libs/demo` and `libs/demo-native`.

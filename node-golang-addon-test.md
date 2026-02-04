@@ -22,12 +22,12 @@ Out of scope: performance measurements, multi‑importer scenarios, and platform
 
 - CLI: `scaf` to create the three sibling packages.
 - Buck2 + Nix planner: `nix_cpp_node_addon` links the Go c‑archive exposed by `nix_go_carchive`.
-- Node importer workflow: PNPM lockfile for `libs/<name>`; `tools/dev/update-pnpm-hash.ts` for FOD alignment.
-- Test helper: `tools/tests/lib/test-helpers.ts` (`runInTemp`) to run in an isolated temp repo.
+- Node importer workflow: PNPM lockfile for `libs/<name>`; `build-tools/tools/dev/update-pnpm-hash.ts` for FOD alignment.
+- Test helper: `build-tools/tools/tests/lib/test-helpers.ts` (`runInTemp`) to run in an isolated temp repo.
 
 ### Test location and naming
 
-- File: `tools/tests/scaffolding/node-go-addon.nix-node-test.pass.test.ts`
+- File: `build-tools/tools/tests/scaffolding/node-go-addon.nix-node-test.pass.test.ts`
 - One test per file, zx + node:test runner (repo convention).
 
 ### Runner and environment
@@ -84,7 +84,7 @@ bash --noprofile --norc -c '
 - Update fixed‑output digest mapping for the importer:
 
 ```bash
-zx-wrapper tools/dev/update-pnpm-hash.ts --lockfile libs/demo/pnpm-lock.yaml
+zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile libs/demo/pnpm-lock.yaml
 ```
 
 - Warm PNPM store and Node modules caches (10‑minute external timeouts are acceptable for single builds):
@@ -146,8 +146,8 @@ These are not required to build the `node-test` derivation, but they help catch 
 - Export graph and generate auto_map:
 
 ```bash
-node tools/buck/export-graph.ts --out tools/buck/graph.json
-node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl
+node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json
+node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl
 ```
 
 - On a second run, assert no diffs:
@@ -158,7 +158,7 @@ git diff --exit-code
 
 Measurable checkpoints:
 
-- `tools/buck/graph.json` and `third_party/providers/auto_map.bzl` exist.
+- `build-tools/tools/buck/graph.json` and `third_party/providers/auto_map.bzl` exist.
 - Re‑running the two commands yields no diffs.
 
 ---
@@ -239,7 +239,7 @@ test("node go-addon: scaffold, build addon, and pass nix_node_test", async () =>
     await $({
       stdio: "inherit",
       env,
-    })`zx-wrapper tools/dev/update-pnpm-hash.ts --lockfile ${lockfile}`;
+    })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${lockfile}`;
     await $({
       stdio: "inherit",
       env,
@@ -283,4 +283,4 @@ test("node go-addon: scaffold, build addon, and pass nix_node_test", async () =>
 - `node-golang-addon.md` (scaffold architecture and acceptance)
 - `build-tools/docs/build-system-design.md` (Buck2 orchestrator, Nix dynamic derivations, patching invariants)
 - `getting-started-on-a-pr.md` (dev shell, build/test commands, glue steps)
-- `tools/tests/lib/test-helpers.ts` (temp repo setup, dev env export)
+- `build-tools/tools/tests/lib/test-helpers.ts` (temp repo setup, dev env export)

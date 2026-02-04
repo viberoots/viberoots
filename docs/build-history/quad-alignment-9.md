@@ -12,7 +12,7 @@ Ensure TS (`normalizeNixAttr`) and Starlark (`normalize_nix_attr`) normalize nix
 
 ### Scope & Changes
 
-- Introduce a small canonical alias manifest (`tools/lib/nix-attr-aliases.json`).
+- Introduce a small canonical alias manifest (`build-tools/tools/lib/nix-attr-aliases.json`).
 - Generate (at dev/test time) a Starlark alias module consumed by `lang/defs_common.bzl` (mirrors the JSON).
 - Update TS to source aliases from the same JSON (migrate from current `nix-attr-aliases.ts` to eliminate drift).
 - Keep normalized output strings unchanged for existing inputs.
@@ -114,12 +114,12 @@ Reduce duplication between `readNodeProviderIndexEntries` and `readPythonProvide
 
 ### Scope & Changes
 
-- Add `tools/lib/provider-index.ts` with a tiny generic helper that:
+- Add `build-tools/tools/lib/provider-index.ts` with a tiny generic helper that:
   - accepts a callback to enumerate `(provider, key)` pairs,
   - ensures deterministic ordering and string normalization,
   - returns the normalized entries.
 - Update Node and Python readers to build their language‑specific `(provider, key)` lists, then pass through the shared helper (no change to entry content).
-- `tools/buck/gen-provider-index.ts` remains the orchestrator; logic unchanged beyond import paths.
+- `build-tools/tools/buck/gen-provider-index.ts` remains the orchestrator; logic unchanged beyond import paths.
 
 ### Tests (in this PR)
 
@@ -152,7 +152,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Place `tools/lib/provider-index.ts` under the standard glue library path and ensure sparse scaffolding includes it wherever glue scripts run (e.g., update the allowlist used by minimal copies).
+- Place `build-tools/tools/lib/provider-index.ts` under the standard glue library path and ensure sparse scaffolding includes it wherever glue scripts run (e.g., update the allowlist used by minimal copies).
 - Keep `gen-provider-index.ts` optional; when lockfiles/patch dirs are missing in a slice, the readers should no‑op without error (current behavior).
 - Avoid introducing any repo‑wide scans outside existing glue inputs to keep execution fast and slice‑friendly.
 
@@ -166,7 +166,7 @@ Avoid ad‑hoc string checks for `//third_party/providers:*` across generators b
 
 ### Scope & Changes
 
-- Add `tools/lib/graph-utils.ts` with `isProviderPackageNode(...)` and label helpers that mirror existing logic.
+- Add `build-tools/tools/lib/graph-utils.ts` with `isProviderPackageNode(...)` and label helpers that mirror existing logic.
 - Replace in‑file string prefix checks in `gen-auto-map.ts` and `gen-provider-index.ts` with the shared helper (behavior identical).
 
 ### Tests (in this PR)
@@ -200,7 +200,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Place `tools/lib/graph-utils.ts` alongside other glue libs and include it in the sparse scaffolding allowlist used by glue execution.
+- Place `build-tools/tools/lib/graph-utils.ts` alongside other glue libs and include it in the sparse scaffolding allowlist used by glue execution.
 - Keep behavior identical to the current inline predicate so that, if the helper is missing in a very thin slice, reverting to the inline check is trivial during backout.
 - Do not add new runtime dependencies; the helper is pure string logic and safe in slices.
 

@@ -166,23 +166,23 @@ Implement.
 
 ---
 
-## PR-4: Move `tools/` under `build-tools`
+## PR-4: Move `build-tools/tools/` under `build-tools`
 
 ### Description
 
-This PR moves the `tools/` tree under `build-tools` and updates all references. It keeps `third_party`, `toolchains`, `target_platforms`, and `patches` at root.
+This PR moves the `build-tools/tools/` tree under `build-tools` and updates all references. It keeps `third_party`, `toolchains`, `target_platforms`, and `patches` at root.
 
 ### Scope & Changes
 
 This PR makes the following changes:
 
-- Move `tools/` to `build-tools/tools/`.
+- Move `build-tools/tools/` to `build-tools/tools/`.
 - Update path references in:
   - `package.json`
-  - `tools/bin/*` (moved to `build-tools/tools/bin/*`)
+  - `build-tools/tools/bin/*` (moved to `build-tools/tools/bin/*`)
   - `Jenkinsfile`
-  - any scripts that hardcode `tools/` paths
-- Update Nix paths for `tools/nix` now under `build-tools/tools/nix`.
+  - any scripts that hardcode `build-tools/tools/` paths
+- Update Nix paths for `build-tools/tools/nix` now under `build-tools/tools/nix`.
 
 ### Tests (in this PR)
 
@@ -200,7 +200,7 @@ I update any docs that mention moved paths.
 
 The following must be true:
 
-- `tools/` now lives under `build-tools/tools/`.
+- `build-tools/tools/` now lives under `build-tools/tools/`.
 - `third_party/`, `toolchains`, `target_platforms`, and `patches/` remain at root.
 - All path references resolve.
 - Baseline runs pass.
@@ -208,7 +208,7 @@ The following must be true:
 
 ### Risks
 
-Medium. Many scripts reference `tools/` paths.
+Medium. Many scripts reference `build-tools/tools/` paths.
 
 ### Consequence of Not Implementing
 

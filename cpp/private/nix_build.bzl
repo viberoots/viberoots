@@ -12,7 +12,7 @@ def _cpp_nix_build_impl(ctx):
     raw = ctx.attrs.self_label
     kind = ctx.attrs.kind
     link_mode = ctx.attrs.link_mode or "static"
-    # Expected artifact names mirror tools/nix/templates/cpp.nix sanitize logic
+    # Expected artifact names mirror build-tools/tools/nix/templates/cpp.nix sanitize logic
     sanitized = sanitize_name(raw)
     expected_bin = "bin/%s" % sanitized
     expected_lib = "lib/lib%s.a" % sanitized
@@ -41,7 +41,7 @@ def _cpp_nix_build_impl(ctx):
         + "PLANNER_ONLY_CPP=1 "
         + ("BUCK_TARGET=\"%s\" " % raw)
         + "BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" "
-        + "BUCK_GRAPH_JSON=\"$WORKSPACE_ROOT/tools/buck/graph.json\" "
+        + "BUCK_GRAPH_JSON=\"$WORKSPACE_ROOT/build-tools/tools/buck/graph.json\" "
     )
     run_and_copy = (
         nix_action_workspace_setup_from_args()
@@ -49,18 +49,18 @@ def _cpp_nix_build_impl(ctx):
         + nix_cmd_prefix(timeout_var = "TIMEOUT", timeout_sec = 600, include_pnpm_store = False, escape_cmd_subst = True)
         + "cd \"$FLK_ROOT\"; "
         + nix_action_export_graph_cmd(
-            out_graph = "$WORKSPACE_ROOT/tools/buck/graph.json",
+            out_graph = "$WORKSPACE_ROOT/build-tools/tools/buck/graph.json",
             query_roots = "libs,go,cpp,third_party",
             zx_wrapper = "path:$FLK_ROOT#zx-wrapper",
         )
         # Require a pre-exported Buck graph for the temp workspace (fail fast if missing)
         + "echo \"[cpp_nix_build] WR=$WORKSPACE_ROOT FLK=$FLK_ROOT\" >&2; "
-        + "ls -la \"$WORKSPACE_ROOT/tools/buck\" >/dev/null 2>&1 || true; "
-        + "if [ ! -f \"$WORKSPACE_ROOT/tools/buck/graph.json\" ]; then "
-        + "  echo 'cpp_nix_build: missing $WORKSPACE_ROOT/tools/buck/graph.json; run tools/buck/export-graph.ts first' >&2; "
+        + "ls -la \"$WORKSPACE_ROOT/build-tools/tools/buck\" >/dev/null 2>&1 || true; "
+        + "if [ ! -f \"$WORKSPACE_ROOT/build-tools/tools/buck/graph.json\" ]; then "
+        + "  echo 'cpp_nix_build: missing $WORKSPACE_ROOT/build-tools/tools/buck/graph.json; run build-tools/tools/buck/export-graph.ts first' >&2; "
         + "  exit 2; "
         + "fi; "
-        + "export BUCK_GRAPH_JSON=\"$WORKSPACE_ROOT/tools/buck/graph.json\"; "
+        + "export BUCK_GRAPH_JSON=\"$WORKSPACE_ROOT/build-tools/tools/buck/graph.json\"; "
         # Build the selected target via the primary flake attr using BUCK_TARGET
         + nix_build_out_path_cmd(
             "\"path:$FLK_ROOT#graph-generator-selected\"",
@@ -83,9 +83,9 @@ def _cpp_nix_build_impl(ctx):
         "-c",
         run_and_copy,
         out.as_output(),
-        # $1: absolute path to tools/buck/graph.json
+        # $1: absolute path to build-tools/tools/buck/graph.json
         graph_arg,
-        # $2: optional path to tools/buck/workspace-root.env (may be an empty artifact in some contexts)
+        # $2: optional path to build-tools/tools/buck/workspace-root.env (may be an empty artifact in some contexts)
         env_arg,
         # $3: absolute path to the repository flake.nix to pin FLK_ROOT deterministically
         ctx.attrs.flake_file if ctx.attrs.flake_file != None else "",

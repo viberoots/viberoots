@@ -60,7 +60,7 @@ Key points
 
 Template root
 
-- `tools/scaffolding/templates/node/go-addon/`
+- `build-tools/tools/scaffolding/templates/node/go-addon/`
   - Generates three sibling packages:
     - `libs/<name>`: Node TS library that loads the addon
     - `libs/<name>-go`: Go package compiled as a C archive (c-archive)
@@ -259,7 +259,7 @@ Acceptance criteria
 - `scaf new node go-addon <name>` creates `libs/<name>`, `libs/<name>-go`, `libs/<name>-native`.
 - `buck2 build //libs/<name>-go:carchive` succeeds.
 - `buck2 build //libs/<name>-native:napi_addon` succeeds (links the Go archive).
-- `node tools/buck/export-graph.ts && node tools/buck/gen-auto-map.ts …` complete without provider diffs.
+- `node build-tools/tools/buck/export-graph.ts && node build-tools/tools/buck/gen-auto-map.ts …` complete without provider diffs.
 - `buck2 test //libs/<name>:unit` passes.
 
 ---
@@ -268,7 +268,7 @@ Acceptance criteria
 
 Stages (unchanged from repo design)
 
-1. Export Graph — `tools/buck/graph.json`
+1. Export Graph — `build-tools/tools/buck/graph.json`
 2. Sync Providers — Node only (no new shapes); noop if no lockfiles
 3. Generate auto_map — unchanged
 4. Build & Test — build `//libs/<name>-native:napi_addon` and run Node test
@@ -285,7 +285,7 @@ Matrix: aarch64‑darwin, aarch64‑linux, x86_64‑linux (ensures Go + N‑API 
     - Introduce a Copier template `node/go-addon` that generates three sibling packages: Node TS (`libs/<name>`), Go c‑archive (`libs/<name>-go`), and C N‑API binding (`libs/<name>-native`).
     - Mirrors `node/cpp-addon` conventions while swapping the native implementation to Go via a small C shim.
   - Scope & Changes
-    - Add `tools/scaffolding/templates/node/go-addon/**` with:
+    - Add `build-tools/tools/scaffolding/templates/node/go-addon/**` with:
       - Node: `package.json.jinja`, `tsconfig.json.jinja`, `src/index.ts.jinja`, `test/index.test.ts.jinja` (optional), `TARGETS.jinja`, `README.md.jinja`.
       - Go: `go.mod.jinja`, `gomod2nix.toml.jinja` (placeholder), `pkg/addon/addon.go.jinja`, `TARGETS.jinja`, `patches/go/.keep`.
       - C binding: `include/<name>_binding.h.jinja`, `src/binding.c.jinja`, `tests/<name>_gtest.cpp.jinja` (optional), `TARGETS.jinja`, `patches/cpp/.keep`.
@@ -293,7 +293,7 @@ Matrix: aarch64‑darwin, aarch64‑linux, x86_64‑linux (ensures Go + N‑API 
     - Ensure Node TARGETS uses `nix_node_gen` to copy the `.node` to `native/<addon_name>.node` and stamps the lockfile label.
   - Acceptance Criteria
     - `scaf new node go-addon demo` creates `libs/demo`, `libs/demo-go`, `libs/demo-native`.
-    - `scaf templates node` lists `go-addon`; `tools/scaffolding/validate.ts` passes.
+    - `scaf templates node` lists `go-addon`; `build-tools/tools/scaffolding/validate.ts` passes.
   - Risks
     - Mis‑templated paths or lockfile label wiring for the Node package.
   - Consequence of Not Implementing
@@ -309,7 +309,7 @@ Matrix: aarch64‑darwin, aarch64‑linux, x86_64‑linux (ensures Go + N‑API 
   - Scope & Changes
     - Scaffold `libs/<name>-go/TARGETS.jinja` to declare `nix_go_carchive(name="carchive", …)` and include Go sources under `pkg/**`.
     - Provide a minimal `go.mod.jinja` (module `example.com/<name>-go`) and placeholder `gomod2nix.toml.jinja`.
-    - Document regeneration via `tools/dev/install-deps.ts` so gomod2nix stays current after dependency changes.
+    - Document regeneration via `build-tools/tools/dev/install-deps.ts` so gomod2nix stays current after dependency changes.
     - Add a zx test that builds `//libs/<name>-go:carchive` and asserts presence of `lib/*.a` and `include/*.h` in the derivation output (via Buck/Nix runner).
   - Acceptance Criteria
     - `buck2 build //libs/demo-go:carchive` succeeds and is a cache hit on repeat.
@@ -406,7 +406,7 @@ All PRs are independently reversible and behavior‑preserving outside the scaff
 
 - “Symbol not found” at runtime: ensure the C binding includes the generated Go header and the addon target depends on `//libs/<name>-go:carchive`.
 - Darwin linkage quirks: the addon template links with `-dynamiclib -undefined dynamic_lookup`; avoid relying on transitive resolution of non‑Node libs; use explicit nixpkgs deps when needed.
-- Dev overrides are set: `tools/dev/clear-overrides.ts` unsets `NIX_GO_DEV_OVERRIDE_JSON` for clean, cacheable builds.
+- Dev overrides are set: `build-tools/tools/dev/clear-overrides.ts` unsets `NIX_GO_DEV_OVERRIDE_JSON` for clean, cacheable builds.
 
 ---
 
@@ -414,7 +414,7 @@ All PRs are independently reversible and behavior‑preserving outside the scaff
 
 - `build-tools/docs/build-system-design.md` — Buck2 orchestrator, Nix dynamic derivations, patching invariants
 - `node-cpp-addon-plan.md` — C++ addon scaffold; this design mirrors its artifact flow using Go
-- `tools/nix/templates/go.nix` — `goCArchive` template
-- `tools/nix/templates/cpp-node-addon.nix` — addon linker (links repo packages + nixpkgs libs)
+- `build-tools/tools/nix/templates/go.nix` — `goCArchive` template
+- `build-tools/tools/nix/templates/cpp-node-addon.nix` — addon linker (links repo packages + nixpkgs libs)
 - `go/defs.bzl` — `nix_go_carchive` macro
 - `cpp/defs.bzl` — `nix_cpp_node_addon` macro

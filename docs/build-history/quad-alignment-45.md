@@ -142,8 +142,8 @@ canonical invalidation report for per-target details.
 
 #
 
-- Update `tools/buck/prebuild-guard.ts` to print a short line that points to
-  `tools/buck/invalidation-report.txt` when importer-local patch models are detected.
+- Update `build-tools/tools/buck/prebuild-guard.ts` to print a short line that points to
+  `build-tools/tools/buck/invalidation-report.txt` when importer-local patch models are detected.
 - Keep the existing one-liner patch scope messages unchanged.
 
 #
@@ -152,7 +152,7 @@ canonical invalidation report for per-target details.
 
 #
 
-- Update `tools/tests/prebuild/guard.patch-invalidation.one-liners.test.ts` to assert the new
+- Update `build-tools/tools/tests/prebuild/guard.patch-invalidation.one-liners.test.ts` to assert the new
   guidance line is present when importer-local patches are enabled.
 
 #
@@ -162,7 +162,7 @@ canonical invalidation report for per-target details.
 #
 
 - Update the diagnostics section in `abstractions.md` to mention the new prebuild-guard guidance
-  line and point to `tools/buck/invalidation-report.txt` as the canonical per-target source.
+  line and point to `build-tools/tools/buck/invalidation-report.txt` as the canonical per-target source.
 
 #
 
@@ -170,7 +170,7 @@ canonical invalidation report for per-target details.
 
 #
 
-- Prebuild guard output includes a clear pointer to `tools/buck/invalidation-report.txt`.
+- Prebuild guard output includes a clear pointer to `build-tools/tools/buck/invalidation-report.txt`.
 - Existing patch scope one-liners remain unchanged.
 - Tests cover the new output and pass.
 

@@ -43,7 +43,7 @@ Non-goals in this PR:
 
 ### Tests (in this PR)
 
-- Add or extend Starlark probe tests under `tools/tests/lang/` that:
+- Add or extend Starlark probe tests under `build-tools/tools/tests/lang/` that:
   - assert planner-visible stubs do not contain provider targets in `deps` by default
   - assert provider edges still influence invalidation when realized into inputs for stub-like shapes
 - Add a focused cquery-based test that verifies representative planner-visible targets keep the intended dependency shape (no provider targets in deps) while still rebuilding when patch inputs change (package-local case).
@@ -174,7 +174,7 @@ Non-goals in this PR:
 
 ### Tests (in this PR)
 
-- Extend existing Node macro tests (under `tools/tests/node/`) to assert:
+- Extend existing Node macro tests (under `build-tools/tools/tests/node/`) to assert:
   - the Nix-calling macros include `global_nix_inputs()` as real action inputs (this should remain true after refactor)
   - importer patch inputs remain real action inputs for representative Node targets
 - Add one targeted “command assembly smoke test” that inspects the generated command string for required invariant substrings (for example, `--no-link --print-out-paths`, `BUCK_GRAPH_JSON=`, workspace-root env sourcing).
@@ -235,7 +235,7 @@ Non-goals in this PR:
 
 ### Tests (in this PR)
 
-- Extend `tools/dev/stamping-lint.ts` (or the existing stamping lint) to require patch_scope labels where applicable.
+- Extend `build-tools/tools/dev/stamping-lint.ts` (or the existing stamping lint) to require patch_scope labels where applicable.
 - Add a cquery-based test that selects representative targets across languages and asserts patch_scope is present in exported labels (including at least one planner-visible shim and one srcs-less Python binary).
 
 ### Docs (in this PR)

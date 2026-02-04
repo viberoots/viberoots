@@ -2,9 +2,9 @@
 
 ### Goal
 
-Deliver complete metadata and variable contracts for `tools/scaffolding/templates/go/lib` and `tools/scaffolding/templates/go/cli` so that:
+Deliver complete metadata and variable contracts for `build-tools/tools/scaffolding/templates/go/lib` and `build-tools/tools/scaffolding/templates/go/cli` so that:
 
-- `scaf validate all` passes (uses `tools/scaffolding/validate.ts`).
+- `scaf validate all` passes (uses `build-tools/tools/scaffolding/validate.ts`).
 - `scaf help new go <template>` shows accurate usage, notes, examples, and variables.
 - Variables are sufficient to drive Phase 2 file generation without later breaking changes.
 
@@ -36,7 +36,7 @@ Each template provides:
 
 ## meta.json schema (per template)
 
-Required keys validated by `tools/scaffolding/validate.ts`:
+Required keys validated by `build-tools/tools/scaffolding/validate.ts`:
 
 - `language` (must equal `go`)
 - `template` (one of `lib`, `cli`)
@@ -162,9 +162,9 @@ Each template must render a README that:
 
 - States what was created and where (e.g., `libs/{{ name }}` or `apps/{{ name }}`).
 - Lists the next steps (glue generation):
-  - `node tools/buck/export-graph.ts`
-  - `node tools/buck/sync-providers.ts`
-  - `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
+  - `node build-tools/tools/buck/export-graph.ts`
+  - `node build-tools/tools/buck/sync-providers.ts`
+  - `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`
 - Reminds that builds/tests must run in a direnv-loaded environment.
 - Mentions decentralized registration: presence of the directory and its `TARGETS` is sufficient for discovery via `//...`.
 - For libs: add a minimal example of import path using `{{ module_computed }}`.
@@ -192,7 +192,7 @@ Execution environment for all tests:
 Checks:
 
 1. Validation
-   - Run: `node tools/scaffolding/validate.ts all`
+   - Run: `node build-tools/tools/scaffolding/validate.ts all`
    - Expect: OK — template meta/help validated
 2. Help surfaces variables
    - Run: `scaf help new go lib` and `scaf help new go cli`

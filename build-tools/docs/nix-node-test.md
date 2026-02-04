@@ -216,7 +216,7 @@ The `node_nix_test` rule’s `ExternalRunnerTestInfo` will:
 ### PR3 — Scaffolding and docs
 
 - **Scope**
-  - Update Node scaffolding (`tools/scaffolding`) to optionally generate a sample `nix_node_test` target and `test/example.test.ts`
+  - Update Node scaffolding (`build-tools/tools/scaffolding`) to optionally generate a sample `nix_node_test` target and `test/example.test.ts`
   - Add documentation snippets (usage, patterns, coverage, timeouts, troubleshooting)
 - **Acceptance criteria**
   - Scaffolding produces a project where `buck2 test` passes out‑of‑the‑box
@@ -230,7 +230,7 @@ The `node_nix_test` rule’s `ExternalRunnerTestInfo` will:
 ### PR3.5 — Update Node templates to use auto‑discovery and auto‑wiring
 
 - **Scope**
-  - Refresh Node scaffolding templates (`tools/scaffolding/templates/node/*`) to rely on the
+  - Refresh Node scaffolding templates (`build-tools/tools/scaffolding/templates/node/*`) to rely on the
     new `nix_node_test` external runner’s default discovery and the repo’s provider auto‑wiring.
   - Remove legacy `cmd`/`out` shim usage in template `TARGETS` and instead declare a plain
     `nix_node_test(name="…", lockfile_label=…)` that lets the runner discover tests from the
@@ -267,7 +267,7 @@ The `node_nix_test` rule’s `ExternalRunnerTestInfo` will:
 ### PR4 — CI wiring and minimal tests
 
 - **Scope**
-  - Add zx tests under `tools/tests` that:
+  - Add zx tests under `build-tools/tools/tests` that:
     - create a tiny importer with one passing and one failing test
     - assert that `nix build .#node-test.<importer>` and `buck2 test` reflect pass/fail
     - assert timeout governance (use a slow test behind a reduced timeout)

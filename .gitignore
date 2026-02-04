@@ -27,12 +27,12 @@ third_party/providers/TARGETS.*.auto
 third_party/providers/provider_index.bzl
 third_party/providers/provider_index.json
 third_party/providers/nix_attr_map.bzl
-tools/buck/graph.json
-tools/buck/export-metrics.json
-tools/buck/node-lock-index.json
-tools/buck/invalidation-report.txt
-tools/buck/invalidation-report.json
-tools/buck/.export-cache/
+build-tools/tools/buck/graph.json
+build-tools/tools/buck/export-metrics.json
+build-tools/tools/buck/node-lock-index.json
+build-tools/tools/buck/invalidation-report.txt
+build-tools/tools/buck/invalidation-report.json
+build-tools/tools/buck/.export-cache/
 
 # Local out-links created during ad-hoc nix builds (not part of normal flow)
 buck-graph-result
@@ -47,7 +47,7 @@ coverage/
 .git/lint-staged_unstaged.patch
 
 # Test temp repos or files if created
-/tools/tests/**/tmp/
+/build-tools/tools/tests/**/tmp/
 
 # zx / misc temp
 *.log
@@ -58,4 +58,4 @@ buck-test.*
 .pnpm-store
 
 # Verify analysis output (generated)
-tools/dev/verify-analysis/
+build-tools/tools/dev/verify-analysis/

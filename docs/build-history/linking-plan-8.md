@@ -6,7 +6,7 @@ This plan closes the gaps found in the C++ linking review. I keep each PR small 
 
 This plan assumes the shared link intent contract and C++ linking phases are already in place:
 
-- `tools/nix/planner/link-closure.nix` exists and is used by the C++ planner
+- `build-tools/tools/nix/planner/link-closure.nix` exists and is used by the C++ planner
 - C++ macros accept `link_deps`, `header_deps`, `link_closure`, and `link_closure_overrides`
 - Exporter surfaces link intent attributes in the graph
 
@@ -30,7 +30,7 @@ This PR makes the following changes:
 
 I add zx tests (one test per file):
 
-- `tools/tests/cpp/cpp.link-closure.overrides.apply.deterministic.test.ts`
+- `build-tools/tools/tests/cpp/cpp.link-closure.overrides.apply.deterministic.test.ts`
   - update or extend to ensure the binary uses the override to pull transitive deps in the expected order via the macro path, not only the planner direct graph path
 
 ### Docs (in this PR)
@@ -75,14 +75,14 @@ This PR ensures C++ libraries can include headers from `nix_cpp_headers` via `he
 
 This PR makes the following changes:
 
-- Update `tools/nix/planner/cpp.nix` to pass `repoCppHeaderPkgsFor` into `cppLib` and `cppSharedLib` inputs so headers are available during lib compilation.
+- Update `build-tools/tools/nix/planner/cpp.nix` to pass `repoCppHeaderPkgsFor` into `cppLib` and `cppSharedLib` inputs so headers are available during lib compilation.
 - Add a C++ test where a library includes a header from a header only target via `header_deps`.
 
 ### Tests (in this PR)
 
 I add zx tests (one test per file):
 
-- `tools/tests/cpp/cpp.lib.header-deps.uses-cpp-headers.compiles.test.ts`
+- `build-tools/tools/tests/cpp/cpp.lib.header-deps.uses-cpp-headers.compiles.test.ts`
   - define a `nix_cpp_library` that includes a header from `nix_cpp_headers`
   - build via the planner and assert compilation succeeds
 
@@ -134,7 +134,7 @@ This PR makes the following changes:
 
 I add zx tests (one test per file):
 
-- `tools/tests/cpp/cpp.addon.links-shared-lib.via-link-deps.build-and-load.test.ts`
+- `build-tools/tools/tests/cpp/cpp.addon.links-shared-lib.via-link-deps.build-and-load.test.ts`
   - build a shared lib and a Node addon that links it via `link_deps`
   - load the addon and assert it returns the shared symbol result
 

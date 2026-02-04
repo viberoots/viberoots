@@ -153,10 +153,10 @@ This PR makes exporter and provider sync share one source of truth for:
 
 ### Scope & Changes
 
-- Add a shared helper in `tools/lib/importers.ts` (or `tools/lib/lockfiles.ts`):
+- Add a shared helper in `build-tools/tools/lib/importers.ts` (or `build-tools/tools/lib/lockfiles.ts`):
   - `findNearestUvLockForPackage(pkgDir)` returning a repo-relative `uv.lock` path or null
   - keep it path-posix normalized and deterministic
-- Update `tools/buck/exporter/lang/python.ts`:
+- Update `build-tools/tools/buck/exporter/lang/python.ts`:
   - replace its local directory-walk logic with the shared helper
   - keep existing behavior for sparse checkouts and missing lockfiles (best-effort)
 - Ensure that the exporter’s attached lockfile labels remain in the canonical form `lockfile:<path>#<importer>`.
@@ -198,7 +198,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `tools/lib` and `tools/buck/exporter`. Should be safe in thin slices that include the exporter.
+- Touches `build-tools/tools/lib` and `build-tools/tools/buck/exporter`. Should be safe in thin slices that include the exporter.
 
 ---
 
@@ -209,8 +209,8 @@ Implement.
 We normalize nixpkgs attrs in three places:
 
 - Starlark labeling (`//lang:nixpkg_labels.bzl`)
-- TypeScript provider naming and label mapping (`tools/lib/provider-names.ts` and `tools/lib/labels.ts`)
-- Nix planner/template resolution (`tools/nix/lib/lang-helpers.nix` and C++ helpers)
+- TypeScript provider naming and label mapping (`build-tools/tools/lib/provider-names.ts` and `build-tools/tools/lib/labels.ts`)
+- Nix planner/template resolution (`build-tools/tools/nix/lib/lang-helpers.nix` and C++ helpers)
 
 This is mostly aligned, but it is easy to regress. Small differences (prefix handling, aliasing, lowercasing, historical `gtest` behavior) create “labels map to provider name that does not exist” failures.
 
@@ -225,7 +225,7 @@ This PR codifies a single shared contract and backs it with a parity test matrix
   - alias mapping and the `gtest` compatibility rule
 - Align implementations as needed so the contract matches:
   - `//lang:nixpkg_labels.bzl:normalize_nix_attr`
-  - `tools/lib/provider-names.ts:normalizeNixAttr`
+  - `build-tools/tools/lib/provider-names.ts:normalizeNixAttr`
   - Nix-side resolution helpers used by templates and planners
 - Add a parity test matrix:
   - same input strings produce the same normalized `pkgs.*` string across TS and Starlark
@@ -272,7 +272,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `//lang` and `tools/lib` plus tests. Avoids changes to large language templates.
+- Touches `//lang` and `build-tools/tools/lib` plus tests. Avoids changes to large language templates.
 
 ---
 

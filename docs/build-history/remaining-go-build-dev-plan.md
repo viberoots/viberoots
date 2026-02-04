@@ -7,7 +7,7 @@ This document enumerates the remaining work to finish the Go build wiring consis
 - Nix/`gomod2nix.toml` is authoritative for Go deps and build.
 - Buck2 orchestrates: graph export, glue, test execution, change impact.
 - No vendoring or copying of third-party sources into `third_party/go`.
-- Dev and CI use the same `tools/bin/gomod2nix` wrapper and flow.
+- Dev and CI use the same `build-tools/tools/bin/gomod2nix` wrapper and flow.
 - E2E runtime tests verify Nix-built artifacts, not Buck-only `go_library` resolution.
 
 ---
@@ -16,7 +16,7 @@ This document enumerates the remaining work to finish the Go build wiring consis
 
 Scope
 
-- Teach `tools/nix/graph-generator.nix` to emit a manifest and stable symlinks so tests can deterministically locate the CLI binary.
+- Teach `build-tools/tools/nix/graph-generator.nix` to emit a manifest and stable symlinks so tests can deterministically locate the CLI binary.
 - Prefer manifest-based discovery; keep `$out/bin` symlinks as a fallback.
 
 Implementation
@@ -26,7 +26,7 @@ Implementation
 - Continue to link all binaries under `$out/bin/`.
 - Add stable symlinks for each binary, e.g.:
   - `go-<sanitized_label>` and `<sanitized_label>` (replace `//`, `:`, `/`, spaces with `-`).
-- Update `tools/tests/scaffolding/go-cli.thirdparty-runtime.test.ts` to:
+- Update `build-tools/tools/tests/scaffolding/go-cli.thirdparty-runtime.test.ts` to:
   - Prefer reading `buck-go/manifest.json` to resolve the CLI path.
   - Fall back to `$out/bin` symlinks and finally a recursive scan.
 
@@ -45,7 +45,7 @@ Risks/Notes
 
 Scope
 
-- Make sub-package selection deterministic for both apps and libs in `tools/nix/lang-templates.nix` via `graph-generator.nix` inputs.
+- Make sub-package selection deterministic for both apps and libs in `build-tools/tools/nix/lang-templates.nix` via `graph-generator.nix` inputs.
 
 Implementation
 
@@ -74,7 +74,7 @@ Scope
 
 Implementation
 
-- Delete code paths in `tools/buck/sync-go-mods.ts` that copy from `GOMODCACHE` or emit third-party targets.
+- Delete code paths in `build-tools/tools/buck/sync-go-mods.ts` that copy from `GOMODCACHE` or emit third-party targets.
 - Ensure macros in `go/defs.bzl` don’t attempt to re-wire external imports via Buck deps; rely on Nix for third-party resolution.
 
 Acceptance Criteria
@@ -96,7 +96,7 @@ Scope
 
 Implementation
 
-- Continue to use `tools/bin/gomod2nix` wrapper in `tools/dev/install-deps.ts` and tests.
+- Continue to use `build-tools/tools/bin/gomod2nix` wrapper in `build-tools/tools/dev/install-deps.ts` and tests.
 - In tests, generate the lockfile from the CLI module (`apps/<app>`) and copy it to repo root for the planner.
 - Keep glue (`export-graph`, `sync-providers`, `gen-auto-map`) as zx scripts invoked by `install-deps`.
 
@@ -115,7 +115,7 @@ Scope
 
 Implementation
 
-- In `tools/tests/lib/test-helpers.ts`, best-effort suppression of non-critical errors when direnv is missing.
+- In `build-tools/tools/tests/lib/test-helpers.ts`, best-effort suppression of non-critical errors when direnv is missing.
 - Keep current policy: do not mutate PATH inside tests.
 
 Acceptance Criteria
@@ -171,7 +171,7 @@ Acceptance Criteria
 
 Scope
 
-- Add `tools/nix/mapping.nix` for custom rule aliases → `{ template, kind }` mapping if needed.
+- Add `build-tools/tools/nix/mapping.nix` for custom rule aliases → `{ template, kind }` mapping if needed.
 - Emit a small `buck-go/README` explaining outputs for local debugging.
 
 Acceptance Criteria

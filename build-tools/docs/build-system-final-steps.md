@@ -8,24 +8,24 @@ References:
 - Go template plan: `go-templates-dev-plan.md`
 - Remaining Go build plan: `remaining-go-build-dev-plan.md`
 - Key code:
-  - Exporter: `tools/buck/export-graph.ts`
-  - Provider sync (canonical): `tools/buck/sync-providers.ts`
-  - Auto-map: `tools/buck/gen-auto-map.ts`
-  - Prebuild guard: `tools/buck/prebuild-guard.ts`
-  - Patching: `tools/patch/patch-pkg.ts`, `tools/patch/patch-go.ts`
-  - Nix templates: `tools/nix/lang-templates.nix`
-  - Nix planner: `tools/nix/graph-generator.nix`
+  - Exporter: `build-tools/tools/buck/export-graph.ts`
+  - Provider sync (canonical): `build-tools/tools/buck/sync-providers.ts`
+  - Auto-map: `build-tools/tools/buck/gen-auto-map.ts`
+  - Prebuild guard: `build-tools/tools/buck/prebuild-guard.ts`
+  - Patching: `build-tools/tools/patch/patch-pkg.ts`, `build-tools/tools/patch/patch-go.ts`
+  - Nix templates: `build-tools/tools/nix/lang-templates.nix`
+  - Nix planner: `build-tools/tools/nix/graph-generator.nix`
   - Buck macros: `go/defs.bzl`
 
 ---
 
 ### PR 1 — Refactor exporter into modules (≤250 lines per file)
 
-Goal: Improve separation of concerns and file-size compliance for `tools/buck/export-graph.ts` while retaining behavior and cache semantics.
+Goal: Improve separation of concerns and file-size compliance for `build-tools/tools/buck/export-graph.ts` while retaining behavior and cache semantics.
 
 Design:
 
-- Split into modules under `tools/buck/exporter/`:
+- Split into modules under `build-tools/tools/buck/exporter/`:
   - `types.ts`: shared types (`Node`, `Tuple`, `GoPkg`, `Metrics`)
   - `env.ts`: parse labels/GOFLAGS → `Tuple`, toolchain hash
   - `batch.ts`: group nodes by `(tuple, moduleRoot)`, compute roots and cwd
@@ -38,26 +38,26 @@ Design:
 
 Acceptance criteria:
 
-- Files under `tools/buck/exporter/*` each ≤250 lines.
-- `node tools/buck/export-graph.ts` produces identical `tools/buck/graph.json` (content hash) on the same repo state as before.
+- Files under `build-tools/tools/buck/exporter/*` each ≤250 lines.
+- `node build-tools/tools/buck/export-graph.ts` produces identical `build-tools/tools/buck/graph.json` (content hash) on the same repo state as before.
 - All existing tests that consume `graph.json` continue to pass.
 - Coverage remains stable; no new side effects introduced.
 
 Notes:
 
-- Keep top-level `tools/buck/export-graph.ts` as a thin wrapper delegating to `./exporter/main.ts`.
+- Keep top-level `build-tools/tools/buck/export-graph.ts` as a thin wrapper delegating to `./exporter/main.ts`.
 - See design: “Exporter (authoritative, batched `go list`)” in `build-tools/docs/build-system-design.md`.
 
 Detailed design (PR 1):
 
 - Directory and files
-  - `tools/buck/exporter/types.ts`
-  - `tools/buck/exporter/env.ts`
-  - `tools/buck/exporter/batch.ts`
-  - `tools/buck/exporter/golist.ts`
-  - `tools/buck/exporter/labeler.ts`
-  - `tools/buck/exporter/io.ts`
-  - `tools/buck/exporter/main.ts`
+  - `build-tools/tools/buck/exporter/types.ts`
+  - `build-tools/tools/buck/exporter/env.ts`
+  - `build-tools/tools/buck/exporter/batch.ts`
+  - `build-tools/tools/buck/exporter/golist.ts`
+  - `build-tools/tools/buck/exporter/labeler.ts`
+  - `build-tools/tools/buck/exporter/io.ts`
+  - `build-tools/tools/buck/exporter/main.ts`
 
 - Public interfaces
   - `types.ts`
@@ -108,17 +108,17 @@ Detailed design (PR 1):
   - `--scope` accepts label filters like `label:go`.
 
 - Tests to add (zx/node:test)
-  - `tools/tests/exporter/exporter.golden-equivalence.test.ts`
+  - `build-tools/tools/tests/exporter/exporter.golden-equivalence.test.ts`
     - Use `--simulate` with a fixed nodes JSON; assert output equals saved golden JSON (stable sort and labels).
-  - `tools/tests/exporter/exporter.test-only-labeling.test.ts`
+  - `build-tools/tools/tests/exporter/exporter.test-only-labeling.test.ts`
     - Simulate a test target that pulls in a test-only dep; assert only the test target gets the module label.
-  - `tools/tests/exporter/exporter.cache-keys.test.ts`
+  - `build-tools/tools/tests/exporter/exporter.cache-keys.test.ts`
     - Verify cache hit/miss behavior for identical tuples and roots; assert `cacheHits` increments and content is identical.
-  - `tools/tests/exporter/exporter.toolchain-hash.test.ts`
+  - `build-tools/tools/tests/exporter/exporter.toolchain-hash.test.ts`
     - Stub `go env`/`go version` via environment or simulate; assert `Tuple.toolchain` formatting and inclusion in tuple keys list.
 
 - Migration plan
-  - Keep `tools/buck/export-graph.ts` with a small body: import and call `./exporter/main.ts`.
+  - Keep `build-tools/tools/buck/export-graph.ts` with a small body: import and call `./exporter/main.ts`.
   - Move existing helpers into modules without changing internal logic; adopt intent-revealing names.
   - Update imports to use `../lib/fs-helpers` for write-if-changed.
 
@@ -131,8 +131,8 @@ Detailed design (PR 1):
   - Ensure JSON parsing remains streaming-based (`parseGoListStream`).
 
 - Acceptance verification (in addition to global acceptance above)
-  - Re-run the existing provider-wiring tests (e.g., `tools/tests/e2e-provider-wiring.ts`) to ensure labels still map to the same providers.
-  - Compare `tools/buck/export-graph.ts --metrics-out` output fields before/after refactor.
+  - Re-run the existing provider-wiring tests (e.g., `build-tools/tools/tests/e2e-provider-wiring.ts`) to ensure labels still map to the same providers.
+  - Compare `build-tools/tools/buck/export-graph.ts --metrics-out` output fields before/after refactor.
 
 ---
 
@@ -143,14 +143,14 @@ Goal: Make the exporter minimal and deterministic by removing implicit `.buckcon
 Design:
 
 - Remove `ensurePreludeBuckConfig()` from exporter.
-- Add or reuse `tools/dev/startup-check.ts` to validate Buck prelude/cells and emit guidance (do not rewrite repo files in exporter).
+- Add or reuse `build-tools/tools/dev/startup-check.ts` to validate Buck prelude/cells and emit guidance (do not rewrite repo files in exporter).
 - Dev shell (`flake.nix` shellHook) continues to best-effort align `.buckconfig`. Exporter only reads Buck graph and fails fast with a clear error when Buck cannot be queried.
 
 Acceptance criteria:
 
 - Exporter does not write or symlink configuration files.
 - Running exporter with a misconfigured Buck setup fails with an actionable error message.
-- `tools/buck/prebuild-guard.ts` can still auto-fix glue locally by calling the ZX scripts; no behavioral regression.
+- `build-tools/tools/buck/prebuild-guard.ts` can still auto-fix glue locally by calling the ZX scripts; no behavioral regression.
 
 Notes:
 
@@ -164,17 +164,17 @@ Goal: Improve maintainability and meet file-size guidelines without changing out
 
 Design:
 
-- Move complex shellHook content and node/pnpm derivations into `tools/nix/*.nix` modules:
-  - `tools/nix/devshell.nix` (shellHook and PATH setup)
-  - `tools/nix/node-modules.nix` (pnpm-store and node-modules derivations)
-  - `tools/nix/buck-prelude.nix` (buck2-prelude package)
+- Move complex shellHook content and node/pnpm derivations into `build-tools/tools/nix/*.nix` modules:
+  - `build-tools/tools/nix/devshell.nix` (shellHook and PATH setup)
+  - `build-tools/tools/nix/node-modules.nix` (pnpm-store and node-modules derivations)
+  - `build-tools/tools/nix/buck-prelude.nix` (buck2-prelude package)
 - `flake.nix` imports these modules and exposes the same `devShells`, `packages`, and `checks`.
 
 Acceptance criteria:
 
 - `flake.nix` ≤250 lines.
 - `nix build .#graph-generator` and `nix develop` behavior unchanged.
-- `tools/dev/install-deps.ts` continues to work end-to-end.
+- `build-tools/tools/dev/install-deps.ts` continues to work end-to-end.
 
 Notes:
 
@@ -188,9 +188,9 @@ Goal: Eliminate drift and reinforce the Nix+gomod2nix source of truth.
 
 Design:
 
-- Delete `tools/buck/vendor-go-mods.ts` and any README/doc links that suggest vendoring.
-- Confirm `tools/buck/sync-go-mods.ts` remains deprecated/no-op and remove any callers.
-- Audit docs to ensure they steer users to `tools/dev/install-deps.ts` and patching UX only.
+- Delete `build-tools/tools/buck/vendor-go-mods.ts` and any README/doc links that suggest vendoring.
+- Confirm `build-tools/tools/buck/sync-go-mods.ts` remains deprecated/no-op and remove any callers.
+- Audit docs to ensure they steer users to `build-tools/tools/dev/install-deps.ts` and patching UX only.
 
 Acceptance criteria:
 
@@ -209,12 +209,12 @@ Goal: Guarantee flat `patches/go` structure and single patch per `module@version
 
 Design:
 
-- Add a CI step to run `node tools/buck/sync-providers.ts --strict`.
+- Add a CI step to run `node build-tools/tools/buck/sync-providers.ts --strict`.
 - Keep non-strict mode for local convenience, but CI must fail on:
   - Subdirectories under `patches/go`.
   - Non-`.patch` files present.
   - Duplicate patches for the same `module@version`.
-- Ensure `tools/dev/patches-lint.ts` still runs in `install-deps` (advisory/non-blocking locally).
+- Ensure `build-tools/tools/dev/patches-lint.ts` still runs in `install-deps` (advisory/non-blocking locally).
 
 Acceptance criteria:
 
@@ -255,7 +255,7 @@ Goal: Improve observability without changing behavior.
 
 Design:
 
-- Keep current auto-fix and CI fail-fast semantics in `tools/buck/prebuild-guard.ts`.
+- Keep current auto-fix and CI fail-fast semantics in `build-tools/tools/buck/prebuild-guard.ts`.
 - Add optional verbose lists (top N newest inputs/oldest outputs) gated by `PREBUILD_GUARD_VERBOSE=1` (already present), document usage.
 
 Acceptance criteria:
@@ -282,10 +282,10 @@ Recommended order: PR 4 (safe cleanup) → PR 2 (exporter no side-effects) → P
 ## Verification
 
 - Run focused tests first, then full suite:
-  - Focused: exporter batching/unit tests; provider wiring (`tools/tests/e2e-provider-wiring.ts`).
+  - Focused: exporter batching/unit tests; provider wiring (`build-tools/tools/tests/e2e-provider-wiring.ts`).
   - Full: `buck2 test //...` with coverage as configured.
 - Validate Nix outputs: `nix build .#graph-generator` and confirm manifest/symlinks are present.
-- Validate glue regeneration paths: `node tools/buck/export-graph.ts`, `node tools/buck/sync-providers.ts --strict`, `node tools/buck/gen-auto-map.ts`.
+- Validate glue regeneration paths: `node build-tools/tools/buck/export-graph.ts`, `node build-tools/tools/buck/sync-providers.ts --strict`, `node build-tools/tools/buck/gen-auto-map.ts`.
 
 ## Done state
 

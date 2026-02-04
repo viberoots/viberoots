@@ -26,7 +26,7 @@ I follow the repo-wide linking model described in `cpp-linking.md`, `build-tools
 - `deps` is the Buck graph edge list. It does not imply link intent.
 - `link_deps` declares linkable inputs. `header_deps` is include-only when that concept applies.
 - Macros compute `deps := deps ∪ link_deps ∪ header_deps` deterministically and validate `link_closure_overrides` keys.
-- `link_closure` defaults to `"direct"`. `"transitive"` follows `link_deps` only via `tools/nix/planner/link-closure.nix`.
+- `link_closure` defaults to `"direct"`. `"transitive"` follows `link_deps` only via `build-tools/tools/nix/planner/link-closure.nix`.
 - Ordering is deterministic and unsupported deps fail fast with targeted errors.
 
 ## C interop requirement
@@ -40,7 +40,7 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
 - Provider wiring: load `MODULE_PROVIDERS` from `//lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
 - Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
-- Patch model contract: `lang/lang_contracts.bzl` and `tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
+- Patch model contract: `lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
 
 ---
@@ -50,8 +50,8 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 The flow mirrors Go and Node patterns:
 
 1. Buck2 targets for Kotlin/Java are labeled and wrapped by thin macros in `//jvm/defs.bzl`.
-2. `tools/buck/export-graph.ts` exports a configured graph with labels.
-3. `graph-generator.nix` routes JVM nodes to `tools/nix/templates/jvm.nix`.
+2. `build-tools/tools/buck/export-graph.ts` exports a configured graph with labels.
+3. `graph-generator.nix` routes JVM nodes to `build-tools/tools/nix/templates/jvm.nix`.
 4. Nix derivations build JARs with a dependency classpath from a lockfile.
 5. Patching is key‑ed by Maven coordinates and applied via providers derived from `patches/jvm/*.patch`.
 6. `gen-auto-map.ts` maps target labels to provider deps, limiting invalidation to impacted targets.
@@ -61,16 +61,16 @@ The flow mirrors Go and Node patterns:
 ## Path Invariants
 
 - Patches: `patches/jvm/*.patch` (flat; one patch per key). No subdirectories.
-- Templates: `tools/nix/templates/jvm.nix` (consumed by `tools/nix/lang-templates.nix`).
+- Templates: `build-tools/tools/nix/templates/jvm.nix` (consumed by `build-tools/tools/nix/lang-templates.nix`).
 - Planner: dispatch entry in `graph-generator.nix` (language registry) for JVM.
 - Macros: `jvm/defs.bzl` using `lang/defs_common.bzl` helpers.
 - Providers:
   - Starlark: `//third_party/providers/defs_jvm.bzl` with `jvm_artifact_patch(...)`.
   - Generated: `third_party/providers/TARGETS.jvm.auto` (deterministic; not hand‑edited).
 - Glue scripts (zx/TypeScript):
-  - `tools/buck/sync-providers-jvm.ts` (scan patches/jvm → write TARGETS.jvm.auto)
-  - `tools/buck/gen-auto-map.ts` (already supports lockfile labels; extended as needed)
-  - `tools/dev/install-deps.ts` integration to (re)generate `tools/nix/jvm-deps.nix` from a lockfile
+  - `build-tools/tools/buck/sync-providers-jvm.ts` (scan patches/jvm → write TARGETS.jvm.auto)
+  - `build-tools/tools/buck/gen-auto-map.ts` (already supports lockfile labels; extended as needed)
+  - `build-tools/tools/dev/install-deps.ts` integration to (re)generate `build-tools/tools/nix/jvm-deps.nix` from a lockfile
 
 ---
 
@@ -115,7 +115,7 @@ Add a zx script that mirrors Go’s provider sync:
 
 ```ts
 #!/usr/bin/env zx-wrapper
-// tools/buck/sync-providers-jvm.ts
+// build-tools/tools/buck/sync-providers-jvm.ts
 import fs from "fs-extra";
 import crypto from "node:crypto";
 import { providerNameForImporter, shortHash } from "../lib/providers";
@@ -251,7 +251,7 @@ Label stamping for lockfiles is done by the caller using the macro’s `labels` 
 
 ---
 
-## Nix Language Templates (`tools/nix/templates/jvm.nix`)
+## Nix Language Templates (`build-tools/tools/nix/templates/jvm.nix`)
 
 The template exposes two functions analogous to Go’s `goApp`/`goLib`:
 
@@ -287,7 +287,7 @@ in {
       devOverrides = let v = builtins.getEnv devOverrideEnv; in if v == "" then {} else builtins.fromJSON v;
       _ = if (builtins.getEnv "CI") == "true" && (builtins.getEnv devOverrideEnv) != "" then
             builtins.throw "Dev overrides are forbidden in CI" else null;
-      deps = import ../../tools/nix/jvm-deps.nix { inherit pkgs lib; lockfilePath = lockfile; importerId = importer; };
+      deps = import ../../build-tools/tools/nix/jvm-deps.nix { inherit pkgs lib; lockfilePath = lockfile; importerId = importer; };
     in pkgs.stdenv.mkDerivation {
       pname = "jvm-${name}";
       version = "0.1.0";
@@ -319,7 +319,7 @@ in {
       devOverrides = let v = builtins.getEnv devOverrideEnv; in if v == "" then {} else builtins.fromJSON v;
       _ = if (builtins.getEnv "CI") == "true" && (builtins.getEnv devOverrideEnv) != "" then
             builtins.throw "Dev overrides are forbidden in CI" else null;
-      deps = import ../../tools/nix/jvm-deps.nix { inherit pkgs lib; lockfilePath = lockfile; importerId = importer; };
+      deps = import ../../build-tools/tools/nix/jvm-deps.nix { inherit pkgs lib; lockfilePath = lockfile; importerId = importer; };
     in pkgs.stdenv.mkDerivation {
       pname = "jvmlib-${name}";
       version = "0.1.0";
@@ -347,7 +347,7 @@ in {
 Notes:
 
 - The above is intentionally simple; real builds will refine source roots, output shapes, and Jar assembly logic.
-- `tools/nix/jvm-deps.nix` is a generated file that yields a single `classpath` string for the importer, constructed from fixed‑output fetches of Maven artifacts via Coursier metadata.
+- `build-tools/tools/nix/jvm-deps.nix` is a generated file that yields a single `classpath` string for the importer, constructed from fixed‑output fetches of Maven artifacts via Coursier metadata.
 - Dev overrides (`NIX_JVM_DEV_OVERRIDE_JSON`) will later enable replacing an artifact with a local path for iteration before patching.
 
 ---
@@ -369,10 +369,10 @@ This is a later‑phase enhancement and does not block the baseline JVM integrat
 
 Hermetic classpaths come from a per‑importer lockfile (`jvm.lock`) checked into each `apps/*` or `libs/*` project.
 
-- Lockfile generator (zx): `tools/dev/jvm/generate-lock.ts`
+- Lockfile generator (zx): `build-tools/tools/dev/jvm/generate-lock.ts`
   - Inputs: `build.gradle(.kts)` or `pom.xml`, or an explicit `deps.txt` of Maven coordinates.
-  - Implementation: shell out to `cs resolve`/`cs fetch --json` (Coursier) to get the transitive dependency set with URLs and checksums; generate a Nix file `tools/nix/jvm-deps.nix` that resolves artifacts as fixed‑output derivations and constructs the classpath at eval time.
-  - Integration: invoked from `tools/dev/install-deps.ts` when JVM projects are detected.
+  - Implementation: shell out to `cs resolve`/`cs fetch --json` (Coursier) to get the transitive dependency set with URLs and checksums; generate a Nix file `build-tools/tools/nix/jvm-deps.nix` that resolves artifacts as fixed‑output derivations and constructs the classpath at eval time.
+  - Integration: invoked from `build-tools/tools/dev/install-deps.ts` when JVM projects are detected.
 
 Lockfile label wiring:
 
@@ -383,7 +383,7 @@ Lockfile label wiring:
 
 ## `patch-pkg` Integration (JVM)
 
-Add a new handler `tools/patch/patch-jvm.ts` implementing the shared `LanguageHandler` interface with subcommands `start/reset/apply/session`:
+Add a new handler `build-tools/tools/patch/patch-jvm.ts` implementing the shared `LanguageHandler` interface with subcommands `start/reset/apply/session`:
 
 - `start <mvn:group/artifact@ver>`
   - Locate and fetch the corresponding source jar via Coursier (from Nix‑provided metadata), copy to a temp writable dir (APFS CoW on macOS; `cp -a` elsewhere).
@@ -392,7 +392,7 @@ Add a new handler `tools/patch/patch-jvm.ts` implementing the shared `LanguageHa
 
 - `apply <mvn:...>`
   - Create unified diff `patches/jvm/<encoded>.patch` using the canonical encoding.
-  - Run glue: `node tools/buck/sync-providers-jvm.ts` then `node tools/buck/gen-auto-map.ts`.
+  - Run glue: `node build-tools/tools/buck/sync-providers-jvm.ts` then `node build-tools/tools/buck/gen-auto-map.ts`.
   - Clear the dev override and delete the temp dir.
 
 - `reset <mvn:...>`
@@ -407,7 +407,7 @@ Dev override env var: `NIX_JVM_DEV_OVERRIDE_JSON` maps artifact keys to local so
 
 ## Exporter Adapter (Phase 2)
 
-Extend `tools/buck/export-graph.ts` (or language‑specific adapter module) to:
+Extend `build-tools/tools/buck/export-graph.ts` (or language‑specific adapter module) to:
 
 - Detect JVM targets (via `lang:jvm` label stamped by macros or via `rule_type` predicate) and attach `lockfile:<path>#<importer>` labels deterministically.
 - Optional: when artifact metadata is available, attach `mvn:<group>/<artifact>@<version>` labels to targets that resolve those artifacts (enables per‑artifact provider mapping later).
@@ -422,7 +422,7 @@ Add a JVM entry in the dispatch registry akin to Go/Node:
 - `isTarget(n)`: rule*type starts with `java*`or label`lang:jvm` present.
 - `kindOf(n)`: `bin|lib|test` from labels or rule type.
 - `modulesFileFor(name)`: path to `jvm.lock` (relative to repo root).
-- `mkApp(name)`, `mkLib(name)`: call into `tools/nix/templates/jvm.nix` using the lockfile path and importer id.
+- `mkApp(name)`, `mkLib(name)`: call into `build-tools/tools/nix/templates/jvm.nix` using the lockfile path and importer id.
 
 The planner remains tiny: it passes only essentials (name, kind, lockfile path, importer id) to the template.
 
@@ -438,7 +438,7 @@ Add/extend Jenkins stages:
 4. Pre‑build guard: fail if glue files missing or stale
 5. Build & Test (Buck)
 
-`tools/buck/prebuild-guard.ts` should treat `patches/jvm/*.patch` presence as requiring at least one `TARGETS.jvm.auto` file.
+`build-tools/tools/buck/prebuild-guard.ts` should treat `patches/jvm/*.patch` presence as requiring at least one `TARGETS.jvm.auto` file.
 
 ---
 
@@ -446,17 +446,17 @@ Add/extend Jenkins stages:
 
 ### Phase 0 — Scaffolding & Glue
 
-- Create dirs/files: `patches/jvm/` (empty), `third_party/providers/defs_jvm.bzl`, `tools/buck/sync-providers-jvm.ts`.
+- Create dirs/files: `patches/jvm/` (empty), `third_party/providers/defs_jvm.bzl`, `build-tools/tools/buck/sync-providers-jvm.ts`.
 - Add minimal `//jvm/defs.bzl` stamping `lang:jvm` and appending providers.
-- Wire sync into `tools/buck/sync-providers.ts` orchestrator if present.
+- Wire sync into `build-tools/tools/buck/sync-providers.ts` orchestrator if present.
 - Acceptance:
   - Sync runs idempotently with empty patch set (produces deterministic `TARGETS.jvm.auto`).
   - Macros compile (no behavior change yet).
 
 ### Phase 1 — Lockfile & Classpath
 
-- Add `tools/dev/jvm/generate-lock.ts` to produce `jvm.lock` and `tools/nix/jvm-deps.nix` via Coursier.
-- Integrate with `tools/dev/install-deps.ts` so `jvm-deps.nix` regenerates when inputs change.
+- Add `build-tools/tools/dev/jvm/generate-lock.ts` to produce `jvm.lock` and `build-tools/tools/nix/jvm-deps.nix` via Coursier.
+- Integrate with `build-tools/tools/dev/install-deps.ts` so `jvm-deps.nix` regenerates when inputs change.
 - Acceptance:
   - For a sample JVM project, `jvm-deps.nix` provides a stable classpath derivation.
 
@@ -469,14 +469,14 @@ Add/extend Jenkins stages:
 
 ### Phase 3 — Nix Templates
 
-- Implement `tools/nix/templates/jvm.nix` with `jvmApp`/`jvmLib` as above (simple compile path).
+- Implement `build-tools/tools/nix/templates/jvm.nix` with `jvmApp`/`jvmLib` as above (simple compile path).
 - Planner dispatch routes `lang:jvm` nodes to these templates.
 - Acceptance:
   - A small Kotlin/Java lib and bin build successfully with the computed classpath.
 
 ### Phase 4 — Patching Flow
 
-- Implement `tools/patch/patch-jvm.ts` with start/apply/reset/session.
+- Implement `build-tools/tools/patch/patch-jvm.ts` with start/apply/reset/session.
 - Apply a dummy patch to a dependency that the sample project uses; verify provider sync and invalidation path.
 - Acceptance:
   - Only targets that depend on the importer’s lockfile rebuild when a relevant patch changes.
@@ -491,7 +491,7 @@ Add/extend Jenkins stages:
 
 ## Testing Strategy
 
-- Add zx tests under `tools/tests/…`:
+- Add zx tests under `build-tools/tools/tests/…`:
   - Provider sync determinism: idempotent output from identical `patches/jvm`.
   - Auto‑map wiring: targets with `lockfile:` labels have the expected provider deps.
   - e2e wiring (template from `build-tools/docs/build-system-design.md`): modifying unrelated patch does not affect rule key; related patch does.
@@ -544,7 +544,7 @@ Add/extend Jenkins stages:
 
 - `patches/jvm/` recognized; `TARGETS.jvm.auto` generated deterministically.
 - `jvm/defs.bzl` macros usable; targets stamped with `lang:jvm` and `lockfile:` labels.
-- `tools/nix/jvm-deps.nix` produced from `jvm.lock`; simple Kotlin/Java lib/bin builds via Nix templates on all target platforms.
+- `build-tools/tools/nix/jvm-deps.nix` produced from `jvm.lock`; simple Kotlin/Java lib/bin builds via Nix templates on all target platforms.
 - `gen-auto-map.ts` includes JVM providers for labeled targets; impacted targets rebuild when relevant patches change.
 
 ---

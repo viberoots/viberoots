@@ -2,7 +2,7 @@
 
 > **Audience:** Engineers (and future LLM agents) who will be responsible for implementing this design.  
 > **Scope today:** The repo is multi-language (Go, C++, Node PNPM, Python uv). This document remains **language-agnostic** at the contract level so additional languages can be added without redesign. For the canonical cross-language contract inventory, see `abstractions.md`.
-> **Script policy:** All **substantive automation** MUST be TypeScript zx scripts using our custom hashbang `#!/usr/bin/env zx-wrapper`. Small `tools/bin/*` wrappers may exist as thin `bash` shims that only delegate into TypeScript (for example to ensure commands run inside the dev shell via `direnv exec`). Do not add new `bash/sh` scripts with substantive logic.
+> **Script policy:** All **substantive automation** MUST be TypeScript zx scripts using our custom hashbang `#!/usr/bin/env zx-wrapper`. Small `build-tools/tools/bin/*` wrappers may exist as thin `bash` shims that only delegate into TypeScript (for example to ensure commands run inside the dev shell via `direnv exec`). Do not add new `bash/sh` scripts with substantive logic.
 
 ---
 
@@ -24,7 +24,7 @@
 8. [Developer Workflow (Mermaid + Commands)](#developer-workflow)
 9. [CI with Jenkins (Matrix across 3 Architectures)](#ci-with-jenkins)
 10. [Scaffolding Requirements](#scaffolding-requirements)
-11. [gomod2nix Integration (called from `tools/install-deps.ts`)](#gomod2nix-integration-called-from-toolsinstall-depsts)
+11. [gomod2nix Integration (called from `build-tools/tools/install-deps.ts`)](#gomod2nix-integration-called-from-toolsinstall-depsts)
 12. [Future-Proofing for Other Languages](#future-proofing-for-other-languages)
 13. [Appendix: Reference Snippets](#appendix-reference-snippets)
 
@@ -69,7 +69,7 @@ Canonical shared Starlark helpers for this contract live under `//lang` and are 
 - `merge_link_intent_deps(deps, link_deps, header_deps)`
 - `validate_link_closure_overrides(link_deps, link_closure_overrides)`
 
-The Buck graph exporter must include these intent fields in `tools/buck/graph.json` so planners can consume them without rule-type-specific fallbacks:
+The Buck graph exporter must include these intent fields in `build-tools/tools/buck/graph.json` so planners can consume them without rule-type-specific fallbacks:
 
 - `link_deps`
 - `header_deps`
@@ -91,55 +91,55 @@ extra-experimental-features = nix-command flakes dynamic-derivations ca-derivati
 ### Path Invariants (must-follow)
 
 1. All non-Nix patch artifacts live under language-specific patch directories. For Go and C++, patches are typically stored in a package-local directory (e.g., `<pkg>/patches/go` or `<pkg>/patches/cpp`) and included in that target’s `srcs` so Buck invalidates precisely. For Node, patches are importer‑local (e.g., `<importer>/patches/node`).
-1. **Planner vs exporter homes.** Planner code & language templates live under `tools/nix/...`. Buck graph export tools live under `tools/buck/...`.
-1. **Single outer CLI.** The only user-facing patching entrypoint is `patch-pkg`. Language-specific implementations live under `tools/patch/<lang>/` and are invoked _only_ by `patch-pkg`.
+1. **Planner vs exporter homes.** Planner code & language templates live under `build-tools/tools/nix/...`. Buck graph export tools live under `build-tools/tools/buck/...`.
+1. **Single outer CLI.** The only user-facing patching entrypoint is `patch-pkg`. Language-specific implementations live under `build-tools/tools/patch/<lang>/` and are invoked _only_ by `patch-pkg`.
 1. You may also use a repo‑level `patches/<lang>/` directory for shared or global patches, but Go/C++ builds source invalidation from package‑local patch files and do not require per‑module provider mapping.
 1. **At most one patch per `module@version`** (enforced by naming convention like `<importPath encoded>@<version>.patch`); duplicates are forbidden.
 1. **All automation scripts** are zx TypeScript files with `#!/usr/bin/env zx-wrapper`. The zx-wrapper is **already provided**; it enables TypeScript, `$` shelling, and common imports by default—**do not** re-implement or re-import zx in each script.
 1. **Flake Integration:** You are working in a repo that already has a `flake.nix`. **Merge** new outputs/attrs with the existing flake **unless** responsibilities overlap; if they do, **this design takes precedence**.
 1. **Naming:** Use **`graph-generator.nix`** for the outer dynamic-derivation planner entrypoint.
-1. **Optional `tools/nix/mapping.nix`:** A small, **explicit dispatch table** for mapping **custom Buck rule types** to planner templates. Think of it as a **name-to-template router**. Keep it tiny and example-driven.
+1. **Optional `build-tools/tools/nix/mapping.nix`:** A small, **explicit dispatch table** for mapping **custom Buck rule types** to planner templates. Think of it as a **name-to-template router**. Keep it tiny and example-driven.
 1. **Examples everywhere.** Prefer short, runnable examples over abstract prose.
-1. **Dev overrides:** Always print a **warning** when dev package overrides are in effect. In CI (environment flags), builds **must fail** if dev overrides are present. **Setting `NIX_GO_DEV_OVERRIDE_JSON` changes derivation hashes; unset it before sharing cache artifacts. Never allowed in CI.** Additionally, the outer planner logs a neutral one‑liner to `build.log` when dev overrides are present locally (**Go, C++, and Python**); set `PLANNER_NO_DEV_OVERRIDE_LOG=1` to suppress this diagnostic. Clear all overrides with `node tools/dev/clear-overrides.ts`. Planner override environments are defined centrally in `tools/nix/planner/overrides.nix` (PR‑5); the planner imports this mapping to detect overrides and emit the neutral local notice generically (suppressed in CI).
+1. **Dev overrides:** Always print a **warning** when dev package overrides are in effect. In CI (environment flags), builds **must fail** if dev overrides are present. **Setting `NIX_GO_DEV_OVERRIDE_JSON` changes derivation hashes; unset it before sharing cache artifacts. Never allowed in CI.** Additionally, the outer planner logs a neutral one‑liner to `build.log` when dev overrides are present locally (**Go, C++, and Python**); set `PLANNER_NO_DEV_OVERRIDE_LOG=1` to suppress this diagnostic. Clear all overrides with `node build-tools/tools/dev/clear-overrides.ts`. Planner override environments are defined centrally in `build-tools/tools/nix/planner/overrides.nix` (PR‑5); the planner imports this mapping to detect overrides and emit the neutral local notice generically (suppressed in CI).
 1. **Patching UX:** One **outer** command: `patch-pkg <subcommand> <language> …` that **delegates** to language-specific scripts (e.g., `patch-go.ts`).
    - Echo snippet mode: pass `--echo-snippet` or set the global `PATCH_ECHO_SNIPPET=1|true` to print a standardized export snippet (stderr) instead of mutating process-local env. The message format is unified across languages and includes the reminder: “Unset before CI: unset <ENV_NAME>”.
 1. **Idempotent patches:** Re-applying the **same** patch must **not** cause rebuilds.
-1. **Sanitization (names/attrs):** All Starlark macros should use `//lang:sanitize.bzl:sanitize_name` for artifact and attribute names. The Nix side mirrors this transform in `tools/nix/lib/lang-helpers.nix:sanitizeName`. TypeScript tooling must not hand-roll this contract; use `tools/lib/sanitize.ts:sanitizeName` so callsites stay drift-free.
-   - **Nix “target label → attr suffix” mapping**: the canonical contract lives in `tools/lib/labels.ts:sanitizeAttrNameFromLabel` and `//lang:nix_attr.bzl:sanitize_nix_attr_from_target_label`. If this mapping changes, update both and keep `tools/tests/labels/nix-attr-sanitize.parity.test.ts` passing.
+1. **Sanitization (names/attrs):** All Starlark macros should use `//lang:sanitize.bzl:sanitize_name` for artifact and attribute names. The Nix side mirrors this transform in `build-tools/tools/nix/lib/lang-helpers.nix:sanitizeName`. TypeScript tooling must not hand-roll this contract; use `build-tools/tools/lib/sanitize.ts:sanitizeName` so callsites stay drift-free.
+   - **Nix “target label → attr suffix” mapping**: the canonical contract lives in `build-tools/tools/lib/labels.ts:sanitizeAttrNameFromLabel` and `//lang:nix_attr.bzl:sanitize_nix_attr_from_target_label`. If this mapping changes, update both and keep `build-tools/tools/tests/labels/nix-attr-sanitize.parity.test.ts` passing.
 1. **Global inputs policy (PR‑5):** Treat repository‑level global inputs (e.g., `flake.lock`) primarily at the builder/Nix level. Macros must not hardcode `//:flake.lock`. When a macro directly calls Nix, wire global inputs through `//lang:defs_common.bzl:wire_global_nix_inputs(...)` (implemented in `//lang:nix_calling_macros.bzl` and backed by `//lang:global_inputs.bzl:global_nix_inputs()`).
    - Node alignment (PR‑2): We stamp `global_nix_inputs()` only in Node macros that directly call Nix (`node_webapp`, `nix_node_cli_bin(bundle=True)`). Non‑Nix macros remain unstamped at the macro level.
-1. **Scaffolding:** When you add new target types, **update/augment** the existing scaffolding tools in `tools/` (don’t invent new scaffolding).
+1. **Scaffolding:** When you add new target types, **update/augment** the existing scaffolding tools in `build-tools/tools/` (don’t invent new scaffolding).
 1. **Platforms:** Everything must work on at least **aarch64-darwin**, **aarch64-linux**, and **x86_64-linux**.
 1. **Glue scripts run outside Nix.** Generators are plain Node tools; do not wrap them in `nix run`.
-1. **Planner languages vs. macro-only languages:** Go and C++ are “planner languages” (the Nix planner emits derivations for them via templates). Node is handled by Buck macros and importer‑scoped providers; it is built and tested through Nix shims. For CLI bundling, a narrowly scoped Node planner plugin (`tools/nix/planner/node.nix`) is used as a shim to invoke bundling without coupling the core planner to Node specifics. This does not change provider/auto_map flows or the Node importer‑scoped provider model. The Go planner is split into `tools/nix/planner/go.nix` for core Go and `tools/nix/planner/go-wasm.nix` for TinyGo Wasm handling.
-1. **Planner node inspection helpers:** I keep them in `tools/nix/planner/lib.nix`. `kindOf` is shared and configured per language (label priorities, rule‑type mapping, planner‑stub handling). Planners must not re‑implement `kindOf`; they pass a config into the shared helper instead.
+1. **Planner languages vs. macro-only languages:** Go and C++ are “planner languages” (the Nix planner emits derivations for them via templates). Node is handled by Buck macros and importer‑scoped providers; it is built and tested through Nix shims. For CLI bundling, a narrowly scoped Node planner plugin (`build-tools/tools/nix/planner/node.nix`) is used as a shim to invoke bundling without coupling the core planner to Node specifics. This does not change provider/auto_map flows or the Node importer‑scoped provider model. The Go planner is split into `build-tools/tools/nix/planner/go.nix` for core Go and `build-tools/tools/nix/planner/go-wasm.nix` for TinyGo Wasm handling.
+1. **Planner node inspection helpers:** I keep them in `build-tools/tools/nix/planner/lib.nix`. `kindOf` is shared and configured per language (label priorities, rule‑type mapping, planner‑stub handling). Planners must not re‑implement `kindOf`; they pass a config into the shared helper instead.
    I keep the Python planner and uv2nix adapter split into smaller files so each module stays under 250 lines and the responsibilities remain clear. The entrypoints remain stable and only delegate.
    Python planner relocation map:
-   - `tools/nix/planner/python.nix` stays the entrypoint
-   - `tools/nix/planner/python-core.nix` holds shared helpers, lockfile resolution, and kind detection
-   - `tools/nix/planner/python-cpp.nix` holds C++ dependency validation and patch input wiring
-   - `tools/nix/planner/python-pyext.nix` holds `pyext` construction and native overlay wiring
-   - `tools/nix/planner/python-wasm.nix` stays the wasm entrypoint
-   - `tools/nix/planner/python-wasm-app.nix` holds wasm app and wasm lib construction
-   - `tools/nix/planner/python-wasm-pyext.nix` holds `pyext_wasm` construction and backend helpers
+   - `build-tools/tools/nix/planner/python.nix` stays the entrypoint
+   - `build-tools/tools/nix/planner/python-core.nix` holds shared helpers, lockfile resolution, and kind detection
+   - `build-tools/tools/nix/planner/python-cpp.nix` holds C++ dependency validation and patch input wiring
+   - `build-tools/tools/nix/planner/python-pyext.nix` holds `pyext` construction and native overlay wiring
+   - `build-tools/tools/nix/planner/python-wasm.nix` stays the wasm entrypoint
+   - `build-tools/tools/nix/planner/python-wasm-app.nix` holds wasm app and wasm lib construction
+   - `build-tools/tools/nix/planner/python-wasm-pyext.nix` holds `pyext_wasm` construction and backend helpers
      Cleanup: once split, remove helper and `pyext` and wasm logic from the entrypoint so it only wires modules.
      uv2nix adapter relocation map:
-   - `tools/nix/uv2nix-adapter.nix` remains the wrapper
-   - `tools/nix/uv2nix-inputs.nix` normalizes args and resolves dev overrides and test resolve inputs
-   - `tools/nix/uv2nix-overlays.nix` validates overlays and prepares the overlay arguments
-   - `tools/nix/uv2nix-env.nix` builds the uv2nix environment and lockfile source wrapper
+   - `build-tools/tools/nix/uv2nix-adapter.nix` remains the wrapper
+   - `build-tools/tools/nix/uv2nix-inputs.nix` normalizes args and resolves dev overrides and test resolve inputs
+   - `build-tools/tools/nix/uv2nix-overlays.nix` validates overlays and prepares the overlay arguments
+   - `build-tools/tools/nix/uv2nix-env.nix` builds the uv2nix environment and lockfile source wrapper
      Cleanup: keep only wiring and validation in the wrapper, and move normalization logic to the helper modules.
    - Language-specific helper placement: `//lang:defs_common.bzl` is language‑agnostic. Go‑specific tuple label helpers (`normalize_build_tags`, `append_tuple_labels`) live in `//go/private:labels.bzl` and are loaded by Go macros.
    - Shared helper error text is argument‑agnostic for reuse across call‑sites. For example, `normalize_labels(...)` reports generic “labels must be a list of string labels”; macros should add parameter context at the call‑site if a named argument is relevant to users.
    - WASM stamps: use `//lang:defs_common.bzl:stamp_wasm_variant(kwargs, "<lang>", "<variant>")` to append `lang:<lang>`, `kind:wasm`, and `wasm:<variant>` uniformly across C++/Go/Python macros.
-   - Note: For discoverability only, `tools/nix/lang-templates.nix` exposes a `Node` symbol bag (forwarded from `tools/nix/templates/node.nix`). The planner’s Node plugin remains authoritative; no consumers rely on this symbol bag.
+   - Note: For discoverability only, `build-tools/tools/nix/lang-templates.nix` exposes a `Node` symbol bag (forwarded from `build-tools/tools/nix/templates/node.nix`). The planner’s Node plugin remains authoritative; no consumers rely on this symbol bag.
    - For a concrete Node→C++ addon scaffold and artifact flow, see `node-call-cpp.md`.
 
 - Node macros that call Nix must use the standardized helper surface in `//lang:nix_shell.bzl` for genrule-style command assembly (e.g., `node_webapp`, bundled `nix_node_cli_bin`).
-  - Use `nix_calling_genrule_bootstrap(...)` to standardize `WORKSPACE_ROOT`/`REPO_ROOT`/`FLK_ROOT` derivation and optional `tools/buck/workspace-root.env` sourcing (for temp repos and sandboxed actions).
+  - Use `nix_calling_genrule_bootstrap(...)` to standardize `WORKSPACE_ROOT`/`REPO_ROOT`/`FLK_ROOT` derivation and optional `build-tools/tools/buck/workspace-root.env` sourcing (for temp repos and sandboxed actions).
   - Use `nix_calling_genrule_nix_build_out_path_prefix(...)` (or `nix_build_out_path_cmd(...)`) for the canonical “nix build + capture out path” structure.
   - `nix_bootstrap_env_pnpm_store()` is Node-specific and opt-in (unified PNPM store setup / env exports).
-- For **importer-scoped, Nix-calling genrule-style** macros, use the shared wiring helper `//lang:defs_common.bzl:prepare_language_wiring(...)` with `wiring = "nix_calling_genrule"` to compose lockfile enforcement, label stamping, importer-local patch inputs, provider-edge realization into action inputs, standardized `tools/buck/workspace-root.env` injection for dict-shaped `srcs`, and `global_nix_inputs()` wiring without mutating call-site dicts.
+- For **importer-scoped, Nix-calling genrule-style** macros, use the shared wiring helper `//lang:defs_common.bzl:prepare_language_wiring(...)` with `wiring = "nix_calling_genrule"` to compose lockfile enforcement, label stamping, importer-local patch inputs, provider-edge realization into action inputs, standardized `build-tools/tools/buck/workspace-root.env` injection for dict-shaped `srcs`, and `global_nix_inputs()` wiring without mutating call-site dicts.
 
 - No out‑links: when assembling shell commands that invoke Nix, use `nix build --no-link --print-out-paths` and capture the last printed path (e.g., `outPath=$$($TIMEOUT nix build ... --no-link --print-out-paths | tail -n1)`). Do not use `--out-link` to avoid creating GC roots and stale symlinks. Macro callsites must assemble this through the canonical helper surface in `//lang:nix_shell.bzl` (`nix_cmd_prefix`, `nix_build_out_path_cmd`) rather than re-implementing it.
   - For Node macros, prefer the higher-level helpers (`nix_calling_genrule_bootstrap`, `nix_calling_genrule_nix_build_out_path_prefix`) so call sites don't partially apply the policy.
@@ -213,13 +213,13 @@ Note on C++ planner cohesion:
 let
   lib = pkgs.lib;
   # Language templates live in a separate module to keep planner small:
-  T = import ./tools/nix/lang-templates.nix { inherit pkgs; };
-  nodes = builtins.fromJSON (builtins.readFile ./tools/buck/graph.json);
+  T = import ./build-tools/tools/nix/lang-templates.nix { inherit pkgs; };
+  nodes = builtins.fromJSON (builtins.readFile ./build-tools/tools/buck/graph.json);
   get = attrs: k: attrs.${k} or null;
 
   # Dispatch: simple prefix + optional mapping.nix (see below)
-  M = if builtins.pathExists ./tools/nix/mapping.nix
-      then import ./tools/nix/mapping.nix
+  M = if builtins.pathExists ./build-tools/tools/nix/mapping.nix
+      then import ./build-tools/tools/nix/mapping.nix
       else {};
   D = M.dispatch or {};
 
@@ -259,9 +259,9 @@ in
 
 ### Planner Dispatch (Including Optional `mapping.nix`)
 
-**What `mapping.nix` is for:** some repos define **custom Buck rule names** (e.g., `go_service`, `my_go_lib`). The optional `tools/nix/mapping.nix` is a **small registry** that tells the planner which **template** to use and any **attribute name overrides**. Think of it as a **lookup table**—not a second build system.
+**What `mapping.nix` is for:** some repos define **custom Buck rule names** (e.g., `go_service`, `my_go_lib`). The optional `build-tools/tools/nix/mapping.nix` is a **small registry** that tells the planner which **template** to use and any **attribute name overrides**. Think of it as a **lookup table**—not a second build system.
 
-**Example `tools/nix/mapping.nix`:**
+**Example `build-tools/tools/nix/mapping.nix`:**
 
 ```nix
 # Optional registry: map custom rule types → template + kind
@@ -280,7 +280,7 @@ in
 
 ### Go Templates (`goApp` / `goLib`)
 
-Canonical patch map helpers live in `tools/nix/lib/lang-helpers.nix`. Templates must import these rather than re‑implementing scanners:
+Canonical patch map helpers live in `build-tools/tools/nix/lib/lang-helpers.nix`. Templates must import these rather than re‑implementing scanners:
 
 - `patchesMapFromDirsWith` — canonical helper; accepts patch dirs, optional version normalization, and store materialization (Python).
 - Wrappers: `patchesMapFromDir`, `patchesMapFromDirs`, `patchesMapFromDirToStore`, `patchesMapFromImporterDirToStore`.
@@ -290,7 +290,7 @@ For the canonical cross-language patch filename decoding contract (and the parit
 Keep language logic localized and easy to read. The Go templates consume the **patch maps** and **dev override** env:
 
 ```nix
-# tools/nix/lang-templates.nix  (Go excerpts)
+# build-tools/tools/nix/lang-templates.nix  (Go excerpts)
 { pkgs }:
 let
   lib = pkgs.lib;
@@ -369,11 +369,11 @@ We export the **configured** Buck graph as JSON with a short zx script. This scr
 #!/usr/bin/env zx-wrapper
 /**
  * export-graph.ts — minimal zx exporter
- * Writes a configured graph to tools/buck/graph.json (or path via --out)
+ * Writes a configured graph to build-tools/tools/buck/graph.json (or path via --out)
  */
 // We enumerate configured targets with a shallow deps() to avoid dumping the entire graph JSON.
 const query = "deps(//..., 1, exec_deps())";
-const out = (argv.out as string) || "tools/buck/graph.json";
+const out = (argv.out as string) || "build-tools/tools/buck/graph.json";
 
 const attrs = [
   "name",
@@ -402,13 +402,13 @@ console.log(`wrote ${out}`);
 
 Inline fallback (buck2 cquery):
 
-- For bootstrap and minimal temp workspaces, the inline exporter is encapsulated in `tools/buck/export-inline.ts`.
-- `tools/patch/glue.ts` calls this module from `ensureGraph()` when forced via `EXPORTER_FORCE_INLINE=1` or as the final fallback if the Node exporter and nix-run delegation are unavailable.
+- For bootstrap and minimal temp workspaces, the inline exporter is encapsulated in `build-tools/tools/buck/export-inline.ts`.
+- `build-tools/tools/patch/glue.ts` calls this module from `ensureGraph()` when forced via `EXPORTER_FORCE_INLINE=1` or as the final fallback if the Node exporter and nix-run delegation are unavailable.
 - The module preserves the existing behavior and wiring (roots, optional `--target`, isolation dir, and optional target platform flag).
 
-> Consumption note: downstream tools should not read `graph.json` directly. Use the Composite Graph API instead — library `tools/lib/graph-view.ts` or CLI `node tools/buck/graph-view.ts`. Glue emits the Node sidecar index at `tools/buck/node-lock-index.json` (via `tools/buck/gen-provider-index.ts`) and both files include `$schema` and `version` fields.
+> Consumption note: downstream tools should not read `graph.json` directly. Use the Composite Graph API instead — library `build-tools/tools/lib/graph-view.ts` or CLI `node build-tools/tools/buck/graph-view.ts`. Glue emits the Node sidecar index at `build-tools/tools/buck/node-lock-index.json` (via `build-tools/tools/buck/gen-provider-index.ts`) and both files include `$schema` and `version` fields.
 
-When one TypeScript tooling script needs to invoke another, do not hand-roll Node flags. Use the shared helper `tools/lib/node-run.ts:runNodeWithZx` so `zx-init` loading and Node flags stay consistent across callsites.
+When one TypeScript tooling script needs to invoke another, do not hand-roll Node flags. Use the shared helper `build-tools/tools/lib/node-run.ts:runNodeWithZx` so `zx-init` loading and Node flags stay consistent across callsites.
 
 ### Validation modes (warn vs error)
 
@@ -482,7 +482,7 @@ The outer CLI `patch-pkg` implements language/subcommand parsing and delegates t
 2. **Dynamic overrides** (patch map + JSON dev overrides)
 
 - **Patch map** (derived from filenames in `patches/go/*.patch`): maps `module@version` → list of patch file paths (under `patches/go/…`).
-  - `NIX_GO_DEV_OVERRIDE_JSON`: (ephemeral env var) maps `module@version` → absolute local path for dev override. This is handled uniformly via the canonical helper `tools/nix/lib/lang-helpers.nix` (`readDevOverrides` / `guardNoDevOverridesInCI`).
+  - `NIX_GO_DEV_OVERRIDE_JSON`: (ephemeral env var) maps `module@version` → absolute local path for dev override. This is handled uniformly via the canonical helper `build-tools/tools/nix/lib/lang-helpers.nix` (`readDevOverrides` / `guardNoDevOverridesInCI`).
 
 **Nix usage snippet:**
 
@@ -545,11 +545,11 @@ _(Adapted from the internal workflow document.)_ fileciteturn5file0
 
 ### Warnings & CI Fail-Safes
 
-- The templates (Nix) use the shared helper `tools/nix/lib/lang-helpers.nix` to **emit a warning** locally whenever dev overrides are set (e.g., `NIX_GO_DEV_OVERRIDE_JSON`, `NIX_CPP_DEV_OVERRIDE_JSON`).
+- The templates (Nix) use the shared helper `build-tools/tools/nix/lib/lang-helpers.nix` to **emit a warning** locally whenever dev overrides are set (e.g., `NIX_GO_DEV_OVERRIDE_JSON`, `NIX_CPP_DEV_OVERRIDE_JSON`).
 - In CI (e.g., `CI=true`), the shared helper **throws** to **fail the build** if dev overrides are detected.
 - The outer `patch-pkg` should also print explicit warnings when in session mode.
 
-> C++ parity: C++ templates honor `NIX_CPP_DEV_OVERRIDE_JSON` (see `tools/nix/templates/cpp-common.nix`). As with Go, you’ll see a local warning when set, and evaluation fails in CI.
+> C++ parity: C++ templates honor `NIX_CPP_DEV_OVERRIDE_JSON` (see `build-tools/tools/nix/templates/cpp-common.nix`). As with Go, you’ll see a local warning when set, and evaluation fails in CI.
 
 ### Provider index (optional, introspection)
 
@@ -558,13 +558,13 @@ For debugging and tooling, you can generate a cross‑language provider index ma
 - Generate during provider sync:
 
 ```
-node tools/buck/sync-providers.ts --emit-index
+node build-tools/tools/buck/sync-providers.ts --emit-index
 ```
 
 - Or generate directly:
 
 ```
-node tools/buck/gen-provider-index.ts --out third_party/providers/provider_index.bzl
+node build-tools/tools/buck/gen-provider-index.ts --out third_party/providers/provider_index.bzl
 ```
 
 The index contains entries like:
@@ -590,7 +590,7 @@ sequenceDiagram
 
   Dev->>Buck: buck2 build //<target>
   Buck->>ZX: cquery configured graph → JSON
-  ZX->>GG: write tools/buck/graph.json
+  ZX->>GG: write build-tools/tools/buck/graph.json
   GG->>Nix: instantiate dynamic derivations
   Nix->>Go: build (apply patches/overrides)
   Go-->>Dev: artifacts (bin / lib)
@@ -644,12 +644,12 @@ Behavior:
 
 - [ ] Ensure the **path invariants** are present in the repo:
   - [ ] `patches/<lang>/` (e.g., `patches/go/`) exists; **no subdirectories** under `patches/go/`.
-  - [ ] `tools/buck/` (exporter + generators) exists.
-  - [ ] `tools/nix/` (language templates) exists.
+  - [ ] `build-tools/tools/buck/` (exporter + generators) exists.
+  - [ ] `build-tools/tools/nix/` (language templates) exists.
 - [ ] Add a simple **lint** script that warns if any subdirectory is found under `patches/go/`.
 - Verification:
   - [ ] Run the lint; it emits **no warnings** on a clean repo.
-- Acceptance: Lint is wired into `tools/install-deps.ts` (or a pre-commit hook).
+- Acceptance: Lint is wired into `build-tools/tools/install-deps.ts` (or a pre-commit hook).
 
 ### Phase 2 — Buck Macro Shell (Go)
 
@@ -677,7 +677,7 @@ nix_go_binary(
 )
 ```
 
-**Acceptance check:** When you change any of these attrs and re‑run the exporter, the target’s `labels` in `tools/buck/graph.json` should update accordingly (different `module:` set if imports change). Patch edits under `<pkg>/patches/go` should invalidate only the affected targets.
+**Acceptance check:** When you change any of these attrs and re‑run the exporter, the target’s `labels` in `build-tools/tools/buck/graph.json` should update accordingly (different `module:` set if imports change). Patch edits under `<pkg>/patches/go` should invalidate only the affected targets.
 
 - [ ] Land `//go/defs.bzl` with the **generic macro** (`nix_go_binary` / `nix_go_library` / `nix_go_test`) that wraps the underlying `go_*` rules and includes package‑local patch files in `srcs` for precise invalidation.
 - [ ] Convert **one small target** to the macro (leave the rest untouched).
@@ -695,7 +695,7 @@ nix_go_binary(
 | `replace github.com/foo/bar => ../bar`                          | `github.com/foo/bar@<pseudo or none>` | `module:github.com/foo/bar@v0.0.0-<pseudo>` |
 | `replace github.com/foo/bar v1.2.3 => github.com/me/bar v1.2.4` | `github.com/me/bar@v1.2.4`            | `module:github.com/me/bar@v1.2.4`           |
 
-- [ ] Implement `tools/buck/export-graph.ts` to run **after codegen** and emit `tools/buck/graph.json` with **authoritative** `module:<path>@<version>` labels using `go list`:
+- [ ] Implement `build-tools/tools/buck/export-graph.ts` to run **after codegen** and emit `build-tools/tools/buck/graph.json` with **authoritative** `module:<path>@<version>` labels using `go list`:
   - Batch targets by **config tuple**: `(toolchain hash, module root, GOOS, GOARCH, CGO_ENABLED, sorted build tags, GOFLAGS)`.
   - For each batch, run exactly **one**:
     ```bash
@@ -713,7 +713,7 @@ nix_go_binary(
 
 ### Phase 4 — Provider Sync (Node)
 
-- [ ] Ensure `tools/buck/sync-providers.ts` orchestrates Node provider generation (importer‑scoped), and C++ sync is a no‑op. Go provider generation is not used.
+- [ ] Ensure `build-tools/tools/buck/sync-providers.ts` orchestrates Node provider generation (importer‑scoped), and C++ sync is a no‑op. Go provider generation is not used.
 - [ ] Ensure idempotency and sorted order for generated Node providers.
 - Verification:
   - [ ] With **no pnpm lockfiles**, running the script produces a minimal output (or empties auto sections).
@@ -722,7 +722,7 @@ nix_go_binary(
 
 ### Phase 5 — Auto Map (Node lockfile + nixpkg only)
 
-- [ ] Ensure `tools/buck/gen-auto-map.ts` maps targets → providers using:
+- [ ] Ensure `build-tools/tools/buck/gen-auto-map.ts` maps targets → providers using:
   - `lockfile:<path>#<importer>` → PNPM importer‑scoped providers (Node)
   - `nixpkg:<attr>` → nixpkgs providers (for CGO in Go and for C++)
 - [ ] Emit `third_party/providers/auto_map.bzl` (GENERATED).
@@ -736,7 +736,7 @@ nix_go_binary(
 
 - [ ] Go/C++: `patch-pkg apply` writes the canonical patch file under the package’s `patches/{go,cpp}` directory and clears dev overrides. No glue steps are required; Buck invalidates via `srcs`.
 - [ ] Node: `patch-pkg apply` commits the pnpm patch and triggers:
-  1. `node tools/buck/glue-pipeline.ts` (centralized orchestration: ensure graph → sync providers → provider index → auto_map)
+  1. `node build-tools/tools/buck/glue-pipeline.ts` (centralized orchestration: ensure graph → sync providers → provider index → auto_map)
 - Verification:
   - [ ] Go/C++: Immediate `buck2 build` invalidates only the affected targets when patch files change.
   - [ ] Node: Provider and auto_map refresh completes; dependent targets rebuild.
@@ -745,7 +745,7 @@ nix_go_binary(
 ### Phase 7 — CI Stages (kept separate for caching)
 
 - [ ] Add stages to Jenkins (exact order):
-  1. **Export Graph** → writes `tools/buck/graph.json`
+  1. **Export Graph** → writes `build-tools/tools/buck/graph.json`
   2. **Sync Providers** → updates `TARGETS*.auto`
   3. **Generate auto_map** → writes `auto_map.bzl`
   4. **Build & Test** (Buck)
@@ -782,9 +782,9 @@ nix_go_binary(
   - Missing provider entries (shouldn’t happen with generators).
 - [ ] Add a **pre-commit** hook to run provider sync (fast) and fail on diffs.
 - Concrete tests implemented:
-  - `tools/tests/exporter/exporter.test-only-deps-only-on-tests.test.ts` — verifies test-only deps only label test targets.
-  - `tools/tests/e2e-provider-wiring.ts` — ensures provider wiring maps module labels only to affected targets.
-  - `tools/tests/exporter/exporter.cache-content-reuse.test.ts` — proves exporter reuses cached go-list JSON for identical batches.
+  - `build-tools/tools/tests/exporter/exporter.test-only-deps-only-on-tests.test.ts` — verifies test-only deps only label test targets.
+  - `build-tools/tools/tests/e2e-provider-wiring.ts` — ensures provider wiring maps module labels only to affected targets.
+  - `build-tools/tools/tests/exporter/exporter.cache-content-reuse.test.ts` — proves exporter reuses cached go-list JSON for identical batches.
 
 - Verification:
   - [ ] All three checks green locally and in CI.
@@ -807,7 +807,7 @@ nix_go_binary(
 > **Additional notes:**
 >
 > - Add a **Codegen** stage (if applicable) **before** “Export Graph” to ensure generated Go sources exist.
-> - Add a **Pre-build guard** stage right after “Generate auto_map” that fails fast if `tools/buck/graph.json` or `third_party/providers/auto_map.bzl` are missing, or if no `TARGETS*.auto` files exist when patches/lockfiles are present.
+> - Add a **Pre-build guard** stage right after “Generate auto_map” that fails fast if `build-tools/tools/buck/graph.json` or `third_party/providers/auto_map.bzl` are missing, or if no `TARGETS*.auto` files exist when patches/lockfiles are present.
 >
 >   Diagnostics:
 >   - Default: minimal, no noise beyond errors/warnings.
@@ -816,9 +816,9 @@ nix_go_binary(
 
 > Provider coverage behavior: the guard prefers `third_party/providers/provider_index.json` as the primary source. When that index is absent or stale, it falls back to scanning all generated provider files matching `third_party/providers/TARGETS.*.auto` (including Python and Node) to verify the presence of expected `lf_*` provider rules. This avoids false “missing provider” reports when autos are up-to-date but the index lags.
 
-> **Decision (glue generation):** Glue files (`tools/buck/graph.json`, `third_party/providers/TARGETS*.auto`, `third_party/providers/auto_map.bzl`) are **generated by plain Node zx scripts**, invoked directly by `patch-pkg apply` and CI **without** Nix-run wrappers, and are **not committed to VCS**.
+> **Decision (glue generation):** Glue files (`build-tools/tools/buck/graph.json`, `third_party/providers/TARGETS*.auto`, `third_party/providers/auto_map.bzl`) are **generated by plain Node zx scripts**, invoked directly by `patch-pkg apply` and CI **without** Nix-run wrappers, and are **not committed to VCS**.
 
-> **Shared glue pipeline:** Orchestration is centralized in `tools/buck/glue-pipeline.ts` and is invoked by both local flows (e.g., `patch-pkg`/install) and CI stages to avoid drift. Behavior and outputs remain identical; only the callsite is unified.
+> **Shared glue pipeline:** Orchestration is centralized in `build-tools/tools/buck/glue-pipeline.ts` and is invoked by both local flows (e.g., `patch-pkg`/install) and CI stages to avoid drift. Behavior and outputs remain identical; only the callsite is unified.
 
 > **Why separate stages (not a single `install-deps` in CI)?**
 >
@@ -830,7 +830,7 @@ nix_go_binary(
 >
 > - **Export Graph:** hash of Buck config & Starlark inputs (e.g., `buck2 --version`, `.buckconfig`, `**/*.bzl`, `**/TARGETS`).
 > - **Sync Providers:** hash of `patches/**` (per-language) and lockfiles (`**/pnpm-lock.yaml`).
-> - **Auto Map:** hash of `tools/buck/graph.json` + generated provider files.
+> - **Auto Map:** hash of `build-tools/tools/buck/graph.json` + generated provider files.
 
 **Example Jenkinsfile (illustrative):**
 
@@ -848,25 +848,25 @@ pipeline {
         environment { CI = "true" }
         stages {
           stage('Codegen') {
-            steps { sh 'node tools/codegen.ts || true' }
+            steps { sh 'node build-tools/tools/codegen.ts || true' }
           }
           stage('Export Graph') {
-            steps { sh 'node tools/buck/export-graph.ts --out tools/buck/graph.json' }
+            steps { sh 'node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json' }
           }
           stage('Sync Providers') {
-            steps { sh 'node tools/buck/sync-providers.ts' }
+            steps { sh 'node build-tools/tools/buck/sync-providers.ts' }
           }
           stage('Sync Node Providers (optional)') {
             // skips automatically when no pnpm-lock.yaml
             when { expression { return sh(returnStatus: true, script: "git ls-files '**/pnpm-lock.yaml' >/dev/null 2>&1" ) == 0 } }
             // Providers-only (no graph/auto_map). Prefer the unified orchestrator.
-            steps { sh 'node tools/buck/sync-providers.ts --lang node --no-glue' }
+            steps { sh 'node build-tools/tools/buck/sync-providers.ts --lang node --no-glue' }
           }
           stage('Generate auto_map') {
-            steps { sh 'node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl' }
+            steps { sh 'node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl' }
           }
           stage('Pre-build guard') {
-            steps { sh 'node tools/buck/prebuild-guard.ts' }
+            steps { sh 'node build-tools/tools/buck/prebuild-guard.ts' }
           }
           stage('Build All (graph-generator)') {
             steps { sh 'nix build .#graph-generator' }
@@ -898,7 +898,7 @@ pipeline {
 
 When adding **new** Go targets (libs or apps):
 
-- **Extend the existing scaffolding tools** in `tools/` to generate:
+- **Extend the existing scaffolding tools** in `build-tools/tools/` to generate:
   - the TARGETS stub,
   - any minimal Nix/planner hints needed, and
   - create package‑local `patches/go/` directories where appropriate (empty is fine).
@@ -906,10 +906,10 @@ When adding **new** Go targets (libs or apps):
 
 ---
 
-## gomod2nix Integration (Called from `tools/install-deps.ts`)
+## gomod2nix Integration (Called from `build-tools/tools/install-deps.ts`)
 
 - After **dependency changes** (e.g., `go.mod` / `go.sum` updates), you **must** regenerate `gomod2nix.toml`.
-- **Do not** add a new command; this must be **invoked by the existing** `tools/install-deps.ts` script **without breaking** its current behavior.
+- **Do not** add a new command; this must be **invoked by the existing** `build-tools/tools/install-deps.ts` script **without breaking** its current behavior.
 - Example (conceptual): `nix run nixpkgs#gomod2nix -- --dir .` then stage the updated `gomod2nix.toml`.
 
 ---
@@ -918,16 +918,16 @@ When adding **new** Go targets (libs or apps):
 
 > **Purpose:** Map targets to provider rules so that only targets that actually consume a patched module (or a lockfile provider) get invalidated.
 
-This file is generated by `tools/buck/gen-auto-map.ts`. Buck macros should load `MODULE_PROVIDERS` via the canonical re-export `//lang:auto_map.bzl` (do not load `//third_party/providers/auto_map.bzl` directly). Do not edit by hand.
+This file is generated by `build-tools/tools/buck/gen-auto-map.ts`. Buck macros should load `MODULE_PROVIDERS` via the canonical re-export `//lang:auto_map.bzl` (do not load `//third_party/providers/auto_map.bzl` directly). Do not edit by hand.
 
-#### Generator Script `tools/buck/gen-auto-map.ts` (zx/TypeScript)
+#### Generator Script `build-tools/tools/buck/gen-auto-map.ts` (zx/TypeScript)
 
-- Reads `tools/buck/graph.json` (exported Buck graph).
+- Reads `build-tools/tools/buck/graph.json` (exported Buck graph).
 - Collects labels from each node and maps only:
   - `lockfile:<path>#<importer>` (Node, PNPM importer-scoped)
   - `nixpkg:<attr>` (nixpkgs providers used by Go CGO/C++)
 - Emits a dict mapping **target → provider labels**. Go `module:` labels are diagnostic only and are not mapped.
-- Provider-package nodes (`//third_party/providers:*`) are intentionally excluded from `MODULE_PROVIDERS` keys to avoid self-mappings and reduce noise during diagnostics. Prefer the centralized helper `tools/lib/graph-utils.ts:isProviderPackageNode(...)` rather than ad‑hoc string checks.
+- Provider-package nodes (`//third_party/providers:*`) are intentionally excluded from `MODULE_PROVIDERS` keys to avoid self-mappings and reduce noise during diagnostics. Prefer the centralized helper `build-tools/tools/lib/graph-utils.ts:isProviderPackageNode(...)` rather than ad‑hoc string checks.
 
 ```ts
 #!/usr/bin/env zx-wrapper
@@ -983,7 +983,7 @@ main().catch((e) => {
 });
 ```
 
-#### Sync Providers Generator `tools/buck/sync-providers.ts` (zx/TypeScript)
+#### Sync Providers Generator `build-tools/tools/buck/sync-providers.ts` (zx/TypeScript)
 
 > **Purpose:** Orchestrate provider generation. Currently:
 >
@@ -1015,12 +1015,12 @@ console.log("providers sync complete for", LANG);
 **When does it run?**
 
 - **Locally**: triggered by Node `patch-pkg apply` (after committing the pnpm patch).
-- **Dev env setup**: may run from `tools/install-deps.ts` after `export-graph.ts`, before `gen-auto-map.ts`.
+- **Dev env setup**: may run from `build-tools/tools/install-deps.ts` after `export-graph.ts`, before `gen-auto-map.ts`.
 - **CI**: as a dedicated stage, before `Generate auto_map`.
 
 ### Shared importer utilities (Node + Python)
 
-Use `tools/lib/importers.ts` to keep importer logic consistent:
+Use `build-tools/tools/lib/importers.ts` to keep importer logic consistent:
 
 - `findImporterLockfiles(globs: string[])` — discover PNPM (`pnpm-lock.yaml`) and uv (`uv.lock`) lockfiles.
 - `computeImporterLabel(lockfilePath)` — POSIX importer string used in `lockfile:<path>#<importer>`.
@@ -1029,7 +1029,7 @@ Use `tools/lib/importers.ts` to keep importer logic consistent:
 
 These helpers are used by provider generators and tests to avoid path/ordering drift across ecosystems.
 
-- Exporter adapter authoring (Node + Python): the canonical shared implementation of importer-scoped validation + nearest-lockfile attachment is `tools/buck/exporter/lang/importer-scoped-adapter.ts`. Lower-level parsing/label helpers live in `tools/buck/exporter/lang/importer-lockfile-labels.ts`.
+- Exporter adapter authoring (Node + Python): the canonical shared implementation of importer-scoped validation + nearest-lockfile attachment is `build-tools/tools/buck/exporter/lang/importer-scoped-adapter.ts`. Lower-level parsing/label helpers live in `build-tools/tools/buck/exporter/lang/importer-lockfile-labels.ts`.
 - Starlark macro path (Node/Python): macros must enforce exactly one importer‑scoped lockfile label via `ensure_single_lockfile_label(...)` and derive the importer with `importer_from_labels(...)`. Avoid bespoke inference; this keeps error text and behavior consistent across macros.
 
 ### Provider patch inclusion semantics (Node vs Python)
@@ -1043,15 +1043,15 @@ Node and Python are both importer-scoped ecosystems, but their provider patch in
 
 This policy is expressed explicitly in the importer provider sync driver:
 
-- `tools/lib/provider-sync-driver.ts` uses `importerPatchInclusionPolicy: "all" | "effective-set-only"`
-- `tools/buck/providers/node.ts` sets `"all"`
-- `tools/buck/providers/python.ts` sets `"effective-set-only"`
+- `build-tools/tools/lib/provider-sync-driver.ts` uses `importerPatchInclusionPolicy: "all" | "effective-set-only"`
+- `build-tools/tools/buck/providers/node.ts` sets `"all"`
+- `build-tools/tools/buck/providers/python.ts` sets `"effective-set-only"`
 - The policy is required at the driver boundary. The driver does not silently default.
 
 This policy is locked down by tests. See:
 
-- Node includes unused importer-local patches: `tools/tests/providers/providers.golden.node-and-python-importer-output.test.ts`
-- Python filters importer-local patches by `uv.lock`: `tools/tests/providers/providers.golden.node-and-python-importer-output.test.ts` and `tools/tests/providers/sync-providers-python.idempotent.test.ts`
+- Node includes unused importer-local patches: `build-tools/tools/tests/providers/providers.golden.node-and-python-importer-output.test.ts`
+- Python filters importer-local patches by `uv.lock`: `build-tools/tools/tests/providers/providers.golden.node-and-python-importer-output.test.ts` and `build-tools/tools/tests/providers/sync-providers-python.idempotent.test.ts`
 
 ## Future-Proofing for Other Languages
 
@@ -1088,18 +1088,18 @@ def node_importer_deps(name, lockfile, importer, patch_paths = []):
 
 #### Node provider generator (canonical)
 
-- The canonical Node provider generator lives at `tools/buck/providers/node.ts` (`syncNodeProviders(...)`).
-- The canonical entrypoint is `tools/buck/sync-providers.ts` (unified orchestrator).
-- Provider sync is invoked only through the unified orchestrator `tools/buck/sync-providers.ts` (use `--lang <lang>` and `--no-glue` for providers-only mode).
+- The canonical Node provider generator lives at `build-tools/tools/buck/providers/node.ts` (`syncNodeProviders(...)`).
+- The canonical entrypoint is `build-tools/tools/buck/sync-providers.ts` (unified orchestrator).
+- Provider sync is invoked only through the unified orchestrator `build-tools/tools/buck/sync-providers.ts` (use `--lang <lang>` and `--no-glue` for providers-only mode).
 - **Synthetic lockfile providers (opt-in):** Node provider sync supports an opt-in mode that synthesizes `pnpm-lock.yaml` paths for workspace importers that have `package.json` but do not yet have a real lockfile. This is intended for early scaffolding only.
   - Default: providers are generated **only** for real `pnpm-lock.yaml` files.
   - Opt-in: set `NODE_PROVIDER_SYNTHETIC_LOCKFILES=1` to enable synthetic lockfile providers. This does **not** change the lockfile label contract for targets.
 - Invoke via the orchestrator:
 
 ```bash
-node tools/buck/sync-providers.ts --lang node
+node build-tools/tools/buck/sync-providers.ts --lang node
 # or via the back-compat alias (wrapper → delegates to orchestrator)
-node tools/buck/sync-providers.ts --lang node --no-glue
+node build-tools/tools/buck/sync-providers.ts --lang node --no-glue
 ```
 
 #### Switching Back to Per‑lockfile (if needed)
@@ -1116,7 +1116,7 @@ node tools/buck/sync-providers.ts --lang node --no-glue
 ### Lockfile Ecosystems (Node, PNPM-Only, Importer‑scoped)
 
 - [ ] Add `//third_party/providers/defs_node.bzl` with `node_importer_deps(...)` (input = **pnpm-lock.yaml** + patch files).
-- [ ] Add a Node provider generator under `tools/buck/providers/node.ts` and drive it via the orchestrator `tools/buck/sync-providers.ts`.
+- [ ] Add a Node provider generator under `build-tools/tools/buck/providers/node.ts` and drive it via the orchestrator `build-tools/tools/buck/sync-providers.ts`.
 - [ ] Extend exporter to attach **`lockfile:<path>#<importer>`** labels to Node targets.
 - Verification:
   - [ ] With a Node workspace using `lodash@4.17.21`, adding `patches/node/lodash@4.17.21.patch` causes only that importer’s provider to change.
@@ -1133,7 +1133,7 @@ Note on invalidation mechanics (Node):
 ### `writeIfChanged()` helper (TypeScript)
 
 ```ts
-// tools/lib/fs-helpers.ts
+// build-tools/tools/lib/fs-helpers.ts
 import fs from "fs-extra";
 import crypto from "node:crypto";
 import path from "node:path";
@@ -1158,10 +1158,10 @@ export async function writeIfChanged(dst: string, data: string) {
 }
 ```
 
-### `tools/nix/planner/lib.nix` (shared helpers)
+### `build-tools/tools/nix/planner/lib.nix` (shared helpers)
 
 ```nix
-# tools/nix/planner/lib.nix — tiny, pure utilities reused by planners
+# build-tools/tools/nix/planner/lib.nix — tiny, pure utilities reused by planners
 { lib, get ? (attrs: k: attrs.${k} or null), nodes ? [], pkgPathOf ? (name: ".") }:
 let
   cleanLabel = s:
@@ -1191,12 +1191,12 @@ in {
 }
 ```
 
-Implementation note: the TypeScript normalizers in `tools/lib/labels.ts` intentionally mirror the planner’s normalization. Specifically, `normalizeTargetLabel(...)` equals `cleanLabel(...)` followed by dropping any cell prefix (e.g., `"root//"` → `"//"`). A zx test asserts TS ↔ Nix parity on a representative matrix (cell prefixes, trailing `(config//...)` suffixes, absolute and relative forms) to prevent drift.
+Implementation note: the TypeScript normalizers in `build-tools/tools/lib/labels.ts` intentionally mirror the planner’s normalization. Specifically, `normalizeTargetLabel(...)` equals `cleanLabel(...)` followed by dropping any cell prefix (e.g., `"root//"` → `"//"`). A zx test asserts TS ↔ Nix parity on a representative matrix (cell prefixes, trailing `(config//...)` suffixes, absolute and relative forms) to prevent drift.
 
-### `tools/lib/providers.ts` (shared naming/encoding)
+### `build-tools/tools/lib/providers.ts` (shared naming/encoding)
 
 ```ts
-// tools/lib/providers.ts — single source of truth used by generators
+// build-tools/tools/lib/providers.ts — single source of truth used by generators
 import crypto from "node:crypto";
 
 export function shortHash(s: string, n = 12): string {
@@ -1283,7 +1283,7 @@ def nix_go_test(name, **kwargs):
     go_test(name = name, deps = deps, **kwargs)
 ```
 
-> Macro error UX: We intentionally rely on `tools/buck/prebuild-guard.ts` to emit actionable messages when glue is missing/stale, because Starlark macro loads cannot portably catch and reword load errors. If your repo can’t use the `@prelude` alias, set the alias in Buck config or change the `load("@prelude//go:def.bzl", ...)` to a repo-local forwarding bzl that re-exports `go_*`.
+> Macro error UX: We intentionally rely on `build-tools/tools/buck/prebuild-guard.ts` to emit actionable messages when glue is missing/stale, because Starlark macro loads cannot portably catch and reword load errors. If your repo can’t use the `@prelude` alias, set the alias in Buck config or change the `load("@prelude//go:def.bzl", ...)` to a repo-local forwarding bzl that re-exports `go_*`.
 
 ### Example TARGETS Entries (Go)
 
@@ -1328,11 +1328,11 @@ Source for the Go patching workflow was incorporated from the attached reference
 
 > Goal: verify the **wiring** guarantees that underpin rebuild invalidation — i.e., a target’s transitive deps include the **right** provider(s) and exclude the **wrong** ones. This is a robust regression test that doesn’t depend on output hashes or timing.
 
-### Script: `tools/tests/e2e-provider-wiring.ts` (zx/TypeScript)
+### Script: `build-tools/tools/tests/e2e-provider-wiring.ts` (zx/TypeScript)
 
 ```ts
 #!/usr/bin/env zx-wrapper
-// tools/tests/e2e-provider-wiring.ts
+// build-tools/tools/tests/e2e-provider-wiring.ts
 
 import crypto from "crypto";
 
@@ -1419,7 +1419,7 @@ main().catch((e) => {
 
 ```bash
 # Node importer-scoped providers
-node tools/tests/e2e-provider-wiring.ts \
+node build-tools/tools/tests/e2e-provider-wiring.ts \
   --target //apps/web:bundle \
   --lockfile apps/web/pnpm-lock.yaml \
   --importer apps/web
@@ -1433,7 +1433,7 @@ If you also want a minimal build smoke test without relying on output hashes:
 # Expect NO rebuild of the target when unrelated patch changes:
 # (touch unrelated patch file with a harmless newline)
 printf "\n# e2e noop\n" >> patches/go/github.com__sirupsen__logrus@v1.9.0.patch
-node tools/buck/sync-providers.ts
+node build-tools/tools/buck/sync-providers.ts
 buck2 build //features/payments:service  # should report cache hit / no work
 
 # Revert patch file change afterwards
@@ -1444,9 +1444,9 @@ git checkout -- patches/go/github.com__sirupsen__logrus@v1.9.0.patch
 
 ## Appendix — CI Guard & Codegen Stubs
 
-### `tools/dev/startup-check.ts` (zx)
+### `build-tools/tools/dev/startup-check.ts` (zx)
 
-### `tools/dev/clear-overrides.ts` (zx)
+### `build-tools/tools/dev/clear-overrides.ts` (zx)
 
 ```ts
 #!/usr/bin/env zx-wrapper
@@ -1462,7 +1462,7 @@ console.log(
 
 ```ts
 #!/usr/bin/env zx-wrapper
-// tools/dev/startup-check.ts — verifies required tools and Nix features; prints fallbacks
+// build-tools/tools/dev/startup-check.ts — verifies required tools and Nix features; prints fallbacks
 import fs from "fs-extra";
 import semver from "semver";
 
@@ -1538,13 +1538,13 @@ main().catch((e) => {
 });
 ```
 
-### `tools/buck/prebuild-guard.ts` (zx)
+### `build-tools/tools/buck/prebuild-guard.ts` (zx)
 
-> Optional: extend this guard to **fail** if `tools/buck/graph.json` is **older** (mtime) than any `TARGETS` or `*.bzl` file, catching stale graphs early.
+> Optional: extend this guard to **fail** if `build-tools/tools/buck/graph.json` is **older** (mtime) than any `TARGETS` or `*.bzl` file, catching stale graphs early.
 
 ```ts
 #!/usr/bin/env zx-wrapper
-// tools/buck/prebuild-guard.ts
+// build-tools/tools/buck/prebuild-guard.ts
 import fs from "fs-extra";
 import { globby } from "globby";
 
@@ -1554,8 +1554,8 @@ const error = (msg: string) => {
   missing = 1;
 };
 
-if (!fs.existsSync("tools/buck/graph.json")) {
-  error("ERROR: tools/buck/graph.json missing — run export-graph stage first.");
+if (!fs.existsSync("build-tools/tools/buck/graph.json")) {
+  error("ERROR: build-tools/tools/buck/graph.json missing — run export-graph stage first.");
 }
 if (!fs.existsSync("third_party/providers/auto_map.bzl")) {
   error("ERROR: third_party/providers/auto_map.bzl missing — run gen-auto-map stage.");
@@ -1576,18 +1576,18 @@ if (patchesPresent) {
 process.exit(missing);
 ```
 
-### `tools/codegen.ts` (no-op stub; safe if you don’t generate code)
+### `build-tools/tools/codegen.ts` (no-op stub; safe if you don’t generate code)
 
 ```ts
 #!/usr/bin/env zx-wrapper
-// tools/codegen.ts — run protobuf/gqlgen/oapi/ent, etc. If none, exit 0.
+// build-tools/tools/codegen.ts — run protobuf/gqlgen/oapi/ent, etc. If none, exit 0.
 process.exit(0);
 ```
 
 ## Misc
 
 ```nix
-# tools/nix/lang-templates.nix (Go)
+# build-tools/tools/nix/lang-templates.nix (Go)
 { pkgs }:
 let
   lib = pkgs.lib;

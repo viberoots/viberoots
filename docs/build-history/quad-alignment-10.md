@@ -12,7 +12,7 @@ Enable Python provider sync when only `uv.lock` is present (e.g., sparse slices)
 
 ### Scope & Changes
 
-- Extend `tools/buck/providers/index.ts` handler discovery to activate Python when any `uv.lock` is discovered (using existing `findUvLockfiles`).
+- Extend `build-tools/tools/buck/providers/index.ts` handler discovery to activate Python when any `uv.lock` is discovered (using existing `findUvLockfiles`).
 - No behavior change when no `uv.lock` is present.
 
 ### Tests (in this PR)
@@ -55,14 +55,14 @@ Implement.
 
 ### Description
 
-Generalize `tools/lib/langs.ts:detectEnabledLanguages()` to treat `requiredPaths` entries that are globs (e.g., `**/pnpm-lock.yaml`, `**/uv.lock`) as “present if any match exists.” Update the Python language manifest to include `**/uv.lock`. With this, provider discovery no longer needs bespoke enablement per language.
+Generalize `build-tools/tools/lib/langs.ts:detectEnabledLanguages()` to treat `requiredPaths` entries that are globs (e.g., `**/pnpm-lock.yaml`, `**/uv.lock`) as “present if any match exists.” Update the Python language manifest to include `**/uv.lock`. With this, provider discovery no longer needs bespoke enablement per language.
 
 ### Scope & Changes
 
 - Add minimal glob support in `detectEnabledLanguages` (fast, ignore repo‑wide heavy dirs).
-- Update `tools/nix/langs.json`:
+- Update `build-tools/tools/nix/langs.json`:
   - For Python, add `**/uv.lock` to `requiredPaths` (keeping existing entries).
-- In `tools/buck/providers/index.ts`, rely primarily on `detectEnabledLanguages` for Node/Python enablement; keep the existing Node PNPM detection as a soft fallback for ultra‑thin slices.
+- In `build-tools/tools/buck/providers/index.ts`, rely primarily on `detectEnabledLanguages` for Node/Python enablement; keep the existing Node PNPM detection as a soft fallback for ultra‑thin slices.
 
 ### Tests (in this PR)
 
@@ -105,7 +105,7 @@ Implement.
 
 ### Description
 
-Replace the conditional chain in `tools/lib/provider-writer.ts:writeImporterProvidersByLang(...)` with a registry mapping language → rule name, sentinels, default output path. No output changes.
+Replace the conditional chain in `build-tools/tools/lib/provider-writer.ts:writeImporterProvidersByLang(...)` with a registry mapping language → rule name, sentinels, default output path. No output changes.
 
 ### Scope & Changes
 

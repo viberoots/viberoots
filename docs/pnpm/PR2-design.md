@@ -13,7 +13,7 @@ This PR hardens the Node provider system by adding comprehensive tests for deter
 3. **Provider naming tests** — Verify the naming function produces consistent, collision-free provider names
 4. **Edge case tests** — Cover peer dependencies, optional dependencies, empty importers, missing YAML package
 5. **Documentation updates** — Clarify importer-scoped labels and provider naming in `pnpm-design.md`
-6. **Orchestrator integration** — Verify `tools/buck/sync-providers.ts` can invoke Node provider sync via `--lang node`
+6. **Orchestrator integration** — Verify `build-tools/tools/buck/sync-providers.ts` can invoke Node provider sync via `--lang node`
 
 ### Out of Scope
 
@@ -31,10 +31,10 @@ This PR hardens the Node provider system by adding comprehensive tests for deter
 ✅ Workspace config exists (`pnpm-workspace.yaml`, `.npmrc` with `shared-workspace-lockfile=false`)  
 ✅ Provider rule defined (`third_party/providers/defs_node.bzl`)  
 ✅ Patch directory exists (`patches/node/`)  
-✅ Provider sync driver implemented (`tools/buck/providers/node.ts`)  
-✅ Unified orchestrator exists (`tools/buck/sync-providers.ts`)  
+✅ Provider sync driver implemented (`build-tools/tools/buck/providers/node.ts`)  
+✅ Unified orchestrator exists (`build-tools/tools/buck/sync-providers.ts`)  
 ✅ One idempotency test exists (`sync-providers-node.idempotent.test.ts`)  
-✅ Auto-map generator supports `lockfile:` labels (`tools/buck/gen-auto-map.ts`)
+✅ Auto-map generator supports `lockfile:` labels (`build-tools/tools/buck/gen-auto-map.ts`)
 
 ### What PR 2 Proves
 
@@ -59,20 +59,20 @@ This PR hardens the Node provider system by adding comprehensive tests for deter
 
 #### 1.1 Basic Idempotency Test (Already Exists)
 
-**File:** `tools/tests/scaffolding/sync-providers-node.idempotent.test.ts`  
+**File:** `build-tools/tools/tests/scaffolding/sync-providers-node.idempotent.test.ts`  
 **Status:** ✅ Exists, passing  
 **Coverage:** Basic idempotency with no lockfiles
 
 #### 1.2 Determinism with Synthetic Lockfile
 
-**New File:** `tools/tests/scaffolding/sync-providers-node.determinism.test.ts`
+**New File:** `build-tools/tools/tests/scaffolding/sync-providers-node.determinism.test.ts`
 
 **Purpose:** Verify byte-for-byte stability with a real pnpm-lock.yaml fixture
 
 **Test Strategy:**
 
 1. Create temp repo with synthetic `pnpm-lock.yaml`
-2. Run `node tools/buck/sync-providers.ts --lang node --no-glue` twice
+2. Run `node build-tools/tools/buck/sync-providers.ts --lang node --no-glue` twice
 3. Assert byte-for-byte identical output
 4. Hash the output to detect any changes
 
@@ -102,7 +102,7 @@ packages:
 
 #### 1.3 Determinism Across Multiple Importers
 
-**New File:** `tools/tests/scaffolding/sync-providers-node.multi-importer.test.ts`
+**New File:** `build-tools/tools/tests/scaffolding/sync-providers-node.multi-importer.test.ts`
 
 **Purpose:** Verify deterministic ordering when multiple importers exist
 
@@ -124,7 +124,7 @@ packages:
 
 #### 1.4 Empty Importer Handling
 
-**New File:** `tools/tests/scaffolding/sync-providers-node.empty-importer.test.ts`
+**New File:** `build-tools/tools/tests/scaffolding/sync-providers-node.empty-importer.test.ts`
 
 **Purpose:** Verify graceful handling of importers with no dependencies
 
@@ -142,7 +142,7 @@ packages:
 
 #### 1.5 Missing YAML Package Graceful Degradation
 
-**New File:** `tools/tests/scaffolding/sync-providers-node.no-yaml-package.test.ts`
+**New File:** `build-tools/tools/tests/scaffolding/sync-providers-node.no-yaml-package.test.ts`
 
 **Purpose:** Verify graceful skip when `yaml` package is unavailable
 
@@ -171,7 +171,7 @@ const originalResolve = mod.createRequire(import.meta.url).resolve;
 
 #### 2.1 Provider Name Consistency
 
-**New File:** `tools/tests/lib/providers.lockfile-importer-naming.test.ts`
+**New File:** `build-tools/tools/tests/lib/providers.lockfile-importer-naming.test.ts`
 
 **Purpose:** Verify `providerNameForImporter` produces consistent names
 
@@ -201,7 +201,7 @@ const cases = [
 
 #### 2.2 Provider Name Collision Detection
 
-**New File:** `tools/tests/lib/providers.lockfile-collision-detection.test.ts`
+**New File:** `build-tools/tools/tests/lib/providers.lockfile-collision-detection.test.ts`
 
 **Purpose:** Verify the system detects provider name collisions
 
@@ -222,7 +222,7 @@ const cases = [
 
 #### 3.1 Label-to-Provider Mapping
 
-**New File:** `tools/tests/scaffolding/auto-map.node-provider-mapping.test.ts`
+**New File:** `build-tools/tools/tests/scaffolding/auto-map.node-provider-mapping.test.ts`
 
 **Purpose:** Verify `gen-auto-map.ts` correctly maps `lockfile:` labels to provider deps
 
@@ -260,7 +260,7 @@ const cases = [
 
 #### 3.2 Multi-Label Handling
 
-**New File:** `tools/tests/scaffolding/auto-map.node-multi-label.test.ts`
+**New File:** `build-tools/tools/tests/scaffolding/auto-map.node-multi-label.test.ts`
 
 **Purpose:** Verify targets with multiple labels get correct subset of providers
 
@@ -278,7 +278,7 @@ const cases = [
 
 #### 3.3 No Label, No Provider
 
-**New File:** `tools/tests/scaffolding/auto-map.node-no-label-skip.test.ts`
+**New File:** `build-tools/tools/tests/scaffolding/auto-map.node-no-label-skip.test.ts`
 
 **Purpose:** Verify targets without `lockfile:` labels don't get Node providers
 
@@ -297,13 +297,13 @@ const cases = [
 
 #### 4.1 Language Flag Support
 
-**New File:** `tools/tests/scaffolding/sync-providers.lang-node.test.ts`
+**New File:** `build-tools/tools/tests/scaffolding/sync-providers.lang-node.test.ts`
 
-**Purpose:** Verify `tools/buck/sync-providers.ts` can sync Node providers via `--lang node`
+**Purpose:** Verify `build-tools/tools/buck/sync-providers.ts` can sync Node providers via `--lang node`
 
 **Test Strategy:**
 
-1. Run `node tools/buck/sync-providers.ts --lang node`
+1. Run `node build-tools/tools/buck/sync-providers.ts --lang node`
 2. Verify only `TARGETS.node.auto` is created/updated
 3. Verify other language provider files are unchanged
 
@@ -317,13 +317,13 @@ const cases = [
 
 #### 4.2 All-Languages Sync Includes Node
 
-**New File:** `tools/tests/scaffolding/sync-providers.all-includes-node.test.ts`
+**New File:** `build-tools/tools/tests/scaffolding/sync-providers.all-includes-node.test.ts`
 
 **Purpose:** Verify syncing all providers includes Node
 
 **Test Strategy:**
 
-1. Run `node tools/buck/sync-providers.ts` (no lang flag)
+1. Run `node build-tools/tools/buck/sync-providers.ts` (no lang flag)
 2. Verify `TARGETS.node.auto` is created alongside Go/C++ providers
 
 **Acceptance:**
@@ -335,7 +335,7 @@ const cases = [
 
 #### 5.1 Peer Dependencies Traversal
 
-**New File:** `tools/tests/scaffolding/sync-providers-node.peer-deps.test.ts`
+**New File:** `build-tools/tools/tests/scaffolding/sync-providers-node.peer-deps.test.ts`
 
 **Purpose:** Verify peer dependencies are correctly included in effective set
 
@@ -371,7 +371,7 @@ packages:
 
 #### 5.2 Optional Dependencies Included
 
-**New File:** `tools/tests/scaffolding/sync-providers-node.optional-deps.test.ts`
+**New File:** `build-tools/tools/tests/scaffolding/sync-providers-node.optional-deps.test.ts`
 
 **Purpose:** Verify optional dependencies are included in effective set
 
@@ -387,7 +387,7 @@ packages:
 
 #### 5.3 Scoped Package Handling
 
-**New File:** `tools/tests/scaffolding/sync-providers-node.scoped-packages.test.ts`
+**New File:** `build-tools/tools/tests/scaffolding/sync-providers-node.scoped-packages.test.ts`
 
 **Purpose:** Verify `@scope/package` names are handled correctly
 
@@ -529,8 +529,8 @@ The Node provider system has comprehensive tests ensuring deterministic behavior
 
 ```bash
 # Run all Node provider tests
-buck2 test //tools/tests/... --filter sync-providers-node
-buck2 test //tools/tests/... --filter auto-map.node
+buck2 test //build-tools/tools/tests/... --filter sync-providers-node
+buck2 test //build-tools/tools/tests/... --filter auto-map.node
 
 # Run with coverage
 buck2 test //... -- --env COVERAGE=1
@@ -554,7 +554,7 @@ test("node provider: <specific behavior>", async () => {
 });
 ```
 
-**File naming:** `tools/tests/scaffolding/sync-providers-node.<behavior>.test.ts`
+**File naming:** `build-tools/tools/tests/scaffolding/sync-providers-node.<behavior>.test.ts`
 
 ````
 
@@ -565,9 +565,9 @@ test("node provider: <specific behavior>", async () => {
 **Add Node-specific commands:**
 ```markdown
 - Node provider operations:
-  - Sync Node providers only (no graph/auto_map): `node tools/buck/sync-providers.ts --lang node --no-glue`
-  - Sync specific language: `node tools/buck/sync-providers.ts --lang node`
-  - Generate auto-map: `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
+  - Sync Node providers only (no graph/auto_map): `node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`
+  - Sync specific language: `node build-tools/tools/buck/sync-providers.ts --lang node`
+  - Generate auto-map: `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`
 ````
 
 ## Implementation Plan
@@ -576,14 +576,14 @@ test("node provider: <specific behavior>", async () => {
 
 **Files to Create:**
 
-1. `tools/tests/lib/providers.lockfile-importer-naming.test.ts`
-2. `tools/tests/lib/providers.lockfile-collision-detection.test.ts`
+1. `build-tools/tools/tests/lib/providers.lockfile-importer-naming.test.ts`
+2. `build-tools/tools/tests/lib/providers.lockfile-collision-detection.test.ts`
 
 **Verification:**
 
 ```bash
-buck2 test //tools/tests/lib:providers.lockfile-importer-naming.test
-buck2 test //tools/tests/lib:providers.lockfile-collision-detection.test
+buck2 test //build-tools/tools/tests/lib:providers.lockfile-importer-naming.test
+buck2 test //build-tools/tools/tests/lib:providers.lockfile-collision-detection.test
 ```
 
 **Acceptance:**
@@ -596,18 +596,18 @@ buck2 test //tools/tests/lib:providers.lockfile-collision-detection.test
 
 **Files to Create:**
 
-1. `tools/tests/scaffolding/sync-providers-node.determinism.test.ts`
-2. `tools/tests/scaffolding/sync-providers-node.multi-importer.test.ts`
-3. `tools/tests/scaffolding/sync-providers-node.empty-importer.test.ts`
-4. `tools/tests/scaffolding/sync-providers-node.no-yaml-package.test.ts`
+1. `build-tools/tools/tests/scaffolding/sync-providers-node.determinism.test.ts`
+2. `build-tools/tools/tests/scaffolding/sync-providers-node.multi-importer.test.ts`
+3. `build-tools/tools/tests/scaffolding/sync-providers-node.empty-importer.test.ts`
+4. `build-tools/tools/tests/scaffolding/sync-providers-node.no-yaml-package.test.ts`
 
 **Verification:**
 
 ```bash
-buck2 test //tools/tests/scaffolding:sync-providers-node.determinism.test
-buck2 test //tools/tests/scaffolding:sync-providers-node.multi-importer.test
-buck2 test //tools/tests/scaffolding:sync-providers-node.empty-importer.test
-buck2 test //tools/tests/scaffolding:sync-providers-node.no-yaml-package.test
+buck2 test //build-tools/tools/tests/scaffolding:sync-providers-node.determinism.test
+buck2 test //build-tools/tools/tests/scaffolding:sync-providers-node.multi-importer.test
+buck2 test //build-tools/tools/tests/scaffolding:sync-providers-node.empty-importer.test
+buck2 test //build-tools/tools/tests/scaffolding:sync-providers-node.no-yaml-package.test
 ```
 
 **Acceptance:**
@@ -620,16 +620,16 @@ buck2 test //tools/tests/scaffolding:sync-providers-node.no-yaml-package.test
 
 **Files to Create:**
 
-1. `tools/tests/scaffolding/auto-map.node-provider-mapping.test.ts`
-2. `tools/tests/scaffolding/auto-map.node-multi-label.test.ts`
-3. `tools/tests/scaffolding/auto-map.node-no-label-skip.test.ts`
+1. `build-tools/tools/tests/scaffolding/auto-map.node-provider-mapping.test.ts`
+2. `build-tools/tools/tests/scaffolding/auto-map.node-multi-label.test.ts`
+3. `build-tools/tools/tests/scaffolding/auto-map.node-no-label-skip.test.ts`
 
 **Verification:**
 
 ```bash
-buck2 test //tools/tests/scaffolding:auto-map.node-provider-mapping.test
-buck2 test //tools/tests/scaffolding:auto-map.node-multi-label.test
-buck2 test //tools/tests/scaffolding:auto-map.node-no-label-skip.test
+buck2 test //build-tools/tools/tests/scaffolding:auto-map.node-provider-mapping.test
+buck2 test //build-tools/tools/tests/scaffolding:auto-map.node-multi-label.test
+buck2 test //build-tools/tools/tests/scaffolding:auto-map.node-no-label-skip.test
 ```
 
 **Acceptance:**
@@ -642,16 +642,16 @@ buck2 test //tools/tests/scaffolding:auto-map.node-no-label-skip.test
 
 **Files to Create:**
 
-1. `tools/tests/scaffolding/sync-providers-node.peer-deps.test.ts`
-2. `tools/tests/scaffolding/sync-providers-node.optional-deps.test.ts`
-3. `tools/tests/scaffolding/sync-providers-node.scoped-packages.test.ts`
+1. `build-tools/tools/tests/scaffolding/sync-providers-node.peer-deps.test.ts`
+2. `build-tools/tools/tests/scaffolding/sync-providers-node.optional-deps.test.ts`
+3. `build-tools/tools/tests/scaffolding/sync-providers-node.scoped-packages.test.ts`
 
 **Verification:**
 
 ```bash
-buck2 test //tools/tests/scaffolding:sync-providers-node.peer-deps.test
-buck2 test //tools/tests/scaffolding:sync-providers-node.optional-deps.test
-buck2 test //tools/tests/scaffolding:sync-providers-node.scoped-packages.test
+buck2 test //build-tools/tools/tests/scaffolding:sync-providers-node.peer-deps.test
+buck2 test //build-tools/tools/tests/scaffolding:sync-providers-node.optional-deps.test
+buck2 test //build-tools/tools/tests/scaffolding:sync-providers-node.scoped-packages.test
 ```
 
 **Acceptance:**
@@ -664,14 +664,14 @@ buck2 test //tools/tests/scaffolding:sync-providers-node.scoped-packages.test
 
 **Files to Create:**
 
-1. `tools/tests/scaffolding/sync-providers.lang-node.test.ts`
-2. `tools/tests/scaffolding/sync-providers.all-includes-node.test.ts`
+1. `build-tools/tools/tests/scaffolding/sync-providers.lang-node.test.ts`
+2. `build-tools/tools/tests/scaffolding/sync-providers.all-includes-node.test.ts`
 
 **Verification:**
 
 ```bash
-buck2 test //tools/tests/scaffolding:sync-providers.lang-node.test
-buck2 test //tools/tests/scaffolding:sync-providers.all-includes-node.test
+buck2 test //build-tools/tools/tests/scaffolding:sync-providers.lang-node.test
+buck2 test //build-tools/tools/tests/scaffolding:sync-providers.all-includes-node.test
 ```
 
 **Acceptance:**
@@ -777,7 +777,7 @@ packages:
     await fsp.writeFile(lockfilePath, lockfileContent, "utf8");
 
     // 2. Execute: Run the provider sync
-    await $`node tools/buck/sync-providers.ts --lang node --no-glue`;
+    await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
 
     // 3. Assert: Verify expected output
     const outPath = path.join(tmp, "third_party/providers/TARGETS.node.auto");
@@ -789,7 +789,7 @@ packages:
     }
 
     // 4. Verify idempotency
-    await $`node tools/buck/sync-providers.ts --lang node --no-glue`;
+    await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
     const output2 = await fsp.readFile(outPath, "utf8");
 
     if (output !== output2) {

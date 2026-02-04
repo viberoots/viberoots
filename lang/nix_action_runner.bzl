@@ -11,7 +11,7 @@ def nix_action_workspace_setup_from_args(
         + ("FLAKE_FILE=\"%s\"; " % flake_file_arg)
         + "[ -n \"$WORKSPACE_ENV\" ] && [ -f \"$WORKSPACE_ENV\" ] && . \"$WORKSPACE_ENV\" || true; "
         + "if [ -n \"$GRAPH\" ] && [ -z \"${WORKSPACE_ROOT:-}\" ]; then "
-        + "  WR=\"${GRAPH%/tools/buck/graph.json}\"; "
+        + "  WR=\"${GRAPH%/build-tools/tools/buck/graph.json}\"; "
         + "  export WORKSPACE_ROOT=\"$WR\"; "
         + "fi; "
         + "export REPO_ROOT=\"${REPO_ROOT:-$WORKSPACE_ROOT}\"; "
@@ -24,14 +24,14 @@ def nix_action_workspace_setup_from_args(
 
 
 def nix_action_export_graph_cmd(
-        out_graph = "$WORKSPACE_ROOT/tools/buck/graph.json",
+        out_graph = "$WORKSPACE_ROOT/build-tools/tools/buck/graph.json",
         query_roots = "libs,go,cpp,third_party",
         zx_wrapper = "path:$FLK_ROOT#zx-wrapper"):
     return (
-        "mkdir -p \"$WORKSPACE_ROOT/tools/buck\"; "
+        "mkdir -p \"$WORKSPACE_ROOT/build-tools/tools/buck\"; "
         + ("BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_QUERY_ROOTS=\"%s\" " % query_roots)
         + ("nix run --accept-flake-config \"%s\" -- " % zx_wrapper)
-        + ("tools/buck/export-graph.ts --out \"%s\"; " % out_graph)
+        + ("build-tools/tools/buck/export-graph.ts --out \"%s\"; " % out_graph)
     )
 
 
@@ -49,7 +49,7 @@ def nix_action_build_selected_out_path_cmd(
             % (raw_var, target_label)
         )
         + ("nix run --accept-flake-config \"%s\" -- " % zx_wrapper)
-        + ("\"$FLK_ROOT/tools/dev/build-selected.ts\" 2> \"%s\"); " % log_file)
+        + ("\"$FLK_ROOT/build-tools/tools/dev/build-selected.ts\" 2> \"%s\"); " % log_file)
         + ("%s=$?; set -e; " % status_var)
         + (
             "%s=$(printf %s \"$%s\" | sed -E 's/\\x1B\\[[0-9;]*[A-Za-z]//g' | tr -d '\\r'); "

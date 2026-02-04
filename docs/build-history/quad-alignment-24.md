@@ -48,10 +48,10 @@ This PR changes Node macro wiring only. The goal is behavior stability and contr
 
 I will update the existing Node macro tests to prove behavior did not change and to catch partial-wiring regressions:
 
-- Extend the `tools/tests/node/*lockfile*` tests to assert:
+- Extend the `build-tools/tools/tests/node/*lockfile*` tests to assert:
   - both `node_webapp` and bundled `nix_node_cli_bin` fail with the same deterministic error text when the lockfile label is missing or malformed
   - importer derivation remains stable for `lockfile:././apps/web/pnpm-lock.yaml#apps/web`
-- Extend the `tools/tests/node/*global-inputs*` tests to keep asserting global inputs are real action inputs after the refactor (list-shaped and dict-shaped cases).
+- Extend the `build-tools/tools/tests/node/*global-inputs*` tests to keep asserting global inputs are real action inputs after the refactor (list-shaped and dict-shaped cases).
 - Add one focused macro expansion test (cquery shape test) proving importer-local patches are present as action inputs for:
   - `node_webapp` (list-shaped `srcs`)
   - bundled `nix_node_cli_bin` (dict-shaped `srcs`)

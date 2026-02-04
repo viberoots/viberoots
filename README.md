@@ -14,7 +14,7 @@ scaf new go cli demo-cli --yes --path=apps/demo-cli
 2. Generate module lock and copy to repo root (authoritative)
 
 ```
-tools/bin/gomod2nix --dir apps/demo-cli
+build-tools/tools/bin/gomod2nix --dir apps/demo-cli
 cp apps/demo-cli/gomod2nix.toml gomod2nix.toml
 ```
 
@@ -24,7 +24,7 @@ cp apps/demo-cli/gomod2nix.toml gomod2nix.toml
 - Use the helper to run all steps in order (export-graph → sync-providers orchestrator → gen-auto-map):
 
 ```
-node tools/dev/install-deps.ts --glue-only
+node build-tools/tools/dev/install-deps.ts --glue-only
 ```
 
 4. Build via Nix and run from manifest
@@ -38,15 +38,15 @@ jq -r '.[] | select(.label=="//apps/demo-cli:demo-cli") | .bins[0]' buck-go/mani
 
 ```
 # Examples
-nix develop -c tools/dev/dev-build.ts build //...
-nix develop -c tools/dev/dev-build.ts cquery deps\(//...,\ 1\)
+nix develop -c build-tools/tools/dev/dev-build.ts build //...
+nix develop -c build-tools/tools/dev/dev-build.ts cquery deps\(//...,\ 1\)
 ```
 
 Notes
 
 - No vendoring: do not copy `.go` files into `third_party/go/**`.
 - Dev overrides: use `NIX_GO_DEV_OVERRIDE_JSON` locally; CI forbids it.
-- Planner has no discovery fallback; it consumes `tools/buck/graph.json` only.
+- Planner has no discovery fallback; it consumes `build-tools/tools/buck/graph.json` only.
 - Testing and coverage: see `docs/handbook/testing.md`.
 - Adding a new language: read `docs/handbook/new-language-walkthrough.md` for a fast, capability‑gated path using the lang‑kit template.
 
@@ -64,9 +64,9 @@ The Buck graph exporter supports a validation severity switch for adapter findin
 - Local warn mode (exits zero):
 
 ```
-node tools/buck/export-graph.ts --validation=warn
+node build-tools/tools/buck/export-graph.ts --validation=warn
 # or
-EXPORTER_VALIDATION=warn node tools/buck/export-graph.ts
+EXPORTER_VALIDATION=warn node build-tools/tools/buck/export-graph.ts
 ```
 
 - CI override: if `CI=true`, findings are always treated as errors regardless of flags/env.
@@ -80,13 +80,13 @@ For tooling and debugging, you can emit a cross‑language provider index that m
 - Generate alongside provider sync:
 
 ```
-node tools/buck/sync-providers.ts --emit-index
+node build-tools/tools/buck/sync-providers.ts --emit-index
 ```
 
 - Or generate directly:
 
 ```
-node tools/buck/gen-provider-index.ts --out third_party/providers/provider_index.bzl
+node build-tools/tools/buck/gen-provider-index.ts --out third_party/providers/provider_index.bzl
 ```
 
 The generated `third_party/providers/provider_index.bzl` exposes `PROVIDER_INDEX` where each entry looks like:
@@ -95,7 +95,7 @@ The generated `third_party/providers/provider_index.bzl` exposes `PROVIDER_INDEX
 "//third_party/providers:<name>": { "kind": "node|cpp", "key": "lockfile:<path>#<importer>|nixpkg:<attr>" }
 ```
 
-This file is not required for builds; it is used by tools/tests for introspection.
+This file is not required for builds; it is used by build-tools/tools/tests for introspection.
 
 ### Adding a Go test file (auto‑wired)
 
@@ -120,7 +120,7 @@ Related docs:
 - Adding a Language (reference): `docs/handbook/adding-language.md`
 - C++ overlays and patching: `docs/cpp/overlays.md`
 
-CI stage runner reference: `tools/ci/run-stage.ts`.
+CI stage runner reference: `build-tools/tools/ci/run-stage.ts`.
 
 ## Key concepts (fast)
 
@@ -133,7 +133,7 @@ CI stage runner reference: `tools/ci/run-stage.ts`.
 
 ### Pipeline stages (human summary)
 
-- Export Graph: freeze the configured Buck graph to `tools/buck/graph.json`.
+- Export Graph: freeze the configured Buck graph to `build-tools/tools/buck/graph.json`.
 - Sync Providers: generate provider rules from patches/lockfiles with stable names.
 - Auto Map: map targets → the exact providers they need (tight invalidation only where needed).
 - Prebuild Guard: verify glue exists and is fresh; local auto‑fix, CI fails fast. See `docs/handbook/troubleshooting.md#prebuild-guard-glue-presence--freshness`.

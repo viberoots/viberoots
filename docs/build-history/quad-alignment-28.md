@@ -6,7 +6,7 @@ The themes in this installment are:
 
 - Remove remaining “tooling entrypoint” compatibility layers so there is one canonical command path for provider sync and glue generation.
 - Make package-local wiring (Go and C++) as hard to misuse as importer-scoped wiring (Node and Python), by providing one small helper surface and locking it down with probe and enforcement tests.
-- Reduce remaining small sources of drift in TypeScript tooling by standardizing on `tools/lib/cli.ts` for flag parsing where we still hand-roll it.
+- Reduce remaining small sources of drift in TypeScript tooling by standardizing on `build-tools/tools/lib/cli.ts` for flag parsing where we still hand-roll it.
 
 As in prior parts, each PR includes the tests and documentation required for the change. There are no PRs dedicated solely to tests or docs.
 
@@ -102,7 +102,7 @@ This repo intentionally has two patch invalidation models:
 - Package-local patches (Go and C++) where patch files live under the owning Buck package and are included in action inputs.
 - Importer-local patches (Node and Python) where patch files live under an importer directory and provider glue is generated.
 
-Today this distinction is described in documentation and appears in TypeScript (`tools/lib/lang-contracts.ts`), but it is not used to keep macro and patch-tool behavior honest. This PR makes the contract explicit and usable in both Starlark probes and patch tooling so the seam is less confusing and harder to misuse.
+Today this distinction is described in documentation and appears in TypeScript (`build-tools/tools/lib/lang-contracts.ts`), but it is not used to keep macro and patch-tool behavior honest. This PR makes the contract explicit and usable in both Starlark probes and patch tooling so the seam is less confusing and harder to misuse.
 
 Clarification: I do not need to preserve backwards compatibility yet. This PR can change internal helper APIs used by patch tooling as long as behavior is preserved.
 
@@ -113,8 +113,8 @@ This PR introduces a minimal contract registry and uses it in two places where t
 - Add a small Starlark contract surface (location: `//lang:lang_contracts.bzl`) that exposes:
   - whether a language is package-local or importer-local for patch invalidation
   - whether applying a patch should run glue (importer-local languages) or not (package-local languages)
-- Update `tools/lib/lang-contracts.ts` if needed so it is the single TS-side definition for the same mapping, and add a parity-style test that asserts Starlark and TS agree on the mapping.
-- Update `tools/patch/patch-pkg.ts` (and any shared patch-tool message helper) to print a single standardized one-liner after `apply` and `reset` that states:
+- Update `build-tools/tools/lib/lang-contracts.ts` if needed so it is the single TS-side definition for the same mapping, and add a parity-style test that asserts Starlark and TS agree on the mapping.
+- Update `build-tools/tools/patch/patch-pkg.ts` (and any shared patch-tool message helper) to print a single standardized one-liner after `apply` and `reset` that states:
   - for package-local languages: “no glue refresh is required”
   - for importer-local languages: “glue pipeline will run (graph, providers, auto_map)”
 
@@ -169,7 +169,7 @@ Implement.
 
 ### Description
 
-The repo currently has a unified provider sync orchestrator (`tools/buck/sync-providers.ts`) and also keeps thin delegator-only wrappers for compatibility and discoverability.
+The repo currently has a unified provider sync orchestrator (`build-tools/tools/buck/sync-providers.ts`) and also keeps thin delegator-only wrappers for compatibility and discoverability.
 
 At this point, the wrappers are a maintenance surface: tests call them, docs reference them, and any future behavior change must be validated in multiple entrypoints. This PR removes the wrappers and makes the orchestrator the only supported entrypoint.
 
@@ -179,11 +179,11 @@ Clarification: I do not need to preserve backwards compatibility yet. This PR ca
 
 - Delete the Node/Python provider sync wrapper entrypoints.
 - Update all call sites to invoke:
-  - `node tools/buck/sync-providers.ts --lang node --no-glue` where wrappers were previously used in “providers-only” mode
-  - `node tools/buck/sync-providers.ts --lang python --no-glue` similarly
-  - or `node tools/buck/sync-providers.ts` when the full orchestrator behavior is intended
+  - `node build-tools/tools/buck/sync-providers.ts --lang node --no-glue` where wrappers were previously used in “providers-only” mode
+  - `node build-tools/tools/buck/sync-providers.ts --lang python --no-glue` similarly
+  - or `node build-tools/tools/buck/sync-providers.ts` when the full orchestrator behavior is intended
 - Update and simplify tests that asserted “wrapper is delegator-only” to instead assert:
-  - there are no remaining references to the deleted scripts in `tools/`, `docs/`, or scaffolding templates
+  - there are no remaining references to the deleted scripts in `build-tools/tools/`, `docs/`, or scaffolding templates
   - provider sync remains idempotent and deterministic when invoked through the orchestrator with `--lang`
 
 ### Tests (in this PR)
@@ -229,7 +229,7 @@ Implement.
 
 ### Description
 
-Most repo tooling already uses `tools/lib/cli.ts` so flags behave consistently whether scripts run under zx global argv or via plain Node. A small number of scripts still hand-roll `(global as any).argv` access or custom `process.argv` parsing.
+Most repo tooling already uses `build-tools/tools/lib/cli.ts` so flags behave consistently whether scripts run under zx global argv or via plain Node. A small number of scripts still hand-roll `(global as any).argv` access or custom `process.argv` parsing.
 
 This is not a functional bug, but it is a drift source. It makes scripts disagree on how flags and defaults behave, which matters in CI, in temp-repo test environments, and when tooling is invoked via `runNodeWithZx`.
 
@@ -237,7 +237,7 @@ Clarification: I do not need to preserve backwards compatibility for internal fl
 
 ### Scope & Changes
 
-- Identify remaining tooling scripts under `tools/` that parse flags manually and migrate them to use `tools/lib/cli.ts`:
+- Identify remaining tooling scripts under `build-tools/tools/` that parse flags manually and migrate them to use `build-tools/tools/lib/cli.ts`:
   - use `getFlagStr`, `getFlagBool`, `getFlagList`, and `hasFlag` as appropriate
   - remove local `getArg` and bespoke parsing helpers where they exist
 - Keep command-line interfaces stable:
@@ -246,12 +246,12 @@ Clarification: I do not need to preserve backwards compatibility for internal fl
 
 ### Tests (in this PR)
 
-- Add or extend a small unit test for `tools/lib/cli.ts` to cover the parsing shapes used by the migrated scripts (presence flags, equals form, and “global argv” precedence).
+- Add or extend a small unit test for `build-tools/tools/lib/cli.ts` to cover the parsing shapes used by the migrated scripts (presence flags, equals form, and “global argv” precedence).
 - Add one focused integration-style test that runs one migrated script in a context where zx global argv is absent, to ensure the `process.argv` fallback path remains correct.
 
 ### Docs (in this PR)
 
-- Update `docs/handbook/tooling.md` (or an existing appropriate handbook page) to state that new tooling should use `tools/lib/cli.ts` and should not hand-roll `process.argv` parsing.
+- Update `docs/handbook/tooling.md` (or an existing appropriate handbook page) to state that new tooling should use `build-tools/tools/lib/cli.ts` and should not hand-roll `process.argv` parsing.
 - Update any per-script docs that previously described flags in a way that depends on the old parsing quirks (only when applicable).
 
 ### Acceptance Criteria
@@ -282,7 +282,7 @@ Implement.
 
 ### Description
 
-PR‑4 standardized flag parsing on `tools/lib/cli.ts`, but there are still a few tooling scripts under `tools/` that hand-roll `process.argv` parsing (either as a fixed-flag parser or as a small bespoke argv-to-map helper).
+PR‑4 standardized flag parsing on `build-tools/tools/lib/cli.ts`, but there are still a few tooling scripts under `build-tools/tools/` that hand-roll `process.argv` parsing (either as a fixed-flag parser or as a small bespoke argv-to-map helper).
 
 This is not a functional bug, but it is a drift surface. These scripts can disagree on precedence (`global argv` vs `process.argv`), accepted forms (`--flag value` vs `--flag=value`), and how unknown flags are handled. This matters in temp-repo test environments and when tooling is invoked via `runNodeWithZx`.
 
@@ -290,33 +290,33 @@ Clarification: This PR is about removing drift in **repo tooling**. It does not 
 
 ### Scope & Changes
 
-This PR identifies and migrates the remaining tooling scripts under `tools/` that parse flags manually:
+This PR identifies and migrates the remaining tooling scripts under `build-tools/tools/` that parse flags manually:
 
-- Migrate fixed-flag tooling entrypoints to use `tools/lib/cli.ts`:
-  - `tools/dev/planner-gen.ts` (currently parses `--lang`, `--all`, `--check`)
-  - `tools/dev/buck-watchdog.ts` (currently parses `--parent`, `--iso`, `--patterns`)
-  - `tools/dev/install/deps-main.ts` (currently parses `--force`, `--dry-run`, `--verbose/-v`, `--skip-glue`, `--glue-only`, `--skip-go-tidy`)
-  - `tools/scaffolding/new-pnpm-project.ts` (currently parses `--kind`, `--name`, `--importer`, `--yes`, `--run-setup`)
-  - `tools/scaffolding/validate.ts` (currently uses `process.argv` directly for positionals)
+- Migrate fixed-flag tooling entrypoints to use `build-tools/tools/lib/cli.ts`:
+  - `build-tools/tools/dev/planner-gen.ts` (currently parses `--lang`, `--all`, `--check`)
+  - `build-tools/tools/dev/buck-watchdog.ts` (currently parses `--parent`, `--iso`, `--patterns`)
+  - `build-tools/tools/dev/install/deps-main.ts` (currently parses `--force`, `--dry-run`, `--verbose/-v`, `--skip-glue`, `--glue-only`, `--skip-go-tidy`)
+  - `build-tools/tools/scaffolding/new-pnpm-project.ts` (currently parses `--kind`, `--name`, `--importer`, `--yes`, `--run-setup`)
+  - `build-tools/tools/scaffolding/validate.ts` (currently uses `process.argv` directly for positionals)
 
 - Migrate the remaining “small bespoke CLI” surfaces that still strip flags manually:
-  - `tools/dev/dev-build/run-dev-build.ts` and `tools/dev/dev-build/args.ts`
+  - `build-tools/tools/dev/dev-build/run-dev-build.ts` and `build-tools/tools/dev/dev-build/args.ts`
     - Stop parsing `process.argv.slice(2)` with bespoke logic for `--impure` and `--no-materialize`.
-    - Use `tools/lib/cli.ts` helpers to read those flags and derive the remaining positional Buck arguments consistently across zx and plain Node invocation.
+    - Use `build-tools/tools/lib/cli.ts` helpers to read those flags and derive the remaining positional Buck arguments consistently across zx and plain Node invocation.
 
 - For tooling that intentionally needs a “flags map” (arbitrary `--key[=value]` surface), add one small shared helper surface instead of re-implementing it:
-  - Add `parseFlagMap(argv?: string[]) -> { positionals: string[], flags: Record<string, string> }` to `tools/lib/cli.ts` (or a small sibling module under `tools/lib/`) that:
+  - Add `parseFlagMap(argv?: string[]) -> { positionals: string[], flags: Record<string, string> }` to `build-tools/tools/lib/cli.ts` (or a small sibling module under `build-tools/tools/lib/`) that:
     - supports `--key=value` and `--key` presence flags (value defaults to `"true"`)
     - preserves caller ordering for positionals
     - does not attempt to be a full CLI framework
   - Refactor:
-    - `tools/scaffolding/scaf/argv.ts` to use the shared helper (it is the canonical “needs a flags map” example)
+    - `build-tools/tools/scaffolding/scaf/argv.ts` to use the shared helper (it is the canonical “needs a flags map” example)
 
   - Refactor the `scaf` entrypoint to route argv handling through the shared helper:
-    - `tools/scaffolding/scaf/main.ts` should avoid direct `process.argv.slice(2)` in the entrypoint and instead call the shared parsing surface.
+    - `build-tools/tools/scaffolding/scaf/main.ts` should avoid direct `process.argv.slice(2)` in the entrypoint and instead call the shared parsing surface.
 
 - Optional (recommended): tighten patch tooling parsing drift in helper libraries:
-  - `tools/patch/lib/apply.ts` contains a small argv-array parser (`parseApplyFlags(...)`) for `--target`, `--patch-dir`, `--force`.
+  - `build-tools/tools/patch/lib/apply.ts` contains a small argv-array parser (`parseApplyFlags(...)`) for `--target`, `--patch-dir`, `--force`.
   - If we keep this pattern (parsing a provided argv list for programmatic/test use), it should use the same shared parsing helpers as CLIs (for example a `parseFlagMap(argv)`-based implementation) so behavior does not drift.
 
 - Keep command-line interfaces stable:
@@ -333,14 +333,14 @@ Non-goals in this PR:
 ### Tests (in this PR)
 
 - Add an enforcement-style TypeScript test that fails if bespoke argv parsing patterns reappear in tool entrypoints:
-  - Scan `tools/**/*.ts` (excluding `tools/tests/**`, scaffolding templates, and the canonical implementation file(s) for CLI helpers).
+  - Scan `build-tools/tools/**/*.ts` (excluding `build-tools/tools/tests/**`, scaffolding templates, and the canonical implementation file(s) for CLI helpers).
   - Fail on common “roll your own argv parsing” patterns, for example:
     - `process.argv.indexOf("--`
     - `process.argv.findIndex((a) => a === "--`
     - local `parseArg(` / `parseFlags(` helpers that exist only to parse CLI flags
-  - The failure message should point authors to `tools/lib/cli.ts` as the canonical mechanism.
+  - The failure message should point authors to `build-tools/tools/lib/cli.ts` as the canonical mechanism.
 
-- Add or extend unit tests for `tools/lib/cli.ts` to cover any parsing shapes required by the migrated scripts:
+- Add or extend unit tests for `build-tools/tools/lib/cli.ts` to cover any parsing shapes required by the migrated scripts:
   - presence flags and equals-form parsing
   - “global argv” precedence over `process.argv`
   - the shared `parseFlagMap(...)` helper (if introduced)
@@ -348,23 +348,23 @@ Non-goals in this PR:
 ### Docs (in this PR)
 
 - Add a handbook page `docs/handbook/tooling.md` (or update the existing best-fit handbook page if one already exists) stating:
-  - new tooling must use `tools/lib/cli.ts` (no bespoke `process.argv` parsing)
-  - when one tool invokes another zx script, use `tools/lib/node-run.ts:runNodeWithZx`
+  - new tooling must use `build-tools/tools/lib/cli.ts` (no bespoke `process.argv` parsing)
+  - when one tool invokes another zx script, use `build-tools/tools/lib/node-run.ts:runNodeWithZx`
   - `parseFlagMap(...)` is the only supported way to build a free-form flags map (used by `scaf`), and call sites must not copy/paste bespoke variants
 - Update `getting-started-on-a-pr.md` to point at the canonical tooling handbook page so guidance lives in one place.
 
 ### Acceptance Criteria
 
 - The remaining tooling scripts no longer hand-roll flag parsing and instead use shared helpers:
-  - `tools/dev/planner-gen.ts`
-  - `tools/dev/buck-watchdog.ts`
-  - `tools/dev/install/deps-main.ts`
-  - `tools/dev/dev-build/run-dev-build.ts` and `tools/dev/dev-build/args.ts`
-  - `tools/scaffolding/new-pnpm-project.ts`
-  - `tools/scaffolding/validate.ts`
-  - `tools/scaffolding/scaf/argv.ts` uses the shared `parseFlagMap(...)` helper (if introduced)
-- `tools/scaffolding/scaf/main.ts` does not bypass the shared parsing surface for argv handling
-- Any remaining argv parsing in patch tooling helper libraries (for example `tools/patch/lib/apply.ts`) either:
+  - `build-tools/tools/dev/planner-gen.ts`
+  - `build-tools/tools/dev/buck-watchdog.ts`
+  - `build-tools/tools/dev/install/deps-main.ts`
+  - `build-tools/tools/dev/dev-build/run-dev-build.ts` and `build-tools/tools/dev/dev-build/args.ts`
+  - `build-tools/tools/scaffolding/new-pnpm-project.ts`
+  - `build-tools/tools/scaffolding/validate.ts`
+  - `build-tools/tools/scaffolding/scaf/argv.ts` uses the shared `parseFlagMap(...)` helper (if introduced)
+- `build-tools/tools/scaffolding/scaf/main.ts` does not bypass the shared parsing surface for argv handling
+- Any remaining argv parsing in patch tooling helper libraries (for example `build-tools/tools/patch/lib/apply.ts`) either:
   - uses the same shared parsing helpers as CLIs, or
   - is explicitly documented as an intentional exception with a regression test that locks down its behavior
 - Tests prevent reintroduction of bespoke argv parsing patterns.
@@ -514,7 +514,7 @@ Implement.
 
 PR‑3 removes provider sync wrapper scripts and updates the handbook-style docs to reference only the unified orchestrator entrypoint. However, older root-level and design-history markdown files can still mention the removed wrapper paths. This is not a functional bug, but it is a recurring source of confusion and review churn (“which command is canonical?”).
 
-This PR makes “no wrapper references remain” true at the repository level, not just under `docs/` and `tools/`, and it updates the remaining stale mentions.
+This PR makes “no wrapper references remain” true at the repository level, not just under `docs/` and `build-tools/tools/`, and it updates the remaining stale mentions.
 
 Clarification: I do not need to preserve backwards compatibility yet. This PR can tighten enforcement and update documentation references in one change.
 
@@ -526,8 +526,8 @@ Clarification: I do not need to preserve backwards compatibility yet. This PR ca
 - Update any remaining markdown references to:
   - the removed Node/Python provider sync wrapper entrypoints,
     replacing them with the canonical orchestrator commands:
-  - `node tools/buck/sync-providers.ts --lang <lang> --no-glue`
-  - `node tools/buck/sync-providers.ts`
+  - `node build-tools/tools/buck/sync-providers.ts --lang <lang> --no-glue`
+  - `node build-tools/tools/buck/sync-providers.ts`
 
 Non-goals in this PR:
 
@@ -545,7 +545,7 @@ Non-goals in this PR:
 
 ### Acceptance Criteria
 
-- The wrapper-reference enforcement test scans the full intended doc surface (not just `tools/` and `docs/`) and passes.
+- The wrapper-reference enforcement test scans the full intended doc surface (not just `build-tools/tools/` and `docs/`) and passes.
 - No markdown in the scanned set references the removed wrapper entrypoints.
 - Documentation consistently presents one canonical command path for provider sync.
 

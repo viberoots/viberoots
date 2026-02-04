@@ -8,15 +8,15 @@ This second part builds on Part 1 and focuses on consolidating shared logic, tig
 
 Factor the common importer‑scoped provider generation logic (discover lockfiles → compute importer labels → select effective set → gather importer‑local patches → write deterministic TARGETS) into a shared helper. Keep ecosystem‑specific lock parsing in their respective modules.
 
-Not yet implemented (verified): no `tools/lib/provider-writer.ts`; both `tools/buck/providers/node.ts` and `tools/buck/providers/python.ts` contain bespoke loops today.
+Not yet implemented (verified): no `build-tools/tools/lib/provider-writer.ts`; both `build-tools/tools/buck/providers/node.ts` and `build-tools/tools/buck/providers/python.ts` contain bespoke loops today.
 
 ### Scope & Changes
 
-- tools/lib/provider-writer.ts (new):
+- build-tools/tools/lib/provider-writer.ts (new):
   - Minimal API to emit importer providers deterministically:
     - Input: lockfiles, parseEffectiveSet(importer) → Set<"name@version">, listImporterPatches(importer), providerNameForImporter, rule headers/load symbols.
     - Output: stable TARGETS text and auto‑section sync.
-- tools/buck/providers/node.ts and tools/buck/providers/python.ts:
+- build-tools/tools/buck/providers/node.ts and build-tools/tools/buck/providers/python.ts:
   - Replace bespoke loops with calls to the shared helper.
   - Keep `parsePnpmLock()/effectiveSetForImporter()` and `parseUvLockKeys()` local.
 
@@ -51,13 +51,13 @@ Not yet implemented (verified): no `tools/lib/provider-writer.ts`; both `tools/b
 
 Centralize the generation of deterministic TARGETS headers (generated banner + `load(...)` lines) used by Node and Python provider writers.
 
-Not yet implemented (verified): no `tools/lib/providers-headers.ts`; headers are inlined in `tools/buck/providers/node.ts` and `tools/buck/providers/python.ts`.
+Not yet implemented (verified): no `build-tools/tools/lib/providers-headers.ts`; headers are inlined in `build-tools/tools/buck/providers/node.ts` and `build-tools/tools/buck/providers/python.ts`.
 
 ### Scope & Changes
 
-- tools/lib/providers-headers.ts (new):
+- build-tools/tools/lib/providers-headers.ts (new):
   - `providersHeaderFor({ lang, load, rule })` → stable, newline‑correct header string.
-- tools/buck/providers/{node,python}.ts:
+- build-tools/tools/buck/providers/{node,python}.ts:
   - Replace in‑file headers with shared helper.
 
 - Tests & Docs (as part of this PR):
@@ -90,11 +90,11 @@ Not yet implemented (verified): no `tools/lib/providers-headers.ts`; headers are
 
 Prefer the language registry (`LANGS.cpp`) path when constructing C++ derivations to reduce bespoke logic in the planner. Retain the existing `PLANNER_ONLY_CPP` optimization as an optional fast‑path for sliced test workspaces.
 
-Not yet implemented (verified): `tools/nix/graph-generator.nix` directly imports C++ planner adapter and uses `mkCpp` instead of going through `LANGS.cpp` for construction.
+Not yet implemented (verified): `build-tools/tools/nix/graph-generator.nix` directly imports C++ planner adapter and uses `mkCpp` instead of going through `LANGS.cpp` for construction.
 
 ### Scope & Changes
 
-- tools/nix/graph-generator.nix:
+- build-tools/tools/nix/graph-generator.nix:
   - Default to `LANGS.cpp.*` for kind inference and mk\* functions.
   - Keep the `onlyCpp` fast‑path minimal and clearly documented as an optimization.
 
@@ -129,20 +129,20 @@ Not yet implemented (verified): `tools/nix/graph-generator.nix` directly imports
 
 Reduce the size and complexity of `ensureGraph()` by moving the inline buck2 export fallback into a dedicated module, preserving idempotence and the existing fallback order.
 
-Not yet implemented (verified): no `tools/buck/export-inline.ts`; inline exporter logic lives in `tools/patch/glue.ts` today.
+Not yet implemented (verified): no `build-tools/tools/buck/export-inline.ts`; inline exporter logic lives in `build-tools/tools/patch/glue.ts` today.
 
 ### Scope & Changes
 
-- tools/buck/export-inline.ts (new): encapsulates the inline `buck2 cquery` export path.
-- tools/patch/glue.ts: call the new module; keep file ≤250 lines; no behavior change.
+- build-tools/tools/buck/export-inline.ts (new): encapsulates the inline `buck2 cquery` export path.
+- build-tools/tools/patch/glue.ts: call the new module; keep file ≤250 lines; no behavior change.
 - Tests & Docs (as part of this PR):
-  - Keep `tools/tests/tools/ensure-graph.idempotent.test.ts` as‑is; add a quick unit that exercises the new module’s argument/flag wiring (no behavioral change).
+  - Keep `build-tools/tools/tests/build-tools/tools/ensure-graph.idempotent.test.ts` as‑is; add a quick unit that exercises the new module’s argument/flag wiring (no behavioral change).
   - Document the split in `build-tools/docs/build-system-design.md` (exporter/glue section).
 
 ### Acceptance Criteria
 
-- `tools/tests/tools/ensure-graph.idempotent.test.ts` passes.
-- No diffs in `tools/buck/graph.json` content for identical inputs.
+- `build-tools/tools/tests/build-tools/tools/ensure-graph.idempotent.test.ts` passes.
+- No diffs in `build-tools/tools/buck/graph.json` content for identical inputs.
 
 ### Risks
 
@@ -166,13 +166,13 @@ Not yet implemented (verified): no `tools/buck/export-inline.ts`; inline exporte
 
 Avoid hard‑coding per‑language override env variable names in the planner by introducing a tiny mapping table. Improves discoverability and eases future language additions.
 
-Not yet implemented (verified): no `tools/nix/planner/overrides.nix`; env names are hard‑coded in `tools/nix/graph-generator.nix`.
+Not yet implemented (verified): no `build-tools/tools/nix/planner/overrides.nix`; env names are hard‑coded in `build-tools/tools/nix/graph-generator.nix`.
 
 ### Scope & Changes
 
-- tools/nix/planner/overrides.nix (new):
+- build-tools/tools/nix/planner/overrides.nix (new):
   - `{ go = "NIX_GO_DEV_OVERRIDE_JSON"; cpp = "NIX_CPP_DEV_OVERRIDE_JSON"; python = "NIX_PY_DEV_OVERRIDE_JSON"; }`
-- tools/nix/graph-generator.nix:
+- build-tools/tools/nix/graph-generator.nix:
   - Import and iterate the mapping when emitting local notices (respecting `PLANNER_NO_DEV_OVERRIDE_LOG` and `CI` semantics).
   - No change to template‑level CI guards.
 

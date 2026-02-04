@@ -1,10 +1,10 @@
 # Buck2 targets
-load("//tools/tests:defs.bzl", "auto_zx_tests")
+load("//build-tools/tools/tests:defs.bzl", "auto_zx_tests")
 load("@prelude//:rules.bzl", "export_file")
 
 # Auto-generate one zx_test per matching test file.
 auto_zx_tests(
-    root = "tools/tests",
+    root = "build-tools/tools/tests",
     patterns = [
         "**/*.test.ts",
         "e2e-provider-wiring.ts",

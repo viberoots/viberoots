@@ -17,7 +17,7 @@ As in prior parts, each PR includes the tests and documentation required for the
 
 ### Description
 
-Dev overrides are a cross-language workflow contract. Today the Nix planner treats env names as data (via `tools/nix/planner/overrides.nix`), but several TypeScript call sites still hardcode the env names directly.
+Dev overrides are a cross-language workflow contract. Today the Nix planner treats env names as data (via `build-tools/tools/nix/planner/overrides.nix`), but several TypeScript call sites still hardcode the env names directly.
 
 That split is a drift surface. It is easy to rename or add an override variable in one place and forget another (patch tooling, startup checks, prebuild notices, tests).
 
@@ -31,8 +31,8 @@ This PR introduces a single source of truth for override env names and refactors
   - Replace hardcoded Nix mapping with reading the manifest.
   - Preserve behavior: warn locally (via the existing notice surface), fail in CI.
 - Refactor TypeScript call sites to read the manifest:
-  - `tools/dev/startup-check.ts` warning blocks
-  - `tools/patch/*` language handlers where override env is passed into shared workflows
+  - `build-tools/tools/dev/startup-check.ts` warning blocks
+  - `build-tools/tools/patch/*` language handlers where override env is passed into shared workflows
   - Any prebuild notice tooling that lists active overrides
 - Keep all env var names stable in this PR. The goal is to unify the source, not to rename.
 
@@ -85,7 +85,7 @@ Implement.
 
 ### Description
 
-We have a patch model contract (`tools/lib/lang-contracts.ts` and `lang/lang_contracts.bzl`) that drives tooling messaging and enables consistent reasoning about invalidation. However, it does not fully describe the behavior we already depend on:
+We have a patch model contract (`build-tools/tools/lib/lang-contracts.ts` and `lang/lang_contracts.bzl`) that drives tooling messaging and enables consistent reasoning about invalidation. However, it does not fully describe the behavior we already depend on:
 
 - Node uses importer-local patches and can also include a global patch dir when patches match the importer effective set.
 - Python provider sync has strict and non-strict parsing modes, which changes failure behavior.
@@ -163,7 +163,7 @@ This PR extracts those utilities into a small shared library so Node provider sy
 
 ### Scope & Changes
 
-- Add a small TS helper module under `tools/lib/` for:
+- Add a small TS helper module under `build-tools/tools/lib/` for:
   - scanning a flat patch dir into a key map suitable for “effective set” selection
   - selecting patch paths for a given importer effective set with stable ordering and dedupe
 - Refactor Node provider sync:
@@ -233,7 +233,7 @@ This PR adds explicit parity tests for importer support rules so changes to impo
 - Add a small Starlark probe surface (under `//lang`) that classifies importer labels as supported or unsupported using the macro-side rules.
 - Add a TypeScript parity test that:
   - runs the Starlark probe for a matrix of importer labels
-  - compares results against `tools/lib/importers.ts:isSupportedImporterLabel`
+  - compares results against `build-tools/tools/lib/importers.ts:isSupportedImporterLabel`
 - Keep behavior stable. This PR adds enforcement, not new supported importers.
 
 Non-goals in this PR:
@@ -243,7 +243,7 @@ Non-goals in this PR:
 
 ### Tests (in this PR)
 
-- The TS parity test described above (matrix includes `.`, `apps/foo`, `libs/bar`, and clearly unsupported cases like `tools/x`, nested `apps/foo/bar`, and `../apps/x`).
+- The TS parity test described above (matrix includes `.`, `apps/foo`, `libs/bar`, and clearly unsupported cases like `build-tools/tools/x`, nested `apps/foo/bar`, and `../apps/x`).
 - Add one regression test that verifies the exporter does not auto-attach lockfile labels when the nearest lockfile is under an unsupported importer root.
 
 ### Docs (in this PR)

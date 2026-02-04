@@ -33,7 +33,7 @@ add an enforcement test that checks macros only call `prepare_language_wiring(..
 
 ### Tests (in this PR)
 
-- Add an enforcement test under `tools/tests/lang/` that scans macro files and asserts they only
+- Add an enforcement test under `build-tools/tools/tests/lang/` that scans macro files and asserts they only
   call `prepare_language_wiring(...)`.
 - Keep existing parity tests for unified wiring unchanged.
 
@@ -81,7 +81,7 @@ TypeScript provider sync. This removes repeated string constants and reduces dri
 
 - Add a shared lockfile basename registry:
   - Starlark: `lang/lockfile_contracts.bzl` with `LOCKFILE_BASENAMES_BY_LANG`.
-  - TypeScript: `tools/lib/lockfile-contracts.ts` with the same mapping.
+  - TypeScript: `build-tools/tools/lib/lockfile-contracts.ts` with the same mapping.
 - Update Node and Python provider sync to use the shared registry.
 - Update `lang/lockfile_labels.bzl` default lockfile helpers to use the registry.
 - Add a parity test that checks Starlark and TypeScript registries match.
@@ -89,7 +89,7 @@ TypeScript provider sync. This removes repeated string constants and reduces dri
 
 ### Tests (in this PR)
 
-- Add `tools/tests/lang/lockfile-contracts.parity.test.ts` to ensure registry parity.
+- Add `build-tools/tools/tests/lang/lockfile-contracts.parity.test.ts` to ensure registry parity.
 - Add a small provider sync test that asserts the registry is used for basenames.
 
 ### Docs (in this PR)
@@ -138,12 +138,12 @@ Python divergence is clear and enforced at the macro layer.
   - Node: `importer_patch_inclusion = "all"`
   - Python: `importer_patch_inclusion = "effective-set-only"`
 - Add a parity test that compares the Starlark policy to
-  `tools/lib/lang-contracts.ts`.
+  `build-tools/tools/lib/lang-contracts.ts`.
 - Update `abstractions.md` to include a clear section on the policy and why it differs.
 
 ### Tests (in this PR)
 
-- Add a parity test under `tools/tests/lang/` that compares Starlark and TS policy values.
+- Add a parity test under `build-tools/tools/tests/lang/` that compares Starlark and TS policy values.
 - Extend provider sync tests to assert the policy is honored for Node and Python.
 
 ### Docs (in this PR)

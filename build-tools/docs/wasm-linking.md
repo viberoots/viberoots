@@ -149,14 +149,14 @@ I propose to add the following attributes where they are meaningful:
 For TinyGo Wasm, there are two build paths in this repo:
 
 - **Graph-aware selected (default for Buck builds)**:
-  - Buck builds of `nix_go_tiny_wasm_lib` route through the graph-aware selected path (`tools/dev/build-selected.ts`, which builds `#graph-generator-selected`).
+  - Buck builds of `nix_go_tiny_wasm_lib` route through the graph-aware selected path (`build-tools/tools/dev/build-selected.ts`, which builds `#graph-generator-selected`).
   - This path can consume exported graph semantics and is required for Phase 2 linking behavior (`link_deps` / closure).
 
 - **Minimal selected-wasm (explicit opt-in)**:
   - The flake attribute `#graph-generator-selected-wasm` intentionally bypasses the exported graph and cannot incorporate repo Wasm link inputs (for example, `wasmStaticLibs` is empty).
   - This path is intended only for small smoke scaffolds that do not link in-repo C/C++.
   - If a call site must use this minimal path via Buck, it must opt in explicitly (for example, `use_selected_wasm = True` on `nix_go_tiny_wasm_lib`).
-  - I lock this opt-in path with `tools/tests/go/go.tinygo-wasm.use-selected-wasm.builds-via-minimal-path.test.ts`.
+  - I lock this opt-in path with `build-tools/tools/tests/go/go.tinygo-wasm.use-selected-wasm.builds-via-minimal-path.test.ts`.
 
 - For `nix_cpp_wasm_static_lib`:
   - `header_deps` (for includes while compiling)
@@ -181,8 +181,8 @@ For `nix_cpp_wasm_emscripten_lib`:
 
 Wasm semantics should be implemented in the relevant language planners:
 
-- Go planner (`tools/nix/planner/go.nix`) for TinyGo Wasm consumers
-- C++ planner (`tools/nix/planner/cpp.nix`) for C++ Wasm producers
+- Go planner (`build-tools/tools/nix/planner/go.nix`) for TinyGo Wasm consumers
+- C++ planner (`build-tools/tools/nix/planner/cpp.nix`) for C++ Wasm producers
 
 ### Go TinyGo Wasm consumer algorithm
 
@@ -454,7 +454,7 @@ Both designs need:
 
 Candidates:
 
-- **Nix side**: a small helper module under `tools/nix/planner/` such as `link-closure.nix` that implements:
+- **Nix side**: a small helper module under `build-tools/tools/nix/planner/` such as `link-closure.nix` that implements:
   - `resolveLinkClosure { byName, linkDepsOf, roots, defaultClosure, overrides } -> [ordered unique deps]`
 - **Starlark side**: a helper in `//lang:defs_common.bzl` that:
   - merges `deps/link_deps/header_deps` deterministically

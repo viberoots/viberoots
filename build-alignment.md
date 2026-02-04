@@ -7,7 +7,7 @@ This plan brings the repository into alignment with `build-tools/docs/build-syst
 - Summary: Switch planner `srcRoot` from repository root back to the filtered `appsLibsSrc` snapshot. Update Nix templates to set `pwd/modRoot` so paths resolve without needing the entire repo.
 - Consequence if not implemented: Larger Nix input closure, avoidable invalidation on unrelated root changes, weaker guardrails against cross-tree references.
 - Changes:
-  - `tools/nix/graph-generator.nix`: set `srcRoot = appsLibsSrc` for `goApp`/`goLib`.
+  - `build-tools/tools/nix/graph-generator.nix`: set `srcRoot = appsLibsSrc` for `goApp`/`goLib`.
   - Ensure `subdir`, `pwd`, and `modRoot` are computed so `cd` and module-relative paths work when only `apps/` and `libs/` are present.
   - Remove any reliance on repo-root existence during build steps.
 - Acceptance criteria:
@@ -28,7 +28,7 @@ This plan brings the repository into alignment with `build-tools/docs/build-syst
 - Summary: Ensure `cquery` reliably emits `rule_type` (and/or macro labels). Map any `buck.*` attributes to canonical names, then remove heuristic additions of `lang:go`/`kind:bin`.
 - Consequence if not implemented: Misclassification risks for Go nodes, noisy/incorrect provider mapping, brittle planner behavior.
 - Changes:
-  - `tools/buck/exporter/io.ts`: keep canonical mapping (`buck.deps` → `deps`, etc.).
+  - `build-tools/tools/buck/exporter/io.ts`: keep canonical mapping (`buck.deps` → `deps`, etc.).
   - Enforce presence of `rule_type` or macro-stamped labels (`lang:go`, `kind:bin`); if absent, early error with a precise message listing affected targets.
   - Remove heuristic label additions based on file extensions.
 - Acceptance criteria:
@@ -45,15 +45,15 @@ This plan brings the repository into alignment with `build-tools/docs/build-syst
 
 ### PR 3 — Remove `gomod2nix` Nix fallback; enforce presence via guard and install-deps
 
-- Summary: Delete the inline fallback `gomod2nix.toml` generation in Nix; rely on `tools/dev/install-deps.ts` to generate per-app files. Strengthen prebuild guard to fail if any required `gomod2nix.toml` is missing.
+- Summary: Delete the inline fallback `gomod2nix.toml` generation in Nix; rely on `build-tools/tools/dev/install-deps.ts` to generate per-app files. Strengthen prebuild guard to fail if any required `gomod2nix.toml` is missing.
 - Consequence if not implemented: Builds may proceed with incomplete dependency metadata, causing subtle failures later; divergence from spec (“install-deps generates deterministically”).
 - Changes:
-  - `tools/nix/graph-generator.nix`: remove inline/default `gomod2nix.toml` text generation; require the file to exist.
-  - `tools/buck/prebuild-guard.ts`: ensure it errors when any `apps/**/go.mod` exists without `apps/**/gomod2nix.toml`.
+  - `build-tools/tools/nix/graph-generator.nix`: remove inline/default `gomod2nix.toml` text generation; require the file to exist.
+  - `build-tools/tools/buck/prebuild-guard.ts`: ensure it errors when any `apps/**/go.mod` exists without `apps/**/gomod2nix.toml`.
   - Docs: add a troubleshooting note that “run install-deps” is required after Go dep changes.
 - Acceptance criteria:
   - Running materialization without per-app `gomod2nix.toml` fails fast with a clear error.
-  - After running `tools/dev/install-deps.ts`, materialization succeeds.
+  - After running `build-tools/tools/dev/install-deps.ts`, materialization succeeds.
 - Tests:
   - Guard test: create a temp app with `go.mod` only; guard must fail.
   - e2e: run install-deps; guard passes; build succeeds.
@@ -66,7 +66,7 @@ This plan brings the repository into alignment with `build-tools/docs/build-syst
 - Summary: Stop force-staging `graph.json` and `gomod2nix.toml`. The prebuild step generates glue; planner references those files directly from the working tree snapshot captured by `builtins.path` and the filtered source.
 - Consequence if not implemented: Local dev continues to depend on git index mutations, adding cognitive overhead and risk of accidental staging.
 - Changes:
-  - `tools/dev/dev-build.ts`: remove `git add -f` and corresponding reset; keep glue generation.
+  - `build-tools/tools/dev/dev-build.ts`: remove `git add -f` and corresponding reset; keep glue generation.
   - Ensure `flake.nix` uses a stable, minimal snapshot strategy (filtered where applicable) so Nix sees the files without staging.
   - Guard already enforces presence; early error if missing.
 - Acceptance criteria:
@@ -84,7 +84,7 @@ This plan brings the repository into alignment with `build-tools/docs/build-syst
 - Summary: Align `graph-outputs` to only include app binaries (not libraries). Libraries are still individually addressable via the planner but not linked into the manifest bundle.
 - Consequence if not implemented: Slightly larger materialized set and potential confusion about non-executable outputs in the manifest directory.
 - Changes:
-  - `tools/nix/graph-generator.nix`: filter `goTargets` to `kind == "bin"` for `all` and manifest emission.
+  - `build-tools/tools/nix/graph-generator.nix`: filter `goTargets` to `kind == "bin"` for `all` and manifest emission.
   - Keep ability to reference libs via separate attribute path for advanced use cases.
 - Acceptance criteria:
   - Manifest lists only binaries; libs are excluded.
@@ -99,7 +99,7 @@ This plan brings the repository into alignment with `build-tools/docs/build-syst
 - Summary: Delete preBuild vendor and ad-hoc patch application in templates. Depend solely on `gomod2nix` and the patch map per design.
 - Consequence if not implemented: Risk of impurity drift and hidden differences between local/CI; conflicts with the “no vendoring” principle.
 - Changes:
-  - `tools/nix/lang-templates.nix`: remove vendor calls and special-case module patching; apply patches only via `overrides` and patch map.
+  - `build-tools/tools/nix/lang-templates.nix`: remove vendor calls and special-case module patching; apply patches only via `overrides` and patch map.
 - Acceptance criteria:
   - Builds remain green without vendor mode; patches from `patches/go/*.patch` are respected.
   - No ad-hoc patch logic remains.
@@ -114,7 +114,7 @@ This plan brings the repository into alignment with `build-tools/docs/build-syst
 - Summary: Guard fails when `graph.json` is older than any `TARGETS`/`*.bzl` or provider auto files are missing/stale. Make messages actionable and concise by default; provide verbose and JSON modes.
 - Consequence if not implemented: Stale glue can slip through, causing confusing build or mapping results.
 - Changes:
-  - `tools/buck/prebuild-guard.ts`: implement mtime-based freshness checks; verify presence of `TARGETS*.auto` when patches/lockfiles exist; keep verbose and JSON flags as documented.
+  - `build-tools/tools/buck/prebuild-guard.ts`: implement mtime-based freshness checks; verify presence of `TARGETS*.auto` when patches/lockfiles exist; keep verbose and JSON flags as documented.
 - Acceptance criteria:
   - Changing any `TARGETS` or `*.bzl` triggers guard failure until `export-graph`/sync steps run.
   - If patches exist, at least one `TARGETS*.auto` must be present.

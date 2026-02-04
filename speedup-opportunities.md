@@ -10,9 +10,9 @@ It intentionally mirrors the **PR subsection structure** used in `quad-alignment
 
 ### Run configuration
 
-- **Command**: `timeout 60m env TEST_TIMING=summary ./tools/bin/v` (inside `direnv exec .`)
+- **Command**: `timeout 60m env TEST_TIMING=summary ./build-tools/tools/bin/v` (inside `direnv exec .`)
 - **Verify log**: `buck-out/tmp/verify-logs/verify-20251228-124519-wzMjkLZv.log`
-- **Timing source**: `tools/tests/lib/test-helpers.ts` emits `[timing] summary` for `runInTemp(...)` overhead.
+- **Timing source**: `build-tools/tools/tests/lib/test-helpers.ts` emits `[timing] summary` for `runInTemp(...)` overhead.
 
 ### Run outcome + parallelism
 
@@ -66,7 +66,7 @@ This avoids repeating expensive directory traversal + file copying work 500+ tim
 
 ### Scope & Changes
 
-- **Add a seed repo cache** in `tools/tests/lib/test-helpers.ts`:
+- **Add a seed repo cache** in `build-tools/tools/tests/lib/test-helpers.ts`:
   - module-level state:
     - `let seedRepoDir: string | null = null`
     - `let seedRepoReady: Promise<string> | null = null`
@@ -92,7 +92,7 @@ This avoids repeating expensive directory traversal + file copying work 500+ tim
 
 ### Tests (in this PR)
 
-- Add a focused unit/integration test under `tools/tests/lib/` that:
+- Add a focused unit/integration test under `build-tools/tools/tests/lib/` that:
   - calls `runInTemp` twice
   - inside the first temp, writes/edits a file that also exists in the seed (e.g., `flake.lock` in temp)
   - then runs a second `runInTemp` and asserts it did **not** observe the prior mutation
@@ -150,14 +150,14 @@ Implement (largest win, strongest evidence).
 
 - Total measured: **308.9s** across the suite (511×)
 
-But `tools/tests/lib/test-helpers.ts` already imports `tools/dev/zx-init.mjs` at module load (best-effort). The per-temp `node` subprocess is primarily a _sanity check_ that can be:
+But `build-tools/tools/tests/lib/test-helpers.ts` already imports `build-tools/tools/dev/zx-init.mjs` at module load (best-effort). The per-temp `node` subprocess is primarily a _sanity check_ that can be:
 
 - **cached once per worker process**, or
 - **removed** after we prove it’s redundant (keeping correctness by ensuring the zx wrapper environment loads zx-init reliably).
 
 ### Scope & Changes
 
-- In `tools/tests/lib/test-helpers.ts`:
+- In `build-tools/tools/tests/lib/test-helpers.ts`:
   - Add module-level cache:
     - `let zxInitProbeDone = false`
     - `let zxInitProbePromise: Promise<void> | null = null`
@@ -228,7 +228,7 @@ But `runInTemp` also sets `CGO_ENABLED=0` by default. When CGO is off, most of t
 
 ### Scope & Changes
 
-- In `tools/tests/lib/test-helpers.ts`:
+- In `build-tools/tools/tests/lib/test-helpers.ts`:
   - Honor an explicit caller’s CGO preference:
     - If the incoming environment sets `CGO_ENABLED`, do not override it.
     - Otherwise default to `CGO_ENABLED=0` (current behavior).
@@ -300,14 +300,14 @@ This is not a speedup itself, but it prevents “optimizing blind.”
 
 ### Scope & Changes
 
-- Add `tools/dev/analyze-verify-timing.ts`:
+- Add `build-tools/tools/dev/analyze-verify-timing.ts`:
   - Input: path to a verify log
   - Output:
     - wall clock from `[verify] buck2 test begin ... start_s=` / `... end_s=`
     - effective parallelism from parsed test durations
     - aggregated totals per `[timing]` bucket
     - computed estimated wall-clock savings for each bucket (and optionally deltas between two logs)
-- Update `tools/bin/verify`:
+- Update `build-tools/tools/bin/verify`:
   - When `TEST_TIMING=summary` is set:
     - run the analyzer at the end and print a short aggregated report into the verify log (and/or stderr).
 

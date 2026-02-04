@@ -123,7 +123,7 @@ Remove the unused `go_module_patch(...)` provider rule to reduce cognitive overh
   - Grep ensure: no references to `go_module_patch(` across the repo (including tests/docs). If any historical mention exists in docs, replace with a sentence clarifying Go is srcs‑driven only.
 - Tests (in this PR):
   - Confirm provider index and auto‑map remain unchanged for real targets (Go does not use providers). Run representative Go builds before/after to ensure byte‑stable outputs for unchanged inputs.
-  - Provider writers (Node/Python) continue to generate deterministic files; smoke run of `node tools/buck/sync-providers.ts` stays green.
+  - Provider writers (Node/Python) continue to generate deterministic files; smoke run of `node build-tools/tools/buck/sync-providers.ts` stays green.
 - Docs (in this PR):
   - Clarify in the patching section that Go does not use provider rules; patching is driven solely by package‑local patch files included in `srcs`.
 

@@ -16,7 +16,7 @@ Rationale
 
 Scope
 
-- Enhance `tools/buck/providers/node.ts` to discover importer‑local patches for each importer derived from lockfiles (e.g., `<importer>/patches/node/*.patch`) and include those paths in the generated `patch_paths=[...]` list.
+- Enhance `build-tools/tools/buck/providers/node.ts` to discover importer‑local patches for each importer derived from lockfiles (e.g., `<importer>/patches/node/*.patch`) and include those paths in the generated `patch_paths=[...]` list.
 - Keep `node_importer_deps` rule unchanged (still `srcs = []`); this is informational only.
 - Add tests:
   - Determinism: idempotent `TARGETS.node.auto` with and without importer-local patches.
@@ -25,7 +25,7 @@ Scope
 
 Acceptance criteria
 
-- `tools/buck/sync-providers.ts --lang node` produces identical outputs if inputs unchanged.
+- `build-tools/tools/buck/sync-providers.ts --lang node` produces identical outputs if inputs unchanged.
 - With `<importer>/patches/node/*.patch` present, the corresponding provider includes these in `patch_paths` deterministically.
 - No target builds change; prebuild guard remains green across scenarios (with/without patches).
 
@@ -45,7 +45,7 @@ Rationale
 
 Scope
 
-- Extend `tools/buck/exporter/lang/node.ts` validation to warn (CI=error) when:
+- Extend `build-tools/tools/buck/exporter/lang/node.ts` validation to warn (CI=error) when:
   - `kind:*` is missing on Node targets using our macros.
   - `lockfile:` label count ≠ 1 (already enforced; expand messages with remediation).
   - Path/importer mismatch (already enforced; improve suggestions).
@@ -74,9 +74,9 @@ Rationale
 Scope
 
 - Update documentation:
-  - `pnpm-design.md`: clarify Node provider `patch_paths` semantics; emphasize importer‑local patch invalidation via macros; call out exporter sidecar (`tools/buck/node-lock-index.json`) and prebuild guard freshness.
-- `pnpm-design.md`: clarify Node provider `patch_paths` semantics; emphasize importer‑local patch invalidation via macros; call out glue‑generated sidecar (`tools/buck/node-lock-index.json`) and prebuild guard freshness.
-  - Handbook: troubleshooting entries for “missing importer provider”, “no‑op sync”, and “stale sidecar” with copy‑paste fixes (`node tools/buck/sync-providers.ts`, exporter rerun, etc.).
+  - `pnpm-design.md`: clarify Node provider `patch_paths` semantics; emphasize importer‑local patch invalidation via macros; call out exporter sidecar (`build-tools/tools/buck/node-lock-index.json`) and prebuild guard freshness.
+- `pnpm-design.md`: clarify Node provider `patch_paths` semantics; emphasize importer‑local patch invalidation via macros; call out glue‑generated sidecar (`build-tools/tools/buck/node-lock-index.json`) and prebuild guard freshness.
+  - Handbook: troubleshooting entries for “missing importer provider”, “no‑op sync”, and “stale sidecar” with copy‑paste fixes (`node build-tools/tools/buck/sync-providers.ts`, exporter rerun, etc.).
   - Reference the Composite Graph API and sidecars as the only supported consumption path.
 - Tests: add/extend e2e wiring test to assert that an importer-local Node patch rebuilds only that importer’s targets.
 

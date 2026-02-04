@@ -41,10 +41,10 @@ This PR changes Starlark helper plumbing and migrates the small set of macros th
 
 Add or update Node macro tests to lock down both the label stamp and the real action input behavior via the new helper:
 
-- Extend the existing `tools/tests/node/*global-inputs*` tests so they explicitly cover:
+- Extend the existing `build-tools/tools/tests/node/*global-inputs*` tests so they explicitly cover:
   - `node_webapp` stamps `//:flake.lock` via `global_nix_inputs()` and includes it in `srcs`
   - bundled `nix_node_cli_bin` stamps `//:flake.lock` and includes it in `srcs` even when `srcs` is dict-shaped
-- Add one focused negative test that fails if a macro hardcodes `//:flake.lock` (this is already enforced by `tools/dev/lint-global-stamping.ts`; this PR should wire that lint into whatever local/CI stage is considered canonical for guardrails if it is not already).
+- Add one focused negative test that fails if a macro hardcodes `//:flake.lock` (this is already enforced by `build-tools/tools/dev/lint-global-stamping.ts`; this PR should wire that lint into whatever local/CI stage is considered canonical for guardrails if it is not already).
 
 ### Docs (in this PR)
 

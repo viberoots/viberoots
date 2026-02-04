@@ -28,7 +28,7 @@ I consider this audit “done” when:
 
 I use a few terms consistently:
 
-- **Label contract**: a label string format that tools/macros interpret (examples: `lang:<id>`, `kind:<k>`, `nixpkg:<attr>`, `lockfile:<path>#<importer>`).
+- **Label contract**: a label string format that build-tools/tools/macros interpret (examples: `lang:<id>`, `kind:<k>`, `nixpkg:<attr>`, `lockfile:<path>#<importer>`).
 - **Importer-scoped ecosystem**: dependencies and patching are keyed by a lockfile and an importer directory (Node PNPM, Python uv).
 - **Package-local patching**: patches live inside the Buck package that owns the target, and are included in that target’s inputs (Go, C++).
 - **Provider edge**: a dependency edge from a target to a provider rule in `//third_party/providers:*`, realized via `MODULE_PROVIDERS`.
@@ -61,18 +61,18 @@ For language macros, stamping is the macro’s responsibility. Call sites should
   - `wire_package_local_wasm_planner_visible_stub(...)` (preferred; non-mutating boundary, delegates to `wire_package_local_planner_visible_stub(...)`)
 - **Kind vocabulary (contract)**:
   - Starlark: `lang/kind_vocabulary.bzl` (re-exported via `lang/defs_common.bzl`)
-  - TypeScript: `tools/lib/kind-vocabulary.ts`
-- **Nix planner kind inference (shared)**: I keep `tools/nix/planner/lib.nix:kindOf` with per-language configs in `tools/nix/planner/kind-configs.nix`, imported by planner plugins. Planners must not re-implement `kindOf`. Relocation note: configs moved from `tools/nix/planner/{go,cpp,python-core,node}.nix` into the registry.
+  - TypeScript: `build-tools/tools/lib/kind-vocabulary.ts`
+- **Nix planner kind inference (shared)**: I keep `build-tools/tools/nix/planner/lib.nix:kindOf` with per-language configs in `build-tools/tools/nix/planner/kind-configs.nix`, imported by planner plugins. Planners must not re-implement `kindOf`. Relocation note: configs moved from `build-tools/tools/nix/planner/{go,cpp,python-core,node}.nix` into the registry.
 - **TypeScript exporter validation**: importer-scoped adapters warn when `kind:*` is missing for targets that should have it.
-  - `tools/buck/exporter/lang/importer-scoped-adapter.ts`
+  - `build-tools/tools/buck/exporter/lang/importer-scoped-adapter.ts`
 - **TypeScript importer-scoped adapter helper**: shared adapter factory used by Node and Python.
-  - `tools/buck/exporter/lang/importer-scoped-adapter.ts` (`buildImporterScopedAdapter`)
+  - `build-tools/tools/buck/exporter/lang/importer-scoped-adapter.ts` (`buildImporterScopedAdapter`)
 - **TypeScript exporter classification registry**: shared config for looks-like rules, rule-type prefixes, labels, and guidance.
-  - `tools/buck/exporter/lang/classification-registry.ts`
+  - `build-tools/tools/buck/exporter/lang/classification-registry.ts`
 
 ### Regression guards
 
-- **Lint**: `tools/dev/stamping-lint.ts` flags missing `lang:*` and invalid `kind:*`.
+- **Lint**: `build-tools/tools/dev/stamping-lint.ts` flags missing `lang:*` and invalid `kind:*`.
 
 ### Common leak patterns
 
@@ -115,8 +115,8 @@ Cleanup required:
 
 ### Regression guards
 
-- `tools/tests/lang/language-wiring.non-mutating.probe.test.ts`
-- `tools/tests/lang/language-wiring.unified.parity.test.ts`
+- `build-tools/tools/tests/lang/language-wiring.non-mutating.probe.test.ts`
+- `build-tools/tools/tests/lang/language-wiring.unified.parity.test.ts`
 
 ### Common leak patterns
 
@@ -143,14 +143,14 @@ No other transformations are part of this contract.
 ### Canonical implementations
 
 - **Starlark**: `lang/sanitize.bzl:sanitize_name`
-- **TypeScript**: `tools/lib/sanitize.ts:sanitizeName`
-- **Nix**: `tools/nix/lib/lang-helpers.nix:sanitizeName`
+- **TypeScript**: `build-tools/tools/lib/sanitize.ts:sanitizeName`
+- **Nix**: `build-tools/tools/nix/lib/lang-helpers.nix:sanitizeName`
   - C++ macros and rules call `sanitize_name` directly; no C++-local wrapper is part of the contract.
 
 ### Regression guards
 
-- `tools/tests/lang/sanitize-name.parity.test.ts` (Starlark `sanitize_name` vs TS sanitizer)
-- `tools/tests/cpp/sanitize-name.parity.test.ts` (C++ bin-name sanitizer vs TS sanitizer)
+- `build-tools/tools/tests/lang/sanitize-name.parity.test.ts` (Starlark `sanitize_name` vs TS sanitizer)
+- `build-tools/tools/tests/cpp/sanitize-name.parity.test.ts` (C++ bin-name sanitizer vs TS sanitizer)
 
 ### Common leak patterns
 
@@ -177,31 +177,31 @@ Some tooling needs a stable mapping from a Buck target label to a Nix attribute 
 
 ### Canonical implementations
 
-- **TypeScript**: `tools/lib/labels.ts`
+- **TypeScript**: `build-tools/tools/lib/labels.ts`
   - `normalizeTargetLabel`
   - `sanitizeAttrNameFromLabel`
 - **Starlark**: `lang/nix_attr.bzl`
   - `normalize_target_label`
   - `sanitize_nix_attr_from_target_label`
-- **Nix**: `tools/nix/lib/lang-helpers.nix`
+- **Nix**: `build-tools/tools/nix/lib/lang-helpers.nix`
   - `normalizeTargetLabel`
   - `packagePathFromTargetLabel`
   - `sanitizeAttrNameFromTargetLabel`
 
-The Nix planner (`tools/nix/graph-generator.nix`) must not re-implement:
+The Nix planner (`build-tools/tools/nix/graph-generator.nix`) must not re-implement:
 
 - Target label normalization (config suffix + cell prefix stripping)
 - Package path derivation from target labels
 - Nix attribute suffix derivation from target labels
 
-It must route these transforms through `tools/nix/lib/lang-helpers.nix` so planner keying, selection (`BUCK_TARGET`), and package path behavior stay drift-free.
+It must route these transforms through `build-tools/tools/nix/lib/lang-helpers.nix` so planner keying, selection (`BUCK_TARGET`), and package path behavior stay drift-free.
 
 ### Regression guards
 
-- `tools/tests/labels/nix-attr-sanitize.parity.test.ts`
-- `tools/tests/labels/nix-attr-sanitize.nix-ts.parity.test.ts`
-- `tools/tests/labels/label-normalization-parity.test.ts`
-- `tools/tests/planner/planner.flat-attrset-keying.stability.test.ts`
+- `build-tools/tools/tests/labels/nix-attr-sanitize.parity.test.ts`
+- `build-tools/tools/tests/labels/nix-attr-sanitize.nix-ts.parity.test.ts`
+- `build-tools/tools/tests/labels/label-normalization-parity.test.ts`
+- `build-tools/tools/tests/planner/planner.flat-attrset-keying.stability.test.ts`
 
 ### Common leak patterns
 
@@ -238,10 +238,10 @@ The validation rules are:
 - **Starlark**: `lang/lockfile_labels.bzl`
   - `ensure_single_lockfile_label`
   - `importer_from_labels`
-- **TypeScript**: `tools/lib/labels.ts`
+- **TypeScript**: `build-tools/tools/lib/labels.ts`
   - `parseLockfileLabelParts`
   - `parseLockfileLabel`
-- **TypeScript**: `tools/lib/importers.ts`
+- **TypeScript**: `build-tools/tools/lib/importers.ts`
   - `isSupportedImporterLabel`
   - `findNearestLockfileForPackage` (canonical “walk upward to repo root” helper for importer-scoped tooling)
   - `findNearestPnpmLockForPackage`, `findNearestUvLockForPackage` (thin wrappers for common basenames)
@@ -250,8 +250,8 @@ The validation rules are:
 
 These tests are the guardrails for this cross-language contract. If you change importer support rules or label parsing behavior, update the matrix and keep these passing.
 
-- `tools/tests/labels/lockfile-label.parity.test.ts`
-- `tools/tests/lib/importer-support.parity.test.ts`
+- `build-tools/tools/tests/labels/lockfile-label.parity.test.ts`
+- `build-tools/tools/tests/lib/importer-support.parity.test.ts`
 
 ### Common leak patterns
 
@@ -278,13 +278,13 @@ Starlark and TypeScript. Do not hardcode basenames in tooling or macros.
 - **Starlark**: `lang/lockfile_contracts.bzl`
   - `LOCKFILE_BASENAMES_BY_LANG`
   - `default_lockfile_basename_for_lang`
-- **TypeScript**: `tools/lib/lockfile-contracts.ts`
+- **TypeScript**: `build-tools/tools/lib/lockfile-contracts.ts`
   - `lockfileBasenamesForLang`
   - `defaultLockfileBasenameForLang`
 
 ### Regression guards
 
-- `tools/tests/lang/lockfile-contracts.parity.test.ts` (Starlark ↔ TS registry parity)
+- `build-tools/tools/tests/lang/lockfile-contracts.parity.test.ts` (Starlark ↔ TS registry parity)
 
 ### Common leak patterns
 
@@ -329,29 +329,29 @@ I treat patch invalidation as two explicit models:
 
 When debugging invalidation, it is easy to misread the surface area by looking only at provider files under `third_party/providers/`. The canonical answers are designed to be available without reading macro or generator code:
 
-- `node tools/buck/prebuild-guard.ts` prints short, canonical one-liners that explain where invalidation comes from, using the contract vocabulary (`package-local` / `importer-local`).
-- When importer-local patching is enabled, prebuild guard prints a short line that points to `tools/buck/invalidation-report.txt` for per-target action inputs.
-- `tools/buck/invalidation-report.txt` is the canonical per-target report. It answers “what invalidates this target?” using the shared contract vocabulary and separates **real action inputs** from **diagnostic stamps**:
+- `node build-tools/tools/buck/prebuild-guard.ts` prints short, canonical one-liners that explain where invalidation comes from, using the contract vocabulary (`package-local` / `importer-local`).
+- When importer-local patching is enabled, prebuild guard prints a short line that points to `build-tools/tools/buck/invalidation-report.txt` for per-target action inputs.
+- `build-tools/tools/buck/invalidation-report.txt` is the canonical per-target report. It answers “what invalidates this target?” using the shared contract vocabulary and separates **real action inputs** from **diagnostic stamps**:
   - `patch_scope` and whether patch inputs are expected to be real action inputs (based on the patch model contract).
   - Where patch inputs are observed (list-shaped `srcs`, dict-shaped `srcs` under `__patch_inputs__/...`, or synthetic deps like `*__patch_inputs`). Dict-shaped `__patch_inputs__/...` observations are classified according to the target’s `patch_scope` (package-local vs importer-local).
   - Where global Nix inputs are observed as action inputs (`srcs` and/or `nix_inputs`). Label stamps are observability-only (`global_nix_inputs_labels_stamped`) and must not be treated as the source of truth for invalidation.
   - Realized provider edges are included as a debugging aid only. They are not the invalidation source of truth.
-  - Regenerate (preferred): `node tools/buck/glue-pipeline.ts`
-  - Regenerate (report-only): `node tools/buck/invalidation-report.ts`
+  - Regenerate (preferred): `node build-tools/tools/buck/glue-pipeline.ts`
+  - Regenerate (report-only): `node build-tools/tools/buck/invalidation-report.ts`
 - `third_party/providers/provider_index.json` is a single, stable report that maps provider targets to their origin key and includes additive patch-model metadata (`patch_scope`, `languages`, and where patch inputs are expected to be carried).
 
 Rule: treat provider `patch_paths` as diagnostic/observability data for importer-scoped ecosystems. Invalidation is driven by real action inputs attached by macro wiring.
 
 Regression guard for this diagnostic surface:
 
-- `tools/tests/buck/invalidation-report.classifies-and-orders.test.ts` (fixture-level invariants: stable ordering, patch model classification, and action-input observation categories)
-- `tools/tests/node/node.webapp.nix-calling.wiring.global-inputs-and-importer-patches-and-stamps.cquery.test.ts` (importer-local: importer patches are real action inputs for a representative dict-safe macro shape)
-- `tools/tests/cpp/cpp.macros.library.package-local-patch-inputs-and-labels.cquery.test.ts` (package-local: package patches are real action inputs for a representative C++ macro)
+- `build-tools/tools/tests/buck/invalidation-report.classifies-and-orders.test.ts` (fixture-level invariants: stable ordering, patch model classification, and action-input observation categories)
+- `build-tools/tools/tests/node/node.webapp.nix-calling.wiring.global-inputs-and-importer-patches-and-stamps.cquery.test.ts` (importer-local: importer patches are real action inputs for a representative dict-safe macro shape)
+- `build-tools/tools/tests/cpp/cpp.macros.library.package-local-patch-inputs-and-labels.cquery.test.ts` (package-local: package patches are real action inputs for a representative C++ macro)
 
 ### Canonical implementations
 
 - **Patch model registry (Starlark)**: `//lang:lang_contracts.bzl`
-- **Patch model registry (TypeScript)**: `tools/lib/lang-contracts.ts`
+- **Patch model registry (TypeScript)**: `build-tools/tools/lib/lang-contracts.ts`
 - **Starlark wiring entrypoint**:
   - `lang/language_wiring.bzl:prepare_language_wiring` (preferred macro-side helper that composes kwarg normalization, label stamping, patch input inclusion, and provider-edge realization deterministically without mutating call-site dicts).
 - **Starlark package-local internals**:
@@ -361,7 +361,7 @@ Regression guard for this diagnostic surface:
 
 For importer-scoped ecosystems, there is an additional provider contract surface that is still part of the “patch model”, because it directly determines invalidation behavior and glue content.
 
-- **Importer-scoped provider contract (TypeScript)**: `tools/lib/lang-contracts.ts`
+- **Importer-scoped provider contract (TypeScript)**: `build-tools/tools/lib/lang-contracts.ts`
   - `importerScopedProviderContractForLang(lang)` defines:
     - importer patch inclusion policy (`all` vs `effective-set-only`)
     - optional global patch dir inputs (for Node: `patches/node`, effective-set matches only)
@@ -369,10 +369,10 @@ For importer-scoped ecosystems, there is an additional provider contract surface
     - provider sync strictness support (Python supports strict parsing; default is non-strict)
 - **Importer-scoped provider policy (Starlark)**: `lang/importer_contracts.bzl`
   - `importer_patch_inclusion_for_lang(lang)` mirrors the patch inclusion policy so probe tests can enforce parity.
-- **TypeScript provider sync driver**: `tools/lib/provider-sync-driver.ts` (takes the contract values as explicit options; does not silently default)
-- **TypeScript importer-scoped provider sync helper**: `tools/buck/providers/importer-scoped.ts` (shared scaffolding for Node/Python; extension points for synthetic lockfiles and strict parsing)
-- **Language adapters**: `tools/buck/providers/*` (read the contract and pass policy into the driver)
-- **Effective set patch selection (TypeScript)**: `tools/lib/effective-set-patch-selection.ts` (scan flat patch dirs into a canonical key map; select global patch paths by importer effective set with stable ordering)
+- **TypeScript provider sync driver**: `build-tools/tools/lib/provider-sync-driver.ts` (takes the contract values as explicit options; does not silently default)
+- **TypeScript importer-scoped provider sync helper**: `build-tools/tools/buck/providers/importer-scoped.ts` (shared scaffolding for Node/Python; extension points for synthetic lockfiles and strict parsing)
+- **Language adapters**: `build-tools/tools/buck/providers/*` (read the contract and pass policy into the driver)
+- **Effective set patch selection (TypeScript)**: `build-tools/tools/lib/effective-set-patch-selection.ts` (scan flat patch dirs into a canonical key map; select global patch paths by importer effective set with stable ordering)
 
 ### Patch filename decoding (flat patch dirs)
 
@@ -384,27 +384,27 @@ Several layers scan a flat `patches/<lang>/*.patch` directory and need to agree 
   - The canonical key is lowercased and formatted as `importPath@version`.
   - Version normalization is explicit at the call site for languages that require it (Python strips suffix after `-`).
 - **Canonical implementations**:
-  - **TypeScript**: `tools/lib/providers.ts:decodeNameVersionFromPatch`
-  - **Nix**: `tools/nix/lib/lang-helpers.nix:decodePatchFilename`
-- **Nix (builders)**: `tools/nix/lib/lang-helpers.nix:patchesMapFromDirsWith` (canonical surface with optional `normalizeVersion` and store materialization)
+  - **TypeScript**: `build-tools/tools/lib/providers.ts:decodeNameVersionFromPatch`
+  - **Nix**: `build-tools/tools/nix/lib/lang-helpers.nix:decodePatchFilename`
+- **Nix (builders)**: `build-tools/tools/nix/lib/lang-helpers.nix:patchesMapFromDirsWith` (canonical surface with optional `normalizeVersion` and store materialization)
 - **Nix (builders, wrappers)**: `patchesMapFromDir`, `patchesMapFromDirs`, `patchesMapFromDirToStore`, `patchesMapFromImporterDirToStore`
-- **Nix (builders, Python defaults)**: `tools/nix/lib/lang-helpers.nix:pythonPatchesMapFromDirs`
-- **Nix (overlay)**: `tools/nix/overlays/cpp-patches.nix` uses `decodePatchFilename` for C++ overlay patch decoding
+- **Nix (builders, Python defaults)**: `build-tools/tools/nix/lib/lang-helpers.nix:pythonPatchesMapFromDirs`
+- **Nix (overlay)**: `build-tools/tools/nix/overlays/cpp-patches.nix` uses `decodePatchFilename` for C++ overlay patch decoding
 - **Loose decoding (lint-only)**:
-  - **TypeScript**: `tools/lib/providers.ts:decodeNameVersionFromPatchLoose`
+  - **TypeScript**: `build-tools/tools/lib/providers.ts:decodeNameVersionFromPatchLoose`
   - The loose variant is for `patches-lint` duplicate detection on case-insensitive filesystems only. It is not part of the cross-language contract and must not be used in build or planner paths.
 - **Regression guards**:
-  - `tools/tests/lib/parity.ts_nix_patch_key_parity.test.ts` (TS scan vs Nix `patchesMapFromDir` key set)
-  - `tools/tests/nix/patch-filename-decoding.nix-ts.parity.test.ts` (TS decode vs Nix decode, including Python-style version normalization)
+  - `build-tools/tools/tests/lib/parity.ts_nix_patch_key_parity.test.ts` (TS scan vs Nix `patchesMapFromDir` key set)
+  - `build-tools/tools/tests/nix/patch-filename-decoding.nix-ts.parity.test.ts` (TS decode vs Nix decode, including Python-style version normalization)
 
 ### Dev overrides (environment variable names)
 
 Dev override environment variable names are treated as a cross-language contract. The names are data, not hardcoded strings, to avoid drift across Nix and TypeScript tooling.
 
-- **Manifest (source of truth)**: `tools/lib/dev-override-envs.json`
-- **TypeScript consumer**: `tools/lib/dev-override-envs.ts`
-- **Nix consumer (planner mapping)**: `tools/nix/planner/overrides.nix` reads the JSON manifest
-- **Nix consumer (template defaults)**: `tools/nix/lib/dev-override-envs.nix` reads the JSON manifest and templates use `envNameForLang(...)` instead of hardcoded strings
+- **Manifest (source of truth)**: `build-tools/tools/lib/dev-override-envs.json`
+- **TypeScript consumer**: `build-tools/tools/lib/dev-override-envs.ts`
+- **Nix consumer (planner mapping)**: `build-tools/tools/nix/planner/overrides.nix` reads the JSON manifest
+- **Nix consumer (template defaults)**: `build-tools/tools/nix/lib/dev-override-envs.nix` reads the JSON manifest and templates use `envNameForLang(...)` instead of hardcoded strings
 
 Rule: tooling must not hardcode `NIX_*_DEV_OVERRIDE_JSON` names. Resolve env var names from the manifest instead.
 
@@ -412,9 +412,9 @@ Rule: tooling must not hardcode `NIX_*_DEV_OVERRIDE_JSON` names. Resolve env var
 
 There are multiple relevant tests. The most important “contract locks” are:
 
-- `tools/tests/lang/lang-contracts.patch-model.parity.test.ts` (Starlark ↔ TS registry parity)
-- `tools/tests/providers/provider-sync-driver.patch-inclusion-policy.test.ts` (Node vs Python importer patch inclusion policy)
-- `tools/tests/lib/lang-contracts.importer-scoped-provider-contract.test.ts` (contract values are explicit and stable)
+- `build-tools/tools/tests/lang/lang-contracts.patch-model.parity.test.ts` (Starlark ↔ TS registry parity)
+- `build-tools/tools/tests/providers/provider-sync-driver.patch-inclusion-policy.test.ts` (Node vs Python importer patch inclusion policy)
+- `build-tools/tools/tests/lib/lang-contracts.importer-scoped-provider-contract.test.ts` (contract values are explicit and stable)
 - Any macro tests that assert importer-local patches are included as inputs for Node/Python targets.
 
 ### Common leak patterns
@@ -445,14 +445,14 @@ Providers are how we attach “shared dependency state” to build targets witho
   - `lang/provider_edges.bzl:realize_provider_edges` is the lower-level helper used by `merge_provider_edges` for list and kwargs bases.
   - `lang/provider_edges.bzl:strip_provider_targets`
 - **TypeScript**:
-  - `tools/buck/gen-auto-map.ts` (generator)
-  - `tools/lib/labels.ts:providersForLabels` (mapping labels to provider targets)
+  - `build-tools/tools/buck/gen-auto-map.ts` (generator)
+  - `build-tools/tools/lib/labels.ts:providersForLabels` (mapping labels to provider targets)
 - **Glue orchestrator**:
-  - `tools/buck/glue-pipeline.ts` (ensure graph, sync providers, provider index, auto-map)
+  - `build-tools/tools/buck/glue-pipeline.ts` (ensure graph, sync providers, provider index, auto-map)
 
 ### Regression guards
 
-- `tools/tests/normalization.nixpkg-providers-for-labels.wiring.test.ts` (ensures `providersForLabels` maps `nixpkg:*` correctly)
+- `build-tools/tools/tests/normalization.nixpkg-providers-for-labels.wiring.test.ts` (ensures `providersForLabels` maps `nixpkg:*` correctly)
 - Provider sync golden tests (Node and Python) that assert deterministic outputs.
 
 ### Common leak patterns
@@ -486,13 +486,13 @@ The label string is:
 
 - **Starlark**: `lang/nixpkg_labels.bzl:normalize_nix_attr` and `append_nixpkg_labels`
 - Macro guidance: prefer `lang/defs_common.bzl:prepare_language_wiring(...)` so language macro files do not re-implement `nixpkg_deps` parsing/defaulting or patch-dir handling.
-- **TypeScript**: `tools/lib/providers.ts:normalizeNixAttr` (canonical import path; implementation lives in `tools/lib/provider-names.ts`)
-- **Nix**: `tools/nix/lib/lang-helpers.nix:normalizeNixAttr`
+- **TypeScript**: `build-tools/tools/lib/providers.ts:normalizeNixAttr` (canonical import path; implementation lives in `build-tools/tools/lib/provider-names.ts`)
+- **Nix**: `build-tools/tools/nix/lib/lang-helpers.nix:normalizeNixAttr`
 
 ### Regression guards
 
-- `tools/tests/normalization-parity.test.ts` (Starlark vs TS vs Nix)
-- `tools/tests/provider-names/nix-attr-normalization.test.ts` (TS behavior)
+- `build-tools/tools/tests/normalization-parity.test.ts` (Starlark vs TS vs Nix)
+- `build-tools/tools/tests/provider-names/nix-attr-normalization.test.ts` (TS behavior)
 
 ### Common leak patterns
 
@@ -519,7 +519,7 @@ Some rules and macros call Nix. Those actions must be invalidated by a small set
   - `global_nix_inputs`
   - `attach_global_nix_inputs`
 - **Starlark label stamp**: `lang/label_stamping.bzl:stamp_global_nix_inputs` (used only when justified)
-- **Lint**: `tools/dev/lint-global-stamping.ts` (fails on direct `//:flake.lock` stamping)
+- **Lint**: `build-tools/tools/dev/lint-global-stamping.ts` (fails on direct `//:flake.lock` stamping)
 
 ### Regression guards
 
@@ -547,7 +547,7 @@ Importer-scoped wrappers should use a standardized wiring sequence. When a wrapp
 - Attach importer-local patches as inputs (list and dict shapes).
 - Realize provider edges into action inputs when a rule shape cannot accept `deps`.
 - When invoking Nix, attach `global_nix_inputs()` as real action inputs (list and dict shapes) and optionally stamp the label for observability.
-- When a genrule command needs a stable repo root in sandboxed/temp-repo environments, inject `tools/buck/workspace-root.env` into dict-shaped `srcs` in a standardized way.
+- When a genrule command needs a stable repo root in sandboxed/temp-repo environments, inject `build-tools/tools/buck/workspace-root.env` into dict-shaped `srcs` in a standardized way.
 
 ### Canonical implementations
 
@@ -583,12 +583,12 @@ These prefixes are a shared contract. Do not hardcode these strings. Import the 
 
 The contract is guarded by probe and enforcement tests. If a new macro bypasses the shared helper surface, these should fail:
 
-- `tools/tests/lang/importer-wiring.attach-patches-and-providers.probe.test.ts`: proves list and dict `srcs` shapes both receive importer-local patch inputs and provider edges.
-- `tools/tests/lang/importer-wiring.macros-avoid-direct-lockfile-parsing.enforcement.test.ts`: prevents importer-scoped macro implementations from directly loading `//lang:lockfile_labels.bzl` instead of delegating to shared wiring.
-- `tools/tests/lang/importer-nix-calling-genrule-wiring.attach-patches-providers-global-inputs.probe.test.ts`: proves list and dict `srcs` shapes receive importer-local patch inputs, provider edges, global Nix inputs, and standardized workspace-root env injection.
-- `tools/tests/node/node.nix-calling-macros.use-shared-importer-nix-genrule-helper.enforcement.test.ts`: prevents Node Nix-calling macro implementations from bypassing the shared helper.
-- `tools/tests/node/node.defs-core.uses-non-mutating-importer-wiring.enforcement.test.ts`: prevents Node macros from falling back to the mutating importer wiring helpers.
-- `tools/tests/lang/starlark.no-legacy-mutating-outside-lang.enforcement.test.ts`: prevents reintroduction of legacy mutating wiring helpers outside `//lang/*`.
+- `build-tools/tools/tests/lang/importer-wiring.attach-patches-and-providers.probe.test.ts`: proves list and dict `srcs` shapes both receive importer-local patch inputs and provider edges.
+- `build-tools/tools/tests/lang/importer-wiring.macros-avoid-direct-lockfile-parsing.enforcement.test.ts`: prevents importer-scoped macro implementations from directly loading `//lang:lockfile_labels.bzl` instead of delegating to shared wiring.
+- `build-tools/tools/tests/lang/importer-nix-calling-genrule-wiring.attach-patches-providers-global-inputs.probe.test.ts`: proves list and dict `srcs` shapes receive importer-local patch inputs, provider edges, global Nix inputs, and standardized workspace-root env injection.
+- `build-tools/tools/tests/node/node.nix-calling-macros.use-shared-importer-nix-genrule-helper.enforcement.test.ts`: prevents Node Nix-calling macro implementations from bypassing the shared helper.
+- `build-tools/tools/tests/node/node.defs-core.uses-non-mutating-importer-wiring.enforcement.test.ts`: prevents Node macros from falling back to the mutating importer wiring helpers.
+- `build-tools/tools/tests/lang/starlark.no-legacy-mutating-outside-lang.enforcement.test.ts`: prevents reintroduction of legacy mutating wiring helpers outside `//lang/*`.
 
 ---
 
@@ -625,9 +625,9 @@ Importer-scoped non-genrule wrappers should:
 
 These tests serve as the regression suite for the non-genrule importer-scoped wiring contract:
 
-- `tools/tests/python/python.importer-patches.srcs-inclusion.cquery.test.ts`: verifies Python macros include importer-local patches as real action inputs.
-- `tools/tests/node/node.webapp-and-cli.importer-patches-action-inputs.srcs.test.ts` and `tools/tests/node/node.nix-test.importer-patches-action-inputs.srcs.test.ts`: verify Node importer-local patches are real action inputs across representative macro shapes.
-- `tools/tests/lang/importer-wiring.macros-avoid-direct-lockfile-parsing.enforcement.test.ts`: ensures macro implementations route lockfile parsing/enforcement through `//lang:importer_wiring.bzl`.
+- `build-tools/tools/tests/python/python.importer-patches.srcs-inclusion.cquery.test.ts`: verifies Python macros include importer-local patches as real action inputs.
+- `build-tools/tools/tests/node/node.webapp-and-cli.importer-patches-action-inputs.srcs.test.ts` and `build-tools/tools/tests/node/node.nix-test.importer-patches-action-inputs.srcs.test.ts`: verify Node importer-local patches are real action inputs across representative macro shapes.
+- `build-tools/tools/tests/lang/importer-wiring.macros-avoid-direct-lockfile-parsing.enforcement.test.ts`: ensures macro implementations route lockfile parsing/enforcement through `//lang:importer_wiring.bzl`.
 
 ---
 

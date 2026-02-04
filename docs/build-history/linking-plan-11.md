@@ -6,7 +6,7 @@ This plan closes the remaining gap from the C++ linking assessment and aligns th
 
 I rely on the existing shared link intent surface and the current C++ planner wiring. This should already be true:
 
-- `tools/nix/planner/link-closure.nix` exists and is used by the C++ planner
+- `build-tools/tools/nix/planner/link-closure.nix` exists and is used by the C++ planner
 - C++ macros accept `link_deps`, `header_deps`, `link_closure`, and `link_closure_overrides`
 - Exporter surfaces link intent attributes in the graph
 - The C++ planner enforces `link_closure_overrides` validity during evaluation
@@ -31,7 +31,7 @@ This PR makes the following changes:
 
 I add one zx test:
 
-- `tools/tests/cpp/cpp.test.link-closure.overrides.must-be-in-link-deps.fails-fast.test.ts`
+- `build-tools/tools/tests/cpp/cpp.test.link-closure.overrides.must-be-in-link-deps.fails-fast.test.ts`
   - define a `nix_cpp_test` that sets `link_closure_overrides` with a key not in `link_deps`
   - assert that Buck macro evaluation fails fast with the expected error
 

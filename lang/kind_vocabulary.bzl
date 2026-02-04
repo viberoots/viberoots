@@ -2,8 +2,8 @@
 kind:* vocabulary contract (Starlark side).
 
 This is a shared cross-language contract surface. Keep it in parity with:
-- `tools/lib/kind-vocabulary.ts`
-- `tools/tests/lang/kind-vocabulary.parity.test.ts`
+- `build-tools/tools/lib/kind-vocabulary.ts`
+- `build-tools/tools/tests/lang/kind-vocabulary.parity.test.ts`
 """
 
 load("//lang:labels_file.bzl", "labels_file")

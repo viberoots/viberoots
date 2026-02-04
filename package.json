@@ -6,8 +6,8 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "dev:check": "tools/dev/startup-check.ts",
-    "dev:clear-overrides": "tools/dev/clear-overrides.ts",
+    "dev:check": "build-tools/tools/dev/startup-check.ts",
+    "dev:clear-overrides": "build-tools/tools/dev/clear-overrides.ts",
     "fmt": "prettier -w .",
     "fmt:check": "prettier -c .",
     "fmt:write": "prettier -w",
@@ -16,8 +16,8 @@
     "lint": "pnpm -s lint:eslint && pnpm -s fmt:check",
     "lint:fix": "pnpm -s lint:eslint:fix && pnpm -s fmt",
     "prepare": "husky",
-    "coverage:summary": "tools/dev/coverage-summary.ts",
-    "coverage:build": "node tools/dev/coverage-raw-normalize.mjs && node ./node_modules/c8/bin/c8.js report --clean=false --temp-directory coverage/raw --reports-dir coverage --reporter=json-summary --reporter=lcov --reporter=html --merge-async --extension .ts --allowExternal --src . --include '**/*.ts' --exclude 'node_modules/**' --exclude 'buck-out/**' --exclude '.clinic/**' --exclude '**/*.d.ts' && node tools/dev/coverage-normalize.mjs",
+    "coverage:summary": "build-tools/tools/dev/coverage-summary.ts",
+    "coverage:build": "node build-tools/tools/dev/coverage-raw-normalize.mjs && node ./node_modules/c8/bin/c8.js report --clean=false --temp-directory coverage/raw --reports-dir coverage --reporter=json-summary --reporter=lcov --reporter=html --merge-async --extension .ts --allowExternal --src . --include '**/*.ts' --exclude 'node_modules/**' --exclude 'buck-out/**' --exclude '.clinic/**' --exclude '**/*.d.ts' && node build-tools/tools/dev/coverage-normalize.mjs",
     "coverage:open": "pnpm coverage:build && pnpm coverage:summary --open-browser || open coverage/lcov-report/index.html",
     "test:cov": "buck2 test //... && pnpm coverage:build"
   },

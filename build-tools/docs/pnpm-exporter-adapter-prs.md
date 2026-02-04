@@ -10,27 +10,27 @@ No backwards‑compat concerns: this project is not yet used.
 
 Scope
 
-- Add `tools/buck/exporter/lang/node.ts` with `adapter: { name: "node", isNode, validate, attachLabels }`.
+- Add `build-tools/tools/buck/exporter/lang/node.ts` with `adapter: { name: "node", isNode, validate, attachLabels }`.
   - `validate` (warn local, error in CI):
     - Exactly one importer‑scoped lockfile label present per Node target: `lockfile:<path>#<importer>`.
     - Malformed importer or mismatched path/importer → finding.
   - `attachLabels`: pass‑through (no label synthesis or mutation).
-- Emit `tools/buck/node-lock-index.json` during glue (`tools/buck/gen-provider-index.ts`):
+- Emit `build-tools/tools/buck/node-lock-index.json` during glue (`build-tools/tools/buck/gen-provider-index.ts`):
   - Map `"//pkg:rule" -> "lockfile:<path>#<importer>"` for targets with valid labels.
   - Deterministic: sort by fully‑qualified target label; use `writeIfChanged` to be idempotent.
 
 Acceptance Criteria
 
 - Exporter completes with 0 findings on a clean repo (or expected warnings with `--validation=warn`).
-- `tools/buck/node-lock-index.json` exists, is sorted, and re‑running export yields no diff.
+- `build-tools/tools/buck/node-lock-index.json` exists, is sorted, and re‑running export yields no diff.
 - No changes to target invalidation behavior.
 
 Verification
 
 - Run:
-  - `node tools/buck/export-graph.ts --out tools/buck/graph.json`
-  - `node tools/buck/gen-provider-index.ts`
-  - Confirm `tools/buck/node-lock-index.json` is created and stable across two runs.
+  - `node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`
+  - `node build-tools/tools/buck/gen-provider-index.ts`
+  - Confirm `build-tools/tools/buck/node-lock-index.json` is created and stable across two runs.
 - Negative checks:
   - Remove a Node lockfile label from a sample target; rerun export → validation finding appears; CI mode would error.
 
@@ -46,11 +46,11 @@ Consequences of Not Implementing
 
 Scope
 
-- Add `tools/lib/graph-view.ts` (or extend `tools/lib/graph.ts`) with a single exported type `CompositeGraphView` and `readCompositeGraph()`:
-  - Loads `tools/buck/graph.json`.
-  - Loads sidecars: `third_party/providers/provider_index.json` and `tools/buck/node-lock-index.json`.
+- Add `build-tools/tools/lib/graph-view.ts` (or extend `build-tools/tools/lib/graph.ts`) with a single exported type `CompositeGraphView` and `readCompositeGraph()`:
+  - Loads `build-tools/tools/buck/graph.json`.
+  - Loads sidecars: `third_party/providers/provider_index.json` and `build-tools/tools/buck/node-lock-index.json`.
   - Returns a normalized composite structure for consumers (providers + importer lock mapping).
-- Add `tools/buck/graph-view.ts` CLI to print the composite view for scripts/dashboards.
+- Add `build-tools/tools/buck/graph-view.ts` CLI to print the composite view for scripts/dashboards.
 
 Acceptance Criteria
 
@@ -59,7 +59,7 @@ Acceptance Criteria
 
 Verification
 
-- Run: `node tools/buck/graph-view.ts | jq .` and spot‑check keys for representative targets.
+- Run: `node build-tools/tools/buck/graph-view.ts | jq .` and spot‑check keys for representative targets.
 
 Consequences of Not Implementing
 
@@ -73,7 +73,7 @@ Consequences of Not Implementing
 
 Scope
 
-- Add `$schema` and `version` fields to both `tools/buck/graph.json` and `tools/buck/node-lock-index.json`.
+- Add `$schema` and `version` fields to both `build-tools/tools/buck/graph.json` and `build-tools/tools/buck/node-lock-index.json`.
 - On successful export, print a short banner that references the Composite Graph API and current schema version.
 
 Acceptance Criteria
@@ -96,9 +96,9 @@ Consequences of Not Implementing
 
 Scope
 
-- Extend `tools/buck/prebuild-guard.ts`:
-  - Fail if `tools/buck/node-lock-index.json` is missing.
-  - Fail if it is older than `tools/buck/graph.json`.
+- Extend `build-tools/tools/buck/prebuild-guard.ts`:
+  - Fail if `build-tools/tools/buck/node-lock-index.json` is missing.
+  - Fail if it is older than `build-tools/tools/buck/graph.json`.
   - Optionally, also fail if older than any `TARGETS`/`*.bzl` that affect labeling.
 
 Acceptance Criteria
@@ -120,13 +120,13 @@ Consequences of Not Implementing
 
 Scope
 
-- CI job: forbid new code paths that read `tools/buck/graph.json` directly.
+- CI job: forbid new code paths that read `build-tools/tools/buck/graph.json` directly.
   - Simple grep with an allowlist: exporter internals and composite API are exempt.
 - Optional: ESLint custom rule in repo scripts to flag raw graph reads.
 
 Acceptance Criteria
 
-- CI fails when a new file references `tools/buck/graph.json` directly (unless allowlisted).
+- CI fails when a new file references `build-tools/tools/buck/graph.json` directly (unless allowlisted).
 
 Verification
 

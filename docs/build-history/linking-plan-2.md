@@ -37,25 +37,25 @@ This PR is intentionally **producer-only**. It does not wire `header_deps` into 
   - uses the same package-local wiring conventions as other C++ macros
   - keeps behavior minimal and deterministic, consistent with existing macro design
 - Extend Nix templates:
-  - add `tools/nix/templates/cpp-headers.nix` implementing `cppHeaders`
-  - export it from `tools/nix/templates/cpp.nix` as `T.cppHeaders`
+  - add `build-tools/tools/nix/templates/cpp-headers.nix` implementing `cppHeaders`
+  - export it from `build-tools/tools/nix/templates/cpp.nix` as `T.cppHeaders`
 - Extend the C++ planner:
-  - update `tools/nix/planner/cpp.nix` `kindOf` to recognize `kind:headers`
+  - update `build-tools/tools/nix/planner/cpp.nix` `kindOf` to recognize `kind:headers`
   - add a constructor (illustrative name): `mkHeaders = name: T.cppHeaders { ... }`
   - ensure the language plugin dispatch can produce a derivation for `kind:headers` targets
 - Update language manifest:
-  - add `"headers"` to the C++ kinds list in `tools/nix/langs.json`
+  - add `"headers"` to the C++ kinds list in `build-tools/tools/nix/langs.json`
   - ensure the “required paths” list still covers all template files required for C++ planning
 
 ### Tests (in this PR)
 
-Add zx tests under `tools/tests/cpp/` (one test per file):
+Add zx tests under `build-tools/tools/tests/cpp/` (one test per file):
 
-- `tools/tests/cpp/cpp.headers.kind-and-template.builds.test.ts`
+- `build-tools/tools/tests/cpp/cpp.headers.kind-and-template.builds.test.ts`
   - creates a temp repo containing a `nix_cpp_headers` target and a minimal include tree
-  - generates `tools/buck/graph.json`
+  - generates `build-tools/tools/buck/graph.json`
   - runs the Nix graph generator build for the header target and asserts it succeeds
-- `tools/tests/cpp/cpp.headers.consumed-via-template-input.compiles.test.ts`
+- `build-tools/tools/tests/cpp/cpp.headers.consumed-via-template-input.compiles.test.ts`
   - creates a temp repo with:
     - a header-only target exporting a header with an inline constant or inline function
     - a C++ binary that includes that header
@@ -126,17 +126,17 @@ This PR is macro-only. It does not attempt to make the planner actually link in-
 
 ### Tests (in this PR)
 
-Add zx tests under `tools/tests/cpp/` (one test per file):
+Add zx tests under `build-tools/tools/tests/cpp/` (one test per file):
 
-- `tools/tests/cpp/cpp.macros.link-intent.deps-union.deterministic.cquery.test.ts`
+- `build-tools/tools/tests/cpp/cpp.macros.link-intent.deps-union.deterministic.cquery.test.ts`
   - creates a temp repo with a C++ target where `deps`, `link_deps`, and `header_deps` overlap
   - asserts cquery sees `deps` as the deterministic union
-- `tools/tests/cpp/cpp.macros.link-intent.attrs.exported-by-graph.test.ts`
+- `build-tools/tools/tests/cpp/cpp.macros.link-intent.attrs.exported-by-graph.test.ts`
   - creates a temp repo with representative targets (bin, lib, test, addon, headers)
   - sets `link_deps`, `header_deps`, and `link_closure`
-  - runs `node tools/buck/export-graph.ts`
-  - asserts `tools/buck/graph.json` includes the new fields on those nodes
-- `tools/tests/cpp/cpp.macros.link-intent.defaults.no-behavior-change.builds.test.ts`
+  - runs `node build-tools/tools/buck/export-graph.ts`
+  - asserts `build-tools/tools/buck/graph.json` includes the new fields on those nodes
+- `build-tools/tools/tests/cpp/cpp.macros.link-intent.defaults.no-behavior-change.builds.test.ts`
   - asserts an existing minimal C++ scaffold still builds when no intent attrs are provided
 
 ### Docs (in this PR)
@@ -185,7 +185,7 @@ The behavior is direct-only, static-only, and deterministic.
 
 ### Scope & Changes
 
-- Extend `tools/nix/planner/cpp.nix` to consume the intent attrs for C++ consumer nodes:
+- Extend `build-tools/tools/nix/planner/cpp.nix` to consume the intent attrs for C++ consumer nodes:
   - read `link_deps` and `header_deps` from the exported graph node
   - for each in-repo C++ library in `link_deps`, build a `T.cppLib { ... }` derivation
   - for each header-only target in `header_deps`, build a `T.cppHeaders { ... }` derivation
@@ -201,23 +201,23 @@ The behavior is direct-only, static-only, and deterministic.
 
 ### Tests (in this PR)
 
-Add zx tests under `tools/tests/cpp/` (one test per file):
+Add zx tests under `build-tools/tools/tests/cpp/` (one test per file):
 
-- `tools/tests/cpp/cpp.bin.links-repo-lib.via-link-deps.build-and-run.test.ts`
+- `build-tools/tools/tests/cpp/cpp.bin.links-repo-lib.via-link-deps.build-and-run.test.ts`
   - temp repo with:
     - `//libs/greeter:greeter` as `nix_cpp_library`
     - `//apps/demo:demo` as `nix_cpp_binary(link_deps=[...])`
   - builds the binary and runs it to prove the link is real
-- `tools/tests/cpp/cpp.addon.links-repo-lib.via-link-deps.build-and-load.test.ts`
+- `build-tools/tools/tests/cpp/cpp.addon.links-repo-lib.via-link-deps.build-and-load.test.ts`
   - temp repo with:
     - a small C++ library exporting one symbol
     - a Node-API addon that calls into that library
   - builds the addon and runs a minimal Node script that requires the addon and calls the function
-- `tools/tests/cpp/cpp.test.links-repo-lib.via-link-deps.buck2-test.test.ts`
+- `build-tools/tools/tests/cpp/cpp.test.links-repo-lib.via-link-deps.buck2-test.test.ts`
   - temp repo with:
     - a `nix_cpp_test` whose compiled sources require symbols from an in-repo lib specified via `link_deps`
   - runs `buck2 test` and asserts it passes
-- `tools/tests/cpp/cpp.header-deps.uses-cpp-headers.compiles.test.ts`
+- `build-tools/tools/tests/cpp/cpp.header-deps.uses-cpp-headers.compiles.test.ts`
   - temp repo with:
     - a `nix_cpp_headers` target providing a header
     - a consumer that includes it via `header_deps`
@@ -283,17 +283,17 @@ This PR should stay narrowly scoped to Phase 1 behavior. It should not introduce
 
 ### Tests (in this PR)
 
-Add zx tests under `tools/tests/cpp/` (one test per file):
+Add zx tests under `build-tools/tools/tests/cpp/` (one test per file):
 
-- `tools/tests/cpp/cpp.link-deps.patch-invalidation.rebuilds-consumer.test.ts`
+- `build-tools/tools/tests/cpp/cpp.link-deps.patch-invalidation.rebuilds-consumer.test.ts`
   - temp repo:
     - binary depends on repo lib via `link_deps`
     - edit a patch file under the repo lib’s patch surface
   - assert a rebuild occurs for the consumer (using existing test harness patterns for invalidation checks)
-- `tools/tests/cpp/cpp.link-input-ordering.deterministic.test.ts`
+- `build-tools/tools/tests/cpp/cpp.link-input-ordering.deterministic.test.ts`
   - temp repo with multiple link deps and a fixed expected ordering
   - asserts the resolved list is stable across repeated builds (or across repeated graph generation + build steps)
-- `tools/tests/cpp/cpp.link-deps.unsupported-target.fails-fast.test.ts`
+- `build-tools/tools/tests/cpp/cpp.link-deps.unsupported-target.fails-fast.test.ts`
   - temp repo where a non-C++ target is placed in `link_deps`
   - asserts a targeted error message (not a generic Nix evaluation failure)
 

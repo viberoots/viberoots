@@ -11,10 +11,10 @@ Unify all generator and glue writes on the shared deterministic IO helpers to el
 ### Scope & Changes
 
 - Ensure all relevant scripts import and use:
-  - `tools/lib/fs-helpers.ts`: `writeIfChanged`, `writeStamp`, `stableUnique`
+  - `build-tools/tools/lib/fs-helpers.ts`: `writeIfChanged`, `writeStamp`, `stableUnique`
 - Apply to:
-  - Provider generators under `tools/buck/providers/*.ts` (Node, C++, future languages)
-  - `tools/buck/gen-auto-map.ts` and `tools/buck/gen-provider-index.ts`
+  - Provider generators under `build-tools/tools/buck/providers/*.ts` (Node, C++, future languages)
+  - `build-tools/tools/buck/gen-auto-map.ts` and `build-tools/tools/buck/gen-provider-index.ts`
   - Any glue or dev scripts that still hand‑roll conditional writes
 
 ### Acceptance Criteria
@@ -47,12 +47,12 @@ Centralize label normalization (drop cell/config suffixes, stable formatting) in
 
 ### Scope & Changes
 
-- Add `tools/lib/labels.ts` with small utilities for:
+- Add `build-tools/tools/lib/labels.ts` with small utilities for:
   - Dropping `(config//...)` suffixes
   - Normalizing `//cell//pkg:rule` forms for display/keys
 - Replace local ad‑hoc versions in:
   - Exporter helpers
-  - `tools/buck/gen-auto-map.ts`
+  - `build-tools/tools/buck/gen-auto-map.ts`
   - Dev/glue helpers that derive package names from labels
 
 ### Acceptance Criteria
@@ -84,10 +84,10 @@ Adopt one exported `ensureGraph()` helper and reuse it in both local glue and de
 
 ### Scope & Changes
 
-- Export a single `ensureGraph()` from a shared place (e.g., `tools/buck/glue-run.ts` or reuse `tools/patch/glue.ts` and re-export from a buck-local shim).
+- Export a single `ensureGraph()` from a shared place (e.g., `build-tools/tools/buck/glue-run.ts` or reuse `build-tools/tools/patch/glue.ts` and re-export from a buck-local shim).
 - Update:
-  - `tools/dev/build-selected.ts`
-  - `tools/buck/prebuild/repair.ts`
+  - `build-tools/tools/dev/build-selected.ts`
+  - `build-tools/tools/buck/prebuild/repair.ts`
   - CI stage runner where it invokes the exporter directly
 
 ### Acceptance Criteria
@@ -152,7 +152,7 @@ Use a shared Nix helpers module for dev overrides and patch map generation acros
 
 ### Scope & Changes
 
-- Introduce or ensure a `tools/nix/templates-common.nix` with:
+- Introduce or ensure a `build-tools/tools/nix/templates-common.nix` with:
   - `patchesMapFromDir`
   - `readDevOverrides ENV` and `guardNoDevOverridesInCI ENV`
 - Update Go and C++ templates to import common helpers and remove duplicated logic.
@@ -216,11 +216,11 @@ Implement.
 
 ### Description
 
-Align docs and code for the composite graph API. Provide a tiny `tools/lib/graph-view.ts` forwarder if needed, or update docs to point to the actual module name.
+Align docs and code for the composite graph API. Provide a tiny `build-tools/tools/lib/graph-view.ts` forwarder if needed, or update docs to point to the actual module name.
 
 ### Scope & Changes
 
-- If the code already uses `tools/lib/graph.ts`, create a minimal `graph-view.ts` that re-exports it, or update the documentation references to the correct path.
+- If the code already uses `build-tools/tools/lib/graph.ts`, create a minimal `graph-view.ts` that re-exports it, or update the documentation references to the correct path.
 
 ### Acceptance Criteria
 
@@ -251,10 +251,10 @@ Prefer a single glue runner (export graph → provider index → auto‑map) tha
 
 ### Scope & Changes
 
-- Export `runGlue()` from a single module (e.g., `tools/buck/glue-run.ts` or re-export from `tools/patch/glue.ts`).
+- Export `runGlue()` from a single module (e.g., `build-tools/tools/buck/glue-run.ts` or re-export from `build-tools/tools/patch/glue.ts`).
 - Update:
-  - `tools/ci/run-stage.ts` to call the shared runner for glue
-  - `tools/buck/prebuild/repair.ts` to reuse the same helper sequence
+  - `build-tools/tools/ci/run-stage.ts` to call the shared runner for glue
+  - `build-tools/tools/buck/prebuild/repair.ts` to reuse the same helper sequence
 
 ### Acceptance Criteria
 

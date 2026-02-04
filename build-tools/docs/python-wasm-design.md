@@ -57,7 +57,7 @@ Description
   - Build `kind:pyext_wasm` modules with `T.pyExtWasi` (for Pyodide only today) and merge overlays into app/lib outputs.
   - Fail fast when a WASI app or lib depends on any `kind:pyext_wasm` targets (runtime lacks dynamic module loading).
 
-The WASI toolchain is pinned in `tools/nix/toolchains/python-wasi.nix`. `T.pyExtWasi` reads `EXT_SUFFIX` and headers from that toolchain, and the runtime uses the same pinned WASI Python artifacts for execution.
+The WASI toolchain is pinned in `build-tools/tools/nix/toolchains/python-wasi.nix`. `T.pyExtWasi` reads `EXT_SUFFIX` and headers from that toolchain, and the runtime uses the same pinned WASI Python artifacts for execution.
 
 Pros
 
@@ -130,11 +130,11 @@ This mirrors our multi‑backend approach in other languages and preserves our i
 
 Phase 1 — Template and Planner (WASI)
 
-- Add `tools/nix/templates/python/wasm.nix` exposing `pyWasmApp` and `pyWasmLib` with a `backend` parameter (default `"wasi"`).
+- Add `build-tools/tools/nix/templates/python/wasm.nix` exposing `pyWasmApp` and `pyWasmLib` with a `backend` parameter (default `"wasi"`).
 - For `backend="wasi"`:
   - App: lay out site‑packages from `uv.lock` (pure‑Python only); apply patches; wire `bin/__main__.py`; produce a WASI‑runnable artifact (Node WASI or `wasmtime`).
   - Lib: produce a reusable site/overlay (no entrypoint) to be composed by apps via PYTHONPATH/FS.
-- Planner: add `mkWasmApp` and `mkWasmLib` in `tools/nix/planner/python.nix`, or map a `kind:wasm` selector to pick app vs lib; labels/providers unchanged.
+- Planner: add `mkWasmApp` and `mkWasmLib` in `build-tools/tools/nix/planner/python.nix`, or map a `kind:wasm` selector to pick app vs lib; labels/providers unchanged.
 - Providers/labels unchanged (importer‑scoped lockfile labels remain the invalidation key).
 
 Phase 2 — Template (Pyodide) and Browser Harness
@@ -221,11 +221,11 @@ Deliver a fully usable WASI path for Python/WASM: templates, planner wiring, mac
 
 #### Scope & Changes
 
-- `tools/nix/templates/python/wasm.nix`:
+- `build-tools/tools/nix/templates/python/wasm.nix`:
   - `pyWasmApp { name, lockfile, subdir, groups, backend ? "wasi" }`
   - `pyWasmLib { name, lockfile, subdir, groups, backend ? "wasi" }`
   - Build app wrapper and lib site/overlay from `uv.lock`; apply `patches/python/*.patch` deterministically.
-- `tools/nix/planner/python.nix`:
+- `build-tools/tools/nix/planner/python.nix`:
   - Add `mkWasmApp` and `mkWasmLib` routing to WASI templates when selected.
 - `python/defs.bzl`:
   - `nix_python_wasm_app(name, lockfile_label, backend="wasi")`
@@ -268,7 +268,7 @@ Deliver a complete browser path via Pyodide in a single change: pinned artifacts
 #### Scope & Changes
 
 - Nix pinning for Pyodide runtime and base artifacts.
-- `tools/nix/templates/python/wasm.nix`:
+- `build-tools/tools/nix/templates/python/wasm.nix`:
   - Implement `backend="pyodide"` for `pyWasmApp` and `pyWasmLib`, assembling `{ .wasm, loader JS, FS }` and lib FS overlays; apply patches deterministically.
 - Headless browser harness for CI.
 - Tests (zx):
@@ -308,7 +308,7 @@ Add optional scaffolding flags for WASI/Pyodide and verify scaffolded projects b
 
 #### Scope & Changes
 
-- `tools/scaffolding/templates/python/`:
+- `build-tools/tools/scaffolding/templates/python/`:
   - WASM app/lib TARGETS using `nix_python_wasm_app/lib` with `lockfile_label`.
 - Tests (zx):
   - Scaffold → build (WASI) → run; scaffold → build (Pyodide) → run (harness).

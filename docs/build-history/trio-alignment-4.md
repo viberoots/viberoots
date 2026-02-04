@@ -10,15 +10,15 @@ Unify shared patch CLI behavior across languages by extracting common utilities 
 
 ### Scope & Changes\n
 
-- Add `tools/patch/lib/util.ts` (debug flag, pathExists, small logging helper)\n
-- Add `tools/patch/lib/session.ts` (Ctrl‑D apply, Ctrl‑C reset loop)\n
-- Update `tools/patch/patch-go.ts` and `tools/patch/patch-cpp.ts` to consume helpers (no behavior change)\n
+- Add `build-tools/tools/patch/lib/util.ts` (debug flag, pathExists, small logging helper)\n
+- Add `build-tools/tools/patch/lib/session.ts` (Ctrl‑D apply, Ctrl‑C reset loop)\n
+- Update `build-tools/tools/patch/patch-go.ts` and `build-tools/tools/patch/patch-cpp.ts` to consume helpers (no behavior change)\n
 - Keep `PATCH_GO_DEBUG` / `PATCH_CPP_DEBUG` as backward‑compatible aliases; prefer `PATCH_PKG_DEBUG`\n
 
 ### Acceptance Criteria\n
 
 - `patch-pkg start|apply|reset|session` works identically for Go and C++\n
-- Re-running integration tests under `tools/tests/patching` passes with no snapshot changes\n
+- Re-running integration tests under `build-tools/tools/tests/patching` passes with no snapshot changes\n
 - Setting `PATCH_PKG_DEBUG=1` produces the same diagnostic verbosity previously gated by per‑language flags\n
 
 ### Risks\n
@@ -42,11 +42,11 @@ Implement.\n
 
 ### Description\n
 
-Eliminate duplication between `tools/lib/providers.ts` and `tools/lib/labels.ts` for provider naming/normalization (importer names and nixpkgs attributes). Introduce a single small module that both import.\n
+Eliminate duplication between `build-tools/tools/lib/providers.ts` and `build-tools/tools/lib/labels.ts` for provider naming/normalization (importer names and nixpkgs attributes). Introduce a single small module that both import.\n
 
 ### Scope & Changes\n
 
-- Add `tools/lib/provider-names.ts` exporting:\n
+- Add `build-tools/tools/lib/provider-names.ts` exporting:\n
   - `normalizeNixAttr(...)`\n
   - `providerNameForImporter(lockfilePath, importer)`\n
   - `providerNameForNixAttr(attr)`\n
@@ -56,7 +56,7 @@ Eliminate duplication between `tools/lib/providers.ts` and `tools/lib/labels.ts`
 ### Acceptance Criteria\n
 
 - No output diffs for `third_party/providers/TARGETS*.auto` or `auto_map.bzl`\n
-- All existing tests in `tools/tests/provider-names` and `tools/tests/auto-map` remain green\n
+- All existing tests in `build-tools/tools/tests/provider-names` and `build-tools/tools/tests/auto-map` remain green\n
 
 ### Risks\n
 
@@ -79,7 +79,7 @@ Implement.\n
 
 ### Description\n
 
-Reduce duplication by reusing `tools/nix/planner/lib.nix` helpers (`cleanLabel`, lookups) directly in `graph-generator.nix` instead of re‑defining variants.\n
+Reduce duplication by reusing `build-tools/tools/nix/planner/lib.nix` helpers (`cleanLabel`, lookups) directly in `graph-generator.nix` instead of re‑defining variants.\n
 
 ### Scope & Changes\n
 
@@ -90,7 +90,7 @@ Reduce duplication by reusing `tools/nix/planner/lib.nix` helpers (`cleanLabel`,
 ### Acceptance Criteria\n
 
 - `nix build .#graph-generator` produces identical derivations/store paths on unchanged graphs\n
-- ZX tests under `tools/tests/planner` are green\n
+- ZX tests under `build-tools/tools/tests/planner` are green\n
 
 ### Risks\n
 
@@ -150,7 +150,7 @@ Ensure the same flat‑directory and duplicate‑detection guarantees for C++ pa
 
 ### Scope & Changes\n
 
-- Update `tools/dev/patches-lint.ts` to:\n
+- Update `build-tools/tools/dev/patches-lint.ts` to:\n
   - Apply flat‑dir warnings/errors to `patches/cpp`\n
   - Detect duplicates using decoded `nixAttr@version` keys\n
 - Keep output formatting and severities consistent with existing languages\n

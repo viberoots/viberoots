@@ -16,13 +16,13 @@ Route Node‑API addon builds through the same Nix planner path used for C++ bin
 - `flake.nix` + planner:
   - Expose addon targets in the planner outputs (e.g., `graph-generator-cppTargets`), mirroring existing bin/lib exposure.
 - Tests/build scripts:
-  - Ensure `tools/dev/build-selected.ts` and existing tests work for addon labels without special handling.
+  - Ensure `build-tools/tools/dev/build-selected.ts` and existing tests work for addon labels without special handling.
 
 ### Acceptance Criteria
 
 - `buck2 build //libs/<name>-native:napi_addon` succeeds with the planner path.
-- `tools/tests/cpp/cpp.node-addon.builds.node-artifact.test.ts` passes without modification.
-- `tools/ci/cpp-addon-smoke.ts` continues to pass across supported architectures.
+- `build-tools/tools/tests/cpp/cpp.node-addon.builds.node-artifact.test.ts` passes without modification.
+- `build-tools/tools/ci/cpp-addon-smoke.ts` continues to pass across supported architectures.
 
 ### Risks
 
@@ -48,7 +48,7 @@ Ensure the Node headers/toolchain used by the addon template are sourced from a 
 
 ### Scope & Changes
 
-- `tools/nix/templates/cpp-node-addon.nix`:
+- `build-tools/tools/nix/templates/cpp-node-addon.nix`:
   - Replace direct references to a specific Node derivation with a single canonical reference (e.g., `pkgs.nodejs` or a shared alias).
 - (Optional) Introduce/export a tiny `nodeToolchain` alias in a shared Nix module for clarity.
 
@@ -110,11 +110,11 @@ Implement.
 
 ### Description
 
-Deduplicate patch‑map composition logic shared by `goApp` and `goLib` in `tools/nix/templates/go.nix` using an internal helper or the shared lang helpers module. No functional changes.
+Deduplicate patch‑map composition logic shared by `goApp` and `goLib` in `build-tools/tools/nix/templates/go.nix` using an internal helper or the shared lang helpers module. No functional changes.
 
 ### Scope & Changes
 
-- `tools/nix/templates/go.nix`:
+- `build-tools/tools/nix/templates/go.nix`:
   - Extract patch‑map merge into a tiny local helper (or reuse `lang-helpers.nix` where appropriate).
   - Keep override semantics and CGO handling identical.
 
@@ -187,7 +187,7 @@ All PRs are independently reversible.
 - PR‑3:
   - Render docs; ensure no code references break. Backout: revert doc/comment changes.
 - PR‑2:
-  - Run `tools/ci/cpp-addon-smoke.ts` locally (or CI) on macOS/Linux; confirm `otool -L`/`ldd` succeed. Backout: restore prior Node pin reference.
+  - Run `build-tools/tools/ci/cpp-addon-smoke.ts` locally (or CI) on macOS/Linux; confirm `otool -L`/`ldd` succeed. Backout: restore prior Node pin reference.
 - PR‑4:
   - Run existing zx tests: Go CGO (`go-cgo.repo-lib.build-and-run`), C→Go c-archive (`cpp.carchive.caller`). Expect no diffs. Backout: restore prior functions.
 - PR‑1:

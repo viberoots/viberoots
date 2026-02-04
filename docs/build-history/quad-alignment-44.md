@@ -78,14 +78,14 @@ across Go, C++, and Python planners. This removes duplicated ordering rules and 
 
 ### Scope & Changes
 
-- Add a shared `kindOf` helper in `tools/nix/planner/lib.nix` that accepts a language-specific
+- Add a shared `kindOf` helper in `build-tools/tools/nix/planner/lib.nix` that accepts a language-specific
   configuration (label priorities, rule-type mapping, planner-stub rules).
 - Update:
-  - `tools/nix/planner/go.nix`
-  - `tools/nix/planner/cpp.nix`
-  - `tools/nix/planner/python-core.nix`
+  - `build-tools/tools/nix/planner/go.nix`
+  - `build-tools/tools/nix/planner/cpp.nix`
+  - `build-tools/tools/nix/planner/python-core.nix`
     to call the shared helper instead of local implementations.
-- Move shared helpers like `dedupePreserveOrder` into `tools/nix/planner/lib.nix` and reuse them.
+- Move shared helpers like `dedupePreserveOrder` into `build-tools/tools/nix/planner/lib.nix` and reuse them.
 - Update `build-tools/docs/build-system-design.md` to state that planners must not re-implement `kindOf`.
 
 ### Tests (in this PR)
@@ -136,12 +136,12 @@ that encodes the Python defaults (normalize version and store materialization).
 
 ### Scope & Changes
 
-- Add a helper to `tools/nix/lib/lang-helpers.nix`, for example:
+- Add a helper to `build-tools/tools/nix/lib/lang-helpers.nix`, for example:
   - `pythonPatchesMapFromDirs(...)` or `patchesMapFromDirsForLang("python", ...)`
 - Update Python templates to use the helper:
-  - `tools/nix/templates/python.nix`
-  - `tools/nix/templates/python/wasm.nix`
-  - `tools/nix/templates/python/wasm-site.nix`
+  - `build-tools/tools/nix/templates/python.nix`
+  - `build-tools/tools/nix/templates/python/wasm.nix`
+  - `build-tools/tools/nix/templates/python/wasm-site.nix`
 - Keep patch filename decoding and normalization rules unchanged.
 
 ### Tests (in this PR)
@@ -190,16 +190,16 @@ a shared registry of language classification config.
 
 ### Scope & Changes
 
-- Add a registry under `tools/buck/exporter/lang/` that defines:
+- Add a registry under `build-tools/tools/buck/exporter/lang/` that defines:
   - `looksLike` patterns
   - rule-type prefixes
   - language labels
   - guidance strings
 - Update adapters to consume the registry rather than re-implementing classification rules:
-  - `tools/buck/exporter/lang/go.ts`
-  - `tools/buck/exporter/lang/cpp.ts`
-  - `tools/buck/exporter/lang/node.ts`
-  - `tools/buck/exporter/lang/python.ts`
+  - `build-tools/tools/buck/exporter/lang/go.ts`
+  - `build-tools/tools/buck/exporter/lang/cpp.ts`
+  - `build-tools/tools/buck/exporter/lang/node.ts`
+  - `build-tools/tools/buck/exporter/lang/python.ts`
 - Keep behavior identical, including Node importer-scoped validation behavior.
 
 ### Tests (in this PR)

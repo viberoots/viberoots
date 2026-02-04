@@ -1,6 +1,6 @@
 ## Quad Alignment Plan — Gap Closure & Determinism Tightening (CPP / Node / lang) — Part 11.5
 
-This installment closes the gaps discovered in the `quad-alignment-11.md` review by making the build/test flow more deterministic under `tools/bin/v`, bringing key files back under the ≤250 LOC methodology gate, and aligning plan docs with the repo’s actual scaffolding/template layout. No user-visible behavior changes are intended. Outputs should remain byte-for-byte identical for unchanged inputs.
+This installment closes the gaps discovered in the `quad-alignment-11.md` review by making the build/test flow more deterministic under `build-tools/tools/bin/v`, bringing key files back under the ≤250 LOC methodology gate, and aligning plan docs with the repo’s actual scaffolding/template layout. No user-visible behavior changes are intended. Outputs should remain byte-for-byte identical for unchanged inputs.
 
 ---
 
@@ -12,7 +12,7 @@ Make C++ patching session workspaces unconditionally unique to remove a plausibl
 
 ### Scope & Changes
 
-- Update `tools/patch/cpp/extract.ts:ensureOriginAndWorkspace(...)` to use per-call unique directories (e.g., `mkdtemp`) instead of a seconds-resolution timestamp suffix.
+- Update `build-tools/tools/patch/cpp/extract.ts:ensureOriginAndWorkspace(...)` to use per-call unique directories (e.g., `mkdtemp`) instead of a seconds-resolution timestamp suffix.
 - Keep all C++ patch semantics unchanged:
   - diff generation still uses `git diff --no-index` with `core.filemode=false`
   - patch format and naming remain identical
@@ -22,11 +22,11 @@ Make C++ patching session workspaces unconditionally unique to remove a plausibl
 
 ### Tests (in this PR)
 
-- New unit-style test under `tools/tests/patching/**` asserting unique origin/workspace paths.
+- New unit-style test under `build-tools/tools/tests/patching/**` asserting unique origin/workspace paths.
 - Re-run the existing patching suite:
   - `//:patching_patch_cpp_apply_noop`
   - the existing C++ patch extract/diff tests
-- Full suite validation via `tools/bin/v` (see Verification section).
+- Full suite validation via `build-tools/tools/bin/v` (see Verification section).
 
 ### Docs (in this PR)
 
@@ -34,7 +34,7 @@ Make C++ patching session workspaces unconditionally unique to remove a plausibl
 
 ### Acceptance Criteria
 
-- `tools/bin/v` passes twice back-to-back on the same machine (no test flake).
+- `build-tools/tools/bin/v` passes twice back-to-back on the same machine (no test flake).
 - New uniqueness test passes and would fail if workspaces were reused/collided.
 
 ### Risks
@@ -55,7 +55,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Changes are confined to patch tooling under `tools/patch/**` and `tools/tests/**`.
+- Changes are confined to patch tooling under `build-tools/tools/patch/**` and `build-tools/tools/tests/**`.
 
 ---
 
@@ -81,8 +81,8 @@ Bring `lang/defs_common.bzl` (currently >250 lines) into compliance by splitting
 ### Tests (in this PR)
 
 - Existing zx tests that rely on `//lang:defs_common.bzl` behavior (no changes expected).
-- Add a small “file size guard” zx test (or extend the existing `tools/dev/file-size-lint.ts` usage) to ensure new split files do not regress above 250 LOC.
-- Full suite validation via `tools/bin/v`.
+- Add a small “file size guard” zx test (or extend the existing `build-tools/tools/dev/file-size-lint.ts` usage) to ensure new split files do not regress above 250 LOC.
+- Full suite validation via `build-tools/tools/bin/v`.
 
 ### Docs (in this PR)
 
@@ -93,7 +93,7 @@ Bring `lang/defs_common.bzl` (currently >250 lines) into compliance by splitting
 - `lang/defs_common.bzl` ≤250 lines.
 - No semantic diffs in macro behavior:
   - label stamping, nixpkg normalization, patch src inclusion, and provider edge realization remain identical.
-- `tools/bin/v` passes.
+- `build-tools/tools/bin/v` passes.
 
 ### Risks
 
@@ -136,7 +136,7 @@ Bring `node/defs.bzl` (currently >250 lines) into compliance by splitting into a
 - Existing node macro zx tests, including:
   - global nix input stamping for `node_webapp` and bundled `nix_node_cli_bin`
   - negative coverage for non-bundled CLI not stamping global inputs
-- Full suite validation via `tools/bin/v`.
+- Full suite validation via `build-tools/tools/bin/v`.
 
 ### Docs (in this PR)
 
@@ -146,7 +146,7 @@ Bring `node/defs.bzl` (currently >250 lines) into compliance by splitting into a
 
 - `node/defs.bzl` ≤250 lines.
 - No diffs in macro output attributes (labels, srcs/deps realization, command assembly) beyond formatting/stable ordering.
-- `tools/bin/v` passes.
+- `build-tools/tools/bin/v` passes.
 
 ### Risks
 
@@ -174,21 +174,21 @@ Implement.
 
 ### Description
 
-Align plan documentation with the repo’s current reality and clarify the one remaining design-policy mismatch we observed (small bash shims in `tools/bin/*`).
+Align plan documentation with the repo’s current reality and clarify the one remaining design-policy mismatch we observed (small bash shims in `build-tools/tools/bin/*`).
 
 ### Scope & Changes
 
 - Update `quad-alignment-11.md`:
-  - Replace references to the old templates path with `tools/scaffolding/templates/**`.
+  - Replace references to the old templates path with `build-tools/tools/scaffolding/templates/**`.
   - Adjust PR‑1 wording to match implementation: legacy kwargs fail fast with actionable errors (rather than an “alias merge helper”).
 - Update `build-tools/docs/build-system-design.md` (Option A):
-  - Clarify that small wrappers in `tools/bin/*` may exist as thin shims, but substantive automation remains in TypeScript zx scripts.
+  - Clarify that small wrappers in `build-tools/tools/bin/*` may exist as thin shims, but substantive automation remains in TypeScript zx scripts.
   - Keep the policy that new substantive scripts are TypeScript zx scripts using the repo’s wrapper.
 - Optionally update `getting-started-on-a-pr.md` to reference the clarified policy (no behavioral change).
 
 ### Tests (in this PR)
 
-- Docs-only; still run `tools/bin/v` before landing to preserve the “full suite green” gate.
+- Docs-only; still run `build-tools/tools/bin/v` before landing to preserve the “full suite green” gate.
 
 ### Docs (in this PR)
 
@@ -198,8 +198,8 @@ Align plan documentation with the repo’s current reality and clarify the one r
 
 - The documentation no longer references non-existent template paths.
 - The PR‑1 description matches actual behavior in macros/tests.
-- Script policy is unambiguous and consistent with the repo’s actual `tools/bin/*` usage.
-- `tools/bin/v` passes.
+- Script policy is unambiguous and consistent with the repo’s actual `build-tools/tools/bin/*` usage.
+- `build-tools/tools/bin/v` passes.
 
 ### Risks
 
@@ -237,13 +237,13 @@ Implement.
 
 ### Verification (each PR)
 
-- Each PR runs `tools/bin/v` once before landing.
+- Each PR runs `build-tools/tools/bin/v` once before landing.
 - PR‑1 additionally runs `//:patching_patch_cpp_apply_noop` and related patching tests in isolation.
 - PR‑2 and PR‑3 additionally verify file-size compliance (≤250 LOC) for touched `.bzl` files.
 
 ### Verification (end of series)
 
-- Run `tools/bin/v` **twice back-to-back** on the same machine to validate determinism.
+- Run `build-tools/tools/bin/v` **twice back-to-back** on the same machine to validate determinism.
 
 ### Backout
 

@@ -8,7 +8,7 @@ This document lays out three focused PRs to complete Go/C++ local patching and a
 
 - Scope
   - Remove global Go provider generation and index:
-    - Delete `tools/buck/providers/go.ts` and associated generation paths from provider index.
+    - Delete `build-tools/tools/buck/providers/go.ts` and associated generation paths from provider index.
     - Stop mapping Go `module:` labels to providers in auto‑map (keep labels for diagnostics only).
   - Prebuild guard cleanup:
     - Remove enforcement for `third_party/providers/TARGETS.go.auto` and `provider_index.*` (Go).
@@ -44,8 +44,8 @@ This document lays out three focused PRs to complete Go/C++ local patching and a
 
 - Scope
   - Extend `nix_cpp_*` macros to accept `nixpkg_deps` (e.g., `["pkgs.zlib", "pkgs.openssl"]`) and stamp `nixpkg:<attr>` labels.
-  - Planner (`tools/nix/planner/cpp.nix`) uses stamped `nixpkg:` labels (already supported) to pass `nixCxxAttrs` to `tools/nix/templates/cpp.nix`.
-  - `tools/nix/templates/cpp.nix` already consumes `nixCxxAttrs` to produce include/lib flags; validate and keep deterministic ordering.
+  - Planner (`build-tools/tools/nix/planner/cpp.nix`) uses stamped `nixpkg:` labels (already supported) to pass `nixCxxAttrs` to `build-tools/tools/nix/templates/cpp.nix`.
+  - `build-tools/tools/nix/templates/cpp.nix` already consumes `nixCxxAttrs` to produce include/lib flags; validate and keep deterministic ordering.
   - Reduce reliance on C++ provider auto‑map for `nixpkg:` propagation:
     - No need to attach provider deps at call sites just to reflect `nixpkg:` labels.
     - Keep existing provider mapping only if required for legacy sample targets; de‑emphasize in docs.
@@ -74,7 +74,7 @@ This document lays out three focused PRs to complete Go/C++ local patching and a
 
 - Scope
   - Remove (or gate off) the global overlay scanner for `patches/cpp/**`:
-    - Stop scanning `patches/cpp/**` to patch nixpkgs globally in `tools/nix/overlays/cpp-patches.nix` for the main build path.
+    - Stop scanning `patches/cpp/**` to patch nixpkgs globally in `build-tools/tools/nix/overlays/cpp-patches.nix` for the main build path.
     - If needed for niche flows, keep a documented, opt‑in overlay separate from the default local‑patch path.
   - Prebuild guard cleanup:
     - Drop checks that indirectly depended on global C++ patch overlay/provider artifacts.

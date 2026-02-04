@@ -53,7 +53,7 @@ Filter out `//third_party/providers:*` nodes from `auto_map.bzl` so we don’t g
 
 ### Scope & Changes
 
-- `tools/buck/gen-auto-map.ts`:
+- `build-tools/tools/buck/gen-auto-map.ts`:
   - Add a small filter that skips nodes whose name starts with `//third_party/providers:` when building the mapping dictionary.
 - Tests (in this PR):
   - Snapshot `third_party/providers/auto_map.bzl` before/after on a fixture with provider nodes present; assert no provider‑package keys remain while real target mappings are byte‑identical.
@@ -133,10 +133,10 @@ Eliminate special‑case coupling to the repo overlay in C++ macros and stamp gl
 ### Scope & Changes
 
 - `cpp/defs.bzl`:
-  - Remove the `//tools/nix/overlays:cpp-patches.nix` item from `nix_inputs` in `nix_cpp_*` macros.
+  - Remove the `//build-tools/tools/nix/overlays:cpp-patches.nix` item from `nix_inputs` in `nix_cpp_*` macros.
   - Keep per‑target local patch dirs via existing shared helpers (unchanged behavior).
   - Ensure `append_nixpkg_labels(...)` drives native deps for invalidation, aligning with other languages.
-- `tools/nix/templates/cpp*.nix` (if present):
+- `build-tools/tools/nix/templates/cpp*.nix` (if present):
   - Confirm patch application is driven solely by per‑target patch inputs; no overlay scans.
 - Optional: centralize any remaining global input stamping (e.g., `flake.lock`) behind a small, shared macro helper so the policy is consistent repo‑wide (see PR‑5).
 - Tests (in this PR):
@@ -180,7 +180,7 @@ Standardize how global inputs (e.g., `flake.lock`) influence rebuilds and ensure
 - Macro‑side:
   - Add a tiny shared helper or policy note to avoid per‑language ad‑hoc stamping of `flake.lock`. Prefer stamping at the builder/Nix level or via one macro‑level helper, applied consistently where justified.
 - TS‑side:
-  - Re‑audit call sites to confirm provider lookups go through `providers_for(...)` and naming helpers in `tools/lib/providers.ts`.
+  - Re‑audit call sites to confirm provider lookups go through `providers_for(...)` and naming helpers in `build-tools/tools/lib/providers.ts`.
 - No behavior changes intended; this is a clarification and minor consolidation.
 - Tests (in this PR):
   - Grep‑based guard to ensure no macro files directly stamp `//:flake.lock` (except where explicitly allowed by the unified policy); enforce in zx as a fast lint.
@@ -215,14 +215,14 @@ Implement.
 
 ### Description
 
-Introduce shared TS interfaces for language contracts (planner predicates/hooks, provider sync, scaffolding metadata) and generate registries from `tools/nix/langs.json`. This removes shape drift, improves partial‑clone safety, and makes adding languages predictable.
+Introduce shared TS interfaces for language contracts (planner predicates/hooks, provider sync, scaffolding metadata) and generate registries from `build-tools/tools/nix/langs.json`. This removes shape drift, improves partial‑clone safety, and makes adding languages predictable.
 
 ### Scope & Changes
 
-- `tools/lib/lang-contracts.ts` (new): define `PlannerLanguage`, `LanguageProviderSync`, and `ScaffoldingLanguage` interfaces.
-- Update orchestrators/loaders to import interfaces and to derive registries from `tools/nix/langs.json`:
-  - `tools/buck/providers/index.ts`
-  - `tools/buck/glue-run.ts` (or equivalent façade)
+- `build-tools/tools/lib/lang-contracts.ts` (new): define `PlannerLanguage`, `LanguageProviderSync`, and `ScaffoldingLanguage` interfaces.
+- Update orchestrators/loaders to import interfaces and to derive registries from `build-tools/tools/nix/langs.json`:
+  - `build-tools/tools/buck/providers/index.ts`
+  - `build-tools/tools/buck/glue-run.ts` (or equivalent façade)
   - Any planner‑adjacent TS modules that enumerate languages.
 - Keep behavior identical; partial‑clone safe imports required.
 - Tests (in this PR):

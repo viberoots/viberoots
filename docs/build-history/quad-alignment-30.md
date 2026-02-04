@@ -90,7 +90,7 @@ Implement.
 
 ### Description
 
-`kind:*` labels are part of the cross-language contract surface. We use them beyond `bin|lib|test` (examples include wasm flows and Node webapp/bundle flows). However, `tools/dev/stamping-lint.ts` currently enforces `kind:(bin|lib|test)` only.
+`kind:*` labels are part of the cross-language contract surface. We use them beyond `bin|lib|test` (examples include wasm flows and Node webapp/bundle flows). However, `build-tools/tools/dev/stamping-lint.ts` currently enforces `kind:(bin|lib|test)` only.
 
 That mismatch is a contract leak. It makes the lint unreliable and discourages use of `kind:*` labels for routing and debugging.
 
@@ -102,7 +102,7 @@ This PR replaces the hardcoded `kind:*` regex with a shared, explicit vocabulary
   - Starlark: add a helper in `//lang` that exports the allowed kind strings (or a predicate).
   - TypeScript: add a helper that exports the same allowed kind strings (or a predicate).
   - Keep the vocabulary small and tied to actual routing/debugging needs.
-- Update `tools/dev/stamping-lint.ts`:
+- Update `build-tools/tools/dev/stamping-lint.ts`:
   - Validate `kind:*` using the shared vocabulary surface, not a hardcoded regex.
   - Continue to check `lang:go` and `lang:cpp` stamping for their respective rule types.
 - Keep exporter behavior unchanged. This PR is lint and contract surface only.
@@ -129,7 +129,7 @@ Non-goals in this PR:
 
 ### Acceptance Criteria
 
-- `tools/dev/stamping-lint.ts` no longer rejects valid `kind:*` labels used by existing macros.
+- `build-tools/tools/dev/stamping-lint.ts` no longer rejects valid `kind:*` labels used by existing macros.
 - Extending `kind:*` vocabulary requires updating a single shared place and is protected by tests.
 
 ### Risks
@@ -156,8 +156,8 @@ Implement.
 
 Provider naming and normalization are cross-language contracts. In TypeScript, the current module structure has a cycle:
 
-- `tools/lib/providers.ts` re-exports naming functions from `tools/lib/provider-names.ts`.
-- `tools/lib/provider-names.ts` imports `shortHash` from `tools/lib/providers.ts`.
+- `build-tools/tools/lib/providers.ts` re-exports naming functions from `build-tools/tools/lib/provider-names.ts`.
+- `build-tools/tools/lib/provider-names.ts` imports `shortHash` from `build-tools/tools/lib/providers.ts`.
 
 This works today, but it is a drift and bundling risk. It also makes it unclear where the canonical API lives.
 
@@ -220,7 +220,7 @@ Implement.
 
 ### Description
 
-We have patch linting for Go, Node, and Python under `tools/dev/patches-lint/`. These lints share a large amount of structure:
+We have patch linting for Go, Node, and Python under `build-tools/tools/dev/patches-lint/`. These lints share a large amount of structure:
 
 - validate flat directory constraint
 - validate filename shape (`<encoded-name>@<version>.patch`)
@@ -232,7 +232,7 @@ This PR extracts the shared logic and refactors the language lints to use it.
 
 ### Scope & Changes
 
-- Add a shared helper in `tools/dev/patches-lint/` that:
+- Add a shared helper in `build-tools/tools/dev/patches-lint/` that:
   - walks a flat patch dir and validates file shape
   - detects duplicates by decoded key
   - produces a standard set of violations

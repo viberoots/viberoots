@@ -16,7 +16,7 @@ The core failure mode we observed was:
 
 Raw V8 coverage (`NODE_V8_COVERAGE`) can generate large per-test artifacts. We changed verify so that raw coverage is only enabled when `COVERAGE=1` (i.e. `v --coverage`), preventing silent accumulation during normal runs.
 
-- **Where**: `tools/bin/verify` (wrapper) + `tools/dev/verify/*` (implementation)
+- **Where**: `build-tools/tools/bin/verify` (wrapper) + `build-tools/tools/dev/verify/*` (implementation)
 - **What**:
   - Creates a per-run raw coverage directory under `buck-out/tmp/node-v8-coverage/v-*` only in coverage mode.
   - Cleans up stale `buck-out/tmp/node-v8-coverage/v-*` dirs when coverage is disabled (local runs only).
@@ -26,9 +26,9 @@ Raw V8 coverage (`NODE_V8_COVERAGE`) can generate large per-test artifacts. We c
 
 When disk is tight, repeated builds/tests can quickly spiral into ENOSPC and additional churn. Verify now does a preflight that cleans repo-local temp outputs, runs bounded `nix store optimise`, optionally runs bounded `nix-store --gc --max-freed …`, and then **refuses to start** if free space is still below a configurable threshold.
 
-- **Where**: `tools/bin/verify` (wrapper) + `tools/dev/verify/housekeeping.ts` (implementation)
+- **Where**: `build-tools/tools/bin/verify` (wrapper) + `build-tools/tools/dev/verify/housekeeping.ts` (implementation)
 - **What**:
-  - `tools/dev/clean-temp-outs.ts` best-effort cleanup.
+  - `build-tools/tools/dev/clean-temp-outs.ts` best-effort cleanup.
   - Purges repo-local `buck-out/tmp` and `.tmp` when critically low.
   - Runs `nix store optimise` with a short timeout.
   - Runs bounded GC cycles with escalating `--max-freed`.
@@ -40,7 +40,7 @@ This was the big one for the “disk filled during `v`” incident.
 
 We found that `runInTemp()` was rewriting `flake.lock` inside each temp repo to convert a relative `path` input (notably `uv2nix`) into an **absolute path under the temp directory**. That made each temp repo content-unique, so `nix build --impure path:${tmp}#...` would produce a new `*-source` store snapshot for every temp repo, rapidly filling `/nix/store`.
 
-- **Where**: `tools/tests/lib/test-helpers.ts` (`runInTemp`)
+- **Where**: `build-tools/tools/tests/lib/test-helpers.ts` (`runInTemp`)
 - **What**:
   - Removed the logic that rewrote `flake.lock` `path` inputs to per-run absolute paths.
   - Added an explicit comment explaining that the rewrite causes per-temp `*-source` store churn and disk spikes.
@@ -49,7 +49,7 @@ We found that `runInTemp()` was rewriting `flake.lock` inside each temp repo to 
 
 Keeping the temp repo minimal reduces IO and avoids pulling large artifacts into each temp run.
 
-- **Where**: `tools/tests/lib/test-helpers.ts` (`rsyncRepoTo`)
+- **Where**: `build-tools/tools/tests/lib/test-helpers.ts` (`rsyncRepoTo`)
 - **What** (notable excludes):
   - `buck-out`, `.git`, `.direnv`, `result`, `node_modules`, `.pnpm-store`, `coverage`, `.clinic`, and generated provider/graph artifacts.
 
@@ -73,7 +73,7 @@ When Nix needs a snapshot of the repo (e.g. via `builtins.path`), including vola
 
 Even after we stopped rewriting `flake.lock`, we observed runs where `/nix/store` still dropped rapidly and `*-source` totals grew by tens of GB. One major contributor was `uv2nix` env realization: when the `uv2nix` environment derivation hashes the _entire_ workspace source tree, then evaluating from temp workspaces (which differ slightly between tests) forces fresh env derivations and re-fetches many `*-source` inputs.
 
-- **Where**: `tools/nix/uv2nix-adapter.nix`
+- **Where**: `build-tools/tools/nix/uv2nix-adapter.nix`
 - **What**:
   - Introduced a minimal `srcForUv2nixEnv` store snapshot containing only `${subdir}/${lockfile}`.
   - Passed `srcForUv2nixEnv` into `uv2nixLib.mkEnv` (instead of the full `src`) to stabilize env hashes when the lockfile is unchanged.
@@ -82,7 +82,7 @@ Even after we stopped rewriting `flake.lock`, we observed runs where `/nix/store
 
 With `TMPDIR` forced into the repo (`buck-out/tmp/tmpdir`), any `nix build` call that creates an out-link (default `./result`) can end up producing GC roots under `/nix/var/nix/gcroots/auto` pointing at paths like `.../buck-out/tmp/tmpdir/.../result`. Those roots can persist and pin large closures, driving `/nix/store` usage up during or after `v`.
 
-- **Where**: various test files under `tools/tests/**`
+- **Where**: various test files under `build-tools/tools/tests/**`
 - **What**:
   - Normalized test `nix build` commands to include `--no-link` (and keep using `--print-out-paths` to find outputs when needed).
   - Updated the one test that relied on `./result/...` to instead read the output path from `--print-out-paths`.
@@ -97,7 +97,7 @@ The following changes were verified to improve **runtime**, **robustness**, or *
 
 We observed that killing the Buck2 daemon per zx test caused repeated cold starts and rebuild churn, making `v` dramatically slower.
 
-- **Where**: `tools/buck/zx_test.bzl` + `tools/bin/verify` (and related test helpers)
+- **Where**: `build-tools/tools/buck/zx_test.bzl` + `build-tools/tools/bin/verify` (and related test helpers)
 - **What**:
   - Removed the `buck2 kill` behavior tied to `ZX_TEST_KILL_DAEMON`.
   - Lean on per-run `--isolation-dir` for correctness instead of per-test daemon teardown.
@@ -106,7 +106,7 @@ We observed that killing the Buck2 daemon per zx test caused repeated cold start
 
 We rely on a “buck daemon reaper” to clean up orphaned daemons/isolation dirs created during temp-repo tests and to avoid process accumulation across a large suite.
 
-- **Where**: `tools/tests/lib/test-helpers.ts` + `tools/tests/lib/buck-daemon-reaper.ts`
+- **Where**: `build-tools/tools/tests/lib/test-helpers.ts` + `build-tools/tools/tests/lib/buck-daemon-reaper.ts`
 - **What**:
   - `BNX_BUCK_REAPER_STATE_FILE` is shared per verify run and temp repos register themselves instead of spawning more helpers.
   - Reaper can reclaim isolations when temp repos are deleted.
@@ -115,7 +115,7 @@ We rely on a “buck daemon reaper” to clean up orphaned daemons/isolation dir
 
 On macOS, temp roots like `/var/folders/...` can alias to `/private/var/...`, and those differences can cause subtle Nix path issues. Keeping temp repos under the workspace also makes cleanup and inspection straightforward.
 
-- **Where**: `tools/bin/verify` wrapper script
+- **Where**: `build-tools/tools/bin/verify` wrapper script
 - **What**:
   - `export TEST_TMP_IN_REPO=1`
   - `export TMPDIR="$LIVE_ROOT/buck-out/tmp/tmpdir"`
@@ -124,7 +124,7 @@ On macOS, temp roots like `/var/folders/...` can alias to `/private/var/...`, an
 
 Clone-aware copying reduces the wall-clock cost and IO overhead of creating temp repos.
 
-- **Where**: `tools/lib/copy-tree.ts`
+- **Where**: `build-tools/tools/lib/copy-tree.ts`
 - **What**:
   - `probeCopyFileCloneSupport()` uses `COPYFILE_FICLONE` (“try”), not “force”.
   - `copyFileCloneAware()` uses “try” cloning with fallback to normal copy.
@@ -133,7 +133,7 @@ Clone-aware copying reduces the wall-clock cost and IO overhead of creating temp
 
 We found that scanning large stores (e.g. `find /nix/store … | du`) can take minutes and make `v` look “hung”. We made this analysis step opt-in.
 
-- **Where**: `tools/bin/verify` + `tools/dev/verify/safety-rails.ts`
+- **Where**: `build-tools/tools/bin/verify` + `build-tools/tools/dev/verify/safety-rails.ts`
 - **What**:
   - Store totals are collected only when `VERIFY_ANALYSIS_STORE_TOTALS=1`.
 
@@ -141,7 +141,7 @@ We found that scanning large stores (e.g. `find /nix/store … | du`) can take m
 
 CI may run multiple `v` instances concurrently, so we explicitly avoided a global mutex. Instead, each run monitors `/nix/store` and stops itself if it’s about to become disruptive.
 
-- **Where**: `tools/bin/verify` + `tools/dev/verify/safety-rails.ts`
+- **Where**: `build-tools/tools/bin/verify` + `build-tools/tools/dev/verify/safety-rails.ts`
 - **What**:
   - Per-run analysis directory under `buck-out/tmp/verify-analysis/run-*`.
   - Per-run monitors that snapshot state and signal only the current run if:
@@ -152,17 +152,17 @@ CI may run multiple `v` instances concurrently, so we explicitly avoided a globa
 
 We found it much easier to diagnose “verify is stuck” vs “verify is making progress but slow” when we can reliably summarize the current log, and continuously watch a stable status view without manually grepping giant superconsole logs.
 
-- **Where**: `tools/bin/tail-log`, `tools/dev/verify-log-status.ts`, `tools/lib/verify-log-status/*`
+- **Where**: `build-tools/tools/bin/tail-log`, `build-tools/tools/dev/verify-log-status.ts`, `build-tools/tools/lib/verify-log-status/*`
 - **What**:
-  - `tools/bin/tail-log --status [--json] [PID]` summarizes the verify log (pass/fail/fatal/skip, remaining, elapsed, etc.).
-  - `tools/bin/tail-log --status -w [SECONDS]` continuously refreshes status and automatically follows “latest” when no PID is provided.
-  - `tools/bin/verify` creates stable per-run pointers so status/diagnostics can find the right log (`buck-out/tmp/verify-logs/by-pid/<pid>.log`, and `buck-out/tmp/verify-logs/latest.log`).
+  - `build-tools/tools/bin/tail-log --status [--json] [PID]` summarizes the verify log (pass/fail/fatal/skip, remaining, elapsed, etc.).
+  - `build-tools/tools/bin/tail-log --status -w [SECONDS]` continuously refreshes status and automatically follows “latest” when no PID is provided.
+  - `build-tools/tools/bin/verify` creates stable per-run pointers so status/diagnostics can find the right log (`buck-out/tmp/verify-logs/by-pid/<pid>.log`, and `buck-out/tmp/verify-logs/latest.log`).
 
 ### H) Keep `v` under a fixed runtime budget (make lint preflight opt-in or tightly bounded)
 
 We observed that running `pnpm lint` inside `v` can materially increase runtime (and compete with the 18-minute full-suite expectation). The effective change was to keep a **bounded** lint preflight by default (so `v` fails fast on obviously dirty formatting), and provide an explicit opt-out (`VERIFY_SKIP_LINT=1`) for cases where lint is intentionally deferred.
 
-- **Where**: `tools/bin/verify` and related docs/tests (verify lint preflight enforcement)
+- **Where**: `build-tools/tools/bin/verify` and related docs/tests (verify lint preflight enforcement)
 - **What**:
   - Run `pnpm -s lint` behind a strict timeout (`VERIFY_LINT_TIMEOUT_SECS`, default 600s).
   - Allow skipping the preflight explicitly via `VERIFY_SKIP_LINT=1`.
@@ -177,13 +177,13 @@ Some mitigation ideas were tried but are not currently present in the repo (eith
 
 We explored “seed” mechanisms intended to avoid expensive repo copies and to keep required store paths from being GC’d mid-run. Related files were later deleted/removed from the current tree:
 
-- `tools/dev/prepare-verify-seed.ts`
-- `tools/nix/verify-test-seed.nix`
-- `tools/nix/verify-test-seed-src.nix`
-- `tools/tests/lib/verify-seed.ts`
+- `build-tools/tools/dev/prepare-verify-seed.ts`
+- `build-tools/tools/nix/verify-test-seed.nix`
+- `build-tools/tools/nix/verify-test-seed-src.nix`
+- `build-tools/tools/tests/lib/verify-seed.ts`
 - several `runInTemp.verify-seed.*.test.ts` test files
-- `tools/tests/lib/seed-temp-repo.ts`
-- `tools/tests/lib/runInTemp.seed-repo.isolation.test.ts`
+- `build-tools/tools/tests/lib/seed-temp-repo.ts`
+- `build-tools/tools/tests/lib/runInTemp.seed-repo.isolation.test.ts`
 
 The current approach relies on `rsyncRepoTo` excludes and avoiding per-temp `flake.lock` rewriting (which was a major churn source).
 
@@ -210,14 +210,14 @@ In practice, the highest-signal checks are:
 
 ## Files touched (high-level)
 
-- `tools/bin/verify`: coverage gating, housekeeping, disk gate.
-- `tools/dev/verify/*`: verify implementation (coverage gating, housekeeping/disk gate, workspace temp roots, safety rails).
-- `tools/bin/tail-log`: status/watch mode for verify runs and better log selection behavior.
-- `tools/dev/verify-log-status.ts` + `tools/lib/verify-log-status/*`: log parsing/formatting for `tail-log --status`.
-- `tools/tests/lib/test-helpers.ts`: temp repo rsync excludes and removal of per-temp `flake.lock` rewriting.
+- `build-tools/tools/bin/verify`: coverage gating, housekeeping, disk gate.
+- `build-tools/tools/dev/verify/*`: verify implementation (coverage gating, housekeeping/disk gate, workspace temp roots, safety rails).
+- `build-tools/tools/bin/tail-log`: status/watch mode for verify runs and better log selection behavior.
+- `build-tools/tools/dev/verify-log-status.ts` + `build-tools/tools/lib/verify-log-status/*`: log parsing/formatting for `tail-log --status`.
+- `build-tools/tools/tests/lib/test-helpers.ts`: temp repo rsync excludes and removal of per-temp `flake.lock` rewriting.
 - `lang/nix_shell.bzl`: canonicalize roots via physical paths (`pwd -P`) to avoid path-alias issues.
 - `flake.nix`: filter repo snapshots to avoid volatile paths that create churny `*-source` store paths.
-- `tools/nix/uv2nix-adapter.nix`: reduce uv2nix env churn by hashing only the lockfile subset for env realization.
+- `build-tools/tools/nix/uv2nix-adapter.nix`: reduce uv2nix env churn by hashing only the lockfile subset for env realization.
 
 ---
 
@@ -261,10 +261,10 @@ This PR ensures that evaluating/building from temp repos does not accidentally m
 
 #### Scope & Changes
 
-- `tools/tests/lib/test-helpers.ts`:
+- `build-tools/tools/tests/lib/test-helpers.ts`:
   - Remove per-temp `flake.lock` rewriting to absolute `path` inputs (keep lockfile inputs stable across temp repos).
   - Keep/extend `rsyncRepoTo` excludes so temp repos do not pull in large/volatile dirs that can perturb snapshots.
-- `tools/nix/uv2nix-adapter.nix`:
+- `build-tools/tools/nix/uv2nix-adapter.nix`:
   - Make uv2nix env derivations depend on a **lockfile-only** `src` snapshot (instead of hashing the full workspace).
 - `flake.nix`:
   - Ensure `filterRepo` excludes volatile paths (e.g. `buck-out/`, coverage, profiling, node_modules, VCS metadata) so repo snapshots do not churn.
@@ -384,7 +384,7 @@ We want `v` to be robust in the face of transient store growth and to fail fast 
 
 #### Scope & Changes
 
-- `tools/bin/verify`:
+- `build-tools/tools/bin/verify`:
   - Preflight cleanup (repo-local temp outs) and bounded Nix maintenance (`optimise`, bounded `gc`) under timeouts.
   - Disk gate: refuse to start when free space is below `VERIFY_TARGET_FREE_GB`.
   - Coverage gating: avoid raw V8 coverage output unless `COVERAGE=1`.
@@ -393,14 +393,14 @@ We want `v` to be robust in the face of transient store growth and to fail fast 
     - `TMPDIR="$LIVE_ROOT/buck-out/tmp/tmpdir"`
   - Improve operator-facing diagnostics:
     - stable per-run log pointers for the current PID and “latest”
-    - `tools/bin/tail-log --status [--json] [-w] [PID]` for summary + watch mode
+    - `build-tools/tools/bin/tail-log --status [--json] [-w] [PID]` for summary + watch mode
   - Per-run safety rails:
     - stop the current run if `/nix/store` free falls below `VERIFY_LOW_SPACE_GB`
     - stop the current run if `/nix/store` free drops by more than `VERIFY_NIX_DROP_BUDGET_GB` from baseline
     - triggers capture snapshots and signal only the current process group.
   - Keep `v` under a fixed runtime budget:
     - do not run an unbounded lint preflight inside `v` (either make it opt-in, or keep it strictly time-bounded)
-- `tools/dev/verify-analysis/*.sh`:
+- `build-tools/tools/dev/verify-analysis/*.sh`:
   - Per-run diagnostics scripts copied into the run directory (so concurrent runs don’t fight over shared paths):
     - `sample.sh`: periodic snapshots (e.g. `df` for repo and `/nix/store`, basic process status, and “where is verify right now” breadcrumbs).
     - `monitor.sh`: long-running loop that appends to the run’s telemetry log(s) (disk slope + “Waiting on Test …” style progress).
@@ -419,7 +419,7 @@ Non-goals:
   - verify enables/disables coverage output correctly based on `COVERAGE`
   - safety-rails signaling targets only the verify run’s process group (no cross-run kill)
   - verify stages/copies the diagnostics scripts into the per-run analysis directory and they are executable
-  - `tools/bin/tail-log --status` can find and summarize the correct verify log (PID mode and “latest” mode)
+  - `build-tools/tools/bin/tail-log --status` can find and summarize the correct verify log (PID mode and “latest” mode)
 
 #### Docs (in this PR)
 
@@ -427,8 +427,8 @@ Non-goals:
   - `VERIFY_TARGET_FREE_GB`, `VERIFY_LOW_SPACE_GB`, `VERIFY_NIX_DROP_BUDGET_GB`, `VERIFY_ANALYSIS_STORE_TOTALS`
 - Document the diagnostics scripts and expected artifacts (what files they write, how to tail them, and what to look for when disk usage balloons).
 - Document the recommended operator workflows:
-  - `tools/bin/tail-log --status -w` (watch mode)
-  - `tools/bin/tail-log --status --json` (machine-readable)
+  - `build-tools/tools/bin/tail-log --status -w` (watch mode)
+  - `build-tools/tools/bin/tail-log --status --json` (machine-readable)
 - Update operator checklist in `space-saving-tasks.md` with expected artifacts and how to interpret snapshots.
 
 #### Acceptance Criteria
@@ -527,24 +527,24 @@ This PR closes those gaps without changing the user-facing behavior of `v` or th
 
 #### Scope & Changes
 
-- `tools/dev/verify/safety-rails.ts`:
+- `build-tools/tools/dev/verify/safety-rails.ts`:
   - Factor the “trigger decision” logic into a small exported helper with injectable side-effects (snapshot writer, `df` sampler, process-group killer) so we can test the behavior deterministically without requiring real low-disk conditions.
   - Keep default behavior unchanged for normal runs.
-- `tools/dev/verify/housekeeping.ts`:
+- `build-tools/tools/dev/verify/housekeeping.ts`:
   - Add a small exported helper for disk-gate decisions so tests can validate the exact failure message and exit behavior without depending on the real filesystem’s free space.
   - Keep the public behavior and env knobs unchanged.
-- `tools/tests/verify/*`:
+- `build-tools/tools/tests/verify/*`:
   - Add behavioral tests for:
     - disk gate refusal logic (including message content and exit code),
     - safety rails triggers (low-space + drop-budget) proving we write a snapshot and send signals only to the intended process group.
-- `tools/tests/lib/test-helpers.ts`:
-  - Split the monolithic helper into small focused modules under `tools/tests/lib/test-helpers/`.
-  - Keep `tools/tests/lib/test-helpers.ts` as a stable re-export surface so existing imports continue to work unchanged.
+- `build-tools/tools/tests/lib/test-helpers.ts`:
+  - Split the monolithic helper into small focused modules under `build-tools/tools/tests/lib/test-helpers/`.
+  - Keep `build-tools/tools/tests/lib/test-helpers.ts` as a stable re-export surface so existing imports continue to work unchanged.
 - `flake.nix`:
-  - Factor the large flake into small imported modules under `tools/nix/` (e.g., snapshot filtering, package wiring, devshell wiring) so the top-level flake stays readable and within the file-size constraint.
+  - Factor the large flake into small imported modules under `build-tools/tools/nix/` (e.g., snapshot filtering, package wiring, devshell wiring) so the top-level flake stays readable and within the file-size constraint.
   - Keep flake outputs and attribute names unchanged.
-- `tools/dev/verify-log-status.ts`:
-  - Remove any bespoke `process.argv` parsing and rely only on `tools/lib/cli.ts` helpers for flags/tokens.
+- `build-tools/tools/dev/verify-log-status.ts`:
+  - Remove any bespoke `process.argv` parsing and rely only on `build-tools/tools/lib/cli.ts` helpers for flags/tokens.
 - `space-saving-tasks.md`:
   - Align wording for lint preflight to match actual behavior: bounded by default with an explicit opt-out (`VERIFY_SKIP_LINT=1`).
 
@@ -563,9 +563,9 @@ Non-goals:
     - write a snapshot file under the per-run analysis directory, and
     - signal only the intended process group (no cross-run interference).
 - File-size compliance enforcement (scoped to touched areas):
-  - Fails if `tools/tests/lib/test-helpers.ts` and the refactored flake entrypoint exceed the 250-line limit after the split.
+  - Fails if `build-tools/tools/tests/lib/test-helpers.ts` and the refactored flake entrypoint exceed the 250-line limit after the split.
 - CLI parsing hygiene:
-  - A small test or linting check that `tools/dev/verify-log-status.ts` does not use `process.argv` directly for flag parsing.
+  - A small test or linting check that `build-tools/tools/dev/verify-log-status.ts` does not use `process.argv` directly for flag parsing.
 
 #### Docs (in this PR)
 
@@ -577,9 +577,9 @@ Non-goals:
 #### Acceptance Criteria
 
 - Verify disk gate and safety rails have behavioral tests that fail if the logic regresses.
-- `tools/tests/lib/test-helpers.ts` is ≤ 250 lines and public imports remain stable via re-exports.
+- `build-tools/tools/tests/lib/test-helpers.ts` is ≤ 250 lines and public imports remain stable via re-exports.
 - The flake entrypoint remains functionally identical but is decomposed into ≤250-line modules.
-- `tools/dev/verify-log-status.ts` uses `tools/lib/cli.ts` only (no bespoke argv parsing).
+- `build-tools/tools/dev/verify-log-status.ts` uses `build-tools/tools/lib/cli.ts` only (no bespoke argv parsing).
 
 #### Risks
 

@@ -1,0 +1,52 @@
+# {{ pkgScope }}/{{ name }}
+
+This package exposes a simple TypeScript API backed by a Go-based Node-API addon.
+
+- The Go package is built as a C archive in `libs/{{ name }}-go` and linked by a tiny C N-API shim in `libs/{{ name }}-native` to produce a `.node` addon.
+- The native addon is copied here to `native/{{ addon_name }}.node`.
+- The TypeScript entry loads the addon from a stable relative path using `createRequire(import.meta.url)`.
+
+## Quickstart
+
+Follow these steps to scaffold, build, and test the addon-backed library:
+
+1) Generate the scaffold (already done if you are reading this in a generated repo):
+
+   - `scaf new node go-addon {{ name }} --yes`
+
+2) Build the Go c-archive and the Node-API addon via Buck/Nix:
+
+   - `buck2 build //libs/{{ name }}-go:carchive`
+   - `buck2 build //libs/{{ name }}-native:napi_addon`
+
+3) Ensure glue is present (providers + auto_map):
+
+   - `node build-tools/tools/buck/sync-providers.ts --lang node` (idempotent; no-op if no pnpm lockfiles are present)
+
+4) Run the Node unit test (single test file, per project conventions):
+
+   - `buck2 test //libs/{{ name }}:unit`
+
+## Runtime loading behavior
+
+- The compiled addon is made available at a stable path: `native/{{ addon_name }}.node`.
+- The loader respects an override for diagnostics: set `ADDON_PATH=/absolute/path/to/{{ addon_name }}.node` to force a specific binary at runtime (useful for low-friction experiments).
+
+## Scripts
+
+- `pnpm -C libs/{{ name }} build` — compile TS to `dist/`
+- `pnpm -C libs/{{ name }} test` — run unit tests{% if includeNodeTests %} (Vitest){% endif %}
+
+## Buck targets
+
+- `//libs/{{ name }}:{{ name }}` — Node library (stamp)
+- `//libs/{{ name }}:copy_addon` — copies the `.node` artifact to `native/{{ addon_name }}.node`
+- `//libs/{{ name }}-go:carchive` — Go c-archive
+- `//libs/{{ name }}-native:napi_addon` — Node-API addon that links the Go c-archive
+
+## Design references
+
+- See `node-golang-addon.md` for the end-to-end design, rationale, and alternatives.
+- See `build-tools/docs/build-system-design.md` for the Buck2 + Nix architecture this scaffold follows.
+
+

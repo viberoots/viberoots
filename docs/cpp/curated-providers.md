@@ -65,7 +65,7 @@ TEST(Demo, OpenSSLSmoke) {
 
 ### Notes
 
-- Naming: `//third_party/providers:nix_<attr>` where `<attr>` is the nixpkgs attribute path normalized and with non‑alnum to `_` (e.g., `pkgs.openssl` → `nix_pkgs_openssl`). Naming is canonical and shared with scripts via `tools/lib/providers.ts`.
-- Determinism: the planner collects `nixpkg:*` labels from deps and passes them to `tools/nix/templates/cpp.nix`, which resolves include and library paths from nixpkgs; no paths are hard-coded in Starlark.
+- Naming: `//third_party/providers:nix_<attr>` where `<attr>` is the nixpkgs attribute path normalized and with non‑alnum to `_` (e.g., `pkgs.openssl` → `nix_pkgs_openssl`). Naming is canonical and shared with scripts via `build-tools/tools/lib/providers.ts`.
+- Determinism: the planner collects `nixpkg:*` labels from deps and passes them to `build-tools/tools/nix/templates/cpp.nix`, which resolves include and library paths from nixpkgs; no paths are hard-coded in Starlark.
 - Linking: GoogleTest linking is auto-detected by the template when `pkgs.googletest` is present; other libraries only need to be listed as provider deps.
-- Normalization contract: `nixpkg:` labels are normalized consistently across Starlark/TypeScript/Nix; the parity matrix lives at `tools/tests/normalization-parity.test.ts`.
+- Normalization contract: `nixpkg:` labels are normalized consistently across Starlark/TypeScript/Nix; the parity matrix lives at `build-tools/tools/tests/normalization-parity.test.ts`.

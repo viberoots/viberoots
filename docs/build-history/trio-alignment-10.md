@@ -60,7 +60,7 @@ Factor Node’s lockfile label parsing/enforcement into shared helpers so Node m
 - No changes to `buck2 cquery` results for representative Node targets.
 - No changes to exporter validation findings for Node targets.
 - Provider sync output remains byte‑for‑byte identical given the same inputs when invoked through the unified orchestrator:
-  - `node tools/buck/sync-providers.ts --lang node --no-glue`
+  - `node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`
 - All zx tests for provider wiring and Node scaffolding pass locally and in CI.
 
 ### Risks

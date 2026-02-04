@@ -26,7 +26,7 @@ This PR introduces one generic nearest-lockfile walker, refactors the existing h
 
 ### Scope & Changes
 
-- Introduce a shared helper in `tools/lib/importers.ts` (final naming up to implementation details):
+- Introduce a shared helper in `build-tools/tools/lib/importers.ts` (final naming up to implementation details):
   - `findNearestLockfileForPackage({ pkgDir, lockfileBasename }) -> Promise<string | null>`
   - Requirements:
     - input and output remain repo-relative POSIX paths
@@ -61,7 +61,7 @@ Non-goals in this PR:
 
 ### Acceptance Criteria
 
-- All nearest-lockfile discovery in TS tooling is driven through `tools/lib/importers.ts` shared helpers.
+- All nearest-lockfile discovery in TS tooling is driven through `build-tools/tools/lib/importers.ts` shared helpers.
 - Behavior remains stable, validated by tests and unchanged downstream outputs.
 
 ### Risks
@@ -82,17 +82,17 @@ Implement.
 
 ---
 
-## PR‑2: Remove Nix patch filename decode duplication in `tools/nix/lib/lang-helpers.nix` and lock it with parity tests
+## PR‑2: Remove Nix patch filename decode duplication in `build-tools/tools/nix/lib/lang-helpers.nix` and lock it with parity tests
 
 ### Description
 
 Patch filename decoding is a cross-language contract. Nix currently decodes patch filenames in multiple helpers (for example “path patch maps” vs “store-materialized patch maps”), and the decoding logic is duplicated.
 
-This PR factors patch filename decoding into a single internal helper in `tools/nix/lib/lang-helpers.nix` and uses it from all patch map builders. It also adds parity tests to ensure the decoding contract cannot drift across Nix and TypeScript tooling.
+This PR factors patch filename decoding into a single internal helper in `build-tools/tools/nix/lib/lang-helpers.nix` and uses it from all patch map builders. It also adds parity tests to ensure the decoding contract cannot drift across Nix and TypeScript tooling.
 
 ### Scope & Changes
 
-- In `tools/nix/lib/lang-helpers.nix`:
+- In `build-tools/tools/nix/lib/lang-helpers.nix`:
   - Introduce a shared decode helper (final naming up to implementation details), for example:
     - `decodePatchFilename(name) -> { key, importPath, version } | null`
   - Refactor:
@@ -169,8 +169,8 @@ This PR introduces a deterministic report generator that:
 
 ### Scope & Changes
 
-- Add a new tool under `tools/buck/` (final naming up to implementation details), for example:
-  - `tools/buck/invalidation-report.ts`
+- Add a new tool under `build-tools/tools/buck/` (final naming up to implementation details), for example:
+  - `build-tools/tools/buck/invalidation-report.ts`
 - Report responsibilities:
   - for each non-provider target:
     - report `patch_scope` (`package-local` vs `importer-local`)
@@ -183,8 +183,8 @@ This PR introduces a deterministic report generator that:
   - when prebuild guard detects missing or stale glue, print where to look (report file path) and how to regenerate
   - keep default output minimal; verbose mode can print the top-N entries relevant to the failure
 - Cleanup and consistent conventions across TS diagnostics:
-  - use the existing contract registries (`tools/lib/lang-contracts.ts`) as the source of patch model classification
-  - avoid re-deriving importer support rules in the report generator (delegate to `tools/lib/importers.ts`)
+  - use the existing contract registries (`build-tools/tools/lib/lang-contracts.ts`) as the source of patch model classification
+  - avoid re-deriving importer support rules in the report generator (delegate to `build-tools/tools/lib/importers.ts`)
 
 Non-goals in this PR:
 

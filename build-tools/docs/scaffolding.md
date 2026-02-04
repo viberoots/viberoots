@@ -115,7 +115,7 @@ Both examples create the destination under the canonical location for the chosen
 - The CLI infers destination directories from repository conventions per language/template. For example:
   - `go library` -> libraries root (e.g., `libs/…`).
   - `go application` -> applications root (e.g., `apps/…` or `microservices/…`).
-- These conventions are defined in a small resolver module, not hard-coded paths. The resolver can be configured per repository (e.g., via a JSON/YAML in `tools/scaffolding/`), allowing reuse across repos.
+- These conventions are defined in a small resolver module, not hard-coded paths. The resolver can be configured per repository (e.g., via a JSON/YAML in `build-tools/tools/scaffolding/`), allowing reuse across repos.
 
 #### Guards and confirmations
 
@@ -140,7 +140,7 @@ Both examples create the destination under the canonical location for the chosen
 
 ### Directory layout
 
-- `tools/scaffolding/`
+- `build-tools/tools/scaffolding/`
   - `templates/<template-name>/`
     - `<language>/` (e.g., `go/`, `typescript/`, etc.)
       - Template content files (Jinja-templated).
@@ -189,7 +189,7 @@ Pseudo-structure (TypeScript with zx-wrapper):
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
-const templateDir = "tools/scaffolding/templates/go";
+const templateDir = "build-tools/tools/scaffolding/templates/go";
 const dest = process.argv[2];
 const answers = {
   name: "my-service",
@@ -263,7 +263,7 @@ For Node/TS scaffolds, `scaf new` ensures the importer lockfile is **real and co
 If you change dependencies in an importer, update the lockfile and then run:
 
 - `i` (updates hashes, builds Nix `node_modules`, links outputs, and refreshes glue as needed)
-- or, for just updating the hash: `node tools/dev/update-pnpm-hash.ts --lockfile <importer>/pnpm-lock.yaml`
+- or, for just updating the hash: `node build-tools/tools/dev/update-pnpm-hash.ts --lockfile <importer>/pnpm-lock.yaml`
 
 ### Determinism and safety
 
@@ -326,7 +326,7 @@ Notes:
 
 ### Implementation checklist
 
-- [ ] Create template directory under `tools/scaffolding/templates/<language>/`.
+- [ ] Create template directory under `build-tools/tools/scaffolding/templates/<language>/`.
 - [ ] Author `copier.yaml` with variables, defaults, and hooks.
 - [ ] Add optional Nix files that define the environment and pinned tools.
 - [ ] Implement a zx-wrapper script that:
@@ -343,7 +343,7 @@ Notes:
    - Provide `scaf` entrypoint (zx-wrapper script) in the dev shell so commands work without additional setup.
 
 2. Template scaffolding structure
-   - Create `tools/scaffolding/templates/<template-name>/<language>/` with template files and a handwritten `copier.yaml`.
+   - Create `build-tools/tools/scaffolding/templates/<template-name>/<language>/` with template files and a handwritten `copier.yaml`.
    - Follow the variable schema needed by the template; document variables in `copier.yaml`.
 
 3. Core utilities

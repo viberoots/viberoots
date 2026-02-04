@@ -19,11 +19,11 @@ This follow-on plan builds on PRs 1–9 to further improve clarity, reduce cyclo
 
 **Changes**
 
-- Add `tools/lib/lang-contracts.ts`:
+- Add `build-tools/tools/lib/lang-contracts.ts`:
   - `LanguageProviderSync` (provider sync adapter)
   - `PlannerLanguage` (planner predicates and mk\* hooks)
   - `ScaffoldingLanguage` (id, kinds, requiredPaths, templatesDir)
-- Update `tools/buck/providers/index.ts`, `tools/lib/langs.ts`, and planner-adjacent TS to import these interfaces.
+- Update `build-tools/tools/buck/providers/index.ts`, `build-tools/tools/lib/langs.ts`, and planner-adjacent TS to import these interfaces.
 - Contracts must not assume a language is present; interfaces work with zero enabled languages.
 
 **Acceptance criteria**
@@ -46,16 +46,16 @@ This follow-on plan builds on PRs 1–9 to further improve clarity, reduce cyclo
 
 **Changes**
 
-- Introduce `tools/nix/langs.json` (authoritative): `[ { id, displayName, requiredPaths, optionalPaths, kinds, templatesDir } ]`.
-- Add `tools/dev/codegen.ts` step to emit:
-  - `tools/lib/langs.ts` (scaffolding/enablement list)
-  - Optional `tools/nix/langs.nix` for planner references
+- Introduce `build-tools/tools/nix/langs.json` (authoritative): `[ { id, displayName, requiredPaths, optionalPaths, kinds, templatesDir } ]`.
+- Add `build-tools/tools/dev/codegen.ts` step to emit:
+  - `build-tools/tools/lib/langs.ts` (scaffolding/enablement list)
+  - Optional `build-tools/tools/nix/langs.nix` for planner references
 - Update glue and `scaf` to import the generated TS.
 - Codegen reads only the manifest; it does not access language files and thus never fails on missing languages.
 
 **Acceptance criteria**
 
-- Editing `tools/nix/langs.json` and rerunning codegen updates registries; tests green.
+- Editing `build-tools/tools/nix/langs.json` and rerunning codegen updates registries; tests green.
 - Partial clone: languages with missing `requiredPaths` are not enabled; commands still succeed.
 
 **If not implemented**
@@ -72,7 +72,7 @@ This follow-on plan builds on PRs 1–9 to further improve clarity, reduce cyclo
 
 **Changes**
 
-- Add `tools/lib/provider-sync.ts` with helpers:
+- Add `build-tools/tools/lib/provider-sync.ts` with helpers:
   - scan flat patch dirs, validate shapes, duplicate detection, sort, write deterministic `TARGETS.*.auto`
   - hooks: `decodeKey(filename)`, `providerNameFor(key)`
 - Refactor Go sync to use framework; keep behavior identical.
@@ -97,7 +97,7 @@ This follow-on plan builds on PRs 1–9 to further improve clarity, reduce cyclo
 
 **Changes**
 
-- Add `tools/buck/exporter/lang/contract.ts` defining `exportLabels(nodes, batches, cacheDir) → nodesWithLabels`.
+- Add `build-tools/tools/buck/exporter/lang/contract.ts` defining `exportLabels(nodes, batches, cacheDir) → nodesWithLabels`.
 - Ensure Go adapter implements contract; `main.ts` dispatches by `lang:*` label or `rule_type`.
 - Avoid dynamic imports for missing adapters; maintain a small present-adapters list and guard dispatch.
 
@@ -116,12 +116,12 @@ This follow-on plan builds on PRs 1–9 to further improve clarity, reduce cyclo
 
 **Intent/Impact**
 
-- Keep `graph-generator.nix` minimal; move language specifics into `tools/nix/planner/<lang>.nix` and import when present.
+- Keep `graph-generator.nix` minimal; move language specifics into `build-tools/tools/nix/planner/<lang>.nix` and import when present.
 
 **Changes**
 
-- Create `tools/nix/planner/go.nix` providing `{ isTarget, kindOf, modulesFileFor, mkApp, mkLib }`.
-- `graph-generator.nix` imports `./tools/nix/planner/<lang>.nix` if the file exists; otherwise skips.
+- Create `build-tools/tools/nix/planner/go.nix` providing `{ isTarget, kindOf, modulesFileFor, mkApp, mkLib }`.
+- `graph-generator.nix` imports `./build-tools/tools/nix/planner/<lang>.nix` if the file exists; otherwise skips.
 
 **Acceptance criteria**
 
@@ -142,13 +142,13 @@ This follow-on plan builds on PRs 1–9 to further improve clarity, reduce cyclo
 
 **Changes**
 
-- Add `tools/scaffolding/templates/lang-kit/` that generates:
-  - `tools/nix/templates/<lang>.nix`
-  - `tools/nix/planner/<lang>.nix`
+- Add `build-tools/tools/scaffolding/templates/lang-kit/` that generates:
+  - `build-tools/tools/nix/templates/<lang>.nix`
+  - `build-tools/tools/nix/planner/<lang>.nix`
   - `<lang>/defs.bzl`
-  - `tools/buck/providers/<lang>.ts` (stub)
-  - Registry entry (extends `tools/nix/langs.json`)
-  - Contract tests under `tools/tests/<lang>/`
+  - `build-tools/tools/buck/providers/<lang>.ts` (stub)
+  - Registry entry (extends `build-tools/tools/nix/langs.json`)
+  - Contract tests under `build-tools/tools/tests/<lang>/`
 
 **Acceptance criteria**
 
@@ -194,7 +194,7 @@ This follow-on plan builds on PRs 1–9 to further improve clarity, reduce cyclo
 
 **Changes**
 
-- Add `tools/lib/errors.ts` with helpers for friendly messages.
+- Add `build-tools/tools/lib/errors.ts` with helpers for friendly messages.
 - Standardize missing‑language messages in `scaf`, glue, and prebuild guard.
 - Commands exit 0 when skipping absent languages (outside strict test modes); non‑zero reserved for real failures.
 
@@ -217,7 +217,7 @@ This follow-on plan builds on PRs 1–9 to further improve clarity, reduce cyclo
 
 **Changes**
 
-- Extend `tools/nix/langs.json` with booleans: `{ patching, lockfileLabels, testAutoWire }`.
+- Extend `build-tools/tools/nix/langs.json` with booleans: `{ patching, lockfileLabels, testAutoWire }`.
 - CI (and local glue) stages pick steps based on capabilities.
 - Stage generators consider missing `requiredPaths` ⇒ language disabled; no error.
 

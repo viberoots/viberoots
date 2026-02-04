@@ -4,7 +4,7 @@ This installment follows Part 33. Part 33 tightened several important seams:
 
 - Provider index output now includes patch model metadata (`patch_scope` and where patch inputs are expected).
 - Prebuild guard and patch tooling now print patch invalidation one-liners using the contract vocabulary.
-- Importer-scoped exporter behavior is configured via a shared registry (`tools/buck/exporter/lang/importer-scoped-registry.ts`).
+- Importer-scoped exporter behavior is configured via a shared registry (`build-tools/tools/buck/exporter/lang/importer-scoped-registry.ts`).
 
 In Part 34 I focus on the remaining gap that still requires too much cross-language context during macro authoring and debugging:
 
@@ -296,16 +296,16 @@ This PR removes that duplication by introducing one shared helper for “read im
 
 ### Scope & Changes
 
-- Add a shared helper under `tools/lib/provider-index.ts` that:
+- Add a shared helper under `build-tools/tools/lib/provider-index.ts` that:
   - reads provider index entries for a set of lockfiles
   - applies supported importer filtering
   - optionally requires a Node module for parsing (Node case with YAML)
   - preserves deterministic ordering
 - Refactor:
-  - `tools/buck/providers/node.ts:readNodeProviderIndexEntries`
-  - `tools/buck/providers/python.ts:readPythonProviderIndexEntries`
+  - `build-tools/tools/buck/providers/node.ts:readNodeProviderIndexEntries`
+  - `build-tools/tools/buck/providers/python.ts:readPythonProviderIndexEntries`
     to call the shared helper.
-- Refactor `tools/buck/gen-provider-index.ts` to depend on the shared helper surface (not language-specific wrappers) where feasible.
+- Refactor `build-tools/tools/buck/gen-provider-index.ts` to depend on the shared helper surface (not language-specific wrappers) where feasible.
 
 Non-goals in this PR:
 

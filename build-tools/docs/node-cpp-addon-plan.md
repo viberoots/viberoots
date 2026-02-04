@@ -10,7 +10,7 @@ Introduce a Nix template that builds a `.node` shared library implementing a Nod
 
 ### Scope & Changes
 
-- Add `tools/nix/templates/cpp-node-addon.nix`:
+- Add `build-tools/tools/nix/templates/cpp-node-addon.nix`:
   - Inputs: source files, headers, `addon_name`, build flags.
   - Uses `pkgs.nodejs` for Node‑API headers and correct link flags.
   - Emits `<addon_name>.node` suitable for dynamic loading by Node.
@@ -80,7 +80,7 @@ Implement.
 
 ### Description
 
-Add a Copier template `tools/scaffolding/templates/node/cpp-addon/` that generates a Node TS library `libs/<name>` and a C++ addon `libs/<name>-native` using Node‑API.
+Add a Copier template `build-tools/tools/scaffolding/templates/node/cpp-addon/` that generates a Node TS library `libs/<name>` and a C++ addon `libs/<name>-native` using Node‑API.
 
 ### Scope & Changes
 

@@ -14,7 +14,7 @@ What’s already implemented and validated:
   - Copies the `report/` directory into `$out/report`.
 - Deterministic pnpm-store hashing without log scraping:
   - `mkPnpmStoreUnfixed` builds a normalized, reproducible pnpm store tree.
-  - `tools/dev/update-pnpm-hash.ts` builds `.#pnpm-store-unfixed.<importer>` and computes the digest via `nix hash path --sri`, updating `tools/nix/node-modules.hashes.json`.
+  - `build-tools/tools/dev/update-pnpm-hash.ts` builds `.#pnpm-store-unfixed.<importer>` and computes the digest via `nix hash path --sri`, updating `build-tools/tools/nix/node-modules.hashes.json`.
 - `nix_node_test` + `node_nix_test` external runner:
   - Enforces `lockfile:<path>#<importer>`, sets timeout, supports passing extra `env` and `patterns`.
   - Smoke-tested with zx + Buck (including a “no tests present” path).
@@ -71,7 +71,7 @@ Rationale:
 
 Introduce two zx tests that validate coverage under `buck2 test` with `--env COVERAGE=1`:
 
-1. `tools/tests/scaffolding/node-lib.nix-node-test.coverage-pass.test.ts`
+1. `build-tools/tools/tests/scaffolding/node-lib.nix-node-test.coverage-pass.test.ts`
    - Scaffold `libs/demo` with a minimal test (e.g., `expect(true).toBe(true)`).
    - Create/commit `pnpm-lock.yaml`, run `update-pnpm-hash`, warm pnpm-store and node-modules, reconcile FOD.
    - Execute: `buck2 test //libs/demo:unit -- --env COVERAGE=1`.
@@ -80,7 +80,7 @@ Introduce two zx tests that validate coverage under `buck2 test` with `--env COV
      - `$out/coverage/lcov.info` exists and non-empty.
      - `$out/coverage/coverage-summary.json` (or `coverage-final.json`) exists.
 
-2. `tools/tests/scaffolding/node-cli.nix-node-test.coverage-pass.test.ts`
+2. `build-tools/tools/tests/scaffolding/node-cli.nix-node-test.coverage-pass.test.ts`
    - Mirror the above for `apps/demo` with a simple CLI test.
 
 Additionally:
@@ -142,7 +142,7 @@ Backward compatibility:
    - `direnv exec . buck2 test //...` passes; `report/junit.xml` is present under the `node-test`’s `$out`.
    - `direnv exec . buck2 test //... -- --env COVERAGE=1` passes and produces `$out/coverage/lcov.info` and `$out/coverage/coverage-summary.json` (or `coverage-final.json`) with non‑zero content.
 2. Missing `vitest` while tests match patterns fails fast with a clear error (already implemented).
-3. `tools/dev/update-pnpm-hash.ts` uses `nix hash path --sri` (already implemented).
+3. `build-tools/tools/dev/update-pnpm-hash.ts` uses `nix hash path --sri` (already implemented).
 4. New coverage tests pass under local `v -- --env COVERAGE=1` and in CI; handbook updated with clear instructions.
 
 ## 5) Rollout Plan

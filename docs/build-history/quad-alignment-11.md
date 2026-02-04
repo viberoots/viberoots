@@ -28,7 +28,7 @@ Introduce a small, breaking change that standardizes on a single kwarg: `nixpkg_
 
 - Macro docs: document `nixpkg_deps` as the only supported kwarg across languages.
 - Migration note: replace `nix_cgo_deps` / `nix_native_deps` / `nix_cxx_attrs` with `nixpkg_deps`.
-- Templates & Scaffolds: update language templates and scaffolds in `tools/scaffolding/templates/**` to use `nixpkg_deps` exclusively. Regenerate scaffold goldens and example `TARGETS` stubs to reflect the single kwarg.
+- Templates & Scaffolds: update language templates and scaffolds in `build-tools/tools/scaffolding/templates/**` to use `nixpkg_deps` exclusively. Regenerate scaffold goldens and example `TARGETS` stubs to reflect the single kwarg.
 
 ### Acceptance Criteria
 
@@ -218,7 +218,7 @@ Unify the minimal provider‑index reader wrappers for Node and Python via a sma
 
 ### Scope & Changes
 
-- Add a generic helper (e.g., `readImporterProviderIndexEntries(...)`) in `tools/lib/provider-index.ts` or `providers/index.ts` that accepts:
+- Add a generic helper (e.g., `readImporterProviderIndexEntries(...)`) in `build-tools/tools/lib/provider-index.ts` or `providers/index.ts` that accepts:
   - `discoverLockfiles`, `importersForLockfile`, optional `shouldInclude` filter.
 - Refactor `readNodeProviderIndexEntries()` and `readPythonProviderIndexEntries()` to delegate to the helper.
 - Preserve Node’s YAML‑parser guard and Python’s importer determination logic.
@@ -256,7 +256,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Helper lives in `tools/lib` or `providers/index.ts`; remains compatible with thin slices.
+- Helper lives in `build-tools/tools/lib` or `providers/index.ts`; remains compatible with thin slices.
 
 ---
 
@@ -282,7 +282,7 @@ Implement.
 
 ## Templates & Scaffolds — Maintenance Guidance
 
-- Scope: When macro surfaces or provider wiring change (even behavior‑neutral refactors), update templates and scaffolds under `tools/scaffolding/templates/**` so newly scaffolded code matches current best practices.
+- Scope: When macro surfaces or provider wiring change (even behavior‑neutral refactors), update templates and scaffolds under `build-tools/tools/scaffolding/templates/**` so newly scaffolded code matches current best practices.
 - Required updates per PR in this series:
   - PR‑1: Replace legacy kwargs with `nixpkg_deps` in Go/Python/C++ templates, example `TARGETS` snippets, and any generator stubs.
   - PR‑2: If CGO examples exist, update them to mirror the consolidated Go helper; outputs remain identical.
@@ -292,7 +292,7 @@ Implement.
 - Verification:
   - Regenerate scaffolded samples (if applicable) and compare against goldens; diffs should be limited to intentional text (e.g., kwarg rename).
   - Build scaffold outputs to confirm label stamping and provider edges exist as expected.
-  - Keep doc snippets synchronized with `tools/scaffolding/templates/**` to avoid drift.
+  - Keep doc snippets synchronized with `build-tools/tools/scaffolding/templates/**` to avoid drift.
 
 ---
 

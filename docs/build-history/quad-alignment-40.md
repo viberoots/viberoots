@@ -3,7 +3,7 @@
 This installment follows Part 39, but adjusts the plan based on current repo reality:
 
 - Package-local WASM wiring is already on the **non-mutating helper boundary** pattern (`lang/wasm_package_local_wiring.bzl:prepare_package_local_wasm_wiring(...)` plus mutation probes), so we do **not** need a PR dedicated to “make WASM wiring non-mutating”.
-- The Nix planner already routes some key transforms through the canonical helper surface (`tools/nix/lib/lang-helpers.nix`), so the remaining planner work is about eliminating the _last_ locally re-implemented target/label parsing and making the “fallback” path obey the same canonical transforms.
+- The Nix planner already routes some key transforms through the canonical helper surface (`build-tools/tools/nix/lib/lang-helpers.nix`), so the remaining planner work is about eliminating the _last_ locally re-implemented target/label parsing and making the “fallback” path obey the same canonical transforms.
 - We already have several enforcement tests for “don’t bypass helper surfaces”; the remaining valuable work is to (a) finish standardizing macro entrypoint conventions across languages, and (b) remove remaining legacy surfaces once enforcement proves they are unused.
 
 After re-reviewing the codebase with the contract inventory in `abstractions.md`, the remaining **valuable** (non-polish) gaps are:
@@ -20,23 +20,23 @@ As in prior parts, each PR includes the tests and documentation required for the
 
 ### Description
 
-The Nix planner (`tools/nix/graph-generator.nix`) already imports `tools/nix/lib/lang-helpers.nix` and uses canonical helpers for several key transforms (sanitization, target→attr suffix).
+The Nix planner (`build-tools/tools/nix/graph-generator.nix`) already imports `build-tools/tools/nix/lib/lang-helpers.nix` and uses canonical helpers for several key transforms (sanitization, target→attr suffix).
 
 However, there is still planner-local logic that effectively re-implements parts of the “canonical label normalization” and package-path derivation surface (especially in the `BUCK_TARGET` “selected target” path and helper functions like `pkgPathOf` / “cell stripping”).
 
 This is a slow-burn abstraction leak: it is correct today, but small differences here can rename flake attrs, mis-resolve package paths, or make fallback behavior diverge from the exporter/macro worldview.
 
-This PR eliminates remaining planner-local normalization logic and routes it through `tools/nix/lib/lang-helpers.nix` (and/or `tools/nix/planner/lib.nix` when the helper is planner-only), keeping behavior identical.
+This PR eliminates remaining planner-local normalization logic and routes it through `build-tools/tools/nix/lib/lang-helpers.nix` (and/or `build-tools/tools/nix/planner/lib.nix` when the helper is planner-only), keeping behavior identical.
 
 ### Scope & Changes
 
-- Refactor `tools/nix/graph-generator.nix`:
+- Refactor `build-tools/tools/nix/graph-generator.nix`:
   - Remove (or minimize) planner-local implementations of:
     - target label normalization (cell prefix + config suffix stripping)
     - package path derivation from a target label
   - Route those transforms through a single canonical helper surface:
-    - Use `tools/nix/lib/lang-helpers.nix:normalizeTargetLabel` and `sanitizeAttrNameFromTargetLabel` everywhere the planner builds keys or selects nodes.
-    - Add a small **planner-only** helper (either in `tools/nix/lib/lang-helpers.nix` or `tools/nix/planner/lib.nix`) for “package path from normalized target label” so the planner does not hand-roll `split(":")` / `split("//")` repeatedly.
+    - Use `build-tools/tools/nix/lib/lang-helpers.nix:normalizeTargetLabel` and `sanitizeAttrNameFromTargetLabel` everywhere the planner builds keys or selects nodes.
+    - Add a small **planner-only** helper (either in `build-tools/tools/nix/lib/lang-helpers.nix` or `build-tools/tools/nix/planner/lib.nix`) for “package path from normalized target label” so the planner does not hand-roll `split(":")` / `split("//")` repeatedly.
   - In the `BUCK_TARGET` “selected target” path:
     - Replace ad-hoc `dropCell` / `canon` logic with canonical normalization.
     - Keep behavior identical (including current error messages and the existing fallback branches), but ensure normalization and package-path derivation uses the canonical helpers.
@@ -60,12 +60,12 @@ Non-goals in this PR:
 ### Docs (in this PR)
 
 - Update `abstractions.md` (under the target-label normalization / nix-attr contract) to explicitly state:
-  - `tools/nix/graph-generator.nix` must not re-implement target normalization or package-path derivation from labels; it must route through the canonical Nix helper surface.
+  - `build-tools/tools/nix/graph-generator.nix` must not re-implement target normalization or package-path derivation from labels; it must route through the canonical Nix helper surface.
   - Link to the parity/fixture tests added/extended in this PR as regression guards.
 
 ### Acceptance Criteria
 
-- `tools/nix/graph-generator.nix` no longer hand-rolls target/label normalization and package-path parsing in multiple places.
+- `build-tools/tools/nix/graph-generator.nix` no longer hand-rolls target/label normalization and package-path parsing in multiple places.
 - Planner outputs remain identical for existing targets (no attr renames, no output shape changes).
 - Parity/fixture tests fail if the planner normalization drifts from the canonical contract.
 
@@ -98,8 +98,8 @@ Implement.
 
 We already have strong “what invalidates what?” tooling:
 
-- `tools/buck/invalidation-report*` emits a contract-vocabulary report.
-- `tools/buck/prebuild/*` prints concise patch invalidation notes and guardrails.
+- `build-tools/tools/buck/invalidation-report*` emits a contract-vocabulary report.
+- `build-tools/tools/buck/prebuild/*` prints concise patch invalidation notes and guardrails.
 
 However, `invalidation-report` still has two concrete risks:
 
@@ -110,7 +110,7 @@ This PR refines the report so it is harder to misread, without changing any unde
 
 ### Scope & Changes
 
-- Update `tools/buck/invalidation-report-row.ts`:
+- Update `build-tools/tools/buck/invalidation-report-row.ts`:
   - When `srcs`/`nix_inputs` are dict-shaped:
     - classify `__patch_inputs__/...` observations based on the target’s `patch_scope` (package-local vs importer-local), not unconditionally as importer-local
     - classify `__global_nix_inputs__/...` as the primary signal of global inputs presence in dict-shaped wiring (mirrors the shared dict-prefix contract)

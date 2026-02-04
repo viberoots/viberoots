@@ -40,7 +40,7 @@ Clarification: I do not need to preserve backwards compatibility yet. This PR ca
     - preserves deterministic key prefixes for synthetic dict keys
   - realizes provider edges deterministically into a selected attribute
     - supports both list and dict-shaped inputs
-  - optionally injects `tools/buck/workspace-root.env` into dict-shaped `srcs` maps in a standardized way
+  - optionally injects `build-tools/tools/buck/workspace-root.env` into dict-shaped `srcs` maps in a standardized way
   - wires `global_nix_inputs()` into action inputs in a standardized way
     - supports `stamp=True|False` so call sites can opt into observability or keep exporter noise down
 - Add one short section to `lang/defs_common.bzl` re-exporting the helper, so language macro files do not need to import a new low-level module.
@@ -60,7 +60,7 @@ Non-goals in this PR:
   - importer-local patch files are present as action inputs
   - provider edges are present as action inputs when realized into `srcs`
   - `global_nix_inputs()` are present as action inputs when enabled
-  - `tools/buck/workspace-root.env` injection is present when enabled
+  - `build-tools/tools/buck/workspace-root.env` injection is present when enabled
 - Add a TypeScript test that asserts the macro surface does not bypass the shared helper:
   - the Node Nix-calling macro file should contain a single call to the shared helper and should not import lower-level wiring modules directly
   - this keeps drift pressure on the helper, not on call sites
@@ -132,7 +132,7 @@ Clarification: I do not need to preserve backwards compatibility yet. This PR ca
   - `nix_node_cli_bin(bundle=True)`
     This should remain a “wiring test” and should not depend on exact command strings.
 - Add or extend a temp-repo scenario test that confirms:
-  - the macros can derive workspace root via `tools/buck/workspace-root.env` in a sandboxed genrule environment
+  - the macros can derive workspace root via `build-tools/tools/buck/workspace-root.env` in a sandboxed genrule environment
   - the macro reaches the point where the bootstrapped command would be invoked (no flake-root resolution failures)
 
 ### Docs (in this PR)

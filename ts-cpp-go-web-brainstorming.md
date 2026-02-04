@@ -146,7 +146,7 @@ Note: The standard Go js/wasm toolchain does not support cgo, which is why TinyG
 
 ### Nix templates and macros (minimal additions; no new provider shapes)
 
-- Extend `tools/nix/templates/cpp.nix` with `cppWasmStaticLib`:
+- Extend `build-tools/tools/nix/templates/cpp.nix` with `cppWasmStaticLib`:
   - Inputs: `srcRoot`, `subdir`, `includeDirs`, `exportHeader` (e.g., `addon.h`), optional `cWrapperSubdir`.
   - Toolchain: `clang --target=wasm32-unknown-unknown` (no syscalls), or `wasm32-wasi` behind a flag.
   - Output: `$out/lib/libcore_wasm.a` and `$out/include/addon.h`.
@@ -240,7 +240,7 @@ The Buck/Nix wiring copies `top.wasm` into `dist/` for web and copies the `.node
 ### Consistency with METHODOLOGY.XML
 
 - Architectural minimalism: one logic implementation in C++ with a tiny C ABI.
-- Determinism: Nix templates build native/Wasm artifacts; `gomod2nix.toml` is maintained via `tools/bin/i`.
+- Determinism: Nix templates build native/Wasm artifacts; `gomod2nix.toml` is maintained via `build-tools/tools/bin/i`.
 - Separation of concerns: C++ core, Go wrappers (base/top), and TS loaders are tiny and focused.
 - Low complexity and file-size discipline: small templates/macros; short wrappers; tests per file.
 

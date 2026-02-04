@@ -32,16 +32,16 @@ This hardens the importer-dir consistency rule and prevents a class of labels th
   - allow `#.` only when the lockfile path is at repo root
   - otherwise require `#<dirname(lockfilePath)>`
   - keep `./` stripping normalization unchanged
-- Update the TypeScript parser in `tools/lib/labels.ts` to match the same rule.
+- Update the TypeScript parser in `build-tools/tools/lib/labels.ts` to match the same rule.
 - Update any callers that rely on the old permissive behavior (expected to be rare).
 - If Nix planner code parses lockfile labels (directly or indirectly), centralize parsing in a tiny helper and apply the same rule so Nix error text matches TS/Starlark.
 
 ### Tests (in this PR)
 
-- Update `tools/tests/lib/labels.parse-lockfile-label.test.ts`:
+- Update `build-tools/tools/tests/lib/labels.parse-lockfile-label.test.ts`:
   - add a regression case asserting `lockfile:apps/web/pnpm-lock.yaml#.` is rejected
   - keep existing valid root lockfile case `lockfile:pnpm-lock.yaml#.` passing
-- Update `tools/tests/labels/lockfile-label.parity.test.ts`:
+- Update `build-tools/tools/tests/labels/lockfile-label.parity.test.ts`:
   - add a parity case for the now-invalid `lockfile:apps/web/pnpm-lock.yaml#.` label and assert both TS and Starlark reject it
   - keep normalization (`lockfile:./apps/web/...`) coverage intact
 - Add a small planner regression (if applicable) to ensure the Nix-side parser fails deterministically on the same invalid label.
@@ -77,7 +77,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `lang/lockfile_labels.bzl`, `tools/lib/labels.ts`, and narrow tests. Safe in tooling slices.
+- Touches `lang/lockfile_labels.bzl`, `build-tools/tools/lib/labels.ts`, and narrow tests. Safe in tooling slices.
 
 ---
 
@@ -95,12 +95,12 @@ This PR makes provider generation and auto-map wiring satisfy the same set of su
   - allow importer `"."` (repo-root lockfile importers)
   - allow importers under `apps/*` and `libs/*`
   - reject everything else
-- Update `tools/lib/provider-sync-driver.ts` to:
+- Update `build-tools/tools/lib/provider-sync-driver.ts` to:
   - stop pre-filtering lockfiles to only `apps/*` or `libs/*`
   - instead, rely on the shared supported-importer predicate on the importer label(s) returned by parsers
   - ensure we never emit mappings for providers we will not generate
 - Update provider index generation (Node/Python) to apply the same supported-importer policy.
-- Ensure `tools/buck/gen-auto-map.ts` continues to map lockfile labels and nixpkg labels, but add a targeted check (warn or fail depending on existing conventions) if a lockfile label parses successfully but the corresponding provider is not expected to be generated under the supported-importer policy.
+- Ensure `build-tools/tools/buck/gen-auto-map.ts` continues to map lockfile labels and nixpkg labels, but add a targeted check (warn or fail depending on existing conventions) if a lockfile label parses successfully but the corresponding provider is not expected to be generated under the supported-importer policy.
 
 ### Tests (in this PR)
 
@@ -143,7 +143,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `tools/lib/provider-sync-driver.ts`, provider index helpers, and narrow tests. Safe in tooling slices.
+- Touches `build-tools/tools/lib/provider-sync-driver.ts`, provider index helpers, and narrow tests. Safe in tooling slices.
 
 ---
 
@@ -153,16 +153,16 @@ Implement.
 
 Node provider sync currently embeds a policy that, when an importer under `apps/*` or `libs/*` has `package.json` but no `pnpm-lock.yaml`, we still synthesize the lockfile path so a metadata-only provider can exist.
 
-This policy is useful, but keeping it inside `tools/buck/providers/node.ts` is a drift vector:
+This policy is useful, but keeping it inside `build-tools/tools/buck/providers/node.ts` is a drift vector:
 
 - other components (exporter, provider index, future language tooling) can easily re-implement the policy slightly differently
 - tests end up validating the behavior indirectly rather than through a single contract
 
 ### Scope & Changes
 
-- Extract the Node synthetic lockfile discovery policy into `tools/lib/importers.ts` (or a dedicated shared helper) with a clear name and contract, for example:
+- Extract the Node synthetic lockfile discovery policy into `build-tools/tools/lib/importers.ts` (or a dedicated shared helper) with a clear name and contract, for example:
   - “discover PNPM lockfiles plus workspace importers missing lockfiles but containing `package.json`”
-- Refactor `tools/buck/providers/node.ts` to use the shared helper.
+- Refactor `build-tools/tools/buck/providers/node.ts` to use the shared helper.
 - Update the Node exporter and/or other tooling that needs consistent importer discovery to use the same helper when applicable (avoid re-implementations).
 
 ### Tests (in this PR)
@@ -204,7 +204,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `tools/lib/importers.ts`, `tools/buck/providers/node.ts`, and narrow provider tests. Safe in Node-focused slices.
+- Touches `build-tools/tools/lib/importers.ts`, `build-tools/tools/buck/providers/node.ts`, and narrow provider tests. Safe in Node-focused slices.
 
 ---
 
@@ -217,7 +217,7 @@ Node and Python are both importer-scoped ecosystems, but they intentionally have
 - Node: include all importer-local patches under `<importer>/patches/node/*.patch`
 - Python: include only patches that match the `uv.lock` effective set
 
-This policy is already described in `build-tools/docs/build-system-design.md`, but it is not treated as a public contract in the handbook, and there is no single focused regression test in `tools/tests/` that fails if the policy drifts. This makes it easy for a future refactor to accidentally unify these behaviors and silently change invalidation semantics.
+This policy is already described in `build-tools/docs/build-system-design.md`, but it is not treated as a public contract in the handbook, and there is no single focused regression test in `build-tools/tools/tests/` that fails if the policy drifts. This makes it easy for a future refactor to accidentally unify these behaviors and silently change invalidation semantics.
 
 This PR makes the policy explicit as part of the public contract and adds one focused test that fails if the policy drifts.
 
@@ -267,7 +267,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `tools/lib/provider-sync-driver.ts` docs/comments and a narrow TS test. Safe in tooling slices.
+- Touches `build-tools/tools/lib/provider-sync-driver.ts` docs/comments and a narrow TS test. Safe in tooling slices.
 
 ---
 
@@ -288,7 +288,7 @@ This PR makes the primary path robust by making TypeScript’s normalization exa
 
 ### Scope & Changes
 
-- Update `tools/lib/labels.ts` lockfile label parsing to strip **all** repeated leading `./` segments from the lockfile path (mirror `lang/lockfile_labels.bzl` and `tools/nix/planner/lib.nix`).
+- Update `build-tools/tools/lib/labels.ts` lockfile label parsing to strip **all** repeated leading `./` segments from the lockfile path (mirror `lang/lockfile_labels.bzl` and `build-tools/tools/nix/planner/lib.nix`).
 - Keep strict parsing rules unchanged:
   - exactly one `#`
   - non-empty path and importer
@@ -297,9 +297,9 @@ This PR makes the primary path robust by making TypeScript’s normalization exa
 
 ### Tests (in this PR)
 
-- Update `tools/tests/lib/labels.parse-lockfile-label.strips-leading-dot-slash.test.ts` (or add a dedicated test) to assert:
+- Update `build-tools/tools/tests/lib/labels.parse-lockfile-label.strips-leading-dot-slash.test.ts` (or add a dedicated test) to assert:
   - `lockfile:././apps/web/pnpm-lock.yaml#apps/web` parses successfully and normalizes to the same canonical lockfile path as `lockfile:apps/web/pnpm-lock.yaml#apps/web`.
-- Update `tools/tests/labels/lockfile-label.parity.test.ts` to add a TS ↔ Starlark parity case for the repeated `./` form.
+- Update `build-tools/tools/tests/labels/lockfile-label.parity.test.ts` to add a TS ↔ Starlark parity case for the repeated `./` form.
 
 ### Docs (in this PR)
 
@@ -321,7 +321,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `tools/lib/labels.ts` and narrow tests/docs only. Safe in tooling slices.
+- Touches `build-tools/tools/lib/labels.ts` and narrow tests/docs only. Safe in tooling slices.
 
 ---
 

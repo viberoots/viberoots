@@ -8,7 +8,7 @@ def sanitize_name(s):
     """
     Canonical sanitizer for labels and attribute names.
 
-    This mirrors the flake-side sanitizer used in tools/nix/lib/lang-helpers.nix:
+    This mirrors the flake-side sanitizer used in build-tools/tools/nix/lib/lang-helpers.nix:
       lib.replaceStrings ["//" ":" "/" " "] ["" "-" "-" "-"] s
 
     All languages should import and use this helper to avoid drift.

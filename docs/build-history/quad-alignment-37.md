@@ -267,14 +267,14 @@ Implement.
 
 ### Description
 
-Importer support rules currently exist in both TypeScript (`tools/lib/importers.ts`) and Starlark (`lang/lockfile_labels.bzl`). Parity tests reduce risk, but the update workflow is still “touch two implementations”.
+Importer support rules currently exist in both TypeScript (`build-tools/tools/lib/importers.ts`) and Starlark (`lang/lockfile_labels.bzl`). Parity tests reduce risk, but the update workflow is still “touch two implementations”.
 
 This PR creates a single source of truth for supported importer roots and generates (or consumes) it in both layers so adding a new importer root is a single change.
 
 ### Scope & Changes
 
 - Introduce a single contract artifact that defines supported importer labels, for example:
-  - `tools/lib/importer-roots.json` (data-only)
+  - `build-tools/tools/lib/importer-roots.json` (data-only)
 - Update TypeScript importer support logic to consume the artifact (instead of hardcoding the regex).
 - Generate a small Starlark file from the artifact (for example `lang/importer_roots.bzl`) and make `lang/lockfile_labels.bzl` validate against that generated list.
   - Generation should be deterministic and invoked through the existing dev tooling flow (glue / install), not a new bespoke pipeline.
@@ -291,7 +291,7 @@ Non-goals in this PR:
 
 - Extend the existing importer-support parity test to assert both layers read the same values.
 - Add an enforcement test that fails if:
-  - `tools/lib/importers.ts` contains a hardcoded importer regex (must use the artifact)
+  - `build-tools/tools/lib/importers.ts` contains a hardcoded importer regex (must use the artifact)
   - `lang/lockfile_labels.bzl` contains a hardcoded list/regex for importer roots (must use the generated file)
 
 ### Docs (in this PR)

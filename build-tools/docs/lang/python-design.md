@@ -28,7 +28,7 @@ I follow the repo-wide linking model described in `cpp-linking.md`, `build-tools
 - `deps` is the Buck graph edge list. It does not imply link intent.
 - `link_deps` declares linkable inputs. `header_deps` is include-only when that concept applies.
 - Macros compute `deps := deps ∪ link_deps ∪ header_deps` deterministically and validate `link_closure_overrides` keys.
-- `link_closure` defaults to `"direct"`. `"transitive"` follows `link_deps` only via `tools/nix/planner/link-closure.nix`.
+- `link_closure` defaults to `"direct"`. `"transitive"` follows `link_deps` only via `build-tools/tools/nix/planner/link-closure.nix`.
 - Ordering is deterministic and unsupported deps fail fast with targeted errors.
 
 ### C interop requirement
@@ -42,7 +42,7 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
 - Provider wiring: load `MODULE_PROVIDERS` from `//lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
 - Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
-- Patch model contract: `lang/lang_contracts.bzl` and `tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
+- Patch model contract: `lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
 
 ---
@@ -50,13 +50,13 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 ## Path Invariants and Naming
 
 - Patches live in `<importer>/patches/python/` (importer‑local, flat directory, no subdirectories). Filenames: `<distribution-name>@<version>.patch` (case‑insensitive keys in logic).
-- Python Nix templates live in `tools/nix/templates/python.nix`, imported by `tools/nix/lang-templates.nix`.
+- Python Nix templates live in `build-tools/tools/nix/templates/python.nix`, imported by `build-tools/tools/nix/lang-templates.nix`.
 - Buck macros live under `python/defs.bzl` and use `//lang:auto_map.bzl`.
 - Provider rules live under `//third_party/providers/**` and are generated, not hand‑edited.
 - Dev overrides via `NIX_PY_DEV_OVERRIDE_JSON` (JSON: `{ "name@ver": "/abs/local/src" }`). CI forbids overrides.
 - Reuse common utilities:
   - Starlark helpers in `lang/defs_common.bzl` (`stamp_labels`, `ensure_single_lockfile_label`, `append_nixpkg_labels`, `providers_for`, `append_patch_srcs`).
-  - Provider naming and label parsing helpers in `tools/lib/providers.ts` and `tools/lib/labels.ts`.
+  - Provider naming and label parsing helpers in `build-tools/tools/lib/providers.ts` and `build-tools/tools/lib/labels.ts`.
 
 ---
 
@@ -73,7 +73,7 @@ We adopt the importer‑scoped lockfile labeling model (like Node) to get precis
 
 ---
 
-## Nix Templates: tools/nix/templates/python.nix
+## Nix Templates: build-tools/tools/nix/templates/python.nix
 
 Provide two functions mirroring Go’s `goApp`/`goLib` style: `pyApp` and `pyLib`. These are thin shims over the uv backend, with unified patch/override hooks.
 
@@ -152,7 +152,7 @@ Extend the planner’s dispatch to include Python using the same pattern as Go/N
 - Detect Python targets either by `rule_type` prefix `python_` or `labels` containing `lang:python`.
 - Compute `kind` as `bin|lib|test` using rule type or label hint (`kind:*`).
 - Determine `modulesFileFor(name)` (lockfile path) by scanning the owning package directory for `uv.lock` only.
-- Emit derivations using `T.pyApp` or `T.pyLib` from `tools/nix/lang-templates.nix` with `lockfile` passed explicitly.
+- Emit derivations using `T.pyApp` or `T.pyLib` from `build-tools/tools/nix/lang-templates.nix` with `lockfile` passed explicitly.
 
 Example dispatch sketch (conceptual)
 
@@ -173,7 +173,7 @@ in { inherit pyTargets; }
 
 ## Exporter: Labels for Python Targets
 
-Extend `tools/buck/export-graph.ts` with a Python adapter that:
+Extend `build-tools/tools/buck/export-graph.ts` with a Python adapter that:
 
 - Identifies Python targets (by `rule_type`/`labels`).
 - Locates the nearest `uv.lock`, computes importer id (`<pkg dir>`), and adds a label: `lockfile:<path>#<importer>`.
@@ -188,7 +188,7 @@ Severity
 
 ## Provider Sync for Python
 
-Add a Python provider sync driver under `tools/buck/providers/python.ts` that is invoked through the unified orchestrator `tools/buck/sync-providers.ts` (`node tools/buck/sync-providers.ts --lang python --no-glue`) and:
+Add a Python provider sync driver under `build-tools/tools/buck/providers/python.ts` that is invoked through the unified orchestrator `build-tools/tools/buck/sync-providers.ts` (`node build-tools/tools/buck/sync-providers.ts --lang python --no-glue`) and:
 
 - Scans all `uv.lock` lockfiles (`**/uv.lock`).
 - For each importer, computes an effective set of distributions (simplest approach: full set from the lockfile; future enhancement may trim unused extras if encoded).
@@ -215,7 +215,7 @@ Determinism & guards
 - Duplicate detection: error if two patch files map to the same `<dist>@<ver>`.
 - Warn if any subdirectories exist under `patches/python/`.
 
-Note: The orchestrator `tools/buck/sync-providers.ts` already drives per‑language providers. Add Python to that driver so one command regenerates all providers (Python = uv only).
+Note: The orchestrator `build-tools/tools/buck/sync-providers.ts` already drives per‑language providers. Add Python to that driver so one command regenerates all providers (Python = uv only).
 
 ---
 
@@ -316,7 +316,7 @@ Notes
 
 ## Patching Workflow: patch-pkg python
 
-Add `tools/patch/patch-python.ts` implementing `LanguageHandler`:
+Add `build-tools/tools/patch/patch-python.ts` implementing `LanguageHandler`:
 
 - `start <dist>`
   - Resolve the distribution `name@version` currently locked for the target importer (using the selected lockfile). Locate its source (prefer sdist source; otherwise unpack wheel). Copy to temp dir (APFS CoW on macOS; `cp -a` elsewhere).
@@ -325,7 +325,7 @@ Add `tools/patch/patch-python.ts` implementing `LanguageHandler`:
 
 - `apply <dist>`
   - Produce unified diff: `diff -ruN "$src" "$tmp" > <importer>/patches/python/<name>@<version>.patch`.
-  - Run glue: `node tools/buck/sync-providers.ts` (now includes Python) and `node tools/buck/gen-auto-map.ts`.
+  - Run glue: `node build-tools/tools/buck/sync-providers.ts` (now includes Python) and `node build-tools/tools/buck/gen-auto-map.ts`.
   - Clear dev override for that key and delete temp dir.
 
 - `reset <dist>`
@@ -345,7 +345,7 @@ Idempotency
 Stages remain unchanged; we extend drivers to include Python:
 
 - Export Graph → Sync Providers (Go + Node + Python) → Generate auto_map → Pre‑build guard → Build & Test.
-- `tools/buck/prebuild-guard.ts` continues to require `graph.json` and `auto_map.bzl`, and when lockfiles exist, at least one provider file (`TARGETS*.auto`). With Python enabled, presence of `TARGETS.python.auto` satisfies the guard when Python lockfiles are present.
+- `build-tools/tools/buck/prebuild-guard.ts` continues to require `graph.json` and `auto_map.bzl`, and when lockfiles exist, at least one provider file (`TARGETS*.auto`). With Python enabled, presence of `TARGETS.python.auto` satisfies the guard when Python lockfiles are present.
 
 Building multiple importers concurrently
 
@@ -353,13 +353,13 @@ Building multiple importers concurrently
 
 Install/lock integration
 
-- Extend `tools/install-deps.ts` to optionally refresh Python lockfiles (uv only) when Python is enabled, mirroring Go’s gomod2nix step:
+- Extend `build-tools/tools/install-deps.ts` to optionally refresh Python lockfiles (uv only) when Python is enabled, mirroring Go’s gomod2nix step:
   - Detect `**/uv.lock` presence; when dependencies change, run the pinned uv/uv2nix helper to refresh reproducible inputs.
   - Keep behavior idempotent and silent when no Python importers exist.
 
 Startup guardrails
 
-- Update `tools/dev/startup-check.ts` to warn when `NIX_PY_DEV_OVERRIDE_JSON` is set locally and to throw (via the shared Nix helpers) in CI if overrides are present, matching Go/CPP behavior.
+- Update `build-tools/tools/dev/startup-check.ts` to warn when `NIX_PY_DEV_OVERRIDE_JSON` is set locally and to throw (via the shared Nix helpers) in CI if overrides are present, matching Go/CPP behavior.
 
 ---
 
@@ -371,15 +371,15 @@ Startup guardrails
 - Isolation and non‑inheritance (no shadow deps)
   - Do not rely on a repo‑wide virtualenv; each importer’s environment is realized by Nix based on its lockfile.
   - Do not set global `PYTHONPATH` in the dev shell or CI for app/lib execution. Keep zx loader and Node tooling separate from Python runtime.
-  - Root tooling (`tools/**`) must not leak into Python apps/libs; builds must use only declared deps from the importer’s lockfile.
+  - Root tooling (`build-tools/tools/**`) must not leak into Python apps/libs; builds must use only declared deps from the importer’s lockfile.
 - Hermetic dev shell integration
   - Expose per‑importer derivations (e.g., `.#py-<importer>`) and optional variants for uv groups (e.g., `.#py-<importer>-dev`, `.#py-<importer>-test`).
   - Pin Python, uv/poetry, and compiler toolchains in the flake so behavior is stable across machines and CI.
 - Provider and auto‑map reuse
-  - Provider naming uses `tools/lib/providers.ts` helpers (`providerNameForImporter`), identical to Node. No Python‑specific naming scheme required for importer‑scoped providers.
-  - Glue files (`tools/buck/graph.json`, `third_party/providers/TARGETS*.auto`, `third_party/providers/auto_map.bzl`) are generated by zx scripts and are not committed.
+  - Provider naming uses `build-tools/tools/lib/providers.ts` helpers (`providerNameForImporter`), identical to Node. No Python‑specific naming scheme required for importer‑scoped providers.
+  - Glue files (`build-tools/tools/buck/graph.json`, `third_party/providers/TARGETS*.auto`, `third_party/providers/auto_map.bzl`) are generated by zx scripts and are not committed.
 - Partial‑clone friendly gating
-  - Detect Python enablement via the presence of `tools/nix/templates/python.nix` (and optional `tools/nix/langs.json` entry). Missing required paths disables Python glue and scaffolding while keeping the repo usable for other languages.
+  - Detect Python enablement via the presence of `build-tools/tools/nix/templates/python.nix` (and optional `build-tools/tools/nix/langs.json` entry). Missing required paths disables Python glue and scaffolding while keeping the repo usable for other languages.
 
 ---
 
@@ -397,7 +397,7 @@ This remains exploratory and is not required for the initial Python support.
 
 ## Scaffolding
 
-Add `tools/scaffolding/templates/python/` and registry entries so `scaf new python <lib|app>` generates:
+Add `build-tools/tools/scaffolding/templates/python/` and registry entries so `scaf new python <lib|app>` generates:
 
 - `pyproject.toml` (PEP 621) with a modern backend (recommend `hatchling`).
 - uv‑only: generate `uv.lock` by default. Provide commented examples in README for enabling uv groups like `dev` and `test`.
@@ -408,7 +408,7 @@ Add `tools/scaffolding/templates/python/` and registry entries so `scaf new pyth
 
 ## Tests (zx; one‑test‑per‑file)
 
-Add targeted zx tests under `tools/tests/`:
+Add targeted zx tests under `build-tools/tools/tests/`:
 
 - `exporter/python.labels-present.test.ts` — exporter adds `lockfile:` label to Python targets; warns when `.py` sources lack `lang:python`.
 - `providers/sync-providers-python.idempotent.test.ts` — deterministic generation of `TARGETS.python.auto`; duplicate patch detection; flat dir warnings.
@@ -470,7 +470,7 @@ Phase 0 — Baseline
 
 Phase 1 — Planner + Templates (skeleton)
 
-- Add `tools/nix/templates/python.nix` with uv‑only backend and group toggles.
+- Add `build-tools/tools/nix/templates/python.nix` with uv‑only backend and group toggles.
 - Wire planner dispatch to call `pyApp`/`pyLib`.
 - Acceptance: one toy Python target (lib/bin) builds via Nix locally (no patches yet).
 
@@ -481,7 +481,7 @@ Phase 2 — Exporter Labels
 
 Phase 3 — Provider Sync (Python)
 
-- Implement the Python provider sync driver and ensure it is wired into the unified orchestrator (`tools/buck/sync-providers.ts`).
+- Implement the Python provider sync driver and ensure it is wired into the unified orchestrator (`build-tools/tools/buck/sync-providers.ts`).
 - Acceptance: with a dummy `patches/python/foo@1.2.3.patch` and a lockfile referencing `foo==1.2.3`, the generator writes `TARGETS.python.auto` deterministically.
 
 Phase 4 — Patch Workflow
@@ -522,13 +522,13 @@ Introduce minimal Python enablement without changing build behavior: path invari
 
 - Add `patches/python/.gitkeep` (flat dir; no subdirectories).
 - Add `//third_party/providers/defs_python.bzl` with `python_importer_deps(...)` content‑addressed stamp (lockfile + patch paths).
-- Optional gating entry in `tools/nix/langs.json` (if present) to detect Python enablement by required paths (templates, providers).
+- Optional gating entry in `build-tools/tools/nix/langs.json` (if present) to detect Python enablement by required paths (templates, providers).
 - Documentation note in this design that Python glue is presence‑based and partial‑clone friendly.
 
 #### Acceptance Criteria
 
 - Repo builds unchanged; no providers generated without `uv.lock`.
-- `tools/buck/prebuild-guard.ts` continues to pass in repos without Python importers.
+- `build-tools/tools/buck/prebuild-guard.ts` continues to pass in repos without Python importers.
 
 #### Risks
 
@@ -557,7 +557,7 @@ Replace the stub uv backend with a real uv2nix-backed builder so Python apps/lib
 #### Scope & Changes
 
 - Backend:
-  - Implement `tools/nix/templates/python/backends/uv.nix` to use uv2nix (or a pinned equivalent) to materialize an environment from `uv.lock`.
+  - Implement `build-tools/tools/nix/templates/python/backends/uv.nix` to use uv2nix (or a pinned equivalent) to materialize an environment from `uv.lock`.
   - Integrate `patchesMap` (apply `<dist>@<ver>.patch` overlays at build time) and `devOverrides` (local source override) exactly as today.
   - Expose an executable/app entry for `pyApp` (and library build realization for `pyLib`) so Buck targets can be executed in tests.
 - Planner/templates:
@@ -600,7 +600,7 @@ Add Python Nix templates and integrate planner dispatch so Python derivations ca
 
 #### Scope & Changes
 
-- Add `tools/nix/templates/python.nix` exposing `pyApp` and `pyLib` using a shared `mkPy` with:
+- Add `build-tools/tools/nix/templates/python.nix` exposing `pyApp` and `pyLib` using a shared `mkPy` with:
   - `patchesMap` from `patches/python/*.patch` filenames,
   - `devOverrides` from `NIX_PY_DEV_OVERRIDE_JSON` (warn locally, throw in CI),
   - uv backend dispatch (`python/backends/uv.nix`) for lockfile consumption.
@@ -637,14 +637,14 @@ Extend the exporter to attach `lockfile:<path>#<importer>` to Python targets and
 
 #### Scope & Changes
 
-- Update `tools/buck/export-graph.ts`:
+- Update `build-tools/tools/buck/export-graph.ts`:
   - Identify Python targets (rule_type or `lang:python`),
   - Locate nearest `uv.lock`, compute importer id, attach `lockfile:<path>#<importer>` label,
   - Warn (non‑CI) if `.py` sources lack `lang:python`.
 
 #### Acceptance Criteria
 
-- `tools/buck/graph.json` shows correct lockfile labels on Python targets.
+- `build-tools/tools/buck/graph.json` shows correct lockfile labels on Python targets.
 - Severity obeys repo policy: local warn, CI error (global exporter setting).
 
 #### Risks
@@ -673,8 +673,8 @@ Generate deterministic importer‑scoped Python providers that are sensitive to 
 
 #### Scope & Changes
 
-- Add `tools/buck/providers/python.ts` (canonical generator) and invoke it only via the unified orchestrator `tools/buck/sync-providers.ts`.
-- Teach `tools/buck/sync-providers.ts` to include Python when `--lang python` or default (all).
+- Add `build-tools/tools/buck/providers/python.ts` (canonical generator) and invoke it only via the unified orchestrator `build-tools/tools/buck/sync-providers.ts`.
+- Teach `build-tools/tools/buck/sync-providers.ts` to include Python when `--lang python` or default (all).
 - Emit `third_party/providers/TARGETS.python.auto`:
   - Stable ordering, one target per importer,
   - `patch_paths` filtered to dist versions present in the importer’s lockfile,
@@ -712,7 +712,7 @@ Confirm `gen-auto-map.ts` maps generic `lockfile:` labels for Python (same as No
 #### Scope & Changes
 
 - Add zx tests to assert Python targets (with lockfile labels) receive the correct importer‑scoped provider entries in `MODULE_PROVIDERS`.
-- If needed, minimally adjust `tools/lib/labels.ts` to ensure Python lockfile labels are already handled (expected: no change).
+- If needed, minimally adjust `build-tools/tools/lib/labels.ts` to ensure Python lockfile labels are already handled (expected: no change).
 
 #### Acceptance Criteria
 
@@ -780,7 +780,7 @@ Implement Python language handler for the unified patch workflow: start/reset/ap
 
 #### Scope & Changes
 
-- Add `tools/patch/patch-python.ts`:
+- Add `build-tools/tools/patch/patch-python.ts`:
   - `start`: resolve `name@version` from importer lockfile, copy sdist/wheel sources to temp (APFS CoW on macOS), set `NIX_PY_DEV_OVERRIDE_JSON`,
   - `apply`: produce `patches/python/<name>@<version>.patch`, run provider sync + auto‑map, clear override,
   - `reset`/`session`: match existing semantics (Ctrl‑D apply, Ctrl‑C reset),
@@ -817,9 +817,9 @@ Integrate uv lock refresh into existing install tooling; add override guardrails
 
 #### Scope & Changes
 
-- `tools/install-deps.ts`: when Python is enabled and `**/uv.lock` present, run pinned uv/uv2nix helper to refresh reproducible inputs; no‑op otherwise.
-- `tools/dev/startup-check.ts`: add local warning for `NIX_PY_DEV_OVERRIDE_JSON`; CI behavior remains enforced in Nix templates.
-- `tools/buck/prebuild-guard.ts`: consider Python providers present when `uv.lock` exists and require at least one `TARGETS.python.auto` (mirrors Node behavior).
+- `build-tools/tools/install-deps.ts`: when Python is enabled and `**/uv.lock` present, run pinned uv/uv2nix helper to refresh reproducible inputs; no‑op otherwise.
+- `build-tools/tools/dev/startup-check.ts`: add local warning for `NIX_PY_DEV_OVERRIDE_JSON`; CI behavior remains enforced in Nix templates.
+- `build-tools/tools/buck/prebuild-guard.ts`: consider Python providers present when `uv.lock` exists and require at least one `TARGETS.python.auto` (mirrors Node behavior).
 
 #### Acceptance Criteria
 
@@ -891,7 +891,7 @@ Add scaffolding templates for Python and update docs for onboarding and operatio
 
 #### Scope & Changes
 
-- Add `tools/scaffolding/templates/python/` (lib/app):
+- Add `build-tools/tools/scaffolding/templates/python/` (lib/app):
   - `pyproject.toml`, `uv.lock` generation, `TARGETS` stubs using `nix_python_*` macros, README snippets.
 - Update docs:
   - `docs/handbook/adding-language.md` — Python notes, path invariants, lockfile labels,
@@ -927,12 +927,12 @@ Expose uv “groups” toggles in the Python templates and surface convenient pe
 
 #### Scope & Changes
 
-- `tools/nix/templates/python.nix`:
+- `build-tools/tools/nix/templates/python.nix`:
   - Add a `groups` parameter (default `[]`) that is forwarded to the backend.
   - Ensure `groups` participates in cache keys and is reflected in `BUILD-INFO.json`.
-- `tools/nix/templates/python/backends/uv.nix`:
+- `build-tools/tools/nix/templates/python/backends/uv.nix`:
   - Honor a `groups` argument to materialize extras/variants deterministically (no network; leverage existing `NIX_PY_TEST_RESOLVE_JSON` in tests).
-- `tools/nix/planner/python.nix` and flake manifest:
+- `build-tools/tools/nix/planner/python.nix` and flake manifest:
   - Add per‑importer exposed outputs `.#py-<importer>`, `.#py-<importer>-dev`, `.#py-<importer>-test` by passing `groups = ["dev"]` / `["test"]`.
 - Tests:
   - Add zx tests proving base vs dev/test variants create distinct derivations and are idempotent.
@@ -966,7 +966,7 @@ Extend the provider index to include Python importer‑scoped providers, enablin
 
 #### Scope & Changes
 
-- `tools/buck/gen-provider-index.ts`:
+- `build-tools/tools/buck/gen-provider-index.ts`:
   - Read Python providers from `third_party/providers/TARGETS.python.auto` (or via `findUvLockfiles`) and emit entries with `kind: "python"` and key `lockfile:<path>#<importer>`.
 - Tests:
   - Add zx tests validating Python entries appear, ordering is deterministic, and JSON/BZL outputs match.
@@ -999,7 +999,7 @@ Augment startup diagnostics to verify `python3` and `uv` availability, aligning 
 
 #### Scope & Changes
 
-- `tools/dev/startup-check.ts`:
+- `build-tools/tools/dev/startup-check.ts`:
   - Add checks for `python3` and `uv`; keep behavior: fail in CI when missing, friendly error locally.
 - Docs:
   - Note Python/uv prerequisites in onboarding sections.
@@ -1032,7 +1032,7 @@ Complete Python scaffolding by generating `pyproject.toml` (hatchling) alongside
 
 #### Scope & Changes
 
-- Add `tools/scaffolding/templates/python/*/pyproject.toml.jinja` with minimal PEP 621 metadata and hatchling backend.
+- Add `build-tools/tools/scaffolding/templates/python/*/pyproject.toml.jinja` with minimal PEP 621 metadata and hatchling backend.
 - Update READMEs to show `uv lock` flow and groups examples.
 - Tests:
   - Ensure `scaf new python <lib|app>` creates `pyproject.toml` and `uv.lock` placeholder files.
@@ -1065,7 +1065,7 @@ Add explicit tests that `.py` sources lacking `lang:python` (and no `python_*` r
 
 #### Scope & Changes
 
-- Tests under `tools/tests/exporter/`:
+- Tests under `build-tools/tools/tests/exporter/`:
   - Local mode: validate warning text.
   - Simulated CI: validate non‑zero exit on findings.
 

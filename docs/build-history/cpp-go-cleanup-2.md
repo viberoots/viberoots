@@ -8,12 +8,12 @@ This plan implements the next set of focused improvements to keep Go and C++ fea
 
 Scope
 
-- Refactor Node provider sync (invoked through `node tools/buck/sync-providers.ts --lang node --no-glue`) to reuse `tools/lib/providers.ts` helpers (`shortHash`, `providerNameForImporter`).
+- Refactor Node provider sync (invoked through `node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`) to reuse `build-tools/tools/lib/providers.ts` helpers (`shortHash`, `providerNameForImporter`).
 - No behavior changes; only remove local implementations and import shared helpers.
 
 Detailed Design
 
-- Replace local `shortHash` and `nameForImporterProvider` functions with imports from `tools/lib/providers.ts`.
+- Replace local `shortHash` and `nameForImporterProvider` functions with imports from `build-tools/tools/lib/providers.ts`.
 - Keep traversal logic for PNPM importer effective sets unchanged.
 - Ensure generated `TARGETS.node.auto` is byte‑for‑byte stable.
 
@@ -37,12 +37,12 @@ Consequence if not implemented
 Scope
 
 - Enforce single‑source normalization and naming for nixpkgs attributes across all generators.
-- Use `normalizeNixAttr` and `providerNameForNixAttr` from `tools/lib/providers.ts` in any script that maps `nixpkg:` labels to provider names.
+- Use `normalizeNixAttr` and `providerNameForNixAttr` from `build-tools/tools/lib/providers.ts` in any script that maps `nixpkg:` labels to provider names.
 
 Detailed Design
 
-- Audit scripts in `tools/buck/*` for any custom `nixpkg:` handling.
-- Ensure `tools/buck/gen-auto-map.ts` (already compliant) remains the example reference.
+- Audit scripts in `build-tools/tools/buck/*` for any custom `nixpkg:` handling.
+- Ensure `build-tools/tools/buck/gen-auto-map.ts` (already compliant) remains the example reference.
 - Add a small unit test exercising alias `pkgs.gtest → pkgs.googletest`, deep paths (e.g., `pkgs.gnome.glib`), and punctuation normalization.
 
 Acceptance Criteria
@@ -122,7 +122,7 @@ Consequence if not implemented
 
 Scope
 
-- Introduce `tools/nix/dev-overrides.nix` and refactor language templates to import a single implementation for reading override JSON, warning locally, and throwing in CI.
+- Introduce `build-tools/tools/nix/dev-overrides.nix` and refactor language templates to import a single implementation for reading override JSON, warning locally, and throwing in CI.
 
 Detailed Design
 
@@ -149,7 +149,7 @@ Consequence if not implemented
 
 Scope
 
-- Consolidate per‑language sync into the existing orchestrator (`tools/buck/sync-providers.ts`) so a single command updates all provider files.
+- Consolidate per‑language sync into the existing orchestrator (`build-tools/tools/buck/sync-providers.ts`) so a single command updates all provider files.
 
 Detailed Design
 
@@ -205,7 +205,7 @@ Consequence if not implemented
 
 Scope
 
-- Ensure `tools/dev/build-selected.ts` is the only entry used by external runner flows (currently used by C++ tests/build rules). Add a smoke test for logs and output path handling.
+- Ensure `build-tools/tools/dev/build-selected.ts` is the only entry used by external runner flows (currently used by C++ tests/build rules). Add a smoke test for logs and output path handling.
 
 Detailed Design
 
@@ -258,14 +258,14 @@ Consequence if not implemented
 
 Scope
 
-- Update CI pipeline and `tools/buck/prebuild-guard` to require `nix_attr_map.bzl` whenever provider files are present.
+- Update CI pipeline and `build-tools/tools/buck/prebuild-guard` to require `nix_attr_map.bzl` whenever provider files are present.
 
 Detailed Design
 
 - In CI, call the unified provider sync script once.
 - Extend prebuild guard to fail if:
   - `third_party/providers/nix_attr_map.bzl` is missing while `TARGETS*.auto` exists, or
-  - `tools/buck/graph.json` is older than any `TARGETS`/`*.bzl` (optional stronger freshness check).
+  - `build-tools/tools/buck/graph.json` is older than any `TARGETS`/`*.bzl` (optional stronger freshness check).
 
 Acceptance Criteria
 

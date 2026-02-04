@@ -258,11 +258,11 @@ Today, `rust/defs.bzl` still directly loads `//third_party/providers:auto_map.bz
   - Replace `load("//third_party/providers:auto_map.bzl", "MODULE_PROVIDERS")` with `load("//lang:auto_map.bzl", "MODULE_PROVIDERS")`.
   - Prefer the shared provider-edge wiring helper (`realize_provider_edges(...)` from `//lang:defs_common.bzl`) rather than bespoke `_providers_for(...)` logic.
 - Extend the existing macro hygiene test to include Rust:
-  - Update `tools/tests/lib/macros.providers-for.usage.test.ts` to include `rust/defs.bzl` in the list of checked macro entrypoints so the invariant is enforced repo-wide.
+  - Update `build-tools/tools/tests/lib/macros.providers-for.usage.test.ts` to include `rust/defs.bzl` in the list of checked macro entrypoints so the invariant is enforced repo-wide.
 
 ### Tests (in this PR)
 
-- Extend `tools/tests/lib/macros.providers-for.usage.test.ts` so it fails if any language entrypoint (including Rust) loads `//third_party/providers:auto_map.bzl` directly or embeds `//third_party/providers:` labels outside the approved `//lang:auto_map.bzl` load.
+- Extend `build-tools/tools/tests/lib/macros.providers-for.usage.test.ts` so it fails if any language entrypoint (including Rust) loads `//third_party/providers:auto_map.bzl` directly or embeds `//third_party/providers:` labels outside the approved `//lang:auto_map.bzl` load.
 
 ### Docs (in this PR)
 

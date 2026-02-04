@@ -6,19 +6,19 @@ This plan advances the consolidation from Parts 3–4. Each PR is small, indepen
 
 ### Description
 
-Eliminate drift between `tools/nix/langs.json`, `tools/lib/langs.ts`, and `tools/nix/langs.nix` by introducing one authoritative source and generating the others.
+Eliminate drift between `build-tools/tools/nix/langs.json`, `build-tools/tools/lib/langs.ts`, and `build-tools/tools/nix/langs.nix` by introducing one authoritative source and generating the others.
 
 ### Scope & Changes
 
-- Make `tools/nix/langs.json` authoritative (ids, requiredPaths, capabilities, templatesDir)
-- Update `tools/lib/langs.ts` to read from JSON (remove hard‑coded KNOWN list)
-- Generate `tools/nix/langs.nix` from JSON (retain “GENERATED FILE” header)
-- Add a tiny generator script (`tools/dev/gen-langs.ts`) invoked by glue/dev flows
+- Make `build-tools/tools/nix/langs.json` authoritative (ids, requiredPaths, capabilities, templatesDir)
+- Update `build-tools/tools/lib/langs.ts` to read from JSON (remove hard‑coded KNOWN list)
+- Generate `build-tools/tools/nix/langs.nix` from JSON (retain “GENERATED FILE” header)
+- Add a tiny generator script (`build-tools/tools/dev/gen-langs.ts`) invoked by glue/dev flows
 
 ### Acceptance Criteria
 
 - Behavior unchanged: enabled language detection and capability flags match current behavior
-- `tools/nix/langs.nix` regenerates deterministically from JSON (idempotent)
+- `build-tools/tools/nix/langs.nix` regenerates deterministically from JSON (idempotent)
 - No downstream code needs updates beyond imports/removals of constants
 
 ### Risks
@@ -45,7 +45,7 @@ Ensure patching works before `node_modules` are linked. Replace `fs-extra` usage
 
 ### Scope & Changes
 
-- Update `tools/patch/patch-node.ts` to use `node:fs/promises` (mkdirp → recursive mkdir, etc.)
+- Update `build-tools/tools/patch/patch-node.ts` to use `node:fs/promises` (mkdirp → recursive mkdir, etc.)
 - Quick pass over glue entrypoints invoked pre‑install to confirm no `fs-extra` usage
 
 ### Acceptance Criteria
@@ -78,7 +78,7 @@ Centralize `<name>@<version>.patch` decoding used by Node provider sync and unif
 ### Scope & Changes
 
 - Add a shared `decodeNameVersionFromPatch(filename)` helper (builds on existing encode/decode)
-- Make `tools/buck/providers/node.ts` use `scanFlatPatchDir` with the shared decoder
+- Make `build-tools/tools/buck/providers/node.ts` use `scanFlatPatchDir` with the shared decoder
 - Ensure duplicate detection and sort order remain deterministic
 
 ### Acceptance Criteria
@@ -106,11 +106,11 @@ Implement.
 
 ### Description
 
-Replace ad‑hoc label cleaning/sanitization in glue scripts with shared helpers from `tools/lib/labels.ts`.
+Replace ad‑hoc label cleaning/sanitization in glue scripts with shared helpers from `build-tools/tools/lib/labels.ts`.
 
 ### Scope & Changes
 
-- Update scripts (e.g., `tools/dev/build-selected.ts`) to use:
+- Update scripts (e.g., `build-tools/tools/dev/build-selected.ts`) to use:
   - `dropConfigSuffix`, `dropCellPrefix`, `normalizeTargetLabel`
   - `sanitizeAttrNameFromLabel` for attr identifiers
 - Remove duplicate local implementations
@@ -140,7 +140,7 @@ Implement.
 
 ### Description
 
-Factor duplicated attribute resolution helpers (`getAtPath`, resolve functions) from `tools/nix/templates/go.nix` and `tools/nix/templates/cpp.nix` into `tools/nix/templates-common.nix` to reduce duplication without changing behavior.
+Factor duplicated attribute resolution helpers (`getAtPath`, resolve functions) from `build-tools/tools/nix/templates/go.nix` and `build-tools/tools/nix/templates/cpp.nix` into `build-tools/tools/nix/templates-common.nix` to reduce duplication without changing behavior.
 
 ### Scope & Changes
 
@@ -177,7 +177,7 @@ Extend the existing patches lint to uniformly cover Go/Node/C++ with flat‑dir 
 
 ### Scope & Changes
 
-- Update `tools/dev/patches-lint.ts` to lint:
+- Update `build-tools/tools/dev/patches-lint.ts` to lint:
   - `patches/go`, `patches/node`, `patches/cpp` (flat dir enforcement)
   - Duplicate keys per language using shared decode helpers
 - Keep severities and messages consistent with current style
@@ -215,7 +215,7 @@ Implement.
 ## Verification & Backout Strategy
 
 - Verification:
-  - PR‑1: Diff generated `tools/nix/langs.nix`; run scaffolding and ensure enabled languages unchanged
+  - PR‑1: Diff generated `build-tools/tools/nix/langs.nix`; run scaffolding and ensure enabled languages unchanged
   - PR‑2: Run `patch-pkg start/apply/reset node` in a clean dev shell; no dependency install required
   - PR‑3: Diff `TARGETS.node.auto`; run provider sync tests; simulate duplicate files
   - PR‑4: Run glue and build‑selected flows; confirm no output diffs

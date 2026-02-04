@@ -36,7 +36,7 @@ nix_python_wasm_app(
 Build the selected target’s WASI output via the planner:
 
 ```bash
-node tools/buck/export-graph.ts
+node build-tools/tools/buck/export-graph.ts
 BUCK_TARGET=//apps/pywasm:pyapp nix build .#graph-generator.selected
 node result/bin/run.mjs
 ```
@@ -78,7 +78,7 @@ Notes:
 
 Before builds, a prebuild guard ensures generated “glue” is present and fresh:
 
-- Inputs include `TARGETS`, `*.bzl`, `patches/**/*.patch`, `flake.lock`, `tools/nix/overlays/**`, and importer-scoped lockfiles: `**/pnpm-lock.yaml` for Node and `**/uv.lock` for Python.
+- Inputs include `TARGETS`, `*.bzl`, `patches/**/*.patch`, `flake.lock`, `build-tools/tools/nix/overlays/**`, and importer-scoped lockfiles: `**/pnpm-lock.yaml` for Node and `**/uv.lock` for Python.
 - Freshness compares the newest input against the oldest glue output with a small allowed skew.
 - Behavior:
   - Local: the guard auto-fixes by running export-graph → sync-providers → gen-auto-map.

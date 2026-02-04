@@ -9,14 +9,14 @@ Steps
 - **Create a new language**
   - Run: `scaf new language kit rust --yes --display_name=Rust`
   - Generated files:
-    - `tools/nix/templates/rust.nix`
-    - `tools/nix/planner/rust.nix`
+    - `build-tools/tools/nix/templates/rust.nix`
+    - `build-tools/tools/nix/planner/rust.nix`
     - `rust/defs.bzl`
-    - `tools/buck/providers/rust.ts`
+    - `build-tools/tools/buck/providers/rust.ts`
     - `patches/rust/.gitkeep`
 
 - **Planner integration**
-  - Ensure `tools/nix/planner/rust.nix` exports: `isTarget`, `kindOf`, `mkApp`, `mkLib`.
+  - Ensure `build-tools/tools/nix/planner/rust.nix` exports: `isTarget`, `kindOf`, `mkApp`, `mkLib`.
   - `graph-generator.nix` auto-imports `planner/<lang>.nix` when present.
 
 - **Exporter adapter validation (new)**
@@ -24,34 +24,34 @@ Steps
   - Purpose: enforce language-specific invariants early with actionable errors.
   - Example policies:
     - Targets with language sources must carry a stamped `lang:<id>` label (or use your macros that add it automatically).
-    - Custom rule aliases must map to your language template via `tools/nix/mapping.nix`.
+    - Custom rule aliases must map to your language template via `build-tools/tools/nix/mapping.nix`.
   - Keep the function small and deterministic; fail fast if invariants are violated.
 
 - **Provider sync**
-  - Implement `tools/buck/providers/rust.ts` using the existing provider-sync helpers pattern. If no patches exist, generator writes a minimal `TARGETS.<lang>.auto` deterministically.
+  - Implement `build-tools/tools/buck/providers/rust.ts` using the existing provider-sync helpers pattern. If no patches exist, generator writes a minimal `TARGETS.<lang>.auto` deterministically.
   - If your language is **importer-scoped** (lockfile ecosystems like Node/PNPM or Python/uv), reuse the shared lockfile and provider-index helpers:
-    - `tools/lib/importers.ts:findImporterLockfiles`, `computeImporterLabel`
-    - `tools/lib/provider-index.ts:readImporterProviderIndexEntriesForSingleImporterLockfileBasenames` (deterministic provider-index enumeration with supported-importer filtering and optional required-module gating)
+    - `build-tools/tools/lib/importers.ts:findImporterLockfiles`, `computeImporterLabel`
+    - `build-tools/tools/lib/provider-index.ts:readImporterProviderIndexEntriesForSingleImporterLockfileBasenames` (deterministic provider-index enumeration with supported-importer filtering and optional required-module gating)
 
 - **Auto-map wiring**
-  - If your exporter emits labels (e.g., `module:…`), `tools/buck/gen-auto-map.ts` will map target → provider name; macros read providers from `MODULE_PROVIDERS` loaded via the stable `//lang:auto_map.bzl` re-export.
+  - If your exporter emits labels (e.g., `module:…`), `build-tools/tools/buck/gen-auto-map.ts` will map target → provider name; macros read providers from `MODULE_PROVIDERS` loaded via the stable `//lang:auto_map.bzl` re-export.
 
 - **Macros (Starlark wiring)**
   - Use `//lang:defs_common.bzl:prepare_language_wiring(...)` as the default macro entrypoint (non-mutating).
   - For Nix-calling macros, select `wiring = "nix_calling_genrule"` or `wiring = "non_genrule_nix_calling"` so global Nix inputs are wired consistently; do not call `wire_global_nix_inputs(...)` at the call site when using these helpers.
 
 - **Capability gating**
-  - Add an entry to `tools/nix/langs.json` with `requiredPaths`, `optionalPaths`, and `capabilities` for your language. Missing required paths in a sparse checkout disables the language; glue and scaf will still work for others.
+  - Add an entry to `build-tools/tools/nix/langs.json` with `requiredPaths`, `optionalPaths`, and `capabilities` for your language. Missing required paths in a sparse checkout disables the language; glue and scaf will still work for others.
 
 - **Scaffolding templates**
-  - Add a `tools/scaffolding/templates/<lang>/` directory, with `meta.json` and `copier.yaml`. Keep variables minimal and defaults sensible. Use `scaf help new <lang> <template>` to preview variables.
+  - Add a `build-tools/tools/scaffolding/templates/<lang>/` directory, with `meta.json` and `copier.yaml`. Keep variables minimal and defaults sensible. Use `scaf help new <lang> <template>` to preview variables.
 
 - **Tests**
   - Copy the Go contract tests as a model and adjust for your language’s providers and labels. Keep tests one-per-file and wire via `TARGETS`.
   - Include a small test that proves your adapter’s `validate(nodes)` rejects a misconfigured sample with a clear message.
 
 - **Run glue**
-  - Local: `node tools/buck/glue-pipeline.ts` (or simply `node tools/buck/prebuild-guard.ts`, which can auto-fix in local mode).
+  - Local: `node build-tools/tools/buck/glue-pipeline.ts` (or simply `node build-tools/tools/buck/prebuild-guard.ts`, which can auto-fix in local mode).
   - CI: stages run these in order; Node sync runs only if `pnpm-lock.yaml` is present.
 
 Tips

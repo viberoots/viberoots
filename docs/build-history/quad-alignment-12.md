@@ -140,7 +140,7 @@ Implement.
 
 ### Description
 
-There are multiple similar utilities for POSIX normalization and deterministic unique sorting across `tools/lib/importers.ts` and `tools/lib/provider-sync-driver.ts`. The behavior is close but not identical, which increases drift risk for importer-scoped provider generation.
+There are multiple similar utilities for POSIX normalization and deterministic unique sorting across `build-tools/tools/lib/importers.ts` and `build-tools/tools/lib/provider-sync-driver.ts`. The behavior is close but not identical, which increases drift risk for importer-scoped provider generation.
 
 This PR centralizes these helpers so Node and Python provider generation cannot subtly diverge.
 
@@ -149,7 +149,7 @@ This PR centralizes these helpers so Node and Python provider generation cannot 
 - Add or reuse a single canonical helper for:
   - `toPosixPath(...)` (strip `./`, normalize `\` to `/`, ensure `.` behavior is consistent)
   - `uniqSorted(...)` (dedupe with canonical normalization, stable sort)
-- Update `tools/lib/provider-sync-driver.ts` to reuse the canonical helper(s) instead of re-implementing them.
+- Update `build-tools/tools/lib/provider-sync-driver.ts` to reuse the canonical helper(s) instead of re-implementing them.
 - Keep behavior identical for existing inputs (especially around `.` importer handling and leading `./` trimming).
 
 ### Tests (in this PR)
@@ -189,7 +189,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Confined to `tools/lib` and does not require touching language-specific tool implementations beyond imports.
+- Confined to `build-tools/tools/lib` and does not require touching language-specific tool implementations beyond imports.
 
 ---
 
@@ -255,7 +255,7 @@ Implement, with Option B unless there is a concrete reason to enforce strict par
 
 ### Sparse / Partial Clone Guidance
 
-- Affects `tools/lib/providers.ts` and `tools/nix/lib/lang-helpers.nix` plus tests; should remain compatible with thin slices.
+- Affects `build-tools/tools/lib/providers.ts` and `build-tools/tools/nix/lib/lang-helpers.nix` plus tests; should remain compatible with thin slices.
 
 ---
 

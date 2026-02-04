@@ -21,7 +21,7 @@ I follow the repo-wide linking model described in `cpp-linking.md`, `build-tools
 - `deps` is the Buck graph edge list. It does not imply link intent.
 - `link_deps` declares linkable inputs. `header_deps` is include-only when that concept applies.
 - Macros compute `deps := deps ∪ link_deps ∪ header_deps` deterministically and validate `link_closure_overrides` keys.
-- `link_closure` defaults to `"direct"`. `"transitive"` follows `link_deps` only via `tools/nix/planner/link-closure.nix`.
+- `link_closure` defaults to `"direct"`. `"transitive"` follows `link_deps` only via `build-tools/tools/nix/planner/link-closure.nix`.
 - Ordering is deterministic and unsupported deps fail fast with targeted errors.
 
 ### C interop requirement
@@ -35,7 +35,7 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
 - Provider wiring: load `MODULE_PROVIDERS` from `//lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
 - Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
-- Patch model contract: `lang/lang_contracts.bzl` and `tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
+- Patch model contract: `lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
 
 ---
@@ -52,7 +52,7 @@ Use the canonical helper surface from `//lang:defs_common.bzl` and `//lang:langu
 ## Path Invariants (Lua)
 
 - Patches live under `patches/lua/` (flat; no subdirectories). Naming: `<rockName>@<version>.patch`.
-- Nix language templates: `tools/nix/templates/lua.nix` (consumed by `tools/nix/lang-templates.nix`).
+- Nix language templates: `build-tools/tools/nix/templates/lua.nix` (consumed by `build-tools/tools/nix/lang-templates.nix`).
 - Planner registry: Lua plugged into the planner via a small registry entry (see Planner Integration).
 - Buck macros: `lua/defs.bzl`, using `lang/defs_common.bzl` for stamping and `//lang:auto_map.bzl` for providers.
 - Provider sync: `third_party/providers/TARGETS.lua.auto` is generated, never hand-edited.
@@ -65,9 +65,9 @@ We follow the Node importer-scoped pattern for Phase A to ensure precise invalid
 
 - Phase A (Importer-scoped): Each Lua target carries a label `lockfile:<relative/path/to/luarocks.lock>#<importer>`.
   - Example: `labels = ["lockfile:apps/lua-example/luarocks.lock#apps/lua-example"]`.
-  - Provider naming uses the existing `providerNameForImporter(lockfilePath, importer)` from `tools/lib/providers.ts` (same as Node).
+  - Provider naming uses the existing `providerNameForImporter(lockfilePath, importer)` from `build-tools/tools/lib/providers.ts` (same as Node).
 
-- Phase B (Optional, per-module): Targets also carry per-module labels `module:<rockName>@<version>` if an authoritative Lua dependency export is implemented (see Exporter Integration). Provider names follow `providerNameForModuleKey(importPathOrName, version)` from `tools/lib/providers.ts` (same as Go).
+- Phase B (Optional, per-module): Targets also carry per-module labels `module:<rockName>@<version>` if an authoritative Lua dependency export is implemented (see Exporter Integration). Provider names follow `providerNameForModuleKey(importPathOrName, version)` from `build-tools/tools/lib/providers.ts` (same as Go).
 
 Providers are generated into:
 
@@ -78,7 +78,7 @@ The `gen-auto-map.ts` already understands lockfile labels; if we later emit `mod
 
 ---
 
-## Nix Templates (tools/nix/templates/lua.nix)
+## Nix Templates (build-tools/tools/nix/templates/lua.nix)
 
 We introduce `luaApp` and `luaLib`, mirroring Go’s `goApp`/`goLib` structure and behavior:
 
@@ -125,13 +125,13 @@ We extend the planner’s dispatch registry (see `graph-generator.nix` and `docs
 - Inputs passed into templates:
   - `name`, `lockfile` (macro attribute), `subdir` (macro attribute), `patchDir` (default), `devOverrideEnv` (default), and selected `luaVersion`.
 
-Planner remains tiny; language logic stays in `tools/nix/templates/lua.nix`.
+Planner remains tiny; language logic stays in `build-tools/tools/nix/templates/lua.nix`.
 
 ---
 
 ## Exporter Integration (Labels)
 
-We add a Lua adapter to the exporter (`tools/buck/export-graph.ts` or its modular adapter) that:
+We add a Lua adapter to the exporter (`build-tools/tools/buck/export-graph.ts` or its modular adapter) that:
 
 - Reads Lua targets’ attributes from Buck (via macros) and attaches the importer-scoped lockfile label:
   - `lockfile:<relative/path/to/luarocks.lock>#<importer>`.
@@ -150,13 +150,13 @@ Exporter severity remains strict in CI and warn-only locally, consistent with ex
   - Append providers from `//lang:auto_map.bzl` using `MODULE_PROVIDERS["//pkg:name"]`.
   - Forward attrs that affect configuration (e.g., entrypoint scripts, `lockfile`, `lua_version`).
 
-Use `lang/defs_common.bzl` helpers for stamping. Error UX and glue presence are handled by `tools/buck/prebuild-guard.ts`.
+Use `lang/defs_common.bzl` helpers for stamping. Error UX and glue presence are handled by `build-tools/tools/buck/prebuild-guard.ts`.
 
 ---
 
-## Provider Sync (tools/buck/sync-providers-lua.ts)
+## Provider Sync (build-tools/tools/buck/sync-providers-lua.ts)
 
-We add a zx script that writes `third_party/providers/TARGETS.lua.auto` deterministically. It reuses `tools/lib/providers.ts` for naming.
+We add a zx script that writes `third_party/providers/TARGETS.lua.auto` deterministically. It reuses `build-tools/tools/lib/providers.ts` for naming.
 
 Behavior:
 
@@ -182,7 +182,7 @@ Determinism and duplication checks mirror Node:
 
 ## Auto-map Integration
 
-`tools/buck/gen-auto-map.ts` already maps:
+`build-tools/tools/buck/gen-auto-map.ts` already maps:
 
 - `lockfile:<path>#<importer>` → importer-scoped providers via `providerNameForImporter`.
 - If Phase B is enabled, `module:<name>@<version>` → per-module providers via `providerNameForModuleKey`.
@@ -193,7 +193,7 @@ No changes to helpers; only ensure the exporter emits the Lua labels and provide
 
 ## Patching Workflow (patch-pkg lua)
 
-Extend `tools/patch/patch-pkg.ts` to support `lua` with a `tools/patch/patch-lua.ts` handler implementing:
+Extend `build-tools/tools/patch/patch-pkg.ts` to support `lua` with a `build-tools/tools/patch/patch-lua.ts` handler implementing:
 
 - `start <rockName>`:
   - Create a temp editable workspace for the rock source. Strategy:
@@ -205,8 +205,8 @@ Extend `tools/patch/patch-pkg.ts` to support `lua` with a `tools/patch/patch-lua
 - `apply <rockName>`:
   - Compute unified diff `diff -ruN "$src" "$tmp" > patches/lua/<rockName>@<version>.patch`.
   - Run glue:
-    - `node tools/buck/sync-providers-lua.ts`
-    - `node tools/buck/gen-auto-map.ts --graph tools/buck/graph.json --out third_party/providers/auto_map.bzl`
+    - `node build-tools/tools/buck/sync-providers-lua.ts`
+    - `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`
   - Clear the dev override and remove temp dir.
 
 - `reset <rockName>`: Remove override and temp dir without writing a patch.
@@ -219,7 +219,7 @@ Idempotency: Re-applying the same patch is a no-op and should not trigger rebuil
 
 ## Scaffolding
 
-- Add templates under `tools/scaffolding/templates/lua/` with `meta.json` and `copier.yaml`.
+- Add templates under `build-tools/tools/scaffolding/templates/lua/` with `meta.json` and `copier.yaml`.
 - `scaf new lua <kind>` creates:
   - `luarocks.lock` and optional `rockspec` (or guidance to generate).
   - `TARGETS` using `nix_lua_*` macros; stamps the lockfile label.
@@ -257,7 +257,7 @@ This is a later‑phase enhancement and not required for baseline Lua.
 - Macro stamping test ensures `lang:lua`, `kind:*`, and lockfile label present.
 - Optional adapter validation: exporter warns/fails when Lua sources lack `lang:lua` label or required lockfile label.
 
-Use the existing harness conventions (external timeouts, zx tests under `tools/tests/**`).
+Use the existing harness conventions (external timeouts, zx tests under `build-tools/tools/tests/**`).
 
 ---
 
@@ -265,10 +265,10 @@ Use the existing harness conventions (external timeouts, zx tests under `tools/t
 
 Phase A — Minimal reliable flow (importer-scoped)
 
-- Implement `tools/nix/templates/lua.nix` with overlay-based patching and dev override handling.
+- Implement `build-tools/tools/nix/templates/lua.nix` with overlay-based patching and dev override handling.
 - Add `lua/defs.bzl` macros and stamp importer-scoped lockfile labels.
 - Extend exporter to emit lockfile labels for Lua targets.
-- Implement `tools/buck/sync-providers-lua.ts` and `third_party/providers/defs_lua.bzl`.
+- Implement `build-tools/tools/buck/sync-providers-lua.ts` and `third_party/providers/defs_lua.bzl`.
 - Add tests for provider sync, auto-map, macro stamping.
 
 Phase B — Optional per-module accuracy
@@ -310,11 +310,11 @@ Phase C — Optional Nix hardening
 
 - Dev Overrides Affecting Reproducibility
   - Risk: Overrides change derivation hashes.
-  - Mitigation: Same policy as Go: warn locally; fail in CI when overrides are set; provide `tools/dev/clear-overrides.ts` support for Lua env var.
+  - Mitigation: Same policy as Go: warn locally; fail in CI when overrides are set; provide `build-tools/tools/dev/clear-overrides.ts` support for Lua env var.
 
 - Tooling Availability (luarocks)
   - Risk: Missing LuaRocks in dev shell breaks patch sessions.
-  - Mitigation: Update dev shell to include Lua/LuaRocks; `tools/dev/startup-check.ts` should check for `lua` and `luarocks`.
+  - Mitigation: Update dev shell to include Lua/LuaRocks; `build-tools/tools/dev/startup-check.ts` should check for `lua` and `luarocks`.
 
 ---
 

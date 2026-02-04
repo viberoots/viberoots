@@ -1,7 +1,7 @@
 """
 Language contracts (Starlark side).
 
-This file intentionally mirrors `tools/lib/lang-contracts.ts` for the subset of
+This file intentionally mirrors `build-tools/tools/lib/lang-contracts.ts` for the subset of
 contracts that must be usable at macro/probe time.
 
 Patch invalidation strategy is a cross-language contract:
@@ -14,8 +14,8 @@ PatchInvalidationStrategy = struct
 # Canonical patch invalidation strategy mapping (Starlark view).
 #
 # Keep this in parity with:
-# - `tools/lib/lang-contracts.ts` (TS)
-# - `tools/tests/lang/lang-contracts.patch-model.parity.test.ts` (parity test)
+# - `build-tools/tools/lib/lang-contracts.ts` (TS)
+# - `build-tools/tools/tests/lang/lang-contracts.patch-model.parity.test.ts` (parity test)
 PATCH_INVALIDATION_STRATEGY_BY_LANG = {
     "go": PatchInvalidationStrategy(patch_scope = "package-local", glue_on_apply_remove = False),
     "cpp": PatchInvalidationStrategy(patch_scope = "package-local", glue_on_apply_remove = False),

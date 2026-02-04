@@ -103,7 +103,7 @@ The design must:
 - Support C++ libraries, binaries, C++ Node-API addons, and C++ tests consistently.
 - Preserve deterministic builds (stable ordering, explicit inputs).
 - Preserve Buck’s impact analysis (deps remain real graph edges; patch inputs remain explicit).
-- Keep the planner small and keep logic in the language adapter (`tools/nix/planner/cpp.nix`) rather than scattering it.
+- Keep the planner small and keep logic in the language adapter (`build-tools/tools/nix/planner/cpp.nix`) rather than scattering it.
 
 ## Non-goals
 
@@ -171,7 +171,7 @@ Notes:
     - `link_deps` materializes `T.cppLib` inputs for C++ bins, Node addons, and tests
     - `header_deps` materializes `T.cppHeaders` inputs for the same consumers
   - PR-6 (this doc’s Phase 2) extends the C++ planner to consume:
-    - `link_closure="direct" | "transitive"` via `tools/nix/planner/link-closure.nix`
+    - `link_closure="direct" | "transitive"` via `build-tools/tools/nix/planner/link-closure.nix`
     - `link_closure_overrides` with deterministic normalization (reject duplicate keys after normalization)
 
 - `deps` remains the graph edge list, but for ergonomics the macro will compute:
@@ -420,7 +420,7 @@ nix_cpp_node_addon(
 
 ## Planner changes (Nix)
 
-All translation from Buck graph deps to Nix link inputs lives in `tools/nix/planner/cpp.nix`.
+All translation from Buck graph deps to Nix link inputs lives in `build-tools/tools/nix/planner/cpp.nix`.
 
 ### Required graph data
 
@@ -440,8 +440,8 @@ To implement explicit C++ linking, the planner must also be able to read:
 
 The exporter includes these intent attributes in the configured graph output:
 
-- `tools/buck/exporter/cquery/attrs.ts` (Node exporter)
-- `tools/buck/export-inline.ts` (inline fallback)
+- `build-tools/tools/buck/exporter/cquery/attrs.ts` (Node exporter)
+- `build-tools/tools/buck/export-inline.ts` (inline fallback)
 
 ### Core algorithm
 
@@ -466,7 +466,7 @@ For a C++ consumer target `T` of kind `lib`, `bin`, `addon`, or `test`:
 7. Pass the resulting Nix package input list to the C++ template as `nixCxxPkgs`.
 8. Continue to pass `nixCxxAttrs` (from `nixpkg:*`) as today.
 
-This design is intentionally parallel to what `tools/nix/planner/go.nix` already does for Go cgo, but scoped to C++.
+This design is intentionally parallel to what `build-tools/tools/nix/planner/go.nix` already does for Go cgo, but scoped to C++.
 
 Note: PR-1 in `linking-plan-2.md` implements the header-only _producer_ (`nix_cpp_headers` + `kind:headers` + `T.cppHeaders`) first. The consumer wiring for `header_deps` is now implemented and exercised by tests.
 
@@ -588,8 +588,8 @@ We need a Nix template that produces:
 
 Call it:
 
-- `tools/nix/templates/cpp-headers.nix` exporting `cppHeaders`
-- wired through `tools/nix/templates/cpp.nix` so `T.cppHeaders` exists
+- `build-tools/tools/nix/templates/cpp-headers.nix` exporting `cppHeaders`
+- wired through `build-tools/tools/nix/templates/cpp.nix` so `T.cppHeaders` exists
 
 This supports header-only deps without any link artifacts.
 
@@ -707,7 +707,7 @@ Acceptance:
 
 This repo expects real tests for behavior changes.
 
-I propose adding zx-based integration tests under `tools/tests/cpp/` that:
+I propose adding zx-based integration tests under `build-tools/tools/tests/cpp/` that:
 
 - scaffold a small temp repo with:
   - `libs/a` as a C++ lib
@@ -780,7 +780,7 @@ Both designs need a tiny, deterministic “link closure” resolver:
 
 Candidate placements:
 
-- **Nix side**: `tools/nix/planner/link-closure.nix` that both `tools/nix/planner/cpp.nix` and `tools/nix/planner/go.nix` can import.
+- **Nix side**: `build-tools/tools/nix/planner/link-closure.nix` that both `build-tools/tools/nix/planner/cpp.nix` and `build-tools/tools/nix/planner/go.nix` can import.
 - **Starlark side**: `//lang:defs_common.bzl` helper that:
   - merges `deps/link_deps/header_deps` deterministically
   - validates `link_closure_overrides` keys are present in `link_deps`

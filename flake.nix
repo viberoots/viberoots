@@ -33,7 +33,7 @@
   };
 
   outputs = { self, nixpkgs, buck2, gomod2nix }:
-    import ./tools/nix/flake/outputs.nix { inherit self nixpkgs buck2 gomod2nix; };
+    import ./build-tools/tools/nix/flake/outputs.nix { inherit self nixpkgs buck2 gomod2nix; };
 }
 
 

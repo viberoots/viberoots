@@ -87,7 +87,7 @@ Implement.
 
 ### Description
 
-Importer-scoped provider generation is shared across ecosystems via `tools/lib/provider-sync-driver.ts`. The driver already supports the two intentional policies:
+Importer-scoped provider generation is shared across ecosystems via `build-tools/tools/lib/provider-sync-driver.ts`. The driver already supports the two intentional policies:
 
 - Node: include all importer-local patch files (even if not in the lockfile effective set).
 - Python: include only importer-local patches that match the lockfile effective set.
@@ -102,10 +102,10 @@ Clarification: We do not need to preserve backwards compatibility yet. This PR c
 
 This PR is focused on TypeScript tooling only. It does not change macro behavior and it does not change the label contract.
 
-- Change `tools/lib/provider-sync-driver.ts` so `importerPatchInclusionPolicy` is required (no default).
+- Change `build-tools/tools/lib/provider-sync-driver.ts` so `importerPatchInclusionPolicy` is required (no default).
 - Update:
-  - `tools/buck/providers/node.ts` to pass `"all"` explicitly (already does today, but the call becomes required).
-  - `tools/buck/providers/python.ts` to pass `"effective-set-only"` explicitly (already does today, but the call becomes required).
+  - `build-tools/tools/buck/providers/node.ts` to pass `"all"` explicitly (already does today, but the call becomes required).
+  - `build-tools/tools/buck/providers/python.ts` to pass `"effective-set-only"` explicitly (already does today, but the call becomes required).
 - Add a small assertion or error message in the driver that fails fast if an unknown policy is provided (defensive, not user-facing).
 
 ### Tests (in this PR)
@@ -124,7 +124,7 @@ I will update docs where provider generation is described so the policy is expli
 
 - Update `docs/handbook/patching.md`:
   - document the two patch inclusion policies and why they differ between Node and Python
-  - point at `tools/lib/provider-sync-driver.ts` as the implementation surface
+  - point at `build-tools/tools/lib/provider-sync-driver.ts` as the implementation surface
 
 ### Acceptance Criteria
 
@@ -171,7 +171,7 @@ Clarification: We do not need to preserve backwards compatibility yet. This PR s
 This PR is macro wiring and shell command assembly only. It does not change provider generation and it does not change label contracts.
 
 - Add a helper in `//lang:nix_shell.bzl` that:
-  - optionally sources `tools/buck/workspace-root.env`
+  - optionally sources `build-tools/tools/buck/workspace-root.env`
   - standardizes how `WORKSPACE_ROOT`, `REPO_ROOT`, and `FLK_ROOT` are derived in a genrule sandbox
   - optionally disables unified store enforcement when the macro’s contract requires it (for example bundling scenarios)
   - composes with `nix_cmd_prefix(...)` and `nix_build_out_path_cmd(...)` so call sites do not assemble partial variants
@@ -186,7 +186,7 @@ This PR is macro wiring and shell command assembly only. It does not change prov
 I will prefer tests that validate invariants rather than asserting exact command strings.
 
 - Add or extend a probe test that:
-  - builds a Node Nix-calling macro in a temp repo scenario where `WORKSPACE_ROOT` must be derived via `tools/buck/workspace-root.env`
+  - builds a Node Nix-calling macro in a temp repo scenario where `WORKSPACE_ROOT` must be derived via `build-tools/tools/buck/workspace-root.env`
   - asserts the macro can find `flake.nix` deterministically and proceeds far enough to execute the planned command prefix
 - Add a focused test that ensures the macro still wires global Nix inputs as real action inputs when `stamp=True`, and does not stamp when the macro contract says `stamp=False`.
 
@@ -227,7 +227,7 @@ Implement.
 
 ### Description
 
-We already have a unified provider sync entrypoint in `tools/buck/sync-providers.ts`, and we also keep thin wrappers (`sync-providers-node.ts`, `sync-providers-python.ts`) for compatibility and discoverability.
+We already have a unified provider sync entrypoint in `build-tools/tools/buck/sync-providers.ts`, and we also keep thin wrappers (`sync-providers-node.ts`, `sync-providers-python.ts`) for compatibility and discoverability.
 
 This is acceptable, but it can become a source of drift if the wrappers gain behavior, or if documentation references multiple “canonical” entrypoints.
 
@@ -243,7 +243,7 @@ This PR is tooling surface consolidation only.
   - contain no substantive logic
   - delegate directly to the canonical provider sync implementations
 - If wrappers are unused, remove them and update any call sites accordingly.
-- Ensure docs point to the orchestrator entrypoint (`tools/buck/sync-providers.ts`) as canonical.
+- Ensure docs point to the orchestrator entrypoint (`build-tools/tools/buck/sync-providers.ts`) as canonical.
 
 ### Tests (in this PR)
 

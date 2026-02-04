@@ -30,15 +30,15 @@ This PR makes the exporter policy identical for Node and Python:
 
 ### Scope & Changes
 
-- Add a small shared helper in `tools/buck/exporter/lang/` for importer-scoped lockfile label attachment:
+- Add a small shared helper in `build-tools/tools/buck/exporter/lang/` for importer-scoped lockfile label attachment:
   - Inputs: nodes, `isTarget(node)`, and a `findNearestLockfile(pkgDir)` function.
   - Behavior:
     - If a node has `kind:*` and lacks `lockfile:` labels, find the nearest lockfile and attach exactly one `lockfile:<path>#<importer>` label.
-    - `importer` is computed as `dirname(lockfilePath)` (or `"."` for repo-root lockfiles), mirroring `tools/lib/importers.ts`.
+    - `importer` is computed as `dirname(lockfilePath)` (or `"."` for repo-root lockfiles), mirroring `build-tools/tools/lib/importers.ts`.
     - The attached label is sorted/deduped with the node’s existing labels.
 - Refactor:
-  - `tools/buck/exporter/lang/node.ts` to use the shared helper for attachment.
-  - `tools/buck/exporter/lang/python.ts` to use the same shared helper and remove the broader attachment behavior.
+  - `build-tools/tools/buck/exporter/lang/node.ts` to use the shared helper for attachment.
+  - `build-tools/tools/buck/exporter/lang/python.ts` to use the same shared helper and remove the broader attachment behavior.
 - Keep Node/Python adapter classification unchanged (how we decide “is node/python target”), but ensure lockfile label attachment is consistently gated by `kind:*`.
 - Update exporter validation:
   - Continue to validate existing `lockfile:` labels (exactly one, parseable, and importer-dir consistent).
@@ -50,7 +50,7 @@ This PR makes the exporter policy identical for Node and Python:
   - A node with `lang:<id>` but no `kind:*` does not get a lockfile label attached.
   - A node with `lang:<id>` and `kind:*` does get a lockfile label attached when a nearest lockfile exists.
   - A node that already has a lockfile label is left unchanged.
-- Add a regression test ensuring Node validation rejects malformed labels with the same criteria as `tools/lib/labels.ts:parseLockfileLabel(...)`.
+- Add a regression test ensuring Node validation rejects malformed labels with the same criteria as `build-tools/tools/lib/labels.ts:parseLockfileLabel(...)`.
 - Keep existing TS↔Starlark parity tests intact and extend them only when necessary to cover the exporter gating behavior.
 
 ### Docs (in this PR)
@@ -91,13 +91,13 @@ Implement.
 
 ### Description
 
-The TypeScript side already has a canonical lockfile label parser and normalizer in `tools/lib/labels.ts`. Some exporter code paths partially parse lockfile labels and then duplicate the remaining checks. This is a drift vector because it can accept labels the canonical parser would reject (or reject labels it would accept).
+The TypeScript side already has a canonical lockfile label parser and normalizer in `build-tools/tools/lib/labels.ts`. Some exporter code paths partially parse lockfile labels and then duplicate the remaining checks. This is a drift vector because it can accept labels the canonical parser would reject (or reject labels it would accept).
 
 This PR removes duplicated parsing and makes the exporter use one canonical implementation.
 
 ### Scope & Changes
 
-- Refactor exporter adapter logic to call `tools/lib/labels.ts:parseLockfileLabel(...)` (or a single shared wrapper) wherever lockfile labels are interpreted.
+- Refactor exporter adapter logic to call `build-tools/tools/lib/labels.ts:parseLockfileLabel(...)` (or a single shared wrapper) wherever lockfile labels are interpreted.
 - Remove local re-implementations of:
   - repeated `./` stripping
   - “exactly one #” validation
@@ -141,7 +141,7 @@ Implement.
 
 ### Sparse / Partial Clone Guidance
 
-- Touches `tools/buck/exporter/lang/*` and narrow tests only. Safe in tooling slices.
+- Touches `build-tools/tools/buck/exporter/lang/*` and narrow tests only. Safe in tooling slices.
 
 ---
 
@@ -158,11 +158,11 @@ This PR closes those gaps and makes the top-level CLI messaging match reality.
 
 ### Scope & Changes
 
-- Implement `remove` in `tools/patch/patch-python.ts`:
+- Implement `remove` in `build-tools/tools/patch/patch-python.ts`:
   - Remove the canonical patch file for `<dist>@<version>` from the importer-local patch directory.
   - Regenerate glue after removal (same behavior as apply).
   - Keep behavior deterministic and idempotent (removing a non-existent patch is a no-op).
-- Update `tools/patch/patch-pkg.ts` usage text:
+- Update `build-tools/tools/patch/patch-pkg.ts` usage text:
   - State that importer-scoped ecosystems (Node and Python) regenerate glue on apply and remove.
   - State that Go and C++ do not regenerate glue for patch invalidation (package-local patch files are part of target inputs).
 - Update any patching handbook sections that claim glue is Node-only so the documentation matches the actual behavior.
@@ -224,16 +224,16 @@ This PR makes the strategy explicit as a contract and uses it for diagnostics an
 
 ### Scope & Changes
 
-- Extend `tools/lib/lang-contracts.ts` with an explicit “patch invalidation strategy” surface per language, for example:
+- Extend `build-tools/tools/lib/lang-contracts.ts` with an explicit “patch invalidation strategy” surface per language, for example:
   - `patchScope: "package-local" | "importer-local"`
   - `glueOnApplyRemove: boolean`
   - `providerModel: "none" | "importer-scoped" | "curated"`
-- Update `tools/dev/langs-diagnose.ts` output to print the strategy for each enabled language.
+- Update `build-tools/tools/dev/langs-diagnose.ts` output to print the strategy for each enabled language.
 - Ensure the handbook references the same contract language rather than restating it inconsistently.
 
 ### Tests (in this PR)
 
-- Add a unit test for `tools/lib/lang-contracts.ts` (or the diagnose output) that asserts:
+- Add a unit test for `build-tools/tools/lib/lang-contracts.ts` (or the diagnose output) that asserts:
   - Node and Python are importer-scoped and require glue on apply/remove.
   - Go and C++ are package-local and do not require glue for patch invalidation.
 - Ensure the diagnose CLI remains stable and deterministic when run in partial clones.
@@ -348,7 +348,7 @@ This PR makes validation behavior consistent with our build system philosophy:
 
 ### Scope & Changes
 
-- Tighten exporter validation in `tools/buck/exporter/lang/importer-lockfile-labels.ts`:
+- Tighten exporter validation in `build-tools/tools/buck/exporter/lang/importer-lockfile-labels.ts`:
   - Validate existing `lockfile:` labels regardless of `kind:*` presence.
   - Keep all existing contract rules unchanged:
     - Exactly one `#`

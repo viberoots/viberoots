@@ -17,7 +17,7 @@ This plan sequences small, verifiable PRs to implement PNPM workspaces (apps/lib
   - `defs_node.bzl` mirrors the cookbook: tiny public provider rule emitting a stable stamp from inputs.
 - Acceptance criteria
   - `pnpm -w list` shows an empty or minimal workspace without errors.
-  - Running `node tools/buck/sync-providers.ts --lang node` creates a deterministic `third_party/providers/TARGETS.node.auto` (empty header when no lockfiles).
+  - Running `node build-tools/tools/buck/sync-providers.ts --lang node` creates a deterministic `third_party/providers/TARGETS.node.auto` (empty header when no lockfiles).
   - CI prebuild-guard passes (no missing glue after running glue steps).
 - Risks
   - Misconfigured `.npmrc` could allow dependency leakage.
@@ -27,7 +27,7 @@ This plan sequences small, verifiable PRs to implement PNPM workspaces (apps/lib
 ### PR2 — Node provider wiring and auto‑map integration hardening
 
 - Scope
-  - Ensure `tools/buck/providers/node.ts` is used via `tools/buck/sync-providers.ts` orchestrator.
+  - Ensure `build-tools/tools/buck/providers/node.ts` is used via `build-tools/tools/buck/sync-providers.ts` orchestrator.
   - Add docs section in `pnpm-design.md` clarifying importer‑scoped labels and provider naming.
   - Add a minimal zx test proving `TARGETS.node.auto` is deterministic given fixed inputs.
 - Detailed design
@@ -64,7 +64,7 @@ This plan sequences small, verifiable PRs to implement PNPM workspaces (apps/lib
 - Scope
   - Add Nix expressions to materialize per‑importer `node-modules` using the documented pattern (`hermetic-node-modules.md`).
   - Link `node_modules` in dev shell for the importer (read‑only symlink).
-  - Add `tools/dev/update-pnpm-hash.ts` usage to update FOD hashes when lockfiles change.
+  - Add `build-tools/tools/dev/update-pnpm-hash.ts` usage to update FOD hashes when lockfiles change.
 - Detailed design
   - Each importer lockfile produces two derivations: `pnpm-store` (FOD) and `node-modules`.
   - Dev shell hook links the per‑importer `node_modules` for IDE and scripts, without running installers.
@@ -98,11 +98,11 @@ This plan sequences small, verifiable PRs to implement PNPM workspaces (apps/lib
 ### PR6 — Node patch wrapper (`patch-node.ts`) and patch‑pkg integration
 
 - Scope
-  - Implement `tools/patch/patch-node.ts` mapping to pnpm’s `patch`/`patch-commit` with `patches-dir=patches/node` (from `.npmrc`).
-  - Update `tools/patch/patch-pkg.ts` to support `node` as a language.
+  - Implement `build-tools/tools/patch/patch-node.ts` mapping to pnpm’s `patch`/`patch-commit` with `patches-dir=patches/node` (from `.npmrc`).
+  - Update `build-tools/tools/patch/patch-pkg.ts` to support `node` as a language.
   - On apply/remove, call `runGlue()` so providers/auto_map refresh automatically.
 - Detailed design
-  - Reuse `tools/patch/state.ts` session store and `tools/patch/glue.ts` for glue steps.
+  - Reuse `build-tools/tools/patch/state.ts` session store and `build-tools/tools/patch/glue.ts` for glue steps.
   - Respect `$PATCH_EDITOR` and `--force` semantics where applicable.
 - Acceptance criteria
   - `patch-pkg start node <pkg>` opens a temp edit dir; `apply` writes `patches/node/<name>@<version>.patch` via pnpm; glue updates run; Buck builds that depend on the importer are invalidated appropriately.
@@ -117,7 +117,7 @@ This plan sequences small, verifiable PRs to implement PNPM workspaces (apps/lib
   - Ensure Jenkins (or CI) stages include Node steps: Export Graph → Sync Providers → Generate auto_map → Prebuild guard → Build & Test.
   - Extend prebuild-guard to include per‑importer lockfile freshness checks if not already covered.
 - Detailed design
-  - CI uses the unified orchestrator (`tools/ci/run-stage.ts`) and runs Node provider sync only when lockfiles exist.
+  - CI uses the unified orchestrator (`build-tools/tools/ci/run-stage.ts`) and runs Node provider sync only when lockfiles exist.
 - Acceptance criteria
   - CI passes on example project with and without patches; stale glue fails fast when steps are omitted.
 - Risks
@@ -128,15 +128,15 @@ This plan sequences small, verifiable PRs to implement PNPM workspaces (apps/lib
 ### PR8 — Scaffolding command for new PNPM projects
 
 - Scope
-  - Add `tools/scaffolding/new-pnpm-project.ts` to generate apps/libs templates with TS/ESLint/Prettier/tests, `.npmrc`, labels, and TARGETS using the Node macro.
+  - Add `build-tools/tools/scaffolding/new-pnpm-project.ts` to generate apps/libs templates with TS/ESLint/Prettier/tests, `.npmrc`, labels, and TARGETS using the Node macro.
   - Register templates in scaffolding registry.
-  - Place all Node templates under `tools/scaffolding/templates` (consistent with other languages).
+  - Place all Node templates under `build-tools/tools/scaffolding/templates` (consistent with other languages).
   - Add a Node CLI template option (apps/\*) that scaffolds a runnable command-line app:
     - Generates `bin/<name>` with `#!/usr/bin/env node` shebang and a minimal `--help` handler.
     - Adds `package.json` `bin` mapping (`"bin": { "<name>": "bin/<name>" }`) and scripts (`build`, `test`, `lint`, `format`).
     - Ensures `.npmrc` includes `node-linker=isolated` and `patches-dir=patches/node`.
     - Emits `TARGETS` using the Node macro (from PR5) with `labels = ["lockfile:<path>#<importer>", "lang:node", "kind:bin"]` so importer-scoped providers auto-wire.
-    - Includes a one-test-per-file zx test under `tools/tests` that executes the CLI with `--help` and asserts exit code 0 (no zx loader in the app itself; zx is used only for the test harness).
+    - Includes a one-test-per-file zx test under `build-tools/tools/tests` that executes the CLI with `--help` and asserts exit code 0 (no zx loader in the app itself; zx is used only for the test harness).
   - Add a Node lib template option (libs/\*) that scaffolds a reusable library:
     - Generates `src/index.ts` exporting a function and a matching one-test-per-file unit test in `test/`.
     - Adds `package.json` `exports`/`types` pointing to built outputs (e.g., `dist/index.js` / `dist/index.d.ts`) and standard scripts (`build`, `test`, `lint`, `format`).
@@ -208,7 +208,7 @@ This plan sequences small, verifiable PRs to implement PNPM workspaces (apps/lib
     - No network or install steps at Buck build time; compilation/bundling runs inside a Nix derivation using pinned inputs and the importer’s lockfile.
     - Runtime behavior: the bundled artifact is directly executable and does not rely on workspace `dist/` at runtime. When bundling is disabled, the shim behavior remains as in PR8 (loading `dist/`). The `--help` path remains fast.
   - Template updates:
-    - `tools/scaffolding/templates/node/cli/TARGETS.jinja` will switch from `nix_node_bin(...)` to `nix_node_cli_bin(...)` and optionally enable `bundle = True` to use `node_cli_bundle(...)`, passing the project’s importer‑scoped lockfile label and leaving other fields minimal.
+    - `build-tools/tools/scaffolding/templates/node/cli/TARGETS.jinja` will switch from `nix_node_bin(...)` to `nix_node_cli_bin(...)` and optionally enable `bundle = True` to use `node_cli_bundle(...)`, passing the project’s importer‑scoped lockfile label and leaving other fields minimal.
 
 - Acceptance criteria
   - `buck2 build //apps/<name>:<name>` produces a single file artifact at `buck-out/.../<name>` with the executable bit set (shim mode) OR `<name>.bundle.js` with shebang (bundled mode).
@@ -216,7 +216,7 @@ This plan sequences small, verifiable PRs to implement PNPM workspaces (apps/lib
   - `buck2 cquery deps(//apps/<name>:<name>)` shows the importer‑scoped provider dependency from `third_party/providers/auto_map.bzl`.
 
 - Tests
-  - Add a zx test under `tools/tests/scaffolding/` that:
+  - Add a zx test under `build-tools/tools/tests/scaffolding/` that:
     - Scaffolds a Node CLI (`apps/demo`), refreshes glue (export graph → sync node providers → gen auto_map),
     - Builds `//apps/demo:demo` in shim mode and asserts the artifact exists and is executable; executes with `--help` and asserts exit code 0,
     - Builds `//apps/demo:demo` in bundled mode (via macro `bundle = True`) and asserts the single‑file bundle exists, is executable, and `--help` exits 0.
@@ -248,7 +248,7 @@ This plan sequences small, verifiable PRs to implement PNPM workspaces (apps/lib
     - Requires the importer‑scoped lockfile label at call sites and appends providers from `auto_map.bzl`.
     - Expands to a `genrule` that invokes a zx shim to run `nix build .#node-webapp[${system}].<importer>` and copies its `dist/` to `$OUT` (no network; uses pinned flake inputs). The shim should be minimal and deterministic.
     - Nix side: expose a flake output `packages.<system>.node-webapp.<importer>` that runs `vite build` with the per‑importer `node-modules` derivation from PR4, producing `dist/` as the derivation output.
-  - Add a zx test under `tools/tests` that:
+  - Add a zx test under `build-tools/tools/tests` that:
     - Refreshes glue (export graph → sync node providers → gen auto_map).
     - Asserts the webapp targets map to the expected importer provider in `auto_map.bzl`.
     - Builds the Buck macro target and asserts the artifact contains `index.html` (verifies Nix‑backed build path end‑to‑end).
@@ -271,7 +271,7 @@ This plan sequences small, verifiable PRs to implement PNPM workspaces (apps/lib
   - Add zx tests for Node provider determinism, auto-map wiring, macro stamping, and patch wrapper behavior (idempotency, collision handling).
   - Add lint for Node patches (optional strict mode) mirroring Go rules: flat dir, one patch per key.
 - Detailed design
-  - Place tests under `tools/tests/**`, one test per file, with external timeouts. Include focused tests for peer traversal in `providers/node.ts`.
+  - Place tests under `build-tools/tools/tests/**`, one test per file, with external timeouts. Include focused tests for peer traversal in `providers/node.ts`.
 - Acceptance criteria
   - All tests pass locally and in CI; coverage is included in the merged report.
 - Risks

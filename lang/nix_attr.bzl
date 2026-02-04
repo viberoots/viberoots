@@ -1,13 +1,13 @@
 def _drop_config_suffix(label):
     # Buck2 appends config suffixes after a space and "(...)".
-    # We mirror tools/lib/labels.ts:dropConfigSuffix by splitting on " (".
+    # We mirror build-tools/tools/lib/labels.ts:dropConfigSuffix by splitting on " (".
     if not isinstance(label, str):
         return ""
     return label.split(" (")[0]
 
 
 def _drop_cell_prefix(label):
-    # Mirror tools/lib/labels.ts:dropCellPrefix:
+    # Mirror build-tools/tools/lib/labels.ts:dropCellPrefix:
     # - "//foo:bar" stays as-is
     # - "root//foo:bar" becomes "//foo:bar"
     # - labels with no "//" are unchanged
@@ -29,7 +29,7 @@ def normalize_target_label(label):
 
 
 def sanitize_nix_attr_from_target_label(label):
-    # Match tools/lib/labels.ts:sanitizeAttrNameFromLabel:
+    # Match build-tools/tools/lib/labels.ts:sanitizeAttrNameFromLabel:
     # - normalize (drop cell prefix + config suffix)
     # - lowercase
     # - map non [a-z0-9_] to "_"

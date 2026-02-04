@@ -105,7 +105,7 @@
 Each test follows the one-test-per-file pattern:
 
 ```
-tools/tests/
+build-tools/tools/tests/
 ├── lib/
 │   ├── providers.lockfile-importer-naming.test.ts
 │   └── providers.lockfile-collision-detection.test.ts
@@ -243,8 +243,8 @@ The traversal algorithm mirrors pnpm's resolution:
 
 **Inputs:**
 
-- Existing provider driver (`tools/buck/providers/node.ts`)
-- Existing auto-map generator (`tools/buck/gen-auto-map.ts`)
+- Existing provider driver (`build-tools/tools/buck/providers/node.ts`)
+- Existing auto-map generator (`build-tools/tools/buck/gen-auto-map.ts`)
 - Test helpers and fixtures
 
 **Outputs:**
@@ -260,7 +260,7 @@ The traversal algorithm mirrors pnpm's resolution:
 cat docs/pnpm/PR2-design.md
 
 # Create first test
-touch tools/tests/lib/providers.lockfile-importer-naming.test.ts
+touch build-tools/tools/tests/lib/providers.lockfile-importer-naming.test.ts
 ```
 
 ## Questions to Consider

@@ -4,7 +4,7 @@ This guide explains how to enable and use the C++ overlays entry-point to apply 
 
 ### Intended workflow
 
-Use `tools/bin/patch-pkg` as the canonical way to create and manage C++ (nixpkgs) patches. It:
+Use `build-tools/tools/bin/patch-pkg` as the canonical way to create and manage C++ (nixpkgs) patches. It:
 
 - Creates a writable workspace cloned from the nix store source for a nixpkgs attr
 - Generates a canonical patch file under `patches/cpp/<encoded>@<version>.patch`
@@ -28,13 +28,13 @@ Notes:
 - In CI (`CI=true`), dev overrides are forbidden and evaluation will fail.
 - Do not commit with this set; it changes derivation hashes locally and is not part of Buck inputs.
 
-Use `tools/dev/clear-overrides-cpp.ts` to unset quickly.
+Use `build-tools/tools/dev/clear-overrides-cpp.ts` to unset quickly.
 
 ### What you get
 
-- **Opt‑in overlay wiring**: If `tools/nix/overlays/cpp-patches.nix` exists and `NIX_CPP_USE_OVERLAY=1` is set in the environment, it is included by `flake.nix`. By default, the overlay is not enabled; local patching remains the canonical path.
+- **Opt‑in overlay wiring**: If `build-tools/tools/nix/overlays/cpp-patches.nix` exists and `NIX_CPP_USE_OVERLAY=1` is set in the environment, it is included by `flake.nix`. By default, the overlay is not enabled; local patching remains the canonical path.
 - **Local patch application**: Keep patches under `patches/cpp/*.patch` and apply them to nixpkgs packages via the overlay.
-- **Buck/Nix integration**: Prebuild freshness detection includes `tools/nix/overlays/*.nix` and `flake.lock`, ensuring changes are noticed and tested.
+- **Buck/Nix integration**: Prebuild freshness detection includes `build-tools/tools/nix/overlays/*.nix` and `flake.lock`, ensuring changes are noticed and tested.
 
 ### Quickstart (example-driven)
 
@@ -44,7 +44,7 @@ This hands-on walkthrough shows how to create, enable, and validate a patch for 
 
 ```bash
 # Start a session for the nixpkgs attribute
-tools/bin/patch-pkg start cpp zlib
+build-tools/tools/bin/patch-pkg start cpp zlib
 
 # The command prints a workspace path. Edit files under that path, e.g.:
 # Example: bump the reported version string
@@ -54,7 +54,7 @@ sed -i '' 's/#define ZLIB_VERSION \".*\"/#define ZLIB_VERSION \"9.9.9-bucknix\"/
 2. Generate the patch
 
 ```bash
-tools/bin/patch-pkg apply cpp zlib
+build-tools/tools/bin/patch-pkg apply cpp zlib
 
 # This writes a canonical patch file under patches/cpp/ named:
 #   pkgs__zlib@<version>.patch
@@ -63,7 +63,7 @@ tools/bin/patch-pkg apply cpp zlib
 
 3. Enable the overlay
 
-Ensure `tools/nix/overlays/cpp-patches.nix` exists, and opt‑in when you want to use it:
+Ensure `build-tools/tools/nix/overlays/cpp-patches.nix` exists, and opt‑in when you want to use it:
 
 ```bash
 export NIX_CPP_USE_OVERLAY=1
@@ -78,7 +78,7 @@ No manual edits are required for each patch; the overlay automatically discovers
 v
 
 # Option B: quick ad-hoc build using the overlay
-nix eval --impure --raw --expr '(import <nixpkgs> { overlays = [ (import ./tools/nix/overlays/cpp-patches.nix) ]; }).zlib.version'
+nix eval --impure --raw --expr '(import <nixpkgs> { overlays = [ (import ./build-tools/tools/nix/overlays/cpp-patches.nix) ]; }).zlib.version'
 
 # Option C: compile a tiny program against the patched headers (for APIs like zlib)
 cat > main.c <<'EOF'
@@ -86,7 +86,7 @@ cat > main.c <<'EOF'
 #include <zlib.h>
 int main(){ printf("%s\n", ZLIB_VERSION); return 0; }
 EOF
-nix shell --impure --expr 'with import <nixpkgs> { overlays = [ (import ./tools/nix/overlays/cpp-patches.nix) ]; }; [ zlib pkg-config ]' \
+nix shell --impure --expr 'with import <nixpkgs> { overlays = [ (import ./build-tools/tools/nix/overlays/cpp-patches.nix) ]; }; [ zlib pkg-config ]' \
   --command sh -c 'cc main.c -o zver $(pkg-config --cflags --libs zlib) && ./zver'
 ```
 
@@ -94,10 +94,10 @@ nix shell --impure --expr 'with import <nixpkgs> { overlays = [ (import ./tools/
 
 ```bash
 # If needed, re-open a session and repeat apply
-tools/bin/patch-pkg session cpp zlib   # Ctrl-D to apply, Ctrl-C to reset
+build-tools/tools/bin/patch-pkg session cpp zlib   # Ctrl-D to apply, Ctrl-C to reset
 
 # To discard the session/workspace
-tools/bin/patch-pkg reset cpp zlib
+build-tools/tools/bin/patch-pkg reset cpp zlib
 ```
 
 —
@@ -109,7 +109,7 @@ patches/
   cpp/
     your-fix-1.patch
     your-fix-2.patch
-tools/
+build-tools/tools/
   nix/
     overlays/
       cpp-patches.nix   # overlay entry-point (you write overrides here)
@@ -117,9 +117,9 @@ tools/
 
 ### 1) Enable the overlay (opt‑in)
 
-`flake.nix` conditionally includes the C++ overlay only when `tools/nix/overlays/cpp-patches.nix` is present and `NIX_CPP_USE_OVERLAY=1` is set in the environment. The file is intentionally minimal by default. Create or edit it to add overrides and export the env var to enable the overlay for a given build or shell session.
+`flake.nix` conditionally includes the C++ overlay only when `build-tools/tools/nix/overlays/cpp-patches.nix` is present and `NIX_CPP_USE_OVERLAY=1` is set in the environment. The file is intentionally minimal by default. Create or edit it to add overrides and export the env var to enable the overlay for a given build or shell session.
 
-The committed overlay file at `tools/nix/overlays/cpp-patches.nix` auto-discovers patches; no per-attr snippet is needed. Remember to set `NIX_CPP_USE_OVERLAY=1` to activate it.
+The committed overlay file at `build-tools/tools/nix/overlays/cpp-patches.nix` auto-discovers patches; no per-attr snippet is needed. Remember to set `NIX_CPP_USE_OVERLAY=1` to activate it.
 
 Tips:
 
@@ -128,7 +128,7 @@ Tips:
 
 ### 2) Add or update patches (via patch-pkg)
 
-The recommended path is to use `tools/bin/patch-pkg` to generate patches. It writes to `patches/cpp/` automatically using the convention `<encoded>@<version>.patch`, e.g. `pkgs__zlib@1.2.13.patch`.
+The recommended path is to use `build-tools/tools/bin/patch-pkg` to generate patches. It writes to `patches/cpp/` automatically using the convention `<encoded>@<version>.patch`, e.g. `pkgs__zlib@1.2.13.patch`.
 If you must add a patch manually, keep it under `patches/cpp/` and follow the same naming convention.
 
 ### 3) Provider glue (no longer required)
@@ -137,10 +137,10 @@ As of PR 2 in `drop-cpp-provider.md`, C++ provider sync is a no‑op. There is n
 
 ```bash
 # List effective nixpkg attrs for all C++ targets in the exported graph
-node tools/buck/inspect-cpp-attrs.ts --json
+node build-tools/tools/buck/inspect-cpp-attrs.ts --json
 
 # Or for specific targets
-node tools/buck/inspect-cpp-attrs.ts --target //libs/helper-lib:lib --target //apps/bar:bin
+node build-tools/tools/buck/inspect-cpp-attrs.ts --target //libs/helper-lib:lib --target //apps/bar:bin
 ```
 
 ### 3.5) Creating patches with patch-pkg (recommended, canonical)
@@ -151,18 +151,18 @@ Commands (canonical flow):
 
 ```bash
 # Start a session for a nixpkgs attribute (both forms accepted)
-tools/bin/patch-pkg start cpp pkgs.zlib
+build-tools/tools/bin/patch-pkg start cpp pkgs.zlib
 # or
-tools/bin/patch-pkg start cpp zlib
+build-tools/tools/bin/patch-pkg start cpp zlib
 
 # Make edits under the printed workspace path, then:
-tools/bin/patch-pkg apply cpp zlib
+build-tools/tools/bin/patch-pkg apply cpp zlib
 
 # If you want to discard the session/workspace:
-tools/bin/patch-pkg reset cpp zlib
+build-tools/tools/bin/patch-pkg reset cpp zlib
 
 # Interactive session: Ctrl-D applies, Ctrl-C resets
-tools/bin/patch-pkg session cpp zlib
+build-tools/tools/bin/patch-pkg session cpp zlib
 ```
 
 What it does:
@@ -170,14 +170,14 @@ What it does:
 - Creates a writable workspace cloned from the nix store source for the package.
 - Generates a canonical unified diff into `patches/cpp/<attr>@<version>.patch` (matching Go's convention).
 - Verifies the patch applies cleanly with `patch -p1 --dry-run`.
-- Prints an overlay snippet you can paste into `tools/nix/overlays/cpp-patches.nix`.
+- Prints an overlay snippet you can paste into `build-tools/tools/nix/overlays/cpp-patches.nix`.
 
 Step-by-step:
 
 1. Start a session for the nixpkgs attribute you want to patch (e.g., `zlib`). This prints a writable workspace path.
 2. Edit files under the printed workspace.
-3. Run `tools/bin/patch-pkg apply cpp <attr>` to generate/update the patch file.
-4. Copy the printed overlay snippet into `tools/nix/overlays/cpp-patches.nix` (or adapt the example below) and save.
+3. Run `build-tools/tools/bin/patch-pkg apply cpp <attr>` to generate/update the patch file.
+4. Copy the printed overlay snippet into `build-tools/tools/nix/overlays/cpp-patches.nix` (or adapt the example below) and save.
 5. Run the tests to validate.
 
 ### 4) Validate and test
@@ -185,7 +185,7 @@ Step-by-step:
 - Run language diagnostics to confirm C++ is enabled and visibility is intact:
 
 ```bash
-direnv exec . node tools/dev/langs-diagnose.ts
+direnv exec . node build-tools/tools/dev/langs-diagnose.ts
 ```
 
 - Run the full test suite (local convention):
@@ -196,7 +196,7 @@ direnv exec . timeout 600s buck2 test //... --target-platforms config//platforms
 
 Notes on invalidation and freshness:
 
-- The prebuild guard tracks `tools/nix/overlays/*.nix` and `flake.lock`, so changes trigger the expected rebuilds.
+- The prebuild guard tracks `build-tools/tools/nix/overlays/*.nix` and `flake.lock`, so changes trigger the expected rebuilds.
 - You do not need a dedicated stamp target; freshness is covered by the existing guard and inputs scanning.
 
 ### 5) Example: patch zlib
@@ -214,14 +214,14 @@ direnv exec . timeout 600s buck2 test //... --target-platforms config//platforms
 ### Troubleshooting
 
 - If you see unspecified platform errors during ad-hoc runs, set the default platform explicitly as above with `--target-platforms config//platforms:default`.
-- If changes seem ignored, ensure your overlay file exists at `tools/nix/overlays/cpp-patches.nix`, that `NIX_CPP_USE_OVERLAY=1` is set, and that patch paths are correct relative to that file.
+- If changes seem ignored, ensure your overlay file exists at `build-tools/tools/nix/overlays/cpp-patches.nix`, that `NIX_CPP_USE_OVERLAY=1` is set, and that patch paths are correct relative to that file.
 - For CI, these overlays are captured by our hermetic Nix builds and Buck change detection.
 
 Checklist before committing (overlay is optional; local patches next to targets are canonical):
 
 - Patch lives under `patches/cpp/` with a descriptive name.
-- If using overlays: add an entry in `tools/nix/overlays/cpp-patches.nix` using overrideAttrs + applyPatches on src, and enable with `NIX_CPP_USE_OVERLAY=1`.
-- `tools/buck/inspect-cpp-attrs.ts` shows effective nixpkg attributes per C++ target (labels-based).
+- If using overlays: add an entry in `build-tools/tools/nix/overlays/cpp-patches.nix` using overrideAttrs + applyPatches on src, and enable with `NIX_CPP_USE_OVERLAY=1`.
+- `build-tools/tools/buck/inspect-cpp-attrs.ts` shows effective nixpkg attributes per C++ target (labels-based).
 - Full suite passes: `v` (dev shell) with 600s external timeout and coverage.
 
 ### Design alignment

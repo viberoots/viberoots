@@ -8,7 +8,7 @@ This guide explains how to link C/C++ into Go (cgo) and how to call Go from C/C+
 - Run the startup check if needed:
 
 ```bash
-node tools/dev/startup-check.ts
+node build-tools/tools/dev/startup-check.ts
 ```
 
 ---
@@ -151,13 +151,13 @@ Implementation notes
 - Build only (fast):
 
 ```bash
-./tools/bin/b
+./build-tools/tools/bin/b
 ```
 
 - Full test suite with coverage:
 
 ```bash
-./tools/bin/v
+./build-tools/tools/bin/v
 ```
 
 ---

@@ -69,7 +69,7 @@ def prepare_language_wiring(
         global_inputs_stamp = None,
         global_inputs_key_prefix = GLOBAL_NIX_INPUTS_KEY_PREFIX,
         inject_workspace_root_env = False,
-        workspace_root_env_src = "root//tools/buck:workspace-root.env",
+        workspace_root_env_src = "root//build-tools/tools/buck:workspace-root.env",
         wasm_variant = None,
         wasm_extra_srcs = [],
         wasm_srcs_include_deps = False,

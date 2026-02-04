@@ -6,7 +6,7 @@ This document explains how I wire Go targets that consume native libraries in th
 
 The basic cgo flow is unchanged. I declare direct in-repo native deps with `repo_cgo_deps`, and I keep `deps` for graph edges.
 
-If I need a Go cgo consumer to follow a C++ library’s `link_deps` transitively, I opt in with `link_closure`. This uses the shared resolver in `tools/nix/planner/link-closure.nix`, so the traversal order and determinism match C++ behavior.
+If I need a Go cgo consumer to follow a C++ library’s `link_deps` transitively, I opt in with `link_closure`. This uses the shared resolver in `build-tools/tools/nix/planner/link-closure.nix`, so the traversal order and determinism match C++ behavior.
 
 ### Attributes
 
