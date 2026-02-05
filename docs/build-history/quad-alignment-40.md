@@ -6,7 +6,7 @@ This installment follows Part 39, but adjusts the plan based on current repo rea
 - The Nix planner already routes some key transforms through the canonical helper surface (`build-tools/tools/nix/lib/lang-helpers.nix`), so the remaining planner work is about eliminating the _last_ locally re-implemented target/label parsing and making the “fallback” path obey the same canonical transforms.
 - We already have several enforcement tests for “don’t bypass helper surfaces”; the remaining valuable work is to (a) finish standardizing macro entrypoint conventions across languages, and (b) remove remaining legacy surfaces once enforcement proves they are unused.
 
-After re-reviewing the codebase with the contract inventory in `abstractions.md`, the remaining **valuable** (non-polish) gaps are:
+After re-reviewing the codebase with the contract inventory in `build-tools/docs/abstractions.md`, the remaining **valuable** (non-polish) gaps are:
 
 - A concrete **contract duplication risk** in the Nix planner: some target/label parsing and “selected target” fallback logic re-implements normalization instead of routing through the canonical Nix helper surface.
 - A concrete **debuggability/correctness gap** in invalidation diagnostics: `invalidation-report` is already strong, but it still has at least one misclassification risk (dict-shaped patch inputs) and a small amount of heuristic coupling around global Nix input stamping that can be made more contract-driven.
@@ -59,7 +59,7 @@ Non-goals in this PR:
 
 ### Docs (in this PR)
 
-- Update `abstractions.md` (under the target-label normalization / nix-attr contract) to explicitly state:
+- Update `build-tools/docs/abstractions.md` (under the target-label normalization / nix-attr contract) to explicitly state:
   - `build-tools/tools/nix/graph-generator.nix` must not re-implement target normalization or package-path derivation from labels; it must route through the canonical Nix helper surface.
   - Link to the parity/fixture tests added/extended in this PR as regression guards.
 
@@ -138,7 +138,7 @@ Non-goals in this PR:
 
 ### Docs (in this PR)
 
-- Update `abstractions.md` under “Diagnostics (how to answer ‘what invalidates what?’)” to:
+- Update `build-tools/docs/abstractions.md` under “Diagnostics (how to answer ‘what invalidates what?’)” to:
   - explicitly state that label stamps are observability-only
   - state that the report’s “observed action inputs” classification is the source of truth
   - link to the updated outcome-based tests

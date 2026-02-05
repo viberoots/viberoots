@@ -133,7 +133,7 @@ If you must add a patch manually, keep it under `patches/cpp/` and follow the sa
 
 ### 3) Provider glue (no longer required)
 
-As of PR 2 in `drop-cpp-provider.md`, C++ provider sync is a no‑op. There is no C++ provider file to generate and no stamps to maintain. Use label introspection instead:
+As of PR 2 in `docs/cpp/drop-cpp-provider.md`, C++ provider sync is a no‑op. There is no C++ provider file to generate and no stamps to maintain. Use label introspection instead:
 
 ```bash
 # List effective nixpkg attrs for all C++ targets in the exported graph

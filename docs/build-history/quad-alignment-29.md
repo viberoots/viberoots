@@ -53,7 +53,7 @@ Non-goals in this PR:
 
 ### Docs (in this PR)
 
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - Document `patch_scope:*` as the graph-visible representation of the patch model contract.
   - Point authors to the helper boundaries where it is applied.
 - Update `docs/handbook/patching.md`:

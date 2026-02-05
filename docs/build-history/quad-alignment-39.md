@@ -4,7 +4,7 @@ This installment follows Part 38, but with one important update from the current
 
 - Package-local WASM wiring is already on the **non-mutating helper boundary** pattern (`build-tools/lang/wasm_package_local_wiring.bzl:prepare_package_local_wasm_wiring(...)` uses `extract_*`, returns a prepared `kwargs`, and has a mutation probe). So we do **not** need a PR dedicated to “make WASM wiring non-mutating” anymore.
 
-After re-reviewing the codebase with the contract inventory in `abstractions.md`, the remaining **valuable** (non-polish) gaps are:
+After re-reviewing the codebase with the contract inventory in `build-tools/docs/abstractions.md`, the remaining **valuable** (non-polish) gaps are:
 
 - A concrete **contract duplication** risk in the Nix planner (`build-tools/tools/nix/graph-generator.nix`) where “canonical transforms” are re-implemented locally instead of importing the shared helper surface.
 - A concrete **debuggability gap** around the intentionally different patch invalidation models (package-local vs importer-local). The code is correct, but the system is still easy to misread when you inspect only provider metadata.
@@ -49,7 +49,7 @@ Non-goals in this PR:
 
 ### Docs (in this PR)
 
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - Add a short note under the relevant contract section that the Nix planner must not re-implement sanitizer / attr-suffix derivation, and must import from `build-tools/tools/nix/lib/lang-helpers.nix`.
   - Link to the new parity test as the regression guard.
 
@@ -123,7 +123,7 @@ Non-goals in this PR:
 
 ### Docs (in this PR)
 
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - Strengthen the “Diagnostics” subsection under the patch model contract:
     - explicitly state that provider `patch_paths` are **observability** only for importer-scoped ecosystems
     - point to `invalidation-report` as the canonical “what invalidates what?” tool

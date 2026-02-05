@@ -64,7 +64,7 @@ I will update documentation so “how to write a package-local patching macro”
 - Update `docs/handbook/adding-language.md`:
   - add a short section describing the package-local wiring helper and when to use it
   - include a minimal example for a new package-local language macro
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - explicitly list “package-local patching macro wiring” as a contract alongside importer-scoped wiring
   - point macro authors to the helper surface and the probe test
 
@@ -137,7 +137,7 @@ Non-goals in this PR:
 - Update `docs/handbook/patching.md`:
   - document the two patch models using the same terms as the contract registry
   - include the expected `patch-pkg apply` output line so the user-facing behavior is explicit
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - list “patch invalidation model” as an explicit contract and point at the registry
 
 ### Acceptance Criteria
@@ -351,7 +351,7 @@ Non-goals in this PR:
   - new tooling must use `build-tools/tools/lib/cli.ts` (no bespoke `process.argv` parsing)
   - when one tool invokes another zx script, use `build-tools/tools/lib/node-run.ts:runNodeWithZx`
   - `parseFlagMap(...)` is the only supported way to build a free-form flags map (used by `scaf`), and call sites must not copy/paste bespoke variants
-- Update `getting-started-on-a-pr.md` to point at the canonical tooling handbook page so guidance lives in one place.
+- Update `docs/handbook/getting-started-on-a-pr.md` to point at the canonical tooling handbook page so guidance lives in one place.
 
 ### Acceptance Criteria
 
@@ -421,7 +421,7 @@ Non-goals in this PR:
 
 ### Docs (in this PR)
 
-- Update `docs/handbook/patching.md` and/or `abstractions.md` to explicitly call out that `nix_cpp_test` uses a planner-visible stub and that the stub carries package-local patch inputs (so patch invalidation remains precise).
+- Update `docs/handbook/patching.md` and/or `build-tools/docs/abstractions.md` to explicitly call out that `nix_cpp_test` uses a planner-visible stub and that the stub carries package-local patch inputs (so patch invalidation remains precise).
 
 ### Acceptance Criteria
 
@@ -482,7 +482,7 @@ Non-goals in this PR:
 
 ### Docs (in this PR)
 
-- Update `docs/handbook/adding-language.md` and/or `abstractions.md` to include `nix_cpp_wasm_emscripten_lib` as an explicit example of a planner-visible stub that still uses the shared package-local wiring helper.
+- Update `docs/handbook/adding-language.md` and/or `build-tools/docs/abstractions.md` to include `nix_cpp_wasm_emscripten_lib` as an explicit example of a planner-visible stub that still uses the shared package-local wiring helper.
 
 ### Acceptance Criteria
 

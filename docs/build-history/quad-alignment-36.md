@@ -70,7 +70,7 @@ Non-goals in this PR:
 
 ### Docs (in this PR)
 
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - add a short note that importer-scoped non-genrule macros that call Nix must use the composed helper
   - call out `nix_node_test` as the canonical example
 - Update `docs/handbook/node-tests.md` (or the nearest applicable handbook page):
@@ -150,7 +150,7 @@ Non-goals in this PR:
 - Update `docs/handbook/adding-language.md`:
   - explicitly state: new package-local planner-visible stubs must use the v2 helper
   - point to `nix_go_carchive` as the canonical example for “provider edges realized into inputs”
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - note that package-local planner-visible stubs should be v2-only at call sites
 
 ### Acceptance Criteria

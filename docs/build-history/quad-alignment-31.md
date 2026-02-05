@@ -51,7 +51,7 @@ Non-goals in this PR:
 
 ### Docs (in this PR)
 
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - Document the override env manifest as a contract surface.
   - State the rule: “Do not hardcode override env var names in tooling.”
 - Update `docs/handbook/patching.md`:
@@ -120,7 +120,7 @@ Non-goals in this PR:
 
 ### Docs (in this PR)
 
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - Document the expanded contract fields and their meaning.
   - Document the Node “global patches” behavior in the same terms used by the contract.
 - Update `docs/handbook/provider-sync-cookbook.md`:
@@ -186,7 +186,7 @@ Non-goals in this PR:
 
 ### Docs (in this PR)
 
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - Identify the canonical module for “effective set patch selection”.
 - Update `docs/handbook/provider-sync-cookbook.md`:
   - Add guidance: “Do not hand-roll global patch selection, use the shared helper.”
@@ -248,7 +248,7 @@ Non-goals in this PR:
 
 ### Docs (in this PR)
 
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - Document supported importer roots as a contract surface and point to the parity test as the guardrail.
 - Update `docs/handbook/adding-language.md`:
   - Add a note for importer-scoped ecosystems: “If you change importer support rules, update the parity test matrix.”

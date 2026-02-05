@@ -184,7 +184,7 @@ Align plan documentation with the repo’s current reality and clarify the one r
 - Update `build-tools/docs/build-system-design.md` (Option A):
   - Clarify that small wrappers in `build-tools/tools/bin/*` may exist as thin shims, but substantive automation remains in TypeScript zx scripts.
   - Keep the policy that new substantive scripts are TypeScript zx scripts using the repo’s wrapper.
-- Optionally update `getting-started-on-a-pr.md` to reference the clarified policy (no behavioral change).
+- Optionally update `docs/handbook/getting-started-on-a-pr.md` to reference the clarified policy (no behavioral change).
 
 ### Tests (in this PR)
 

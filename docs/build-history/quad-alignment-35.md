@@ -56,7 +56,7 @@ Non-goals in this PR:
 
 ### Docs (in this PR)
 
-- Update `abstractions.md` to point TS tooling authors at the single nearest-lockfile helper and to call out the policy: do not hand-roll upward directory walks in new tooling.
+- Update `build-tools/docs/abstractions.md` to point TS tooling authors at the single nearest-lockfile helper and to call out the policy: do not hand-roll upward directory walks in new tooling.
 - Update relevant handbook pages under `docs/handbook/` that describe importer-scoped labeling to reference the canonical helper location.
 
 ### Acceptance Criteria
@@ -121,10 +121,10 @@ Non-goals in this PR:
 
 ### Docs (in this PR)
 
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - call out patch filename decoding as a shared contract
   - point to the single canonical decoding logic on the Nix side and TS side
-- Update `build-tools/docs/build-system-design.md` where it references patch maps, to point at `abstractions.md` for the canonical contract definition.
+- Update `build-tools/docs/build-system-design.md` where it references patch maps, to point at `build-tools/docs/abstractions.md` for the canonical contract definition.
 
 ### Acceptance Criteria
 
@@ -204,7 +204,7 @@ Non-goals in this PR:
 
 - Update `docs/handbook/troubleshooting.md`:
   - add a short “Invalidation report” section describing when to use it and how to interpret the output
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - reference the report as the canonical “what invalidates what?” debugging entrypoint
 
 ### Acceptance Criteria
@@ -271,7 +271,7 @@ Non-goals in this PR:
 - Update `docs/handbook/adding-language.md`:
   - explicitly list the enforcement expectations for new macro shapes
   - point authors at the functional wiring helpers from Part 34 and the enforcement tests from this PR
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - add a short “Enforcement” section summarizing which tests guard which contracts
 
 ### Acceptance Criteria

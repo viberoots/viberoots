@@ -59,7 +59,7 @@ I will update docs where Python macros are described so they point at the canoni
 - `docs/handbook/patching.md` and/or `docs/handbook/adding-language.md`:
   - note that Python importer-scoped macros use `prepare_importer_non_genrule_wiring(...)` as the canonical wiring path
   - clarify the exception case for `python_binary` (patch inputs carried via a synthetic dep because the underlying rule does not accept `srcs`)
-- `abstractions.md`:
+- `build-tools/docs/abstractions.md`:
   - update the Python macro callouts to reference the shared helper surface as the canonical implementation
 
 ### Acceptance Criteria
@@ -188,7 +188,7 @@ This PR should not change macro behavior. It is guardrail-only, but it ships wit
 
 ### Docs (in this PR)
 
-- `abstractions.md`:
+- `build-tools/docs/abstractions.md`:
   - add a short “enforcement” subsection under the importer-scoped wiring and patch invalidation contracts that links to the new tests and explains the failure mode.
 - `docs/handbook/adding-language.md`:
   - add a checklist item: new importer-scoped macros should use the shared helper surface and should be covered by the enforcement tests.

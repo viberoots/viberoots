@@ -62,7 +62,7 @@ Non-goals in this PR:
 
 ### Docs (in this PR)
 
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - clarify that package-local WASM wiring is non-mutating by default, matching other package-local wiring helpers
   - point to `nix_cpp_wasm_static_lib` and `nix_go_tiny_wasm_lib` as the canonical “package-local WASM wiring” examples (one per language)
 - Update `docs/handbook/adding-language.md`:

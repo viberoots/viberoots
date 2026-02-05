@@ -194,7 +194,7 @@ Document how to extend the scaffold (expose new functions, add sources), and app
 
 - Docs:
   - Short README within the scaffolded Node package explaining artifact layout and loading.
-  - Link from repo docs to `node-call-cpp.md` as the canonical design.
+  - Link from repo docs to `build-tools/docs/node-call-cpp.md` as the canonical design.
 - Hardening:
   - Minor tuning in `cpp-node-addon.nix` (flags) if needed.
   - Non‑functional read‑me tweaks in the scaffold for clarity.

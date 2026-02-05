@@ -1,6 +1,6 @@
 ## TS + C++ + Go — Node Addon and WebAssembly Plan (Multi‑Target Deliverable)
 
-This plan lays out a sequence of small, reversible PRs to fully implement the architecture described in `ts-cpp-go-web-brainstorming.md`: one TypeScript package with two entrypoints (`node` via N‑API, `browser` via WASM), reusing a single logic core (C++) and a Go layer. All items are designed to be low‑risk, independently verifiable, and behavior‑preserving to the rest of the repo unless explicitly noted.
+This plan lays out a sequence of small, reversible PRs to fully implement the architecture described in `build-tools/docs/ts-cpp-go-web-brainstorming.md`: one TypeScript package with two entrypoints (`node` via N‑API, `browser` via WASM), reusing a single logic core (C++) and a Go layer. All items are designed to be low‑risk, independently verifiable, and behavior‑preserving to the rest of the repo unless explicitly noted.
 
 ## PR‑1: C++ Core + C Wrapper (native + wasm‑static lib)
 

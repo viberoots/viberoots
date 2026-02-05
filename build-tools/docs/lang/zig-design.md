@@ -12,7 +12,7 @@ This document proposes adding Zig as a first-class language in a way that aligns
 
 ### Linking expectations
 
-I follow the repo-wide linking model described in `cpp-linking.md`, `build-tools/docs/wasm-linking.md`, and `linking-roadmap.md`. If this language does not introduce native or cross-language linking, `deps` remains a graph edge list and no link intent is inferred.
+I follow the repo-wide linking model described in `build-tools/docs/cpp-linking.md`, `build-tools/docs/wasm-linking.md`, and `build-tools/docs/linking-roadmap.md`. If this language does not introduce native or cross-language linking, `deps` remains a graph edge list and no link intent is inferred.
 
 - `deps` is the Buck graph edge list. It does not imply link intent.
 - `link_deps` declares linkable inputs. `header_deps` is include-only when that concept applies.

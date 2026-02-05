@@ -2,7 +2,7 @@
 
 This document proposes a design to support explicit, deterministic Wasm dependency semantics for targets that produce Wasm artifacts in this repo.
 
-I base this on the same conceptual model as `cpp-linking.md`:
+I base this on the same conceptual model as `build-tools/docs/cpp-linking.md`:
 
 - Buck is the source of truth for the dependency graph and impact analysis.
 - Nix templates build the actual artifacts.
@@ -52,7 +52,7 @@ I want Wasm linking semantics that:
 
 ## Proposed model (shared concept with C++)
 
-I use the same concept as `cpp-linking.md`: separate “graph dependency” from “link intent”.
+I use the same concept as `build-tools/docs/cpp-linking.md`: separate “graph dependency” from “link intent”.
 
 At the call site:
 
@@ -142,7 +142,7 @@ I propose to add the following attributes where they are meaningful:
 - For `nix_go_tiny_wasm_lib`:
   - `link_deps` (Wasm link deps, typically C++ Wasm static libs)
   - `link_closure` (direct/transitive)
-  - `link_closure_overrides` (optional extension, same as `cpp-linking.md`)
+- `link_closure_overrides` (optional extension, same as `build-tools/docs/cpp-linking.md`)
 
 ### Build path: graph-aware selected vs selected-wasm
 
@@ -219,7 +219,7 @@ For `nix_cpp_wasm_static_lib`:
 
 ## Ordering and determinism
 
-I want the same ordering rules as `cpp-linking.md`:
+I want the same ordering rules as `build-tools/docs/cpp-linking.md`:
 
 - In direct-only mode, preserve the `link_deps` order.
 - In transitive mode, walk `link_deps` deterministically and include each node once.
@@ -439,9 +439,9 @@ node_webapp(
 
 ## Shared code opportunities (avoid reinvention)
 
-If we implement either C++ native linking (`cpp-linking.md`) or Wasm linking first, I want shared helper code to be used by both.
+If we implement either C++ native linking (`build-tools/docs/cpp-linking.md`) or Wasm linking first, I want shared helper code to be used by both.
 
-I propose the shared code boundaries below. I also reference these in `cpp-linking.md` so either implementation can depend on the shared helpers.
+I propose the shared code boundaries below. I also reference these in `build-tools/docs/cpp-linking.md` so either implementation can depend on the shared helpers.
 
 ### Shared semantics helper for deterministic traversal
 
@@ -472,11 +472,11 @@ Python extension modules (`build-tools/docs/python-extension-design.md`) are ano
 
 ## Implementation sequence
 
-See `linking-roadmap.md` for a proposed order that implements shared primitives once and then applies them across native C++, Wasm, and Python extension modules.
+See `build-tools/docs/linking-roadmap.md` for a proposed order that implements shared primitives once and then applies them across native C++, Wasm, and Python extension modules.
 
-## Notes to update in `cpp-linking.md`
+## Notes to update in `build-tools/docs/cpp-linking.md`
 
-I will keep `cpp-linking.md` and `build-tools/docs/wasm-linking.md` aligned on:
+I will keep `build-tools/docs/cpp-linking.md` and `build-tools/docs/wasm-linking.md` aligned on:
 
 - the union rule (`deps := deps ∪ link_deps ∪ header_deps`)
 - closure semantics and optional per-dep overrides

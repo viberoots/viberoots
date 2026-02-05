@@ -62,12 +62,12 @@ Non-goals in this PR:
 
 ### Docs (in this PR)
 
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - document the new “functional wiring helper” surface as preferred for new macros
   - call out the policy: macros should not depend on helper-side mutation ordering
 - Update `build-tools/docs/build-system-design.md`:
   - update the “scope” framing to reflect current cross-language parity and the two patch models
-  - point to `abstractions.md` as the canonical contract index
+  - point to `build-tools/docs/abstractions.md` as the canonical contract index
 
 ### Acceptance Criteria
 
@@ -131,7 +131,7 @@ Non-goals in this PR:
 
 ### Docs (in this PR)
 
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - document the importer-scoped functional wiring helpers
   - include explicit guidance for srcs-less rule shapes
 - Update the relevant handbook pages under `docs/handbook/` that describe Python macros to reference the new helper surface.
@@ -198,7 +198,7 @@ Non-goals in this PR:
 
 ### Docs (in this PR)
 
-- Update `abstractions.md` and the Node macro cookbook pages under `docs/handbook/`:
+- Update `build-tools/docs/abstractions.md` and the Node macro cookbook pages under `docs/handbook/`:
   - document the functional helper usage for Node macros
   - document the intended default behavior for dict-shaped inputs
 
@@ -255,7 +255,7 @@ Non-goals in this PR:
 
 ### Docs (in this PR)
 
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - record C++ macro usage of the functional package-local wiring helpers
   - include guidance for planner-visible and WASM macro shapes
 

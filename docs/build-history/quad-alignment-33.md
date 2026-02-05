@@ -59,7 +59,7 @@ Non-goals in this PR:
 
 ### Docs (in this PR)
 
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - Add a short “Diagnostics” subsection explaining how to interpret provider files versus action-input invalidation, especially for Node.
   - Add a short “Debug checklist” item that points to the provider index report and the prebuild guard output.
 - Update the patching handbook page(s) under `docs/handbook/` to include the same one-liner explanation used by the guard.
@@ -201,7 +201,7 @@ Non-goals in this PR:
 
 ### Docs (in this PR)
 
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - add the new helper under “Patch invalidation models” or “WASM stamping” and state that package-local WASM macros must use it
 - Update the macro stamping cookbook page under `docs/handbook/` to show the package-local WASM pattern as “use the shared helper, not manual wiring.”
 

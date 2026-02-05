@@ -55,7 +55,7 @@ Non-goals in this PR:
 
 ### Docs (in this PR)
 
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - Document “planner-visible wiring” as a distinct shared surface for package-local languages.
   - Document the provider-strip option and when it is required.
 - Update `docs/handbook/adding-language.md`:
@@ -121,7 +121,7 @@ Non-goals in this PR:
 
 ### Docs (in this PR)
 
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - Document the `kind:*` vocabulary as a contract surface.
   - State how to extend it and what tests must be updated.
 - Update `docs/handbook/macro-stamping-cookbook.md`:
@@ -187,7 +187,7 @@ Non-goals in this PR:
 
 ### Docs (in this PR)
 
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - Point to the canonical TypeScript module for provider naming and normalization.
 - Update `docs/handbook/provider-sync-cookbook.md`:
   - State “use this module” for provider naming and patch filename key decoding.

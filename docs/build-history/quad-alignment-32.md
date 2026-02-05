@@ -50,7 +50,7 @@ Non-goals in this PR:
 
 ### Docs (in this PR)
 
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - document the updated “planner-visible stub defaults” and the new provider realization vocabulary
   - include a short checklist item for reviewers: “planner-visible call sites should not manually strip providers”
 - Update the relevant handbook page(s) under `docs/handbook/` that describe planner-visible patterns to use the new helper surface.
@@ -114,7 +114,7 @@ Non-goals in this PR:
 
 ### Docs (in this PR)
 
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - document the canonical prefix constants and the rule: “do not hardcode synthetic key prefixes”
 - Update any macro wiring cookbook pages to show usage through `//build-tools/lang:defs_common.bzl` exports.
 
@@ -181,7 +181,7 @@ Non-goals in this PR:
 
 ### Docs (in this PR)
 
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - identify the new canonical helper for Node Nix-calling command assembly
   - add guidance: “do not hand-roll Nix build out-path capture in Node macros”
 - Update the Node handbook pages (or macro cookbook pages) that show how to author new Node macros to reference the helper.
@@ -240,7 +240,7 @@ Non-goals in this PR:
 
 ### Docs (in this PR)
 
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - document patch_scope stamping expectations and where it must be applied (including planner-visible targets)
 - Update the macro stamping cookbook under `docs/handbook/` to include patch_scope as part of the standard stamping bundle.
 
@@ -300,7 +300,7 @@ Non-goals in this PR:
 ### Docs (in this PR)
 
 - Update `docs/handbook/` Go workflow documentation to point to the helper as the canonical location for auto-wired test behavior.
-- Update `abstractions.md` to note that auto-wired helper targets are implemented through a Go-private helper and should not be duplicated elsewhere.
+- Update `build-tools/docs/abstractions.md` to note that auto-wired helper targets are implemented through a Go-private helper and should not be duplicated elsewhere.
 
 ### Acceptance Criteria
 

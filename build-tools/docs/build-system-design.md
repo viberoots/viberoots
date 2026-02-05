@@ -1,7 +1,7 @@
 # Nix Dynamic Derivations + Buck2 + Go Patching — Implementation Guide
 
 > **Audience:** Engineers (and future LLM agents) who will be responsible for implementing this design.  
-> **Scope today:** The repo is multi-language (Go, C++, Node PNPM, Python uv). This document remains **language-agnostic** at the contract level so additional languages can be added without redesign. For the canonical cross-language contract inventory, see `abstractions.md`.
+> **Scope today:** The repo is multi-language (Go, C++, Node PNPM, Python uv). This document remains **language-agnostic** at the contract level so additional languages can be added without redesign. For the canonical cross-language contract inventory, see `build-tools/docs/abstractions.md`.
 > **Script policy:** All **substantive automation** MUST be TypeScript zx scripts using our custom hashbang `#!/usr/bin/env zx-wrapper`. Small `build-tools/tools/bin/*` wrappers may exist as thin `bash` shims that only delegate into TypeScript (for example to ensure commands run inside the dev shell via `direnv exec`). Do not add new `bash/sh` scripts with substantive logic.
 
 ---
@@ -133,7 +133,8 @@ extra-experimental-features = nix-command flakes dynamic-derivations ca-derivati
    - Shared helper error text is argument‑agnostic for reuse across call‑sites. For example, `normalize_labels(...)` reports generic “labels must be a list of string labels”; macros should add parameter context at the call‑site if a named argument is relevant to users.
    - WASM stamps: use `//build-tools/lang:defs_common.bzl:stamp_wasm_variant(kwargs, "<lang>", "<variant>")` to append `lang:<lang>`, `kind:wasm`, and `wasm:<variant>` uniformly across C++/Go/Python macros.
    - Note: For discoverability only, `build-tools/tools/nix/lang-templates.nix` exposes a `Node` symbol bag (forwarded from `build-tools/tools/nix/templates/node.nix`). The planner’s Node plugin remains authoritative; no consumers rely on this symbol bag.
-   - For a concrete Node→C++ addon scaffold and artifact flow, see `node-call-cpp.md`.
+
+- For a concrete Node→C++ addon scaffold and artifact flow, see `build-tools/docs/node-call-cpp.md`.
 
 - Node macros that call Nix must use the standardized helper surface in `//build-tools/lang:nix_shell.bzl` for genrule-style command assembly (e.g., `node_webapp`, bundled `nix_node_cli_bin`).
   - Use `nix_calling_genrule_bootstrap(...)` to standardize `WORKSPACE_ROOT`/`REPO_ROOT`/`FLK_ROOT` derivation and optional `build-tools/tools/buck/workspace-root.env` sourcing (for temp repos and sandboxed actions).

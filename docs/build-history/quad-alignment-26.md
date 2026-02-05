@@ -56,7 +56,7 @@ I will update documentation so the exception case is described in terms of the s
 - Update `docs/handbook/adding-language.md`:
   - add a section describing the srcs-less rule shape helper and when to use it
   - include a short example for Python binaries
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - describe srcs-less rule shapes as an explicit part of the importer-scoped contract and point at the helper surface
 
 ### Acceptance Criteria

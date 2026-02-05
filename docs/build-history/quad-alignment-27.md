@@ -70,7 +70,7 @@ Non-goals in this PR:
 - Update `docs/handbook/adding-language.md`:
   - add a section describing the “importer-scoped, Nix-calling genrule macro” helper and when to use it
   - include a minimal example using dict-shaped `srcs`
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - explicitly list “Nix-calling importer-scoped macros” as a contract and point at the helper surface
 
 ### Acceptance Criteria
@@ -196,7 +196,7 @@ Clarification: I do not need to preserve backwards compatibility yet. This PR ca
 
 ### Docs (in this PR)
 
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - in the “label stamping” contract, clarify that Go tests are stamped by the macro, like other languages
 - Update `docs/handbook/adding-language.md`:
   - include Go test stamping as an example of “stamping belongs in the macro, not in call sites”
@@ -268,7 +268,7 @@ Non-goals:
 
 - Update `docs/handbook/adding-language.md`:
   - recommend using the helper when implementing package-local patching macros for a new language
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - point macro authors to the helper to avoid duplicating default patch dir handling and nixpkg label appends
 
 ### Acceptance Criteria

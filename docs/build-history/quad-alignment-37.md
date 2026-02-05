@@ -67,7 +67,7 @@ Non-goals in this PR:
 - Update `docs/handbook/adding-language.md`:
   - explicitly state: package-local WASM planner-visible stubs must use the v2 WASM wrapper
   - point to `nix_cpp_wasm_emscripten_lib` as the canonical example
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - note that `wire_package_local_wasm_planner_visible_stub(...)` is legacy-only and should not appear in new macro code
 
 ### Acceptance Criteria
@@ -143,7 +143,7 @@ Non-goals in this PR:
 - Update `docs/handbook/adding-language.md`:
   - clarify that v2 helpers are the default for new macros
   - list the v1 helpers as “legacy” with a short “when it is acceptable” note (rare, rule-shape constraints)
-- Update `abstractions.md`:
+- Update `build-tools/docs/abstractions.md`:
   - add a short “v1 vs v2” note in the wiring contracts section
 
 ### Acceptance Criteria
@@ -230,7 +230,7 @@ Non-goals in this PR:
 
 ### Docs (in this PR)
 
-- Update `abstractions.md` and `docs/handbook/adding-language.md` to:
+- Update `build-tools/docs/abstractions.md` and `docs/handbook/adding-language.md` to:
   - treat the versionless helpers as canonical
   - list legacy helper names only as migration escape hatches (expected to trend to zero)
 
