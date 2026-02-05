@@ -55,7 +55,7 @@ test("go lib: adding *_test.go auto-wires nix_go_test and runs", async () => {
     await fsp.mkdir(pkgDir, { recursive: true });
     await fsp.writeFile(
       path.join(pkgDir, "demo-lib_test.go"),
-      'package demopkg\nimport "testing"\nfunc TestIt(t *testing.T){}\n',
+      'package demolib\nimport "testing"\nfunc TestIt(t *testing.T){}\n',
       "utf8",
     );
 

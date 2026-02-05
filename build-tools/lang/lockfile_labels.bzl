@@ -56,10 +56,11 @@ def default_lockfile_label_from_package(lang = "node"):
     path = _default_lockfile_path_for_package(pkg, lang = lang)
     return "lockfile:%s#%s" % (path, pkg)
 
-def ensure_default_lockfile_exists(path, macro_name = None):
+def ensure_default_lockfile_exists(path, macro_name = None, lang = "node"):
     if not (isinstance(path, str) and path != ""):
         fail("Default lockfile path must be a non-empty string; got: %s" % path)
-    matches = native.glob(["pnpm-lock.yaml"])
+    basename = default_lockfile_basename_for_lang(lang)
+    matches = native.glob([basename])
     if len(matches) == 0:
         prefix = ("%s: " % macro_name) if isinstance(macro_name, str) and macro_name != "" else ""
         fail("%smissing lockfile at %s. Provide lockfile_label or create %s." % (prefix, path, path))

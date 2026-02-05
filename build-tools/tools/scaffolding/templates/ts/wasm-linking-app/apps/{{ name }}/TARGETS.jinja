@@ -2,7 +2,6 @@ load("//build-tools/node:defs.bzl", "node_webapp")
 
 node_webapp(
     name = "webapp",
-    lockfile_label = "lockfile:{{ lockfilePath }}#{{ importer }}",
     out = "dist",
 )
 

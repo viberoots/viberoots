@@ -18,10 +18,6 @@ test("python macros fail with deterministic error text when lockfile label is mi
 
     const cases: Array<{ label?: string; expected: string }> = [
       {
-        expected:
-          "Exactly one importer-scoped lockfile label is required (lockfile:<path>#<importer>)",
-      },
-      {
         label: "lockfile:projects/apps/demo/uv.lock",
         expected: "missing '#<importer>'",
       },

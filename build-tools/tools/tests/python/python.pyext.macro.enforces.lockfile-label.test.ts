@@ -18,10 +18,6 @@ test("python pyext macro fails with deterministic error text when lockfile label
 
     const cases: Array<{ label?: string; expected: string }> = [
       {
-        expected:
-          "Exactly one importer-scoped lockfile label is required (lockfile:<path>#<importer>)",
-      },
-      {
         label: "lockfile:projects/apps/demo/uv.lock",
         expected: "missing '#<importer>'",
       },

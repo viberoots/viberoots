@@ -67,6 +67,7 @@ We adopt the importer‑scoped lockfile labeling model (like Node) to get precis
 - Label format on Python targets: `lockfile:<relative/path/to/lockfile>#<importer>`
   - Repo standard (monorepo‑wide): Python projects use `uv` exclusively; the lockfile is `uv.lock` at the importer root.
   - `<importer>` is the project root directory (e.g., `projects/apps/pytool`) to disambiguate multiple importers.
+- When `lockfile_label` is omitted on Python macros, I default to `lockfile:<pkg>/uv.lock#<pkg>` and fail fast if `<pkg>/uv.lock` is missing.
 - `gen-auto-map.ts` already maps generic `lockfile:` labels to providers using `providerNameForImporter(path, importer)`; Python reuses this machinery.
 - Optional per‑distribution labels (future): `pymodule:<dist>@<version>` can be emitted by a Python adapter if we later implement authoritative module discovery. Not required in Phase A.
 - Native dependencies for C-extensions: macros append `nixpkg:<attr>` labels (via `append_nixpkg_labels`) to precisely map nixpkgs inputs through `gen-auto-map.ts`, mirroring Go/C++.

@@ -57,10 +57,8 @@ test("scaf: new ts wasm-linking-app; build tinygo wasm; callAdd2() returns 5", a
 
     const appTargetsText = await fs.readFile(appTargets, "utf8");
     assert.ok(
-      appTargetsText.includes(
-        `lockfile:projects/apps/${name}/pnpm-lock.yaml#projects/apps/${name}`,
-      ),
-      "expected importer-scoped pnpm lockfile label in projects/apps/<name>/TARGETS",
+      !appTargetsText.includes("lockfile:"),
+      "expected projects/apps/<name>/TARGETS to rely on default lockfile labels",
     );
 
     const coreTargetsText = await fs.readFile(coreTargets, "utf8");
