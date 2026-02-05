@@ -11,7 +11,7 @@ test("python adapter warns when .py sources lack rule_type and lang:python (warn
     // Simulate a target with .py sources but missing both python_* rule_type and lang:python label
     const nodes = [
       {
-        name: "//apps/pytool:bin",
+        name: "//projects/apps/pytool:bin",
         // rule_type intentionally omitted
         labels: [],
         srcs: ["apps/pytool/main.py"],

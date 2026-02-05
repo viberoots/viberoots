@@ -10,7 +10,7 @@ test("scaf new go lib <name> renders README", async () => {
     const pipe$ = _$({ stdio: "pipe" });
 
     const name = "demo-lib";
-    const dest = path.join(tmp, "libs", name);
+    const dest = path.join(tmp, "projects", "libs", name);
     try {
       await pipe$`scaf new go lib ${name}`;
     } catch (e: any) {

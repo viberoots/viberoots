@@ -11,7 +11,7 @@ test("go lib: adding *_test.go auto-wires nix_go_test and runs", async () => {
     await $`git init`;
 
     // Scaffold a Go library
-    await $`scaf new go lib demo-lib --yes --path=libs/demo-lib`;
+    await $`scaf new go lib demo-lib --yes --path=projects/libs/demo-lib`;
     // Seed gomod2nix deterministically via local stub (no network)
     const stubDir = path.join(tmp, "bin");
     await fsp.mkdir(stubDir, { recursive: true });
@@ -44,14 +44,14 @@ test("go lib: adding *_test.go auto-wires nix_go_test and runs", async () => {
       cwd: tmp,
       stdio: "inherit",
       env: { ...process.env, PATH: `${stubDir}:${process.env.PATH || ""}` },
-    })`gomod2nix --dir libs/demo-lib`;
+    })`gomod2nix --dir projects/libs/demo-lib`;
     await fsp.copyFile(
-      path.join(tmp, "libs", "demo-lib", "gomod2nix.toml"),
+      path.join(tmp, "projects", "libs", "demo-lib", "gomod2nix.toml"),
       path.join(tmp, "gomod2nix.toml"),
     );
 
     // Add a simple *_test.go inside pkg/** so nix_go_library's auto-test picks it up
-    const pkgDir = path.join(tmp, "libs/demo-lib/pkg/demo-lib");
+    const pkgDir = path.join(tmp, "projects/libs/demo-lib/pkg/demo-lib");
     await fsp.mkdir(pkgDir, { recursive: true });
     await fsp.writeFile(
       path.join(pkgDir, "demo-lib_test.go"),
@@ -63,6 +63,6 @@ test("go lib: adding *_test.go auto-wires nix_go_test and runs", async () => {
     await $`build-tools/tools/dev/install-deps.ts --glue-only`;
 
     // Run the test via Buck; platform is set by runInTemp's .buckconfig
-    await $`buck2 test //libs/demo-lib:demo-lib_test --target-platforms //:no_cgo`;
+    await $`buck2 test //projects/libs/demo-lib:demo-lib_test --target-platforms //:no_cgo`;
   });
 });

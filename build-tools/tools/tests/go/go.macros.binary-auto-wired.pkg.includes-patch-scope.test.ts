@@ -29,11 +29,11 @@ EOF'`;
       cwd: tmp,
     })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
 MODULE_PROVIDERS = {
-  "//apps/demo:demo_pkg": ["//third_party/providers:prov"],
+  "//projects/apps/demo:demo_pkg": ["//third_party/providers:prov"],
 }
 EOF'`;
 
-    const appDir = path.join(tmp, "apps", "demo");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(path.join(appDir, "cmd", "demo"), { recursive: true });
     await fsp.mkdir(path.join(appDir, "patches", "go"), { recursive: true });
 
@@ -69,7 +69,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //apps/demo:demo_pkg`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //projects/apps/demo:demo_pkg`;
     if (probePkg.exitCode !== 0) return; // skip when Buck/prelude/toolchains unavailable
 
     const pkg = firstCqueryNode<{ labels?: string[] }>(JSON.parse(String(probePkg.stdout || "")));

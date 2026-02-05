@@ -10,25 +10,25 @@
 let
   traceEnabled = (builtins.getEnv "PLANNER_TRACE") != "";
   _trace_nodes_len = if traceEnabled then builtins.trace ("[planner][trace] nodesList.length=" + (toString (builtins.length nodesList))) null else null;
-  # Select Go nodes limited to apps/* and libs/*
+  # Select Go nodes limited to projects/apps/* and projects/libs/*
   safeGoNodes =
   let xs = builtins.filter (n:
     let
       nm = ensureFullLabel n;
       okName = (builtins.typeOf nm == "string") && nm != "";
       rel = if okName then (pkgPathOf nm) else "";
-      inAppsLibs = lib.hasPrefix "apps/" rel || lib.hasPrefix "libs/" rel;
+      inAppsLibs = lib.hasPrefix "projects/apps/" rel || lib.hasPrefix "projects/libs/" rel;
     in okName && inAppsLibs && (LANGS.go.isTarget n)
   ) nodesList; in if traceEnabled then builtins.trace ("[planner][trace] safeGoNodes=" + (toString (builtins.length xs))) xs else xs;
 
-  # Select C++ nodes limited to apps/* and libs/*
+  # Select C++ nodes limited to projects/apps/* and projects/libs/*
   safeCppNodes =
   let ys = builtins.filter (n:
     let
       nm = ensureFullLabel n;
       okName = (builtins.typeOf nm == "string") && nm != "";
       rel = if okName then (pkgPathOf nm) else "";
-      inAppsLibs = lib.hasPrefix "apps/" rel || lib.hasPrefix "libs/" rel;
+      inAppsLibs = lib.hasPrefix "projects/apps/" rel || lib.hasPrefix "projects/libs/" rel;
       hasCpp = (LANGS ? cpp);
     in okName && inAppsLibs && hasCpp && (LANGS.cpp.isTarget n)
   ) nodesList; in if traceEnabled then builtins.trace ("[planner][trace] safeCppNodes=" + (toString (builtins.length ys))) ys else ys;
@@ -80,7 +80,7 @@ let
       nm = ensureFullLabel n;
       okName = (builtins.typeOf nm == "string") && nm != "";
       rel = if okName then (pkgPathOf nm) else "";
-      inAppsLibs = lib.hasPrefix "apps/" rel || lib.hasPrefix "libs/" rel;
+      inAppsLibs = lib.hasPrefix "projects/apps/" rel || lib.hasPrefix "projects/libs/" rel;
       isNode = (LANGS ? node) && (LANGS.node.isTarget n);
       kind = if isNode then (LANGS.node.kindOf n) else null;
     in okName && inAppsLibs && isNode && (kind == "bin")

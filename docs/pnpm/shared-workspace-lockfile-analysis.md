@@ -103,7 +103,7 @@ From `pnpm-design.md` isolation requirements:
 - Scaffold `apps/example` with its own `package.json`
 - Run `pnpm install` in `apps/example` → creates `apps/example/pnpm-lock.yaml`
 - No interference with root lockfile or other importers
-- Labels use `lockfile:apps/example/pnpm-lock.yaml#apps/example`
+- Labels use `lockfile:projects/apps/example/pnpm-lock.yaml#projects/apps/example`
 
 ### PR 4 — Hermetic Nix Derivations
 

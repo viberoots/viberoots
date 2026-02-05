@@ -48,7 +48,7 @@ let
 
         hasNative = builtins.pathExists (repoRoot + ("/" + importerDir + "-native"));
         addonName = name + "_addon";
-        goPkgDir = "libs/" + name + "-go";
+        goPkgDir = "projects/libs/" + name + "-go";
         modulesTomlPath = repoRoot + ("/" + goPkgDir + "/gomod2nix.toml");
         carchive =
           if hasNative && builtins.pathExists (repoRoot + ("/" + goPkgDir)) then

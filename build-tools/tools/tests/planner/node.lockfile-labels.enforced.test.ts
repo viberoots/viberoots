@@ -8,8 +8,12 @@ import { runInTemp } from "../lib/test-helpers";
 test("node planner: lockfile label parsing is strict and deterministic (single ok, multiple fail)", async () => {
   await runInTemp("planner-node-lockfile-labels", async (tmp, $) => {
     // Ensure the importer lockfile exists (node-modules plumbing expects it to exist at eval time).
-    await fsp.mkdir(path.join(tmp, "apps", "web"), { recursive: true });
-    await fsp.writeFile(path.join(tmp, "apps", "web", "pnpm-lock.yaml"), "# lockfile\n", "utf8");
+    await fsp.mkdir(path.join(tmp, "projects", "apps", "web"), { recursive: true });
+    await fsp.writeFile(
+      path.join(tmp, "projects", "apps", "web", "pnpm-lock.yaml"),
+      "# lockfile\n",
+      "utf8",
+    );
 
     const exprOk = `
       let
@@ -17,8 +21,8 @@ test("node planner: lockfile label parsing is strict and deterministic (single o
         lib = pkgs.lib;
         nodes = [
           {
-            name = "//apps/web:cli";
-            labels = [ "lang:node" "kind:bin" "lockfile:apps/web/pnpm-lock.yaml#apps/web" ];
+            name = "//projects/apps/web:cli";
+            labels = [ "lang:node" "kind:bin" "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web" ];
             deps = [];
             srcs = [];
           }
@@ -27,15 +31,15 @@ test("node planner: lockfile label parsing is strict and deterministic (single o
           inherit lib pkgs nodes;
           repoRoot = ./.;
           get = n: k: if builtins.hasAttr k n then n.\${k} else null;
-          pkgPathOf = name: "apps/web";
+          pkgPathOf = name: "projects/apps/web";
           modulesTomlFor = name: null;
         };
         plugin = (import ./build-tools/tools/nix/planner/node.nix { inherit lib; }) ctx;
-        drv = plugin.mkApp "//apps/web:cli";
+        drv = plugin.mkApp "//projects/apps/web:cli";
       in drv.version
     `;
     const ok = await $({ cwd: tmp, stdio: "pipe" })`nix eval --impure --raw --expr ${exprOk}`;
-    assert.equal(String(ok.stdout || "").trim(), "apps-web");
+    assert.equal(String(ok.stdout || "").trim(), "projects-apps-web");
 
     const exprMulti = `
       let
@@ -43,12 +47,12 @@ test("node planner: lockfile label parsing is strict and deterministic (single o
         lib = pkgs.lib;
         nodes = [
           {
-            name = "//apps/web:cli";
+            name = "//projects/apps/web:cli";
             labels = [
               "lang:node"
               "kind:bin"
-              "lockfile:apps/web/pnpm-lock.yaml#apps/web"
-              "lockfile:apps/api/pnpm-lock.yaml#apps/api"
+              "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"
+              "lockfile:projects/apps/api/pnpm-lock.yaml#projects/apps/api"
             ];
             deps = [];
             srcs = [];
@@ -58,11 +62,11 @@ test("node planner: lockfile label parsing is strict and deterministic (single o
           inherit lib pkgs nodes;
           repoRoot = ./.;
           get = n: k: if builtins.hasAttr k n then n.\${k} else null;
-          pkgPathOf = name: "apps/web";
+          pkgPathOf = name: "projects/apps/web";
           modulesTomlFor = name: null;
         };
         plugin = (import ./build-tools/tools/nix/planner/node.nix { inherit lib; }) ctx;
-      in (plugin.mkApp "//apps/web:cli").version
+      in (plugin.mkApp "//projects/apps/web:cli").version
     `;
     const bad = await $({
       cwd: tmp,
@@ -81,7 +85,7 @@ test("node planner: lockfile label parsing is strict and deterministic (single o
       `expected deterministic multiple-label error; got:\n${combined}`,
     );
     assert.ok(
-      combined.includes("//apps/web:cli"),
+      combined.includes("//projects/apps/web:cli"),
       `expected error to mention target name; got:\n${combined}`,
     );
   });

@@ -13,9 +13,9 @@ test("sync-providers-node deterministic ordering with multiple importers", async
     await fsp.rm(path.join(tmp, "pnpm-lock.yaml"), { force: true });
 
     // Create separate lockfiles for 3 different projects (per-importer design)
-    const webLockfile = path.join(tmp, "apps/web/pnpm-lock.yaml");
-    const apiLockfile = path.join(tmp, "apps/api/pnpm-lock.yaml");
-    const utilsLockfile = path.join(tmp, "libs/utils/pnpm-lock.yaml");
+    const webLockfile = path.join(tmp, "projects/apps/web/pnpm-lock.yaml");
+    const apiLockfile = path.join(tmp, "projects/apps/api/pnpm-lock.yaml");
+    const utilsLockfile = path.join(tmp, "projects/libs/utils/pnpm-lock.yaml");
 
     await fsp.mkdir(path.dirname(webLockfile), { recursive: true });
     await fsp.mkdir(path.dirname(apiLockfile), { recursive: true });
@@ -28,7 +28,7 @@ test("sync-providers-node deterministic ordering with multiple importers", async
 lockfileVersion: "9.0"
 
 importers:
-  apps/web:
+  projects/apps/web:
     dependencies:
       react:
         specifier: ^18.0.0
@@ -47,7 +47,7 @@ packages:
 lockfileVersion: "9.0"
 
 importers:
-  apps/api:
+  projects/apps/api:
     dependencies:
       express:
         specifier: ^4.18.0
@@ -66,7 +66,7 @@ packages:
 lockfileVersion: "9.0"
 
 importers:
-  libs/utils:
+  projects/libs/utils:
     dependencies:
       lodash:
         specifier: ^4.17.21
@@ -79,7 +79,7 @@ packages:
       "utf8",
     );
 
-    await $`git add apps/web/pnpm-lock.yaml apps/api/pnpm-lock.yaml libs/utils/pnpm-lock.yaml`;
+    await $`git add projects/apps/web/pnpm-lock.yaml projects/apps/api/pnpm-lock.yaml projects/libs/utils/pnpm-lock.yaml`;
 
     // First run
     await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
@@ -111,15 +111,15 @@ packages:
     }
 
     // Verify each importer is represented
-    if (!output1.includes("apps/web")) {
+    if (!output1.includes("projects/apps/web")) {
       console.error("Missing apps/web importer");
       process.exit(2);
     }
-    if (!output1.includes("apps/api")) {
+    if (!output1.includes("projects/apps/api")) {
       console.error("Missing apps/api importer");
       process.exit(2);
     }
-    if (!output1.includes("libs/utils")) {
+    if (!output1.includes("projects/libs/utils")) {
       console.error("Missing libs/utils importer");
       process.exit(2);
     }

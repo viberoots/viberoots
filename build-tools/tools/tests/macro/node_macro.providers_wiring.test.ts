@@ -12,9 +12,13 @@ test("node macro: providers are auto-wired from auto_map", async () => {
     await fs.mkdirp(graphDir);
     const nodes = [
       {
-        name: "//apps/example:smoke_test",
+        name: "//projects/apps/example:smoke_test",
         rule_type: "genrule",
-        labels: ["lockfile:apps/example/pnpm-lock.yaml#apps/example", "lang:node", "kind:test"],
+        labels: [
+          "lockfile:projects/apps/example/pnpm-lock.yaml#projects/apps/example",
+          "lang:node",
+          "kind:test",
+        ],
       },
     ];
     await fs.writeJSON(path.join(graphDir, "graph.json"), nodes, { spaces: 2 });
@@ -24,7 +28,7 @@ test("node macro: providers are auto-wired from auto_map", async () => {
 
     const autoMapPath = path.join(tmp, "third_party/providers/auto_map.bzl");
     const content = await fs.readFile(autoMapPath, "utf8");
-    const key = '"//apps/example:smoke_test"';
+    const key = '"//projects/apps/example:smoke_test"';
     const start = content.indexOf(key);
     assert.ok(start >= 0, "auto_map contains target key for smoke_test");
     const slice = content.slice(start, Math.min(content.length, start + 500));

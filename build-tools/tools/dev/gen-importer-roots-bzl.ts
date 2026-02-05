@@ -12,6 +12,8 @@ type RawContract = Partial<{
   workspaceRoots: unknown;
 }>;
 
+const DEFAULT_WORKSPACE_ROOTS = ["projects/apps", "projects/libs"];
+
 function normalizeWorkspaceRoots(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   const out: string[] = [];
@@ -20,8 +22,10 @@ function normalizeWorkspaceRoots(raw: unknown): string[] {
     const trimmed = v.trim().replace(/^\/+/, "").replace(/\/+$/, "");
     if (!trimmed) continue;
     if (trimmed === ".") continue;
-    if (trimmed.includes("/") || trimmed.includes("\\")) continue;
-    out.push(trimmed);
+    if (trimmed.includes("\\")) continue;
+    const parts = trimmed.split("/");
+    if (parts.some((p) => p === "" || p === "." || p === "..")) continue;
+    out.push(parts.join("/"));
   }
   return Array.from(new Set(out)).sort((a, b) => a.localeCompare(b));
 }
@@ -61,7 +65,9 @@ async function main() {
   const txt = await fsp.readFile(jsonPath, "utf8");
   const raw = JSON.parse(txt) as RawContract;
   const allowDotImporter = raw.allowDotImporter === false ? false : true;
-  const workspaceRoots = normalizeWorkspaceRoots(raw.workspaceRoots);
+  const workspaceRootsRaw = normalizeWorkspaceRoots(raw.workspaceRoots);
+  const workspaceRoots =
+    workspaceRootsRaw.length > 0 ? workspaceRootsRaw : DEFAULT_WORKSPACE_ROOTS.slice();
   const out = renderBzl(allowDotImporter, workspaceRoots);
   await writeIfChanged(bzlPath, out);
   console.log(`wrote ${bzlPath} (${workspaceRoots.length} workspace roots)`);

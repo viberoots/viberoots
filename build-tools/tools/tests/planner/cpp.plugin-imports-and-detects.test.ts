@@ -40,8 +40,8 @@ test("cpp planner imports and detects cxx_* and lang:cpp", async () => {
 
     // Export a tiny Buck graph JSON with two nodes: one cxx_*, one with lang:cpp label
     const graph = [
-      { name: "//apps/demo:bin", rule_type: "cxx_binary", labels: [] },
-      { name: "//libs/demo:lib", rule_type: "custom_rule", labels: ["lang:cpp"] },
+      { name: "//projects/apps/demo:bin", rule_type: "cxx_binary", labels: [] },
+      { name: "//projects/libs/demo:lib", rule_type: "custom_rule", labels: ["lang:cpp"] },
     ];
     await fs.outputFile(
       path.join(tmp, "build-tools/tools/buck/graph.json"),

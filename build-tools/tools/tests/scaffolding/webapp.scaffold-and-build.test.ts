@@ -13,9 +13,9 @@ test("webapp: scaffold, glue, build dist via Buck", { timeout: TEST_TIMEOUT_MS }
     await $`scaf new node webapp demo-web --yes`;
     // Install deps via repo installer (handles pnpm store path and Nix node_modules)
     await $({
-      cwd: path.join(tmp, "apps", "demo-web"),
+      cwd: path.join(tmp, "projects", "apps", "demo-web"),
       env: { ...process.env },
-    })`zx-wrapper ../../build-tools/tools/dev/install/deps-main.ts --verbose --glue-only`;
+    })`zx-wrapper ../../../build-tools/tools/dev/install/deps-main.ts --verbose --glue-only`;
     // quiet: remove temporary diagnostics
     // Glue (no buck invocations)
     await $`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
@@ -25,12 +25,12 @@ test("webapp: scaffold, glue, build dist via Buck", { timeout: TEST_TIMEOUT_MS }
     await $({
       cwd: tmp,
       stdio: "pipe",
-    })`git add -A apps/demo-web build-tools/tools/nix/node-modules.hashes.json build-tools/tools/nix/langs.nix build-tools/lang/importer_roots.bzl build-tools/tools/buck third_party/providers`;
+    })`git add -A projects/apps/demo-web build-tools/tools/nix/node-modules.hashes.json build-tools/tools/nix/langs.nix build-tools/lang/importer_roots.bzl build-tools/tools/buck third_party/providers`;
     // No longer modify flake envs for LOCAL_PNPM_STORE; pure Nix path only
     // Build via Nix directly to avoid nested buck invocations from within a buck test
-    const importer = "apps/demo-web";
+    const importer = "projects/apps/demo-web";
     // Prefetch removed: rely on pure Nix fetch inside FOD
-    const appAbs = path.join(tmp, "apps", "demo-web");
+    const appAbs = path.join(tmp, "projects", "apps", "demo-web");
     // Ensure no pre-existing node_modules links before pnpm ops (do not create writable dirs)
     try {
       await fsp.rm(path.join(tmp, "node_modules"), { recursive: true, force: true });
@@ -38,6 +38,7 @@ test("webapp: scaffold, glue, build dist via Buck", { timeout: TEST_TIMEOUT_MS }
     try {
       await fsp.rm(path.join(appAbs, "node_modules"), { recursive: true, force: true });
     } catch {}
+    const lockfile = path.join(importer, "pnpm-lock.yaml");
     // No pnpm prefetch; Nix FOD handles it hermetically
     const sanitized = importer
       .replace(/\/\//g, "")
@@ -47,12 +48,17 @@ test("webapp: scaffold, glue, build dist via Buck", { timeout: TEST_TIMEOUT_MS }
       string,
       string
     >;
+    await $({
+      cwd: tmp,
+      stdio: "inherit",
+      env: { ...envWithPrefetch },
+    })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${lockfile}`;
     // Ensure node_modules is realizable (reconciles pnpm-store hash if needed) before building dist.
     await $({
       cwd: path.join(tmp, importer),
       stdio: "inherit",
       env: { ...envWithPrefetch },
-    })`zx-wrapper ../../build-tools/tools/dev/node-modules-build.ts`;
+    })`zx-wrapper ../../../build-tools/tools/dev/node-modules-build.ts`;
     const nixOut = await (async () => {
       const mj = String(process.env.NIX_MAX_JOBS || "0");
       const cr = String(process.env.NIX_CORES || "0");

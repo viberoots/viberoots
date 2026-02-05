@@ -2,7 +2,7 @@
 
 This package exposes a simple TypeScript API backed by a C++ Node-API addon.
 
-- The native addon is built in `libs/{{ name }}-native` and copied here to `native/{{ addon_name }}.node`.
+- The native addon is built in `projects/libs/{{ name }}-native` and copied here to `native/{{ addon_name }}.node`.
 - The TypeScript entry loads the addon from a stable relative path using `createRequire(import.meta.url)`.
 
 ## Quickstart
@@ -15,7 +15,7 @@ Follow these steps to scaffold, build, and test the addon-backed library:
 
 2) Build the C++ addon via Buck/Nix:
 
-   - `buck2 build //libs/{{ name }}-native:napi_addon`
+   - `buck2 build //projects/libs/{{ name }}-native:napi_addon`
 
 3) Ensure glue is present (providers + auto_map):
 
@@ -23,7 +23,7 @@ Follow these steps to scaffold, build, and test the addon-backed library:
 
 4) Run the Node unit test (single test file, per project conventions):
 
-   - `buck2 test //libs/{{ name }}:unit`
+   - `buck2 test //projects/libs/{{ name }}:unit`
 
 ## Runtime loading behavior
 
@@ -32,14 +32,14 @@ Follow these steps to scaffold, build, and test the addon-backed library:
 
 ## Scripts
 
-- `pnpm -C libs/{{ name }} build` — compile TS to `dist/`
-- `pnpm -C libs/{{ name }} test` — run unit tests{% if includeNodeTests %} (Vitest){% endif %}
+- `pnpm -C projects/libs/{{ name }} build` — compile TS to `dist/`
+- `pnpm -C projects/libs/{{ name }} test` — run unit tests{% if includeNodeTests %} (Vitest){% endif %}
 
 ## Buck targets
 
-- `//libs/{{ name }}:{{ name }}` — Node library (stamp)
-- `//libs/{{ name }}:copy_addon` — copies the `.node` artifact to `native/{{ addon_name }}.node`
-- `//libs/{{ name }}-native:napi_addon` — C++ addon that produces the `.node` artifact
+- `//projects/libs/{{ name }}:{{ name }}` — Node library (stamp)
+- `//projects/libs/{{ name }}:copy_addon` — copies the `.node` artifact to `native/{{ addon_name }}.node`
+- `//projects/libs/{{ name }}-native:napi_addon` — C++ addon that produces the `.node` artifact
 
 ## Design references
 

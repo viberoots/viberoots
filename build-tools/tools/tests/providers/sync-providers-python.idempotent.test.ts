@@ -6,7 +6,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("sync-providers-python: deterministic generation and idempotency with patch filter", async () => {
   await runInTemp("sync-python-idem", async (tmp, $) => {
-    const importer = path.join(tmp, "apps", "pytool");
+    const importer = path.join(tmp, "projects", "apps", "pytool");
     await fsp.mkdir(importer, { recursive: true });
     // Minimal uv.lock with two packages; only one has a matching patch
     const uvLock = [
@@ -36,24 +36,24 @@ test("sync-providers-python: deterministic generation and idempotency with patch
     const text1 = await fsp.readFile(outPath, "utf8");
 
     // Expectations:
-    // - Contains python_importer_deps for apps/pytool/uv.lock and importer "apps/pytool"
+    // - Contains python_importer_deps for projects/apps/pytool/uv.lock and importer "projects/apps/pytool"
     // - patch_paths includes only the matching requests patch, not unused
     if (!text1.includes("python_importer_deps(")) {
       console.error("missing python_importer_deps entry");
       process.exit(2);
     }
     if (
-      !text1.includes('lockfile="apps/pytool/uv.lock"') ||
-      !text1.includes('importer="apps/pytool"')
+      !text1.includes('lockfile="projects/apps/pytool/uv.lock"') ||
+      !text1.includes('importer="projects/apps/pytool"')
     ) {
       console.error("lockfile/importer fields incorrect");
       process.exit(2);
     }
-    if (!text1.includes("apps/pytool/patches/python/requests@2.32.3.patch")) {
+    if (!text1.includes("projects/apps/pytool/patches/python/requests@2.32.3.patch")) {
       console.error("expected matching patch to be included in patch_paths");
       process.exit(2);
     }
-    if (text1.includes("apps/pytool/patches/python/unused@1.0.0.patch")) {
+    if (text1.includes("projects/apps/pytool/patches/python/unused@1.0.0.patch")) {
       console.error("unexpected unused patch included in patch_paths");
       process.exit(2);
     }

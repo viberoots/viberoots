@@ -6,8 +6,8 @@ import { runInTemp } from "../lib/test-helpers";
 
 await runInTemp("export-graph-attach-modules-local-replace", async (tmp, $) => {
   // Create minimal Go module A and module B, with A replacing B locally.
-  const modA = path.join(tmp, "apps", "a");
-  const modB = path.join(tmp, "apps", "b");
+  const modA = path.join(tmp, "projects", "apps", "a");
+  const modB = path.join(tmp, "projects", "apps", "b");
   await fs.mkdirp(path.join(modA));
   await fs.mkdirp(path.join(modB));
 
@@ -71,12 +71,17 @@ await runInTemp("export-graph-attach-modules-local-replace", async (tmp, $) => {
 
   // Simulate nodes instead of relying on Buck prelude
   const nodes = [
-    { name: "//apps/a:appa_lib", rule_type: "filegroup", labels: ["lang:go"], srcs: ["main.go"] },
     {
-      name: "//apps/a:appa_test",
+      name: "//projects/apps/a:appa_lib",
       rule_type: "filegroup",
       labels: ["lang:go"],
-      srcs: ["main_test.go"],
+      srcs: ["projects/apps/a/main.go"],
+    },
+    {
+      name: "//projects/apps/a:appa_test",
+      rule_type: "filegroup",
+      labels: ["lang:go"],
+      srcs: ["projects/apps/a/main_test.go"],
     },
   ];
   await fs.outputFile(path.join(tmp, "sim.json"), JSON.stringify(nodes));

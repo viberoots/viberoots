@@ -33,7 +33,7 @@ async function removeGeneratedProviderOutputs(provDir: string): Promise<void> {
 
 test("glue-pipeline: outputs identical to manual steps (no lockfiles present)", async () => {
   await runInTemp("glue-pipeline-no-locks", async (tmp, $) => {
-    const impDir = path.join(tmp, "apps", "web");
+    const impDir = path.join(tmp, "projects", "apps", "web");
     await fsp.mkdir(impDir, { recursive: true });
     await fsp.writeFile(
       path.join(impDir, "package.json"),
@@ -45,8 +45,8 @@ test("glue-pipeline: outputs identical to manual steps (no lockfiles present)", 
     await fsp.mkdir(path.dirname(graphPath), { recursive: true });
     const nodes = [
       {
-        name: "//apps/web:app",
-        labels: ["lockfile:apps/web/pnpm-lock.yaml#apps/web"],
+        name: "//projects/apps/web:app",
+        labels: ["lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"],
       },
     ];
     await fsp.writeFile(graphPath, JSON.stringify(nodes), "utf8");

@@ -7,8 +7,8 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("workspace map generation matches providers", async () => {
   await runInTemp("node-workspace-map-gen", async (tmp, $) => {
-    const appDir = path.join(tmp, "apps", "web");
-    const libDir = path.join(tmp, "libs", "ui");
+    const appDir = path.join(tmp, "projects", "apps", "web");
+    const libDir = path.join(tmp, "projects", "libs", "ui");
     await fs.mkdirp(appDir);
     await fs.mkdirp(libDir);
     await fs.writeJson(path.join(appDir, "package.json"), { name: "@repo/web", version: "0.0.0" });
@@ -16,19 +16,31 @@ test("workspace map generation matches providers", async () => {
 
     const nodes = [
       {
-        name: "//apps/web:web",
+        name: "//projects/apps/web:web",
         rule_type: "js_binary",
-        labels: ["lang:node", "kind:app", "lockfile:apps/web/pnpm-lock.yaml#apps/web"],
+        labels: [
+          "lang:node",
+          "kind:app",
+          "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",
+        ],
       },
       {
-        name: "//libs/ui:ui",
+        name: "//projects/libs/ui:ui",
         rule_type: "js_library",
-        labels: ["lang:node", "kind:lib", "lockfile:libs/ui/pnpm-lock.yaml#libs/ui"],
+        labels: [
+          "lang:node",
+          "kind:lib",
+          "lockfile:projects/libs/ui/pnpm-lock.yaml#projects/libs/ui",
+        ],
       },
       {
-        name: "//libs/ui:unit",
+        name: "//projects/libs/ui:unit",
         rule_type: "js_test",
-        labels: ["lang:node", "kind:test", "lockfile:libs/ui/pnpm-lock.yaml#libs/ui"],
+        labels: [
+          "lang:node",
+          "kind:test",
+          "lockfile:projects/libs/ui/pnpm-lock.yaml#projects/libs/ui",
+        ],
       },
     ];
     const sim = path.join(tmp, "build-tools", "tools", "buck", "simulated.json");
@@ -40,8 +52,8 @@ test("workspace map generation matches providers", async () => {
     const outPath = path.join(tmp, "build-tools", "tools", "node", "workspace-map.json");
     const got = await fs.readJson(outPath);
     assert.deepEqual(got, {
-      "@repo/ui": "//libs/ui:ui",
-      "@repo/web": "//apps/web:web",
+      "@repo/ui": "//projects/libs/ui:ui",
+      "@repo/web": "//projects/apps/web:web",
     });
   });
 });

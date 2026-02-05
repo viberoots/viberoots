@@ -6,7 +6,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("pr4: wasm static lib builds and exports headers (smoke link optional)", async () => {
   await runInTemp("pr4-wasm-static-lib", async (tmp, $) => {
-    const libDir = path.join(tmp, "libs", "math-core");
+    const libDir = path.join(tmp, "projects", "libs", "math-core");
     // Minimal C ABI + C++ core + C wrapper
     await fs.outputFile(
       path.join(libDir, "include", "addon.h"),
@@ -93,14 +93,14 @@ nix_cpp_wasm_static_lib(
     await fs.outputFile(path.join(libDir, "TARGETS"), targets);
 
     // Build in the temp repo via Buck (which invokes the Nix planner)
-    await $`buck2 build --target-platforms prelude//platforms:default //libs/math-core:core_wasm`;
+    await $`buck2 build --target-platforms prelude//platforms:default //projects/libs/math-core:core_wasm`;
 
     // Query the Nix out path for the selected target and verify archive + headers
     const sel = await $({
       cwd: tmp,
       env: {
         ...process.env,
-        BUCK_TARGET: "//libs/math-core:core_wasm",
+        BUCK_TARGET: "//projects/libs/math-core:core_wasm",
         WORKSPACE_ROOT: tmp,
         BUCK_TEST_SRC: tmp,
       },
@@ -139,7 +139,7 @@ nix_cpp_wasm_static_lib(
       const smokeC = path.join(tmp, "smoke.c");
       await fs.writeFile(
         smokeC,
-        `#include "libs/math-core/include/addon.h"
+        `#include "projects/libs/math-core/include/addon.h"
 int main(void) { return add(2, 3) == 5 ? 0 : 42; }`,
         "utf8",
       );

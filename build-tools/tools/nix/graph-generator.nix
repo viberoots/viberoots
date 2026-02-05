@@ -5,20 +5,26 @@ let
   # Allow tests to override the repo root via BUCK_TEST_SRC; default to provided flake src
   buckTestSrcEnv = builtins.getEnv "BUCK_TEST_SRC";
   repoRootStr = if buckTestSrcEnv != "" then buckTestSrcEnv else builtins.toString src;
-  repoRoot = builtins.toPath repoRootStr;
+  repoRootBase = builtins.toPath repoRootStr;
   traceEnabled = (builtins.getEnv "PLANNER_TRACE") != "";
   onlyCpp = (builtins.getEnv "PLANNER_ONLY_CPP") != "";
-  # Filtered source that includes both apps/* and libs/* so local replaces resolve
+  # Filtered source that includes both projects/apps/* and projects/libs/* so local replaces resolve
   appsLibsSrc = lib.cleanSourceWith {
-    src = repoRoot;
+    src = repoRootBase;
     filter = path: type:
       let p = builtins.toString path;
-          rootP = builtins.toString repoRoot;
+          rootP = builtins.toString repoRootBase;
           rel = lib.removePrefix (rootP + "/") p;
       in
-      # keep the root, the top-level apps/libs directories, and anything under them
-      p == rootP || rel == "apps" || rel == "libs" || lib.hasPrefix "apps/" rel || lib.hasPrefix "libs/" rel;
+      # keep the root, the top-level projects/apps/libs directories, and anything under them
+      p == rootP ||
+      rel == "projects" ||
+      rel == "projects/apps" ||
+      rel == "projects/libs" ||
+      lib.hasPrefix "projects/apps/" rel ||
+      lib.hasPrefix "projects/libs/" rel;
   };
+  repoRoot = appsLibsSrc;
 
   # Helper to read module path from a go.mod file under the repo root (pure with src)
   readModulePathLive = rel:
@@ -123,7 +129,7 @@ let
 
   # Build planner context and import language plugins if present
   ctx = {
-    inherit lib T repoRoot localModuleOverrides pkgPathOf pkgs;
+    inherit lib T repoRoot repoRootStr localModuleOverrides pkgPathOf pkgs;
     # Provide full nodes list so language plugins (e.g., C++) can walk deps
     nodes = nodesList;
     get = get;
@@ -165,16 +171,16 @@ let
   # Minimal local libs listing (not used for target discovery) to build a map of
   # module import path -> live source for local libs (for replaces)
   safeReadDir = p: if builtins.pathExists p then builtins.readDir p else {};
-  libsDir = builtins.toPath (repoRootStr + "/libs");
+  libsDir = builtins.toPath (repoRootStr + "/projects/libs");
   libNames = builtins.attrNames (safeReadDir libsDir);
 
   # Build a map of module import path -> live source for local libs (for replaces)
   localModuleOverrides =
     let
-      modForLib = nm: readModulePathLive ("libs/" + nm + "/go.mod");
+      modForLib = nm: readModulePathLive ("projects/libs/" + nm + "/go.mod");
       entries = lib.filter (kv: (lib.elemAt kv 1) != "") (map (nm: [ nm (modForLib nm) ]) libNames);
       mk = acc: kv:
-        let nm = lib.elemAt kv 0; m = lib.elemAt kv 1; p = builtins.toPath (repoRootStr + "/libs/" + nm);
+        let nm = lib.elemAt kv 0; m = lib.elemAt kv 1; p = builtins.toPath (repoRootStr + "/projects/libs/" + nm);
         in acc // { "${m}" = p; "${m}@v0.0.0" = p; };
     in builtins.foldl' mk {} entries;
 
@@ -200,7 +206,7 @@ let
         nmOk = n: let nm = ensureFullLabel n; in (builtins.typeOf nm == "string") && (nm != "");
         inAppsLibs = n:
           let rel = if nmOk n then (pkgPathOf (ensureFullLabel n)) else ""; in
-            lib.hasPrefix "apps/" rel || lib.hasPrefix "libs/" rel;
+            lib.hasPrefix "projects/apps/" rel || lib.hasPrefix "projects/libs/" rel;
     in builtins.filter (n: nmOk n && inAppsLibs n && hasLabel n) nodesList;
   cppTargetsFromGraph = builtins.foldl' (acc: n:
     let nm = ensureFullLabel n; tnm = builtins.typeOf nm; k = LANGS.cpp.kindOf n; in
@@ -240,7 +246,7 @@ let
         hasGoLabel = n:
           let ls = get n "labels"; in (ls != null) && (builtins.isList ls) && builtins.elem "lang:go" ls;
         inAppsLibs = n:
-          let rel = pkgPathOf (ensureFullLabel n); in lib.hasPrefix "apps/" rel || lib.hasPrefix "libs/" rel;
+          let rel = pkgPathOf (ensureFullLabel n); in lib.hasPrefix "projects/apps/" rel || lib.hasPrefix "projects/libs/" rel;
         safeGoNodes = builtins.filter (n:
           let nm = ensureFullLabel n; in
             (builtins.typeOf nm == "string") && (nm != "") && inAppsLibs n && hasGoLabel n
@@ -340,17 +346,17 @@ let
             if isLib then T.pyWasmLib { name = nm; lockfile = lockRel; srcRoot = repoRoot; subdir = pkg; }
             else
               let
-                # Heuristic overlays: include any libs/* importer that carries a uv.lock
+                # Heuristic overlays: include any projects/libs/* importer that carries a uv.lock
                 listDirs = base: if builtins.pathExists base then builtins.attrNames (builtins.readDir base) else [];
-                libNames = listDirs (builtins.toPath (repoRootStr + "/libs"));
-                libHasLock = d: builtins.pathExists (builtins.toPath (repoRootStr + "/libs/" + d + "/uv.lock"));
+                libNames = listDirs (builtins.toPath (repoRootStr + "/projects/libs"));
+                libHasLock = d: builtins.pathExists (builtins.toPath (repoRootStr + "/projects/libs/" + d + "/uv.lock"));
                 libImporters = builtins.filter libHasLock libNames;
                 overlays = map (d:
                   T.pyWasmLib {
-                    name = "//libs/${d}:${d}";
-                    lockfile = "libs/${d}/uv.lock";
+                    name = "//projects/libs/${d}:${d}";
+                    lockfile = "projects/libs/${d}/uv.lock";
                     srcRoot = repoRoot;
-                    subdir = "libs/${d}";
+                    subdir = "projects/libs/${d}";
                   }
                 ) libImporters;
               in T.pyWasmApp { name = nm; lockfile = lockRel; srcRoot = repoRoot; subdir = pkg; libOverlays = overlays; }

@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
-import path from "node:path";
 import assert from "node:assert/strict";
+import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
-import { readCompositeGraph } from "../../lib/graph-view.ts";
 import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const.ts";
+import { readCompositeGraph } from "../../lib/graph-view.ts";
+import { runInTemp } from "../lib/test-helpers";
 
 test("node exporter does not auto-attach lockfile labels for unsupported importer roots", async () => {
   await runInTemp("exp-node-unsupported-importer-autoattach", async (tmp, $) => {
@@ -16,10 +16,10 @@ test("node exporter does not auto-attach lockfile labels for unsupported importe
       "utf8",
     );
 
-    await fs.mkdirp(path.join(tmp, "apps", "foo", "bar"));
+    await fs.mkdirp(path.join(tmp, "projects", "apps", "foo", "bar"));
     await fs.outputFile(
-      path.join(tmp, "apps", "foo", "bar", "pnpm-lock.yaml"),
-      'lockfileVersion: "9.0"\nimporters:\n  apps/foo/bar:\n    dependencies: {}\npackages: {}\n',
+      path.join(tmp, "projects", "apps", "foo", "bar", "pnpm-lock.yaml"),
+      'lockfileVersion: "9.0"\nimporters:\n  projects/apps/foo/bar:\n    dependencies: {}\npackages: {}\n',
       "utf8",
     );
 
@@ -30,7 +30,7 @@ test("node exporter does not auto-attach lockfile labels for unsupported importe
         labels: ["lang:node", "kind:bundle"],
       },
       {
-        name: "//apps/foo/bar:bundle",
+        name: "//projects/apps/foo/bar:bundle",
         rule_type: "js_binary",
         labels: ["lang:node", "kind:bundle"],
       },
@@ -59,7 +59,7 @@ test("node exporter does not auto-attach lockfile labels for unsupported importe
 
       const { nodes } = await readCompositeGraph({ graphPath: outPath });
       const byName = new Map(nodes.map((n: any) => [n?.name, n]));
-      for (const name of ["//services/api:bundle", "//apps/foo/bar:bundle"]) {
+      for (const name of ["//services/api:bundle", "//projects/apps/foo/bar:bundle"]) {
         const n = byName.get(name);
         const labels: string[] = (n?.labels || []) as string[];
         assert.ok(!labels.some((l) => l.startsWith("lockfile:")));

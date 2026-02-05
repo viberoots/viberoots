@@ -15,7 +15,7 @@ function extractString(v: unknown): string | undefined {
 
 test("nix_node_test derives importer deterministically from lockfile label", async () => {
   await runInTemp("node-nix-test-importer-derived", async (tmp, $) => {
-    const dir = path.join(tmp, "apps", "web");
+    const dir = path.join(tmp, "projects", "apps", "web");
     await fsp.mkdir(dir, { recursive: true });
     await fsp.writeFile(path.join(dir, "pnpm-lock.yaml"), "lockfileVersion: 9\n", "utf8");
 
@@ -27,7 +27,7 @@ test("nix_node_test derives importer deterministically from lockfile label", asy
         "nix_node_test(",
         '  name = "t",',
         "  patterns = [],",
-        '  lockfile_label = "lockfile:././apps/web/pnpm-lock.yaml#apps/web",',
+        '  lockfile_label = "lockfile:././projects/apps/web/pnpm-lock.yaml#projects/apps/web",',
         ")",
         "",
       ].join("\n"),
@@ -39,13 +39,17 @@ test("nix_node_test derives importer deterministically from lockfile label", asy
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute importer //apps/web:t`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute importer //projects/apps/web:t`;
     assert.equal(probe.exitCode, 0, "expected buck2 cquery to succeed");
 
     const parsed = JSON.parse(String(probe.stdout || "")) as unknown;
     if (Array.isArray(parsed)) {
       const raw = (parsed[0] as { importer?: unknown } | undefined)?.importer;
-      assert.equal(extractString(raw), "apps/web", `unexpected cquery output: ${probe.stdout}`);
+      assert.equal(
+        extractString(raw),
+        "projects/apps/web",
+        `unexpected cquery output: ${probe.stdout}`,
+      );
       return;
     }
 
@@ -53,7 +57,7 @@ test("nix_node_test derives importer deterministically from lockfile label", asy
       const first = Object.values(parsed as Record<string, { importer?: unknown }>)[0];
       assert.equal(
         extractString(first?.importer),
-        "apps/web",
+        "projects/apps/web",
         `unexpected cquery output: ${probe.stdout}`,
       );
       return;

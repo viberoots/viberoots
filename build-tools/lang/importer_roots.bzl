@@ -3,6 +3,6 @@
 
 ALLOW_DOT_IMPORTER = True
 WORKSPACE_IMPORTER_ROOTS = [
-    "apps",
-    "libs",
+    "projects/apps",
+    "projects/libs",
 ]

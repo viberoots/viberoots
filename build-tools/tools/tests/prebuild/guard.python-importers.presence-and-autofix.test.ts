@@ -31,7 +31,7 @@ test("prebuild-guard: flags missing Python importer providers and auto-fixes loc
     );
 
     // Create a uv.lock for a Python importer
-    const importer = path.join(tmp, "apps", "pytool");
+    const importer = path.join(tmp, "projects", "apps", "pytool");
     await fsp.mkdir(importer, { recursive: true });
     const uvLockPath = path.join(importer, "uv.lock");
     const uvLock = ["# uv lock", "[[package]]", 'name = "requests"', 'version = "2.32.3"', ""].join(
@@ -61,8 +61,8 @@ test("prebuild-guard: flags missing Python importer providers and auto-fixes loc
     const txt = await fsp.readFile(targetsPy, "utf8");
     if (
       !txt.includes("python_importer_deps(") ||
-      !txt.includes('lockfile="apps/pytool/uv.lock"') ||
-      !txt.includes('importer="apps/pytool"')
+      !txt.includes('lockfile="projects/apps/pytool/uv.lock"') ||
+      !txt.includes('importer="projects/apps/pytool"')
     ) {
       throw new Error("expected TARGETS.python.auto to include python_importer_deps for importer");
     }

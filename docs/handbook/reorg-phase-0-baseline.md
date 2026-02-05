@@ -33,7 +33,7 @@ I am recording the baseline run list and a root-level inventory snapshot for the
 - `python/`
 - `rust/`
 - `build-tools/lang/`
-- `build-tools/docs/build-tools/lang/`
+- `build-tools/docs/lang/`
 
 ### Build-system reference docs to `/build-tools/docs`
 

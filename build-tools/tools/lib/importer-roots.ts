@@ -11,6 +11,8 @@ type RawImporterRootsContract = Partial<{
   workspaceRoots: unknown;
 }>;
 
+const DEFAULT_WORKSPACE_ROOTS = ["projects/apps", "projects/libs"];
+
 const CONTRACT_JSON_PATH = fileURLToPath(new URL("./importer-roots.json", import.meta.url));
 
 let cached: ImporterRootsContract | null = null;
@@ -22,10 +24,11 @@ function normalizeWorkspaceRoots(raw: unknown): string[] {
     if (typeof v !== "string") continue;
     const trimmed = v.trim().replace(/^\/+/, "").replace(/\/+$/, "");
     if (!trimmed) continue;
-    // Enforce single path segment roots only (e.g. "apps", "libs").
-    if (trimmed.includes("/") || trimmed.includes("\\")) continue;
     if (trimmed === ".") continue;
-    out.push(trimmed);
+    if (trimmed.includes("\\")) continue;
+    const parts = trimmed.split("/");
+    if (parts.some((p) => p === "" || p === "." || p === "..")) continue;
+    out.push(parts.join("/"));
   }
   // Dedupe + stable order
   return Array.from(new Set(out)).sort((a, b) => a.localeCompare(b));
@@ -54,7 +57,9 @@ export function getImporterRootsContract(): ImporterRootsContract {
   }
 
   const allowDotImporter = parsed.allowDotImporter === false ? false : true;
-  const workspaceRoots = normalizeWorkspaceRoots(parsed.workspaceRoots);
+  const workspaceRootsRaw = normalizeWorkspaceRoots(parsed.workspaceRoots);
+  const workspaceRoots =
+    workspaceRootsRaw.length > 0 ? workspaceRootsRaw : DEFAULT_WORKSPACE_ROOTS.slice();
 
   cached = { allowDotImporter, workspaceRoots };
   return cached;

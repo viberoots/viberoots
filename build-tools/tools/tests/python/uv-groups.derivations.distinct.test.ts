@@ -12,7 +12,7 @@ test("python uv groups: base vs dev/test produce distinct, stable derivations", 
 
     // 1) Create a minimal Python importer with uv.lock
     const appName = "pyenv_demo";
-    const appDir = path.join(tmp, "apps", appName);
+    const appDir = path.join(tmp, "projects", "apps", appName);
     await fs.mkdirp(appDir);
     const lockText = ["# uv lock", "[[package]]", 'name = "foo"', 'version = "1.0.0"', ""].join(
       "\n",
@@ -31,9 +31,9 @@ test("python uv groups: base vs dev/test produce distinct, stable derivations", 
         .split(/\s+/)
         .pop() as string;
     }
-    const attrBase = "py-apps-" + appName;
-    const attrDev = "py-apps-" + appName + "-dev";
-    const attrTest = "py-apps-" + appName + "-test";
+    const attrBase = "py-projects-apps-" + appName;
+    const attrDev = "py-projects-apps-" + appName + "-dev";
+    const attrTest = "py-projects-apps-" + appName + "-test";
 
     const base1 = await nixOut(attrBase);
     const dev1 = await nixOut(attrDev);

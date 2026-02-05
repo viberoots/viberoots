@@ -80,8 +80,8 @@ test("cpp wasm static lib preserves link intent attrs in build-tools/tools/buck/
         "nix_cpp_wasm_static_lib(",
         '  name = "core_wasm",',
         '  srcs = ["src/core.c"],',
-        '  link_deps = ["//libs/dep:dep_wasm"],',
-        '  header_deps = ["//libs/hdrs:hdrs"],',
+        '  link_deps = ["//projects/libs/dep:dep_wasm"],',
+        '  header_deps = ["//projects/libs/hdrs:hdrs"],',
         '  labels = ["lang:cpp", "kind:lib"],',
         '  visibility = ["PUBLIC"],',
         ")",
@@ -95,7 +95,7 @@ test("cpp wasm static lib preserves link intent attrs in build-tools/tools/buck/
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir cpp_wasm_link_intent cquery "deps(//libs/core:core_wasm)" --json --output-attribute name`;
+    })`buck2 --isolation-dir cpp_wasm_link_intent cquery "deps(//projects/libs/core:core_wasm)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return;
 
     await $({
@@ -103,28 +103,28 @@ test("cpp wasm static lib preserves link intent attrs in build-tools/tools/buck/
     })`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
     const nodes = await readGraph(path.join(tmp, "build-tools", "tools", "buck", "graph.json"));
     const node = nodes.find(
-      (x) => normalizeTargetLabel(String(x.name || "")) === "//libs/core:core_wasm",
+      (x) => normalizeTargetLabel(String(x.name || "")) === "//projects/libs/core:core_wasm",
     );
-    assert.ok(node, "missing node //libs/core:core_wasm");
+    assert.ok(node, "missing node //projects/libs/core:core_wasm");
 
     const linkDeps = normalizeLabelList((node as any).link_deps);
     const headerDeps = normalizeLabelList((node as any).header_deps);
     const deps = normalizeLabelList((node as any).deps);
 
     assert.ok(
-      linkDeps.includes("//libs/dep:dep_wasm"),
-      "missing link_deps on //libs/core:core_wasm",
+      linkDeps.includes("//projects/libs/dep:dep_wasm"),
+      "missing link_deps on //projects/libs/core:core_wasm",
     );
     assert.ok(
-      headerDeps.includes("//libs/hdrs:hdrs"),
-      "missing header_deps on //libs/core:core_wasm",
+      headerDeps.includes("//projects/libs/hdrs:hdrs"),
+      "missing header_deps on //projects/libs/core:core_wasm",
     );
     assert.ok(
-      deps.includes("//libs/dep:dep_wasm"),
+      deps.includes("//projects/libs/dep:dep_wasm"),
       "expected deps to include link_deps (union contract)",
     );
     assert.ok(
-      deps.includes("//libs/hdrs:hdrs"),
+      deps.includes("//projects/libs/hdrs:hdrs"),
       "expected deps to include header_deps (union contract)",
     );
   });

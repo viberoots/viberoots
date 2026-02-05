@@ -9,14 +9,14 @@ test("sparse checkout: go lib with local patches builds and tests", async () => 
     const $ = _$({ stdio: "inherit" });
 
     // Scaffold a new Go library with auto-wired test
-    await $`scaf new go lib demo-lib --yes --path=libs/demo-lib`;
+    await $`scaf new go lib demo-lib --yes --path=projects/libs/demo-lib`;
 
     // Add a local patch placeholder under the target
-    const patchDir = path.join(tmp, "libs", "demo-lib", "patches", "go");
+    const patchDir = path.join(tmp, "projects", "libs", "demo-lib", "patches", "go");
     await $`mkdir -p ${patchDir}`;
     await $`bash --noprofile --norc -c 'printf "# sparse noop patch\n" > ${patchDir}/example.com__placeholder@v0.0.0.patch'`;
 
     // Build the library target directly in sparse context
-    await $`buck2 build //libs/demo-lib:demo-lib --target-platforms //:no_cgo`;
+    await $`buck2 build //projects/libs/demo-lib:demo-lib --target-platforms //:no_cgo`;
   });
 });

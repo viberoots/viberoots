@@ -21,7 +21,7 @@ verify
 Within this app directory:
 
 ```
-cd apps/{{ name }}
+cd projects/apps/{{ name }}
 go get example.com/some/module@latest
 go mod tidy
 ```
@@ -46,13 +46,13 @@ build-tools/tools/bin/patch-pkg start go golang.org/x/net
 build-tools/tools/bin/patch-pkg apply go golang.org/x/net
 ```
 
-Patches are stored under `apps/{{ name }}/patches/go/` and are consumed directly by the Go Nix template. No provider sync is required for Go; just rebuild after applying a patch.
+Patches are stored under `projects/apps/{{ name }}/patches/go/` and are consumed directly by the Go Nix template. No provider sync is required for Go; just rebuild after applying a patch.
 
 ## Repository layout
 
-- `apps/{{ name }}`: CLI source, its `go.mod`, and `TARGETS` using `nix_go_binary`.
-- `libs/*`: Libraries consumed by apps; each owns its `TARGETS`.
-- `apps/{{ name }}/patches/go/`: Canonical Go dependency patches created by `patch-pkg` for this package.
+- `projects/apps/{{ name }}`: CLI source, its `go.mod`, and `TARGETS` using `nix_go_binary`.
+- `projects/libs/*`: Libraries consumed by apps; each owns its `TARGETS`.
+- `projects/apps/{{ name }}/patches/go/`: Canonical Go dependency patches created by `patch-pkg` for this package.
 
 ## Providers and glue
 

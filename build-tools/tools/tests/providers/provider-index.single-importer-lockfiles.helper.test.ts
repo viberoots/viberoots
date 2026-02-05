@@ -8,25 +8,25 @@ test("readImporterProviderIndexEntriesForSingleImporterLockfiles returns stable 
   await runInTemp("provider-index-single-importer-lockfiles", async (tmp, $) => {
     await $`git init`;
 
-    const webPnpm = path.join(tmp, "apps/web/pnpm-lock.yaml");
-    const apiPnpm = path.join(tmp, "apps/api/pnpm-lock.yaml");
-    const webUv = path.join(tmp, "apps/web/uv.lock");
-    const apiUv = path.join(tmp, "apps/api/uv.lock");
+    const webPnpm = path.join(tmp, "projects/apps/web/pnpm-lock.yaml");
+    const apiPnpm = path.join(tmp, "projects/apps/api/pnpm-lock.yaml");
+    const webUv = path.join(tmp, "projects/apps/web/uv.lock");
+    const apiUv = path.join(tmp, "projects/apps/api/uv.lock");
     await fsp.mkdir(path.dirname(webPnpm), { recursive: true });
     await fsp.mkdir(path.dirname(apiPnpm), { recursive: true });
     await fsp.writeFile(
       webPnpm,
-      `lockfileVersion: "9.0"\nimporters:\n  apps/web:\n    dependencies: {}\npackages: {}`,
+      `lockfileVersion: "9.0"\nimporters:\n  projects/apps/web:\n    dependencies: {}\npackages: {}`,
       "utf8",
     );
     await fsp.writeFile(
       apiPnpm,
-      `lockfileVersion: "9.0"\nimporters:\n  apps/api:\n    dependencies: {}\npackages: {}`,
+      `lockfileVersion: "9.0"\nimporters:\n  projects/apps/api:\n    dependencies: {}\npackages: {}`,
       "utf8",
     );
     await fsp.writeFile(webUv, "", "utf8");
     await fsp.writeFile(apiUv, "", "utf8");
-    await $`git add apps/web/pnpm-lock.yaml apps/api/pnpm-lock.yaml apps/web/uv.lock apps/api/uv.lock`;
+    await $`git add projects/apps/web/pnpm-lock.yaml projects/apps/api/pnpm-lock.yaml projects/apps/web/uv.lock projects/apps/api/uv.lock`;
 
     const { stdout } = await $({ stdio: "pipe" })`node -e ${`
         import { readImporterProviderIndexEntriesForSingleImporterLockfileBasenames } from './build-tools/tools/lib/provider-index.ts';

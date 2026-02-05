@@ -1,7 +1,5 @@
-import * as fsp from "node:fs/promises";
-import path from "node:path";
-import { resolveImporterDir } from "../../lib/lockfiles.ts";
 import { getImporterRootsContract } from "../../lib/importer-roots.ts";
+import { resolveImporterDir } from "../../lib/lockfiles.ts";
 import { sanitizeName as sanitizeNameContract } from "../../lib/sanitize.ts";
 
 // Must mirror build-tools/tools/nix/templates-common.nix sanitizeName
@@ -15,17 +13,33 @@ export function normalizeImporter(input: string | null | undefined): string {
 
   const { workspaceRoots } = getImporterRootsContract();
   const isSegment = (s: string) => /^[A-Za-z0-9._-]+$/.test(s);
-
   const parts = raw.replace(/\\/g, "/").split("/").filter(Boolean);
-  if (parts.length >= 2 && workspaceRoots.includes(parts[0]) && isSegment(parts[1])) {
-    return `${parts[0]}/${parts[1]}`;
+  const rootPartsList = workspaceRoots
+    .map((root) => root.split("/").filter(Boolean))
+    .filter((rootParts) => rootParts.length > 0);
+  const matchAt = (startIdx: number, rootParts: string[]): string | null => {
+    if (startIdx + rootParts.length >= parts.length) return null;
+    for (let i = 0; i < rootParts.length; i++) {
+      if (parts[startIdx + i] !== rootParts[i]) return null;
+    }
+    const name = parts[startIdx + rootParts.length];
+    if (!isSegment(name)) return null;
+    return `${rootParts.join("/")}/${name}`;
+  };
+
+  if (parts.length >= 2) {
+    for (const rootParts of rootPartsList) {
+      const match = matchAt(0, rootParts);
+      if (match) return match;
+    }
   }
 
-  // Best-effort extraction from longer paths (e.g. ".../apps/web/...")
+  // Best-effort extraction from longer paths (e.g. ".../projects/apps/web/...")
   for (let i = 0; i + 1 < parts.length; i++) {
-    const root = parts[i];
-    const name = parts[i + 1];
-    if (workspaceRoots.includes(root) && isSegment(name)) return `${root}/${name}`;
+    for (const rootParts of rootPartsList) {
+      const match = matchAt(i, rootParts);
+      if (match) return match;
+    }
   }
 
   return ".";

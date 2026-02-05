@@ -10,9 +10,9 @@ test("node adapter validates malformed lockfile labels even without kind:* (warn
     await fs.mkdirp(path.dirname(out));
     const nodes = [
       {
-        name: "//apps/web:bundle",
+        name: "//projects/apps/web:bundle",
         rule_type: "js_binary",
-        labels: ["lang:node", "lockfile:apps/web/pnpm-lock.yaml"], // missing #importer
+        labels: ["lang:node", "lockfile:projects/apps/web/pnpm-lock.yaml"], // missing #importer
       },
     ];
     const sim = path.join(tmp, "build-tools/tools/buck/simulated.json");

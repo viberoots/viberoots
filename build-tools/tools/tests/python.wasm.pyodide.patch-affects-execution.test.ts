@@ -7,7 +7,7 @@ import { runInTemp } from "./lib/test-helpers.ts";
 
 test("python wasm (pyodide): patch affects execution banner", async () => {
   await runInTemp("py-wasm-pyodide-patch", async (tmp, $) => {
-    const appDir = path.join(tmp, "apps", "pywasm");
+    const appDir = path.join(tmp, "projects", "apps", "pywasm");
     await fs.mkdir(path.join(appDir, "bin"), { recursive: true });
     await fs.mkdir(path.join(appDir, "src"), { recursive: true });
     await fs.mkdir(path.join(appDir, "patches", "python"), { recursive: true });
@@ -29,7 +29,7 @@ load("//build-tools/python:defs.bzl", "nix_python_wasm_app")
 nix_python_wasm_app(
   name = "pyapp",
   labels = ["backend:pyodide"],
-  lockfile_label = "lockfile:apps/pywasm/uv.lock#apps/pywasm",
+  lockfile_label = "lockfile:projects/apps/pywasm/uv.lock#projects/apps/pywasm",
   srcs = glob(["**/*.py"]),
 )
 `,
@@ -38,11 +38,11 @@ nix_python_wasm_app(
     await $`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
     const env = {
       ...process.env,
-      BUCK_TARGET: "//apps/pywasm:pyapp",
+      BUCK_TARGET: "//projects/apps/pywasm:pyapp",
       WORKSPACE_ROOT: tmp,
       BUCK_TEST_SRC: tmp,
       NIX_PY_TEST_RESOLVE_JSON: JSON.stringify({
-        hello: { version: "1.0.0", originPath: "apps/pywasm/vendor/hello" },
+        hello: { version: "1.0.0", originPath: "projects/apps/pywasm/vendor/hello" },
       }),
       PY_WASM_BACKEND: "pyodide",
     };

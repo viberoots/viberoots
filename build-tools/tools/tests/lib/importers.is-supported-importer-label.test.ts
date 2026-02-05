@@ -22,5 +22,5 @@ test("isSupportedImporterLabel matches the importer-roots contract", () => {
   for (const root of workspaceRoots) {
     assert.equal(isSupportedImporterLabel(`${root}/web/sub`), false);
   }
-  assert.equal(isSupportedImporterLabel("../apps/web"), false);
+  assert.equal(isSupportedImporterLabel("../projects/apps/web"), false);
 });

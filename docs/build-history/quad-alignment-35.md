@@ -43,7 +43,7 @@ This PR introduces one generic nearest-lockfile walker, refactors the existing h
 Non-goals in this PR:
 
 - No change to the lockfile label format (`lockfile:<path>#<importer>`).
-- No change to supported importer roots (`.`, `apps/*`, `libs/*`).
+- No change to supported importer roots (`.`, `projects/apps/*`, `projects/libs/*`).
 - No change to provider sync output formats.
 
 ### Tests (in this PR)

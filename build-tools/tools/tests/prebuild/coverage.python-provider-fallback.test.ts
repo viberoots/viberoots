@@ -42,7 +42,7 @@ test("prebuild-guard: coverage falls back to TARGETS.*.auto for Python importer 
     );
 
     // Provide auto_map mapping for the node to the provider
-    const nodeName = "//apps/pytool:bin";
+    const nodeName = "//projects/apps/pytool:bin";
     await fsp.writeFile(
       path.join(providersDir, "auto_map.bzl"),
       [

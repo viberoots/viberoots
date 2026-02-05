@@ -31,7 +31,7 @@ in {
         if buckTestSrc != "" then buckTestSrc
         else if workspaceEnv != "" then workspaceEnv
         else builtins.toString srcRoot;
-      patchDir = builtins.toPath ("${builtins.toString srcRoot}/${subdir}/patches/python");
+      patchDir = builtins.toPath ("${wsRoot}/${subdir}/patches/python");
       patchesMap = H.pythonPatchesMapFromDirs { dirs = [ patchDir ]; };
       patchedKeys = builtins.attrNames patchesMap;
       overlaysCount = builtins.length libOverlays;
@@ -44,10 +44,9 @@ in {
       uv = UvBackend {
         pname = "py-${H.sanitizeName name}";
         version = "0.1.0";
-        # Snapshot the importer subtree directly; uv2nix-adapter expects lockfile paths to be
-        # relative to srcAbs, so do not pass subdir through again.
+        # Snapshot the importer subtree directly for deterministic site staging.
         srcAbs = builtins.path { path = builtins.toPath ("${builtins.toString srcRoot}/${subdir}"); name = "py-src"; };
-        lockfile = if lib.hasSuffix "/uv.lock" lockfile then "uv.lock" else lockfile;
+        lockfile = lockfile;
         subdir = ".";
         patchesMap = patchesMap;
         devOverrides = H.readDevOverrides devOverrideEnv;

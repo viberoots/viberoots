@@ -23,7 +23,7 @@ def importer_wiring_mutation_probe(name, lang, kind):
         deps = [],
         lang = lang,
         kind = kind,
-        lockfile_label = "lockfile:apps/demo/uv.lock#apps/demo",
+        lockfile_label = "lockfile:projects/apps/demo/uv.lock#projects/apps/demo",
         MODULE_PROVIDERS = {},
     )
     post_labels = kw.get("labels", []) or []

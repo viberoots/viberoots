@@ -35,7 +35,7 @@ Use the canonical helper surface from `//build-tools/lang:defs_common.bzl` and `
 
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
 - Provider wiring: load `MODULE_PROVIDERS` from `//build-tools/lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
-- Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
+- Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `projects/apps/*`/`projects/libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
 - Patch model contract: `build-tools/lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
 
@@ -50,13 +50,13 @@ Use the canonical helper surface from `//build-tools/lang:defs_common.bzl` and `
 
 - Buck2 remains the orchestrator. Targets using Gleam carry `labels = ["lang:gleam", "lockfile:<path>#<project>"]`.
 - A planner entry dispatches Gleam targets to Nix language templates.
-- Nix templates build apps/libs using a cached deps derivation and apply patches/dev‑overrides.
+- Nix templates build projects/apps/libs using a cached deps derivation and apply patches/dev‑overrides.
 - Provider sync generates `TARGETS.gleam.auto` (one provider per importer/lockfile); auto‑map includes the provider for each labeled target.
 - Patching UX integrates with `patch-pkg` outer CLI via `patch-gleam.ts`.
 
 ### Path Invariants
 
-- Lock/manifest lives in project (e.g., `apps/<name>/gleam.lock` or `apps/<name>/manifest.toml`).
+- Lock/manifest lives in project (e.g., `projects/apps/<name>/gleam.lock` or `projects/apps/<name>/manifest.toml`).
 - Patches live under `patches/gleam/` (flat directory, no subdirs). Filenames: `<package>@<version>.patch` (lowercased; `/` encoded as `__` if needed).
 - Language templates under `build-tools/tools/nix/templates/gleam.nix` and aggregated from `build-tools/tools/nix/lang-templates.nix`.
 - Provider files under `//third_party/providers/**` are generated (not hand‑edited).

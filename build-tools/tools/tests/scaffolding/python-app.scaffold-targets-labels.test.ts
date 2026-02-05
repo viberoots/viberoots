@@ -12,9 +12,9 @@ test("python app scaffold TARGETS has importer-scoped lockfile label", async () 
     const name = "demo_pyapp";
     await $`scaf new python app ${name} --yes`;
 
-    const targetsPath = path.join(tmp, "apps", name, "TARGETS");
+    const targetsPath = path.join(tmp, "projects", "apps", name, "TARGETS");
     const txt = await fsp.readFile(targetsPath, "utf8");
-    const expectLabel = `lockfile:apps/${name}/uv.lock#apps/${name}`;
+    const expectLabel = `lockfile:projects/apps/${name}/uv.lock#projects/apps/${name}`;
     if (!txt.includes(expectLabel)) {
       throw new Error(`TARGETS missing importer-scoped lockfile label: ${expectLabel}`);
     }

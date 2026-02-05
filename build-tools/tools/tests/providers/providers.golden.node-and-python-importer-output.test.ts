@@ -13,12 +13,12 @@ test("golden: Node importer provider TARGETS.node.auto is stable for representat
   await runInTemp("golden-node-provider-output", async (tmp, $) => {
     await $`git init`;
 
-    // Keep the fixture focused on a single importer-owned lockfile under apps/*.
+    // Keep the fixture focused on a single importer-owned lockfile under projects/apps/*.
     // The workspace copy may include a repo-root pnpm-lock.yaml used for tooling;
     // remove it here so the golden output remains stable and minimal.
     await fsp.rm(path.join(tmp, "pnpm-lock.yaml"), { force: true });
 
-    const importerDir = path.join(tmp, "apps/web");
+    const importerDir = path.join(tmp, "projects/apps/web");
     await fsp.mkdir(path.join(importerDir, "patches", "node"), { recursive: true });
     await fsp.writeFile(
       path.join(importerDir, "patches/node/zzz@9.9.9.patch"),
@@ -36,7 +36,7 @@ test("golden: Node importer provider TARGETS.node.auto is stable for representat
 lockfileVersion: "9.0"
 
 importers:
-  apps/web:
+  projects/apps/web:
     dependencies:
       lodash:
         specifier: ^4.17.21
@@ -47,18 +47,18 @@ packages:
     resolution: { integrity: sha512-abc... }
 `.trim();
     await fsp.writeFile(lockfilePath, lockfile, "utf8");
-    await $`git add apps/web/pnpm-lock.yaml`;
+    await $`git add projects/apps/web/pnpm-lock.yaml`;
 
     await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
     const out = await readText(path.join(tmp, "third_party/providers/TARGETS.node.auto"));
 
     const { providerNameForImporter } = await import("../../lib/providers.ts");
-    const name = providerNameForImporter("apps/web/pnpm-lock.yaml", "apps/web");
+    const name = providerNameForImporter("projects/apps/web/pnpm-lock.yaml", "projects/apps/web");
     const expected = [
       "# GENERATED FILE — DO NOT EDIT.",
       'load("//third_party/providers:defs_node.bzl", "node_importer_deps")',
       "",
-      `node_importer_deps(name="${name}", lockfile="apps/web/pnpm-lock.yaml", importer="apps/web", patch_paths=["apps/web/patches/node/aaa@1.0.0.patch", "apps/web/patches/node/zzz@9.9.9.patch"])`,
+      `node_importer_deps(name="${name}", lockfile="projects/apps/web/pnpm-lock.yaml", importer="projects/apps/web", patch_paths=["projects/apps/web/patches/node/aaa@1.0.0.patch", "projects/apps/web/patches/node/zzz@9.9.9.patch"])`,
       "",
     ].join("\n");
 
@@ -68,7 +68,7 @@ packages:
 
 test("golden: Python importer provider TARGETS.python.auto is stable for representative fixture", async () => {
   await runInTemp("golden-python-provider-output", async (tmp, $) => {
-    const importerDir = path.join(tmp, "libs/api");
+    const importerDir = path.join(tmp, "projects/libs/api");
     await fsp.mkdir(path.join(importerDir, "patches", "python"), { recursive: true });
     await fsp.writeFile(
       path.join(importerDir, "patches/python/requests@2.32.3.patch"),
@@ -99,12 +99,12 @@ test("golden: Python importer provider TARGETS.python.auto is stable for represe
     const out = await readText(path.join(tmp, "third_party/providers/TARGETS.python.auto"));
 
     const { providerNameForImporter } = await import("../../lib/providers.ts");
-    const name = providerNameForImporter("libs/api/uv.lock", "libs/api");
+    const name = providerNameForImporter("projects/libs/api/uv.lock", "projects/libs/api");
     const expected = [
       "# GENERATED FILE — DO NOT EDIT.",
       'load("//third_party/providers:defs_python.bzl", "python_importer_deps")',
       "",
-      `python_importer_deps(name="${name}", lockfile="libs/api/uv.lock", importer="libs/api", patch_paths=["libs/api/patches/python/requests@2.32.3.patch"])`,
+      `python_importer_deps(name="${name}", lockfile="projects/libs/api/uv.lock", importer="projects/libs/api", patch_paths=["projects/libs/api/patches/python/requests@2.32.3.patch"])`,
       "",
     ].join("\n");
 

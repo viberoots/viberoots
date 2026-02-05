@@ -11,13 +11,13 @@ test("node go-addon: scaffolded go TARGETS declares nix_go_carchive with labels"
     // Skip lockfile generation: this test is about the Go TARGETS content, not Node lockfile production.
     await $`scaf new node go-addon demo --yes --skip-lockfile-gen`;
 
-    const targetsPath = path.join(tmp, "libs", "demo-go", "TARGETS");
+    const targetsPath = path.join(tmp, "projects", "libs", "demo-go", "TARGETS");
     const txt = await fsp.readFile(targetsPath, "utf8");
     if (!txt.includes("nix_go_carchive(")) {
-      throw new Error("nix_go_carchive not declared in libs/demo-go/TARGETS");
+      throw new Error("nix_go_carchive not declared in projects/libs/demo-go/TARGETS");
     }
     if (!txt.includes('"lang:go"') || !txt.includes('"kind:carchive"')) {
-      throw new Error("expected labels lang:go and kind:carchive in libs/demo-go/TARGETS");
+      throw new Error("expected labels lang:go and kind:carchive in projects/libs/demo-go/TARGETS");
     }
   });
 });

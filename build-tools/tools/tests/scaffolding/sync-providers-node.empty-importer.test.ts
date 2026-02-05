@@ -9,12 +9,12 @@ test("sync-providers-node handles empty importer gracefully", async () => {
     // Initialize git so git ls-files works
     await $`git init`;
 
-    const lockfilePath = path.join(tmp, "apps/empty/pnpm-lock.yaml");
+    const lockfilePath = path.join(tmp, "projects/apps/empty/pnpm-lock.yaml");
     const lockfileContent = `
 lockfileVersion: "9.0"
 
 importers:
-  apps/empty:
+  projects/apps/empty:
     dependencies: {}
 
 packages: {}
@@ -22,7 +22,7 @@ packages: {}
 
     await fsp.mkdir(path.dirname(lockfilePath), { recursive: true });
     await fsp.writeFile(lockfilePath, lockfileContent, "utf8");
-    await $`git add apps/empty/pnpm-lock.yaml`;
+    await $`git add projects/apps/empty/pnpm-lock.yaml`;
 
     // Run sync
     await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
@@ -36,8 +36,8 @@ packages: {}
       process.exit(2);
     }
 
-    if (!output.includes("apps/empty")) {
-      console.error("Expected apps/empty importer in output");
+    if (!output.includes("projects/apps/empty")) {
+      console.error("Expected projects/apps/empty importer in output");
       process.exit(2);
     }
 

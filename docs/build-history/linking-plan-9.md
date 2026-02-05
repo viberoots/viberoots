@@ -87,10 +87,10 @@ This PR makes the following changes:
 I add zx tests (one test per file):
 
 - `build-tools/tools/tests/cpp/cpp.addon.link-closure.transitive.follows-link-deps.build-and-load.test.ts`
-  - addon links `//libs/core:core` and `core` links `//libs/support:support`
+  - addon links `//projects/libs/core:core` and `core` links `//projects/libs/support:support`
   - addon sets `link_closure="transitive"` and loads successfully
 - `build-tools/tools/tests/cpp/cpp.test.link-closure.transitive.follows-link-deps.build-and-run.test.ts`
-  - C++ test links `//libs/core:core` with transitive closure and runs
+  - C++ test links `//projects/libs/core:core` with transitive closure and runs
 
 ### Docs (in this PR)
 

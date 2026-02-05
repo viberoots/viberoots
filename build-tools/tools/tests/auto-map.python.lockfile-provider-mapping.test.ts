@@ -1,10 +1,10 @@
 #!/usr/bin/env zx-wrapper
+import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import assert from "node:assert/strict";
 import { test } from "node:test";
-import { runInTemp } from "./lib/test-helpers";
 import { providerNameForImporter } from "../lib/providers.ts";
+import { runInTemp } from "./lib/test-helpers";
 
 test("gen-auto-map: Python lockfile label maps to importer-scoped provider; unlabeled target skipped", async () => {
   await runInTemp("auto-map-python-lockfile", async (tmp, $) => {
@@ -14,14 +14,18 @@ test("gen-auto-map: Python lockfile label maps to importer-scoped provider; unla
     // - a Python target with a uv.lock importer-scoped label
     // - an unlabeled target that should not appear in auto_map
     const pyTarget = {
-      name: "//apps/pytool:lib",
+      name: "//projects/apps/pytool:lib",
       rule_type: "python_library",
-      labels: ["lang:python", "kind:lib", "lockfile:apps/pytool/uv.lock#apps/pytool"],
+      labels: [
+        "lang:python",
+        "kind:lib",
+        "lockfile:projects/apps/pytool/uv.lock#projects/apps/pytool",
+      ],
       srcs: [],
       deps: [],
     };
     const unlabeled = {
-      name: "//apps/pytool:unlabeled",
+      name: "//projects/apps/pytool:unlabeled",
       rule_type: "python_library",
       labels: ["lang:python", "kind:lib"],
       srcs: [],
@@ -36,13 +40,16 @@ test("gen-auto-map: Python lockfile label maps to importer-scoped provider; unla
     const out = await fsp.readFile(outPath, "utf8");
 
     // Expect a key for the labeled Python target. Allow optional Buck config suffix.
-    const keyRegex = /"\/\/apps\/pytool:lib(?: \(config\/\/platforms:[^)]+\))?": \[/m;
-    assert.ok(keyRegex.test(out), "expected mapping key for //apps/pytool:lib in auto_map.bzl");
+    const keyRegex = /"\/\/projects\/apps\/pytool:lib(?: \(config\/\/platforms:[^)]+\))?": \[/m;
+    assert.ok(
+      keyRegex.test(out),
+      "expected mapping key for //projects/apps/pytool:lib in auto_map.bzl",
+    );
 
     // Expect the importer-scoped provider derived from the uv.lock label
     const expectedProvider = `//third_party/providers:${providerNameForImporter(
-      "apps/pytool/uv.lock",
-      "apps/pytool",
+      "projects/apps/pytool/uv.lock",
+      "projects/apps/pytool",
     )}`;
     assert.ok(
       out.includes(expectedProvider),
@@ -51,7 +58,7 @@ test("gen-auto-map: Python lockfile label maps to importer-scoped provider; unla
 
     // Ensure unlabeled target does not get a mapping entry
     assert.ok(
-      !out.includes('"//apps/pytool:unlabeled"'),
+      !out.includes('"//projects/apps/pytool:unlabeled"'),
       "did not expect mapping for unlabeled target",
     );
   });

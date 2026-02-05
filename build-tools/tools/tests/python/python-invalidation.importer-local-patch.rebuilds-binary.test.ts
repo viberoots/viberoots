@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("python binary wiring includes importer-local patches via synthetic dep (cquery)", async () => {
   await runInTemp("py-binary-importer-patches-synthetic-dep", async (tmp, $) => {
-    const appDir = path.join(tmp, "apps", "demo");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     const patchDir = path.join(appDir, "patches", "python");
     await fsp.mkdir(path.join(appDir, "src"), { recursive: true });
     await fsp.mkdir(patchDir, { recursive: true });
@@ -18,7 +18,7 @@ test("python binary wiring includes importer-local patches via synthetic dep (cq
       "utf8",
     );
 
-    const patchRel = "apps/demo/patches/python/base@0.0.0.patch";
+    const patchRel = "projects/apps/demo/patches/python/base@0.0.0.patch";
     await fsp.writeFile(path.join(tmp, patchRel), "# baseline\n", "utf8");
 
     await fsp.writeFile(
@@ -34,7 +34,7 @@ test("python binary wiring includes importer-local patches via synthetic dep (cq
         "",
         "nix_python_binary(",
         '  name = "bin",',
-        '  lockfile_label = "lockfile:apps/demo/uv.lock#apps/demo",',
+        '  lockfile_label = "lockfile:projects/apps/demo/uv.lock#projects/apps/demo",',
         '  main = "src/main.py",',
         '  deps = [":lib"],',
         ")",
@@ -48,7 +48,7 @@ test("python binary wiring includes importer-local patches via synthetic dep (cq
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute deps //apps/demo:bin`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute deps //projects/apps/demo:bin`;
     if (depsQ.exitCode !== 0) {
       return;
     }
@@ -63,7 +63,7 @@ test("python binary wiring includes importer-local patches via synthetic dep (cq
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute resources //apps/demo:bin__patch_inputs`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute resources //projects/apps/demo:bin__patch_inputs`;
     if (resourcesQ.exitCode !== 0) {
       return;
     }

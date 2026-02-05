@@ -80,8 +80,8 @@ test("cpp addon follows transitive link_deps with link_closure=transitive (build
         "nix_cpp_library(",
         '  name = "core",',
         '  srcs = ["src/core.cpp", "include/core.h"],',
-        '  link_deps = ["//libs/support:support"],',
-        '  header_deps = ["//libs/support:headers"],',
+        '  link_deps = ["//projects/libs/support:support"],',
+        '  header_deps = ["//projects/libs/support:headers"],',
         '  labels = ["lang:cpp", "kind:lib"],',
         '  visibility = ["PUBLIC"],',
         ")",
@@ -122,7 +122,7 @@ test("cpp addon follows transitive link_deps with link_closure=transitive (build
         "nix_cpp_node_addon(",
         '  name = "addon",',
         '  srcs = ["src/binding.cc"],',
-        '  link_deps = ["//libs/core:core"],',
+        '  link_deps = ["//projects/libs/core:core"],',
         '  link_closure = "transitive",',
         '  labels = ["lang:cpp", "kind:addon"],',
         '  visibility = ["PUBLIC"],',
@@ -137,7 +137,7 @@ test("cpp addon follows transitive link_deps with link_closure=transitive (build
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir cpp_addon_link_closure cquery "deps(//libs/addon-native:addon)" --json --output-attribute name`;
+    })`buck2 --isolation-dir cpp_addon_link_closure cquery "deps(//projects/libs/addon-native:addon)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return;
 
     await $({
@@ -148,7 +148,7 @@ test("cpp addon follows transitive link_deps with link_closure=transitive (build
       stdio: "pipe",
       reject: false,
       nothrow: true,
-      env: { ...process.env, BUCK_TARGET: "//libs/addon-native:addon" },
+      env: { ...process.env, BUCK_TARGET: "//projects/libs/addon-native:addon" },
     })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
     assert.equal(build.exitCode, 0, String(build.stderr || build.stdout));
 

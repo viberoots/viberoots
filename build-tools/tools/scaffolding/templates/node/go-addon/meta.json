@@ -5,7 +5,7 @@
   "help": {
     "usage": "scaf new node go-addon <name> [--path=DEST] [--addon_name=<name>_addon] [--no-tests]",
     "notes": [
-      "Generates libs/<name> (Node TS), libs/<name>-go (Go c-archive), and libs/<name>-native (C N-API binding).",
+      "Generates projects/libs/<name> (Node TS), projects/libs/<name>-go (Go c-archive), and projects/libs/<name>-native (C N-API binding).",
       "The Node package loads native/<addon_name>.node via createRequire(import.meta.url).",
       "TARGETS use nix_go_carchive for the Go archive and nix_cpp_node_addon for the addon; the planner links the Go archive automatically."
     ],

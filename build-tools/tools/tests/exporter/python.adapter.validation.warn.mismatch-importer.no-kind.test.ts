@@ -10,12 +10,12 @@ test("python adapter validates lockfile importer mismatch even without kind:* (w
     await fs.mkdirp(path.dirname(out));
     const nodes = [
       {
-        name: "//apps/pytool:tool",
+        name: "//projects/apps/pytool:tool",
         rule_type: "python_binary",
         labels: [
           "lang:python",
           // importer 'libs/foo' does not match directory of lockfile 'apps/pytool'
-          "lockfile:apps/pytool/uv.lock#libs/foo",
+          "lockfile:projects/apps/pytool/uv.lock#projects/libs/foo",
         ],
         srcs: ["main.py"],
       },

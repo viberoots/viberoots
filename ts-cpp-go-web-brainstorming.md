@@ -175,7 +175,7 @@ libs/math-core/            # C++ core + C wrapper
 libs/math-go-core/         # Go core lib that wraps C ABI via cgo
   core/bridge.go           # cgo wrapper using addon.h
   go.mod, gomod2nix.toml   # locked via install-deps
-  TARGETS                  # nix_go_library (depends on //libs/math-core:* native)
+  TARGETS                  # nix_go_library (depends on //projects/libs/math-core:* native)
   patches/go/.keep
 
 libs/math-api/             # Go API layer depending on go-core
@@ -187,7 +187,7 @@ libs/math-api/             # Go API layer depending on go-core
 libs/math-native/          # Node N‑API addon (C++)
   include/*.h
   src/binding.cc           # calls exported C functions from go-top c-archive
-  TARGETS                  # nix_cpp_node_addon (deps: //libs/math-go-top:carchive, //libs/math-core:lib)
+  TARGETS                  # nix_cpp_node_addon (deps: //projects/libs/math-go-top:carchive, //projects/libs/math-core:lib)
   patches/cpp/.keep
 
 libs/math-ts/              # Top-level TS package (single public API)
@@ -195,7 +195,7 @@ libs/math-ts/              # Top-level TS package (single public API)
   src/node/index.ts        # require('./native/math_native.node'); export { add }
   package.json             # conditional exports for node/browser
   dist/                    # built JS + staged artifacts (top.wasm, native addon)
-  TARGETS                  # nix_node_lib (web depends on //libs/math-api:wasm; node depends on //libs/math-native:napi_addon)
+  TARGETS                  # nix_node_lib (web depends on //projects/libs/math-api:wasm; node depends on //projects/libs/math-native:napi_addon)
 ```
 
 ### TypeScript ESM loader sketch
@@ -255,7 +255,7 @@ The Buck/Nix wiring copies `top.wasm` into `dist/` for web and copies the `.node
 2. Native Node path
 
 - Add `libs/math-go-base` (cgo wrapper) and `libs/math-go-top` (public API).
-- Build `//libs/math-go-top:carchive` via `T.goCArchive`.
+- Build `//projects/libs/math-go-top:carchive` via `T.goCArchive`.
 - Add `libs/math-native` with `nix_cpp_node_addon`, passing `nixCxxPkgs = [ goTopCArchive, cppCoreLib ]`.
 - Add a TS test that calls `loadNode()` and validates `add(2,3)=5`.
 
@@ -283,7 +283,7 @@ The Buck/Nix wiring copies `top.wasm` into `dist/` for web and copies the `.node
 
 ### Acceptance (first iteration)
 
-- Native Node: build `//libs/math-native:napi_addon` and call through `loadNode()` successfully.
+- Native Node: build `//projects/libs/math-native:napi_addon` and call through `loadNode()` successfully.
 - Web: build `.#…libs_math_ts` (or equivalent) that stages `top.wasm`; `loadWeb()` returns the correct result.
 - Go: unit tests pass across `math-go-base` and `math-go-top`.
 - No changes to provider shapes; full suite green via `i && b && v`.

@@ -5,7 +5,7 @@ import path from "node:path";
 import { runInTemp } from "../lib/test-helpers";
 
 await runInTemp("planner-visible-package-local-wiring-non-mutating-probe", async (tmp, $) => {
-  const appDir = path.join(tmp, "apps", "probe");
+  const appDir = path.join(tmp, "projects", "apps", "probe");
   await fsp.mkdir(path.join(appDir, "patches", "cpp"), { recursive: true });
   await fsp.writeFile(path.join(appDir, "patches", "cpp", "demo@0.0.0.patch"), "# noop\n", "utf8");
 
@@ -50,7 +50,7 @@ await runInTemp("planner-visible-package-local-wiring-non-mutating-probe", async
   const so = await $({
     cwd: tmp,
     stdio: "pipe",
-  })`buck2 build --target-platforms //:no_cgo --show-output //apps/probe:probe`.nothrow();
+  })`buck2 build --target-platforms //:no_cgo --show-output //projects/apps/probe:probe`.nothrow();
   assert.equal(so.exitCode, 0, "buck2 build --show-output failed for probe");
   const outLine = String(so.stdout || "").trim();
   const outPath = outLine.split(/\s+/).pop()!;

@@ -47,7 +47,7 @@ test("cpp library compiles with header_deps via nix_cpp_headers (build)", async 
         "nix_cpp_library(",
         '  name = "core",',
         '  srcs = ["src/core.cpp"],',
-        '  header_deps = ["//libs/hdrs:hdrs"],',
+        '  header_deps = ["//projects/libs/hdrs:hdrs"],',
         '  labels = ["lang:cpp", "kind:lib"],',
         '  visibility = ["PUBLIC"],',
         ")",
@@ -61,7 +61,7 @@ test("cpp library compiles with header_deps via nix_cpp_headers (build)", async 
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir cpp_lib_header_deps cquery "deps(//libs/core:core)" --json --output-attribute name`;
+    })`buck2 --isolation-dir cpp_lib_header_deps cquery "deps(//projects/libs/core:core)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return;
 
     await $({
@@ -72,7 +72,7 @@ test("cpp library compiles with header_deps via nix_cpp_headers (build)", async 
       stdio: "pipe",
       reject: false,
       nothrow: true,
-      env: { ...process.env, BUCK_TARGET: "//libs/core:core" },
+      env: { ...process.env, BUCK_TARGET: "//projects/libs/core:core" },
     })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
     assert.equal(build.exitCode, 0, String(build.stderr || build.stdout));
   });

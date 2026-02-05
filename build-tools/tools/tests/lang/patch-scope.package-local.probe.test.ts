@@ -5,7 +5,7 @@ import path from "node:path";
 import { runInTemp } from "../lib/test-helpers";
 
 await runInTemp("patch-scope-package-local-probe", async (tmp, $) => {
-  const pkg = path.join(tmp, "libs", "demo");
+  const pkg = path.join(tmp, "projects", "libs", "demo");
   await fsp.mkdir(path.join(pkg, "patches", "go"), { recursive: true });
   await fsp.writeFile(path.join(pkg, "patches", "go", "a@1.0.0.patch"), "# a\n", "utf8");
 
@@ -37,7 +37,7 @@ await runInTemp("patch-scope-package-local-probe", async (tmp, $) => {
   const so = await $({
     cwd: tmp,
     stdio: "pipe",
-  })`buck2 build --target-platforms //:no_cgo --show-output //libs/demo:labels_probe`.nothrow();
+  })`buck2 build --target-platforms //:no_cgo --show-output //projects/libs/demo:labels_probe`.nothrow();
   assert.equal(so.exitCode, 0, "buck2 build --show-output failed for labels probe");
 
   const outLine = String(so.stdout || "").trim();

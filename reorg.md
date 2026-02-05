@@ -47,8 +47,8 @@ I will use these anchors. Names are stable and minimal.
 
 ```
 /build-tools/    Build system source code, configs, and tooling
-/apps/           App entrypoints (future)
-/libs/           Shared libraries (future)
+/projects/apps/  App entrypoints (future)
+/projects/libs/  Shared libraries (future)
 /docs/           Documentation
 /patches/        Patch files by language
 /third_party/    External and generated providers, vendored inputs

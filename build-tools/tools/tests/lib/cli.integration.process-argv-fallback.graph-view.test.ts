@@ -12,8 +12,11 @@ test("graph-view: works when zx global argv is absent (process.argv fallback)", 
     await fsp.mkdir(path.dirname(graphPath), { recursive: true });
     await fsp.writeFile(
       graphPath,
-      JSON.stringify({ nodes: [{ name: "//apps/demo:demo", labels: ["lang:node"] }] }, null, 2) +
-        "\n",
+      JSON.stringify(
+        { nodes: [{ name: "//projects/apps/demo:demo", labels: ["lang:node"] }] },
+        null,
+        2,
+      ) + "\n",
       "utf8",
     );
 
@@ -31,6 +34,6 @@ test("graph-view: works when zx global argv is absent (process.argv fallback)", 
     const parsed = JSON.parse(String(res.stdout || "")) as any;
     assert.ok(parsed && typeof parsed === "object");
     assert.ok(Array.isArray(parsed.nodes));
-    assert.equal(parsed.nodes[0]?.name, "//apps/demo:demo");
+    assert.equal(parsed.nodes[0]?.name, "//projects/apps/demo:demo");
   });
 });

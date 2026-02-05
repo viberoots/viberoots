@@ -289,7 +289,7 @@ Implement if wrappers are actively used. Otherwise, remove them and keep the uni
 
 Importer-local patching (Node, Python) is a deliberate model choice: patches live under `<importer>/patches/<lang>/*.patch`, and macros include those patch files as real action inputs so patch edits deterministically invalidate only targets bound to that importer.
 
-There is one inconsistency risk: Buck package boundaries. `native.glob(...)` operates relative to the current Buck package, so a target defined in a subpackage (for example `apps/web/ui:bundle`) cannot reliably include importer-local patches that live in the importer root package (`apps/web/patches/node/*.patch`) without either:
+There is one inconsistency risk: Buck package boundaries. `native.glob(...)` operates relative to the current Buck package, so a target defined in a subpackage (for example `projects/apps/web/ui:bundle`) cannot reliably include importer-local patches that live in the importer root package (`projects/apps/web/patches/node/*.patch`) without either:
 
 - silently failing to include the patches (bad: patch edits would not invalidate the target), or
 - hand-rolling path hacks that drift across macros and languages.
@@ -307,7 +307,7 @@ This PR is Starlark wiring and contract enforcement only. It does not change pro
   - compares it against `native.package_name()`,
   - allows only:
     - importer `"."` when `native.package_name()` is `""` or `"."` (repo root), and
-    - importer `apps/<x>` or `libs/<x>` when `native.package_name()` equals that importer,
+    - importer `projects/apps/<x>` or `projects/libs/<x>` when `native.package_name()` equals that importer,
   - otherwise fails with deterministic error text explaining that importer-local patches cannot cross Buck package boundaries.
 - Apply the validation in the canonical importer-local patch inclusion surfaces so call sites do not need to remember it:
   - `//build-tools/lang:patch_inputs.bzl` importer-local patch helpers
@@ -318,10 +318,10 @@ This PR is Starlark wiring and contract enforcement only. It does not change pro
 
 I will lock down the invariant at the macro boundary with probe-style tests (deterministic failures, no reliance on command strings).
 
-- Add a Node probe test that defines a Node target in a subpackage (e.g., `apps/demo/subpkg:bundle`) with `lockfile:apps/demo/pnpm-lock.yaml#apps/demo` and asserts:
+- Add a Node probe test that defines a Node target in a subpackage (e.g., `projects/apps/demo/subpkg:bundle`) with `lockfile:projects/apps/demo/pnpm-lock.yaml#projects/apps/demo` and asserts:
   - macro evaluation fails,
   - stderr contains stable guidance (“importer-local patches must be wired from the importer package”).
-- Add a Python probe test that defines `nix_python_library` (or `nix_python_binary`) in a subpackage with `lockfile:apps/demo/uv.lock#apps/demo` and asserts the same deterministic failure and guidance.
+- Add a Python probe test that defines `nix_python_library` (or `nix_python_binary`) in a subpackage with `lockfile:projects/apps/demo/uv.lock#projects/apps/demo` and asserts the same deterministic failure and guidance.
 - Add one positive control test that confirms a target defined in the importer package continues to include importer-local patches as action inputs (existing tests should already cover this; extend only if needed for clarity).
 
 ### Docs (in this PR)
@@ -331,7 +331,7 @@ I will make the package-boundary requirement explicit so it is not tribal knowle
 - Update `docs/handbook/patching.md`:
   - add a short “Buck package boundary” note under importer-local patching describing where targets must live to get importer-local patch invalidation.
 - Update `docs/handbook/node-macros.md`:
-  - include a short example showing correct placement (targets in `apps/<importer>/TARGETS`) and a warning that subpackages must not attach importer-local patches.
+  - include a short example showing correct placement (targets in `projects/apps/<importer>/TARGETS`) and a warning that subpackages must not attach importer-local patches.
 - Update `docs/handbook/adding-language.md`:
   - document the rule for importer-scoped ecosystems: targets must live in the importer package (or adopt package-local patching instead).
 

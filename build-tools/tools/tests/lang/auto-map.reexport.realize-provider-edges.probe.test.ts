@@ -38,14 +38,14 @@ test("build-tools/lang/auto_map.bzl re-export: realize_provider_edges uses MODUL
       path.join(providersDir, "auto_map.bzl"),
       [
         "MODULE_PROVIDERS = {",
-        '  "//apps/demo:bin": ["//third_party/providers:prov_a", "//third_party/providers:prov_b"],',
+        '  "//projects/apps/demo:bin": ["//third_party/providers:prov_a", "//third_party/providers:prov_b"],',
         "}",
         "",
       ].join("\n"),
       "utf8",
     );
 
-    const appDir = path.join(tmp, "apps", "demo");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(appDir, { recursive: true });
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
@@ -70,7 +70,7 @@ test("build-tools/lang/auto_map.bzl re-export: realize_provider_edges uses MODUL
       "utf8",
     );
 
-    const out = await buildOutPath(tmp, $, "//apps/demo:probe");
+    const out = await buildOutPath(tmp, $, "//projects/apps/demo:probe");
     if (!out) return; // skip if prelude/toolchains aren't available in the temp repo
     const lines = readLines(await fsp.readFile(out, "utf8"));
     assert.deepEqual(lines, [

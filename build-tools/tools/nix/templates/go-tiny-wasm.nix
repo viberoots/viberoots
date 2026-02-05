@@ -15,7 +15,7 @@ in {
     name,
     # Repository root (absolute, typically provided by the planner)
     srcRoot ? ../../..,
-    # Go package directory relative to srcRoot (e.g., "libs/math-api")
+    # Go package directory relative to srcRoot (e.g., "projects/libs/math-api")
     subdir ? ".",
     # gomod2nix lockfile path for the module (unused by TinyGo but kept for parity)
     modulesToml ? null,

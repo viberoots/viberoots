@@ -9,21 +9,21 @@ test("node provider includes patch only for importer's effective set after patch
     await $`git init`;
 
     // Importer with lodash dependency
-    const lf = path.join(tmp, "apps/example/pnpm-lock.yaml");
+    const lf = path.join(tmp, "projects/apps/example/pnpm-lock.yaml");
     await fsp.mkdir(path.dirname(lf), { recursive: true });
     await fsp.writeFile(
       lf,
-      `lockfileVersion: "9.0"\nimporters:\n  apps/example:\n    dependencies:\n      lodash:\n        specifier: ^4.17.21\n        version: 4.17.21\npackages:\n  /lodash/4.17.21:\n    resolution: { integrity: sha512-... }\n`,
+      `lockfileVersion: "9.0"\nimporters:\n  projects/apps/example:\n    dependencies:\n      lodash:\n        specifier: ^4.17.21\n        version: 4.17.21\npackages:\n  /lodash/4.17.21:\n    resolution: { integrity: sha512-... }\n`,
       "utf8",
     );
-    await $`git add apps/example/pnpm-lock.yaml`;
+    await $`git add projects/apps/example/pnpm-lock.yaml`;
 
     // Initial sync: no patches referenced
     await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
     const outPath = path.join(tmp, "third_party/providers/TARGETS.node.auto");
     const before = await fsp.readFile(outPath, "utf8");
-    if (!before.includes('importer="apps/example"')) {
-      console.error("Expected provider entry for apps/example");
+    if (!before.includes('importer="projects/apps/example"')) {
+      console.error("Expected provider entry for projects/apps/example");
       process.exit(2);
     }
     if (/patch_paths=\[.*lodash@4\.17\.21\.patch/.test(before)) {

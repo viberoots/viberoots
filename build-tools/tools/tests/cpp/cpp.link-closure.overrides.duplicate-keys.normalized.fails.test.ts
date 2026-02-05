@@ -22,8 +22,8 @@ test("cpp: duplicate normalized link_closure_overrides keys fail fast", async ()
           inherit lib get cleanLabel ensureStringList nodeOfName;
         };
         overrides = {
-          "//libs/core:core" = "transitive";
-          "//libs/core:core (config//normalized-dup)" = "direct";
+          "//projects/libs/core:core" = "transitive";
+          "//projects/libs/core:core (config//normalized-dup)" = "direct";
         };
       in H.normalizeOverrides "demo" overrides
     `;

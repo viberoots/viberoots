@@ -1,12 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import fs from "node:fs";
 import path from "node:path";
+import { importerLockfileNeedsRegen } from "../lib/pnpm-importer-lockfile.ts";
 import { sanitizeName } from "./install/common.ts";
 import { withExclusiveInstallLock } from "./install/lock.ts";
 import { parseUpdatePnpmHashArgs } from "./update-pnpm-hash/args.ts";
 import { updateNodeModulesHashesJson } from "./update-pnpm-hash/hashes-json.ts";
 import { generateImporterLockfile } from "./update-pnpm-hash/lockfile.ts";
-import { importerLockfileNeedsRegen } from "../lib/pnpm-importer-lockfile.ts";
 import {
   buildStore,
   buildUnfixedAndHash,
@@ -14,7 +14,6 @@ import {
   flakeAttrExists,
 } from "./update-pnpm-hash/nix.ts";
 import {
-  importerFromLockfile,
   normalizeImporter,
   pnpmStoreAttrFromImporter,
   pnpmStoreUnfixedAttrFromImporter,
@@ -25,7 +24,7 @@ async function inner() {
   const { lockfile, force } = parseUpdatePnpmHashArgs();
   const repoRoot = process.cwd();
   const relLock = repoRelativeLockfilePath(repoRoot, lockfile);
-  const importer = importerFromLockfile(relLock);
+  const importer = normalizeImporter(path.posix.dirname(relLock));
   const storeAttr = pnpmStoreAttrFromImporter(importer);
   const unfixedAttr = pnpmStoreUnfixedAttrFromImporter(importer);
   // quiet: avoid noisy diagnostics in normal operation
@@ -40,8 +39,8 @@ async function inner() {
   }
 
   // If forcing, pre-write placeholder digest to bump the FOD derivation and force a rebuild
+  const key = relLock;
   if (force) {
-    const key = importer && importer !== "." ? `${importer}/pnpm-lock.yaml` : "pnpm-lock.yaml";
     // Known placeholder value also used in node-modules.nix
     const placeholder = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
     await updateNodeModulesHashesJson(key, placeholder);
@@ -64,7 +63,6 @@ async function inner() {
   }
 
   // Robust path: build unfixed store and compute SRI from its normalized 'store' directory
-  const key = importer && importer !== "." ? `${importer}/pnpm-lock.yaml` : "pnpm-lock.yaml";
   let pre = await buildUnfixedAndHash(unfixedAttr);
   // If the flake does not expose a per-importer attr for this importer, skip gracefully.
   if (!pre.ok && /does not provide attribute/.test(String(pre.output || ""))) {
@@ -85,7 +83,6 @@ async function inner() {
     }
     // If still failing or missing SRI, pre-seed a placeholder to force a suggestion on verify
     if (!pre.ok || !pre.sri) {
-      const key = importer && importer !== "." ? `${importer}/pnpm-lock.yaml` : "pnpm-lock.yaml";
       const placeholder = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
       await updateNodeModulesHashesJson(key, placeholder);
     }

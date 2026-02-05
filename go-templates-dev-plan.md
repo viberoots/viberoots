@@ -11,7 +11,7 @@ Create production-ready Copier templates in `build-tools/tools/scaffolding/templ
   - Generated projects align with `build-tools/docs/build-system-design.md` (graph export, provider sync, auto-map, prebuild-guard) and pass validation with `build-tools/tools/scaffolding/validate.ts`.
   - E2E scaffold tests verify build and minimal test execution using Buck2.
   - Presence of a scaffold directory with its own `TARGETS` (using `nix_go_*` macros) is sufficient for Buck2 discovery via `//...` — no central registry.
-  - HARD REQUIREMENT (partial clones): Decentralized registration is mandatory so that a partial clone containing only certain `apps/<name>` or `libs/<name>` directories (plus required shared files) can be built without modifying any central registry.
+  - HARD REQUIREMENT (partial clones): Decentralized registration is mandatory so that a partial clone containing only certain `projects/apps/<name>` or `projects/libs/<name>` directories (plus required shared files) can be built without modifying any central registry.
 
 ## Components and dependencies
 
@@ -23,7 +23,7 @@ Create production-ready Copier templates in `build-tools/tools/scaffolding/templ
 
 ## Decentralized registration (design intent and requirement)
 
-- **Hard requirement (supports partial clones)**: Each scaffolded package owns its `TARGETS` file under `libs/<name>/` or `apps/<name>/`, using `load("//build-tools/go:defs.bzl", "nix_go_library", "nix_go_test", "nix_go_binary")` and declaring its targets. Buck2 discovers these with `//...`; no central, shared registry or aggregator files may be required for new packages.
+- **Hard requirement (supports partial clones)**: Each scaffolded package owns its `TARGETS` file under `projects/libs/<name>/` or `projects/apps/<name>/`, using `load("//build-tools/go:defs.bzl", "nix_go_library", "nix_go_test", "nix_go_binary")` and declaring its targets. Buck2 discovers these with `//...`; no central, shared registry or aggregator files may be required for new packages.
 - **Prohibited**:
   - Central lists of packages, top-level aggregators that must be edited per instantiation, or any manual provider wiring in package `TARGETS`.
 - **Touch points**:
@@ -33,7 +33,7 @@ Create production-ready Copier templates in `build-tools/tools/scaffolding/templ
   - Only if introducing custom rule names that do not resolve to `go_*`, add a mapping entry in `build-tools/tools/nix/mapping.nix` to route to the Go template (not required for `nix_go_*` macros wrapping `go_*`).
   - Ensure `//build-tools/go/defs.bzl` is present in any partial clone you want to build; `build-tools/tools/scaffolding/resolver.json` only controls destination paths, not build registration.
 - **Acceptance**:
-  - Creating a new `libs/<name>` or `apps/<name>` directory with a valid `TARGETS` and running glue steps is sufficient for `buck2 build //...` to include it automatically.
+  - Creating a new `projects/libs/<name>` or `projects/apps/<name>` directory with a valid `TARGETS` and running glue steps is sufficient for `buck2 build //...` to include it automatically.
   - Partial clone smoke: In a temp dir, copy only `build-tools/go/defs.bzl`, `third_party/providers/auto_map.bzl` (or regenerate glue), minimal Buck config, and a single scaffolded package; `buck2 build //...` succeeds without editing any central registry.
 
 ## Phases
@@ -51,14 +51,14 @@ Create production-ready Copier templates in `build-tools/tools/scaffolding/templ
 ### Phase 2 — Directory layout and essential files
 
 - `go/lib` template layout:
-  - `libs/{{ name }}/`
+  - `projects/libs/{{ name }}/`
     - `go.mod` (module = `{{ module }}`), `go.sum` (empty allowed).
     - `TARGETS` with `nix_go_library` and `nix_go_test` using our macros.
     - `pkg/{{ name }}/{{ name }}.go` minimal API.
     - `pkg/{{ name }}/{{ name }}_test.go` minimal single-test file.
     - `README.md` from `README.md.jinja`.
 - `go/cli` template layout:
-  - `apps/{{ name }}/`
+  - `projects/apps/{{ name }}/`
     - `go.mod` (module = `{{ module }}`).
     - `TARGETS` with `nix_go_binary`.
     - `cmd/{{ name }}/main.go` hello-world using a function shape that mirrors lib usage.
@@ -72,7 +72,7 @@ Create production-ready Copier templates in `build-tools/tools/scaffolding/templ
   - Use `labels = ["lang:go", "kind:lib|bin"]` on raw `go_*` rules if any are present; for macros, rely on `build-tools/go/defs.bzl`.
   - Ensure macros used are `nix_go_*`; do not directly depend on providers; providers come via `auto_map.bzl`.
 - Add a repo-level guard call guidance in the generated README: run `node build-tools/tools/buck/export-graph.ts`, `node build-tools/tools/buck/sync-providers.ts`, `node build-tools/tools/buck/gen-auto-map.ts`, then `buck2 build`.
-- Acceptance: After creating templates in this repo, a sample scaffold builds via `buck2 build //apps/demo-cli:demo-cli` and `buck2 test //libs/demo-lib:demo-lib_test` once glue is generated.
+- Acceptance: After creating templates in this repo, a sample scaffold builds via `buck2 build //projects/apps/demo-cli:demo-cli` and `buck2 test //projects/libs/demo-lib:demo-lib_test` once glue is generated.
 
 ### Phase 4 — Go module and gomod2nix bootstrapping
 
@@ -92,7 +92,7 @@ Create production-ready Copier templates in `build-tools/tools/scaffolding/templ
   - How to build with Buck2 and our glue scripts.
   - How to add a dependency and refresh `gomod2nix.toml`.
   - How to create and apply a Go patch using `patch-pkg`.
-  - Where files live and why (`apps/`, `libs/`, `patches/go/`).
+  - Where files live and why (`projects/apps/`, `projects/libs/`, `patches/go/`).
 - Acceptance: Readme renders with variables and is accurate.
 
 ### Phase 7 — E2E scaffold tests (repo-level)
@@ -119,7 +119,7 @@ Create production-ready Copier templates in `build-tools/tools/scaffolding/templ
 - Provide a `go/mono` template to initialize a basic monorepo skeleton:
   - Top-level `TARGETS` placeholder if needed.
   - Create empty `patches/go/`, `third_party/providers/` (empty; auto files are generated), `.gitignore` entries for generated glue.
-  - A sample `libs/example-lib` and `apps/example-cli` created via sub-calls to Copier or inline files to prove end-to-end flow.
+  - A sample `projects/libs/example-lib` and `projects/apps/example-cli` created via sub-calls to Copier or inline files to prove end-to-end flow.
 - Acceptance: `scaf new go mono <name>` yields a repo that builds after running glue steps.
 
 ## Systematic tasks with checkpoints
@@ -128,7 +128,7 @@ Create production-ready Copier templates in `build-tools/tools/scaffolding/templ
   - Output: Updated `meta.json`, `copier.yaml` for `go/lib` and `go/cli`.
   - Check: `scaf validate all` succeeds.
 - Layout and files
-  - Output: `apps/{{name}}` and/or `libs/{{name}}` tree with minimal Go code and Buck `TARGETS` using macros.
+  - Output: `projects/apps/{{name}}` and/or `projects/libs/{{name}}` tree with minimal Go code and Buck `TARGETS` using macros.
   - Check: Copier runs successfully; files present.
 - Buck2 wiring
   - Output: Valid `TARGETS` that build once glue is generated.

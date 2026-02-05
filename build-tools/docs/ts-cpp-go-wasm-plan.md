@@ -66,7 +66,7 @@ Add a Go layer that calls the C ABI (`addon.h`) and a thin Go API facade that wi
 
 ### Acceptance Criteria
 
-- In a runInTemp temp repo, `buck2 build //libs/math-api:lib` succeeds on all supported systems.
+- In a runInTemp temp repo, `buck2 build //projects/libs/math-api:lib` succeeds on all supported systems.
 - In that temp repo, `go test` basic unit covers one exported function (pure compute path).
 - Docs present and accurate (cgo boundary and lockfile regeneration steps).
 
@@ -98,7 +98,7 @@ Build a Node addon that links the Go API as a `c-archive` and the native C++ cor
 
 - Scaffold `libs/math-native` in a runInTemp zx test (no live repo changes):
   - `src/binding.cc` (N‑API shim calling Go `extern "C"` symbols)
-  - `TARGETS` uses `nix_cpp_node_addon` with `nixCxxPkgs=[ //libs/math-api:carchive, //libs/math-core:lib ]`.
+  - `TARGETS` uses `nix_cpp_node_addon` with `nixCxxPkgs=[ //projects/libs/math-api:carchive, //projects/libs/math-core:lib ]`.
 - Exercise a temp `libs/math-ts/src/node/index.ts` that `require("./native/math_native.node")` and exports functions (live packaging lands in PR‑7).
 - Add a small TS test (`build-tools/tools/tests/...`) asserting `add(2,3)=5` via the node entrypoint.
 - Docs:
@@ -106,7 +106,7 @@ Build a Node addon that links the Go API as a `c-archive` and the native C++ cor
 
 ### Acceptance Criteria
 
-- In a runInTemp temp repo, `buck2 build //libs/math-native:napi_addon` produces a `.node` artifact.
+- In a runInTemp temp repo, `buck2 build //projects/libs/math-native:napi_addon` produces a `.node` artifact.
 - The temp TS node entry loads and passes the unit test.
 - Docs present in `libs/math-native/README.md`.
 

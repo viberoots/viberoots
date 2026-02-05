@@ -1,6 +1,6 @@
 # Patching Handbook (Go, C++, Node, and Python)
 
-Note: Go and C++ use per‑target local patching by default. Place patches under each target’s package directory (for example, `apps/<app>/patches/go` or `libs/<lib>/patches/cpp`) so they are included in that target’s `srcs` and Buck invalidation is precise. The global `patches/go` flow remains supported where applicable, but local patching is the default developer experience for new scaffolds. See `build-tools/docs/build-system-design.md` for details.
+Note: Go and C++ use per‑target local patching by default. Place patches under each target’s package directory (for example, `projects/apps/<app>/patches/go` or `projects/libs/<lib>/patches/cpp`) so they are included in that target’s `srcs` and Buck invalidation is precise. The global `patches/go` flow remains supported where applicable, but local patching is the default developer experience for new scaffolds. See `build-tools/docs/build-system-design.md` for details.
 
 All scripts are zx TypeScript using `#!/usr/bin/env zx-wrapper`.
 
@@ -19,10 +19,10 @@ This section is a quick index of “don’t re-implement this” utilities. Most
 - C++ extraction/workspace setup uses the common permission normalizer `build-tools/tools/patch/cross-platform.ts: chmodRecursive` to guarantee writable workspaces without affecting diffs.
 - Node and Python macros include importer‑local patch files in `srcs` via the unified helper `//build-tools/lang:defs_common.bzl:prepare_language_wiring(...)`. Importer is derived from a single `lockfile:<path>#<importer>` label (enforced by `ensure_single_lockfile_label(...)`).
   - Labels must include the `#<importer>` suffix and contain **exactly one** `#`; malformed labels fail fast with deterministic error text.
-  - Lockfile path normalization: any number of repeated leading `./` segments are stripped (example: `lockfile:././apps/web/pnpm-lock.yaml#apps/web` is treated as `lockfile:apps/web/pnpm-lock.yaml#apps/web`).
+  - Lockfile path normalization: any number of repeated leading `./` segments are stripped (example: `lockfile:././projects/apps/web/pnpm-lock.yaml#projects/apps/web` is treated as `lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web`).
   - Importer-dir consistency:
     - `#.` is allowed only for repo-root lockfiles (example: `lockfile:pnpm-lock.yaml#.`).
-    - For non-root lockfiles, `<importer>` must equal the directory that contains `<path>` (example: `lockfile:apps/web/pnpm-lock.yaml#apps/web`).
+    - For non-root lockfiles, `<importer>` must equal the directory that contains `<path>` (example: `lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web`).
   - Supported importer labels: defined by the single contract artifact `build-tools/tools/lib/importer-roots.json` (rendered to Starlark as `build-tools/lang/importer_roots.bzl`). Any other importer label fails early during macro evaluation with deterministic error text.
   - To support additional importer roots, update **only** `build-tools/tools/lib/importer-roots.json`, then run glue generation (for example `i` or `node build-tools/tools/buck/glue-pipeline.ts`) so `build-tools/lang/importer_roots.bzl` is regenerated. The parity/enforcement tests will fail if the generated view is stale.
 - Patch inputs are attached through `//build-tools/lang:patch_inputs.bzl` helpers. When a rule does not support `srcs`, call sites must choose a supported input attribute explicitly using `into = "<attr>"` or carry patch inputs via a small helper target.
@@ -82,11 +82,11 @@ This repo supports two patch invalidation strategies. Treat this as a cross-lang
 
 ### package-local
 
-Go and C++ use **package-local** patches. Patch files live under the Buck package of the target (for example `libs/foo/patches/go/*.patch`). Those patch files are included in the target inputs (via `srcs` or an equivalent input attribute), so Buck invalidation is precise and no glue regeneration is required on apply/remove.
+Go and C++ use **package-local** patches. Patch files live under the Buck package of the target (for example `projects/libs/foo/patches/go/*.patch`). Those patch files are included in the target inputs (via `srcs` or an equivalent input attribute), so Buck invalidation is precise and no glue regeneration is required on apply/remove.
 
 ### importer-local
 
-Node and Python use **importer-local** patches. Patch files live under an importer directory (for example `apps/web/patches/node/*.patch` and `apps/api/patches/python/*.patch`). Importer-scoped providers and `auto_map.bzl` are generated artifacts, so apply/remove regenerates glue to keep providers and mappings aligned with the lockfile and patch set.
+Node and Python use **importer-local** patches. Patch files live under an importer directory (for example `projects/apps/web/patches/node/*.patch` and `projects/apps/api/patches/python/*.patch`). Importer-scoped providers and `auto_map.bzl` are generated artifacts, so apply/remove regenerates glue to keep providers and mappings aligned with the lockfile and patch set.
 
 ### Graph-visible patch scope labels
 
@@ -107,7 +107,7 @@ buck2 cquery 'attrfilter(labels, "patch_scope:importer-local", //...)'
 Buck package boundary note (important):
 
 - Importer-local patch inputs are attached via `native.glob(...)`, which cannot reach across Buck package boundaries.
-- Therefore, **targets that include importer-local patches must be defined in the importer’s Buck package** (e.g. define the target in `apps/web/TARGETS`, not `apps/web/ui/TARGETS`).
+- Therefore, **targets that include importer-local patches must be defined in the importer’s Buck package** (e.g. define the target in `projects/apps/web/TARGETS`, not `projects/apps/web/ui/TARGETS`).
 - Subpackage call sites fail fast with deterministic guidance so patch edits never silently stop invalidating targets.
 
 Provider patch inclusion policy (Node vs Python):
@@ -205,7 +205,7 @@ node build-tools/tools/dev/patches-lint.ts --lang python
   - Lockfile discovery for exporter labeling uses the shared nearest-lock helper.
   - Importer label is defined as the lockfile directory (`.` when the lockfile is at repo root).
 - The Python library and test macros include importer‑local patch files in `srcs` for precise Buck invalidation:
-  - Patches live under `<importer>/patches/python/*.patch` (e.g., `apps/api/patches/python/...`).
+  - Patches live under `<importer>/patches/python/*.patch` (e.g., `projects/apps/api/patches/python/...`).
   - Changing a patch only invalidates Python targets bound to that importer.
 - `nix_python_binary` cannot carry patches via `srcs` (Buck prelude `python_binary` does not accept `srcs`). Instead it uses `prepare_language_wiring(..., wiring = "srcsless_rule")` to create a synthetic dep that carries importer‑local patches as real action inputs (`resources`) and adds that dep to `deps`, so patch edits deterministically invalidate the binary.
 - Lockfile label enforcement and parsing are centralized in Starlark. For importer-scoped macros, **do not** parse lockfile labels directly; route through the canonical helper surface in `//build-tools/lang:defs_common.bzl`:
@@ -224,7 +224,7 @@ Quick checks and guidance:
 - Node targets use importer‑scoped lockfile labels: `lockfile:<path/to/pnpm-lock.yaml>#<importer>`.
 - When a Node target is missing a lockfile label, the exporter attaches one deterministically when a nearest `pnpm-lock.yaml` is discoverable.
 - The Node macros include importer‑local patch files in `srcs` to achieve precise Buck invalidation, mirroring Go:
-  - Patches live under `<importer>/patches/node/*.patch` (e.g., `apps/web/patches/node/...`).
+  - Patches live under `<importer>/patches/node/*.patch` (e.g., `projects/apps/web/patches/node/...`).
   - Changing a patch only invalidates Node targets bound to that importer.
 - Some Node genrule shims pass dict-shaped `srcs` mappings (dest → source) for deterministic in-action paths. In that mode, macros still carry importer-local patches and provider-edge inputs without changing the user mapping semantics:
   - Patch files are attached by adding synthetic dict entries under `__patch_inputs__/...` with a stable key derived from a canonical sanitizer (see `//build-tools/lang:sanitize.bzl:sanitize_name`). Collisions are resolved deterministically with a `__<n>` suffix.
@@ -273,26 +273,26 @@ build-tools/tools/bin/patch-pkg start go golang.org/x/net
 
 ```bash
 # Option A (recommended): point to the Buck target to derive <pkg>/patches/go
-build-tools/tools/bin/patch-pkg apply go golang.org/x/net --target //libs/helper-lib:helper-lib
+build-tools/tools/bin/patch-pkg apply go golang.org/x/net --target //projects/libs/helper-lib:helper-lib
 
 # Option B: specify the destination directory explicitly
-build-tools/tools/bin/patch-pkg apply go golang.org/x/net --patch-dir libs/helper-lib/patches/go
+build-tools/tools/bin/patch-pkg apply go golang.org/x/net --patch-dir projects/libs/helper-lib/patches/go
 ```
 
 The command writes a file like:
 
 ```
-libs/helper-lib/patches/go/golang.org__x__net@v0.24.0.patch
+projects/libs/helper-lib/patches/go/golang.org__x__net@v0.24.0.patch
 ```
 
 4. Build and verify
 
 ```bash
 # Rebuild only the affected targets; Buck invalidates via srcs
-buck2 build //libs/helper-lib:helper-lib
+buck2 build //projects/libs/helper-lib:helper-lib
 
 # Optional: run impacted tests
-IMP=$(buck2 cquery 'testsof(rdeps(//..., //libs/helper-lib:helper-lib))')
+IMP=$(buck2 cquery 'testsof(rdeps(//..., //projects/libs/helper-lib:helper-lib))')
 [ -n "$IMP" ] && buck2 test $IMP || true
 ```
 
@@ -300,7 +300,7 @@ IMP=$(buck2 cquery 'testsof(rdeps(//..., //libs/helper-lib:helper-lib))')
 
 ```bash
 # Remove the patch file and rebuild; no glue required
-build-tools/tools/bin/patch-pkg remove go golang.org/x/net --target //libs/helper-lib:helper-lib
+build-tools/tools/bin/patch-pkg remove go golang.org/x/net --target //projects/libs/helper-lib:helper-lib
 ```
 
 Tips:
@@ -310,19 +310,19 @@ Tips:
 
 ### Node — importer‑scoped patching workflow (PNPM)
 
-This example patches `lodash` for the `apps/web` importer.
+This example patches `lodash` for the `projects/apps/web` importer.
 
 1. Start a patch session
 
 ```bash
-build-tools/tools/bin/patch-pkg start node lodash --importer apps/web
+build-tools/tools/bin/patch-pkg start node lodash --importer projects/apps/web
 # prints the pnpm patch workspace; open and edit
 ```
 
 2. Apply the patch and refresh glue
 
 ```bash
-build-tools/tools/bin/patch-pkg apply node lodash --importer apps/web
+build-tools/tools/bin/patch-pkg apply node lodash --importer projects/apps/web
 # This runs pnpm patch-commit, then:
 #   - build-tools/tools/buck/sync-providers.ts
 #   - build-tools/tools/buck/gen-auto-map.ts
@@ -331,20 +331,20 @@ build-tools/tools/bin/patch-pkg apply node lodash --importer apps/web
 A patch file appears under:
 
 ```
-apps/web/patches/node/lodash@<version>.patch
+projects/apps/web/patches/node/lodash@<version>.patch
 ```
 
 3. Build and/or test
 
 ```bash
-buck2 build //apps/web:bundle
-buck2 test  //apps/web:tests   # or your repo’s Node test targets
+buck2 build //projects/apps/web:bundle
+buck2 test  //projects/apps/web:tests   # or your repo’s Node test targets
 ```
 
 4. Remove or iterate
 
 ```bash
-build-tools/tools/bin/patch-pkg remove node lodash --importer apps/web
+build-tools/tools/bin/patch-pkg remove node lodash --importer projects/apps/web
 # Provider sync and auto_map will regenerate automatically
 ```
 
@@ -360,7 +360,7 @@ Python patching is importer‑scoped, like Node, but patch files are plain `*.pa
 By default, patches are written to:
 
 - If the importer lockfile is at repo root: `patches/python/`
-- Otherwise: `<importer>/patches/python/` (for example `apps/api/patches/python/`)
+- Otherwise: `<importer>/patches/python/` (for example `projects/apps/api/patches/python/`)
 
 You can override the destination directory with `--patch-dir`:
 
@@ -371,13 +371,13 @@ Example:
 
 ```bash
 # Start a patch session (pick importer by locating the nearest uv.lock)
-build-tools/tools/bin/patch-pkg start python requests --importer apps/api
+build-tools/tools/bin/patch-pkg start python requests --importer projects/apps/api
 
 # Apply with default destination (<importer>/patches/python)
-build-tools/tools/bin/patch-pkg apply python requests --importer apps/api
+build-tools/tools/bin/patch-pkg apply python requests --importer projects/apps/api
 
 # Or, override the destination directory explicitly
-build-tools/tools/bin/patch-pkg apply python requests --importer apps/api --patch-dir apps/api/patches/python
+build-tools/tools/bin/patch-pkg apply python requests --importer projects/apps/api --patch-dir projects/apps/api/patches/python
 ```
 
 ### C++ — patching a nixpkgs dependency
@@ -397,22 +397,22 @@ build-tools/tools/bin/patch-pkg start cpp pkgs.zlib
 
 ```bash
 # Option A: derive destination from a Buck target’s package
-build-tools/tools/bin/patch-pkg apply cpp pkgs.zlib --target //libs/cppdemo:lib
+build-tools/tools/bin/patch-pkg apply cpp pkgs.zlib --target //projects/libs/cppdemo:lib
 
 # Option B: specify the destination directory explicitly
-build-tools/tools/bin/patch-pkg apply cpp pkgs.zlib --patch-dir libs/cppdemo/patches/cpp
+build-tools/tools/bin/patch-pkg apply cpp pkgs.zlib --patch-dir projects/libs/cppdemo/patches/cpp
 ```
 
 3. Build and verify
 
 ```bash
-buck2 build //libs/cppdemo:lib
+buck2 build //projects/libs/cppdemo:lib
 ```
 
 4. Remove or iterate
 
 ```bash
-build-tools/tools/bin/patch-pkg remove cpp pkgs.zlib --target //libs/cppdemo:lib
+build-tools/tools/bin/patch-pkg remove cpp pkgs.zlib --target //projects/libs/cppdemo:lib
 ```
 
 Notes:

@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 test("pr5: tinygo top.wasm builds and loader returns add(2,3)=5", async () => {
   await runInTemp("pr5-tinygo-wasm", async (tmp, $) => {
     // 1) Scaffold minimal C++ wasm static lib (per PR-4)
-    const coreDir = path.join(tmp, "libs", "math-core");
+    const coreDir = path.join(tmp, "projects", "libs", "math-core");
     await fs.outputFile(
       path.join(coreDir, "include", "addon.h"),
       `#ifndef MATH_CORE_ADDON_H
@@ -43,7 +43,7 @@ nix_cpp_wasm_static_lib(
     );
 
     // 2) TinyGo package exporting a wasm function `add`
-    const apiDir = path.join(tmp, "libs", "math-api");
+    const apiDir = path.join(tmp, "projects", "libs", "math-api");
     await fs.mkdirp(apiDir);
     await fs.outputFile(
       path.join(apiDir, "go.mod"),
@@ -71,7 +71,7 @@ func main() {}
 nix_go_tiny_wasm_lib(
     name = "wasm",
     srcs = ["main.go"],
-    deps = ["//libs/math-core:core_wasm"],
+    deps = ["//projects/libs/math-core:core_wasm"],
     labels = ["lang:go", "kind:wasm"],
     visibility = ["PUBLIC"],
 )
@@ -98,7 +98,7 @@ nix_go_tiny_wasm_lib(
       stdio: "pipe",
       reject: false,
       nothrow: true,
-      env: { ...process.env, BUCK_TARGET: "//libs/math-api:wasm" },
+      env: { ...process.env, BUCK_TARGET: "//projects/libs/math-api:wasm" },
     })`nix build --impure -L ${`path:${tmp}#graph-generator-selected-wasm`} --accept-flake-config --no-link --print-out-paths`;
     const outPath =
       String(outSel || "")
@@ -118,7 +118,7 @@ nix_go_tiny_wasm_lib(
     }
 
     // 5) A tiny ESM loader that instantiates the provided wasm URL and returns exports
-    const tsDir = path.join(tmp, "libs", "math-ts", "src", "browser");
+    const tsDir = path.join(tmp, "projects", "libs", "math-ts", "src", "browser");
     await fs.mkdirp(tsDir);
     const loaderPath = path.join(tsDir, "index.mjs");
     await fs.writeFile(

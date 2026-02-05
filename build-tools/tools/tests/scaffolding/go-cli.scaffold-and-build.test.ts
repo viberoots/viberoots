@@ -10,7 +10,7 @@ test("go cli: scaffold and build", async () => {
     const $ = _$({ stdio: "pipe" });
     await scaffoldApp("go", "demo-cli", { tmp: _tmp, $ });
     // Preflight: ensure Buck sees the new target
-    await $({ cwd: _tmp, stdio: "inherit" })`buck2 targets //apps/demo-cli:demo-cli`;
+    await $({ cwd: _tmp, stdio: "inherit" })`buck2 targets //projects/apps/demo-cli:demo-cli`;
     // Export Buck graph so the planner sees newly scaffolded targets
     await $({
       cwd: _tmp,
@@ -31,7 +31,7 @@ test("go cli: scaffold and build", async () => {
       env: {
         ...process.env,
         BUCK_GRAPH_JSON: path.join(_tmp, "build-tools", "tools", "buck", "graph.json"),
-        BUCK_TARGET: "//apps/demo-cli:demo-cli",
+        BUCK_TARGET: "//projects/apps/demo-cli:demo-cli",
       },
     })`nix build ${`path:${_tmp}#graph-generator`} --no-link --accept-flake-config --print-build-logs`;
   });

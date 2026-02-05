@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("node deps enforcement: fix rewrites deps", async () => {
   await runInTemp("node-deps-enforcement-fix", async (tmp, $) => {
-    const appDir = path.join(tmp, "apps", "admin");
+    const appDir = path.join(tmp, "projects", "apps", "admin");
     await fsp.mkdir(appDir, { recursive: true });
     await fsp.writeFile(
       path.join(appDir, "package.json"),
@@ -31,7 +31,7 @@ test("node deps enforcement: fix rewrites deps", async () => {
         "",
         "nix_node_lib(",
         '  name = "admin",',
-        '  deps = ["//libs/old:old"],',
+        '  deps = ["//projects/libs/old:old"],',
         ")",
         "",
       ].join("\n"),
@@ -40,7 +40,11 @@ test("node deps enforcement: fix rewrites deps", async () => {
     await fsp.mkdir(path.join(tmp, "build-tools", "tools", "node"), { recursive: true });
     await fsp.writeFile(
       path.join(tmp, "build-tools", "tools", "node", "workspace-map.json"),
-      JSON.stringify({ "@repo/ui": "//libs/ui:ui", "@repo/old": "//libs/old:old" }, null, 2),
+      JSON.stringify(
+        { "@repo/ui": "//projects/libs/ui:ui", "@repo/old": "//projects/libs/old:old" },
+        null,
+        2,
+      ),
       "utf8",
     );
 
@@ -53,7 +57,7 @@ test("node deps enforcement: fix rewrites deps", async () => {
     assert.equal(res.exitCode, 0);
 
     const updated = await fsp.readFile(path.join(appDir, "TARGETS"), "utf8");
-    assert.ok(updated.includes('"//libs/ui:ui"'));
-    assert.ok(!updated.includes('"//libs/old:old"'));
+    assert.ok(updated.includes('"//projects/libs/ui:ui"'));
+    assert.ok(!updated.includes('"//projects/libs/old:old"'));
   });
 });

@@ -18,7 +18,7 @@ As in prior parts, each PR includes the tests and documentation required for the
 
 The exporter has a convenience behavior for importer-scoped ecosystems: for targets that appear macro-stamped (they have `kind:*`), it can attach a missing `lockfile:<path>#<importer>` label by searching for the nearest lockfile.
 
-Today, this attachment path does not enforce the supported importer policy. If the nearest lockfile is under an unsupported root (not `apps/*`, not `libs/*`, not `.`), the exporter can attach a label whose importer is unsupported. That label is syntactically valid, but it violates the macro contract in `build-tools/lang/lockfile_labels.bzl` and can fail later during macro evaluation with confusing causality.
+Today, this attachment path does not enforce the supported importer policy. If the nearest lockfile is under an unsupported root (not `projects/apps/*`, not `projects/libs/*`, not `.`), the exporter can attach a label whose importer is unsupported. That label is syntactically valid, but it violates the macro contract in `build-tools/lang/lockfile_labels.bzl` and can fail later during macro evaluation with confusing causality.
 
 This PR makes “supported importer roots” a contract in the exporter lockfile-label attachment path. The exporter must not generate labels that the macro layer will reject.
 
@@ -52,13 +52,13 @@ Add a focused exporter test under `build-tools/tools/tests/exporter/` that:
 Update `build-tools/docs/build-system-design.md` (exporter section) to clarify observed behavior:
 
 - The exporter may attach `lockfile:<path>#<importer>` only when the computed importer is supported.
-- Unsupported importer roots must be fixed by moving the lockfile under `apps/*`, `libs/*`, or repo root, or by extending the supported importer predicate with parity checks.
+- Unsupported importer roots must be fixed by moving the lockfile under `projects/apps/*`, `projects/libs/*`, or repo root, or by extending the supported importer predicate with parity checks.
 
 ### Acceptance Criteria
 
 - The exporter never auto-attaches importer-scoped lockfile labels with unsupported importer values.
 - The exporter produces deterministic findings when it detects a nearest lockfile that would yield an unsupported importer.
-- Existing behavior for supported importers under `apps/*`, `libs/*`, or `.` remains unchanged.
+- Existing behavior for supported importers under `projects/apps/*`, `projects/libs/*`, or `.` remains unchanged.
 
 ### Risks
 
@@ -175,7 +175,7 @@ This PR makes synthetic lockfile providers opt-in, so the default behavior align
 
 Add a focused provider test under `build-tools/tools/tests/providers/` that:
 
-- creates a temp workspace importer under `apps/*` with `package.json` but no `pnpm-lock.yaml`
+- creates a temp workspace importer under `projects/apps/*` with `package.json` but no `pnpm-lock.yaml`
 - runs Node provider sync with default settings and asserts:
   - no provider is generated for that importer
 - runs Node provider sync with synthetic mode enabled and asserts:

@@ -9,16 +9,9 @@ export async function isLanguageEnabled(language: string): Promise<boolean> {
     return (await exists(goTpl)) && (await exists(goDefs));
   }
   if (language === "node") {
-    try {
-      const { globby } = await import("fast-glob");
-      const locks = await globby(["**/pnpm-lock.yaml"], {
-        gitignore: true,
-        ignore: ["**/buck-out/**", "**/.tmp/**", "**/node_modules/**"],
-      });
-      return Array.isArray(locks) && locks.length > 0;
-    } catch {
-      return false;
-    }
+    const defs = path.join("build-tools", "node", "defs.bzl");
+    const tplRoot = path.join("build-tools", "tools", "scaffolding", "templates", "node");
+    return (await exists(defs)) && (await exists(tplRoot));
   }
   if (language === "ts") {
     return true;

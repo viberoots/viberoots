@@ -12,7 +12,7 @@ test("python lib overlay build smoke: site exists and contains resolved dist", a
 
     // 1) Scaffold a minimal python lib
     const name = "demo_pylib";
-    const libDir = path.join(tmp, "libs", name);
+    const libDir = path.join(tmp, "projects", "libs", name);
     await $`scaf new python lib ${name} --yes --path=${libDir}`;
 
     // 2) Provide a simple vendor origin for mydep@1.0.0 and a minimal uv.lock
@@ -29,10 +29,10 @@ test("python lib overlay build smoke: site exists and contains resolved dist", a
     const graphDir = path.join(tmp, "build-tools", "tools", "buck");
     await fs.mkdirp(graphDir);
     const node = {
-      name: `//libs/${name}:${name}`,
+      name: `//projects/libs/${name}:${name}`,
       rule_type: "python_library",
       labels: ["lang:python", "kind:lib"],
-      srcs: [`libs/${name}/src/${name}/__init__.py`],
+      srcs: [`projects/libs/${name}/src/${name}/__init__.py`],
     };
     await fs.writeFile(
       path.join(graphDir, "graph.json"),
@@ -45,7 +45,7 @@ test("python lib overlay build smoke: site exists and contains resolved dist", a
       cwd: tmp,
       env: {
         ...process.env,
-        BUCK_TARGET: `//libs/${name}:${name}`,
+        BUCK_TARGET: `//projects/libs/${name}:${name}`,
         BUCK_TEST_SRC: tmp,
         NIX_PY_TEST_RESOLVE_JSON: JSON.stringify({
           mydep: { version: "1.0.0", originPath: originRel },

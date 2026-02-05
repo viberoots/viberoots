@@ -74,7 +74,7 @@ Introduce two zx tests that validate coverage under `buck2 test` with `--env COV
 1. `build-tools/tools/tests/scaffolding/node-lib.nix-node-test.coverage-pass.test.ts`
    - Scaffold `libs/demo` with a minimal test (e.g., `expect(true).toBe(true)`).
    - Create/commit `pnpm-lock.yaml`, run `update-pnpm-hash`, warm pnpm-store and node-modules, reconcile FOD.
-   - Execute: `buck2 test //libs/demo:unit -- --env COVERAGE=1`.
+   - Execute: `buck2 test //projects/libs/demo:unit -- --env COVERAGE=1`.
    - `nix build path:$TMP#node-test.libs-demo --no-link --print-out-paths`, then assert:
      - `$out/report/journal.xml` (or configured JUnit file) exists and non-empty.
      - `$out/coverage/lcov.info` exists and non-empty.
@@ -126,7 +126,7 @@ This allows:
 ```python
 nix_node_test(
     name = "unit",
-    lockfile_label = "lockfile:libs/demo/pnpm-lock.yaml#libs/demo",
+    lockfile_label = "lockfile:projects/libs/demo/pnpm-lock.yaml#projects/libs/demo",
     coverage = True,
 )
 ```

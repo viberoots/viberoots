@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("node macros default lockfile label fails fast when missing", async () => {
   await runInTemp("node-lockfile-default-missing", async (tmp, $) => {
-    const dir = path.join(tmp, "apps", "bar");
+    const dir = path.join(tmp, "projects", "apps", "bar");
     await fsp.mkdir(dir, { recursive: true });
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
@@ -29,7 +29,7 @@ test("node macros default lockfile label fails fast when missing", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute name //apps/bar:gen`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute name //projects/apps/bar:gen`;
 
     assert.notEqual(
       res.exitCode,
@@ -39,7 +39,7 @@ test("node macros default lockfile label fails fast when missing", async () => {
     const combined = String(res.stderr || "") + String(res.stdout || "");
     assert.ok(
       combined.includes(
-        "nix_node_gen: missing lockfile at apps/bar/pnpm-lock.yaml. Provide lockfile_label or create apps/bar/pnpm-lock.yaml.",
+        "nix_node_gen: missing lockfile at projects/apps/bar/pnpm-lock.yaml. Provide lockfile_label or create projects/apps/bar/pnpm-lock.yaml.",
       ),
       "expected a targeted missing lockfile error",
     );

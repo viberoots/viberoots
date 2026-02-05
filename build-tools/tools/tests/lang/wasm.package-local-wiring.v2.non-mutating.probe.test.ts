@@ -5,7 +5,7 @@ import path from "node:path";
 import { runInTemp } from "../lib/test-helpers";
 
 await runInTemp("wasm-package-local-wiring-non-mutating-probe", async (tmp, $) => {
-  const pkg = path.join(tmp, "libs", "demo");
+  const pkg = path.join(tmp, "projects", "libs", "demo");
   await fsp.mkdir(pkg, { recursive: true });
 
   await fsp.writeFile(
@@ -28,7 +28,7 @@ await runInTemp("wasm-package-local-wiring-non-mutating-probe", async (tmp, $) =
   const so = await $({
     cwd: tmp,
     stdio: "pipe",
-  })`buck2 build --target-platforms //:no_cgo --show-output //libs/demo:probe`.nothrow();
+  })`buck2 build --target-platforms //:no_cgo --show-output //projects/libs/demo:probe`.nothrow();
   assert.equal(so.exitCode, 0, "buck2 build --show-output failed for probe");
   const outLine = String(so.stdout || "").trim();
   const outPath = outLine.split(/\s+/).pop()!;

@@ -29,7 +29,7 @@ test(
       // Scaffold the Node TS package and C++ addon sibling
       await $`scaf new node cpp-addon demo --yes`;
 
-      const importer = "libs/demo";
+      const importer = "projects/libs/demo";
       const sanitized = importer
         .replace(/\/\//g, "")
         .replace(/:/g, "-")

@@ -31,7 +31,7 @@ test("nix_cpp_binary: defaults build unchanged when no link intent attrs are pro
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir cpp_link_intent_defaults cquery "deps(//apps/link_intent_defaults:demo)" --json --output-attribute name`;
+    })`buck2 --isolation-dir cpp_link_intent_defaults cquery "deps(//projects/apps/link_intent_defaults:demo)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return; // skip when Buck/prelude/toolchains unavailable
 
     await $({
@@ -43,7 +43,7 @@ test("nix_cpp_binary: defaults build unchanged when no link intent attrs are pro
       stdio: "pipe",
       reject: false,
       nothrow: true,
-      env: { ...process.env, BUCK_TARGET: "//apps/link_intent_defaults:demo" },
+      env: { ...process.env, BUCK_TARGET: "//projects/apps/link_intent_defaults:demo" },
     })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
     if (build.exitCode !== 0) {
       throw new Error(String(build.stdout || "") + "\n" + String(build.stderr || ""));

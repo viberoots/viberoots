@@ -57,7 +57,7 @@ async function buildSelectedOutPath(args: {
 
 test("wasm: patch change in linked C++ wasm producer rebuilds TinyGo consumer", async () => {
   await runInTemp("wasm-link-deps-patch-invalidation", async (tmp, $) => {
-    const coreDir = path.join(tmp, "libs", "math-core");
+    const coreDir = path.join(tmp, "projects", "libs", "math-core");
     const patchFile = path.join(coreDir, "patches", "cpp", "core_wasm@0.0.0.patch");
     await fs.mkdirp(path.dirname(patchFile));
 
@@ -103,7 +103,7 @@ nix_cpp_wasm_static_lib(
 `,
     );
 
-    const apiDir = path.join(tmp, "libs", "math-api");
+    const apiDir = path.join(tmp, "projects", "libs", "math-api");
     await fs.outputFile(path.join(apiDir, "go.mod"), `module example.com/math/api\n\ngo 1.22.0\n`);
     await fs.outputFile(
       path.join(apiDir, "main.go"),
@@ -129,7 +129,7 @@ func main() {}
 nix_go_tiny_wasm_lib(
     name = "wasm",
     srcs = ["main.go"],
-    link_deps = ["//libs/math-core:core_wasm"],
+    link_deps = ["//projects/libs/math-core:core_wasm"],
     visibility = ["PUBLIC"],
 )
 `,
@@ -140,7 +140,7 @@ nix_go_tiny_wasm_lib(
       stdio: "inherit",
     })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
 
-    const out1 = await buildSelectedOutPath({ tmp, $, target: "//libs/math-api:wasm" });
+    const out1 = await buildSelectedOutPath({ tmp, $, target: "//projects/libs/math-api:wasm" });
     const wasm1 = path.join(out1, "lib", "top.wasm");
     await fs.access(wasm1);
     const inst1 = await instantiateWasmFromFile(wasm1);
@@ -153,7 +153,7 @@ nix_go_tiny_wasm_lib(
     );
     await fs.writeFile(patchFile, patchV2, "utf8");
 
-    const out2 = await buildSelectedOutPath({ tmp, $, target: "//libs/math-api:wasm" });
+    const out2 = await buildSelectedOutPath({ tmp, $, target: "//projects/libs/math-api:wasm" });
     if (out2 === out1)
       throw new Error(
         `expected consumer output store path to change after producer patch edit; out=${out1}`,

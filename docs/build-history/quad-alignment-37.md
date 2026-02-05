@@ -285,7 +285,7 @@ This PR creates a single source of truth for supported importer roots and genera
 Non-goals in this PR:
 
 - No change to label format (`lockfile:<path>#<importer>`).
-- No change to current supported importers (`.`, `apps/*`, `libs/*`) unless explicitly decided.
+- No change to current supported importers (`.`, `projects/apps/*`, `projects/libs/*`) unless explicitly decided.
 
 ### Tests (in this PR)
 

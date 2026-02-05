@@ -10,9 +10,9 @@ test("node adapter rejects '#.' importer for non-root lockfiles (warn mode)", as
     await fs.mkdirp(path.dirname(out));
     const nodes = [
       {
-        name: "//apps/web:bundle",
+        name: "//projects/apps/web:bundle",
         rule_type: "js_binary",
-        labels: ["lang:node", "kind:bundle", "lockfile:apps/web/pnpm-lock.yaml#."],
+        labels: ["lang:node", "kind:bundle", "lockfile:projects/apps/web/pnpm-lock.yaml#."],
       },
     ];
     const sim = path.join(tmp, "build-tools/tools/buck/simulated.json");
@@ -32,7 +32,7 @@ test("node adapter rejects '#.' importer for non-root lockfiles (warn mode)", as
       console.error("expected importer mismatch warning for '#.' on non-root lockfile", txt);
       process.exit(2);
     }
-    if (!txt.includes("Fix: set importer to 'apps/web'")) {
+    if (!txt.includes("Fix: set importer to 'projects/apps/web'")) {
       console.error("expected remediation guidance to match the lockfile directory", txt);
       process.exit(2);
     }

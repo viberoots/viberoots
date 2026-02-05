@@ -10,9 +10,9 @@ if uv2nixLib == null then
       in
       if wr != "" then (builtins.toPath wr) else repoRoot;
     listDirs = base: if builtins.pathExists base then builtins.attrNames (builtins.readDir base) else [ ];
-    appsDirs = listDirs (srcRoot + "/apps");
-    libsDirs = listDirs (srcRoot + "/libs");
-    allImporters = (map (d: "apps/" + d) appsDirs) ++ (map (d: "libs/" + d) libsDirs);
+    appsDirs = listDirs (srcRoot + "/projects/apps");
+    libsDirs = listDirs (srcRoot + "/projects/libs");
+    allImporters = (map (d: "projects/apps/" + d) appsDirs) ++ (map (d: "projects/libs/" + d) libsDirs);
     mkWheelhouseStub =
       importer:
         let
@@ -51,12 +51,12 @@ else
     pwdEnv = builtins.getEnv "PWD";
     srcRootPwd = if pwdEnv != "" then (builtins.toPath pwdEnv) else null;
     srcRootPwdStr = if srcRootPwd == null then "" else (builtins.toString srcRootPwd);
-    appsPath = builtins.toPath (srcRootStr + "/apps");
-    libsPath = builtins.toPath (srcRootStr + "/libs");
-    appsEnvPath = if srcRootEnv != null then builtins.toPath ((builtins.toString srcRootEnv) + "/apps") else null;
-    libsEnvPath = if srcRootEnv != null then builtins.toPath ((builtins.toString srcRootEnv) + "/libs") else null;
-    appsPwdPath = if srcRootPwd != null then builtins.toPath (srcRootPwdStr + "/apps") else null;
-    libsPwdPath = if srcRootPwd != null then builtins.toPath (srcRootPwdStr + "/libs") else null;
+    appsPath = builtins.toPath (srcRootStr + "/projects/apps");
+    libsPath = builtins.toPath (srcRootStr + "/projects/libs");
+    appsEnvPath = if srcRootEnv != null then builtins.toPath ((builtins.toString srcRootEnv) + "/projects/apps") else null;
+    libsEnvPath = if srcRootEnv != null then builtins.toPath ((builtins.toString srcRootEnv) + "/projects/libs") else null;
+    appsPwdPath = if srcRootPwd != null then builtins.toPath (srcRootPwdStr + "/projects/apps") else null;
+    libsPwdPath = if srcRootPwd != null then builtins.toPath (srcRootPwdStr + "/projects/libs") else null;
     appsDirsBase = if builtins.pathExists appsPath then (listDirs appsPath) else [ ];
     libsDirsBase = if builtins.pathExists libsPath then (listDirs libsPath) else [ ];
     appsDirsEnv = if (appsEnvPath != null && builtins.pathExists appsEnvPath) then (listDirs appsEnvPath) else [ ];
@@ -65,7 +65,7 @@ else
     libsDirsPwd = if (libsPwdPath != null && builtins.pathExists libsPwdPath) then (listDirs libsPwdPath) else [ ];
     appsDirs = pkgs.lib.unique (appsDirsBase ++ appsDirsEnv ++ appsDirsPwd);
     libsDirs = pkgs.lib.unique (libsDirsBase ++ libsDirsEnv ++ libsDirsPwd);
-    allImporters = (map (d: "apps/" + d) appsDirs) ++ (map (d: "libs/" + d) libsDirs);
+    allImporters = (map (d: "projects/apps/" + d) appsDirs) ++ (map (d: "projects/libs/" + d) libsDirs);
     hasUvLock =
       imp:
         let

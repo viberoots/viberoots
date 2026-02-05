@@ -1,4 +1,4 @@
 {
   "allowDotImporter": true,
-  "workspaceRoots": ["apps", "libs"]
+  "workspaceRoots": ["projects/apps", "projects/libs"]
 }

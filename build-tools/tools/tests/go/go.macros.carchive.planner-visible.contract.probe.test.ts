@@ -17,11 +17,11 @@ EOF'`;
       cwd: tmp,
     })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
 MODULE_PROVIDERS = {
-  "//apps/demo:arc": ["//third_party/providers:prov"],
+  "//projects/apps/demo:arc": ["//third_party/providers:prov"],
 }
 EOF'`;
 
-    const appDir = path.join(tmp, "apps", "demo");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(path.join(appDir, "pkg", "demo"), { recursive: true });
     await fsp.mkdir(path.join(appDir, "patches", "go"), { recursive: true });
     await fsp.writeFile(
@@ -30,7 +30,7 @@ EOF'`;
       "utf8",
     );
 
-    const patchRel = "apps/demo/patches/go/demo@0.0.0.patch";
+    const patchRel = "projects/apps/demo/patches/go/demo@0.0.0.patch";
     await fsp.writeFile(path.join(tmp, patchRel), "# noop\n", "utf8");
 
     await fsp.appendFile(
@@ -54,7 +54,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //apps/demo:arc`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //projects/apps/demo:arc`;
     if (labelsProbe.exitCode !== 0) return;
     const labelsOut = String(labelsProbe.stdout || "");
     assert.ok(
@@ -76,7 +76,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //apps/demo:arc`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //projects/apps/demo:arc`;
     if (srcsProbe.exitCode !== 0) return;
     const srcsOut = String(srcsProbe.stdout || "");
     assert.ok(
@@ -93,7 +93,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 build --target-platforms //:no_cgo --show-output //apps/demo:arc`;
+    })`buck2 build --target-platforms //:no_cgo --show-output //projects/apps/demo:arc`;
     if (build.exitCode !== 0) return;
     const outLine = String(build.stdout || "").trim();
     const outPath = outLine.split(/\s+/).pop()!;

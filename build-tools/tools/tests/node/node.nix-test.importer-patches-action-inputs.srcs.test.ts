@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("nix_node_test includes importer-local node patches in srcs (action inputs)", async () => {
   await runInTemp("node-nix-test-importer-patches-srcs", async (tmp, $) => {
-    const dir = path.join(tmp, "apps", "web");
+    const dir = path.join(tmp, "projects", "apps", "web");
     await fsp.mkdir(path.join(dir, "tests"), { recursive: true });
     await fsp.mkdir(path.join(dir, "patches", "node"), { recursive: true });
 
@@ -26,7 +26,7 @@ test("nix_node_test includes importer-local node patches in srcs (action inputs)
         "",
         "nix_node_test(",
         '  name = "t",',
-        '  labels = ["lockfile:apps/web/pnpm-lock.yaml#apps/web"],',
+        '  labels = ["lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"],',
         '  patterns = ["tests/**/*.test.ts"],',
         ")",
         "",
@@ -39,7 +39,7 @@ test("nix_node_test includes importer-local node patches in srcs (action inputs)
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //apps/web:t`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //projects/apps/web:t`;
     if (probe.exitCode !== 0) return;
     const out = String(probe.stdout || "");
 

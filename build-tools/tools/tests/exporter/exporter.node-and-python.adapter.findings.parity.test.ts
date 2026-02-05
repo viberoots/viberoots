@@ -34,27 +34,27 @@ test("node and python adapters emit consistent finding styles for shared importe
     const nodes = [
       // Missing kind:* when macro-stamped (lockfile label present)
       {
-        name: "//apps/web:missing_kind",
+        name: "//projects/apps/web:missing_kind",
         rule_type: "js_binary",
-        labels: ["lang:node", "lockfile:apps/web/pnpm-lock.yaml#apps/web"],
+        labels: ["lang:node", "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"],
       },
       {
-        name: "//apps/pytool:missing_kind",
+        name: "//projects/apps/pytool:missing_kind",
         rule_type: "python_binary",
-        labels: ["lang:python", "lockfile:apps/pytool/uv.lock#apps/pytool"],
+        labels: ["lang:python", "lockfile:projects/apps/pytool/uv.lock#projects/apps/pytool"],
         srcs: ["main.py"],
       },
 
       // Malformed lockfile label
       {
-        name: "//apps/web:malformed_label",
+        name: "//projects/apps/web:malformed_label",
         rule_type: "js_binary",
-        labels: ["lang:node", "kind:bundle", "lockfile:apps/web/pnpm-lock.yaml"],
+        labels: ["lang:node", "kind:bundle", "lockfile:projects/apps/web/pnpm-lock.yaml"],
       },
       {
-        name: "//apps/pytool:malformed_label",
+        name: "//projects/apps/pytool:malformed_label",
         rule_type: "python_binary",
-        labels: ["lang:python", "kind:bin", "lockfile:apps/pytool/uv.lock"],
+        labels: ["lang:python", "kind:bin", "lockfile:projects/apps/pytool/uv.lock"],
         srcs: ["main.py"],
       },
 

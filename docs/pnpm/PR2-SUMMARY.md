@@ -177,7 +177,7 @@ From `pnpm-plan.md`:
 
 **With importer-scoped:**
 
-- Change `apps/web/pnpm-lock.yaml` → only `//apps/web:*` rebuilds
+- Change `projects/apps/web/pnpm-lock.yaml` → only `//projects/apps/web:*` rebuilds
 - Change `lodash` patch used by web only → only web rebuilds
 - Fine-grained = efficient incremental builds
 

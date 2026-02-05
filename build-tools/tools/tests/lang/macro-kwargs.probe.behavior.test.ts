@@ -41,7 +41,7 @@ function lines(txt: string): string[] {
 
 test("macro kwargs helper probe: defaults, overrides, and tolerant nixpkg_deps parsing", async () => {
   await runInTemp("macro-kwargs-probe", async (tmp, $) => {
-    const appDir = path.join(tmp, "apps", "demo");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(appDir, { recursive: true });
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
@@ -69,9 +69,9 @@ test("macro kwargs helper probe: defaults, overrides, and tolerant nixpkg_deps p
       "utf8",
     );
 
-    const pDefault = await buildOutPath(tmp, $, "//apps/demo:default_go");
-    const pCustom = await buildOutPath(tmp, $, "//apps/demo:custom_cpp");
-    const pBad = await buildOutPath(tmp, $, "//apps/demo:bad_nixpkg_shape");
+    const pDefault = await buildOutPath(tmp, $, "//projects/apps/demo:default_go");
+    const pCustom = await buildOutPath(tmp, $, "//projects/apps/demo:custom_cpp");
+    const pBad = await buildOutPath(tmp, $, "//projects/apps/demo:bad_nixpkg_shape");
 
     const d = lines(await fsp.readFile(pDefault, "utf8"));
     assert.deepEqual(d, ["patch_dir:patches/go"]);

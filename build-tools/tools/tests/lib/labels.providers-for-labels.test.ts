@@ -6,7 +6,7 @@ test("providersForLabels parses lockfile/nixpkg labels (module labels ignored)",
   const labels = [
     "module:github.com/sirupsen/logrus@v1.9.0",
     "module:GOLANG.ORG/X/NET@V0.24.0", // case-insensitive handling
-    "lockfile:apps/web/pnpm-lock.yaml#apps/web",
+    "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",
     "nixpkg:pkgs.zlib",
     "nixpkg:gtest", // alias to pkgs.googletest
   ];

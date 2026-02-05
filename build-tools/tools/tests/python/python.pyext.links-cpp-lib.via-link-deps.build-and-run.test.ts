@@ -32,9 +32,9 @@ async function nixBuildSelected(tmp: string, $: any, target: string): Promise<st
 
 test("python: pyext links an in-repo C++ library via link_deps (build + run)", async () => {
   await runInTemp("python-pyext-link-cpp-lib", async (tmp, $) => {
-    const appRel = path.join("apps", "pyext_link_cpp");
+    const appRel = path.join("projects", "apps", "pyext_link_cpp");
     const appDir = path.join(tmp, appRel);
-    const libRel = path.join("libs", "cpp_math");
+    const libRel = path.join("projects", "libs", "cpp_math");
     const libDir = path.join(tmp, libRel);
 
     await fs.mkdirp(path.join(appDir, "bin"));

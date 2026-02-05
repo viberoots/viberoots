@@ -42,14 +42,14 @@ test("cpp wasm static lib compiles with header_deps via nix_cpp_headers (build)"
       "utf8",
     );
     await fs.outputFile(
-      path.join(tmp, "libs", "core", "TARGETS"),
+      path.join(tmp, "projects", "libs", "core", "TARGETS"),
       [
         'load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_static_lib")',
         "",
         "nix_cpp_wasm_static_lib(",
         '  name = "core_wasm",',
         '  srcs = ["src/core.c"],',
-        '  header_deps = ["//libs/hdrs:hdrs"],',
+        '  header_deps = ["//projects/libs/hdrs:hdrs"],',
         '  labels = ["lang:cpp", "kind:lib"],',
         '  visibility = ["PUBLIC"],',
         ")",
@@ -63,7 +63,7 @@ test("cpp wasm static lib compiles with header_deps via nix_cpp_headers (build)"
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir cpp_wasm_hdr_deps cquery "deps(//libs/core:core_wasm)" --json --output-attribute name`;
+    })`buck2 --isolation-dir cpp_wasm_hdr_deps cquery "deps(//projects/libs/core:core_wasm)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return;
 
     await $({
@@ -74,7 +74,7 @@ test("cpp wasm static lib compiles with header_deps via nix_cpp_headers (build)"
       stdio: "pipe",
       reject: false,
       nothrow: true,
-      env: { ...process.env, BUCK_TARGET: "//libs/core:core_wasm" },
+      env: { ...process.env, BUCK_TARGET: "//projects/libs/core:core_wasm" },
     })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
     assert.equal(build.exitCode, 0, String(build.stderr || build.stdout));
   });

@@ -14,12 +14,12 @@ test("cpp link_mode=shared rejects header-only targets", async () => {
     );
 
     await fs.outputFile(
-      path.join(tmp, "libs", "headers", "include", "headers.h"),
+      path.join(tmp, "projects", "libs", "headers", "include", "headers.h"),
       ["#pragma once", "inline int header_only() { return 1; }", ""].join("\n"),
       "utf8",
     );
     await fs.outputFile(
-      path.join(tmp, "libs", "headers", "TARGETS"),
+      path.join(tmp, "projects", "libs", "headers", "TARGETS"),
       [
         'load("//build-tools/cpp:defs.bzl", "nix_cpp_headers")',
         "",
@@ -55,7 +55,7 @@ test("cpp link_mode=shared rejects header-only targets", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-      env: { ...process.env, BUCK_TARGET: "//libs/headers:headers" },
+      env: { ...process.env, BUCK_TARGET: "//projects/libs/headers:headers" },
     })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
     assert.notEqual(build.exitCode, 0, "expected header-only link_mode=shared to fail");
     const err = String(build.stderr || build.stdout || "");

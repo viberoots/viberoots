@@ -3,8 +3,8 @@ load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_static_lib")
 nix_cpp_wasm_static_lib(
     name = "core_wasm",
     srcs = ["src/core.c"],
-    header_deps = ["//libs/{{ name }}-support:headers"],
-    link_deps = ["//libs/{{ name }}-support:support_wasm"],
+    header_deps = ["//projects/libs/{{ name }}-support:headers"],
+    link_deps = ["//projects/libs/{{ name }}-support:support_wasm"],
     wasm_abi = "wasi",
     visibility = ["PUBLIC"],
 )

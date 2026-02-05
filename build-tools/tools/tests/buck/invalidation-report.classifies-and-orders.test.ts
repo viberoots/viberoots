@@ -14,50 +14,52 @@ test("invalidation-report: stable ordering, patch scope classification, and glob
       version: 1,
       nodes: [
         {
-          name: "//apps/py:bin",
+          name: "//projects/apps/py:bin",
           rule_type: "python_binary",
           labels: [
             "lang:python",
             "kind:bin",
             "patch_scope:importer-local",
-            "lockfile:apps/py/uv.lock#apps/py",
+            "lockfile:projects/apps/py/uv.lock#projects/apps/py",
           ],
-          srcs: ["apps/py/main.py"],
+          srcs: ["projects/apps/py/main.py"],
         },
         {
-          name: "//apps/web:bundle",
+          name: "//projects/apps/web:bundle",
           rule_type: "node_webapp",
           labels: [
             "lang:node",
             "kind:bundle",
             "patch_scope:importer-local",
-            "lockfile:apps/web/pnpm-lock.yaml#apps/web",
+            "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",
             "//:flake.lock",
           ],
           srcs: {
             "__global_nix_inputs__/flake_lock": "//:flake.lock",
-            "__patch_inputs__/apps_web_patches_node": "root//apps/web/patches/node/demo.patch",
+            "__patch_inputs__/projects_apps_web_patches_node":
+              "root//projects/apps/web/patches/node/demo.patch",
           },
         },
         {
-          name: "//libs/cpp:lib",
+          name: "//projects/libs/cpp:lib",
           rule_type: "cxx_library",
           labels: ["lang:cpp", "kind:lib", "patch_scope:package-local"],
-          srcs: ["libs/cpp/lib.cc", "libs/cpp/patches/cpp/demo@0.0.0.patch"],
+          srcs: ["projects/libs/cpp/lib.cc", "projects/libs/cpp/patches/cpp/demo@0.0.0.patch"],
         },
         {
-          name: "//libs/cpp:stub",
+          name: "//projects/libs/cpp:stub",
           rule_type: "planner_stub",
           labels: ["lang:cpp", "kind:stub", "patch_scope:package-local"],
           srcs: {
-            "__patch_inputs__/libs_cpp_patches_cpp": "root//libs/cpp/patches/cpp/demo@0.0.0.patch",
+            "__patch_inputs__/projects_libs_cpp_patches_cpp":
+              "root//projects/libs/cpp/patches/cpp/demo@0.0.0.patch",
           },
         },
         {
-          name: "//libs/go:lib",
+          name: "//projects/libs/go:lib",
           rule_type: "go_library",
           labels: ["lang:go", "kind:lib", "patch_scope:package-local"],
-          srcs: ["libs/go/lib.go", "libs/go/patches/go/demo@0.0.0.patch"],
+          srcs: ["projects/libs/go/lib.go", "projects/libs/go/patches/go/demo@0.0.0.patch"],
         },
         {
           name: "//third_party/providers:lf_demo",
@@ -77,8 +79,8 @@ test("invalidation-report: stable ordering, patch scope classification, and glob
       $schema: "https://example.com/schemas/node-lock-index.schema.json",
       version: 1,
       index: {
-        "//apps/web:bundle": "lockfile:apps/web/pnpm-lock.yaml#apps/web",
-        "//apps/py:bin": "lockfile:apps/py/uv.lock#apps/py",
+        "//projects/apps/web:bundle": "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",
+        "//projects/apps/py:bin": "lockfile:projects/apps/py/uv.lock#projects/apps/py",
       },
     };
     await fsp.writeFile(
@@ -90,7 +92,7 @@ test("invalidation-report: stable ordering, patch scope classification, and glob
     const providerIndex = {
       "//third_party/providers:lf_demo": {
         kind: "node",
-        key: "lockfile:apps/web/pnpm-lock.yaml#apps/web",
+        key: "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",
         patch_scope: "importer-local",
       },
     };
@@ -106,7 +108,7 @@ test("invalidation-report: stable ordering, patch scope classification, and glob
         "# GENERATED FILE — DO NOT EDIT.",
         "",
         "MODULE_PROVIDERS = {",
-        '    "//apps/web:bundle": [',
+        '    "//projects/apps/web:bundle": [',
         '        "//third_party/providers:lf_demo",',
         "    ],",
         "}",
@@ -124,10 +126,10 @@ test("invalidation-report: stable ordering, patch scope classification, and glob
     const txt = await fsp.readFile(reportPath, "utf8");
 
     // Stable ordering: targets are sorted lexicographically by normalized label.
-    const idxGo = txt.indexOf("target=//libs/go:lib");
-    const idxCpp = txt.indexOf("target=//libs/cpp:lib");
-    const idxNode = txt.indexOf("target=//apps/web:bundle");
-    const idxPy = txt.indexOf("target=//apps/py:bin");
+    const idxGo = txt.indexOf("target=//projects/libs/go:lib");
+    const idxCpp = txt.indexOf("target=//projects/libs/cpp:lib");
+    const idxNode = txt.indexOf("target=//projects/apps/web:bundle");
+    const idxPy = txt.indexOf("target=//projects/apps/py:bin");
     if ([idxGo, idxCpp, idxNode, idxPy].some((n) => n < 0)) {
       throw new Error(`expected all fixture targets to be present; got:\n${txt}`);
     }
@@ -137,17 +139,17 @@ test("invalidation-report: stable ordering, patch scope classification, and glob
 
     // Patch scope + global nix input expectation for a representative Nix-calling Node macro shape.
     const wantNodeParts = [
-      "target=//apps/web:bundle",
+      "target=//projects/apps/web:bundle",
       "langs=node",
       "patch_scope=importer-local",
       "provider_model=importer-scoped",
-      "lockfile_label=lockfile:apps/web/pnpm-lock.yaml#apps/web",
+      "lockfile_label=lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",
       "global_nix_inputs_action_inputs_expected=true",
       "global_nix_inputs_action_inputs_observed_in=srcs(dict)/__global_nix_inputs__",
       "global_nix_inputs_labels_stamped=true",
       "importer_local_patches_action_inputs_expected=true",
       "importer_local_patches_action_inputs_observed_in=srcs(dict)/__patch_inputs__",
-      "module_providers=[//third_party/providers:lf_demo kind=node key=lockfile:apps/web/pnpm-lock.yaml#apps/web patch_scope=importer-local]",
+      "module_providers=[//third_party/providers:lf_demo kind=node key=lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web patch_scope=importer-local]",
     ];
     for (const part of wantNodeParts) {
       if (!txt.includes(part)) {
@@ -157,14 +159,14 @@ test("invalidation-report: stable ordering, patch scope classification, and glob
 
     // Patch scope classification for representative targets (Go/C++/Python).
     const wantOtherParts = [
-      "target=//libs/go:lib\tlangs=go\tpatch_scope=package-local",
+      "target=//projects/libs/go:lib\tlangs=go\tpatch_scope=package-local",
       "package_local_patches_action_inputs_expected=true",
-      "package_local_patches_action_inputs_observed_in=srcs(list)/libs/go/patches/go",
-      "target=//libs/cpp:lib\tlangs=cpp\tpatch_scope=package-local",
-      "package_local_patches_action_inputs_observed_in=srcs(list)/libs/cpp/patches/cpp",
-      "target=//libs/cpp:stub\tlangs=cpp\tpatch_scope=package-local",
+      "package_local_patches_action_inputs_observed_in=srcs(list)/projects/libs/go/patches/go",
+      "target=//projects/libs/cpp:lib\tlangs=cpp\tpatch_scope=package-local",
+      "package_local_patches_action_inputs_observed_in=srcs(list)/projects/libs/cpp/patches/cpp",
+      "target=//projects/libs/cpp:stub\tlangs=cpp\tpatch_scope=package-local",
       "package_local_patches_action_inputs_observed_in=srcs(dict)/__patch_inputs__",
-      "target=//apps/py:bin\tlangs=python\tpatch_scope=importer-local",
+      "target=//projects/apps/py:bin\tlangs=python\tpatch_scope=importer-local",
     ];
     for (const part of wantOtherParts) {
       if (!txt.includes(part)) {

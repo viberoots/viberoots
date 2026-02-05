@@ -2,20 +2,35 @@
 
 This repo wires Go builds with Buck2 orchestrating “what” and Nix deciding “how”. Third‑party dependencies are resolved by `gomod2nix.toml` (no vendoring), and tests validate Nix‑built artifacts using a manifest.
 
+## Repo layout (final)
+
+- `build-tools/` — build system and tooling root
+- `build-tools/lang/` — shared Starlark helpers
+- `build-tools/tools/` — zx/Node tooling
+- `build-tools/docs/` — build-system docs
+- `build-tools/docs/lang/` — language design docs
+- `projects/apps/` — application roots
+- `projects/libs/` — library roots
+- `docs/build-history/` — historical build notes
+- `patches/` — repo-level patch overlays
+- `third_party/` — external provider and vendored metadata
+- `toolchains/` — Buck toolchain wiring
+- `target_platforms/` — platform definitions
+
 ## Quickstart (CLI + lib)
 
 1. Scaffold
 
 ```
-scaf new go lib demo-lib --yes --path=libs/demo-lib
-scaf new go cli demo-cli --yes --path=apps/demo-cli
+scaf new go lib demo-lib --yes --path=projects/libs/demo-lib
+scaf new go cli demo-cli --yes --path=projects/apps/demo-cli
 ```
 
 2. Generate module lock and copy to repo root (authoritative)
 
 ```
-build-tools/tools/bin/gomod2nix --dir apps/demo-cli
-cp apps/demo-cli/gomod2nix.toml gomod2nix.toml
+build-tools/tools/bin/gomod2nix --dir projects/apps/demo-cli
+cp projects/apps/demo-cli/gomod2nix.toml gomod2nix.toml
 ```
 
 3. Glue (strict: export graph → unified sync-providers → auto_map)
@@ -31,7 +46,7 @@ node build-tools/tools/dev/install-deps.ts --glue-only
 
 ```
 nix build .#graph-generator
-jq -r '.[] | select(.label=="//apps/demo-cli:demo-cli") | .bins[0]' buck-go/manifest.json
+jq -r '.[] | select(.label=="//projects/apps/demo-cli:demo-cli") | .bins[0]' buck-go/manifest.json
 ```
 
 5. Dev build helper (runs startup check, glue refresh, then Buck)
@@ -102,13 +117,13 @@ This file is not required for builds; it is used by build-tools/tools/tests for 
 - Generate a minimal, passing test with the scaffolding CLI:
 
 ```
-scaf new go test handlers --path=libs/demo-lib/pkg/demo-lib/handlers_test.go
-scaf new go test main_case --path=apps/demo-cli/cmd/demo-cli/main_case_test.go
+scaf new go test handlers --path=projects/libs/demo-lib/pkg/demo-lib/handlers_test.go
+scaf new go test main_case --path=projects/apps/demo-cli/cmd/demo-cli/main_case_test.go
 ```
 
 - Auto‑wiring rules (no TARGETS edits):
-  - Libs: tests under `libs/<lib>/pkg/<pkg>/**/_test.go` are discovered and bound to `//libs/<lib>:<lib>_test`.
-  - Apps: tests under `apps/<app>/cmd/<app>/**/_test.go` are discovered and bound to `//apps/<app>:<app>_test`.
+  - Libs: tests under `projects/libs/<lib>/pkg/<pkg>/**/_test.go` are discovered and bound to `//projects/libs/<lib>:<lib>_test`.
+  - Apps: tests under `projects/apps/<app>/cmd/<app>/**/_test.go` are discovered and bound to `//projects/apps/<app>:<app>_test`.
   - Package name is inferred from existing files; under `/cmd/` it defaults to `main`.
 
 Further reading: `build-tools/docs/build-system-design.md`, `docs/handbook/`.

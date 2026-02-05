@@ -54,8 +54,8 @@ test("language classification registry preserves validation wording", () => {
     const out = findingsFor(
       [
         {
-          name: "//apps/web:bundle",
-          labels: ["lockfile:apps/web/pnpm-lock.yaml#apps/web"],
+          name: "//projects/apps/web:bundle",
+          labels: ["lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"],
         },
       ],
       "node",
@@ -70,7 +70,7 @@ test("language classification registry preserves validation wording", () => {
 
   {
     const out = findingsFor(
-      [{ name: "//apps/pytool:bin", srcs: ["apps/pytool/main.py"] }],
+      [{ name: "//projects/apps/pytool:bin", srcs: ["projects/apps/pytool/main.py"] }],
       "python",
     );
     assert.equal(out.length, 1);

@@ -17,12 +17,12 @@ EOF'`;
       cwd: tmp,
     })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
 MODULE_PROVIDERS = {
-  "//apps/demo:wasm_app": ["//third_party/providers:prov"],
+  "//projects/apps/demo:wasm_app": ["//third_party/providers:prov"],
 }
 EOF'`;
 
     // Minimal importer with uv.lock and wasm app target
-    const appDir = path.join(tmp, "apps", "demo");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     await fs.mkdirp(path.join(appDir, "src"));
     await fs.outputFile(
       path.join(appDir, "uv.lock"),
@@ -37,7 +37,7 @@ EOF'`;
         "",
         "nix_python_wasm_app(",
         '  name = "wasm_app",',
-        '  lockfile_label = "lockfile:apps/demo/uv.lock#apps/demo",',
+        '  lockfile_label = "lockfile:projects/apps/demo/uv.lock#projects/apps/demo",',
         '  srcs = glob(["**/*.py"]),',
         ")",
         "",
@@ -62,7 +62,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir py_prov cquery "deps(//apps/demo:wasm_app)" --json --output-attribute name`;
+    })`buck2 --isolation-dir py_prov cquery "deps(//projects/apps/demo:wasm_app)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return; // skip if prelude not available
     const out = String(probe.stdout || "");
     if (!out.includes("//third_party/providers:prov")) {

@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
+import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
-import fs from "fs-extra";
 
 test("node lib scaffold: TARGETS includes lockfile label and auto_map wires provider", async () => {
   await runInTemp("node-lib-scaffold-wiring", async (tmp, _$) => {
@@ -10,16 +10,18 @@ test("node lib scaffold: TARGETS includes lockfile label and auto_map wires prov
     // Skip lockfile generation: this test only asserts label wiring and provider mapping generation.
     // The primary lockfile generation path is exercised elsewhere.
     await $`scaf new node lib demo --yes --skip-lockfile-gen`;
-    const lockLabel = "lockfile:libs/demo/pnpm-lock.yaml#libs/demo";
-    const tPath = path.join(tmp, "libs", "demo", "TARGETS");
+    const lockLabel = "lockfile:projects/libs/demo/pnpm-lock.yaml#projects/libs/demo";
+    const tPath = path.join(tmp, "projects", "libs", "demo", "TARGETS");
     const txt = await fs.readFile(tPath, "utf8");
-    if (!txt.includes(lockLabel)) throw new Error("lockfile label missing in TARGETS");
+    if (txt.includes("lockfile:")) {
+      throw new Error("lockfile label should be inferred, not explicit in TARGETS");
+    }
 
     await fs.outputJson(
       path.join(tmp, "build-tools", "tools", "buck", "graph.json"),
       [
         {
-          name: "//libs/demo:demo",
+          name: "//projects/libs/demo:demo",
           rule_type: "genrule",
           labels: [lockLabel, "lang:node", "kind:lib"],
         },
@@ -31,7 +33,7 @@ test("node lib scaffold: TARGETS includes lockfile label and auto_map wires prov
       path.join(tmp, "third_party", "providers", "auto_map.bzl"),
       "utf8",
     );
-    if (!autoMap.includes("//libs/demo:demo"))
+    if (!autoMap.includes("//projects/libs/demo:demo"))
       throw new Error("auto_map missing provider mapping for demo");
   });
 });

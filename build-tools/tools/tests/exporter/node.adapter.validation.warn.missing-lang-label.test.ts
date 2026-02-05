@@ -12,9 +12,9 @@ test("node adapter warns when macro-stamped target lacks lang:node (warn mode)",
     // but is missing the lang:node label.
     const nodes = [
       {
-        name: "//apps/web:bundle",
+        name: "//projects/apps/web:bundle",
         rule_type: "genrule",
-        labels: ["kind:bundle", "lockfile:apps/web/pnpm-lock.yaml#apps/web"],
+        labels: ["kind:bundle", "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"],
       },
     ];
     const sim = path.join(tmp, "build-tools/tools/buck/simulated.json");

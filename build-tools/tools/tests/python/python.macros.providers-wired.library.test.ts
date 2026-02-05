@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import assert from "node:assert/strict";
 import fs from "fs-extra";
+import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
@@ -17,11 +17,11 @@ EOF'`;
       cwd: tmp,
     })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
 MODULE_PROVIDERS = {
-  "//apps/demo:lib": ["//third_party/providers:prov"],
+  "//projects/apps/demo:lib": ["//third_party/providers:prov"],
 }
 EOF'`;
 
-    const appDir = path.join(tmp, "apps", "demo");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     await fs.mkdirp(path.join(appDir, "src"));
     await fs.outputFile(path.join(appDir, "src", "main.py"), "print('ok')\n", "utf8");
     await fs.outputFile(
@@ -36,7 +36,7 @@ EOF'`;
         "",
         "nix_python_library(",
         '  name = "lib",',
-        '  lockfile_label = "lockfile:apps/demo/uv.lock#apps/demo",',
+        '  lockfile_label = "lockfile:projects/apps/demo/uv.lock#projects/apps/demo",',
         '  srcs = glob(["**/*.py"]),',
         ")",
         "",
@@ -49,7 +49,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir py_prov_lib cquery "deps(//apps/demo:lib)" --json --output-attribute name`;
+    })`buck2 --isolation-dir py_prov_lib cquery "deps(//projects/apps/demo:lib)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return;
 
     const out = String(probe.stdout || "");

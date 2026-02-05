@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 test("patch-python apply writes canonical patch and refreshes glue", async () => {
   await runInTemp("patch-python-apply", async (tmp, $) => {
     // Create a minimal Python importer with uv.lock
-    const importer = path.join(tmp, "apps", "pytool");
+    const importer = path.join(tmp, "projects", "apps", "pytool");
     await fs.mkdirp(importer);
     const uvLock = ["# uv lock", "[[package]]", 'name = "requests"', 'version = "2.32.3"', ""].join(
       "\n",
@@ -54,9 +54,9 @@ test("patch-python apply writes canonical patch and refreshes glue", async () =>
     }
     const txt = await fs.readFile(auto, "utf8");
     if (
-      !txt.includes('lockfile="apps/pytool/uv.lock"') ||
-      !txt.includes('importer="apps/pytool"') ||
-      !txt.includes("apps/pytool/patches/python/requests@2.32.3.patch")
+      !txt.includes('lockfile="projects/apps/pytool/uv.lock"') ||
+      !txt.includes('importer="projects/apps/pytool"') ||
+      !txt.includes("projects/apps/pytool/patches/python/requests@2.32.3.patch")
     ) {
       console.error("providers file missing expected importer or patch entries");
       process.exit(2);

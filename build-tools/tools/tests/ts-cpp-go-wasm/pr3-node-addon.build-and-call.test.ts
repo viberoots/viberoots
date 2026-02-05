@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import { test } from "node:test";
 import path from "node:path";
+import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
 test("PR-3 Node N-API addon builds and returns add(2,3)=5 (temp repo)", async () => {
@@ -10,19 +10,19 @@ test("PR-3 Node N-API addon builds and returns add(2,3)=5 (temp repo)", async ()
     // Enable C++ (and Go implicitly via planner) in this temp workspace for the planner path
     await sh`bash --noprofile --norc -c 'mkdir -p build-tools/tools/nix && printf %s \'{"enabled":["cpp"]}\' > build-tools/tools/nix/langs.json'`;
 
-    // libs/math-core — minimal C++ core (not strictly required by the binding, but present per plan)
-    await sh`bash --noprofile --norc -c 'mkdir -p libs/math-core/include/core libs/math-core/src/core'`;
-    await sh`bash --noprofile --norc -c 'cat > libs/math-core/include/core/math.h <<"EOF"
+    // projects/libs/math-core — minimal C++ core (not strictly required by the binding, but present per plan)
+    await sh`bash --noprofile --norc -c 'mkdir -p projects/libs/math-core/include/core projects/libs/math-core/src/core'`;
+    await sh`bash --noprofile --norc -c 'cat > projects/libs/math-core/include/core/math.h <<"EOF"
 #pragma once
 int add_ints(int a, int b);
 EOF'`;
-    await sh`bash --noprofile --norc -c 'cat > libs/math-core/src/core/math.cc <<"EOF"
+    await sh`bash --noprofile --norc -c 'cat > projects/libs/math-core/src/core/math.cc <<"EOF"
 #include "core/math.h"
 int add_ints(int a, int b) {
   return a + b;
 }
 EOF'`;
-    await sh`bash --noprofile --norc -c 'cat > libs/math-core/TARGETS <<"EOF"
+    await sh`bash --noprofile --norc -c 'cat > projects/libs/math-core/TARGETS <<"EOF"
 load("//build-tools/cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
@@ -35,9 +35,9 @@ nix_cpp_library(
 )
 EOF'`;
 
-    // libs/math-api — minimal Go c-archive exporting Add (pure Go for simplicity and determinism here)
-    await sh`bash --noprofile --norc -c 'mkdir -p libs/math-api/pkg/addon'`;
-    await sh`bash --noprofile --norc -c 'cat > libs/math-api/pkg/addon/export.go <<"EOF"
+    // projects/libs/math-api — minimal Go c-archive exporting Add (pure Go for simplicity and determinism here)
+    await sh`bash --noprofile --norc -c 'mkdir -p projects/libs/math-api/pkg/addon'`;
+    await sh`bash --noprofile --norc -c 'cat > projects/libs/math-api/pkg/addon/export.go <<"EOF"
 package main
 
 // #include <stdint.h>
@@ -50,20 +50,20 @@ func Add(a, b C.int) C.int {
 
 func main() {}
 EOF'`;
-    await sh`bash --noprofile --norc -c 'cat > libs/math-api/go.mod <<"EOF"
+    await sh`bash --noprofile --norc -c 'cat > projects/libs/math-api/go.mod <<"EOF"
 module example.com/math/api
 
 go 1.22.0
 EOF'`;
     // Minimal gomod2nix (no deps) so the planner can resolve modulesTomlFor for this Go target.
-    await sh`bash --noprofile --norc -c 'cat > libs/math-api/gomod2nix.toml <<"EOF"
+    await sh`bash --noprofile --norc -c 'cat > projects/libs/math-api/gomod2nix.toml <<"EOF"
 schema = 3
 mod = {}
 replace = {}
 prune = { go-tests = true, unused-packages = true }
 EOF'`;
     // TARGETS declaring a Go c-archive
-    await sh`bash --noprofile --norc -c 'cat > libs/math-api/TARGETS <<"EOF"
+    await sh`bash --noprofile --norc -c 'cat > projects/libs/math-api/TARGETS <<"EOF"
 load("//build-tools/go:defs.bzl", "nix_go_carchive")
 
 nix_go_carchive(
@@ -76,9 +76,9 @@ nix_go_carchive(
 )
 EOF'`;
 
-    // libs/math-native — Node N-API addon binding to the Go c-archive's exported Add
-    await sh`bash --noprofile --norc -c 'mkdir -p libs/math-native/src'`;
-    await sh`bash --noprofile --norc -c 'cat > libs/math-native/src/binding.cc <<"EOF"
+    // projects/libs/math-native — Node N-API addon binding to the Go c-archive's exported Add
+    await sh`bash --noprofile --norc -c 'mkdir -p projects/libs/math-native/src'`;
+    await sh`bash --noprofile --norc -c 'cat > projects/libs/math-native/src/binding.cc <<"EOF"
 #include <node_api.h>
 #include <assert.h>
 #include <stdint.h>
@@ -112,7 +112,7 @@ static napi_value Init(napi_env env, napi_value exports) {
 
 NAPI_MODULE(NODE_GYP_MODULE_NAME, Init);
 EOF'`;
-    await sh`bash --noprofile --norc -c 'cat > libs/math-native/TARGETS <<"EOF"
+    await sh`bash --noprofile --norc -c 'cat > projects/libs/math-native/TARGETS <<"EOF"
 load("//build-tools/cpp:defs.bzl", "nix_cpp_node_addon")
 
 nix_cpp_node_addon(
@@ -120,8 +120,8 @@ nix_cpp_node_addon(
     srcs = ["src/binding.cc"],
     # Link to the Go c-archive; include math-core lib as present in plan (not required by binding)
     deps = [
-        "//libs/math-api:carchive",
-        "//libs/math-core:lib",
+        "//projects/libs/math-api:carchive",
+        "//projects/libs/math-core:lib",
     ],
     labels = ["lang:cpp", "kind:addon"],
     visibility = ["PUBLIC"],
@@ -142,7 +142,7 @@ EOF'`;
       nothrow: true,
       env: {
         ...process.env,
-        BUCK_TARGET: "//libs/math-native:napi_addon",
+        BUCK_TARGET: "//projects/libs/math-native:napi_addon",
         WORKSPACE_ROOT: tmp,
         BUCK_TEST_SRC: tmp,
       },
@@ -155,7 +155,7 @@ EOF'`;
     if (!outPath) {
       throw new Error("nix build-selected did not emit an out path");
     }
-    const addonPath = path.join(outPath, "lib", "libs-math-native-napi_addon.node");
+    const addonPath = path.join(outPath, "lib", "projects-libs-math-native-napi_addon.node");
     const probe = await $({
       cwd: tmp,
       stdio: "pipe",

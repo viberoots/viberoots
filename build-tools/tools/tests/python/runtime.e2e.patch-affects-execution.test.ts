@@ -13,7 +13,7 @@ test("python runtime e2e: app output changes after patch apply", async () => {
 
     // 1) Scaffold a minimal python app
     const appName = "demo_pyapp";
-    const app = path.join(tmp, "apps", appName);
+    const app = path.join(tmp, "projects", "apps", appName);
     await $`scaf new python app ${appName} --yes --path=${app}`;
 
     // Wire the app to import a dist "mydep" and print its message
@@ -60,10 +60,13 @@ test("python runtime e2e: app output changes after patch apply", async () => {
     const graphDir = path.join(tmp, "build-tools", "tools", "buck");
     await fs.mkdirp(graphDir);
     const node = {
-      name: `//apps/${appName}:${appName}`,
+      name: `//projects/apps/${appName}:${appName}`,
       rule_type: "python_binary",
       labels: ["lang:python", "kind:bin"],
-      srcs: [`apps/${appName}/bin/__main__.py`, `apps/${appName}/src/${appName}/__init__.py`],
+      srcs: [
+        `projects/apps/${appName}/bin/__main__.py`,
+        `projects/apps/${appName}/src/${appName}/__init__.py`,
+      ],
     };
     await fs.writeFile(
       path.join(graphDir, "graph.json"),
@@ -78,7 +81,7 @@ test("python runtime e2e: app output changes after patch apply", async () => {
         cwd: tmp,
         env: {
           ...process.env,
-          BUCK_TARGET: `//apps/${appName}:${appName}`,
+          BUCK_TARGET: `//projects/apps/${appName}:${appName}`,
           BUCK_TEST_SRC: tmp,
           NIX_PY_TEST_RESOLVE_JSON: JSON.stringify({
             mydep: { version: "1.0.0", originPath: originRel },
@@ -96,7 +99,7 @@ test("python runtime e2e: app output changes after patch apply", async () => {
         process.exit(2);
       }
       // Execute wrapper
-      const bin = path.join(outPath, "bin", `py-apps-${appName}-${appName}`);
+      const bin = path.join(outPath, "bin", `py-projects-apps-${appName}-${appName}`);
       const { stdout } = await $({ cwd: tmp, stdio: "pipe" })`${bin}`;
       const out = String(stdout || "").trim();
       if (out !== expect) {

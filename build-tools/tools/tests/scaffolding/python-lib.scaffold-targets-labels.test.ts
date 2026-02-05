@@ -12,9 +12,9 @@ test("python lib scaffold TARGETS has importer-scoped lockfile label", async () 
     const name = "demo_pylib";
     await $`scaf new python lib ${name} --yes`;
 
-    const targetsPath = path.join(tmp, "libs", name, "TARGETS");
+    const targetsPath = path.join(tmp, "projects", "libs", name, "TARGETS");
     const txt = await fsp.readFile(targetsPath, "utf8");
-    const expectLabel = `lockfile:libs/${name}/uv.lock#libs/${name}`;
+    const expectLabel = `lockfile:projects/libs/${name}/uv.lock#projects/libs/${name}`;
     if (!txt.includes(expectLabel)) {
       throw new Error(`TARGETS missing importer-scoped lockfile label: ${expectLabel}`);
     }

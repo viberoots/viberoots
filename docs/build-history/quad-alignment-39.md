@@ -44,7 +44,7 @@ Non-goals in this PR:
 
 - Add a parity test that proves the planner’s Nix “target → attr suffix” helper matches the canonical contract:
   - TS (`build-tools/tools/lib/labels.ts:sanitizeAttrNameFromLabel`) vs Nix (`build-tools/tools/nix/lib/lang-helpers.nix:sanitizeAttrNameFromTargetLabel`).
-  - Include a small matrix: cell prefixes, config suffixes, mixed punctuation, and representative `//apps/*` / `//libs/*` labels.
+  - Include a small matrix: cell prefixes, config suffixes, mixed punctuation, and representative `//projects/apps/*` / `//projects/libs/*` labels.
 - Add (or extend) an integration-ish planner test that asserts the exported “flat attrset keying” remains stable for a small fixture graph.
 
 ### Docs (in this PR)

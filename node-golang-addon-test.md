@@ -4,7 +4,7 @@ I’m designing a single, self‑contained E2E test that exercises a real user f
 
 ### Scope
 
-- Scaffold `libs/<name>`, `libs/<name>-go`, `libs/<name>-native` via `scaf new node go-addon`.
+- Scaffold `projects/libs/<name>`, `projects/libs/<name>-go`, `projects/libs/<name>-native` via `scaf new node go-addon`.
 - Generate an importer lockfile for the Node package, update the PNPM fixed-output digest mapping, and warm caches.
 - Build the Nix `node-test.<importer>` derivation for the importer and validate the test report.
 - Validate the addon’s loader path and a simple call that crosses Node → C N‑API → Go C API.
@@ -22,7 +22,7 @@ Out of scope: performance measurements, multi‑importer scenarios, and platform
 
 - CLI: `scaf` to create the three sibling packages.
 - Buck2 + Nix planner: `nix_cpp_node_addon` links the Go c‑archive exposed by `nix_go_carchive`.
-- Node importer workflow: PNPM lockfile for `libs/<name>`; `build-tools/tools/dev/update-pnpm-hash.ts` for FOD alignment.
+- Node importer workflow: PNPM lockfile for `projects/libs/<name>`; `build-tools/tools/dev/update-pnpm-hash.ts` for FOD alignment.
 - Test helper: `build-tools/tools/tests/lib/test-helpers.ts` (`runInTemp`) to run in an isolated temp repo.
 
 ### Test location and naming
@@ -53,9 +53,9 @@ Out of scope: performance measurements, multi‑importer scenarios, and platform
 - Init a git repo (some glue helpers expect a repo, and pure Nix snapshots read committed files).
 - Run: `scaf new node go-addon demo --yes`
 - Assert presence of:
-  - `libs/demo/package.json`, `libs/demo/src/index.ts`, `libs/demo/TARGETS`
-  - `libs/demo-go/pkg/addon/addon.go`, `libs/demo-go/TARGETS`
-  - `libs/demo-native/src/binding.c`, `libs/demo-native/TARGETS`
+  - `projects/libs/demo/package.json`, `projects/libs/demo/src/index.ts`, `projects/libs/demo/TARGETS`
+  - `projects/libs/demo-go/pkg/addon/addon.go`, `projects/libs/demo-go/TARGETS`
+  - `projects/libs/demo-native/src/binding.c`, `projects/libs/demo-native/TARGETS`
 - Commit scaffold output so Nix flake snapshots see the importer.
 
 Measurable checkpoints:
@@ -65,18 +65,18 @@ Measurable checkpoints:
 
 ### Phase 2 — Lockfile + FOD alignment + cache warmup
 
-- Importer path: `libs/demo` (sanitized id: `libs_demo`).
+- Importer path: `projects/libs/demo` (sanitized id: `projects_libs_demo`).
 - If missing, generate lockfile for the importer using Nix‑provided PNPM (lockfile‑only, no install):
 
 ```bash
 bash --noprofile --norc -c '
   set -euo pipefail
-  mkdir -p "libs/demo/.pnpm-home" "libs/demo/.pnpm-store"
-  export PNPM_HOME="libs/demo/.pnpm-home"
-  nix run .#pnpm --accept-flake-config -- config set store-dir "libs/demo/.pnpm-store"
+  mkdir -p "projects/libs/demo/.pnpm-home" "projects/libs/demo/.pnpm-store"
+  export PNPM_HOME="projects/libs/demo/.pnpm-home"
+  nix run .#pnpm --accept-flake-config -- config set store-dir "projects/libs/demo/.pnpm-store"
   nix run .#pnpm --accept-flake-config -- \
-    install --filter "./libs/demo" --lockfile-only --prod=false \
-    --ignore-scripts --lockfile-dir "./libs/demo" --dir "./libs/demo"
+    install --filter "./projects/libs/demo" --lockfile-only --prod=false \
+    --ignore-scripts --lockfile-dir "./projects/libs/demo" --dir "./projects/libs/demo"
 '
 ```
 
@@ -84,7 +84,7 @@ bash --noprofile --norc -c '
 - Update fixed‑output digest mapping for the importer:
 
 ```bash
-zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile libs/demo/pnpm-lock.yaml
+zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile projects/libs/demo/pnpm-lock.yaml
 ```
 
 - Warm PNPM store and Node modules caches (10‑minute external timeouts are acceptable for single builds):
@@ -98,7 +98,7 @@ bash --noprofile --norc -c '
 
 Measurable checkpoints:
 
-- `libs/demo/pnpm-lock.yaml` exists and is committed.
+- `projects/libs/demo/pnpm-lock.yaml` exists and is committed.
 - `update-pnpm-hash.ts` finishes without errors.
 - Both warmup builds complete successfully.
 
@@ -126,13 +126,13 @@ Measurable checkpoints:
 - Sanity that the loader uses a stable path (`native/<addon_name>.node`) and respects `ADDON_PATH`:
 
 ```bash
-node -e "const { add } = await import('./libs/demo/dist/index.js').catch(()=>({})); if (typeof add !== 'function') process.exit(2); if (add(2,3) !== 5) process.exit(3);"
+node -e "const { add } = await import('./projects/libs/demo/dist/index.js').catch(()=>({})); if (typeof add !== 'function') process.exit(2); if (add(2,3) !== 5) process.exit(3);"
 ```
 
 - Optionally, re‑run with:
 
 ```bash
-ADDON_PATH=./libs/demo/native/demo_addon.node node -e "/* same check */"
+ADDON_PATH=./projects/libs/demo/native/demo_addon.node node -e "/* same check */"
 ```
 
 Measurable checkpoints:
@@ -199,13 +199,13 @@ test("node go-addon: scaffold, build addon, and pass nix_node_test", async () =>
     await $`scaf new node go-addon demo --yes`;
     // Existence checks (Node, Go, Native)
     for (const p of [
-      "libs/demo/package.json",
-      "libs/demo/src/index.ts",
-      "libs/demo/TARGETS",
-      "libs/demo-go/pkg/addon/addon.go",
-      "libs/demo-go/TARGETS",
-      "libs/demo-native/src/binding.c",
-      "libs/demo-native/TARGETS",
+      "projects/libs/demo/package.json",
+      "projects/libs/demo/src/index.ts",
+      "projects/libs/demo/TARGETS",
+      "projects/libs/demo-go/pkg/addon/addon.go",
+      "projects/libs/demo-go/TARGETS",
+      "projects/libs/demo-native/src/binding.c",
+      "projects/libs/demo-native/TARGETS",
     ]) {
       if (!(await exists(path.join(tmp, p)))) throw new Error(`missing ${p}`);
     }
@@ -214,7 +214,7 @@ test("node go-addon: scaffold, build addon, and pass nix_node_test", async () =>
     await $`bash -lc 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
 
     // Ensure importer lockfile
-    const importer = "libs/demo";
+    const importer = "projects/libs/demo";
     const sanitized = "libs_demo";
     const lockfile = path.join(importer, "pnpm-lock.yaml");
     let hasLock = await fsp

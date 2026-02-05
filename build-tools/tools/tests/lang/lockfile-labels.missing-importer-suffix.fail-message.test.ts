@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("ensure_single_lockfile_label rejects labels missing '#<importer>' suffix (stable error text)", async () => {
   await runInTemp("lockfile-label-missing-importer-suffix", async (tmp, $) => {
-    const dir = path.join(tmp, "apps", "web");
+    const dir = path.join(tmp, "projects", "apps", "web");
     await fsp.mkdir(dir, { recursive: true });
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
@@ -16,7 +16,7 @@ test("ensure_single_lockfile_label rejects labels missing '#<importer>' suffix (
         "",
         "node_webapp(",
         '  name = "bundle",',
-        '  labels = ["lang:node", "kind:app", "lockfile:apps/web/pnpm-lock.yaml"],',
+        '  labels = ["lang:node", "kind:app", "lockfile:projects/apps/web/pnpm-lock.yaml"],',
         ")",
         "",
       ].join("\n"),
@@ -28,7 +28,7 @@ test("ensure_single_lockfile_label rejects labels missing '#<importer>' suffix (
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 build //apps/web:bundle`;
+    })`buck2 build //projects/apps/web:bundle`;
 
     assert.notEqual(
       res.exitCode,

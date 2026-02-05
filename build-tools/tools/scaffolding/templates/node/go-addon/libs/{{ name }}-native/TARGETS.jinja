@@ -6,7 +6,7 @@ nix_cpp_node_addon(
         "src/binding.c",
     ],
     headers = glob(["include/**/*.h"]),
-    deps = ["//libs/{{ name }}-go:carchive"],
+    deps = ["//projects/libs/{{ name }}-go:carchive"],
     addon_name = "{{ addon_name }}",
     labels = ["lang:cpp", "kind:addon"],
     visibility = ["PUBLIC"],

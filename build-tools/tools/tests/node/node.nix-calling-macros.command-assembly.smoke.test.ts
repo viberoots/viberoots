@@ -22,7 +22,7 @@ function assertCmdInvariants(cmd: string, label: string) {
 
 test("node Nix-calling macros use standardized command assembly helpers (cquery smoke)", async () => {
   await runInTemp("node-nix-calling-cmd-assembly-smoke", async (tmp, $) => {
-    const appDir = path.join(tmp, "apps", "web");
+    const appDir = path.join(tmp, "projects", "apps", "web");
     await fsp.mkdir(path.join(appDir, "src"), { recursive: true });
     await fsp.writeFile(path.join(appDir, "pnpm-lock.yaml"), "# stub\n", "utf8");
     await fsp.writeFile(path.join(appDir, "src", "index.ts"), "console.log('cli')\n", "utf8");
@@ -34,13 +34,13 @@ test("node Nix-calling macros use standardized command assembly helpers (cquery 
         "",
         "node_webapp(",
         '  name = "bundle",',
-        '  labels = ["lockfile:apps/web/pnpm-lock.yaml#apps/web"],',
+        '  labels = ["lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"],',
         ")",
         "",
         "nix_node_cli_bin(",
         '  name = "tool",',
         "  bundle = True,",
-        '  labels = ["lockfile:apps/web/pnpm-lock.yaml#apps/web"],',
+        '  labels = ["lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"],',
         ")",
         "",
       ].join("\n"),
@@ -52,7 +52,7 @@ test("node Nix-calling macros use standardized command assembly helpers (cquery 
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cmd //apps/web:bundle`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cmd //projects/apps/web:bundle`;
     if (app.exitCode !== 0) return;
     assertCmdInvariants(String(app.stdout || ""), "node_webapp");
 
@@ -61,7 +61,7 @@ test("node Nix-calling macros use standardized command assembly helpers (cquery 
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cmd //apps/web:tool`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cmd //projects/apps/web:tool`;
     if (cli.exitCode !== 0) return;
     assertCmdInvariants(String(cli.stdout || ""), "nix_node_cli_bin(bundle=True)");
   });

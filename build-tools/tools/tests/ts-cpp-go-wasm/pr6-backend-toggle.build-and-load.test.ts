@@ -1,6 +1,5 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
-import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
@@ -8,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 test("pr6: backend toggle tinygo_single and emscripten_dual both return add(2,3)=5", async () => {
   await runInTemp("pr6-backend-toggle", async (tmp, $) => {
     // 1) Scaffold minimal C wrapper and header (pure compute) in a temp repo
-    const coreDir = path.join(tmp, "libs", "math-core");
+    const coreDir = path.join(tmp, "projects", "libs", "math-core");
     await fsp.mkdir(path.join(coreDir, "include"), { recursive: true });
     await fsp.mkdir(path.join(coreDir, "src", "cwrapper"), { recursive: true });
     await fsp.writeFile(
@@ -53,7 +52,7 @@ nix_cpp_wasm_emscripten_lib(
     );
 
     // 2) TinyGo package exporting a wasm function `add`
-    const apiDir = path.join(tmp, "libs", "math-api");
+    const apiDir = path.join(tmp, "projects", "libs", "math-api");
     await fsp.mkdir(apiDir, { recursive: true });
     await fsp.writeFile(
       path.join(apiDir, "go.mod"),
@@ -81,7 +80,7 @@ func main() {}
 nix_go_tiny_wasm_lib(
     name = "wasm",
     srcs = ["main.go"],
-    deps = ["//libs/math-core:core_wasm"],
+    deps = ["//projects/libs/math-core:core_wasm"],
     labels = ["lang:go", "kind:wasm"],
     visibility = ["PUBLIC"],
 )
@@ -110,7 +109,7 @@ nix_go_tiny_wasm_lib(
       stdio: "pipe",
       reject: false,
       nothrow: true,
-      env: { ...process.env, BUCK_TARGET: "//libs/math-api:wasm" },
+      env: { ...process.env, BUCK_TARGET: "//projects/libs/math-api:wasm" },
     })`nix build --impure -L ${`path:${tmp}#graph-generator-selected-wasm`} --accept-flake-config --no-link --print-out-paths`;
     const outWasmPath =
       String(outWasmSel || "")
@@ -139,7 +138,7 @@ nix_go_tiny_wasm_lib(
       nothrow: true,
       env: {
         ...process.env,
-        BUCK_TARGET: "//libs/math-core:core_emscripten",
+        BUCK_TARGET: "//projects/libs/math-core:core_emscripten",
         PLANNER_ONLY_CPP: "1",
         WORKSPACE_ROOT: tmp,
         BUCK_TEST_SRC: tmp,
@@ -163,7 +162,7 @@ nix_go_tiny_wasm_lib(
     const emWasm = path.join(libDir, wasmFile);
 
     // 7) Minimal TS/ESM loader that reads a manifest and returns the API
-    const tsDir = path.join(tmp, "libs", "math-ts", "src", "browser");
+    const tsDir = path.join(tmp, "projects", "libs", "math-ts", "src", "browser");
     await fsp.mkdir(tsDir, { recursive: true });
     const loaderPath = path.join(tsDir, "index.mjs");
     await fsp.writeFile(
@@ -243,7 +242,7 @@ export async function loadFromManifest(manifestPath) {
     );
 
     // 8) Manifests for both backends
-    const manifestsDir = path.join(tmp, "libs", "math-ts", "dist");
+    const manifestsDir = path.join(tmp, "projects", "libs", "math-ts", "dist");
     await fsp.mkdir(manifestsDir, { recursive: true });
     const tinyManifest = path.join(manifestsDir, "manifest.tiny.json");
     const emManifest = path.join(manifestsDir, "manifest.ems.json");

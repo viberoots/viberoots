@@ -16,10 +16,10 @@ test("planner lib kindOf shared helper respects per-language configs", async () 
         cppCfg = kindConfigs.cpp;
         pyCfg = kindConfigs.python;
         nodeCfg = kindConfigs.node;
-        goA = L.kindOf { labels = [ "kind:carchive" "kind:bin" ]; ruleType = "go_binary"; name = "//apps/goapp:goapp"; config = goCfg; };
+        goA = L.kindOf { labels = [ "kind:carchive" "kind:bin" ]; ruleType = "go_binary"; name = "//projects/apps/goapp:goapp"; config = goCfg; };
         goB = L.kindOf { labels = [ "lang:go" ]; ruleType = "go_binary"; config = goCfg; };
         goC = L.kindOf { labels = [ "kind:bin" ]; ruleType = "other"; config = goCfg; };
-        cppA = L.kindOf { labels = [ "kind:lib" ]; ruleType = "cxx_library"; name = "//apps/cpp:demo__planner"; config = cppCfg; };
+        cppA = L.kindOf { labels = [ "kind:lib" ]; ruleType = "cxx_library"; name = "//projects/apps/cpp:demo__planner"; config = cppCfg; };
         cppB = L.kindOf { labels = []; ruleType = "cxx_binary"; config = cppCfg; };
         cppC = L.kindOf { labels = []; ruleType = "other"; config = cppCfg; };
         pyA = L.kindOf { labels = [ "kind:pyext" ]; ruleType = "python_library"; config = pyCfg; };

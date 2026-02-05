@@ -1,10 +1,10 @@
-## PR 8.5 — Vite-based Webapp Template (apps/\*)
+## PR 8.5 — Vite-based Webapp Template (projects/apps/\*)
 
 This document specifies the design for adding a Vite + TypeScript webapp template to the scaffolding system, with importer‑scoped provider wiring, hermetic production builds through Nix and Buck, and a clean developer experience for dev mode with HMR/Fast Refresh that does not compromise our build philosophy.
 
 ### Goals
 
-- **Scaffold** a minimal, framework‑neutral “vanilla TS” Vite webapp under `apps/*`.
+- **Scaffold** a minimal, framework‑neutral “vanilla TS” Vite webapp under `projects/apps/*`.
 - **Wire** importer‑scoped Node providers and Buck auto‑map labels for precise invalidation.
 - **Build** production artifacts hermetically (Nix derivation invoked via Buck macro).
 - **Develop** with fast feedback (Vite dev server, HMR/Fast Refresh) without changing hermetic production rules or introducing non‑determinism.
@@ -14,7 +14,7 @@ This document specifies the design for adding a Vite + TypeScript webapp templat
 - **New scaffold template:** `build-tools/tools/scaffolding/templates/node/webapp`
   - Files: `index.html`, `src/main.ts`, `src/style.css`, `vite.config.ts`, `.npmrc`, `tsconfig.json`, `package.json`, `TARGETS`
 - **Scaffolding CLI:** expose template via `scaf new node webapp <name>`; integrate with `build-tools/tools/scaffolding/new-pnpm-project.ts` as `--kind webapp`.
-- **Labels & providers:** template `TARGETS` includes `labels = ["lockfile:apps/<name>/pnpm-lock.yaml#apps/<name>", "lang:node", "kind:app"]` so `gen-auto-map.ts` maps to the importer‑scoped provider.
+- **Labels & providers:** template `TARGETS` includes `labels = ["lockfile:projects/apps/<name>/pnpm-lock.yaml#projects/apps/<name>", "lang:node", "kind:app"]` so `gen-auto-map.ts` maps to the importer‑scoped provider.
 - **Buck macro (initial):** add `node_webapp(...)` to `build-tools/node/defs.bzl` that stamps labels and appends providers from `//third_party/providers:auto_map.bzl`, and uses a zx shim to copy a Nix‑built `dist/` into `$OUT`.
 - **Tests:** add a zx test that scaffolds a webapp, refreshes glue, asserts correct provider mapping, and asserts `dist/index.html` materializes via Buck.
 
@@ -25,7 +25,7 @@ This document specifies the design for adding a Vite + TypeScript webapp templat
 
 ## Design Details
 
-### Template contents (generated under `apps/<name>`)
+### Template contents (generated under `projects/apps/<name>`)
 
 - `.npmrc` (strict isolation + patch location)
 
@@ -38,7 +38,7 @@ patches-dir=patches/node
 
 ```json
 {
-  "name": "@apps/{{ name }}",
+  "name": "@projects/apps/{{ name }}",
   "private": true,
   "type": "module",
   "scripts": {
@@ -103,7 +103,7 @@ load("//build-tools/node:defs.bzl", "node_webapp")
 node_webapp(
     name = "app",
     labels = [
-        "lockfile:apps/{{ name }}/pnpm-lock.yaml#apps/{{ name }}",
+        "lockfile:projects/apps/{{ name }}/pnpm-lock.yaml#projects/apps/{{ name }}",
         "lang:node",
         "kind:app",
     ],
@@ -131,7 +131,7 @@ node_webapp(
 
 - After scaffolding (or when lockfile changes), run:
   - Node providers + downstream glue (canonical): `node build-tools/tools/buck/sync-providers.ts --lang node`
-- The template’s importer‑scoped label ensures only targets that depend on `apps/<name>`’s lockfile provider are invalidated when patches/lockfile change.
+- The template’s importer‑scoped label ensures only targets that depend on `projects/apps/<name>`’s lockfile provider are invalidated when patches/lockfile change.
 
 ## Developer Experience: Dev Mode with HMR / Fast Refresh
 
@@ -152,7 +152,7 @@ We enable fast local iteration via Vite’s dev server while preserving hermetic
 - In the webapp directory:
 
 ```bash
-cd apps/<name>
+cd projects/apps/<name>
 pnpm dev
 ```
 
@@ -173,17 +173,17 @@ pnpm dev
 ## Tests
 
 - Add zx test `build-tools/tools/tests/scaffolding/webapp.scaffold-and-build.test.ts` (one test per file):
-  - Scaffold `apps/demo-web`.
-  - `pnpm -w install --lockfile-only` in `apps/demo-web`.
+  - Scaffold `projects/apps/demo-web`.
+  - `pnpm -w install --lockfile-only` in `projects/apps/demo-web`.
   - Run Node provider sync and auto‑map.
-  - Assert `auto_map.bzl` maps `//apps/demo-web:app` to the expected importer provider.
-  - `buck2 build //apps/demo-web:app` and assert the artifact contains `dist/index.html`.
+  - Assert `auto_map.bzl` maps `//projects/apps/demo-web:app` to the expected importer provider.
+  - `buck2 build //projects/apps/demo-web:app` and assert the artifact contains `dist/index.html`.
 
 - Add zx test `build-tools/tools/tests/scaffolding/webapp.dev-server.running.test.ts` (one test per file):
   - Create a temporary copy of the repo for the test using rsync, excluding `.git`, `node_modules`, `coverage`, and `.clinic` so the main repo is untouched.
-  - In the temp repo, scaffold `apps/demo-web`.
-  - Enter the dev shell (direnv) and install dependencies for only this importer using our installer (e.g. `node build-tools/tools/dev/install-deps.ts --importer apps/demo-web`) so installs do not affect the main repo.
-  - Start the dev server in `apps/demo-web` (e.g. `pnpm dev` with `server.strictPort=true`, optionally setting a known free port) in the background and wait until it is ready.
+  - In the temp repo, scaffold `projects/apps/demo-web`.
+  - Enter the dev shell (direnv) and install dependencies for only this importer using our installer (e.g. `node build-tools/tools/dev/install-deps.ts --importer projects/apps/demo-web`) so installs do not affect the main repo.
+  - Start the dev server in `projects/apps/demo-web` (e.g. `pnpm dev` with `server.strictPort=true`, optionally setting a known free port) in the background and wait until it is ready.
   - Probe `http://127.0.0.1:<port>/` and assert HTTP 200 and expected content (e.g. the page title or root element) to verify it is running.
   - Ensure the server is terminated at the end of the test and apply an external timeout guard so the test cannot hang indefinitely.
 
@@ -209,21 +209,21 @@ pnpm dev
 scaf new node webapp demo --yes
 
 # Lockfile-only for stable inputs
-(cd apps/demo && pnpm -w install --lockfile-only)
+(cd projects/apps/demo && pnpm -w install --lockfile-only)
 
 # Glue
 node build-tools/tools/buck/sync-providers.ts --lang node
 
 # Dev mode (HMR)
-(cd apps/demo && pnpm dev)
+(cd projects/apps/demo && pnpm dev)
 
 # Production build via Buck
-buck2 build //apps/demo:app
+buck2 build //projects/apps/demo:app
 ```
 
 ## Acceptance Criteria
 
 - `scaf new node webapp <name>` generates a working project with `.npmrc`, `package.json`, Vite config, TS config, sources, and `TARGETS`.
-- Glue steps produce an importer‑scoped provider and auto‑map entry for `//apps/<name>:app`.
-- `buck2 cquery 'deps(//apps/<name>:app)'` shows the importer provider.
-- `buck2 build //apps/<name>:app` yields an artifact containing `dist/index.html`.
+- Glue steps produce an importer‑scoped provider and auto‑map entry for `//projects/apps/<name>:app`.
+- `buck2 cquery 'deps(//projects/apps/<name>:app)'` shows the importer provider.
+- `buck2 build //projects/apps/<name>:app` yields an artifact containing `dist/index.html`.

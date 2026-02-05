@@ -29,7 +29,10 @@ test("readGraph handles array shape", async () => {
 test("readGraph handles object-map shape", async () => {
   await runInTemp("graph-read-map", async (tmp, $) => {
     const nodes = {
-      a: { name: "//app:bin", labels: ["lockfile:apps/web/pnpm-lock.yaml#apps/web"] },
+      a: {
+        name: "//app:bin",
+        labels: ["lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"],
+      },
       b: { name: "//lib:core", labels: ["nixpkg:pkgs.zlib"] },
     } as Record<string, any>;
     const dir = path.join(tmp, "build-tools", "tools", "buck");

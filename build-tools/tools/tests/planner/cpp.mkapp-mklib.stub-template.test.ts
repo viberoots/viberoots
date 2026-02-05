@@ -53,8 +53,8 @@ test("cpp mkApp/mkLib delegate to T.cpp* via stub template", async () => {
 
     // Minimal Buck graph including one bin and one lib (rule types drive kind)
     const graph = [
-      { name: "//apps/tool:tool", rule_type: "cxx_binary", labels: [] },
-      { name: "//libs/math:math", rule_type: "cxx_library", labels: [] },
+      { name: "//projects/apps/tool:tool", rule_type: "cxx_binary", labels: [] },
+      { name: "//projects/libs/math:math", rule_type: "cxx_library", labels: [] },
     ];
     await fs.outputFile(
       path.join(tmp, "build-tools/tools/buck/graph.json"),

@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 test("planner builds python binary via selected target when uv.lock present", async () => {
   await runInTemp("planner-python-selected", async (tmp, $) => {
     // Minimal importer with uv.lock
-    const appDir = path.join(tmp, "apps", "pytool");
+    const appDir = path.join(tmp, "projects", "apps", "pytool");
     await fs.mkdirp(appDir);
     await fs.writeFile(path.join(appDir, "uv.lock"), "{}", "utf8");
     await fs.mkdirp(path.join(appDir, "src"));
@@ -17,10 +17,10 @@ test("planner builds python binary via selected target when uv.lock present", as
     const graphDir = path.join(tmp, "build-tools", "tools", "buck");
     await fs.mkdirp(graphDir);
     const node = {
-      name: "//apps/pytool:cli",
+      name: "//projects/apps/pytool:cli",
       rule_type: "python_binary",
       labels: ["lang:python", "kind:bin"],
-      srcs: ["apps/pytool/src/main.py"],
+      srcs: ["projects/apps/pytool/src/main.py"],
     };
     await fs.writeFile(
       path.join(graphDir, "graph.json"),
@@ -36,7 +36,7 @@ test("planner builds python binary via selected target when uv.lock present", as
       env: {
         ...process.env,
         BUCK_TEST_SRC: tmp,
-        BUCK_TARGET: "//apps/pytool:cli",
+        BUCK_TARGET: "//projects/apps/pytool:cli",
       },
     })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
 

@@ -54,7 +54,7 @@ async function main() {
     );
 
     // Create a minimal C++ app in the temp repo and its TARGETS
-    const appDir = path.join(tmp, "apps", "demo");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     await fs.ensureDir(path.join(appDir, "src"));
     await fs.writeFile(path.join(appDir, "src", "main.cpp"), "int main(){return 0;}\n", "utf8");
     // Provide cpp macro defs
@@ -86,7 +86,7 @@ async function main() {
 
     // Ensure executable bit and run via zx-wrapper shebang
     await $({ cwd: tmp })`chmod +x build-tools/tools/dev/build-selected.ts`;
-    const label = "//apps/demo:demo";
+    const label = "//projects/apps/demo:demo";
     const cppTargetAttrSuffix = sanitizeAttrNameFromLabel(label);
     const env = {
       ...process.env,

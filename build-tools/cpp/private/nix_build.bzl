@@ -50,7 +50,6 @@ def _cpp_nix_build_impl(ctx):
         + "cd \"$FLK_ROOT\"; "
         + nix_action_export_graph_cmd(
             out_graph = "$WORKSPACE_ROOT/build-tools/tools/buck/graph.json",
-            query_roots = "libs,go,cpp,third_party",
             zx_wrapper = "path:$FLK_ROOT#zx-wrapper",
         )
         # Require a pre-exported Buck graph for the temp workspace (fail fast if missing)

@@ -9,13 +9,13 @@ Build via planner-selected derivation (requires exported Buck graph):
 
 ```bash
 node build-tools/tools/buck/export-graph.ts
-BUCK_TARGET=//libs/{{ name }}:{{ name }} nix build --impure -L --accept-flake-config '.#graph-generator-selected' --no-link
+BUCK_TARGET=//projects/libs/{{ name }}:{{ name }} nix build --impure -L --accept-flake-config '.#graph-generator-selected' --no-link
 ```
 
 Inspect the overlay metadata:
 
 ```bash
-OUT=$(BUCK_TARGET=//libs/{{ name }}:{{ name }} nix build --impure -L --accept-flake-config '.#graph-generator-selected' --print-out-paths)
+OUT=$(BUCK_TARGET=//projects/libs/{{ name }}:{{ name }} nix build --impure -L --accept-flake-config '.#graph-generator-selected' --print-out-paths)
 cat "$OUT/BUILD-INFO.json"
 ```
 

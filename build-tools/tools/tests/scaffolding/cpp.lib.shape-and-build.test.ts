@@ -25,11 +25,11 @@ test("cpp lib scaffold: files render and TARGETS wires gtest deps", async () => 
     );
 
     // Scaffold
-    await $`scaf new cpp lib demo-lib --yes --path=libs/demo-lib`;
+    await $`scaf new cpp lib demo-lib --yes --path=projects/libs/demo-lib`;
 
     // Expect TARGETS present at the scaffold path
-    const targetsPath = path.join(tmp, "libs/demo-lib", "TARGETS");
-    assert(await fs.pathExists(targetsPath), "missing libs/demo-lib/TARGETS");
+    const targetsPath = path.join(tmp, "projects/libs/demo-lib", "TARGETS");
+    assert(await fs.pathExists(targetsPath), "missing projects/libs/demo-lib/TARGETS");
 
     // Verify TARGETS content references provider-backed gtest targets
     const txt = await fs.readFile(targetsPath, "utf8");

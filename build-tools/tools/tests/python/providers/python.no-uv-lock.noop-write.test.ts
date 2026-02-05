@@ -7,7 +7,7 @@ import { runInTemp, exists } from "../../lib/test-helpers";
 
 test("providers: Python sync with no uv.lock writes stable header and no entries", async () => {
   await runInTemp("python-no-uv-noop", async (tmp, $) => {
-    // No uv.lock under apps/* or libs/* — narrow to python to exercise writer no-op behavior
+    // No uv.lock under projects/apps/* or projects/libs/* — narrow to python to exercise writer no-op behavior
     const runner = `#!/usr/bin/env zx-wrapper
 import { syncAllProviders } from "./build-tools/tools/buck/providers/index.ts";
 await syncAllProviders({ lang: "python" });
@@ -25,7 +25,7 @@ await syncAllProviders({ lang: "python" });
       txt,
       /load\("\/\/third_party\/providers:defs_python\.bzl", "python_importer_deps"\)/,
     );
-    // No provider entries since no uv.lock under apps/* or libs/*
+    // No provider entries since no uv.lock under projects/apps/* or projects/libs/*
     assert.ok(!/python_importer_deps\(name="/.test(txt), "no providers should be listed");
   });
 });

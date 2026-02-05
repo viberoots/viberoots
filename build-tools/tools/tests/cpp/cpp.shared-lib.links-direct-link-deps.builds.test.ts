@@ -47,12 +47,12 @@ function extractBuildLogLine(buildLog: string, key: string): string {
 test("cpp: shared lib links direct link_deps (build)", async () => {
   await runInTemp("cpp-shared-lib-direct-link-deps", async (tmp, $) => {
     await fs.outputFile(
-      path.join(tmp, "libs", "support", "src", "support.cpp"),
+      path.join(tmp, "projects", "libs", "support", "src", "support.cpp"),
       ["int support_answer() { return 3; }", ""].join("\n"),
       "utf8",
     );
     await fs.outputFile(
-      path.join(tmp, "libs", "core", "src", "core.cpp"),
+      path.join(tmp, "projects", "libs", "core", "src", "core.cpp"),
       ["extern int support_answer();", "int core_answer() { return support_answer(); }", ""].join(
         "\n",
       ),
@@ -61,19 +61,19 @@ test("cpp: shared lib links direct link_deps (build)", async () => {
 
     const graph = [
       {
-        name: "//libs/support:support",
+        name: "//projects/libs/support:support",
         rule_type: "cxx_library",
         labels: ["lang:cpp", "kind:lib"],
-        srcs: ["libs/support/src/support.cpp"],
+        srcs: ["projects/libs/support/src/support.cpp"],
         link_mode: "shared",
       },
       {
-        name: "//libs/core:core",
+        name: "//projects/libs/core:core",
         rule_type: "cxx_library",
         labels: ["lang:cpp", "kind:lib"],
-        srcs: ["libs/core/src/core.cpp"],
+        srcs: ["projects/libs/core/src/core.cpp"],
         link_mode: "shared",
-        link_deps: ["//libs/support:support"],
+        link_deps: ["//projects/libs/support:support"],
       },
     ];
     const graphJsonPath = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
@@ -83,11 +83,11 @@ test("cpp: shared lib links direct link_deps (build)", async () => {
       tmp,
       $,
       graphJsonPath,
-      target: "//libs/core:core",
+      target: "//projects/libs/core:core",
     });
     const log = await fs.readFile(path.join(outPath, "build.log"), "utf8");
     const linkLibs = extractBuildLogLine(log, "link_libs");
     assert.ok(linkLibs, `expected build.log to include link_libs=...; got:\n${log}`);
-    assert.equal(linkLibs.trim(), `-l${sanitizeName("//libs/support:support")}`);
+    assert.equal(linkLibs.trim(), `-l${sanitizeName("//projects/libs/support:support")}`);
   });
 });

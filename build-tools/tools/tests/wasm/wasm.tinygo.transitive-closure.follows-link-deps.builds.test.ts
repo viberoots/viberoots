@@ -36,7 +36,7 @@ async function instantiateWasmFromFile(filePath: string): Promise<WebAssembly.In
 
 test("wasm: tinygo transitive closure follows link_deps (build + load)", async () => {
   await runInTemp("wasm-tinygo-transitive-link-closure", async (tmp, $) => {
-    const supportDir = path.join(tmp, "libs", "support");
+    const supportDir = path.join(tmp, "projects", "libs", "support");
     await fs.outputFile(
       path.join(supportDir, "include", "support.h"),
       `#ifndef SUPPORT_H
@@ -66,7 +66,7 @@ nix_cpp_wasm_static_lib(
 `,
     );
 
-    const coreDir = path.join(tmp, "libs", "core");
+    const coreDir = path.join(tmp, "projects", "libs", "core");
     await fs.outputFile(
       path.join(coreDir, "include", "core.h"),
       `#ifndef CORE_H
@@ -90,7 +90,7 @@ nix_cpp_wasm_static_lib(
     name = "core_wasm",
     srcs = ["src/core.c"],
     headers = ["include/core.h"],
-    link_deps = ["//libs/support:support_wasm"],
+    link_deps = ["//projects/libs/support:support_wasm"],
     labels = ["kind:lib"],
     wasm_abi = "wasi",
     visibility = ["PUBLIC"],
@@ -98,7 +98,7 @@ nix_cpp_wasm_static_lib(
 `,
     );
 
-    const apiDir = path.join(tmp, "libs", "api");
+    const apiDir = path.join(tmp, "projects", "libs", "api");
     await fs.outputFile(
       path.join(apiDir, "go.mod"),
       `module example.com/api
@@ -130,7 +130,7 @@ func main() {}
 nix_go_tiny_wasm_lib(
     name = "wasm",
     srcs = ["main.go"],
-    link_deps = ["//libs/core:core_wasm"],
+    link_deps = ["//projects/libs/core:core_wasm"],
     link_closure = "transitive",
     visibility = ["PUBLIC"],
 )
@@ -144,11 +144,15 @@ nix_go_tiny_wasm_lib(
     await $({
       stdio: "inherit",
       env: { ...process.env, WEB_WASM_BACKEND: "wasi_single" },
-    })`buck2 build --target-platforms prelude//platforms:default //libs/api:wasm`;
+    })`buck2 build --target-platforms prelude//platforms:default //projects/libs/api:wasm`;
 
     const sel = await $({
       stdio: "pipe",
-      env: { ...process.env, BUCK_TARGET: "//libs/api:wasm", WEB_WASM_BACKEND: "wasi_single" },
+      env: {
+        ...process.env,
+        BUCK_TARGET: "//projects/libs/api:wasm",
+        WEB_WASM_BACKEND: "wasi_single",
+      },
     })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/dev/build-selected.ts`;
     const outPath =
       String(sel.stdout || "")

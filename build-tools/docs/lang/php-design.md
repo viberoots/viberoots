@@ -38,7 +38,7 @@ Use the canonical helper surface from `//build-tools/lang:defs_common.bzl` and `
 
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
 - Provider wiring: load `MODULE_PROVIDERS` from `//build-tools/lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
-- Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
+- Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `projects/apps/*`/`projects/libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
 - Patch model contract: `build-tools/lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
 
@@ -79,7 +79,7 @@ graph LR
 
 - Label form for PHP targets mirrors importer-scoped Node labels to reuse auto-map and provider naming:
   - `lockfile:<relative/path/to/composer.lock>#<importer>`
-  - `<importer>` is the project root containing the `composer.json` (e.g., `apps/php-api`).
+  - `<importer>` is the project root containing the `composer.json` (e.g., `projects/apps/php-api`).
 - Rationale: Composer lockfiles are per-project; importer ID gives stability if multiple PHP projects exist.
 - `build-tools/tools/buck/gen-auto-map.ts` already maps `lockfile:` labels to provider names via `providerNameForImporter()`; no changes needed.
 
@@ -167,8 +167,8 @@ load("//third_party/providers:defs_php.bzl", "php_importer_deps")
 
 php_importer_deps(
     name = "lf_<hash>_<suffix>",
-    lockfile = "apps/php-api/composer.lock",
-    importer = "apps/php-api",
+    lockfile = "projects/apps/php-api/composer.lock",
+    importer = "projects/apps/php-api",
     patch_paths = ["patches/php/vendor__name@1.2.3.patch", ...],
 )
 ```
@@ -220,7 +220,7 @@ nix_php_library(
   labels = [
     "lang:php",
     "kind:lib",
-    "lockfile:apps/php-api/composer.lock#apps/php-api",
+    "lockfile:projects/apps/php-api/composer.lock#projects/apps/php-api",
   ],
 )
 
@@ -231,7 +231,7 @@ nix_php_test(
   labels = [
     "lang:php",
     "kind:test",
-    "lockfile:apps/php-api/composer.lock#apps/php-api",
+    "lockfile:projects/apps/php-api/composer.lock#projects/apps/php-api",
   ],
 )
 ```

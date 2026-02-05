@@ -27,4 +27,4 @@ go_min: "1.22"
 license: "MIT"
 enable_ci: false
 _tasks:
-  - mkdir -p libs/{{ name }}/pkg/{{ name }}
+  - mkdir -p pkg/{{ name }}

@@ -30,10 +30,10 @@ async function nixEvalSelectedDrvPath(tmp: string, $: any, target: string): Prom
 
 test("python: pyext link input ordering is deterministic across builds", async () => {
   await runInTemp("python-pyext-link-order", async (tmp, $) => {
-    const appRel = path.join("apps", "pyext_link_order");
+    const appRel = path.join("projects", "apps", "pyext_link_order");
     const appDir = path.join(tmp, appRel);
-    const libARel = path.join("libs", "pick_a");
-    const libBRel = path.join("libs", "pick_b");
+    const libARel = path.join("projects", "libs", "pick_a");
+    const libBRel = path.join("projects", "libs", "pick_b");
     const libADir = path.join(tmp, libARel);
     const libBDir = path.join(tmp, libBRel);
 

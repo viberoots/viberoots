@@ -13,10 +13,10 @@ To keep behavior deterministic and avoid drift, I follow the rules below when I 
 I keep stable anchor directories for the reorg. These are structural only:
 
 - `build-tools/` — build system and tooling anchor
-- `apps/` — application roots
-- `libs/` — library roots
+- `projects/apps/` — application roots
+- `projects/libs/` — library roots
 - `build-tools/docs/` — build-system docs
-- `build-tools/docs/build-tools/lang/` — language-specific build docs
+- `build-tools/docs/lang/` — language-specific build docs
 - `docs/build-history/` — historical build notes
 
 ## CLI parsing (required)

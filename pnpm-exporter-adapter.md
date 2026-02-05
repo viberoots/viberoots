@@ -45,8 +45,8 @@ Example (illustrative):
 
 ```json
 {
-  "//apps/web:bundle": "lockfile:apps/web/pnpm-lock.yaml#apps/web",
-  "//libs/ui:build": "lockfile:libs/ui/pnpm-lock.yaml#libs/ui"
+  "//projects/apps/web:bundle": "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",
+  "//projects/libs/ui:build": "lockfile:projects/libs/ui/pnpm-lock.yaml#projects/libs/ui"
 }
 ```
 

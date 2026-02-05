@@ -14,19 +14,27 @@ test("graph-view CLI prints composite view with nodes and indexes", async () => 
     // Minimal graph with one Node and one non-Node entry
     const nodes = [
       {
-        name: "//apps/web:bundle",
+        name: "//projects/apps/web:bundle",
         rule_type: "node_bundle",
-        labels: ["lang:node", "kind:bin", "lockfile:apps/web/pnpm-lock.yaml#apps/web"],
+        labels: [
+          "lang:node",
+          "kind:bin",
+          "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",
+        ],
       },
-      { name: "//libs/ui:lib", rule_type: "go_library", labels: ["lang:go", "kind:lib"] },
+      {
+        name: "//projects/libs/ui:lib",
+        rule_type: "go_library",
+        labels: ["lang:go", "kind:lib"],
+      },
     ];
     await fsp.writeFile(path.join(graphDir, "graph.json"), JSON.stringify(nodes, null, 2));
 
     // Provider index (JSON sidecar)
     const providerIndex = {
-      "//third_party/providers:lf_deadbeef_apps_web__apps_web_pnpm_lock_yaml": {
+      "//third_party/providers:lf_deadbeef_projects_apps_web__projects_apps_web_pnpm_lock_yaml": {
         kind: "node",
-        key: "lockfile:apps/web/pnpm-lock.yaml#apps/web",
+        key: "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",
       },
     };
     await fsp.writeFile(
@@ -37,7 +45,7 @@ test("graph-view CLI prints composite view with nodes and indexes", async () => 
 
     // Node lock index (emitted by exporter in real runs; synthesize here)
     const nodeLockIndex = {
-      "//apps/web:bundle": "lockfile:apps/web/pnpm-lock.yaml#apps/web",
+      "//projects/apps/web:bundle": "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",
     };
     await fsp.writeFile(
       path.join(graphDir, "node-lock-index.json"),
@@ -70,7 +78,10 @@ test("graph-view CLI prints composite view with nodes and indexes", async () => 
       console.error("composite.nodeLockIndex missing");
       process.exit(2);
     }
-    if (json.nodeLockIndex["//apps/web:bundle"] !== "lockfile:apps/web/pnpm-lock.yaml#apps/web") {
+    if (
+      json.nodeLockIndex["//projects/apps/web:bundle"] !==
+      "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"
+    ) {
       console.error("nodeLockIndex entry not found or mismatched");
       process.exit(2);
     }

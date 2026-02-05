@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
 import { computeImporterLabel } from "../../lib/importers";
+import { runInTemp } from "../lib/test-helpers";
 
 test("Starlark importer_from_labels ↔ TS computeImporterLabel parity", async () => {
   await runInTemp("importer-label-parity", async (tmp, $) => {
@@ -19,13 +19,19 @@ test("Starlark importer_from_labels ↔ TS computeImporterLabel parity", async (
     type Case = { lf: string; label: string };
     const cases: Case[] = [
       { lf: "pnpm-lock.yaml", label: "lockfile:pnpm-lock.yaml#." },
-      { lf: "apps/web/pnpm-lock.yaml", label: "lockfile:apps/web/pnpm-lock.yaml#apps/web" },
+      {
+        lf: "projects/apps/web/pnpm-lock.yaml",
+        label: "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",
+      },
       { lf: "uv.lock", label: "lockfile:uv.lock#." },
-      { lf: "apps/api/uv.lock", label: "lockfile:apps/api/uv.lock#apps/api" },
+      {
+        lf: "projects/apps/api/uv.lock",
+        label: "lockfile:projects/apps/api/uv.lock#projects/apps/api",
+      },
     ];
     // Ensure directories and files exist for realism
-    await fsp.mkdir(path.join(tmp, "apps", "web"), { recursive: true });
-    await fsp.mkdir(path.join(tmp, "apps", "api"), { recursive: true });
+    await fsp.mkdir(path.join(tmp, "projects", "apps", "web"), { recursive: true });
+    await fsp.mkdir(path.join(tmp, "projects", "apps", "api"), { recursive: true });
     for (const c of cases) {
       const p = path.join(tmp, c.lf);
       await fsp.mkdir(path.dirname(p), { recursive: true });

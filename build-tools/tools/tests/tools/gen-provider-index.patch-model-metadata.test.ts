@@ -8,13 +8,13 @@ import { runInTemp } from "../lib/test-helpers";
 test("gen-provider-index: provider_index.json includes patch model metadata (additive)", async () => {
   await runInTemp("gen-provider-index-patch-model", async (tmp, $) => {
     // Enable importer-scoped languages in the temp repo
-    const nodeImporterDir = path.join(tmp, "apps", "web");
-    const pyImporterDir = path.join(tmp, "apps", "pytool");
+    const nodeImporterDir = path.join(tmp, "projects", "apps", "web");
+    const pyImporterDir = path.join(tmp, "projects", "apps", "pytool");
     await fsp.mkdir(nodeImporterDir, { recursive: true });
     await fsp.mkdir(pyImporterDir, { recursive: true });
     await fsp.writeFile(
       path.join(nodeImporterDir, "pnpm-lock.yaml"),
-      `lockfileVersion: "9.0"\nimporters:\n  apps/web:\n    dependencies: {}\npackages: {}`,
+      `lockfileVersion: "9.0"\nimporters:\n  projects/apps/web:\n    dependencies: {}\npackages: {}`,
       "utf8",
     );
     await fsp.writeFile(path.join(pyImporterDir, "uv.lock"), "", "utf8");
@@ -24,7 +24,10 @@ test("gen-provider-index: provider_index.json includes patch model metadata (add
     const jsonPath = path.join(tmp, "third_party", "providers", "provider_index.json");
     const idx = JSON.parse(await fsp.readFile(jsonPath, "utf8")) as Record<string, any>;
 
-    const nodeProvider = providerNameForImporter("apps/web/pnpm-lock.yaml", "apps/web");
+    const nodeProvider = providerNameForImporter(
+      "projects/apps/web/pnpm-lock.yaml",
+      "projects/apps/web",
+    );
     const nodeFq = `//third_party/providers:${nodeProvider}`;
     const nodeEntry = idx[nodeFq];
     if (!nodeEntry) {
@@ -43,7 +46,10 @@ test("gen-provider-index: provider_index.json includes patch model metadata (add
       throw new Error("node entry: expected providerPatchPaths='diagnostic'");
     }
 
-    const pyProvider = providerNameForImporter("apps/pytool/uv.lock", "apps/pytool");
+    const pyProvider = providerNameForImporter(
+      "projects/apps/pytool/uv.lock",
+      "projects/apps/pytool",
+    );
     const pyFq = `//third_party/providers:${pyProvider}`;
     const pyEntry = idx[pyFq];
     if (!pyEntry) {

@@ -1,30 +1,30 @@
 {
   "default": {
-    "lib": "libs/{name}",
-    "cli": "apps/{name}"
+    "lib": "projects/libs/{name}",
+    "cli": "projects/apps/{name}"
   },
   "go": {
-    "lib": "libs/{name}",
-    "cli": "apps/{name}"
+    "lib": "projects/libs/{name}",
+    "cli": "projects/apps/{name}"
   },
   "cpp": {
-    "lib": "libs/{name}",
-    "cli": "apps/{name}"
+    "lib": "projects/libs/{name}",
+    "cli": "projects/apps/{name}"
   },
   "node": {
-    "lib": "libs/{name}",
-    "cli": "apps/{name}",
-    "webapp": "apps/{name}",
-    "cpp-addon": ".",
-    "go-addon": "."
+    "lib": "projects/libs/{name}",
+    "cli": "projects/apps/{name}",
+    "webapp": "projects/apps/{name}",
+    "cpp-addon": "projects",
+    "go-addon": "projects"
   },
   "python": {
-    "lib": "libs/{name}",
-    "app": "apps/{name}"
+    "lib": "projects/libs/{name}",
+    "app": "projects/apps/{name}"
   },
   "ts": {
-    "wasm-app": ".",
-    "wasm-linking-app": ".",
-    "go-cpp-lib": "."
+    "wasm-app": "projects",
+    "wasm-linking-app": "projects",
+    "go-cpp-lib": "projects"
   }
 }

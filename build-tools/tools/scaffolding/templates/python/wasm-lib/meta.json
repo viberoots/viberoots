@@ -5,13 +5,13 @@
   "help": {
     "usage": "scaf new python wasm-lib <name> [--path=DEST]",
     "notes": [
-      "Creates libs/<name> with uv.lock and TARGETS using nix_python_wasm_lib.",
+      "Creates projects/libs/<name> with uv.lock and TARGETS using nix_python_wasm_lib.",
       "Lib overlays are automatically merged into apps that depend on this lib.",
-      "Lockfile label uses importer-scoped form: lockfile:libs/<name>/uv.lock#libs/<name>."
+      "Lockfile label uses importer-scoped form: lockfile:projects/libs/<name>/uv.lock#projects/libs/<name>."
     ],
     "examples": [
-      "scaf new python wasm-lib demo-wasmlib --path=libs/demo-wasmlib",
-      "scaf regen libs/demo-wasmlib"
+      "scaf new python wasm-lib demo-wasmlib --path=projects/libs/demo-wasmlib",
+      "scaf regen projects/libs/demo-wasmlib"
     ]
   }
 }

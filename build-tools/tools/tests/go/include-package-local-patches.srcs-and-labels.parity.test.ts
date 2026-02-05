@@ -14,7 +14,7 @@ await runInTemp("go-include-pkg-local-patches", async (tmp, $) => {
   );
 
   // Minimal Go lib with package-local patches
-  const pkg = path.join(tmp, "libs/demo");
+  const pkg = path.join(tmp, "projects/libs/demo");
   await fs.mkdirp(path.join(pkg, "patches/go"));
   await fs.writeFile(path.join(pkg, "patches/go", "a@1.0.0.patch"), "# a\n", "utf8");
   await fs.writeFile(path.join(pkg, "patches/go", "b@1.2.3.patch"), "# b\n", "utf8");
@@ -41,7 +41,7 @@ await runInTemp("go-include-pkg-local-patches", async (tmp, $) => {
   const so = await $({
     cwd: tmp,
     stdio: "pipe",
-  })`buck2 build --show-output //libs/demo:probe_go`.nothrow();
+  })`buck2 build --show-output //projects/libs/demo:probe_go`.nothrow();
   assert.equal(so.exitCode, 0, "buck2 build --show-output failed for probe_go");
   const outLine = String(so.stdout || "").trim();
   assert.match(outLine, /probe_go\.srcs\.txt/, "expected probe_go.srcs.txt output to be produced");

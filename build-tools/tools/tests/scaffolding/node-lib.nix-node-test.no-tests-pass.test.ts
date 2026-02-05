@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
+import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import fs from "fs-extra";
 import { runInTemp } from "../lib/test-helpers";
 
 // Ensure dev env tooling when spawning Buck/Nix inside temp repos
@@ -19,24 +19,24 @@ test("node lib: nix_node_test target passes when no tests present", async () => 
     // Keep devDependencies; update-pnpm-hash will align lockfile/FOD
 
     // Remove any sample tests so the runner passes with no matches
-    await fs.remove(path.join(tmp, "libs", "demo", "test"));
+    await fs.remove(path.join(tmp, "projects", "libs", "demo", "test"));
 
     // Commit scaffold and lockfile so Nix flake sees importer under git+file sources
     await $`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
 
     // Require `scaf new` primary path to produce the importer lockfile.
-    await $`bash --noprofile --norc -c 'test -f libs/demo/pnpm-lock.yaml'`;
+    await $`bash --noprofile --norc -c 'test -f projects/libs/demo/pnpm-lock.yaml'`;
 
     // Align the fixed-output hash mapping for this importer before running nix_node_test.
     await $({
       stdio: "inherit",
       env: { ...process.env, NIX_PNPM_ALLOW_GENERATE: "1" },
-    })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --force --lockfile libs/demo/pnpm-lock.yaml`;
+    })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --force --lockfile projects/libs/demo/pnpm-lock.yaml`;
 
     // Confirm Nix sees the importer lockfile path
     await $({
       stdio: "inherit",
-    })`nix eval --impure --raw --expr 'builtins.toString (builtins.pathExists ./libs/demo/pnpm-lock.yaml)'`;
+    })`nix eval --impure --raw --expr 'builtins.toString (builtins.pathExists ./projects/libs/demo/pnpm-lock.yaml)'`;
 
     // Avoid pre-warming pnpm-store/node-modules here; nix_node_test will build what it needs.
 
@@ -47,9 +47,9 @@ test("node lib: nix_node_test target passes when no tests present", async () => 
     // Target should exist and test should pass (no tests matched → success)
     await $({
       stdio: "inherit",
-    })`buck2 targets --target-platforms prelude//platforms:default //libs/demo:unit`;
+    })`buck2 targets --target-platforms prelude//platforms:default //projects/libs/demo:unit`;
     await $({
       stdio: "inherit",
-    })`buck2 test --target-platforms prelude//platforms:default //libs/demo:unit`;
+    })`buck2 test --target-platforms prelude//platforms:default //projects/libs/demo:unit`;
   });
 });

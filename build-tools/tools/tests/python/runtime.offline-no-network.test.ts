@@ -9,7 +9,7 @@ test("python runtime: offline build (no network) succeeds via uv2nix adapter", a
     const $ = _$
       ? _$
       : (cmd: TemplateStringsArray, ...args: any[]) => (global as any).$`${cmd}${args}`;
-    const app = path.join(tmp, "apps", "demo_pyapp");
+    const app = path.join(tmp, "projects", "apps", "demo_pyapp");
     await fs.mkdirp(path.join(app, "src", "demo_pyapp"));
     await fs.mkdirp(path.join(app, "bin"));
     // uv.lock with one distribution
@@ -37,10 +37,10 @@ test("python runtime: offline build (no network) succeeds via uv2nix adapter", a
     const graphDir = path.join(tmp, "build-tools", "tools", "buck");
     await fs.mkdirp(graphDir);
     const node = {
-      name: "//apps/demo_pyapp:demo_pyapp",
+      name: "//projects/apps/demo_pyapp:demo_pyapp",
       rule_type: "python_binary",
       labels: ["lang:python", "kind:bin"],
-      srcs: ["apps/demo_pyapp/bin/__main__.py"],
+      srcs: ["projects/apps/demo_pyapp/bin/__main__.py"],
     };
     await fs.writeFile(
       path.join(graphDir, "graph.json"),
@@ -52,13 +52,13 @@ test("python runtime: offline build (no network) succeeds via uv2nix adapter", a
       cwd: tmp,
       env: {
         ...process.env,
-        BUCK_TARGET: "//apps/demo_pyapp:demo_pyapp",
+        BUCK_TARGET: "//projects/apps/demo_pyapp:demo_pyapp",
         BUCK_TEST_SRC: tmp,
         WORKSPACE_ROOT: tmp,
         NIX_PY_TEST_RESOLVE_JSON: JSON.stringify({
           mydep: {
             version: "1.0.0",
-            originPath: path.join("apps", "demo_pyapp", "vendor", "mydep-1.0.0"),
+            originPath: path.join("projects", "apps", "demo_pyapp", "vendor", "mydep-1.0.0"),
           },
         }),
       },
@@ -69,7 +69,7 @@ test("python runtime: offline build (no network) succeeds via uv2nix adapter", a
       .split(/\s+/)
       .pop() as string;
     if (!outPath) throw new Error("missing nix outPath");
-    const bin = path.join(outPath, "bin", "py-apps-demo_pyapp-demo_pyapp");
+    const bin = path.join(outPath, "bin", "py-projects-apps-demo_pyapp-demo_pyapp");
     const run = await $({ cwd: tmp, stdio: "pipe" })`${bin}`;
     const out = String(run.stdout || "").trim();
     if (out !== "app:orig") {

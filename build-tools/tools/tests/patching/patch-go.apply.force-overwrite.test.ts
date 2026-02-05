@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import * as fsp from "node:fs/promises";
 import fs from "fs-extra";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
@@ -49,13 +49,14 @@ test("patch-go apply supports --force overwrite when patch exists with different
     )} NIX_GO_DEV_OVERRIDE_JSON={} GOMODCACHE=${path.join(
       tmp,
       "gomodcache",
-    )} build-tools/tools/bin/patch-pkg apply go golang.org/x/net --target //libs/core:lib`;
+    )} build-tools/tools/bin/patch-pkg apply go golang.org/x/net --target //projects/libs/core:lib`;
     if ((apply1.exitCode || 0) !== 0) {
       console.error("initial apply failed:", String(apply1.stderr || ""));
       process.exit(2);
     }
     const patchPath = path.join(
       tmp,
+      "projects",
       "libs",
       "core",
       "patches",
@@ -100,7 +101,7 @@ test("patch-go apply supports --force overwrite when patch exists with different
     )} NIX_GO_DEV_OVERRIDE_JSON={} GOMODCACHE=${path.join(
       tmp,
       "gomodcache",
-    )} build-tools/tools/bin/patch-pkg apply go golang.org/x/net --target //libs/core:lib`.nothrow();
+    )} build-tools/tools/bin/patch-pkg apply go golang.org/x/net --target //projects/libs/core:lib`.nothrow();
     if ((applyNoForce.exitCode || 0) === 0) {
       console.error(
         "apply without --force should have failed due to different existing patch content",
@@ -122,7 +123,7 @@ test("patch-go apply supports --force overwrite when patch exists with different
     )} NIX_GO_DEV_OVERRIDE_JSON={} GOMODCACHE=${path.join(
       tmp,
       "gomodcache",
-    )} build-tools/tools/bin/patch-pkg apply go golang.org/x/net --target //libs/core:lib --force`;
+    )} build-tools/tools/bin/patch-pkg apply go golang.org/x/net --target //projects/libs/core:lib --force`;
     if ((applyForce.exitCode || 0) !== 0) {
       console.error("apply with --force should have succeeded");
       console.error(String(applyForce.stderr || ""));

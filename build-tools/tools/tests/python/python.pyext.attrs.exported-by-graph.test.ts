@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import assert from "node:assert/strict";
 import fs from "fs-extra";
+import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { readGraph } from "../../lib/graph.ts";
@@ -14,7 +14,7 @@ function normalizeLabelList(xs: unknown): string[] {
 
 test("exporter: python pyext nodes include module + link intent attrs in build-tools/tools/buck/graph.json", async () => {
   await runInTemp("python-pyext-exported-attrs", async (tmp, $) => {
-    const appRel = path.join("apps", "pyext_export");
+    const appRel = path.join("projects", "apps", "pyext_export");
     const app = path.join(tmp, appRel);
     await fs.mkdirp(path.join(app, "native"));
     await fs.writeFile(path.join(app, "native", "ext.c"), "int x(){return 1;}\n", "utf8");
@@ -42,7 +42,7 @@ test("exporter: python pyext nodes include module + link intent attrs in build-t
         "",
         "nix_python_extension_module(",
         '  name = "ext",',
-        '  lockfile_label = "lockfile:apps/pyext_export/uv.lock#apps/pyext_export",',
+        '  lockfile_label = "lockfile:projects/apps/pyext_export/uv.lock#projects/apps/pyext_export",',
         '  module = "demo._native",',
         '  srcs = ["native/ext.c"],',
         '  link_deps = [":dep_link"],',

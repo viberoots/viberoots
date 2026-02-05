@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("python macros fail fast when importer-local patches would cross a Buck package boundary (subpackage call site)", async () => {
   await runInTemp("python-importer-patches-subpackage-callsite-fails-fast", async (tmp, $) => {
-    const importerDir = path.join(tmp, "apps", "demo");
+    const importerDir = path.join(tmp, "projects", "apps", "demo");
     const subpkgDir = path.join(importerDir, "subpkg");
     const patchDir = path.join(importerDir, "patches", "python");
 
@@ -31,7 +31,7 @@ test("python macros fail fast when importer-local patches would cross a Buck pac
         "",
         "nix_python_library(",
         '  name = "lib",',
-        '  lockfile_label = "lockfile:apps/demo/uv.lock#apps/demo",',
+        '  lockfile_label = "lockfile:projects/apps/demo/uv.lock#projects/apps/demo",',
         '  srcs = glob(["**/*.py"]),',
         ")",
         "",
@@ -44,7 +44,7 @@ test("python macros fail fast when importer-local patches would cross a Buck pac
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute name //apps/demo/subpkg:lib`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute name //projects/apps/demo/subpkg:lib`;
 
     assert.notEqual(q.exitCode, 0, "expected cquery to fail for subpackage callsite");
     const combined = String(q.stderr || "") + String(q.stdout || "");

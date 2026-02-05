@@ -17,7 +17,7 @@ test("planner: root-only files are excluded from materialized outputs", async ()
     await fsp.writeFile(path.join(tmp, "ONLY_AT_REPO_ROOT.txt"), sentinelTxt + "\n", "utf8");
 
     // Scaffold a small CLI app under apps/
-    await $`scaf new go cli demo-cli --yes --path=apps/demo-cli`;
+    await $`scaf new go cli demo-cli --yes --path=projects/apps/demo-cli`;
     // Provide a local stub gomod2nix to avoid network and nix lookups for this no-deps app
     const stubDir = path.join(tmp, "bin");
     await fsp.mkdir(stubDir, { recursive: true });
@@ -50,7 +50,7 @@ test("planner: root-only files are excluded from materialized outputs", async ()
       cwd: tmp,
       stdio: "inherit",
       env: { ...process.env, PATH: `${stubDir}:${process.env.PATH || ""}` },
-    })`gomod2nix --dir apps/demo-cli`;
+    })`gomod2nix --dir projects/apps/demo-cli`;
     // No explicit go.sum creation here; allow glue-only to handle tidy deterministically.
 
     // Full path: glue-only (fail-fast gomod2nix), then export graph
@@ -65,7 +65,7 @@ test("planner: root-only files are excluded from materialized outputs", async ()
     const { stdout } = await $({
       cwd: tmp,
       stdio: "pipe",
-      env: { ...process.env, BUCK_TARGET: "//apps/demo-cli:demo-cli" },
+      env: { ...process.env, BUCK_TARGET: "//projects/apps/demo-cli:demo-cli" },
     })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --no-link --accept-flake-config --print-out-paths`;
     const outPath =
       String(stdout || "")

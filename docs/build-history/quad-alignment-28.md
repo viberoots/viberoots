@@ -414,9 +414,9 @@ Non-goals in this PR:
 ### Tests (in this PR)
 
 - Add a focused C++ macro regression test that asserts the `nix_cpp_test` planner-visible stub includes package-local patch files as action inputs:
-  - Create a temp repo with `apps/demo/patches/cpp/*.patch`.
+- Create a temp repo with `projects/apps/demo/patches/cpp/*.patch`.
   - Declare a `nix_cpp_test(name = "demo_test", ...)`.
-  - `buck2 cquery` the planner-visible stub target (`//apps/demo:demo_test__planner`) and assert `srcs` includes `apps/demo/patches/cpp/<file>.patch`.
+- `buck2 cquery` the planner-visible stub target (`//projects/apps/demo:demo_test__planner`) and assert `srcs` includes `projects/apps/demo/patches/cpp/<file>.patch`.
 - Extend or reuse the existing test that asserts provider deps are stripped from planner-visible deps for `nix_cpp_test` so the combined behavior remains locked down (patch inputs present; provider deps still excluded).
 
 ### Docs (in this PR)
@@ -522,7 +522,7 @@ Clarification: I do not need to preserve backwards compatibility yet. This PR ca
 
 - Tighten the existing wrapper-reference enforcement test (added in PR‑3) to scan:
   - repo root `*.md` files (excluding large log/output directories already excluded elsewhere like `test-logs/`, `buck-out/`, `coverage/`, etc.)
-  - `build-tools/docs/build-tools/lang/**` and other design-doc locations if present
+  - `build-tools/docs/lang/**` and other design-doc locations if present
 - Update any remaining markdown references to:
   - the removed Node/Python provider sync wrapper entrypoints,
     replacing them with the canonical orchestrator commands:

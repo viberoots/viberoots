@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("nix_node_cli_bin(bundle=True) stamps global Nix inputs via labels", async () => {
   await runInTemp("node-cli-bundle-stamp", async (tmp, $) => {
-    const dir = path.join(tmp, "apps", "cli");
+    const dir = path.join(tmp, "projects", "apps", "cli");
     await fsp.mkdir(path.join(dir, "src"), { recursive: true });
     // Create a dummy entry so cquery can typecheck srcs for the bundled rule
     await fsp.writeFile(path.join(dir, "src", "index.ts"), "console.log('cli')\n", "utf8");
@@ -20,8 +20,8 @@ test("nix_node_cli_bin(bundle=True) stamps global Nix inputs via labels", async 
         "nix_node_cli_bin(",
         '  name = "tool",',
         "  bundle = True,",
-        '  importer = "apps/cli",',
-        '  labels = ["lockfile:apps/cli/pnpm-lock.yaml#apps/cli"],',
+        '  importer = "projects/apps/cli",',
+        '  labels = ["lockfile:projects/apps/cli/pnpm-lock.yaml#projects/apps/cli"],',
         ")",
         "",
       ].join("\n"),
@@ -33,7 +33,7 @@ test("nix_node_cli_bin(bundle=True) stamps global Nix inputs via labels", async 
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //apps/cli:tool`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //projects/apps/cli:tool`;
     if (probe.exitCode !== 0) {
       // Environment not fully available in temp — skip to avoid false negatives
       return;
@@ -53,7 +53,7 @@ test("nix_node_cli_bin(bundle=True) stamps global Nix inputs via labels", async 
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //apps/cli:tool`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //projects/apps/cli:tool`;
     if (srcsProbe.exitCode !== 0) return;
     const srcsOut = String(srcsProbe.stdout || "");
     assert.ok(

@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("link intent: link_closure_overrides keys must be present in link_deps (fails fast)", async () => {
   await runInTemp("link-intent-overrides-must-be-in-link-deps", async (tmp, $) => {
-    const appDir = path.join(tmp, "apps", "demo");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(appDir, { recursive: true });
 
     await fsp.writeFile(
@@ -35,7 +35,7 @@ test("link intent: link_closure_overrides keys must be present in link_deps (fai
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 build --target-platforms //:no_cgo //apps/demo:probe`;
+    })`buck2 build --target-platforms //:no_cgo //projects/apps/demo:probe`;
     if (res.exitCode === 0) {
       assert.fail("expected buck2 build to fail due to invalid link_closure_overrides");
     }

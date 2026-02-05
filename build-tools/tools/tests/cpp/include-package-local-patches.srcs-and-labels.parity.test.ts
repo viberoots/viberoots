@@ -14,7 +14,7 @@ await runInTemp("cpp-include-pkg-local-patches", async (tmp, $) => {
   );
 
   // Minimal C++ lib with package-local patches
-  const pkg = path.join(tmp, "libs/demo");
+  const pkg = path.join(tmp, "projects/libs/demo");
   await fs.mkdirp(path.join(pkg, "patches/cpp"));
   await fs.writeFile(path.join(pkg, "patches/cpp", "x@0.0.1.patch"), "# x\n", "utf8");
   await fs.writeFile(path.join(pkg, "patches/cpp", "y@2.3.4.patch"), "# y\n", "utf8");
@@ -41,7 +41,7 @@ await runInTemp("cpp-include-pkg-local-patches", async (tmp, $) => {
   const so = await $({
     cwd: tmp,
     stdio: "pipe",
-  })`buck2 build --show-output //libs/demo:probe_cpp`.nothrow();
+  })`buck2 build --show-output //projects/libs/demo:probe_cpp`.nothrow();
   assert.equal(so.exitCode, 0, "buck2 build --show-output failed for probe_cpp");
   const outLine = String(so.stdout || "").trim();
   assert.match(

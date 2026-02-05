@@ -420,7 +420,7 @@ The exporter aggregates adapter findings (e.g., labeling irregularities) and app
 
 This preserves strictness in CI while enabling smoother local iteration.
 
-> Importer-scoped lockfile labeling: the exporter may attach a missing `lockfile:<path>#<importer>` label deterministically for importer-scoped ecosystems (Node: nearest `pnpm-lock.yaml`, Python: nearest `uv.lock`) only when the computed importer is supported (`.`, `apps/*`, `libs/*`). If the nearest lockfile would yield an unsupported importer, the exporter must not auto-attach the label and must emit a deterministic finding with the lockfile path and importer.
+> Importer-scoped lockfile labeling: the exporter may attach a missing `lockfile:<path>#<importer>` label deterministically for importer-scoped ecosystems (Node: nearest `pnpm-lock.yaml`, Python: nearest `uv.lock`) only when the computed importer is supported (`.`, `projects/apps/*`, `projects/libs/*`). If the nearest lockfile would yield an unsupported importer, the exporter must not auto-attach the label and must emit a deterministic finding with the lockfile path and importer.
 
 ---
 
@@ -717,7 +717,7 @@ nix_go_binary(
 - [ ] Ensure idempotency and sorted order for generated Node providers.
 - Verification:
   - [ ] With **no pnpm lockfiles**, running the script produces a minimal output (or empties auto sections).
-  - [ ] Add a dummy `apps/web/pnpm-lock.yaml` and an importer‑local patch; re‑run → a Node provider appears; running twice is a no‑op.
+  - [ ] Add a dummy `projects/apps/web/pnpm-lock.yaml` and an importer‑local patch; re‑run → a Node provider appears; running twice is a no‑op.
 - Acceptance: Node provider sync merged; no manual provider edits required.
 
 ### Phase 5 — Auto Map (Node lockfile + nixpkg only)
@@ -988,7 +988,7 @@ main().catch((e) => {
 > **Purpose:** Orchestrate provider generation. Currently:
 >
 > - Node: generate importer‑scoped providers from discovered `pnpm-lock.yaml` files and importer‑local patches.
-> - Python: generate importer‑scoped providers from discovered `uv.lock` files; activation in sparse/partial clones is lockfile‑driven (presence of `uv.lock` under `apps/*` or `libs/*` enables Python).
+> - Python: generate importer‑scoped providers from discovered `uv.lock` files; activation in sparse/partial clones is lockfile‑driven (presence of `uv.lock` under `projects/apps/*` or `projects/libs/*` enables Python).
 > - C++: sync is a no‑op (providers are curated); patches are handled via package‑local `srcs`.
 > - Go: no provider generation; patches are handled via package‑local `srcs`.
 
@@ -1057,7 +1057,7 @@ This policy is locked down by tests. See:
 
 ### PNPM Importer‑scoped Providers (Node)
 
-We scope Node to **PNPM only**, and generate **one provider per importer (workspace)** from a given `pnpm-lock.yaml`. This yields tighter invalidation: patching a package used only by `apps/web` will not rebuild providers for `services/api`.
+We scope Node to **PNPM only**, and generate **one provider per importer (workspace)** from a given `pnpm-lock.yaml`. This yields tighter invalidation: patching a package used only by `projects/apps/web` will not rebuild providers for `services/api`.
 
 #### Labels & Mapping
 
@@ -1067,7 +1067,7 @@ We scope Node to **PNPM only**, and generate **one provider per importer (worksp
   lockfile:<path/to/pnpm-lock.yaml>#<importer>
   ```
 
-  Example: `lockfile:apps/web/pnpm-lock.yaml#apps/web`.
+  Example: `lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web`.
 
 - `gen-auto-map.ts` maps this label to the corresponding importer‑scoped provider.
 
@@ -1420,9 +1420,9 @@ main().catch((e) => {
 ```bash
 # Node importer-scoped providers
 node build-tools/tools/tests/e2e-provider-wiring.ts \
-  --target //apps/web:bundle \
-  --lockfile apps/web/pnpm-lock.yaml \
-  --importer apps/web
+  --target //projects/apps/web:bundle \
+  --lockfile projects/apps/web/pnpm-lock.yaml \
+  --importer projects/apps/web
 ```
 
 ### Optional Extension — Build Smoke Check

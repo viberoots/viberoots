@@ -114,7 +114,7 @@ This PR intentionally does not change provider selection semantics (`auto_map.bz
 - Add a parity test `build-tools/tools/tests/labels/lockfile-label.parity.test.ts` that:
   - feeds a table of valid and invalid lockfile labels
   - asserts TS parsing results (or null) match Starlark behavior via `importer_from_labels_probe` (and a new probe that also writes the normalized lockfile path, not only importer)
-  - locks down normalization (`lockfile:./apps/web/pnpm-lock.yaml#apps/web` → `apps/web/pnpm-lock.yaml#apps/web`)
+  - locks down normalization (`lockfile:./projects/apps/web/pnpm-lock.yaml#projects/apps/web` → `projects/apps/web/pnpm-lock.yaml#projects/apps/web`)
 - Add a planner regression test that evaluates the Node planner on a tiny synthetic graph:
   - case 1: exactly one lockfile label → importer resolves deterministically
   - case 2: two lockfile labels → evaluation fails with the expected error text

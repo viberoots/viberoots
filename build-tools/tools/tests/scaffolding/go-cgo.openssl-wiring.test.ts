@@ -17,7 +17,7 @@ EOF'`;
     })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
 # GENERATED for test
 MODULE_PROVIDERS = {
-    "//apps/demo-cli:demo": [
+    "//projects/apps/demo-cli:demo": [
         "//third_party/providers:nix_pkgs_openssl",
     ],
 }
@@ -25,7 +25,7 @@ EOF'`;
 
     await $({
       cwd: tmp,
-    })`bash --noprofile --norc -c 'mkdir -p apps/demo-cli/cmd/demo && cat > apps/demo-cli/cmd/demo/main.go <<'\''EOF'\''
+    })`bash --noprofile --norc -c 'mkdir -p projects/apps/demo-cli/cmd/demo && cat > projects/apps/demo-cli/cmd/demo/main.go <<'\''EOF'\''
 package main
 /*
 #cgo pkg-config: openssl
@@ -35,7 +35,9 @@ import "C"
 func main() {}
 EOF'`;
 
-    await $({ cwd: tmp })`bash --noprofile --norc -c 'cat > apps/demo-cli/TARGETS <<'\''EOF'\''
+    await $({
+      cwd: tmp,
+    })`bash --noprofile --norc -c 'cat > projects/apps/demo-cli/TARGETS <<'\''EOF'\''
 load("//build-tools/go:defs.bzl", "nix_go_binary")
 
 nix_go_binary(
@@ -50,7 +52,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir cgo_openssl cquery "deps(//apps/demo-cli:demo)" --json --output-attribute name`;
+    })`buck2 --isolation-dir cgo_openssl cquery "deps(//projects/apps/demo-cli:demo)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return; // skip if prelude not available
     const raw = String(probe.stdout || "").trim();
     if (!raw) return; // skip if no JSON produced (empty graph/older buck)

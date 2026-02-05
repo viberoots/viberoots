@@ -8,7 +8,7 @@ test("node cli: scaffold writes pnpm-lock.yaml for importer-scoped wiring", asyn
     const $ = _$({ cwd: tmp, stdio: "inherit" });
     await $`git init`;
     await $`scaf new node cli demo --yes`;
-    const lf = path.join(tmp, "apps", "demo", "pnpm-lock.yaml");
+    const lf = path.join(tmp, "projects", "apps", "demo", "pnpm-lock.yaml");
     if (!(await exists(lf))) {
       throw new Error(`expected pnpm-lock.yaml to exist after scaffold: ${lf}`);
     }

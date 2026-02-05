@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("nix_node_cli_bin(bundle=True) rejects non-default entry (bundle entry is fixed)", async () => {
   await runInTemp("node-cli-bundle-entry-reject", async (tmp, $) => {
-    const dir = path.join(tmp, "apps", "cli");
+    const dir = path.join(tmp, "projects", "apps", "cli");
     await fsp.mkdir(path.join(dir, "bin"), { recursive: true });
     await fsp.writeFile(path.join(dir, "bin", "tool"), "#!/usr/bin/env node\n", "utf8");
     await fsp.writeFile(path.join(dir, "pnpm-lock.yaml"), "# stub\n", "utf8");
@@ -21,7 +21,7 @@ test("nix_node_cli_bin(bundle=True) rejects non-default entry (bundle entry is f
         '  name = "tool",',
         '  entry = "bin/tool",',
         "  bundle = True,",
-        '  labels = ["lockfile:apps/cli/pnpm-lock.yaml#apps/cli"],',
+        '  labels = ["lockfile:projects/apps/cli/pnpm-lock.yaml#projects/apps/cli"],',
         ")",
         "",
       ].join("\n"),
@@ -33,7 +33,7 @@ test("nix_node_cli_bin(bundle=True) rejects non-default entry (bundle entry is f
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 build //apps/cli:tool`;
+    })`buck2 build //projects/apps/cli:tool`;
 
     assert.notEqual(res.exitCode, 0, "expected buck2 build to fail for non-default bundled entry");
     const combined = String(res.stderr || "") + String(res.stdout || "");

@@ -1,11 +1,11 @@
 load("//build-tools/cpp:defs.bzl", "cpp_sanitize_probe")
 
 # One test target per case; zx test will query outputs
-cpp_sanitize_probe(name = "case1", label = "//apps/foo:bin")
-cpp_sanitize_probe(name = "case2", label = "//apps/foo/sub:my bin")
+cpp_sanitize_probe(name = "case1", label = "//projects/apps/foo:bin")
+cpp_sanitize_probe(name = "case2", label = "//projects/apps/foo/sub:my bin")
 cpp_sanitize_probe(name = "case3", label = "//third_party/providers:mod_ABC")
 cpp_sanitize_probe(name = "case4", label = "//a:b/c")
 cpp_sanitize_probe(name = "case5", label = "//UPPER:Case With Spaces")
-cpp_sanitize_probe(name = "case6", label = "root//apps/foo:bin (config//toolchains:clang)")
+cpp_sanitize_probe(name = "case6", label = "root//projects/apps/foo:bin (config//toolchains:clang)")
 
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
+import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
-import { existsSync } from "node:fs";
-import { spawn, spawnSync } from "node:child_process";
 import { runInTemp } from "../lib/test-helpers";
 
 const bashProbe = spawnSync("/bin/bash", ["-lc", "echo ok"], { stdio: "ignore" });
@@ -62,7 +62,7 @@ test(
       // 5) Skip heavy native build; Node path will be validated using a JS stub
 
       // 6) Stage a minimal dist/ for the TS package with loaders and artifacts
-      const tsPkg = path.join(tmp, "libs", "demo-ts");
+      const tsPkg = path.join(tmp, "projects", "libs", "demo-ts");
       const distPath = path.join(tsPkg, "dist");
       await fs.mkdirp(path.join(distPath, "browser"));
       await fs.mkdirp(path.join(distPath, "node"));
@@ -126,7 +126,7 @@ exports.add = (a, b) => (a|0) + (b|0);
       await fs.writeFile(
         path.join(tmp, "runner_node.cjs"),
         `
-const m = require('./libs/demo-ts/dist/node/index.cjs');
+const m = require('./projects/libs/demo-ts/dist/node/index.cjs');
 const got = m.add(2, 3);
 if (got !== 5) { console.error('expected 5, got', got); process.exit(2); }
 console.log('OK node', got);

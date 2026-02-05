@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
 import { patchInvalidationStrategyForLang } from "../../lib/lang-contracts";
+import { runInTemp } from "../lib/test-helpers";
 
 async function buildOutPath(tmp: string, $: any, target: string): Promise<string> {
   const res = await $({
@@ -43,7 +43,7 @@ function parseProbe(txt: string): { patchScope: string; glueOnApplyRemove: boole
 
 test("lang patch invalidation model mapping is consistent (Starlark ↔ TS)", async () => {
   await runInTemp("lang-contracts-parity", async (tmp, $) => {
-    const appDir = path.join(tmp, "apps", "demo");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(appDir, { recursive: true });
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
@@ -60,7 +60,7 @@ test("lang patch invalidation model mapping is consistent (Starlark ↔ TS)", as
     );
 
     for (const lang of ["go", "cpp", "node", "python"] as const) {
-      const target = `//apps/demo:${lang}`;
+      const target = `//projects/apps/demo:${lang}`;
       const outPath = await buildOutPath(tmp, $, target);
       const probe = parseProbe(await fsp.readFile(outPath, "utf8"));
       const ts = patchInvalidationStrategyForLang(lang);

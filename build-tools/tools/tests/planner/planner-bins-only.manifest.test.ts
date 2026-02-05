@@ -8,8 +8,8 @@ void (async function main() {
   console.log("TAP version 13");
   const ok = await runInTemp("planner-bins-only", async (tmp, $) => {
     // Scaffold a lib and a cli so we have both kinds in graph
-    await $`scaf new go lib demo-lib --yes --path=libs/demo-lib`;
-    await $`scaf new go cli demo-cli --yes --path=apps/demo-cli`;
+    await $`scaf new go lib demo-lib --yes --path=projects/libs/demo-lib`;
+    await $`scaf new go cli demo-cli --yes --path=projects/apps/demo-cli`;
 
     // Seed gomod2nix deterministically via local stub (no network)
     const stubDir = path.join(tmp, "bin");
@@ -42,9 +42,9 @@ void (async function main() {
     await $({
       cwd: tmp,
       env: { ...process.env, PATH: `${stubDir}:${process.env.PATH || ""}` },
-    })`gomod2nix --dir apps/demo-cli`;
+    })`gomod2nix --dir projects/apps/demo-cli`;
     await fsp.copyFile(
-      path.join(tmp, "apps", "demo-cli", "gomod2nix.toml"),
+      path.join(tmp, "projects", "apps", "demo-cli", "gomod2nix.toml"),
       path.join(tmp, "gomod2nix.toml"),
     );
 
@@ -55,7 +55,7 @@ void (async function main() {
     await $({
       cwd: tmp,
       stdio: "pipe",
-    })`git add -A apps libs gomod2nix.toml build-tools/tools/buck third_party/providers build-tools/tools/nix`;
+    })`git add -A projects/apps projects/libs gomod2nix.toml build-tools/tools/buck third_party/providers build-tools/tools/nix`;
     const { stdout } = await $({
       cwd: tmp,
       stdio: "pipe",
@@ -71,8 +71,8 @@ void (async function main() {
     const arr = JSON.parse(txt) as Array<any>;
     // Assert only binaries are present (label ends with demo-cli target, not lib)
     const labels = arr.map((e) => String(e?.label || ""));
-    const hasCli = labels.some((l) => /apps\/demo-cli:demo-cli/.test(l));
-    const hasLib = labels.some((l) => /libs\/demo-lib:demo-lib/.test(l));
+    const hasCli = labels.some((l) => /projects\/apps\/demo-cli:demo-cli/.test(l));
+    const hasLib = labels.some((l) => /projects\/libs\/demo-lib:demo-lib/.test(l));
     if (!hasCli || hasLib) {
       console.log("not ok 1 - manifest should contain only binaries (cli present, lib absent)");
       console.log(`  ---\n  labels: ${JSON.stringify(labels)}\n  ...`);

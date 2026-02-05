@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
-import { normalizeNixAttr, providerNameForImporter, providerNameForNixAttr } from "./providers.ts";
-import { isSupportedImporterLabel } from "./importers.ts";
 import path from "node:path";
+import { isSupportedImporterLabel } from "./importers.ts";
+import { normalizeNixAttr, providerNameForImporter, providerNameForNixAttr } from "./providers.ts";
 
 function fqProviderLabel(name: string): string {
   return `//third_party/providers:${name}`;
@@ -20,7 +20,7 @@ export type LockfileLabelInspection =
 
 // Parse an importer-scoped PNPM lockfile label.
 // Accepts forms like:
-//   - lockfile:apps/web/pnpm-lock.yaml#apps/web
+//   - lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web
 //   - lockfile:pnpm-lock.yaml#.          (repo-root lockfiles only)
 // Normalizes the lockfile path by stripping any number of repeated leading "./" segments.
 function stripRepeatedLeadingDotSlashSegments(s: string): string {
@@ -111,7 +111,7 @@ export function dropConfigSuffix(label: string): string {
   return String(label || "").split(" (")[0];
 }
 
-// Convert labels like "root//apps/foo:svc" or "prelude//build-tools/cpp:lib" to "//apps/foo:svc" or "//build-tools/cpp:lib".
+// Convert labels like "root//projects/apps/foo:svc" or "prelude//build-tools/cpp:lib" to "//projects/apps/foo:svc" or "//build-tools/cpp:lib".
 export function dropCellPrefix(label: string): string {
   const s = String(label || "");
   if (s.startsWith("//")) return s;

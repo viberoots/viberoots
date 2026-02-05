@@ -18,8 +18,8 @@ async function nixBuildSelected(tmp: string, $: any, target: string): Promise<st
       BUCK_TEST_SRC: tmp,
       PY_WASM_BACKEND: "wasi",
       NIX_PY_TEST_RESOLVE_JSON: JSON.stringify({
-        hello: { version: "1.0.0", originPath: "apps/pywasm/vendor/hello" },
-        world: { version: "0.1.0", originPath: "libs/pylib/vendor/world" },
+        hello: { version: "1.0.0", originPath: "projects/apps/pywasm/vendor/hello" },
+        world: { version: "0.1.0", originPath: "projects/libs/pylib/vendor/world" },
       }),
     },
   })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
@@ -33,7 +33,7 @@ async function nixBuildSelected(tmp: string, $: any, target: string): Promise<st
 
 test("python wasm (wasi): app consumes lib overlay with extension", async () => {
   await runInTemp("py-wasm-wasi-ext-lib", async (tmp, $) => {
-    const libRel = path.join("libs", "pylib");
+    const libRel = path.join("projects", "libs", "pylib");
     const libDir = path.join(tmp, libRel);
     await fs.mkdir(path.join(libDir, "src", "world"), { recursive: true });
     await fs.mkdir(path.join(libDir, "native"), { recursive: true });
@@ -90,13 +90,13 @@ nix_python_wasm_extension_module(
   module = "world._native",
   srcs = ["native/ext.c"],
   labels = ["backend:wasi"],
-  lockfile_label = "lockfile:libs/pylib/uv.lock#libs/pylib",
+  lockfile_label = "lockfile:projects/libs/pylib/uv.lock#projects/libs/pylib",
 )
 
 nix_python_wasm_lib(
   name = "pylib",
   labels = ["backend:wasi"],
-  lockfile_label = "lockfile:libs/pylib/uv.lock#libs/pylib",
+  lockfile_label = "lockfile:projects/libs/pylib/uv.lock#projects/libs/pylib",
   srcs = glob(["**/*.py"]),
   deps = [":ext"],
   visibility = ["PUBLIC"],
@@ -105,7 +105,7 @@ nix_python_wasm_lib(
       "utf8",
     );
 
-    const appRel = path.join("apps", "pywasm");
+    const appRel = path.join("projects", "apps", "pywasm");
     const appDir = path.join(tmp, appRel);
     await fs.mkdir(path.join(appDir, "bin"), { recursive: true });
     await fs.mkdir(path.join(appDir, "src"), { recursive: true });
@@ -130,15 +130,15 @@ load("//build-tools/python:defs.bzl", "nix_python_wasm_app")
 nix_python_wasm_app(
   name = "pyapp",
   labels = ["backend:wasi"],
-  lockfile_label = "lockfile:apps/pywasm/uv.lock#apps/pywasm",
+  lockfile_label = "lockfile:projects/apps/pywasm/uv.lock#projects/apps/pywasm",
   srcs = glob(["**/*.py"]),
-  deps = ["//libs/pylib:pylib"],
+  deps = ["//projects/libs/pylib:pylib"],
 )
 `,
       "utf8",
     );
 
     await $`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
-    await nixBuildSelected(tmp, $, "//apps/pywasm:pyapp");
+    await nixBuildSelected(tmp, $, "//projects/apps/pywasm:pyapp");
   });
 });

@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("node macros: nix_node_gen stamps lang:node and kind:gen", async () => {
   await runInTemp("node-macro-stamp-gen", async (tmp, $) => {
-    const appDir = path.join(tmp, "apps", "web");
+    const appDir = path.join(tmp, "projects", "apps", "web");
     await fsp.mkdir(appDir, { recursive: true });
     // Minimal lockfile to satisfy importer-scoped label
     await fsp.writeFile(path.join(appDir, "pnpm-lock.yaml"), "lockfileVersion: 9\n", "utf8");
@@ -24,7 +24,7 @@ test("node macros: nix_node_gen stamps lang:node and kind:gen", async () => {
         '  name = "stamp_probe",',
         '  out = "out.txt",',
         '  cmd = ": > $OUT",',
-        '  labels = ["lockfile:apps/web/pnpm-lock.yaml#apps/web"],',
+        '  labels = ["lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"],',
         ")",
         "",
       ].join("\n"),

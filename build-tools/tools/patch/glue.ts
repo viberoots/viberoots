@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { exportInlineGraph } from "../buck/export-inline.ts";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
+import { getImporterRootsContract } from "../lib/importer-roots.ts";
 import { normalizeTargetLabel } from "../lib/labels.ts";
 import { runNodeWithZx } from "../lib/node-run.ts";
 import { findRepoRoot } from "../lib/repo.ts";
@@ -121,7 +122,9 @@ export async function ensureGraph(opts: { exportGraph?: () => Promise<void> } = 
     try {
       console.error(`[ensureGraph] inline export via buck2 → ${graphPath}`);
     } catch {}
-    const rawRoots = (process.env.BUCK_QUERY_ROOTS || "apps,libs,go,cpp,third_party")
+    const importerRoots = getImporterRootsContract().workspaceRoots;
+    const defaultRoots = Array.from(new Set([...importerRoots, "go", "cpp", "third_party"]));
+    const rawRoots = (process.env.BUCK_QUERY_ROOTS || defaultRoots.join(","))
       .split(/[,\s]+/)
       .filter(Boolean);
     const fs = await import("node:fs");

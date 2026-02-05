@@ -42,7 +42,7 @@ This is a “Go consumer, C++ producer” case. It is not driven by `nix_cpp_bin
 Example call site:
 
 ```python
-# libs/greeter/TARGETS
+# projects/libs/greeter/TARGETS
 load("//build-tools/cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
@@ -56,13 +56,13 @@ nix_cpp_library(
 ```
 
 ```python
-# apps/demo-cli/TARGETS
+# projects/apps/demo-cli/TARGETS
 load("//build-tools/go:defs.bzl", "nix_go_binary")
 
 nix_go_binary(
     name = "demo",
     srcs = ["cmd/demo/main.go"],
-    repo_cgo_deps = ["//libs/greeter:greeter"],
+    repo_cgo_deps = ["//projects/libs/greeter:greeter"],
 )
 ```
 
@@ -222,7 +222,7 @@ These examples assume the deterministic union rule above:
 #### 1) C++ binary links an in-repo C++ static library (direct)
 
 ```python
-# libs/math/TARGETS
+# projects/libs/math/TARGETS
 load("//build-tools/cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
@@ -233,13 +233,13 @@ nix_cpp_library(
 ```
 
 ```python
-# apps/calc/TARGETS
+# projects/apps/calc/TARGETS
 load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 
 nix_cpp_binary(
     name = "calc",
     srcs = ["src/main.cpp"],
-    link_deps = ["//libs/math:math_core"],
+    link_deps = ["//projects/libs/math:math_core"],
     link_closure = "direct",
 )
 ```
@@ -247,7 +247,7 @@ nix_cpp_binary(
 #### 2) C++ library depends on another in-repo C++ library (compile + link intent)
 
 ```python
-# libs/support/TARGETS
+# projects/libs/support/TARGETS
 load("//build-tools/cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
@@ -258,29 +258,29 @@ nix_cpp_library(
 ```
 
 ```python
-# libs/math/TARGETS
+# projects/libs/math/TARGETS
 load("//build-tools/cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
     name = "math_core",
     srcs = glob(["src/**/*.cpp", "include/**/*.h"]),
-    link_deps = ["//libs/support:support"],
+    link_deps = ["//projects/libs/support:support"],
     visibility = ["PUBLIC"],
 )
 ```
 
 #### 3) C++ binary links transitive library requirements (transitive closure)
 
-`math_core` declares `link_deps = ["//libs/support:support"]`. The binary only mentions `math_core`.
+`math_core` declares `link_deps = ["//projects/libs/support:support"]`. The binary only mentions `math_core`.
 
 ```python
-# apps/calc/TARGETS
+# projects/apps/calc/TARGETS
 load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 
 nix_cpp_binary(
     name = "calc",
     srcs = ["src/main.cpp"],
-    link_deps = ["//libs/math:math_core"],
+    link_deps = ["//projects/libs/math:math_core"],
     link_closure = "transitive",
 )
 ```
@@ -288,7 +288,7 @@ nix_cpp_binary(
 #### 4) Header-only dependency (include paths only)
 
 ```python
-# libs/api-headers/TARGETS
+# projects/libs/api-headers/TARGETS
 load("//build-tools/cpp:defs.bzl", "nix_cpp_headers")
 
 nix_cpp_headers(
@@ -299,13 +299,13 @@ nix_cpp_headers(
 ```
 
 ```python
-# apps/uses-headers/TARGETS
+# projects/apps/uses-headers/TARGETS
 load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 
 nix_cpp_binary(
     name = "uses_headers",
     srcs = ["src/main.cpp"],
-    header_deps = ["//libs/api-headers:api_headers"],
+    header_deps = ["//projects/libs/api-headers:api_headers"],
 )
 ```
 
@@ -314,20 +314,20 @@ nix_cpp_binary(
 Example shape: declare function prototypes yourself (C ABI) or only use opaque handles.
 
 ```python
-# apps/link-only/TARGETS
+# projects/apps/link-only/TARGETS
 load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 
 nix_cpp_binary(
     name = "link_only",
     srcs = ["src/main.cpp"],
-    link_deps = ["//libs/math:math_core"],
+    link_deps = ["//projects/libs/math:math_core"],
 )
 ```
 
 #### 6) C++ Node-API addon links an in-repo C++ library
 
 ```python
-# libs/addon-native/TARGETS
+# projects/libs/addon-native/TARGETS
 load("//build-tools/cpp:defs.bzl", "nix_cpp_node_addon")
 
 nix_cpp_node_addon(
@@ -337,7 +337,7 @@ nix_cpp_node_addon(
         "src/binding.cc",
         "include/addon.h",
     ],
-    link_deps = ["//libs/math:math_core"],
+    link_deps = ["//projects/libs/math:math_core"],
     addon_name = "calc_native",
     visibility = ["PUBLIC"],
 )
@@ -346,13 +346,13 @@ nix_cpp_node_addon(
 #### 7) C++ test links an in-repo C++ library
 
 ```python
-# libs/math/TARGETS
+# projects/libs/math/TARGETS
 load("//build-tools/cpp:defs.bzl", "nix_cpp_test")
 
 nix_cpp_test(
     name = "math_gtest",
     srcs = ["tests/math_gtest.cpp"],
-    link_deps = ["//libs/math:math_core"],
+    link_deps = ["//projects/libs/math:math_core"],
     deps = [
         # Example of nixpkgs dep via provider target
         "//third_party/providers:nix_pkgs_googletest",
@@ -366,7 +366,7 @@ nix_cpp_test(
 and that runtime loading is handled (rpath or packaging) as described later in this document.
 
 ```python
-# libs/runtime/TARGETS
+# projects/libs/runtime/TARGETS
 load("//build-tools/cpp:defs.bzl", "nix_cpp_shared_library")
 
 nix_cpp_shared_library(
@@ -377,13 +377,13 @@ nix_cpp_shared_library(
 ```
 
 ```python
-# apps/uses-shared/TARGETS
+# projects/apps/uses-shared/TARGETS
 load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 
 nix_cpp_binary(
     name = "uses_shared",
     srcs = ["src/main.cpp"],
-    link_deps = ["//libs/runtime:runtime"],
+    link_deps = ["//projects/libs/runtime:runtime"],
     link_closure = "transitive",
 )
 ```
@@ -394,7 +394,7 @@ The addon template emits rpath entries for each linked Nix package so the runtim
 can resolve shared libs without `DYLD_LIBRARY_PATH`/`LD_LIBRARY_PATH`.
 
 ```python
-# libs/runtime/TARGETS
+# projects/libs/runtime/TARGETS
 load("//build-tools/cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
@@ -406,13 +406,13 @@ nix_cpp_library(
 ```
 
 ```python
-# libs/addon-native/TARGETS
+# projects/libs/addon-native/TARGETS
 load("//build-tools/cpp:defs.bzl", "nix_cpp_node_addon")
 
 nix_cpp_node_addon(
     name = "napi_addon",
     srcs = glob(["src/**/*.cc"]),
-    link_deps = ["//libs/runtime:runtime"],
+    link_deps = ["//projects/libs/runtime:runtime"],
     addon_name = "runtime_addon",
     visibility = ["PUBLIC"],
 )
@@ -513,7 +513,7 @@ This prevents a common source of nondeterminism where link inputs are stable at 
 
 In Phase 1, patch invalidation is intentionally explicit and monotonic:
 
-- Patch files live under the producer package (for example, `libs/foo/patches/cpp/*.patch`).
+- Patch files live under the producer package (for example, `projects/libs/foo/patches/cpp/*.patch`).
 - Patch files must be included in the producer target’s `srcs` so Buck invalidation is precise and predictable.
 - If a C++ library is used via `link_deps`, changing one of its patch files must rebuild:
   - the library derivation, and
@@ -561,12 +561,12 @@ nix_cpp_binary(
     # Default: direct-only.
     link_closure = "direct",
     link_deps = [
-        "//libs/normal:normal",
-        "//libs/bundle:bundle",
+        "//projects/libs/normal:normal",
+        "//projects/libs/bundle:bundle",
     ],
     # Only this dep pulls its transitive link requirements.
     link_closure_overrides = {
-        "//libs/bundle:bundle": "transitive",
+        "//projects/libs/bundle:bundle": "transitive",
     },
 )
 ```
@@ -710,14 +710,14 @@ This repo expects real tests for behavior changes.
 I propose adding zx-based integration tests under `build-tools/tools/tests/cpp/` that:
 
 - scaffold a small temp repo with:
-  - `libs/a` as a C++ lib
-  - `apps/b` as a C++ bin depending on it
+  - `projects/libs/a` as a C++ lib
+  - `projects/apps/b` as a C++ bin depending on it
 - build and run the binary to prove the link succeeds
 
 For transitive linking:
 
-- create `libs/a` depending on `libs/b`
-- ensure `apps/c` only lists `link_deps=["//libs/a:a"]` and still links and runs with `link_closure="transitive"`
+- create `projects/libs/a` depending on `projects/libs/b`
+- ensure `projects/apps/c` only lists `link_deps=["//projects/libs/a:a"]` and still links and runs with `link_closure="transitive"`
 - add addon and test cases that follow the same nested `link_deps` chain
 
 For header-only:

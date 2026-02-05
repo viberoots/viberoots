@@ -22,14 +22,14 @@ let
   }:
     let
       _guard = H.guardNoDevOverridesInCI devOverrideEnv;
-      patchDir = builtins.toPath ("${builtins.toString srcRoot}/${subdir}/patches/python");
-      patchesMap = H.pythonPatchesMapFromDirs { dirs = [ patchDir ]; };
-      devOverrides = H.readDevOverrides devOverrideEnv;
-      # Also pass through the live workspace root for test-only origin lookups
       wsRootEnv = builtins.getEnv "WORKSPACE_ROOT";
       wsRoot =
         if wsRootEnv != "" then wsRootEnv
         else builtins.toString srcRoot;
+      patchDir = builtins.toPath ("${wsRoot}/${subdir}/patches/python");
+      patchesMap = H.pythonPatchesMapFromDirs { dirs = [ patchDir ]; };
+      devOverrides = H.readDevOverrides devOverrideEnv;
+      # Also pass through the live workspace root for test-only origin lookups
       # Use a stable snapshot of the app/lib subtree, preferring the live WORKSPACE_ROOT
       # so temp repos created during tests are visible even if srcRoot was store-snapshotted earlier.
       srcAbs =
@@ -43,14 +43,7 @@ let
             else if builtins.pathExists (builtins.toPath ("${baseFlake}/" + subdir)) then baseFlake
             else baseSrcRoot;
         in builtins.path { path = builtins.toPath ("${candidate}/" + subdir); name = "py-src"; };
-      # Compute lockfile path relative to srcAbs to keep builds hermetic.
-      lockRel =
-        let lf = lockfile;
-            withPrefix = subdir + "/";
-        in if lib.hasPrefix withPrefix lf then lib.removePrefix withPrefix lf
-           else (
-             if lib.hasSuffix "/uv.lock" lf then "uv.lock" else lf
-           );
+      lockRel = lockfile;
       pname =
         if kind == "app"
         then "py-${H.sanitizeName name}"
@@ -162,7 +155,11 @@ in {
     patchDirs ? [ ../../patches/python ],
   }:
     let
-      patchDir = builtins.toPath ("${builtins.toString srcRoot}/${subdir}/patches/python");
+      wsRootEnv = builtins.getEnv "WORKSPACE_ROOT";
+      wsRoot =
+        if wsRootEnv != "" then wsRootEnv
+        else builtins.toString srcRoot;
+      patchDir = builtins.toPath ("${wsRoot}/${subdir}/patches/python");
       patchesMap = H.pythonPatchesMapFromDirs { dirs = [ patchDir ]; };
 
       # Build a minimal store directory containing only the lockfile at ./uv.lock

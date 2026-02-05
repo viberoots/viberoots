@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import assert from "node:assert/strict";
 import fs from "fs-extra";
+import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
@@ -12,7 +12,7 @@ test("python: pyext wheelhouse env drvPath depends only on importer uv.lock (not
     }
     const $ = _$;
 
-    const appRel = path.join("apps", "pyext_build_deps");
+    const appRel = path.join("projects", "apps", "pyext_build_deps");
     const appDir = path.join(tmp, appRel);
     await fs.mkdirp(path.join(appDir, "native"));
 
@@ -81,7 +81,7 @@ test("python: pyext wheelhouse env drvPath depends only on importer uv.lock (not
     const resolveJson = JSON.stringify({
       builddep: {
         version: "1.0.0",
-        originPath: path.join("apps", "pyext_build_deps", "vendor", "builddep-1.0.0"),
+        originPath: path.join("projects", "apps", "pyext_build_deps", "vendor", "builddep-1.0.0"),
       },
     });
     const baseEnv = {

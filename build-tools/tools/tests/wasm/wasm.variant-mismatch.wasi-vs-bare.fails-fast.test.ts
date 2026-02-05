@@ -6,7 +6,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("wasm: variant mismatch (TinyGo WASI vs bare lib) fails fast with targeted error", async () => {
   await runInTemp("wasm-variant-mismatch-wasi-vs-bare", async (tmp, $) => {
-    const coreDir = path.join(tmp, "libs", "math-core");
+    const coreDir = path.join(tmp, "projects", "libs", "math-core");
     await fs.outputFile(
       path.join(coreDir, "include", "addon.h"),
       `#ifndef MATH_CORE_ADDON_H
@@ -35,7 +35,7 @@ nix_cpp_wasm_static_lib(
 `,
     );
 
-    const apiDir = path.join(tmp, "libs", "math-api");
+    const apiDir = path.join(tmp, "projects", "libs", "math-api");
     await fs.outputFile(
       path.join(apiDir, "go.mod"),
       `module example.com/math/api
@@ -67,7 +67,7 @@ func main() {}
 nix_go_tiny_wasm_lib(
     name = "wasm",
     srcs = ["main.go"],
-    link_deps = ["//libs/math-core:core_wasm"],
+    link_deps = ["//projects/libs/math-core:core_wasm"],
     visibility = ["PUBLIC"],
 )
 `,
@@ -81,7 +81,7 @@ nix_go_tiny_wasm_lib(
       stdio: "pipe",
       env: {
         ...process.env,
-        BUCK_TARGET: "//libs/math-api:wasm",
+        BUCK_TARGET: "//projects/libs/math-api:wasm",
         WEB_WASM_BACKEND: "wasi_single",
       },
       reject: false,

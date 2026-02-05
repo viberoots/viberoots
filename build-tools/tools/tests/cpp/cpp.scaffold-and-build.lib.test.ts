@@ -73,10 +73,10 @@ test("cpp lib scaffold builds via planner (archive exists)", async () => {
     // Create a simulated Buck graph JSON for planner consumption
     const graphNodes = [
       {
-        name: "//libs/demo:demo",
+        name: "//projects/libs/demo:demo",
         rule_type: "cxx_library",
         labels: ["lang:cpp", "kind:lib"],
-        srcs: ["libs/demo/src/demo.cpp"],
+        srcs: ["projects/libs/demo/src/demo.cpp"],
       },
     ];
     const graphPath = path.join(tmp, "build-tools/tools/buck/graph.json");

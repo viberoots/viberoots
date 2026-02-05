@@ -47,7 +47,7 @@ test("cpp cli scaffold builds via planner (binary exists)", async () => {
     );
 
     // Scaffold a minimal CLI under apps/demo
-    const appDir = path.join(tmp, "apps/demo");
+    const appDir = path.join(tmp, "projects/apps/demo");
     await fs.mkdirp(path.join(appDir, "src"));
     await fs.outputFile(path.join(appDir, "src", "main.cpp"), "int main(){return 0;}\n", "utf8");
     const targets = [
@@ -65,10 +65,10 @@ test("cpp cli scaffold builds via planner (binary exists)", async () => {
     // Simulated graph for planner
     const graphNodes = [
       {
-        name: "//apps/demo:demo",
+        name: "//projects/apps/demo:demo",
         rule_type: "cxx_binary",
         labels: ["lang:cpp", "kind:bin"],
-        srcs: ["apps/demo/src/main.cpp"],
+        srcs: ["projects/apps/demo/src/main.cpp"],
       },
     ];
     const graphPath = path.join(tmp, "build-tools/tools/buck/graph.json");

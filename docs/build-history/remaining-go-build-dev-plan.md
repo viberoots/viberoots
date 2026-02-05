@@ -50,13 +50,13 @@ Scope
 Implementation
 
 - In `graph-generator.nix`, compute `subdir` from the Buck label:
-  - For `go_binary`: `apps/<name>/cmd/<name>`.
-  - For `go_library`: the package directory (e.g., `libs/<name>`).
+  - For `go_binary`: `projects/apps/<name>/cmd/<name>`.
+  - For `go_library`: the package directory (e.g., `projects/libs/<name>`).
 - Ensure templates still use `src = ../..` (repo root) and `subPackages = [ subdir ]`.
 
 Acceptance Criteria
 
-- `nix build .#graph-generator` produces the CLI binary under `$out/bin/` for `//apps/<name>:<name>`.
+- `nix build .#graph-generator` produces the CLI binary under `$out/bin/` for `//projects/apps/<name>:<name>`.
 - Lib derivations are consistently built using the expected subdir.
 
 Dependencies
@@ -97,7 +97,7 @@ Scope
 Implementation
 
 - Continue to use `build-tools/tools/bin/gomod2nix` wrapper in `build-tools/tools/dev/install-deps.ts` and tests.
-- In tests, generate the lockfile from the CLI module (`apps/<app>`) and copy it to repo root for the planner.
+- In tests, generate the lockfile from the CLI module (`projects/apps/<app>`) and copy it to repo root for the planner.
 - Keep glue (`export-graph`, `sync-providers`, `gen-auto-map`) as zx scripts invoked by `install-deps`.
 
 Acceptance Criteria

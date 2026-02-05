@@ -1,20 +1,20 @@
 #!/usr/bin/env zx-wrapper
+import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import assert from "node:assert/strict";
 import { runInTemp } from "../lib/test-helpers";
 
 test("providers registry: node sync generates importer-scoped provider from pnpm-lock.yaml", async () => {
   await runInTemp("providers-registry-node", async (tmp, $) => {
     // Synthesize a minimal importer with a pnpm-lock.yaml and a matching patch file
-    const importer = path.join(tmp, "apps", "web");
+    const importer = path.join(tmp, "projects", "apps", "web");
     await fsp.mkdir(importer, { recursive: true });
     const lf = path.join(importer, "pnpm-lock.yaml");
     const lock = [
       "lockfileVersion: '9.0'",
       "importers:",
-      "  .:",
+      "  projects/apps/web:",
       "    dependencies:",
       "      lodash: 4.17.21",
       "packages:",
@@ -40,7 +40,7 @@ test("providers registry: node sync generates importer-scoped provider from pnpm
       "expected node_importer_deps rule in TARGETS.node.auto",
     );
     assert.ok(
-      /apps\/web\/pnpm-lock\.yaml/.test(txt),
+      /projects\/apps\/web\/pnpm-lock\.yaml/.test(txt),
       "expected lockfile path in generated provider",
     );
   });

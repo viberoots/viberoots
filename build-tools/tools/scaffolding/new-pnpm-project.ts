@@ -10,7 +10,7 @@ function usage(): void {
       "",
       "Examples:",
       "  new-pnpm-project --kind cli --name demo",
-      "  new-pnpm-project --kind lib --name utils --importer libs/utils",
+      "  new-pnpm-project --kind lib --name utils --importer projects/libs/utils",
     ].join("\n"),
   );
 }
@@ -50,7 +50,9 @@ async function main(): Promise<void> {
 
   const kind = getFlagStr("kind", "").toLowerCase();
   const name = getFlagStr("name", "") || getFlagStr("project", "") || getFlagStr("n", "");
-  const importer = getFlagStr("importer", "") || (kind === "lib" ? `libs/${name}` : `apps/${name}`);
+  const importer =
+    getFlagStr("importer", "") ||
+    (kind === "lib" ? `projects/libs/${name}` : `projects/apps/${name}`);
   const yes = getFlagBool("yes");
   const runSetup = getFlagBool("run-setup");
 
@@ -60,7 +62,8 @@ async function main(): Promise<void> {
   }
 
   const template = kind === "cli" ? "cli" : "lib";
-  const dest = kind === "cli" ? path.join("apps", name) : path.join("libs", name);
+  const dest =
+    kind === "cli" ? path.join("projects", "apps", name) : path.join("projects", "libs", name);
 
   const extra: string[] = [
     `--importer=${importer}`,

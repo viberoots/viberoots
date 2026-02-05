@@ -46,7 +46,7 @@ test("cpp wasm static lib stamps wasm:wasi when wasm_abi is wasi", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir cpp_wasm_abi_stamping cquery "deps(//libs/core:core_wasm)" --json --output-attribute name`;
+    })`buck2 --isolation-dir cpp_wasm_abi_stamping cquery "deps(//projects/libs/core:core_wasm)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return;
 
     await $({
@@ -54,9 +54,9 @@ test("cpp wasm static lib stamps wasm:wasi when wasm_abi is wasi", async () => {
     })`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
     const nodes = await readGraph(path.join(tmp, "build-tools", "tools", "buck", "graph.json"));
     const node = nodes.find(
-      (x) => normalizeTargetLabel(String(x.name || "")) === "//libs/core:core_wasm",
+      (x) => normalizeTargetLabel(String(x.name || "")) === "//projects/libs/core:core_wasm",
     );
-    assert.ok(node, "missing node //libs/core:core_wasm");
+    assert.ok(node, "missing node //projects/libs/core:core_wasm");
 
     const labels = normalizeLabelList((node as any).labels);
     assert.ok(labels.includes("wasm:wasi"), "missing wasm:wasi label");

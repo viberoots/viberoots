@@ -17,7 +17,7 @@ test("node go-addon: scaffold, build addon via Buck planner, run and observe Go-
 
     // Export Buck graph for the temp repo (exercise exporter path; not strictly required to build)
     await $({
-      env: { ...process.env, BUCK_QUERY_ROOTS: "libs,go,cpp,third_party" },
+      env: { ...process.env, BUCK_QUERY_ROOTS: "projects/apps,projects/libs,go,cpp,third_party" },
     })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs ./build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
 
     // Build via Buck2 to exercise macro -> planner -> Nix through the normal user path
@@ -26,10 +26,10 @@ test("node go-addon: scaffold, build addon via Buck planner, run and observe Go-
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 build //libs/demo-native:napi_addon --show-full-output --target-platforms //:no_cgo`;
+    })`buck2 build //projects/libs/demo-native:napi_addon --show-full-output --target-platforms //:no_cgo`;
     if (res.exitCode !== 0) {
       console.error(String(res.stdout || "") + "\n" + String(res.stderr || ""));
-      throw new Error("buck2 build failed for //libs/demo-native:napi_addon");
+      throw new Error("buck2 build failed for //projects/libs/demo-native:napi_addon");
     }
 
     const producedAddon =
@@ -47,7 +47,7 @@ test("node go-addon: scaffold, build addon via Buck planner, run and observe Go-
 
     // Materialize the addon at the stable runtime path expected by the loader
     const addonName = "demo_addon";
-    const stableAddon = path.join(tmp, "libs", "demo", "native", `${addonName}.node`);
+    const stableAddon = path.join(tmp, "projects", "libs", "demo", "native", `${addonName}.node`);
     await fsp.mkdir(path.dirname(stableAddon), { recursive: true });
     await fsp.copyFile(absProducedAddon, stableAddon);
 
@@ -55,7 +55,7 @@ test("node go-addon: scaffold, build addon via Buck planner, run and observe Go-
     const runner = path.join(tmp, "run-e2e.cjs");
     const script = `
       const path = require("node:path");
-      const addon = require(path.resolve("libs/demo/native/${addonName}.node"));
+      const addon = require(path.resolve("projects/libs/demo/native/${addonName}.node"));
       const sum = addon.add(2, 3);
       if (sum !== 5) {
         console.error("[e2e] unexpected sum", sum);

@@ -10,12 +10,12 @@ test("node adapter validates lockfile importer mismatch even without kind:* (war
     await fs.mkdirp(path.dirname(out));
     const nodes = [
       {
-        name: "//apps/web:bundle",
+        name: "//projects/apps/web:bundle",
         rule_type: "js_binary",
         labels: [
           "lang:node",
           // importer 'libs/ui' does not match directory of lockfile 'apps/web'
-          "lockfile:apps/web/pnpm-lock.yaml#libs/ui",
+          "lockfile:projects/apps/web/pnpm-lock.yaml#projects/libs/ui",
         ],
       },
     ];

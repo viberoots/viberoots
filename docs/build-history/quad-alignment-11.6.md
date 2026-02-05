@@ -287,7 +287,7 @@ Implement.
 
 - Create `build-tools/tools/dev/update-pnpm-hash/` modules, for example:
   - args parsing (`--lockfile`, `--force`)
-  - importer normalization (apps/_ and libs/_)
+  - importer normalization (projects/apps/_ and projects/libs/_)
   - Nix build runner (including timeout + `--no-link --print-out-paths` handling)
   - lockfile seeding/generation behavior (`NIX_PNPM_ALLOW_GENERATE`)
   - `build-tools/tools/nix/node-modules.hashes.json` read/modify/write

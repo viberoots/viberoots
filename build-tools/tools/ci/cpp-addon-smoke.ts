@@ -5,11 +5,10 @@
  * Cross-platform smoke build for the Node C++ addon scaffold.
  * - Creates a temp workspace (no changes to the live repo)
  * - Scaffolds `node cpp-addon` named "demo"
- * - Builds the native addon target: //libs/demo-native:napi_addon
+ * - Builds the native addon target: //projects/libs/demo-native:napi_addon
  *
  * This is a build-only smoke check (no behavior change, no providers required).
  */
-import path from "node:path";
 import { runInTemp } from "../tests/lib/test-helpers.ts";
 
 async function main() {
@@ -22,18 +21,18 @@ async function main() {
     // Initialize a git repo for any glue scripts that read git state
     await $`git init`;
 
-    // Scaffold the addon pair: libs/demo and libs/demo-native
+    // Scaffold the addon pair: projects/libs/demo and projects/libs/demo-native
     await $`node build-tools/tools/scaffolding/scaf.ts new node cpp-addon demo --yes`;
 
     // Build only the native addon via Buck (delegates to Nix template internally)
-    await $`buck2 build //libs/demo-native:napi_addon`;
+    await $`buck2 build //projects/libs/demo-native:napi_addon`;
 
     // Optional: print target output for diagnostics
     let artifactPath = "";
     try {
       const out = await $({
         stdio: "pipe",
-      })`buck2 targets --show-output //libs/demo-native:napi_addon`;
+      })`buck2 targets --show-output //projects/libs/demo-native:napi_addon`;
       const line =
         String(out.stdout || "")
           .trim()
@@ -43,7 +42,7 @@ async function main() {
       // Expect: //<target> <buck-out-path>
       const parts = line.split(/\s+/);
       artifactPath = parts.length >= 2 ? parts[parts.length - 1] : "";
-      await $`buck2 targets --show-output //libs/demo-native:napi_addon`;
+      await $`buck2 targets --show-output //projects/libs/demo-native:napi_addon`;
     } catch {}
     if (!artifactPath) {
       throw new Error("Unable to resolve addon artifact path via `buck2 targets --show-output`");
@@ -69,7 +68,7 @@ async function main() {
     await $`node build-tools/tools/buck/sync-providers.ts --lang node`.nothrow();
     await $`node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
     await $`node build-tools/tools/buck/prebuild-guard.ts`;
-    await $`buck2 test //libs/demo:unit`;
+    await $`buck2 test //projects/libs/demo:unit`;
   });
 }
 

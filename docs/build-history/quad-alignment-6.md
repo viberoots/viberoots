@@ -21,7 +21,7 @@ Introduce a single Starlark helper to (a) enforce exactly one importer‑scoped 
 - Helper contracts (exact signatures/semantics):
   - `def importer_from_labels(kwargs):`
     - Preconditions: `kwargs["labels"]` may be missing or mixed‐type; the helper must tolerate that.
-    - Behavior: calls `ensure_single_lockfile_label(kwargs, None)`; then parses the only `lockfile:<path>#<importer>` label; returns `<importer>` as a string (e.g., `"."`, `"apps/web"`).
+  - Behavior: calls `ensure_single_lockfile_label(kwargs, None)`; then parses the only `lockfile:<path>#<importer>` label; returns `<importer>` as a string (e.g., `"."`, `"projects/apps/web"`).
     - Error text: rely on and preserve the message produced by `ensure_single_lockfile_label` to keep tests stable: `Exactly one importer-scoped lockfile label is required (lockfile:<path>#<importer>); got: [...]`.
   - `def include_importer_patches_from_labels(kwargs, lang):`
     - Behavior: `imp = importer_from_labels(kwargs)`; then `append_importer_patches(kwargs, imp, lang)`; no-op if `imp` is empty (should not occur if preconditions pass).
@@ -32,11 +32,11 @@ Introduce a single Starlark helper to (a) enforce exactly one importer‑scoped 
 - `build-tools/python/defs.bzl`:
   - Replace local importer extraction logic with `include_importer_patches_from_labels(kwargs, "python")` in all `nix_python_*` macros (including wasm stamps).
 - Edge cases handled:
-  - Root importer `"."` vs nested importers (`apps/*`, `libs/*`) produce the correct patch directory (`patches/<lang>` vs `<importer>/patches/<lang>`).
+  - Root importer `"."` vs nested importers (`projects/apps/*`, `projects/libs/*`) produce the correct patch directory (`patches/<lang>` vs `<importer>/patches/<lang>`).
   - Multiple `lockfile:` labels → error (delegated to `ensure_single_lockfile_label`).
   - Non-string/empty labels are ignored when scanning.
 - Tests (in this PR):
-  - Starlark↔TS importer parity: build a small table of lockfile labels in zx, call a Starlark probe via a tiny test rule and compare to the TS `computeImporterLabel(...)` output for the same cases (repo root `.` and nested `apps/*`, `libs/*`).
+  - Starlark↔TS importer parity: build a small table of lockfile labels in zx, call a Starlark probe via a tiny test rule and compare to the TS `computeImporterLabel(...)` output for the same cases (repo root `.` and nested `projects/apps/*`, `projects/libs/*`).
   - Macro srcs realization: for minimal Node and Python importer fixtures with a single patch, `buck2 cquery --json --output-attributes=srcs` includes the importer‑local patch path for representative macros (bin/lib/test).
   - Grep guard: no references remain to `append_node_patches_for_importer(` in the repo.
 - Docs (in this PR):

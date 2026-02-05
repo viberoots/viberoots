@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 test("node nix runner: minimal importer with no tests passes", async () => {
   await runInTemp("node-nix-runner-smoke", async (tmp, _$) => {
     const $ = _$({ cwd: tmp, stdio: "inherit" });
-    const app = path.join(tmp, "apps", "mini");
+    const app = path.join(tmp, "projects", "apps", "mini");
     await fsp.mkdir(app, { recursive: true });
     // Minimal package.json (no tests, no lockfile)
     await fsp.writeFile(
@@ -40,15 +40,15 @@ test("node nix runner: minimal importer with no tests passes", async () => {
       "",
       "nix_node_test(",
       '    name = "node_tests",',
-      '    lockfile_label = "lockfile:apps/mini/pnpm-lock.yaml#apps/mini",',
+      '    lockfile_label = "lockfile:projects/apps/mini/pnpm-lock.yaml#projects/apps/mini",',
       '    env = {"NIX_PNPM_ALLOW_GENERATE": "1"},',
       ")",
       "",
     ].join("\n");
     await fsp.writeFile(path.join(app, "TARGETS"), targets, "utf8");
     // Update pnpm-store FOD hash mapping for this importer lockfile
-    await $`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile apps/mini/pnpm-lock.yaml`;
+    await $`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile projects/apps/mini/pnpm-lock.yaml`;
     // Execute the test target; with no test files present, the derivation should succeed
-    await $`buck2 test //apps/mini:node_tests`;
+    await $`buck2 test //projects/apps/mini:node_tests`;
   });
 });

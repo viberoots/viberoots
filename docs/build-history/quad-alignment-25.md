@@ -49,7 +49,7 @@ I will add or extend tests that assert the macro-visible behavior and lock down 
   - `nix_python_binary` includes importer-local patches via the synthetic dep path (and still invalidates deterministically on patch edits).
 - Add a focused macro expansion test that asserts:
   - `nix_python_*` macros fail with the same deterministic error text when the lockfile label is missing or malformed.
-  - importer derivation remains stable for `lockfile:././apps/foo/uv.lock#apps/foo`.
+  - importer derivation remains stable for `lockfile:././projects/apps/foo/uv.lock#projects/apps/foo`.
 - Keep existing provider sync golden tests unchanged (this PR does not change provider generation), but add one check that Python macros still realize provider edges from `MODULE_PROVIDERS` in the expected attribute (`deps` unless the rule shape forces otherwise).
 
 ### Docs (in this PR)

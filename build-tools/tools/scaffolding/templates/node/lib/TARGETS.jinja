@@ -5,11 +5,9 @@ nix_node_lib(
     srcs = [],
     out = "build.stamp",
     cmd = "echo ok > $OUT",
-    lockfile_label = "lockfile:{{ lockfilePath }}#{{ importer }}",
 )
 
 nix_node_test(
     name = "unit",
-    lockfile_label = "lockfile:{{ lockfilePath }}#{{ importer }}",
 )
 

@@ -74,7 +74,7 @@ def _node_nix_test_impl(ctx):
 node_nix_test = rule(
     impl = _node_nix_test_impl,
     attrs = {
-        # Importer directory like "apps/web" or "."
+        # Importer directory like "projects/apps/web" or "."
         "importer": attrs.string(),
         # Optional newline-separated test patterns (forwarded via env)
         "patterns": attrs.list(attrs.string(), default = []),

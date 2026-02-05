@@ -34,7 +34,7 @@ Use the canonical helper surface from `//build-tools/lang:defs_common.bzl` and `
 
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
 - Provider wiring: load `MODULE_PROVIDERS` from `//build-tools/lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
-- Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
+- Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `projects/apps/*`/`projects/libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
 - Patch model contract: `build-tools/lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
 
@@ -51,20 +51,20 @@ Use the canonical helper surface from `//build-tools/lang:defs_common.bzl` and `
 
 ### Key Assumptions (to validate)
 
-- **A1: Lockfile** — Projects use Rebar3 with a `rebar.lock` (per app/lib). Multi‑app repos may have multiple `rebar.lock` files (e.g., under `apps/*` or `libs/*`). If a repo uses `erlang.mk` or bare git checkouts without a lockfile, we will add a fallback (Phase C).
+- **A1: Lockfile** — Projects use Rebar3 with a `rebar.lock` (per app/lib). Multi‑app repos may have multiple `rebar.lock` files (e.g., under `projects/apps/*` or `projects/libs/*`). If a repo uses `erlang.mk` or bare git checkouts without a lockfile, we will add a fallback (Phase C).
 - **A2: Nixpkgs** — We will use `beamPackages` from Nixpkgs (e.g., `beamPackages.rebar3`, `beamPackages.erlang`). These provide reproducible builds on macOS and Linux.
 - **A3: Dependency identity** — For Hex deps we can derive stable keys as `<name>@<version>`. For git deps we will derive keys as `git+<host>/<owner>/<repo>@<rev>`; these map to patch filenames and provider set membership.
 - **A4: Buck rules** — We can express Erlang builds via thin macros over `genrule` invoking Rebar3 in a hermetic Nix environment, until native `erlang_*` rules exist. This mirrors the Node macro strategy.
 
 ### Decisions and Open Questions
 
-- D1 (Importer identity): Use Erlang app name from `rebar.config` when present; fallback to the package directory (e.g., `apps/foo`). Expose explicit `importer` in macros for overrides.
+- D1 (Importer identity): Use Erlang app name from `rebar.config` when present; fallback to the package directory (e.g., `projects/apps/foo`). Expose explicit `importer` in macros for overrides.
 - D2 (Git dep identity): Normalize to `git+<host>/<owner>/<repo>@<rev>`; reject floating refs. Confirm lockfile always pins rev.
 - D3 (Profiles): Start with the `default` profile only; revisit profile‑scoped providers later if needed.
 
 ### Architecture Overview
 
-- **Labels**: Erlang targets carry a deterministic lockfile label: `lockfile:<relative/path/to/rebar.lock>#<importer>`. The importer is the Erlang app name (from `rebar.config`/`{project_applications, [...]}` or `{app, Name}`); default to the package directory (e.g., `apps/foo`) if an explicit name isn’t resolvable.
+- **Labels**: Erlang targets carry a deterministic lockfile label: `lockfile:<relative/path/to/rebar.lock>#<importer>`. The importer is the Erlang app name (from `rebar.config`/`{project_applications, [...]}` or `{app, Name}`); default to the package directory (e.g., `projects/apps/foo`) if an explicit name isn’t resolvable.
 - **Providers**: A zx generator scans all `rebar.lock` files and `patches/erbuild-tools/lang/*.patch`, computes per‑importer effective dep sets, and emits `TARGETS.erlang.auto` with one provider per `(lockfile, importer)`; patch paths included only if relevant to the importer’s effective set.
 - **Invalidation**: Macros also include importer‑local patch files in target `srcs` (mirroring Node) so Buck invalidation is precise. Provider stamps remain metadata‑only.
 - **Auto‑map**: `gen-auto-map.ts` maps `lockfile:...#...` labels to the fully qualified provider target names using shared naming helpers.
@@ -99,7 +99,7 @@ Use the canonical helper surface from `//build-tools/lang:defs_common.bzl` and `
 - **Mapping**: Reuse `build-tools/tools/lib/providers.ts` `providerNameForImporter(lockfilePath, importer)` to generate provider target names (same hashing/suffix scheme used for Node).
 - **Auto‑map**: Extend `build-tools/tools/buck/gen-auto-map.ts` (if necessary) to treat Erlang lockfile labels exactly like Node’s: translate to `//third_party/providers:<name>`, dedupe, sort, emit under `MODULE_PROVIDERS` for use in macros.
 - Example:
-  - Target label: `lockfile:apps/er/foo/rebar.lock#foo`
+  - Target label: `lockfile:projects/apps/er/foo/rebar.lock#foo`
   - Provider: `//third_party/providers:lf_<hash>_foo__apps_er_foo_rebar_lock`
 
 ### Provider Sync (build-tools/tools/buck/sync-providers-erlang.ts)

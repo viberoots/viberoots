@@ -16,7 +16,7 @@ test(
       const TIMEOUT_SECS = String(
         Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200"),
       );
-      const importer = "apps/demo-node";
+      const importer = "projects/apps/demo-node";
       const impDir = path.join(tmp, importer);
       await fsp.mkdir(impDir, { recursive: true });
       // Minimal package.json without test runner deps; no test files created

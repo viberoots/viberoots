@@ -11,8 +11,8 @@ test("python wheelhouse: identical lock+patch → identical store path across im
       : (cmd: TemplateStringsArray, ...args: any[]) => (global as any).$`${cmd}${args}`;
 
     // Create two importers with identical uv.lock and no patches.
-    const impA = path.join(tmp, "apps", "alpha");
-    const impB = path.join(tmp, "apps", "bravo");
+    const impA = path.join(tmp, "projects", "apps", "alpha");
+    const impB = path.join(tmp, "projects", "apps", "bravo");
     await fs.mkdirp(impA);
     await fs.mkdirp(impB);
     const lockText = ["# uv lock", "[[package]]", 'name = "mydep"', 'version = "1.0.0"', ""].join(
@@ -46,8 +46,8 @@ test("python wheelhouse: identical lock+patch → identical store path across im
         .pop() as string;
     }
 
-    const attrA = "py-wheelhouse-apps-alpha";
-    const attrB = "py-wheelhouse-apps-bravo";
+    const attrA = "py-wheelhouse-projects-apps-alpha";
+    const attrB = "py-wheelhouse-projects-apps-bravo";
 
     let outA1: string = "";
     try {

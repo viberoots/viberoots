@@ -6,7 +6,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("wasm: unsupported target in link_deps fails fast with targeted error", async () => {
   await runInTemp("wasm-link-deps-unsupported-target", async (tmp, $) => {
-    const appDir = path.join(tmp, "libs", "api");
+    const appDir = path.join(tmp, "projects", "libs", "api");
     await fs.outputFile(path.join(appDir, "go.mod"), `module example.com/api\n\ngo 1.22.0\n`);
     await fs.outputFile(path.join(appDir, "main.go"), `package main\n\nfunc main() {}\n`);
     await fs.outputFile(
@@ -37,7 +37,11 @@ test("wasm: unsupported target in link_deps fails fast with targeted error", asy
       stdio: "pipe",
       reject: false,
       nothrow: true,
-      env: { ...process.env, BUCK_TARGET: "//libs/api:wasm", WEB_WASM_BACKEND: "wasi_single" },
+      env: {
+        ...process.env,
+        BUCK_TARGET: "//projects/libs/api:wasm",
+        WEB_WASM_BACKEND: "wasi_single",
+      },
     })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/dev/build-selected.ts`;
 
     if (res.exitCode === 0) {
@@ -46,8 +50,8 @@ test("wasm: unsupported target in link_deps fails fast with targeted error", asy
     const combined = `${String(res.stdout || "")}\n${String(res.stderr || "")}`;
     if (
       !combined.includes("link_dep") ||
-      !combined.includes("//libs/api:wasm") ||
-      !combined.includes("//libs/api:not_wasm")
+      !combined.includes("//projects/libs/api:wasm") ||
+      !combined.includes("//projects/libs/api:not_wasm")
     ) {
       throw new Error(`expected error to name consumer and offending dep; got:\n${combined}`);
     }

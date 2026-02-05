@@ -2,8 +2,8 @@ load("//build-tools/lang:importer_strings.bzl", "importer_strings_probe")
 
 # One probe target per representative importer string
 importer_strings_probe(name = "dot", importer = ".")
-importer_strings_probe(name = "apps_web", importer = "apps/web")
-importer_strings_probe(name = "libs_some_tool", importer = "libs/some_tool")
-importer_strings_probe(name = "repeated_slashes_trailing", importer = "apps//web/")
+importer_strings_probe(name = "projects_apps_web", importer = "projects/apps/web")
+importer_strings_probe(name = "projects_libs_some_tool", importer = "projects/libs/some_tool")
+importer_strings_probe(name = "repeated_slashes_trailing", importer = "projects/apps//web/")
 
 

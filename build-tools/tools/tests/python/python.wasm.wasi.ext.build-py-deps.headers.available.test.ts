@@ -20,7 +20,7 @@ async function nixBuildSelected(tmp: string, $: any, target: string): Promise<st
       NIX_PY_TEST_RESOLVE_JSON: JSON.stringify({
         builddep: {
           version: "1.0.0",
-          originPath: "apps/pywasm/vendor/builddep-1.0.0",
+          originPath: "projects/apps/pywasm/vendor/builddep-1.0.0",
         },
       }),
     },
@@ -35,7 +35,7 @@ async function nixBuildSelected(tmp: string, $: any, target: string): Promise<st
 
 test("python wasm (wasi): extension build_py_deps headers are available", async () => {
   await runInTemp("py-wasm-wasi-ext-build-deps", async (tmp, $) => {
-    const appRel = path.join("apps", "pywasm");
+    const appRel = path.join("projects", "apps", "pywasm");
     const appDir = path.join(tmp, appRel);
     await fs.mkdir(path.join(appDir, "bin"), { recursive: true });
     await fs.mkdir(path.join(appDir, "src", "demo"), { recursive: true });
@@ -111,13 +111,13 @@ nix_python_wasm_extension_module(
   srcs = ["native/ext.c"],
   build_py_deps = ["builddep"],
   labels = ["backend:wasi"],
-  lockfile_label = "lockfile:apps/pywasm/uv.lock#apps/pywasm",
+  lockfile_label = "lockfile:projects/apps/pywasm/uv.lock#projects/apps/pywasm",
 )
 
 nix_python_wasm_app(
   name = "pyapp",
   labels = ["backend:wasi"],
-  lockfile_label = "lockfile:apps/pywasm/uv.lock#apps/pywasm",
+  lockfile_label = "lockfile:projects/apps/pywasm/uv.lock#projects/apps/pywasm",
   srcs = glob(["**/*.py"]),
   deps = [":ext"],
 )
@@ -126,6 +126,6 @@ nix_python_wasm_app(
     );
 
     await $`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
-    await nixBuildSelected(tmp, $, "//apps/pywasm:pyapp");
+    await nixBuildSelected(tmp, $, "//projects/apps/pywasm:pyapp");
   });
 });

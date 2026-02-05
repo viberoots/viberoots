@@ -3,11 +3,11 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp, exists } from "../../lib/test-helpers";
+import { exists, runInTemp } from "../../lib/test-helpers";
 
 test("providers: Node activation via pnpm-lock.yaml in sparse clone (no --lang)", async () => {
   await runInTemp("node-pnpm-activation", async (tmp, $) => {
-    const importerDir = path.join(tmp, "apps", "web");
+    const importerDir = path.join(tmp, "projects", "apps", "web");
     await fsp.mkdir(path.join(importerDir, "patches", "node"), { recursive: true });
     const lock = `lockfileVersion: '9.0'\nimporters:\n  .:\n    dependencies: {}\n`;
     await fsp.writeFile(path.join(importerDir, "pnpm-lock.yaml"), lock, "utf8");
@@ -33,8 +33,8 @@ await syncAllProviders();
     // Header + load line present
     assert.match(txt, /# GENERATED FILE — DO NOT EDIT\./);
     assert.match(txt, /load\("\/\/third_party\/providers:defs_node\.bzl", "node_importer_deps"\)/);
-    // Provider entry present for apps/web importer
+    // Provider entry present for projects/apps/web importer
     assert.match(txt, /node_importer_deps\(name="/);
-    assert.match(txt, /lockfile="apps\/web\/pnpm-lock\.yaml"/);
+    assert.match(txt, /lockfile="projects\/apps\/web\/pnpm-lock\.yaml"/);
   });
 });

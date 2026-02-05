@@ -14,7 +14,7 @@ function normalizeLabelList(xs: unknown): string[] {
 
 test("exporter: C++ macros preserve link intent attrs in build-tools/tools/buck/graph.json", async () => {
   await runInTemp("cpp-macros-link-intent-exported-attrs", async (tmp, $) => {
-    const appRel = path.join("apps", "link_intent_export");
+    const appRel = path.join("projects", "apps", "link_intent_export");
     const app = path.join(tmp, appRel);
     await fs.mkdirp(path.join(app, "src"));
     await fs.mkdirp(path.join(app, "tests"));

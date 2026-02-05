@@ -139,8 +139,8 @@ Rule: new package-local planner-visible stub call sites must use the non-mutatin
     - Prefer `//build-tools/lang:defs_common.bzl:prepare_language_wiring(...)` with `wiring = "non_genrule"` for `nix_python_library`, `nix_python_test`, and `nix_python_wasm_*` (non-mutating).
     - Prefer `//build-tools/lang:defs_common.bzl:prepare_language_wiring(...)` with `wiring = "srcsless_rule"` for rule shapes that cannot accept `srcs` (example: prelude `python_binary`).
 - Scaffolding:
-  - `scaf new python lib <name>` → `libs/<name>` with `pyproject.toml`, `uv.lock`, `TARGETS` using `nix_python_library` and a sample test via `nix_python_test`.
-  - `scaf new python app <name>` → `apps/<name>` with a small library and binary (`nix_python_binary`) and importer‑scoped `lockfile_label`.
+  - `scaf new python lib <name>` → `projects/libs/<name>` with `pyproject.toml`, `uv.lock`, `TARGETS` using `nix_python_library` and a sample test via `nix_python_test`.
+  - `scaf new python app <name>` → `projects/apps/<name>` with a small library and binary (`nix_python_binary`) and importer‑scoped `lockfile_label`.
 - Glue:
   - Provider sync reads all `**/uv.lock` and writes `third_party/providers/TARGETS.python.auto` deterministically.
   - Python provider sync does **not** accept a global `patchDir` input; patch discovery is always importer-local under `<importer>/patches/python`.

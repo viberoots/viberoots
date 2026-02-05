@@ -25,7 +25,7 @@
 - Fix (local):
   - `node build-tools/tools/buck/sync-providers.ts` (unified orchestrator regenerates `third_party/providers/TARGETS.node.auto`)
   - `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`
-  - Ensure the Node target carries a lockfile label like `lockfile:apps/web/pnpm-lock.yaml#apps/web`.
+  - Ensure the Node target carries a lockfile label like `lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web`.
 - Fix (CI): run the dedicated stages before build/test as above.
 
 ## No-op sync (Node)

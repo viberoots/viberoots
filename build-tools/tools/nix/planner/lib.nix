@@ -9,7 +9,7 @@
 
 let
   # Buck labels may contain a trailing config suffix like
-  #   "//apps/demo:demo_gtest__planner (config//platforms:default#hash)"
+  #   "//projects/apps/demo:demo_gtest__planner (config//platforms:default#hash)"
   # Normalize by stripping the suffix for stable lookups.
   cleanLabel = s:
     let parts = lib.splitString " (" s; in

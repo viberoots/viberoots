@@ -2,8 +2,8 @@
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { runInTemp } from "../lib/test-helpers";
 import { sanitizeAttrNameFromLabel } from "../../lib/labels";
+import { runInTemp } from "../lib/test-helpers";
 
 function parseOutPath(stdout: unknown): string {
   const lines = String(stdout || "")
@@ -21,15 +21,15 @@ await runInTemp("cpp-headers-builds", async (tmp, $) => {
   const defs = await fsp.readFile(path.join(repo, "build-tools", "cpp", "defs.bzl"), "utf8");
   assert.ok(defs.includes("def nix_cpp_headers("), "expected nix_cpp_headers macro to exist");
 
-  await fsp.mkdir(path.join(tmp, "libs", "demo", "include"), { recursive: true });
+  await fsp.mkdir(path.join(tmp, "projects", "libs", "demo", "include"), { recursive: true });
   await fsp.writeFile(
-    path.join(tmp, "libs", "demo", "include", "demo.h"),
+    path.join(tmp, "projects", "libs", "demo", "include", "demo.h"),
     ["#pragma once", "", "inline int demo_answer() { return 42; }", ""].join("\n"),
     "utf8",
   );
 
   await fsp.mkdir(path.join(tmp, "build-tools", "tools", "buck"), { recursive: true });
-  const label = "//libs/demo:demo_headers";
+  const label = "//projects/libs/demo:demo_headers";
   const attrSuffix = sanitizeAttrNameFromLabel(label);
   await fsp.writeFile(
     path.join(tmp, "build-tools", "tools", "buck", "graph.json"),
@@ -39,7 +39,7 @@ await runInTemp("cpp-headers-builds", async (tmp, $) => {
           name: label,
           rule_type: "planner_stub",
           labels: ["lang:cpp", "kind:headers"],
-          srcs: ["libs/demo/include/demo.h"],
+          srcs: ["projects/libs/demo/include/demo.h"],
           deps: [],
         },
       ],

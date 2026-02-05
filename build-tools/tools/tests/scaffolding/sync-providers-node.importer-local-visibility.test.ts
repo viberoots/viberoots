@@ -8,13 +8,13 @@ test("sync-providers-node lists importer-local patches in patch_paths (sorted, d
   await runInTemp("node-importer-local-visibility", async (tmp, $) => {
     await $`git init`;
 
-    const importerDir = path.join(tmp, "apps/web");
+    const importerDir = path.join(tmp, "projects/apps/web");
     const lockfilePath = path.join(importerDir, "pnpm-lock.yaml");
     const lockfileContent = `
 lockfileVersion: "9.0"
 
 importers:
-  apps/web:
+  projects/apps/web:
     dependencies:
       lodash:
         specifier: ^4.17.21
@@ -34,15 +34,15 @@ packages:
 
     await fsp.mkdir(path.dirname(lockfilePath), { recursive: true });
     await fsp.writeFile(lockfilePath, lockfileContent, "utf8");
-    await $`git add apps/web/pnpm-lock.yaml`;
+    await $`git add projects/apps/web/pnpm-lock.yaml`;
 
     await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
     const outPath = path.join(tmp, "third_party/providers/TARGETS.node.auto");
     const output = await fsp.readFile(outPath, "utf8");
 
     // Expect the provider entry to include importer-local patch paths (sorted)
-    const expectedA = "apps/web/patches/node/aaa@1.0.0.patch";
-    const expectedZ = "apps/web/patches/node/zzz@9.9.9.patch";
+    const expectedA = "projects/apps/web/patches/node/aaa@1.0.0.patch";
+    const expectedZ = "projects/apps/web/patches/node/zzz@9.9.9.patch";
 
     if (!output.includes("node_importer_deps(")) {
       console.error("Missing node_importer_deps rule in output");

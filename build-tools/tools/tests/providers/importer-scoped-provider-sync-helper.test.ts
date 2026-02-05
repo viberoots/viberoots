@@ -28,7 +28,7 @@ test("importer-scoped provider sync helper wires node and python configs", async
 
       await fsp.mkdir(path.join(tmp, "third_party/providers"), { recursive: true });
 
-      const nodeImporter = "apps/web";
+      const nodeImporter = "projects/apps/web";
       const nodeLockfile = path.join(tmp, nodeImporter, "pnpm-lock.yaml");
       await fsp.mkdir(path.dirname(nodeLockfile), { recursive: true });
       await fsp.writeFile(nodeLockfile, "# lock\n", "utf8");
@@ -38,7 +38,7 @@ test("importer-scoped provider sync helper wires node and python configs", async
       await fsp.writeFile(path.join(nodePatches, "aaa@1.0.0.patch"), "# patch\n", "utf8");
       await fsp.writeFile(path.join(nodePatches, "zzz@9.9.9.patch"), "# patch\n", "utf8");
 
-      const pythonImporter = "libs/api";
+      const pythonImporter = "projects/libs/api";
       const pythonLockfile = path.join(tmp, pythonImporter, "uv.lock");
       await fsp.mkdir(path.dirname(pythonLockfile), { recursive: true });
       const uvLock = [

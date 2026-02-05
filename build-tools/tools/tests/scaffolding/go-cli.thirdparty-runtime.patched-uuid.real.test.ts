@@ -45,9 +45,9 @@ EOF
 }
 
 async function scaffoldLibrary(sh: any, tmp: string) {
-  await sh`scaf new go lib demo-lib --yes --path=libs/demo-lib`;
+  await sh`scaf new go lib demo-lib --yes --path=projects/libs/demo-lib`;
   await writeFileAbs(
-    path.join(tmp, "libs", "demo-lib", "pkg", "demo-lib", "demo-lib.go"),
+    path.join(tmp, "projects", "libs", "demo-lib", "pkg", "demo-lib", "demo-lib.go"),
     [
       "package demolib",
       "",
@@ -65,19 +65,19 @@ async function scaffoldLibrary(sh: any, tmp: string) {
 }
 
 async function scaffoldCli(sh: any, tmp: string) {
-  await sh`scaf new go cli demo-cli --yes --path=apps/demo-cli`;
-  const cliTargetsPath = path.join(tmp, "apps", "demo-cli", "TARGETS");
+  await sh`scaf new go cli demo-cli --yes --path=projects/apps/demo-cli`;
+  const cliTargetsPath = path.join(tmp, "projects", "apps", "demo-cli", "TARGETS");
   let cliTargets = await fsp.readFile(cliTargetsPath, "utf8");
-  if (!/deps\s*=\s*\[\s*"\/\/libs\/demo-lib:demo-lib"\s*\]/.test(cliTargets)) {
+  if (!/deps\s*=\s*\[\s*"\/\/projects\/libs\/demo-lib:demo-lib"\s*\]/.test(cliTargets)) {
     cliTargets = cliTargets.replace(/nix_go_binary\(([^)]*)\)/ms, (m: string, body: string) => {
       const withDeps = body.includes("deps = ")
         ? body.replace(
             /deps\s*=\s*\[([^\]]*)\]/m,
-            (mm: string, inner: string) => `deps = [${inner}, "//libs/demo-lib:demo-lib"]`,
+            (mm: string, inner: string) => `deps = [${inner}, "//projects/libs/demo-lib:demo-lib"]`,
           )
         : body.replace(
             /labels\s*=\s*\[[^\]]*\],?/m,
-            (lm: string) => `${lm}\n    deps = ["//libs/demo-lib:demo-lib"],`,
+            (lm: string) => `${lm}\n    deps = ["//projects/libs/demo-lib:demo-lib"],`,
           );
       return `nix_go_binary(${withDeps})`;
     });
@@ -167,10 +167,11 @@ test("go cli with local lib + third-party patched uuid runtime (prefetched real 
           .join(path.delimiter),
         PATH: `${path.dirname(process.execPath)}:${process.env.PATH || ""}`,
       },
-    })`build-tools/tools/bin/patch-pkg apply go github.com/google/uuid --target //apps/demo-cli:demo-cli --force`;
+    })`build-tools/tools/bin/patch-pkg apply go github.com/google/uuid --target //projects/apps/demo-cli:demo-cli --force`;
 
     const patchFile = path.join(
       _tmp,
+      "projects",
       "apps",
       "demo-cli",
       "patches",

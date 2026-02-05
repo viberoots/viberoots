@@ -43,7 +43,7 @@ test("node webapp: dev server runs and serves index", { timeout: TEST_TIMEOUT_MS
   process.env.NIX_PNPM_FETCH_TIMEOUT = process.env.NIX_PNPM_FETCH_TIMEOUT || "240";
   await runInTemp("webapp-dev", async (tmp, _$) => {
     const name = "demo-web";
-    const appDir = `apps/${name}`;
+    const appDir = `projects/apps/${name}`;
     const appAbs = path.join(tmp, appDir);
     // Choose a free port programmatically to avoid both contention and reliance on Vite logs
     let chosenPort: number | undefined;
@@ -66,7 +66,7 @@ test("node webapp: dev server runs and serves index", { timeout: TEST_TIMEOUT_MS
     const outPathRaw = await _$({
       cwd: appAbs,
       stdio: "pipe",
-    })`zx-wrapper ../../build-tools/tools/dev/node-modules-build.ts`;
+    })`zx-wrapper ../../../build-tools/tools/dev/node-modules-build.ts`;
     try {
       await _$({ cwd: tmp, stdio: "pipe" })`git add -A ${appDir}`;
     } catch {}

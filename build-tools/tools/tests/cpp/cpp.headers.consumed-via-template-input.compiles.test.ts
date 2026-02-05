@@ -16,16 +16,16 @@ function parseOutPath(stdout: unknown): string {
 await runInTemp("cpp-headers-consumed-by-template-input", async (tmp, $) => {
   const repo = process.cwd();
 
-  await fsp.mkdir(path.join(tmp, "libs", "hdrs", "include"), { recursive: true });
+  await fsp.mkdir(path.join(tmp, "projects", "libs", "hdrs", "include"), { recursive: true });
   await fsp.writeFile(
-    path.join(tmp, "libs", "hdrs", "include", "hdrs.h"),
+    path.join(tmp, "projects", "libs", "hdrs", "include", "hdrs.h"),
     ["#pragma once", "", "inline int hdrs_value() { return 7; }", ""].join("\n"),
     "utf8",
   );
 
-  await fsp.mkdir(path.join(tmp, "apps", "demo", "src"), { recursive: true });
+  await fsp.mkdir(path.join(tmp, "projects", "apps", "demo", "src"), { recursive: true });
   await fsp.writeFile(
-    path.join(tmp, "apps", "demo", "src", "main.cpp"),
+    path.join(tmp, "projects", "apps", "demo", "src", "main.cpp"),
     ['#include "hdrs.h"', "", "int main() {", "  (void)hdrs_value();", "  return 0;", "}", ""].join(
       "\n",
     ),
@@ -38,15 +38,15 @@ await runInTemp("cpp-headers-consumed-by-template-input", async (tmp, $) => {
     `  T = import ${JSON.stringify(path.join(repo, "build-tools", "tools", "nix", "templates", "cpp.nix"))} { inherit pkgs; };`,
     `  srcRoot = builtins.toPath ${JSON.stringify(tmp)};`,
     "  hdrs = T.cppHeaders {",
-    '    name = "//libs/hdrs:hdrs";',
+    '    name = "//projects/libs/hdrs:hdrs";',
     "    inherit srcRoot;",
-    '    subdir = "libs/hdrs";',
+    '    subdir = "projects/libs/hdrs";',
     '    srcList = [ "include/hdrs.h" ];',
     "  };",
     "  app = T.cppApp {",
-    '    name = "//apps/demo:demo";',
+    '    name = "//projects/apps/demo:demo";',
     "    inherit srcRoot;",
-    '    subdir = "apps/demo";',
+    '    subdir = "projects/apps/demo";',
     '    srcList = [ "src/main.cpp" ];',
     "    nixCxxPkgs = [ hdrs ];",
     "  };",

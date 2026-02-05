@@ -11,15 +11,15 @@ test("node: importer-local patch rebuilds only affected importer's target", asyn
     await $`git init`;
 
     // Two importers with their own lockfiles
-    const lfA = path.join(tmp, "apps/a/pnpm-lock.yaml");
-    const lfB = path.join(tmp, "apps/b/pnpm-lock.yaml");
+    const lfA = path.join(tmp, "projects/apps/a/pnpm-lock.yaml");
+    const lfB = path.join(tmp, "projects/apps/b/pnpm-lock.yaml");
     await fsp.mkdir(path.dirname(lfA), { recursive: true });
     await fsp.mkdir(path.dirname(lfB), { recursive: true });
-    await fsp.writeFile(lfA, `lockfileVersion: "9.0"\nimporters:\n  apps/a: {}\n`, "utf8");
-    await fsp.writeFile(lfB, `lockfileVersion: "9.0"\nimporters:\n  apps/b: {}\n`, "utf8");
+    await fsp.writeFile(lfA, `lockfileVersion: "9.0"\nimporters:\n  projects/apps/a: {}\n`, "utf8");
+    await fsp.writeFile(lfB, `lockfileVersion: "9.0"\nimporters:\n  projects/apps/b: {}\n`, "utf8");
     // Ensure importer-local patches directories exist before the initial build so glob() tracks them
-    const patchDirA = path.join(tmp, "apps/a/patches/node");
-    const patchDirB = path.join(tmp, "apps/b/patches/node");
+    const patchDirA = path.join(tmp, "projects/apps/a/patches/node");
+    const patchDirB = path.join(tmp, "projects/apps/b/patches/node");
     await fsp.mkdir(patchDirA, { recursive: true });
     await fsp.mkdir(patchDirB, { recursive: true });
     // Seed a baseline patch for A so the rule has a declared input we can track
@@ -34,29 +34,29 @@ test("node: importer-local patch rebuilds only affected importer's target", asyn
       '  out = "a.stamp",',
       "  cmd = \"bash -c 'set -euo pipefail; wc -c < $(location :pa) > $OUT'\",",
       '  srcs = [":pa"],',
-      '  labels = ["lockfile:apps/a/pnpm-lock.yaml#apps/a"],',
+      '  labels = ["lockfile:projects/apps/a/pnpm-lock.yaml#projects/apps/a"],',
       ")",
       "",
     ].join("\n");
-    await fsp.writeFile(path.join(tmp, "apps/a/TARGETS"), targetsA, "utf8");
+    await fsp.writeFile(path.join(tmp, "projects/apps/a/TARGETS"), targetsA, "utf8");
     const targetsB = [
       'load("@prelude//:rules.bzl", "genrule")',
-      'genrule(name="tb", out="b.stamp", cmd="echo b > $OUT", srcs = glob(["patches/node/*.patch"]), labels=["lockfile:apps/b/pnpm-lock.yaml#apps/b"])',
+      'genrule(name="tb", out="b.stamp", cmd="echo b > $OUT", srcs = glob(["patches/node/*.patch"]), labels=["lockfile:projects/apps/b/pnpm-lock.yaml#projects/apps/b"])',
       "",
     ].join("\n");
-    await fsp.writeFile(path.join(tmp, "apps/b/TARGETS"), targetsB, "utf8");
+    await fsp.writeFile(path.join(tmp, "projects/apps/b/TARGETS"), targetsB, "utf8");
 
     // Initial build
-    await $`buck2 --isolation-dir ${iso1} build --target-platforms //:no_cgo //apps/a:ta //apps/b:tb`;
+    await $`buck2 --isolation-dir ${iso1} build --target-platforms //:no_cgo //projects/apps/a:ta //projects/apps/b:tb`;
     const outA1 =
-      await $`buck2 --isolation-dir ${iso1} targets --target-platforms //:no_cgo --show-output //apps/a:ta`;
+      await $`buck2 --isolation-dir ${iso1} targets --target-platforms //:no_cgo --show-output //projects/apps/a:ta`;
     const outB1 =
-      await $`buck2 --isolation-dir ${iso1} targets --target-platforms //:no_cgo --show-output //apps/b:tb`;
+      await $`buck2 --isolation-dir ${iso1} targets --target-platforms //:no_cgo --show-output //projects/apps/b:tb`;
     const lineA1 =
       String(outA1.stdout || "")
         .trim()
         .split(/\r?\n/)
-        .find((l) => l.includes("apps/a:ta")) ||
+        .find((l) => l.includes("projects/apps/a:ta")) ||
       String(outA1.stdout || "")
         .trim()
         .split(/\r?\n/)[0] ||
@@ -65,7 +65,7 @@ test("node: importer-local patch rebuilds only affected importer's target", asyn
       String(outB1.stdout || "")
         .trim()
         .split(/\r?\n/)
-        .find((l) => l.includes("apps/b:tb")) ||
+        .find((l) => l.includes("projects/apps/b:tb")) ||
       String(outB1.stdout || "")
         .trim()
         .split(/\r?\n/)[0] ||
@@ -91,16 +91,16 @@ test("node: importer-local patch rebuilds only affected importer's target", asyn
     await fsp.appendFile(path.join(patchDirA, "base@0.0.0.patch"), "# change\n", "utf8");
 
     // Rebuild both targets. The declared input is an existing file, so Buck should observe the change.
-    await $`buck2 --isolation-dir ${iso2} build --target-platforms //:no_cgo //apps/a:ta //apps/b:tb`;
+    await $`buck2 --isolation-dir ${iso2} build --target-platforms //:no_cgo //projects/apps/a:ta //projects/apps/b:tb`;
     const outA2 =
-      await $`buck2 --isolation-dir ${iso2} targets --target-platforms //:no_cgo --show-output //apps/a:ta`;
+      await $`buck2 --isolation-dir ${iso2} targets --target-platforms //:no_cgo --show-output //projects/apps/a:ta`;
     const outB2 =
-      await $`buck2 --isolation-dir ${iso2} targets --target-platforms //:no_cgo --show-output //apps/b:tb`;
+      await $`buck2 --isolation-dir ${iso2} targets --target-platforms //:no_cgo --show-output //projects/apps/b:tb`;
     const lineA2 =
       String(outA2.stdout || "")
         .trim()
         .split(/\r?\n/)
-        .find((l) => l.includes("apps/a:ta")) ||
+        .find((l) => l.includes("projects/apps/a:ta")) ||
       String(outA2.stdout || "")
         .trim()
         .split(/\r?\n/)[0] ||
@@ -109,7 +109,7 @@ test("node: importer-local patch rebuilds only affected importer's target", asyn
       String(outB2.stdout || "")
         .trim()
         .split(/\r?\n/)
-        .find((l) => l.includes("apps/b:tb")) ||
+        .find((l) => l.includes("projects/apps/b:tb")) ||
       String(outB2.stdout || "")
         .trim()
         .split(/\r?\n/)[0] ||
@@ -129,12 +129,12 @@ test("node: importer-local patch rebuilds only affected importer's target", asyn
       .then((s) => s.trim())
       .catch(() => "");
     if (!(a2Content !== a1Content)) {
-      console.error("expected //apps/a:ta content to change after importer A patch");
+      console.error("expected //projects/apps/a:ta content to change after importer A patch");
       console.error("before:", JSON.stringify(a1Content), "after:", JSON.stringify(a2Content));
       process.exit(2);
     }
     if (!(b2Content === b1Content)) {
-      console.error("expected //apps/b:tb content to remain unchanged");
+      console.error("expected //projects/apps/b:tb content to remain unchanged");
       console.error("before:", JSON.stringify(b1Content), "after:", JSON.stringify(b2Content));
       process.exit(2);
     }

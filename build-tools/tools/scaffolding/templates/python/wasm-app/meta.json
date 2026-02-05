@@ -5,13 +5,13 @@
   "help": {
     "usage": "scaf new python wasm-app <name> [--path=DEST]",
     "notes": [
-      "Creates apps/<name> with uv.lock and TARGETS using nix_python_wasm_app.",
+      "Creates projects/apps/<name> with uv.lock and TARGETS using nix_python_wasm_app.",
       "Default backend is wasi; add label backend:pyodide to switch.",
-      "Lockfile label uses importer-scoped form: lockfile:apps/<name>/uv.lock#apps/<name>."
+      "Lockfile label uses importer-scoped form: lockfile:projects/apps/<name>/uv.lock#projects/apps/<name>."
     ],
     "examples": [
-      "scaf new python wasm-app demo-wasm --path=apps/demo-wasm",
-      "scaf regen apps/demo-wasm"
+      "scaf new python wasm-app demo-wasm --path=projects/apps/demo-wasm",
+      "scaf regen projects/apps/demo-wasm"
     ]
   }
 }

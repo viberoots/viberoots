@@ -13,8 +13,8 @@ await runInTemp("exporter-adapters-inactive", async (tmp, $) => {
   await fs.writeFile(path.join(langDir, "go.ts"), goSrc, "utf8");
 
   const nodes = [
-    { name: "//apps/go:svc", rule_type: "go_binary", labels: ["lang:go"] },
-    { name: "//apps/cpp:tool", rule_type: "cxx_binary", labels: [] },
+    { name: "//projects/apps/go:svc", rule_type: "go_binary", labels: ["lang:go"] },
+    { name: "//projects/apps/cpp:tool", rule_type: "cxx_binary", labels: [] },
   ];
   const graph = path.join(tmp, "build-tools/tools/buck/graph.json");
   await fs.outputFile(graph, JSON.stringify(nodes) + "\n", "utf8");
@@ -26,8 +26,8 @@ await runInTemp("exporter-adapters-inactive", async (tmp, $) => {
 
   const out = (await readGraph(graph)) as any[];
   const by = new Map(out.map((n) => [n.name, n]));
-  const goSvc = by.get("//apps/go:svc");
-  const cppTool = by.get("//apps/cpp:tool");
+  const goSvc = by.get("//projects/apps/go:svc");
+  const cppTool = by.get("//projects/apps/cpp:tool");
   assert.ok((goSvc.labels || []).includes("lang:go"));
   // cpp adapter is missing, so cpp labels should not be added; ensure it's unchanged
   assert.ok(!(cppTool.labels || []).includes("lang:cpp"));

@@ -32,7 +32,7 @@ function readItems(txt: string): string[] {
 
 test("synthetic_dep_for_importer_patches_from_labels computes stable dep name and patch inputs (probe)", async () => {
   await runInTemp("patch-inputs-synthetic-dep-importer-patches-probe", async (tmp, $) => {
-    const pkgDir = path.join(tmp, "apps", "demo");
+    const pkgDir = path.join(tmp, "projects", "apps", "demo");
     const patchDir = path.join(pkgDir, "patches", "python");
     await fsp.mkdir(patchDir, { recursive: true });
     await fsp.writeFile(path.join(pkgDir, "uv.lock"), "# uv lock\n", "utf8");
@@ -46,7 +46,7 @@ test("synthetic_dep_for_importer_patches_from_labels computes stable dep name an
         "synthetic_dep_for_importer_patches_from_labels_probe(",
         '  name = "probe_bin",',
         '  parent_name = "bin",',
-        '  lockfile_label = "lockfile:apps/demo/uv.lock#apps/demo",',
+        '  lockfile_label = "lockfile:projects/apps/demo/uv.lock#projects/apps/demo",',
         '  lang = "python",',
         '  into = "resources",',
         ")",
@@ -54,7 +54,7 @@ test("synthetic_dep_for_importer_patches_from_labels computes stable dep name an
         "synthetic_dep_for_importer_patches_from_labels_probe(",
         '  name = "probe_spaced",',
         '  parent_name = "bin with space",',
-        '  lockfile_label = "lockfile:apps/demo/uv.lock#apps/demo",',
+        '  lockfile_label = "lockfile:projects/apps/demo/uv.lock#projects/apps/demo",',
         '  lang = "python",',
         '  into = "resources",',
         ")",
@@ -63,8 +63,8 @@ test("synthetic_dep_for_importer_patches_from_labels computes stable dep name an
       "utf8",
     );
 
-    const out1 = await buildOutPath(tmp, $, "//apps/demo:probe_bin");
-    const out2 = await buildOutPath(tmp, $, "//apps/demo:probe_spaced");
+    const out1 = await buildOutPath(tmp, $, "//projects/apps/demo:probe_bin");
+    const out2 = await buildOutPath(tmp, $, "//projects/apps/demo:probe_spaced");
     if (!out1 || !out2) {
       // Skip when prelude/toolchains aren't available in the ephemeral temp repo.
       return;

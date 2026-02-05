@@ -13,7 +13,7 @@ test("prebuild-guard: flags missing MODULE_PROVIDERS mapping for nixpkg-labeled 
 
     // Minimal graph.json with a node that carries a nixpkg label
     await fsp.mkdir(path.join(tmp, "build-tools", "tools", "buck"), { recursive: true });
-    const graph = [{ name: "//apps/a:bin", labels: ["nixpkg:pkgs.zlib"] }];
+    const graph = [{ name: "//projects/apps/a:bin", labels: ["nixpkg:pkgs.zlib"] }];
     await fsp.writeFile(
       path.join(tmp, "build-tools", "tools", "buck", "graph.json"),
       JSON.stringify(graph),
@@ -30,7 +30,7 @@ test("prebuild-guard: flags missing MODULE_PROVIDERS mapping for nixpkg-labeled 
       "utf8",
     );
 
-    // auto_map missing the mapping entry for //apps/a:bin (empty mapping)
+    // auto_map missing the mapping entry for //projects/apps/a:bin (empty mapping)
     await fsp.writeFile(
       path.join(providersDir, "auto_map.bzl"),
       "# gen\nMODULE_PROVIDERS = {}\n",
@@ -95,7 +95,7 @@ EOF
       [
         "# gen",
         "MODULE_PROVIDERS = {",
-        '  "//apps/a:bin": [',
+        '  "//projects/apps/a:bin": [',
         '    "//third_party/providers:nix_pkgs_zlib",',
         "  ],",
         "}",

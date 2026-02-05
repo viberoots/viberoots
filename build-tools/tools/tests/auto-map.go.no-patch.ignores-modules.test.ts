@@ -13,7 +13,7 @@ test("auto-map: with no Go patches, module: labels are ignored", async () => {
       graph,
       JSON.stringify([
         {
-          name: "//apps/example:bin",
+          name: "//projects/apps/example:bin",
           rule_type: "go_binary",
           labels: ["module:golang.org/x/net@v0.24.0"],
         },

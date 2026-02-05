@@ -22,7 +22,7 @@ test("exporter: nix_go_tiny_wasm_lib preserves link intent attrs in build-tools/
       "utf8",
     );
 
-    const appRel = path.join("apps", "wasm");
+    const appRel = path.join("projects", "apps", "wasm");
     const app = path.join(tmp, appRel);
     await fs.mkdirp(path.join(app, "src"));
     await fs.writeFile(path.join(app, "go.mod"), "module example.com/wasm\n\ngo 1.22.0\n", "utf8");

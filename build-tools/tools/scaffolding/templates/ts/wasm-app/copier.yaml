@@ -16,8 +16,8 @@ name: ""
 language: "ts"
 template: "wasm-app"
 pkgScope: "@apps"
-importer: "apps/{{ name }}"
-lockfilePath: "apps/{{ name }}/pnpm-lock.yaml"
+importer: "projects/apps/{{ name }}"
+lockfilePath: "projects/apps/{{ name }}/pnpm-lock.yaml"
 
 _tasks:
   - mkdir -p apps/{{ name }}/src

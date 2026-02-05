@@ -3,8 +3,8 @@
 This is a minimal Python library scaffold using uv for locking and Buck2 macros (`nix_python_library`).
 
 Notes:
-- Lockfile: `uv.lock` at the importer root (`libs/{{ name }}/uv.lock`)
-- Lockfile label: `lockfile:libs/{{ name }}/uv.lock#libs/{{ name }}`
+- Lockfile: `uv.lock` at the importer root (`projects/libs/{{ name }}/uv.lock`)
+- Lockfile label: `lockfile:projects/libs/{{ name }}/uv.lock#projects/libs/{{ name }}`
 - Edit `pyproject.toml` to set metadata and dependencies (PEP 621; hatchling backend).
 - Generate/refresh the lockfile with uv (outside Buck/Nix):
   - `uv lock` (base)

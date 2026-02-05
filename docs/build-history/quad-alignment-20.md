@@ -362,7 +362,7 @@ This PR makes validation behavior consistent with our build system philosophy:
 
 - Extend or add an exporter regression test that asserts:
   - A target without `kind:*` but with a malformed `lockfile:` label produces a deterministic “malformed lockfile label” finding.
-  - A target without `kind:*` but with an importer mismatch (e.g., `lockfile:apps/web/pnpm-lock.yaml#libs/foo`) produces an importer mismatch finding.
+  - A target without `kind:*` but with an importer mismatch (e.g., `lockfile:projects/apps/web/pnpm-lock.yaml#projects/libs/foo`) produces an importer mismatch finding.
   - Auto-attachment behavior remains unchanged (still only attaches for `kind:*`).
 
 ### Docs (in this PR)

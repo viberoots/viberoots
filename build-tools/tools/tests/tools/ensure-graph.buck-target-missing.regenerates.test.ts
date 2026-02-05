@@ -14,7 +14,7 @@ test("ensureGraph regenerates when BUCK_TARGET is missing from the existing grap
     const prevBuckTarget = process.env.BUCK_TARGET;
     try {
       process.env.WORKSPACE_ROOT = tmp;
-      process.env.BUCK_TARGET = "//apps/example:svc";
+      process.env.BUCK_TARGET = "//projects/apps/example:svc";
 
       await fsp.writeFile(
         graphPath,

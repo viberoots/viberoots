@@ -27,7 +27,7 @@ Implementation detail: the helper-target synthesis lives in `build-tools/go/priv
 1. Create or use a C/C++ library target (in-repo):
 
 ```python
-# libs/greeter/TARGETS
+# projects/libs/greeter/TARGETS
 load("//build-tools/cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
@@ -41,13 +41,13 @@ nix_cpp_library(
 2. Consume it from a Go target via `repo_cgo_deps`; optionally add nixpkgs deps via `nixpkg_deps`:
 
 ```python
-# apps/demo-cli/TARGETS
+# projects/apps/demo-cli/TARGETS
 load("//build-tools/go:defs.bzl", "nix_go_binary")
 
 nix_go_binary(
     name = "demo",
     srcs = ["cmd/demo/main.go"],
-    repo_cgo_deps = ["//libs/greeter:greeter"],          # in-repo C/C++
+    repo_cgo_deps = ["//projects/libs/greeter:greeter"],          # in-repo C/C++
     nixpkg_deps = ["pkgs.openssl"],                       # nixpkgs native deps (optional)
     # Note: nix_cgo_pkgconfig is currently unsupported (fails fast if provided).
 )
@@ -88,7 +88,7 @@ To call Go from C/C++, build your Go package as a c-archive and link it into a C
 1. Declare a Go c-archive target:
 
 ```python
-# libs/greetgo/TARGETS
+# projects/libs/greetgo/TARGETS
 load("//build-tools/go:defs.bzl", "nix_go_carchive")
 
 nix_go_carchive(
@@ -102,7 +102,7 @@ nix_go_carchive(
 2. Export C-callable symbols from Go:
 
 ```go
-// libs/greetgo/export.go
+// projects/libs/greetgo/export.go
 package greetgo
 
 // #include <stdint.h>
@@ -115,19 +115,19 @@ func GoGreet() *C.char { return C.CString("hello from go") }
 3. Link the Go c-archive into a C++ binary and call the exported symbol:
 
 ```python
-# apps/caller/TARGETS
+# projects/apps/caller/TARGETS
 load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 
 nix_cpp_binary(
     name = "caller",
     srcs = ["src/main.cpp"],
-    deps = ["//libs/greetgo:greetgo"],
+    deps = ["//projects/libs/greetgo:greetgo"],
     labels = ["lang:cpp", "kind:bin"],
 )
 ```
 
 ```cpp
-// apps/caller/src/main.cpp
+// projects/apps/caller/src/main.cpp
 #include <iostream>
 extern "C" char* GoGreet();
 

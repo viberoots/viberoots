@@ -59,7 +59,7 @@ nix_go_library(
     cgo_enabled = True,
     # Exercise CGO wiring and nixpkg label normalization
     nixpkg_deps = ["zlib"],
-    repo_cgo_deps = ["//libs/native:native"],
+    repo_cgo_deps = ["//projects/libs/native:native"],
     # Exercise extra provider injection + normalization
     extra_module_providers = ["//third_party/providers:extra_provider", ":localprov"],
 )
@@ -98,6 +98,6 @@ EOF'`;
     assert.ok(out.includes("//third_party/providers:nix_pkgs_zlib"));
     assert.ok(out.includes("//third_party/providers:extra_provider"));
     assert.ok(out.includes("//tmp:localprov"));
-    assert.ok(out.includes("//libs/native:native"));
+    assert.ok(out.includes("//projects/libs/native:native"));
   });
 });

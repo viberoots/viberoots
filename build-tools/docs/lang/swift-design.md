@@ -17,7 +17,7 @@ Audience: Engineers and LLM agents implementing Swift as a first‑class languag
 ### Scope (Phase 1)
 
 - Swift Package Manager (SPM) projects on macOS and Linux.
-- Build Swift apps/libs by invoking SPM within a hermetic Nix derivation.
+- Build Swift projects/apps/libs by invoking SPM within a hermetic Nix derivation.
 - Optional Objective‑C (.m/.mm) sources allowed inside SPM targets (via bridging headers) with no additional repository‑level language.
 - Patching third‑party SPM packages via a flat `patches/swift/*.patch` and a dev‑override JSON.
 
@@ -46,7 +46,7 @@ Use the canonical helper surface from `//build-tools/lang:defs_common.bzl` and `
 
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
 - Provider wiring: load `MODULE_PROVIDERS` from `//build-tools/lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
-- Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
+- Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `projects/apps/*`/`projects/libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
 - Patch model contract: `build-tools/lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
 

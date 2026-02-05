@@ -10,8 +10,8 @@ test("sync-providers-node detects provider name collisions", async () => {
     await $`git init`;
 
     // Create two lockfiles with different importers
-    const lf1 = path.join(tmp, "apps/web/pnpm-lock.yaml");
-    const lf2 = path.join(tmp, "apps/api/pnpm-lock.yaml");
+    const lf1 = path.join(tmp, "projects/apps/web/pnpm-lock.yaml");
+    const lf2 = path.join(tmp, "projects/apps/api/pnpm-lock.yaml");
 
     await fsp.mkdir(path.dirname(lf1), { recursive: true });
     await fsp.mkdir(path.dirname(lf2), { recursive: true });
@@ -20,7 +20,7 @@ test("sync-providers-node detects provider name collisions", async () => {
 lockfileVersion: "9.0"
 
 importers:
-  apps/web:
+  projects/apps/web:
     dependencies:
       lodash:
         specifier: ^4.17.21
@@ -33,8 +33,12 @@ packages:
 `.trim();
 
     await fsp.writeFile(lf1, lockfileContent, "utf8");
-    await fsp.writeFile(lf2, lockfileContent.replace("apps/web", "apps/api"), "utf8");
-    await $`git add apps/web/pnpm-lock.yaml apps/api/pnpm-lock.yaml`;
+    await fsp.writeFile(
+      lf2,
+      lockfileContent.replace("projects/apps/web", "projects/apps/api"),
+      "utf8",
+    );
+    await $`git add projects/apps/web/pnpm-lock.yaml projects/apps/api/pnpm-lock.yaml`;
 
     // Normal case: no collision, should succeed
     await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
@@ -43,7 +47,7 @@ packages:
     const output = await fsp.readFile(outPath, "utf8");
 
     // Verify both providers exist
-    if (!output.includes("apps/web") || !output.includes("apps/api")) {
+    if (!output.includes("projects/apps/web") || !output.includes("projects/apps/api")) {
       console.error("Expected both importer providers in output");
       process.exit(2);
     }
@@ -54,8 +58,8 @@ packages:
     // So we verify that different inputs produce different provider names
     const lines = output.split("\n");
     const expectedLockfiles = new Set<string>([
-      "apps/web/pnpm-lock.yaml",
-      "apps/api/pnpm-lock.yaml",
+      "projects/apps/web/pnpm-lock.yaml",
+      "projects/apps/api/pnpm-lock.yaml",
     ]);
     const providerNames = lines
       .map((l) => {

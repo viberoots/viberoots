@@ -27,7 +27,7 @@ test("nix_go_tiny_wasm_lib passes global Nix inputs through go_nix_build_wasm(ni
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute nix_inputs //apps/wasm:mod`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute nix_inputs //projects/apps/wasm:mod`;
     if (probe.exitCode !== 0) return;
     const out = String(probe.stdout || "");
     assert.ok(

@@ -22,7 +22,7 @@ test("cpp: link_deps rejects unsupported target kinds with actionable error", as
         '  name = "demo",',
         '  srcs = ["src/main.cpp"],',
         '  labels = ["lang:cpp", "kind:bin"],',
-        '  link_deps = ["//libs/notcpp:notcpp"],',
+        '  link_deps = ["//projects/libs/notcpp:notcpp"],',
         ")",
         "",
       ].join("\n"),
@@ -31,17 +31,17 @@ test("cpp: link_deps rejects unsupported target kinds with actionable error", as
 
     const graph = [
       {
-        name: "//libs/notcpp:notcpp",
+        name: "//projects/libs/notcpp:notcpp",
         rule_type: "go_library",
         labels: ["lang:go", "kind:lib"],
         srcs: ["libs/notcpp/lib.go"],
       },
       {
-        name: "//apps/demo:demo",
+        name: "//projects/apps/demo:demo",
         rule_type: "cxx_binary",
         labels: ["lang:cpp", "kind:bin"],
         srcs: ["apps/demo/src/main.cpp"],
-        link_deps: ["//libs/notcpp:notcpp"],
+        link_deps: ["//projects/libs/notcpp:notcpp"],
       },
     ];
     const graphJsonPath = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
@@ -54,7 +54,7 @@ test("cpp: link_deps rejects unsupported target kinds with actionable error", as
       stdio: "pipe",
       nothrow: true,
       reject: false,
-      env: { ...process.env, BUCK_TARGET: "//apps/demo:demo" },
+      env: { ...process.env, BUCK_TARGET: "//projects/apps/demo:demo" },
     })`nix build --impure --accept-flake-config --file build-tools/tools/nix/graph-generator.nix selected --arg pkgs 'import <nixpkgs> {}' --arg src ./. --argstr system ${system} --arg graphJsonPath ${graphJsonPath} --no-link --print-out-paths`;
 
     if (res.exitCode === 0) {
@@ -62,7 +62,7 @@ test("cpp: link_deps rejects unsupported target kinds with actionable error", as
     }
     const stderr = String(res.stderr || "");
     const wantParts = [
-      "cpp planner: link_deps for //apps/demo:demo contains //libs/notcpp:notcpp",
+      "cpp planner: link_deps for //projects/apps/demo:demo contains //projects/libs/notcpp:notcpp",
       "expected lang:cpp",
     ];
     for (const p of wantParts) {

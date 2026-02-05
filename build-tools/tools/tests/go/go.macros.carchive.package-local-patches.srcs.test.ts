@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("go macros: nix_go_carchive includes package-local patches in srcs (cquery)", async () => {
   await runInTemp("go-carchive-package-local-patches", async (tmp, $) => {
-    const appDir = path.join(tmp, "apps", "demo");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(path.join(appDir, "pkg", "demo"), { recursive: true });
     await fsp.mkdir(path.join(appDir, "patches", "go"), { recursive: true });
 
@@ -16,7 +16,7 @@ test("go macros: nix_go_carchive includes package-local patches in srcs (cquery)
       "package demo\n\nfunc X(){}\n",
       "utf8",
     );
-    const patchRel = "apps/demo/patches/go/demo@0.0.0.patch";
+    const patchRel = "projects/apps/demo/patches/go/demo@0.0.0.patch";
     await fsp.writeFile(path.join(tmp, patchRel), "# noop\n", "utf8");
 
     await fsp.writeFile(
@@ -40,7 +40,7 @@ test("go macros: nix_go_carchive includes package-local patches in srcs (cquery)
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //apps/demo:arc`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //projects/apps/demo:arc`;
     if (probe.exitCode !== 0) return;
     assert.ok(
       String(probe.stdout || "").includes(patchRel),

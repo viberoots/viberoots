@@ -13,8 +13,8 @@ _envops:
 _exclude:
   - meta.json
   - help.md
-  # Prevent accidental nested apps/ inside destination (dest is already apps/<name>)
-  - apps/**
+  # Prevent accidental nested projects/apps inside destination (dest is already projects/apps/<name>)
+  - projects/apps/**
 
 # scaf supplies values via --data-file
 name: ""

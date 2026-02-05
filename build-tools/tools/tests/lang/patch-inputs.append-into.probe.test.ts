@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("append_patch_inputs appends patch globs into requested field (probe)", async () => {
   await runInTemp("patch-inputs-append-into-probe", async (tmp, $) => {
-    const pkgDir = path.join(tmp, "apps", "demo");
+    const pkgDir = path.join(tmp, "projects", "apps", "demo");
     const patchDir = path.join(pkgDir, "patches", "python");
     await fsp.mkdir(patchDir, { recursive: true });
     await fsp.writeFile(path.join(patchDir, "a@1.0.0.patch"), "# a\n", "utf8");
@@ -53,8 +53,8 @@ test("append_patch_inputs appends patch globs into requested field (probe)", asy
       return path.isAbsolute(outPath) ? outPath : path.join(tmp, outPath);
     }
 
-    const srcsPath = await buildOutPath("//apps/demo:probe_srcs");
-    const resourcesPath = await buildOutPath("//apps/demo:probe_resources");
+    const srcsPath = await buildOutPath("//projects/apps/demo:probe_srcs");
+    const resourcesPath = await buildOutPath("//projects/apps/demo:probe_resources");
     if (!srcsPath || !resourcesPath) {
       // Skip when prelude/toolchains aren't available in the ephemeral temp repo.
       return;

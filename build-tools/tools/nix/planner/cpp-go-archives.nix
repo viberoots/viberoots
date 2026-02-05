@@ -34,7 +34,7 @@ let
   primaries = builtins.filter isCArchive direct;
   # If no direct dep edge is present (e.g., exporter omitted it), attempt a
   # conservative sibling resolution based on conventional naming:
-  #   //libs/<base>-native:<addon> → //libs/<base>-go:carchive
+  #   //projects/libs/<base>-native:<addon> → //projects/libs/<base>-go:carchive
   # This does not change behavior when edges are present; it only helps in
   # temporary/scaffolded repos where the graph may be minimal.
   fallback =
@@ -42,7 +42,7 @@ let
     else
       let
         pkg = pkgPathOf name;
-        # Expect libs/<base>-native
+        # Expect projects/libs/<base>-native
         parts = lib.splitString "/" pkg;
         last = if (builtins.length parts) > 0 then builtins.elemAt parts ((builtins.length parts) - 1) else pkg;
         base =
@@ -51,7 +51,7 @@ let
           else null;
         cand =
           if base == null then null
-          else ("//libs/" + base + "-go:carchive");
+          else ("//projects/libs/" + base + "-go:carchive");
       in if cand != null && (builtins.hasAttr cand byName) then [ cand ] else [];
   chosen = primaries ++ fallback;
 in builtins.map asDerivation chosen

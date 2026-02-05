@@ -36,7 +36,7 @@ test("importer-scoped wiring stamps patch_scope:importer-local exactly once (pro
       "utf8",
     );
 
-    const appDir = path.join(tmp, "apps", "demo");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(path.join(appDir, "patches", "python"), { recursive: true });
     await fsp.writeFile(path.join(appDir, "uv.lock"), "# uv lock\n", "utf8");
     await fsp.writeFile(
@@ -59,7 +59,7 @@ test("importer-scoped wiring stamps patch_scope:importer-local exactly once (pro
         "  deps = [],",
         '  lang = "python",',
         '  kind = "lib",',
-        '  lockfile_label = "lockfile:apps/demo/uv.lock#apps/demo",',
+        '  lockfile_label = "lockfile:projects/apps/demo/uv.lock#projects/apps/demo",',
         "  MODULE_PROVIDERS = {},",
         '  wiring = "non_genrule",',
         ")",
@@ -74,7 +74,7 @@ test("importer-scoped wiring stamps patch_scope:importer-local exactly once (pro
       "utf8",
     );
 
-    const outPath = await buildOutPath(tmp, $, "//apps/demo:labels_probe");
+    const outPath = await buildOutPath(tmp, $, "//projects/apps/demo:labels_probe");
     const labels = readLines(await fsp.readFile(outPath, "utf8"));
     const patchScopes = labels.filter((l) => l.startsWith("patch_scope:"));
     assert.deepEqual(

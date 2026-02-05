@@ -1,13 +1,13 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
-import path from "node:path";
 import assert from "node:assert/strict";
+import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
 test("python macros: nix_python_wasm_* stamp wasm:wasi variant", async () => {
   await runInTemp("py-wasm-variant", async (tmp, $) => {
-    const appDir = path.join(tmp, "apps", "demo");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     await fs.mkdirp(path.join(appDir, "src"));
     await fs.writeFile(path.join(appDir, "src", "main.py"), "print('ok')\n", "utf8");
     await fs.writeFile(
@@ -22,13 +22,13 @@ test("python macros: nix_python_wasm_* stamp wasm:wasi variant", async () => {
         "",
         "nix_python_wasm_app(",
         '  name = "wasm_app",',
-        '  lockfile_label = "lockfile:apps/demo/uv.lock#apps/demo",',
+        '  lockfile_label = "lockfile:projects/apps/demo/uv.lock#projects/apps/demo",',
         '  srcs = glob(["**/*.py"]),',
         ")",
         "",
         "nix_python_wasm_lib(",
         '  name = "wasm_lib",',
-        '  lockfile_label = "lockfile:apps/demo/uv.lock#apps/demo",',
+        '  lockfile_label = "lockfile:projects/apps/demo/uv.lock#projects/apps/demo",',
         '  srcs = glob(["**/*.py"]),',
         ")",
         "",
@@ -41,7 +41,7 @@ test("python macros: nix_python_wasm_* stamp wasm:wasi variant", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir py_wasm_variant cquery --json --output-attribute labels //apps/demo:wasm_lib`;
+    })`buck2 --isolation-dir py_wasm_variant cquery --json --output-attribute labels //projects/apps/demo:wasm_lib`;
     if (probe.exitCode !== 0) return;
     const parsed = JSON.parse(String(probe.stdout || "")) as unknown;
     const values = Array.isArray(parsed)

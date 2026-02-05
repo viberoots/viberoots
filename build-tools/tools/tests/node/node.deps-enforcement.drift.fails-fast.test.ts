@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("node deps enforcement: drift fails fast", async () => {
   await runInTemp("node-deps-enforcement-drift", async (tmp, $) => {
-    const appDir = path.join(tmp, "apps", "api");
+    const appDir = path.join(tmp, "projects", "apps", "api");
     await fsp.mkdir(appDir, { recursive: true });
     await fsp.writeFile(
       path.join(appDir, "package.json"),
@@ -39,7 +39,7 @@ test("node deps enforcement: drift fails fast", async () => {
     await fsp.mkdir(path.join(tmp, "build-tools", "tools", "node"), { recursive: true });
     await fsp.writeFile(
       path.join(tmp, "build-tools", "tools", "node", "workspace-map.json"),
-      JSON.stringify({ "@repo/ui": "//libs/ui:ui" }, null, 2),
+      JSON.stringify({ "@repo/ui": "//projects/libs/ui:ui" }, null, 2),
       "utf8",
     );
 
@@ -51,8 +51,8 @@ test("node deps enforcement: drift fails fast", async () => {
     })`node build-tools/tools/buck/enforce-node-deps.ts --check`;
     assert.notEqual(res.exitCode, 0);
     const combined = String(res.stdout || "") + String(res.stderr || "");
-    assert.ok(combined.includes("node deps drift in //apps/api:api"));
-    assert.ok(combined.includes("missing: //libs/ui:ui"));
+    assert.ok(combined.includes("node deps drift in //projects/apps/api:api"));
+    assert.ok(combined.includes("missing: //projects/libs/ui:ui"));
     assert.ok(combined.includes("Fix: node build-tools/tools/buck/enforce-node-deps.ts --fix"));
   });
 });

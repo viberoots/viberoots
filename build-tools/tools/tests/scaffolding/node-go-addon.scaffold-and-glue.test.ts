@@ -14,9 +14,9 @@ test("node go-addon: scaffold and run glue in temp repo", async () => {
     await $`scaf new node go-addon demo --yes`;
 
     // Basic assertions on created files
-    const nodePkg = path.join(tmp, "libs", "demo");
-    const goPkg = path.join(tmp, "libs", "demo-go");
-    const nativePkg = path.join(tmp, "libs", "demo-native");
+    const nodePkg = path.join(tmp, "projects", "libs", "demo");
+    const goPkg = path.join(tmp, "projects", "libs", "demo-go");
+    const nativePkg = path.join(tmp, "projects", "libs", "demo-native");
     for (const p of [
       path.join(nodePkg, "package.json"),
       path.join(nodePkg, "src", "index.ts"),

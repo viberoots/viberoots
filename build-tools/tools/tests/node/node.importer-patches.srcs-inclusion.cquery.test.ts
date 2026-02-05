@@ -7,12 +7,12 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("node macros include importer-local patches in srcs (cquery)", async () => {
   await runInTemp("node-importer-patches-srcs", async (tmp, $) => {
-    const appDir = path.join(tmp, "apps", "web");
+    const appDir = path.join(tmp, "projects", "apps", "web");
     const patchDir = path.join(appDir, "patches", "node");
     await fsp.mkdir(patchDir, { recursive: true });
-    // Minimal lockfile and a patch under importer "apps/web"
+    // Minimal lockfile and a patch under importer "projects/apps/web"
     await fsp.writeFile(path.join(appDir, "pnpm-lock.yaml"), "lockfileVersion: 9\n", "utf8");
-    const patchRel = "apps/web/patches/node/leftpad@1.3.0.patch";
+    const patchRel = "projects/apps/web/patches/node/leftpad@1.3.0.patch";
     await fsp.writeFile(path.join(tmp, patchRel), "# noop\n", "utf8");
 
     // Define a tiny gen target at repo root bound to the importer; macro should append importer-local patches to srcs
@@ -27,7 +27,7 @@ test("node macros include importer-local patches in srcs (cquery)", async () => 
         '  name = "node_gen_importer_srcs_probe",',
         '  out = "out.txt",',
         '  cmd = "echo ok > $OUT",',
-        '  lockfile_label = "lockfile:apps/web/pnpm-lock.yaml#apps/web",',
+        '  lockfile_label = "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",',
         ")",
         "",
       ].join("\n"),

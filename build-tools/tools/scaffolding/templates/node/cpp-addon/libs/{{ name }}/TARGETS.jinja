@@ -5,9 +5,8 @@ nix_node_gen(
     name = "copy_addon",
     srcs = [],
     out = "native/{{ addon_name }}.node",
-    cmd = "cp $(location //libs/{{ name }}-native:napi_addon) $OUT",
-    deps = ["//libs/{{ name }}-native:napi_addon"],
-    lockfile_label = "lockfile:{{ lockfilePath }}#{{ importer }}",
+    cmd = "cp $(location //projects/libs/{{ name }}-native:napi_addon) $OUT",
+    deps = ["//projects/libs/{{ name }}-native:napi_addon"],
     labels = ["lang:node", "kind:gen"],
 )
 
@@ -18,14 +17,12 @@ nix_node_lib(
     out = "build.stamp",
     cmd = "echo ok > $OUT",
     deps = [":copy_addon"],
-    lockfile_label = "lockfile:{{ lockfilePath }}#{{ importer }}",
 )
 
 {% if includeNodeTests -%}
 nix_node_test(
     name = "unit",
-    deps = ["//libs/{{ name }}-native:napi_addon"],
-    lockfile_label = "lockfile:{{ lockfilePath }}#{{ importer }}",
+    deps = ["//projects/libs/{{ name }}-native:napi_addon"],
 )
 {%- endif %}
 

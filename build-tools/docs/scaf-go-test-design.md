@@ -22,8 +22,8 @@ This command creates a Go test file with a single empty/passing test that is aut
 - Lib tests are discovered from `pkg/**/*_test.go` beneath a `nix_go_library` directory.
 - App (CLI) tests are discovered from `cmd/<app>/**/*_test.go` beneath a `nix_go_binary` directory; a companion package library is synthesized automatically.
 - Therefore, to get auto‑wiring:
-  - Place tests under `libs/<lib>/pkg/<pkg>/` for libraries.
-- Place tests under `apps/<app>/cmd/<app>/` for CLIs.
+- Place tests under `projects/libs/<lib>/pkg/<pkg>/` for libraries.
+- Place tests under `projects/apps/<app>/cmd/<app>/` for CLIs.
 - If the current directory doesn’t match these shapes and `--path` is omitted, the file will still be created, but Buck auto‑wiring may not pick it up; the command will emit a friendly warning suggesting a suitable path.
 
 ### Package and test naming
@@ -77,15 +77,15 @@ Optionally, after write, best‑effort `go fmt <file>` (non‑fatal on failure).
 ### Tests (zx)
 
 - `build-tools/tools/tests/scaffolding/scaf-go-test.lib.auto-wires.test.ts`
-  - Scaffold lib: `scaf new go lib demo-lib --path=libs/demo-lib`.
-  - Run: `scaf go test demo_case --path=libs/demo-lib/pkg/demo-lib/demo_case_test.go`.
+  - Scaffold lib: `scaf new go lib demo-lib --path=projects/libs/demo-lib`.
+  - Run: `scaf go test demo_case --path=projects/libs/demo-lib/pkg/demo-lib/demo_case_test.go`.
   - `build-tools/tools/dev/install-deps.ts --glue-only`.
-  - `buck2 test --target-platforms prelude//platforms:default //libs/demo-lib:demo-lib_test` → pass.
+  - `buck2 test --target-platforms prelude//platforms:default //projects/libs/demo-lib:demo-lib_test` → pass.
 
 - `build-tools/tools/tests/scaffolding/scaf-go-test.cli.auto-wires.test.ts`
-  - Scaffold app: `scaf new go cli demo-cli --path=apps/demo-cli`.
-  - Run: `scaf go test main_case --path=apps/demo-cli/cmd/demo-cli/main_case_test.go`.
-  - Glue; then `buck2 test --target-platforms prelude//platforms:default //apps/demo-cli:demo-cli_test` → pass.
+  - Scaffold app: `scaf new go cli demo-cli --path=projects/apps/demo-cli`.
+  - Run: `scaf go test main_case --path=projects/apps/demo-cli/cmd/demo-cli/main_case_test.go`.
+  - Glue; then `buck2 test --target-platforms prelude//platforms:default //projects/apps/demo-cli:demo-cli_test` → pass.
 
 Note: TARGETS is already using `auto_zx_tests`, so these new tests auto‑register.
 
@@ -134,8 +134,8 @@ Note: TARGETS is already using `auto_zx_tests`, so these new tests auto‑regist
 
 - Acceptance criteria
   - Running `scaf go test demo_case` in any directory creates `./demo_case_test.go` with a passing test and no overwrite unless `--yes`.
-  - In `libs/<lib>/pkg/<pkg>`, running `scaf go test x` and then `buck2 test --target-platforms prelude//platforms:default //libs/<lib>:<lib>_test` passes.
-  - In `apps/<app>/cmd/<app>`, running `scaf go test x` and then `buck2 test --target-platforms prelude//platforms:default //apps/<app>:<app>_test` passes.
+  - In `projects/libs/<lib>/pkg/<pkg>`, running `scaf go test x` and then `buck2 test --target-platforms prelude//platforms:default //projects/libs/<lib>:<lib>_test` passes.
+  - In `projects/apps/<app>/cmd/<app>`, running `scaf go test x` and then `buck2 test --target-platforms prelude//platforms:default //projects/apps/<app>:<app>_test` passes.
 
 - Risks / mitigations
   - Package inference edge cases: prefer parsing an existing file; fallback rules are deterministic and documented.
@@ -157,11 +157,11 @@ Note: TARGETS is already using `auto_zx_tests`, so these new tests auto‑regist
   3. `go mod tidy`; generate `gomod2nix.toml`; copy to repo root.
   4. `build-tools/tools/dev/install-deps.ts --glue-only` to refresh glue.
   5. Invoke `scaf go test ... --path=...` into the canonical subtree:
-     - Lib: `libs/demo-lib/pkg/demo-lib/demo_case_test.go`.
-     - App: `apps/demo-cli/cmd/demo-cli/main_case_test.go`.
+  - Lib: `projects/libs/demo-lib/pkg/demo-lib/demo_case_test.go`.
+  - App: `projects/apps/demo-cli/cmd/demo-cli/main_case_test.go`.
   6. Run Buck tests with explicit platform:
-     - Lib: `buck2 test --target-platforms prelude//platforms:default //libs/demo-lib:demo-lib_test` → pass.
-     - App: `buck2 test --target-platforms prelude//platforms:default //apps/demo-cli:demo-cli_test` → pass.
+  - Lib: `buck2 test --target-platforms prelude//platforms:default //projects/libs/demo-lib:demo-lib_test` → pass.
+  - App: `buck2 test --target-platforms prelude//platforms:default //projects/apps/demo-cli:demo-cli_test` → pass.
 
 - Wiring
   - No changes to top‑level `TARGETS`; `auto_zx_tests` already discovers `build-tools/tools/tests/**/*.test.ts`.

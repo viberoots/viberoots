@@ -44,7 +44,11 @@ test("cppLib template builds a static archive", async () => {
 
     // Buck graph with one cxx_library; planner maps to cppLib
     const graph = [
-      { name: "//libs/demo:demo", rule_type: "cxx_library", labels: ["lang:cpp", "kind:lib"] },
+      {
+        name: "//projects/libs/demo:demo",
+        rule_type: "cxx_library",
+        labels: ["lang:cpp", "kind:lib"],
+      },
     ];
     await fs.outputFile(
       path.join(tmp, "build-tools/tools/buck/graph.json"),

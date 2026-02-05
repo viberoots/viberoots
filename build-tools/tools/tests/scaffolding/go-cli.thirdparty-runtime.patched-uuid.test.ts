@@ -4,6 +4,7 @@ import path from "node:path";
 import process from "node:process";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+
 // Ensure Node is on PATH inside zx_test sandboxes that may not have dev shell
 process.env.PATH = `${path.dirname(process.execPath)}:${process.env.PATH || ""}`;
 
@@ -124,13 +125,13 @@ async function applyPatchPkg(sh: any, tmp: string, resolveOrigin: string) {
         .join(path.delimiter),
       PATH: `${path.dirname(process.execPath)}:${localBin}:${process.env.PATH || ""}`,
     },
-  })`build-tools/tools/bin/patch-pkg apply go github.com/google/uuid --target //apps/demo-cli:demo-cli --force`;
+  })`build-tools/tools/bin/patch-pkg apply go github.com/google/uuid --target //projects/apps/demo-cli:demo-cli --force`;
 }
 
 async function scaffoldLibrary(sh: any, tmp: string) {
-  await sh`scaf new go lib demo-lib --yes --path=libs/demo-lib`;
+  await sh`scaf new go lib demo-lib --yes --path=projects/libs/demo-lib`;
   await writeFileAbs(
-    path.join(tmp, "libs", "demo-lib", "pkg", "demo-lib", "demo-lib.go"),
+    path.join(tmp, "projects", "libs", "demo-lib", "pkg", "demo-lib", "demo-lib.go"),
     [
       "package demolib",
       "",
@@ -148,9 +149,9 @@ async function scaffoldLibrary(sh: any, tmp: string) {
 }
 
 async function scaffoldCli(sh: any, tmp: string) {
-  await sh`scaf new go cli demo-cli --yes --path=apps/demo-cli`;
+  await sh`scaf new go cli demo-cli --yes --path=projects/apps/demo-cli`;
 
-  const cliGoModPath = path.join(tmp, "apps", "demo-cli", "go.mod");
+  const cliGoModPath = path.join(tmp, "projects", "apps", "demo-cli", "go.mod");
   let cliGoMod = await fsp.readFile(cliGoModPath, "utf8");
   if (!/\nrequire\s/.test(cliGoMod)) {
     cliGoMod = cliGoMod.replace(
@@ -168,7 +169,7 @@ async function scaffoldCli(sh: any, tmp: string) {
   }
   await fsp.writeFile(cliGoModPath, cliGoMod, "utf8");
 
-  const libTargetsPath = path.join(tmp, "libs", "demo-lib", "TARGETS");
+  const libTargetsPath = path.join(tmp, "projects", "libs", "demo-lib", "TARGETS");
   let libTargets = await fsp.readFile(libTargetsPath, "utf8");
   if (!/visibility\s*=\s*\[\s*"PUBLIC"\s*\]/.test(libTargets)) {
     libTargets = libTargets.replace(/nix_go_library\(([^)]*)\)/ms, (m: string, body: string) => {
@@ -183,18 +184,18 @@ async function scaffoldCli(sh: any, tmp: string) {
     await fsp.writeFile(libTargetsPath, libTargets, "utf8");
   }
 
-  const cliTargetsPath = path.join(tmp, "apps", "demo-cli", "TARGETS");
+  const cliTargetsPath = path.join(tmp, "projects", "apps", "demo-cli", "TARGETS");
   let cliTargets = await fsp.readFile(cliTargetsPath, "utf8");
-  if (!/deps\s*=\s*\[\s*"\/\/libs\/demo-lib:demo-lib"\s*\]/.test(cliTargets)) {
+  if (!/deps\s*=\s*\[\s*"\/\/projects\/libs\/demo-lib:demo-lib"\s*\]/.test(cliTargets)) {
     cliTargets = cliTargets.replace(/nix_go_binary\(([^)]*)\)/ms, (m: string, body: string) => {
       const withDeps = body.includes("deps = ")
         ? body.replace(
             /deps\s*=\s*\[([^\]]*)\]/m,
-            (mm: string, inner: string) => `deps = [${inner}, "//libs/demo-lib:demo-lib"]`,
+            (mm: string, inner: string) => `deps = [${inner}, "//projects/libs/demo-lib:demo-lib"]`,
           )
         : body.replace(
             /labels\s*=\s*\[[^\]]*\],?/m,
-            (lm: string) => `${lm}\n    deps = ["//libs/demo-lib:demo-lib"],`,
+            (lm: string) => `${lm}\n    deps = ["//projects/libs/demo-lib:demo-lib"],`,
           );
       return `nix_go_binary(${withDeps})`;
     });
@@ -202,7 +203,7 @@ async function scaffoldCli(sh: any, tmp: string) {
   }
 
   await writeFileAbs(
-    path.join(tmp, "apps", "demo-cli", "cmd", "demo-cli", "main.go"),
+    path.join(tmp, "projects", "apps", "demo-cli", "cmd", "demo-cli", "main.go"),
     [
       "package main",
       "",
@@ -225,11 +226,11 @@ async function scaffoldCli(sh: any, tmp: string) {
 }
 
 async function generateGomod2nixForLibAndCli(sh: any, tmp: string) {
-  await runGomod2nix(sh, tmp, "libs/demo-lib");
-  await runGomod2nix(sh, tmp, "apps/demo-cli");
+  await runGomod2nix(sh, tmp, "projects/libs/demo-lib");
+  await runGomod2nix(sh, tmp, "projects/apps/demo-cli");
   const rootToml = path.join(tmp, "gomod2nix.toml");
-  const cliToml = path.join(tmp, "apps", "demo-cli", "gomod2nix.toml");
-  const libToml = path.join(tmp, "libs", "demo-lib", "gomod2nix.toml");
+  const cliToml = path.join(tmp, "projects", "apps", "demo-cli", "gomod2nix.toml");
+  const libToml = path.join(tmp, "projects", "libs", "demo-lib", "gomod2nix.toml");
   // Start from CLI's toml
   let rootTxt = await fsp.readFile(cliToml, "utf8").catch(() => "");
   const seen = new Set<string>();
@@ -276,7 +277,7 @@ async function createUuidWorkspace(sh: any, tmp: string): Promise<{ origin: stri
 }
 
 async function enforceCliReplaceToWorkspace(sh: any, tmp: string, ws: string) {
-  const cliGoModPath = path.join(tmp, "apps", "demo-cli", "go.mod");
+  const cliGoModPath = path.join(tmp, "projects", "apps", "demo-cli", "go.mod");
   let cliGoMod = await fsp.readFile(cliGoModPath, "utf8");
   if (
     !/\nreplace\s+github\.com\/google\/uuid\s+=>\s+\.\.\/\.\.\/uuid-workspace\s*$/.test(cliGoMod)
@@ -284,15 +285,15 @@ async function enforceCliReplaceToWorkspace(sh: any, tmp: string, ws: string) {
     cliGoMod = cliGoMod.trimEnd() + "\nreplace github.com/google/uuid => ../../uuid-workspace\n";
     await fsp.writeFile(cliGoModPath, cliGoMod, "utf8");
   }
-  await runGomod2nix(sh, tmp, "apps/demo-cli");
+  await runGomod2nix(sh, tmp, "projects/apps/demo-cli");
   await fsp.copyFile(
-    path.join(tmp, "apps", "demo-cli", "gomod2nix.toml"),
+    path.join(tmp, "projects", "apps", "demo-cli", "gomod2nix.toml"),
     path.join(tmp, "gomod2nix.toml"),
   );
 }
 
 async function enforceLibReplaceToWorkspace(sh: any, tmp: string, ws: string) {
-  const libGoModPath = path.join(tmp, "libs", "demo-lib", "go.mod");
+  const libGoModPath = path.join(tmp, "projects", "libs", "demo-lib", "go.mod");
   let libGoMod = await fsp.readFile(libGoModPath, "utf8");
   if (
     !/\nreplace\s+github\.com\/google\/uuid\s+=>\s+\.\.\/\.\.\/uuid-workspace\s*$/.test(libGoMod)
@@ -300,7 +301,7 @@ async function enforceLibReplaceToWorkspace(sh: any, tmp: string, ws: string) {
     libGoMod = libGoMod.trimEnd() + "\nreplace github.com/google/uuid => ../../uuid-workspace\n";
     await fsp.writeFile(libGoModPath, libGoMod, "utf8");
   }
-  await runGomod2nix(sh, tmp, "libs/demo-lib");
+  await runGomod2nix(sh, tmp, "projects/libs/demo-lib");
 }
 
 // PR6: Go providers removed; auto_map is Node-only. No provider sync here.
@@ -329,7 +330,9 @@ async function buildGraphAndFindBin(sh: any, tmp: string, label: string): Promis
     const labelEntry = entries.find((e) => {
       const lab = String(e?.label || "");
       return (
-        lab === label || normalizeCellLabel(lab) === label || lab.includes("apps/demo-cli:demo-cli")
+        lab === label ||
+        normalizeCellLabel(lab) === label ||
+        lab.includes("projects/apps/demo-cli:demo-cli")
       );
     });
     if (!labelEntry) throw new Error(`manifest.json missing expected label: ${label}`);
@@ -423,8 +426,9 @@ async function patchUuidWorkspace(workspacePath: string): Promise<void> {
       changed++;
     }
   }
-  if (changed === 0)
+  if (changed === 0) {
     throw new Error("could not locate uuid.NewString()/New()/NewRandom() to patch");
+  }
 }
 
 test("go cli with local lib + third-party patched uuid runtime", async () => {
@@ -447,13 +451,13 @@ test("go cli with local lib + third-party patched uuid runtime", async () => {
     // Remove any accidental local replace directives; rely on Nix-layer local patches only
     // Ensure clean gomod2nix after stripping replaces
     try {
-      const cliGoModPath = path.join(_tmp, "apps", "demo-cli", "go.mod");
+      const cliGoModPath = path.join(_tmp, "projects", "apps", "demo-cli", "go.mod");
       const cliTxt = await fsp.readFile(cliGoModPath, "utf8");
       const cleanedCli = cliTxt.replace(/\nreplace\s+github\.com\/google\/uuid\s+=>.*$/gm, "");
       if (cleanedCli !== cliTxt) await fsp.writeFile(cliGoModPath, cleanedCli, "utf8");
     } catch {}
     try {
-      const libGoModPath = path.join(_tmp, "libs", "demo-lib", "go.mod");
+      const libGoModPath = path.join(_tmp, "projects", "libs", "demo-lib", "go.mod");
       const libTxt = await fsp.readFile(libGoModPath, "utf8");
       const cleanedLib = libTxt.replace(/\nreplace\s+github\.com\/google\/uuid\s+=>.*$/gm, "");
       if (cleanedLib !== libTxt) await fsp.writeFile(libGoModPath, cleanedLib, "utf8");
@@ -463,6 +467,7 @@ test("go cli with local lib + third-party patched uuid runtime", async () => {
     // 5) Assert local patch file under the target's patches/go (PR6 local mode)
     const patchFile = path.join(
       _tmp,
+      "projects",
       "apps",
       "demo-cli",
       "patches",

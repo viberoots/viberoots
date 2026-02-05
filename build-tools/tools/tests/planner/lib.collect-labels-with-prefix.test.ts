@@ -14,16 +14,16 @@ test("collectLabelsWithPrefix performs DFS, dedupes, sorts, and bounds", async (
         # A -> B, C; B -> D; C -> D; D -> (none)
         # Labels on nodes: D has two nixpkg labels; C has one; A has none; B duplicates one of D's labels
         nodes = [
-          { name = "//apps/demo:A"; labels = []; deps = [ "//apps/demo:B" "//apps/demo:C" ]; srcs = []; }
-          { name = "//apps/demo:B"; labels = [ "nixpkg:pkgs.zlib" ]; deps = [ "//apps/demo:D" ]; srcs = []; }
-          { name = "//apps/demo:C"; labels = [ "nixpkg:pkgs.openssl" ]; deps = [ "//apps/demo:D" ]; srcs = []; }
-          { name = "//apps/demo:D"; labels = [ "nixpkg:pkgs.zlib" "nixpkg:pkgs.libcurl" "misc:ignore" ]; deps = []; srcs = []; }
+          { name = "//projects/apps/demo:A"; labels = []; deps = [ "//projects/apps/demo:B" "//projects/apps/demo:C" ]; srcs = []; }
+          { name = "//projects/apps/demo:B"; labels = [ "nixpkg:pkgs.zlib" ]; deps = [ "//projects/apps/demo:D" ]; srcs = []; }
+          { name = "//projects/apps/demo:C"; labels = [ "nixpkg:pkgs.openssl" ]; deps = [ "//projects/apps/demo:D" ]; srcs = []; }
+          { name = "//projects/apps/demo:D"; labels = [ "nixpkg:pkgs.zlib" "nixpkg:pkgs.libcurl" "misc:ignore" ]; deps = []; srcs = []; }
         ];
         pkgPathOf = name: "apps/demo";
         L = import ./build-tools/tools/nix/planner/lib.nix { inherit lib get nodes pkgPathOf; };
-        fromA = L.collectLabelsWithPrefix "//apps/demo:A" "nixpkg:";
-        fromB = L.collectLabelsWithPrefix "//apps/demo:B" "nixpkg:";
-        fromD = L.collectLabelsWithPrefix "//apps/demo:D" "nixpkg:";
+        fromA = L.collectLabelsWithPrefix "//projects/apps/demo:A" "nixpkg:";
+        fromB = L.collectLabelsWithPrefix "//projects/apps/demo:B" "nixpkg:";
+        fromD = L.collectLabelsWithPrefix "//projects/apps/demo:D" "nixpkg:";
       in { inherit fromA fromB fromD; }
     `;
     const { stdout } = await $({ cwd: tmp })`nix eval --impure --expr ${expr} --json`;

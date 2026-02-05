@@ -16,12 +16,12 @@
         if buckTestSrc != "" then buckTestSrc
         else if workspaceEnv != "" then workspaceEnv
         else builtins.toString srcRoot;
-      patchDir = builtins.toPath ("${builtins.toString srcRoot}/${subdir}/patches/python");
+      patchDir = builtins.toPath ("${wsRoot}/${subdir}/patches/python");
       uv = UvBackend {
         pname = "pylib-${H.sanitizeName name}";
         version = "0.1.0";
         srcAbs = builtins.path { path = builtins.toPath ("${builtins.toString srcRoot}/${subdir}"); name = "py-src"; };
-        lockfile = if lib.hasSuffix "/uv.lock" lockfile then "uv.lock" else lockfile;
+        lockfile = lockfile;
         subdir = ".";
         patchesMap = H.pythonPatchesMapFromDirs { dirs = [ patchDir ]; };
         devOverrides = H.readDevOverrides devOverrideEnv;

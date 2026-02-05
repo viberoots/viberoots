@@ -22,7 +22,7 @@ function parseCqueryOne(stdout: string): any | null {
 
 test("nix_python_extension_module: deps := deps ∪ link_deps ∪ header_deps as deterministic union", async () => {
   await runInTemp("python-pyext-link-intent-deps-union", async (tmp, $) => {
-    const app = path.join(tmp, "apps", "link_intent_union");
+    const app = path.join(tmp, "projects", "apps", "link_intent_union");
     await fsp.mkdir(path.join(app, "native"), { recursive: true });
     await fsp.writeFile(path.join(app, "native", "ext.c"), "int x(){return 1;}\n", "utf8");
     await fsp.writeFile(path.join(app, "uv.lock"), "# uv lock\n", "utf8");
@@ -55,7 +55,7 @@ test("nix_python_extension_module: deps := deps ∪ link_deps ∪ header_deps as
         "",
         "nix_python_extension_module(",
         '  name = "ext",',
-        '  lockfile_label = "lockfile:apps/link_intent_union/uv.lock#apps/link_intent_union",',
+        '  lockfile_label = "lockfile:projects/apps/link_intent_union/uv.lock#projects/apps/link_intent_union",',
         '  module = "demo._native",',
         '  srcs = ["native/ext.c"],',
         '  deps = [":a", ":b"],',
@@ -75,7 +75,7 @@ test("nix_python_extension_module: deps := deps ∪ link_deps ∪ header_deps as
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo //apps/link_intent_union:ext --json --output-attribute deps`;
+    })`buck2 cquery --target-platforms //:no_cgo //projects/apps/link_intent_union:ext --json --output-attribute deps`;
     if (q.exitCode !== 0) return; // skip when Buck/prelude/toolchains unavailable
 
     const node = parseCqueryOne(String(q.stdout || ""));
@@ -85,10 +85,10 @@ test("nix_python_extension_module: deps := deps ∪ link_deps ∪ header_deps as
       .filter(Boolean);
 
     assert.deepEqual(deps, [
-      "//apps/link_intent_union:a",
-      "//apps/link_intent_union:b",
-      "//apps/link_intent_union:c",
-      "//apps/link_intent_union:d",
+      "//projects/apps/link_intent_union:a",
+      "//projects/apps/link_intent_union:b",
+      "//projects/apps/link_intent_union:c",
+      "//projects/apps/link_intent_union:d",
     ]);
   });
 });

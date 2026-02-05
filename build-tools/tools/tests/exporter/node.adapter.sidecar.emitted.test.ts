@@ -11,12 +11,16 @@ test("glue/generator emits node-lock-index.json deterministically", async () => 
     await fs.mkdirp(path.dirname(sidecar));
     const nodes = [
       {
-        name: "//apps/web:bundle",
+        name: "//projects/apps/web:bundle",
         rule_type: "js_binary",
-        labels: ["lang:node", "kind:bundle", "lockfile:apps/web/pnpm-lock.yaml#apps/web"],
+        labels: [
+          "lang:node",
+          "kind:bundle",
+          "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",
+        ],
       },
       {
-        name: "//libs/ui:lib",
+        name: "//projects/libs/ui:lib",
         rule_type: "go_library",
         labels: ["lang:go"],
       },
@@ -33,8 +37,8 @@ test("glue/generator emits node-lock-index.json deterministically", async () => 
     const parsed = JSON.parse(a);
     const idxA = parsed && typeof parsed === "object" && parsed.index ? parsed.index : parsed;
     assert.equal(
-      idxA["//apps/web:bundle"],
-      "lockfile:apps/web/pnpm-lock.yaml#apps/web",
+      idxA["//projects/apps/web:bundle"],
+      "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",
       "sidecar should map target to importer-scoped lockfile label",
     );
 

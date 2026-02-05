@@ -12,7 +12,7 @@ test("python app scaffold includes pyproject.toml and uv.lock placeholder", asyn
     const name = "demo_pyapp";
     await $`scaf new python app ${name} --yes`;
 
-    const appDir = path.join(tmp, "apps", name);
+    const appDir = path.join(tmp, "projects", "apps", name);
     const pyproject = path.join(appDir, "pyproject.toml");
     const uvlock = path.join(appDir, "uv.lock");
 

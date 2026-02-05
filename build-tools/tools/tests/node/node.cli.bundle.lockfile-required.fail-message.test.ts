@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("nix_node_cli_bin(bundle=True) defaults lockfile label and fails fast when missing", async () => {
   await runInTemp("node-cli-bundle-lockfile-required", async (tmp, $) => {
-    const dir = path.join(tmp, "apps", "cli");
+    const dir = path.join(tmp, "projects", "apps", "cli");
     await fsp.mkdir(dir, { recursive: true });
     await fsp.mkdir(path.join(dir, "src"), { recursive: true });
     await fsp.writeFile(path.join(dir, "src", "index.ts"), "console.log('hello')\n", "utf8");
@@ -31,14 +31,14 @@ test("nix_node_cli_bin(bundle=True) defaults lockfile label and fails fast when 
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 build //apps/cli:tool`;
+    })`buck2 build //projects/apps/cli:tool`;
 
     // Expect failure with targeted missing lockfile error from defaulting path
     assert.notEqual(res.exitCode, 0, "expected buck2 build to fail when lockfile label is missing");
     const combined = String(res.stderr || "") + String(res.stdout || "");
     assert.ok(
       combined.includes(
-        "nix_node_cli_bin(bundle=True): missing lockfile at apps/cli/pnpm-lock.yaml. Provide lockfile_label or create apps/cli/pnpm-lock.yaml.",
+        "nix_node_cli_bin(bundle=True): missing lockfile at projects/apps/cli/pnpm-lock.yaml. Provide lockfile_label or create projects/apps/cli/pnpm-lock.yaml.",
       ),
       "expected targeted missing lockfile error",
     );

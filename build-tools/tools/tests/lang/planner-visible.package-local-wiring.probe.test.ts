@@ -17,19 +17,19 @@ EOF'`;
       cwd: tmp,
     })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
 MODULE_PROVIDERS = {
-  "//apps/probe:stub_realize": ["//third_party/providers:prov"],
-  "//apps/probe_go:stub_realize_go": ["//third_party/providers:prov"],
+  "//projects/apps/probe:stub_realize": ["//third_party/providers:prov"],
+  "//projects/apps/probe_go:stub_realize_go": ["//third_party/providers:prov"],
 }
 EOF'`;
 
-    const appDir = path.join(tmp, "apps", "probe");
+    const appDir = path.join(tmp, "projects", "apps", "probe");
     await fsp.mkdir(path.join(appDir, "patches", "cpp"), { recursive: true });
-    const patchRel = "apps/probe/patches/cpp/demo@0.0.0.patch";
+    const patchRel = "projects/apps/probe/patches/cpp/demo@0.0.0.patch";
     await fsp.writeFile(path.join(tmp, patchRel), "# noop\n", "utf8");
 
-    const goAppDir = path.join(tmp, "apps", "probe_go");
+    const goAppDir = path.join(tmp, "projects", "apps", "probe_go");
     await fsp.mkdir(path.join(goAppDir, "patches", "go"), { recursive: true });
-    const goPatchRel = "apps/probe_go/patches/go/demo@0.0.0.patch";
+    const goPatchRel = "projects/apps/probe_go/patches/go/demo@0.0.0.patch";
     await fsp.writeFile(path.join(tmp, goPatchRel), "# noop\n", "utf8");
 
     await fsp.writeFile(
@@ -128,7 +128,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo //apps/probe:stub_strip --json --output-attribute labels`;
+    })`buck2 cquery --target-platforms //:no_cgo //projects/apps/probe:stub_strip --json --output-attribute labels`;
     assert.equal(qLabels.exitCode, 0, "buck2 cquery failed for stub_strip labels");
     const nodeLabels = parseCqueryOne(String(qLabels.stdout || ""));
     const labelsRaw =
@@ -146,7 +146,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo //apps/probe:stub_strip --json --output-attribute srcs`;
+    })`buck2 cquery --target-platforms //:no_cgo //projects/apps/probe:stub_strip --json --output-attribute srcs`;
     assert.equal(qSrcs.exitCode, 0, "buck2 cquery failed for stub_strip srcs");
     assert.ok(
       String(qSrcs.stdout || "").includes(patchRel),
@@ -158,7 +158,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo //apps/probe_go:stub_strip_go --json --output-attribute srcs`;
+    })`buck2 cquery --target-platforms //:no_cgo //projects/apps/probe_go:stub_strip_go --json --output-attribute srcs`;
     assert.equal(qSrcsGo.exitCode, 0, "buck2 cquery failed for stub_strip_go srcs");
     assert.ok(
       String(qSrcsGo.stdout || "").includes(goPatchRel),
@@ -170,7 +170,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo //apps/probe:stub_strip --json --output-attribute deps`;
+    })`buck2 cquery --target-platforms //:no_cgo //projects/apps/probe:stub_strip --json --output-attribute deps`;
     assert.equal(qDepsStrip.exitCode, 0, "buck2 cquery failed for stub_strip deps");
     assert.ok(
       !String(qDepsStrip.stdout || "").includes("//third_party/providers:prov"),
@@ -182,7 +182,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo //apps/probe:stub_keep --json --output-attribute deps`;
+    })`buck2 cquery --target-platforms //:no_cgo //projects/apps/probe:stub_keep --json --output-attribute deps`;
     assert.equal(qDepsKeep.exitCode, 0, "buck2 cquery failed for stub_keep deps");
     assert.ok(
       String(qDepsKeep.stdout || "").includes("//third_party/providers:prov"),
@@ -194,7 +194,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo //apps/probe_go:stub_strip_go --json --output-attribute deps`;
+    })`buck2 cquery --target-platforms //:no_cgo //projects/apps/probe_go:stub_strip_go --json --output-attribute deps`;
     assert.equal(qDepsStripGo.exitCode, 0, "buck2 cquery failed for stub_strip_go deps");
     assert.ok(
       !String(qDepsStripGo.stdout || "").includes("//third_party/providers:prov"),
@@ -206,7 +206,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo //apps/probe:stub_realize --json --output-attribute srcs`;
+    })`buck2 cquery --target-platforms //:no_cgo //projects/apps/probe:stub_realize --json --output-attribute srcs`;
     assert.equal(qSrcsRealize.exitCode, 0, "buck2 cquery failed for stub_realize srcs");
     assert.ok(
       String(qSrcsRealize.stdout || "").includes("//third_party/providers:prov"),
@@ -218,7 +218,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo //apps/probe_go:stub_realize_go --json --output-attribute srcs`;
+    })`buck2 cquery --target-platforms //:no_cgo //projects/apps/probe_go:stub_realize_go --json --output-attribute srcs`;
     assert.equal(qSrcsRealizeGo.exitCode, 0, "buck2 cquery failed for stub_realize_go srcs");
     assert.ok(
       String(qSrcsRealizeGo.stdout || "").includes("//third_party/providers:prov"),

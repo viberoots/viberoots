@@ -20,7 +20,7 @@ MODULE_PROVIDERS = {
 }
 EOF'`;
 
-    const appDir = path.join(tmp, "apps", "web");
+    const appDir = path.join(tmp, "projects", "apps", "web");
     await fsp.mkdir(appDir, { recursive: true });
     await fsp.writeFile(path.join(appDir, "pnpm-lock.yaml"), "lockfileVersion: 9\n", "utf8");
 
@@ -41,7 +41,7 @@ EOF'`;
         "  srcs = {",
         '    "bin/entry.js": "bin/entry.js",',
         "  },",
-        '  lockfile_label = "lockfile:apps/web/pnpm-lock.yaml#apps/web",',
+        '  lockfile_label = "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",',
         ")",
         "",
       ].join("\n"),

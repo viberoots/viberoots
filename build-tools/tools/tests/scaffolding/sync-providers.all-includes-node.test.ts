@@ -10,14 +10,14 @@ test("sync-providers without lang flag includes Node providers", async () => {
     await $`git init`;
 
     // Create a Node lockfile
-    const lockfilePath = path.join(tmp, "apps/example/pnpm-lock.yaml");
+    const lockfilePath = path.join(tmp, "projects/apps/example/pnpm-lock.yaml");
     await fsp.mkdir(path.dirname(lockfilePath), { recursive: true });
     await fsp.writeFile(
       lockfilePath,
-      `lockfileVersion: "9.0"\nimporters:\n  apps/example:\n    dependencies: {}\npackages: {}`,
+      `lockfileVersion: "9.0"\nimporters:\n  projects/apps/example:\n    dependencies: {}\npackages: {}`,
       "utf8",
     );
-    await $`git add apps/example/pnpm-lock.yaml`;
+    await $`git add projects/apps/example/pnpm-lock.yaml`;
 
     // Run without --lang flag (sync all)
     await $`node build-tools/tools/buck/sync-providers.ts`;
@@ -45,10 +45,10 @@ test("sync-providers without lang flag includes Node providers", async () => {
     }
 
     // Verify Node provider has content
-    if (nodeContent.includes("apps/example")) {
+    if (nodeContent.includes("projects/apps/example")) {
       // Good - has actual provider
     } else {
-      console.error("Expected Node provider to include apps/example importer");
+      console.error("Expected Node provider to include projects/apps/example importer");
       process.exit(2);
     }
 

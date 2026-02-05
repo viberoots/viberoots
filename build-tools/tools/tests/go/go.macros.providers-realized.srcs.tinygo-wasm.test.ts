@@ -17,11 +17,11 @@ EOF'`;
       cwd: tmp,
     })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
 MODULE_PROVIDERS = {
-  "//apps/wasm:mod": ["//third_party/providers:prov"],
+  "//projects/apps/wasm:mod": ["//third_party/providers:prov"],
 }
 EOF'`;
 
-    const appDir = path.join(tmp, "apps", "wasm");
+    const appDir = path.join(tmp, "projects", "apps", "wasm");
     await fsp.mkdir(appDir, { recursive: true });
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
@@ -43,7 +43,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //apps/wasm:mod`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //projects/apps/wasm:mod`;
     if (probe.exitCode !== 0) return;
     assert.ok(
       String(probe.stdout || "").includes("//third_party/providers:prov"),
@@ -55,7 +55,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //apps/wasm:mod`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //projects/apps/wasm:mod`;
     if (labelsProbe.exitCode !== 0) return;
     assert.ok(
       String(labelsProbe.stdout || "").includes("patch_scope:package-local"),

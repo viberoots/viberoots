@@ -32,7 +32,7 @@ async function nixBuildSelected(tmp: string, $: any, target: string): Promise<st
 
 test("python: planner-built pyApp can import a pyext module through a pylib dependency", async () => {
   await runInTemp("python-pyext-pylib-import", async (tmp, $) => {
-    const appRel = path.join("apps", "pyext_pylib");
+    const appRel = path.join("projects", "apps", "pyext_pylib");
     const appDir = path.join(tmp, appRel);
 
     await fs.mkdirp(path.join(appDir, "bin"));

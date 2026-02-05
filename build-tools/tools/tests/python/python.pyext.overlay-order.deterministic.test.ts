@@ -32,7 +32,7 @@ async function nixBuildSelected(tmp: string, $: any, target: string): Promise<st
 
 test("python: pyext overlay order is deterministic for planner-built apps", async () => {
   await runInTemp("python-pyext-overlay-order", async (tmp, $) => {
-    const appRel = path.join("apps", "pyext_overlay_order");
+    const appRel = path.join("projects", "apps", "pyext_overlay_order");
     const appDir = path.join(tmp, appRel);
 
     await fs.mkdirp(path.join(appDir, "bin"));

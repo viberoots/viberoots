@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("append_patch_inputs_dict_safe attaches patch globs to dict-shaped inputs (probe)", async () => {
   await runInTemp("patch-inputs-dict-safe-probe", async (tmp, $) => {
-    const pkgDir = path.join(tmp, "apps", "demo");
+    const pkgDir = path.join(tmp, "projects", "apps", "demo");
     const patchDir = path.join(pkgDir, "patches", "python");
     await fsp.mkdir(patchDir, { recursive: true });
     await fsp.writeFile(path.join(patchDir, "a@1.0.0.patch"), "# a\n", "utf8");
@@ -37,7 +37,7 @@ test("append_patch_inputs_dict_safe attaches patch globs to dict-shaped inputs (
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 build --target-platforms //:no_cgo --show-output //apps/demo:probe_srcs_dict`;
+    })`buck2 build --target-platforms //:no_cgo --show-output //projects/apps/demo:probe_srcs_dict`;
     if (so.exitCode !== 0) {
       return;
     }

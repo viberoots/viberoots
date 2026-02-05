@@ -5,7 +5,7 @@ import { runInTemp } from "../lib/test-helpers";
 test("prebuild-guard auto-fixes when stale and passes thereafter", async () => {
   const prevRoots = process.env.TEST_RSYNC_ROOTS;
   if (!prevRoots) {
-    process.env.TEST_RSYNC_ROOTS = "build-tools toolchains go lang cpp third_party/providers";
+    process.env.TEST_RSYNC_ROOTS = "build-tools toolchains third_party/providers";
   }
   try {
     await runInTemp("scaf-prebuild-guard", async (_tmp, _$) => {

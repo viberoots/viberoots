@@ -17,11 +17,11 @@ EOF'`;
       cwd: tmp,
     })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
 MODULE_PROVIDERS = {
-  "//apps/web:test": ["//third_party/providers:prov"],
+  "//projects/apps/web:test": ["//third_party/providers:prov"],
 }
 EOF'`;
 
-    const appDir = path.join(tmp, "apps", "web");
+    const appDir = path.join(tmp, "projects", "apps", "web");
     await fsp.mkdir(appDir, { recursive: true });
     await fsp.writeFile(path.join(appDir, "pnpm-lock.yaml"), "lockfileVersion: 9\n", "utf8");
 
@@ -35,7 +35,7 @@ EOF'`;
         "nix_node_test(",
         '  name = "test",',
         "  patterns = [],",
-        '  lockfile_label = "lockfile:apps/web/pnpm-lock.yaml#apps/web",',
+        '  lockfile_label = "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",',
         ")",
         "",
       ].join("\n"),
@@ -47,7 +47,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute deps //apps/web:test`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute deps //projects/apps/web:test`;
     if (probe.exitCode !== 0) return;
     const out = String(probe.stdout || "");
     assert.ok(

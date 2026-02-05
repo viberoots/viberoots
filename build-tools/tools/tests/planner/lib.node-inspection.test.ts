@@ -11,8 +11,8 @@ test("planner lib node inspection helpers handle rule types and labels", async (
         lib = pkgs.lib;
         get = attrs: k: if builtins.hasAttr k attrs then attrs.\${k} else null;
         nodes = [
-          { name = "//apps/goapp:goapp"; rule_type = "go_binary"; labels = [ "lang:go" "kind:bin" ]; }
-          { name = "//apps/cppapp:cppapp"; rule_type = "my_cpp_nix_build_rule"; labels = []; }
+          { name = "//projects/apps/goapp:goapp"; rule_type = "go_binary"; labels = [ "lang:go" "kind:bin" ]; }
+          { name = "//projects/apps/cppapp:cppapp"; rule_type = "my_cpp_nix_build_rule"; labels = []; }
         ];
         L = import ./build-tools/tools/nix/planner/lib.nix { inherit lib get nodes; };
         nGo = builtins.elemAt nodes 0;

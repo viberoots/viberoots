@@ -51,7 +51,7 @@ EOF
       mkdir -p toolchains
       printf '[buildfile]\nname = TARGETS\n' > toolchains/.buckconfig
     `}`;
-  await $`scaf new go lib ${name} --yes --path=libs/${name}`;
+  await $`scaf new go lib ${name} --yes --path=projects/libs/${name}`;
   // Seed gomod2nix deterministically via local stub to avoid network
   const stubDir = path.join(t, "bin");
   await fsp.mkdir(stubDir, { recursive: true });
@@ -83,8 +83,11 @@ EOF
   await $({
     cwd: t,
     env: { ...process.env, PATH: `${stubDir}:${process.env.PATH || ""}` },
-  })`gomod2nix --dir libs/${name}`;
-  await fsp.copyFile(path.join(t, "libs", name, "gomod2nix.toml"), path.join(t, "gomod2nix.toml"));
+  })`gomod2nix --dir projects/libs/${name}`;
+  await fsp.copyFile(
+    path.join(t, "projects", "libs", name, "gomod2nix.toml"),
+    path.join(t, "gomod2nix.toml"),
+  );
 }
 
 export async function scaffoldApp(lang: string, name: string, ctx: TestCtx): Promise<void> {
@@ -134,7 +137,7 @@ EOF
       mkdir -p toolchains
       printf '[buildfile]\nname = TARGETS\n' > toolchains/.buckconfig
     `}`;
-  await $`scaf new go cli ${name} --yes --path=apps/${name}`;
+  await $`scaf new go cli ${name} --yes --path=projects/apps/${name}`;
   // Seed gomod2nix deterministically via local stub (no network)
   const stubDir = path.join(t, "bin");
   await fsp.mkdir(stubDir, { recursive: true });
@@ -167,8 +170,11 @@ EOF
     cwd: t,
     stdio: "inherit",
     env: { ...process.env, PATH: `${stubDir}:${process.env.PATH || ""}` },
-  })`gomod2nix --dir apps/${name}`;
-  await fsp.copyFile(path.join(t, "apps", name, "gomod2nix.toml"), path.join(t, "gomod2nix.toml"));
+  })`gomod2nix --dir projects/apps/${name}`;
+  await fsp.copyFile(
+    path.join(t, "projects", "apps", name, "gomod2nix.toml"),
+    path.join(t, "gomod2nix.toml"),
+  );
   await $({
     env: { ...process.env, INSTALL_DEPS_SKIP_GO_TIDY: "1" },
   })`build-tools/tools/dev/install-deps.ts --glue-only`;

@@ -7,8 +7,8 @@ import { exists, runInTemp } from "../lib/test-helpers";
 test("go scaffold creates patches/go with placeholder patch", async () => {
   await runInTemp("go-scaffold-patches", async (_tmp, _$) => {
     const $ = _$({ stdio: "pipe" });
-    await $`scaf new go lib demo-lib --yes --path=libs/demo-lib`;
-    const dir = path.join(_tmp, "libs", "demo-lib", "patches", "go");
+    await $`scaf new go lib demo-lib --yes --path=projects/libs/demo-lib`;
+    const dir = path.join(_tmp, "projects", "libs", "demo-lib", "patches", "go");
     if (!(await exists(dir))) {
       console.error("expected patches/go directory to exist in scaffold");
       process.exit(2);

@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("python macros include importer-local patches in srcs for nix_python_test (cquery)", async () => {
   await runInTemp("py-importer-patches-srcs-test-macro", async (tmp, $) => {
-    const appDir = path.join(tmp, "apps", "demo");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     const patchDir = path.join(appDir, "patches", "python");
     await fsp.mkdir(path.join(appDir, "src"), { recursive: true });
     await fsp.mkdir(patchDir, { recursive: true });
@@ -19,7 +19,7 @@ test("python macros include importer-local patches in srcs for nix_python_test (
       "utf8",
     );
 
-    const patchRel = "apps/demo/patches/python/leftpad@1.3.0.patch";
+    const patchRel = "projects/apps/demo/patches/python/leftpad@1.3.0.patch";
     await fsp.writeFile(path.join(tmp, patchRel), "# noop\n", "utf8");
 
     await fsp.writeFile(
@@ -29,7 +29,7 @@ test("python macros include importer-local patches in srcs for nix_python_test (
         "",
         "nix_python_test(",
         '  name = "t",',
-        '  lockfile_label = "lockfile:apps/demo/uv.lock#apps/demo",',
+        '  lockfile_label = "lockfile:projects/apps/demo/uv.lock#projects/apps/demo",',
         '  srcs = glob(["**/*.py"]),',
         ")",
         "",
@@ -42,7 +42,7 @@ test("python macros include importer-local patches in srcs for nix_python_test (
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //apps/demo:t`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //projects/apps/demo:t`;
     if (probe.exitCode !== 0) return;
     const out = String(probe.stdout || "");
     assert.ok(

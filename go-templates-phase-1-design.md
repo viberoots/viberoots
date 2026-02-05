@@ -23,8 +23,8 @@ Phase 1 is a hard prerequisite for Phase 2 because Copier requires stable variab
 
 ## Template inventory
 
-- go/lib — Library scaffold under `libs/{{ name }}/`.
-- go/cli — CLI scaffold under `apps/{{ name }}/`.
+- go/lib — Library scaffold under `projects/libs/{{ name }}/`.
+- go/cli — CLI scaffold under `projects/apps/{{ name }}/`.
 
 Each template provides:
 
@@ -160,7 +160,7 @@ Each template includes its own `copier.yaml`, reusing the same variable set. Min
 
 Each template must render a README that:
 
-- States what was created and where (e.g., `libs/{{ name }}` or `apps/{{ name }}`).
+- States what was created and where (e.g., `projects/libs/{{ name }}` or `projects/apps/{{ name }}`).
 - Lists the next steps (glue generation):
   - `node build-tools/tools/buck/export-graph.ts`
   - `node build-tools/tools/buck/sync-providers.ts`

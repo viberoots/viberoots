@@ -255,7 +255,7 @@ These examples assume the same union rule:
 ### 1) C++ Wasm static lib (producer)
 
 ```python
-# libs/cpp-core/TARGETS
+# projects/libs/cpp-core/TARGETS
 load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_static_lib")
 
 nix_cpp_wasm_static_lib(
@@ -270,7 +270,7 @@ nix_cpp_wasm_static_lib(
 ### 2) C++ Wasm static lib depends on another C++ Wasm static lib
 
 ```python
-# libs/cpp-support/TARGETS
+# projects/libs/cpp-support/TARGETS
 load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_static_lib")
 
 nix_cpp_wasm_static_lib(
@@ -283,14 +283,14 @@ nix_cpp_wasm_static_lib(
 ```
 
 ```python
-# libs/cpp-core/TARGETS
+# projects/libs/cpp-core/TARGETS
 load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_static_lib")
 
 nix_cpp_wasm_static_lib(
     name = "cpp_core_wasm",
     srcs = glob(["src/**/*.cpp"]),
     headers = glob(["include/**/*.h"]),
-    link_deps = ["//libs/cpp-support:cpp_support_wasm"],
+    link_deps = ["//projects/libs/cpp-support:cpp_support_wasm"],
     wasm_abi = "wasi",
     visibility = ["PUBLIC"],
 )
@@ -299,13 +299,13 @@ nix_cpp_wasm_static_lib(
 ### 3) Go TinyGo Wasm module links a C++ Wasm static lib (direct)
 
 ```python
-# libs/wasm-module/TARGETS
+# projects/libs/wasm-module/TARGETS
 load("//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")
 
 nix_go_tiny_wasm_lib(
     name = "wasm_module",
     srcs = glob(["pkg/**/*.go"]),
-    link_deps = ["//libs/cpp-core:cpp_core_wasm"],
+    link_deps = ["//projects/libs/cpp-core:cpp_core_wasm"],
     link_closure = "direct",
     visibility = ["PUBLIC"],
 )
@@ -313,16 +313,16 @@ nix_go_tiny_wasm_lib(
 
 ### 4) Go TinyGo Wasm module links transitive C++ Wasm libs (transitive closure)
 
-If `//libs/cpp-core:cpp_core_wasm` declares `link_deps = ["//libs/cpp-support:cpp_support_wasm"]`:
+If `//projects/libs/cpp-core:cpp_core_wasm` declares `link_deps = ["//projects/libs/cpp-support:cpp_support_wasm"]`:
 
 ```python
-# libs/wasm-module/TARGETS
+# projects/libs/wasm-module/TARGETS
 load("//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")
 
 nix_go_tiny_wasm_lib(
     name = "wasm_module",
     srcs = glob(["pkg/**/*.go"]),
-    link_deps = ["//libs/cpp-core:cpp_core_wasm"],
+    link_deps = ["//projects/libs/cpp-core:cpp_core_wasm"],
     link_closure = "transitive",
     visibility = ["PUBLIC"],
 )
@@ -338,11 +338,11 @@ nix_go_tiny_wasm_lib(
     srcs = glob(["pkg/**/*.go"]),
     link_closure = "direct",
     link_deps = [
-        "//libs/cpp-core:cpp_core_wasm",
-        "//libs/cpp-bundle:cpp_bundle_wasm",
+        "//projects/libs/cpp-core:cpp_core_wasm",
+        "//projects/libs/cpp-bundle:cpp_bundle_wasm",
     ],
     link_closure_overrides = {
-        "//libs/cpp-bundle:cpp_bundle_wasm": "transitive",
+        "//projects/libs/cpp-bundle:cpp_bundle_wasm": "transitive",
     },
 )
 ```
@@ -350,7 +350,7 @@ nix_go_tiny_wasm_lib(
 ### 6) Header-only dep for C++ Wasm static lib
 
 ```python
-# libs/headers/TARGETS
+# projects/libs/headers/TARGETS
 load("//build-tools/cpp:defs.bzl", "nix_cpp_headers")
 
 nix_cpp_headers(
@@ -361,14 +361,14 @@ nix_cpp_headers(
 ```
 
 ```python
-# libs/cpp-core/TARGETS
+# projects/libs/cpp-core/TARGETS
 load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_static_lib")
 
 nix_cpp_wasm_static_lib(
     name = "cpp_core_wasm",
     srcs = glob(["src/**/*.cpp"]),
     headers = glob(["include/**/*.h"]),
-    header_deps = ["//libs/headers:api_headers"],
+    header_deps = ["//projects/libs/headers:api_headers"],
     wasm_abi = "wasi",
     visibility = ["PUBLIC"],
 )
@@ -379,7 +379,7 @@ nix_cpp_wasm_static_lib(
 This is a planner-visible stub for a JS+Wasm output pair. It is not a general-purpose “linkable library” dependency.
 
 ```python
-# libs/emscripten/TARGETS
+# projects/libs/emscripten/TARGETS
 load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_emscripten_lib")
 
 nix_cpp_wasm_emscripten_lib(
@@ -395,13 +395,13 @@ nix_cpp_wasm_emscripten_lib(
 Python has a Wasm “app” macro today: `nix_python_wasm_app`. This is the closest thing to a first-class “Wasm application target” in the repo.
 
 ```python
-# apps/pywasm/TARGETS
+# projects/apps/pywasm/TARGETS
 load("//build-tools/python:defs.bzl", "nix_python_wasm_app")
 
 nix_python_wasm_app(
     name = "pyapp",
     srcs = glob(["**/*.py"]),
-    lockfile_label = "lockfile:apps/pywasm/uv.lock#apps/pywasm",
+    lockfile_label = "lockfile:projects/apps/pywasm/uv.lock#projects/apps/pywasm",
     visibility = ["PUBLIC"],
 )
 ```
@@ -409,13 +409,13 @@ nix_python_wasm_app(
 ### 9) Python WASI library target (lib)
 
 ```python
-# libs/pywasm-lib/TARGETS
+# projects/libs/pywasm-lib/TARGETS
 load("//build-tools/python:defs.bzl", "nix_python_wasm_lib")
 
 nix_python_wasm_lib(
     name = "pylib",
     srcs = glob(["**/*.py"]),
-    lockfile_label = "lockfile:libs/pywasm-lib/uv.lock#libs/pywasm-lib",
+    lockfile_label = "lockfile:projects/libs/pywasm-lib/uv.lock#projects/libs/pywasm-lib",
     visibility = ["PUBLIC"],
 )
 ```
@@ -425,12 +425,12 @@ nix_python_wasm_lib(
 The TS wasm-app scaffold in this repo uses `node_webapp`. This is an application target that produces a `dist` output.
 
 ```python
-# apps/my-wasm-webapp/TARGETS
+# projects/apps/my-wasm-webapp/TARGETS
 load("//build-tools/node:defs.bzl", "node_webapp")
 
 node_webapp(
     name = "webapp",
-    lockfile_label = "lockfile:apps/my-wasm-webapp/pnpm-lock.yaml#apps/my-wasm-webapp",
+    lockfile_label = "lockfile:projects/apps/my-wasm-webapp/pnpm-lock.yaml#projects/apps/my-wasm-webapp",
     out = "dist",
 )
 ```

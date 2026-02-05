@@ -4,6 +4,23 @@ This handbook summarizes project-wide conventions that keep behavior determinist
 
 In this repo, I treat Starlark macros as part of the long-lived public surface area. The goal is not only correctness, but predictability in review. When macro code has one obvious place where labels and deps are assembled, it is harder to introduce policy drift by accident.
 
+## Top-level layout anchors
+
+These anchors describe the stable, final layout:
+
+- `build-tools/` — build system and tooling root
+- `build-tools/lang/` — shared Starlark helpers
+- `build-tools/tools/` — zx/Node tooling
+- `build-tools/docs/` — build-system docs
+- `build-tools/docs/lang/` — language design docs
+- `projects/apps/` — application roots
+- `projects/libs/` — library roots
+- `docs/build-history/` — historical build notes
+- `patches/` — repo-level patch overlays
+- `third_party/` — external provider and vendored metadata
+- `toolchains/` — Buck toolchain wiring
+- `target_platforms/` — platform definitions
+
 - Scripts
   - Use zx TypeScript with the hashbang `#!/usr/bin/env zx-wrapper`.
   - Glue scripts run outside Nix; do not wrap them in `nix run`.
@@ -65,7 +82,7 @@ def nix_cpp_wasm_emscripten_lib(name, **kwargs):
   - `patches/<lang>/` is flat; for Go: `<encodedImport>@<version>.patch` with `/` → `__`.
   - For Node/PNPM: importer‑local patches live under `<importer>/patches/node/*.patch`; labels use `lockfile:<relative/path/to/pnpm-lock.yaml>#<importer>`.
     - `#.` is allowed only for repo-root lockfiles (example: `lockfile:pnpm-lock.yaml#.`).
-    - For non-root lockfiles, `<importer>` must equal `dirname(<path>)` (example: `lockfile:apps/web/pnpm-lock.yaml#apps/web`).
+    - For non-root lockfiles, `<importer>` must equal `dirname(<path>)` (example: `lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web`).
     - Supported importer labels: defined by `build-tools/tools/lib/importer-roots.json` (rendered to Starlark as `build-tools/lang/importer_roots.bzl`). Any other importer label is unsupported.
   - For C++: canonical flow is per‑target local patches under `<pkg>/patches/cpp/*.patch` (included in target `srcs`). Optional: a repo‑level overlay at `patches/cpp/*.patch` via `build-tools/tools/nix/overlays/cpp-patches.nix`.
   - Buck exporter and generators live under `build-tools/tools/buck/`.

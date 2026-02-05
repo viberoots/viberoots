@@ -12,7 +12,7 @@ test("pr7: ts package packaging with conditional exports and artifact staging", 
     await sh`bash --noprofile --norc -c 'mkdir -p build-tools/tools/nix && printf %s \'{"enabled":["cpp"]}\' > build-tools/tools/nix/langs.json'`;
 
     // 1) Scaffold minimal C wrapper for pure compute: add(a,b)
-    const coreDir = path.join(tmp, "libs", "math-core");
+    const coreDir = path.join(tmp, "projects", "libs", "math-core");
     await fs.outputFile(
       path.join(coreDir, "include", "addon.h"),
       `#ifndef MATH_CORE_ADDON_H
@@ -48,7 +48,7 @@ nix_cpp_wasm_static_lib(
     );
 
     // 2) TinyGo package exporting a wasm function `add` (pure compute)
-    const apiDir = path.join(tmp, "libs", "math-api");
+    const apiDir = path.join(tmp, "projects", "libs", "math-api");
     await fs.mkdirp(apiDir);
     await fs.writeFile(
       path.join(apiDir, "go.mod"),
@@ -90,7 +90,7 @@ func main() {}
 nix_go_tiny_wasm_lib(
     name = "wasm",
     srcs = ["main.go"],
-    deps = ["//libs/math-core:core_wasm"],
+    deps = ["//projects/libs/math-core:core_wasm"],
     labels = ["lang:go", "kind:wasm"],
     visibility = ["PUBLIC"],
 )
@@ -107,7 +107,7 @@ nix_go_carchive(
     );
 
     // 3) Node N-API addon binding a trivial add (keeps test self-contained)
-    const nativeDir = path.join(tmp, "libs", "math-native");
+    const nativeDir = path.join(tmp, "projects", "libs", "math-native");
     await fs.mkdirp(path.join(nativeDir, "src"));
     await fs.writeFile(
       path.join(nativeDir, "src", "binding.cc"),
@@ -154,8 +154,8 @@ nix_cpp_node_addon(
     name = "napi_addon",
     srcs = ["src/binding.cc"],
     deps = [
-        "//libs/math-api:carchive",
-        "//libs/math-core:core_wasm",  # not strictly required by binding; included for plan parity
+        "//projects/libs/math-api:carchive",
+        "//projects/libs/math-core:core_wasm",  # not strictly required by binding; included for plan parity
     ],
     labels = ["lang:cpp", "kind:addon"],
     visibility = ["PUBLIC"],
@@ -175,7 +175,7 @@ nix_cpp_node_addon(
     );
 
     // 5) TS package with dual entries and conditional exports
-    const tsPkg = path.join(tmp, "libs", "math-ts");
+    const tsPkg = path.join(tmp, "projects", "libs", "math-ts");
     await fs.mkdirp(path.join(tsPkg, "src", "browser"));
     await fs.mkdirp(path.join(tsPkg, "src", "node"));
     await fs.mkdirp(path.join(tsPkg, "src", "types"));
@@ -261,8 +261,8 @@ genrule(
         "src/browser/index.js",
         "src/node/index.cjs",
         "src/types/index.d.ts",
-        "//libs/math-api:wasm",
-        "//libs/math-native:napi_addon",
+        "//projects/libs/math-api:wasm",
+        "//projects/libs/math-native:napi_addon",
     ],
     out = "dist",
     cmd = "set -euo pipefail; " +
@@ -270,9 +270,13 @@ genrule(
           "cp src/browser/index.js \\"$OUT\\"/browser/index.js; " +
           "cp src/node/index.cjs \\"$OUT\\"/node/index.cjs; " +
           "cp src/types/index.d.ts \\"$OUT\\"/types/index.d.ts; " +
-          "cp $(location //libs/math-api:wasm) \\"$OUT\\"/browser/top.wasm; " +
-          "cp $(location //libs/math-native:napi_addon) \\"$OUT\\"/native/math_native.node",
-    labels = ["lang:node", "kind:packaging", "lockfile:libs/math-ts/pnpm-lock.yaml#libs/math-ts"],
+          "cp $(location //projects/libs/math-api:wasm) \\"$OUT\\"/browser/top.wasm; " +
+          "cp $(location //projects/libs/math-native:napi_addon) \\"$OUT\\"/native/math_native.node",
+    labels = [
+        "lang:node",
+        "kind:packaging",
+        "lockfile:projects/libs/math-ts/pnpm-lock.yaml#projects/libs/math-ts",
+    ],
     visibility = ["PUBLIC"],
 )
 `,
@@ -294,7 +298,7 @@ genrule(
       nothrow: true,
       env: {
         ...process.env,
-        BUCK_TARGET: "//libs/math-api:wasm",
+        BUCK_TARGET: "//projects/libs/math-api:wasm",
         WORKSPACE_ROOT: tmp,
         BUCK_TEST_SRC: tmp,
       },
@@ -315,7 +319,7 @@ genrule(
       nothrow: true,
       env: {
         ...process.env,
-        BUCK_TARGET: "//libs/math-native:napi_addon",
+        BUCK_TARGET: "//projects/libs/math-native:napi_addon",
         WORKSPACE_ROOT: tmp,
         BUCK_TEST_SRC: tmp,
       },
@@ -333,7 +337,7 @@ genrule(
     if (!nodeName) throw new Error("addon .node artifact not found under nix out/lib");
     const addonSrc = path.join(addonLibDir, nodeName);
 
-    // Stage dist files under libs/math-ts/dist
+    // Stage dist files under projects/libs/math-ts/dist
     const distPath = path.join(tsPkg, "dist");
     await fs.mkdirp(path.join(distPath, "browser"));
     await fs.mkdirp(path.join(distPath, "node"));
@@ -377,8 +381,11 @@ genrule(
     // 9) Simulate `import "@org/math"` via node_modules symlink and verify Node entry
     const nmScope = path.join(tmp, "node_modules", "@org");
     await fs.mkdirp(nmScope);
-    const linkTarget = path.relative(path.join(nmScope), path.join(tmp, "libs", "math-ts"));
-    // Link node_modules/@org/math -> libs/math-ts
+    const linkTarget = path.relative(
+      path.join(nmScope),
+      path.join(tmp, "projects", "libs", "math-ts"),
+    );
+    // Link node_modules/@org/math -> projects/libs/math-ts
     try {
       await fs.symlink(linkTarget, path.join(nmScope, "math"), "dir");
     } catch {

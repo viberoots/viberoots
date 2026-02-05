@@ -8,19 +8,19 @@ test("node adapter attaches importer lockfile label when missing", async () => {
   await runInTemp("exp-node-attach-missing", async (tmp, $) => {
     const out = path.join(tmp, "build-tools/tools/buck/.tmp.graph.json");
     await fs.mkdirp(path.dirname(out));
-    // Create a lockfile at the derived importer directory: apps/web/pnpm-lock.yaml
-    const lock = path.join(tmp, "apps/web/pnpm-lock.yaml");
+    // Create a lockfile at the derived importer directory: projects/apps/web/pnpm-lock.yaml
+    const lock = path.join(tmp, "projects/apps/web/pnpm-lock.yaml");
     await fs.mkdirp(path.dirname(lock));
     await fs.writeFile(
       lock,
-      'lockfileVersion: "9.0"\nimporters:\n  apps/web:\n    dependencies: {}\npackages: {}\n',
+      'lockfileVersion: "9.0"\nimporters:\n  projects/apps/web:\n    dependencies: {}\npackages: {}\n',
       "utf8",
     );
 
     // Simulate a Node target missing the lockfile label but stamped with kind:*
     const nodes = [
       {
-        name: "//apps/web:lib",
+        name: "//projects/apps/web:lib",
         rule_type: "js_library",
         labels: ["lang:node", "kind:lib"],
       },
@@ -41,13 +41,13 @@ test("node adapter attaches importer lockfile label when missing", async () => {
 
     const parsed = JSON.parse(await fs.readFile(out, "utf8"));
     const nodesOut: Array<{ name: string; labels?: string[] }> = parsed?.nodes || [];
-    const n = nodesOut.find((x) => x.name === "//apps/web:lib");
+    const n = nodesOut.find((x) => x.name === "//projects/apps/web:lib");
     if (!n) {
       console.error("target not present in exporter output");
       process.exit(2);
     }
     const labs = new Set(n.labels || []);
-    const expected = "lockfile:apps/web/pnpm-lock.yaml#apps/web";
+    const expected = "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web";
     if (!labs.has(expected)) {
       console.error(
         "expected attached lockfile label missing:",

@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import assert from "node:assert/strict";
 import fs from "fs-extra";
+import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
@@ -12,7 +12,7 @@ test("uv2nix env drvPath depends only on uv.lock (not importer source files)", a
     }
     const $ = _$;
 
-    const importer = path.join(tmp, "apps", "demo_pyapp");
+    const importer = path.join(tmp, "projects", "apps", "demo_pyapp");
     await fs.mkdirp(path.join(importer, "src", "demo_pyapp"));
     await fs.mkdirp(path.join(importer, "bin"));
 
@@ -29,17 +29,17 @@ test("uv2nix env drvPath depends only on uv.lock (not importer source files)", a
     await fs.writeFile(path.join(origin, "mydep", "__init__.py"), "y = 1\n", "utf8");
 
     await $`git add -A`;
-    await $`git ls-files --error-unmatch apps/demo_pyapp/uv.lock`;
+    await $`git ls-files --error-unmatch projects/apps/demo_pyapp/uv.lock`;
     await $`git -c user.name=tmp -c user.email=tmp@example.com commit -m "test: pyapp setup"`;
 
     const graphDir = path.join(tmp, "build-tools", "tools", "buck");
     await fs.mkdirp(graphDir);
     const graph = [
       {
-        name: "//apps/demo_pyapp:demo_pyapp",
+        name: "//projects/apps/demo_pyapp:demo_pyapp",
         rule_type: "python_binary",
         labels: ["lang:python", "kind:bin"],
-        srcs: ["apps/demo_pyapp/bin/__main__.py"],
+        srcs: ["projects/apps/demo_pyapp/bin/__main__.py"],
       },
     ];
     await fs.writeFile(
@@ -56,11 +56,11 @@ test("uv2nix env drvPath depends only on uv.lock (not importer source files)", a
       ...process.env,
       WORKSPACE_ROOT: tmp,
       BUCK_TEST_SRC: tmp,
-      BUCK_TARGET: "//apps/demo_pyapp:demo_pyapp",
+      BUCK_TARGET: "//projects/apps/demo_pyapp:demo_pyapp",
       NIX_PY_TEST_RESOLVE_JSON: JSON.stringify({
         mydep: {
           version: "1.0.0",
-          originPath: path.join("apps", "demo_pyapp", "vendor", "mydep-1.0.0"),
+          originPath: path.join("projects", "apps", "demo_pyapp", "vendor", "mydep-1.0.0"),
         },
       }),
     };
@@ -81,7 +81,7 @@ test("uv2nix env drvPath depends only on uv.lock (not importer source files)", a
 
     await fs.writeFile(path.join(importer, "src", "demo_pyapp", "unrelated.py"), "z = 1\n", "utf8");
     await $`git add -A`;
-    await $`git ls-files --error-unmatch apps/demo_pyapp/src/demo_pyapp/unrelated.py`;
+    await $`git ls-files --error-unmatch projects/apps/demo_pyapp/src/demo_pyapp/unrelated.py`;
     await $`git -c user.name=tmp -c user.email=tmp@example.com commit -m "test: change src"`;
 
     const drv2 = String(

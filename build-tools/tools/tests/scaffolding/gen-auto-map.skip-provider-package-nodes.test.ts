@@ -11,12 +11,12 @@ test("gen-auto-map: skips provider-package nodes (no self-entries)", async () =>
     // 1) A provider-package node that would otherwise map to itself
     // 2) A normal target node with a lockfile label
     const providerNode = {
-      name: "//third_party/providers:lf_dummy_importer__apps_web_pnpm_lock_yaml",
+      name: "//third_party/providers:lf_dummy_importer__projects_apps_web_pnpm_lock_yaml",
       labels: ["nixpkg:pkgs.zlib"], // any supported mapping label; shouldn't produce a key due to skip
     };
     const normalNode = {
       name: "//svc:api",
-      labels: ["lockfile:apps/web/pnpm-lock.yaml#apps/web"],
+      labels: ["lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"],
     };
     const graphPath = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
     await fsp.mkdir(path.dirname(graphPath), { recursive: true });
@@ -33,8 +33,8 @@ test("gen-auto-map: skips provider-package nodes (no self-entries)", async () =>
     }
     // Assert normal node still maps its expected provider
     const expectedProv = `//third_party/providers:${providerNameForImporter(
-      "apps/web/pnpm-lock.yaml",
-      "apps/web",
+      "projects/apps/web/pnpm-lock.yaml",
+      "projects/apps/web",
     )}`;
     if (!out.includes(`"//svc:api": [`)) {
       console.error('missing mapping key for normal node "//svc:api"');

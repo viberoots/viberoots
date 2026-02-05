@@ -121,7 +121,7 @@ Add or update tests that would catch drift introduced by partial wiring:
 
 - Add a focused Node macro test asserting:
   - `nix_node_test` fails with the same deterministic error text when the lockfile label is missing or malformed
-  - importer derivation behavior is stable (for example `lockfile:././apps/web/pnpm-lock.yaml#apps/web` still derives `apps/web`)
+  - importer derivation behavior is stable (for example `lockfile:././projects/apps/web/pnpm-lock.yaml#projects/apps/web` still derives `projects/apps/web`)
   - importer-local patches appear in the action inputs (via `srcs`) after macro expansion
 - If Python call sites are refactored, add a similar focused Python macro test verifying:
   - `nix_python_{library,test}` include importer-local patches in `srcs` and fail with stable error text when labels are missing

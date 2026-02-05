@@ -16,12 +16,20 @@ test("generator emits node-lock-index with sorted keys and no rewrite on second 
       {
         name: "//zz/app:bin",
         rule_type: "js_binary",
-        labels: ["lang:node", "kind:bin", "lockfile:apps/zz/pnpm-lock.yaml#apps/zz"],
+        labels: [
+          "lang:node",
+          "kind:bin",
+          "lockfile:projects/apps/zz/pnpm-lock.yaml#projects/apps/zz",
+        ],
       },
       {
         name: "//aa/web:bundle",
         rule_type: "js_binary",
-        labels: ["lang:node", "kind:bundle", "lockfile:apps/aa/pnpm-lock.yaml#apps/aa"],
+        labels: [
+          "lang:node",
+          "kind:bundle",
+          "lockfile:projects/apps/aa/pnpm-lock.yaml#projects/apps/aa",
+        ],
       },
     ];
     const sim = path.join(tmp, "build-tools/tools/buck/simulated.json");

@@ -266,9 +266,9 @@ Add zx integration tests (one test per file). These should validate real symbol 
   - loads it in Node (WebAssembly instantiate) and asserts the exported function returns 5
 - `build-tools/tools/tests/wasm/wasm.tinygo.transitive-closure.follows-link-deps.builds.test.ts`
   - temp repo defines a chain:
-    - `//libs/support:support_wasm` exporting `int inc(int)`
-    - `//libs/core:core_wasm` exporting `int add2(int)` and referencing `inc` and declaring `link_deps=["//libs/support:support_wasm"]`
-    - `//libs/api:wasm` tinygo module with `link_deps=["//libs/core:core_wasm"]` and `link_closure="transitive"`, calling `C.add2(3)` and exporting the result
+    - `//projects/libs/support:support_wasm` exporting `int inc(int)`
+    - `//projects/libs/core:core_wasm` exporting `int add2(int)` and referencing `inc` and declaring `link_deps=["//projects/libs/support:support_wasm"]`
+    - `//projects/libs/api:wasm` tinygo module with `link_deps=["//projects/libs/core:core_wasm"]` and `link_closure="transitive"`, calling `C.add2(3)` and exporting the result
   - asserts the build succeeds and the result is correct
 - `build-tools/tools/tests/wasm/wasm.variant-mismatch.wasi-vs-bare.fails-fast.test.ts`
   - temp repo defines a mismatch case, for example:
@@ -423,9 +423,9 @@ Add zx integration tests (one test per file):
 
 - `build-tools/tools/tests/cpp/cpp.link-closure.transitive.follows-link-deps.build-and-run.test.ts`
   - temp repo defines:
-    - `//libs/support:support` (C++ lib)
-    - `//libs/core:core` (C++ lib) that uses a symbol from `support` and declares `link_deps=["//libs/support:support"]`
-    - `//apps/demo:demo` (C++ bin) with `link_deps=["//libs/core:core"]` and `link_closure="transitive"`
+    - `//projects/libs/support:support` (C++ lib)
+    - `//projects/libs/core:core` (C++ lib) that uses a symbol from `support` and declares `link_deps=["//projects/libs/support:support"]`
+    - `//projects/apps/demo:demo` (C++ bin) with `link_deps=["//projects/libs/core:core"]` and `link_closure="transitive"`
   - builds and runs the binary and asserts output proves the transitive lib was linked (symbol resolution is real)
 - `build-tools/tools/tests/cpp/cpp.link-closure.direct.does-not-follow-link-deps.fails.test.ts`
   - same repo shape, but `link_closure="direct"`

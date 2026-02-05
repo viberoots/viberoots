@@ -6,7 +6,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("cpp zlib include via nixpkg_deps at call site (no providers)", async () => {
   await runInTemp("cpp-nixattrs-zlib-include", async (tmp, $) => {
-    const appDir = path.join(tmp, "apps/demo");
+    const appDir = path.join(tmp, "projects/apps/demo");
     await fs.outputFile(path.join(appDir, "src", "main.cpp"), "int main(){return 0;}\n");
     // Copy macros and Nix artifacts required by the external runner
     await fs.outputFile(
@@ -67,6 +67,6 @@ nix_cpp_test(
 `;
     await fs.outputFile(path.join(appDir, "TARGETS"), targets);
     // Build and run the test; explicit platform to bind toolchains
-    await $`buck2 test --target-platforms prelude//platforms:default //apps/demo:demo_zlib_gtest`;
+    await $`buck2 test --target-platforms prelude//platforms:default //projects/apps/demo:demo_zlib_gtest`;
   });
 });

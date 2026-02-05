@@ -10,9 +10,13 @@ test("exporter verbose timing logs for node adapter and sidecar", async () => {
     await fs.mkdirp(path.dirname(out));
     const nodes = [
       {
-        name: "//apps/web:bundle",
+        name: "//projects/apps/web:bundle",
         rule_type: "js_binary",
-        labels: ["lang:node", "kind:bundle", "lockfile:apps/web/pnpm-lock.yaml#apps/web"],
+        labels: [
+          "lang:node",
+          "kind:bundle",
+          "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",
+        ],
       },
     ];
     const sim = path.join(tmp, "build-tools/tools/buck/simulated.json");

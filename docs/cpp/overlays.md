@@ -140,7 +140,7 @@ As of PR 2 in `drop-cpp-provider.md`, C++ provider sync is a no‑op. There is n
 node build-tools/tools/buck/inspect-cpp-attrs.ts --json
 
 # Or for specific targets
-node build-tools/tools/buck/inspect-cpp-attrs.ts --target //libs/helper-lib:lib --target //apps/bar:bin
+node build-tools/tools/buck/inspect-cpp-attrs.ts --target //projects/libs/helper-lib:lib --target //projects/apps/bar:bin
 ```
 
 ### 3.5) Creating patches with patch-pkg (recommended, canonical)

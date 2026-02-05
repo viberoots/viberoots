@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { getFlagBool, getFlagList, getFlagStr } from "../lib/cli.ts";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
+import { getImporterRootsContract } from "../lib/importer-roots.ts";
 import { normalizeTargetLabel } from "../lib/labels.ts";
 
 type InlineExportOptions = {
@@ -153,11 +154,12 @@ export async function runFromCLI(): Promise<void> {
   const targetRaw = getFlagStr("target", "");
   const target = targetRaw ? normalizeTargetLabel(targetRaw) : "";
   const rootsList = getFlagList("roots");
+  const importerRoots = getImporterRootsContract().workspaceRoots;
+  const defaultRoots = Array.from(new Set([...importerRoots, "go", "cpp", "third_party"]));
+  const envRoots = String(process.env.BUCK_QUERY_ROOTS || "").trim();
   const roots = rootsList.length
     ? rootsList
-    : String(process.env.BUCK_QUERY_ROOTS || "apps,libs,go,cpp,third_party")
-        .split(/[,\s]+/)
-        .filter(Boolean);
+    : (envRoots ? envRoots : defaultRoots.join(",")).split(/[,\s]+/).filter(Boolean);
   const includeTargetPlatforms = getFlagBool("platforms") || !!target;
   const normalizeLabels = getFlagBool("normalize") || !!target;
   const fs = await import("node:fs");

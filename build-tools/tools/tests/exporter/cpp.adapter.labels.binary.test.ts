@@ -6,7 +6,7 @@ import { readGraph } from "../../lib/graph";
 import { runInTemp } from "../lib/test-helpers";
 
 await runInTemp("exp-cpp-bin-labels", async (tmp, $) => {
-  const nodes = [{ name: "//apps/demo:demo", rule_type: "cxx_binary", labels: [] }];
+  const nodes = [{ name: "//projects/apps/demo:demo", rule_type: "cxx_binary", labels: [] }];
   const out = path.join(tmp, "build-tools/tools/buck/graph.json");
   await fs.outputFile(out, JSON.stringify(nodes) + "\n");
 

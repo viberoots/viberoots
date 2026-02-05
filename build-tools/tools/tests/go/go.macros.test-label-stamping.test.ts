@@ -70,7 +70,7 @@ test("go macros: nix_go_test stamps lang:go and kind:test (including auto-wired 
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //apps/demo:lib_test`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //projects/apps/demo:lib_test`;
     if (probeAuto.exitCode !== 0) return; // skip when Buck/prelude/toolchains unavailable
 
     const auto = firstCqueryNode<{ labels?: string[] }>(JSON.parse(String(probeAuto.stdout || "")));
@@ -83,7 +83,7 @@ test("go macros: nix_go_test stamps lang:go and kind:test (including auto-wired 
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //apps/demo:explicit`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //projects/apps/demo:explicit`;
     const explicit = firstCqueryNode<{ labels?: string[] }>(
       JSON.parse(String(probeExplicit.stdout || "")),
     );

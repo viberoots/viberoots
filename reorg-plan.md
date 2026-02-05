@@ -60,6 +60,58 @@ Implement.
 
 ---
 
+## PR-9: Default lockfile inference for Python
+
+### Description
+
+This PR aligns Python with Node by defaulting the importer-scoped lockfile label when a Python macro call omits it. This reduces boilerplate in scaffolds while preserving strict validation.
+
+### Scope & Changes
+
+This PR makes the following changes:
+
+- Add default lockfile inference for Python macros (e.g., `nix_python_library`, `nix_python_binary`, `nix_python_test`, WASM variants) when no lockfile label is provided.
+- Keep the existing validation rules for importer-scoped lockfile labels and supported importer roots.
+- Ensure error text remains deterministic when the default lockfile is missing.
+
+### Tests (in this PR)
+
+I update or add tests to prove:
+
+- Python macros succeed with omitted `lockfile_label` when the default lockfile exists at `<package>/uv.lock`.
+- Python macros fail with the same deterministic error if the default lockfile is missing.
+- Existing explicit-label behavior remains unchanged.
+
+### Docs (in this PR)
+
+I update docs that describe Python lockfile labeling to note that the default label is inferred when omitted.
+
+### Acceptance Criteria
+
+The following must be true:
+
+- Python importer-scoped macros infer the default lockfile label when omitted.
+- Failure behavior and supported importer rules remain unchanged.
+- Tests cover default inference and missing-lockfile error cases.
+
+### Risks
+
+Low. This is a small wiring change and should only reduce boilerplate in Python targets.
+
+### Consequence of Not Implementing
+
+Python scaffolds and targets must continue to specify lockfile labels manually, even when the default is obvious.
+
+### Downsides for Implementing
+
+Minor behavior change that requires updating a small set of tests and documentation.
+
+### Recommendation
+
+Implement.
+
+---
+
 ## PR-2: Add new top-level anchors
 
 ### Description
@@ -72,11 +124,11 @@ This PR makes the following changes:
 
 - Create empty directories:
   - `build-tools/`
-  - `apps/`
-  - `libs/`
+  - `projects/apps/`
+  - `projects/libs/`
   - `docs/build-history/`
   - `build-tools/docs/`
-  - `build-tools/docs/build-tools/lang/`
+  - `build-tools/docs/lang/`
 - Add a short note in `docs/handbook/tooling.md` describing the new top-level layout and intent.
 
 ### Tests (in this PR)

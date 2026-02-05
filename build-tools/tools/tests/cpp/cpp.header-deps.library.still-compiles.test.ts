@@ -54,7 +54,7 @@ test("cpp: header_deps on a library still compiles with header-only usage", asyn
         "nix_cpp_binary(",
         '  name = "demo",',
         '  srcs = ["src/main.cpp"],',
-        '  header_deps = ["//libs/dep:dep"],',
+        '  header_deps = ["//projects/libs/dep:dep"],',
         '  labels = ["lang:cpp", "kind:bin"],',
         '  visibility = ["PUBLIC"],',
         ")",
@@ -68,7 +68,7 @@ test("cpp: header_deps on a library still compiles with header-only usage", asyn
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir cpp_header_deps_lib_compiles cquery "deps(//apps/demo:demo)" --json --output-attribute name`;
+    })`buck2 --isolation-dir cpp_header_deps_lib_compiles cquery "deps(//projects/apps/demo:demo)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return;
 
     await $({
@@ -79,7 +79,7 @@ test("cpp: header_deps on a library still compiles with header-only usage", asyn
       stdio: "pipe",
       nothrow: true,
       reject: false,
-      env: { ...process.env, BUCK_TARGET: "//apps/demo:demo" },
+      env: { ...process.env, BUCK_TARGET: "//projects/apps/demo:demo" },
     })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
     assert.equal(build.exitCode, 0, String(build.stderr || build.stdout));
   });

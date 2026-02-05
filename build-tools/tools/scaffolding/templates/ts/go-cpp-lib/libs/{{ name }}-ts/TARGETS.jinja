@@ -1,18 +1,18 @@
 load("//build-tools/node:defs.bzl", "nix_node_lib", "nix_node_test")
 
-# Note: This scaffold assumes an importer at libs/{{ name }}-ts with its own lockfile.
+# Note: This scaffold assumes an importer at projects/libs/{{ name }}-ts with its own lockfile.
 # Provider sync can be added later; the lockfile label is declared up-front.
 nix_node_lib(
     name = "{{ name }}_ts_pkg",
     srcs = glob(["src/**/*.ts"]),
     out = "build.stamp",
     cmd = "echo ok > $OUT",
-    lockfile_label = "lockfile:libs/{{ name }}-ts/pnpm-lock.yaml#libs/{{ name }}-ts",
+    lockfile_label = "lockfile:projects/libs/{{ name }}-ts/pnpm-lock.yaml#projects/libs/{{ name }}-ts",
 )
 
 nix_node_test(
     name = "ts_unit",
-    lockfile_label = "lockfile:libs/{{ name }}-ts/pnpm-lock.yaml#libs/{{ name }}-ts",
+    lockfile_label = "lockfile:projects/libs/{{ name }}-ts/pnpm-lock.yaml#projects/libs/{{ name }}-ts",
 )
 
 

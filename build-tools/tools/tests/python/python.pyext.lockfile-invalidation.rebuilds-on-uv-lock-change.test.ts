@@ -30,9 +30,9 @@ async function nixEvalSelectedDrvPath(tmp: string, $: any, target: string): Prom
 
 test("python: pyext rebuilds when uv.lock changes with empty build_py_deps", async () => {
   await runInTemp("python-pyext-lockfile-invalidation", async (tmp, $) => {
-    const appRel = path.join("apps", "pyext_lockfile");
+    const appRel = path.join("projects", "apps", "pyext_lockfile");
     const appDir = path.join(tmp, appRel);
-    const libRel = path.join("libs", "math");
+    const libRel = path.join("projects", "libs", "math");
     const libDir = path.join(tmp, libRel);
 
     await fs.mkdirp(path.join(appDir, "native"));

@@ -12,7 +12,7 @@ import { runInTemp } from "../lib/test-helpers";
 test("planner builds go_binary with filtered srcRoot", async () => {
   await runInTemp("planner-go-binary-filtered", async (tmp, $) => {
     // Create minimal repo structure
-    const appDir = path.join(tmp, "apps", "tcli");
+    const appDir = path.join(tmp, "projects", "apps", "tcli");
     const cmdDir = path.join(appDir, "cmd", "tcli");
     await fs.mkdirp(cmdDir);
     await fs.writeFile(
@@ -32,10 +32,10 @@ test("planner builds go_binary with filtered srcRoot", async () => {
     const graphDir = path.join(tmp, "build-tools", "tools", "buck");
     await fs.mkdirp(graphDir);
     const node = {
-      name: "//apps/tcli:tcli",
+      name: "//projects/apps/tcli:tcli",
       rule_type: "go_binary",
       labels: ["lang:go", "kind:bin"],
-      srcs: ["apps/tcli/cmd/tcli/main.go"],
+      srcs: ["projects/apps/tcli/cmd/tcli/main.go"],
     };
     await fs.writeFile(
       path.join(graphDir, "graph.json"),
@@ -51,7 +51,7 @@ test("planner builds go_binary with filtered srcRoot", async () => {
       cwd: tmp,
       stdio: "pipe",
       env: { ...process.env, BUCK_TEST_SRC: tmp },
-    })`nix build ${`path:${tmp}#graph-generator`} --no-link --accept-flake-config --print-out-paths`;
+    })`nix build --impure ${`path:${tmp}#graph-generator`} --no-link --accept-flake-config --print-out-paths`;
     const outPath =
       String(stdout || "")
         .trim()
@@ -67,12 +67,12 @@ test("planner builds go_binary with filtered srcRoot", async () => {
     const entries = JSON.parse(txt) as Array<any>;
     const hasBin = entries.some(
       (e) =>
-        String(e?.label || "").includes("//apps/tcli:tcli") &&
+        String(e?.label || "").includes("//projects/apps/tcli:tcli") &&
         Array.isArray(e?.bins) &&
         e.bins.length > 0,
     );
     if (!hasBin) {
-      console.error("expected binary entry in manifest for //apps/tcli:tcli");
+      console.error("expected binary entry in manifest for //projects/apps/tcli:tcli");
       console.error(txt);
       process.exit(2);
     }

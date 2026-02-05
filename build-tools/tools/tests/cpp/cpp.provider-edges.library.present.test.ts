@@ -17,12 +17,12 @@ EOF'`;
       cwd: tmp,
     })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<\'EOF'
 MODULE_PROVIDERS = {
-  "//libs/demo:lib": ["//third_party/providers:prov"],
+  "//projects/libs/demo:lib": ["//third_party/providers:prov"],
 }
 EOF'`;
 
     // Simple C++ library using nix_cpp_library
-    const libDir = path.join(tmp, "libs/demo");
+    const libDir = path.join(tmp, "projects", "libs", "demo");
     await fs.mkdirp(libDir);
     await fs.outputFile(path.join(libDir, "lib.cpp"), "int add(int a,int b){return a+b;}\n");
     await fs.outputFile(
@@ -42,7 +42,7 @@ nix_cpp_library(
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms prelude//platforms:default "deps(//libs/demo:lib)" --json --output-attribute name`;
+    })`buck2 cquery --target-platforms prelude//platforms:default "deps(//projects/libs/demo:lib)" --json --output-attribute name`;
     if (probe.exitCode !== 0) {
       console.error("buck2 cquery failed; prelude or config missing");
       process.exit(2);

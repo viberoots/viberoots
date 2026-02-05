@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("node deps enforcement: matches package.json passes", async () => {
   await runInTemp("node-deps-enforcement-pass", async (tmp, $) => {
-    const appDir = path.join(tmp, "apps", "web");
+    const appDir = path.join(tmp, "projects", "apps", "web");
     await fsp.mkdir(appDir, { recursive: true });
     await fsp.writeFile(
       path.join(appDir, "package.json"),
@@ -31,7 +31,7 @@ test("node deps enforcement: matches package.json passes", async () => {
         "",
         "nix_node_lib(",
         '  name = "web",',
-        '  deps = ["//libs/ui:ui"],',
+        '  deps = ["//projects/libs/ui:ui"],',
         ")",
         "",
       ].join("\n"),
@@ -40,7 +40,7 @@ test("node deps enforcement: matches package.json passes", async () => {
     await fsp.mkdir(path.join(tmp, "build-tools", "tools", "node"), { recursive: true });
     await fsp.writeFile(
       path.join(tmp, "build-tools", "tools", "node", "workspace-map.json"),
-      JSON.stringify({ "@repo/ui": "//libs/ui:ui" }, null, 2),
+      JSON.stringify({ "@repo/ui": "//projects/libs/ui:ui" }, null, 2),
       "utf8",
     );
 

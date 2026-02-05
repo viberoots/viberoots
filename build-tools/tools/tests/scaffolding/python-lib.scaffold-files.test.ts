@@ -12,7 +12,7 @@ test("python lib scaffold includes pyproject.toml and uv.lock placeholder", asyn
     const name = "demo_pylib";
     await $`scaf new python lib ${name} --yes`;
 
-    const libDir = path.join(tmp, "libs", name);
+    const libDir = path.join(tmp, "projects", "libs", name);
     const pyproject = path.join(libDir, "pyproject.toml");
     const uvlock = path.join(libDir, "uv.lock");
 

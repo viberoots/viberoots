@@ -11,13 +11,13 @@ This plan closes the gaps surfaced by the new e2e test for the scaffolded Go add
 - Completion criteria
   - On a temp scaffolded project created by `scaf new node go-addon demo`:
     - `nix build .#node-test.libs_demo` succeeds; the test report exists and the Node addon runs `add(2, 3) = 5`.
-    - Optional: `buck2 test --target-platforms prelude//platforms:default //libs/demo:unit` succeeds.
+    - Optional: `buck2 test --target-platforms prelude//platforms:default //projects/libs/demo:unit` succeeds.
   - Full repository suite passes with `i && b && v` after direnv loads.
 
 ### Gaps diagnosed
 
 - Flake builder path for Node tests did not link the Go c-archive into the C addon, causing a missing header (e.g., `demo-go.h`) at compile time.
-- Buck-path Node test (`//libs/<name>:unit`) depended on `//libs/<name>-native:napi_addon` and hit a visibility/config nuance. Even with `visibility = ["PUBLIC"]`, the dependency was rejected in our Buck test environment.
+- Buck-path Node test (`//projects/libs/<name>:unit`) depended on `//projects/libs/<name>-native:napi_addon` and hit a visibility/config nuance. Even with `visibility = ["PUBLIC"]`, the dependency was rejected in our Buck test environment.
 
 ### Design: precise fixes
 
@@ -61,7 +61,7 @@ Acceptance checks
 
 2. Buck test visibility: make the Node test depend on the local copy, not the native target
 
-- The scaffolded Node test currently depends directly on `//libs/<name>-native:napi_addon`. To avoid cross-package visibility and keep the dependency strictly within the Node package, change it to depend on `:copy_addon`.
+- The scaffolded Node test currently depends directly on `//projects/libs/<name>-native:napi_addon`. To avoid cross-package visibility and keep the dependency strictly within the Node package, change it to depend on `:copy_addon`.
 
 Code reference (current template):
 
@@ -69,7 +69,7 @@ Code reference (current template):
 {% if includeNodeTests -%}
 nix_node_test(
     name = "unit",
-    deps = ["//libs/{{ name }}-native:napi_addon"],
+    deps = ["//projects/libs/{{ name }}-native:napi_addon"],
     lockfile_label = "lockfile:{{ lockfilePath }}#{{ importer }}",
 )
 {%- endif %}
@@ -81,7 +81,7 @@ nix_node_test(
 
 Acceptance checks
 
-- In a temp run, `buck2 test --target-platforms prelude//platforms:default //libs/demo:unit` succeeds (platform chosen to avoid unspecified config complaints on Go rules).
+- In a temp run, `buck2 test --target-platforms prelude//platforms:default //projects/libs/demo:unit` succeeds (platform chosen to avoid unspecified config complaints on Go rules).
 
 ### Implementation phases and tasks
 
@@ -99,9 +99,9 @@ Phase 1 — Flake builder integration (Go c-archive → addon)
 Phase 2 — Buck test visibility hardening
 
 - Task 2.1: Update the scaffold template for the Node test deps:
-  - In `build-tools/tools/scaffolding/templates/node/go-addon/libs/{{ name }}/TARGETS.jinja`, change `deps` on `nix_node_test("unit", ...)` from `//libs/<name>-native:napi_addon` to `:copy_addon`.
+  - In `build-tools/tools/scaffolding/templates/node/go-addon/libs/{{ name }}/TARGETS.jinja`, change `deps` on `nix_node_test("unit", ...)` from `//projects/libs/<name>-native:napi_addon` to `:copy_addon`.
 - Task 2.2: Validate in a temp repo:
-  - `buck2 test --target-platforms prelude//platforms:default //libs/demo:unit` runs and passes (optional smoke; flake path remains the main test path).
+  - `buck2 test --target-platforms prelude//platforms:default //projects/libs/demo:unit` runs and passes (optional smoke; flake path remains the main test path).
 - Acceptance:
   - No visibility errors when using Buck’s Node test target locally.
 
@@ -165,6 +165,6 @@ Phase 3 — E2E test update (build-tools/tools/tests/...)
   - `build-tools/tools/bin/i`
   - `nix build .#node-test.libs_demo` succeeds and produces non-empty `report/`.
   - Node runtime smoke: `node -e "const a=require('./libs/demo/native/demo_addon.node'); if(a.add(2,3)!==5) process.exit(3)"` exits 0.
-  - Optional: `buck2 test --target-platforms prelude//platforms:default //libs/demo:unit` succeeds.
+  - Optional: `buck2 test --target-platforms prelude//platforms:default //projects/libs/demo:unit` succeeds.
 
 This closes the gaps without expanding surface area: the Node flake builder handles cross-language linkage for tests by composing the Go c-archive directly, and Buck visibility friction is avoided for the local Node test by depending on the copy stage within the same package.**_ End Patch _**!

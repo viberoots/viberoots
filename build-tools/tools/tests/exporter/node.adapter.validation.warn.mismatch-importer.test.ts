@@ -10,13 +10,13 @@ test("node adapter warns on path/importer mismatch (warn mode)", async () => {
     await fs.mkdirp(path.dirname(out));
     const nodes = [
       {
-        name: "//apps/web:bundle",
+        name: "//projects/apps/web:bundle",
         rule_type: "js_binary",
         labels: [
           "lang:node",
           "kind:bundle",
           // importer 'libs/ui' does not match directory of lockfile 'apps/web'
-          "lockfile:apps/web/pnpm-lock.yaml#libs/ui",
+          "lockfile:projects/apps/web/pnpm-lock.yaml#projects/libs/ui",
         ],
       },
     ];
@@ -38,7 +38,7 @@ test("node adapter warns on path/importer mismatch (warn mode)", async () => {
       process.exit(2);
     }
     if (
-      !txt.includes("Fix: set importer to 'apps/web'") ||
+      !txt.includes("Fix: set importer to 'projects/apps/web'") ||
       !txt.includes("Use importer '.' only for repo-root lockfiles")
     ) {
       console.error("expected remediation guidance for importer mismatch", txt);

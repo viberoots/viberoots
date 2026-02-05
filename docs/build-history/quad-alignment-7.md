@@ -68,7 +68,7 @@ Standardize importer inference by replacing bespoke logic in `node_webapp` and `
 
 #### Tests (in this PR)
 
-- Importer inference parity: for root importer `.` and nested importers like `apps/web`, the inferred importer matches `build-tools/tools/lib/importers.ts:computeImporterLabel(...)`.
+- Importer inference parity: for root importer `.` and nested importers like `projects/apps/web`, the inferred importer matches `build-tools/tools/lib/importers.ts:computeImporterLabel(...)`.
 - Invalidation:
   - Changing `flake.lock` invalidates `node_webapp(...)` and bundled `nix_node_cli_bin(...)` only.
   - Touching `<importer>/patches/node/*.patch` invalidates only that importer’s Node targets.

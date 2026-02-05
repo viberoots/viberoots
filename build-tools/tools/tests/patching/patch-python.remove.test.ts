@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 test("patch-python remove drops patch and refreshes glue deterministically", async () => {
   await runInTemp("patch-python-remove", async (tmp, $) => {
     // Create a minimal Python importer with uv.lock
-    const importer = path.join(tmp, "apps", "pytool");
+    const importer = path.join(tmp, "projects", "apps", "pytool");
     await fs.mkdirp(importer);
     const uvLock = ["# uv lock", "[[package]]", 'name = "requests"', 'version = "2.32.3"', ""].join(
       "\n",
@@ -46,13 +46,13 @@ test("patch-python remove drops patch and refreshes glue deterministically", asy
     }
     const txt = await fs.readFile(auto, "utf8");
     if (
-      !txt.includes('lockfile="apps/pytool/uv.lock"') ||
-      !txt.includes('importer="apps/pytool"')
+      !txt.includes('lockfile="projects/apps/pytool/uv.lock"') ||
+      !txt.includes('importer="projects/apps/pytool"')
     ) {
       console.error("providers file missing expected importer entries");
       process.exit(2);
     }
-    if (txt.includes("apps/pytool/patches/python/requests@2.32.3.patch")) {
+    if (txt.includes("projects/apps/pytool/patches/python/requests@2.32.3.patch")) {
       console.error("providers file still references removed patch");
       process.exit(2);
     }

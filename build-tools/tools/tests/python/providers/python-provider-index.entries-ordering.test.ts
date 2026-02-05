@@ -8,13 +8,13 @@ test("readPythonProviderIndexEntries returns stable, ordered provider entries", 
   await runInTemp("python-provider-index", async (tmp, $) => {
     await $`git init`;
 
-    const webLf = path.join(tmp, "apps/web/uv.lock");
-    const apiLf = path.join(tmp, "apps/api/uv.lock");
+    const webLf = path.join(tmp, "projects/apps/web/uv.lock");
+    const apiLf = path.join(tmp, "projects/apps/api/uv.lock");
     await fsp.mkdir(path.dirname(webLf), { recursive: true });
     await fsp.mkdir(path.dirname(apiLf), { recursive: true });
     await fsp.writeFile(webLf, "", "utf8");
     await fsp.writeFile(apiLf, "", "utf8");
-    await $`git add apps/web/uv.lock apps/api/uv.lock`;
+    await $`git add projects/apps/web/uv.lock projects/apps/api/uv.lock`;
 
     // Invoke readPythonProviderIndexEntries inside the temp repo process
     const { stdout } = await $({ stdio: "pipe" })`node -e ${`

@@ -1,13 +1,13 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
-import path from "node:path";
 import assert from "node:assert/strict";
+import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
 test("python macros: wasm app/lib parse and stamp labels", async () => {
   await runInTemp("py-macros-parse-stamp", async (tmp, $) => {
-    const appDir = path.join(tmp, "apps", "demo");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     await fs.mkdirp(path.join(appDir, "src"));
     // Minimal source tree
     await fs.outputFile(path.join(appDir, "src", "main.py"), "print('ok')\n", "utf8");
@@ -25,13 +25,13 @@ test("python macros: wasm app/lib parse and stamp labels", async () => {
         "",
         "nix_python_wasm_app(",
         '  name = "wasm_app",',
-        '  lockfile_label = "lockfile:apps/demo/uv.lock#apps/demo",',
+        '  lockfile_label = "lockfile:projects/apps/demo/uv.lock#projects/apps/demo",',
         '  srcs = glob(["**/*.py"]),',
         ")",
         "",
         "nix_python_wasm_lib(",
         '  name = "wasm_lib",',
-        '  lockfile_label = "lockfile:apps/demo/uv.lock#apps/demo",',
+        '  lockfile_label = "lockfile:projects/apps/demo/uv.lock#projects/apps/demo",',
         '  srcs = glob(["**/*.py"]),',
         ")",
         "",
@@ -45,7 +45,7 @@ test("python macros: wasm app/lib parse and stamp labels", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir py_macros cquery --json --output-attribute labels //apps/demo:wasm_app`;
+    })`buck2 --isolation-dir py_macros cquery --json --output-attribute labels //projects/apps/demo:wasm_app`;
     if (probe.exitCode !== 0) return; // skip if prelude not available
     const parsed = JSON.parse(String(probe.stdout || "")) as unknown;
     const values = Array.isArray(parsed)

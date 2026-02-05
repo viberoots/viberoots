@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
-import assert from "node:assert/strict";
 import fs from "fs-extra";
+import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
 import nodeAdapter from "../../buck/exporter/lang/node.ts";
 import pythonAdapter from "../../buck/exporter/lang/python.ts";
+import { runInTemp } from "../lib/test-helpers";
 
 function mustFind(nodes: Array<{ name: string; labels?: string[] }>, name: string) {
   const found = nodes.find((n) => n.name === name);
@@ -15,15 +15,19 @@ function mustFind(nodes: Array<{ name: string; labels?: string[] }>, name: strin
 
 test("importer-scoped adapter helper keeps node/python attach + validate behavior aligned", async () => {
   await runInTemp("exp-importer-scoped-adapter-shared", async (tmp) => {
-    await fs.mkdirp(path.join(tmp, "apps", "web"));
+    await fs.mkdirp(path.join(tmp, "projects", "apps", "web"));
     await fs.outputFile(
-      path.join(tmp, "apps", "web", "pnpm-lock.yaml"),
-      'lockfileVersion: "9.0"\nimporters:\n  apps/web:\n    dependencies: {}\npackages: {}\n',
+      path.join(tmp, "projects", "apps", "web", "pnpm-lock.yaml"),
+      'lockfileVersion: "9.0"\nimporters:\n  projects/apps/web:\n    dependencies: {}\npackages: {}\n',
       "utf8",
     );
 
-    await fs.mkdirp(path.join(tmp, "apps", "pytool"));
-    await fs.outputFile(path.join(tmp, "apps", "pytool", "uv.lock"), "# uv lock\n", "utf8");
+    await fs.mkdirp(path.join(tmp, "projects", "apps", "pytool"));
+    await fs.outputFile(
+      path.join(tmp, "projects", "apps", "pytool", "uv.lock"),
+      "# uv lock\n",
+      "utf8",
+    );
 
     const prev = process.cwd();
     try {
@@ -31,12 +35,12 @@ test("importer-scoped adapter helper keeps node/python attach + validate behavio
 
       const attachNodes = [
         {
-          name: "//apps/web:lib",
+          name: "//projects/apps/web:lib",
           rule_type: "js_library",
           labels: ["lang:node", "kind:lib"],
         },
         {
-          name: "//apps/pytool:lib",
+          name: "//projects/apps/pytool:lib",
           rule_type: "python_library",
           labels: ["lang:python", "kind:lib"],
           srcs: ["lib.py"],
@@ -45,28 +49,30 @@ test("importer-scoped adapter helper keeps node/python attach + validate behavio
       const nodeAttached = await nodeAdapter.attachLabels(attachNodes, [], "");
       const pythonAttached = await pythonAdapter.attachLabels(attachNodes, [], "");
 
-      const nodeLabels = new Set(mustFind(nodeAttached, "//apps/web:lib").labels || []);
+      const nodeLabels = new Set(mustFind(nodeAttached, "//projects/apps/web:lib").labels || []);
       assert.ok(
-        nodeLabels.has("lockfile:apps/web/pnpm-lock.yaml#apps/web"),
+        nodeLabels.has("lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"),
         "node lockfile label missing",
       );
 
-      const pythonLabels = new Set(mustFind(pythonAttached, "//apps/pytool:lib").labels || []);
+      const pythonLabels = new Set(
+        mustFind(pythonAttached, "//projects/apps/pytool:lib").labels || [],
+      );
       assert.ok(
-        pythonLabels.has("lockfile:apps/pytool/uv.lock#apps/pytool"),
+        pythonLabels.has("lockfile:projects/apps/pytool/uv.lock#projects/apps/pytool"),
         "python lockfile label missing",
       );
 
       const validateNodes = [
         {
-          name: "//apps/web:missing_kind",
+          name: "//projects/apps/web:missing_kind",
           rule_type: "js_binary",
-          labels: ["lang:node", "lockfile:apps/web/pnpm-lock.yaml#apps/web"],
+          labels: ["lang:node", "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"],
         },
         {
-          name: "//apps/pytool:missing_kind",
+          name: "//projects/apps/pytool:missing_kind",
           rule_type: "python_binary",
-          labels: ["lang:python", "lockfile:apps/pytool/uv.lock#apps/pytool"],
+          labels: ["lang:python", "lockfile:projects/apps/pytool/uv.lock#projects/apps/pytool"],
           srcs: ["main.py"],
         },
       ];

@@ -20,7 +20,7 @@ MODULE_PROVIDERS = {
 }
 EOF'`;
 
-    const appDir = path.join(tmp, "apps", "web");
+    const appDir = path.join(tmp, "projects", "apps", "web");
     const patchDir = path.join(appDir, "patches", "node");
     await fsp.mkdir(patchDir, { recursive: true });
     await fsp.writeFile(path.join(appDir, "pnpm-lock.yaml"), "lockfileVersion: 9\n", "utf8");
@@ -43,7 +43,7 @@ EOF'`;
         "  srcs = {",
         '    "bin/entry.js": "bin/entry.js",',
         "  },",
-        '  lockfile_label = "lockfile:apps/web/pnpm-lock.yaml#apps/web",',
+        '  lockfile_label = "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",',
         ")",
         "",
       ].join("\n"),
@@ -65,7 +65,7 @@ EOF'`;
 
     // Importer patch attachment uses reserved namespace and sanitized keying
     assert.ok(
-      out.includes("__patch_inputs__/apps-web-patches-node-leftpad@1.3.0.patch"),
+      out.includes("__patch_inputs__/projects-apps-web-patches-node-leftpad@1.3.0.patch"),
       "expected importer patch key under __patch_inputs__/ with sanitized patch path",
     );
 

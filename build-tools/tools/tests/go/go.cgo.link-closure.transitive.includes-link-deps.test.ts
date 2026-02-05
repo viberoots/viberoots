@@ -32,9 +32,9 @@ async function nixBuildSelected(tmp: string, $: any, target: string) {
 
 test("go cgo link_closure=transitive follows C++ link_deps", async () => {
   await runInTemp("go-cgo-link-closure-transitive", async (tmp, $) => {
-    const supportDir = path.join(tmp, "libs", "support");
-    const coreDir = path.join(tmp, "libs", "core");
-    const appDir = path.join(tmp, "apps", "demo");
+    const supportDir = path.join(tmp, "projects", "libs", "support");
+    const coreDir = path.join(tmp, "projects", "libs", "core");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     await fs.mkdirp(path.join(supportDir, "src"));
     await fs.mkdirp(path.join(coreDir, "src"));
     await fs.mkdirp(path.join(appDir, "cmd", "demo"));
@@ -81,26 +81,26 @@ test("go cgo link_closure=transitive follows C++ link_deps", async () => {
 
     const graph = [
       {
-        name: "//libs/support:support",
+        name: "//projects/libs/support:support",
         rule_type: "cxx_library",
         labels: ["lang:cpp", "kind:lib"],
-        srcs: ["libs/support/src/support.cpp"],
+        srcs: ["projects/libs/support/src/support.cpp"],
         link_deps: [],
       },
       {
-        name: "//libs/core:core",
+        name: "//projects/libs/core:core",
         rule_type: "cxx_library",
         labels: ["lang:cpp", "kind:lib"],
-        srcs: ["libs/core/src/core.cpp"],
-        deps: ["//libs/support:support"],
-        link_deps: ["//libs/support:support"],
+        srcs: ["projects/libs/core/src/core.cpp"],
+        deps: ["//projects/libs/support:support"],
+        link_deps: ["//projects/libs/support:support"],
       },
       {
-        name: "//apps/demo:demo",
+        name: "//projects/apps/demo:demo",
         rule_type: "go_binary",
         labels: ["lang:go", "kind:bin", "cgo:enabled"],
-        srcs: ["apps/demo/cmd/demo/main.go"],
-        deps: ["//libs/core:core"],
+        srcs: ["projects/apps/demo/cmd/demo/main.go"],
+        deps: ["//projects/libs/core:core"],
         link_closure: "transitive",
         link_closure_overrides: {},
       },
@@ -109,7 +109,7 @@ test("go cgo link_closure=transitive follows C++ link_deps", async () => {
     await fs.mkdirp(path.dirname(graphJsonPath));
     await fs.writeFile(graphJsonPath, JSON.stringify(graph, null, 2) + "\n", "utf8");
 
-    const outPath = await nixBuildSelected(tmp, $, "//apps/demo:demo");
+    const outPath = await nixBuildSelected(tmp, $, "//projects/apps/demo:demo");
     const binDir = path.join(outPath, "bin");
     const bins = (await fs.readdir(binDir)).filter(Boolean);
     assert.ok(bins.length >= 1, `expected at least one binary in ${binDir}`);

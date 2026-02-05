@@ -39,11 +39,11 @@ This hardens the importer-dir consistency rule and prevents a class of labels th
 ### Tests (in this PR)
 
 - Update `build-tools/tools/tests/lib/labels.parse-lockfile-label.test.ts`:
-  - add a regression case asserting `lockfile:apps/web/pnpm-lock.yaml#.` is rejected
+  - add a regression case asserting `lockfile:projects/apps/web/pnpm-lock.yaml#.` is rejected
   - keep existing valid root lockfile case `lockfile:pnpm-lock.yaml#.` passing
 - Update `build-tools/tools/tests/labels/lockfile-label.parity.test.ts`:
-  - add a parity case for the now-invalid `lockfile:apps/web/pnpm-lock.yaml#.` label and assert both TS and Starlark reject it
-  - keep normalization (`lockfile:./apps/web/...`) coverage intact
+  - add a parity case for the now-invalid `lockfile:projects/apps/web/pnpm-lock.yaml#.` label and assert both TS and Starlark reject it
+  - keep normalization (`lockfile:./projects/apps/web/...`) coverage intact
 - Add a small planner regression (if applicable) to ensure the Nix-side parser fails deterministically on the same invalid label.
 
 ### Docs (in this PR)
@@ -93,10 +93,10 @@ This PR makes provider generation and auto-map wiring satisfy the same set of su
 
 - Introduce one shared “supported importer label” policy on the TypeScript side (used by provider sync and provider index generation):
   - allow importer `"."` (repo-root lockfile importers)
-  - allow importers under `apps/*` and `libs/*`
+  - allow importers under `projects/apps/*` and `projects/libs/*`
   - reject everything else
 - Update `build-tools/tools/lib/provider-sync-driver.ts` to:
-  - stop pre-filtering lockfiles to only `apps/*` or `libs/*`
+  - stop pre-filtering lockfiles to only `projects/apps/*` or `projects/libs/*`
   - instead, rely on the shared supported-importer predicate on the importer label(s) returned by parsers
   - ensure we never emit mappings for providers we will not generate
 - Update provider index generation (Node/Python) to apply the same supported-importer policy.
@@ -115,7 +115,7 @@ This PR makes provider generation and auto-map wiring satisfy the same set of su
 ### Docs (in this PR)
 
 - Update the “importer-scoped ecosystems” doc section:
-  - explicitly list supported importer labels: `"."`, `apps/*`, `libs/*`
+  - explicitly list supported importer labels: `"."`, `projects/apps/*`, `projects/libs/*`
   - describe what root importer `"."` means, and when it is expected to exist
   - describe that auto-map mappings are only meaningful when provider sync can generate providers for the same importer set
 
@@ -127,7 +127,7 @@ This PR makes provider generation and auto-map wiring satisfy the same set of su
 
 ### Risks
 
-- If there are existing lockfiles outside `apps/*` and `libs/*` that should participate, this PR will require an explicit policy decision (expand supported importers or keep them excluded).
+- If there are existing lockfiles outside `projects/apps/*` and `projects/libs/*` that should participate, this PR will require an explicit policy decision (expand supported importers or keep them excluded).
 
 ### Consequence of Not Implementing
 
@@ -151,7 +151,7 @@ Implement.
 
 ### Description
 
-Node provider sync currently embeds a policy that, when an importer under `apps/*` or `libs/*` has `package.json` but no `pnpm-lock.yaml`, we still synthesize the lockfile path so a metadata-only provider can exist.
+Node provider sync currently embeds a policy that, when an importer under `projects/apps/*` or `projects/libs/*` has `package.json` but no `pnpm-lock.yaml`, we still synthesize the lockfile path so a metadata-only provider can exist.
 
 This policy is useful, but keeping it inside `build-tools/tools/buck/providers/node.ts` is a drift vector:
 
@@ -168,8 +168,8 @@ This policy is useful, but keeping it inside `build-tools/tools/buck/providers/n
 ### Tests (in this PR)
 
 - Add a focused provider-sync test that:
-  - creates a temp repo with `apps/demo/package.json` but no `apps/demo/pnpm-lock.yaml`
-  - asserts provider sync emits a provider for `apps/demo` (metadata-only provider)
+  - creates a temp repo with `projects/apps/demo/package.json` but no `projects/apps/demo/pnpm-lock.yaml`
+  - asserts provider sync emits a provider for `projects/apps/demo` (metadata-only provider)
   - asserts behavior is deterministic and idempotent across runs
 - Add a regression case ensuring importers outside the supported importer set do not get synthetic providers.
 
@@ -279,7 +279,7 @@ We tightened the lockfile label contract in PR‑1 and explicitly treat “leadi
 
 However, there is still a small cross-language drift vector:
 
-- Starlark and Nix strip **repeated** leading `./` segments (e.g. `././apps/web/...`).
+- Starlark and Nix strip **repeated** leading `./` segments (e.g. `././projects/apps/web/...`).
 - TypeScript currently strips only the first leading `./` segment.
 
 This creates a narrow class of labels that are “valid” in one layer and “invalid” in another. Even if rare, it violates the stated design goal that label normalizers are identical across TypeScript, Starlark, and Nix.
@@ -298,7 +298,7 @@ This PR makes the primary path robust by making TypeScript’s normalization exa
 ### Tests (in this PR)
 
 - Update `build-tools/tools/tests/lib/labels.parse-lockfile-label.strips-leading-dot-slash.test.ts` (or add a dedicated test) to assert:
-  - `lockfile:././apps/web/pnpm-lock.yaml#apps/web` parses successfully and normalizes to the same canonical lockfile path as `lockfile:apps/web/pnpm-lock.yaml#apps/web`.
+  - `lockfile:././projects/apps/web/pnpm-lock.yaml#projects/apps/web` parses successfully and normalizes to the same canonical lockfile path as `lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web`.
 - Update `build-tools/tools/tests/labels/lockfile-label.parity.test.ts` to add a TS ↔ Starlark parity case for the repeated `./` form.
 
 ### Docs (in this PR)

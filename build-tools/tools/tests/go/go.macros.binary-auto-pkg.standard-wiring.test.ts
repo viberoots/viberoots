@@ -30,16 +30,16 @@ EOF'`;
       cwd: tmp,
     })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
 MODULE_PROVIDERS = {
-  "//apps/demo:demo_pkg": ["//third_party/providers:prov"],
+  "//projects/apps/demo:demo_pkg": ["//third_party/providers:prov"],
 }
 EOF'`;
 
     // Minimal Go CLI layout with an auto-wired test under cmd/<name>/**.
-    const appDir = path.join(tmp, "apps", "demo");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(path.join(appDir, "cmd", "demo"), { recursive: true });
     await fsp.mkdir(path.join(appDir, "patches", "go"), { recursive: true });
 
-    const patchRel = "apps/demo/patches/go/demo@0.0.0.patch";
+    const patchRel = "projects/apps/demo/patches/go/demo@0.0.0.patch";
     await fsp.writeFile(path.join(tmp, patchRel), "# noop\n", "utf8");
 
     await fsp.writeFile(
@@ -75,7 +75,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels --output-attribute deps --output-attribute srcs //apps/demo:demo_pkg`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels --output-attribute deps --output-attribute srcs //projects/apps/demo:demo_pkg`;
     if (probe.exitCode !== 0) return; // skip if prelude not available
 
     const node = firstCqueryNode<{

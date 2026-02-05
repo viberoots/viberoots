@@ -5,15 +5,15 @@
   "help": {
     "usage": "scaf new node lib <name> [--path=DEST] [--key=value ...]",
     "notes": [
-      "Generates libs/<name> with .npmrc, package.json, tsconfig, src, test, TARGETS.",
+      "Generates projects/libs/<name> with .npmrc, package.json, tsconfig, src, test, TARGETS.",
       "Includes a default nix_node_test target (unit) using Vitest; opt out of sample tests with --no-tests.",
-      "Pass importer=<id> to override default libs/<name> importer.",
+      "Pass importer=<id> to override default projects/libs/<name> importer.",
       "TARGETS uses nix_node_lib and requires exactly one lockfile label."
     ],
     "examples": [
       "scaf new node lib demo-lib",
       "scaf new node lib demo-lib --no-tests",
-      "scaf new node lib demo-lib --importer=libs/util"
+      "scaf new node lib demo-lib --importer=projects/libs/util"
     ]
   }
 }

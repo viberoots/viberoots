@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("node deps enforcement: generated map required", async () => {
   await runInTemp("node-deps-generated-map-required", async (tmp, $) => {
-    const appDir = path.join(tmp, "apps", "web");
+    const appDir = path.join(tmp, "projects", "apps", "web");
     await fsp.mkdir(appDir, { recursive: true });
     await fsp.writeFile(
       path.join(appDir, "package.json"),

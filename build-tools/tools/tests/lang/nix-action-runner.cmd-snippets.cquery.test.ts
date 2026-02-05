@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("nix_action_runner helpers assemble stable cmd snippets (cquery)", async () => {
   await runInTemp("nix-action-runner-cmd-snippets", async (tmp, $) => {
-    const dir = path.join(tmp, "apps", "probe");
+    const dir = path.join(tmp, "projects", "apps", "probe");
     await fsp.mkdir(dir, { recursive: true });
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
@@ -21,7 +21,7 @@ test("nix_action_runner helpers assemble stable cmd snippets (cquery)", async ()
         "  cmd = escape_buck_cmd_subst(",
         "    nix_action_shell_prefix_core()",
         "    + nix_action_export_graph_cmd()",
-        '    + nix_action_build_selected_out_path_cmd("//apps/probe:probe")',
+        '    + nix_action_build_selected_out_path_cmd("//projects/apps/probe:probe")',
         '    + "echo ok > $OUT"',
         "  ),",
         ")",
@@ -35,7 +35,7 @@ test("nix_action_runner helpers assemble stable cmd snippets (cquery)", async ()
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cmd //apps/probe:probe`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cmd //projects/apps/probe:probe`;
     if (probe.exitCode !== 0) return;
     const out = String(probe.stdout || "");
 

@@ -46,10 +46,15 @@ export function isWorkspaceImporterPath(importer: string): boolean {
   if (p === ".") return false;
   const { workspaceRoots } = getImporterRootsContract();
   const parts = p.split("/").filter(Boolean);
-  if (parts.length !== 2) return false;
-  const [root, name] = parts;
-  if (!root || !name) return false;
-  return workspaceRoots.includes(root);
+  if (parts.length < 2) return false;
+  for (const root of workspaceRoots) {
+    const rootParts = toPosixPath(root).split("/").filter(Boolean);
+    if (rootParts.length === 0) continue;
+    if (parts.length !== rootParts.length + 1) continue;
+    if (!rootParts.every((seg, idx) => parts[idx] === seg)) continue;
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -66,10 +71,15 @@ export function isSupportedImporterLabel(importer: string): boolean {
   const { allowDotImporter, workspaceRoots } = getImporterRootsContract();
   if (p === ".") return allowDotImporter;
   const parts = p.split("/").filter(Boolean);
-  if (parts.length !== 2) return false;
-  const [root, name] = parts;
-  if (!root || !name) return false;
-  return workspaceRoots.includes(root);
+  if (parts.length < 2) return false;
+  for (const root of workspaceRoots) {
+    const rootParts = toPosixPath(root).split("/").filter(Boolean);
+    if (rootParts.length === 0) continue;
+    if (parts.length !== rootParts.length + 1) continue;
+    if (!rootParts.every((seg, idx) => parts[idx] === seg)) continue;
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -119,7 +129,7 @@ export async function listImporterPatches(
  * are present; it only provides a deterministic key.
  *
  * Rules:
- * - Only workspace importers under apps/* or libs/* are eligible.
+ * - Only workspace importers under projects/apps/* or projects/libs/* are eligible.
  * - An importer is eligible when <importer>/package.json exists.
  * - If <importer>/pnpm-lock.yaml already exists (discovered normally), it is not synthesized.
  * - Returned paths are POSIX-style repo-relative paths, deterministically sorted.
@@ -203,7 +213,7 @@ export async function findNearestLockfileForPackage(
  * Find the nearest pnpm-lock.yaml for a Buck package directory by walking upwards to repo root.
  *
  * - Input: package directory path, relative to repo root (POSIX or platform separators).
- * - Output: repo-relative POSIX lockfile path (e.g., "apps/web/pnpm-lock.yaml", or "pnpm-lock.yaml"), or null.
+ * - Output: repo-relative POSIX lockfile path (e.g., "projects/apps/web/pnpm-lock.yaml", or "pnpm-lock.yaml"), or null.
  *
  * This helper is intentionally shared between exporter and provider tooling to avoid drift.
  */

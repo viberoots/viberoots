@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
+import { test } from "node:test";
 import { buildInlinePlan } from "../../buck/export-inline.ts";
 import { getImporterRootsContract } from "../../lib/importer-roots.ts";
 
@@ -13,13 +13,13 @@ test("export-inline: with --target includes platform flags and deps(target)", as
     const plan = buildInlinePlan({
       workspaceRoot: "/tmp/work",
       outPath: path.join("/tmp/work", "out.json"),
-      target: "//apps/web:bundle",
+      target: "//projects/apps/web:bundle",
       roots: workspaceRoots,
       includeTargetPlatforms: true,
       normalizeLabels: true,
     });
     assert.ok(Array.isArray(plan.platformFlags) && plan.platformFlags.length > 0);
-    assert.match(plan.query, /deps\(\/\/apps\/web:bundle, 1, exec_deps\(\)\)\)$/);
+    assert.match(plan.query, /deps\(\/\/projects\/apps\/web:bundle, 1, exec_deps\(\)\)\)$/);
     assert.equal(Array.isArray(plan.isoArgs) && plan.isoArgs.length, 0);
   } finally {
     if (prevNoIso === undefined) delete process.env.BUCK_NO_ISOLATION;

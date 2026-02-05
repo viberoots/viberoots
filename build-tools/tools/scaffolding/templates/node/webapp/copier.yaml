@@ -18,8 +18,8 @@ language: "node"
 template: "webapp"
 
 # Derived defaults for Node webapp
-importer: "apps/{{ name }}"
-lockfilePath: "apps/{{ name }}/pnpm-lock.yaml"
+importer: "projects/apps/{{ name }}"
+lockfilePath: "projects/apps/{{ name }}/pnpm-lock.yaml"
 pkgScope: "@apps"
 includeNodeTests: true
 

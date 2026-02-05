@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("node_webapp default lockfile label fails fast when missing", async () => {
   await runInTemp("node-defs-nix-lockfile-default-missing", async (tmp, $) => {
-    const dir = path.join(tmp, "apps", "missing");
+    const dir = path.join(tmp, "projects", "apps", "missing");
     await fsp.mkdir(dir, { recursive: true });
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
@@ -27,7 +27,7 @@ test("node_webapp default lockfile label fails fast when missing", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute name //apps/missing:web`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute name //projects/apps/missing:web`;
 
     assert.notEqual(
       res.exitCode,
@@ -37,7 +37,7 @@ test("node_webapp default lockfile label fails fast when missing", async () => {
     const combined = String(res.stderr || "") + String(res.stdout || "");
     assert.ok(
       combined.includes(
-        "node_webapp: missing lockfile at apps/missing/pnpm-lock.yaml. Provide lockfile_label or create apps/missing/pnpm-lock.yaml.",
+        "node_webapp: missing lockfile at projects/apps/missing/pnpm-lock.yaml. Provide lockfile_label or create projects/apps/missing/pnpm-lock.yaml.",
       ),
       "expected a targeted missing lockfile error",
     );

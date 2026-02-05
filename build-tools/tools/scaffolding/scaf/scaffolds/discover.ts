@@ -20,9 +20,9 @@ export async function discoverScaffolds(root: string = "."): Promise<DiscoveredS
       const name = path.basename(dir);
       const txt = await fsp.readFile(f, "utf8").catch(() => "");
       const lang =
-        /language:\s*(\S+)/m.exec(txt)?.[1] || (dir.includes("libs/") ? "go" : "unknown");
+        /language:\s*(\S+)/m.exec(txt)?.[1] || (dir.includes("projects/libs/") ? "go" : "unknown");
       const tmpl =
-        /template:\s*(\S+)/m.exec(txt)?.[1] || (dir.includes("libs/") ? "lib" : "unknown");
+        /template:\s*(\S+)/m.exec(txt)?.[1] || (dir.includes("projects/libs/") ? "lib" : "unknown");
       const templateRef = /^scaf_src_path:\s*(\S+)/m.exec(txt)?.[1]?.trim();
       out.push({ path: dir, language: lang, template: tmpl, name, templateRef });
     }

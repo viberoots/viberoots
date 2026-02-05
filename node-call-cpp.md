@@ -62,20 +62,20 @@ Adopt the Node-API C++ addon approach. It aligns best with our philosophy of det
 - Location: `build-tools/tools/scaffolding/templates/node/cpp-addon/`
 - Purpose: scaffold a Node TS library that calls into a C++ Node-API addon.
 - Default destination structure (two packages created together):
-  - `libs/{{ name }}/` — Node TS library
-  - `libs/{{ name }}-native/` — C++ addon (Node-API)
+  - `projects/libs/{{ name }}/` — Node TS library
+  - `projects/libs/{{ name }}-native/` — C++ addon (Node-API)
 
 Rationale: separating Node and C++ into sibling packages preserves clear boundaries (SoC) while keeping local patch invalidation precise and isolated.
 
 ### Variables (copier.yaml)
 
-- `name` (required): scaffold name (used for both `libs/{{name}}` and `libs/{{name}}-native`).
+- `name` (required): scaffold name (used for both `projects/libs/{{name}}` and `projects/libs/{{name}}-native`).
 - `addon_name` (optional, default = `{{ name }}_addon`): shared library base name (`{{ addon_name }}.node`).
 - `includeNodeTests` (boolean, default true): generate a single Node test file (one test per file to match project convention).
 
 ### Generated files (high level)
 
-1. Node package: `libs/{{ name }}/`
+1. Node package: `projects/libs/{{ name }}/`
 
 - `package.json` (TS lib configuration; includes `node-addon-api` as a dependency if we choose the C++ header‑only wrapper; otherwise pure N-API C is OK).
 - `tsconfig.json`
@@ -85,7 +85,7 @@ Rationale: separating Node and C++ into sibling packages preserves clear boundar
   - `nix_node_lib(name = "{{ name }}", ...)`
   - An additional `nix_node_gen` helper rule to copy the compiled addon into a predictable relative path for runtime consumption (see “Artifact flow” below).
 
-2. C++ addon: `libs/{{ name }}-native/`
+2. C++ addon: `projects/libs/{{ name }}-native/`
 
 - `src/binding.cc` (minimal N-API binding that exposes a function, such as `sum(a, b)`).
 - `include/{{ name }}.h` and `src/{{ name }}.cc` (simple implementation used by binding).
@@ -98,7 +98,7 @@ Rationale: separating Node and C++ into sibling packages preserves clear boundar
 ### Artifact flow and Buck wiring
 
 - C++ addon target outputs `{{ addon_name }}.node`.
-- Node `TARGETS` includes a small `nix_node_gen` rule (e.g., `:copy_addon`) that uses `$(location //libs/{{ name }}-native:napi_addon)` in its `cmd` to copy the `.node` artifact into `$OUT` (for example, to `native/{{ addon_name }}.node`).
+- Node `TARGETS` includes a small `nix_node_gen` rule (e.g., `:copy_addon`) that uses `$(location //projects/libs/{{ name }}-native:napi_addon)` in its `cmd` to copy the `.node` artifact into `$OUT` (for example, to `native/{{ addon_name }}.node`).
 - The Node library target (`nix_node_lib`) depends on `:copy_addon` so the addon is an input and placed in a deterministic relative location. The TypeScript wrapper loads the addon from that location using `createRequire(import.meta.url)` to resolve a relative file path.
 - Labels:
   - Node target carries its importer‑scoped lockfile label (`lockfile:<path>#<importer>`) as usual; auto‑map stays unchanged.
@@ -163,8 +163,8 @@ This keeps C++ a planner language and avoids introducing Node‑specific logic i
     - `node build-tools/tools/buck/export-graph.ts`
     - `node build-tools/tools/buck/sync-providers.ts --lang node` (if lockfiles exist)
     - `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`
-  - Build: `buck2 build //libs/{{ name }}:{{ name }}`
-  - Test: `buck2 test //libs/{{ name }}:{{ name }}_test`
+  - Build: `buck2 build //projects/libs/{{ name }}:{{ name }}`
+  - Test: `buck2 test //projects/libs/{{ name }}:{{ name }}_test`
 
 No new glue stages are required; prebuild guard continues to check for graph and auto_map freshness.
 
@@ -180,10 +180,10 @@ Phase 0 — Nix + macro substrate
 Phase 1 — Scaffolding template
 
 - Add `build-tools/tools/scaffolding/templates/node/cpp-addon/` with the content outlined above.
-- Ensure the Node `TARGETS` uses a `nix_node_gen` helper (e.g., `:copy_addon`) that copies `$(location //libs/{{ name }}-native:napi_addon)` into a `native/{{ addon_name }}.node` path the wrapper loads.
+- Ensure the Node `TARGETS` uses a `nix_node_gen` helper (e.g., `:copy_addon`) that copies `$(location //projects/libs/{{ name }}-native:napi_addon)` into a `native/{{ addon_name }}.node` path the wrapper loads.
 - Acceptance:
-  - `scaf new node cpp-addon demo` creates both `libs/demo` and `libs/demo-native`.
-  - `buck2 build //libs/demo:demo` and `buck2 test //libs/demo:demo_test` pass locally across supported platforms.
+  - `scaf new node cpp-addon demo` creates both `projects/libs/demo` and `projects/libs/demo-native`.
+  - `buck2 build //projects/libs/demo:demo` and `buck2 test //projects/libs/demo:demo_test` pass locally across supported platforms.
 
 Phase 2 — Docs and examples
 
@@ -203,7 +203,7 @@ Phase 3 — Hardening
 
 - Node version drift: use Node-API (N-API) level targeting to decouple from Node minor/patch versions; confirm dev shell pinning matches our Node baseline from the repo flake.
 - Discovery/path churn: rely on Buck `$(location ...)` in the copy rule to avoid brittle buck‑out paths; keep the runtime load relative to the package’s compiled output.
-- Over‑coupling of Node and C++: separation into `libs/{{ name }}` and `libs/{{ name }}-native` preserves SoC and small ownership surface.
+- Over‑coupling of Node and C++: separation into `projects/libs/{{ name }}` and `projects/libs/{{ name }}-native` preserves SoC and small ownership surface.
 
 ## Future extensions
 

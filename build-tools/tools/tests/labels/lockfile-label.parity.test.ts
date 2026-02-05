@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
 import { isSupportedImporterLabel } from "../../lib/importers";
 import { parseLockfileLabel } from "../../lib/labels";
+import { runInTemp } from "../lib/test-helpers";
 
 type ProbeOut = { lockfile: string; importer: string };
 
@@ -29,24 +29,24 @@ test("lockfile label parsing parity (TS ↔ Starlark): strict '#', ./ normalizat
 
     const cases = [
       { label: "lockfile:pnpm-lock.yaml#." },
-      { label: "lockfile:apps/web/pnpm-lock.yaml#apps/web" },
-      { label: "lockfile:./apps/web/pnpm-lock.yaml#apps/web" }, // normalization
-      { label: "lockfile:././apps/web/pnpm-lock.yaml#apps/web" }, // repeated normalization
+      { label: "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web" },
+      { label: "lockfile:./projects/apps/web/pnpm-lock.yaml#projects/apps/web" }, // normalization
+      { label: "lockfile:././projects/apps/web/pnpm-lock.yaml#projects/apps/web" }, // repeated normalization
       { label: "lockfile:services/api/pnpm-lock.yaml#services/api" }, // syntactically valid in TS; rejected by Starlark (unsupported importer)
-      { label: "lockfile:apps/web/pnpm-lock.yaml#." }, // invalid: '#.' only allowed for repo-root lockfiles
+      { label: "lockfile:projects/apps/web/pnpm-lock.yaml#." }, // invalid: '#.' only allowed for repo-root lockfiles
       { label: "lockfile:uv.lock#." },
-      { label: "lockfile:apps/api/uv.lock#apps/api" },
+      { label: "lockfile:projects/apps/api/uv.lock#projects/apps/api" },
       // Invalid shapes
-      { label: "lockfile:apps/web/pnpm-lock.yaml" }, // missing '#<importer>'
-      { label: "lockfile:apps/web/pnpm-lock.yaml#" }, // empty importer
+      { label: "lockfile:projects/apps/web/pnpm-lock.yaml" }, // missing '#<importer>'
+      { label: "lockfile:projects/apps/web/pnpm-lock.yaml#" }, // empty importer
       { label: "lockfile:#apps/web" }, // empty path
-      { label: "lockfile:apps/web/pnpm-lock.yaml#apps/web#extra" }, // extra '#'
-      { label: "lockfile:apps/web/pnpm-lock.yaml#apps/api" }, // importer mismatch
+      { label: "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web#extra" }, // extra '#'
+      { label: "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/api" }, // importer mismatch
     ] as const;
 
     // Ensure directories exist for realism (Buck doesn't require contents, but this mirrors real layout).
-    await fsp.mkdir(path.join(tmp, "apps", "web"), { recursive: true });
-    await fsp.mkdir(path.join(tmp, "apps", "api"), { recursive: true });
+    await fsp.mkdir(path.join(tmp, "projects", "apps", "web"), { recursive: true });
+    await fsp.mkdir(path.join(tmp, "projects", "apps", "api"), { recursive: true });
     await fsp.mkdir(path.join(tmp, "services", "api"), { recursive: true });
 
     const body = cases
@@ -85,7 +85,7 @@ test("lockfile label parsing parity (TS ↔ Starlark): strict '#', ./ normalizat
           `expected unsupported-importer error text; got:\n${combined}`,
         );
         assert.ok(
-          combined.includes("apps/*") && combined.includes("libs/*"),
+          combined.includes("projects/apps/*") && combined.includes("projects/libs/*"),
           `expected supported importer roots to be mentioned; got:\n${combined}`,
         );
         continue;

@@ -38,14 +38,14 @@ test("importer_wiring exposes srcs-less rule shape wiring via synthetic dep help
       path.join(providersDir, "auto_map.bzl"),
       [
         "MODULE_PROVIDERS = {",
-        '  "//apps/demo:bin": ["//third_party/providers:prov_a"],',
+        '  "//projects/apps/demo:bin": ["//third_party/providers:prov_a"],',
         "}",
         "",
       ].join("\n"),
       "utf8",
     );
 
-    const appDir = path.join(tmp, "apps", "demo");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     const patchDir = path.join(appDir, "patches", "python");
     await fsp.mkdir(path.join(appDir, "src"), { recursive: true });
     await fsp.mkdir(patchDir, { recursive: true });
@@ -71,7 +71,7 @@ test("importer_wiring exposes srcs-less rule shape wiring via synthetic dep help
         "  deps = [],",
         '  lang = "python",',
         '  kind = "bin",',
-        '  lockfile_label = "lockfile:apps/demo/uv.lock#apps/demo",',
+        '  lockfile_label = "lockfile:projects/apps/demo/uv.lock#projects/apps/demo",',
         ")",
         "python_library(**w.patch_dep.kwargs)",
         "labels_file(",
@@ -89,8 +89,8 @@ test("importer_wiring exposes srcs-less rule shape wiring via synthetic dep help
       "utf8",
     );
 
-    const depsOut = await buildOutPath(tmp, $, "//apps/demo:deps_probe");
-    const resourcesOut = await buildOutPath(tmp, $, "//apps/demo:resources_probe");
+    const depsOut = await buildOutPath(tmp, $, "//projects/apps/demo:deps_probe");
+    const resourcesOut = await buildOutPath(tmp, $, "//projects/apps/demo:resources_probe");
     if (!depsOut || !resourcesOut) return;
 
     const depsLines = readLines(await fsp.readFile(depsOut, "utf8"));

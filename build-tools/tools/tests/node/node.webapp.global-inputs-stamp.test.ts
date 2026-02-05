@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("node_webapp stamps global Nix inputs via labels", async () => {
   await runInTemp("node-webapp-stamp", async (tmp, $) => {
-    const dir = path.join(tmp, "apps", "web");
+    const dir = path.join(tmp, "projects", "apps", "web");
     await fsp.mkdir(dir, { recursive: true });
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
@@ -16,7 +16,7 @@ test("node_webapp stamps global Nix inputs via labels", async () => {
         "",
         "node_webapp(",
         '  name = "bundle",',
-        '  labels = ["lockfile:apps/web/pnpm-lock.yaml#apps/web"],',
+        '  labels = ["lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"],',
         ")",
         "",
       ].join("\n"),
@@ -28,7 +28,7 @@ test("node_webapp stamps global Nix inputs via labels", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //apps/web:bundle`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //projects/apps/web:bundle`;
     if (probe.exitCode !== 0) {
       // Environment not fully available in temp — skip to avoid false negatives
       return;
@@ -48,7 +48,7 @@ test("node_webapp stamps global Nix inputs via labels", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //apps/web:bundle`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //projects/apps/web:bundle`;
     if (srcsProbe.exitCode !== 0) return;
     const srcsOut = String(srcsProbe.stdout || "");
     assert.ok(

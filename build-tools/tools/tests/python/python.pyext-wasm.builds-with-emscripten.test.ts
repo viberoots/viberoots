@@ -33,7 +33,7 @@ async function nixBuildSelected(tmp: string, $: any, target: string): Promise<st
 
 test("python: pyext_wasm builds with emscripten and emits an extension under site/", async () => {
   await runInTemp("python-pyext-wasm-builds", async (tmp, $) => {
-    const appRel = path.join("apps", "pyext_wasm_build");
+    const appRel = path.join("projects", "apps", "pyext_wasm_build");
     const appDir = path.join(tmp, appRel);
     await fs.mkdirp(path.join(appDir, "native"));
     await fs.mkdirp(path.join(appDir, "src", "demo"));

@@ -8,7 +8,7 @@ They also use the shared importer-scoped wiring helpers so lockfile enforcement,
 
 Buck package boundary note:
 
-Node macros include importer-local patches via `native.glob(...)`. Because Buck cannot glob outside the current package, **any Node target that includes importer-local patches must be defined in the importer package** (for example `apps/web/TARGETS`, not a subpackage like `apps/web/ui/TARGETS`). Subpackage call sites fail fast with deterministic guidance.
+Node macros include importer-local patches via `native.glob(...)`. Because Buck cannot glob outside the current package, **any Node target that includes importer-local patches must be defined in the importer package** (for example `projects/apps/web/TARGETS`, not a subpackage like `projects/apps/web/ui/TARGETS`). Subpackage call sites fail fast with deterministic guidance.
 
 ### Macros
 

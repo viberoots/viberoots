@@ -7,14 +7,14 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("nix_node_test (Nix-calling) wires global inputs + importer patches as action inputs and stamps build-tools/lang/kind/patch_scope (cquery)", async () => {
   await runInTemp("node-nix-test-nix-calling-wiring-cquery", async (tmp, $) => {
-    const appDir = path.join(tmp, "apps", "web");
+    const appDir = path.join(tmp, "projects", "apps", "web");
     const patchDir = path.join(appDir, "patches", "node");
     await fsp.mkdir(path.join(appDir, "tests"), { recursive: true });
     await fsp.mkdir(patchDir, { recursive: true });
     await fsp.writeFile(path.join(appDir, "pnpm-lock.yaml"), "lockfileVersion: 9\n", "utf8");
     await fsp.writeFile(path.join(appDir, "tests", "a.test.ts"), "import 'node:test'\n", "utf8");
 
-    const patchRel = "apps/web/patches/node/leftpad@1.3.0.patch";
+    const patchRel = "projects/apps/web/patches/node/leftpad@1.3.0.patch";
     await fsp.writeFile(path.join(tmp, patchRel), "# noop\n", "utf8");
 
     await fsp.writeFile(
@@ -24,7 +24,7 @@ test("nix_node_test (Nix-calling) wires global inputs + importer patches as acti
         "",
         "nix_node_test(",
         '  name = "t",',
-        '  labels = ["lockfile:apps/web/pnpm-lock.yaml#apps/web"],',
+        '  labels = ["lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"],',
         '  patterns = ["tests/**/*.test.ts"],',
         ")",
         "",
@@ -37,7 +37,7 @@ test("nix_node_test (Nix-calling) wires global inputs + importer patches as acti
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //apps/web:t`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //projects/apps/web:t`;
     if (srcsProbe.exitCode !== 0) return;
     const srcsOut = String(srcsProbe.stdout || "");
     const altPatch = "patches/node/leftpad@1.3.0.patch";
@@ -55,7 +55,7 @@ test("nix_node_test (Nix-calling) wires global inputs + importer patches as acti
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //apps/web:t`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //projects/apps/web:t`;
     if (labelsProbe.exitCode !== 0) return;
     const labelsOut = String(labelsProbe.stdout || "");
     assert.ok(

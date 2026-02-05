@@ -10,7 +10,7 @@ test("scaf new go cli <name> renders README", async () => {
     const pipe$ = _$({ stdio: "pipe" });
 
     const name = "demo-cli";
-    const dest = path.join(tmp, "apps", name);
+    const dest = path.join(tmp, "projects", "apps", name);
     try {
       await pipe$`scaf new go cli ${name} --yes`;
     } catch (e: any) {

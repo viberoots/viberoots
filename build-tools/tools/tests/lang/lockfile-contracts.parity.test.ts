@@ -38,7 +38,7 @@ function parseProbe(txt: string): string[] {
 
 test("lockfile basenames are consistent (Starlark ↔ TS)", async () => {
   await runInTemp("lockfile-contracts-parity", async (tmp, $) => {
-    const appDir = path.join(tmp, "apps", "demo");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(appDir, { recursive: true });
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
@@ -53,7 +53,7 @@ test("lockfile basenames are consistent (Starlark ↔ TS)", async () => {
     );
 
     for (const lang of ["node", "python"] as const) {
-      const target = `//apps/demo:${lang}`;
+      const target = `//projects/apps/demo:${lang}`;
       const outPath = await buildOutPath(tmp, $, target);
       const probe = parseProbe(await fsp.readFile(outPath, "utf8"));
       const ts = lockfileBasenamesForLang(lang);

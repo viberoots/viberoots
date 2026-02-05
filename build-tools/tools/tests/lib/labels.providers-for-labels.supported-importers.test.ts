@@ -10,8 +10,8 @@ function fqImporterProvider(lockfile: string, importer: string): string {
 
 test("providersForLabels ignores lockfile labels with unsupported importer roots", () => {
   const labels = [
-    "lockfile:apps/demo/pnpm-lock.yaml#apps/demo",
-    "lockfile:libs/demo/pnpm-lock.yaml#libs/demo",
+    "lockfile:projects/apps/demo/pnpm-lock.yaml#projects/apps/demo",
+    "lockfile:projects/libs/demo/pnpm-lock.yaml#projects/libs/demo",
     "lockfile:pnpm-lock.yaml#.",
     "lockfile:third_party/pnpm-lock.yaml#third_party",
     "lockfile:services/api/pnpm-lock.yaml#services/api",
@@ -19,8 +19,12 @@ test("providersForLabels ignores lockfile labels with unsupported importer roots
 
   const got = providersForLabels(labels);
 
-  assert.ok(got.includes(fqImporterProvider("apps/demo/pnpm-lock.yaml", "apps/demo")));
-  assert.ok(got.includes(fqImporterProvider("libs/demo/pnpm-lock.yaml", "libs/demo")));
+  assert.ok(
+    got.includes(fqImporterProvider("projects/apps/demo/pnpm-lock.yaml", "projects/apps/demo")),
+  );
+  assert.ok(
+    got.includes(fqImporterProvider("projects/libs/demo/pnpm-lock.yaml", "projects/libs/demo")),
+  );
   assert.ok(got.includes(fqImporterProvider("pnpm-lock.yaml", ".")));
 
   assert.ok(!got.includes(fqImporterProvider("third_party/pnpm-lock.yaml", "third_party")));

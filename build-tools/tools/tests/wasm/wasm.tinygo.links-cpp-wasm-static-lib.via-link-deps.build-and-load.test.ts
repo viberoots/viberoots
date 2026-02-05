@@ -39,7 +39,7 @@ async function instantiateWasmFromFile(filePath: string): Promise<WebAssembly.In
 
 test("wasm: tinygo links a cpp wasm static lib via link_deps (build + load)", async () => {
   await runInTemp("wasm-tinygo-links-cpp-via-link-deps", async (tmp, $) => {
-    const coreDir = path.join(tmp, "libs", "math-core");
+    const coreDir = path.join(tmp, "projects", "libs", "math-core");
     await fs.outputFile(
       path.join(coreDir, "include", "addon.h"),
       `#ifndef MATH_CORE_ADDON_H
@@ -75,7 +75,7 @@ nix_cpp_wasm_static_lib(
 `,
     );
 
-    const apiDir = path.join(tmp, "libs", "math-api");
+    const apiDir = path.join(tmp, "projects", "libs", "math-api");
     await fs.outputFile(
       path.join(apiDir, "go.mod"),
       `module example.com/math/api
@@ -107,7 +107,7 @@ func main() {}
 nix_go_tiny_wasm_lib(
     name = "wasm",
     srcs = ["main.go"],
-    link_deps = ["//libs/math-core:core_wasm"],
+    link_deps = ["//projects/libs/math-core:core_wasm"],
     visibility = ["PUBLIC"],
 )
 `,
@@ -120,11 +120,15 @@ nix_go_tiny_wasm_lib(
     await $({
       stdio: "inherit",
       env: { ...process.env, WEB_WASM_BACKEND: "wasi_single" },
-    })`buck2 build --target-platforms prelude//platforms:default //libs/math-api:wasm`;
+    })`buck2 build --target-platforms prelude//platforms:default //projects/libs/math-api:wasm`;
 
     const sel = await $({
       stdio: "pipe",
-      env: { ...process.env, BUCK_TARGET: "//libs/math-api:wasm", WEB_WASM_BACKEND: "wasi_single" },
+      env: {
+        ...process.env,
+        BUCK_TARGET: "//projects/libs/math-api:wasm",
+        WEB_WASM_BACKEND: "wasi_single",
+      },
     })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/dev/build-selected.ts`;
     const outPath =
       String(sel.stdout || "")

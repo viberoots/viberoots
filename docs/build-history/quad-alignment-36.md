@@ -56,7 +56,7 @@ Then it migrates Node `nix_node_test` to use the single composed helper, so the 
 Non-goals in this PR:
 
 - No change to lockfile label format.
-- No change to importer support (`.`, `apps/*`, `libs/*`).
+- No change to importer support (`.`, `projects/apps/*`, `projects/libs/*`).
 - No change to patch inclusion policies (Node importer-local is still invalidated by macro-attached patch inputs).
 
 ### Tests (in this PR)

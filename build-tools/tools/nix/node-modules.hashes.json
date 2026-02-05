@@ -1,7 +1,7 @@
 {
   "pnpm-lock.yaml": "sha256-OzBIr7U8VbaW7SBG75q8ae9mACR2QoH1yQ4KycHrTR8=",
-  "apps/demo-node/pnpm-lock.yaml": "sha256-B5DYPmvtkBrpkaZz7sMyvLViSbI1rWdQXqvVjNhmvG4=",
-  "apps/demo-web-dev/pnpm-lock.yaml": "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-  "apps/example/pnpm-lock.yaml": "sha256-fRC+K9fncUsjK5qiwi+wkK/yhR/y1VXxR54tU5sB5Ww=",
-  "libs/demo/pnpm-lock.yaml": "sha256-ObVjNvHYmlr9Lg5Ldpeh1aT8mV6UFhESac/5ynCfvvk="
+  "projects/apps/demo-node/pnpm-lock.yaml": "sha256-B5DYPmvtkBrpkaZz7sMyvLViSbI1rWdQXqvVjNhmvG4=",
+  "projects/apps/demo-web-dev/pnpm-lock.yaml": "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+  "projects/apps/example/pnpm-lock.yaml": "sha256-fRC+K9fncUsjK5qiwi+wkK/yhR/y1VXxR54tU5sB5Ww=",
+  "projects/libs/demo/pnpm-lock.yaml": "sha256-ObVjNvHYmlr9Lg5Ldpeh1aT8mV6UFhESac/5ynCfvvk="
 }

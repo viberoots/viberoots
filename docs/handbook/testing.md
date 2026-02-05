@@ -97,7 +97,7 @@ Do not copy/paste shell fragments between languages. If you need to change the b
 
 ## Nix-first runtime validation (Go)
 
-- Build Go apps/libs via `nix build .#graph-generator` (strict glue required; no planner fallback).
+- Build Go projects/apps/libs via `nix build .#graph-generator` (strict glue required; no planner fallback).
 - Locate binaries via `buck-go/manifest.json` (preferred) or `$out/bin` symlinks.
 - Tests should prefer manifest-based discovery instead of Buck-only `go_library` resolution for third-party deps.
 

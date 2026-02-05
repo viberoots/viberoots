@@ -10,9 +10,9 @@ test("node adapter warns on malformed lockfile label (warn mode)", async () => {
     await fs.mkdirp(path.dirname(out));
     const nodes = [
       {
-        name: "//apps/web:bundle",
+        name: "//projects/apps/web:bundle",
         rule_type: "js_binary",
-        labels: ["lang:node", "kind:bundle", "lockfile:apps/web/pnpm-lock.yaml"], // missing #importer
+        labels: ["lang:node", "kind:bundle", "lockfile:projects/apps/web/pnpm-lock.yaml"], // missing #importer
       },
     ];
     const sim = path.join(tmp, "build-tools/tools/buck/simulated.json");

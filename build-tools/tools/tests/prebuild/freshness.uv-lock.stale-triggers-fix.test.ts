@@ -31,7 +31,7 @@ test("prebuild-guard: touching uv.lock marks stale and auto-fixes locally", asyn
       "utf8",
     );
     // Create a uv.lock for a Python importer
-    const importerDir = path.join(tmp, "apps", "pytool");
+    const importerDir = path.join(tmp, "projects", "apps", "pytool");
     await fsp.mkdir(importerDir, { recursive: true });
     const uvLockPath = path.join(importerDir, "uv.lock");
     const uvLock = ["# uv lock", "[[package]]", 'name = "requests"', 'version = "2.32.3"', ""].join(

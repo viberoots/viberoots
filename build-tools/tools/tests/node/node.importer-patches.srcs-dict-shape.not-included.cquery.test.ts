@@ -7,11 +7,11 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("node macros inject importer-local patches into dict-shaped srcs via synthetic keys (cquery)", async () => {
   await runInTemp("node-importer-patches-srcs-dict-shape", async (tmp, $) => {
-    const appDir = path.join(tmp, "apps", "web");
+    const appDir = path.join(tmp, "projects", "apps", "web");
     const patchDir = path.join(appDir, "patches", "node");
     await fsp.mkdir(patchDir, { recursive: true });
     await fsp.writeFile(path.join(appDir, "pnpm-lock.yaml"), "lockfileVersion: 9\n", "utf8");
-    const patchRel = "apps/web/patches/node/leftpad@1.3.0.patch";
+    const patchRel = "projects/apps/web/patches/node/leftpad@1.3.0.patch";
     await fsp.writeFile(path.join(tmp, patchRel), "# noop\n", "utf8");
 
     await fsp.appendFile(
@@ -28,7 +28,7 @@ test("node macros inject importer-local patches into dict-shaped srcs via synthe
         "  srcs = {",
         '    "bin/entry.js": "bin/entry.js",',
         "  },",
-        '  lockfile_label = "lockfile:apps/web/pnpm-lock.yaml#apps/web",',
+        '  lockfile_label = "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",',
         ")",
         "",
       ].join("\n"),

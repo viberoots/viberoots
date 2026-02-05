@@ -8,7 +8,7 @@ import { runInTemp } from "../lib/test-helpers";
 await runInTemp("exp-cpp-preserve", async (tmp, $) => {
   const nodes = [
     {
-      name: "//apps/demo:demo",
+      name: "//projects/apps/demo:demo",
       rule_type: "cxx_binary",
       labels: ["custom:x", "lang:cpp", "kind:bin"],
     },

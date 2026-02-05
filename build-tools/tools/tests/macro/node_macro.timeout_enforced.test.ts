@@ -25,7 +25,7 @@ test("nix_node_test: external timeout is enforced", { timeout: 420_000 }, async 
       env,
     })`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
 
-    const importer = "libs/demo";
+    const importer = "projects/libs/demo";
     const lockfile = path.join(importer, "pnpm-lock.yaml");
 
     // Create a deliberately slow test (~5 seconds)
@@ -46,7 +46,7 @@ test("nix_node_test: external timeout is enforced", { timeout: 420_000 }, async 
       "",
       "nix_node_test(",
       '    name = "timeout_short",',
-      '    lockfile_label = "lockfile:libs/demo/pnpm-lock.yaml#libs/demo",',
+      '    lockfile_label = "lockfile:projects/libs/demo/pnpm-lock.yaml#projects/libs/demo",',
       "    patterns = [",
       '        "test/slow.test.ts",',
       "    ],",
@@ -65,7 +65,7 @@ test("nix_node_test: external timeout is enforced", { timeout: 420_000 }, async 
       cwd: tmp,
       stdio: "pipe",
       env,
-    })`buck2 test //libs/demo:timeout_short`.nothrow();
+    })`buck2 test //projects/libs/demo:timeout_short`.nothrow();
     if (res.exitCode === 0) {
       throw new Error("expected buck2 test to fail due to external timeout");
     }

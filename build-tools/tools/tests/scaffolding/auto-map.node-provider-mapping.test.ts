@@ -13,16 +13,24 @@ test("gen-auto-map correctly maps lockfile labels to Node providers", async () =
     const graphPath = path.join(tmp, "build-tools/tools/buck/graph.json");
     const graphContent = JSON.stringify([
       {
-        name: "//apps/web:bundle",
+        name: "//projects/apps/web:bundle",
         rule_type: "genrule",
-        labels: ["lockfile:apps/web/pnpm-lock.yaml#apps/web", "lang:node", "kind:bundle"],
+        labels: [
+          "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",
+          "lang:node",
+          "kind:bundle",
+        ],
         srcs: ["src/index.ts"],
         deps: [],
       },
       {
-        name: "//apps/api:server",
+        name: "//projects/apps/api:server",
         rule_type: "genrule",
-        labels: ["lockfile:apps/api/pnpm-lock.yaml#apps/api", "lang:node", "kind:bin"],
+        labels: [
+          "lockfile:projects/apps/api/pnpm-lock.yaml#projects/apps/api",
+          "lang:node",
+          "kind:bin",
+        ],
         srcs: ["src/main.ts"],
         deps: [],
       },
@@ -32,23 +40,23 @@ test("gen-auto-map correctly maps lockfile labels to Node providers", async () =
     await fsp.writeFile(graphPath, graphContent, "utf8");
 
     // Create matching lockfiles
-    const webLockfile = path.join(tmp, "apps/web/pnpm-lock.yaml");
-    const apiLockfile = path.join(tmp, "apps/api/pnpm-lock.yaml");
+    const webLockfile = path.join(tmp, "projects/apps/web/pnpm-lock.yaml");
+    const apiLockfile = path.join(tmp, "projects/apps/api/pnpm-lock.yaml");
 
     await fsp.mkdir(path.dirname(webLockfile), { recursive: true });
     await fsp.mkdir(path.dirname(apiLockfile), { recursive: true });
 
     await fsp.writeFile(
       webLockfile,
-      `lockfileVersion: "9.0"\nimporters:\n  apps/web:\n    dependencies: {}\npackages: {}`,
+      `lockfileVersion: "9.0"\nimporters:\n  projects/apps/web:\n    dependencies: {}\npackages: {}`,
       "utf8",
     );
     await fsp.writeFile(
       apiLockfile,
-      `lockfileVersion: "9.0"\nimporters:\n  apps/api:\n    dependencies: {}\npackages: {}`,
+      `lockfileVersion: "9.0"\nimporters:\n  projects/apps/api:\n    dependencies: {}\npackages: {}`,
       "utf8",
     );
-    await $`git add apps/web/pnpm-lock.yaml apps/api/pnpm-lock.yaml`;
+    await $`git add projects/apps/web/pnpm-lock.yaml projects/apps/api/pnpm-lock.yaml`;
 
     // Generate providers
     await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
@@ -66,13 +74,13 @@ test("gen-auto-map correctly maps lockfile labels to Node providers", async () =
     }
 
     // Verify both targets are mapped
-    if (!autoMapContent.includes("//apps/web:bundle")) {
-      console.error("Missing //apps/web:bundle in auto_map");
+    if (!autoMapContent.includes("//projects/apps/web:bundle")) {
+      console.error("Missing //projects/apps/web:bundle in auto_map");
       process.exit(2);
     }
 
-    if (!autoMapContent.includes("//apps/api:server")) {
-      console.error("Missing //apps/api:server in auto_map");
+    if (!autoMapContent.includes("//projects/apps/api:server")) {
+      console.error("Missing //projects/apps/api:server in auto_map");
       process.exit(2);
     }
 

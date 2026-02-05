@@ -39,7 +39,7 @@ Use the canonical helper surface from `//build-tools/lang:defs_common.bzl` and `
 
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
 - Provider wiring: load `MODULE_PROVIDERS` from `//build-tools/lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
-- Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
+- Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `projects/apps/*`/`projects/libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
 - Patch model contract: `build-tools/lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
 
@@ -82,8 +82,8 @@ We reuse the lockfile‑scoped invalidation pattern (like Node) to keep mapping 
   - `lockfile:<relative/path/to/jvm.lock>#<importer>`
 
   Examples:
-  - `lockfile:apps/service-a/jvm.lock#apps/service-a`
-  - `lockfile:libs/common/jvm.lock#libs/common`
+  - `lockfile:projects/apps/service-a/jvm.lock#projects/apps/service-a`
+  - `lockfile:projects/libs/common/jvm.lock#projects/libs/common`
 
 - Optional per‑artifact labeling (Phase 2+):
   - `mvn:<group>/<artifact>@<version>` for refined per‑artifact provider mapping (mirrors Go’s `module:<path>@<version>`). This is introduced after exporter work stabilizes.
@@ -367,7 +367,7 @@ This is a later‑phase enhancement and does not block the baseline JVM integrat
 
 ## Dependency Resolution and Lockfiles
 
-Hermetic classpaths come from a per‑importer lockfile (`jvm.lock`) checked into each `apps/*` or `libs/*` project.
+Hermetic classpaths come from a per‑importer lockfile (`jvm.lock`) checked into each `projects/apps/*` or `projects/libs/*` project.
 
 - Lockfile generator (zx): `build-tools/tools/dev/jvm/generate-lock.ts`
   - Inputs: `build.gradle(.kts)` or `pom.xml`, or an explicit `deps.txt` of Maven coordinates.
@@ -557,21 +557,21 @@ load("//jvm:defs.bzl", "nix_jvm_library", "nix_jvm_binary", "nix_jvm_test")
 nix_jvm_library(
     name = "core",
     srcs = glob(["src/main/**/*.kt", "src/main/**/*.java"]),
-    labels = ["lockfile:apps/service-a/jvm.lock#apps/service-a"],
+    labels = ["lockfile:projects/apps/service-a/jvm.lock#projects/apps/service-a"],
 )
 
 nix_jvm_binary(
     name = "service",
     srcs = ["src/main/kotlin/Main.kt"],
     deps = [":core"],
-    labels = ["lockfile:apps/service-a/jvm.lock#apps/service-a"],
+    labels = ["lockfile:projects/apps/service-a/jvm.lock#projects/apps/service-a"],
 )
 
 nix_jvm_test(
     name = "core_test",
     srcs = glob(["src/test/**/*.kt", "src/test/**/*.java"]),
     deps = [":core"],
-    labels = ["lockfile:apps/service-a/jvm.lock#apps/service-a", "kind:test"],
+    labels = ["lockfile:projects/apps/service-a/jvm.lock#projects/apps/service-a", "kind:test"],
 )
 ```
 

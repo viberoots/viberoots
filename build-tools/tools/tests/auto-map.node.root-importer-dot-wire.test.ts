@@ -30,7 +30,7 @@ test("auto-map includes importer-scoped provider for a repo-root pnpm-lock.yaml 
       path.join(tmp, graph),
       [
         {
-          name: "//apps/example:smoke_test",
+          name: "//projects/apps/example:smoke_test",
           rule_type: "genrule",
           labels: ["lockfile:pnpm-lock.yaml#.", "lang:node", "kind:test"],
           srcs: [],

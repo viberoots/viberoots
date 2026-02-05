@@ -88,7 +88,7 @@ Add a Copier template `build-tools/tools/scaffolding/templates/node/cpp-addon/` 
   - Node package: `package.json.jinja`, `tsconfig.json.jinja`, `src/index.ts.jinja`, `test/index.test.ts.jinja`, `TARGETS.jinja`, `README.md.jinja`.
   - C++ addon: `include/<name>.h.jinja`, `src/<name>.cc.jinja`, `src/binding.cc.jinja`, `tests/<name>_gtest.cpp.jinja`, `patches/cpp/pkgs__placeholder@0.0.0.patch.jinja`, `TARGETS.jinja`.
   - `meta.json`, `copier.yaml` with variables: `name` (required), `addon_name` (default `<name>_addon`), `includeNodeTests` (default true).
-- Node TARGETS includes a helper `nix_node_gen` rule to copy `$(location //libs/<name>-native:napi_addon)` into a deterministic `native/<addon_name>.node` path.
+- Node TARGETS includes a helper `nix_node_gen` rule to copy `$(location //projects/libs/<name>-native:napi_addon)` into a deterministic `native/<addon_name>.node` path.
 - No provider changes; importer‑scoped Node providers remain as‑is.
 
 ### Acceptance Criteria
@@ -131,9 +131,9 @@ Ensure the scaffold’s artifact flow is deterministic and tested end‑to‑end
 
 ### Acceptance Criteria
 
-- `buck2 build //libs/demo:demo` succeeds after scaffolding.
-- `buck2 test //libs/demo:demo_test` passes (single test per file).
-- (Optional) `buck2 test //libs/demo-native:<name>_gtest` passes.
+- `buck2 build //projects/libs/demo:demo` succeeds after scaffolding.
+- `buck2 test //projects/libs/demo:demo_test` passes (single test per file).
+- (Optional) `buck2 test //projects/libs/demo-native:<name>_gtest` passes.
 
 ### Risks
 

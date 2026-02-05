@@ -1,9 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import path from "node:path";
-import type { Node } from "../types.ts";
-import { packageDirFromTargetName } from "../batch.ts";
-import { inspectLockfileLabel } from "../../../lib/labels.ts";
 import { computeImporterLabel, isSupportedImporterLabel } from "../../../lib/importers.ts";
+import { inspectLockfileLabel } from "../../../lib/labels.ts";
+import { packageDirFromTargetName } from "../batch.ts";
+import type { Node } from "../types.ts";
 
 function labelsOf(n: Node): string[] {
   return Array.isArray(n.labels) ? n.labels : [];
@@ -50,7 +49,7 @@ export function validateImporterLockfileLabels(
     findings.push(
       [
         `[exporter][${adapterName}] malformed lockfile label on ${node.name}: '${first}'.`,
-        `Expected: lockfile:<path>#<importer> (example: lockfile:apps/web/pnpm-lock.yaml#apps/web).`,
+        `Expected: lockfile:<path>#<importer> (example: lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web).`,
       ].join("\n"),
     );
     return findings;

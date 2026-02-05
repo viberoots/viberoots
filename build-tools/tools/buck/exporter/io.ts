@@ -1,15 +1,17 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import type { Node } from "./types.ts";
-import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const.ts";
 import { getFlagStr } from "../../lib/cli.ts";
+import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const.ts";
+import { getImporterRootsContract } from "../../lib/importer-roots.ts";
+import type { Node } from "./types.ts";
 
 export async function cqueryNodes(scope: string, attrs: string[]): Promise<Node[]> {
   const flags = attrs.flatMap((a) => ["--output-attribute", a]);
   const platformFlags = ["--target-platforms", "prelude//platforms:default"];
   // Limit scan roots to avoid parsing ephemeral or intentionally invalid packages (e.g., .tmp)
-  const defaultRoots = ["apps", "libs", "third_party", "go", "cpp"];
+  const importerRoots = getImporterRootsContract().workspaceRoots;
+  const defaultRoots = [...importerRoots, "third_party", "go", "cpp"];
   const rootsEnv = (process.env.BUCK_QUERY_ROOTS || "").trim();
   const rootsList = rootsEnv ? rootsEnv.split(/[\,\s]+/).filter(Boolean) : defaultRoots;
   // Filter to existing directories to avoid recursive spec errors in sparse/temp repos

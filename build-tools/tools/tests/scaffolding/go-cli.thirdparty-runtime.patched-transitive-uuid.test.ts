@@ -167,23 +167,23 @@ async function applyPatchPkg(
       PATH: `${path.dirname(process.execPath)}:${localBin}:${process.env.PATH || ""}`,
       ...goEnv,
     },
-  })`build-tools/tools/bin/patch-pkg apply go github.com/google/uuid --target //apps/demo-cli:demo-cli --force`;
+  })`build-tools/tools/bin/patch-pkg apply go github.com/google/uuid --target //projects/apps/demo-cli:demo-cli --force`;
 }
 
 async function scaffoldHelperLib(sh: any, tmp: string, goEnv: NodeJS.ProcessEnv) {
-  await sh`scaf new go lib helper-lib --yes --path=libs/helper-lib`;
+  await sh`scaf new go lib helper-lib --yes --path=projects/libs/helper-lib`;
   await sh({
-    cwd: path.join(tmp, "libs", "helper-lib"),
+    cwd: path.join(tmp, "projects", "libs", "helper-lib"),
     stdio: "inherit",
     env: { ...process.env, ...goEnv },
   })`go get github.com/google/uuid@v1.6.0`;
   await sh({
-    cwd: path.join(tmp, "libs", "helper-lib"),
+    cwd: path.join(tmp, "projects", "libs", "helper-lib"),
     stdio: "inherit",
     env: { ...process.env, ...goEnv },
   })`go mod tidy`;
   await writeFileAbs(
-    path.join(tmp, "libs", "helper-lib", "pkg", "helper-lib", "helper-lib.go"),
+    path.join(tmp, "projects", "libs", "helper-lib", "pkg", "helper-lib", "helper-lib.go"),
     [
       "package helperlib",
       "",
@@ -200,9 +200,9 @@ async function scaffoldHelperLib(sh: any, tmp: string, goEnv: NodeJS.ProcessEnv)
 }
 
 async function scaffoldDemoLib(sh: any, tmp: string) {
-  await sh`scaf new go lib demo-lib --yes --path=libs/demo-lib`;
+  await sh`scaf new go lib demo-lib --yes --path=projects/libs/demo-lib`;
   // Add replace + require for helper-lib
-  const demoGoModPath = path.join(tmp, "libs", "demo-lib", "go.mod");
+  const demoGoModPath = path.join(tmp, "projects", "libs", "demo-lib", "go.mod");
   let demoGoMod = await fsp.readFile(demoGoModPath, "utf8");
   if (!/\nrequire\s/.test(demoGoMod)) {
     demoGoMod = demoGoMod.replace(
@@ -210,18 +210,13 @@ async function scaffoldDemoLib(sh: any, tmp: string) {
       `$1\nrequire github.com/example/helper-lib v0.0.0\n`,
     );
   }
-  if (
-    !/\nreplace\s+github\.com\/example\/helper-lib\s+=>\s+\.\.\/\.\.\/libs\/helper-lib\s*$/.test(
-      demoGoMod,
-    )
-  ) {
-    demoGoMod =
-      demoGoMod.trimEnd() + "\nreplace github.com/example/helper-lib => ../../libs/helper-lib\n";
+  if (!/\nreplace\s+github\.com\/example\/helper-lib\s+=>\s+\.\.\/helper-lib\s*$/.test(demoGoMod)) {
+    demoGoMod = demoGoMod.trimEnd() + "\nreplace github.com/example/helper-lib => ../helper-lib\n";
   }
   await fsp.writeFile(demoGoModPath, demoGoMod, "utf8");
 
   // Ensure TARGETS visibility public and wire deps from demo-lib to helper-lib
-  const demoTargetsPath = path.join(tmp, "libs", "demo-lib", "TARGETS");
+  const demoTargetsPath = path.join(tmp, "projects", "libs", "demo-lib", "TARGETS");
   let demoTargets = await fsp.readFile(demoTargetsPath, "utf8");
   if (!/visibility\s*=\s*\[\s*"PUBLIC"\s*\]/.test(demoTargets)) {
     demoTargets = demoTargets.replace(/nix_go_library\(([^)]*)\)/ms, (m: string, body: string) => {
@@ -234,11 +229,12 @@ async function scaffoldDemoLib(sh: any, tmp: string) {
       const withDeps = withVis.includes("deps = ")
         ? withVis.replace(
             /deps\s*=\s*\[([^\]]*)\]/m,
-            (mm: string, inner: string) => `deps = [${inner}, "//libs/helper-lib:helper-lib"]`,
+            (mm: string, inner: string) =>
+              `deps = [${inner}, "//projects/libs/helper-lib:helper-lib"]`,
           )
         : withVis.replace(
             /labels\s*=\s*\[[^\]]*\],?/m,
-            (lm: string) => `${lm}\n    deps = ["//libs/helper-lib:helper-lib"],`,
+            (lm: string) => `${lm}\n    deps = ["//projects/libs/helper-lib:helper-lib"],`,
           );
       return `nix_go_library(${withDeps})`;
     });
@@ -246,7 +242,7 @@ async function scaffoldDemoLib(sh: any, tmp: string) {
   }
 
   await writeFileAbs(
-    path.join(tmp, "libs", "demo-lib", "pkg", "demo-lib", "demo-lib.go"),
+    path.join(tmp, "projects", "libs", "demo-lib", "pkg", "demo-lib", "demo-lib.go"),
     [
       "package demolib",
       "",
@@ -264,10 +260,10 @@ async function scaffoldDemoLib(sh: any, tmp: string) {
 }
 
 async function scaffoldCli(sh: any, tmp: string) {
-  await sh`scaf new go cli demo-cli --yes --path=apps/demo-cli`;
+  await sh`scaf new go cli demo-cli --yes --path=projects/apps/demo-cli`;
 
   // Wire demo-cli to demo-lib
-  const cliGoModPath = path.join(tmp, "apps", "demo-cli", "go.mod");
+  const cliGoModPath = path.join(tmp, "projects", "apps", "demo-cli", "go.mod");
   let cliGoMod = await fsp.readFile(cliGoModPath, "utf8");
   // Ensure a proper require block that includes both demo-lib and helper-lib
   if (/require\s*\(/.test(cliGoMod)) {
@@ -317,18 +313,18 @@ async function scaffoldCli(sh: any, tmp: string) {
   await fsp.writeFile(cliGoModPath, cliGoMod, "utf8");
 
   // Ensure CLI TARGETS depends on demo-lib
-  const cliTargetsPath = path.join(tmp, "apps", "demo-cli", "TARGETS");
+  const cliTargetsPath = path.join(tmp, "projects", "apps", "demo-cli", "TARGETS");
   let cliTargets = await fsp.readFile(cliTargetsPath, "utf8");
   if (!/deps\s*=\s*\[\s*"\/\/libs\/demo-lib:demo-lib"\s*\]/.test(cliTargets)) {
     cliTargets = cliTargets.replace(/nix_go_binary\(([^)]*)\)/ms, (m: string, body: string) => {
       const withDeps = body.includes("deps = ")
         ? body.replace(
             /deps\s*=\s*\[([^\]]*)\]/m,
-            (mm: string, inner: string) => `deps = [${inner}, "//libs/demo-lib:demo-lib"]`,
+            (mm: string, inner: string) => `deps = [${inner}, "//projects/libs/demo-lib:demo-lib"]`,
           )
         : body.replace(
             /labels\s*=\s*\[[^\]]*\],?/m,
-            (lm: string) => `${lm}\n    deps = ["//libs/demo-lib:demo-lib"],`,
+            (lm: string) => `${lm}\n    deps = ["//projects/libs/demo-lib:demo-lib"],`,
           );
       return `nix_go_binary(${withDeps})`;
     });
@@ -336,7 +332,7 @@ async function scaffoldCli(sh: any, tmp: string) {
   }
 
   await writeFileAbs(
-    path.join(tmp, "apps", "demo-cli", "cmd", "demo-cli", "main.go"),
+    path.join(tmp, "projects", "apps", "demo-cli", "cmd", "demo-cli", "main.go"),
     [
       "package main",
       "",
@@ -413,7 +409,9 @@ async function buildGraphAndFindBin(sh: any, tmp: string, label: string): Promis
     const labelEntry = entries.find((e) => {
       const lab = String(e?.label || "");
       return (
-        lab === label || normalizeCellLabel(lab) === label || lab.includes("apps/demo-cli:demo-cli")
+        lab === label ||
+        normalizeCellLabel(lab) === label ||
+        lab.includes("projects/apps/demo-cli:demo-cli")
       );
     });
     if (!labelEntry) throw new Error(`manifest.json missing expected label: ${label}`);
@@ -421,8 +419,12 @@ async function buildGraphAndFindBin(sh: any, tmp: string, label: string): Promis
       binPath = String(labelEntry.bins[0] || "");
     }
   }
-  if (!binPath) binPath = await findExecutableRecursively(path.join(outPath, "bin"));
-  if (!binPath) throw new Error("CLI executable not found in graph outputs");
+  if (!binPath) {
+    binPath = await findExecutableRecursively(path.join(outPath, "bin"));
+  }
+  if (!binPath) {
+    throw new Error("CLI executable not found in graph outputs");
+  }
   return binPath;
 }
 
@@ -499,7 +501,7 @@ test("go cli with transitive third-party patched uuid runtime", async () => {
     await scaffoldDemoLib($, _tmp);
     await scaffoldCli($, _tmp);
     await $({
-      cwd: path.join(_tmp, "apps", "demo-cli"),
+      cwd: path.join(_tmp, "projects", "apps", "demo-cli"),
       stdio: "inherit",
       env: { ...process.env, ...goEnv },
     })`go mod tidy`;
@@ -528,7 +530,7 @@ test("go cli with transitive third-party patched uuid runtime", async () => {
           PATH: `${path.dirname(process.execPath)}:${localBin}:${process.env.PATH || ""}`,
           ...goEnv,
         },
-      })`build-tools/tools/bin/patch-pkg apply go github.com/google/uuid --target //apps/demo-cli:demo-cli --force`;
+      })`build-tools/tools/bin/patch-pkg apply go github.com/google/uuid --target //projects/apps/demo-cli:demo-cli --force`;
     }
     // Exercise full glue path after applying the patch
     await $`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
@@ -537,6 +539,7 @@ test("go cli with transitive third-party patched uuid runtime", async () => {
     // Validate local patch presence under CLI target
     const patchFile = path.join(
       _tmp,
+      "projects",
       "apps",
       "demo-cli",
       "patches",

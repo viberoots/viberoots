@@ -3,7 +3,7 @@ load("//build-tools/python:defs.bzl", "nix_python_library", "nix_python_test")
 nix_python_library(
     name = "{{ name }}",
     srcs = glob(["src/**/*.py"]),
-    lockfile_label = "lockfile:libs/{{ name }}/uv.lock#libs/{{ name }}",
+    lockfile_label = "lockfile:projects/libs/{{ name }}/uv.lock#projects/libs/{{ name }}",
     visibility = ["PUBLIC"],
 )
 
@@ -11,7 +11,7 @@ nix_python_test(
     name = "{{ name }}_test",
     srcs = glob(["tests/**/*.py"]),
     deps = [":{{ name }}"],
-    lockfile_label = "lockfile:libs/{{ name }}/uv.lock#libs/{{ name }}",
+    lockfile_label = "lockfile:projects/libs/{{ name }}/uv.lock#projects/libs/{{ name }}",
     visibility = ["PUBLIC"],
 )
 

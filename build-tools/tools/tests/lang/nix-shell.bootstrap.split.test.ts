@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("nix_shell bootstrap split: core is language-agnostic; PNPM store is opt-in", async () => {
   await runInTemp("nix-shell-bootstrap-split", async (tmp, $) => {
-    const dir = path.join(tmp, "apps", "probe");
+    const dir = path.join(tmp, "projects", "apps", "probe");
     await fsp.mkdir(dir, { recursive: true });
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
@@ -37,7 +37,7 @@ test("nix_shell bootstrap split: core is language-agnostic; PNPM store is opt-in
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cmd //apps/probe:core`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cmd //projects/apps/probe:core`;
     if (probeCore.exitCode !== 0) return;
 
     const probePnpm = await $({
@@ -45,7 +45,7 @@ test("nix_shell bootstrap split: core is language-agnostic; PNPM store is opt-in
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cmd //apps/probe:pnpm`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cmd //projects/apps/probe:pnpm`;
     if (probePnpm.exitCode !== 0) return;
 
     const outCore = String(probeCore.stdout || "");

@@ -32,8 +32,8 @@ let
       : > $out/manifest.json
       : > $out/build.log
       echo "repoRootStr=${repoRootStr}" >> $out/build.log
-      echo "appsDir=${builtins.toString (builtins.toPath (repoRootStr + "/apps"))}" >> $out/build.log
-      echo "libsDir=${builtins.toString (builtins.toPath (repoRootStr + "/libs"))}" >> $out/build.log
+      echo "appsDir=${builtins.toString (builtins.toPath (repoRootStr + "/projects/apps"))}" >> $out/build.log
+      echo "libsDir=${builtins.toString (builtins.toPath (repoRootStr + "/projects/libs"))}" >> $out/build.log
       echo "devOverrideJSON=${builtins.toJSON devOverrideJSON}" >> $out/build.log
       ${if (!isCI && !suppressDevOverrideLog && ((builtins.length overridePresentList) > 0)) then ''
         echo "[planner] dev overrides present: ${presentShort}" >> $out/build.log
@@ -52,7 +52,7 @@ let
           echo "pkgPath: ${pkgPathOf n}" >> $out/build.log
           echo "targetName: ${targetNameOf n}" >> $out/build.log
           echo "expected subdir(bin): ${pkgPathOf n}/cmd/${targetNameOf n}" >> $out/build.log
-          echo "expected srcRoot: (repo root with apps/libs)" >> $out/build.log
+          echo "expected srcRoot: (repo root with projects/apps and projects/libs)" >> $out/build.log
           echo "tree (depth 2) of out path:" >> $out/build.log
           (cd "${p}" && { ls -la || true; echo "-- bin --"; ls -la bin 2>/dev/null || true; }) >> $out/build.log || true
           bins=""

@@ -10,13 +10,13 @@ test("node adapter warns when multiple lockfile labels are present (warn mode)",
     await fs.mkdirp(path.dirname(out));
     const nodes = [
       {
-        name: "//apps/web:bundle",
+        name: "//projects/apps/web:bundle",
         rule_type: "js_binary",
         labels: [
           "lang:node",
           "kind:bundle",
-          "lockfile:apps/web/pnpm-lock.yaml#apps/web",
-          "lockfile:libs/ui/pnpm-lock.yaml#libs/ui",
+          "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",
+          "lockfile:projects/libs/ui/pnpm-lock.yaml#projects/libs/ui",
         ],
       },
     ];

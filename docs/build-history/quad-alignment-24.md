@@ -50,7 +50,7 @@ I will update the existing Node macro tests to prove behavior did not change and
 
 - Extend the `build-tools/tools/tests/node/*lockfile*` tests to assert:
   - both `node_webapp` and bundled `nix_node_cli_bin` fail with the same deterministic error text when the lockfile label is missing or malformed
-  - importer derivation remains stable for `lockfile:././apps/web/pnpm-lock.yaml#apps/web`
+  - importer derivation remains stable for `lockfile:././projects/apps/web/pnpm-lock.yaml#projects/apps/web`
 - Extend the `build-tools/tools/tests/node/*global-inputs*` tests to keep asserting global inputs are real action inputs after the refactor (list-shaped and dict-shaped cases).
 - Add one focused macro expansion test (cquery shape test) proving importer-local patches are present as action inputs for:
   - `node_webapp` (list-shaped `srcs`)

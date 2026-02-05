@@ -33,7 +33,7 @@ test(
       // Commit scaffold so Nix flake sees importer under git+file sources
       await $`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
 
-      const importer = "libs/demo";
+      const importer = "projects/libs/demo";
       const lockfile = path.join(importer, "pnpm-lock.yaml");
       const sanitized = importer
         .replace(/\/\//g, "")

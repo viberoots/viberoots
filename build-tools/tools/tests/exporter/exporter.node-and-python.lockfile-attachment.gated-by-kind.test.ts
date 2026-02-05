@@ -1,12 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
-import path from "node:path";
 import assert from "node:assert/strict";
+import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
-import { readCompositeGraph } from "../../lib/graph-view.ts";
 import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const.ts";
+import { readCompositeGraph } from "../../lib/graph-view.ts";
 import { importerScopedProviderContractForLang } from "../../lib/lang-contracts.ts";
+import { runInTemp } from "../lib/test-helpers";
 
 test("exporter attaches importer lockfile labels only for kind:* (node + python)", async () => {
   await runInTemp("exp-kind-gate-lockfile", async (tmp, $) => {
@@ -19,35 +19,35 @@ test("exporter attaches importer lockfile labels only for kind:* (node + python)
       "requires-kind-stamp",
     );
 
-    await fs.mkdirp(path.join(tmp, "apps", "web"));
+    await fs.mkdirp(path.join(tmp, "projects", "apps", "web"));
     await fs.writeFile(
-      path.join(tmp, "apps", "web", "pnpm-lock.yaml"),
-      'lockfileVersion: "9.0"\nimporters:\n  apps/web:\n    dependencies: {}\npackages: {}\n',
+      path.join(tmp, "projects", "apps", "web", "pnpm-lock.yaml"),
+      'lockfileVersion: "9.0"\nimporters:\n  projects/apps/web:\n    dependencies: {}\npackages: {}\n',
       "utf8",
     );
 
-    await fs.mkdirp(path.join(tmp, "apps", "pytool"));
-    await fs.writeFile(path.join(tmp, "apps", "pytool", "uv.lock"), "# lock\n", "utf8");
+    await fs.mkdirp(path.join(tmp, "projects", "apps", "pytool"));
+    await fs.writeFile(path.join(tmp, "projects", "apps", "pytool", "uv.lock"), "# lock\n", "utf8");
 
     const simNodes = [
       {
-        name: "//apps/web:nokind",
+        name: "//projects/apps/web:nokind",
         rule_type: "js_library",
         labels: ["lang:node"],
       },
       {
-        name: "//apps/web:kind",
+        name: "//projects/apps/web:kind",
         rule_type: "js_library",
         labels: ["lang:node", "kind:lib"],
       },
       {
-        name: "//apps/pytool:nokind",
+        name: "//projects/apps/pytool:nokind",
         rule_type: "python_binary",
         labels: ["lang:python"],
         srcs: ["main.py"],
       },
       {
-        name: "//apps/pytool:kind",
+        name: "//projects/apps/pytool:kind",
         rule_type: "python_binary",
         labels: ["lang:python", "kind:bin"],
         srcs: ["main.py"],
@@ -73,24 +73,24 @@ test("exporter attaches importer lockfile labels only for kind:* (node + python)
     const byName = new Map(nodes.map((n: any) => [n?.name, n]));
 
     {
-      const n = byName.get("//apps/web:nokind");
+      const n = byName.get("//projects/apps/web:nokind");
       const labels: string[] = (n?.labels || []) as string[];
       assert.ok(!labels.some((l) => l.startsWith("lockfile:")));
     }
     {
-      const n = byName.get("//apps/web:kind");
+      const n = byName.get("//projects/apps/web:kind");
       const labels: string[] = (n?.labels || []) as string[];
-      assert.ok(labels.includes("lockfile:apps/web/pnpm-lock.yaml#apps/web"));
+      assert.ok(labels.includes("lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"));
     }
     {
-      const n = byName.get("//apps/pytool:nokind");
+      const n = byName.get("//projects/apps/pytool:nokind");
       const labels: string[] = (n?.labels || []) as string[];
       assert.ok(!labels.some((l) => l.startsWith("lockfile:")));
     }
     {
-      const n = byName.get("//apps/pytool:kind");
+      const n = byName.get("//projects/apps/pytool:kind");
       const labels: string[] = (n?.labels || []) as string[];
-      assert.ok(labels.includes("lockfile:apps/pytool/uv.lock#apps/pytool"));
+      assert.ok(labels.includes("lockfile:projects/apps/pytool/uv.lock#projects/apps/pytool"));
     }
   });
 });

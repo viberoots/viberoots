@@ -4,7 +4,7 @@ This document proposes how to add first-class PNPM projects to this monorepo, in
 
 ### Goals
 
-- **Workspaces:** Enable PNPM workspaces under `apps/*` and `libs/*` (no `packages/*`) without breaking the root `package.json` dev tooling.
+- **Workspaces:** Enable PNPM workspaces under `projects/apps/*` and `projects/libs/*` (no `packages/*`) without breaking the root `package.json` dev tooling.
 - **Hermeticity:** Keep installs reproducible using Nix; prefer immutable `node_modules` realized in the Nix store, symlinked in dev shells (see `hermetic-node-modules.md`).
 - **Build invalidation:** Use importer‑scoped providers derived from per‑project `pnpm-lock.yaml` for precise Buck2 rebuilds and impacted tests.
 - **Patching:** Use PNPM’s native `patchedDependencies` and optional flat `patches/node/*.patch` for advanced cases; wire providers automatically.
@@ -30,7 +30,7 @@ Use the canonical helper surface from `//build-tools/lang:defs_common.bzl` and `
 
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
 - Provider wiring: load `MODULE_PROVIDERS` from `//build-tools/lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
-- Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
+- Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `projects/apps/*`/`projects/libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
 - Patch model contract: `build-tools/lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
 
@@ -52,22 +52,22 @@ Use the canonical helper surface from `//build-tools/lang:defs_common.bzl` and `
 
 ### Decisions captured
 
-- **Per‑project importer‑scoped lockfiles:** Each project under `apps/*` / `libs/*` owns its `pnpm-lock.yaml` and importer key. Labels use `lockfile:<relative/path>#<importer>`.
-- **Workspace roots:** Only `apps/*` and `libs/*` are included in `pnpm-workspace.yaml`.
+- **Per‑project importer‑scoped lockfiles:** Each project under `projects/apps/*` / `projects/libs/*` owns its `pnpm-lock.yaml` and importer key. Labels use `lockfile:<relative/path>#<importer>`.
+- **Workspace roots:** Only `projects/apps/*` and `projects/libs/*` are included in `pnpm-workspace.yaml`.
 - **Macros vs. raw genrules:** Prefer a thin macro that wraps genrules and injects providers automatically for better DX (details below).
 - **Scaffold contents:** Include TypeScript, ESLint/Prettier, and a test setup by default.
 
 ### Caching with per‑project lockfiles
 
 - **Nix store:** We still get strong caching. Each importer’s `pnpm-lock.yaml` keys its own pair of derivations (`pnpm-store` FOD and `node-modules`). Unchanged lockfiles are full cache hits. Different importers with overlapping tarballs will reuse the same tarballs via the fixed‑output store content once built.
-- **Buck2 invalidation scope:** Importer‑scoped providers ensure that edits to `apps/web/pnpm-lock.yaml` only invalidate targets that depend on `apps/web`’s provider, not the whole repo.
+- **Buck2 invalidation scope:** Importer‑scoped providers ensure that edits to `projects/apps/web/pnpm-lock.yaml` only invalidate targets that depend on `projects/apps/web`’s provider, not the whole repo.
 - **Trade‑offs:** More lockfiles means more (smaller) derivations, but better isolation and parallelism. The PNPM global content‑addressable behavior plus Nix FODs preserves efficiency across importers.
 
 ### Recommended Approach
 
-1. **Introduce `pnpm-workspace.yaml` (apps/libs only)**
+1. **Introduce `pnpm-workspace.yaml` (projects/apps + projects/libs only)**
    - Initial contents:
-     - `packages: ["apps/*", "libs/*"]`.
+   - `packages: ["projects/apps/*", "projects/libs/*"]`.
    - Keep the root `package.json` for shared dev tools; the root can remain an importer if desired.
 
 2. **Nix hermetic installs (per importer)**
@@ -97,7 +97,7 @@ Use the canonical helper surface from `//build-tools/lang:defs_common.bzl` and `
 
 This is the minimal coordination between PNPM and Buck. PNPM handles runtime module resolution via a workspace dependency, and Buck gets a graph edge for invalidation via `deps`.
 
-`libs/utils/package.json`:
+`projects/libs/utils/package.json`:
 
 ```json
 {
@@ -108,7 +108,7 @@ This is the minimal coordination between PNPM and Buck. PNPM handles runtime mod
 }
 ```
 
-`apps/web/package.json`:
+`projects/apps/web/package.json`:
 
 ```json
 {
@@ -120,37 +120,38 @@ This is the minimal coordination between PNPM and Buck. PNPM handles runtime mod
 }
 ```
 
-`apps/web/TARGETS`:
+`projects/apps/web/TARGETS`:
 
 ```python
 load("//build-tools/node:defs_nix.bzl", "node_webapp")
 
 node_webapp(
     name = "web",
-    lockfile_label = "lockfile:apps/web/pnpm-lock.yaml#apps/web",
-    deps = ["//libs/utils:utils"],
+    lockfile_label = "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",
+    deps = ["//projects/libs/utils:utils"],
 )
 ```
 
-`libs/utils/TARGETS`:
+`projects/libs/utils/TARGETS`:
 
 ```python
 load("//build-tools/node:defs_core.bzl", "nix_node_lib")
 
 nix_node_lib(
     name = "utils",
-    lockfile_label = "lockfile:libs/utils/pnpm-lock.yaml#libs/utils",
+    lockfile_label = "lockfile:projects/libs/utils/pnpm-lock.yaml#projects/libs/utils",
 )
 ```
 
 5. **Scaffolding command**
-   - Extend `build-tools/tools/scaffolding` to create a new PNPM project (e.g., `apps/web` or `libs/utils`) with:
-     - `package.json` (name, version, scripts), `pnpm-lock.yaml` (after `pnpm install` run in dev shell), and `.npmrc` if needed.
-     - `tsconfig.json` with top‑level await if required by zx scripts; sensible module/target defaults.
-     - ESLint + Prettier config aligned with repo standards.
-     - `src/index.ts` and `test/example.test.ts` (one-test-per-file style).
-     - `TARGETS` stub with Node build/test genrules and the lockfile label.
-     - A short README and usage scripts (build/test/lint/format).
+
+- Extend `build-tools/tools/scaffolding` to create a new PNPM project (e.g., `projects/apps/web` or `projects/libs/utils`) with:
+  - `package.json` (name, version, scripts), `pnpm-lock.yaml` (after `pnpm install` run in dev shell), and `.npmrc` if needed.
+  - `tsconfig.json` with top‑level await if required by zx scripts; sensible module/target defaults.
+  - ESLint + Prettier config aligned with repo standards.
+  - `src/index.ts` and `test/example.test.ts` (one-test-per-file style).
+  - `TARGETS` stub with Node build/test genrules and the lockfile label.
+  - A short README and usage scripts (build/test/lint/format).
 
 ### Macros vs. raw genrules (trade‑offs and recommendation)
 
@@ -176,13 +177,13 @@ nix_node_lib(
 ### Phases
 
 - **Phase A: Workspace bootstrapping**
-  - Add `pnpm-workspace.yaml` with `apps/*` and `libs/*`.
+  - Add `pnpm-workspace.yaml` with `projects/apps/*` and `projects/libs/*`.
   - Commit minimal `third_party/providers/defs_node.bzl`.
   - Verify `node build-tools/tools/buck/sync-providers.ts --lang node --no-glue` runs idempotently with empty or initial projects.
 
 - **Phase B: First PNPM project (per‑project lockfile)**
-  - Scaffold `apps/example` with its own `package.json` and `pnpm-lock.yaml`.
-  - Add Buck `TARGETS` with `labels = ["lockfile:apps/example/pnpm-lock.yaml#apps/example"]`.
+  - Scaffold `projects/apps/example` with its own `package.json` and `pnpm-lock.yaml`.
+  - Add Buck `TARGETS` with `labels = ["lockfile:projects/apps/example/pnpm-lock.yaml#projects/apps/example"]`.
   - Run exporters/generators: export graph → sync node providers → gen auto‑map; build target.
 
 - **Phase C: Hermetic dev shell**
@@ -194,7 +195,7 @@ nix_node_lib(
 
 ### Completion Criteria
 
-- `pnpm-workspace.yaml` present with `apps/*` and `libs/*`; at least one PNPM project builds under Buck2 with importer‑scoped providers.
+- `pnpm-workspace.yaml` present with `projects/apps/*` and `projects/libs/*`; at least one PNPM project builds under Buck2 with importer‑scoped providers.
 - Per‑importer Nix derivations for `node_modules` are documented and linked in the dev shell.
 - `TARGETS.node.auto` is generated deterministically and `gen-auto-map.ts` includes Node providers for labeled targets.
 - Scaffolding command can create a new PNPM project with TS/ESLint/Prettier/tests and correct labels and scripts.
@@ -263,7 +264,7 @@ Net result: zx scripts continue to run the same way (via `build-tools/tools/bin/
 
 Requirements
 
-- Projects under `apps/*` and `libs/*` must not inherit dependencies or devDependencies from the repo root.
+- Projects under `projects/apps/*` and `projects/libs/*` must not inherit dependencies or devDependencies from the repo root.
 - zx bootstrap (`build-tools/tools/dev/zx-init.mjs`) is for zx scripts only; app/lib runtime must not depend on it or run with the zx loader.
 
 How we enforce this
@@ -277,7 +278,7 @@ How we enforce this
 Implication for scaffolding
 
 - Generated projects include their own `package.json`, `.npmrc` (with `patches-dir=patches/node` and `node-linker=isolated`), `pnpm-lock.yaml`, and tool configs (TS, ESLint/Prettier, tests).
-- Scripts in apps/libs run with plain `node` (or bundler) without the zx import hook. zx is reserved for `build-tools/tools/**` scripts.
+- Scripts in projects/apps and projects/libs run with plain `node` (or bundler) without the zx import hook. zx is reserved for `build-tools/tools/**` scripts.
 
 ### Provider Naming and Labeling
 
@@ -286,7 +287,7 @@ Each Node target must include a label identifying its lockfile and importer to e
 #### Label Format
 
 ```python
-labels = ["lockfile:apps/web/pnpm-lock.yaml#apps/web"]
+labels = ["lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"]
 ```
 
 **Format:** `lockfile:<relative-path-to-lockfile>#<importer-id>`
@@ -296,11 +297,11 @@ labels = ["lockfile:apps/web/pnpm-lock.yaml#apps/web"]
 
 **Examples:**
 
-| Target              | Lockfile Path               | Importer ID  | Label                                           |
-| ------------------- | --------------------------- | ------------ | ----------------------------------------------- |
-| `//apps/web:bundle` | `apps/web/pnpm-lock.yaml`   | `apps/web`   | `lockfile:apps/web/pnpm-lock.yaml#apps/web`     |
-| `//libs/utils:lib`  | `libs/utils/pnpm-lock.yaml` | `libs/utils` | `lockfile:libs/utils/pnpm-lock.yaml#libs/utils` |
-| `//apps/api:test`   | `apps/api/pnpm-lock.yaml`   | `apps/api`   | `lockfile:apps/api/pnpm-lock.yaml#apps/api`     |
+| Target                       | Lockfile Path                        | Importer ID           | Label                                                             |
+| ---------------------------- | ------------------------------------ | --------------------- | ----------------------------------------------------------------- |
+| `//projects/apps/web:bundle` | `projects/apps/web/pnpm-lock.yaml`   | `projects/apps/web`   | `lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web`     |
+| `//projects/libs/utils:lib`  | `projects/libs/utils/pnpm-lock.yaml` | `projects/libs/utils` | `lockfile:projects/libs/utils/pnpm-lock.yaml#projects/libs/utils` |
+| `//projects/apps/api:test`   | `projects/apps/api/pnpm-lock.yaml`   | `projects/apps/api`   | `lockfile:projects/apps/api/pnpm-lock.yaml#projects/apps/api`     |
 
 When I omit `lockfile_label` on a Node macro, I derive the label from the Buck package path. The default is `lockfile:<pkg>/pnpm-lock.yaml#<pkg>`. The macro fails fast if `<pkg>/pnpm-lock.yaml` is missing. The error tells me to add the file or provide an explicit `lockfile_label`.
 
@@ -316,7 +317,7 @@ Provider names are generated by `providerNameForImporter(lockfilePath, importer)
 **Example:**
 
 ```typescript
-providerNameForImporter("apps/web/pnpm-lock.yaml", "apps/web");
+providerNameForImporter("projects/apps/web/pnpm-lock.yaml", "projects/apps/web");
 // => "lf_a1b2c3d4e5f6_apps_web__apps_web_pnpm_lock_yaml"
 ```
 
@@ -361,7 +362,7 @@ function effectiveSet(importer):
 
 #### Synthetic lockfile discovery (provider sync)
 
-Node provider sync also emits **metadata-only providers** for workspace importers under `apps/*` or `libs/*` that have a `package.json` but do not yet have a `pnpm-lock.yaml`.
+Node provider sync also emits **metadata-only providers** for workspace importers under `projects/apps/*` or `projects/libs/*` that have a `package.json` but do not yet have a `pnpm-lock.yaml`.
 
 This is a deliberate policy to keep dependency edges stable during early scaffolding:
 
@@ -375,11 +376,11 @@ This discovery contract is implemented in `build-tools/tools/lib/importers.ts` a
 
 Importer-scoped providers enable **precise invalidation**:
 
-| Change                                   | Invalidates                    | Does NOT Invalidate                   |
-| ---------------------------------------- | ------------------------------ | ------------------------------------- |
-| Edit `apps/web/pnpm-lock.yaml`           | `//apps/web:*` targets         | `//apps/api:*`, `//libs/utils:*`      |
-| Patch `lodash@4.17.21` used by web only  | `//apps/web:*` targets         | Other importers                       |
-| Patch `react@18.0.0` used by web and api | `//apps/web:*`, `//apps/api:*` | `//libs/utils:*` (if not using React) |
+| Change                                   | Invalidates                                      | Does NOT Invalidate                                |
+| ---------------------------------------- | ------------------------------------------------ | -------------------------------------------------- |
+| Edit `projects/apps/web/pnpm-lock.yaml`  | `//projects/apps/web:*` targets                  | `//projects/apps/api:*`, `//projects/libs/utils:*` |
+| Patch `lodash@4.17.21` used by web only  | `//projects/apps/web:*` targets                  | Other importers                                    |
+| Patch `react@18.0.0` used by web and api | `//projects/apps/web:*`, `//projects/apps/api:*` | `//projects/libs/utils:*` (if not using React)     |
 
 **Contrast with Shared Lockfile:**
 

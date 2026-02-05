@@ -10,7 +10,7 @@ test(
   { timeout: 420_000 },
   async () => {
     await runInTemp("node-cli-bundle-workspace-root-env-probe", async (tmp, $) => {
-      const dir = path.join(tmp, "apps", "cli");
+      const dir = path.join(tmp, "projects", "apps", "cli");
       await fsp.mkdir(path.join(dir, "src"), { recursive: true });
       await fsp.writeFile(path.join(dir, "src", "index.ts"), "console.log('cli')\n", "utf8");
       await fsp.writeFile(path.join(dir, "pnpm-lock.yaml"), "# stub\n", "utf8");
@@ -23,7 +23,7 @@ test(
           "nix_node_cli_bin(",
           '  name = "tool",',
           "  bundle = True,",
-          '  labels = ["lockfile:apps/cli/pnpm-lock.yaml#apps/cli"],',
+          '  labels = ["lockfile:projects/apps/cli/pnpm-lock.yaml#projects/apps/cli"],',
           ")",
           "",
         ].join("\n"),
@@ -35,7 +35,7 @@ test(
         stdio: "pipe",
         reject: false,
         nothrow: true,
-      })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cmd //apps/cli:tool`;
+      })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cmd //projects/apps/cli:tool`;
 
       // Some environments skip cquery in temp repos (missing toolchain config, etc.).
       // When it runs, it must show the standardized workspace-root env bootstrap.

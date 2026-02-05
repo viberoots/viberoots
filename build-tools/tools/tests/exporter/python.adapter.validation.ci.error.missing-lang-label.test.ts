@@ -10,7 +10,7 @@ test("python adapter errors in CI when .py sources lack rule_type and lang:pytho
     await fs.mkdirp(path.dirname(out));
     const nodes = [
       {
-        name: "//apps/pytool:bin",
+        name: "//projects/apps/pytool:bin",
         labels: [],
         srcs: ["apps/pytool/main.py"],
       },

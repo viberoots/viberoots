@@ -8,7 +8,7 @@ def require_importer_package_boundary(importer):
 
     Contract:
     - importer "." is allowed only from the repo root package (native.package_name() == "" or ".")
-    - importer "apps/<x>" or "libs/<x>" is allowed only from that exact package
+    - importer "projects/apps/<x>" or "projects/libs/<x>" is allowed only from that exact package
     """
     if importer == None or not isinstance(importer, str) or importer == "":
         return

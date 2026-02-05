@@ -3,12 +3,12 @@
 import { sanitizeName } from "../../lib/sanitize.ts";
 
 const cases: Array<{ name: string; label: string }> = [
-  { name: "case1", label: "//apps/foo:bin" },
-  { name: "case2", label: "//apps/foo/sub:my bin" },
+  { name: "case1", label: "//projects/apps/foo:bin" },
+  { name: "case2", label: "//projects/apps/foo/sub:my bin" },
   { name: "case3", label: "//third_party/providers:mod_ABC" },
   { name: "case4", label: "//a:b/c" },
   { name: "case5", label: "//UPPER:Case With Spaces" },
-  { name: "case6", label: "root//apps/foo:bin (config//toolchains:clang)" },
+  { name: "case6", label: "root//projects/apps/foo:bin (config//toolchains:clang)" },
 ];
 
 async function starlarkProbeOutput(target: string, label: string): Promise<string> {

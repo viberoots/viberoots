@@ -56,7 +56,7 @@ Changes
 
 Acceptance criteria
 
-- Planner still builds existing Go apps/libs and emits the same bin manifest
+- Planner still builds existing Go projects/apps/libs and emits the same bin manifest
 - Partial clone safety: if Go files are absent, planner does not fail; it produces an empty graph-outputs
 - All tests pass
 

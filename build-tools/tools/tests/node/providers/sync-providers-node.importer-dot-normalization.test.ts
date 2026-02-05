@@ -8,7 +8,7 @@ test("sync-providers-node normalizes importer '.' to lockfile dirname", async ()
   await runInTemp("node-importer-dot", async (tmp, $) => {
     await $`git init`;
 
-    const lockfilePath = path.join(tmp, "apps/example/pnpm-lock.yaml");
+    const lockfilePath = path.join(tmp, "projects/apps/example/pnpm-lock.yaml");
     const lockfileContent = `
 lockfileVersion: "9.0"
 
@@ -26,24 +26,26 @@ packages:
 
     await fsp.mkdir(path.dirname(lockfilePath), { recursive: true });
     await fsp.writeFile(lockfilePath, lockfileContent, "utf8");
-    await $`git add apps/example/pnpm-lock.yaml`;
+    await $`git add projects/apps/example/pnpm-lock.yaml`;
 
     await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
 
     const outPath = path.join(tmp, "third_party/providers/TARGETS.node.auto");
     const output = await fsp.readFile(outPath, "utf8");
 
-    if (!output.includes('importer="apps/example"')) {
-      console.error("Expected importer to be normalized to apps/example");
+    if (!output.includes('importer="projects/apps/example"')) {
+      console.error("Expected importer to be normalized to projects/apps/example");
       console.error(output);
       process.exit(2);
     }
 
     if (
-      output.includes('lockfile="apps/example/pnpm-lock.yaml", importer="."') ||
-      output.includes('lockfile="apps/example/pnpm-lock.yaml",importer="."')
+      output.includes('lockfile="projects/apps/example/pnpm-lock.yaml", importer="."') ||
+      output.includes('lockfile="projects/apps/example/pnpm-lock.yaml",importer="."')
     ) {
-      console.error("Importer '.' should not appear for apps/example lockfile provider entry");
+      console.error(
+        "Importer '.' should not appear for projects/apps/example lockfile provider entry",
+      );
       process.exit(2);
     }
   });

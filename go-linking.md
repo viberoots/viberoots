@@ -31,10 +31,10 @@ load("//build-tools/go:defs.bzl", "nix_go_binary")
 nix_go_binary(
     name = "demo",
     srcs = ["cmd/demo/main.go"],
-    repo_cgo_deps = ["//libs/core:core"],
+    repo_cgo_deps = ["//projects/libs/core:core"],
     link_closure = "transitive",
     link_closure_overrides = {
-        "//libs/core:core": "transitive",
+        "//projects/libs/core:core": "transitive",
     },
 )
 ```

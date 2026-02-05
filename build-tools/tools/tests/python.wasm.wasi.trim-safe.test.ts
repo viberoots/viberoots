@@ -7,7 +7,7 @@ import { runInTemp, exists } from "./lib/test-helpers.ts";
 
 test("python wasm (wasi): trim:safe prunes caches/tests and preserves run", async () => {
   await runInTemp("py-wasm-wasi-trim-safe", async (tmp, $) => {
-    const appDir = path.join(tmp, "apps", "pywasm");
+    const appDir = path.join(tmp, "projects", "apps", "pywasm");
     await fs.mkdir(path.join(appDir, "bin"), { recursive: true });
     await fs.mkdir(path.join(appDir, "src"), { recursive: true });
     // Minimal app entry
@@ -42,7 +42,7 @@ load("//build-tools/python:defs.bzl", "nix_python_wasm_app")
 nix_python_wasm_app(
     name = "pyapp",
     labels = ["trim:safe"],
-    lockfile_label = "lockfile:apps/pywasm/uv.lock#apps/pywasm",
+    lockfile_label = "lockfile:projects/apps/pywasm/uv.lock#projects/apps/pywasm",
     srcs = glob(["**/*.py"]),
 )
 `,
@@ -52,15 +52,15 @@ nix_python_wasm_app(
     await $`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
     const env = {
       ...process.env,
-      BUCK_TARGET: "//apps/pywasm:pyapp",
+      BUCK_TARGET: "//projects/apps/pywasm:pyapp",
       WORKSPACE_ROOT: tmp,
       BUCK_TEST_SRC: tmp,
       PY_WASM_TRIM: "safe",
       NIX_PY_TEST_RESOLVE_JSON: JSON.stringify({
-        hello: { version: "1.0.0", originPath: "apps/pywasm/vendor/hello" },
+        hello: { version: "1.0.0", originPath: "projects/apps/pywasm/vendor/hello" },
       }),
       EXPORTER_DEBUG: "1",
-      BUCK_QUERY_ROOTS: "apps,libs,third_party,go,cpp",
+      BUCK_QUERY_ROOTS: "projects/apps,projects/libs,third_party,go,cpp",
     };
     const out = await $({
       cwd: tmp,

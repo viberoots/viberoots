@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
+import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import fs from "fs-extra";
 import { runInTemp } from "../lib/test-helpers";
 
 async function instantiateWasmFromFile(filePath: string): Promise<WebAssembly.Instance> {
@@ -44,10 +44,10 @@ test("scaf: new ts wasm-linking-app; build tinygo wasm; callAdd2() returns 5", a
       stdio: "inherit",
     })`node build-tools/tools/scaffolding/scaf.ts new ts wasm-linking-app ${name} --yes`;
 
-    const appTargets = path.join(tmp, "apps", name, "TARGETS");
-    const coreTargets = path.join(tmp, "libs", `${name}-core`, "TARGETS");
-    const apiTargets = path.join(tmp, "libs", `${name}-api`, "TARGETS");
-    const supportTargets = path.join(tmp, "libs", `${name}-support`, "TARGETS");
+    const appTargets = path.join(tmp, "projects", "apps", name, "TARGETS");
+    const coreTargets = path.join(tmp, "projects", "libs", `${name}-core`, "TARGETS");
+    const apiTargets = path.join(tmp, "projects", "libs", `${name}-api`, "TARGETS");
+    const supportTargets = path.join(tmp, "projects", "libs", `${name}-support`, "TARGETS");
     await Promise.all([
       fs.access(appTargets),
       fs.access(coreTargets),
@@ -57,8 +57,10 @@ test("scaf: new ts wasm-linking-app; build tinygo wasm; callAdd2() returns 5", a
 
     const appTargetsText = await fs.readFile(appTargets, "utf8");
     assert.ok(
-      appTargetsText.includes(`lockfile:apps/${name}/pnpm-lock.yaml#apps/${name}`),
-      "expected importer-scoped pnpm lockfile label in apps/<name>/TARGETS",
+      appTargetsText.includes(
+        `lockfile:projects/apps/${name}/pnpm-lock.yaml#projects/apps/${name}`,
+      ),
+      "expected importer-scoped pnpm lockfile label in projects/apps/<name>/TARGETS",
     );
 
     const coreTargetsText = await fs.readFile(coreTargets, "utf8");
@@ -80,7 +82,7 @@ test("scaf: new ts wasm-linking-app; build tinygo wasm; callAdd2() returns 5", a
       stdio: "inherit",
     })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
 
-    const wasmTarget = `//libs/${name}-api:wasm`;
+    const wasmTarget = `//projects/libs/${name}-api:wasm`;
     const sel = await $({
       cwd: tmp,
       stdio: "pipe",

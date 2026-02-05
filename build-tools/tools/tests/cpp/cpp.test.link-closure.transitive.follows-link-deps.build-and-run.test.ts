@@ -63,15 +63,15 @@ test("nix_cpp_test follows transitive link_deps with link_closure=transitive", a
       "utf8",
     );
     await fs.outputFile(
-      path.join(tmp, "libs", "core", "TARGETS"),
+      path.join(tmp, "projects", "libs", "core", "TARGETS"),
       [
         'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
         "nix_cpp_library(",
         '  name = "core",',
         '  srcs = ["src/core.cpp", "include/core.h"],',
-        '  link_deps = ["//libs/support:support"],',
-        '  header_deps = ["//libs/support:headers"],',
+        '  link_deps = ["//projects/libs/support:support"],',
+        '  header_deps = ["//projects/libs/support:headers"],',
         '  labels = ["lang:cpp", "kind:lib"],',
         '  visibility = ["PUBLIC"],',
         ")",
@@ -81,7 +81,7 @@ test("nix_cpp_test follows transitive link_deps with link_closure=transitive", a
     );
 
     await fs.outputFile(
-      path.join(tmp, "apps", "demo", "tests", "t.cpp"),
+      path.join(tmp, "projects", "apps", "demo", "tests", "t.cpp"),
       [
         "#include <gtest/gtest.h>",
         "#include <core.h>",
@@ -94,14 +94,14 @@ test("nix_cpp_test follows transitive link_deps with link_closure=transitive", a
       "utf8",
     );
     await fs.outputFile(
-      path.join(tmp, "apps", "demo", "TARGETS"),
+      path.join(tmp, "projects", "apps", "demo", "TARGETS"),
       [
         'load("//build-tools/cpp:defs.bzl", "nix_cpp_test")',
         "",
         "nix_cpp_test(",
         '  name = "t",',
         '  srcs = ["tests/t.cpp"],',
-        '  link_deps = ["//libs/core:core"],',
+        '  link_deps = ["//projects/libs/core:core"],',
         '  link_closure = "transitive",',
         '  nixpkg_deps = ["pkgs.googletest"],',
         '  labels = ["lang:cpp", "kind:test"],',
@@ -116,12 +116,12 @@ test("nix_cpp_test follows transitive link_deps with link_closure=transitive", a
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir cpp_test_link_closure cquery "deps(//apps/demo:t)" --json --output-attribute name`;
+    })`buck2 --isolation-dir cpp_test_link_closure cquery "deps(//projects/apps/demo:t)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return;
 
     await $({
       cwd: tmp,
     })`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
-    await $({ cwd: tmp })`buck2 --isolation-dir cpp_test_link_closure test //apps/demo:t`;
+    await $({ cwd: tmp })`buck2 --isolation-dir cpp_test_link_closure test //projects/apps/demo:t`;
   });
 });

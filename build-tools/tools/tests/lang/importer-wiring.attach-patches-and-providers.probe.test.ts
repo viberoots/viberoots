@@ -38,14 +38,14 @@ test("importer_wiring attaches importer patches and merges provider edges for li
       path.join(providersDir, "auto_map.bzl"),
       [
         "MODULE_PROVIDERS = {",
-        '  "//apps/web:bin": ["//third_party/providers:prov_a"],',
+        '  "//projects/apps/web:bin": ["//third_party/providers:prov_a"],',
         "}",
         "",
       ].join("\n"),
       "utf8",
     );
 
-    const appDir = path.join(tmp, "apps", "web");
+    const appDir = path.join(tmp, "projects", "apps", "web");
     const patchDir = path.join(appDir, "patches", "node");
     await fsp.mkdir(patchDir, { recursive: true });
     await fsp.writeFile(path.join(appDir, "pnpm-lock.yaml"), "lockfileVersion: 9\n", "utf8");
@@ -68,7 +68,7 @@ test("importer_wiring attaches importer patches and merges provider edges for li
         '  lang = "node",',
         '  kind = "gen",',
         "  labels = [],",
-        '  lockfile_label = "lockfile:apps/web/pnpm-lock.yaml#apps/web",',
+        '  lockfile_label = "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",',
         ")",
         "labels_file(",
         '  name = "list_probe",',
@@ -86,7 +86,7 @@ test("importer_wiring attaches importer patches and merges provider edges for li
         '  lang = "node",',
         '  kind = "gen",',
         "  labels = [],",
-        '  lockfile_label = "lockfile:apps/web/pnpm-lock.yaml#apps/web",',
+        '  lockfile_label = "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",',
         "  patch_key_prefix = PATCH_INPUTS_KEY_PREFIX,",
         "  provider_key_prefix = PROVIDER_EDGES_KEY_PREFIX,",
         ")",
@@ -100,8 +100,8 @@ test("importer_wiring attaches importer patches and merges provider edges for li
       "utf8",
     );
 
-    const listOut = await buildOutPath(tmp, $, "//apps/web:list_probe");
-    const dictOut = await buildOutPath(tmp, $, "//apps/web:dict_probe");
+    const listOut = await buildOutPath(tmp, $, "//projects/apps/web:list_probe");
+    const dictOut = await buildOutPath(tmp, $, "//projects/apps/web:dict_probe");
     if (!listOut || !dictOut) return;
 
     const listLines = readLines(await fsp.readFile(listOut, "utf8"));

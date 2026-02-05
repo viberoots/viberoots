@@ -17,15 +17,15 @@ EOF'`;
       cwd: tmp,
     })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
 MODULE_PROVIDERS = {
-  "//apps/demo:core": ["//third_party/providers:prov"],
+  "//projects/apps/demo:core": ["//third_party/providers:prov"],
 }
 EOF'`;
 
-    const appDir = path.join(tmp, "apps", "demo");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(path.join(appDir, "src"), { recursive: true });
     await fsp.mkdir(path.join(appDir, "patches", "cpp"), { recursive: true });
     await fsp.writeFile(path.join(appDir, "src", "lib.cpp"), "int demo(){return 0;}\n", "utf8");
-    const patchRel = "apps/demo/patches/cpp/demo@0.0.0.patch";
+    const patchRel = "projects/apps/demo/patches/cpp/demo@0.0.0.patch";
     await fsp.writeFile(path.join(tmp, patchRel), "# noop\n", "utf8");
 
     await fsp.writeFile(
@@ -51,7 +51,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //apps/demo:core`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //projects/apps/demo:core`;
     if (qSrcs.exitCode !== 0) return; // skip when Buck/prelude/toolchains unavailable
     assert.ok(
       String(qSrcs.stdout || "").includes(patchRel),
@@ -63,7 +63,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute deps //apps/demo:core`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute deps //projects/apps/demo:core`;
     if (qDeps.exitCode !== 0) return;
     assert.ok(
       String(qDeps.stdout || "").includes("//third_party/providers:prov"),
@@ -75,7 +75,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //apps/demo:core`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //projects/apps/demo:core`;
     if (qLabels.exitCode !== 0) return;
     const out = String(qLabels.stdout || "");
     assert.ok(

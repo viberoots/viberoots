@@ -37,7 +37,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //apps/wasm:mod`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //projects/apps/wasm:mod`;
     if (srcsProbe.exitCode !== 0) return;
     assert.ok(
       String(srcsProbe.stdout || "").includes("patches/go/a@1.0.0.patch"),
@@ -49,7 +49,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //apps/wasm:mod`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //projects/apps/wasm:mod`;
     if (labelsProbe.exitCode !== 0) return;
     const labelsJson = String(labelsProbe.stdout || "");
     assert.ok(

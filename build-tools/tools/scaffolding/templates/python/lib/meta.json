@@ -5,10 +5,13 @@
   "help": {
     "usage": "scaf new python lib <name> [--path=DEST]",
     "notes": [
-      "Creates a Python library under libs/<name> with uv.lock and Buck2 TARGETS wired to nix_python_library.",
-      "Lockfile label uses importer-scoped form: lockfile:libs/<name>/uv.lock#libs/<name>.",
+      "Creates a Python library under projects/libs/<name> with uv.lock and Buck2 TARGETS wired to nix_python_library.",
+      "Lockfile label uses importer-scoped form: lockfile:projects/libs/<name>/uv.lock#projects/libs/<name>.",
       "Enable dev/test extras by editing pyproject.toml; regenerate uv.lock with uv."
     ],
-    "examples": ["scaf new python lib demo-lib --path=libs/demo-lib", "scaf regen libs/demo-lib"]
+    "examples": [
+      "scaf new python lib demo-lib --path=projects/libs/demo-lib",
+      "scaf regen projects/libs/demo-lib"
+    ]
   }
 }

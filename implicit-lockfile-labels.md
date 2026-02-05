@@ -1,6 +1,6 @@
 # Implicit Lockfile Labels for Node Macros
 
-This document proposes a small, deterministic change to the Node macro surface so callers do not need to manually compute lockfile labels. It follows the design principles in `build-tools/docs/build-system-design.md` and the PNPM design in `build-tools/docs/build-tools/lang/pnpm-design.md`.
+This document proposes a small, deterministic change to the Node macro surface so callers do not need to manually compute lockfile labels. It follows the design principles in `build-tools/docs/build-system-design.md` and the PNPM design in `build-tools/docs/lang/pnpm-design.md`.
 
 I keep the behavior explicit and deterministic. I do not add filesystem scans or nearest-lockfile deduction. The default is derived from the Buck package path and fails fast if the lockfile is missing.
 
@@ -36,7 +36,7 @@ The macro continues to allow an explicit `lockfile_label` override.
 ### Rationale
 
 - Determinism: `native.package_name()` is stable and unambiguous.
-- Consistency: matches the per‑importer lockfile model in `build-tools/docs/build-tools/lang/pnpm-design.md`.
+- Consistency: matches the per‑importer lockfile model in `build-tools/docs/lang/pnpm-design.md`.
 - Predictability: no filesystem scanning and no label guessing.
 - Failure mode: missing lockfile fails fast with a targeted error.
 
@@ -92,24 +92,24 @@ These examples show the expected callsites after the change. The default case re
 
 ### Default Cases (convention-based)
 
-App under `apps/web` with its own importer and lockfile. No explicit `lockfile_label` is needed.
+App under `projects/apps/web` with its own importer and lockfile. No explicit `lockfile_label` is needed.
 
-`apps/web/TARGETS`:
+`projects/apps/web/TARGETS`:
 
 ```python
 load("//build-tools/node:defs_nix.bzl", "node_webapp")
 
 node_webapp(
     name = "web",
-    deps = ["//libs/ui:ui"],
+    deps = ["//projects/libs/ui:ui"],
 )
 ```
 
-This expands to `lockfile:apps/web/pnpm-lock.yaml#apps/web` and fails fast if the lockfile is missing.
+This expands to `lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web` and fails fast if the lockfile is missing.
 
-Library under `libs/ui` using the default convention:
+Library under `projects/libs/ui` using the default convention:
 
-`libs/ui/TARGETS`:
+`projects/libs/ui/TARGETS`:
 
 ```python
 load("//build-tools/node:defs_core.bzl", "nix_node_lib")
@@ -136,9 +136,9 @@ nix_node_gen(
 )
 ```
 
-Migration case where the importer id does not match the package path. For example, an app under `apps/admin` uses a lockfile importer id of `apps/web` during a staged move.
+Migration case where the importer id does not match the package path. For example, an app under `projects/apps/admin` uses a lockfile importer id of `projects/apps/web` during a staged move.
 
-`apps/admin/TARGETS`:
+`projects/apps/admin/TARGETS`:
 
 ```python
 load("//build-tools/node:defs_core.bzl", "nix_node_gen")
@@ -147,7 +147,7 @@ nix_node_gen(
     name = "admin-bundle",
     srcs = ["bundle.ts"],
     cmd = "node $SRCS > $OUT",
-    lockfile_label = "lockfile:apps/web/pnpm-lock.yaml#apps/web",
+    lockfile_label = "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",
 )
 ```
 
@@ -175,17 +175,17 @@ Introduce a convention-based default lockfile label for `nix_node_gen`, `nix_nod
   - derive a default when `lockfile_label` is omitted
   - validate the default lockfile exists
   - preserve the existing enforcement of exactly one lockfile label
-- Update `build-tools/docs/build-tools/lang/pnpm-design.md`:
+- Update `build-tools/docs/lang/pnpm-design.md`:
   - document the default label convention
   - note the fast-fail on missing lockfile
 
 #### Tests (in this PR)
 
 - `build-tools/tools/tests/node/node.lockfile-label.default-from-package.uses-default.test.ts`
-  - define a node target without `lockfile_label` in `apps/foo/TARGETS`
-  - ensure the macro expands successfully when `apps/foo/pnpm-lock.yaml` exists
+  - define a node target without `lockfile_label` in `projects/apps/foo/TARGETS`
+  - ensure the macro expands successfully when `projects/apps/foo/pnpm-lock.yaml` exists
 - `build-tools/tools/tests/node/node.lockfile-label.default-from-package.missing-lockfile.fails-fast.test.ts`
-  - define a node target without `lockfile_label` in `apps/bar/TARGETS`
+  - define a node target without `lockfile_label` in `projects/apps/bar/TARGETS`
   - assert the macro fails with the missing lockfile error
 
 #### Acceptance Criteria
@@ -232,10 +232,10 @@ Apply the same defaulting behavior to Nix-calling Node macros (`node_webapp` and
 #### Tests (in this PR)
 
 - `build-tools/tools/tests/node/node.defs-nix.lockfile-label.default-from-package.webapp.test.ts`
-  - define a `node_webapp` without `lockfile_label` under `apps/web`
+  - define a `node_webapp` without `lockfile_label` under `projects/apps/web`
   - assert the macro expands and the derived lockfile label is used
 - `build-tools/tools/tests/node/node.defs-nix.lockfile-label.default-from-package.missing-lockfile.fails-fast.test.ts`
-  - define a `node_webapp` without `lockfile_label` under `apps/missing`
+  - define a `node_webapp` without `lockfile_label` under `projects/apps/missing`
   - assert fast-fail with missing lockfile error
 
 #### Acceptance Criteria
@@ -272,7 +272,7 @@ Add a deterministic enforcement mechanism that keeps Node workspace dependencies
 #### Scope & Changes
 
 - Add `build-tools/tools/buck/enforce-node-deps.ts` (zx):
-  - Reads each importer `package.json` under `apps/*` and `libs/*`.
+- Reads each importer `package.json` under `projects/apps/*` and `projects/libs/*`.
   - Resolves workspace dependencies to Buck target labels via a deterministic mapping file:
     - `build-tools/tools/node/workspace-map.json` (package name → Buck label).
   - For each Node target in the importer package, compare declared Buck `deps` with the expected set.
@@ -284,7 +284,7 @@ Add a deterministic enforcement mechanism that keeps Node workspace dependencies
     - `node build-tools/tools/buck/enforce-node-deps.ts --fix`
 - Update `build-tools/tools/buck/prebuild-guard.ts` to call `node build-tools/tools/buck/enforce-node-deps.ts --check` in CI.
 - Update `docs/handbook/node-macros.md` to describe the enforcement and the `--fix` workflow.
-- Update `build-tools/docs/build-tools/lang/pnpm-design.md` with the high-level rule: `package.json` is the source of truth, Buck `deps` must match.
+- Update `build-tools/docs/lang/pnpm-design.md` with the high-level rule: `package.json` is the source of truth, Buck `deps` must match.
 
 #### Tests (in this PR)
 

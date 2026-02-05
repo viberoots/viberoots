@@ -70,7 +70,7 @@ Update the macro handbook documentation to describe the unified behavior:
 ### Risks
 
 - If any repo sections intentionally keep lockfiles only at root, importer derivation (`.`) must remain consistent with provider naming and macro expectations.
-- If there are unusual workspace layouts (non `apps/*` or `libs/*` importers), auto-attachment could create labels for targets that previously had none. This must not change build behavior beyond glue mapping.
+- If there are unusual workspace layouts (non `projects/apps/*` or `projects/libs/*` importers), auto-attachment could create labels for targets that previously had none. This must not change build behavior beyond glue mapping.
 
 ### Consequence of Not Implementing
 

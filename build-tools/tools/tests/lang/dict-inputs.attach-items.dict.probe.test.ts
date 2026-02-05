@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("attach_items_dict_safe attaches items with stable sanitized keys and deterministic collisions (probe)", async () => {
   await runInTemp("dict-inputs-attach-items-probe", async (tmp, $) => {
-    const pkgDir = path.join(tmp, "apps", "demo");
+    const pkgDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(pkgDir, { recursive: true });
 
     await fsp.writeFile(
@@ -31,7 +31,7 @@ test("attach_items_dict_safe attaches items with stable sanitized keys and deter
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 build --target-platforms //:no_cgo --show-output //apps/demo:probe_keys`;
+    })`buck2 build --target-platforms //:no_cgo --show-output //projects/apps/demo:probe_keys`;
     if (so.exitCode !== 0) return;
 
     const line = String(so.stdout || "")

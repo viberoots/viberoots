@@ -6,7 +6,7 @@
  * graph-generator-selected. Prints ONLY the out path on stdout; all logs go to stderr.
  *
  * Inputs (via env):
- * - BUCK_TARGET: required label (e.g., //apps/foo:foo)
+ * - BUCK_TARGET: required label (e.g., //projects/apps/foo:foo)
  * - BUCK_GRAPH_JSON: optional path to build-tools/tools/buck/graph.json for the CURRENT workspace
  * - BUCK_TEST_SRC: optional path to current repo working tree (defaults to cwd)
  * - WORKSPACE_ROOT: optional working tree root (preferred when present in Buck actions)
@@ -14,9 +14,10 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { ensureGraph } from "../buck/glue-run.ts";
-import { findRepoRoot, pathExists } from "../lib/repo.ts";
-import { sanitizeAttrNameFromLabel } from "../lib/labels.ts";
 import { allDevOverrideEnvNames } from "../lib/dev-override-envs.ts";
+import { getImporterRootsContract } from "../lib/importer-roots.ts";
+import { sanitizeAttrNameFromLabel } from "../lib/labels.ts";
+import { findRepoRoot, pathExists } from "../lib/repo.ts";
 
 function stripAnsi(s: string): string {
   return s.replace(/\x1B\[[0-9;]*[A-Za-z]/g, "").replace(/\r/g, "");
@@ -25,7 +26,7 @@ function stripAnsi(s: string): string {
 async function main() {
   const target = (process.env.BUCK_TARGET || "").trim();
   if (!target) {
-    console.error("BUCK_TARGET is required (e.g., //apps/foo:foo)");
+    console.error("BUCK_TARGET is required (e.g., //projects/apps/foo:foo)");
     process.exit(2);
   }
   const cwd = path.resolve(process.cwd());
@@ -43,9 +44,12 @@ async function main() {
   // Ensure the graph exists via the canonical helper; preserve exporter env behavior
   const graphPath = path.join(workspaceRoot, "build-tools", "tools", "buck", "graph.json");
   // Prefer working tree as BUCK_TEST_SRC so exporter operates on the correct repo root
+  const importerRoots = getImporterRootsContract().workspaceRoots;
+  const defaultRoots = Array.from(new Set([...importerRoots, "go", "cpp", "third_party"])).join(
+    ",",
+  );
   const queryRoots =
-    (process.env.BUCK_QUERY_ROOTS && String(process.env.BUCK_QUERY_ROOTS).trim()) ||
-    ["apps", "libs", "go", "cpp", "third_party"].join(",");
+    (process.env.BUCK_QUERY_ROOTS && String(process.env.BUCK_QUERY_ROOTS).trim()) || defaultRoots;
   process.env.BUCK_TEST_SRC = workspaceRoot;
   // ensureGraph prefers WORKSPACE_ROOT when set; force it to the chosen workDir so we don't
   // accidentally export a graph into the outer verify workspace when invoked from a temp repo.

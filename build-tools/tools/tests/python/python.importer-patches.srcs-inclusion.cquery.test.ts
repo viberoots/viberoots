@@ -7,20 +7,20 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("python macros include importer-local patches in srcs (cquery)", async () => {
   await runInTemp("py-importer-patches-srcs", async (tmp, $) => {
-    const appDir = path.join(tmp, "apps", "demo");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     const srcDir = path.join(appDir, "src");
     const patchDir = path.join(appDir, "patches", "python");
     await fsp.mkdir(srcDir, { recursive: true });
     await fsp.mkdir(patchDir, { recursive: true });
 
-    // Minimal source and lockfile for importer "apps/demo"
+    // Minimal source and lockfile for importer "projects/apps/demo"
     await fsp.writeFile(path.join(srcDir, "main.py"), "print('ok')\n", "utf8");
     await fsp.writeFile(
       path.join(appDir, "uv.lock"),
       ["# uv lock", "[[package]]", 'name = "hello"', 'version = "1.0.0"', ""].join("\n"),
       "utf8",
     );
-    const patchRel = "apps/demo/patches/python/leftpad@1.3.0.patch";
+    const patchRel = "projects/apps/demo/patches/python/leftpad@1.3.0.patch";
     await fsp.writeFile(path.join(tmp, patchRel), "# noop\n", "utf8");
 
     // Define a tiny library bound to the importer; macro should append importer-local patches to srcs
@@ -31,7 +31,7 @@ test("python macros include importer-local patches in srcs (cquery)", async () =
         "",
         "nix_python_library(",
         '  name = "lib",',
-        '  lockfile_label = "lockfile:apps/demo/uv.lock#apps/demo",',
+        '  lockfile_label = "lockfile:projects/apps/demo/uv.lock#projects/apps/demo",',
         '  srcs = glob(["**/*.py"]),',
         ")",
         "",
@@ -45,7 +45,7 @@ test("python macros include importer-local patches in srcs (cquery)", async () =
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //apps/demo:lib`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //projects/apps/demo:lib`;
     if (probe.exitCode !== 0) {
       // Skip when prelude or toolchains aren't available in the ephemeral temp repo.
       return;
@@ -61,7 +61,7 @@ test("python macros include importer-local patches in srcs (cquery)", async () =
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //apps/demo:lib`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //projects/apps/demo:lib`;
     if (labelsQ.exitCode !== 0) {
       return;
     }

@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("nix_node_cli_bin(bundle=True) defaults lockfile label from package path", async () => {
   await runInTemp("node-cli-bundle-lockfile-default", async (tmp, $) => {
-    const dir = path.join(tmp, "apps", "cli");
+    const dir = path.join(tmp, "projects", "apps", "cli");
     await fsp.mkdir(path.join(dir, "src"), { recursive: true });
     await fsp.writeFile(path.join(dir, "src", "index.ts"), "console.log('cli')\n", "utf8");
     await fsp.writeFile(path.join(dir, "pnpm-lock.yaml"), "lockfileVersion: 9\n", "utf8");
@@ -30,7 +30,7 @@ test("nix_node_cli_bin(bundle=True) defaults lockfile label from package path", 
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //apps/cli:tool`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //projects/apps/cli:tool`;
 
     assert.equal(
       res.exitCode,
@@ -40,7 +40,7 @@ test("nix_node_cli_bin(bundle=True) defaults lockfile label from package path", 
     const out = String(res.stdout || "");
     assert.match(
       out,
-      /lockfile:apps\/cli\/pnpm-lock\.yaml#apps\/cli/,
+      /lockfile:projects\/apps\/cli\/pnpm-lock\.yaml#projects\/apps\/cli/,
       "expected default lockfile label derived from package path",
     );
   });

@@ -44,7 +44,7 @@ function extractBuildLogLine(buildLog: string, key: string): string {
 
 test("cpp: link input ordering is deterministic (repo link deps)", async () => {
   await runInTemp("cpp-link-ordering-deterministic", async (tmp, $) => {
-    const libsAlpha = path.join(tmp, "libs", "alpha");
+    const libsAlpha = path.join(tmp, "projects", "libs", "alpha");
     await fs.outputFile(
       path.join(libsAlpha, "src", "alpha.cpp"),
       ["int alpha() { return 1; }", ""].join("\n"),
@@ -65,7 +65,7 @@ test("cpp: link input ordering is deterministic (repo link deps)", async () => {
       "utf8",
     );
 
-    const libsBravo = path.join(tmp, "libs", "bravo");
+    const libsBravo = path.join(tmp, "projects", "libs", "bravo");
     await fs.outputFile(
       path.join(libsBravo, "src", "bravo.cpp"),
       ["int bravo() { return 2; }", ""].join("\n"),
@@ -86,7 +86,7 @@ test("cpp: link input ordering is deterministic (repo link deps)", async () => {
       "utf8",
     );
 
-    const appDir = path.join(tmp, "apps", "demo");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     await fs.outputFile(
       path.join(appDir, "src", "main.cpp"),
       [
@@ -110,7 +110,7 @@ test("cpp: link input ordering is deterministic (repo link deps)", async () => {
         '  name = "demo",',
         '  srcs = ["src/main.cpp"],',
         '  labels = ["lang:cpp", "kind:bin"],',
-        '  link_deps = ["//libs/bravo:bravo", "//libs/alpha:alpha"],',
+        '  link_deps = ["//projects/libs/bravo:bravo", "//projects/libs/alpha:alpha"],',
         ")",
         "",
       ].join("\n"),
@@ -119,29 +119,34 @@ test("cpp: link input ordering is deterministic (repo link deps)", async () => {
 
     const graph = [
       {
-        name: "//libs/alpha:alpha",
+        name: "//projects/libs/alpha:alpha",
         rule_type: "cxx_library",
         labels: ["lang:cpp", "kind:lib"],
-        srcs: ["libs/alpha/src/alpha.cpp"],
+        srcs: ["projects/libs/alpha/src/alpha.cpp"],
       },
       {
-        name: "//libs/bravo:bravo",
+        name: "//projects/libs/bravo:bravo",
         rule_type: "cxx_library",
         labels: ["lang:cpp", "kind:lib"],
-        srcs: ["libs/bravo/src/bravo.cpp"],
+        srcs: ["projects/libs/bravo/src/bravo.cpp"],
       },
       {
-        name: "//apps/demo:demo",
+        name: "//projects/apps/demo:demo",
         rule_type: "cxx_binary",
         labels: ["lang:cpp", "kind:bin"],
-        srcs: ["apps/demo/src/main.cpp"],
-        link_deps: ["//libs/bravo:bravo", "//libs/alpha:alpha"],
+        srcs: ["projects/apps/demo/src/main.cpp"],
+        link_deps: ["//projects/libs/bravo:bravo", "//projects/libs/alpha:alpha"],
       },
     ];
     const graphJsonPath = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
     await fs.outputFile(graphJsonPath, JSON.stringify(graph, null, 2) + "\n", "utf8");
 
-    const out1 = await nixBuildSelected({ tmp, $, graphJsonPath, target: "//apps/demo:demo" });
+    const out1 = await nixBuildSelected({
+      tmp,
+      $,
+      graphJsonPath,
+      target: "//projects/apps/demo:demo",
+    });
     if (!out1) throw new Error("nix build did not produce an out path for selected target");
     const log1 = await fs.readFile(path.join(out1, "build.log"), "utf8");
     const linkLibs1 = extractBuildLogLine(log1, "link_libs");
@@ -149,12 +154,19 @@ test("cpp: link input ordering is deterministic (repo link deps)", async () => {
       throw new Error(`expected build.log to include link_libs=...; got:\n${log1}`);
     }
 
-    const expect1 = `-l${sanitizeName("//libs/bravo:bravo")} -l${sanitizeName("//libs/alpha:alpha")}`;
+    const expect1 = `-l${sanitizeName("//projects/libs/bravo:bravo")} -l${sanitizeName(
+      "//projects/libs/alpha:alpha",
+    )}`;
     if (linkLibs1.trim() !== expect1) {
       throw new Error(`expected deterministic link_libs order:\nwant=${expect1}\ngot=${linkLibs1}`);
     }
 
-    const out2 = await nixBuildSelected({ tmp, $, graphJsonPath, target: "//apps/demo:demo" });
+    const out2 = await nixBuildSelected({
+      tmp,
+      $,
+      graphJsonPath,
+      target: "//projects/apps/demo:demo",
+    });
     if (!out2)
       throw new Error("nix build did not produce an out path for selected target (second build)");
     const log2 = await fs.readFile(path.join(out2, "build.log"), "utf8");

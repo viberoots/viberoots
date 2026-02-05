@@ -167,7 +167,7 @@ This PR makes exporter and provider sync share one source of truth for:
   - constructs a small temp repo layout with nested packages and a `uv.lock`
   - asserts both the shared helper and exporter adapter pick the same lockfile path and importer label
 - Add a regression test that ensures:
-  - for a package under `apps/*` or `libs/*`, the importer label matches the lockfile directory
+  - for a package under `projects/apps/*` or `projects/libs/*`, the importer label matches the lockfile directory
 
 ### Docs (in this PR)
 

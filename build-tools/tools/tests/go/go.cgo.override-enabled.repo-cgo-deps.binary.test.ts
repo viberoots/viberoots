@@ -40,7 +40,7 @@ load("//build-tools/go:defs.bzl", "nix_go_binary")
 nix_go_binary(
     name = "demo",
     srcs = ["cmd/demo/main.go"],
-    repo_cgo_deps = ["//libs/native:native"],
+    repo_cgo_deps = ["//projects/libs/native:native"],
 )
 EOF'`;
 

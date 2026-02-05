@@ -2,10 +2,10 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
 import { listImporterPatches } from "../../lib/importers";
 import { runImporterProviderSync } from "../../lib/provider-sync-driver";
 import { decodeNameVersionFromPatch } from "../../lib/providers";
+import { runInTemp } from "../lib/test-helpers";
 
 function extractPatchPathsFromTargetsAuto(output: string): string[] {
   const m = output.match(/patch_paths=\[([^\]]*)\]/);
@@ -33,7 +33,7 @@ test("provider-sync-driver patch inclusion policy: Node includes all importer-lo
 
       await fsp.mkdir(path.join(tmp, "third_party/providers"), { recursive: true });
 
-      const importer = "apps/demo";
+      const importer = "projects/apps/demo";
       const onlyEffective = "aaa@1.0.0.patch";
       const notEffective = "zzz@9.9.9.patch";
 

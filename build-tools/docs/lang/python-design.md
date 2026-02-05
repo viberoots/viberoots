@@ -41,7 +41,7 @@ Use the canonical helper surface from `//build-tools/lang:defs_common.bzl` and `
 
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
 - Provider wiring: load `MODULE_PROVIDERS` from `//build-tools/lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
-- Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
+- Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `projects/apps/*`/`projects/libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
 - Patch model contract: `build-tools/lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
 
@@ -66,7 +66,7 @@ We adopt the importer‑scoped lockfile labeling model (like Node) to get precis
 
 - Label format on Python targets: `lockfile:<relative/path/to/lockfile>#<importer>`
   - Repo standard (monorepo‑wide): Python projects use `uv` exclusively; the lockfile is `uv.lock` at the importer root.
-  - `<importer>` is the project root directory (e.g., `apps/pytool`) to disambiguate multiple importers.
+  - `<importer>` is the project root directory (e.g., `projects/apps/pytool`) to disambiguate multiple importers.
 - `gen-auto-map.ts` already maps generic `lockfile:` labels to providers using `providerNameForImporter(path, importer)`; Python reuses this machinery.
 - Optional per‑distribution labels (future): `pymodule:<dist>@<version>` can be emitted by a Python adapter if we later implement authoritative module discovery. Not required in Phase A.
 - Native dependencies for C-extensions: macros append `nixpkg:<attr>` labels (via `append_nixpkg_labels`) to precisely map nixpkgs inputs through `gen-auto-map.ts`, mirroring Go/C++.
@@ -200,10 +200,10 @@ load("//third_party/providers:defs_python.bzl", "python_importer_deps")
 
 python_importer_deps(
     name = "lf_<hash>_<suffix>",
-    lockfile = "apps/pytool/uv.lock",
-    importer = "apps/pytool",
+    lockfile = "projects/apps/pytool/uv.lock",
+    importer = "projects/apps/pytool",
     patch_paths = [
-        "apps/pytool/patches/python/requests@2.32.3.patch",
+        "projects/apps/pytool/patches/python/requests@2.32.3.patch",
         # ...
     ],
 )
@@ -366,12 +366,12 @@ Startup guardrails
 ## Monorepo‑Friendly Patterns and Isolation
 
 - Per‑importer lockfiles
-  - Python projects live under `apps/*` and `libs/*`, each owning its lockfile (`uv.lock` only in the initial rollout).
-  - Labels use `lockfile:<relative/path>#<importer>` where `<importer>` is the project root (e.g., `apps/pytool`).
+  - Python projects live under `projects/apps/*` and `projects/libs/*`, each owning its lockfile (`uv.lock` only in the initial rollout).
+  - Labels use `lockfile:<relative/path>#<importer>` where `<importer>` is the project root (e.g., `projects/apps/pytool`).
 - Isolation and non‑inheritance (no shadow deps)
   - Do not rely on a repo‑wide virtualenv; each importer’s environment is realized by Nix based on its lockfile.
   - Do not set global `PYTHONPATH` in the dev shell or CI for app/lib execution. Keep zx loader and Node tooling separate from Python runtime.
-  - Root tooling (`build-tools/tools/**`) must not leak into Python apps/libs; builds must use only declared deps from the importer’s lockfile.
+  - Root tooling (`build-tools/tools/**`) must not leak into Python projects/apps/libs; builds must use only declared deps from the importer’s lockfile.
 - Hermetic dev shell integration
   - Expose per‑importer derivations (e.g., `.#py-<importer>`) and optional variants for uv groups (e.g., `.#py-<importer>-dev`, `.#py-<importer>-test`).
   - Pin Python, uv/poetry, and compiler toolchains in the flake so behavior is stable across machines and CI.
@@ -424,7 +424,7 @@ All tests follow repo conventions: zx, external timeouts, single test per file.
 ## Assumptions to Validate
 
 - `uv` is available in our flake toolchain (or we vendor a small, pinned helper if `uv2nix` is absent).
-- Lockfiles are committed and stable per importer (`apps/*` and `libs/*`); Python projects won’t share one monolithic lockfile.
+- Lockfiles are committed and stable per importer (`projects/apps/*` and `projects/libs/*`); Python projects won’t share one monolithic lockfile.
 - We will not ship Poetry/pip‑tools support.
 - Mapping distribution name ↔ package metadata (`name@version`) is unambiguous for patching; normalization is lower‑case with hyphen/underscore equivalence handled in backend.
 - A single Python version is sufficient repo‑wide; if needed later, adding a per‑importer interpreter pin is a simple, optional parameter.
@@ -552,7 +552,7 @@ Re-evaluation: After landing this PR, re-evaluate the remaining PR list and adju
 
 #### Description
 
-Replace the stub uv backend with a real uv2nix-backed builder so Python apps/libs are realized as runnable environments. Add a true end‑to‑end test that patches a dependency and verifies runtime behavior changes.
+Replace the stub uv backend with a real uv2nix-backed builder so Python projects/apps/libs are realized as runnable environments. Add a true end‑to‑end test that patches a dependency and verifies runtime behavior changes.
 
 #### Scope & Changes
 

@@ -11,9 +11,9 @@ test("node adapter warns when kind:* label is missing (warn mode)", async () => 
     const nodes = [
       // Detected as Node (js_ rule family) and stamped with importer label but missing kind:*
       {
-        name: "//apps/web:bundle",
+        name: "//projects/apps/web:bundle",
         rule_type: "js_binary",
-        labels: ["lang:node", "lockfile:apps/web/pnpm-lock.yaml#apps/web"],
+        labels: ["lang:node", "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"],
       },
     ];
     const sim = path.join(tmp, "build-tools/tools/buck/simulated.json");

@@ -8,7 +8,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("inline exporter: python pyext_wasm nodes include module attrs in inline graph", async () => {
   await runInTemp("python-pyext-wasm-inline-exported-attrs", async (tmp, $) => {
-    const appRel = path.join("apps", "pyext_wasm_inline_export");
+    const appRel = path.join("projects", "apps", "pyext_wasm_inline_export");
     const app = path.join(tmp, appRel);
     await fs.mkdirp(path.join(app, "native"));
     await fs.writeFile(path.join(app, "native", "ext.c"), "int x(){return 1;}\n", "utf8");
@@ -25,7 +25,7 @@ test("inline exporter: python pyext_wasm nodes include module attrs in inline gr
         "",
         "nix_python_wasm_extension_module(",
         '  name = "ext",',
-        '  lockfile_label = "lockfile:apps/pyext_wasm_inline_export/uv.lock#apps/pyext_wasm_inline_export",',
+        '  lockfile_label = "lockfile:projects/apps/pyext_wasm_inline_export/uv.lock#projects/apps/pyext_wasm_inline_export",',
         '  labels = ["backend:wasi"],',
         '  module = "demo._native",',
         '  srcs = ["native/ext.c"],',
@@ -47,7 +47,7 @@ test("inline exporter: python pyext_wasm nodes include module attrs in inline gr
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`node build-tools/tools/buck/export-inline.ts --out ${graphPath} --roots apps --normalize`;
+    })`node build-tools/tools/buck/export-inline.ts --out ${graphPath} --roots projects/apps --normalize`;
     if (res.exitCode !== 0) return;
 
     const nodes = await readGraph(graphPath);

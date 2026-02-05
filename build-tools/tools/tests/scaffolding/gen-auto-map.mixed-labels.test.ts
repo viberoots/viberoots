@@ -11,7 +11,7 @@ test("gen-auto-map: mixed module+lockfile labels map only lockfile provider (Nod
       name: "//svc:api",
       labels: [
         "module:github.com/sirupsen/logrus@v1.9.0",
-        "lockfile:apps/web/pnpm-lock.yaml#apps/web",
+        "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",
       ],
     };
     await fsp.mkdir(path.join(tmp, "build-tools", "tools", "buck"), { recursive: true });
@@ -25,7 +25,10 @@ test("gen-auto-map: mixed module+lockfile labels map only lockfile provider (Nod
       path.join(tmp, "third_party", "providers", "auto_map.bzl"),
       "utf8",
     );
-    const lf = `//third_party/providers:${providerNameForImporter("apps/web/pnpm-lock.yaml", "apps/web")}`;
+    const lf = `//third_party/providers:${providerNameForImporter(
+      "projects/apps/web/pnpm-lock.yaml",
+      "projects/apps/web",
+    )}`;
     if (!out.includes(lf)) {
       console.error("missing expected lockfile provider in mapping");
       process.exit(2);

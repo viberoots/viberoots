@@ -5,15 +5,15 @@ import { isImporterScopedLockfileLabel, parseLockfileLabel } from "../../lib/lab
 
 test("parseLockfileLabel: rejects malformed labels", () => {
   const bad = [
-    "lockfile:apps/web/pnpm-lock.yaml", // missing importer
+    "lockfile:projects/apps/web/pnpm-lock.yaml", // missing importer
     "lockfile:#apps/web", // missing path
-    "lockfile:apps/web/pnpm-lock.yaml#", // missing importer
+    "lockfile:projects/apps/web/pnpm-lock.yaml#", // missing importer
     "lockfile:#", // empty parts
     "lockfile:", // empty
     "lockfile", // not a proper prefix form
-    "lockfile:apps/web/pnpm-lock.yaml#apps/web#extra", // extra '#'
-    "lockfile:apps/web/pnpm-lock.yaml#apps/api", // importer mismatch
-    "lockfile:apps/web/pnpm-lock.yaml#.", // '#.' only allowed for repo-root lockfiles
+    "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web#extra", // extra '#'
+    "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/api", // importer mismatch
+    "lockfile:projects/apps/web/pnpm-lock.yaml#.", // '#.' only allowed for repo-root lockfiles
     "", // empty string
   ];
   for (const s of bad) {

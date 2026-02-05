@@ -29,7 +29,7 @@ load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 nix_cpp_binary(
     name = "calc",
     srcs = ["src/main.cpp"],
-    link_deps = ["//libs/math:math_core"],
+    link_deps = ["//projects/libs/math:math_core"],
     link_closure = "direct",
 )
 ```
@@ -56,7 +56,7 @@ nix_cpp_library(
     name = "math_core",
     srcs = glob(["src/**/*.cpp"]),
     headers = glob(["include/**/*.h"]),
-    link_deps = ["//libs/support:support"],
+    link_deps = ["//projects/libs/support:support"],
     visibility = ["PUBLIC"],
 )
 ```
@@ -65,7 +65,7 @@ Consumers can choose whether to list support explicitly (direct) or rely on tran
 
 ## 3) C++ binary links transitive library requirements (transitive closure)
 
-`math_core` has `link_deps = ["//libs/support:support"]`. The binary only mentions `math_core`.
+`math_core` has `link_deps = ["//projects/libs/support:support"]`. The binary only mentions `math_core`.
 
 ```python
 # apps/calc/TARGETS
@@ -74,7 +74,7 @@ load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 nix_cpp_binary(
     name = "calc",
     srcs = ["src/main.cpp"],
-    link_deps = ["//libs/math:math_core"],
+    link_deps = ["//projects/libs/math:math_core"],
     link_closure = "transitive",
 )
 ```
@@ -99,7 +99,7 @@ load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 nix_cpp_binary(
     name = "uses_headers",
     srcs = ["src/main.cpp"],
-    header_deps = ["//libs/api-headers:api_headers"],
+    header_deps = ["//projects/libs/api-headers:api_headers"],
 )
 ```
 
@@ -114,7 +114,7 @@ load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 nix_cpp_binary(
     name = "link_only",
     srcs = ["src/main.cpp"],
-    link_deps = ["//libs/math:math_core"],
+    link_deps = ["//projects/libs/math:math_core"],
 )
 ```
 
@@ -131,7 +131,7 @@ nix_cpp_node_addon(
         "src/binding.cc",
     ],
     headers = glob(["include/**/*.h"]),
-    link_deps = ["//libs/math:math_core"],
+    link_deps = ["//projects/libs/math:math_core"],
     addon_name = "calc_native",
     visibility = ["PUBLIC"],
 )
@@ -146,7 +146,7 @@ load("//build-tools/cpp:defs.bzl", "nix_cpp_test")
 nix_cpp_test(
     name = "math_gtest",
     srcs = ["tests/math_gtest.cpp"],
-    link_deps = ["//libs/math:math_core"],
+    link_deps = ["//projects/libs/math:math_core"],
     deps = [
         # Example of nixpkgs dep via provider target
         "//third_party/providers:nix_pkgs_googletest",
@@ -178,7 +178,7 @@ load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 nix_cpp_binary(
     name = "uses_shared",
     srcs = ["src/main.cpp"],
-    link_deps = ["//libs/runtime:runtime"],
+    link_deps = ["//projects/libs/runtime:runtime"],
     link_closure = "transitive",
 )
 ```

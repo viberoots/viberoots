@@ -146,8 +146,11 @@ export async function runGomod2nixGenerateIn(dir: string, dryRun: boolean, verbo
 }
 
 export async function runGomod2nixScanAll(dryRun: boolean, verbose: boolean) {
-  // Scan for go.mod+go.sum under apps/* and libs/* and generate per-module gomod2nix.toml
-  const roots = [path.join(process.cwd(), "apps"), path.join(process.cwd(), "libs")];
+  // Scan for go.mod+go.sum under projects/apps/* and projects/libs/* and generate per-module gomod2nix.toml
+  const roots = [
+    path.join(process.cwd(), "projects", "apps"),
+    path.join(process.cwd(), "projects", "libs"),
+  ];
   const dirs: string[] = [];
   for (const r of roots) {
     try {

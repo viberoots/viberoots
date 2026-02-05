@@ -7,8 +7,8 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("python importer-scoped macros fail fast when labels and lockfile_label disagree", async () => {
   await runInTemp("python-lockfile-label-disagreement", async (tmp, $) => {
-    const aDir = path.join(tmp, "apps", "a");
-    const bDir = path.join(tmp, "apps", "b");
+    const aDir = path.join(tmp, "projects", "apps", "a");
+    const bDir = path.join(tmp, "projects", "apps", "b");
     await fsp.mkdir(aDir, { recursive: true });
     await fsp.mkdir(bDir, { recursive: true });
     await fsp.writeFile(path.join(aDir, "uv.lock"), "# lock\n", "utf8");
@@ -21,8 +21,8 @@ test("python importer-scoped macros fail fast when labels and lockfile_label dis
         "",
         "nix_python_library(",
         '  name = "lib",',
-        '  labels = ["lockfile:apps/a/uv.lock#apps/a"],',
-        '  lockfile_label = "lockfile:apps/b/uv.lock#apps/b",',
+        '  labels = ["lockfile:projects/apps/a/uv.lock#projects/apps/a"],',
+        '  lockfile_label = "lockfile:projects/apps/b/uv.lock#projects/apps/b",',
         ")",
         "",
       ].join("\n"),
@@ -34,7 +34,7 @@ test("python importer-scoped macros fail fast when labels and lockfile_label dis
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute name //apps/a:lib`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute name //projects/apps/a:lib`;
 
     assert.notEqual(q.exitCode, 0, "expected cquery to fail on lockfile label disagreement");
     const combined = String(q.stderr || "") + String(q.stdout || "");

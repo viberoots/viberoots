@@ -17,11 +17,11 @@ EOF'`;
       cwd: tmp,
     })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
 MODULE_PROVIDERS = {
-  "//apps/demo:arc": ["//third_party/providers:prov"],
+  "//projects/apps/demo:arc": ["//third_party/providers:prov"],
 }
 EOF'`;
 
-    const appDir = path.join(tmp, "apps", "demo");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(path.join(appDir, "pkg", "demo"), { recursive: true });
     await fsp.writeFile(
       path.join(appDir, "pkg", "demo", "x.go"),
@@ -51,7 +51,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //apps/demo:arc`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //projects/apps/demo:arc`;
     if (probe.exitCode !== 0) return;
     const out = String(probe.stdout || "");
     assert.ok(
@@ -64,7 +64,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 build --target-platforms //:no_cgo --show-output //apps/demo:arc`;
+    })`buck2 build --target-platforms //:no_cgo --show-output //projects/apps/demo:arc`;
     if (build.exitCode !== 0) return;
     assert.ok(
       String(build.stdout || "").includes("arc.stamp"),

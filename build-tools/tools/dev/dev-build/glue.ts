@@ -1,9 +1,9 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import "zx/globals";
-import { runGomod2nixGenerate, runGomod2nixScanAll } from "../install/gomod2nix.ts";
-import { readCompositeGraph } from "../../lib/graph-view.ts";
 import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const.ts";
+import { readCompositeGraph } from "../../lib/graph-view.ts";
+import { runGomod2nixGenerate, runGomod2nixScanAll } from "../install/gomod2nix.ts";
 import { nodeBin, zxNodeBase } from "./paths.ts";
 
 export async function cleanDevBuildWorkspace(root: string): Promise<void> {
@@ -29,7 +29,7 @@ async function debugListTargets(root: string): Promise<void> {
     const demoTargets = path.join(root, "libs", "demo-lib", "TARGETS");
     try {
       const txt = await fsp.readFile(demoTargets, "utf8").catch(() => "");
-      if (txt) console.warn("[dev-build][debug] libs/demo-lib/TARGETS contents:\n" + txt);
+      if (txt) console.warn("[dev-build][debug] projects/libs/demo-lib/TARGETS contents:\n" + txt);
     } catch {}
     console.warn("[dev-build][debug] running 'buck2 targets //...'");
     await $({ stdio: "inherit", cwd: root })`buck2 targets //...`;

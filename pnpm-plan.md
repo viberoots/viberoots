@@ -1,18 +1,18 @@
 ## PNPM Monorepo Enablement — Multi‑PR Development Plan
 
-This plan sequences small, verifiable PRs to implement PNPM workspaces (apps/libs), importer‑scoped providers, hermetic Nix installs, and a Node patch wrapper. It follows the methodology (clear phases, measurable gates) and the build‑system design guide.
+This plan sequences small, verifiable PRs to implement PNPM workspaces (projects/apps + projects/libs), importer‑scoped providers, hermetic Nix installs, and a Node patch wrapper. It follows the methodology (clear phases, measurable gates) and the build‑system design guide.
 
 ### PR1 — Workspace bootstrap and isolation invariants
 
 - Scope
-  - Add `pnpm-workspace.yaml` with `packages: ["apps/*", "libs/*"]`.
+  - Add `pnpm-workspace.yaml` with `packages: ["projects/apps/*", "projects/libs/*"]`.
   - Commit `.npmrc` defaults to enforce isolation and patch location:
     - `node-linker=isolated`
     - `patches-dir=patches/node`
   - Add empty `patches/node/.gitkeep` and create `third_party/providers/` folder (if missing).
   - Add `third_party/providers/defs_node.bzl` with `node_importer_deps(...)` genrule.
 - Detailed design
-  - `pnpm-workspace.yaml` introduces only apps/libs; root remains a tooling importer but apps/libs do not inherit root deps.
+  - `pnpm-workspace.yaml` introduces only projects/apps + projects/libs; root remains a tooling importer but projects/apps/libs do not inherit root deps.
   - `.npmrc` ensures no shadow dependencies; patches for Node land under `patches/node/` by default.
   - `defs_node.bzl` mirrors the cookbook: tiny public provider rule emitting a stable stamp from inputs.
 - Acceptance criteria
@@ -41,18 +41,18 @@ This plan sequences small, verifiable PRs to implement PNPM workspaces (apps/lib
 - Consequences of not implementing
   - Fragile Node provider determinism; harder to reason about rebuild invalidation.
 
-### PR3 — First PNPM project scaffold (apps/example) with per‑importer lockfile
+### PR3 — First PNPM project scaffold (projects/apps/example) with per‑importer lockfile
 
 - Scope
-  - Scaffold `apps/example` (TS, ESLint, Prettier, tests) with its own `package.json`, `.npmrc` (inherits repo defaults), and `pnpm-lock.yaml`.
+  - Scaffold `projects/apps/example` (TS, ESLint, Prettier, tests) with its own `package.json`, `.npmrc` (inherits repo defaults), and `pnpm-lock.yaml`.
   - Add a `TARGETS` file for the project with label:
-    - `labels = ["lockfile:apps/example/pnpm-lock.yaml#apps/example"]`.
+    - `labels = ["lockfile:projects/apps/example/pnpm-lock.yaml#projects/apps/example"]`.
   - Add a minimal build/test genrule and integrate with Buck’s provider auto‑map.
 - Detailed design
   - Scaffolding aligns with isolation: no root deps; local install runs in dev shell.
   - Test file follows one-test-per-file convention and a trivial assertion.
 - Acceptance criteria
-  - `pnpm -w install` completes; `apps/example` runs `pnpm test` successfully in dev shell.
+  - `pnpm -w install` completes; `projects/apps/example` runs `pnpm test` successfully in dev shell.
   - Glue steps: export-graph → sync-providers → gen-auto-map run cleanly; Buck build/test for the example target succeeds.
 - Risks
   - Mislabeling lockfile or importer; incorrect label prevents provider mapping.
@@ -83,12 +83,12 @@ This plan sequences small, verifiable PRs to implement PNPM workspaces (apps/lib
     - Call `build-tools/lang/defs_common.bzl` stamping helpers to add `lang:node` and `kind:*` labels.
     - Append providers from `//third_party/providers:auto_map.bzl`.
     - Accept a `labels` parameter so the lockfile label is explicit in the macro call.
-  - Migrate `apps/example` TARGETS to use the macro.
+  - Migrate `projects/apps/example` TARGETS to use the macro.
 - Detailed design
   - Macro enforces presence of `lockfile:<path>#<importer>` label at call sites and merges with user labels.
   - Leaves escape hatch to pass additional `deps` manually if needed.
 - Acceptance criteria
-  - Example builds/tests unchanged; `buck2 cquery deps(//apps/example:...)` shows Node provider dependency.
+  - Example builds/tests unchanged; `buck2 cquery deps(//projects/apps/example:...)` shows Node provider dependency.
   - Stamping lint passes for `lang:node` and kind labels.
 - Risks
   - Over‑strict validation might block legitimate custom cases.
@@ -128,16 +128,16 @@ This plan sequences small, verifiable PRs to implement PNPM workspaces (apps/lib
 ### PR8 — Scaffolding command for new PNPM projects
 
 - Scope
-  - Add `build-tools/tools/scaffolding/new-pnpm-project.ts` to generate apps/libs templates with TS/ESLint/Prettier/tests, `.npmrc`, labels, and TARGETS using the Node macro.
+  - Add `build-tools/tools/scaffolding/new-pnpm-project.ts` to generate projects/apps/libs templates with TS/ESLint/Prettier/tests, `.npmrc`, labels, and TARGETS using the Node macro.
   - Register templates in scaffolding registry.
   - Place all Node templates under `build-tools/tools/scaffolding/templates` (consistent with other languages).
-  - Add a Node CLI template option (apps/\*) that scaffolds a runnable command-line app:
+  - Add a Node CLI template option (projects/apps/\*) that scaffolds a runnable command-line app:
     - Generates `bin/<name>` with `#!/usr/bin/env node` shebang and a minimal `--help` handler.
     - Adds `package.json` `bin` mapping (`"bin": { "<name>": "bin/<name>" }`) and scripts (`build`, `test`, `lint`, `format`).
     - Ensures `.npmrc` includes `node-linker=isolated` and `patches-dir=patches/node`.
     - Emits `TARGETS` using the Node macro (from PR5) with `labels = ["lockfile:<path>#<importer>", "lang:node", "kind:bin"]` so importer-scoped providers auto-wire.
     - Includes a one-test-per-file zx test under `build-tools/tools/tests` that executes the CLI with `--help` and asserts exit code 0 (no zx loader in the app itself; zx is used only for the test harness).
-  - Add a Node lib template option (libs/\*) that scaffolds a reusable library:
+  - Add a Node lib template option (projects/libs/\*) that scaffolds a reusable library:
     - Generates `src/index.ts` exporting a function and a matching one-test-per-file unit test in `test/`.
     - Adds `package.json` `exports`/`types` pointing to built outputs (e.g., `dist/index.js` / `dist/index.d.ts`) and standard scripts (`build`, `test`, `lint`, `format`).
     - Ensures `.npmrc` includes `node-linker=isolated` and `patches-dir=patches/node`.
@@ -156,14 +156,14 @@ This plan sequences small, verifiable PRs to implement PNPM workspaces (apps/lib
     - The generator ensures `pnpm-lock.yaml` exists (lockfile-only) so provider sync has stable inputs.
 - Acceptance criteria
   - Running the command produces a project that installs, builds, tests, and wires providers correctly on first try.
-  - CLI template: `pnpm run build` succeeds; `node bin/<name> --help` exits 0; Buck build/test targets succeed and depend on the correct importer-scoped provider (visible via `buck2 cquery deps(//apps/<name>:<rule>)`).
-  - Lib template: `pnpm run build` emits `dist/`; `node -e "import('<pkg>')"` succeeds (when locally linked); Buck build/test targets succeed and depend on the correct importer-scoped provider (visible via `buck2 cquery deps(//libs/<name>:<rule>)`).
+  - CLI template: `pnpm run build` succeeds; `node bin/<name> --help` exits 0; Buck build/test targets succeed and depend on the correct importer-scoped provider (visible via `buck2 cquery deps(//projects/apps/<name>:<rule>)`).
+  - Lib template: `pnpm run build` emits `dist/`; `node -e "import('<pkg>')"` succeeds (when locally linked); Buck build/test targets succeed and depend on the correct importer-scoped provider (visible via `buck2 cquery deps(//projects/libs/<name>:<rule>)`).
 - Risks
   - Template drift; mitigate with tests using scaffolding fixtures.
 - Consequences of not implementing
   - Manual setup is error‑prone; slower adoption.
 
-### PR8.1 — Node CLI binary materialization (apps/\*)
+### PR8.1 — Node CLI binary materialization (projects/apps/\*)
 
 - Scope
   - Add a minimal Buck macro `nix_node_cli_bin(...)` that materializes a CLI launcher as a Buck output for Node CLI importers.
@@ -211,15 +211,15 @@ This plan sequences small, verifiable PRs to implement PNPM workspaces (apps/lib
     - `build-tools/tools/scaffolding/templates/node/cli/TARGETS.jinja` will switch from `nix_node_bin(...)` to `nix_node_cli_bin(...)` and optionally enable `bundle = True` to use `node_cli_bundle(...)`, passing the project’s importer‑scoped lockfile label and leaving other fields minimal.
 
 - Acceptance criteria
-  - `buck2 build //apps/<name>:<name>` produces a single file artifact at `buck-out/.../<name>` with the executable bit set (shim mode) OR `<name>.bundle.js` with shebang (bundled mode).
+  - `buck2 build //projects/apps/<name>:<name>` produces a single file artifact at `buck-out/.../<name>` with the executable bit set (shim mode) OR `<name>.bundle.js` with shebang (bundled mode).
   - Running the built artifact with `--help` exits 0 and prints usage (in both shim and bundled modes).
-  - `buck2 cquery deps(//apps/<name>:<name>)` shows the importer‑scoped provider dependency from `third_party/providers/auto_map.bzl`.
+  - `buck2 cquery deps(//projects/apps/<name>:<name>)` shows the importer‑scoped provider dependency from `third_party/providers/auto_map.bzl`.
 
 - Tests
   - Add a zx test under `build-tools/tools/tests/scaffolding/` that:
-    - Scaffolds a Node CLI (`apps/demo`), refreshes glue (export graph → sync node providers → gen auto_map),
-    - Builds `//apps/demo:demo` in shim mode and asserts the artifact exists and is executable; executes with `--help` and asserts exit code 0,
-    - Builds `//apps/demo:demo` in bundled mode (via macro `bundle = True`) and asserts the single‑file bundle exists, is executable, and `--help` exits 0.
+    - Scaffolds a Node CLI (`projects/apps/demo`), refreshes glue (export graph → sync node providers → gen auto_map),
+    - Builds `//projects/apps/demo:demo` in shim mode and asserts the artifact exists and is executable; executes with `--help` and asserts exit code 0,
+    - Builds `//projects/apps/demo:demo` in bundled mode (via macro `bundle = True`) and asserts the single‑file bundle exists, is executable, and `--help` exits 0.
 
 - Risks
   - Bundling configuration drift (esbuild/tsup options) can affect hermetic outputs; mitigate by pinning tool versions and keeping configs minimal/deterministic.
@@ -229,10 +229,10 @@ This plan sequences small, verifiable PRs to implement PNPM workspaces (apps/lib
   - CLIs scaffolded in PR8 have no visible Buck artifact, leading to confusion when trying to locate outputs.
   - Teams may roll ad‑hoc genrules per project, increasing drift and maintenance cost.
 
-### PR8.5 — Vite‑based webapp template (apps/\*)
+### PR8.5 — Vite‑based webapp template (projects/apps/\*)
 
 - Scope
-  - Add a `vite` + TypeScript webapp template under `apps/*` to the `new-pnpm-project` scaffolder.
+  - Add a `vite` + TypeScript webapp template under `projects/apps/*` to the `new-pnpm-project` scaffolder.
   - Generate minimal files: `index.html`, `src/main.ts`, `src/style.css` (optional), `vite.config.ts`.
   - Create `package.json` with scripts: `dev` (vite), `build` (vite build), `preview` (vite preview), plus `lint`/`format`.
   - Ensure `.npmrc` includes `node-linker=isolated` and `patches-dir=patches/node`; create importer‑scoped `pnpm-lock.yaml`.
@@ -254,9 +254,9 @@ This plan sequences small, verifiable PRs to implement PNPM workspaces (apps/lib
     - Builds the Buck macro target and asserts the artifact contains `index.html` (verifies Nix‑backed build path end‑to‑end).
 
 - Acceptance criteria
-  - Scaffolding produces an `apps/<name>` webapp that builds with `pnpm run build` in the dev shell.
+  - Scaffolding produces a `projects/apps/<name>` webapp that builds with `pnpm run build` in the dev shell.
   - Provider glue steps run cleanly; `auto_map.bzl` lists the importer‑scoped provider for the webapp target.
-  - Buck build/test of the template’s stamp target succeeds; `buck2 cquery deps(//apps/<name>:<rule>)` shows the importer provider.
+  - Buck build/test of the template’s stamp target succeeds; `buck2 cquery deps(//projects/apps/<name>:<rule>)` shows the importer provider.
 
 - Risks
   - Tooling drift between Vite versions; mitigate with pinned versions and minimal config.

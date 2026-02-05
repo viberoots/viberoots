@@ -12,7 +12,7 @@ test("node cpp-addon: README documents quickstart and canonical links", async ()
     // Skip lockfile generation: this test is about rendered docs, not lockfile production.
     await $`scaf new node cpp-addon demo --yes --skip-lockfile-gen`;
 
-    const readmePath = path.join(tmp, "libs", "demo", "README.md");
+    const readmePath = path.join(tmp, "projects", "libs", "demo", "README.md");
     const txt = await fsp.readFile(readmePath, "utf8");
 
     // Quick sanity checks on documented paths/links

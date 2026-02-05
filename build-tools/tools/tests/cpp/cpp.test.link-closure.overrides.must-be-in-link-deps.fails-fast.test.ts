@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("cpp: nix_cpp_test rejects invalid link_closure_overrides (fails fast)", async () => {
   await runInTemp("cpp-test-link-closure-overrides-invalid", async (tmp, $) => {
-    const supportDir = path.join(tmp, "libs", "support");
+    const supportDir = path.join(tmp, "projects", "libs", "support");
     await fsp.mkdir(path.join(supportDir, "src"), { recursive: true });
     await fsp.writeFile(
       path.join(supportDir, "src", "support.cpp"),
@@ -30,7 +30,7 @@ test("cpp: nix_cpp_test rejects invalid link_closure_overrides (fails fast)", as
       "utf8",
     );
 
-    const appDir = path.join(tmp, "apps", "demo");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(path.join(appDir, "src"), { recursive: true });
     await fsp.writeFile(
       path.join(appDir, "src", "demo_test.cpp"),
@@ -47,7 +47,7 @@ test("cpp: nix_cpp_test rejects invalid link_closure_overrides (fails fast)", as
         '  srcs = ["src/demo_test.cpp"],',
         "  link_deps = [],",
         "  link_closure_overrides = {",
-        '    "//libs/support:support": "transitive",',
+        '    "//projects/libs/support:support": "transitive",',
         "  },",
         ")",
         "",
@@ -60,7 +60,7 @@ test("cpp: nix_cpp_test rejects invalid link_closure_overrides (fails fast)", as
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 test --target-platforms //:no_cgo //apps/demo:demo_test`;
+    })`buck2 test --target-platforms //:no_cgo //projects/apps/demo:demo_test`;
     if (res.exitCode === 0) {
       assert.fail("expected buck2 test to fail due to invalid link_closure_overrides");
     }
@@ -69,6 +69,9 @@ test("cpp: nix_cpp_test rejects invalid link_closure_overrides (fails fast)", as
       err.includes("link_closure_overrides keys must be present in link_deps"),
       "expected link_closure_overrides validation error",
     );
-    assert.ok(err.includes("//libs/support:support"), "expected missing dep label in error");
+    assert.ok(
+      err.includes("//projects/libs/support:support"),
+      "expected missing dep label in error",
+    );
   });
 });

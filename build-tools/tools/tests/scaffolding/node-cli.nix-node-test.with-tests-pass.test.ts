@@ -33,7 +33,7 @@ test(
       // Scaffold with tests default-on
       await $`scaf new node cli demo --yes`;
 
-      const importer = "apps/demo";
+      const importer = "projects/apps/demo";
       const lockfile = path.join(importer, "pnpm-lock.yaml");
       const sanitized = importer
         .replace(/\/\//g, "")

@@ -11,7 +11,7 @@ function hasUnescapedCommandSubst(s: string): boolean {
 
 test("node macros do not emit unescaped $(...) command substitutions in assembled cmd", async () => {
   await runInTemp("node-cmd-no-unescaped-subst", async (tmp, $) => {
-    const appDir = path.join(tmp, "apps", "web");
+    const appDir = path.join(tmp, "projects", "apps", "web");
     await fsp.mkdir(path.join(appDir, "src"), { recursive: true });
     await fsp.writeFile(path.join(appDir, "pnpm-lock.yaml"), "# stub\n", "utf8");
     await fsp.writeFile(path.join(appDir, "src", "index.ts"), "console.log('cli')\n", "utf8");
@@ -22,13 +22,13 @@ test("node macros do not emit unescaped $(...) command substitutions in assemble
         "",
         "node_webapp(",
         '  name = "bundle",',
-        '  labels = ["lockfile:apps/web/pnpm-lock.yaml#apps/web"],',
+        '  labels = ["lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"],',
         ")",
         "",
         "nix_node_cli_bin(",
         '  name = "tool",',
         "  bundle = True,",
-        '  labels = ["lockfile:apps/web/pnpm-lock.yaml#apps/web"],',
+        '  labels = ["lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"],',
         ")",
         "",
       ].join("\n"),
@@ -40,7 +40,7 @@ test("node macros do not emit unescaped $(...) command substitutions in assemble
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cmd //apps/web:bundle`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cmd //projects/apps/web:bundle`;
     if (probeApp.exitCode !== 0) {
       return;
     }
@@ -52,7 +52,7 @@ test("node macros do not emit unescaped $(...) command substitutions in assemble
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cmd //apps/web:tool`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cmd //projects/apps/web:tool`;
     if (probeCli.exitCode !== 0) {
       return;
     }

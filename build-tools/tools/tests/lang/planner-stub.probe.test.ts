@@ -19,7 +19,7 @@ async function readFirstBuckOutputPath(stdout: unknown): Promise<string> {
 
 test("planner_stub: deterministic stamp with deps-only and srcs+deps+labels", async () => {
   await runInTemp("planner-stub-probe", async (tmp, $) => {
-    const appDir = path.join(tmp, "apps", "probe");
+    const appDir = path.join(tmp, "projects", "apps", "probe");
     await fsp.mkdir(appDir, { recursive: true });
     await fsp.writeFile(path.join(appDir, "in.txt"), "hello\n", "utf8");
 
@@ -53,7 +53,7 @@ test("planner_stub: deterministic stamp with deps-only and srcs+deps+labels", as
     const depsOnly = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`buck2 build --target-platforms //:no_cgo --show-output //apps/probe:deps_only`;
+    })`buck2 build --target-platforms //:no_cgo --show-output //projects/apps/probe:deps_only`;
     const depsOnlyOut = await readFirstBuckOutputPath(depsOnly.stdout);
     const depsOnlyTxt = await fsp.readFile(path.join(tmp, depsOnlyOut), "utf8");
     assert.equal(
@@ -65,7 +65,7 @@ test("planner_stub: deterministic stamp with deps-only and srcs+deps+labels", as
     const srcsAndDeps = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`buck2 build --target-platforms //:no_cgo --show-output //apps/probe:srcs_and_deps`;
+    })`buck2 build --target-platforms //:no_cgo --show-output //projects/apps/probe:srcs_and_deps`;
     const srcsAndDepsOut = await readFirstBuckOutputPath(srcsAndDeps.stdout);
     const srcsAndDepsTxt = await fsp.readFile(path.join(tmp, srcsAndDepsOut), "utf8");
     assert.equal(

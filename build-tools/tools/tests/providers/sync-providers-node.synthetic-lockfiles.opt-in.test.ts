@@ -13,14 +13,14 @@ test("sync-providers-node: synthetic lockfile providers are opt-in", async () =>
     // so default provider sync yields an empty providers file.
     await fsp.rm(path.join(tmp, "pnpm-lock.yaml"), { force: true });
 
-    const importerDir = path.join(tmp, "apps", "demo");
+    const importerDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(importerDir, { recursive: true });
     await fsp.writeFile(
       path.join(importerDir, "package.json"),
       JSON.stringify({ name: "demo", private: true }, null, 2) + "\n",
       "utf8",
     );
-    await $`git add apps/demo/package.json`;
+    await $`git add projects/apps/demo/package.json`;
 
     // Default behavior: no provider for non-existent lockfiles
     await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
@@ -28,7 +28,7 @@ test("sync-providers-node: synthetic lockfile providers are opt-in", async () =>
     const outDefault = await fsp.readFile(outPath, "utf8");
     assert.ok(!outDefault.includes("node_importer_deps("), "expected no node providers by default");
     assert.ok(
-      !outDefault.includes("apps/demo/pnpm-lock.yaml"),
+      !outDefault.includes("projects/apps/demo/pnpm-lock.yaml"),
       "expected no synthetic lockfile path by default",
     );
 
@@ -37,11 +37,11 @@ test("sync-providers-node: synthetic lockfile providers are opt-in", async () =>
     const outSynth = await fsp.readFile(outPath, "utf8");
     assert.ok(outSynth.includes("node_importer_deps("), "expected node provider in synthetic mode");
     assert.ok(
-      outSynth.includes('lockfile="apps/demo/pnpm-lock.yaml"'),
+      outSynth.includes('lockfile="projects/apps/demo/pnpm-lock.yaml"'),
       "expected synthesized lockfile path in synthetic mode",
     );
     assert.ok(
-      outSynth.includes('importer="apps/demo"'),
+      outSynth.includes('importer="projects/apps/demo"'),
       "expected importer label in synthetic mode",
     );
   });

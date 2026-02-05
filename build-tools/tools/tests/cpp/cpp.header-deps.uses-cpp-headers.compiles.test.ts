@@ -49,7 +49,7 @@ test("cpp consumer compiles with header_deps via nix_cpp_headers (build)", async
         "nix_cpp_binary(",
         '  name = "demo",',
         '  srcs = ["src/main.cpp"],',
-        '  header_deps = ["//libs/hdrs:hdrs"],',
+        '  header_deps = ["//projects/libs/hdrs:hdrs"],',
         '  labels = ["lang:cpp", "kind:bin"],',
         '  visibility = ["PUBLIC"],',
         ")",
@@ -63,7 +63,7 @@ test("cpp consumer compiles with header_deps via nix_cpp_headers (build)", async
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir cpp_header_deps cquery "deps(//apps/demo:demo)" --json --output-attribute name`;
+    })`buck2 --isolation-dir cpp_header_deps cquery "deps(//projects/apps/demo:demo)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return;
 
     await $({
@@ -74,7 +74,7 @@ test("cpp consumer compiles with header_deps via nix_cpp_headers (build)", async
       stdio: "pipe",
       reject: false,
       nothrow: true,
-      env: { ...process.env, BUCK_TARGET: "//apps/demo:demo" },
+      env: { ...process.env, BUCK_TARGET: "//projects/apps/demo:demo" },
     })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
     assert.equal(build.exitCode, 0, String(build.stderr || build.stdout));
   });

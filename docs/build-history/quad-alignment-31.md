@@ -243,7 +243,7 @@ Non-goals in this PR:
 
 ### Tests (in this PR)
 
-- The TS parity test described above (matrix includes `.`, `apps/foo`, `libs/bar`, and clearly unsupported cases like `build-tools/tools/x`, nested `apps/foo/bar`, and `../apps/x`).
+- The TS parity test described above (matrix includes `.`, `projects/apps/foo`, `projects/libs/bar`, and clearly unsupported cases like `build-tools/tools/x`, nested `projects/apps/foo/bar`, and `../projects/apps/x`).
 - Add one regression test that verifies the exporter does not auto-attach lockfile labels when the nearest lockfile is under an unsupported importer root.
 
 ### Docs (in this PR)

@@ -21,15 +21,16 @@ let
   siteOverlays = args.siteOverlays or [];
 
   isAbs = p: lib.hasPrefix "/" p;
-  isRepoRel = p: lib.hasPrefix "apps/" p || lib.hasPrefix "libs/" p;
+  isRepoRel = p: lib.hasPrefix "projects/apps/" p || lib.hasPrefix "projects/libs/" p;
   isStorePath = p: lib.hasPrefix "/nix/store/" p;
   toStore = p: builtins.toString (builtins.path { path = builtins.toPath p; name = "uv-dev"; });
 
   flakeRoot = builtins.toString ./.;
   buckTestSrc = builtins.getEnv "BUCK_TEST_SRC";
   workspaceEnv = builtins.getEnv "WORKSPACE_ROOT";
+  wsRootOk = wsRoot != null && wsRoot != "" && !(isStorePath wsRoot);
   originRoot =
-    if (wsRoot != null && wsRoot != "") then wsRoot
+    if wsRootOk then wsRoot
     else if buckTestSrc != "" then buckTestSrc
     else if workspaceEnv != "" then workspaceEnv
     else flakeRoot;
@@ -58,7 +59,7 @@ let
   testResolveObj =
     let raw = if testResolveJSON != "" then (builtins.fromJSON testResolveJSON) else {};
         names = builtins.attrNames raw;
-        isRepoRel = p: lib.hasPrefix "apps/" p || lib.hasPrefix "libs/" p;
+        isRepoRel = p: lib.hasPrefix "projects/apps/" p || lib.hasPrefix "projects/libs/" p;
         isAbs = p: lib.hasPrefix "/" p;
         toStore = p: builtins.toString (builtins.path { path = builtins.toPath p; name = "uv-src"; });
         step = acc: name:

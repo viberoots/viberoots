@@ -160,7 +160,7 @@ async function applyPatchPkg($: any, tmp: string, resolveOrigin: string, goEnv: 
       NIX_GO_TEST_RESOLVE_JSON: resolveMap,
       ...goEnv,
     },
-  })`build-tools/tools/bin/patch-pkg apply go github.com/google/uuid --target //apps/demo-cli:demo-cli --force`;
+  })`build-tools/tools/bin/patch-pkg apply go github.com/google/uuid --target //projects/apps/demo-cli:demo-cli --force`;
 }
 
 async function patchUuidWorkspaceToZero($: any, ws: string) {
@@ -238,10 +238,10 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
     await writeBuckConfig($);
 
     // Scaffold a CLI app that directly imports github.com/google/uuid
-    await $`scaf new go cli demo-cli --yes --path=apps/demo-cli`;
+    await $`scaf new go cli demo-cli --yes --path=projects/apps/demo-cli`;
     // Replace main to use uuid, then tidy to add dependency
     await writeFileAbs(
-      path.join(_tmp, "apps", "demo-cli", "cmd", "demo-cli", "main.go"),
+      path.join(_tmp, "projects", "apps", "demo-cli", "cmd", "demo-cli", "main.go"),
       [
         "package main",
         "",
@@ -271,14 +271,14 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
       ...(gomodcache ? { GOMODCACHE: gomodcache } : {}),
     };
     await $({
-      cwd: path.join(_tmp, "apps", "demo-cli"),
+      cwd: path.join(_tmp, "projects", "apps", "demo-cli"),
       stdio: "inherit",
       env: {
         ...process.env,
         ...goEnv,
       },
     })`go mod tidy`;
-    await writeGoSumFromDownload($, path.join(_tmp, "apps", "demo-cli"), goEnv);
+    await writeGoSumFromDownload($, path.join(_tmp, "projects", "apps", "demo-cli"), goEnv);
 
     // Generate gomod2nix.toml via local stub (avoid network)
     const stubDir = path.join(_tmp, "bin");
@@ -312,9 +312,9 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
       cwd: _tmp,
       stdio: "inherit",
       env: { ...process.env, PATH: `${stubDir}:${process.env.PATH || ""}` },
-    })`gomod2nix --dir apps/demo-cli`;
+    })`gomod2nix --dir projects/apps/demo-cli`;
     await fsp.copyFile(
-      path.join(_tmp, "apps", "demo-cli", "gomod2nix.toml"),
+      path.join(_tmp, "projects", "apps", "demo-cli", "gomod2nix.toml"),
       path.join(_tmp, "gomod2nix.toml"),
     );
 
@@ -333,12 +333,13 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
 
     // Vendor dependencies and inject patched uuid into vendor tree
     await $({
-      cwd: path.join(_tmp, "apps", "demo-cli"),
+      cwd: path.join(_tmp, "projects", "apps", "demo-cli"),
       stdio: "inherit",
       env: { ...process.env, ...goEnv },
     })`go mod vendor`;
     const vendUuidDir = path.join(
       _tmp,
+      "projects",
       "apps",
       "demo-cli",
       "vendor",
@@ -370,7 +371,7 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
           app = pkgs.buildGoModule {
             pname = "demo-cli";
             version = "0.1.0";
-            src = ./apps/demo-cli;
+            src = ./projects/apps/demo-cli;
             subPackages = [ "cmd/demo-cli" ];
             # Vendor directory present; instruct buildGoModule to use it
             vendorHash = null;
@@ -387,6 +388,7 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
       try {
         const h1 = await $({ stdio: "pipe" })`nix hash path ${path.join(
           _tmp,
+          "projects",
           "apps",
           "demo-cli",
           "vendor",

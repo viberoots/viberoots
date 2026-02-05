@@ -8,7 +8,7 @@ Run glue, then build and test:
 
 ```
 build
-verify //libs/{{ name }}:{{ name }}_test
+verify //projects/libs/{{ name }}:{{ name }}_test
 ```
 
 ## Add dependencies and refresh gomod2nix
@@ -16,7 +16,7 @@ verify //libs/{{ name }}:{{ name }}_test
 Within this library directory:
 
 ```
-cd libs/{{ name }}
+cd projects/libs/{{ name }}
 go get example.com/some/module@latest
 go mod tidy
 ```
@@ -41,13 +41,13 @@ build-tools/tools/bin/patch-pkg start go golang.org/x/net
 build-tools/tools/bin/patch-pkg apply go golang.org/x/net
 ```
 
-Patches are stored under `libs/{{ name }}/patches/go/` and are consumed directly by the Go Nix template. No provider sync is required for Go; just rebuild after applying a patch.
+Patches are stored under `projects/libs/{{ name }}/patches/go/` and are consumed directly by the Go Nix template. No provider sync is required for Go; just rebuild after applying a patch.
 
 ## Repository layout
 
-- `libs/{{ name }}`: Library source, its `go.mod`, and `TARGETS` using `nix_go_library` and `nix_go_test`.
-- `apps/*`: Example consumers of libraries; each owns its `TARGETS`.
-- `libs/{{ name }}/patches/go/`: Canonical Go dependency patches created by `patch-pkg` for this package.
+- `projects/libs/{{ name }}`: Library source, its `go.mod`, and `TARGETS` using `nix_go_library` and `nix_go_test`.
+- `projects/apps/*`: Example consumers of libraries; each owns its `TARGETS`.
+- `projects/libs/{{ name }}/patches/go/`: Canonical Go dependency patches created by `patch-pkg` for this package.
 
 ## Providers and glue
 

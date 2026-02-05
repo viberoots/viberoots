@@ -58,7 +58,7 @@ The design preserves the current model: importer‑scoped providers, validate‑
   - Update `build-tools/tools/tests/scaffolding/node-cli.scaffold-and-build.shim-and-bundle.test.ts`:
     - Keep the existing shim test (non‑bundled).
     - For the bundling test:
-      - After `buck2 build //apps/demo:demo` in bundle mode, add a run step to execute the built artifact and assert basic output (e.g., “usage” text or `--help` route). This validates the bundle is actually produced by Nix and is runnable.
+      - After `buck2 build //projects/apps/demo:demo` in bundle mode, add a run step to execute the built artifact and assert basic output (e.g., “usage” text or `--help` route). This validates the bundle is actually produced by Nix and is runnable.
 
 - Provider label presence
   - New test (example filename): `build-tools/tools/tests/node/providers/node-provider-lang-label.test.ts`:

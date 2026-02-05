@@ -3,6 +3,7 @@ let
   T = ctx.T;
   get = ctx.get;
   repoRoot = ctx.repoRoot;
+  repoRootStr = ctx.repoRootStr or (builtins.toString repoRoot);
   pkgPathOf = ctx.pkgPathOf;
   L = import ./lib.nix {
     inherit lib;
@@ -49,14 +50,14 @@ let
       descend = idx:
         if idx < 0 then null else
         let rel = lib.concatStringsSep "/" (lib.take (idx + 1) segments);
-            cand = builtins.toPath (repoRoot + "/" + rel + "/uv.lock");
+            cand = builtins.toPath (repoRootStr + "/" + rel + "/uv.lock");
         in if builtins.pathExists cand then cand else descend (idx - 1);
       nearest = if (builtins.length segments) > 0 then descend ((builtins.length segments) - 1) else null;
     in if nearest != null then nearest
        else builtins.throw ("uv.lock missing for target " + name + "; expected at or above " + (repoRoot + "/" + pkgRel));
 
   lockRelFor = name:
-    let abs = lockfileFor name; absStr = builtins.toString abs; rootStr = builtins.toString repoRoot;
+    let abs = lockfileFor name; absStr = builtins.toString abs; rootStr = repoRootStr;
     in if lib.hasPrefix (rootStr + "/") absStr then lib.removePrefix (rootStr + "/") absStr else absStr;
 
   ensureString = ctxStr: x:

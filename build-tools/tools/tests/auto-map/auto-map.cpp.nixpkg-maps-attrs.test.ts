@@ -12,7 +12,7 @@ test("auto-map: C++ nixpkg labels map to providers", async () => {
     await fs.mkdirp(path.dirname(graphPath));
     const nodes = [
       {
-        name: "//libs/cppdemo:lib",
+        name: "//projects/libs/cppdemo:lib",
         rule_type: "cxx_library",
         labels: ["lang:cpp", "nixpkg:pkgs.zlib", "nixpkg:pkgs.googletest"],
       },

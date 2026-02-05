@@ -192,13 +192,13 @@ Rollback is trivial: re‑enable provider append in macros and keep prior tools;
 ## Test Plan (high‑signal cases)
 
 - C++ patch invalidation
-  - Create `libs/x/patches/cpp/fix.patch` touching a symbol; verify the `//libs/x:x` bin/lib rebuilds; unrelated targets cache‑hit; verify `testsof(rdeps(...))` scope matches rdeps.
+  - Create `projects/libs/x/patches/cpp/fix.patch` touching a symbol; verify the `//projects/libs/x:x` bin/lib rebuilds; unrelated targets cache‑hit; verify `testsof(rdeps(...))` scope matches rdeps.
 - `flake.lock` invalidation
   - Touch `flake.lock` (or simulate a change) and verify only C++ targets depending on specific `nixpkg_deps` rebuild (others remain cache‑hit).
 - Overlay invalidation (when overlay is enabled)
   - Place a trivial overlay; enable env flag; verify changes invalidate only affected targets.
 - No providers in graph
-  - `buck2 cquery deps(//libs/x:x)` returns no `//third_party/providers:*` edges for C++; docs point devs to the new `inspect-cpp-attrs` CLI.
+  - `buck2 cquery deps(//projects/libs/x:x)` returns no `//third_party/providers:*` edges for C++; docs point devs to the new `inspect-cpp-attrs` CLI.
 
 ---
 
@@ -322,9 +322,9 @@ Purpose: replace provider‑node based graph queries for C++ with a labels/plann
   - For each target, collect `nixpkg:` labels on the node (and optionally on its direct deps if we decide to reflect inherited attrs)
   - Print a sorted, deduped list of effective attrs
 - Output example (text):
-  - `//libs/core:lib → pkgs.zlib, pkgs.openssl`
+  - `//projects/libs/core:lib → pkgs.zlib, pkgs.openssl`
 - Output example (json):
-  - `{ "targets": { "//libs/core:lib": ["pkgs.openssl","pkgs.zlib"] } }`
+  - `{ "targets": { "//projects/libs/core:lib": ["pkgs.openssl","pkgs.zlib"] } }`
 
 ### F. CI and guard implications
 

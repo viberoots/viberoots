@@ -8,7 +8,7 @@ import { runInTemp } from "../lib/test-helpers";
 test("cpp gtest include via nixpkg_deps at call site", async () => {
   await runInTemp("cpp-nixpkg-include", async (tmp, $) => {
     // Write a minimal app with a single gtest
-    const appDir = path.join(tmp, "apps/demo");
+    const appDir = path.join(tmp, "projects/apps/demo");
     await fs.outputFile(path.join(appDir, "src", "main.cpp"), "int main(){return 0;}\n");
     // Ensure C++ macros are available in the temp repo
     await fs.outputFile(
@@ -76,6 +76,6 @@ nix_cpp_test(
     assert.ok(!rootTargets.includes("third_party/cpp:gtest"));
 
     // Build and run the test; explicit platform to bind toolchains
-    await $`buck2 test --target-platforms prelude//platforms:default //apps/demo:demo_gtest`;
+    await $`buck2 test --target-platforms prelude//platforms:default //projects/apps/demo:demo_gtest`;
   });
 });

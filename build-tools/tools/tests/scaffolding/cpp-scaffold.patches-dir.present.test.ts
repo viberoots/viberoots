@@ -7,8 +7,8 @@ import { exists, runInTemp } from "../lib/test-helpers";
 test("cpp scaffold creates patches/cpp with placeholder patch", async () => {
   await runInTemp("cpp-scaffold-patches", async (_tmp, _$) => {
     const $ = _$({ stdio: "pipe" });
-    await $`scaf new cpp lib core --yes --path=libs/core`;
-    const dir = path.join(_tmp, "libs", "core", "patches", "cpp");
+    await $`scaf new cpp lib core --yes --path=projects/libs/core`;
+    const dir = path.join(_tmp, "projects", "libs", "core", "patches", "cpp");
     if (!(await exists(dir))) {
       console.error("expected patches/cpp directory to exist in scaffold");
       process.exit(2);

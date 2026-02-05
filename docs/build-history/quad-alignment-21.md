@@ -17,7 +17,7 @@ As in prior parts, each PR includes the tests and documentation required for the
 
 ### Description
 
-Provider generation already filters to supported importer labels (`apps/*`, `libs/*`, and `.`). Today, the TS label-to-provider mapping used by `gen-auto-map.ts` can still emit provider edges for any syntactically valid `lockfile:<path>#<importer>` label, even if the importer is unsupported.
+Provider generation already filters to supported importer labels (`projects/apps/*`, `projects/libs/*`, and `.`). Today, the TS label-to-provider mapping used by `gen-auto-map.ts` can still emit provider edges for any syntactically valid `lockfile:<path>#<importer>` label, even if the importer is unsupported.
 
 This is a cross-layer contract hole. It creates a failure mode where `third_party/providers/auto_map.bzl` references providers that `sync-providers` will never generate.
 
@@ -40,8 +40,8 @@ This PR changes only TS tooling behavior. It does not change provider generation
 Add a focused test under `build-tools/tools/tests/lib/` that:
 
 - feeds `providersForLabels(...)` a set of `lockfile:` labels with importers:
-  - `"apps/demo"`
-  - `"libs/demo"`
+  - `"projects/apps/demo"`
+  - `"projects/libs/demo"`
   - `"."`
   - an unsupported value like `"services/api"` or `"third_party/foo"`
 - asserts that only the supported importer labels yield provider labels.
@@ -56,7 +56,7 @@ Update the glue and mapping documentation to clarify the policy:
 ### Acceptance Criteria
 
 - `third_party/providers/auto_map.bzl` never contains a provider edge for an unsupported importer label.
-- No behavior changes for existing importers under `apps/*`, `libs/*`, or `.`.
+- No behavior changes for existing importers under `projects/apps/*`, `projects/libs/*`, or `.`.
 
 ### Risks
 
@@ -221,7 +221,7 @@ This PR tightens the Starlark contract so unsupported importers fail at macro de
 - Update `build-tools/lang/lockfile_labels.bzl`:
   - after parsing `(path_part, importer)`, validate importer is supported:
     - `"."` is allowed
-    - `apps/*` and `libs/*` are allowed
+    - `projects/apps/*` and `projects/libs/*` are allowed
     - everything else fails with deterministic text
 - Keep existing parsing rules unchanged:
   - `./` normalization
@@ -244,7 +244,7 @@ This test should assert that Buck build fails with an error that includes the de
 Update the importer-scoped macro documentation to state:
 
 - importer-scoped lockfile labels are contracts
-- supported importer roots are restricted to `apps/*`, `libs/*`, and `.`
+- supported importer roots are restricted to `projects/apps/*`, `projects/libs/*`, and `.`
 - how to extend the set (where to change it, and which tests will enforce it)
 
 ### Acceptance Criteria

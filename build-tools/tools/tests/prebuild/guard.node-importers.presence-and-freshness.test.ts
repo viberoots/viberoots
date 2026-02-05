@@ -30,10 +30,10 @@ test("prebuild-guard: flags missing Node importer providers and auto-fixes local
       "utf8",
     );
     // Create a pnpm-lock.yaml with one importer
-    const lockDir = path.join(tmp, "apps", "example");
+    const lockDir = path.join(tmp, "projects", "apps", "example");
     await fsp.mkdir(lockDir, { recursive: true });
     const lockPath = path.join(lockDir, "pnpm-lock.yaml");
-    const importerId = "apps/example";
+    const importerId = "projects/apps/example";
     const lockContent = [
       "lockfileVersion: '9.0'",
       "importers:",
@@ -66,7 +66,7 @@ test("prebuild-guard: flags missing Node importer providers and auto-fixes local
     const txt = await fsp.readFile(targetsNode, "utf8");
     if (
       !txt.includes("node_importer_deps(") ||
-      !txt.includes(`lockfile="apps/example/pnpm-lock.yaml"`)
+      !txt.includes(`lockfile="projects/apps/example/pnpm-lock.yaml"`)
     ) {
       throw new Error("expected TARGETS.node.auto to include node_importer_deps for importer");
     }

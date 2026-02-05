@@ -52,14 +52,14 @@ test("nix_cpp_test links an in-repo C++ lib via link_deps (buck2 test)", async (
       "utf8",
     );
     await fs.outputFile(
-      path.join(tmp, "apps", "demo", "TARGETS"),
+      path.join(tmp, "projects", "apps", "demo", "TARGETS"),
       [
         'load("//build-tools/cpp:defs.bzl", "nix_cpp_test")',
         "",
         "nix_cpp_test(",
         '  name = "t",',
         '  srcs = ["tests/t.cpp"],',
-        '  link_deps = ["//libs/greeter:greeter"],',
+        '  link_deps = ["//projects/libs/greeter:greeter"],',
         '  nixpkg_deps = ["pkgs.googletest"],',
         '  labels = ["lang:cpp", "kind:test"],',
         ")",
@@ -73,12 +73,12 @@ test("nix_cpp_test links an in-repo C++ lib via link_deps (buck2 test)", async (
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir cpp_test_link_deps cquery "deps(//apps/demo:t)" --json --output-attribute name`;
+    })`buck2 --isolation-dir cpp_test_link_deps cquery "deps(//projects/apps/demo:t)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return;
 
     await $({
       cwd: tmp,
     })`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
-    await $({ cwd: tmp })`buck2 --isolation-dir cpp_test_link_deps test //apps/demo:t`;
+    await $({ cwd: tmp })`buck2 --isolation-dir cpp_test_link_deps test //projects/apps/demo:t`;
   });
 });

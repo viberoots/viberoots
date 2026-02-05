@@ -10,17 +10,17 @@ test("planner flat attrset keying (cppTargetsFlat) stays stable", async () => {
   await runInTemp("planner-flat-attrset-keying", async (tmp, $) => {
     const graph = [
       {
-        name: "root//apps/foo:My Bin (config//toolchains:default#buck2/default//:default#linkerbuild-tools/lang/cxx)",
+        name: "root//projects/apps/foo:My Bin (config//toolchains:default#buck2/default//:default#linkerbuild-tools/lang/cxx)",
         rule_type: "cxx_binary",
         labels: ["lang:cpp"],
       },
       {
-        name: "prelude//libs/math:lib (config//toolchains:xyz)",
+        name: "prelude//projects/libs/math:lib (config//toolchains:xyz)",
         rule_type: "cxx_library",
         labels: ["lang:cpp"],
       },
       {
-        name: "//libs/helper:my@target",
+        name: "//projects/libs/helper:my@target",
         rule_type: "cxx_library",
         labels: ["lang:cpp"],
       },

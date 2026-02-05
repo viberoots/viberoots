@@ -6,7 +6,9 @@ import { readGraph } from "../../lib/graph";
 import { runInTemp } from "../lib/test-helpers";
 
 await runInTemp("exp-cpp-noncpp-unchanged", async (tmp, $) => {
-  const nodes = [{ name: "//apps/web:site", rule_type: "js_binary", labels: ["lang:node"] }];
+  const nodes = [
+    { name: "//projects/apps/web:site", rule_type: "js_binary", labels: ["lang:node"] },
+  ];
   const out = path.join(tmp, "build-tools/tools/buck/graph.json");
   await fs.outputFile(out, JSON.stringify(nodes) + "\n");
 

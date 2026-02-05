@@ -62,14 +62,14 @@ test("cpp default link_mode=static still links via link_deps", async () => {
       "utf8",
     );
     await fs.outputFile(
-      path.join(tmp, "apps", "demo", "TARGETS"),
+      path.join(tmp, "projects", "apps", "demo", "TARGETS"),
       [
         'load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")',
         "",
         "nix_cpp_binary(",
         '  name = "demo",',
         '  srcs = ["src/main.cpp"],',
-        '  link_deps = ["//libs/core:core"],',
+        '  link_deps = ["//projects/libs/core:core"],',
         '  labels = ["lang:cpp", "kind:bin"],',
         '  visibility = ["PUBLIC"],',
         ")",
@@ -83,7 +83,7 @@ test("cpp default link_mode=static still links via link_deps", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir cpp_link_mode_static cquery "deps(//apps/demo:demo)" --json --output-attribute name`;
+    })`buck2 --isolation-dir cpp_link_mode_static cquery "deps(//projects/apps/demo:demo)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return;
 
     await $({
@@ -94,7 +94,7 @@ test("cpp default link_mode=static still links via link_deps", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-      env: { ...process.env, BUCK_TARGET: "//apps/demo:demo" },
+      env: { ...process.env, BUCK_TARGET: "//projects/apps/demo:demo" },
     })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
     assert.equal(build.exitCode, 0, String(build.stderr || build.stdout));
 

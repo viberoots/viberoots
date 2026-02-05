@@ -2,8 +2,8 @@ import type { ScafFlags } from "../types.ts";
 
 import path from "node:path";
 
-import { normalizeTemplateName } from "../templates/names.ts";
 import { readTemplateMeta } from "../templates/meta.ts";
+import { normalizeTemplateName } from "../templates/names.ts";
 import { readCopierVariables } from "../templates/variables.ts";
 import { usage } from "../usage.ts";
 
@@ -34,7 +34,7 @@ async function helpForCommand(cmd: string, flags: ScafFlags): Promise<boolean> {
       "",
       "Examples:",
       "  scaf update all --dry-run",
-      "  scaf update libs/demo-lib --yes",
+      "  scaf update projects/libs/demo-lib --yes",
     ];
     printJsonOrLines(flags, { command: cmd, usage: lines[0], examples: lines.slice(2) }, lines);
     return true;
@@ -45,7 +45,7 @@ async function helpForCommand(cmd: string, flags: ScafFlags): Promise<boolean> {
       "",
       "Examples:",
       "  scaf regen all --dry-run",
-      "  scaf regen libs/demo-lib --yes",
+      "  scaf regen projects/libs/demo-lib --yes",
     ];
     printJsonOrLines(flags, { command: cmd, usage: lines[0], examples: lines.slice(2) }, lines);
     return true;
@@ -56,7 +56,7 @@ async function helpForCommand(cmd: string, flags: ScafFlags): Promise<boolean> {
       "",
       "Examples:",
       "  scaf delete all --dry-run",
-      "  scaf delete libs/demo-lib --yes",
+      "  scaf delete projects/libs/demo-lib --yes",
     ];
     printJsonOrLines(flags, { command: cmd, usage: lines[0], examples: lines.slice(2) }, lines);
     return true;
@@ -67,17 +67,17 @@ async function helpForCommand(cmd: string, flags: ScafFlags): Promise<boolean> {
 function helpForGoTest(flags: ScafFlags) {
   const usageLine = "Usage: scaf new go test <name_of_test> [--path=DEST] [--yes] [--dry-run]";
   const notes = [
-    "- Place tests under libs/<lib>/pkg/<pkg>/ for libs, apps/<app>/cmd/<app>/ for apps.",
+    "- Place tests under projects/libs/<lib>/pkg/<pkg>/ for libs, projects/apps/<app>/cmd/<app>/ for apps.",
     "- The file name will be suffixed with _test.go if missing.",
     "- Package is inferred from existing *.go, or 'main' under /cmd/, else directory name.",
     "- Default DEST is resolved from current directory:",
-    "  • apps/<app> → apps/<app>/cmd/<app>/<name>_test.go",
-    "  • libs/<lib> → libs/<lib>/pkg/<lib>/<name>_test.go",
+    "  • projects/apps/<app> → projects/apps/<app>/cmd/<app>/<name>_test.go",
+    "  • projects/libs/<lib> → projects/libs/<lib>/pkg/<lib>/<name>_test.go",
     "  • inside those trees, writes into the current directory",
   ];
   const examples = [
-    "scaf new go test handlers --path=libs/demo-lib/pkg/demo-lib/handlers_test.go",
-    "scaf new go test main_case --path=apps/demo-cli/cmd/demo-cli/main_case_test.go",
+    "scaf new go test handlers --path=projects/libs/demo-lib/pkg/demo-lib/handlers_test.go",
+    "scaf new go test main_case --path=projects/apps/demo-cli/cmd/demo-cli/main_case_test.go",
   ];
   if (flags["json"] === "true") {
     console.log(

@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import fs from "node:fs";
 import path from "node:path";
+import { getImporterRootsContract } from "../../../lib/importer-roots.ts";
 
 export type CqueryRunnerOptions = {
   scope: string; // label selector used by attrfilter(labels, <scope>, <expr>)
@@ -36,7 +37,8 @@ function computePlatformLabel(cwd: string): string {
 }
 
 function computeRootsExpr(cwd: string): string {
-  const defaultRoots = ["apps", "libs", "third_party", "go", "cpp"];
+  const importerRoots = getImporterRootsContract().workspaceRoots;
+  const defaultRoots = Array.from(new Set([...importerRoots, "third_party", "go", "cpp"]));
   const rootsFromEnv = parseCsvish(process.env.BUCK_QUERY_ROOTS || "");
   const rootsList = rootsFromEnv.length > 0 ? rootsFromEnv : defaultRoots;
   const existing = rootsList.filter((r) => {

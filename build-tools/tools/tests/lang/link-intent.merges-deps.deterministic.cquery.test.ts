@@ -21,7 +21,7 @@ function firstCqueryNode<T>(json: unknown): T | null {
 
 test("link intent: deterministic union merges deps/link_deps/header_deps", async () => {
   await runInTemp("link-intent-merges-deterministic", async (tmp, $) => {
-    const appDir = path.join(tmp, "apps", "demo");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(appDir, { recursive: true });
 
     await fsp.writeFile(
@@ -50,13 +50,13 @@ test("link intent: deterministic union merges deps/link_deps/header_deps", async
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute deps //apps/demo:probe`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute deps //projects/apps/demo:probe`;
     if (qDeps.exitCode !== 0) return; // skip when Buck/prelude/toolchains unavailable
 
     const node = firstCqueryNode<{ deps?: string[] }>(JSON.parse(String(qDeps.stdout || "")));
     const deps = (node?.deps || []).map(normalizeTargetLabel);
 
-    const want = ["//apps/demo:a", "//apps/demo:b", "//apps/demo:c"];
+    const want = ["//projects/apps/demo:a", "//projects/apps/demo:b", "//projects/apps/demo:c"];
     assert.deepEqual(deps, want);
   });
 });

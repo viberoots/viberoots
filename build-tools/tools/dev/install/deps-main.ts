@@ -57,7 +57,7 @@ try {
     process.env.BUCK_TEST_SRC = repoRoot;
   }
 } catch {}
-// Discover importers (apps/*, libs/*) that contain a pnpm-lock.yaml.
+// Discover importers (projects/apps/*, projects/libs/*) that contain a pnpm-lock.yaml.
 async function discoverImportersWithLock(root: string): Promise<string[]> {
   const { allowDotImporter, workspaceRoots } = getImporterRootsContract();
   const out: string[] = [];
@@ -117,7 +117,7 @@ if (glueOnly) {
 }
 
 async function runGoModTidyForMissingSum(root: string, dryRun: boolean, verbose: boolean) {
-  const bases = [".", "apps", "libs"];
+  const bases = [".", path.join("projects", "apps"), path.join("projects", "libs")];
   for (const base of bases) {
     const baseAbs = path.join(root, base);
     let entries: string[] = [];
@@ -209,7 +209,7 @@ await withExclusiveInstallLock(
       await $({
         stdio: "inherit",
       })`nix build ${repoRoot}#${attr} --no-link --accept-flake-config --print-build-logs`;
-      // Link apps/<name>/node_modules -> Nix output's node_modules (remove stale link first)
+      // Link importer/node_modules -> Nix output's node_modules (remove stale link first)
       await $({
         cwd: path.join(repoRoot, imp),
         stdio: "inherit",
@@ -223,7 +223,7 @@ try {
   const patchesLintAbs = path.join(repoRoot, "build-tools/tools/dev/patches-lint.ts");
   await $({ stdio: "inherit" })`zx-wrapper ${patchesLintAbs}`.nothrow();
 } catch {}
-// Generate gomod2nix.toml at repo root (if present) and per-app/lib (apps/*, libs/*)
+// Generate gomod2nix.toml at repo root (if present) and per project (projects/apps/*, projects/libs/*)
 if (!skipGoTidy) {
   await runGoModTidyForMissingSum(repoRoot, dryRun, verbose);
 } else if (verbose) {

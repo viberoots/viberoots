@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("node_webapp fails fast when importer argument disagrees with lockfile_label importer", async () => {
   await runInTemp("node-webapp-importer-arg-mismatch", async (tmp, $) => {
-    const importerDir = path.join(tmp, "apps", "demo");
+    const importerDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(importerDir, { recursive: true });
     await fsp.writeFile(path.join(importerDir, "pnpm-lock.yaml"), "lockfileVersion: 9\n", "utf8");
 
@@ -18,8 +18,8 @@ test("node_webapp fails fast when importer argument disagrees with lockfile_labe
         "",
         "node_webapp(",
         '  name = "bundle",',
-        '  lockfile_label = "lockfile:apps/demo/pnpm-lock.yaml#apps/demo",',
-        '  importer = "apps/other",',
+        '  lockfile_label = "lockfile:projects/apps/demo/pnpm-lock.yaml#projects/apps/demo",',
+        '  importer = "projects/apps/other",',
         ")",
         "",
       ].join("\n"),
@@ -31,7 +31,7 @@ test("node_webapp fails fast when importer argument disagrees with lockfile_labe
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute name //apps/demo:bundle`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute name //projects/apps/demo:bundle`;
 
     assert.notEqual(q.exitCode, 0, "expected cquery to fail on importer mismatch");
     const combined = String(q.stderr || "") + String(q.stdout || "");

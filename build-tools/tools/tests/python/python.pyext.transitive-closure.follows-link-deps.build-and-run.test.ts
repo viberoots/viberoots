@@ -32,11 +32,11 @@ async function nixBuildSelected(tmp: string, $: any, target: string): Promise<st
 
 test("python: pyext transitive link_closure follows link_deps on producers (build + run)", async () => {
   await runInTemp("python-pyext-link-closure-transitive", async (tmp, $) => {
-    const appRel = path.join("apps", "pyext_link_transitive");
+    const appRel = path.join("projects", "apps", "pyext_link_transitive");
     const appDir = path.join(tmp, appRel);
-    const supportRel = path.join("libs", "cpp_support");
+    const supportRel = path.join("projects", "libs", "cpp_support");
     const supportDir = path.join(tmp, supportRel);
-    const coreRel = path.join("libs", "cpp_core");
+    const coreRel = path.join("projects", "libs", "cpp_core");
     const coreDir = path.join(tmp, coreRel);
 
     await fs.mkdirp(path.join(appDir, "bin"));

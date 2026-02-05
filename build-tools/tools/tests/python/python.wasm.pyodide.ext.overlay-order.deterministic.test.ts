@@ -18,7 +18,7 @@ async function nixBuildSelected(tmp: string, $: any, target: string): Promise<st
       BUCK_TEST_SRC: tmp,
       PY_WASM_BACKEND: "pyodide",
       NIX_PY_TEST_RESOLVE_JSON: JSON.stringify({
-        hello: { version: "1.0.0", originPath: "apps/pywasm/vendor/hello" },
+        hello: { version: "1.0.0", originPath: "projects/apps/pywasm/vendor/hello" },
       }),
     },
   })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
@@ -65,7 +65,7 @@ function extSource(marker: string): string {
 
 test("python wasm (pyodide): native overlay order is deterministic", async () => {
   await runInTemp("py-wasm-pyodide-ext-order", async (tmp, $) => {
-    const appRel = path.join("apps", "pywasm");
+    const appRel = path.join("projects", "apps", "pywasm");
     const appDir = path.join(tmp, appRel);
     await fs.mkdir(path.join(appDir, "bin"), { recursive: true });
     await fs.mkdir(path.join(appDir, "src", "demo"), { recursive: true });
@@ -94,7 +94,7 @@ nix_python_wasm_extension_module(
   module = "demo._native",
   srcs = ["native/ext-one.c"],
   labels = ["backend:pyodide"],
-  lockfile_label = "lockfile:apps/pywasm/uv.lock#apps/pywasm",
+  lockfile_label = "lockfile:projects/apps/pywasm/uv.lock#projects/apps/pywasm",
 )
 
 nix_python_wasm_extension_module(
@@ -102,13 +102,13 @@ nix_python_wasm_extension_module(
   module = "demo._native",
   srcs = ["native/ext-two.c"],
   labels = ["backend:pyodide"],
-  lockfile_label = "lockfile:apps/pywasm/uv.lock#apps/pywasm",
+  lockfile_label = "lockfile:projects/apps/pywasm/uv.lock#projects/apps/pywasm",
 )
 
 nix_python_wasm_app(
   name = "pyapp",
   labels = ["backend:pyodide"],
-  lockfile_label = "lockfile:apps/pywasm/uv.lock#apps/pywasm",
+  lockfile_label = "lockfile:projects/apps/pywasm/uv.lock#projects/apps/pywasm",
   srcs = glob(["**/*.py"]),
   deps = [":ext_one", ":ext_two"],
 )
@@ -117,7 +117,7 @@ nix_python_wasm_app(
     );
 
     await $`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
-    const outPath = await nixBuildSelected(tmp, $, "//apps/pywasm:pyapp");
+    const outPath = await nixBuildSelected(tmp, $, "//projects/apps/pywasm:pyapp");
     const outDir = path.join(outPath, "site", "demo");
     const entries = await fs.readdir(outDir);
     const hit = entries.find((entry) => entry.startsWith("_native") && entry.endsWith(".so"));

@@ -36,10 +36,10 @@ test("rust stubs realize provider edges deterministically (cquery)", async () =>
       path.join(providersDir, "auto_map.bzl"),
       [
         "MODULE_PROVIDERS = {",
-        '  "//apps/rustdemo:lib": [',
-        '    "//apps/rustdemo:prov_a",',
-        '    "//apps/rustdemo:prov_b",',
-        '    "//apps/rustdemo:prov_a",',
+        '  "//projects/apps/rustdemo:lib": [',
+        '    "//projects/apps/rustdemo:prov_a",',
+        '    "//projects/apps/rustdemo:prov_b",',
+        '    "//projects/apps/rustdemo:prov_a",',
         "  ],",
         "}",
         "",
@@ -47,7 +47,7 @@ test("rust stubs realize provider edges deterministically (cquery)", async () =>
       "utf8",
     );
 
-    const appDir = path.join(tmp, "apps", "rustdemo");
+    const appDir = path.join(tmp, "projects", "apps", "rustdemo");
     await fsp.mkdir(path.join(appDir, "src"), { recursive: true });
     await fsp.writeFile(path.join(appDir, "src", "lib.rs"), "pub fn demo() {}\n", "utf8");
     await fsp.writeFile(
@@ -63,7 +63,7 @@ test("rust stubs realize provider edges deterministically (cquery)", async () =>
         "rust_library(",
         '  name = "lib",',
         '  srcs = ["src/lib.rs"],',
-        '  deps = ["//apps/rustdemo:prov_b"],',
+        '  deps = ["//projects/apps/rustdemo:prov_b"],',
         ")",
         "",
       ].join("\n"),
@@ -75,7 +75,7 @@ test("rust stubs realize provider edges deterministically (cquery)", async () =>
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //apps/rustdemo:lib`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //projects/apps/rustdemo:lib`;
     assert.equal(qSrcs.exitCode, 0, "buck2 cquery failed for rustdemo lib srcs");
 
     const node = parseCqueryOne(String(qSrcs.stdout || ""));
@@ -85,9 +85,9 @@ test("rust stubs realize provider edges deterministically (cquery)", async () =>
     );
 
     assert.deepEqual(srcs, [
-      "//apps/rustdemo/src/lib.rs",
-      "//apps/rustdemo:prov_b",
-      "//apps/rustdemo:prov_a",
+      "//projects/apps/rustdemo/src/lib.rs",
+      "//projects/apps/rustdemo:prov_b",
+      "//projects/apps/rustdemo:prov_a",
     ]);
   });
 });

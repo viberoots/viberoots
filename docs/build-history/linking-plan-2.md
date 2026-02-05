@@ -205,8 +205,8 @@ Add zx tests under `build-tools/tools/tests/cpp/` (one test per file):
 
 - `build-tools/tools/tests/cpp/cpp.bin.links-repo-lib.via-link-deps.build-and-run.test.ts`
   - temp repo with:
-    - `//libs/greeter:greeter` as `nix_cpp_library`
-    - `//apps/demo:demo` as `nix_cpp_binary(link_deps=[...])`
+    - `//projects/libs/greeter:greeter` as `nix_cpp_library`
+    - `//projects/apps/demo:demo` as `nix_cpp_binary(link_deps=[...])`
   - builds the binary and runs it to prove the link is real
 - `build-tools/tools/tests/cpp/cpp.addon.links-repo-lib.via-link-deps.build-and-load.test.ts`
   - temp repo with:

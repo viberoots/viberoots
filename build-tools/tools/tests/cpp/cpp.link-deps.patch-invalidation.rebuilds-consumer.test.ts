@@ -36,7 +36,7 @@ async function nixBuildSelected(args: {
 
 test("cpp: patch change in repo lib via link_deps rebuilds consumer", async () => {
   await runInTemp("cpp-link-deps-patch-invalidation", async (tmp, $) => {
-    const libDir = path.join(tmp, "libs", "greeter");
+    const libDir = path.join(tmp, "projects", "libs", "greeter");
     const patchFile = path.join(libDir, "patches", "cpp", "greeter@0.0.0.patch");
 
     await fsp.mkdir(path.join(libDir, "include"), { recursive: true });
@@ -77,7 +77,7 @@ test("cpp: patch change in repo lib via link_deps rebuilds consumer", async () =
       "utf8",
     );
 
-    const appDir = path.join(tmp, "apps", "demo");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(path.join(appDir, "src"), { recursive: true });
     await fsp.writeFile(
       path.join(appDir, "src", "main.cpp"),
@@ -101,7 +101,7 @@ test("cpp: patch change in repo lib via link_deps rebuilds consumer", async () =
         '  name = "demo",',
         '  srcs = ["src/main.cpp"],',
         '  labels = ["lang:cpp", "kind:bin"],',
-        '  link_deps = ["//libs/greeter:greeter"],',
+        '  link_deps = ["//projects/libs/greeter:greeter"],',
         ")",
         "",
       ].join("\n"),
@@ -110,26 +110,34 @@ test("cpp: patch change in repo lib via link_deps rebuilds consumer", async () =
 
     const graph = [
       {
-        name: "//libs/greeter:greeter",
+        name: "//projects/libs/greeter:greeter",
         rule_type: "cxx_library",
         labels: ["lang:cpp", "kind:lib"],
-        srcs: ["libs/greeter/src/greeter.cpp", "libs/greeter/patches/cpp/greeter@0.0.0.patch"],
+        srcs: [
+          "projects/libs/greeter/src/greeter.cpp",
+          "projects/libs/greeter/patches/cpp/greeter@0.0.0.patch",
+        ],
       },
       {
-        name: "//apps/demo:demo",
+        name: "//projects/apps/demo:demo",
         rule_type: "cxx_binary",
         labels: ["lang:cpp", "kind:bin"],
-        srcs: ["apps/demo/src/main.cpp"],
-        link_deps: ["//libs/greeter:greeter"],
+        srcs: ["projects/apps/demo/src/main.cpp"],
+        link_deps: ["//projects/libs/greeter:greeter"],
       },
     ];
     const graphJsonPath = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
     await fsp.mkdir(path.dirname(graphJsonPath), { recursive: true });
     await fsp.writeFile(graphJsonPath, JSON.stringify(graph, null, 2) + "\n", "utf8");
 
-    const out1 = await nixBuildSelected({ tmp, $, graphJsonPath, target: "//apps/demo:demo" });
+    const out1 = await nixBuildSelected({
+      tmp,
+      $,
+      graphJsonPath,
+      target: "//projects/apps/demo:demo",
+    });
     if (!out1) throw new Error("nix build did not produce an out path for selected target");
-    const bin1 = path.join(out1, "bin", sanitizeName("//apps/demo:demo"));
+    const bin1 = path.join(out1, "bin", sanitizeName("//projects/apps/demo:demo"));
     const run1 = await $({ cwd: tmp, stdio: "pipe" })`${bin1}`;
     const v1 = String(run1.stdout || "").trim();
     if (v1 !== "1")
@@ -140,7 +148,12 @@ test("cpp: patch change in repo lib via link_deps rebuilds consumer", async () =
     const patchV2 = patchV1.replace("+  return 1;", "+  return 2;");
     await fsp.writeFile(patchFile, patchV2, "utf8");
 
-    const out2 = await nixBuildSelected({ tmp, $, graphJsonPath, target: "//apps/demo:demo" });
+    const out2 = await nixBuildSelected({
+      tmp,
+      $,
+      graphJsonPath,
+      target: "//projects/apps/demo:demo",
+    });
     if (!out2)
       throw new Error(
         "nix build did not produce an out path for selected target after patch change",
@@ -150,7 +163,7 @@ test("cpp: patch change in repo lib via link_deps rebuilds consumer", async () =
         `expected consumer output store path to change after repo lib patch edit; out=${out1}`,
       );
     }
-    const bin2 = path.join(out2, "bin", sanitizeName("//apps/demo:demo"));
+    const bin2 = path.join(out2, "bin", sanitizeName("//projects/apps/demo:demo"));
     const run2 = await $({ cwd: tmp, stdio: "pipe" })`${bin2}`;
     const v2 = String(run2.stdout || "").trim();
     if (v2 !== "2")

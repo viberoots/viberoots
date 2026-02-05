@@ -69,7 +69,7 @@ async function resolveImporterInRepo(
 }
 
 // Allow an explicit importer override for tests to reduce redundant per-importer builds.
-// When set, it should be a repo-root-relative directory containing pnpm-lock.yaml, e.g., "libs/test-deps".
+// When set, it should be a repo-root-relative directory containing pnpm-lock.yaml, e.g., "projects/libs/test-deps".
 const overrideImporterRaw = (process.env.ZX_TEST_NODE_MODULES_IMPORTER || "").trim();
 let importer = "";
 if (overrideImporterRaw) {

@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 test("cpp math-core lib builds and gtest runs", async () => {
   await runInTemp("cpp-math-core", async (tmp, $) => {
     // Create minimal math-core library scaffold in the temp repo
-    const libDir = path.join(tmp, "libs", "math-core");
+    const libDir = path.join(tmp, "projects", "libs", "math-core");
     await fs.outputFile(
       path.join(libDir, "include", "addon.h"),
       `#ifndef MATH_CORE_ADDON_H
@@ -134,7 +134,7 @@ nix_cpp_test(
     await $({ cwd: tmp })`node build-tools/tools/buck/export-graph.ts`;
 
     // Build and run the test inside the temp repo
-    await $`buck2 build --target-platforms prelude//platforms:default //libs/math-core:lib`;
-    await $`buck2 test --target-platforms prelude//platforms:default //libs/math-core:math_core_gtest`;
+    await $`buck2 build --target-platforms prelude//platforms:default //projects/libs/math-core:lib`;
+    await $`buck2 test --target-platforms prelude//platforms:default //projects/libs/math-core:math_core_gtest`;
   });
 });

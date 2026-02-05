@@ -26,7 +26,7 @@ test("cpp registry-first path equals onlyCpp fast-path", async () => {
     // Minimal Buck graph describing the C++ binary target
     const graph = [
       {
-        name: "//apps/demo:demo",
+        name: "//projects/apps/demo:demo",
         rule_type: "cxx_binary",
         labels: ["lang:cpp", "kind:bin"],
         srcs: ["apps/demo/src/main.cpp"],
@@ -40,7 +40,7 @@ test("cpp registry-first path equals onlyCpp fast-path", async () => {
       "utf8",
     );
 
-    const envBase = { ...process.env, BUCK_TARGET: "//apps/demo:demo" };
+    const envBase = { ...process.env, BUCK_TARGET: "//projects/apps/demo:demo" };
 
     const a = await $({
       cwd: tmp,

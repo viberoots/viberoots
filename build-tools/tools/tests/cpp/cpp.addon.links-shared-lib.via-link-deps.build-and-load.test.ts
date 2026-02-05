@@ -81,7 +81,7 @@ test("cpp Node-API addon links a shared C++ lib via link_deps (build + load)", a
         "nix_cpp_node_addon(",
         '  name = "addon",',
         '  srcs = ["src/binding.cc"],',
-        '  link_deps = ["//libs/shared:shared"],',
+        '  link_deps = ["//projects/libs/shared:shared"],',
         '  labels = ["lang:cpp", "kind:addon"],',
         '  visibility = ["PUBLIC"],',
         ")",
@@ -95,7 +95,7 @@ test("cpp Node-API addon links a shared C++ lib via link_deps (build + load)", a
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir cpp_addon_shared cquery "deps(//libs/addon-native:addon)" --json --output-attribute name`;
+    })`buck2 --isolation-dir cpp_addon_shared cquery "deps(//projects/libs/addon-native:addon)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return;
 
     await $({
@@ -106,7 +106,7 @@ test("cpp Node-API addon links a shared C++ lib via link_deps (build + load)", a
       stdio: "pipe",
       reject: false,
       nothrow: true,
-      env: { ...process.env, BUCK_TARGET: "//libs/addon-native:addon" },
+      env: { ...process.env, BUCK_TARGET: "//projects/libs/addon-native:addon" },
     })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
     assert.equal(build.exitCode, 0, String(build.stderr || build.stdout));
 

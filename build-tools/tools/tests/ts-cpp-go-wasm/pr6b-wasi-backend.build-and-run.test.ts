@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 test("pr6b: wasi_single backend builds and runs add(2,3)=5 via node:wasi", async () => {
   await runInTemp("pr6b-wasi-backend", async (tmp, $) => {
     // 1) Scaffold minimal C wrapper and header (pure compute) in a temp repo
-    const coreDir = path.join(tmp, "libs", "math-core");
+    const coreDir = path.join(tmp, "projects", "libs", "math-core");
     await fs.outputFile(
       path.join(coreDir, "include", "addon.h"),
       `#ifndef MATH_CORE_ADDON_H
@@ -67,7 +67,7 @@ nix_cpp_wasm_static_lib(
       nothrow: true,
       env: {
         ...process.env,
-        BUCK_TARGET: "//libs/math-core:core_wasm",
+        BUCK_TARGET: "//projects/libs/math-core:core_wasm",
         PLANNER_ONLY_CPP: "1",
         WORKSPACE_ROOT: tmp,
         BUCK_TEST_SRC: tmp,
@@ -87,7 +87,7 @@ nix_cpp_wasm_static_lib(
     }
 
     // 5) TinyGo package exporting a wasm function `add` (pure Go, no C++ link required for smoke)
-    const apiDir = path.join(tmp, "libs", "math-api");
+    const apiDir = path.join(tmp, "projects", "libs", "math-api");
     await fs.mkdirp(apiDir);
     await fs.outputFile(
       path.join(apiDir, "go.mod"),
@@ -130,7 +130,7 @@ nix_go_tiny_wasm_lib(
       nothrow: true,
       env: {
         ...process.env,
-        BUCK_TARGET: "//libs/math-api:wasm",
+        BUCK_TARGET: "//projects/libs/math-api:wasm",
         WEB_WASM_BACKEND: "wasi_single",
         WORKSPACE_ROOT: tmp,
         BUCK_TEST_SRC: tmp,
@@ -154,7 +154,7 @@ nix_go_tiny_wasm_lib(
     }
 
     // 7) Minimal Node WASI loader that instantiates the module and returns exports
-    const tsDir = path.join(tmp, "libs", "math-ts", "src", "browser");
+    const tsDir = path.join(tmp, "projects", "libs", "math-ts", "src", "browser");
     await fs.mkdirp(tsDir);
     const loaderPath = path.join(tsDir, "wasi-loader.mjs");
     await fs.writeFile(

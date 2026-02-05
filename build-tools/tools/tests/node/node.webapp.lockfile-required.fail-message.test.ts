@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("node_webapp defaults lockfile label and fails fast when missing", async () => {
   await runInTemp("node-webapp-lockfile-required", async (tmp, $) => {
-    const dir = path.join(tmp, "apps", "web");
+    const dir = path.join(tmp, "projects", "apps", "web");
     await fsp.mkdir(dir, { recursive: true });
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
@@ -29,14 +29,14 @@ test("node_webapp defaults lockfile label and fails fast when missing", async ()
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 build //apps/web:bundle`;
+    })`buck2 build //projects/apps/web:bundle`;
 
     // Expect failure with targeted missing lockfile error from defaulting path
     assert.notEqual(res.exitCode, 0, "expected buck2 build to fail when lockfile label is missing");
     const combined = String(res.stderr || "") + String(res.stdout || "");
     assert.ok(
       combined.includes(
-        "node_webapp: missing lockfile at apps/web/pnpm-lock.yaml. Provide lockfile_label or create apps/web/pnpm-lock.yaml.",
+        "node_webapp: missing lockfile at projects/apps/web/pnpm-lock.yaml. Provide lockfile_label or create projects/apps/web/pnpm-lock.yaml.",
       ),
       "expected targeted missing lockfile error",
     );

@@ -98,7 +98,7 @@ This PR introduces one shared patch-dir resolver for importer-local languages an
 - Add a shared helper in patch tooling:
   - A small function to compute the default importer-local patch directory for an importer and language (`node` and `python`).
   - Resolve relative override `--patch-dir` values consistently against repo root.
-  - Preserve the existing Python behavior for importer `"."` vs `apps/*` and `libs/*`.
+  - Preserve the existing Python behavior for importer `"."` vs `projects/apps/*` and `projects/libs/*`.
 - Refactor `build-tools/tools/patch/patch-python.ts`:
   - Remove `resolvePythonPatchDir(...)`.
   - Route path selection through the shared helper surface.
@@ -112,7 +112,7 @@ Non-goals in this PR:
 
 - Add unit tests for the new helper covering:
   - importer `"."` default path
-  - importer `apps/<x>` default path
+  - importer `projects/apps/<x>` default path
   - absolute override path
   - relative override path
 - Add a focused integration-style test for Python patch apply that asserts:
@@ -317,8 +317,8 @@ Non-goals in this PR:
 
 - Add a focused Starlark probe test that exercises both helpers with representative importers:
   - `"."`
-  - `"apps/web"`
-  - `"libs/some_tool"`
+  - `"projects/apps/web"`
+  - `"projects/libs/some_tool"`
   - A path with repeated separators or trailing slashes (normalized behavior should be deterministic).
 - Add an enforcement-style test that fails if `build-tools/node/defs_nix.bzl` reintroduces local helper definitions matching the removed patterns.
 

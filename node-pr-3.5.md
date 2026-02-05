@@ -73,15 +73,15 @@ Add tests that validate both the presence of tests and the empty-suite fast‑pa
 
 - lib: scaffold with tests (default)
   - Run glue (export graph → sync providers → gen auto_map) if not implicit in test helper.
-  - `buck2 test //libs/<name>:unit` succeeds; Vitest sample passes.
+  - `buck2 test //projects/libs/<name>:unit` succeeds; Vitest sample passes.
   - With `COVERAGE=1 buck2 test …` ensure the Nix runner completes (optional: spot‑check for coverage artifacts via a separate `nix build .#node-test.<importer>` if needed).
 
 - cli: scaffold with tests (default)
-  - `buck2 test //apps/<name>:unit` succeeds.
+  - `buck2 test //projects/apps/<name>:unit` succeeds.
   - Optional: add a failing sample test then assert Buck test fails (proves failure propagation).
 
 - webapp: scaffold with tests (default)
-  - `buck2 test //apps/<name>:unit` succeeds with Vitest sample.
+  - `buck2 test //projects/apps/<name>:unit` succeeds with Vitest sample.
 
 - no‑tests fast‑pass (lib/cli/webapp)
   - Scaffold with `--no-tests` and run `buck2 test …`; should pass with “no tests matched”.

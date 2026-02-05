@@ -82,7 +82,7 @@ EOF
     await ensureFile("TARGETS");
 
     // Scaffold a new Go lib into the sparse repo
-    await $`scaf new go lib demo-lib --yes --path=libs/demo-lib`;
+    await $`scaf new go lib demo-lib --yes --path=projects/libs/demo-lib`;
 
     // No module downloads or gomod2nix; keep the test focused on glue discovery
 

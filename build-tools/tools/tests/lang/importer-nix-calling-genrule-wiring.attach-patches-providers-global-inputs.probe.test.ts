@@ -38,14 +38,14 @@ test("prepare_importer_nix_calling_genrule_wiring composes patches, provider edg
       path.join(providersDir, "auto_map.bzl"),
       [
         "MODULE_PROVIDERS = {",
-        '  "//apps/web:bin": ["//third_party/providers:prov_a"],',
+        '  "//projects/apps/web:bin": ["//third_party/providers:prov_a"],',
         "}",
         "",
       ].join("\n"),
       "utf8",
     );
 
-    const appDir = path.join(tmp, "apps", "web");
+    const appDir = path.join(tmp, "projects", "apps", "web");
     const patchDir = path.join(appDir, "patches", "node");
     await fsp.mkdir(patchDir, { recursive: true });
     await fsp.writeFile(path.join(appDir, "pnpm-lock.yaml"), "lockfileVersion: 9\n", "utf8");
@@ -66,7 +66,7 @@ test("prepare_importer_nix_calling_genrule_wiring composes patches, provider edg
         "  deps = [],",
         '  lang = "node",',
         '  kind = "gen",',
-        '  lockfile_label = "lockfile:apps/web/pnpm-lock.yaml#apps/web",',
+        '  lockfile_label = "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",',
         "  inject_workspace_root_env = False,",
         '  global_inputs_into = "srcs",',
         "  global_inputs_stamp = True,",
@@ -86,7 +86,7 @@ test("prepare_importer_nix_calling_genrule_wiring composes patches, provider edg
         "  deps = [],",
         '  lang = "node",',
         '  kind = "gen",',
-        '  lockfile_label = "lockfile:apps/web/pnpm-lock.yaml#apps/web",',
+        '  lockfile_label = "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",',
         "  inject_workspace_root_env = True,",
         ")",
         "labels_file(",
@@ -99,8 +99,8 @@ test("prepare_importer_nix_calling_genrule_wiring composes patches, provider edg
       "utf8",
     );
 
-    const listOut = await buildOutPath(tmp, $, "//apps/web:list_probe");
-    const dictOut = await buildOutPath(tmp, $, "//apps/web:dict_probe");
+    const listOut = await buildOutPath(tmp, $, "//projects/apps/web:list_probe");
+    const dictOut = await buildOutPath(tmp, $, "//projects/apps/web:dict_probe");
     if (!listOut || !dictOut) return;
 
     const listLines = readLines(await fsp.readFile(listOut, "utf8"));

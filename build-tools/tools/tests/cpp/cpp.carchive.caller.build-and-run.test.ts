@@ -52,7 +52,7 @@ load("//build-tools/cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_test")
 nix_cpp_binary(
     name = "caller",
     srcs = ["src/main.cpp"],
-    deps = ["//libs/greetgo:greetgo"],
+    deps = ["//projects/libs/greetgo:greetgo"],
     labels = ["lang:cpp", "kind:bin"],
     visibility = ["PUBLIC"],
 )
@@ -62,7 +62,7 @@ nix_cpp_test(
     srcs = ["tests/caller_gtest.cpp"],
     deps = [
         ":caller",
-        "//libs/greetgo:greetgo",
+        "//projects/libs/greetgo:greetgo",
     ],
     nixpkg_deps = [
         "pkgs.googletest",
@@ -77,7 +77,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir cpp_carchive cquery "deps(//apps/caller:caller)" --json --output-attribute name`;
+    })`buck2 --isolation-dir cpp_carchive cquery "deps(//projects/apps/caller:caller)" --json --output-attribute name`;
     if (probe.exitCode !== 0) {
       // Skip if prelude/toolchain not available in the environment
       return;
@@ -91,7 +91,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-      env: { ...process.env, BUCK_TARGET: "//apps/caller:caller" },
+      env: { ...process.env, BUCK_TARGET: "//projects/apps/caller:caller" },
     })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
     if (build.exitCode !== 0) {
       console.error(build.stdout + "\n" + build.stderr);

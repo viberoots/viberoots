@@ -79,14 +79,14 @@ EOF'`;
       cwd: tmp,
     })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
 MODULE_PROVIDERS = {
-  "//libs/demo:lib": ["//third_party/providers:prov"],
-  "//apps/demo:demo": ["//third_party/providers:prov"],
-  "//libs/addon:addon": ["//third_party/providers:prov"],
+  "//projects/libs/demo:lib": ["//third_party/providers:prov"],
+  "//projects/apps/demo:demo": ["//third_party/providers:prov"],
+  "//projects/libs/addon:addon": ["//third_party/providers:prov"],
 }
 EOF'`;
 
     // Library package
-    const libDir = path.join(tmp, "libs", "demo");
+    const libDir = path.join(tmp, "projects", "libs", "demo");
     await fsp.mkdir(path.join(libDir, "patches", "cpp"), { recursive: true });
     await fsp.writeFile(path.join(libDir, "patches", "cpp", "x@0.0.1.patch"), "# x\n", "utf8");
     await fsp.writeFile(
@@ -102,7 +102,7 @@ genrule(name="localprov", out="localprov.stamp", cmd=": > $OUT", visibility=["PU
 
 cpp_sanitize_probe(
     name = "sanitize_lib",
-    label = "//libs/demo:lib",
+    label = "//projects/libs/demo:lib",
 )
 
 nix_cpp_library(
@@ -116,7 +116,7 @@ nix_cpp_library(
     );
 
     // Binary package
-    const binDir = path.join(tmp, "apps", "demo");
+    const binDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(path.join(binDir, "patches", "cpp"), { recursive: true });
     await fsp.writeFile(path.join(binDir, "patches", "cpp", "y@2.3.4.patch"), "# y\n", "utf8");
     await fsp.writeFile(path.join(binDir, "main.cpp"), "int main(){return 0;}\n", "utf8");
@@ -128,7 +128,7 @@ genrule(name="localprov", out="localprov.stamp", cmd=": > $OUT", visibility=["PU
 
 cpp_sanitize_probe(
     name = "sanitize_bin",
-    label = "//apps/demo:demo",
+    label = "//projects/apps/demo:demo",
 )
 
 nix_cpp_binary(
@@ -142,7 +142,7 @@ nix_cpp_binary(
     );
 
     // Addon package
-    const addonDir = path.join(tmp, "libs", "addon");
+    const addonDir = path.join(tmp, "projects", "libs", "addon");
     await fsp.mkdir(path.join(addonDir, "patches", "cpp"), { recursive: true });
     await fsp.writeFile(path.join(addonDir, "patches", "cpp", "z@9.9.9.patch"), "# z\n", "utf8");
     await fsp.writeFile(path.join(addonDir, "addon.cpp"), "int x(){return 1;}\n", "utf8");
@@ -154,7 +154,7 @@ genrule(name="localprov", out="localprov.stamp", cmd=": > $OUT", visibility=["PU
 
 cpp_sanitize_probe(
     name = "sanitize_addon",
-    label = "//libs/addon:addon",
+    label = "//projects/libs/addon:addon",
 )
 
 nix_cpp_node_addon(
@@ -170,27 +170,27 @@ nix_cpp_node_addon(
 
     const attrs = "out,kind,self_label,labels,deps,srcs,nix_inputs";
 
-    const sLibProbe = await cqueryOne(tmp, $, "//libs/demo:sanitize_lib", "out");
-    const sBinProbe = await cqueryOne(tmp, $, "//apps/demo:sanitize_bin", "out");
-    const sAddonProbe = await cqueryOne(tmp, $, "//libs/addon:sanitize_addon", "out");
+    const sLibProbe = await cqueryOne(tmp, $, "//projects/libs/demo:sanitize_lib", "out");
+    const sBinProbe = await cqueryOne(tmp, $, "//projects/apps/demo:sanitize_bin", "out");
+    const sAddonProbe = await cqueryOne(tmp, $, "//projects/libs/addon:sanitize_addon", "out");
     if (!sLibProbe || !sBinProbe || !sAddonProbe) return;
 
     const sLib = sanitizeValueFromProbeOut(String(sLibProbe.out));
     const sBin = sanitizeValueFromProbeOut(String(sBinProbe.out));
     const sAddon = sanitizeValueFromProbeOut(String(sAddonProbe.out));
 
-    const lib = await cqueryOne(tmp, $, "//libs/demo:lib", attrs);
-    const bin = await cqueryOne(tmp, $, "//apps/demo:demo", attrs);
-    const addon = await cqueryOne(tmp, $, "//libs/addon:addon", attrs);
+    const lib = await cqueryOne(tmp, $, "//projects/libs/demo:lib", attrs);
+    const bin = await cqueryOne(tmp, $, "//projects/apps/demo:demo", attrs);
+    const addon = await cqueryOne(tmp, $, "//projects/libs/addon:addon", attrs);
     if (!lib || !bin || !addon) return;
 
     assert.equal(lib.kind, "lib");
     assert.equal(bin.kind, "bin");
     assert.equal(addon.kind, "addon");
 
-    assert.equal(lib.self_label, "//libs/demo:lib");
-    assert.equal(bin.self_label, "//apps/demo:demo");
-    assert.equal(addon.self_label, "//libs/addon:addon");
+    assert.equal(lib.self_label, "//projects/libs/demo:lib");
+    assert.equal(bin.self_label, "//projects/apps/demo:demo");
+    assert.equal(addon.self_label, "//projects/libs/addon:addon");
 
     assert.equal(lib.out, `${sLib}.a`);
     assert.equal(bin.out, sBin);
@@ -234,9 +234,9 @@ nix_cpp_node_addon(
         `expected normalized extra_module_providers relative label for ${label}; want=${local}; have=${JSON.stringify(deps)}`,
       );
     };
-    expectsProviderEdge(lib, "//libs/demo:lib");
-    expectsProviderEdge(bin, "//apps/demo:demo");
-    expectsProviderEdge(addon, "//libs/addon:addon");
+    expectsProviderEdge(lib, "//projects/libs/demo:lib");
+    expectsProviderEdge(bin, "//projects/apps/demo:demo");
+    expectsProviderEdge(addon, "//projects/libs/addon:addon");
 
     const expectsPatchInput = (n: CqueryNode, pkg: string) => {
       const srcs = n.srcs || [];

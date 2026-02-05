@@ -80,11 +80,11 @@ test("go cli with local lib + third-party runtime", async () => {
     // use runInTemp-generated buck config
 
     // 1) Scaffold the lib
-    await $`scaf new go lib demo-lib --yes --path=libs/demo-lib`;
+    await $`scaf new go lib demo-lib --yes --path=projects/libs/demo-lib`;
 
     // 2) Implement Greeting; avoid network by not adding external deps during this test
     await writeFileAbs(
-      path.join(_tmp, "libs", "demo-lib", "pkg", "demo-lib", "demo-lib.go"),
+      path.join(_tmp, "projects", "libs", "demo-lib", "pkg", "demo-lib", "demo-lib.go"),
       [
         "package demolib",
         "",
@@ -101,10 +101,10 @@ test("go cli with local lib + third-party runtime", async () => {
     );
 
     // 3) Scaffold CLI and wire to lib via replace + deps
-    await $`scaf new go cli demo-cli --yes --path=apps/demo-cli`;
+    await $`scaf new go cli demo-cli --yes --path=projects/apps/demo-cli`;
 
     // Add require + replace to CLI go.mod
-    const cliGoModPath = path.join(_tmp, "apps", "demo-cli", "go.mod");
+    const cliGoModPath = path.join(_tmp, "projects", "apps", "demo-cli", "go.mod");
     let cliGoMod = await fsp.readFile(cliGoModPath, "utf8");
     if (!/\nrequire\s/.test(cliGoMod)) {
       // Insert require after the 'go x.y' line
@@ -124,7 +124,7 @@ test("go cli with local lib + third-party runtime", async () => {
     await fsp.writeFile(cliGoModPath, cliGoMod, "utf8");
 
     // Ensure local lib TARGETS advertises import path and is visible
-    const libTargetsPath = path.join(_tmp, "libs", "demo-lib", "TARGETS");
+    const libTargetsPath = path.join(_tmp, "projects", "libs", "demo-lib", "TARGETS");
     let libTargets = await fsp.readFile(libTargetsPath, "utf8");
     // No importpath injection; rely on Buck package layout and explicit deps
     if (!/visibility\s*=\s*\[\s*"PUBLIC"\s*\]/.test(libTargets)) {
@@ -142,19 +142,20 @@ test("go cli with local lib + third-party runtime", async () => {
     await fsp.writeFile(libTargetsPath, libTargets, "utf8");
 
     // Add Buck dep on the local lib after scaffolding (not in template)
-    const cliTargetsPath = path.join(_tmp, "apps", "demo-cli", "TARGETS");
+    const cliTargetsPath = path.join(_tmp, "projects", "apps", "demo-cli", "TARGETS");
     let cliTargets = await fsp.readFile(cliTargetsPath, "utf8");
-    if (!/deps\s*=\s*\[\s*"\/\/libs\/demo-lib:demo-lib"\s*\]/.test(cliTargets)) {
+    if (!/deps\s*=\s*\[\s*"\/\/projects\/libs\/demo-lib:demo-lib"\s*\]/.test(cliTargets)) {
       cliTargets = cliTargets.replace(/nix_go_binary\(([^)]*)\)/ms, (m: string, body: string) => {
         const withDeps = body.includes("deps = ")
           ? body.replace(
               /deps\s*=\s*\[([^\]]*)\]/m,
-              (mm: string, inner: string) => `deps = [${inner}, "//libs/demo-lib:demo-lib"]`,
+              (mm: string, inner: string) =>
+                `deps = [${inner}, "//projects/libs/demo-lib:demo-lib"]`,
             )
           : body.replace(
               /labels\s*=\s*\[[^\]]*\],?/m,
               (lm: string) => `${lm}
-    deps = ["//libs/demo-lib:demo-lib"],`,
+    deps = ["//projects/libs/demo-lib:demo-lib"],`,
             );
         return `nix_go_binary(${withDeps})`;
       });
@@ -163,7 +164,7 @@ test("go cli with local lib + third-party runtime", async () => {
 
     // CLI main.go uses the lib
     await writeFileAbs(
-      path.join(_tmp, "apps", "demo-cli", "cmd", "demo-cli", "main.go"),
+      path.join(_tmp, "projects", "apps", "demo-cli", "cmd", "demo-cli", "main.go"),
       [
         "package main",
         "",
@@ -197,7 +198,7 @@ test("go cli with local lib + third-party runtime", async () => {
       graphPath,
       JSON.stringify([
         {
-          name: "//apps/demo-cli:demo-cli",
+          name: "//projects/apps/demo-cli:demo-cli",
           labels: ["lang:go", "module:github.com/google/uuid@v1.6.0"],
         },
       ]),

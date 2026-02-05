@@ -1,25 +1,25 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
 import { normalizeTargetLabel } from "../../lib/labels";
+import { runInTemp } from "../lib/test-helpers";
 
 test("TS ↔ Nix label normalization parity (cell + config suffix + abs/rel)", async () => {
   await runInTemp("labels-parity", async (tmp, $) => {
     const samples: string[] = [
       // cell + config suffix
-      "root//apps/foo:svc (config//toolchains:default#buck2/default//:default#linkerbuild-tools/lang/cxx)",
+      "root//projects/apps/foo:svc (config//toolchains:default#buck2/default//:default#linkerbuild-tools/lang/cxx)",
       "prelude//build-tools/cpp:lib (config//toolchains:xyz)",
       // alternate suffix shape (platform / cfg hash)
       "//third_party/providers:prov (root//:no_cgo#6eb543497f051f11)",
       // absolute with config suffix
-      "//apps/foo:svc (config//buck:some)",
+      "//projects/apps/foo:svc (config//buck:some)",
       // relative with config suffix
-      "apps/foo:svc (config//buck:some)",
+      "projects/apps/foo:svc (config//buck:some)",
       // no suffixes
-      "root//libs/helper:lib",
-      "//libs/helper:lib",
-      "libs/helper:lib",
+      "root//projects/libs/helper:lib",
+      "//projects/libs/helper:lib",
+      "projects/libs/helper:lib",
       // bare target name (no package)
       "svc (config//foo:bar)",
       "svc",

@@ -38,8 +38,8 @@ test("language classification registry is stable contract data", () => {
   );
   assert.equal(
     node.looksLike({
-      name: "//apps/web:bundle",
-      labels: ["lockfile:apps/web/pnpm-lock.yaml#apps/web"],
+      name: "//projects/apps/web:bundle",
+      labels: ["lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"],
     } as any),
     true,
   );

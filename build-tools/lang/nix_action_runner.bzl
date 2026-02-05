@@ -1,4 +1,5 @@
 load("//build-tools/lang:nix_shell.bzl", "nix_bootstrap_env_core")
+load("//build-tools/lang:importer_roots.bzl", "WORKSPACE_IMPORTER_ROOTS")
 
 
 def nix_action_workspace_setup_from_args(
@@ -25,8 +26,11 @@ def nix_action_workspace_setup_from_args(
 
 def nix_action_export_graph_cmd(
         out_graph = "$WORKSPACE_ROOT/build-tools/tools/buck/graph.json",
-        query_roots = "libs,go,cpp,third_party",
+        query_roots = None,
         zx_wrapper = "path:$FLK_ROOT#zx-wrapper"):
+    if not query_roots:
+        roots = WORKSPACE_IMPORTER_ROOTS if WORKSPACE_IMPORTER_ROOTS else ["apps", "libs"]
+        query_roots = ",".join(roots + ["go", "cpp", "third_party"])
     return (
         "mkdir -p \"$WORKSPACE_ROOT/build-tools/tools/buck\"; "
         + ("BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_QUERY_ROOTS=\"%s\" " % query_roots)

@@ -8,21 +8,21 @@ test("readNodeProviderIndexEntries returns stable, ordered provider entries", as
   await runInTemp("node-provider-index", async (tmp, $) => {
     await $`git init`;
 
-    const webLf = path.join(tmp, "apps/web/pnpm-lock.yaml");
-    const apiLf = path.join(tmp, "apps/api/pnpm-lock.yaml");
+    const webLf = path.join(tmp, "projects/apps/web/pnpm-lock.yaml");
+    const apiLf = path.join(tmp, "projects/apps/api/pnpm-lock.yaml");
     await fsp.mkdir(path.dirname(webLf), { recursive: true });
     await fsp.mkdir(path.dirname(apiLf), { recursive: true });
     await fsp.writeFile(
       webLf,
-      `lockfileVersion: "9.0"\nimporters:\n  apps/web:\n    dependencies: {}\npackages: {}`,
+      `lockfileVersion: "9.0"\nimporters:\n  projects/apps/web:\n    dependencies: {}\npackages: {}`,
       "utf8",
     );
     await fsp.writeFile(
       apiLf,
-      `lockfileVersion: "9.0"\nimporters:\n  apps/api:\n    dependencies: {}\npackages: {}`,
+      `lockfileVersion: "9.0"\nimporters:\n  projects/apps/api:\n    dependencies: {}\npackages: {}`,
       "utf8",
     );
-    await $`git add apps/web/pnpm-lock.yaml apps/api/pnpm-lock.yaml`;
+    await $`git add projects/apps/web/pnpm-lock.yaml projects/apps/api/pnpm-lock.yaml`;
 
     // Invoke readNodeProviderIndexEntries inside the temp repo process so git ls-files
     // and dynamic import('yaml') resolve correctly relative to the temp CWD.

@@ -6,7 +6,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("nix_go_tiny_wasm_lib builds via Buck (smoke)", async () => {
   await runInTemp("go-tinygo-wasm-buck-build", async (tmp, $) => {
-    const apiDir = path.join(tmp, "libs", "math-api");
+    const apiDir = path.join(tmp, "projects", "libs", "math-api");
     await fs.mkdirp(apiDir);
     await fs.writeFile(
       path.join(apiDir, "go.mod"),
@@ -44,6 +44,6 @@ nix_go_tiny_wasm_lib(
     await $({
       cwd: tmp,
       stdio: "inherit",
-    })`buck2 build --target-platforms prelude//platforms:default //libs/math-api:wasm`;
+    })`buck2 build --target-platforms prelude//platforms:default //projects/libs/math-api:wasm`;
   });
 });

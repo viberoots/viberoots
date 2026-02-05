@@ -8,7 +8,7 @@ import { runInTemp } from "./lib/test-helpers.ts";
 test("python wasm (pyodide): app consumes wasm lib overlay", async () => {
   await runInTemp("py-wasm-pyodide-lib-overlay", async (tmp, $) => {
     // Lib importer
-    const libDir = path.join(tmp, "libs", "pylib");
+    const libDir = path.join(tmp, "projects", "libs", "pylib");
     await fs.mkdir(path.join(libDir, "src"), { recursive: true });
     await fs.writeFile(
       path.join(libDir, "uv.lock"),
@@ -25,7 +25,7 @@ load("//build-tools/python:defs.bzl", "nix_python_wasm_lib")
 nix_python_wasm_lib(
   name = "pylib",
   labels = ["backend:pyodide"],
-  lockfile_label = "lockfile:libs/pylib/uv.lock#libs/pylib",
+  lockfile_label = "lockfile:projects/libs/pylib/uv.lock#projects/libs/pylib",
   srcs = glob(["**/*.py"]),
   visibility = ["PUBLIC"],
 )
@@ -33,7 +33,7 @@ nix_python_wasm_lib(
       "utf8",
     );
     // App that depends on the lib
-    const appDir = path.join(tmp, "apps", "pywasm");
+    const appDir = path.join(tmp, "projects", "apps", "pywasm");
     await fs.mkdir(path.join(appDir, "bin"), { recursive: true });
     await fs.writeFile(path.join(appDir, "bin", "__main__.py"), 'print("ok")\n', "utf8");
     await fs.writeFile(
@@ -51,9 +51,9 @@ load("//build-tools/python:defs.bzl", "nix_python_wasm_app")
 nix_python_wasm_app(
   name = "pyapp",
   labels = ["backend:pyodide"],
-  lockfile_label = "lockfile:apps/pywasm/uv.lock#apps/pywasm",
+  lockfile_label = "lockfile:projects/apps/pywasm/uv.lock#projects/apps/pywasm",
   srcs = [],
-  deps = ["//libs/pylib:pylib"],
+  deps = ["//projects/libs/pylib:pylib"],
   visibility = ["PUBLIC"],
 )
 `,
@@ -62,12 +62,12 @@ nix_python_wasm_app(
     await $`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
     const env = {
       ...process.env,
-      BUCK_TARGET: "//apps/pywasm:pyapp",
+      BUCK_TARGET: "//projects/apps/pywasm:pyapp",
       WORKSPACE_ROOT: tmp,
       BUCK_TEST_SRC: tmp,
       NIX_PY_TEST_RESOLVE_JSON: JSON.stringify({
-        hello: { version: "1.0.0", originPath: "apps/pywasm/vendor/hello" },
-        world: { version: "0.1.0", originPath: "libs/pylib/vendor/world" },
+        hello: { version: "1.0.0", originPath: "projects/apps/pywasm/vendor/hello" },
+        world: { version: "0.1.0", originPath: "projects/libs/pylib/vendor/world" },
       }),
       PY_WASM_BACKEND: "pyodide",
     };

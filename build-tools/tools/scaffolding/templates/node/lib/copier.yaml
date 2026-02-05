@@ -16,11 +16,11 @@ name: ""
 language: "node"
 template: "lib"
 
-importer: "libs/{{ name }}"
-lockfilePath: "libs/{{ name }}/pnpm-lock.yaml"
+importer: "projects/libs/{{ name }}"
+lockfilePath: "projects/libs/{{ name }}/pnpm-lock.yaml"
 pkgScope: "@libs"
 includeNodeTests: true
 
 _tasks:
-  - mkdir -p libs/{{ name }}/src
-  - mkdir -p libs/{{ name }}/test
+  - mkdir -p projects/libs/{{ name }}/src
+  - mkdir -p projects/libs/{{ name }}/test

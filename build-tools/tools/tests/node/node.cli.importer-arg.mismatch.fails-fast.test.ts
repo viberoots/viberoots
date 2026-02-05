@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("nix_node_cli_bin(bundle=True) fails fast when importer argument disagrees with lockfile_label importer", async () => {
   await runInTemp("node-cli-importer-arg-mismatch", async (tmp, $) => {
-    const importerDir = path.join(tmp, "apps", "demo");
+    const importerDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(path.join(importerDir, "src"), { recursive: true });
     await fsp.writeFile(path.join(importerDir, "pnpm-lock.yaml"), "lockfileVersion: 9\n", "utf8");
     await fsp.writeFile(path.join(importerDir, "src", "index.ts"), "console.log('ok')\n", "utf8");
@@ -20,8 +20,8 @@ test("nix_node_cli_bin(bundle=True) fails fast when importer argument disagrees 
         "nix_node_cli_bin(",
         '  name = "cli",',
         "  bundle = True,",
-        '  lockfile_label = "lockfile:apps/demo/pnpm-lock.yaml#apps/demo",',
-        '  importer = "apps/other",',
+        '  lockfile_label = "lockfile:projects/apps/demo/pnpm-lock.yaml#projects/apps/demo",',
+        '  importer = "projects/apps/other",',
         ")",
         "",
       ].join("\n"),
@@ -33,7 +33,7 @@ test("nix_node_cli_bin(bundle=True) fails fast when importer argument disagrees 
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute name //apps/demo:cli`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute name //projects/apps/demo:cli`;
 
     assert.notEqual(q.exitCode, 0, "expected cquery to fail on importer mismatch");
     const combined = String(q.stderr || "") + String(q.stdout || "");

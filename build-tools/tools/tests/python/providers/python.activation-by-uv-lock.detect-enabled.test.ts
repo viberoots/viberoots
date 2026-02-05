@@ -7,8 +7,8 @@ import { runInTemp, exists } from "../../lib/test-helpers";
 
 test("providers: Python activation via uv.lock in sparse clone (no --lang)", async () => {
   await runInTemp("python-uv-activation", async (tmp, $) => {
-    // Synthesize a sparse slice: only libs/api/uv.lock and optional importer-local patches
-    const importerDir = path.join(tmp, "libs", "api");
+    // Synthesize a sparse slice: only projects/libs/api/uv.lock and optional importer-local patches
+    const importerDir = path.join(tmp, "projects", "libs", "api");
     await fsp.mkdir(path.join(importerDir, "patches", "python"), { recursive: true });
     // Minimal uv.lock with one package entry (parser tolerates empty as well)
     const uvLock = `# uv.lock (minimal)
@@ -42,8 +42,8 @@ await syncAllProviders();
       txt,
       /load\("\/\/third_party\/providers:defs_python\.bzl", "python_importer_deps"\)/,
     );
-    // Provider entry present for libs/api importer
+    // Provider entry present for projects/libs/api importer
     assert.match(txt, /python_importer_deps\(name="/);
-    assert.match(txt, /lockfile="libs\/api\/uv\.lock"/);
+    assert.match(txt, /lockfile="projects\/libs\/api\/uv\.lock"/);
   });
 });

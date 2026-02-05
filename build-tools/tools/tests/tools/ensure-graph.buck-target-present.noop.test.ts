@@ -14,7 +14,7 @@ test("ensureGraph is a no-op when BUCK_TARGET is already present in the graph", 
     const prevBuckTarget = process.env.BUCK_TARGET;
     try {
       process.env.WORKSPACE_ROOT = tmp;
-      process.env.BUCK_TARGET = "//apps/example:svc";
+      process.env.BUCK_TARGET = "//projects/apps/example:svc";
 
       await fsp.writeFile(
         graphPath,

@@ -10,11 +10,19 @@ import { computeImporterLabel, findNearestUvLockForPackage } from "../../lib/imp
 
 test("python exporter and shared helper agree on nearest uv.lock and importer label", async () => {
   await runInTemp("exp-python-nearest-uv", async (tmp, $) => {
-    await fs.mkdirp(path.join(tmp, "apps", "demo", "nested"));
-    await fs.outputFile(path.join(tmp, "apps", "demo", "uv.lock"), "# uv lock\n", "utf8");
+    await fs.mkdirp(path.join(tmp, "projects", "apps", "demo", "nested"));
+    await fs.outputFile(
+      path.join(tmp, "projects", "apps", "demo", "uv.lock"),
+      "# uv lock\n",
+      "utf8",
+    );
 
-    await fs.mkdirp(path.join(tmp, "libs", "api", "inner"));
-    await fs.outputFile(path.join(tmp, "libs", "api", "uv.lock"), "# uv lock\n", "utf8");
+    await fs.mkdirp(path.join(tmp, "projects", "libs", "api", "inner"));
+    await fs.outputFile(
+      path.join(tmp, "projects", "libs", "api", "uv.lock"),
+      "# uv lock\n",
+      "utf8",
+    );
 
     await fs.outputFile(path.join(tmp, "uv.lock"), "# root uv lock\n", "utf8");
 
@@ -22,13 +30,13 @@ test("python exporter and shared helper agree on nearest uv.lock and importer la
     try {
       process.chdir(tmp);
 
-      const demoLock = await findNearestUvLockForPackage("apps/demo/nested");
-      assert.equal(demoLock, "apps/demo/uv.lock");
-      assert.equal(computeImporterLabel(demoLock), "apps/demo");
+      const demoLock = await findNearestUvLockForPackage("projects/apps/demo/nested");
+      assert.equal(demoLock, "projects/apps/demo/uv.lock");
+      assert.equal(computeImporterLabel(demoLock), "projects/apps/demo");
 
-      const apiLock = await findNearestUvLockForPackage("libs/api/inner");
-      assert.equal(apiLock, "libs/api/uv.lock");
-      assert.equal(computeImporterLabel(apiLock), "libs/api");
+      const apiLock = await findNearestUvLockForPackage("projects/libs/api/inner");
+      assert.equal(apiLock, "projects/libs/api/uv.lock");
+      assert.equal(computeImporterLabel(apiLock), "projects/libs/api");
 
       const rootLock = await findNearestUvLockForPackage(".");
       assert.equal(rootLock, "uv.lock");
@@ -39,13 +47,13 @@ test("python exporter and shared helper agree on nearest uv.lock and importer la
 
     const simNodes = [
       {
-        name: "//apps/demo/nested:tool",
+        name: "//projects/apps/demo/nested:tool",
         rule_type: "python_binary",
         labels: ["lang:python", "kind:bin"],
         srcs: ["tool.py"],
       },
       {
-        name: "//libs/api/inner:tool",
+        name: "//projects/libs/api/inner:tool",
         rule_type: "python_binary",
         labels: ["lang:python", "kind:bin"],
         srcs: ["tool.py"],
@@ -76,14 +84,14 @@ test("python exporter and shared helper agree on nearest uv.lock and importer la
     const byName = new Map(nodes.map((n: any) => [n?.name, n]));
 
     {
-      const n = byName.get("//apps/demo/nested:tool");
+      const n = byName.get("//projects/apps/demo/nested:tool");
       const labels: string[] = (n?.labels || []) as string[];
-      assert.ok(labels.includes("lockfile:apps/demo/uv.lock#apps/demo"));
+      assert.ok(labels.includes("lockfile:projects/apps/demo/uv.lock#projects/apps/demo"));
     }
     {
-      const n = byName.get("//libs/api/inner:tool");
+      const n = byName.get("//projects/libs/api/inner:tool");
       const labels: string[] = (n?.labels || []) as string[];
-      assert.ok(labels.includes("lockfile:libs/api/uv.lock#libs/api"));
+      assert.ok(labels.includes("lockfile:projects/libs/api/uv.lock#projects/libs/api"));
     }
     {
       const n = byName.get("//:root_py");

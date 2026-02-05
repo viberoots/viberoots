@@ -100,8 +100,8 @@ Both examples create the destination under the canonical location for the chosen
     - Destination defaults to `./<name_of_test>_test.go` if `--path` is omitted.
     - Package is inferred from existing files; under `/cmd/` it defaults to `main`.
   - Auto‑wiring (no TARGETS edits):
-    - Libs: tests under `libs/<lib>/pkg/<pkg>/**/_test.go` bind to `//libs/<lib>:<lib>_test`.
-    - Apps: tests under `apps/<app>/cmd/<app>/**/_test.go` bind to `//apps/<app>:<app>_test`.
+    - Libs: tests under `projects/libs/<lib>/pkg/<pkg>/**/_test.go` bind to `//projects/libs/<lib>:<lib>_test`.
+    - Apps: tests under `projects/apps/<app>/cmd/<app>/**/_test.go` bind to `//projects/apps/<app>:<app>_test`.
 
 #### Target selection
 

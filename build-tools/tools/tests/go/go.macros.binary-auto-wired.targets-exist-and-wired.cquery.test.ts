@@ -33,15 +33,15 @@ EOF'`;
       cwd: tmp,
     })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
 MODULE_PROVIDERS = {
-  "//apps/demo:demo_pkg": ["//third_party/providers:prov"],
+  "//projects/apps/demo:demo_pkg": ["//third_party/providers:prov"],
 }
 EOF'`;
 
-    const appDir = path.join(tmp, "apps", "demo");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(path.join(appDir, "cmd", "demo"), { recursive: true });
     await fsp.mkdir(path.join(appDir, "patches", "go"), { recursive: true });
 
-    const patchRel = "apps/demo/patches/go/demo@0.0.0.patch";
+    const patchRel = "projects/apps/demo/patches/go/demo@0.0.0.patch";
     await fsp.writeFile(path.join(tmp, patchRel), "# noop\n", "utf8");
 
     await fsp.writeFile(
@@ -76,7 +76,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute deps --output-attribute srcs //apps/demo:demo_pkg`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute deps --output-attribute srcs //projects/apps/demo:demo_pkg`;
     if (probePkg.exitCode !== 0) return; // skip when Buck/prelude/toolchains unavailable
 
     const pkg = firstCqueryNode<{ deps?: string[]; srcs?: string[] }>(
@@ -97,7 +97,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute library //apps/demo:demo_test`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute library //projects/apps/demo:demo_test`;
     const node = firstCqueryNode<{ library?: string | null }>(
       JSON.parse(String(probeTest.stdout || "")),
     );

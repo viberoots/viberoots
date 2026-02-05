@@ -261,7 +261,7 @@ Implement.
 
 ### Description
 
-Factor the common scaffolding in Node/Python provider sync into a generic “importer provider sync” driver that accepts pluggable lockfile discovery/parsing and effective‑set computation. Keep language‑specific parsing (pnpm/uv) behind the plugin boundary. Centralize workspace importer filtering (`apps/*` or `libs/*`).
+Factor the common scaffolding in Node/Python provider sync into a generic “importer provider sync” driver that accepts pluggable lockfile discovery/parsing and effective‑set computation. Keep language‑specific parsing (pnpm/uv) behind the plugin boundary. Centralize workspace importer filtering (`projects/apps/*` or `projects/libs/*`).
 
 ### Scope & Changes
 

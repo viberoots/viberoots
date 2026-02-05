@@ -1,13 +1,13 @@
 #!/usr/bin/env zx-wrapper
-import { test } from "node:test";
 import assert from "node:assert/strict";
+import { test } from "node:test";
 import { isImporterScopedLockfileLabel, parseLockfileLabel } from "../../lib/labels";
 
 test("parseLockfileLabel: nested importer path", () => {
-  const s = "lockfile:apps/web/pnpm-lock.yaml#apps/web";
+  const s = "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web";
   const parsed = parseLockfileLabel(s);
   assert.ok(parsed, "should parse");
-  assert.equal(parsed!.lockfile, "apps/web/pnpm-lock.yaml");
-  assert.equal(parsed!.importer, "apps/web");
+  assert.equal(parsed!.lockfile, "projects/apps/web/pnpm-lock.yaml");
+  assert.equal(parsed!.importer, "projects/apps/web");
   assert.equal(isImporterScopedLockfileLabel(s), true);
 });

@@ -29,7 +29,7 @@ Use the canonical helper surface from `//build-tools/lang:defs_common.bzl` and `
 
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
 - Provider wiring: load `MODULE_PROVIDERS` from `//build-tools/lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
-- Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
+- Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `projects/apps/*`/`projects/libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
 - Patch model contract: `build-tools/lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
 
@@ -45,7 +45,7 @@ Use the canonical helper surface from `//build-tools/lang:defs_common.bzl` and `
 2. Exporter inspects configured C# targets, runs authoritative queries to compute the set of NuGet packages used, tagging targets with `nuget:<id>@<version>` labels.
 3. Default providers are importer‑scoped (lockfile + importer), mirroring Node; per‑package providers are optional.
 4. Auto‑map maps `lockfile:<path>#<importer>` and `nixpkg:<attr>` labels; mapping `nuget:` per‑package labels would require extending `build-tools/tools/buck/gen-auto-map.ts`.
-5. Planner templates (`build-tools/tools/nix/templates/csharp.nix`) build .NET apps/libs with `buildDotnetModule` (or equivalent), applying patches and dev overrides.
+5. Planner templates (`build-tools/tools/nix/templates/csharp.nix`) build .NET projects/apps/libs with `buildDotnetModule` (or equivalent), applying patches and dev overrides.
 
 ### Labels and naming
 

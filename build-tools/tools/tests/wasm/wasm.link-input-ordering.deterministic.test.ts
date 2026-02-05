@@ -27,7 +27,7 @@ async function buildSelectedOutPath(args: {
 test("wasm: link input ordering is deterministic (logged by template)", async () => {
   await runInTemp("wasm-link-input-ordering-deterministic", async (tmp, $) => {
     const mkLib = async (dirName: string, name: string, opts?: { linkDeps?: string[] }) => {
-      const dir = path.join(tmp, "libs", dirName);
+      const dir = path.join(tmp, "projects", "libs", dirName);
       await fs.outputFile(path.join(dir, "include", `${dirName}.h`), `int ${dirName}_id(void);\n`);
       await fs.outputFile(
         path.join(dir, "src", `${dirName}.c`),
@@ -53,10 +53,10 @@ test("wasm: link input ordering is deterministic (logged by template)", async ()
     };
 
     await mkLib("support", "support_wasm");
-    await mkLib("core", "core_wasm", { linkDeps: ["//libs/support:support_wasm"] });
-    await mkLib("util", "util_wasm", { linkDeps: ["//libs/support:support_wasm"] });
+    await mkLib("core", "core_wasm", { linkDeps: ["//projects/libs/support:support_wasm"] });
+    await mkLib("util", "util_wasm", { linkDeps: ["//projects/libs/support:support_wasm"] });
 
-    const apiDir = path.join(tmp, "libs", "api");
+    const apiDir = path.join(tmp, "projects", "libs", "api");
     await fs.outputFile(path.join(apiDir, "go.mod"), `module example.com/api\n\ngo 1.22.0\n`);
     await fs.outputFile(path.join(apiDir, "main.go"), `package main\n\nfunc main() {}\n`);
     await fs.outputFile(
@@ -67,7 +67,7 @@ test("wasm: link input ordering is deterministic (logged by template)", async ()
         "nix_go_tiny_wasm_lib(",
         '    name = "wasm",',
         '    srcs = ["main.go"],',
-        '    link_deps = ["//libs/core:core_wasm", "//libs/util:util_wasm"],',
+        '    link_deps = ["//projects/libs/core:core_wasm", "//projects/libs/util:util_wasm"],',
         '    link_closure = "transitive",',
         '    visibility = ["PUBLIC"],',
         ")",
@@ -80,8 +80,8 @@ test("wasm: link input ordering is deterministic (logged by template)", async ()
       stdio: "inherit",
     })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
 
-    const out1 = await buildSelectedOutPath({ tmp, $, target: "//libs/api:wasm" });
-    const out2 = await buildSelectedOutPath({ tmp, $, target: "//libs/api:wasm" });
+    const out1 = await buildSelectedOutPath({ tmp, $, target: "//projects/libs/api:wasm" });
+    const out2 = await buildSelectedOutPath({ tmp, $, target: "//projects/libs/api:wasm" });
 
     const log1 = await fs.readFile(path.join(out1, "build.log"), "utf8");
     const log2 = await fs.readFile(path.join(out2, "build.log"), "utf8");
@@ -99,7 +99,7 @@ test("wasm: link input ordering is deterministic (logged by template)", async ()
       );
 
     const expected =
-      "wasmStaticLibLabels=//libs/core:core_wasm,//libs/support:support_wasm,//libs/util:util_wasm";
+      "wasmStaticLibLabels=//projects/libs/core:core_wasm,//projects/libs/support:support_wasm,//projects/libs/util:util_wasm";
     if (got1 !== expected) throw new Error(`expected resolved ordering ${expected}; got ${got1}`);
   });
 });

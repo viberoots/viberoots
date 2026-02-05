@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("python: pyext link_deps rejects unsupported targets with a targeted error", async () => {
   await runInTemp("python-pyext-link-deps-unsupported", async (tmp, $) => {
-    const appRel = path.join("apps", "pyext_bad_link_dep");
+    const appRel = path.join("projects", "apps", "pyext_bad_link_dep");
     const appDir = path.join(tmp, appRel);
 
     await fs.mkdirp(path.join(appDir, "bin"));

@@ -10,7 +10,7 @@ import { runInTemp } from "../lib/test-helpers";
 test("planner: touching root-only file does not change app bin store path", async () => {
   await runInTemp("planner-invalidation-root-touch", async (tmp, $) => {
     // Scaffold a small CLI app under apps/
-    await $`scaf new go cli demo-cli --yes --path=apps/demo-cli`;
+    await $`scaf new go cli demo-cli --yes --path=projects/apps/demo-cli`;
     // Seed gomod2nix deterministically via local stub (no network)
     const stubDir = path.join(tmp, "bin");
     await fsp.mkdir(stubDir, { recursive: true });
@@ -43,7 +43,7 @@ test("planner: touching root-only file does not change app bin store path", asyn
       cwd: tmp,
       stdio: "inherit",
       env: { ...process.env, PATH: `${stubDir}:${process.env.PATH || ""}` },
-    })`gomod2nix --dir apps/demo-cli`;
+    })`gomod2nix --dir projects/apps/demo-cli`;
     // Use app-local gomod2nix.toml (nearest ancestor resolution) to avoid broad root invalidations
 
     // Generate glue, then build graph-generator bundle
@@ -66,7 +66,9 @@ test("planner: touching root-only file does not change app bin store path", asyn
     const manifest1Path = path.join(outPath1, "manifest.json");
     const manifest1Txt = await fsp.readFile(manifest1Path, "utf8");
     const manifest1 = JSON.parse(manifest1Txt) as Array<any>;
-    const entry1 = manifest1.find((e) => String(e?.label || "").includes("apps/demo-cli:demo-cli"));
+    const entry1 = manifest1.find((e) =>
+      String(e?.label || "").includes("projects/apps/demo-cli:demo-cli"),
+    );
     if (!entry1 || !Array.isArray(entry1?.bins) || entry1.bins.length === 0) {
       throw new Error("missing demo-cli bin in manifest after first build");
     }
@@ -96,7 +98,9 @@ test("planner: touching root-only file does not change app bin store path", asyn
     const manifest2Path = path.join(outPath2, "manifest.json");
     const manifest2Txt = await fsp.readFile(manifest2Path, "utf8");
     const manifest2 = JSON.parse(manifest2Txt) as Array<any>;
-    const entry2 = manifest2.find((e) => String(e?.label || "").includes("apps/demo-cli:demo-cli"));
+    const entry2 = manifest2.find((e) =>
+      String(e?.label || "").includes("projects/apps/demo-cli:demo-cli"),
+    );
     if (!entry2 || !Array.isArray(entry2?.bins) || entry2.bins.length === 0) {
       throw new Error("missing demo-cli bin in manifest after second build");
     }

@@ -12,12 +12,12 @@ test("sync-providers-node creates provider with peer dependency lockfile", async
     // Create lockfile with peer dependencies
     // This verifies the provider sync can parse lockfiles with peer dependencies
     // Full patch matching will be tested with real projects in PR 3
-    const lockfilePath = path.join(tmp, "apps/example/pnpm-lock.yaml");
+    const lockfilePath = path.join(tmp, "projects/apps/example/pnpm-lock.yaml");
     const lockfileContent = `
 lockfileVersion: "9.0"
 
 importers:
-  apps/example:
+  projects/apps/example:
     dependencies:
       react-dom:
         specifier: ^18.0.0
@@ -37,7 +37,7 @@ packages:
 
     await fsp.mkdir(path.dirname(lockfilePath), { recursive: true });
     await fsp.writeFile(lockfilePath, lockfileContent, "utf8");
-    await $`git add apps/example/pnpm-lock.yaml`;
+    await $`git add projects/apps/example/pnpm-lock.yaml`;
 
     // Run sync (without patches to simplify test)
     await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
@@ -54,12 +54,12 @@ packages:
     }
 
     // Verify lockfile and importer are referenced
-    if (!output.includes("apps/example/pnpm-lock.yaml")) {
+    if (!output.includes("projects/apps/example/pnpm-lock.yaml")) {
       console.error("Expected lockfile path in output");
       process.exit(2);
     }
 
-    if (!output.includes('importer="apps/example"')) {
+    if (!output.includes('importer="projects/apps/example"')) {
       console.error("Expected importer in output");
       process.exit(2);
     }

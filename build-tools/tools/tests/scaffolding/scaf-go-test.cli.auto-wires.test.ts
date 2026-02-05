@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
+import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import assert from "node:assert/strict";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
@@ -41,7 +41,7 @@ test(
       // ensure git repo for glue scripts that use git
       await $`git init`;
       // Scaffold a Go CLI app
-      await $`scaf new go cli demo-cli --yes --path=apps/demo-cli`;
+      await $`scaf new go cli demo-cli --yes --path=projects/apps/demo-cli`;
       // Seed gomod2nix deterministically via local stub (no network)
       const stubDir = path.join(tmp, "bin");
       await fsp.mkdir(stubDir, { recursive: true });
@@ -74,14 +74,14 @@ test(
         cwd: tmp,
         stdio: "inherit",
         env: { ...process.env, PATH: `${stubDir}:${process.env.PATH || ""}` },
-      })`gomod2nix --dir apps/demo-cli`;
+      })`gomod2nix --dir projects/apps/demo-cli`;
       await fsp.copyFile(
-        path.join(tmp, "apps", "demo-cli", "gomod2nix.toml"),
+        path.join(tmp, "projects", "apps", "demo-cli", "gomod2nix.toml"),
         path.join(tmp, "gomod2nix.toml"),
       );
 
       // Use scaf to create a new test under cmd/<app>/**
-      const testPath = path.join(tmp, "apps/demo-cli/cmd/demo-cli/extra_case_test.go");
+      const testPath = path.join(tmp, "projects/apps/demo-cli/cmd/demo-cli/extra_case_test.go");
       await $`scaf new go test extra_case --path=${testPath}`;
 
       // Glue and test
@@ -93,12 +93,12 @@ test(
         stdio: "pipe",
         reject: false,
         nothrow: true,
-      })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //apps/demo-cli:demo-cli_test`;
+      })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //projects/apps/demo-cli:demo-cli_test`;
       if (q.exitCode !== 0) return; // skip when Buck/prelude/toolchains unavailable
       const node = firstCqueryNode<{ srcs?: unknown[] }>(JSON.parse(String(q.stdout || "")));
       const srcs = (node?.srcs || []).map(srcToString);
 
-      const wantA = "apps/demo-cli/cmd/demo-cli/extra_case_test.go";
+      const wantA = "projects/apps/demo-cli/cmd/demo-cli/extra_case_test.go";
       const wantB = "cmd/demo-cli/extra_case_test.go";
       assert.ok(
         srcs.some((s) => s.includes(wantA) || s.includes(wantB)),

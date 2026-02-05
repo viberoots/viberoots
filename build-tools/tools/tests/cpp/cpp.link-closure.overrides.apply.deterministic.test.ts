@@ -87,7 +87,7 @@ test("cpp: link_closure_overrides apply deterministically (ordering locked by bu
         "nix_cpp_library(",
         '  name = "core",',
         '  srcs = ["src/core.cpp"],',
-        '  link_deps = ["//libs/support:support"],',
+        '  link_deps = ["//projects/libs/support:support"],',
         '  labels = ["lang:cpp", "kind:lib"],',
         '  visibility = ["PUBLIC"],',
         ")",
@@ -118,10 +118,10 @@ test("cpp: link_closure_overrides apply deterministically (ordering locked by bu
         "nix_cpp_binary(",
         '  name = "demo",',
         '  srcs = ["src/main.cpp"],',
-        '  link_deps = ["//libs/core:core", "//libs/alpha:alpha"],',
+        '  link_deps = ["//projects/libs/core:core", "//projects/libs/alpha:alpha"],',
         '  link_closure = "direct",',
         "  link_closure_overrides = {",
-        '    "//libs/core:core": "transitive",',
+        '    "//projects/libs/core:core": "transitive",',
         "  },",
         '  labels = ["lang:cpp", "kind:bin"],',
         '  visibility = ["PUBLIC"],',
@@ -136,7 +136,7 @@ test("cpp: link_closure_overrides apply deterministically (ordering locked by bu
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir cpp_link_closure_overrides cquery "deps(//apps/demo:demo)" --json --output-attribute name`;
+    })`buck2 --isolation-dir cpp_link_closure_overrides cquery "deps(//projects/apps/demo:demo)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return;
 
     await $({
@@ -147,7 +147,7 @@ test("cpp: link_closure_overrides apply deterministically (ordering locked by bu
       stdio: "pipe",
       nothrow: true,
       reject: false,
-      env: { ...process.env, BUCK_TARGET: "//apps/demo:demo" },
+      env: { ...process.env, BUCK_TARGET: "//projects/apps/demo:demo" },
     })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
     if (build1.exitCode !== 0) {
       throw new Error(String(build1.stderr || build1.stdout));
@@ -160,9 +160,9 @@ test("cpp: link_closure_overrides apply deterministically (ordering locked by bu
     }
 
     const expected = [
-      `-l${sanitizeName("//libs/core:core")}`,
-      `-l${sanitizeName("//libs/support:support")}`,
-      `-l${sanitizeName("//libs/alpha:alpha")}`,
+      `-l${sanitizeName("//projects/libs/core:core")}`,
+      `-l${sanitizeName("//projects/libs/support:support")}`,
+      `-l${sanitizeName("//projects/libs/alpha:alpha")}`,
     ].join(" ");
     if (linkLibs1.trim() !== expected) {
       throw new Error(
@@ -175,7 +175,7 @@ test("cpp: link_closure_overrides apply deterministically (ordering locked by bu
       stdio: "pipe",
       nothrow: true,
       reject: false,
-      env: { ...process.env, BUCK_TARGET: "//apps/demo:demo" },
+      env: { ...process.env, BUCK_TARGET: "//projects/apps/demo:demo" },
     })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
     if (build2.exitCode !== 0) {
       throw new Error(String(build2.stderr || build2.stdout));

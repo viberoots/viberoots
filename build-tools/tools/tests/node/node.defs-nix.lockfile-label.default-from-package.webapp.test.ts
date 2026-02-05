@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("node_webapp defaults lockfile label from package path", async () => {
   await runInTemp("node-defs-nix-lockfile-default-webapp", async (tmp, $) => {
-    const dir = path.join(tmp, "apps", "web");
+    const dir = path.join(tmp, "projects", "apps", "web");
     await fsp.mkdir(dir, { recursive: true });
     await fsp.writeFile(path.join(dir, "pnpm-lock.yaml"), "lockfileVersion: 9\n", "utf8");
     await fsp.writeFile(
@@ -28,7 +28,7 @@ test("node_webapp defaults lockfile label from package path", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //apps/web:web`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //projects/apps/web:web`;
     assert.equal(
       res.exitCode,
       0,
@@ -37,7 +37,7 @@ test("node_webapp defaults lockfile label from package path", async () => {
     const out = String(res.stdout || "");
     assert.match(
       out,
-      /lockfile:apps\/web\/pnpm-lock\.yaml#apps\/web/,
+      /lockfile:projects\/apps\/web\/pnpm-lock\.yaml#projects\/apps\/web/,
       "expected default lockfile label derived from package path",
     );
   });

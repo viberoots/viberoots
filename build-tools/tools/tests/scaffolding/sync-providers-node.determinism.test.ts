@@ -10,12 +10,12 @@ test("sync-providers-node is byte-for-byte stable with synthetic lockfile", asyn
     // Initialize git so git ls-files works
     await $`git init`;
 
-    const lockfilePath = path.join(tmp, "apps/example/pnpm-lock.yaml");
+    const lockfilePath = path.join(tmp, "projects/apps/example/pnpm-lock.yaml");
     const lockfileContent = `
 lockfileVersion: "9.0"
 
 importers:
-  apps/example:
+  projects/apps/example:
     dependencies:
       lodash:
         specifier: ^4.17.21
@@ -29,7 +29,7 @@ packages:
 
     await fsp.mkdir(path.dirname(lockfilePath), { recursive: true });
     await fsp.writeFile(lockfilePath, lockfileContent, "utf8");
-    await $`git add apps/example/pnpm-lock.yaml`;
+    await $`git add projects/apps/example/pnpm-lock.yaml`;
 
     // First run
     await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
@@ -66,7 +66,7 @@ packages:
       process.exit(2);
     }
 
-    if (!output1.includes("apps/example/pnpm-lock.yaml")) {
+    if (!output1.includes("projects/apps/example/pnpm-lock.yaml")) {
       console.error("Expected lockfile path in output");
       process.exit(2);
     }

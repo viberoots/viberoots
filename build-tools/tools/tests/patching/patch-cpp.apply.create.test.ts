@@ -22,7 +22,7 @@ test("patch-cpp apply writes encoded patch filename and auto-discovery note", as
 
     const out = await $({ cwd: tmp })`PATCH_CPP_DEBUG=1 NIX_CPP_TEST_RESOLVE_JSON=${JSON.stringify(
       map,
-    )} build-tools/tools/bin/patch-pkg apply cpp --target //libs/core:lib zlib`;
+    )} build-tools/tools/bin/patch-pkg apply cpp --target //projects/libs/core:lib zlib`;
     const outTxtAll = String(out.stdout || out.stderr || "");
     const printed = outTxtAll
       .split(/\r?\n/)

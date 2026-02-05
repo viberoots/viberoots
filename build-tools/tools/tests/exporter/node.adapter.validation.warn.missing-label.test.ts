@@ -13,7 +13,11 @@ test("node adapter warns when lockfile label is missing (warn mode)", async () =
     await fs.remove(path.join(tmp, "pnpm-lock.yaml"));
     await fs.remove(path.join(tmp, "apps", "web", "pnpm-lock.yaml"));
     const nodes = [
-      { name: "//apps/web:bundle", rule_type: "js_binary", labels: ["lang:node", "kind:bundle"] },
+      {
+        name: "//projects/apps/web:bundle",
+        rule_type: "js_binary",
+        labels: ["lang:node", "kind:bundle"],
+      },
     ];
     const sim = path.join(tmp, "build-tools/tools/buck/simulated.json");
     await fs.outputFile(sim, JSON.stringify(nodes) + "\n");

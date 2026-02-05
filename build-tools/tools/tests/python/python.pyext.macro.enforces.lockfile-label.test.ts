@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("python pyext macro fails with deterministic error text when lockfile label is missing or malformed", async () => {
   await runInTemp("py-pyext-lockfile-label-errors", async (tmp, $) => {
-    const appDir = path.join(tmp, "apps", "demo");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(path.join(appDir, "native"), { recursive: true });
     await fsp.writeFile(path.join(appDir, "native", "ext.c"), "int x(){return 1;}\n", "utf8");
     await fsp.writeFile(
@@ -22,7 +22,7 @@ test("python pyext macro fails with deterministic error text when lockfile label
           "Exactly one importer-scoped lockfile label is required (lockfile:<path>#<importer>)",
       },
       {
-        label: "lockfile:apps/demo/uv.lock",
+        label: "lockfile:projects/apps/demo/uv.lock",
         expected: "missing '#<importer>'",
       },
       {
@@ -56,7 +56,7 @@ test("python pyext macro fails with deterministic error text when lockfile label
         stdio: "pipe",
         reject: false,
         nothrow: true,
-      })`buck2 cquery --target-platforms //:no_cgo //apps/demo:ext`;
+      })`buck2 cquery --target-platforms //:no_cgo //projects/apps/demo:ext`;
 
       assert.notEqual(q.exitCode, 0, "expected cquery to fail for invalid lockfile label");
       const stderr = String(q.stderr || "");

@@ -1,25 +1,28 @@
 #!/usr/bin/env zx-wrapper
+import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import assert from "node:assert/strict";
 import { test } from "node:test";
-import { runInTemp } from "../../lib/test-helpers";
 import { providerNameForImporter } from "../../../lib/providers";
+import { runInTemp } from "../../lib/test-helpers";
 
 test("node providers carry lang:node label", async () => {
   await runInTemp("node-provider-lang-label", async (tmp, $) => {
     await $`git init`;
     // Minimal PNPM lockfile under an importer
-    const lf = path.join(tmp, "apps/demo/pnpm-lock.yaml");
+    const lf = path.join(tmp, "projects/apps/demo/pnpm-lock.yaml");
     await fsp.mkdir(path.dirname(lf), { recursive: true });
     await fsp.writeFile(
       lf,
-      `lockfileVersion: "9.0"\nimporters:\n  apps/demo:\n    dependencies: {}\npackages: {}`,
+      `lockfileVersion: "9.0"\nimporters:\n  projects/apps/demo:\n    dependencies: {}\npackages: {}`,
       "utf8",
     );
     // Generate Node providers
     await $({ cwd: tmp })`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
-    const provider = providerNameForImporter("apps/demo/pnpm-lock.yaml", "apps/demo");
+    const provider = providerNameForImporter(
+      "projects/apps/demo/pnpm-lock.yaml",
+      "projects/apps/demo",
+    );
     // Query labels of the provider target
     const cq = await $({
       cwd: tmp,

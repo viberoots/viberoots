@@ -22,12 +22,12 @@ test("auto-map: Go module labels do not map to providers (even with local patche
       graph,
       JSON.stringify([
         {
-          name: "//apps/example:affected",
+          name: "//projects/apps/example:affected",
           rule_type: "go_binary",
           labels: ["module:golang.org/x/net@v0.24.0"],
         },
         {
-          name: "//apps/example:unrelated",
+          name: "//projects/apps/example:unrelated",
           rule_type: "go_binary",
           labels: ["module:github.com/sirupsen/logrus@v1.9.0"],
         },

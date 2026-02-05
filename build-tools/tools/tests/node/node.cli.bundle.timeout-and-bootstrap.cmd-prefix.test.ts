@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("nix_node_cli_bin(bundle=True) cmd prefixes nix bootstrap env and timeout wrapper", async () => {
   await runInTemp("node-cli-timeout-prefix", async (tmp, $) => {
-    const dir = path.join(tmp, "apps", "cli");
+    const dir = path.join(tmp, "projects", "apps", "cli");
     await fsp.mkdir(path.join(dir, "src"), { recursive: true });
     await fsp.writeFile(path.join(dir, "src", "index.ts"), "console.log('cli')\n", "utf8");
     await fsp.writeFile(
@@ -18,7 +18,7 @@ test("nix_node_cli_bin(bundle=True) cmd prefixes nix bootstrap env and timeout w
         "nix_node_cli_bin(",
         '  name = "tool",',
         "  bundle = True,",
-        '  labels = ["lockfile:apps/cli/pnpm-lock.yaml#apps/cli"],',
+        '  labels = ["lockfile:projects/apps/cli/pnpm-lock.yaml#projects/apps/cli"],',
         ")",
         "",
       ].join("\n"),
@@ -30,7 +30,7 @@ test("nix_node_cli_bin(bundle=True) cmd prefixes nix bootstrap env and timeout w
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cmd //apps/cli:tool`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cmd //projects/apps/cli:tool`;
     if (probe.exitCode !== 0) {
       // Environment not fully available in temp — skip to avoid false negatives
       return;

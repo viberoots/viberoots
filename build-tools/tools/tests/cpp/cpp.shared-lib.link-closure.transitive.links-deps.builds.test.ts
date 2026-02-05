@@ -47,12 +47,12 @@ function extractBuildLogLine(buildLog: string, key: string): string {
 test("cpp: shared lib link_closure=transitive follows link_deps", async () => {
   await runInTemp("cpp-shared-lib-transitive-link-closure", async (tmp, $) => {
     await fs.outputFile(
-      path.join(tmp, "libs", "support", "src", "support.cpp"),
+      path.join(tmp, "projects", "libs", "support", "src", "support.cpp"),
       ["int support_answer() { return 4; }", ""].join("\n"),
       "utf8",
     );
     await fs.outputFile(
-      path.join(tmp, "libs", "core", "src", "core.cpp"),
+      path.join(tmp, "projects", "libs", "core", "src", "core.cpp"),
       [
         "extern int support_answer();",
         "int core_answer() {",
@@ -63,7 +63,7 @@ test("cpp: shared lib link_closure=transitive follows link_deps", async () => {
       "utf8",
     );
     await fs.outputFile(
-      path.join(tmp, "libs", "runtime", "src", "runtime.cpp"),
+      path.join(tmp, "projects", "libs", "runtime", "src", "runtime.cpp"),
       [
         "extern int core_answer();",
         "int runtime_answer() {",
@@ -76,27 +76,27 @@ test("cpp: shared lib link_closure=transitive follows link_deps", async () => {
 
     const graph = [
       {
-        name: "//libs/support:support",
+        name: "//projects/libs/support:support",
         rule_type: "cxx_library",
         labels: ["lang:cpp", "kind:lib"],
-        srcs: ["libs/support/src/support.cpp"],
+        srcs: ["projects/libs/support/src/support.cpp"],
         link_mode: "shared",
       },
       {
-        name: "//libs/core:core",
+        name: "//projects/libs/core:core",
         rule_type: "cxx_library",
         labels: ["lang:cpp", "kind:lib"],
-        srcs: ["libs/core/src/core.cpp"],
+        srcs: ["projects/libs/core/src/core.cpp"],
         link_mode: "shared",
-        link_deps: ["//libs/support:support"],
+        link_deps: ["//projects/libs/support:support"],
       },
       {
-        name: "//libs/runtime:runtime",
+        name: "//projects/libs/runtime:runtime",
         rule_type: "cxx_library",
         labels: ["lang:cpp", "kind:lib"],
-        srcs: ["libs/runtime/src/runtime.cpp"],
+        srcs: ["projects/libs/runtime/src/runtime.cpp"],
         link_mode: "shared",
-        link_deps: ["//libs/core:core"],
+        link_deps: ["//projects/libs/core:core"],
         link_closure: "transitive",
       },
     ];
@@ -107,12 +107,14 @@ test("cpp: shared lib link_closure=transitive follows link_deps", async () => {
       tmp,
       $,
       graphJsonPath,
-      target: "//libs/runtime:runtime",
+      target: "//projects/libs/runtime:runtime",
     });
     const log = await fs.readFile(path.join(outPath, "build.log"), "utf8");
     const linkLibs = extractBuildLogLine(log, "link_libs");
     assert.ok(linkLibs, `expected build.log to include link_libs=...; got:\n${log}`);
-    const expect = `-l${sanitizeName("//libs/core:core")} -l${sanitizeName("//libs/support:support")}`;
+    const expect = `-l${sanitizeName("//projects/libs/core:core")} -l${sanitizeName(
+      "//projects/libs/support:support",
+    )}`;
     assert.equal(linkLibs.trim(), expect);
   });
 });

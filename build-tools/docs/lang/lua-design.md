@@ -34,7 +34,7 @@ Use the canonical helper surface from `//build-tools/lang:defs_common.bzl` and `
 
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
 - Provider wiring: load `MODULE_PROVIDERS` from `//build-tools/lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
-- Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `apps/*`/`libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
+- Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `projects/apps/*`/`projects/libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
 - Patch model contract: `build-tools/lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
 
@@ -64,7 +64,7 @@ Use the canonical helper surface from `//build-tools/lang:defs_common.bzl` and `
 We follow the Node importer-scoped pattern for Phase A to ensure precise invalidation per project, then extend to per-module in Phase B if needed.
 
 - Phase A (Importer-scoped): Each Lua target carries a label `lockfile:<relative/path/to/luarocks.lock>#<importer>`.
-  - Example: `labels = ["lockfile:apps/lua-example/luarocks.lock#apps/lua-example"]`.
+  - Example: `labels = ["lockfile:projects/apps/lua-example/luarocks.lock#projects/apps/lua-example"]`.
   - Provider naming uses the existing `providerNameForImporter(lockfilePath, importer)` from `build-tools/tools/lib/providers.ts` (same as Node).
 
 - Phase B (Optional, per-module): Targets also carry per-module labels `module:<rockName>@<version>` if an authoritative Lua dependency export is implemented (see Exporter Integration). Provider names follow `providerNameForModuleKey(importPathOrName, version)` from `build-tools/tools/lib/providers.ts` (same as Go).
@@ -135,7 +135,7 @@ We add a Lua adapter to the exporter (`build-tools/tools/buck/export-graph.ts` o
 
 - Reads Lua targets’ attributes from Buck (via macros) and attaches the importer-scoped lockfile label:
   - `lockfile:<relative/path/to/luarocks.lock>#<importer>`.
-  - The importer id defaults to the Buck package path (e.g., `apps/lua-example`) unless specified by the macro.
+  - The importer id defaults to the Buck package path (e.g., `projects/apps/lua-example`) unless specified by the macro.
 
 - Optional (Phase B): If a Lua dependency index is available, add `module:<rockName>@<version>` labels based on the importer’s effective dependency set (see Provider Sync for how we compute that set).
 

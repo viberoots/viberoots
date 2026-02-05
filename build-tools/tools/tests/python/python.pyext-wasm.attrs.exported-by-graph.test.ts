@@ -8,7 +8,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("exporter: python pyext_wasm nodes include module attrs in build-tools/tools/buck/graph.json", async () => {
   await runInTemp("python-pyext-wasm-exported-attrs", async (tmp, $) => {
-    const appRel = path.join("apps", "pyext_wasm_export");
+    const appRel = path.join("projects", "apps", "pyext_wasm_export");
     const app = path.join(tmp, appRel);
     await fs.mkdirp(path.join(app, "native"));
     await fs.writeFile(path.join(app, "native", "ext.c"), "int x(){return 1;}\n", "utf8");
@@ -25,7 +25,7 @@ test("exporter: python pyext_wasm nodes include module attrs in build-tools/tool
         "",
         "nix_python_wasm_extension_module(",
         '  name = "ext",',
-        '  lockfile_label = "lockfile:apps/pyext_wasm_export/uv.lock#apps/pyext_wasm_export",',
+        '  lockfile_label = "lockfile:projects/apps/pyext_wasm_export/uv.lock#projects/apps/pyext_wasm_export",',
         '  labels = ["backend:wasi"],',
         '  module = "demo._native",',
         '  srcs = ["native/ext.c"],',

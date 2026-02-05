@@ -9,14 +9,14 @@ test("regen staging restores original on failure", async () => {
     const $ = _$({ stdio: "ignore" });
     const pipe$ = _$({ stdio: "pipe" });
     await $`scaf new go lib demo-lib`;
-    const answers = path.join(tmp, "libs", "demo-lib", ".copier-answers.yml");
+    const answers = path.join(tmp, "projects", "libs", "demo-lib", ".copier-answers.yml");
     let txt = await fsp.readFile(answers, "utf8").catch(() => "");
     txt = txt.replace(
       /^scaf_src_path:.*/m,
       "scaf_src_path: build-tools/tools/scaffolding/templates/does/not/exist",
     );
     await fsp.writeFile(answers, txt, "utf8");
-    const readme = path.join(tmp, "libs", "demo-lib", "README.md");
+    const readme = path.join(tmp, "projects", "libs", "demo-lib", "README.md");
     const marker = "RESTORE_ME";
     await fsp.appendFile(readme, `\n${marker}\n`, "utf8");
     let failed = false;

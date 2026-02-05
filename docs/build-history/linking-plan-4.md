@@ -168,7 +168,7 @@ Medium. CPython extension build details are platform-sensitive (Darwin/Linux), a
 
 ### Consequence of Not Implementing
 
-Phase 3 would define a macro and graph shape but still not produce a usable runtime artifact for Python apps/libs.
+Phase 3 would define a macro and graph shape but still not produce a usable runtime artifact for Python projects/apps/libs.
 
 ### Downsides for Implementing
 
@@ -289,7 +289,7 @@ Add zx integration tests (one test per file). These should validate real symbol 
     - a Python binary that imports the module and asserts the function returns the expected value
 - `build-tools/tools/tests/python/python.pyext.transitive-closure.follows-link-deps.build-and-run.test.ts`
   - temp repo defines:
-    - C++ lib `core` with `link_deps=["//libs/support:support"]` and uses a symbol from `support`
+    - C++ lib `core` with `link_deps=["//projects/libs/support:support"]` and uses a symbol from `support`
     - extension module links only `core` with `link_closure="transitive"`
     - runtime asserts success (import + function call)
 - `build-tools/tools/tests/python/python.pyext.link-deps.unsupported-target.fails-fast.test.ts`

@@ -11,7 +11,7 @@ This plan brings the repository into alignment with `build-tools/docs/build-syst
   - Ensure `subdir`, `pwd`, and `modRoot` are computed so `cd` and module-relative paths work when only `apps/` and `libs/` are present.
   - Remove any reliance on repo-root existence during build steps.
 - Acceptance criteria:
-  - Building `//apps/test-cli:test-cli` materializes the binary and records it in the manifest.
+  - Building `//projects/apps/test-cli:test-cli` materializes the binary and records it in the manifest.
   - Nix closure excludes files outside `apps/` and `libs/` (verify via `nix path-info -r`).
   - Changing a non-app/lib file at repo root does not invalidate the app derivation.
 - Tests:
@@ -70,7 +70,7 @@ This plan brings the repository into alignment with `build-tools/docs/build-syst
   - Ensure `flake.nix` uses a stable, minimal snapshot strategy (filtered where applicable) so Nix sees the files without staging.
   - Guard already enforces presence; early error if missing.
 - Acceptance criteria:
-  - `b //apps/test-cli:test-cli` works from a clean or dirty working tree without staging.
+  - `b //projects/apps/test-cli:test-cli` works from a clean or dirty working tree without staging.
   - No git index changes occur during the build.
 - Tests:
   - Integration test invoking `dev-build` verifying no changes in `git status --porcelain` before/after.

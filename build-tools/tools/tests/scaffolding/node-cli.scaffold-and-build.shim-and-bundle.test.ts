@@ -11,16 +11,16 @@ test("node cli: scaffold, build shim, run help", async () => {
     await $`git init`;
     await $`scaf new node cli demo --yes`;
     // Ensure Buck sees the new target
-    await $`buck2 targets //apps/demo:demo`;
+    await $`buck2 targets //projects/apps/demo:demo`;
     // Glue
     await $`build-tools/tools/dev/install-deps.ts --glue-only`;
     // Ensure Node providers are synced via orchestrator (primary path)
     await $`node build-tools/tools/buck/sync-providers.ts --lang=node`;
-    await $`buck2 targets //apps/demo:demo`;
+    await $`buck2 targets //projects/apps/demo:demo`;
     // Build shim target (default macro mode)
-    await $`buck2 build --target-platforms prelude//platforms:default //apps/demo:demo`;
+    await $`buck2 build --target-platforms prelude//platforms:default //projects/apps/demo:demo`;
     // Run help
-    await $`node apps/demo/bin/demo --help`;
+    await $`node projects/apps/demo/bin/demo --help`;
   });
 });
 
@@ -28,28 +28,28 @@ test("node cli: build bundled single-file and run help", async () => {
   await runInTemp("node-cli-bundle", async (tmp, $) => {
     await $`git init`;
     await $`scaf new node cli demo --yes`;
-    const targetsPath = path.join(tmp, "apps", "demo", "TARGETS");
+    const targetsPath = path.join(tmp, "projects", "apps", "demo", "TARGETS");
     // Toggle bundle mode with importer param
     await $`node -e ${`const fs=require('fs');
        const p='${targetsPath.replace(/'/g, "'\\''")}';
        let t=fs.readFileSync(p,'utf8');
        t=t.replace('# bundle = True,', 'bundle = True,');
-       t=t.replace('# importer = "{{ importer }}",', 'importer = "apps/demo",');
+       t=t.replace('# importer = "{{ importer }}",', 'importer = "projects/apps/demo",');
        fs.writeFileSync(p,t,'utf8');`}`;
     // Glue
     await $`build-tools/tools/dev/install-deps.ts --glue-only`;
     await $`node build-tools/tools/buck/sync-providers.ts --lang=node`;
-    await $`buck2 targets //apps/demo:demo`;
+    await $`buck2 targets //projects/apps/demo:demo`;
     // Build bundled artifact via macro (nix build under the hood)
-    await $`buck2 build --target-platforms prelude//platforms:default //apps/demo:demo`;
+    await $`buck2 build --target-platforms prelude//platforms:default //projects/apps/demo:demo`;
     // Run the bundled artifact and assert help works
     const so =
-      await $`buck2 targets --target-platforms prelude//platforms:default --show-output //apps/demo:demo`;
+      await $`buck2 targets --target-platforms prelude//platforms:default --show-output //projects/apps/demo:demo`;
     const line =
       String(so.stdout || "")
         .trim()
         .split(/\r?\n/)
-        .find((l) => l.includes("//apps/demo:demo")) || "";
+        .find((l) => l.includes("//projects/apps/demo:demo")) || "";
     const outPath = line.split(/\s+/)[1] || "";
     if (!outPath) {
       console.error("could not determine bundled output path from --show-output");

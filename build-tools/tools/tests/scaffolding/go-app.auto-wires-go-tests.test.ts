@@ -12,7 +12,7 @@ test("go app: adding *_test.go auto-wires nix_go_test and runs", async () => {
     await $`git init`;
 
     // Scaffold a Go CLI app
-    await $`scaf new go cli demo-cli --yes --path=apps/demo-cli`;
+    await $`scaf new go cli demo-cli --yes --path=projects/apps/demo-cli`;
 
     // Seed gomod2nix deterministically via local stub (no network)
     const stubDir = path.join(tmp, "bin");
@@ -46,14 +46,14 @@ test("go app: adding *_test.go auto-wires nix_go_test and runs", async () => {
       cwd: tmp,
       stdio: "inherit",
       env: { ...process.env, PATH: `${stubDir}:${process.env.PATH || ""}` },
-    })`gomod2nix --dir apps/demo-cli`;
+    })`gomod2nix --dir projects/apps/demo-cli`;
     await fsp.copyFile(
-      path.join(tmp, "apps", "demo-cli", "gomod2nix.toml"),
+      path.join(tmp, "projects", "apps", "demo-cli", "gomod2nix.toml"),
       path.join(tmp, "gomod2nix.toml"),
     );
 
     // Add a simple *_test.go under cmd/<name>/
-    const pkgDir = path.join(tmp, "apps/demo-cli/cmd/demo-cli");
+    const pkgDir = path.join(tmp, "projects/apps/demo-cli/cmd/demo-cli");
     await fsp.mkdir(pkgDir, { recursive: true });
     await fsp.writeFile(
       path.join(pkgDir, "main_test.go"),
@@ -65,7 +65,7 @@ test("go app: adding *_test.go auto-wires nix_go_test and runs", async () => {
     await $`build-tools/tools/dev/install-deps.ts --glue-only`;
     // Add a short, actionable external timeout message if the test stalls on stdlib
     try {
-      await $`buck2 test //apps/demo-cli:demo-cli_test --target-platforms //:no_cgo`;
+      await $`buck2 test //projects/apps/demo-cli:demo-cli_test --target-platforms //:no_cgo`;
     } catch (e) {
       console.error(
         "go app auto-wires: buck2 test stalled or failed — ensure go stdlib toolchain built; rerun test or check Buck logs for go_build_stdlib",

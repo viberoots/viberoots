@@ -36,7 +36,7 @@ async function nixBuild(
 
 test("python: pyext_wasm (wasi) uses pinned toolchain ext suffix", async () => {
   await runInTemp("python-pyext-wasm-wasi-ext-suffix", async (tmp, $) => {
-    const appRel = path.join("apps", "pyext_wasm_wasi_suffix");
+    const appRel = path.join("projects", "apps", "pyext_wasm_wasi_suffix");
     const appDir = path.join(tmp, appRel);
     await fs.mkdirp(path.join(appDir, "native"));
     await fs.mkdirp(path.join(appDir, "src", "demo"));

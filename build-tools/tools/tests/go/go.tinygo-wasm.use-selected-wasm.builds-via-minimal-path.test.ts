@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import assert from "node:assert/strict";
 import fs from "fs-extra";
+import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
@@ -11,7 +11,7 @@ function safeLogKeyFromLabel(label: string): string {
 
 test("nix_go_tiny_wasm_lib use_selected_wasm routes to selected-wasm path", async () => {
   await runInTemp("go-tinygo-wasm-use-selected-wasm", async (tmp, $) => {
-    const apiDir = path.join(tmp, "libs", "math-api");
+    const apiDir = path.join(tmp, "projects", "libs", "math-api");
     await fs.mkdirp(apiDir);
     await fs.writeFile(
       path.join(apiDir, "go.mod"),
@@ -40,7 +40,7 @@ test("nix_go_tiny_wasm_lib use_selected_wasm routes to selected-wasm path", asyn
       "utf8",
     );
 
-    const label = "//libs/math-api:wasm";
+    const label = "//projects/libs/math-api:wasm";
     const build = await $({
       cwd: tmp,
       stdio: "pipe",

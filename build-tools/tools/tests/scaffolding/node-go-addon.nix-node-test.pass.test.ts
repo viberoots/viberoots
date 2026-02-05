@@ -18,8 +18,7 @@ test(
   async () => {
     const prevRoots = process.env.TEST_RSYNC_ROOTS;
     if (!prevRoots) {
-      process.env.TEST_RSYNC_ROOTS =
-        "build-tools toolchains go node lang third_party/providers patches";
+      process.env.TEST_RSYNC_ROOTS = "build-tools toolchains third_party/providers patches";
     }
     try {
       await runInTemp("node-go-addon-nix-node-test", async (tmp, _$) => {
@@ -39,9 +38,9 @@ test(
         await $`scaf new node go-addon demo --yes`;
 
         // Basic assertions on created files
-        const nodePkg = path.join(tmp, "libs", "demo");
-        const goPkg = path.join(tmp, "libs", "demo-go");
-        const nativePkg = path.join(tmp, "libs", "demo-native");
+        const nodePkg = path.join(tmp, "projects", "libs", "demo");
+        const goPkg = path.join(tmp, "projects", "libs", "demo-go");
+        const nativePkg = path.join(tmp, "projects", "libs", "demo-native");
         for (const p of [
           path.join(nodePkg, "package.json"),
           path.join(nodePkg, "src", "index.ts"),
@@ -59,7 +58,7 @@ test(
         // Commit scaffold so pure flake snapshots see new importers
         await $`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
 
-        const importer = "libs/demo";
+        const importer = "projects/libs/demo";
         const sanitized = importer
           .replace(/\/\//g, "")
           .replace(/:/g, "-")

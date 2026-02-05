@@ -44,19 +44,19 @@ async function inferPackageName(dir: string, destPath: string): Promise<string> 
 function defaultDestFromCwd(ctx: ScafContext, file: string): string {
   const rel = path.relative(ctx.repoRoot, ctx.originalCwd);
   const parts = rel.split(path.sep).filter(Boolean);
-  if (parts[0] === "apps" && parts[1]) {
-    const app = parts[1];
-    if (parts[2] === "cmd" && parts[3] === app) {
+  if (parts[0] === "projects" && parts[1] === "apps" && parts[2]) {
+    const app = parts[2];
+    if (parts[3] === "cmd" && parts[4] === app) {
       return path.join(ctx.originalCwd, file);
     }
-    return path.join(ctx.repoRoot, "apps", app, "cmd", app, file);
+    return path.join(ctx.repoRoot, "projects", "apps", app, "cmd", app, file);
   }
-  if (parts[0] === "libs" && parts[1]) {
-    const lib = parts[1];
-    if (parts[2] === "pkg" && parts[3]) {
+  if (parts[0] === "projects" && parts[1] === "libs" && parts[2]) {
+    const lib = parts[2];
+    if (parts[3] === "pkg" && parts[4]) {
       return path.join(ctx.originalCwd, file);
     }
-    return path.join(ctx.repoRoot, "libs", lib, "pkg", lib, file);
+    return path.join(ctx.repoRoot, "projects", "libs", lib, "pkg", lib, file);
   }
   return path.join(ctx.originalCwd, file);
 }
@@ -89,12 +89,14 @@ export async function cmdGoTest(ctx: ScafContext, name: string, flags: ScafFlags
   } catch {}
 
   const hintLib =
-    dest.includes(`${path.sep}libs${path.sep}`) && dest.includes(`${path.sep}pkg${path.sep}`);
+    dest.includes(`${path.sep}projects${path.sep}libs${path.sep}`) &&
+    dest.includes(`${path.sep}pkg${path.sep}`);
   const hintApp =
-    dest.includes(`${path.sep}apps${path.sep}`) && dest.includes(`${path.sep}cmd${path.sep}`);
+    dest.includes(`${path.sep}projects${path.sep}apps${path.sep}`) &&
+    dest.includes(`${path.sep}cmd${path.sep}`);
   if (!hintLib && !hintApp) {
     console.warn(
-      "note: for auto-wiring, place tests under libs/<lib>/pkg/<pkg>/ (lib) or apps/<app>/cmd/<app>/ (app)",
+      "note: for auto-wiring, place tests under projects/libs/<lib>/pkg/<pkg>/ (lib) or projects/apps/<app>/cmd/<app>/ (app)",
     );
   }
   console.log("created:", dest);

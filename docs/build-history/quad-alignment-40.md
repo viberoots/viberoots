@@ -52,7 +52,7 @@ Non-goals in this PR:
   - Ensure canonical normalization remains aligned for:
     - cell prefixes (`root//...`)
     - config suffixes (` (config//...)`)
-    - representative `//apps/*` / `//libs/*` labels
+    - representative `//projects/apps/*` / `//projects/libs/*` labels
 - Add/extend a small fixture-based planner test that asserts:
   - the planner’s “flat attrset keying” remains stable for a representative fixture graph (no attr renames)
   - `BUCK_TARGET` selection still resolves the same target for representative inputs (including cell-prefixed and config-suffixed forms)

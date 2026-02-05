@@ -76,7 +76,7 @@ test("nix_cpp_library: deps := deps ∪ link_deps ∪ header_deps as determinist
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo //apps/link_intent_union:core --json --output-attribute deps`;
+    })`buck2 cquery --target-platforms //:no_cgo //projects/apps/link_intent_union:core --json --output-attribute deps`;
     if (q.exitCode !== 0) return; // skip when Buck/prelude/toolchains unavailable
 
     const node = parseCqueryOne(String(q.stdout || ""));
@@ -86,10 +86,10 @@ test("nix_cpp_library: deps := deps ∪ link_deps ∪ header_deps as determinist
       .filter(Boolean);
 
     assert.deepEqual(deps, [
-      "//apps/link_intent_union:a",
-      "//apps/link_intent_union:b",
-      "//apps/link_intent_union:c",
-      "//apps/link_intent_union:d",
+      "//projects/apps/link_intent_union:a",
+      "//projects/apps/link_intent_union:b",
+      "//projects/apps/link_intent_union:c",
+      "//projects/apps/link_intent_union:d",
     ]);
   });
 });

@@ -20,7 +20,7 @@ Route Node‑API addon builds through the same Nix planner path used for C++ bin
 
 ### Acceptance Criteria
 
-- `buck2 build //libs/<name>-native:napi_addon` succeeds with the planner path.
+- `buck2 build //projects/libs/<name>-native:napi_addon` succeeds with the planner path.
 - `build-tools/tools/tests/cpp/cpp.node-addon.builds.node-artifact.test.ts` passes without modification.
 - `build-tools/tools/ci/cpp-addon-smoke.ts` continues to pass across supported architectures.
 
@@ -191,7 +191,7 @@ All PRs are independently reversible.
 - PR‑4:
   - Run existing zx tests: Go CGO (`go-cgo.repo-lib.build-and-run`), C→Go c-archive (`cpp.carchive.caller`). Expect no diffs. Backout: restore prior functions.
 - PR‑1:
-  - Ensure `buck2 build //libs/demo-native:napi_addon` uses the planner path; re-run `cpp.node-addon.builds.node-artifact` zx test and CI smoke. Backout: restore the inline addon branch in `build-tools/cpp/private/nix_build.bzl` (no planner changes needed).
+  - Ensure `buck2 build //projects/libs/demo-native:napi_addon` uses the planner path; re-run `cpp.node-addon.builds.node-artifact` zx test and CI smoke. Backout: restore the inline addon branch in `build-tools/cpp/private/nix_build.bzl` (no planner changes needed).
 
 ## Summary of Expected Impact
 

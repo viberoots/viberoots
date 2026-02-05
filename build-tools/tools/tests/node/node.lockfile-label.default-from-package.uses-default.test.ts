@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("node macros default lockfile label uses package path", async () => {
   await runInTemp("node-lockfile-default-from-package", async (tmp, $) => {
-    const dir = path.join(tmp, "apps", "foo");
+    const dir = path.join(tmp, "projects", "apps", "foo");
     await fsp.mkdir(dir, { recursive: true });
     await fsp.writeFile(path.join(dir, "pnpm-lock.yaml"), "lockfileVersion: 9\n", "utf8");
     await fsp.writeFile(
@@ -30,14 +30,14 @@ test("node macros default lockfile label uses package path", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //apps/foo:gen`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //projects/apps/foo:gen`;
     if (res.exitCode !== 0) {
       return;
     }
     const out = String(res.stdout || "");
     assert.match(
       out,
-      /lockfile:apps\/foo\/pnpm-lock\.yaml#apps\/foo/,
+      /lockfile:projects\/apps\/foo\/pnpm-lock\.yaml#projects\/apps\/foo/,
       "expected default lockfile label derived from package path",
     );
   });

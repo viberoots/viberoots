@@ -17,7 +17,7 @@ Enable Python provider sync when only `uv.lock` is present (e.g., sparse slices)
 
 ### Tests (in this PR)
 
-- zx test: with a temp repo slice containing only `libs/foo/uv.lock` and importer‑local patches, `syncAllProviders({ lang: "python" })` emits `third_party/providers/TARGETS.python.auto` deterministically.
+- zx test: with a temp repo slice containing only `projects/libs/foo/uv.lock` and importer‑local patches, `syncAllProviders({ lang: "python" })` emits `third_party/providers/TARGETS.python.auto` deterministically.
 - zx test: absence of `uv.lock` yields an empty/no‑op write (stable banner with “No patches present” if applicable).
 
 ### Docs (in this PR)
@@ -26,7 +26,7 @@ Enable Python provider sync when only `uv.lock` is present (e.g., sparse slices)
 
 ### Acceptance Criteria
 
-- `TARGETS.python.auto` is generated in a sparse slice containing only `uv.lock` under `apps/*` or `libs/*`.
+- `TARGETS.python.auto` is generated in a sparse slice containing only `uv.lock` under `projects/apps/*` or `projects/libs/*`.
 - Node behavior remains unchanged.
 
 ### Risks
@@ -67,8 +67,8 @@ Generalize `build-tools/tools/lib/langs.ts:detectEnabledLanguages()` to treat `r
 ### Tests (in this PR)
 
 - zx tests:
-  - With only `apps/web/pnpm-lock.yaml` in slice, Node is detected as enabled via glob logic and providers sync emits `TARGETS.node.auto`.
-  - With only `libs/foo/uv.lock` in slice, Python is detected as enabled and emits `TARGETS.python.auto`.
+  - With only `projects/apps/web/pnpm-lock.yaml` in slice, Node is detected as enabled via glob logic and providers sync emits `TARGETS.node.auto`.
+  - With only `projects/libs/foo/uv.lock` in slice, Python is detected as enabled and emits `TARGETS.python.auto`.
   - Golden comparison: outputs are byte‑identical to pre‑change behavior for unchanged inputs.
 
 ### Docs (in this PR)

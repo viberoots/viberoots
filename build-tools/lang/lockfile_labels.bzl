@@ -12,7 +12,7 @@ def extract_lockfile_labels(labels):
     return out
 
 def _strip_leading_dot_slash(path_part):
-    # Normalize "lockfile:./apps/web/pnpm-lock.yaml#apps/web" to "apps/web/pnpm-lock.yaml"
+    # Normalize "lockfile:./projects/apps/web/pnpm-lock.yaml#projects/apps/web" to "projects/apps/web/pnpm-lock.yaml"
     # so TS/Starlark/Nix agree on the canonical lockfile path representation.
     if path_part.startswith("./"):
         return _strip_leading_dot_slash(path_part[2:])
@@ -32,6 +32,14 @@ def _normalize_package_name(pkg):
     if pkg == "" or pkg == ".":
         return "."
     return pkg
+
+def _workspace_roots():
+    if len(WORKSPACE_IMPORTER_ROOTS) > 0:
+        return WORKSPACE_IMPORTER_ROOTS
+    return [
+        "projects/apps",
+        "projects/libs",
+    ]
 
 def _default_lockfile_path_for_package(pkg, lang = "node"):
     base = default_lockfile_basename_for_lang(lang)
@@ -59,20 +67,30 @@ def ensure_default_lockfile_exists(path, macro_name = None):
 def _is_supported_importer_label(importer):
     if importer == ".":
         return ALLOW_DOT_IMPORTER
-    # Supported workspace importers are single-segment roots: <root>/<name>.
-    # Nested importers like <root>/foo/bar are intentionally unsupported.
-    parts = importer.split("/")
-    if len(parts) != 2:
+    # Supported workspace importers are root paths + one segment: <root>/<name>.
+    parts = [p for p in importer.split("/") if p != ""]
+    if len(parts) < 2:
         return False
-    root = parts[0]
-    name = parts[1]
-    return root in WORKSPACE_IMPORTER_ROOTS and name != ""
+    for root in _workspace_roots():
+        root_parts = [p for p in root.split("/") if p != ""]
+        if len(root_parts) == 0:
+            continue
+        if len(parts) != (len(root_parts) + 1):
+            continue
+        ok = True
+        for i in range(len(root_parts)):
+            if parts[i] != root_parts[i]:
+                ok = False
+                break
+        if ok and parts[len(root_parts)] != "":
+            return True
+    return False
 
 def _supported_importer_patterns():
     out = []
     if ALLOW_DOT_IMPORTER:
         out.append(".")
-    for r in WORKSPACE_IMPORTER_ROOTS:
+    for r in _workspace_roots():
         out.append("%s/*" % r)
     return out
 

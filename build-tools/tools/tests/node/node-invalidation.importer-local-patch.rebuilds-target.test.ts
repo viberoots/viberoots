@@ -11,12 +11,16 @@ test("node: importer-local patch touch triggers rebuild of target", async () => 
     await $`git init`;
 
     // Minimal PNPM lockfile with one importer
-    const lf = path.join(tmp, "apps/demo/pnpm-lock.yaml");
+    const lf = path.join(tmp, "projects/apps/demo/pnpm-lock.yaml");
     await fsp.mkdir(path.dirname(lf), { recursive: true });
-    await fsp.writeFile(lf, `lockfileVersion: "9.0"\nimporters:\n  apps/demo: {}\n`, "utf8");
+    await fsp.writeFile(
+      lf,
+      `lockfileVersion: "9.0"\nimporters:\n  projects/apps/demo: {}\n`,
+      "utf8",
+    );
     // Ensure the importer-local patches directory exists before the initial build so glob()
     // tracks it and future patch additions invalidate correctly
-    const patchDir = path.join(tmp, "apps/demo/patches/node");
+    const patchDir = path.join(tmp, "projects/apps/demo/patches/node");
     await fsp.mkdir(patchDir, { recursive: true });
     // Seed a baseline patch so glob() tracks the file from the start
     const basePatch = path.join(patchDir, "base@0.0.0.patch");
@@ -31,23 +35,23 @@ test("node: importer-local patch touch triggers rebuild of target", async () => 
       '  out = "out.stamp",',
       "  cmd = \"bash -c 'set -euo pipefail; wc -c < $(location :base_patch) > $OUT'\",",
       '  srcs = [":base_patch"],',
-      '  labels = ["lockfile:apps/demo/pnpm-lock.yaml#apps/demo"],',
+      '  labels = ["lockfile:projects/apps/demo/pnpm-lock.yaml#projects/apps/demo"],',
       ")",
       "",
     ].join("\n");
-    await fsp.writeFile(path.join(tmp, "apps/demo/TARGETS"), targets, "utf8");
+    await fsp.writeFile(path.join(tmp, "projects/apps/demo/TARGETS"), targets, "utf8");
 
     // Initial build
-    await $`buck2 --isolation-dir ${iso1} build --target-platforms //:no_cgo //apps/demo:t`;
+    await $`buck2 --isolation-dir ${iso1} build --target-platforms //:no_cgo //projects/apps/demo:t`;
     const so1 =
-      await $`buck2 --isolation-dir ${iso1} targets --target-platforms //:no_cgo --show-output //apps/demo:t`;
+      await $`buck2 --isolation-dir ${iso1} targets --target-platforms //:no_cgo --show-output //projects/apps/demo:t`;
     const line =
       String(so1.stdout || "")
         .trim()
         .split(/\r?\n/)
         .find((l) =>
           // Match any printed form of the label
-          l.includes("apps/demo:t"),
+          l.includes("projects/apps/demo:t"),
         ) ||
       String(so1.stdout || "")
         .trim()
@@ -63,14 +67,14 @@ test("node: importer-local patch touch triggers rebuild of target", async () => 
     // Modify the existing importer-local patch and rebuild
     await fsp.appendFile(basePatch, "# change\n", "utf8");
 
-    await $`buck2 --isolation-dir ${iso2} build --target-platforms //:no_cgo //apps/demo:t`;
+    await $`buck2 --isolation-dir ${iso2} build --target-platforms //:no_cgo //projects/apps/demo:t`;
     const so2 =
-      await $`buck2 --isolation-dir ${iso2} targets --target-platforms //:no_cgo --show-output //apps/demo:t`;
+      await $`buck2 --isolation-dir ${iso2} targets --target-platforms //:no_cgo --show-output //projects/apps/demo:t`;
     const line2 =
       String(so2.stdout || "")
         .trim()
         .split(/\r?\n/)
-        .find((l) => l.includes("apps/demo:t")) ||
+        .find((l) => l.includes("projects/apps/demo:t")) ||
       String(so2.stdout || "")
         .trim()
         .split(/\r?\n/)[0] ||

@@ -25,7 +25,7 @@ test(
         {},
       )`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
 
-      const importer = "libs/demo";
+      const importer = "projects/libs/demo";
       // Overwrite TARGETS to enforce allow-generate semantics in the runner
       const targets = [
         'load("//build-tools/node:defs.bzl", "nix_node_lib", "nix_node_test")',
@@ -35,13 +35,13 @@ test(
         "    srcs = [],",
         '    out = "build.stamp",',
         '    cmd = "echo ok > $OUT",',
-        '    lockfile_label = "lockfile:libs/demo/pnpm-lock.yaml#libs/demo",',
+        '    lockfile_label = "lockfile:projects/libs/demo/pnpm-lock.yaml#projects/libs/demo",',
         ")",
         "",
         "nix_node_test(",
         '    name = "unit",',
         '    srcs = glob(["src/**/*.ts", "src/**/*.js", "test/**/*.ts", "test/**/*.js", "__tests__/**/*.ts", "__tests__/**/*.js"]),',
-        '    lockfile_label = "lockfile:libs/demo/pnpm-lock.yaml#libs/demo",',
+        '    lockfile_label = "lockfile:projects/libs/demo/pnpm-lock.yaml#projects/libs/demo",',
         "    env = {",
         '        "NIX_PNPM_ALLOW_GENERATE": "1",',
         '        "NIX_PNPM_FETCH_TIMEOUT": "300",',
@@ -52,13 +52,13 @@ test(
       await fsp.mkdir(path.join(tmp, importer), { recursive: true });
       await fsp.writeFile(path.join(tmp, importer, "TARGETS"), targets, "utf8");
 
-      // Ensure the importer lockfile exists at libs/demo/pnpm-lock.yaml (some scaffolding flows
+      // Ensure the importer lockfile exists at projects/libs/demo/pnpm-lock.yaml (some scaffolding flows
       // write at repo root). Then align the fixed-output hash mapping for the importer so nix_node_test
       // fails for the intended reason (test failures), not due to pnpm-store hash mismatch.
-      await $`bash --noprofile --norc -c 'test -f pnpm-lock.yaml && [ ! -f libs/demo/pnpm-lock.yaml ] && cp pnpm-lock.yaml libs/demo/pnpm-lock.yaml || true'`;
+      await $`bash --noprofile --norc -c 'test -f pnpm-lock.yaml && [ ! -f projects/libs/demo/pnpm-lock.yaml ] && cp pnpm-lock.yaml projects/libs/demo/pnpm-lock.yaml || true'`;
       await $({
         stdio: "inherit",
-      })`bash --noprofile --norc -c 'set -euo pipefail; NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT=300 zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --force --lockfile libs/demo/pnpm-lock.yaml'`;
+      })`bash --noprofile --norc -c 'set -euo pipefail; NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT=300 zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --force --lockfile projects/libs/demo/pnpm-lock.yaml'`;
 
       // Add an explicitly failing test file
       const failingTest = [
@@ -89,11 +89,11 @@ test(
       const res = await $({
         cwd: tmp,
         stdio: "pipe",
-      })`buck2 test //libs/demo:unit`.nothrow();
-      console.error("[debug] buck2 exitCode=", res.exitCode);
-      if (res.stdout) console.error("[debug] buck2 stdout:\n" + res.stdout);
-      if (res.stderr) console.error("[debug] buck2 stderr:\n" + res.stderr);
+      })`buck2 test //projects/libs/demo:unit`.nothrow();
       if (res.exitCode === 0) {
+        console.error("[debug] buck2 exitCode=", res.exitCode);
+        if (res.stdout) console.error("[debug] buck2 stdout:\n" + res.stdout);
+        if (res.stderr) console.error("[debug] buck2 stderr:\n" + res.stderr);
         throw new Error("expected buck2 test to fail when importer tests fail");
       }
     });

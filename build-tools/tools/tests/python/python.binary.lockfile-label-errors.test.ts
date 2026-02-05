@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("python binary fails with deterministic error text when lockfile label is missing or malformed", async () => {
   await runInTemp("py-binary-lockfile-label-errors", async (tmp, $) => {
-    const appDir = path.join(tmp, "apps", "demo");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(path.join(appDir, "src"), { recursive: true });
     await fsp.writeFile(path.join(appDir, "src", "main.py"), "print('ok')\n", "utf8");
     await fsp.writeFile(
@@ -22,7 +22,7 @@ test("python binary fails with deterministic error text when lockfile label is m
           "Exactly one importer-scoped lockfile label is required (lockfile:<path>#<importer>)",
       },
       {
-        label: "lockfile:apps/demo/uv.lock",
+        label: "lockfile:projects/apps/demo/uv.lock",
         expected: "missing '#<importer>'",
       },
       {
@@ -62,7 +62,7 @@ test("python binary fails with deterministic error text when lockfile label is m
         stdio: "pipe",
         reject: false,
         nothrow: true,
-      })`buck2 cquery --target-platforms //:no_cgo //apps/demo:bin`;
+      })`buck2 cquery --target-platforms //:no_cgo //projects/apps/demo:bin`;
 
       assert.notEqual(q.exitCode, 0, "expected cquery to fail for invalid lockfile label");
       const stderr = String(q.stderr || "");

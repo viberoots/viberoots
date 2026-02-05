@@ -17,12 +17,12 @@ EOF'`;
       cwd: tmp,
     })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<\'EOF'
 MODULE_PROVIDERS = {
-  "//apps/demo:demo": ["//third_party/providers:prov"],
+  "//projects/apps/demo:demo": ["//third_party/providers:prov"],
 }
 EOF'`;
 
     // Simple C++ binary using nix_cpp_binary
-    const appDir = path.join(tmp, "apps/demo");
+    const appDir = path.join(tmp, "projects", "apps", "demo");
     await fs.mkdirp(appDir);
     await fs.outputFile(path.join(appDir, "main.cpp"), "int main(){return 0;}\n");
     await fs.outputFile(
@@ -42,7 +42,7 @@ nix_cpp_binary(
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms prelude//platforms:default "deps(//apps/demo:demo)" --json --output-attribute name`;
+    })`buck2 cquery --target-platforms prelude//platforms:default "deps(//projects/apps/demo:demo)" --json --output-attribute name`;
     if (probe.exitCode !== 0) {
       console.error("buck2 cquery failed; prelude or config missing");
       process.exit(2);

@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
 import { getImporterRootsContract } from "../../lib/importer-roots.ts";
 import { isSupportedImporterLabel } from "../../lib/importers";
+import { runInTemp } from "../lib/test-helpers";
 
 type ProbeOut = { importer: string; supported: boolean };
 
@@ -24,7 +24,7 @@ test("Starlark supported importer predicate ↔ TS isSupportedImporterLabel pari
     const supported: string[] = [];
     if (allowDotImporter) supported.push(".");
     for (const r of workspaceRoots) supported.push(`${r}/foo`);
-    const unsupported: string[] = ["build-tools/tools/x", "../apps/x"];
+    const unsupported: string[] = ["build-tools/tools/x", "../projects/apps/x"];
     for (const r of workspaceRoots) unsupported.push(`${r}/foo/bar`);
     const cases = [...supported, ...unsupported];
     const body = cases

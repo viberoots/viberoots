@@ -30,9 +30,9 @@ async function nixEvalSelectedDrvPath(tmp: string, $: any, target: string): Prom
 
 test("python: patch change in linked C++ producer rebuilds pyext consumer runtime", async () => {
   await runInTemp("python-pyext-patch-invalidation", async (tmp, $) => {
-    const appRel = path.join("apps", "pyext_patch_inv");
+    const appRel = path.join("projects", "apps", "pyext_patch_inv");
     const appDir = path.join(tmp, appRel);
-    const libRel = path.join("libs", "cpp_math");
+    const libRel = path.join("projects", "libs", "cpp_math");
     const libDir = path.join(tmp, libRel);
 
     const libPatchRel = path.join(libRel, "patches", "cpp", "math@0.0.0.patch").replace(/\\/g, "/");

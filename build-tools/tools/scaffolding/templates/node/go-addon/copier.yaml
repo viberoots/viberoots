@@ -16,9 +16,9 @@ name: ""
 language: "node"
 template: "go-addon"
 
-# Node importer for the TS package; Go and native live alongside as libs/{{ name }}-go and libs/{{ name }}-native
-importer: "libs/{{ name }}"
-lockfilePath: "libs/{{ name }}/pnpm-lock.yaml"
+# Node importer for the TS package; Go and native live alongside as projects/libs/{{ name }}-go and projects/libs/{{ name }}-native
+importer: "projects/libs/{{ name }}"
+lockfilePath: "projects/libs/{{ name }}/pnpm-lock.yaml"
 pkgScope: "@libs"
 addon_name: "{{ name }}_addon"
 includeNodeTests: true

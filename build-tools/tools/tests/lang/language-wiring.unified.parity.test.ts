@@ -38,8 +38,8 @@ test("prepare_language_wiring matches per-model helpers and stays non-mutating",
       path.join(providersDir, "auto_map.bzl"),
       [
         "MODULE_PROVIDERS = {",
-        '  "//libs/demo:probe": ["//third_party/providers:prov"],',
-        '  "//apps/web:probe": ["//third_party/providers:prov"],',
+        '  "//projects/libs/demo:probe": ["//third_party/providers:prov"],',
+        '  "//projects/apps/web:probe": ["//third_party/providers:prov"],',
         "}",
         "",
       ].join("\n"),
@@ -53,7 +53,7 @@ test("prepare_language_wiring matches per-model helpers and stays non-mutating",
       "utf8",
     );
 
-    const pkg = path.join(tmp, "libs", "demo");
+    const pkg = path.join(tmp, "projects", "libs", "demo");
     await fsp.mkdir(path.join(pkg, "patches", "go"), { recursive: true });
     await fsp.writeFile(path.join(pkg, "patches", "go", "a@1.0.0.patch"), "# a\n", "utf8");
     await fsp.writeFile(
@@ -110,7 +110,7 @@ test("prepare_language_wiring matches per-model helpers and stays non-mutating",
       "utf8",
     );
 
-    const appDir = path.join(tmp, "apps", "web");
+    const appDir = path.join(tmp, "projects", "apps", "web");
     await fsp.mkdir(path.join(appDir, "patches", "node"), { recursive: true });
     await fsp.writeFile(path.join(appDir, "pnpm-lock.yaml"), "lockfileVersion: 9\n", "utf8");
     await fsp.writeFile(
@@ -133,7 +133,7 @@ test("prepare_language_wiring matches per-model helpers and stays non-mutating",
         '  deps = [":dep_a"],',
         '  lang = "node",',
         '  kind = "lib",',
-        '  lockfile_label = "lockfile:apps/web/pnpm-lock.yaml#apps/web",',
+        '  lockfile_label = "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",',
         "  MODULE_PROVIDERS = MODULE_PROVIDERS,",
         ")",
         "w_new = prepare_language_wiring(",
@@ -142,7 +142,7 @@ test("prepare_language_wiring matches per-model helpers and stays non-mutating",
         '  deps = [":dep_a"],',
         '  lang = "node",',
         '  kind = "lib",',
-        '  lockfile_label = "lockfile:apps/web/pnpm-lock.yaml#apps/web",',
+        '  lockfile_label = "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",',
         "  MODULE_PROVIDERS = MODULE_PROVIDERS,",
         '  wiring = "non_genrule",',
         ")",
@@ -174,7 +174,7 @@ test("prepare_language_wiring matches per-model helpers and stays non-mutating",
       "utf8",
     );
 
-    const demoApp = path.join(tmp, "apps", "demo");
+    const demoApp = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(path.join(demoApp, "patches", "python"), { recursive: true });
     await fsp.writeFile(path.join(demoApp, "uv.lock"), "# uv lock\n", "utf8");
     await fsp.writeFile(
@@ -191,37 +191,37 @@ test("prepare_language_wiring matches per-model helpers and stays non-mutating",
         '  name = "mutation_probe",',
         '  lang = "python",',
         '  kind = "lib",',
-        '  lockfile_label = "lockfile:apps/demo/uv.lock#apps/demo",',
+        '  lockfile_label = "lockfile:projects/apps/demo/uv.lock#projects/apps/demo",',
         ")",
         "",
       ].join("\n"),
       "utf8",
     );
 
-    const pkgOld = await buildOutPath(tmp, $, "//libs/demo:old");
-    const pkgNew = await buildOutPath(tmp, $, "//libs/demo:new");
+    const pkgOld = await buildOutPath(tmp, $, "//projects/libs/demo:old");
+    const pkgNew = await buildOutPath(tmp, $, "//projects/libs/demo:new");
     assert.deepEqual(
       readLines(await fsp.readFile(pkgOld, "utf8")),
       readLines(await fsp.readFile(pkgNew, "utf8")),
       "package-local wiring outputs should match",
     );
 
-    const impOld = await buildOutPath(tmp, $, "//apps/web:old");
-    const impNew = await buildOutPath(tmp, $, "//apps/web:new");
+    const impOld = await buildOutPath(tmp, $, "//projects/apps/web:old");
+    const impNew = await buildOutPath(tmp, $, "//projects/apps/web:new");
     assert.deepEqual(
       readLines(await fsp.readFile(impOld, "utf8")),
       readLines(await fsp.readFile(impNew, "utf8")),
       "importer-scoped wiring outputs should match",
     );
 
-    const importerProbe = await buildOutPath(tmp, $, "//apps/web:importer_probe");
+    const importerProbe = await buildOutPath(tmp, $, "//projects/apps/web:importer_probe");
     assert.ok(
-      readLines(await fsp.readFile(importerProbe, "utf8")).includes("importer:apps/web"),
+      readLines(await fsp.readFile(importerProbe, "utf8")).includes("importer:projects/apps/web"),
       "importer should derive from lockfile label",
     );
 
-    const pkgProbe = await buildOutPath(tmp, $, "//libs/demo:mutation_probe");
-    const appProbe = await buildOutPath(tmp, $, "//apps/demo:mutation_probe");
+    const pkgProbe = await buildOutPath(tmp, $, "//projects/libs/demo:mutation_probe");
+    const appProbe = await buildOutPath(tmp, $, "//projects/apps/demo:mutation_probe");
     const want = [
       "pre:srcs:false",
       "post:srcs:false",

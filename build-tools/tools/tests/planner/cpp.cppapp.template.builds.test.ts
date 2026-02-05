@@ -38,12 +38,16 @@ test("cppApp template builds a binary via planner", async () => {
 
     // tiny app with main()
     await fs.outputFile(
-      path.join(tmp, "apps/demo/src/main.cpp"),
+      path.join(tmp, "projects", "apps", "demo", "src", "main.cpp"),
       '#include <iostream>\nint main(){ std::cout<<"ok\\n"; return 0; }\n',
     );
 
     const graph = [
-      { name: "//apps/demo:demo", rule_type: "cxx_binary", labels: ["lang:cpp", "kind:bin"] },
+      {
+        name: "//projects/apps/demo:demo",
+        rule_type: "cxx_binary",
+        labels: ["lang:cpp", "kind:bin"],
+      },
     ];
     await fs.outputFile(
       path.join(tmp, "build-tools/tools/buck/graph.json"),
