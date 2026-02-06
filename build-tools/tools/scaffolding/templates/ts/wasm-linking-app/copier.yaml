@@ -27,8 +27,13 @@ _tasks:
   - mkdir -p libs/{{ name }}-core/patches/cpp
   - mkdir -p libs/{{ name }}-api
   - mkdir -p libs/{{ name }}-api/patches/go
+  - mkdir -p libs/{{ name }}-cpp-wasm/src
+  - mkdir -p libs/{{ name }}-py-wasm/native
+  - mkdir -p libs/{{ name }}-py-wasm/src/pyext
+  - mkdir -p libs/{{ name }}-wasm-inline
   - mkdir -p apps/{{ name }}/src
   - mkdir -p apps/{{ name }}/public
+  - mkdir -p apps/{{ name }}-cli/src
 
 _templates_suffix: ".jinja"
 _answers_file: ".copier-answers.yml"

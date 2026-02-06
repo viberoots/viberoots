@@ -39,7 +39,6 @@ async function waitForGone(token: string, timeoutMs: number): Promise<void> {
 }
 
 test("buck cleanup: interrupted temp repo run is reaped (no orphan buck2 daemons)", async () => {
-  process.env.TEST_NEED_DEV_ENV = "1";
   // Spawn a child that creates a temp repo and starts a buck2 daemon, then blocks.
   // We SIGKILL the child to simulate an interruption; the detached buck-daemon-reaper
   // must reap any buck2d/forkserver processes rooted under that temp repo.

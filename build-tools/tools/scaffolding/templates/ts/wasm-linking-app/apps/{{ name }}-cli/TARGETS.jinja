@@ -1,0 +1,8 @@
+load("//build-tools/node:defs.bzl", "nix_node_cli_bin")
+
+nix_node_cli_bin(
+    name = "{{ name }}_cli",
+    bundle = True,
+    deps = ["//projects/libs/{{ name }}-wasm-inline:wasm_inline"],
+)
+

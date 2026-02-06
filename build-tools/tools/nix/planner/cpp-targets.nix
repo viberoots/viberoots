@@ -33,6 +33,13 @@ let
       isWasmStatic = builtins.elem "flavor:wasm" labs || builtins.elem "wasm:static" labs;
       isEmscripten = builtins.elem "flavor:emscripten" labs || builtins.elem "wasm:emscripten" labs;
       wantWasi = builtins.elem "wasm:wasi" labs;
+      exportedFunctions =
+        if n == null then null
+        else if (n ? exportedFunctions) && builtins.isList n.exportedFunctions then n.exportedFunctions
+        else if (n ? "buck.exportedFunctions") && builtins.isList n."buck.exportedFunctions" then n."buck.exportedFunctions"
+        else if (n ? exported_functions) && builtins.isList n.exported_functions then n.exported_functions
+        else if (n ? "buck.exported_functions") && builtins.isList n."buck.exported_functions" then n."buck.exported_functions"
+        else null;
       headerPkgsForWasm =
         if isWasmStatic then (repoCppHeaderPkgsFor name) else [];
       includeRootsForWasm = builtins.map (p: "${p}/include") headerPkgsForWasm;
@@ -54,6 +61,10 @@ let
             else {};
           wasmHeaderAttrs = if isWasmStatic then { includes = includeRootsForWasm; } else {};
           wasmLibAttrs = baseAttrs // wasmAttrs // wasmHeaderAttrs;
+          emscriptenAttrs =
+            if exportedFunctions != null && exportedFunctions != []
+            then { exportedFunctions = exportedFunctions; }
+            else {};
           nativeLibAttrs = baseAttrs // {
             nixCxxPkgs =
               if mode == "shared"
@@ -61,7 +72,7 @@ let
               else repoCppHeaderPkgsFor name;
           };
         in
-          if isEmscripten then T.cppWasmEmscriptenLib wasmLibAttrs
+          if isEmscripten then T.cppWasmEmscriptenLib (wasmLibAttrs // emscriptenAttrs)
           else if isWasmStatic then T.cppWasmStaticLib wasmLibAttrs
           else if mode == "shared" then T.cppSharedLib nativeLibAttrs
           else T.cppLib nativeLibAttrs

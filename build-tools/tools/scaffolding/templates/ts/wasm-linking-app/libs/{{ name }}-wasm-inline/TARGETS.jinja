@@ -1,0 +1,22 @@
+load("//build-tools/node:defs.bzl", "node_wasm_inline_module")
+
+node_wasm_inline_module(
+    name = "wasm_inline",
+    src = "//projects/libs/{{ name }}-api:wasm",
+    visibility = ["PUBLIC"],
+)
+
+node_wasm_inline_module(
+    name = "wasm_inline_cpp",
+    src = "//projects/libs/{{ name }}-cpp-wasm:cpp_wasm",
+    out = "cpp.js",
+    visibility = ["PUBLIC"],
+)
+
+node_wasm_inline_module(
+    name = "wasm_inline_py",
+    src = "//projects/libs/{{ name }}-py-wasm:py_wasm",
+    out = "py.js",
+    visibility = ["PUBLIC"],
+)
+

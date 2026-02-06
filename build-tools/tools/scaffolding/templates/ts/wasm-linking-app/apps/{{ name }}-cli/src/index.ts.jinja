@@ -1,0 +1,72 @@
+import { wasmBytes as wasmBytesGo } from "@libs/{{ name }}-wasm-inline";
+import { wasmBytes as wasmBytesCpp } from "@libs/{{ name }}-wasm-inline/cpp";
+import { wasmBytes as wasmBytesPy } from "@libs/{{ name }}-wasm-inline/py";
+
+async function instantiate(bytes: Uint8Array): Promise<WebAssembly.Instance> {
+  const module = new WebAssembly.Module(bytes);
+  const imports: Record<string, any> = {};
+  const env: Record<string, any> = {};
+  for (const imp of WebAssembly.Module.imports(module)) {
+    if (imp.module !== "env") continue;
+    if (imp.kind === "function") env[imp.name] = () => 0;
+    else if (imp.kind === "global") {
+      const type = (imp as any).type;
+      const rawValue = type?.value;
+      const value =
+        rawValue === "i64" || rawValue === "f32" || rawValue === "f64" ? rawValue : "i32";
+      const inferredMutable = imp.name === "__stack_pointer";
+      const mutable = typeof type?.mutable === "boolean" ? type.mutable : inferredMutable;
+      env[imp.name] = new WebAssembly.Global({ value, mutable }, 0);
+    }
+    else if (imp.kind === "memory") env[imp.name] = new WebAssembly.Memory({ initial: 256 });
+    else if (imp.kind === "table") {
+      const type = (imp as any).type;
+      const rawElement = type?.element;
+      const element = rawElement === "externref" ? "externref" : "anyfunc";
+      const initial =
+        typeof type?.minimum === "number"
+          ? type.minimum
+          : typeof type?.initial === "number"
+            ? type.initial
+            : 1;
+      const desc: WebAssembly.TableDescriptor = { initial, element };
+      if (typeof type?.maximum === "number") desc.maximum = type.maximum;
+      env[imp.name] = new WebAssembly.Table(desc);
+    }
+  }
+  if (Object.keys(env).length) imports.env = env;
+  try {
+    const instance = await WebAssembly.instantiate(module, imports);
+    return instance;
+  } catch {
+    const { WASI } = await import("node:wasi");
+    const wasi = new WASI({ version: "preview1", args: [], env: {}, preopens: {} });
+    const instance = await WebAssembly.instantiate(module, {
+      ...imports,
+      wasi_snapshot_preview1: wasi.wasiImport,
+    } as any);
+    if (typeof wasi.start === "function") wasi.start(instance);
+    return instance;
+  }
+}
+
+const instGo = await instantiate(wasmBytesGo());
+const expGo = instGo.exports as Record<string, any>;
+const goVal = typeof expGo.callAdd2 === "function" ? expGo.callAdd2() : null;
+console.log("go_callAdd2=" + String(goVal));
+
+const instCpp = await instantiate(wasmBytesCpp());
+const expCpp = instCpp.exports as Record<string, any>;
+const cppFn =
+  typeof expCpp._add === "function"
+    ? expCpp._add
+    : typeof expCpp.add === "function"
+      ? expCpp.add
+      : null;
+const cppVal = cppFn ? cppFn() : null;
+console.log("cpp_add=" + String(cppVal));
+
+const instPy = await instantiate(wasmBytesPy());
+const expPy = instPy.exports as Record<string, any>;
+console.log("pyext_exports=" + Object.keys(expPy).join(","));
+

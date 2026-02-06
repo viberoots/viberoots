@@ -1,0 +1,29 @@
+load("@prelude//:rules.bzl", "genrule")
+load("//build-tools/python:defs.bzl", "nix_python_wasm_extension_module")
+
+nix_python_wasm_extension_module(
+    name = "pyext",
+    module = "pyext._native",
+    srcs = ["native/ext.c"],
+    labels = ["backend:pyodide"],
+    lockfile_label = "lockfile:projects/libs/{{ name }}-py-wasm/uv.lock#projects/libs/{{ name }}-py-wasm",
+    visibility = ["PUBLIC"],
+)
+
+genrule(
+    name = "py_wasm",
+    srcs = [
+        ":pyext",
+        "uv.lock",
+        "native/ext.c",
+        "//build-tools/tools/wasm:export-wasm-from-nix",
+    ],
+    out = "pyext.wasm",
+    cmd = "WASM_TARGET=//projects/libs/{{ name }}-py-wasm:pyext "
+          + "WASM_DIR=site/pyext "
+          + "WASM_NAME=_native "
+          + "WASM_EXTS=.so,.wasm "
+          + "OUT_PATH=\"$OUT\" "
+          + "zx-wrapper \"$(location //build-tools/tools/wasm:export-wasm-from-nix)\"",
+    visibility = ["PUBLIC"],
+)

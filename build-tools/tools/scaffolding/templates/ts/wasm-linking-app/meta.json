@@ -1,12 +1,16 @@
 {
   "language": "ts",
   "template": "wasm-linking-app",
-  "description": "Phase 2 Wasm linking demo: TinyGo consumer + C++ Wasm static libs + minimal webapp",
+  "description": "Wasm linking demo: TinyGo consumer + C++ Wasm static libs + webapp + bundled CLI",
   "help": {
     "usage": "scaf new ts wasm-linking-app <name> [--path=DEST]",
     "notes": [
-      "Creates a minimal Phase 2 Wasm linking demo.",
-      "The C++ Wasm libs use header_deps + link_deps, and the TinyGo module links via link_deps with transitive closure."
+      "Creates a minimal Wasm linking demo with staged assets and inline module outputs.",
+      "The webapp stages top.wasm and wasm-inline/{index,cpp,py}.js into dist.",
+      "The CLI app bundles single-file outputs for Go, C++, and Python inline modules.",
+      "The C++ Wasm libs use header_deps + link_deps, and the TinyGo module links via link_deps with transitive closure.",
+      "The C++ inline module is built via the Emscripten planner template and exported as a .wasm file.",
+      "The Python inline module exports a Pyodide side module as a .wasm file."
     ],
     "examples": ["scaf new ts wasm-linking-app demo"]
   }

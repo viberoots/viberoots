@@ -5,6 +5,25 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
+async function buckOutPath(args: {
+  tmp: string;
+  $: any;
+  target: string;
+  env?: Record<string, string>;
+}): Promise<string> {
+  const { tmp, $, target, env } = args;
+  const res = await $({
+    cwd: tmp,
+    stdio: "pipe",
+    env: { ...process.env, ...(env || {}) },
+  })`buck2 build --target-platforms prelude//platforms:default --show-output ${target}`;
+  const outText = String(res.stdout || res.stderr || "").trim();
+  const outLine = outText.split(/\n+/).pop() || "";
+  const outPath = outLine.split(/\s+/).pop() || "";
+  if (!outPath) throw new Error(`no output for ${target}`);
+  return path.isAbsolute(outPath) ? outPath : path.join(tmp, outPath);
+}
+
 async function instantiateWasmFromFile(filePath: string): Promise<WebAssembly.Instance> {
   const bytes = await fs.readFile(filePath);
   const module = new WebAssembly.Module(bytes);
@@ -13,11 +32,29 @@ async function instantiateWasmFromFile(filePath: string): Promise<WebAssembly.In
   for (const imp of WebAssembly.Module.imports(module)) {
     if (imp.module !== "env") continue;
     if (imp.kind === "function") env[imp.name] = () => 0;
-    else if (imp.kind === "global")
-      env[imp.name] = new WebAssembly.Global({ value: "i32", mutable: true }, 0);
-    else if (imp.kind === "memory") env[imp.name] = new WebAssembly.Memory({ initial: 256 });
-    else if (imp.kind === "table")
-      env[imp.name] = new WebAssembly.Table({ initial: 0, element: "funcref" });
+    else if (imp.kind === "global") {
+      const type = (imp as any).type;
+      const rawValue = type?.value;
+      const value =
+        rawValue === "i64" || rawValue === "f32" || rawValue === "f64" ? rawValue : "i32";
+      const inferredMutable = imp.name === "__stack_pointer";
+      const mutable = typeof type?.mutable === "boolean" ? type.mutable : inferredMutable;
+      env[imp.name] = new WebAssembly.Global({ value, mutable }, 0);
+    } else if (imp.kind === "memory") env[imp.name] = new WebAssembly.Memory({ initial: 256 });
+    else if (imp.kind === "table") {
+      const type = (imp as any).type;
+      const rawElement = type?.element;
+      const element = rawElement === "externref" ? "externref" : "anyfunc";
+      const initial =
+        typeof type?.minimum === "number"
+          ? type.minimum
+          : typeof type?.initial === "number"
+            ? type.initial
+            : 1;
+      const desc: WebAssembly.TableDescriptor = { initial, element };
+      if (typeof type?.maximum === "number") desc.maximum = type.maximum;
+      env[imp.name] = new WebAssembly.Table(desc);
+    }
   }
   if (Object.keys(env).length) imports.env = env;
 
@@ -45,14 +82,18 @@ test("scaf: new ts wasm-linking-app; build tinygo wasm; callAdd2() returns 5", a
     })`node build-tools/tools/scaffolding/scaf.ts new ts wasm-linking-app ${name} --yes`;
 
     const appTargets = path.join(tmp, "projects", "apps", name, "TARGETS");
+    const cliTargets = path.join(tmp, "projects", "apps", `${name}-cli`, "TARGETS");
     const coreTargets = path.join(tmp, "projects", "libs", `${name}-core`, "TARGETS");
     const apiTargets = path.join(tmp, "projects", "libs", `${name}-api`, "TARGETS");
     const supportTargets = path.join(tmp, "projects", "libs", `${name}-support`, "TARGETS");
+    const inlineTargets = path.join(tmp, "projects", "libs", `${name}-wasm-inline`, "TARGETS");
     await Promise.all([
       fs.access(appTargets),
+      fs.access(cliTargets),
       fs.access(coreTargets),
       fs.access(apiTargets),
       fs.access(supportTargets),
+      fs.access(inlineTargets),
     ]);
 
     const appTargetsText = await fs.readFile(appTargets, "utf8");
@@ -67,6 +108,16 @@ test("scaf: new ts wasm-linking-app; build tinygo wasm; callAdd2() returns 5", a
     assert.ok(
       appTargetsText.includes("webapp_raw"),
       "expected wasm-linking-app webapp to include a raw node_webapp target",
+    );
+    assert.ok(
+      appTargetsText.includes("wasm-inline/index.js"),
+      "expected wasm-linking-app webapp to stage wasm-inline/index.js",
+    );
+
+    const inlineTargetsText = await fs.readFile(inlineTargets, "utf8");
+    assert.ok(
+      inlineTargetsText.includes("node_wasm_inline_module"),
+      "expected wasm-inline package to use node_wasm_inline_module",
     );
 
     const coreTargetsText = await fs.readFile(coreTargets, "utf8");
@@ -107,5 +158,56 @@ test("scaf: new ts wasm-linking-app; build tinygo wasm; callAdd2() returns 5", a
     const exp = inst.exports as any;
     const got = exp.callAdd2();
     assert.equal(got, 5);
+
+    const webappOut = await buckOutPath({
+      tmp,
+      $,
+      target: `//projects/apps/${name}:webapp`,
+      env: { WEB_WASM_BACKEND: "wasi_single" },
+    });
+    await fs.access(path.join(webappOut, "top.wasm"));
+    await fs.access(path.join(webappOut, "wasm-inline", "index.js"));
+    await fs.access(path.join(webappOut, "wasm-inline", "cpp.js"));
+    await fs.access(path.join(webappOut, "wasm-inline", "py.js"));
+
+    const inlineOut = await buckOutPath({
+      tmp,
+      $,
+      target: `//projects/libs/${name}-wasm-inline:wasm_inline`,
+      env: { WEB_WASM_BACKEND: "wasi_single" },
+    });
+    const inlineCppOut = await buckOutPath({
+      tmp,
+      $,
+      target: `//projects/libs/${name}-wasm-inline:wasm_inline_cpp`,
+      env: { WEB_WASM_BACKEND: "wasi_single" },
+    });
+    const inlinePyOut = await buckOutPath({
+      tmp,
+      $,
+      target: `//projects/libs/${name}-wasm-inline:wasm_inline_py`,
+      env: { WEB_WASM_BACKEND: "wasi_single" },
+    });
+    const inlinePkgDir = path.join(tmp, "projects", "libs", `${name}-wasm-inline`);
+    await fs.copy(inlineOut, path.join(inlinePkgDir, "index.js"));
+    await fs.copy(inlineCppOut, path.join(inlinePkgDir, "cpp.js"));
+    await fs.copy(inlinePyOut, path.join(inlinePkgDir, "py.js"));
+
+    const cliOut = await buckOutPath({
+      tmp,
+      $,
+      target: `//projects/apps/${name}-cli:${name}_cli`,
+      env: { WEB_WASM_BACKEND: "wasi_single" },
+    });
+    const runDir = path.join(tmp, "tmp-cli-run");
+    await fs.mkdirp(runDir);
+    const runBin = path.join(runDir, `${name}-cli`);
+    await fs.copyFile(cliOut, runBin);
+    await fs.chmod(runBin, 0o755);
+    const run = await $({ cwd: runDir, stdio: "pipe" })`${runBin}`;
+    const stdout = String(run.stdout || "");
+    assert.match(stdout, /go_callAdd2=5/);
+    assert.match(stdout, /cpp_add=5/);
+    assert.match(stdout, /pyext_exports=/);
   });
 });

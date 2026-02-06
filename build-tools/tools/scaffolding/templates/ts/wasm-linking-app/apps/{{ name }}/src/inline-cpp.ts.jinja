@@ -1,7 +1,7 @@
-async function loadWasm(url: URL): Promise<WebAssembly.Instance> {
-  const res = await fetch(url);
-  const buf = await res.arrayBuffer();
-  const module = new WebAssembly.Module(buf);
+async function loadInlineWasm(): Promise<WebAssembly.Instance> {
+  const mod = await import(new URL("/wasm-inline/cpp.js", window.location.href).toString());
+  const bytes = mod.wasmBytes();
+  const module = new WebAssembly.Module(bytes);
   const imports: Record<string, any> = {};
   const env: Record<string, any> = {};
 
@@ -43,21 +43,24 @@ document.addEventListener("DOMContentLoaded", async () => {
   const root = document.getElementById("app");
   if (!root) return;
 
-  root.innerHTML = `<h1>{{ name }} (Wasm linking demo)</h1>`;
+  root.innerHTML = `<h1>{{ name }} (Wasm inline C++ demo)</h1>`;
 
-  const wasmUrl = new URL("/top.wasm", window.location.href);
   try {
-    const inst = await loadWasm(wasmUrl);
+    const inst = await loadInlineWasm();
     const exp = inst.exports as any;
-    const got = typeof exp.callAdd2 === "function" ? exp.callAdd2() : null;
+    const fn =
+      typeof exp._add === "function"
+        ? exp._add
+        : typeof exp.add === "function"
+          ? exp.add
+          : null;
+    const got = fn ? fn() : null;
     const p = document.createElement("p");
-    p.textContent = `callAdd2() => ${String(got)}`;
+    p.textContent = `add() => ${String(got)}`;
     root.appendChild(p);
   } catch (err) {
     const p = document.createElement("p");
-    p.textContent = `Failed to load ${wasmUrl.pathname}: ${String(err)}`;
+    p.textContent = `Failed to load inline wasm: ${String(err)}`;
     root.appendChild(p);
   }
 });
-
-

@@ -88,6 +88,9 @@ def nix_cpp_wasm_emscripten_lib(name, **kwargs):
       Nix flake attributes (e.g., graph-generator-selected).
     """
     kw = dict(kwargs)
+    labels = kw.get("labels", []) or []
+    # Ensure planner treats emscripten stubs as libs (while still stamping kind:wasm).
+    kw["labels"] = dedupe_preserve(labels + ["kind:lib"])
     deps = kw.pop("deps", []) or []
     srcs = kw.get("srcs", []) or []
     wire_package_local_wasm_planner_visible_stub(

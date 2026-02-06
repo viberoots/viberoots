@@ -287,6 +287,69 @@ node_asset_stage(
 )
 ```
 
+### Wasm inline modules for Node webapps
+
+I generate an inline module from a Wasm file and stage it into `dist/` alongside the webapp output. The webapp loads the module at runtime, so I do not need a Vite plugin.
+
+Example:
+
+```
+node_wasm_inline_module(
+    name = "wasm_inline",
+    src = "//projects/libs/math-api:wasm",
+)
+
+node_webapp(
+    name = "webapp_raw",
+    out = "dist",
+)
+
+node_asset_stage(
+    name = "webapp",
+    app = ":webapp_raw",
+    assets = [
+        {"src": ":wasm_inline", "dest": "wasm-inline/index.js"},
+    ],
+    out = "dist",
+)
+```
+
+App entrypoint:
+
+```
+const mod = await import(new URL("/wasm-inline/index.js", window.location.href).toString());
+const { instance } = await WebAssembly.instantiate(mod.wasmBytes(), {});
+```
+
+### Bundled CLI with inline Wasm
+
+For a bundled CLI, I depend on the inline module and import it from the workspace package. The bundled output embeds the Wasm bytes.
+
+Example:
+
+```
+node_wasm_inline_module(
+    name = "wasm_inline",
+    src = "//projects/libs/math-api:wasm",
+)
+
+nix_node_cli_bin(
+    name = "math_cli",
+    bundle = True,
+    deps = ["//projects/libs/math-wasm-inline:wasm_inline"],
+)
+```
+
+Entrypoint:
+
+```
+import { wasmBytes } from "@libs/math-wasm-inline";
+
+const { instance } = await WebAssembly.instantiate(wasmBytes(), {});
+```
+
+Related guidance lives in `build-tools/docs/wasm-node-linking.md`.
+
 ### Determinism and safety
 
 - Always run Copier and post steps via Nix to pin tool versions.

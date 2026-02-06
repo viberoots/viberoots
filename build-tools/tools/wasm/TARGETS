@@ -1,0 +1,7 @@
+load("@prelude//:rules.bzl", "export_file")
+
+export_file(
+    name = "export-wasm-from-nix",
+    src = "export-wasm-from-nix.ts",
+    visibility = ["PUBLIC"],
+)

@@ -1,0 +1,26 @@
+#include <Python.h>
+
+static PyObject* add2(PyObject* self, PyObject* args) {
+  int x = 0;
+  if (!PyArg_ParseTuple(args, "i", &x)) {
+    return NULL;
+  }
+  return PyLong_FromLong(x + 2);
+}
+
+static PyMethodDef Methods[] = {
+  {"add2", add2, METH_VARARGS, NULL},
+  {NULL, NULL, 0, NULL},
+};
+
+static struct PyModuleDef moduledef = {
+  PyModuleDef_HEAD_INIT,
+  "_native",
+  NULL,
+  -1,
+  Methods,
+};
+
+PyMODINIT_FUNC PyInit__native(void) {
+  return PyModule_Create(&moduledef);
+}
