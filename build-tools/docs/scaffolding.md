@@ -265,6 +265,28 @@ If you change dependencies in an importer, update the lockfile and then run:
 - `i` (updates hashes, builds Nix `node_modules`, links outputs, and refreshes glue as needed)
 - or, for just updating the hash: `node build-tools/tools/dev/update-pnpm-hash.ts --lockfile <importer>/pnpm-lock.yaml`
 
+### Wasm asset staging for Node webapps
+
+I stage runtime Wasm artifacts explicitly so the built `dist/` includes them without changing Vite. The pattern is a two-step build where `node_webapp` produces the base output and `node_asset_stage` copies the Wasm into the final output directory.
+
+Example:
+
+```
+node_webapp(
+    name = "webapp_raw",
+    out = "dist",
+)
+
+node_asset_stage(
+    name = "webapp",
+    app = ":webapp_raw",
+    assets = [
+        {"src": "//projects/libs/math-api:wasm", "dest": "top.wasm"},
+    ],
+    out = "dist",
+)
+```
+
 ### Determinism and safety
 
 - Always run Copier and post steps via Nix to pin tool versions.

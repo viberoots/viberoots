@@ -1,7 +1,16 @@
-load("//build-tools/node:defs.bzl", "node_webapp")
+load("//build-tools/node:defs.bzl", "node_asset_stage", "node_webapp")
 
 node_webapp(
+    name = "webapp_raw",
+    out = "dist",
+)
+
+node_asset_stage(
     name = "webapp",
+    app = ":webapp_raw",
+    assets = [
+        {"src": "//projects/libs/{{ name }}-api:wasm", "dest": "top.wasm"},
+    ],
     out = "dist",
 )
 

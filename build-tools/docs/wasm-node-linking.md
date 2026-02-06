@@ -26,7 +26,7 @@ I want a standard, low-friction way for templates for webapps and other Node or 
 
 ### 1) Add a generic staging macro
 
-Create a small macro in `build-tools/node/defs.bzl` that wraps an existing app target and copies additional assets into its output directory. I will call it `node_asset_stage`.
+Create a small macro in `build-tools/node/defs.bzl` that wraps an existing app target and copies additional assets into its output directory. The macro is `node_asset_stage`.
 
 **Inputs**
 

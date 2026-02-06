@@ -60,6 +60,14 @@ test("scaf: new ts wasm-linking-app; build tinygo wasm; callAdd2() returns 5", a
       !appTargetsText.includes("lockfile:"),
       "expected projects/apps/<name>/TARGETS to rely on default lockfile labels",
     );
+    assert.ok(
+      appTargetsText.includes("node_asset_stage"),
+      "expected wasm-linking-app webapp to use node_asset_stage",
+    );
+    assert.ok(
+      appTargetsText.includes("webapp_raw"),
+      "expected wasm-linking-app webapp to include a raw node_webapp target",
+    );
 
     const coreTargetsText = await fs.readFile(coreTargets, "utf8");
     assert.ok(coreTargetsText.includes("header_deps"), "expected core_wasm to declare header_deps");

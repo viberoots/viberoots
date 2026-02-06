@@ -20,7 +20,7 @@ test("runInTemp seed repo does not leak mutations across temp repos", async () =
     process.env.BNX_TEST_SEED_KEY = "seed-store-test";
 
     const realRepoRoot = process.cwd();
-    const targetRel = "abstractions.md";
+    const targetRel = "README.md";
     const realPath = path.join(realRepoRoot, targetRel);
     const original = await fsp.readFile(realPath, "utf8");
 
