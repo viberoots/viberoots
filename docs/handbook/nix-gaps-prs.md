@@ -113,3 +113,106 @@ Adds a small script and test to maintain.
 ### Recommendation
 
 Implement.
+
+---
+
+## PR-3: Nix toolchain packages for Go and Python
+
+### Description
+
+I will ensure Nix provides the Go and Python toolchains used by the build. If the toolchains already
+exist, I will align their outputs and visibility with the migration plan and add explicit tests that
+build them.
+
+### Scope & Changes
+
+- Add or adjust flake outputs for `toolchains.go` and `toolchains.python`.
+- Ensure derivations build on supported platforms with consistent output paths.
+- Add minimal wiring for downstream consumers to reference these outputs.
+
+### Tests (in this PR)
+
+- Add a test that runs `nix build` for `.#toolchains.go` and `.#toolchains.python`.
+- Add a test that fails if either output is missing or not executable as expected.
+
+### Docs (in this PR)
+
+- Update `docs/handbook/nix-gaps.md` to mark Go and Python toolchains as Nix-provided.
+- Add short usage notes for the toolchain outputs where build tooling expects them.
+
+### Acceptance Criteria
+
+- `nix build .#toolchains.go` and `nix build .#toolchains.python` succeed on supported platforms.
+- The tests fail if a toolchain output disappears or becomes non-executable.
+- Downstream consumers have stable paths for the Nix-provided toolchains.
+
+### Risks
+
+Platform-specific toolchain differences may break builds on less common hosts.
+
+### Mitigation
+
+Keep the toolchain outputs minimal and validate on all supported platforms in CI.
+
+### Consequence of Not Implementing
+
+Buck builds continue to rely on host toolchains, which blocks Phase 1 goals.
+
+### Downsides for Implementing
+
+Adds flake outputs and tests to maintain.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-4: Buck uses Nix toolchains during migration
+
+### Description
+
+I will route remaining non-Nix build paths to use Nix-provided Go and Python toolchains so Buck does
+not depend on host-installed binaries during the migration.
+
+### Scope & Changes
+
+- Update Buck toolchain configuration to reference Nix toolchain outputs.
+- Adjust adapter paths in `build-tools/tools/buck/` to consume those outputs.
+- Add a migration bridge that fails fast when the host toolchain is used.
+
+### Tests (in this PR)
+
+- Add a test that builds representative Go and Python targets using the Nix toolchains.
+- Add a test that detects host toolchain usage and fails when it occurs.
+
+### Docs (in this PR)
+
+- Update `docs/handbook/nix-gaps.md` to mark the temporary bridge for non-Nix paths.
+- Add a short note describing how to verify Buck is using Nix toolchains.
+
+### Acceptance Criteria
+
+- Representative Buck builds use the Nix toolchains.
+- Tests fail if a host toolchain is used.
+- The bridge is in place for remaining non-Nix paths until later phases complete.
+
+### Risks
+
+Some targets may still assume host toolchain layouts.
+
+### Mitigation
+
+Add explicit path mappings and fail fast to surface mismatches early.
+
+### Consequence of Not Implementing
+
+Hermeticity is not achieved and Phase 1 cannot be considered complete.
+
+### Downsides for Implementing
+
+Temporary wiring that will be removed in later phases.
+
+### Recommendation
+
+Implement.

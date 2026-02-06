@@ -88,6 +88,7 @@ CI should always use the pure path. Local development can opt into `--impure` fo
   - `.#toolchains.cxx`
   - `.#toolchains.emscripten`
   - `.#toolchains.tinygo`
+- Heavy toolchains (`toolchains.go`, `toolchains.python`) are skipped unless `PREWARM_HEAVY=1`.
 
 Notes:
 

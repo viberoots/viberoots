@@ -24,6 +24,10 @@ function getEnvBool(name: string, def = false): boolean {
   return v === "1" || v.toLowerCase() === "true" || v.toLowerCase() === "yes";
 }
 
+function isHeavyAttr(attr: string): boolean {
+  return attr === "toolchains.go" || attr === "toolchains.python";
+}
+
 function getAttrList(): string[] {
   const raw = String(process.env.PREWARM_ATTRS || "").trim();
   if (raw) {
@@ -36,6 +40,13 @@ function getAttrList(): string[] {
 }
 
 async function buildAttr(attr: string, verbose: boolean): Promise<BuildResult> {
+  const allowHeavy = getEnvBool("PREWARM_HEAVY", false);
+  if (isHeavyAttr(attr) && !allowHeavy) {
+    if (verbose) {
+      console.error(`[prewarm] skip (heavy attr; set PREWARM_HEAVY=1): ${attr}`);
+    }
+    return { attr, ok: true, skipped: true, output: "skipped heavy attr" };
+  }
   // We intentionally do not use `--dry-run` because some attrs may need to
   // evaluate to detect existence. We rely on nothrow() and classify errors.
   const cmd = $({

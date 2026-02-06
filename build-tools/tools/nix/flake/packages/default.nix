@@ -31,6 +31,7 @@ let
     allowGenerate = importers.allowGenerate;
   };
 
+  toolchains = import ./toolchains.nix { inherit pkgs; };
   python = import ./python.nix { inherit pkgs repoRoot uv2nixLib; };
   pyWasiToolchain = import ../../toolchains/python-wasi.nix { inherit pkgs; };
   testSeed = import ./test-seed.nix { inherit pkgs repoRoot; };
@@ -51,6 +52,7 @@ in
   node-webapp = nodeWebapp;
   node-test = nodeTest;
   py-wasi-toolchain = pyWasiToolchain;
+  toolchains = toolchains;
 } // python
 
 

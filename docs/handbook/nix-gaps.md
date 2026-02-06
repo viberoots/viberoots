@@ -63,6 +63,11 @@ Any macro that is a **Buck build** or **Stub or probe** can be impacted by:
 - Host-specific environment (PATH, locale, OS differences).
 - Differences between devshell and non-devshell workflows.
 
+## Toolchains
+
+- `toolchains.go` → Nix build (flake output).
+- `toolchains.python` → Nix build (flake output).
+
 ## References
 
 - `toolchains/TARGETS` uses `system_go_toolchain`.
