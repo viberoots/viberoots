@@ -54,6 +54,14 @@ test("node cli: build bundled single-file and run help", async () => {
       await $`build-tools/tools/dev/install-deps.ts --glue-only`;
       await $`node build-tools/tools/buck/sync-providers.ts --lang=node`;
       await $`buck2 targets //projects/apps/demo:demo`;
+      await $({
+        cwd: tmp,
+        stdio: "inherit",
+      })`node build-tools/tools/dev/update-pnpm-hash.ts --lockfile projects/apps/demo/pnpm-lock.yaml`;
+      await $({
+        cwd: tmp,
+        stdio: "inherit",
+      })`git add build-tools/tools/nix/node-modules.hashes.json`;
       // Build bundled artifact via macro (nix build under the hood)
       await $`buck2 build --target-platforms prelude//platforms:default //projects/apps/demo:demo`;
       // Run the bundled artifact and assert help works

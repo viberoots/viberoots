@@ -147,8 +147,8 @@ main().catch((err) => {
 - `nix_node_cli_bin(bundle=True)` (or the existing bundle path) consumes the entrypoint.
 - The inline module is pulled in as a normal dependency.
 - The output is one JS file that does not need any `.wasm` file at runtime.
-
-⚠️ The bundling path used by `nix_node_cli_bin(bundle=True)` must preserve imported modules without externalizing them. I have not verified whether it currently externalizes workspace deps. If it does, the bundler config must change to inline them.
+- Bundled CLI output inlines workspace deps so inline modules are embedded.
+  - Trade-off: bundling workspace deps can increase single-file bundle size.
 
 ### 7) Usage examples for Go, C++, and Python Wasm producers
 
