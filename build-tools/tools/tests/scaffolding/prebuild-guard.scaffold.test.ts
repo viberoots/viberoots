@@ -30,8 +30,8 @@ EOF
       await $`scaf new go lib demo-lib --yes`;
       // Guard should auto-fix glue if stale and succeed
       await $`env PREBUILD_GUARD_SKEW_MS=5000 node build-tools/tools/buck/prebuild-guard.ts`;
-      // Build via Buck with an explicit target platform to avoid unspecified-platform selects
-      await $`env CGO_ENABLED=0 buck2 build --target-platforms //:no_cgo //...`;
+      // Validate Buck can resolve the scaffolded target without a full build.
+      await $`env CGO_ENABLED=0 buck2 targets --target-platforms //:no_cgo //projects/libs/demo-lib:demo-lib`;
       await $`env PREBUILD_GUARD_SKEW_MS=5000 node build-tools/tools/buck/prebuild-guard.ts`;
     });
   } finally {

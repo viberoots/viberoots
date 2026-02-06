@@ -145,5 +145,6 @@ zx_test = rule(
         "script": attrs.source(),
         # Ensure a default output so Buck always recognizes an output artifact
         "out": attrs.string(default = "zx_test.stamp"),
+        "test_rule_timeout_ms": attrs.option(attrs.int(), default = None),
     },
 )

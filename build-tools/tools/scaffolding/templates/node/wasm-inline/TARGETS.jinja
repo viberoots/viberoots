@@ -1,0 +1,6 @@
+load("//build-tools/node:defs.bzl", "node_wasm_inline_module")
+
+node_wasm_inline_module(
+    name = "wasm_inline",
+    src = "{{ wasmSrc }}",
+)

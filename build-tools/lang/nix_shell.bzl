@@ -1,6 +1,10 @@
 def nix_bootstrap_env_core():
     return (
         "set -euo pipefail; "
+        + "if [ -z \"${XDG_CONFIG_HOME:-}\" ]; then "
+        + "  CONF_HOME=\"${BUCK2_REAL_HOME:-${HOME:-}}\"; "
+        + "  if [ -n \"$CONF_HOME\" ]; then export XDG_CONFIG_HOME=\"$CONF_HOME/.config\"; fi; "
+        + "fi; "
         + "export TMP=\"${TMPDIR:-/tmp}\"; "
         + "WS_ENV=\"\"; "
         + "CAND_WS=\"$PWD\"; "

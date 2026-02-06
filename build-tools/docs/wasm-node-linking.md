@@ -91,7 +91,19 @@ Webapp templates must support embedding Wasm bytes inside the JS bundle instead 
 
 ```
 export const wasmBytesBase64 = "...";
-export const wasmBytes = () => Uint8Array.from(atob(wasmBytesBase64), (c) => c.charCodeAt(0));
+const decodeBase64 = (value) => {
+  if (typeof atob === "function") {
+    const bin = atob(value);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  if (typeof Buffer !== "undefined") {
+    return Uint8Array.from(Buffer.from(value, "base64"));
+  }
+  throw new Error("wasm inline module: no base64 decoder available");
+};
+export const wasmBytes = () => decodeBase64(wasmBytesBase64);
 ```
 
 **Webapp usage**

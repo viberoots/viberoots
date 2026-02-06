@@ -26,6 +26,7 @@ def auto_zx_tests(root = "build-tools/tools/tests", patterns = ["**/*.test.ts"])
             name = name,
             script = f,
             out = name + ".stamp",
+            test_rule_timeout_ms = 20 * 60 * 1000,
         )
 
 

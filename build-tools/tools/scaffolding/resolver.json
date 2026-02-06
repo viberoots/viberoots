@@ -13,6 +13,7 @@
   },
   "node": {
     "lib": "projects/libs/{name}",
+    "wasm-inline": "projects/libs/{name}-wasm-inline",
     "cli": "projects/apps/{name}",
     "webapp": "projects/apps/{name}",
     "cpp-addon": "projects",

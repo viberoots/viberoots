@@ -1,0 +1,7 @@
+load("@prelude//:rules.bzl", "export_file")
+
+export_file(
+    name = "gen-wasm-inline-module",
+    src = "gen-wasm-inline-module.ts",
+    visibility = ["PUBLIC"],
+)

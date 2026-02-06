@@ -1,0 +1,26 @@
+version: 1
+
+_envops:
+  block_start_string: "{%"
+  block_end_string: "%}"
+  variable_start_string: "{{"
+  variable_end_string: "}}"
+  comment_start_string: "{#"
+  comment_end_string: "#}"
+  keep_trailing_newline: true
+
+_exclude:
+  - meta.json
+
+name: ""
+language: "node"
+template: "wasm-inline"
+
+importer: "projects/libs/{{ name }}-wasm-inline"
+lockfilePath: "projects/libs/{{ name }}-wasm-inline/pnpm-lock.yaml"
+pkgScope: "@libs"
+wasmSrc: "//projects/libs/{{ name }}-api:wasm"
+includeNodeTests: false
+
+_tasks:
+  - mkdir -p projects/libs/{{ name }}-wasm-inline

@@ -40,28 +40,7 @@ test(
         .replace(/:/g, "-")
         .replace(/[\/\s]+/g, "-");
 
-      // Compute/update FOD mapping from the committed lockfile
-      await $({
-        stdio: "inherit",
-      })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${lockfile}`;
-
-      // Warm pnpm-store and node-modules
-      {
-        const mj = String(process.env.NIX_MAX_JOBS || "0");
-        const cr = String(process.env.NIX_CORES || "0");
-        const flags = [
-          mj && mj !== "0" ? `--max-jobs ${mj}` : "",
-          cr && cr !== "0" ? `--option cores ${cr}` : "",
-        ]
-          .filter(Boolean)
-          .join(" ");
-        const cmd1 = `set -euo pipefail; timeout ${TIMEOUT_SECS}s nix build "${tmp}#pnpm-store.${sanitized}" --impure --no-link --accept-flake-config --builders "" --print-build-logs ${flags}`;
-        await $({ stdio: "inherit" })`bash --noprofile --norc -c ${cmd1}`;
-        const cmd2 = `set -euo pipefail; timeout ${TIMEOUT_SECS}s nix build "${tmp}#node-modules.${sanitized}" --impure --no-link --accept-flake-config --builders "" --print-build-logs ${flags}`;
-        await $({ stdio: "inherit" })`bash --noprofile --norc -c ${cmd2}`;
-      }
-
-      // Reconcile any FOD digest drift detected during warm-up
+      // Align the fixed-output hash mapping for this importer before building node-test.
       await $({
         stdio: "inherit",
       })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --force --lockfile ${lockfile}`;
