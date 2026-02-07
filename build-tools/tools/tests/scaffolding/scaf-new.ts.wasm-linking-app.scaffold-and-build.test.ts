@@ -170,28 +170,13 @@ test("scaf: new ts wasm-linking-app; build tinygo wasm; callAdd2() returns 5", a
     await fs.access(path.join(webappOut, "wasm-inline", "cpp.js"));
     await fs.access(path.join(webappOut, "wasm-inline", "py.js"));
 
-    const inlineOut = await buckOutPath({
-      tmp,
-      $,
-      target: `//projects/libs/${name}-wasm-inline:wasm_inline`,
-      env: { WEB_WASM_BACKEND: "wasi_single" },
-    });
-    const inlineCppOut = await buckOutPath({
-      tmp,
-      $,
-      target: `//projects/libs/${name}-wasm-inline:wasm_inline_cpp`,
-      env: { WEB_WASM_BACKEND: "wasi_single" },
-    });
-    const inlinePyOut = await buckOutPath({
-      tmp,
-      $,
-      target: `//projects/libs/${name}-wasm-inline:wasm_inline_py`,
-      env: { WEB_WASM_BACKEND: "wasi_single" },
-    });
     const inlinePkgDir = path.join(tmp, "projects", "libs", `${name}-wasm-inline`);
-    await fs.copy(inlineOut, path.join(inlinePkgDir, "index.js"));
-    await fs.copy(inlineCppOut, path.join(inlinePkgDir, "cpp.js"));
-    await fs.copy(inlinePyOut, path.join(inlinePkgDir, "py.js"));
+    await fs.copy(
+      path.join(webappOut, "wasm-inline", "index.js"),
+      path.join(inlinePkgDir, "index.js"),
+    );
+    await fs.copy(path.join(webappOut, "wasm-inline", "cpp.js"), path.join(inlinePkgDir, "cpp.js"));
+    await fs.copy(path.join(webappOut, "wasm-inline", "py.js"), path.join(inlinePkgDir, "py.js"));
 
     const cliOut = await buckOutPath({
       tmp,

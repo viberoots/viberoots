@@ -56,6 +56,8 @@ test-logs/*.pid
 graph-gen-pure
 buck-test.*
 .pnpm-store
+toolchains/toolchain_paths.bzl
+build-tools/tools/dev/toolchain-paths.json
 
 # Verify analysis output (generated)
 build-tools/tools/dev/verify-analysis/

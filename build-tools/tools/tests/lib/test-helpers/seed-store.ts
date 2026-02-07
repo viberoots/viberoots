@@ -26,8 +26,7 @@ function isVerifyMode(): boolean {
 function wantsFilteredRsync(): boolean {
   return (
     String(process.env.TEST_RSYNC_ROOTS || "").trim() !== "" ||
-    String(process.env.TEST_PARTIAL_CLONE_GO_ONLY || "").trim() === "1" ||
-    String(process.env.TEST_EXCLUDE_CPP_REQS || "").trim() === "1"
+    String(process.env.TEST_PARTIAL_CLONE_GO_ONLY || "").trim() === "1"
   );
 }
 

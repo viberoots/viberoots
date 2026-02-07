@@ -10,6 +10,7 @@ import { rsyncRepoTo } from "./rsync";
 import { initTempRepoFromSeedStore } from "./seed-store";
 import { shSingleQuote } from "./shell-quote";
 import { timeAsync } from "./timing";
+import { ensureToolchainPathsForTempRepo } from "./toolchain-paths";
 import { mktemp } from "./tmp";
 import "./worker-init";
 import { ensureZxInitProbedOnce, zxInitPathFromWorkspace } from "./zx-init-probe";
@@ -58,6 +59,20 @@ async function stableGoModCacheRoot(): Promise<string> {
   const root = path.join(base, `bucknix-go-modcache${suffix}`);
   await fsp.mkdir(root, { recursive: true }).catch(() => {});
   return root;
+}
+
+async function removeCppReqsIfRequested(tmp: string): Promise<void> {
+  if (String(process.env.TEST_EXCLUDE_CPP_REQS || "").trim() !== "1") return;
+  const rels = [
+    "build-tools/cpp/defs.bzl",
+    "build-tools/cpp/wasm_defs.bzl",
+    "build-tools/tools/nix/templates/cpp.nix",
+  ];
+  for (const rel of rels) {
+    try {
+      await fsp.rm(path.join(tmp, rel), { force: true });
+    } catch {}
+  }
 }
 
 async function unifiedPnpmStoreFromRepoRoot(repoRoot: string): Promise<string> {
@@ -109,6 +124,7 @@ export async function runInTemp<T>(
     "NIX_PY_DEV_OVERRIDE_JSON",
     "WORKSPACE_ROOT",
     "BUCK_TEST_SRC",
+    "REPO_ROOT",
     "BNX_TEST_SEED_STORE_PATH",
     "BNX_TEST_SEED_KEY",
     "BNX_TEST_SEED_PIN_DIR",
@@ -127,12 +143,14 @@ export async function runInTemp<T>(
   }
   process.env.WORKSPACE_ROOT = tmp;
   process.env.BUCK_TEST_SRC = tmp;
+  process.env.REPO_ROOT = process.cwd();
   const { home, removeOnExit: removeHome } = await resolveTestHome();
   const goModCacheRoot = await stableGoModCacheRoot();
   const initMode = await initTempRepoFromSeedStore({
     tmpDir: tmp,
     deps: { rsyncRepoTo, timeAsync },
   });
+  await removeCppReqsIfRequested(tmp);
 
   const wantGit = opts?.git !== false && process.env.TEST_TEMP_GIT !== "0";
   if (wantGit) {
@@ -164,6 +182,7 @@ export async function runInTemp<T>(
 
   await ensureBuckConfigForTempRepo(tmp, $);
   await ensureWorkspaceRootEnvFile(tmp);
+  await ensureToolchainPathsForTempRepo(tmp, $);
 
   if ((process.env.TEST_NEED_DEV_ENV || "") === "1") {
     const chk = await $({

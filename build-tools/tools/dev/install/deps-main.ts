@@ -12,6 +12,7 @@ import { runGlue } from "./glue.ts";
 import { runGomod2nixGenerate, runGomod2nixScanAll } from "./gomod2nix.ts";
 import { withExclusiveInstallLock } from "./lock.ts";
 import { runUvRefreshAll } from "./uv.ts";
+import { ensureToolchainPathsFiles } from "../toolchain-paths.ts";
 type Flags = {
   force: boolean;
   dryRun: boolean;
@@ -47,8 +48,7 @@ const { force, dryRun, verbose, skipGlue, glueOnly, skipGoTidy } = {
 const effSkipGoTidy =
   skipGoTidy || (glueOnly && String(process.env.INSTALL_DEPS_SKIP_GO_TIDY || "") !== "0");
 const repoRoot = await resolveWorkspaceRoot();
-// Make the selected workspace explicit so downstream helpers (ensureGraph, provider writers, etc.)
-// operate on the intended repo root even when invoked from a subdirectory.
+// Make the selected workspace explicit so downstream helpers operate on the intended repo root.
 try {
   if (String(process.env.WORKSPACE_ROOT || "").trim() !== repoRoot) {
     process.env.WORKSPACE_ROOT = repoRoot;
@@ -57,6 +57,7 @@ try {
     process.env.BUCK_TEST_SRC = repoRoot;
   }
 } catch {}
+await ensureToolchainPathsFiles(repoRoot);
 // Discover importers (projects/apps/*, projects/libs/*) that contain a pnpm-lock.yaml.
 async function discoverImportersWithLock(root: string): Promise<string[]> {
   const { allowDotImporter, workspaceRoots } = getImporterRootsContract();

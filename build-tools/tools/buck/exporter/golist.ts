@@ -2,6 +2,7 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { requireGoToolchainBin } from "../../lib/toolchain-paths.ts";
 import type { GoPkg, Tuple } from "./types.ts";
 
 export let cacheHits = 0;
@@ -34,6 +35,7 @@ export async function runGoList(
   cacheDir: string,
 ): Promise<GoPkg[]> {
   if (!roots.length) return [];
+  const goBin = await requireGoToolchainBin();
   const env = {
     ...process.env,
     GOOS: tuple.goos,
@@ -67,12 +69,12 @@ export async function runGoList(
   cacheMisses++;
   // Ensure module dependencies (including test-only) are available and go.sum is populated
   try {
-    await $({ env, stdio: "pipe", cwd: modRootAbs })`go mod download all`;
+    await $({ env, stdio: "pipe", cwd: modRootAbs })`${goBin} mod download all`;
   } catch {
     // best-effort; continue to go list which will report errors if unresolved
   }
   try {
-    const { stdout } = await $({ env, stdio: "pipe", cwd: modRootAbs })`go ${args}`;
+    const { stdout } = await $({ env, stdio: "pipe", cwd: modRootAbs })`${goBin} ${args}`;
     const raw = String(stdout);
     await fsp.writeFile(cachePath, raw, "utf8");
     return parseGoListStream(raw);

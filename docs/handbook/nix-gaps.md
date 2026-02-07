@@ -67,6 +67,9 @@ Any macro that is a **Buck build** or **Stub or probe** can be impacted by:
 
 - `toolchains.go` → Nix build (flake output).
 - `toolchains.python` → Nix build (flake output).
+- Buck toolchains read Nix store paths from `toolchains/toolchain_paths.bzl`.
+  - Generate with `build-tools/tools/dev/gen-toolchain-paths.ts` (runs during `i`).
+  - If the file is missing or points outside `/nix/store`, Buck fails fast.
 
 ## References
 

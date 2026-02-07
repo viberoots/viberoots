@@ -23,7 +23,7 @@
   },
   "lint-staged": {
     "**/*.{ts,tsx}": [
-      "pnpm -s lint:eslint:fix --",
+      "pnpm exec eslint --max-warnings=0 --fix --ignore-pattern buck-out --ignore-pattern coverage --ignore-pattern .clinic --",
       "pnpm -s fmt:write --"
     ],
     "**/*.{js,mjs,cjs,md,json,yml,yaml}": [

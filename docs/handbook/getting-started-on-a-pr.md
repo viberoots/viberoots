@@ -82,11 +82,14 @@ These guardrails assume test tooling stays aligned with the dev shell and global
 - **Avoid `--impure` cache busts**: untracked files can force impure mode and invalidate flake snapshots. Track new tests early (for example, `git add` new files before `i`, `b`, or `v`) or exclude them intentionally from the flake source snapshot.
 - **Use the planner path**: prefer `graph-generator-selected` and avoid building larger outputs when a derivation path is enough, for example `nix eval ... .drvPath`.
 - **Minimize temp-repo copy cost**: seed repo cloning can dominate runtime. Prefer tar or CoW copies, and keep rsync excludes conservative.
+- **Prefer seed filters to rsync**: if a test only needs a couple files missing, keep seed-store cloning and delete those files in the temp repo instead of forcing a full rsync.
 - **Consolidate temp-repo tests**: if multiple assertions can share one `runInTemp` repo, do so to avoid repeated seed-store copies.
+- **Keep seed inputs complete**: when new tools or helpers are needed in temp repos, ensure they are included in seed/rsync allowlists or copied from `REPO_ROOT`; missing files cause ENOENT failures and slow retries.
 - **Invalidate clean seeds on new commits**: seed repos must vary with the current `HEAD` to avoid stale code and hidden regressions. If a clean checkout uses an old seed, refresh the seed or include commit identity in the seed key.
 - **Keep test HOME stable**: per-test HOME isolation wipes tool caches (Nix/pnpm) and can multiply runtime. Only set `TEST_HOME_PER_TEST=1` for tests that truly require a fresh HOME.
 - **Prevent env leakage between tests**: restore `TEST_*` env vars in `finally` blocks or shared helpers.
 - **Reset dev override envs**: tests that set `NIX_*_DEV_OVERRIDE_JSON` must restore it, or later tests will run with overrides and can force slow local builds.
+- **Keep lint-staged scoped**: lint-staged commands should honor file arguments (avoid `eslint .` in hooks) so pre-commit and test runs do not lint the entire repo.
 - **Do not remove required files**: excluding `build-tools/tools/tests`, `*.md`, or patch session files causes missing inputs and expensive retries.
 - **Target invalidation explicitly**: include patch files in graph-visible inputs so Nix can track them without extra runtime work.
 - **Measure before optimizing**: identify the dominant cost first, then optimize only that path.

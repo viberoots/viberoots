@@ -21,11 +21,6 @@ test("webapp: scaffold, glue, build dist via Buck", { timeout: TEST_TIMEOUT_MS }
         cwd: path.join(tmp, "projects", "apps", "demo-web"),
         env: { ...process.env },
       })`zx-wrapper ../../../build-tools/tools/dev/install/deps-main.ts --verbose --glue-only`;
-      // quiet: remove temporary diagnostics
-      // Glue (no buck invocations)
-      await $`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
-      await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
-      await $`node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
       // runInTemp commits the initial seed; stage generated importer + glue outputs so git-flake evaluation sees them.
       await $({
         cwd: tmp,
@@ -58,12 +53,6 @@ test("webapp: scaffold, glue, build dist via Buck", { timeout: TEST_TIMEOUT_MS }
         stdio: "inherit",
         env: { ...envWithPrefetch },
       })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${lockfile}`;
-      // Ensure node_modules is realizable (reconciles pnpm-store hash if needed) before building dist.
-      await $({
-        cwd: path.join(tmp, importer),
-        stdio: "inherit",
-        env: { ...envWithPrefetch },
-      })`zx-wrapper ../../../build-tools/tools/dev/node-modules-build.ts`;
       const nixOut = await (async () => {
         const mj = String(process.env.NIX_MAX_JOBS || "0");
         const cr = String(process.env.NIX_CORES || "0");

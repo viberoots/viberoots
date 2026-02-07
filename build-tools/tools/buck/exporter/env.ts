@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import crypto from "node:crypto";
 import os from "node:os";
+import { requireGoToolchainBin } from "../../lib/toolchain-paths.ts";
 import type { Node, Tuple } from "./types.ts";
 
 export function parseTagsFromLabels(labels: string[] | undefined): string[] {
@@ -74,8 +75,9 @@ function parseGoEnvFromLabels(labels: string[] | undefined): {
 
 async function gatherToolchainIdentity(): Promise<string> {
   try {
-    const { stdout: gorootOut } = await $({ stdio: "pipe" })`go env GOROOT`;
-    const { stdout: goversionOut } = await $({ stdio: "pipe" })`go version`;
+    const goBin = await requireGoToolchainBin();
+    const { stdout: gorootOut } = await $({ stdio: "pipe" })`${goBin} env GOROOT`;
+    const { stdout: goversionOut } = await $({ stdio: "pipe" })`${goBin} version`;
     const goroot = String(gorootOut || "").trim();
     const goversion = String(goversionOut || "").trim();
     const obj = {
