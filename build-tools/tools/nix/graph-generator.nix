@@ -371,7 +371,8 @@ let
               exit 1
             '' else (
               if k.template == "go" then (
-                if (k.kind == "bin" || k.kind == "lib") then LANGS.go.mkApp buildLabel
+                if k.kind == "bin" then LANGS.go.mkApp buildLabel
+                else if k.kind == "lib" then LANGS.go.mkLib buildLabel
                 else if (k.kind == "tinywasm") then LANGS.go.mkTinyWasm buildLabel
                 else LANGS.go.mkApp buildLabel
               ) else if k.template == "node" then (

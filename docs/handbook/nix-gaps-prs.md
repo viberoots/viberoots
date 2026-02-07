@@ -216,3 +216,156 @@ Temporary wiring that will be removed in later phases.
 ### Recommendation
 
 Implement.
+
+---
+
+## PR-5: Nix planner templates for Go library and binary
+
+### Description
+
+I will add Nix planner templates for Go library and binary targets so the planner can generate
+Nix-backed build steps for representative Go targets.
+
+### Scope & Changes
+
+- Add Nix planner templates for Go library and Go binary target kinds.
+- Ensure the templates consume the Buck graph attributes needed for Go builds.
+- Wire template selection into the planner where Go target kinds are resolved.
+
+### Tests (in this PR)
+
+- Add a planner test that renders Go library and Go binary templates for fixtures.
+- Add a build test that runs `nix build` for a representative Go library and Go binary target.
+
+### Docs (in this PR)
+
+- Update `docs/handbook/nix-gaps.md` to mark Go library and binary targets as Nix-backed.
+- Add short notes on the planner template coverage for Go.
+
+### Acceptance Criteria
+
+- Planner output includes Nix build steps for Go library and Go binary targets.
+- `nix build` succeeds for the representative Go targets.
+- The tests fail if Go template generation is missing or malformed.
+
+### Risks
+
+Go target metadata in the Buck graph may be incomplete for some targets.
+
+### Mitigation
+
+Start with representative targets and extend attributes as gaps surface.
+
+### Consequence of Not Implementing
+
+Phase 2 cannot progress because the planner lacks Go build templates.
+
+### Downsides for Implementing
+
+Adds new template surface area to maintain.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-6: Nix-backed Go macros for library, binary, and test
+
+### Description
+
+I will replace `nix_go_library`, `nix_go_binary`, and `nix_go_test` macro paths so they route to
+Nix-backed rules or actions, with no `go_*` Buck rules used by these macros.
+
+### Scope & Changes
+
+- Update Go macros to select Nix-backed rule shapes.
+- Remove direct `go_*` Buck rule usage from these macro implementations.
+- Ensure macro outputs align with existing downstream expectations.
+
+### Tests (in this PR)
+
+- Add tests that build representative Go library, binary, and test targets through the macros.
+- Add a test that fails if any `go_*` Buck rule is invoked by these macros.
+
+### Docs (in this PR)
+
+- Update `docs/handbook/nix-gaps.md` to mark the Go macros as Nix-backed.
+- Add short usage notes for the Nix-backed Go macro outputs.
+
+### Acceptance Criteria
+
+- Macro-driven Go builds produce outputs via Nix.
+- Tests fail if the macros route to Buck `go_*` rules.
+- Downstream consumers see the same output paths as before.
+
+### Risks
+
+Some targets may rely on implicit Buck rule behavior.
+
+### Mitigation
+
+Capture representative targets and compare outputs to the Phase 0 baseline.
+
+### Consequence of Not Implementing
+
+Go macros remain Buck-backed and Phase 2 cannot be considered complete.
+
+### Downsides for Implementing
+
+Transitional complexity while both Buck and Nix code paths exist.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-7: Nix-backed Go C archive builds
+
+### Description
+
+I will replace the `nix_go_carchive` stub with a Nix-backed build that produces a Go C archive
+usable by C/C++ consumers.
+
+### Scope & Changes
+
+- Add a Nix build path for Go C archive outputs.
+- Update the macro or rule wrapper for `nix_go_carchive` to use the Nix build.
+- Ensure the output is consumable by C/C++ link steps.
+
+### Tests (in this PR)
+
+- Add a test that builds a representative Go C archive via Nix.
+- Add a test that links a minimal C/C++ consumer against the archive.
+
+### Docs (in this PR)
+
+- Update `docs/handbook/nix-gaps.md` to mark `nix_go_carchive` as Nix-backed.
+- Add a short note describing the expected archive output and consumption.
+
+### Acceptance Criteria
+
+- The Nix build produces a Go C archive artifact.
+- A representative C/C++ consumer links against the archive successfully.
+- Tests fail if the archive is missing or not linkable.
+
+### Risks
+
+Toolchain or linker flags may differ between platforms.
+
+### Mitigation
+
+Keep the archive build minimal and validate on supported platforms in CI.
+
+### Consequence of Not Implementing
+
+Go C archive consumers remain blocked by the stub.
+
+### Downsides for Implementing
+
+Adds one more build shape to maintain across platforms.
+
+### Recommendation
+
+Implement.
