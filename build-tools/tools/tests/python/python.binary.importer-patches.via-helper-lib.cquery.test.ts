@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("python binary carries importer-local patches via synthetic dep (cquery)", async () => {
+test("python binary carries importer-local patches as action inputs (cquery)", async () => {
   await runInTemp("py-binary-importer-patches-helper-lib", async (tmp, $) => {
     const appDir = path.join(tmp, "projects", "apps", "demo");
     const patchDir = path.join(appDir, "patches", "python");
@@ -42,21 +42,6 @@ test("python binary carries importer-local patches via synthetic dep (cquery)", 
       "utf8",
     );
 
-    const depsQ = await $({
-      cwd: tmp,
-      stdio: "pipe",
-      reject: false,
-      nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute deps //projects/apps/demo:bin`;
-    if (depsQ.exitCode !== 0) {
-      return;
-    }
-    const depsOut = String(depsQ.stdout || "");
-    assert.ok(
-      depsOut.includes("bin__patch_inputs"),
-      "expected internal helper lib to appear in deps",
-    );
-
     const labelsQ = await $({
       cwd: tmp,
       stdio: "pipe",
@@ -72,19 +57,19 @@ test("python binary carries importer-local patches via synthetic dep (cquery)", 
       "expected patch_scope:importer-local label present on nix_python_binary target",
     );
 
-    const resQ = await $({
+    const srcsQ = await $({
       cwd: tmp,
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute resources //projects/apps/demo:bin__patch_inputs`;
-    if (resQ.exitCode !== 0) {
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //projects/apps/demo:bin`;
+    if (srcsQ.exitCode !== 0) {
       return;
     }
-    const resOut = String(resQ.stdout || "");
+    const resOut = String(srcsQ.stdout || "");
     assert.ok(
       resOut.includes(patchRel),
-      "expected synthetic dep to include importer-local patch in resources",
+      "expected importer-local patch path present in binary srcs",
     );
   });
 });

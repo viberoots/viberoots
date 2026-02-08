@@ -17,7 +17,7 @@ import {
 import { startVerifySafetyRails } from "./safety-rails.ts";
 import { spawnVerifyBuck2Tests } from "./buck2-test.ts";
 import { runVerifyLintPreflight } from "./lint-preflight.ts";
-import { cleanupOrphanBuckDaemons } from "./buck-orphan-cleanup.ts";
+import { cleanupOrphanBuckDaemons, cleanupRegisteredTempRepos } from "./buck-orphan-cleanup.ts";
 import {
   appendVerifyLogLine,
   killBuckIsolation,
@@ -141,6 +141,19 @@ export async function runVerify(): Promise<void> {
   });
   const status = await spawned.wait();
   rails.stop();
+
+  // Best-effort cleanup for temp repos spawned by this verify run.
+  try {
+    const res = await cleanupRegisteredTempRepos({
+      stateFile,
+      log: async (line) => await appendVerifyLogLine(lock.logFile, line),
+      maxKills: 200,
+    });
+    await appendVerifyLogLine(
+      lock.logFile,
+      `[verify] temp-repo buck cleanup: roots=${res.roots} killed=${res.killed}`,
+    );
+  } catch {}
 
   if (process.env.TEST_TIMING === "summary" && lock.logFile) {
     await runNodeWithZx({

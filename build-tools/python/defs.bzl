@@ -1,4 +1,4 @@
-load("@prelude//:rules.bzl", "python_binary", "python_library", "python_test")
+load("@prelude//:rules.bzl", "python_library")
 load(
     "//build-tools/lang:defs_common.bzl",
     "append_nixpkg_labels",
@@ -6,7 +6,6 @@ load(
     "default_lockfile_path_from_package",
     "ensure_default_lockfile_exists",
     "extract_lockfile_labels",
-    "merge_provider_edges",
     "merge_link_intent_deps",
     "prepare_language_wiring",
     "stamp_wasm_variant",
@@ -14,6 +13,8 @@ load(
 )
 load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
 load("//build-tools/python:pyext_stub.bzl", "python_pyext_stub")
+load("//build-tools/python/private:nix_build.bzl", "python_nix_build")
+load("//build-tools/python/private:nix_test.bzl", "python_nix_test")
 load(
     "//build-tools/python:defs_pyext_wasm.bzl",
     _nix_python_wasm_extension_module = "nix_python_wasm_extension_module",
@@ -25,11 +26,6 @@ def _apply_default_lockfile_label(lockfile_label, labels, macro_name):
         return default_lockfile_label_from_package(lang = "python")
     return lockfile_label
 def nix_python_library(name, lockfile_label = None, deps = [], **kwargs):
-    """
-    Thin macro over python_library that:
-    - appends nixpkg labels for native deps
-    - delegates importer-scoped wiring (lockfile enforcement, stamping, patch inputs, provider edges)
-    """
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     append_nixpkg_labels(kwargs, nixpkg_deps)
     lockfile_label = _apply_default_lockfile_label(
@@ -45,13 +41,22 @@ def nix_python_library(name, lockfile_label = None, deps = [], **kwargs):
         kind = "lib",
         lockfile_label = lockfile_label,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
-        wiring = "non_genrule",
+        wiring = "non_genrule_nix_calling",
+        global_inputs_into = "nix_inputs",
     )
-    python_library(deps = wiring.deps, **wiring.kwargs)
+    prepared = wiring.kwargs
+    python_nix_build(
+        name = name,
+        out = name + ".stamp",
+        kind = "lib",
+        self_label = "//%s:%s" % (native.package_name(), name),
+        deps = wiring.deps,
+        srcs = prepared.get("srcs", []) or [],
+        nix_inputs = prepared.get("nix_inputs", []) or [],
+        labels = prepared.get("labels", []) or [],
+        visibility = prepared.get("visibility", []),
+    )
 def nix_python_binary(name, lockfile_label = None, deps = [], **kwargs):
-    """
-    See nix_python_library — identical wiring for binaries.
-    """
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     append_nixpkg_labels(kwargs, nixpkg_deps)
     if "srcs" in kwargs:
@@ -69,25 +74,26 @@ def nix_python_binary(name, lockfile_label = None, deps = [], **kwargs):
         kind = "bin",
         lockfile_label = lockfile_label,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
-        wiring = "srcsless_rule",
+        wiring = "non_genrule_nix_calling",
+        global_inputs_into = "nix_inputs",
     )
-    base_deps = list(deps) if isinstance(deps, list) else []
-    patch_inputs = wiring.patch_dep.kwargs.get("resources", []) or []
-    if len(patch_inputs) > 0:
-        python_library(**wiring.patch_dep.kwargs)
-        deps = wiring.merge_deps(base_deps)
-    else:
-        deps = merge_provider_edges(
-            name,
-            base_deps,
-            MODULE_PROVIDERS = MODULE_PROVIDERS,
-        )
-
-    python_binary(deps = deps, **wiring.kwargs)
+    prepared = wiring.kwargs
+    srcs = list(prepared.get("srcs", []) or [])
+    main_src = prepared.get("main")
+    if isinstance(main_src, str) and main_src and main_src not in srcs:
+        srcs.append(main_src)
+    python_nix_build(
+        name = name,
+        out = name,
+        kind = "bin",
+        self_label = "//%s:%s" % (native.package_name(), name),
+        deps = wiring.deps,
+        srcs = srcs,
+        nix_inputs = prepared.get("nix_inputs", []) or [],
+        labels = prepared.get("labels", []) or [],
+        visibility = prepared.get("visibility", []),
+    )
 def nix_python_test(name, lockfile_label = None, deps = [], **kwargs):
-    """
-    See nix_python_library — identical wiring for tests.
-    """
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     append_nixpkg_labels(kwargs, nixpkg_deps)
     lockfile_label = _apply_default_lockfile_label(
@@ -103,9 +109,20 @@ def nix_python_test(name, lockfile_label = None, deps = [], **kwargs):
         kind = "test",
         lockfile_label = lockfile_label,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
-        wiring = "non_genrule",
+        wiring = "non_genrule_nix_calling",
+        global_inputs_into = "nix_inputs",
     )
-    python_test(deps = wiring.deps, **wiring.kwargs)
+    prepared = wiring.kwargs
+    python_nix_test(
+        name = name,
+        out = name + ".stamp",
+        self_label = "//%s:%s" % (native.package_name(), name),
+        deps = wiring.deps,
+        srcs = prepared.get("srcs", []) or [],
+        nix_inputs = prepared.get("nix_inputs", []) or [],
+        labels = prepared.get("labels", []) or [],
+        visibility = prepared.get("visibility", []),
+    )
 def nix_python_extension_module(
         name,
         module,
@@ -122,15 +139,6 @@ def nix_python_extension_module(
         link_closure = "direct",
         link_closure_overrides = None,
         **kwargs):
-    """
-    Planner-visible stub for an in-repo CPython extension module (kind:pyext).
-
-    Contract (PR-1):
-    - importer-scoped lockfile label enforcement (lockfile:<path>#<importer>)
-    - stamps labels: lang:python, kind:pyext
-    - exports `module` and link intent attrs to build-tools/tools/buck/graph.json
-    - deps := deps ∪ link_deps ∪ header_deps (deterministic union)
-    """
     if not module or not isinstance(module, str):
         fail("module must be a non-empty string (e.g. 'mypkg._native')")
     if not isinstance(srcs, list):
@@ -151,7 +159,6 @@ def nix_python_extension_module(
         "nix_python_extension_module",
     )
 
-    # Preserve intent attrs for exporter/planner consumption.
     kw["module"] = module
     kw["link_deps"] = link_deps or []
     kw["header_deps"] = header_deps or []
@@ -161,8 +168,6 @@ def nix_python_extension_module(
     kw["ldflags"] = ldflags or []
     kw["build_py_deps"] = build_py_deps or []
 
-    # Treat headers as build inputs; this is a stub (does not compile in PR-1) but
-    # still participates in invalidation and planner discovery via srcs.
     kw["srcs"] = list(srcs or []) + list(headers or [])
 
     merged = merge_link_intent_deps(deps, kw["link_deps"], kw["header_deps"])
@@ -183,9 +188,6 @@ def nix_python_wasm_extension_module(*args, **kwargs):
 
 # WASM (WASI) convenience macros — stamp kind:wasm so planner routes to pyWasm* templates
 def nix_python_wasm_app(name, lockfile_label = None, deps = [], labels = [], **kwargs):
-    """
-    WASI app stamp: uses python_* rules for Buck semantics but marks kind:wasm for the planner.
-    """
     kw = dict(kwargs)
     stamp_wasm_variant(kw, "python", "wasi")
     nixpkg_deps = kw.pop("nixpkg_deps", [])
@@ -209,9 +211,6 @@ def nix_python_wasm_app(name, lockfile_label = None, deps = [], labels = [], **k
     python_library(deps = wiring.deps, **wiring.kwargs)
 
 def nix_python_wasm_lib(name, lockfile_label = None, deps = [], labels = [], **kwargs):
-    """
-    WASI lib stamp: emits a reusable overlay (planner builds via pyWasmLib).
-    """
     kw = dict(kwargs)
     stamp_wasm_variant(kw, "python", "wasi")
     nixpkg_deps = kw.pop("nixpkg_deps", [])

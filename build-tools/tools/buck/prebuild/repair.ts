@@ -146,6 +146,25 @@ async function removeInvalidGraphJsonIfPresent() {
   } catch {}
 }
 
+async function shouldRunInstallDeps(): Promise<boolean> {
+  const graphPath = path.join(process.cwd(), "build-tools", "tools", "buck", "graph.json");
+  const toolchainPaths = path.join(process.cwd(), "toolchains", "toolchain_paths.bzl");
+  try {
+    await fsp.access(toolchainPaths);
+  } catch {
+    return true;
+  }
+  try {
+    const txt = await fsp.readFile(graphPath, "utf8");
+    const trimmed = String(txt || "").trim();
+    if (!trimmed || trimmed === "[]") return true;
+    JSON.parse(trimmed);
+    return false;
+  } catch {
+    return true;
+  }
+}
+
 export async function autoFixGlue() {
   // Ensure local .buckconfig/.buckroot and prelude mapping exist so Buck commands use a valid platform
   await ensureLocalPreludeMapping();
@@ -153,13 +172,15 @@ export async function autoFixGlue() {
   // delete it so ensureGraph regenerates deterministically.
   await removeInvalidGraphJsonIfPresent();
   // Ensure gomod2nix.toml is generated before glue; ignore errors in local mode
-  try {
-    await runNodeWithZx({
-      zxInitPath: path.resolve("build-tools/tools/dev/zx-init.mjs"),
-      script: path.resolve("build-tools/tools/dev/install-deps.ts"),
-      args: ["--glue-only"],
-    });
-  } catch {}
+  if (await shouldRunInstallDeps()) {
+    try {
+      await runNodeWithZx({
+        zxInitPath: path.resolve("build-tools/tools/dev/zx-init.mjs"),
+        script: path.resolve("build-tools/tools/dev/install-deps.ts"),
+        args: ["--glue-only"],
+      });
+    } catch {}
+  }
   // Run unified glue orchestration (export graph → provider index → auto-map)
   await runGlue();
   // Repair mode should leave provider index artifacts in a readable state.

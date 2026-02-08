@@ -52,6 +52,12 @@ Planner coverage note: Go library and binary target kinds are now supported by t
 - `nix_python_wasm_app` → Buck build (`python_library`).
 - `nix_python_wasm_lib` → Buck build (`python_library`).
 
+Notes on Nix-backed Python outputs:
+
+- I expect binaries to expose `bin/py-<sanitized-target>`.
+- I expect tests to expose `bin/pytest-<sanitized-target>`.
+- I keep Buck outputs as stamps for libraries; the Nix output still contains `bin/pylib-<sanitized-target>` if needed.
+
 ## Rust macros
 
 - `rust_library` → Stub or probe (`genrule`).

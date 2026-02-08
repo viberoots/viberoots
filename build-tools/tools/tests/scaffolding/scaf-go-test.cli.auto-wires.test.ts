@@ -84,8 +84,20 @@ test(
       const testPath = path.join(tmp, "projects/apps/demo-cli/cmd/demo-cli/extra_case_test.go");
       await $`scaf new go test extra_case --path=${testPath}`;
 
-      // Glue and test
-      await $`build-tools/tools/dev/install-deps.ts --glue-only`;
+      // Skip glue refresh when provider maps are already present in the seeded repo.
+      const autoMap = path.join(tmp, "third_party/providers/auto_map.bzl");
+      const nixAttrMap = path.join(tmp, "third_party/providers/nix_attr_map.bzl");
+      const hasAutoMap = await fsp
+        .access(autoMap)
+        .then(() => true)
+        .catch(() => false);
+      const hasNixAttrMap = await fsp
+        .access(nixAttrMap)
+        .then(() => true)
+        .catch(() => false);
+      if (!hasAutoMap || !hasNixAttrMap) {
+        await $`build-tools/tools/dev/install-deps.ts --glue-only`;
+      }
 
       // Assert wiring via cquery (fast, deterministic, and not sensitive to toolchain rebuild time).
       const q = await $({
