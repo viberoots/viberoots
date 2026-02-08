@@ -369,3 +369,215 @@ Adds one more build shape to maintain across platforms.
 ### Recommendation
 
 Implement.
+
+---
+
+## PR-8: Nix planner templates for Python library, binary, and test
+
+### Description
+
+I will add Nix planner templates for Python library, Python binary, and Python test target kinds so
+the planner can generate Nix-backed build steps for representative Python targets.
+
+### Scope & Changes
+
+- Add Nix planner templates for Python library, binary, and test target kinds.
+- Ensure the templates consume Buck graph attributes needed for Python builds.
+- Wire template selection into the planner where Python target kinds are resolved.
+
+### Tests (in this PR)
+
+- Add a planner test that renders Python library, binary, and test templates for fixtures.
+- Add a build test that runs `nix build` for representative Python library and binary targets.
+- Add a test that runs a representative Python test target via the Nix-backed path.
+
+### Docs (in this PR)
+
+- Update `docs/handbook/nix-gaps.md` to mark Python library, binary, and test targets as Nix-backed.
+- Add short notes on the planner template coverage for Python.
+
+### Acceptance Criteria
+
+- Planner output includes Nix build steps for Python library, binary, and test targets.
+- `nix build` succeeds for representative Python library and binary targets.
+- Representative Python tests run via the Nix-backed path.
+- Tests fail if Python template generation is missing or malformed.
+
+### Risks
+
+Python target metadata in the Buck graph may be incomplete for some targets.
+
+### Mitigation
+
+Start with representative targets and extend attributes as gaps surface.
+
+### Consequence of Not Implementing
+
+Phase 3 cannot progress because the planner lacks Python build templates.
+
+### Downsides for Implementing
+
+Adds new template surface area to maintain.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-9: Nix-backed Python macros for library, binary, and test
+
+### Description
+
+I will replace `nix_python_library`, `nix_python_binary`, and `nix_python_test` macro paths so they
+route to Nix-backed rules or actions, with no `python_*` Buck rules used by these macros.
+
+### Scope & Changes
+
+- Update Python macros to select Nix-backed rule shapes.
+- Remove direct `python_*` Buck rule usage from these macro implementations.
+- Ensure macro outputs align with existing downstream expectations.
+
+### Tests (in this PR)
+
+- Add tests that build representative Python library and binary targets through the macros.
+- Add a test that runs representative Python tests through the macros.
+- Add a test that fails if any `python_*` Buck rule is invoked by these macros.
+
+### Docs (in this PR)
+
+- Update `docs/handbook/nix-gaps.md` to mark the Python macros as Nix-backed.
+- Add short usage notes for the Nix-backed Python macro outputs.
+
+### Acceptance Criteria
+
+- Macro-driven Python builds produce outputs via Nix.
+- Tests fail if the macros route to Buck `python_*` rules.
+- Downstream consumers see the same output paths as before.
+
+### Risks
+
+Some targets may rely on implicit Buck rule behavior.
+
+### Mitigation
+
+Capture representative targets and compare outputs to the Phase 0 baseline.
+
+### Consequence of Not Implementing
+
+Python macros remain Buck-backed and Phase 3 cannot be considered complete.
+
+### Downsides for Implementing
+
+Transitional complexity while both Buck and Nix code paths exist.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-10: Nix-backed Python extension modules
+
+### Description
+
+I will replace the `nix_python_extension_module` and `nix_python_wasm_extension_module` stubs with
+Nix-backed builds that produce extension modules and wasm extension modules used by Python runtime
+loads.
+
+### Scope & Changes
+
+- Add Nix build paths for Python extension modules and wasm extension modules.
+- Update the macro or rule wrappers for `nix_python_extension_module` and
+  `nix_python_wasm_extension_module` to use the Nix builds.
+- Ensure outputs are consumable by Python import and runtime load paths.
+
+### Tests (in this PR)
+
+- Add a test that builds a representative Python extension module via Nix.
+- Add a test that builds a representative Python wasm extension module via Nix.
+- Add runtime tests that import or load the produced extension modules.
+
+### Docs (in this PR)
+
+- Update `docs/handbook/nix-gaps.md` to mark these macros as Nix-backed.
+- Add short notes describing expected outputs and runtime loading.
+
+### Acceptance Criteria
+
+- Nix builds produce Python extension module artifacts.
+- Runtime tests can import or load the produced extension modules.
+- Tests fail if extension module outputs are missing or not loadable.
+
+### Risks
+
+Toolchain differences for extension builds may surface platform-specific issues.
+
+### Mitigation
+
+Keep the extension build minimal and validate on supported platforms in CI.
+
+### Consequence of Not Implementing
+
+Extension module consumers remain blocked by the stubs.
+
+### Downsides for Implementing
+
+Adds another build shape to maintain across platforms.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-11: Nix-backed Python wasm app and lib builds
+
+### Description
+
+I will replace `nix_python_wasm_app` and `nix_python_wasm_lib` with Nix-backed builds that produce
+wasm artifacts used by downstream targets.
+
+### Scope & Changes
+
+- Add Nix build paths for Python wasm app and lib targets.
+- Update the macro or rule wrappers for `nix_python_wasm_app` and `nix_python_wasm_lib` to use the
+  Nix builds.
+- Ensure the wasm artifacts flow into downstream targets as before.
+
+### Tests (in this PR)
+
+- Add a test that builds a representative Python wasm app via Nix.
+- Add a test that builds a representative Python wasm lib via Nix.
+- Add a consumer test that validates the produced wasm artifacts are used by downstream targets.
+
+### Docs (in this PR)
+
+- Update `docs/handbook/nix-gaps.md` to mark these macros as Nix-backed.
+- Add short notes describing expected wasm outputs and consumption.
+
+### Acceptance Criteria
+
+- Nix builds produce wasm artifacts for app and lib targets.
+- Downstream targets consume the wasm artifacts without manual wiring.
+- Tests fail if wasm outputs are missing or not consumed.
+
+### Risks
+
+Wasm toolchain configuration may vary between host platforms.
+
+### Mitigation
+
+Pin wasm toolchain inputs in Nix and validate in CI.
+
+### Consequence of Not Implementing
+
+Wasm app and lib targets remain on non-Nix paths.
+
+### Downsides for Implementing
+
+Additional build shape to keep aligned with downstream expectations.
+
+### Recommendation
+
+Implement.
