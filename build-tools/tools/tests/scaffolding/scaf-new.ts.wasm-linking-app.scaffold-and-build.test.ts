@@ -134,38 +134,18 @@ test("scaf: new ts wasm-linking-app; build tinygo wasm; callAdd2() returns 5", a
       'expected tinygo wasm target to set link_closure = "transitive"',
     );
 
-    await $({
-      cwd: tmp,
-      stdio: "inherit",
-    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
-
-    const wasmTarget = `//projects/libs/${name}-api:wasm`;
-    const sel = await $({
-      cwd: tmp,
-      stdio: "pipe",
-      env: { ...process.env, BUCK_TARGET: wasmTarget, WEB_WASM_BACKEND: "wasi_single" },
-    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/dev/build-selected.ts`;
-    const outPath =
-      String(sel.stdout || "")
-        .trim()
-        .split(/\n+/)
-        .pop() || "";
-    if (!outPath) throw new Error("no out path emitted by build-selected.ts");
-
-    const wasmPath = path.join(outPath, "lib", "top.wasm");
-    await fs.access(wasmPath);
-    const inst = await instantiateWasmFromFile(wasmPath);
-    const exp = inst.exports as any;
-    const got = exp.callAdd2();
-    assert.equal(got, 5);
-
     const webappOut = await buckOutPath({
       tmp,
       $,
       target: `//projects/apps/${name}:webapp`,
       env: { WEB_WASM_BACKEND: "wasi_single" },
     });
-    await fs.access(path.join(webappOut, "top.wasm"));
+    const wasmPath = path.join(webappOut, "top.wasm");
+    await fs.access(wasmPath);
+    const inst = await instantiateWasmFromFile(wasmPath);
+    const exp = inst.exports as any;
+    const got = exp.callAdd2();
+    assert.equal(got, 5);
     await fs.access(path.join(webappOut, "wasm-inline", "index.js"));
     await fs.access(path.join(webappOut, "wasm-inline", "cpp.js"));
     await fs.access(path.join(webappOut, "wasm-inline", "py.js"));

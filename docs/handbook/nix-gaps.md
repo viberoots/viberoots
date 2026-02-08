@@ -13,7 +13,7 @@ This document maps every public Starlark macro to its build path. I use it to tr
 - `nix_go_library` → Nix build (`graph-generator-selected`).
 - `nix_go_binary` → Nix build (`graph-generator-selected`).
 - `nix_go_test` → Nix build (`graph-generator-selected`).
-- `nix_go_carchive` → Stub or probe (planner-visible stub).
+- `nix_go_carchive` → Nix build (`goCArchive`).
 - `nix_go_tiny_wasm_lib` → Nix build (`go_nix_build_wasm`).
 
 Planner coverage note: Go library and binary target kinds are now supported by the Nix planner templates (`goLib` and `goApp`) for `graph-generator-selected`. Macro routing remains Buck until PR-6.

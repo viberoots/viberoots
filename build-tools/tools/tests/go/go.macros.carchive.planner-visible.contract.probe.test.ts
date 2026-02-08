@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("go macros: nix_go_carchive is a planner_stub with package-local patch inputs, patch_scope stamp, and provider edges realized into srcs (probe)", async () => {
+test("go macros: nix_go_carchive stamps labels, includes patch inputs, and builds a c-archive output (probe)", async () => {
   await runInTemp("go-carchive-planner-visible-contract-probe", async (tmp, $) => {
     // Minimal provider and auto_map mapping
     await $({
@@ -25,8 +25,14 @@ EOF'`;
     await fsp.mkdir(path.join(appDir, "pkg", "demo"), { recursive: true });
     await fsp.mkdir(path.join(appDir, "patches", "go"), { recursive: true });
     await fsp.writeFile(
+      path.join(appDir, "go.mod"),
+      "module example.com/demo\n\ngo 1.22\n",
+      "utf8",
+    );
+    await fsp.writeFile(path.join(appDir, "gomod2nix.toml"), "schema = 3\n\n[mod]\n", "utf8");
+    await fsp.writeFile(
       path.join(appDir, "pkg", "demo", "x.go"),
-      "package demo\n\nfunc X(){}\n",
+      'package main\n\n// #include <stdint.h>\nimport "C"\n\n//export Demo\nfunc Demo() C.int { return 0 }\n\nfunc main() {}\n',
       "utf8",
     );
 
@@ -83,9 +89,18 @@ EOF'`;
       srcsOut.includes(patchRel),
       `expected package-local patch input present in srcs: ${patchRel}`,
     );
+
+    const depsProbe = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute deps //projects/apps/demo:arc`;
+    if (depsProbe.exitCode !== 0) return;
+    const depsOut = String(depsProbe.stdout || "");
     assert.ok(
-      srcsOut.includes("//third_party/providers:prov"),
-      "expected provider edge to be realized into srcs for nix_go_carchive (provider_realization_mode='inputs')",
+      depsOut.includes("//third_party/providers:prov"),
+      "expected provider edge to be realized into deps for nix_go_carchive",
     );
 
     const build = await $({
@@ -94,14 +109,25 @@ EOF'`;
       reject: false,
       nothrow: true,
     })`buck2 build --target-platforms //:no_cgo --show-output //projects/apps/demo:arc`;
-    if (build.exitCode !== 0) return;
+    if (build.exitCode !== 0) {
+      throw new Error(
+        `buck2 build failed:\n${String(build.stdout || "")}\n${String(build.stderr || "")}`,
+      );
+    }
     const outLine = String(build.stdout || "").trim();
     const outPath = outLine.split(/\s+/).pop()!;
     const absOutPath = path.isAbsolute(outPath) ? outPath : path.join(tmp, outPath);
-    const content = await fsp.readFile(absOutPath, "utf8");
+    const libDir = path.join(absOutPath, "lib");
+    const includeDir = path.join(absOutPath, "include");
+    const libs = await fsp.readdir(libDir);
+    const headers = await fsp.readdir(includeDir);
     assert.ok(
-      content.startsWith("planner_stub\n"),
-      "expected nix_go_carchive to build as planner_stub (stamp output)",
+      libs.some((name) => name.endsWith(".a")),
+      "expected a .a archive in output/lib",
+    );
+    assert.ok(
+      headers.some((name) => name.endsWith(".h")),
+      "expected a .h header in output/include",
     );
   });
 });

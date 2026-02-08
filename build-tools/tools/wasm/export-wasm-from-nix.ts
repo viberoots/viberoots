@@ -6,6 +6,10 @@ function readEnv(name) {
   return String(process.env[name] || "").trim();
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function findRepoRoot(start) {
   let dir = path.resolve(start);
   for (;;) {
@@ -17,12 +21,54 @@ async function findRepoRoot(start) {
   throw new Error(`flake.nix not found from ${start}`);
 }
 
+async function acquireGraphLock(lockPath, graphPath) {
+  const start = Date.now();
+  for (;;) {
+    if (await fs.pathExists(graphPath)) return null;
+    try {
+      return await fs.open(lockPath, "wx");
+    } catch (err) {
+      if (err?.code !== "EEXIST") throw err;
+    }
+    if (Date.now() - start > 5 * 60 * 1000) {
+      throw new Error(`timed out waiting for graph lock at ${lockPath}`);
+    }
+    await sleep(250);
+  }
+}
+
+async function ensureGraph(repoRoot, graphPath) {
+  if (await fs.pathExists(graphPath)) return;
+  const lockPath = `${graphPath}.lock`;
+  const lockHandle = await acquireGraphLock(lockPath, graphPath);
+  if (!lockHandle) return;
+  try {
+    await $({
+      cwd: repoRoot,
+      stdio: "pipe",
+      env: {
+        ...process.env,
+        BUCK_TEST_SRC: repoRoot,
+        WORKSPACE_ROOT: repoRoot,
+      },
+    })`nix run --accept-flake-config ${repoRoot}#zx-wrapper -- build-tools/tools/buck/export-graph.ts --out ${graphPath}`;
+    if (!(await fs.pathExists(graphPath))) {
+      throw new Error(`graph.json not found at ${graphPath}`);
+    }
+  } finally {
+    if (typeof lockHandle === "number") {
+      await fs.close(lockHandle);
+    } else {
+      await lockHandle.close();
+    }
+    await fs.remove(lockPath);
+  }
+}
+
 async function buildTarget(target) {
   const repoRoot = await findRepoRoot(process.cwd());
   const graphPath = path.join(repoRoot, "build-tools", "tools", "buck", "graph.json");
-  if (!(await fs.pathExists(graphPath))) {
-    throw new Error(`graph.json not found at ${graphPath}`);
-  }
+  await ensureGraph(repoRoot, graphPath);
   const res = await $({
     stdio: "pipe",
     env: {

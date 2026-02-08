@@ -129,6 +129,7 @@ Public args:
 ### `nix_go_carchive(name, **kwargs)`
 
 Use this when you need a Go library output suitable for linking from C or C++.
+I build via the Nix planner and produce a directory containing `lib/*.a` and `include/*.h`.
 
 Public args:
 
@@ -136,7 +137,7 @@ Public args:
   - Example: `nix_go_carchive(name = "go_carchive")`
 - `deps` list of labels. Direct deps for the archive.
   - Example: `deps = [":core"]`
-- `srcs` list of file paths. Source files to keep on the stub.
+- `srcs` list of file paths. Go source files (and package-local patch inputs).
   - Example: `srcs = ["main.go"]`
 - `labels` list of strings. Optional labels to add.
   - Example: `labels = ["team:core"]`

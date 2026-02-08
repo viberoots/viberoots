@@ -198,13 +198,15 @@ EOF
     subdir ? ".",
     pkgPath ? ".",
     srcRoot ? ../../..,
+    patchDirs ? null,
     patchDir ? ../../patches/go,
     nixCgoPkgs ? [],
     nixCgoAttrs ? [],
     repoCgoPkgs ? [],
   }:
     let
-      patchesMap = H.patchesMapFromDirsWith { dirs = [ patchDir ]; };
+      patchDirsResolved = if patchDirs != null then patchDirs else [ patchDir ];
+      patchesMap = H.patchesMapFromDirsWith { dirs = patchDirsResolved; };
       _guard = H.guardNoDevOverridesInCI devOverrideEnv;
       srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + subdir));
       cgo = mkCgoEnv { inherit nixCgoPkgs nixCgoAttrs repoCgoPkgs; };
@@ -255,7 +257,7 @@ EOF
           find . -maxdepth 1 -type f -name '*.h' -print -quit | xargs -I{} cp -f {} "$outH" 2>/dev/null || true
         fi
         # Compatibility: also expose a header named after the Go package directory (e.g., demo-go.h)
-        if [ -f "$outH" ]; then
+        if [ -f "$outH" ] && [ "${subdirBase}" != "$pkgName" ]; then
           cp -f "$outH" "$out/include/${subdirBase}.h"
         fi
         runHook postBuild

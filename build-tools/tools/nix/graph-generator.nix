@@ -256,6 +256,7 @@ let
         mkGo = name: kind:
           if (kind == "bin") then LANGS.go.mkApp name
           else if (kind == "test") then LANGS.go.mkTest name
+          else if (kind == "carchive") then LANGS.go.mkCArchive name
           else LANGS.go.mkLib name;
         goTargetsFromGraph = builtins.foldl' (acc: n:
           let nm = ensureFullLabel n; kind = goKindOf n; in
@@ -319,50 +320,10 @@ let
         let matches = builtins.filter (n:
               (normalizedTargetKeyFromNode n) == want
             ) nodesList;
-        in if matches == [] then (
-          # Fallback: when the target is missing from the exported graph (e.g., new Python WASM
-          # macros in a temp repo), attempt a direct build using Python templates by inferring the
-          # package path and nearest uv.lock. This keeps zx tests hermetic without requiring the
-          # exporter to classify the target first.
-          let
-            nm = selectedTargetName;
-            pkg = pkgPathOf nm;
-            # Find nearest uv.lock by walking up from pkg
-            findUv = rec {
-              parts = lib.splitString "/" pkg;
-              descend = idx:
-                if idx < 0 then null else
-                let rel = lib.concatStringsSep "/" (lib.take (idx + 1) parts);
-                    cand = builtins.toPath (repoRootStr + "/" + rel + "/uv.lock");
-                in if builtins.pathExists cand then cand else descend (idx - 1);
-              nearest = if (builtins.length parts) > 0 then descend ((builtins.length parts) - 1) else null;
-            };
-            lockAbs = findUv.nearest;
-            lockRel =
-              if lockAbs != null then
-                let absStr = builtins.toString lockAbs; rootStr = builtins.toString repoRoot; in
-                  if lib.hasPrefix (rootStr + "/") absStr then lib.removePrefix (rootStr + "/") absStr else absStr
-              else "uv.lock";
-            isLib = lib.hasSuffix ":pylib" nm || lib.hasSuffix ":lib" nm;
-          in
-            if isLib then T.pyWasmLib { name = nm; lockfile = lockRel; srcRoot = repoRoot; subdir = pkg; }
-            else
-              let
-                # Heuristic overlays: include any projects/libs/* importer that carries a uv.lock
-                listDirs = base: if builtins.pathExists base then builtins.attrNames (builtins.readDir base) else [];
-                libNames = listDirs (builtins.toPath (repoRootStr + "/projects/libs"));
-                libHasLock = d: builtins.pathExists (builtins.toPath (repoRootStr + "/projects/libs/" + d + "/uv.lock"));
-                libImporters = builtins.filter libHasLock libNames;
-                overlays = map (d:
-                  T.pyWasmLib {
-                    name = "//projects/libs/${d}:${d}";
-                    lockfile = "projects/libs/${d}/uv.lock";
-                    srcRoot = repoRoot;
-                    subdir = "projects/libs/${d}";
-                  }
-                ) libImporters;
-              in T.pyWasmApp { name = nm; lockfile = lockRel; srcRoot = repoRoot; subdir = pkg; libOverlays = overlays; }
-        ) else (
+        in if matches == [] then pkgs.runCommand "missing-target-${sanitize selectedTargetName}" {} ''
+          echo "missing target: ${selectedTargetName}" >&2
+          exit 1
+        '' else (
           let
             n = builtins.head matches;
             k = pick n;
@@ -373,11 +334,12 @@ let
               exit 1
             '' else (
               if k.template == "go" then (
-                if k.kind == "bin" then LANGS.go.mkApp buildLabel
-                else if k.kind == "lib" then LANGS.go.mkLib buildLabel
-                else if k.kind == "test" then LANGS.go.mkTest buildLabel
-                else if (k.kind == "tinywasm") then LANGS.go.mkTinyWasm buildLabel
-                else LANGS.go.mkApp buildLabel
+              if k.kind == "bin" then LANGS.go.mkApp buildLabel
+              else if k.kind == "lib" then LANGS.go.mkLib buildLabel
+              else if k.kind == "test" then LANGS.go.mkTest buildLabel
+              else if k.kind == "carchive" then LANGS.go.mkCArchive buildLabel
+              else if (k.kind == "tinywasm") then LANGS.go.mkTinyWasm buildLabel
+              else LANGS.go.mkApp buildLabel
               ) else if k.template == "node" then (
                 LANGS.node.mkApp buildLabel
               ) else if k.template == "python" then (

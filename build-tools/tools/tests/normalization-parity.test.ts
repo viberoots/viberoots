@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import fs from "node:fs";
 import { decodeNameVersionFromPatch, normalizeNixAttr } from "../lib/providers.ts";
 
 const cases: Array<{ name: string; attr: string }> = [
@@ -10,13 +11,34 @@ const cases: Array<{ name: string; attr: string }> = [
   { name: "case6", attr: "pkgs.zlib" },
 ];
 
+function resolveBuckEnv(): Record<string, string> {
+  const env: Record<string, string> = { ...process.env } as Record<string, string>;
+  if (!env.SSL_CERT_FILE) {
+    const fromNix = env.NIX_SSL_CERT_FILE;
+    if (fromNix) env.SSL_CERT_FILE = fromNix;
+  }
+  if (!env.SSL_CERT_FILE) {
+    const defaultCert = "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt";
+    try {
+      if (fs.existsSync(defaultCert)) env.SSL_CERT_FILE = defaultCert;
+    } catch {}
+  }
+  if (!env.SSL_CERT_DIR && env.NIX_SSL_CERT_DIR) {
+    env.SSL_CERT_DIR = env.NIX_SSL_CERT_DIR;
+  }
+  return env;
+}
+
 async function starlarkProbeOutput(target: string): Promise<string> {
   const inherited = process.env.BUCK_ISOLATION_DIR;
   const iso = inherited && inherited.trim() ? inherited : `parity_${process.pid}`;
   const createdOwnIso = !inherited;
+  const env = resolveBuckEnv();
   try {
-    await $`buck2 --isolation-dir ${iso} build ${target}`;
-    const { stdout } = await $`buck2 --isolation-dir ${iso} targets --show-output ${target}`;
+    await $({ env })`buck2 --isolation-dir ${iso} build ${target}`;
+    const { stdout } = await $({
+      env,
+    })`buck2 --isolation-dir ${iso} targets --show-output ${target}`;
     const out = stdout.trim().split(/\s+/).pop() || "";
     const outName: string = out.split("/").pop() || "";
     if (!outName) throw new Error("no output path for " + target);
@@ -24,7 +46,7 @@ async function starlarkProbeOutput(target: string): Promise<string> {
   } finally {
     if (createdOwnIso) {
       try {
-        await $`buck2 --isolation-dir ${iso} kill`;
+        await $({ env })`buck2 --isolation-dir ${iso} kill`;
       } catch {}
     }
   }

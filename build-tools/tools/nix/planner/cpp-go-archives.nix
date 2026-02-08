@@ -17,10 +17,32 @@ let
   pkgPathFor = nm:
     let
       srcs = srcsOf nm;
-      hasPrefix = pref: builtins.any (s: lib.hasPrefix pref s) srcs;
-    in if hasPrefix "pkg/addon/" then "./pkg/addon"
-       else if hasPrefix "pkg/" then "./pkg"
-       else ".";
+      goSrcs = builtins.filter (s: lib.hasSuffix ".go" s) srcs;
+      dirs = builtins.map (s:
+        let parts = lib.splitString "/" s;
+        in if (builtins.length parts) > 1 then lib.concatStringsSep "/" (lib.init parts) else "."
+      ) goSrcs;
+      underPkg = builtins.filter (d: d == "pkg" || lib.hasPrefix "pkg/" d) dirs;
+      pickLongest = ds:
+        if ds == [] then null
+        else builtins.head (builtins.sort (a: b: (builtins.stringLength a) > (builtins.stringLength b)) ds);
+      chosen = if underPkg != [] then pickLongest underPkg else pickLongest dirs;
+    in if chosen == null || chosen == "." then "."
+       else if lib.hasPrefix "./" chosen then chosen
+       else "./" + chosen;
+  patchDirsAbsFor = nm:
+    let
+      srcs = srcsOf nm;
+      patchDirsLocalRel = builtins.sort (a: b: a < b) (
+        builtins.attrNames (builtins.listToAttrs (
+          map (p:
+            let parts = lib.splitString "/" p;
+                dir = if (builtins.length parts) > 1 then lib.concatStringsSep "/" (lib.init parts) else ".";
+            in { name = dir; value = true; }
+          ) (builtins.filter (s: lib.hasSuffix ".patch" s) srcs)
+        ))
+      );
+    in map (d: builtins.toPath (repoRoot + "/" + (pkgPathOf nm) + "/" + d)) patchDirsLocalRel;
   asDerivation = nm: T.goCArchive {
     name = nm;
     modulesToml = modulesTomlFor nm;
@@ -29,6 +51,7 @@ let
     # Prefer a pkgPath inferred from the target's declared srcs so both
     # scaffolded (pkg/addon) and simple (.) c-archive layouts work.
     pkgPath = pkgPathFor nm;
+    patchDirs = patchDirsAbsFor nm;
   };
   # Primary resolution: direct deps only
   primaries = builtins.filter isCArchive direct;

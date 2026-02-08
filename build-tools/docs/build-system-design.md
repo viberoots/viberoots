@@ -1235,7 +1235,7 @@ As of PR‑3 in `quad-alignment-6.md`, the historical `go_module_patch(...)` pro
     - a list (common): returns the merged list
     - a `kwargs` dict (optional): updates `kwargs[into]` in-place and returns the merged list
 - For most macros, merge into `deps`: `deps = merge_provider_edges(name, deps, MODULE_PROVIDERS = MODULE_PROVIDERS)`.
-- For genrule-style shims that don’t accept `deps` (e.g., Node `nix_node_gen`, Go `nix_go_carchive`), merge into `srcs`: `srcs = merge_provider_edges(name, srcs + deps, into = "srcs", MODULE_PROVIDERS = MODULE_PROVIDERS)`.
+- For genrule-style shims that don’t accept `deps` (e.g., Node `nix_node_gen`), merge into `srcs`: `srcs = merge_provider_edges(name, srcs + deps, into = "srcs", MODULE_PROVIDERS = MODULE_PROVIDERS)`.
 - This replaces ad‑hoc `providers_for(...) + dedupe_preserve(...)` patterns and keeps behavior stable across languages.
 - **Preferred stub/shim entrypoint**: for planner-visible stubs and “providers into inputs” shims, prefer `//build-tools/lang:defs_common.bzl:wire_planner_visible_inputs(...)` and `wire_planner_visible_stub(...)` so call sites don’t re-learn the same edge cases.
 

@@ -2,8 +2,8 @@ load("//build-tools/lang:defs_common.bzl", "normalize_labels", "prepare_language
 load("//build-tools/lang:defs_common.bzl", "merge_link_intent_deps", "validate_link_closure_overrides")
 load("//build-tools/lang:global_inputs.bzl", "global_nix_inputs")
 load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
-load("//build-tools/lang:defs_common.bzl", "wire_package_local_planner_visible_stub")
 load("//build-tools/go/private:nix_build_wasm.bzl", "go_nix_build_wasm")
+load("//build-tools/go/private:nix_build_carchive.bzl", "go_nix_build_carchive")
 load("//build-tools/go/private:nix_build.bzl", "go_nix_build")
 load("//build-tools/go/private:nix_test.bzl", "go_nix_test")
 load("//build-tools/go/private:cgo_wiring.bzl", "apply_go_rule_stable_defaults", "apply_go_tuple_labels", "configure_cgo_kwargs")
@@ -58,8 +58,6 @@ def nix_go_library(name, **kwargs):
     go_nix_build(**attrs)
 
     maybe_autowire_go_library_test(nix_go_test = nix_go_test, name = name)
-
-
 def nix_go_binary(name, **kwargs):
     orig = dict(kwargs)
     kw = dict(kwargs)
@@ -113,8 +111,6 @@ def nix_go_binary(name, **kwargs):
         repo_cgo_deps = repo_cgo_deps,
         local_patch_dirs = wiring.local_patch_dirs,
     )
-
-
 def nix_go_test(name, **kwargs):
     kw = dict(kwargs)
     repo_cgo_deps = kw.pop("repo_cgo_deps", [])
@@ -163,44 +159,45 @@ def nix_go_test(name, **kwargs):
     _apply_go_nix_rule_attrs(attrs, prepared)
     go_nix_test(**attrs)
 
-# Third-party shim: expose vendor-provided sources as a go_library while
-# allowing an explicit import path via package map flags
-
-
 def nix_go_carchive(name, **kwargs):
-    """
-    Declare a planner-visible Go target that builds as a C archive via Nix.
-
-    This macro stamps labels so the exporter/planner can route the target to
-    the goCArchive Nix template. It creates a small genrule to appear in the
-    Buck graph; the actual archive is produced by the Nix planner build when
-    a consumer (e.g., a C++ binary) is built.
-    """
+    # Declare a Go target that builds a C archive via the Nix planner.
     kw = dict(kwargs)
+    repo_cgo_deps = kw.pop("repo_cgo_deps", [])
+    nix_cgo_pkgconfig = kw.pop("nix_cgo_pkgconfig", {})
+    if isinstance(nix_cgo_pkgconfig, dict) and len(nix_cgo_pkgconfig) > 0:
+        fail(
+            "nix_go_carchive: nix_cgo_pkgconfig is currently unsupported; it was previously ignored. "
+            + "Remove it so importer/package wiring stays deterministic."
+        )
     deps = kw.pop("deps", [])
-    srcs = kw.get("srcs", []) or []
-    # Keep a minimal graph node with srcs so the planner can discover the package.
-    # Preserve the existing behavior where provider edges are realized into `srcs`.
-    wire_package_local_planner_visible_stub(
+    extra = normalize_labels(native.package_name(), kw.pop("extra_module_providers", []))
+    apply_go_tuple_labels(kw)
+    wiring = prepare_language_wiring(
         name = name,
-        out = name + ".stamp",
         kwargs = kw,
         lang = "go",
         kind = "carchive",
-        deps = deps,
-        srcs = srcs,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
-        provider_realization_mode = "inputs",
+        deps = deps + repo_cgo_deps + extra,
     )
-
+    configure_cgo_kwargs(wiring.kwargs, wiring.nixpkg_deps, repo_cgo_deps)
+    prepared = wiring.kwargs
+    nix_inputs = global_nix_inputs()
+    attrs = {
+        "name": name,
+        "out": name + ".carchive",
+        "self_label": "//%s:%s" % (native.package_name(), name),
+        "deps": wiring.deps,
+        "srcs": prepared.get("srcs", []) or [],
+        "labels": prepared.get("labels", []) or [],
+        "nix_inputs": nix_inputs,
+        "visibility": prepared.get("visibility", []),
+    }
+    _apply_go_nix_rule_attrs(attrs, prepared)
+    go_nix_build_carchive(**attrs)
 
 def nix_go_tiny_wasm_lib(name, **kwargs):
-    """
-    Declare a planner-visible TinyGo Wasm target that builds a single `top.wasm` via Nix.
-
-    Stamps language/kind labels for adapter detection and uses a thin rule that
-    invokes the planner-selected build, copying `$out/lib/top.wasm` to this rule's output.
-    """
+    # Planner-visible TinyGo Wasm target that builds a single top.wasm via Nix.
     pkg = native.package_name()
     kw = dict(kwargs)
     deps = kw.pop("deps", []) or []
@@ -231,7 +228,6 @@ def nix_go_tiny_wasm_lib(name, **kwargs):
         wasm_strip_providers_from_deps = True,
     )
     prepared = wiring.kwargs
-    # Graph-facing shim that copies from the Nix out path produced by planner
     go_nix_build_wasm(
         name = name,
         self_label = "//%s:%s" % (pkg, name),

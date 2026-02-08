@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runInTemp } from "../lib/test-helpers";
 
-test("go macros: provider edges realized into srcs for nix_go_carchive", async () => {
+test("go macros: provider edges realized into deps for nix_go_carchive", async () => {
   await runInTemp("go-macro-providers-srcs-carchive", async (tmp, $) => {
     // Minimal provider and auto_map mapping
     await $({
@@ -24,8 +24,14 @@ EOF'`;
     const appDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(path.join(appDir, "pkg", "demo"), { recursive: true });
     await fsp.writeFile(
+      path.join(appDir, "go.mod"),
+      "module example.com/demo\n\ngo 1.22\n",
+      "utf8",
+    );
+    await fsp.writeFile(path.join(appDir, "gomod2nix.toml"), "schema = 3\n\n[mod]\n", "utf8");
+    await fsp.writeFile(
       path.join(appDir, "pkg", "demo", "x.go"),
-      "package demo\n\nfunc X(){}\n",
+      'package main\n\n// #include <stdint.h>\nimport "C"\n\n//export Demo\nfunc Demo() C.int { return 0 }\n\nfunc main() {}\n',
       "utf8",
     );
 
@@ -51,12 +57,12 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //projects/apps/demo:arc`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute deps //projects/apps/demo:arc`;
     if (probe.exitCode !== 0) return;
     const out = String(probe.stdout || "");
     assert.ok(
       out.includes("//third_party/providers:prov"),
-      "expected provider target present in srcs for nix_go_carchive",
+      "expected provider target present in deps for nix_go_carchive",
     );
 
     const build = await $({
@@ -65,10 +71,14 @@ EOF'`;
       reject: false,
       nothrow: true,
     })`buck2 build --target-platforms //:no_cgo --show-output //projects/apps/demo:arc`;
-    if (build.exitCode !== 0) return;
+    if (build.exitCode !== 0) {
+      throw new Error(
+        `buck2 build failed:\n${String(build.stdout || "")}\n${String(build.stderr || "")}`,
+      );
+    }
     assert.ok(
-      String(build.stdout || "").includes("arc.stamp"),
-      "expected planner stub to produce a stamp output",
+      String(build.stdout || "").includes("arc.carchive"),
+      "expected carchive output directory",
     );
   });
 });

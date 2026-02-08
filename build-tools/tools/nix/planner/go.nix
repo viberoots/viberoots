@@ -155,6 +155,22 @@ let
         ))
       );
     in map (d: builtins.toPath (repoRoot + "/" + (pkgPathOf name) + "/" + d)) patchDirsLocalRel;
+  pkgPathForCArchive = name:
+    let
+      srcs = L.srcsOf name;
+      goSrcs = builtins.filter (s: lib.hasSuffix ".go" s) srcs;
+      dirs = builtins.map (s:
+        let parts = lib.splitString "/" s;
+        in if (builtins.length parts) > 1 then lib.concatStringsSep "/" (lib.init parts) else "."
+      ) goSrcs;
+      underPkg = builtins.filter (d: d == "pkg" || lib.hasPrefix "pkg/" d) dirs;
+      pickLongest = ds:
+        if ds == [] then null
+        else builtins.head (builtins.sort (a: b: (builtins.stringLength a) > (builtins.stringLength b)) ds);
+      chosen = if underPkg != [] then pickLongest underPkg else pickLongest dirs;
+    in if chosen == null || chosen == "." then "."
+       else if lib.hasPrefix "./" chosen then chosen
+       else "./" + chosen;
 in {
   isTarget = L.isTargetByRuleTypeOrLabel {
     ruleTypePrefixes = [ "go_" ];
@@ -231,6 +247,26 @@ in {
       nixCgoAttrs = nixCgoAttrs;
       repoCgoPkgs = repoCgoPkgs;
       srcList = srcList;
+    };
+
+  mkCArchive = name:
+    let
+      repoCgoPkgs = repoCgoPkgsFor name;
+      nixCgoAttrs = let
+        attrFrom = l: lib.removePrefix "nixpkg:" l;
+        labels = L.collectLabelsWithPrefix name "nixpkg:";
+        attrs = map attrFrom labels;
+        uniq = xs: builtins.attrNames (builtins.listToAttrs (map (a: { name = a; value = true; }) xs));
+      in builtins.sort (a: b: a < b) (uniq attrs);
+    in T.goCArchive {
+      inherit name;
+      modulesToml = modulesTomlFor name;
+      srcRoot = repoRoot;
+      subdir = (pkgPathOf name);
+      pkgPath = pkgPathForCArchive name;
+      patchDirs = patchDirsAbsFor name;
+      nixCgoAttrs = nixCgoAttrs;
+      repoCgoPkgs = repoCgoPkgs;
     };
 
   mkTinyWasm = wasm.mkTinyWasm;

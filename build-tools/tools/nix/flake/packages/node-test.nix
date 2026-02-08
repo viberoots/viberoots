@@ -58,6 +58,9 @@ let
               subdir = goPkgDir;
               pkgPath = "./pkg/addon";
               srcRoot = repoRoot;
+              patchDirs =
+                let p = repoRoot + ("/" + goPkgDir + "/patches/go"); in
+                if builtins.pathExists p then [ (builtins.toPath p) ] else [];
             }
           else
             null;

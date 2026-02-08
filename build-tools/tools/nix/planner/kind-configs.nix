@@ -2,7 +2,7 @@
   go = {
     labelPriorityPre = [
       { label = "kind:bin"; kind = "bin"; }
-      { label = "kind:carchive"; kind = "lib"; }
+      { label = "kind:carchive"; kind = "carchive"; }
       { label = "kind:wasm"; kind = "tinywasm"; }
       { label = "kind:test"; kind = "test"; }
     ];
