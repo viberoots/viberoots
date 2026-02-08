@@ -346,7 +346,9 @@ let
                 if (k.kind == "wasm") then LANGS.python.mkWasmApp buildLabel
                 else if (k.kind == "pyext") then LANGS.python.mkPyExt buildLabel
                 else if (k.kind == "pyext_wasm") then LANGS.python.mkPyExtWasm buildLabel
-                else if (k.kind == "bin" || k.kind == "lib") then LANGS.python.mkApp buildLabel
+                else if (k.kind == "test") then LANGS.python.mkTest buildLabel
+                else if (k.kind == "bin") then LANGS.python.mkApp buildLabel
+                else if (k.kind == "lib") then LANGS.python.mkLib buildLabel
                 else LANGS.python.mkLib buildLabel
               ) else (
                 if k.kind == "bin" then LANGS.cpp.mkApp buildLabel

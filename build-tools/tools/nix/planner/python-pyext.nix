@@ -68,6 +68,18 @@ let
       nativeModuleOverlays = overlays;
     };
 
+  mkTest = name:
+    let
+      pyExtDeps = collectPyExtDepsTransitive name;
+      overlays = map mkPyExt pyExtDeps;
+    in T.pyTest {
+      inherit name;
+      lockfile = lockRelFor name;
+      srcRoot = repoRoot;
+      subdir = pkgPathOf name;
+      nativeModuleOverlays = overlays;
+    };
+
   mkPyExt = name:
     let
       n = nodeOfName name;
@@ -135,5 +147,5 @@ let
     };
 in {
   inherit collectPyExtDepsTransitive;
-  inherit mkApp mkLib mkPyExt;
+  inherit mkApp mkLib mkTest mkPyExt;
 }

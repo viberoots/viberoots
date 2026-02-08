@@ -47,6 +47,8 @@ let
       pname =
         if kind == "app"
         then "py-${H.sanitizeName name}"
+        else if kind == "test"
+        then "pytest-${H.sanitizeName name}"
         else "pylib-${H.sanitizeName name}";
     in UvBackend {
       inherit pname srcAbs;
@@ -89,6 +91,21 @@ in {
     mkPy {
       inherit name lockfile devOverrideEnv subdir srcRoot patchDirs groups nativeModuleOverlays;
       kind = "lib";
+    };
+
+  pyTest = {
+    name,
+    lockfile,
+    devOverrideEnv ? DevOverrideEnvs.envNameForLang "python",
+    subdir ? ".",
+    srcRoot ? ../../..,
+    patchDirs ? [ ../../patches/python ],
+    groups ? [ "test" ],
+    nativeModuleOverlays ? [],
+  }:
+    mkPy {
+      inherit name lockfile devOverrideEnv subdir srcRoot patchDirs groups nativeModuleOverlays;
+      kind = "test";
     };
 
   pyExt = {

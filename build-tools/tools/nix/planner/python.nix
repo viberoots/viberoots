@@ -7,7 +7,7 @@ let
   wasm = import ./python-wasm.nix { inherit lib ctx core cpp pyext; };
 in {
   inherit (core) isTarget kindOf modulesFileFor;
-  inherit (pyext) mkApp mkLib mkPyExt;
+  inherit (pyext) mkApp mkLib mkTest mkPyExt;
   inherit (wasm) backendFor mkPyExtWasm mkWasmApp mkWasmLib;
 }
 

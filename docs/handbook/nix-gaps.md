@@ -44,9 +44,9 @@ Planner coverage note: Go library and binary target kinds are now supported by t
 
 ## Python macros
 
-- `nix_python_library` → Buck build (`python_library`).
-- `nix_python_binary` → Buck build (`python_binary`).
-- `nix_python_test` → Buck build (`python_test`).
+- `nix_python_library` → Nix build (`graph-generator-selected`).
+- `nix_python_binary` → Nix build (`graph-generator-selected`).
+- `nix_python_test` → Nix build (`graph-generator-selected`).
 - `nix_python_extension_module` → Stub or probe (`python_pyext_stub`).
 - `nix_python_wasm_extension_module` → Stub or probe (`python_pyext_stub`).
 - `nix_python_wasm_app` → Buck build (`python_library`).
