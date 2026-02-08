@@ -211,6 +211,28 @@ in {
       repoCgoPkgs = repoCgoPkgs;
     };
 
+  mkTest = name:
+    let
+      repoCgoPkgs = repoCgoPkgsFor name;
+      nixCgoAttrs = let
+        attrFrom = l: lib.removePrefix "nixpkg:" l;
+        labels = L.collectLabelsWithPrefix name "nixpkg:";
+        attrs = map attrFrom labels;
+        uniq = xs: builtins.attrNames (builtins.listToAttrs (map (a: { name = a; value = true; }) xs));
+      in builtins.sort (a: b: a < b) (uniq attrs);
+      srcList = L.srcsOf name;
+    in T.goTest {
+      inherit name;
+      modulesToml = modulesTomlFor name;
+      devOverridesMap = localModuleOverrides;
+      srcRoot = repoRoot;
+      subdir = (pkgPathOf name);
+      patchDirs = patchDirsAbsFor name;
+      nixCgoAttrs = nixCgoAttrs;
+      repoCgoPkgs = repoCgoPkgs;
+      srcList = srcList;
+    };
+
   mkTinyWasm = wasm.mkTinyWasm;
 }
 

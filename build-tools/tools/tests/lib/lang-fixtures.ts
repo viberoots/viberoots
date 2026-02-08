@@ -7,9 +7,23 @@ export type TestCtx = { tmp: string; $: any };
 export async function scaffoldLib(lang: string, name: string, ctx: TestCtx): Promise<void> {
   if (lang !== "go") throw new Error(`unsupported lang: ${lang}`);
   const { tmp: t, $ } = ctx;
+  const flakePath = path.join(t, "flake.lock");
+  try {
+    await fsp.access(flakePath);
+  } catch {
+    const repoRoot = process.env.REPO_ROOT || process.cwd();
+    try {
+      await fsp.copyFile(path.join(repoRoot, "flake.lock"), flakePath);
+    } catch {
+      await fsp.writeFile(flakePath, "{}\n", "utf8");
+    }
+  }
   await $`bash --noprofile --norc -c ${`set -euo pipefail
       printf '.\n' > .buckroot
+      test -f flake.lock || printf "{}\n" > flake.lock
       cat > TARGETS <<'EOF'
+load("@prelude//:rules.bzl", "export_file")
+
 platform(
     name = "no_cgo",
     constraint_values = [
@@ -17,6 +31,12 @@ platform(
         "config//go/constraints:asan_false",
         "config//go/constraints:race_false",
     ],
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "flake.lock",
+    src = "flake.lock",
     visibility = ["PUBLIC"],
 )
 EOF
@@ -93,9 +113,23 @@ EOF
 export async function scaffoldApp(lang: string, name: string, ctx: TestCtx): Promise<void> {
   if (lang !== "go") throw new Error(`unsupported lang: ${lang}`);
   const { tmp: t, $ } = ctx;
+  const flakePath = path.join(t, "flake.lock");
+  try {
+    await fsp.access(flakePath);
+  } catch {
+    const repoRoot = process.env.REPO_ROOT || process.cwd();
+    try {
+      await fsp.copyFile(path.join(repoRoot, "flake.lock"), flakePath);
+    } catch {
+      await fsp.writeFile(flakePath, "{}\n", "utf8");
+    }
+  }
   await $`bash --noprofile --norc -c ${`set -euo pipefail
       printf '.\n' > .buckroot
+      test -f flake.lock || printf "{}\n" > flake.lock
       cat > TARGETS <<'EOF'
+load("@prelude//:rules.bzl", "export_file")
+
 platform(
     name = "no_cgo",
     constraint_values = [
@@ -103,6 +137,12 @@ platform(
         "config//go/constraints:asan_false",
         "config//go/constraints:race_false",
     ],
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "flake.lock",
+    src = "flake.lock",
     visibility = ["PUBLIC"],
 )
 EOF

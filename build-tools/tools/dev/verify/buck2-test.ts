@@ -59,6 +59,8 @@ export function spawnVerifyBuck2Tests(opts: {
     "--env",
     `TEST_NODE_OPTIONS=--test-timeout=${tms}`,
     "--env",
+    `TEST_NIX_TIMEOUT_SECS=${process.env.TEST_NIX_TIMEOUT_SECS || "900"}`,
+    "--env",
     `BNX_BUCK_REAPER_STATE_FILE=${process.env.BNX_BUCK_REAPER_STATE_FILE || ""}`,
     "--env",
     `BNX_VERIFY_LOCK_DIR=${process.env.BNX_VERIFY_LOCK_DIR || ""}`,

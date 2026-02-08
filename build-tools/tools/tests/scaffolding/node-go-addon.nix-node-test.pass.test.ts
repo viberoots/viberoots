@@ -26,10 +26,10 @@ test(
         const rawTimeoutSecs = Number(
           process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200",
         );
-        // This zx_test action has a hard Buck-side timeout (currently 10 minutes). Keep the
+        // This zx_test action has a hard Buck-side timeout (currently 15 minutes). Keep the
         // internal nix build timeout comfortably below that so we fail deterministically rather
         // than being SIGKILL'd (which can strand nix-daemon builders).
-        const TIMEOUT_SECS = String(Math.min(rawTimeoutSecs, 9 * 60));
+        const TIMEOUT_SECS = String(Math.min(rawTimeoutSecs, 14 * 60));
         const NIX_PNPM_FETCH_TIMEOUT = String(Number(process.env.NIX_PNPM_FETCH_TIMEOUT || "600"));
 
         await $`git init`;

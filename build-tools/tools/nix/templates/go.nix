@@ -112,6 +112,84 @@ in {
       } else {}));
     in buildGoFn args;
 
+  goTest = {
+    name,
+    modulesToml,
+    devOverrideEnv ? DevOverrideEnvs.envNameForLang "go",
+    devOverridesMap ? {},
+    subdir ? ".",
+    srcRoot ? ../../..,
+    patchDirs ? [],
+    nixCgoPkgs ? [],
+    nixCgoAttrs ? [],
+    repoCgoPkgs ? [],
+    srcList ? [],
+  }:
+    let
+      patchesMap = H.patchesMapFromDirsWith { dirs = patchDirs; };
+      devOverridesFromEnv = H.readDevOverrides devOverrideEnv;
+      _guard = H.guardNoDevOverridesInCI devOverrideEnv;
+      devOverrides = (devOverridesMap // devOverridesFromEnv);
+      srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + subdir));
+      cgo = mkCgoEnv { inherit nixCgoPkgs nixCgoAttrs repoCgoPkgs; };
+      testDirs =
+        let
+          testSrcs = builtins.filter (s: lib.hasSuffix "_test.go" s) (if srcList == null then [] else srcList);
+          dirOf = s: let parts = lib.splitString "/" s; in if (builtins.length parts) > 1 then lib.concatStringsSep "/" (lib.init parts) else ".";
+          uniq = xs: builtins.attrNames (builtins.listToAttrs (map (d: { name = d; value = true; }) xs));
+          dirs = uniq (map dirOf testSrcs);
+        in if (builtins.length dirs) > 0 then dirs else [ "." ];
+      dirList = lib.concatStringsSep " " (map (d: "\"${d}\"") testDirs);
+      baseArgs = {
+        pname = "gotest-${H.sanitizeName name}";
+        version = "0.1.0";
+        src = srcAbs;
+        modules = modulesToml;
+        subPackages = [ "." ];
+        doCheck = false;
+        doInstallCheck = false;
+        allowGoReference = true;
+        disallowedReferences = [];
+        nativeBuildInputs = (if cgo.haveCgo then (cgo.cgoPkgs ++ [ pkgs.pkg-config ]) else []);
+        configurePhase = Common.mkConfigurePhase { inherit cgo; includeGoFlags = true; };
+      };
+      args = baseArgs // ({
+        pwd = srcAbs;
+        modRoot = ".";
+      } // (if takesOverrides then {
+        overrides = Common.mkOverrides { patchesMap = patchesMap; devMap = devOverrides; };
+      } else {}));
+    in buildGoFn (args // {
+      buildPhase = ''
+        runHook preBuild
+        mkdir -p "$TMPDIR/go-test-bins"
+        for d in ${dirList}; do
+          if [ "$d" = "." ]; then
+            go test -c -o "$TMPDIR/go-test-bins"
+          else
+            go test -c -o "$TMPDIR/go-test-bins" "./$d"
+          fi
+        done
+        runHook postBuild
+      '';
+      installPhase = ''
+        runHook preInstall
+        mkdir -p "$out/bin" "$out/tests"
+        cp -f "$TMPDIR/go-test-bins/"*.test "$out/tests/"
+        runner="$out/bin/${H.sanitizeName name}"
+        cat > "$runner" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+for t in "$ROOT/tests"/*.test; do
+  if [ -x "$t" ]; then "$t"; fi
+done
+EOF
+        chmod +x "$runner"
+        runHook postInstall
+      '';
+    });
+
   # Build a Go package as a C archive (.a) with an accompanying header via buildmode=c-archive
   goCArchive = {
     name,

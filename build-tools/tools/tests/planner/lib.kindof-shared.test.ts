@@ -32,7 +32,7 @@ test("planner lib kindOf shared helper respects per-language configs", async () 
     `;
     const { stdout } = await $({ cwd: tmp })`nix eval --impure --expr ${expr} --json`;
     const obj = JSON.parse(String(stdout || "{}"));
-    assert.equal(obj.goA, "lib");
+    assert.equal(obj.goA, "bin");
     assert.equal(obj.goB, "bin");
     assert.equal(obj.goC, "bin");
     assert.equal(obj.cppA, "test");

@@ -1,13 +1,24 @@
-load("@prelude//:rules.bzl", "go_binary", "go_library", "go_test")
 load("//build-tools/lang:defs_common.bzl", "normalize_labels", "prepare_language_wiring")
 load("//build-tools/lang:defs_common.bzl", "merge_link_intent_deps", "validate_link_closure_overrides")
 load("//build-tools/lang:global_inputs.bzl", "global_nix_inputs")
 load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
 load("//build-tools/lang:defs_common.bzl", "wire_package_local_planner_visible_stub")
 load("//build-tools/go/private:nix_build_wasm.bzl", "go_nix_build_wasm")
+load("//build-tools/go/private:nix_build.bzl", "go_nix_build")
+load("//build-tools/go/private:nix_test.bzl", "go_nix_test")
 load("//build-tools/go/private:cgo_wiring.bzl", "apply_go_rule_stable_defaults", "apply_go_tuple_labels", "configure_cgo_kwargs")
 load("//build-tools/go/private:auto_tests.bzl", "maybe_autowire_go_binary_test", "maybe_autowire_go_library_test")
 
+
+def _apply_go_nix_rule_attrs(attrs, prepared):
+    if "override_cgo_enabled" in prepared:
+        attrs["override_cgo_enabled"] = prepared["override_cgo_enabled"]
+    if "asan" in prepared:
+        attrs["asan"] = prepared["asan"]
+    if "race" in prepared:
+        attrs["race"] = prepared["race"]
+    if "cgo_enabled" in prepared:
+        attrs["cgo_enabled"] = prepared["cgo_enabled"]
 
 def nix_go_library(name, **kwargs):
     kw = dict(kwargs)
@@ -30,7 +41,21 @@ def nix_go_library(name, **kwargs):
         deps = deps + repo_cgo_deps + extra,
     )
     configure_cgo_kwargs(wiring.kwargs, wiring.nixpkg_deps, repo_cgo_deps)
-    go_library(name = name, deps = wiring.deps, **wiring.kwargs)
+    prepared = wiring.kwargs
+    nix_inputs = global_nix_inputs()
+    attrs = {
+        "name": name,
+        "out": name + ".stamp",
+        "kind": "lib",
+        "self_label": "//%s:%s" % (native.package_name(), name),
+        "deps": wiring.deps,
+        "srcs": prepared.get("srcs", []) or [],
+        "labels": prepared.get("labels", []) or [],
+        "nix_inputs": nix_inputs,
+        "visibility": prepared.get("visibility", []),
+    }
+    _apply_go_nix_rule_attrs(attrs, prepared)
+    go_nix_build(**attrs)
 
     maybe_autowire_go_library_test(nix_go_test = nix_go_test, name = name)
 
@@ -58,7 +83,21 @@ def nix_go_binary(name, **kwargs):
     )
     configure_cgo_kwargs(wiring.kwargs, wiring.nixpkg_deps, repo_cgo_deps)
     apply_go_rule_stable_defaults(wiring.kwargs)
-    go_binary(name = name, deps = wiring.deps, **wiring.kwargs)
+    prepared = wiring.kwargs
+    nix_inputs = global_nix_inputs()
+    attrs = {
+        "name": name,
+        "out": name,
+        "kind": "bin",
+        "self_label": "//%s:%s" % (native.package_name(), name),
+        "deps": wiring.deps,
+        "srcs": prepared.get("srcs", []) or [],
+        "labels": prepared.get("labels", []) or [],
+        "nix_inputs": nix_inputs,
+        "visibility": prepared.get("visibility", []),
+    }
+    _apply_go_nix_rule_attrs(attrs, prepared)
+    go_nix_build(**attrs)
 
     maybe_autowire_go_binary_test(
         nix_go_library = nix_go_library,
@@ -107,7 +146,22 @@ def nix_go_test(name, **kwargs):
     )
     configure_cgo_kwargs(wiring.kwargs, wiring.nixpkg_deps, repo_cgo_deps)
     apply_go_rule_stable_defaults(wiring.kwargs)
-    go_test(name = name, deps = wiring.deps, **wiring.kwargs)
+    prepared = wiring.kwargs
+    nix_inputs = global_nix_inputs()
+    attrs = {
+        "name": name,
+        "out": name + ".stamp",
+        "self_label": "//%s:%s" % (native.package_name(), name),
+        "deps": wiring.deps,
+        "srcs": prepared.get("srcs", []) or [],
+        "labels": prepared.get("labels", []) or [],
+        "nix_inputs": nix_inputs,
+        "visibility": prepared.get("visibility", []),
+    }
+    if "library" in prepared:
+        attrs["library"] = prepared["library"]
+    _apply_go_nix_rule_attrs(attrs, prepared)
+    go_nix_test(**attrs)
 
 # Third-party shim: expose vendor-provided sources as a go_library while
 # allowing an explicit import path via package map flags

@@ -1254,10 +1254,9 @@ Some macros must produce a **planner-visible** node without building a normal ar
 ### `//build-tools/go/defs.bzl` macros (copy‑pasteable)
 
 ```starlark
-# //build-tools/go/defs.bzl — wrap go_* and attach providers from auto_map.bzl
-# Note: Some repos don’t define the `prelude` cell alias. If so, adjust the load
-# to your local alias or expose go rules via a repo-local forwarding bzl.
-load("@prelude//build-tools/go:def.bzl", "go_binary", "go_library", "go_test")
+# //build-tools/go/defs.bzl — route Go builds through Nix + attach providers
+load("//build-tools/go/private:nix_build.bzl", "go_nix_build")
+load("//build-tools/go/private:nix_test.bzl", "go_nix_test")
 
 def _providers_for(name):
     # Mapping is generated; guard its presence via prebuild-guard in CI/local.
@@ -1271,17 +1270,17 @@ def _providers_for(name):
 def nix_go_library(name, **kwargs):
     deps = kwargs.pop("deps", [])
     deps = deps + _providers_for(name)
-    go_library(name = name, deps = deps, **kwargs)
+    go_nix_build(name = name, kind = "lib", out = name + ".stamp", deps = deps, **kwargs)
 
 def nix_go_binary(name, **kwargs):
     deps = kwargs.pop("deps", [])
     deps = deps + _providers_for(name)
-    go_binary(name = name, deps = deps, **kwargs)
+    go_nix_build(name = name, kind = "bin", out = name, deps = deps, **kwargs)
 
 def nix_go_test(name, **kwargs):
     deps = kwargs.pop("deps", [])
     deps = deps + _providers_for(name)
-    go_test(name = name, deps = deps, **kwargs)
+    go_nix_test(name = name, out = name + ".stamp", deps = deps, **kwargs)
 ```
 
 > Macro error UX: We intentionally rely on `build-tools/tools/buck/prebuild-guard.ts` to emit actionable messages when glue is missing/stale, because Starlark macro loads cannot portably catch and reword load errors. If your repo can’t use the `@prelude` alias, set the alias in Buck config or change the `load("@prelude//build-tools/go:def.bzl", ...)` to a repo-local forwarding bzl that re-exports `go_*`.
@@ -1289,29 +1288,24 @@ def nix_go_test(name, **kwargs):
 ### Example TARGETS Entries (Go)
 
 ```starlark
-go_library(
+load("//build-tools/go:defs.bzl", "nix_go_binary", "nix_go_library")
+
+nix_go_library(
   name = "auth_lib",
   srcs = glob(["**/*.go"]),
-  labels = ["lang:go", "kind:lib"],
 )
 
-go_binary(
+nix_go_binary(
   name = "auth_service",
   srcs = ["cmd/auth/main.go"],
   deps = [":auth_lib"],
-  labels = ["lang:go", "kind:bin"],
 )
 ```
 
 ### Example: Using a specific derivation for an app
 
-```nix
-# Assuming your flake exposes:
-# packages.<system>.graph-generator
-# and inside that, the per-target outputs in graph-generator.goTargets
-
-# Reference a specific derivation in Nix (illustrative):
-packages.x86_64-linux.graph-generator.goTargets."//features/payments:service"
+```bash
+BUCK_TARGET=//features/payments:service nix build .#graph-generator-selected --no-link --print-out-paths
 ```
 
 ### Declaring Buck Inputs (So Impact Works)

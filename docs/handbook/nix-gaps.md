@@ -10,9 +10,9 @@ This document maps every public Starlark macro to its build path. I use it to tr
 
 ## Go macros
 
-- `nix_go_library` → Buck build (`go_library`).
-- `nix_go_binary` → Buck build (`go_binary`).
-- `nix_go_test` → Buck build (`go_test`).
+- `nix_go_library` → Nix build (`graph-generator-selected`).
+- `nix_go_binary` → Nix build (`graph-generator-selected`).
+- `nix_go_test` → Nix build (`graph-generator-selected`).
 - `nix_go_carchive` → Stub or probe (planner-visible stub).
 - `nix_go_tiny_wasm_lib` → Nix build (`go_nix_build_wasm`).
 

@@ -207,6 +207,17 @@ export async function runInTemp<T>(
   for (const [k, v] of Object.entries(process.env)) {
     if (typeof v === "string") exportEnv[k] = v;
   }
+  const allowDevOverrides = String(process.env.TEST_ALLOW_DEV_OVERRIDES || "").trim() === "1";
+  if (!allowDevOverrides) {
+    // Avoid leaking local dev overrides into temp-repo commands unless explicitly allowed.
+    for (const key of [
+      "NIX_CPP_DEV_OVERRIDE_JSON",
+      "NIX_GO_DEV_OVERRIDE_JSON",
+      "NIX_PY_DEV_OVERRIDE_JSON",
+    ]) {
+      delete exportEnv[key];
+    }
+  }
   exportEnv.REPO_ROOT = process.cwd();
   exportEnv.CGO_ENABLED = String(exportEnv.CGO_ENABLED || "").trim() || "0";
 

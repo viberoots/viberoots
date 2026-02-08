@@ -1,11 +1,16 @@
 {
   go = {
     labelPriorityPre = [
+      { label = "kind:bin"; kind = "bin"; }
       { label = "kind:carchive"; kind = "lib"; }
       { label = "kind:wasm"; kind = "tinywasm"; }
+      { label = "kind:test"; kind = "test"; }
     ];
     ruleTypes = {
-      suffixes = [ { suffix = "_binary"; kind = "bin"; } ];
+      suffixes = [
+        { suffix = "_binary"; kind = "bin"; }
+        { suffix = "_test"; kind = "test"; }
+      ];
       prefixes = [ { prefix = "go_"; kind = "lib"; } ];
     };
     labelPriorityPost = [ { label = "kind:bin"; kind = "bin"; } ];

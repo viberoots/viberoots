@@ -12,7 +12,10 @@ test("partial clone: discover and build scaffolded lib via //...", async () => {
     const T = Number(process.env.TEST_CMD_TIMEOUT_S || "300");
     await $`bash --noprofile --norc -c ${`set -euo pipefail
       printf '.\n' > .buckroot
+      test -f flake.lock || printf "{}\n" > flake.lock
       cat > TARGETS <<'EOF'
+load("@prelude//:rules.bzl", "export_file")
+
 platform(
     name = "no_cgo",
     constraint_values = [
@@ -20,6 +23,12 @@ platform(
         "config//go/constraints:asan_false",
         "config//go/constraints:race_false",
     ],
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "flake.lock",
+    src = "flake.lock",
     visibility = ["PUBLIC"],
 )
 EOF
@@ -80,11 +89,45 @@ EOF
     await ensureFile("build-tools/tools/lib/fs-helpers.ts");
     await ensureDir("third_party/providers");
     await ensureFile("TARGETS");
+    await ensureFile("flake.lock");
 
     // Scaffold a new Go lib into the sparse repo
     await $`scaf new go lib demo-lib --yes --path=projects/libs/demo-lib`;
 
-    // No module downloads or gomod2nix; keep the test focused on glue discovery
+    // Seed gomod2nix deterministically via local stub (no network)
+    const stubDir = path.join(_tmp, "bin");
+    await $`mkdir -p ${stubDir}`;
+    const stubPath = path.join(stubDir, "gomod2nix");
+    await $`bash --noprofile --norc -c ${`cat > ${stubPath} <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+DIR=.
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dir)
+      DIR="$2"; shift 2;;
+    *) shift;;
+  esac
+done
+mkdir -p "$DIR"
+cat > "$DIR/gomod2nix.toml" <<'EOF2'
+schema = 3
+mod = {}
+replace = {}
+prune = { go-tests = true, unused-packages = true }
+EOF2
+EOF
+chmod +x ${stubPath}
+`}`;
+    await $({
+      cwd: _tmp,
+      stdio: "inherit",
+      env: { ...process.env, PATH: `${stubDir}:${process.env.PATH || ""}` },
+    })`gomod2nix --dir projects/libs/demo-lib`;
+    await $`cp ${path.join(_tmp, "projects/libs/demo-lib/gomod2nix.toml")} ${path.join(
+      _tmp,
+      "gomod2nix.toml",
+    )}`;
 
     // Run glue explicitly to ensure discovery works in sparse context
     await $`build-tools/tools/dev/install-deps.ts --glue-only`;

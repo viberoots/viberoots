@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 process.env.TEST_NEED_DEV_ENV = "1";
 
-test("go lib: scaffold and build+test", { timeout: 420_000 }, async () => {
+test("go lib: scaffold and build+test", { timeout: 600_000 }, async () => {
   // Ensure minimal roots are available in the temp repo for Buck macros.
   const prevRoots = process.env.TEST_RSYNC_ROOTS;
   if (!prevRoots) {

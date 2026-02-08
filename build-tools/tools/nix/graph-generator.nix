@@ -254,7 +254,9 @@ let
         # Use adapter's kindOf for Go
         goKindOf = n: LANGS.go.kindOf n;
         mkGo = name: kind:
-          if (kind == "bin") then LANGS.go.mkApp name else LANGS.go.mkLib name;
+          if (kind == "bin") then LANGS.go.mkApp name
+          else if (kind == "test") then LANGS.go.mkTest name
+          else LANGS.go.mkLib name;
         goTargetsFromGraph = builtins.foldl' (acc: n:
           let nm = ensureFullLabel n; kind = goKindOf n; in
             if (kind == null) then acc else (acc // { "${nm}" = mkGo nm kind; })
@@ -373,6 +375,7 @@ let
               if k.template == "go" then (
                 if k.kind == "bin" then LANGS.go.mkApp buildLabel
                 else if k.kind == "lib" then LANGS.go.mkLib buildLabel
+                else if k.kind == "test" then LANGS.go.mkTest buildLabel
                 else if (k.kind == "tinywasm") then LANGS.go.mkTinyWasm buildLabel
                 else LANGS.go.mkApp buildLabel
               ) else if k.template == "node" then (
