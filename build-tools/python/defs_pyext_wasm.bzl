@@ -1,24 +1,14 @@
 load(
     "//build-tools/lang:defs_common.bzl",
-    "default_lockfile_label_from_package",
-    "default_lockfile_path_from_package",
-    "ensure_default_lockfile_exists",
-    "extract_lockfile_labels",
     "merge_link_intent_deps",
     "prepare_language_wiring",
     "validate_link_closure_overrides",
 )
 load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
-load("//build-tools/python:pyext_stub.bzl", "python_pyext_stub")
+load("//build-tools/python:defs_lockfile.bzl", "apply_default_lockfile_label")
+load("//build-tools/python/private:nix_build.bzl", "python_nix_pyext_build")
 
 _BACKEND_LABELS = ["backend:wasi", "backend:pyodide"]
-
-def _apply_default_lockfile_label(lockfile_label, labels, macro_name):
-    if (lockfile_label == None or lockfile_label == "") and len(extract_lockfile_labels(labels or [])) == 0:
-        default_path = default_lockfile_path_from_package(lang = "python")
-        ensure_default_lockfile_exists(default_path, macro_name, lang = "python")
-        return default_lockfile_label_from_package(lang = "python")
-    return lockfile_label
 
 def _label_list(labels):
     if labels == None:
@@ -72,7 +62,7 @@ def nix_python_wasm_extension_module(
     extra_labels = _label_list(labels)
     kw["labels"] = base_labels
     _require_backend_label(base_labels + extra_labels)
-    lockfile_label = _apply_default_lockfile_label(
+    lockfile_label = apply_default_lockfile_label(
         lockfile_label,
         base_labels + extra_labels,
         "nix_python_wasm_extension_module",
@@ -103,9 +93,28 @@ def nix_python_wasm_extension_module(
         labels = extra_labels,
         lockfile_label = lockfile_label,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
-        wiring = "non_genrule",
+        wiring = "non_genrule_nix_calling",
+        global_inputs_into = "nix_inputs",
     )
-    python_pyext_stub(deps = wiring.deps, **wiring.kwargs)
+    prepared = wiring.kwargs
+    python_nix_pyext_build(
+        name = name,
+        out = name + ".stamp",
+        self_label = "//%s:%s" % (native.package_name(), name),
+        deps = wiring.deps,
+        module = prepared.get("module", ""),
+        link_deps = prepared.get("link_deps", []) or [],
+        header_deps = prepared.get("header_deps", []) or [],
+        link_closure = prepared.get("link_closure", "direct"),
+        link_closure_overrides = prepared.get("link_closure_overrides", {}),
+        cflags = prepared.get("cflags", []) or [],
+        ldflags = prepared.get("ldflags", []) or [],
+        build_py_deps = prepared.get("build_py_deps", []) or [],
+        srcs = prepared.get("srcs", []) or [],
+        nix_inputs = prepared.get("nix_inputs", []) or [],
+        labels = prepared.get("labels", []) or [],
+        visibility = prepared.get("visibility", []),
+    )
 
 __all__ = [
     "nix_python_wasm_extension_module",

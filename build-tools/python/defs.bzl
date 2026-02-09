@@ -1,34 +1,27 @@
-load("@prelude//:rules.bzl", "python_library")
 load(
     "//build-tools/lang:defs_common.bzl",
     "append_nixpkg_labels",
-    "default_lockfile_label_from_package",
-    "default_lockfile_path_from_package",
-    "ensure_default_lockfile_exists",
-    "extract_lockfile_labels",
     "merge_link_intent_deps",
     "prepare_language_wiring",
-    "stamp_wasm_variant",
     "validate_link_closure_overrides",
 )
 load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
-load("//build-tools/python:pyext_stub.bzl", "python_pyext_stub")
-load("//build-tools/python/private:nix_build.bzl", "python_nix_build")
+load("//build-tools/python:defs_lockfile.bzl", "apply_default_lockfile_label")
+load("//build-tools/python/private:nix_build.bzl", "python_nix_build", "python_nix_pyext_build")
 load("//build-tools/python/private:nix_test.bzl", "python_nix_test")
 load(
     "//build-tools/python:defs_pyext_wasm.bzl",
     _nix_python_wasm_extension_module = "nix_python_wasm_extension_module",
 )
-def _apply_default_lockfile_label(lockfile_label, labels, macro_name):
-    if (lockfile_label == None or lockfile_label == "") and len(extract_lockfile_labels(labels or [])) == 0:
-        default_path = default_lockfile_path_from_package(lang = "python")
-        ensure_default_lockfile_exists(default_path, macro_name, lang = "python")
-        return default_lockfile_label_from_package(lang = "python")
-    return lockfile_label
+load(
+    "//build-tools/python:defs_wasm.bzl",
+    _nix_python_wasm_app = "nix_python_wasm_app",
+    _nix_python_wasm_lib = "nix_python_wasm_lib",
+)
 def nix_python_library(name, lockfile_label = None, deps = [], **kwargs):
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     append_nixpkg_labels(kwargs, nixpkg_deps)
-    lockfile_label = _apply_default_lockfile_label(
+    lockfile_label = apply_default_lockfile_label(
         lockfile_label,
         kwargs.get("labels", []) or [],
         "nix_python_library",
@@ -61,7 +54,7 @@ def nix_python_binary(name, lockfile_label = None, deps = [], **kwargs):
     append_nixpkg_labels(kwargs, nixpkg_deps)
     if "srcs" in kwargs:
         fail("nix_python_binary does not accept srcs; use main/main_module + deps instead")
-    lockfile_label = _apply_default_lockfile_label(
+    lockfile_label = apply_default_lockfile_label(
         lockfile_label,
         kwargs.get("labels", []) or [],
         "nix_python_binary",
@@ -96,7 +89,7 @@ def nix_python_binary(name, lockfile_label = None, deps = [], **kwargs):
 def nix_python_test(name, lockfile_label = None, deps = [], **kwargs):
     nixpkg_deps = kwargs.pop("nixpkg_deps", [])
     append_nixpkg_labels(kwargs, nixpkg_deps)
-    lockfile_label = _apply_default_lockfile_label(
+    lockfile_label = apply_default_lockfile_label(
         lockfile_label,
         kwargs.get("labels", []) or [],
         "nix_python_test",
@@ -153,7 +146,7 @@ def nix_python_extension_module(
     kw = dict(kwargs)
     append_nixpkg_labels(kw, nixpkg_deps)
     validate_link_closure_overrides(link_deps, link_closure_overrides)
-    lockfile_label = _apply_default_lockfile_label(
+    lockfile_label = apply_default_lockfile_label(
         lockfile_label,
         kw.get("labels", []) or [],
         "nix_python_extension_module",
@@ -179,59 +172,37 @@ def nix_python_extension_module(
         kind = "pyext",
         lockfile_label = lockfile_label,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
-        wiring = "non_genrule",
+        wiring = "non_genrule_nix_calling",
+        global_inputs_into = "nix_inputs",
     )
-    python_pyext_stub(deps = wiring.deps, **wiring.kwargs)
+    prepared = wiring.kwargs
+    python_nix_pyext_build(
+        name = name,
+        out = name + ".stamp",
+        self_label = "//%s:%s" % (native.package_name(), name),
+        deps = wiring.deps,
+        module = prepared.get("module", ""),
+        link_deps = prepared.get("link_deps", []) or [],
+        header_deps = prepared.get("header_deps", []) or [],
+        link_closure = prepared.get("link_closure", "direct"),
+        link_closure_overrides = prepared.get("link_closure_overrides", {}),
+        cflags = prepared.get("cflags", []) or [],
+        ldflags = prepared.get("ldflags", []) or [],
+        build_py_deps = prepared.get("build_py_deps", []) or [],
+        srcs = prepared.get("srcs", []) or [],
+        nix_inputs = prepared.get("nix_inputs", []) or [],
+        labels = prepared.get("labels", []) or [],
+        visibility = prepared.get("visibility", []),
+    )
 
 def nix_python_wasm_extension_module(*args, **kwargs):
     return _nix_python_wasm_extension_module(*args, **kwargs)
 
-# WASM (WASI) convenience macros — stamp kind:wasm so planner routes to pyWasm* templates
-def nix_python_wasm_app(name, lockfile_label = None, deps = [], labels = [], **kwargs):
-    kw = dict(kwargs)
-    stamp_wasm_variant(kw, "python", "wasi")
-    nixpkg_deps = kw.pop("nixpkg_deps", [])
-    append_nixpkg_labels(kw, nixpkg_deps)
-    lockfile_label = _apply_default_lockfile_label(
-        lockfile_label,
-        (kw.get("labels", []) or []) + (labels or []),
-        "nix_python_wasm_app",
-    )
-    wiring = prepare_language_wiring(
-        name = name,
-        kwargs = kw,
-        deps = deps,
-        lang = "python",
-        kind = "wasm",
-        labels = list(labels or []),
-        lockfile_label = lockfile_label,
-        MODULE_PROVIDERS = MODULE_PROVIDERS,
-        wiring = "non_genrule",
-    )
-    python_library(deps = wiring.deps, **wiring.kwargs)
+def nix_python_wasm_app(*args, **kwargs):
+    return _nix_python_wasm_app(*args, **kwargs)
 
-def nix_python_wasm_lib(name, lockfile_label = None, deps = [], labels = [], **kwargs):
-    kw = dict(kwargs)
-    stamp_wasm_variant(kw, "python", "wasi")
-    nixpkg_deps = kw.pop("nixpkg_deps", [])
-    append_nixpkg_labels(kw, nixpkg_deps)
-    lockfile_label = _apply_default_lockfile_label(
-        lockfile_label,
-        (kw.get("labels", []) or []) + (labels or []),
-        "nix_python_wasm_lib",
-    )
-    wiring = prepare_language_wiring(
-        name = name,
-        kwargs = kw,
-        deps = deps,
-        lang = "python",
-        kind = "wasm",
-        labels = list(labels or []),
-        lockfile_label = lockfile_label,
-        MODULE_PROVIDERS = MODULE_PROVIDERS,
-        wiring = "non_genrule",
-    )
-    python_library(deps = wiring.deps, **wiring.kwargs)
+def nix_python_wasm_lib(*args, **kwargs):
+    return _nix_python_wasm_lib(*args, **kwargs)
 __all__ = [
     "nix_python_binary",
     "nix_python_extension_module",

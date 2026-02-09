@@ -8,6 +8,21 @@ import { runInTemp } from "../lib/test-helpers";
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
 
+function ensureCertEnv(env: Record<string, string>): Record<string, string> {
+  const next = { ...env };
+  if (!next.SSL_CERT_FILE && next.NIX_SSL_CERT_FILE) {
+    next.SSL_CERT_FILE = next.NIX_SSL_CERT_FILE;
+  }
+  if (!next.SSL_CERT_FILE) {
+    const defaultCert = "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt";
+    if (fs.existsSync(defaultCert)) next.SSL_CERT_FILE = defaultCert;
+  }
+  if (!next.SSL_CERT_DIR && next.NIX_SSL_CERT_DIR) {
+    next.SSL_CERT_DIR = next.NIX_SSL_CERT_DIR;
+  }
+  return next;
+}
+
 test(
   "node_asset_stage: webapp output stages tinygo wasm",
   { timeout: TEST_TIMEOUT_MS },
@@ -112,10 +127,14 @@ node_asset_stage(
           env: { ...envWithPrefetch },
         })`zx-wrapper ../../../build-tools/tools/dev/node-modules-build.ts`;
 
+        const baseEnv =
+          typeof ($ as any).env === "object" && ($ as any).env
+            ? { ...($ as any).env }
+            : { ...process.env };
         const build = await $({
           cwd: tmp,
           stdio: "pipe",
-          env: { ...process.env, WEB_WASM_BACKEND: "wasi_single" },
+          env: ensureCertEnv({ ...baseEnv, WEB_WASM_BACKEND: "wasi_single" }),
         })`buck2 build --target-platforms prelude//platforms:default --show-output //projects/apps/demo-web:webapp`;
         const outText = String(build.stdout || build.stderr || "").trim();
         const outLine = outText.split(/\n+/).pop() || "";
