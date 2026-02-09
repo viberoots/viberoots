@@ -35,7 +35,8 @@
 **Goal:** Combine **Buck2** (fine-grained graph, change detection, impacted tests) with **Nix** (hermetic toolchains, reproducible builds) and a **Go patching** workflow.
 
 - Buck2 remains the **source of truth** for the dependency graph and test impact analysis.
-- Each Buck target’s build is implemented **via Nix** using **dynamic derivations**.
+- Artifact-producing public macro builds are migrated to Nix-backed paths using dynamic derivations.
+- Planner-visible probes/stubs are allowed only when explicitly documented as non-build exceptions.
 - Patching third-party modules is **ergonomic**, **idempotent**, and **cache-friendly**.
 
 ### Why this design?
@@ -43,6 +44,26 @@
 - Buck2 gives us **precise incremental builds and “what to retest”** queries.
 - Nix gives us **hermeticity** and **deterministic artifacts** (toolchains, dependencies).
 - The patching layer makes it safe and **repeatable** to adjust third-party code without vendoring.
+
+### Migration contract (authoritative docs)
+
+Use these docs as the source of truth for migration scope and completion:
+
+- Inventory: `docs/handbook/nix-gaps.md`
+- Phase plan: `docs/handbook/nix-gaps-plan.md`
+- Execution sequence: `docs/handbook/nix-gaps-prs.md`
+
+Current status in those docs:
+
+- Phases 0 through 3 are complete (Go and Python migrations).
+- Remaining scope starts at Phase 4 (Node residuals, C++/Rust residuals, exception policy, enforcement).
+
+Guardrails for all current and future languages:
+
+- Classify macros as artifact-producing, orchestration wrapper, or probe-only.
+- Treat only artifact-producing non-Nix routes as migration debt.
+- Keep non-build macros only as explicit, reviewed exceptions with rationale.
+- Do not mark migration complete while any artifact-producing macro still has a non-hermetic Buck path.
 
 ---
 
@@ -1056,6 +1077,14 @@ This policy is locked down by tests. See:
 
 ## Future-Proofing for Other Languages
 
+Before adding a new language, define its macro inventory and migration policy using the same pattern as current languages:
+
+1. Add each public macro to `docs/handbook/nix-gaps.md` with a route classification.
+2. Classify each macro as artifact-producing, orchestration wrapper, or probe-only.
+3. Add or extend phases in `docs/handbook/nix-gaps-plan.md` using dependency order and measurable acceptance criteria.
+4. Add concrete PR slices in `docs/handbook/nix-gaps-prs.md`, including tests and docs per PR.
+5. Enforce inventory coverage and exception policy checks in CI before calling the migration complete.
+
 ### PNPM Importer‑scoped Providers (Node)
 
 We scope Node to **PNPM only**, and generate **one provider per importer (workspace)** from a given `pnpm-lock.yaml`. This yields tighter invalidation: patching a package used only by `projects/apps/web` will not rebuild providers for `services/api`.
@@ -1242,6 +1271,8 @@ As of PR‑3 in `quad-alignment-6.md`, the historical `go_module_patch(...)` pro
 ### Planner-visible stub contract (PR‑2)
 
 Some macros must produce a **planner-visible** node without building a normal artifact (for example, C++ Emscripten `.js` + `.wasm` bundles, or other non-standard shapes). These targets still participate in invalidation and planner discovery.
+
+Planner-visible stubs are not automatically migration debt. They are acceptable only when the macro is explicitly classified as probe/test-only in `docs/handbook/nix-gaps.md`. If a macro contract expects a production artifact, a planner-visible stub is a temporary gap and must be tracked in `docs/handbook/nix-gaps-plan.md` and `docs/handbook/nix-gaps-prs.md`.
 
 - **Canonical rule**: use `//build-tools/lang:planner_stub.bzl:planner_stub`. Do not introduce ad-hoc `genrule` stubs.
 - **Contract**: a planner-visible stub should carry:

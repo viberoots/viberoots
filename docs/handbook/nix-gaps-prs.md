@@ -5,6 +5,73 @@ Each PR includes code, tests, and documentation updates together.
 
 Non-goals: no standalone docs-only or tests-only PRs.
 
+Status checkpoint:
+
+- PR-1 through PR-11 are implemented.
+- Rework and remaining migration scope start at PR-12.
+- PRs below are aligned to the updated framing in `docs/handbook/nix-gaps-plan.md`:
+  - Focus on artifact-producing non-Nix paths.
+  - Keep intentional probe/test-only exceptions explicit and enforced.
+
+Verification snapshot for PR-1 through PR-11 (repo evidence):
+
+- PR-1: inventory checker exists at `build-tools/tools/dev/nix-gaps-inventory-check.ts` and test at
+  `build-tools/tools/tests/dev/nix-gaps-inventory-check.test.ts` (`7239ad5`).
+- PR-2: baseline generator exists at `build-tools/tools/dev/nix-gaps-baseline.ts`, baseline test at
+  `build-tools/tools/tests/dev/nix-gaps-baseline.test.ts`, baseline artifact at
+  `docs/handbook/nix-gaps-baseline.md` (`336f513`).
+- PR-3/PR-4: toolchain outputs and host-path guard tests exist, including
+  `build-tools/tools/tests/dev/toolchains.nix-build.go-python.test.ts` and
+  `build-tools/tools/tests/dev/toolchains.host-path.fails-fast.test.ts` (`dd42aa1` plus follow-up
+  toolchain path wiring commits).
+- PR-5: Go planner template routing landed (`6f2b255`).
+- PR-6: Go macro build/test routing via Nix landed (`e60d0b9`).
+- PR-7: Go carchive Nix build and tests landed (`c75c000`).
+- PR-8: Python planner test routing landed (`ce19920`).
+- PR-9: Python macro build/test routing via Nix landed (`114470c`).
+- PR-10: Python extension module Nix routing landed (`d8f161b`).
+- PR-11: Python wasm app/lib Nix routing landed (`61d6963`).
+
+⚠️ This verification is based on committed code, tests, and docs in the repository. It does not
+re-run the entire historical CI matrix for each PR in this document.
+
+## Test-time guardrails (evidence-based, required for PR-12+)
+
+These controls are already implemented in-repo and have landed across test/runtime speedup commits
+(`123fbb5`, `d1b1ee6`, `2134656`, `a33cd6e`, `0e24563`, `e900dd8`, `a1da123`).
+PRs after PR-11 should use them consistently and avoid bypassing them.
+
+1. Coverage remains opt-in.
+   - Keep default runs without coverage; only enable with `-- --env COVERAGE=1`.
+   - Evidence: `TESTING.md` documents coverage-off default and explicit opt-in.
+
+2. Iterate with scoped test runs before full-suite validation.
+   - Use target/subset runs during implementation; run full safety suite at merge gate.
+   - Evidence: `TESTING.md` includes single-target and multi-target test commands.
+
+3. Reuse verify seed store for temp repos; do not rebuild seed per test.
+   - Preserve `BNX_TEST_SEED_STORE_PATH` flow and fail-fast behavior in verify mode.
+   - Evidence: `build-tools/tools/tests/lib/test-helpers/run-in-temp.ts` and
+     `build-tools/tools/dev/verify/seed.ts`.
+
+4. Scope temp repo copy roots in heavy zx tests.
+   - Use `TEST_RSYNC_ROOTS` where a test only needs part of the repo.
+   - Evidence: `build-tools/tools/tests/rsync/rsync.roots-only.tools.test.ts` and multiple
+     scaffolding/node tests that set scoped roots.
+
+5. Keep heavy toolchain prewarm gated.
+   - Do not force heavy prewarm globally; heavy attrs are opt-in via `PREWARM_HEAVY=1`.
+   - Evidence: `TESTING.md` and `build-tools/tools/dev/prewarm-toolchains.ts`.
+
+6. Keep lint/test scope tight when editing docs/tooling.
+   - Avoid widening checks to untouched areas in PR-local validation loops.
+   - Evidence: scoped-lint speedup landed in `0e24563`.
+
+PR template requirement (apply to PR-12+):
+
+- Include a short “Test runtime controls used” note listing which of the six controls were applied.
+- If any control is not applied, state why with concrete constraints in that PR.
+
 ---
 
 ## PR-1: Inventory enforcement for public macros
@@ -577,6 +644,463 @@ Wasm app and lib targets remain on non-Nix paths.
 ### Downsides for Implementing
 
 Additional build shape to keep aligned with downstream expectations.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-12: Node macro outcome classification and inventory framing
+
+### Description
+
+I will classify every Node public macro as artifact-producing, orchestration wrapper, or probe-only,
+then update `docs/handbook/nix-gaps.md` to use the artifact-vs-exception framing consistently.
+
+### Scope & Changes
+
+- Add a Node classification table to `docs/handbook/nix-gaps.md` covering every Node public macro.
+- Update legend terminology in `docs/handbook/nix-gaps.md` to distinguish:
+  - Buck artifact gaps
+  - Stub artifact gaps
+  - Probe-only exceptions
+- Add an explicit exception policy section and list any intentional non-build macros.
+
+### Tests (in this PR)
+
+- Add or update inventory checker expectations so classification/exception sections are validated.
+- Add a test that fails if a Node public macro is missing from the classification table.
+
+### Docs (in this PR)
+
+- Update `docs/handbook/nix-gaps.md` with classification and exception policy.
+
+### Acceptance Criteria
+
+- Every Node public macro has a classification with rationale.
+- Inventory terminology matches the updated migration plan framing.
+- Tests fail when classification coverage drifts.
+
+### Risks
+
+Classification can drift when macros change behavior.
+
+### Mitigation
+
+Keep checker logic tied to public macro inventory and fail fast on missing entries.
+
+### Consequence of Not Implementing
+
+Phase 4 scope remains ambiguous and migration can include unnecessary rework.
+
+### Downsides for Implementing
+
+Adds a small amount of metadata maintenance.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-13: Node artifact-producing planner coverage (`nix_node_gen/lib/bin`)
+
+### Description
+
+I will extend Node planner/template routing for artifact-producing macro paths so `nix_node_gen`,
+`nix_node_lib`, and `nix_node_bin` can be built via Nix-backed paths.
+
+### Scope & Changes
+
+- Add template/routing support for artifact-producing Node gen/lib/bin target paths.
+- Ensure generated outputs preserve expected downstream names and structure.
+- Keep orchestration-wrapper behavior intact where macros intentionally call `nix build`.
+
+### Tests (in this PR)
+
+- Add planner/template rendering tests for Node artifact-producing cases.
+- Add representative build tests for gen/lib/bin outputs.
+- Add regression checks for output path compatibility.
+
+### Docs (in this PR)
+
+- Update `docs/handbook/nix-gaps.md` Node rows to reflect new build routing status.
+
+### Acceptance Criteria
+
+- Representative `nix_node_gen`, `nix_node_lib`, and `nix_node_bin` targets build through Nix-backed paths.
+- Tests fail if routing falls back to non-hermetic artifact Buck paths.
+- Downstream targets continue to consume outputs without manual rewiring.
+
+### Risks
+
+Node target metadata may be incomplete for some real-world targets.
+
+### Mitigation
+
+Start with representative targets and extend attributes as gaps are found.
+
+### Consequence of Not Implementing
+
+Core Node artifact-producing macros remain outside Phase 4 objectives.
+
+### Downsides for Implementing
+
+Adds Node planner and test surface area.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-14: Node artifact steps (`node_asset_stage`, `node_wasm_inline_module`)
+
+### Description
+
+I will migrate remaining artifact-producing Node helper macros so staged assets and inline wasm
+module outputs are produced through Nix-backed paths where consumed by downstream builds.
+
+### Scope & Changes
+
+- Add Nix-backed route for `node_asset_stage` when output is consumed as a build artifact.
+- Add Nix-backed route for `node_wasm_inline_module`.
+- Preserve output layout and file names expected by current consumers.
+
+### Tests (in this PR)
+
+- Add representative tests for staged asset outputs and inline wasm module outputs.
+- Add consumer tests that validate downstream targets use migrated outputs.
+
+### Docs (in this PR)
+
+- Update Node macro status and notes in `docs/handbook/nix-gaps.md`.
+
+### Acceptance Criteria
+
+- Artifact outputs from `node_asset_stage` and `node_wasm_inline_module` are Nix-backed.
+- Existing consumers continue to build without behavioral regressions.
+- Tests fail if these macros route to non-hermetic artifact Buck paths.
+
+### Risks
+
+Output shape mismatches can break packaging or runtime loaders.
+
+### Mitigation
+
+Use explicit output parity checks for representative targets.
+
+### Consequence of Not Implementing
+
+Phase 4 remains incomplete for artifact-producing Node paths.
+
+### Downsides for Implementing
+
+More output-compatibility cases to maintain.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-15: C++ residual artifact stubs (`nix_cpp_headers`, `nix_cpp_wasm_emscripten_lib`)
+
+### Description
+
+I will replace remaining C++ artifact-expected stubs with Nix-backed builds.
+
+### Scope & Changes
+
+- Implement Nix-backed output path for `nix_cpp_headers`.
+- Implement Nix-backed output path for `nix_cpp_wasm_emscripten_lib`.
+- Ensure outputs are consumable by current C++/wasm consumers.
+
+### Tests (in this PR)
+
+- Add representative build tests for headers package and Emscripten outputs.
+- Add consumer tests to validate integration with downstream targets.
+
+### Docs (in this PR)
+
+- Update C++ macro status in `docs/handbook/nix-gaps.md`.
+
+### Acceptance Criteria
+
+- Both C++ stubs are replaced by Nix-backed artifact-producing paths.
+- Consumer builds succeed with migrated outputs.
+- Tests fail on fallback to stub behavior.
+
+### Risks
+
+Emscripten environment differences may surface platform-specific issues.
+
+### Mitigation
+
+Pin toolchain inputs and run coverage in CI on supported platforms.
+
+### Consequence of Not Implementing
+
+Phase 5 stays blocked by known C++ artifact gaps.
+
+### Downsides for Implementing
+
+Adds cross-toolchain compatibility work.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-16: Rust artifact-producing macro migration
+
+### Description
+
+I will migrate Rust public macros to Nix-backed builds where their contract is artifact-producing.
+
+### Scope & Changes
+
+- Replace Rust stub/genrule paths with Nix-backed library and binary build paths.
+- Preserve expected artifact names and downstream integration points.
+- Keep any non-artifact behavior out of scope unless explicitly documented as an exception.
+
+### Tests (in this PR)
+
+- Add representative Rust library/binary build tests via Nix-backed routes.
+- Add consumer tests for downstream usage of Rust outputs.
+
+### Docs (in this PR)
+
+- Update Rust macro status in `docs/handbook/nix-gaps.md`.
+
+### Acceptance Criteria
+
+- Artifact-producing Rust public macros build through Nix-backed paths.
+- Downstream consumers build against migrated outputs.
+- Tests fail on fallback to stub behavior.
+
+### Risks
+
+Rust target metadata or toolchain wiring may be incomplete.
+
+### Mitigation
+
+Start with representative targets and extend metadata where needed.
+
+### Consequence of Not Implementing
+
+Phase 5 remains incomplete for Rust artifact-producing macros.
+
+### Downsides for Implementing
+
+Additional language-specific build routing to maintain.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-17: Exception policy enforcement for probe/test-only macros
+
+### Description
+
+I will formalize and enforce the exception policy so only intentional probe/test-only macros remain
+non-build, with explicit rationale in inventory documentation.
+
+### Scope & Changes
+
+- Add machine-checked exception list (source of truth) for allowed non-build public macros.
+- Fail checks when non-build macros are introduced without being listed and justified.
+- Keep `cpp_sanitize_probe` documented as an intentional probe-only exception if still retained.
+
+### Tests (in this PR)
+
+- Add tests that enforce exception-list coverage and justification fields.
+- Add a regression test that fails when an unlisted probe/stub macro appears.
+
+### Docs (in this PR)
+
+- Update exception policy section in `docs/handbook/nix-gaps.md`.
+- Update plan references where needed for enforcement details.
+
+### Acceptance Criteria
+
+- Every non-build public macro is listed as an explicit, reviewed exception.
+- CI fails when a new non-build macro is added without policy entry.
+- Documentation and checks remain aligned.
+
+### Risks
+
+Policy checks can become brittle if tied to unstable formatting.
+
+### Mitigation
+
+Use stable data structure or strict section format validated by tests.
+
+### Consequence of Not Implementing
+
+Probe/stub drift can reintroduce undocumented non-hermetic behavior.
+
+### Downsides for Implementing
+
+Adds one policy artifact and checker maintenance.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-18: Validation and parity for remaining phases
+
+### Description
+
+I will run and codify cross-language parity and hermeticity checks for post-PR-11 migrations.
+
+### Scope & Changes
+
+- Add representative parity checks for Node, C++, and Rust outputs.
+- Add minimal-environment hermeticity checks to catch host toolchain leakage.
+- Document explicit justified output differences where parity is not byte-for-byte.
+
+### Tests (in this PR)
+
+- Add parity tests for representative migrated targets.
+- Add CI checks that run builds in a minimal environment.
+
+### Docs (in this PR)
+
+- Update parity and hermeticity notes in `docs/handbook/nix-gaps-baseline.md` and related docs.
+
+### Acceptance Criteria
+
+- Representative migrated targets pass parity checks or have documented expected deltas.
+- Minimal-environment checks pass without host toolchain dependencies.
+- CI catches regressions in parity or hermeticity.
+
+### Risks
+
+Parity checks may fail due to benign metadata differences.
+
+### Mitigation
+
+Define strict-but-practical parity signals and document approved exceptions.
+
+### Consequence of Not Implementing
+
+Migration may appear complete without evidence of behavioral parity.
+
+### Downsides for Implementing
+
+Longer CI runtime and additional fixtures.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-19: Cleanup and enforcement gates for artifact-producing macros
+
+### Description
+
+I will remove legacy fallback paths and enforce that public artifact-producing macros cannot route to
+non-hermetic Buck artifact builds.
+
+### Scope & Changes
+
+- Remove or guard legacy artifact-producing Buck fallback paths in macro code.
+- Add CI enforcement checks for artifact-producing macro routing.
+- Keep allowed probe/test-only exception policy integrated into enforcement logic.
+
+### Tests (in this PR)
+
+- Add checks that fail on disallowed Buck artifact routing in public macros.
+- Add regression tests for exception-policy compliance.
+
+### Docs (in this PR)
+
+- Update `docs/handbook/nix-gaps-plan.md` and `docs/handbook/nix-gaps.md` status sections.
+- Update architecture docs to reflect final enforcement model.
+
+### Acceptance Criteria
+
+- Public artifact-producing macros cannot regress to non-hermetic Buck artifact paths.
+- Exception policy remains explicit and machine-checked.
+- CI is green with all enforcement gates enabled.
+
+### Risks
+
+Hard enforcement may temporarily block valid transitional work.
+
+### Mitigation
+
+Roll out gates with targeted allowlist and then tighten once migrations land.
+
+### Consequence of Not Implementing
+
+Completed migration work can regress without detection.
+
+### Downsides for Implementing
+
+Initial contributor friction while adapting to stricter gates.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-20: `nix_node_cli_bin` non-bundled path migration
+
+### Description
+
+I will migrate the remaining non-Nix branch of `nix_node_cli_bin` (`bundle = False`) so this
+artifact-producing macro no longer relies on Buck copy/genrule artifact output paths.
+
+### Scope & Changes
+
+- Add a Nix-backed route for `nix_node_cli_bin` when `bundle = False`.
+- Preserve current output contract consumed by downstream CLI callers.
+- Keep `bundle = True` behavior unchanged if already Nix-backed and correct.
+
+### Tests (in this PR)
+
+- Add representative tests for both `bundle = False` and `bundle = True`.
+- Add regression checks ensuring `bundle = False` does not route through non-hermetic Buck artifact
+  paths.
+
+### Docs (in this PR)
+
+- Update `docs/handbook/nix-gaps.md` Node macro rows to remove the mixed-status note once migrated.
+- Update phase tracking notes in `docs/handbook/nix-gaps-plan.md` if needed.
+
+### Acceptance Criteria
+
+- `nix_node_cli_bin` is Nix-backed for both bundle modes, or the non-bundled mode is explicitly
+  reclassified as a documented non-artifact exception (expected to be unnecessary).
+- No artifact-producing Node public macro remains on a non-hermetic Buck path.
+- Tests fail on regression to Buck artifact routing for this macro.
+
+### Risks
+
+CLI launch semantics may differ between bundled and non-bundled outputs.
+
+### Mitigation
+
+Validate output paths and runtime invocation behavior for both modes in tests.
+
+### Consequence of Not Implementing
+
+`docs/handbook/nix-gaps.md` still contains a Node artifact-producing macro with a non-Nix path, so
+inventory completion is not achieved.
+
+### Downsides for Implementing
+
+Adds one more Node migration path and compatibility surface.
 
 ### Recommendation
 

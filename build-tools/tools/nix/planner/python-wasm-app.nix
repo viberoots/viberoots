@@ -50,7 +50,8 @@ let
           let n = if builtins.hasAttr dn core.byName then core.byName.${dn} else null;
               lbs = if n == null then [] else (get n "labels");
               hasPy = (n != null) && (core.isTarget n);
-              isLib = (lbs != null) && (builtins.elem "kind:lib" lbs || builtins.elem "kind:wasm" lbs);
+              isWasmLib = (lbs != null) && (builtins.elem "kind:wasm" lbs && builtins.elem "wasm:lib" lbs);
+              isLib = (lbs != null) && (builtins.elem "kind:lib" lbs || isWasmLib);
           in hasPy && isLib
         ) directDeps;
       overlays = map mkWasmLib pyLibDeps;

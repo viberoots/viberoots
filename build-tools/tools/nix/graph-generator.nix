@@ -343,7 +343,11 @@ let
               ) else if k.template == "node" then (
                 LANGS.node.mkApp buildLabel
               ) else if k.template == "python" then (
-                if (k.kind == "wasm") then LANGS.python.mkWasmApp buildLabel
+                if (k.kind == "wasm") then
+                  let
+                    labs = get n "labels";
+                    hasWasmLib = (labs != null) && (builtins.isList labs) && (builtins.elem "wasm:lib" labs);
+                  in if hasWasmLib then LANGS.python.mkWasmLib buildLabel else LANGS.python.mkWasmApp buildLabel
                 else if (k.kind == "pyext") then LANGS.python.mkPyExt buildLabel
                 else if (k.kind == "pyext_wasm") then LANGS.python.mkPyExtWasm buildLabel
                 else if (k.kind == "test") then LANGS.python.mkTest buildLabel

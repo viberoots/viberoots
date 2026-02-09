@@ -1,15 +1,16 @@
 # Nix gaps migration plan
 
-This plan migrates every macro that currently builds via Buck rules to a Nix-backed build path. Buck remains the orchestrator. Nix builds all artifacts. The plan follows the project documentation methodology and defines scope, dependencies, phases, tasks, and acceptance checks.
+This plan migrates every artifact-producing macro that currently builds via Buck rules to a Nix-backed build path. Buck remains the orchestrator. Nix builds all production artifacts. The plan follows the project documentation methodology and defines scope, dependencies, phases, tasks, and acceptance checks.
 
 ## Scope
 
 In scope:
 
 - Replace all “Buck build” macro paths with Nix-backed builds.
-- Replace all stub or probe paths with Nix-backed builds or explicit Nix-produced artifacts where a build output is expected.
+- Replace all stub paths that are expected to produce build artifacts with Nix-backed builds.
 - Ensure hermetic toolchains for Go, Python, and Node (non-bundled paths).
 - Ensure all public Starlark macros produce their artifacts via Nix or via Nix-backed rules.
+- Maintain an explicit exception list for intentional probe/test-only macros that do not produce production artifacts.
 
 Out of scope:
 
@@ -21,11 +22,18 @@ Out of scope:
 
 The migration is complete when:
 
-- Every public macro in `docs/handbook/starlark-api.md` is Nix-backed.
-- `docs/handbook/nix-gaps.md` lists no Buck-build or stub paths.
+- Every artifact-producing public macro in `docs/handbook/starlark-api.md` is Nix-backed.
+- `docs/handbook/nix-gaps.md` lists no non-hermetic artifact build paths.
+- Any remaining non-build macros are intentional probes and are explicitly documented as exceptions.
 - Builds are hermetic outside the devshell (no reliance on system tool variants).
 - CI builds and tests pass using Nix-backed build steps.
 - The Buck graph remains the orchestrator of dependency edges and test impact.
+
+## Current status after Phase 3
+
+- Phases 0 through 3 are complete.
+- Go and Python macro migrations are complete for the currently tracked public macros.
+- Remaining migration work starts at Phase 4 and focuses on Node paths plus residual C++/Rust and exception handling.
 
 ## Components and dependencies
 
@@ -112,27 +120,31 @@ Tasks:
    - Output: Nix builds for wasm app and lib targets.
    - Success criteria: Generated wasm artifacts are used by downstream targets.
 
-## Phase 4 — Node migration (non-Nix paths)
+## Phase 4 — Node migration (artifact-producing non-Nix paths)
 
-Goal: Replace all Node genrule builds with Nix-backed builds.
+Goal: Replace remaining artifact-producing Node genrule builds with Nix-backed builds.
 
 Tasks:
 
-1. Extend the Node planner templates to cover `nix_node_gen`, `nix_node_lib`, `nix_node_bin`.
+1. Classify Node macros by outcome: artifact-producing, orchestration wrapper, or probe-only.
+   - Output: Classification table added to `docs/handbook/nix-gaps.md`.
+   - Success criteria: Every Node public macro has one category with rationale.
+
+2. Extend the Node planner templates to cover artifact-producing `nix_node_gen`, `nix_node_lib`, `nix_node_bin` paths.
    - Output: Nix-backed Node template paths for gen and lib/bin cases.
    - Success criteria: Existing targets build and produce the same outputs.
 
-2. Replace `node_asset_stage` with a Nix-backed staging step.
+3. Replace `node_asset_stage` with a Nix-backed staging step when it produces consumed build artifacts.
    - Output: Nix-built staging output for assets.
    - Success criteria: Asset outputs match current structure and names.
 
-3. Replace `node_wasm_inline_module` with a Nix-backed build.
+4. Replace `node_wasm_inline_module` with a Nix-backed build.
    - Output: Nix-backed wasm inline module artifact.
    - Success criteria: Generated JS module is identical to current output.
 
-## Phase 5 — C++ and Rust stub removal
+## Phase 5 — C++ and Rust residual migration plus exception policy
 
-Goal: Eliminate remaining non-Nix stubs for public macros.
+Goal: Migrate remaining artifact-producing C++/Rust gaps and formalize intentional exceptions.
 
 Tasks:
 
@@ -140,13 +152,13 @@ Tasks:
    - Output: Nix-built header package and Emscripten outputs.
    - Success criteria: Consumers can build against those outputs.
 
-2. Replace Rust stub genrules with Nix builds.
+2. Replace Rust stub genrules with Nix builds when the macro contract is artifact-producing.
    - Output: Nix-built Rust library and binary targets.
    - Success criteria: Rust targets build and produce expected artifacts.
 
-3. Keep `cpp_sanitize_probe` as a test probe, but document that it is non-build by design.
-   - Output: Documented exception (if retained).
-   - Success criteria: The only remaining non-build macro is explicitly documented as a probe.
+3. Define and enforce an exception policy for probe/test-only macros (for example `cpp_sanitize_probe`).
+   - Output: Documented exception list in `docs/handbook/nix-gaps.md` with rationale per macro.
+   - Success criteria: Every non-build macro is intentional, documented, and reviewed.
 
 ## Phase 6 — Validation and parity
 
@@ -162,13 +174,13 @@ Tasks:
    - Output: CI runs in a minimal environment without host toolchains.
    - Success criteria: Builds succeed without system-installed Go/Python.
 
-3. Update docs to reflect Nix-only builds.
+3. Update docs to reflect Nix-backed artifact builds with explicit probe exceptions.
    - Output: `build-tools/docs/build-system-design.md` and `docs/handbook/starlark-api.md` updated.
-   - Success criteria: No documentation claims Buck builds artifacts.
+   - Success criteria: Documentation distinguishes artifact builds from probe/test-only exceptions.
 
 ## Phase 7 — Cleanup and enforcement
 
-Goal: Remove old paths and enforce Nix-only builds.
+Goal: Remove old artifact build paths and enforce Nix-backed artifact production.
 
 Tasks:
 
@@ -177,14 +189,15 @@ Tasks:
    - Success criteria: Code search shows no direct `go_*` or `python_*` usage in macros.
 
 2. Add enforcement checks.
-   - Output: CI checks that fail when Buck build rules are used by public macros.
+   - Output: CI checks that fail when public artifact-producing macros use non-hermetic Buck build paths.
    - Success criteria: Any regression is caught before merge.
 
 ## Systematic checkpoints
 
-At the end of each phase:
+At the end of each remaining phase:
 
-- Validate that all macros in `docs/handbook/nix-gaps.md` moved to “Nix build”.
+- Validate that artifact-producing macros in `docs/handbook/nix-gaps.md` moved to “Nix build”.
+- Validate that any non-build macros are explicitly listed as intentional exceptions.
 - Run representative builds for Go, Python, Node, C++, Rust.
 - Confirm no host toolchain leakage by building in a minimal environment.
 
@@ -201,6 +214,7 @@ At the end of each phase:
 
 This plan is done when:
 
-- `docs/handbook/nix-gaps.md` has no Buck builds or stubs for public macros.
-- All build outputs are produced via Nix.
-- CI is green with Nix-only builds.
+- `docs/handbook/nix-gaps.md` has no non-hermetic artifact build paths for public macros.
+- All production build outputs are produced via Nix.
+- Any remaining non-build public macros are intentional probes with documented rationale.
+- CI is green with Nix-backed artifact builds and exception-policy enforcement.

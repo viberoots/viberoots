@@ -38,6 +38,16 @@ Use the canonical helper surface from `//build-tools/lang:defs_common.bzl` and `
 - Patch model contract: `build-tools/lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
 
+### Build route policy
+
+Policy for this language:
+
+- Implement artifact-producing macros as Nix-backed builds.
+- Keep Buck as graph and test-impact orchestrator, not the producer of production artifacts.
+- Allow orchestration wrappers that call `nix build` when inputs remain hermetic and deterministic.
+- Allow probe-only non-build macros only when explicitly documented as non-artifact paths.
+- Do not introduce fallback Buck artifact build paths for convenience.
+
 ### Path Invariants (must‑follow)
 
 - **Patches**: `patches/erbuild-tools/lang/` (flat directory; one file per `pkg@version`), no subdirectories.
