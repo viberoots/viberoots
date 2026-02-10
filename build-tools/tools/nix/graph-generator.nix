@@ -232,9 +232,36 @@ let
     in k != null && k == "bin"
   ) (builtins.attrNames cppTargetsFromGraph);
   cppOutPaths = builtins.listToAttrs (map (nm: { name = nm; value = cppTargetsFromGraph.${nm}; }) cppBinNames);
-  # Node targets are not needed for this flow; provide empty set
-  nodeTargetsFromGraph = if onlyCpp then {} else {};
-  nodeOutPaths = if onlyCpp then {} else {};
+  nodeOutPaths =
+    if onlyCpp then {}
+    else (
+      let
+        hasNodeLabel = n:
+          let ls = get n "labels"; in (ls != null) && (builtins.isList ls) && builtins.elem "lang:node" ls;
+        inAppsLibs = n:
+          let rel = pkgPathOf (ensureFullLabel n); in lib.hasPrefix "projects/apps/" rel || lib.hasPrefix "projects/libs/" rel;
+        safeNodeNodes = builtins.filter (n:
+          let nm = ensureFullLabel n; in
+            (builtins.typeOf nm == "string") && (nm != "") && inAppsLibs n && hasNodeLabel n
+        ) nodesList;
+        nodeKindOf = n: LANGS.node.kindOf n;
+        mkNode = name: kind:
+          if (kind == "bin") then LANGS.node.mkBin name
+          else if (kind == "lib") then LANGS.node.mkLib name
+          else if (kind == "gen") then LANGS.node.mkGen name
+          else LANGS.node.mkApp name;
+        nodeTargetsFromGraph = builtins.foldl' (acc: n:
+          let nm = ensureFullLabel n; kind = nodeKindOf n; in
+            if (kind == null) then acc else (acc // { "${nm}" = mkNode nm kind; })
+        ) {} safeNodeNodes;
+        nodeBinNames = builtins.filter (nm:
+          let nms = builtins.filter (x: ensureFullLabel x == nm) safeNodeNodes;
+              n = if nms == [] then null else builtins.head nms;
+              k = if n == null then null else nodeKindOf n;
+          in k != null && k == "bin"
+        ) (builtins.attrNames nodeTargetsFromGraph);
+      in builtins.listToAttrs (map (nm: { name = nm; value = nodeTargetsFromGraph.${nm}; }) nodeBinNames)
+    );
 
   # Strict mode: require Buck graph; only build app binaries/libs in goTargets
   # Defer Go computation entirely to avoid evaluating unrelated paths in C++-only temp workspaces
@@ -341,7 +368,10 @@ let
               else if (k.kind == "tinywasm") then LANGS.go.mkTinyWasm buildLabel
               else LANGS.go.mkApp buildLabel
               ) else if k.template == "node" then (
-                LANGS.node.mkApp buildLabel
+                if k.kind == "bin" then LANGS.node.mkBin buildLabel
+                else if k.kind == "lib" then LANGS.node.mkLib buildLabel
+                else if k.kind == "gen" then LANGS.node.mkGen buildLabel
+                else LANGS.node.mkApp buildLabel
               ) else if k.template == "python" then (
                 if (k.kind == "wasm") then
                   let

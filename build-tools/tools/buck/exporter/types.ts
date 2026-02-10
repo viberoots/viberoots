@@ -4,6 +4,8 @@ export interface Node {
   rule_type: string;
   labels?: string[];
   srcs?: string[];
+  cmd?: string;
+  out?: string;
 }
 
 export interface Tuple {

@@ -22,6 +22,8 @@ export const attrList = [
   "buck.labels",
   "args",
   "env",
+  "cmd",
+  "out",
   "main",
   "main_class",
   "includes",

@@ -17,6 +17,7 @@ let
   labelsOf = L.labelsOf;
   nameOf = L.nameOf;
   byName = L.byName;
+  srcsOf = L.srcsOf;
   parseLock = L.parseImporterScopedLockfileLabel;
   extractLocks = L.extractLockfileLabels;
 
@@ -44,6 +45,67 @@ let
     let parts = lib.splitString ":" n; in
       if (builtins.length parts) > 1 then builtins.elemAt parts 1
       else (lib.baseNameOf (ctx.pkgPathOf n));
+
+  nodeOfName = name:
+    if builtins.hasAttr name byName then byName.${name} else null;
+
+  attrStringOr = n: key: fallback:
+    let v = if n == null then null else get n key;
+    in if builtins.isString v && v != "" then v else fallback;
+
+  mkGenLike = { name, kind }:
+    let
+      info = lockInfoOfName name;
+      n = nodeOfName name;
+      cmd = attrStringOr n "cmd" "";
+      outRel = attrStringOr n "out" (targetNameOf name);
+      srcs = srcsOf name;
+      cmdEscaped = lib.escapeShellArg cmd;
+      outEscaped = lib.escapeShellArg outRel;
+      srcsEscaped = lib.escapeShellArg (lib.concatStringsSep " " srcs);
+      kindBin = kind == "bin";
+      sanitize = H.sanitizeName;
+    in
+      if cmd == "" then builtins.throw "node planner: missing genrule cmd for ${name}"
+      else pkgs.stdenvNoCC.mkDerivation {
+        pname = "node-${kind}-" + (sanitize name);
+        version = sanitize info.importer;
+        src = repoRoot;
+        nativeBuildInputs = [ pkgs.bash pkgs.coreutils pkgs.nodejs_22 pkgs.pnpm ];
+        buildPhase = ''
+          set -euo pipefail
+          cd ${info.importer}
+          tmpOut="$PWD/.bnx-out/${outRel}"
+          mkdir -p "$(dirname "$tmpOut")"
+          export OUT="$tmpOut"
+          export SRCS=${srcsEscaped}
+          export SRCDIR="$PWD"
+          export TMPDIR="$PWD/.tmp"
+          mkdir -p "$TMPDIR"
+          ${pkgs.bash}/bin/bash -euo pipefail -c ${cmdEscaped}
+          if [ ! -e "$tmpOut" ]; then
+            echo "node planner: command did not produce expected output path: ${outRel}" >&2
+            exit 2
+          fi
+        '';
+        installPhase = ''
+          set -euo pipefail
+          outRel=${outEscaped}
+          srcPath="$PWD/.bnx-out/$outRel"
+          mkdir -p "$out/$(dirname "$outRel")"
+          if [ -d "$srcPath" ]; then
+            cp -R "$srcPath" "$out/$outRel"
+          else
+            cp "$srcPath" "$out/$outRel"
+          fi
+          ${if kindBin then ''
+            base="$(basename "$outRel")"
+            mkdir -p "$out/bin"
+            cp "$out/$outRel" "$out/bin/$base"
+            chmod +x "$out/bin/$base" || true
+          '' else ""}
+        '';
+      };
 in {
   # Detect Node targets by lang label
   isTarget = n:
@@ -178,7 +240,8 @@ in {
         install -m0755 ${outBase} $out/bin/${outBase}
       '';
     };
+
+  mkGen = name: mkGenLike { inherit name; kind = "gen"; };
+  mkLib = name: mkGenLike { inherit name; kind = "lib"; };
+  mkBin = name: mkGenLike { inherit name; kind = "bin"; };
 }
-
-
-

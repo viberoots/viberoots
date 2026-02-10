@@ -32,10 +32,10 @@ Planner coverage note: Go library and binary target kinds are now supported by t
 
 ## Node macros
 
-- `nix_node_gen` → Buck build (`genrule`). Not Nix unless `cmd` calls Nix.
+- `nix_node_gen` → Nix build (`graph-generator-selected` via Node planner `mkGen`).
 - `nix_node_test` → Nix build (`node_nix_test`).
-- `nix_node_lib` → Buck build (`genrule` via `nix_node_gen`).
-- `nix_node_bin` → Buck build (`genrule` via `nix_node_gen`).
+- `nix_node_lib` → Nix build (`graph-generator-selected` via Node planner `mkLib`).
+- `nix_node_bin` → Nix build (`graph-generator-selected` via Node planner `mkBin`).
 - `node_webapp` → Nix build (calls `nix build` in genrule).
 - `nix_node_cli_bin` → Mixed:
   - `bundle = False` → Buck build (copy via `genrule`).
@@ -47,10 +47,10 @@ Node macro outcome classification:
 
 | Macro                     | Outcome category                 | Current route | Notes                                                              |
 | ------------------------- | -------------------------------- | ------------- | ------------------------------------------------------------------ |
-| `nix_node_gen`            | artifact-producing               | Buck build    | Migration gap for artifact-producing Node builds.                  |
+| `nix_node_gen`            | artifact-producing               | Nix build     | Routed through Node planner `mkGen` for selected planner builds.   |
 | `nix_node_test`           | artifact-producing (test)        | Nix build     | Already routed via `node_nix_test`.                                |
-| `nix_node_lib`            | artifact-producing               | Buck build    | Delegates to `nix_node_gen`.                                       |
-| `nix_node_bin`            | artifact-producing               | Buck build    | Delegates to `nix_node_gen`.                                       |
+| `nix_node_lib`            | artifact-producing               | Nix build     | Routed through Node planner `mkLib` for selected planner builds.   |
+| `nix_node_bin`            | artifact-producing               | Nix build     | Routed through Node planner `mkBin` for selected planner builds.   |
 | `node_webapp`             | orchestration wrapper            | Nix build     | Uses `genrule` to call `nix build`.                                |
 | `nix_node_cli_bin`        | mixed wrapper/artifact-producing | Mixed         | `bundle = True` is Nix; `bundle = False` remains Buck copy path.   |
 | `node_asset_stage`        | artifact-producing               | Buck build    | Migration gap when staged output is consumed by downstream builds. |

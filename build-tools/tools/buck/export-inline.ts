@@ -38,6 +38,8 @@ function buildAttrs(): string[] {
     "buck.labels",
     "args",
     "env",
+    "cmd",
+    "out",
     "main",
     "main_class",
     "includes",
