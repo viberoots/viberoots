@@ -575,7 +575,7 @@ Public args:
 - `importer` string. Optional package name. Must match the lockfile label suffix.
   - Example: `importer = "projects/apps/web"`
 
-### `node_asset_stage(name, app, assets = [], out = None, **kwargs)`
+### `node_asset_stage(name, app, assets = [], out = None, deps = [], labels = [], lockfile_label = None, **kwargs)`
 
 Use this to stage a webapp output with extra assets into one directory.
 
@@ -589,6 +589,12 @@ Public args:
   - Example: `assets = [{"src": "//assets:logo", "dest": "img/logo.svg"}]`
 - `out` string. Output directory name. Default is `dist`.
   - Example: `out = "dist"`
+- `deps` list of labels. Optional direct deps.
+  - Example: `deps = [":app_raw"]`
+- `labels` list of strings. Optional labels to add.
+  - Example: `labels = ["team:web"]`
+- `lockfile_label` string. Lockfile label in the form `lockfile:<path>#<package>`.
+  - Example: `lockfile_label = "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"`
 
 ### `node_wasm_inline_module(name, src, out = None, labels = [], lockfile_label = None, **kwargs)`
 
