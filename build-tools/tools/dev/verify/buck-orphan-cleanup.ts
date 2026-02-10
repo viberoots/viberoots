@@ -12,12 +12,7 @@ import {
 } from "./buck-orphan-cleanup-lib";
 import type { ForkserverProc } from "./buck-orphan-cleanup-lib";
 
-export async function cleanupOrphanBuckDaemons(opts: {
-  log?: (line: string) => Promise<void>;
-  maxKills?: number;
-}): Promise<{ scanned: number; candidates: number; killed: number }> {
-  const maxKills = Math.max(0, opts.maxKills ?? 50);
-  const lines = await psLines(2000);
+function parseForkservers(lines: string[]): ForkserverProc[] {
   const forks: ForkserverProc[] = [];
   for (const ln of lines) {
     if (!ln.includes("(buck2-forkserver)") || !ln.includes("--state-dir")) continue;
@@ -28,6 +23,16 @@ export async function cleanupOrphanBuckDaemons(opts: {
     if (!stateDir) continue;
     forks.push({ ...base, stateDir });
   }
+  return forks;
+}
+
+export async function cleanupOrphanBuckDaemons(opts: {
+  log?: (line: string) => Promise<void>;
+  maxKills?: number;
+}): Promise<{ scanned: number; candidates: number; killed: number }> {
+  const maxKills = Math.max(0, opts.maxKills ?? 50);
+  const lines = await psLines(2000);
+  const forks = parseForkservers(lines);
 
   let killed = 0;
   let candidates = 0;
@@ -81,21 +86,14 @@ export async function cleanupRegisteredTempRepos(opts: {
     .map((l) => l.trim())
     .filter(Boolean)
     .map((p) => path.resolve(p))
-    .filter((p) => isTempRepoRoot(p));
+    // Registered roots come from this verify run's own state file; keep broad here so
+    // temp dirs rooted under platform-specific $TMPDIR locations are still cleaned.
+    .filter((p) => p.length > 1);
   const uniqueRoots = Array.from(new Set(roots));
   if (uniqueRoots.length === 0) return { roots: 0, killed: 0 };
 
   const lines = await psLines(2000);
-  const forks: ForkserverProc[] = [];
-  for (const ln of lines) {
-    if (!ln.includes("(buck2-forkserver)") || !ln.includes("--state-dir")) continue;
-    const base = parsePsLine(ln);
-    if (!base) continue;
-    const sm = base.cmd.match(/--state-dir\s+([^\s]+)/);
-    const stateDir = sm && sm[1] ? String(sm[1]).trim() : "";
-    if (!stateDir) continue;
-    forks.push({ ...base, stateDir });
-  }
+  let forks = parseForkservers(lines);
 
   let killed = 0;
   const maxKills = Math.max(0, opts.maxKills ?? 200);
@@ -109,32 +107,38 @@ export async function cleanupRegisteredTempRepos(opts: {
     }
   }
 
-  for (const f of forks) {
-    if (killed >= maxKills) break;
-    const mapped = tryRepoRootFromStateDir(f.stateDir);
-    if (!mapped) continue;
-    const { repoRoot, iso } = mapped;
-    const absRepo = path.resolve(repoRoot);
-    if (!uniqueRoots.includes(absRepo)) continue;
-    if (!(await pathExists(absRepo))) continue;
+  for (let pass = 0; pass < 3 && killed < maxKills; pass++) {
+    let matchedThisPass = 0;
+    for (const f of forks) {
+      if (killed >= maxKills) break;
+      const mapped = tryRepoRootFromStateDir(f.stateDir);
+      if (!mapped) continue;
+      const { repoRoot, iso } = mapped;
+      const absRepo = path.resolve(repoRoot);
+      if (!uniqueRoots.includes(absRepo)) continue;
+      if (!(await pathExists(absRepo))) continue;
+      matchedThisPass++;
 
-    await buck2Kill(absRepo, iso, 5000);
-    if (isPidAlive(f.pid)) {
-      try {
-        process.kill(f.pid, "SIGKILL");
-      } catch {}
+      await buck2Kill(absRepo, iso, 5000);
+      if (isPidAlive(f.pid)) {
+        try {
+          process.kill(f.pid, "SIGKILL");
+        } catch {}
+      }
+      if (f.ppid > 1 && isPidAlive(f.ppid)) {
+        try {
+          process.kill(f.ppid, "SIGKILL");
+        } catch {}
+      }
+      killed++;
+      if (opts.log) {
+        await opts.log(
+          `[verify] temp-repo buck cleanup: killed forkserver pid=${f.pid} ppid=${f.ppid} etime=${f.etime} repo=${repoRoot} iso=${iso}`,
+        );
+      }
     }
-    if (f.ppid > 1 && isPidAlive(f.ppid)) {
-      try {
-        process.kill(f.ppid, "SIGKILL");
-      } catch {}
-    }
-    killed++;
-    if (opts.log) {
-      await opts.log(
-        `[verify] temp-repo buck cleanup: killed forkserver pid=${f.pid} ppid=${f.ppid} etime=${f.etime} repo=${repoRoot} iso=${iso}`,
-      );
-    }
+    if (matchedThisPass === 0) break;
+    forks = parseForkservers(await psLines(2000));
   }
 
   // Final fallback: if buck2 kill + forkserver sweep didn't clear daemons,

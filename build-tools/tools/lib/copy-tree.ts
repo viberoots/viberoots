@@ -72,6 +72,19 @@ export async function copyTree(
   }
   await fsp.mkdir(dstRoot, { recursive: true });
 
+  const cpuCount = Math.max(1, os.cpus()?.length || 1);
+  const maxInFlight = Math.max(8, Math.min(64, cpuCount * 4));
+  const inflight = new Set<Promise<void>>();
+  const runBound = async (task: () => Promise<void>): Promise<void> => {
+    while (inflight.size >= maxInFlight) {
+      await Promise.race(inflight);
+    }
+    const p = task().finally(() => {
+      inflight.delete(p);
+    });
+    inflight.add(p);
+  };
+
   const stack: Array<{ src: string; dst: string }> = [{ src: srcRoot, dst: dstRoot }];
   while (stack.length) {
     const cur = stack.pop() as { src: string; dst: string };
@@ -87,20 +100,27 @@ export async function copyTree(
       }
 
       if (ent.isFile()) {
-        await copyFileCloneAware(src, dst, { cloneMode, force: true });
+        await runBound(async () => {
+          await copyFileCloneAware(src, dst, { cloneMode, force: true });
+        });
         continue;
       }
 
       if (ent.isSymbolicLink()) {
-        const link = await fsp.readlink(src);
-        await safeRemoveExisting(dst);
-        await fsp.symlink(link, dst);
+        await runBound(async () => {
+          const link = await fsp.readlink(src);
+          await safeRemoveExisting(dst);
+          await fsp.symlink(link, dst);
+        });
         continue;
       }
 
       // Avoid silent data loss for unsupported file types.
       throw new Error(`copyTree: unsupported entry type: ${src}`);
     }
+  }
+  if (inflight.size > 0) {
+    await Promise.all(inflight);
   }
 }
 

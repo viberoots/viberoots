@@ -100,3 +100,7 @@ These guardrails assume test tooling stays aligned with the dev shell and global
 - **Target invalidation explicitly**: include patch files in graph-visible inputs so Nix can track them without extra runtime work.
 - **Measure before optimizing**: identify the dominant cost first, then optimize only that path.
 - **Stage updated pnpm-store hashes in temp repos**: when a test updates `build-tools/tools/nix/node-modules.hashes.json`, `git add` it before any Nix builds so the flake snapshot sees the new hash instead of the placeholder. If a test generates a new `pnpm-lock.yaml`, always regenerate its hash even if an older entry exists in the map.
+- **Watch pacing checkpoints, not just final duration**: if pass/min drops sharply between 5-minute and 10-minute checkpoints, treat that as a systemic contention signal and investigate immediately.
+- **Keep `gomod2nix` incremental**: avoid shelling out to `gomod2nix` when `go.mod` has no `require/replace`; write/validate the minimal `gomod2nix.toml` directly, and skip project scans when `go.mod`/`go.sum` mtimes are older than `gomod2nix.toml`.
+- **Prefer bounded-concurrency seed copies**: per-file copy loops in temp-repo setup can become global bottlenecks under verify fan-out; use bounded parallel file copies rather than fully serial recursion.
+- **Avoid parallel `direnv exec` for profiling**: concurrent `direnv`/Nix eval can block on `.direnv/flake-profile` and distort timing; collect timing baselines with serialized runs.

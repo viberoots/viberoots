@@ -15,18 +15,19 @@ function verifyBuck2Threads(): number {
     const n = Number(raw);
     if (Number.isFinite(n) && n >= 1) return Math.floor(n);
   }
-  // Default: aggressive oversubscription helps in this repo because many test actions are IO-bound
-  // (Nix builds, file IO, temp repo scaffolds). Users can always override via VERIFY_BUCK2_THREADS.
+  // Default: keep concurrency moderate to avoid temp-repo seed copy storms and buck daemon churn.
+  // Users can override via VERIFY_BUCK2_THREADS.
   //
-  // CI can set VERIFY_BUCK2_THREADS explicitly, or rely on buck2 defaults (no --num-threads) by
-  // returning 0 below.
+  // CI can set VERIFY_BUCK2_THREADS explicitly, or rely on buck2 defaults (no --num-threads)
+  // by returning 0 below.
   const isCi =
     String(process.env.CI || "").trim() === "1" || String(process.env.CI || "").trim() === "true";
   if (isCi) return 0;
   const cores = Math.max(1, os.cpus()?.length || 1);
-  // Historically, 30 threads has been a good local default on macOS for overall verify throughput.
-  const oversubscribed = Math.ceil(cores * 3);
-  return Math.max(1, Math.min(32, oversubscribed));
+  // Empirical default: ~2x cores with a tighter cap is more stable for local verify workloads
+  // that run many runInTemp-based tests concurrently.
+  const moderate = Math.ceil(cores * 2);
+  return Math.max(1, Math.min(20, moderate));
 }
 
 export function spawnVerifyBuck2Tests(opts: {

@@ -29,8 +29,10 @@ async function findForkserverDir(tmp: string): Promise<string | null> {
 }
 
 process.env.TEST_KEEP_TMP = "1";
-// Print TMP before expensive seeding so the parent can coordinate without waiting on repo setup.
-process.env.TEST_EARLY_TMP_STDOUT = "1";
+// Keep early TMP disabled by default; parents should synchronize on READY/TMP emitted below.
+if (!Object.prototype.hasOwnProperty.call(process.env, "TEST_EARLY_TMP_STDOUT")) {
+  process.env.TEST_EARLY_TMP_STDOUT = "0";
+}
 
 await runInTemp("buck-cleanup-nondisruptive-child", async (tmp, $) => {
   console.log(`TMP ${tmp}`);

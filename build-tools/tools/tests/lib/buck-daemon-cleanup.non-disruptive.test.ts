@@ -58,7 +58,9 @@ test("buck cleanup: does not kill buck2 daemons belonging to other running temp 
 
   let tmp = "";
   let stdout = "";
+  let stderr = "";
   let ready = false;
+  let exitCode: number | null = null;
   child.stdout.setEncoding("utf8");
   child.stdout.on("data", (d) => {
     stdout += d;
@@ -66,13 +68,21 @@ test("buck cleanup: does not kill buck2 daemons belonging to other running temp 
     if (m && m[1]) tmp = String(m[1]).trim();
     if (stdout.includes("\nREADY\n") || stdout.trimEnd().endsWith("READY")) ready = true;
   });
+  child.stderr.setEncoding("utf8");
+  child.stderr.on("data", (d) => {
+    stderr += d;
+  });
+  child.on("close", (code) => {
+    exitCode = code;
+  });
 
   const t0 = Date.now();
-  while ((!tmp || !ready) && Date.now() - t0 < 60_000) {
+  while ((!tmp || !ready) && Date.now() - t0 < 120_000) {
+    if (exitCode !== null) break;
     await new Promise((r) => setTimeout(r, 50));
   }
-  assert.ok(tmp, `expected child tmp path; got stdout:\n${stdout}`);
-  assert.ok(ready, `expected child READY; got stdout:\n${stdout}`);
+  assert.ok(tmp, `expected child tmp path; got stdout:\n${stdout}\nstderr:\n${stderr}`);
+  assert.ok(ready, `expected child READY; got stdout:\n${stdout}\nstderr:\n${stderr}`);
 
   const token = path.basename(tmp);
   await waitForPresent(token, 10_000);

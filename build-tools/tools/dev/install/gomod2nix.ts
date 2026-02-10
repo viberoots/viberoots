@@ -24,6 +24,27 @@ async function sha256File(file: string): Promise<string> {
   }
 }
 
+async function fileMtimeMs(p: string): Promise<number> {
+  try {
+    const st = await fsp.stat(p);
+    return Number(st.mtimeMs || 0);
+  } catch {
+    return 0;
+  }
+}
+
+async function needsGomod2nixRefresh(dir: string): Promise<boolean> {
+  const mod = path.join(dir, "go.mod");
+  const sum = path.join(dir, "go.sum");
+  const out = path.join(dir, "gomod2nix.toml");
+  const modM = await fileMtimeMs(mod);
+  const sumM = await fileMtimeMs(sum);
+  const outM = await fileMtimeMs(out);
+  if (!outM) return true;
+  const srcM = Math.max(modM, sumM);
+  return srcM > outM;
+}
+
 export async function runGomod2nixGenerate(dryRun: boolean, verbose: boolean) {
   await runGomod2nixGenerateIn(process.cwd(), dryRun, verbose);
 }
@@ -59,6 +80,28 @@ export async function runGomod2nixGenerateIn(dir: string, dryRun: boolean, verbo
       `[gomod2nix] error: go.sum missing in ${path.relative(process.cwd(), dir) || "."}; run 'build-tools/tools/dev/install-deps.ts' (or pass --skip-go-tidy to skip)`,
     );
     process.exit(2);
+  }
+
+  let goModTxt = "";
+  try {
+    goModTxt = await fsp.readFile(path.join(dir, "go.mod"), "utf8");
+  } catch {}
+  const strippedGoMod = String(goModTxt || "")
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s*\/\/.*$/, ""))
+    .join("\n");
+  const hasDeps = /^\s*(require|replace)\s*(\(|\S)/m.test(strippedGoMod);
+  if (!hasDeps) {
+    const dst = path.join(dir, "gomod2nix.toml");
+    const minimal = "schema = 3\n\n[mod]\n";
+    const cur = (await exists(dst)) ? await fsp.readFile(dst, "utf8") : "";
+    if (cur !== minimal) {
+      await fsp.writeFile(dst, minimal, "utf8");
+      console.log(`[gomod2nix] updated ${path.relative(process.cwd(), dst)}`);
+    } else if (verbose) {
+      console.log(`[gomod2nix] no changes: ${path.relative(process.cwd(), dst)}`);
+    }
+    return;
   }
 
   const beforeHash = await sha256File(path.join(dir, "gomod2nix.toml"));
@@ -102,26 +145,6 @@ export async function runGomod2nixGenerateIn(dir: string, dryRun: boolean, verbo
     const tmpExists = await exists(tmpOut);
     const dst = path.join(dir, "gomod2nix.toml");
     if (!tmpExists) {
-      let goModTxt = "";
-      try {
-        goModTxt = await fsp.readFile(path.join(dir, "go.mod"), "utf8");
-      } catch {}
-      const stripped = String(goModTxt || "")
-        .split(/\r?\n/)
-        .map((line) => line.replace(/\s*\/\/.*$/, ""))
-        .join("\n");
-      const hasDeps = /^\s*(require|replace)\s*(\(|\S)/m.test(stripped);
-      if (!hasDeps) {
-        const minimal = "schema = 3\n\n[mod]\n";
-        const cur = (await exists(dst)) ? await fsp.readFile(dst, "utf8") : "";
-        if (cur !== minimal) {
-          await fsp.writeFile(dst, minimal, "utf8");
-          console.log(`[gomod2nix] updated ${path.relative(process.cwd(), dst)}`);
-        } else if (verbose) {
-          console.log(`[gomod2nix] no changes: ${path.relative(process.cwd(), dst)}`);
-        }
-        return;
-      }
       console.error("[gomod2nix] error: primary path did not produce gomod2nix.toml");
       process.exit(3);
     }
@@ -166,6 +189,11 @@ export async function runGomod2nixScanAll(dryRun: boolean, verbose: boolean) {
     } catch {}
   }
   for (const d of dirs) {
+    const refresh = await needsGomod2nixRefresh(d);
+    if (!refresh) {
+      if (verbose) console.log(`[gomod2nix] up-to-date: ${path.relative(process.cwd(), d) || "."}`);
+      continue;
+    }
     await runGomod2nixGenerateIn(d, dryRun, verbose);
   }
 }
