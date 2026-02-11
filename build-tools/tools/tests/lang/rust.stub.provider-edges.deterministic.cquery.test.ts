@@ -20,8 +20,8 @@ function parseCqueryOne(stdout: string): any | null {
   return null;
 }
 
-test("rust stubs realize provider edges deterministically (cquery)", async () => {
-  await runInTemp("rust-stub-provider-edges", async (tmp, $) => {
+test("rust macros realize provider edges in deps deterministically (cquery)", async () => {
+  await runInTemp("rust-provider-edges", async (tmp, $) => {
     const rustDefs = await fsp.readFile(
       path.join(process.cwd(), "build-tools", "rust", "defs.bzl"),
       "utf8",
@@ -70,24 +70,29 @@ test("rust stubs realize provider edges deterministically (cquery)", async () =>
       "utf8",
     );
 
-    const qSrcs = await $({
+    const kindProbe = await $({
       cwd: tmp,
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //projects/apps/rustdemo:lib`;
-    assert.equal(qSrcs.exitCode, 0, "buck2 cquery failed for rustdemo lib srcs");
+    })`buck2 cquery --target-platforms //:no_cgo "kind(rust_nix_build, //projects/apps/rustdemo:lib)"`;
+    assert.equal(kindProbe.exitCode, 0, "buck2 cquery kind probe failed for rustdemo lib");
+    assert.ok(String(kindProbe.stdout || "").includes("//projects/apps/rustdemo:lib"));
 
-    const node = parseCqueryOne(String(qSrcs.stdout || ""));
-    const srcsRaw = (node && (node.srcs || (node["buck.srcs"] as any))) || [];
-    const srcs = (Array.isArray(srcsRaw) ? srcsRaw : []).map((s) =>
+    const qDeps = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute deps //projects/apps/rustdemo:lib`;
+    assert.equal(qDeps.exitCode, 0, "buck2 cquery failed for rustdemo lib deps");
+
+    const node = parseCqueryOne(String(qDeps.stdout || ""));
+    const depsRaw = (node && (node.deps || (node["buck.deps"] as any))) || [];
+    const deps = (Array.isArray(depsRaw) ? depsRaw : []).map((s) =>
       normalizeTargetLabel(String(s)),
     );
 
-    assert.deepEqual(srcs, [
-      "//projects/apps/rustdemo/src/lib.rs",
-      "//projects/apps/rustdemo:prov_b",
-      "//projects/apps/rustdemo:prov_a",
-    ]);
+    assert.deepEqual(deps, ["//projects/apps/rustdemo:prov_b", "//projects/apps/rustdemo:prov_a"]);
   });
 });

@@ -19,6 +19,7 @@ PatchInvalidationStrategy = struct
 PATCH_INVALIDATION_STRATEGY_BY_LANG = {
     "go": PatchInvalidationStrategy(patch_scope = "package-local", glue_on_apply_remove = False),
     "cpp": PatchInvalidationStrategy(patch_scope = "package-local", glue_on_apply_remove = False),
+    "rust": PatchInvalidationStrategy(patch_scope = "package-local", glue_on_apply_remove = False),
     "node": PatchInvalidationStrategy(patch_scope = "importer-local", glue_on_apply_remove = True),
     "python": PatchInvalidationStrategy(patch_scope = "importer-local", glue_on_apply_remove = True),
 }

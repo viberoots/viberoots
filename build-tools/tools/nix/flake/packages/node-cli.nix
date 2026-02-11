@@ -20,10 +20,6 @@ let
         nativeBuildInputs = [ esbuild pkgs.nodejs_22 ];
         buildPhase = ''
           set -euo pipefail
-          echo "[nix] DEBUG root listing before cd" >&2
-          ls -la >&2 || true
-          echo "[nix] DEBUG tree (depth 2)" >&2
-          find . -maxdepth 2 -type d -print >&2 || true
           cd ${importerDir}
           export SOURCE_DATE_EPOCH=1
           mkdir -p node_modules

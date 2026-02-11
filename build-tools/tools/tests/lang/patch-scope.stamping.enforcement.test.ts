@@ -12,6 +12,7 @@ const macroImplFiles = [
   "build-tools/node/defs_core.bzl",
   "build-tools/node/defs_nix.bzl",
   "build-tools/python/defs.bzl",
+  "build-tools/rust/defs.bzl",
 ];
 
 test("language macros must not stamp patch_scope:* directly (delegate to shared wiring helpers)", async () => {

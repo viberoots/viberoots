@@ -74,8 +74,8 @@ Notes on Nix-backed Python outputs:
 
 ## Rust macros
 
-- `rust_library` → Stub (artifact expected; `genrule`).
-- `rust_binary` → Stub (artifact expected; `genrule`).
+- `rust_library` → Nix build (`rust_nix_build`).
+- `rust_binary` → Nix build (`rust_nix_build`).
 
 ## Hermeticity risks (non-Nix paths)
 

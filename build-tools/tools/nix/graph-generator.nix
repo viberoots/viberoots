@@ -384,6 +384,9 @@ let
                 else if (k.kind == "bin") then LANGS.python.mkApp buildLabel
                 else if (k.kind == "lib") then LANGS.python.mkLib buildLabel
                 else LANGS.python.mkLib buildLabel
+              ) else if k.template == "rust" then (
+                if k.kind == "bin" then LANGS.rust.mkApp buildLabel
+                else LANGS.rust.mkLib buildLabel
               ) else (
                 if k.kind == "bin" then LANGS.cpp.mkApp buildLabel
                 else if k.kind == "headers" then LANGS.cpp.mkHeaders buildLabel

@@ -52,6 +52,7 @@ test("lang patch invalidation model mapping is consistent (Starlark ↔ TS)", as
         "",
         'lang_contract_probe(name = "go", lang = "go")',
         'lang_contract_probe(name = "cpp", lang = "cpp")',
+        'lang_contract_probe(name = "rust", lang = "rust")',
         'lang_contract_probe(name = "node", lang = "node")',
         'lang_contract_probe(name = "python", lang = "python")',
         "",
@@ -59,7 +60,7 @@ test("lang patch invalidation model mapping is consistent (Starlark ↔ TS)", as
       "utf8",
     );
 
-    for (const lang of ["go", "cpp", "node", "python"] as const) {
+    for (const lang of ["go", "cpp", "rust", "node", "python"] as const) {
       const target = `//projects/apps/demo:${lang}`;
       const outPath = await buildOutPath(tmp, $, target);
       const probe = parseProbe(await fsp.readFile(outPath, "utf8"));

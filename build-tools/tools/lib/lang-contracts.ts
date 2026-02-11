@@ -18,6 +18,7 @@ const PATCH_INVALIDATION_STRATEGY_BY_LANG: Record<string, PatchInvalidationStrat
   // Go and C++: package-local patch files are part of target inputs (srcs). No glue required.
   go: { patchScope: "package-local", glueOnApplyRemove: false, providerModel: "none" },
   cpp: { patchScope: "package-local", glueOnApplyRemove: false, providerModel: "curated" },
+  rust: { patchScope: "package-local", glueOnApplyRemove: false, providerModel: "none" },
 
   // Node and Python: importer-local patch dirs, with importer-scoped providers and auto_map glue.
   node: { patchScope: "importer-local", glueOnApplyRemove: true, providerModel: "importer-scoped" },

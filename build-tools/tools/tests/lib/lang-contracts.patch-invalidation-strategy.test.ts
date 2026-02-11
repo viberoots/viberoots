@@ -14,6 +14,11 @@ test("lang-contracts: patch invalidation strategy is explicit for Go/C++ vs Node
     glueOnApplyRemove: false,
     providerModel: "curated",
   });
+  assert.deepEqual(patchInvalidationStrategyForLang("rust"), {
+    patchScope: "package-local",
+    glueOnApplyRemove: false,
+    providerModel: "none",
+  });
   assert.deepEqual(patchInvalidationStrategyForLang("node"), {
     patchScope: "importer-local",
     glueOnApplyRemove: true,
@@ -25,5 +30,5 @@ test("lang-contracts: patch invalidation strategy is explicit for Go/C++ vs Node
     providerModel: "importer-scoped",
   });
 
-  assert.equal(patchInvalidationStrategyForLang("rust"), null);
+  assert.equal(patchInvalidationStrategyForLang("unknown-language"), null);
 });

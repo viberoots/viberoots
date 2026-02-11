@@ -1,19 +1,40 @@
 { lib }:
-# build-tools/tools/nix/planner/rust.nix — planner plug-in (skeleton)
 ctx:
-{
+let
+  P = import ./lib.nix { inherit lib; get = ctx.get; };
+in {
   isTarget = n:
-    let rt = ctx.get n "rule_type"; lbs = ctx.get n "labels"; in
-      (rt != null) && lib.hasPrefix "rust_" rt
-      || (lbs != null) && builtins.elem "lang:rust" lbs;
+    P.isTargetByRuleTypeOrLabel {
+      ruleTypePrefixes = [ "rust_" ];
+      label = "lang:rust";
+    } n;
 
   kindOf = n:
-    let rt = ctx.get n "rule_type"; in
-      if (rt != null) && lib.hasSuffix "_binary" rt then "bin"
-      else if (rt != null) && lib.hasSuffix "_library" rt then "lib" else null;
+    let
+      rt = P.ruleTypeOf n;
+      labels = P.labelsOf n;
+      nm = P.nameOf n;
+    in
+      P.kindOf {
+        inherit labels;
+        ruleType = rt;
+        name = nm;
+        config = {
+          labelPriorityPre = [
+            { label = "kind:bin"; kind = "bin"; }
+            { label = "kind:lib"; kind = "lib"; }
+          ];
+          ruleTypes = {
+            suffixes = [
+              { suffix = "_binary"; kind = "bin"; }
+              { suffix = "_library"; kind = "lib"; }
+            ];
+          };
+        };
+      };
 
   modulesFileFor = _: null;
 
-  mkApp = name: (ctx.T.rustApp { inherit name; srcRoot = ctx.repoRoot; });
-  mkLib = name: (ctx.T.rustLib { inherit name; srcRoot = ctx.repoRoot; });
+  mkApp = name: ctx.T.rustApp { inherit name; srcRoot = ctx.repoRoot; };
+  mkLib = name: ctx.T.rustLib { inherit name; srcRoot = ctx.repoRoot; };
 }
