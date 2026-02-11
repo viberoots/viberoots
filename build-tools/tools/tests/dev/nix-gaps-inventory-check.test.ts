@@ -34,21 +34,21 @@ const nixGapsComplete = `# Nix gaps (public macro inventory)
 
 ## Go macros
 
-- \`nix_go_library\` → Buck build (\`go_library\`).
-- \`nix_go_binary\` → Buck build (\`go_binary\`).
+- \`nix_go_library\` → Nix build (\`graph-generator-selected\`).
+- \`nix_go_binary\` → Nix build (\`graph-generator-selected\`).
 
 ## Node macros
 
-- \`nix_node_gen\` → Buck build (\`genrule\`).
-- \`nix_node_lib\` → Buck build (\`genrule\`).
+- \`nix_node_gen\` → Nix build (\`graph-generator-selected\`).
+- \`nix_node_lib\` → Nix build (\`graph-generator-selected\`).
 - \`node_webapp\` → Nix build (\`nix build\`).
 
 Node macro outcome classification:
 
 | Macro | Outcome category | Current route | Notes |
 | ----- | ---------------- | ------------- | ----- |
-| \`nix_node_gen\` | artifact-producing | Buck build | gap |
-| \`nix_node_lib\` | artifact-producing | Buck build | gap |
+| \`nix_node_gen\` | artifact-producing | Nix build | migrated |
+| \`nix_node_lib\` | artifact-producing | Nix build | migrated |
 | \`node_webapp\` | orchestration wrapper | Nix build | wrapper |
 
 ## Exception policy (intentional non-build macros)

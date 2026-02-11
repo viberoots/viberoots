@@ -9,6 +9,8 @@ Status checkpoint:
 
 - PR-1 through PR-11 are implemented.
 - Rework and remaining migration scope start at PR-12.
+- PR-19 enforcement gate implementation is now present in `build-tools/tools/dev/nix-gaps-inventory-check.ts` with
+  tests under `build-tools/tools/tests/dev/nix-gaps-artifact-route-allowlist.test.ts`.
 - PRs below are aligned to the updated framing in `docs/handbook/nix-gaps-plan.md`:
   - Focus on artifact-producing non-Nix paths.
   - Keep intentional probe/test-only exceptions explicit and enforced.

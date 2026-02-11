@@ -29,11 +29,12 @@ The migration is complete when:
 - CI builds and tests pass using Nix-backed build steps.
 - The Buck graph remains the orchestrator of dependency edges and test impact.
 
-## Current status after Phase 3
+## Current status
 
-- Phases 0 through 3 are complete.
-- Go and Python macro migrations are complete for the currently tracked public macros.
-- Remaining migration work starts at Phase 4 and focuses on Node paths plus residual C++/Rust and exception handling.
+- Phases 0 through 6 are implemented in-repo, including parity and hermeticity checks.
+- Exception policy is machine-checked for probe-only non-build macros.
+- Artifact-route enforcement is now machine-checked with a temporary allowlist for known mixed routes.
+- Remaining migration work is focused on eliminating the final mixed Node route (`nix_node_cli_bin` with `bundle = False`).
 
 ## Components and dependencies
 

@@ -2,10 +2,12 @@
 import fs from "fs-extra";
 import { getFlagStr } from "../lib/cli";
 import {
+  type ArtifactRouteAllowlistEntry,
   hasExceptionPolicySection,
   macroNamePattern,
   missingLegendTerms,
   nodeDefsBzlPath,
+  parseArtifactRouteGaps,
   parseNixGapsInventory,
   parseNodeClassificationTableMacros,
   parseNonBuildInventoryMacros,
@@ -28,6 +30,10 @@ async function main() {
     ? exceptionsJson.exceptions
     : [];
   const exceptionList = exceptionListRaw as NixGapsException[];
+  const artifactRouteAllowlistRaw = Array.isArray(exceptionsJson?.artifactRouteAllowlist)
+    ? exceptionsJson.artifactRouteAllowlist
+    : [];
+  const artifactRouteAllowlist = artifactRouteAllowlistRaw as ArtifactRouteAllowlistEntry[];
 
   const starlarkMacros = parseStarlarkIndexMacros(starlarkTxt);
   const starlarkByModule = parseStarlarkIndexMacrosByModule(starlarkTxt);
@@ -35,6 +41,7 @@ async function main() {
   const inventoryMacros = parseNixGapsInventory(inventoryTxt);
   const nodeClassificationMacros = parseNodeClassificationTableMacros(inventoryTxt);
   const nonBuildInventoryMacros = parseNonBuildInventoryMacros(inventoryTxt);
+  const artifactRouteGaps = parseArtifactRouteGaps(inventoryTxt);
 
   const malformedExceptionEntries = exceptionList.filter(
     (e) =>
@@ -45,6 +52,18 @@ async function main() {
   if (malformedExceptionEntries.length > 0) {
     console.error(
       `Malformed exception entries in ${exceptionsPath}; each entry needs macro, kind="probe-only", and non-empty justification.`,
+    );
+    process.exit(1);
+  }
+  const malformedArtifactRouteAllowlist = artifactRouteAllowlist.filter(
+    (e) =>
+      !macroNamePattern.test(String(e?.macro || "").trim()) ||
+      !["buck-build", "stub-artifact-expected", "mixed"].includes(String(e?.kind || "").trim()) ||
+      String(e?.justification || "").trim() === "",
+  );
+  if (malformedArtifactRouteAllowlist.length > 0) {
+    console.error(
+      `Malformed artifactRouteAllowlist entries in ${exceptionsPath}; each entry needs macro, kind in {"buck-build","stub-artifact-expected","mixed"}, and non-empty justification.`,
     );
     process.exit(1);
   }
@@ -102,6 +121,14 @@ async function main() {
     (v) => v.kind === "stub-artifact-expected",
   );
   const missingExceptionEntries = [...nonBuildInventorySet].filter((m) => !exceptionSet.has(m));
+  const routeGapKeys = new Set(artifactRouteGaps.map((v) => `${v.macro}:${v.kind}`));
+  const allowlistKeys = new Set(artifactRouteAllowlist.map((v) => `${v.macro}:${v.kind}`));
+  const missingArtifactRouteAllowlist = artifactRouteGaps.filter(
+    (v) => !allowlistKeys.has(`${v.macro}:${v.kind}`),
+  );
+  const staleArtifactRouteAllowlist = artifactRouteAllowlist.filter(
+    (v) => !routeGapKeys.has(`${v.macro}:${v.kind}`),
+  );
   if (missingNodeClassifications.length > 0) {
     console.error("Missing Node classification entries in nix-gaps Node classification table:");
     for (const name of missingNodeClassifications) console.error(`- ${name}`);
@@ -122,6 +149,16 @@ async function main() {
   if (missingExceptionEntries.length > 0) {
     console.error("Missing exception policy entries for non-build macros:");
     for (const macro of missingExceptionEntries) console.error(`- ${macro}`);
+    process.exit(1);
+  }
+  if (missingArtifactRouteAllowlist.length > 0) {
+    console.error("Missing artifact route allowlist entries for non-Nix artifact routes:");
+    for (const item of missingArtifactRouteAllowlist) console.error(`- ${item.macro}:${item.kind}`);
+    process.exit(1);
+  }
+  if (staleArtifactRouteAllowlist.length > 0) {
+    console.error("Stale artifactRouteAllowlist entries (no matching current route gap):");
+    for (const item of staleArtifactRouteAllowlist) console.error(`- ${item.macro}:${item.kind}`);
     process.exit(1);
   }
 

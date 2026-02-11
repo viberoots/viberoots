@@ -7,11 +7,23 @@ export const requiredLegendTerms = [
 ];
 
 export type NonBuildKind = "probe-only" | "stub-artifact-expected";
+export type ArtifactRouteGapKind = "buck-build" | "stub-artifact-expected" | "mixed";
 
 export type NixGapsException = {
   macro: string;
   kind: NonBuildKind;
   justification: string;
+};
+
+export type ArtifactRouteAllowlistEntry = {
+  macro: string;
+  kind: ArtifactRouteGapKind;
+  justification: string;
+};
+
+export type ArtifactRouteGap = {
+  macro: string;
+  kind: ArtifactRouteGapKind;
 };
 
 export function uniqStable(items: string[]): string[] {
@@ -160,6 +172,21 @@ export function parseNonBuildInventoryMacros(text: string): NixGapsException[] {
         ? "probe-only"
         : "stub-artifact-expected";
     entries.push({ macro, kind, justification: "inventory" });
+  }
+  return entries;
+}
+
+export function parseArtifactRouteGaps(text: string): ArtifactRouteGap[] {
+  const entries: ArtifactRouteGap[] = [];
+  const regex = /^- `([^`]+)`\s+→\s+(Buck build|Stub \(artifact expected\)|Mixed)(?::|\s|\(|$)/gm;
+  for (const match of text.matchAll(regex)) {
+    const macro = String(match[1] || "").trim();
+    if (!macroNamePattern.test(macro)) continue;
+    const route = String(match[2] || "").trim();
+    let kind: ArtifactRouteGapKind = "buck-build";
+    if (route === "Stub (artifact expected)") kind = "stub-artifact-expected";
+    if (route === "Mixed") kind = "mixed";
+    entries.push({ macro, kind });
   }
   return entries;
 }

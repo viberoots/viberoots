@@ -98,6 +98,18 @@ Allowed non-build public macros:
 
 - `cpp_sanitize_probe` (test-only sanitizer probe with no production artifact contract).
 
+## Enforcement gates
+
+I keep machine-checked enforcement in `build-tools/tools/dev/nix-gaps-inventory-check.ts`.
+The policy data lives in `docs/handbook/nix-gaps-exceptions.json`:
+
+- `exceptions`: allowed probe-only non-build macros.
+- `artifactRouteAllowlist`: temporary non-Nix artifact routes that are still allowed.
+
+Current temporary allowlist entry:
+
+- `nix_node_cli_bin` (`kind = "mixed"`) while `bundle = False` is still on the Buck copy path.
+
 ## Toolchains
 
 - `toolchains.go` → Nix build (flake output).

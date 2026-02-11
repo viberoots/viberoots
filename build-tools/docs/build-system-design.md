@@ -64,6 +64,10 @@ Guardrails for all current and future languages:
 - Treat only artifact-producing non-Nix routes as migration debt.
 - Keep non-build macros only as explicit, reviewed exceptions with rationale.
 - Do not mark migration complete while any artifact-producing macro still has a non-hermetic Buck path.
+- Enforce migration status via `build-tools/tools/dev/nix-gaps-inventory-check.ts`:
+  - Probe-only exceptions are sourced from `docs/handbook/nix-gaps-exceptions.json` (`exceptions`).
+  - Temporary non-Nix artifact routes are sourced from `docs/handbook/nix-gaps-exceptions.json` (`artifactRouteAllowlist`).
+  - The check fails on missing or stale allowlist entries so temporary gaps do not become permanent.
 
 ---
 
