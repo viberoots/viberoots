@@ -98,8 +98,7 @@ def nix_cpp_binary(name, **kwargs):
     _cpp_common(name, "bin", kwargs)
 
 def nix_cpp_headers(name, **kwargs):
-    # Planner-visible header-only target. This produces no linkable artifact; the planner
-    # materializes a derivation with an include tree via T.cppHeaders.
+    # Header-only C++ target routed through the Nix planner template (cppHeaders).
     kw = dict(kwargs)
     deps = kw.pop("deps", []) or []
     link_deps = kw.pop("link_deps", []) or []
@@ -118,16 +117,29 @@ def nix_cpp_headers(name, **kwargs):
     kw["link_closure"] = link_closure
     kw["link_mode"] = link_mode
     merged = merge_link_intent_deps(deps, link_deps, header_deps)
-    srcs = kw.get("srcs", []) or []
-    wire_package_local_planner_visible_stub(
+    wiring = prepare_language_wiring(
         name = name,
-        out = name + ".stamp",
         kwargs = kw,
         lang = "cpp",
         kind = "headers",
         deps = merged,
-        srcs = srcs,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
+    )
+    prepared = wiring.kwargs
+    cpp_nix_build(
+        name = name,
+        out = name + ".stamp",
+        kind = "headers",
+        self_label = "//%s:%s" % (native.package_name(), name),
+        deps = wiring.deps,
+        link_deps = prepared.get("link_deps", []) or [],
+        header_deps = prepared.get("header_deps", []) or [],
+        link_closure = prepared.get("link_closure", link_closure),
+        link_mode = prepared.get("link_mode", link_mode),
+        srcs = prepared.get("srcs", []) or [],
+        labels = prepared.get("labels", []) or [],
+        nix_inputs = global_nix_inputs(),
+        visibility = prepared.get("visibility", []),
     )
 
 

@@ -9,6 +9,8 @@ def _cpp_nix_build_impl(ctx):
     # - kind="bin"   → bin/<sanitized>
     # - kind="lib"   → lib/lib<sanitized>.a
     # - kind="addon" → lib/<sanitized>.node
+    # - kind="headers" → header tree under include/ (this rule emits a stamp)
+    # - kind="emscripten" → lib/<sanitized>.js + lib/<sanitized>.wasm (this rule emits a stamp)
     raw = ctx.attrs.self_label
     kind = ctx.attrs.kind
     link_mode = ctx.attrs.link_mode or "static"
@@ -18,6 +20,9 @@ def _cpp_nix_build_impl(ctx):
     expected_lib = "lib/lib%s.a" % sanitized
     expected_shared_lib = "lib/lib%s.so" % sanitized
     expected_addon = "lib/%s.node" % sanitized
+    expected_headers_dir = "include"
+    expected_ems_js = "lib/%s.js" % sanitized
+    expected_ems_wasm = "lib/%s.wasm" % sanitized
     if kind == "bin":
         expected = expected_bin
     elif kind == "lib":
@@ -27,10 +32,14 @@ def _cpp_nix_build_impl(ctx):
             expected = expected_lib
     elif kind == "addon":
         expected = expected_addon
+    elif kind == "headers":
+        expected = expected_headers_dir
+    elif kind == "emscripten":
+        expected = expected_ems_js
     else:
         fail(
-            "unknown kind for cpp_nix_build: %s. Supported kinds: bin→%s, lib→%s, addon→%s"
-            % (kind, expected_bin, expected_lib, expected_addon)
+            "unknown kind for cpp_nix_build: %s. Supported kinds: bin→%s, lib→%s, addon→%s, headers→%s, emscripten→%s"
+            % (kind, expected_bin, expected_lib, expected_addon, expected_headers_dir, expected_ems_js)
         )
     # Build flow:
     # 1) Ensure the Buck graph is exported for the temp workspace
@@ -68,10 +77,28 @@ def _cpp_nix_build_impl(ctx):
             build_prefix = build_prefix,
         )
         + (
-            "if [ ! -e \"$outPath/%s\" ]; then echo 'cpp_nix_build (%s): expected artifact not found for kind \"%s\": %s' >&2; (ls -la \"$outPath\"; ls -la \"$outPath/bin\" 2>/dev/null || true; ls -la \"$outPath/lib\" 2>/dev/null || true) >&2; exit 2; fi; "
+            "if [ ! -e \"$outPath/%s\" ]; then echo 'cpp_nix_build (%s): expected artifact not found for kind \"%s\": %s' >&2; (ls -la \"$outPath\"; ls -la \"$outPath/bin\" 2>/dev/null || true; ls -la \"$outPath/lib\" 2>/dev/null || true; ls -la \"$outPath/include\" 2>/dev/null || true) >&2; exit 2; fi; "
             % (expected, raw, kind, expected)
         )
-        + "DEST=\"$0\"; cp -f \"$outPath/%s\" \"$DEST\"; " % expected
+        + (
+            "if [ \"%s\" = \"headers\" ]; then "
+            + "if ! find \"$outPath/include\" -type f \\( -name '*.h' -o -name '*.hpp' -o -name '*.hh' -o -name '*.hxx' \\) | awk 'NR==1{found=1} END{exit !found}'; then "
+            + "  echo 'cpp_nix_build (%s): headers output contains no header files under include/' >&2; "
+            + "  exit 2; "
+            + "fi; "
+            + "DEST=\"$0\"; "
+            + "if [ -f \"$outPath/build.log\" ]; then cp -f \"$outPath/build.log\" \"$DEST\"; else printf 'kind=headers\\nlabel=%s\\nout=%s\\n' > \"$DEST\"; fi; "
+            + "elif [ \"%s\" = \"emscripten\" ]; then "
+            + "if [ ! -f \"$outPath/%s\" ]; then "
+            + "  echo 'cpp_nix_build (%s): expected Emscripten WASM artifact missing: %s' >&2; "
+            + "  exit 2; "
+            + "fi; "
+            + "DEST=\"$0\"; "
+            + "printf 'kind=emscripten\\nlabel=%s\\njs=%s\\nwasm=%s\\n' > \"$DEST\"; "
+            + "else "
+            + "DEST=\"$0\"; cp -f \"$outPath/%s\" \"$DEST\"; "
+            + "fi; "
+        ) % (kind, raw, raw, expected, kind, expected_ems_wasm, raw, expected_ems_wasm, raw, expected_ems_js, expected_ems_wasm, expected)
     )
     out = ctx.actions.declare_output(ctx.attrs.out)
     # For bash -c, $0 is set to the first argument after the script string
@@ -102,7 +129,7 @@ cpp_nix_build = rule(
     impl = _cpp_nix_build_impl,
     attrs = {
         "self_label": attrs.string(),
-        "kind": attrs.string(),  # "bin" | "lib" | "addon"
+        "kind": attrs.string(),  # "bin" | "lib" | "addon" | "headers" | "emscripten"
         "out": attrs.string(),
         "deps": attrs.list(attrs.dep(), default = []),
         # Link intent surface (planner/exporter contract; unused by this rule impl).
@@ -114,6 +141,8 @@ cpp_nix_build = rule(
         "srcs": attrs.list(attrs.source(), default = []),  # include local patch files as inputs
         "nix_inputs": attrs.list(attrs.source(), default = []),  # explicit Nix inputs that should affect the rule key
         "labels": attrs.list(attrs.string(), default = []),
+        # Optional Emscripten symbol export contract (consumed by planner/template path).
+        "exported_functions": attrs.list(attrs.string(), default = []),
         # Optional: path to a buck graph.json; if provided, used to derive WORKSPACE_ROOT
         "graph_json": attrs.option(attrs.source(), default = None),
         # Optional: env file to inject WORKSPACE_ROOT explicitly (used by tests)

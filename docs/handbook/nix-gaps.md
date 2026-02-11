@@ -23,11 +23,11 @@ Planner coverage note: Go library and binary target kinds are now supported by t
 
 - `nix_cpp_library` → Nix build (`cpp_nix_build`).
 - `nix_cpp_binary` → Nix build (`cpp_nix_build`).
-- `nix_cpp_headers` → Stub (artifact expected; planner-visible stub).
+- `nix_cpp_headers` → Nix build (`cpp_nix_build`, planner `cppHeaders`).
 - `nix_cpp_test` → Nix build (`cpp_nix_test`).
 - `nix_cpp_node_addon` → Nix build (`cpp_nix_build`).
 - `nix_cpp_wasm_static_lib` → Nix build (`cpp_nix_build`).
-- `nix_cpp_wasm_emscripten_lib` → Stub (artifact expected; planner-visible stub).
+- `nix_cpp_wasm_emscripten_lib` → Nix build (`cpp_nix_build`, planner `cppWasmEmscriptenLib`).
 - `cpp_sanitize_probe` → Probe-only exception (test probe).
 
 ## Node macros

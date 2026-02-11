@@ -15,17 +15,20 @@ function sliceDefBody(fileText: string, defName: string): string {
   return fileText.slice(startIdx);
 }
 
-test("nix_cpp_wasm_emscripten_lib uses shared wasm package-local wiring", async () => {
-  const cppDefs = await fsp.readFile("build-tools/cpp/wasm_defs.bzl", "utf8");
-  const body = sliceDefBody(cppDefs, "nix_cpp_wasm_emscripten_lib");
+test("nix_cpp_headers uses cpp_nix_build route", async () => {
+  const cppDefs = await fsp.readFile("build-tools/cpp/defs.bzl", "utf8");
+  const body = sliceDefBody(cppDefs, "nix_cpp_headers");
 
   assert.ok(
-    body.includes("prepare_language_wiring(") && body.includes('wasm_variant = "emscripten"'),
-    'expected nix_cpp_wasm_emscripten_lib to route through prepare_language_wiring(..., wasm_variant = "emscripten")',
+    body.includes("prepare_language_wiring(") && body.includes('kind = "headers"'),
+    'expected nix_cpp_headers to route through prepare_language_wiring(..., kind = "headers")',
   );
-
   assert.ok(
     body.includes("cpp_nix_build("),
-    "expected nix_cpp_wasm_emscripten_lib to delegate artifact build to cpp_nix_build(...)",
+    "expected nix_cpp_headers to delegate to cpp_nix_build(...)",
+  );
+  assert.ok(
+    !body.includes("wire_package_local_planner_visible_stub("),
+    "expected nix_cpp_headers to avoid planner stub route",
   );
 });

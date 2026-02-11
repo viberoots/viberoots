@@ -45,6 +45,7 @@ nix_cpp_wasm_static_lib(
 nix_cpp_wasm_emscripten_lib(
     name = "core_emscripten",
     # Planner stub; no srcs needed here. The planner will read from package layout.
+    exported_functions = ["_add"],
     labels = ["lang:cpp", "kind:lib", "wasm:emscripten"],
     visibility = ["PUBLIC"],
 )

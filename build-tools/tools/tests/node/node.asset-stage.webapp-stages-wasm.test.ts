@@ -94,18 +94,8 @@ node_asset_stage(
           stdio: "inherit",
           env: { ...process.env },
         })`zx-wrapper ../../../build-tools/tools/dev/install/deps-main.ts --verbose --glue-only`;
-        await $({
-          cwd: tmp,
-          stdio: "inherit",
-        })`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
-        await $({
-          cwd: tmp,
-          stdio: "inherit",
-        })`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
-        await $({
-          cwd: tmp,
-          stdio: "inherit",
-        })`node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
+        // deps-main --glue-only already runs glue-pipeline (graph export + provider sync + auto-map).
+        // Keep test setup single-pass to avoid avoidable verify-time contention.
         await $({
           cwd: tmp,
           stdio: "pipe",
@@ -121,12 +111,6 @@ node_asset_stage(
           stdio: "inherit",
           env: { ...envWithPrefetch },
         })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${lockfile}`;
-        await $({
-          cwd: appDir,
-          stdio: "inherit",
-          env: { ...envWithPrefetch },
-        })`zx-wrapper ../../../build-tools/tools/dev/node-modules-build.ts`;
-
         const baseEnv =
           typeof ($ as any).env === "object" && ($ as any).env
             ? { ...($ as any).env }

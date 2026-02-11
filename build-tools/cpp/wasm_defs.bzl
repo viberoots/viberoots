@@ -3,7 +3,6 @@ load(
     "dedupe_preserve",
     "merge_link_intent_deps",
     "prepare_language_wiring",
-    "wire_package_local_wasm_planner_visible_stub",
 )
 load("//build-tools/lang:global_inputs.bzl", "global_nix_inputs")
 load("//build-tools/lang:sanitize.bzl", "sanitize_name")
@@ -75,37 +74,52 @@ def nix_cpp_wasm_static_lib(name, **kwargs):
 
 def nix_cpp_wasm_emscripten_lib(name, **kwargs):
     """
-    Planner-visible stub for an Emscripten C/C++ bundle (JS + WASM) via the Nix planner.
+    Build an Emscripten C/C++ bundle (JS + WASM) via the Nix planner.
 
     Stamps:
       - lang:cpp, kind:lib, wasm:emscripten
 
     Note:
-      This macro intentionally declares a lightweight planner stub instead of invoking
-      the generic cpp_nix_build rule, because the artifact shape is a dual output
-      (.js + .wasm) rather than a single .a/.node. The actual JS/WASM bundle is
-      produced by the planner template (cppWasmEmscriptenLib) when built via the
-      Nix flake attributes (e.g., graph-generator-selected).
+      This macro keeps a stamp output at the Buck rule boundary, while enforcing that
+      the underlying Nix output contains both bundle artifacts:
+      - lib/<sanitized>.js
+      - lib/<sanitized>.wasm
     """
     kw = dict(kwargs)
     labels = kw.get("labels", []) or []
-    # Ensure planner treats emscripten stubs as libs (while still stamping kind:wasm).
+    # Ensure planner treats emscripten targets as libs (while still stamping kind:wasm).
     kw["labels"] = dedupe_preserve(labels + ["kind:lib"])
     deps = kw.pop("deps", []) or []
-    srcs = kw.get("srcs", []) or []
-    wire_package_local_wasm_planner_visible_stub(
+    link_deps = kw.pop("link_deps", []) or []
+    header_deps = kw.pop("header_deps", []) or []
+    kw["link_deps"] = link_deps
+    kw["header_deps"] = header_deps
+    merged = merge_link_intent_deps(deps, link_deps, header_deps)
+    wiring = prepare_language_wiring(
         name = name,
-        out = name + ".stamp",
         kwargs = kw,
         lang = "cpp",
-        variant = "emscripten",
-        deps = deps,
-        srcs = srcs,
+        kind = None,
+        deps = merged,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
-        # Preserve historical behavior for this macro: provider targets remain in deps.
-        # This stub shape is used as a graph node and provider deps are part of its invalidation surface.
-        provider_realization_mode = "deps",
-        strip_providers_from_deps = False,
+        wasm_variant = "emscripten",
+        wasm_provider_realization_mode = "deps",
+        wasm_strip_providers_from_deps = False,
+    )
+    prepared = wiring.kwargs
+    cpp_nix_build(
+        name = name,
+        out = name + ".stamp",
+        kind = "emscripten",
+        self_label = "//%s:%s" % (native.package_name(), name),
+        deps = wiring.deps,
+        link_deps = prepared.get("link_deps", []) or [],
+        header_deps = prepared.get("header_deps", []) or [],
+        srcs = prepared.get("srcs", []) or [],
+        labels = prepared.get("labels", []) or [],
+        exported_functions = prepared.get("exported_functions", []) or [],
+        nix_inputs = global_nix_inputs(),
+        visibility = prepared.get("visibility", []),
     )
 
 __all__ = [

@@ -28,7 +28,11 @@ test("package-local WASM macros use the shared //build-tools/lang wasm wiring he
     "build-tools/cpp/wasm_defs.bzl must use prepare_language_wiring(...) for nix_cpp_wasm_static_lib",
   );
   assert(
-    cppDefs.includes("wire_package_local_wasm_planner_visible_stub("),
-    "build-tools/cpp/wasm_defs.bzl must use wire_package_local_wasm_planner_visible_stub(...) for planner-visible WASM stubs",
+    cppDefs.includes("cpp_nix_build("),
+    "build-tools/cpp/wasm_defs.bzl must route package-local WASM macros through cpp_nix_build(...)",
+  );
+  assert(
+    !cppDefs.includes("wire_package_local_wasm_planner_visible_stub("),
+    "build-tools/cpp/wasm_defs.bzl must not use wire_package_local_wasm_planner_visible_stub(...) for nix-backed WASM macros",
   );
 });

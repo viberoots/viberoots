@@ -27,7 +27,7 @@ in {
     srcList ? [],
     patches ? [],
     # Emscripten-specific options
-    exportedFunctions ? [ "_add" ],
+    exportedFunctions ? [],
     extraFlags ? [],
   }:
   let
@@ -50,6 +50,11 @@ in {
       in "[${quoted}]";
     emcc = "${pkgs.emscripten}/bin/emcc";
     empp = "${pkgs.emscripten}/bin/em++";
+    exportedFunctionsList = if builtins.isList exportedFunctions then exportedFunctions else [];
+    exportedFunctionFlags =
+      if exportedFunctionsList != []
+      then [ "-s" "EXPORTED_FUNCTIONS=${exportedStr}" ]
+      else [];
     # Minimal flags for Node + standalone wasm; modularized factory for clean import()
     emFlagsCommon = [
       "-O2"
@@ -58,13 +63,16 @@ in {
       "-s" "ENVIRONMENT=node"
       "-s" "MODULARIZE=1"
       "-s" "EXPORT_NAME=ModuleFactory"
-      "-s" "EXPORTED_FUNCTIONS=${exportedStr}"
-    ] ++ extraFlags;
-    # Also force WASM exports at the linker level to avoid dead-stripping in some modes
-    ldExports = map (f:
-      let nm = if lib.hasPrefix "_" f then lib.removePrefix "_" f else f;
-      in "-Wl,--export=${nm}"
-    ) exportedFunctions;
+    ] ++ exportedFunctionFlags ++ extraFlags;
+    # When callers provide explicit exports, honor that exact list.
+    # Otherwise export all defined symbols so generic C entrypoints remain callable.
+    ldExports =
+      if exportedFunctionsList != []
+      then map (f:
+        let nm = if lib.hasPrefix "_" f then lib.removePrefix "_" f else f;
+        in "-Wl,--export=${nm}"
+      ) exportedFunctionsList
+      else [ "-Wl,--export-all" ];
     join = xs: lib.concatStringsSep " " xs;
     srcsCmd = if srcList != [] then (
       "printf '%s\\n' " + (lib.concatStringsSep " " (map (s: "'" + s + "'") (lib.sort (a: b: a < b) srcList))) + " | sort"

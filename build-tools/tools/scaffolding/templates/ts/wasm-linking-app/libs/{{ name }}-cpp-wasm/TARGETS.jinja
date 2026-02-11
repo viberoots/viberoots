@@ -4,6 +4,7 @@ load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_emscripten_lib")
 nix_cpp_wasm_emscripten_lib(
     name = "cpp_emscripten",
     srcs = ["src/add.c"],
+    exported_functions = ["_add"],
     visibility = ["PUBLIC"],
 )
 
