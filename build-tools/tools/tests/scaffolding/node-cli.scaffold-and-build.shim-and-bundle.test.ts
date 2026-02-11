@@ -16,8 +16,8 @@ test("node cli: scaffold, build shim, run help", async () => {
       await $`scaf new node cli demo --yes`;
       // Ensure Buck sees the new target
       await $`buck2 targets //projects/apps/demo:demo`;
-      // Glue
-      await $`build-tools/tools/dev/install-deps.ts --glue-only`;
+      // Glue (target-scoped refresh so graph includes the newly scaffolded target)
+      await $`BUCK_TARGET=//projects/apps/demo:demo build-tools/tools/dev/install-deps.ts --glue-only`;
       // Ensure Node providers are synced via orchestrator (primary path)
       await $`node build-tools/tools/buck/sync-providers.ts --lang=node`;
       await $`buck2 targets //projects/apps/demo:demo`;

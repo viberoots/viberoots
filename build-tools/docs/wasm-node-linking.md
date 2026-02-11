@@ -6,6 +6,13 @@ Our `node_webapp` target builds a Vite app and copies `dist/` to the Buck output
 
 I want a standard, low-friction way for templates for webapps and other Node or TypeScript apps to include in-repo Wasm artifacts at runtime.
 
+## Related implementation design
+
+For the contract-focused implementation plan that resolves cross-language wasm source-shape ambiguity
+while preserving low-boilerplate callsites, see:
+
+- `build-tools/docs/node-wasm-staging-contract-design.md`
+
 ## Goals
 
 - Provide one simple rule that stages Wasm artifacts into an app output.

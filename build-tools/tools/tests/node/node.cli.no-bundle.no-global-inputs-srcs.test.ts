@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("nix_node_cli_bin(bundle=False) does not include global Nix inputs as action inputs", async () => {
+test("nix_node_cli_bin(bundle=False) includes global Nix inputs as action inputs", async () => {
   await runInTemp("node-cli-no-bundle-no-global-inputs-srcs", async (tmp, $) => {
     const dir = path.join(tmp, "projects", "apps", "cli");
     await fsp.mkdir(path.join(dir, "bin"), { recursive: true });
@@ -37,8 +37,8 @@ test("nix_node_cli_bin(bundle=False) does not include global Nix inputs as actio
     if (probe.exitCode !== 0) return;
     const out = String(probe.stdout || "");
     assert.ok(
-      !out.includes(":flake.lock"),
-      "expected //:flake.lock to be absent from srcs when bundle=False",
+      out.includes(":flake.lock"),
+      "expected //:flake.lock to be present in srcs when bundle=False is Nix-calling",
     );
   });
 });

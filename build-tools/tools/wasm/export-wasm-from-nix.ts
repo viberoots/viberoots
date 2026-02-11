@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import fs from "fs-extra";
+import * as fs from "node:fs/promises";
 import path from "node:path";
 
 function readEnv(name) {
@@ -13,7 +13,7 @@ function sleep(ms) {
 async function findRepoRoot(start) {
   let dir = path.resolve(start);
   for (;;) {
-    if (await fs.pathExists(path.join(dir, "flake.nix"))) return dir;
+    if (await pathExists(path.join(dir, "flake.nix"))) return dir;
     const parent = path.dirname(dir);
     if (parent === dir) break;
     dir = parent;
@@ -24,7 +24,7 @@ async function findRepoRoot(start) {
 async function acquireGraphLock(lockPath, graphPath) {
   const start = Date.now();
   for (;;) {
-    if (await fs.pathExists(graphPath)) return null;
+    if (await pathExists(graphPath)) return null;
     try {
       return await fs.open(lockPath, "wx");
     } catch (err) {
@@ -38,7 +38,7 @@ async function acquireGraphLock(lockPath, graphPath) {
 }
 
 async function ensureGraph(repoRoot, graphPath) {
-  if (await fs.pathExists(graphPath)) return;
+  if (await pathExists(graphPath)) return;
   const lockPath = `${graphPath}.lock`;
   const lockHandle = await acquireGraphLock(lockPath, graphPath);
   if (!lockHandle) return;
@@ -52,16 +52,23 @@ async function ensureGraph(repoRoot, graphPath) {
         WORKSPACE_ROOT: repoRoot,
       },
     })`nix run --accept-flake-config ${repoRoot}#zx-wrapper -- build-tools/tools/buck/export-graph.ts --out ${graphPath}`;
-    if (!(await fs.pathExists(graphPath))) {
+    if (!(await pathExists(graphPath))) {
       throw new Error(`graph.json not found at ${graphPath}`);
     }
   } finally {
-    if (typeof lockHandle === "number") {
-      await fs.close(lockHandle);
-    } else {
+    if (lockHandle) {
       await lockHandle.close();
     }
-    await fs.remove(lockPath);
+    await fs.rm(lockPath, { force: true });
+  }
+}
+
+async function pathExists(p) {
+  try {
+    await fs.access(p);
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -121,7 +128,7 @@ async function main() {
     throw new Error(`multiple wasm artifacts under ${wasmDir}; set WASM_NAME to disambiguate`);
   }
   const hit = matches[0];
-  await fs.ensureDir(path.dirname(out));
+  await fs.mkdir(path.dirname(out), { recursive: true });
   await fs.copyFile(path.join(wasmDir, hit), out);
 }
 

@@ -410,7 +410,8 @@ Load from `//build-tools/node:defs.bzl`.
 
 ### `nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = [], lockfile_label = None, kind = "gen", **kwargs)`
 
-Use this for Node genrules that need a lockfile-aware Node context.
+Use this for Node artifact-producing generators that run through the Nix selected planner path.
+The public target is a Nix-calling wrapper; a planner companion target retains the original `cmd`.
 
 Public args:
 
@@ -420,7 +421,7 @@ Public args:
   - Example: `srcs = ["src/index.ts"]`
 - `out` string. Output filename.
   - Example: `out = "index.out"`
-- `cmd` string. Shell command to run.
+- `cmd` string. Shell command executed by the planner companion target.
   - Example: `cmd = "cp $(location src/index.ts) $OUT"`
 - `deps` list of labels. Direct deps for the genrule.
   - Example: `deps = [":tools"]`
@@ -493,6 +494,7 @@ Public args:
 ### `nix_node_lib(name, **kwargs)`
 
 Use this for Node library targets that produce generated artifacts.
+This is an alias of `nix_node_gen(..., kind = "lib")`.
 
 Public args:
 
@@ -514,6 +516,7 @@ Public args:
 ### `nix_node_bin(name, **kwargs)`
 
 Use this for Node targets that produce an executable file.
+This is an alias of `nix_node_gen(..., kind = "bin")`.
 
 Public args:
 

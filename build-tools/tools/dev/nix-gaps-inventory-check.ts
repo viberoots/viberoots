@@ -42,6 +42,9 @@ async function main() {
   const nodeClassificationMacros = parseNodeClassificationTableMacros(inventoryTxt);
   const nonBuildInventoryMacros = parseNonBuildInventoryMacros(inventoryTxt);
   const artifactRouteGaps = parseArtifactRouteGaps(inventoryTxt);
+  const hasNodeImplementationFiles =
+    (await fs.pathExists("build-tools/node/defs_core.bzl")) &&
+    (await fs.pathExists("build-tools/node/defs_stage.bzl"));
 
   const malformedExceptionEntries = exceptionList.filter(
     (e) =>
@@ -160,6 +163,48 @@ async function main() {
     console.error("Stale artifactRouteAllowlist entries (no matching current route gap):");
     for (const item of staleArtifactRouteAllowlist) console.error(`- ${item.macro}:${item.kind}`);
     process.exit(1);
+  }
+
+  if (hasNodeImplementationFiles) {
+    const nodeDefsCoreTxt = await fs.readFile("build-tools/node/defs_core.bzl", "utf8");
+    const nodeDefsStageTxt = await fs.readFile("build-tools/node/defs_stage.bzl", "utf8");
+    const routeLine = (macro: string) => new RegExp(`^- \`${macro}\`\\s+→\\s+Nix build`, "m");
+    const nodeMacrosClaimedNix = [
+      "nix_node_gen",
+      "nix_node_lib",
+      "nix_node_bin",
+      "node_asset_stage",
+      "node_wasm_inline_module",
+    ].filter((macro) => routeLine(macro).test(inventoryTxt));
+
+    if (nodeMacrosClaimedNix.length > 0) {
+      const missingRouteSignals: string[] = [];
+      if (!nodeDefsCoreTxt.includes('planner_name = name + "__planner"')) {
+        missingRouteSignals.push("defs_core missing planner companion target for nix_node_gen");
+      }
+      if (!nodeDefsCoreTxt.includes('wiring = "nix_calling_genrule"')) {
+        missingRouteSignals.push(
+          "defs_core missing nix_calling_genrule wiring for public nix_node_gen",
+        );
+      }
+      if (!nodeDefsCoreTxt.includes("graph-generator-selected")) {
+        missingRouteSignals.push(
+          "defs_core missing graph-generator-selected route for nix_node_gen",
+        );
+      }
+      if (!nodeDefsStageTxt.includes("graph-generator-selected")) {
+        missingRouteSignals.push(
+          "defs_stage missing graph-generator-selected Nix route for stage/inline macros",
+        );
+      }
+      if (missingRouteSignals.length > 0) {
+        console.error(
+          `Node implementation route checks failed for Nix-claimed macros: ${nodeMacrosClaimedNix.join(", ")}`,
+        );
+        for (const msg of missingRouteSignals) console.error(`- ${msg}`);
+        process.exit(1);
+      }
+    }
   }
 
   if (extra.length > 0) {

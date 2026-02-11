@@ -1107,3 +1107,86 @@ Adds one more Node migration path and compatibility surface.
 ### Recommendation
 
 Implement.
+
+---
+
+## PR-21: Close Node gen/lib/bin/stage/inline gaps and enforce route parity
+
+### Description
+
+I will close the remaining Node artifact-route gaps by routing `nix_node_gen`, `nix_node_lib`,
+`nix_node_bin`, `node_asset_stage`, and `node_wasm_inline_module` through a Nix-calling selected
+planner path, and I will add implementation-aware checks so inventory status cannot drift from code
+again.
+
+### Scope & Changes
+
+- Migrate `nix_node_gen` to a two-target pattern:
+  - planner companion target keeps the original `cmd` for Node planner `mkGen`/`mkLib`/`mkBin`.
+  - public macro target becomes a Nix-calling wrapper that builds `graph-generator-selected` for
+    the companion and copies the expected output.
+- Keep `nix_node_lib` / `nix_node_bin` as aliases of the migrated `nix_node_gen` route.
+- Keep `node_asset_stage` / `node_wasm_inline_module` routed through `nix_node_gen`, so they inherit
+  the same Nix-calling path.
+- Extend inventory enforcement (`build-tools/tools/dev/nix-gaps-inventory-check.ts`) with
+  implementation-route assertions for these Node macros when implementation files are present.
+
+### Tests (in this PR)
+
+- Expand Node command-assembly smoke coverage to include:
+  - `nix_node_gen`
+  - `node_asset_stage`
+  - `node_wasm_inline_module`
+    and assert standardized Nix-calling command invariants.
+- Add a Node enforcement test that fails if `build-tools/node/defs_core.bzl` drops:
+  - planner companion pattern (`name + "__planner"`)
+  - public `nix_calling_genrule` wiring
+  - `graph-generator-selected` wrapper route.
+- Keep existing inventory-check fixture tests passing while adding implementation-route checks only
+  when Node implementation files are present.
+
+### Docs (in this PR)
+
+- Update `docs/handbook/nix-gaps.md` Node route notes to describe wrapper + planner-companion flow.
+- Remove stale Go planner note that still claimed macro routing remained Buck pre-PR-6.
+- Update `docs/handbook/starlark-api.md` Node macro docs so `nix_node_gen` describes planner-executed
+  `cmd` and `nix_node_lib`/`nix_node_bin` alias behavior.
+- Update `build-tools/docs/build-system-design.md` with the Node two-target wrapper pattern.
+
+### Test runtime controls used
+
+- Coverage remains opt-in.
+- Scoped test execution for changed Node/dev checks.
+- No full-suite rerun in PR loop; safety suite remains merge-gate responsibility.
+
+### Acceptance Criteria
+
+- `nix_node_gen`, `nix_node_lib`, `nix_node_bin`, `node_asset_stage`, and
+  `node_wasm_inline_module` are Nix-calling in macro execution paths.
+- Node planner still receives the original artifact command via the planner companion target.
+- Inventory checks fail if docs claim Nix route but Node implementation route signals regress.
+- Updated docs and tests reflect and validate the new routing contract.
+
+### Risks
+
+Two-target macro wiring can introduce output-contract regressions if planner and wrapper out paths
+drift.
+
+### Mitigation
+
+Enforce command-assembly invariants plus static route-shape checks in tests, and keep output-copy
+logic explicit in the wrapper command.
+
+### Consequence of Not Implementing
+
+`docs/handbook/nix-gaps.md` can report closure while Node artifact paths silently regress to Buck
+genrule behavior.
+
+### Downsides for Implementing
+
+Slightly more macro complexity (planner companion + public wrapper) and additional enforcement
+surface to maintain.
+
+### Recommendation
+
+Implement.

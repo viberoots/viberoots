@@ -6,11 +6,5 @@
       "justification": "Test-only sanitizer probe; no production artifact contract."
     }
   ],
-  "artifactRouteAllowlist": [
-    {
-      "macro": "nix_node_cli_bin",
-      "kind": "mixed",
-      "justification": "Temporary PR-20 migration gap: bundle=False still uses a Buck copy path."
-    }
-  ]
+  "artifactRouteAllowlist": []
 }

@@ -17,7 +17,7 @@ This document maps every public Starlark macro to its build path. I use it to tr
 - `nix_go_carchive` → Nix build (`goCArchive`).
 - `nix_go_tiny_wasm_lib` → Nix build (`go_nix_build_wasm`).
 
-Planner coverage note: Go library and binary target kinds are now supported by the Nix planner templates (`goLib` and `goApp`) for `graph-generator-selected`. Macro routing remains Buck until PR-6.
+Planner coverage note: Go library and binary target kinds are supported by the Nix planner templates (`goLib` and `goApp`) for `graph-generator-selected`, and the public Go macros route through Nix-backed rules.
 
 ## C++ macros
 
@@ -32,29 +32,27 @@ Planner coverage note: Go library and binary target kinds are now supported by t
 
 ## Node macros
 
-- `nix_node_gen` → Nix build (`graph-generator-selected` via Node planner `mkGen`).
+- `nix_node_gen` → Nix build (public wrapper calls `graph-generator-selected`; planner companion uses Node planner `mkGen`).
 - `nix_node_test` → Nix build (`node_nix_test`).
-- `nix_node_lib` → Nix build (`graph-generator-selected` via Node planner `mkLib`).
-- `nix_node_bin` → Nix build (`graph-generator-selected` via Node planner `mkBin`).
+- `nix_node_lib` → Nix build (alias of `nix_node_gen` with planner kind `lib` / `mkLib`).
+- `nix_node_bin` → Nix build (alias of `nix_node_gen` with planner kind `bin` / `mkBin`).
 - `node_webapp` → Nix build (calls `nix build` in genrule).
-- `nix_node_cli_bin` → Mixed:
-  - `bundle = False` → Buck build (copy via `genrule`).
-  - `bundle = True` → Nix build (calls `nix build` in genrule).
-- `node_asset_stage` → Nix build (`nix_node_gen` route).
-- `node_wasm_inline_module` → Nix build (`nix_node_gen` route).
+- `nix_node_cli_bin` → Nix build (calls `nix build` in genrule for both bundle modes).
+- `node_asset_stage` → Nix build (`nix_node_gen` wrapper route).
+- `node_wasm_inline_module` → Nix build (`nix_node_gen` wrapper route).
 
 Node macro outcome classification:
 
-| Macro                     | Outcome category                 | Current route | Notes                                                            |
-| ------------------------- | -------------------------------- | ------------- | ---------------------------------------------------------------- |
-| `nix_node_gen`            | artifact-producing               | Nix build     | Routed through Node planner `mkGen` for selected planner builds. |
-| `nix_node_test`           | artifact-producing (test)        | Nix build     | Already routed via `node_nix_test`.                              |
-| `nix_node_lib`            | artifact-producing               | Nix build     | Routed through Node planner `mkLib` for selected planner builds. |
-| `nix_node_bin`            | artifact-producing               | Nix build     | Routed through Node planner `mkBin` for selected planner builds. |
-| `node_webapp`             | orchestration wrapper            | Nix build     | Uses `genrule` to call `nix build`.                              |
-| `nix_node_cli_bin`        | mixed wrapper/artifact-producing | Mixed         | `bundle = True` is Nix; `bundle = False` remains Buck copy path. |
-| `node_asset_stage`        | artifact-producing               | Nix build     | Routes through the Node `nix_node_gen` macro path.               |
-| `node_wasm_inline_module` | artifact-producing               | Nix build     | Routes through the Node `nix_node_gen` macro path.               |
+| Macro                     | Outcome category          | Current route | Notes                                                                   |
+| ------------------------- | ------------------------- | ------------- | ----------------------------------------------------------------------- |
+| `nix_node_gen`            | artifact-producing        | Nix build     | Public target is a Nix-calling wrapper; planner companion uses `mkGen`. |
+| `nix_node_test`           | artifact-producing (test) | Nix build     | Already routed via `node_nix_test`.                                     |
+| `nix_node_lib`            | artifact-producing        | Nix build     | Alias of `nix_node_gen` with planner kind `lib` (`mkLib`).              |
+| `nix_node_bin`            | artifact-producing        | Nix build     | Alias of `nix_node_gen` with planner kind `bin` (`mkBin`).              |
+| `node_webapp`             | orchestration wrapper     | Nix build     | Uses `genrule` to call `nix build`.                                     |
+| `nix_node_cli_bin`        | artifact-producing        | Nix build     | Both `bundle = True` and `bundle = False` use Nix-calling routes.       |
+| `node_asset_stage`        | artifact-producing        | Nix build     | Routes through the Node `nix_node_gen` Nix-calling wrapper path.        |
+| `node_wasm_inline_module` | artifact-producing        | Nix build     | Routes through the Node `nix_node_gen` Nix-calling wrapper path.        |
 
 ## Python macros
 
@@ -106,9 +104,9 @@ The policy data lives in `docs/handbook/nix-gaps-exceptions.json`:
 - `exceptions`: allowed probe-only non-build macros.
 - `artifactRouteAllowlist`: temporary non-Nix artifact routes that are still allowed.
 
-Current temporary allowlist entry:
+Current temporary allowlist entries:
 
-- `nix_node_cli_bin` (`kind = "mixed"`) while `bundle = False` is still on the Buck copy path.
+- None.
 
 ## Toolchains
 

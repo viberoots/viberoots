@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "genrule")
-load("//build-tools/lang:defs_common.bzl", "default_lockfile_label_from_package", "default_lockfile_path_from_package", "ensure_default_lockfile_exists", "extract_lockfile_labels", "importer_from_labels", "prepare_language_wiring")
+load("//build-tools/lang:defs_common.bzl", "default_lockfile_label_from_package", "default_lockfile_path_from_package", "ensure_default_lockfile_exists", "extract_lockfile_labels", "prepare_language_wiring")
 load("//build-tools/lang:importer_strings.bzl", "importer_display_name", "sanitize_importer_for_nix_attr")
 load(
     "//build-tools/lang:nix_shell.bzl",
@@ -9,7 +9,6 @@ load(
     "nix_calling_genrule_bootstrap",
 )
 load("//build-tools/node:defs_core.bzl", "nix_node_gen")
-
 MODULE_PROVIDERS = {}
 load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
 
@@ -34,23 +33,6 @@ def _validate_optional_importer_arg_matches_wiring(importer, wiring, macro_name)
             importer = importer,
             lockfile_importer = wiring.importer,
             lockfile_label = _effective_lockfile_label_from_wiring(wiring),
-        )
-
-def _validate_optional_importer_arg_matches_single_lockfile_label(importer, lockfile_label, labels, macro_name):
-    if importer == None:
-        return
-    kw = {"labels": list(labels or [])}
-    if lockfile_label != None:
-        kw["labels"] = (kw.get("labels", []) or []) + [lockfile_label]
-    derived = importer_from_labels(kw)
-    lf = extract_lockfile_labels(kw.get("labels", []) or [])
-    effective = lf[0] if len(lf) == 1 else lf
-    if importer != derived:
-        _fail_importer_arg_mismatch(
-            macro_name = macro_name,
-            importer = importer,
-            lockfile_importer = derived,
-            lockfile_label = effective,
         )
 
 def _apply_default_lockfile_label(lockfile_label, labels, macro_name):
@@ -83,7 +65,6 @@ def _prepare_node_importer_nix_calling_genrule_kwargs(
         global_inputs_stamp = True,
         wiring = "nix_calling_genrule",
     )
-
 def node_webapp(
     name,
     deps = [],
@@ -93,13 +74,6 @@ def node_webapp(
     out = None,
     **kwargs
 ):
-    """
-    Build a Vite webapp via a hermetic Nix derivation and copy its dist/ into $OUT.
-
-    - Requires exactly one importer-scoped lockfile label (lockfile:<path>#<importer>).
-    - `importer` is optional; if omitted, derive from the lockfile label's importer suffix.
-    - Runs `nix build .#node-webapp.<importer>` and copies dist/.
-    """
     kw = dict(kwargs) if kwargs != None else {}
     lockfile_label = _apply_default_lockfile_label(lockfile_label, labels, "node_webapp")
     wiring = _prepare_node_importer_nix_calling_genrule_kwargs(
@@ -150,31 +124,15 @@ def nix_node_cli_bin(
     importer = None,
     **kwargs
 ):
-    """
-    Materialize a Node CLI binary.
-
-    - Shim mode (default): copies `entry` (defaults to bin/<name>) to $OUT and chmod +x.
-    - Bundled mode (bundle = True): builds a single-file shebanged bundle via Nix and copies it to $OUT.
-
-    Notes:
-    - Exactly one importer-scoped lockfile label must be present (lockfile:<path>#<importer>).
-    - When bundle=True, the importer is derived from the single lockfile label via shared helpers
-      (importer_from_labels); no explicit `importer` argument is required.
-    """
     if out == None:
         out = name
-
     if not bundle:
-        _validate_optional_importer_arg_matches_single_lockfile_label(
-            importer = importer,
-            lockfile_label = lockfile_label,
-            labels = labels,
-            macro_name = "nix_node_cli_bin(bundle=False)",
-        )
         if entry == None:
             entry = "bin/%s" % name
+        lockfile_label = _apply_default_lockfile_label(lockfile_label, labels, "nix_node_cli_bin(bundle=False)")
+        impl_name = name + "__nix_impl"
         nix_node_gen(
-            name = name,
+            name = impl_name,
             srcs = [entry],
             out = out,
             cmd = "cp %s $OUT && chmod +x $OUT" % entry,
@@ -182,10 +140,53 @@ def nix_node_cli_bin(
             labels = labels,
             lockfile_label = lockfile_label,
             kind = "bin",
-            **kwargs
+            planner_only = True,
         )
+        _srcs_map = {entry: entry}
+        kw = dict(kwargs) if kwargs != None else {}
+        wiring = _prepare_node_importer_nix_calling_genrule_kwargs(
+            name = name,
+            kwargs = kw,
+            srcs = _srcs_map,
+            deps = deps,
+            kind = "bin",
+            labels = list(labels or []),
+            lockfile_label = lockfile_label,
+        )
+        _validate_optional_importer_arg_matches_wiring(
+            importer = importer,
+            wiring = wiring,
+            macro_name = "nix_node_cli_bin(bundle=False)",
+        )
+        kw = wiring.kwargs
+        impl_label = "//%s:%s__planner" % (native.package_name(), impl_name)
+        cmd = (
+            "SCRATCH=\"$PWD\"; OUT_ABS=\"$SCRATCH/$OUT\"; "
+            + nix_calling_genrule_bootstrap(
+                timeout_sec = 180,
+                include_pnpm_store = False,
+                source_workspace_root_env = True,
+            )
+            + nix_calling_env_export_buck_graph_json()
+            + nix_build_out_path_cmd(
+                "\"path:$WORKSPACE_ROOT#graph-generator-selected\"",
+                timeout_var = "TIMEOUT",
+                impure = True,
+                build_prefix = ("env BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"%s\" " % impl_label),
+            )
+            + ("EXPECTED=\"$outPath/%s\"; " % out)
+            + "if [ ! -f \"$EXPECTED\" ]; then "
+            + "  echo \"nix_node_cli_bin(bundle=False): expected output missing: $EXPECTED\" >&2; "
+            + "  (ls -la \"$outPath\" || true) >&2; "
+            + "  exit 2; "
+            + "fi; "
+            + "cp -f \"$EXPECTED\" \"$OUT_ABS\"; "
+            + "chmod +x \"$OUT_ABS\"; "
+        )
+        kw["out"] = out
+        kw["cmd"] = cmd
+        genrule(**kw)
         return
-
     if entry == None:
         entry = "src/index.ts"
     elif entry != "src/index.ts":
@@ -193,11 +194,7 @@ def nix_node_cli_bin(
             "nix_node_cli_bin(bundle=True) supports only entry='src/index.ts' (or omit entry). "
             + "If you need to copy a different entry file, use bundle=False."
         )
-
-    _srcs_map = {
-        entry: entry,
-    }
-
+    _srcs_map = {entry: entry}
     kw = dict(kwargs) if kwargs != None else {}
     lockfile_label = _apply_default_lockfile_label(lockfile_label, labels, "nix_node_cli_bin(bundle=True)")
     wiring = _prepare_node_importer_nix_calling_genrule_kwargs(
@@ -216,7 +213,6 @@ def nix_node_cli_bin(
     )
     kw = wiring.kwargs
     _importer = wiring.importer
-
     bundle_name = importer_display_name(_importer)
     cmd = (
         "SCRATCH=\"$PWD\"; OUT_ABS=\"$SCRATCH/$OUT\"; "
@@ -243,7 +239,6 @@ def nix_node_cli_bin(
         + "cp -f \"$EXPECTED\" \"$OUT_ABS\"; "
         + "chmod +x \"$OUT_ABS\"; "
     )
-
     kw["out"] = out
     kw["cmd"] = cmd
     genrule(**kw)

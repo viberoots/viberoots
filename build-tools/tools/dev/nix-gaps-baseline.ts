@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
+import { spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
 import { getFlagBool, getFlagStr } from "../lib/cli";
 import { writeIfChanged } from "../lib/fs-helpers";
 

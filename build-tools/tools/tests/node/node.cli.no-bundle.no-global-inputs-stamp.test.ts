@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("nix_node_cli_bin(bundle=False) does not stamp global Nix inputs", async () => {
+test("nix_node_cli_bin(bundle=False) stamps global Nix inputs", async () => {
   await runInTemp("node-cli-no-bundle-no-stamp", async (tmp, $) => {
     const dir = path.join(tmp, "projects", "apps", "cli");
     await fsp.mkdir(path.join(dir, "bin"), { recursive: true });
@@ -43,8 +43,8 @@ test("nix_node_cli_bin(bundle=False) does not stamp global Nix inputs", async ()
       "expected lang:node label to be present",
     );
     assert.ok(
-      !out.includes(":flake.lock"),
-      "expected //:flake.lock to be absent when bundle=False",
+      out.includes(":flake.lock"),
+      "expected //:flake.lock to be present when bundle=False is Nix-calling",
     );
   });
 });

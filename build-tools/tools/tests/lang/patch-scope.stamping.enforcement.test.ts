@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import { test } from "node:test";
 import * as fsp from "node:fs/promises";
+import { test } from "node:test";
 
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message);
