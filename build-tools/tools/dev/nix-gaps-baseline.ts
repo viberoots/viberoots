@@ -207,6 +207,19 @@ async function main() {
   lines.push("");
   lines.push(renderCommands(buildSteps));
   lines.push("");
+  lines.push("## Phase 6 parity and hermeticity signals");
+  lines.push("");
+  lines.push("- Representative Node target parity signal: sha256 of generated output file.");
+  lines.push("- Representative C++ target parity signal: executable stdout contract.");
+  lines.push("- Representative Rust target parity signal: executable stdout contract.");
+  lines.push("- Expected delta: C++/Rust binaries are not required to be byte-identical.");
+  lines.push(
+    "- Hermeticity gate: selected builds pass in a minimal environment with host toolchain vars poisoned.",
+  );
+  lines.push(
+    "- Primary enforcement test: `build-tools/tools/tests/dev/nix-gaps.phase6.parity-and-hermeticity.test.ts`.",
+  );
+  lines.push("");
 
   const outAbs = path.isAbsolute(outPath) ? outPath : path.join(repoRoot, outPath);
   await writeIfChanged(outAbs, lines.join("\n"));

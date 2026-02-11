@@ -167,15 +167,15 @@ Goal: Ensure behavior parity and hermeticity.
 Tasks:
 
 1. Cross-validate outputs for representative targets per language.
-   - Output: Build parity checks (hash or size).
+   - Output: Build parity checks for Node/C++/Rust (file hash for Node output, runtime stdout contracts for C++/Rust).
    - Success criteria: Nix-built outputs match expected outputs.
 
 2. Ensure builds are hermetic outside devshell.
-   - Output: CI runs in a minimal environment without host toolchains.
-   - Success criteria: Builds succeed without system-installed Go/Python.
+   - Output: CI checks selected builds in a minimal environment with host toolchain variables poisoned.
+   - Success criteria: Representative Node/C++/Rust selected builds succeed without host toolchain leakage.
 
 3. Update docs to reflect Nix-backed artifact builds with explicit probe exceptions.
-   - Output: `build-tools/docs/build-system-design.md` and `docs/handbook/starlark-api.md` updated.
+   - Output: `docs/handbook/nix-gaps-baseline.md`, `build-tools/docs/build-system-design.md`, and `docs/handbook/starlark-api.md` are aligned with parity signals and expected deltas.
    - Success criteria: Documentation distinguishes artifact builds from probe/test-only exceptions.
 
 ## Phase 7 — Cleanup and enforcement

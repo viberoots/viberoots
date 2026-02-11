@@ -23,5 +23,6 @@ test("nix-gaps baseline generator writes required sections", async () => {
     assert.match(txt, /## Tool versions/);
     assert.match(txt, /## Example build commands/);
     assert.match(txt, /## Best-effort timings/);
+    assert.match(txt, /## Phase 6 parity and hermeticity signals/);
   });
 });
