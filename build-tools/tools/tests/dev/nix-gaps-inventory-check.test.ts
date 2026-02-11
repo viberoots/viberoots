@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
 const scriptPath = "build-tools/tools/dev/nix-gaps-inventory-check.ts";
+const exceptionsPath = "docs/handbook/nix-gaps-exceptions.json";
 
 const starlarkApi = `# Starlark API reference
 
@@ -148,15 +149,37 @@ Node macro outcome classification:
 | \`node_webapp\` | orchestration wrapper | Nix build | wrapper |
 `;
 
+const exceptionsComplete = `{
+  "exceptions": [
+    {
+      "macro": "cpp_sanitize_probe",
+      "kind": "probe-only",
+      "justification": "Test-only sanitizer probe with no production artifact contract."
+    }
+  ]
+}
+`;
+
+const exceptionsMissingJustification = `{
+  "exceptions": [
+    {
+      "macro": "cpp_sanitize_probe",
+      "kind": "probe-only",
+      "justification": ""
+    }
+  ]
+}
+`;
+
 test("nix-gaps inventory check passes when inventory is complete", async () => {
   await runInTemp("nix-gaps-inventory-pass", async (tmp, $) => {
     await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptPath, "utf8"));
     await fs.outputFile(path.join(tmp, "docs/handbook/starlark-api.md"), starlarkApi);
     await fs.outputFile(path.join(tmp, "docs/handbook/nix-gaps.md"), nixGapsComplete);
-
+    await fs.outputFile(path.join(tmp, exceptionsPath), exceptionsComplete);
     await $({
       cwd: tmp,
-    })`node ${scriptPath} --starlark-api docs/handbook/starlark-api.md --nix-gaps docs/handbook/nix-gaps.md`;
+    })`node ${scriptPath} --starlark-api docs/handbook/starlark-api.md --nix-gaps docs/handbook/nix-gaps.md --exceptions ${exceptionsPath}`;
   });
 });
 
@@ -165,11 +188,11 @@ test("nix-gaps inventory check fails when a macro is missing", async () => {
     await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptPath, "utf8"));
     await fs.outputFile(path.join(tmp, "docs/handbook/starlark-api.md"), starlarkApi);
     await fs.outputFile(path.join(tmp, "docs/handbook/nix-gaps.md"), nixGapsMissing);
-
+    await fs.outputFile(path.join(tmp, exceptionsPath), exceptionsComplete);
     const res = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`node ${scriptPath} --starlark-api docs/handbook/starlark-api.md --nix-gaps docs/handbook/nix-gaps.md`.nothrow();
+    })`node ${scriptPath} --starlark-api docs/handbook/starlark-api.md --nix-gaps docs/handbook/nix-gaps.md --exceptions ${exceptionsPath}`.nothrow();
 
     assert.notEqual(res.exitCode, 0);
     assert.match(String(res.stderr || ""), /Missing macros in nix-gaps inventory/);
@@ -184,11 +207,11 @@ test("nix-gaps inventory check fails when a Node macro is missing from classific
       path.join(tmp, "docs/handbook/nix-gaps.md"),
       nixGapsMissingNodeClassification,
     );
-
+    await fs.outputFile(path.join(tmp, exceptionsPath), exceptionsComplete);
     const res = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`node ${scriptPath} --starlark-api docs/handbook/starlark-api.md --nix-gaps docs/handbook/nix-gaps.md`.nothrow();
+    })`node ${scriptPath} --starlark-api docs/handbook/starlark-api.md --nix-gaps docs/handbook/nix-gaps.md --exceptions ${exceptionsPath}`.nothrow();
 
     assert.notEqual(res.exitCode, 0);
     assert.match(String(res.stderr || ""), /Missing Node classification entries/);
@@ -200,13 +223,28 @@ test("nix-gaps inventory check fails when exception policy section is missing", 
     await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptPath, "utf8"));
     await fs.outputFile(path.join(tmp, "docs/handbook/starlark-api.md"), starlarkApi);
     await fs.outputFile(path.join(tmp, "docs/handbook/nix-gaps.md"), nixGapsMissingExceptionPolicy);
-
+    await fs.outputFile(path.join(tmp, exceptionsPath), exceptionsComplete);
     const res = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`node ${scriptPath} --starlark-api docs/handbook/starlark-api.md --nix-gaps docs/handbook/nix-gaps.md`.nothrow();
+    })`node ${scriptPath} --starlark-api docs/handbook/starlark-api.md --nix-gaps docs/handbook/nix-gaps.md --exceptions ${exceptionsPath}`.nothrow();
 
     assert.notEqual(res.exitCode, 0);
     assert.match(String(res.stderr || ""), /Missing section.*Exception policy/);
+  });
+});
+
+test("nix-gaps inventory check fails when exception entry lacks justification", async () => {
+  await runInTemp("nix-gaps-exception-justification-missing", async (tmp, $) => {
+    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptPath, "utf8"));
+    await fs.outputFile(path.join(tmp, "docs/handbook/starlark-api.md"), starlarkApi);
+    await fs.outputFile(path.join(tmp, "docs/handbook/nix-gaps.md"), nixGapsComplete);
+    await fs.outputFile(path.join(tmp, exceptionsPath), exceptionsMissingJustification);
+    const res = await $({
+      cwd: tmp,
+      stdio: "pipe",
+    })`node ${scriptPath} --starlark-api docs/handbook/starlark-api.md --nix-gaps docs/handbook/nix-gaps.md --exceptions ${exceptionsPath}`.nothrow();
+    assert.notEqual(res.exitCode, 0);
+    assert.match(String(res.stderr || ""), /Malformed exception entries/);
   });
 });

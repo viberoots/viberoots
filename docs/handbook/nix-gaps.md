@@ -87,9 +87,16 @@ Any macro that is a **Buck build** or **Stub (artifact expected)** can be impact
 
 ## Exception policy (intentional non-build macros)
 
-These macros are allowed to remain non-build only when they are probe/test-only by design:
+I keep a machine-checked source of truth at `docs/handbook/nix-gaps-exceptions.json`.
+Each exception entry must include:
 
-- `cpp_sanitize_probe` (test probe only, no production artifact contract).
+- `macro`
+- `kind` (`probe-only`)
+- `justification`
+
+Allowed non-build public macros:
+
+- `cpp_sanitize_probe` (test-only sanitizer probe with no production artifact contract).
 
 ## Toolchains
 

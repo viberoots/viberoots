@@ -1,0 +1,9 @@
+{
+  "exceptions": [
+    {
+      "macro": "cpp_sanitize_probe",
+      "kind": "probe-only",
+      "justification": "Test-only sanitizer probe; no production artifact contract."
+    }
+  ]
+}

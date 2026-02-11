@@ -157,7 +157,7 @@ Tasks:
    - Success criteria: Rust targets build and produce expected artifacts.
 
 3. Define and enforce an exception policy for probe/test-only macros (for example `cpp_sanitize_probe`).
-   - Output: Documented exception list in `docs/handbook/nix-gaps.md` with rationale per macro.
+   - Output: Documented exception list in `docs/handbook/nix-gaps.md` plus machine-checked source of truth in `docs/handbook/nix-gaps-exceptions.json` with rationale per macro.
    - Success criteria: Every non-build macro is intentional, documented, and reviewed.
 
 ## Phase 6 — Validation and parity

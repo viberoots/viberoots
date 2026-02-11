@@ -1,159 +1,53 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
 import { getFlagStr } from "../lib/cli";
+import {
+  hasExceptionPolicySection,
+  macroNamePattern,
+  missingLegendTerms,
+  nodeDefsBzlPath,
+  parseNixGapsInventory,
+  parseNodeClassificationTableMacros,
+  parseNonBuildInventoryMacros,
+  parseStarlarkIndexMacros,
+  parseStarlarkIndexMacrosByModule,
+  type NixGapsException,
+} from "./nix-gaps-inventory-check-lib.ts";
 
-const macroNamePattern = /^[a-z][a-z0-9_]+$/;
-const nodeDefsBzlPath = "//build-tools/node:defs.bzl";
-const requiredLegendTerms = ["Buck build", "Stub (artifact expected)", "Probe-only exception"];
-
-function uniqStable(items: string[]): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const item of items) {
-    if (seen.has(item)) continue;
-    seen.add(item);
-    out.push(item);
-  }
-  return out;
-}
-
-function parseStarlarkIndexMacros(text: string): string[] {
-  const lines = text.split(/\r?\n/);
-  const macros: string[] = [];
-  let inIndex = false;
-  for (const raw of lines) {
-    const line = raw.trim();
-    if (line.startsWith("## ")) {
-      if (line === "## Index") {
-        inIndex = true;
-        continue;
-      }
-      if (inIndex) break;
-    }
-    if (!inIndex) continue;
-    const match = line.match(/`([^`]+)`/);
-    if (!match) continue;
-    const value = match[1].trim();
-    if (!macroNamePattern.test(value)) continue;
-    macros.push(value);
-  }
-  return uniqStable(macros);
-}
-
-function parseStarlarkIndexMacrosByModule(text: string): Record<string, string[]> {
-  const lines = text.split(/\r?\n/);
-  const byModule: Record<string, string[]> = {};
-  let inIndex = false;
-  let currentModule = "";
-  for (const raw of lines) {
-    const line = raw.trim();
-    if (line.startsWith("## ")) {
-      if (line === "## Index") {
-        inIndex = true;
-        continue;
-      }
-      if (inIndex) break;
-    }
-    if (!inIndex) continue;
-    const moduleMatch = line.match(/^- `([^`]+)`$/);
-    const moduleValue = moduleMatch ? moduleMatch[1].trim() : "";
-    const isModulePath =
-      moduleValue.startsWith("//") && moduleValue.includes(":") && moduleValue.endsWith(".bzl");
-    if (moduleMatch && isModulePath) {
-      currentModule = moduleValue;
-      if (!byModule[currentModule]) byModule[currentModule] = [];
-      continue;
-    }
-    const macroMatch = line.match(/^- `([^`]+)`/);
-    if (!macroMatch || !currentModule) continue;
-    const macro = macroMatch[1].trim();
-    if (!macroNamePattern.test(macro)) continue;
-    byModule[currentModule].push(macro);
-  }
-  for (const mod of Object.keys(byModule)) byModule[mod] = uniqStable(byModule[mod]);
-  return byModule;
-}
-
-function parseNixGapsInventory(text: string): string[] {
-  const lines = text.split(/\r?\n/);
-  const macros: string[] = [];
-  for (const raw of lines) {
-    const match = raw.match(/^- `([^`]+)`/);
-    if (!match) continue;
-    const value = match[1].trim();
-    if (!macroNamePattern.test(value)) continue;
-    macros.push(value);
-  }
-  return uniqStable(macros);
-}
-
-function sectionLines(text: string, heading: string): string[] {
-  const lines = text.split(/\r?\n/);
-  const out: string[] = [];
-  let inSection = false;
-  for (const raw of lines) {
-    const line = raw.trimEnd();
-    if (line.trim() === heading) {
-      inSection = true;
-      continue;
-    }
-    if (!inSection) continue;
-    if (line.startsWith("## ")) break;
-    out.push(raw);
-  }
-  return out;
-}
-
-function parseNodeClassificationTableMacros(text: string): string[] {
-  const lines = sectionLines(text, "## Node macros");
-  if (lines.length === 0) return [];
-  const macros: string[] = [];
-  let inTable = false;
-  for (const raw of lines) {
-    const line = raw.trim();
-    if (!inTable && line === "Node macro outcome classification:") {
-      inTable = true;
-      continue;
-    }
-    if (!inTable) continue;
-    if (line === "") {
-      if (macros.length > 0) break;
-      continue;
-    }
-    if (!line.startsWith("|")) continue;
-    if (/^\|\s*-+\s*\|/.test(line)) continue;
-    const cells = line
-      .split("|")
-      .slice(1, -1)
-      .map((v) => v.trim());
-    if (cells.length === 0) continue;
-    const first = cells[0].replaceAll("`", "").trim();
-    if (!macroNamePattern.test(first)) continue;
-    macros.push(first);
-  }
-  return uniqStable(macros);
-}
-
-function hasExceptionPolicySection(text: string): boolean {
-  return sectionLines(text, "## Exception policy (intentional non-build macros)").length > 0;
-}
-
-function missingLegendTerms(text: string): string[] {
-  return requiredLegendTerms.filter((term) => !text.includes(term));
-}
+const defaultExceptionsPath = "docs/handbook/nix-gaps-exceptions.json";
 
 async function main() {
   const starlarkPath = getFlagStr("starlark-api", "docs/handbook/starlark-api.md");
   const inventoryPath = getFlagStr("nix-gaps", "docs/handbook/nix-gaps.md");
+  const exceptionsPath = getFlagStr("exceptions", defaultExceptionsPath);
 
   const starlarkTxt = await fs.readFile(starlarkPath, "utf8");
   const inventoryTxt = await fs.readFile(inventoryPath, "utf8");
+  const exceptionsJson = await fs.readJson(exceptionsPath);
+  const exceptionListRaw = Array.isArray(exceptionsJson?.exceptions)
+    ? exceptionsJson.exceptions
+    : [];
+  const exceptionList = exceptionListRaw as NixGapsException[];
 
   const starlarkMacros = parseStarlarkIndexMacros(starlarkTxt);
   const starlarkByModule = parseStarlarkIndexMacrosByModule(starlarkTxt);
   const nodePublicMacros = starlarkByModule[nodeDefsBzlPath] || [];
   const inventoryMacros = parseNixGapsInventory(inventoryTxt);
   const nodeClassificationMacros = parseNodeClassificationTableMacros(inventoryTxt);
+  const nonBuildInventoryMacros = parseNonBuildInventoryMacros(inventoryTxt);
+
+  const malformedExceptionEntries = exceptionList.filter(
+    (e) =>
+      !macroNamePattern.test(String(e?.macro || "").trim()) ||
+      String(e?.kind || "").trim() !== "probe-only" ||
+      String(e?.justification || "").trim() === "",
+  );
+  if (malformedExceptionEntries.length > 0) {
+    console.error(
+      `Malformed exception entries in ${exceptionsPath}; each entry needs macro, kind="probe-only", and non-empty justification.`,
+    );
+    process.exit(1);
+  }
 
   if (starlarkMacros.length === 0) {
     console.error(`No macros parsed from ${starlarkPath} (Index section).`);
@@ -188,6 +82,8 @@ async function main() {
   const inventorySet = new Set(inventoryMacros);
   const starlarkSet = new Set(starlarkMacros);
   const nodeClassifiedSet = new Set(nodeClassificationMacros);
+  const nonBuildInventorySet = new Set(nonBuildInventoryMacros.map((v) => v.macro));
+  const exceptionSet = new Set(exceptionList.map((v) => v.macro));
 
   const missing = starlarkMacros.filter((m) => !inventorySet.has(m));
   const extra = inventoryMacros.filter((m) => !starlarkSet.has(m));
@@ -202,6 +98,10 @@ async function main() {
   const extraNodeClassifications = nodeClassificationMacros.filter(
     (m) => !nodePublicMacros.includes(m),
   );
+  const disallowedStubGaps = nonBuildInventoryMacros.filter(
+    (v) => v.kind === "stub-artifact-expected",
+  );
+  const missingExceptionEntries = [...nonBuildInventorySet].filter((m) => !exceptionSet.has(m));
   if (missingNodeClassifications.length > 0) {
     console.error("Missing Node classification entries in nix-gaps Node classification table:");
     for (const name of missingNodeClassifications) console.error(`- ${name}`);
@@ -212,6 +112,16 @@ async function main() {
       "Extra Node classification entries not present in Starlark Node public macro list:",
     );
     for (const name of extraNodeClassifications) console.error(`- ${name}`);
+    process.exit(1);
+  }
+  if (disallowedStubGaps.length > 0) {
+    console.error("Stub (artifact expected) entries are not allowed under exception policy:");
+    for (const gap of disallowedStubGaps) console.error(`- ${gap.macro}`);
+    process.exit(1);
+  }
+  if (missingExceptionEntries.length > 0) {
+    console.error("Missing exception policy entries for non-build macros:");
+    for (const macro of missingExceptionEntries) console.error(`- ${macro}`);
     process.exit(1);
   }
 
