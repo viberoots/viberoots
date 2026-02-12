@@ -208,6 +208,16 @@ Checkpoint:
 
 - failing tests above pass individually and as grouped reruns.
 
+Phase 3 status (PR-3):
+
+- Scaffold end-to-end parity is covered by
+  `build-tools/tools/tests/scaffolding/scaf-new.ts.wasm-linking-app.scaffold-and-build.test.ts`
+  and validated against mixed Go/C++/Python wasm producer labels.
+- Node wasm stage/inline coverage includes focused mixed-producer staging and inline assertions in
+  `build-tools/tools/tests/node/node.wasm-stage-inline.mixed-producer-labels.test.ts`.
+- Scaffold templates keep default resolution for unambiguous file outputs and rely on explicit
+  selectors only where source ambiguity exists.
+
 ## Phase 4: Documentation Updates
 
 Goal: align user-facing and design docs.

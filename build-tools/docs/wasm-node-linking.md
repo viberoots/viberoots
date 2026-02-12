@@ -278,6 +278,7 @@ const { instance } = await WebAssembly.instantiate(wasmBytes(), {});
 node_wasm_inline_module(
     name = "math-wasm-inline",
     src = "//projects/libs/math-core:core_cpp_wasm",
+    artifact_name = "cpp_emscripten.wasm",
 )
 
 nix_node_cli_bin(
@@ -342,6 +343,7 @@ main().catch((err) => {
 node_wasm_inline_module(
     name = "py-wasm-inline",
     src = "//projects/libs/py-wasm:module",
+    artifact_name = "pyext.wasm",
 )
 
 nix_node_cli_bin(

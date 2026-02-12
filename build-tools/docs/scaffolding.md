@@ -287,6 +287,26 @@ node_asset_stage(
 )
 ```
 
+Source resolution contract for staged assets:
+
+- If `src` resolves to a file, the macro stages that file directly.
+- If `src` resolves to a directory, the macro prefers `top.wasm`, then exactly one `*.wasm`,
+  otherwise fails with a disambiguation error.
+- For ambiguous directory outputs, set `artifact_name` (preferred) or `artifact_glob`.
+
+Example disambiguation:
+
+```
+node_asset_stage(
+    name = "webapp",
+    app = ":webapp_raw",
+    assets = [
+        {"src": "//projects/libs/math-core:core_cpp_wasm", "artifact_name": "cpp_emscripten.wasm", "dest": "top.wasm"},
+    ],
+    out = "dist",
+)
+```
+
 ### Wasm inline modules for Node webapps
 
 I generate an inline module from a Wasm file and stage it into `dist/` alongside the webapp output. The webapp loads the module at runtime, so I do not need a Vite plugin.
@@ -313,6 +333,12 @@ node_asset_stage(
     out = "dist",
 )
 ```
+
+Source resolution contract for inline modules matches `node_asset_stage`:
+
+- File source: use the file.
+- Directory source: `top.wasm` default, then exactly one `*.wasm`, otherwise fail.
+- Ambiguous directory source: set `artifact_name` (preferred) or `artifact_glob`.
 
 App entrypoint:
 

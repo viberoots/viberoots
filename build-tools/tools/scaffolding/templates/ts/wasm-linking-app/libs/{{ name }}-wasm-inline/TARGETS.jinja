@@ -9,7 +9,6 @@ node_wasm_inline_module(
 node_wasm_inline_module(
     name = "wasm_inline_cpp",
     src = "//projects/libs/{{ name }}-cpp-wasm:cpp_wasm",
-    artifact_name = "top.wasm",
     out = "cpp.js",
     visibility = ["PUBLIC"],
 )
@@ -17,7 +16,6 @@ node_wasm_inline_module(
 node_wasm_inline_module(
     name = "wasm_inline_py",
     src = "//projects/libs/{{ name }}-py-wasm:py_wasm",
-    artifact_name = "pyext.wasm",
     out = "py.js",
     visibility = ["PUBLIC"],
 )
