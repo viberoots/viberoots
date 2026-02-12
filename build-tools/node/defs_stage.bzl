@@ -1,17 +1,7 @@
 load("@prelude//:rules.bzl", "genrule")
-load(
-    "//build-tools/lang:defs_common.bzl",
-    "default_lockfile_label_from_package",
-    "default_lockfile_path_from_package",
-    "ensure_default_lockfile_exists",
-    "extract_lockfile_labels",
-    "prepare_language_wiring",
-)
-load(
-    "//build-tools/lang:nix_shell.bzl",
-    "nix_calling_env_export_buck_graph_json",
-    "nix_calling_genrule_bootstrap",
-)
+load("//build-tools/lang:defs_common.bzl", "default_lockfile_label_from_package", "default_lockfile_path_from_package", "ensure_default_lockfile_exists", "extract_lockfile_labels", "prepare_language_wiring")
+load("//build-tools/lang:nix_shell.bzl", "nix_calling_env_export_buck_graph_json", "nix_calling_genrule_bootstrap")
+load("//build-tools/node/private:wasm_source_resolver.bzl", "asset_with_selector", "sh_quote", "validate_wasm_selector_args", "wasm_source_resolver_shell")
 MODULE_PROVIDERS = {}
 load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
 
@@ -22,6 +12,17 @@ def _to_abs_label(v):
     if v.startswith(":"):
         return "//%s:%s" % (native.package_name(), v[1:])
     return v
+
+def _label_package(v):
+    if not _is_label_ref(v):
+        return ""
+    if v.startswith(":"):
+        return native.package_name()
+    trimmed = v[2:]
+    i = trimmed.find(":")
+    if i < 0:
+        return trimmed
+    return trimmed[:i]
 
 def _apply_default_lockfile_label(lockfile_label, labels, macro_name):
     if (lockfile_label == None or lockfile_label == "") and len(extract_lockfile_labels(labels or [])) == 0:
@@ -61,29 +62,32 @@ def node_asset_stage(
     if out == None:
         out = "dist"
     lockfile_label = _apply_default_lockfile_label(lockfile_label, labels, "node_asset_stage")
+    app_ref = app
+    app_pkg = ""
+    if _is_label_ref(app):
+        app_ref = "$(location %s)" % _to_abs_label(app)
+        app_pkg = _label_package(app)
 
     stage_srcs = [app]
     copy_assets = []
     for a in assets:
-        src = a["src"]
-        dest = a["dest"]
+        selected = asset_with_selector(a)
+        src = selected.src
+        dest = selected.dest
         stage_srcs.append(src)
         copy_assets.append(
             "if [ \"$#\" -lt 1 ]; then "
-            + "echo \"node_asset_stage: missing staged asset input for %s\" >&2; exit 2; "
+            + ("echo \"node_asset_stage: missing staged asset input for %s\" >&2; exit 2; " % src)
             + "fi; "
-            + "ASSET_SRC=\"$1\"; shift; "
-            + "if [ ! -e \"$ASSET_SRC\" ] && [ -e \"$SRCDIR/$ASSET_SRC\" ]; then ASSET_SRC=\"$SRCDIR/$ASSET_SRC\"; fi; "
-            + "if [ ! -e \"$ASSET_SRC\" ] && [ -e \"$WORKSPACE_ROOT/$ASSET_SRC\" ]; then ASSET_SRC=\"$WORKSPACE_ROOT/$ASSET_SRC\"; fi; "
-            + "if [ -d \"$ASSET_SRC\" ]; then "
-            + "  if [ -f \"$ASSET_SRC/top.wasm\" ]; then ASSET_SRC=\"$ASSET_SRC/top.wasm\"; "
-            + "  else ASSET_WASM=\"\"; for f in \"$ASSET_SRC\"/*.wasm \"$ASSET_SRC\"/*/*.wasm \"$ASSET_SRC\"/*/*/*.wasm; do "
-            + "    if [ -f \"$f\" ]; then ASSET_WASM=\"$f\"; break; fi; "
-            + "  done; "
-            + "    if [ -n \"$ASSET_WASM\" ]; then ASSET_SRC=\"$ASSET_WASM\"; "
-            + "    else echo \"node_asset_stage: no wasm file found in asset output dir: $ASSET_SRC\" >&2; exit 2; fi; "
-            + "  fi; "
-            + "fi; "
+            + "ASSET_HINT=\"$1\"; shift; "
+            + ("ASSET_RAW=%s; " % sh_quote(src))
+            + ("ASSET_NAME=%s; " % sh_quote(selected.artifact_name))
+            + ("ASSET_GLOB=%s; " % sh_quote(selected.artifact_glob))
+            + "if resolve_node_source_path node_asset_stage \"$ASSET_RAW\" \"$ASSET_HINT\"; then "
+            + "ASSET_SRC=\"$BNX_WASM_RESOLVED_PATH\"; "
+            + "else ASSET_SRC=\"$SRCDIR\"; fi; "
+            + "resolve_node_wasm_artifact node_asset_stage \"$ASSET_RAW\" \"$ASSET_SRC\" \"$ASSET_NAME\" \"$ASSET_GLOB\" || exit $?; "
+            + "ASSET_SRC=\"$BNX_WASM_RESOLVED_PATH\"; "
             + ("DEST=\"$OUT_ABS/%s\"; " % dest)
             + "if [ -e \"$DEST\" ] && [ ! -f \"$DEST\" ]; then "
             + "echo \"node_asset_stage: destination is not a file: $DEST\" >&2; exit 2; "
@@ -94,6 +98,7 @@ def node_asset_stage(
             + "cp -f \"$ASSET_SRC\" \"$DEST\"; "
         )
 
+    # Route note: these stage/inline macros run through the graph-generator-selected Nix path.
     cmd = (
         "SCRATCH=\"$PWD\"; OUT_ABS=\"$SCRATCH/$OUT\"; "
         + nix_calling_genrule_bootstrap(
@@ -102,15 +107,24 @@ def node_asset_stage(
             source_workspace_root_env = True,
         )
         + nix_calling_env_export_buck_graph_json()
+        + wasm_source_resolver_shell()
+        + "if [ -n \"$SRCDIR\" ] && [ \"${SRCDIR#/}\" = \"$SRCDIR\" ]; then SRCDIR=\"$SCRATCH/$SRCDIR\"; fi; "
         + "set -- $SRCS; "
         + "if [ \"$#\" -lt %s ]; then echo \"node_asset_stage: missing app/assets inputs\" >&2; exit 2; fi; " % (len(assets) + 1)
-        + "APP_OUT=\"$1\"; shift; "
+        + ("APP_HINT=\"%s\"; " % app_ref)
+        + ("APP_PKG=%s; " % sh_quote(app_pkg))
+        + "if [ ! -e \"$APP_HINT\" ]; then APP_HINT=\"$1\"; fi; "
+        + "if [ -n \"$APP_HINT\" ] && [ \"${APP_HINT#/}\" = \"$APP_HINT\" ]; then APP_HINT=\"$SCRATCH/$APP_HINT\"; fi; "
+        + "shift; "
+        + "APP_OUT=\"$APP_HINT\"; "
         + "if [ ! -e \"$APP_OUT\" ] && [ -e \"$SRCDIR/$APP_OUT\" ]; then APP_OUT=\"$SRCDIR/$APP_OUT\"; fi; "
         + "if [ ! -e \"$APP_OUT\" ] && [ -e \"$WORKSPACE_ROOT/$APP_OUT\" ]; then APP_OUT=\"$WORKSPACE_ROOT/$APP_OUT\"; fi; "
+        + "if [ ! -e \"$APP_OUT\" ] && [ -n \"$APP_PKG\" ] && [ -d \"$WORKSPACE_ROOT/$APP_PKG/dist\" ]; then APP_OUT=\"$WORKSPACE_ROOT/$APP_PKG/dist\"; fi; "
         + "mkdir -p \"$OUT_ABS\"; "
-        + "if [ -d \"$APP_OUT\" ]; then "
-        + "cp -R \"$APP_OUT\"/. \"$OUT_ABS\"; "
-        + "else cp -f \"$APP_OUT\" \"$OUT_ABS\"; fi; "
+        + "if [ -e \"$APP_OUT\" ]; then "
+        + "  if [ -d \"$APP_OUT\" ]; then cp -R \"$APP_OUT\"/. \"$OUT_ABS\"; "
+        + "  else cp -f \"$APP_OUT\" \"$OUT_ABS\"; fi; "
+        + "fi; "
         + "".join(copy_assets)
     )
     kw = dict(kwargs) if kwargs != None else {}
@@ -127,15 +141,26 @@ def node_asset_stage(
     kw["cmd"] = cmd
     genrule(**kw)
 
-def node_wasm_inline_module(name, src, out = None, labels = [], lockfile_label = None, deps = [], **kwargs):
+def node_wasm_inline_module(
+        name,
+        src,
+        out = None,
+        artifact_name = None,
+        artifact_glob = None,
+        labels = [],
+        lockfile_label = None,
+        deps = [],
+        **kwargs):
     if src == None or src == "":
         fail("node_wasm_inline_module: src is required")
+    validate_wasm_selector_args("node_wasm_inline_module", artifact_name, artifact_glob)
     if out == None:
         out = "index.js"
     lockfile_label = _apply_default_lockfile_label(lockfile_label, labels, "node_wasm_inline_module")
     src_ref = src
     if _is_label_ref(src):
         src_ref = "$(location %s)" % _to_abs_label(src)
+    # Route note: this macro runs through the graph-generator-selected Nix path.
     cmd = (
         "SCRATCH=\"$PWD\"; OUT_ABS=\"$SCRATCH/$OUT\"; "
         + nix_calling_genrule_bootstrap(
@@ -144,22 +169,31 @@ def node_wasm_inline_module(name, src, out = None, labels = [], lockfile_label =
             source_workspace_root_env = True,
         )
         + nix_calling_env_export_buck_graph_json()
-        + ("SRC_PATH=\"%s\"; " % src_ref)
-        + "if [ ! -e \"$SRC_PATH\" ]; then "
+        + wasm_source_resolver_shell()
+        + "if [ -n \"$SRCDIR\" ] && [ \"${SRCDIR#/}\" = \"$SRCDIR\" ]; then SRCDIR=\"$SCRATCH/$SRCDIR\"; fi; "
+        + ("SRC_HINT=\"%s\"; " % src_ref)
+        + "if [ ! -e \"$SRC_HINT\" ]; then "
         + "  set -- $SRCS; "
-        + "  if [ \"$#\" -ge 1 ]; then SRC_PATH=\"$1\"; fi; "
+        + "  if [ \"$#\" -ge 1 ]; then SRC_HINT=\"$1\"; fi; "
         + "fi; "
-        + "if [ ! -e \"$SRC_PATH\" ] && [ -e \"$SRCDIR/$SRC_PATH\" ]; then SRC_PATH=\"$SRCDIR/$SRC_PATH\"; fi; "
-        + "if [ ! -e \"$SRC_PATH\" ] && [ -e \"$WORKSPACE_ROOT/$SRC_PATH\" ]; then SRC_PATH=\"$WORKSPACE_ROOT/$SRC_PATH\"; fi; "
-        + "if [ -d \"$SRC_PATH\" ]; then "
-        + "  if [ -f \"$SRC_PATH/top.wasm\" ]; then SRC_PATH=\"$SRC_PATH/top.wasm\"; "
-        + "  else SRC_WASM=\"\"; for f in \"$SRC_PATH\"/*.wasm \"$SRC_PATH\"/*/*.wasm \"$SRC_PATH\"/*/*/*.wasm; do "
-        + "    if [ -f \"$f\" ]; then SRC_WASM=\"$f\"; break; fi; "
-        + "  done; "
-        + "    if [ -n \"$SRC_WASM\" ]; then SRC_PATH=\"$SRC_WASM\"; "
-        + "    else echo \"node_wasm_inline_module: no wasm file found in source dir: $SRC_PATH\" >&2; exit 2; fi; "
-        + "  fi; "
+        + "if [ -n \"$SRC_HINT\" ] && [ \"${SRC_HINT#/}\" = \"$SRC_HINT\" ]; then SRC_HINT=\"$SCRATCH/$SRC_HINT\"; fi; "
+        + ("SRC_RAW=%s; " % sh_quote(src))
+        + ("SRC_NAME=%s; " % sh_quote(artifact_name))
+        + ("SRC_GLOB=%s; " % sh_quote(artifact_glob))
+        + "if resolve_node_source_path node_wasm_inline_module \"$SRC_RAW\" \"$SRC_HINT\"; then "
+        + "SRC_PATH=\"$BNX_WASM_RESOLVED_PATH\"; "
+        + "else SRC_PATH=\"$SRCDIR\"; "
+        + "if [[ \"$SRC_RAW\" == //*:* ]]; then "
+        + "INLINE_FALLBACK_WASM=\"$SCRATCH/.bnx-inline-fallback-${RANDOM}.wasm\"; "
+        + "INLINE_EXPORT_TOOL=\"$WORKSPACE_ROOT/build-tools/tools/wasm/export-wasm-from-nix.ts\"; "
+        + "if [ -x \"$INLINE_EXPORT_TOOL\" ]; then "
+        + "WASM_TARGET=\"$SRC_RAW\" WASM_DIR=\"lib\" WASM_NAME=\"$SRC_NAME\" OUT_PATH=\"$INLINE_FALLBACK_WASM\" \"$INLINE_EXPORT_TOOL\" >/dev/null 2>&1 || true; "
+        + "if [ -f \"$INLINE_FALLBACK_WASM\" ]; then SRC_PATH=\"$INLINE_FALLBACK_WASM\"; fi; "
         + "fi; "
+        + "fi; "
+        + "fi; "
+        + "resolve_node_wasm_artifact node_wasm_inline_module \"$SRC_RAW\" \"$SRC_PATH\" \"$SRC_NAME\" \"$SRC_GLOB\" || exit $?; "
+        + "SRC_PATH=\"$BNX_WASM_RESOLVED_PATH\"; "
         + "if [ ! -f \"$SRC_PATH\" ]; then echo \"node_wasm_inline_module: source not found: $SRC_PATH\" >&2; exit 2; fi; "
         + "SRC_PATH=\"$SRC_PATH\" OUT_ABS=\"$OUT_ABS\" node -e \""
         + "const fs=require('node:fs');"
@@ -188,11 +222,14 @@ def node_wasm_inline_module(name, src, out = None, labels = [], lockfile_label =
         + "fs.writeFileSync(out,data);\"; "
     )
     kw = dict(kwargs) if kwargs != None else {}
+    wiring_deps = list(deps or [])
+    if _is_label_ref(src):
+        wiring_deps.append(src)
     wiring = _prepare_node_nix_calling_genrule(
         name = name,
         kwargs = kw,
         srcs = [src],
-        deps = list(deps or []),
+        deps = wiring_deps,
         labels = labels,
         lockfile_label = lockfile_label,
     )

@@ -25,10 +25,17 @@ async function nixPathInfo(root: string, attr: string): Promise<string> {
   const txt = String(res.stdout || "").trim();
   if (!txt.startsWith("[")) return "";
   try {
-    const arr = JSON.parse(txt) as Array<string | { path?: string }>;
+    const arr = JSON.parse(txt) as Array<string | { path?: string; valid?: boolean }>;
     const first = arr[0];
-    const out = typeof first === "string" ? first : String(first?.path || "");
-    return out || "";
+    const out = (typeof first === "string" ? first : String(first?.path || "")).trim();
+    if (!out) return "";
+    if (typeof first !== "string" && first?.valid === false) return "";
+    try {
+      await fsp.access(out);
+      return out;
+    } catch {
+      return "";
+    }
   } catch {
     return "";
   }
@@ -95,8 +102,19 @@ async function readExistingToolchainPaths(repo: string): Promise<ToolchainPaths 
     const pyBin = String(parsed?.python?.bin || "").trim();
     if (!goBin || !pyBin) return null;
     if (!isNixStorePath(goBin) || !isNixStorePath(pyBin)) return null;
+    try {
+      await fsp.access(goBin);
+      await fsp.access(pyBin);
+    } catch {
+      return null;
+    }
     const root = goRoot || (await resolveGoRoot(goBin)) || "";
     if (!root || !isNixStorePath(root)) return null;
+    try {
+      await fsp.access(root);
+    } catch {
+      return null;
+    }
     const out: ToolchainPaths = { go: { bin: goBin, root }, python: { bin: pyBin } };
     const bzlPath = path.join(repo, BZL_REL);
     await writeIfChanged(jsonPath, JSON.stringify(out, null, 2) + "\n");

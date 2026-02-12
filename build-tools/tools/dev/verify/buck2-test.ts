@@ -74,6 +74,8 @@ export function spawnVerifyBuck2Tests(opts: {
     "--env",
     `BNX_TEST_SEED_PIN_DIR=${process.env.BNX_TEST_SEED_PIN_DIR || ""}`,
     "--env",
+    `BNX_SHARED_PRELUDE_PATH=${process.env.BNX_SHARED_PRELUDE_PATH || ""}`,
+    "--env",
     `TEST_RSYNC_ROOTS=${process.env.TEST_RSYNC_ROOTS || ""}`,
     "--env",
     `TEST_PARTIAL_CLONE_GO_ONLY=${process.env.TEST_PARTIAL_CLONE_GO_ONLY || ""}`,

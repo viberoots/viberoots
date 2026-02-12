@@ -31,6 +31,43 @@ import { prepareVerifySeed } from "./seed.ts";
 import { ensureRepoLocalTmpRoot } from "./tmp-root.ts";
 import { computeZxTestNodeModulesOut } from "./zx-node-modules.ts";
 
+async function activeNixGcProcesses(): Promise<Array<{ pid: number; command: string }>> {
+  const out = await $({
+    stdio: "pipe",
+    reject: false,
+  })`ps -axo pid=,command=`;
+  if ((out as any).exitCode !== 0) return [];
+  const rows: Array<{ pid: number; command: string }> = [];
+  const lines = String((out as any).stdout || "").split("\n");
+  for (const line of lines) {
+    const s = line.trim();
+    if (!s) continue;
+    const firstSpace = s.indexOf(" ");
+    if (firstSpace <= 0) continue;
+    const pid = Number(s.slice(0, firstSpace).trim());
+    const command = s.slice(firstSpace + 1).trim();
+    if (!Number.isFinite(pid) || pid <= 0 || !command) continue;
+    if (
+      command.includes("nix store gc") ||
+      command.includes("nix-store --gc") ||
+      command.includes("nix-store -gc")
+    ) {
+      rows.push({ pid, command });
+    }
+  }
+  return rows;
+}
+
+function ensureVerifyNixLockTimeout(): string {
+  const key = "lock-timeout =";
+  const current = String(process.env.NIX_CONFIG || "");
+  if (current.includes(key)) return current;
+  const line = "lock-timeout = 120";
+  const next = current.trim() ? `${current.trim()}\n${line}\n` : `${line}\n`;
+  process.env.NIX_CONFIG = next;
+  return next;
+}
+
 export async function runVerify(): Promise<void> {
   const root = repoRoot();
   const args = parseVerifyArgs();
@@ -59,6 +96,7 @@ export async function runVerify(): Promise<void> {
   await fsp.rm(path.join(root, ".tmp"), { recursive: true, force: true }).catch(() => {});
 
   await ensureBuckPreludeConfig(root);
+  process.env.BNX_SHARED_PRELUDE_PATH = path.join(root, "prelude");
 
   const targetFreeGiB = verifyTargetFreeGiBDefault(args.coverage);
   const { freeGiB } = await runVerifyHousekeeping({ root, targetFreeGiB, zxInitPath });
@@ -69,6 +107,27 @@ export async function runVerify(): Promise<void> {
   const iso = `v-${process.pid}-${Date.now()}`;
   await writeVerifyIsoMarker(lock.lockDir, iso);
   await appendVerifyLogLine(lock.logFile, `[verify] begin iso=${iso}`);
+  const nixGc = await activeNixGcProcesses();
+  if (nixGc.length > 0) {
+    const sample = nixGc
+      .slice(0, 3)
+      .map((p) => `${p.pid}:${p.command.slice(0, 120)}`)
+      .join(" | ");
+    await appendVerifyLogLine(
+      lock.logFile,
+      `[verify] nix gc preflight blocked: active_gc_processes=${nixGc.length} sample=${sample}`,
+    );
+    throw new Error(
+      `verify preflight failed: active 'nix store gc' process(es) detected (${nixGc
+        .map((p) => p.pid)
+        .join(", ")}). Stop GC and rerun verify to avoid SQLite lock contention.`,
+    );
+  }
+  await appendVerifyLogLine(lock.logFile, "[verify] nix gc preflight: ok");
+  const nixConfig = ensureVerifyNixLockTimeout();
+  if (nixConfig.includes("lock-timeout =")) {
+    await appendVerifyLogLine(lock.logFile, "[verify] nix lock-timeout configured: 120s");
+  }
   // Log the current git revision for performance correlation across runs.
   // This intentionally runs after we have a logFile (verify-lock acquired).
   try {

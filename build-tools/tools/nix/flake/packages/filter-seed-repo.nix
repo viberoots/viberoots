@@ -18,6 +18,7 @@ let
     "lang"
     "node"
     "patches"
+    "prelude"
     "python"
     "tools"
     "third_party"
@@ -63,6 +64,8 @@ let
   allowByRoots = rel:
     rel == "flake.nix" ||
     rel == "flake.lock" ||
+    rel == "prelude" ||
+    lib.hasPrefix "prelude/" rel ||
     builtins.any (r: rel == r || lib.hasPrefix (r + "/") rel) roots;
   allowByDefault = rel:
     let

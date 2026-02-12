@@ -39,8 +39,11 @@ Create a small macro in `build-tools/node/defs.bzl` that wraps an existing app t
 
 - `app`: label for the already-built app target
 - `assets`: list of `{src, dest}` entries
-  - `src` is a label that resolves to a single file
+  - `src` is a file label/path or a target output that may resolve to a file or directory
   - `dest` is a relative path inside the output directory
+  - optional selectors for directory sources:
+    - `artifact_name` (preferred exact filename)
+    - `artifact_glob` (controlled glob for unstable names)
 - `out`: name of the output directory (defaults to `dist`)
 
 **Behavior**
@@ -49,7 +52,13 @@ Create a small macro in `build-tools/node/defs.bzl` that wraps an existing app t
 - For each asset entry, copy `$(location src)` to `$OUT/<dest>`.
 - Fail if any asset path already exists and is not a file.
 
-This keeps the Wasm asset staging explicit and does not require new build phases inside Vite.
+Default directory resolution contract for `src`:
+
+- prefer `top.wasm` when present,
+- otherwise use exactly one `*.wasm` match from a bounded scan,
+- fail (deterministic, actionable) on zero or multiple matches.
+
+This keeps the Wasm asset staging explicit and deterministic and does not require new build phases inside Vite.
 
 ### 2) Template pattern for webapps
 
@@ -198,6 +207,7 @@ const { instance } = await WebAssembly.instantiate(wasmBytes(), {});
 node_wasm_inline_module(
     name = "math-wasm-inline",
     src = "//projects/libs/math-core:core_cpp_wasm",
+    artifact_name = "cpp_emscripten.wasm",
 )
 
 node_webapp(
@@ -229,6 +239,7 @@ const { instance } = await WebAssembly.instantiate(wasmBytes(), {});
 node_wasm_inline_module(
     name = "py-wasm-inline",
     src = "//projects/libs/py-wasm:module",
+    artifact_name = "pyext.wasm",
 )
 
 node_webapp(

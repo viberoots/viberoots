@@ -588,8 +588,18 @@ Public args:
   - Example: `node_asset_stage(name = "web_assets")`
 - `app` label. Webapp output to copy.
   - Example: `app = ":webapp"`
-- `assets` list of dicts. Each item has `src` and `dest`.
+- `assets` list of dicts. Each item requires `src` and `dest`, and may set one selector.
   - Example: `assets = [{"src": "//assets:logo", "dest": "img/logo.svg"}]`
+  - Optional selector keys:
+    - `artifact_name` string. Exact wasm filename when `src` resolves to a directory.
+      - Example: `{"src": "//libs:py_wasm", "artifact_name": "pyext.wasm", "dest": "wasm/py.wasm"}`
+    - `artifact_glob` string. Glob selector for controlled unstable names when `src` resolves to a directory.
+      - Example: `{"src": "//libs:wasm_out", "artifact_glob": "module-*.wasm", "dest": "wasm/module.wasm"}`
+  - Do not set both `artifact_name` and `artifact_glob` on the same asset.
+- Directory resolution defaults when no selector is set:
+  - Prefer `top.wasm` when present.
+  - Otherwise require exactly one `*.wasm` match (scan bounded to directory, one level, and two levels).
+  - Fail deterministically on zero or multiple matches with a disambiguation message.
 - `out` string. Output directory name. Default is `dist`.
   - Example: `out = "dist"`
 - `deps` list of labels. Optional direct deps.
@@ -599,7 +609,7 @@ Public args:
 - `lockfile_label` string. Lockfile label in the form `lockfile:<path>#<package>`.
   - Example: `lockfile_label = "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"`
 
-### `node_wasm_inline_module(name, src, out = None, labels = [], lockfile_label = None, **kwargs)`
+### `node_wasm_inline_module(name, src, out = None, artifact_name = None, artifact_glob = None, labels = [], lockfile_label = None, **kwargs)`
 
 Use this to wrap a wasm file into a JS module for Node usage.
 
@@ -611,6 +621,15 @@ Public args:
   - Example: `src = ":core_wasm"`
 - `out` string. Output filename. Default is `index.js`.
   - Example: `out = "inline.js"`
+- `artifact_name` string. Exact wasm filename when `src` resolves to a directory.
+  - Example: `artifact_name = "cpp_emscripten.wasm"`
+- `artifact_glob` string. Glob selector for controlled unstable names when `src` resolves to a directory.
+  - Example: `artifact_glob = "module-*.wasm"`
+- Do not set both `artifact_name` and `artifact_glob`.
+- Directory resolution defaults when no selector is set:
+  - Prefer `top.wasm` when present.
+  - Otherwise require exactly one `*.wasm` match (bounded scan).
+  - Fail deterministically on zero or multiple matches with a clear selector hint.
 - `labels` list of strings. Optional labels to add.
   - Example: `labels = ["team:web"]`
 - `lockfile_label` string. Lockfile label in the form `lockfile:<path>#<package>`.

@@ -5,11 +5,13 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-function assertCmdInvariants(cmd: string, label: string) {
-  assert.ok(
-    cmd.includes("--no-link --print-out-paths"),
-    `${label}: expected nix build out-path capture (--no-link --print-out-paths)`,
-  );
+function assertCmdInvariants(cmd: string, label: string, requiresOutPathCapture = true) {
+  if (requiresOutPathCapture) {
+    assert.ok(
+      cmd.includes("--no-link --print-out-paths"),
+      `${label}: expected nix build out-path capture (--no-link --print-out-paths)`,
+    );
+  }
   assert.ok(
     cmd.includes("BUCK_GRAPH_JSON="),
     `${label}: expected BUCK_GRAPH_JSON env export to be present`,
@@ -101,7 +103,7 @@ test("node Nix-calling macros use standardized command assembly helpers (cquery 
       nothrow: true,
     })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cmd //projects/apps/web:staged`;
     if (staged.exitCode !== 0) return;
-    assertCmdInvariants(String(staged.stdout || ""), "node_asset_stage");
+    assertCmdInvariants(String(staged.stdout || ""), "node_asset_stage", false);
 
     const inline = await $({
       cwd: tmp,
@@ -110,7 +112,7 @@ test("node Nix-calling macros use standardized command assembly helpers (cquery 
       nothrow: true,
     })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cmd //projects/apps/web:inline_mod`;
     if (inline.exitCode !== 0) return;
-    assertCmdInvariants(String(inline.stdout || ""), "node_wasm_inline_module");
+    assertCmdInvariants(String(inline.stdout || ""), "node_wasm_inline_module", false);
 
     const cli = await $({
       cwd: tmp,

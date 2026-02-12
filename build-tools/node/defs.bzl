@@ -73,11 +73,22 @@ def node_asset_stage(name, app, assets = [], out = None, **kwargs):
         **kwargs
     )
 
-def node_wasm_inline_module(name, src, out = None, labels = [], lockfile_label = None, **kwargs):
+def node_wasm_inline_module(
+    name,
+    src,
+    out = None,
+    artifact_name = None,
+    artifact_glob = None,
+    labels = [],
+    lockfile_label = None,
+    **kwargs
+):
     _node_wasm_inline_module(
         name = name,
         src = src,
         out = out,
+        artifact_name = artifact_name,
+        artifact_glob = artifact_glob,
         labels = labels,
         lockfile_label = lockfile_label,
         **kwargs

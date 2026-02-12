@@ -19,7 +19,13 @@ async function nixPathInfoOrBuild(root: string, $: any, attr: string): Promise<s
       const arr = JSON.parse(txt) as Array<string | { path?: string }>;
       const first = arr[0];
       const pathInfo = typeof first === "string" ? first : String(first?.path || "");
-      if (pathInfo) return pathInfo;
+      if (pathInfo) {
+        const exists = await fsp
+          .access(pathInfo)
+          .then(() => true)
+          .catch(() => false);
+        if (exists) return pathInfo;
+      }
     }
   }
   const res = await $({

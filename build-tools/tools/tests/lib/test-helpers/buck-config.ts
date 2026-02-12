@@ -2,37 +2,62 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import "./worker-init";
 
-export async function ensureBuckConfigForTempRepo(tmp: string, $: any): Promise<void> {
-  let preludePath = "";
+let cachedPreludePath: Promise<string> | null = null;
+
+async function resolvePreludePath(tmp: string, $: any): Promise<string> {
+  const sharedPrelude = String(process.env.BNX_SHARED_PRELUDE_PATH || "").trim();
+  if (sharedPrelude) {
+    try {
+      await fsp.access(sharedPrelude);
+      return sharedPrelude;
+    } catch {}
+  }
+
   const localPrelude = path.join(tmp, "prelude");
   try {
     await fsp.access(localPrelude);
-    preludePath = localPrelude;
+    return localPrelude;
   } catch {}
-  if (!preludePath) {
-    try {
-      const pre = await $({
-        cwd: tmp,
-        stdio: "pipe",
-      })`nix build ${`path:${tmp}#buck2-prelude`} --no-link --accept-flake-config --print-out-paths`;
-      const out = String(pre.stdout || "")
-        .trim()
-        .split("\n")
-        .filter(Boolean)
-        .pop();
-      if (out) preludePath = path.join(out, "prelude").replaceAll("\\", "/");
-    } catch {}
-    if (!preludePath) {
+
+  // Fast path: seeded temp repos intentionally stay small and may omit prelude.
+  // Reuse the already-materialized workspace prelude when available.
+  const repoPrelude = path.join(process.cwd(), "prelude");
+  try {
+    await fsp.access(repoPrelude);
+    return repoPrelude;
+  } catch {}
+
+  if (!cachedPreludePath) {
+    cachedPreludePath = (async () => {
+      try {
+        const pre = await $({
+          cwd: tmp,
+          stdio: "pipe",
+        })`nix build ${`path:${tmp}#buck2-prelude`} --no-link --accept-flake-config --print-out-paths`;
+        const out = String(pre.stdout || "")
+          .trim()
+          .split("\n")
+          .filter(Boolean)
+          .pop();
+        if (out) return path.join(out, "prelude").replaceAll("\\", "/");
+      } catch {}
       try {
         const ev = await $({
           cwd: tmp,
           stdio: "pipe",
         })`nix eval --raw ${`path:${tmp}#inputs.buck2.outPath`}`;
         const p = String(ev.stdout || "").trim();
-        if (p) preludePath = path.join(p, "prelude").replaceAll("\\", "/");
+        if (p) return path.join(p, "prelude").replaceAll("\\", "/");
       } catch {}
-    }
+      return "";
+    })();
   }
+
+  return await cachedPreludePath;
+}
+
+export async function ensureBuckConfigForTempRepo(tmp: string, $: any): Promise<void> {
+  const preludePath = await resolvePreludePath(tmp, $);
   if (!preludePath) return;
 
   const setupScript = [
