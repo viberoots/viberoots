@@ -116,10 +116,12 @@ async function main() {
   const buildOut = await buildTarget(target);
   const wasmDir = path.join(buildOut, subdir);
   const entries = await fs.readdir(wasmDir);
-  const matches = entries.filter((entry) => {
-    if (name && !entry.startsWith(name)) return false;
-    return exts.some((ext) => entry.endsWith(ext));
-  });
+  const matches = entries
+    .filter((entry) => {
+      if (name && !entry.startsWith(name)) return false;
+      return exts.some((ext) => entry.endsWith(ext));
+    })
+    .sort();
   if (matches.length === 0) {
     const label = name ? ` for ${name}` : "";
     throw new Error(`no wasm artifact under ${wasmDir}${label}`);

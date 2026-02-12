@@ -180,6 +180,15 @@ Checkpoint:
 
 - Inline module generation works for Go/C++/Python wasm producers in temp-repo scaffold tests.
 
+Phase 2 status (PR-2):
+
+- `node_wasm_inline_module` now stays on one primary resolution path and no longer uses the hidden
+  `export-wasm-from-nix.ts` fallback route.
+- `build-tools/tools/wasm/export-wasm-from-nix.ts` uses Node built-in modules only and keeps graph
+  lock behavior deterministic.
+- Regression coverage now includes a temp-repo test that poisons local `fs-extra` resolution and
+  confirms inline export still works.
+
 ## Phase 3: Tests and Regression Coverage
 
 Goal: ensure cross-language producer compatibility and prevent regressions.

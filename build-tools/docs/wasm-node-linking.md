@@ -138,6 +138,13 @@ const { instance } = await WebAssembly.instantiate(wasmBytes(), {});
 
 This keeps the inline path explicit and avoids new Vite configuration.
 
+Inline generation implementation note:
+
+- The macro keeps a single primary source-resolution path and does not use a hidden fallback export
+  route.
+- Inline module emission relies on Node built-in modules only for action-time stability in temp
+  repos and sandboxed runs.
+
 ### 6) Bundling into a single server-side Node script
 
 Node and TypeScript templates that target a single-file server or CLI must support a bundled output that embeds the Wasm bytes. The entrypoint imports the inline module and the bundler emits a single JS file with the Wasm bytes embedded.
