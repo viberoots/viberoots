@@ -129,268 +129,6 @@ Implement.
 
 ---
 
-## PR-22: Wire inventory and exception checks into verify/CI gates
-
-### Description
-
-I will make the inventory and exception-policy checker a first-class repo gate so drift in
-`docs/handbook/nix-gaps.md`, `docs/handbook/starlark-api.md`, and
-`docs/handbook/nix-gaps-exceptions.json` fails local verify and CI before merge.
-
-### Scope & Changes
-
-- Add a stable invocation path for `build-tools/tools/dev/nix-gaps-inventory-check.ts` in:
-  - verify preflight flow (or equivalent required local gate),
-  - CI gate flow used before merge.
-- Keep checker flags explicit so the gate always runs against canonical repo docs:
-  - `--starlark-api docs/handbook/starlark-api.md`
-  - `--nix-gaps docs/handbook/nix-gaps.md`
-  - `--exceptions docs/handbook/nix-gaps-exceptions.json`
-- Keep execution cost low and deterministic so this remains a fast policy gate.
-
-### Tests (in this PR)
-
-- Add/extend a test that verifies verify/CI gate wiring invokes the checker command.
-- Add an integration-style test (or harness assertion) that fails when:
-  - a public macro is removed from inventory docs,
-  - an exception entry is malformed or missing required fields,
-  - stale `artifactRouteAllowlist` entries remain.
-
-### Docs (in this PR)
-
-- Update `docs/handbook/getting-started-on-a-pr.md` and/or `TESTING.md` gate guidance to include
-  this policy check as part of required pre-merge validation.
-- Update `build-tools/docs/build-system-design.md` enforcement section to reflect that this checker
-  is now executed as a merge gate and not only unit-tested.
-
-### Test runtime controls used
-
-- Coverage remains opt-in.
-- Scoped test execution for verify/dev gate and checker behavior.
-- No full-suite rerun in PR loop; safety suite remains merge-gate responsibility.
-
-### Acceptance Criteria
-
-- Running verify (or required local gate) executes inventory checking against real repo docs.
-- CI fails when inventory, exception policy, or allowlist drift is introduced.
-- Gate output is actionable and points to the exact failing policy condition.
-
-### Risks
-
-Gate wiring can be noisy if failure messages are generic.
-
-### Mitigation
-
-Keep errors specific and deterministic, including offending macro/policy keys.
-
-### Consequence of Not Implementing
-
-Inventory and policy drift can still merge undetected.
-
-### Downsides for Implementing
-
-Adds one more required gate command in verify/CI.
-
-### Recommendation
-
-Implement.
-
----
-
-## PR-23: Strengthen Node implementation-route parity checks for stage/inline macros
-
-### Description
-
-I will tighten Node route enforcement so `docs/handbook/nix-gaps.md` claims are validated by actual
-implementation shape and command invariants, not by weak textual signals.
-
-### Scope & Changes
-
-- Replace weak route-signal checks in `build-tools/tools/dev/nix-gaps-inventory-check.ts` for:
-  - `node_asset_stage`
-  - `node_wasm_inline_module`
-  with implementation-aware assertions tied to real macro wiring/command assembly contracts.
-- Keep route assertions aligned with intended architecture:
-  - if routed via `nix_node_gen`, enforce wrapper/companion pattern;
-  - if standalone Nix-calling genrule path is intentional, enforce standardized Nix-calling
-    invariants and update docs language to match exact route.
-- Ensure Node route checks fail when docs claim “Nix build” but implementation no longer satisfies
-  the declared route contract.
-
-### Tests (in this PR)
-
-- Add/extend Node enforcement tests that fail when:
-  - stage/inline route drops required Nix-calling command invariants,
-  - docs route claims and implementation route shape diverge.
-- Keep existing command-assembly smoke tests passing while adding stricter assertions for the
-  stage/inline route contract.
-
-### Docs (in this PR)
-
-- Update `docs/handbook/nix-gaps.md` Node route notes to exactly match the enforced implementation
-  route for `node_asset_stage` and `node_wasm_inline_module`.
-- Update `build-tools/docs/build-system-design.md` Node routing notes if route contract wording
-  changes.
-
-### Test runtime controls used
-
-- Coverage remains opt-in.
-- Scoped test execution for Node and dev-checker suites.
-- No full-suite rerun in PR loop; safety suite remains merge-gate responsibility.
-
-### Acceptance Criteria
-
-- Node route checks for stage/inline macros are implementation-aware and deterministic.
-- Checker fails on docs/implementation route mismatch for those macros.
-- Node route documentation reflects enforced behavior without ambiguity.
-
-### Risks
-
-Route assertions can become brittle if tied to unstable formatting details.
-
-### Mitigation
-
-Assert stable structural signals and command invariants instead of raw comment/text matches.
-
-### Consequence of Not Implementing
-
-Node route regressions can pass while docs still report Nix-backed status.
-
-### Downsides for Implementing
-
-Adds stricter Node enforcement logic and test maintenance.
-
-### Recommendation
-
-Implement.
-
----
-
-## PR-24: Enforce negative-route assertions for Go macro migration contract
-
-### Description
-
-I will close the remaining Go test coverage gap by asserting that migrated Go public macros do not
-route through Buck `go_*` rules.
-
-### Scope & Changes
-
-- Extend `build-tools/tools/tests/go/go.macros.nix-build.rule-types.cquery.test.ts` (or companion
-  test) to add negative assertions for:
-  - `kind(go_library, <nix_go_library target>) == empty`
-  - `kind(go_binary, <nix_go_binary target>) == empty`
-  - `kind(go_test, <nix_go_test target>) == empty`
-- Keep existing positive assertions for `go_nix_build` / `go_nix_test`.
-- Align Go macro test pattern with existing Python negative-route test style.
-
-### Tests (in this PR)
-
-- Update Go macro rule-type cquery test with positive + negative route assertions.
-- Add regression case that demonstrates failure when a macro target resolves to Buck `go_*` rules.
-
-### Docs (in this PR)
-
-- Update relevant Go migration notes in `docs/handbook/nix-gaps-prs.md` and/or
-  `docs/handbook/nix-gaps.md` to reflect explicit no-`go_*` enforcement evidence.
-
-### Test runtime controls used
-
-- Coverage remains opt-in.
-- Scoped test execution for Go macro rule-type checks.
-- No full-suite rerun in PR loop; safety suite remains merge-gate responsibility.
-
-### Acceptance Criteria
-
-- Go macro tests fail if any migrated macro route resolves to Buck `go_*` rules.
-- Positive and negative route assertions are both present and passing.
-- Go test evidence matches PR-6 acceptance wording.
-
-### Risks
-
-Cquery behavior differences across environments can cause flaky assertions.
-
-### Mitigation
-
-Use stable target fixtures and deterministic cquery expressions already used elsewhere in repo
-tests.
-
-### Consequence of Not Implementing
-
-A route regression to Buck `go_*` rules can slip past current Go tests.
-
-### Downsides for Implementing
-
-Small increase in Go test assertions and maintenance.
-
-### Recommendation
-
-Implement.
-
----
-
-## PR-25: Reconcile and enforce test/coverage policy documentation
-
-### Description
-
-I will reconcile conflicting test-coverage guidance so contributor docs, migration guardrails, and
-actual verify defaults all describe the same required behavior.
-
-### Scope & Changes
-
-- Align coverage policy language across:
-  - `docs/handbook/getting-started-on-a-pr.md`
-  - `TESTING.md`
-  - `docs/handbook/nix-gaps-prs.md` guardrails section
-- Choose one explicit policy and apply it consistently:
-  - default runs coverage-off with opt-in coverage, and
-  - define exactly when coverage-on is required (if any mandatory context exists).
-- Ensure command examples and required pre-merge checklist text match actual verify tooling flags.
-
-### Tests (in this PR)
-
-- Add a lightweight doc-policy consistency test/checker that validates required coverage policy
-  phrases/commands are aligned across the above docs.
-- Add regression checks that fail when policy text diverges.
-
-### Docs (in this PR)
-
-- Update all affected docs to one consistent coverage policy.
-- Add a concise policy statement in a single canonical location and reference it from the others.
-
-### Test runtime controls used
-
-- Coverage remains opt-in.
-- Scoped test execution for doc-policy checker.
-- No full-suite rerun in PR loop; safety suite remains merge-gate responsibility.
-
-### Acceptance Criteria
-
-- Coverage policy text is consistent across contributor and migration docs.
-- Required verification commands in docs match actual verify behavior.
-- Drift in coverage policy wording is detected by tests/checks.
-
-### Risks
-
-Policy changes can create confusion if rollout messaging is incomplete.
-
-### Mitigation
-
-Use one canonical policy statement and link all secondary docs to it.
-
-### Consequence of Not Implementing
-
-Contributors receive conflicting instructions and run inconsistent validation workflows.
-
-### Downsides for Implementing
-
-Adds a small docs-consistency check to maintain.
-
-### Recommendation
-
-Implement.
-
----
-
 ## PR-2: Baseline capture for Nix migration
 
 ### Description
@@ -1448,6 +1186,268 @@ genrule behavior.
 
 Slightly more macro complexity (planner companion + public wrapper) and additional enforcement
 surface to maintain.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-22: Wire inventory and exception checks into verify/CI gates
+
+### Description
+
+I will make the inventory and exception-policy checker a first-class repo gate so drift in
+`docs/handbook/nix-gaps.md`, `docs/handbook/starlark-api.md`, and
+`docs/handbook/nix-gaps-exceptions.json` fails local verify and CI before merge.
+
+### Scope & Changes
+
+- Add a stable invocation path for `build-tools/tools/dev/nix-gaps-inventory-check.ts` in:
+  - verify preflight flow (or equivalent required local gate),
+  - CI gate flow used before merge.
+- Keep checker flags explicit so the gate always runs against canonical repo docs:
+  - `--starlark-api docs/handbook/starlark-api.md`
+  - `--nix-gaps docs/handbook/nix-gaps.md`
+  - `--exceptions docs/handbook/nix-gaps-exceptions.json`
+- Keep execution cost low and deterministic so this remains a fast policy gate.
+
+### Tests (in this PR)
+
+- Add/extend a test that verifies verify/CI gate wiring invokes the checker command.
+- Add an integration-style test (or harness assertion) that fails when:
+  - a public macro is removed from inventory docs,
+  - an exception entry is malformed or missing required fields,
+  - stale `artifactRouteAllowlist` entries remain.
+
+### Docs (in this PR)
+
+- Update `docs/handbook/getting-started-on-a-pr.md` and/or `TESTING.md` gate guidance to include
+  this policy check as part of required pre-merge validation.
+- Update `build-tools/docs/build-system-design.md` enforcement section to reflect that this checker
+  is now executed as a merge gate and not only unit-tested.
+
+### Test runtime controls used
+
+- Coverage remains opt-in.
+- Scoped test execution for verify/dev gate and checker behavior.
+- No full-suite rerun in PR loop; safety suite remains merge-gate responsibility.
+
+### Acceptance Criteria
+
+- Running verify (or required local gate) executes inventory checking against real repo docs.
+- CI fails when inventory, exception policy, or allowlist drift is introduced.
+- Gate output is actionable and points to the exact failing policy condition.
+
+### Risks
+
+Gate wiring can be noisy if failure messages are generic.
+
+### Mitigation
+
+Keep errors specific and deterministic, including offending macro/policy keys.
+
+### Consequence of Not Implementing
+
+Inventory and policy drift can still merge undetected.
+
+### Downsides for Implementing
+
+Adds one more required gate command in verify/CI.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-23: Strengthen Node implementation-route parity checks for stage/inline macros
+
+### Description
+
+I will tighten Node route enforcement so `docs/handbook/nix-gaps.md` claims are validated by actual
+implementation shape and command invariants, not by weak textual signals.
+
+### Scope & Changes
+
+- Replace weak route-signal checks in `build-tools/tools/dev/nix-gaps-inventory-check.ts` for:
+  - `node_asset_stage`
+  - `node_wasm_inline_module`
+    with implementation-aware assertions tied to real macro wiring/command assembly contracts.
+- Keep route assertions aligned with intended architecture:
+  - if routed via `nix_node_gen`, enforce wrapper/companion pattern;
+  - if standalone Nix-calling genrule path is intentional, enforce standardized Nix-calling
+    invariants and update docs language to match exact route.
+- Ensure Node route checks fail when docs claim “Nix build” but implementation no longer satisfies
+  the declared route contract.
+
+### Tests (in this PR)
+
+- Add/extend Node enforcement tests that fail when:
+  - stage/inline route drops required Nix-calling command invariants,
+  - docs route claims and implementation route shape diverge.
+- Keep existing command-assembly smoke tests passing while adding stricter assertions for the
+  stage/inline route contract.
+
+### Docs (in this PR)
+
+- Update `docs/handbook/nix-gaps.md` Node route notes to exactly match the enforced implementation
+  route for `node_asset_stage` and `node_wasm_inline_module`.
+- Update `build-tools/docs/build-system-design.md` Node routing notes if route contract wording
+  changes.
+
+### Test runtime controls used
+
+- Coverage remains opt-in.
+- Scoped test execution for Node and dev-checker suites.
+- No full-suite rerun in PR loop; safety suite remains merge-gate responsibility.
+
+### Acceptance Criteria
+
+- Node route checks for stage/inline macros are implementation-aware and deterministic.
+- Checker fails on docs/implementation route mismatch for those macros.
+- Node route documentation reflects enforced behavior without ambiguity.
+
+### Risks
+
+Route assertions can become brittle if tied to unstable formatting details.
+
+### Mitigation
+
+Assert stable structural signals and command invariants instead of raw comment/text matches.
+
+### Consequence of Not Implementing
+
+Node route regressions can pass while docs still report Nix-backed status.
+
+### Downsides for Implementing
+
+Adds stricter Node enforcement logic and test maintenance.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-24: Enforce negative-route assertions for Go macro migration contract
+
+### Description
+
+I will close the remaining Go test coverage gap by asserting that migrated Go public macros do not
+route through Buck `go_*` rules.
+
+### Scope & Changes
+
+- Extend `build-tools/tools/tests/go/go.macros.nix-build.rule-types.cquery.test.ts` (or companion
+  test) to add negative assertions for:
+  - `kind(go_library, <nix_go_library target>) == empty`
+  - `kind(go_binary, <nix_go_binary target>) == empty`
+  - `kind(go_test, <nix_go_test target>) == empty`
+- Keep existing positive assertions for `go_nix_build` / `go_nix_test`.
+- Align Go macro test pattern with existing Python negative-route test style.
+
+### Tests (in this PR)
+
+- Update Go macro rule-type cquery test with positive + negative route assertions.
+- Add regression case that demonstrates failure when a macro target resolves to Buck `go_*` rules.
+
+### Docs (in this PR)
+
+- Update relevant Go migration notes in `docs/handbook/nix-gaps-prs.md` and/or
+  `docs/handbook/nix-gaps.md` to reflect explicit no-`go_*` enforcement evidence.
+
+### Test runtime controls used
+
+- Coverage remains opt-in.
+- Scoped test execution for Go macro rule-type checks.
+- No full-suite rerun in PR loop; safety suite remains merge-gate responsibility.
+
+### Acceptance Criteria
+
+- Go macro tests fail if any migrated macro route resolves to Buck `go_*` rules.
+- Positive and negative route assertions are both present and passing.
+- Go test evidence matches PR-6 acceptance wording.
+
+### Risks
+
+Cquery behavior differences across environments can cause flaky assertions.
+
+### Mitigation
+
+Use stable target fixtures and deterministic cquery expressions already used elsewhere in repo
+tests.
+
+### Consequence of Not Implementing
+
+A route regression to Buck `go_*` rules can slip past current Go tests.
+
+### Downsides for Implementing
+
+Small increase in Go test assertions and maintenance.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-25: Reconcile and enforce test/coverage policy documentation
+
+### Description
+
+I will reconcile conflicting test-coverage guidance so contributor docs, migration guardrails, and
+actual verify defaults all describe the same required behavior.
+
+### Scope & Changes
+
+- Align coverage policy language across:
+  - `docs/handbook/getting-started-on-a-pr.md`
+  - `TESTING.md`
+  - `docs/handbook/nix-gaps-prs.md` guardrails section
+- Choose one explicit policy and apply it consistently:
+  - default runs coverage-off with opt-in coverage, and
+  - define exactly when coverage-on is required (if any mandatory context exists).
+- Ensure command examples and required pre-merge checklist text match actual verify tooling flags.
+
+### Tests (in this PR)
+
+- Add a lightweight doc-policy consistency test/checker that validates required coverage policy
+  phrases/commands are aligned across the above docs.
+- Add regression checks that fail when policy text diverges.
+
+### Docs (in this PR)
+
+- Update all affected docs to one consistent coverage policy.
+- Add a concise policy statement in a single canonical location and reference it from the others.
+
+### Test runtime controls used
+
+- Coverage remains opt-in.
+- Scoped test execution for doc-policy checker.
+- No full-suite rerun in PR loop; safety suite remains merge-gate responsibility.
+
+### Acceptance Criteria
+
+- Coverage policy text is consistent across contributor and migration docs.
+- Required verification commands in docs match actual verify behavior.
+- Drift in coverage policy wording is detected by tests/checks.
+
+### Risks
+
+Policy changes can create confusion if rollout messaging is incomplete.
+
+### Mitigation
+
+Use one canonical policy statement and link all secondary docs to it.
+
+### Consequence of Not Implementing
+
+Contributors receive conflicting instructions and run inconsistent validation workflows.
+
+### Downsides for Implementing
+
+Adds a small docs-consistency check to maintain.
 
 ### Recommendation
 

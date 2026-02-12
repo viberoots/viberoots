@@ -17,4 +17,17 @@ test("verify includes a bounded lint preflight (enforcement)", async () => {
     txt.includes("timeout -k 10s"),
     "expected build-tools/tools/bin/verify lint preflight to use timeout -k 10s to avoid indefinite hangs",
   );
+  assert.ok(
+    txt.includes("nix-gaps-inventory-check.ts"),
+    "expected verify preflight to run nix-gaps inventory policy checks",
+  );
+  assert.ok(
+    txt.includes("--starlark-api") &&
+      txt.includes("docs/handbook/starlark-api.md") &&
+      txt.includes("--nix-gaps") &&
+      txt.includes("docs/handbook/nix-gaps.md") &&
+      txt.includes("--exceptions") &&
+      txt.includes("docs/handbook/nix-gaps-exceptions.json"),
+    "expected verify preflight to invoke nix-gaps policy checker with canonical docs paths",
+  );
 });

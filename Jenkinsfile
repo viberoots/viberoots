@@ -30,6 +30,9 @@ pipeline {
           stage('Pre-build guard') {
             steps { sh 'node build-tools/tools/ci/run-stage.ts --stage prebuild-guard' }
           }
+          stage('Nix-gaps policy gate') {
+            steps { sh 'node build-tools/tools/ci/run-stage.ts --stage nix-gaps-policy' }
+          }
           stage('CPP Addon Smoke') {
             steps { sh 'node build-tools/tools/ci/run-stage.ts --stage cpp-addon-smoke' }
           }

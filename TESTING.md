@@ -82,6 +82,12 @@ CI should always use the pure path. Local development can opt into `--impure` fo
 
 `build-tools/tools/bin/verify` supports an optional, best-effort prewarm step for heavy Nix toolchains to reduce cold-start time. It never affects correctness and is skipped silently if a flake attribute is missing.
 
+`v` also runs a required policy preflight that executes:
+
+`node build-tools/tools/dev/nix-gaps-inventory-check.ts --starlark-api docs/handbook/starlark-api.md --nix-gaps docs/handbook/nix-gaps.md --exceptions docs/handbook/nix-gaps-exceptions.json`
+
+The verify run fails fast if inventory, exception policy, or allowlist state drifts.
+
 - Enabled by default: `VERIFY_PREWARM=1` (set `VERIFY_PREWARM=0` to disable)
 - Prewarms by attempting to build these flake attrs when available:
   - `.#toolchains.go`

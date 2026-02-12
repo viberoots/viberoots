@@ -14,6 +14,7 @@ type Stage =
   | "export-graph"
   | "sync-providers"
   | "gen-auto-map"
+  | "nix-gaps-policy"
   | "prebuild-guard"
   | "patches-lint"
   | "file-size-lint"
@@ -104,6 +105,18 @@ async function main() {
         DEFAULT_GRAPH_PATH,
         "--out",
         "third_party/providers/auto_map.bzl",
+      ]);
+      break;
+    }
+    case "nix-gaps-policy": {
+      const target = path.resolve("build-tools/tools/dev/nix-gaps-inventory-check.ts");
+      await runTool(target, [
+        "--starlark-api",
+        "docs/handbook/starlark-api.md",
+        "--nix-gaps",
+        "docs/handbook/nix-gaps.md",
+        "--exceptions",
+        "docs/handbook/nix-gaps-exceptions.json",
       ]);
       break;
     }

@@ -35,6 +35,7 @@ Python provider sync activation in sparse/partial clones is lockfile‑driven: t
 - Build/test:
   - Full test with coverage: `buck2 test //... -- --env COVERAGE=1`
   - Single target build/test: `buck2 build //<pkg>:<name>`, `buck2 test //<pkg>:<name>`
+  - Policy gate (inventory + exceptions): `node build-tools/tools/dev/nix-gaps-inventory-check.ts --starlark-api docs/handbook/starlark-api.md --nix-gaps docs/handbook/nix-gaps.md --exceptions docs/handbook/nix-gaps-exceptions.json`
 - Glue generation (when working on providers/labels mappings):
   - Run full glue pipeline (preferred): `node build-tools/tools/buck/glue-pipeline.ts`
   - Export graph: `node build-tools/tools/buck/export-graph.ts`
@@ -49,6 +50,7 @@ Python provider sync activation in sparse/partial clones is lockfile‑driven: t
   - `nix build .#graph-generator`
 - Repo wrappers (preferred; thin shims that delegate into TypeScript and ensure the dev shell is loaded):
   - `i` (install deps), `b` (build), `v` (verify / full test suite)
+  - `v` includes a preflight run of the nix-gaps inventory/exception policy checker and fails fast on drift.
 
 ### 4. When `v` is slow (performance regression workflow)
 

@@ -78,7 +78,7 @@ export async function runVerify(): Promise<void> {
 
   // Run lint preflight before acquiring the verify lock so formatting-only failures
   // don't create a verify-lock dir.
-  await runVerifyLintPreflight(root);
+  await runVerifyLintPreflight(root, zxInitPath);
 
   const allowConcurrent = process.env.VERIFY_ALLOW_CONCURRENT === "1";
   const lock = await acquireVerifyLock({ root, allowConcurrent });
