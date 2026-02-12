@@ -49,6 +49,18 @@ Policy for this language:
 - Allow probe-only non-build macros only when explicitly documented as non-artifact paths.
 - Do not introduce fallback Buck artifact build paths for convenience.
 
+### Enforcement integration requirement
+
+Language rollout is not complete if it only adds build plumbing. I also need to keep migration
+policy enforcement current:
+
+- Add and maintain public macro rows in `docs/handbook/nix-gaps.md`.
+- Keep intentional non-build macros in `docs/handbook/nix-gaps-exceptions.json` with
+  `kind = "probe-only"` and non-empty justification.
+- Extend `build-tools/tools/dev/nix-gaps-inventory-check.ts` and related tests under
+  `build-tools/tools/tests/dev/` when route contracts change.
+- Ensure required repo validation runs this checker so doc/policy drift fails before merge.
+
 ### Key Assumptions (to validate)
 
 1. Lock and manifest: Gleam projects provide `gleam.toml` and a lock artifact (manifest) we can parse deterministically. Many projects generate `manifest.toml` under `build/`; we assume a repo‑tracked lock file (e.g., `manifest.toml` or `gleam.lock`) will be available or we will generate/commit a stable lock snapshot file (see Risks/Mitigations).

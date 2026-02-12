@@ -55,8 +55,9 @@ Use these docs as the source of truth for migration scope and completion:
 
 Current status in those docs:
 
-- Phases 0 through 3 are complete (Go and Python migrations).
-- Remaining scope starts at Phase 4 (Node residuals, C++/Rust residuals, exception policy, enforcement).
+- Phases 0 through 6 are complete (Go, Python, Node, C++, Rust, and enforcement closure).
+- `docs/handbook/nix-gaps.md` has no remaining artifact-producing non-Nix routes.
+- `docs/handbook/nix-gaps-exceptions.json` allows only explicit probe-only exceptions and currently has no artifact-route allowlist entries.
 
 Guardrails for all current and future languages:
 

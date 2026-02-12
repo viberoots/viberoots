@@ -43,6 +43,18 @@ Policy for this language:
 - Allow probe-only non-build macros only when explicitly documented as non-artifact paths.
 - Do not introduce fallback Buck artifact build paths for convenience.
 
+### Enforcement integration requirement
+
+Language rollout is not complete if it only adds build plumbing. I also need to keep migration
+policy enforcement current:
+
+- Add and maintain public macro rows in `docs/handbook/nix-gaps.md`.
+- Keep intentional non-build macros in `docs/handbook/nix-gaps-exceptions.json` with
+  `kind = "probe-only"` and non-empty justification.
+- Extend `build-tools/tools/dev/nix-gaps-inventory-check.ts` and related tests under
+  `build-tools/tools/tests/dev/` when route contracts change.
+- Ensure required repo validation runs this checker so doc/policy drift fails before merge.
+
 ### Path invariants (must‑follow)
 
 - Patches live at `patches/rust/*.patch` (flat; no subdirectories).

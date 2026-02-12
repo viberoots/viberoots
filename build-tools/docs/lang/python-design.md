@@ -55,6 +55,19 @@ Policy for this language:
 - Allow probe-only non-build macros only when explicitly documented as non-artifact paths.
 - Do not introduce fallback Buck artifact build paths for convenience.
 
+### Enforcement integration requirement
+
+Python rollout is not complete if it only adds build plumbing. I also need to keep migration policy
+enforcement up to date:
+
+- Add and maintain Python public macro rows in `docs/handbook/nix-gaps.md`.
+- Keep any intentional non-build macros in `docs/handbook/nix-gaps-exceptions.json` with
+  `kind = "probe-only"` and non-empty justification.
+- Extend `build-tools/tools/dev/nix-gaps-inventory-check.ts` and
+  `build-tools/tools/tests/dev/nix-gaps-inventory-check.test.ts` when Python routing contracts
+  change.
+- Ensure required repo validation runs this checker so doc/policy drift fails before merge.
+
 ---
 
 ## Path Invariants and Naming
