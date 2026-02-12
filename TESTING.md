@@ -1,5 +1,16 @@
 # Testing
 
+## Coverage policy (canonical)
+
+Coverage is opt-in.
+
+- Default local and pre-merge verification runs use coverage-off commands:
+  - `i && b && v`
+  - `buck2 test //...`
+- Enable coverage only when a PR, task, or CI job explicitly requires it:
+  - `v --coverage`
+  - `buck2 test //... -- --env COVERAGE=1`
+
 ## Fast runs (default)
 
 Coverage is disabled by default for speed.
@@ -64,6 +75,7 @@ buck2 test $(buck2 targets //:scaffolding_* | tr '\n' ' ')
 
 ```
 buck2 test //:scaffolding_help -- --env COVERAGE=1
+```
 
 ## Dev Build Modes (Pure vs Impure)
 
@@ -76,6 +88,7 @@ buck2 test //:scaffolding_help -- --env COVERAGE=1
   - Example: `build-tools/tools/dev/dev-build.ts --impure build //...`
 
 CI should always use the pure path. Local development can opt into `--impure` for fast iteration.
+
 ```
 
 ## Verify prewarm (toolchains)
@@ -102,7 +115,9 @@ Notes:
 - You can customize the attribute list for local experiments by running the script directly:
 
 ```
+
 PREWARM_ATTRS="toolchains.go,toolchains.cxx" node build-tools/tools/dev/prewarm-toolchains.ts
+
 ```
 
 ## Faster temp workspaces (seed store)
@@ -123,11 +138,16 @@ During `v`, verify prepares a single Nix-store seed and exports it to all tests:
 Examples:
 
 ```
+
 # Only copy the tools tree (plus flake.nix if present)
+
 TEST_RSYNC_ROOTS=tools buck2 test //build-tools/tools/tests/rsync:rsync_roots_only_tools_test_ts
 
 # Multiple roots:
+
 TEST_RSYNC_ROOTS="apps/demo,cpp,build-tools/tools/nix" buck2 test //<target>
+
 ```
 
 This optimization is best-effort and opt-in; tests remain deterministic regardless of whether `TEST_RSYNC_ROOTS` is set.
+```

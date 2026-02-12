@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
 // build-tools/tools/ci/run-stage.ts — small runner to invoke named CI stages locally or in CI
-import * as fsp from "node:fs/promises";
 import assert from "node:assert";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { ensureGraph, runGlue } from "../buck/glue-run.ts";
-import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
 import { getFlagStr } from "../lib/cli.ts";
+import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
 import { runNodeWithZx } from "../lib/node-run.ts";
 
 type Stage =

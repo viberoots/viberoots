@@ -1,23 +1,23 @@
-import "zx/globals";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import "zx/globals";
 import { runNodeWithZx } from "../../lib/node-run.ts";
+import { repoRoot } from "../dev-build/paths.ts";
 import { ensureBuckPreludeConfig } from "../dev-build/prelude.ts";
 import { runStartupCheck } from "../dev-build/startup.ts";
-import { repoRoot } from "../dev-build/paths.ts";
 import { parseVerifyArgs } from "./args.ts";
-import { setupCoverage, runMergedCoverageReport } from "./coverage.ts";
-import { acquireVerifyLock } from "./lock.ts";
+import { cleanupOrphanBuckDaemons, cleanupRegisteredTempRepos } from "./buck-orphan-cleanup.ts";
+import { spawnVerifyBuck2Tests } from "./buck2-test.ts";
+import { runMergedCoverageReport, setupCoverage } from "./coverage.ts";
 import {
   enforceVerifyDiskGate,
   runVerifyHousekeeping,
   verifyTargetFreeGiBDefault,
 } from "./housekeeping.ts";
-import { startVerifySafetyRails } from "./safety-rails.ts";
-import { spawnVerifyBuck2Tests } from "./buck2-test.ts";
 import { runVerifyLintPreflight } from "./lint-preflight.ts";
-import { cleanupOrphanBuckDaemons, cleanupRegisteredTempRepos } from "./buck-orphan-cleanup.ts";
+import { acquireVerifyLock } from "./lock.ts";
+import { prewarmVerifyOnce } from "./prewarm.ts";
 import {
   appendVerifyLogLine,
   killBuckIsolation,
@@ -26,7 +26,7 @@ import {
   startBuckWatchdog,
   writeVerifyIsoMarker,
 } from "./process-control.ts";
-import { prewarmVerifyOnce } from "./prewarm.ts";
+import { startVerifySafetyRails } from "./safety-rails.ts";
 import { prepareVerifySeed } from "./seed.ts";
 import { ensureRepoLocalTmpRoot } from "./tmp-root.ts";
 import { computeZxTestNodeModulesOut } from "./zx-node-modules.ts";

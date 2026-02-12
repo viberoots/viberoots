@@ -54,8 +54,8 @@ Node macro outcome classification:
 | `nix_node_bin`            | artifact-producing        | Nix build     | Alias of `nix_node_gen` with planner kind `bin` (`mkBin`).              |
 | `node_webapp`             | orchestration wrapper     | Nix build     | Uses `genrule` to call `nix build`.                                     |
 | `nix_node_cli_bin`        | artifact-producing        | Nix build     | Both `bundle = True` and `bundle = False` use Nix-calling routes.       |
-| `node_asset_stage`        | artifact-producing        | Nix build     | Uses a standalone Node Nix-calling genrule route with shared wiring.    |
-| `node_wasm_inline_module` | artifact-producing        | Nix build     | Uses a standalone Node Nix-calling genrule route with shared wiring.    |
+| `node_asset_stage`        | artifact-producing        | Nix build     | Uses standalone nix-calling genrule route with shared wiring.           |
+| `node_wasm_inline_module` | artifact-producing        | Nix build     | Uses standalone nix-calling genrule route with shared wiring.           |
 
 ## Python macros
 

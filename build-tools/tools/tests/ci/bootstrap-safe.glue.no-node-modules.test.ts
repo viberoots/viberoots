@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import * as fsp from "node:fs/promises";
 import crypto from "node:crypto";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";

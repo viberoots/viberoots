@@ -19,8 +19,10 @@ Python provider sync activation in sparse/partial clones is lockfile‑driven: t
 ### 2. Project rules you must follow
 
 - Follow `@METHODOLOGY.XML` and `@build-tools/docs/build-system-design.md` at all times.
-- Never commit without verifying that all tests are wired and passing (full suite with coverage):
-  - `buck2 test //... -- --env COVERAGE=1`
+- Never commit without verifying that all tests are wired and passing:
+  - baseline pre-merge command: `i && b && v` (coverage-off by default)
+  - coverage is opt-in; only run `v --coverage` or `buck2 test //... -- --env COVERAGE=1` when explicitly required by the PR/task/CI job
+  - canonical policy location: `TESTING.md` section `Coverage policy (canonical)`
 - Use Conventional Commits and real newlines in commit messages.
 - Keep files small and focused (≤ 250 lines ideally); split modules when needed.
 - Maintain determinism and low cyclomatic complexity; prefer small, well-named functions.
@@ -33,7 +35,9 @@ Python provider sync activation in sparse/partial clones is lockfile‑driven: t
 ### 3. Commands cheat sheet
 
 - Build/test:
-  - Full test with coverage: `buck2 test //... -- --env COVERAGE=1`
+  - Default full verify run: `v`
+  - Full verify run with coverage (opt-in): `v --coverage`
+  - Buck direct full test with coverage (opt-in): `buck2 test //... -- --env COVERAGE=1`
   - Single target build/test: `buck2 build //<pkg>:<name>`, `buck2 test //<pkg>:<name>`
   - Policy gate (inventory + exceptions): `node build-tools/tools/dev/nix-gaps-inventory-check.ts --starlark-api docs/handbook/starlark-api.md --nix-gaps docs/handbook/nix-gaps.md --exceptions docs/handbook/nix-gaps-exceptions.json`
 - Glue generation (when working on providers/labels mappings):

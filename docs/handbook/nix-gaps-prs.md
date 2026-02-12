@@ -7,11 +7,9 @@ Non-goals: no standalone docs-only or tests-only PRs.
 
 Status checkpoint:
 
-- PR-1 through PR-11 are implemented.
-- Rework and remaining migration scope start at PR-12.
-- PR-19 enforcement gate implementation is now present in `build-tools/tools/dev/nix-gaps-inventory-check.ts` with
-  tests under `build-tools/tools/tests/dev/nix-gaps-artifact-route-allowlist.test.ts`.
-- PRs below are aligned to the updated framing in `docs/handbook/nix-gaps-plan.md`:
+- PR-1 through PR-26 are implemented in-repo.
+- Remaining work is no longer migration routing; it is maintenance and hardening of policy/docs parity.
+- PRs in this document remain aligned to `docs/handbook/nix-gaps-plan.md` framing:
   - Focus on artifact-producing non-Nix paths.
   - Keep intentional probe/test-only exceptions explicit and enforced.
 
@@ -37,6 +35,51 @@ Verification snapshot for PR-1 through PR-11 (repo evidence):
 ⚠️ This verification is based on committed code, tests, and docs in the repository. It does not
 re-run the entire historical CI matrix for each PR in this document.
 
+Verification snapshot for PR-12 through PR-26 (repo evidence):
+
+- PR-12: Node classification table and exception-policy framing are present in
+  `docs/handbook/nix-gaps.md`; checker coverage exists in
+  `build-tools/tools/dev/nix-gaps-inventory-check.ts` and
+  `build-tools/tools/tests/dev/nix-gaps-inventory-check.test.ts`.
+- PR-13/PR-14/PR-21: Node artifact-route implementation is present in `build-tools/node/defs_core.bzl`
+  and `build-tools/node/defs_stage.bzl`, with route-shape tests in
+  `build-tools/tools/tests/node/node.defs-core.nix-node-gen.nix-route.enforcement.test.ts` and
+  `build-tools/tools/tests/node/node.nix-calling-macros.command-assembly.smoke.test.ts`.
+- PR-15: C++ residual artifact stubs are Nix-backed via `nix_cpp_headers` and
+  `nix_cpp_wasm_emscripten_lib` in `build-tools/cpp/defs.bzl` and `build-tools/cpp/wasm_defs.bzl`
+  using `cpp_nix_build`.
+- PR-16: Rust artifact-producing macros are Nix-backed in `build-tools/rust/defs.bzl` via
+  `rust_nix_build`.
+- PR-17/PR-19: Exception policy and artifact-route allowlist enforcement are implemented in
+  `build-tools/tools/dev/nix-gaps-inventory-check.ts` with policy data in
+  `docs/handbook/nix-gaps-exceptions.json` and tests in
+  `build-tools/tools/tests/dev/nix-gaps-artifact-route-allowlist.test.ts`.
+- PR-18: Parity and minimal-environment hermeticity checks exist in
+  `build-tools/tools/tests/dev/nix-gaps.phase6.parity-and-hermeticity.test.ts`.
+- PR-20: `nix_node_cli_bin` bundle/non-bundle routes are Nix-calling in
+  `build-tools/node/defs_nix.bzl` with tests including
+  `build-tools/tools/tests/node/node.cli.no-bundle.no-global-inputs-srcs.test.ts`.
+- PR-22: Inventory/exception policy checker is wired into verify preflight and CI stage runner in
+  `build-tools/tools/dev/verify/lint-preflight.ts` and `build-tools/tools/ci/run-stage.ts`, with
+  enforcement tests under `build-tools/tools/tests/verify` and `build-tools/tools/tests/ci`.
+- PR-23: Node implementation-route parity checks are implemented in
+  `build-tools/tools/dev/nix-gaps-inventory-node-routes.ts` with tests in
+  `build-tools/tools/tests/dev/nix-gaps-inventory-check.node-route-parity.test.ts`.
+- PR-24: Go negative-route assertions (`go_*` absent for migrated macros) are enforced in
+  `build-tools/tools/tests/go/go.macros.nix-build.rule-types.cquery.test.ts`.
+- PR-25: Coverage-policy docs checker and tests exist in
+  `build-tools/tools/dev/coverage-policy-doc-check.ts` and
+  `build-tools/tools/tests/dev/coverage-policy-doc-check.test.ts`.
+- PR-26: Node route doc-contract checker and tests exist in
+  `build-tools/tools/dev/node-route-doc-contract-check.ts` and
+  `build-tools/tools/tests/dev/node-route-doc-contract-check.test.ts`.
+
+Implementation note for PR-25/PR-26:
+
+- These two doc-contract checks are implemented and test-covered.
+- The required verify/CI merge gate currently runs `nix-gaps-inventory-check.ts`; PR-25/PR-26 checks
+  are not yet wired as mandatory verify/CI stage invocations.
+
 ## Test-time guardrails (evidence-based, required for PR-12+)
 
 These controls are already implemented in-repo and have landed across test/runtime speedup commits
@@ -44,8 +87,11 @@ These controls are already implemented in-repo and have landed across test/runti
 PRs after PR-11 should use them consistently and avoid bypassing them.
 
 1. Coverage remains opt-in.
-   - Keep default runs without coverage; only enable with `-- --env COVERAGE=1`.
-   - Evidence: `TESTING.md` documents coverage-off default and explicit opt-in.
+   - Keep default runs without coverage: `i && b && v` (or `buck2 test //...`).
+   - Enable coverage only when explicitly required by the PR/task/CI context:
+     `v --coverage` or `buck2 test //... -- --env COVERAGE=1`.
+   - Evidence: `TESTING.md` section `Coverage policy (canonical)` documents default coverage-off
+     and explicit opt-in.
 
 2. Iterate with scoped test runs before full-suite validation.
    - Use target/subset runs during implementation; run full safety suite at merge gate.
@@ -182,8 +228,6 @@ Adds a small script and test to maintain.
 ### Recommendation
 
 Implement.
-
----
 
 ## PR-3: Nix toolchain packages for Go and Python
 
@@ -1110,7 +1154,7 @@ Implement.
 
 ---
 
-## PR-21: Close Node gen/lib/bin/stage/inline gaps and enforce route parity
+## PR-21: Close Node gen/lib/bin/stage/inline gaps and enforce route parity (superseded in part by PR-23)
 
 ### Description
 
@@ -1119,6 +1163,12 @@ I will close the remaining Node artifact-route gaps by routing `nix_node_gen`, `
 planner path, and I will add implementation-aware checks so inventory status cannot drift from code
 again.
 
+Supersession note:
+
+- PR-21 is superseded by PR-23 for the `node_asset_stage` and `node_wasm_inline_module` route
+  contract.
+- Final enforced route contract for those two macros is: `standalone nix-calling genrule route`.
+
 ### Scope & Changes
 
 - Migrate `nix_node_gen` to a two-target pattern:
@@ -1126,8 +1176,10 @@ again.
   - public macro target becomes a Nix-calling wrapper that builds `graph-generator-selected` for
     the companion and copies the expected output.
 - Keep `nix_node_lib` / `nix_node_bin` as aliases of the migrated `nix_node_gen` route.
-- Keep `node_asset_stage` / `node_wasm_inline_module` routed through `nix_node_gen`, so they inherit
-  the same Nix-calling path.
+- Historical plan note: the original PR-21 draft described stage/inline routing through
+  `nix_node_gen`, but this was superseded by PR-23.
+- Final route contract for `node_asset_stage` / `node_wasm_inline_module` is
+  `standalone nix-calling genrule route`.
 - Extend inventory enforcement (`build-tools/tools/dev/nix-gaps-inventory-check.ts`) with
   implementation-route assertions for these Node macros when implementation files are present.
 
@@ -1453,3 +1505,152 @@ Adds a small docs-consistency check to maintain.
 ### Recommendation
 
 Implement.
+
+---
+
+## PR-26: Reconcile superseded Node route contract history (PR-21 superseded by PR-23)
+
+### Description
+
+I will close the remaining documentation sequencing gap by explicitly marking PR-21 as superseded by
+PR-23 and reconciling Node stage/inline route language so the execution log and enforced route
+contract do not conflict.
+
+### Scope & Changes
+
+- Mark PR-21 as superseded by PR-23 in this PR plan and explain the contract outcome.
+- Align Node route wording across:
+  - `docs/handbook/nix-gaps-prs.md`
+  - `docs/handbook/nix-gaps.md`
+  - `build-tools/docs/build-system-design.md`
+- Keep the enforced stage/inline route contract explicit and unambiguous:
+  - either wrapper-route wording via `nix_node_gen`, or
+  - standalone Nix-calling genrule wording,
+  and ensure all docs use the same wording.
+- Add a small doc-contract parity check that fails if these route-contract statements diverge.
+
+### Tests (in this PR)
+
+- Add or extend a docs parity test/check that validates:
+  - PR-21 is marked superseded by PR-23 in the PR plan,
+  - Node stage/inline route wording matches the currently enforced contract text across docs.
+- Add a regression check that fails when PR-plan route narrative conflicts with enforced route docs.
+
+### Docs (in this PR)
+
+- Update `docs/handbook/nix-gaps-prs.md` to record supersession and final route contract outcome.
+- Update `docs/handbook/nix-gaps.md` Node route notes if wording needs normalization.
+- Update `build-tools/docs/build-system-design.md` Node route language to the same contract text.
+
+### Test runtime controls used
+
+- Coverage remains opt-in.
+- Scoped test execution for docs parity checks.
+- No full-suite rerun in PR loop; safety suite remains merge-gate responsibility.
+
+### Acceptance Criteria
+
+- PR-21 is explicitly marked as superseded by PR-23 in `docs/handbook/nix-gaps-prs.md`.
+- Node stage/inline route wording is consistent across PR plan, inventory, and design docs.
+- Tests fail if route-contract wording or supersession markers drift.
+
+### Risks
+
+Wording updates can accidentally weaken route-contract precision.
+
+### Mitigation
+
+Keep one canonical contract phrase set and validate exact required fragments in tests.
+
+### Consequence of Not Implementing
+
+The PR execution history remains internally inconsistent and can mislead future migration work.
+
+### Downsides for Implementing
+
+Adds a small documentation parity check and maintenance surface.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-27: Close Node stage/inline Nix-route gap and enforce strict file-size gate compliance
+
+### Description
+
+I will close two remaining closure gaps together: the Node stage/inline route implementation gap and
+the methodology file-size gate gap.
+
+### Scope & Changes
+
+- Update `build-tools/node/defs_stage.bzl` so both:
+  - `node_asset_stage`
+  - `node_wasm_inline_module`
+    execute the canonical Nix selected-build command path (for example via
+    `nix_build_out_path_cmd(... "path:$WORKSPACE_ROOT#graph-generator-selected" ...)`) before
+    artifact extraction/wrapping.
+- Keep the existing shared command assembly helpers/invariants:
+  - `nix_calling_genrule_bootstrap(...)`
+  - `nix_calling_env_export_buck_graph_json(...)`
+  - `_prepare_node_nix_calling_genrule(...)`
+- Update required gate wiring so file-size checks run without temporary `--allow-known` exceptions.
+- Ensure known over-limit files are split or otherwise brought into compliant modular structure before
+  strict gate enablement.
+
+### Tests (in this PR)
+
+- Add/extend Node route tests that assert stage/inline command assembly includes an actual Nix build
+  out-path capture step, not only bootstrap/wiring helpers.
+- Add regression checks proving route test failure when Nix invocation is removed from either macro.
+- Add/extend CI stage/file-size enforcement tests to assert strict file-size gate arguments are used.
+- Add regression tests that fail when `--allow-known` is reintroduced in required gate paths.
+
+### Docs (in this PR)
+
+- Update `docs/handbook/nix-gaps.md` Node route notes to match the enforced command-level route.
+- Update `build-tools/docs/build-system-design.md` route and file-size gate notes to match enforced
+  behavior.
+- Update `docs/handbook/getting-started-on-a-pr.md` to reflect strict file-size gate behavior in
+  required flows.
+- Add a short note in `docs/handbook/nix-gaps-prs.md` execution log for this PR documenting closure
+  evidence.
+
+### Test runtime controls used
+
+- Coverage remains opt-in.
+- Scoped test execution for Node route, CI stage, and file-size gate suites.
+- No full-suite rerun in PR loop; safety suite remains merge-gate responsibility.
+
+### Acceptance Criteria
+
+- `node_asset_stage` and `node_wasm_inline_module` command paths include canonical Nix selected-build
+  invocation and out-path capture.
+- Route tests fail if either macro loses Nix invocation while still claiming Nix-backed status.
+- Required gate paths no longer pass `--allow-known` for file-size lint.
+- Enforcement tests fail if file-size bypass flags are reintroduced.
+- Documentation reflects the enforced Node route and strict methodology file-size gate behavior.
+
+### Risks
+
+Combining route and gate enforcement in one PR can increase change surface and review load.
+
+### Mitigation
+
+Keep assertions scoped, reuse existing helper contracts, and preserve deterministic tests for each
+sub-area.
+
+### Consequence of Not Implementing
+
+Node route claims can drift from implementation, and methodology/file-size enforcement remains
+inconsistent in required paths.
+
+### Downsides for Implementing
+
+Requires coordinated updates across Node command assembly, gate wiring, and docs/tests.
+
+### Recommendation
+
+Implement.
+
