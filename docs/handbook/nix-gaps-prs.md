@@ -1350,7 +1350,8 @@ route through Buck `go_*` rules.
 ### Tests (in this PR)
 
 - Update Go macro rule-type cquery test with positive + negative route assertions.
-- Add regression case that demonstrates failure when a macro target resolves to Buck `go_*` rules.
+- Add a regression control fixture with raw Buck `go_*` targets to prove the negative-route query
+  detects Buck-routed Go targets deterministically.
 
 ### Docs (in this PR)
 

@@ -16,6 +16,9 @@ This document maps every public Starlark macro to its build path. I use it to tr
 - `nix_go_test` → Nix build (`graph-generator-selected`).
 - `nix_go_carchive` → Nix build (`goCArchive`).
 - `nix_go_tiny_wasm_lib` → Nix build (`go_nix_build_wasm`).
+- Enforcement evidence: `build-tools/tools/tests/go/go.macros.nix-build.rule-types.cquery.test.ts`
+  asserts both positive (`go_nix_build` / `go_nix_test`) and negative (`go_library` /
+  `go_binary` / `go_test` must be empty) route checks for migrated public Go macros.
 
 Planner coverage note: Go library and binary target kinds are supported by the Nix planner templates (`goLib` and `goApp`) for `graph-generator-selected`, and the public Go macros route through Nix-backed rules.
 
