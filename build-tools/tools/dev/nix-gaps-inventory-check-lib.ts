@@ -190,3 +190,24 @@ export function parseArtifactRouteGaps(text: string): ArtifactRouteGap[] {
   }
   return entries;
 }
+
+export function parseInventoryNixRouteDetails(text: string): Record<string, string> {
+  const byMacro: Record<string, string> = {};
+  const regex = /^- `([^`]+)`\s+→\s+Nix build\s+\(([^)]+)\)\.?$/gm;
+  for (const match of text.matchAll(regex)) {
+    const macro = String(match[1] || "").trim();
+    const detail = String(match[2] || "").trim();
+    if (!macroNamePattern.test(macro) || detail === "") continue;
+    byMacro[macro] = detail;
+  }
+  return byMacro;
+}
+
+export function bzlDefBody(text: string, macroName: string): string {
+  const needle = `def ${macroName}(`;
+  const start = text.indexOf(needle);
+  if (start < 0) return "";
+  const next = text.indexOf("\ndef ", start + needle.length);
+  if (next < 0) return text.slice(start);
+  return text.slice(start, next);
+}
