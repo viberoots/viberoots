@@ -7,6 +7,7 @@ load(
     "nix_calling_env_export_nix_pnpm_fetch_timeout",
     "nix_build_out_path_cmd",
     "nix_calling_genrule_bootstrap",
+    "nix_calling_node_patch_requirements_preflight",
 )
 load("//build-tools/node:defs_core.bzl", "nix_node_gen")
 MODULE_PROVIDERS = {}
@@ -100,6 +101,7 @@ def node_webapp(
             source_workspace_root_env = True,
         )
         + nix_calling_env_export_buck_graph_json()
+        + nix_calling_node_patch_requirements_preflight(_importer)
         + nix_calling_env_export_nix_pnpm_fetch_timeout(default_sec = 600)
         + nix_build_out_path_cmd(
             "\"path:$WORKSPACE_ROOT#node-webapp.%s\"" % sanitize_importer_for_nix_attr(_importer),
@@ -168,6 +170,7 @@ def nix_node_cli_bin(
                 source_workspace_root_env = True,
             )
             + nix_calling_env_export_buck_graph_json()
+            + nix_calling_node_patch_requirements_preflight(wiring.importer)
             + nix_build_out_path_cmd(
                 "\"path:$WORKSPACE_ROOT#graph-generator-selected\"",
                 timeout_var = "TIMEOUT",
@@ -223,6 +226,7 @@ def nix_node_cli_bin(
             skip_require_unified_pnpm_store = True,
         )
         + nix_calling_env_export_buck_graph_json()
+        + nix_calling_node_patch_requirements_preflight(_importer)
         + nix_calling_env_export_nix_pnpm_fetch_timeout(default_sec = 600)
         + "export NIX_PNPM_ALLOW_GENERATE=1; "
         + nix_build_out_path_cmd(

@@ -338,6 +338,7 @@ build-tools/tools/bin/patch-pkg sync-required node --importer projects/apps/web
 - The check resolves transitive Node patch requirements from local library deps.
 - Missing required ids fail with deterministic diagnostics.
 - Missing optional ids warn.
+- The same read-only policy also runs in normal Node build entrypoint macros before Nix build execution.
 - Diagnostics always include the exact remediation command:
   - `patch-pkg sync-required node --importer <importer>`
 - Optional placeholder generation is explicit only:

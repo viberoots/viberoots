@@ -50,7 +50,8 @@ async function main(): Promise<void> {
   const check = getFlagBool("check") || !writePlaceholders;
   const lockfiles = await findImporterLockfiles(["pnpm-lock.yaml"]);
   const importers = importerArg ? [importerArg] : deterministicImporters(lockfiles);
-  const graph = await readCompositeGraph({});
+  const graphPath = (process.env.BUCK_GRAPH_JSON || "").trim();
+  const graph = await readCompositeGraph(graphPath ? { graphPath } : {});
 
   if (importers.length === 0) {
     console.error("node patch requirements: no Node importers discovered");

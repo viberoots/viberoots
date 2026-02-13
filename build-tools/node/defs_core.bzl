@@ -13,6 +13,7 @@ load(
     "nix_build_out_path_cmd",
     "nix_calling_env_export_buck_graph_json",
     "nix_calling_genrule_bootstrap",
+    "nix_calling_node_patch_requirements_preflight",
 )
 load("//build-tools/node/private:nix_test.bzl", "node_nix_test")
 
@@ -79,6 +80,7 @@ def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = []
             source_workspace_root_env = True,
         )
         + nix_calling_env_export_buck_graph_json()
+        + nix_calling_node_patch_requirements_preflight(wiring.importer)
         + nix_build_out_path_cmd(
             "\"path:$WORKSPACE_ROOT#graph-generator-selected\"",
             timeout_var = "TIMEOUT",

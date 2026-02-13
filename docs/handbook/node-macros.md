@@ -43,6 +43,23 @@ Node macros include importer-local patches via `native.glob(...)`. Because Buck 
     - `node_patch_required:<name>@<version>`
     - `node_patch_optional:<name>@<version>`
 
+### Transitive Node patch preflight on build entrypoints
+
+Before Nix build execution, Node build entrypoint macros run read-only transitive patch requirement checks through `build-tools/tools/buck/enforce-node-patch-requirements.ts --check --importer <importer>`.
+
+- Entry points covered:
+  - `nix_node_gen` and wrappers (`nix_node_lib`)
+  - `node_webapp`
+  - `nix_node_cli_bin` (`bundle=True` and `bundle=False`)
+  - `node_asset_stage`
+  - `node_wasm_inline_module`
+- Policy:
+  - Missing required transitive patch ids fail the build.
+  - Missing optional transitive patch ids warn and do not fail.
+  - Diagnostics include the importer-specific remediation command:
+    - `patch-pkg sync-required node --importer <importer>`
+- Command assembly is shared via `//build-tools/lang:nix_shell.bzl:nix_calling_node_patch_requirements_preflight(...)`.
+
 ### Related: `nix_node_test` (stamp policy)
 
 `nix_node_test(...)` is also Nix-backed, but it is not a genrule-style “macro builds via Nix” command string like `node_webapp` / bundled `nix_node_cli_bin`.

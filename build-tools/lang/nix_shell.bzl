@@ -205,5 +205,18 @@ def nix_calling_env_export_nix_pnpm_fetch_timeout(default_sec = 600):
     v = default_sec if isinstance(default_sec, int) and default_sec > 0 else 600
     return ("export NIX_PNPM_FETCH_TIMEOUT=\"${NIX_PNPM_FETCH_TIMEOUT:-%d}\"; " % v)
 
+def nix_calling_node_patch_requirements_preflight(importer):
+    if not isinstance(importer, str) or importer == "":
+        fail("nix_calling_node_patch_requirements_preflight: importer is required")
+    return (
+        ("BNX_NODE_PATCH_IMPORTER=\"%s\"; " % importer)
+        + "BNX_NODE_ZX_INIT=\"$WORKSPACE_ROOT/build-tools/tools/dev/zx-init.mjs\"; "
+        + "export BUCK_GRAPH_JSON=\"${BUCK_GRAPH_JSON:-$WORKSPACE_ROOT/build-tools/tools/buck/graph.json}\"; "
+        + "if [ ! -f \"$BUCK_GRAPH_JSON\" ]; then "
+        + "  node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$BNX_NODE_ZX_INIT\" \"$WORKSPACE_ROOT/build-tools/tools/buck/export-graph.ts\" --out \"$BUCK_GRAPH_JSON\"; "
+        + "fi; "
+        + "node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$BNX_NODE_ZX_INIT\" \"$WORKSPACE_ROOT/build-tools/tools/buck/enforce-node-patch-requirements.ts\" --check --importer \"$BNX_NODE_PATCH_IMPORTER\"; "
+    )
+
 
 

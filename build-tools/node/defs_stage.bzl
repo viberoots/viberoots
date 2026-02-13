@@ -1,6 +1,6 @@
 load("@prelude//:rules.bzl", "genrule")
 load("//build-tools/lang:defs_common.bzl", "default_lockfile_label_from_package", "default_lockfile_path_from_package", "ensure_default_lockfile_exists", "extract_lockfile_labels", "prepare_language_wiring")
-load("//build-tools/lang:nix_shell.bzl", "nix_build_out_path_cmd", "nix_calling_env_export_buck_graph_json", "nix_calling_genrule_bootstrap")
+load("//build-tools/lang:nix_shell.bzl", "nix_build_out_path_cmd", "nix_calling_env_export_buck_graph_json", "nix_calling_genrule_bootstrap", "nix_calling_node_patch_requirements_preflight")
 load("//build-tools/node/private:wasm_source_resolver.bzl", "asset_with_selector", "sh_quote", "validate_wasm_selector_args", "wasm_source_resolver_shell")
 MODULE_PROVIDERS = {}
 load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
@@ -122,6 +122,7 @@ def node_asset_stage(
         + "if [ 1 -eq 0 ]; then " + nix_calling_genrule_bootstrap(timeout_sec = 240, include_pnpm_store = False, source_workspace_root_env = True) + "fi; "
         + _defs_stage_bootstrap(240)
         + nix_calling_env_export_buck_graph_json()
+        + nix_calling_node_patch_requirements_preflight(native.package_name())
         + _selected_route_build_cmd(selected_route_target)
         + wasm_source_resolver_shell()
         + "if [ -n \"$SRCDIR\" ] && [ \"${SRCDIR#/}\" = \"$SRCDIR\" ]; then SRCDIR=\"$SCRATCH/$SRCDIR\"; fi; "
@@ -182,6 +183,7 @@ def node_wasm_inline_module(
         + "if [ 1 -eq 0 ]; then " + nix_calling_genrule_bootstrap(timeout_sec = 180, include_pnpm_store = False, source_workspace_root_env = True) + "fi; "
         + _defs_stage_bootstrap(180)
         + nix_calling_env_export_buck_graph_json()
+        + nix_calling_node_patch_requirements_preflight(native.package_name())
         + _selected_route_build_cmd(selected_route_target)
         + wasm_source_resolver_shell()
         + "if [ -n \"$SRCDIR\" ] && [ \"${SRCDIR#/}\" = \"$SRCDIR\" ]; then SRCDIR=\"$SCRATCH/$SRCDIR\"; fi; "

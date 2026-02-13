@@ -4,7 +4,12 @@ This plan adds importer-safe patch requirement enforcement for Node local-librar
 
 The design keeps importer-local patch ownership and prevents silent misses with automatic checks.
 
-This is a single PR that includes code, tests, and docs.
+This plan is split into two PRs:
+
+- PR-1 establishes the Node patch requirement model, CLI remediation, install-time checks, tests,
+  and docs.
+- PR-2 closes remaining build-entrypoint enforcement gaps so normal Node build paths enforce the
+  same transitive requirement policy.
 
 Scope: infer patch requirements from library patch files, allow per-patch option overrides, enforce
 transitive requirements on importer builds, and provide explicit remediation tooling.
@@ -192,6 +197,95 @@ Patch requirements remain implicit and apps can miss critical dependency patches
 ### Downsides for Implementing
 
 Additional validation logic, CLI surface area, and test coverage to maintain.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-2: Enforce Node transitive patch requirements on all Node build entrypoints
+
+### Description
+
+I will close the remaining enforcement gap by wiring Node transitive patch requirement checks into
+the primary Node build entrypoints, not only install-time warnings and selected-build preflight.
+
+### Scope & Changes
+
+- [ ] Define one Node build-time preflight contract:
+  - [ ] run read-only requirement checks before Node Nix build execution.
+  - [ ] preserve current remediation command output.
+- [ ] Wire enforcement into normal Node build entrypoints:
+  - [ ] `build-tools/node/defs_core.bzl` (`nix_node_gen` and wrappers such as `nix_node_lib`).
+  - [ ] `build-tools/node/defs_nix.bzl` (`node_webapp`, `nix_node_cli_bin` bundle and non-bundle routes).
+  - [ ] `build-tools/node/defs_stage.bzl` (`node_asset_stage`, `node_wasm_inline_module`).
+- [ ] Apply one shared policy across all listed entrypoints:
+  - [ ] missing required transitive patch requirements => fail.
+  - [ ] missing optional transitive patch requirements => warn (non-fatal).
+  - [ ] print exact importer-specific remediation command.
+- [ ] Reuse a shared command or wiring helper so entrypoints do not re-implement enforcement shell logic.
+- [ ] Keep install-time behavior unchanged (`i` remains warning-first and non-mutating by default).
+- [ ] Keep CLI behavior unchanged (`patch-pkg sync-required node --importer <importer>` remains explicit remediation).
+
+### Implementation Map (new engineer guide)
+
+- **Node macro build entrypoints**: `build-tools/node/defs_core.bzl`, `build-tools/node/defs_nix.bzl`, `build-tools/node/defs_stage.bzl`, `build-tools/node/defs.bzl`
+- **Shared shell/wiring helper (preferred location)**: `build-tools/lang/nix_shell.bzl` (or existing shared Node wiring helper)
+- **Enforcement script**: `build-tools/tools/buck/enforce-node-patch-requirements.ts`
+- **Requirement closure helpers**: `build-tools/tools/lib/node-patch-requirements.ts`
+- **Install warning path (reference only)**: `build-tools/tools/dev/install/deps-main.ts`
+
+### Tests (in this PR)
+
+- [ ] Add static wiring tests that verify enforcement is present in:
+  - [ ] `build-tools/node/defs_core.bzl`.
+  - [ ] `build-tools/node/defs_nix.bzl`.
+  - [ ] `build-tools/node/defs_stage.bzl`.
+- [ ] Add execution-path tests that verify:
+  - [ ] missing required transitive patch requirements fail in normal Node build paths.
+  - [ ] missing optional transitive patch requirements warn and remain non-fatal.
+  - [ ] unaffected importers remain unaffected.
+- [ ] Add deterministic diagnostics tests that verify failure or warning output includes:
+  - [ ] `patch-pkg sync-required node --importer <importer>`.
+- [ ] Use these concrete test file targets:
+  - [ ] extend `build-tools/tools/tests/patching/patch-node.sync-required.test.ts`.
+  - [ ] extend `build-tools/tools/tests/dev/build-selected.node-patch-requirements.preflight.test.ts`.
+  - [ ] add Node macro-entrypoint wiring coverage under `build-tools/tools/tests/node/` for `defs_nix.bzl` and `defs_stage.bzl` paths.
+
+### Docs (in this PR)
+
+- [ ] Update `docs/handbook/patching.md` with an explicit statement that required transitive Node patch checks run in normal Node build entry paths, in addition to install-time checks.
+- [ ] Update `docs/handbook/node-macros.md` with Node macro preflight enforcement behavior and failure or warn policy.
+
+### Acceptance Criteria
+
+- [ ] All normal Node build entrypoints listed in this PR run transitive patch requirement preflight.
+- [ ] Missing required transitive Node patch requirements fail with importer-specific diagnostics.
+- [ ] Missing optional transitive Node patch requirements warn and do not fail.
+- [ ] `i` remains read-only warning flow and does not mutate patch files by default.
+- [ ] Diagnostics include exact remediation command: `patch-pkg sync-required node --importer <importer>`.
+- [ ] Existing importer-local patch ownership and semantics remain unchanged.
+- [ ] Test coverage in the listed files verifies both required-fail and optional-warn policy for normal Node build paths.
+
+### Risks
+
+Enforcement expansion can surface previously hidden missing patch requirements in existing Node
+importers.
+
+### Mitigation
+
+Keep diagnostics deterministic and actionable, preserve optional-as-warn policy, and provide direct
+remediation with `patch-pkg sync-required`.
+
+### Consequence of Not Implementing
+
+Some normal Node build paths can still bypass required transitive patch enforcement and allow
+silent misses.
+
+### Downsides for Implementing
+
+Additional wiring and test maintenance for build-entrypoint preflight behavior.
 
 ### Recommendation
 
