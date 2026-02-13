@@ -9,8 +9,8 @@ pnpm-exporter-adapter-prs.md -> build-tools/docs/pnpm-exporter-adapter-prs.md
 go-cpp-local-patching.md -> build-tools/docs/go-cpp-local-patching.md
 node-cpp-addon-plan.md -> build-tools/docs/node-cpp-addon-plan.md
 python-extension-design.md -> build-tools/docs/python-extension-design.md
-python-wasm-design.md -> build-tools/docs/python-wasm-design.md
-uv2nix-design.md -> build-tools/docs/uv2nix-design.md
+python-wasm-design.md -> build-tools/docs/lang/python-wasm-design.md
+uv2nix-design.md -> build-tools/docs/lang/uv2nix-design.md
 patch-in-uv2nix.md -> build-tools/docs/patch-in-uv2nix.md
 wasm-linking.md -> build-tools/docs/wasm-linking.md
 ts-cpp-go-wasm-plan.md -> build-tools/docs/ts-cpp-go-wasm-plan.md

@@ -113,13 +113,13 @@ We introduce `luaApp` and `luaLib`, mirroring Go’s `goApp`/`goLib` structure a
   - `devOverrideEnv`: default `NIX_LUA_DEV_OVERRIDE_JSON`.
 
 - Patches:
-  - `patchesMapFromDir` scans `patches/lua/*.patch` at evaluation time.
+  - Use `H.patchesMapFromDir patchDir` from `build-tools/tools/nix/lib/lang-helpers.nix` to scan `patches/lua/*.patch` at evaluation time.
   - Keys: `rockName@version` (lowercased); values: list of absolute patch paths.
   - Applied via Nix overlays that override the corresponding Lua package derivations to add `patches`.
 
 - Dev overrides:
-  - Parse `NIX_LUA_DEV_OVERRIDE_JSON` mapping `rockName@version` → absolute local path.
-  - In CI (`CI=true`), throw if overrides are present (same policy as Go).
+  - Parse overrides via `H.readDevOverrides devOverrideEnv`.
+  - In CI (`CI=true`), guard via `H.guardNoDevOverridesInCI devOverrideEnv` (same policy as Go).
   - Locally, warn when overrides are active.
 
 - Build forms:

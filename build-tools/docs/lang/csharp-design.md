@@ -95,9 +95,9 @@ policy enforcement current:
 - **Implementation**: Use `pkgs.buildDotnetModule` (from nixpkgs) or a thin wrapper around it:
   - `nugetDeps` points to `nuget-deps.nix` (generated deterministically; see Install‑deps below).
   - Build parameters set from exporter/planner (TFM, RID, SelfContained, Configuration).
-  - Apply patches using a `patchesMapFromDir` analogous to Go: build `{ "<id>@<ver>" = [ /abs/path.patch ... ] }` from filenames in package‑ or importer‑local patch directories (preferred) or a shared `patches/csharp/*.patch` directory when appropriate.
-  - Dev overrides: read JSON from `NIX_CSHARP_DEV_OVERRIDE_JSON` mapping `"<id>@<ver>"` → absolute path of an unpacked package source tree.
-  - In CI: throw if dev overrides are set. Locally: print a clear warning (shared helper).
+  - Apply patches via `H.patchesMapFromDir patchDir` from `build-tools/tools/nix/lib/lang-helpers.nix` so filename decoding stays consistent with other languages.
+  - Dev overrides via `H.readDevOverrides devOverrideEnv` (mapping `"<id>@<ver>"` → absolute unpacked source path).
+  - In CI: enforce via `H.guardNoDevOverridesInCI devOverrideEnv`. Locally: print a clear warning.
 
 #### Dev overrides and patches in Nix
 

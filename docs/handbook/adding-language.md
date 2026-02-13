@@ -136,8 +136,8 @@ Rule: new package-local planner-visible stub call sites must use the non-mutatin
   - Macros: use `nix_python_{library,binary,test}` from `build-tools/python/defs.bzl` and pass `lockfile_label` explicitly.
     - Do not pass `lockfile:` labels through `labels`; importer identity is derived from `lockfile_label` and macros require exactly one lockfile label.
   - Macro wiring: importer-scoped wiring is centralized via:
-    - Prefer `//build-tools/lang:defs_common.bzl:prepare_language_wiring(...)` with `wiring = "non_genrule"` for `nix_python_library`, `nix_python_test`, and `nix_python_wasm_*` (non-mutating).
-    - Prefer `//build-tools/lang:defs_common.bzl:prepare_language_wiring(...)` with `wiring = "srcsless_rule"` for rule shapes that cannot accept `srcs` (example: prelude `python_binary`).
+    - Prefer `//build-tools/lang:defs_common.bzl:prepare_language_wiring(...)` with `wiring = "non_genrule_nix_calling"` for `nix_python_library`, `nix_python_binary`, `nix_python_test`, and `nix_python_wasm_*` (non-mutating with `global_nix_inputs()` wiring).
+    - Keep `wiring = "srcsless_rule"` as a helper for rule shapes that truly cannot carry patch inputs through the normal prepared-kwargs path.
 - Scaffolding:
   - `scaf new python lib <name>` → `projects/libs/<name>` with `pyproject.toml`, `uv.lock`, `TARGETS` using `nix_python_library` and a sample test via `nix_python_test`.
   - `scaf new python app <name>` → `projects/apps/<name>` with a small library and binary (`nix_python_binary`) and importer‑scoped `lockfile_label`.

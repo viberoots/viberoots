@@ -129,28 +129,13 @@ Sketch:
 ```nix
 { pkgs }:
 let
-  lib = pkgs.lib;
-
-  patchesMapFromDir = patchDir: let
-    names = if builtins.pathExists patchDir then builtins.attrNames (builtins.readDir patchDir) else [];
-    isPatch = name: lib.hasSuffix ".patch" name;
-    toKey = name: let
-      base = lib.removeSuffix ".patch" name;
-      at = lib.findLastIndex (x: x == "@") (lib.stringToCharacters base);
-      key = if at == -1 then base else base; # identity@version (lowercased)
-    in lib.toLower key;
-    step = acc: name:
-      let k = toKey name; v = (acc.${k} or []) ++ ["${patchDir}/${name}"]; in acc // { "${k}" = v; };
-  in builtins.foldl' step {} (lib.filter isPatch names);
-
-  devOverridesOf = envName: let v = builtins.getEnv envName; in if v == "" then {} else builtins.fromJSON v;
+  H = import ../lib/lang-helpers.nix { inherit pkgs; };
 
   buildWithSPM = { name, packageDir, resolved, patchDir ? ../../patches/swift, devOverrideEnv ? "NIX_SWIFT_DEV_OVERRIDE_JSON" }:
     let
-      patchesMap = patchesMapFromDir patchDir;
-      devOverrides = devOverridesOf devOverrideEnv;
-      _ = if (builtins.getEnv "CI") == "true" && (builtins.getEnv devOverrideEnv) != "" then
-            builtins.throw "Dev overrides are forbidden in CI" else null;
+      patchesMap = H.patchesMapFromDir patchDir;
+      devOverrides = H.readDevOverrides devOverrideEnv;
+      _ = H.guardNoDevOverridesInCI devOverrideEnv;
     in pkgs.stdenv.mkDerivation {
       pname = "swift-${name}";
       version = "0.1.0";

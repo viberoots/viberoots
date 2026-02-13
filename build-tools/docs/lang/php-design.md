@@ -126,18 +126,12 @@ Sketch (illustrative, mirroring Go):
 ```nix
 { pkgs }:
 let
-  lib = pkgs.lib;
-  patchesMapFromDir = patchDir: let
-    names = if builtins.pathExists patchDir then builtins.attrNames (builtins.readDir patchDir) else [];
-    isPatch = name: lib.hasSuffix ".patch" name;
-    toKey = name: let base = lib.removeSuffix ".patch" name; parts = lib.splitString "@" base; pkg = lib.concatStringsSep "@" (lib.take (lib.length parts - 1) parts); ver = lib.last parts; importName = lib.replaceStrings ["__"] ["/"] pkg; in lib.toLower "${importName}@${ver}";
-    step = acc: name: let key = toKey name; val = (acc.${key} or []) ++ [ "${patchDir}/${name}" ]; in acc // { "${key}" = val; };
-  in builtins.foldl' step {} (lib.filter isPatch names);
+  H = import ../lib/lang-helpers.nix { inherit pkgs; };
 in {
   phpApp = { name, composerLock, projectDir ? ".", devOverrideEnv ? "NIX_PHP_DEV_OVERRIDE_JSON", patchDir ? ../../patches/php }:
-    let patchesMap   = patchesMapFromDir patchDir;
-        devOverrides = let v = builtins.getEnv devOverrideEnv; in if v == "" then {} else builtins.fromJSON v;
-        _ = if (builtins.getEnv "CI") == "true" && (builtins.getEnv devOverrideEnv) != "" then builtins.throw "Dev overrides are forbidden in CI" else null;
+    let patchesMap   = H.patchesMapFromDir patchDir;
+        devOverrides = H.readDevOverrides devOverrideEnv;
+        _ = H.guardNoDevOverridesInCI devOverrideEnv;
     in pkgs.php.buildComposerProject {
       pname = "php-${name}"; version = "0.1.0"; src = ./.; composerLock = composerLock; projectRoot = projectDir;
       overrides = pkg: old: old // {
@@ -147,9 +141,9 @@ in {
     };
 
   phpLib = { name, composerLock, projectDir ? ".", devOverrideEnv ? "NIX_PHP_DEV_OVERRIDE_JSON", patchDir ? ../../patches/php }:
-    let patchesMap   = patchesMapFromDir patchDir;
-        devOverrides = let v = builtins.getEnv devOverrideEnv; in if v == "" then {} else builtins.fromJSON v;
-        _ = if (builtins.getEnv "CI") == "true" && (builtins.getEnv devOverrideEnv) != "" then builtins.throw "Dev overrides are forbidden in CI" else null;
+    let patchesMap   = H.patchesMapFromDir patchDir;
+        devOverrides = H.readDevOverrides devOverrideEnv;
+        _ = H.guardNoDevOverridesInCI devOverrideEnv;
     in pkgs.php.buildComposerProject {
       pname = "phplib-${name}"; version = "0.1.0"; src = ./.; composerLock = composerLock; projectRoot = projectDir;
       overrides = pkg: old: old // {

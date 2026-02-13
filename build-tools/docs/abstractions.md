@@ -611,9 +611,8 @@ Importer-scoped non-genrule wrappers should:
 - **Starlark (preferred)**: `build-tools/lang/defs_common.bzl:prepare_language_wiring(...)` with `wiring = "non_genrule"`
 - **Starlark (Nix-calling, preferred)**: `build-tools/lang/defs_common.bzl:prepare_language_wiring(...)` with `wiring = "non_genrule_nix_calling"` (composes non-genrule importer wiring plus `global_nix_inputs()` as real action inputs, without mutating caller dicts)
 - **Genrule-style (preferred)**: `build-tools/lang/defs_common.bzl:prepare_language_wiring(...)` with `wiring = "genrule"`
-- **Python macro usage**: `build-tools/python/defs.bzl` (`nix_python_library`, `nix_python_test`, `nix_python_wasm_*`)
-- **Srcs-less rule shapes (preferred)**: `build-tools/lang/defs_common.bzl:prepare_language_wiring(...)` with `wiring = "srcsless_rule"` (creates a synthetic dep carrying importer-local patches as action inputs)
-  - Python macro usage: `build-tools/python/defs.bzl` (`nix_python_binary`)
+- **Python macro usage**: `build-tools/python/defs.bzl` (`nix_python_library`, `nix_python_binary`, `nix_python_test`, `nix_python_wasm_*`) with `wiring = "non_genrule_nix_calling"`
+- **Srcs-less rule shapes (preferred when needed)**: `build-tools/lang/defs_common.bzl:prepare_language_wiring(...)` with `wiring = "srcsless_rule"` (creates a synthetic dep carrying importer-local patches as action inputs)
 
 ### Common leak patterns
 
@@ -645,7 +644,7 @@ Node providers cannot list importer-local patch files as Buck `srcs` without cro
 
 ### Some rules cannot accept `srcs`
 
-Example: Buck prelude `python_binary` does not accept `srcs`. `nix_python_binary` carries importer-local patch inputs via a synthetic dependency created by `prepare_language_wiring(...)` with `wiring = "srcsless_rule"`.
+Example: Buck prelude `python_binary` does not accept a user `srcs` parameter. In this repo, `nix_python_binary` routes through `prepare_language_wiring(...)` with `wiring = "non_genrule_nix_calling"` and passes the prepared `srcs`/`nix_inputs` into the Nix-backed rule wrapper (`python_nix_build`), preserving importer-local patch invalidation without macro-side special-casing.
 
 ---
 

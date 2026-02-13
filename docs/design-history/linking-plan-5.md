@@ -65,7 +65,7 @@ I update documentation to record the new contract:
 - Update `docs/design-history/python-extension-design.md`:
   - note the separation between native `kind:pyext` and WASM `kind:pyext_wasm`
   - document the exported node fields for `kind:pyext_wasm`
-- Update `build-tools/docs/python-wasm-design.md`:
+- Update `build-tools/docs/lang/python-wasm-design.md`:
   - document the new macro and the backend label requirement
 
 ### Acceptance Criteria
@@ -133,7 +133,7 @@ I update documentation to describe the template contract:
 
 - Update `docs/design-history/python-extension-design.md`:
   - document `T.pyExtWasm` output contract and how `EXT_SUFFIX` is determined
-- Update `build-tools/docs/python-wasm-design.md`:
+- Update `build-tools/docs/lang/python-wasm-design.md`:
   - note that Pyodide extensions are built as Emscripten side modules
 
 ### Acceptance Criteria
@@ -206,7 +206,7 @@ I add zx integration tests (one test per file):
 
 I update documentation to capture planner behavior:
 
-- Update `build-tools/docs/python-wasm-design.md`:
+- Update `build-tools/docs/lang/python-wasm-design.md`:
   - document how Pyodide app/lib outputs include extension overlays
 
 ### Acceptance Criteria
@@ -277,7 +277,7 @@ I add zx integration tests (one test per file):
 
 - Update `docs/design-history/python-extension-design.md`:
   - document the WASI `kind:pyext_wasm` build and runtime constraints
-- Update `build-tools/docs/python-wasm-design.md`:
+- Update `build-tools/docs/lang/python-wasm-design.md`:
   - document the WASI extension module runtime requirements
 
 ### Acceptance Criteria
@@ -332,7 +332,7 @@ I add zx integration tests (one test per file):
 
 I update documentation to describe the link model:
 
-- Update `docs/design-history/python-extension-design.md` and `build-tools/docs/python-wasm-design.md` with the supported producers and closure rules
+- Update `docs/design-history/python-extension-design.md` and `build-tools/docs/lang/python-wasm-design.md` with the supported producers and closure rules
 
 ### Acceptance Criteria
 
@@ -436,7 +436,7 @@ I add zx tests (one test per file):
 I update documentation to record the toolchain source:
 
 - Update `docs/design-history/python-extension-design.md` with the pinned WASI config source for `EXT_SUFFIX`
-- Update `build-tools/docs/python-wasm-design.md` with the same detail
+- Update `build-tools/docs/lang/python-wasm-design.md` with the same detail
 
 ### Acceptance Criteria
 
@@ -495,7 +495,7 @@ I add zx integration tests (one test per file):
 
 I update documentation to align with the runtime behavior:
 
-- Update `build-tools/docs/python-wasm-design.md` with the runtime execution contract for tests
+- Update `build-tools/docs/lang/python-wasm-design.md` with the runtime execution contract for tests
 - Update `docs/design-history/python-extension-design.md` to clarify that tests must execute, not just build
 
 ### Acceptance Criteria

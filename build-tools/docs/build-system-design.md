@@ -321,34 +321,14 @@ Keep language logic localized and easy to read. The Go templates consume the **p
 # build-tools/tools/nix/lang-templates.nix  (Go excerpts)
 { pkgs }:
 let
-  lib = pkgs.lib;
-
-  # Build a mapping of "module@version" -> list of patch file paths by scanning patches/go/*.patch
-  patchesMapFromDir = patchDir: let
-    names = if builtins.pathExists patchDir then builtins.attrNames (builtins.readDir patchDir) else [];
-    isPatch = name: lib.hasSuffix ".patch" name;
-    toKey = name: let
-      base = lib.removeSuffix ".patch" name;
-      parts = lib.splitString "@" base;
-      impEnc = lib.concatStringsSep "@" (lib.take (lib.length parts - 1) parts);
-      ver    = lib.last parts;
-      importPath = lib.replaceStrings ["__"] ["/"] impEnc;
-    in lib.toLower "${importPath}@${ver}";
-    step = acc: name:
-      let key = toKey name;
-          val = (acc.${key} or []) ++ [ "${patchDir}/${name}" ];
-      in acc // { "${key}" = val; };
-  in builtins.foldl' step {} (lib.filter isPatch names);
+  H = import ../lib/lang-helpers.nix { inherit pkgs; };
 in
 {
   goApp = { name, modulesToml, devOverrideEnv ? (import ./lib/dev-override-envs.nix { inherit pkgs; }).envNameForLang "go", subdir ? ".", patchDir ? ../../patches/go }:
     let
-      patchesMap   = patchesMapFromDir patchDir;
-      devOverrides = let v = builtins.getEnv devOverrideEnv;
-                     in if v == "" then {} else builtins.fromJSON v;
-      _ = if (builtins.getEnv "CI") == "true" && (builtins.getEnv devOverrideEnv) != "" then
-            builtins.throw "Dev overrides are forbidden in CI"
-          else null;
+      patchesMap = H.patchesMapFromDir patchDir;
+      devOverrides = H.readDevOverrides devOverrideEnv;
+      _ = H.guardNoDevOverridesInCI devOverrideEnv;
     in pkgs.buildGoApplication {
       pname   = "go-${name}";
       version = "0.1.0";
@@ -363,12 +343,9 @@ in
 
   goLib = { name, modulesToml, devOverrideEnv ? (import ./lib/dev-override-envs.nix { inherit pkgs; }).envNameForLang "go", subdir ? ".", patchDir ? ../../patches/go }:
     let
-      patchesMap   = patchesMapFromDir patchDir;
-      devOverrides = let v = builtins.getEnv devOverrideEnv;
-                     in if v == "" then {} else builtins.fromJSON v;
-      _ = if (builtins.getEnv "CI") == "true" && (builtins.getEnv devOverrideEnv) != "" then
-            builtins.throw "Dev overrides are forbidden in CI"
-          else null;
+      patchesMap = H.patchesMapFromDir patchDir;
+      devOverrides = H.readDevOverrides devOverrideEnv;
+      _ = H.guardNoDevOverridesInCI devOverrideEnv;
     in pkgs.buildGoApplication {
       pname   = "golib-${name}";
       version = "0.1.0";
@@ -1625,32 +1602,13 @@ process.exit(0);
 # build-tools/tools/nix/lang-templates.nix (Go)
 { pkgs }:
 let
-  lib = pkgs.lib;
-
-  # Build {"importPath@version" = [ /abs/path.patch ... ]} from flat patches/go/*.patch filenames.
-  patchesMapFromDir = patchDir: let
-    names = if builtins.pathExists patchDir then builtins.attrNames (builtins.readDir patchDir) else [];
-    isPatch = name: lib.hasSuffix ".patch" name;
-    toKey = name: let
-      base = lib.removeSuffix ".patch" name;
-      parts = lib.splitString "@" base;
-      impEnc = lib.concatStringsSep "@" (lib.take (lib.length parts - 1) parts);
-      ver    = lib.last parts;
-      importPath = lib.replaceStrings ["__"] ["/"] impEnc;
-    in lib.toLower "${importPath}@${ver}";
-    step = acc: name:
-      let key = toKey name;
-          val = (acc.${key} or []) ++ [ "${patchDir}/${name}" ];
-      in acc // { "${key}" = val; };
-  in builtins.foldl' step {} (lib.filter isPatch names);
+  H = import ../lib/lang-helpers.nix { inherit pkgs; };
 in {
   goApp = { name, modulesToml, devOverrideEnv ? (import ./lib/dev-override-envs.nix { inherit pkgs; }).envNameForLang "go", subdir ? ".", patchDir ? ../../patches/go }:
     let
-      patchesMap   = patchesMapFromDir patchDir;
-      devOverrides = let v = builtins.getEnv devOverrideEnv; in if v == "" then {} else builtins.fromJSON v;
-      _ = if (builtins.getEnv "CI") == "true" && (builtins.getEnv devOverrideEnv) != "" then
-            builtins.throw "Dev overrides are forbidden in CI"
-          else null;
+      patchesMap = H.patchesMapFromDir patchDir;
+      devOverrides = H.readDevOverrides devOverrideEnv;
+      _ = H.guardNoDevOverridesInCI devOverrideEnv;
     in pkgs.buildGoApplication {
       pname   = "go-${name}";
       version = "0.1.0";
@@ -1665,11 +1623,9 @@ in {
 
   goLib = { name, modulesToml, devOverrideEnv ? (import ./lib/dev-override-envs.nix { inherit pkgs; }).envNameForLang "go", subdir ? ".", patchDir ? ../../patches/go }:
     let
-      patchesMap   = patchesMapFromDir patchDir;
-      devOverrides = let v = builtins.getEnv devOverrideEnv; in if v == "" then {} else builtins.fromJSON v;
-      _ = if (builtins.getEnv "CI") == "true" && (builtins.getEnv devOverrideEnv) != "" then
-            builtins.throw "Dev overrides are forbidden in CI"
-          else null;
+      patchesMap = H.patchesMapFromDir patchDir;
+      devOverrides = H.readDevOverrides devOverrideEnv;
+      _ = H.guardNoDevOverridesInCI devOverrideEnv;
     in pkgs.buildGoApplication {
       pname   = "golib-${name}";
       version = "0.1.0";

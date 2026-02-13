@@ -108,9 +108,9 @@ Functions: `gleamApp { name, lockfilePath, subdir ? ".", devOverrideEnv ? "NIX_G
 Responsibilities:
 
 - Build a deterministic deps set from `lockfilePath` using a pre‑materialized derivation (see Deps Derivation below).
-- Construct `patchesMap` from `patchDir/*.patch` keyed by `<package>@<version>` (lowercased; `__` → `/`).
-- Parse `devOverrideEnv` JSON mapping `<package>@<version>` → absolute local path for dev override sources.
-- Fail in CI if dev overrides are set; warn locally (reuse shared helper pattern from other languages).
+- Construct `patchesMap` via `H.patchesMapFromDir patchDir` from `build-tools/tools/nix/lib/lang-helpers.nix`.
+- Parse dev overrides via `H.readDevOverrides devOverrideEnv`.
+- Fail in CI via `H.guardNoDevOverridesInCI devOverrideEnv`; warn locally (shared helper pattern).
 - Build via `gleam build --target erlang` (or `test`) within a Nix builder that sets `GLEAN_DEPS_PATH` (or appropriate env) to the deps derivation.
 
 Deps Derivation (FOD):

@@ -101,8 +101,8 @@ Implement two functions `rustApp` and `rustLib` consumed by `build-tools/tools/n
 Key design points:
 
 - Use `pkgs.rustPlatform.buildRustPackage` for both app and lib, mirroring Go’s simplification. If later we adopt `naersk`, the interface stays the same; only internals change.
-- Patches are applied to vendored crates using `cargoPatches`. We derive a map `{ "crate@version": [ /abs/path.patch ... ] }` by scanning `patches/rust/*.patch` (flat), identical to Go’s `patchesMapFromDir` approach.
-- Dev overrides are read from `NIX_RUST_DEV_OVERRIDE_JSON` (JSON map of `crate@version` → local path). In Nix, these are converted with `builtins.path` to deterministic store paths and injected during the patch phase to replace the vendored crate directory. CI throws if overrides are present.
+- Patches are applied to vendored crates using `cargoPatches`, with map construction via `H.patchesMapFromDir patchDir` from `build-tools/tools/nix/lib/lang-helpers.nix`.
+- Dev overrides are read via `H.readDevOverrides devOverrideEnv` (JSON map of `crate@version` → local path). In Nix, these are converted with `builtins.path` to deterministic store paths and injected during the patch phase to replace the vendored crate directory. CI enforcement uses `H.guardNoDevOverridesInCI devOverrideEnv`.
 - Features, target triple, and release flag are threaded through to the builder.
 
 Sketch (illustrative):
@@ -111,22 +111,7 @@ Sketch (illustrative):
 { pkgs }:
 let
   lib = pkgs.lib;
-
-  patchesMapFromDir = patchDir: let
-    names = if builtins.pathExists patchDir then builtins.attrNames (builtins.readDir patchDir) else [];
-    isPatch = name: lib.hasSuffix ".patch" name;
-    toKey = name: let
-      base = lib.removeSuffix ".patch" name;
-      # crates are simple: <crate>@<version>
-      parts = lib.splitString "@" base;
-      crate = lib.concatStringsSep "@" (lib.take (lib.length parts - 1) parts);
-      ver = lib.last parts;
-    in lib.toLower "${crate}@${ver}";
-    step = acc: name:
-      let key = toKey name;
-          val = (acc.${key} or []) ++ [ "${patchDir}/${name}" ];
-      in acc // { "${key}" = val; };
-  in builtins.foldl' step {} (lib.filter isPatch names);
+  H = import ../lib/lang-helpers.nix { inherit pkgs; };
 in {
   rustApp = { name
             , cargoLock
@@ -137,9 +122,9 @@ in {
             , target ? null
             }:
     let
-      patchesMap = patchesMapFromDir patchDir;
-      devOverrides = let v = builtins.getEnv devOverrideEnv; in if v == "" then {} else builtins.fromJSON v;
-      _ = if (builtins.getEnv "CI") == "true" && (builtins.getEnv devOverrideEnv) != "" then builtins.throw "Dev overrides are forbidden in CI" else null;
+      patchesMap = H.patchesMapFromDir patchDir;
+      devOverrides = H.readDevOverrides devOverrideEnv;
+      _ = H.guardNoDevOverridesInCI devOverrideEnv;
       cratePatches = lib.concatLists (lib.attrValues patchesMap);
     in pkgs.rustPlatform.buildRustPackage {
       pname = "rust-${name}";

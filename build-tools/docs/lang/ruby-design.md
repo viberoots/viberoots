@@ -85,9 +85,10 @@ Add `build-tools/tools/nix/templates/ruby.nix` that exposes two functions mirror
 Key behaviors (consistent with Go templates):
 
 - Build inputs: `name`, `gemfileLock`, optional `gemset` (if using bundix), `subdir` (default "."), `devOverrideEnv` (default `NIX_RUBY_DEV_OVERRIDE_JSON`), and `patchDir` (default `../../patches/ruby`).
-- `patchesMapFromDir` scans `patchDir` into a map `{"<gem>@<version>" = [ /abs/path.patch ... ]}` at Nix eval time, identical to Go’s approach.
-- `devOverrides` reads JSON from `NIX_RUBY_DEV_OVERRIDE_JSON`: `{ "<gem>@<version>": "/abs/dev/path" }`.
-- CI guardrails: if `CI=true` and dev overrides are set, throw.
+- Use shared Nix helpers from `build-tools/tools/nix/lib/lang-helpers.nix`:
+  - `H.patchesMapFromDir patchDir` for canonical patch filename decoding and map construction.
+  - `H.readDevOverrides devOverrideEnv` for override JSON parsing.
+  - `H.guardNoDevOverridesInCI devOverrideEnv` for CI policy enforcement.
 - Patching: inject patches per gem using the chosen Ruby Nix builder (see below), and override `src` when dev overrides point to a local path.
 
 Recommended base in nixpkgs:

@@ -36,7 +36,7 @@ The migration is complete when:
 - Artifact-route enforcement is machine-checked; `artifactRouteAllowlist` is currently empty.
 - No mixed Node artifact route remains for public macros.
 - Detailed follow-on implementation design for robust Node wasm staging/inline source resolution is
-  documented in `build-tools/docs/node-wasm-staging-contract-design.md`.
+  documented in `build-tools/docs/lang/node-wasm-staging-contract-design.md`.
 
 ## Components and dependencies
 

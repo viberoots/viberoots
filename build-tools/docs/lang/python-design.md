@@ -118,33 +118,14 @@ Sketch (illustrative)
 ```nix
 { pkgs }:
 let
-  lib = pkgs.lib;
+  H = import ../lib/lang-helpers.nix { inherit pkgs; };
   DevOverrideEnvs = import ../lib/dev-override-envs.nix { inherit pkgs; };
-
-  patchesMapFromDir = patchDir: let
-    names = if builtins.pathExists patchDir then builtins.attrNames (builtins.readDir patchDir) else [];
-    isPatch = name: lib.hasSuffix ".patch" name;
-    toKey = name: let
-      base = lib.removeSuffix ".patch" name;
-      at   = lib.strLastIndexOf base "@";
-      dist = lib.toLower (lib.substring 0 at base);
-      ver  = lib.toLower (lib.substring (at + 1) (lib.stringLength base - at - 1) base);
-    in "${dist}@${ver}";
-    step = acc: name:
-      let key = toKey name;
-          val = (acc.${key} or []) ++ [ "${patchDir}/${name}" ];
-      in acc // { "${key}" = val; };
-  in builtins.foldl' step {} (lib.filter isPatch names);
-
-  devOverridesFromEnv = envName: let v = builtins.getEnv envName; in if v == "" then {} else builtins.fromJSON v;
 
   mkPy = { pname, version ? "0.1.0", src ? ./. , lockfile, subdir ? ".", patchDir ? ../../patches/python, devOverrideEnv ? DevOverrideEnvs.envNameForLang "python", kind ? "app" }:
     let
-      patchesMap = patchesMapFromDir patchDir;
-      devOverrides = devOverridesFromEnv devOverrideEnv;
-      _ = if (builtins.getEnv "CI") == "true" && (builtins.getEnv devOverrideEnv) != "" then
-            builtins.throw "Dev overrides are forbidden in CI"
-          else null;
+      patchesMap = H.patchesMapFromDir patchDir;
+      devOverrides = H.readDevOverrides devOverrideEnv;
+      _ = H.guardNoDevOverridesInCI devOverrideEnv;
       # Backend dispatch (simplified): uv only
       hasUv = builtins.pathExists (src + "/uv.lock");
     in
@@ -296,6 +277,10 @@ def nix_python_test(name, labels = [], deps = [], **kwargs):
 ```
 
 Using common helpers (macro outline)
+
+Current implementation note: `build-tools/python/defs.bzl` routes Python wrappers through
+`prepare_language_wiring(...)` with `wiring = "non_genrule_nix_calling"` for
+`nix_python_library`, `nix_python_binary`, `nix_python_test`, and extension/wasm variants.
 
 ```starlark
 load("@prelude//build-tools/python:defs.bzl", "python_binary", "python_library", "python_test")

@@ -71,7 +71,7 @@ policy enforcement current:
 - Buck2: orchestrates target graph, test impact, and label propagation.
 - Exporter (`build-tools/tools/buck/export-graph.ts` + Zig adapter): emits `module:<pkgId>@<version>` labels for Zig targets.
 - Planner (`graph-generator.nix`): detects Zig targets and dispatches to Zig Nix templates (`zigApp`/`zigLib`).
-- Nix templates (`build-tools/tools/nix/templates/zig.nix`, re-exported via `build-tools/tools/nix/lang-templates.nix`): build Zig projects hermetically; scan `patches/zig` to map `pkg@ver → [patch files]`; apply `NIX_ZIG_DEV_OVERRIDE_JSON` locally (warn) and fail in CI.
+- Nix templates (`build-tools/tools/nix/templates/zig.nix`, re-exported via `build-tools/tools/nix/lang-templates.nix`): build Zig projects hermetically; use shared Nix helpers from `build-tools/tools/nix/lib/lang-helpers.nix` (`patchesMapFromDir`, `readDevOverrides`, `guardNoDevOverridesInCI`) so patch decoding and override policy stay consistent with other languages.
 - Providers: `third_party/providers/defs_zig.bzl` + generated `TARGETS.zig.auto`.
 - Auto-map (`build-tools/tools/buck/gen-auto-map.ts`): maps `module:` labels to provider names; no code changes needed (existing module label path reused).
 - Macros (`zig/defs.bzl`): stamp `lang:zig` labels, `kind:*` labels, and append providers from `//build-tools/lang:auto_map.bzl`.
@@ -156,9 +156,9 @@ We implement minimal, readable templates that align with the Go pattern and reus
   - `patchDir`: default `../../patches/zig`.
   - `devOverrideEnv`: `NIX_ZIG_DEV_OVERRIDE_JSON`.
 - Patch map and dev overrides:
-  - Build a map `{ "pkgId@version" = [ /abs/patch1.patch ... ] }` by scanning `patchDir` (flat) at evaluation time. Same directory-scanning approach as Go.
-  - Parse `builtins.getEnv devOverrideEnv` as JSON mapping `{ "pkgId@version": "/abs/local/path" }`.
-  - CI guard: if `CI == true` and `devOverrideEnv` present, `builtins.throw`.
+  - Build a map `{ "pkgId@version" = [ /abs/patch1.patch ... ] }` via `H.patchesMapFromDir patchDir` (flat dir contract shared with other languages).
+  - Parse overrides via `H.readDevOverrides devOverrideEnv`.
+  - CI guard via `H.guardNoDevOverridesInCI devOverrideEnv`.
 - Apply patches and overrides:
   - Vendor dependencies using Zig’s mechanisms (e.g., `build.zig.zon` + vendor dir). Overlay patches per `pkg@ver` on top of the vendored sources during the derivation.
   - If a dev override is present for a `pkg@ver`, replace that vendored source with the provided local path.

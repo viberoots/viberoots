@@ -47,8 +47,8 @@ I am recording the baseline run list and a root-level inventory snapshot for the
 - `docs/design-history/go-cpp-local-patching.md`
 - `build-tools/docs/node-cpp-addon-plan.md`
 - `docs/design-history/python-extension-design.md`
-- `build-tools/docs/python-wasm-design.md`
-- `build-tools/docs/uv2nix-design.md`
+- `build-tools/docs/lang/python-wasm-design.md`
+- `build-tools/docs/lang/uv2nix-design.md`
 - `docs/design-history/patch-in-uv2nix.md`
 - `build-tools/docs/wasm-linking.md`
 - `build-tools/docs/ts-cpp-go-wasm-plan.md`

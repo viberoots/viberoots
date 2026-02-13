@@ -28,7 +28,8 @@ This section is a quick index of “don’t re-implement this” utilities. Most
 - Patch inputs are attached through `//build-tools/lang:patch_inputs.bzl` helpers. When a rule does not support `srcs`, call sites must choose a supported input attribute explicitly using `into = "<attr>"` or carry patch inputs via a small helper target.
   - For importer-scoped ecosystems (Node, Python), macro wiring is standardized via the unified helper surface re-exported from `//build-tools/lang:defs_common.bzl`:
     - `prepare_language_wiring(...)` with `wiring = "genrule"` for genrule-style wrappers (handles list vs dict `srcs`)
-    - `prepare_language_wiring(...)` with `wiring = "non_genrule"` for non-genrule wrappers (returns `importer`, prepared `kwargs`, and provider-wired `deps`)
+    - `prepare_language_wiring(...)` with `wiring = "non_genrule"` for non-genrule wrappers
+    - `prepare_language_wiring(...)` with `wiring = "non_genrule_nix_calling"` for non-genrule wrappers that call Nix and need `global_nix_inputs()` wired as action inputs
     - `prepare_language_wiring(...)` with `wiring = "srcsless_rule"` for rule shapes that cannot accept `srcs` (synthetic dep carries patch inputs)
 - Dev override environment variable names are a shared contract and are defined in `build-tools/tools/lib/dev-override-envs.json`. Tooling must not hardcode `NIX_*_DEV_OVERRIDE_JSON` names.
 
@@ -207,9 +208,9 @@ node build-tools/tools/dev/patches-lint.ts --lang python
 - The Python library and test macros include importer‑local patch files in `srcs` for precise Buck invalidation:
   - Patches live under `<importer>/patches/python/*.patch` (e.g., `projects/apps/api/patches/python/...`).
   - Changing a patch only invalidates Python targets bound to that importer.
-- `nix_python_binary` cannot carry patches via `srcs` (Buck prelude `python_binary` does not accept `srcs`). Instead it uses `prepare_language_wiring(..., wiring = "srcsless_rule")` to create a synthetic dep that carries importer‑local patches as real action inputs (`resources`) and adds that dep to `deps`, so patch edits deterministically invalidate the binary.
+- `nix_python_binary` macro input does not accept `srcs` (matching the prelude `python_binary` UX), but the macro still routes through `prepare_language_wiring(..., wiring = "non_genrule_nix_calling")` and passes prepared `srcs` and `nix_inputs` to the Nix-backed rule wrapper (`python_nix_build`), so importer-local patch edits still deterministically invalidate the binary.
 - Lockfile label enforcement and parsing are centralized in Starlark. For importer-scoped macros, **do not** parse lockfile labels directly; route through the canonical helper surface in `//build-tools/lang:defs_common.bzl`:
-  - Prefer `prepare_language_wiring(...)` with `wiring = "non_genrule"` for non-genrule wrappers (Python `nix_python_library`, `nix_python_test`, `nix_python_wasm_*`)
+  - Prefer `prepare_language_wiring(...)` with `wiring = "non_genrule_nix_calling"` for Python non-genrule wrappers (`nix_python_library`, `nix_python_binary`, `nix_python_test`, `nix_python_wasm_*`)
   - Prefer `prepare_language_wiring(...)` with `wiring = "genrule"` for genrule-style wrappers (`nix_node_gen`, similar shims).
   - Implementation note: the unified helper encapsulates `ensure_single_lockfile_label(...)` and patch-input attachment (`include_importer_patches_from_labels(...)`) so error text, normalization, and list/dict input handling stay consistent across Node and Python.
 

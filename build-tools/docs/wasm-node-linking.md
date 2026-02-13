@@ -11,7 +11,7 @@ I want a standard, low-friction way for templates for webapps and other Node or 
 For the contract-focused implementation plan that resolves cross-language wasm source-shape ambiguity
 while preserving low-boilerplate callsites, see:
 
-- `build-tools/docs/node-wasm-staging-contract-design.md`
+- `build-tools/docs/lang/node-wasm-staging-contract-design.md`
 
 ## Goals
 

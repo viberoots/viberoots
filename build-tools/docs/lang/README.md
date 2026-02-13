@@ -43,3 +43,20 @@ A language rollout doc in this directory is only complete when it includes:
 - Exception policy expectations.
 - Checker and test updates needed to prevent drift.
 - Validation commands that contributors can run before merge.
+
+## Canonical helper baseline
+
+Language design docs should describe shared helper usage, not bespoke implementations, for common
+cross-language contracts.
+
+- For macro wiring, point to `prepare_language_wiring(...)` from
+  `//build-tools/lang:defs_common.bzl` and the relevant `wiring` modes.
+- For patch map + dev override behavior in Nix examples, prefer:
+  - `H = import ../lib/lang-helpers.nix { inherit pkgs; };`
+  - `H.patchesMapFromDir patchDir`
+  - `H.readDevOverrides devOverrideEnv`
+  - `H.guardNoDevOverridesInCI devOverrideEnv`
+- Keep path examples aligned with repository conventions:
+  - language docs under `build-tools/docs/lang/`
+  - language patch dirs under `patches/<lang>/` unless a design explicitly requires importer-local
+    package paths.
