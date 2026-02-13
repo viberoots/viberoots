@@ -35,7 +35,7 @@ async function main() {
         "- `node_wasm_inline_module` → Nix build (`standalone nix-calling genrule route`).",
         "| `node_asset_stage`",
         "| `node_wasm_inline_module`",
-        "Uses standalone nix-calling genrule route with shared wiring.",
+        "Uses standalone nix-calling genrule route with selected-build out-path capture and shared wiring.",
       ],
     },
     {
@@ -43,6 +43,7 @@ async function main() {
       path: designPath,
       requiredFragments: [
         "`node_asset_stage` and `node_wasm_inline_module` use standalone nix-calling genrule route in `build-tools/node/defs_stage.bzl`",
+        "`nix_build_out_path_cmd`",
       ],
     },
   ];

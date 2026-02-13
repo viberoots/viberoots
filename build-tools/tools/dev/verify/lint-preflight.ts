@@ -1,7 +1,21 @@
-import "zx/globals";
 import path from "node:path";
 import process from "node:process";
+import "zx/globals";
 import { runNodeWithZx } from "../../lib/node-run.ts";
+
+async function runVerifyFileSizePreflight(root: string, zxInitPath: string): Promise<void> {
+  const script = path.resolve(root, "build-tools/tools/dev/file-size-lint.ts");
+  const args = ["--scope=source", "--fail=true"];
+  process.stderr.write("[verify] file-size preflight: running strict source-file size gate\n");
+  try {
+    await runNodeWithZx({ cwd: root, script, args, zxInitPath, stdio: "inherit" });
+  } catch {
+    process.stderr.write(
+      "error: file-size preflight failed; split oversized source files and re-run 'v'\n",
+    );
+    process.exit(2);
+  }
+}
 
 async function runVerifyNixGapsPolicyPreflight(root: string, zxInitPath: string): Promise<void> {
   const script = path.resolve(root, "build-tools/tools/dev/nix-gaps-inventory-check.ts");
@@ -52,5 +66,6 @@ export async function runVerifyLintPreflight(root: string, zxInitPath: string): 
     process.exit(2);
   }
 
+  await runVerifyFileSizePreflight(root, zxInitPath);
   await runVerifyNixGapsPolicyPreflight(root, zxInitPath);
 }

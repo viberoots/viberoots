@@ -10,6 +10,7 @@ import { runNodeWithZx } from "../lib/node-run.ts";
 
 type Stage =
   | "codegen"
+  | "langs-validate"
   | "glue"
   | "export-graph"
   | "sync-providers"
@@ -134,8 +135,7 @@ async function main() {
     }
     case "file-size-lint": {
       const target = path.resolve("build-tools/tools/dev/file-size-lint.ts");
-      // Temporary: keep PR-1 green while PR-2..PR-5 split the known >250 LOC offenders.
-      await runTool(target, ["--scope=source", "--fail=true", "--allow-known"]);
+      await runTool(target, ["--scope=source", "--fail=true"]);
       break;
     }
     case "nix-build-graph-generator":

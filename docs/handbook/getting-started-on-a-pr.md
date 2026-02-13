@@ -25,6 +25,7 @@ Python provider sync activation in sparse/partial clones is lockfile‑driven: t
   - canonical policy location: `TESTING.md` section `Coverage policy (canonical)`
 - Use Conventional Commits and real newlines in commit messages.
 - Keep files small and focused (≤ 250 lines ideally); split modules when needed.
+- Required CI stage wiring enforces the methodology file-size gate in strict mode (`file-size-lint` runs `--scope=source --fail=true` without `--allow-known` bypass flags).
 - Maintain determinism and low cyclomatic complexity; prefer small, well-named functions.
 - Follow the tooling rules in `docs/handbook/tooling.md`:
   - Use `build-tools/tools/lib/cli.ts` for CLI parsing (no bespoke `process.argv` parsing).

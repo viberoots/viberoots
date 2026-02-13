@@ -173,6 +173,12 @@ Small maintenance overhead if the doc format changes.
 
 Implement.
 
+### Execution log note
+
+- `build-tools/node/defs_stage.bzl` stage/inline commands now include selected-build out-path capture with `nix_build_out_path_cmd` before staging/inline artifact handling.
+- `build-tools/tools/ci/run-stage.ts` file-size lint stage now uses strict args without `--allow-known`.
+- Regression tests now fail if stage/inline Nix selected-build capture is removed or if file-size bypass flags are reintroduced in required stage wiring.
+
 ---
 
 ## PR-2: Baseline capture for Nix migration
@@ -1526,7 +1532,7 @@ contract do not conflict.
 - Keep the enforced stage/inline route contract explicit and unambiguous:
   - either wrapper-route wording via `nix_node_gen`, or
   - standalone Nix-calling genrule wording,
-  and ensure all docs use the same wording.
+    and ensure all docs use the same wording.
 - Add a small doc-contract parity check that fails if these route-contract statements diverge.
 
 ### Tests (in this PR)
@@ -1653,4 +1659,3 @@ Requires coordinated updates across Node command assembly, gate wiring, and docs
 ### Recommendation
 
 Implement.
-

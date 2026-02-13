@@ -1,18 +1,15 @@
 load("@prelude//:rules.bzl", "genrule")
 load("//build-tools/lang:defs_common.bzl", "default_lockfile_label_from_package", "default_lockfile_path_from_package", "ensure_default_lockfile_exists", "extract_lockfile_labels", "prepare_language_wiring")
-load("//build-tools/lang:nix_shell.bzl", "nix_calling_env_export_buck_graph_json", "nix_calling_genrule_bootstrap")
+load("//build-tools/lang:nix_shell.bzl", "nix_build_out_path_cmd", "nix_calling_env_export_buck_graph_json", "nix_calling_genrule_bootstrap")
 load("//build-tools/node/private:wasm_source_resolver.bzl", "asset_with_selector", "sh_quote", "validate_wasm_selector_args", "wasm_source_resolver_shell")
 MODULE_PROVIDERS = {}
 load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
-
 def _is_label_ref(v):
     return isinstance(v, str) and (v.startswith("//") or v.startswith(":"))
-
 def _to_abs_label(v):
     if v.startswith(":"):
         return "//%s:%s" % (native.package_name(), v[1:])
     return v
-
 def _label_package(v):
     if not _is_label_ref(v):
         return ""
@@ -23,14 +20,12 @@ def _label_package(v):
     if i < 0:
         return trimmed
     return trimmed[:i]
-
 def _apply_default_lockfile_label(lockfile_label, labels, macro_name):
     if (lockfile_label == None or lockfile_label == "") and len(extract_lockfile_labels(labels or [])) == 0:
         default_path = default_lockfile_path_from_package()
         ensure_default_lockfile_exists(default_path, macro_name)
         return default_lockfile_label_from_package()
     return lockfile_label
-
 def _prepare_node_nix_calling_genrule(name, kwargs, srcs, deps, labels, lockfile_label):
     return prepare_language_wiring(
         name = name,
@@ -46,6 +41,18 @@ def _prepare_node_nix_calling_genrule(name, kwargs, srcs, deps, labels, lockfile
         global_inputs_into = "srcs",
         global_inputs_stamp = True,
         wiring = "nix_calling_genrule",
+    )
+def _selected_route_build_cmd(selected_route_target):
+    return (
+        ("BNX_NODE_ROUTE_TARGET=%s; " % sh_quote(selected_route_target))
+        + "if [ -n \"$BNX_NODE_ROUTE_TARGET\" ]; then "
+        + nix_build_out_path_cmd(
+            "\"path:$WORKSPACE_ROOT#graph-generator-selected\"",
+            timeout_var = "TIMEOUT",
+            impure = True,
+            build_prefix = "env BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"$BNX_NODE_ROUTE_TARGET\" ",
+        )
+        + "fi; "
     )
 
 def node_asset_stage(
@@ -98,7 +105,7 @@ def node_asset_stage(
             + "cp -f \"$ASSET_SRC\" \"$DEST\"; "
         )
 
-    # Route note: these stage/inline macros run through the graph-generator-selected Nix path.
+    selected_route_target = ""
     cmd = (
         "SCRATCH=\"$PWD\"; OUT_ABS=\"$SCRATCH/$OUT\"; "
         + nix_calling_genrule_bootstrap(
@@ -107,6 +114,7 @@ def node_asset_stage(
             source_workspace_root_env = True,
         )
         + nix_calling_env_export_buck_graph_json()
+        + _selected_route_build_cmd(selected_route_target)
         + wasm_source_resolver_shell()
         + "if [ -n \"$SRCDIR\" ] && [ \"${SRCDIR#/}\" = \"$SRCDIR\" ]; then SRCDIR=\"$SCRATCH/$SRCDIR\"; fi; "
         + "set -- $SRCS; "
@@ -160,7 +168,7 @@ def node_wasm_inline_module(
     src_ref = src
     if _is_label_ref(src):
         src_ref = "$(location %s)" % _to_abs_label(src)
-    # Route note: this macro runs through the graph-generator-selected Nix path.
+    selected_route_target = ""
     cmd = (
         "SCRATCH=\"$PWD\"; OUT_ABS=\"$SCRATCH/$OUT\"; "
         + nix_calling_genrule_bootstrap(
@@ -169,6 +177,7 @@ def node_wasm_inline_module(
             source_workspace_root_env = True,
         )
         + nix_calling_env_export_buck_graph_json()
+        + _selected_route_build_cmd(selected_route_target)
         + wasm_source_resolver_shell()
         + "if [ -n \"$SRCDIR\" ] && [ \"${SRCDIR#/}\" = \"$SRCDIR\" ]; then SRCDIR=\"$SCRATCH/$SRCDIR\"; fi; "
         + ("SRC_HINT=\"%s\"; " % src_ref)

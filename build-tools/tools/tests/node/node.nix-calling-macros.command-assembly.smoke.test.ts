@@ -103,7 +103,7 @@ test("node Nix-calling macros use standardized command assembly helpers (cquery 
       nothrow: true,
     })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cmd //projects/apps/web:staged`;
     if (staged.exitCode !== 0) return;
-    assertCmdInvariants(String(staged.stdout || ""), "node_asset_stage", false);
+    assertCmdInvariants(String(staged.stdout || ""), "node_asset_stage");
 
     const inline = await $({
       cwd: tmp,
@@ -112,7 +112,7 @@ test("node Nix-calling macros use standardized command assembly helpers (cquery 
       nothrow: true,
     })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cmd //projects/apps/web:inline_mod`;
     if (inline.exitCode !== 0) return;
-    assertCmdInvariants(String(inline.stdout || ""), "node_wasm_inline_module", false);
+    assertCmdInvariants(String(inline.stdout || ""), "node_wasm_inline_module");
 
     const cli = await $({
       cwd: tmp,

@@ -22,6 +22,14 @@ test("verify includes a bounded lint preflight (enforcement)", async () => {
     "expected verify preflight to run nix-gaps inventory policy checks",
   );
   assert.ok(
+    txt.includes("file-size-lint.ts"),
+    "expected verify preflight to run strict source file-size checks",
+  );
+  assert.ok(
+    txt.includes("--scope=source") && txt.includes("--fail=true"),
+    "expected verify preflight to pass strict source file-size args",
+  );
+  assert.ok(
     txt.includes("--starlark-api") &&
       txt.includes("docs/handbook/starlark-api.md") &&
       txt.includes("--nix-gaps") &&

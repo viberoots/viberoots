@@ -41,21 +41,21 @@ Planner coverage note: Go library and binary target kinds are supported by the N
 - `nix_node_bin` → Nix build (alias of `nix_node_gen` with planner kind `bin` / `mkBin`).
 - `node_webapp` → Nix build (calls `nix build` in genrule).
 - `nix_node_cli_bin` → Nix build (calls `nix build` in genrule for both bundle modes).
-- `node_asset_stage` → Nix build (`standalone nix-calling genrule route`).
-- `node_wasm_inline_module` → Nix build (`standalone nix-calling genrule route`).
+- `node_asset_stage` → Nix build (`standalone nix-calling genrule route` with selected-build out-path capture).
+- `node_wasm_inline_module` → Nix build (`standalone nix-calling genrule route` with selected-build out-path capture).
 
 Node macro outcome classification:
 
-| Macro                     | Outcome category          | Current route | Notes                                                                   |
-| ------------------------- | ------------------------- | ------------- | ----------------------------------------------------------------------- |
-| `nix_node_gen`            | artifact-producing        | Nix build     | Public target is a Nix-calling wrapper; planner companion uses `mkGen`. |
-| `nix_node_test`           | artifact-producing (test) | Nix build     | Already routed via `node_nix_test`.                                     |
-| `nix_node_lib`            | artifact-producing        | Nix build     | Alias of `nix_node_gen` with planner kind `lib` (`mkLib`).              |
-| `nix_node_bin`            | artifact-producing        | Nix build     | Alias of `nix_node_gen` with planner kind `bin` (`mkBin`).              |
-| `node_webapp`             | orchestration wrapper     | Nix build     | Uses `genrule` to call `nix build`.                                     |
-| `nix_node_cli_bin`        | artifact-producing        | Nix build     | Both `bundle = True` and `bundle = False` use Nix-calling routes.       |
-| `node_asset_stage`        | artifact-producing        | Nix build     | Uses standalone nix-calling genrule route with shared wiring.           |
-| `node_wasm_inline_module` | artifact-producing        | Nix build     | Uses standalone nix-calling genrule route with shared wiring.           |
+| Macro                     | Outcome category          | Current route | Notes                                                                                             |
+| ------------------------- | ------------------------- | ------------- | ------------------------------------------------------------------------------------------------- |
+| `nix_node_gen`            | artifact-producing        | Nix build     | Public target is a Nix-calling wrapper; planner companion uses `mkGen`.                           |
+| `nix_node_test`           | artifact-producing (test) | Nix build     | Already routed via `node_nix_test`.                                                               |
+| `nix_node_lib`            | artifact-producing        | Nix build     | Alias of `nix_node_gen` with planner kind `lib` (`mkLib`).                                        |
+| `nix_node_bin`            | artifact-producing        | Nix build     | Alias of `nix_node_gen` with planner kind `bin` (`mkBin`).                                        |
+| `node_webapp`             | orchestration wrapper     | Nix build     | Uses `genrule` to call `nix build`.                                                               |
+| `nix_node_cli_bin`        | artifact-producing        | Nix build     | Both `bundle = True` and `bundle = False` use Nix-calling routes.                                 |
+| `node_asset_stage`        | artifact-producing        | Nix build     | Uses standalone nix-calling genrule route with selected-build out-path capture and shared wiring. |
+| `node_wasm_inline_module` | artifact-producing        | Nix build     | Uses standalone nix-calling genrule route with selected-build out-path capture and shared wiring. |
 
 ## Python macros
 

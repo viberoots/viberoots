@@ -23,11 +23,11 @@ const nixGapsDoc = `## Node macros
 
 | Macro                     | Outcome category   | Current route | Notes                                                            |
 | ------------------------- | ------------------ | ------------- | ---------------------------------------------------------------- |
-| \`node_asset_stage\`        | artifact-producing | Nix build     | Uses standalone nix-calling genrule route with shared wiring. |
-| \`node_wasm_inline_module\` | artifact-producing | Nix build     | Uses standalone nix-calling genrule route with shared wiring. |
+| \`node_asset_stage\`        | artifact-producing | Nix build     | Uses standalone nix-calling genrule route with selected-build out-path capture and shared wiring. |
+| \`node_wasm_inline_module\` | artifact-producing | Nix build     | Uses standalone nix-calling genrule route with selected-build out-path capture and shared wiring. |
 `;
 
-const designDoc = `1. **Planner languages vs. macro-only languages:** \`node_asset_stage\` and \`node_wasm_inline_module\` use standalone nix-calling genrule route in \`build-tools/node/defs_stage.bzl\`.`;
+const designDoc = `1. **Planner languages vs. macro-only languages:** \`node_asset_stage\` and \`node_wasm_inline_module\` use standalone nix-calling genrule route in \`build-tools/node/defs_stage.bzl\` and include selected-build out-path capture via \`nix_build_out_path_cmd\`.`;
 
 test("node-route-doc-contract-check passes when docs contract is aligned", async () => {
   await runInTemp("node-route-doc-contract-check-pass", async (tmp, $) => {

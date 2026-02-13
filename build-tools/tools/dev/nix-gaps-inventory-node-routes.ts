@@ -60,9 +60,20 @@ export async function enforceNodeImplementationRouteChecks({
     const hasWrapperRoute = macroBody.includes("nix_node_gen(");
     const hasStandaloneBootstrap = macroBody.includes("nix_calling_genrule_bootstrap(");
     const hasStandaloneGraphEnv = macroBody.includes("nix_calling_env_export_buck_graph_json(");
+    const hasDirectNixBuildOutPath = macroBody.includes("nix_build_out_path_cmd(");
+    const hasSharedSelectedRouteHelperCall = macroBody.includes("_selected_route_build_cmd(");
+    const hasSharedSelectedRouteHelperDef =
+      nodeDefsStageTxt.includes("def _selected_route_build_cmd(") &&
+      nodeDefsStageTxt.includes("nix_build_out_path_cmd(");
+    const hasStandaloneNixBuildOutPath =
+      hasDirectNixBuildOutPath ||
+      (hasSharedSelectedRouteHelperCall && hasSharedSelectedRouteHelperDef);
     const hasStandaloneWiring = macroBody.includes("_prepare_node_nix_calling_genrule(");
     const hasStandaloneRoute =
-      hasStandaloneBootstrap && hasStandaloneGraphEnv && hasStandaloneWiring;
+      hasStandaloneBootstrap &&
+      hasStandaloneGraphEnv &&
+      hasStandaloneNixBuildOutPath &&
+      hasStandaloneWiring;
 
     if (docsClaimWrapper && !hasWrapperRoute) {
       console.error(
@@ -80,6 +91,8 @@ export async function enforceNodeImplementationRouteChecks({
         console.error("- missing nix_calling_genrule_bootstrap(...) in command assembly");
       if (!hasStandaloneGraphEnv)
         console.error("- missing nix_calling_env_export_buck_graph_json(...) in command assembly");
+      if (!hasStandaloneNixBuildOutPath)
+        console.error("- missing nix_build_out_path_cmd(...) selected-build capture");
       process.exit(1);
     }
   }
