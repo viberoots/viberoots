@@ -4,7 +4,10 @@ import path from "node:path";
 import process from "node:process";
 import { getFlagBool, hasShortFlag } from "../../lib/cli.ts";
 import { getImporterRootsContract } from "../../lib/importer-roots.ts";
-import { warnNodeDepsInLocal } from "../../lib/node-deps-enforcement.ts";
+import {
+  warnNodeDepsInLocal,
+  warnNodePatchRequirementsInLocal,
+} from "../../lib/node-deps-enforcement.ts";
 import { findRepoRoot } from "../../lib/repo.ts";
 import { nodeModulesAttr } from "./common.ts";
 import { runGoModTidyForMissingSum } from "./go-tidy.ts";
@@ -177,6 +180,7 @@ if (!skipGlue) {
 }
 if (!skipGlue) {
   await warnNodeDepsInLocal(repoRoot);
+  await warnNodePatchRequirementsInLocal(repoRoot);
 } else if (verbose) {
   console.log("[skip] node deps enforcement");
 }

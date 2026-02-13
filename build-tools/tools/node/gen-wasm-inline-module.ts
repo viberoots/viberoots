@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import fs from "fs-extra";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 function readEnv(name) {
   return String(process.env[name] || "").trim();
@@ -32,11 +32,11 @@ async function main() {
   if (!src || !out) {
     throw new Error("missing SRC or OUT_PATH");
   }
-  const bytes = await fs.readFile(src);
+  const bytes = await fsp.readFile(src);
   const base64 = bytes.toString("base64");
   const data = moduleSource(base64);
-  await fs.ensureDir(path.dirname(out));
-  await fs.writeFile(out, data, "utf8");
+  await fsp.mkdir(path.dirname(out), { recursive: true });
+  await fsp.writeFile(out, data, "utf8");
 }
 
 main().catch((err) => {

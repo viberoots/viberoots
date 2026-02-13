@@ -6,7 +6,7 @@ load(
     _node_wasm_inline_module = "node_wasm_inline_module",
 )
 
-def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = [], lockfile_label = None, kind = "gen", **kwargs):
+def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = [], lockfile_label = None, patch_options = None, kind = "gen", **kwargs):
     _nix_node_gen(
         name = name,
         srcs = srcs,
@@ -15,6 +15,7 @@ def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = []
         deps = deps,
         labels = labels,
         lockfile_label = lockfile_label,
+        patch_options = patch_options,
         kind = kind,
         **kwargs
     )
@@ -48,8 +49,8 @@ def nix_node_test(
         **kwargs
     )
 
-def nix_node_lib(name, **kwargs):
-    _nix_node_lib(name = name, **kwargs)
+def nix_node_lib(name, patch_options = None, **kwargs):
+    _nix_node_lib(name = name, patch_options = patch_options, **kwargs)
 
 def nix_node_bin(name, **kwargs):
     _nix_node_bin(name = name, **kwargs)

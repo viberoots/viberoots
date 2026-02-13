@@ -8,6 +8,7 @@ import { repoRoot } from "./lib/apply";
 import { requirePositional } from "./lib/args";
 import { resolveImporterLocalPatchDir } from "./lib/importer-local-patch-dir";
 import { runSession } from "./lib/session";
+import { runNodeSyncRequired } from "./node-sync-required.ts";
 import {
   deleteSession,
   deleteSessionAtPath,
@@ -233,8 +234,8 @@ const handler: LanguageHandler = {
   apply: doApply,
   reset: doReset,
   session: doSession,
-  // @ts-expect-error: extend for node remove support
   remove: doRemove,
+  syncRequired: runNodeSyncRequired,
 };
 
 export default handler;

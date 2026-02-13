@@ -2,6 +2,66 @@ import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 
+async function activeNixGcPids(): Promise<number[]> {
+  const out = await $({
+    stdio: "pipe",
+    reject: false,
+  })`ps -axo pid=,command=`;
+  if ((out as any).exitCode !== 0) return [];
+  const pids: number[] = [];
+  const lines = String((out as any).stdout || "").split("\n");
+  for (const line of lines) {
+    const s = line.trim();
+    if (!s) continue;
+    const firstSpace = s.indexOf(" ");
+    if (firstSpace <= 0) continue;
+    const pid = Number(s.slice(0, firstSpace).trim());
+    const command = s.slice(firstSpace + 1).trim();
+    if (!Number.isFinite(pid) || pid <= 0 || !command) continue;
+    if (
+      command.includes("nix store gc") ||
+      command.includes("nix-store --gc") ||
+      command.includes("nix-store -gc")
+    ) {
+      pids.push(pid);
+    }
+  }
+  return pids;
+}
+
+function pnpmFlakeRef(repoRoot: string): string {
+  // Keep path: so newly scaffolded/untracked files are visible to flake evaluation.
+  return `path:${path.resolve(repoRoot)}#pnpm`;
+}
+
+function localPnpmDirs(importerAbs: string): { homeDir: string; storeDir: string } {
+  return {
+    homeDir: path.join(importerAbs, ".pnpm-home"),
+    storeDir: path.join(importerAbs, ".pnpm-store"),
+  };
+}
+
+async function makeFilteredFlakeRef(repoRoot: string): Promise<{
+  flakeRef: string;
+  cleanup: () => Promise<void>;
+}> {
+  const tmpBase = process.env.TMPDIR || "/tmp";
+  const workDir = await fsp.mkdtemp(path.join(tmpBase, "scaf-flake-"));
+  const snapDir = path.join(workDir, "src");
+  await fsp.mkdir(snapDir, { recursive: true });
+  const src = path.resolve(repoRoot);
+  // Keep untracked scaffold outputs while excluding large generated directories.
+  await $({
+    stdio: "pipe",
+  })`rsync -a --delete --exclude .git --exclude node_modules --exclude buck-out --exclude .direnv --exclude .pnpm-store --exclude .pnpm-home ${src}/ ${snapDir}/`;
+  return {
+    flakeRef: pnpmFlakeRef(snapDir),
+    cleanup: async () => {
+      await fsp.rm(workDir, { recursive: true, force: true }).catch(() => {});
+    },
+  };
+}
+
 async function ensureLocalWorkspaceMarker(importerAbs: string): Promise<{
   workspaceFileAbs: string;
   hadLocalWorkspaceFile: boolean;
@@ -47,14 +107,38 @@ export async function generateImporterLockfile(opts: { repoRoot: string; importe
   // Ensure pnpm uses a writable local store/cache. Run from importer root to avoid
   // pnpm choosing the workspace root implicitly and write lockfile to importer dir.
   const importerAbs = path.resolve(opts.repoRoot, opts.importer);
+  const activeGc = await activeNixGcPids();
+  if (activeGc.length > 0) {
+    throw new Error(
+      `lockfile generation blocked: active 'nix store gc' process(es) detected (${activeGc.join(", ")}). Stop GC and rerun 'scaf new ...'.`,
+    );
+  }
 
   const { workspaceFileAbs, hadLocalWorkspaceFile } = await ensureLocalWorkspaceMarker(importerAbs);
   const fetchTimeout = String(process.env.NIX_PNPM_FETCH_TIMEOUT || "").trim() || "180";
-  await $({
-    cwd: importerAbs,
-    stdio: "inherit",
-  })`bash --noprofile --norc -c 'set -euo pipefail; mkdir -p ".pnpm-home" ".pnpm-store"; export PNPM_HOME="$(pwd)/.pnpm-home"; env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT="${fetchTimeout}" nix run --accept-flake-config "path:${opts.repoRoot}#pnpm" -- config set store-dir "$(pwd)/.pnpm-store"; env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT="${fetchTimeout}" nix run --accept-flake-config "path:${opts.repoRoot}#pnpm" -- install --lockfile-only --prod=false --ignore-scripts --lockfile-dir "." --dir "." --color never'`;
+  const timeoutMs = (Number.parseInt(fetchTimeout, 10) || 180) * 1000 + 120_000;
+  const { homeDir, storeDir } = localPnpmDirs(importerAbs);
+  await fsp.mkdir(homeDir, { recursive: true }).catch(() => {});
+  await fsp.mkdir(storeDir, { recursive: true }).catch(() => {});
+  const flakeSnap = await makeFilteredFlakeRef(opts.repoRoot);
+  console.log(`[lockfile] generating importer lockfile: ${opts.importer}`);
+  try {
+    await $({
+      cwd: importerAbs,
+      stdio: "inherit",
+      timeout: timeoutMs,
+      env: {
+        ...process.env,
+        NIX_PNPM_ALLOW_GENERATE: "1",
+        NIX_PNPM_FETCH_TIMEOUT: fetchTimeout,
+        PNPM_HOME: homeDir,
+      },
+    })`nix run --accept-flake-config ${flakeSnap.flakeRef} -- install --lockfile-only --prod=false --ignore-scripts --lockfile-dir . --dir . --store-dir ${storeDir} --color never`;
+  } finally {
+    await flakeSnap.cleanup();
+  }
 
   await seedImporterLockfileFromRootIfNeeded({ repoRoot: opts.repoRoot, importerAbs });
   await cleanupLocalWorkspaceMarker({ workspaceFileAbs, hadLocalWorkspaceFile });
+  console.log(`[lockfile] done: ${path.join(opts.importer, "pnpm-lock.yaml")}`);
 }

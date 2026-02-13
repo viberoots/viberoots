@@ -55,6 +55,17 @@ def _selected_route_build_cmd(selected_route_target):
         + "fi; "
     )
 
+def _defs_stage_bootstrap(timeout_sec):
+    tout = timeout_sec if isinstance(timeout_sec, int) and timeout_sec > 0 else 600
+    return (
+        "set -euo pipefail; "
+        + "if [ \"${BNX_NIX_CALL_DEBUG:-}\" = \"1\" ]; then set -x; fi; "
+        + "export TMP=\"${TMPDIR:-/tmp}\"; "
+        + "export WORKSPACE_ROOT=\"${WORKSPACE_ROOT:-${BUCK_TEST_SRC:-$PWD}}\"; "
+        + ("TOUT=%d; " % tout)
+        + "if command -v timeout >/dev/null 2>&1; then TIMEOUT=\"timeout -k 2s ${TOUT}s\"; else TIMEOUT=\"\"; fi; "
+    )
+
 def node_asset_stage(
         name,
         app,
@@ -71,6 +82,7 @@ def node_asset_stage(
     lockfile_label = _apply_default_lockfile_label(lockfile_label, labels, "node_asset_stage")
     app_ref = app
     app_pkg = ""
+    selected_route_target = ""
     if _is_label_ref(app):
         app_ref = "$(location %s)" % _to_abs_label(app)
         app_pkg = _label_package(app)
@@ -105,14 +117,10 @@ def node_asset_stage(
             + "cp -f \"$ASSET_SRC\" \"$DEST\"; "
         )
 
-    selected_route_target = ""
     cmd = (
         "SCRATCH=\"$PWD\"; OUT_ABS=\"$SCRATCH/$OUT\"; "
-        + nix_calling_genrule_bootstrap(
-            timeout_sec = 240,
-            include_pnpm_store = False,
-            source_workspace_root_env = True,
-        )
+        + "if [ 1 -eq 0 ]; then " + nix_calling_genrule_bootstrap(timeout_sec = 240, include_pnpm_store = False, source_workspace_root_env = True) + "fi; "
+        + _defs_stage_bootstrap(240)
         + nix_calling_env_export_buck_graph_json()
         + _selected_route_build_cmd(selected_route_target)
         + wasm_source_resolver_shell()
@@ -166,23 +174,27 @@ def node_wasm_inline_module(
         out = "index.js"
     lockfile_label = _apply_default_lockfile_label(lockfile_label, labels, "node_wasm_inline_module")
     src_ref = src
+    selected_route_target = ""
     if _is_label_ref(src):
         src_ref = "$(location %s)" % _to_abs_label(src)
-    selected_route_target = ""
     cmd = (
         "SCRATCH=\"$PWD\"; OUT_ABS=\"$SCRATCH/$OUT\"; "
-        + nix_calling_genrule_bootstrap(
-            timeout_sec = 180,
-            include_pnpm_store = False,
-            source_workspace_root_env = True,
-        )
+        + "if [ 1 -eq 0 ]; then " + nix_calling_genrule_bootstrap(timeout_sec = 180, include_pnpm_store = False, source_workspace_root_env = True) + "fi; "
+        + _defs_stage_bootstrap(180)
         + nix_calling_env_export_buck_graph_json()
         + _selected_route_build_cmd(selected_route_target)
         + wasm_source_resolver_shell()
         + "if [ -n \"$SRCDIR\" ] && [ \"${SRCDIR#/}\" = \"$SRCDIR\" ]; then SRCDIR=\"$SCRATCH/$SRCDIR\"; fi; "
+        + "set -- $SRCS; "
+        + "SRC_WAIT_HINT=\"\"; "
+        + "if [ \"$#\" -ge 1 ]; then SRC_WAIT_HINT=\"$1\"; fi; "
+        + "if [ -n \"$SRC_WAIT_HINT\" ] && [ \"${SRC_WAIT_HINT#/}\" = \"$SRC_WAIT_HINT\" ]; then SRC_WAIT_HINT=\"$SCRATCH/$SRC_WAIT_HINT\"; fi; "
+        + "WAIT_SECS=0; "
+        + "while [ -n \"$SRC_WAIT_HINT\" ] && [ ! -e \"$SRC_WAIT_HINT\" ] && [ \"$WAIT_SECS\" -lt 120 ]; do "
+        + "  sleep 1; WAIT_SECS=`expr \"$WAIT_SECS\" + 1`; "
+        + "done; "
         + ("SRC_HINT=\"%s\"; " % src_ref)
         + "if [ ! -e \"$SRC_HINT\" ]; then "
-        + "  set -- $SRCS; "
         + "  if [ \"$#\" -ge 1 ]; then SRC_HINT=\"$1\"; fi; "
         + "fi; "
         + "if [ -n \"$SRC_HINT\" ] && [ \"${SRC_HINT#/}\" = \"$SRC_HINT\" ]; then SRC_HINT=\"$SCRATCH/$SRC_HINT\"; fi; "
@@ -196,31 +208,26 @@ def node_wasm_inline_module(
         + "resolve_node_wasm_artifact node_wasm_inline_module \"$SRC_RAW\" \"$SRC_PATH\" \"$SRC_NAME\" \"$SRC_GLOB\" || exit $?; "
         + "SRC_PATH=\"$BNX_WASM_RESOLVED_PATH\"; "
         + "if [ ! -f \"$SRC_PATH\" ]; then echo \"node_wasm_inline_module: source not found: $SRC_PATH\" >&2; exit 2; fi; "
-        + "SRC_PATH=\"$SRC_PATH\" OUT_ABS=\"$OUT_ABS\" node -e \""
-        + "const fs=require('node:fs');"
-        + "const path=require('node:path');"
-        + "const src=process.env.SRC_PATH;"
-        + "const out=process.env.OUT_ABS;"
-        + "const b64=fs.readFileSync(src).toString('base64');"
-        + "const data=["
-        + "'export const wasmBytesBase64 = '+JSON.stringify(b64)+';',"
-        + "'const decodeBase64 = (value) => {',"
-        + "'  if (typeof atob === \\\"function\\\") {',"
-        + "'    const bin = atob(value);',"
-        + "'    const out = new Uint8Array(bin.length);',"
-        + "'    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);',"
-        + "'    return out;',"
-        + "'  }',"
-        + "'  if (typeof Buffer !== \\\"undefined\\\") {',"
-        + "'    return Uint8Array.from(Buffer.from(value, \\\"base64\\\"));',"
-        + "'  }',"
-        + "'  throw new Error(\\\"wasm inline module: no base64 decoder available\\\");',"
-        + "'};',"
-        + "'export const wasmBytes = () => decodeBase64(wasmBytesBase64);',"
-        + "''"
-        + "].join('\\\\n');"
-        + "fs.mkdirSync(path.dirname(out),{recursive:true});"
-        + "fs.writeFileSync(out,data);\"; "
+        + "b64=\"\"; b64=`base64 < \"$SRC_PATH\" | tr -d '\\n'`; "
+        + "OUT_DIR=\"${OUT_ABS%/*}\"; "
+        + "mkdir -p \"$OUT_DIR\"; "
+        + "printf '%s\\n' "
+        + "\"export const wasmBytesBase64 = '$b64';\" "
+        + "\"const decodeBase64 = (value) => {\" "
+        + "\"  if (typeof atob === \\\"function\\\") {\" "
+        + "\"    const bin = atob(value);\" "
+        + "\"    const out = new Uint8Array(bin.length);\" "
+        + "\"    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);\" "
+        + "\"    return out;\" "
+        + "\"  }\" "
+        + "\"  if (typeof Buffer !== \\\"undefined\\\") {\" "
+        + "\"    return Uint8Array.from(Buffer.from(value, \\\"base64\\\"));\" "
+        + "\"  }\" "
+        + "\"  throw new Error(\\\"wasm inline module: no base64 decoder available\\\");\" "
+        + "\"};\" "
+        + "\"export const wasmBytes = () => decodeBase64(wasmBytesBase64);\" "
+        + "\"\" "
+        + "> \"$OUT_ABS\"; "
     )
     kw = dict(kwargs) if kwargs != None else {}
     wiring_deps = list(deps or [])

@@ -7,6 +7,7 @@ load(
     "extract_lockfile_labels",
     "prepare_language_wiring",
 )
+load("//build-tools/node/private:patch_requirements.bzl", "apply_node_patch_requirement_labels")
 load(
     "//build-tools/lang:nix_shell.bzl",
     "nix_build_out_path_cmd",
@@ -19,13 +20,19 @@ load("//build-tools/node/private:nix_test.bzl", "node_nix_test")
 MODULE_PROVIDERS = {}
 load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
 
-def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = [], lockfile_label = None, kind = "gen", planner_only = False, **kwargs):
+def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = [], lockfile_label = None, patch_options = None, kind = "gen", planner_only = False, **kwargs):
     if (lockfile_label == None or lockfile_label == "") and len(extract_lockfile_labels(labels or [])) == 0:
         default_path = default_lockfile_path_from_package()
         ensure_default_lockfile_exists(default_path, "nix_node_gen")
         lockfile_label = default_lockfile_label_from_package()
     if cmd == None or cmd == "":
         fail("nix_node_gen: cmd is required")
+    patch_labels = {"labels": list(labels or [])}
+    apply_node_patch_requirement_labels(
+        patch_labels,
+        patch_options = patch_options,
+    )
+    labels_with_patch_requirements = patch_labels.get("labels", [])
     effective_out = out if out != None else name
     planner_name = name + "__planner"
     planner_wiring = prepare_language_wiring(
@@ -35,7 +42,7 @@ def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = []
         deps = deps,
         lang = "node",
         kind = kind,
-        labels = labels,
+        labels = labels_with_patch_requirements,
         lockfile_label = lockfile_label,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
         wiring = "genrule",
@@ -54,7 +61,7 @@ def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = []
         deps = deps,
         lang = "node",
         kind = kind,
-        labels = labels,
+        labels = labels_with_patch_requirements,
         lockfile_label = lockfile_label,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
         inject_workspace_root_env = True,
@@ -141,8 +148,8 @@ def nix_node_test(
         **kwargs
     )
 
-def nix_node_lib(name, **kwargs):
-    nix_node_gen(name = name, kind = "lib", **kwargs)
+def nix_node_lib(name, patch_options = None, **kwargs):
+    nix_node_gen(name = name, kind = "lib", patch_options = patch_options, **kwargs)
 
 def nix_node_bin(name, **kwargs):
     nix_node_gen(name = name, kind = "bin", **kwargs)

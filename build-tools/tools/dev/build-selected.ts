@@ -17,6 +17,7 @@ import { ensureGraph } from "../buck/glue-run.ts";
 import { allDevOverrideEnvNames } from "../lib/dev-override-envs.ts";
 import { getImporterRootsContract } from "../lib/importer-roots.ts";
 import { sanitizeAttrNameFromLabel } from "../lib/labels.ts";
+import { runNodeWithZx } from "../lib/node-run.ts";
 import { findRepoRoot, pathExists } from "../lib/repo.ts";
 
 function stripAnsi(s: string): string {
@@ -77,6 +78,19 @@ async function main() {
   await ensureGraph();
   process.env.BUCK_GRAPH_JSON = graphPath;
   process.env.BUCK_TEST_SRC = workspaceRoot;
+  await runNodeWithZx({
+    cwd: workspaceRoot,
+    zxInitPath: path.join(workspaceRoot, "build-tools", "tools", "dev", "zx-init.mjs"),
+    script: path.join(
+      workspaceRoot,
+      "build-tools",
+      "tools",
+      "buck",
+      "enforce-node-patch-requirements.ts",
+    ),
+    args: ["--check"],
+    stdio: "inherit",
+  });
   // Optional debug: surface a snippet of graph.json for diagnostics when requested
   if ((process.env.EXPORTER_DEBUG || "").trim() === "1") {
     try {

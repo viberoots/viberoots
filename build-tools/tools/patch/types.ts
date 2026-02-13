@@ -19,6 +19,8 @@ export interface LanguageHandler {
   apply(args: string[]): Promise<void>;
   reset(args: string[]): Promise<void>;
   session(args: string[]): Promise<void>;
+  remove?(args: string[]): Promise<void>;
+  syncRequired?(args: string[]): Promise<void>;
 }
 
 export type ResolveResult = { importPath: string; version: string; originPath: string };

@@ -3,6 +3,12 @@ import { runNodeWithZx } from "./node-run.ts";
 
 const ZX_INIT = path.join("build-tools", "tools", "dev", "zx-init.mjs");
 const ENFORCE_SCRIPT = path.join("build-tools", "tools", "buck", "enforce-node-deps.ts");
+const ENFORCE_PATCH_REQUIREMENTS_SCRIPT = path.join(
+  "build-tools",
+  "tools",
+  "buck",
+  "enforce-node-patch-requirements.ts",
+);
 
 function resolveNodeDepsScript(repoRoot: string): { zxInitPath: string; script: string } {
   return {
@@ -36,5 +42,25 @@ export async function warnNodeDepsInLocal(repoRoot: string): Promise<void> {
     if (stdout) console.warn(stdout);
     if (stderr) console.warn(stderr);
     console.warn("Fix: node build-tools/tools/buck/enforce-node-deps.ts --fix");
+  }
+}
+
+export async function warnNodePatchRequirementsInLocal(repoRoot: string): Promise<void> {
+  const zxInitPath = path.join(repoRoot, ZX_INIT);
+  const script = path.join(repoRoot, ENFORCE_PATCH_REQUIREMENTS_SCRIPT);
+  try {
+    await runNodeWithZx({
+      zxInitPath,
+      script,
+      args: ["--check"],
+      stdio: "pipe",
+    });
+  } catch (error: any) {
+    console.warn("WARN: node transitive patch requirements have gaps");
+    const stdout = String(error?.stdout || "").trim();
+    const stderr = String(error?.stderr || "").trim();
+    if (stdout) console.warn(stdout);
+    if (stderr) console.warn(stderr);
+    console.warn("Fix: patch-pkg sync-required node --importer <importer>");
   }
 }

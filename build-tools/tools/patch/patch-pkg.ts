@@ -17,7 +17,7 @@ import path from "node:path";
 import { getFlagBool, getFlagStr, getPositionals } from "../lib/cli.ts";
 import { patchInvalidationStrategyForLang, patchPkgUsageNotes } from "../lib/lang-contracts.ts";
 
-type SubcommandName = "start" | "apply" | "reset" | "session" | "remove" | "help";
+type SubcommandName = "start" | "apply" | "reset" | "session" | "remove" | "sync-required" | "help";
 
 function printPatchModelOneLiner(lang: string) {
   const s = patchInvalidationStrategyForLang(lang);
@@ -43,6 +43,7 @@ function usage(msg?: string) {
       "  reset <lang> <module>    Drop workspace and clear dev override",
       "  session <lang> <module>  Start and attach; Ctrl-D=apply, Ctrl-C=reset",
       "  remove <lang> <module>   Remove a patch and regenerate glue",
+      "  sync-required <lang>     Check transitive required patches for an importer",
       "",
       "languages:",
       "  go | cpp | node | python",
@@ -78,6 +79,9 @@ if (patchDirVal.trim() !== "") {
 if (getFlagBool("force")) {
   rest.push("--force");
 }
+if (getFlagBool("write-placeholders")) {
+  rest.push("--write-placeholders");
+}
 
 async function main() {
   if (!sub || sub === "help") return usage();
@@ -105,6 +109,7 @@ async function main() {
     reset(args: string[]): Promise<void>;
     session(args: string[]): Promise<void>;
     remove?(args: string[]): Promise<void>;
+    syncRequired?(args: string[]): Promise<void>;
   };
 
   const map: Record<SubcommandName, (args: string[]) => Promise<void>> = {
@@ -113,6 +118,8 @@ async function main() {
     reset: handler.reset,
     session: handler.session,
     remove: handler.remove || (async () => usage(`remove not supported for ${lang}`)),
+    "sync-required":
+      handler.syncRequired || (async () => usage(`sync-required not supported for ${lang}`)),
     help: async () => usage(),
   };
 

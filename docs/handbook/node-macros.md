@@ -32,6 +32,17 @@ Node macros include importer-local patches via `native.glob(...)`. Because Buck 
     - If `entry` is set while `bundle=True`, it must be `src/index.ts` (or omitted).
     - To copy an arbitrary entry file, use `bundle=False`.
 
+- **`nix_node_lib(..., patch_options = {...})`** (`build-tools/node/defs_core.bzl`)
+  - Infers transitive Node patch requirements from local patch files in `<importer>/patches/node/*.patch`.
+  - Canonical requirement ids are lowercase `<name>@<version>` and use existing filename decoding (`__` -> `/`, split by last `@`).
+  - `patch_options` supports per-id overrides:
+    - `patch_options = {"debug@4.3.4": {"optional": True}}`
+  - Unknown option keys fail macro validation.
+  - Unknown ids fail macro validation, except stale optional entries (`optional = True`) which warn and are ignored.
+  - Requirements are exported as labels for downstream enforcement:
+    - `node_patch_required:<name>@<version>`
+    - `node_patch_optional:<name>@<version>`
+
 ### Related: `nix_node_test` (stamp policy)
 
 `nix_node_test(...)` is also Nix-backed, but it is not a genrule-style “macro builds via Nix” command string like `node_webapp` / bundled `nix_node_cli_bin`.

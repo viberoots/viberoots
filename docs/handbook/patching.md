@@ -329,6 +329,23 @@ build-tools/tools/bin/patch-pkg apply node lodash --importer projects/apps/web
 #   - build-tools/tools/buck/gen-auto-map.ts
 ```
 
+2b. Check transitive required patch coverage (read-only by default)
+
+```bash
+build-tools/tools/bin/patch-pkg sync-required node --importer projects/apps/web
+```
+
+- The check resolves transitive Node patch requirements from local library deps.
+- Missing required ids fail with deterministic diagnostics.
+- Missing optional ids warn.
+- Diagnostics always include the exact remediation command:
+  - `patch-pkg sync-required node --importer <importer>`
+- Optional placeholder generation is explicit only:
+
+```bash
+build-tools/tools/bin/patch-pkg sync-required node --importer projects/apps/web --write-placeholders
+```
+
 A patch file appears under:
 
 ```
