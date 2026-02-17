@@ -617,6 +617,24 @@ patch-pkg start go golang.org/x/net
 patch-pkg apply go golang.org/x/net
 ```
 
+### Runnable-target contract (`run.prod` / `run.dev`)
+
+The planner manifest (`<graph-out>/manifest.json`) preserves legacy `bins` fields and now carries an additive runnable contract:
+
+- `runnable.kind`: `native-bin`, `script`, `webapp`, or other language-specific runnable categories.
+- `runnable.run.prod`: required argv contract for production-style execution.
+- `runnable.run.dev`: optional argv contract for development-mode execution.
+- `runnable.artifacts`: referenced artifact paths (for example `bins` or `dist`).
+
+Rules:
+
+- Library-only targets remain non-runnable and are excluded from runnable listings.
+- Non-binary app targets (for example webapps that materialize `dist`) are reported as runnable.
+- Developer commands use the contract:
+  - `r //<target>` executes `run.prod`.
+  - `d //<target>` executes `run.dev` and fails with a clear error when it is not declared.
+- Verify/CI behavior is unchanged; these commands are developer UX only.
+
 ---
 
 ## Verify Seed Artifact (Temp Repo Seeding)

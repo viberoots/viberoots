@@ -10,6 +10,7 @@
 , goOutPaths
 , cppOutPaths
 , nodeOutPaths
+, nodeDevImporters ? {}
 , modulesTomlFor
 , pkgPathOf
 , targetNameOf
@@ -56,10 +57,12 @@ let
           echo "tree (depth 2) of out path:" >> $out/build.log
           (cd "${p}" && { ls -la || true; echo "-- bin --"; ls -la bin 2>/dev/null || true; }) >> $out/build.log || true
           bins=""
+          first_bin=""
           if [ -d "${p}/bin" ]; then
             for f in "${p}/bin"/*; do
               if [ -f "$f" ] && [ -x "$f" ]; then
                 if [ -z "$bins" ]; then bins="\"$f\""; else bins="$bins, \"$f\""; fi
+                if [ -z "$first_bin" ]; then first_bin="$f"; fi
                 ln -s "$f" "$out/bin/$(basename "$f")" || true
                 ln -s "$f" "$out/bin/${sanitize n}" || true
                 ln -s "$f" "$out/bin/go-${sanitize n}" || true
@@ -69,7 +72,7 @@ let
           if [ -n "$bins" ]; then
             echo "label=${n} bins=[ $bins ]" >> $out/build.log
             if [ "$first" -eq 0 ]; then echo "," >> $out/manifest.json; fi
-            echo "{ \"label\": \"${n}\", \"kind\": \"bin\", \"bins\": [ $bins ], \"aux\": [] }" >> $out/manifest.json
+            echo "{ \"label\": \"${n}\", \"kind\": \"bin\", \"bins\": [ $bins ], \"aux\": [], \"runnable\": { \"kind\": \"native-bin\", \"run\": { \"prod\": { \"argv\": [ \"$first_bin\" ] } }, \"artifacts\": { \"bins\": [ $bins ] } } }" >> $out/manifest.json
             first=0
           else
             echo "label=${n} bins=[]" >> $out/build.log
@@ -83,10 +86,12 @@ let
           echo "path: ${p}" >> $out/build.log
           (cd "${p}" && { ls -la || true; echo "-- bin --"; ls -la bin 2>/dev/null || true; }) >> $out/build.log || true
           bins=""
+          first_bin=""
           if [ -d "${p}/bin" ]; then
             for f in "${p}/bin"/*; do
               if [ -f "$f" ] && [ -x "$f" ]; then
                 if [ -z "$bins" ]; then bins="\"$f\""; else bins="$bins, \"$f\""; fi
+                if [ -z "$first_bin" ]; then first_bin="$f"; fi
                 ln -s "$f" "$out/bin/$(basename "$f")" || true
                 ln -s "$f" "$out/bin/${sanitize n}" || true
                 ln -s "$f" "$out/bin/cpp-${sanitize n}" || true
@@ -95,7 +100,7 @@ let
           fi
           if [ -n "$bins" ]; then
             if [ "$first" -eq 0 ]; then echo "," >> $out/manifest.json; fi
-            echo "{ \"label\": \"${n}\", \"kind\": \"bin\", \"bins\": [ $bins ], \"aux\": [] }" >> $out/manifest.json
+            echo "{ \"label\": \"${n}\", \"kind\": \"bin\", \"bins\": [ $bins ], \"aux\": [], \"runnable\": { \"kind\": \"native-bin\", \"run\": { \"prod\": { \"argv\": [ \"$first_bin\" ] } }, \"artifacts\": { \"bins\": [ $bins ] } } }" >> $out/manifest.json
             first=0
           fi
         ''
@@ -106,19 +111,31 @@ let
           echo "== node target: ${n} ==" >> $out/build.log
           (cd "${p}" && { ls -la || true; echo "-- bin --"; ls -la bin 2>/dev/null || true; }) >> $out/build.log || true
           bins=""
+          first_bin=""
           if [ -d "${p}/bin" ]; then
             for f in "${p}/bin"/*; do
               if [ -f "$f" ] && [ -x "$f" ]; then
                 if [ -z "$bins" ]; then bins="\"$f\""; else bins="$bins, \"$f\""; fi
+                if [ -z "$first_bin" ]; then first_bin="$f"; fi
                 ln -s "$f" "$out/bin/$(basename "$f")" || true
                 ln -s "$f" "$out/bin/${sanitize n}" || true
                 ln -s "$f" "$out/bin/node-${sanitize n}" || true
               fi
             done
           fi
+          dist="${p}/dist"
+          importer="${nodeDevImporters.${n} or ""}"
           if [ -n "$bins" ]; then
             if [ "$first" -eq 0 ]; then echo "," >> $out/manifest.json; fi
-            echo "{ \"label\": \"${n}\", \"kind\": \"bin\", \"bins\": [ $bins ], \"aux\": [] }" >> $out/manifest.json
+            echo "{ \"label\": \"${n}\", \"kind\": \"bin\", \"bins\": [ $bins ], \"aux\": [], \"runnable\": { \"kind\": \"script\", \"run\": { \"prod\": { \"argv\": [ \"$first_bin\" ] } }, \"artifacts\": { \"bins\": [ $bins ] } } }" >> $out/manifest.json
+            first=0
+          elif [ -d "$dist" ]; then
+            if [ "$first" -eq 0 ]; then echo "," >> $out/manifest.json; fi
+            if [ -n "$importer" ]; then
+              echo "{ \"label\": \"${n}\", \"kind\": \"app\", \"bins\": [], \"aux\": [], \"runnable\": { \"kind\": \"webapp\", \"run\": { \"prod\": { \"argv\": [ \"python3\", \"-m\", \"http.server\", \"--directory\", \"$dist\" ] }, \"dev\": { \"argv\": [ \"pnpm\", \"--dir\", \"$importer\", \"dev\" ] } }, \"artifacts\": { \"dist\": \"$dist\" } } }" >> $out/manifest.json
+            else
+              echo "{ \"label\": \"${n}\", \"kind\": \"app\", \"bins\": [], \"aux\": [], \"runnable\": { \"kind\": \"webapp\", \"run\": { \"prod\": { \"argv\": [ \"python3\", \"-m\", \"http.server\", \"--directory\", \"$dist\" ] } }, \"artifacts\": { \"dist\": \"$dist\" } } }" >> $out/manifest.json
+            fi
             first=0
           fi
         ''

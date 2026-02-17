@@ -44,6 +44,15 @@ Policy for this language:
 - Allow probe-only non-build macros only when explicitly documented as non-artifact paths.
 - Do not introduce fallback Buck artifact build paths for convenience.
 
+### Runnable contract alignment
+
+Node targets publish runnable behavior through the planner/build manifest contract:
+
+- `run.prod` is required for runnable app/script/bin outcomes.
+- `run.dev` is optional and used for dev-server flows (`node_webapp` importer dev command).
+- `kind:lib` targets remain non-runnable and must not be listed in runnable-target output.
+- Webapp targets are runnable even when `bin/` is empty, via explicit `dist` artifact contracts.
+
 ### Enforcement integration requirement
 
 Language rollout is not complete if it only adds build plumbing. I also need to keep migration

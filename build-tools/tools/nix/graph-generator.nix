@@ -254,14 +254,32 @@ let
           let nm = ensureFullLabel n; kind = nodeKindOf n; in
             if (kind == null) then acc else (acc // { "${nm}" = mkNode nm kind; })
         ) {} safeNodeNodes;
-        nodeBinNames = builtins.filter (nm:
+        nodeRunnableNames = builtins.filter (nm:
           let nms = builtins.filter (x: ensureFullLabel x == nm) safeNodeNodes;
               n = if nms == [] then null else builtins.head nms;
               k = if n == null then null else nodeKindOf n;
-          in k != null && k == "bin"
+          in k != null && (k == "bin" || k == "app")
         ) (builtins.attrNames nodeTargetsFromGraph);
-      in builtins.listToAttrs (map (nm: { name = nm; value = nodeTargetsFromGraph.${nm}; }) nodeBinNames)
+      in builtins.listToAttrs (map (nm: { name = nm; value = nodeTargetsFromGraph.${nm}; }) nodeRunnableNames)
     );
+  nodeDevImporters = builtins.listToAttrs (
+    map (nm:
+      let
+        matches = builtins.filter (x: ensureFullLabel x == nm) nodesList;
+        n = if matches == [] then null else builtins.head matches;
+        labs0 = if n == null then null else (get n "labels");
+        labs = if labs0 != null && builtins.isList labs0 then labs0 else [];
+        lockLabs = builtins.filter (l: builtins.isString l && lib.hasPrefix "lockfile:" l) labs;
+        importer =
+          if lockLabs == [] then ""
+          else
+            let
+              raw = builtins.head lockLabs;
+              parts = lib.splitString "#" raw;
+            in if (builtins.length parts) > 1 then builtins.elemAt parts 1 else "";
+      in { name = nm; value = importer; }
+    ) (builtins.attrNames nodeOutPaths)
+  );
 
   # Strict mode: require Buck graph; only build app binaries/libs in goTargets
   # Defer Go computation entirely to avoid evaluating unrelated paths in C++-only temp workspaces
@@ -407,6 +425,7 @@ let
   Manifest = import (manifestBase + "/planner/manifest.nix") {
     inherit pkgs lib repoRootStr devOverrideJSON devOverrideCppJSON devOverridePyJSON isCI suppressDevOverrideLog
             goOutPaths cppOutPaths nodeOutPaths modulesTomlFor pkgPathOf targetNameOf sanitize;
+    nodeDevImporters = nodeDevImporters;
     overridePresentList = overridePresentList;
   };
   all = Manifest.all;

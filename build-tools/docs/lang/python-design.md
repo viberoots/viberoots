@@ -55,6 +55,15 @@ Policy for this language:
 - Allow probe-only non-build macros only when explicitly documented as non-artifact paths.
 - Do not introduce fallback Buck artifact build paths for convenience.
 
+### Runnable contract alignment
+
+Python targets use the shared runnable-target contract in planner/build manifests:
+
+- `nix_python_binary`/app-style targets publish `run.prod`.
+- `run.dev` is optional and only published when a Python target defines a real dev-mode command.
+- `nix_python_library` remains non-runnable (`kind:lib`), and is excluded from runnable listings.
+- Runnable discovery must not rely on `bin/` only; contract entries are the source of truth.
+
 ### Enforcement integration requirement
 
 Python rollout is not complete if it only adds build plumbing. I also need to keep migration policy

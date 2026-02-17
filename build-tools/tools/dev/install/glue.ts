@@ -8,9 +8,7 @@ import { nodeFlagsWithZx } from "../../lib/node-run.ts";
 import { findRepoRoot } from "../../lib/repo.ts";
 
 function repoRoot(): string {
-  // Resolve relative to this file to avoid accidental parent cwd resolution
   const here = path.dirname(new URL(import.meta.url).pathname);
-  // File lives at build-tools/tools/dev/install/glue.ts → repo root is four levels up
   return path.resolve(here, "..", "..", "..", "..");
 }
 
@@ -40,8 +38,6 @@ async function ensurePreludeSymlinkIfMissing() {
     })`bash --noprofile --norc -c ${`test -e ${path.join(wsRoot, "prelude")}`}`;
     if (check.exitCode === 0) return;
   } catch {}
-  // Resolve the Nix-store path of the buck2 prelude and symlink it into the workspace.
-  // Use the host workspace flake (derived from ZX_INIT) to avoid missing inputs in the temp copy.
   const zxInit = String(process.env.ZX_INIT || "").trim();
   const flakeRoot =
     zxInit && zxInit.length > 0 ? path.resolve(path.dirname(zxInit), "..", "..") : repoRoot();
@@ -92,7 +88,6 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
   const nodeBin = process.execPath || "node";
   const zxImport = path.join(repoRoot(), "build-tools/tools/dev/zx-init.mjs");
   const wsRoot = await workspaceRoot();
-  // Detect enabled languages via templates or optional langs.json
   type LangConfig = {
     enabled?: string[];
     languages?: Array<{ id: string; capabilities?: Record<string, boolean> }>;
@@ -109,7 +104,6 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
     for (const l of cfg.languages || [])
       caps.set(String(l.id), (l.capabilities || {}) as Record<string, boolean>);
   } catch {}
-  // Fall back to presence of templates directory entries
   if (enabledLangs.size === 0) {
     const tplDir = path.join(repoRoot(), "build-tools/tools/nix/templates");
     try {
@@ -207,12 +201,15 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
       when: true,
     },
     {
+      label: "gen-nix-attr-aliases",
+      cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "build-tools/tools/dev/gen-nix-attr-aliases-bzl.ts")}`,
+      withZx: true,
+      when: true,
+    },
+    {
       label: "glue-pipeline",
       cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "build-tools/tools/buck/glue-pipeline.ts")}`,
       withZx: true,
-      // Always run: glue-pipeline is idempotent and language drivers are no-ops when inactive.
-      // Skipping based on a manifest-derived capability set is brittle in temp/sparse repos
-      // where the manifest may be missing or partially parsed.
       when: true,
     },
   ];
@@ -243,7 +240,6 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
             .join(" "),
         }
       : baseEnv;
-    // Execute language/gen tasks in the workspace root to generate files in the temp repo when running tests
     await $({ stdio: "inherit", cwd: wsRoot, env })`bash --noprofile --norc -c ${c.cmd}`;
   }
 }

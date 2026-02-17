@@ -1744,6 +1744,12 @@ It also introduces short developer commands:
 - Scoped test execution for planner/manifest/run-command behavior.
 - No full-suite rerun in PR loop; safety suite remains merge-gate responsibility.
 
+### Execution log note
+
+- Added runnable-contract manifest fields (`runnable.kind`, `run.prod`, optional `run.dev`, artifacts) while preserving legacy `bins`.
+- Updated materialization output to report `Runnable targets:` instead of binaries-only messaging.
+- Added `r`/`d` command wrappers and route tests for prod/dev dispatch and missing dev-mode contract failures.
+
 ### Acceptance Criteria
 
 - After build/materialization, output includes a runnable-target listing (not binaries-only).

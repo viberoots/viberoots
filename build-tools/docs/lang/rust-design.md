@@ -43,6 +43,14 @@ Policy for this language:
 - Allow probe-only non-build macros only when explicitly documented as non-artifact paths.
 - Do not introduce fallback Buck artifact build paths for convenience.
 
+### Runnable contract alignment
+
+Rust target run behavior is expressed through manifest runnable contracts:
+
+- Binary/app outcomes publish `run.prod`.
+- `run.dev` is optional; Rust defaults to production-style execution unless a dev command is declared.
+- `kind:lib` targets remain non-runnable and are excluded from runnable-target summaries.
+
 ### Enforcement integration requirement
 
 Language rollout is not complete if it only adds build plumbing. I also need to keep migration

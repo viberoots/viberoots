@@ -2,6 +2,11 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import "zx/globals";
 import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const.ts";
+import {
+  formatRunnableLine,
+  inferRunnableFromOutPath,
+  parseRunnableManifest,
+} from "../../lib/runnables.ts";
 
 function isLikelyBuckTarget(tok: string): boolean {
   if (!tok) return false;
@@ -38,33 +43,27 @@ async function listBinArtifacts(outPath: string): Promise<string[]> {
   }
 }
 
-async function printManifestBins(linkName: string): Promise<void> {
+async function printManifestRunnables(linkName: string): Promise<void> {
   try {
     const manifestPath = path.resolve(linkName, "manifest.json");
     const txt = await fsp.readFile(manifestPath, "utf8").catch(() => "");
     if (!txt) return;
-    const entries = JSON.parse(txt) as Array<any>;
-    const bins: Array<{ label: string; bin: string }> = [];
-    for (const e of entries) {
-      const lab = String(e?.label || "");
-      if (!lab) continue;
-      const list: string[] = Array.isArray(e?.bins) ? e.bins : [];
-      for (const b of list) bins.push({ label: lab, bin: String(b) });
-    }
-    if (bins.length) {
-      console.log("Materialized binaries:");
-      for (const b of bins) console.log(` - ${b.label}: ${b.bin}`);
+    const entries = parseRunnableManifest(txt);
+    const runnables = entries.filter((e) => !!e.runnable);
+    if (runnables.length) {
+      console.log("Runnable targets:");
+      for (const e of runnables) console.log(` - ${formatRunnableLine(e)}`);
       return;
     }
 
-    const labels = entries.map((e: any) => String(e?.label || "")).filter(Boolean);
+    const labels = entries.map((e) => String(e?.label || "")).filter(Boolean);
     if (labels.length) {
-      console.log("Materialized graph; no bins produced. Available labels:");
+      console.log("Materialized graph; no runnable targets in manifest. Available labels:");
       for (const l of labels) console.log(` - ${l}`);
       console.log("See", manifestPath);
       return;
     }
-    console.log("Materialized graph; no bins found in manifest. See", manifestPath);
+    console.log("Materialized graph; no runnable targets found in manifest. See", manifestPath);
   } catch {}
 }
 
@@ -123,11 +122,13 @@ export async function materializePureGraphIfEnabled(opts: {
           console.log(` - ${sel}: (no out path)`);
           continue;
         }
-        const bins = await listBinArtifacts(outPath);
-        if (bins.length) {
-          for (const b of bins) console.log(` - ${sel}: ${b}`);
+        const runnable = await inferRunnableFromOutPath({ label: sel, outPath });
+        if (runnable) {
+          console.log(` - ${sel}: ${runnable.kind}`);
         } else {
-          console.log(` - ${sel}: (no bin artifacts in ${path.join(outPath, "bin")})`);
+          const bins = await listBinArtifacts(outPath);
+          if (bins.length) for (const b of bins) console.log(` - ${sel}: ${b}`);
+          else console.log(` - ${sel}: (not runnable; inspect ${outPath})`);
         }
       } catch (e) {
         console.log(` - ${sel}: (failed to materialize)`, e);
@@ -157,6 +158,10 @@ export async function materializePureGraphIfEnabled(opts: {
     );
   } else {
     await $({ stdio: "inherit", cwd: opts.root })`ln -sfn ${purePath} ${linkName}`;
+    await $({
+      stdio: "pipe",
+      cwd: opts.root,
+    })`ln -sfn ${purePath} ${path.join(linkDir, "runnable-manifest-current")}`;
   }
-  await printManifestBins(linkName);
+  await printManifestRunnables(linkName);
 }

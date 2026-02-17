@@ -91,6 +91,17 @@ CI should always use the pure path. Local development can opt into `--impure` fo
 
 ```
 
+## Runnable target commands
+
+Use runnable contracts for developer execution instead of assuming `bin/*` exists for every app target.
+
+- Production-style run:
+  - `r //<pkg>:<target>`
+- Development-mode run (when `run.dev` exists):
+  - `d //<pkg>:<target>`
+
+If a target does not publish `run.dev`, `d` fails with a deterministic error.
+
 ## Verify prewarm (toolchains)
 
 `build-tools/tools/bin/verify` supports an optional, best-effort prewarm step for heavy Nix toolchains to reduce cold-start time. It never affects correctness and is skipped silently if a flake attribute is missing.
