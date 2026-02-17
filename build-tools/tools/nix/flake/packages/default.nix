@@ -21,7 +21,7 @@ let
   };
 
   nodeWebapp = import ./node-webapp.nix {
-    inherit pkgs nodeMods repoSnapshot repoRoot;
+    inherit pkgs nodeMods filterRepo repoSnapshot repoRoot;
     importerDirs = importers.importerDirs;
   };
 

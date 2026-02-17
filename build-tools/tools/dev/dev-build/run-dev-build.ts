@@ -7,6 +7,7 @@ import { runHousekeeping } from "./housekeeping.ts";
 import { createIsolation } from "./isolation.ts";
 import { materializePureGraphIfEnabled } from "./materialize-pure.ts";
 import { maybePrintImpureMaterializedBins, exportGraphImpure } from "./materialize-impure.ts";
+import { shouldMaterializeByDefault } from "./materialize-policy.ts";
 import { repoRoot } from "./paths.ts";
 import { ensureBuckPreludeConfig } from "./prelude.ts";
 import { runStartupCheck } from "./startup.ts";
@@ -16,6 +17,10 @@ import { getArgvTokens } from "../../lib/cli.ts";
 export async function runDevBuild(): Promise<void> {
   const root = repoRoot();
   const isCI = process.env.CI === "true";
+
+  try {
+    process.chdir(root);
+  } catch {}
 
   const iso = createIsolation();
   iso.attachSignalHandlers();
@@ -30,40 +35,52 @@ export async function runDevBuild(): Promise<void> {
     process.exit(1);
   });
 
-  try {
-    process.chdir(root);
-  } catch {}
-
   const parsed = parseDevBuildArgs(getArgvTokens());
   const auto = await maybeAutoImpureFromUntrackedFiles({
     isCI,
     root,
     impure: parsed.impure,
+    subcmd: parsed.subcmd,
+    restArgs: parsed.restArgs,
   });
   const impure = auto.impure || parsed.impure;
+  const materializeDecision = await shouldMaterializeByDefault({
+    root,
+    requestedMaterialize: parsed.materialize,
+    isCI,
+  });
+  const materialize = materializeDecision.materialize;
 
   await runStartupCheck(root);
 
-  if (parsed.materialize) {
+  if (parsed.materialize && !materialize) {
+    console.log(`[dev-build] fast-path: skipping glue/materialize (${materializeDecision.reason})`);
+  }
+
+  if (materialize) {
     await ensureBuckPreludeConfig(root);
   }
 
   await cleanDevBuildWorkspace(root);
 
-  if (!isCI && parsed.materialize) {
+  let exportedGraphDuringMaterialize = false;
+  if (!isCI && materialize) {
     await refreshGlueAndExportGraph(root);
+    exportedGraphDuringMaterialize = true;
   }
 
   await materializePureGraphIfEnabled({
     isCI,
     root,
-    materialize: parsed.materialize,
+    materialize,
     impure,
     restArgs: parsed.restArgs,
   });
 
-  if (impure) {
+  if (impure && !exportedGraphDuringMaterialize) {
     await exportGraphImpure(root);
+  } else if (impure && exportedGraphDuringMaterialize) {
+    console.log("[dev-build] fast-path: reusing freshly exported graph for impure build");
   }
 
   await runBuckCommand({

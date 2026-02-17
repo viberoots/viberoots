@@ -121,9 +121,14 @@ async function main(): Promise<void> {
     entry.targets = Array.from(new Set(entry.targets)).sort((a, b) => a.localeCompare(b));
   }
 
+  const importers = await listImporters(root);
+  const importerSet = new Set(importers);
   const mapping: Record<string, string> = {};
   const errors: string[] = [];
   for (const entry of importerTargets) {
+    // Graph snapshots can temporarily contain stale importer lockfile labels.
+    // Only map importers that actually exist in the current workspace tree.
+    if (!importerSet.has(entry.importer)) continue;
     const pkgPath = path.join(root, entry.importer, "package.json");
     let pkg: any;
     try {
@@ -151,7 +156,6 @@ async function main(): Promise<void> {
     mapping[pkgName] = target;
   }
 
-  const importers = await listImporters(root);
   const missingDeps: string[] = [];
   for (const importer of importers) {
     const pkgPath = path.join(root, importer, "package.json");

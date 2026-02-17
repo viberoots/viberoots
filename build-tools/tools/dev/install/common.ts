@@ -1,6 +1,7 @@
 import { getImporterRootsContract } from "../../lib/importer-roots.ts";
 import { resolveImporterDir } from "../../lib/lockfiles.ts";
 import { sanitizeName as sanitizeNameContract } from "../../lib/sanitize.ts";
+import path from "node:path";
 
 // Must mirror build-tools/tools/nix/templates-common.nix sanitizeName
 export function sanitizeName(input: string): string {
@@ -65,4 +66,12 @@ export function nodeModulesAttr(importer: string): string {
 export function pnpmStoreAttr(importer: string): string {
   const imp = normalizeImporter(importer);
   return !imp || imp === "." ? "pnpm-store.default" : `pnpm-store.${sanitizeName(imp)}`;
+}
+
+export function flakeRefForImporter(repoOrWorkspaceRoot: string, importer: string): string {
+  const root = path.resolve(repoOrWorkspaceRoot);
+  const imp = normalizeImporter(importer);
+  // Keep git-backed flake resolution for root importer to avoid expensive full path copies.
+  // Use path: for non-root importers so freshly scaffolded/untracked importers are visible.
+  return !imp || imp === "." ? root : `path:${root}`;
 }

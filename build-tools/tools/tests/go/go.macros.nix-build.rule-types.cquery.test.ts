@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import { test } from "node:test";
 import assert from "node:assert/strict";
+import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
 async function cqueryKind(

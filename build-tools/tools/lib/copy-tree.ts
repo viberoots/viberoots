@@ -9,6 +9,7 @@ export type CopyFileCloneMode = "none" | "try" | "force";
 type CopyTreeOptions = {
   cloneMode?: CopyFileCloneMode;
   force?: boolean;
+  maxInFlight?: number;
 };
 
 function cloneFlagForMode(mode: CopyFileCloneMode): number | null {
@@ -73,7 +74,12 @@ export async function copyTree(
   await fsp.mkdir(dstRoot, { recursive: true });
 
   const cpuCount = Math.max(1, os.cpus()?.length || 1);
-  const maxInFlight = Math.max(8, Math.min(64, cpuCount * 4));
+  const defaultMaxInFlight = Math.max(8, Math.min(64, cpuCount * 4));
+  const maxInFlightRaw = Number(opts?.maxInFlight);
+  const maxInFlight =
+    Number.isFinite(maxInFlightRaw) && maxInFlightRaw >= 1
+      ? Math.floor(maxInFlightRaw)
+      : defaultMaxInFlight;
   const inflight = new Set<Promise<void>>();
   const runBound = async (task: () => Promise<void>): Promise<void> => {
     while (inflight.size >= maxInFlight) {

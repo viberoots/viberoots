@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 
@@ -32,8 +33,22 @@ export async function findRepoRoot(start: string): Promise<string> {
 // Lightweight, synchronous repo root resolver used by zx scripts and helpers.
 // Prefers explicit environment anchors to avoid accidental cwd drift in tests/CI.
 export function repoRoot(): string {
-  const a = (process.env.WORKSPACE_ROOT || "").trim();
-  const b = (process.env.LIVE_ROOT || "").trim();
-  const base = a || b || process.cwd();
-  return path.resolve(base);
+  const canonical = (p: string): string => {
+    const abs = path.resolve(p);
+    try {
+      return fs.realpathSync.native(abs);
+    } catch {
+      return abs;
+    }
+  };
+  const candidates = [
+    (process.env.WORKSPACE_ROOT || "").trim(),
+    (process.env.LIVE_ROOT || "").trim(),
+    process.cwd(),
+  ].filter(Boolean);
+  for (const c of candidates) {
+    const root = canonical(c);
+    if (fs.existsSync(path.join(root, "flake.nix"))) return root;
+  }
+  return canonical(candidates[0] || process.cwd());
 }

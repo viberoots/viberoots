@@ -48,6 +48,13 @@ async function main() {
   const out = [header, "{", body, "}", ""].join("\n");
   const outPath = path.join(repo, "build-tools/tools/nix/langs.nix");
   await fsp.mkdir(path.dirname(outPath), { recursive: true });
+  try {
+    const cur = await fsp.readFile(outPath, "utf8");
+    if (cur === out) {
+      console.log("wrote", path.relative(repo, outPath), "(unchanged)");
+      return;
+    }
+  } catch {}
   await fsp.writeFile(outPath, out, "utf8");
   console.log("wrote", path.relative(repo, outPath));
 }

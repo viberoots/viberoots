@@ -1,76 +1,140 @@
+import process from "node:process";
+import { activeNixGcPids, nixGcLockMessage } from "../../lib/nix-gc-lock.ts";
+import { type ManagedCommandActivity, runManagedCommand } from "../../lib/managed-command.ts";
+
 export function extractHash(text: string): string | null {
   const all = Array.from(text.matchAll(/sha256-[A-Za-z0-9+/=\-_]{43,}/g)).map((m) => m[0]);
   if (all.length) return all[all.length - 1];
   return null;
 }
 
-export async function buildStore(attrPath: string): Promise<{ ok: boolean; output: string }> {
-  try {
-    const maxJobs = String(process.env.NIX_MAX_JOBS || "").trim();
-    const cores = String(process.env.NIX_CORES || "").trim();
-    const timeoutSec = String(process.env.NIX_PNPM_FETCH_TIMEOUT || "600").trim();
-    const cmd = [
-      "set -euo pipefail;",
-      'MJ="${NIX_MAX_JOBS:-' + (maxJobs || "0") + '}";',
-      'CR="${NIX_CORES:-' + (cores || "0") + '}";',
-      'TS="' + timeoutSec + '";',
-      'if ! command -v timeout >/dev/null 2>&1; then echo "update-pnpm-hash: error: timeout not found on PATH" 1>&2; exit 127; fi;',
-      'TO="timeout -k 10s ${TS}s ";',
-      'JOBS_FLAG=""; if [ -n "$MJ" ] && [ "$MJ" != "0" ]; then JOBS_FLAG="--max-jobs $MJ"; fi;',
-      'CORES_FLAG=""; if [ -n "$CR" ] && [ "$CR" != "0" ]; then CORES_FLAG="--option cores $CR"; fi;',
-      `$TO nix build .#${attrPath} --impure --no-link --accept-flake-config --builders "" $JOBS_FLAG $CORES_FLAG`,
-    ].join(" ");
-    const res = await $({ stdio: "pipe" })`bash --noprofile --norc -c ${cmd}`;
-    return { ok: true, output: String(res.stdout || "") + String(res.stderr || "") };
-  } catch (e: any) {
-    const out = String((e && e.stdout) || "") + String((e && e.stderr) || "");
-    return { ok: false, output: out };
+function nixBuildArgs(opts: {
+  flakeRef: string;
+  attrPath: string;
+  printOutPaths: boolean;
+  maxJobs: string;
+  cores: string;
+}): string[] {
+  const args = [
+    "build",
+    `${opts.flakeRef}#${opts.attrPath}`,
+    "--impure",
+    "--no-link",
+    "--accept-flake-config",
+    "--builders",
+    "",
+    "--option",
+    "min-free",
+    "0",
+    "--option",
+    "max-free",
+    "0",
+  ];
+  if (opts.printOutPaths) args.push("--print-out-paths");
+  if (opts.maxJobs && opts.maxJobs !== "0") args.push("--max-jobs", opts.maxJobs);
+  if (opts.cores && opts.cores !== "0") args.push("--option", "cores", opts.cores);
+  return args;
+}
+
+export async function buildStore(
+  attrPath: string,
+  flakeRef: string,
+  activity?: ManagedCommandActivity,
+): Promise<{ ok: boolean; output: string }> {
+  const gcPids = activeNixGcPids();
+  if (gcPids.length > 0) {
+    return {
+      ok: false,
+      output: nixGcLockMessage("update-pnpm-hash buildStore", gcPids),
+    };
   }
+  const maxJobs = String(process.env.NIX_MAX_JOBS || "").trim() || "0";
+  const cores = String(process.env.NIX_CORES || "").trim() || "0";
+  const timeoutSec =
+    Number.parseInt(String(process.env.NIX_PNPM_FETCH_TIMEOUT || "600").trim(), 10) || 600;
+  const res = await runManagedCommand({
+    command: "nix",
+    args: nixBuildArgs({ flakeRef, attrPath, printOutPaths: false, maxJobs, cores }),
+    cwd: process.cwd(),
+    env: process.env,
+    timeoutMs: timeoutSec * 1000,
+    activity,
+  });
+  const output = String(res.stdout || "") + String(res.stderr || "");
+  if (res.timedOut) {
+    return {
+      ok: false,
+      output:
+        output +
+        `\nupdate-pnpm-hash: timed out building ${attrPath} after ${timeoutSec}s (descendants terminated)`,
+    };
+  }
+  return { ok: res.ok, output };
 }
 
 export async function buildUnfixedAndHash(
   attrPath: string,
+  flakeRef: string,
+  activity?: ManagedCommandActivity,
 ): Promise<{ ok: boolean; sri?: string; output?: string }> {
-  try {
-    const maxJobs = String(process.env.NIX_MAX_JOBS || "").trim();
-    const cores = String(process.env.NIX_CORES || "").trim();
-    const timeoutSec = String(process.env.NIX_PNPM_FETCH_TIMEOUT || "600").trim();
-    const cmd = [
-      "set -euo pipefail;",
-      'MJ="${NIX_MAX_JOBS:-' + (maxJobs || "0") + '}";',
-      'CR="${NIX_CORES:-' + (cores || "0") + '}";',
-      'TS="' + timeoutSec + '";',
-      'if ! command -v timeout >/dev/null 2>&1; then echo "update-pnpm-hash: error: timeout not found on PATH" 1>&2; exit 127; fi;',
-      'TO="timeout -k 10s ${TS}s ";',
-      'JOBS_FLAG=""; if [ -n "$MJ" ] && [ "$MJ" != "0" ]; then JOBS_FLAG="--max-jobs $MJ"; fi;',
-      'CORES_FLAG=""; if [ -n "$CR" ] && [ "$CR" != "0" ]; then CORES_FLAG="--option cores $CR"; fi;',
-      `$TO nix build .#${attrPath} --impure --no-link --accept-flake-config --builders "" --print-out-paths $JOBS_FLAG $CORES_FLAG`,
-    ].join(" ");
-    const built = await $({ stdio: "pipe" })`bash --noprofile --norc -c ${cmd}`;
-    const outPath =
-      String(built.stdout || "")
-        .trim()
-        .split(/\r?\n/)
-        .filter(Boolean)
-        .pop() || "";
-    if (!outPath) {
-      return { ok: false, output: "nix build returned no out path for " + attrPath };
-    }
-    // Hash the entire unfixed output path to match the fixed-output derivation's outputHash.
-    // The output includes both 'store' and 'lockfile' directories; hashing only 'store'
-    // would drift from the fixed-output derivation hash.
-    const hashed = await $({
-      stdio: "pipe",
-    })`nix hash path --sri ${outPath}`;
-    const sri = String(hashed.stdout || "").trim();
-    if (!/^sha256-[A-Za-z0-9+/=_-]+$/.test(sri)) {
-      return { ok: false, output: "unexpected hash-path output: " + sri };
-    }
-    return { ok: true, sri };
-  } catch (e: any) {
-    const out = String((e && e.stdout) || "") + String((e && e.stderr) || "");
-    return { ok: false, output: out };
+  const gcPids = activeNixGcPids();
+  if (gcPids.length > 0) {
+    return {
+      ok: false,
+      output: nixGcLockMessage("update-pnpm-hash buildUnfixedAndHash", gcPids),
+    };
   }
+  const maxJobs = String(process.env.NIX_MAX_JOBS || "").trim() || "0";
+  const cores = String(process.env.NIX_CORES || "").trim() || "0";
+  const timeoutSec =
+    Number.parseInt(String(process.env.NIX_PNPM_FETCH_TIMEOUT || "600").trim(), 10) || 600;
+  const built = await runManagedCommand({
+    command: "nix",
+    args: nixBuildArgs({ flakeRef, attrPath, printOutPaths: true, maxJobs, cores }),
+    cwd: process.cwd(),
+    env: process.env,
+    timeoutMs: timeoutSec * 1000,
+    activity,
+  });
+  if (!built.ok) {
+    const output = String(built.stdout || "") + String(built.stderr || "");
+    if (built.timedOut) {
+      return {
+        ok: false,
+        output:
+          output +
+          `\nupdate-pnpm-hash: timed out building ${attrPath} after ${timeoutSec}s (descendants terminated)`,
+      };
+    }
+    return { ok: false, output };
+  }
+  const outPath =
+    String(built.stdout || "")
+      .trim()
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .pop() || "";
+  if (!outPath) {
+    return { ok: false, output: "nix build returned no out path for " + attrPath };
+  }
+  const hashed = await runManagedCommand({
+    command: "nix",
+    args: ["hash", "path", "--sri", outPath],
+    cwd: process.cwd(),
+    env: process.env,
+    timeoutMs: 120_000,
+  });
+  if (!hashed.ok) {
+    return {
+      ok: false,
+      output: String(hashed.stdout || "") + String(hashed.stderr || ""),
+    };
+  }
+  const sri = String(hashed.stdout || "").trim();
+  if (!/^sha256-[A-Za-z0-9+/=_-]+$/.test(sri)) {
+    return { ok: false, output: "unexpected hash-path output: " + sri };
+  }
+  return { ok: true, sri };
 }
 
 async function currentSystem(): Promise<string> {
@@ -84,13 +148,17 @@ async function currentSystem(): Promise<string> {
   }
 }
 
-export async function flakeAttrExists(attrset: string, key: string): Promise<boolean> {
+export async function flakeAttrExists(
+  attrset: string,
+  key: string,
+  flakeRef: string,
+): Promise<boolean> {
   try {
     const sys = await currentSystem();
     if (!sys) return false;
     const out = await $({
       stdio: "pipe",
-    })`bash --noprofile --norc -c ${`nix eval --impure .#packages.${sys}.${attrset} --apply 'builtins.hasAttr "${key}"' --accept-flake-config`}`;
+    })`bash --noprofile --norc -c ${`nix eval --impure ${flakeRef}#packages.${sys}.${attrset} --apply 'builtins.hasAttr "${key}"' --accept-flake-config`}`;
     const val = String(out.stdout || "").trim();
     return val === "true";
   } catch {

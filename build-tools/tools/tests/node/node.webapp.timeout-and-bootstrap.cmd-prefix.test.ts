@@ -39,21 +39,26 @@ test("node_webapp cmd prefixes nix bootstrap env and timeout wrapper", async () 
       out.includes("export WORKSPACE_ROOT=") || out.includes("FLK_ROOT="),
       "expected nix_bootstrap_env_core() fragments in cmd",
     );
-    // Node macros that invoke Nix must opt in to unified PNPM store setup
-    assert.ok(
+    // node_webapp should avoid unified PNPM store bootstrap to keep the build path lean.
+    assert.equal(
       out.includes("require-unified-pnpm-store.ts") || out.includes(".unified-pnpm-store/path"),
-      "expected nix_bootstrap_env_pnpm_store() fragments in cmd",
+      false,
+      "node_webapp should not include unified PNPM store bootstrap fragments",
     );
-    // Should declare TIMEOUT wrapper and use it to invoke nix build
+    // Should declare TIMEOUT wrapper and use it to invoke the filtered flake
+    // builder entrypoint for node_webapp.
     assert.ok(out.includes("TIMEOUT="), "expected TIMEOUT= assignment in cmd");
     const idxTimeout = out.indexOf("TIMEOUT");
-    const idxNix = out.indexOf("nix build");
-    assert.ok(idxTimeout >= 0 && idxNix > idxTimeout, "expected TIMEOUT to precede nix build");
+    const idxFilteredBuilder = out.indexOf("nix-build-filtered-flake.ts");
+    assert.ok(
+      idxTimeout >= 0 && idxFilteredBuilder > idxTimeout,
+      "expected TIMEOUT to precede filtered flake builder invocation",
+    );
 
     // Enforce "no out-links" policy and standard outPath capture structure
     assert.ok(
-      out.includes("--no-link --print-out-paths"),
-      "expected nix build to use --no-link --print-out-paths",
+      out.includes("--attr") && out.includes("node-webapp."),
+      "expected node_webapp filtered builder to receive attr selection",
     );
     assert.ok(
       out.includes("OUT_PATHS_FILE=") || out.includes("bnx-nix-outpaths.txt"),

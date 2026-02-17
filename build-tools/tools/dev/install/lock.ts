@@ -83,43 +83,10 @@ export async function withExclusiveInstallLock<T>(
   }
 
   while (true) {
+    // Acquire by creating a directory atomically (portable and robust).
+    // Only acquisition failures should be retried in this loop.
     try {
-      // Acquire by creating a directory atomically (portable and robust)
       await fsp.mkdir(p);
-      const ownerFile = path.join(p, "owner.json");
-      const payload =
-        JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }) + "\n";
-      await fsp.writeFile(ownerFile, payload, "utf8");
-      // Register cleanup
-      const cleanup = async () => {
-        try {
-          // Remove owner file first, then the directory lock
-          await fsp.rm(p, { recursive: true, force: true });
-        } catch {}
-      };
-      process.once("exit", () => void cleanup());
-      process.once("SIGINT", () => {
-        void cleanup();
-        process.exit(130);
-      });
-      process.once("SIGTERM", () => {
-        void cleanup();
-        process.exit(143);
-      });
-      // Heartbeat: periodically refresh mtime to signal liveness
-      const hb = setInterval(async () => {
-        try {
-          const ownerFile = path.join(p, "owner.json");
-          const now = new Date();
-          await fsp.utimes(ownerFile, now, now).catch(() => {});
-        } catch {}
-      }, 4000);
-      try {
-        return await fn();
-      } finally {
-        clearInterval(hb);
-        await cleanup();
-      }
     } catch (e: any) {
       // Already locked — check for staleness or wait (and optional force)
       try {
@@ -178,8 +145,12 @@ export async function withExclusiveInstallLock<T>(
         }
       } catch {}
       if (Date.now() - start > timeoutMs) {
+        let owner = "";
+        try {
+          owner = await fsp.readFile(path.join(p, "owner.json"), "utf8");
+        } catch {}
         throw new Error(
-          `Timed out acquiring install lock (${(timeoutMs / 1000).toFixed(0)}s). Another process is preparing node_modules. Try again shortly.\nLock: ${p}`,
+          `Timed out acquiring install lock (${(timeoutMs / 1000).toFixed(0)}s). Another process is preparing node_modules. Try again shortly.\nLock: ${p}${owner ? `\nOwner: ${owner.trim()}` : ""}`,
         );
       }
       if (verbose && delay >= 1000 && (Date.now() - start) % 5000 < delay) {
@@ -189,6 +160,38 @@ export async function withExclusiveInstallLock<T>(
       }
       await sleep(delay);
       delay = Math.min(delay * 1.5, 2000);
+      continue;
+    }
+
+    const ownerFile = path.join(p, "owner.json");
+    const payload =
+      JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }) + "\n";
+    await fsp.writeFile(ownerFile, payload, "utf8");
+    const cleanup = async () => {
+      try {
+        await fsp.rm(p, { recursive: true, force: true });
+      } catch {}
+    };
+    process.once("exit", () => void cleanup());
+    process.once("SIGINT", () => {
+      void cleanup();
+      process.exit(130);
+    });
+    process.once("SIGTERM", () => {
+      void cleanup();
+      process.exit(143);
+    });
+    const hb = setInterval(async () => {
+      try {
+        const now = new Date();
+        await fsp.utimes(ownerFile, now, now).catch(() => {});
+      } catch {}
+    }, 4000);
+    try {
+      return await fn();
+    } finally {
+      clearInterval(hb);
+      await cleanup();
     }
   }
 }

@@ -62,6 +62,16 @@ function computeRootsExpr(cwd: string): string {
 
 function computeIsolationFlags(): { iso: string; flags: string[] } {
   if (process.env.BUCK_NO_ISOLATION === "1") return { iso: "", flags: [] };
+  const reuse = String(process.env.BUCK_EXPORTER_REUSE_DAEMON || "").trim() === "1";
+  if (reuse) {
+    const shared = String(
+      process.env.BUCK_ISOLATION_DIR_EXPORTER ||
+        process.env.BUCK_ISOLATION_DIR ||
+        process.env.BUCK_NESTED_ISO ||
+        "exporter-shared",
+    ).trim();
+    return { iso: shared, flags: ["--isolation-dir", shared] };
+  }
   const parentIso = String(
     process.env.BUCK_ISOLATION_DIR_EXPORTER || process.env.BUCK_ISOLATION_DIR || "",
   ).trim();
@@ -71,6 +81,8 @@ function computeIsolationFlags(): { iso: string; flags: string[] } {
 
 async function withBuckCleanup<T>(iso: string, fn: () => Promise<T>): Promise<T> {
   if (!iso) return await fn();
+  const reuse = String(process.env.BUCK_EXPORTER_REUSE_DAEMON || "").trim() === "1";
+  if (reuse) return await fn();
   const onSignal = async () => {
     try {
       const cwd = String(

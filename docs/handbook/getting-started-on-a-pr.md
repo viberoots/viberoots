@@ -9,7 +9,7 @@ This guide helps a new contributor land any PR in this plan successfully, follow
 - Quick checks (must succeed):
   - `nix --version`, `buck2 --version`, `go version`, `node --version`, `pnpm --version`
   - `python3 --version`, `uv --version` ← required for Python enablement
-  - `nix show-config` includes experimental features (flakes, dynamic-derivations, recursive-nix)
+  - `nix show-config` includes experimental features (`nix-command`, `flakes`)
 - Optional: run our startup check if present (prints clear hints):
   - `node build-tools/tools/dev/startup-check.ts`
 

@@ -1,10 +1,13 @@
 import path from "node:path";
+import crypto from "node:crypto";
 import "zx/globals";
 import { nodeFlagsWithZx } from "../../lib/node-run.ts";
 
 export type Isolation = {
   buckIsolation: string;
   isolationFlags: string[];
+  reuseDaemon: boolean;
+  killOnExit: boolean;
   killIsolationIfOwned: () => Promise<void>;
   attachSignalHandlers: () => void;
   attachExitHandlers: () => void;
@@ -43,8 +46,19 @@ async function reapExporterDaemonsFromPs(): Promise<void> {
 }
 
 export function createIsolation(): Isolation {
+  const reuseDaemon = String(process.env.BUCK_DEVBUILD_REUSE_DAEMON || "1").trim() !== "0";
+  const defaultKillOnExit = !reuseDaemon;
+  const killOnExit = String(process.env.BUCK_DEVBUILD_KILL_ON_EXIT || "").trim()
+    ? String(process.env.BUCK_DEVBUILD_KILL_ON_EXIT || "").trim() === "1"
+    : defaultKillOnExit;
   const inheritedIso = (process.env.BUCK_ISOLATION_DIR || "").trim();
-  const buckIsolation = inheritedIso ? inheritedIso : `devbuild-${process.pid}`;
+  const repoHash = crypto
+    .createHash("sha256")
+    .update(path.resolve(process.cwd()))
+    .digest("hex")
+    .slice(0, 10);
+  const defaultIso = reuseDaemon ? `devbuild-shared-${repoHash}` : `devbuild-${process.pid}`;
+  const buckIsolation = inheritedIso ? inheritedIso : defaultIso;
   const createdOwnIsolation = !inheritedIso && process.env.BUCK_NO_ISOLATION !== "1";
   const isolationFlags: string[] =
     process.env.BUCK_NO_ISOLATION === "1" ? [] : ["--isolation-dir", buckIsolation];
@@ -64,9 +78,11 @@ export function createIsolation(): Isolation {
           try {
             process.kill(-process.pid, sig as any);
           } catch {}
-          try {
-            await $`buck2 --isolation-dir ${buckIsolation} kill`;
-          } catch {}
+          if (killOnExit) {
+            try {
+              await $`buck2 --isolation-dir ${buckIsolation} kill`;
+            } catch {}
+          }
           await reapExporterDaemonsFromPs();
           process.exit(130);
         });
@@ -75,6 +91,7 @@ export function createIsolation(): Isolation {
   }
 
   function attachExitHandlers() {
+    if (!killOnExit) return;
     process.once("exit", () => {
       (async () => {
         try {
@@ -92,18 +109,22 @@ export function createIsolation(): Isolation {
         path.resolve(repoRoot, "build-tools/tools/dev/zx-init.mjs"),
       ).join(" ");
       const node = process.execPath || "node";
+      const watchdogIso = killOnExit ? `--iso ${buckIsolation}` : "";
+      const watchdogPatterns = killOnExit ? "zxtest-,exporter-,devbuild-" : "zxtest-,exporter-";
       await $({
         stdio: "ignore",
       })`bash --noprofile --norc -c ${`${node} ${nodeBase} ${path.join(
         repoRoot,
         "build-tools/tools/dev/buck-watchdog.ts",
-      )} --parent ${parentPid} --iso ${buckIsolation} --patterns zxtest-,exporter-,devbuild- & disown`}`.nothrow();
+      )} --parent ${parentPid} ${watchdogIso} --patterns ${watchdogPatterns} & disown`}`.nothrow();
     } catch {}
   }
 
   return {
     buckIsolation,
     isolationFlags,
+    reuseDaemon,
+    killOnExit,
     killIsolationIfOwned,
     attachSignalHandlers,
     attachExitHandlers,

@@ -188,7 +188,7 @@ def nix_build_out_path_cmd(flake_attr, timeout_var = "TIMEOUT", impure = False, 
         "OUT_PATHS_FILE=\"$TMP/bnx-nix-outpaths.txt\"; "
         + (
             tout +
-            ("%snix build %s --accept-flake-config %s--no-link --print-out-paths > \"$OUT_PATHS_FILE\"; " % (prefix, flake_attr, imp))
+            ("%snix build %s --accept-flake-config --option min-free 0 --option max-free 0 %s--no-link --print-out-paths > \"$OUT_PATHS_FILE\"; " % (prefix, flake_attr, imp))
         )
         + "OUT_LAST_FILE=\"$OUT_PATHS_FILE.last\"; "
         + "tail -n1 \"$OUT_PATHS_FILE\" > \"$OUT_LAST_FILE\"; "

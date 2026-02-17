@@ -1,4 +1,5 @@
 import * as fsp from "node:fs/promises";
+import crypto from "node:crypto";
 import path from "node:path";
 import "zx/globals";
 import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const.ts";
@@ -52,6 +53,12 @@ async function exportGraph(root: string, opts: { scope?: string; env: Record<str
   return graphPath;
 }
 
+function stableExporterIsolation(root: string): string {
+  const key = path.resolve(root);
+  const h = crypto.createHash("sha256").update(key).digest("hex").slice(0, 10);
+  return `exporter-shared-${h}`;
+}
+
 async function ensureNonEmptyGraphOrExit(root: string, graphPath: string): Promise<void> {
   const comp = await readCompositeGraph({ graphPath: path.resolve(root, DEFAULT_GRAPH_PATH) });
   const graphLen = Array.isArray(comp?.nodes) ? comp.nodes.length : 0;
@@ -65,7 +72,8 @@ async function ensureNonEmptyGraphOrExit(root: string, graphPath: string): Promi
       process.env.DEVBUILD_TRIED_FALLBACK = "1";
       const runEnv = {
         ...process.env,
-        BUCK_NESTED_ISO: `exporter-${process.pid}`,
+        BUCK_NESTED_ISO: stableExporterIsolation(root),
+        BUCK_EXPORTER_REUSE_DAEMON: "1",
         ...(String(process.env.DEVBUILD_DEBUG || "").trim() === "1" ? { EXPORTER_DEBUG: "1" } : {}),
       } as any;
       await exportGraph(root, { scope: "lang:go", env: runEnv });
@@ -133,7 +141,8 @@ export async function refreshGlueAndExportGraph(root: string): Promise<string> {
 
   const runEnv = {
     ...process.env,
-    BUCK_NESTED_ISO: `exporter-${process.pid}`,
+    BUCK_NESTED_ISO: stableExporterIsolation(root),
+    BUCK_EXPORTER_REUSE_DAEMON: "1",
     ...(String(process.env.DEVBUILD_DEBUG || "").trim() === "1" ? { EXPORTER_DEBUG: "1" } : {}),
   } as any;
 

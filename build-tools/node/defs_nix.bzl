@@ -1,5 +1,4 @@
 load("@prelude//:rules.bzl", "genrule")
-load("//build-tools/lang:defs_common.bzl", "default_lockfile_label_from_package", "default_lockfile_path_from_package", "ensure_default_lockfile_exists", "extract_lockfile_labels", "prepare_language_wiring")
 load("//build-tools/lang:importer_strings.bzl", "importer_display_name", "sanitize_importer_for_nix_attr")
 load(
     "//build-tools/lang:nix_shell.bzl",
@@ -10,62 +9,15 @@ load(
     "nix_calling_node_patch_requirements_preflight",
 )
 load("//build-tools/node:defs_core.bzl", "nix_node_gen")
+load(
+    "//build-tools/node:defs_nix_helpers.bzl",
+    "apply_default_lockfile_label",
+    "prepare_node_importer_nix_calling_genrule_kwargs",
+    "validate_optional_importer_arg_matches_wiring",
+)
 MODULE_PROVIDERS = {}
 load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
 
-def _fail_importer_arg_mismatch(macro_name, importer, lockfile_importer, lockfile_label):
-    fail(
-        ("%s: importer must match the importer suffix in the single lockfile label; " % macro_name) +
-        ("importer=%s lockfile_importer=%s lockfile_label=%s" % (importer, lockfile_importer, lockfile_label))
-    )
-
-def _effective_lockfile_label_from_wiring(wiring):
-    lf = extract_lockfile_labels(wiring.kwargs.get("labels", []) or [])
-    if len(lf) == 1:
-        return lf[0]
-    return lf
-
-def _validate_optional_importer_arg_matches_wiring(importer, wiring, macro_name):
-    if importer == None:
-        return
-    if importer != wiring.importer:
-        _fail_importer_arg_mismatch(
-            macro_name = macro_name,
-            importer = importer,
-            lockfile_importer = wiring.importer,
-            lockfile_label = _effective_lockfile_label_from_wiring(wiring),
-        )
-
-def _apply_default_lockfile_label(lockfile_label, labels, macro_name):
-    if (lockfile_label == None or lockfile_label == "") and len(extract_lockfile_labels(labels or [])) == 0:
-        default_path = default_lockfile_path_from_package()
-        ensure_default_lockfile_exists(default_path, macro_name)
-        return default_lockfile_label_from_package()
-    return lockfile_label
-
-def _prepare_node_importer_nix_calling_genrule_kwargs(
-        name,
-        kwargs,
-        srcs,
-        deps,
-        kind,
-        labels = [],
-        lockfile_label = None):
-    return prepare_language_wiring(
-        name = name,
-        kwargs = kwargs,
-        srcs = srcs,
-        deps = deps,
-        lang = "node",
-        kind = kind,
-        labels = labels,
-        lockfile_label = lockfile_label,
-        MODULE_PROVIDERS = MODULE_PROVIDERS,
-        inject_workspace_root_env = True,
-        global_inputs_into = "srcs",
-        global_inputs_stamp = True,
-        wiring = "nix_calling_genrule",
-    )
 def node_webapp(
     name,
     deps = [],
@@ -76,17 +28,18 @@ def node_webapp(
     **kwargs
 ):
     kw = dict(kwargs) if kwargs != None else {}
-    lockfile_label = _apply_default_lockfile_label(lockfile_label, labels, "node_webapp")
-    wiring = _prepare_node_importer_nix_calling_genrule_kwargs(
+    lockfile_label = apply_default_lockfile_label(lockfile_label, labels, "node_webapp")
+    wiring = prepare_node_importer_nix_calling_genrule_kwargs(
         name = name,
         kwargs = kw,
         srcs = {},
         deps = deps,
         kind = "app",
+        MODULE_PROVIDERS = MODULE_PROVIDERS,
         labels = list(labels or []),
         lockfile_label = lockfile_label,
     )
-    _validate_optional_importer_arg_matches_wiring(
+    validate_optional_importer_arg_matches_wiring(
         importer = importer,
         wiring = wiring,
         macro_name = "node_webapp",
@@ -96,20 +49,27 @@ def node_webapp(
     cmd = (
         "SCRATCH=\"$PWD\"; OUT_ABS=\"$SCRATCH/$OUT\"; "
         + nix_calling_genrule_bootstrap(
-            timeout_sec = 240,
-            include_pnpm_store = True,
+            # Webapp Nix builds can exceed 4m on cold/local-first runs.
+            # Keep a bounded timeout, but avoid premature SIGKILL at 240s.
+            timeout_sec = 600,
+            include_pnpm_store = False,
             source_workspace_root_env = True,
         )
         + nix_calling_env_export_buck_graph_json()
         + nix_calling_node_patch_requirements_preflight(_importer)
         + nix_calling_env_export_nix_pnpm_fetch_timeout(default_sec = 600)
-        + nix_build_out_path_cmd(
-            "\"path:$WORKSPACE_ROOT#node-webapp.%s\"" % sanitize_importer_for_nix_attr(_importer),
-            timeout_var = "TIMEOUT",
-            impure = False,
+        + "OUT_PATHS_FILE=\"$TMP/bnx-nix-outpaths.txt\"; "
+        + (
+            "$TIMEOUT node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$BNX_NODE_ZX_INIT\" "
+            + "\"$WORKSPACE_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts\" --attr "
+            + ("\"node-webapp.%s\" > \"$OUT_PATHS_FILE\"; " % sanitize_importer_for_nix_attr(_importer))
         )
+        + "OUT_LAST_FILE=\"$OUT_PATHS_FILE.last\"; "
+        + "tail -n1 \"$OUT_PATHS_FILE\" > \"$OUT_LAST_FILE\"; "
+        + "outPath=\"\"; read -r outPath < \"$OUT_LAST_FILE\" 2>/dev/null || true; "
+        + "test -n \"$outPath\"; "
         + "mkdir -p \"$OUT_ABS\"; "
-        + "if [ -d \"$outPath/dist\" ]; then cp -R \"$outPath/dist\" \"$OUT_ABS\"; else echo 'dist missing' >&2; exit 2; fi"
+        + "if [ -d \"$outPath/dist\" ]; then cp -R \"$outPath/dist\" \"$OUT_ABS\"; chmod -R u+w \"$OUT_ABS\" 2>/dev/null || true; else echo 'dist missing' >&2; exit 2; fi"
     )
 
     kw["out"] = out if out != None else "dist"
@@ -131,7 +91,7 @@ def nix_node_cli_bin(
     if not bundle:
         if entry == None:
             entry = "bin/%s" % name
-        lockfile_label = _apply_default_lockfile_label(lockfile_label, labels, "nix_node_cli_bin(bundle=False)")
+        lockfile_label = apply_default_lockfile_label(lockfile_label, labels, "nix_node_cli_bin(bundle=False)")
         impl_name = name + "__nix_impl"
         nix_node_gen(
             name = impl_name,
@@ -146,16 +106,17 @@ def nix_node_cli_bin(
         )
         _srcs_map = {entry: entry}
         kw = dict(kwargs) if kwargs != None else {}
-        wiring = _prepare_node_importer_nix_calling_genrule_kwargs(
+        wiring = prepare_node_importer_nix_calling_genrule_kwargs(
             name = name,
             kwargs = kw,
             srcs = _srcs_map,
             deps = deps,
             kind = "bin",
+            MODULE_PROVIDERS = MODULE_PROVIDERS,
             labels = list(labels or []),
             lockfile_label = lockfile_label,
         )
-        _validate_optional_importer_arg_matches_wiring(
+        validate_optional_importer_arg_matches_wiring(
             importer = importer,
             wiring = wiring,
             macro_name = "nix_node_cli_bin(bundle=False)",
@@ -199,17 +160,18 @@ def nix_node_cli_bin(
         )
     _srcs_map = {entry: entry}
     kw = dict(kwargs) if kwargs != None else {}
-    lockfile_label = _apply_default_lockfile_label(lockfile_label, labels, "nix_node_cli_bin(bundle=True)")
-    wiring = _prepare_node_importer_nix_calling_genrule_kwargs(
+    lockfile_label = apply_default_lockfile_label(lockfile_label, labels, "nix_node_cli_bin(bundle=True)")
+    wiring = prepare_node_importer_nix_calling_genrule_kwargs(
         name = name,
         kwargs = kw,
         srcs = _srcs_map,
         deps = deps,
         kind = "bin",
+        MODULE_PROVIDERS = MODULE_PROVIDERS,
         labels = list(labels or []),
         lockfile_label = lockfile_label,
     )
-    _validate_optional_importer_arg_matches_wiring(
+    validate_optional_importer_arg_matches_wiring(
         importer = importer,
         wiring = wiring,
         macro_name = "nix_node_cli_bin(bundle=True)",

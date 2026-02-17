@@ -1,7 +1,42 @@
+import crypto from "node:crypto";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import "zx/globals";
 
+async function tryRootNodeModulesOutFromMarker(root: string): Promise<string> {
+  const markerPath = path.join(root, "buck-out", "tmp", "node-modules-link.root.json");
+  const lockPath = path.join(root, "pnpm-lock.yaml");
+  try {
+    const [markerRaw, lockBuf] = await Promise.all([
+      fsp.readFile(markerPath, "utf8"),
+      fsp.readFile(lockPath),
+    ]);
+    const marker = JSON.parse(markerRaw) as {
+      importer?: string;
+      lockfile?: string;
+      lockHash?: string;
+      outPath?: string;
+    };
+    const lockHash = crypto.createHash("sha256").update(lockBuf).digest("hex");
+    const outPath = String(marker.outPath || "").trim();
+    if (
+      marker.importer !== "." ||
+      marker.lockfile !== "pnpm-lock.yaml" ||
+      marker.lockHash !== lockHash ||
+      !outPath
+    ) {
+      return "";
+    }
+    await fsp.access(path.join(outPath, "node_modules"));
+    return outPath;
+  } catch {
+    return "";
+  }
+}
+
 async function resolveRootNodeModulesOut(root: string): Promise<string> {
+  const markerOut = await tryRootNodeModulesOutFromMarker(root);
+  if (markerOut) return markerOut;
   try {
     const { stdout } = await $({
       stdio: "pipe",

@@ -16,6 +16,7 @@ import { runGomod2nixGenerate, runGomod2nixScanAll } from "./gomod2nix.ts";
 import { withExclusiveInstallLock } from "./lock.ts";
 import { runUvRefreshAll } from "./uv.ts";
 import { ensureToolchainPathsFiles } from "../toolchain-paths.ts";
+
 type Flags = {
   force: boolean;
   dryRun: boolean;
@@ -128,31 +129,59 @@ if (dryRun) {
     console.log(`[node-modules] dry-run: skip hash/build/link for ${imp} (${relLock} -> ${attr})`);
   }
 } else {
+  if (verbose) {
+    console.log("[install-deps] acquiring node-modules install lock...");
+  }
   await withExclusiveInstallLock(
     "node-modules",
     async () => {
-      const absUpdate = path.join(repoRoot, "build-tools/tools/dev/update-pnpm-hash.ts");
-      for (const imp of importers) {
-        const relLock = path.join(imp, "pnpm-lock.yaml");
-        // Update the FOD hash for this importer lockfile
-        await $({
-          stdio: "inherit",
-          cwd: repoRoot,
-          env: { ...process.env, INSTALL_LOCK_SKIP: "1" },
-        })`zx-wrapper ${absUpdate} --lockfile ${relLock}`;
-        // Build the importer-scoped node_modules via Nix (pure sandbox)
-        const attr = nodeModulesAttr(imp);
-        await $({
-          stdio: "inherit",
-        })`nix build ${repoRoot}#${attr} --no-link --accept-flake-config --print-build-logs`;
-        // Link importer/node_modules -> Nix output's node_modules (remove stale link first)
-        await $({
-          cwd: path.join(repoRoot, imp),
-          stdio: "inherit",
-        })`zx-wrapper ${path.join(repoRoot, "build-tools/tools/dev/install/link-node.ts")} ${force ? "--force" : ""}`.nothrow();
+      const prevInstallLockSkip = process.env.INSTALL_LOCK_SKIP;
+      process.env.INSTALL_LOCK_SKIP = "1";
+      if (verbose) {
+        console.log("[install-deps] lock acquired");
+      }
+      try {
+        const absUpdate = path.join(repoRoot, "build-tools/tools/dev/update-pnpm-hash.ts");
+        for (const imp of importers) {
+          const relLock = path.join(imp, "pnpm-lock.yaml");
+          if (verbose) {
+            console.log(`[install-deps] importer ${imp}: updating pnpm-store hash (${relLock})`);
+          }
+          // Update the FOD hash for this importer lockfile
+          await $({
+            stdio: "inherit",
+            cwd: repoRoot,
+            env: {
+              ...process.env,
+              // First-time/cold fixed-store builds can legitimately exceed 180s.
+              // Keep a bounded timeout, but avoid prematurely killing healthy runs.
+              NIX_PNPM_FETCH_TIMEOUT: String(process.env.NIX_PNPM_FETCH_TIMEOUT || "600"),
+            },
+          })`zx-wrapper ${absUpdate} --lockfile ${relLock}`;
+          // Realize and link importer node_modules via link-node (single strict path).
+          if (verbose) {
+            console.log(`[install-deps] importer ${imp}: realizing+linking node_modules`);
+          }
+          await $({
+            cwd: path.join(repoRoot, imp),
+            stdio: "inherit",
+            env: {
+              ...process.env,
+              NIX_PNPM_FETCH_TIMEOUT: String(process.env.NIX_PNPM_FETCH_TIMEOUT || "600"),
+            },
+          })`zx-wrapper ${path.join(repoRoot, "build-tools/tools/dev/install/link-node.ts")} ${force ? "--force" : ""}`;
+        }
+      } finally {
+        if (prevInstallLockSkip === undefined) {
+          delete process.env.INSTALL_LOCK_SKIP;
+        } else {
+          process.env.INSTALL_LOCK_SKIP = prevInstallLockSkip;
+        }
       }
     },
-    { verbose: String(process.env.INSTALL_LOCK_VERBOSE || "").trim() === "1" },
+    {
+      verbose: verbose || String(process.env.INSTALL_LOCK_VERBOSE || "").trim() === "1",
+    },
   );
 }
 // Best-effort patches lint (non-fatal)

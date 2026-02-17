@@ -10,3 +10,14 @@ export async function updateNodeModulesHashesJson(lockfileRel: string, newHash: 
   obj[lockfileRel] = newHash;
   await fsp.writeFile(file, JSON.stringify(obj, null, 2) + "\n", "utf8");
 }
+
+export async function readNodeModulesHashForLockfile(lockfileRel: string): Promise<string> {
+  const file = path.join(process.cwd(), "build-tools", "tools", "nix", "node-modules.hashes.json");
+  try {
+    const obj = JSON.parse(await fsp.readFile(file, "utf8")) as Record<string, string>;
+    const v = String(obj[lockfileRel] || "").trim();
+    return v;
+  } catch {
+    return "";
+  }
+}

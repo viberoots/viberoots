@@ -32,12 +32,18 @@ test("link-node writes marker at repo root", async () => {
 
     const fakeOut = path.join(tmp, "fake-out");
     await fsp.mkdir(path.join(fakeOut, "node_modules"), { recursive: true });
+    const nixArgsLog = path.join(tmp, "nix-args.log");
 
     const binDir = path.join(tmp, "fake-bin");
     const nixPath = path.join(binDir, "nix");
     await writeExecutable(
       nixPath,
-      ["#!/usr/bin/env bash", "set -euo pipefail", `echo "${fakeOut}"`].join("\n"),
+      [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        `echo "$*" >> "${nixArgsLog}"`,
+        `echo "${fakeOut}"`,
+      ].join("\n"),
     );
 
     const script = path.join(tmp, "build-tools/tools/dev/install/link-node.ts");
@@ -56,11 +62,17 @@ test("link-node writes marker at repo root", async () => {
     assert.ok(st.isSymbolicLink());
     assert.equal(await fsp.readlink(nm), path.join(fakeOut, "node_modules"));
 
-    const markerPath = path.join(tmp, "buck-out", "tmp", "node-modules-link.json");
+    const markerPath = path.join(tmp, "buck-out", "tmp", "node-modules-link.root.json");
     const marker = JSON.parse(await fsp.readFile(markerPath, "utf8"));
     assert.equal(marker.importer, ".");
     assert.equal(marker.lockfile, "pnpm-lock.yaml");
     assert.equal(marker.lockHash, lockHash);
     assert.equal(marker.outPath, fakeOut);
+
+    const logged = await fsp.readFile(nixArgsLog, "utf8");
+    assert.ok(
+      logged.includes(`${tmp}#node-modules.default`),
+      "expected root importer to use bare workspace flake ref for fast git-backed resolution",
+    );
   });
 });

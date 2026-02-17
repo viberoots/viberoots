@@ -173,6 +173,8 @@ Small maintenance overhead if the doc format changes.
 
 Implement.
 
+---
+
 ### Execution log note
 
 - `build-tools/node/defs_stage.bzl` stage/inline commands now include selected-build out-path capture with `nix_build_out_path_cmd` before staging/inline artifact handling.
@@ -1655,6 +1657,212 @@ inconsistent in required paths.
 ### Downsides for Implementing
 
 Requires coordinated updates across Node command assembly, gate wiring, and docs/tests.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-28: Generic runnable-target contract and DX commands (`r`/`d`)
+
+### Description
+
+I will generalize target run UX beyond native binaries by introducing a runnable-target contract
+that covers interpreter-driven apps (Node/Python/etc.), webapps, and native binaries without
+forcing non-binary artifacts into synthetic executables.
+
+This PR defines and wires a single model for "what can be run" after build:
+
+- `run.prod`: production-like run contract from built artifacts.
+- `run.dev`: development-mode run contract (watchers/HMR/dev servers).
+
+It also introduces short developer commands:
+
+- `r` for runnable production-mode execution.
+- `d` for runnable development-mode execution.
+
+### Scope & Changes
+
+- Extend planner/build manifest output schema to include runnable entries, not only executable
+  `bin` entries.
+- Add a generic runnable contract shape (language-agnostic) per target label, including:
+  - runnable kind/category (for example `native-bin`, `script`, `webapp`, `service`),
+  - `run.prod` contract,
+  - optional `run.dev` contract,
+  - referenced build artifacts (for example `bin`, `dist`, bundle paths).
+- Explicitly exclude library-only targets from runnable contract emission:
+  - library targets remain build artifacts, not runnable entries,
+  - runnable listing and `r`/`d` resolution must include only non-library targets that declare a
+    runnable contract.
+- Update materialization/reporting UX so post-build output always prints runnable targets:
+  - Replace or augment `Materialized binaries:` / `no bins found` messaging with
+    `Runnable targets:` summary.
+  - Ensure non-binary runnable targets (for example webapps with `dist`) are listed clearly.
+- Add command routing:
+  - `r <target>` resolves and executes `run.prod`.
+  - `d <target>` resolves and executes `run.dev` when available, with clear error/help if missing.
+  - Keep existing long-form command path behavior intact for compatibility.
+- Keep verify/CI isolation and correctness semantics unchanged:
+  - `v` and CI stage flows must not implicitly switch to `run.dev` behavior,
+  - runnable UX changes apply to developer run commands (`r`/`d` and long-form equivalents), not to
+    verify/CI execution contracts.
+- Keep interpreter-run contracts explicit (no fake executable coercion):
+  - script targets run via declared interpreter/argv contract,
+  - webapps use explicit run mode rather than pretending to be native `bin` outputs.
+
+### Tests (in this PR)
+
+- Add manifest-schema tests for runnable contract fields and backward-compatible parsing.
+- Add planner/materialization tests proving runnable entries are emitted for:
+  - native binary target,
+  - interpreter-script target,
+  - webapp target.
+- Add command-routing tests for:
+  - `r` dispatch to `run.prod`,
+  - `d` dispatch to `run.dev`,
+  - deterministic failure/help text when requested mode is unavailable.
+- Add regression tests proving webapp/script targets are discoverable as runnable even when
+  `bin/` is empty.
+- Add regression tests proving library targets are not emitted in runnable listings and cannot be
+  executed through `r`/`d`.
+
+### Docs (in this PR)
+
+- Update `build-tools/docs/build-system-design.md` to define runnable-target contract semantics and
+  mode split (`run.prod` vs `run.dev`).
+- Update language design docs (`build-tools/docs/*-design.md`) to define how each language/template
+  maps app/service/script targets into `run.prod`/`run.dev` runnable contracts, and to confirm
+  library targets remain non-runnable.
+- Update `docs/handbook/nix-gaps.md`/related run guidance to reference runnable-target reporting,
+  not binaries-only language.
+- Update contributor workflow docs (`TESTING.md` and command references) with `r` and `d` usage.
+
+### Test runtime controls used
+
+- Coverage remains opt-in.
+- Scoped test execution for planner/manifest/run-command behavior.
+- No full-suite rerun in PR loop; safety suite remains merge-gate responsibility.
+
+### Acceptance Criteria
+
+- After build/materialization, output includes a runnable-target listing (not binaries-only).
+- Runnable listing includes non-binary app targets (for example webapps and interpreter-run apps).
+- `r` and `d` commands resolve runnable targets through manifest contracts and execute the correct
+  mode (`run.prod`/`run.dev`).
+- Existing native binary behavior remains compatible and deterministic.
+- Library targets are never surfaced as runnable targets and `r`/`d` reject them with clear errors.
+- Verify/CI behavior remains strict and isolation-safe, with no implicit adoption of dev-mode run
+  semantics.
+- Tests fail on regression to binaries-only discovery/reporting.
+
+### Risks
+
+Manifest and command UX changes may break existing consumers that assume `bin`-only semantics.
+
+### Mitigation
+
+Ship runnable contract as additive schema first, preserve existing `bin` fields, and provide clear
+fallback/error messaging for legacy assumptions.
+
+### Consequence of Not Implementing
+
+DX remains inconsistent for non-binary apps; runnable discovery stays biased toward native binaries,
+and webapp/interpreter targets continue to appear "missing" after build.
+
+### Downsides for Implementing
+
+Adds a new stable contract surface (manifest schema + run dispatch) and ongoing compatibility
+maintenance for command UX.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-29: Validate Nix experimental-feature usage and disable unused features
+
+### Description
+
+I will close the configuration gap by validating which Nix experimental features are actually used by
+the build system implementation (not policy scripts), then disable features that are proven unused.
+
+This PR keeps runtime behavior intact while reducing feature surface area to only what current build
+paths require.
+
+### Scope & Changes
+
+- Add an implementation-level feature-usage validation matrix for representative build paths, including:
+  - flake entrypoint resolution,
+  - planner-selected build path,
+  - node-modules derivation path,
+  - verify/dev command invocation paths that call Nix.
+- Record and enforce the minimum required feature set for current build-system behavior:
+  - required: `nix-command`, `flakes`,
+  - candidate-to-disable (validated unused): `dynamic-derivations`, `recursive-nix`, `ca-derivations`.
+- Update Nix configuration defaults/templates used in local development to remove experimentally enabled
+  features that are not required by build implementation.
+- Keep CI policy decisions explicit and separate from implementation-usage results:
+  - this PR validates runtime dependency,
+  - CI policy may continue to require additional features for organizational reasons.
+- Add a single source-of-truth note describing:
+  - "implementation-required features" vs
+  - "policy-required features".
+
+### Tests (in this PR)
+
+- Add a feature-matrix integration test that runs representative Nix commands with controlled
+  `NIX_CONFIG` feature subsets and asserts:
+  - success with minimum implementation-required feature set,
+  - failure when required features are missing (`nix-command`, `flakes`),
+  - no behavioral dependency on removed candidate features for covered paths.
+- Add regression coverage ensuring future introduction of actual dynamic/recursive/CA feature
+  dependencies is detected and documented.
+- Add/update a docs/config parity test so documented "implementation-required" features match validated
+  matrix outcomes.
+
+### Docs (in this PR)
+
+- Update `build-tools/docs/build-system-design.md` to distinguish implementation-required features from
+  policy-enforced features and reference the validation matrix.
+- Update `build-tools/docs/remote-build-setup.md` with explicit minimum implementation requirements and
+  separate policy recommendations.
+- Add a short execution-log note in `docs/handbook/nix-gaps-prs.md` summarizing matrix evidence and the
+  resulting disabled features.
+
+### Test runtime controls used
+
+- Coverage remains opt-in.
+- Scoped test execution for feature-matrix and docs/config parity suites.
+- No full-suite rerun in PR loop; safety suite remains merge-gate responsibility.
+
+### Acceptance Criteria
+
+- Representative build-system paths pass with implementation-required features only
+  (`nix-command`, `flakes`).
+- Candidate features (`dynamic-derivations`, `recursive-nix`, `ca-derivations`) are disabled in local
+  default config surfaces where this repo controls defaults.
+- Tests fail if required-feature assumptions drift without updating validation expectations/docs.
+- Documentation clearly separates implementation usage from CI/policy requirements.
+
+### Risks
+
+A path not covered by the validation matrix may still rely on a feature that appears unused.
+
+### Mitigation
+
+Use representative command coverage across planner, selected-target, and node-modules paths; add
+regression checks whenever a new Nix invocation path is introduced.
+
+### Consequence of Not Implementing
+
+The repo continues carrying unnecessary experimental-feature surface area and ambiguity between runtime
+requirements and policy choices.
+
+### Downsides for Implementing
+
+Adds a small ongoing maintenance burden for the feature-matrix test and docs/config parity checks.
 
 ### Recommendation
 

@@ -22,6 +22,29 @@ function assertCmdInvariants(cmd: string, label: string, requiresOutPathCapture 
   );
 }
 
+function assertNodeWebappCmdInvariants(cmd: string) {
+  assert.ok(
+    cmd.includes("nix-build-filtered-flake.ts"),
+    "node_webapp: expected filtered flake builder entrypoint",
+  );
+  assert.ok(
+    cmd.includes("--attr") && cmd.includes("node-webapp."),
+    "node_webapp: expected attr argument for filtered flake builder",
+  );
+  assert.ok(
+    cmd.includes("OUT_PATHS_FILE=") || cmd.includes("bnx-nix-outpaths.txt"),
+    "node_webapp: expected deterministic outPath capture file",
+  );
+  assert.ok(
+    cmd.includes("BUCK_GRAPH_JSON="),
+    "node_webapp: expected BUCK_GRAPH_JSON env export to be present",
+  );
+  assert.ok(
+    cmd.includes(". build-tools/tools/buck/workspace-root.env"),
+    "node_webapp: expected workspace-root env sourcing for temp/sandboxed workspaces",
+  );
+}
+
 test("node Nix-calling macros use standardized command assembly helpers (cquery smoke)", async () => {
   await runInTemp("node-nix-calling-cmd-assembly-smoke", async (tmp, $) => {
     const appDir = path.join(tmp, "projects", "apps", "web");
@@ -94,7 +117,7 @@ test("node Nix-calling macros use standardized command assembly helpers (cquery 
       nothrow: true,
     })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cmd //projects/apps/web:bundle`;
     if (app.exitCode !== 0) return;
-    assertCmdInvariants(String(app.stdout || ""), "node_webapp");
+    assertNodeWebappCmdInvariants(String(app.stdout || ""));
 
     const staged = await $({
       cwd: tmp,

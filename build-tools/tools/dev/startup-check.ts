@@ -160,27 +160,8 @@ async function main() {
       console.error("[startup-check] missing nix experimental feature: flakes");
       process.exit(1);
     }
-    if (!features.has("dynamic-derivations")) {
-      console.error("[startup-check] missing nix experimental feature: dynamic-derivations");
-      process.exit(1);
-    }
-    if (!features.has("recursive-nix")) {
-      console.error("[startup-check] missing nix experimental feature: recursive-nix");
-      process.exit(1);
-    }
-
-    if (!features.has("ca-derivations")) {
-      if ((process.env.CI || "").toLowerCase() === "true") {
-        console.error(
-          "[startup-check] missing nix experimental feature: ca-derivations (required in CI)",
-        );
-        process.exit(1);
-      } else {
-        console.warn(
-          "[startup-check] warning: ca-derivations not enabled. Local dev is OK; CI will enforce it.",
-        );
-      }
-    }
+    // Implementation-required feature floor: nix-command + flakes.
+    // Do not require dynamic-derivations/recursive-nix/ca-derivations here; those are policy-level choices.
   } catch {
     console.error("[startup-check] cannot read nix config via `nix show-config`");
     process.exit(1);

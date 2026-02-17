@@ -20,17 +20,17 @@ This guide explains how to enable remote Nix building and binary caching for thi
 
 - **Nix version**: 2.18+ recommended.
 - **Enable features** (client and builders):
-  - Required: `nix-command`, `flakes`, `dynamic-derivations`, `recursive-nix`
-  - Recommended/CI-enforced: `ca-derivations`
+  - Required by current build implementation: `nix-command`, `flakes`
+  - Optional policy features (org/CI choice): `dynamic-derivations`, `recursive-nix`, `ca-derivations`
 - **Our repo conventions**:
-  - CI enforces `ca-derivations`; local dev may omit it, but enabling it improves cross‑machine cache reuse.
-  - Our startup check validates features and will fail in CI if required features are missing.
+  - Startup-check enforces implementation-required features (`nix-command`, `flakes`).
+  - CI may enforce additional policy features independently of startup-check.
   - Unset `NIX_GO_DEV_OVERRIDE_JSON` before sharing caches (local overrides change derivation hashes and are forbidden in CI).
 
 Example snippets for `nix.conf` (see OS‑specific locations below):
 
 ```conf
-experimental-features = nix-command flakes dynamic-derivations recursive-nix ca-derivations
+experimental-features = nix-command flakes
 ```
 
 Locations:
@@ -120,7 +120,7 @@ macOS specifics:
 On each builder:
 
 1. Install Nix (multi-user) and enable `nix-daemon`.
-2. Set `experimental-features` to include at least: `nix-command flakes dynamic-derivations recursive-nix` (and preferably `ca-derivations`).
+2. Set `experimental-features` to include at least: `nix-command flakes`.
 3. Ensure the builder user has SSH access and is allowed in `nix.conf` (e.g., `trusted-users = root <builder-user>` if needed).
 4. Keep the builder’s Nixpkgs pinned or allow flake‑provided inputs; consistency across builders improves cache hits.
 5. Ensure adequate disk, CPU, and RAM; set `systemd` limits if applicable.
@@ -199,7 +199,7 @@ nix build .#py-apps-foo --offline --accept-flake-config
 ```bash
 sudo mkdir -p /etc/nix
 sudo tee -a /etc/nix/nix.conf >/dev/null <<'CONF'
-experimental-features = nix-command flakes dynamic-derivations recursive-nix ca-derivations
+experimental-features = nix-command flakes
 builders-use-substitutes = true
 max-jobs = 0
 CONF
@@ -254,7 +254,7 @@ cachix push <your-cache-name> $(nix path-info .#graph-generator)
 
 ## Troubleshooting
 
-- **startup-check fails for Nix features**: Align your `nix.conf` with the features list; CI requires `ca-derivations`.
+- **startup-check fails for Nix features**: Align your `nix.conf` with implementation-required features (`nix-command flakes`).
 - **Remote builder never used**: Ensure `max-jobs = 0` (to avoid local builds) and `builders-use-substitutes = true`. Confirm SSH access and `nix-daemon` on the builder.
 - **Poor cache hits between hosts**: Enable `ca-derivations` on both client and builders; ensure identical flake inputs; avoid local overrides.
 - **macOS notarization warnings**: Not relevant to Nix store binaries, but some CI uploaders may need signing—configure per your org’s policy.

@@ -8,12 +8,14 @@ function assert(condition: boolean, message: string) {
 
 test("node Nix-calling macros route through unified wiring helper", async () => {
   const file = "build-tools/node/defs_nix.bzl";
+  const helperFile = "build-tools/node/defs_nix_helpers.bzl";
   const txt = await fsp.readFile(file, "utf8");
+  const helperTxt = await fsp.readFile(helperFile, "utf8");
 
-  const helperCalls = (txt.match(/prepare_language_wiring\(/g) || []).length;
+  const helperCalls = (helperTxt.match(/prepare_language_wiring\(/g) || []).length;
   assert(
     helperCalls === 1,
-    `${file} must contain exactly one direct call to prepare_language_wiring(...); found ${helperCalls}`,
+    `${helperFile} must contain exactly one direct call to prepare_language_wiring(...); found ${helperCalls}`,
   );
 
   assert(
@@ -21,8 +23,8 @@ test("node Nix-calling macros route through unified wiring helper", async () => 
     `${file} must load MODULE_PROVIDERS via //build-tools/lang:auto_map.bzl so provider edges are realized consistently`,
   );
   assert(
-    txt.includes("MODULE_PROVIDERS = MODULE_PROVIDERS"),
-    `${file} must pass MODULE_PROVIDERS into prepare_language_wiring(...)`,
+    helperTxt.includes("MODULE_PROVIDERS = MODULE_PROVIDERS"),
+    `${helperFile} must pass MODULE_PROVIDERS into prepare_language_wiring(...)`,
   );
 
   assert(

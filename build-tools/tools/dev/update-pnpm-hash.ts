@@ -1,24 +1,33 @@
 #!/usr/bin/env zx-wrapper
-import fs from "node:fs";
 import path from "node:path";
-import { importerLockfileNeedsRegen } from "../lib/pnpm-importer-lockfile.ts";
-import { sanitizeName } from "./install/common.ts";
+import { type ManagedCommandActivity } from "../lib/managed-command.ts";
+import { flakeRefForImporter } from "./install/common.ts";
 import { withExclusiveInstallLock } from "./install/lock.ts";
+import { withHeartbeat } from "./update-pnpm-hash/heartbeat.ts";
 import { parseUpdatePnpmHashArgs } from "./update-pnpm-hash/args.ts";
-import { updateNodeModulesHashesJson } from "./update-pnpm-hash/hashes-json.ts";
-import { generateImporterLockfile } from "./update-pnpm-hash/lockfile.ts";
 import {
-  buildStore,
-  buildUnfixedAndHash,
-  extractHash,
-  flakeAttrExists,
-} from "./update-pnpm-hash/nix.ts";
+  readNodeModulesHashForLockfile,
+  updateNodeModulesHashesJson,
+} from "./update-pnpm-hash/hashes-json.ts";
+import {
+  ensureImporterLockfileFreshIfAllowed,
+  generateImporterLockfile,
+  makeFilteredFlakeRef,
+} from "./update-pnpm-hash/lockfile.ts";
+import { handleNonDefaultImporter } from "./update-pnpm-hash/nondefault.ts";
+import { buildStore, buildUnfixedAndHash, extractHash } from "./update-pnpm-hash/nix.ts";
 import {
   normalizeImporter,
   pnpmStoreAttrFromImporter,
   pnpmStoreUnfixedAttrFromImporter,
   repoRelativeLockfilePath,
 } from "./update-pnpm-hash/paths.ts";
+import {
+  readVerifiedMarker,
+  sha256File,
+  verifiedMarkerPath,
+  writeVerifiedMarker,
+} from "./update-pnpm-hash/verified-marker.ts";
 
 async function inner() {
   const { lockfile, force } = parseUpdatePnpmHashArgs();
@@ -27,96 +36,195 @@ async function inner() {
   const importer = normalizeImporter(path.posix.dirname(relLock));
   const storeAttr = pnpmStoreAttrFromImporter(importer);
   const unfixedAttr = pnpmStoreUnfixedAttrFromImporter(importer);
-  // quiet: avoid noisy diagnostics in normal operation
-  const normImp = normalizeImporter(importer);
-  const isDefault = !normImp || normImp === ".";
-  const sanitized = isDefault ? "default" : sanitizeName(normImp);
-  if (!isDefault) {
-    const hasUnfixed = await flakeAttrExists("pnpm-store-unfixed", sanitized);
-    if (!hasUnfixed) {
-      return;
-    }
-  }
+  const flakeRef = flakeRefForImporter(repoRoot, importer);
+  const nonDefaultImporter = normalizeImporter(importer) !== ".";
+  const timeoutSec = String(process.env.NIX_PNPM_FETCH_TIMEOUT || "600").trim();
+  const lockAbs = path.join(repoRoot, relLock);
+  const markerPath = verifiedMarkerPath(repoRoot, importer);
 
   // If forcing, pre-write placeholder digest to bump the FOD derivation and force a rebuild
   const key = relLock;
+  const placeholder = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
   if (force) {
     // Known placeholder value also used in node-modules.nix
-    const placeholder = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
     await updateNodeModulesHashesJson(key, placeholder);
   }
+  const existingHash = await readNodeModulesHashForLockfile(key);
+  const hasValidExistingHash = !force && !!existingHash && existingHash !== placeholder;
+  const existingLockHash = await sha256File(lockAbs);
+  const existingMarker = await readVerifiedMarker(markerPath);
 
-  // If importer lockfile is missing and generation is allowed, generate it OUTSIDE Nix first
-  const impAbsGen = path.resolve(repoRoot, importer);
-  const impLockGen = path.join(impAbsGen, "pnpm-lock.yaml");
-  const allowGenerate = String(process.env.NIX_PNPM_ALLOW_GENERATE || "").trim() === "1";
-  if (allowGenerate) {
-    const missing = !fs.existsSync(impLockGen);
-    const stale = !missing
-      ? await importerLockfileNeedsRegen({ repoRootAbs: repoRoot, importerRel: importer }).catch(
-          () => true,
-        )
-      : true;
-    if (missing || stale) {
-      await generateImporterLockfile({ repoRoot, importer });
-    }
-  }
+  await ensureImporterLockfileFreshIfAllowed({ repoRoot, importer });
 
-  // Robust path: build unfixed store and compute SRI from its normalized 'store' directory
-  let pre = await buildUnfixedAndHash(unfixedAttr);
-  // If the flake does not expose a per-importer attr for this importer, skip gracefully.
-  if (!pre.ok && /does not provide attribute/.test(String(pre.output || ""))) {
-    console.warn(
-      `[update-pnpm-hash] skip: flake attr missing (${unfixedAttr}); continuing without per-importer store prewarm`,
-    );
+  if (
+    await handleNonDefaultImporter({
+      importer,
+      key,
+      repoRoot,
+      storeAttr,
+      unfixedAttr,
+      timeoutSec,
+      markerPath,
+      hasValidExistingHash,
+      existingHash,
+      existingLockHash,
+      existingMarker,
+    })
+  ) {
     return;
   }
-  if (!pre.ok) {
-    // Attempt to regenerate lock in importer (isolated workspace root), then retry once
-    await generateImporterLockfile({ repoRoot, importer });
-    pre = await buildUnfixedAndHash(unfixedAttr);
-    if (!pre.ok && /does not provide attribute/.test(String(pre.output || ""))) {
-      console.warn(
-        `[update-pnpm-hash] skip after regen: flake attr still missing (${unfixedAttr})`,
+
+  if (!nonDefaultImporter && hasValidExistingHash) {
+    const lockHash = existingLockHash;
+    const marker = existingMarker;
+    if (
+      lockHash &&
+      marker &&
+      marker.importer === importer &&
+      marker.lockfile === key &&
+      marker.lockHash === lockHash &&
+      marker.hashValue === existingHash
+    ) {
+      console.log(
+        `[update-pnpm-hash] importer=${importer} step=skip-root-marker attr=${storeAttr} lockfile=${key}`,
       );
       return;
     }
-    // If still failing or missing SRI, pre-seed a placeholder to force a suggestion on verify
-    if (!pre.ok || !pre.sri) {
-      const placeholder = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-      await updateNodeModulesHashesJson(key, placeholder);
-    }
-  }
-  if (pre.ok && pre.sri) {
-    await updateNodeModulesHashesJson(key, pre.sri);
   }
 
-  // Verify fixed-output build; if it still fails, fall back once to parsing suggestion
-  const verify = await buildStore(storeAttr);
-  if (!verify.ok) {
-    if (/does not provide attribute/.test(String(verify.output || ""))) {
-      console.warn(`[update-pnpm-hash] skip: flake attr missing (${storeAttr}); continuing`);
-      return;
+  // Fast strict path: verify fixed-output store first. Only compute unfixed hash when needed.
+  console.log(
+    `[update-pnpm-hash] importer=${importer} step=fixed-build attr=${storeAttr} timeout=${timeoutSec}s`,
+  );
+  const fixedActivity: ManagedCommandActivity = {
+    startedAtMs: Date.now(),
+    lastOutputAtMs: 0,
+    lastEventSnippet: "",
+    stdoutBytes: 0,
+    stderrBytes: 0,
+  };
+  let verify = await withHeartbeat(
+    `importer=${importer} step=fixed-build attr=${storeAttr}`,
+    buildStore(storeAttr, flakeRef, fixedActivity),
+    { activity: fixedActivity },
+  );
+  if (verify.ok) {
+    if (!nonDefaultImporter && hasValidExistingHash) {
+      const lockHash = existingLockHash;
+      if (lockHash) {
+        await writeVerifiedMarker(markerPath, {
+          importer,
+          lockfile: key,
+          lockHash,
+          hashValue: existingHash,
+        });
+      }
     }
-    let suggested = extractHash(verify.output || "");
-    if (!suggested && pre && pre.sri) {
-      suggested = pre.sri;
-    }
-    if (!suggested) {
-      const retry = await buildUnfixedAndHash(unfixedAttr);
-      if (retry.ok && retry.sri) suggested = retry.sri;
-    }
-    if (!suggested) {
-      console.error(
-        "pnpm-store still failing and no suggested hash found\n\n" + (verify.output || ""),
+    console.log("pnpm-store:", storeAttr, "hash updated and build succeeded");
+    return;
+  }
+  if (/does not provide attribute/.test(String(verify.output || ""))) {
+    console.warn(`[update-pnpm-hash] skip: flake attr missing (${storeAttr}); continuing`);
+    return;
+  }
+  let suggested = extractHash(verify.output || "");
+
+  if (!suggested) {
+    let tempFlake: { flakeRef: string; cleanup: () => Promise<void> } | null = null;
+    try {
+      if (nonDefaultImporter) {
+        console.log(
+          `[update-pnpm-hash] importer=${importer} step=prepare-filtered-flake attr=${unfixedAttr}`,
+        );
+      }
+      tempFlake = nonDefaultImporter
+        ? await withHeartbeat(
+            `importer=${importer} step=prepare-filtered-flake attr=${unfixedAttr}`,
+            makeFilteredFlakeRef(repoRoot),
+          )
+        : null;
+      const prewarmFlakeRef = tempFlake ? tempFlake.flakeRef.replace(/#pnpm$/, "") : flakeRef;
+      console.log(
+        `[update-pnpm-hash] importer=${importer} step=unfixed-build attr=${unfixedAttr} timeout=${timeoutSec}s`,
       );
-      process.exit(1);
+      const unfixedActivity: ManagedCommandActivity = {
+        startedAtMs: Date.now(),
+        lastOutputAtMs: 0,
+        lastEventSnippet: "",
+        stdoutBytes: 0,
+        stderrBytes: 0,
+      };
+      let pre = await withHeartbeat(
+        `importer=${importer} step=unfixed-build attr=${unfixedAttr}`,
+        buildUnfixedAndHash(unfixedAttr, prewarmFlakeRef, unfixedActivity),
+        { activity: unfixedActivity },
+      );
+      if (!pre.ok) {
+        await generateImporterLockfile({ repoRoot, importer });
+        console.log(
+          `[update-pnpm-hash] importer=${importer} step=unfixed-build-retry attr=${unfixedAttr} timeout=${timeoutSec}s`,
+        );
+        const retryActivity: ManagedCommandActivity = {
+          startedAtMs: Date.now(),
+          lastOutputAtMs: 0,
+          lastEventSnippet: "",
+          stdoutBytes: 0,
+          stderrBytes: 0,
+        };
+        pre = await withHeartbeat(
+          `importer=${importer} step=unfixed-build-retry attr=${unfixedAttr}`,
+          buildUnfixedAndHash(unfixedAttr, prewarmFlakeRef, retryActivity),
+          { activity: retryActivity },
+        );
+      }
+      if (pre.ok && pre.sri) {
+        suggested = pre.sri;
+      }
+    } finally {
+      if (tempFlake) {
+        await tempFlake.cleanup();
+      }
     }
-    await updateNodeModulesHashesJson(key, suggested);
-    const final = await buildStore(storeAttr);
-    if (!final.ok) {
-      console.error("pnpm-store still failing after hash update\n\n" + final.output);
-      process.exit(1);
+  }
+
+  if (!suggested) {
+    console.error(
+      "pnpm-store still failing and no suggested hash found\n\n" + (verify.output || ""),
+    );
+    process.exit(1);
+    return;
+  }
+  const nextHash: string = suggested;
+
+  await updateNodeModulesHashesJson(key, nextHash);
+  console.log(
+    `[update-pnpm-hash] importer=${importer} step=fixed-build-after-hash attr=${storeAttr} timeout=${timeoutSec}s`,
+  );
+  const fixedAfterActivity: ManagedCommandActivity = {
+    startedAtMs: Date.now(),
+    lastOutputAtMs: 0,
+    lastEventSnippet: "",
+    stdoutBytes: 0,
+    stderrBytes: 0,
+  };
+  verify = await withHeartbeat(
+    `importer=${importer} step=fixed-build-after-hash attr=${storeAttr}`,
+    buildStore(storeAttr, flakeRef, fixedAfterActivity),
+    { activity: fixedAfterActivity },
+  );
+  if (!verify.ok) {
+    console.error("pnpm-store still failing after hash update\n\n" + verify.output);
+    process.exit(1);
+  }
+  if (!nonDefaultImporter) {
+    const lockHash = existingLockHash;
+    if (lockHash) {
+      await writeVerifiedMarker(markerPath, {
+        importer,
+        lockfile: key,
+        lockHash,
+        hashValue: nextHash,
+      });
     }
   }
   console.log("pnpm-store:", storeAttr, "hash updated and build succeeded");

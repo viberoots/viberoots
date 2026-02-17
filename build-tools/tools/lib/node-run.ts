@@ -25,7 +25,7 @@ export async function runNodeWithZx(opts: RunNodeWithZxOptions): Promise<{
   stdout: string;
   stderr: string;
 }> {
-  const nodeBin = opts.nodeBin || process.execPath || "node";
+  const nodeBin = opts.nodeBin || process.execPath;
   const cwd = opts.cwd || process.cwd();
   const env = opts.env || process.env;
   const args = opts.args || [];

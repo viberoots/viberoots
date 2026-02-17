@@ -1,0 +1,4 @@
+name: myapp
+language: node
+template: webapp
+scaf_src_path: build-tools/tools/scaffolding/templates/node/webapp

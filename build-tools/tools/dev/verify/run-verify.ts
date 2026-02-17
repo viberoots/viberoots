@@ -58,16 +58,6 @@ async function activeNixGcProcesses(): Promise<Array<{ pid: number; command: str
   return rows;
 }
 
-function ensureVerifyNixLockTimeout(): string {
-  const key = "lock-timeout =";
-  const current = String(process.env.NIX_CONFIG || "");
-  if (current.includes(key)) return current;
-  const line = "lock-timeout = 120";
-  const next = current.trim() ? `${current.trim()}\n${line}\n` : `${line}\n`;
-  process.env.NIX_CONFIG = next;
-  return next;
-}
-
 export async function runVerify(): Promise<void> {
   const root = repoRoot();
   const args = parseVerifyArgs();
@@ -124,10 +114,6 @@ export async function runVerify(): Promise<void> {
     );
   }
   await appendVerifyLogLine(lock.logFile, "[verify] nix gc preflight: ok");
-  const nixConfig = ensureVerifyNixLockTimeout();
-  if (nixConfig.includes("lock-timeout =")) {
-    await appendVerifyLogLine(lock.logFile, "[verify] nix lock-timeout configured: 120s");
-  }
   // Log the current git revision for performance correlation across runs.
   // This intentionally runs after we have a logFile (verify-lock acquired).
   try {

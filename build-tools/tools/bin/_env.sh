@@ -26,8 +26,27 @@ env_init_paths() {
 
 exec_in_dev_shell() {
 	local live_root="$1"; shift
+	local fastpath_enabled="${BUCK_DEV_SHELL_FASTPATH:-1}"
+	local zx_init_path="${ZX_INIT:-${live_root}/build-tools/tools/dev/zx-init.mjs}"
+	local can_bypass_direnv="0"
+	if [[ "${fastpath_enabled}" != "0" ]]; then
+		# Safe fast-path: only bypass direnv when core runtime tools and zx bootstrap are already present.
+		# Use a strict superset of tools needed by i/b/v paths.
+		local missing=0
+		for tool in zx-wrapper nix buck2 pnpm git; do
+			if ! command -v "$tool" >/dev/null 2>&1; then
+				missing=1
+				break
+			fi
+		done
+		if [[ "${missing}" == "0" && -f "${zx_init_path}" ]]; then
+			can_bypass_direnv="1"
+		fi
+	fi
   if [[ -n "${NO_DEV_SHELL:-}" ]]; then
     exec "$@"
+  elif [[ -z "${IN_NIX_SHELL:-}" && "${can_bypass_direnv}" == "1" ]]; then
+		BUCK_CONFIG_LOCK=1 exec "$@"
   elif [[ -z "${IN_NIX_SHELL:-}" ]]; then
 		if ! command -v direnv >/dev/null 2>&1; then
 			echo "error: direnv not found on PATH; run inside the dev shell" 1>&2

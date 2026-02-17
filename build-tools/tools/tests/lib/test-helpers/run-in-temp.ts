@@ -109,6 +109,27 @@ async function resolveTestHome(): Promise<{ home: string; removeOnExit: boolean 
   return { home, removeOnExit: false };
 }
 
+async function removeTreeWithWritableFallback(target: string, $: any): Promise<void> {
+  try {
+    await fsp.rm(target, { recursive: true, force: true });
+    return;
+  } catch {
+    // Only pay the recursive chmod cost when deletion actually fails.
+    try {
+      const q = shSingleQuote(target);
+      await $({
+        stdio: "ignore",
+        cwd: process.cwd(),
+        reject: false,
+        nothrow: true,
+      })`bash --noprofile --norc -c ${`chmod -R u+w ${q} >/dev/null 2>&1 || true`}`;
+    } catch {}
+    await fsp.rm(target, { recursive: true, force: true }).catch((err) => {
+      console.warn("warning: failed to remove temp test dir:", err);
+    });
+  }
+}
+
 export async function runInTemp<T>(
   name: string,
   fn: (tmp: string, $: any) => Promise<T>,
@@ -340,23 +361,10 @@ export async function runInTemp<T>(
           .catch(() => {});
       } catch {}
     } else {
-      try {
-        const chmodTargets = [tmp, ...(removeHome ? [home] : [])]
-          .map((target) => shSingleQuote(target))
-          .join(" ");
-        await $({
-          stdio: "ignore",
-          cwd: process.cwd(),
-          reject: false,
-          nothrow: true,
-        })`bash --noprofile --norc -c ${`chmod -R u+w ${chmodTargets} >/dev/null 2>&1 || true`}`;
-      } catch {}
-      await fsp.rm(tmp, { recursive: true, force: true }).catch((err) => {
-        console.warn("warning: failed to remove temp test dir:", err);
-      });
+      await removeTreeWithWritableFallback(tmp, $);
     }
     if (removeHome) {
-      await fsp.rm(home, { recursive: true, force: true }).catch(() => {});
+      await removeTreeWithWritableFallback(home, $);
     }
   }
 }

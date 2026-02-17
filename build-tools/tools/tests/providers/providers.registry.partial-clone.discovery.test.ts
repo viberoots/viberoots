@@ -5,6 +5,29 @@ import assert from "node:assert/strict";
 import { runInTemp, exists } from "../lib/test-helpers";
 import * as fsp from "node:fs/promises";
 
+async function removeLockfilesRecursively(root: string): Promise<void> {
+  const stack: string[] = [root];
+  while (stack.length > 0) {
+    const dir = stack.pop()!;
+    let entries: Array<any> = [];
+    try {
+      entries = await fsp.readdir(dir, { withFileTypes: true } as any);
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(full);
+        continue;
+      }
+      if (entry.name === "pnpm-lock.yaml" || entry.name === "uv.lock") {
+        await fsp.rm(full, { force: true });
+      }
+    }
+  }
+}
+
 test("providers registry: partial-clone with no enabled languages runs without errors", async () => {
   process.env.TEST_PARTIAL_CLONE_GO_ONLY = "1";
   await runInTemp("providers-registry-partial", async (tmp, $) => {
@@ -15,6 +38,7 @@ test("providers registry: partial-clone with no enabled languages runs without e
     // does not enable Node/Python in this partial clone.
     await fsp.rm(path.join(tmp, "pnpm-lock.yaml"), { force: true });
     await fsp.rm(path.join(tmp, "uv.lock"), { force: true });
+    await removeLockfilesRecursively(tmp);
     // Run without --lang so discovery uses manifest + requiredPaths gating.
     await $({ cwd: tmp, stdio: "inherit" })`node build-tools/tools/buck/sync-providers.ts`;
     // With no enabled languages present, provider files must be empty (header-only) if present.

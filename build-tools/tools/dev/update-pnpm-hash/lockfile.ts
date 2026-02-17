@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { importerLockfileNeedsRegen } from "../../lib/pnpm-importer-lockfile.ts";
 
 async function activeNixGcPids(): Promise<number[]> {
   const out = await $({
@@ -41,7 +42,7 @@ function localPnpmDirs(importerAbs: string): { homeDir: string; storeDir: string
   };
 }
 
-async function makeFilteredFlakeRef(repoRoot: string): Promise<{
+export async function makeFilteredFlakeRef(repoRoot: string): Promise<{
   flakeRef: string;
   cleanup: () => Promise<void>;
 }> {
@@ -53,7 +54,7 @@ async function makeFilteredFlakeRef(repoRoot: string): Promise<{
   // Keep untracked scaffold outputs while excluding large generated directories.
   await $({
     stdio: "pipe",
-  })`rsync -a --delete --exclude .git --exclude node_modules --exclude buck-out --exclude .direnv --exclude .pnpm-store --exclude .pnpm-home ${src}/ ${snapDir}/`;
+  })`rsync -a --delete --exclude .git --exclude node_modules --exclude buck-out --exclude .direnv --exclude .pnpm-store --exclude .pnpm-home --exclude coverage --exclude .clinic --exclude .turbo --exclude .cache ${src}/ ${snapDir}/`;
   return {
     flakeRef: pnpmFlakeRef(snapDir),
     cleanup: async () => {
@@ -141,4 +142,24 @@ export async function generateImporterLockfile(opts: { repoRoot: string; importe
   await seedImporterLockfileFromRootIfNeeded({ repoRoot: opts.repoRoot, importerAbs });
   await cleanupLocalWorkspaceMarker({ workspaceFileAbs, hadLocalWorkspaceFile });
   console.log(`[lockfile] done: ${path.join(opts.importer, "pnpm-lock.yaml")}`);
+}
+
+export async function ensureImporterLockfileFreshIfAllowed(opts: {
+  repoRoot: string;
+  importer: string;
+}): Promise<void> {
+  const allowGenerate = String(process.env.NIX_PNPM_ALLOW_GENERATE || "").trim() === "1";
+  if (!allowGenerate) return;
+  const importerAbs = path.resolve(opts.repoRoot, opts.importer);
+  const importerLock = path.join(importerAbs, "pnpm-lock.yaml");
+  const missing = !fs.existsSync(importerLock);
+  const stale = !missing
+    ? await importerLockfileNeedsRegen({
+        repoRootAbs: opts.repoRoot,
+        importerRel: opts.importer,
+      }).catch(() => true)
+    : true;
+  if (missing || stale) {
+    await generateImporterLockfile(opts);
+  }
 }

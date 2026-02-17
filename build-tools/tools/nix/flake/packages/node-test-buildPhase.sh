@@ -42,7 +42,13 @@ else
     exit 3
   fi
 
-  ln -s "${NM_PATH}/node_modules" node_modules
+  NM_TARGET="${NM_PATH}/node_modules"
+  if [ -L node_modules ] && [ "$(readlink node_modules)" = "$NM_TARGET" ]; then
+    :
+  else
+    rm -rf node_modules
+    ln -s "$NM_TARGET" node_modules
+  fi
   if [ -x "node_modules/.bin/vitest" ] || [ -f "node_modules/.bin/vitest" ]; then
     VITEST_BIN="node_modules/.bin/vitest"
   else

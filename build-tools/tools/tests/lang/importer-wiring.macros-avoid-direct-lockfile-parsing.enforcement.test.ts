@@ -9,6 +9,7 @@ function assert(condition: boolean, message: string) {
 const importerScopedMacroImplFiles = [
   "build-tools/node/defs_core.bzl",
   "build-tools/node/defs_nix.bzl",
+  "build-tools/node/defs_nix_helpers.bzl",
   "build-tools/python/defs.bzl",
   "build-tools/python/defs_pyext_wasm.bzl",
 ];
@@ -30,10 +31,10 @@ test("importer-scoped macros delegate lockfile parsing/enforcement to //build-to
       `${file} must not load internal importer wiring; use prepare_language_wiring(...)`,
     );
 
-    assert(
-      txt.includes("prepare_language_wiring("),
-      `${file} must use prepare_language_wiring(...) for importer-scoped macros`,
-    );
+    const usesSharedImporterWiring =
+      txt.includes("prepare_language_wiring(") ||
+      txt.includes("prepare_node_importer_nix_calling_genrule_kwargs(");
+    assert(usesSharedImporterWiring, `${file} must use shared importer wiring helpers`);
 
     const legacyOrRemovedHelpers = [
       "prepare_importer_genrule_kwargs_legacy_mutating(",

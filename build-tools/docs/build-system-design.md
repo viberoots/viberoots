@@ -110,7 +110,7 @@ The Buck graph exporter must include these intent fields in `build-tools/tools/b
 Set once in **devshell** and **CI** so dynamic derivations and flakes work consistently everywhere:
 
 ```
-extra-experimental-features = nix-command flakes dynamic-derivations ca-derivations recursive-nix
+extra-experimental-features = nix-command flakes
 ```
 
 > Tip: put this in the devshell environment (e.g., `devshell.toml` or `flake`-based shell) **and** ensure CI agents export the same value. Avoid per-job drift.
@@ -1509,14 +1509,12 @@ async function main() {
 
   try {
     const { stdout } = await $`nix show-config`;
-    const need = ["dynamic-derivations", "ca-derivations", "recursive-nix"];
+    const need = ["nix-command", "flakes"];
     const ok = need.every((k) =>
       new RegExp(`extra-experimental-features\s*=.*\b${k}\b`).test(stdout),
     );
     if (!ok) {
-      console.error(
-        "[startup-check] nix extra-experimental-features must include: dynamic-derivations ca-derivations recursive-nix",
-      );
+      console.error("[startup-check] nix experimental-features must include: nix-command flakes");
       process.exit(1);
     }
   } catch {
