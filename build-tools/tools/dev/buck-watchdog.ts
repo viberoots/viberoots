@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import "zx/globals";
 import { getFlagStr } from "../lib/cli.ts";
+import { ownerPidForIsolation } from "./buck-watchdog-lib.ts";
 
 function isPidAlive(pid: number): boolean {
   try {
@@ -40,18 +41,8 @@ async function sweepOrphans(patterns: RegExp) {
       if (!m) continue;
       const iso = m[1];
       if (!patterns.test(iso)) continue;
-      // Determine whether this buck2d is orphaned by inferring its "owner pid" from the
-      // isolation dir naming convention.
-      //
-      // Conventions in this repo:
-      // - v-<pid>[-...]
-      // - zxtest-<pid>
-      // - exporter-<pid>
-      // - devbuild-<pid>
-      const ownerMatch = iso.match(/^(?:v|zxtest|exporter|devbuild)-(\d+)/);
-      const pidMatch = ownerMatch || iso.match(/(\d+)$/);
-      const suffixPid = pidMatch ? Number(pidMatch[1]) : NaN;
-      if (!Number.isFinite(suffixPid) || isPidAlive(suffixPid)) continue;
+      const ownerPid = ownerPidForIsolation(iso);
+      if (!Number.isFinite(ownerPid) || ownerPid == null || isPidAlive(ownerPid)) continue;
       await tryBuckKillIsolation(iso);
       await new Promise((r) => setTimeout(r, 250));
       await killBuck2dByPid(pidFromLine);

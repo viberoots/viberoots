@@ -166,6 +166,13 @@ export async function runInTemp<T>(
   process.env.BUCK_TEST_SRC = tmp;
   process.env.REPO_ROOT = process.cwd();
   const { home, removeOnExit: removeHome } = await resolveTestHome();
+  const tempSetupEnv = {
+    ...process.env,
+    WORKSPACE_ROOT: tmp,
+    BUCK_TEST_SRC: tmp,
+    REPO_ROOT: process.cwd(),
+    HOME: home,
+  };
   const goModCacheRoot = await stableGoModCacheRoot();
   const initMode = await initTempRepoFromSeedStore({
     tmpDir: tmp,
@@ -175,7 +182,7 @@ export async function runInTemp<T>(
 
   const wantGit = opts?.git !== false && process.env.TEST_TEMP_GIT !== "0";
   if (wantGit) {
-    const $tmp = $({ cwd: tmp, stdio: "pipe" });
+    const $tmp = $({ cwd: tmp, stdio: "pipe", env: tempSetupEnv });
     try {
       if (initMode === "rsync") {
         await $tmp`git -c init.defaultBranch=main -c advice.defaultBranchName=false init -q`;
@@ -201,15 +208,14 @@ export async function runInTemp<T>(
     }
   }
 
-  await ensureBuckConfigForTempRepo(tmp, $);
+  const $setup = $({ cwd: tmp, env: tempSetupEnv, stdio: "pipe" });
+  await ensureBuckConfigForTempRepo(tmp, $setup);
   await ensureWorkspaceRootEnvFile(tmp);
-  await ensureToolchainPathsForTempRepo(tmp, $);
+  await ensureToolchainPathsForTempRepo(tmp, $setup);
 
   if ((process.env.TEST_NEED_DEV_ENV || "") === "1") {
-    const chk = await $({
-      cwd: tmp,
-      stdio: "pipe",
-    })`nix build ${`path:${tmp}#buck2-prelude`} --no-link --accept-flake-config --print-build-logs`.nothrow();
+    const chk =
+      await $setup`nix build ${`path:${tmp}#buck2-prelude`} --no-link --accept-flake-config --print-build-logs`.nothrow();
     if (chk.exitCode !== 0) {
       throw new Error(
         "dev-shell check failed: nix build path:<tmp>#buck2-prelude did not succeed in temp repo; ensure direnv/dev shell is active",

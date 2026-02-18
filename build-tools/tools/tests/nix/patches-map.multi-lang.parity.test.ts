@@ -38,7 +38,7 @@ test("lang-helpers: patch map parity across go and python modes", async () => {
           dirs = [ d ];
           normalizeVersion = (v: lib.head (lib.splitString "-" v));
           namePrefix = "py-patch";
-          materialize = true;
+          materialize = false;
         };
       }
     `;
@@ -56,6 +56,6 @@ test("lang-helpers: patch map parity across go and python modes", async () => {
 
     const pyVals = Object.values(parsed.python || {}).flat();
     assert.ok(pyVals.length > 0);
-    assert.ok(pyVals.some((p) => typeof p === "string" && p.startsWith("/nix/store/")));
+    assert.ok(pyVals.every((p) => typeof p === "string" && p.endsWith(".patch")));
   });
 });

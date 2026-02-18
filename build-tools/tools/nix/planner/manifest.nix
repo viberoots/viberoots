@@ -48,14 +48,11 @@ let
           ln -s "${p}" "$out/" || true
           echo "== target: ${n} ==" >> $out/build.log
           echo "path: ${p}" >> $out/build.log
-          echo "deriver: $(nix-store -q --deriver "${p}" 2>/dev/null || true)" >> $out/build.log
           echo "modulesToml: ${builtins.toString (modulesTomlFor n)}" >> $out/build.log
           echo "pkgPath: ${pkgPathOf n}" >> $out/build.log
           echo "targetName: ${targetNameOf n}" >> $out/build.log
           echo "expected subdir(bin): ${pkgPathOf n}/cmd/${targetNameOf n}" >> $out/build.log
           echo "expected srcRoot: (repo root with projects/apps and projects/libs)" >> $out/build.log
-          echo "tree (depth 2) of out path:" >> $out/build.log
-          (cd "${p}" && { ls -la || true; echo "-- bin --"; ls -la bin 2>/dev/null || true; }) >> $out/build.log || true
           bins=""
           first_bin=""
           if [ -d "${p}/bin" ]; then
@@ -84,7 +81,6 @@ let
           ln -s "${p}" "$out/" || true
           echo "== cpp target: ${n} ==" >> $out/build.log
           echo "path: ${p}" >> $out/build.log
-          (cd "${p}" && { ls -la || true; echo "-- bin --"; ls -la bin 2>/dev/null || true; }) >> $out/build.log || true
           bins=""
           first_bin=""
           if [ -d "${p}/bin" ]; then
@@ -109,7 +105,6 @@ let
         ''
           ln -s "${p}" "$out/" || true
           echo "== node target: ${n} ==" >> $out/build.log
-          (cd "${p}" && { ls -la || true; echo "-- bin --"; ls -la bin 2>/dev/null || true; }) >> $out/build.log || true
           bins=""
           first_bin=""
           if [ -d "${p}/bin" ]; then

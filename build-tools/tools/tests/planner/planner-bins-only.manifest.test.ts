@@ -7,59 +7,49 @@ import { runInTemp } from "../lib/test-helpers";
 void (async function main() {
   console.log("TAP version 13");
   const ok = await runInTemp("planner-bins-only", async (tmp, $) => {
-    // Scaffold a lib and a cli so we have both kinds in graph
-    await $`scaf new go lib demo-lib --yes --path=projects/libs/demo-lib`;
-    await $`scaf new go cli demo-cli --yes --path=projects/apps/demo-cli`;
-
-    // Seed gomod2nix deterministically via local stub (no network)
-    const stubDir = path.join(tmp, "bin");
-    await fsp.mkdir(stubDir, { recursive: true });
-    const stubPath = path.join(stubDir, "gomod2nix");
-    await fsp.writeFile(
-      stubPath,
-      [
-        "#!/usr/bin/env bash",
-        "set -euo pipefail",
-        "DIR=.",
-        "while [[ $# -gt 0 ]]; do",
-        '  case "$1" in',
-        "    --dir)",
-        '      DIR="$2"; shift 2;;',
-        "    *) shift;;",
-        "  esac",
-        "done",
-        'mkdir -p "$DIR"',
-        "cat > \"$DIR/gomod2nix.toml\" <<'EOF'",
-        "schema = 3",
-        "mod = {}",
-        "replace = {}",
-        "prune = { go-tests = true, unused-packages = true }",
-        "EOF",
-      ].join("\n"),
-      "utf8",
-    );
-    await $`chmod +x ${stubPath}`;
-    await $({
-      cwd: tmp,
-      env: { ...process.env, PATH: `${stubDir}:${process.env.PATH || ""}` },
-    })`gomod2nix --dir projects/apps/demo-cli`;
-    await fsp.copyFile(
-      path.join(tmp, "projects", "apps", "demo-cli", "gomod2nix.toml"),
-      path.join(tmp, "gomod2nix.toml"),
-    );
-
-    // Glue and build via Nix
-    await $`build-tools/tools/dev/install-deps.ts --glue-only`;
-    // runInTemp initializes a git repo; stage generated app/lib + lockfiles so Nix git-flake
-    // evaluation sees them.
-    await $({
-      cwd: tmp,
-      stdio: "pipe",
-    })`git add -A projects/apps projects/libs gomod2nix.toml build-tools/tools/buck third_party/providers build-tools/tools/nix`;
+    const expr = `
+      let
+        pkgs = import <nixpkgs> {};
+        lib = pkgs.lib;
+        mkBin = pkgs.runCommand "planner-bin" {} ''
+          mkdir -p "$out/bin"
+          cat > "$out/bin/demo-cli" <<'EOF'
+#!/usr/bin/env bash
+echo demo
+EOF
+          chmod +x "$out/bin/demo-cli"
+        '';
+        mkLib = pkgs.runCommand "planner-lib" {} ''
+          mkdir -p "$out/lib"
+          echo "ok" > "$out/lib/lib.txt"
+        '';
+        M = import ./build-tools/tools/nix/planner/manifest.nix {
+          inherit pkgs lib;
+          repoRootStr = builtins.toString ./.;
+          devOverrideJSON = "";
+          devOverrideCppJSON = "";
+          devOverridePyJSON = "";
+          isCI = false;
+          suppressDevOverrideLog = true;
+          overridePresentList = [];
+          goOutPaths = {
+            "//projects/apps/demo-cli:demo-cli" = mkBin;
+            "//projects/libs/demo-lib:demo-lib" = mkLib;
+          };
+          cppOutPaths = {};
+          nodeOutPaths = {};
+          nodeDevImporters = {};
+          modulesTomlFor = _: ./gomod2nix.toml;
+          pkgPathOf = _: ".";
+          targetNameOf = _: "demo";
+          sanitize = s: "t";
+        };
+      in M.all
+    `;
     const { stdout } = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`nix build ${`path:${tmp}#graph-generator`} --no-link --print-out-paths --accept-flake-config`;
+    })`nix build --impure --expr ${expr} --no-link --print-out-paths`;
     const outPath =
       String(stdout || "")
         .trim()

@@ -22,6 +22,30 @@ async function pathExists(p: string): Promise<boolean> {
   }
 }
 
+async function requireImpureEnvPassthrough() {
+  const probe = "__bnx_impure_env_probe__";
+  const res = await $({
+    stdio: "pipe",
+    env: {
+      ...process.env,
+      BUCK_TARGET: probe,
+    },
+  })`nix eval --impure --raw --expr ${'builtins.getEnv "BUCK_TARGET"'}`.nothrow();
+  if (res.exitCode !== 0) {
+    console.error(
+      "[startup-check] failed to verify impure env passthrough via `nix eval --impure`",
+    );
+    process.exit(1);
+  }
+  const seen = String(res.stdout || "").trim();
+  if (seen !== probe) {
+    console.error(
+      "[startup-check] impure env passthrough is blocked for BUCK_TARGET. Check Nix policy and flake-config trust for allowed-impure-env-vars.",
+    );
+    process.exit(1);
+  }
+}
+
 async function main() {
   // Only require the glue/orchestrator tools that the repo workflows depend on.
   // Language-specific toolchains (go/python/etc) are optional: if present they must
@@ -166,6 +190,8 @@ async function main() {
     console.error("[startup-check] cannot read nix config via `nix show-config`");
     process.exit(1);
   }
+
+  await requireImpureEnvPassthrough();
 
   // No overlayfs requirement: patch workspaces use cp -cR on macOS when available, else cp -a.
 

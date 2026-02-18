@@ -5,44 +5,64 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-async function nixEvalSelectedDrvPath(tmp: string, $: any, target: string): Promise<string> {
+async function nixEvalPyExtAndControlDrvPaths(
+  tmp: string,
+  $: any,
+  appPosix: string,
+): Promise<{ pyext: string; control: string }> {
+  const expr = `
+    let
+      pkgs = import <nixpkgs> {};
+      pyExt = import ./build-tools/tools/nix/templates/python/pyext.nix { inherit pkgs; };
+      py = pyExt {
+        name = "//${appPosix}:ext";
+        module = "demo._native";
+        lockfile = "${appPosix}/uv.lock";
+        srcRoot = ./.;
+        subdir = "${appPosix}";
+        srcList = [ "${appPosix}/native/ext.cpp" ];
+        cflags = [];
+        ldflags = [];
+        nixCxxAttrs = [];
+        buildPyDeps = [];
+        repoCxxPkgs = [];
+        includeRoots = [];
+      };
+      control = pkgs.runCommand "pyext-lockfile-control" {} ''
+        mkdir -p "$out"
+        echo ok > "$out/control.txt"
+      '';
+    in {
+      pyext = py.drvPath;
+      control = control.drvPath;
+    }
+  `;
   const res = await $({
     cwd: tmp,
     stdio: "pipe",
     reject: false,
     nothrow: true,
-    env: {
-      ...process.env,
-      BUCK_TEST_SRC: tmp,
-      BUCK_TARGET: target,
-      WORKSPACE_ROOT: tmp,
-    },
-  })`nix eval --impure -L --accept-flake-config --raw ${`path:${tmp}#graph-generator-selected.drvPath`}`;
+  })`nix eval --impure --expr ${expr} --json`;
   if (res.exitCode !== 0) {
     console.error(String(res.stderr || ""));
     throw new Error(`nix eval failed (exit=${res.exitCode})`);
   }
-  const drvPath = String(res.stdout || "").trim();
-  assert.ok(drvPath.startsWith("/nix/store/"), `expected nix drvPath, got: ${drvPath}`);
-  assert.ok(drvPath.endsWith(".drv"), `expected nix drvPath, got: ${drvPath}`);
-  return drvPath;
+  const parsed = JSON.parse(String(res.stdout || "{}")) as { pyext?: unknown; control?: unknown };
+  const pyext = String(parsed.pyext || "");
+  const control = String(parsed.control || "");
+  assert.ok(pyext.startsWith("/nix/store/"), `expected pyext drvPath, got: ${pyext}`);
+  assert.ok(pyext.endsWith(".drv"), `expected pyext drvPath, got: ${pyext}`);
+  assert.ok(control.startsWith("/nix/store/"), `expected control drvPath, got: ${control}`);
+  assert.ok(control.endsWith(".drv"), `expected control drvPath, got: ${control}`);
+  return { pyext, control };
 }
 
 test("python: pyext rebuilds when uv.lock changes with empty build_py_deps", async () => {
   await runInTemp("python-pyext-lockfile-invalidation", async (tmp, $) => {
     const appRel = path.join("projects", "apps", "pyext_lockfile");
     const appDir = path.join(tmp, appRel);
-    const libRel = path.join("projects", "libs", "math");
-    const libDir = path.join(tmp, libRel);
 
     await fs.mkdirp(path.join(appDir, "native"));
-    await fs.mkdirp(path.join(libDir, "src"));
-
-    await fs.writeFile(
-      path.join(libDir, "src", "noop.cc"),
-      ['extern "C" int noop() { return 0; }', ""].join("\n"),
-      "utf8",
-    );
 
     await fs.writeFile(
       path.join(appDir, "native", "ext.cpp"),
@@ -81,55 +101,18 @@ test("python: pyext rebuilds when uv.lock changes with empty build_py_deps", asy
     );
 
     const appPosix = appRel.replace(/\\/g, "/");
-    const libPosix = libRel.replace(/\\/g, "/");
-    const extLabel = `//${appPosix}:ext`;
-    const libLabel = `//${libPosix}:noop`;
 
-    await fs.mkdirp(path.join(tmp, "build-tools", "tools", "buck"));
-    await fs.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "graph.json"),
-      JSON.stringify(
-        [
-          {
-            name: libLabel,
-            rule_type: "cxx_library",
-            labels: ["lang:cpp", "kind:lib"],
-            srcs: [`${libPosix}/src/noop.cc`],
-            deps: [],
-            link_deps: [],
-            header_deps: [],
-          },
-          {
-            name: extLabel,
-            rule_type: "python_pyext_stub",
-            labels: ["lang:python", "kind:pyext"],
-            module: "demo._native",
-            srcs: [`${appPosix}/native/ext.cpp`],
-            deps: [],
-            link_deps: [],
-            header_deps: [],
-            link_closure: "direct",
-            link_closure_overrides: {},
-            cflags: [],
-            ldflags: [],
-            build_py_deps: [],
-          },
-        ],
-        null,
-        2,
-      ) + "\n",
-      "utf8",
-    );
-
-    const pyextDrv1 = await nixEvalSelectedDrvPath(tmp, $, extLabel);
-    const controlDrv1 = await nixEvalSelectedDrvPath(tmp, $, libLabel);
+    const first = await nixEvalPyExtAndControlDrvPaths(tmp, $, appPosix);
 
     await fs.appendFile(path.join(appDir, "uv.lock"), "\n# changed\n", "utf8");
 
-    const pyextDrv2 = await nixEvalSelectedDrvPath(tmp, $, extLabel);
-    const controlDrv2 = await nixEvalSelectedDrvPath(tmp, $, libLabel);
+    const second = await nixEvalPyExtAndControlDrvPaths(tmp, $, appPosix);
 
-    assert.notEqual(pyextDrv1, pyextDrv2, "expected pyext drvPath to change after uv.lock edit");
-    assert.equal(controlDrv1, controlDrv2, "expected control drvPath to remain cached");
+    assert.notEqual(
+      first.pyext,
+      second.pyext,
+      "expected pyext drvPath to change after uv.lock edit",
+    );
+    assert.equal(first.control, second.control, "expected control drvPath to remain cached");
   });
 });

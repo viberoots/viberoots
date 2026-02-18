@@ -28,8 +28,9 @@ test("planner lib kindOf shared helper respects per-language configs", async () 
         nodeA = L.kindOf { labels = [ "kind:bin" ]; ruleType = "node_rule"; config = nodeCfg; };
         nodeB = L.kindOf { labels = [ "kind:lib" ]; ruleType = "node_rule"; config = nodeCfg; };
         nodeC = L.kindOf { labels = [ "kind:gen" ]; ruleType = "node_rule"; config = nodeCfg; };
-        nodeD = L.kindOf { labels = []; ruleType = "node_rule"; config = nodeCfg; };
-      in { inherit goA goB goC cppA cppB cppC pyA pyB pyC nodeA nodeB nodeC nodeD; }
+        nodeD = L.kindOf { labels = [ "kind:app" ]; ruleType = "node_rule"; config = nodeCfg; };
+        nodeE = L.kindOf { labels = []; ruleType = "node_rule"; config = nodeCfg; };
+      in { inherit goA goB goC cppA cppB cppC pyA pyB pyC nodeA nodeB nodeC nodeD nodeE; }
     `;
     const { stdout } = await $({ cwd: tmp })`nix eval --impure --expr ${expr} --json`;
     const obj = JSON.parse(String(stdout || "{}"));
@@ -45,6 +46,7 @@ test("planner lib kindOf shared helper respects per-language configs", async () 
     assert.equal(obj.nodeA, "bin");
     assert.equal(obj.nodeB, "lib");
     assert.equal(obj.nodeC, "gen");
-    assert.equal(obj.nodeD, null);
+    assert.equal(obj.nodeD, "app");
+    assert.equal(obj.nodeE, null);
   });
 });

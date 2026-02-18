@@ -51,6 +51,7 @@
   };
   node = {
     labelPriorityPre = [
+      { label = "kind:app"; kind = "app"; }
       { label = "kind:gen"; kind = "gen"; }
       { label = "kind:bin"; kind = "bin"; }
       { label = "kind:lib"; kind = "lib"; }

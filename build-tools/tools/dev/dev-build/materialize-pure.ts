@@ -8,6 +8,40 @@ import {
   parseRunnableManifest,
 } from "../../lib/runnables.ts";
 
+function materializeTimeoutSec(): number {
+  const raw = String(process.env.BNX_MATERIALIZE_TIMEOUT_SEC || "").trim();
+  const parsed = Number(raw || "120");
+  if (!Number.isFinite(parsed) || parsed <= 0) return 120;
+  return Math.floor(parsed);
+}
+
+async function nixBuildPrintOutPaths(opts: {
+  root: string;
+  env: Record<string, string>;
+  args: string;
+  label: string;
+}): Promise<string> {
+  const tout = materializeTimeoutSec();
+  const res = await $({
+    stdio: "pipe",
+    cwd: opts.root,
+    env: opts.env,
+    nothrow: true,
+  })`bash --noprofile --norc -c ${`set -euo pipefail; if ! command -v timeout >/dev/null 2>&1; then echo "dev-build materialize: timeout not found on PATH" 1>&2; exit 127; fi; timeout -k 5s ${tout}s nix build ${opts.args}`}`;
+  if (res.exitCode === 0) {
+    return String(res.stdout || "");
+  }
+  const stderr = String(res.stderr || "").trim();
+  if (res.exitCode === 124) {
+    throw new Error(
+      `[dev-build] ${opts.label} timed out after ${tout}s while running: nix build ${opts.args}\n${stderr}`,
+    );
+  }
+  throw new Error(
+    `[dev-build] ${opts.label} failed (exit ${res.exitCode}) while running: nix build ${opts.args}\n${stderr}`,
+  );
+}
+
 function isLikelyBuckTarget(tok: string): boolean {
   if (!tok) return false;
   if (tok.includes("...")) return false;
@@ -85,11 +119,12 @@ export async function materializePureGraphIfEnabled(opts: {
     BUCK_GRAPH_JSON: path.join(opts.root, DEFAULT_GRAPH_PATH),
   } as any;
 
-  const { stdout: graphOut } = await $({
-    stdio: "pipe",
-    cwd: opts.root,
-    env: envPure,
-  })`nix build --impure --no-write-lock-file .#buck-graph --no-link --accept-flake-config --print-out-paths`;
+  const graphOut = await nixBuildPrintOutPaths({
+    root: opts.root,
+    env: envPure as Record<string, string>,
+    args: "--impure --no-write-lock-file .#buck-graph --no-link --accept-flake-config --print-out-paths",
+    label: "materialize buck-graph",
+  });
   const graphStore = String(graphOut || "")
     .trim()
     .split("\n")
@@ -107,11 +142,12 @@ export async function materializePureGraphIfEnabled(opts: {
           BUCK_TARGET: sel,
           BUCK_GRAPH_JSON: path.join(opts.root, DEFAULT_GRAPH_PATH),
         } as any;
-        const { stdout: selOut } = await $({
-          stdio: "pipe",
-          cwd: opts.root,
-          env: envSel,
-        })`nix build --no-write-lock-file .#graph-generator-pure-selected --accept-flake-config --print-out-paths`;
+        const selOut = await nixBuildPrintOutPaths({
+          root: opts.root,
+          env: envSel as Record<string, string>,
+          args: "--no-write-lock-file .#graph-generator-pure-selected --accept-flake-config --print-out-paths",
+          label: `materialize selected target ${sel}`,
+        });
         const outPath =
           String(selOut || "")
             .trim()
@@ -131,7 +167,8 @@ export async function materializePureGraphIfEnabled(opts: {
           else console.log(` - ${sel}: (not runnable; inspect ${outPath})`);
         }
       } catch (e) {
-        console.log(` - ${sel}: (failed to materialize)`, e);
+        console.log(` - ${sel}: (failed to materialize)`);
+        throw e;
       }
     }
     return;
@@ -141,11 +178,12 @@ export async function materializePureGraphIfEnabled(opts: {
     ...process.env,
     BUCK_GRAPH_JSON: path.join(opts.root, DEFAULT_GRAPH_PATH),
   } as any;
-  const { stdout: pureOut } = await $({
-    stdio: "pipe",
-    cwd: opts.root,
-    env: envFull,
-  })`nix build --impure --no-write-lock-file .#graph-generator-pure --accept-flake-config --print-out-paths`;
+  const pureOut = await nixBuildPrintOutPaths({
+    root: opts.root,
+    env: envFull as Record<string, string>,
+    args: "--impure --no-write-lock-file .#graph-generator-pure --accept-flake-config --print-out-paths",
+    label: "materialize full pure graph",
+  });
   const purePath =
     String(pureOut || "")
       .trim()
