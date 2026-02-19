@@ -143,7 +143,10 @@ async function mergeBaseChangedPaths(root: string, env: NodeJS.ProcessEnv): Prom
   return await gitLines(root, ["diff", "--name-only", `${mergeBase}...HEAD`]);
 }
 
-async function hasBuildSystemChanges(root: string, env: NodeJS.ProcessEnv): Promise<boolean> {
+export async function collectChangedPaths(
+  root: string,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<string[]> {
   const committed = await mergeBaseChangedPaths(root, env);
   const statusRaw = await $({
     cwd: root,
@@ -154,7 +157,13 @@ async function hasBuildSystemChanges(root: string, env: NodeJS.ProcessEnv): Prom
     (statusRaw as any).exitCode === 0
       ? parseStatusPaths(String((statusRaw as any).stdout || ""))
       : [];
-  const changed = new Set<string>([...committed, ...statusPaths].map((p) => normalizePath(p)));
+  return Array.from(
+    new Set<string>([...committed, ...statusPaths].map((p) => normalizePath(p))),
+  ).sort();
+}
+
+async function hasBuildSystemChanges(root: string, env: NodeJS.ProcessEnv): Promise<boolean> {
+  const changed = await collectChangedPaths(root, env);
   for (const p of changed) {
     if (isBuildSystemPath(p)) {
       return true;

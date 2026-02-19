@@ -648,6 +648,23 @@ Behavior:
 - The seed key includes workspace root, `HEAD`, `git status --porcelain=v1 -z`, and filter toggles (`TEST_RSYNC_ROOTS`, `TEST_PARTIAL_CLONE_GO_ONLY`, `TEST_EXCLUDE_CPP_REQS`).
 - The seed contents are a filtered working-tree snapshot built from an allowlist that mirrors the temp repo shape.
 
+## Template-only selector contract (PR-2)
+
+I keep template test selection as a deterministic tool contract before verify/CI wiring.
+
+- Entrypoint: `node build-tools/tools/dev/select-template-tests.ts`
+- Source of truth for changed paths: merge-base diff plus working tree status.
+- Template id extraction uses only paths under:
+  `build-tools/tools/scaffolding/templates/<language>/<template>/...`
+- Selector mode is one of:
+  - `template-only`: template ids changed and no other build-system paths changed.
+  - `mixed`: template ids changed and at least one non-template build-system path changed.
+  - `no-template-impact`: no changed template ids detected.
+- Label resolution is Buck-driven: for each changed id, query `template:<language>/<template>`.
+- In `template-only`, selected targets are:
+  `label-selected targets ∪ safety floor`, then sorted and deduplicated.
+- Diagnostics are emitted as stable JSON (`mode`, changed paths, changed template ids, selected targets).
+
 ## Implementation Plan (bite‑sized, ordered, with verification)
 
 > This plan is designed for a junior engineer or an LLM agent. Each step is **small**, has **clear acceptance criteria**, and includes a **verification** recipe to prevent regressions. Follow in order.

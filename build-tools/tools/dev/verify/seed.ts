@@ -4,6 +4,7 @@ import path from "node:path";
 import process from "node:process";
 import "zx/globals";
 import { writeIfChanged } from "../../lib/fs-helpers.ts";
+import { runManagedCommand } from "../../lib/managed-command.ts";
 import { shouldStageSeed, stageSeedStore } from "./seed-staging.ts";
 import { pidAlive } from "./seed-utils.ts";
 
@@ -100,19 +101,53 @@ async function computeSeedKey(root: string): Promise<string> {
   return JSON.stringify(payload);
 }
 
+function seedBuildTimeoutSec(): number {
+  const raw = String(process.env.BNX_VERIFY_SEED_BUILD_TIMEOUT_SEC || "").trim();
+  const parsed = Number(raw || "300");
+  if (!Number.isFinite(parsed) || parsed <= 0) return 300;
+  return Math.floor(parsed);
+}
+
 async function buildSeedStorePath(root: string): Promise<string> {
-  const res = await $({
+  const timeoutSec = seedBuildTimeoutSec();
+  const flakeRef = `${root}#test-seed`;
+  process.stderr.write(`[verify] seed build: nix build ${flakeRef} (timeout=${timeoutSec}s)\n`);
+  const cmd = await runManagedCommand({
+    command: "nix",
+    args: [
+      "build",
+      "--option",
+      "eval-cache",
+      "false",
+      "--impure",
+      flakeRef,
+      "--accept-flake-config",
+      "--no-link",
+      "--print-out-paths",
+    ],
     cwd: root,
-    stdio: "pipe",
-    reject: false,
-  })`nix build --impure ${root}#test-seed --accept-flake-config --no-link --print-out-paths`;
-  if (res.exitCode !== 0) throw new Error("verify seed: nix build .#test-seed failed");
-  const out = String(res.stdout || "")
+    env: { ...process.env, IN_NIX_SHELL: process.env.IN_NIX_SHELL || "1" },
+    timeoutMs: timeoutSec * 1000,
+    killGraceMs: 5000,
+  });
+  if (!cmd.ok) {
+    const detail = String(cmd.stderr || cmd.stdout || "").trim();
+    if (cmd.timedOut) {
+      throw new Error(
+        `verify seed: nix build .#test-seed timed out after ${timeoutSec}s${detail ? `\n${detail}` : ""}`,
+      );
+    }
+    throw new Error(
+      `verify seed: nix build .#test-seed failed (exit ${String(cmd.code)})${detail ? `\n${detail}` : ""}`,
+    );
+  }
+  const out = String(cmd.stdout || "")
     .trim()
     .split("\n")
     .filter(Boolean)
     .pop();
   if (!out) throw new Error("verify seed: nix build .#test-seed returned no store path");
+  process.stderr.write("[verify] seed build: complete\n");
   return out;
 }
 

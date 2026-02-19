@@ -57,6 +57,10 @@ Python provider sync activation in sparse/partial clones is lockfile‑driven: t
   - Generate auto_map (building block; prefer the pipeline): `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`
   - Prebuild guard (freshness/presence): `node build-tools/tools/buck/prebuild-guard.ts [--verbose|--json]`
   - Note: touching any `pnpm-lock.yaml` requires re-running provider sync + auto_map; the guard will fail in CI if importer entries are missing and auto-fix locally unless `PREBUILD_GUARD_NO_FIX=1`.
+- Template test selection (PR-2):
+  - Auto-detect from git changes: `node build-tools/tools/dev/select-template-tests.ts`
+  - Provide explicit changed paths: `node build-tools/tools/dev/select-template-tests.ts --changed build-tools/tools/scaffolding/templates/go/lib/copier.yaml`
+  - Targets-only output: `node build-tools/tools/dev/select-template-tests.ts --targets-only`
 - Nix builds (planner outputs):
   - `nix build .#graph-generator`
 - Repo wrappers (preferred; thin shims that delegate into TypeScript and ensure the dev shell is loaded):

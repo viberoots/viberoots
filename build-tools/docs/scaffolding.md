@@ -408,6 +408,45 @@ buck2 cquery //:scaffolding_go_lib_scaffold_and_build \
   --output-attribute template_inputs
 ```
 
+#### Template-only test selector (changed paths + Buck labels)
+
+The selector entrypoint is `build-tools/tools/dev/select-template-tests.ts`.
+It reads changed files from git by default, derives changed template ids from
+`build-tools/tools/scaffolding/templates/<language>/<template>/...`, and resolves
+template tests through Buck label queries (`template:<language>/<template>`).
+Optional flags:
+
+- `--changed <path1,path2,...>` to bypass git diff/status discovery.
+- `--targets-only` to print only the selected target list.
+
+Modes:
+
+- `template-only`:
+  - At least one template id changed.
+  - No other build-system paths changed outside template roots.
+  - Output is `label-selected targets ∪ safety floor`.
+- `mixed`:
+  - Template ids changed and other build-system paths changed.
+  - Selector emits diagnostics and no narrowed target list (full-scope testing is required).
+- `no-template-impact`:
+  - No changed template ids detected.
+  - Selector emits diagnostics and no template target list.
+
+Diagnostics contract:
+
+- Emit deterministic, sorted diagnostics that include:
+  - mode
+  - changed paths
+  - changed template ids
+  - selected targets by template id (for `template-only`)
+  - fixed safety-floor targets
+
+Safety floor:
+
+- `//:scaffolding_smoke_lib_readme`
+- `//:scaffolding_smoke_cli_readme`
+- `//:scaffolding_python_wasm_app_scaffold_smoke`
+
 #### End-to-end testing without disturbing the source repository
 
 To exercise the full `scaf` flow safely while developing or augmenting scaffolding capabilities, run tests in an ephemeral copy of the repo:

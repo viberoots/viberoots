@@ -44,10 +44,19 @@ async function psLines(): Promise<string[]> {
 function extractBuckIsolations(lines: string[]): Array<{ pid: string; iso: string }> {
   const out: Array<{ pid: string; iso: string }> = [];
   for (const line of lines) {
-    // Example: " 32079 buck2d[go-app-auto-tests-o2iN8J] --isolation-dir ..."
-    const m = line.match(/\b(\d+)\s+.*\bbuck2d\[([^\]]+)\]/);
-    if (m) {
-      out.push({ pid: m[1], iso: m[2] });
+    const pidMatch = line.match(/^\s*(\d+)\s+/);
+    if (!pidMatch) continue;
+    const pid = pidMatch[1];
+    // Prefer explicit isolation-dir argument (matches both buck2 and buck2d command shapes).
+    const isoArg = line.match(/--isolation-dir\s+([^\s]+)/);
+    if (isoArg) {
+      out.push({ pid, iso: isoArg[1] });
+      continue;
+    }
+    // Fallback for command forms that only expose buck2d[isolation].
+    const daemonIso = line.match(/\bbuck2d\[([^\]]+)\]/);
+    if (daemonIso) {
+      out.push({ pid, iso: daemonIso[1] });
     }
   }
   return out;
