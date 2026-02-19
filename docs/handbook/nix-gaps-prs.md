@@ -115,6 +115,11 @@ PRs after PR-11 should use them consistently and avoid bypassing them.
    - Avoid widening checks to untouched areas in PR-local validation loops.
    - Evidence: scoped-lint speedup landed in `0e24563`.
 
+7. Keep direnv shell activation on the cached nix-direnv path.
+   - Require `nix-direnv` for repo entry so `.envrc` does not silently fall back to plain `use flake`.
+   - Use `build-tools/tools/bin/shell-cache-check` to confirm contract and local cache state.
+   - If cache is stale, recover with: `rm -rf .direnv && direnv allow && direnv reload`.
+
 PR template requirement (apply to PR-12+):
 
 - Include a short “Test runtime controls used” note listing which of the six controls were applied.

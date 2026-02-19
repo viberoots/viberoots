@@ -6,10 +6,16 @@ This guide helps a new contributor land any PR in this plan successfully, follow
 
 - Ensure direnv is active in your shell and permitted for the repo:
   - `direnv allow` (once per clone), verify it loads automatically in new shells
+- Ensure `nix-direnv` is installed (required for cached shell loading in this repo):
+  - `nix profile install nixpkgs#nix-direnv`
 - Quick checks (must succeed):
   - `nix --version`, `buck2 --version`, `go version`, `node --version`, `pnpm --version`
   - `python3 --version`, `uv --version` ← required for Python enablement
   - `nix show-config` includes experimental features (`nix-command`, `flakes`)
+- Optional shell-cache health check:
+  - `build-tools/tools/bin/shell-cache-check`
+- Cache recovery (only when cache state is stale or broken):
+  - `rm -rf .direnv && direnv allow && direnv reload`
 - Optional: run our startup check if present (prints clear hints):
   - `node build-tools/tools/dev/startup-check.ts`
 

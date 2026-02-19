@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# shell helpers
+# shellcheck source=/dev/null
+. "$(cd "$(dirname "$0")" && pwd)/_env.sh"
+
+run_ts "../dev/shell-cache-check.ts" "$@"
