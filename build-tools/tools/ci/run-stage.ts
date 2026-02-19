@@ -4,6 +4,7 @@ import assert from "node:assert";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { ensureGraph, runGlue } from "../buck/glue-run.ts";
+import { resolveBuildSystemBuckTestScope } from "../lib/build-system-test-scope.ts";
 import { getFlagStr } from "../lib/cli.ts";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
 import { runNodeWithZx } from "../lib/node-run.ts";
@@ -149,9 +150,22 @@ async function main() {
     case "buck-test":
       // External timeout is recommended; allow override via TIMEOUT_SEC
       const t = Number(process.env.TIMEOUT_SEC || 1200);
+      const scope = await resolveBuildSystemBuckTestScope({
+        root: process.cwd(),
+        requestedTargets: ["//..."],
+      });
+      if (scope.targets.length === 1 && scope.targets[0] === "//projects/...") {
+        console.log(
+          `[ci] buck-test: skipping build-system tests (BNX_BUILD_SYSTEM_TESTS=${scope.mode}; no build-system changes detected)`,
+        );
+      } else {
+        console.log(
+          `[ci] buck-test: including build-system tests (BNX_BUILD_SYSTEM_TESTS=${scope.mode})`,
+        );
+      }
       // Coverage passthrough if COVERAGE=1 in env
       const extra = process.env.COVERAGE === "1" ? ["--", "--env", "COVERAGE=1"] : [];
-      await $`timeout -k 10s ${t}s buck2 test //... ${extra}`;
+      await $`timeout -k 10s ${t}s buck2 test ${scope.targets} ${extra}`;
       break;
     case "cpp-addon-smoke": {
       const target = path.resolve("build-tools/tools/ci/cpp-addon-smoke.ts");

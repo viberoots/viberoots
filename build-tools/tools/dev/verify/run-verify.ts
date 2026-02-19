@@ -3,6 +3,7 @@ import path from "node:path";
 import process from "node:process";
 import "zx/globals";
 import { runNodeWithZx } from "../../lib/node-run.ts";
+import { resolveBuildSystemBuckTestScope } from "../../lib/build-system-test-scope.ts";
 import { repoRoot } from "../dev-build/paths.ts";
 import { ensureBuckPreludeConfig } from "../dev-build/prelude.ts";
 import { runStartupCheck } from "../dev-build/startup.ts";
@@ -139,6 +140,21 @@ export async function runVerify(): Promise<void> {
   process.env.BNX_TEST_SEED_STORE_PATH = seed.seedPath;
   process.env.BNX_TEST_SEED_KEY = seed.seedKey;
   process.env.BNX_TEST_SEED_PIN_DIR = seed.pinDir;
+  const testScope = await resolveBuildSystemBuckTestScope({
+    root,
+    requestedTargets: args.targets,
+  });
+  if (testScope.targets.length === 1 && testScope.targets[0] === "//projects/...") {
+    await appendVerifyLogLine(
+      lock.logFile,
+      `[verify] test scope: projects-only (BNX_BUILD_SYSTEM_TESTS=${testScope.mode}; no build-system changes detected)`,
+    );
+  } else {
+    await appendVerifyLogLine(
+      lock.logFile,
+      `[verify] test scope: including build-system tests (BNX_BUILD_SYSTEM_TESTS=${testScope.mode})`,
+    );
+  }
   let seedCleanup: (() => Promise<void>) | null = seed.cleanup;
 
   // Proactively kill *orphaned* buck2 daemons rooted under temp repos to avoid host overload.
@@ -175,7 +191,7 @@ export async function runVerify(): Promise<void> {
     iso,
     logFile: lock.logFile,
     console: args.console,
-    targets: args.targets,
+    targets: testScope.targets,
     zxNodeModulesOut,
   });
   pgid = spawned.pgid;
