@@ -1,5 +1,9 @@
-{ pkgs, repoSnapshot, uv2nixLib, repoRoot, nodeMods }:
+{ pkgs, repoSnapshot, uv2nixLib, repoRoot, nodeMods ? null, mkNodeMods ? null }:
 let
+  resolvedNodeMods =
+    if nodeMods != null then nodeMods
+    else if mkNodeMods != null then mkNodeMods { }
+    else builtins.throw "packages/graph.nix requires nodeMods or mkNodeMods";
   graphGen =
     let
       envGraph = builtins.getEnv "BUCK_GRAPH_JSON";
@@ -10,7 +14,7 @@ let
     pkgs.callPackage ../../graph-generator.nix {
       inherit pkgs;
       src = repoSnapshot;
-      nodeMods = nodeMods;
+      nodeMods = resolvedNodeMods;
       graphJsonPath = graphArg;
       rootModulesTomlPath =
         let
@@ -35,7 +39,7 @@ let
   graphGenPure = pkgs.callPackage ../../graph-generator.nix {
     inherit pkgs;
     src = repoSnapshot;
-    nodeMods = nodeMods;
+    nodeMods = resolvedNodeMods;
     graphJsonPath =
       let
         envGraph = builtins.getEnv "BUCK_GRAPH_JSON";

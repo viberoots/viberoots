@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
+import assert from "node:assert/strict";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import assert from "node:assert/strict";
-import { runInTemp, exists } from "../lib/test-helpers";
-import * as fsp from "node:fs/promises";
+import { exists, runInTemp } from "../lib/test-helpers";
 
 async function removeLockfilesRecursively(root: string): Promise<void> {
   const stack: string[] = [root];

@@ -2,12 +2,12 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { getFlagStr } from "../lib/cli.ts";
-import { readCompositeGraph } from "../lib/graph-view.ts";
-import { parseLockfileLabel, normalizeTargetLabel } from "../lib/labels.ts";
-import { isWorkspaceImporterPath } from "../lib/importers.ts";
 import { writeIfChanged } from "../lib/fs-helpers.ts";
-import { repoRoot } from "../lib/repo.ts";
+import { readCompositeGraph } from "../lib/graph-view.ts";
+import { isWorkspaceImporterPath } from "../lib/importers.ts";
+import { normalizeTargetLabel, parseLockfileLabel } from "../lib/labels.ts";
 import { collectDeps, listImporters } from "../lib/node-deps-enforcement-core.ts";
+import { repoRoot } from "../lib/repo.ts";
 
 type GraphNode = { name?: string; labels?: string[]; rule_type?: string };
 

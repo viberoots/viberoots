@@ -1,32 +1,39 @@
-{ pkgs, zx-wrapper, nodeMods, prelude, uv2nixLib, ... }:
+{ pkgs, zx-wrapper, nodeMods ? null, mkNodeMods ? null, prelude, uv2nixLib, ... }:
 let
   lib = pkgs.lib;
   repoRoot = ../../../../..;
+  resolvedNodeMods =
+    if nodeMods != null then nodeMods
+    else if mkNodeMods != null then mkNodeMods { }
+    else builtins.throw "packages/default.nix requires nodeMods or mkNodeMods";
   filterRepo = import ./filter-repo.nix { inherit lib; };
   repoSnapshot = builtins.path { path = filterRepo repoRoot; name = "repo"; };
 
   importers = import ./importers.nix { inherit lib filterRepo repoSnapshot repoRoot; };
-  graph = import ./graph.nix { inherit pkgs repoSnapshot uv2nixLib repoRoot nodeMods; };
+  graph = import ./graph.nix { inherit pkgs repoSnapshot uv2nixLib repoRoot; nodeMods = resolvedNodeMods; };
 
   nodeModsPkgs = import ./node-mods.nix {
-    inherit nodeMods;
+    nodeMods = resolvedNodeMods;
     importerDirs = importers.importerDirs;
     haveRootLock = importers.haveRootLock;
   };
 
   nodeCli = import ./node-cli.nix {
-    inherit pkgs nodeMods filterRepo repoSnapshot repoRoot;
+    inherit pkgs filterRepo repoSnapshot repoRoot;
+    nodeMods = resolvedNodeMods;
     importerDirs = importers.importerDirs;
     allowGenerate = importers.allowGenerate;
   };
 
   nodeWebapp = import ./node-webapp.nix {
-    inherit pkgs nodeMods filterRepo repoSnapshot repoRoot;
+    inherit pkgs filterRepo repoSnapshot repoRoot;
+    nodeMods = resolvedNodeMods;
     importerDirs = importers.importerDirs;
   };
 
   nodeTest = import ./node-test.nix {
-    inherit pkgs nodeMods uv2nixLib repoRoot;
+    inherit pkgs uv2nixLib repoRoot;
+    nodeMods = resolvedNodeMods;
     importerDirs = importers.importerDirs;
     allowGenerate = importers.allowGenerate;
   };

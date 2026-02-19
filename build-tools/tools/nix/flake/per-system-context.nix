@@ -1,4 +1,4 @@
-{ nixpkgs, buck2, gomod2nix, system }:
+{ nixpkgs, buck2, gomod2nix, system, includeNodeMods ? false }:
 let
   repoRoot = ../../../..;
   pkgs = import nixpkgs {
@@ -32,25 +32,26 @@ let
     in
     if w != "" then (builtins.toPath w) else (if t != "" then (builtins.toPath t) else repoRoot);
 
-  nodeMods = import ../node-modules.nix {
-    inherit pkgs;
-    repoRoot = repoRoot;
-    repoFsRoot = liveFsRoot;
-    hashesPath = ../node-modules.hashes.json;
-    prefetchedStorePathGlobal =
-      let
-        s = builtins.getEnv "LOCAL_PNPM_STORE";
-      in
-      if s != "" then (builtins.toPath s) else null;
-  };
+  mkNodeMods =
+    { repoFsRoot ? liveFsRoot }:
+    import ../node-modules.nix {
+      inherit pkgs repoFsRoot;
+      repoRoot = repoRoot;
+      hashesPath = ../node-modules.hashes.json;
+      prefetchedStorePathGlobal =
+        let
+          s = builtins.getEnv "LOCAL_PNPM_STORE";
+        in
+        if s != "" then (builtins.toPath s) else null;
+    };
 
   prelude = import ../buck-prelude.nix { inherit pkgs; buck2Input = buck2; };
 
   uv2nixLib =
     let
-      uvPath = repoRoot + "/third_party/uv2nix/flake.nix";
-      haveUv = builtins.pathExists uvPath;
-      uvLocal = if haveUv then import uvPath else null;
+      uvPathStr = (builtins.toString repoRoot) + "/third_party/uv2nix/flake.nix";
+      haveUv = builtins.pathExists uvPathStr;
+      uvLocal = if haveUv then import (builtins.toPath uvPathStr) else null;
       uvOut = if haveUv && uvLocal != null then uvLocal.outputs { self = null; inherit nixpkgs; } else null;
       lib = if uvOut == null then null else (uvOut.lib or null);
     in
@@ -64,8 +65,8 @@ let
     };
 in
 {
-  inherit pkgs system zx-wrapper devshell nodeMods prelude uv2nixLib;
+  inherit pkgs system zx-wrapper devshell prelude uv2nixLib liveFsRoot mkNodeMods;
   buck2Input = buck2;
-}
+} // (if includeNodeMods then { nodeMods = mkNodeMods { }; } else { })
 
 

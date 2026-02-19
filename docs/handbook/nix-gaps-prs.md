@@ -80,6 +80,18 @@ Implementation note for PR-25/PR-26:
 - The required verify/CI merge gate currently runs `nix-gaps-inventory-check.ts`; PR-25/PR-26 checks
   are not yet wired as mandatory verify/CI stage invocations.
 
+Execution log note (fast-shell PR-2 lazy flake context hardening):
+
+- I split per-system context usage into light and heavy routes in
+  `build-tools/tools/nix/flake/outputs.nix` so `apps`/`devShells` no longer share the same context
+  path as `packages`/`checks`.
+- I made `nodeMods` construction explicit and opt-in through `includeNodeMods` and `mkNodeMods` in
+  `build-tools/tools/nix/flake/per-system-context.nix`.
+- I updated package/check callsites to resolve `nodeMods` from either an injected value or
+  `mkNodeMods`, and added enforcement tests:
+  - `build-tools/tools/tests/dev/flake.outputs.lazy-node-mods-context.enforcement.test.ts`
+  - `build-tools/tools/tests/node/node.flake-context.node-mods-constructor.enforcement.test.ts`
+
 ## Test-time guardrails (evidence-based, required for PR-12+)
 
 These controls are already implemented in-repo and have landed across test/runtime speedup commits

@@ -1,9 +1,8 @@
 import { type ManagedCommandActivity } from "../../lib/managed-command.ts";
 import { updateNodeModulesHashesJson } from "./hashes-json.ts";
-import { makeFilteredFlakeRef } from "./lockfile.ts";
 import { withHeartbeat } from "./heartbeat.ts";
+import { generateImporterLockfile, makeFilteredFlakeRef } from "./lockfile.ts";
 import { buildStore, buildUnfixedAndHash, extractHash } from "./nix.ts";
-import { generateImporterLockfile } from "./lockfile.ts";
 import { type PnpmStoreVerifiedMarker, writeVerifiedMarker } from "./verified-marker.ts";
 
 export async function handleNonDefaultImporter(opts: {
