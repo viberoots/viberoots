@@ -13,6 +13,9 @@ let
   get = ctx.get;
   pkgs = ctx.pkgs or null;
   repoRoot = ctx.repoRoot;
+  repoSnapshot = ctx.repoSnapshot or repoRoot;
+  repoStoreRoot = ctx.repoStoreRoot or repoSnapshot;
+  sharedNodeMods = ctx.nodeMods or null;
 
   labelsOf = L.labelsOf;
   nameOf = L.nameOf;
@@ -35,12 +38,6 @@ let
       else
         parseLock (builtins.head locks);
 
-  # Local node-modules utilities (hermetic pnpm store + node_modules)
-  nodeMods = import ../node-modules.nix {
-    inherit pkgs;
-    repoRoot = repoRoot;
-  };
-
   targetNameOf = n:
     let parts = lib.splitString ":" n; in
       if (builtins.length parts) > 1 then builtins.elemAt parts 1
@@ -52,6 +49,15 @@ let
   attrStringOr = n: key: fallback:
     let v = if n == null then null else get n key;
     in if builtins.isString v && v != "" then v else fallback;
+  isWebappLike = n:
+    let
+      rt = attrStringOr n "rule_type" "";
+      cmd = attrStringOr n "cmd" "";
+    in
+      rt == "node_webapp" ||
+      lib.hasInfix "node-webapp." cmd ||
+      lib.hasInfix "--attr \"node-webapp." cmd ||
+      lib.hasInfix "--attr node-webapp." cmd;
 
   mkGenLike = { name, kind }:
     let
@@ -114,12 +120,15 @@ in {
 
   # Infer kind from labels (bin/lib); default null
   kindOf = n:
-    L.kindOf {
-      labels = labelsOf n;
-      ruleType = L.ruleTypeOf n;
-      name = L.nameOf n;
-      config = kindConfigs.node;
-    };
+    let
+      k = L.kindOf {
+        labels = labelsOf n;
+        ruleType = L.ruleTypeOf n;
+        name = L.nameOf n;
+        config = kindConfigs.node;
+      };
+    in
+      if k == "app" && isWebappLike n then "webapp" else k;
 
   # Unused for Node; keep interface parity
   modulesFileFor = name: ctx.modulesTomlFor name;
@@ -129,20 +138,32 @@ in {
     let
       info = lockInfoOfName name;
       importerDir = info.importer;
-      # Expect importerDir/lockfilePath from lockfile label; fail deterministically if malformed.
+      nodeMods =
+        if sharedNodeMods != null then sharedNodeMods
+        else builtins.trace
+          "[planner/node] ctx.nodeMods not provided; using compat local node-modules import"
+          (import ../node-modules.nix {
+            inherit pkgs;
+            repoRoot = repoStoreRoot;
+          });
+      sanitize = H.sanitizeName;
       nm = nodeMods.mkNodeModules { lockfilePath = info.lockfilePath; inherit importerDir; };
       entryRel = "src/index.ts";
       outBase = targetNameOf name;
-      sanitize = H.sanitizeName;
     in pkgs.stdenvNoCC.mkDerivation {
       pname = "node-cli-" + (sanitize name);
       version = sanitize importerDir;
-      src = repoRoot;
-      nativeBuildInputs = [ pkgs.esbuild pkgs.nodejs_22 ];
+      src = repoStoreRoot;
+      nativeBuildInputs = [ pkgs.nodejs_22 ];
       buildPhase = ''
         set -euo pipefail
         cd ${importerDir}
         export SOURCE_DATE_EPOCH=1
+        # Reset node_modules to a fresh writable directory before linking.
+        # Source snapshots can carry read-only metadata files (e.g. .modules.yaml),
+        # which makes in-place unlink/link updates fail.
+        chmod -R u+w node_modules 2>/dev/null || true
+        rm -rf node_modules
         mkdir -p node_modules
         STORE_ROOT="${nm}/node_modules"
         BNX_NODE_MODULES_STORE="$STORE_ROOT" node - <<'EOF'
@@ -155,11 +176,43 @@ in {
         let repoRoot = cwd;
         for (let i = 0; i < levels; i++) repoRoot = path.dirname(repoRoot);
         const nodeModules = path.join(cwd, "node_modules");
+        const pathEntryExists = (p) => {
+          try {
+            fs.lstatSync(p);
+            return true;
+          } catch {
+            return false;
+          }
+        };
+        const removePathEntry = (p) => {
+          if (!pathEntryExists(p)) return;
+          fs.rmSync(p, { recursive: true, force: true });
+          if (pathEntryExists(p)) {
+            throw new Error("[nix] failed to remove existing path before symlink: " + p);
+          }
+        };
+        const safeLink = (target, linkPath, kind) => {
+          removePathEntry(linkPath);
+          try {
+            fs.symlinkSync(target, linkPath, kind);
+            return;
+          } catch (e) {
+            if (e && e.code === "EEXIST") {
+              // Retry once after a hard cleanup. This is deterministic and surfaces
+              // a hard error if the entry cannot be removed.
+              removePathEntry(linkPath);
+              fs.symlinkSync(target, linkPath, kind);
+              return;
+            }
+            throw e;
+          }
+        };
         let storeLinked = 0;
         if (storeRoot && fs.existsSync(storeRoot)) {
           const entries = fs.readdirSync(storeRoot, { withFileTypes: true });
           for (const ent of entries) {
             const name = ent.name;
+            if (name === ".bin") continue;
             if (name.startsWith("@")) {
               const scopeStore = path.join(storeRoot, name);
               const scopeDir = path.join(nodeModules, name);
@@ -173,20 +226,14 @@ in {
               for (const pkg of scoped) {
                 const target = path.join(scopeStore, pkg.name);
                 const linkPath = path.join(scopeDir, pkg.name);
-                try {
-                  fs.rmSync(linkPath, { recursive: true, force: true });
-                } catch {}
-                fs.symlinkSync(target, linkPath, "dir");
+                safeLink(target, linkPath, pkg.isDirectory() ? "dir" : "file");
                 storeLinked++;
               }
               continue;
             }
             const target = path.join(storeRoot, name);
             const linkPath = path.join(nodeModules, name);
-            try {
-              fs.rmSync(linkPath, { recursive: true, force: true });
-            } catch {}
-            fs.symlinkSync(target, linkPath, "dir");
+            safeLink(target, linkPath, ent.isDirectory() ? "dir" : "file");
             storeLinked++;
           }
         }
@@ -199,6 +246,7 @@ in {
           for (const ent of fs.readdirSync(abs, { withFileTypes: true })) {
             if (!ent.isDirectory()) continue;
             const pkgDir = path.join(abs, ent.name);
+            if (path.resolve(pkgDir) === path.resolve(cwd)) continue;
             const pkgJson = path.join(pkgDir, "package.json");
             if (!fs.existsSync(pkgJson)) continue;
             let name = "";
@@ -224,12 +272,21 @@ in {
         console.error("[nix] linked workspace packages: " + String(workspaceLinked));
         EOF
         outFile="${outBase}"
-        ${pkgs.esbuild}/bin/esbuild ${entryRel} \
+        if [ ! -f "${entryRel}" ]; then
+          echo "node planner: missing entry '${entryRel}' for ${name}" >&2
+          if [ -d src ]; then ls -la src >&2; fi
+          exit 2
+        fi
+        ESBUILD_BIN="${nm}/node_modules/.bin/esbuild"
+        if [ ! -x "$ESBUILD_BIN" ]; then
+          echo "node planner: missing esbuild in locked node_modules for ${importerDir}" >&2
+          exit 2
+        fi
+        "$ESBUILD_BIN" ${entryRel} \
           --platform=node \
           --target=node22 \
           --bundle \
           --format=esm \
-          --packages=bundle \
           --legal-comments=none \
           --banner:js='#!/usr/bin/env node' \
           --outfile="$outFile"
@@ -244,4 +301,43 @@ in {
   mkGen = name: mkGenLike { inherit name; kind = "gen"; };
   mkLib = name: mkGenLike { inherit name; kind = "lib"; };
   mkBin = name: mkGenLike { inherit name; kind = "bin"; };
+  mkWebapp = name:
+    let
+      info = lockInfoOfName name;
+      importerDir = info.importer;
+      nodeMods =
+        if sharedNodeMods != null then sharedNodeMods
+        else builtins.trace
+          "[planner/node] ctx.nodeMods not provided; using compat local node-modules import"
+          (import ../node-modules.nix {
+            inherit pkgs;
+            repoRoot = repoStoreRoot;
+          });
+      sanitize = H.sanitizeName;
+      nm = nodeMods.mkNodeModules { lockfilePath = info.lockfilePath; inherit importerDir; };
+    in pkgs.stdenvNoCC.mkDerivation {
+      pname = "node-webapp-" + (sanitize name);
+      version = sanitize importerDir;
+      src = repoStoreRoot;
+      nativeBuildInputs = [ pkgs.nodejs_22 ];
+      buildPhase = ''
+        set -euo pipefail
+        cd ${importerDir}
+        export SOURCE_DATE_EPOCH=1
+        rm -rf node_modules
+        ln -s "${nm}/node_modules" node_modules
+        VITE_BIN="${nm}/node_modules/.bin/vite"
+        if [ ! -x "$VITE_BIN" ]; then
+          echo "node planner: missing vite in locked node_modules for ${importerDir}" >&2
+          exit 2
+        fi
+        "$VITE_BIN" build
+        test -d dist
+      '';
+      installPhase = ''
+        set -euo pipefail
+        mkdir -p "$out"
+        cp -R dist "$out/dist"
+      '';
+    };
 }

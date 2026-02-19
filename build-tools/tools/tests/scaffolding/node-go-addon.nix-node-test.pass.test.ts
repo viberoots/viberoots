@@ -31,6 +31,11 @@ test(
         // than being SIGKILL'd (which can strand nix-daemon builders).
         const TIMEOUT_SECS = String(Math.min(rawTimeoutSecs, 14 * 60));
         const NIX_PNPM_FETCH_TIMEOUT = String(Number(process.env.NIX_PNPM_FETCH_TIMEOUT || "600"));
+        const env = {
+          ...process.env,
+          NIX_PNPM_ALLOW_GENERATE: "1",
+          NIX_PNPM_FETCH_TIMEOUT,
+        } as Record<string, string>;
 
         await $`git init`;
 
@@ -65,13 +70,11 @@ test(
           .replace(/[\/\s]+/g, "-");
         const lockfile = path.join(importer, "pnpm-lock.yaml");
 
-        // Install deps and ensure gomod2nix.toml is generated for libs/demo-go
+        // Align fixed-output hash for the importer before building node-test.
         await $({
           stdio: "inherit",
-        })`env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT=${NIX_PNPM_FETCH_TIMEOUT} ${path.join(
-          tmp,
-          "build-tools/tools/bin/i",
-        )}`;
+          env,
+        })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --force --lockfile ${lockfile}`;
 
         // Build the importer's Node tests; the builder links the Go c-archive into the addon
         const testOut = await (async () => {
@@ -83,9 +86,10 @@ test(
           ]
             .filter(Boolean)
             .join(" ");
-          const cmd = `set -euo pipefail; timeout ${TIMEOUT_SECS}s env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT=${NIX_PNPM_FETCH_TIMEOUT} nix build "${tmp}#node-test.${sanitized}" -L --impure --no-link --accept-flake-config --builders "" --print-out-paths ${flags}`;
+          const cmd = `set -euo pipefail; timeout ${TIMEOUT_SECS}s nix build "${tmp}#node-test.${sanitized}" -L --impure --no-link --accept-flake-config --builders "" --print-out-paths ${flags}`;
           return await $({
             stdio: "pipe",
+            env,
           })`bash --noprofile --norc -c ${cmd}`;
         })();
         const outPath =

@@ -133,6 +133,10 @@ test("scaf: new ts wasm-linking-app; build tinygo wasm; callAdd2() returns 5", a
       apiTargetsText.includes('link_closure = "transitive"'),
       'expected tinygo wasm target to set link_closure = "transitive"',
     );
+    await $({
+      cwd: tmp,
+      stdio: "inherit",
+    })`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
 
     const webappOut = await buckOutPath({
       tmp,

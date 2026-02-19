@@ -28,8 +28,9 @@ let
   liveFsRoot =
     let
       w = builtins.getEnv "WORKSPACE_ROOT";
+      t = builtins.getEnv "BUCK_TEST_SRC";
     in
-    if w != "" then (builtins.toPath w) else repoRoot;
+    if w != "" then (builtins.toPath w) else (if t != "" then (builtins.toPath t) else repoRoot);
 
   nodeMods = import ../node-modules.nix {
     inherit pkgs;

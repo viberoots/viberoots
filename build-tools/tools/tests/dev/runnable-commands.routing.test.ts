@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers.ts";
 
-test("r routes to run.prod", async () => {
+test("p routes to run.prod", async () => {
   await runInTemp("runnable-routes-prod", async (tmp, $) => {
     const outPath = path.join(tmp, "buck-out", "tmp", "runnable-out");
     await fsp.mkdir(path.join(outPath, "bin"), { recursive: true });
@@ -43,7 +43,7 @@ test("r routes to run.prod", async () => {
         ...process.env,
         RUNNABLE_TEST_MANIFEST: manifestPath,
       },
-    })`build-tools/tools/bin/r //projects/apps/demo:demo`;
+    })`build-tools/tools/bin/p //projects/apps/demo:demo`;
     assert.match(String(stdout || ""), /prod-ok/);
   });
 });
@@ -151,7 +151,7 @@ test("d routes to run.dev and fails clearly when unavailable", async () => {
         ...process.env,
         RUNNABLE_TEST_MANIFEST: libraryManifestPath,
       },
-    })`build-tools/tools/bin/r //projects/libs/core:core`;
+    })`build-tools/tools/bin/p //projects/libs/core:core`;
     assert.notEqual(libraryRun.exitCode, 0);
     assert.match(String(libraryRun.stderr || ""), /library-only/);
   });

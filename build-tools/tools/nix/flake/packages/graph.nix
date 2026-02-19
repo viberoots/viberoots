@@ -1,4 +1,4 @@
-{ pkgs, repoSnapshot, uv2nixLib, repoRoot }:
+{ pkgs, repoSnapshot, uv2nixLib, repoRoot, nodeMods }:
 let
   graphGen =
     let
@@ -10,6 +10,7 @@ let
     pkgs.callPackage ../../graph-generator.nix {
       inherit pkgs;
       src = repoSnapshot;
+      nodeMods = nodeMods;
       graphJsonPath = graphArg;
       rootModulesTomlPath =
         let
@@ -34,6 +35,7 @@ let
   graphGenPure = pkgs.callPackage ../../graph-generator.nix {
     inherit pkgs;
     src = repoSnapshot;
+    nodeMods = nodeMods;
     graphJsonPath =
       let
         envGraph = builtins.getEnv "BUCK_GRAPH_JSON";

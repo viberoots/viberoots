@@ -4,6 +4,7 @@ import "zx/globals";
 import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const.ts";
 import { inferRunnableFromOutPath } from "../../lib/runnables.ts";
 import { nodeBin, zxNodeBase } from "./paths.ts";
+import { runNixBuildWithProgress } from "../run-runnable-nix.ts";
 
 function materializeTimeoutSec(): number {
   const raw = String(process.env.BNX_MATERIALIZE_TIMEOUT_SEC || "").trim();
@@ -15,26 +16,22 @@ function materializeTimeoutSec(): number {
 async function nixBuildPrintOutPaths(opts: {
   root: string;
   env: Record<string, string>;
-  args: string;
+  args: string[];
   label: string;
 }): Promise<string> {
-  const tout = materializeTimeoutSec();
-  const res = await $({
-    stdio: "pipe",
-    cwd: opts.root,
-    env: opts.env,
-    nothrow: true,
-  })`bash --noprofile --norc -c ${`set -euo pipefail; if ! command -v timeout >/dev/null 2>&1; then echo "dev-build materialize: timeout not found on PATH" 1>&2; exit 127; fi; timeout -k 5s ${tout}s nix build ${opts.args}`}`;
-  if (res.exitCode === 0) return String(res.stdout || "");
-  const stderr = String(res.stderr || "").trim();
-  if (res.exitCode === 124) {
-    throw new Error(
-      `[dev-build] ${opts.label} timed out after ${tout}s while running: nix build ${opts.args}\n${stderr}`,
-    );
+  const prev = process.env.BNX_RUNNABLE_BUILD_TIMEOUT_SEC;
+  process.env.BNX_RUNNABLE_BUILD_TIMEOUT_SEC = String(materializeTimeoutSec());
+  try {
+    return await runNixBuildWithProgress({
+      workspaceRoot: opts.root,
+      env: opts.env,
+      args: opts.args,
+      label: opts.label,
+    });
+  } finally {
+    if (typeof prev === "string") process.env.BNX_RUNNABLE_BUILD_TIMEOUT_SEC = prev;
+    else delete process.env.BNX_RUNNABLE_BUILD_TIMEOUT_SEC;
   }
-  throw new Error(
-    `[dev-build] ${opts.label} failed (exit ${res.exitCode}) while running: nix build ${opts.args}\n${stderr}`,
-  );
 }
 
 async function listBinArtifacts(outPath: string): Promise<string[]> {
@@ -114,7 +111,17 @@ export async function maybePrintImpureMaterializedBins(opts: {
             BUCK_GRAPH_JSON: graphPath,
             BUCK_TARGET: sel,
           } as Record<string, string>,
-          args: "--impure .#graph-generator-selected --accept-flake-config --print-out-paths",
+          args: [
+            "--impure",
+            "--no-write-lock-file",
+            "--option",
+            "eval-cache",
+            "false",
+            ".#graph-generator-selected",
+            "--accept-flake-config",
+            "--print-out-paths",
+            "-L",
+          ],
           label: `impure materialize selected target ${sel}`,
         });
         const outPath =

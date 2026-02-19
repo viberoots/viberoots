@@ -55,7 +55,7 @@ Python provider sync activation in sparse/partial clones is lockfile‑driven: t
   - `nix build .#graph-generator`
 - Repo wrappers (preferred; thin shims that delegate into TypeScript and ensure the dev shell is loaded):
   - `i` (install deps), `b` (build), `v` (verify / full test suite)
-  - `r` (run runnable target in `run.prod` mode), `d` (run runnable target in `run.dev` mode when available)
+- `p` (run runnable target in `run.prod` mode), `d` (run runnable target in `run.dev` mode when available)
   - `v` includes a preflight run of the nix-gaps inventory/exception policy checker and fails fast on drift.
 
 ### 4. When `v` is slow (performance regression workflow)

@@ -119,19 +119,6 @@ export async function materializePureGraphIfEnabled(opts: {
     BUCK_GRAPH_JSON: path.join(opts.root, DEFAULT_GRAPH_PATH),
   } as any;
 
-  const graphOut = await nixBuildPrintOutPaths({
-    root: opts.root,
-    env: envPure as Record<string, string>,
-    args: "--impure --no-write-lock-file .#buck-graph --no-link --accept-flake-config --print-out-paths",
-    label: "materialize buck-graph",
-  });
-  const graphStore = String(graphOut || "")
-    .trim()
-    .split("\n")
-    .filter(Boolean)
-    .pop();
-  if (!graphStore) throw new Error("failed to build .#buck-graph");
-
   const specific = extractSpecificTargets(opts.restArgs || []);
   if (specific.length > 0) {
     console.log("Materializing selected targets (pure):");

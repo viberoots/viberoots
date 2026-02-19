@@ -6,7 +6,7 @@ let
   repoSnapshot = builtins.path { path = filterRepo repoRoot; name = "repo"; };
 
   importers = import ./importers.nix { inherit lib filterRepo repoSnapshot repoRoot; };
-  graph = import ./graph.nix { inherit pkgs repoSnapshot uv2nixLib repoRoot; };
+  graph = import ./graph.nix { inherit pkgs repoSnapshot uv2nixLib repoRoot nodeMods; };
 
   nodeModsPkgs = import ./node-mods.nix {
     inherit nodeMods;

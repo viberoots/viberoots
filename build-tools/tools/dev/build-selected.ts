@@ -119,7 +119,7 @@ async function main() {
     env: sanitizedEnv,
     reject: false,
     nothrow: true,
-  })`nix build --impure ${workspaceRoot}#graph-generator-selected --accept-flake-config --print-out-paths ${nixTrace}`;
+  })`nix build --impure --no-write-lock-file --option eval-cache false ${workspaceRoot}#graph-generator-selected --accept-flake-config --print-out-paths ${nixTrace}`;
   if (exitCode !== 0) {
     console.error(
       "[build-selected] nix build failed.\n" +

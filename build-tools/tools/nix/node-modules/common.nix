@@ -15,66 +15,77 @@ let
 
   dirnameOf = p: let parts = lib.splitString "/" p; in lib.concatStringsSep "/" (lib.take (lib.length parts - 1) parts);
 
-  # Minimal importer-scoped source snapshot (pure): include only importer dir and lockfile.
+  # Minimal importer-scoped source snapshot:
+  # copy only importer package.json/.npmrc plus lockfile/workspace metadata.
   # Prefer the flake snapshot (repoRoot); when the importer exists only in a live temp workspace,
   # fall back to repoFsRoot so temp importers (e.g., scaffolded tests) are visible.
   importerOnlySrc = { importerDir, lockfilePath }:
     let
       srcBase =
         let
-          importerPathStore = repoRoot + ("/" + importerDir);
-          importerPathLive = repoFsRoot + ("/" + importerDir);
+          storeRootStr = builtins.toString repoRoot;
+          liveRootStr = builtins.toString repoFsRoot;
+          importerPathStore = storeRootStr + "/" + importerDir;
+          importerPathLive = liveRootStr + "/" + importerDir;
           haveStore = builtins.pathExists importerPathStore;
           haveLive = builtins.pathExists importerPathLive;
-          lockPathStore = repoRoot + ("/" + lockfilePath);
-          lockPathLive = repoFsRoot + ("/" + lockfilePath);
+          lockPathStore = storeRootStr + "/" + lockfilePath;
+          lockPathLive = liveRootStr + "/" + lockfilePath;
           haveLockStore = builtins.pathExists lockPathStore;
           haveLockLive = builtins.pathExists lockPathLive;
         in if haveLive && haveLockLive && (!haveLockStore) then repoFsRoot else (if haveStore || !haveLive then repoRoot else repoFsRoot);
       genAllowed = (builtins.getEnv "NIX_PNPM_ALLOW_GENERATE") == "1";
-      haveImporterLock = builtins.pathExists (srcBase + ("/" + importerDir + "/pnpm-lock.yaml"));
+      srcBaseStr = builtins.toString srcBase;
+      haveImporterLock = builtins.pathExists (srcBaseStr + "/" + importerDir + "/pnpm-lock.yaml");
       ignoreImporterLock = genAllowed && (!haveImporterLock);
-    in pkgs.lib.cleanSourceWith {
-      src = srcBase;
-      filter = path: type:
-        let
-          p = builtins.toString path;
-          rel = lib.removePrefix ((builtins.toString srcBase) + "/") p;
-          impPrefix = importerDir + "/";
-          lockDir = dirnameOf lockfilePath;
-          lockPrefix = if lockDir == "" then "" else (lockDir + "/");
-          # Helper: does REL start with prefix S?
-          relHasPrefix = s: lib.hasPrefix s rel;
-          # Helper: is REL a parent of importerDir? i.e. REL is a prefix of impPrefix
-          isParentOfImporter = lib.hasPrefix rel impPrefix;
-          # Helper: is REL a parent of lockDir?
-          isParentOfLock = lockPrefix != "" && lib.hasPrefix rel lockPrefix;
-          # Exclude any vendor artifacts to keep derivations stable and cached
-          # - Always ignore paths under importerDir/node_modules and importerDir/.pnpm
-          # - When importerDir is the repo root ("."), also ignore top-level node_modules/.pnpm
-          isVendorPath =
-            (relHasPrefix (impPrefix + "node_modules") || relHasPrefix (impPrefix + ".pnpm")) ||
-            (importerDir == "." && (relHasPrefix "node_modules" || relHasPrefix ".pnpm"));
-          # Detect importer-local lockfile path
-          isImporterLock = (type != "directory") && (rel == (impPrefix + "pnpm-lock.yaml"));
-        in
-        (
-          # Always include parent directories so traversal reaches importerDir/lockDir
-          (type == "directory" && (rel == importerDir || relHasPrefix impPrefix || isParentOfImporter || (lockPrefix != "" && (rel == lockDir || relHasPrefix lockPrefix || isParentOfLock))))
-          # Include only the minimal files under importerDir required for pnpm:
-          # - package.json (project manifest)
-          # - optional .npmrc (per-importer config)
-          || ((type != "directory") && (rel == (impPrefix + "package.json") || rel == (impPrefix + ".npmrc")))
-          # Special-case root importer: include top-level package.json so pnpm sees a project
-          || (importerDir == "." && type != "directory" && rel == "package.json")
-          # Include lockfile and files under its dir; special-case root lockfile
-          || ((lockPrefix == "" && type != "directory" && rel == lockfilePath) || (lockPrefix != "" && ((type != "directory" && (rel == lockfilePath || relHasPrefix lockPrefix)))))
-          # Top-level files sometimes consulted by pnpm
-          || (builtins.match "^pnpm-workspace\\.yaml$" rel != null)
-          || (builtins.match "^\\.npmrc$" rel != null)
-          # Do not include any unrelated root lockfiles; importer derivations must not fall back implicitly
-        ) && (!isVendorPath) && (!ignoreImporterLock || !isImporterLock);
-    };
+      impPkgJson = srcBaseStr + "/" + importerDir + "/package.json";
+      impNpmrc = srcBaseStr + "/" + importerDir + "/.npmrc";
+      impLock = srcBaseStr + "/" + importerDir + "/pnpm-lock.yaml";
+      wantedLock = srcBaseStr + "/" + lockfilePath;
+      wsNpmrc = srcBaseStr + "/.npmrc";
+      wsPnpmWs = srcBaseStr + "/pnpm-workspace.yaml";
+      lockDir = dirnameOf lockfilePath;
+    in pkgs.runCommand "importer-src-${sanitizeName importerDir}" {} ''
+      set -euo pipefail
+      mkdir -p "$out"
+      copy_file() {
+        src="$1"
+        dst="$2"
+        mkdir -p "$(dirname "$dst")"
+        cat "$src" > "$dst"
+      }
+      if [ "${importerDir}" = "." ]; then
+        imp_out_dir="$out"
+      else
+        imp_out_dir="$out/${importerDir}"
+        mkdir -p "$imp_out_dir"
+      fi
+
+      if [ -f ${builtins.toJSON impPkgJson} ]; then
+        copy_file ${builtins.toJSON impPkgJson} "$imp_out_dir/package.json"
+      fi
+      if [ -f ${builtins.toJSON impNpmrc} ]; then
+        copy_file ${builtins.toJSON impNpmrc} "$imp_out_dir/.npmrc"
+      fi
+
+      # Include only the requested lockfile path, unless generation mode intentionally
+      # ignores a missing importer-local lockfile.
+      if [ -n "${lockDir}" ]; then
+        mkdir -p "$out/${lockDir}"
+      fi
+      if [ "${if ignoreImporterLock then "1" else "0"}" != "1" ] && [ -f ${builtins.toJSON wantedLock} ]; then
+        copy_file ${builtins.toJSON wantedLock} "$out/${lockfilePath}"
+      elif [ "${if ignoreImporterLock then "1" else "0"}" != "1" ] && [ -f ${builtins.toJSON impLock} ]; then
+        copy_file ${builtins.toJSON impLock} "$out/${lockfilePath}"
+      fi
+
+      if [ -f ${builtins.toJSON wsPnpmWs} ]; then
+        copy_file ${builtins.toJSON wsPnpmWs} "$out/pnpm-workspace.yaml"
+      fi
+      if [ -f ${builtins.toJSON wsNpmrc} ]; then
+        copy_file ${builtins.toJSON wsNpmrc} "$out/.npmrc"
+      fi
+    '';
 in {
   inherit lib sanitizeName placeholderDigest hashMap dirnameOf importerOnlySrc repoRoot repoFsRoot prefetchedStorePathGlobal;
 }

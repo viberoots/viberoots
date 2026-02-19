@@ -34,11 +34,30 @@ let
           let repoRoot = cwd;
           for (let i = 0; i < levels; i++) repoRoot = path.dirname(repoRoot);
           const nodeModules = path.join(cwd, "node_modules");
+          const safeLinkDir = (target, linkPath) => {
+            try {
+              if (fs.existsSync(linkPath)) fs.rmSync(linkPath, { recursive: true, force: true });
+            } catch {}
+            try {
+              fs.symlinkSync(target, linkPath, "dir");
+            } catch (e) {
+              if (e && e.code === "EEXIST") {
+                // Defensive retry for transient races on darwin filesystems.
+                try {
+                  fs.rmSync(linkPath, { recursive: true, force: true });
+                } catch {}
+                fs.symlinkSync(target, linkPath, "dir");
+                return;
+              }
+              throw e;
+            }
+          };
           let storeLinked = 0;
           if (storeRoot && fs.existsSync(storeRoot)) {
             const entries = fs.readdirSync(storeRoot, { withFileTypes: true });
             for (const ent of entries) {
               const name = ent.name;
+              if (name === ".bin") continue;
               if (name.startsWith("@")) {
                 const scopeStore = path.join(storeRoot, name);
                 const scopeDir = path.join(nodeModules, name);
@@ -52,20 +71,14 @@ let
                 for (const pkg of scoped) {
                   const target = path.join(scopeStore, pkg.name);
                   const linkPath = path.join(scopeDir, pkg.name);
-                  try {
-                    fs.rmSync(linkPath, { recursive: true, force: true });
-                  } catch {}
-                  fs.symlinkSync(target, linkPath, "dir");
+                  safeLinkDir(target, linkPath);
                   storeLinked++;
                 }
                 continue;
               }
               const target = path.join(storeRoot, name);
               const linkPath = path.join(nodeModules, name);
-              try {
-                fs.rmSync(linkPath, { recursive: true, force: true });
-              } catch {}
-              fs.symlinkSync(target, linkPath, "dir");
+              safeLinkDir(target, linkPath);
               storeLinked++;
             }
           }

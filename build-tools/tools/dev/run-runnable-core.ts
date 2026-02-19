@@ -1,0 +1,86 @@
+import { spawn } from "node:child_process";
+import * as fsp from "node:fs/promises";
+import path from "node:path";
+import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
+import { normalizeTargetLabel, parseLockfileLabel } from "../lib/labels.ts";
+import {
+  findRunnableEntryForTarget,
+  readRunnableManifest,
+  type RunnableManifestEntry,
+} from "../lib/runnables.ts";
+
+export function parseArgs(argv: string[]): {
+  mode: "prod" | "dev";
+  target: string;
+  passthrough: string[];
+} {
+  let mode: "prod" | "dev" = "prod";
+  const rest: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    const tok = String(argv[i] || "");
+    if (tok === "--mode" && i + 1 < argv.length) {
+      const m = String(argv[i + 1] || "").trim();
+      if (m === "prod" || m === "dev") mode = m;
+      i++;
+      continue;
+    }
+    if (tok.startsWith("--mode=")) {
+      const m = tok.slice("--mode=".length).trim();
+      if (m === "prod" || m === "dev") mode = m;
+      continue;
+    }
+    rest.push(tok);
+  }
+  const target = String(rest[0] || "").trim();
+  return { mode, target, passthrough: rest.slice(1) };
+}
+
+export async function importerForTarget(workspaceRoot: string, target: string): Promise<string> {
+  try {
+    const graphTxt = await fsp.readFile(path.join(workspaceRoot, DEFAULT_GRAPH_PATH), "utf8");
+    const raw = JSON.parse(graphTxt);
+    const nodes = Array.isArray(raw) ? raw : Array.isArray(raw?.nodes) ? raw.nodes : [];
+    const want = normalizeTargetLabel(target);
+    for (const n of nodes) {
+      const name = normalizeTargetLabel(String(n?.name || ""));
+      if (name !== want) continue;
+      const labels = Array.isArray(n?.labels) ? n.labels : [];
+      for (const label of labels) {
+        const parsed = parseLockfileLabel(String(label || ""));
+        if (parsed?.importer) return parsed.importer;
+      }
+      return "";
+    }
+  } catch {}
+  return "";
+}
+
+export async function readManifestEntry(
+  manifestPath: string,
+  target: string,
+): Promise<RunnableManifestEntry | null> {
+  try {
+    const entries = await readRunnableManifest(manifestPath);
+    return findRunnableEntryForTarget(entries, target);
+  } catch {
+    return null;
+  }
+}
+
+export async function runCommand(argv: string[], extra: string[], cwd?: string): Promise<number> {
+  const cmd = String(argv[0] || "").trim();
+  if (!cmd) return 2;
+  const args = [...argv.slice(1), ...extra];
+  const child = spawn(cmd, args, {
+    cwd: cwd || process.cwd(),
+    stdio: "inherit",
+    env: process.env,
+  });
+  return await new Promise<number>((resolve) => {
+    child.once("close", (code, signal) => {
+      if (typeof code === "number") resolve(code);
+      else resolve(signal ? 130 : 1);
+    });
+    child.once("error", () => resolve(1));
+  });
+}

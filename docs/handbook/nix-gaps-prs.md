@@ -1664,7 +1664,7 @@ Implement.
 
 ---
 
-## PR-28: Generic runnable-target contract and DX commands (`r`/`d`)
+## PR-28: Generic runnable-target contract and DX commands (`p`/`d`)
 
 ### Description
 
@@ -1679,7 +1679,7 @@ This PR defines and wires a single model for "what can be run" after build:
 
 It also introduces short developer commands:
 
-- `r` for runnable production-mode execution.
+- `p` for runnable production-mode execution.
 - `d` for runnable development-mode execution.
 
 ### Scope & Changes
@@ -1693,19 +1693,22 @@ It also introduces short developer commands:
   - referenced build artifacts (for example `bin`, `dist`, bundle paths).
 - Explicitly exclude library-only targets from runnable contract emission:
   - library targets remain build artifacts, not runnable entries,
-  - runnable listing and `r`/`d` resolution must include only non-library targets that declare a
+  - runnable listing and `p`/`d` resolution must include only non-library targets that declare a
     runnable contract.
 - Update materialization/reporting UX so post-build output always prints runnable targets:
   - Replace or augment `Materialized binaries:` / `no bins found` messaging with
     `Runnable targets:` summary.
   - Ensure non-binary runnable targets (for example webapps with `dist`) are listed clearly.
 - Add command routing:
-  - `r <target>` resolves and executes `run.prod`.
+  - `p <target>` resolves and executes `run.prod`.
   - `d <target>` resolves and executes `run.dev` when available, with clear error/help if missing.
   - Keep existing long-form command path behavior intact for compatibility.
+- External callers importing `build-tools/tools/nix/graph-generator.nix` directly should pass
+  `nodeMods` from per-system context to keep selected-target eval deterministic; when omitted, planner
+  Node path uses a compatibility fallback import.
 - Keep verify/CI isolation and correctness semantics unchanged:
   - `v` and CI stage flows must not implicitly switch to `run.dev` behavior,
-  - runnable UX changes apply to developer run commands (`r`/`d` and long-form equivalents), not to
+  - runnable UX changes apply to developer run commands (`p`/`d` and long-form equivalents), not to
     verify/CI execution contracts.
 - Keep interpreter-run contracts explicit (no fake executable coercion):
   - script targets run via declared interpreter/argv contract,
@@ -1719,13 +1722,13 @@ It also introduces short developer commands:
   - interpreter-script target,
   - webapp target.
 - Add command-routing tests for:
-  - `r` dispatch to `run.prod`,
+  - `p` dispatch to `run.prod`,
   - `d` dispatch to `run.dev`,
   - deterministic failure/help text when requested mode is unavailable.
 - Add regression tests proving webapp/script targets are discoverable as runnable even when
   `bin/` is empty.
 - Add regression tests proving library targets are not emitted in runnable listings and cannot be
-  executed through `r`/`d`.
+  executed through `p`/`d`.
 
 ### Docs (in this PR)
 
@@ -1736,7 +1739,7 @@ It also introduces short developer commands:
   library targets remain non-runnable.
 - Update `docs/handbook/nix-gaps.md`/related run guidance to reference runnable-target reporting,
   not binaries-only language.
-- Update contributor workflow docs (`TESTING.md` and command references) with `r` and `d` usage.
+- Update contributor workflow docs (`TESTING.md` and command references) with `p` and `d` usage.
 
 ### Test runtime controls used
 
@@ -1748,16 +1751,16 @@ It also introduces short developer commands:
 
 - Added runnable-contract manifest fields (`runnable.kind`, `run.prod`, optional `run.dev`, artifacts) while preserving legacy `bins`.
 - Updated materialization output to report `Runnable targets:` instead of binaries-only messaging.
-- Added `r`/`d` command wrappers and route tests for prod/dev dispatch and missing dev-mode contract failures.
+- Added `p`/`d` command wrappers and route tests for prod/dev dispatch and missing dev-mode contract failures.
 
 ### Acceptance Criteria
 
 - After build/materialization, output includes a runnable-target listing (not binaries-only).
 - Runnable listing includes non-binary app targets (for example webapps and interpreter-run apps).
-- `r` and `d` commands resolve runnable targets through manifest contracts and execute the correct
+- `p` and `d` commands resolve runnable targets through manifest contracts and execute the correct
   mode (`run.prod`/`run.dev`).
 - Existing native binary behavior remains compatible and deterministic.
-- Library targets are never surfaced as runnable targets and `r`/`d` reject them with clear errors.
+- Library targets are never surfaced as runnable targets and `p`/`d` reject them with clear errors.
 - Verify/CI behavior remains strict and isolation-safe, with no implicit adoption of dev-mode run
   semantics.
 - Tests fail on regression to binaries-only discovery/reporting.

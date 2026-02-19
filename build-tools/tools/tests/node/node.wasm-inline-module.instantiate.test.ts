@@ -120,6 +120,10 @@ node_wasm_inline_module(
 )
 `,
         );
+        await $({
+          cwd: tmp,
+          stdio: "inherit",
+        })`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
 
         const build = await $({
           cwd: tmp,

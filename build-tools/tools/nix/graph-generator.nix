@@ -1,4 +1,4 @@
-{ pkgs, src ? ../../., graphJsonPath ? null, rootModulesTomlPath ? null, uv2nixLib ? null }:
+{ pkgs, src ? ../../., graphJsonPath ? null, rootModulesTomlPath ? null, uv2nixLib ? null, nodeMods ? null }:
 let
   lib = pkgs.lib;
   H = import ./lib/lang-helpers.nix { inherit pkgs; };
@@ -8,6 +8,7 @@ let
   repoRootBase = builtins.toPath repoRootStr;
   traceEnabled = (builtins.getEnv "PLANNER_TRACE") != "";
   onlyCpp = (builtins.getEnv "PLANNER_ONLY_CPP") != "";
+  selectedTargetName = builtins.getEnv "BUCK_TARGET";
   # Filtered source that includes both projects/apps/* and projects/libs/* so local replaces resolve
   appsLibsSrc = lib.cleanSourceWith {
     src = repoRootBase;
@@ -73,10 +74,12 @@ let
   # so zx tests that rsync a temp repo can provide cpp enablement without requiring
   # the main flake workspace to also include those files.
   manifestBase =
-    let candidate = builtins.toPath (repoRootStr + "/build-tools/tools/nix"); in
-      if (builtins.pathExists candidate) && (builtins.pathExists (candidate + "/lang-templates.nix"))
-      then candidate
-      else ./.;
+    if selectedTargetName != "" then ./. else
+      let candidate = builtins.toPath (repoRootStr + "/build-tools/tools/nix"); in
+        if (builtins.pathExists candidate) && (builtins.pathExists (candidate + "/lang-templates.nix"))
+        then candidate
+        else ./.;
+  repoStoreRoot = ./../../..;
   # Load language templates from the chosen manifest base (temp repo when set)
   T = import (manifestBase + "/lang-templates.nix") { inherit pkgs uv2nixLib; };
   M = if builtins.pathExists ./mapping.nix then (
@@ -130,6 +133,9 @@ let
   # Build planner context and import language plugins if present
   ctx = {
     inherit lib T repoRoot repoRootStr localModuleOverrides pkgPathOf pkgs;
+    repoSnapshot = src;
+    repoStoreRoot = repoStoreRoot;
+    nodeMods = nodeMods;
     # Provide full nodes list so language plugins (e.g., C++) can walk deps
     nodes = nodesList;
     get = get;
@@ -246,7 +252,8 @@ let
         ) nodesList;
         nodeKindOf = n: LANGS.node.kindOf n;
         mkNode = name: kind:
-          if (kind == "bin") then LANGS.node.mkBin name
+          if (kind == "webapp") then LANGS.node.mkWebapp name
+          else if (kind == "bin") then LANGS.node.mkBin name
           else if (kind == "lib") then LANGS.node.mkLib name
           else if (kind == "gen") then LANGS.node.mkGen name
           else LANGS.node.mkApp name;
@@ -258,7 +265,7 @@ let
           let nms = builtins.filter (x: ensureFullLabel x == nm) safeNodeNodes;
               n = if nms == [] then null else builtins.head nms;
               k = if n == null then null else nodeKindOf n;
-          in k != null && (k == "bin" || k == "app")
+          in k != null && (k == "bin" || k == "app" || k == "webapp")
         ) (builtins.attrNames nodeTargetsFromGraph);
       in builtins.listToAttrs (map (nm: { name = nm; value = nodeTargetsFromGraph.${nm}; }) nodeRunnableNames)
     );
@@ -326,12 +333,23 @@ let
   );
 
   # Optional: select a single target by BUCK_TARGET for impure local builds/tests
-  selectedTargetName = builtins.getEnv "BUCK_TARGET";
   stripLeadingDoubleSlash = s: if lib.hasPrefix "//" s then lib.removePrefix "//" s else s;
   normalizedTargetKeyFromString = s:
     stripLeadingDoubleSlash (H.normalizeTargetLabel (ensureFullLabel { name = s; }));
   normalizedTargetKeyFromNode = n:
     stripLeadingDoubleSlash (H.normalizeTargetLabel (ensureFullLabel n));
+  labelsOf = n:
+    let ls = get n "labels";
+    in if ls != null && builtins.isList ls then ls else [];
+  templateFromLabels = n:
+    let ls = labelsOf n;
+    in
+      if builtins.elem "lang:node" ls then "node"
+      else if builtins.elem "lang:go" ls then "go"
+      else if builtins.elem "lang:python" ls then "python"
+      else if builtins.elem "lang:rust" ls then "rust"
+      else if builtins.elem "lang:cpp" ls then "cpp"
+      else null;
   selected = if selectedTargetName != "" then (
     let want = normalizedTargetKeyFromString selectedTargetName; in
       if onlyCpp then (
@@ -371,7 +389,26 @@ let
         '' else (
           let
             n = builtins.head matches;
-            k = pick n;
+            rt = get n "rule_type";
+            hasDispatch = (rt != null) && builtins.hasAttr rt D;
+            hintedTemplate = templateFromLabels n;
+            adapterFor = template:
+              if template == "go" then (import (manifestBase + "/planner/go.nix") { inherit lib; } ctx)
+              else if template == "node" then (import (manifestBase + "/planner/node.nix") { inherit lib; } ctx)
+              else if template == "python" then (import (manifestBase + "/planner/python.nix") { inherit lib; } ctx)
+              else if template == "rust" then (import (manifestBase + "/planner/rust.nix") { inherit lib; } ctx)
+              else (import (manifestBase + "/planner/cpp.nix") { inherit lib; } ctx);
+            dispatchK = if hasDispatch then D.${rt} else null;
+            selectedTemplate =
+              if hasDispatch then (dispatchK.template or null)
+              else hintedTemplate;
+            selectedKind =
+              if selectedTemplate == null then null
+              else (adapterFor selectedTemplate).kindOf n;
+            k =
+              if hasDispatch then dispatchK
+              else if selectedTemplate != null then { template = selectedTemplate; kind = selectedKind; }
+              else pick n;
             buildLabel = H.normalizeTargetLabel (ensureFullLabel n);
           in
             if k == null then pkgs.runCommand "missing-kind-${sanitize selectedTargetName}" {} ''
@@ -379,39 +416,45 @@ let
               exit 1
             '' else (
               if k.template == "go" then (
-              if k.kind == "bin" then LANGS.go.mkApp buildLabel
-              else if k.kind == "lib" then LANGS.go.mkLib buildLabel
-              else if k.kind == "test" then LANGS.go.mkTest buildLabel
-              else if k.kind == "carchive" then LANGS.go.mkCArchive buildLabel
-              else if (k.kind == "tinywasm") then LANGS.go.mkTinyWasm buildLabel
-              else LANGS.go.mkApp buildLabel
+              let A = adapterFor "go"; in
+              if k.kind == "bin" then A.mkApp buildLabel
+              else if k.kind == "lib" then A.mkLib buildLabel
+              else if k.kind == "test" then A.mkTest buildLabel
+              else if k.kind == "carchive" then A.mkCArchive buildLabel
+              else if (k.kind == "tinywasm") then A.mkTinyWasm buildLabel
+              else A.mkApp buildLabel
               ) else if k.template == "node" then (
-                if k.kind == "bin" then LANGS.node.mkBin buildLabel
-                else if k.kind == "lib" then LANGS.node.mkLib buildLabel
-                else if k.kind == "gen" then LANGS.node.mkGen buildLabel
-                else LANGS.node.mkApp buildLabel
+                let A = adapterFor "node"; in
+                if k.kind == "webapp" then A.mkWebapp buildLabel
+                else if k.kind == "bin" then A.mkBin buildLabel
+                else if k.kind == "lib" then A.mkLib buildLabel
+                else if k.kind == "gen" then A.mkGen buildLabel
+                else A.mkApp buildLabel
               ) else if k.template == "python" then (
+                let A = adapterFor "python"; in
                 if (k.kind == "wasm") then
                   let
                     labs = get n "labels";
                     hasWasmLib = (labs != null) && (builtins.isList labs) && (builtins.elem "wasm:lib" labs);
-                  in if hasWasmLib then LANGS.python.mkWasmLib buildLabel else LANGS.python.mkWasmApp buildLabel
-                else if (k.kind == "pyext") then LANGS.python.mkPyExt buildLabel
-                else if (k.kind == "pyext_wasm") then LANGS.python.mkPyExtWasm buildLabel
-                else if (k.kind == "test") then LANGS.python.mkTest buildLabel
-                else if (k.kind == "bin") then LANGS.python.mkApp buildLabel
-                else if (k.kind == "lib") then LANGS.python.mkLib buildLabel
-                else LANGS.python.mkLib buildLabel
+                  in if hasWasmLib then A.mkWasmLib buildLabel else A.mkWasmApp buildLabel
+                else if (k.kind == "pyext") then A.mkPyExt buildLabel
+                else if (k.kind == "pyext_wasm") then A.mkPyExtWasm buildLabel
+                else if (k.kind == "test") then A.mkTest buildLabel
+                else if (k.kind == "bin") then A.mkApp buildLabel
+                else if (k.kind == "lib") then A.mkLib buildLabel
+                else A.mkLib buildLabel
               ) else if k.template == "rust" then (
-                if k.kind == "bin" then LANGS.rust.mkApp buildLabel
-                else LANGS.rust.mkLib buildLabel
+                let A = adapterFor "rust"; in
+                if k.kind == "bin" then A.mkApp buildLabel
+                else A.mkLib buildLabel
               ) else (
-                if k.kind == "bin" then LANGS.cpp.mkApp buildLabel
-                else if k.kind == "headers" then LANGS.cpp.mkHeaders buildLabel
-                else if k.kind == "lib" then LANGS.cpp.mkLib buildLabel
-                else if k.kind == "test" then LANGS.cpp.mkTest buildLabel
-                else if k.kind == "addon" then LANGS.cpp.mkAddon buildLabel
-                else LANGS.cpp.mkApp buildLabel
+                let A = adapterFor "cpp"; in
+                if k.kind == "bin" then A.mkApp buildLabel
+                else if k.kind == "headers" then A.mkHeaders buildLabel
+                else if k.kind == "lib" then A.mkLib buildLabel
+                else if k.kind == "test" then A.mkTest buildLabel
+                else if k.kind == "addon" then A.mkAddon buildLabel
+                else A.mkApp buildLabel
               )
             )
         )
