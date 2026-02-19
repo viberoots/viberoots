@@ -181,7 +181,24 @@ function parseEtimeToSec(raw: string): number {
   return days * 86400 + h * 3600 + m * 60 + sec;
 }
 
-function findCompetingNodeModulesBuilds(attr: string): CompetingBuild[] {
+function scopeHintsForFlakeRef(flakeRefBase: string): string[] {
+  const raw = String(flakeRefBase || "").trim();
+  if (!raw) return [];
+  if (raw.startsWith("path:")) {
+    const p = raw.slice("path:".length).trim();
+    if (!p) return [raw];
+    return [raw, p];
+  }
+  return [raw];
+}
+
+function commandMatchesScope(cmd: string, flakeRefBase: string): boolean {
+  const hints = scopeHintsForFlakeRef(flakeRefBase);
+  if (hints.length === 0) return true;
+  return hints.some((h) => cmd.includes(`${h}#`) || cmd.includes(h));
+}
+
+function findCompetingNodeModulesBuilds(attr: string, flakeRefBase: string): CompetingBuild[] {
   const out = spawnSync("ps", ["-axo", "pid=,etime=,command="], { encoding: "utf8" });
   if (out.status !== 0) return [];
   const self = Number(process.pid || 0);
@@ -199,20 +216,21 @@ function findCompetingNodeModulesBuilds(attr: string): CompetingBuild[] {
     if (!Number.isFinite(pid) || pid <= 0 || pid === self) continue;
     if (!cmd.includes("nix build")) continue;
     if (!cmd.includes(needle)) continue;
+    if (!commandMatchesScope(cmd, flakeRefBase)) continue;
     res.push({ pid, etimeSec, command: cmd });
   }
   return res;
 }
 
-export function failOnCompetingBuilds(attr: string): void {
-  const conflicts = findCompetingNodeModulesBuilds(attr);
+export function failOnCompetingBuilds(attr: string, flakeRefBase: string): void {
+  const conflicts = findCompetingNodeModulesBuilds(attr, flakeRefBase);
   if (conflicts.length > 0) {
     const sample = conflicts
       .slice(0, 3)
       .map((x) => `${x.pid}@${x.etimeSec}s`)
       .join(", ");
     throw new Error(
-      `[link-node] conflicting active nix build(s) for node-modules.${attr}: ${sample}. Resolve competing process(es) or retry after they finish.`,
+      `[link-node] conflicting active nix build(s) for node-modules.${attr} in scope '${flakeRefBase}': ${sample}. Resolve competing process(es) or retry after they finish.`,
     );
   }
 }

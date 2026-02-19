@@ -101,7 +101,7 @@ export async function relinkNodeModules(force: boolean) {
       if (gcPids.length > 0) {
         throw new Error(nixGcLockMessage("[link-node] nix build", gcPids));
       }
-      failOnCompetingBuilds(attr);
+      failOnCompetingBuilds(attr, buildFlakeRefBase);
       console.error(
         "[link-node] building nix attr",
         `node-modules.${attr}`,
