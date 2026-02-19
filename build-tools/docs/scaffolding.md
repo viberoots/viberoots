@@ -388,6 +388,26 @@ Related guidance lives in `build-tools/docs/wasm-node-linking.md`.
 - Golden tests: render a template into a temporary directory with fixed answers, then verify file tree and key file contents.
 - Update path: render with V1 of the template, then update with V2 and confirm expected changes.
 
+#### Template-test Buck conventions
+
+Template-owned tests are encoded directly in Buck metadata so selection can be driven from Buck query output.
+
+- Template id labels use `template:<language>/<template>` (for example `template:go/lib`).
+- Each template-owned test carries exactly one classification label:
+  - `template:smoke`
+  - `template:contract`
+  - `template:shared`
+- Each template-owned test declares explicit `template_inputs` that point to files under `build-tools/tools/scaffolding/templates/<language>/<template>/...`.
+- Conventions and the fixed template safety floor are defined in `build-tools/tools/tests/template_conventions.bzl`.
+
+Buck query example:
+
+```bash
+buck2 cquery //:scaffolding_go_lib_scaffold_and_build \
+  --output-attribute labels \
+  --output-attribute template_inputs
+```
+
 #### End-to-end testing without disturbing the source repository
 
 To exercise the full `scaf` flow safely while developing or augmenting scaffolding capabilities, run tests in an ephemeral copy of the repo:

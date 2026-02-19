@@ -126,9 +126,13 @@ def _zx_test_impl(ctx):
         "-c",
         run_and_report,
     ]
-    # Declare a tiny output to satisfy Buck's expectation of outputs
+    labels = ctx.attrs.labels or []
     stamp = ctx.actions.declare_output(ctx.attrs.out)
-    ctx.actions.write(stamp, "zx_test\n")
+    stamp_cmd = cmd_args(
+        ["bash", "-c", "echo zx_test > \"$1\"", "stamp", stamp.as_output()],
+        hidden = [ctx.attrs.script] + (ctx.attrs.template_inputs or []),
+    )
+    ctx.actions.run(stamp_cmd, category = "zx_test_stamp")
     return [
         DefaultInfo(
             default_output = stamp,
@@ -136,7 +140,7 @@ def _zx_test_impl(ctx):
         ExternalRunnerTestInfo(
             type = "custom",
             command = cmd,
-            labels = [],
+            labels = labels,
             contacts = [],
         ),
     ]
@@ -148,5 +152,7 @@ zx_test = rule(
         # Ensure a default output so Buck always recognizes an output artifact
         "out": attrs.string(default = "zx_test.stamp"),
         "test_rule_timeout_ms": attrs.option(attrs.int(), default = None),
+        "labels": attrs.list(attrs.string(), default = []),
+        "template_inputs": attrs.list(attrs.source(), default = []),
     },
 )
