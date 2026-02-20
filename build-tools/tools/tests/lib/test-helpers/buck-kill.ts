@@ -8,6 +8,8 @@ import {
   pidCmdline,
 } from "./buck-procs";
 
+const BUCK_KILL_TIMEOUT_MS = 1200;
+
 async function assertNoBuckForkserversUnderRepo(repoRoot: string, $: any): Promise<void> {
   const offenders = await forkserversUnderRepo(repoRoot, $);
   if (offenders.length > 0) {
@@ -70,15 +72,21 @@ export async function killBuckDaemonsForRepo(repoRoot: string, $: any): Promise<
   const isoDirs = await buckIsolationDirsForRepo(repoRoot);
   const want = new Set([...isoDirs, ...procIsos].filter(Boolean));
   if (want.size > 0 && procIsos.size > 0) {
-    for (const iso of procIsos) {
-      await $({
-        stdio: "ignore",
-        cwd: repoRoot,
-        reject: false,
-        nothrow: true,
-        timeout: 10_000,
-      })`buck2 --isolation-dir ${iso} kill`;
-    }
+    // Keep cleanup bounded: serial 10s buck2 kill calls can dominate test wall time
+    // when many temporary isolations are present in a single temp repo.
+    const killIsos = Array.from(procIsos);
+    await Promise.allSettled(
+      killIsos.map(
+        (iso) =>
+          $({
+            stdio: "ignore",
+            cwd: repoRoot,
+            reject: false,
+            nothrow: true,
+            timeout: BUCK_KILL_TIMEOUT_MS,
+          })`buck2 --isolation-dir ${iso} kill`,
+      ),
+    );
   }
   if (want.size > 0 && procs.length > 0) {
     for (const p of procs) {

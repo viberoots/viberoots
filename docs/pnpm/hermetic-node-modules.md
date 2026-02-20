@@ -28,7 +28,7 @@ This document captures the exact approach we use to make `node_modules` immutabl
 
 ### Dev shell marker and relink checks
 
-I write a marker at `buck-out/tmp/node-modules-link.json` when I link `node_modules` from the repo root. The marker stores the importer, lockfile path, lockfile hash, and Nix output path. On entry, I only trust the marker or an existing `node_modules` symlink. If the lockfile changes or the marker is missing, I skip linking. To refresh the link, I run `build-tools/tools/bin/i`.
+I write a marker at `buck-out/tmp/node-modules-link.root.json` when I link `node_modules` from the repo root. The marker stores the importer, lockfile path, lockfile hash, and Nix output path. On entry, I only trust the marker or an existing `node_modules` symlink. If the lockfile changes or the marker is missing, I skip linking. To refresh the link, I run `build-tools/tools/bin/i`.
 
 ---
 

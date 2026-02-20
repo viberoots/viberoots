@@ -96,7 +96,7 @@ async function main() {
   const lockAbs = lockRel ? path.join(repoRoot, lockRel) : "";
   const lockHash = lockAbs && (await pathExists(lockAbs)) ? await hashFile(lockAbs) : "";
 
-  const markerPath = path.join(repoRoot, "buck-out", "tmp", "node-modules-link.json");
+  const markerPath = path.join(repoRoot, "buck-out", "tmp", "node-modules-link.root.json");
   const marker = await readMarker(markerPath);
   const markerValid =
     lockRel &&

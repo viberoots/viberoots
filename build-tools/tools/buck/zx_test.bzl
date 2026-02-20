@@ -4,13 +4,17 @@ def _zx_test_impl(ctx):
     run_and_report = (
         (
             "export WORKSPACE_ROOT=\"${WORKSPACE_ROOT:-${BUCK_TEST_SRC:-$(pwd)}}\"; "
+            + "# Guard against accidental WORKSPACE_ROOT drift into a node_modules symlink path.\n"
+            + "if [ \"$(basename \"$WORKSPACE_ROOT\")\" = \"node_modules\" ] && [ -f \"$WORKSPACE_ROOT/../flake.nix\" ]; then "
+            + "  WORKSPACE_ROOT=\"$(cd \"$WORKSPACE_ROOT/..\" && pwd)\"; "
+            + "fi; "
             # Tests run under verify inside the dev shell, but Buck actions do not propagate IN_NIX_SHELL.
             # Many build-tools/tools/bin wrappers will re-exec via direnv when IN_NIX_SHELL is unset, which breaks
             # in tests that set HOME to a temp dir (direnv treats the repo .envrc as "blocked").
             + "export IN_NIX_SHELL=\"${IN_NIX_SHELL:-1}\"; "
             + "ORIG_BUCK2=\"$(command -v buck2)\"; "
-            # Default to linking workspace node_modules; tests may disable with NO_NODE_MODULES_LINK=1
-            + "export NO_NODE_MODULES_LINK=\"${NO_NODE_MODULES_LINK:-0}\"; "
+            # Default to no relink side-effects; tests may opt in with NO_NODE_MODULES_LINK=0.
+            + "export NO_NODE_MODULES_LINK=\"${NO_NODE_MODULES_LINK:-1}\"; "
             + "# Coverage: keep NODE_V8_COVERAGE scoped to the actual node --test process (not helper node scripts),\n"
             + "# otherwise we generate massive raw coverage churn and slow the suite down.\n"
             + "V8COV_DIR=\"\"; "

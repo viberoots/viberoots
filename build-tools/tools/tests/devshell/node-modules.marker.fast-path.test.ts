@@ -69,7 +69,7 @@ test("devshell marker avoids nix eval", async () => {
     assert.equal(await pathExists(path.join(tmp, "node_modules")), false);
 
     const lockHash = crypto.createHash("sha256").update(lockV1).digest("hex");
-    const markerPath = path.join(tmp, "buck-out", "tmp", "node-modules-link.json");
+    const markerPath = path.join(tmp, "buck-out", "tmp", "node-modules-link.root.json");
     await fsp.mkdir(path.dirname(markerPath), { recursive: true });
     await fsp.writeFile(
       markerPath,
