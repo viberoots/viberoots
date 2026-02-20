@@ -28,8 +28,9 @@ export async function cmdNew(args: string[], flags: ScafFlags) {
   }
   const template = normalizeTemplateName(templateRaw);
   const root = path.join("build-tools", "tools", "scaffolding", "templates", language, template);
-  if (!(await exists(root))) {
-    console.error(`template not found: ${language}/${template}`);
+  const metaPath = path.join(root, "meta.json");
+  if (!(await exists(root)) || !(await exists(metaPath))) {
+    console.error(`unknown template: ${language}/${template}`);
     process.exit(1);
   }
   const destInfo = resolveDestination(language, template, name, flags["path"]);

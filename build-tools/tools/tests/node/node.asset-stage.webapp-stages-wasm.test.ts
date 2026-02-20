@@ -67,7 +67,7 @@ nix_go_tiny_wasm_lib(
 `,
         );
 
-        await $`scaf new node webapp demo-web --yes`;
+        await $`scaf new node webapp-static demo-web --yes`;
         const appDir = path.join(tmp, "projects", "apps", "demo-web");
         await fs.outputFile(
           path.join(appDir, "TARGETS"),

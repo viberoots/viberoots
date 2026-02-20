@@ -36,7 +36,7 @@ _TEMPLATE_TEST_CONVENTIONS = {
         "classification": "template:contract",
     },
     "build-tools/tools/tests/scaffolding/webapp.scaffold-and-build.test.ts": {
-        "template_ids": ["node/webapp"],
+        "template_ids": ["node/webapp-static"],
         "classification": "template:contract",
     },
     "build-tools/tools/tests/scaffolding/python-lib.scaffold-files.test.ts": {

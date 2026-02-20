@@ -15,7 +15,7 @@ _exclude:
 # Variables populated by scaf
 name: ""
 language: "node"
-template: "webapp"
+template: "webapp-static"
 
 # Derived defaults for Node webapp
 importer: "projects/apps/{{ name }}"

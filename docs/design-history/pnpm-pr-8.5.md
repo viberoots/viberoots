@@ -11,9 +11,9 @@ This document specifies the design for adding a Vite + TypeScript webapp templat
 
 ### Scope (What lands in this PR)
 
-- **New scaffold template:** `build-tools/tools/scaffolding/templates/node/webapp`
+- **New scaffold template:** `build-tools/tools/scaffolding/templates/node/webapp-static`
   - Files: `index.html`, `src/main.ts`, `src/style.css`, `vite.config.ts`, `.npmrc`, `tsconfig.json`, `package.json`, `TARGETS`
-- **Scaffolding CLI:** expose template via `scaf new node webapp <name>`; integrate with `build-tools/tools/scaffolding/new-pnpm-project.ts` as `--kind webapp`.
+- **Scaffolding CLI:** expose template via `scaf new node webapp-static <name>`; integrate with `build-tools/tools/scaffolding/new-pnpm-project.ts` as `--kind webapp`.
 - **Labels & providers:** template `TARGETS` includes `labels = ["lockfile:projects/apps/<name>/pnpm-lock.yaml#projects/apps/<name>", "lang:node", "kind:app"]` so `gen-auto-map.ts` maps to the importer‑scoped provider.
 - **Buck macro (initial):** add `node_webapp(...)` to `build-tools/node/defs.bzl` that stamps labels and appends providers from `//third_party/providers:auto_map.bzl`, and uses a zx shim to copy a Nix‑built `dist/` into `$OUT`.
 - **Tests:** add a zx test that scaffolds a webapp, refreshes glue, asserts correct provider mapping, and asserts `dist/index.html` materializes via Buck.
@@ -206,7 +206,7 @@ pnpm dev
 
 ```bash
 # Create
-scaf new node webapp demo --yes
+scaf new node webapp-static demo --yes
 
 # Lockfile-only for stable inputs
 (cd projects/apps/demo && pnpm -w install --lockfile-only)
@@ -223,7 +223,7 @@ buck2 build //projects/apps/demo:app
 
 ## Acceptance Criteria
 
-- `scaf new node webapp <name>` generates a working project with `.npmrc`, `package.json`, Vite config, TS config, sources, and `TARGETS`.
+- `scaf new node webapp-static <name>` generates a working project with `.npmrc`, `package.json`, Vite config, TS config, sources, and `TARGETS`.
 - Glue steps produce an importer‑scoped provider and auto‑map entry for `//projects/apps/<name>:app`.
 - `buck2 cquery 'deps(//projects/apps/<name>:app)'` shows the importer provider.
 - `buck2 build //projects/apps/<name>:app` yields an artifact containing `dist/index.html`.

@@ -25,10 +25,10 @@ test("template id extraction supports direct, delete, and rename paths", () => {
 test("changed template id extraction is sorted and unique", () => {
   const ids = changedTemplateIdsFromPaths([
     "build-tools/tools/scaffolding/templates/go/lib/copier.yaml",
-    "build-tools/tools/scaffolding/templates/node/webapp/copier.yaml",
+    "build-tools/tools/scaffolding/templates/node/webapp-static/copier.yaml",
     "build-tools/tools/scaffolding/templates/go/lib/README.md.jinja",
   ]);
-  assert.deepEqual(ids, ["go/lib", "node/webapp"]);
+  assert.deepEqual(ids, ["go/lib", "node/webapp-static"]);
 });
 
 test("selector mode classification handles template-only, mixed, and no-template-impact", () => {

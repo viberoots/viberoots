@@ -51,8 +51,8 @@ const EXPECTATIONS: TemplateExpectation[] = [
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp.scaffold-and-build.test.ts",
-    requiredLabels: ["template:node/webapp", "template:contract"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/node/webapp/"],
+    requiredLabels: ["template:node/webapp-static", "template:contract"],
+    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/node/webapp-static/"],
   },
   {
     script: "build-tools/tools/tests/scaffolding/python-lib.scaffold-files.test.ts",

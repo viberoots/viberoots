@@ -64,7 +64,7 @@ CLI examples:
 scaf new node lib my-lib --yes
 
 # explicit opt-out
-scaf new node webapp demo-web --yes --no-tests
+scaf new node webapp-static demo-web --yes --no-tests
 ```
 
 ## Tests to add (zx)

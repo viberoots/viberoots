@@ -15,7 +15,7 @@ test("webapp: scaffold, glue, build dist via Buck", { timeout: TEST_TIMEOUT_MS }
   try {
     await runInTemp("node-webapp-scaffold-build", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
-      await $`scaf new node webapp demo-web --yes`;
+      await $`scaf new node webapp-static demo-web --yes`;
       // Install deps via repo installer (handles pnpm store path and Nix node_modules)
       await $({
         cwd: path.join(tmp, "projects", "apps", "demo-web"),
