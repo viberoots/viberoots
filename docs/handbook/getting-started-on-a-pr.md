@@ -61,6 +61,11 @@ Python provider sync activation in sparse/partial clones is lockfile‑driven: t
   - Auto-detect from git changes: `node build-tools/tools/dev/select-template-tests.ts`
   - Provide explicit changed paths: `node build-tools/tools/dev/select-template-tests.ts --changed build-tools/tools/scaffolding/templates/go/lib/copier.yaml`
   - Targets-only output: `node build-tools/tools/dev/select-template-tests.ts --targets-only`
+- Verify template-scope controls (PR-3):
+  - `BNX_TEMPLATE_TEST_SCOPE=auto|always|never v`
+  - `auto`: when changes are template-only, `v` runs only label-selected template tests + safety floor
+  - `always`: force selector mode; fails fast when the change-set is not template-only
+  - `never`: bypass selector mode and use existing build-system test scope behavior
 - Nix builds (planner outputs):
   - `nix build .#graph-generator`
 - Repo wrappers (preferred; thin shims that delegate into TypeScript and ensure the dev shell is loaded):
@@ -106,6 +111,7 @@ These guardrails assume test tooling stays aligned with the dev shell and global
 - **Avoid lock waits in single-verify staging**: verify already holds its own run lock. Do not introduce extra staging waits that can add multi-minute stalls when a prior run was interrupted.
 - **Bound seed build time**: any `nix build .#test-seed` path must run with a timeout and a clear failure message. A bounded failure is easier to diagnose than an unbounded hang.
 - **Avoid duplicate glue/setup passes inside one test**: if `deps-main --glue-only` (or glue-pipeline) already refreshed graph/providers/auto-map, do not run `export-graph` + `sync-providers` + `gen-auto-map` again in the same test flow.
+- **Use pnpm filtered lint in template-only mode**: `v` runs `pnpm --filter . -s lint` when template selector mode is active, so template-only verification avoids unnecessary workspace-wide lint.
 - **Prefer seed filters to rsync**: if a test only needs a couple files missing, keep seed-store cloning and delete those files in the temp repo instead of forcing a full rsync.
 - **Consolidate temp-repo tests**: if multiple assertions can share one `runInTemp` repo, do so to avoid repeated seed-store copies.
 - **Use a lightweight smoke target for seed performance checks**: for quick validation, pick a small `runInTemp` test target that still emits `seedStoreCopy(...)` timing instead of heavy planner end-to-end tests.

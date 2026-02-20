@@ -665,6 +665,26 @@ I keep template test selection as a deterministic tool contract before verify/CI
   `label-selected targets ∪ safety floor`, then sorted and deduplicated.
 - Diagnostics are emitted as stable JSON (`mode`, changed paths, changed template ids, selected targets).
 
+## Verify/CI template-scope contract (PR-3)
+
+I wire template selector decisions directly into `v` and CI verify execution.
+
+- Control env: `BNX_TEMPLATE_TEST_SCOPE=auto|always|never`
+  - `auto`: use selector decision
+  - `always`: force selector path and fail if changes are not `template-only`
+  - `never`: bypass selector path and keep build-system scope behavior
+- Execution behavior:
+  - `template-only`: run selector targets (`label-selected ∪ safety floor`)
+  - `mixed`: run existing full build-system verify scope
+  - `no-template-impact`: skip template-targeted path and run existing scope
+- Guardrails (strict, fail-fast):
+  - fail if any changed template id has zero Buck label-selected targets
+  - fail when `always` is requested but selector mode is not `template-only`
+  - include stable JSON diagnostics in verify logs for reproducibility
+- pnpm policy in template-only mode:
+  - run filtered lint with `pnpm --filter . -s lint`
+  - avoid workspace-wide lint for template-only changes
+
 ## Implementation Plan (bite‑sized, ordered, with verification)
 
 > This plan is designed for a junior engineer or an LLM agent. Each step is **small**, has **clear acceptance criteria**, and includes a **verification** recipe to prevent regressions. Follow in order.

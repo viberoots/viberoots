@@ -40,7 +40,11 @@ async function runVerifyNixGapsPolicyPreflight(root: string, zxInitPath: string)
   }
 }
 
-export async function runVerifyLintPreflight(root: string, zxInitPath: string): Promise<void> {
+export async function runVerifyLintPreflight(
+  root: string,
+  zxInitPath: string,
+  opts: { lintFilter?: string | null } = {},
+): Promise<void> {
   const skipLint = (process.env.VERIFY_SKIP_LINT || "").trim() === "1";
   if (skipLint) {
     process.stderr.write("[verify] lint preflight: skipped (VERIFY_SKIP_LINT=1)\n");
@@ -51,13 +55,21 @@ export async function runVerifyLintPreflight(root: string, zxInitPath: string): 
   const timeoutSecs = Number((process.env.VERIFY_LINT_TIMEOUT_SECS || "600").trim());
   const secs = Number.isFinite(timeoutSecs) && timeoutSecs > 0 ? Math.floor(timeoutSecs) : 600;
 
-  process.stderr.write(`[verify] lint preflight: timeout -k 10s ${secs}s pnpm -s lint\n`);
+  const lintFilter = String(opts.lintFilter || "").trim();
+  const lintCmd = lintFilter ? `pnpm --filter ${lintFilter} -s lint` : "pnpm -s lint";
+  process.stderr.write(`[verify] lint preflight: timeout -k 10s ${secs}s ${lintCmd}\n`);
 
-  const res = await $({
-    stdio: "inherit",
-    cwd: root,
-    reject: false,
-  })`timeout -k 10s ${secs}s pnpm -s lint`;
+  const res = lintFilter
+    ? await $({
+        stdio: "inherit",
+        cwd: root,
+        reject: false,
+      })`timeout -k 10s ${secs}s pnpm --filter ${lintFilter} -s lint`
+    : await $({
+        stdio: "inherit",
+        cwd: root,
+        reject: false,
+      })`timeout -k 10s ${secs}s pnpm -s lint`;
   if (res.exitCode !== 0) {
     process.stderr.write(
       "error: lint preflight failed; refusing to run verify while formatting/lint is dirty\n" +

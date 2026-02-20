@@ -1,0 +1,155 @@
+#!/usr/bin/env zx-wrapper
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { resolveVerifyTemplateTestScope } from "../../dev/verify/template-test-scope.ts";
+
+test("auto mode uses template-selected targets for template-only changes", async () => {
+  const result = await resolveVerifyTemplateTestScope({
+    root: process.cwd(),
+    requestedTargets: ["//..."],
+    env: {},
+    deps: {
+      resolveBuildScope: async () => ({
+        targets: ["//projects/..."],
+        mode: "auto",
+        hasBuildSystemChanges: false,
+      }),
+      resolveTemplateSelection: async () => ({
+        mode: "template-only",
+        targets: ["//:a_template_test", "//:scaffolding_smoke_lib_readme"],
+        diagnostics: {
+          mode: "template-only",
+          changedPaths: ["build-tools/tools/scaffolding/templates/go/lib/copier.yaml"],
+          changedTemplateIds: ["go/lib"],
+          nonTemplateBuildSystemPaths: [],
+          safetyFloorTargets: ["//:scaffolding_smoke_lib_readme"],
+          templateTargetsById: {
+            "go/lib": ["//:a_template_test"],
+          },
+          selectedTargets: ["//:a_template_test", "//:scaffolding_smoke_lib_readme"],
+        },
+      }),
+    },
+  });
+  assert.equal(result.selectorMode, "template-only");
+  assert.deepEqual(result.targets, ["//:a_template_test", "//:scaffolding_smoke_lib_readme"]);
+  assert.equal(result.lintFilter, ".");
+});
+
+test("auto mode falls back to build-system scope when selector reports mixed", async () => {
+  const result = await resolveVerifyTemplateTestScope({
+    root: process.cwd(),
+    requestedTargets: ["//..."],
+    env: {},
+    deps: {
+      resolveBuildScope: async () => ({
+        targets: ["//..."],
+        mode: "auto",
+        hasBuildSystemChanges: true,
+      }),
+      resolveTemplateSelection: async () => ({
+        mode: "mixed",
+        targets: [],
+        diagnostics: {
+          mode: "mixed",
+          changedPaths: [
+            "build-tools/tools/scaffolding/templates/go/lib/copier.yaml",
+            "build-tools/tools/dev/verify.ts",
+          ],
+          changedTemplateIds: ["go/lib"],
+          nonTemplateBuildSystemPaths: ["build-tools/tools/dev/verify.ts"],
+          safetyFloorTargets: ["//:scaffolding_smoke_lib_readme"],
+          templateTargetsById: { "go/lib": [] },
+          selectedTargets: [],
+        },
+      }),
+    },
+  });
+  assert.equal(result.selectorMode, "mixed");
+  assert.deepEqual(result.targets, ["//..."]);
+  assert.equal(result.lintFilter, null);
+});
+
+test("never mode bypasses selector path and keeps existing build-system scope", async () => {
+  const result = await resolveVerifyTemplateTestScope({
+    root: process.cwd(),
+    requestedTargets: ["//..."],
+    env: { BNX_TEMPLATE_TEST_SCOPE: "never" },
+    deps: {
+      resolveBuildScope: async () => ({
+        targets: ["//projects/..."],
+        mode: "auto",
+        hasBuildSystemChanges: false,
+      }),
+      resolveTemplateSelection: async () => {
+        throw new Error("selector should not be called in never mode");
+      },
+    },
+  });
+  assert.equal(result.selectorMode, "skipped");
+  assert.deepEqual(result.targets, ["//projects/..."]);
+});
+
+test("always mode fails with actionable diagnostics when change-set is not template-only", async () => {
+  await assert.rejects(
+    async () =>
+      resolveVerifyTemplateTestScope({
+        root: process.cwd(),
+        requestedTargets: ["//..."],
+        env: { BNX_TEMPLATE_TEST_SCOPE: "always" },
+        deps: {
+          resolveBuildScope: async () => ({
+            targets: ["//..."],
+            mode: "auto",
+            hasBuildSystemChanges: true,
+          }),
+          resolveTemplateSelection: async () => ({
+            mode: "no-template-impact",
+            targets: [],
+            diagnostics: {
+              mode: "no-template-impact",
+              changedPaths: ["projects/apps/myapp/src/index.ts"],
+              changedTemplateIds: [],
+              nonTemplateBuildSystemPaths: [],
+              safetyFloorTargets: ["//:scaffolding_smoke_lib_readme"],
+              templateTargetsById: {},
+              selectedTargets: [],
+            },
+          }),
+        },
+      }),
+    /BNX_TEMPLATE_TEST_SCOPE=always requires template-only changes/,
+  );
+});
+
+test("template-only mode fails when a changed template id has no label-selected Buck targets", async () => {
+  await assert.rejects(
+    async () =>
+      resolveVerifyTemplateTestScope({
+        root: process.cwd(),
+        requestedTargets: ["//..."],
+        env: {},
+        deps: {
+          resolveBuildScope: async () => ({
+            targets: ["//..."],
+            mode: "auto",
+            hasBuildSystemChanges: true,
+          }),
+          resolveTemplateSelection: async () => ({
+            mode: "template-only",
+            targets: ["//:scaffolding_smoke_lib_readme"],
+            diagnostics: {
+              mode: "template-only",
+              changedPaths: ["build-tools/tools/scaffolding/templates/go/lib/copier.yaml"],
+              changedTemplateIds: ["go/lib"],
+              nonTemplateBuildSystemPaths: [],
+              safetyFloorTargets: ["//:scaffolding_smoke_lib_readme"],
+              templateTargetsById: { "go/lib": [] },
+              selectedTargets: ["//:scaffolding_smoke_lib_readme"],
+            },
+          }),
+        },
+      }),
+    /emptyTemplateIds=go\/lib/,
+  );
+});
