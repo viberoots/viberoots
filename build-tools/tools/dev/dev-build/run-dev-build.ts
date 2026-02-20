@@ -1,4 +1,5 @@
-import "zx/globals";
+import * as fsp from "node:fs/promises";
+import path from "node:path";
 import { parseDevBuildArgs } from "./args.ts";
 import { runBuckCommand } from "./buck.ts";
 import { cleanDevBuildWorkspace, refreshGlueAndExportGraph } from "./glue.ts";
@@ -17,6 +18,11 @@ import { getArgvTokens } from "../../lib/cli.ts";
 export async function runDevBuild(): Promise<void> {
   const root = repoRoot();
   const isCI = process.env.CI === "true";
+  const graphPath = path.join(root, "build-tools", "tools", "buck", "graph.json");
+  const graphExistedBefore = await fsp
+    .access(graphPath)
+    .then(() => true)
+    .catch(() => false);
 
   try {
     process.chdir(root);
@@ -77,9 +83,9 @@ export async function runDevBuild(): Promise<void> {
     restArgs: parsed.restArgs,
   });
 
-  if (impure && !exportedGraphDuringMaterialize) {
+  if (materialize && impure && !exportedGraphDuringMaterialize) {
     await exportGraphImpure(root);
-  } else if (impure && exportedGraphDuringMaterialize) {
+  } else if (materialize && impure && exportedGraphDuringMaterialize) {
     console.log("[dev-build] fast-path: reusing freshly exported graph for impure build");
   }
 
@@ -89,6 +95,12 @@ export async function runDevBuild(): Promise<void> {
     restArgs: parsed.restArgs,
     isolationFlags: iso.isolationFlags,
   });
+
+  // `--no-materialize` is a strict no-glue path. If the build side-effects an
+  // ephemeral graph file during first-run bootstrap, remove that transient output.
+  if (!materialize && !graphExistedBefore) {
+    await fsp.rm(graphPath, { force: true }).catch(() => {});
+  }
 
   await maybePrintImpureMaterializedBins({
     root,

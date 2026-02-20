@@ -1,7 +1,6 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import "zx/globals";
 
 async function tryRootNodeModulesOutFromMarker(root: string): Promise<string> {
   const markerPath = path.join(root, "buck-out", "tmp", "node-modules-link.root.json");

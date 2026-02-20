@@ -163,18 +163,27 @@ async function main() {
   } catch {}
 
   try {
-    const { stdout } = await $`nix show-config`;
+    const { stdout } = await $`nix config show`;
     const configText = String(stdout).toLowerCase();
     const envText = (process.env.NIX_CONFIG || "").toLowerCase();
-    const expLine =
-      configText.split(/\n/).find((l) => l.trim().startsWith("experimental-features =")) || "";
-    const merged = [expLine.split("=").slice(1).join("=") || "", envText].join(" ").trim();
+    const configFeatureParts = Array.from(
+      configText.matchAll(/(?:^|\n)\s*(?:extra-)?experimental-features\s*=\s*([^\n]*)/g),
+    ).map((m) => String(m[1] || ""));
+    const merged = configFeatureParts.concat(envText).join(" ").trim();
     const features = new Set(
       merged
         .split(/[\s,]+/)
         .map((s) => s.trim())
         .filter(Boolean),
     );
+    // `nix config show` itself requires the modern CLI path.
+    features.add("nix-command");
+    if (!features.has("flakes")) {
+      const flakeHelp = await $`nix flake metadata --help`.nothrow();
+      if (flakeHelp.exitCode === 0) {
+        features.add("flakes");
+      }
+    }
 
     if (!features.has("nix-command")) {
       console.error("[startup-check] missing nix experimental feature: nix-command");
@@ -187,7 +196,7 @@ async function main() {
     // Implementation-required feature floor: nix-command + flakes.
     // Do not require dynamic-derivations/recursive-nix/ca-derivations here; those are policy-level choices.
   } catch {
-    console.error("[startup-check] cannot read nix config via `nix show-config`");
+    console.error("[startup-check] cannot read nix config via `nix config show`");
     process.exit(1);
   }
 

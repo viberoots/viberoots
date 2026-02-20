@@ -1,6 +1,5 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import "zx/globals";
 import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const.ts";
 import { inferRunnableFromOutPath } from "../../lib/runnables.ts";
 import { nodeBin, zxNodeBase } from "./paths.ts";

@@ -112,6 +112,9 @@ in {
           seed_store ${if prefetchedInput != null then "\"${prefetchedInput}\"" else "\"/nonexistent\""}
         fi
         pnpm config set store-dir "$LOCAL_STORE"
+        # Keep imported package files writable in sandbox builds.
+        # Hardlinked files from read-only store paths can fail during bin chmod.
+        pnpm config set package-import-method copy
         FT="${ftVal}"
         echo "[BNX-MKNM-DEBUG] NIX_PNPM_FETCH_TIMEOUT=$FT" >&2
         echo "[BNX-MKNM-DEBUG] lockfile_present=$(test -f pnpm-lock.yaml && echo yes || echo no)" >&2

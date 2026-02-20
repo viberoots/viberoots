@@ -1,5 +1,3 @@
-import "zx/globals";
-
 function explicitTargetPackages(subcmd: string, restArgs: string[]): string[] {
   if (subcmd !== "build" && subcmd !== "test" && subcmd !== "run") return [];
   const pkgs = new Set<string>();

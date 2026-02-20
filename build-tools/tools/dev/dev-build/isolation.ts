@@ -1,6 +1,5 @@
 import path from "node:path";
 import crypto from "node:crypto";
-import "zx/globals";
 import { nodeFlagsWithZx } from "../../lib/node-run.ts";
 
 export type Isolation = {

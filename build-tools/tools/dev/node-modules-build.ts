@@ -164,6 +164,19 @@ async function ensurePnpmStoreHash(lockfileRel: string): Promise<void> {
     await $({ cwd: flakeRoot })`git add ${hashFile}`.nothrow();
   } catch {}
 }
+
+async function forceRefreshPnpmStoreHash(lockfileRel: string): Promise<void> {
+  const updater = path.join(flakeRoot, "build-tools/tools/dev/update-pnpm-hash.ts");
+  const update = await $({
+    cwd: flakeRoot,
+  })`zx-wrapper ${updater} --lockfile ${lockfileRel} --force`.nothrow();
+  if (update.exitCode !== 0) {
+    console.error("node-modules-build: forced pnpm-store hash update failed");
+    if (update.stdout) console.error(String(update.stdout).trim());
+    if (update.stderr) console.error(String(update.stderr).trim());
+    process.exit(2);
+  }
+}
 // Fast path: if output is already realized in the store, prefer path-info
 let outPath = "";
 await ensurePnpmStoreHash(relLock);
@@ -207,6 +220,7 @@ if (!outPath) {
 }
 
 if (!outPath) {
+  await forceRefreshPnpmStoreHash(relLock);
   outPath = await tryBuild();
 }
 if (!outPath) {

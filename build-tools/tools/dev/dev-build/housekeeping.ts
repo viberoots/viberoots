@@ -1,6 +1,5 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import "zx/globals";
 import { nodeBin, zxNodeBase } from "./paths.ts";
 
 async function getDiskStats(root: string): Promise<{ freePct: number; freeBytes: number }> {

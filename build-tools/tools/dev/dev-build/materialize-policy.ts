@@ -1,4 +1,3 @@
-import "zx/globals";
 import fs from "node:fs";
 import { checkFreshness } from "../../buck/prebuild/freshness.ts";
 import { computeCoverageMissing } from "../../buck/prebuild/coverage.ts";

@@ -1,5 +1,3 @@
-import "zx/globals";
-
 export async function runBuckCommand(opts: {
   root: string;
   subcmd: string;
