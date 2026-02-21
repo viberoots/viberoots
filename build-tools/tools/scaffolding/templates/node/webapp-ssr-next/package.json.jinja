@@ -1,0 +1,32 @@
+{
+  "name": "{{ pkgScope }}/{{ name }}",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "scripts": {
+    "dev:ssr": "next dev -H 127.0.0.1 -p 4173",
+    "build:ssr": "next build && tsc -p tsconfig.server.json",
+    "start:ssr": "node dist/server/index.js",
+    {% if includeNodeTests %}
+    "test": "vitest run"
+    {% else %}
+    "test": "node --test dist/**/*.test.js"
+    {% endif %}
+  },
+  "dependencies": {
+    "next": "^14.2.18",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "esbuild": "^0.21.5",
+    "@esbuild/darwin-arm64": "^0.21.5",
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1"{% if includeNodeTests %},
+    "vitest": "^1.6.0",
+    "@vitest/coverage-v8": "^1.6.0"
+    {% endif %}
+  }
+}

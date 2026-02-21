@@ -8,7 +8,7 @@
       "Generates a minimal Vite webapp with importer-scoped lockfile labeling and Buck/Nix integration.",
       "Includes a default nix_node_test target (unit) using Vitest; opt out of sample tests with --no-tests.",
       "Use pnpm dev for HMR. Production builds are hermetic via Nix + Buck.",
-      "Reserved SSR template names: webapp-ssr-express and webapp-ssr-next.",
+      "SSR alternatives: webapp-ssr-express for framework-neutral SSR, webapp-ssr-next for Next app-router SSR.",
       "Labels include lockfile:projects/apps/<name>/pnpm-lock.yaml#projects/apps/<name> to auto-wire providers."
     ],
     "examples": [

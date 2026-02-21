@@ -16,6 +16,8 @@
     "wasm-inline": "projects/libs/{name}-wasm-inline",
     "cli": "projects/apps/{name}",
     "webapp-static": "projects/apps/{name}",
+    "webapp-ssr-express": "projects/apps/{name}",
+    "webapp-ssr-next": "projects/apps/{name}",
     "cpp-addon": "projects",
     "go-addon": "projects"
   },

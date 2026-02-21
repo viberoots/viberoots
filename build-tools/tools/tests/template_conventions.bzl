@@ -39,6 +39,10 @@ _TEMPLATE_TEST_CONVENTIONS = {
         "template_ids": ["node/webapp-static"],
         "classification": "template:contract",
     },
+    "build-tools/tools/tests/scaffolding/webapp-ssr.scaffold-contract-and-runtime-smoke.test.ts": {
+        "template_ids": ["node/webapp-ssr-express", "node/webapp-ssr-next"],
+        "classification": "template:shared",
+    },
     "build-tools/tools/tests/scaffolding/python-lib.scaffold-files.test.ts": {
         "template_ids": ["python/lib"],
         "classification": "template:smoke",

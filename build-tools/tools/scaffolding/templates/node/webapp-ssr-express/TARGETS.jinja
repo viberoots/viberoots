@@ -1,0 +1,10 @@
+load("//build-tools/node:defs.bzl", "node_webapp", "nix_node_test")
+
+node_webapp(
+    name = "app",
+    labels = ["lang:node", "kind:app", "webapp:ssr", "framework:express"],
+)
+
+nix_node_test(
+    name = "unit",
+)

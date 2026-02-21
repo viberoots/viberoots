@@ -15,6 +15,42 @@ Production build via Buck (Nix under the hood):
 buck2 build //projects/apps/{{ name }}:app
 ```
 {% endif %}
+{% if template == "webapp-ssr-express" %}
+This is an Express SSR scaffold with explicit production startup via a Node server entrypoint.
+
+Use this when you want framework-neutral SSR behavior with a small server layer and Vite-managed client/server bundles.
+
+Dev mode:
+
+```bash
+pnpm run dev:ssr
+```
+
+Production build and startup:
+
+```bash
+pnpm run build:ssr
+pnpm run start:ssr
+```
+{% endif %}
+{% if template == "webapp-ssr-next" %}
+This is a Next.js SSR scaffold with an explicit Node server wrapper for production startup.
+
+Use this when you want Next app-router features while keeping startup contract explicit as a Node entrypoint.
+
+Dev mode:
+
+```bash
+pnpm run dev:ssr
+```
+
+Production build and startup:
+
+```bash
+pnpm run build:ssr
+pnpm run start:ssr
+```
+{% endif %}
 
 ## Node tests (nix_node_test)
 

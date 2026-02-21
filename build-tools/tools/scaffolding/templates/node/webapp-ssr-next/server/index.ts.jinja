@@ -1,0 +1,17 @@
+import { createServer } from "node:http";
+import { parse } from "node:url";
+import next from "next";
+
+const port = Number(process.env.PORT || "4173");
+const host = "127.0.0.1";
+const app = next({ dev: false, hostname: host, port });
+const handle = app.getRequestHandler();
+
+await app.prepare();
+
+createServer((req, res) => {
+  const parsedUrl = parse(req.url || "/", true);
+  handle(req, res, parsedUrl);
+}).listen(port, host, () => {
+  console.log(`[webapp-ssr-next] listening on http://${host}:${port}`);
+});
