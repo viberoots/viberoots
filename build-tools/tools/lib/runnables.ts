@@ -10,9 +10,15 @@ export type RunnableExec = {
 
 export type RunnableContract = {
   kind: string;
+  framework?: string;
   run: {
     prod: RunnableExec;
     dev?: RunnableExec;
+  };
+  runtime?: {
+    serverCwd?: string;
+    envFiles?: string[];
+    nodeArgs?: string[];
   };
   artifacts?: Record<string, unknown>;
 };
@@ -35,8 +41,11 @@ function normalizeRunnableContract(v: unknown): RunnableContract | null {
   const prod = asStringArray(raw?.run?.prod?.argv);
   if (prod.length === 0) return null;
   const dev = asStringArray(raw?.run?.dev?.argv);
+  const envFiles = asStringArray(raw?.runtime?.envFiles);
+  const nodeArgs = asStringArray(raw?.runtime?.nodeArgs);
   return {
     kind: String(raw?.kind || "runnable"),
+    framework: typeof raw?.framework === "string" ? raw.framework : undefined,
     run: {
       prod: {
         argv: prod,
@@ -51,6 +60,15 @@ function normalizeRunnableContract(v: unknown): RunnableContract | null {
           }
         : {}),
     },
+    runtime:
+      typeof raw?.runtime === "object" && raw.runtime
+        ? {
+            serverCwd:
+              typeof raw?.runtime?.serverCwd === "string" ? raw.runtime.serverCwd : undefined,
+            envFiles: envFiles.length > 0 ? envFiles : undefined,
+            nodeArgs: nodeArgs.length > 0 ? nodeArgs : undefined,
+          }
+        : undefined,
     artifacts: raw?.artifacts && typeof raw.artifacts === "object" ? raw.artifacts : undefined,
   };
 }
@@ -106,6 +124,8 @@ export async function inferRunnableFromOutPath(opts: {
   label: string;
   outPath: string;
   importer?: string;
+  mode?: "static" | "ssr";
+  framework?: string;
 }): Promise<RunnableContract | null> {
   const binDir = path.join(opts.outPath, "bin");
   const bins: string[] = [];
@@ -129,6 +149,26 @@ export async function inferRunnableFromOutPath(opts: {
   }
 
   const dist = path.join(opts.outPath, "dist");
+  const wantSsr = opts.mode === "ssr";
+  if (wantSsr) {
+    const serverEntry = path.join(dist, "server", "index.js");
+    const clientDir = path.join(dist, "client");
+    return {
+      kind: "webapp-ssr",
+      framework: opts.framework || undefined,
+      run: {
+        prod: { argv: ["node", serverEntry] },
+        ...(opts.importer
+          ? {
+              dev: {
+                argv: ["pnpm", "--dir", opts.importer, "dev:ssr"],
+              },
+            }
+          : {}),
+      },
+      artifacts: { serverEntry, clientDir },
+    };
+  }
   try {
     const st = await fsp.stat(dist);
     if (!st.isDirectory()) return null;

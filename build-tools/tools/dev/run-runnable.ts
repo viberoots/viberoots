@@ -6,6 +6,7 @@ import { inferRunnableFromOutPath, type RunnableManifestEntry } from "../lib/run
 import {
   parseArgs,
   importerForTarget,
+  runnableHintsForTarget,
   readManifestEntry,
   runCommand,
 } from "./run-runnable-core.ts";
@@ -20,6 +21,7 @@ async function main() {
   }
   const workspaceRoot = await findRepoRoot(process.cwd());
   const target = parsed.target;
+  let targetHints: { importer: string; mode: "static" | "ssr"; framework: string } | null = null;
   let entry: RunnableManifestEntry | null = null;
   const testManifestPath = String(process.env.RUNNABLE_TEST_MANIFEST || "").trim();
   if (testManifestPath) {
@@ -27,13 +29,17 @@ async function main() {
   } else {
     // Fast path: use selected-target build + output-shape inference first.
     // This avoids full graph manifest materialization for one-target run commands.
-    const importer = await importerForTarget(workspaceRoot, target);
+    const hints = await runnableHintsForTarget(workspaceRoot, target);
+    targetHints = hints;
+    const importer = hints.importer;
     let selectedError: unknown = null;
     try {
       const outPath = await buildSelectedOutPath(workspaceRoot, target);
       const inferred = await inferRunnableFromOutPath({
         label: target,
         outPath,
+        mode: hints.mode,
+        framework: hints.framework || undefined,
         ...(importer ? { importer } : {}),
       });
       if (inferred) {
@@ -69,8 +75,13 @@ async function main() {
   }
   let spec = parsed.mode === "dev" ? entry.runnable.run.dev : entry.runnable.run.prod;
   if (parsed.mode === "dev" && !spec) {
-    const importer = await importerForTarget(workspaceRoot, target);
-    if (importer) spec = { argv: ["pnpm", "--dir", importer, "dev"] };
+    const hints = targetHints || (await runnableHintsForTarget(workspaceRoot, target));
+    const importer = hints.importer || (await importerForTarget(workspaceRoot, target));
+    if (importer) {
+      const devScript =
+        entry.runnable.kind === "webapp-ssr" || hints.mode === "ssr" ? "dev:ssr" : "dev";
+      spec = { argv: ["pnpm", "--dir", importer, devScript] };
+    }
   }
   if (!spec) {
     console.error(`run.${parsed.mode} is not available for ${target}`);

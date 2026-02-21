@@ -39,3 +39,40 @@ test("parseRunnableManifest reads explicit runnable contract fields", () => {
     "dev",
   ]);
 });
+
+test("parseRunnableManifest keeps SSR framework and runtime metadata fields", () => {
+  const withSsr = JSON.stringify([
+    {
+      label: "//projects/apps/ssr:app",
+      kind: "app",
+      bins: [],
+      aux: [],
+      runnable: {
+        kind: "webapp-ssr",
+        framework: "hatch",
+        run: {
+          prod: { argv: ["node", "/nix/store/x/dist/server/index.js"] },
+          dev: { argv: ["pnpm", "--dir", "projects/apps/ssr", "dev:ssr"] },
+        },
+        runtime: {
+          serverCwd: "/nix/store/x",
+          envFiles: [".env", ".env.local"],
+          nodeArgs: ["--enable-source-maps"],
+        },
+        artifacts: {
+          serverEntry: "/nix/store/x/dist/server/index.js",
+          clientDir: "/nix/store/x/dist/client",
+          assetManifest: "/nix/store/x/dist/client/manifest.json",
+          publicDir: "/nix/store/x/public",
+        },
+      },
+    },
+  ]);
+  const parsed = parseRunnableManifest(withSsr);
+  assert.equal(parsed.length, 1);
+  assert.equal(parsed[0]?.runnable?.kind, "webapp-ssr");
+  assert.equal(parsed[0]?.runnable?.framework, "hatch");
+  assert.equal(parsed[0]?.runnable?.runtime?.serverCwd, "/nix/store/x");
+  assert.deepEqual(parsed[0]?.runnable?.runtime?.envFiles, [".env", ".env.local"]);
+  assert.deepEqual(parsed[0]?.runnable?.runtime?.nodeArgs, ["--enable-source-maps"]);
+});

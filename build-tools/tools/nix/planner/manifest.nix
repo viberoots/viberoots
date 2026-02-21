@@ -11,6 +11,7 @@
 , cppOutPaths
 , nodeOutPaths
 , nodeDevImporters ? {}
+, nodeRunnableMeta ? {}
 , modulesTomlFor
 , pkgPathOf
 , targetNameOf
@@ -120,9 +121,21 @@ let
           fi
           dist="${p}/dist"
           importer="${nodeDevImporters.${n} or ""}"
+          webappMode="${(nodeRunnableMeta.${n}.webappMode or "static")}"
+          framework="${(nodeRunnableMeta.${n}.framework or "")}"
+          serverEntry="$dist/server/index.js"
+          clientDir="$dist/client"
           if [ -n "$bins" ]; then
             if [ "$first" -eq 0 ]; then echo "," >> $out/manifest.json; fi
             echo "{ \"label\": \"${n}\", \"kind\": \"bin\", \"bins\": [ $bins ], \"aux\": [], \"runnable\": { \"kind\": \"script\", \"run\": { \"prod\": { \"argv\": [ \"$first_bin\" ] } }, \"artifacts\": { \"bins\": [ $bins ] } } }" >> $out/manifest.json
+            first=0
+          elif [ "$webappMode" = "ssr" ]; then
+            if [ "$first" -eq 0 ]; then echo "," >> $out/manifest.json; fi
+            if [ -n "$importer" ]; then
+              echo "{ \"label\": \"${n}\", \"kind\": \"app\", \"bins\": [], \"aux\": [], \"runnable\": { \"kind\": \"webapp-ssr\", \"framework\": \"$framework\", \"run\": { \"prod\": { \"argv\": [ \"node\", \"$serverEntry\" ] }, \"dev\": { \"argv\": [ \"pnpm\", \"--dir\", \"$importer\", \"dev:ssr\" ] } }, \"artifacts\": { \"serverEntry\": \"$serverEntry\", \"clientDir\": \"$clientDir\" } } }" >> $out/manifest.json
+            else
+              echo "{ \"label\": \"${n}\", \"kind\": \"app\", \"bins\": [], \"aux\": [], \"runnable\": { \"kind\": \"webapp-ssr\", \"framework\": \"$framework\", \"run\": { \"prod\": { \"argv\": [ \"node\", \"$serverEntry\" ] } }, \"artifacts\": { \"serverEntry\": \"$serverEntry\", \"clientDir\": \"$clientDir\" } } }" >> $out/manifest.json
+            fi
             first=0
           elif [ -d "$dist" ]; then
             if [ "$first" -eq 0 ]; then echo "," >> $out/manifest.json; fi

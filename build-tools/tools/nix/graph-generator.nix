@@ -287,6 +287,28 @@ let
       in { name = nm; value = importer; }
     ) (builtins.attrNames nodeOutPaths)
   );
+  nodeRunnableMeta = builtins.listToAttrs (
+    map (nm:
+      let
+        matches = builtins.filter (x: ensureFullLabel x == nm) nodesList;
+        n = if matches == [] then null else builtins.head matches;
+        labs0 = if n == null then null else (get n "labels");
+        labs = if labs0 != null && builtins.isList labs0 then labs0 else [];
+        hasSsr = builtins.elem "webapp:ssr" labs;
+        framework =
+          if builtins.elem "framework:express" labs then "express"
+          else if builtins.elem "framework:next" labs then "next"
+          else if builtins.elem "framework:hatch" labs then "hatch"
+          else "";
+      in {
+        name = nm;
+        value = {
+          webappMode = if hasSsr then "ssr" else "static";
+          framework = framework;
+        };
+      }
+    ) (builtins.attrNames nodeOutPaths)
+  );
 
   # Strict mode: require Buck graph; only build app binaries/libs in goTargets
   # Defer Go computation entirely to avoid evaluating unrelated paths in C++-only temp workspaces
@@ -469,6 +491,7 @@ let
     inherit pkgs lib repoRootStr devOverrideJSON devOverrideCppJSON devOverridePyJSON isCI suppressDevOverrideLog
             goOutPaths cppOutPaths nodeOutPaths modulesTomlFor pkgPathOf targetNameOf sanitize;
     nodeDevImporters = nodeDevImporters;
+    nodeRunnableMeta = nodeRunnableMeta;
     overridePresentList = overridePresentList;
   };
   all = Manifest.all;

@@ -156,3 +156,66 @@ test("d routes to run.dev and fails clearly when unavailable", async () => {
     assert.match(String(libraryRun.stderr || ""), /library-only/);
   });
 });
+
+test("SSR runnable routes to canonical node prod and dev:ssr commands", async () => {
+  await runInTemp("runnable-routes-ssr", async (tmp, $) => {
+    const manifestPath = path.join(tmp, "buck-out", "tmp", "runnable.ssr.manifest.json");
+    await fsp.mkdir(path.dirname(manifestPath), { recursive: true });
+    const serverEntry = "/nix/store/fake/dist/server/index.js";
+    await fsp.writeFile(
+      manifestPath,
+      JSON.stringify(
+        [
+          {
+            label: "//projects/apps/ssr:app",
+            kind: "app",
+            bins: [],
+            aux: [],
+            runnable: {
+              kind: "webapp-ssr",
+              framework: "next",
+              run: {
+                prod: { argv: ["node", serverEntry] },
+                dev: { argv: ["pnpm", "--dir", "projects/apps/ssr", "dev:ssr"] },
+              },
+              artifacts: { serverEntry, clientDir: "/nix/store/fake/dist/client" },
+            },
+          },
+        ],
+        null,
+        2,
+      ) + "\n",
+      "utf8",
+    );
+
+    const stubBin = path.join(tmp, "stub-bin");
+    await fsp.mkdir(stubBin, { recursive: true });
+    const nodeStub = path.join(stubBin, "node");
+    const pnpmStub = path.join(stubBin, "pnpm");
+    await fsp.writeFile(nodeStub, "#!/usr/bin/env bash\necho node-ok:$*\n", "utf8");
+    await fsp.writeFile(pnpmStub, "#!/usr/bin/env bash\necho pnpm-ok:$*\n", "utf8");
+    await $`chmod +x ${nodeStub} ${pnpmStub}`;
+
+    const prod = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      env: {
+        ...process.env,
+        PATH: `${stubBin}:${process.env.PATH || ""}`,
+        RUNNABLE_TEST_MANIFEST: manifestPath,
+      },
+    })`build-tools/tools/bin/p //projects/apps/ssr:app`;
+    assert.match(String(prod.stdout || ""), /node-ok:\/nix\/store\/fake\/dist\/server\/index\.js/);
+
+    const dev = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      env: {
+        ...process.env,
+        PATH: `${stubBin}:${process.env.PATH || ""}`,
+        RUNNABLE_TEST_MANIFEST: manifestPath,
+      },
+    })`build-tools/tools/bin/d //projects/apps/ssr:app`;
+    assert.match(String(dev.stdout || ""), /pnpm-ok:--dir projects\/apps\/ssr dev:ssr/);
+  });
+});

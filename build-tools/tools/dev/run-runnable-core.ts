@@ -36,6 +36,15 @@ export function parseArgs(argv: string[]): {
 }
 
 export async function importerForTarget(workspaceRoot: string, target: string): Promise<string> {
+  const hints = await runnableHintsForTarget(workspaceRoot, target);
+  return hints.importer;
+}
+
+export async function runnableHintsForTarget(
+  workspaceRoot: string,
+  target: string,
+): Promise<{ importer: string; mode: "static" | "ssr"; framework: string }> {
+  const fallback = { importer: "", mode: "static" as const, framework: "" };
   try {
     const graphTxt = await fsp.readFile(path.join(workspaceRoot, DEFAULT_GRAPH_PATH), "utf8");
     const raw = JSON.parse(graphTxt);
@@ -45,14 +54,22 @@ export async function importerForTarget(workspaceRoot: string, target: string): 
       const name = normalizeTargetLabel(String(n?.name || ""));
       if (name !== want) continue;
       const labels = Array.isArray(n?.labels) ? n.labels : [];
+      let importer = "";
+      let mode: "static" | "ssr" = "static";
+      let framework = "";
       for (const label of labels) {
         const parsed = parseLockfileLabel(String(label || ""));
-        if (parsed?.importer) return parsed.importer;
+        if (parsed?.importer) importer = parsed.importer;
+        const value = String(label || "");
+        if (value === "webapp:ssr") mode = "ssr";
+        if (value === "framework:express") framework = "express";
+        if (value === "framework:next") framework = "next";
+        if (value === "framework:hatch") framework = "hatch";
       }
-      return "";
+      return { importer, mode, framework };
     }
   } catch {}
-  return "";
+  return fallback;
 }
 
 export async function readManifestEntry(

@@ -622,9 +622,15 @@ patch-pkg apply go golang.org/x/net
 The planner manifest (`<graph-out>/manifest.json`) preserves legacy `bins` fields and now carries an additive runnable contract:
 
 - `runnable.kind`: `native-bin`, `script`, `webapp`, or other language-specific runnable categories.
+- SSR webapps use `runnable.kind = "webapp-ssr"` with framework discriminator (`express`, `next`, reserved `hatch`).
 - `runnable.run.prod`: required argv contract for production-style execution.
 - `runnable.run.dev`: optional argv contract for development-mode execution.
-- `runnable.artifacts`: referenced artifact paths (for example `bins` or `dist`).
+- `webapp-ssr` production startup is canonical: `run.prod.argv = ["node", "<serverEntry>"]`.
+- `runnable.artifacts`: referenced artifact paths.
+  - Static webapp example: `{ "dist": "<distDir>" }`
+  - SSR webapp example: `{ "serverEntry": "<path>", "clientDir": "<path>" }`
+  - Optional adapter fields are allowed (`assetManifest`, `publicDir`).
+- Optional runtime metadata is supported: `runtime.serverCwd`, `runtime.envFiles`, `runtime.nodeArgs`.
 
 Rules:
 
