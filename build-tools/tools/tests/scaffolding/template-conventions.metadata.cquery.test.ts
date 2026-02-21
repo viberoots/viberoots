@@ -68,6 +68,30 @@ const EXPECTATIONS: TemplateExpectation[] = [
     ],
   },
   {
+    script: "build-tools/tools/tests/scaffolding/webapp-ssr.scaffold-and-build.test.ts",
+    requiredLabels: [
+      "template:node/webapp-ssr-express",
+      "template:node/webapp-ssr-next",
+      "template:shared",
+    ],
+    requiredTemplateRoots: [
+      "build-tools/tools/scaffolding/templates/node/webapp-ssr-express/",
+      "build-tools/tools/scaffolding/templates/node/webapp-ssr-next/",
+    ],
+  },
+  {
+    script: "build-tools/tools/tests/scaffolding/webapp-ssr.pr4-contracts.test.ts",
+    requiredLabels: [
+      "template:node/webapp-ssr-express",
+      "template:node/webapp-ssr-next",
+      "template:shared",
+    ],
+    requiredTemplateRoots: [
+      "build-tools/tools/scaffolding/templates/node/webapp-ssr-express/",
+      "build-tools/tools/scaffolding/templates/node/webapp-ssr-next/",
+    ],
+  },
+  {
     script: "build-tools/tools/tests/scaffolding/python-lib.scaffold-files.test.ts",
     requiredLabels: ["template:python/lib", "template:smoke"],
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/python/lib/"],

@@ -7,7 +7,7 @@ test("node-webapp build phase includes heartbeat and phase logs", async () => {
   if (!txt.includes("[node-webapp][phase]")) {
     throw new Error("node-webapp.nix must emit phase logs for profiling");
   }
-  if (!txt.includes("[node-webapp][heartbeat] vite-build running")) {
-    throw new Error("node-webapp.nix must emit heartbeat logs while vite build runs");
+  if (!txt.includes("[node-webapp][heartbeat] webapp-build running")) {
+    throw new Error("node-webapp.nix must emit heartbeat logs while webapp build runs");
   }
 });

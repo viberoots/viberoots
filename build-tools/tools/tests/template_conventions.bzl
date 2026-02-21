@@ -43,6 +43,14 @@ _TEMPLATE_TEST_CONVENTIONS = {
         "template_ids": ["node/webapp-ssr-express", "node/webapp-ssr-next"],
         "classification": "template:shared",
     },
+    "build-tools/tools/tests/scaffolding/webapp-ssr.scaffold-and-build.test.ts": {
+        "template_ids": ["node/webapp-ssr-express", "node/webapp-ssr-next"],
+        "classification": "template:shared",
+    },
+    "build-tools/tools/tests/scaffolding/webapp-ssr.pr4-contracts.test.ts": {
+        "template_ids": ["node/webapp-ssr-express", "node/webapp-ssr-next"],
+        "classification": "template:shared",
+    },
     "build-tools/tools/tests/scaffolding/python-lib.scaffold-files.test.ts": {
         "template_ids": ["python/lib"],
         "classification": "template:smoke",

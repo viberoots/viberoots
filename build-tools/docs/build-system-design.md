@@ -631,6 +631,17 @@ The planner manifest (`<graph-out>/manifest.json`) preserves legacy `bins` field
   - SSR webapp example: `{ "serverEntry": "<path>", "clientDir": "<path>" }`
   - Optional adapter fields are allowed (`assetManifest`, `publicDir`).
 - Optional runtime metadata is supported: `runtime.serverCwd`, `runtime.envFiles`, `runtime.nodeArgs`.
+- SSR packaging contract:
+  - Express and Next adapters both normalize to `dist/server/index.js` and `dist/client/`.
+  - Next packaging must copy runtime assets under `dist/client` and keep server startup at `node dist/server/index.js`.
+  - Missing `serverEntry` or `clientDir` is a hard build failure. There is no fallback to static-host serving for SSR targets.
+- Docker-aligned startup:
+  - Container startup uses one plain Node command from the packaged output: `node <serverEntry>`.
+  - Runtime startup must not depend on planner/runnable tooling inside the container image.
+- SSR troubleshooting:
+  - If startup fails with missing assets, verify `dist/server/index.js` and `dist/client` exist in the built output.
+  - If Next startup fails in production mode, verify `.next` artifacts are present under `dist/client`.
+  - If manifest/runtime disagree, inspect `<graph-out>/manifest.json` and verify `runnable.kind=webapp-ssr` with the expected `framework`.
 
 Rules:
 

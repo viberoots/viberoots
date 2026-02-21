@@ -14,6 +14,10 @@ Node macros include importer-local patches via `native.glob(...)`. Because Buck 
 
 - **`node_webapp(...)`** (`build-tools/node/defs_nix.bzl`)
   - Builds the importer webapp via Nix (`.#node-webapp.<importer>`) and copies `dist/` into `$OUT`.
+  - For `webapp:ssr` targets:
+    - `framework:express` and `framework:next` both normalize to `dist/server/index.js` + `dist/client/`.
+    - Production startup contract remains one Node command: `node dist/server/index.js`.
+    - Missing SSR artifacts fail the build directly. There is no fallback to static hosting behavior.
   - Requires exactly one importer-scoped lockfile label: `lockfile:<path>#<importer>`.
     - If `lockfile_label` is omitted and no `lockfile:` label is present, it defaults to
       `lockfile:<package>/pnpm-lock.yaml#<package>` and fails fast if the lockfile is missing.

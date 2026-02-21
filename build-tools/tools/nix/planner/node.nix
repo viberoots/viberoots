@@ -305,6 +305,13 @@ in {
     let
       info = lockInfoOfName name;
       importerDir = info.importer;
+      n = nodeOfName name;
+      labs = if n == null then [] else labelsOf n;
+      hasSsr = builtins.elem "webapp:ssr" labs;
+      framework =
+        if builtins.elem "framework:next" labs then "next"
+        else if builtins.elem "framework:express" labs then "express"
+        else "";
       nodeMods =
         if sharedNodeMods != null then sharedNodeMods
         else builtins.trace
@@ -327,12 +334,55 @@ in {
         rm -rf node_modules
         ln -s "${nm}/node_modules" node_modules
         VITE_BIN="${nm}/node_modules/.bin/vite"
-        if [ ! -x "$VITE_BIN" ]; then
-          echo "node planner: missing vite in locked node_modules for ${importerDir}" >&2
+        TSC_BIN="${nm}/node_modules/.bin/tsc"
+        NEXT_BIN="${nm}/node_modules/.bin/next"
+        ${if !hasSsr then ''
+          if [ ! -x "$VITE_BIN" ]; then
+            echo "node planner: missing vite in locked node_modules for ${importerDir}" >&2
+            exit 2
+          fi
+          "$VITE_BIN" build
+          test -d dist
+        '' else if framework == "express" then ''
+          if [ ! -x "$VITE_BIN" ] || [ ! -x "$TSC_BIN" ]; then
+            echo "node planner: expected vite and tsc in locked node_modules for ${importerDir}" >&2
+            exit 2
+          fi
+          "$VITE_BIN" build --outDir dist/client
+          "$VITE_BIN" build --ssr src/entry-server.ts --outDir dist/server
+          "$TSC_BIN" -p tsconfig.server.json
+          test -d dist/client
+          test -f dist/server/index.js
+        '' else if framework == "next" then ''
+          if [ ! -x "$NEXT_BIN" ] || [ ! -x "$TSC_BIN" ]; then
+            echo "node planner: expected next and tsc in locked node_modules for ${importerDir}" >&2
+            exit 2
+          fi
+          "$NEXT_BIN" build
+          "$TSC_BIN" -p tsconfig.server.json
+          test -d .next
+          mkdir -p dist/client
+          cp -R .next dist/client/.next
+          if [ -d public ]; then cp -R public dist/client/public; fi
+          if [ -f package.json ]; then cp package.json dist/client/package.json; fi
+          if [ -f next.config.mjs ]; then cp next.config.mjs dist/client/next.config.mjs; fi
+          if [ -f dist/server/index.js ]; then mv dist/server/index.js dist/server/server-main.js; fi
+          cat > dist/server/index.js <<'EOF'
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+process.chdir(path.resolve(__dirname, "../client"));
+await import("./server-main.js");
+EOF
+          test -d dist/client
+          test -f dist/server/index.js
+          test -f dist/server/server-main.js
+        '' else ''
+          echo "node planner: SSR webapp target ${name} missing framework label (framework:express|framework:next)" >&2
           exit 2
-        fi
-        "$VITE_BIN" build
-        test -d dist
+        ''}
       '';
       installPhase = ''
         set -euo pipefail
