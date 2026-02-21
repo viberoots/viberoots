@@ -61,6 +61,19 @@ async function stableGoModCacheRoot(): Promise<string> {
   return root;
 }
 
+async function stableXdgCacheRoot(): Promise<string> {
+  if (process.platform === "win32") return path.join(os.tmpdir(), "bucknix-xdg-cache");
+  const base = "/tmp";
+  let user = "";
+  try {
+    user = os.userInfo().username || "";
+  } catch {}
+  const suffix = user ? `-${user}` : "";
+  const root = path.join(base, `bucknix-xdg-cache${suffix}`);
+  await fsp.mkdir(root, { recursive: true }).catch(() => {});
+  return root;
+}
+
 async function removeCppReqsIfRequested(tmp: string): Promise<void> {
   if (String(process.env.TEST_EXCLUDE_CPP_REQS || "").trim() !== "1") return;
   const rels = [
@@ -166,12 +179,14 @@ export async function runInTemp<T>(
   process.env.BUCK_TEST_SRC = tmp;
   process.env.REPO_ROOT = process.cwd();
   const { home, removeOnExit: removeHome } = await resolveTestHome();
+  const xdgCacheHome = await stableXdgCacheRoot();
   const tempSetupEnv = {
     ...process.env,
     WORKSPACE_ROOT: tmp,
     BUCK_TEST_SRC: tmp,
     REPO_ROOT: process.cwd(),
     HOME: home,
+    XDG_CACHE_HOME: process.env.XDG_CACHE_HOME || xdgCacheHome,
   };
   const goModCacheRoot = await stableGoModCacheRoot();
   const initMode = await initTempRepoFromSeedStore({
@@ -266,6 +281,7 @@ export async function runInTemp<T>(
   exportEnv.WORKSPACE_ROOT = tmp;
   exportEnv.BUCK_TEST_SRC = tmp;
   exportEnv.HOME = home;
+  exportEnv.XDG_CACHE_HOME = exportEnv.XDG_CACHE_HOME || xdgCacheHome;
   if (!exportEnv.BUCK2_REAL_HOME && realHome) {
     exportEnv.BUCK2_REAL_HOME = realHome;
   }
