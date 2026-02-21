@@ -75,12 +75,19 @@ node_asset_stage(
     app = ":webapp_raw",
     assets = [
         {"src": "//projects/libs/{{ name }}-api:wasm", "dest": "top.wasm"},
+        {"src": ":wasm_inline", "dest": "wasm-inline/index.js"},
     ],
     out = "dist",
 )
 ```
 
-The app continues to fetch `/top.wasm`. The staging step guarantees it exists in `dist/`.
+The app continues to fetch `/top.wasm` and can import `/wasm-inline/index.js`. The staging step guarantees both artifacts are present.
+
+Variant-specific destination contract:
+
+- static webapp: stage to `dist/top.wasm` and `dist/wasm-inline/index.js`
+- express SSR webapp: stage to `dist/client/top.wasm` and `dist/client/wasm-inline/index.js`
+- next SSR webapp: stage to `dist/client/public/top.wasm` and `dist/client/public/wasm-inline/index.js`
 
 ### 3) Template pattern for other Node and TypeScript apps
 

@@ -267,21 +267,32 @@ If you change dependencies in an importer, update the lockfile and then run:
 
 ### Wasm asset staging for Node webapps
 
-I stage runtime Wasm artifacts explicitly so the built `dist/` includes them without changing Vite. The pattern is a two-step build where `node_webapp` produces the base output and `node_asset_stage` copies the Wasm into the final output directory.
+I stage runtime Wasm artifacts explicitly so the built `dist/` includes them without changing Vite/Next build steps. The pattern is a two-step build where `node_webapp` produces the base output and `node_asset_stage` copies the Wasm into the final output directory.
 
-Example:
+Shared client-side contract paths:
+
+- `webapp-static`: `dist/top.wasm` and `dist/wasm-inline/index.js`
+- `webapp-ssr-express`: `dist/client/top.wasm` and `dist/client/wasm-inline/index.js`
+- `webapp-ssr-next`: `dist/client/public/top.wasm` and `dist/client/public/wasm-inline/index.js`
+
+Static example:
 
 ```
 node_webapp(
-    name = "webapp_raw",
-    out = "dist",
+    name = "app_raw",
+)
+
+node_wasm_inline_module(
+    name = "wasm_inline",
+    src = "src/wasm-contract/top.wasm",
 )
 
 node_asset_stage(
-    name = "webapp",
-    app = ":webapp_raw",
+    name = "app",
+    app = ":app_raw",
     assets = [
-        {"src": "//projects/libs/math-api:wasm", "dest": "top.wasm"},
+        {"src": "src/wasm-contract/top.wasm", "dest": "top.wasm"},
+        {"src": ":wasm_inline", "dest": "wasm-inline/index.js"},
     ],
     out = "dist",
 )
@@ -309,7 +320,7 @@ node_asset_stage(
 
 ### Wasm inline modules for Node webapps
 
-I generate an inline module from a Wasm file and stage it into `dist/` alongside the webapp output. The webapp loads the module at runtime, so I do not need a Vite plugin.
+I generate an inline module from a Wasm file and stage it into the client-facing output directory alongside the webapp output. The webapp loads the module at runtime, so I do not need a Vite/Next plugin.
 
 Example:
 

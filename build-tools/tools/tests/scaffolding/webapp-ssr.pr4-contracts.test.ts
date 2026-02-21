@@ -170,6 +170,12 @@ test(
           assert.equal(runnable?.kind, "webapp-ssr");
           assert.equal(runnable?.framework, framework);
           assert.equal(runnable?.run.prod.argv[0], "node");
+          const clientContractRoot =
+            framework === "next"
+              ? path.join(selectedOut, "dist", "client", "public")
+              : path.join(selectedOut, "dist", "client");
+          await fsp.access(path.join(clientContractRoot, "top.wasm"));
+          await fsp.access(path.join(clientContractRoot, "wasm-inline", "index.js"));
           const line = formatRunnableLine({ label, runnable } as any);
           assert.ok(line.includes(label));
           assert.ok(line.includes("[webapp-ssr]"));

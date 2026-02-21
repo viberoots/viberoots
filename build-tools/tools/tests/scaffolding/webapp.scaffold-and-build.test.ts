@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
@@ -80,6 +81,16 @@ test("webapp: scaffold, glue, build dist via Buck", { timeout: TEST_TIMEOUT_MS }
           .pop() || "";
       const index = path.join(outPath, "dist", "index.html");
       if (!(await exists(index))) throw new Error("dist/index.html missing in Nix webapp output");
+      const stagedWasm = path.join(outPath, "dist", "top.wasm");
+      if (!(await exists(stagedWasm)))
+        throw new Error("dist/top.wasm missing in Nix webapp output");
+      const inlineModule = path.join(outPath, "dist", "wasm-inline", "index.js");
+      if (!(await exists(inlineModule))) {
+        throw new Error("dist/wasm-inline/index.js missing in Nix webapp output");
+      }
+      const entrySource = await fsp.readFile(path.join(appAbs, "src", "wasm-contract.ts"), "utf8");
+      assert.match(entrySource, /\/top\.wasm/);
+      assert.match(entrySource, /\/wasm-inline\/index\.js/);
     });
   } finally {
     if (prevRoots === undefined) delete process.env.TEST_RSYNC_ROOTS;

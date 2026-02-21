@@ -164,6 +164,18 @@ async function scaffoldBuildAndSmoke(
   const clientDir = path.join(outPath, "dist", "client");
   if (!(await exists(serverEntry))) throw new Error(`missing serverEntry artifact: ${serverEntry}`);
   if (!(await exists(clientDir))) throw new Error(`missing clientDir artifact: ${clientDir}`);
+  const stagedWasm = path.join(clientDir, "top.wasm");
+  if (!(await exists(stagedWasm)))
+    throw new Error(`missing staged client wasm artifact: ${stagedWasm}`);
+  const inlineModule = path.join(clientDir, "wasm-inline", "index.js");
+  if (!(await exists(inlineModule))) {
+    throw new Error(`missing staged client inline wasm module: ${inlineModule}`);
+  }
+  if (template == "webapp-ssr-express") {
+    const clientSource = await fsp.readFile(path.join(appAbs, "src", "wasm-contract.ts"), "utf8");
+    assert.match(clientSource, /\/top\.wasm/);
+    assert.match(clientSource, /\/wasm-inline\/index\.js/);
+  }
 
   const runnable = await inferRunnableFromOutPath({
     label: "//projects/apps/demo-ssr:app",
@@ -201,6 +213,9 @@ async function assertNextScaffoldContractOnly(tmp: string, _$: any): Promise<voi
   const targets = await fsp.readFile(path.join(appAbs, "TARGETS"), "utf8");
   assert.ok(targets.includes("webapp:ssr"));
   assert.ok(targets.includes("framework:next"));
+  const pageSource = await fsp.readFile(path.join(appAbs, "app", "wasm-contract.ts"), "utf8");
+  assert.match(pageSource, /\/top\.wasm/);
+  assert.match(pageSource, /\/wasm-inline\/index\.js/);
 }
 
 test(

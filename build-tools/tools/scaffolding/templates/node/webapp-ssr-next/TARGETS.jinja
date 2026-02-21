@@ -1,8 +1,23 @@
-load("//build-tools/node:defs.bzl", "node_webapp", "nix_node_test")
+load("//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module", "node_webapp", "nix_node_test")
 
 node_webapp(
+    name = "app_raw",
+)
+
+node_wasm_inline_module(
+    name = "wasm_inline",
+    src = "app/wasm-contract/top.wasm",
+)
+
+node_asset_stage(
     name = "app",
+    app = ":app_raw",
+    assets = [
+        {"src": "app/wasm-contract/top.wasm", "dest": "client/public/top.wasm"},
+        {"src": ":wasm_inline", "dest": "client/public/wasm-inline/index.js"},
+    ],
     labels = ["lang:node", "kind:app", "webapp:ssr", "framework:next"],
+    out = "dist",
 )
 
 nix_node_test(

@@ -1,6 +1,23 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { readWasmContractBytes } from "./wasm-contract";
+
 export default function HomePage() {
+  const [wasmBytes, setWasmBytes] = useState<number | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    void readWasmContractBytes().then((bytes) => {
+      if (mounted) setWasmBytes(bytes.byteLength);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
-    <main data-ssr-marker="next">
+    <main data-ssr-marker="next" data-wasm-bytes={wasmBytes == null ? "pending" : String(wasmBytes)}>
       <h1>Hello from Next SSR</h1>
     </main>
   );

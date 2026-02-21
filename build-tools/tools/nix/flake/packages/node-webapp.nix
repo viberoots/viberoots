@@ -53,6 +53,33 @@ let
             WEBAPP_FRAMEWORK="static"
           fi
           phase_log "webapp-framework-$WEBAPP_FRAMEWORK"
+          stage_wasm_contract() {
+            local wasm_src="$1"
+            local client_root="$2"
+            if [ ! -f "$wasm_src" ]; then
+              return 0
+            fi
+            mkdir -p "$client_root/wasm-inline"
+            cp -f "$wasm_src" "$client_root/top.wasm"
+            local wasm_b64
+            wasm_b64="$(base64 < "$wasm_src" | tr -d '\n')"
+            cat > "$client_root/wasm-inline/index.js" <<EOF
+export const wasmBytesBase64 = '$wasm_b64';
+const decodeBase64 = (value) => {
+  if (typeof atob === "function") {
+    const bin = atob(value);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  if (typeof Buffer !== "undefined") {
+    return Uint8Array.from(Buffer.from(value, "base64"));
+  }
+  throw new Error("wasm inline module: no base64 decoder available");
+};
+export const wasmBytes = () => decodeBase64(wasmBytesBase64);
+EOF
+          }
           HB_PID=""
           trap 'if [ -n "$HB_PID" ]; then kill "$HB_PID" >/dev/null 2>&1 || true; fi' EXIT
           (
@@ -69,6 +96,7 @@ let
             fi
             "$VITE_BIN" build
             test -d dist
+            stage_wasm_contract "src/wasm-contract/top.wasm" "dist"
           elif [ "$WEBAPP_FRAMEWORK" = "express" ]; then
             if [ ! -x "$VITE_BIN" ] || [ ! -x "$TSC_BIN" ]; then
               echo "[nix] ERROR: expected vite and tsc binaries for Express SSR build" >&2
@@ -79,6 +107,7 @@ let
             "$TSC_BIN" -p tsconfig.server.json
             test -d dist/client
             test -f dist/server/index.js
+            stage_wasm_contract "src/wasm-contract/top.wasm" "dist/client"
           else
             if [ ! -x "$NEXT_BIN" ] || [ ! -x "$TSC_BIN" ]; then
               echo "[nix] ERROR: expected next and tsc binaries for Next SSR build" >&2
@@ -105,6 +134,7 @@ EOF
             test -d dist/client
             test -f dist/server/index.js
             test -f dist/server/server-main.js
+            stage_wasm_contract "app/wasm-contract/top.wasm" "dist/client/public"
           fi
           if [ -n "$HB_PID" ]; then kill "$HB_PID" >/dev/null 2>&1 || true; fi
           phase_log "webapp-build-complete"
