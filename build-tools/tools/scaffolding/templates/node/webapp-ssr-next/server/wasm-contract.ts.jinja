@@ -1,0 +1,25 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import * as fsp from "node:fs/promises";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const wasmCandidates = [
+  path.resolve(__dirname, "wasm-contract", "top.wasm"),
+  path.resolve(__dirname, "../client/public/top.wasm"),
+  path.resolve(__dirname, "../client/top.wasm"),
+];
+
+export async function readServerWasmContractByteLength(): Promise<number> {
+  let bytes: Buffer | null = null;
+  for (const p of wasmCandidates) {
+    try {
+      bytes = await fsp.readFile(p);
+      break;
+    } catch {}
+  }
+  if (!bytes) {
+    throw new Error("server wasm contract asset is missing from expected runtime paths");
+  }
+  return bytes.byteLength;
+}

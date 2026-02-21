@@ -84,6 +84,10 @@ test("webapp: scaffold, glue, build dist via Buck", { timeout: TEST_TIMEOUT_MS }
       const stagedWasm = path.join(outPath, "dist", "top.wasm");
       if (!(await exists(stagedWasm)))
         throw new Error("dist/top.wasm missing in Nix webapp output");
+      const serverParityWasm = path.join(outPath, "dist", "server", "wasm-contract", "top.wasm");
+      if (!(await exists(serverParityWasm))) {
+        throw new Error("dist/server/wasm-contract/top.wasm missing in Nix webapp output");
+      }
       const inlineModule = path.join(outPath, "dist", "wasm-inline", "index.js");
       if (!(await exists(inlineModule))) {
         throw new Error("dist/wasm-inline/index.js missing in Nix webapp output");

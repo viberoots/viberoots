@@ -56,11 +56,14 @@ let
           stage_wasm_contract() {
             local wasm_src="$1"
             local client_root="$2"
+            local server_root="$3"
             if [ ! -f "$wasm_src" ]; then
               return 0
             fi
             mkdir -p "$client_root/wasm-inline"
+            mkdir -p "$server_root"
             cp -f "$wasm_src" "$client_root/top.wasm"
+            cp -f "$wasm_src" "$server_root/top.wasm"
             local wasm_b64
             wasm_b64="$(base64 < "$wasm_src" | tr -d '\n')"
             cat > "$client_root/wasm-inline/index.js" <<EOF
@@ -96,7 +99,7 @@ EOF
             fi
             "$VITE_BIN" build
             test -d dist
-            stage_wasm_contract "src/wasm-contract/top.wasm" "dist"
+            stage_wasm_contract "src/wasm-contract/top.wasm" "dist" "dist/server/wasm-contract"
           elif [ "$WEBAPP_FRAMEWORK" = "express" ]; then
             if [ ! -x "$VITE_BIN" ] || [ ! -x "$TSC_BIN" ]; then
               echo "[nix] ERROR: expected vite and tsc binaries for Express SSR build" >&2
@@ -107,7 +110,7 @@ EOF
             "$TSC_BIN" -p tsconfig.server.json
             test -d dist/client
             test -f dist/server/index.js
-            stage_wasm_contract "src/wasm-contract/top.wasm" "dist/client"
+            stage_wasm_contract "src/wasm-contract/top.wasm" "dist/client" "dist/server/wasm-contract"
           else
             if [ ! -x "$NEXT_BIN" ] || [ ! -x "$TSC_BIN" ]; then
               echo "[nix] ERROR: expected next and tsc binaries for Next SSR build" >&2
@@ -134,7 +137,7 @@ EOF
             test -d dist/client
             test -f dist/server/index.js
             test -f dist/server/server-main.js
-            stage_wasm_contract "app/wasm-contract/top.wasm" "dist/client/public"
+            stage_wasm_contract "app/wasm-contract/top.wasm" "dist/client/public" "dist/server/wasm-contract"
           fi
           if [ -n "$HB_PID" ]; then kill "$HB_PID" >/dev/null 2>&1 || true; fi
           phase_log "webapp-build-complete"

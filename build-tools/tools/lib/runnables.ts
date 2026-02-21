@@ -153,6 +153,7 @@ export async function inferRunnableFromOutPath(opts: {
   if (wantSsr) {
     const serverEntry = path.join(dist, "server", "index.js");
     const clientDir = path.join(dist, "client");
+    const serverWasmContract = path.join(dist, "server", "wasm-contract", "top.wasm");
     return {
       kind: "webapp-ssr",
       framework: opts.framework || undefined,
@@ -166,7 +167,7 @@ export async function inferRunnableFromOutPath(opts: {
             }
           : {}),
       },
-      artifacts: { serverEntry, clientDir },
+      artifacts: { serverEntry, clientDir, serverWasmContract },
     };
   }
   try {
@@ -190,7 +191,7 @@ export async function inferRunnableFromOutPath(opts: {
           }
         : {}),
     },
-    artifacts: { dist },
+    artifacts: { dist, serverWasmContract: path.join(dist, "server", "wasm-contract", "top.wasm") },
   };
 }
 

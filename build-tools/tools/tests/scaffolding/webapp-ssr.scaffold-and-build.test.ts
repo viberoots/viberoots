@@ -14,13 +14,15 @@ import { inferRunnableFromOutPath } from "../../lib/runnables.ts";
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
 
-async function httpGet(url: string): Promise<{ status: number; body: string }> {
+async function httpGet(
+  url: string,
+): Promise<{ status: number; body: string; headers: http.IncomingHttpHeaders }> {
   return await new Promise((resolve, reject) => {
     const req = http.get(url, (res) => {
       let body = "";
       res.setEncoding("utf8");
       res.on("data", (chunk) => (body += chunk));
-      res.on("end", () => resolve({ status: res.statusCode || 0, body }));
+      res.on("end", () => resolve({ status: res.statusCode || 0, body, headers: res.headers }));
     });
     req.on("error", reject);
     req.end();
@@ -85,7 +87,7 @@ async function buildSsrWebappOutPath(
 async function runNodeServerSmoke(
   appRoot: string,
   expectedMarker: string,
-): Promise<{ status: number; body: string }> {
+): Promise<{ status: number; body: string; headers: http.IncomingHttpHeaders }> {
   const port = await pickFreePort();
   const serverEntry = path.join(appRoot, "dist", "server", "index.js");
   const child = spawn("node", [serverEntry], {
@@ -132,16 +134,17 @@ async function runNodeServerSmoke(
 
 async function scaffoldBuildAndSmoke(
   tmp: string,
+  appName: string,
   template: "webapp-ssr-express" | "webapp-ssr-next",
   framework: "express" | "next",
   marker: string,
   runRuntimeSmoke: boolean,
   _$: any,
 ): Promise<void> {
-  const importer = "projects/apps/demo-ssr";
+  const importer = path.join("projects", "apps", appName);
   const appAbs = path.join(tmp, importer);
   const $ = _$({ cwd: tmp, stdio: "inherit" });
-  await $`scaf new node ${template} demo-ssr --yes --no-tests`;
+  await $`scaf new node ${template} ${appName} --yes --no-tests`;
   await _$({
     cwd: appAbs,
     env: { ...process.env },
@@ -150,7 +153,7 @@ async function scaffoldBuildAndSmoke(
   await _$({
     cwd: tmp,
     stdio: "pipe",
-  })`git add -A projects/apps/demo-ssr build-tools/tools/nix/node-modules.hashes.json build-tools/tools/nix/langs.nix build-tools/lang/importer_roots.bzl build-tools/tools/buck third_party/providers`;
+  })`git add -A ${importer} build-tools/tools/nix/node-modules.hashes.json build-tools/tools/nix/langs.nix build-tools/lang/importer_roots.bzl build-tools/tools/buck third_party/providers`;
 
   const outPath = await buildSsrWebappOutPath(
     tmp,
@@ -162,12 +165,30 @@ async function scaffoldBuildAndSmoke(
 
   const serverEntry = path.join(outPath, "dist", "server", "index.js");
   const clientDir = path.join(outPath, "dist", "client");
+  const clientWasmRoot = framework === "next" ? path.join(clientDir, "public") : clientDir;
   if (!(await exists(serverEntry))) throw new Error(`missing serverEntry artifact: ${serverEntry}`);
   if (!(await exists(clientDir))) throw new Error(`missing clientDir artifact: ${clientDir}`);
-  const stagedWasm = path.join(clientDir, "top.wasm");
+  const stagedWasm = path.join(clientWasmRoot, "top.wasm");
   if (!(await exists(stagedWasm)))
     throw new Error(`missing staged client wasm artifact: ${stagedWasm}`);
-  const inlineModule = path.join(clientDir, "wasm-inline", "index.js");
+  const serverWasmCandidates = [
+    path.join(outPath, "dist", "server", "wasm-contract", "top.wasm"),
+    path.join(clientDir, "top.wasm"),
+    path.join(clientDir, "public", "top.wasm"),
+  ];
+  let foundServerWasm = false;
+  for (const candidate of serverWasmCandidates) {
+    if (await exists(candidate)) {
+      foundServerWasm = true;
+      break;
+    }
+  }
+  if (!foundServerWasm) {
+    throw new Error(
+      `missing server runtime wasm asset candidates: ${serverWasmCandidates.join(", ")}`,
+    );
+  }
+  const inlineModule = path.join(clientWasmRoot, "wasm-inline", "index.js");
   if (!(await exists(inlineModule))) {
     throw new Error(`missing staged client inline wasm module: ${inlineModule}`);
   }
@@ -196,26 +217,9 @@ async function scaffoldBuildAndSmoke(
     await fsp.cp(path.join(outPath, "dist"), path.join(appAbs, "dist"), { recursive: true });
     const res = await runNodeServerSmoke(appAbs, marker);
     assert.equal(res.status, 200);
+    const serverWasmHeader = Number(String(res.headers["x-server-wasm-bytes"] || "0"));
+    assert.ok(serverWasmHeader > 0, "expected x-server-wasm-bytes header from server wasm path");
   }
-}
-
-async function assertNextScaffoldContractOnly(tmp: string, _$: any): Promise<void> {
-  const $ = _$({ cwd: tmp, stdio: "inherit" });
-  await $`scaf new node webapp-ssr-next demo-ssr-next --yes --no-tests`;
-  const appAbs = path.join(tmp, "projects", "apps", "demo-ssr-next");
-  const pkg = JSON.parse(await fsp.readFile(path.join(appAbs, "package.json"), "utf8")) as {
-    scripts?: Record<string, string>;
-  };
-  const scripts = pkg.scripts || {};
-  assert.equal(typeof scripts["build:ssr"], "string");
-  assert.equal(typeof scripts["start:ssr"], "string");
-  assert.ok(String(scripts["start:ssr"]).startsWith("node "));
-  const targets = await fsp.readFile(path.join(appAbs, "TARGETS"), "utf8");
-  assert.ok(targets.includes("webapp:ssr"));
-  assert.ok(targets.includes("framework:next"));
-  const pageSource = await fsp.readFile(path.join(appAbs, "app", "wasm-contract.ts"), "utf8");
-  assert.match(pageSource, /\/top\.wasm/);
-  assert.match(pageSource, /\/wasm-inline\/index\.js/);
 }
 
 test(
@@ -231,13 +235,22 @@ test(
       await runInTemp("node-webapp-ssr-scaffold-build", async (tmp, _$) => {
         await scaffoldBuildAndSmoke(
           tmp,
+          "demo-ssr-express",
           "webapp-ssr-express",
           "express",
           'data-ssr-marker="express"',
           true,
           _$,
         );
-        await assertNextScaffoldContractOnly(tmp, _$);
+        await scaffoldBuildAndSmoke(
+          tmp,
+          "demo-ssr-next",
+          "webapp-ssr-next",
+          "next",
+          'data-ssr-marker="next"',
+          true,
+          _$,
+        );
       });
     } finally {
       if (prevRoots === undefined) delete process.env.TEST_RSYNC_ROOTS;

@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "scripts": {
     "dev:ssr": "next dev -H 127.0.0.1 -p 4173",
-    "build:ssr": "next build && tsc -p tsconfig.server.json",
+    "build:ssr": "next build && tsc -p tsconfig.server.json && mkdir -p dist/server/wasm-contract && cp app/wasm-contract/top.wasm dist/server/wasm-contract/top.wasm",
     "start:ssr": "node dist/server/index.js",
     {% if includeNodeTests %}
     "test": "vitest run"

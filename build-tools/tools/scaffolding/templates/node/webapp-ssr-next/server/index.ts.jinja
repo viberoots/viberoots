@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { parse } from "node:url";
 import next from "next";
+import { readServerWasmContractByteLength } from "./wasm-contract.js";
 
 const port = Number(process.env.PORT || "4173");
 const host = "127.0.0.1";
@@ -13,10 +14,12 @@ const app = (next as unknown as (opts: {
   getRequestHandler: () => (req: unknown, res: unknown, parsedUrl: unknown) => void;
 })({ dev: false, hostname: host, port });
 const handle = app.getRequestHandler();
+const serverWasmByteLength = await readServerWasmContractByteLength();
 
 await app.prepare();
 
 createServer((req, res) => {
+  res.setHeader("x-server-wasm-bytes", String(serverWasmByteLength));
   const parsedUrl = parse(req.url || "/", true);
   handle(req, res, parsedUrl);
 }).listen(port, host, () => {

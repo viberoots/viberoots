@@ -627,12 +627,13 @@ The planner manifest (`<graph-out>/manifest.json`) preserves legacy `bins` field
 - `runnable.run.dev`: optional argv contract for development-mode execution.
 - `webapp-ssr` production startup is canonical: `run.prod.argv = ["node", "<serverEntry>"]`.
 - `runnable.artifacts`: referenced artifact paths.
-  - Static webapp example: `{ "dist": "<distDir>" }`
-  - SSR webapp example: `{ "serverEntry": "<path>", "clientDir": "<path>" }`
+  - Static webapp example: `{ "dist": "<distDir>", "serverWasmContract": "<dist/server/wasm-contract/top.wasm>" }`
+  - SSR webapp example: `{ "serverEntry": "<path>", "clientDir": "<path>", "serverWasmContract": "<dist/server/wasm-contract/top.wasm>" }`
   - Optional adapter fields are allowed (`assetManifest`, `publicDir`).
 - Optional runtime metadata is supported: `runtime.serverCwd`, `runtime.envFiles`, `runtime.nodeArgs`.
 - SSR packaging contract:
   - Express and Next adapters both normalize to `dist/server/index.js` and `dist/client/`.
+  - Server-side Wasm contract path is shared across static and SSR outputs: `dist/server/wasm-contract/top.wasm`.
   - Next packaging must copy runtime assets under `dist/client` and keep server startup at `node dist/server/index.js`.
   - Missing `serverEntry` or `clientDir` is a hard build failure. There is no fallback to static-host serving for SSR targets.
 - Docker-aligned startup:

@@ -635,6 +635,133 @@ Public args:
 - `lockfile_label` string. Lockfile label in the form `lockfile:<path>#<package>`.
   - Example: `lockfile_label = "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"`
 
+### End-to-end webapp WASM examples
+
+These examples show complete wiring for webapps that need runtime WASM assets plus an inline module.
+
+```python
+# static webapp: top.wasm + wasm-inline module in dist/
+load("//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module", "node_webapp")
+
+node_webapp(
+    name = "app_raw",
+)
+
+node_wasm_inline_module(
+    name = "wasm_inline",
+    src = "src/wasm-contract/top.wasm",
+)
+
+node_asset_stage(
+    name = "app",
+    app = ":app_raw",
+    assets = [
+        {"src": "src/wasm-contract/top.wasm", "dest": "top.wasm"},
+        {"src": ":wasm_inline", "dest": "wasm-inline/index.js"},
+        {"src": "src/wasm-contract/top.wasm", "dest": "server/wasm-contract/top.wasm"},
+    ],
+    labels = ["lang:node", "kind:app", "webapp:static"],
+    out = "dist",
+)
+```
+
+```python
+# SSR express webapp: client + server contract paths
+load("//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module", "node_webapp")
+
+node_webapp(
+    name = "app_raw",
+)
+
+node_wasm_inline_module(
+    name = "wasm_inline",
+    src = "src/wasm-contract/top.wasm",
+)
+
+node_asset_stage(
+    name = "app",
+    app = ":app_raw",
+    assets = [
+        {"src": "src/wasm-contract/top.wasm", "dest": "client/top.wasm"},
+        {"src": ":wasm_inline", "dest": "client/wasm-inline/index.js"},
+        {"src": "src/wasm-contract/top.wasm", "dest": "server/wasm-contract/top.wasm"},
+    ],
+    labels = ["lang:node", "kind:app", "webapp:ssr", "framework:express"],
+    out = "dist",
+)
+```
+
+```python
+# SSR next webapp: client/public + server contract paths
+load("//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module", "node_webapp")
+
+node_webapp(
+    name = "app_raw",
+)
+
+node_wasm_inline_module(
+    name = "wasm_inline",
+    src = "app/wasm-contract/top.wasm",
+)
+
+node_asset_stage(
+    name = "app",
+    app = ":app_raw",
+    assets = [
+        {"src": "app/wasm-contract/top.wasm", "dest": "client/public/top.wasm"},
+        {"src": ":wasm_inline", "dest": "client/public/wasm-inline/index.js"},
+        {"src": "app/wasm-contract/top.wasm", "dest": "server/wasm-contract/top.wasm"},
+    ],
+    labels = ["lang:node", "kind:app", "webapp:ssr", "framework:next"],
+    out = "dist",
+)
+```
+
+TypeScript usage examples:
+
+```ts
+// client-side usage (static, SSR express, and SSR next)
+// For SSR next, these URLs resolve from dist/client/public.
+// For static and SSR express, they resolve from dist/ and dist/client.
+export async function readWasmContractBytes(): Promise<Uint8Array> {
+  const wasmUrl = new URL("/top.wasm", window.location.href).toString();
+  const wasmRes = await fetch(wasmUrl);
+  if (!wasmRes.ok) throw new Error(`failed to load wasm: ${wasmRes.status}`);
+
+  const inlineUrl = new URL("/wasm-inline/index.js", window.location.href).toString();
+  const inlineRes = await fetch(inlineUrl);
+  if (!inlineRes.ok) throw new Error(`failed to load inline module: ${inlineRes.status}`);
+
+  return new Uint8Array(await wasmRes.arrayBuffer());
+}
+```
+
+```ts
+// server-side usage (SSR express and SSR next)
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import * as fsp from "node:fs/promises";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const wasmCandidates = [
+  path.resolve(__dirname, "wasm-contract", "top.wasm"),
+  path.resolve(__dirname, "../client/top.wasm"),
+  path.resolve(__dirname, "../client/public/top.wasm"),
+];
+
+export async function readServerWasmContractByteLength(): Promise<number> {
+  for (const candidate of wasmCandidates) {
+    try {
+      const bytes = await fsp.readFile(candidate);
+      return bytes.byteLength;
+    } catch {}
+  }
+  throw new Error("server wasm contract asset is missing from expected runtime paths");
+}
+```
+
 ## Python macros
 
 Load from `//build-tools/python:defs.bzl`.

@@ -15,6 +15,7 @@ node_asset_stage(
     assets = [
         {"src": "src/wasm-contract/top.wasm", "dest": "top.wasm"},
         {"src": ":wasm_inline", "dest": "wasm-inline/index.js"},
+        {"src": "src/wasm-contract/top.wasm", "dest": "server/wasm-contract/top.wasm"},
     ],
     labels = ["lang:node", "kind:app", "webapp:static"],
     out = "dist",

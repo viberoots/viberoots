@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "scripts": {
     "dev:ssr": "vite dev --host 127.0.0.1 --port 5173 --strictPort",
-    "build:ssr": "vite build --outDir dist/client && vite build --ssr src/entry-server.ts --outDir dist/server && tsc -p tsconfig.server.json",
+    "build:ssr": "vite build --outDir dist/client && vite build --ssr src/entry-server.ts --outDir dist/server && tsc -p tsconfig.server.json && mkdir -p dist/server/wasm-contract && cp src/wasm-contract/top.wasm dist/server/wasm-contract/top.wasm",
     "start:ssr": "node dist/server/index.js",
     {% if includeNodeTests %}
     "test": "vitest run"

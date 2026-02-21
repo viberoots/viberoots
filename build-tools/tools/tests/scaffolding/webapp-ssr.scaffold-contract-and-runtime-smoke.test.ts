@@ -13,13 +13,15 @@ import { exists, runInTemp } from "../lib/test-helpers";
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
 
-async function httpGet(url: string): Promise<{ status: number; body: string }> {
+async function httpGet(
+  url: string,
+): Promise<{ status: number; body: string; headers: http.IncomingHttpHeaders }> {
   return await new Promise((resolve, reject) => {
     const req = http.get(url, (res) => {
       let body = "";
       res.setEncoding("utf8");
       res.on("data", (chunk) => (body += chunk));
-      res.on("end", () => resolve({ status: res.statusCode || 0, body }));
+      res.on("end", () => resolve({ status: res.statusCode || 0, body, headers: res.headers }));
     });
     req.on("error", reject);
     req.end();
@@ -30,7 +32,7 @@ async function waitForServer(
   url: string,
   expectedMarker: string,
   timeoutMs = 45000,
-): Promise<{ status: number; body: string }> {
+): Promise<{ status: number; body: string; headers: http.IncomingHttpHeaders }> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     try {
@@ -140,6 +142,8 @@ async function runExpressRuntimeSmoke(tmp: string, marker: string, _$: any): Pro
   try {
     const res = await waitForServer(`http://127.0.0.1:${port}/`, marker);
     assert.equal(res.status, 200);
+    const serverWasmHeader = Number(String(res.headers["x-server-wasm-bytes"] || "0"));
+    assert.ok(serverWasmHeader > 0, "expected x-server-wasm-bytes header from server wasm path");
   } finally {
     try {
       if (child.pid) process.kill(-child.pid, "SIGINT");
@@ -158,20 +162,23 @@ async function runExpressRuntimeSmoke(tmp: string, marker: string, _$: any): Pro
 async function runNextRuntimeSmoke(tmp: string, marker: string, _$: any): Promise<void> {
   const appAbs = path.join(tmp, "projects", "apps", "demo-ssr");
   await installNodeModules(appAbs, _$);
+  await _$({
+    cwd: appAbs,
+    stdio: "inherit",
+    env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1" },
+  })`pnpm run build:ssr`;
   const port = await pickFreePort();
-  const child = spawn(
-    "node",
-    ["./node_modules/next/dist/bin/next", "dev", "-H", "127.0.0.1", "-p", String(port)],
-    {
-      cwd: appAbs,
-      stdio: "pipe",
-      detached: true,
-      env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", NODE_OPTIONS: "" },
-    },
-  );
+  const child = spawn("node", ["dist/server/index.js"], {
+    cwd: appAbs,
+    stdio: "pipe",
+    detached: true,
+    env: { ...process.env, PORT: String(port), NEXT_TELEMETRY_DISABLED: "1", NODE_OPTIONS: "" },
+  });
   try {
     const res = await waitForServer(`http://127.0.0.1:${port}/`, marker, 90000);
     assert.equal(res.status, 200);
+    const serverWasmHeader = Number(String(res.headers["x-server-wasm-bytes"] || "0"));
+    assert.ok(serverWasmHeader > 0, "expected x-server-wasm-bytes header from server wasm path");
   } finally {
     try {
       if (child.pid) process.kill(-child.pid, "SIGINT");
