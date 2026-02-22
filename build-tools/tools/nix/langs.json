@@ -25,7 +25,7 @@
         "lockfileLabels": true,
         "testAutoWire": false
       },
-      "templatesDir": "build-tools/tools/scaffolding/templates/node"
+      "templatesDir": "build-tools/tools/scaffolding/templates/ts"
     },
     {
       "id": "cpp",

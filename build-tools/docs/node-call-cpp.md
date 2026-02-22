@@ -2,6 +2,8 @@
 
 This document proposes a scaffolding template that enables calling C++ from a Node package, aligned with our Buck2 + Nix architecture and project methodology.
 
+For scaffolding commands, template identity uses `ts/*` (for example `scaf new ts cpp-addon ...`), while `node` terms in this document refer to runtime/toolchain behavior.
+
 ### Goals and scope
 
 - Provide a reproducible, cross‑platform, hermetic way for Node code to call C++.
@@ -157,7 +159,7 @@ This keeps C++ a planner language and avoids introducing Node‑specific logic i
 
 ### Post‑gen and local iteration
 
-- After `scaf new node cpp-addon <name>`:
+- After `scaf new ts cpp-addon <name>`:
   - If the workspace lacks a PNPM lock for the Node importer, run dependency setup (per existing Node templates). The Node project follows the same dev shell conventions.
   - Run:
     - `node build-tools/tools/buck/export-graph.ts`
@@ -182,7 +184,7 @@ Phase 1 — Scaffolding template
 - Add `build-tools/tools/scaffolding/templates/node/cpp-addon/` with the content outlined above.
 - Ensure the Node `TARGETS` uses a `nix_node_gen` helper (e.g., `:copy_addon`) that copies `$(location //projects/libs/{{ name }}-native:napi_addon)` into a `native/{{ addon_name }}.node` path the wrapper loads.
 - Acceptance:
-  - `scaf new node cpp-addon demo` creates both `projects/libs/demo` and `projects/libs/demo-native`.
+  - `scaf new ts cpp-addon demo` creates both `projects/libs/demo` and `projects/libs/demo-native`.
   - `buck2 build //projects/libs/demo:demo` and `buck2 test //projects/libs/demo:demo_test` pass locally across supported platforms.
 
 Phase 2 — Docs and examples

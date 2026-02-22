@@ -4,6 +4,8 @@
 
 Node projects in this repo are already hermetic for builds (pnpm store as FOD; importer‑scoped `node-modules` derivations; macros that stamp `lang:node` and importer lockfile labels). What we do not yet have is a first‑class, hermetic test rule for Node that integrates cleanly with Buck2 test execution, mirrors our Go/C++ patterns, and works per‑importer without guessing each team’s runner/build chain.
 
+Scaffolding command examples use `scaf new ts ...` for template identity; `node` naming here remains runtime/toolchain terminology.
+
 ### Goals
 
 - Hermetic, reproducible tests for Node importers (apps/_, libs/_) with pinned toolchain and zero network
@@ -243,7 +245,7 @@ The `node_nix_test` rule’s `ExternalRunnerTestInfo` will:
     `nix_node_test` example target when `test/` exists.
 
 - **Acceptance criteria**
-  - `scaf new node lib …` and `scaf new node cli …` produce projects where:
+  - `scaf new ts lib …` and `scaf new ts cli …` produce projects where:
     - `buck2 test //<importer>:unit` (or equivalent) passes via the Nix runner without custom
       `cmd` shims, discovering tests from `test/*.test.ts`.
     - `COVERAGE=1 buck2 test //<importer>:unit` produces coverage artifacts in the derivation out.

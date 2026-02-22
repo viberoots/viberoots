@@ -135,6 +135,36 @@ const EXPECTATIONS: TemplateExpectation[] = [
       "build-tools/tools/scaffolding/templates/ts/wasm-app/",
     ],
   },
+  {
+    script: "build-tools/tools/tests/scaffolding/pr3-ts-command-path.tooling-contract.test.ts",
+    requiredLabels: [
+      "template:ts/lib",
+      "template:ts/cli",
+      "template:ts/webapp-static",
+      "template:shared",
+    ],
+    requiredTemplateRoots: [
+      "build-tools/tools/scaffolding/templates/ts/lib/",
+      "build-tools/tools/scaffolding/templates/ts/cli/",
+      "build-tools/tools/scaffolding/templates/ts/webapp-static/",
+    ],
+  },
+  {
+    script: "build-tools/tools/tests/scaffolding/pr3-ts-command-path.docs-contract.test.ts",
+    requiredLabels: [
+      "template:ts/lib",
+      "template:ts/cli",
+      "template:ts/webapp-static",
+      "template:ts/cpp-addon",
+      "template:shared",
+    ],
+    requiredTemplateRoots: [
+      "build-tools/tools/scaffolding/templates/ts/lib/",
+      "build-tools/tools/scaffolding/templates/ts/cli/",
+      "build-tools/tools/scaffolding/templates/ts/webapp-static/",
+      "build-tools/tools/scaffolding/templates/ts/cpp-addon/",
+    ],
+  },
 ];
 
 function targetNameFromScript(script: string): string {

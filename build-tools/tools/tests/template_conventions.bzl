@@ -83,6 +83,14 @@ _TEMPLATE_TEST_CONVENTIONS = {
         "template_ids": ["ts/go-cpp-lib", "ts/wasm-app"],
         "classification": "template:shared",
     },
+    "build-tools/tools/tests/scaffolding/pr3-ts-command-path.tooling-contract.test.ts": {
+        "template_ids": ["ts/lib", "ts/cli", "ts/webapp-static"],
+        "classification": "template:shared",
+    },
+    "build-tools/tools/tests/scaffolding/pr3-ts-command-path.docs-contract.test.ts": {
+        "template_ids": ["ts/lib", "ts/cli", "ts/webapp-static", "ts/cpp-addon"],
+        "classification": "template:shared",
+    },
 }
 
 TEMPLATE_SAFETY_FLOOR_SCRIPTS = [

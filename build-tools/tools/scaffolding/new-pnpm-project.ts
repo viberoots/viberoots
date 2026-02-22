@@ -71,7 +71,7 @@ async function main(): Promise<void> {
   ];
   const confirm = yes ? ["--yes"] : [];
 
-  await $`scaf new node ${template} ${name} ${confirm} ${extra}`;
+  await $`scaf new ts ${template} ${name} ${confirm} ${extra}`;
 
   if (runSetup) {
     // Best-effort: create lockfile-only and refresh glue

@@ -8,8 +8,10 @@ This plan follows the PR section structure used in `docs/build-history/quad-alig
 2. [Non-Goals](#non-goals)
 3. [PR-1: Unify template identity and roots under `ts`](#pr-1-unify-template-identity-and-roots-under-ts)
 4. [PR-2: Cut over CLI/API surface and complete naming cleanup](#pr-2-cut-over-cliapi-surface-and-complete-naming-cleanup)
-5. [Rollout and Sequencing](#rollout-and-sequencing)
-6. [Completion Criteria](#completion-criteria)
+5. [PR-3: Cut over dependent tooling and user docs to `ts` command paths](#pr-3-cut-over-dependent-tooling-and-user-docs-to-ts-command-paths)
+6. [PR-4: Centralize taxonomy consumption and add anti-drift contracts](#pr-4-centralize-taxonomy-consumption-and-add-anti-drift-contracts)
+7. [Rollout and Sequencing](#rollout-and-sequencing)
+8. [Completion Criteria](#completion-criteria)
 
 ## Context and Decision
 
@@ -182,14 +184,119 @@ Implement.
 
 ---
 
+## PR-3: Cut over dependent tooling and user docs to `ts` command paths
+
+### Description
+
+I will remove remaining internal and user-facing command-surface drift where TypeScript scaffolding still routes through legacy `node` commands, and align related docs in the same PR.
+
+### Scope & Changes
+
+- Update helper tooling that still shells through legacy commands (for example `new-pnpm-project.ts`) to call `scaf new ts ...`.
+- Update any language/tooling manifest metadata that still points TypeScript scaffolding roots to `templates/node` so discoverability reflects the `ts/*` canonical model.
+- Keep runtime/toolchain naming (`node`, `nix_node_*`, `node_webapp`) unchanged where it is not template identity.
+- Update handbook and build-tool docs that still instruct `scaf new node {typescript-template}` to use `scaf new ts {template}`.
+
+### Tests (in this PR)
+
+- Add command-path regression tests for helper entrypoints that scaffold TypeScript templates (for example `new-pnpm-project`) to ensure they use `ts` and do not route through `node`.
+- Add a repo contract test for tooling scripts/manifests that fails when TypeScript scaffold invocations still use `scaf new node {typescript-template}`.
+- Add doc command-contract checks for updated handbook/build-tool docs so canonical examples for TypeScript scaffolding remain `scaf new ts ...`.
+
+### Docs (in this PR)
+
+- Update stale TypeScript scaffolding command examples in:
+  - `docs/handbook/node-tests.md`
+  - `build-tools/docs/node-call-cpp.md`
+  - `build-tools/docs/node-cpp-addon-plan.md`
+  - related design-history docs that are still used as implementation references
+- Clarify in those docs that template identity is `ts/*` while `node` naming remains runtime/toolchain terminology.
+
+### Acceptance Criteria
+
+- Internal helper tooling scaffolds TypeScript templates only via `scaf new ts ...`.
+- No actively referenced handbook/build-tool doc tells users to run `scaf new node {typescript-template}`.
+- Contract tests fail if TypeScript scaffold command drift to `node` is reintroduced in tooling or docs.
+
+### Risks
+
+Low. Main risk is over-broad text replacement in historical docs that are intentionally archival.
+
+### Consequence of Not Implementing
+
+Users and helper tooling keep conflicting command guidance, causing avoidable failures and confusion.
+
+### Downsides for Implementing
+
+One-time update churn across helper tooling and documentation references.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-4: Centralize taxonomy consumption and add anti-drift contracts
+
+### Description
+
+I will complete the central-source contract for template identity by wiring remaining consumers to taxonomy-driven data and adding explicit anti-drift tests.
+
+### Scope & Changes
+
+- Refactor remaining scaffolding metadata/convention surfaces so template identity derives from the canonical taxonomy source instead of duplicated, hand-maintained tables.
+- Ensure test convention wiring and metadata readers agree on canonical ids and canonical TypeScript ownership under `ts/*`.
+- Add explicit validation/wiring for cross-family id uniqueness so duplicate `{language}/{template}` identities fail fast.
+- Keep PR-1/PR-2 ids stable; this PR is contract hardening, not another rename.
+
+### Tests (in this PR)
+
+- Add a dedicated uniqueness contract test that fails on duplicate template ids across families.
+- Add parity tests that assert taxonomy-driven consumers (metadata listing, convention mapping, resolver expectations) agree on canonical TypeScript ids.
+- Add anti-drift contract checks that fail if a new TypeScript template is added outside taxonomy-driven wiring.
+
+### Docs (in this PR)
+
+- Update `build-tools/docs/scaffolding.md` with an explicit source-of-truth matrix showing:
+  - canonical taxonomy source
+  - consumers that must derive from it
+  - anti-drift contracts that enforce parity
+- Document the duplicate-id failure contract and the expected update workflow when adding a new TypeScript template.
+
+### Acceptance Criteria
+
+- Taxonomy is the authoritative source for TypeScript template identity across metadata and test-convention consumers.
+- Duplicate template ids across families are blocked by a dedicated contract test.
+- Adding a new TypeScript template requires updating taxonomy-consumed wiring and fails fast when incomplete.
+
+### Risks
+
+Low to moderate. Main risk is touching both TypeScript and Starlark-facing convention wiring in one PR.
+
+### Consequence of Not Implementing
+
+Identity drift remains possible between taxonomy, conventions, and metadata consumers.
+
+### Downsides for Implementing
+
+Small upfront complexity in wiring adapters to a shared canonical source.
+
+### Recommendation
+
+Implement.
+
+---
+
 ## Rollout and Sequencing
 
 Dependency-ordered sequence:
 
 1. PR-1 unifies identity and roots.
 2. PR-2 finalizes command surface and naming cleanup.
+3. PR-3 cuts over dependent tooling/doc command paths to `ts`.
+4. PR-4 hardens taxonomy-centralized wiring and anti-drift contracts.
 
-This keeps the plan modular while reducing PR count from five to two.
+This keeps the plan modular while closing remaining drift without adding testing-only or docs-only PRs.
 
 ---
 
@@ -202,3 +309,5 @@ Cleanup is complete when all are true:
 - `scaf new ts ...` is the only TypeScript scaffold entrypoint.
 - Resolver, template metadata, selector diagnostics, and tests use the same canonical ids.
 - No backward compatibility aliases remain for legacy `node` TypeScript template ids.
+- Internal helper tooling and actively referenced docs do not instruct `scaf new node {typescript-template}`.
+- Taxonomy-consumed wiring and uniqueness contracts fail fast on identity drift.

@@ -2,6 +2,8 @@
 
 This plan follows the same structure and subsection format as trio-alignment-14.md. Each PR is independently reversible, behavior-preserving where noted, and aims for minimal, deterministic changes consistent with our build-system design and methodology.
 
+Template identity is `ts/*` for scaffolding commands, while `node` naming here remains runtime/toolchain terminology.
+
 ## PR‑1: Nix template for Node‑API C++ addon
 
 ### Description
@@ -93,7 +95,7 @@ Add a Copier template `build-tools/tools/scaffolding/templates/node/cpp-addon/` 
 
 ### Acceptance Criteria
 
-- `scaf new node cpp-addon demo` creates `libs/demo` and `libs/demo-native`.
+- `scaf new ts cpp-addon demo` creates `libs/demo` and `libs/demo-native`.
 - Running glue (export graph, sync providers, gen auto_map) produces no unexpected diffs.
 
 ### Risks
@@ -240,7 +242,7 @@ All PRs are independently reversible; each has narrow scope and clear acceptance
   - Build a hand‑wired example target; verify patch invalidation via edits under `patches/cpp/`.
   - Backout: remove macro and any `kind:addon` branch; existing C++ macros unchanged.
 - PR‑3:
-  - Run `scaf new node cpp-addon demo`; glue steps produce expected files with no unexpected diffs.
+  - Run `scaf new ts cpp-addon demo`; glue steps produce expected files with no unexpected diffs.
   - Backout: delete the new template directory; no runtime paths affected elsewhere.
 - PR‑4:
   - Build and test the scaffolded example; confirm deterministic `.node` load path.

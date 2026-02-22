@@ -2,6 +2,8 @@
 
 This repository standardizes Node tests through a Nix-backed runner that executes Vitest hermetically per importer (app/lib). Buck orchestrates which tests run; Nix ensures how they run with pinned toolchains.
 
+Template identity for scaffolding is `ts/*` (`scaf new ts ...`), while `node` in this guide refers to runtime/test tooling.
+
 - **Runner**: Vitest (pinned via flake)
 - **Default patterns**: `test/**/*.test.(ts|js)`, `__tests__/**/*.test.(ts|js)`, `src/**/*.test.(ts|js)`
 - **Importer scoping**: Each test target must carry one `lockfile:<path>#<importer>` label.
@@ -72,7 +74,7 @@ nix_node_test(
   - `__tests__/**/*.test.ts`, `__tests__/**/*.test.js`
   - `src/**/*.test.ts`, `src/**/*.test.js`
 
-- Scaffolded projects include this test target and Vitest sample tests by default. Opt out of sample tests and devDependencies with `--no-tests` when running `scaf new node ...` (the test target remains; the runner passes with no tests).
+- Scaffolded projects include this test target and Vitest sample tests by default. Opt out of sample tests and devDependencies with `--no-tests` when running `scaf new ts ...` (the test target remains; the runner passes with no tests).
 
 - Run:
 
