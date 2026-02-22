@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 
 import { exists } from "../fs.ts";
 import { isLanguageEnabled } from "../language-enablement.ts";
+import { canonicalTemplateIdsForLanguage, TEMPLATE_TAXONOMY } from "./taxonomy.ts";
 import { readCopierVariables } from "./variables.ts";
 
 export type TemplateMetaRow = {
@@ -17,11 +18,8 @@ export type TemplateMetaRow = {
 export async function readTemplateMeta(language?: string): Promise<TemplateMetaRow[]> {
   const root = path.join("build-tools", "tools", "scaffolding", "templates");
   const requestedLanguage = language ? String(language).trim() : "";
-  let langs = requestedLanguage
-    ? [requestedLanguage]
-    : (await exists(root))
-      ? await fsp.readdir(root)
-      : [];
+  const strictCanonicalRoots = requestedLanguage !== "";
+  let langs = requestedLanguage ? [requestedLanguage] : Object.keys(TEMPLATE_TAXONOMY);
 
   const filtered: string[] = [];
   for (const l of langs) {
@@ -31,18 +29,18 @@ export async function readTemplateMeta(language?: string): Promise<TemplateMetaR
 
   const out: TemplateMetaRow[] = [];
   for (const l of langs) {
-    const langDir = path.join(root, l);
-    const selectedLangDir = langDir;
-    if (!(await exists(selectedLangDir))) {
-      continue;
-    }
-    const entries = await fsp.readdir(selectedLangDir, { withFileTypes: true });
-    for (const e of entries) {
-      if (!e.isDirectory()) {
+    const canonicalIds = canonicalTemplateIdsForLanguage(l);
+    for (const id of canonicalIds) {
+      const tmpl = id.split("/")[1] || "";
+      const tmplDir = path.join(root, l, tmpl);
+      if (!(await exists(tmplDir))) {
+        if (strictCanonicalRoots) {
+          throw new Error(
+            `[scaf templates] missing template root for canonical id '${id}' at ${tmplDir}`,
+          );
+        }
         continue;
       }
-      const tmpl = e.name;
-      const tmplDir = path.join(selectedLangDir, tmpl);
       const metaPath = path.join(tmplDir, "meta.json");
       let meta: any = { language: requestedLanguage || l, template: tmpl };
       if (await exists(metaPath)) {

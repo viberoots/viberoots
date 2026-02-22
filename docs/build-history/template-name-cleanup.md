@@ -12,8 +12,10 @@ This plan follows the PR section structure used in `docs/build-history/quad-alig
 6. [PR-4: Centralize taxonomy consumption and add anti-drift contracts](#pr-4-centralize-taxonomy-consumption-and-add-anti-drift-contracts)
 7. [PR-5: Make taxonomy the runtime source for metadata and template-test conventions](#pr-5-make-taxonomy-the-runtime-source-for-metadata-and-template-test-conventions)
 8. [PR-6: Close remaining `node` command-path drift in actively referenced docs and enforce it](#pr-6-close-remaining-node-command-path-drift-in-actively-referenced-docs-and-enforce-it)
-9. [Rollout and Sequencing](#rollout-and-sequencing)
-10. [Completion Criteria](#completion-criteria)
+9. [PR-7: Generate taxonomy adapters and resolver surfaces from canonical template manifests](#pr-7-generate-taxonomy-adapters-and-resolver-surfaces-from-canonical-template-manifests)
+10. [PR-8: Remove manual template registration from template-test conventions and enforce generator freshness](#pr-8-remove-manual-template-registration-from-template-test-conventions-and-enforce-generator-freshness)
+11. [Rollout and Sequencing](#rollout-and-sequencing)
+12. [Completion Criteria](#completion-criteria)
 
 ## Context and Decision
 
@@ -393,6 +395,115 @@ Implement.
 
 ---
 
+## PR-7: Generate taxonomy adapters and resolver surfaces from canonical template manifests
+
+### Description
+
+I will remove manual cross-file template registration by generating downstream taxonomy consumers from canonical template manifests. This keeps template identity updates single-source and deterministic.
+
+### Scope & Changes
+
+- Add a canonical machine-readable manifest for scaffold templates (language, template id, destination defaults, template root).
+- Generate Starlark taxonomy adapter outputs from this manifest (replacing hand-maintained canonical id lists).
+- Generate resolver surfaces used by `scaf` from the same manifest (or validate generated output parity if resolver remains partially handwritten for non-template defaults).
+- Keep runtime consumers (`scaf/templates/meta.ts`, conventions wiring) reading generated artifacts, not duplicated literal maps.
+- Keep command behavior unchanged (`scaf new ts ...` and existing non-TypeScript command contracts remain stable).
+- PR-7 boundary: this PR owns producer-side generation plumbing (manifest + generators + generated adapter/resolver artifacts). It does not refactor template-test convention ownership semantics beyond switching convention inputs to generated outputs.
+
+### Tests (in this PR)
+
+- Add a generator parity contract that fails when generated taxonomy adapter output is stale against canonical template manifest data.
+- Add a resolver parity contract that fails when resolver template entries drift from canonical template manifest data.
+- Add a scaffold smoke test that adds a synthetic template manifest entry in a temp repo and verifies generated surfaces expose it without manual adapter edits.
+
+### Docs (in this PR)
+
+- Update `build-tools/docs/scaffolding.md` with a source-of-truth workflow that starts at canonical manifest data and flows through generated taxonomy/resolver consumers.
+- Document when generated files are refreshed (local dev and verify/CI) and how deterministic drift failures are reported.
+
+### Acceptance Criteria
+
+- Adding a new template id does not require manually editing taxonomy adapter files.
+- Resolver/template identity surfaces stay aligned with canonical manifest data via generation or strict parity checks.
+- Generator drift is caught by deterministic contracts before merge.
+- Registration outcome at end of PR-7: resolver/adapter registration is generator-driven, but template-test convention registration may still be partially manual until PR-8 lands.
+
+### Risks
+
+Moderate. Main risk is migration churn while replacing handwritten maps with generated artifacts.
+
+### Consequence of Not Implementing
+
+Template registration remains multi-file manual work and drift risk persists.
+
+### Downsides for Implementing
+
+Adds generator code and generated-artifact lifecycle management.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-8: Remove manual template registration from template-test conventions and enforce generator freshness
+
+### Description
+
+I will remove manual template-id registration from template-test convention wiring and make path-convention auto-discovery the primary onboarding model, so adding a new template is directory-first and does not require manual wiring edits.
+
+### Scope & Changes
+
+- Refactor template-test conventions so template ids are resolved from canonical/generated taxonomy data at evaluation time.
+- Preserve explicit test classification metadata (`template:smoke|template:contract|template:shared`) while removing manual template-id registration in convention maps.
+- Add generator freshness enforcement in verify/CI for template taxonomy/convention artifacts so stale generated files fail fast.
+- Make template discovery authoritative from path conventions under `build-tools/tools/scaffolding/templates/<language>/<template>/...`.
+- Keep optional onboarding convenience tooling (for example `scaf template add ...`) as non-required sugar; correctness must not depend on it.
+- Keep existing test target names and label contracts stable.
+- PR-8 boundary: this PR owns consumer-side convention migration and closes remaining manual registration surfaces left intentionally out of PR-7.
+
+### Tests (in this PR)
+
+- Add contract tests that fail when convention wiring requires manual template-id registration for newly added canonical templates.
+- Add a generator freshness test that fails when required taxonomy/convention generated outputs are stale.
+- Add a temp-repo onboarding e2e test that adds a new template by copying/creating a template directory at the canonical path and verifies taxonomy wiring, resolver mapping, and convention labels are fully wired without manual registration edits.
+- Add a parity test that proves optional convenience tooling (if present) yields the same generated outputs as the directory-first path.
+
+### Docs (in this PR)
+
+- Update `build-tools/docs/scaffolding.md` with the post-PR registration workflow:
+  - create/copy template directory under canonical path
+  - update template-local files (`copier.yaml`, `meta.json`, scaffold files)
+  - run generators/verify
+  - no manual edits required for registration/wiring files
+- Document optional convenience tooling (if provided) as an ergonomic wrapper over the same directory-first workflow, not a required step.
+- Document verify/CI freshness enforcement and expected remediation command(s).
+
+### Acceptance Criteria
+
+- New template onboarding does not require manual template-id registration in convention sources.
+- Convention metadata remains explicit where intentional (classification), but canonical id wiring is derived from generated/canonical taxonomy data.
+- Verify/CI fails fast on stale generation outputs.
+- End-state guarantee: by the end of PR-8, adding a new template via canonical directory conventions requires no manual registration/wiring edits; discovery and downstream wiring are generated and contract-enforced.
+
+### Risks
+
+Low to moderate. Main risk is preserving readability of convention ownership while removing manual id declarations.
+
+### Consequence of Not Implementing
+
+Manual registration cost and drift risk remain in template-test convention wiring.
+
+### Downsides for Implementing
+
+Requires careful convention refactor to keep ownership signals clear.
+
+### Recommendation
+
+Implement.
+
+---
+
 ## Rollout and Sequencing
 
 Dependency-ordered sequence:
@@ -403,6 +514,8 @@ Dependency-ordered sequence:
 4. PR-4 hardens taxonomy-centralized wiring and anti-drift contracts.
 5. PR-5 makes taxonomy runtime-authoritative for metadata and convention id wiring.
 6. PR-6 closes active-doc command drift and enforces active vs archival doc contracts.
+7. PR-7 generates taxonomy adapters and resolver surfaces from canonical manifests.
+8. PR-8 removes manual template-id registration from conventions and enforces generation freshness.
 
 This keeps the plan modular while closing remaining drift without adding testing-only or docs-only PRs.
 
@@ -421,3 +534,6 @@ Cleanup is complete when all are true:
 - Taxonomy-consumed wiring and uniqueness contracts fail fast on identity drift.
 - Metadata and template-test convention id wiring derive canonical template ids from taxonomy-driven runtime sources, not duplicated literal tables.
 - Active-doc command contract inventory is enforced, and archival docs are explicitly classified outside active command guidance.
+- New template onboarding does not require manual edits to taxonomy adapter/resolver/convention id registration tables.
+- Generator freshness for taxonomy-driven scaffolding artifacts is enforced in verify/CI.
+- Template onboarding is path-convention first: creating/copying a template directory and running generation/verify is sufficient, with no manual registration/wiring edits required.

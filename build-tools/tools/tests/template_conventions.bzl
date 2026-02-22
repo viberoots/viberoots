@@ -1,4 +1,9 @@
 load("//build-tools/lang:defs_common.bzl", "dedupe_preserve")
+load(
+    "//build-tools/tools/tests:template_taxonomy_adapter.bzl",
+    "CANONICAL_TEMPLATE_ID_SET",
+    "canonical_template_id",
+)
 
 TEMPLATE_CLASSIFICATION_LABELS = [
     "template:smoke",
@@ -8,87 +13,87 @@ TEMPLATE_CLASSIFICATION_LABELS = [
 
 _TEMPLATE_TEST_CONVENTIONS = {
     "build-tools/tools/tests/scaffolding/smoke.lib-readme.test.ts": {
-        "template_ids": ["go/lib"],
+        "template_keys": [("go", "lib")],
         "classification": "template:smoke",
     },
     "build-tools/tools/tests/scaffolding/smoke.cli-readme.test.ts": {
-        "template_ids": ["go/cli"],
+        "template_keys": [("go", "cli")],
         "classification": "template:smoke",
     },
     "build-tools/tools/tests/scaffolding/go-lib.scaffold-and-build.test.ts": {
-        "template_ids": ["go/lib"],
+        "template_keys": [("go", "lib")],
         "classification": "template:contract",
     },
     "build-tools/tools/tests/scaffolding/go-cli.scaffold-and-build.test.ts": {
-        "template_ids": ["go/cli"],
+        "template_keys": [("go", "cli")],
         "classification": "template:contract",
     },
     "build-tools/tools/tests/scaffolding/cpp.lib.shape-and-build.test.ts": {
-        "template_ids": ["cpp/lib"],
+        "template_keys": [("cpp", "lib")],
         "classification": "template:contract",
     },
     "build-tools/tools/tests/scaffolding/node-lib.nix-node-test.with-tests-pass.test.ts": {
-        "template_ids": ["ts/lib"],
+        "template_keys": [("ts", "lib")],
         "classification": "template:contract",
     },
     "build-tools/tools/tests/scaffolding/node-cli.nix-node-test.with-tests-pass.test.ts": {
-        "template_ids": ["ts/cli"],
+        "template_keys": [("ts", "cli")],
         "classification": "template:contract",
     },
     "build-tools/tools/tests/scaffolding/webapp.scaffold-and-build.test.ts": {
-        "template_ids": ["ts/webapp-static"],
+        "template_keys": [("ts", "webapp-static")],
         "classification": "template:contract",
     },
     "build-tools/tools/tests/scaffolding/webapp-ssr.scaffold-contract-and-runtime-smoke.test.ts": {
-        "template_ids": ["ts/webapp-ssr-express", "ts/webapp-ssr-next"],
+        "template_keys": [("ts", "webapp-ssr-express"), ("ts", "webapp-ssr-next")],
         "classification": "template:shared",
     },
     "build-tools/tools/tests/scaffolding/webapp-ssr.scaffold-and-build.test.ts": {
-        "template_ids": ["ts/webapp-ssr-express", "ts/webapp-ssr-next"],
+        "template_keys": [("ts", "webapp-ssr-express"), ("ts", "webapp-ssr-next")],
         "classification": "template:shared",
     },
     "build-tools/tools/tests/scaffolding/webapp-ssr.pr4-contracts.test.ts": {
-        "template_ids": ["ts/webapp-ssr-express", "ts/webapp-ssr-next"],
+        "template_keys": [("ts", "webapp-ssr-express"), ("ts", "webapp-ssr-next")],
         "classification": "template:shared",
     },
     "build-tools/tools/tests/scaffolding/python-lib.scaffold-files.test.ts": {
-        "template_ids": ["python/lib"],
+        "template_keys": [("python", "lib")],
         "classification": "template:smoke",
     },
     "build-tools/tools/tests/scaffolding/python-app.scaffold-files.test.ts": {
-        "template_ids": ["python/app"],
+        "template_keys": [("python", "app")],
         "classification": "template:smoke",
     },
     "build-tools/tools/tests/scaffolding/python-wasm-app.scaffold-smoke.test.ts": {
-        "template_ids": ["python/wasm-app"],
+        "template_keys": [("python", "wasm-app")],
         "classification": "template:smoke",
     },
     "build-tools/tools/tests/scaffolding/scaf-language-new.manifest-write.test.ts": {
-        "template_ids": ["language/kit"],
+        "template_keys": [("language", "kit")],
         "classification": "template:contract",
     },
     "build-tools/tools/tests/scaffolding/lang-kit.scaffold-smoke.test.ts": {
-        "template_ids": ["language/kit"],
+        "template_keys": [("language", "kit")],
         "classification": "template:smoke",
     },
     "build-tools/tools/tests/ts-cpp-go-wasm/pr8-scaffolding.scaf-new-dry-run.test.ts": {
-        "template_ids": ["ts/go-cpp-lib"],
+        "template_keys": [("ts", "go-cpp-lib")],
         "classification": "template:smoke",
     },
     "build-tools/tools/tests/ts-cpp-go-wasm/pr8-scaffolding.wasm-app.scaffold-smoke.test.ts": {
-        "template_ids": ["ts/wasm-app"],
+        "template_keys": [("ts", "wasm-app")],
         "classification": "template:smoke",
     },
     "build-tools/tools/tests/ts-cpp-go-wasm/pr8-scaffolding.templates-exist.test.ts": {
-        "template_ids": ["ts/go-cpp-lib", "ts/wasm-app"],
+        "template_keys": [("ts", "go-cpp-lib"), ("ts", "wasm-app")],
         "classification": "template:shared",
     },
     "build-tools/tools/tests/scaffolding/pr3-ts-command-path.tooling-contract.test.ts": {
-        "template_ids": ["ts/lib", "ts/cli", "ts/webapp-static"],
+        "template_keys": [("ts", "lib"), ("ts", "cli"), ("ts", "webapp-static")],
         "classification": "template:shared",
     },
     "build-tools/tools/tests/scaffolding/pr3-ts-command-path.docs-contract.test.ts": {
-        "template_ids": ["ts/lib", "ts/cli", "ts/webapp-static", "ts/cpp-addon"],
+        "template_keys": [("ts", "lib"), ("ts", "cli"), ("ts", "webapp-static"), ("ts", "cpp-addon")],
         "classification": "template:shared",
     },
 }
@@ -120,11 +125,22 @@ def _template_label_for_id(template_id):
 def _template_glob_for_id(template_id):
     return "build-tools/tools/scaffolding/templates/%s/**" % template_id
 
+def _template_ids_from_keys(template_keys):
+    out = []
+    for key in template_keys:
+        if type(key) != type(()) or len(key) != 2:
+            fail("template convention key must be (language, template)")
+        template_id = canonical_template_id(key[0], key[1])
+        if not CANONICAL_TEMPLATE_ID_SET.get(template_id, False):
+            fail("template convention references unknown canonical id: %s" % template_id)
+        out.append(template_id)
+    return dedupe_preserve(out)
+
 def template_convention_for_script(path):
     c = _TEMPLATE_TEST_CONVENTIONS.get(path)
     if c == None:
         return None
-    template_ids = c.get("template_ids", [])
+    template_ids = _template_ids_from_keys(c.get("template_keys", []))
     labels = [_template_label_for_id(tid) for tid in template_ids]
     classification = c.get("classification")
     if classification != None and classification != "":

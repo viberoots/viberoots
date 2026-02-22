@@ -18,13 +18,25 @@ function sortedUnique(values: readonly string[]): string[] {
 
 function parseTemplateConventionIdsFromBzl(src: string): string[] {
   const out: string[] = [];
-  const listPattern = /"template_ids":\s*\[([^\]]*)\]/g;
+  const listPattern = /"template_keys":\s*\[([^\]]*)\]/g;
   for (const match of src.matchAll(listPattern)) {
     const body = String(match[1] || "");
-    for (const idMatch of body.matchAll(/"([^"]+)"/g)) {
-      const id = String(idMatch[1] || "").trim();
-      if (id) out.push(id);
+    for (const keyMatch of body.matchAll(/\(\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)/g)) {
+      const language = String(keyMatch[1] || "").trim();
+      const template = String(keyMatch[2] || "").trim();
+      if (language && template) out.push(`${language}/${template}`);
     }
+  }
+  return sortedUnique(out);
+}
+
+function parseCanonicalTemplateIdsFromAdapter(src: string): string[] {
+  const block = src.match(/CANONICAL_TEMPLATE_IDS\s*=\s*\[([\s\S]*?)\]/);
+  if (!block) return [];
+  const out: string[] = [];
+  for (const m of String(block[1] || "").matchAll(/"([^"]+)"/g)) {
+    const id = String(m[1] || "").trim();
+    if (id) out.push(id);
   }
   return sortedUnique(out);
 }
@@ -107,4 +119,13 @@ test("PR-4 anti-drift: template conventions reference canonical taxonomy only", 
     sortedUnique(safetyFloorTargetsFromBzl),
     sortedUnique([...TEMPLATE_SAFETY_FLOOR_TARGETS]),
   );
+});
+
+test("PR-5 parity: template taxonomy adapter ids match canonical taxonomy", async () => {
+  const adapter = await fsp.readFile(
+    "build-tools/tools/tests/template_taxonomy_adapter.bzl",
+    "utf8",
+  );
+  const adapterIds = parseCanonicalTemplateIdsFromAdapter(adapter);
+  assert.deepEqual(adapterIds, sortedUnique(CANONICAL_TEMPLATE_IDS));
 });

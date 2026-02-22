@@ -425,22 +425,34 @@ Source-of-truth matrix for template identity:
 - Canonical taxonomy source:
   - `build-tools/tools/scaffolding/scaf/templates/taxonomy.ts`
   - owns canonical ids (`<language>/<template>`) and uniqueness checks.
-- Metadata consumer:
+- Runtime metadata consumer:
   - `build-tools/tools/scaffolding/scaf/templates/meta.ts`
-  - `scaf templates` must list ids that match the canonical taxonomy for supported templates.
+  - `scaf templates` is taxonomy-driven at runtime:
+    - canonical ids are read from taxonomy first
+    - filesystem is validation only
+    - language-scoped listing (`scaf templates <language>`) requires every canonical id root and fails fast with deterministic error text
+    - discovery listing (`scaf templates`) returns only present canonical roots across enabled languages (partial-clone safe)
+- Runtime template-convention consumer:
+  - `build-tools/tools/tests/template_conventions.bzl`
+  - consumes canonical ids through the imported adapter:
+    - `build-tools/tools/tests/template_taxonomy_adapter.bzl`
+  - template-owned mappings use `(language, template)` keys and resolve canonical ids via adapter helpers
 - Resolver consumer:
   - `build-tools/tools/scaffolding/resolver.json`
   - TypeScript resolver keys must stay in parity with canonical `ts/*` ids.
-- Test-convention consumer:
-  - `build-tools/tools/tests/template_conventions.bzl`
-  - `template_ids` must reference canonical taxonomy ids only.
+- Validation-only parity contracts:
+  - `build-tools/tools/tests/scaffolding/template-taxonomy.pr4-parity-contract.test.ts`
+  - `build-tools/tools/tests/scaffolding/template-taxonomy.pr5-runtime-contract.test.ts`
+  - these tests verify runtime consumers stay aligned with taxonomy and fail loudly on drift.
 
 Anti-drift contracts:
 
 - `build-tools/tools/tests/scaffolding/template-taxonomy.pr1-contract.test.ts`
   - locks the canonical TypeScript id set and `templates/ts` filesystem parity.
 - `build-tools/tools/tests/scaffolding/template-taxonomy.pr4-parity-contract.test.ts`
-  - enforces canonical-id uniqueness, resolver parity, metadata-reader parity, and convention-id parity.
+  - enforces canonical-id uniqueness, resolver parity, convention-id parity, and adapter parity.
+- `build-tools/tools/tests/scaffolding/template-taxonomy.pr5-runtime-contract.test.ts`
+  - enforces taxonomy-driven metadata listing and deterministic missing-root failures.
 
 Duplicate-id failure contract:
 
@@ -448,9 +460,11 @@ Duplicate-id failure contract:
 - If a duplicate id is introduced, PR-4 parity contracts fail with a duplicate-id error.
 - Update workflow when adding a template:
   1. add the template id in `taxonomy.ts`
-  2. add/update `resolver.json` mapping if the template is scaffoldable via resolver defaults
-  3. add/update `template_conventions.bzl` if a template-owned test is introduced
-  4. run parity contracts and fix any reported drift before merge
+  2. add the template root directory under `build-tools/tools/scaffolding/templates/<language>/<template>/`
+  3. add/update `resolver.json` mapping if the template is scaffoldable via resolver defaults
+  4. add/update template test mappings in `template_conventions.bzl` (classification + `(language, template)` keys)
+  5. update `template_taxonomy_adapter.bzl` and run parity/runtime contracts
+  6. run parity contracts and fix any reported drift before merge
 
 Buck query example:
 
