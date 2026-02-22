@@ -3,7 +3,7 @@
   "template": "webapp-ssr-express",
   "description": "Express SSR webapp with Vite entrypoints and Node startup",
   "help": {
-    "usage": "scaf new node webapp-ssr-express <name> [--importer=projects/apps/<name>] [--pkgScope=@apps]",
+    "usage": "scaf new ts webapp-ssr-express <name> [--importer=projects/apps/<name>] [--pkgScope=@apps]",
     "notes": [
       "Generates an Express SSR webapp with Vite client/server entrypoints.",
       "Production startup is a direct Node server entrypoint via server/index.ts.",
@@ -11,9 +11,9 @@
       "TARGETS keeps SSR intent explicit with framework labels for later planner wiring."
     ],
     "examples": [
-      "scaf new node webapp-ssr-express demo-ssr --yes",
-      "scaf new node webapp-ssr-express demo-ssr --yes --no-tests",
-      "scaf new node webapp-ssr-express demo-ssr --importer=projects/apps/demo-ssr --pkgScope=@apps"
+      "scaf new ts webapp-ssr-express demo-ssr --yes",
+      "scaf new ts webapp-ssr-express demo-ssr --yes --no-tests",
+      "scaf new ts webapp-ssr-express demo-ssr --importer=projects/apps/demo-ssr --pkgScope=@apps"
     ]
   }
 }

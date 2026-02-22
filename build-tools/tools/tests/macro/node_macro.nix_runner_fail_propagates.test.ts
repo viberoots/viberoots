@@ -20,7 +20,7 @@ test(
       await $`git init`;
       // IMPORTANT: rely on runInTemp's injected env (WORKSPACE_ROOT/HOME/etc). Do not spread
       // process.env here; Buck tests set WORKSPACE_ROOT/BUCK_TEST_SRC for the *outer* repo.
-      await $`scaf new node lib demo --yes --skip-lockfile-gen`;
+      await $`scaf new ts lib demo --yes --skip-lockfile-gen`;
       await $(
         {},
       )`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();

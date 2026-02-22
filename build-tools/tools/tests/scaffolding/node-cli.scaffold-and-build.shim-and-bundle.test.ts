@@ -13,7 +13,7 @@ test("node cli: scaffold, build shim, run help", async () => {
   try {
     await runInTemp("node-cli-scaffold-shim", async (_tmp, $) => {
       await $`git init`;
-      await $`scaf new node cli demo --yes`;
+      await $`scaf new ts cli demo --yes`;
       // Ensure Buck sees the new target
       await $`buck2 targets //projects/apps/demo:demo`;
       // Glue (target-scoped refresh so graph includes the newly scaffolded target)

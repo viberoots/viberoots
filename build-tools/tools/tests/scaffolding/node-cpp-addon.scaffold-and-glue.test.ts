@@ -11,7 +11,7 @@ test("node cpp-addon: scaffold and run glue in temp repo", async () => {
     await $`git init`;
 
     // Scaffold the two sibling packages
-    await $`scaf new node cpp-addon demo --yes`;
+    await $`scaf new ts cpp-addon demo --yes`;
 
     // Basic assertions on created files
     const nodePkg = path.join(tmp, "projects", "libs", "demo");

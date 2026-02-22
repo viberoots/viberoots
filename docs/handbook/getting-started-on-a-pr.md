@@ -74,6 +74,10 @@ Python provider sync activation in sparse/partial clones is lockfile‑driven: t
   - `i` (install deps), `b` (build), `v` (verify / full test suite)
 - `p` (run runnable target in `run.prod` mode), `d` (run runnable target in `run.dev` mode when available)
   - `v` includes a preflight run of the nix-gaps inventory/exception policy checker and fails fast on drift.
+- TypeScript scaffolding command surface (ts-only):
+  - `scaf new ts lib demo-lib --yes --dry-run`
+  - `scaf new ts cli demo-cli --yes --dry-run`
+  - `scaf new ts webapp-static demo-web --yes --dry-run`
 
 ### 4. When `v` is slow (performance regression workflow)
 

@@ -14,7 +14,7 @@ test("node cli: build bundled single-file and run help", async () => {
   try {
     await runInTemp("node-cli-bundle", async (tmp, $) => {
       await $`git init`;
-      await $`scaf new node cli demo --yes`;
+      await $`scaf new ts cli demo --yes`;
       const targetsPath = path.join(tmp, "projects", "apps", "demo", "TARGETS");
       // Toggle bundle mode with importer param
       await $`node -e ${`const fs=require('fs');

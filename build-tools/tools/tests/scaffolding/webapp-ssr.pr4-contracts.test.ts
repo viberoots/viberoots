@@ -116,8 +116,8 @@ test(
     try {
       await runInTemp("node-webapp-ssr-pr4-contracts", async (tmp, _$) => {
         const $ = _$({ cwd: tmp, stdio: "inherit" });
-        await $`scaf new node webapp-ssr-express demo-ssr-express --yes --no-tests`;
-        await $`scaf new node webapp-ssr-next demo-ssr-next --yes --no-tests`;
+        await $`scaf new ts webapp-ssr-express demo-ssr-express --yes --no-tests`;
+        await $`scaf new ts webapp-ssr-next demo-ssr-next --yes --no-tests`;
 
         await _$({
           cwd: tmp,

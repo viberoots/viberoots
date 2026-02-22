@@ -3,16 +3,16 @@
   "template": "go-addon",
   "description": "Node TS library + Go c-archive + C N-API addon (three sibling packages)",
   "help": {
-    "usage": "scaf new node go-addon <name> [--path=DEST] [--addon_name=<name>_addon] [--no-tests]",
+    "usage": "scaf new ts go-addon <name> [--path=DEST] [--addon_name=<name>_addon] [--no-tests]",
     "notes": [
       "Generates projects/libs/<name> (Node TS), projects/libs/<name>-go (Go c-archive), and projects/libs/<name>-native (C N-API binding).",
       "The Node package loads native/<addon_name>.node via createRequire(import.meta.url).",
       "TARGETS use nix_go_carchive for the Go archive and nix_cpp_node_addon for the addon; the planner links the Go archive automatically."
     ],
     "examples": [
-      "scaf new node go-addon demo",
-      "scaf new node go-addon demo --addon_name=myaddon",
-      "scaf new node go-addon demo --no-tests"
+      "scaf new ts go-addon demo",
+      "scaf new ts go-addon demo --addon_name=myaddon",
+      "scaf new ts go-addon demo --no-tests"
     ]
   }
 }

@@ -14,7 +14,7 @@ import { exists } from "../fs.ts";
 import { isLanguageEnabled } from "../language-enablement.ts";
 import { resolveDestination } from "../templates/destination.ts";
 import { normalizeTemplateName } from "../templates/names.ts";
-import { canonicalTemplateLanguage } from "../templates/taxonomy.ts";
+import { canonicalTemplateLanguage, isCanonicalTypeScriptTemplate } from "../templates/taxonomy.ts";
 import { usage } from "../usage.ts";
 
 export async function cmdNew(args: string[], flags: ScafFlags) {
@@ -23,11 +23,15 @@ export async function cmdNew(args: string[], flags: ScafFlags) {
     usage();
     process.exit(2);
   }
-  if (language !== "language" && language !== "node" && !(await isLanguageEnabled(language))) {
+  const template = normalizeTemplateName(templateRaw);
+  if (language === "node" && isCanonicalTypeScriptTemplate(template)) {
+    console.error(`TypeScript templates use 'ts'. Try: scaf new ts ${template} ${name}`);
+    process.exit(1);
+  }
+  if (language !== "language" && !(await isLanguageEnabled(language))) {
     printSkip("missing-language", `${language}`);
     return;
   }
-  const template = normalizeTemplateName(templateRaw);
   const canonicalLanguage = canonicalTemplateLanguage(language, template);
   const root = path.join(
     "build-tools",

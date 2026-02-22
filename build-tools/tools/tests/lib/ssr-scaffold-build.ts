@@ -140,7 +140,7 @@ export async function scaffoldBuildAndSmoke(
   const importer = path.join("projects", "apps", appName);
   const appAbs = path.join(tmp, importer);
   const $ = _$({ cwd: tmp, stdio: "inherit" });
-  await $`scaf new node ${template} ${appName} --yes --no-tests`;
+  await $`scaf new ts ${template} ${appName} --yes --no-tests`;
   await _$({
     cwd: appAbs,
     env: { ...process.env },

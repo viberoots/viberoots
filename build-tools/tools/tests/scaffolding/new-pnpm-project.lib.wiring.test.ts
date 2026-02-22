@@ -9,7 +9,7 @@ test("node lib scaffold: TARGETS includes lockfile label and auto_map wires prov
     const $ = _$({ cwd: tmp, stdio: "pipe" });
     // Skip lockfile generation: this test only asserts label wiring and provider mapping generation.
     // The primary lockfile generation path is exercised elsewhere.
-    await $`scaf new node lib demo --yes --skip-lockfile-gen`;
+    await $`scaf new ts lib demo --yes --skip-lockfile-gen`;
     const lockLabel = "lockfile:projects/libs/demo/pnpm-lock.yaml#projects/libs/demo";
     const tPath = path.join(tmp, "projects", "libs", "demo", "TARGETS");
     const txt = await fs.readFile(tPath, "utf8");

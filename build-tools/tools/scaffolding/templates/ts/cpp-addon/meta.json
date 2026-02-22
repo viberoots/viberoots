@@ -3,7 +3,7 @@
   "template": "cpp-addon",
   "description": "Node TS library + C++ Node-API addon (two sibling packages)",
   "help": {
-    "usage": "scaf new node cpp-addon <name> [--path=DEST] [--addon_name=<name>_addon] [--no-tests]",
+    "usage": "scaf new ts cpp-addon <name> [--path=DEST] [--addon_name=<name>_addon] [--no-tests]",
     "notes": [
       "Generates projects/libs/<name> (Node TS) and projects/libs/<name>-native (C++ Node-API addon).",
       "The Node package loads native/<addon_name>.node via createRequire(import.meta.url).",
@@ -11,9 +11,9 @@
       "One test per file. Set --no-tests to skip Node test file generation."
     ],
     "examples": [
-      "scaf new node cpp-addon demo",
-      "scaf new node cpp-addon demo --addon_name=myaddon",
-      "scaf new node cpp-addon demo --no-tests"
+      "scaf new ts cpp-addon demo",
+      "scaf new ts cpp-addon demo --addon_name=myaddon",
+      "scaf new ts cpp-addon demo --no-tests"
     ]
   }
 }

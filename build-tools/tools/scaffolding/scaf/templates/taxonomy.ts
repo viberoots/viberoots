@@ -33,14 +33,10 @@ export function isCanonicalTypeScriptTemplate(templateName: string): boolean {
   return CANONICAL_TS_TEMPLATE_SET.has(normalizeTemplateName(templateName));
 }
 
-export function canonicalTemplateLanguage(language: string, templateName: string): string {
-  const normalizedTemplate = normalizeTemplateName(templateName);
-  if (language === "node" && isCanonicalTypeScriptTemplate(normalizedTemplate)) {
-    return "ts";
-  }
+export function canonicalTemplateLanguage(language: string, _templateName: string): string {
   return language;
 }
 
 export function canonicalTemplateRootLanguage(language: string): string {
-  return language === "node" ? "ts" : language;
+  return language;
 }

@@ -33,7 +33,7 @@ test(
 
       await $`git init`;
       // Scaffold with tests default-on
-      await $`scaf new node lib demo --yes`;
+      await $`scaf new ts lib demo --yes`;
 
       const importer = "projects/libs/demo";
       const lockfile = path.join(importer, "pnpm-lock.yaml");

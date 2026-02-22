@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { readTemplateMeta } from "../templates/meta.ts";
 import { normalizeTemplateName } from "../templates/names.ts";
-import { canonicalTemplateLanguage } from "../templates/taxonomy.ts";
+import { canonicalTemplateLanguage, isCanonicalTypeScriptTemplate } from "../templates/taxonomy.ts";
 import { readCopierVariables } from "../templates/variables.ts";
 import { usage } from "../usage.ts";
 
@@ -93,6 +93,10 @@ function helpForGoTest(flags: ScafFlags) {
 
 async function helpForNewTemplate(language: string, templateRaw: string, flags: ScafFlags) {
   const template = normalizeTemplateName(templateRaw);
+  if (language === "node" && isCanonicalTypeScriptTemplate(template)) {
+    console.error(`TypeScript templates use 'ts'. Try: scaf help ts ${template}`);
+    process.exit(1);
+  }
   const canonicalLanguage = canonicalTemplateLanguage(language, template);
   const tmplDirPath = path.join(
     "build-tools",
@@ -194,6 +198,10 @@ export async function cmdHelp(args: string[], flags: ScafFlags) {
   const metas = await readTemplateMeta(language);
   const meta = metas.find((m) => m.template === template);
   if (!meta) {
+    if (language === "node" && isCanonicalTypeScriptTemplate(template)) {
+      console.error(`TypeScript templates use 'ts'. Try: scaf help ts ${template}`);
+      process.exit(1);
+    }
     console.error("template not found for help");
     process.exit(1);
   }

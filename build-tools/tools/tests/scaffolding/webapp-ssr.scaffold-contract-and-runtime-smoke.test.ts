@@ -202,14 +202,14 @@ test(
     await runInTemp("node-webapp-ssr-scaffold-smoke", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
       // Runtime smoke validates SSR startup contracts, so skip template test deps to reduce install cost.
-      await $`scaf new node webapp-ssr-express demo-ssr --yes --no-tests`;
+      await $`scaf new ts webapp-ssr-express demo-ssr --yes --no-tests`;
       await assertContractFiles(tmp, "webapp-ssr-express");
       await assertPackageScriptsAndLabels(tmp, "webapp-ssr-express", "express");
       await runExpressRuntimeSmoke(tmp, 'data-ssr-marker="express"', _$);
 
       await $`rm -rf projects/apps/demo-ssr`;
 
-      await $`scaf new node webapp-ssr-next demo-ssr --yes --no-tests`;
+      await $`scaf new ts webapp-ssr-next demo-ssr --yes --no-tests`;
       await assertContractFiles(tmp, "webapp-ssr-next");
       await assertPackageScriptsAndLabels(tmp, "webapp-ssr-next", "next");
       await runNextRuntimeSmoke(tmp, 'data-ssr-marker="next"', _$);

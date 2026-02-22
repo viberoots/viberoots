@@ -10,7 +10,7 @@ test("node cpp-addon: README documents quickstart and canonical links", async ()
     await $`git init`;
 
     // Skip lockfile generation: this test is about rendered docs, not lockfile production.
-    await $`scaf new node cpp-addon demo --yes --skip-lockfile-gen`;
+    await $`scaf new ts cpp-addon demo --yes --skip-lockfile-gen`;
 
     const readmePath = path.join(tmp, "projects", "libs", "demo", "README.md");
     const txt = await fsp.readFile(readmePath, "utf8");

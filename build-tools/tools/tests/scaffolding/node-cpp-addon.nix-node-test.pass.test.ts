@@ -27,7 +27,7 @@ test(
 
       await $`git init`;
       // Scaffold the Node TS package and C++ addon sibling
-      await $`scaf new node cpp-addon demo --yes`;
+      await $`scaf new ts cpp-addon demo --yes`;
 
       const importer = "projects/libs/demo";
       const sanitized = importer

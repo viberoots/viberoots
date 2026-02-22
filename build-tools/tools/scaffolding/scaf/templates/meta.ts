@@ -5,7 +5,6 @@ import * as fsp from "node:fs/promises";
 import { exists } from "../fs.ts";
 import { isLanguageEnabled } from "../language-enablement.ts";
 import { readCopierVariables } from "./variables.ts";
-import { canonicalTemplateRootLanguage } from "./taxonomy.ts";
 
 export type TemplateMetaRow = {
   language: string;
@@ -32,14 +31,8 @@ export async function readTemplateMeta(language?: string): Promise<TemplateMetaR
 
   const out: TemplateMetaRow[] = [];
   for (const l of langs) {
-    const effectiveLanguage = canonicalTemplateRootLanguage(l);
     const langDir = path.join(root, l);
-    const effectiveLangDir = path.join(root, effectiveLanguage);
-    const selectedLangDir = requestedLanguage
-      ? effectiveLangDir
-      : (await exists(langDir))
-        ? langDir
-        : effectiveLangDir;
+    const selectedLangDir = langDir;
     if (!(await exists(selectedLangDir))) {
       continue;
     }
@@ -51,7 +44,7 @@ export async function readTemplateMeta(language?: string): Promise<TemplateMetaR
       const tmpl = e.name;
       const tmplDir = path.join(selectedLangDir, tmpl);
       const metaPath = path.join(tmplDir, "meta.json");
-      let meta: any = { language: requestedLanguage || effectiveLanguage, template: tmpl };
+      let meta: any = { language: requestedLanguage || l, template: tmpl };
       if (await exists(metaPath)) {
         try {
           meta = JSON.parse(await fsp.readFile(metaPath, "utf8"));
@@ -63,7 +56,7 @@ export async function readTemplateMeta(language?: string): Promise<TemplateMetaR
       }
       const variables = await readCopierVariables(tmplDir).catch(() => [] as string[]);
       out.push({
-        language: requestedLanguage || effectiveLanguage,
+        language: requestedLanguage || l,
         template: tmpl,
         description: meta.description || "",
         help: meta.help || {},

@@ -12,7 +12,7 @@ test("node webapp: nix_node_test target passes when no tests present", async () 
     const $ = _$({ cwd: tmp, stdio: "pipe" });
     await $`git init`;
     // Scaffold with test target enabled by default
-    await $`scaf new node webapp-static demo-web --yes`;
+    await $`scaf new ts webapp-static demo-web --yes`;
 
     // Proceed; environment is expected to provide Buck prelude via runInTemp setup
 

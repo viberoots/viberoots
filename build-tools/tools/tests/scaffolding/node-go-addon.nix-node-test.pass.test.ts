@@ -40,7 +40,7 @@ test(
         await $`git init`;
 
         // Scaffold the Node TS package, Go c-archive sibling, and C N-API addon sibling
-        await $`scaf new node go-addon demo --yes`;
+        await $`scaf new ts go-addon demo --yes`;
 
         // Basic assertions on created files
         const nodePkg = path.join(tmp, "projects", "libs", "demo");

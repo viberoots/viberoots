@@ -3,7 +3,7 @@
   "template": "webapp-ssr-next",
   "description": "Next.js SSR webapp with explicit Node server entrypoint",
   "help": {
-    "usage": "scaf new node webapp-ssr-next <name> [--importer=projects/apps/<name>] [--pkgScope=@apps]",
+    "usage": "scaf new ts webapp-ssr-next <name> [--importer=projects/apps/<name>] [--pkgScope=@apps]",
     "notes": [
       "Generates a Next.js app-router SSR webapp and an explicit Node server wrapper.",
       "Production startup is direct Node execution of server/index.ts output.",
@@ -11,9 +11,9 @@
       "TARGETS keeps SSR intent explicit with framework labels for later planner wiring."
     ],
     "examples": [
-      "scaf new node webapp-ssr-next demo-next --yes",
-      "scaf new node webapp-ssr-next demo-next --yes --no-tests",
-      "scaf new node webapp-ssr-next demo-next --importer=projects/apps/demo-next --pkgScope=@apps"
+      "scaf new ts webapp-ssr-next demo-next --yes",
+      "scaf new ts webapp-ssr-next demo-next --yes --no-tests",
+      "scaf new ts webapp-ssr-next demo-next --importer=projects/apps/demo-next --pkgScope=@apps"
     ]
   }
 }
