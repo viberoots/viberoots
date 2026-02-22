@@ -420,6 +420,38 @@ Template-owned tests are encoded directly in Buck metadata so selection can be d
 - Each template-owned test declares explicit `template_inputs` that point to files under `build-tools/tools/scaffolding/templates/<language>/<template>/...`.
 - Conventions and the fixed template safety floor are defined in `build-tools/tools/tests/template_conventions.bzl`.
 
+Source-of-truth matrix for template identity:
+
+- Canonical taxonomy source:
+  - `build-tools/tools/scaffolding/scaf/templates/taxonomy.ts`
+  - owns canonical ids (`<language>/<template>`) and uniqueness checks.
+- Metadata consumer:
+  - `build-tools/tools/scaffolding/scaf/templates/meta.ts`
+  - `scaf templates` must list ids that match the canonical taxonomy for supported templates.
+- Resolver consumer:
+  - `build-tools/tools/scaffolding/resolver.json`
+  - TypeScript resolver keys must stay in parity with canonical `ts/*` ids.
+- Test-convention consumer:
+  - `build-tools/tools/tests/template_conventions.bzl`
+  - `template_ids` must reference canonical taxonomy ids only.
+
+Anti-drift contracts:
+
+- `build-tools/tools/tests/scaffolding/template-taxonomy.pr1-contract.test.ts`
+  - locks the canonical TypeScript id set and `templates/ts` filesystem parity.
+- `build-tools/tools/tests/scaffolding/template-taxonomy.pr4-parity-contract.test.ts`
+  - enforces canonical-id uniqueness, resolver parity, metadata-reader parity, and convention-id parity.
+
+Duplicate-id failure contract:
+
+- Canonical ids are required to be unique across the taxonomy.
+- If a duplicate id is introduced, PR-4 parity contracts fail with a duplicate-id error.
+- Update workflow when adding a template:
+  1. add the template id in `taxonomy.ts`
+  2. add/update `resolver.json` mapping if the template is scaffoldable via resolver defaults
+  3. add/update `template_conventions.bzl` if a template-owned test is introduced
+  4. run parity contracts and fix any reported drift before merge
+
 Buck query example:
 
 ```bash

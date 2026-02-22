@@ -10,8 +10,10 @@ This plan follows the PR section structure used in `docs/build-history/quad-alig
 4. [PR-2: Cut over CLI/API surface and complete naming cleanup](#pr-2-cut-over-cliapi-surface-and-complete-naming-cleanup)
 5. [PR-3: Cut over dependent tooling and user docs to `ts` command paths](#pr-3-cut-over-dependent-tooling-and-user-docs-to-ts-command-paths)
 6. [PR-4: Centralize taxonomy consumption and add anti-drift contracts](#pr-4-centralize-taxonomy-consumption-and-add-anti-drift-contracts)
-7. [Rollout and Sequencing](#rollout-and-sequencing)
-8. [Completion Criteria](#completion-criteria)
+7. [PR-5: Make taxonomy the runtime source for metadata and template-test conventions](#pr-5-make-taxonomy-the-runtime-source-for-metadata-and-template-test-conventions)
+8. [PR-6: Close remaining `node` command-path drift in actively referenced docs and enforce it](#pr-6-close-remaining-node-command-path-drift-in-actively-referenced-docs-and-enforce-it)
+9. [Rollout and Sequencing](#rollout-and-sequencing)
+10. [Completion Criteria](#completion-criteria)
 
 ## Context and Decision
 
@@ -287,6 +289,110 @@ Implement.
 
 ---
 
+## PR-5: Make taxonomy the runtime source for metadata and template-test conventions
+
+### Description
+
+I will complete the unresolved part of the taxonomy contract by moving key consumers from parity checks to direct taxonomy-driven wiring at runtime. This removes duplicate, hand-maintained template-id tables as drift vectors.
+
+### Scope & Changes
+
+- Refactor `scaf/templates/meta.ts` so template listing for language/template identity is derived from taxonomy ids first, with filesystem checks used only to validate that expected template roots exist.
+- Refactor template-test convention wiring to consume canonical template ids from a single generated or imported taxonomy adapter, replacing duplicated id literals where possible.
+- Keep test classification metadata (`template:smoke|contract|shared`) explicit, but remove duplicated canonical id lists from convention sources.
+- Add fail-fast validation that reports missing template roots or convention entries keyed by canonical taxonomy ids.
+- Keep PR-1 to PR-4 ids and command surfaces stable. This PR hardens consumer architecture, not user-facing naming.
+
+### Tests (in this PR)
+
+- Add a contract test that fails when `scaf templates <language>` omits a canonical taxonomy id or includes an id not present in taxonomy.
+- Add a contract test that fails when template-convention wiring is out of sync with canonical taxonomy ids for template-owned test mappings.
+- Add a negative-path test that simulates a missing template root for a canonical id and verifies deterministic failure output.
+- Keep existing PR-1 and PR-4 parity contracts and update them to assert the new runtime-wiring path (not just value parity).
+
+### Docs (in this PR)
+
+- Update `build-tools/docs/scaffolding.md` to distinguish:
+  - taxonomy-driven runtime consumers
+  - validation-only parity checks
+  - expected failure modes for missing canonical template roots
+- Document the update workflow when adding a template id so developers update taxonomy first, then template root and test-convention classification.
+
+### Acceptance Criteria
+
+- Metadata listing and template-test convention id wiring consume canonical template ids from taxonomy-driven sources, not duplicated literal tables.
+- Missing template roots for canonical ids fail fast with deterministic contract errors.
+- Existing command behavior remains unchanged (`scaf new ts ...`, legacy node path rejection for TypeScript templates).
+
+### Risks
+
+Moderate. Main risk is cross-language wiring churn between TypeScript tooling and Starlark convention surfaces.
+
+### Consequence of Not Implementing
+
+Taxonomy remains partially authoritative in practice, and duplicated id tables can still drift even when parity tests exist.
+
+### Downsides for Implementing
+
+One-time refactor cost in metadata and convention adapters.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-6: Close remaining `node` command-path drift in actively referenced docs and enforce it
+
+### Description
+
+I will close the remaining documentation drift where TypeScript template examples still use `scaf new node ...` in actively referenced docs, and I will enforce this boundary with an explicit doc contract inventory.
+
+### Scope & Changes
+
+- Define and maintain an explicit inventory of actively referenced docs that must not contain `scaf new node {typescript-template}` examples.
+- Migrate remaining TypeScript template command examples in actively referenced docs to canonical `scaf new ts ...`.
+- Preserve historical/archival intent where needed by marking files as archival in a way that excludes them from active-command contracts.
+- Keep runtime/toolchain naming (`node`, `nix_node_*`, `node_webapp`) unchanged outside template command identity.
+
+### Tests (in this PR)
+
+- Add a repo doc-command contract test that scans the active-doc inventory and fails on `scaf new node {typescript-template}` usage.
+- Add positive assertions for required canonical `scaf new ts ...` examples in those same docs.
+- Add a guard test that fails if an active doc is added without being classified in the inventory (active vs archival), so enforcement scope cannot silently drift.
+
+### Docs (in this PR)
+
+- Update active docs that still show legacy TypeScript template command paths to canonical `scaf new ts ...`.
+- Add a short section to `docs/handbook/getting-started-on-a-pr.md` (or equivalent handbook location) that defines:
+  - active-doc command contract scope
+  - archival-doc handling policy
+  - expected update workflow for new docs
+
+### Acceptance Criteria
+
+- No active docs instruct `scaf new node {typescript-template}`.
+- Active-doc contract tests fail fast when legacy TypeScript command paths are reintroduced.
+- Archival docs remain allowed when explicitly classified as archival and not implementation guidance.
+
+### Risks
+
+Low to moderate. Main risk is misclassifying docs that are still consumed during implementation.
+
+### Consequence of Not Implementing
+
+Contributors continue seeing conflicting command guidance, causing avoidable setup and scaffold failures.
+
+### Downsides for Implementing
+
+Small ongoing maintenance overhead for doc inventory classification.
+
+### Recommendation
+
+Implement.
+
+---
+
 ## Rollout and Sequencing
 
 Dependency-ordered sequence:
@@ -295,6 +401,8 @@ Dependency-ordered sequence:
 2. PR-2 finalizes command surface and naming cleanup.
 3. PR-3 cuts over dependent tooling/doc command paths to `ts`.
 4. PR-4 hardens taxonomy-centralized wiring and anti-drift contracts.
+5. PR-5 makes taxonomy runtime-authoritative for metadata and convention id wiring.
+6. PR-6 closes active-doc command drift and enforces active vs archival doc contracts.
 
 This keeps the plan modular while closing remaining drift without adding testing-only or docs-only PRs.
 
@@ -311,3 +419,5 @@ Cleanup is complete when all are true:
 - No backward compatibility aliases remain for legacy `node` TypeScript template ids.
 - Internal helper tooling and actively referenced docs do not instruct `scaf new node {typescript-template}`.
 - Taxonomy-consumed wiring and uniqueness contracts fail fast on identity drift.
+- Metadata and template-test convention id wiring derive canonical template ids from taxonomy-driven runtime sources, not duplicated literal tables.
+- Active-doc command contract inventory is enforced, and archival docs are explicitly classified outside active command guidance.

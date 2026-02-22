@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { CANONICAL_TS_TEMPLATE_IDS } from "../../scaffolding/scaf/templates/taxonomy.ts";
+import {
+  CANONICAL_TS_TEMPLATE_IDS,
+  assertCanonicalTemplateIdsUnique,
+} from "../../scaffolding/scaf/templates/taxonomy.ts";
 
 const EXPECTED_TS_TEMPLATE_IDS = [
   "ts/lib",
@@ -25,6 +28,7 @@ function sortedUnique(values: string[]): string[] {
 
 test("PR-1 taxonomy canonical TypeScript id set stays stable", () => {
   assert.deepEqual(sortedUnique(CANONICAL_TS_TEMPLATE_IDS), sortedUnique(EXPECTED_TS_TEMPLATE_IDS));
+  assertCanonicalTemplateIdsUnique(CANONICAL_TS_TEMPLATE_IDS);
   const legacyNodeIds = CANONICAL_TS_TEMPLATE_IDS.filter((id) => id.startsWith("node/"));
   assert.equal(legacyNodeIds.length, 0);
 });

@@ -1,0 +1,110 @@
+#!/usr/bin/env zx-wrapper
+import assert from "node:assert/strict";
+import * as fsp from "node:fs/promises";
+import { test } from "node:test";
+import {
+  CANONICAL_TEMPLATE_IDS,
+  CANONICAL_TS_TEMPLATE_IDS,
+  assertCanonicalTemplateIdsUnique,
+  canonicalTemplateIdsForLanguage,
+  hasCanonicalTemplateId,
+} from "../../scaffolding/scaf/templates/taxonomy.ts";
+import { readTemplateMeta } from "../../scaffolding/scaf/templates/meta.ts";
+import { TEMPLATE_SAFETY_FLOOR_TARGETS } from "../../lib/template-test-selector.ts";
+
+function sortedUnique(values: readonly string[]): string[] {
+  return Array.from(new Set(values)).sort();
+}
+
+function parseTemplateConventionIdsFromBzl(src: string): string[] {
+  const out: string[] = [];
+  const listPattern = /"template_ids":\s*\[([^\]]*)\]/g;
+  for (const match of src.matchAll(listPattern)) {
+    const body = String(match[1] || "");
+    for (const idMatch of body.matchAll(/"([^"]+)"/g)) {
+      const id = String(idMatch[1] || "").trim();
+      if (id) out.push(id);
+    }
+  }
+  return sortedUnique(out);
+}
+
+function parseConventionScriptKeysFromBzl(src: string): string[] {
+  const out: string[] = [];
+  const block = src.match(/_TEMPLATE_TEST_CONVENTIONS\s*=\s*\{([\s\S]*?)\n\}/);
+  if (!block) return out;
+  const body = String(block[1] || "");
+  for (const m of body.matchAll(/^\s*"([^"]+)":\s*\{/gm)) {
+    const script = String(m[1] || "").trim();
+    if (script) out.push(script);
+  }
+  return sortedUnique(out);
+}
+
+function parseSafetyFloorScriptsFromBzl(src: string): string[] {
+  const out: string[] = [];
+  const block = src.match(/TEMPLATE_SAFETY_FLOOR_SCRIPTS\s*=\s*\[([\s\S]*?)\]/);
+  if (!block) return out;
+  const body = String(block[1] || "");
+  for (const m of body.matchAll(/"([^"]+)"/g)) {
+    const script = String(m[1] || "").trim();
+    if (script) out.push(script);
+  }
+  return sortedUnique(out);
+}
+
+function targetNameFromScript(script: string): string {
+  let n = script;
+  const prefix = "build-tools/tools/tests/";
+  if (n.startsWith(prefix)) n = n.slice(prefix.length);
+  if (n.endsWith(".ts")) n = n.slice(0, -3);
+  if (n.endsWith(".test")) n = n.slice(0, -5);
+  return n.replace(/[/.-]/g, "_");
+}
+
+test("PR-4 taxonomy contract: canonical ids are unique and language-qualified", () => {
+  assertCanonicalTemplateIdsUnique(CANONICAL_TEMPLATE_IDS);
+  for (const id of CANONICAL_TEMPLATE_IDS) {
+    assert.match(id, /^[^/]+\/[^/]+$/, `invalid canonical template id: ${id}`);
+  }
+});
+
+test("PR-4 parity: resolver and metadata readers match canonical ts ids", async () => {
+  const resolverRaw = await fsp.readFile("build-tools/tools/scaffolding/resolver.json", "utf8");
+  const resolver = JSON.parse(resolverRaw) as Record<string, Record<string, string>>;
+  const resolverTsIds = Object.keys(resolver.ts || {}).map((template) => `ts/${template}`);
+  assert.deepEqual(sortedUnique(resolverTsIds), sortedUnique(CANONICAL_TS_TEMPLATE_IDS));
+
+  const metaRows = await readTemplateMeta("ts");
+  const metaIds = metaRows.map((row) => `ts/${row.template}`);
+  assert.deepEqual(sortedUnique(metaIds), sortedUnique(CANONICAL_TS_TEMPLATE_IDS));
+  assert.deepEqual(
+    sortedUnique(canonicalTemplateIdsForLanguage("ts")),
+    sortedUnique(CANONICAL_TS_TEMPLATE_IDS),
+  );
+});
+
+test("PR-4 anti-drift: template conventions reference canonical taxonomy only", async () => {
+  const bzl = await fsp.readFile("build-tools/tools/tests/template_conventions.bzl", "utf8");
+  const conventionIds = parseTemplateConventionIdsFromBzl(bzl);
+  for (const id of conventionIds) {
+    assert.equal(hasCanonicalTemplateId(id), true, `template convention has unknown id: ${id}`);
+  }
+
+  const scripts = parseConventionScriptKeysFromBzl(bzl);
+  const safetyFloorScripts = parseSafetyFloorScriptsFromBzl(bzl);
+  for (const script of safetyFloorScripts) {
+    assert.equal(
+      scripts.includes(script),
+      true,
+      `safety-floor script missing convention: ${script}`,
+    );
+  }
+  const safetyFloorTargetsFromBzl = safetyFloorScripts.map(
+    (script) => `//:${targetNameFromScript(script)}`,
+  );
+  assert.deepEqual(
+    sortedUnique(safetyFloorTargetsFromBzl),
+    sortedUnique([...TEMPLATE_SAFETY_FLOOR_TARGETS]),
+  );
+});
