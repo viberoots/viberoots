@@ -15,9 +15,13 @@ import { buildRunnableManifest, buildSelectedOutPath } from "./run-runnable-grap
 
 async function main() {
   const parsed = parseArgs(getArgvTokens());
+  if (parsed.sourceError) {
+    console.error(`[run-runnable] ${parsed.sourceError}`);
+    process.exit(2);
+  }
   if (!parsed.target || parsed.target.startsWith("-")) {
-    console.error("usage: p <target> [args...]");
-    console.error("   or: d <target> [args...]");
+    console.error("usage: p <target> [--source=auto|git|path] [args...]");
+    console.error("   or: d <target> [--source=auto|git|path] [args...]");
     process.exit(2);
   }
   const workspaceRoot = await findRepoRoot(process.cwd());
@@ -35,7 +39,7 @@ async function main() {
     const importer = hints.importer;
     let selectedError: unknown = null;
     try {
-      const outPath = await buildSelectedOutPath(workspaceRoot, target);
+      const outPath = await buildSelectedOutPath(workspaceRoot, target, parsed.sourceMode);
       const inferred = await inferRunnableFromOutPath({
         label: target,
         outPath,
@@ -67,7 +71,10 @@ async function main() {
     }
     if (!entry) {
       if (selectedError) throw selectedError;
-      const refreshedManifestPath = await buildRunnableManifest(workspaceRoot);
+      const refreshedManifestPath = await buildRunnableManifest(workspaceRoot, {
+        sourceMode: parsed.sourceMode,
+        target,
+      });
       entry = await readManifestEntry(refreshedManifestPath, target);
     }
   }

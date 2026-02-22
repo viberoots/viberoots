@@ -72,7 +72,7 @@ if [[ -o interactive ]]; then
   PROMPT='%F{green}[nix-shell]%f %m:%~$ '
   autoload -Uz compinit
   compinit -i
-  if [ -d "node_modules/zx" ]; then
+  if command -v scaf >/dev/null 2>&1; then
     eval "$(scaf completions zsh)"
   fi
 fi
@@ -86,7 +86,7 @@ alias b=build
 alias v=verify
 alias i='bash build-tools/tools/bin/install-deps'
 alias t=verify
-if [ -d "node_modules/zx" ]; then
+if command -v scaf >/dev/null 2>&1; then
   eval "$(scaf completions zsh)"
 fi
 EOF
@@ -103,6 +103,11 @@ EOF
       fi
 
       if [ -n "$ZSH_VERSION" ] && [ "$is_interactive" = "1" ]; then
+        autoload -Uz compinit
+        compinit -i
+        if command -v scaf >/dev/null 2>&1; then
+          eval "$(scaf completions zsh)"
+        fi
         alias b=build
         alias v=verify
         alias i='bash build-tools/tools/bin/install-deps'

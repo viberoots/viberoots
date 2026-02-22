@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# shell helpers
+# shellcheck source=/dev/null
+. "$(cd "$(dirname "$0")" && pwd)/_env.sh"
+
+exec_in_dev_shell "${LIVE_ROOT}" zsh "$@"

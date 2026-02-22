@@ -1,0 +1,46 @@
+import express from "express";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { readServerWasmContractByteLength } from "./wasm-contract.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const clientDir = path.resolve(__dirname, "../client");
+const port = Number(process.env.PORT || "4173");
+
+const app = express();
+app.use(express.static(clientDir));
+const serverWasmByteLength = await readServerWasmContractByteLength();
+
+const entryServerPath = path.resolve(__dirname, "entry-server.js");
+const { render } = (await import(pathToFileURL(entryServerPath).href)) as {
+  render: (url: string) => string;
+};
+
+app.get("*", (req, res) => {
+  const appHtml = render(req.originalUrl);
+  const html = [
+    "<!doctype html>",
+    '<html lang="en">',
+    "  <head>",
+    '    <meta charset="UTF-8" />',
+    '    <meta name="viewport" content="width=device-width, initial-scale=1.0" />',
+    "    <title>express-app SSR Express</title>",
+    "  </head>",
+    "  <body>",
+    `    <div data-server-wasm-bytes="${serverWasmByteLength}"></div>`,
+    `    ${appHtml}`,
+    '    <script type="module" src="/entry-client.js"></script>',
+    "  </body>",
+    "</html>",
+  ].join("\n");
+  res
+    .status(200)
+    .setHeader("content-type", "text/html; charset=utf-8")
+    .setHeader("x-server-wasm-bytes", String(serverWasmByteLength))
+    .end(html);
+});
+
+app.listen(port, "127.0.0.1", () => {
+  console.log(`[webapp-ssr-express] listening on http://127.0.0.1:${port}`);
+});

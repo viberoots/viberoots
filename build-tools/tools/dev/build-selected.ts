@@ -19,15 +19,101 @@ import { getImporterRootsContract } from "../lib/importer-roots.ts";
 import { sanitizeAttrNameFromLabel } from "../lib/labels.ts";
 import { runNodeWithZx } from "../lib/node-run.ts";
 import { findRepoRoot, pathExists } from "../lib/repo.ts";
+import { getArgvTokens } from "../lib/cli.ts";
+import { untrackedRequiresImpureForTargets } from "./dev-build/untracked.ts";
+import { makeFilteredFlakeRef } from "./filtered-flake.ts";
 
 function stripAnsi(s: string): string {
   return s.replace(/\x1B\[[0-9;]*[A-Za-z]/g, "").replace(/\r/g, "");
 }
 
+function targetPackageFromLabel(target: string): string {
+  const t = String(target || "").trim();
+  const noCell = t.startsWith("root//") ? t.slice("root//".length - 2) : t;
+  if (!noCell.startsWith("//")) return "";
+  const body = noCell.slice(2);
+  const idx = body.indexOf(":");
+  return idx >= 0 ? body.slice(0, idx) : body;
+}
+
+function parseSourceMode(argv: string[]): {
+  sourceMode: "auto" | "git" | "path";
+  sourceError?: string;
+} {
+  let sourceMode: "auto" | "git" | "path" = "auto";
+  let sourceError: string | undefined;
+  for (let i = 0; i < argv.length; i++) {
+    const tok = String(argv[i] || "").trim();
+    if (tok === "--source" && i + 1 < argv.length) {
+      const s = String(argv[i + 1] || "").trim();
+      if (s === "auto" || s === "git" || s === "path") sourceMode = s;
+      else sourceError = `invalid --source value '${s}' (expected auto|git|path)`;
+      i++;
+      continue;
+    }
+    if (tok.startsWith("--source=")) {
+      const s = tok.slice("--source=".length).trim();
+      if (s === "auto" || s === "git" || s === "path") sourceMode = s;
+      else sourceError = `invalid --source value '${s}' (expected auto|git|path)`;
+      continue;
+    }
+  }
+  return { sourceMode, sourceError };
+}
+
+async function chooseFlakeRef(opts: {
+  workspaceRoot: string;
+  target: string;
+  sourceMode: "auto" | "git" | "path";
+}): Promise<{ flakeRef: string; cleanup?: () => Promise<void> }> {
+  if (opts.sourceMode === "path")
+    return { flakeRef: `path:${opts.workspaceRoot}#graph-generator-selected` };
+  if (opts.sourceMode === "git")
+    return { flakeRef: `${opts.workspaceRoot}#graph-generator-selected` };
+  try {
+    const { stdout } = await $({
+      stdio: "pipe",
+      cwd: opts.workspaceRoot,
+    })`git ls-files --others --exclude-standard`;
+    const untracked = String(stdout || "")
+      .trim()
+      .split("\n")
+      .map((x) => x.trim())
+      .filter(Boolean);
+    if (untracked.length === 0)
+      return { flakeRef: `${opts.workspaceRoot}#graph-generator-selected` };
+    const targetPackages = [targetPackageFromLabel(opts.target)].filter(Boolean);
+    const decision = untrackedRequiresImpureForTargets({ untracked, targetPackages });
+    if (!decision.requiresImpure)
+      return { flakeRef: `${opts.workspaceRoot}#graph-generator-selected` };
+    console.error(
+      "[build-selected] Falling back to path flake source due to relevant untracked files:",
+    );
+    for (const f of decision.relevant.slice(0, 50)) console.error(` - ${f}`);
+    if (decision.relevant.length > 50) {
+      console.error(` ... and ${decision.relevant.length - 50} more`);
+    }
+    const filtered = await makeFilteredFlakeRef({
+      workspaceRoot: opts.workspaceRoot,
+      attr: "graph-generator-selected",
+      logPrefix: "[build-selected]",
+    });
+    return { flakeRef: filtered.flakeRef, cleanup: filtered.cleanup };
+  } catch {
+    return { flakeRef: `${opts.workspaceRoot}#graph-generator-selected` };
+  }
+}
+
 async function main() {
+  const parsedSource = parseSourceMode(getArgvTokens());
+  if (parsedSource.sourceError) {
+    console.error(`[build-selected] ${parsedSource.sourceError}`);
+    process.exit(2);
+  }
   const target = (process.env.BUCK_TARGET || "").trim();
   if (!target) {
     console.error("BUCK_TARGET is required (e.g., //projects/apps/foo:foo)");
+    console.error("optional: --source=auto|git|path");
     process.exit(2);
   }
   const cwd = path.resolve(process.cwd());
@@ -114,12 +200,23 @@ async function main() {
     sanitizedEnv[envName] = "";
   }
 
+  const flakeSource = await chooseFlakeRef({
+    workspaceRoot,
+    target,
+    sourceMode: parsedSource.sourceMode,
+  });
   const nixTrace = (process.env.EXPORTER_DEBUG || "").trim() === "1" ? "--show-trace" : "";
-  const { stdout, exitCode } = await $({
-    env: sanitizedEnv,
-    reject: false,
-    nothrow: true,
-  })`nix build --impure --no-write-lock-file --option eval-cache false ${workspaceRoot}#graph-generator-selected --accept-flake-config --print-out-paths ${nixTrace}`;
+  const { stdout, exitCode } = await (async () => {
+    try {
+      return await $({
+        env: sanitizedEnv,
+        reject: false,
+        nothrow: true,
+      })`nix build --impure --no-write-lock-file --option eval-cache false ${flakeSource.flakeRef} --accept-flake-config --print-out-paths ${nixTrace}`;
+    } finally {
+      await flakeSource.cleanup?.();
+    }
+  })();
   if (exitCode !== 0) {
     console.error(
       "[build-selected] nix build failed.\n" +

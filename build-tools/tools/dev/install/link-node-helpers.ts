@@ -140,6 +140,9 @@ export async function ensureNodeModulesGcRoot(
       .filter(Boolean)
       .pop();
     if (!drvPath || drvPath === "unknown-deriver") return;
+    // Substituted store paths may have a deriver path string whose .drv is not present locally.
+    // In that case, gc-root pinning via --realise is not possible and should be a quiet no-op.
+    if (!(await pathExists(drvPath))) return;
     const pinned = await runManagedCommand({
       command: "nix-store",
       args: ["--realise", "--add-root", gcRoot, "--indirect", drvPath],

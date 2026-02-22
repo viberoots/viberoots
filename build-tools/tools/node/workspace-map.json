@@ -1,1 +1,3 @@
-{}
+{
+  "@apps/express-app": "//projects/apps/express-app:app"
+}

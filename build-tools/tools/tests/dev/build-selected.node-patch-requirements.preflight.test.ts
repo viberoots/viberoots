@@ -11,6 +11,12 @@ test("build-selected runs node patch requirement preflight", async () => {
   if (!txt.includes('args: ["--check"]')) {
     throw new Error(`${file} must pass --check for read-only preflight`);
   }
+  if (!txt.includes("--source=auto|git|path")) {
+    throw new Error(`${file} usage should document --source mode choices`);
+  }
+  if (!txt.includes("untrackedRequiresImpureForTargets")) {
+    throw new Error(`${file} should reuse untracked impurity policy helper`);
+  }
 });
 
 test("node entrypoint macros use shared node patch preflight helper", async () => {

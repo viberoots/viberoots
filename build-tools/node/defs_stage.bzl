@@ -55,17 +55,6 @@ def _selected_route_build_cmd(selected_route_target):
         + "fi; "
     )
 
-def _defs_stage_bootstrap(timeout_sec):
-    tout = timeout_sec if isinstance(timeout_sec, int) and timeout_sec > 0 else 600
-    return (
-        "set -euo pipefail; "
-        + "if [ \"${BNX_NIX_CALL_DEBUG:-}\" = \"1\" ]; then set -x; fi; "
-        + "export TMP=\"${TMPDIR:-/tmp}\"; "
-        + "export WORKSPACE_ROOT=\"${WORKSPACE_ROOT:-${BUCK_TEST_SRC:-$PWD}}\"; "
-        + ("TOUT=%d; " % tout)
-        + "if command -v timeout >/dev/null 2>&1; then TIMEOUT=\"timeout -k 2s ${TOUT}s\"; else TIMEOUT=\"\"; fi; "
-    )
-
 def node_asset_stage(
         name,
         app,
@@ -119,8 +108,12 @@ def node_asset_stage(
 
     cmd = (
         "SCRATCH=\"$PWD\"; OUT_ABS=\"$SCRATCH/$OUT\"; "
-        + "if [ 1 -eq 0 ]; then " + nix_calling_genrule_bootstrap(timeout_sec = 240, include_pnpm_store = False, source_workspace_root_env = True) + "fi; "
-        + _defs_stage_bootstrap(240)
+        + nix_calling_genrule_bootstrap(
+            timeout_var = "TIMEOUT",
+            timeout_sec = 240,
+            include_pnpm_store = False,
+            source_workspace_root_env = True,
+        )
         + nix_calling_env_export_buck_graph_json()
         + nix_calling_node_patch_requirements_preflight(native.package_name())
         + _selected_route_build_cmd(selected_route_target)
@@ -180,8 +173,12 @@ def node_wasm_inline_module(
         src_ref = "$(location %s)" % _to_abs_label(src)
     cmd = (
         "SCRATCH=\"$PWD\"; OUT_ABS=\"$SCRATCH/$OUT\"; "
-        + "if [ 1 -eq 0 ]; then " + nix_calling_genrule_bootstrap(timeout_sec = 180, include_pnpm_store = False, source_workspace_root_env = True) + "fi; "
-        + _defs_stage_bootstrap(180)
+        + nix_calling_genrule_bootstrap(
+            timeout_var = "TIMEOUT",
+            timeout_sec = 180,
+            include_pnpm_store = False,
+            source_workspace_root_env = True,
+        )
         + nix_calling_env_export_buck_graph_json()
         + nix_calling_node_patch_requirements_preflight(native.package_name())
         + _selected_route_build_cmd(selected_route_target)

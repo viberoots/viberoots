@@ -13,8 +13,12 @@ export function parseArgs(argv: string[]): {
   mode: "prod" | "dev";
   target: string;
   passthrough: string[];
+  sourceMode: "auto" | "git" | "path";
+  sourceError?: string;
 } {
   let mode: "prod" | "dev" = "prod";
+  let sourceMode: "auto" | "git" | "path" = "auto";
+  let sourceError: string | undefined;
   const rest: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const tok = String(argv[i] || "");
@@ -29,10 +33,23 @@ export function parseArgs(argv: string[]): {
       if (m === "prod" || m === "dev") mode = m;
       continue;
     }
+    if (tok === "--source" && i + 1 < argv.length) {
+      const s = String(argv[i + 1] || "").trim();
+      if (s === "auto" || s === "git" || s === "path") sourceMode = s;
+      else sourceError = `invalid --source value '${s}' (expected auto|git|path)`;
+      i++;
+      continue;
+    }
+    if (tok.startsWith("--source=")) {
+      const s = tok.slice("--source=".length).trim();
+      if (s === "auto" || s === "git" || s === "path") sourceMode = s;
+      else sourceError = `invalid --source value '${s}' (expected auto|git|path)`;
+      continue;
+    }
     rest.push(tok);
   }
   const target = String(rest[0] || "").trim();
-  return { mode, target, passthrough: rest.slice(1) };
+  return { mode, target, passthrough: rest.slice(1), sourceMode, sourceError };
 }
 
 export async function importerForTarget(workspaceRoot: string, target: string): Promise<string> {
