@@ -2,6 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { normalizeTargetLabel } from "./labels.ts";
+import { SSR_FRAMEWORKS } from "./runnable-contracts.ts";
 
 export type RunnableExec = {
   argv: string[];
@@ -151,12 +152,34 @@ export async function inferRunnableFromOutPath(opts: {
   const dist = path.join(opts.outPath, "dist");
   const wantSsr = opts.mode === "ssr";
   if (wantSsr) {
+    const framework = String(opts.framework || "").trim();
+    if (!SSR_FRAMEWORKS.includes(framework as (typeof SSR_FRAMEWORKS)[number])) {
+      throw new Error(
+        `SSR contract error for ${opts.label}: missing/invalid framework label (expected ${SSR_FRAMEWORKS.join("|")})`,
+      );
+    }
     const serverEntry = path.join(dist, "server", "index.js");
     const clientDir = path.join(dist, "client");
     const serverWasmContract = path.join(dist, "server", "wasm-contract", "top.wasm");
+    try {
+      const st = await fsp.stat(serverEntry);
+      if (!st.isFile()) throw new Error("not a file");
+    } catch {
+      throw new Error(
+        `SSR packaging contract violation for ${opts.label}: missing serverEntry at ${serverEntry}`,
+      );
+    }
+    try {
+      const st = await fsp.stat(clientDir);
+      if (!st.isDirectory()) throw new Error("not a directory");
+    } catch {
+      throw new Error(
+        `SSR packaging contract violation for ${opts.label}: missing clientDir at ${clientDir}`,
+      );
+    }
     return {
       kind: "webapp-ssr",
-      framework: opts.framework || undefined,
+      framework,
       run: {
         prod: { argv: ["node", serverEntry] },
         ...(opts.importer

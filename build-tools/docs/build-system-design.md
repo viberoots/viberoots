@@ -641,6 +641,9 @@ The planner manifest (`<graph-out>/manifest.json`) preserves legacy `bins` field
   - Runtime startup must not depend on planner/runnable tooling inside the container image.
 - SSR troubleshooting:
   - If startup fails with missing assets, verify `dist/server/index.js` and `dist/client` exist in the built output.
+  - If planner packaging fails with `node planner: SSR webapp target ... missing framework label`, add exactly one framework label: `framework:express` or `framework:next`.
+  - If runnable execution fails with `SSR contract error ...`, fix the manifest contract fields (`framework`, `artifacts.serverEntry`, `artifacts.clientDir`, `run.prod`).
+  - `webapp-ssr` targets never fall back to static-host production commands. Any attempt to route SSR to `python3 -m http.server` is treated as a hard contract failure.
   - If Next startup fails in production mode, verify `.next` artifacts are present under `dist/client`.
   - If manifest/runtime disagree, inspect `<graph-out>/manifest.json` and verify `runnable.kind=webapp-ssr` with the expected `framework`.
 
@@ -648,6 +651,7 @@ Rules:
 
 - Library-only targets remain non-runnable and are excluded from runnable listings.
 - Non-binary app targets (for example webapps that materialize `dist`) are reported as runnable.
+- Methodology file-size/decomposition gates apply to touched test modules as well as runtime modules.
 - Developer commands use the contract:
   - `r //<target>` executes `run.prod`.
   - `d //<target>` executes `run.dev` and fails with a clear error when it is not declared.

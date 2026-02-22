@@ -161,7 +161,12 @@ test("SSR runnable routes to canonical node prod and dev:ssr commands", async ()
   await runInTemp("runnable-routes-ssr", async (tmp, $) => {
     const manifestPath = path.join(tmp, "buck-out", "tmp", "runnable.ssr.manifest.json");
     await fsp.mkdir(path.dirname(manifestPath), { recursive: true });
-    const serverEntry = "/nix/store/fake/dist/server/index.js";
+    const outPath = path.join(tmp, "buck-out", "tmp", "ssr-out");
+    const serverEntry = path.join(outPath, "dist", "server", "index.js");
+    const clientDir = path.join(outPath, "dist", "client");
+    await fsp.mkdir(path.dirname(serverEntry), { recursive: true });
+    await fsp.mkdir(clientDir, { recursive: true });
+    await fsp.writeFile(serverEntry, "console.log('server');\n", "utf8");
     await fsp.writeFile(
       manifestPath,
       JSON.stringify(
@@ -178,7 +183,7 @@ test("SSR runnable routes to canonical node prod and dev:ssr commands", async ()
                 prod: { argv: ["node", serverEntry] },
                 dev: { argv: ["pnpm", "--dir", "projects/apps/ssr", "dev:ssr"] },
               },
-              artifacts: { serverEntry, clientDir: "/nix/store/fake/dist/client" },
+              artifacts: { serverEntry, clientDir },
             },
           },
         ],
@@ -205,7 +210,10 @@ test("SSR runnable routes to canonical node prod and dev:ssr commands", async ()
         RUNNABLE_TEST_MANIFEST: manifestPath,
       },
     })`build-tools/tools/bin/p //projects/apps/ssr:app`;
-    assert.match(String(prod.stdout || ""), /node-ok:\/nix\/store\/fake\/dist\/server\/index\.js/);
+    assert.match(
+      String(prod.stdout || ""),
+      new RegExp(`node-ok:${serverEntry.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
+    );
 
     const dev = await $({
       cwd: tmp,

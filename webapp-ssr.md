@@ -29,6 +29,8 @@ Dependency chain (must execute in order):
 - PR-4 -> SSR packaging/runtime contract required before WASM parity can be validated end-to-end.
 - PR-5 -> shared client-side WASM contract required before server-side + parity enforcement.
 - PR-6 -> server-side WASM and cross-variant parity finalization.
+- PR-7 -> close remaining contract-negative coverage and strict methodology compliance gaps.
+- PR-8 -> close remaining SSR test-module methodology gate and documentation parity gaps.
 
 ---
 
@@ -94,6 +96,104 @@ Breaking template API names may require updating in-flight local scripts immedia
 ### Recommendation
 
 Implement.
+
+### Closure Status
+
+Implemented and validated:
+
+- Strict SSR test-module size gates are wired in verify and CI (`--scope=ssr-tests --fail=true`).
+- Touched SSR scaffold/runnable test modules were decomposed to remain under 250 lines.
+- Handbook and build-system docs now reflect that strict methodology gates apply to touched test
+  modules.
+- Existing SSR positive and negative contract suites remained green after the refactor.
+
+---
+
+## PR-8: Close remaining SSR methodology-gate and test-module decomposition gaps
+
+### Description
+
+I will close the remaining compliance gaps left after PR-7 by enforcing methodology sizing rules on
+touched SSR test modules and by finishing the related documentation contract so test-module rules are
+explicit in the same places as runtime-module rules.
+
+### Scope & Changes
+
+- Complete methodology compliance for touched SSR test modules:
+  - split any touched SSR test file that exceeds the 250-line methodology limit into focused helper
+    modules.
+  - keep each resulting module single-purpose and readable, with no behavior expansion.
+- Add strict methodology gate coverage for test modules:
+  - add a deterministic file-size check path that applies to touched test modules (not only source
+    modules).
+  - wire the check into existing verify/CI quality-gate flow with fail-fast behavior.
+- Close documentation parity for methodology scope:
+  - add explicit wording in build-system docs that strict methodology size/decomposition expectations
+    apply to test modules as well as runtime modules.
+  - keep contributor guidance aligned with the same contract language.
+- Keep PR scope narrow:
+  - no runtime/planner/packaging behavior changes.
+  - no fallback logic or compatibility expansion.
+
+### Tests (in this PR)
+
+- Add/extend tests to assert:
+  - touched SSR test modules remain under methodology file-size limits.
+  - new/updated test-module file-size gate runs in strict mode and fails on violations.
+  - refactored SSR test helpers preserve existing positive-path and negative-path assertions.
+- Keep existing SSR contract-negative suites green:
+  - missing/invalid framework contract checks.
+  - missing `serverEntry` and `clientDir` checks.
+  - SSR no-static-fallback routing checks.
+
+### Docs (in this PR)
+
+- Update build-system documentation to explicitly state methodology gates apply to test modules.
+- Update this plan with closure status notes for PR-7 follow-up gaps.
+- Keep handbook contributor guidance aligned with the strict methodology gate behavior.
+
+### Acceptance Criteria
+
+- All touched SSR test modules are decomposed to comply with the 250-line methodology limit.
+- Strict verify/CI gate coverage exists for touched test-module sizing violations and fails
+  deterministically on regressions.
+- Existing SSR positive and negative contract suites remain green with no runtime behavior changes.
+- Build-system docs, handbook guidance, and this plan reflect the same methodology scope for test
+  modules.
+
+### Risks
+
+Test-file decomposition can accidentally change fixtures or execution ordering if helper extraction is
+not surgical.
+
+### Mitigation
+
+Keep refactors mechanical, preserve existing test assertions, and add focused regression checks around
+shared helper extraction points.
+
+### Consequence of Not Implementing
+
+Methodology drift remains in touched SSR test modules, and strict compliance expectations differ
+between docs and enforced gates.
+
+### Downsides for Implementing
+
+Slightly higher test-module surface area and additional maintenance for strict gate coverage.
+
+### Recommendation
+
+Implement.
+
+### Closure Status
+
+Implemented and validated:
+
+- SSR contract-negative checks now fail deterministically for invalid/missing framework and missing
+  canonical SSR artifacts (`serverEntry`, `clientDir`).
+- SSR runnable routing fails fast on contract violations and no longer allows static-host fallback
+  semantics for SSR targets.
+- Added strict SSR contract-negative test coverage and kept existing positive SSR suites green.
+- Added documentation updates describing expected negative failure signatures and remediation paths.
 
 ---
 
@@ -445,6 +545,85 @@ drift.
 ### Downsides for Implementing
 
 Longer cross-variant integration test matrix and tighter packaging constraints.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-7: Close SSR negative-contract and methodology-compliance gaps
+
+### Description
+
+I will close the remaining gaps by adding explicit negative-path contract tests for SSR build/runtime
+failure semantics and by aligning touched test modules with strict methodology file-size expectations.
+
+### Scope & Changes
+
+- Add explicit negative-path contract coverage for SSR framework and artifact contracts:
+  - fail when `webapp:ssr` targets omit a valid `framework:*` label.
+  - fail when SSR packaging outputs are missing canonical `serverEntry` (`dist/server/index.js`).
+  - fail when SSR packaging outputs are missing canonical `clientDir` (`dist/client`).
+  - fail when SSR runtime routing would otherwise drift to static-host fallback semantics.
+- Add planner/runtime contract-negative routing assertions:
+  - SSR targets without valid contracts must not resolve to static-webapp run commands.
+  - missing SSR run metadata must fail with explicit actionable errors.
+- Enforce methodology-oriented module sizing and decomposition for newly added or modified test code:
+  - split oversized SSR test files into focused helper modules where practical.
+  - keep each file aligned with strict file-size gate expectations and single-purpose boundaries.
+- Keep all changes surgical and contract-focused:
+  - no runtime behavior broadening.
+  - no compatibility fallback paths that mask primary-path defects.
+
+### Tests (in this PR)
+
+- Add/extend negative tests to assert hard failures for:
+  - `webapp:ssr` with missing/invalid framework label.
+  - missing `dist/server/index.js` in SSR packaging output.
+  - missing `dist/client` in SSR packaging output.
+  - attempted static fallback behavior on SSR targets.
+- Add/extend runnable/planner routing tests to confirm:
+  - invalid SSR contracts fail fast with clear error messages.
+  - SSR targets never map to static-host production commands.
+- Add methodology compliance guard coverage for touched SSR test modules:
+  - file-size lint gate passes in strict mode.
+  - refactored test helpers preserve existing positive-path assertions.
+
+### Docs (in this PR)
+
+- Update SSR troubleshooting notes to include explicit negative-contract failure signatures and expected
+  remediation.
+- Update contributor/testing guidance to document the required negative-path checks for SSR contract
+  changes.
+- Add a short note in this plan and related build docs that strict methodology gates apply to test
+  modules as well as runtime modules.
+
+### Acceptance Criteria
+
+- SSR contract-negative scenarios fail deterministically with explicit error output.
+- SSR routing cannot regress to static-host fallback behavior without test failures.
+- Existing positive SSR scaffold/build/run/WASM parity tests remain green.
+- Touched SSR test modules comply with strict methodology file-size and modular-boundary expectations.
+- Docs and tests for these guarantees land in the same PR.
+
+### Risks
+
+Negative-path tests can be brittle if assertions depend on unstable command output text.
+
+### Mitigation
+
+Assert stable contract markers and failure classes, and isolate reusable expectations in shared helper
+utilities to avoid duplicated brittle checks.
+
+### Consequence of Not Implementing
+
+Primary SSR contract regressions can slip through positive-path-only coverage, and methodology drift in
+test modules can accumulate unnoticed.
+
+### Downsides for Implementing
+
+Additional negative-path coverage and module-splitting increases test maintenance surface.
 
 ### Recommendation
 

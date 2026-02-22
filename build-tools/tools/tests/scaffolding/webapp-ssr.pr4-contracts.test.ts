@@ -207,7 +207,7 @@ test(
           cwd: expressAppAbs,
           stdio: "inherit",
           env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1" },
-        })`pnpm install --frozen-lockfile --ignore-workspace --reporter=append-only`;
+        })`pnpm install --prod --frozen-lockfile --ignore-scripts --ignore-workspace --reporter=append-only`;
 
         const runtimeRoot = path.join(tmp, "docker-runtime-express");
         await fsp.mkdir(runtimeRoot, { recursive: true });

@@ -3,6 +3,7 @@ import path from "node:path";
 import { getArgvTokens } from "../lib/cli.ts";
 import { findRepoRoot } from "../lib/repo.ts";
 import { inferRunnableFromOutPath, type RunnableManifestEntry } from "../lib/runnables.ts";
+import { validateSsrRunnableContract } from "../lib/runnable-contracts.ts";
 import {
   parseArgs,
   importerForTarget,
@@ -54,6 +55,7 @@ async function main() {
       selectedError = e;
     }
     if (!entry) {
+      if (targetHints?.mode === "ssr" && selectedError) throw selectedError;
       const currentManifestPath = path.join(
         workspaceRoot,
         "buck-out",
@@ -73,8 +75,21 @@ async function main() {
     console.error(`target is not runnable (or is library-only): ${target}`);
     process.exit(2);
   }
+  if (entry.runnable.kind === "webapp-ssr") {
+    const errs = validateSsrRunnableContract(target, entry.runnable);
+    if (errs.length > 0) {
+      for (const err of errs) console.error(err);
+      process.exit(2);
+    }
+  }
   let spec = parsed.mode === "dev" ? entry.runnable.run.dev : entry.runnable.run.prod;
   if (parsed.mode === "dev" && !spec) {
+    if (entry.runnable.kind === "webapp-ssr") {
+      console.error(
+        `SSR contract error for ${target}: missing run.dev argv (expected pnpm --dir <importer> dev:ssr)`,
+      );
+      process.exit(2);
+    }
     const hints = targetHints || (await runnableHintsForTarget(workspaceRoot, target));
     const importer = hints.importer || (await importerForTarget(workspaceRoot, target));
     if (importer) {

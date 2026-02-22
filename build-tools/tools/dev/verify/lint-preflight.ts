@@ -17,6 +17,20 @@ async function runVerifyFileSizePreflight(root: string, zxInitPath: string): Pro
   }
 }
 
+async function runVerifySsrTestFileSizePreflight(root: string, zxInitPath: string): Promise<void> {
+  const script = path.resolve(root, "build-tools/tools/dev/file-size-lint.ts");
+  const args = ["--scope=ssr-tests", "--fail=true"];
+  process.stderr.write("[verify] file-size preflight: running strict SSR test-module size gate\n");
+  try {
+    await runNodeWithZx({ cwd: root, script, args, zxInitPath, stdio: "inherit" });
+  } catch {
+    process.stderr.write(
+      "error: SSR test-module file-size preflight failed; split oversized SSR test files and re-run 'v'\n",
+    );
+    process.exit(2);
+  }
+}
+
 async function runVerifyNixGapsPolicyPreflight(root: string, zxInitPath: string): Promise<void> {
   const script = path.resolve(root, "build-tools/tools/dev/nix-gaps-inventory-check.ts");
   const args = [
@@ -79,5 +93,6 @@ export async function runVerifyLintPreflight(
   }
 
   await runVerifyFileSizePreflight(root, zxInitPath);
+  await runVerifySsrTestFileSizePreflight(root, zxInitPath);
   await runVerifyNixGapsPolicyPreflight(root, zxInitPath);
 }
