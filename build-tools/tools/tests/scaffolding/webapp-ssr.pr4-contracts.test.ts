@@ -120,13 +120,13 @@ test(
         await $`scaf new node webapp-ssr-next demo-ssr-next --yes --no-tests`;
 
         await _$({
-          cwd: path.join(tmp, "projects", "apps", "demo-ssr-express"),
+          cwd: tmp,
           stdio: "inherit",
-        })`zx-wrapper ../../../build-tools/tools/dev/install/deps-main.ts --verbose --glue-only`;
+        })`zx-wrapper build-tools/tools/dev/install/deps-main.ts --verbose --glue-only`;
         await _$({
-          cwd: path.join(tmp, "projects", "apps", "demo-ssr-next"),
+          cwd: tmp,
           stdio: "inherit",
-        })`zx-wrapper ../../../build-tools/tools/dev/install/deps-main.ts --verbose --glue-only`;
+        })`zx-wrapper build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
 
         await _$({
           cwd: tmp,
@@ -143,11 +143,6 @@ test(
           stdio: "inherit",
           env: { ...process.env, NIX_PNPM_ALLOW_GENERATE: "1" },
         })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile projects/apps/demo-ssr-next/pnpm-lock.yaml`;
-        await _$({
-          cwd: tmp,
-          stdio: "inherit",
-        })`zx-wrapper build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
-
         const selectedOutPaths = new Map<string, string>();
         for (const [label, framework] of [
           ["//projects/apps/demo-ssr-express:app", "express"],

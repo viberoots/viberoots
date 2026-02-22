@@ -1,5 +1,5 @@
 {
-  "language": "node",
+  "language": "ts",
   "template": "wasm-inline",
   "description": "Wasm inline module package (Node)",
   "help": {

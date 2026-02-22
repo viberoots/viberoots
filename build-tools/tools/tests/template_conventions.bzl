@@ -28,27 +28,27 @@ _TEMPLATE_TEST_CONVENTIONS = {
         "classification": "template:contract",
     },
     "build-tools/tools/tests/scaffolding/node-lib.nix-node-test.with-tests-pass.test.ts": {
-        "template_ids": ["node/lib"],
+        "template_ids": ["ts/lib"],
         "classification": "template:contract",
     },
     "build-tools/tools/tests/scaffolding/node-cli.nix-node-test.with-tests-pass.test.ts": {
-        "template_ids": ["node/cli"],
+        "template_ids": ["ts/cli"],
         "classification": "template:contract",
     },
     "build-tools/tools/tests/scaffolding/webapp.scaffold-and-build.test.ts": {
-        "template_ids": ["node/webapp-static"],
+        "template_ids": ["ts/webapp-static"],
         "classification": "template:contract",
     },
     "build-tools/tools/tests/scaffolding/webapp-ssr.scaffold-contract-and-runtime-smoke.test.ts": {
-        "template_ids": ["node/webapp-ssr-express", "node/webapp-ssr-next"],
+        "template_ids": ["ts/webapp-ssr-express", "ts/webapp-ssr-next"],
         "classification": "template:shared",
     },
     "build-tools/tools/tests/scaffolding/webapp-ssr.scaffold-and-build.test.ts": {
-        "template_ids": ["node/webapp-ssr-express", "node/webapp-ssr-next"],
+        "template_ids": ["ts/webapp-ssr-express", "ts/webapp-ssr-next"],
         "classification": "template:shared",
     },
     "build-tools/tools/tests/scaffolding/webapp-ssr.pr4-contracts.test.ts": {
-        "template_ids": ["node/webapp-ssr-express", "node/webapp-ssr-next"],
+        "template_ids": ["ts/webapp-ssr-express", "ts/webapp-ssr-next"],
         "classification": "template:shared",
     },
     "build-tools/tools/tests/scaffolding/python-lib.scaffold-files.test.ts": {

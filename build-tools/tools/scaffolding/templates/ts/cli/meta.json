@@ -1,5 +1,5 @@
 {
-  "language": "node",
+  "language": "ts",
   "template": "cli",
   "description": "Node CLI (PNPM importer-scoped)",
   "help": {

@@ -10,8 +10,9 @@ export async function isLanguageEnabled(language: string): Promise<boolean> {
   }
   if (language === "node") {
     const defs = path.join("build-tools", "node", "defs.bzl");
-    const tplRoot = path.join("build-tools", "tools", "scaffolding", "templates", "node");
-    return (await exists(defs)) && (await exists(tplRoot));
+    const legacyTplRoot = path.join("build-tools", "tools", "scaffolding", "templates", "node");
+    const tsTplRoot = path.join("build-tools", "tools", "scaffolding", "templates", "ts");
+    return (await exists(defs)) && ((await exists(legacyTplRoot)) || (await exists(tsTplRoot)));
   }
   if (language === "ts") {
     return true;

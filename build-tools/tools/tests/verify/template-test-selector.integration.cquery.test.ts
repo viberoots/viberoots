@@ -41,7 +41,7 @@ async function queryTemplateLabelTargets(templateId: string): Promise<string[]> 
 test("selector output matches Buck template label query results", async () => {
   const changedPaths = [
     "build-tools/tools/scaffolding/templates/go/lib/copier.yaml",
-    "build-tools/tools/scaffolding/templates/node/lib/copier.yaml",
+    "build-tools/tools/scaffolding/templates/ts/lib/copier.yaml",
   ];
   const result = await resolveTemplateTestSelection({
     root: process.cwd(),
@@ -50,7 +50,7 @@ test("selector output matches Buck template label query results", async () => {
 
   assert.equal(result.mode, "template-only");
   const expectedGo = await queryTemplateLabelTargets("go/lib");
-  const expectedNode = await queryTemplateLabelTargets("node/lib");
+  const expectedNode = await queryTemplateLabelTargets("ts/lib");
   const expected = Array.from(
     new Set([...expectedGo, ...expectedNode, ...TEMPLATE_SAFETY_FLOOR_TARGETS]),
   ).sort();

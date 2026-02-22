@@ -11,7 +11,11 @@
     "lib": "projects/libs/{name}",
     "cli": "projects/apps/{name}"
   },
-  "node": {
+  "python": {
+    "lib": "projects/libs/{name}",
+    "app": "projects/apps/{name}"
+  },
+  "ts": {
     "lib": "projects/libs/{name}",
     "wasm-inline": "projects/libs/{name}-wasm-inline",
     "cli": "projects/apps/{name}",
@@ -19,13 +23,7 @@
     "webapp-ssr-express": "projects/apps/{name}",
     "webapp-ssr-next": "projects/apps/{name}",
     "cpp-addon": "projects",
-    "go-addon": "projects"
-  },
-  "python": {
-    "lib": "projects/libs/{name}",
-    "app": "projects/apps/{name}"
-  },
-  "ts": {
+    "go-addon": "projects",
     "wasm-app": "projects",
     "wasm-linking-app": "projects",
     "go-cpp-lib": "projects"

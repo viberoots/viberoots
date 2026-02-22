@@ -1,5 +1,5 @@
 {
-  "language": "node",
+  "language": "ts",
   "template": "go-addon",
   "description": "Node TS library + Go c-archive + C N-API addon (three sibling packages)",
   "help": {

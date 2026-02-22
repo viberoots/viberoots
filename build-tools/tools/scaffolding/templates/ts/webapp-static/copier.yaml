@@ -14,7 +14,7 @@ _exclude:
 
 # Variables populated by scaf
 name: ""
-language: "node"
+language: "ts"
 template: "webapp-static"
 
 # Derived defaults for Node webapp

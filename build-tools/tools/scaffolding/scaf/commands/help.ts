@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { readTemplateMeta } from "../templates/meta.ts";
 import { normalizeTemplateName } from "../templates/names.ts";
+import { canonicalTemplateLanguage } from "../templates/taxonomy.ts";
 import { readCopierVariables } from "../templates/variables.ts";
 import { usage } from "../usage.ts";
 
@@ -92,12 +93,13 @@ function helpForGoTest(flags: ScafFlags) {
 
 async function helpForNewTemplate(language: string, templateRaw: string, flags: ScafFlags) {
   const template = normalizeTemplateName(templateRaw);
+  const canonicalLanguage = canonicalTemplateLanguage(language, template);
   const tmplDirPath = path.join(
     "build-tools",
     "tools",
     "scaffolding",
     "templates",
-    language,
+    canonicalLanguage,
     template,
   );
   const variables = await readCopierVariables(tmplDirPath).catch(() => [] as string[]);
@@ -202,7 +204,7 @@ export async function cmdHelp(args: string[], flags: ScafFlags) {
       "tools",
       "scaffolding",
       "templates",
-      language,
+      canonicalTemplateLanguage(language, template),
       template,
     );
     const variables = await readCopierVariables(tmplDirPath).catch(() => [] as string[]);

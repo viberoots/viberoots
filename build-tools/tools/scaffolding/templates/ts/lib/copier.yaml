@@ -13,14 +13,14 @@ _exclude:
   - meta.json
 
 name: ""
-language: "node"
-template: "wasm-inline"
+language: "ts"
+template: "lib"
 
-importer: "projects/libs/{{ name }}-wasm-inline"
-lockfilePath: "projects/libs/{{ name }}-wasm-inline/pnpm-lock.yaml"
+importer: "projects/libs/{{ name }}"
+lockfilePath: "projects/libs/{{ name }}/pnpm-lock.yaml"
 pkgScope: "@libs"
-wasmSrc: "//projects/libs/{{ name }}-api:wasm"
-includeNodeTests: false
+includeNodeTests: true
 
 _tasks:
-  - mkdir -p projects/libs/{{ name }}-wasm-inline
+  - mkdir -p projects/libs/{{ name }}/src
+  - mkdir -p projects/libs/{{ name }}/test

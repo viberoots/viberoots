@@ -409,6 +409,9 @@ Related guidance lives in `build-tools/docs/wasm-node-linking.md`.
 
 Template-owned tests are encoded directly in Buck metadata so selection can be driven from Buck query output.
 
+- Canonical taxonomy source: `build-tools/tools/scaffolding/scaf/templates/taxonomy.ts`.
+- Canonical id format: `<language>/<template>` (for example `ts/lib`).
+- TypeScript template ownership is `ts/*`. `node/*` is runtime/toolchain naming, not template taxonomy.
 - Template id labels use `template:<language>/<template>` (for example `template:go/lib`).
 - Each template-owned test carries exactly one classification label:
   - `template:smoke`

@@ -1,5 +1,5 @@
 {
-  "language": "node",
+  "language": "ts",
   "template": "cpp-addon",
   "description": "Node TS library + C++ Node-API addon (two sibling packages)",
   "help": {

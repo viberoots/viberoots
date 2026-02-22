@@ -12,12 +12,10 @@ _envops:
 _exclude:
   - meta.json
 
-# Variables populated by scaf
 name: ""
-language: "node"
-template: "cli"
+language: "ts"
+template: "webapp-ssr-express"
 
-# Derived defaults for Node CLI
 importer: "projects/apps/{{ name }}"
 lockfilePath: "projects/apps/{{ name }}/pnpm-lock.yaml"
 pkgScope: "@apps"
@@ -25,6 +23,7 @@ includeNodeTests: true
 
 _tasks:
   - mkdir -p src
-  - mkdir -p bin
+  - mkdir -p server
   - mkdir -p test
-  - chmod +x bin/{{ name }}
+_templates_suffix: ".jinja"
+_answers_file: ".copier-answers.yml"

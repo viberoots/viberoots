@@ -13,10 +13,10 @@ _exclude:
   - meta.json
 
 name: ""
-language: "node"
-template: "go-addon"
+language: "ts"
+template: "cpp-addon"
 
-# Node importer for the TS package; Go and native live alongside as projects/libs/{{ name }}-go and projects/libs/{{ name }}-native
+# Node importer for the TS package; C++ addon lives alongside as projects/libs/{{ name }}-native
 importer: "projects/libs/{{ name }}"
 lockfilePath: "projects/libs/{{ name }}/pnpm-lock.yaml"
 pkgScope: "@libs"
@@ -24,11 +24,9 @@ addon_name: "{{ name }}_addon"
 includeNodeTests: true
 
 _tasks:
-  # Ensure all sibling package directories exist
+  # Ensure both sibling package directories exist
   - mkdir -p libs/{{ name }}/src
   - mkdir -p libs/{{ name }}/test
-  - mkdir -p libs/{{ name }}-go/pkg/addon
-  - mkdir -p libs/{{ name }}-go/patches/go
   - mkdir -p libs/{{ name }}-native/src
   - mkdir -p libs/{{ name }}-native/include
   - mkdir -p libs/{{ name }}-native/tests

@@ -1,5 +1,5 @@
 {
-  "language": "node",
+  "language": "ts",
   "template": "webapp-ssr-next",
   "description": "Next.js SSR webapp with explicit Node server entrypoint",
   "help": {

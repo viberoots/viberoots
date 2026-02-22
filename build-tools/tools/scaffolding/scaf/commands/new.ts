@@ -14,6 +14,7 @@ import { exists } from "../fs.ts";
 import { isLanguageEnabled } from "../language-enablement.ts";
 import { resolveDestination } from "../templates/destination.ts";
 import { normalizeTemplateName } from "../templates/names.ts";
+import { canonicalTemplateLanguage } from "../templates/taxonomy.ts";
 import { usage } from "../usage.ts";
 
 export async function cmdNew(args: string[], flags: ScafFlags) {
@@ -27,15 +28,23 @@ export async function cmdNew(args: string[], flags: ScafFlags) {
     return;
   }
   const template = normalizeTemplateName(templateRaw);
-  const root = path.join("build-tools", "tools", "scaffolding", "templates", language, template);
+  const canonicalLanguage = canonicalTemplateLanguage(language, template);
+  const root = path.join(
+    "build-tools",
+    "tools",
+    "scaffolding",
+    "templates",
+    canonicalLanguage,
+    template,
+  );
   const metaPath = path.join(root, "meta.json");
   if (!(await exists(root)) || !(await exists(metaPath))) {
     console.error(`unknown template: ${language}/${template}`);
     process.exit(1);
   }
-  const destInfo = resolveDestination(language, template, name, flags["path"]);
+  const destInfo = resolveDestination(canonicalLanguage, template, name, flags["path"]);
   const dest = language === "language" && template === "kit" ? "." : destInfo.path;
-  const data: Record<string, any> = { name, language, template };
+  const data: Record<string, any> = { name, language: canonicalLanguage, template };
 
   if (language === "python") {
     const moduleName = name
@@ -51,7 +60,7 @@ export async function cmdNew(args: string[], flags: ScafFlags) {
       data[k] = v;
     }
   }
-  if (language === "node" || language === "ts") {
+  if (canonicalLanguage === "ts") {
     const noTests = (flags["no-tests"] || "").toString().toLowerCase() === "true";
     if (noTests) {
       data["includeNodeTests"] = false;
@@ -91,7 +100,7 @@ export async function cmdNew(args: string[], flags: ScafFlags) {
     await fsp.mkdir(path.dirname(dest), { recursive: true });
   } catch {}
   await runCopierCopy(root, dest, data);
-  await recordSource(dest, language, template);
+  await recordSource(dest, canonicalLanguage, template);
   await runPostSteps(dest);
 
   if (isLangKit) {
@@ -123,7 +132,7 @@ export async function cmdNew(args: string[], flags: ScafFlags) {
     }
   }
 
-  if (language === "node" || language === "ts") {
+  if (canonicalLanguage === "ts") {
     const noTests =
       (flags["no-tests"] || "").toString().toLowerCase() === "true" ||
       data["includeNodeTests"] === false;
@@ -145,12 +154,7 @@ export async function cmdNew(args: string[], flags: ScafFlags) {
       // Nix builders run pnpm with --frozen-lockfile; placeholder lockfiles are not acceptable.
       const repoRoot = process.cwd();
       const importer = (() => {
-        if (language === "node") {
-          return template === "go-addon" || template === "cpp-addon"
-            ? path.join("libs", name)
-            : destInfo.path;
-        }
-        // TS templates currently scaffold Node/TS importers and use pnpm lockfiles.
+        if (template === "go-addon" || template === "cpp-addon") return path.join("libs", name);
         if (template === "wasm-app" || template === "wasm-linking-app")
           return path.join("apps", name);
         if (template === "go-cpp-lib") return path.join("libs", `${name}-ts`);

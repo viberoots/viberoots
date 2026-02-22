@@ -1,5 +1,5 @@
 {
-  "language": "node",
+  "language": "ts",
   "template": "webapp-ssr-express",
   "description": "Express SSR webapp with Vite entrypoints and Node startup",
   "help": {
