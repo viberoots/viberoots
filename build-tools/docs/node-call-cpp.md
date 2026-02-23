@@ -61,7 +61,7 @@ Adopt the Node-API C++ addon approach. It aligns best with our philosophy of det
 
 ### Template name and location
 
-- Location: `build-tools/tools/scaffolding/templates/node/cpp-addon/`
+- Location: `build-tools/tools/scaffolding/templates/ts/cpp-addon/`
 - Purpose: scaffold a Node TS library that calls into a C++ Node-API addon.
 - Default destination structure (two packages created together):
   - `projects/libs/{{ name }}/` — Node TS library
@@ -181,7 +181,7 @@ Phase 0 — Nix + macro substrate
 
 Phase 1 — Scaffolding template
 
-- Add `build-tools/tools/scaffolding/templates/node/cpp-addon/` with the content outlined above.
+- Add `build-tools/tools/scaffolding/templates/ts/cpp-addon/` with the content outlined above.
 - Ensure the Node `TARGETS` uses a `nix_node_gen` helper (e.g., `:copy_addon`) that copies `$(location //projects/libs/{{ name }}-native:napi_addon)` into a `native/{{ addon_name }}.node` path the wrapper loads.
 - Acceptance:
   - `scaf new ts cpp-addon demo` creates both `projects/libs/demo` and `projects/libs/demo-native`.

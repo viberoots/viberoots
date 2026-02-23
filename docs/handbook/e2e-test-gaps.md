@@ -153,7 +153,7 @@ Phase 3 — E2E test update (build-tools/tools/tests/...)
     - Import `T = import ./build-tools/tools/nix/lang-templates.nix { inherit pkgs; };`
     - Build `carchive = T.Go.goCArchive {...}` with `modulesToml = ./libs/${name}-go/gomod2nix.toml`, `subdir = "libs/${name}-go"`, `srcRoot = ./.`.
     - Pass `nixCxxPkgs = [ carchive ]` to `TAddon.cppNodeAddon`.
-- build-tools/tools/scaffolding/templates/node/go-addon/libs/{{ name }}/TARGETS.jinja
+- build-tools/tools/scaffolding/templates/ts/go-addon/libs/{{ name }}/TARGETS.jinja
   - Change `nix_node_test(..., deps = [":copy_addon"], ...)`.
 - build-tools/tools/tests/scaffolding/node-go-addon.nix-node-test.pass.test.ts
   - Add an early `build-tools/tools/bin/i` invocation (or `zx-wrapper build-tools/tools/dev/install-deps.ts`) to refresh `gomod2nix.toml` before building the Node test derivation.

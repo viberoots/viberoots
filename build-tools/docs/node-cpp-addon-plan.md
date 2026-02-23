@@ -78,11 +78,11 @@ Add a Buck macro that stamps `lang:cpp`/`kind:addon`, includes package‑local `
 
 Implement.
 
-## PR‑3: New scaffold `node/cpp-addon` (two sibling packages)
+## PR‑3: New scaffold `ts/cpp-addon` (two sibling packages)
 
 ### Description
 
-Add a Copier template `build-tools/tools/scaffolding/templates/node/cpp-addon/` that generates a Node TS library `libs/<name>` and a C++ addon `libs/<name>-native` using Node‑API.
+Add a Copier template `build-tools/tools/scaffolding/templates/ts/cpp-addon/` that generates a Node TS library `libs/<name>` and a C++ addon `libs/<name>-native` using Node‑API.
 
 ### Scope & Changes
 
