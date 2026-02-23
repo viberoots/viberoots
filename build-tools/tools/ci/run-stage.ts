@@ -125,6 +125,10 @@ async function main() {
     case "prebuild-guard": {
       const target = path.resolve("build-tools/tools/buck/prebuild-guard.ts");
       await runTool(target);
+      await runTool(
+        path.resolve("build-tools/tools/scaffolding/gen-template-manifest-artifacts.ts"),
+        ["--check"],
+      );
       break;
     }
     case "patches-lint": {

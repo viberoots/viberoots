@@ -440,7 +440,7 @@ Source-of-truth matrix for template identity:
   - `build-tools/tools/tests/template_conventions.bzl`
   - consumes canonical ids through the imported adapter:
     - `build-tools/tools/tests/template_taxonomy_adapter.bzl`
-  - template-owned mappings use `(language, template)` keys and resolve canonical ids via adapter helpers
+  - template-owned mappings keep explicit classification metadata and derive canonical ids from canonical template root paths (`template_roots`)
 - Resolver consumer:
   - `build-tools/tools/scaffolding/resolver.json`
   - TypeScript resolver keys must stay in parity with canonical `ts/*` ids.
@@ -467,7 +467,9 @@ Duplicate-id failure contract:
   2. add the template root directory under `build-tools/tools/scaffolding/templates/<language>/<template>/`
   3. refresh generated taxonomy/resolver surfaces:
      - `node build-tools/tools/scaffolding/gen-template-manifest-artifacts.ts`
-  4. add/update template test mappings in `template_conventions.bzl` (classification + `(language, template)` keys)
+  4. add/update template test mappings in `template_conventions.bzl` only when adding a new template-owned test script:
+     - keep explicit classification (`template:smoke|template:contract|template:shared`)
+     - wire `template_roots` paths only; do not register `(language, template)` keys
   5. run parity/runtime contracts and fix reported drift before merge
 
 Generated-surface refresh contract:
@@ -481,6 +483,9 @@ Generated-surface refresh contract:
   - `node build-tools/tools/scaffolding/gen-template-manifest-artifacts.ts --check`
   - `build-tools/tools/tests/scaffolding/template-manifest.pr7-generator-parity.contract.test.ts`
   - `build-tools/tools/tests/scaffolding/template-manifest.pr7-resolver-parity.contract.test.ts`
+- Verify/CI freshness enforcement:
+  - `v` runs `gen-template-manifest-artifacts.ts --check` before test execution.
+  - CI `run-stage --stage prebuild-guard` runs the same `--check` gate.
 
 Buck query example:
 

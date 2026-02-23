@@ -77,6 +77,12 @@ export async function runVerify(): Promise<void> {
   // Run lint preflight before acquiring the verify lock so formatting-only failures
   // don't create a verify-lock dir.
   await runVerifyLintPreflight(root, zxInitPath, { lintFilter: templateScope.lintFilter });
+  await runNodeWithZx({
+    cwd: root,
+    script: path.join(root, "build-tools/tools/scaffolding/gen-template-manifest-artifacts.ts"),
+    args: ["--check"],
+    zxInitPath,
+  });
 
   const allowConcurrent = process.env.VERIFY_ALLOW_CONCURRENT === "1";
   const lock = await acquireVerifyLock({ root, allowConcurrent });

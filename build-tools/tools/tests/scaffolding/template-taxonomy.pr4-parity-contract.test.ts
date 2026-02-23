@@ -16,15 +16,29 @@ function sortedUnique(values: readonly string[]): string[] {
   return Array.from(new Set(values)).sort();
 }
 
+function templateIdFromRootPath(rootPath: string): string | null {
+  const normalized = String(rootPath || "")
+    .replace(/\\/g, "/")
+    .replace(/\/+$/, "");
+  const prefix = "build-tools/tools/scaffolding/templates/";
+  if (!normalized.startsWith(prefix)) return null;
+  const rel = normalized.slice(prefix.length);
+  const parts = rel.split("/");
+  if (parts.length !== 2) return null;
+  const language = String(parts[0] || "").trim();
+  const template = String(parts[1] || "").trim();
+  if (!language || !template) return null;
+  return `${language}/${template}`;
+}
+
 function parseTemplateConventionIdsFromBzl(src: string): string[] {
   const out: string[] = [];
-  const listPattern = /"template_keys":\s*\[([^\]]*)\]/g;
+  const listPattern = /"template_roots":\s*\[([^\]]*)\]/g;
   for (const match of src.matchAll(listPattern)) {
     const body = String(match[1] || "");
-    for (const keyMatch of body.matchAll(/\(\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)/g)) {
-      const language = String(keyMatch[1] || "").trim();
-      const template = String(keyMatch[2] || "").trim();
-      if (language && template) out.push(`${language}/${template}`);
+    for (const rootMatch of body.matchAll(/"([^"]+)"/g)) {
+      const id = templateIdFromRootPath(String(rootMatch[1] || ""));
+      if (id) out.push(id);
     }
   }
   return sortedUnique(out);
@@ -98,6 +112,11 @@ test("PR-4 parity: resolver and metadata readers match canonical ts ids", async 
 
 test("PR-4 anti-drift: template conventions reference canonical taxonomy only", async () => {
   const bzl = await fsp.readFile("build-tools/tools/tests/template_conventions.bzl", "utf8");
+  assert.equal(
+    bzl.includes("template_keys"),
+    false,
+    "template conventions must not use manual template_keys registration; use template_roots path conventions",
+  );
   const conventionIds = parseTemplateConventionIdsFromBzl(bzl);
   for (const id of conventionIds) {
     assert.equal(hasCanonicalTemplateId(id), true, `template convention has unknown id: ${id}`);
