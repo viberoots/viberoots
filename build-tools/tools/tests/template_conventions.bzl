@@ -58,12 +58,13 @@ _TEMPLATE_TEST_CONVENTIONS = {
         ],
         "classification": "template:shared",
     },
-    "build-tools/tools/tests/scaffolding/webapp-ssr.pr4-contracts.test.ts": {
-        "template_roots": [
-            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-express",
-            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next",
-        ],
-        "classification": "template:shared",
+    "build-tools/tools/tests/scaffolding/webapp-ssr.pr4-express-contracts.test.ts": {
+        "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-express"],
+        "classification": "template:contract",
+    },
+    "build-tools/tools/tests/scaffolding/webapp-ssr.pr4-next-contracts.test.ts": {
+        "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next"],
+        "classification": "template:contract",
     },
     "build-tools/tools/tests/scaffolding/python-lib.scaffold-files.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/python/lib"],

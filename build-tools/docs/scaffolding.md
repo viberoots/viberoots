@@ -489,6 +489,8 @@ Generated-surface refresh contract:
   - `node build-tools/tools/scaffolding/gen-template-manifest-artifacts.ts --check`
   - `build-tools/tools/tests/scaffolding/template-manifest.pr7-generator-parity.contract.test.ts`
   - `build-tools/tools/tests/scaffolding/template-manifest.pr7-resolver-parity.contract.test.ts`
+- `scaf` command preflight:
+  - `scaf` runs `gen-template-manifest-artifacts.ts` before taxonomy-consuming commands (`new`, `templates`, `template`, and template-related completion subcommands), so template-directory onboarding does not require a separate manual refresh step.
 - Verify/CI freshness enforcement:
   - `v` runs `gen-template-manifest-artifacts.ts --check` before test execution.
   - CI `run-stage --stage prebuild-guard` runs the same `--check` gate.
