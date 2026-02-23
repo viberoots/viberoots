@@ -59,15 +59,15 @@ compatibility-only complexity.
 
 - Add/extend scaffolding tests to assert:
   - `scaf templates` shows `webapp-static`.
-  - `scaf new node webapp-static <name>` succeeds and produces expected static files.
-  - `scaf new node webapp <name>` fails with a clear "unknown template" error.
+  - `scaf new ts webapp-static <name>` succeeds and produces expected static files.
+  - `scaf new ts webapp <name>` fails with a clear "unknown template" error.
 - Add/extend help text tests to verify usage/examples include `webapp-static`.
 
 ### Docs (in this PR)
 
 - Update Node scaffolding docs/help contract to describe naming split with no compatibility alias.
-- Update references that currently use `scaf new node webapp ...` to use
-  `scaf new node webapp-static ...`.
+- Update references that currently use `scaf new ts webapp ...` to use
+  `scaf new ts webapp-static ...`.
 
 ### Acceptance Criteria
 
@@ -237,7 +237,7 @@ keeping framework-specific implementation details inside template artifacts.
 
 ### Acceptance Criteria
 
-- `scaf new node webapp-ssr-express <name>` and `scaf new node webapp-ssr-next <name>` both succeed.
+- `scaf new ts webapp-ssr-express <name>` and `scaf new ts webapp-ssr-next <name>` both succeed.
 - Both generated templates start and serve SSR responses in smoke tests.
 - Template naming and purpose are unambiguous across static and SSR options.
 
