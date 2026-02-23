@@ -63,6 +63,35 @@ Server-side Wasm contract artifact:
 dist/server/wasm-contract/top.wasm
 ```
 {% endif %}
+{% if template == "webapp-ssr-vite" %}
+This is a Vite-first SSR scaffold that runs development SSR through Vite middleware mode.
+
+Use this when you want Vite-native SSR hooks in development and an explicit Node server entrypoint in production.
+
+Dev mode:
+
+```bash
+pnpm run dev:ssr
+```
+
+Production build and startup:
+
+```bash
+pnpm run build:ssr
+pnpm run start:ssr
+```
+
+Default local URL:
+
+```text
+http://127.0.0.1:5173
+```
+
+Expected SSR contract failures:
+
+- Missing SSR entry module: `SSR contract error: failed to load /src/entry-server.ts: ...`
+- Invalid SSR render export: `SSR contract error: /src/entry-server.ts must export a render(url) function`
+{% endif %}
 
 ## Node tests (nix_node_test)
 

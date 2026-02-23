@@ -70,6 +70,10 @@ _TEMPLATE_TEST_CONVENTIONS = {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite"],
         "classification": "template:contract",
     },
+    "build-tools/tools/tests/scaffolding/webapp-ssr-vite.pr2-dev-runtime-contract.test.ts": {
+        "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite"],
+        "classification": "template:contract",
+    },
     "build-tools/tools/tests/scaffolding/python-lib.scaffold-files.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/python/lib"],
         "classification": "template:smoke",
