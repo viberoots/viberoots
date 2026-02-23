@@ -41,6 +41,25 @@ Python provider sync activation in sparse/partial clones is lockfile‑driven: t
 - Nix attr alias source of truth: `build-tools/tools/lib/nix-attr-aliases.json`. Starlark mirror is generated (dev/test-time) via:
   - `node build-tools/tools/dev/gen-nix-attr-aliases-bzl.ts` → writes `build-tools/lang/nix_attr_aliases.bzl`. A stub exists and runtime does not depend on generation; behavior is unchanged for current aliases.
 
+### 2.1 Active-doc command contract scope (PR-6)
+
+I maintain an explicit inventory for docs that contain scaffold command guidance:
+
+- Inventory source: `build-tools/tools/tests/scaffolding/doc-command-contract.inventory.ts`
+- Classification is required for scaffold-command docs under these areas:
+  - `docs/handbook`
+  - `build-tools/docs`
+  - `docs/design-history`
+  - `docs/pnpm`
+- Active docs are implementation guidance and must keep canonical TypeScript commands (`scaf new ts ...`) for canonical TypeScript templates.
+- Archival docs are historical records and may keep legacy command examples when explicitly classified as archival.
+
+When adding or materially editing scaffold command guidance:
+
+- Update the active/archival classification inventory in the same PR.
+- Keep active docs on canonical command paths.
+- Run the PR-6 docs contract tests to ensure classification and command-path enforcement stay in sync.
+
 ### 3. Commands cheat sheet
 
 - Build/test:

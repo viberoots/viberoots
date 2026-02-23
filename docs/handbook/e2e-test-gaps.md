@@ -9,7 +9,7 @@ This plan closes the gaps surfaced by the new e2e test for the scaffolded Go add
   - Adjust the scaffolded Node TARGETS to avoid cross-package visibility issues for Buck tests.
   - Keep exporter/provider flows unchanged. No new provider shapes.
 - Completion criteria
-  - On a temp scaffolded project created by `scaf new node go-addon demo`:
+  - On a temp scaffolded project created by `scaf new ts go-addon demo`:
     - `nix build .#node-test.libs_demo` succeeds; the test report exists and the Node addon runs `add(2, 3) = 5`.
     - Optional: `buck2 test --target-platforms prelude//platforms:default //projects/libs/demo:unit` succeeds.
   - Full repository suite passes with `i && b && v` after direnv loads.
@@ -65,7 +65,7 @@ Acceptance checks
 
 Code reference (current template):
 
-```23:28:build-tools/tools/scaffolding/templates/node/go-addon/libs/{{ name }}/TARGETS.jinja
+```23:28:build-tools/tools/scaffolding/templates/ts/go-addon/libs/{{ name }}/TARGETS.jinja
 {% if includeNodeTests -%}
 nix_node_test(
     name = "unit",
@@ -99,7 +99,7 @@ Phase 1 — Flake builder integration (Go c-archive → addon)
 Phase 2 — Buck test visibility hardening
 
 - Task 2.1: Update the scaffold template for the Node test deps:
-  - In `build-tools/tools/scaffolding/templates/node/go-addon/libs/{{ name }}/TARGETS.jinja`, change `deps` on `nix_node_test("unit", ...)` from `//projects/libs/<name>-native:napi_addon` to `:copy_addon`.
+  - In `build-tools/tools/scaffolding/templates/ts/go-addon/libs/{{ name }}/TARGETS.jinja`, change `deps` on `nix_node_test("unit", ...)` from `//projects/libs/<name>-native:napi_addon` to `:copy_addon`.
 - Task 2.2: Validate in a temp repo:
   - `buck2 test --target-platforms prelude//platforms:default //projects/libs/demo:unit` runs and passes (optional smoke; flake path remains the main test path).
 - Acceptance:
@@ -161,7 +161,7 @@ Phase 3 — E2E test update (build-tools/tools/tests/...)
 ### Acceptance
 
 - Temp run (macOS + Linux builders):
-  - `scaf new node go-addon demo --yes`
+  - `scaf new ts go-addon demo --yes`
   - `build-tools/tools/bin/i`
   - `nix build .#node-test.libs_demo` succeeds and produces non-empty `report/`.
   - Node runtime smoke: `node -e "const a=require('./libs/demo/native/demo_addon.node'); if(a.add(2,3)!==5) process.exit(3)"` exits 0.
