@@ -81,6 +81,7 @@ export async function runnableHintsForTarget(
         if (value === "webapp:ssr") mode = "ssr";
         if (value === "framework:express") framework = "express";
         if (value === "framework:next") framework = "next";
+        if (value === "framework:vite") framework = "vite";
         if (value === "framework:hatch") framework = "hatch";
       }
       return { importer, mode, framework };

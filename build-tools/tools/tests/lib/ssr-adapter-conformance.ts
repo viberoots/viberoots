@@ -8,7 +8,7 @@ type SsrAdapterConformanceOpts = {
   label: string;
   outPath: string;
   importer: string;
-  framework: "express" | "next";
+  framework: "express" | "next" | "vite";
 };
 
 export async function assertSsrAdapterConformance(opts: SsrAdapterConformanceOpts): Promise<void> {

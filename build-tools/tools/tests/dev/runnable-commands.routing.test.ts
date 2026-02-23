@@ -178,7 +178,7 @@ test("SSR runnable routes to canonical node prod and dev:ssr commands", async ()
             aux: [],
             runnable: {
               kind: "webapp-ssr",
-              framework: "next",
+              framework: "vite",
               run: {
                 prod: { argv: ["node", serverEntry] },
                 dev: { argv: ["pnpm", "--dir", "projects/apps/ssr", "dev:ssr"] },

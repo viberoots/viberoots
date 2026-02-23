@@ -1,4 +1,4 @@
-export const SSR_FRAMEWORKS = ["express", "next", "hatch"] as const;
+export const SSR_FRAMEWORKS = ["express", "next", "vite", "hatch"] as const;
 
 function readArtifactPath(artifacts: Record<string, unknown> | undefined, key: string): string {
   const value = artifacts?.[key];

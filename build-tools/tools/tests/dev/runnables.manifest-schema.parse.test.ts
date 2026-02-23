@@ -52,7 +52,7 @@ test("parseRunnableManifest keeps SSR framework and runtime metadata fields", ()
       aux: [],
       runnable: {
         kind: "webapp-ssr",
-        framework: "hatch",
+        framework: "vite",
         run: {
           prod: { argv: ["node", "/nix/store/x/dist/server/index.js"] },
           dev: { argv: ["pnpm", "--dir", "projects/apps/ssr", "dev:ssr"] },
@@ -74,7 +74,7 @@ test("parseRunnableManifest keeps SSR framework and runtime metadata fields", ()
   const parsed = parseRunnableManifest(withSsr);
   assert.equal(parsed.length, 1);
   assert.equal(parsed[0]?.runnable?.kind, "webapp-ssr");
-  assert.equal(parsed[0]?.runnable?.framework, "hatch");
+  assert.equal(parsed[0]?.runnable?.framework, "vite");
   assert.equal(parsed[0]?.runnable?.runtime?.serverCwd, "/nix/store/x");
   assert.deepEqual(parsed[0]?.runnable?.runtime?.envFiles, [".env", ".env.local"]);
   assert.deepEqual(parsed[0]?.runnable?.runtime?.nodeArgs, ["--enable-source-maps"]);
@@ -111,4 +111,21 @@ test("inferRunnableFromOutPath fails fast for missing SSR packaging artifacts", 
       }),
     /missing clientDir/,
   );
+});
+
+test("inferRunnableFromOutPath accepts vite SSR framework", async () => {
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "runnable-ssr-vite-"));
+  await fsp.mkdir(path.join(tmp, "dist", "server"), { recursive: true });
+  await fsp.mkdir(path.join(tmp, "dist", "client"), { recursive: true });
+  await fsp.writeFile(path.join(tmp, "dist", "server", "index.js"), "console.log('ok');\n", "utf8");
+  const runnable = await inferRunnableFromOutPath({
+    label: "//projects/apps/ssr:app",
+    outPath: tmp,
+    importer: "projects/apps/ssr",
+    mode: "ssr",
+    framework: "vite",
+  });
+  assert.equal(runnable?.kind, "webapp-ssr");
+  assert.equal(runnable?.framework, "vite");
+  assert.deepEqual(runnable?.run.prod.argv, ["node", path.join(tmp, "dist", "server", "index.js")]);
 });

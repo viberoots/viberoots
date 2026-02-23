@@ -314,6 +314,7 @@ in {
       framework =
         if builtins.elem "framework:next" labs then "next"
         else if builtins.elem "framework:express" labs then "express"
+        else if builtins.elem "framework:vite" labs then "vite"
         else "";
       nodeMods =
         if sharedNodeMods != null then sharedNodeMods
@@ -374,7 +375,7 @@ EOF
           "$VITE_BIN" build
           test -d dist
           stage_wasm_contract "src/wasm-contract/top.wasm" "dist"
-        '' else if framework == "express" then ''
+        '' else if framework == "express" || framework == "vite" then ''
           if [ ! -x "$VITE_BIN" ] || [ ! -x "$TSC_BIN" ]; then
             echo "node planner: expected vite and tsc in locked node_modules for ${importerDir}" >&2
             exit 2
@@ -413,7 +414,7 @@ EOF
           test -f dist/server/server-main.js
           stage_wasm_contract "app/wasm-contract/top.wasm" "dist/client/public"
         '' else ''
-          echo "node planner: SSR webapp target ${name} missing framework label (framework:express|framework:next)" >&2
+          echo "node planner: SSR webapp target ${name} missing framework label (framework:express|framework:next|framework:vite)" >&2
           exit 2
         ''}
       '';

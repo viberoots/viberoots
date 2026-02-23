@@ -42,8 +42,7 @@ async function httpGet(url: string): Promise<{ status: number; body: string }> {
 export async function withTempRoots<T>(run: () => Promise<T>): Promise<T> {
   const prevRoots = process.env.TEST_RSYNC_ROOTS;
   if (!prevRoots) {
-    process.env.TEST_RSYNC_ROOTS =
-      "build-tools toolchains third_party/providers prelude patches docs METHODOLOGY.XML AI-PREFERENCES.XML";
+    process.env.TEST_RSYNC_ROOTS = "build-tools toolchains third_party/providers prelude patches";
   }
   try {
     return await run();
@@ -56,7 +55,7 @@ export async function withTempRoots<T>(run: () => Promise<T>): Promise<T> {
 export async function scaffoldAndPrepareWorkspace(
   tmp: string,
   _$: any,
-  template: "webapp-ssr-express" | "webapp-ssr-next",
+  template: "webapp-ssr-express" | "webapp-ssr-next" | "webapp-ssr-vite",
   name: string,
 ): Promise<void> {
   const appRel = path.join("projects", "apps", name).replace(/\\/g, "/");
@@ -85,7 +84,7 @@ export async function buildSelectedSsr(
   tmp: string,
   _$: any,
   label: string,
-  framework: "express" | "next",
+  framework: "express" | "next" | "vite",
 ): Promise<{ outPath: string; importer: string }> {
   const graphJson = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
   const built = await _$({

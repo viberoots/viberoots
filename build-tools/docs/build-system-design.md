@@ -622,7 +622,7 @@ patch-pkg apply go golang.org/x/net
 The planner manifest (`<graph-out>/manifest.json`) preserves legacy `bins` fields and now carries an additive runnable contract:
 
 - `runnable.kind`: `native-bin`, `script`, `webapp`, or other language-specific runnable categories.
-- SSR webapps use `runnable.kind = "webapp-ssr"` with framework discriminator (`express`, `next`, reserved `hatch`).
+- SSR webapps use `runnable.kind = "webapp-ssr"` with framework discriminator (`express`, `next`, `vite`, reserved `hatch`).
 - `runnable.run.prod`: required argv contract for production-style execution.
 - `runnable.run.dev`: optional argv contract for development-mode execution.
 - `webapp-ssr` production startup is canonical: `run.prod.argv = ["node", "<serverEntry>"]`.
@@ -633,6 +633,7 @@ The planner manifest (`<graph-out>/manifest.json`) preserves legacy `bins` field
 - Optional runtime metadata is supported: `runtime.serverCwd`, `runtime.envFiles`, `runtime.nodeArgs`.
 - SSR packaging contract:
   - Express and Next adapters both normalize to `dist/server/index.js` and `dist/client/`.
+  - Vite SSR adapters normalize to `dist/server/index.js` and `dist/client/`.
   - Server-side Wasm contract path is shared across static and SSR outputs: `dist/server/wasm-contract/top.wasm`.
   - Next packaging must copy runtime assets under `dist/client` and keep server startup at `node dist/server/index.js`.
   - Missing `serverEntry` or `clientDir` is a hard build failure. There is no fallback to static-host serving for SSR targets.
@@ -641,7 +642,7 @@ The planner manifest (`<graph-out>/manifest.json`) preserves legacy `bins` field
   - Runtime startup must not depend on planner/runnable tooling inside the container image.
 - SSR troubleshooting:
   - If startup fails with missing assets, verify `dist/server/index.js` and `dist/client` exist in the built output.
-  - If planner packaging fails with `node planner: SSR webapp target ... missing framework label`, add exactly one framework label: `framework:express` or `framework:next`.
+  - If planner packaging fails with `node planner: SSR webapp target ... missing framework label`, add exactly one framework label: `framework:express`, `framework:next`, or `framework:vite`.
   - If runnable execution fails with `SSR contract error ...`, fix the manifest contract fields (`framework`, `artifacts.serverEntry`, `artifacts.clientDir`, `run.prod`).
   - `webapp-ssr` targets never fall back to static-host production commands. Any attempt to route SSR to `python3 -m http.server` is treated as a hard contract failure.
   - If Next startup fails in production mode, verify `.next` artifacts are present under `dist/client`.

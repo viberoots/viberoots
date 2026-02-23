@@ -281,12 +281,14 @@ Shared client-side contract paths:
 - `webapp-static`: `dist/top.wasm` and `dist/wasm-inline/index.js`
 - `webapp-ssr-express`: `dist/client/top.wasm` and `dist/client/wasm-inline/index.js`
 - `webapp-ssr-next`: `dist/client/public/top.wasm` and `dist/client/public/wasm-inline/index.js`
+- `webapp-ssr-vite`: `dist/client/top.wasm` and `dist/client/wasm-inline/index.js`
 
 Shared server-side parity contract path:
 
 - `webapp-static`: `dist/server/wasm-contract/top.wasm`
 - `webapp-ssr-express`: `dist/server/wasm-contract/top.wasm`
 - `webapp-ssr-next`: `dist/server/wasm-contract/top.wasm`
+- `webapp-ssr-vite`: `dist/server/wasm-contract/top.wasm`
 
 Static example:
 

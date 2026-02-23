@@ -298,6 +298,7 @@ let
         framework =
           if builtins.elem "framework:express" labs then "express"
           else if builtins.elem "framework:next" labs then "next"
+          else if builtins.elem "framework:vite" labs then "vite"
           else if builtins.elem "framework:hatch" labs then "hatch"
           else "";
       in {

@@ -18,6 +18,8 @@ test(
       );
       const importer = "apps/demo-node";
       const impDir = path.join(tmp, importer);
+      const pnpmHome = path.join(tmp, ".pnpm-home");
+      const pnpmStore = path.join(tmp, ".pnpm-store");
       await fsp.mkdir(path.join(impDir, "src"), { recursive: true });
       await fsp.writeFile(
         path.join(impDir, "package.json"),
@@ -34,8 +36,6 @@ test(
         "export const x = 1;\n",
         "utf8",
       );
-      // runInTemp initializes a git repo; stage generated files so Nix git-flake evaluation sees them.
-      await $({ cwd: tmp, stdio: "pipe" })`git add -A ${importer}`;
       const env = {
         ...process.env,
         NIX_PNPM_ALLOW_GENERATE: "1",
@@ -49,7 +49,7 @@ test(
         cwd: tmp,
         stdio: "inherit",
         env,
-      })`bash --noprofile --norc -c 'set -euo pipefail; mkdir -p "${tmp}/${importer}/.pnpm-home" "${tmp}/${importer}/.pnpm-store"; export PNPM_HOME="${tmp}/${importer}/.pnpm-home"; nix run ${tmp}#pnpm --accept-flake-config -- config set store-dir "${tmp}/${importer}/.pnpm-store"; nix run ${tmp}#pnpm --accept-flake-config -- install --filter "./${importer}" --lockfile-only --prod=false --ignore-scripts --lockfile-dir "./${importer}" --dir "./${importer}"'`;
+      })`bash --noprofile --norc -c 'set -euo pipefail; mkdir -p "${pnpmHome}" "${pnpmStore}"; export PNPM_HOME="${pnpmHome}"; nix run ${tmp}#pnpm --accept-flake-config -- config set store-dir "${pnpmStore}"; nix run ${tmp}#pnpm --accept-flake-config -- install --filter "./${importer}" --lockfile-only --prod=false --ignore-scripts --lockfile-dir "./${importer}" --dir "./${importer}"'`;
       // Stage the generated lockfile so Nix git-flake evaluation sees it.
       await $({ cwd: tmp, stdio: "pipe" })`git add -A ${importer}`;
       await $({

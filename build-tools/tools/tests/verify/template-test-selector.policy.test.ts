@@ -26,9 +26,10 @@ test("changed template id extraction is sorted and unique", () => {
   const ids = changedTemplateIdsFromPaths([
     "build-tools/tools/scaffolding/templates/go/lib/copier.yaml",
     "build-tools/tools/scaffolding/templates/ts/webapp-static/copier.yaml",
+    "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/server/index.ts.jinja",
     "build-tools/tools/scaffolding/templates/go/lib/README.md.jinja",
   ]);
-  assert.deepEqual(ids, ["go/lib", "ts/webapp-static"]);
+  assert.deepEqual(ids, ["go/lib", "ts/webapp-ssr-vite", "ts/webapp-static"]);
 });
 
 test("selector mode classification handles template-only, mixed, and no-template-impact", () => {

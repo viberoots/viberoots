@@ -131,8 +131,8 @@ async function runNodeServerSmoke(
 export async function scaffoldBuildAndSmoke(
   tmp: string,
   appName: string,
-  template: "webapp-ssr-express" | "webapp-ssr-next",
-  framework: "express" | "next",
+  template: "webapp-ssr-express" | "webapp-ssr-next" | "webapp-ssr-vite",
+  framework: "express" | "next" | "vite",
   marker: string,
   runRuntimeSmoke: boolean,
   _$: any,
@@ -160,12 +160,13 @@ export async function scaffoldBuildAndSmoke(
 
   const serverEntry = path.join(outPath, "dist", "server", "index.js");
   const clientDir = path.join(outPath, "dist", "client");
-  const clientWasmRoot = framework === "next" ? path.join(clientDir, "public") : clientDir;
   if (!(await exists(serverEntry))) throw new Error(`missing serverEntry artifact: ${serverEntry}`);
   if (!(await exists(clientDir))) throw new Error(`missing clientDir artifact: ${clientDir}`);
+  const clientWasmRoot = framework === "next" ? path.join(clientDir, "public") : clientDir;
   const stagedWasm = path.join(clientWasmRoot, "top.wasm");
-  if (!(await exists(stagedWasm)))
+  if (!(await exists(stagedWasm))) {
     throw new Error(`missing staged client wasm artifact: ${stagedWasm}`);
+  }
   const serverWasmCandidates = [
     path.join(outPath, "dist", "server", "wasm-contract", "top.wasm"),
     path.join(clientDir, "top.wasm"),

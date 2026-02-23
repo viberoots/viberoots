@@ -70,8 +70,11 @@ test("PR-1 Vite SSR template metadata and scaffold baseline are present", async 
       path.join(appRoot, "tsconfig.server.json"),
       path.join(appRoot, "pnpm-lock.yaml"),
       path.join(appRoot, "server", "index.ts"),
+      path.join(appRoot, "server", "wasm-contract.ts"),
       path.join(appRoot, "src", "entry-client.ts"),
       path.join(appRoot, "src", "entry-server.ts"),
+      path.join(appRoot, "src", "wasm-contract.ts"),
+      path.join(appRoot, "src", "wasm-contract", "top.wasm"),
     ];
     for (const file of expectedFiles) {
       assert.ok(await exists(file), `expected scaffold file missing: ${file}`);

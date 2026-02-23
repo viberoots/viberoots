@@ -43,10 +43,12 @@ let
           if grep -q "webapp:ssr" TARGETS; then
             if grep -q "framework:next" TARGETS; then
               WEBAPP_FRAMEWORK="next"
+            elif grep -q "framework:vite" TARGETS; then
+              WEBAPP_FRAMEWORK="vite"
             elif grep -q "framework:express" TARGETS; then
               WEBAPP_FRAMEWORK="express"
             else
-              echo "[nix] ERROR: webapp:ssr target must declare framework:next or framework:express" >&2
+              echo "[nix] ERROR: webapp:ssr target must declare framework:next, framework:vite, or framework:express" >&2
               exit 3
             fi
           else
@@ -100,9 +102,9 @@ EOF
             "$VITE_BIN" build
             test -d dist
             stage_wasm_contract "src/wasm-contract/top.wasm" "dist" "dist/server/wasm-contract"
-          elif [ "$WEBAPP_FRAMEWORK" = "express" ]; then
+          elif [ "$WEBAPP_FRAMEWORK" = "express" ] || [ "$WEBAPP_FRAMEWORK" = "vite" ]; then
             if [ ! -x "$VITE_BIN" ] || [ ! -x "$TSC_BIN" ]; then
-              echo "[nix] ERROR: expected vite and tsc binaries for Express SSR build" >&2
+              echo "[nix] ERROR: expected vite and tsc binaries for Express/Vite SSR build" >&2
               exit 3
             fi
             "$VITE_BIN" build --outDir dist/client

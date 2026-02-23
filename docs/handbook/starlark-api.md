@@ -638,6 +638,11 @@ Public args:
 ### End-to-end webapp WASM examples
 
 These examples show complete wiring for webapps that need runtime WASM assets plus an inline module.
+Contract notes for all examples:
+
+- `top.wasm` is the canonical browser-runtime filename expected by the client helper (`new URL("/top.wasm", ...)`).
+- `server/wasm-contract/top.wasm` is the canonical server-side parity path used by SSR runtimes.
+- Producer outputs can keep their native filename (for example `lib/top.wasm` or `pyext.wasm`), while `node_asset_stage(..., dest = ".../top.wasm")` normalizes the runtime path.
 
 ```python
 # static webapp: top.wasm + wasm-inline module in dist/
@@ -659,6 +664,40 @@ node_asset_stage(
         {"src": "src/wasm-contract/top.wasm", "dest": "top.wasm"},
         {"src": ":wasm_inline", "dest": "wasm-inline/index.js"},
         {"src": "src/wasm-contract/top.wasm", "dest": "server/wasm-contract/top.wasm"},
+    ],
+    labels = ["lang:node", "kind:app", "webapp:static"],
+    out = "dist",
+)
+```
+
+```python
+# Vite webapp + Python wasm library:
+# normalize Python producer output to canonical runtime contract paths
+load("//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module", "node_webapp")
+load("//build-tools/python:defs.bzl", "nix_python_wasm_lib")
+
+nix_python_wasm_lib(
+    name = "py_wasm",
+    labels = ["backend:pyodide"],
+    lockfile_label = "lockfile:projects/libs/demo-py-wasm/uv.lock#projects/libs/demo-py-wasm",
+)
+
+node_webapp(
+    name = "app_raw",
+)
+
+node_wasm_inline_module(
+    name = "py_wasm_inline",
+    src = "//projects/libs/demo-py-wasm:py_wasm",
+)
+
+node_asset_stage(
+    name = "app",
+    app = ":app_raw",
+    assets = [
+        {"src": "//projects/libs/demo-py-wasm:py_wasm", "dest": "top.wasm"},
+        {"src": ":py_wasm_inline", "dest": "wasm-inline/py.js"},
+        {"src": "//projects/libs/demo-py-wasm:py_wasm", "dest": "server/wasm-contract/top.wasm"},
     ],
     labels = ["lang:node", "kind:app", "webapp:static"],
     out = "dist",
