@@ -1,3 +1,6 @@
+# GENERATED FILE — DO NOT EDIT.
+# Rendered from build-tools/tools/scaffolding/template-manifest.json
+
 CANONICAL_TEMPLATE_IDS = [
     "cpp/cli",
     "cpp/lib",

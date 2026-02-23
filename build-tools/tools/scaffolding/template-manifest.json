@@ -1,0 +1,130 @@
+{
+  "templateNameAliases": {
+    "library": "lib",
+    "cli-app": "cli",
+    "ts-go-cpp-lib": "go-cpp-lib"
+  },
+  "resolverDefaults": {
+    "lib": "projects/libs/{name}",
+    "cli": "projects/apps/{name}"
+  },
+  "templates": [
+    {
+      "language": "go",
+      "template": "lib",
+      "templateRoot": "build-tools/tools/scaffolding/templates/go/lib",
+      "resolverDestination": "projects/libs/{name}"
+    },
+    {
+      "language": "go",
+      "template": "cli",
+      "templateRoot": "build-tools/tools/scaffolding/templates/go/cli",
+      "resolverDestination": "projects/apps/{name}"
+    },
+    {
+      "language": "cpp",
+      "template": "lib",
+      "templateRoot": "build-tools/tools/scaffolding/templates/cpp/lib",
+      "resolverDestination": "projects/libs/{name}"
+    },
+    {
+      "language": "cpp",
+      "template": "cli",
+      "templateRoot": "build-tools/tools/scaffolding/templates/cpp/cli",
+      "resolverDestination": "projects/apps/{name}"
+    },
+    {
+      "language": "python",
+      "template": "lib",
+      "templateRoot": "build-tools/tools/scaffolding/templates/python/lib",
+      "resolverDestination": "projects/libs/{name}"
+    },
+    {
+      "language": "python",
+      "template": "app",
+      "templateRoot": "build-tools/tools/scaffolding/templates/python/app",
+      "resolverDestination": "projects/apps/{name}"
+    },
+    {
+      "language": "python",
+      "template": "wasm-app",
+      "templateRoot": "build-tools/tools/scaffolding/templates/python/wasm-app"
+    },
+    {
+      "language": "python",
+      "template": "wasm-lib",
+      "templateRoot": "build-tools/tools/scaffolding/templates/python/wasm-lib"
+    },
+    {
+      "language": "ts",
+      "template": "lib",
+      "templateRoot": "build-tools/tools/scaffolding/templates/ts/lib",
+      "resolverDestination": "projects/libs/{name}"
+    },
+    {
+      "language": "ts",
+      "template": "cli",
+      "templateRoot": "build-tools/tools/scaffolding/templates/ts/cli",
+      "resolverDestination": "projects/apps/{name}"
+    },
+    {
+      "language": "ts",
+      "template": "webapp-static",
+      "templateRoot": "build-tools/tools/scaffolding/templates/ts/webapp-static",
+      "resolverDestination": "projects/apps/{name}"
+    },
+    {
+      "language": "ts",
+      "template": "webapp-ssr-express",
+      "templateRoot": "build-tools/tools/scaffolding/templates/ts/webapp-ssr-express",
+      "resolverDestination": "projects/apps/{name}"
+    },
+    {
+      "language": "ts",
+      "template": "webapp-ssr-next",
+      "templateRoot": "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next",
+      "resolverDestination": "projects/apps/{name}"
+    },
+    {
+      "language": "ts",
+      "template": "cpp-addon",
+      "templateRoot": "build-tools/tools/scaffolding/templates/ts/cpp-addon",
+      "resolverDestination": "projects"
+    },
+    {
+      "language": "ts",
+      "template": "go-addon",
+      "templateRoot": "build-tools/tools/scaffolding/templates/ts/go-addon",
+      "resolverDestination": "projects"
+    },
+    {
+      "language": "ts",
+      "template": "wasm-inline",
+      "templateRoot": "build-tools/tools/scaffolding/templates/ts/wasm-inline",
+      "resolverDestination": "projects/libs/{name}-wasm-inline"
+    },
+    {
+      "language": "ts",
+      "template": "wasm-app",
+      "templateRoot": "build-tools/tools/scaffolding/templates/ts/wasm-app",
+      "resolverDestination": "projects"
+    },
+    {
+      "language": "ts",
+      "template": "wasm-linking-app",
+      "templateRoot": "build-tools/tools/scaffolding/templates/ts/wasm-linking-app",
+      "resolverDestination": "projects"
+    },
+    {
+      "language": "ts",
+      "template": "go-cpp-lib",
+      "templateRoot": "build-tools/tools/scaffolding/templates/ts/go-cpp-lib",
+      "resolverDestination": "projects"
+    },
+    {
+      "language": "language",
+      "template": "kit",
+      "templateRoot": "build-tools/tools/scaffolding/templates/language/kit"
+    }
+  ]
+}

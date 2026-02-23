@@ -1,28 +1,8 @@
-const TEMPLATE_NAME_ALIASES: Record<string, string> = {
-  library: "lib",
-  "cli-app": "cli",
-  "ts-go-cpp-lib": "go-cpp-lib",
-};
-
-export const TEMPLATE_TAXONOMY: Readonly<Record<string, readonly string[]>> = {
-  go: ["lib", "cli"],
-  cpp: ["lib", "cli"],
-  python: ["lib", "app", "wasm-app", "wasm-lib"],
-  ts: [
-    "lib",
-    "cli",
-    "webapp-static",
-    "webapp-ssr-express",
-    "webapp-ssr-next",
-    "cpp-addon",
-    "go-addon",
-    "wasm-inline",
-    "wasm-app",
-    "wasm-linking-app",
-    "go-cpp-lib",
-  ],
-  language: ["kit"],
-} as const;
+import {
+  TEMPLATE_NAME_ALIASES,
+  TEMPLATE_TAXONOMY,
+} from "./generated/template-taxonomy.generated.ts";
+export { TEMPLATE_NAME_ALIASES, TEMPLATE_TAXONOMY };
 
 type CanonicalTemplateLanguage = keyof typeof TEMPLATE_TAXONOMY;
 type CanonicalTemplateId = `${CanonicalTemplateLanguage}/${string}`;

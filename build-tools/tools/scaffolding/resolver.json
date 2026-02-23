@@ -1,31 +1,31 @@
 {
+  "cpp": {
+    "cli": "projects/apps/{name}",
+    "lib": "projects/libs/{name}"
+  },
   "default": {
-    "lib": "projects/libs/{name}",
-    "cli": "projects/apps/{name}"
+    "cli": "projects/apps/{name}",
+    "lib": "projects/libs/{name}"
   },
   "go": {
-    "lib": "projects/libs/{name}",
-    "cli": "projects/apps/{name}"
-  },
-  "cpp": {
-    "lib": "projects/libs/{name}",
-    "cli": "projects/apps/{name}"
+    "cli": "projects/apps/{name}",
+    "lib": "projects/libs/{name}"
   },
   "python": {
-    "lib": "projects/libs/{name}",
-    "app": "projects/apps/{name}"
+    "app": "projects/apps/{name}",
+    "lib": "projects/libs/{name}"
   },
   "ts": {
-    "lib": "projects/libs/{name}",
-    "wasm-inline": "projects/libs/{name}-wasm-inline",
     "cli": "projects/apps/{name}",
-    "webapp-static": "projects/apps/{name}",
-    "webapp-ssr-express": "projects/apps/{name}",
-    "webapp-ssr-next": "projects/apps/{name}",
     "cpp-addon": "projects",
     "go-addon": "projects",
+    "go-cpp-lib": "projects",
+    "lib": "projects/libs/{name}",
     "wasm-app": "projects",
+    "wasm-inline": "projects/libs/{name}-wasm-inline",
     "wasm-linking-app": "projects",
-    "go-cpp-lib": "projects"
+    "webapp-ssr-express": "projects/apps/{name}",
+    "webapp-ssr-next": "projects/apps/{name}",
+    "webapp-static": "projects/apps/{name}"
   }
 }
