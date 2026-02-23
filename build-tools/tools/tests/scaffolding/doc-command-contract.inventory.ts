@@ -30,6 +30,10 @@ export const ACTIVE_DOC_COMMAND_CONTRACT: DocCommandContractEntry[] = [
     path: "build-tools/docs/wasm-linking.md",
     requiredFragments: ["scaf new ts wasm-linking-app <name>"],
   },
+  {
+    path: "build-tools/docs/scaffolding.md",
+    requiredFragments: ["scaf new ts webapp-ssr-vite demo-vite-ssr --yes"],
+  },
 ];
 
 export const ARCHIVAL_DOC_COMMAND_CONTRACT: string[] = [

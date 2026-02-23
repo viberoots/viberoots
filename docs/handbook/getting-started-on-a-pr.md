@@ -97,6 +97,7 @@ When adding or materially editing scaffold command guidance:
   - `scaf new ts lib demo-lib --yes --dry-run`
   - `scaf new ts cli demo-cli --yes --dry-run`
   - `scaf new ts webapp-static demo-web --yes --dry-run`
+  - `scaf new ts webapp-ssr-vite demo-vite-ssr --yes --dry-run`
 
 ### 4. When `v` is slow (performance regression workflow)
 

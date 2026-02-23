@@ -90,6 +90,11 @@ const EXPECTATIONS: TemplateExpectation[] = [
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/"],
   },
   {
+    script: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.pr1-baseline-contract.test.ts",
+    requiredLabels: ["template:ts/webapp-ssr-vite", "template:contract"],
+    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/"],
+  },
+  {
     script: "build-tools/tools/tests/scaffolding/python-lib.scaffold-files.test.ts",
     requiredLabels: ["template:python/lib", "template:smoke"],
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/python/lib/"],

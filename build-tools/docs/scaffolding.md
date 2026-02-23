@@ -44,7 +44,14 @@ Examples:
 ```bash
 scaf new go lib[rary] greeter-utilities
 scaf new go cli-app greeter-cli
+scaf new ts webapp-ssr-vite demo-vite-ssr --yes
 ```
+
+For TypeScript SSR templates, I keep framework-specific names explicit:
+
+- `webapp-ssr-express` for Express SSR.
+- `webapp-ssr-next` for Next SSR.
+- `webapp-ssr-vite` for the Vite-first SSR scaffold baseline.
 
 Both examples create the destination under the canonical location for the chosen language/template. The CLI resolves synonyms (e.g., `lib`/`library`) and normalizes names.
 

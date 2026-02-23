@@ -21,6 +21,7 @@ CANONICAL_TEMPLATE_IDS = [
     "ts/wasm-linking-app",
     "ts/webapp-ssr-express",
     "ts/webapp-ssr-next",
+    "ts/webapp-ssr-vite",
     "ts/webapp-static",
 ]
 

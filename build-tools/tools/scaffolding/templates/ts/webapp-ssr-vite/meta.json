@@ -1,0 +1,20 @@
+{
+  "language": "ts",
+  "template": "webapp-ssr-vite",
+  "resolverDestination": "projects/apps/{name}",
+  "description": "Vite-first SSR webapp baseline with explicit Node server entrypoint",
+  "help": {
+    "usage": "scaf new ts webapp-ssr-vite <name> [--importer=projects/apps/<name>] [--pkgScope=@apps]",
+    "notes": [
+      "Generates a Vite-first SSR baseline with explicit client/server entries.",
+      "Production startup stays a direct Node server entrypoint via server/index.ts.",
+      "Scripts include dev:ssr, build:ssr, and start:ssr for template-local iteration.",
+      "TARGETS keeps SSR intent explicit with framework:vite for later planner wiring."
+    ],
+    "examples": [
+      "scaf new ts webapp-ssr-vite demo-vite-ssr --yes",
+      "scaf new ts webapp-ssr-vite demo-vite-ssr --yes --no-tests",
+      "scaf new ts webapp-ssr-vite demo-vite-ssr --importer=projects/apps/demo-vite-ssr --pkgScope=@apps"
+    ]
+  }
+}
