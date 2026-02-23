@@ -1,6 +1,7 @@
 {
   "language": "ts",
   "template": "webapp-ssr-next",
+  "resolverDestination": "projects/apps/{name}",
   "description": "Next.js SSR webapp with explicit Node server entrypoint",
   "help": {
     "usage": "scaf new ts webapp-ssr-next <name> [--importer=projects/apps/<name>] [--pkgScope=@apps]",

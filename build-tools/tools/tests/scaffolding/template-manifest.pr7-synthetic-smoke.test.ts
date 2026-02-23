@@ -7,25 +7,6 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("PR-7 smoke: synthetic manifest template is exposed via generated surfaces", async () => {
   await runInTemp("template-manifest-pr7-synthetic", async (tmp, _$) => {
-    const manifestPath = path.join(
-      tmp,
-      "build-tools",
-      "tools",
-      "scaffolding",
-      "template-manifest.json",
-    );
-    const manifestRaw = await fsp.readFile(manifestPath, "utf8");
-    const manifest = JSON.parse(manifestRaw) as {
-      templates: Array<Record<string, string>>;
-    };
-    manifest.templates.push({
-      language: "ts",
-      template: "pr7-synthetic",
-      templateRoot: "build-tools/tools/scaffolding/templates/ts/pr7-synthetic",
-      resolverDestination: "projects/apps/{name}",
-    });
-    await fsp.writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf8");
-
     const syntheticRoot = path.join(
       tmp,
       "build-tools",
@@ -42,6 +23,7 @@ test("PR-7 smoke: synthetic manifest template is exposed via generated surfaces"
         {
           language: "ts",
           template: "pr7-synthetic",
+          resolverDestination: "projects/apps/{name}",
           description: "PR-7 synthetic template",
           help: {
             usage: "scaf new ts pr7-synthetic <name>",

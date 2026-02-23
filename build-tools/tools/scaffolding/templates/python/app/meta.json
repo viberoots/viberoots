@@ -1,6 +1,7 @@
 {
   "language": "python",
   "template": "app",
+  "resolverDestination": "projects/apps/{name}",
   "description": "Python app scaffold (uv + Buck2 macros)",
   "help": {
     "usage": "scaf new python app <name> [--path=DEST]",

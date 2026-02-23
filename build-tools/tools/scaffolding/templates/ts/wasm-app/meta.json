@@ -1,6 +1,7 @@
 {
   "language": "ts",
   "template": "wasm-app",
+  "resolverDestination": "projects",
   "description": "Minimal browser app scaffold that can load a Wasm module and call add()",
   "help": {
     "usage": "scaf new ts wasm-app <name> [--path=DEST]",

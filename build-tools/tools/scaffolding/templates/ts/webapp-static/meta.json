@@ -1,6 +1,7 @@
 {
   "language": "ts",
   "template": "webapp-static",
+  "resolverDestination": "projects/apps/{name}",
   "description": "Vite + TypeScript webapp (framework-neutral)",
   "help": {
     "usage": "scaf new ts webapp-static <name> [--importer=projects/apps/<name>] [--pkgScope=@apps]",

@@ -1,6 +1,7 @@
 {
   "language": "ts",
   "template": "go-cpp-lib",
+  "resolverDestination": "projects",
   "description": "TS package with dual entries (node+browser) plus Go and C++ stubs",
   "help": {
     "usage": "scaf new ts go-cpp-lib <name> [--path=DEST]",

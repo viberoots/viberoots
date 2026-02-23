@@ -1,6 +1,7 @@
 {
   "language": "ts",
   "template": "go-addon",
+  "resolverDestination": "projects",
   "description": "Node TS library + Go c-archive + C N-API addon (three sibling packages)",
   "help": {
     "usage": "scaf new ts go-addon <name> [--path=DEST] [--addon_name=<name>_addon] [--no-tests]",

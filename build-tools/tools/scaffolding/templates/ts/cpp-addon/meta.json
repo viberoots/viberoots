@@ -1,6 +1,7 @@
 {
   "language": "ts",
   "template": "cpp-addon",
+  "resolverDestination": "projects",
   "description": "Node TS library + C++ Node-API addon (two sibling packages)",
   "help": {
     "usage": "scaf new ts cpp-addon <name> [--path=DEST] [--addon_name=<name>_addon] [--no-tests]",

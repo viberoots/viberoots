@@ -1,6 +1,7 @@
 {
   "language": "ts",
   "template": "wasm-linking-app",
+  "resolverDestination": "projects",
   "description": "Wasm linking demo: TinyGo consumer + C++ Wasm static libs + webapp + bundled CLI",
   "help": {
     "usage": "scaf new ts wasm-linking-app <name> [--path=DEST]",

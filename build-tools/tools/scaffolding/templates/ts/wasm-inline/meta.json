@@ -1,6 +1,7 @@
 {
   "language": "ts",
   "template": "wasm-inline",
+  "resolverDestination": "projects/libs/{name}-wasm-inline",
   "description": "Wasm inline module package (Node)",
   "help": {
     "usage": "scaf new ts wasm-inline <name> [--path=DEST] [--key=value ...]",

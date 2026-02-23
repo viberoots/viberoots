@@ -424,7 +424,11 @@ Source-of-truth matrix for template identity:
 
 - Canonical taxonomy source:
   - `build-tools/tools/scaffolding/template-manifest.json`
-  - owns canonical ids (`<language>/<template>`), resolver defaults, and template roots.
+  - owns template-name aliases and resolver defaults.
+- Canonical template roots:
+  - `build-tools/tools/scaffolding/templates/<language>/<template>/`
+  - own canonical ids (`<language>/<template>`) through directory conventions.
+  - template-local `meta.json` may declare `resolverDestination` overrides.
 - Generated taxonomy outputs:
   - `build-tools/tools/scaffolding/scaf/templates/generated/template-taxonomy.generated.ts`
   - `build-tools/tools/tests/template_taxonomy_adapter.bzl`
@@ -463,8 +467,10 @@ Duplicate-id failure contract:
 - Canonical ids are required to be unique across the taxonomy.
 - If a duplicate id is introduced, PR-4 parity contracts fail with a duplicate-id error.
 - Update workflow when adding a template:
-  1. add the template entry in `build-tools/tools/scaffolding/template-manifest.json`
-  2. add the template root directory under `build-tools/tools/scaffolding/templates/<language>/<template>/`
+  1. add the template root directory under `build-tools/tools/scaffolding/templates/<language>/<template>/`
+  2. update template-local files (`meta.json`, `copier.yaml`, scaffold files):
+     - set `language` and `template` in `meta.json`
+     - set `resolverDestination` in `meta.json` when template-default routing is not enough
   3. refresh generated taxonomy/resolver surfaces:
      - `node build-tools/tools/scaffolding/gen-template-manifest-artifacts.ts`
   4. add/update template test mappings in `template_conventions.bzl` only when adding a new template-owned test script:

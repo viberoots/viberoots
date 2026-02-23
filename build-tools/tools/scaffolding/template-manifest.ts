@@ -34,12 +34,51 @@ function assertValidEntry(entry: TemplateManifestEntry): void {
   }
 }
 
+async function discoverTemplatesFromDirectories(
+  resolverDefaults: Record<string, string>,
+): Promise<TemplateManifestEntry[]> {
+  const templatesRoot = path.join("build-tools", "tools", "scaffolding", "templates");
+  const languages = await fsp.readdir(templatesRoot, { withFileTypes: true });
+  const out: TemplateManifestEntry[] = [];
+
+  for (const langDir of languages) {
+    if (!langDir.isDirectory()) continue;
+    const language = langDir.name;
+    const languageRoot = path.join(templatesRoot, language);
+    const templateDirs = await fsp.readdir(languageRoot, { withFileTypes: true });
+    for (const templateDir of templateDirs) {
+      if (!templateDir.isDirectory()) continue;
+      const template = templateDir.name;
+      const templateRoot = path.join(languageRoot, template).replace(/\\/g, "/");
+      const metaPath = path.join(templateRoot, "meta.json");
+      let resolverDestination = resolverDefaults[template];
+      try {
+        const raw = await fsp.readFile(metaPath, "utf8");
+        const parsed = JSON.parse(raw) as { resolverDestination?: string };
+        const fromMeta = String(parsed.resolverDestination || "").trim();
+        if (fromMeta) resolverDestination = fromMeta;
+      } catch {
+        // meta.json is optional for discovery; resolver falls back to resolverDefaults.
+      }
+      out.push({
+        language,
+        template,
+        templateRoot,
+        resolverDestination: resolverDestination || undefined,
+      });
+    }
+  }
+  return stableSorted(out.map((t) => JSON.stringify(t))).map(
+    (t) => JSON.parse(t) as TemplateManifestEntry,
+  );
+}
+
 export async function readTemplateManifest(): Promise<TemplateManifest> {
   const raw = await fsp.readFile(TEMPLATE_MANIFEST_PATH, "utf8");
-  const parsed = JSON.parse(raw) as TemplateManifest;
+  const parsed = JSON.parse(raw) as Partial<TemplateManifest> & { templates?: unknown };
   const aliases = parsed.templateNameAliases || {};
   const defaults = parsed.resolverDefaults || {};
-  const templates = parsed.templates || [];
+  const templates = await discoverTemplatesFromDirectories(defaults);
   const ids = new Set<string>();
   for (const entry of templates) {
     assertValidEntry(entry);
@@ -50,9 +89,7 @@ export async function readTemplateManifest(): Promise<TemplateManifest> {
   return {
     templateNameAliases: aliases,
     resolverDefaults: defaults,
-    templates: stableSorted(templates.map((t) => JSON.stringify(t))).map(
-      (t) => JSON.parse(t) as TemplateManifestEntry,
-    ),
+    templates,
   };
 }
 
