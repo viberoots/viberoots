@@ -11,6 +11,8 @@ type SsrManifestOpts = {
   includeServerEntry?: boolean;
   includeClientDir?: boolean;
   includeDev?: boolean;
+  malformedServerEntry?: boolean;
+  malformedClientDir?: boolean;
 };
 
 async function writeSsrManifest(tmp: string, opts: SsrManifestOpts = {}): Promise<string> {
@@ -28,9 +30,13 @@ async function writeSsrManifest(tmp: string, opts: SsrManifestOpts = {}): Promis
     `runnable.ssr-negative.${Date.now()}.json`,
   );
   await fsp.mkdir(path.dirname(manifestPath), { recursive: true });
-  const artifacts: Record<string, string> = {};
-  if (opts.includeServerEntry !== false) artifacts.serverEntry = serverEntry;
-  if (opts.includeClientDir !== false) artifacts.clientDir = clientDir;
+  const artifacts: Record<string, unknown> = {};
+  if (opts.includeServerEntry !== false) {
+    artifacts.serverEntry = opts.malformedServerEntry ? { path: serverEntry } : serverEntry;
+  }
+  if (opts.includeClientDir !== false) {
+    artifacts.clientDir = opts.malformedClientDir ? { path: clientDir } : clientDir;
+  }
   const runnable: Record<string, unknown> = {
     kind: "webapp-ssr",
     framework: opts.framework ?? "next",
@@ -107,6 +113,7 @@ test("SSR run command fails when clientDir artifact is missing", async () => {
 test("SSR run command never falls back to static host production command", async () => {
   await runInTemp("runnable-ssr-negative-static-fallback", async (tmp, $) => {
     const manifestPath = await writeSsrManifest(tmp, {
+      framework: "vite",
       prodArgv: ["python3", "-m", "http.server", "--directory", "/tmp/fake"],
     });
     const result = await $({
@@ -117,6 +124,40 @@ test("SSR run command never falls back to static host production command", async
     })`build-tools/tools/bin/p //projects/apps/ssr:app`;
     assert.notEqual(result.exitCode, 0);
     assert.match(String(result.stderr || ""), /must not use static host fallback/);
+  });
+});
+
+test("SSR run command fails when serverEntry artifact is malformed", async () => {
+  await runInTemp("runnable-ssr-negative-malformed-server-entry", async (tmp, $) => {
+    const manifestPath = await writeSsrManifest(tmp, {
+      framework: "vite",
+      malformedServerEntry: true,
+    });
+    const result = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      nothrow: true,
+      env: { ...process.env, RUNNABLE_TEST_MANIFEST: manifestPath },
+    })`build-tools/tools/bin/p //projects/apps/ssr:app`;
+    assert.notEqual(result.exitCode, 0);
+    assert.match(String(result.stderr || ""), /missing artifacts\.serverEntry/);
+  });
+});
+
+test("SSR run command fails when clientDir artifact is malformed", async () => {
+  await runInTemp("runnable-ssr-negative-malformed-client-dir", async (tmp, $) => {
+    const manifestPath = await writeSsrManifest(tmp, {
+      framework: "vite",
+      malformedClientDir: true,
+    });
+    const result = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      nothrow: true,
+      env: { ...process.env, RUNNABLE_TEST_MANIFEST: manifestPath },
+    })`build-tools/tools/bin/p //projects/apps/ssr:app`;
+    assert.notEqual(result.exitCode, 0);
+    assert.match(String(result.stderr || ""), /missing artifacts\.clientDir/);
   });
 });
 

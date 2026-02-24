@@ -7,6 +7,11 @@ import { runInTemp } from "../lib/test-helpers";
 test("pr7: ts package packaging with conditional exports and artifact staging", async () => {
   await runInTemp("pr7-packaging", async (tmp, $) => {
     const sh = $({ cwd: tmp, stdio: "inherit" });
+    const git = $({ cwd: tmp, stdio: "pipe" });
+
+    await git`git init`;
+    await git`git config user.email test@example.com`;
+    await git`git config user.name test`;
 
     // Enable C++ in this temp workspace for planner path parity
     await sh`bash --noprofile --norc -c 'mkdir -p build-tools/tools/nix && printf %s \'{"enabled":["cpp"]}\' > build-tools/tools/nix/langs.json'`;
@@ -283,14 +288,18 @@ genrule(
       "utf8",
     );
 
+    // Keep Nix flake source filtering in sync with generated fixture files.
+    await git`git add -A`;
+    await git`git commit -m scaffold-fixture`;
+
     // 6) Generate glue (graph + providers + auto_map) for the temp repo to satisfy planner macros
     await $({
       cwd: tmp,
       stdio: "inherit",
     })`${process.execPath} build-tools/tools/dev/install/deps-main.ts --glue-only`;
 
-    // 7) Build artifacts via Nix-selected builders and stage to dist/ manually (equivalent to the genrule)
-    // Build TinyGo wasm (selected-wasm)
+    // 7) Build artifacts via selected builders and stage to dist/ manually (equivalent to the genrule)
+    // Build TinyGo wasm via build-selected (same path used for addon below).
     const { stdout: outWasmSel } = await $({
       cwd: tmp,
       stdio: "pipe",
@@ -302,13 +311,13 @@ genrule(
         WORKSPACE_ROOT: tmp,
         BUCK_TEST_SRC: tmp,
       },
-    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected-wasm`} --accept-flake-config --no-link --print-out-paths`;
+    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/dev/build-selected.ts`;
     const outWasmPath =
       String(outWasmSel || "")
         .trim()
         .split(/\n+/)
         .pop() || "";
-    if (!outWasmPath) throw new Error("no out path from graph-generator-selected-wasm");
+    if (!outWasmPath) throw new Error("no out path from build-selected for wasm");
     const wasmSrc = path.join(outWasmPath, "lib", "top.wasm");
 
     // Build Node addon (selected)

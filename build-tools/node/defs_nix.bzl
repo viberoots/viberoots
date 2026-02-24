@@ -126,7 +126,8 @@ def nix_node_cli_bin(
         cmd = (
             "SCRATCH=\"$PWD\"; OUT_ABS=\"$SCRATCH/$OUT\"; "
             + nix_calling_genrule_bootstrap(
-                timeout_sec = 180,
+                # Bundled and selected CLI paths can exceed 3m under shared verify load.
+                timeout_sec = 600,
                 include_pnpm_store = False,
                 source_workspace_root_env = True,
             )
@@ -182,7 +183,8 @@ def nix_node_cli_bin(
     cmd = (
         "SCRATCH=\"$PWD\"; OUT_ABS=\"$SCRATCH/$OUT\"; "
         + nix_calling_genrule_bootstrap(
-            timeout_sec = 180,
+            # Bundled CLI builds regularly exceed 3m on cold/shared hosts.
+            timeout_sec = 600,
             include_pnpm_store = True,
             source_workspace_root_env = True,
             skip_require_unified_pnpm_store = True,

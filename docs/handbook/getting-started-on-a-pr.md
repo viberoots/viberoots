@@ -98,6 +98,22 @@ When adding or materially editing scaffold command guidance:
   - `scaf new ts cli demo-cli --yes --dry-run`
   - `scaf new ts webapp-static demo-web --yes --dry-run`
   - `scaf new ts webapp-ssr-vite demo-vite-ssr --yes --dry-run`
+  - `scaf help ts webapp-ssr-vite`
+
+### 3.1 Vite SSR troubleshooting signatures (PR-5 lock-in)
+
+When this PR touches `ts/webapp-ssr-vite` paths, validate these deterministic failure signatures before merge:
+
+- Invalid/missing framework label for SSR target shape:
+  - `missing/invalid framework label`
+- Malformed or missing runnable SSR artifacts:
+  - `missing artifacts.serverEntry`
+  - `missing artifacts.clientDir`
+- Static-host fallback accidentally used for SSR:
+  - `SSR prod command must not use static host fallback`
+- Broken dev SSR entry wiring:
+  - `SSR contract error: failed to load /src/entry-server.ts:`
+  - `SSR contract error: /src/entry-server.ts must export a render(url) function`
 
 ### 4. When `v` is slow (performance regression workflow)
 

@@ -97,6 +97,23 @@ test("inferRunnableFromOutPath fails fast for SSR targets missing framework labe
   );
 });
 
+test("inferRunnableFromOutPath fails fast for SSR targets with invalid framework label", async () => {
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "runnable-ssr-invalid-framework-"));
+  await fsp.mkdir(path.join(tmp, "dist", "server"), { recursive: true });
+  await fsp.mkdir(path.join(tmp, "dist", "client"), { recursive: true });
+  await fsp.writeFile(path.join(tmp, "dist", "server", "index.js"), "console.log('ok');\n", "utf8");
+  await assert.rejects(
+    () =>
+      inferRunnableFromOutPath({
+        label: "//projects/apps/ssr:app",
+        outPath: tmp,
+        mode: "ssr",
+        framework: "vite-invalid",
+      }),
+    /missing\/invalid framework label/,
+  );
+});
+
 test("inferRunnableFromOutPath fails fast for missing SSR packaging artifacts", async () => {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "runnable-ssr-artifacts-"));
   await fsp.mkdir(path.join(tmp, "dist", "server"), { recursive: true });

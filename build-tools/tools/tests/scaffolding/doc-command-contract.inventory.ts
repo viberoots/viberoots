@@ -8,7 +8,7 @@ export type DocCommandContractEntry = {
 export const ACTIVE_DOC_COMMAND_CONTRACT: DocCommandContractEntry[] = [
   {
     path: "docs/handbook/getting-started-on-a-pr.md",
-    requiredFragments: ["scaf new ts lib demo-lib --yes --dry-run"],
+    requiredFragments: ["scaf new ts lib demo-lib --yes --dry-run", "scaf help ts webapp-ssr-vite"],
   },
   {
     path: "docs/handbook/node-tests.md",

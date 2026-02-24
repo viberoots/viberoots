@@ -46,6 +46,8 @@ test(
         stdio: "inherit",
         env,
       })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --force --lockfile ${lockfile}`;
+      await $`git add build-tools/tools/nix/node-modules.hashes.json`;
+      await $`git commit -m update-hashes`.nothrow();
 
       // Build the node-test derivation; vitest should pass calling through the native addon
       const out = await (async () => {

@@ -4,8 +4,7 @@ import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 import { scaffoldBuildAndSmoke } from "../lib/ssr-scaffold-build.ts";
 
-const TEST_TIMEOUT_MS =
-  Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
+const TEST_TIMEOUT_MS = Number(process.env.TEST_NIX_TIMEOUT_SECS || "1200") * 1000;
 
 test(
   "node SSR express template: scaffold and build via Nix with canonical runnable contract",

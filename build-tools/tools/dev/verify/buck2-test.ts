@@ -41,6 +41,13 @@ export function spawnVerifyBuck2Tests(opts: {
   const tsecRaw = Number((process.env.VERIFY_TIMEOUT_SECS || "3600").trim());
   const tsec = Number.isFinite(tsecRaw) && tsecRaw > 0 ? Math.floor(tsecRaw) : 3600;
   const tms = tsec * 1000;
+  const testNixTimeoutRaw = Number((process.env.TEST_NIX_TIMEOUT_SECS || "900").trim());
+  const testNixTimeoutSecs =
+    Number.isFinite(testNixTimeoutRaw) && testNixTimeoutRaw > 0
+      ? Math.floor(testNixTimeoutRaw)
+      : 900;
+  // Node's per-test timeout should never be tighter than the Nix timeout budget.
+  const nodeTestTimeoutMs = Math.max(tms, testNixTimeoutSecs * 1000);
 
   const consoleFlag =
     opts.console === "auto"
@@ -58,9 +65,9 @@ export function spawnVerifyBuck2Tests(opts: {
     "--env",
     `COVERAGE=${process.env.COVERAGE || "0"}`,
     "--env",
-    `TEST_NODE_OPTIONS=--test-timeout=${tms}`,
+    `TEST_NODE_OPTIONS=--test-timeout=${nodeTestTimeoutMs}`,
     "--env",
-    `TEST_NIX_TIMEOUT_SECS=${process.env.TEST_NIX_TIMEOUT_SECS || "900"}`,
+    `TEST_NIX_TIMEOUT_SECS=${testNixTimeoutSecs}`,
     "--env",
     `BNX_BUCK_REAPER_STATE_FILE=${process.env.BNX_BUCK_REAPER_STATE_FILE || ""}`,
     "--env",
