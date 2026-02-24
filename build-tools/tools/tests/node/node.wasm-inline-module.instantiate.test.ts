@@ -44,11 +44,17 @@ test(
   async () => {
     const prevRoots = process.env.TEST_RSYNC_ROOTS;
     if (!prevRoots) {
-      process.env.TEST_RSYNC_ROOTS = "build-tools toolchains third_party/providers prelude patches";
+      process.env.TEST_RSYNC_ROOTS =
+        "build-tools toolchains third_party/providers prelude patches flake.nix flake.lock";
     }
     try {
       await runInTemp("node-wasm-inline-module", async (tmp, _$) => {
         const $ = _$({ cwd: tmp, stdio: "inherit" });
+        const repoRoot = process.cwd();
+        const flakeNix = path.join(repoRoot, "flake.nix");
+        if (await fs.pathExists(flakeNix)) {
+          await fs.copyFile(flakeNix, path.join(tmp, "flake.nix"));
+        }
         const wasmDir = path.join(tmp, "projects", "libs", "demo-wasm");
         await fs.mkdirp(wasmDir);
         await fs.outputFile(

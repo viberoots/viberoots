@@ -32,29 +32,59 @@ test("changed template id extraction is sorted and unique", () => {
   assert.deepEqual(ids, ["go/lib", "ts/webapp-ssr-vite", "ts/webapp-static"]);
 });
 
-test("selector mode classification handles template-only, mixed, and no-template-impact", () => {
-  const templateOnly = classifyTemplateSelectorMode([
+test("selector mode classification handles template-only, mixed, and no-template-impact", async () => {
+  const templateOnly = await classifyTemplateSelectorMode(process.cwd(), [
     "build-tools/tools/scaffolding/templates/go/lib/copier.yaml",
     "build-tools/tools/scaffolding/templates/go/lib/README.md.jinja",
   ]);
   assert.equal(templateOnly.mode, "template-only");
   assert.deepEqual(templateOnly.changedTemplateIds, ["go/lib"]);
+  assert.deepEqual(templateOnly.ownedChangedTestPaths, []);
+  assert.deepEqual(templateOnly.ownedChangedTestTargets, []);
   assert.deepEqual(templateOnly.nonTemplateBuildSystemPaths, []);
 
-  const mixed = classifyTemplateSelectorMode([
+  const mixed = await classifyTemplateSelectorMode(process.cwd(), [
     "build-tools/tools/scaffolding/templates/go/lib/copier.yaml",
     "build-tools/tools/dev/verify.ts",
   ]);
   assert.equal(mixed.mode, "mixed");
   assert.deepEqual(mixed.changedTemplateIds, ["go/lib"]);
+  assert.deepEqual(mixed.ownedChangedTestPaths, []);
+  assert.deepEqual(mixed.ownedChangedTestTargets, []);
   assert.deepEqual(mixed.nonTemplateBuildSystemPaths, ["build-tools/tools/dev/verify.ts"]);
 
-  const noTemplate = classifyTemplateSelectorMode([
+  const noTemplate = await classifyTemplateSelectorMode(process.cwd(), [
     "projects/apps/myapp/src/index.ts",
     "docs/handbook/getting-started-on-a-pr.md",
   ]);
   assert.equal(noTemplate.mode, "no-template-impact");
   assert.deepEqual(noTemplate.changedTemplateIds, []);
+  assert.deepEqual(noTemplate.ownedChangedTestPaths, []);
+  assert.deepEqual(noTemplate.ownedChangedTestTargets, []);
+});
+
+test("template-only mode allows changed template-owned tests and selects changed test targets", async () => {
+  const result = await resolveTemplateTestSelection({
+    root: process.cwd(),
+    changedPaths: [
+      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/server/index.ts.jinja",
+      "build-tools/tools/tests/scaffolding/webapp-ssr-vite.pr3-runnable-contracts.test.ts",
+    ],
+    deps: {
+      queryTargetsForTemplateLabel: async (_root, templateId) => {
+        assert.equal(templateId, "ts/webapp-ssr-vite");
+        return ["//:scaffolding_webapp_ssr_vite_pr1_baseline_contracts"];
+      },
+    },
+  });
+  assert.equal(result.mode, "template-only");
+  assert.deepEqual(result.diagnostics.ownedChangedTestPaths, [
+    "build-tools/tools/tests/scaffolding/webapp-ssr-vite.pr3-runnable-contracts.test.ts",
+  ]);
+  assert.deepEqual(result.diagnostics.ownedChangedTestTargets, [
+    "//:scaffolding_webapp_ssr_vite_pr3_runnable_contracts",
+  ]);
+  assert.ok(result.targets.includes("//:scaffolding_webapp_ssr_vite_pr3_runnable_contracts"));
 });
 
 test("template-only selection unions label targets and safety floor", async () => {
@@ -76,6 +106,8 @@ test("template-only selection unions label targets and safety floor", async () =
     "//:scaffolding_smoke_lib_readme",
     "//:z_target",
   ]);
+  assert.deepEqual(result.diagnostics.ownedChangedTestPaths, []);
+  assert.deepEqual(result.diagnostics.ownedChangedTestTargets, []);
   assert.deepEqual(result.diagnostics.safetyFloorTargets, [...TEMPLATE_SAFETY_FLOOR_TARGETS]);
 });
 

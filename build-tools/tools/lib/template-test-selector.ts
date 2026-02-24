@@ -1,6 +1,7 @@
 import process from "node:process";
 import "zx/globals";
 import { collectChangedPaths, isBuildSystemPath } from "./build-system-test-scope.ts";
+import { readTemplateOwnedTestIndex, targetLabelFromScript } from "./template-owned-tests.ts";
 
 export type TemplateTestSelectorMode = "template-only" | "mixed" | "no-template-impact";
 
@@ -8,6 +9,8 @@ export type TemplateTestSelectorDiagnostics = {
   mode: TemplateTestSelectorMode;
   changedPaths: string[];
   changedTemplateIds: string[];
+  ownedChangedTestPaths: string[];
+  ownedChangedTestTargets: string[];
   nonTemplateBuildSystemPaths: string[];
   safetyFloorTargets: string[];
   templateTargetsById: Record<string, string[]>;
@@ -68,25 +71,50 @@ export function changedTemplateIdsFromPaths(paths: string[]): string[] {
   return toSortedUnique(out);
 }
 
-export function classifyTemplateSelectorMode(changedPaths: string[]): {
+export async function classifyTemplateSelectorMode(
+  root: string,
+  changedPaths: string[],
+): Promise<{
   mode: TemplateTestSelectorMode;
   changedTemplateIds: string[];
+  ownedChangedTestPaths: string[];
+  ownedChangedTestTargets: string[];
   nonTemplateBuildSystemPaths: string[];
-} {
+}> {
   const normalized = toSortedUnique(changedPaths.map((p) => normalizePath(p)));
   const changedTemplateIds = changedTemplateIdsFromPaths(normalized);
   if (changedTemplateIds.length === 0) {
-    return { mode: "no-template-impact", changedTemplateIds, nonTemplateBuildSystemPaths: [] };
+    return {
+      mode: "no-template-impact",
+      changedTemplateIds,
+      ownedChangedTestPaths: [],
+      ownedChangedTestTargets: [],
+      nonTemplateBuildSystemPaths: [],
+    };
   }
+  const changedTemplateIdSet = new Set(changedTemplateIds);
+  const ownedIndex = await readTemplateOwnedTestIndex(root);
+  const ownedChangedTestPaths: string[] = [];
+  const ownedChangedTestTargets: string[] = [];
   const nonTemplateBuildSystemPaths: string[] = [];
   for (const p of normalized) {
     if (!isBuildSystemPath(p)) continue;
     if (p.startsWith(TEMPLATE_ROOT)) continue;
+    const ownerTemplateIds = ownedIndex.scriptToTemplateIds.get(p) || [];
+    const isOwnedChangedTest =
+      ownerTemplateIds.length > 0 && ownerTemplateIds.every((id) => changedTemplateIdSet.has(id));
+    if (isOwnedChangedTest) {
+      ownedChangedTestPaths.push(p);
+      ownedChangedTestTargets.push(targetLabelFromScript(p));
+      continue;
+    }
     nonTemplateBuildSystemPaths.push(p);
   }
   return {
     mode: nonTemplateBuildSystemPaths.length > 0 ? "mixed" : "template-only",
     changedTemplateIds,
+    ownedChangedTestPaths: toSortedUnique(ownedChangedTestPaths),
+    ownedChangedTestTargets: toSortedUnique(ownedChangedTestTargets),
     nonTemplateBuildSystemPaths: toSortedUnique(nonTemplateBuildSystemPaths),
   };
 }
@@ -135,8 +163,13 @@ export async function resolveTemplateTestSelection(opts: {
   const env = opts.env || process.env;
   const changedPaths = opts.changedPaths || (await collectChangedPaths(opts.root, env));
   const normalizedPaths = toSortedUnique(changedPaths.map((p) => normalizePath(p)));
-  const { mode, changedTemplateIds, nonTemplateBuildSystemPaths } =
-    classifyTemplateSelectorMode(normalizedPaths);
+  const {
+    mode,
+    changedTemplateIds,
+    ownedChangedTestPaths,
+    ownedChangedTestTargets,
+    nonTemplateBuildSystemPaths,
+  } = await classifyTemplateSelectorMode(opts.root, normalizedPaths);
   const templateTargetsById: Record<string, string[]> = {};
   const queryByLabel = opts.deps?.queryTargetsForTemplateLabel || queryTargetsForTemplateLabel;
 
@@ -157,7 +190,11 @@ export async function resolveTemplateTestSelection(opts: {
   );
   const selectedTargets =
     mode === "template-only"
-      ? toSortedUnique([...selectedTemplateTargets, ...TEMPLATE_SAFETY_FLOOR_TARGETS])
+      ? toSortedUnique([
+          ...selectedTemplateTargets,
+          ...ownedChangedTestTargets,
+          ...TEMPLATE_SAFETY_FLOOR_TARGETS,
+        ])
       : [];
 
   return {
@@ -167,6 +204,8 @@ export async function resolveTemplateTestSelection(opts: {
       mode,
       changedPaths: normalizedPaths,
       changedTemplateIds,
+      ownedChangedTestPaths,
+      ownedChangedTestTargets,
       nonTemplateBuildSystemPaths,
       safetyFloorTargets: [...TEMPLATE_SAFETY_FLOOR_TARGETS],
       templateTargetsById,

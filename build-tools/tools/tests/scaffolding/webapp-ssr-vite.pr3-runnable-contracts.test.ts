@@ -1,35 +1,81 @@
 #!/usr/bin/env zx-wrapper
+import assert from "node:assert/strict";
+import * as fsp from "node:fs/promises";
+import path from "node:path";
 import { test } from "node:test";
-import { scaffoldBuildAndSmoke } from "../lib/ssr-scaffold-build.ts";
+import { inferRunnableFromOutPath } from "../../lib/runnables.ts";
+import { assertSsrAdapterConformance } from "../lib/ssr-adapter-conformance.ts";
 import { runInTemp } from "../lib/test-helpers";
+import {
+  TEST_TIMEOUT_MS,
+  buildSelectedSsr,
+  runExpressDockerSmoke,
+  scaffoldAndPrepareWorkspace,
+  withTempRoots,
+} from "./lib/webapp-ssr-pr4.ts";
 
-const TEST_TIMEOUT_MS =
-  Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
+async function expectMissingArtifactFailure(
+  scratchRoot: string,
+  importer: string,
+  label: string,
+  missing: "serverEntry" | "clientDir",
+): Promise<void> {
+  const sandbox = path.join(scratchRoot, `vite-pr4-missing-${missing}`);
+  await fsp.rm(sandbox, { recursive: true, force: true });
+  await fsp.mkdir(path.join(sandbox, "dist", "server"), { recursive: true });
+  if (missing === "clientDir") {
+    await fsp.writeFile(path.join(sandbox, "dist", "server", "index.js"), "export {};\n", "utf8");
+  } else {
+    await fsp.mkdir(path.join(sandbox, "dist", "client"), { recursive: true });
+  }
+
+  await assert.rejects(
+    async () =>
+      inferRunnableFromOutPath({
+        label,
+        outPath: sandbox,
+        importer,
+        mode: "ssr",
+        framework: "vite",
+      }),
+    new RegExp(`missing ${missing}`),
+  );
+}
 
 test(
-  "PR-3 Vite SSR contracts: planner/runnable metadata keeps canonical SSR startup",
+  "PR-4 Vite SSR contracts: packaging shape, runtime startup, and missing-artifact failures",
   { timeout: TEST_TIMEOUT_MS },
   async () => {
-    const prevRoots = process.env.TEST_RSYNC_ROOTS;
-    if (!prevRoots) {
-      process.env.TEST_RSYNC_ROOTS =
-        "build-tools toolchains third_party/providers prelude patches docs METHODOLOGY.XML AI-PREFERENCES.XML";
-    }
-    try {
-      await runInTemp("node-webapp-ssr-vite-pr3-contracts", async (tmp, _$) => {
-        await scaffoldBuildAndSmoke(
-          tmp,
-          "demo-ssr-vite-pr3",
-          "webapp-ssr-vite",
-          "vite",
-          'data-ssr-marker="vite"',
-          false,
-          _$,
+    await withTempRoots(async () => {
+      await runInTemp("node-webapp-ssr-vite-pr4-contracts", async (tmp, _$) => {
+        const appName = "demo-ssr-vite";
+        const label = `//projects/apps/${appName}:app`;
+        await scaffoldAndPrepareWorkspace(tmp, _$, "webapp-ssr-vite", appName);
+        const { outPath, importer } = await buildSelectedSsr(tmp, _$, label, "vite");
+        await assertSsrAdapterConformance({ label, outPath, importer, framework: "vite" });
+
+        const appAbs = path.join(tmp, importer);
+        await _$({
+          cwd: appAbs,
+          stdio: "inherit",
+          env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1" },
+        })`pnpm install --prod --frozen-lockfile --ignore-scripts --ignore-workspace --reporter=append-only`;
+
+        const runtimeRoot = path.join(tmp, "docker-runtime-vite");
+        await fsp.rm(runtimeRoot, { recursive: true, force: true });
+        await fsp.mkdir(runtimeRoot, { recursive: true });
+        await fsp.cp(path.join(outPath, "dist"), path.join(runtimeRoot, "dist"), {
+          recursive: true,
+        });
+        await fsp.symlink(
+          path.join(appAbs, "node_modules"),
+          path.join(runtimeRoot, "node_modules"),
         );
+        await runExpressDockerSmoke(runtimeRoot, 'data-ssr-marker="vite"');
+
+        await expectMissingArtifactFailure(tmp, importer, label, "serverEntry");
+        await expectMissingArtifactFailure(tmp, importer, label, "clientDir");
       });
-    } finally {
-      if (prevRoots === undefined) delete process.env.TEST_RSYNC_ROOTS;
-      else process.env.TEST_RSYNC_ROOTS = prevRoots;
-    }
+    });
   },
 );

@@ -173,6 +173,8 @@ def node_wasm_inline_module(
         src_ref = "$(location %s)" % _to_abs_label(src)
     cmd = (
         "SCRATCH=\"$PWD\"; OUT_ABS=\"$SCRATCH/$OUT\"; "
+        + ("BNX_NODE_ROUTE_TARGET=%s; " % sh_quote(selected_route_target))
+        + "if [ -n \"$BNX_NODE_ROUTE_TARGET\" ]; then "
         + nix_calling_genrule_bootstrap(
             timeout_var = "TIMEOUT",
             timeout_sec = 180,
@@ -182,6 +184,7 @@ def node_wasm_inline_module(
         + nix_calling_env_export_buck_graph_json()
         + nix_calling_node_patch_requirements_preflight(native.package_name())
         + _selected_route_build_cmd(selected_route_target)
+        + "fi; "
         + wasm_source_resolver_shell()
         + "if [ -n \"$SRCDIR\" ] && [ \"${SRCDIR#/}\" = \"$SRCDIR\" ]; then SRCDIR=\"$SCRATCH/$SRCDIR\"; fi; "
         + "set -- $SRCS; "
