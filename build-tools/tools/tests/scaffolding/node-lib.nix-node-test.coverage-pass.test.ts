@@ -26,7 +26,6 @@ test(
         Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200"),
       );
 
-      await $`git init`;
       // Scaffold with tests default-on
       await $`scaf new ts lib demo --yes`;
 
@@ -43,7 +42,7 @@ test(
       // Align the fixed-output hash mapping for this importer before building node-test.
       await $({
         stdio: "inherit",
-      })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --force --lockfile ${lockfile}`;
+      })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${lockfile}`;
 
       // Build the node-test derivation with coverage
       const out = await (async () => {

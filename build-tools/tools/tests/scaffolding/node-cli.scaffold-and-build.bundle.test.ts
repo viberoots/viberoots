@@ -13,7 +13,6 @@ test("node cli: build bundled single-file and run help", async () => {
   }
   try {
     await runInTemp("node-cli-bundle", async (tmp, $) => {
-      await $`git init`;
       await $`scaf new ts cli demo --yes`;
       const targetsPath = path.join(tmp, "projects", "apps", "demo", "TARGETS");
       // Toggle bundle mode with importer param
@@ -25,8 +24,6 @@ test("node cli: build bundled single-file and run help", async () => {
        fs.writeFileSync(p,t,'utf8');`}`;
       // Glue
       await $`build-tools/tools/dev/install-deps.ts --glue-only`;
-      await $`node build-tools/tools/buck/sync-providers.ts --lang=node`;
-      await $`buck2 targets //projects/apps/demo:demo`;
       await $({
         cwd: tmp,
         stdio: "inherit",

@@ -4,7 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-// PR 7: partial-clone friendly: presence of files enables language; absence hides it
+// Partial-clone friendly: presence of files enables language; absence hides it
 
 test("scaffolding registry: discovery only lists present languages and allows others to work", async () => {
   process.env.TEST_PARTIAL_CLONE_GO_ONLY = "1";

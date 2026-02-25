@@ -23,7 +23,7 @@ export async function cmdLanguage(args: string[], flags: ScafFlags) {
   }
   if (sub === "doctor") {
     const json = flags["json"] === "true";
-    const payload = { languages: [], note: "diagnostics stub; implement in PR 28" } as const;
+    const payload = { languages: [], note: "diagnostics stub; implement in follow-up" } as const;
     console.log(json ? JSON.stringify(payload, null, 2) : payload.note);
     return;
   }

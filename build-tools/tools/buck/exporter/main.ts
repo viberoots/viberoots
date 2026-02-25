@@ -37,7 +37,7 @@ export async function run() {
     return !(nm.startsWith("config//") || nm.startsWith("prelude//"));
   });
 
-  // Adapter-level validation hook (PR 1) will run per active adapter below.
+  // Adapter-level validation hook runs per active adapter below.
 
   const adapters: Adapter[] = (await loadPresentAdapters()).sort((a, b) =>
     a.name.localeCompare(b.name),

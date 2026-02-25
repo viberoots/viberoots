@@ -8,5 +8,5 @@
  * See: `drop-cpp-provider.md` and `docs/handbook/cpp-pr2-migration.md`.
  */
 export async function syncCppProviders(): Promise<void> {
-  console.info("[providers] C++ provider sync is a no-op — see drop-cpp-provider.md (PR 2).");
+  console.info("[providers] C++ provider sync is a no-op — see drop-cpp-provider.md.");
 }

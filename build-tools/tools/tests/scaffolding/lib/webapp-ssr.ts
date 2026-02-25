@@ -59,16 +59,17 @@ export async function scaffoldAndPrepareWorkspace(
   name: string,
 ): Promise<void> {
   const appRel = path.join("projects", "apps", name).replace(/\\/g, "/");
+  const graphJsonAbs = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
+  const appLabel = `//${appRel}:app`;
   const $ = _$({ cwd: tmp, stdio: "inherit" });
   await $`scaf new ts ${template} ${name} --yes --no-tests`;
   await _$({
     cwd: tmp,
     stdio: "inherit",
+    env: { ...process.env, BUCK_TARGET: appLabel },
   })`zx-wrapper build-tools/tools/dev/install/deps-main.ts --verbose --glue-only`;
-  await _$({
-    cwd: tmp,
-    stdio: "inherit",
-  })`zx-wrapper build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+  // deps-main --glue-only is the single authoritative glue path for this flow.
+  await fsp.access(graphJsonAbs);
   await _$({
     cwd: tmp,
     stdio: "pipe",

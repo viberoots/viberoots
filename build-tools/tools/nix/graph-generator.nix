@@ -94,7 +94,7 @@ let
         in if attempt.success then attempt.value else raw
       ) else {};
   D = M.dispatch or {};
-  # Planner override env mapping (PR-5): avoid hard-coded names
+  # Planner override env mapping: avoid hard-coded names
   Overrides = import (manifestBase + "/planner/overrides.nix");
   devOverrideJSON =
     if builtins.hasAttr "go" Overrides

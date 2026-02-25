@@ -67,7 +67,7 @@ async function installNodeModules(appAbs: string, _$: any): Promise<void> {
     cwd: appAbs,
     stdio: "inherit",
     env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1" },
-  })`pnpm install --frozen-lockfile --ignore-workspace --reporter=append-only`;
+  })`pnpm install --frozen-lockfile --ignore-scripts --ignore-workspace --prefer-offline --reporter=append-only`;
 }
 
 async function assertContractFiles(tmp: string, template: string): Promise<void> {

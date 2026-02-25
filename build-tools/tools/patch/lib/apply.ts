@@ -74,9 +74,7 @@ export function resolvePatchDir(
   if (targetPkg) {
     return path.join(root, targetPkg, languageSubdir);
   }
-  throw new Error(
-    "missing --target //<pkg>:name or --patch-dir for local patch placement (PR6 local mode)",
-  );
+  throw new Error("missing --target //<pkg>:name or --patch-dir for local patch placement");
 }
 
 export async function writePatchIfChanged(

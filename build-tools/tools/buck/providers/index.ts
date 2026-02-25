@@ -21,7 +21,7 @@ const REGISTRY: Record<string, () => Promise<LanguageProviderSync>> = {
   cpp: async () => ({
     lang: "cpp",
     sync: async () => {
-      console.info("[providers] C++ provider sync is a no-op — see drop-cpp-provider.md (PR 2).");
+      console.info("[providers] C++ provider sync is a no-op — see drop-cpp-provider.md.");
     },
   }),
   node: async () => {

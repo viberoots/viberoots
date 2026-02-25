@@ -3,7 +3,7 @@ import * as fsp from "node:fs/promises";
 import { writeIfChanged, maybeAssumeUnchanged } from "../lib/fs-helpers.ts";
 // zx is available via shebang; we'll use `$` to interact with git when present.
 import { readCompositeGraph } from "../lib/graph-view.ts";
-// PR6 (go-cpp-local-patching): provider mapping is Node-only (lockfile:...) and nixpkg; Go `module:`
+// Provider mapping is Node-only (lockfile:...) and nixpkg; Go `module:`
 // labels are kept for diagnostics and are intentionally ignored here.
 import { providersForLabels, parseLockfileLabel } from "../lib/labels.ts";
 import { getFlagStr } from "../lib/cli.ts";
@@ -46,7 +46,7 @@ async function main() {
   const mapping: Record<string, string[]> = {};
   const unsupportedLockfileLabels: Array<{ target: string; label: string; importer: string }> = [];
   for (const n of list) {
-    // PR-2: Skip provider-package nodes to avoid self-mappings in auto_map.
+    // Skip provider-package nodes to avoid self-mappings in auto_map.
     if (n.name && isProviderPackageNode(n.name)) {
       continue;
     }

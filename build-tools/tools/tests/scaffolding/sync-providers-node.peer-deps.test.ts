@@ -11,7 +11,7 @@ test("sync-providers-node creates provider with peer dependency lockfile", async
 
     // Create lockfile with peer dependencies
     // This verifies the provider sync can parse lockfiles with peer dependencies
-    // Full patch matching will be tested with real projects in PR 3
+    // Full patch matching is covered with real project fixtures elsewhere.
     const lockfilePath = path.join(tmp, "projects/apps/example/pnpm-lock.yaml");
     const lockfileContent = `
 lockfileVersion: "9.0"

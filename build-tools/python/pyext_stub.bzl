@@ -44,10 +44,10 @@ python_pyext_stub = rule(
         "header_deps": attrs.list(attrs.dep(), default = []),
         "link_closure": attrs.string(default = "direct"),
         "link_closure_overrides": attrs.dict(key = attrs.label(), value = attrs.string(), default = {}),
-        # Preserve compile/link flags in the exported node contract (consumed in PR-2+).
+        # Preserve compile/link flags in the exported node contract.
         "cflags": attrs.list(attrs.string(), default = []),
         "ldflags": attrs.list(attrs.string(), default = []),
-        # PR-3: build-time Python deps (from importer uv.lock wheelhouse env).
+        # Build-time Python deps (from importer uv.lock wheelhouse env).
         # This is a planner/exporter contract only; this stub does not interpret it.
         "build_py_deps": attrs.list(attrs.string(), default = []),
         # `attrs.source()` allows both files and target outputs (like genrule srcs).

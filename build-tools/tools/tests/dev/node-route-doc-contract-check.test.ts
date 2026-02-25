@@ -7,11 +7,11 @@ import { runInTemp } from "../lib/test-helpers";
 
 const scriptPath = "build-tools/tools/dev/node-route-doc-contract-check.ts";
 
-const prPlanDoc = `## PR-21: Close Node gen/lib/bin/stage/inline gaps and enforce route parity (superseded in part by PR-23)
+const prPlanDoc = `## Close Node gen/lib/bin/stage/inline gaps and enforce route parity (superseded in part by another plan update)
 
 Supersession note:
 
-- PR-21 is superseded by PR-23 for the \`node_asset_stage\` and \`node_wasm_inline_module\` route
+- This work is superseded for the \`node_asset_stage\` and \`node_wasm_inline_module\` route
   contract.
 - Final enforced route contract for those two macros is: \`standalone nix-calling genrule route\`.
 `;
@@ -47,7 +47,7 @@ test("node-route-doc-contract-check fails when supersession marker drifts", asyn
     await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptPath, "utf8"));
     await fs.outputFile(
       path.join(tmp, "docs/handbook/nix-gaps-prs.md"),
-      prPlanDoc.replace("(superseded in part by PR-23)", ""),
+      prPlanDoc.replace("(superseded in part by another plan update)", ""),
     );
     await fs.outputFile(path.join(tmp, "docs/handbook/nix-gaps.md"), nixGapsDoc);
     await fs.outputFile(path.join(tmp, "build-tools/docs/build-system-design.md"), designDoc);

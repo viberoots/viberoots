@@ -22,8 +22,8 @@ async function main() {
       label: "pr-plan",
       path: prPlanPath,
       requiredFragments: [
-        "## PR-21: Close Node gen/lib/bin/stage/inline gaps and enforce route parity (superseded in part by PR-23)",
-        "PR-21 is superseded by PR-23 for the `node_asset_stage` and `node_wasm_inline_module` route",
+        "Close Node gen/lib/bin/stage/inline gaps and enforce route parity (superseded in part by",
+        "for the `node_asset_stage` and `node_wasm_inline_module` route",
         "Final enforced route contract for those two macros is: `standalone nix-calling genrule route`.",
       ],
     },
