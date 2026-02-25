@@ -4,7 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-// PR1 invalidation test: touching a non-app/lib file at repo root should NOT
+// base-contract invalidation test: touching a non-app/lib file at repo root should NOT
 // change the app binary derivation (cache hit expected; store path unchanged).
 
 test("planner: touching root-only file does not change app bin store path", async () => {

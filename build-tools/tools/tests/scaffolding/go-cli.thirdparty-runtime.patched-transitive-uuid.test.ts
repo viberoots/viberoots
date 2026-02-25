@@ -356,7 +356,7 @@ async function scaffoldCli(sh: any, tmp: string) {
 
 // No gomod2nix or glue generation: patch-go uses NIX_GO_TEST_RESOLVE_JSON for speed.
 
-// PR6: Go providers removed; auto_map remains Node-only. No provider sync step here.
+// current-contract: Go providers removed; auto_map remains Node-only. No provider sync step here.
 
 function normalizeCellLabel(s: string) {
   return s.replace(/^\/\/[^/]+\/+/, "//");
@@ -549,6 +549,6 @@ test("go cli with transitive third-party patched uuid runtime", async () => {
     if (!(await fsp.stat(patchFile).catch(() => null))) {
       throw new Error("expected uuid patch file not found");
     }
-    // Done: local patch present is sufficient for PR6
+    // Done: local patch present is sufficient for current-contract
   });
 });

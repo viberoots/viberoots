@@ -116,8 +116,8 @@ export async function generateImporterLockfile(opts: { repoRoot: string; importe
   }
 
   const { workspaceFileAbs, hadLocalWorkspaceFile } = await ensureLocalWorkspaceMarker(importerAbs);
-  const fetchTimeout = String(process.env.NIX_PNPM_FETCH_TIMEOUT || "").trim() || "180";
-  const timeoutMs = (Number.parseInt(fetchTimeout, 10) || 180) * 1000 + 120_000;
+  const fetchTimeout = String(process.env.NIX_PNPM_FETCH_TIMEOUT || "").trim() || "600";
+  const timeoutMs = (Number.parseInt(fetchTimeout, 10) || 600) * 1000 + 120_000;
   const { homeDir, storeDir } = localPnpmDirs(importerAbs);
   await fsp.mkdir(homeDir, { recursive: true }).catch(() => {});
   await fsp.mkdir(storeDir, { recursive: true }).catch(() => {});

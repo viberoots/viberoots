@@ -55,7 +55,7 @@ Verification snapshot for PR-12 through PR-26 (repo evidence):
   `docs/handbook/nix-gaps-exceptions.json` and tests in
   `build-tools/tools/tests/dev/nix-gaps-artifact-route-allowlist.test.ts`.
 - PR-18: Parity and minimal-environment hermeticity checks exist in
-  `build-tools/tools/tests/dev/nix-gaps.phase6.parity-and-hermeticity.test.ts`.
+  `build-tools/tools/tests/dev/nix-gaps.parity-and-hermeticity.test.ts`.
 - PR-20: `nix_node_cli_bin` bundle/non-bundle routes are Nix-calling in
   `build-tools/node/defs_nix.bzl` with tests including
   `build-tools/tools/tests/node/node.cli.no-bundle.no-global-inputs-srcs.test.ts`.

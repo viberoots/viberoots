@@ -44,4 +44,4 @@ I regenerate this file by running `node --experimental-strip-types --import ./bu
 - Representative Rust target parity signal: executable stdout contract.
 - Expected delta: C++/Rust binaries are not required to be byte-identical.
 - Hermeticity gate: selected builds pass in a minimal environment with host toolchain vars poisoned.
-- Primary enforcement test: `build-tools/tools/tests/dev/nix-gaps.phase6.parity-and-hermeticity.test.ts`.
+- Primary enforcement test: `build-tools/tools/tests/dev/nix-gaps.parity-and-hermeticity.test.ts`.

@@ -22,7 +22,7 @@ async function readIfExists(p: string): Promise<string> {
 }
 
 test("no references to go_module_patch and no Go auto provider file present", async () => {
-  // The Go provider rule was removed in PR-3; ensure no stale files or references remain.
+  // The Go provider rule was removed; ensure no stale files or references remain.
 
   // 1) TARGETS.go.auto should not exist anymore
   const goAuto = path.join("third_party", "providers", "TARGETS.go.auto");

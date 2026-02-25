@@ -458,17 +458,17 @@ Source-of-truth matrix for template identity:
   - `build-tools/tools/scaffolding/resolver.json`
   - TypeScript resolver keys must stay in parity with canonical `ts/*` ids.
 - Validation-only parity contracts:
-  - `build-tools/tools/tests/scaffolding/template-taxonomy.pr4-parity-contract.test.ts`
-  - `build-tools/tools/tests/scaffolding/template-taxonomy.pr5-runtime-contract.test.ts`
+- `build-tools/tools/tests/scaffolding/template-taxonomy.parity-contract.test.ts`
+- `build-tools/tools/tests/scaffolding/template-taxonomy.runtime-contract.test.ts`
   - these tests verify runtime consumers stay aligned with taxonomy and fail loudly on drift.
 
 Anti-drift contracts:
 
-- `build-tools/tools/tests/scaffolding/template-taxonomy.pr1-contract.test.ts`
+- `build-tools/tools/tests/scaffolding/template-taxonomy.contract.test.ts`
   - locks the canonical TypeScript id set and `templates/ts` filesystem parity.
-- `build-tools/tools/tests/scaffolding/template-taxonomy.pr4-parity-contract.test.ts`
+- `build-tools/tools/tests/scaffolding/template-taxonomy.parity-contract.test.ts`
   - enforces canonical-id uniqueness, resolver parity, convention-id parity, and adapter parity.
-- `build-tools/tools/tests/scaffolding/template-taxonomy.pr5-runtime-contract.test.ts`
+- `build-tools/tools/tests/scaffolding/template-taxonomy.runtime-contract.test.ts`
   - enforces taxonomy-driven metadata listing and deterministic missing-root failures.
 
 Duplicate-id failure contract:
@@ -496,8 +496,8 @@ Generated-surface refresh contract:
   - `build-tools/tools/tests/template_taxonomy_adapter.bzl`
 - Deterministic freshness checks:
   - `node build-tools/tools/scaffolding/gen-template-manifest-artifacts.ts --check`
-  - `build-tools/tools/tests/scaffolding/template-manifest.pr7-generator-parity.contract.test.ts`
-  - `build-tools/tools/tests/scaffolding/template-manifest.pr7-resolver-parity.contract.test.ts`
+- `build-tools/tools/tests/scaffolding/template-manifest.generator-parity.contract.test.ts`
+- `build-tools/tools/tests/scaffolding/template-manifest.resolver-parity.contract.test.ts`
 - `scaf` command preflight:
   - `scaf` runs `gen-template-manifest-artifacts.ts` before taxonomy-consuming commands (`new`, `templates`, `template`, and template-related completion subcommands), so template-directory onboarding does not require a separate manual refresh step.
 - Verify/CI freshness enforcement:

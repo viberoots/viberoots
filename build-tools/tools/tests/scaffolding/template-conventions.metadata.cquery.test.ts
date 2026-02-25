@@ -80,22 +80,22 @@ const EXPECTATIONS: TemplateExpectation[] = [
     ],
   },
   {
-    script: "build-tools/tools/tests/scaffolding/webapp-ssr.pr4-express-contracts.test.ts",
+    script: "build-tools/tools/tests/scaffolding/webapp-ssr.express-contracts.test.ts",
     requiredLabels: ["template:ts/webapp-ssr-express", "template:contract"],
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-express/"],
   },
   {
-    script: "build-tools/tools/tests/scaffolding/webapp-ssr.pr4-next-contracts.test.ts",
+    script: "build-tools/tools/tests/scaffolding/webapp-ssr.next-contracts.test.ts",
     requiredLabels: ["template:ts/webapp-ssr-next", "template:contract"],
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/"],
   },
   {
-    script: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.pr1-baseline-contract.test.ts",
+    script: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.baseline-contract.test.ts",
     requiredLabels: ["template:ts/webapp-ssr-vite", "template:contract"],
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/"],
   },
   {
-    script: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.pr3-runnable-contracts.test.ts",
+    script: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.runnable-contracts.test.ts",
     requiredLabels: ["template:ts/webapp-ssr-vite", "template:contract"],
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/"],
   },
@@ -125,18 +125,17 @@ const EXPECTATIONS: TemplateExpectation[] = [
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/language/kit/"],
   },
   {
-    script: "build-tools/tools/tests/ts-cpp-go-wasm/pr8-scaffolding.scaf-new-dry-run.test.ts",
+    script: "build-tools/tools/tests/ts-cpp-go-wasm/scaffolding.scaf-new-dry-run.test.ts",
     requiredLabels: ["template:ts/go-cpp-lib", "template:smoke"],
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/go-cpp-lib/"],
   },
   {
-    script:
-      "build-tools/tools/tests/ts-cpp-go-wasm/pr8-scaffolding.wasm-app.scaffold-smoke.test.ts",
+    script: "build-tools/tools/tests/ts-cpp-go-wasm/scaffolding.wasm-app.scaffold-smoke.test.ts",
     requiredLabels: ["template:ts/wasm-app", "template:smoke"],
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/wasm-app/"],
   },
   {
-    script: "build-tools/tools/tests/ts-cpp-go-wasm/pr8-scaffolding.templates-exist.test.ts",
+    script: "build-tools/tools/tests/ts-cpp-go-wasm/scaffolding.templates-exist.test.ts",
     requiredLabels: ["template:ts/go-cpp-lib", "template:ts/wasm-app", "template:shared"],
     requiredTemplateRoots: [
       "build-tools/tools/scaffolding/templates/ts/go-cpp-lib/",
@@ -144,7 +143,7 @@ const EXPECTATIONS: TemplateExpectation[] = [
     ],
   },
   {
-    script: "build-tools/tools/tests/scaffolding/pr3-ts-command-path.tooling-contract.test.ts",
+    script: "build-tools/tools/tests/scaffolding/ts-command-path.tooling-contract.test.ts",
     requiredLabels: [
       "template:ts/lib",
       "template:ts/cli",
@@ -158,7 +157,7 @@ const EXPECTATIONS: TemplateExpectation[] = [
     ],
   },
   {
-    script: "build-tools/tools/tests/scaffolding/pr3-ts-command-path.docs-contract.test.ts",
+    script: "build-tools/tools/tests/scaffolding/ts-command-path.docs-contract.test.ts",
     requiredLabels: [
       "template:ts/lib",
       "template:ts/cli",

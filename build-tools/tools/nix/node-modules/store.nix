@@ -28,7 +28,8 @@ in {
       # beyond the lockfile, which makes the fixed-output hash unstable.
       preferPrefetch = false;
       prefetchedInput = null;
-      ftVal = let v = builtins.getEnv "NIX_PNPM_FETCH_TIMEOUT"; in if v != "" then v else "180";
+      # Keep default fetch timeout aligned with update-pnpm-hash/install-deps primary path.
+      ftVal = let v = builtins.getEnv "NIX_PNPM_FETCH_TIMEOUT"; in if v != "" then v else "600";
       # Choose FOD hashing strategy:
       # - When a lockfile is present (in live FS or flake snapshot), fix the output hash to the lockfile hash.
       # - When lockfile is missing and generation is allowed, do NOT fix the output hash (non-FOD) to avoid hash mismatch.
@@ -233,7 +234,7 @@ in {
         printf '%s\n' "packages:" > pnpm-workspace.yaml
         printf '%s\n' "  - ./" >> pnpm-workspace.yaml
         echo "[nix] mkPnpmStoreUnfixed: pnpm install --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir ."
-        FT="''${NIX_PNPM_FETCH_TIMEOUT:-180}"
+        FT="''${NIX_PNPM_FETCH_TIMEOUT:-600}"
         timeout "$FT"s env PNPM_HOME="$PNPM_HOME" pnpm install --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
         echo "[nix] mkPnpmStoreUnfixed: install complete"
         # Normalize store timestamps and scrub volatile JSON fields to stabilize output hashing

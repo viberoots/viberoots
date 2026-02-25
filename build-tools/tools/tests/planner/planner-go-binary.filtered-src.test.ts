@@ -4,7 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-// This test verifies PR1: planner uses filtered apps/libs source and still builds a bin
+// This test verifies base-contract: planner uses filtered apps/libs source and still builds a bin
 // It creates a tiny Go app under apps/ in a temp repo, generates a simple gomod2nix.toml,
 // writes a graph.json with a go_binary node, then builds the graph-generator
 // and asserts the manifest lists the binary.

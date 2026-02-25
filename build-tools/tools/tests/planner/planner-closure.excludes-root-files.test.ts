@@ -6,7 +6,7 @@ import { runInTemp } from "../lib/test-helpers";
 // Ensure dev shell tools (gomod2nix, zx deps) are exported into temp repos
 process.env.TEST_NEED_DEV_ENV = "1";
 
-// PR1 closure test: ensure that content written to a root-only file does not
+// base-contract closure test: ensure that content written to a root-only file does not
 // appear anywhere under the materialized graph outputs, as a proxy that the
 // filtered srcRoot (apps/libs only) excludes root files from the closure.
 

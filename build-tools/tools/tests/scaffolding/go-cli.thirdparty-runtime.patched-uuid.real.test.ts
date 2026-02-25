@@ -183,6 +183,6 @@ test("go cli with local lib + third-party patched uuid runtime (prefetched real 
       .then(() => true)
       .catch(() => false);
     if (!ok) throw new Error("expected uuid patch file not found");
-    // No provider assertions (PR6)
+    // No provider assertions (current-contract)
   });
 });

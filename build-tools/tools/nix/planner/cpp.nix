@@ -39,7 +39,7 @@ let
 
   nodeOfName = nm: if builtins.hasAttr nm byName then byName.${nm} else null;
 
-  Phase1 = import ./cpp-phase1-helpers.nix {
+  Helpers = import ./cpp-helpers.nix {
     inherit lib get cleanLabel ensureStringList nodeOfName kindOf labelsOf hasLangCpp;
     dedupePreserveOrder = L.dedupePreserveOrder;
     normSrcsOf = normSrcsOf;
@@ -57,11 +57,11 @@ let
     repoRoot = repoRoot;
   };
 
-  labelsFromNodeAttr = Phase1.labelsFromNodeAttr;
-  dedupePreserveOrder = Phase1.dedupePreserveOrder;
-  ensureRepoCppLibDep = Phase1.ensureRepoCppLibDep;
-  ensureRepoCppHeaderDepInfo = Phase1.ensureRepoCppHeaderDepInfo;
-  patchInputsFor = Phase1.patchInputsFor;
+  labelsFromNodeAttr = Helpers.labelsFromNodeAttr;
+  dedupePreserveOrder = Helpers.dedupePreserveOrder;
+  ensureRepoCppLibDep = Helpers.ensureRepoCppLibDep;
+  ensureRepoCppHeaderDepInfo = Helpers.ensureRepoCppHeaderDepInfo;
+  patchInputsFor = Helpers.patchInputsFor;
   LC = import ./link-closure.nix { inherit lib; };
   normalizeLabelList = LinkHelpers.normalizeLabelList;
   normalizeOverrides = LinkHelpers.normalizeOverrides;

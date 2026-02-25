@@ -68,23 +68,23 @@ test("template-only mode allows changed template-owned tests and selects changed
     root: process.cwd(),
     changedPaths: [
       "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/server/index.ts.jinja",
-      "build-tools/tools/tests/scaffolding/webapp-ssr-vite.pr3-runnable-contracts.test.ts",
+      "build-tools/tools/tests/scaffolding/webapp-ssr-vite.runnable-contracts.test.ts",
     ],
     deps: {
       queryTargetsForTemplateLabel: async (_root, templateId) => {
         assert.equal(templateId, "ts/webapp-ssr-vite");
-        return ["//:scaffolding_webapp_ssr_vite_pr1_baseline_contracts"];
+        return ["//:scaffolding_webapp_ssr_vite_baseline_contract"];
       },
     },
   });
   assert.equal(result.mode, "template-only");
   assert.deepEqual(result.diagnostics.ownedChangedTestPaths, [
-    "build-tools/tools/tests/scaffolding/webapp-ssr-vite.pr3-runnable-contracts.test.ts",
+    "build-tools/tools/tests/scaffolding/webapp-ssr-vite.runnable-contracts.test.ts",
   ]);
   assert.deepEqual(result.diagnostics.ownedChangedTestTargets, [
-    "//:scaffolding_webapp_ssr_vite_pr3_runnable_contracts",
+    "//:scaffolding_webapp_ssr_vite_runnable_contracts",
   ]);
-  assert.ok(result.targets.includes("//:scaffolding_webapp_ssr_vite_pr3_runnable_contracts"));
+  assert.ok(result.targets.includes("//:scaffolding_webapp_ssr_vite_runnable_contracts"));
 });
 
 test("template-only selection unions label targets and safety floor", async () => {

@@ -27,7 +27,7 @@ test("provider wiring: Go module labels do not map to providers (Node-only mappi
       'package main\nimport "github.com/stretchr/testify/require"\nimport "testing"\nfunc TestX(t *testing.T){ require.True(t, true) }\n',
     );
 
-    // No provider syncing for Go modules; mapping is Node-only in PR2.
+    // No provider syncing for Go modules; mapping is Node-only in provider-migration.
 
     // Build graph.json directly with module label only on test target
     const graphPath = path.join(tmp, "build-tools/tools/buck/graph.json");

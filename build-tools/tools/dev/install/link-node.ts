@@ -25,7 +25,7 @@ export async function relinkNodeModules(force: boolean) {
   let outPath = "";
   const flakeRoot = (process.env.WORKSPACE_ROOT || process.cwd()).trim();
   const timeoutSec =
-    Number.parseInt(String(process.env.NIX_PNPM_FETCH_TIMEOUT || "180"), 10) || 180;
+    Number.parseInt(String(process.env.NIX_PNPM_FETCH_TIMEOUT || "600"), 10) || 600;
   const nixBuildTimeoutMs = timeoutSec * 1000 + 10000;
   const isDefaultImporter = !importer || importer === ".";
   const lockRel = isDefaultImporter ? "pnpm-lock.yaml" : `${importer}/pnpm-lock.yaml`;

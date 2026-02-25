@@ -304,7 +304,7 @@ async function enforceLibReplaceToWorkspace(sh: any, tmp: string, ws: string) {
   await runGomod2nix(sh, tmp, "projects/libs/demo-lib");
 }
 
-// PR6: Go providers removed; auto_map is Node-only. No provider sync here.
+// current-contract: Go providers removed; auto_map is Node-only. No provider sync here.
 
 function normalizeCellLabel(s: string) {
   return s.replace(/^\/\/[^/]+\/+/, "//");
@@ -464,7 +464,7 @@ test("go cli with local lib + third-party patched uuid runtime", async () => {
     } catch {}
     // Note: skip git-based verification in sandbox to avoid requiring git
 
-    // 5) Assert local patch file under the target's patches/go (PR6 local mode)
+    // 5) Assert local patch file under the target's patches/go (current-contract local mode)
     const patchFile = path.join(
       _tmp,
       "projects",

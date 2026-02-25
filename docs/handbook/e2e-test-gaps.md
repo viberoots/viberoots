@@ -105,7 +105,7 @@ Phase 2 — Buck test visibility hardening
 - Acceptance:
   - No visibility errors when using Buck’s Node test target locally.
 
-Phase 3 — E2E test update (build-tools/tools/tests/...)
+E2E test update (build-tools/tools/tests/...)
 
 - Task 3.1: Call `build-tools/tools/bin/i` early in the test to ensure `gomod2nix.toml` for the Go package is present.
 - Task 3.2: Keep the e2e test on the Nix flake path (`.#node-test.libs_demo`). The builder now links the Go c-archive, so no external graph/planner calls are needed for this particular flow.

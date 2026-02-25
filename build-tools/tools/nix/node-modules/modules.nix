@@ -26,7 +26,7 @@ in {
       hasLockFs = builtins.pathExists lockAbsStrFs;
       hasLockStore = builtins.pathExists lockAbsStrStore;
       lockInput = if hasLockFs then (builtins.path { path = lockAbsStrFs; name = "pnpm-lock.yaml"; }) else (if hasLockStore then (builtins.path { path = lockAbsStrStore; name = "pnpm-lock.yaml"; }) else null);
-      ftVal = let v = builtins.getEnv "NIX_PNPM_FETCH_TIMEOUT"; in if v != "" then v else "180";
+      ftVal = let v = builtins.getEnv "NIX_PNPM_FETCH_TIMEOUT"; in if v != "" then v else "600";
       genAllowed = (builtins.getEnv "NIX_PNPM_ALLOW_GENERATE") == "1";
     in pkgs.stdenvNoCC.mkDerivation {
       pname = "node-modules";

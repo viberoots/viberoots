@@ -8,6 +8,18 @@ export function extractHash(text: string): string | null {
   return null;
 }
 
+function resolvedFetchTimeoutSec(): number {
+  return Number.parseInt(String(process.env.NIX_PNPM_FETCH_TIMEOUT || "600").trim(), 10) || 600;
+}
+
+function envWithFetchTimeout(timeoutSec: number): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    // Keep nix-evaluated derivation timeout aligned with managed-process timeout.
+    NIX_PNPM_FETCH_TIMEOUT: String(timeoutSec),
+  };
+}
+
 function nixBuildArgs(opts: {
   flakeRef: string;
   attrPath: string;
@@ -50,13 +62,12 @@ export async function buildStore(
   }
   const maxJobs = String(process.env.NIX_MAX_JOBS || "").trim() || "0";
   const cores = String(process.env.NIX_CORES || "").trim() || "0";
-  const timeoutSec =
-    Number.parseInt(String(process.env.NIX_PNPM_FETCH_TIMEOUT || "600").trim(), 10) || 600;
+  const timeoutSec = resolvedFetchTimeoutSec();
   const res = await runManagedCommand({
     command: "nix",
     args: nixBuildArgs({ flakeRef, attrPath, printOutPaths: false, maxJobs, cores }),
     cwd: process.cwd(),
-    env: process.env,
+    env: envWithFetchTimeout(timeoutSec),
     timeoutMs: timeoutSec * 1000,
     activity,
   });
@@ -86,13 +97,12 @@ export async function buildUnfixedAndHash(
   }
   const maxJobs = String(process.env.NIX_MAX_JOBS || "").trim() || "0";
   const cores = String(process.env.NIX_CORES || "").trim() || "0";
-  const timeoutSec =
-    Number.parseInt(String(process.env.NIX_PNPM_FETCH_TIMEOUT || "600").trim(), 10) || 600;
+  const timeoutSec = resolvedFetchTimeoutSec();
   const built = await runManagedCommand({
     command: "nix",
     args: nixBuildArgs({ flakeRef, attrPath, printOutPaths: true, maxJobs, cores }),
     cwd: process.cwd(),
-    env: process.env,
+    env: envWithFetchTimeout(timeoutSec),
     timeoutMs: timeoutSec * 1000,
     activity,
   });

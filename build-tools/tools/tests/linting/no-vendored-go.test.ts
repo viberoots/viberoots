@@ -22,7 +22,8 @@ test("no vendored go sources under third_party/go", async () => {
   const offenders = files.filter((f) => f.endsWith(".go"));
   if (offenders.length > 0) {
     throw new Error(
-      `found vendored Go sources under third_party/go — forbidden by PR3:\n` + offenders.join("\n"),
+      `found vendored Go sources under third_party/go — forbidden by provider-migration:\n` +
+        offenders.join("\n"),
     );
   }
 });

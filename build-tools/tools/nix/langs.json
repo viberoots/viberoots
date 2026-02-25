@@ -36,7 +36,7 @@
         "build-tools/tools/nix/planner/cpp.nix",
         "build-tools/tools/nix/planner/cpp-link-helpers.nix",
         "build-tools/tools/nix/planner/cpp-go-archives.nix",
-        "build-tools/tools/nix/planner/cpp-phase1-helpers.nix",
+        "build-tools/tools/nix/planner/cpp-helpers.nix",
         "build-tools/tools/nix/planner/cpp-provider-attrs-fallback.nix",
         "build-tools/tools/nix/templates/cpp.nix",
         "build-tools/tools/nix/templates/cpp-headers.nix",

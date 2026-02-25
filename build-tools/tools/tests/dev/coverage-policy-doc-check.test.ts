@@ -35,7 +35,7 @@ const gettingStartedDoc = `## Getting Started on a PR — Practical Guide for Th
 
 const nixGapsPrsDoc = `# Nix Gaps PR Plan
 
-## Test-time guardrails (evidence-based, required for PR-12+)
+## Test-time guardrails (evidence-based, required for migration hardening)
 
 1. Coverage remains opt-in.
    - Keep default runs without coverage: \`i && b && v\` (or \`buck2 test //...\`).

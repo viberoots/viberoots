@@ -58,23 +58,23 @@ _TEMPLATE_TEST_CONVENTIONS = {
         ],
         "classification": "template:shared",
     },
-    "build-tools/tools/tests/scaffolding/webapp-ssr.pr4-express-contracts.test.ts": {
+    "build-tools/tools/tests/scaffolding/webapp-ssr.express-contracts.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-express"],
         "classification": "template:contract",
     },
-    "build-tools/tools/tests/scaffolding/webapp-ssr.pr4-next-contracts.test.ts": {
+    "build-tools/tools/tests/scaffolding/webapp-ssr.next-contracts.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next"],
         "classification": "template:contract",
     },
-    "build-tools/tools/tests/scaffolding/webapp-ssr-vite.pr1-baseline-contract.test.ts": {
+    "build-tools/tools/tests/scaffolding/webapp-ssr-vite.baseline-contract.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite"],
         "classification": "template:contract",
     },
-    "build-tools/tools/tests/scaffolding/webapp-ssr-vite.pr2-dev-runtime-contract.test.ts": {
+    "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-runtime-contract.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite"],
         "classification": "template:contract",
     },
-    "build-tools/tools/tests/scaffolding/webapp-ssr-vite.pr3-runnable-contracts.test.ts": {
+    "build-tools/tools/tests/scaffolding/webapp-ssr-vite.runnable-contracts.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite"],
         "classification": "template:contract",
     },
@@ -98,22 +98,22 @@ _TEMPLATE_TEST_CONVENTIONS = {
         "template_roots": ["build-tools/tools/scaffolding/templates/language/kit"],
         "classification": "template:smoke",
     },
-    "build-tools/tools/tests/ts-cpp-go-wasm/pr8-scaffolding.scaf-new-dry-run.test.ts": {
+    "build-tools/tools/tests/ts-cpp-go-wasm/scaffolding.scaf-new-dry-run.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/go-cpp-lib"],
         "classification": "template:smoke",
     },
-    "build-tools/tools/tests/ts-cpp-go-wasm/pr8-scaffolding.wasm-app.scaffold-smoke.test.ts": {
+    "build-tools/tools/tests/ts-cpp-go-wasm/scaffolding.wasm-app.scaffold-smoke.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/wasm-app"],
         "classification": "template:smoke",
     },
-    "build-tools/tools/tests/ts-cpp-go-wasm/pr8-scaffolding.templates-exist.test.ts": {
+    "build-tools/tools/tests/ts-cpp-go-wasm/scaffolding.templates-exist.test.ts": {
         "template_roots": [
             "build-tools/tools/scaffolding/templates/ts/go-cpp-lib",
             "build-tools/tools/scaffolding/templates/ts/wasm-app",
         ],
         "classification": "template:shared",
     },
-    "build-tools/tools/tests/scaffolding/pr3-ts-command-path.tooling-contract.test.ts": {
+    "build-tools/tools/tests/scaffolding/ts-command-path.tooling-contract.test.ts": {
         "template_roots": [
             "build-tools/tools/scaffolding/templates/ts/lib",
             "build-tools/tools/scaffolding/templates/ts/cli",
@@ -121,7 +121,7 @@ _TEMPLATE_TEST_CONVENTIONS = {
         ],
         "classification": "template:shared",
     },
-    "build-tools/tools/tests/scaffolding/pr3-ts-command-path.docs-contract.test.ts": {
+    "build-tools/tools/tests/scaffolding/ts-command-path.docs-contract.test.ts": {
         "template_roots": [
             "build-tools/tools/scaffolding/templates/ts/lib",
             "build-tools/tools/scaffolding/templates/ts/cli",
