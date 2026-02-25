@@ -79,6 +79,18 @@ export async function handleNonDefaultImporter(opts: {
       if (suggestedFromVerify) {
         const nextHash = suggestedFromVerify;
         await updateNodeModulesHashesJson(opts.key, nextHash);
+        if (tempFlake) {
+          await tempFlake.cleanup();
+          tempFlake = null;
+        }
+        console.log(
+          `[update-pnpm-hash] importer=${opts.importer} step=prepare-filtered-flake attr=${opts.storeAttr}`,
+        );
+        tempFlake = await withHeartbeat(
+          `importer=${opts.importer} step=prepare-filtered-flake attr=${opts.storeAttr}`,
+          makeFilteredFlakeRef(opts.repoRoot),
+        );
+        const refreshedFlakeRef = tempFlake.flakeRef.replace(/#pnpm$/, "");
         console.log(
           `[update-pnpm-hash] importer=${opts.importer} step=fixed-build-after-hash attr=${opts.storeAttr} timeout=${opts.timeoutSec}s`,
         );
@@ -91,15 +103,15 @@ export async function handleNonDefaultImporter(opts: {
         };
         const verifyAfterHash = await withHeartbeat(
           `importer=${opts.importer} step=fixed-build-after-hash attr=${opts.storeAttr}`,
-          buildStore(opts.storeAttr, prewarmFlakeRef, verifyAfterActivity),
+          buildStore(opts.storeAttr, refreshedFlakeRef, verifyAfterActivity),
           { activity: verifyAfterActivity },
         );
         if (!verifyAfterHash.ok) {
-          console.warn(
-            "pnpm-store fixed-build still failing after hash update; deriving hash from unfixed build\n\n" +
-              String(verifyAfterHash.output || ""),
+          console.error(
+            "pnpm-store still failing after hash update\n\n" + String(verifyAfterHash.output || ""),
           );
-          // Continue below to unfixed build and derive an authoritative hash.
+          process.exit(1);
+          return true;
         } else {
           if (opts.existingLockHash) {
             await writeVerifiedMarker(opts.markerPath, {

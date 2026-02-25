@@ -1,5 +1,6 @@
 import process from "node:process";
 import "zx/globals";
+import { buckCommandEnv, isBuckDaemonInitTransient } from "./buck-command-env.ts";
 import { collectChangedPaths, isBuildSystemPath } from "./build-system-test-scope.ts";
 import { readTemplateOwnedTestIndex, targetLabelFromScript } from "./template-owned-tests.ts";
 
@@ -129,14 +130,34 @@ async function queryTargetsForTemplateLabel(root: string, templateId: string): P
   const targetPlatform =
     String(process.env.BUCK_TARGET_PLATFORMS || process.env.BUCK_TARGET_PLATFORM || "").trim() ||
     "prelude//platforms:default";
-  try {
-    const out = await $({
+  const runCquery = async () =>
+    await $({
       cwd: root,
       stdio: "pipe",
       reject: false,
-      env: { ...process.env, IN_NIX_SHELL: process.env.IN_NIX_SHELL || "1" },
+      env: buckCommandEnv(),
     })`buck2 --isolation-dir ${isolationDir} cquery --target-platforms ${targetPlatform} ${query} --json --output-attribute name`;
+  try {
+    let out: any;
+    try {
+      out = await runCquery();
+    } catch (err) {
+      if (!isBuckDaemonInitTransient(err instanceof Error ? err.message : String(err))) throw err;
+      await new Promise<void>((resolve) => setTimeout(resolve, 150));
+      out = await runCquery();
+    }
     if ((out as any).exitCode !== 0) {
+      const errText = String((out as any).stderr || "");
+      if (isBuckDaemonInitTransient(errText)) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 150));
+        const retryOut = await runCquery();
+        if ((retryOut as any).exitCode !== 0) return [];
+        const retryRaw = JSON.parse(String((retryOut as any).stdout || "{}")) as Record<
+          string,
+          { name?: string }
+        >;
+        return toSortedUnique(Object.keys(retryRaw).map((k) => normalizeTarget(k)));
+      }
       return [];
     }
     const raw = JSON.parse(String((out as any).stdout || "{}")) as Record<
@@ -149,7 +170,7 @@ async function queryTargetsForTemplateLabel(root: string, templateId: string): P
       cwd: root,
       stdio: "ignore",
       reject: false,
-      env: { ...process.env, IN_NIX_SHELL: process.env.IN_NIX_SHELL || "1" },
+      env: buckCommandEnv(),
     })`buck2 --isolation-dir ${isolationDir} kill`;
   }
 }

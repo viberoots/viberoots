@@ -28,20 +28,53 @@ function displayName(importer: string): string {
   return parts.length > 0 ? parts[parts.length - 1]! : importer;
 }
 
+function buckEnv(): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
+    SSL_CERT_FILE: process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE,
+  };
+}
+
+function isBuckDaemonInitTransient(text: string): boolean {
+  const msg = String(text || "");
+  return (
+    msg.includes("Error initializing DaemonStateData") ||
+    msg.includes("Error creating HTTP client") ||
+    msg.includes("Error loading system root certificates native frameworks")
+  );
+}
+
+async function runBuckWithTransientRetry(run: () => Promise<any>): Promise<any> {
+  try {
+    return await run();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (!isBuckDaemonInitTransient(msg)) throw err;
+    await new Promise<void>((resolve) => setTimeout(resolve, 150));
+    return await run();
+  }
+}
+
 async function buildAndReadOutput(target: string): Promise<string> {
   const inherited = process.env.BUCK_ISOLATION_DIR;
   const iso = inherited && inherited.trim() ? inherited : `importer_strings_${process.pid}`;
   const createdOwnIso = !inherited;
   try {
-    await $`buck2 --isolation-dir ${iso} build ${target}`;
-    const { stdout } = await $`buck2 --isolation-dir ${iso} targets --show-output ${target}`;
+    await runBuckWithTransientRetry(
+      async () => await $({ env: buckEnv() })`buck2 --isolation-dir ${iso} build ${target}`,
+    );
+    const { stdout } = await runBuckWithTransientRetry(
+      async () =>
+        await $({ env: buckEnv() })`buck2 --isolation-dir ${iso} targets --show-output ${target}`,
+    );
     const out = stdout.trim().split(/\s+/).pop() || "";
     if (!out) throw new Error("no output path for " + target);
     return await fsp.readFile(out, "utf8");
   } finally {
     if (createdOwnIso) {
       try {
-        await $`buck2 --isolation-dir ${iso} kill`;
+        await $({ env: buckEnv(), reject: false })`buck2 --isolation-dir ${iso} kill`;
       } catch {}
     }
   }

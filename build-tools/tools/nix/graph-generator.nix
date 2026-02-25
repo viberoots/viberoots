@@ -9,22 +9,26 @@ let
   traceEnabled = (builtins.getEnv "PLANNER_TRACE") != "";
   onlyCpp = (builtins.getEnv "PLANNER_ONLY_CPP") != "";
   selectedTargetName = builtins.getEnv "BUCK_TARGET";
-  # Filtered source that includes both projects/apps/* and projects/libs/* so local replaces resolve
-  appsLibsSrc = lib.cleanSourceWith {
-    src = repoRootBase;
-    filter = path: type:
-      let p = builtins.toString path;
-          rootP = builtins.toString repoRootBase;
-          rel = lib.removePrefix (rootP + "/") p;
-      in
-      # keep the root, the top-level projects/apps/libs directories, and anything under them
-      p == rootP ||
-      rel == "projects" ||
-      rel == "projects/apps" ||
-      rel == "projects/libs" ||
-      lib.hasPrefix "projects/apps/" rel ||
-      lib.hasPrefix "projects/libs/" rel;
-  };
+  keepAppsLibsPath = path: type:
+    let
+      p = builtins.toString path;
+      rootP = builtins.toString repoRootBase;
+      isRoot = p == rootP;
+      isProjects = lib.hasSuffix "/projects" p;
+      isProjectsApps = lib.hasSuffix "/projects/apps" p;
+      isProjectsLibs = lib.hasSuffix "/projects/libs" p;
+      inProjectsApps = lib.hasInfix "/projects/apps/" p;
+      inProjectsLibs = lib.hasInfix "/projects/libs/" p;
+    in
+      isRoot || isProjects || isProjectsApps || isProjectsLibs || inProjectsApps || inProjectsLibs;
+  # Filtered source that includes both projects/apps/* and projects/libs/* so local replaces resolve.
+  # In BUCK_TEST_SRC mode, use builtins.path to keep temp-repo test fixtures (including untracked files).
+  appsLibsSrc = if buckTestSrcEnv != ""
+    then builtins.path { path = repoRootBase; name = "buck-test-src-apps-libs"; filter = keepAppsLibsPath; }
+    else lib.cleanSourceWith {
+      src = repoRootBase;
+      filter = keepAppsLibsPath;
+    };
   repoRoot = appsLibsSrc;
 
   # Helper to read module path from a go.mod file under the repo root (pure with src)
@@ -79,7 +83,9 @@ let
         if (builtins.pathExists candidate) && (builtins.pathExists (candidate + "/lang-templates.nix"))
         then candidate
         else ./.;
-  repoStoreRoot = ./../../..;
+  repoStoreRoot = if buckTestSrcEnv != ""
+    then appsLibsSrc
+    else ./../../..;
   # Load language templates from the chosen manifest base (temp repo when set)
   T = import (manifestBase + "/lang-templates.nix") { inherit pkgs uv2nixLib; };
   M = if builtins.pathExists ./mapping.nix then (
