@@ -1,4 +1,48 @@
-export default {
+import * as fsp from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { defineConfig } from "vite";
+
+type PackageJson = {
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
+  optionalDependencies?: Record<string, string>;
+};
+
+const appRoot = fileURLToPath(new URL(".", import.meta.url));
+const workspaceRoot = path.resolve(appRoot, "../../..");
+
+function readPackageJson(pkgPath: string): PackageJson {
+  try {
+    return JSON.parse(fsp.readFileSync(pkgPath, "utf8")) as PackageJson;
+  } catch {
+    return {};
+  }
+}
+
+function workspaceDependencyNames(pkg: PackageJson): string[] {
+  const specs = {
+    ...(pkg.dependencies || {}),
+    ...(pkg.devDependencies || {}),
+    ...(pkg.peerDependencies || {}),
+    ...(pkg.optionalDependencies || {}),
+  };
+  return Object.entries(specs)
+    .filter(([, spec]) => {
+      return (
+        spec.startsWith("workspace:") ||
+        spec.startsWith("link:") ||
+        spec.startsWith("file:")
+      );
+    })
+    .map(([name]) => name)
+    .sort();
+}
+
+const optimizeDepsExclude = workspaceDependencyNames(readPackageJson(path.join(appRoot, "package.json")));
+
+export default defineConfig({
   appType: "spa",
   clearScreen: false,
   logLevel: "info",
@@ -12,12 +56,15 @@ export default {
     host: "127.0.0.1",
     port: 5187,
     preTransformRequests: false,
+    fs: {
+      allow: [workspaceRoot],
+    },
   },
   cacheDir: ".vite-cache",
   optimizeDeps: {
-    // Avoid heavy prebundling in CI to keep startup fast
     disabled: true,
+    exclude: optimizeDepsExclude,
   },
-};
+});
 
 

@@ -55,6 +55,20 @@ For TypeScript SSR templates, I keep framework-specific names explicit:
 
 Both examples create the destination under the canonical location for the chosen language/template. The CLI resolves synonyms (e.g., `lib`/`library`) and normalizes names.
 
+### Local workspace TS dependency live updates (`ts/webapp-static`)
+
+For `scaf new ts webapp-static <name>`, the generated `vite.config.ts` includes a Phase-1 local-dependency contract:
+
+- `server.fs.allow` includes the workspace root so source imports from sibling workspace packages resolve in dev mode.
+- `optimizeDeps.exclude` is derived from `workspace:`, `link:`, and `file:` dependency specs in the app importer `package.json`.
+- `optimizeDeps.disabled` remains enabled for fast, deterministic startup in this repository.
+
+Troubleshooting when local dependency edits do not refresh:
+
+- Confirm the dependency spec uses `workspace:`, `link:`, or `file:` in the importer `package.json`.
+- Restart `pnpm run dev` after changing dependency specs in `package.json`.
+- Prefer source-based imports for local workspace packages during template development checks.
+
 #### Subcommands and semantics
 
 - new: Create a new scaffold at the resolved destination using `copier copy`.

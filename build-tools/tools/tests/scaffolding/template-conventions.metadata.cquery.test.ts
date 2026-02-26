@@ -55,6 +55,11 @@ const EXPECTATIONS: TemplateExpectation[] = [
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-static/"],
   },
   {
+    script: "build-tools/tools/tests/scaffolding/webapp-static.dev-hmr.local-ts-dep.test.ts",
+    requiredLabels: ["template:ts/webapp-static", "template:contract"],
+    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-static/"],
+  },
+  {
     script:
       "build-tools/tools/tests/scaffolding/webapp-ssr.scaffold-contract-and-runtime-smoke.test.ts",
     requiredLabels: [
