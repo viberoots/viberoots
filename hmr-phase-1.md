@@ -177,7 +177,7 @@ across static, SSR vite, and SSR next templates.
   - ensure server-side render path resolves live workspace source during dev
 - Ensure local dependency import shape is Vite/Next graph trackable and consistent with prior PR
   contract decisions.
-- Align shared helper usage introduced in PR-1 so next template does not drift from static/SSR vite.
+- Introduce or adopt shared helper usage only if PR-2 reveals repeated local-dependency config logic that risks drift across static/SSR vite/next.
 - Update next template docs to define local dependency live-update expectations and constraints.
 
 ### Tests (in this PR)
