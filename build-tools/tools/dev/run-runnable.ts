@@ -7,11 +7,33 @@ import { validateSsrRunnableContract } from "../lib/runnable-contracts.ts";
 import {
   parseArgs,
   importerForTarget,
+  resolveRunnableTargetLabel,
   runnableHintsForTarget,
   readManifestEntry,
   runCommand,
 } from "./run-runnable-core.ts";
 import { buildRunnableManifest, buildSelectedOutPath } from "./run-runnable-graph.ts";
+
+function commandCwdForSpec(
+  spec: { argv: string[]; cwd?: string },
+  workspaceRoot: string,
+): string | undefined {
+  if (spec.cwd) return spec.cwd;
+  const argv = Array.isArray(spec.argv) ? spec.argv.map((x) => String(x || "")) : [];
+  const cmd = String(argv[0] || "")
+    .trim()
+    .toLowerCase();
+  if (cmd !== "pnpm") return undefined;
+  for (let i = 1; i < argv.length - 1; i++) {
+    if (argv[i] !== "--dir") continue;
+    const importer = String(argv[i + 1] || "").trim();
+    if (!importer) continue;
+    if (importer.startsWith("/") || importer.startsWith("./") || importer.startsWith("../"))
+      continue;
+    return workspaceRoot;
+  }
+  return undefined;
+}
 
 async function main() {
   const parsed = parseArgs(getArgvTokens());
@@ -24,8 +46,9 @@ async function main() {
     console.error("   or: d <target> [--source=auto|git|path] [args...]");
     process.exit(2);
   }
-  const workspaceRoot = await findRepoRoot(process.cwd());
-  const target = parsed.target;
+  const cwd = process.cwd();
+  const workspaceRoot = await findRepoRoot(cwd);
+  const target = await resolveRunnableTargetLabel(workspaceRoot, parsed.target, { baseDir: cwd });
   let targetHints: { importer: string; mode: "static" | "ssr"; framework: string } | null = null;
   let entry: RunnableManifestEntry | null = null;
   const testManifestPath = String(process.env.RUNNABLE_TEST_MANIFEST || "").trim();
@@ -109,7 +132,11 @@ async function main() {
     console.error(`run.${parsed.mode} is not available for ${target}`);
     process.exit(2);
   }
-  const exitCode = await runCommand(spec.argv, parsed.passthrough, spec.cwd);
+  const exitCode = await runCommand(
+    spec.argv,
+    parsed.passthrough,
+    commandCwdForSpec(spec, workspaceRoot),
+  );
   process.exit(exitCode);
 }
 

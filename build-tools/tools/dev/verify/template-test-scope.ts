@@ -4,6 +4,7 @@ import {
   resolveTemplateTestSelection,
 } from "../../lib/template-test-selector.ts";
 import { resolveBuildSystemBuckTestScope } from "../../lib/build-system-test-scope.ts";
+import { packagePathFromLabel } from "../../lib/labels.ts";
 
 export type VerifyTemplateScopeMode = "auto" | "always" | "never";
 
@@ -12,7 +13,7 @@ export type VerifyTemplateScopeDecision = {
   selectorMode: "template-only" | "mixed" | "no-template-impact" | "skipped";
   targets: string[];
   diagnostics: TemplateTestSelectorDiagnostics | null;
-  lintFilter: string | null;
+  lintFilters: string[] | null;
   reason: string;
 };
 
@@ -32,6 +33,23 @@ function parseVerifyTemplateScopeMode(raw: string | undefined): VerifyTemplateSc
 
 function isDefaultVerifyTargetSet(targets: string[]): boolean {
   return targets.length === 1 && targets[0] === "//...";
+}
+
+function lintFiltersFromExplicitTargets(targets: string[]): string[] | null {
+  const filters = new Set<string>();
+  for (const raw of targets) {
+    const t = String(raw || "").trim();
+    if (!t || !t.startsWith("//")) return null;
+    if (t.includes("*") || t.includes("?") || t.includes("[") || t.includes("]")) {
+      return null;
+    }
+    const pkg =
+      t.endsWith("/...") && !t.includes(":") ? t.slice(2, -"/...".length) : packagePathFromLabel(t);
+    if (!pkg) return null;
+    if (!pkg.startsWith("projects/apps/") && !pkg.startsWith("projects/libs/")) return null;
+    filters.add(`./${pkg}`);
+  }
+  return filters.size > 0 ? Array.from(filters).sort() : null;
 }
 
 function emptyTemplateLabelIds(d: TemplateTestSelectorDiagnostics): string[] {
@@ -80,7 +98,7 @@ export async function resolveVerifyTemplateTestScope(opts: {
       selectorMode: "skipped",
       targets: baseScope.targets,
       diagnostics: null,
-      lintFilter: null,
+      lintFilters: lintFiltersFromExplicitTargets(opts.requestedTargets),
       reason: "explicit-targets",
     };
   }
@@ -90,7 +108,7 @@ export async function resolveVerifyTemplateTestScope(opts: {
       selectorMode: "skipped",
       targets: baseScope.targets,
       diagnostics: null,
-      lintFilter: null,
+      lintFilters: null,
       reason: "selector-disabled",
     };
   }
@@ -117,7 +135,7 @@ export async function resolveVerifyTemplateTestScope(opts: {
       selectorMode: selected.mode,
       targets: selected.targets,
       diagnostics,
-      lintFilter: ".",
+      lintFilters: ["."],
       reason: "template-targeted",
     };
   }
@@ -127,7 +145,7 @@ export async function resolveVerifyTemplateTestScope(opts: {
     selectorMode: selected.mode,
     targets: baseScope.targets,
     diagnostics,
-    lintFilter: null,
+    lintFilters: null,
     reason: "fallback-build-system-scope",
   };
 }

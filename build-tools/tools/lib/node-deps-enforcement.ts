@@ -20,6 +20,7 @@ function resolveNodeDepsScript(repoRoot: string): { zxInitPath: string; script: 
 export async function checkNodeDepsInCi(repoRoot: string): Promise<void> {
   const { zxInitPath, script } = resolveNodeDepsScript(repoRoot);
   await runNodeWithZx({
+    cwd: repoRoot,
     zxInitPath,
     script,
     args: ["--check"],
@@ -30,6 +31,7 @@ export async function warnNodeDepsInLocal(repoRoot: string): Promise<void> {
   const { zxInitPath, script } = resolveNodeDepsScript(repoRoot);
   try {
     await runNodeWithZx({
+      cwd: repoRoot,
       zxInitPath,
       script,
       args: ["--check"],
@@ -50,6 +52,7 @@ export async function warnNodePatchRequirementsInLocal(repoRoot: string): Promis
   const script = path.join(repoRoot, ENFORCE_PATCH_REQUIREMENTS_SCRIPT);
   try {
     await runNodeWithZx({
+      cwd: repoRoot,
       zxInitPath,
       script,
       args: ["--check"],

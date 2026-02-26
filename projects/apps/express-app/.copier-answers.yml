@@ -1,4 +1,0 @@
-name: express-app
-language: ts
-template: webapp-ssr-express
-scaf_src_path: build-tools/tools/scaffolding/templates/ts/webapp-ssr-express

@@ -9,6 +9,7 @@ export type RunNodeWithZxOptions = {
   nodeBin?: string;
   zxInitPath: string;
   stdio?: "inherit" | "pipe";
+  timeoutMs?: number;
 };
 
 export function nodeFlagsWithZx(zxInitPath: string): string[] {
@@ -30,6 +31,7 @@ export async function runNodeWithZx(opts: RunNodeWithZxOptions): Promise<{
   const env = opts.env || process.env;
   const args = opts.args || [];
   const stdio = opts.stdio || "inherit";
+  const timeoutMs = Number.isFinite(opts.timeoutMs) ? Math.max(0, opts.timeoutMs || 0) : 0;
 
   const argv = [...nodeFlagsWithZx(opts.zxInitPath), opts.script, ...args];
 
@@ -39,6 +41,22 @@ export async function runNodeWithZx(opts: RunNodeWithZxOptions): Promise<{
       env,
       stdio: stdio === "inherit" ? "inherit" : "pipe",
     });
+    let timedOut = false;
+    let killTimer: NodeJS.Timeout | null = null;
+    let hardKillTimer: NodeJS.Timeout | null = null;
+    if (timeoutMs > 0) {
+      killTimer = setTimeout(() => {
+        timedOut = true;
+        try {
+          proc.kill("SIGTERM");
+        } catch {}
+        hardKillTimer = setTimeout(() => {
+          try {
+            proc.kill("SIGKILL");
+          } catch {}
+        }, 1500);
+      }, timeoutMs);
+    }
 
     let stdout = "";
     let stderr = "";
@@ -49,8 +67,20 @@ export async function runNodeWithZx(opts: RunNodeWithZxOptions): Promise<{
 
     proc.on("error", reject);
     proc.on("exit", (code, signal) => {
+      if (killTimer) clearTimeout(killTimer);
+      if (hardKillTimer) clearTimeout(hardKillTimer);
       if (code === 0) {
         resolve({ stdout, stderr });
+        return;
+      }
+      if (timedOut) {
+        reject(
+          Object.assign(new Error(`${path.basename(opts.script)} timed out after ${timeoutMs}ms`), {
+            exitCode: 124,
+            stdout,
+            stderr,
+          }),
+        );
         return;
       }
       const suffix = signal ? ` (signal ${signal})` : "";

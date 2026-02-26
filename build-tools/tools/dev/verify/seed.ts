@@ -6,6 +6,7 @@ import "zx/globals";
 import { writeIfChanged } from "../../lib/fs-helpers.ts";
 import { runManagedCommand } from "../../lib/managed-command.ts";
 import { shouldStageSeed, stageSeedStore } from "./seed-staging.ts";
+import { isProjectsOnlyVerifyTargets } from "./target-scope.ts";
 import { pidAlive } from "./seed-utils.ts";
 
 type SeedInfo = {
@@ -16,6 +17,25 @@ type SeedInfo = {
 };
 
 const seedTtlMs = 24 * 60 * 60 * 1000;
+
+function parseVerifySeedMode(raw: string | undefined): "auto" | "always" | "never" {
+  const v = String(raw || "auto")
+    .trim()
+    .toLowerCase();
+  if (v === "always") return "always";
+  if (v === "never") return "never";
+  return "auto";
+}
+
+export function shouldPrepareVerifySeedForRequestedTargets(
+  effectiveTargets: string[],
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  const mode = parseVerifySeedMode(env.BNX_VERIFY_SEED_MODE);
+  if (mode === "always") return true;
+  if (mode === "never") return false;
+  return !isProjectsOnlyVerifyTargets(effectiveTargets);
+}
 
 function seedRootDir(root: string): string {
   return path.join(root, "buck-out", "tmp", "verify-seed");

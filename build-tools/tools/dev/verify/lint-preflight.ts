@@ -57,42 +57,77 @@ async function runVerifyNixGapsPolicyPreflight(root: string, zxInitPath: string)
 export async function runVerifyLintPreflight(
   root: string,
   zxInitPath: string,
-  opts: { lintFilter?: string | null } = {},
+  opts: { lintFilters?: string[] | null; includeBuildSystemPolicy?: boolean } = {},
 ): Promise<void> {
+  const includeBuildSystemPolicy = opts.includeBuildSystemPolicy !== false;
   const skipLint = (process.env.VERIFY_SKIP_LINT || "").trim() === "1";
   if (skipLint) {
     process.stderr.write("[verify] lint preflight: skipped (VERIFY_SKIP_LINT=1)\n");
-    await runVerifyNixGapsPolicyPreflight(root, zxInitPath);
+    if (includeBuildSystemPolicy) {
+      await runVerifyNixGapsPolicyPreflight(root, zxInitPath);
+    } else {
+      process.stderr.write(
+        "[verify] nix-gaps policy preflight: skipped for projects-only verify scope\n",
+      );
+    }
     return;
   }
 
   const timeoutSecs = Number((process.env.VERIFY_LINT_TIMEOUT_SECS || "600").trim());
   const secs = Number.isFinite(timeoutSecs) && timeoutSecs > 0 ? Math.floor(timeoutSecs) : 600;
 
-  const lintFilter = String(opts.lintFilter || "").trim();
-  const lintCmd = lintFilter ? `pnpm --filter ${lintFilter} -s lint` : "pnpm -s lint";
+  const lintFilters = Array.isArray(opts.lintFilters)
+    ? opts.lintFilters.map((x) => String(x || "").trim()).filter(Boolean)
+    : [];
+  const scoped = lintFilters.length > 0;
+  const lintCmd = scoped
+    ? `pnpm exec eslint ${lintFilters.join(" ")} --ext .ts --max-warnings=0 --ignore-pattern buck-out --ignore-pattern coverage --ignore-pattern .clinic && pnpm exec prettier -c ${lintFilters.join(" ")}`
+    : "pnpm -s lint";
   process.stderr.write(`[verify] lint preflight: timeout -k 10s ${secs}s ${lintCmd}\n`);
 
-  const res = lintFilter
+  const eslintRes = scoped
     ? await $({
         stdio: "inherit",
         cwd: root,
         reject: false,
-      })`timeout -k 10s ${secs}s pnpm --filter ${lintFilter} -s lint`
+      })`timeout -k 10s ${secs}s pnpm exec eslint ${lintFilters} --ext .ts --max-warnings=0 --ignore-pattern buck-out --ignore-pattern coverage --ignore-pattern .clinic`
     : await $({
         stdio: "inherit",
         cwd: root,
         reject: false,
       })`timeout -k 10s ${secs}s pnpm -s lint`;
-  if (res.exitCode !== 0) {
+  if (eslintRes.exitCode !== 0) {
     process.stderr.write(
       "error: lint preflight failed; refusing to run verify while formatting/lint is dirty\n" +
         "hint: run 'pnpm -s lint:fix' (or format the specific files), then re-run 'v'\n",
     );
     process.exit(2);
   }
+  if (scoped) {
+    const prettierRes = await $({
+      stdio: "inherit",
+      cwd: root,
+      reject: false,
+    })`timeout -k 10s ${secs}s pnpm exec prettier -c ${lintFilters}`;
+    if (prettierRes.exitCode !== 0) {
+      process.stderr.write(
+        "error: lint preflight failed; refusing to run verify while formatting/lint is dirty\n" +
+          "hint: run 'pnpm -s lint:fix' (or format the specific files), then re-run 'v'\n",
+      );
+      process.exit(2);
+    }
+  }
 
-  await runVerifyFileSizePreflight(root, zxInitPath);
-  await runVerifySsrTestFileSizePreflight(root, zxInitPath);
-  await runVerifyNixGapsPolicyPreflight(root, zxInitPath);
+  if (includeBuildSystemPolicy) {
+    await runVerifyFileSizePreflight(root, zxInitPath);
+    await runVerifySsrTestFileSizePreflight(root, zxInitPath);
+    await runVerifyNixGapsPolicyPreflight(root, zxInitPath);
+  } else {
+    process.stderr.write(
+      "[verify] file-size preflight: skipped build-system file-size gates for projects-only verify scope\n",
+    );
+    process.stderr.write(
+      "[verify] nix-gaps policy preflight: skipped for projects-only verify scope\n",
+    );
+  }
 }

@@ -14,7 +14,7 @@ _exclude:
 
 name: ""
 language: "ts"
-template: "webapp-ssr-express"
+template: "webapp-ssr-vite"
 
 importer: "projects/apps/{{ name }}"
 lockfilePath: "projects/apps/{{ name }}/pnpm-lock.yaml"

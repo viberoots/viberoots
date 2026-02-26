@@ -4,6 +4,7 @@ import path from "node:path";
 import process from "node:process";
 import { getFlagBool, hasShortFlag } from "../../lib/cli.ts";
 import { getImporterRootsContract } from "../../lib/importer-roots.ts";
+import { runNodeWithZx } from "../../lib/node-run.ts";
 import {
   warnNodeDepsInLocal,
   warnNodePatchRequirementsInLocal,
@@ -212,5 +213,34 @@ if (!skipGlue) {
   await warnNodePatchRequirementsInLocal(repoRoot);
 } else if (verbose) {
   console.log("[skip] node deps enforcement");
+}
+// Prewarm unified PNPM store as part of install-deps so verify/build/test paths
+// can consume it without blocking on first-use setup.
+try {
+  const zxInitPath = path.join(repoRoot, "build-tools", "tools", "dev", "zx-init.mjs");
+  if (verbose) {
+    console.log("[install-deps] prewarming unified pnpm store");
+  }
+  await runNodeWithZx({
+    cwd: repoRoot,
+    script: path.join(repoRoot, "build-tools/tools/dev/require-unified-pnpm-store.ts"),
+    args: [],
+    zxInitPath,
+    stdio: verbose ? "inherit" : "pipe",
+    timeoutMs:
+      Number.parseInt(process.env.INSTALL_UNIFIED_PNPM_TIMEOUT_MS || "180000", 10) || 180000,
+  });
+} catch (e: any) {
+  const msg = e?.message ? String(e.message) : String(e);
+  const lockPath = path.join(repoRoot, "buck-out", ".unified-pnpm-store", "require.lock");
+  console.warn(
+    [
+      `[install-deps] unified pnpm prewarm skipped: ${msg}`,
+      "[install-deps] To recover:",
+      `  1) remove stale lock if present: rm -f "${lockPath}"`,
+      "  2) rerun: i",
+      "  3) retry verify/build command",
+    ].join("\n"),
+  );
 }
 console.log("Dependencies installed and node_modules linked.");

@@ -1,15 +1,26 @@
 import path from "node:path";
+import { execSync } from "node:child_process";
 import { nodeFlagsWithZx } from "../../lib/node-run.ts";
 
 export function repoRoot(): string {
-  // Prefer the current working directory so tests running in a temp repo operate on that sandbox.
-  // Fall back to script-relative resolution if CWD is unavailable.
+  // Resolve from git so commands work when invoked from subdirectories.
+  try {
+    const out = execSync("git rev-parse --show-toplevel", {
+      cwd: process.cwd(),
+      stdio: ["ignore", "pipe", "ignore"],
+      encoding: "utf8",
+    })
+      .trim()
+      .replace(/\r?\n/g, "");
+    if (out) return out;
+  } catch {
+    // Fall through to non-git fallback.
+  }
   try {
     return process.cwd();
-  } catch {
-    const here = path.dirname(new URL(import.meta.url).pathname);
-    return path.resolve(here, "..", "..", "..", "..");
-  }
+  } catch {}
+  const here = path.dirname(new URL(import.meta.url).pathname);
+  return path.resolve(here, "..", "..", "..", "..");
 }
 
 export function nodeBin(): string {

@@ -107,10 +107,13 @@ in {
           done
         }
 
-        seed_store "${store}/store"
+        # Seed global prefetched store first, then overlay lock-specific store so
+        # importer-specific index metadata wins and cannot be clobbered by stale
+        # global indexes from unrelated importers.
         if [ -d ${if prefetchedInput != null then "\"${prefetchedInput}\"" else "\"/nonexistent\""} ]; then
           seed_store ${if prefetchedInput != null then "\"${prefetchedInput}\"" else "\"/nonexistent\""}
         fi
+        seed_store "${store}/store"
         pnpm config set store-dir "$LOCAL_STORE"
         # Keep imported package files writable in sandbox builds.
         # Hardlinked files from read-only store paths can fail during bin chmod.

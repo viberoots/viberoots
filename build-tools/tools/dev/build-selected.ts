@@ -22,6 +22,7 @@ import { findRepoRoot, pathExists } from "../lib/repo.ts";
 import { getArgvTokens } from "../lib/cli.ts";
 import { untrackedRequiresImpureForTargets } from "./dev-build/untracked.ts";
 import { makeFilteredFlakeRef } from "./filtered-flake.ts";
+import { resolveSelectedTargetLabel } from "./target-label-resolver.ts";
 
 function stripAnsi(s: string): string {
   return s.replace(/\x1B\[[0-9;]*[A-Za-z]/g, "").replace(/\r/g, "");
@@ -110,8 +111,8 @@ async function main() {
     console.error(`[build-selected] ${parsedSource.sourceError}`);
     process.exit(2);
   }
-  const target = (process.env.BUCK_TARGET || "").trim();
-  if (!target) {
+  const targetRaw = (process.env.BUCK_TARGET || "").trim();
+  if (!targetRaw) {
     console.error("BUCK_TARGET is required (e.g., //projects/apps/foo:foo)");
     console.error("optional: --source=auto|git|path");
     process.exit(2);
@@ -127,6 +128,7 @@ async function main() {
     console.error(`flake.nix not found at workspace root: ${workspaceRoot}`);
     process.exit(2);
   }
+  const target = await resolveSelectedTargetLabel(workspaceRoot, targetRaw, { baseDir: cwd });
 
   // Ensure the graph exists via the canonical helper; preserve exporter env behavior
   const graphPath = path.join(workspaceRoot, "build-tools", "tools", "buck", "graph.json");

@@ -2,6 +2,7 @@
 import { findRepoRoot } from "../lib/repo.ts";
 import { getArgvTokens } from "../lib/cli.ts";
 import { buildSelectedOutPath } from "./run-runnable-graph.ts";
+import { resolveSelectedTargetLabel } from "./target-label-resolver.ts";
 
 async function main() {
   const args = getArgvTokens();
@@ -29,12 +30,14 @@ async function main() {
     console.error(`[probe-graph-generator-selected] ${sourceError}`);
     process.exit(2);
   }
-  const target = String(rest[0] || "").trim();
-  if (!target || target.startsWith("-")) {
+  const targetInput = String(rest[0] || "").trim();
+  if (!targetInput || targetInput.startsWith("-")) {
     console.error("usage: probe-graph-generator-selected <target> [--source=auto|git|path]");
     process.exit(2);
   }
-  const root = await findRepoRoot(process.cwd());
+  const cwd = process.cwd();
+  const root = await findRepoRoot(cwd);
+  const target = await resolveSelectedTargetLabel(root, targetInput, { baseDir: cwd });
   if (!String(process.env.BNX_RUNNABLE_BUILD_TIMEOUT_SEC || "").trim()) {
     process.env.BNX_RUNNABLE_BUILD_TIMEOUT_SEC = "25";
   }

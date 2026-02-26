@@ -29,6 +29,9 @@ in {
       fi
 
       export PATH="$PWD/build-tools/tools/bin:$PWD/node_modules/.bin:$PATH"
+      # Ensure wrapper scripts on PATH are used even if stale aliases linger
+      # from an older shellHook revision.
+      unalias i b v t >/dev/null 2>&1 || true
       
       cache_dir="$PWD/buck-out/tmp/devshell-cache"
       mkdir -p "$cache_dir" 2>/dev/null || true
@@ -82,10 +85,6 @@ EOF
 PROMPT='%F{green}[nix-shell]%f %m:%~$ '
 autoload -Uz compinit
 compinit -i
-alias b=build
-alias v=verify
-alias i='bash build-tools/tools/bin/install-deps'
-alias t=verify
 if command -v scaf >/dev/null 2>&1; then
   eval "$(scaf completions zsh)"
 fi
@@ -96,10 +95,6 @@ EOF
         if [ -d "node_modules/zx" ]; then
           eval "$(scaf completions bash)"
         fi
-        alias b=build
-        alias v=verify
-        alias i='bash build-tools/tools/bin/install-deps'
-        alias t=verify
       fi
 
       if [ -n "$ZSH_VERSION" ] && [ "$is_interactive" = "1" ]; then
@@ -108,10 +103,6 @@ EOF
         if command -v scaf >/dev/null 2>&1; then
           eval "$(scaf completions zsh)"
         fi
-        alias b=build
-        alias v=verify
-        alias i='bash build-tools/tools/bin/install-deps'
-        alias t=verify
       fi
 
       # Symlink prelude from flake output for local dev if missing; do not edit .buckconfig here

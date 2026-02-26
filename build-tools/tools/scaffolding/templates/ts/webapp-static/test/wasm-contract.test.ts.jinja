@@ -1,0 +1,25 @@
+import { describe, expect, it, vi } from "vitest";
+import { readWasmContractBytes } from "../src/wasm-contract.ts";
+
+describe("readWasmContractBytes", () => {
+  it("loads wasm bytes and validates inline module shape", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(Uint8Array.from([0, 1, 2]), {
+          status: 200,
+          headers: { "content-type": "application/wasm" },
+        }),
+      )
+      .mockResolvedValueOnce(new Response("export const wasmBytesBase64 = 'AA==';", { status: 200 }));
+
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const bytes = await readWasmContractBytes();
+      expect(bytes.byteLength).toBe(3);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});

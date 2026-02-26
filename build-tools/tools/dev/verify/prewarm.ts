@@ -12,16 +12,34 @@ async function exists(p: string): Promise<boolean> {
   }
 }
 
+function prewarmRecoveryHint(root: string): string {
+  const lockPath = path.join(root, "buck-out", ".unified-pnpm-store", "require.lock");
+  return [
+    "[verify] unified prewarm skipped (non-fatal).",
+    `  - If verify appears blocked by lock contention, run: rm -f "${lockPath}"`,
+    "  - Then run: i",
+    "  - Retry verify.",
+  ].join("\n");
+}
+
 export async function prewarmVerifyOnce(root: string, zxInitPath: string): Promise<void> {
   const unifiedStamp = path.join(root, "buck-out", ".unified-pnpm-store", "path");
-  if (!(await exists(unifiedStamp))) {
+  const shouldPrewarmUnifiedInVerify = (process.env.VERIFY_PREWARM_UNIFIED || "0").trim() === "1";
+  if (shouldPrewarmUnifiedInVerify && !(await exists(unifiedStamp))) {
     await runNodeWithZx({
       cwd: root,
       script: path.join(root, "build-tools/tools/dev/require-unified-pnpm-store.ts"),
       args: [],
       zxInitPath,
       stdio: "pipe",
-    }).catch(() => {});
+      timeoutMs:
+        Number.parseInt(process.env.VERIFY_PREWARM_UNIFIED_TIMEOUT_MS || "20000", 10) || 20000,
+    }).catch((e: any) => {
+      const msg = e?.message ? String(e.message) : String(e);
+      process.stderr.write(
+        `[verify] unified prewarm failed: ${msg}\n${prewarmRecoveryHint(root)}\n`,
+      );
+    });
   }
 
   if ((process.env.VERIFY_PREWARM || "0").trim() === "1") {
@@ -31,6 +49,13 @@ export async function prewarmVerifyOnce(root: string, zxInitPath: string): Promi
       args: [],
       zxInitPath,
       stdio: "pipe",
-    }).catch(() => {});
+      timeoutMs: Number.parseInt(process.env.VERIFY_PREWARM_TIMEOUT_MS || "30000", 10) || 30000,
+    }).catch((e: any) => {
+      const msg = e?.message ? String(e.message) : String(e);
+      process.stderr.write(
+        `[verify] toolchain prewarm failed (non-fatal): ${msg}\n` +
+          "  - Retry with VERIFY_PREWARM=1 once dependencies are healthy\n",
+      );
+    });
   }
 }

@@ -6,17 +6,19 @@ import { runNodeWithZx } from "../../lib/node-run.ts";
 import { repoRoot } from "../dev-build/paths.ts";
 import { ensureBuckPreludeConfig } from "../dev-build/prelude.ts";
 import { runStartupCheck } from "../dev-build/startup.ts";
-import { parseVerifyArgs } from "./args.ts";
+import { normalizeVerifyTargets, parseVerifyArgs } from "./args.ts";
 import { cleanupOrphanBuckDaemons, cleanupRegisteredTempRepos } from "./buck-orphan-cleanup.ts";
 import { spawnVerifyBuck2Tests } from "./buck2-test.ts";
 import { runMergedCoverageReport, setupCoverage } from "./coverage.ts";
 import {
   enforceVerifyDiskGate,
   runVerifyHousekeeping,
+  shouldRunNixStoreOptimizeForRequestedTargets,
   verifyTargetFreeGiBDefault,
 } from "./housekeeping.ts";
 import { runVerifyLintPreflight } from "./lint-preflight.ts";
 import { acquireVerifyLock } from "./lock.ts";
+import { activeNixGcProcesses, logVerifyRevision } from "./preflight.ts";
 import { prewarmVerifyOnce } from "./prewarm.ts";
 import {
   appendVerifyLogLine,
@@ -27,7 +29,8 @@ import {
   writeVerifyIsoMarker,
 } from "./process-control.ts";
 import { startVerifySafetyRails } from "./safety-rails.ts";
-import { prepareVerifySeed } from "./seed.ts";
+import { prepareVerifySeed, shouldPrepareVerifySeedForRequestedTargets } from "./seed.ts";
+import { isProjectsOnlyVerifyTargets } from "./target-scope.ts";
 import {
   resolveVerifyTemplateTestScope,
   summarizeTemplateScopeDecision,
@@ -35,36 +38,18 @@ import {
 import { ensureRepoLocalTmpRoot } from "./tmp-root.ts";
 import { computeZxTestNodeModulesOut } from "./zx-node-modules.ts";
 
-async function activeNixGcProcesses(): Promise<Array<{ pid: number; command: string }>> {
-  const out = await $({
-    stdio: "pipe",
-    reject: false,
-  })`ps -axo pid=,command=`;
-  if ((out as any).exitCode !== 0) return [];
-  const rows: Array<{ pid: number; command: string }> = [];
-  const lines = String((out as any).stdout || "").split("\n");
-  for (const line of lines) {
-    const s = line.trim();
-    if (!s) continue;
-    const firstSpace = s.indexOf(" ");
-    if (firstSpace <= 0) continue;
-    const pid = Number(s.slice(0, firstSpace).trim());
-    const command = s.slice(firstSpace + 1).trim();
-    if (!Number.isFinite(pid) || pid <= 0 || !command) continue;
-    if (
-      command.includes("nix store gc") ||
-      command.includes("nix-store --gc") ||
-      command.includes("nix-store -gc")
-    ) {
-      rows.push({ pid, command });
-    }
-  }
-  return rows;
-}
-
 export async function runVerify(): Promise<void> {
+  const invocationCwd = process.cwd();
   const root = repoRoot();
-  const args = parseVerifyArgs();
+  const parsedArgs = parseVerifyArgs();
+  const args = {
+    ...parsedArgs,
+    targets: await normalizeVerifyTargets({
+      workspaceRoot: root,
+      baseDir: invocationCwd,
+      targets: parsedArgs.targets,
+    }),
+  };
   const zxInitPath = path.join(root, "build-tools", "tools", "dev", "zx-init.mjs");
 
   await runStartupCheck(root);
@@ -73,16 +58,26 @@ export async function runVerify(): Promise<void> {
     root,
     requestedTargets: args.targets,
   });
+  const projectsOnlyScope = isProjectsOnlyVerifyTargets(templateScope.targets);
 
   // Run lint preflight before acquiring the verify lock so formatting-only failures
   // don't create a verify-lock dir.
-  await runVerifyLintPreflight(root, zxInitPath, { lintFilter: templateScope.lintFilter });
-  await runNodeWithZx({
-    cwd: root,
-    script: path.join(root, "build-tools/tools/scaffolding/gen-template-manifest-artifacts.ts"),
-    args: ["--check"],
-    zxInitPath,
+  await runVerifyLintPreflight(root, zxInitPath, {
+    lintFilters: templateScope.lintFilters,
+    includeBuildSystemPolicy: !projectsOnlyScope,
   });
+  if (!projectsOnlyScope) {
+    await runNodeWithZx({
+      cwd: root,
+      script: path.join(root, "build-tools/tools/scaffolding/gen-template-manifest-artifacts.ts"),
+      args: ["--check"],
+      zxInitPath,
+    });
+  } else {
+    process.stderr.write(
+      "[verify] template-manifest check: skipped for projects-only verify scope\n",
+    );
+  }
 
   const allowConcurrent = process.env.VERIFY_ALLOW_CONCURRENT === "1";
   const lock = await acquireVerifyLock({ root, allowConcurrent });
@@ -103,7 +98,13 @@ export async function runVerify(): Promise<void> {
   process.env.BNX_SHARED_PRELUDE_PATH = path.join(root, "prelude");
 
   const targetFreeGiB = verifyTargetFreeGiBDefault(args.coverage);
-  const { freeGiB } = await runVerifyHousekeeping({ root, targetFreeGiB, zxInitPath });
+  const runNixStoreOptimize = shouldRunNixStoreOptimizeForRequestedTargets(templateScope.targets);
+  const { freeGiB } = await runVerifyHousekeeping({
+    root,
+    targetFreeGiB,
+    zxInitPath,
+    runNixStoreOptimize,
+  });
   enforceVerifyDiskGate({ freeGiB, targetFreeGiB });
 
   const cov = await setupCoverage({ root, enabled: args.coverage });
@@ -128,19 +129,7 @@ export async function runVerify(): Promise<void> {
     );
   }
   await appendVerifyLogLine(lock.logFile, "[verify] nix gc preflight: ok");
-  // Log the current git revision for performance correlation across runs.
-  // This intentionally runs after we have a logFile (verify-lock acquired).
-  try {
-    const revOut = await $({ cwd: root, stdio: "pipe", reject: false })`git rev-parse HEAD`;
-    const rev = String((revOut as any).stdout || "").trim();
-    const dirtyOut = await $({
-      cwd: root,
-      stdio: "pipe",
-      reject: false,
-    })`bash --noprofile --norc -c 'test -z \"$(git status --porcelain 2>/dev/null)\" && echo 0 || echo 1'`;
-    const dirty = String((dirtyOut as any).stdout || "").trim() || "0";
-    if (rev) await appendVerifyLogLine(lock.logFile, `[verify] rev=${rev} dirty=${dirty}`);
-  } catch {}
+  await logVerifyRevision(root, lock.logFile);
 
   // One buck-daemon-reaper per verify run. zx tests register temp repo roots via BNX_BUCK_REAPER_STATE_FILE.
   const stateFile = path.join(process.env.TMPDIR || "/tmp", `bucknix-buck-reaper-${iso}.txt`);
@@ -149,10 +138,6 @@ export async function runVerify(): Promise<void> {
   await startBuckDaemonReaper({ root, zxInitPath, iso, stateFile });
   await startBuckWatchdog({ root, zxInitPath, iso });
   await prewarmVerifyOnce(root, zxInitPath);
-  const seed = await prepareVerifySeed({ root, iso });
-  process.env.BNX_TEST_SEED_STORE_PATH = seed.seedPath;
-  process.env.BNX_TEST_SEED_KEY = seed.seedKey;
-  process.env.BNX_TEST_SEED_PIN_DIR = seed.pinDir;
   await appendVerifyLogLine(
     lock.logFile,
     `[verify] template scope: ${summarizeTemplateScopeDecision(templateScope)}`,
@@ -163,7 +148,19 @@ export async function runVerify(): Promise<void> {
       `[verify] template scope diagnostics: ${JSON.stringify(templateScope.diagnostics)}`,
     );
   }
-  let seedCleanup: (() => Promise<void>) | null = seed.cleanup;
+  let seedCleanup: (() => Promise<void>) | null = null;
+  if (shouldPrepareVerifySeedForRequestedTargets(templateScope.targets)) {
+    const seed = await prepareVerifySeed({ root, iso });
+    process.env.BNX_TEST_SEED_STORE_PATH = seed.seedPath;
+    process.env.BNX_TEST_SEED_KEY = seed.seedKey;
+    process.env.BNX_TEST_SEED_PIN_DIR = seed.pinDir;
+    seedCleanup = seed.cleanup;
+  } else {
+    process.stderr.write("[verify] seed build: skipped for scoped verify run\n");
+    delete process.env.BNX_TEST_SEED_STORE_PATH;
+    delete process.env.BNX_TEST_SEED_KEY;
+    delete process.env.BNX_TEST_SEED_PIN_DIR;
+  }
 
   // Proactively kill *orphaned* buck2 daemons rooted under temp repos to avoid host overload.
   // This is intentionally scoped to temp-repo roots (e.g. /tmp/bnx-* or buck-out/tmp/tmpdir/*).

@@ -1,4 +1,6 @@
+import path from "node:path";
 import { getArgvTokens } from "../../lib/cli.ts";
+import { normalizeDevBuildTargetArgs } from "../dev-build/target-args.ts";
 
 export type VerifyConsole = "auto" | "super" | "simple";
 
@@ -42,4 +44,42 @@ export function parseVerifyArgs(): VerifyArgs {
   }
 
   return { coverage, console, targets: passthrough.length > 0 ? passthrough : ["//..."] };
+}
+
+export async function normalizeVerifyTargets(opts: {
+  workspaceRoot: string;
+  baseDir: string;
+  targets: string[];
+}): Promise<string[]> {
+  const normalized = await normalizeDevBuildTargetArgs({
+    workspaceRoot: opts.workspaceRoot,
+    baseDir: opts.baseDir,
+    subcmd: "test",
+    args: opts.targets,
+  });
+  return normalized.map((t, i) => {
+    const original = String(opts.targets[i] || "").trim();
+    const normalizedTarget = String(t || "").trim();
+    const isExplicitBuckLabel =
+      original.startsWith("//") || original.startsWith("root//") || original.startsWith(":");
+    const looksPathLike =
+      !isExplicitBuckLabel &&
+      (original === "." ||
+        original === ".." ||
+        original.startsWith("./") ||
+        original.startsWith("../") ||
+        original.startsWith("/") ||
+        original.includes("/"));
+    if (!looksPathLike) return normalizedTarget;
+    if (normalizedTarget === "." && (original === "." || original === "./")) {
+      const baseAbs = path.resolve(opts.baseDir);
+      const rootAbs = path.resolve(opts.workspaceRoot);
+      if (baseAbs === rootAbs) return "//...";
+    }
+    if (!normalizedTarget.startsWith("//")) return normalizedTarget;
+    if (normalizedTarget.includes("...")) return normalizedTarget;
+    const pkg = normalizedTarget.split(":")[0];
+    if (!pkg || !pkg.startsWith("//")) return normalizedTarget;
+    return `${pkg}/...`;
+  });
 }

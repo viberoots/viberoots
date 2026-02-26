@@ -1,4 +1,3 @@
-import "./style.css";
 import { readWasmContractBytes } from "./wasm-contract";
 
 const root = document.getElementById("app");

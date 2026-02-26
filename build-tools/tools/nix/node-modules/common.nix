@@ -38,12 +38,18 @@ let
       srcBaseStr = builtins.toString srcBase;
       haveImporterLock = builtins.pathExists (srcBaseStr + "/" + importerDir + "/pnpm-lock.yaml");
       ignoreImporterLock = genAllowed && (!haveImporterLock);
-      impPkgJson = srcBaseStr + "/" + importerDir + "/package.json";
-      impNpmrc = srcBaseStr + "/" + importerDir + "/.npmrc";
-      impLock = srcBaseStr + "/" + importerDir + "/pnpm-lock.yaml";
-      wantedLock = srcBaseStr + "/" + lockfilePath;
-      wsNpmrc = srcBaseStr + "/.npmrc";
-      wsPnpmWs = srcBaseStr + "/pnpm-workspace.yaml";
+      impPkgJsonPath = srcBaseStr + "/" + importerDir + "/package.json";
+      impNpmrcPath = srcBaseStr + "/" + importerDir + "/.npmrc";
+      impLockPath = srcBaseStr + "/" + importerDir + "/pnpm-lock.yaml";
+      wantedLockPath = srcBaseStr + "/" + lockfilePath;
+      wsNpmrcPath = srcBaseStr + "/.npmrc";
+      wsPnpmWsPath = srcBaseStr + "/pnpm-workspace.yaml";
+      impPkgJson = if builtins.pathExists impPkgJsonPath then (builtins.path { path = impPkgJsonPath; name = "importer-package.json"; }) else null;
+      impNpmrc = if builtins.pathExists impNpmrcPath then (builtins.path { path = impNpmrcPath; name = "importer.npmrc"; }) else null;
+      impLock = if builtins.pathExists impLockPath then (builtins.path { path = impLockPath; name = "importer-pnpm-lock.yaml"; }) else null;
+      wantedLock = if builtins.pathExists wantedLockPath then (builtins.path { path = wantedLockPath; name = "requested-pnpm-lock.yaml"; }) else null;
+      wsNpmrc = if builtins.pathExists wsNpmrcPath then (builtins.path { path = wsNpmrcPath; name = "workspace.npmrc"; }) else null;
+      wsPnpmWs = if builtins.pathExists wsPnpmWsPath then (builtins.path { path = wsPnpmWsPath; name = "pnpm-workspace.yaml"; }) else null;
       lockDir = dirnameOf lockfilePath;
     in pkgs.runCommand "importer-src-${sanitizeName importerDir}" {} ''
       set -euo pipefail
@@ -61,11 +67,11 @@ let
         mkdir -p "$imp_out_dir"
       fi
 
-      if [ -f ${builtins.toJSON impPkgJson} ]; then
-        copy_file ${builtins.toJSON impPkgJson} "$imp_out_dir/package.json"
+      if [ -f ${if impPkgJson != null then builtins.toJSON (builtins.toString impPkgJson) else "\"/nonexistent\""} ]; then
+        copy_file ${if impPkgJson != null then builtins.toJSON (builtins.toString impPkgJson) else "\"/nonexistent\""} "$imp_out_dir/package.json"
       fi
-      if [ -f ${builtins.toJSON impNpmrc} ]; then
-        copy_file ${builtins.toJSON impNpmrc} "$imp_out_dir/.npmrc"
+      if [ -f ${if impNpmrc != null then builtins.toJSON (builtins.toString impNpmrc) else "\"/nonexistent\""} ]; then
+        copy_file ${if impNpmrc != null then builtins.toJSON (builtins.toString impNpmrc) else "\"/nonexistent\""} "$imp_out_dir/.npmrc"
       fi
 
       # Include only the requested lockfile path, unless generation mode intentionally
@@ -73,17 +79,17 @@ let
       if [ -n "${lockDir}" ]; then
         mkdir -p "$out/${lockDir}"
       fi
-      if [ "${if ignoreImporterLock then "1" else "0"}" != "1" ] && [ -f ${builtins.toJSON wantedLock} ]; then
-        copy_file ${builtins.toJSON wantedLock} "$out/${lockfilePath}"
-      elif [ "${if ignoreImporterLock then "1" else "0"}" != "1" ] && [ -f ${builtins.toJSON impLock} ]; then
-        copy_file ${builtins.toJSON impLock} "$out/${lockfilePath}"
+      if [ "${if ignoreImporterLock then "1" else "0"}" != "1" ] && [ -f ${if wantedLock != null then builtins.toJSON (builtins.toString wantedLock) else "\"/nonexistent\""} ]; then
+        copy_file ${if wantedLock != null then builtins.toJSON (builtins.toString wantedLock) else "\"/nonexistent\""} "$out/${lockfilePath}"
+      elif [ "${if ignoreImporterLock then "1" else "0"}" != "1" ] && [ -f ${if impLock != null then builtins.toJSON (builtins.toString impLock) else "\"/nonexistent\""} ]; then
+        copy_file ${if impLock != null then builtins.toJSON (builtins.toString impLock) else "\"/nonexistent\""} "$out/${lockfilePath}"
       fi
 
-      if [ -f ${builtins.toJSON wsPnpmWs} ]; then
-        copy_file ${builtins.toJSON wsPnpmWs} "$out/pnpm-workspace.yaml"
+      if [ -f ${if wsPnpmWs != null then builtins.toJSON (builtins.toString wsPnpmWs) else "\"/nonexistent\""} ]; then
+        copy_file ${if wsPnpmWs != null then builtins.toJSON (builtins.toString wsPnpmWs) else "\"/nonexistent\""} "$out/pnpm-workspace.yaml"
       fi
-      if [ -f ${builtins.toJSON wsNpmrc} ]; then
-        copy_file ${builtins.toJSON wsNpmrc} "$out/.npmrc"
+      if [ -f ${if wsNpmrc != null then builtins.toJSON (builtins.toString wsNpmrc) else "\"/nonexistent\""} ]; then
+        copy_file ${if wsNpmrc != null then builtins.toJSON (builtins.toString wsNpmrc) else "\"/nonexistent\""} "$out/.npmrc"
       fi
     '';
 in {

@@ -8,6 +8,7 @@ import {
   readRunnableManifest,
   type RunnableManifestEntry,
 } from "../lib/runnables.ts";
+export { resolveRunnableTargetLabel } from "./target-label-resolver.ts";
 
 export function parseArgs(argv: string[]): {
   mode: "prod" | "dev";

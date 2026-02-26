@@ -7,5 +7,7 @@
   "projects/apps/example/pnpm-lock.yaml": "sha256-fRC+K9fncUsjK5qiwi+wkK/yhR/y1VXxR54tU5sB5Ww=",
   "projects/libs/demo/pnpm-lock.yaml": "sha256-ObVjNvHYmlr9Lg5Ldpeh1aT8mV6UFhESac/5ynCfvvk=",
   "projects/apps/myapp/pnpm-lock.yaml": "sha256-RRBDAJbHdvRnL5amg2P1VYB0LQXwi0L060KulQXrUcs=",
-  "projects/apps/express-app/pnpm-lock.yaml": "sha256-2Tino913CR8TqAD2yRhGB3CFPRSvv0HRVsOS8t4TGJk="
+  "projects/apps/express-app/pnpm-lock.yaml": "sha256-2Tino913CR8TqAD2yRhGB3CFPRSvv0HRVsOS8t4TGJk=",
+  "projects/apps/my-app/pnpm-lock.yaml": "sha256-arktnMfDuKQQxiWI+x6d9Obl8uxmmBXj2RzEy7FtXyo=",
+  "projects/apps/demo-vite-ssr/pnpm-lock.yaml": "sha256-arktnMfDuKQQxiWI+x6d9Obl8uxmmBXj2RzEy7FtXyo="
 }

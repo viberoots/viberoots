@@ -143,6 +143,7 @@ I want performance regressions treated as correctness issues. Use these guardrai
 
 These guardrails assume test tooling stays aligned with the dev shell and global Nix configuration so we avoid accidental slow paths and hidden network errors.
 
+- **Investigation default (including LLM agents)**: severe regressions here are almost never contention alone. We run this suite routinely at high volume without contention-only degradation. Treat large slowdowns/timeouts as a recently introduced systemic change until proven otherwise.
 - **Honor `XDG_CONFIG_HOME` for Nix**: if temp test environments hide or bypass it, Nix can ignore configured substituters and keys, forcing slow source builds and spurious failures.
 
 - **Avoid `--impure` cache busts**: untracked files can force impure mode and invalidate flake snapshots. Track new tests early (for example, `git add` new files before `i`, `b`, or `v`) or exclude them intentionally from the flake source snapshot.
@@ -167,6 +168,7 @@ These guardrails assume test tooling stays aligned with the dev shell and global
 - **Keep global Nix inputs present in temp repos**: tests that exercise Nix-calling macros with `global_nix_inputs()` wiring must include `flake.nix` and `flake.lock` in `TEST_RSYNC_ROOTS`; missing global inputs can fail actions before meaningful test assertions run.
 - **Invalidate clean seeds on new commits**: seed repos must vary with the current `HEAD` to avoid stale code and hidden regressions. If a clean checkout uses an old seed, refresh the seed or include commit identity in the seed key.
 - **Keep test HOME stable**: per-test HOME isolation wipes tool caches (Nix/pnpm) and can multiply runtime. Only set `TEST_HOME_PER_TEST=1` for tests that truly require a fresh HOME.
+- **Do not bootstrap unified pnpm store per temp repo when repo prewarm exists**: temp-repo Nix call sites should prefer `REPO_ROOT/buck-out/.unified-pnpm-store/path` when available and skip local `require-unified-pnpm-store` bootstrap; per-temp bootstrap multiplies Nix eval/build cost and creates suite-wide long-tail stalls.
 - **Prevent env leakage between tests**: restore `TEST_*` env vars in `finally` blocks or shared helpers.
 - **Reset dev override envs**: tests that set `NIX_*_DEV_OVERRIDE_JSON` must restore it, or later tests will run with overrides and can force slow local builds.
 - **Keep lint-staged scoped**: lint-staged commands should honor file arguments (avoid `eslint .` in hooks) so pre-commit and test runs do not lint the entire repo.

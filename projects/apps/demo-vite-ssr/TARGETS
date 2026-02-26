@@ -17,7 +17,7 @@ node_asset_stage(
         {"src": ":wasm_inline", "dest": "client/wasm-inline/index.js"},
         {"src": "src/wasm-contract/top.wasm", "dest": "server/wasm-contract/top.wasm"},
     ],
-    labels = ["lang:node", "kind:app", "webapp:ssr", "framework:express"],
+    labels = ["lang:node", "kind:app", "webapp:ssr", "framework:vite"],
     out = "dist",
 )
 

@@ -9,14 +9,16 @@ import { createIsolation } from "./isolation.ts";
 import { materializePureGraphIfEnabled } from "./materialize-pure.ts";
 import { maybePrintImpureMaterializedBins, exportGraphImpure } from "./materialize-impure.ts";
 import { shouldMaterializeByDefault } from "./materialize-policy.ts";
-import { repoRoot } from "./paths.ts";
 import { ensureBuckPreludeConfig } from "./prelude.ts";
 import { runStartupCheck } from "./startup.ts";
+import { normalizeDevBuildTargetArgs } from "./target-args.ts";
 import { maybeAutoImpureFromUntrackedFiles } from "./untracked.ts";
 import { getArgvTokens } from "../../lib/cli.ts";
+import { findRepoRoot } from "../../lib/repo.ts";
 
 export async function runDevBuild(): Promise<void> {
-  const root = repoRoot();
+  const invocationCwd = process.cwd();
+  const root = await findRepoRoot(invocationCwd);
   const isCI = process.env.CI === "true";
   const graphPath = path.join(root, "build-tools", "tools", "buck", "graph.json");
   const graphExistedBefore = await fsp
@@ -41,7 +43,16 @@ export async function runDevBuild(): Promise<void> {
     process.exit(1);
   });
 
-  const parsed = parseDevBuildArgs(getArgvTokens());
+  const parsed0 = parseDevBuildArgs(getArgvTokens());
+  const parsed = {
+    ...parsed0,
+    restArgs: await normalizeDevBuildTargetArgs({
+      workspaceRoot: root,
+      baseDir: invocationCwd,
+      subcmd: parsed0.subcmd,
+      args: parsed0.restArgs,
+    }),
+  };
   const auto = await maybeAutoImpureFromUntrackedFiles({
     isCI,
     root,

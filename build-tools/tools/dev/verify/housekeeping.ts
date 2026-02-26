@@ -50,6 +50,10 @@ exit 0
 `}`.nothrow();
 }
 
+export function shouldRunNixStoreOptimizeForRequestedTargets(requestedTargets: string[]): boolean {
+  return requestedTargets.length === 1 && requestedTargets[0] === "//...";
+}
+
 async function runBoundedGc(root: string, maxFreed: string, secs: number): Promise<void> {
   await $({
     stdio: "ignore",
@@ -69,6 +73,7 @@ export async function runVerifyHousekeeping(opts: {
   root: string;
   targetFreeGiB: number;
   zxInitPath: string;
+  runNixStoreOptimize?: boolean;
 }): Promise<{ freeGiB: number }> {
   const root = opts.root;
   const target = opts.targetFreeGiB;
@@ -101,8 +106,14 @@ export async function runVerifyHousekeeping(opts: {
     process.stderr.write(`[verify] after purge: ~${free}GiB\n`);
   }
 
-  await runBoundedNixOptimise(root, 60);
-  free = await freeGiBAtPath(root);
+  if (opts.runNixStoreOptimize !== false) {
+    await runBoundedNixOptimise(root, 60);
+    free = await freeGiBAtPath(root);
+  } else {
+    process.stderr.write(
+      "[verify] housekeeping: skipping nix store optimise for scoped verify run\n",
+    );
+  }
 
   if (free < target) {
     process.stderr.write("[verify] low disk free detected; running bounded nix-store GC...\n");

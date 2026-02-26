@@ -66,8 +66,15 @@ def nix_bootstrap_env_core():
 
 def nix_bootstrap_env_pnpm_store():
     return (
-        "if [ \"${BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE:-}\" != \"1\" ]; then "
-        + "  if [ ! -f \"$FLK_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
+        "if [ -z \"${LOCAL_PNPM_STORE:-}\" ] && [ -n \"${REPO_ROOT:-}\" ] && [ -f \"$REPO_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
+        + "  LOCAL_PNPM_STORE=\"\"; read -r LOCAL_PNPM_STORE < \"$REPO_ROOT/buck-out/.unified-pnpm-store/path\" 2>/dev/null || true; "
+        + "  if [ -n \"$LOCAL_PNPM_STORE\" ]; then "
+        + "    export NIX_USE_PREFETCHED_PNPM_STORE=1; "
+        + "    export LOCAL_PNPM_STORE; "
+        + "  fi; "
+        + "fi; "
+        + "if [ \"${BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE:-}\" != \"1\" ]; then "
+        + "  if [ -z \"${LOCAL_PNPM_STORE:-}\" ] && [ ! -f \"$FLK_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
         + "    if command -v node >/dev/null 2>&1; then "
         + "      (cd \"$FLK_ROOT\" && node \"$FLK_ROOT/build-tools/tools/dev/require-unified-pnpm-store.ts\" >/dev/null 2>&1 || true); "
         + "    elif command -v nix >/dev/null 2>&1; then "
@@ -75,7 +82,7 @@ def nix_bootstrap_env_pnpm_store():
         + "    fi; "
         + "  fi; "
         + "fi; "
-        + "if [ -f \"$FLK_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
+        + "if [ -z \"${LOCAL_PNPM_STORE:-}\" ] && [ -f \"$FLK_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
         + "  export NIX_USE_PREFETCHED_PNPM_STORE=1; "
         + "  LOCAL_PNPM_STORE=\"\"; read -r LOCAL_PNPM_STORE < \"$FLK_ROOT/buck-out/.unified-pnpm-store/path\" 2>/dev/null || true; "
         + "  export LOCAL_PNPM_STORE; "

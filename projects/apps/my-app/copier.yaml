@@ -1,0 +1,29 @@
+version: 1
+
+_envops:
+  block_start_string: "{%"
+  block_end_string: "%}"
+  variable_start_string: "{{"
+  variable_end_string: "}}"
+  comment_start_string: "{#"
+  comment_end_string: "#}"
+  keep_trailing_newline: true
+
+_exclude:
+  - meta.json
+
+name: ""
+language: "ts"
+template: "webapp-ssr-vite"
+
+importer: "projects/apps/{{ name }}"
+lockfilePath: "projects/apps/{{ name }}/pnpm-lock.yaml"
+pkgScope: "@apps"
+includeNodeTests: true
+
+_tasks:
+  - mkdir -p src
+  - mkdir -p server
+  - mkdir -p test
+_templates_suffix: ".jinja"
+_answers_file: ".copier-answers.yml"

@@ -1,9 +1,91 @@
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { execSync } from "node:child_process";
 
 import { ensureTemplateVariables } from "./template-vars.ts";
 import { pathExists } from "../../../lib/repo.ts";
+
+function workspaceRoot(): string {
+  const envRoot = String(process.env.WORKSPACE_ROOT || process.env.BUCK_TEST_SRC || "").trim();
+  if (envRoot) return path.resolve(envRoot);
+  try {
+    const out = execSync("git rev-parse --show-toplevel", {
+      cwd: process.cwd(),
+      stdio: ["ignore", "pipe", "ignore"],
+      encoding: "utf8",
+    })
+      .trim()
+      .replace(/\r?\n/g, "");
+    if (out) return out;
+  } catch {}
+  return path.resolve(
+    path.dirname(new URL(import.meta.url).pathname),
+    "..",
+    "..",
+    "..",
+    "..",
+    "..",
+  );
+}
+
+function toRepoAbsolute(inputPath: string): string {
+  const root = workspaceRoot();
+  return path.isAbsolute(inputPath) ? inputPath : path.resolve(root, inputPath);
+}
+
+function toRepoRelativeIfPossible(inputPath: string): string {
+  const root = workspaceRoot();
+  const rel = path.relative(root, inputPath);
+  if (rel && !rel.startsWith("..") && !path.isAbsolute(rel)) return rel;
+  return inputPath;
+}
+
+function normalizeTemplateSource(raw: string): string {
+  const src = String(raw || "").trim();
+  if (!src) return "";
+  if (src.endsWith("/copier.yaml") || src.endsWith("/copier.yml")) {
+    return path.dirname(src);
+  }
+  return src;
+}
+
+async function templateSourceExists(src: string): Promise<boolean> {
+  const resolved = toRepoAbsolute(src);
+  try {
+    const st = await fsp.stat(resolved);
+    return st.isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+async function resolveTemplateSource(targetDir: string, answersFile: string): Promise<string> {
+  const txt = await fsp.readFile(answersFile, "utf8");
+  const fromRecorded = normalizeTemplateSource(
+    /^scaf_src_path:\s*(\S+)/m.exec(txt)?.[1]?.trim() || "",
+  );
+  if (fromRecorded && (await templateSourceExists(fromRecorded))) return fromRecorded;
+
+  const language = /^language:\s*(\S+)/m.exec(txt)?.[1]?.trim() || "";
+  const template = /^template:\s*(\S+)/m.exec(txt)?.[1]?.trim() || "";
+  if (!language || !template) {
+    throw new Error("scaf_src_path missing and language/template not present in answers");
+  }
+  const inferred = path.join(
+    "build-tools",
+    "tools",
+    "scaffolding",
+    "templates",
+    language,
+    template,
+  );
+  if (await templateSourceExists(inferred)) return inferred;
+
+  throw new Error(
+    `cannot resolve scaffold template source for ${targetDir}; tried '${fromRecorded || "(none)"}' and '${inferred}'`,
+  );
+}
 
 export async function seedAnswersViaCopier(
   templateDir: string,
@@ -23,10 +105,17 @@ export async function seedAnswersViaCopier(
 }
 
 export async function copierUpdate(targetDir: string) {
-  const answers = path.join(targetDir, ".copier-answers.yml");
-  if (await pathExists(answers)) {
-    await ensureTemplateVariables(targetDir, answers);
-    await runCopierFiltered(["update", "--trust", "--defaults", "--answers-file", answers]);
+  const targetAbs = toRepoAbsolute(targetDir);
+  const answersAbs = path.join(targetAbs, ".copier-answers.yml");
+  if (await pathExists(answersAbs)) {
+    await ensureTemplateVariables(targetAbs, answersAbs);
+    await runCopierFiltered([
+      "update",
+      "--trust",
+      "--defaults",
+      "--answers-file",
+      toRepoRelativeIfPossible(answersAbs),
+    ]);
   } else {
     throw new Error("No .copier-answers.yml for update");
   }
@@ -41,21 +130,19 @@ export async function copierRecopyOrUpdate(targetDir: string) {
 }
 
 export async function recopyUsingRecordedSource(targetDir: string) {
-  const answersFile = path.join(targetDir, ".copier-answers.yml");
+  const targetAbs = toRepoAbsolute(targetDir);
+  const answersFile = path.join(targetAbs, ".copier-answers.yml");
   if (!(await pathExists(answersFile))) {
     throw new Error("answers file missing");
   }
+  const src = toRepoAbsolute(await resolveTemplateSource(targetDir, answersFile));
   const txt = await fsp.readFile(answersFile, "utf8");
-  const src = /^scaf_src_path:\s*(\S+)/m.exec(txt)?.[1]?.trim();
-  if (!src) {
-    throw new Error("scaf_src_path not recorded in answers");
-  }
   const name = /^name:\s*(\S+)/m.exec(txt)?.[1]?.trim() || path.basename(targetDir);
   const language = /^language:\s*(\S+)/m.exec(txt)?.[1]?.trim() || "";
   const template = /^template:\s*(\S+)/m.exec(txt)?.[1]?.trim() || "";
   const data = { name, language, template } as Record<string, any>;
 
-  await ensureTemplateVariables(targetDir, answersFile, src, data);
+  await ensureTemplateVariables(targetAbs, answersFile, src, data);
 
   const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), "scaf-"));
   try {
@@ -67,11 +154,11 @@ export async function recopyUsingRecordedSource(targetDir: string) {
       "--defaults",
       "--force",
       "--answers-file",
-      answersFile,
+      toRepoRelativeIfPossible(answersFile),
       "--data-file",
       answersJson,
       src,
-      targetDir,
+      targetAbs,
     ]);
   } finally {
     await removeTempDirBestEffort(tmpDir);
@@ -104,7 +191,7 @@ function filterCopierLogs(text: string): string {
 }
 
 async function runCopierFiltered(args: string[]): Promise<void> {
-  const res = await $({ stdio: "pipe" })`copier ${args}`.nothrow();
+  const res = await $({ stdio: "pipe", cwd: workspaceRoot() })`copier ${args}`.nothrow();
   const out = filterCopierLogs(String(res.stdout || ""));
   const err = filterCopierLogs(String(res.stderr || ""));
   if (out) process.stdout.write(out + (out.endsWith("\n") ? "" : "\n"));

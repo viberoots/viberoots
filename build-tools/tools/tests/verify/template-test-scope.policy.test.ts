@@ -35,7 +35,7 @@ test("auto mode uses template-selected targets for template-only changes", async
   });
   assert.equal(result.selectorMode, "template-only");
   assert.deepEqual(result.targets, ["//:a_template_test", "//:scaffolding_smoke_lib_readme"]);
-  assert.equal(result.lintFilter, ".");
+  assert.deepEqual(result.lintFilters, ["."]);
 });
 
 test("auto mode falls back to build-system scope when selector reports mixed", async () => {
@@ -71,7 +71,7 @@ test("auto mode falls back to build-system scope when selector reports mixed", a
   });
   assert.equal(result.selectorMode, "mixed");
   assert.deepEqual(result.targets, ["//..."]);
-  assert.equal(result.lintFilter, null);
+  assert.equal(result.lintFilters, null);
 });
 
 test("never mode bypasses selector path and keeps existing build-system scope", async () => {
@@ -92,6 +92,24 @@ test("never mode bypasses selector path and keeps existing build-system scope", 
   });
   assert.equal(result.selectorMode, "skipped");
   assert.deepEqual(result.targets, ["//projects/..."]);
+});
+
+test("explicit project target scopes lint/prettier to that importer", async () => {
+  const result = await resolveVerifyTemplateTestScope({
+    root: process.cwd(),
+    requestedTargets: ["//projects/apps/my-app:app"],
+    env: {},
+    deps: {
+      resolveBuildScope: async () => ({
+        targets: ["//projects/apps/my-app:app"],
+        mode: "auto",
+        hasBuildSystemChanges: false,
+      }),
+    },
+  });
+  assert.equal(result.selectorMode, "skipped");
+  assert.deepEqual(result.targets, ["//projects/apps/my-app:app"]);
+  assert.deepEqual(result.lintFilters, ["./projects/apps/my-app"]);
 });
 
 test("always mode fails with actionable diagnostics when change-set is not template-only", async () => {
