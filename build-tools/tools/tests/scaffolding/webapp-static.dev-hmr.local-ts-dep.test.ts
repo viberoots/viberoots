@@ -1,100 +1,24 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
-import { once } from "node:events";
 import * as fsp from "node:fs/promises";
-import http from "node:http";
-import net from "node:net";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { after, test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import {
+  evaluateRenderedAppText,
+  extractImportedUrl,
+  httpGet,
+  pickFreePort,
+  stopServer,
+  toAbsoluteModuleUrl,
+  viteFsUrlFor,
+  waitForHttpOk,
+} from "./lib/webapp-static-hmr";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
-
-async function pickFreePort(): Promise<number> {
-  const server = net.createServer();
-  await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => resolve());
-  });
-  const addr = server.address();
-  server.close();
-  if (!addr || typeof addr !== "object" || typeof addr.port !== "number") {
-    throw new Error("failed to reserve an ephemeral port");
-  }
-  return addr.port;
-}
-
-async function httpGet(url: string): Promise<{ status: number; body: string }> {
-  return await new Promise((resolve, reject) => {
-    const req = http.get(url, (res) => {
-      let body = "";
-      res.setEncoding("utf8");
-      res.on("data", (chunk) => (body += chunk));
-      res.on("end", () => resolve({ status: res.statusCode || 0, body }));
-    });
-    req.on("error", reject);
-    req.end();
-  });
-}
-
-async function waitForHttpOk(url: string, timeoutMs = 45000): Promise<void> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    try {
-      const res = await httpGet(url);
-      if (res.status === 200) return;
-    } catch {}
-    await sleep(300);
-  }
-  throw new Error(`server did not become ready within ${timeoutMs}ms`);
-}
-
-async function stopServer(child: ChildProcess): Promise<void> {
-  try {
-    if (child.pid) child.kill("SIGINT");
-  } catch {}
-  try {
-    await Promise.race([once(child, "exit"), sleep(5000)]);
-  } catch {}
-  if (child.exitCode == null) {
-    try {
-      if (child.pid) child.kill("SIGKILL");
-    } catch {}
-  }
-}
-
-function viteFsUrlFor(absPath: string): string {
-  const normalized = absPath.replace(/\\/g, "/");
-  return normalized.startsWith("/") ? `/@fs${normalized}` : `/@fs/${normalized}`;
-}
-
-function extractImportedUrl(moduleBody: string, includesNeedle: string): string {
-  const importRe = /from\s+["']([^"']+)["']/g;
-  let match: RegExpExecArray | null = null;
-  while (true) {
-    const next = importRe.exec(moduleBody);
-    if (!next) break;
-    const spec = String(next[1] || "");
-    if (spec.includes(includesNeedle)) {
-      match = next;
-      break;
-    }
-  }
-  if (!match || !match[1]) {
-    throw new Error(`failed to find imported module containing '${includesNeedle}'`);
-  }
-  return String(match[1]);
-}
-
-function toAbsoluteModuleUrl(baseUrl: string, maybeRelative: string): string {
-  if (maybeRelative.startsWith("http://") || maybeRelative.startsWith("https://")) {
-    return maybeRelative;
-  }
-  return new URL(maybeRelative, baseUrl).toString();
-}
 
 function esbuildPackageName(): string {
   const { platform, arch } = process;
@@ -140,22 +64,12 @@ test(
       const libSourcePath = path.join(tmp, "projects", "libs", "demo-lib", "src", "index.ts");
       const libSourceFsPath = viteFsUrlFor(libSourcePath);
       const appMainSource = [
-        'import { readWasmContractBytes } from "./wasm-contract";',
         'import { depMessage } from "../../../libs/demo-lib/src/index";',
         "",
         'const root = document.getElementById("app");',
         "if (root) {",
         "  root.textContent = `dep:${depMessage()}`;",
         "}",
-        "",
-        'document.addEventListener("DOMContentLoaded", () => {',
-        '  const el = document.getElementById("app");',
-        "  if (el) {",
-        "    void readWasmContractBytes().then((bytes) => {",
-        '      el.setAttribute("data-wasm-bytes", String(bytes.byteLength));',
-        "    });",
-        "  }",
-        "});",
         "",
       ].join("\n");
       await fsp.writeFile(appMainPath, appMainSource, "utf8");
@@ -241,6 +155,8 @@ test(
         assert.equal(firstModule.status, 200);
         assert.match(firstModule.body, /phase1-a/);
         assert.ok(firstDepModuleUrl.includes(libSourceFsPath));
+        const firstRenderedText = await evaluateRenderedAppText(mainModuleUrl);
+        assert.equal(firstRenderedText, "dep:phase1-a");
 
         await fsp.writeFile(
           libSourcePath,
@@ -266,18 +182,24 @@ test(
           const currentDepSpec = extractImportedUrl(currentMainModule.body, "/demo-lib/src/index");
           const currentDepModuleUrl = toAbsoluteModuleUrl(mainModuleUrl, currentDepSpec);
           const nextModule = await httpGet(currentDepModuleUrl);
-          if (nextModule.status === 200 && nextModule.body.includes("phase1-b")) {
-            observed = nextModule.body;
+          if (nextModule.status !== 200 || !nextModule.body.includes("phase1-b")) {
+            await sleep(300);
+            continue;
+          }
+          const renderedText = await evaluateRenderedAppText(mainModuleUrl);
+          if (renderedText === "dep:phase1-b") {
+            observed = renderedText;
             break;
           }
           await sleep(300);
         }
-        if (!observed.includes("phase1-b")) {
+        if (observed !== "dep:phase1-b") {
           const tailOut = serverStdout.join("").slice(-6000);
           const tailErr = serverStderr.join("").slice(-6000);
           throw new Error(
             [
               "expected updated local dependency source to be served in the same dev session",
+              "expected rendered app text to update from dep:phase1-a to dep:phase1-b",
               `vite stdout tail:\n${tailOut}`,
               `vite stderr tail:\n${tailErr}`,
             ].join("\n\n"),

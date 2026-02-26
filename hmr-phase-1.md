@@ -40,8 +40,8 @@ template tests and one dev-loop E2E.
   - add `server.fs.allow` for workspace roots required by linked local deps
   - add `optimizeDeps.exclude` for workspace dependency packages
   - keep changes minimal and template-owned
-- Add a shared helper for template Vite config generation where feasible, so static/vite/next can
-  reuse one contract shape rather than diverging.
+- Keep the local-dependency config shape explicit and reusable; introduce a shared helper only if PR-2
+  and PR-3 show repeated logic that cannot stay template-local without drift.
 - Add or update static scaffold test fixtures to include a local TS dependency import path that
   participates in Vite graph tracking.
 - Update scaffold docs and template README content to document linking expectations for local deps.
@@ -64,8 +64,8 @@ template tests and one dev-loop E2E.
 ### Verification Commands
 
 - `buck2 test //:scaffolding_webapp_static_scaffold_includes_sample_test`
-- `buck2 test //:webapp_static_dev_hmr_local_ts_dep_e2e`
-- `buck2 test //:template_conventions` (or equivalent template contract target in this repo)
+- `buck2 test //:scaffolding_webapp_static_dev_hmr_local_ts_dep`
+- `buck2 test //:scaffolding_template_conventions_metadata_cquery`
 
 ### Acceptance Criteria
 
@@ -128,9 +128,9 @@ local dependencies so client and server render paths both live-update.
 
 ### Verification Commands
 
-- `buck2 test //:webapp_ssr_vite_dev_hmr_local_ts_dep_e2e`
+- `buck2 test //:scaffolding_webapp_ssr_vite_dev_hmr_local_ts_dep` (new in PR-2)
 - `buck2 test //:scaffolding_webapp_ssr_vite_scaffold_includes_sample_test`
-- `buck2 test //:template_conventions` (or equivalent template contract target in this repo)
+- `buck2 test //:scaffolding_template_conventions_metadata_cquery`
 
 ### Acceptance Criteria
 
@@ -201,9 +201,9 @@ across static, SSR vite, and SSR next templates.
 
 ### Verification Commands
 
-- `buck2 test //:webapp_ssr_next_dev_hmr_local_ts_dep_e2e`
+- `buck2 test //:scaffolding_webapp_ssr_next_dev_hmr_local_ts_dep` (new in PR-3)
 - `buck2 test //:scaffolding_webapp_ssr_next_contracts`
-- `buck2 test //:template_conventions` (or equivalent template contract target in this repo)
+- `buck2 test //:scaffolding_template_conventions_metadata_cquery`
 
 ### Acceptance Criteria
 
