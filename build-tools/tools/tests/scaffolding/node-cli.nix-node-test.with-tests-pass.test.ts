@@ -50,7 +50,7 @@ test(
       // Align the fixed-output hash mapping for this importer before building node-test.
       await $({
         stdio: "inherit",
-      })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --force --lockfile ${lockfile}`;
+      })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${lockfile}`;
 
       // 5) Build the node-test derivation; sample tests should pass
       const out = await (async () => {

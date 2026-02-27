@@ -1,4 +1,3 @@
 {
-  "@apps/demo-vite-ssr": "//projects/apps/demo-vite-ssr:app",
   "@apps/my-app": "//projects/apps/my-app:app"
 }

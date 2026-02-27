@@ -17,6 +17,7 @@ import {
 import { handleNonDefaultImporter } from "./update-pnpm-hash/nondefault.ts";
 import { buildStore, buildUnfixedAndHash, extractHash } from "./update-pnpm-hash/nix.ts";
 import {
+  installLockKeyForImporter,
   normalizeImporter,
   pnpmStoreAttrFromImporter,
   pnpmStoreUnfixedAttrFromImporter,
@@ -42,15 +43,15 @@ async function inner() {
   const lockAbs = path.join(repoRoot, relLock);
   const markerPath = verifiedMarkerPath(repoRoot, importer);
 
-  // If forcing, pre-write placeholder digest to bump the FOD derivation and force a rebuild
   const key = relLock;
-  const placeholder = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
   if (force) {
-    // Known placeholder value also used in node-modules.nix
-    await updateNodeModulesHashesJson(key, placeholder);
+    await updateNodeModulesHashesJson(key, "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
   }
   const existingHash = await readNodeModulesHashForLockfile(key);
-  const hasValidExistingHash = !force && !!existingHash && existingHash !== placeholder;
+  const hasValidExistingHash =
+    !force &&
+    !!existingHash &&
+    existingHash !== "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
   const existingLockHash = await sha256File(lockAbs);
   const existingMarker = await readVerifiedMarker(markerPath);
 
@@ -75,14 +76,13 @@ async function inner() {
   }
 
   if (!nonDefaultImporter && hasValidExistingHash) {
-    const lockHash = existingLockHash;
     const marker = existingMarker;
     if (
-      lockHash &&
+      existingLockHash &&
       marker &&
       marker.importer === importer &&
       marker.lockfile === key &&
-      marker.lockHash === lockHash &&
+      marker.lockHash === existingLockHash &&
       marker.hashValue === existingHash
     ) {
       console.log(
@@ -188,11 +188,9 @@ async function inner() {
   }
 
   if (!suggested) {
-    console.error(
+    throw new Error(
       "pnpm-store still failing and no suggested hash found\n\n" + (verify.output || ""),
     );
-    process.exit(1);
-    return;
   }
   const nextHash: string = suggested;
 
@@ -229,14 +227,20 @@ async function inner() {
   }
   console.log("pnpm-store:", storeAttr, "hash updated and build succeeded");
 }
-
 async function main() {
   if (String(process.env.INSTALL_LOCK_SKIP || "").trim() === "1") {
-    await inner();
-    return;
+    return inner();
   }
-  await withExclusiveInstallLock("node-modules", inner, {
+  const { lockfile } = parseUpdatePnpmHashArgs();
+  const installLockKey = installLockKeyForImporter(
+    normalizeImporter(path.posix.dirname(repoRelativeLockfilePath(process.cwd(), lockfile))),
+  );
+  const lockScopeRaw = String(process.env.REPO_ROOT || process.env.WORKSPACE_ROOT || "").trim();
+  const lockScopeRoot =
+    lockScopeRaw && path.isAbsolute(lockScopeRaw) ? path.resolve(lockScopeRaw) : undefined;
+  await withExclusiveInstallLock(installLockKey, inner, {
     verbose: String(process.env.INSTALL_LOCK_VERBOSE || "").trim() === "1",
+    scopeRootAbs: lockScopeRoot,
   });
 }
 

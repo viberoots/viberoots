@@ -87,10 +87,17 @@ Default local URL:
 http://127.0.0.1:5173
 ```
 
+Local workspace TypeScript dependencies update in the same dev session when they are workspace-linked (`workspace:`, `link:`, or `file:`) and imported from app code used by client or SSR render paths.
+
 Expected SSR contract failures:
 
 - Missing SSR entry module: `SSR contract error: failed to load /src/entry-server.ts: ...`
 - Invalid SSR render export: `SSR contract error: /src/entry-server.ts must export a render(url) function`
+
+Local dependency troubleshooting:
+
+- If local dependency edits do not apply on SSR paths, verify `vite.config.ts` includes `ssr.noExternal` for workspace-linked dependency package names.
+- If local dependency source resolves outside the app root, verify `vite.config.ts` keeps `server.fs.allow` scoped to the workspace root.
 {% endif %}
 
 ## Node tests (nix_node_test)

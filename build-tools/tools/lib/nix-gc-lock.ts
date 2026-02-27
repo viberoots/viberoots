@@ -1,5 +1,29 @@
 import { spawnSync } from "node:child_process";
 
+function isExactTokenOrNixBin(token: string, binName: "nix" | "nix-store"): boolean {
+  if (token === binName) return true;
+  return token.endsWith(`/bin/${binName}`);
+}
+
+export function isNixGcCommand(cmd: string): boolean {
+  const tokens = String(cmd || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (tokens.length === 0) return false;
+  for (let i = 0; i < tokens.length; i += 1) {
+    const token = tokens[i];
+    if (isExactTokenOrNixBin(token, "nix") && tokens[i + 1] === "store" && tokens[i + 2] === "gc") {
+      return true;
+    }
+    if (isExactTokenOrNixBin(token, "nix-store")) {
+      const rest = tokens.slice(i + 1);
+      if (rest.includes("--gc") || rest.includes("-gc")) return true;
+    }
+  }
+  return false;
+}
+
 export function activeNixGcPids(): number[] {
   const out = spawnSync("ps", ["-axo", "pid=,command="], {
     encoding: "utf8",
@@ -15,11 +39,7 @@ export function activeNixGcPids(): number[] {
     const pid = Number(s.slice(0, i).trim());
     const cmd = s.slice(i + 1).trim();
     if (!Number.isFinite(pid) || pid <= 0 || !cmd) continue;
-    if (
-      cmd.includes("nix store gc") ||
-      cmd.includes("nix-store --gc") ||
-      cmd.includes("nix-store -gc")
-    ) {
+    if (isNixGcCommand(cmd)) {
       pids.push(pid);
     }
   }

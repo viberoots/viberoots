@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { isNixGcCommand } from "../../lib/nix-gc-lock.ts";
 import { importerLockfileNeedsRegen } from "../../lib/pnpm-importer-lockfile.ts";
 
 async function activeNixGcPids(): Promise<number[]> {
@@ -19,11 +20,7 @@ async function activeNixGcPids(): Promise<number[]> {
     const pid = Number(s.slice(0, firstSpace).trim());
     const command = s.slice(firstSpace + 1).trim();
     if (!Number.isFinite(pid) || pid <= 0 || !command) continue;
-    if (
-      command.includes("nix store gc") ||
-      command.includes("nix-store --gc") ||
-      command.includes("nix-store -gc")
-    ) {
+    if (isNixGcCommand(command)) {
       pids.push(pid);
     }
   }

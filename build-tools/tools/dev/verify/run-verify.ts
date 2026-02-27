@@ -204,6 +204,9 @@ export async function runVerify(): Promise<void> {
     root,
     analysisDir,
     processGroupIdToKill: pgid,
+    onTrigger: async (reason) => {
+      await appendVerifyLogLine(lock.logFile, `[verify] safety-rails stop: ${reason}`);
+    },
   });
   const status = await spawned.wait();
   rails.stop();

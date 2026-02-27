@@ -89,3 +89,10 @@ export function repoRelativeLockfilePath(repoRoot: string, lockfileArg?: string)
   const rootReal = safeRealpath(repoRoot);
   return path.relative(rootReal, abs).split(path.sep).join("/");
 }
+
+export function installLockKeyForImporter(importer: string): string {
+  const key = normalizeImporter(importer);
+  const suffix =
+    key === "." ? "root" : key.replace(/[\\/]+/g, "-").replace(/[^A-Za-z0-9._-]/g, "-");
+  return `node-modules:${suffix}`;
+}

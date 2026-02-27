@@ -33,8 +33,8 @@ function repoIdentity(): string {
   return cwd;
 }
 
-function lockPathFor(key: string): string {
-  const id = repoIdentity();
+function lockPathFor(key: string, scopeRootAbs?: string): string {
+  const id = scopeRootAbs || repoIdentity();
   const h = crypto.createHash("sha256").update(`${id}::${key}`).digest("hex").slice(0, 16);
   // Use a stable system-wide directory to avoid test sandboxes or dev shells changing TMPDIR.
   // On POSIX, prefer /tmp; on Windows, fallback to os.tmpdir().
@@ -50,7 +50,7 @@ async function sleep(ms: number) {
 export async function withExclusiveInstallLock<T>(
   key: string,
   fn: () => Promise<T>,
-  opts?: { timeoutMs?: number; staleMs?: number; verbose?: boolean },
+  opts?: { timeoutMs?: number; staleMs?: number; verbose?: boolean; scopeRootAbs?: string },
 ): Promise<T> {
   const envTimeout = Number(process.env.INSTALL_LOCK_TIMEOUT_MS || "");
   const envStale = Number(process.env.INSTALL_LOCK_STALE_MS || "");
@@ -63,7 +63,7 @@ export async function withExclusiveInstallLock<T>(
   const forceAfterMs =
     Number.isFinite(envForceAfter) && envForceAfter > 0 ? envForceAfter : Infinity;
   const verbose = opts?.verbose ?? false;
-  const p = lockPathFor(key);
+  const p = lockPathFor(key, opts?.scopeRootAbs);
   const parent = path.dirname(p);
   await fsp.mkdir(parent, { recursive: true });
   const dbg = String(process.env.INSTALL_LOCK_DEBUG || "").trim() === "1";

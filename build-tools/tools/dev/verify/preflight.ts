@@ -1,4 +1,5 @@
 import { appendVerifyLogLine } from "./process-control.ts";
+import { isNixGcCommand } from "../../lib/nix-gc-lock.ts";
 
 export async function activeNixGcProcesses(): Promise<Array<{ pid: number; command: string }>> {
   const out = await $({
@@ -16,11 +17,7 @@ export async function activeNixGcProcesses(): Promise<Array<{ pid: number; comma
     const pid = Number(s.slice(0, firstSpace).trim());
     const command = s.slice(firstSpace + 1).trim();
     if (!Number.isFinite(pid) || pid <= 0 || !command) continue;
-    if (
-      command.includes("nix store gc") ||
-      command.includes("nix-store --gc") ||
-      command.includes("nix-store -gc")
-    ) {
+    if (isNixGcCommand(command)) {
       rows.push({ pid, command });
     }
   }

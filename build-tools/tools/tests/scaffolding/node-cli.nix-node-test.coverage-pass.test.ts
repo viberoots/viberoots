@@ -8,7 +8,6 @@ import { runInTemp } from "../lib/test-helpers";
 process.env.TEST_NEED_DEV_ENV = "1";
 process.env.NIX_PNPM_ALLOW_GENERATE = "1";
 process.env.NIX_PNPM_FETCH_TIMEOUT = process.env.NIX_PNPM_FETCH_TIMEOUT || "600";
-process.env.COVERAGE = "1";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
@@ -43,7 +42,7 @@ test(
       // Align the fixed-output hash mapping for this importer before building node-test.
       await $({
         stdio: "inherit",
-      })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --force --lockfile ${lockfile}`;
+      })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${lockfile}`;
 
       // Build the node-test derivation with coverage
       const out = await (async () => {
@@ -56,7 +55,10 @@ test(
           .filter(Boolean)
           .join(" ");
         const cmd = `set -euo pipefail; timeout ${TIMEOUT_SECS}s nix build "${tmp}#node-test.${sanitized}" --impure --no-link --accept-flake-config --builders "" --print-out-paths ${flags}`;
-        return await $({ stdio: "pipe" })`bash --noprofile --norc -c ${cmd}`;
+        return await $({
+          stdio: "pipe",
+          env: { ...process.env, COVERAGE: "1" },
+        })`bash --noprofile --norc -c ${cmd}`;
       })();
       const outPath =
         String(out.stdout || "")

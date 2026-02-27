@@ -62,7 +62,8 @@ export default defineConfig({
   },
   cacheDir: ".vite-cache",
   optimizeDeps: {
-    disabled: true,
+    noDiscovery: true,
+    include: [],
     exclude: optimizeDepsExclude,
   },
 });

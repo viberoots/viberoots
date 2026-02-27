@@ -2,9 +2,12 @@ import "zx/globals";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { activeNixGcProcesses } from "./preflight.ts";
 
 function parseNum(s: string | undefined): number | null {
-  const n = Number(String(s || "").trim());
+  const raw = String(s ?? "").trim();
+  if (!raw) return null;
+  const n = Number(raw);
   if (!Number.isFinite(n)) return null;
   return n;
 }
@@ -13,6 +16,11 @@ function defaultOrNonNegative(envVal: number | null, def: number): number {
   if (envVal == null) return def;
   if (!Number.isFinite(envVal)) return def;
   return Math.max(0, envVal);
+}
+
+function defaultOrAtLeast(envVal: number | null, def: number, min: number): number {
+  if (envVal == null || !Number.isFinite(envVal)) return Math.max(min, def);
+  return Math.max(min, envVal);
 }
 
 async function freeGiBForPath(p: string): Promise<number | null> {
@@ -86,8 +94,10 @@ export function decideVerifySafetyRailsTrigger(opts: {
 export type VerifySafetyRailsPollDeps = {
   freeGiBForPath: (p: string) => Promise<number | null>;
   writeSnapshot: (dir: string, reason: string) => Promise<void>;
+  onTrigger: (reason: string) => Promise<void>;
   killProcessGroup: (processGroupIdToKill: number, signal: NodeJS.Signals) => void;
   setTimeoutFn: (fn: () => void, ms: number) => void;
+  activeNixGcProcesses: () => Promise<Array<{ pid: number; command: string }>>;
 };
 
 export async function pollVerifySafetyRailsOnce(opts: {
@@ -103,6 +113,26 @@ export async function pollVerifySafetyRailsOnce(opts: {
   if (cur == null) return null;
   await appendLine(opts.telemetryPath, `${Date.now()} freeGiB=${cur}`);
 
+  const activeGc = await opts.deps.activeNixGcProcesses();
+  if (activeGc.length > 0) {
+    const sample = activeGc
+      .slice(0, 3)
+      .map((p) => `${p.pid}:${p.command.slice(0, 120)}`)
+      .join(" | ");
+    const reason = `active nix gc process detected during verify (${activeGc.length}): ${sample}`;
+    await opts.deps.onTrigger(reason);
+    await opts.deps.writeSnapshot(opts.analysisDir, reason);
+    try {
+      opts.deps.killProcessGroup(opts.processGroupIdToKill, "SIGTERM");
+    } catch {}
+    opts.deps.setTimeoutFn(() => {
+      try {
+        opts.deps.killProcessGroup(opts.processGroupIdToKill, "SIGKILL");
+      } catch {}
+    }, 10_000);
+    return { shouldStop: true, reason };
+  }
+
   const decision = decideVerifySafetyRailsTrigger({
     baseFreeGiB: opts.baseFreeGiB,
     curFreeGiB: cur,
@@ -111,6 +141,7 @@ export async function pollVerifySafetyRailsOnce(opts: {
   });
   if (!decision) return null;
 
+  await opts.deps.onTrigger(decision.reason);
   await opts.deps.writeSnapshot(opts.analysisDir, decision.reason);
   try {
     opts.deps.killProcessGroup(opts.processGroupIdToKill, "SIGTERM");
@@ -127,10 +158,11 @@ export async function startVerifySafetyRails(opts: {
   root: string;
   analysisDir: string;
   processGroupIdToKill: number;
+  onTrigger?: (reason: string) => Promise<void>;
 }): Promise<{ stop: () => void }> {
   const lowSpace = defaultOrNonNegative(parseNum(process.env.VERIFY_LOW_SPACE_GB), 5);
   const dropBudget = defaultOrNonNegative(parseNum(process.env.VERIFY_NIX_DROP_BUDGET_GB), 20);
-  const intervalSec = parseNum(process.env.VERIFY_SAFETY_RAILS_POLL_SECS) ?? 5;
+  const intervalSec = defaultOrAtLeast(parseNum(process.env.VERIFY_SAFETY_RAILS_POLL_SECS), 5, 1);
 
   const base = await freeGiBForPath("/nix/store");
   if (base == null) {
@@ -171,12 +203,16 @@ export async function startVerifySafetyRails(opts: {
             freeGiBForPath,
             writeSnapshot: async (dir, reason) =>
               writeVerifySafetyRailsTriggerSnapshot(dir, reason),
+            onTrigger: async (reason) => {
+              await opts.onTrigger?.(reason);
+            },
             killProcessGroup: (pgid, signal) => {
               process.kill(-pgid, signal);
             },
             setTimeoutFn: (fn, ms) => {
               setTimeout(fn, ms);
             },
+            activeNixGcProcesses,
           },
         });
         if (decision) stopped = true;

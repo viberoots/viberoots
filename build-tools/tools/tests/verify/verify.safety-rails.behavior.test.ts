@@ -24,6 +24,8 @@ test("verify safety rails: triggers write snapshot and signal only the intended 
 
   const deps = {
     freeGiBForPath: async (_p: string) => nextFreeGiB,
+    activeNixGcProcesses: async () => [],
+    onTrigger: async (_reason: string) => {},
     writeSnapshot: async (dir: string, reason: string) => {
       await writeVerifySafetyRailsTriggerSnapshot(dir, reason, {
         sampleDfText: async () => "df-output\n",

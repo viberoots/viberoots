@@ -66,7 +66,8 @@ export async function runDevBuild(): Promise<void> {
     requestedMaterialize: parsed.materialize,
     isCI,
   });
-  const materialize = materializeDecision.materialize;
+  let materialize = materializeDecision.materialize;
+  let materializeReason = materializeDecision.reason;
 
   await runStartupCheck(root);
 
@@ -84,6 +85,20 @@ export async function runDevBuild(): Promise<void> {
   if (!isCI && materialize) {
     await refreshGlueAndExportGraph(root);
     exportedGraphDuringMaterialize = true;
+    if (materializeReason === "prebuild-guard-stale") {
+      const afterRefreshDecision = await shouldMaterializeByDefault({
+        root,
+        requestedMaterialize: parsed.materialize,
+        isCI,
+      });
+      if (!afterRefreshDecision.materialize) {
+        materialize = false;
+        materializeReason = "prebuild-fresh-after-refresh";
+        console.log("[dev-build] fast-path: skipping pure materialization after glue refresh");
+      } else {
+        materializeReason = afterRefreshDecision.reason;
+      }
+    }
   }
 
   await materializePureGraphIfEnabled({

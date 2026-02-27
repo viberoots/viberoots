@@ -74,7 +74,7 @@ test(
         await $({
           stdio: "inherit",
           env,
-        })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --force --lockfile ${lockfile}`;
+        })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${lockfile}`;
 
         // Build the importer's Node tests; the builder links the Go c-archive into the addon
         const testOut = await (async () => {

@@ -45,7 +45,7 @@ test(
       await $({
         stdio: "inherit",
         env,
-      })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --force --lockfile ${lockfile}`;
+      })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${lockfile}`;
       await $`git add build-tools/tools/nix/node-modules.hashes.json`;
       await $`git commit -m update-hashes`.nothrow();
 

@@ -31,7 +31,7 @@ test("node lib: nix_node_test target passes when no tests present", async () => 
     await $({
       stdio: "inherit",
       env: { ...process.env, NIX_PNPM_ALLOW_GENERATE: "1" },
-    })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --force --lockfile projects/libs/demo/pnpm-lock.yaml`;
+    })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile projects/libs/demo/pnpm-lock.yaml`;
 
     // Confirm Nix sees the importer lockfile path
     await $({
