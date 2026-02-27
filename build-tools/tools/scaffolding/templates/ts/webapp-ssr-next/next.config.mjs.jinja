@@ -1,6 +1,47 @@
+import * as fsp from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const appRoot = fileURLToPath(new URL(".", import.meta.url));
+
+function readPackageJson(pkgPath) {
+  try {
+    return JSON.parse(fsp.readFileSync(pkgPath, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+function workspaceDependencyNames(pkg) {
+  const specs = {
+    ...(pkg.dependencies || {}),
+    ...(pkg.devDependencies || {}),
+    ...(pkg.peerDependencies || {}),
+    ...(pkg.optionalDependencies || {}),
+  };
+  return Object.entries(specs)
+    .filter(([, spec]) => {
+      return (
+        spec.startsWith("workspace:") ||
+        spec.startsWith("link:") ||
+        spec.startsWith("file:")
+      );
+    })
+    .map(([name]) => name)
+    .sort();
+}
+
+const transpilePackages = workspaceDependencyNames(
+  readPackageJson(path.join(appRoot, "package.json")),
+);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  transpilePackages,
+  experimental: {
+    externalDir: true,
+  },
 };
 
 export default nextConfig;

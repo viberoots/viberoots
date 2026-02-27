@@ -95,6 +95,11 @@ const EXPECTATIONS: TemplateExpectation[] = [
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/"],
   },
   {
+    script: "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-hmr.local-ts-dep.test.ts",
+    requiredLabels: ["template:ts/webapp-ssr-next", "template:contract"],
+    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/"],
+  },
+  {
     script: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.baseline-contract.test.ts",
     requiredLabels: ["template:ts/webapp-ssr-vite", "template:contract"],
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/"],

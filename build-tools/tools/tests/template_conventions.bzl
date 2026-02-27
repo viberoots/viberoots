@@ -70,6 +70,10 @@ _TEMPLATE_TEST_CONVENTIONS = {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next"],
         "classification": "template:contract",
     },
+    "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-hmr.local-ts-dep.test.ts": {
+        "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next"],
+        "classification": "template:contract",
+    },
     "build-tools/tools/tests/scaffolding/webapp-ssr-vite.baseline-contract.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite"],
         "classification": "template:contract",

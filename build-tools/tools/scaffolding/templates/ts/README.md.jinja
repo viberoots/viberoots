@@ -26,6 +26,8 @@ Dev mode:
 pnpm run dev:ssr
 ```
 
+Local workspace TypeScript dependencies update in the same dev session when they are workspace-linked (`workspace:`, `link:`, or `file:`) and imported from app code used by client or SSR render paths.
+
 Production build and startup:
 
 ```bash
@@ -38,6 +40,11 @@ Server-side Wasm contract artifact:
 ```text
 dist/server/wasm-contract/top.wasm
 ```
+
+Local dependency troubleshooting:
+
+- If local dependency edits do not apply, verify `next.config.mjs` includes `transpilePackages` entries for workspace-linked dependency package names.
+- If local dependency source resolves outside the app root, verify `next.config.mjs` keeps `experimental.externalDir = true`.
 {% endif %}
 {% if template == "webapp-ssr-next" %}
 This is a Next.js SSR scaffold with an explicit Node server wrapper for production startup.

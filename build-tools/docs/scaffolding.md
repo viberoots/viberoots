@@ -55,19 +55,25 @@ For TypeScript SSR templates, I keep framework-specific names explicit:
 
 Both examples create the destination under the canonical location for the chosen language/template. The CLI resolves synonyms (e.g., `lib`/`library`) and normalizes names.
 
-### Local workspace TS dependency live updates (`ts/webapp-static`)
+### Local workspace TS dependency live updates (`ts/webapp-static`, `ts/webapp-ssr-vite`, `ts/webapp-ssr-next`)
 
-For `scaf new ts webapp-static <name>`, the generated `vite.config.ts` includes a Phase-1 local-dependency contract:
+For `scaf new ts webapp-static <name>` and `scaf new ts webapp-ssr-vite <name>`, the generated `vite.config.ts` includes a Phase-1 local-dependency contract:
 
 - `server.fs.allow` includes the workspace root so source imports from sibling workspace packages resolve in dev mode.
 - `optimizeDeps.exclude` is derived from `workspace:`, `link:`, and `file:` dependency specs in the app importer `package.json`.
-- `optimizeDeps.disabled` remains enabled for fast, deterministic startup in this repository.
+- `webapp-ssr-vite` additionally sets `ssr.noExternal` from that same package list.
+
+For `scaf new ts webapp-ssr-next <name>`, the generated `next.config.mjs` includes:
+
+- `transpilePackages` derived from the same `workspace:`, `link:`, and `file:` dependency specs.
+- `experimental.externalDir = true` so workspace-linked source outside the app directory is resolvable in dev mode.
 
 Troubleshooting when local dependency edits do not refresh:
 
 - Confirm the dependency spec uses `workspace:`, `link:`, or `file:` in the importer `package.json`.
 - Restart `pnpm run dev` after changing dependency specs in `package.json`.
-- Prefer source-based imports for local workspace packages during template development checks.
+- For Vite SSR templates, verify `ssr.noExternal` still includes local workspace package names.
+- For Next SSR templates, verify `transpilePackages` includes local workspace package names and `experimental.externalDir` remains enabled.
 
 #### Subcommands and semantics
 
