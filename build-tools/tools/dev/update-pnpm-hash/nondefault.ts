@@ -5,6 +5,14 @@ import { generateImporterLockfile, makeFilteredFlakeRef } from "./lockfile.ts";
 import { buildStore, buildUnfixedAndHash, extractHash } from "./nix.ts";
 import { type PnpmStoreVerifiedMarker, writeVerifiedMarker } from "./verified-marker.ts";
 
+const newActivity = (): ManagedCommandActivity => ({
+  startedAtMs: Date.now(),
+  lastOutputAtMs: 0,
+  lastEventSnippet: "",
+  stdoutBytes: 0,
+  stderrBytes: 0,
+});
+
 export async function handleNonDefaultImporter(opts: {
   importer: string;
   key: string;
@@ -37,100 +45,6 @@ export async function handleNonDefaultImporter(opts: {
     console.log(
       `[update-pnpm-hash] importer=${opts.importer} step=stale-existing-hash attr=${opts.storeAttr} lockfile=${opts.key}`,
     );
-    try {
-      console.log(
-        `[update-pnpm-hash] importer=${opts.importer} step=prepare-filtered-flake attr=${opts.storeAttr}`,
-      );
-      tempFlake = await withHeartbeat(
-        `importer=${opts.importer} step=prepare-filtered-flake attr=${opts.storeAttr}`,
-        makeFilteredFlakeRef(opts.repoRoot),
-      );
-      const prewarmFlakeRef = tempFlake.flakeRef.replace(/#pnpm$/, "");
-      console.log(
-        `[update-pnpm-hash] importer=${opts.importer} step=verify-existing-hash attr=${opts.storeAttr} timeout=${opts.timeoutSec}s`,
-      );
-      const verifyActivity: ManagedCommandActivity = {
-        startedAtMs: Date.now(),
-        lastOutputAtMs: 0,
-        lastEventSnippet: "",
-        stdoutBytes: 0,
-        stderrBytes: 0,
-      };
-      const verifyExisting = await withHeartbeat(
-        `importer=${opts.importer} step=verify-existing-hash attr=${opts.storeAttr}`,
-        buildStore(opts.storeAttr, prewarmFlakeRef, verifyActivity),
-        { activity: verifyActivity },
-      );
-      if (verifyExisting.ok) {
-        if (opts.existingLockHash) {
-          await writeVerifiedMarker(opts.markerPath, {
-            importer: opts.importer,
-            lockfile: opts.key,
-            lockHash: opts.existingLockHash,
-            hashValue: opts.existingHash,
-          });
-        }
-        console.log(
-          `[update-pnpm-hash] importer=${opts.importer} step=skip-verified-existing-hash attr=${opts.storeAttr} lockfile=${opts.key}`,
-        );
-        return true;
-      }
-      const suggestedFromVerify = extractHash(verifyExisting.output || "");
-      if (suggestedFromVerify) {
-        const nextHash = suggestedFromVerify;
-        await updateNodeModulesHashesJson(opts.key, nextHash);
-        if (tempFlake) {
-          await tempFlake.cleanup();
-          tempFlake = null;
-        }
-        console.log(
-          `[update-pnpm-hash] importer=${opts.importer} step=prepare-filtered-flake attr=${opts.storeAttr}`,
-        );
-        tempFlake = await withHeartbeat(
-          `importer=${opts.importer} step=prepare-filtered-flake attr=${opts.storeAttr}`,
-          makeFilteredFlakeRef(opts.repoRoot),
-        );
-        const refreshedFlakeRef = tempFlake.flakeRef.replace(/#pnpm$/, "");
-        console.log(
-          `[update-pnpm-hash] importer=${opts.importer} step=fixed-build-after-hash attr=${opts.storeAttr} timeout=${opts.timeoutSec}s`,
-        );
-        const verifyAfterActivity: ManagedCommandActivity = {
-          startedAtMs: Date.now(),
-          lastOutputAtMs: 0,
-          lastEventSnippet: "",
-          stdoutBytes: 0,
-          stderrBytes: 0,
-        };
-        const verifyAfterHash = await withHeartbeat(
-          `importer=${opts.importer} step=fixed-build-after-hash attr=${opts.storeAttr}`,
-          buildStore(opts.storeAttr, refreshedFlakeRef, verifyAfterActivity),
-          { activity: verifyAfterActivity },
-        );
-        if (!verifyAfterHash.ok) {
-          console.error(
-            "pnpm-store still failing after hash update\n\n" + String(verifyAfterHash.output || ""),
-          );
-          process.exit(1);
-          return true;
-        } else {
-          if (opts.existingLockHash) {
-            await writeVerifiedMarker(opts.markerPath, {
-              importer: opts.importer,
-              lockfile: opts.key,
-              lockHash: opts.existingLockHash,
-              hashValue: nextHash,
-            });
-          }
-          console.log("pnpm-store:", opts.storeAttr, "hash updated and build succeeded");
-          return true;
-        }
-      }
-    } finally {
-      if (tempFlake) {
-        await tempFlake.cleanup();
-        tempFlake = null;
-      }
-    }
   }
   try {
     console.log(
@@ -144,13 +58,7 @@ export async function handleNonDefaultImporter(opts: {
     console.log(
       `[update-pnpm-hash] importer=${opts.importer} step=unfixed-build attr=${opts.unfixedAttr} timeout=${opts.timeoutSec}s`,
     );
-    const unfixedActivity: ManagedCommandActivity = {
-      startedAtMs: Date.now(),
-      lastOutputAtMs: 0,
-      lastEventSnippet: "",
-      stdoutBytes: 0,
-      stderrBytes: 0,
-    };
+    const unfixedActivity = newActivity();
     let pre = await withHeartbeat(
       `importer=${opts.importer} step=unfixed-build attr=${opts.unfixedAttr}`,
       buildUnfixedAndHash(opts.unfixedAttr, prewarmFlakeRef, unfixedActivity),
@@ -161,13 +69,7 @@ export async function handleNonDefaultImporter(opts: {
       console.log(
         `[update-pnpm-hash] importer=${opts.importer} step=unfixed-build-retry attr=${opts.unfixedAttr} timeout=${opts.timeoutSec}s`,
       );
-      const retryActivity: ManagedCommandActivity = {
-        startedAtMs: Date.now(),
-        lastOutputAtMs: 0,
-        lastEventSnippet: "",
-        stdoutBytes: 0,
-        stderrBytes: 0,
-      };
+      const retryActivity = newActivity();
       pre = await withHeartbeat(
         `importer=${opts.importer} step=unfixed-build-retry attr=${opts.unfixedAttr}`,
         buildUnfixedAndHash(opts.unfixedAttr, prewarmFlakeRef, retryActivity),
@@ -181,8 +83,64 @@ export async function handleNonDefaultImporter(opts: {
       process.exit(1);
       return true;
     }
-    const sri: string = pre.sri;
+    let sri: string = pre.sri;
     await updateNodeModulesHashesJson(opts.key, sri);
+    if (tempFlake) {
+      await tempFlake.cleanup();
+      tempFlake = null;
+    }
+    console.log(
+      `[update-pnpm-hash] importer=${opts.importer} step=prepare-filtered-flake attr=${opts.storeAttr}`,
+    );
+    tempFlake = await withHeartbeat(
+      `importer=${opts.importer} step=prepare-filtered-flake attr=${opts.storeAttr}`,
+      makeFilteredFlakeRef(opts.repoRoot),
+    );
+    const refreshedFlakeRef = tempFlake.flakeRef.replace(/#pnpm$/, "");
+    console.log(
+      `[update-pnpm-hash] importer=${opts.importer} step=fixed-build-after-hash attr=${opts.storeAttr} timeout=${opts.timeoutSec}s`,
+    );
+    const verifyAfterActivity = newActivity();
+    const verifyAfterHash = await withHeartbeat(
+      `importer=${opts.importer} step=fixed-build-after-hash attr=${opts.storeAttr}`,
+      buildStore(opts.storeAttr, refreshedFlakeRef, verifyAfterActivity),
+      { activity: verifyAfterActivity },
+    );
+    if (!verifyAfterHash.ok) {
+      const suggestedFromFixed = extractHash(String(verifyAfterHash.output || ""));
+      if (suggestedFromFixed && suggestedFromFixed !== sri) {
+        sri = suggestedFromFixed;
+        await updateNodeModulesHashesJson(opts.key, sri);
+        if (tempFlake) {
+          await tempFlake.cleanup();
+          tempFlake = null;
+        }
+        tempFlake = await withHeartbeat(
+          `importer=${opts.importer} step=prepare-filtered-flake attr=${opts.storeAttr}`,
+          makeFilteredFlakeRef(opts.repoRoot),
+        );
+        const retryFlakeRef = tempFlake.flakeRef.replace(/#pnpm$/, "");
+        const retryAfterActivity = newActivity();
+        const retryAfterHash = await withHeartbeat(
+          `importer=${opts.importer} step=fixed-build-after-hash-retry attr=${opts.storeAttr}`,
+          buildStore(opts.storeAttr, retryFlakeRef, retryAfterActivity),
+          { activity: retryAfterActivity },
+        );
+        if (!retryAfterHash.ok) {
+          console.error(
+            "pnpm-store still failing after hash update\n\n" + String(retryAfterHash.output || ""),
+          );
+          process.exit(1);
+          return true;
+        }
+      } else {
+        console.error(
+          "pnpm-store still failing after hash update\n\n" + String(verifyAfterHash.output || ""),
+        );
+        process.exit(1);
+        return true;
+      }
+    }
     if (opts.existingLockHash) {
       await writeVerifiedMarker(opts.markerPath, {
         importer: opts.importer,

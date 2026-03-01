@@ -19,21 +19,14 @@ test("update-pnpm-hash skips non-default recompute when existing hash is present
   if (!nondefaultTxt.includes("step=stale-existing-hash")) {
     throw new Error("nondefault.ts must log stale-existing-hash when marker validation fails");
   }
-  if (!nondefaultTxt.includes("step=verify-existing-hash")) {
+  if (nondefaultTxt.includes("step=verify-existing-hash")) {
     throw new Error(
-      "nondefault.ts must verify fixed store using existing hash before unfixed rebuild",
+      "nondefault.ts must not run speculative verify-existing-hash when marker validation fails",
     );
   }
-  if (
-    !nondefaultTxt.includes('const suggestedFromVerify = extractHash(verifyExisting.output || "");')
-  ) {
+  if (nondefaultTxt.includes("step=skip-verified-existing-hash")) {
     throw new Error(
-      "nondefault.ts must parse suggested hash from verify-existing-hash failures before unfixed rebuild",
-    );
-  }
-  if (!nondefaultTxt.includes("step=skip-verified-existing-hash")) {
-    throw new Error(
-      "nondefault.ts must skip non-default rebuild after successful fixed-store verification",
+      "nondefault.ts must not log skip-verified-existing-hash for stale non-default markers",
     );
   }
   if (!nondefaultTxt.includes("step=skip-existing-hash")) {

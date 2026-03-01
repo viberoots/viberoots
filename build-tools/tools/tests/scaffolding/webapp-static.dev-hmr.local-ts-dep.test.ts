@@ -10,10 +10,10 @@ import {
   evaluateRenderedAppText,
   extractImportedUrl,
   httpGet,
+  moduleUrlResolvesToFile,
   pickFreePort,
   stopServer,
   toAbsoluteModuleUrl,
-  viteFsUrlFor,
   waitForHttpOk,
 } from "./lib/webapp-static-hmr";
 
@@ -62,7 +62,6 @@ test(
       const appAbs = path.join(tmp, "projects", "apps", "demo-web");
       const appMainPath = path.join(appAbs, "src", "main.ts");
       const libSourcePath = path.join(tmp, "projects", "libs", "demo-lib", "src", "index.ts");
-      const libSourceFsPath = viteFsUrlFor(libSourcePath);
       const appMainSource = [
         'import { depMessage } from "../../../libs/demo-lib/src/index";',
         "",
@@ -154,7 +153,12 @@ test(
         const firstModule = await httpGet(firstDepModuleUrl);
         assert.equal(firstModule.status, 200);
         assert.match(firstModule.body, /phase1-a/);
-        assert.ok(firstDepModuleUrl.includes(libSourceFsPath));
+        const resolvesToSource = await moduleUrlResolvesToFile(firstDepModuleUrl, libSourcePath);
+        assert.equal(
+          resolvesToSource,
+          true,
+          `expected dependency module URL to resolve to source file ${libSourcePath}, got ${firstDepModuleUrl}`,
+        );
         const firstRenderedText = await evaluateRenderedAppText(mainModuleUrl);
         assert.equal(firstRenderedText, "dep:phase1-a");
 

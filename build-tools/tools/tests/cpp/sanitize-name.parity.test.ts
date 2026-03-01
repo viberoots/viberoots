@@ -11,10 +11,12 @@ const cases: Array<{ name: string; label: string }> = [
   { name: "case6", label: "root//projects/apps/foo:bin (config//toolchains:clang)" },
 ];
 
-async function starlarkProbeOutput(target: string, label: string): Promise<string> {
+async function starlarkProbeOutput(target: string): Promise<string> {
+  const inherited = String(
+    process.env.BUCK_ISOLATION_DIR || process.env.BUCK_NESTED_ISO || "",
+  ).trim();
   const safeTarget = target.replace(/[^a-zA-Z0-9]+/g, "_");
-  const iso = `parity_${process.pid}_${Date.now()}_${safeTarget}`;
-  const createdOwnIso = true;
+  const iso = inherited || `parity_${process.pid}_${Date.now()}_${safeTarget}`;
   try {
     await $`buck2 --isolation-dir ${iso} build ${target}`;
     const { stdout } = await $`buck2 --isolation-dir ${iso} targets --show-output ${target}`;
@@ -24,19 +26,14 @@ async function starlarkProbeOutput(target: string, label: string): Promise<strin
     if (!outName) throw new Error("no output path for " + target);
     return outName.replace(/\.txt$/, "");
   } finally {
-    // If we created a custom isolation for this script, kill only that daemon.
-    if (createdOwnIso) {
-      try {
-        await $`buck2 --isolation-dir ${iso} kill`;
-      } catch {}
-    }
+    // Let verify/test harness manage daemon lifecycle; avoid per-test cold-start churn.
   }
 }
 
 for (const c of cases) {
   const target = `//build-tools/tools/tests/cpp/sanitize:${c.name}`;
   const want = sanitizeName(c.label);
-  const got = await starlarkProbeOutput(target, c.label);
+  const got = await starlarkProbeOutput(target);
   if (got !== want) {
     console.error(`sanitize mismatch for ${c.label}: starlark='${got}' nix='${want}'`);
     process.exit(2);

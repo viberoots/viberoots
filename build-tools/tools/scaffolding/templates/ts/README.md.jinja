@@ -9,11 +9,19 @@ Dev mode with HMR:
 pnpm dev
 ```
 
+Local workspace TypeScript dependencies update in the same dev session when they are workspace-linked (`workspace:`, `link:`, or `file:`) and imported from app code.
+
 Production build via Buck (Nix under the hood):
 
 ```bash
 buck2 build //projects/apps/{{ name }}:app
 ```
+
+Local dependency troubleshooting:
+
+- If local dependency edits do not apply, verify the dependency spec in `package.json` is `workspace:`, `link:`, or `file:`.
+- If local dependency source resolves outside the app root, verify `vite.config.ts` keeps `server.fs.allow` scoped to the workspace root.
+- If local dependency edits stay stale after `package.json` changes, restart `pnpm dev`.
 {% endif %}
 {% if template == "webapp-ssr-express" %}
 This is an Express SSR scaffold with explicit production startup via a Node server entrypoint.
@@ -57,6 +65,8 @@ Dev mode:
 pnpm run dev:ssr
 ```
 
+Local workspace TypeScript dependencies update in the same dev session when they are workspace-linked (`workspace:`, `link:`, or `file:`) and imported from app code used by client or SSR render paths.
+
 Production build and startup:
 
 ```bash
@@ -69,6 +79,12 @@ Server-side Wasm contract artifact:
 ```text
 dist/server/wasm-contract/top.wasm
 ```
+
+Local dependency troubleshooting:
+
+- If local dependency edits do not apply, verify `next.config.mjs` includes `transpilePackages` entries for workspace-linked dependency package names.
+- If local dependency source resolves outside the app root, verify `next.config.mjs` keeps `experimental.externalDir = true`.
+- If local dependency edits stay stale after `package.json` changes, restart `pnpm run dev:ssr`.
 {% endif %}
 {% if template == "webapp-ssr-vite" %}
 This is a Vite-first SSR scaffold that runs development SSR through Vite middleware mode.

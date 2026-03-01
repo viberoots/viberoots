@@ -75,6 +75,11 @@ test("p uses graph-generator-selected and skips full graph-generator for runnabl
       },
     })`build-tools/tools/bin/p ${target}`;
     assert.match(String(run.stdout || ""), /selected-prod-ok/);
+    assert.doesNotMatch(
+      String(run.stderr || ""),
+      /creating filtered source snapshot/i,
+      "temp runnable path should avoid filtered flake snapshot in auto source mode",
+    );
 
     const logTxt = await fsp.readFile(nixLog, "utf8");
     assert.match(logTxt, /graph-generator-selected/);

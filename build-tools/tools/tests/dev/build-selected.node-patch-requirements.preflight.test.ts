@@ -17,6 +17,13 @@ test("build-selected runs node patch requirement preflight", async () => {
   if (!txt.includes("untrackedRequiresImpureForTargets")) {
     throw new Error(`${file} should reuse untracked impurity policy helper`);
   }
+  if (
+    !txt.includes(
+      "workspaceAbs.includes(`${path.sep}buck-out${path.sep}tmp${path.sep}tmpdir${path.sep}`)",
+    )
+  ) {
+    throw new Error(`${file} should treat repo-local buck-out/tmp/tmpdir workspaces as temp`);
+  }
 });
 
 test("node entrypoint macros use shared node patch preflight helper", async () => {

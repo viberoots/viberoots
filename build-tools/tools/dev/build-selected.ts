@@ -1,16 +1,4 @@
 #!/usr/bin/env zx-wrapper
-/**
- * build-tools/tools/dev/build-selected.ts
- *
- * Centralized helper to build a single Buck target via the Nix flake attr
- * graph-generator-selected. Prints ONLY the out path on stdout; all logs go to stderr.
- *
- * Inputs (via env):
- * - BUCK_TARGET: required label (e.g., //projects/apps/foo:foo)
- * - BUCK_GRAPH_JSON: optional path to build-tools/tools/buck/graph.json for the CURRENT workspace
- * - BUCK_TEST_SRC: optional path to current repo working tree (defaults to cwd)
- * - WORKSPACE_ROOT: optional working tree root (preferred when present in Buck actions)
- */
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { ensureGraph } from "../buck/glue-run.ts";
@@ -20,14 +8,13 @@ import { sanitizeAttrNameFromLabel } from "../lib/labels.ts";
 import { runNodeWithZx } from "../lib/node-run.ts";
 import { findRepoRoot, pathExists } from "../lib/repo.ts";
 import { getArgvTokens } from "../lib/cli.ts";
+import { withScopedEnv } from "../lib/scoped-env.ts";
 import { untrackedRequiresImpureForTargets } from "./dev-build/untracked.ts";
 import { makeFilteredFlakeRef } from "./filtered-flake.ts";
 import { resolveSelectedTargetLabel } from "./target-label-resolver.ts";
-
 function stripAnsi(s: string): string {
   return s.replace(/\x1B\[[0-9;]*[A-Za-z]/g, "").replace(/\r/g, "");
 }
-
 function targetPackageFromLabel(target: string): string {
   const t = String(target || "").trim();
   const noCell = t.startsWith("root//") ? t.slice("root//".length - 2) : t;
@@ -61,12 +48,27 @@ function parseSourceMode(argv: string[]): {
   }
   return { sourceMode, sourceError };
 }
-
 async function chooseFlakeRef(opts: {
   workspaceRoot: string;
   target: string;
   sourceMode: "auto" | "git" | "path";
 }): Promise<{ flakeRef: string; cleanup?: () => Promise<void> }> {
+  const repoRootEnv = String(process.env.REPO_ROOT || "").trim();
+  const workspaceAbs = path.resolve(opts.workspaceRoot);
+  const isLikelyTempWorkspace =
+    workspaceAbs.startsWith("/tmp/") ||
+    workspaceAbs.startsWith("/private/tmp/") ||
+    workspaceAbs.startsWith("/private/var/folders/") ||
+    workspaceAbs.includes(`${path.sep}buck-out${path.sep}tmp${path.sep}tmpdir${path.sep}`);
+  if (opts.sourceMode === "auto" && isLikelyTempWorkspace) {
+    return { flakeRef: `path:${workspaceAbs}#graph-generator-selected` };
+  }
+  if (opts.sourceMode === "auto" && repoRootEnv) {
+    const repoRootAbs = path.resolve(repoRootEnv);
+    if (repoRootAbs !== workspaceAbs) {
+      return { flakeRef: `path:${workspaceAbs}#graph-generator-selected` };
+    }
+  }
   if (opts.sourceMode === "path")
     return { flakeRef: `path:${opts.workspaceRoot}#graph-generator-selected` };
   if (opts.sourceMode === "git")
@@ -118,54 +120,48 @@ async function main() {
     process.exit(2);
   }
   const cwd = path.resolve(process.cwd());
-  // This tool must always operate on the *current working tree*.
-  //
-  // In Buck tests, the parent process often has env vars like BUCK_TEST_SRC/WORKSPACE_ROOT pointing
-  // at the developer checkout ("live repo"), but the test itself runs inside a temp repo (cwd=tmp).
-  // Using those env vars here would silently target the wrong workspace and make builds flaky.
-  const workspaceRoot = await findRepoRoot(cwd);
+  const envWorkspace = String(process.env.WORKSPACE_ROOT || process.env.BUCK_TEST_SRC || "").trim();
+  const workspaceRoot =
+    envWorkspace && (await pathExists(path.join(envWorkspace, "flake.nix")))
+      ? path.resolve(envWorkspace)
+      : await findRepoRoot(cwd);
   if (!(await pathExists(path.join(workspaceRoot, "flake.nix")))) {
     console.error(`flake.nix not found at workspace root: ${workspaceRoot}`);
     process.exit(2);
   }
   const target = await resolveSelectedTargetLabel(workspaceRoot, targetRaw, { baseDir: cwd });
-
-  // Ensure the graph exists via the canonical helper; preserve exporter env behavior
   const graphPath = path.join(workspaceRoot, "build-tools", "tools", "buck", "graph.json");
-  // Prefer working tree as BUCK_TEST_SRC so exporter operates on the correct repo root
   const importerRoots = getImporterRootsContract().workspaceRoots;
   const defaultRoots = Array.from(new Set([...importerRoots, "go", "cpp", "third_party"])).join(
     ",",
   );
   const queryRoots =
     (process.env.BUCK_QUERY_ROOTS && String(process.env.BUCK_QUERY_ROOTS).trim()) || defaultRoots;
-  process.env.BUCK_TEST_SRC = workspaceRoot;
-  // ensureGraph prefers WORKSPACE_ROOT when set; force it to the chosen workDir so we don't
-  // accidentally export a graph into the outer verify workspace when invoked from a temp repo.
-  process.env.WORKSPACE_ROOT = workspaceRoot;
-  process.env.EXPORTER_DEBUG = "1";
-  // Prefer warn-level validation during local/dev builds to avoid spurious failures in temp repos
-  if (!process.env.EXPORTER_VALIDATION) {
-    process.env.EXPORTER_VALIDATION = "warn";
-  }
-  process.env.BUCK_QUERY_ROOTS = queryRoots;
-  // Ensure ensureGraph can see the requested target for presence checks
-  process.env.BUCK_TARGET = target;
-  // Log idempotent export/use to satisfy smoke tests and aid diagnostics
-  try {
-    const existing = await fsp.readFile(graphPath, "utf8");
-    const trimmed = String(existing || "").trim();
-    if (trimmed && trimmed !== "[]") {
-      console.error(`[build-selected] using existing graph: ${graphPath}`);
-    } else {
-      console.error(`[build-selected] exporting graph to ${graphPath}`);
-    }
-  } catch {
-    console.error(`[build-selected] exporting graph to ${graphPath}`);
-  }
-  await ensureGraph();
-  process.env.BUCK_GRAPH_JSON = graphPath;
-  process.env.BUCK_TEST_SRC = workspaceRoot;
+  const exporterDebug = (process.env.EXPORTER_DEBUG || "").trim();
+  const validation = (process.env.EXPORTER_VALIDATION || "").trim() || "warn";
+  await withScopedEnv(
+    {
+      BUCK_TEST_SRC: workspaceRoot,
+      WORKSPACE_ROOT: workspaceRoot,
+      EXPORTER_DEBUG: exporterDebug,
+      EXPORTER_VALIDATION: validation,
+      BUCK_QUERY_ROOTS: queryRoots,
+      BUCK_TARGET: target,
+      BUCK_GRAPH_JSON: graphPath,
+    },
+    async () => {
+      try {
+        const existing = await fsp.readFile(graphPath, "utf8");
+        const trimmed = String(existing || "").trim();
+        if (trimmed && trimmed !== "[]")
+          console.error(`[build-selected] using existing graph: ${graphPath}`);
+        else console.error(`[build-selected] exporting graph to ${graphPath}`);
+      } catch {
+        console.error(`[build-selected] exporting graph to ${graphPath}`);
+      }
+      await ensureGraph();
+    },
+  );
   await runNodeWithZx({
     cwd: workspaceRoot,
     zxInitPath: path.join(workspaceRoot, "build-tools", "tools", "dev", "zx-init.mjs"),
@@ -179,24 +175,27 @@ async function main() {
     args: ["--check"],
     stdio: "inherit",
   });
-  // Optional debug: surface a snippet of graph.json for diagnostics when requested
-  if ((process.env.EXPORTER_DEBUG || "").trim() === "1") {
+  if (exporterDebug === "1") {
     try {
       const preview = await fsp.readFile(graphPath, "utf8");
       const head = preview.slice(0, 200).replace(/\s+/g, " ");
       console.error(`[build-selected][debug] graph.json head: ${head}`);
     } catch {}
   }
-
   console.error(`[build-selected] BUCK_TARGET=${target}`);
   const providedTargetAttr = (process.env.BUCK_TARGET_ATTR || "").trim();
   const cppTargetAttrSuffix = providedTargetAttr || sanitizeAttrNameFromLabel(target);
   console.error(`[build-selected] cppTargetAttrSuffix=${cppTargetAttrSuffix}`);
 
-  // Sanitize impure dev-override env to avoid accidental JSON parse errors in planner
   const sanitizedEnv: Record<string, string> = {
     ...process.env,
     BUCK_TARGET: target,
+    WORKSPACE_ROOT: workspaceRoot,
+    BUCK_TEST_SRC: workspaceRoot,
+    BUCK_GRAPH_JSON: graphPath,
+    BUCK_QUERY_ROOTS: queryRoots,
+    EXPORTER_VALIDATION: validation,
+    EXPORTER_DEBUG: exporterDebug,
   };
   for (const envName of allDevOverrideEnvNames()) {
     sanitizedEnv[envName] = "";
@@ -207,14 +206,21 @@ async function main() {
     target,
     sourceMode: parsedSource.sourceMode,
   });
-  const nixTrace = (process.env.EXPORTER_DEBUG || "").trim() === "1" ? "--show-trace" : "";
+  const nixTrace = exporterDebug === "1" ? "--show-trace" : "";
   const { stdout, exitCode } = await (async () => {
     try {
+      if (nixTrace) {
+        return await $({
+          env: sanitizedEnv,
+          reject: false,
+          nothrow: true,
+        })`nix build --impure --no-write-lock-file --option eval-cache false --accept-flake-config --print-out-paths ${nixTrace} ${flakeSource.flakeRef}`;
+      }
       return await $({
         env: sanitizedEnv,
         reject: false,
         nothrow: true,
-      })`nix build --impure --no-write-lock-file --option eval-cache false ${flakeSource.flakeRef} --accept-flake-config --print-out-paths ${nixTrace}`;
+      })`nix build --impure --no-write-lock-file --option eval-cache false --accept-flake-config --print-out-paths ${flakeSource.flakeRef}`;
     } finally {
       await flakeSource.cleanup?.();
     }
@@ -235,7 +241,6 @@ async function main() {
     console.error("no out path emitted by nix build");
     process.exit(2);
   }
-  // Print ONLY the out path on stdout
   process.stdout.write(outPath + "\n");
 }
 

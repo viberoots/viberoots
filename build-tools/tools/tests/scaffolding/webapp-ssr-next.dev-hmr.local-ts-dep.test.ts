@@ -7,10 +7,8 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { after, test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 import { httpGet, pickFreePort, stopServer, waitForHttpOk } from "./lib/webapp-static-hmr";
-
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
-
 function writeLibSource(clientValue: string, serverValue: string): string {
   return [
     `export const depClientMessage = (): string => "${clientValue}";`,
@@ -23,17 +21,17 @@ async function waitForValue<T>(
   getter: () => Promise<T>,
   check: (value: T) => boolean,
   timeoutMs = 90000,
+  pollMs = 300,
 ): Promise<T> {
   const start = Date.now();
   let last: T | undefined;
   while (Date.now() - start < timeoutMs) {
     last = await getter();
     if (check(last)) return last;
-    await sleep(300);
+    await sleep(pollMs);
   }
   throw new Error(`timed out waiting for expected value after ${timeoutMs}ms`);
 }
-
 function extractAssetUrls(html: string, baseUrl: string): string[] {
   const scriptRe = /<script[^>]*\ssrc="([^"]+)"[^>]*>/g;
   const urls: string[] = [];
@@ -46,7 +44,6 @@ function extractAssetUrls(html: string, baseUrl: string): string[] {
   }
   return urls;
 }
-
 async function clientAssetsContain(pageUrl: string, needle: string): Promise<boolean> {
   const page = await httpGet(pageUrl);
   if (page.status !== 200) return false;
@@ -210,6 +207,8 @@ test(
         const clientProbeUpdated = await waitForValue(
           async () => await clientAssetsContain(pageUrl, "client-b"),
           (value) => value,
+          90000,
+          1000,
         );
         assert.equal(clientProbeUpdated, true);
         assert.equal(devServer.exitCode, null);

@@ -4,6 +4,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { withScopedEnv } from "../lib/test-helpers/scoped-env.ts";
 
 test("provider-writer: deterministic output and managed section sync", async () => {
   await runInTemp("provider-writer-determinism", async (tmp, $) => {
@@ -18,9 +19,6 @@ test("provider-writer: deterministic output and managed section sync", async () 
     // Import the helper from the temp repo
     const mod = await import(path.join(tmp, "build-tools/tools/lib/provider-writer.ts"));
     const { writeImporterProviders } = mod as any;
-    // Ensure library writes into the temp workspace
-    process.env.WORKSPACE_ROOT = tmp;
-
     const providers = [
       { lockfile: lockA, importer: "apps/a", patchPaths: ["apps/a/patches/node/x@1.0.0.patch"] },
       { lockfile: lockB, importer: "apps/b", patchPaths: [] },
@@ -29,47 +27,49 @@ test("provider-writer: deterministic output and managed section sync", async () 
     const ruleLoad = 'load("//third_party/providers:defs_node.bzl", "node_importer_deps")';
     const ruleName = "node_importer_deps";
 
-    // First write
-    await writeImporterProviders(providers, {
-      outFile,
-      ruleLoad,
-      ruleName,
-      autoSection: {
-        begin: "# BEGIN AUTO_TEST",
-        end: "# END AUTO_TEST",
-        header: ruleLoad,
-      },
+    await withScopedEnv({ WORKSPACE_ROOT: tmp }, async () => {
+      // First write
+      await writeImporterProviders(providers, {
+        outFile,
+        ruleLoad,
+        ruleName,
+        autoSection: {
+          begin: "# BEGIN AUTO_TEST",
+          end: "# END AUTO_TEST",
+          header: ruleLoad,
+        },
+      });
+      const out1 = await fsp.readFile(path.join(tmp, outFile), "utf8");
+      const h1 = crypto.createHash("sha256").update(out1).digest("hex");
+
+      // Second write (no-op expected)
+      await writeImporterProviders(providers, {
+        outFile,
+        ruleLoad,
+        ruleName,
+        autoSection: {
+          begin: "# BEGIN AUTO_TEST",
+          end: "# END AUTO_TEST",
+          header: ruleLoad,
+        },
+      });
+      const out2 = await fsp.readFile(path.join(tmp, outFile), "utf8");
+      const h2 = crypto.createHash("sha256").update(out2).digest("hex");
+
+      if (h1 !== h2 || out1 !== out2) {
+        console.error("provider-writer output changed between runs");
+        process.exit(2);
+      }
+
+      const curated = await fsp.readFile(path.join(tmp, "third_party/providers/TARGETS"), "utf8");
+      if (!curated.includes("# BEGIN AUTO_TEST") || !curated.includes("# END AUTO_TEST")) {
+        console.error("expected managed section markers in curated TARGETS");
+        process.exit(2);
+      }
+      if (!curated.includes("node_importer_deps(")) {
+        console.error("expected at least one provider rule in managed section");
+        process.exit(2);
+      }
     });
-    const out1 = await fsp.readFile(path.join(tmp, outFile), "utf8");
-    const h1 = crypto.createHash("sha256").update(out1).digest("hex");
-
-    // Second write (no-op expected)
-    await writeImporterProviders(providers, {
-      outFile,
-      ruleLoad,
-      ruleName,
-      autoSection: {
-        begin: "# BEGIN AUTO_TEST",
-        end: "# END AUTO_TEST",
-        header: ruleLoad,
-      },
-    });
-    const out2 = await fsp.readFile(path.join(tmp, outFile), "utf8");
-    const h2 = crypto.createHash("sha256").update(out2).digest("hex");
-
-    if (h1 !== h2 || out1 !== out2) {
-      console.error("provider-writer output changed between runs");
-      process.exit(2);
-    }
-
-    const curated = await fsp.readFile(path.join(tmp, "third_party/providers/TARGETS"), "utf8");
-    if (!curated.includes("# BEGIN AUTO_TEST") || !curated.includes("# END AUTO_TEST")) {
-      console.error("expected managed section markers in curated TARGETS");
-      process.exit(2);
-    }
-    if (!curated.includes("node_importer_deps(")) {
-      console.error("expected at least one provider rule in managed section");
-      process.exit(2);
-    }
   });
 });

@@ -3,6 +3,8 @@ import { activeNixGcPids, nixGcLockMessage } from "../../lib/nix-gc-lock.ts";
 import { type ManagedCommandActivity, runManagedCommand } from "../../lib/managed-command.ts";
 
 export function extractHash(text: string): string | null {
+  const mismatchGot = text.match(/got:\s*(sha256-[A-Za-z0-9+/=\-_]{43,})/);
+  if (mismatchGot?.[1]) return mismatchGot[1];
   const all = Array.from(text.matchAll(/sha256-[A-Za-z0-9+/=\-_]{43,}/g)).map((m) => m[0]);
   if (all.length) return all[all.length - 1];
   return null;

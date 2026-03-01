@@ -11,8 +11,7 @@ export async function ensureZxInitProbedOnce(opts: {
   $: any;
   exportEnv: Record<string, string>;
 }): Promise<void> {
-  const force = String(process.env.TEST_FORCE_ZX_INIT_PROBE || "") === "1";
-  if (!force && zxInitProbeDone) return;
+  if (zxInitProbeDone) return;
 
   const doProbe = async () => {
     try {
@@ -24,11 +23,6 @@ export async function ensureZxInitProbedOnce(opts: {
       });
     } catch {}
   };
-
-  if (force) {
-    await doProbe();
-    return;
-  }
 
   if (!zxInitProbePromise) {
     zxInitProbePromise = (async () => {

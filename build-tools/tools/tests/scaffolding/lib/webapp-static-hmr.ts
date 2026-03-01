@@ -1,8 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import { type ChildProcess } from "node:child_process";
 import { once } from "node:events";
+import * as fsp from "node:fs/promises";
 import http from "node:http";
 import net from "node:net";
+import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
 export async function pickFreePort(): Promise<number> {
@@ -79,6 +81,43 @@ export function toAbsoluteModuleUrl(baseUrl: string, maybeRelative: string): str
     return maybeRelative;
   }
   return new URL(maybeRelative, baseUrl).toString();
+}
+
+function decodeViteFsPathname(pathname: string): string | null {
+  const decoded = decodeURIComponent(pathname);
+  if (!decoded.startsWith("/@fs/")) return null;
+  let fsPath = decoded.slice("/@fs".length);
+  while (fsPath.startsWith("//")) fsPath = fsPath.slice(1);
+  return fsPath;
+}
+
+async function canonicalPath(input: string): Promise<string> {
+  const resolved = path.resolve(input);
+  try {
+    const real = await fsp.realpath(resolved);
+    return process.platform === "win32" ? real.toLowerCase() : real;
+  } catch {
+    return process.platform === "win32" ? resolved.toLowerCase() : resolved;
+  }
+}
+
+export async function moduleUrlResolvesToFile(
+  moduleUrl: string,
+  filePath: string,
+): Promise<boolean> {
+  let moduleFsPath: string | null = null;
+  try {
+    const parsed = new URL(moduleUrl);
+    moduleFsPath = decodeViteFsPathname(parsed.pathname);
+  } catch {
+    return false;
+  }
+  if (!moduleFsPath) return false;
+  const [moduleCanonical, fileCanonical] = await Promise.all([
+    canonicalPath(moduleFsPath),
+    canonicalPath(filePath),
+  ]);
+  return moduleCanonical === fileCanonical;
 }
 
 function transformEsmForEval(

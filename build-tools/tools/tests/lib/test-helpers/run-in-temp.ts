@@ -16,6 +16,33 @@ import "./worker-init";
 import { ensureZxInitProbedOnce, zxInitPathFromWorkspace } from "./zx-init-probe";
 
 let cachedDevEnvExport: Promise<string> | null = null;
+let envMutationQueue: Promise<void> = Promise.resolve();
+type EnvKeys = "WORKSPACE_ROOT" | "BUCK_TEST_SRC";
+
+async function withTempProcessEnv<T>(tmp: string, fn: () => Promise<T>): Promise<T> {
+  const prevGate = envMutationQueue;
+  let releaseGate: (() => void) | null = null;
+  envMutationQueue = new Promise<void>((resolve) => {
+    releaseGate = resolve;
+  });
+  await prevGate;
+  const keys: EnvKeys[] = ["WORKSPACE_ROOT", "BUCK_TEST_SRC"];
+  const prev: Partial<Record<EnvKeys, string | undefined>> = {};
+  for (const key of keys) prev[key] = process.env[key];
+  process.env.WORKSPACE_ROOT = tmp;
+  process.env.BUCK_TEST_SRC = tmp;
+  try {
+    return await fn();
+  } finally {
+    for (const key of keys) {
+      const val = prev[key];
+      if (typeof val === "string") process.env[key] = val;
+      else delete process.env[key];
+    }
+    releaseGate?.();
+  }
+}
+
 async function exportDevEnvOncePerWorker($: any): Promise<string> {
   if (cachedDevEnvExport) return await cachedDevEnvExport;
   cachedDevEnvExport = (async () => {
@@ -149,24 +176,6 @@ export async function runInTemp<T>(
   opts?: { git?: boolean },
 ): Promise<T> {
   const realHome = String(process.env.HOME || os.homedir() || "").trim();
-  const envKeys = [
-    "TEST_RSYNC_ROOTS",
-    "TEST_PARTIAL_CLONE_GO_ONLY",
-    "TEST_EXCLUDE_CPP_REQS",
-    "NIX_CPP_DEV_OVERRIDE_JSON",
-    "NIX_GO_DEV_OVERRIDE_JSON",
-    "NIX_PY_DEV_OVERRIDE_JSON",
-    "WORKSPACE_ROOT",
-    "BUCK_TEST_SRC",
-    "REPO_ROOT",
-    "BNX_TEST_SEED_STORE_PATH",
-    "BNX_TEST_SEED_KEY",
-    "BNX_TEST_SEED_PIN_DIR",
-    "BNX_VERIFY_LOCK_DIR",
-    "BNX_VERIFY_LOG_FILE",
-  ] as const;
-  const envSnapshot: Record<string, string | undefined> = {};
-  for (const key of envKeys) envSnapshot[key] = process.env[key];
   const tmp = await mktemp(name + "-");
   // Optional early signal for tests that need the temp path even if setup is interrupted or slow
   // (e.g. to coordinate out-of-process cleanup/reaping assertions).
@@ -175,9 +184,6 @@ export async function runInTemp<T>(
       console.log(`TMP ${tmp}`);
     } catch {}
   }
-  process.env.WORKSPACE_ROOT = tmp;
-  process.env.BUCK_TEST_SRC = tmp;
-  process.env.REPO_ROOT = process.cwd();
   const { home, removeOnExit: removeHome } = await resolveTestHome();
   const xdgCacheHome = await stableXdgCacheRoot();
   const tempSetupEnv = {
@@ -357,18 +363,16 @@ export async function runInTemp<T>(
     } catch {}
   }
 
-  await ensureZxInitProbedOnce({ tmp, $, exportEnv });
+  const forceZxProbe = String(process.env.TEST_FORCE_ZX_INIT_PROBE || "").trim() === "1";
+  if ((process.env.TEST_NEED_DEV_ENV || "") === "1" || forceZxProbe) {
+    await ensureZxInitProbedOnce({ tmp, $, exportEnv });
+  }
   const _$ = $({ cwd: tmp, env: exportEnv });
   await timeAsync("buck-daemon-reaper setup", async () => await ensureBuckReaperStarted(tmp, _$));
 
   try {
-    return await fn(tmp, _$);
+    return await withTempProcessEnv(tmp, async () => await fn(tmp, _$));
   } finally {
-    for (const key of envKeys) {
-      const prev = envSnapshot[key];
-      if (prev === undefined) delete process.env[key];
-      else process.env[key] = prev;
-    }
     await timeAsync("buck-daemon cleanup", async () => await killBuckDaemonsForRepo(tmp, _$));
     if ((process.env.TEST_REWRITE_COVERAGE_TMP || "") === "1") {
       await timeAsync(`rewriteCoverageUrls(${path.basename(tmp)})`, async () =>

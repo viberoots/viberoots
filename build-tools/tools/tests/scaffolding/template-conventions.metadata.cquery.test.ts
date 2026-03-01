@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { test } from "node:test";
+import { after, test } from "node:test";
 
 type TemplateExpectation = {
   script: string;
@@ -206,88 +206,79 @@ function isolationId(prefix: string): string {
   return `${prefix}_${process.pid}_${Date.now()}`;
 }
 
+const templateConventionsIsolation = isolationId("template_conventions_metadata_cquery");
+const buckEnv = { ...process.env, IN_NIX_SHELL: process.env.IN_NIX_SHELL || "1" };
+
+after(async () => {
+  await $({
+    stdio: "ignore",
+    reject: false,
+    env: buckEnv,
+  })`buck2 --isolation-dir ${templateConventionsIsolation} kill`;
+});
+
 test("template-owned tests expose labels and template inputs", async () => {
   const targets = EXPECTATIONS.map((entry) => `//:${targetNameFromScript(entry.script)}`);
   const query = `set(${targets.join(" ")})`;
-  const isolationDir = isolationId("template_conventions_metadata_cquery");
-  try {
-    const out = await $({
-      stdio: "pipe",
-      env: { ...process.env, IN_NIX_SHELL: process.env.IN_NIX_SHELL || "1" },
-    })`buck2 --isolation-dir ${isolationDir} cquery ${query} --json --output-attribute labels --output-attribute template_inputs`;
-    const raw = JSON.parse(out.stdout) as Record<
-      string,
-      { labels?: string[]; template_inputs?: string[] }
-    >;
+  const out = await $({
+    stdio: "pipe",
+    env: buckEnv,
+  })`buck2 --isolation-dir ${templateConventionsIsolation} cquery ${query} --json --output-attribute labels --output-attribute template_inputs`;
+  const raw = JSON.parse(out.stdout) as Record<
+    string,
+    { labels?: string[]; template_inputs?: string[] }
+  >;
 
-    const byTarget = new Map<string, { labels: string[]; templateInputs: string[] }>();
-    for (const [key, value] of Object.entries(raw)) {
-      byTarget.set(normalizeTarget(key), {
-        labels: Array.isArray(value.labels) ? value.labels.map(String) : [],
-        templateInputs: Array.isArray(value.template_inputs)
-          ? value.template_inputs.map(String)
-          : [],
-      });
-    }
+  const byTarget = new Map<string, { labels: string[]; templateInputs: string[] }>();
+  for (const [key, value] of Object.entries(raw)) {
+    byTarget.set(normalizeTarget(key), {
+      labels: Array.isArray(value.labels) ? value.labels.map(String) : [],
+      templateInputs: Array.isArray(value.template_inputs) ? value.template_inputs.map(String) : [],
+    });
+  }
 
-    for (const entry of EXPECTATIONS) {
-      const target = `root//:${targetNameFromScript(entry.script)}`;
-      const node = byTarget.get(target);
-      if (!node) throw new Error(`missing cquery result for ${target}`);
+  for (const entry of EXPECTATIONS) {
+    const target = `root//:${targetNameFromScript(entry.script)}`;
+    const node = byTarget.get(target);
+    if (!node) throw new Error(`missing cquery result for ${target}`);
 
-      for (const label of entry.requiredLabels) {
-        if (!node.labels.includes(label)) {
-          throw new Error(`missing label ${label} on ${target}`);
-        }
-      }
-
-      const classCount = node.labels.filter((label) => TEMPLATE_CLASSIFICATIONS.has(label)).length;
-      if (classCount !== 1) {
-        throw new Error(
-          `expected exactly one template classification on ${target}, got ${classCount}`,
-        );
-      }
-
-      if (node.templateInputs.length === 0) {
-        throw new Error(`missing template_inputs for ${target}`);
-      }
-
-      for (const root of entry.requiredTemplateRoots) {
-        if (!node.templateInputs.some((src) => src.includes(root))) {
-          throw new Error(`expected template_inputs for ${target} to include ${root}`);
-        }
+    for (const label of entry.requiredLabels) {
+      if (!node.labels.includes(label)) {
+        throw new Error(`missing label ${label} on ${target}`);
       }
     }
-  } finally {
-    await $({
-      stdio: "ignore",
-      reject: false,
-      env: { ...process.env, IN_NIX_SHELL: process.env.IN_NIX_SHELL || "1" },
-    })`buck2 --isolation-dir ${isolationDir} kill`;
+
+    const classCount = node.labels.filter((label) => TEMPLATE_CLASSIFICATIONS.has(label)).length;
+    if (classCount !== 1) {
+      throw new Error(
+        `expected exactly one template classification on ${target}, got ${classCount}`,
+      );
+    }
+
+    if (node.templateInputs.length === 0) {
+      throw new Error(`missing template_inputs for ${target}`);
+    }
+
+    for (const root of entry.requiredTemplateRoots) {
+      if (!node.templateInputs.some((src) => src.includes(root))) {
+        throw new Error(`expected template_inputs for ${target} to include ${root}`);
+      }
+    }
   }
 });
 
 test("non-template tests do not carry template labels", async () => {
-  const isolationDir = isolationId("template_conventions_non_template_labels");
-  try {
-    const out = await $({
-      stdio: "pipe",
-      env: { ...process.env, IN_NIX_SHELL: process.env.IN_NIX_SHELL || "1" },
-    })`buck2 --isolation-dir ${isolationDir} cquery //:scaffolding_macros_exports_present --json --output-attribute labels`;
-    const raw = JSON.parse(out.stdout) as Record<string, { labels?: string[] }>;
-    const first = Object.values(raw)[0] || {};
-    const labels = Array.isArray(first.labels) ? first.labels.map(String) : [];
-    const templateLabels = labels.filter((label) => label.startsWith("template:"));
-    if (templateLabels.length !== 0) {
-      throw new Error(
-        `expected no template labels on non-template test, got: ${templateLabels.join(", ")}`,
-      );
-    }
-  } finally {
-    await $({
-      stdio: "ignore",
-      reject: false,
-      env: { ...process.env, IN_NIX_SHELL: process.env.IN_NIX_SHELL || "1" },
-    })`buck2 --isolation-dir ${isolationDir} kill`;
+  const out = await $({
+    stdio: "pipe",
+    env: buckEnv,
+  })`buck2 --isolation-dir ${templateConventionsIsolation} cquery //:scaffolding_macros_exports_present --json --output-attribute labels`;
+  const raw = JSON.parse(out.stdout) as Record<string, { labels?: string[] }>;
+  const first = Object.values(raw)[0] || {};
+  const labels = Array.isArray(first.labels) ? first.labels.map(String) : [];
+  const templateLabels = labels.filter((label) => label.startsWith("template:"));
+  if (templateLabels.length !== 0) {
+    throw new Error(
+      `expected no template labels on non-template test, got: ${templateLabels.join(", ")}`,
+    );
   }
 });

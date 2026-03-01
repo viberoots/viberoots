@@ -26,11 +26,62 @@ function parseForkservers(lines: string[]): ForkserverProc[] {
   return forks;
 }
 
+type BuckDaemonProc = { pid: number; ppid: number; etime: string; cmd: string; iso: string };
+
+function parseBuckDaemons(lines: string[]): BuckDaemonProc[] {
+  const daemons: BuckDaemonProc[] = [];
+  for (const ln of lines) {
+    if (!ln.includes("buck2d[")) continue;
+    const base = parsePsLine(ln);
+    if (!base) continue;
+    const im = base.cmd.match(/--isolation-dir\s+([^\s]+)/);
+    const iso = im && im[1] ? String(im[1]).trim() : "";
+    if (!iso) continue;
+    daemons.push({ ...base, iso });
+  }
+  return daemons;
+}
+
+function etimeToSeconds(etime: string): number {
+  const raw = String(etime || "").trim();
+  if (!raw) return 0;
+  const dm = raw.match(/^(\d+)-(.+)$/);
+  const days = dm ? Number(dm[1]) : 0;
+  const clock = dm ? dm[2] : raw;
+  const parts = clock
+    .split(":")
+    .map((x) => Number(x))
+    .filter((n) => Number.isFinite(n) && n >= 0);
+  if (parts.length === 3) {
+    const [h, m, s] = parts;
+    return days * 86400 + h * 3600 + m * 60 + s;
+  }
+  if (parts.length === 2) {
+    const [m, s] = parts;
+    return days * 86400 + m * 60 + s;
+  }
+  return days * 86400;
+}
+
+export function isLikelyEphemeralIsolation(iso: string): boolean {
+  const s = String(iso || "").trim();
+  if (!s) return false;
+  if (/^v-\d+-\d+$/.test(s)) return true;
+  if (/^debug-[A-Za-z0-9._-]+-\d{9,}$/.test(s)) return true;
+  if (/^targeted-[A-Za-z0-9._-]+-\d{9,}$/.test(s)) return true;
+  if (/^(parity_|sanitize_|importer_strings_)/.test(s)) return true;
+  return false;
+}
+
 export async function cleanupOrphanBuckDaemons(opts: {
   log?: (line: string) => Promise<void>;
   maxKills?: number;
 }): Promise<{ scanned: number; candidates: number; killed: number }> {
   const maxKills = Math.max(0, opts.maxKills ?? 50);
+  const staleGraceSec = Math.max(
+    0,
+    Number.parseInt(String(process.env.BNX_BUCK_ORPHAN_STALE_GRACE_SECS || "120"), 10) || 120,
+  );
   const lines = await psLines(2000);
   const forks = parseForkservers(lines);
 
@@ -70,7 +121,27 @@ export async function cleanupOrphanBuckDaemons(opts: {
       );
     }
   }
-  return { scanned: forks.length, candidates, killed };
+
+  const daemons = parseBuckDaemons(lines);
+  for (const d of daemons) {
+    const orphan = d.ppid <= 1 || !isPidAlive(d.ppid);
+    if (!orphan) continue;
+    if (!isLikelyEphemeralIsolation(d.iso)) continue;
+    if (etimeToSeconds(d.etime) < staleGraceSec) continue;
+    candidates++;
+    if (killed >= maxKills) continue;
+    if (!isPidAlive(d.pid)) continue;
+    try {
+      process.kill(d.pid, "SIGKILL");
+    } catch {}
+    killed++;
+    if (opts.log) {
+      await opts.log(
+        `[verify] buck2 orphan cleanup: killed daemon pid=${d.pid} ppid=${d.ppid} etime=${d.etime} iso=${d.iso}`,
+      );
+    }
+  }
+  return { scanned: forks.length + daemons.length, candidates, killed };
 }
 
 export async function cleanupRegisteredTempRepos(opts: {

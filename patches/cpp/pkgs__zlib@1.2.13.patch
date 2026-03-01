@@ -1,0 +1,10 @@
+diff --git a/zlib.h b/zlib.h
+index 423b690..2c66329 100644
+--- a/zlib.h
++++ b/zlib.h
+@@ -1,4 +1,4 @@
+ #ifndef ZLIB_H
+ #define ZLIB_H
+-#define ZLIB_VERSION "1.2.13"
++#define ZLIB_VERSION "9.9.9-bucknix"
+ #endif

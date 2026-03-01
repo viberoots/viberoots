@@ -13,9 +13,10 @@ const cases: Array<{ name: string; value: string }> = [
 ];
 
 async function starlarkProbeOutput(target: string): Promise<string> {
-  const inherited = process.env.BUCK_ISOLATION_DIR;
-  const iso = inherited && inherited.trim() ? inherited : `sanitize_${process.pid}`;
-  const createdOwnIso = !inherited;
+  const inherited = String(
+    process.env.BUCK_ISOLATION_DIR || process.env.BUCK_NESTED_ISO || "",
+  ).trim();
+  const iso = inherited || `sanitize_${process.pid}`;
   const runBuck = async (mode: "build" | "show-output") =>
     mode === "build"
       ? await $({ env: buckCommandEnv() })`buck2 --isolation-dir ${iso} build ${target}`
@@ -46,11 +47,7 @@ async function starlarkProbeOutput(target: string): Promise<string> {
     if (!outName) throw new Error("no output path for " + target);
     return outName.replace(/\.txt$/, "");
   } finally {
-    if (createdOwnIso) {
-      try {
-        await $({ env: buckCommandEnv(), reject: false })`buck2 --isolation-dir ${iso} kill`;
-      } catch {}
-    }
+    // Let verify/test harness manage daemon lifecycle; avoid per-test cold-start churn.
   }
 }
 

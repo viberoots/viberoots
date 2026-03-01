@@ -7,7 +7,7 @@ test("runInTemp zx-init probe runs once per worker", async () => {
   const prevForce = process.env.TEST_FORCE_ZX_INIT_PROBE;
   try {
     process.env.TEST_TIMING = "summary";
-    delete process.env.TEST_FORCE_ZX_INIT_PROBE;
+    process.env.TEST_FORCE_ZX_INIT_PROBE = "1";
 
     const { runInTemp, getTimingCountForLabel } = await import("./test-helpers");
     const label = "zx-init probe (node --import zx-init)";

@@ -57,9 +57,10 @@ async function runBuckWithTransientRetry(run: () => Promise<any>): Promise<any> 
 }
 
 async function buildAndReadOutput(target: string): Promise<string> {
-  const inherited = process.env.BUCK_ISOLATION_DIR;
-  const iso = inherited && inherited.trim() ? inherited : `importer_strings_${process.pid}`;
-  const createdOwnIso = !inherited;
+  const inherited = String(
+    process.env.BUCK_ISOLATION_DIR || process.env.BUCK_NESTED_ISO || "",
+  ).trim();
+  const iso = inherited || `importer_strings_${process.pid}`;
   try {
     await runBuckWithTransientRetry(
       async () => await $({ env: buckEnv() })`buck2 --isolation-dir ${iso} build ${target}`,
@@ -72,11 +73,7 @@ async function buildAndReadOutput(target: string): Promise<string> {
     if (!out) throw new Error("no output path for " + target);
     return await fsp.readFile(out, "utf8");
   } finally {
-    if (createdOwnIso) {
-      try {
-        await $({ env: buckEnv(), reject: false })`buck2 --isolation-dir ${iso} kill`;
-      } catch {}
-    }
+    // Let verify/test harness manage daemon lifecycle; avoid per-test cold-start churn.
   }
 }
 

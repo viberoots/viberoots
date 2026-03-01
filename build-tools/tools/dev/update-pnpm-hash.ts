@@ -52,10 +52,10 @@ async function inner() {
     !force &&
     !!existingHash &&
     existingHash !== "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-  const existingLockHash = await sha256File(lockAbs);
-  const existingMarker = await readVerifiedMarker(markerPath);
 
   await ensureImporterLockfileFreshIfAllowed({ repoRoot, importer });
+  const existingLockHash = await sha256File(lockAbs);
+  const existingMarker = await readVerifiedMarker(markerPath);
 
   if (
     await handleNonDefaultImporter({
@@ -235,7 +235,7 @@ async function main() {
   const installLockKey = installLockKeyForImporter(
     normalizeImporter(path.posix.dirname(repoRelativeLockfilePath(process.cwd(), lockfile))),
   );
-  const lockScopeRaw = String(process.env.REPO_ROOT || process.env.WORKSPACE_ROOT || "").trim();
+  const lockScopeRaw = String(process.env.WORKSPACE_ROOT || process.env.REPO_ROOT || "").trim();
   const lockScopeRoot =
     lockScopeRaw && path.isAbsolute(lockScopeRaw) ? path.resolve(lockScopeRaw) : undefined;
   await withExclusiveInstallLock(installLockKey, inner, {

@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { getImporterRootsContract } from "../../../lib/importer-roots.ts";
@@ -60,27 +61,39 @@ function computeRootsExpr(cwd: string): string {
   return `set(${patterns.join(" ")})`;
 }
 
-function computeIsolationFlags(): { iso: string; flags: string[] } {
-  if (process.env.BUCK_NO_ISOLATION === "1") return { iso: "", flags: [] };
-  const reuse = String(process.env.BUCK_EXPORTER_REUSE_DAEMON || "").trim() === "1";
+function stableExporterIsolation(cwd: string): string {
+  const key = path.resolve(cwd);
+  const h = crypto.createHash("sha256").update(key).digest("hex").slice(0, 10);
+  return `exporter-shared-${h}`;
+}
+
+function computeIsolationFlags(cwd: string): { iso: string; flags: string[]; ownsIso: boolean } {
+  if (process.env.BUCK_NO_ISOLATION === "1") return { iso: "", flags: [], ownsIso: false };
+  const reuseRaw = String(process.env.BUCK_EXPORTER_REUSE_DAEMON || "").trim();
+  const reuse = reuseRaw ? reuseRaw === "1" : true;
   if (reuse) {
     const shared = String(
       process.env.BUCK_ISOLATION_DIR_EXPORTER ||
         process.env.BUCK_ISOLATION_DIR ||
         process.env.BUCK_NESTED_ISO ||
-        "exporter-shared",
+        stableExporterIsolation(cwd),
     ).trim();
-    return { iso: shared, flags: ["--isolation-dir", shared] };
+    return { iso: shared, flags: ["--isolation-dir", shared], ownsIso: false };
   }
   const parentIso = String(
     process.env.BUCK_ISOLATION_DIR_EXPORTER || process.env.BUCK_ISOLATION_DIR || "",
   ).trim();
-  const iso = parentIso ? `${parentIso}__exporter-${process.pid}` : `exporter-${process.pid}`;
-  return { iso, flags: ["--isolation-dir", iso] };
+  if (parentIso) {
+    // Reuse parent isolation for exporter calls to avoid per-process daemon churn.
+    return { iso: parentIso, flags: ["--isolation-dir", parentIso], ownsIso: false };
+  }
+  const iso = `exporter-${process.pid}`;
+  return { iso, flags: ["--isolation-dir", iso], ownsIso: true };
 }
 
-async function withBuckCleanup<T>(iso: string, fn: () => Promise<T>): Promise<T> {
+async function withBuckCleanup<T>(iso: string, ownsIso: boolean, fn: () => Promise<T>): Promise<T> {
   if (!iso) return await fn();
+  if (!ownsIso) return await fn();
   const reuse = String(process.env.BUCK_EXPORTER_REUSE_DAEMON || "").trim() === "1";
   if (reuse) return await fn();
   const onSignal = async () => {
@@ -131,7 +144,7 @@ export async function runCqueryMerged(opts: CqueryRunnerOptions): Promise<Record
   const platformLabel = computePlatformLabel(cwd);
   const platformFlags = ["--target-platforms", platformLabel];
   const rootsExpr = computeRootsExpr(cwd);
-  const { iso, flags: isolationFlags } = computeIsolationFlags();
+  const { iso, flags: isolationFlags, ownsIso } = computeIsolationFlags(cwd);
 
   const runQuery = async (q: string): Promise<Record<string, any>> => {
     const qScoped = q.replaceAll("//...", rootsExpr);
@@ -152,21 +165,26 @@ export async function runCqueryMerged(opts: CqueryRunnerOptions): Promise<Record
     return JSON.parse(String(stdout)) as Record<string, any>;
   };
 
-  const runQueryWithRetry = async (q: string): Promise<Record<string, any>> => {
-    let lastErr: unknown;
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        return await runQuery(q);
-      } catch (e) {
-        lastErr = e;
-        await new Promise<void>((resolve) => setTimeout(resolve, 150));
-      }
-    }
-    const msg = lastErr instanceof Error ? lastErr.message : String(lastErr);
-    throw new Error(`buck2 cquery failed after retry for query: ${q}\n${msg}`);
+  const isTransientBuckInitError = (msg: string): boolean =>
+    msg.includes("Error initializing DaemonStateData") ||
+    msg.includes("Error loading system root certificates native frameworks");
+
+  const resetBuckDaemon = async (): Promise<void> => {
+    if (!iso) return;
+    try {
+      await $({
+        cwd,
+        stdio: "pipe",
+        env: {
+          ...process.env,
+          HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
+          SSL_CERT_FILE: process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE,
+        },
+      })`buck2 --isolation-dir ${iso} kill`.nothrow();
+    } catch {}
   };
 
-  return await withBuckCleanup(iso, async () => {
+  return await withBuckCleanup(iso, ownsIso, async () => {
     const runQueriesOnce = async (): Promise<Record<string, any>> => {
       const base = `deps(//..., 1, exec_deps())`;
       const allKind = `kind(".*", //...)`;
@@ -177,17 +195,15 @@ export async function runCqueryMerged(opts: CqueryRunnerOptions): Promise<Record
       const cxxPlanner = `filter("__planner$", kind("cxx_library", //...))`;
       const labeledCpp = `attrfilter(labels, "lang:cpp", //...)`;
       const kindNixCxxLib = `attrfilter(rule_type, "nix_cxx_library", //...)`;
-      const [obj0, obj1, obj2, obj3, obj4, obj5, obj6, obj7, obj8] = await Promise.all([
-        runQueryWithRetry(allKind),
-        runQueryWithRetry(base),
-        runQueryWithRetry(kindCxxTest),
-        runQueryWithRetry(attrCxxTest),
-        runQueryWithRetry(kindCxxBin),
-        runQueryWithRetry(attrCxxBin),
-        runQueryWithRetry(cxxPlanner),
-        runQueryWithRetry(labeledCpp),
-        runQueryWithRetry(kindNixCxxLib),
-      ]);
+      const obj0 = await runQuery(allKind);
+      const obj1 = await runQuery(base);
+      const obj2 = await runQuery(kindCxxTest);
+      const obj3 = await runQuery(attrCxxTest);
+      const obj4 = await runQuery(kindCxxBin);
+      const obj5 = await runQuery(attrCxxBin);
+      const obj6 = await runQuery(cxxPlanner);
+      const obj7 = await runQuery(labeledCpp);
+      const obj8 = await runQuery(kindNixCxxLib);
       return {
         ...obj0,
         ...obj1,
@@ -201,10 +217,28 @@ export async function runCqueryMerged(opts: CqueryRunnerOptions): Promise<Record
       };
     };
 
-    let merged = await runQueriesOnce();
+    const runQueriesWithRetry = async (): Promise<Record<string, any>> => {
+      let lastErr: unknown;
+      for (let attempt = 0; attempt < 6; attempt++) {
+        try {
+          return await runQueriesOnce();
+        } catch (e) {
+          lastErr = e;
+          const msg = e instanceof Error ? e.message : String(e);
+          if (!isTransientBuckInitError(msg)) break;
+          await resetBuckDaemon();
+          const backoffMs = 150 * (attempt + 1);
+          await new Promise<void>((resolve) => setTimeout(resolve, backoffMs));
+        }
+      }
+      const msg = lastErr instanceof Error ? lastErr.message : String(lastErr);
+      throw new Error(`buck2 cquery failed after retry\n${msg}`);
+    };
+
+    let merged = await runQueriesWithRetry();
     if (Object.keys(merged).length === 0) {
       await new Promise<void>((resolve) => setTimeout(resolve, 200));
-      merged = await runQueriesOnce();
+      merged = await runQueriesWithRetry();
     }
     return merged;
   });

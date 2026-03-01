@@ -18,6 +18,12 @@ test("dev-build glue config enables stable exporter daemon reuse", async () => {
   if (!runner.includes("process.env.BUCK_EXPORTER_REUSE_DAEMON")) {
     throw new Error("cquery runner must read BUCK_EXPORTER_REUSE_DAEMON");
   }
+  if (!runner.includes('const reuse = reuseRaw ? reuseRaw === "1" : true;')) {
+    throw new Error("cquery runner must default exporter daemon reuse to enabled");
+  }
+  if (!runner.includes("stableExporterIsolation(cwd)")) {
+    throw new Error("cquery runner must derive stable shared exporter isolation per workspace");
+  }
   if (!runner.includes("if (reuse) return await fn();")) {
     throw new Error("cquery runner must skip daemon cleanup when reuse is enabled");
   }

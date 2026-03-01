@@ -1,4 +1,5 @@
 import "./worker-init";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import {
@@ -67,6 +68,34 @@ async function killBuckForkserversUnderRepo(repoRoot: string, $: any): Promise<v
 }
 
 export async function killBuckDaemonsForRepo(repoRoot: string, $: any): Promise<void> {
+  const buckOut = path.join(repoRoot, "buck-out");
+  const buckOutExists = await fsp
+    .access(buckOut)
+    .then(() => true)
+    .catch(() => false);
+  if (!buckOutExists) {
+    // Fast path with hardening: skip full cleanup scans when repo buck-out was removed,
+    // but still reap any forkservers/daemons that are provably scoped to this exact temp repo.
+    const [forks, procs] = await Promise.all([
+      forkserversUnderRepo(repoRoot, $),
+      buck2dProcsForRepo(repoRoot, $),
+    ]);
+    if (forks.length === 0 && procs.length === 0) return;
+    for (const p of procs) {
+      try {
+        process.kill(p.pid, "SIGTERM");
+      } catch {}
+    }
+    await new Promise((r) => setTimeout(r, 150));
+    for (const p of procs) {
+      try {
+        process.kill(p.pid, "SIGKILL");
+      } catch {}
+    }
+    await killBuckForkserversUnderRepo(repoRoot, $);
+    await assertNoBuckForkserversUnderRepo(repoRoot, $);
+    return;
+  }
   const procs = await buck2dProcsForRepo(repoRoot, $);
   const procIsos = new Set(procs.map((p) => p.iso).filter(Boolean));
   const isoDirs = await buckIsolationDirsForRepo(repoRoot);

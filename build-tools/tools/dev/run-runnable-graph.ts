@@ -6,6 +6,32 @@ import { runNixBuildWithProgress } from "./run-runnable-nix.ts";
 import { untrackedRequiresImpureForTargets } from "./dev-build/untracked.ts";
 import { makeFilteredFlakeRef } from "./filtered-flake.ts";
 
+async function withScopedGraphEnv<T>(
+  workspaceRoot: string,
+  entries: Record<string, string | undefined>,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const prev: Record<string, string | undefined> = {};
+  const merged = {
+    WORKSPACE_ROOT: workspaceRoot,
+    BUCK_TEST_SRC: workspaceRoot,
+    ...entries,
+  };
+  for (const [k, v] of Object.entries(merged)) {
+    prev[k] = process.env[k];
+    if (v === undefined) delete process.env[k];
+    else process.env[k] = v;
+  }
+  try {
+    return await fn();
+  } finally {
+    for (const [k, v] of Object.entries(prev)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  }
+}
+
 function lastOutPath(stdout: string, err: string): string {
   const outPath =
     String(stdout || "")
@@ -26,6 +52,16 @@ function targetPackageFromLabel(target: string): string {
   return idx >= 0 ? body.slice(0, idx) : body;
 }
 
+function isLikelyTempWorkspace(workspaceRoot: string): boolean {
+  const workspaceAbs = path.resolve(workspaceRoot);
+  return (
+    workspaceAbs.startsWith("/tmp/") ||
+    workspaceAbs.startsWith("/private/tmp/") ||
+    workspaceAbs.startsWith("/private/var/folders/") ||
+    workspaceAbs.includes(`${path.sep}buck-out${path.sep}tmp${path.sep}tmpdir${path.sep}`)
+  );
+}
+
 async function chooseFlakeRef(opts: {
   workspaceRoot: string;
   target?: string;
@@ -34,6 +70,8 @@ async function chooseFlakeRef(opts: {
 }): Promise<{ flakeRef: string; cleanup?: () => Promise<void> }> {
   if (opts.sourceMode === "path") return { flakeRef: `path:${opts.workspaceRoot}#${opts.attr}` };
   if (opts.sourceMode === "git") return { flakeRef: `${opts.workspaceRoot}#${opts.attr}` };
+  if (isLikelyTempWorkspace(opts.workspaceRoot))
+    return { flakeRef: `path:${path.resolve(opts.workspaceRoot)}#${opts.attr}` };
 
   try {
     const { stdout } = await $({
@@ -81,14 +119,20 @@ export async function buildRunnableManifest(
     attr: "graph-generator",
   });
   const graphPath = path.join(workspaceRoot, DEFAULT_GRAPH_PATH);
-  process.env.BUCK_TEST_SRC = workspaceRoot;
-  process.env.WORKSPACE_ROOT = workspaceRoot;
-  process.env.BUCK_GRAPH_JSON = graphPath;
-  await ensureGraph();
+  const baseEnv: Record<string, string> = {
+    ...process.env,
+    WORKSPACE_ROOT: workspaceRoot,
+    BUCK_TEST_SRC: workspaceRoot,
+    BUCK_GRAPH_JSON: graphPath,
+  };
+  await withScopedGraphEnv(workspaceRoot, { BUCK_GRAPH_JSON: graphPath }, async () => {
+    await ensureGraph();
+  });
   const stdout = await (async () => {
     try {
       return await runNixBuildWithProgress({
         workspaceRoot,
+        env: baseEnv,
         label: "build runnable manifest",
         args: [
           "--impure",
@@ -131,15 +175,25 @@ export async function buildSelectedOutPath(
     attr: "graph-generator-selected",
   });
   const graphPath = path.join(workspaceRoot, DEFAULT_GRAPH_PATH);
-  process.env.BUCK_TEST_SRC = workspaceRoot;
-  process.env.WORKSPACE_ROOT = workspaceRoot;
-  process.env.BUCK_GRAPH_JSON = graphPath;
-  process.env.BUCK_TARGET = target;
-  await ensureGraph();
+  const selectedEnv: Record<string, string> = {
+    ...process.env,
+    WORKSPACE_ROOT: workspaceRoot,
+    BUCK_TEST_SRC: workspaceRoot,
+    BUCK_GRAPH_JSON: graphPath,
+    BUCK_TARGET: target,
+  };
+  await withScopedGraphEnv(
+    workspaceRoot,
+    { BUCK_GRAPH_JSON: graphPath, BUCK_TARGET: target },
+    async () => {
+      await ensureGraph();
+    },
+  );
   const stdout = await (async () => {
     try {
       return await runNixBuildWithProgress({
         workspaceRoot,
+        env: selectedEnv,
         label,
         args: [
           "--impure",

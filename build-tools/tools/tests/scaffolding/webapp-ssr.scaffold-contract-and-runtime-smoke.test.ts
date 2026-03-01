@@ -70,8 +70,8 @@ async function installNodeModules(appAbs: string, _$: any): Promise<void> {
   })`pnpm install --frozen-lockfile --ignore-scripts --ignore-workspace --prefer-offline --reporter=append-only`;
 }
 
-async function assertContractFiles(tmp: string, template: string): Promise<void> {
-  const appAbs = path.join(tmp, "projects", "apps", "demo-ssr");
+async function assertContractFiles(tmp: string, template: string, appName: string): Promise<void> {
+  const appAbs = path.join(tmp, "projects", "apps", appName);
   const expectedCommon = [
     path.join(appAbs, "TARGETS"),
     path.join(appAbs, "package.json"),
@@ -101,8 +101,13 @@ async function assertContractFiles(tmp: string, template: string): Promise<void>
   }
 }
 
-async function assertPackageScriptsAndLabels(tmp: string, template: string, framework: string) {
-  const appAbs = path.join(tmp, "projects", "apps", "demo-ssr");
+async function assertPackageScriptsAndLabels(
+  tmp: string,
+  template: string,
+  framework: string,
+  appName: string,
+) {
+  const appAbs = path.join(tmp, "projects", "apps", appName);
   const pkg = JSON.parse(await fsp.readFile(path.join(appAbs, "package.json"), "utf8")) as {
     scripts?: Record<string, string>;
   };
@@ -123,8 +128,13 @@ async function assertPackageScriptsAndLabels(tmp: string, template: string, fram
   );
 }
 
-async function runExpressRuntimeSmoke(tmp: string, marker: string, _$: any): Promise<void> {
-  const appAbs = path.join(tmp, "projects", "apps", "demo-ssr");
+async function runExpressRuntimeSmoke(
+  tmp: string,
+  marker: string,
+  _$: any,
+  appName: string,
+): Promise<void> {
+  const appAbs = path.join(tmp, "projects", "apps", appName);
   await installNodeModules(appAbs, _$);
   await _$({
     cwd: appAbs,
@@ -159,8 +169,13 @@ async function runExpressRuntimeSmoke(tmp: string, marker: string, _$: any): Pro
   }
 }
 
-async function runNextRuntimeSmoke(tmp: string, marker: string, _$: any): Promise<void> {
-  const appAbs = path.join(tmp, "projects", "apps", "demo-ssr");
+async function runNextRuntimeSmoke(
+  tmp: string,
+  marker: string,
+  _$: any,
+  appName: string,
+): Promise<void> {
+  const appAbs = path.join(tmp, "projects", "apps", appName);
   await installNodeModules(appAbs, _$);
   await _$({
     cwd: appAbs,
@@ -201,18 +216,18 @@ test(
     process.env.NIX_PNPM_ALLOW_GENERATE = "1";
     await runInTemp("node-webapp-ssr-scaffold-smoke", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
+      const expressApp = "scaf-smoke-ssr-express";
+      const nextApp = "scaf-smoke-ssr-next";
       // Runtime smoke validates SSR startup contracts, so skip template test deps to reduce install cost.
-      await $`scaf new ts webapp-ssr-express demo-ssr --yes --no-tests`;
-      await assertContractFiles(tmp, "webapp-ssr-express");
-      await assertPackageScriptsAndLabels(tmp, "webapp-ssr-express", "express");
-      await runExpressRuntimeSmoke(tmp, 'data-ssr-marker="express"', _$);
+      await $`scaf new ts webapp-ssr-express ${expressApp} --yes --no-tests`;
+      await assertContractFiles(tmp, "webapp-ssr-express", expressApp);
+      await assertPackageScriptsAndLabels(tmp, "webapp-ssr-express", "express", expressApp);
+      await runExpressRuntimeSmoke(tmp, 'data-ssr-marker="express"', _$, expressApp);
 
-      await $`rm -rf projects/apps/demo-ssr`;
-
-      await $`scaf new ts webapp-ssr-next demo-ssr --yes --no-tests`;
-      await assertContractFiles(tmp, "webapp-ssr-next");
-      await assertPackageScriptsAndLabels(tmp, "webapp-ssr-next", "next");
-      await runNextRuntimeSmoke(tmp, 'data-ssr-marker="next"', _$);
+      await $`scaf new ts webapp-ssr-next ${nextApp} --yes --no-tests`;
+      await assertContractFiles(tmp, "webapp-ssr-next", nextApp);
+      await assertPackageScriptsAndLabels(tmp, "webapp-ssr-next", "next", nextApp);
+      await runNextRuntimeSmoke(tmp, 'data-ssr-marker="next"', _$, nextApp);
     });
   },
 );

@@ -3,7 +3,6 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { getFlagBool, hasShortFlag } from "../../lib/cli.ts";
-import { getImporterRootsContract } from "../../lib/importer-roots.ts";
 import { runNodeWithZx } from "../../lib/node-run.ts";
 import {
   warnNodeDepsInLocal,
@@ -17,6 +16,7 @@ import { runGomod2nixGenerate, runGomod2nixScanAll } from "./gomod2nix.ts";
 import { withExclusiveInstallLock } from "./lock.ts";
 import { runUvRefreshAll } from "./uv.ts";
 import { ensureToolchainPathsFiles } from "../toolchain-paths.ts";
+import { discoverImportersWithLock, sharedUnifiedStorePath } from "./importers.ts";
 
 type Flags = {
   force: boolean;
@@ -63,40 +63,6 @@ try {
   }
 } catch {}
 await ensureToolchainPathsFiles(repoRoot);
-// Discover importers (projects/apps/*, projects/libs/*) that contain a pnpm-lock.yaml.
-async function discoverImportersWithLock(root: string): Promise<string[]> {
-  const { allowDotImporter, workspaceRoots } = getImporterRootsContract();
-  const out: string[] = [];
-  // Root importer (.) is supported when enabled and pnpm-lock.yaml exists at repo root.
-  if (allowDotImporter) {
-    try {
-      await fsp.access(path.join(root, "pnpm-lock.yaml"));
-      out.push(".");
-    } catch {}
-  }
-  for (const base of workspaceRoots) {
-    const baseAbs = path.join(root, base);
-    try {
-      const entries = await fsp.readdir(baseAbs).catch(() => [] as string[]);
-      for (const d of entries) {
-        const p = path.join(baseAbs, d);
-        try {
-          const st = await fsp.stat(p);
-          if (st.isDirectory()) {
-            const lock = path.join(p, "pnpm-lock.yaml");
-            try {
-              await fsp.access(lock);
-              // Record as relative path from root
-              out.push(path.relative(root, p) || ".");
-            } catch {}
-          }
-        } catch {}
-      }
-    } catch {}
-  }
-  return out;
-}
-
 if (glueOnly) {
   if (verbose) console.log("[install-deps] glue-only mode");
   try {
@@ -216,31 +182,51 @@ if (!skipGlue) {
 }
 // Prewarm unified PNPM store as part of install-deps so verify/build/test paths
 // can consume it without blocking on first-use setup.
-try {
-  const zxInitPath = path.join(repoRoot, "build-tools", "tools", "dev", "zx-init.mjs");
-  if (verbose) {
-    console.log("[install-deps] prewarming unified pnpm store");
+if (!dryRun) {
+  try {
+    const liveRepoRoot = String(process.env.REPO_ROOT || "").trim();
+    const shouldPreferSharedPrewarm = !!liveRepoRoot && path.resolve(liveRepoRoot) !== repoRoot;
+    let skippedForSharedStore = false;
+    if (shouldPreferSharedPrewarm) {
+      const shared = await sharedUnifiedStorePath(liveRepoRoot);
+      if (shared) {
+        if (verbose) {
+          console.log(
+            `[install-deps] skipping temp-workspace unified prewarm; using shared store marker from ${liveRepoRoot}`,
+          );
+        }
+        skippedForSharedStore = true;
+      }
+    }
+    if (!skippedForSharedStore) {
+      const zxInitPath = path.join(repoRoot, "build-tools", "tools", "dev", "zx-init.mjs");
+      if (verbose) {
+        console.log("[install-deps] prewarming unified pnpm store");
+      }
+      await runNodeWithZx({
+        cwd: repoRoot,
+        script: path.join(repoRoot, "build-tools/tools/dev/require-unified-pnpm-store.ts"),
+        args: [],
+        zxInitPath,
+        stdio: verbose ? "inherit" : "pipe",
+        timeoutMs:
+          Number.parseInt(process.env.INSTALL_UNIFIED_PNPM_TIMEOUT_MS || "180000", 10) || 180000,
+      });
+    }
+  } catch (e: any) {
+    const msg = e?.message ? String(e.message) : String(e);
+    const lockPath = path.join(repoRoot, "buck-out", ".unified-pnpm-store", "require.lock");
+    console.warn(
+      [
+        `[install-deps] unified pnpm prewarm skipped: ${msg}`,
+        "[install-deps] To recover:",
+        `  1) remove stale lock if present: rm -f "${lockPath}"`,
+        "  2) rerun: i",
+        "  3) retry verify/build command",
+      ].join("\n"),
+    );
   }
-  await runNodeWithZx({
-    cwd: repoRoot,
-    script: path.join(repoRoot, "build-tools/tools/dev/require-unified-pnpm-store.ts"),
-    args: [],
-    zxInitPath,
-    stdio: verbose ? "inherit" : "pipe",
-    timeoutMs:
-      Number.parseInt(process.env.INSTALL_UNIFIED_PNPM_TIMEOUT_MS || "180000", 10) || 180000,
-  });
-} catch (e: any) {
-  const msg = e?.message ? String(e.message) : String(e);
-  const lockPath = path.join(repoRoot, "buck-out", ".unified-pnpm-store", "require.lock");
-  console.warn(
-    [
-      `[install-deps] unified pnpm prewarm skipped: ${msg}`,
-      "[install-deps] To recover:",
-      `  1) remove stale lock if present: rm -f "${lockPath}"`,
-      "  2) rerun: i",
-      "  3) retry verify/build command",
-    ].join("\n"),
-  );
+} else if (verbose) {
+  console.log("[install-deps] skipping unified pnpm prewarm in --dry-run mode");
 }
 console.log("Dependencies installed and node_modules linked.");

@@ -59,9 +59,6 @@ export async function runVerify(): Promise<void> {
     requestedTargets: args.targets,
   });
   const projectsOnlyScope = isProjectsOnlyVerifyTargets(templateScope.targets);
-
-  // Run lint preflight before acquiring the verify lock so formatting-only failures
-  // don't create a verify-lock dir.
   await runVerifyLintPreflight(root, zxInitPath, {
     lintFilters: templateScope.lintFilters,
     includeBuildSystemPolicy: !projectsOnlyScope,
@@ -130,8 +127,6 @@ export async function runVerify(): Promise<void> {
   }
   await appendVerifyLogLine(lock.logFile, "[verify] nix gc preflight: ok");
   await logVerifyRevision(root, lock.logFile);
-
-  // One buck-daemon-reaper per verify run. zx tests register temp repo roots via BNX_BUCK_REAPER_STATE_FILE.
   const stateFile = path.join(process.env.TMPDIR || "/tmp", `bucknix-buck-reaper-${iso}.txt`);
   process.env.BNX_BUCK_REAPER_STATE_FILE = stateFile;
   await fsp.writeFile(stateFile, "", "utf8").catch(() => {});
@@ -161,9 +156,6 @@ export async function runVerify(): Promise<void> {
     delete process.env.BNX_TEST_SEED_KEY;
     delete process.env.BNX_TEST_SEED_PIN_DIR;
   }
-
-  // Proactively kill *orphaned* buck2 daemons rooted under temp repos to avoid host overload.
-  // This is intentionally scoped to temp-repo roots (e.g. /tmp/bnx-* or buck-out/tmp/tmpdir/*).
   try {
     const res = await cleanupOrphanBuckDaemons({
       log: async (line) => await appendVerifyLogLine(lock.logFile, line),
@@ -176,17 +168,26 @@ export async function runVerify(): Promise<void> {
   } catch {}
 
   let pgid = process.pid;
-  const signalHandler = (sig: NodeJS.Signals) => {
-    void (async () => {
-      if (seedCleanup) await seedCleanup();
-      await killProcessGroup(pgid);
-      await killBuckIsolation(root, iso);
-      process.exit(sig === "SIGINT" ? 130 : 143);
-    })();
+  let requestedExitCode: number | null = null;
+  let shutdownPromise: Promise<void> | null = null;
+  const requestShutdown = (sig: NodeJS.Signals): Promise<void> => {
+    requestedExitCode = sig === "SIGINT" ? 130 : 143;
+    if (!shutdownPromise) {
+      shutdownPromise = (async () => {
+        if (seedCleanup) {
+          await seedCleanup();
+          seedCleanup = null;
+        }
+        await killProcessGroup(pgid);
+        await killBuckIsolation(root, iso);
+      })();
+    }
+    return shutdownPromise;
   };
+  const signalHandler = (sig: NodeJS.Signals) => void requestShutdown(sig);
   for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
     try {
-      process.on(sig, () => signalHandler(sig));
+      process.once(sig, () => signalHandler(sig));
     } catch {}
   }
 
@@ -209,9 +210,8 @@ export async function runVerify(): Promise<void> {
     },
   });
   const status = await spawned.wait();
+  if (shutdownPromise) await shutdownPromise;
   rails.stop();
-
-  // Best-effort cleanup for temp repos spawned by this verify run.
   try {
     const res = await cleanupRegisteredTempRepos({
       stateFile,
@@ -233,15 +233,11 @@ export async function runVerify(): Promise<void> {
       stdio: "pipe",
     }).catch(() => {});
   }
-
-  if (status === 0 && cov.rawDir) {
-    await runMergedCoverageReport({ root, rawDir: cov.rawDir });
-  }
-
+  if (status === 0 && cov.rawDir) await runMergedCoverageReport({ root, rawDir: cov.rawDir });
   if (seedCleanup) {
     await seedCleanup();
     seedCleanup = null;
   }
   await killBuckIsolation(root, iso);
-  process.exit(status);
+  process.exit(requestedExitCode ?? status);
 }

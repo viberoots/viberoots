@@ -19,6 +19,8 @@ const WRITABLE_MARKER = ".seed-store-writable";
 let seedStoreCloneMode: "try" | "none" | null = null;
 let seedStoreCloneModePromise: Promise<"try" | "none"> | null = null;
 let untrackedOverlayOncePerWorker: Promise<string[]> | null = null;
+let trackedOverlayOncePerWorker: Promise<string[]> | null = null;
+let overlayFilesOncePerWorker: Promise<string[]> | null = null;
 
 function isVerifyMode(): boolean {
   return Boolean(process.env.BNX_VERIFY_LOCK_DIR || process.env.BNX_VERIFY_LOG_FILE);
@@ -79,18 +81,70 @@ async function listUntrackedFilesOncePerWorker(): Promise<string[]> {
   return await untrackedOverlayOncePerWorker;
 }
 
+async function listTrackedChangedFilesOncePerWorker(): Promise<string[]> {
+  if (!trackedOverlayOncePerWorker) {
+    trackedOverlayOncePerWorker = (async () => {
+      const out = await $({
+        stdio: "pipe",
+        cwd: process.cwd(),
+      })`git status --porcelain=v1 --untracked-files=no`.nothrow();
+      if (out.exitCode !== 0) return [];
+      const rels = String(out.stdout || "")
+        .split(/\r?\n/)
+        .map((line) => line.trimEnd())
+        .filter(Boolean)
+        .map((line) => {
+          const raw = line.length >= 4 ? line.slice(3).trim() : "";
+          if (!raw) return "";
+          const renameSep = raw.indexOf(" -> ");
+          return (renameSep >= 0 ? raw.slice(renameSep + 4) : raw).trim();
+        })
+        .filter(Boolean)
+        .filter((rel) => rel.startsWith("build-tools/"))
+        .sort((a, b) => a.localeCompare(b));
+      return Array.from(new Set(rels));
+    })();
+  }
+  return await trackedOverlayOncePerWorker;
+}
+
 async function overlayUntrackedFilesIntoTempRepo(tmpDir: string): Promise<void> {
-  const files = await listUntrackedFilesOncePerWorker();
-  if (files.length === 0) return;
-  const fileList = await fsp.mkdtemp(path.join(tmpDir, ".seed-overlay-"));
-  const listPath = path.join(fileList, "files.txt");
+  const listOverlayFilesOncePerWorker = async (): Promise<string[]> => {
+    if (!overlayFilesOncePerWorker) {
+      overlayFilesOncePerWorker = (async () => {
+        const [untrackedFiles, trackedChangedFiles] = await Promise.all([
+          listUntrackedFilesOncePerWorker(),
+          listTrackedChangedFilesOncePerWorker(),
+        ]);
+        const files = Array.from(new Set([...untrackedFiles, ...trackedChangedFiles])).sort(
+          (a, b) => a.localeCompare(b),
+        );
+        if (files.length === 0) return [];
+        const valid: string[] = [];
+        for (const rel of files) {
+          const st = await fsp.lstat(rel).catch(() => null);
+          if (!st || st.isDirectory()) continue;
+          valid.push(rel);
+        }
+        return valid;
+      })();
+    }
+    return await overlayFilesOncePerWorker;
+  };
+  const cached = await listOverlayFilesOncePerWorker();
+  if (cached.length === 0) return;
   const valid: string[] = [];
-  for (const rel of files) {
+  for (const rel of cached) {
     const st = await fsp.lstat(rel).catch(() => null);
     if (!st || st.isDirectory()) continue;
     valid.push(rel);
   }
+  if (valid.length !== cached.length) {
+    overlayFilesOncePerWorker = Promise.resolve(valid);
+  }
   if (valid.length === 0) return;
+  const fileList = await fsp.mkdtemp(path.join(tmpDir, ".seed-overlay-"));
+  const listPath = path.join(fileList, "files.txt");
   await fsp.writeFile(listPath, valid.join("\n") + "\n", "utf8");
   try {
     await $({ cwd: process.cwd() })`rsync -a --relative --files-from ${listPath} ./ ${tmpDir}/`;
@@ -150,7 +204,7 @@ export async function initTempRepoFromSeedStore(args: {
   await deps.timeAsync(`seedStoreCopy(${path.basename(tmpDir)})`, async () => {
     // Seed copies run in many parallel test processes; keep per-copy file operation
     // fanout modest to avoid APFS metadata contention and long tail stalls.
-    await copyTree(seedPath, tmpDir, { cloneMode, force: true, maxInFlight: 8 });
+    await copyTree(seedPath, tmpDir, { cloneMode, force: true, maxInFlight: 6 });
   });
   await deps.timeAsync(`seedOverlayUntracked(${path.basename(tmpDir)})`, async () => {
     await overlayUntrackedFilesIntoTempRepo(tmpDir);
