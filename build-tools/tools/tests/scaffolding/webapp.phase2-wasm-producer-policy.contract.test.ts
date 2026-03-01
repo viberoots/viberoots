@@ -11,7 +11,6 @@ type Phase2TemplateContract = {
   id: string;
   templateRoot: string;
   payloadFile: string;
-  buildScriptFile: string;
   watchPathFragment: string;
   syncPathFragment: string;
 };
@@ -28,7 +27,6 @@ const CONTRACTS: Phase2TemplateContract[] = [
       "webapp-static",
     ),
     payloadFile: path.join("src", "wasm-producer", "payload.txt"),
-    buildScriptFile: path.join("scripts", "build-wasm-producer.mjs.jinja"),
     watchPathFragment: "--watch src/wasm-producer/payload.txt",
     syncPathFragment: "--sync-out src/wasm-contract/top.wasm",
   },
@@ -43,7 +41,6 @@ const CONTRACTS: Phase2TemplateContract[] = [
       "webapp-ssr-vite",
     ),
     payloadFile: path.join("src", "wasm-producer", "payload.txt"),
-    buildScriptFile: path.join("scripts", "build-wasm-producer.mjs.jinja"),
     watchPathFragment: "--watch src/wasm-producer/payload.txt",
     syncPathFragment: "--sync-out src/wasm-contract/top.wasm",
   },
@@ -58,7 +55,6 @@ const CONTRACTS: Phase2TemplateContract[] = [
       "webapp-ssr-next",
     ),
     payloadFile: path.join("app", "wasm-producer", "payload.txt"),
-    buildScriptFile: path.join("scripts", "build-wasm-producer.mjs.jinja"),
     watchPathFragment: "--watch app/wasm-producer/payload.txt",
     syncPathFragment: "--sync-out app/wasm-contract/top.wasm",
   },
@@ -87,8 +83,13 @@ test("Phase-2 template policy: wasm producer contract keys exist across template
     assert.match(packageJson, /--build-cmd/, `${contract.id}: watcher build command flag missing`);
     assert.match(
       packageJson,
+      /build-wasm-producer\.ts/,
+      `${contract.id}: watcher build command must use zx-wrapper TypeScript producer script`,
+    );
+    assert.doesNotMatch(
+      packageJson,
       /build-wasm-producer\.mjs/,
-      `${contract.id}: watcher build command mismatch`,
+      `${contract.id}: watcher build command must not rely on legacy .mjs producer logic`,
     );
     assert.match(
       packageJson,
@@ -110,11 +111,6 @@ test("Phase-2 template policy: wasm producer contract keys exist across template
       await exists(path.join(root, contract.payloadFile)),
       true,
       `${contract.id}: payload missing`,
-    );
-    assert.equal(
-      await exists(path.join(root, contract.buildScriptFile)),
-      true,
-      `${contract.id}: build script missing`,
     );
   }
 });

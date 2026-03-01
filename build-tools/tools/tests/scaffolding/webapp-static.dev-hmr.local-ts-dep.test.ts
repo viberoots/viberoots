@@ -93,9 +93,11 @@ test(
 
       const appAbs = path.join(tmp, "projects", "apps", "demo-web");
       const appMainPath = path.join(appAbs, "src", "main.ts");
+      const appPackageJsonPath = path.join(appAbs, "package.json");
+      const libPackageJsonPath = path.join(tmp, "projects", "libs", "demo-lib", "package.json");
       const libSourcePath = path.join(tmp, "projects", "libs", "demo-lib", "src", "index.ts");
       const appMainSource = [
-        'import { depMessage } from "../../../libs/demo-lib/src/index";',
+        'import { depMessage } from "@libs/demo-lib";',
         "",
         'const root = document.getElementById("app");',
         "if (root) {",
@@ -103,6 +105,39 @@ test(
         "}",
         "",
       ].join("\n");
+      const appPackageJson = JSON.parse(await fsp.readFile(appPackageJsonPath, "utf8")) as {
+        dependencies?: Record<string, string>;
+      };
+      const libPackageJson = JSON.parse(await fsp.readFile(libPackageJsonPath, "utf8")) as Record<
+        string,
+        unknown
+      >;
+      const nextAppPackageJson = {
+        ...appPackageJson,
+        dependencies: {
+          ...(appPackageJson.dependencies || {}),
+          "@libs/demo-lib": "workspace:*",
+        },
+      };
+      const nextLibPackageJson = {
+        ...libPackageJson,
+        exports: {
+          ".": {
+            default: "./src/index.ts",
+          },
+        },
+        types: "./src/index.ts",
+      };
+      await fsp.writeFile(
+        appPackageJsonPath,
+        JSON.stringify(nextAppPackageJson, null, 2) + "\n",
+        "utf8",
+      );
+      await fsp.writeFile(
+        libPackageJsonPath,
+        JSON.stringify(nextLibPackageJson, null, 2) + "\n",
+        "utf8",
+      );
       await fsp.writeFile(appMainPath, appMainSource, "utf8");
       await fsp.writeFile(
         libSourcePath,
@@ -114,17 +149,11 @@ test(
         cwd: tmp,
         stdio: "pipe",
       })`git add -A projects/apps/demo-web projects/libs/demo-lib`;
-
-      const outPathRaw = await _$({
-        cwd: appAbs,
-        stdio: "pipe",
-      })`zx-wrapper ../../../build-tools/tools/dev/node-modules-build.ts`;
-      const outPath = String(outPathRaw.stdout || "").trim();
-      if (!outPath) throw new Error("failed to resolve node_modules derivation path");
       await _$({
-        cwd: appAbs,
+        cwd: tmp,
         stdio: "inherit",
-      })`rm -rf node_modules && ln -s ${outPath}/node_modules node_modules`;
+        env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1" },
+      })`pnpm install --filter ./projects/apps/demo-web --filter ./projects/libs/demo-lib --no-frozen-lockfile --ignore-scripts --reporter=append-only`;
 
       const esbuildPkg = esbuildPackageName();
       const esbuildBin = esbuildPkg
@@ -141,9 +170,10 @@ test(
       const serverStdout: string[] = [];
       const serverStderr: string[] = [];
       const devServer = spawn(
-        "node",
+        "pnpm",
         [
-          "./node_modules/vite/bin/vite.js",
+          "exec",
+          "vite",
           "dev",
           "--host",
           "127.0.0.1",
@@ -180,7 +210,7 @@ test(
         const mainModuleUrl = `http://127.0.0.1:${port}/src/main.ts`;
         const firstMainModule = await httpGet(mainModuleUrl);
         assert.equal(firstMainModule.status, 200);
-        const firstDepSpec = extractImportedUrl(firstMainModule.body, "/demo-lib/src/index");
+        const firstDepSpec = extractImportedUrl(firstMainModule.body, "/demo-lib");
         const firstDepModuleUrl = toAbsoluteModuleUrl(mainModuleUrl, firstDepSpec);
         const firstModule = await httpGet(firstDepModuleUrl);
         assert.equal(firstModule.status, 200);
@@ -218,7 +248,7 @@ test(
         // Verify the served dependency module source also advanced, not just DOM text.
         const currentMainModule = await httpGet(mainModuleUrl);
         assert.equal(currentMainModule.status, 200);
-        const currentDepSpec = extractImportedUrl(currentMainModule.body, "/demo-lib/src/index");
+        const currentDepSpec = extractImportedUrl(currentMainModule.body, "/demo-lib");
         const currentDepModuleUrl = toAbsoluteModuleUrl(mainModuleUrl, currentDepSpec);
         const nextModule = await httpGet(currentDepModuleUrl);
         assert.equal(nextModule.status, 200);

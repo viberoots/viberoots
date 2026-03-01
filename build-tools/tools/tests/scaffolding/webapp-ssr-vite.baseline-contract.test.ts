@@ -71,7 +71,6 @@ test("Vite SSR template metadata and scaffold baseline are present", async () =>
       path.join(appRoot, "pnpm-lock.yaml"),
       path.join(appRoot, "server", "index.ts"),
       path.join(appRoot, "server", "wasm-contract.ts"),
-      path.join(appRoot, "scripts", "build-wasm-producer.mjs"),
       path.join(appRoot, "src", "entry-client.ts"),
       path.join(appRoot, "src", "entry-server.ts"),
       path.join(appRoot, "src", "wasm-contract.ts"),
@@ -85,5 +84,15 @@ test("Vite SSR template metadata and scaffold baseline are present", async () =>
     const targets = await fsp.readFile(path.join(appRoot, "TARGETS"), "utf8");
     assert.match(targets, /webapp:ssr/);
     assert.match(targets, /framework:vite/);
+    const packageJson = JSON.parse(
+      await fsp.readFile(path.join(appRoot, "package.json"), "utf8"),
+    ) as {
+      scripts?: Record<string, string>;
+    };
+    assert.match(String(packageJson.scripts?.["dev:wasm:watch"] || ""), /build-wasm-producer\.ts/);
+    assert.doesNotMatch(
+      String(packageJson.scripts?.["dev:wasm:watch"] || ""),
+      /build-wasm-producer\.mjs/,
+    );
   });
 });

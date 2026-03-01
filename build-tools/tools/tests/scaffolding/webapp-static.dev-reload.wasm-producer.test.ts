@@ -7,95 +7,15 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { after, test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 import { httpGet, pickFreePort, stopServer } from "./lib/webapp-static-hmr";
+import {
+  assertSingleQueueInvariant,
+  captureHmrMutationEventsDuring,
+  esbuildPackageName,
+  waitForHmrConnected,
+} from "./lib/wasm-watch";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
-
-function esbuildPackageName(): string {
-  const { platform, arch } = process;
-  if (platform === "darwin")
-    return arch === "arm64" ? "@esbuild/darwin-arm64" : "@esbuild/darwin-x64";
-  if (platform === "linux") return arch === "arm64" ? "@esbuild/linux-arm64" : "@esbuild/linux-x64";
-  if (platform === "win32") return arch === "arm64" ? "@esbuild/win32-arm64" : "@esbuild/win32-x64";
-  return "";
-}
-
-function assertSingleQueueInvariant(logs: string): void {
-  const lines = logs.split(/\r?\n/).filter(Boolean);
-  let active = 0;
-  for (const line of lines) {
-    if (!line.includes("[wasm-watch]")) continue;
-    if (line.includes("rebuild:start")) {
-      active += 1;
-      if (active > 1) {
-        throw new Error(`detected overlapping wasm-watch rebuilds: ${line}`);
-      }
-    }
-    if (line.includes("sync:ok") || line.includes("rebuild:fail")) {
-      active = Math.max(0, active - 1);
-    }
-  }
-}
-
-async function waitForHmrConnected(ws: WebSocket, timeoutMs: number): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error(`vite hmr websocket did not connect within ${timeoutMs}ms`));
-    }, timeoutMs);
-    ws.addEventListener("message", (event) => {
-      try {
-        const data = JSON.parse(String(event.data || "{}")) as { type?: string };
-        if (data.type === "connected") {
-          clearTimeout(timer);
-          resolve();
-        }
-      } catch {}
-    });
-    ws.addEventListener("error", () => {
-      clearTimeout(timer);
-      reject(new Error("vite hmr websocket error before connected event"));
-    });
-  });
-}
-
-async function captureHmrMutationEventsDuring(
-  ws: WebSocket,
-  timeoutMs: number,
-  mutate: () => Promise<void>,
-): Promise<{ sawUpdate: boolean; sawFullReload: boolean }> {
-  return await new Promise((resolve, reject) => {
-    let sawUpdate = false;
-    let sawFullReload = false;
-    const onMessage = (event: any) => {
-      try {
-        const data = JSON.parse(String(event.data || "{}")) as { type?: string };
-        if (data.type === "update") sawUpdate = true;
-        if (data.type === "full-reload") sawFullReload = true;
-      } catch {}
-    };
-    const onError = () => {
-      cleanup();
-      reject(new Error("vite hmr websocket error while waiting for mutation events"));
-    };
-    const cleanup = () => {
-      ws.removeEventListener("message", onMessage);
-      ws.removeEventListener("error", onError);
-    };
-    const timer = setTimeout(() => {
-      cleanup();
-      resolve({ sawUpdate, sawFullReload });
-    }, timeoutMs);
-
-    ws.addEventListener("message", onMessage);
-    ws.addEventListener("error", onError);
-
-    mutate().catch((error) => {
-      clearTimeout(timer);
-      cleanup();
-      reject(error);
-    });
-  });
-}
 
 test(
   "webapp-static wasm producer watcher rebuilds and syncs without restart",
@@ -125,7 +45,7 @@ test(
       const depWatchCmd = [
         "zx-wrapper ../../../build-tools/tools/dev/watch-wasm-producer.ts",
         "--watch ../../libs/demo-wasm-producer/payload.txt",
-        '--build-cmd "WASM_PRODUCER_PAYLOAD_PATH=../../libs/demo-wasm-producer/payload.txt node ./scripts/build-wasm-producer.mjs"',
+        '--build-cmd "zx-wrapper ../../../build-tools/tools/dev/build-wasm-producer.ts --payload ../../libs/demo-wasm-producer/payload.txt --out .wasm-producer/top.wasm"',
         "--build-out .wasm-producer/top.wasm",
         "--sync-out src/wasm-contract/top.wasm",
       ].join(" ");

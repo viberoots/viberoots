@@ -67,6 +67,8 @@ For `scaf new ts webapp-static <name>`, `scaf new ts webapp-ssr-vite <name>`, an
 
 - `pnpm run dev` composes Vite and a wasm producer watcher with clean shutdown.
 - `pnpm run dev:wasm:watch` watches producer inputs, runs a producer build command, and syncs output to `src/wasm-contract/top.wasm`.
+- The producer build command path is canonical TypeScript via `zx-wrapper ../../../build-tools/tools/dev/build-wasm-producer.ts`.
+- Template-local `.mjs` producer build scripts are not used for substantive behavior.
 - Watcher output is deterministic and structured for tests:
   - `[wasm-watch] rebuild:start`
   - `[wasm-watch] sync:ok`
@@ -87,6 +89,7 @@ Troubleshooting when local dependency edits do not refresh:
 - Restart `pnpm run dev` after changing dependency specs in `package.json`.
 - For Vite SSR templates, verify `ssr.noExternal` still includes local workspace package names.
 - For Next SSR templates, verify `transpilePackages` includes local workspace package names and `experimental.externalDir` remains enabled.
+- If wasm producer updates do not apply, run `pnpm run dev:wasm:watch` and verify the logged build command uses `build-tools/tools/dev/build-wasm-producer.ts`.
 
 #### Subcommands and semantics
 

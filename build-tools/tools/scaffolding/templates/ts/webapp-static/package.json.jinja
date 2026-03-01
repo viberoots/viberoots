@@ -7,7 +7,7 @@
     "dev": "zx-wrapper ../../../build-tools/tools/dev/dev-with-wasm-watch.ts --vite-cmd \"pnpm exec vite --host 127.0.0.1 --port ${PORT:-5187} --strictPort --clearScreen false --logLevel info\" --watch-cmd \"pnpm run dev:wasm:watch\"",
     "dev:wasm": "pnpm run dev",
     "dev:vite": "vite",
-    "dev:wasm:watch": "zx-wrapper ../../../build-tools/tools/dev/watch-wasm-producer.ts --watch src/wasm-producer/payload.txt --build-cmd \"node ./scripts/build-wasm-producer.mjs\" --build-out .wasm-producer/top.wasm --sync-out src/wasm-contract/top.wasm",
+    "dev:wasm:watch": "zx-wrapper ../../../build-tools/tools/dev/watch-wasm-producer.ts --watch src/wasm-producer/payload.txt --build-cmd \"zx-wrapper ../../../build-tools/tools/dev/build-wasm-producer.ts --payload src/wasm-producer/payload.txt --out .wasm-producer/top.wasm\" --build-out .wasm-producer/top.wasm --sync-out src/wasm-contract/top.wasm",
     "build": "vite build",
     "preview": "vite preview",
     {% if includeNodeTests %}

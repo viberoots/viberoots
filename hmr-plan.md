@@ -113,23 +113,34 @@ Completion criteria: E2E confirms non-TS source edit rebuilds wasm and browser r
 Dependencies: Phase 1.
 Checkpoint: `READY` for Phase 3 when loop is deterministic across repeated runs.
 
+### Phase 2 Baseline Invariants (locked before Phase 3)
+
+These are no longer open design choices:
+
+1. Producer automation is canonical via zx-wrapper TypeScript (`build-tools/tools/dev/build-wasm-producer.ts`).
+2. Template-local `.mjs` files are not used for substantive producer automation logic.
+3. Strict wasm update policy remains the primary path (no full-page-reload-first fallback).
+4. Phase 1 and Phase 2 non-regression tests for static, SSR vite, and SSR next must stay green during Phase 3 and Phase 4.
+
 ### Phase 3: SSR and Runtime Consistency
 
-Objective: verify SSR-specific consistency and prevent client/server regressions.
+Objective: verify SSR-specific consistency on top of the locked Phase 2 baseline and prevent client/server regressions.
 
 Tasks:
 
 1. Confirm SSR module updates via `ssrLoadModule` hot-apply.
 2. Confirm wasm updates are visible in SSR entry path.
 3. Ensure dev startup scripts do not block on long prewarm tasks.
+4. Keep producer automation path unchanged (canonical zx-wrapper TypeScript) unless a reproduced blocker requires escalation.
+5. Prove no-restart and no-hang behavior under repeated SSR edit cycles.
 
-Completion criteria: SSR E2E passes for client module change, server module change, and wasm producer change.
+Completion criteria: SSR E2E passes for client module change, server module change, and wasm producer change, while all Phase 1 and Phase 2 non-regression targets remain green.
 Dependencies: Phase 2.
 Checkpoint: `READY` for Phase 4 when static, SSR vite, and SSR next pass target scenarios.
 
 ### Phase 4: Regression Coverage and Docs
 
-Objective: stabilize and document guarantees.
+Objective: lock in Phase 0 through Phase 3 guarantees in CI and docs without reopening Phase 2 design decisions.
 
 Tasks:
 
@@ -137,8 +148,9 @@ Tasks:
 2. Add troubleshooting for stale lock, watcher build failure, missing local link.
 3. Document reload expectations:
    - TS edits: HMR or module invalidation
-   - wasm edits: full reload acceptable if deterministic and fast
-4. Remove `ts/webapp-ssr-express` and document migration to next/vite SSR templates.
+   - wasm edits: strict deterministic update path is primary; fallback policy only by explicit escalation trigger
+4. Document canonical producer command-path checks (`build-tools/tools/dev/build-wasm-producer.ts`) for generated templates.
+5. Remove `ts/webapp-ssr-express` and document migration to next/vite SSR templates.
 
 Completion criteria: E2E in CI and docs include clear recovery commands.
 Dependencies: Phase 3.
@@ -198,4 +210,4 @@ Escalation trigger from strict HMR to hybrid:
 
 ## Immediate Next Step
 
-Start Phase 0 with test harness and first pilot E2E.
+Start Phase 3 SSR consistency and runtime hardening on top of the locked Phase 2 baseline.

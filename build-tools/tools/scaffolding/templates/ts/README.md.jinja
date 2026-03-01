@@ -35,6 +35,7 @@ Local dependency troubleshooting:
 - If local dependency source resolves outside the app root, verify `vite.config.ts` keeps `server.fs.allow` scoped to the workspace root.
 - If local dependency edits stay stale after `package.json` changes, restart `pnpm dev`.
 - If producer edits do not update wasm output, check `src/wasm-producer/payload.txt`, then run `pnpm run dev:wasm:watch` and verify `[wasm-watch] sync:ok`.
+- Confirm `pnpm run dev:wasm:watch` resolves to `build-tools/tools/dev/build-wasm-producer.ts`.
 - If watcher failures persist, run the logged recovery command and confirm `src/wasm-contract/top.wasm` exists.
 {% endif %}
 {% if template == "webapp-ssr-express" %}
@@ -112,6 +113,7 @@ Local dependency troubleshooting:
 - If local dependency source resolves outside the app root, verify `next.config.mjs` keeps `experimental.externalDir = true`.
 - If local dependency edits stay stale after `package.json` changes, restart `pnpm run dev:ssr`.
 - If producer edits do not update wasm output, check `app/wasm-producer/payload.txt`, then run `pnpm run dev:wasm:watch` and verify `[wasm-watch] sync:ok`.
+- Confirm `pnpm run dev:wasm:watch` resolves to `build-tools/tools/dev/build-wasm-producer.ts`.
 - If server-rendered wasm probes fail in dev, confirm `app/wasm-contract/top.wasm` exists and rerun the logged watcher recovery command.
 {% endif %}
 {% if template == "webapp-ssr-vite" %}
@@ -162,6 +164,7 @@ Local dependency troubleshooting:
 - If local dependency edits do not apply on SSR paths, verify `vite.config.ts` includes `ssr.noExternal` for workspace-linked dependency package names.
 - If local dependency source resolves outside the app root, verify `vite.config.ts` keeps `server.fs.allow` scoped to the workspace root.
 - If producer edits do not update wasm output, check `src/wasm-producer/payload.txt`, then run `pnpm run dev:wasm:watch` and verify `[wasm-watch] sync:ok`.
+- Confirm `pnpm run dev:wasm:watch` resolves to `build-tools/tools/dev/build-wasm-producer.ts`.
 - If server-rendered wasm probes fail in dev, confirm `src/wasm-contract/top.wasm` exists and rerun the logged watcher recovery command.
 {% endif %}
 

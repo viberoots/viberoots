@@ -8,7 +8,7 @@
     "dev:ssr": "pnpm run dev",
     "dev:ssr:only": "next dev -H 127.0.0.1 -p ${PORT:-4173}",
     "dev:wasm": "pnpm run dev",
-    "dev:wasm:watch": "zx-wrapper ../../../build-tools/tools/dev/watch-wasm-producer.ts --watch app/wasm-producer/payload.txt --build-cmd \"node ./scripts/build-wasm-producer.mjs\" --build-out .wasm-producer/top.wasm --sync-out app/wasm-contract/top.wasm",
+    "dev:wasm:watch": "zx-wrapper ../../../build-tools/tools/dev/watch-wasm-producer.ts --watch app/wasm-producer/payload.txt --build-cmd \"zx-wrapper ../../../build-tools/tools/dev/build-wasm-producer.ts --payload app/wasm-producer/payload.txt --out .wasm-producer/top.wasm\" --build-out .wasm-producer/top.wasm --sync-out app/wasm-contract/top.wasm",
     "build:ssr": "next build && tsc -p tsconfig.server.json && mkdir -p dist/server/wasm-contract && cp app/wasm-contract/top.wasm dist/server/wasm-contract/top.wasm",
     "start:ssr": "node dist/server/index.js",
     {% if includeNodeTests %}
