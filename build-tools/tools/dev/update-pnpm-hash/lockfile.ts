@@ -1,30 +1,30 @@
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { isNixGcCommand } from "../../lib/nix-gc-lock.ts";
+import { gcWaitConfig, waitForNoActiveNixGc } from "../../lib/nix-gc-lock.ts";
 import { importerLockfileNeedsRegen } from "../../lib/pnpm-importer-lockfile.ts";
 
-async function activeNixGcPids(): Promise<number[]> {
-  const out = await $({
-    stdio: "pipe",
-    reject: false,
-  })`ps -axo pid=,command=`;
-  if ((out as any).exitCode !== 0) return [];
-  const pids: number[] = [];
-  const lines = String((out as any).stdout || "").split("\n");
-  for (const line of lines) {
-    const s = line.trim();
-    if (!s) continue;
-    const firstSpace = s.indexOf(" ");
-    if (firstSpace <= 0) continue;
-    const pid = Number(s.slice(0, firstSpace).trim());
-    const command = s.slice(firstSpace + 1).trim();
-    if (!Number.isFinite(pid) || pid <= 0 || !command) continue;
-    if (isNixGcCommand(command)) {
-      pids.push(pid);
-    }
+async function waitForNixGcToClearForLockfile(): Promise<void> {
+  const cfg = gcWaitConfig();
+  let lastLogAt = 0;
+  const stillActive = await waitForNoActiveNixGc({
+    timeoutMs: cfg.timeoutMs,
+    pollMs: cfg.pollMs,
+    onWait: (pids, elapsedMs, timeoutMs) => {
+      if (elapsedMs - lastLogAt < 15_000) return;
+      lastLogAt = elapsedMs;
+      const elapsedSec = Math.floor(elapsedMs / 1000);
+      const timeoutSec = Math.floor(timeoutMs / 1000);
+      console.warn(
+        `[lockfile] waiting for active nix gc to finish (${pids.join(", ")}); elapsed=${elapsedSec}s timeout=${timeoutSec}s`,
+      );
+    },
+  });
+  if (stillActive.length > 0) {
+    throw new Error(
+      `lockfile generation blocked: active 'nix store gc' process(es) detected (${stillActive.join(", ")}). Stop GC and rerun 'scaf new ...'.`,
+    );
   }
-  return pids;
 }
 
 function pnpmFlakeRef(repoRoot: string): string {
@@ -105,12 +105,7 @@ export async function generateImporterLockfile(opts: { repoRoot: string; importe
   // Ensure pnpm uses a writable local store/cache. Run from importer root to avoid
   // pnpm choosing the workspace root implicitly and write lockfile to importer dir.
   const importerAbs = path.resolve(opts.repoRoot, opts.importer);
-  const activeGc = await activeNixGcPids();
-  if (activeGc.length > 0) {
-    throw new Error(
-      `lockfile generation blocked: active 'nix store gc' process(es) detected (${activeGc.join(", ")}). Stop GC and rerun 'scaf new ...'.`,
-    );
-  }
+  await waitForNixGcToClearForLockfile();
 
   const { workspaceFileAbs, hadLocalWorkspaceFile } = await ensureLocalWorkspaceMarker(importerAbs);
   const fetchTimeout = String(process.env.NIX_PNPM_FETCH_TIMEOUT || "").trim() || "600";
@@ -118,23 +113,19 @@ export async function generateImporterLockfile(opts: { repoRoot: string; importe
   const { homeDir, storeDir } = localPnpmDirs(importerAbs);
   await fsp.mkdir(homeDir, { recursive: true }).catch(() => {});
   await fsp.mkdir(storeDir, { recursive: true }).catch(() => {});
-  const flakeSnap = await makeFilteredFlakeRef(opts.repoRoot);
+  const flakeRef = pnpmFlakeRef(opts.repoRoot);
   console.log(`[lockfile] generating importer lockfile: ${opts.importer}`);
-  try {
-    await $({
-      cwd: importerAbs,
-      stdio: "inherit",
-      timeout: timeoutMs,
-      env: {
-        ...process.env,
-        NIX_PNPM_ALLOW_GENERATE: "1",
-        NIX_PNPM_FETCH_TIMEOUT: fetchTimeout,
-        PNPM_HOME: homeDir,
-      },
-    })`nix run --accept-flake-config ${flakeSnap.flakeRef} -- install --lockfile-only --prod=false --ignore-scripts --lockfile-dir . --dir . --store-dir ${storeDir} --color never`;
-  } finally {
-    await flakeSnap.cleanup();
-  }
+  await $({
+    cwd: importerAbs,
+    stdio: "inherit",
+    timeout: timeoutMs,
+    env: {
+      ...process.env,
+      NIX_PNPM_ALLOW_GENERATE: "1",
+      NIX_PNPM_FETCH_TIMEOUT: fetchTimeout,
+      PNPM_HOME: homeDir,
+    },
+  })`nix run --accept-flake-config ${flakeRef} -- install --lockfile-only --prod=false --ignore-scripts --lockfile-dir . --dir . --store-dir ${storeDir} --color never`;
 
   await seedImporterLockfileFromRootIfNeeded({ repoRoot: opts.repoRoot, importerAbs });
   await cleanupLocalWorkspaceMarker({ workspaceFileAbs, hadLocalWorkspaceFile });

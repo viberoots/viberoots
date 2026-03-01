@@ -41,7 +41,10 @@ export async function importerLockfileNeedsRegen(opts: {
 
   const pkg = await readJson<PkgJson>(pkgJsonAbs);
   const doc = await parsePnpmLock(lockAbs);
-  const imp = (doc.importers || {})[opts.importerRel] || {};
+  const importers = doc.importers || {};
+  // Importer-local lockfiles use "." as the importer key.
+  const imp =
+    importers["."] || importers[opts.importerRel] || importers[`./${opts.importerRel}`] || {};
 
   const pkgDeps = keysOf(pkg.dependencies);
   const pkgDevDeps = keysOf(pkg.devDependencies);

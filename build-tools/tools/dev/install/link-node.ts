@@ -5,7 +5,7 @@ import path from "node:path";
 import { getFlagBool } from "../../lib/cli.ts";
 import { writeIfChanged } from "../../lib/fs-helpers.ts";
 import { resolveImporterDir } from "../../lib/lockfiles.ts";
-import { activeNixGcPids, nixGcLockMessage } from "../../lib/nix-gc-lock.ts";
+import { gcWaitConfig, nixGcLockMessage, waitForNoActiveNixGc } from "../../lib/nix-gc-lock.ts";
 import { type ManagedCommandActivity, runManagedCommand } from "../../lib/managed-command.ts";
 import { pathExists, repoRoot } from "../../lib/repo.ts";
 import { makeFilteredFlakeRef } from "../update-pnpm-hash/lockfile.ts";
@@ -97,7 +97,11 @@ export async function relinkNodeModules(force: boolean) {
         );
         buildFlakeRefBase = tempFlake.flakeRef.replace(/#pnpm$/, "");
       }
-      const gcPids = activeNixGcPids();
+      const gcCfg = gcWaitConfig();
+      const gcPids = await waitForNoActiveNixGc({
+        timeoutMs: gcCfg.timeoutMs,
+        pollMs: gcCfg.pollMs,
+      });
       if (gcPids.length > 0) {
         throw new Error(nixGcLockMessage("[link-node] nix build", gcPids));
       }

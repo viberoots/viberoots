@@ -11,32 +11,37 @@ const cases: Array<{ name: string; label: string }> = [
   { name: "case6", label: "root//projects/apps/foo:bin (config//toolchains:clang)" },
 ];
 
+const inheritedIso = String(
+  process.env.BUCK_ISOLATION_DIR || process.env.BUCK_NESTED_ISO || "",
+).trim();
+const parityIso = inheritedIso || `parity_${process.pid}`;
+const ownsIso = !inheritedIso;
+
 async function starlarkProbeOutput(target: string): Promise<string> {
-  const inherited = String(
-    process.env.BUCK_ISOLATION_DIR || process.env.BUCK_NESTED_ISO || "",
-  ).trim();
-  const safeTarget = target.replace(/[^a-zA-Z0-9]+/g, "_");
-  const iso = inherited || `parity_${process.pid}_${Date.now()}_${safeTarget}`;
-  try {
-    await $`buck2 --isolation-dir ${iso} build ${target}`;
-    const { stdout } = await $`buck2 --isolation-dir ${iso} targets --show-output ${target}`;
-    const out = stdout.trim().split(/\s+/).pop() || "";
-    const outName = out.split("/").pop() || "";
-    // The file content is the sanitized value; derive expected content from Nix sanitizer
-    if (!outName) throw new Error("no output path for " + target);
-    return outName.replace(/\.txt$/, "");
-  } finally {
-    // Let verify/test harness manage daemon lifecycle; avoid per-test cold-start churn.
-  }
+  await $`buck2 --isolation-dir ${parityIso} build ${target}`;
+  const { stdout } = await $`buck2 --isolation-dir ${parityIso} targets --show-output ${target}`;
+  const out = stdout.trim().split(/\s+/).pop() || "";
+  const outName = out.split("/").pop() || "";
+  if (!outName) throw new Error("no output path for " + target);
+  return outName.replace(/\.txt$/, "");
 }
 
-for (const c of cases) {
-  const target = `//build-tools/tools/tests/cpp/sanitize:${c.name}`;
-  const want = sanitizeName(c.label);
-  const got = await starlarkProbeOutput(target);
-  if (got !== want) {
-    console.error(`sanitize mismatch for ${c.label}: starlark='${got}' nix='${want}'`);
-    process.exit(2);
+try {
+  for (const c of cases) {
+    const target = `//build-tools/tools/tests/cpp/sanitize:${c.name}`;
+    const want = sanitizeName(c.label);
+    const got = await starlarkProbeOutput(target);
+    if (got !== want) {
+      console.error(`sanitize mismatch for ${c.label}: starlark='${got}' nix='${want}'`);
+      process.exit(2);
+    }
+  }
+} finally {
+  if (ownsIso) {
+    await $({
+      reject: false,
+      stdio: "ignore",
+    })`buck2 --isolation-dir ${parityIso} kill`;
   }
 }
 

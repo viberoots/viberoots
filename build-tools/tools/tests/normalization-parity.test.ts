@@ -11,6 +11,12 @@ const cases: Array<{ name: string; attr: string }> = [
   { name: "case6", attr: "pkgs.zlib" },
 ];
 
+const inheritedIso = String(
+  process.env.BUCK_ISOLATION_DIR || process.env.BUCK_NESTED_ISO || "",
+).trim();
+const parityIso = inheritedIso || `parity_${process.pid}`;
+const ownsIso = !inheritedIso;
+
 function resolveBuckEnv(): Record<string, string> {
   const env: Record<string, string> = { ...process.env } as Record<string, string>;
   if (!env.SSL_CERT_FILE) {
@@ -30,23 +36,15 @@ function resolveBuckEnv(): Record<string, string> {
 }
 
 async function starlarkProbeOutput(target: string): Promise<string> {
-  const inherited = String(
-    process.env.BUCK_ISOLATION_DIR || process.env.BUCK_NESTED_ISO || "",
-  ).trim();
-  const iso = inherited || `parity_${process.pid}`;
   const env = resolveBuckEnv();
-  try {
-    await $({ env })`buck2 --isolation-dir ${iso} build ${target}`;
-    const { stdout } = await $({
-      env,
-    })`buck2 --isolation-dir ${iso} targets --show-output ${target}`;
-    const out = stdout.trim().split(/\s+/).pop() || "";
-    const outName: string = out.split("/").pop() || "";
-    if (!outName) throw new Error("no output path for " + target);
-    return outName.replace(/\.txt$/, "");
-  } finally {
-    // Let verify/test harness manage daemon lifecycle; avoid per-test cold-start churn.
-  }
+  await $({ env })`buck2 --isolation-dir ${parityIso} build ${target}`;
+  const { stdout } = await $({
+    env,
+  })`buck2 --isolation-dir ${parityIso} targets --show-output ${target}`;
+  const out = stdout.trim().split(/\s+/).pop() || "";
+  const outName: string = out.split("/").pop() || "";
+  if (!outName) throw new Error("no output path for " + target);
+  return outName.replace(/\.txt$/, "");
 }
 
 async function nixNormalize(attr: string): Promise<string> {
@@ -59,18 +57,28 @@ async function nixNormalize(attr: string): Promise<string> {
   return stdout.trim();
 }
 
-for (const c of cases) {
-  const target = `//build-tools/tools/tests/normalization:${c.name}`;
-  const want = normalizeNixAttr(c.attr);
-  const got = await starlarkProbeOutput(target);
-  if (got !== want) {
-    console.error(`normalize_nix_attr mismatch for '${c.attr}': starlark='${got}' ts='${want}'`);
-    process.exit(2);
+try {
+  for (const c of cases) {
+    const target = `//build-tools/tools/tests/normalization:${c.name}`;
+    const want = normalizeNixAttr(c.attr);
+    const got = await starlarkProbeOutput(target);
+    if (got !== want) {
+      console.error(`normalize_nix_attr mismatch for '${c.attr}': starlark='${got}' ts='${want}'`);
+      process.exit(2);
+    }
+    const nix = await nixNormalize(c.attr);
+    if (nix !== want) {
+      console.error(`normalize_nix_attr mismatch for '${c.attr}': nix='${nix}' ts='${want}'`);
+      process.exit(2);
+    }
   }
-  const nix = await nixNormalize(c.attr);
-  if (nix !== want) {
-    console.error(`normalize_nix_attr mismatch for '${c.attr}': nix='${nix}' ts='${want}'`);
-    process.exit(2);
+} finally {
+  if (ownsIso) {
+    await $({
+      env: resolveBuckEnv(),
+      reject: false,
+      stdio: "ignore",
+    })`buck2 --isolation-dir ${parityIso} kill`;
   }
 }
 

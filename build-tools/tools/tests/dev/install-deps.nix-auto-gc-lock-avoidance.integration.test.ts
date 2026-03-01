@@ -7,8 +7,11 @@ test("install deps nix calls disable per-invocation auto-GC lock waits", async (
   if (!hashNix.includes('"min-free"') || !hashNix.includes('"max-free"')) {
     throw new Error("update-pnpm-hash/nix.ts must disable min-free/max-free for nix build calls");
   }
-  if (!hashNix.includes("activeNixGcPids()")) {
-    throw new Error("update-pnpm-hash/nix.ts must detect active nix store gc and fail fast");
+  if (!hashNix.includes("waitForNoActiveNixGc")) {
+    throw new Error("update-pnpm-hash/nix.ts must wait briefly for active nix store gc to finish");
+  }
+  if (!hashNix.includes("gcWaitConfig()")) {
+    throw new Error("update-pnpm-hash/nix.ts must use bounded nix gc wait configuration");
   }
 
   const depsMain = await fsp.readFile("build-tools/tools/dev/install/deps-main.ts", "utf8");
@@ -23,9 +26,12 @@ test("install deps nix calls disable per-invocation auto-GC lock waits", async (
   if (!linkNode.includes('"min-free"') || !linkNode.includes('"max-free"')) {
     throw new Error("link-node.ts nix builds must disable min-free/max-free");
   }
+  if (!linkNode.includes("waitForNoActiveNixGc")) {
+    throw new Error("link-node.ts must wait briefly for active nix store gc before nix build");
+  }
   if (!linkNode.includes("nixGcLockMessage")) {
     throw new Error(
-      "link-node.ts must fail fast with actionable message when nix store gc is active",
+      "link-node.ts must fail with actionable message when nix store gc remains active",
     );
   }
 

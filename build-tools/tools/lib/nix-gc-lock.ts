@@ -46,6 +46,42 @@ export function activeNixGcPids(): number[] {
   return pids;
 }
 
+function parsePositiveInt(raw: string | undefined, fallback: number): number {
+  const n = Number(String(raw || "").trim());
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.floor(n);
+}
+
+export function gcWaitConfig(): { timeoutMs: number; pollMs: number } {
+  const timeoutSec = parsePositiveInt(process.env.NIX_GC_WAIT_TIMEOUT_SECS, 180);
+  const pollSec = parsePositiveInt(process.env.NIX_GC_WAIT_POLL_SECS, 2);
+  return {
+    timeoutMs: timeoutSec * 1000,
+    pollMs: pollSec * 1000,
+  };
+}
+
+export async function waitForNoActiveNixGc(opts?: {
+  timeoutMs?: number;
+  pollMs?: number;
+  onWait?: (pids: number[], elapsedMs: number, timeoutMs: number) => void;
+}): Promise<number[]> {
+  const cfg = gcWaitConfig();
+  const timeoutMs = Math.max(1000, Number(opts?.timeoutMs || cfg.timeoutMs));
+  const pollMs = Math.max(250, Number(opts?.pollMs || cfg.pollMs));
+  const started = Date.now();
+  while (true) {
+    const pids = activeNixGcPids();
+    if (pids.length === 0) return [];
+    const elapsed = Date.now() - started;
+    if (elapsed >= timeoutMs) return pids;
+    try {
+      opts?.onWait?.(pids, elapsed, timeoutMs);
+    } catch {}
+    await new Promise<void>((resolve) => setTimeout(resolve, pollMs));
+  }
+}
+
 export function nixGcLockMessage(context: string, pids: number[]): string {
   return `${context}: blocked by active 'nix store gc' process(es): ${pids.join(", ")}. Stop GC and retry.`;
 }

@@ -68,109 +68,69 @@ async function writeSsrManifest(tmp: string, opts: SsrManifestOpts = {}): Promis
   return manifestPath;
 }
 
-test("SSR run command fails on missing or invalid framework discriminator", async () => {
-  await runInTemp("runnable-ssr-negative-framework", async (tmp, $) => {
-    const manifestPath = await writeSsrManifest(tmp, { framework: "unknown" });
-    const result = await $({
-      cwd: tmp,
-      stdio: "pipe",
-      nothrow: true,
-      env: { ...process.env, RUNNABLE_TEST_MANIFEST: manifestPath },
-    })`build-tools/tools/bin/p //projects/apps/ssr:app`;
-    assert.notEqual(result.exitCode, 0);
-    assert.match(String(result.stderr || ""), /missing\/invalid framework/);
-  });
-});
+test("SSR runnable commands fail fast on invalid contract shapes", async () => {
+  await runInTemp("runnable-ssr-negative-contracts", async (tmp, $) => {
+    const runCase = async (opts: {
+      name: string;
+      cmd: "p" | "d";
+      manifest: SsrManifestOpts;
+      expected: RegExp;
+    }) => {
+      const manifestPath = await writeSsrManifest(tmp, opts.manifest);
+      const result = await $({
+        cwd: tmp,
+        stdio: "pipe",
+        nothrow: true,
+        env: { ...process.env, RUNNABLE_TEST_MANIFEST: manifestPath },
+      })`build-tools/tools/bin/${opts.cmd} //projects/apps/ssr:app`;
+      assert.notEqual(result.exitCode, 0, `${opts.name}: expected non-zero exit`);
+      assert.match(String(result.stderr || ""), opts.expected, `${opts.name}: expected error`);
+    };
 
-test("SSR run command fails when serverEntry artifact is missing", async () => {
-  await runInTemp("runnable-ssr-negative-server-entry", async (tmp, $) => {
-    const manifestPath = await writeSsrManifest(tmp, { includeServerEntry: false });
-    const result = await $({
-      cwd: tmp,
-      stdio: "pipe",
-      nothrow: true,
-      env: { ...process.env, RUNNABLE_TEST_MANIFEST: manifestPath },
-    })`build-tools/tools/bin/p //projects/apps/ssr:app`;
-    assert.notEqual(result.exitCode, 0);
-    assert.match(String(result.stderr || ""), /missing artifacts\.serverEntry/);
-  });
-});
-
-test("SSR run command fails when clientDir artifact is missing", async () => {
-  await runInTemp("runnable-ssr-negative-client-dir", async (tmp, $) => {
-    const manifestPath = await writeSsrManifest(tmp, { includeClientDir: false });
-    const result = await $({
-      cwd: tmp,
-      stdio: "pipe",
-      nothrow: true,
-      env: { ...process.env, RUNNABLE_TEST_MANIFEST: manifestPath },
-    })`build-tools/tools/bin/p //projects/apps/ssr:app`;
-    assert.notEqual(result.exitCode, 0);
-    assert.match(String(result.stderr || ""), /missing artifacts\.clientDir/);
-  });
-});
-
-test("SSR run command never falls back to static host production command", async () => {
-  await runInTemp("runnable-ssr-negative-static-fallback", async (tmp, $) => {
-    const manifestPath = await writeSsrManifest(tmp, {
-      framework: "vite",
-      prodArgv: ["python3", "-m", "http.server", "--directory", "/tmp/fake"],
+    await runCase({
+      name: "missing/invalid framework discriminator",
+      cmd: "p",
+      manifest: { framework: "unknown" },
+      expected: /missing\/invalid framework/,
     });
-    const result = await $({
-      cwd: tmp,
-      stdio: "pipe",
-      nothrow: true,
-      env: { ...process.env, RUNNABLE_TEST_MANIFEST: manifestPath },
-    })`build-tools/tools/bin/p //projects/apps/ssr:app`;
-    assert.notEqual(result.exitCode, 0);
-    assert.match(String(result.stderr || ""), /must not use static host fallback/);
-  });
-});
-
-test("SSR run command fails when serverEntry artifact is malformed", async () => {
-  await runInTemp("runnable-ssr-negative-malformed-server-entry", async (tmp, $) => {
-    const manifestPath = await writeSsrManifest(tmp, {
-      framework: "vite",
-      malformedServerEntry: true,
+    await runCase({
+      name: "missing serverEntry artifact",
+      cmd: "p",
+      manifest: { includeServerEntry: false },
+      expected: /missing artifacts\.serverEntry/,
     });
-    const result = await $({
-      cwd: tmp,
-      stdio: "pipe",
-      nothrow: true,
-      env: { ...process.env, RUNNABLE_TEST_MANIFEST: manifestPath },
-    })`build-tools/tools/bin/p //projects/apps/ssr:app`;
-    assert.notEqual(result.exitCode, 0);
-    assert.match(String(result.stderr || ""), /missing artifacts\.serverEntry/);
-  });
-});
-
-test("SSR run command fails when clientDir artifact is malformed", async () => {
-  await runInTemp("runnable-ssr-negative-malformed-client-dir", async (tmp, $) => {
-    const manifestPath = await writeSsrManifest(tmp, {
-      framework: "vite",
-      malformedClientDir: true,
+    await runCase({
+      name: "missing clientDir artifact",
+      cmd: "p",
+      manifest: { includeClientDir: false },
+      expected: /missing artifacts\.clientDir/,
     });
-    const result = await $({
-      cwd: tmp,
-      stdio: "pipe",
-      nothrow: true,
-      env: { ...process.env, RUNNABLE_TEST_MANIFEST: manifestPath },
-    })`build-tools/tools/bin/p //projects/apps/ssr:app`;
-    assert.notEqual(result.exitCode, 0);
-    assert.match(String(result.stderr || ""), /missing artifacts\.clientDir/);
-  });
-});
-
-test("SSR dev routing fails fast when run.dev metadata is missing", async () => {
-  await runInTemp("runnable-ssr-negative-missing-dev", async (tmp, $) => {
-    const manifestPath = await writeSsrManifest(tmp, { includeDev: false });
-    const result = await $({
-      cwd: tmp,
-      stdio: "pipe",
-      nothrow: true,
-      env: { ...process.env, RUNNABLE_TEST_MANIFEST: manifestPath },
-    })`build-tools/tools/bin/d //projects/apps/ssr:app`;
-    assert.notEqual(result.exitCode, 0);
-    assert.match(String(result.stderr || ""), /missing run\.dev argv/);
+    await runCase({
+      name: "static-host prod fallback rejected",
+      cmd: "p",
+      manifest: {
+        framework: "vite",
+        prodArgv: ["python3", "-m", "http.server", "--directory", "/tmp/fake"],
+      },
+      expected: /must not use static host fallback/,
+    });
+    await runCase({
+      name: "malformed serverEntry artifact",
+      cmd: "p",
+      manifest: { framework: "vite", malformedServerEntry: true },
+      expected: /missing artifacts\.serverEntry/,
+    });
+    await runCase({
+      name: "malformed clientDir artifact",
+      cmd: "p",
+      manifest: { framework: "vite", malformedClientDir: true },
+      expected: /missing artifacts\.clientDir/,
+    });
+    await runCase({
+      name: "missing dev routing metadata",
+      cmd: "d",
+      manifest: { includeDev: false },
+      expected: /missing run\.dev argv/,
+    });
   });
 });

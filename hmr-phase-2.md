@@ -272,3 +272,126 @@ Additional template-specific maintenance and E2E time.
 ### Recommendation
 
 Implement as the final Phase 2 closeout PR.
+
+---
+
+## PR-4: Phase 2 gap-closure hardening (static parity + policy compliance)
+
+### Description
+
+I will close the remaining Phase 2 delivery gaps identified in review by hardening static-template
+startup parity, aligning producer automation with build-system script policy, and bringing touched
+test modules back into methodology file-size compliance without changing Phase 2 scope.
+
+### Scope & Changes
+
+- Close static-template startup parity gap:
+  - ensure `ts/webapp-static` producer seed input and seeded wasm output are deterministic and in
+    sync at scaffold time
+  - remove mismatch between producer payload baseline and initial wasm artifact baseline
+- Stabilize static Phase-2 live dev loop behavior:
+  - ensure composed static dev loop deterministically serves producer-driven wasm output before and
+    after producer edits in the same session
+  - keep strict wasm HMR/module invalidation policy (no navigation fallback path)
+- Align producer build automation with repository script policy:
+  - migrate substantive producer build script behavior from template `.mjs` scripts to zx-wrapper
+    TypeScript entrypoints
+  - keep any retained `.mjs` files as thin delegators only (or remove them) so no substantive
+    producer automation logic remains outside zx-wrapper TypeScript
+  - keep template script surface deterministic and minimal while preserving existing behavior
+- Bring touched Phase-2 test modules into methodology file-size compliance:
+  - split oversized test/helper modules into focused units while preserving existing assertions
+  - keep behavior and test intent unchanged, only improve decomposition and maintainability
+  - explicitly split `webapp-static.dev-reload.wasm-producer` to satisfy the ≤250-line rule
+- Resolve the systemic Next Phase-1/Phase-2 non-regression blocker:
+  - investigate and fix the root cause of `webapp-ssr-next.dev-hmr.local-ts-dep` hangs/timeouts in
+    the primary path (no fallback paths that mask primary-path bugs)
+  - prove the fix with deterministic, repeatable pass behavior for the target in isolation and in
+    the PR-4 verification set
+- Keep changes surgical:
+  - no new runtime feature additions outside existing Phase-2 producer bridge loop
+  - no expansion of template scope beyond `webapp-static`, `webapp-ssr-vite`, `webapp-ssr-next`
+
+### Tests (in this PR)
+
+- Fix and keep green static Phase-2 wasm producer dev-loop E2E:
+  - `//:scaffolding_webapp_static_dev_reload_wasm_producer`
+  - assert initial served wasm reflects producer baseline, then producer edits propagate without
+    restart
+- Keep cross-template Phase-2 policy contract green:
+  - `//:scaffolding_webapp_phase2_wasm_producer_policy_contract`
+  - assert required producer bridge keys and troubleshooting text remain aligned across all three
+    templates
+- Add/update contract assertions for script-policy alignment:
+  - generated template script wiring resolves to zx-wrapper TypeScript producer automation
+  - no substantive behavior remains in template `.mjs` producer build scripts
+  - policy assertions lock in the zx-wrapper TypeScript producer path as canonical so regressions
+    back to substantive `.mjs` logic fail fast
+- Preserve existing SSR-vite and SSR-next Phase-2/Phase-1 coverage as non-regression checks:
+  - `//:scaffolding_webapp_ssr_vite_dev_reload_wasm_producer`
+  - `//:scaffolding_webapp_ssr_next_dev_reload_wasm_producer`
+  - `//:scaffolding_webapp_ssr_vite_dev_hmr_local_ts_dep`
+  - `//:scaffolding_webapp_ssr_next_dev_hmr_local_ts_dep`
+  - require deterministic completion for `//:scaffolding_webapp_ssr_next_dev_hmr_local_ts_dep`
+    (no timeout/hang behavior) as a PR-4 gate
+- Add/adjust targeted decomposition tests as needed when splitting oversized modules, so assertion
+  coverage is preserved after file moves.
+
+### Docs (in this PR)
+
+- Update `hmr-phase-2.md` and template-facing docs to record gap closure outcomes:
+  - static seed parity contract and expected initial wasm behavior
+  - producer automation script-policy alignment notes (zx-wrapper TypeScript path)
+  - maintained strict HMR/module invalidation policy statement for wasm edits
+- Update troubleshooting snippets to include deterministic checks for:
+  - static initial wasm mismatch diagnosis
+  - producer build command path verification after script migration
+
+### Verification Commands
+
+- `buck2 test //:scaffolding_webapp_static_dev_reload_wasm_producer`
+- `buck2 test //:scaffolding_webapp_phase2_wasm_producer_policy_contract`
+- `buck2 test //:scaffolding_webapp_ssr_vite_dev_reload_wasm_producer`
+- `buck2 test //:scaffolding_webapp_ssr_next_dev_reload_wasm_producer`
+- `buck2 test //:scaffolding_webapp_ssr_vite_dev_hmr_local_ts_dep`
+- `buck2 test //:scaffolding_webapp_ssr_next_dev_hmr_local_ts_dep`
+- `buck2 test //:scaffolding_template_conventions_metadata_cquery`
+- `buck2 test //:scaffolding_ts_command_path_docs_contract`
+
+### Acceptance Criteria
+
+- Static template no longer has producer-seed versus seeded-wasm mismatch at scaffold baseline.
+- Static Phase-2 wasm dev-loop E2E passes deterministically.
+- Producer build automation follows repository script policy (substantive logic in zx-wrapper
+  TypeScript tooling path).
+- Touched Phase-2 test modules satisfy methodology file-size/decomposition constraints, including
+  `webapp-static.dev-reload.wasm-producer` at ≤250 lines after decomposition.
+- Existing SSR-vite and SSR-next Phase-2/Phase-1 behavior remains green as non-regression evidence.
+- `webapp-ssr-next.dev-hmr.local-ts-dep` no longer exhibits systemic timeout/hang behavior and
+  passes deterministically in PR-4 verification.
+- Phase-2 policy/contract tests enforce zx-wrapper TypeScript producer automation as the canonical
+  path, preventing drift back to substantive `.mjs` script logic.
+
+### Risks
+
+Script migration and test decomposition can accidentally change dev-loop behavior or weaken existing
+assertion coverage.
+
+### Mitigation
+
+Use behavior-preserving refactors with explicit before/after contract assertions and keep all
+existing Phase-2 and Phase-1 non-regression targets in the PR verification set.
+
+### Consequence of Not Implementing
+
+Phase 2 remains incomplete due to unresolved static failure and unresolved design/methodology
+compliance gaps.
+
+### Downsides for Implementing
+
+Adds one focused hardening PR and short-term maintenance overhead to migrate scripts and split test
+modules safely.
+
+### Recommendation
+
+Implement immediately after PR-3 as the final compliance and determinism closure PR for Phase 2.

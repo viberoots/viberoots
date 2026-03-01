@@ -1,5 +1,5 @@
 import process from "node:process";
-import { activeNixGcPids, nixGcLockMessage } from "../../lib/nix-gc-lock.ts";
+import { gcWaitConfig, nixGcLockMessage, waitForNoActiveNixGc } from "../../lib/nix-gc-lock.ts";
 import { type ManagedCommandActivity, runManagedCommand } from "../../lib/managed-command.ts";
 
 export function extractHash(text: string): string | null {
@@ -55,7 +55,11 @@ export async function buildStore(
   flakeRef: string,
   activity?: ManagedCommandActivity,
 ): Promise<{ ok: boolean; output: string }> {
-  const gcPids = activeNixGcPids();
+  const gcCfg = gcWaitConfig();
+  const gcPids = await waitForNoActiveNixGc({
+    timeoutMs: gcCfg.timeoutMs,
+    pollMs: gcCfg.pollMs,
+  });
   if (gcPids.length > 0) {
     return {
       ok: false,
@@ -90,7 +94,11 @@ export async function buildUnfixedAndHash(
   flakeRef: string,
   activity?: ManagedCommandActivity,
 ): Promise<{ ok: boolean; sri?: string; output?: string }> {
-  const gcPids = activeNixGcPids();
+  const gcCfg = gcWaitConfig();
+  const gcPids = await waitForNoActiveNixGc({
+    timeoutMs: gcCfg.timeoutMs,
+    pollMs: gcCfg.pollMs,
+  });
   if (gcPids.length > 0) {
     return {
       ok: false,

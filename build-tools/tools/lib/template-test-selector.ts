@@ -1,7 +1,6 @@
-import process from "node:process";
-import "zx/globals";
-import { buckCommandEnv, isBuckDaemonInitTransient } from "./buck-command-env.ts";
 import { collectChangedPaths, isBuildSystemPath } from "./build-system-test-scope.ts";
+import { TEMPLATE_TAXONOMY } from "../scaffolding/scaf/templates/generated/template-taxonomy.generated.ts";
+import { queryTargetsForTemplateLabel } from "./template-test-selector-query.ts";
 import { readTemplateOwnedTestIndex, targetLabelFromScript } from "./template-owned-tests.ts";
 
 export type TemplateTestSelectorMode = "template-only" | "mixed" | "no-template-impact";
@@ -26,7 +25,12 @@ export type TemplateTestSelectorResult = {
 
 const TEMPLATE_ROOT = "build-tools/tools/scaffolding/templates/";
 const TEMPLATE_PATH = /^build-tools\/tools\/scaffolding\/templates\/([^/]+)\/([^/]+)(?:\/|$)/;
-const CONFIG_SUFFIX = /\s+\([^)]*\)$/;
+const TEMPLATE_SUPPORT_EXACT = new Set([
+  "build-tools/tools/tests/template_conventions.bzl",
+  "build-tools/tools/tests/scaffolding/template-conventions.metadata.cquery.test.ts",
+  "build-tools/tools/tests/scaffolding/template-conventions.safety-floor.test.ts",
+]);
+const TEMPLATE_SUPPORT_PREFIXES = ["build-tools/tools/tests/scaffolding/lib/"];
 
 export const TEMPLATE_SAFETY_FLOOR_TARGETS = [
   "//:scaffolding_smoke_lib_readme",
@@ -40,17 +44,18 @@ function normalizePath(relPath: string): string {
     .trim();
 }
 
-function normalizeTarget(target: string): string {
-  const clean = String(target || "")
-    .trim()
-    .replace(CONFIG_SUFFIX, "");
-  if (!clean) return "";
-  if (clean.startsWith("root//")) return clean.slice("root".length);
-  return clean;
-}
-
 function toSortedUnique(values: Iterable<string>): string[] {
   return Array.from(new Set(Array.from(values).filter(Boolean))).sort();
+}
+
+function isCanonicalTemplateId(language: string, template: string): boolean {
+  const entries = TEMPLATE_TAXONOMY[language as keyof typeof TEMPLATE_TAXONOMY];
+  return Array.isArray(entries) && entries.includes(template as never);
+}
+
+function isTemplateSupportBuildSystemPath(relPath: string): boolean {
+  if (TEMPLATE_SUPPORT_EXACT.has(relPath)) return true;
+  return TEMPLATE_SUPPORT_PREFIXES.some((prefix) => relPath.startsWith(prefix));
 }
 
 export function templateIdFromPath(relPath: string): string | null {
@@ -60,6 +65,7 @@ export function templateIdFromPath(relPath: string): string | null {
   const language = String(m[1] || "").trim();
   const template = String(m[2] || "").trim();
   if (!language || !template) return null;
+  if (!isCanonicalTemplateId(language, template)) return null;
   return `${language}/${template}`;
 }
 
@@ -101,6 +107,7 @@ export async function classifyTemplateSelectorMode(
   for (const p of normalized) {
     if (!isBuildSystemPath(p)) continue;
     if (p.startsWith(TEMPLATE_ROOT)) continue;
+    if (isTemplateSupportBuildSystemPath(p)) continue;
     const ownerTemplateIds = ownedIndex.scriptToTemplateIds.get(p) || [];
     const isOwnedChangedTest =
       ownerTemplateIds.length > 0 && ownerTemplateIds.every((id) => changedTemplateIdSet.has(id));
@@ -123,57 +130,6 @@ export async function classifyTemplateSelectorMode(
 type SelectorDeps = {
   queryTargetsForTemplateLabel: (root: string, templateId: string) => Promise<string[]>;
 };
-
-async function queryTargetsForTemplateLabel(root: string, templateId: string): Promise<string[]> {
-  const isolationDir = `template_selector_${process.pid}_${Date.now()}`;
-  const query = `attrfilter(labels, "template:${templateId}", //...)`;
-  const targetPlatform =
-    String(process.env.BUCK_TARGET_PLATFORMS || process.env.BUCK_TARGET_PLATFORM || "").trim() ||
-    "prelude//platforms:default";
-  const runCquery = async () =>
-    await $({
-      cwd: root,
-      stdio: "pipe",
-      reject: false,
-      env: buckCommandEnv(),
-    })`buck2 --isolation-dir ${isolationDir} cquery --target-platforms ${targetPlatform} ${query} --json --output-attribute name`;
-  try {
-    let out: any;
-    try {
-      out = await runCquery();
-    } catch (err) {
-      if (!isBuckDaemonInitTransient(err instanceof Error ? err.message : String(err))) throw err;
-      await new Promise<void>((resolve) => setTimeout(resolve, 150));
-      out = await runCquery();
-    }
-    if ((out as any).exitCode !== 0) {
-      const errText = String((out as any).stderr || "");
-      if (isBuckDaemonInitTransient(errText)) {
-        await new Promise<void>((resolve) => setTimeout(resolve, 150));
-        const retryOut = await runCquery();
-        if ((retryOut as any).exitCode !== 0) return [];
-        const retryRaw = JSON.parse(String((retryOut as any).stdout || "{}")) as Record<
-          string,
-          { name?: string }
-        >;
-        return toSortedUnique(Object.keys(retryRaw).map((k) => normalizeTarget(k)));
-      }
-      return [];
-    }
-    const raw = JSON.parse(String((out as any).stdout || "{}")) as Record<
-      string,
-      { name?: string }
-    >;
-    return toSortedUnique(Object.keys(raw).map((k) => normalizeTarget(k)));
-  } finally {
-    await $({
-      cwd: root,
-      stdio: "ignore",
-      reject: false,
-      env: buckCommandEnv(),
-    })`buck2 --isolation-dir ${isolationDir} kill`;
-  }
-}
 
 export async function resolveTemplateTestSelection(opts: {
   root: string;
@@ -207,7 +163,9 @@ export async function resolveTemplateTestSelection(opts: {
   }
 
   const selectedTemplateTargets = toSortedUnique(
-    Object.values(templateTargetsById).flatMap((targets) => targets.map((t) => normalizeTarget(t))),
+    Object.values(templateTargetsById).flatMap((targets) =>
+      targets.map((t) => String(t || "").trim()),
+    ),
   );
   const selectedTargets =
     mode === "template-only"

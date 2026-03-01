@@ -18,6 +18,10 @@ test("template id extraction supports direct, delete, and rename paths", () => {
     templateIdFromPath("build-tools/tools/scaffolding/templates/ts/wasm-app/README.md.jinja"),
     "ts/wasm-app",
   );
+  assert.equal(
+    templateIdFromPath("build-tools/tools/scaffolding/templates/ts/README.md.jinja"),
+    null,
+  );
   assert.equal(templateIdFromPath("build-tools/tools/scaffolding/templates/go"), null);
   assert.equal(templateIdFromPath("docs/handbook/getting-started-on-a-pr.md"), null);
 });
@@ -85,6 +89,18 @@ test("template-only mode allows changed template-owned tests and selects changed
     "//:scaffolding_webapp_ssr_vite_runnable_contracts",
   ]);
   assert.ok(result.targets.includes("//:scaffolding_webapp_ssr_vite_runnable_contracts"));
+});
+
+test("template-only mode accepts template-support build-system files", async () => {
+  const classification = await classifyTemplateSelectorMode(process.cwd(), [
+    "build-tools/tools/scaffolding/templates/ts/webapp-static/copier.yaml",
+    "build-tools/tools/tests/template_conventions.bzl",
+    "build-tools/tools/tests/scaffolding/template-conventions.metadata.cquery.test.ts",
+    "build-tools/tools/tests/scaffolding/lib/webapp-static-hmr.ts",
+  ]);
+  assert.equal(classification.mode, "template-only");
+  assert.deepEqual(classification.changedTemplateIds, ["ts/webapp-static"]);
+  assert.deepEqual(classification.nonTemplateBuildSystemPaths, []);
 });
 
 test("template-only selection unions label targets and safety floor", async () => {

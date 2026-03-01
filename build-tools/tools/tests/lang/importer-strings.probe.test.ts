@@ -23,6 +23,12 @@ const cases: Case[] = [
   },
 ];
 
+const inheritedIso = String(
+  process.env.BUCK_ISOLATION_DIR || process.env.BUCK_NESTED_ISO || "",
+).trim();
+const importerStringsIso = inheritedIso || `importer_strings_${process.pid}`;
+const ownsIso = !inheritedIso;
+
 function displayName(importer: string): string {
   const parts = importer.split("/").filter((p) => p !== "");
   return parts.length > 0 ? parts[parts.length - 1]! : importer;
@@ -57,44 +63,49 @@ async function runBuckWithTransientRetry(run: () => Promise<any>): Promise<any> 
 }
 
 async function buildAndReadOutput(target: string): Promise<string> {
-  const inherited = String(
-    process.env.BUCK_ISOLATION_DIR || process.env.BUCK_NESTED_ISO || "",
-  ).trim();
-  const iso = inherited || `importer_strings_${process.pid}`;
-  try {
-    await runBuckWithTransientRetry(
-      async () => await $({ env: buckEnv() })`buck2 --isolation-dir ${iso} build ${target}`,
-    );
-    const { stdout } = await runBuckWithTransientRetry(
-      async () =>
-        await $({ env: buckEnv() })`buck2 --isolation-dir ${iso} targets --show-output ${target}`,
-    );
-    const out = stdout.trim().split(/\s+/).pop() || "";
-    if (!out) throw new Error("no output path for " + target);
-    return await fsp.readFile(out, "utf8");
-  } finally {
-    // Let verify/test harness manage daemon lifecycle; avoid per-test cold-start churn.
-  }
+  await runBuckWithTransientRetry(
+    async () =>
+      await $({ env: buckEnv() })`buck2 --isolation-dir ${importerStringsIso} build ${target}`,
+  );
+  const { stdout } = await runBuckWithTransientRetry(
+    async () =>
+      await $({
+        env: buckEnv(),
+      })`buck2 --isolation-dir ${importerStringsIso} targets --show-output ${target}`,
+  );
+  const out = stdout.trim().split(/\s+/).pop() || "";
+  if (!out) throw new Error("no output path for " + target);
+  return await fsp.readFile(out, "utf8");
 }
 
-for (const c of cases) {
-  const txt = await buildAndReadOutput(c.target);
-  const [sanitized, display] = txt.trimEnd().split("\n");
+try {
+  for (const c of cases) {
+    const txt = await buildAndReadOutput(c.target);
+    const [sanitized, display] = txt.trimEnd().split("\n");
 
-  const wantSanitized = sanitizeName(c.importer);
-  const wantDisplay = displayName(c.importer);
+    const wantSanitized = sanitizeName(c.importer);
+    const wantDisplay = displayName(c.importer);
 
-  if (sanitized !== wantSanitized) {
-    console.error(
-      `sanitize_importer_for_nix_attr mismatch for importer='${c.importer}': starlark='${sanitized}' ts='${wantSanitized}'`,
-    );
-    process.exit(2);
+    if (sanitized !== wantSanitized) {
+      console.error(
+        `sanitize_importer_for_nix_attr mismatch for importer='${c.importer}': starlark='${sanitized}' ts='${wantSanitized}'`,
+      );
+      process.exit(2);
+    }
+    if (display !== wantDisplay) {
+      console.error(
+        `importer_display_name mismatch for importer='${c.importer}': starlark='${display}' ts='${wantDisplay}'`,
+      );
+      process.exit(2);
+    }
   }
-  if (display !== wantDisplay) {
-    console.error(
-      `importer_display_name mismatch for importer='${c.importer}': starlark='${display}' ts='${wantDisplay}'`,
-    );
-    process.exit(2);
+} finally {
+  if (ownsIso) {
+    await $({
+      env: buckEnv(),
+      reject: false,
+      stdio: "ignore",
+    })`buck2 --isolation-dir ${importerStringsIso} kill`;
   }
 }
 
